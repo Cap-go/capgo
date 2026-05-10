@@ -14,6 +14,7 @@ import IconDocumentDuplicate from '~icons/heroicons/document-duplicate'
 import IconTrash from '~icons/heroicons/trash'
 import IconSearch from '~icons/ic/round-search?raw'
 import IconAlertCircle from '~icons/lucide/alert-circle'
+import { findChannelsWithoutPromotionPermission, formatChannelPromotionTargets } from '~/services/channelPromotion'
 import { formatBytes, getChecksumInfo } from '~/services/conversion'
 import { formatDate, formatLocalDate } from '~/services/date'
 import { checkPermissions } from '~/services/permissions'
@@ -48,12 +49,23 @@ const channelSearchVal = ref('')
 const filteredChannels = ref<(Database['public']['Tables']['channels']['Row'])[]>([])
 const promotableChannelIds = ref<Set<number>>(new Set())
 
+interface LinkedChannel {
+  id: number
+  name: string
+}
+
 function canPromoteChannel(channelId: number) {
   return promotableChannelIds.value.has(channelId)
 }
 
 function getPromotableChannels() {
   return channels.value.filter(channel => canPromoteChannel(channel.id))
+}
+
+function showChannelUnlinkPermissionError(deniedChannels: LinkedChannel[]) {
+  toast.error(t('channel-permission-unlink-required', {
+    channels: formatChannelPromotionTargets(deniedChannels),
+  }))
 }
 
 // Watch for search changes
@@ -643,6 +655,12 @@ async function deleteBundle() {
     }
 
     if (channelFound && channelFound.length > 0) {
+      const deniedChannels = await findChannelsWithoutPromotionPermission(version.value.app_id, channelFound)
+      if (deniedChannels.length > 0) {
+        showChannelUnlinkPermissionError(deniedChannels)
+        return
+      }
+
       let shouldUnlink = false
 
       dialogStore.openDialog({

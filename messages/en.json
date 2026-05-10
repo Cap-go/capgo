@@ -572,6 +572,7 @@
   "channel-permission-history": "History",
   "channel-permission-read": "Read",
   "channel-permission-read-required": "You don't have permission to view this channel.",
+  "channel-permission-unlink-required": "You don't have permission to unlink this bundle from: {channels}.",
   "channel-permissions-allow": "Allow",
   "channel-permissions-default-allow": "Default (allow)",
   "channel-permissions-default-deny": "Default (deny)",
