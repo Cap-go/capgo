@@ -1333,6 +1333,135 @@ export async function getAdminGlobalStatsTrend(
   }
 }
 
+export interface AdminPaidProductActivityTrend {
+  date: string
+  paying_clients: number
+  builder_active_clients: number
+  live_updates_active_clients: number
+  builder_adoption_rate: number
+  live_updates_adoption_rate: number
+}
+
+export async function getAdminPaidProductActivityTrend(
+  c: Context,
+  start_date: string,
+  end_date: string,
+): Promise<AdminPaidProductActivityTrend[]> {
+  let pgClient: ReturnType<typeof getPgClient> | undefined
+
+  try {
+    // daily_build_time and daily_version are primary-only admin rollups.
+    pgClient = getPgClient(c)
+    const drizzleClient = getDrizzleClient(pgClient)
+    const startTimestamp = new Date(start_date)
+    const endTimestamp = new Date(end_date)
+    const startDay = new Date(Date.UTC(startTimestamp.getUTCFullYear(), startTimestamp.getUTCMonth(), startTimestamp.getUTCDate()))
+    const endDay = new Date(Date.UTC(endTimestamp.getUTCFullYear(), endTimestamp.getUTCMonth(), endTimestamp.getUTCDate()))
+    const lookbackStartDay = new Date(startDay)
+    lookbackStartDay.setUTCDate(lookbackStartDay.getUTCDate() - 59)
+
+    const query = sql`
+      WITH date_series AS (
+        SELECT generate_series(
+          ${startDay.toISOString()}::timestamptz::date,
+          ${endDay.toISOString()}::timestamptz::date,
+          '1 day'::interval
+        )::date AS date
+      ),
+      paying_orgs_by_day AS (
+        SELECT
+          ds.date,
+          o.id AS org_id
+        FROM date_series ds
+        INNER JOIN public.orgs o ON true
+        INNER JOIN public.stripe_info si ON si.customer_id = o.customer_id
+        WHERE si.status = 'succeeded'
+          AND si.is_good_plan = true
+          AND COALESCE(si.paid_at, si.subscription_anchor_start, si.created_at, o.created_at) < (ds.date + interval '1 day')
+          AND (si.canceled_at IS NULL OR si.canceled_at >= ds.date::timestamptz)
+      ),
+      builder_activity AS (
+        SELECT DISTINCT
+          a.owner_org AS org_id,
+          dbt.date
+        FROM public.apps a
+        INNER JOIN public.daily_build_time dbt ON dbt.app_id = a.app_id
+        WHERE dbt.date >= ${lookbackStartDay.toISOString()}::timestamptz::date
+          AND dbt.date <= ${endDay.toISOString()}::timestamptz::date
+          AND dbt.build_count > 0
+      ),
+      live_updates_activity AS (
+        SELECT DISTINCT
+          a.owner_org AS org_id,
+          dv.date
+        FROM public.apps a
+        INNER JOIN public.daily_version dv ON dv.app_id = a.app_id
+        WHERE dv.date >= ${lookbackStartDay.toISOString()}::timestamptz::date
+          AND dv.date <= ${endDay.toISOString()}::timestamptz::date
+          AND (
+            COALESCE(dv.get, 0) > 0
+            OR COALESCE(dv.install, 0) > 0
+            OR COALESCE(dv.fail, 0) > 0
+            OR COALESCE(dv.uninstall, 0) > 0
+          )
+      ),
+      daily_counts AS (
+        SELECT
+          ds.date,
+          COUNT(DISTINCT po.org_id)::int AS paying_clients,
+          COUNT(DISTINCT po.org_id) FILTER (WHERE ba.org_id IS NOT NULL)::int AS builder_active_clients,
+          COUNT(DISTINCT po.org_id) FILTER (WHERE lua.org_id IS NOT NULL)::int AS live_updates_active_clients
+        FROM date_series ds
+        LEFT JOIN paying_orgs_by_day po ON po.date = ds.date
+        LEFT JOIN builder_activity ba
+          ON ba.org_id = po.org_id
+          AND ba.date BETWEEN (ds.date - interval '59 days')::date AND ds.date
+        LEFT JOIN live_updates_activity lua
+          ON lua.org_id = po.org_id
+          AND lua.date BETWEEN (ds.date - interval '59 days')::date AND ds.date
+        GROUP BY ds.date
+      )
+      SELECT
+        date::text AS date,
+        paying_clients,
+        builder_active_clients,
+        live_updates_active_clients,
+        CASE
+          WHEN paying_clients > 0 THEN ROUND((builder_active_clients::numeric / paying_clients::numeric) * 100, 2)
+          ELSE 0
+        END::float AS builder_adoption_rate,
+        CASE
+          WHEN paying_clients > 0 THEN ROUND((live_updates_active_clients::numeric / paying_clients::numeric) * 100, 2)
+          ELSE 0
+        END::float AS live_updates_adoption_rate
+      FROM daily_counts
+      ORDER BY date ASC
+    `
+
+    const result = await drizzleClient.execute(query)
+    const data = result.rows.map((row: any) => ({
+      date: row.date,
+      paying_clients: Number(row.paying_clients) || 0,
+      builder_active_clients: Number(row.builder_active_clients) || 0,
+      live_updates_active_clients: Number(row.live_updates_active_clients) || 0,
+      builder_adoption_rate: Number(row.builder_adoption_rate) || 0,
+      live_updates_adoption_rate: Number(row.live_updates_adoption_rate) || 0,
+    }))
+
+    cloudlog({ requestId: c.get('requestId'), message: 'getAdminPaidProductActivityTrend result', resultCount: data.length })
+
+    return data
+  }
+  catch (e: unknown) {
+    logPgError(c, 'getAdminPaidProductActivityTrend', e)
+    return []
+  }
+  finally {
+    if (pgClient)
+      await closeClient(c, pgClient)
+  }
+}
+
 export interface AdminEmailTypeBreakdown {
   totals: {
     professional: number

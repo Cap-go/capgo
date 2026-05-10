@@ -68,7 +68,17 @@ const globalStatsTrendData = ref<Array<{
   builds_day_android?: number
 }>>([])
 
+const paidProductActivityTrendData = ref<Array<{
+  date: string
+  paying_clients: number
+  builder_active_clients: number
+  live_updates_active_clients: number
+  builder_adoption_rate: number
+  live_updates_adoption_rate: number
+}>>([])
+
 const isLoadingGlobalStatsTrend = ref(false)
+const isLoadingPaidProductActivityTrend = ref(false)
 
 function getBuildTotalSeconds(item: (typeof globalStatsTrendData.value)[number], platform: 'ios' | 'android') {
   const totalSeconds = platform === 'ios' ? item.build_total_seconds_day_ios : item.build_total_seconds_day_android
@@ -109,6 +119,22 @@ async function loadGlobalStatsTrend() {
   }
   finally {
     isLoadingGlobalStatsTrend.value = false
+  }
+}
+
+async function loadPaidProductActivityTrend() {
+  isLoadingPaidProductActivityTrend.value = true
+  try {
+    const data = await adminStore.fetchStats('paid_product_activity_trend')
+    console.log('[Admin Dashboard] Paid product activity trend data:', data)
+    paidProductActivityTrendData.value = data || []
+  }
+  catch (error) {
+    console.error('[Admin Dashboard] Error loading paid product activity trend:', error)
+    paidProductActivityTrendData.value = []
+  }
+  finally {
+    isLoadingPaidProductActivityTrend.value = false
   }
 }
 
@@ -157,6 +183,38 @@ const totalUsersTrendSeries = computed(() => {
         value: item.users_active,
       })),
       color: '#14b8a6', // teal
+    },
+  ]
+})
+
+const paidProductActivityTrendSeries = computed(() => {
+  if (paidProductActivityTrendData.value.length === 0)
+    return []
+
+  return [
+    {
+      label: 'Paying Clients',
+      data: paidProductActivityTrendData.value.map(item => ({
+        date: item.date,
+        value: item.paying_clients,
+      })),
+      color: '#119eff',
+    },
+    {
+      label: 'Builder Active (60d)',
+      data: paidProductActivityTrendData.value.map(item => ({
+        date: item.date,
+        value: item.builder_active_clients,
+      })),
+      color: '#8b5cf6',
+    },
+    {
+      label: 'Live Updates Active (60d)',
+      data: paidProductActivityTrendData.value.map(item => ({
+        date: item.date,
+        value: item.live_updates_active_clients,
+      })),
+      color: '#10b981',
     },
   ]
 })
@@ -405,11 +463,13 @@ const latestGlobalStats = computed(() => {
 // Watch for date range changes and reload data
 watch(() => adminStore.activeDateRange, () => {
   loadGlobalStatsTrend()
+  loadPaidProductActivityTrend()
 }, { deep: true })
 
 // Watch for refresh button clicks
 watch(() => adminStore.refreshTrigger, () => {
   loadGlobalStatsTrend()
+  loadPaidProductActivityTrend()
 })
 
 onMounted(async () => {
@@ -421,7 +481,10 @@ onMounted(async () => {
   }
 
   isLoading.value = true
-  await loadGlobalStatsTrend()
+  await Promise.all([
+    loadGlobalStatsTrend(),
+    loadPaidProductActivityTrend(),
+  ])
   isLoading.value = false
 
   displayStore.NavTitle = t('admin-dashboard')
@@ -575,6 +638,20 @@ displayStore.defaultBack = '/dashboard'
               <AdminMultiLineChart
                 :series="totalUsersTrendSeries"
                 :is-loading="isLoadingGlobalStatsTrend"
+              />
+            </ChartCard>
+          </div>
+
+          <!-- Paying Client Product Activity -->
+          <div class="grid grid-cols-1 gap-6">
+            <ChartCard
+              :title="t('paying-client-product-activity-trend')"
+              :is-loading="isLoadingPaidProductActivityTrend"
+              :has-data="paidProductActivityTrendSeries.length > 0"
+            >
+              <AdminMultiLineChart
+                :series="paidProductActivityTrendSeries"
+                :is-loading="isLoadingPaidProductActivityTrend"
               />
             </ChartCard>
           </div>

@@ -49,6 +49,15 @@ describe('admin stats validation', () => {
     expect(parsed.success).toBe(true)
   })
 
+  it('accepts the paid product activity trend metric', () => {
+    const parsed = safeParseSchema(adminStatsBodySchema, {
+      ...baseBody,
+      metric_category: 'paid_product_activity_trend',
+    })
+
+    expect(parsed.success).toBe(true)
+  })
+
   it.each([
     ['plain date start', { start_date: '2025-01-01' }],
     ['plain date end', { end_date: '2025-01-31' }],
