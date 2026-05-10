@@ -6,7 +6,7 @@ import { literalUnion, safeParseSchema } from '../utils/ark_validation.ts'
 import { getAdminAppsTrend, getAdminBandwidthTrend, getAdminBundlesTrend, getAdminDistributionMetrics, getAdminFailureMetrics, getAdminMauTrend, getAdminOrgMetrics, getAdminPlatformOverview, getAdminStorageTrend, getAdminSuccessRate, getAdminSuccessRateTrend, getAdminUploadMetrics } from '../utils/cloudflare.ts'
 import { middlewareAuth, parseBody, simpleError, useCors } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
-import { getAdminCancelledOrganizations, getAdminCustomerCountryBreakdown, getAdminDeploymentsTrend, getAdminEmailTypeBreakdown, getAdminGlobalStatsTrend, getAdminOnboardingFunnel, getAdminPaidProductActivityTrend, getAdminPluginBreakdown, getAdminTrialOrganizations } from '../utils/pg.ts'
+import { getAdminCancelledOrganizations, getAdminCustomerCountryBreakdown, getAdminDeploymentsTrend, getAdminEmailTypeBreakdown, getAdminGlobalStatsTrend, getAdminOnboardingFunnel, getAdminPluginBreakdown, getAdminTrialOrganizations } from '../utils/pg.ts'
 import { getCancellationDetails } from '../utils/stripe.ts'
 import { supabaseClient as useSupabaseClient } from '../utils/supabase.ts'
 
@@ -36,7 +36,6 @@ const metricCategories = [
   'cancelled_users',
   'email_type_breakdown',
   'customer_country_breakdown',
-  'paid_product_activity_trend',
 ] as const
 
 const isoUtcDatetimeSchema = type('string').narrow((value, ctx) => {
@@ -283,10 +282,6 @@ app.post('/', middlewareAuth, async (c) => {
 
       case 'customer_country_breakdown':
         result = await getAdminCustomerCountryBreakdown(c, start_date, end_date)
-        break
-
-      case 'paid_product_activity_trend':
-        result = await getAdminPaidProductActivityTrend(c, start_date, end_date)
         break
 
       default:
