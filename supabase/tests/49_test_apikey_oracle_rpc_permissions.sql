@@ -1,6 +1,6 @@
 BEGIN;
 
-SELECT plan(25);
+SELECT plan(27);
 
 SELECT
     is(
@@ -435,6 +435,44 @@ SELECT
         'perm_owner',
         'authenticated execution of'
         || ' get_org_perm_for_apikey(text, text) still works'
+    );
+
+RESET ROLE;
+
+DELETE FROM public.user_password_compliance
+WHERE
+    user_id = '6aa76066-55ef-4238-ade6-0b32334a4097'::uuid
+    AND org_id = '046a36ac-e03c-4590-9257-bd6c9dba9ee8'::uuid;
+
+SET LOCAL ROLE anon;
+
+DO $$
+BEGIN
+    PERFORM set_config('request.headers', '{"capgkey": "rbac-v2-password-policy-rls-key"}', true);
+END $$;
+
+SELECT
+    is(
+        (
+            SELECT count(*)
+            FROM public.apps
+            WHERE app_id = 'com.demo.app'
+        ),
+        0::bigint,
+        'anon RBAC v2 API key cannot read apps when password policy is stale'
+    );
+
+SELECT
+    is(
+        public.check_min_rights(
+            'read'::public.user_min_right,
+            NULL::uuid,
+            '046a36ac-e03c-4590-9257-bd6c9dba9ee8'::uuid,
+            'com.demo.app',
+            NULL::bigint
+        ),
+        false,
+        'anon RBAC v2 API key fails check_min_rights when password policy is stale'
     );
 
 RESET ROLE;
