@@ -1,0 +1,156 @@
+name: DeepSec
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+on:
+  pull_request_target:
+
+permissions: {}
+
+jobs:
+  analyze:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    name: Scan PR changes
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout trusted scanner
+        uses: actions/checkout@v6 # v6
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          fetch-depth: 0
+          path: scanner
+          persist-credentials: false
+      - name: Checkout PR source
+        uses: actions/checkout@v6 # v6
+        with:
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          path: target
+          persist-credentials: false
+      - name: Setup bun
+        run: bash scanner/scripts/setup-bun.sh
+      - name: List changed files
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if ! [[ "$BASE_SHA" =~ ^[0-9a-f]{40}$ && "$HEAD_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "Unexpected pull request SHA format."
+            exit 1
+          fi
+
+          if ! git -C target cat-file -e "$BASE_SHA^{commit}"; then
+            git -C target fetch --no-tags origin "$BASE_SHA" --depth=1
+          fi
+          git -C target diff --name-only --diff-filter=ACMRT "$BASE_SHA" "$HEAD_SHA" > changed-files.txt
+          cat changed-files.txt
+      - name: Install DeepSec dependencies
+        run: bun install --frozen-lockfile
+        working-directory: scanner/.deepsec
+      - name: Check DeepSec credentials
+        env:
+          AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}
+        run: |
+          if [ -z "$AI_GATEWAY_API_KEY" ]; then
+            echo "DeepSec needs AI_GATEWAY_API_KEY configured as a repository secret."
+            exit 1
+          fi
+      - id: deepsec
+        name: Run DeepSec
+        env:
+          AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}
+        run: |
+          if [ ! -s ../../changed-files.txt ]; then
+            echo "No changed files to scan."
+            exit 0
+          fi
+
+          gateway_token="$AI_GATEWAY_API_KEY"
+          client_token="$(bun -e "console.log(crypto.randomUUID())")"
+          unset AI_GATEWAY_API_KEY
+
+          printf '%s\n%s\n' "$gateway_token" "$client_token" | env -i PATH="$PATH" HOME="$HOME" bun ../.github/scripts/ai-gateway-proxy.mjs > "$RUNNER_TEMP/ai-gateway-proxy.log" 2>&1 &
+          proxy_pid=$!
+          unset gateway_token
+          trap 'kill "$proxy_pid" 2>/dev/null || true' EXIT
+
+          for _ in $(seq 1 50); do
+            if curl -fsS http://127.0.0.1:8787/health >/dev/null 2>&1; then
+              break
+            fi
+            sleep 0.1
+          done
+
+          if ! curl -fsS http://127.0.0.1:8787/health >/dev/null 2>&1; then
+            cat "$RUNNER_TEMP/ai-gateway-proxy.log"
+            exit 1
+          fi
+
+          OPENAI_API_KEY="$client_token" OPENAI_BASE_URL="http://127.0.0.1:8787/v1" bun deepsec process \
+            --files-from ../../changed-files.txt \
+            --root ../../target \
+            --agent codex \
+            --comment-out comment.md
+          unset client_token
+        working-directory: scanner/.deepsec
+      - name: Upload DeepSec comment
+        if: always() && hashFiles('scanner/.deepsec/comment.md') != ''
+        uses: actions/upload-artifact@v6 # v6
+        with:
+          name: deepsec-comment
+          path: scanner/.deepsec/comment.md
+          retention-days: 1
+
+  comment:
+    needs: analyze
+    if: always() && needs.analyze.result == 'failure'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    name: Post findings comment
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
+    steps:
+      - id: download-comment
+        name: Download DeepSec comment
+        continue-on-error: true
+        uses: actions/download-artifact@v6 # v6
+        with:
+          name: deepsec-comment
+      - name: Upsert PR comment
+        if: steps.download-comment.outcome == 'success'
+        uses: actions/github-script@v8 # v8
+        with:
+          script: |
+            const fs = require('node:fs')
+            const marker = '<!-- capgo-deepsec-findings -->'
+            const body = `${marker}\n${fs.readFileSync('comment.md', 'utf8')}`
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            })
+            const existing = comments.find((comment) => comment.user.type === 'Bot' && comment.body?.startsWith(marker))
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              })
+            }
+            else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              })
+            }
