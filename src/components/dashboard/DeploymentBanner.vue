@@ -216,8 +216,10 @@ async function executeDeployment() {
   const bundle = latestBundle.value
   const allowedTargetIds = new Set(deployTargets.value.map(target => target.id))
   const targetIds = selectedChannelIds.value.filter(id => allowedTargetIds.has(id))
-  if (targetIds.length === 0)
+  if (targetIds.length === 0) {
+    toast.error(t('no-permission'))
     return
+  }
 
   deploying.value = true
 

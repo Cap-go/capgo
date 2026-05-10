@@ -105,6 +105,10 @@ const canEditBundleMetadata = computedAsync(async () => {
   return await checkPermissions('app.upload_bundle', { appId: version.value.app_id })
 }, false)
 
+const selectableChannels = computed(() => {
+  return filteredChannels.value.filter(channel => canPromoteChannel(channel.id))
+})
+
 const canDeleteBundle = computedAsync(async () => {
   if (!version.value?.app_id)
     return false
@@ -227,6 +231,7 @@ async function getUnknownBundleId() {
     .single()
   return data?.id
 }
+
 // add check compatibility here
 async function setChannel(channel: Database['public']['Tables']['channels']['Row'], id: number) {
   if (!canPromoteChannel(channel.id)) {
@@ -238,6 +243,11 @@ async function setChannel(channel: Database['public']['Tables']['channels']['Row
     console.error('Invalid version ID:', id)
     toast.error(t('error-invalid-version'))
     return Promise.reject(new Error('Invalid version ID'))
+  }
+
+  if (!(await checkPermissions('channel.promote_bundle', { channelId: channel.id }))) {
+    toast.error(t('no-permission'))
+    return Promise.reject(new Error('No permission to update channel version'))
   }
 
   return supabase
@@ -1213,12 +1223,12 @@ async function deleteBundle() {
           </div>
 
           <!-- Available Channels -->
-          <div v-if="filteredChannels.length > 0" class="space-y-2">
+          <div v-if="selectableChannels.length > 0" class="space-y-2">
             <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300">
               {{ t('available-channels') }}
             </h4>
             <div
-              v-for="chan in filteredChannels"
+              v-for="chan in selectableChannels"
               :key="chan.id"
               class="p-3 transition-colors border rounded-lg cursor-pointer"
               :class="{
