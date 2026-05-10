@@ -48,11 +48,14 @@ export function buildBuilderPayload(input: {
   buildOptions: Record<string, unknown>
   buildCredentials: Record<string, string>
 }) {
+  const buildOptions = { ...input.buildOptions }
+  delete buildOptions.timeoutSeconds
+
   return {
     userId: input.orgId,
     artifactKey: input.uploadPath,
     fastlane: { lane: input.platform },
-    buildOptions: input.buildOptions,
+    buildOptions,
     buildCredentials: input.buildCredentials,
   }
 }

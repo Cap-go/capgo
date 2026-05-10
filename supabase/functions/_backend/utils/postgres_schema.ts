@@ -26,6 +26,8 @@ export const apps = pgTable('apps', {
   updated_at: timestamp('updated_at'),
   id: uuid('id').primaryKey().unique(),
   retention: bigint('retention', { mode: 'number' }).notNull().default(2592000),
+  build_timeout_seconds: bigint('build_timeout_seconds', { mode: 'number' }).notNull().default(900),
+  build_timeout_updated_at: timestamp('build_timeout_updated_at', { withTimezone: true }).notNull().defaultNow(),
   channel_device_count: bigint('channel_device_count', { mode: 'number' }).notNull().default(0),
   manifest_bundle_count: bigint('manifest_bundle_count', { mode: 'number' }).notNull().default(0),
   expose_metadata: boolean('expose_metadata').notNull().default(false),
