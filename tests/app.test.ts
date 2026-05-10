@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { afterAll, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { BASE_URL, fetchWithRetry, getSupabaseClient, headers, NON_OWNER_ORG_ID, ORG_ID, resetAndSeedAppData, resetAppData, resetAppDataStats, USER_ID, USER_ID_2 } from './test-utils.ts'
 
 function isDuplicateAppCreationError(body: any): boolean {
@@ -283,6 +283,88 @@ describe('[GET] /app subkey ownership enforcement', () => {
       method: 'GET',
       headers: { ...headers, ...subkeyHeaders },
     })
+    expect(response.status).toBe(401)
+    const data = await response.json() as { error?: string }
+    expect(data.error).toBe('invalid_subkey')
+  })
+})
+
+describe('/app hashed subkey enforcement', () => {
+  const id = randomUUID()
+  const ALLOWED_APPNAME = `com.hashed-subkey.allowed.${id}`
+  const BLOCKED_APPNAME = `com.hashed-subkey.blocked.${id}`
+  let subkeyId = 0
+
+  async function createAppForTest(appName: string) {
+    const createApp = await fetch(`${BASE_URL}/app`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        owner_org: ORG_ID,
+        app_id: appName,
+        name: `App ${appName}`,
+        icon: 'test-icon',
+      }),
+    })
+    if (createApp.status !== 200) {
+      const body = await createApp.json().catch(() => null) as any
+      const isDuplicate = isDuplicateAppCreationError(body)
+      if (!isDuplicate) {
+        expect(createApp.status, JSON.stringify(body)).toBe(200)
+      }
+    }
+  }
+
+  beforeAll(async () => {
+    await createAppForTest(ALLOWED_APPNAME)
+    const createSubkey = await fetch(`${BASE_URL}/apikey`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        name: 'Hashed Limited Subkey',
+        mode: 'all',
+        limited_to_apps: [ALLOWED_APPNAME],
+        hashed: true,
+      }),
+    })
+    expect(createSubkey.status).toBe(200)
+    const subkeyData = await createSubkey.json() as { id: number }
+    subkeyId = subkeyData.id
+  })
+
+  afterAll(async () => {
+    if (subkeyId) {
+      await getSupabaseClient().from('apikeys').delete().eq('id', subkeyId)
+    }
+    await resetAppData(ALLOWED_APPNAME)
+    await resetAppDataStats(ALLOWED_APPNAME)
+    await resetAppData(BLOCKED_APPNAME)
+    await resetAppDataStats(BLOCKED_APPNAME)
+  })
+
+  it('should reject hashed subkeys on middlewareKey routes', async () => {
+    const response = await fetch(`${BASE_URL}/app/${ALLOWED_APPNAME}`, {
+      method: 'GET',
+      headers: { ...headers, 'x-limited-key-id': String(subkeyId) },
+    })
+
+    expect(response.status).toBe(401)
+    const data = await response.json() as { error?: string }
+    expect(data.error).toBe('invalid_subkey')
+  })
+
+  it('should reject hashed subkeys on middlewareV2 routes', async () => {
+    const response = await fetch(`${BASE_URL}/app`, {
+      method: 'POST',
+      headers: { ...headers, 'x-limited-key-id': String(subkeyId) },
+      body: JSON.stringify({
+        owner_org: ORG_ID,
+        app_id: BLOCKED_APPNAME,
+        name: `App ${BLOCKED_APPNAME}`,
+        icon: 'test-icon',
+      }),
+    })
+
     expect(response.status).toBe(401)
     const data = await response.json() as { error?: string }
     expect(data.error).toBe('invalid_subkey')
