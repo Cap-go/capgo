@@ -1,7 +1,9 @@
 import { execFileSync } from 'node:child_process'
+import process from 'node:process'
 
 export type Component = 'capgo' | 'cli'
 export type ReleaseAs = 'patch' | 'minor' | 'major'
+type GitRunner = (args: string[]) => string
 
 const sharedMatchers = [
   /^\.github\/workflows\/bump_version\.yml$/,
@@ -72,32 +74,50 @@ function runGit(args: string[]): string {
   }).trim()
 }
 
-function getCommitShas(before: string, after: string): string[] {
+export function getComponentTagPattern(component: Component): string {
+  return `${component}-[0-9]*`
+}
+
+export function getLatestComponentTag(component: Component, after: string, run: GitRunner = runGit): string | null {
+  try {
+    const tag = run(['describe', '--tags', '--match', getComponentTagPattern(component), '--abbrev=0', after])
+    return tag || null
+  }
+  catch {
+    return null
+  }
+}
+
+export function getReleaseRangeBase(component: Component, before: string, after: string, run: GitRunner = runGit): string {
+  return getLatestComponentTag(component, after, run) ?? before
+}
+
+function getCommitShas(before: string, after: string, run: GitRunner = runGit): string[] {
   const isZero = before === '' || /^0+$/.test(before)
 
   if (!isZero) {
-    const commits = runGit(['rev-list', '--reverse', `${before}..${after}`])
+    const commits = run(['rev-list', '--reverse', `${before}..${after}`])
     return commits ? commits.split('\n').filter(Boolean) : []
   }
 
-  const parents = runGit(['rev-list', '--parents', '-n', '1', after]).split(' ')
+  const parents = run(['rev-list', '--parents', '-n', '1', after]).split(' ')
   if (parents.length > 1) {
-    const commits = runGit(['rev-list', '--reverse', `${after}^..${after}`])
+    const commits = run(['rev-list', '--reverse', `${after}^..${after}`])
     return commits ? commits.split('\n').filter(Boolean) : []
   }
 
   return [after]
 }
 
-function getChangedFiles(commit: string): string[] {
-  const files = runGit(['show', '--format=', '--name-only', commit])
+function getChangedFiles(commit: string, run: GitRunner = runGit): string[] {
+  const files = run(['show', '--format=', '--name-only', commit])
   return files ? files.split('\n').filter(Boolean) : []
 }
 
-function getCommitMessage(commit: string): { subject: string, body: string } {
+function getCommitMessage(commit: string, run: GitRunner = runGit): { subject: string, body: string } {
   return {
-    subject: runGit(['log', '-1', '--format=%s', commit]),
-    body: runGit(['log', '-1', '--format=%b', commit]),
+    subject: run(['log', '-1', '--format=%s', commit]),
+    body: run(['log', '-1', '--format=%b', commit]),
   }
 }
 
@@ -132,20 +152,21 @@ export function toReleaseAs(severity: number): ReleaseAs {
   return 'patch'
 }
 
-export function resolveReleaseScope(component: Component, before: string, after: string) {
-  const commits = getCommitShas(before, after)
+export function resolveReleaseScope(component: Component, before: string, after: string, run: GitRunner = runGit) {
+  const releaseBase = getReleaseRangeBase(component, before, after, run)
+  const commits = getCommitShas(releaseBase, after, run)
 
   let shouldRelease = false
   let highestSeverity = 0
 
   for (const commit of commits) {
-    const files = getChangedFiles(commit)
+    const files = getChangedFiles(commit, run)
     if (!matchesComponent(component, files)) {
       continue
     }
 
     shouldRelease = true
-    const message = getCommitMessage(commit)
+    const message = getCommitMessage(commit, run)
     highestSeverity = Math.max(highestSeverity, getSeverity(message.subject, message.body))
   }
 

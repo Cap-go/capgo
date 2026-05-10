@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { matchesComponent } from '../scripts/release-scope.ts'
+import { getReleaseRangeBase, matchesComponent, resolveReleaseScope } from '../scripts/release-scope.ts'
 
 describe('release scope matching', () => {
   it.concurrent('treats shared release infrastructure as affecting both components', () => {
@@ -41,5 +41,55 @@ describe('release scope matching', () => {
 
     expect(matchesComponent('capgo', files)).toBe(false)
     expect(matchesComponent('cli', files)).toBe(false)
+  })
+
+  it.concurrent('uses the latest component tag instead of only the pushed range', () => {
+    const run = (args: string[]) => {
+      if (args[0] === 'describe') {
+        expect(args).toEqual(['describe', '--tags', '--match', 'cli-[0-9]*', '--abbrev=0', 'HEAD'])
+        return 'cli-7.95.15'
+      }
+
+      throw new Error(`Unexpected git call: ${args.join(' ')}`)
+    }
+
+    expect(getReleaseRangeBase('cli', 'previous-push-sha', 'HEAD', run)).toBe('cli-7.95.15')
+  })
+
+  it.concurrent('falls back to the pushed range when no component tag exists', () => {
+    const run = (args: string[]) => {
+      if (args[0] === 'describe') {
+        throw new Error('no matching tag')
+      }
+
+      throw new Error(`Unexpected git call: ${args.join(' ')}`)
+    }
+
+    expect(getReleaseRangeBase('capgo', 'previous-push-sha', 'HEAD', run)).toBe('previous-push-sha')
+  })
+
+  it.concurrent('keeps missed CLI changes releasable after a later Capgo-only push', () => {
+    const run = (args: string[]) => {
+      const key = args.join(' ')
+      const responses: Record<string, string> = {
+        'describe --tags --match cli-[0-9]* --abbrev=0 head-capgo-only': 'cli-7.95.15',
+        'rev-list --reverse cli-7.95.15..head-capgo-only': 'cli-change\ncapgo-change',
+        'show --format= --name-only cli-change': 'cli/src/posthog.ts',
+        'show --format= --name-only capgo-change': 'src/pages/index.vue',
+        'log -1 --format=%s cli-change': 'feat(cli): capture exceptions',
+        'log -1 --format=%b cli-change': '',
+      }
+
+      if (key in responses) {
+        return responses[key]
+      }
+
+      throw new Error(`Unexpected git call: ${key}`)
+    }
+
+    expect(resolveReleaseScope('cli', 'capgo-change-parent', 'head-capgo-only', run)).toEqual({
+      shouldRelease: true,
+      releaseAs: 'minor',
+    })
   })
 })
