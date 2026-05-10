@@ -94,12 +94,20 @@ const canUpdateBundleMetadata = computedAsync(async () => {
 
 // Function to open link in a new tab
 function openLink(url?: string): void {
-  if (url) {
-    // Using window from global scope
-    const win = window.open(url, '_blank')
-    // Add some security with noopener
-    if (win)
-      win.opener = null
+  if (!url)
+    return
+
+  try {
+    const parsedUrl = new URL(url, window.location.origin)
+    if (!['http:', 'https:'].includes(parsedUrl.protocol)) {
+      console.warn('Blocked unsafe bundle link protocol')
+      return
+    }
+
+    window.open(parsedUrl.toString(), '_blank', 'noopener,noreferrer')
+  }
+  catch {
+    console.warn('Cannot open invalid bundle link')
   }
 }
 
@@ -914,7 +922,7 @@ async function deleteBundle() {
                   <button
                     v-if="!version.deleted"
                     type="button"
-                    class="inline-flex items-center gap-2 py-1.5 pr-3 pl-2 text-sm font-medium text-gray-700 no-underline transition-colors border border-gray-200 rounded-md dark:text-gray-200 dark:border-gray-700 hover:bg-gray-50 hover:border-gray-300 dark:hover:border-gray-600 dark:hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed"
+                    class="d-btn d-btn-outline d-btn-sm h-auto min-h-0 gap-2 py-1.5 pr-3 pl-2 text-gray-700 no-underline dark:text-gray-200"
                     :disabled="!canUpdateBundleMetadata"
                     :title="t('edit-bundle-metadata')"
                     :aria-label="t('edit-bundle-metadata')"
@@ -937,7 +945,7 @@ async function deleteBundle() {
                   <button
                     v-if="!version.deleted"
                     type="button"
-                    class="inline-flex items-center gap-2 py-1.5 pr-3 pl-2 text-sm font-medium text-gray-700 no-underline transition-colors border border-gray-200 rounded-md dark:text-gray-200 dark:border-gray-700 hover:bg-gray-50 hover:border-gray-300 dark:hover:border-gray-600 dark:hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed"
+                    class="d-btn d-btn-outline d-btn-sm h-auto min-h-0 gap-2 py-1.5 pr-3 pl-2 text-gray-700 no-underline dark:text-gray-200"
                     :disabled="!canUpdateBundleMetadata"
                     :title="t('edit-bundle-metadata')"
                     :aria-label="t('edit-bundle-metadata')"
@@ -1077,7 +1085,7 @@ async function deleteBundle() {
             id="bundle-link-input"
             v-model="metadataLink"
             type="url"
-            class="mt-2 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition placeholder:text-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400 dark:focus:border-blue-500 dark:focus:ring-blue-900/40"
+            class="d-input d-input-bordered mt-2 w-full text-sm"
             :placeholder="t('bundle-link-placeholder')"
           >
         </div>
@@ -1089,7 +1097,7 @@ async function deleteBundle() {
             id="bundle-comment-input"
             v-model="metadataComment"
             rows="4"
-            class="mt-2 block w-full resize-y rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition placeholder:text-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400 dark:focus:border-blue-500 dark:focus:ring-blue-900/40"
+            class="d-textarea d-textarea-bordered mt-2 w-full resize-y text-sm"
             :placeholder="t('bundle-comment-placeholder')"
           />
         </div>
