@@ -1086,6 +1086,10 @@ export interface AdminGlobalStatsTrend {
   users_active: number
   paying: number
   org_conversion_rate: number
+  plan_solo_conversion_rate: number
+  plan_maker_conversion_rate: number
+  plan_team_conversion_rate: number
+  plan_enterprise_conversion_rate: number
   trial: number
   not_paying: number
   updates: number
@@ -1109,6 +1113,11 @@ export interface AdminGlobalStatsTrend {
   canceled_orgs: number
   upgraded_orgs: number
   mrr: number
+  previous_mrr: number
+  previous_mrr_solo: number
+  previous_mrr_maker: number
+  previous_mrr_team: number
+  previous_mrr_enterprise: number
   nrr: number
   churn_revenue: number
   churn_revenue_solo: number
@@ -1163,13 +1172,17 @@ export async function getAdminGlobalStatsTrend(
     const query = sql`
       WITH stats AS (
         SELECT
-        date_id AS date,
+        gs.date_id AS date,
         apps::int,
         apps_active::int,
         users::int,
         users_active::int,
         paying::int,
         org_conversion_rate::float,
+        COALESCE(NULLIF(to_jsonb(gs) ->> 'plan_solo_conversion_rate', '')::float, 0)::float AS plan_solo_conversion_rate,
+        COALESCE(NULLIF(to_jsonb(gs) ->> 'plan_maker_conversion_rate', '')::float, 0)::float AS plan_maker_conversion_rate,
+        COALESCE(NULLIF(to_jsonb(gs) ->> 'plan_team_conversion_rate', '')::float, 0)::float AS plan_team_conversion_rate,
+        COALESCE(NULLIF(to_jsonb(gs) ->> 'plan_enterprise_conversion_rate', '')::float, 0)::float AS plan_enterprise_conversion_rate,
         trial::int,
         not_paying::int,
         updates::int,
@@ -1193,6 +1206,11 @@ export async function getAdminGlobalStatsTrend(
         canceled_orgs::int,
         COALESCE(upgraded_orgs, 0)::int AS upgraded_orgs,
         mrr::float,
+        COALESCE(prev.mrr, 0)::float AS previous_mrr,
+        (COALESCE(prev.revenue_solo, 0)::float / 12)::float AS previous_mrr_solo,
+        (COALESCE(prev.revenue_maker, 0)::float / 12)::float AS previous_mrr_maker,
+        (COALESCE(prev.revenue_team, 0)::float / 12)::float AS previous_mrr_team,
+        (COALESCE(prev.revenue_enterprise, 0)::float / 12)::float AS previous_mrr_enterprise,
         COALESCE(NULLIF(to_jsonb(gs) ->> 'nrr', '')::float, 100)::float AS nrr,
         COALESCE(NULLIF(to_jsonb(gs) ->> 'churn_revenue', '')::float, 0)::float AS churn_revenue,
         COALESCE(NULLIF(to_jsonb(gs) ->> 'churn_revenue_solo', '')::float, 0)::float AS churn_revenue_solo,
@@ -1252,7 +1270,8 @@ export async function getAdminGlobalStatsTrend(
         COALESCE(NULLIF(to_jsonb(gs) ->> 'builder_active_paying_clients_60d', '')::int, 0)::int AS builder_active_paying_clients_60d,
         COALESCE(NULLIF(to_jsonb(gs) ->> 'live_updates_active_paying_clients_60d', '')::int, 0)::int AS live_updates_active_paying_clients_60d
       FROM global_stats gs
-      WHERE date_id <= ${endDateOnly}
+      LEFT JOIN global_stats prev ON prev.date_id = (gs.date_id::date - 1)::text
+      WHERE gs.date_id <= ${endDateOnly}
       )
       SELECT *
       FROM stats
@@ -1270,6 +1289,10 @@ export async function getAdminGlobalStatsTrend(
       users_active: Number(row.users_active) || 0,
       paying: Number(row.paying) || 0,
       org_conversion_rate: Number(row.org_conversion_rate) || 0,
+      plan_solo_conversion_rate: Number(row.plan_solo_conversion_rate) || 0,
+      plan_maker_conversion_rate: Number(row.plan_maker_conversion_rate) || 0,
+      plan_team_conversion_rate: Number(row.plan_team_conversion_rate) || 0,
+      plan_enterprise_conversion_rate: Number(row.plan_enterprise_conversion_rate) || 0,
       trial: Number(row.trial) || 0,
       not_paying: Number(row.not_paying) || 0,
       updates: Number(row.updates) || 0,
@@ -1293,6 +1316,11 @@ export async function getAdminGlobalStatsTrend(
       canceled_orgs: Number(row.canceled_orgs) || 0,
       upgraded_orgs: Number(row.upgraded_orgs) || 0,
       mrr: Number(row.mrr) || 0,
+      previous_mrr: Number(row.previous_mrr) || 0,
+      previous_mrr_solo: Number(row.previous_mrr_solo) || 0,
+      previous_mrr_maker: Number(row.previous_mrr_maker) || 0,
+      previous_mrr_team: Number(row.previous_mrr_team) || 0,
+      previous_mrr_enterprise: Number(row.previous_mrr_enterprise) || 0,
       nrr: Number(row.nrr) || 0,
       churn_revenue: Number(row.churn_revenue) || 0,
       churn_revenue_solo: Number(row.churn_revenue_solo) || 0,
