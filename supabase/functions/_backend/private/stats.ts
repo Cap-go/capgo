@@ -190,7 +190,7 @@ app.post('/export', middlewareV2(['read', 'write', 'all', 'upload']), async (c) 
     })
   }
 
-  const header = ['created_at', 'app_id', 'device_id', 'action', 'version_name'] as const
+  const header = ['created_at', 'app_id', 'device_id', 'action', 'version_name', 'metadata'] as const
   const csv = toCsv(
     header,
     (Array.isArray(data) ? data : []).map((row: any) => ({
@@ -199,6 +199,7 @@ app.post('/export', middlewareV2(['read', 'write', 'all', 'upload']), async (c) 
       device_id: row.device_id ?? '',
       action: row.action ?? '',
       version_name: row.version_name ?? '',
+      metadata: row.metadata ? JSON.stringify(row.metadata) : '',
     })),
   )
 

@@ -183,7 +183,6 @@ function formatCurrency(value: number) {
 function formatMetricAmount(metric: Database['public']['Enums']['credit_metric_type'], value: number) {
   // Apply ceil to round up the metric value
   const ceiledValue = Math.ceil(value)
-  const min = new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 }).format(ceiledValue)
   switch (metric) {
     case 'mau':
       return `${new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 }).format(ceiledValue)} ${t('users')}`
@@ -193,13 +192,20 @@ function formatMetricAmount(metric: Database['public']['Enums']['credit_metric_t
       const gib = Math.ceil(ceiledValue / 1073741824)
       return `${new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 }).format(gib)} GiB`
     }
-    case 'build_time':
-      // Convert minutes to hours if > 60
-      if (ceiledValue >= 60) {
-        const hours = new Intl.NumberFormat(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(ceiledValue / 60)
+    case 'build_time': {
+      // ceiledValue is in seconds: computeUsageFromCredits inverts the SQL pricing
+      // formula (credits = ceil(seconds / unit_factor) * price_per_unit) where
+      // unit_factor = 60, so the inverse hands back raw seconds. Convert to hours
+      // when >= 1h, otherwise show whole minutes (rounded up to match billing).
+      if (ceiledValue >= 3600) {
+        const hours = new Intl.NumberFormat(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })
+          .format(ceiledValue / 3600)
         return t('x-hours-short', { hours })
       }
-      return t('minutes-short', { minutes: min })
+      const minutes = new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 })
+        .format(Math.ceil(ceiledValue / 60))
+      return t('minutes-short', { minutes })
+    }
     default:
       return new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }).format(ceiledValue)
   }

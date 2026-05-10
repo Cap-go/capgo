@@ -33,14 +33,14 @@ interface PostResult {
 }
 
 async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClient>, body: AppStats): Promise<PostResult> {
-  const { app_id, action, version_name, old_version_name, plugin_version } = body
+  const { app_id, action, version_name, old_version_name, plugin_version, metadata } = body
 
   const planActions: Array<'mau' | 'bandwidth'> = ['mau', 'bandwidth']
   const cachedAppStatus = await getAppStatus(c, app_id)
   const cachedStatus = cachedAppStatus.status
   if (cachedStatus === 'onprem') {
     const device = makeDevice(body, cachedAppStatus.allow_device_custom_id)
-    await onPremStats(c, app_id, action, device)
+    await onPremStats(c, app_id, action, device, metadata)
     return { success: true, isOnprem: true }
   }
 
@@ -61,7 +61,7 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
   const device = makeDevice(body, allowDeviceCustomId)
   if (!appOwner) {
     await setAppStatus(c, app_id, 'onprem', true)
-    await onPremStats(c, app_id, action, device)
+    await onPremStats(c, app_id, action, device, metadata)
     return { success: true, isOnprem: true }
   }
   if (!appOwner.plan_valid) {
@@ -133,7 +133,7 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
       // instead of per-device notifications. See process_daily_fail_ratio_email.
     }
   }
-  statsActions.push({ action: action as Database['public']['Enums']['stats_action'] })
+  statsActions.push({ action: action as Database['public']['Enums']['stats_action'], metadata })
 
   // Don't update device record on failure actions - the version_name in the request
   // is the failed version, not the actual running version on the device
@@ -142,6 +142,10 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
   return { success: true }
 }
 
+// Plugin endpoints are intentionally public device endpoints: their responses are
+// considered public data, so we do not require Capgo JWT/API-key auth or add
+// checks beyond Supabase/platform protections. Endpoint-specific validation, plan
+// checks, and rate limits still apply.
 export const app = new Hono<MiddlewareKeyVariables>()
 
 async function parseBodyRaw(c: Context): Promise<AppStats | AppStats[]> {

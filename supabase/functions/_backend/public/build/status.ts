@@ -1,5 +1,14 @@
 import type { Context } from 'hono'
 import type { Database } from '../../utils/supabase.types.ts'
+import {
+  BUILD_TIMEOUT_STATUS,
+  calculateBuildRuntimeSeconds,
+  calculateTimeoutCompletedAt,
+  capBuildRuntimeSeconds,
+  formatBuildTimeoutError,
+  normalizeBuildTimeoutSeconds,
+  shouldApplyBuildTimeout,
+} from '../../utils/build_timeout.ts'
 import { simpleError } from '../../utils/hono.ts'
 import { cloudlog, cloudlogErr } from '../../utils/logging.ts'
 import { checkPermission } from '../../utils/rbac.ts'
@@ -21,6 +30,54 @@ interface BuilderStatusResponse {
   }
   machine: Record<string, unknown> | null
   uploadUrl?: string
+}
+
+async function cancelTimedOutBuilderJob(c: Context, jobId: string, appId: string): Promise<boolean> {
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), 5000)
+  try {
+    const builderResponse = await fetch(`${getEnv(c, 'BUILDER_URL')}/jobs/${jobId}/cancel`, {
+      method: 'POST',
+      headers: {
+        'x-api-key': getEnv(c, 'BUILDER_API_KEY'),
+      },
+      signal: controller.signal,
+    })
+
+    if (!builderResponse.ok) {
+      const errorText = await builderResponse.text()
+      cloudlogErr({
+        requestId: c.get('requestId'),
+        message: 'Builder timeout cancel failed',
+        job_id: jobId,
+        app_id: appId,
+        status: builderResponse.status,
+        error: errorText,
+      })
+      return false
+    }
+
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'Timed out build cancelled in builder',
+      job_id: jobId,
+      app_id: appId,
+    })
+    return true
+  }
+  catch (error) {
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: 'Builder timeout cancel errored',
+      job_id: jobId,
+      app_id: appId,
+      error: error instanceof Error ? error.message : String(error),
+    })
+    return false
+  }
+  finally {
+    clearTimeout(timeoutId)
+  }
 }
 
 export async function getBuildStatus(
@@ -61,7 +118,24 @@ export async function getBuildStatus(
     throw simpleError('unauthorized', 'You do not have permission to view builds for this app')
   }
 
+  const { data: appSettings, error: appSettingsError } = await supabase
+    .from('apps')
+    .select('build_timeout_seconds, build_timeout_updated_at')
+    .eq('app_id', buildRequest.app_id)
+    .single()
+
+  if (appSettingsError || !appSettings) {
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: 'Failed to fetch app build timeout for status',
+      app_id: buildRequest.app_id,
+      error: appSettingsError?.message,
+    })
+    throw simpleError('internal_error', 'Failed to fetch app build timeout')
+  }
+
   const org_id = buildRequest.owner_org
+  const timeoutSeconds = normalizeBuildTimeoutSeconds(appSettings.build_timeout_seconds)
   const resolvedPlatform = (buildRequest.platform === 'ios' || buildRequest.platform === 'android')
     ? buildRequest.platform
     : platform
@@ -87,14 +161,43 @@ export async function getBuildStatus(
   }
 
   const builderJob = await builderResponse.json() as BuilderStatusResponse
+  const runtimeSeconds = calculateBuildRuntimeSeconds(builderJob.job.started_at, builderJob.job.completed_at)
+  const timedOut = shouldApplyBuildTimeout(
+    builderJob.job.started_at,
+    builderJob.job.completed_at,
+    builderJob.job.status,
+    timeoutSeconds,
+    appSettings.build_timeout_updated_at,
+  )
+  const timeoutCompletedAt = timedOut && typeof builderJob.job.started_at === 'number'
+    ? calculateTimeoutCompletedAt(builderJob.job.started_at, timeoutSeconds)
+    : null
+  let timeoutApplied = false
+
+  if (timedOut && builderJob.job.completed_at)
+    timeoutApplied = true
+  else if (timedOut)
+    timeoutApplied = await cancelTimedOutBuilderJob(c, job_id, buildRequest.app_id)
+
+  const effectiveStatus = timeoutApplied ? BUILD_TIMEOUT_STATUS : builderJob.job.status
+  const effectiveError = timeoutApplied ? formatBuildTimeoutError(timeoutSeconds) : builderJob.job.error || null
+  const effectiveCompletedAt = timeoutApplied ? timeoutCompletedAt : builderJob.job.completed_at
+  const effectiveBuildTimeSeconds = runtimeSeconds === null
+    ? null
+    : timeoutApplied
+      ? capBuildRuntimeSeconds(runtimeSeconds, timeoutSeconds)
+      : runtimeSeconds
 
   cloudlog({
     requestId: c.get('requestId'),
     message: 'Build status fetched',
     job_id,
-    status: builderJob.job.status,
+    status: effectiveStatus,
+    builder_status: builderJob.job.status,
     started_at: builderJob.job.started_at,
-    completed_at: builderJob.job.completed_at,
+    completed_at: effectiveCompletedAt,
+    timeout_seconds: timeoutSeconds,
+    timed_out: timedOut,
   })
 
   // Update build_requests table with current status
@@ -104,8 +207,8 @@ export async function getBuildStatus(
   const { error: updateError } = await supabaseAdmin(c)
     .from('build_requests')
     .update({
-      status: builderJob.job.status,
-      last_error: builderJob.job.error || null,
+      status: effectiveStatus,
+      last_error: effectiveError,
       updated_at: new Date().toISOString(),
     })
     .eq('builder_job_id', job_id)
@@ -120,44 +223,45 @@ export async function getBuildStatus(
     })
   }
 
-  // Track build time if job completed
-  if (builderJob.job.started_at && builderJob.job.completed_at) {
-    const buildTimeSeconds = Math.floor((builderJob.job.completed_at - builderJob.job.started_at) / 1000)
+  const shouldRecordBuildTime = !!builderJob.job.started_at
+    && (timeoutApplied || ((effectiveStatus === 'succeeded' || effectiveStatus === 'failed') && !!builderJob.job.completed_at))
 
-    // Record build time in tracking system (only once per build)
-    if (builderJob.job.status === 'succeeded' || builderJob.job.status === 'failed') {
-      cloudlog({
-        requestId: c.get('requestId'),
-        message: 'Recording build time',
-        job_id,
-        org_id,
-        build_time_seconds: buildTimeSeconds,
-        platform,
-      })
+  if (shouldRecordBuildTime && effectiveBuildTimeSeconds !== null && effectiveCompletedAt) {
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'Recording build time',
+      job_id,
+      org_id,
+      build_time_seconds: effectiveBuildTimeSeconds,
+      raw_build_time_seconds: runtimeSeconds,
+      timeout_seconds: timeoutSeconds,
+      platform: resolvedPlatform,
+    })
 
-      await recordBuildTime(
-        c,
-        org_id,
-        apikey.user_id,
-        job_id,
-        resolvedPlatform,
-        buildTimeSeconds,
-        builderJob.job.completed_at,
-        buildRequest.app_id,
-      )
-    }
+    await recordBuildTime(
+      c,
+      org_id,
+      apikey.user_id,
+      job_id,
+      resolvedPlatform,
+      effectiveBuildTimeSeconds,
+      effectiveCompletedAt,
+      buildRequest.app_id,
+    )
   }
 
   return c.json({
     job_id,
-    status: builderJob.job.status,
+    status: effectiveStatus,
     machine: builderJob.machine || null,
     started_at: builderJob.job.started_at,
-    completed_at: builderJob.job.completed_at,
-    build_time_seconds: builderJob.job.started_at && builderJob.job.completed_at
-      ? Math.floor((builderJob.job.completed_at - builderJob.job.started_at) / 1000)
-      : null,
-    error: builderJob.job.error || null,
+    completed_at: effectiveCompletedAt,
+    build_time_seconds: timeoutApplied
+      ? effectiveBuildTimeSeconds
+      : builderJob.job.started_at && builderJob.job.completed_at
+        ? runtimeSeconds
+        : null,
+    error: effectiveError,
     upload_url: builderJob.uploadUrl || null,
   }, 200)
 }

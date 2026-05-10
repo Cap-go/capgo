@@ -62,6 +62,10 @@ const canDeleteApp = computedAsync(async () => {
   return await checkPermissions('app.delete', { appId: props.appId })
 }, false)
 
+const DEFAULT_BUILD_TIMEOUT_SECONDS = 15 * 60
+const MIN_BUILD_TIMEOUT_MINUTES = 5
+const MAX_BUILD_TIMEOUT_MINUTES = 360
+
 // Retention presets (value in seconds)
 const RETENTION_PRESETS = [
   { value: 0, labelKey: 'retention-immediate' },
@@ -93,6 +97,8 @@ const effectiveRetentionValue = computed(() => {
     ? customRetentionValue.value
     : selectedRetentionPreset.value
 })
+
+const buildTimeoutMinutes = computed(() => Math.trunc((appRef.value?.build_timeout_seconds ?? DEFAULT_BUILD_TIMEOUT_SECONDS) / 60))
 
 function initializeRetentionPreset() {
   const current = appRef.value?.retention ?? 2592000
@@ -231,6 +237,7 @@ async function submit(form: {
   expose_metadata: boolean
   allow_preview: boolean
   allow_device_custom_id: boolean
+  build_timeout_minutes?: number | string
 }) {
   isLoading.value = true
   if (!canUpdateSettings.value) {
@@ -255,6 +262,13 @@ async function submit(form: {
 
   try {
     await updateAppRetention(effectiveRetentionValue.value)
+  }
+  catch (error) {
+    toast.error(error as string)
+  }
+
+  try {
+    await updateBuildTimeout(form.build_timeout_minutes)
   }
   catch (error) {
     toast.error(error as string)
@@ -454,6 +468,28 @@ async function updateAppRetention(newRetention: number) {
   toast.success(t('changed-app-retention'))
   if (appRef.value)
     appRef.value.retention = newRetention
+}
+
+async function updateBuildTimeout(rawTimeoutMinutes: number | string | undefined) {
+  const timeoutMinutes = Number(rawTimeoutMinutes)
+  if (!Number.isFinite(timeoutMinutes))
+    throw t('build-timeout-invalid')
+
+  const normalizedMinutes = Math.trunc(timeoutMinutes)
+  if (normalizedMinutes < MIN_BUILD_TIMEOUT_MINUTES || normalizedMinutes > MAX_BUILD_TIMEOUT_MINUTES)
+    throw t('build-timeout-invalid')
+
+  const timeoutSeconds = normalizedMinutes * 60
+  if (timeoutSeconds === appRef.value?.build_timeout_seconds)
+    return
+
+  const { error } = await supabase.from('apps').update({ build_timeout_seconds: timeoutSeconds }).eq('app_id', props.appId)
+  if (error)
+    throw t('cannot-change-build-timeout')
+
+  toast.success(t('changed-build-timeout'))
+  if (appRef.value)
+    appRef.value.build_timeout_seconds = timeoutSeconds
 }
 
 async function updateExposeMetadata(newExposeMetadata: boolean) {
@@ -1390,6 +1426,17 @@ async function transferAppOwnership() {
               <p v-if="effectiveRetentionValue >= 63113904" class="text-xs font-medium text-blue-600 dark:text-blue-400">
                 {{ t('retention-never-info') }}
               </p>
+              <FormKit
+                type="number"
+                number="integer"
+                name="build_timeout_minutes"
+                :prefix-icon="gearSix"
+                :value="buildTimeoutMinutes"
+                :label="t('build-timeout-label')"
+                :help="t('build-timeout-help')"
+                :min="MIN_BUILD_TIMEOUT_MINUTES"
+                :max="MAX_BUILD_TIMEOUT_MINUTES"
+              />
               <FormKit
                 type="checkbox"
                 name="expose_metadata"
