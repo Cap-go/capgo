@@ -1,7 +1,7 @@
 import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../../utils/hono.ts'
 import type { Database } from '../../utils/supabase.types.ts'
-import { quickError, simpleError } from '../../utils/hono.ts'
+import { simpleError } from '../../utils/hono.ts'
 import { closeClient, getPgClient, logPgError } from '../../utils/pg.ts'
 import { checkPermission } from '../../utils/rbac.ts'
 import { supabaseApikey } from '../../utils/supabase.ts'
@@ -22,11 +22,6 @@ export async function setChannel(c: Context<MiddlewareKeyVariables>, body: SetCh
     throw simpleError('invalid_app_id', 'App ID must be a reverse domain string', { app_id: body.app_id })
   }
 
-  // Auth context is already set by middlewareKey
-  if (!(await checkPermission(c, 'channel.promote_bundle', { appId: body.app_id }))) {
-    throw simpleError('cannot_access_app', 'You can\'t access this app', { app_id: body.app_id })
-  }
-
   // Get organization info
   const { data: org, error: orgError } = await supabaseApikey(c, apikey.key)
     .from('apps')
@@ -35,7 +30,7 @@ export async function setChannel(c: Context<MiddlewareKeyVariables>, body: SetCh
     .single()
 
   if (orgError || !org) {
-    throw quickError(404, 'cannot_find_app', 'Cannot find app', { supabaseError: orgError })
+    throw simpleError('cannot_access_app', 'You can\'t access this app', { app_id: body.app_id, supabaseError: orgError })
   }
 
   // Verify the bundle exists and belongs to the app
@@ -63,6 +58,10 @@ export async function setChannel(c: Context<MiddlewareKeyVariables>, body: SetCh
 
   if (channelError || !channel) {
     throw simpleError('cannot_find_channel', 'Cannot find channel', { supabaseError: channelError })
+  }
+
+  if (!(await checkPermission(c, 'channel.promote_bundle', { appId: body.app_id, channelId: body.channel_id }))) {
+    throw simpleError('cannot_access_app', 'You can\'t access this app', { app_id: body.app_id, channel_id: body.channel_id })
   }
 
   const effectiveApikey = apikey.key ?? c.get('capgkey')

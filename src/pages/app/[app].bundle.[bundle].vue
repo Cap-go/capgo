@@ -15,6 +15,7 @@ import IconTrash from '~icons/heroicons/trash'
 import IconSearch from '~icons/ic/round-search?raw'
 import IconAlertCircle from '~icons/lucide/alert-circle'
 import IconPencil from '~icons/lucide/pencil'
+import { findChannelsWithoutPromotionPermission, formatChannelPromotionTargets } from '~/services/channelPromotion'
 import { formatBytes, getChecksumInfo } from '~/services/conversion'
 import { formatDate, formatLocalDate } from '~/services/date'
 import { checkPermissions } from '~/services/permissions'
@@ -49,35 +50,59 @@ const selectedChannelForLink = ref<Database['public']['Tables']['channels']['Row
 const currentChannelAction = ref<'set' | 'open' | 'unlink' | null>(null)
 const channelSearchVal = ref('')
 const filteredChannels = ref<(Database['public']['Tables']['channels']['Row'])[]>([])
+const promotableChannelIds = ref<Set<number>>(new Set())
+
+interface LinkedChannel {
+  id: number
+  name: string
+}
+
+function canPromoteChannel(channelId: number) {
+  return promotableChannelIds.value.has(channelId)
+}
+
+function getPromotableChannels() {
+  return channels.value.filter(channel => canPromoteChannel(channel.id))
+}
+
+function showChannelUnlinkPermissionError(deniedChannels: LinkedChannel[]) {
+  toast.error(t('channel-permission-unlink-required', {
+    channels: formatChannelPromotionTargets(deniedChannels),
+  }))
+}
 
 // Watch for search changes
 watch(() => channelSearchVal.value, () => {
+  const promotableChannels = getPromotableChannels()
   if (channelSearchVal.value.trim()) {
-    filteredChannels.value = channels.value.filter(channel =>
+    filteredChannels.value = promotableChannels.filter(channel =>
       channel.name.toLowerCase().includes(channelSearchVal.value.toLowerCase()),
     )
   }
   else {
-    filteredChannels.value = channels.value
+    filteredChannels.value = promotableChannels
   }
 })
 
 // Update filtered channels when channels change
-watch(() => channels.value, () => {
+watch([() => channels.value, () => promotableChannelIds.value], () => {
+  const promotableChannels = getPromotableChannels()
   if (channelSearchVal.value.trim()) {
-    filteredChannels.value = channels.value.filter(channel =>
+    filteredChannels.value = promotableChannels.filter(channel =>
       channel.name.toLowerCase().includes(channelSearchVal.value.toLowerCase()),
     )
   }
   else {
-    filteredChannels.value = channels.value
+    filteredChannels.value = promotableChannels
   }
 }, { immediate: true })
 
-const canPromoteBundle = computedAsync(async () => {
+const canPromoteBundle = computed(() => promotableChannelIds.value.size > 0)
+
+const canEditBundleMetadata = computedAsync(async () => {
   if (!version.value?.app_id)
     return false
-  return await checkPermissions('channel.promote_bundle', { appId: version.value.app_id })
+  return await checkPermissions('app.upload_bundle', { appId: version.value.app_id })
 }, false)
 
 const canDeleteBundle = computedAsync(async () => {
@@ -138,13 +163,34 @@ async function getChannels() {
   if (!version.value)
     return
   channel.value = undefined
-  const { data: dataChannel } = await supabase
+  const appId = version.value.app_id
+  const { data: dataChannel, error: channelsError } = await supabase
     .from('channels')
     .select()
-    .eq('app_id', version.value.app_id)
+    .eq('app_id', appId)
     // .eq('version', version.value.id)
     .order('updated_at', { ascending: false })
-  channels.value = dataChannel || channels.value
+
+  if (channelsError) {
+    console.error('Cannot load channels:', channelsError)
+    channels.value = []
+    filteredChannels.value = []
+    promotableChannelIds.value = new Set()
+    return
+  }
+
+  channels.value = dataChannel ?? []
+  const channelPermissions = await Promise.all(channels.value.map(async (channel) => {
+    try {
+      const allowed = await checkPermissions('channel.promote_bundle', { appId, channelId: channel.id })
+      return { channelId: channel.id, allowed }
+    }
+    catch (error) {
+      console.error('Cannot check channel promotion permission:', error)
+      return { channelId: channel.id, allowed: false }
+    }
+  }))
+  promotableChannelIds.value = new Set(channelPermissions.filter(result => result.allowed).map(result => result.channelId))
   showBundleMetadataInput.value = !!channels.value.find(c => c.disable_auto_update === 'version_number')
 }
 
@@ -183,6 +229,11 @@ async function getUnknownBundleId() {
 }
 // add check compatibility here
 async function setChannel(channel: Database['public']['Tables']['channels']['Row'], id: number) {
+  if (!canPromoteChannel(channel.id)) {
+    toast.error(t('no-permission'))
+    return Promise.reject(new Error('No permission'))
+  }
+
   if (!id || typeof id !== 'number') {
     console.error('Invalid version ID:', id)
     toast.error(t('error-invalid-version'))
@@ -208,7 +259,7 @@ async function ASChannelChooser() {
   selectedChannelForLink.value = null
   currentChannelAction.value = 'set'
   channelSearchVal.value = ''
-  filteredChannels.value = channels.value
+  filteredChannels.value = getPromotableChannels()
 
   dialogStore.openDialog({
     title: t('channel-linking'),
@@ -238,6 +289,11 @@ async function ASChannelChooser() {
 async function handleChannelLink(chan: Database['public']['Tables']['channels']['Row']) {
   if (!version.value)
     return
+  if (!canPromoteChannel(chan.id)) {
+    toast.error(t('no-permission'))
+    return
+  }
+
   try {
     const {
       finalCompatibility,
@@ -517,6 +573,11 @@ async function saveCustomId(input: string) {
   if (!id.value)
     return
 
+  if (!canEditBundleMetadata.value) {
+    toast.error(t('no-permission'))
+    return
+  }
+
   if (input.length === 0) {
     const { error: errorNull } = await supabase
       .from('app_versions')
@@ -555,7 +616,7 @@ async function saveCustomId(input: string) {
 }
 
 function guardMinAutoUpdate(event: Event) {
-  if (!canPromoteBundle.value) {
+  if (!canEditBundleMetadata.value) {
     toast.error(t('no-permission'))
     event.preventDefault()
     return false
@@ -563,7 +624,7 @@ function guardMinAutoUpdate(event: Event) {
 }
 
 function preventInputChangePerm(event: Event) {
-  if (!canPromoteBundle.value) {
+  if (!canEditBundleMetadata.value) {
     event.preventDefault()
     return false
   }
@@ -692,6 +753,12 @@ async function deleteBundle() {
     }
 
     if (channelFound && channelFound.length > 0) {
+      const deniedChannels = await findChannelsWithoutPromotionPermission(version.value.app_id, channelFound)
+      if (deniedChannels.length > 0) {
+        showChannelUnlinkPermissionError(deniedChannels)
+        return
+      }
+
       let shouldUnlink = false
 
       dialogStore.openDialog({
@@ -839,7 +906,7 @@ async function deleteBundle() {
               <InfoRow
                 v-if="showBundleMetadataInput" id="metadata-bundle"
                 :label="t('min-update-version')" editable
-                :readonly="!canPromoteBundle"
+                :readonly="!canEditBundleMetadata"
                 @click="guardMinAutoUpdate" @update:value="(saveCustomId as any)" @keydown="preventInputChangePerm"
               >
                 {{ version.min_update_version }}
@@ -1252,7 +1319,7 @@ async function deleteBundle() {
 
           <!-- Unlink Channel (if user has permissions) -->
           <div
-            v-if="canPromoteBundle"
+            v-if="selectedChannelForLink && canPromoteChannel(selectedChannelForLink.id)"
             class="p-3 border border-red-300 rounded-lg cursor-pointer dark:border-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
             @click="handleChannelAction('unlink')"
           >

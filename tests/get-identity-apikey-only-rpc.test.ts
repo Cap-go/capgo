@@ -1,4 +1,5 @@
 import type { Database } from '../src/types/supabase.types'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { env } from 'node:process'
 import { createClient } from '@supabase/supabase-js'
 import { describe, expect, it } from 'vitest'
@@ -24,6 +25,24 @@ const SUPABASE_SERVICE_KEY = (env.SUPABASE_SERVICE_KEY || env.SUPABASE_SERVICE_R
 
 const keyModes: Database['public']['Enums']['key_mode'][] = ['all', 'read', 'write']
 
+function isRetryableRpcTransportError(error: { message?: string } | null) {
+  return error?.message?.includes('fetch failed') === true
+}
+
+async function getIdentityApikeyOnly(client: SupabaseClient<Database>) {
+  let result: Awaited<ReturnType<typeof client.rpc<'get_identity_apikey_only'>>>
+
+  for (let attempt = 0; attempt < 3; attempt++) {
+    result = await client.rpc('get_identity_apikey_only', { keymode: keyModes })
+    if (!isRetryableRpcTransportError(result.error) || attempt === 2)
+      return result
+
+    await new Promise(resolve => setTimeout(resolve, 200 * (attempt + 1)))
+  }
+
+  return result!
+}
+
 async function createAuthenticatedClient() {
   const authHeaders = await getAuthHeadersForCredentials(USER_EMAIL, USER_PASSWORD)
 
@@ -46,7 +65,7 @@ describe('get_identity_apikey_only RPC permissions', () => {
       global: { headers: { capgkey: APIKEY_TEST_ALL } },
     })
 
-    const { data, error } = await supabaseAnon.rpc('get_identity_apikey_only', { keymode: keyModes })
+    const { data, error } = await getIdentityApikeyOnly(supabaseAnon)
 
     expect(data).toBeNull()
     expect(error).not.toBeNull()
@@ -58,7 +77,7 @@ describe('get_identity_apikey_only RPC permissions', () => {
       global: { headers: { capgkey: APIKEY_TEST_ALL } },
     })
 
-    const { data, error } = await supabaseServiceRole.rpc('get_identity_apikey_only', { keymode: keyModes })
+    const { data, error } = await getIdentityApikeyOnly(supabaseServiceRole)
 
     expect(error).toBeNull()
     expect(typeof data).toBe('string')
@@ -68,7 +87,7 @@ describe('get_identity_apikey_only RPC permissions', () => {
   it.concurrent('denies authenticated RPC access', async () => {
     const supabaseAuthenticated = await createAuthenticatedClient()
 
-    const { data, error } = await supabaseAuthenticated.rpc('get_identity_apikey_only', { keymode: keyModes })
+    const { data, error } = await getIdentityApikeyOnly(supabaseAuthenticated)
 
     expect(data).toBeNull()
     expect(error).not.toBeNull()
@@ -80,7 +99,7 @@ describe('get_identity_apikey_only RPC permissions', () => {
       global: { headers: { capgkey: '00000000-0000-0000-0000-000000000000' } },
     })
 
-    const { data, error } = await supabaseServiceRole.rpc('get_identity_apikey_only', { keymode: keyModes })
+    const { data, error } = await getIdentityApikeyOnly(supabaseServiceRole)
 
     expect(error).toBeNull()
     expect(data).toBeNull()
