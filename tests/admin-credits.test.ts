@@ -83,7 +83,7 @@ afterAll(async () => {
 })
 
 describe('[POST] /private/admin_credits/grant - Admin Access Control', () => {
-  it('should return 401 when no authorization header is provided', async () => {
+  it('should reject credit grants without the internal API secret', async () => {
     const response = await fetch(`${BASE_URL}/private/admin_credits/grant`, {
       method: 'POST',
       headers: {
@@ -95,12 +95,11 @@ describe('[POST] /private/admin_credits/grant - Admin Access Control', () => {
         notes: 'Test grant',
       }),
     })
-    expect(response.status).toBe(401)
-    const data = await response.json() as { error: string }
-    expect(data.error).toBe('no_jwt_apikey_or_subkey')
+    expect(response.status).toBe(400)
+    await expect(response.text()).resolves.toContain('Cannot find authorization')
   })
 
-  it('should return 400 not_admin when non-admin user tries to grant credits', async () => {
+  it('should reject non-admin user JWTs for credit grants', async () => {
     const response = await fetch(`${BASE_URL}/private/admin_credits/grant`, {
       method: 'POST',
       headers,
@@ -111,20 +110,17 @@ describe('[POST] /private/admin_credits/grant - Admin Access Control', () => {
       }),
     })
     expect(response.status).toBe(400)
-    const data = await response.json() as { error: string }
-    expect(data.error).toBe('not_admin')
+    await expect(response.text()).resolves.toContain('Cannot find authorization')
   })
 
-  it('should return 400 for invalid JSON body (admin check happens first)', async () => {
+  it('should reject invalid JSON before user auth can reach the grant path', async () => {
     const response = await fetch(`${BASE_URL}/private/admin_credits/grant`, {
       method: 'POST',
       headers,
       body: 'invalid json',
     })
-    // The not_admin check happens before body validation for authenticated users
     expect(response.status).toBe(400)
-    const data = await response.json() as { error: string }
-    expect(data.error).toBe('not_admin')
+    await expect(response.text()).resolves.toContain('Cannot find authorization')
   })
 
   it('should return 400 when org_id is missing', async () => {
@@ -136,8 +132,8 @@ describe('[POST] /private/admin_credits/grant - Admin Access Control', () => {
         notes: 'Test grant',
       }),
     })
-    // The not_admin check happens before body validation for authenticated users
     expect(response.status).toBe(400)
+    await expect(response.text()).resolves.toContain('Cannot find authorization')
   })
 
   it('should return 400 when amount is missing', async () => {
@@ -149,8 +145,8 @@ describe('[POST] /private/admin_credits/grant - Admin Access Control', () => {
         notes: 'Test grant',
       }),
     })
-    // The not_admin check happens before body validation for authenticated users
     expect(response.status).toBe(400)
+    await expect(response.text()).resolves.toContain('Cannot find authorization')
   })
 
   it('should return 400 when amount is less than 1', async () => {
@@ -163,8 +159,8 @@ describe('[POST] /private/admin_credits/grant - Admin Access Control', () => {
         notes: 'Test grant',
       }),
     })
-    // The not_admin check happens before body validation
     expect(response.status).toBe(400)
+    await expect(response.text()).resolves.toContain('Cannot find authorization')
   })
 })
 
@@ -318,7 +314,7 @@ describe('admin credits - admin JWT access', () => {
     expect(data.orgs.some(org => org.id === TEST_ORG_ID)).toBe(true)
   })
 
-  it('should allow admin user to grant credits', async () => {
+  it('should reject admin JWT credit grants', async () => {
     const adminHeaders = await getAdminHeaders()
 
     const grantResponse = await fetch(`${BASE_URL}/private/admin_credits/grant`, {
@@ -331,35 +327,14 @@ describe('admin credits - admin JWT access', () => {
       }),
     })
 
-    expect(grantResponse.status).toBe(200)
-    const grantData = await grantResponse.json() as {
-      success: boolean
-      org: { id: string }
-    }
-    expect(grantData.success).toBe(true)
-    expect(grantData.org.id).toBe(TEST_ORG_ID)
-
-    const balanceResponse = await fetch(`${BASE_URL}/private/admin_credits/org-balance/${TEST_ORG_ID}`, {
-      method: 'GET',
-      headers: adminHeaders,
-    })
-    expect(balanceResponse.status).toBe(200)
-
-    const balanceData = await balanceResponse.json() as {
-      balance: {
-        total_credits: number
-        available_credits: number
-      }
-    }
-    expect(balanceData.balance.total_credits).toBeGreaterThanOrEqual(25)
-    expect(balanceData.balance.available_credits).toBeGreaterThanOrEqual(25)
+    expect(grantResponse.status).toBe(400)
+    await expect(grantResponse.text()).resolves.toContain('Cannot find authorization')
   })
 })
 
 describe('admin credits - consistent error responses', () => {
   it('all endpoints should return consistent not_admin error for unauthorized users', async () => {
     const endpoints = [
-      { method: 'POST', path: '/private/admin_credits/grant', body: JSON.stringify({ org_id: TEST_ORG_ID, amount: 100 }) },
       { method: 'GET', path: '/private/admin_credits/search-orgs?q=test', body: null },
       { method: 'GET', path: `/private/admin_credits/org-balance/${TEST_ORG_ID}`, body: null },
       { method: 'GET', path: '/private/admin_credits/grants-history', body: null },
@@ -380,7 +355,6 @@ describe('admin credits - consistent error responses', () => {
 
   it('all endpoints should return consistent unauthorized error when auth header is missing', async () => {
     const endpoints = [
-      { method: 'POST', path: '/private/admin_credits/grant', body: JSON.stringify({ org_id: TEST_ORG_ID, amount: 100 }) },
       { method: 'GET', path: '/private/admin_credits/search-orgs?q=test', body: null },
       { method: 'GET', path: `/private/admin_credits/org-balance/${TEST_ORG_ID}`, body: null },
       { method: 'GET', path: '/private/admin_credits/grants-history', body: null },

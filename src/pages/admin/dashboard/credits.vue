@@ -4,7 +4,6 @@ meta:
 </route>
 
 <script setup lang="ts">
-import { FormKit } from '@formkit/vue'
 import dayjs from 'dayjs'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -74,21 +73,6 @@ const selectedOrg = ref<OrgSearchResult | null>(null)
 const orgBalance = ref<OrgBalance | null>(null)
 const isLoadingBalance = ref(false)
 
-const creditAmountStr = ref('100')
-const creditNotes = ref('')
-const expiresInMonthsStr = ref('12')
-const isGranting = ref(false)
-
-const creditAmount = computed(() => {
-  const parsed = Number.parseInt(creditAmountStr.value, 10)
-  return Number.isNaN(parsed) ? 0 : parsed
-})
-
-const expiresInMonths = computed(() => {
-  const parsed = Number.parseInt(expiresInMonthsStr.value, 10)
-  return Number.isNaN(parsed) ? 12 : parsed
-})
-
 const recentGrants = ref<AdminGrant[]>([])
 const isLoadingGrants = ref(false)
 const globalStatsTrendData = ref<GlobalStatsTrendRow[]>([])
@@ -97,12 +81,6 @@ const isLoadingCreditAnalytics = ref(false)
 let searchDebounce: ReturnType<typeof setTimeout> | null = null
 let creditAnalyticsRequestSeq = 0
 let currentSearchQuery = '' // Track current query to avoid race conditions
-
-function getExpiresAt() {
-  if (expiresInMonths.value <= 0)
-    return null
-  return dayjs().add(expiresInMonths.value, 'month').toISOString()
-}
 
 function formatCredits(value: number) {
   return new Intl.NumberFormat(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value)
@@ -315,59 +293,6 @@ async function loadOrgBalance(orgId: string) {
   }
 }
 
-async function grantCredits() {
-  if (!selectedOrg.value)
-    return
-
-  if (creditAmount.value < 1) {
-    toast.error(t('admin-credits-amount-required'))
-    return
-  }
-
-  isGranting.value = true
-
-  try {
-    const { data } = await supabase.auth.getSession()
-    const response = await fetch(`${defaultApiHost}/private/admin_credits/grant`, {
-      method: 'POST',
-      headers: {
-        'authorization': `Bearer ${data.session?.access_token}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        org_id: selectedOrg.value.id,
-        amount: creditAmount.value,
-        notes: creditNotes.value || undefined,
-        expires_at: getExpiresAt(),
-      }),
-    })
-
-    if (!response.ok) {
-      const errorData = await response.json() as { message?: string }
-      throw new Error(errorData.message || 'Grant failed')
-    }
-
-    toast.success(t('admin-credits-grant-success', { amount: creditAmount.value, org: selectedOrg.value.name }))
-
-    // Refresh balance and grants
-    await Promise.all([
-      loadOrgBalance(selectedOrg.value.id),
-      loadRecentGrants(),
-    ])
-
-    // Reset form
-    creditAmountStr.value = '100'
-    creditNotes.value = ''
-  }
-  catch (error) {
-    console.error('Grant error:', error)
-    toast.error(t('admin-credits-grant-error'))
-  }
-  finally {
-    isGranting.value = false
-  }
-}
-
 async function loadRecentGrants() {
   isLoadingGrants.value = true
 
@@ -495,10 +420,10 @@ onMounted(async () => {
           </ChartCard>
         </div>
 
-        <!-- Grant Form Card -->
+        <!-- Credit Lookup Card -->
         <div class="p-6 bg-white border rounded-lg shadow-lg border-slate-300 dark:bg-gray-800 dark:border-slate-900">
           <h2 class="mb-6 text-lg font-semibold text-gray-900 dark:text-white">
-            {{ t('admin-credits-grant-title') }}
+            {{ t('admin-credits-lookup-title') }}
           </h2>
 
           <div class="space-y-6">
@@ -586,53 +511,9 @@ onMounted(async () => {
               </div>
             </div>
 
-            <!-- Grant Form Fields -->
-            <div v-if="selectedOrg" class="grid gap-6 md:grid-cols-2">
-              <FormKit
-                v-model="creditAmountStr"
-                type="number"
-                name="creditAmount"
-                :label="t('admin-credits-amount-label')"
-                validation="required|min:1"
-                :min="1"
-                :step="1"
-                outer-class="!mb-0"
-              />
-
-              <FormKit
-                v-model="expiresInMonthsStr"
-                type="number"
-                name="expiresInMonths"
-                :label="t('admin-credits-expires-months')"
-                :min="1"
-                :max="60"
-                :step="1"
-                outer-class="!mb-0"
-              />
-            </div>
-
-            <FormKit
-              v-if="selectedOrg"
-              v-model="creditNotes"
-              type="textarea"
-              name="notes"
-              :label="t('admin-credits-notes-label')"
-              :placeholder="t('admin-credits-notes-placeholder')"
-              rows="2"
-              outer-class="!mb-0"
-            />
-
-            <!-- Submit Button -->
-            <button
-              v-if="selectedOrg"
-              type="button"
-              :disabled="isGranting || creditAmount < 1"
-              class="flex items-center justify-center w-full px-6 py-3 text-white transition-colors bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-              @click="grantCredits"
-            >
-              <Spinner v-if="isGranting" size="w-5 h-5" class="mr-2" color="white" />
-              {{ t('admin-credits-grant-button', { amount: creditAmount }) }}
-            </button>
+            <p v-if="selectedOrg" class="text-sm text-gray-500 dark:text-gray-400">
+              {{ t('admin-credits-readonly-note') }}
+            </p>
           </div>
         </div>
 

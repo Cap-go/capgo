@@ -2,7 +2,7 @@ import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { type } from 'arktype'
 import { safeParseSchema } from '../utils/ark_validation.ts'
-import { createHono, parseBody, simpleError, useCors } from '../utils/hono.ts'
+import { createHono, middlewareAPISecret, parseBody, simpleError, useCors } from '../utils/hono.ts'
 import { middlewareV2 } from '../utils/hono_middleware.ts'
 import { cloudlog, cloudlogErr } from '../utils/logging.ts'
 import { supabaseAdmin, supabaseClient } from '../utils/supabase.ts'
@@ -53,15 +53,10 @@ export const app = createHono('', version)
 
 app.use('*', useCors)
 
-// Grant credits to an organization (admin only)
-app.post('/grant', middlewareV2(['all']), async (c) => {
-  const { isAdmin, userId } = await verifyAdmin(c)
-
-  if (!isAdmin) {
-    cloudlog({ requestId: c.get('requestId'), message: 'not_admin_grant_attempt', userId })
-    throw simpleError('not_admin', 'Only admin users can grant credits')
-  }
-
+// Grant credits to an organization. This is intentionally not exposed to
+// platform-admin JWTs: platform-admin user actions must stay read-only except
+// impersonation, so credit mutations require the internal API secret.
+app.post('/grant', middlewareAPISecret, async (c) => {
   const body = await parseBody<GrantRequest>(c)
   const parsedBodyResult = safeParseSchema(grantSchema, body)
 
@@ -74,7 +69,6 @@ app.post('/grant', middlewareV2(['all']), async (c) => {
   cloudlog({
     requestId: c.get('requestId'),
     message: 'admin_credit_grant_request',
-    adminUserId: userId,
     org_id,
     amount,
     notes,
@@ -100,8 +94,7 @@ app.post('/grant', middlewareV2(['all']), async (c) => {
   }
 
   const sourceRef = {
-    admin_user_id: userId,
-    granted_via: 'admin_ui',
+    granted_via: 'internal_api',
     org_name: org.name,
   }
 
@@ -111,7 +104,7 @@ app.post('/grant', middlewareV2(['all']), async (c) => {
       p_amount: amount,
       p_expires_at: expires_at || undefined,
       p_source: 'manual',
-      p_notes: notes || `Admin grant by ${userId}`,
+      p_notes: notes || 'Internal credit grant',
       p_source_ref: sourceRef,
     })
 
@@ -121,7 +114,6 @@ app.post('/grant', middlewareV2(['all']), async (c) => {
       message: 'admin_credit_grant_failed',
       org_id,
       amount,
-      adminUserId: userId,
       error: rpcError,
     })
     throw simpleError('grant_failed', 'Failed to grant credits', { error: rpcError })
@@ -130,7 +122,6 @@ app.post('/grant', middlewareV2(['all']), async (c) => {
   cloudlog({
     requestId: c.get('requestId'),
     message: 'admin_credit_grant_success',
-    adminUserId: userId,
     org_id,
     org_name: org.name,
     amount,
