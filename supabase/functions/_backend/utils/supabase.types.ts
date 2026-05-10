@@ -1238,7 +1238,6 @@ export type Database = {
           build_total_seconds_day_android: number
           build_total_seconds_day_ios: number
           builder_active_paying_clients_60d: number
-          live_updates_active_paying_clients_60d: number
           builds_android: number | null
           builds_ios: number | null
           builds_last_month: number | null
@@ -1263,6 +1262,7 @@ export type Database = {
           devices_last_month: number | null
           devices_last_month_android: number | null
           devices_last_month_ios: number | null
+          live_updates_active_paying_clients_60d: number
           mrr: number
           need_upgrade: number | null
           new_paying_orgs: number
@@ -1270,23 +1270,23 @@ export type Database = {
           nrr: number
           onboarded: number | null
           org_conversion_rate: number
-          plan_enterprise_conversion_rate: number
-          plan_maker_conversion_rate: number
-          plan_solo_conversion_rate: number
-          plan_team_conversion_rate: number
           paying: number | null
           paying_monthly: number | null
           paying_yearly: number | null
           plan_enterprise: number | null
+          plan_enterprise_conversion_rate: number
           plan_enterprise_monthly: number
           plan_enterprise_yearly: number
           plan_maker: number | null
+          plan_maker_conversion_rate: number
           plan_maker_monthly: number
           plan_maker_yearly: number
           plan_solo: number | null
+          plan_solo_conversion_rate: number
           plan_solo_monthly: number
           plan_solo_yearly: number
           plan_team: number | null
+          plan_team_conversion_rate: number
           plan_team_monthly: number
           plan_team_yearly: number
           plugin_major_breakdown: Json
@@ -1318,7 +1318,6 @@ export type Database = {
           build_total_seconds_day_android?: number
           build_total_seconds_day_ios?: number
           builder_active_paying_clients_60d?: number
-          live_updates_active_paying_clients_60d?: number
           builds_android?: number | null
           builds_ios?: number | null
           builds_last_month?: number | null
@@ -1343,6 +1342,7 @@ export type Database = {
           devices_last_month?: number | null
           devices_last_month_android?: number | null
           devices_last_month_ios?: number | null
+          live_updates_active_paying_clients_60d?: number
           mrr?: number
           need_upgrade?: number | null
           new_paying_orgs?: number
@@ -1350,23 +1350,23 @@ export type Database = {
           nrr?: number
           onboarded?: number | null
           org_conversion_rate?: number
-          plan_enterprise_conversion_rate?: number
-          plan_maker_conversion_rate?: number
-          plan_solo_conversion_rate?: number
-          plan_team_conversion_rate?: number
           paying?: number | null
           paying_monthly?: number | null
           paying_yearly?: number | null
           plan_enterprise?: number | null
+          plan_enterprise_conversion_rate?: number
           plan_enterprise_monthly?: number
           plan_enterprise_yearly?: number
           plan_maker?: number | null
+          plan_maker_conversion_rate?: number
           plan_maker_monthly?: number
           plan_maker_yearly?: number
           plan_solo?: number | null
+          plan_solo_conversion_rate?: number
           plan_solo_monthly?: number
           plan_solo_yearly?: number
           plan_team?: number | null
+          plan_team_conversion_rate?: number
           plan_team_monthly?: number
           plan_team_yearly?: number
           plugin_major_breakdown?: Json
@@ -1398,7 +1398,6 @@ export type Database = {
           build_total_seconds_day_android?: number
           build_total_seconds_day_ios?: number
           builder_active_paying_clients_60d?: number
-          live_updates_active_paying_clients_60d?: number
           builds_android?: number | null
           builds_ios?: number | null
           builds_last_month?: number | null
@@ -1423,6 +1422,7 @@ export type Database = {
           devices_last_month?: number | null
           devices_last_month_android?: number | null
           devices_last_month_ios?: number | null
+          live_updates_active_paying_clients_60d?: number
           mrr?: number
           need_upgrade?: number | null
           new_paying_orgs?: number
@@ -1430,23 +1430,23 @@ export type Database = {
           nrr?: number
           onboarded?: number | null
           org_conversion_rate?: number
-          plan_enterprise_conversion_rate?: number
-          plan_maker_conversion_rate?: number
-          plan_solo_conversion_rate?: number
-          plan_team_conversion_rate?: number
           paying?: number | null
           paying_monthly?: number | null
           paying_yearly?: number | null
           plan_enterprise?: number | null
+          plan_enterprise_conversion_rate?: number
           plan_enterprise_monthly?: number
           plan_enterprise_yearly?: number
           plan_maker?: number | null
+          plan_maker_conversion_rate?: number
           plan_maker_monthly?: number
           plan_maker_yearly?: number
           plan_solo?: number | null
+          plan_solo_conversion_rate?: number
           plan_solo_monthly?: number
           plan_solo_yearly?: number
           plan_team?: number | null
+          plan_team_conversion_rate?: number
           plan_team_monthly?: number
           plan_team_yearly?: number
           plugin_major_breakdown?: Json
