@@ -1,5 +1,6 @@
 import type { Context } from 'hono'
 import { createHono, middlewareAuth, parseBody, quickError, useCors } from '../utils/hono.ts'
+import { readResponseBytesWithLimit } from '../utils/response.ts'
 import { version } from '../utils/version.ts'
 import { getWebhookUrlValidationError } from '../utils/webhook.ts'
 
@@ -311,11 +312,10 @@ async function fetchIconDataUrl(c: Context, iconUrl: string) {
   if (Number.isFinite(contentLength) && contentLength > MAX_ICON_BYTES)
     return null
 
-  const arrayBuffer = await response.arrayBuffer()
-  if (arrayBuffer.byteLength === 0 || arrayBuffer.byteLength > MAX_ICON_BYTES)
+  const bytes = await readResponseBytesWithLimit(response, MAX_ICON_BYTES)
+  if (!bytes || bytes.byteLength === 0)
     return null
 
-  const bytes = new Uint8Array(arrayBuffer)
   let binary = ''
   const chunkSize = 0x8000
   for (let index = 0; index < bytes.length; index += chunkSize)

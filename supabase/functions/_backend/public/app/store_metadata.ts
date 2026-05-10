@@ -1,6 +1,7 @@
 import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../../utils/hono.ts'
 import { quickError } from '../../utils/hono.ts'
+import { readResponseBytesWithLimit } from '../../utils/response.ts'
 
 export interface FetchStoreMetadataBody {
   url?: string
@@ -21,6 +22,7 @@ const ALLOWED_STORE_HOSTS = new Set([
   'play-lh.googleusercontent.com',
   'play.googleusercontent.com',
 ])
+const MAX_ICON_BYTES = 512 * 1024
 
 function uint8ArrayToBase64(bytes: Uint8Array) {
   let binary = ''
@@ -51,7 +53,10 @@ async function fetchIconDataUrl(iconUrl: string | null) {
       return null
 
     const contentType = response.headers.get('content-type')?.split(';')[0]?.trim() || 'image/png'
-    const bytes = new Uint8Array(await response.arrayBuffer())
+    const bytes = await readResponseBytesWithLimit(response, MAX_ICON_BYTES)
+    if (!bytes || bytes.byteLength === 0)
+      return null
+
     return `data:${contentType};base64,${uint8ArrayToBase64(bytes)}`
   }
   catch {
