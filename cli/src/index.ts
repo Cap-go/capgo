@@ -607,7 +607,7 @@ organization
   .alias('s')
   .description(`⚙️ Update organization settings including name, email, security policies, and enforcement options.
 
-Security settings require super_admin role.
+Security settings and management email updates require super_admin role.
 
 Example: npx @capgo/cli@latest organization set ORG_ID --name "New Name"
 Example: npx @capgo/cli@latest organization set ORG_ID --enforce-2fa
@@ -616,7 +616,7 @@ Example: npx @capgo/cli@latest organization set ORG_ID --require-apikey-expirati
 Example: npx @capgo/cli@latest organization set ORG_ID --enforce-hashed-api-keys`)
   .action(setOrganization)
   .option('-n, --name <name>', `Organization name`)
-  .option('-e, --email <email>', `Management email for the organization`)
+  .option('-e, --email <email>', `Management email for the organization (requires super_admin)`)
   .option('--enforce-2fa', `Enable 2FA enforcement for all organization members`)
   .option('--no-enforce-2fa', `Disable 2FA enforcement for organization`)
   .option('--password-policy', `Enable password policy enforcement for organization`)
@@ -698,7 +698,7 @@ organisation
   .description(`[DEPRECATED] Use "organization set" instead.`)
   .action(setOrganization)
   .option('-n, --name <name>', `Organization name`)
-  .option('-e, --email <email>', `Management email for the organization`)
+  .option('-e, --email <email>', `Management email for the organization (requires super_admin)`)
   .option('--enforce-2fa', `Enable 2FA enforcement for all organization members`)
   .option('--no-enforce-2fa', `Disable 2FA enforcement for organization`)
   .option('--password-policy', `Enable password policy enforcement for organization`)

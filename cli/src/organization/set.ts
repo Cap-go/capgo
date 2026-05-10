@@ -11,6 +11,25 @@ import {
   sendEvent,
 } from '../utils'
 
+type SupabaseClient = Awaited<ReturnType<typeof createSupabaseClient>>
+
+async function updateOrganizationManagementEmail(
+  supabase: SupabaseClient,
+  orgId: string,
+  email: string,
+  silent: boolean,
+) {
+  const { error } = await supabase.functions.invoke('private/set_org_email', {
+    body: JSON.stringify({ org_id: orgId, email }),
+  })
+
+  if (error) {
+    if (!silent)
+      log.error(`Could not update organization management email: ${formatError(error)}`)
+    throw new Error(`Could not update organization management email: ${formatError(error)}`)
+  }
+}
+
 export async function setOrganizationInternal(
   orgId: string,
   options: OrganizationSetOptions,
@@ -399,18 +418,21 @@ export async function setOrganizationInternal(
   if (!silent)
     log.info(`Updating organization "${orgId}"`)
 
-  const { error: dbError } = await supabase
-    .from('orgs')
-    .update({
-      name,
-      management_email: email,
-    })
-    .eq('id', orgId)
+  if (name !== orgData.name) {
+    const { error: dbError } = await supabase
+      .from('orgs')
+      .update({ name })
+      .eq('id', orgId)
 
-  if (dbError) {
-    if (!silent)
-      log.error(`Could not update organization ${formatError(dbError)}`)
-    throw new Error(`Could not update organization: ${formatError(dbError)}`)
+    if (dbError) {
+      if (!silent)
+        log.error(`Could not update organization ${formatError(dbError)}`)
+      throw new Error(`Could not update organization: ${formatError(dbError)}`)
+    }
+  }
+
+  if (email !== orgData.management_email) {
+    await updateOrganizationManagementEmail(supabase, orgId, email, silent)
   }
 
   await sendEvent(enrichedOptions.apikey, {

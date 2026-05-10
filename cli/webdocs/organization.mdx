@@ -96,7 +96,7 @@ npx @capgo/cli@latest organization set
 ```
 
 ⚙️ Update organization settings including name, email, security policies, and enforcement options.
-Security settings require super_admin role.
+Security settings and management email updates require super_admin role.
 
 **Example:**
 
@@ -109,7 +109,7 @@ npx @capgo/cli@latest organization set ORG_ID --name "New Name"
 | Param          | Type          | Description          |
 | -------------- | ------------- | -------------------- |
 | **-n** | <code>string</code> | Organization name |
-| **-e** | <code>string</code> | Management email for the organization |
+| **-e** | <code>string</code> | Management email for the organization (requires super_admin) |
 | **--enforce-2fa** | <code>boolean</code> | Enable 2FA enforcement for all organization members |
 | **--no-enforce-2fa** | <code>boolean</code> | Disable 2FA enforcement for organization |
 | **--password-policy** | <code>boolean</code> | Enable password policy enforcement for organization |

@@ -1095,6 +1095,108 @@ describe('[PUT] /organization', () => {
     }
   })
 
+  it.concurrent('rejects management email updates from org admins', async () => {
+    const orgId = randomUUID()
+    const orgName = `Admin Email Boundary Organization ${new Date().toISOString()}`
+    const attemptedEmail = `admin-bypass-${randomUUID()}@example.com`
+    const { error: createError } = await getSupabaseClient().from('orgs').insert({
+      id: orgId,
+      name: orgName,
+      management_email: TEST_EMAIL,
+      created_by: USER_ID_2,
+      use_new_rbac: false,
+    })
+    if (createError)
+      throw createError
+
+    const { error: orgUserError } = await getSupabaseClient().from('org_users').insert({
+      org_id: orgId,
+      user_id: USER_ID,
+      user_right: 'admin',
+    })
+    if (orgUserError)
+      throw orgUserError
+
+    try {
+      const adminHeaders = await getAuthHeadersForCredentials(USER_EMAIL, USER_PASSWORD)
+      const response = await fetch(`${BASE_URL}/organization`, {
+        headers: adminHeaders,
+        method: 'PUT',
+        body: JSON.stringify({ orgId, management_email: attemptedEmail }),
+      })
+      expect(response.status).toBe(403)
+      const responseData = await response.json() as { error: string }
+      expect(responseData.error).toBe('not_authorized')
+
+      const { data, error } = await getSupabaseClient()
+        .from('orgs')
+        .select('management_email')
+        .eq('id', orgId)
+        .single()
+      expect(error).toBeNull()
+      expect(data?.management_email).toBe(TEST_EMAIL)
+    }
+    finally {
+      await getSupabaseClient().from('org_users').delete().eq('org_id', orgId)
+      await getSupabaseClient().from('orgs').delete().eq('id', orgId)
+    }
+  })
+
+  it.concurrent('rejects direct management email updates from org admins', async () => {
+    const orgId = randomUUID()
+    const orgName = `Direct Admin Email Boundary Organization ${new Date().toISOString()}`
+    const attemptedEmail = `direct-admin-bypass-${randomUUID()}@example.com`
+    const { error: createError } = await getSupabaseClient().from('orgs').insert({
+      id: orgId,
+      name: orgName,
+      management_email: TEST_EMAIL,
+      created_by: USER_ID_2,
+      use_new_rbac: false,
+    })
+    if (createError)
+      throw createError
+
+    const { error: orgUserError } = await getSupabaseClient().from('org_users').insert({
+      org_id: orgId,
+      user_id: USER_ID,
+      user_right: 'admin',
+    })
+    if (orgUserError)
+      throw orgUserError
+
+    try {
+      const adminHeaders = await getAuthHeadersForCredentials(USER_EMAIL, USER_PASSWORD)
+      const adminClient = createClient(normalizedSupabaseBaseUrl, SUPABASE_ANON_KEY, {
+        auth: {
+          persistSession: false,
+        },
+        global: {
+          headers: adminHeaders,
+        },
+      })
+
+      const { error: updateError } = await adminClient
+        .from('orgs')
+        .update({ management_email: attemptedEmail })
+        .eq('id', orgId)
+
+      expect(updateError).toBeTruthy()
+      expect(updateError?.message).toContain('Only organization super admins can update the management email')
+
+      const { data, error } = await getSupabaseClient()
+        .from('orgs')
+        .select('management_email')
+        .eq('id', orgId)
+        .single()
+      expect(error).toBeNull()
+      expect(data?.management_email).toBe(TEST_EMAIL)
+    }
+    finally {
+      await getSupabaseClient().from('org_users').delete().eq('org_id', orgId)
+      await getSupabaseClient().from('orgs').delete().eq('id', orgId)
+    }
+  })
+
   it('update organization with invalid body', async () => {
     const response = await fetch(`${BASE_URL}/organization`, {
       headers,

@@ -7,7 +7,7 @@ import { safeParseSchema } from '../../utils/ark_validation.ts'
 import { quickError, simpleError } from '../../utils/hono.ts'
 import { checkPermission } from '../../utils/rbac.ts'
 import { createSignedImageUrl, normalizeImagePath } from '../../utils/storage.ts'
-import { getStripeCustomerName, isDeterministicStripeCustomerUpdateError, updateCustomerOrganizationName } from '../../utils/stripe.ts'
+import { getStripeCustomerName, isDeterministicStripeCustomerUpdateError, updateCustomerEmail, updateCustomerOrganizationName } from '../../utils/stripe.ts'
 import { apikeyHasOrgRightWithPolicy, supabaseAdmin, supabaseApikey, supabaseClient } from '../../utils/supabase.ts'
 import { normalizeWebsiteUrl } from './website.ts'
 
@@ -72,6 +72,28 @@ async function ensureOrgAccess(
     throw quickError(401, 'org_requires_expiring_key', 'This organization requires API keys with an expiration date. Please use a different key or update this key with an expiration date.')
   }
   throw simpleError('cannot_access_organization', 'You can\'t access this organization', { orgId })
+}
+
+async function ensureManagementEmailAccess(
+  supabase: ReturnType<typeof supabaseApikey>,
+  orgId: string,
+  authUserId: string,
+) {
+  const userRight = await supabase.rpc('check_min_rights', {
+    min_right: 'super_admin',
+    org_id: orgId,
+    user_id: authUserId,
+    channel_id: null as any,
+    app_id: null as any,
+  })
+
+  if (userRight.error) {
+    throw simpleError('internal_auth_error', 'Internal auth error', { userRight })
+  }
+
+  if (!userRight.data) {
+    throw quickError(403, 'not_authorized', 'Only organization super admins can update the management email', { orgId })
+  }
 }
 
 function validateMaxExpirationDays(maxDays?: number | null) {
@@ -257,6 +279,26 @@ function getErrorDetail(error: unknown) {
   return error
 }
 
+async function rollbackStripeCustomerEmail(
+  c: Context<MiddlewareKeyVariables>,
+  currentOrg: OrgRow,
+  originalError: unknown,
+) {
+  if (!currentOrg.customer_id) {
+    return
+  }
+
+  try {
+    await updateCustomerEmail(c, currentOrg.customer_id, currentOrg.management_email)
+  }
+  catch (rollbackError) {
+    throw simpleError('cannot_update_org', 'Cannot update org', {
+      error: getErrorDetail(originalError),
+      rollbackError: getErrorDetail(rollbackError),
+    })
+  }
+}
+
 export async function put(
   c: Context<MiddlewareKeyVariables>,
   bodyRaw: any,
@@ -275,6 +317,10 @@ export async function put(
 
   // Auth context is already set by middlewareV2
   await ensureOrgAccess(c, apikey, body.orgId, supabase)
+  const shouldSyncStripeEmail = body.management_email !== undefined
+  if (body.management_email !== undefined) {
+    await ensureManagementEmailAccess(supabase, body.orgId, authUserId)
+  }
 
   if (body.enforcing_2fa) {
     await enforceSelf2faRequirement(authUserId, c)
@@ -287,13 +333,29 @@ export async function put(
     : undefined
   const updateFields = buildUpdateFields(body, sanitizedOrgName)
   const shouldSyncStripeName = body.name !== undefined
-  const currentOrg = shouldSyncStripeName
+  const currentOrg = shouldSyncStripeName || shouldSyncStripeEmail
     ? await getOrgForNameSync(supabase, body.orgId)
     : null
 
-  const dataOrg: Database['public']['Tables']['orgs']['Row'] = await updateOrg(supabase, body.orgId, updateFields, {
-    expectedCurrentName: shouldSyncStripeName ? currentOrg?.name : undefined,
-  })
+  if (shouldSyncStripeEmail) {
+    if (!currentOrg?.customer_id) {
+      throw simpleError('org_does_not_have_customer', 'Organization does not have a customer id', { orgId: body.orgId })
+    }
+    await updateCustomerEmail(c, currentOrg.customer_id, body.management_email!)
+  }
+
+  let dataOrg: Database['public']['Tables']['orgs']['Row']
+  try {
+    dataOrg = await updateOrg(supabase, body.orgId, updateFields, {
+      expectedCurrentName: shouldSyncStripeName ? currentOrg?.name : undefined,
+    })
+  }
+  catch (updateError) {
+    if (shouldSyncStripeEmail && currentOrg) {
+      await rollbackStripeCustomerEmail(c, currentOrg, updateError)
+    }
+    throw updateError
+  }
 
   const committedCustomerId = dataOrg.customer_id
 
@@ -315,6 +377,9 @@ export async function put(
             expectedCurrentName: dataOrg.name,
             expectedCurrentFields: buildExpectedCurrentFields(dataOrg, updateFields),
           })
+          if (shouldSyncStripeEmail && currentOrg) {
+            await rollbackStripeCustomerEmail(c, currentOrg, stripeError)
+          }
         }
         catch (rollbackError) {
           throw simpleError('cannot_update_org', 'Cannot update org', {

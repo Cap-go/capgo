@@ -52,9 +52,10 @@ Use this skill for account and organization administration commands.
   - `npx @capgo/cli@latest organization set ORG_ID --enforce-hashed-api-keys`
 - Notes:
   - Security settings require `super_admin` role.
+  - Management email updates require `super_admin` role and sync the billing customer email through the private organization email endpoint.
 - Key options:
   - `-n, --name <name>`
-  - `-e, --email <email>`
+  - `-e, --email <email>` (requires `super_admin`)
   - `--enforce-2fa`, `--no-enforce-2fa`
   - `--password-policy`, `--no-password-policy`
   - `--min-length <minLength>`
