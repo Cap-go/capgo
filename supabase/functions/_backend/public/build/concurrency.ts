@@ -3,17 +3,9 @@ import { HTTPException } from 'hono/http-exception'
 import { quickError, simpleError } from '../../utils/hono.ts'
 import { cloudlog } from '../../utils/logging.ts'
 import { closeClient, getPgClient, logPgError } from '../../utils/pg.ts'
-import { getCurrentPlanNameOrg } from '../../utils/supabase.ts'
 
 export const NATIVE_BUILD_TERMINAL_STATUSES = ['succeeded', 'failed', 'expired', 'released', 'cancelled', 'canceled'] as const
 const NON_ACTIVE_NATIVE_BUILD_STATUSES = ['pending', ...NATIVE_BUILD_TERMINAL_STATUSES] as const
-
-const NATIVE_BUILD_CONCURRENCY_LIMITS: Record<string, number> = {
-  Solo: 2,
-  Maker: 3,
-  Team: 4,
-  Enterprise: 6,
-}
 
 interface PgClient {
   query: <T extends Record<string, unknown> = Record<string, unknown>>(query: string, params?: unknown[]) => Promise<{
@@ -37,10 +29,6 @@ export interface NativeBuildSlotReservation {
   status: string
 }
 
-export function getNativeBuildConcurrencyLimit(planName: string | null | undefined): number {
-  return NATIVE_BUILD_CONCURRENCY_LIMITS[planName ?? ''] ?? NATIVE_BUILD_CONCURRENCY_LIMITS.Solo
-}
-
 export async function reserveNativeBuildSlot(
   c: Context,
   input: ReserveNativeBuildSlotInput,
@@ -51,8 +39,6 @@ export async function reserveNativeBuildSlot(
   let client: PgClient | null = null
 
   try {
-    planName = await getCurrentPlanNameOrg(c, input.orgId)
-    limit = getNativeBuildConcurrencyLimit(planName)
     pgPool = getPgClient(c)
     client = await pgPool.connect() as PgClient
     await client.query('BEGIN')
@@ -63,6 +49,30 @@ export async function reserveNativeBuildSlot(
     )
     if ((orgLock.rowCount ?? 0) !== 1) {
       throw simpleError('not_found', 'Organization not found')
+    }
+
+    const planLimitResult = await client.query<{
+      plan_name: string | null
+      native_build_concurrency: number | string | null
+    }>(
+      `
+        SELECT
+          COALESCE(current_plan.name, solo_plan.name) AS plan_name,
+          COALESCE(current_plan.native_build_concurrency, solo_plan.native_build_concurrency) AS native_build_concurrency
+        FROM public.orgs o
+        LEFT JOIN public.stripe_info si ON o.customer_id = si.customer_id
+        LEFT JOIN public.plans current_plan ON si.product_id = current_plan.stripe_id
+        LEFT JOIN public.plans solo_plan ON solo_plan.name = 'Solo'
+        WHERE o.id = $1
+        LIMIT 1
+      `,
+      [input.orgId],
+    )
+    planName = planLimitResult.rows[0]?.plan_name ?? ''
+    limit = Number(planLimitResult.rows[0]?.native_build_concurrency)
+
+    if (!planName || !Number.isInteger(limit) || limit <= 0) {
+      throw simpleError('internal_error', 'Native build concurrency limit is not configured for plan')
     }
 
     const activeBuildsResult = await client.query<{ active_count: string }>(
