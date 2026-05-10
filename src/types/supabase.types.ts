@@ -490,6 +490,7 @@ export type Database = {
           owner_org: string
           platform: string
           requested_by: string
+          runner_wait_seconds: number
           status: string
           updated_at: string
           upload_expires_at: string
@@ -508,6 +509,7 @@ export type Database = {
           owner_org: string
           platform: string
           requested_by: string
+          runner_wait_seconds?: number
           status?: string
           updated_at?: string
           upload_expires_at: string
@@ -526,6 +528,7 @@ export type Database = {
           owner_org?: string
           platform?: string
           requested_by?: string
+          runner_wait_seconds?: number
           status?: string
           updated_at?: string
           upload_expires_at?: string
@@ -1850,6 +1853,7 @@ export type Database = {
           market_desc: string | null
           mau: number
           name: string
+          native_build_concurrency: number
           price_m: number
           price_m_id: string
           price_y: number
@@ -1868,6 +1872,7 @@ export type Database = {
           market_desc?: string | null
           mau?: number
           name?: string
+          native_build_concurrency?: number
           price_m?: number
           price_m_id: string
           price_y?: number
@@ -1886,6 +1891,7 @@ export type Database = {
           market_desc?: string | null
           mau?: number
           name?: string
+          native_build_concurrency?: number
           price_m?: number
           price_m_id?: string
           price_y?: number
@@ -3339,6 +3345,7 @@ export type Database = {
           bandwidth: number
           build_time_unit: number
           mau: number
+          native_build_concurrency: number
           storage: number
         }[]
       }

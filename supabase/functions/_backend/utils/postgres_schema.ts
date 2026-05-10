@@ -169,6 +169,7 @@ export const plans = pgTable('plans', {
   name: varchar('name').notNull(),
   stripe_id: varchar('stripe_id').notNull(),
   credit_id: text('credit_id').notNull(),
+  native_build_concurrency: integer('native_build_concurrency').notNull().default(2),
 })
 
 export const apikeys = pgTable('apikeys', {

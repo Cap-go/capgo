@@ -3,6 +3,7 @@ import { Hono } from 'hono/tiny'
 import {
   BUILD_TIMEOUT_STATUS,
   calculateBuildRuntimeSeconds,
+  calculateRunnerWaitSeconds,
   calculateTimeoutCompletedAt,
   capBuildRuntimeSeconds,
   formatBuildTimeoutError,
@@ -21,6 +22,7 @@ interface BuilderStatusResponse {
     status: string
     started_at: number | null
     completed_at: number | null
+    runner_wait_ms?: number | null
     error: string | null
   }
   machine: Record<string, unknown> | null
@@ -150,6 +152,7 @@ app.post('/', middlewareAPISecret, async (c) => {
       const appTimeout = appTimeouts.get(build.app_id)
       const timeoutSeconds = normalizeBuildTimeoutSeconds(appTimeout?.timeoutSeconds)
       const runtimeSeconds = calculateBuildRuntimeSeconds(builderJob.job.started_at, builderJob.job.completed_at)
+      const runnerWaitSeconds = calculateRunnerWaitSeconds(builderJob.job.runner_wait_ms)
       const buildTimedOut = shouldApplyBuildTimeout(
         builderJob.job.started_at,
         builderJob.job.completed_at,
@@ -211,6 +214,7 @@ app.post('/', middlewareAPISecret, async (c) => {
         .update({
           status: effectiveStatus,
           last_error: effectiveError,
+          runner_wait_seconds: runnerWaitSeconds,
           updated_at: new Date().toISOString(),
         })
         .eq('id', build.id)
