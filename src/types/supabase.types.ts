@@ -1237,6 +1237,8 @@ export type Database = {
           build_count_day_ios: number
           build_total_seconds_day_android: number
           build_total_seconds_day_ios: number
+          builder_active_paying_clients_60d: number
+          live_updates_active_paying_clients_60d: number
           builds_android: number | null
           builds_ios: number | null
           builds_last_month: number | null
@@ -1311,6 +1313,8 @@ export type Database = {
           build_count_day_ios?: number
           build_total_seconds_day_android?: number
           build_total_seconds_day_ios?: number
+          builder_active_paying_clients_60d?: number
+          live_updates_active_paying_clients_60d?: number
           builds_android?: number | null
           builds_ios?: number | null
           builds_last_month?: number | null
@@ -1385,6 +1389,8 @@ export type Database = {
           build_count_day_ios?: number
           build_total_seconds_day_android?: number
           build_total_seconds_day_ios?: number
+          builder_active_paying_clients_60d?: number
+          live_updates_active_paying_clients_60d?: number
           builds_android?: number | null
           builds_ios?: number | null
           builds_last_month?: number | null
