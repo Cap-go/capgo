@@ -2,13 +2,20 @@ ALTER TABLE "public"."plans"
 ADD COLUMN "native_build_concurrency" integer DEFAULT 2 NOT NULL;
 
 UPDATE "public"."plans"
-SET "native_build_concurrency" = CASE "name"
-  WHEN 'Solo' THEN 2
-  WHEN 'Maker' THEN 3
-  WHEN 'Team' THEN 4
-  WHEN 'Enterprise' THEN 6
-  ELSE "native_build_concurrency"
-END;
+SET "native_build_concurrency" = 2
+WHERE "name" = 'Solo';
+
+UPDATE "public"."plans"
+SET "native_build_concurrency" = 3
+WHERE "name" = 'Maker';
+
+UPDATE "public"."plans"
+SET "native_build_concurrency" = 4
+WHERE "name" = 'Team';
+
+UPDATE "public"."plans"
+SET "native_build_concurrency" = 6
+WHERE "name" = 'Enterprise';
 
 ALTER TABLE "public"."plans"
 ADD CONSTRAINT "plans_native_build_concurrency_positive"
