@@ -38,6 +38,13 @@ export function calculateBuildRuntimeSeconds(
   return Math.max(0, Math.floor((endMs - startedAt) / 1000))
 }
 
+export function calculateRunnerWaitSeconds(runnerWaitMs: number | null | undefined): number {
+  if (typeof runnerWaitMs !== 'number' || !Number.isFinite(runnerWaitMs))
+    return 0
+
+  return Math.max(0, Math.floor(runnerWaitMs / 1000))
+}
+
 export function calculateTimeoutCompletedAt(startedAt: number, timeoutSeconds: number): number {
   return startedAt + normalizeBuildTimeoutSeconds(timeoutSeconds) * 1000
 }

@@ -183,7 +183,6 @@ function formatCurrency(value: number) {
 function formatMetricAmount(metric: Database['public']['Enums']['credit_metric_type'], value: number) {
   // Apply ceil to round up the metric value
   const ceiledValue = Math.ceil(value)
-  const min = new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 }).format(ceiledValue)
   switch (metric) {
     case 'mau':
       return `${new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 }).format(ceiledValue)} ${t('users')}`

@@ -3,6 +3,7 @@ import type { Database } from '../../utils/supabase.types.ts'
 import {
   BUILD_TIMEOUT_STATUS,
   calculateBuildRuntimeSeconds,
+  calculateRunnerWaitSeconds,
   calculateTimeoutCompletedAt,
   capBuildRuntimeSeconds,
   formatBuildTimeoutError,
@@ -26,6 +27,7 @@ interface BuilderStatusResponse {
     status: string
     started_at: number | null
     completed_at: number | null
+    runner_wait_ms?: number | null
     error: string | null
   }
   machine: Record<string, unknown> | null
@@ -162,6 +164,7 @@ export async function getBuildStatus(
 
   const builderJob = await builderResponse.json() as BuilderStatusResponse
   const runtimeSeconds = calculateBuildRuntimeSeconds(builderJob.job.started_at, builderJob.job.completed_at)
+  const runnerWaitSeconds = calculateRunnerWaitSeconds(builderJob.job.runner_wait_ms)
   const timedOut = shouldApplyBuildTimeout(
     builderJob.job.started_at,
     builderJob.job.completed_at,
@@ -196,6 +199,7 @@ export async function getBuildStatus(
     builder_status: builderJob.job.status,
     started_at: builderJob.job.started_at,
     completed_at: effectiveCompletedAt,
+    runner_wait_seconds: runnerWaitSeconds,
     timeout_seconds: timeoutSeconds,
     timed_out: timedOut,
   })
@@ -209,6 +213,7 @@ export async function getBuildStatus(
     .update({
       status: effectiveStatus,
       last_error: effectiveError,
+      runner_wait_seconds: runnerWaitSeconds,
       updated_at: new Date().toISOString(),
     })
     .eq('builder_job_id', job_id)
@@ -256,6 +261,7 @@ export async function getBuildStatus(
     machine: builderJob.machine || null,
     started_at: builderJob.job.started_at,
     completed_at: effectiveCompletedAt,
+    runner_wait_seconds: runnerWaitSeconds,
     build_time_seconds: timeoutApplied
       ? effectiveBuildTimeSeconds
       : builderJob.job.started_at && builderJob.job.completed_at

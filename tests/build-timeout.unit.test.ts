@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   calculateBuildRuntimeSeconds,
+  calculateRunnerWaitSeconds,
   calculateTimeoutCompletedAt,
   capBuildRuntimeSeconds,
   DEFAULT_BUILD_TIMEOUT_SECONDS,
@@ -24,6 +25,12 @@ describe('build timeout helpers', () => {
     expect(calculateBuildRuntimeSeconds(1_000, 31_999)).toBe(30)
     expect(calculateBuildRuntimeSeconds(31_000, 1_000)).toBe(0)
     expect(calculateBuildRuntimeSeconds(null, 31_000)).toBeNull()
+  })
+
+  it.concurrent('normalizes runner wait stats without affecting runtime', () => {
+    expect(calculateRunnerWaitSeconds(61_999)).toBe(61)
+    expect(calculateRunnerWaitSeconds(-1)).toBe(0)
+    expect(calculateRunnerWaitSeconds(null)).toBe(0)
   })
 
   it.concurrent('detects running and completed builds past their timeout', () => {
