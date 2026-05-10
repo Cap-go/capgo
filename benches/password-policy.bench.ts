@@ -6,7 +6,7 @@ import {
 } from '../supabase/functions/_backend/utils/password_policy.ts'
 
 describe('getPasswordUtf8ByteLength', () => {
-  bench('ASCII password', () => {
+  bench('ascii password', () => {
     getPasswordUtf8ByteLength('MyP@ssw0rd!2024')
   })
 

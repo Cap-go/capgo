@@ -1,0 +1,192 @@
+{
+  "name": "capgo_translation",
+  "logpush": true,
+  "compatibility_date": "2026-04-21",
+  "main": "./index.ts",
+  "compatibility_flags": [
+    "nodejs_compat",
+    "nodejs_compat_populate_process_env"
+  ],
+  "placement": {
+    "mode": "smart"
+  },
+  "ai": {
+    "binding": "AI"
+  },
+  "workers_dev": false,
+  "upload_source_maps": true,
+  "env": {
+    "prod": {
+      "name": "capgo_translation-prod",
+      "ai": {
+        "binding": "AI"
+      },
+      "vars": {
+        "ENV_NAME": "capgo_translation-prod"
+      },
+      "observability": {
+        "enabled": true,
+        "head_sampling_rate": 1
+      },
+      "d1_databases": [
+        {
+          "binding": "DB_STOREAPPS",
+          "database_name": "capgo_prod_storeapps",
+          "database_id": "81236a0c-db6e-454d-87da-944fa9bc100c"
+        }
+      ],
+      "queues": {
+        "producers": [
+          {
+            "binding": "TRANSLATION_MESSAGES_QUEUE",
+            "queue": "capgo-api-prod-translation-messages"
+          }
+        ],
+        "consumers": [
+          {
+            "queue": "capgo-api-prod-translation-messages",
+            "max_batch_size": 1,
+            "max_batch_timeout": 5,
+            "max_retries": 5,
+            "retry_delay": 30
+          }
+        ]
+      },
+      "routes": [
+        {
+          "pattern": "api.capgo.app/translation*",
+          "zone_name": "capgo.app"
+        },
+        {
+          "pattern": "api.usecapgo.com/translation*",
+          "zone_name": "usecapgo.com"
+        }
+      ]
+    },
+    "preprod": {
+      "name": "capgo_translation-preprod",
+      "ai": {
+        "binding": "AI"
+      },
+      "vars": {
+        "ENV_NAME": "capgo_translation-preprod"
+      },
+      "observability": {
+        "enabled": true
+      },
+      "d1_databases": [
+        {
+          "binding": "DB_STOREAPPS",
+          "database_name": "capgo_prod_storeapps",
+          "database_id": "81236a0c-db6e-454d-87da-944fa9bc100c"
+        }
+      ],
+      "queues": {
+        "producers": [
+          {
+            "binding": "TRANSLATION_MESSAGES_QUEUE",
+            "queue": "capgo-api-preprod-translation-messages"
+          }
+        ],
+        "consumers": [
+          {
+            "queue": "capgo-api-preprod-translation-messages",
+            "max_batch_size": 1,
+            "max_batch_timeout": 5,
+            "max_retries": 5,
+            "retry_delay": 30
+          }
+        ]
+      },
+      "routes": [
+        {
+          "pattern": "api.preprod.capgo.app/translation*",
+          "zone_name": "capgo.app"
+        },
+        {
+          "pattern": "api.preprod.usecapgo.com/translation*",
+          "zone_name": "usecapgo.com"
+        }
+      ]
+    },
+    "alpha": {
+      "name": "capgo_translation-alpha",
+      "ai": {
+        "binding": "AI"
+      },
+      "vars": {
+        "ENV_NAME": "capgo_translation-alpha"
+      },
+      "observability": {
+        "enabled": true
+      },
+      "d1_databases": [
+        {
+          "binding": "DB_STOREAPPS",
+          "database_name": "capgo_prod_storeapps",
+          "database_id": "81236a0c-db6e-454d-87da-944fa9bc100c"
+        }
+      ],
+      "queues": {
+        "producers": [
+          {
+            "binding": "TRANSLATION_MESSAGES_QUEUE",
+            "queue": "capgo-api-alpha-translation-messages"
+          }
+        ],
+        "consumers": [
+          {
+            "queue": "capgo-api-alpha-translation-messages",
+            "max_batch_size": 1,
+            "max_batch_timeout": 5,
+            "max_retries": 5,
+            "retry_delay": 30
+          }
+        ]
+      },
+      "routes": [
+        {
+          "pattern": "api.dev.capgo.app/translation*",
+          "zone_name": "capgo.app"
+        },
+        {
+          "pattern": "api.dev.usecapgo.com/translation*",
+          "zone_name": "usecapgo.com"
+        }
+      ]
+    },
+    "local": {
+      "name": "capgo_translation-local",
+      "ai": {
+        "binding": "AI"
+      },
+      "vars": {
+        "ENV_NAME": "capgo_translation-local"
+      },
+      "d1_databases": [
+        {
+          "binding": "DB_STOREAPPS",
+          "database_name": "capgo_prod_storeapps",
+          "database_id": "81236a0c-db6e-454d-87da-944fa9bc100c"
+        }
+      ],
+      "queues": {
+        "producers": [
+          {
+            "binding": "TRANSLATION_MESSAGES_QUEUE",
+            "queue": "capgo-api-local-translation-messages"
+          }
+        ],
+        "consumers": [
+          {
+            "queue": "capgo-api-local-translation-messages",
+            "max_batch_size": 1,
+            "max_batch_timeout": 5,
+            "max_retries": 5,
+            "retry_delay": 30
+          }
+        ]
+      }
+    }
+  }
+}

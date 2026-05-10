@@ -27,6 +27,10 @@ describe('rbac permission system', () => {
       userId,
     ])
     await query(`SELECT set_config($1, $2, true)`, [
+      'request.jwt.claim.role',
+      'authenticated',
+    ])
+    await query(`SELECT set_config($1, $2, true)`, [
       'request.jwt.claims',
       JSON.stringify({
         sub: userId,
@@ -738,6 +742,112 @@ describe('rbac permission system', () => {
 
         expect(deniedResult.rows[0].allowed).toBe(false)
         expect(allowedResult.rows[0].allowed).toBe(true)
+      })
+
+      it('should block direct channel version updates when promote_bundle is denied for the channel', async () => {
+        const testId = randomUUID()
+        const orgId = randomUUID()
+        const appUuid = randomUUID()
+        const appId = `com.rbac.channel.promote-deny.${testId}`
+
+        await query(`
+          INSERT INTO public.orgs (id, name, management_email, created_by, use_new_rbac)
+          VALUES ($1::uuid, $2, $3, $4::uuid, true)
+        `, [orgId, `RBAC Promote Deny ${testId}`, `rbac-promote-deny-${testId}@capgo.app`, USER_ID])
+
+        await query(`
+          INSERT INTO public.apps (id, app_id, name, icon_url, owner_org)
+          VALUES ($1::uuid, $2, $3, $4, $5::uuid)
+        `, [appUuid, appId, `RBAC Promote Deny App ${testId}`, 'rbac-promote-deny-icon', orgId])
+
+        await query(`
+          INSERT INTO public.role_bindings (
+            principal_type,
+            principal_id,
+            role_id,
+            scope_type,
+            org_id,
+            app_id,
+            granted_by,
+            is_direct
+          )
+          SELECT
+            public.rbac_principal_user(),
+            $1::uuid,
+            r.id,
+            public.rbac_scope_app(),
+            $2::uuid,
+            $3::uuid,
+            $1::uuid,
+            true
+          FROM public.roles r
+          WHERE r.name = public.rbac_role_app_developer()
+        `, [USER_ID, orgId, appUuid])
+
+        const originalVersion = await query(`
+          INSERT INTO public.app_versions (app_id, name, owner_org, user_id, storage_provider)
+          VALUES ($1, $2, $3::uuid, $4::uuid, 'r2-direct')
+          RETURNING id
+        `, [appId, `1.0.0-original-${testId}`, orgId, USER_ID])
+
+        const nextVersion = await query(`
+          INSERT INTO public.app_versions (app_id, name, owner_org, user_id, storage_provider)
+          VALUES ($1, $2, $3::uuid, $4::uuid, 'r2-direct')
+          RETURNING id
+        `, [appId, `1.0.0-next-${testId}`, orgId, USER_ID])
+
+        const channel = await query(`
+          INSERT INTO public.channels (name, app_id, version, created_by, owner_org)
+          VALUES ($1, $2, $3::bigint, $4::uuid, $5::uuid)
+          RETURNING id
+        `, [`production-${testId}`, appId, originalVersion.rows[0].id, USER_ID, orgId])
+
+        await query(`
+          INSERT INTO public.channel_permission_overrides (
+            principal_type,
+            principal_id,
+            channel_id,
+            permission_key,
+            is_allowed
+          )
+          VALUES (
+            public.rbac_principal_user(),
+            $1::uuid,
+            $2::bigint,
+            public.rbac_perm_channel_promote_bundle(),
+            false
+          )
+        `, [USER_ID, channel.rows[0].id])
+
+        await withAuthClaim(USER_ID)
+
+        const permission = await query(`
+          SELECT public.rbac_check_permission_request(
+            public.rbac_perm_channel_promote_bundle(),
+            $1::uuid,
+            $2,
+            $3::bigint
+          ) AS allowed
+        `, [orgId, appId, channel.rows[0].id])
+
+        expect(permission.rows[0].allowed).toBe(false)
+
+        await query('SAVEPOINT channel_version_denied')
+        let deniedError: unknown
+        try {
+          await query(`
+            UPDATE public.channels
+            SET version = $1::bigint
+            WHERE id = $2::bigint
+          `, [nextVersion.rows[0].id, channel.rows[0].id])
+        }
+        catch (error) {
+          deniedError = error
+        }
+        await query('ROLLBACK TO SAVEPOINT channel_version_denied')
+
+        expect(deniedError).toBeTruthy()
+        expect((deniedError as Error).message).toContain('PERMISSION_DENIED_CHANNEL_PROMOTE_BUNDLE')
       })
     })
 

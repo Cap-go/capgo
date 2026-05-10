@@ -199,6 +199,21 @@ function getStatusColor(status: string): string {
   }
 }
 
+function formatWaitTime(seconds: number | null | undefined): string {
+  const safeSeconds = Math.max(0, Math.floor(seconds ?? 0))
+  if (safeSeconds < 60)
+    return `${safeSeconds}s`
+
+  const minutes = Math.floor(safeSeconds / 60)
+  const remainingSeconds = safeSeconds % 60
+  if (minutes < 60)
+    return remainingSeconds > 0 ? `${minutes}m ${remainingSeconds}s` : `${minutes}m`
+
+  const hours = Math.floor(minutes / 60)
+  const remainingMinutes = minutes % 60
+  return remainingMinutes > 0 ? `${hours}h ${remainingMinutes}m` : `${hours}h`
+}
+
 columns.value = [
   {
     label: t('created-at'),
@@ -218,6 +233,12 @@ columns.value = [
       const mode = elem.build_mode || ''
       return `${platform} ${mode}`.trim() || '-'
     },
+  },
+  {
+    label: t('runner-wait-time'),
+    key: 'runner_wait_seconds',
+    class: 'truncate max-w-24',
+    displayFunction: (elem: Element) => formatWaitTime(elem.runner_wait_seconds),
   },
   {
     label: t('status'),

@@ -3,29 +3,9 @@ export function toFixed(value: number, fixed: number) {
     return value
   return Number.parseFloat(value.toFixed(fixed))
 }
-export function bytesToMb(bytes: number, fixes = 0) {
-  return toFixed(Math.round(((bytes / 1024.0 / 1024.0) + Number.EPSILON) * 100) / 100, fixes)
-}
 export function bytesToGb(bytes: number, fixes = 0) {
   return toFixed(Math.round(((bytes / 1024.0 / 1024.0 / 1024.0) + Number.EPSILON) * 100) / 100, fixes)
 }
-export function octetsToGb(octets: number) {
-  return Math.round(((octets / 8.0 / 1024.0 / 1024.0 / 1024.0) + Number.EPSILON) * 100) / 100
-}
-export function mbToBytes(mb: number) {
-  return mb * 1024 * 1024
-}
-export function gbToBytes(gb: number) {
-  return gb * 1024 * 1024 * 1024
-}
-
-export function bytesToMbText(bytes: number) {
-  return `${bytesToMb(bytes)} MB`
-}
-export function bytesToGBText(bytes: number) {
-  return `${bytesToGb(bytes)} GB`
-}
-
 /**
  * Formats bytes to a human-readable string with the appropriate unit (B, KB, MB, GB, TB).
  * Automatically picks the right unit based on the size.

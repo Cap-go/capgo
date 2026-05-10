@@ -17,6 +17,7 @@ import { fileURLToPath } from 'node:url'
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const FIXTURES_DIR = join(__dirname, 'fixtures')
 const TEST_PACKAGE = '@capgo/capacitor-updater'
+const PACKNAME = 'package.json'
 
 // Dynamically get the expected version from the first installed fixture
 // This way the test never breaks when new versions are published
@@ -34,9 +35,63 @@ function getExpectedVersion() {
   return null
 }
 
-// Re-implement getInstalledVersion logic to test
-const PACKNAME = 'package.json'
+function readInstalledPackageVersion(packageJsonPath) {
+  if (!existsSync(packageJsonPath))
+    return null
 
+  try {
+    const pkg = JSON.parse(readFileSync(packageJsonPath, 'utf-8'))
+    return pkg.version || null
+  }
+  catch {
+    return null
+  }
+}
+
+function getFixtureInstalledVersion(projectPath, options = {}) {
+  const { subdir, packageJsonPath } = options
+  const fixtureRoot = resolve(projectPath)
+  const candidateBaseDirs = []
+  const addCandidateDir = (dir) => {
+    const candidate = resolve(dir)
+    if (!candidateBaseDirs.includes(candidate))
+      candidateBaseDirs.push(candidate)
+  }
+
+  if (packageJsonPath) {
+    for (const packageJsonPathItem of packageJsonPath.split(',').map(item => item.trim()).filter(Boolean))
+      addCandidateDir(dirname(resolve(projectPath, packageJsonPathItem)))
+  }
+
+  if (subdir)
+    addCandidateDir(join(projectPath, subdir))
+
+  addCandidateDir(projectPath)
+
+  for (const baseDir of candidateBaseDirs) {
+    let currentDir = baseDir
+
+    while (true) {
+      const installedPackageJson = join(currentDir, 'node_modules', ...TEST_PACKAGE.split('/'), PACKNAME)
+      const version = readInstalledPackageVersion(installedPackageJson)
+      if (version)
+        return version
+
+      if (currentDir === fixtureRoot)
+        break
+
+      const parentDir = dirname(currentDir)
+      if (parentDir === currentDir)
+        break
+
+      currentDir = parentDir
+    }
+  }
+
+  return null
+}
+
+// Re-implement getInstalledVersion logic to test
 async function getInstalledVersion(packageName, rootDir, packageJsonPath) {
   if (packageName !== '@capgo/capacitor-updater') {
     return null
@@ -157,14 +212,15 @@ async function runTest(name, projectPath, expectedVersion, options = {}) {
   try {
     const testDir = subdir ? join(projectPath, subdir) : projectPath
     const pkgJsonPath = packageJsonPath ? join(projectPath, packageJsonPath) : undefined
+    const expectedInstalledVersion = getFixtureInstalledVersion(projectPath, options) ?? expectedVersion
 
     const version = await getInstalledVersion(TEST_PACKAGE, testDir, pkgJsonPath)
 
-    if (version === expectedVersion) {
+    if (version === expectedInstalledVersion) {
       console.log(`   ✓ ${name}: ${version}`)
       passed++
     } else {
-      console.error(`   ❌ ${name}: expected ${expectedVersion}, got ${version}`)
+      console.error(`   ❌ ${name}: expected ${expectedInstalledVersion}, got ${version}`)
       failed++
     }
   } catch (error) {

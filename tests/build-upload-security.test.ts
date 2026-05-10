@@ -152,6 +152,54 @@ describe('build upload proxy security', () => {
     }
   })
 
+  it('keeps TUS resume state discoverable between PATCH chunks', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(new Response(null, {
+        status: 204,
+        headers: {
+          'Upload-Offset': '4',
+          'Tus-Resumable': '1.0.0',
+        },
+      }))
+      .mockResolvedValueOnce(new Response(null, {
+        status: 200,
+        headers: {
+          'Upload-Offset': '4',
+          'Tus-Resumable': '1.0.0',
+        },
+      }))
+      .mockResolvedValueOnce(new Response(null, {
+        status: 204,
+        headers: {
+          'Upload-Offset': '5',
+          'Tus-Resumable': '1.0.0',
+        },
+      }))
+
+    try {
+      const uploadUrl = `http://localhost/build/upload/${jobId}/artifact.zip`
+      const apikey = { user_id: 'user-test', key: 'api-test' } as any
+      const firstPatchResponse = await tusProxy(fakeContext(uploadUrl, 'PATCH') as any, jobId, apikey)
+      const headResponse = await tusProxy(fakeContext(uploadUrl, 'HEAD') as any, jobId, apikey, 'HEAD')
+      const secondPatchResponse = await tusProxy(fakeContext(uploadUrl, 'PATCH') as any, jobId, apikey)
+      const forwardedMethods = fetchMock.mock.calls.map(([, init]) => (init as RequestInit).method)
+      const [, headInit] = fetchMock.mock.calls[1] as [string, RequestInit]
+
+      expect(firstPatchResponse.status).toBe(204)
+      expect(firstPatchResponse.headers.get('Upload-Offset')).toBe('4')
+      expect(headResponse.status).toBe(200)
+      expect(headResponse.headers.get('Upload-Offset')).toBe('4')
+      expect(secondPatchResponse.status).toBe(204)
+      expect(secondPatchResponse.headers.get('Upload-Offset')).toBe('5')
+      expect(forwardedMethods).toEqual(['PATCH', 'HEAD', 'PATCH'])
+      expect(headInit).not.toHaveProperty('body')
+      expect(headInit).not.toHaveProperty('duplex')
+    }
+    finally {
+      fetchMock.mockRestore()
+    }
+  })
+
   it('forwards HEAD probes to builder without a request body', async () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(null, {
       status: 204,

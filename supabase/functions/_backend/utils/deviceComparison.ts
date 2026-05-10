@@ -1,5 +1,4 @@
 import type { DeviceWithoutCreatedAt } from './types.ts'
-import { cloudlog } from './logging.ts'
 
 const normalizeOptionalString = (value: string | null | undefined) => (value === undefined || value === null || value === '' ? null : value)
 
@@ -98,44 +97,11 @@ export function hasComparableDeviceChanged(existing: DeviceExistingRowLike, devi
   const comparableExisting = toComparableExisting(existing)
   const comparableDevice = toComparableDevice(device)
 
-  // DEBUG: Log the comparison details
-  const changed = Object.entries(comparableDevice).some(([key, value]) => {
+  return Object.entries(comparableDevice).some(([key, value]) => {
     const existingValue = comparableExisting[key as keyof DeviceComparable]
-    const hasChanged = existingValue !== value
-
-    if (hasChanged) {
-      cloudlog({
-        message: `[DEVICE_COMPARISON] Field "${key}" changed:`,
-        context: {
-          existing: existingValue,
-          new: value,
-          existingType: typeof existingValue,
-          newType: typeof value,
-          device_id: device.device_id,
-          app_id: device.app_id,
-        },
-      })
-    }
-
-    return hasChanged
+    return existingValue !== value
   })
-
-  if (!changed) {
-    cloudlog(`[DEVICE_COMPARISON] No changes detected for device ${device.device_id}`)
-  }
-  else {
-    cloudlog({
-      message: `[DEVICE_COMPARISON] Changes detected for device ${device.device_id}`,
-      context: {
-        comparableExisting,
-        comparableDevice,
-      },
-    })
-  }
-
-  return changed
 }
-
 export function buildNormalizedDeviceForWrite(device: DeviceWithoutCreatedAt) {
   const comparableDevice = toComparableDevice(device)
 

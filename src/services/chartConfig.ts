@@ -266,28 +266,3 @@ export function createLegendConfig(
     },
   }
 }
-
-/**
- * Creates base chart options with common configuration
- */
-export function createBaseChartOptions(
-  isDark: boolean,
-  options: {
-    responsive?: boolean
-    maintainAspectRatio?: boolean
-    interaction?: any
-    scales?: any
-    plugins?: any
-  } = {},
-) {
-  return {
-    responsive: options.responsive ?? true,
-    maintainAspectRatio: options.maintainAspectRatio ?? false,
-    interaction: options.interaction ?? {
-      mode: 'index' as const,
-      intersect: false,
-    },
-    scales: options.scales,
-    plugins: options.plugins,
-  }
-}

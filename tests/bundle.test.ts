@@ -1,9 +1,11 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { BASE_URL, createAppVersions, fetchBundle, getSupabaseClient, headers, resetAndSeedAppData, resetAppData, resetAppDataStats } from './test-utils.ts'
+import { BASE_URL, createAppVersions, fetchBundle, getSupabaseClient, headers, resetAndSeedAppData, resetAppData, resetAppDataStats, USER_ID } from './test-utils.ts'
 
 const id = randomUUID()
 const APPNAME = `com.app.b.${id}`
+const RBAC_APPNAME = `com.app.b.rbac.${id}`
+const RBAC_ORG_ID = randomUUID()
 
 async function putBundleToChannelWithRetry(body: { app_id: string, version_id: number, channel_id: number }, maxRetries = 3): Promise<Response> {
   let response: Response | undefined
@@ -392,5 +394,179 @@ describe('[PUT] /bundle operations - Set bundle to channel', () => {
     expect(response.status).toBe(400)
     const data = await response.json() as { error: string }
     expect(data.error).toBe('invalid_app_id') // Changed: validation now catches invalid format first
+  })
+})
+
+describe('[PUT] /bundle RBAC channel overrides', () => {
+  let versionId: number
+  let originalVersionId: number
+  let channelId: number | undefined
+  let rbacApiKeyId: number | undefined
+  let rbacHeaders: Record<string, string> | undefined
+
+  beforeAll(async () => {
+    const supabase = getSupabaseClient()
+
+    const { error: orgError } = await supabase.from('orgs').insert({
+      id: RBAC_ORG_ID,
+      name: `Bundle RBAC Org ${id}`,
+      management_email: `bundle-rbac-${id}@capgo.app`,
+      created_by: USER_ID,
+      use_new_rbac: true,
+    })
+    if (orgError)
+      throw orgError
+
+    const { data: app, error: appError } = await supabase
+      .from('apps')
+      .insert({
+        app_id: RBAC_APPNAME,
+        name: `Bundle RBAC App ${id}`,
+        icon_url: 'bundle-rbac-test-icon',
+        owner_org: RBAC_ORG_ID,
+      })
+      .select('id')
+      .single()
+    if (appError || !app)
+      throw appError ?? new Error('Failed to create RBAC bundle app')
+    const appId = app.id
+    if (!appId)
+      throw new Error('Created RBAC bundle app is missing id')
+
+    const { error: memberError } = await supabase.from('org_users').insert({
+      org_id: RBAC_ORG_ID,
+      user_id: USER_ID,
+      user_right: 'write',
+    })
+    if (memberError)
+      throw memberError
+
+    await supabase
+      .from('role_bindings')
+      .delete()
+      .eq('principal_type', 'user')
+      .eq('principal_id', USER_ID)
+      .eq('scope_type', 'app')
+      .eq('app_id', appId)
+
+    const { data: role, error: roleError } = await supabase
+      .from('roles')
+      .select('id')
+      .eq('name', 'app_developer')
+      .single()
+    if (roleError || !role)
+      throw roleError ?? new Error('Failed to find app_developer role')
+
+    const { error: bindingError } = await supabase.from('role_bindings').insert({
+      principal_type: 'user',
+      principal_id: USER_ID,
+      role_id: role.id,
+      scope_type: 'app',
+      org_id: RBAC_ORG_ID,
+      app_id: appId,
+      granted_by: USER_ID,
+      is_direct: true,
+    })
+    if (bindingError)
+      throw bindingError
+
+    originalVersionId = (await createAppVersions(`1.0.0-rbac-original-${id}`, RBAC_APPNAME, {
+      owner_org: RBAC_ORG_ID,
+      user_id: USER_ID,
+    })).id
+    versionId = (await createAppVersions(`1.0.0-rbac-target-${id}`, RBAC_APPNAME, {
+      owner_org: RBAC_ORG_ID,
+      user_id: USER_ID,
+    })).id
+
+    const { data: channel, error: channelError } = await supabase
+      .from('channels')
+      .insert({
+        name: `rbac-denied-channel-${id}`,
+        app_id: RBAC_APPNAME,
+        version: originalVersionId,
+        created_by: USER_ID,
+        owner_org: RBAC_ORG_ID,
+      })
+      .select('id')
+      .single()
+    if (channelError || !channel)
+      throw channelError ?? new Error('Failed to create RBAC denied channel')
+    channelId = channel.id
+
+    const { error: overrideError } = await supabase.from('channel_permission_overrides').insert({
+      principal_type: 'user',
+      principal_id: USER_ID,
+      channel_id: channelId,
+      permission_key: 'channel.promote_bundle',
+      is_allowed: false,
+    })
+    if (overrideError)
+      throw overrideError
+
+    const { data: apiKey, error: apiKeyError } = await supabase
+      .from('apikeys')
+      .insert({
+        user_id: USER_ID,
+        key: randomUUID(),
+        key_hash: null,
+        mode: 'write',
+        name: `bundle-rbac-denied-${id}`,
+        limited_to_apps: [RBAC_APPNAME],
+        limited_to_orgs: [],
+      })
+      .select('id, key')
+      .single()
+    if (apiKeyError || !apiKey?.key)
+      throw apiKeyError ?? new Error('Failed to create RBAC API key')
+    rbacApiKeyId = apiKey.id
+    rbacHeaders = {
+      'Content-Type': 'application/json',
+      'capgkey': apiKey.key,
+    }
+  })
+
+  afterAll(async () => {
+    const supabase = getSupabaseClient()
+    if (rbacApiKeyId != null)
+      await supabase.from('apikeys').delete().eq('id', rbacApiKeyId)
+    if (channelId != null)
+      await supabase.from('channel_permission_overrides').delete().eq('channel_id', channelId)
+    await supabase.from('channels').delete().eq('app_id', RBAC_APPNAME)
+    await supabase.from('app_versions').delete().eq('app_id', RBAC_APPNAME)
+    await supabase.from('role_bindings').delete().eq('org_id', RBAC_ORG_ID)
+    await supabase.from('org_users').delete().eq('org_id', RBAC_ORG_ID)
+    await supabase.from('apps').delete().eq('app_id', RBAC_APPNAME)
+    await supabase.from('orgs').delete().eq('id', RBAC_ORG_ID)
+  })
+
+  it('rejects API-key bundle promotion when the user has a target-channel deny override', async () => {
+    if (channelId == null)
+      throw new Error('RBAC denied channel was not created')
+    if (!rbacHeaders)
+      throw new Error('RBAC API key was not created')
+
+    const response = await fetch(`${BASE_URL}/bundle`, {
+      method: 'PUT',
+      headers: rbacHeaders,
+      body: JSON.stringify({
+        app_id: RBAC_APPNAME,
+        version_id: versionId,
+        channel_id: channelId,
+      }),
+    })
+
+    const data = await response.json() as { error: string }
+    expect(response.status).toBe(400)
+    expect(data.error).toBe('cannot_access_app')
+
+    const { data: channel, error } = await getSupabaseClient()
+      .from('channels')
+      .select('version')
+      .eq('id', channelId)
+      .single()
+
+    expect(error).toBeNull()
+    expect(channel?.version).toBe(originalVersionId)
   })
 })

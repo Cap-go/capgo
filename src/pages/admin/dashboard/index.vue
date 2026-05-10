@@ -62,6 +62,8 @@ const globalStatsTrendData = ref<Array<{
   build_avg_seconds_day_android: number
   build_count_day_ios: number
   build_count_day_android: number
+  builder_active_paying_clients_60d: number
+  live_updates_active_paying_clients_60d: number
   build_minutes_day_ios?: number
   build_minutes_day_android?: number
   builds_day_ios?: number
@@ -157,6 +159,38 @@ const totalUsersTrendSeries = computed(() => {
         value: item.users_active,
       })),
       color: '#14b8a6', // teal
+    },
+  ]
+})
+
+const paidProductActivityTrendSeries = computed(() => {
+  if (globalStatsTrendData.value.length === 0)
+    return []
+
+  return [
+    {
+      label: 'Paying Clients',
+      data: globalStatsTrendData.value.map(item => ({
+        date: item.date,
+        value: item.paying || 0,
+      })),
+      color: '#119eff',
+    },
+    {
+      label: 'Builder Active (60d)',
+      data: globalStatsTrendData.value.map(item => ({
+        date: item.date,
+        value: item.builder_active_paying_clients_60d || 0,
+      })),
+      color: '#8b5cf6',
+    },
+    {
+      label: 'Live Updates Active (60d)',
+      data: globalStatsTrendData.value.map(item => ({
+        date: item.date,
+        value: item.live_updates_active_paying_clients_60d || 0,
+      })),
+      color: '#10b981',
     },
   ]
 })
@@ -574,6 +608,20 @@ displayStore.defaultBack = '/dashboard'
             >
               <AdminMultiLineChart
                 :series="totalUsersTrendSeries"
+                :is-loading="isLoadingGlobalStatsTrend"
+              />
+            </ChartCard>
+          </div>
+
+          <!-- Paying Client Product Activity -->
+          <div class="grid grid-cols-1 gap-6">
+            <ChartCard
+              :title="t('paying-client-product-activity-trend')"
+              :is-loading="isLoadingGlobalStatsTrend"
+              :has-data="paidProductActivityTrendSeries.length > 0"
+            >
+              <AdminMultiLineChart
+                :series="paidProductActivityTrendSeries"
                 :is-loading="isLoadingGlobalStatsTrend"
               />
             </ChartCard>

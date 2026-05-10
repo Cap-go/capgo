@@ -7,7 +7,7 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 FIXTURES_DIR="$SCRIPT_DIR"
 PACKAGE_NAME="@capgo/capacitor-updater"
-PACKAGE_VERSION="6.25.5"
+PACKAGE_VERSION="6.45.10"
 
 echo "🧹 Cleaning up old fixtures..."
 rm -rf "$FIXTURES_DIR/npm-project"
@@ -35,7 +35,7 @@ cat > package.json << EOF
   "version": "1.0.0",
   "private": true,
   "dependencies": {
-    "$PACKAGE_NAME": "^$PACKAGE_VERSION"
+    "$PACKAGE_NAME": "$PACKAGE_VERSION"
   }
 }
 EOF
@@ -55,7 +55,7 @@ cat > package.json << EOF
   "version": "1.0.0",
   "private": true,
   "dependencies": {
-    "$PACKAGE_NAME": "^$PACKAGE_VERSION"
+    "$PACKAGE_NAME": "$PACKAGE_VERSION"
   }
 }
 EOF
@@ -75,7 +75,7 @@ cat > package.json << EOF
   "version": "1.0.0",
   "private": true,
   "dependencies": {
-    "$PACKAGE_NAME": "^$PACKAGE_VERSION"
+    "$PACKAGE_NAME": "$PACKAGE_VERSION"
   }
 }
 EOF
@@ -95,7 +95,7 @@ cat > package.json << EOF
   "version": "1.0.0",
   "private": true,
   "dependencies": {
-    "$PACKAGE_NAME": "^$PACKAGE_VERSION"
+    "$PACKAGE_NAME": "$PACKAGE_VERSION"
   }
 }
 EOF
@@ -123,7 +123,7 @@ cat > apps/mobile/package.json << EOF
   "version": "1.0.0",
   "private": true,
   "dependencies": {
-    "$PACKAGE_NAME": "^$PACKAGE_VERSION"
+    "$PACKAGE_NAME": "$PACKAGE_VERSION"
   }
 }
 EOF
@@ -154,7 +154,7 @@ cat > apps/mobile/package.json << EOF
   "version": "1.0.0",
   "private": true,
   "dependencies": {
-    "$PACKAGE_NAME": "^$PACKAGE_VERSION"
+    "$PACKAGE_NAME": "$PACKAGE_VERSION"
   }
 }
 EOF
@@ -180,7 +180,7 @@ packages:
   - 'apps/*'
 
 catalog:
-  '@capgo/capacitor-updater': ^$PACKAGE_VERSION
+  '@capgo/capacitor-updater': $PACKAGE_VERSION
 EOF
 cat > apps/mobile/package.json << EOF
 {
@@ -216,7 +216,7 @@ cat > apps/mobile/package.json << EOF
   "version": "1.0.0",
   "private": true,
   "dependencies": {
-    "$PACKAGE_NAME": "^$PACKAGE_VERSION"
+    "$PACKAGE_NAME": "$PACKAGE_VERSION"
   }
 }
 EOF
@@ -252,7 +252,7 @@ cat > apps/mobile/package.json << EOF
   "version": "1.0.0",
   "private": true,
   "dependencies": {
-    "$PACKAGE_NAME": "^$PACKAGE_VERSION"
+    "$PACKAGE_NAME": "$PACKAGE_VERSION"
   }
 }
 EOF
@@ -286,7 +286,7 @@ cat > apps/mobile/package.json << EOF
   "version": "1.0.0",
   "private": true,
   "dependencies": {
-    "$PACKAGE_NAME": "^$PACKAGE_VERSION"
+    "$PACKAGE_NAME": "$PACKAGE_VERSION"
   }
 }
 EOF
@@ -321,7 +321,7 @@ cat > packages/mobile/package.json << EOF
   "version": "1.0.0",
   "private": true,
   "dependencies": {
-    "$PACKAGE_NAME": "^$PACKAGE_VERSION"
+    "$PACKAGE_NAME": "$PACKAGE_VERSION"
   }
 }
 EOF
@@ -334,8 +334,8 @@ echo "   ✓ lerna monorepo created"
 # ============================================================================
 
 # ============================================================================
-# 11. Version Mismatch: package.json says old, node_modules has new
-# This simulates: user has ^6.14.10 in package.json but 6.30.0 installed
+# 11. Version Mismatch: package.json says old, node_modules has the installed fixture version
+# This simulates: user has ^6.14.10 in package.json but a newer fixture version installed
 # ============================================================================
 echo ""
 echo "🎭 Creating version mismatch trap (package.json lies)..."
@@ -348,7 +348,7 @@ cat > package.json << EOF
   "version": "1.0.0",
   "private": true,
   "dependencies": {
-    "$PACKAGE_NAME": "^$PACKAGE_VERSION"
+    "$PACKAGE_NAME": "$PACKAGE_VERSION"
   }
 }
 EOF
@@ -364,7 +364,7 @@ cat > package.json << EOF
   }
 }
 EOF
-echo "   ✓ version mismatch trap created (package.json says 6.14.10, node_modules has latest)"
+echo "   ✓ version mismatch trap created (package.json says 6.14.10, node_modules has the fixture version)"
 
 # ============================================================================
 # 12. Fake nested package.json: Wrong version in a nested fake location
@@ -380,7 +380,7 @@ cat > package.json << EOF
   "version": "1.0.0",
   "private": true,
   "dependencies": {
-    "$PACKAGE_NAME": "^$PACKAGE_VERSION"
+    "$PACKAGE_NAME": "$PACKAGE_VERSION"
   }
 }
 EOF
@@ -393,7 +393,7 @@ cat > "src/@capgo/capacitor-updater/package.json" << EOF
   "version": "1.0.0-FAKE"
 }
 EOF
-echo "   ✓ wrong nested version trap created (fake 1.0.0-FAKE in src/, real in node_modules)"
+echo "   ✓ wrong nested version trap created (fake 1.0.0-FAKE in src/, fixture version in node_modules)"
 
 # ============================================================================
 # 13. Monorepo with different versions: root and app have different versions
@@ -403,13 +403,16 @@ echo ""
 echo "🎭 Creating monorepo different versions trap..."
 mkdir -p "$FIXTURES_DIR/fake-version-trap/apps/mobile"
 cd "$FIXTURES_DIR/fake-version-trap"
-# Only the app has the dependency - this is the common case
+# Root and app both install the package so root lookups stay inside this fixture
 cat > package.json << EOF
 {
   "name": "fake-version-trap-monorepo",
   "version": "1.0.0",
   "private": true,
-  "workspaces": ["apps/*"]
+  "workspaces": ["apps/*"],
+  "dependencies": {
+    "$PACKAGE_NAME": "$PACKAGE_VERSION"
+  }
 }
 EOF
 cat > apps/mobile/package.json << EOF
@@ -418,7 +421,7 @@ cat > apps/mobile/package.json << EOF
   "version": "1.0.0",
   "private": true,
   "dependencies": {
-    "$PACKAGE_NAME": "^$PACKAGE_VERSION"
+    "$PACKAGE_NAME": "$PACKAGE_VERSION"
   }
 }
 EOF
@@ -435,7 +438,7 @@ cat > apps/mobile/package.json << EOF
   }
 }
 EOF
-echo "   ✓ monorepo fake version trap created (app package.json lies, node_modules has real)"
+echo "   ✓ monorepo fake version trap created (app package.json lies, node_modules has the fixture version)"
 
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"

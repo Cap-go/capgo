@@ -99,11 +99,11 @@ async function proxyTusHead(c: Parameters<typeof tusProxy>[0]) {
 }
 
 function isTusHeadProbe(c: Parameters<typeof tusProxy>[0]) {
-  return !!c.req.header('Tus-Resumable')
+  return c.req.method === 'HEAD' || !!c.req.header('Tus-Resumable')
 }
 
-// Some runtimes normalize HEAD to GET on mounted routes.
-// Accept only TUS-shaped GET probes here and forward them upstream as HEAD.
+// Hono serves HEAD through GET handlers on mounted routes.
+// Accept real HEAD requests plus TUS-shaped GET probes and forward them upstream as HEAD.
 app.get(
   '/upload/:jobId',
   async (c, next) => {

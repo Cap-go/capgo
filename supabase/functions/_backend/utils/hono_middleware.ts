@@ -340,8 +340,9 @@ function setApiKeyAuthContext(c: Context, apikey: Database['public']['Tables']['
  * @param c - Hono context used to store auth data.
  * @param userId - The owner of the parent API key.
  * @param subkey - The row representing the validated subkey.
+ * @param subkeySecret - The plaintext subkey secret to propagate to downstream checks.
  */
-function setSubkeyAuthContext(c: Context, userId: string, subkey: Database['public']['Tables']['apikeys']['Row']) {
+function setSubkeyAuthContext(c: Context, userId: string, subkey: Database['public']['Tables']['apikeys']['Row'], subkeySecret: string) {
   c.set('auth', {
     userId,
     authType: 'apikey',
@@ -350,11 +351,7 @@ function setSubkeyAuthContext(c: Context, userId: string, subkey: Database['publ
   })
   c.set('apikey', subkey)
   c.set('subkey', subkey)
-
-  // Prefer the subkey's own secret for downstream RLS/policy checks when it exists.
-  if (subkey.key) {
-    c.set('capgkey', subkey.key)
-  }
+  c.set('capgkey', subkeySecret)
 }
 
 /**
@@ -387,6 +384,29 @@ function validateSubkeyLimits(c: Context, subkey: Database['public']['Tables']['
     return quickError(401, 'invalid_subkey', 'Invalid subkey, no limited apps or orgs')
   }
   return null
+}
+
+/**
+ * Rejects hashed-only subkeys because downstream SQL/RLS paths still require a
+ * plaintext key string and would otherwise fall back to the parent API key.
+ *
+ * @param c - Hono context used for logging.
+ * @param subkey - The candidate subkey row.
+ * @throws quickError when the subkey cannot be safely represented.
+ */
+function assertSubkeyHasPlaintextSecret(
+  c: Context,
+  subkey: Database['public']['Tables']['apikeys']['Row'],
+): asserts subkey is Database['public']['Tables']['apikeys']['Row'] & { key: string } {
+  if (!subkey.key) {
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'Invalid hashed subkey, cannot propagate subkey auth context',
+      subkeyId: subkey.id,
+      subkeyUserId: subkey.user_id,
+    })
+    quickError(401, 'invalid_subkey', 'Invalid subkey')
+  }
 }
 
 /**
@@ -532,7 +552,8 @@ async function foundAPIKey(c: Context, capgkeyString: string, rights: Database['
     if (limitError) {
       return limitError
     }
-    setSubkeyAuthContext(c, apikey.user_id, subkey)
+    assertSubkeyHasPlaintextSecret(c, subkey)
+    setSubkeyAuthContext(c, apikey.user_id, subkey, subkey.key)
   }
 }
 
@@ -657,8 +678,9 @@ export function middlewareKey(rights: Database['public']['Enums']['key_mode'][],
       if (limitError) {
         return limitError
       }
+      assertSubkeyHasPlaintextSecret(c, subkey)
       // Override auth context with subkey for RBAC
-      setSubkeyAuthContext(c, apikey.user_id, subkey)
+      setSubkeyAuthContext(c, apikey.user_id, subkey, subkey.key)
     }
     await next()
   })
