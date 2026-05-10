@@ -15,6 +15,7 @@ import { Client as PgClient } from 'pg'
 import { DEFAULT_ENV_FILE, getArgValue, loadEnv, parsePositiveInteger } from './admin_stripe_backfill_utils.ts'
 
 const DEFAULT_BATCH_SIZE = 30
+const DEFAULT_STATEMENT_TIMEOUT_MS = 300_000
 const DATE_ID_REGEX = /^\d{4}-\d{2}-\d{2}$/
 const DATABASE_URL_ENV_KEYS = [
   'MAIN_SUPABASE_DB_URL',
@@ -45,6 +46,8 @@ Options:
   --to=YYYY-MM-DD      End date_id, inclusive.
   --all                Explicitly process every stored global_stats row. This is the default.
   --batch-size=N       Number of date rows to calculate per SQL batch. Default: ${DEFAULT_BATCH_SIZE}.
+  --statement-timeout-ms=N
+                       SQL statement timeout in milliseconds. Default: ${DEFAULT_STATEMENT_TIMEOUT_MS}.
   --env-file=PATH      Env file to load. Default: ${DEFAULT_ENV_FILE}.
   --help               Show this help.
 `)
@@ -123,12 +126,13 @@ function shouldAllowSelfSignedPgCertificate(env: Record<string, string | undefin
   return isSupabasePoolerHost(databaseUrl)
 }
 
-function createPgClient(databaseUrl: string, env: Record<string, string | undefined>) {
+function createPgClient(databaseUrl: string, env: Record<string, string | undefined>, statementTimeoutMs: number) {
   const host = new URL(databaseUrl).hostname
   const usesLocalDatabase = host === 'localhost' || host === '127.0.0.1' || host === '::1'
   return new PgClient({
     connectionString: databaseUrl,
     ssl: usesLocalDatabase ? false : { rejectUnauthorized: !shouldAllowSelfSignedPgCertificate(env, databaseUrl) },
+    statement_timeout: statementTimeoutMs,
   })
 }
 
@@ -319,6 +323,7 @@ async function main(args = process.argv.slice(2), runtimeEnv: Record<string, str
   const toArg = getArgValue(args, '--to')
   const envFile = getArgValue(args, '--env-file') ?? DEFAULT_ENV_FILE
   const batchSize = parsePositiveInteger(getArgValue(args, '--batch-size'), '--batch-size', DEFAULT_BATCH_SIZE)
+  const statementTimeoutArg = getArgValue(args, '--statement-timeout-ms')
 
   if (all && (fromArg || toArg))
     throw new Error('--all cannot be combined with --from or --to')
@@ -334,8 +339,13 @@ async function main(args = process.argv.slice(2), runtimeEnv: Record<string, str
     ...fileEnv,
     ...runtimeEnv,
   }
+  const statementTimeoutMs = parsePositiveInteger(
+    statementTimeoutArg ?? env.PG_STATEMENT_TIMEOUT_MS?.trim() ?? null,
+    '--statement-timeout-ms',
+    DEFAULT_STATEMENT_TIMEOUT_MS,
+  )
   const databaseUrl = getRequiredDatabaseUrl(env)
-  const client = createPgClient(databaseUrl, env)
+  const client = createPgClient(databaseUrl, env, statementTimeoutMs)
 
   await client.connect()
   try {
@@ -351,6 +361,7 @@ async function main(args = process.argv.slice(2), runtimeEnv: Record<string, str
     else
       console.log(`Scope: ${fromDateId ?? 'first'} to ${toDateId ?? 'last'}`)
     console.log(`Batch size: ${batchSize}`)
+    console.log(`Statement timeout: ${statementTimeoutMs}ms`)
 
     for (const chunk of chunks) {
       const batchRows = apply
