@@ -25,6 +25,7 @@ describe('admin Stripe backfill scripts', () => {
         plan_solo_conversion_rate: 0,
         plan_team: 0,
         plan_team_conversion_rate: 0,
+        plan_total_conversion_rate: 0,
       },
       {
         date_id: '2026-04-02',
@@ -38,6 +39,7 @@ describe('admin Stripe backfill scripts', () => {
         plan_solo_conversion_rate: 15,
         plan_team: 0,
         plan_team_conversion_rate: 0,
+        plan_total_conversion_rate: 25,
       },
     ] as any, [
       ...Array.from({ length: 200 }, () => ({ created_at: '2026-04-01T12:00:00.000Z' })),
@@ -54,6 +56,7 @@ describe('admin Stripe backfill scripts', () => {
           maker: 0,
           solo: 0,
           team: 0,
+          total: 0,
         },
         current_rate: 0,
         next_plan_rates: {
@@ -61,6 +64,7 @@ describe('admin Stripe backfill scripts', () => {
           maker: 5,
           solo: 7.5,
           team: 0,
+          total: 12.5,
         },
         next_rate: 12.5,
         changed: true,
@@ -74,6 +78,7 @@ describe('admin Stripe backfill scripts', () => {
           maker: 10,
           solo: 15,
           team: 0,
+          total: 25,
         },
         current_rate: 25,
         next_plan_rates: {
@@ -81,6 +86,7 @@ describe('admin Stripe backfill scripts', () => {
           maker: 10,
           solo: 15,
           team: 0,
+          total: 25,
         },
         next_rate: 25,
         changed: false,
@@ -102,6 +108,7 @@ describe('admin Stripe backfill scripts', () => {
         plan_solo_conversion_rate: 15,
         plan_team: 0,
         plan_team_conversion_rate: 0,
+        plan_total_conversion_rate: 19.5,
       },
     ] as any, Array.from({ length: 200 }, () => ({ created_at: '2026-04-01T12:00:00.000Z' })))
 
@@ -115,6 +122,7 @@ describe('admin Stripe backfill scripts', () => {
           maker: 4.5,
           solo: 15,
           team: 0,
+          total: 19.5,
         },
         current_rate: 20,
         next_plan_rates: {
@@ -122,6 +130,7 @@ describe('admin Stripe backfill scripts', () => {
           maker: 5,
           solo: 15,
           team: 0,
+          total: 20,
         },
         next_rate: 20,
         changed: true,

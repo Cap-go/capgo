@@ -67,6 +67,7 @@ interface PlanConversionRates {
   maker: number
   solo: number
   team: number
+  total: number
 }
 interface DailyRevenueChangeSummary {
   churnMrr: number
@@ -130,12 +131,17 @@ function calculateConversionRate(converted: number | null | undefined, totalOrgs
   return Number((((converted ?? 0) * 100) / totalOrgs).toFixed(1))
 }
 
+function getPaidPlanTotal(plans: PlanTotal) {
+  return (plans.Solo ?? 0) + (plans.Maker ?? 0) + (plans.Team ?? 0) + (plans.Enterprise ?? 0)
+}
+
 function getPlanConversionRates(plans: PlanTotal, totalOrgs: number): PlanConversionRates {
   return {
     solo: calculateConversionRate(plans.Solo, totalOrgs),
     maker: calculateConversionRate(plans.Maker, totalOrgs),
     team: calculateConversionRate(plans.Team, totalOrgs),
     enterprise: calculateConversionRate(plans.Enterprise, totalOrgs),
+    total: calculateConversionRate(getPaidPlanTotal(plans), totalOrgs),
   }
 }
 
@@ -1069,6 +1075,7 @@ app.post('/', middlewareAPISecret, async (c) => {
     stars,
     paying: customers.total,
     org_conversion_rate,
+    plan_total_conversion_rate: planConversionRates.total,
     plan_solo_conversion_rate: planConversionRates.solo,
     plan_maker_conversion_rate: planConversionRates.maker,
     plan_team_conversion_rate: planConversionRates.team,
