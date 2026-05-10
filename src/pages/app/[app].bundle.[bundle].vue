@@ -14,6 +14,7 @@ import IconDocumentDuplicate from '~icons/heroicons/document-duplicate'
 import IconTrash from '~icons/heroicons/trash'
 import IconSearch from '~icons/ic/round-search?raw'
 import IconAlertCircle from '~icons/lucide/alert-circle'
+import IconPencil from '~icons/lucide/pencil'
 import { findChannelsWithoutPromotionPermission, formatChannelPromotionTargets } from '~/services/channelPromotion'
 import { formatBytes, getChecksumInfo } from '~/services/conversion'
 import { formatDate, formatLocalDate } from '~/services/date'
@@ -41,6 +42,8 @@ const version_meta = ref<Database['public']['Tables']['app_versions_meta']['Row'
 const showBundleMetadataInput = ref<boolean>(false)
 const hasManifest = ref<boolean>(false)
 const showChecksumTooltip = ref(false)
+const metadataLink = ref('')
+const metadataComment = ref('')
 
 // Channel chooser state
 const selectedChannelForLink = ref<Database['public']['Tables']['channels']['Row'] | null>(null)
@@ -108,14 +111,28 @@ const canDeleteBundle = computedAsync(async () => {
   return await checkPermissions('bundle.delete', { appId: version.value.app_id })
 }, false)
 
+const canUpdateBundleMetadata = computedAsync(async () => {
+  if (!version.value?.app_id)
+    return false
+  return await checkPermissions('app.update_settings', { appId: version.value.app_id })
+}, false)
+
 // Function to open link in a new tab
 function openLink(url?: string): void {
-  if (url) {
-    // Using window from global scope
-    const win = window.open(url, '_blank')
-    // Add some security with noopener
-    if (win)
-      win.opener = null
+  if (!url)
+    return
+
+  try {
+    const parsedUrl = new URL(url, globalThis.location.origin)
+    if (!['http:', 'https:'].includes(parsedUrl.protocol)) {
+      console.warn('Blocked unsafe bundle link protocol')
+      return
+    }
+
+    globalThis.open(parsedUrl.toString(), '_blank', 'noopener,noreferrer')
+  }
+  catch {
+    console.warn('Cannot open invalid bundle link')
   }
 }
 
@@ -147,16 +164,31 @@ async function getChannels() {
     return
   channel.value = undefined
   const appId = version.value.app_id
-  const { data: dataChannel } = await supabase
+  const { data: dataChannel, error: channelsError } = await supabase
     .from('channels')
     .select()
     .eq('app_id', appId)
     // .eq('version', version.value.id)
     .order('updated_at', { ascending: false })
-  channels.value = dataChannel || channels.value
+
+  if (channelsError) {
+    console.error('Cannot load channels:', channelsError)
+    channels.value = []
+    filteredChannels.value = []
+    promotableChannelIds.value = new Set()
+    return
+  }
+
+  channels.value = dataChannel ?? []
   const channelPermissions = await Promise.all(channels.value.map(async (channel) => {
-    const allowed = await checkPermissions('channel.promote_bundle', { appId, channelId: channel.id })
-    return { channelId: channel.id, allowed }
+    try {
+      const allowed = await checkPermissions('channel.promote_bundle', { appId, channelId: channel.id })
+      return { channelId: channel.id, allowed }
+    }
+    catch (error) {
+      console.error('Cannot check channel promotion permission:', error)
+      return { channelId: channel.id, allowed: false }
+    }
   }))
   promotableChannelIds.value = new Set(channelPermissions.filter(result => result.allowed).map(result => result.channelId))
   showBundleMetadataInput.value = !!channels.value.find(c => c.disable_auto_update === 'version_number')
@@ -412,6 +444,72 @@ async function openDownload() {
         handler: async () => {
           await downloadNow()
         },
+      },
+    ],
+  })
+  return dialogStore.onDialogDismiss()
+}
+
+function normalizeOptionalMetadata(value: string) {
+  const trimmedValue = value.trim()
+  return trimmedValue.length > 0 ? trimmedValue : null
+}
+
+async function saveBundleMetadata() {
+  if (!version.value)
+    return false
+
+  if (!canUpdateBundleMetadata.value) {
+    toast.error(t('no-permission'))
+    return false
+  }
+
+  const { data, error } = await supabase
+    .from('app_versions')
+    .update({
+      link: normalizeOptionalMetadata(metadataLink.value),
+      comment: normalizeOptionalMetadata(metadataComment.value),
+    })
+    .eq('app_id', version.value.app_id)
+    .eq('id', version.value.id)
+    .select()
+    .single()
+
+  if (error || !data) {
+    console.error('Cannot update bundle metadata', error)
+    toast.error(t('cannot-update-bundle-metadata'))
+    return false
+  }
+
+  version.value = data
+  toast.success(t('bundle-metadata-updated'))
+  return true
+}
+
+async function openBundleMetadataDialog() {
+  if (!version.value)
+    return
+
+  if (!canUpdateBundleMetadata.value) {
+    toast.error(t('no-permission'))
+    return
+  }
+
+  metadataLink.value = version.value.link ?? ''
+  metadataComment.value = version.value.comment ?? ''
+
+  dialogStore.openDialog({
+    title: t('edit-bundle-metadata'),
+    size: 'lg',
+    buttons: [
+      {
+        text: t('button-cancel'),
+        role: 'cancel',
+      },
+      {
+        text: t('update'),
+        role: 'primary',
+        handler: saveBundleMetadata,
       },
     ],
   })
@@ -876,17 +974,52 @@ async function deleteBundle() {
               </InfoRow>
               <!-- Bundle Link -->
               <InfoRow
-                v-if="version.link" :label="t('bundle-link')" :is-link="true"
-                @click="openLink(version.link)"
+                v-if="version.link || !version.deleted" :label="t('bundle-link')"
+                @click="version.link ? openLink(version.link) : null"
               >
-                {{ version.link }}
+                <div class="flex items-center justify-end w-full gap-3 text-right">
+                  <span
+                    :class="{
+                      'cursor-pointer font-bold text-blue-600 underline underline-offset-4 dark:text-blue-500': version.link,
+                      'text-gray-500 dark:text-gray-400': !version.link,
+                    }"
+                  >
+                    {{ version.link || t('bundle-link-empty') }}
+                  </span>
+                  <button
+                    v-if="!version.deleted"
+                    type="button"
+                    class="p-1 transition-colors border border-gray-200 rounded-md dark:border-gray-700 hover:bg-gray-50 hover:border-gray-300 dark:hover:border-gray-600 dark:hover:bg-gray-800"
+                    :disabled="!canUpdateBundleMetadata"
+                    :title="t('edit-bundle-metadata')"
+                    :aria-label="t('edit-bundle-metadata')"
+                    @click.stop="openBundleMetadataDialog"
+                  >
+                    <IconPencil class="w-4 h-4 text-gray-500 cursor-pointer dark:text-gray-400 hover:text-blue-500 dark:hover:text-blue-400" />
+                  </button>
+                </div>
               </InfoRow>
               <!-- Bundle Comment -->
               <InfoRow
-                v-if="version.comment" :label="t('bundle-comment')"
-                @click="copyToast(version?.comment ?? '')"
+                v-if="version.comment || !version.deleted" :label="t('bundle-comment')"
+                @click="version.comment ? copyToast(version.comment) : null"
               >
-                {{ version.comment }}
+                <div class="flex items-center justify-end w-full gap-3 text-right">
+                  <span :class="{ 'text-gray-500 dark:text-gray-400': !version.comment }">
+                    {{ version.comment || t('bundle-comment-empty') }}
+                  </span>
+                  <button
+                    v-if="!version.deleted"
+                    type="button"
+                    class="p-1 transition-colors border border-gray-200 rounded-md dark:border-gray-700 hover:bg-gray-50 hover:border-gray-300 dark:hover:border-gray-600 dark:hover:bg-gray-800"
+                    :disabled="!canUpdateBundleMetadata"
+                    :title="t('edit-bundle-metadata')"
+                    :aria-label="t('edit-bundle-metadata')"
+                    @click.stop="openBundleMetadataDialog"
+                  >
+                    <IconPencil class="w-4 h-4 text-gray-500 cursor-pointer dark:text-gray-400 hover:text-blue-500 dark:hover:text-blue-400" />
+                  </button>
+                </div>
               </InfoRow>
               <!-- zip -->
               <InfoRow :label="t('zip-bundle')">
@@ -1003,6 +1136,36 @@ async function deleteBundle() {
             {{ t('here') }}
           </a>
         </p>
+      </div>
+    </Teleport>
+
+    <!-- Teleport Content for Bundle Metadata Editor -->
+    <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.title === t('edit-bundle-metadata')" defer to="#dialog-v2-content">
+      <div class="w-full space-y-4">
+        <div>
+          <label for="bundle-link-input" class="text-sm font-medium text-gray-700 dark:text-gray-200">
+            {{ t('bundle-link') }}
+          </label>
+          <input
+            id="bundle-link-input"
+            v-model="metadataLink"
+            type="url"
+            class="d-input d-input-bordered mt-2 w-full text-sm"
+            :placeholder="t('bundle-link-placeholder')"
+          >
+        </div>
+        <div>
+          <label for="bundle-comment-input" class="text-sm font-medium text-gray-700 dark:text-gray-200">
+            {{ t('bundle-comment') }}
+          </label>
+          <textarea
+            id="bundle-comment-input"
+            v-model="metadataComment"
+            rows="4"
+            class="d-textarea d-textarea-bordered mt-2 w-full resize-y text-sm"
+            :placeholder="t('bundle-comment-placeholder')"
+          />
+        </div>
       </div>
     </Teleport>
 
