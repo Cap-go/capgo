@@ -87,6 +87,8 @@ testing against Cloudflare Workers.
 
 ### AI Workflow Notes
 
+- **Hono v4 HEAD routing:** do not add HEAD routes with `app.on`. Hono v4 removed `app.head()` because `GET` handlers implicitly serve `HEAD`; keep shared GET/HEAD logic in the `app.get(...)` handler and branch on `c.req.raw.method` only when the behavior must differ.
+
 - For understanding the **current DB schema**, prefer
   `supabase/schemas/prod.sql` (schema dump) instead of scanning all migrations.
 - For **schema changes**, always edit or add files under
@@ -376,6 +378,62 @@ BEGIN
 END;
 $$;
 ```
+
+### PostgreSQL Function Scalability Gate (CRITICAL)
+
+Every PostgreSQL function call added to a policy, view, trigger, RPC,
+PostgREST-exposed query path, or hot backend endpoint must be proven to scale
+before it ships. Treat this as mandatory for RLS helpers such as
+`check_min_rights`, `get_identity_org_appid`, `get_identity_org_allowed`, and
+any new wrapper around them.
+
+Before adding or changing a function call, document the execution model:
+
+- Where the function runs: RLS `USING` / `WITH CHECK`, SQL view, trigger, RPC,
+  backend query, or plugin endpoint.
+- How often it can run: once per statement, once per request, once per row, or
+  once per candidate row from another table.
+- Which roles can reach it: `anon`, `authenticated`, `service_role`, API key, or
+  public PostgREST traffic.
+- The production cardinality of every table it touches, using
+  `supabase/schemas/prod.sql`, production estimates, or staging data with
+  production-like row counts.
+- The exact indexes expected to bound each lookup.
+
+RLS function calls are dangerous by default:
+
+- Assume every function inside an RLS policy can run per row unless
+  `EXPLAIN (ANALYZE, BUFFERS)` proves otherwise.
+- Never fix an unbounded table scan by adding an "allowed ids" helper that scans
+  another large table. Allowed-list helpers are only acceptable when they start
+  from caller-scoped, indexed identity data and stay bounded before touching the
+  protected resource.
+- Never create a helper that scans a broad production table and calls
+  `check_min_rights`, `get_identity*`, RBAC checks, API-key checks, logging, or
+  other SQL functions once per scanned row.
+- If a table has `app_id`, prefer a policy shape that constrains by that
+  row's indexed `app_id`/`owner_org` values. Do not precompute visibility by
+  scanning all apps, all versions, all channels, or all org resources.
+
+Before opening a PR with a PostgreSQL function or RLS policy change, run and
+paste the relevant `EXPLAIN (ANALYZE, BUFFERS)` summary in the PR notes for the
+worst cases:
+
+- Public `anon` request with no auth and no API key.
+- Invalid API key.
+- Valid API key with broad access.
+- Authenticated user with many orgs/apps.
+- Unfiltered PostgREST query with `limit=1`.
+- Filtered control query on the normal indexed filter path.
+- At least 8 parallel unfiltered requests plus an unrelated lightweight query
+  such as `/orgs?select=id&limit=1`.
+
+The plan must show bounded index lookups, stable latency, and no sequential scan
+over large production tables. Nested loops are acceptable only when the outer
+side is already bounded and the inner side uses indexes. If production-scale
+testing is not possible, choose the conservative safer design: deny or restrict
+the path, require an indexed filter, split the endpoint, or ask for review
+before shipping. Do not guess.
 
 ### PostgreSQL Function Permissioning (Least Privilege)
 

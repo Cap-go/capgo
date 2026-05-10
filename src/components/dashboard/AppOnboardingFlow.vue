@@ -10,7 +10,7 @@ import IconCopy from '~icons/ion/copy-outline'
 import IconCheck from '~icons/lucide/check'
 import IconLoader from '~icons/lucide/loader-2'
 import { createDefaultApiKey } from '~/services/apikeys'
-import { createSignedImageUrl } from '~/services/storage'
+import { createSignedImageUrl, getImmediateImageUrl } from '~/services/storage'
 import { getLocalConfig, isLocal, useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
 import { useMainStore } from '~/stores/main'
@@ -34,6 +34,7 @@ type AppRow = Database['public']['Tables']['apps']['Row']
 const isLoading = ref(true)
 const isSubmitting = ref(false)
 const isImportingStore = ref(false)
+const isResumeIconLoading = ref(false)
 const isSeedingDemo = ref(false)
 const isCliCommandVisible = ref(false)
 const apiKey = ref<string | null>(null)
@@ -173,6 +174,31 @@ function getStoreUrls(url: string) {
   return { iosStoreUrl: null, androidStoreUrl: null }
 }
 
+let resumeIconLoadRun = 0
+async function loadResumeIconPreview(rawIconUrl: string | null | undefined, appId: string, run: number) {
+  if (!rawIconUrl || getImmediateImageUrl(rawIconUrl)) {
+    if (run === resumeIconLoadRun)
+      isResumeIconLoading.value = false
+    return
+  }
+
+  isResumeIconLoading.value = true
+  try {
+    const signedIconUrl = await createSignedImageUrl(rawIconUrl)
+    if (!signedIconUrl || run !== resumeIconLoadRun || createdApp.value?.app_id !== appId)
+      return
+
+    localIconPreview.value = signedIconUrl
+  }
+  catch (error) {
+    console.warn('Cannot load signed resume app icon', { appId, error })
+  }
+  finally {
+    if (run === resumeIconLoadRun)
+      isResumeIconLoading.value = false
+  }
+}
+
 async function ensureApiKey() {
   const userId = main.user?.id
   if (!userId)
@@ -233,8 +259,9 @@ async function loadResumeApp() {
   existingApp.value = data.existing_app ?? null
   storeUrl.value = data.ios_store_url ?? data.android_store_url ?? ''
   importedStoreAppId.value = extractAndroidAppId(data.android_store_url ?? '') || ''
-  if (data.icon_url)
-    localIconPreview.value = await createSignedImageUrl(data.icon_url) ?? ''
+  const iconLoadRun = ++resumeIconLoadRun
+  localIconPreview.value = getImmediateImageUrl(data.icon_url) || ''
+  void loadResumeIconPreview(data.icon_url, data.app_id, iconLoadRun)
   storeScreenshotPreview.value = ''
   flowStep.value = 'install'
   return true
@@ -292,6 +319,7 @@ function onSelectIconFormKit(value: unknown) {
   if (localIconPreview.value.startsWith('blob:'))
     URL.revokeObjectURL(localIconPreview.value)
   localIconPreview.value = file ? URL.createObjectURL(file) : ''
+  isResumeIconLoading.value = false
 }
 
 function onAppIdInput(event: Event) {
@@ -791,6 +819,7 @@ watch(suggestedAppId, (value) => {
                 <div class="flex items-center gap-4">
                   <div class="flex h-18 w-18 items-center justify-center overflow-hidden rounded-[22px] bg-slate-800 text-3xl">
                     <img v-if="iconPreview" :src="iconPreview" :alt="t('app-onboarding-icon-preview-alt')" class="h-full w-full object-cover">
+                    <span v-else-if="isResumeIconLoading" class="h-7 w-7 rounded-full border-2 border-blue-400 border-t-transparent animate-spin" :aria-label="t('loading')" />
                     <span v-else>📱</span>
                   </div>
                   <div class="min-w-0">

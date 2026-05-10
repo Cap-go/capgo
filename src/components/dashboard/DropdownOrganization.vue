@@ -338,6 +338,14 @@ watch(
             @error="refreshBrokenOrganizationLogo(currentOrganization)"
           >
           <div
+            v-else-if="currentOrganization?.logo_is_loading"
+            class="flex items-center justify-center w-6 h-6 mr-2 bg-gray-700 rounded-sm d-mask d-mask-squircle shrink-0"
+            :aria-label="t('loading')"
+          >
+            <span class="w-3.5 h-3.5 rounded-full border-2 border-blue-400 border-t-transparent animate-spin" />
+            <span class="sr-only">{{ t('loading') }}</span>
+          </div>
+          <div
             v-else
             class="flex items-center justify-center w-6 h-6 mr-2 text-xs font-semibold text-gray-300 bg-gray-700 rounded-sm d-mask d-mask-squircle shrink-0"
           >
@@ -381,6 +389,14 @@ watch(
                   class="object-cover w-6 h-6 mr-2 rounded-sm d-mask d-mask-squircle shrink-0"
                   @error="refreshBrokenOrganizationLogo(org)"
                 >
+                <div
+                  v-else-if="org.logo_is_loading"
+                  class="flex items-center justify-center w-6 h-6 mr-2 bg-gray-700 rounded-sm d-mask d-mask-squircle shrink-0"
+                  :aria-label="t('loading')"
+                >
+                  <span class="w-3.5 h-3.5 rounded-full border-2 border-blue-400 border-t-transparent animate-spin" />
+                  <span class="sr-only">{{ t('loading') }}</span>
+                </div>
                 <div
                   v-else
                   class="flex items-center justify-center w-6 h-6 mr-2 text-xs font-semibold text-gray-300 bg-gray-700 rounded-sm d-mask d-mask-squircle shrink-0"

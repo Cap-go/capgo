@@ -148,13 +148,6 @@ export const bundleCleanupOptionsSchema = optionsBaseSchema.extend({
 
 export type BundleCleanupOptions = z.infer<typeof bundleCleanupOptionsSchema>
 
-export const bundleUnlinkOptionsSchema = optionsBaseSchema.extend({
-  bundle: z.string().optional(),
-  packageJson: z.string().optional(),
-})
-
-export type BundleUnlinkOptions = z.infer<typeof bundleUnlinkOptionsSchema>
-
 export const bundleEncryptOptionsSchema = z.object({
   key: z.string().optional(),
   keyData: z.string().optional(),

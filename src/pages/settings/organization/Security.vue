@@ -15,7 +15,7 @@ import IconShield from '~icons/heroicons/shield-check'
 import IconUser from '~icons/heroicons/user'
 import SsoConfiguration from '~/components/organizations/SsoConfiguration.vue'
 import { checkPermissions } from '~/services/permissions'
-import { createSignedImageUrl } from '~/services/storage'
+import { createSignedImageUrl, getImmediateImageUrl } from '~/services/storage'
 import { getCurrentPlanNameOrg, useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
 import { useDisplayStore } from '~/stores/display'
@@ -121,6 +121,61 @@ const passwordNonCompliantMembersCount = computed(() => {
 const totalPasswordPolicyMembersCount = computed(() => {
   return membersWithPasswordPolicyStatus.value.filter(m => !m.is_tmp).length
 })
+
+interface MemberImageSource {
+  key: string
+  imageUrl?: string | null
+}
+let mfaMemberImageLoadRun = 0
+let passwordMemberImageLoadRun = 0
+
+async function loadSignedMemberImages(
+  sources: MemberImageSource[],
+  isCurrentRun: () => boolean,
+  applySignedImages: (signedImages: Map<string, string>) => void,
+) {
+  const signedEntries = await Promise.all(sources.map(async (source) => {
+    if (!source.key || !source.imageUrl || getImmediateImageUrl(source.imageUrl))
+      return null
+
+    try {
+      const signedImage = await createSignedImageUrl(source.imageUrl)
+      return signedImage ? [source.key, signedImage] as const : null
+    }
+    catch (error) {
+      console.warn('Cannot load signed security member image', { memberKey: source.key, error })
+      return null
+    }
+  }))
+
+  if (!isCurrentRun())
+    return
+
+  const signedImages = new Map<string, string>()
+  for (const entry of signedEntries) {
+    if (entry)
+      signedImages.set(entry[0], entry[1])
+  }
+
+  if (signedImages.size > 0)
+    applySignedImages(signedImages)
+}
+
+function applyMfaMemberImages(signedImages: Map<string, string>) {
+  membersWithMfaStatus.value = membersWithMfaStatus.value.map((member) => {
+    const signedImage = signedImages.get(member.uid)
+    return signedImage ? { ...member, image_url: signedImage } : member
+  })
+  impactedMembers.value = membersWithMfaStatus.value.filter(m => !m.has_2fa && !m.is_tmp)
+}
+
+function applyPasswordMemberImages(signedImages: Map<string, string>) {
+  membersWithPasswordPolicyStatus.value = membersWithPasswordPolicyStatus.value.map((member) => {
+    const signedImage = signedImages.get(member.uid)
+    return signedImage ? { ...member, image_url: signedImage } : member
+  })
+  nonCompliantPasswordMembers.value = membersWithPasswordPolicyStatus.value.filter(m => !m.password_policy_compliant && !m.is_tmp)
+}
 
 function acronym(email: string) {
   let res = 'NA'
@@ -289,21 +344,28 @@ async function loadMembersWithMfaStatus() {
       }
     }
 
+    const imageLoadRun = ++mfaMemberImageLoadRun
+    const imageSources: MemberImageSource[] = []
     // Merge members with MFA status
-    membersWithMfaStatus.value = await Promise.all((members || []).map(async (member) => {
-      const signedImage = member.image_url ? await createSignedImageUrl(member.image_url) : ''
+    membersWithMfaStatus.value = (members || []).map((member) => {
+      imageSources.push({ key: member.uid, imageUrl: member.image_url })
       return {
         uid: member.uid,
         email: member.email,
-        image_url: signedImage || '',
+        image_url: getImmediateImageUrl(member.image_url) || '',
         role: member.role,
         is_tmp: member.is_tmp,
         has_2fa: mfaMap.get(member.uid) ?? false,
       }
-    }))
+    })
 
     // Calculate impacted members (those without 2FA, excluding pending invites)
     impactedMembers.value = membersWithMfaStatus.value.filter(m => !m.has_2fa && !m.is_tmp)
+    void loadSignedMemberImages(
+      imageSources,
+      () => imageLoadRun === mfaMemberImageLoadRun,
+      applyMfaMemberImages,
+    )
   }
   catch (error) {
     console.error('Error loading members with MFA status:', error)
@@ -354,24 +416,31 @@ async function loadMembersWithPasswordPolicyStatus() {
       }
     }
 
+    const imageLoadRun = ++passwordMemberImageLoadRun
+    const imageSources: MemberImageSource[] = []
     // Merge members with password policy compliance status
-    membersWithPasswordPolicyStatus.value = await Promise.all((members || []).map(async (member) => {
+    membersWithPasswordPolicyStatus.value = (members || []).map((member) => {
       const compliance = complianceMap.get(member.uid)
-      const signedImage = member.image_url ? await createSignedImageUrl(member.image_url) : ''
+      imageSources.push({ key: member.uid, imageUrl: member.image_url })
       return {
         uid: member.uid,
         email: member.email,
         first_name: compliance?.first_name || null,
         last_name: compliance?.last_name || null,
-        image_url: signedImage || '',
+        image_url: getImmediateImageUrl(member.image_url) || '',
         role: member.role,
         is_tmp: member.is_tmp,
         password_policy_compliant: compliance?.compliant ?? false,
       }
-    }))
+    })
 
     // Calculate non-compliant members (excluding pending invites)
     nonCompliantPasswordMembers.value = membersWithPasswordPolicyStatus.value.filter(m => !m.password_policy_compliant && !m.is_tmp)
+    void loadSignedMemberImages(
+      imageSources,
+      () => imageLoadRun === passwordMemberImageLoadRun,
+      applyPasswordMemberImages,
+    )
   }
   catch (error) {
     console.error('Error loading members with password policy status:', error)

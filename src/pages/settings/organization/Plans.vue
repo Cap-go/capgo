@@ -8,7 +8,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import AdminOnlyModal from '~/components/AdminOnlyModal.vue'
 import CreditsCta from '~/components/CreditsCta.vue'
-import { formatCreditPricingPrice, formatIncludedThenPrice } from '~/services/creditPricing'
+import { formatIncludedThenPrice } from '~/services/creditPricing'
 import { checkPermissions } from '~/services/permissions'
 import { openCheckout } from '~/services/stripe'
 import { getCreditUnitPricing, getCurrentPlanNameOrg, useSupabase } from '~/services/supabase'
@@ -47,6 +47,30 @@ const showAdminModal = ref(false)
 
 const { currentOrganization } = storeToRefs(organizationStore)
 const creditUnitPrices = ref<Partial<Record<Database['public']['Enums']['credit_metric_type'], number>>>({})
+
+interface PlanFeature {
+  label: string
+  showCreditPricingLink?: boolean
+}
+
+function planFeature(label: string, showCreditPricingLink = false): PlanFeature {
+  return { label, showCreditPricingLink }
+}
+
+const planFeatureLabelKeysByPlan: Record<string, string[]> = {
+  solo: ['plan-feature-community-support-discord'],
+  maker: ['plan-feature-priority-plugin-bug-fixes'],
+  team: ['plan-feature-priority-plugin-bug-fixes', 'plan-feature-priority-email-support'],
+  enterprise: [
+    'plan-feature-priority-plugin-bug-fixes',
+    'plan-feature-priority-email-support',
+    'plan-feature-custom-domain',
+    'plan-feature-direct-chat-support',
+    'plan-feature-service-sla',
+    'plan-feature-soc2-certified',
+  ],
+}
+
 function planFeatures(plan: Database['public']['Tables']['plans']['Row']) {
   // Convert build time from seconds to hours or minutes for display
   const buildTimeSeconds = plan.build_time_unit || 0
@@ -75,42 +99,23 @@ function planFeatures(plan: Database['public']['Tables']['plans']['Row']) {
     ? `${plan.bandwidth.toLocaleString()} ${t('plan-bandwidth')} · ${formatIncludedThenPrice('bandwidth', creditUnitPrices.value.bandwidth, t)}`
     : `${plan.bandwidth.toLocaleString()} ${t('plan-bandwidth')}`
 
-  const buildTimeFeature = buildTimeDisplay
-    ? creditUnitPrices.value.build_time !== undefined
-      ? `${buildTimeDisplay} · ${formatIncludedThenPrice('build_time', creditUnitPrices.value.build_time, t)}`
-      : buildTimeDisplay
-    : creditUnitPrices.value.build_time !== undefined
-      ? `${t('build-time')} · ${formatCreditPricingPrice('build_time', creditUnitPrices.value.build_time, t)}`
-      : ''
-
-  const features = [
-    mauFeature,
-    storageFeature,
-    bandwidthFeature,
-    buildTimeFeature,
-  ]
+  const buildTimeFeature = buildTimeDisplay ? planFeature(buildTimeDisplay, true) : null
+  const nativeBuildConcurrencyFeature = plan.native_build_concurrency
+    ? planFeature(t('plan-native-build-concurrency', { count: plan.native_build_concurrency.toLocaleString() }))
+    : null
 
   const planName = plan.name?.toLowerCase() ?? ''
-  if (planName === 'solo') {
-    features.push('Community support (Discord)')
-  }
-  else if (planName === 'maker') {
-    features.push('Priority bug fixes on plugins')
-  }
-  else if (planName === 'team') {
-    features.push('Priority bug fixes on plugins')
-    features.push('Priority support by email')
-  }
-  else if (planName === 'enterprise') {
-    features.push('Priority bug fixes on plugins')
-    features.push('Priority support by email')
-    features.push('Custom domain')
-    features.push('Direct chat support')
-    features.push('Service SLA agreement')
-    features.push('SOC 2 certified')
-  }
+  const extraFeatures = (planFeatureLabelKeysByPlan[planName] ?? [])
+    .map(key => planFeature(t(key)))
 
-  return features.filter(Boolean)
+  return [
+    planFeature(mauFeature),
+    planFeature(storageFeature),
+    planFeature(bandwidthFeature),
+    buildTimeFeature,
+    nativeBuildConcurrencyFeature,
+    ...extraFeatures,
+  ].filter((feature): feature is PlanFeature => !!feature)
 }
 
 function convertKey(key: string) {
@@ -427,6 +432,11 @@ function buttonStyle(p: Database['public']['Tables']['plans']['Row']) {
           <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
             {{ t('plan-desc') }}
           </p>
+          <p class="mt-2 text-sm">
+            <a class="font-medium text-blue-600 hover:underline dark:text-blue-300" href="https://capgo.app/pricing/#compare-plans">
+              {{ t('plan-full-comparison-link') }}
+            </a>
+          </p>
         </div>
 
         <!-- Toggle -->
@@ -550,7 +560,16 @@ function buttonStyle(p: Database['public']['Tables']['plans']['Row']) {
                 <svg class="w-5 h-5 text-green-500 shrink-0" viewBox="0 0 20 20" fill="currentColor">
                   <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
                 </svg>
-                <span class="leading-tight text-gray-600 dark:text-gray-300">{{ f }}</span>
+                <span class="leading-tight text-gray-600 dark:text-gray-300">
+                  {{ f.label }}
+                  <router-link
+                    v-if="f.showCreditPricingLink"
+                    class="ml-1 font-medium text-blue-600 hover:underline dark:text-blue-300"
+                    to="/settings/organization/credits#credit-pricing"
+                  >
+                    {{ t('credits-pricing-after-included-link') }}
+                  </router-link>
+                </span>
               </li>
             </ul>
           </div>

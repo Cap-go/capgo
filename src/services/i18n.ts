@@ -22,10 +22,6 @@ export function getEmoji(locale: string) {
   return countryCodeToFlagEmoji((countryCodes[locale] ?? locale).toUpperCase())
 }
 
-export function getLanguageEmoji(locale: string) {
-  return getEmoji(locale)
-}
-
 export async function changeLanguage(lang: string) {
   const currentLanguage = getSelectedLanguage()
   const nextLanguage = normalizeLanguage(lang)

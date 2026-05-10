@@ -4,7 +4,7 @@ import type { UserModule } from '~/types'
 import { hideLoader } from '~/services/loader'
 import { setUser } from '~/services/posthog'
 import { isSsoUser, provisionSsoUser } from '~/services/ssoProvisioning'
-import { createSignedImageUrl } from '~/services/storage'
+import { createSignedImageUrl, getImmediateImageUrl } from '~/services/storage'
 import { getLocalConfig, useSupabase } from '~/services/supabase'
 import { sendEvent } from '~/services/tracking'
 import { useMainStore } from '~/stores/main'
@@ -65,18 +65,43 @@ async function updateUser(
       userRecord.email = main.auth?.email
     }
 
-    if (userRecord.image_url)
-      userRecord.image_url = await createSignedImageUrl(userRecord.image_url) || null
+    const rawImageUrl = userRecord.image_url
+    const immediateImageUrl = getImmediateImageUrl(rawImageUrl)
+    if (rawImageUrl)
+      userRecord.image_url = immediateImageUrl || null
+
+    const updatePosthogUser = (avatar?: string | null) => {
+      setUser(
+        main.auth?.id ?? '',
+        {
+          email: userRecord.email,
+          nickname: [userRecord.first_name, userRecord.last_name].filter(Boolean).join(' ') || undefined,
+          avatar: avatar ?? undefined,
+        },
+        config.supaHost,
+      )
+    }
+
     main.user = userRecord
-    setUser(
-      main.auth?.id ?? '',
-      {
-        email: userRecord.email,
-        nickname: [userRecord.first_name, userRecord.last_name].filter(Boolean).join(' ') || undefined,
-        avatar: userRecord.image_url ?? undefined,
-      },
-      config.supaHost,
-    )
+    updatePosthogUser(userRecord.image_url)
+
+    if (rawImageUrl && !immediateImageUrl) {
+      void (async () => {
+        try {
+          const signedImageUrl = await createSignedImageUrl(rawImageUrl)
+          const currentUser = main.user
+          if (!signedImageUrl || !currentUser || currentUser.id !== userRecord.id)
+            return
+
+          currentUser.image_url = signedImageUrl
+          main.user = currentUser
+          updatePosthogUser(signedImageUrl)
+        }
+        catch (error) {
+          console.warn('Cannot load signed user image', { userId: userRecord.id, error })
+        }
+      })()
+    }
   }
   catch (error) {
     console.error('auth', error)

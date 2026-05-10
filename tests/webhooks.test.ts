@@ -65,14 +65,16 @@ beforeAll(async () => {
   appScopedKeyId = appScopedKeyData.id
   appScopedKey = appScopedKeyData.key
 
-  const { data: orgScopedSubkeyData, error: orgScopedSubkeyError } = await getSupabaseClient().rpc('create_hashed_apikey_for_user', {
-    p_user_id: USER_ID,
-    p_mode: 'all',
-    p_name: `webhook-org-scoped-subkey-${globalId}`,
-    p_limited_to_orgs: [WEBHOOK_TEST_ORG_ID],
-    p_limited_to_apps: [],
-    p_expires_at: null as unknown as string,
-  })
+  const { data: orgScopedSubkeyData, error: orgScopedSubkeyError } = await getSupabaseClient().from('apikeys').insert({
+    user_id: USER_ID,
+    key: randomUUID(),
+    key_hash: null,
+    mode: 'all',
+    name: `webhook-org-scoped-subkey-${globalId}`,
+    limited_to_orgs: [WEBHOOK_TEST_ORG_ID],
+    limited_to_apps: [],
+    expires_at: null,
+  }).select('id').single()
   if (orgScopedSubkeyError || !orgScopedSubkeyData?.id) {
     throw new Error(`Failed to create org-scoped API subkey for webhook tests: ${orgScopedSubkeyError?.message ?? 'missing key data'}`)
   }

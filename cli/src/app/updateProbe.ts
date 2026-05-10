@@ -485,11 +485,11 @@ const errorHints: Record<string, { cause: string, fix: string, docsUrl?: string 
   },
   invalid_json_body: {
     cause: 'Updates endpoint rejected the request body as invalid JSON.',
-    fix: 'This is likely a CLI bug — please report it at https://github.com/Cap-go/CLI/issues.',
+    fix: 'This is likely a CLI bug — please report it at https://github.com/Cap-go/capgo/issues.',
   },
   invalid_query_parameters: {
     cause: 'Updates endpoint rejected the query parameters.',
-    fix: 'This is likely a CLI bug — please report it at https://github.com/Cap-go/CLI/issues.',
+    fix: 'This is likely a CLI bug — please report it at https://github.com/Cap-go/capgo/issues.',
   },
 }
 

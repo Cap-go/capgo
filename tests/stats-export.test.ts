@@ -28,7 +28,7 @@ describe('[POST] /private/stats/export', () => {
     expect(data.filename).toMatch(/capgo-logs-/)
     expect(data.contentType).toContain('text/csv')
     expect(typeof data.csv).toBe('string')
-    expect(data.csv.startsWith('created_at,app_id,device_id,action,version_name\n')).toBe(true)
+    expect(data.csv.startsWith('created_at,app_id,device_id,action,version_name,metadata\n')).toBe(true)
     // Always ends with a newline for spreadsheet compatibility.
     expect(data.csv.endsWith('\n')).toBe(true)
     expect(data.limit).toBe(10)

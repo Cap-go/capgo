@@ -2,7 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Context } from 'hono'
 import type { AuthInfo, MiddlewareKeyVariables } from './hono.ts'
 import type { Database } from './supabase.types.ts'
-import type { DeviceWithoutCreatedAt, Order, ReadDevicesParams, ReadStatsParams, VersionUsage } from './types.ts'
+import type { DeviceWithoutCreatedAt, NativeVersionUsage, Order, ReadDevicesParams, ReadStatsParams, StatsMetadata, VersionUsage } from './types.ts'
 import { createClient } from '@supabase/supabase-js'
 import { buildNormalizedDeviceForWrite, hasComparableDeviceChanged, nullableString } from './deviceComparison.ts'
 import { simpleError } from './hono.ts'
@@ -1038,6 +1038,8 @@ export function trackDeviceUsageSB(
   deviceId: string,
   appId: string,
   orgId: string,
+  platform: string,
+  versionBuild?: string | null,
 ) {
   return supabaseAdmin(c)
     .from('device_usage')
@@ -1046,6 +1048,8 @@ export function trackDeviceUsageSB(
         device_id: deviceId.toLowerCase(),
         app_id: appId,
         org_id: orgId,
+        platform: platform || 'unknown',
+        version_build: versionBuild || 'unknown',
       },
     ])
 }
@@ -1119,7 +1123,7 @@ export async function trackDevicesSB(c: Context, device: DeviceWithoutCreatedAt)
     .upsert(payload, { onConflict: 'device_id,app_id' })
 }
 
-export function trackLogsSB(c: Context, app_id: string, device_id: string, action: Database['public']['Enums']['stats_action'], version_name: string) {
+export function trackLogsSB(c: Context, app_id: string, device_id: string, action: Database['public']['Enums']['stats_action'], version_name: string, metadata?: StatsMetadata) {
   return supabaseAdmin(c)
     .from('stats')
     .insert(
@@ -1129,6 +1133,7 @@ export function trackLogsSB(c: Context, app_id: string, device_id: string, actio
         device_id,
         action,
         version_name,
+        metadata,
       },
     )
 }
@@ -1156,6 +1161,18 @@ export async function readStatsVersionSB(c: Context, app_id: string, period_star
     .rpc('read_version_usage', { p_app_id: app_id, p_period_start: period_start, p_period_end: period_end })
   // Cast to VersionUsage[] - the SQL function returns version_name but auto-generated types are stale
   return (data ?? []) as unknown as VersionUsage[]
+}
+
+export async function readNativeVersionUsageSB(c: Context, app_id: string, period_start: string, period_end: string, supabase: SupabaseClient<Database>): Promise<NativeVersionUsage[]> {
+  const { data, error } = await supabase
+    .rpc('read_native_version_usage' as any, { p_app_id: app_id, p_period_start: period_start, p_period_end: period_end })
+
+  if (error) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Error reading native version usage', error })
+    throw error
+  }
+
+  return (data ?? []) as unknown as NativeVersionUsage[]
 }
 
 export async function readDeviceVersionCountsSB(c: Context, app_id: string, channelName?: string): Promise<Record<string, number>> {
@@ -1290,14 +1307,15 @@ export async function readDevicesSB(c: Context, params: ReadDevicesParams, custo
 
   const devicesOrder = getDevicesOrder(params.order)
 
-  // Cursor-based pagination only works when an updated_at order is active
-  if (params.cursor && devicesOrder) {
+  if (params.cursor) {
     // Cursor format: "updated_at|device_id"
     const [cursorTime, cursorDeviceId] = params.cursor.split('|')
     if (cursorTime && cursorDeviceId) {
       const quotedCursorTime = quotePostgrestFilterValue(cursorTime)
       const quotedCursorDeviceId = quotePostgrestFilterValue(cursorDeviceId)
-      if (devicesOrder.ascending)
+      if (!devicesOrder)
+        query = query.gt('device_id', cursorDeviceId)
+      else if (devicesOrder.ascending)
         query = query.or(`updated_at.gt.${quotedCursorTime},and(updated_at.eq.${quotedCursorTime},device_id.gt.${quotedCursorDeviceId})`)
       else
         query = query.or(`updated_at.lt.${quotedCursorTime},and(updated_at.eq.${quotedCursorTime},device_id.gt.${quotedCursorDeviceId})`)

@@ -23,9 +23,7 @@
  * <DeploymentBanner :app-id="appId" @deployed="refreshData" />
  */
 
-import type { OrganizationRole } from '~/stores/organization'
 import type { Database } from '~/types/supabase.types'
-import { computedAsync } from '@vueuse/core'
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
@@ -33,7 +31,6 @@ import IconInfo from '~icons/lucide/info'
 import { checkPermissions } from '~/services/permissions'
 import { useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
-import { useOrganizationStore } from '~/stores/organization'
 
 /**
  * Component props interface
@@ -57,15 +54,12 @@ const emit = defineEmits<{
 const { t } = useI18n()
 const supabase = useSupabase()
 const dialogStore = useDialogV2Store()
-const organizationStore = useOrganizationStore()
 
 // Component state
 /** Indicates if initial data is being loaded */
 const loading = ref(true)
 /** Indicates if a deployment is currently in progress */
 const deploying = ref(false)
-/** User's role for the current app (determines permission level) */
-const userRole = ref<OrganizationRole | null>(null)
 /** The most recent bundle available for deployment */
 const latestBundle = ref<Database['public']['Tables']['app_versions']['Row'] | null>(null)
 type DefaultChannel = Pick<
@@ -87,18 +81,6 @@ interface DeployTarget {
   platforms: PlatformKey[]
   needsDeploy: boolean
 }
-
-/**
- * Computed property that checks if the user has admin-level permissions.
- * Only users with admin or super_admin roles can see and use the banner.
- *
- * @returns {boolean} True if user has admin permissions, false otherwise
- */
-const hasAdminPermission = computedAsync(async () => {
-  if (!props.appId || !userRole.value)
-    return false
-  return await checkPermissions('channel.promote_bundle', { appId: props.appId })
-}, false)
 
 const deployTargets = computed<DeployTarget[]>(() => {
   const bundle = latestBundle.value
@@ -132,7 +114,7 @@ const deployTargets = computed<DeployTarget[]>(() => {
  */
 const showBanner = computed(() => {
   // Don't show banner during initial load or if data is missing
-  if (loading.value || !latestBundle.value || !hasAdminPermission.value)
+  if (loading.value || !latestBundle.value)
     return false
 
   if (!deployTargets.value.length)
@@ -144,13 +126,11 @@ const showBanner = computed(() => {
 /**
  * Loads necessary data for the deployment banner.
  *
- * This function performs three main queries:
- * 1. Fetches the user's role/permission level for the app
- * 2. Retrieves the default channel configuration
- * 3. Gets the latest deployable bundle
+ * This function performs two main queries:
+ * 1. Retrieves the default channel configuration and filters by channel permission
+ * 2. Gets the latest deployable bundle
  *
- * The banner will only show if all three pieces of data are available
- * and the user has sufficient permissions.
+ * The banner will only show if deployable channel and bundle data are available.
  *
  * @async
  * @returns {Promise<void>}
@@ -167,23 +147,23 @@ async function loadData() {
   console.log('[DeploymentBanner] Loading data for app:', props.appId)
 
   try {
-    await organizationStore.awaitInitialLoad()
-
-    // Step 1: Get user's role for this app from the organization store
-    // This determines if the user has permission to see and use the banner
-    userRole.value = await organizationStore.getCurrentRoleForApp(props.appId)
-
-    // Step 2: Get default channels configuration (public download channels)
+    // Step 1: Get default channels configuration (public download channels)
     const { data: publicChannels } = await supabase
       .from('channels')
       .select('id, name, ios, android, electron, public, version')
       .eq('app_id', props.appId)
       .eq('public', true)
 
-    defaultChannels.value = publicChannels?.filter(channel => channel.ios || channel.android || channel.electron) ?? []
+    const platformChannels = publicChannels?.filter(channel => channel.ios || channel.android || channel.electron) ?? []
+    const allowedChannels = await Promise.all(platformChannels.map(async (channel) => {
+      const allowed = await checkPermissions('channel.promote_bundle', { appId: props.appId, channelId: channel.id })
+      return allowed ? channel : null
+    }))
+
+    defaultChannels.value = allowedChannels.filter((channel): channel is DefaultChannel => channel !== null)
     console.log('[DeploymentBanner] Default channels:', defaultChannels.value)
 
-    // Step 3: Get latest bundle (excluding special bundle types)
+    // Step 2: Get latest bundle (excluding special bundle types)
     // We filter out 'unknown' and 'builtin' bundles as these are not deployable
     // Only fetch non-deleted bundles ordered by creation date (newest first)
     const { data: bundles } = await supabase
@@ -234,7 +214,12 @@ async function executeDeployment() {
     return
 
   const bundle = latestBundle.value
-  const targetIds = [...selectedChannelIds.value]
+  const allowedTargetIds = new Set(deployTargets.value.map(target => target.id))
+  const targetIds = selectedChannelIds.value.filter(id => allowedTargetIds.has(id))
+  if (targetIds.length === 0) {
+    toast.error(t('no-permission'))
+    return
+  }
 
   deploying.value = true
 

@@ -18,6 +18,10 @@ import { useOrganizationStore } from '~/stores/organization'
 import ChartCard from './ChartCard.vue'
 
 const props = defineProps({
+  appId: {
+    type: String,
+    default: '',
+  },
   useBillingPeriod: {
     type: Boolean,
     default: true,
@@ -34,10 +38,14 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  usageKind: {
+    type: String,
+    default: 'bundle',
+  },
 })
 
 // Demo data generator for devices stats when forceDemo is true
-function generateDemoDevicesData(days: number): { labels: string[], datasets: { label: string, data: number[] }[] } {
+function generateDemoDevicesData(days: number, usageKind: string = 'bundle'): { labels: string[], datasets: { label: string, data: number[] }[] } {
   const labels: string[] = []
   const today = new Date()
 
@@ -67,11 +75,15 @@ function generateDemoDevicesData(days: number): { labels: string[], datasets: { 
     newVersionData.push(Math.round((newValue / total) * 100 * 10) / 10)
   }
 
+  const labelsByKind = usageKind === 'native'
+    ? ['iOS 1.0.0', 'Android 1.1.0']
+    : ['2.0.5', '2.1.0']
+
   return {
     labels,
     datasets: [
-      { label: '2.0.5', data: oldVersionData },
-      { label: '2.1.0', data: newVersionData },
+      { label: labelsByKind[0], data: oldVersionData },
+      { label: labelsByKind[1], data: newVersionData },
     ],
   }
 }
@@ -98,6 +110,9 @@ const supabase = useSupabase()
 const rawChartData = ref<ChartApiData | null>(null)
 
 const appId = ref('')
+const activeAppId = computed(() => props.appId || appId.value)
+const isNativeUsage = computed(() => props.usageKind === 'native')
+const titleKey = computed(() => isNativeUsage.value ? 'active_users_by_native_version' : 'active_users_by_version')
 
 // Cache for bundle ID lookups (version name -> bundle ID)
 const bundleIdCache = ref<Record<string, number>>({})
@@ -118,7 +133,7 @@ const versionByLabel = computed(() => {
 async function navigateToBundle(versionName: string) {
   // Check cache first
   if (bundleIdCache.value[versionName]) {
-    router.push(`/app/${appId.value}/bundle/${bundleIdCache.value[versionName]}`)
+    router.push(`/app/${activeAppId.value}/bundle/${bundleIdCache.value[versionName]}`)
     return
   }
 
@@ -126,7 +141,7 @@ async function navigateToBundle(versionName: string) {
   const { data } = await supabase
     .from('app_versions')
     .select('id')
-    .eq('app_id', appId.value)
+    .eq('app_id', activeAppId.value)
     .eq('name', versionName)
     .limit(1)
     .single()
@@ -134,14 +149,14 @@ async function navigateToBundle(versionName: string) {
   if (data?.id) {
     // Cache the result
     bundleIdCache.value[versionName] = data.id
-    router.push(`/app/${appId.value}/bundle/${data.id}`)
+    router.push(`/app/${activeAppId.value}/bundle/${data.id}`)
   }
 }
 
 // Click handler for tooltip items - navigates directly to bundle page
 // Disabled in demo mode to prevent navigation to non-existent bundles
 const tooltipClickHandler = computed<TooltipClickHandler | undefined>(() => {
-  if (props.forceDemo)
+  if (props.forceDemo || isNativeUsage.value)
     return undefined
   return {
     onAppClick: navigateToBundle,
@@ -265,8 +280,8 @@ const latestVersionCountDisplay = computed(() => {
 })
 
 function resolveOrganizationForCurrentContext(): Organization | undefined {
-  if (appId.value) {
-    const org = organizationStore.getOrgByAppId(appId.value)
+  if (activeAppId.value) {
+    const org = organizationStore.getOrgByAppId(activeAppId.value)
     if (org)
       return org
   }
@@ -299,20 +314,6 @@ function generateDayLabels(_totalLength: number) {
   // Both modes: generate labels for the full date range
   const { startDate, endDate } = currentRange.value
   return generateChartDayLabels(props.useBillingPeriod, startDate, endDate)
-}
-
-function roundPercentageInString(text: string) {
-  if (!text)
-    return text
-
-  return text.replace(/(\d+(?:\.\d+)?)(?=%)/g, (match) => {
-    const numeric = Number(match)
-    if (Number.isNaN(numeric))
-      return match
-
-    const rounded = Number(numeric.toFixed(1))
-    return Number.isInteger(rounded) ? Math.trunc(rounded).toString() : rounded.toFixed(1)
-  })
 }
 
 const processedChartData = computed<ChartData<'line'> | null>(() => {
@@ -537,22 +538,7 @@ const chartOptions = computed<ChartOptions<'line'>>(() => {
 
   const pluginOptions = {
     legend: {
-      display: hasMultipleDatasets,
-      position: 'bottom',
-      labels: {
-        color: isDark.value ? 'white' : 'black',
-        padding: 10,
-        font: {
-          size: 11,
-        },
-        generateLabels(chart: Chart) {
-          const original = Chart.defaults.plugins.legend.labels.generateLabels(chart)
-          return original.map(item => ({
-            ...item,
-            text: roundPercentageInString(item.text),
-          }))
-        },
-      },
+      display: false,
     },
     title: { display: false },
     tooltip: tooltipOptions,
@@ -583,7 +569,7 @@ const chartOptions = computed<ChartOptions<'line'>>(() => {
 const chartPlugins = [verticalLinePlugin, todayLinePlugin] as unknown as Plugin<'line'>[]
 
 async function loadData(forceRefetch = false) {
-  if (!appId.value) {
+  if (!activeAppId.value) {
     rawChartData.value = null
     return
   }
@@ -592,7 +578,7 @@ async function loadData(forceRefetch = false) {
   if (props.forceDemo) {
     const { startDate, endDate } = getDateRange()
     const days = Math.floor((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1
-    const demoData = generateDemoDevicesData(days)
+    const demoData = generateDemoDevicesData(days, props.usageKind)
     rawChartData.value = demoData
     currentRange.value = { startDate, endDate }
     isLoading.value = false
@@ -640,7 +626,7 @@ async function loadData(forceRefetch = false) {
   currentRange.value = { startDate, endDate }
 
   try {
-    const data = await useChartData(supabase, appId.value, startDate, endDate)
+    const data = await useChartData(supabase, activeAppId.value, startDate, endDate, props.usageKind === 'native' ? 'native' : 'bundle')
 
     if (currentToken !== requestToken)
       return
@@ -671,25 +657,27 @@ async function loadData(forceRefetch = false) {
 
 // Watch billing period changes - use cached data if available
 watch(() => props.useBillingPeriod, async () => {
-  if (appId.value)
+  if (activeAppId.value)
     await loadData(false) // Use cache if available
 })
 
 // Watch forceDemo changes - reload with demo data or real data
 watch(() => props.forceDemo, async () => {
-  if (appId.value)
+  if (activeAppId.value)
     await loadData(true) // Force reload to switch between demo/real data
 })
 
 // Watch for reload trigger - force refetch
 watch(() => props.reloadTrigger, async () => {
-  if (appId.value)
+  if (activeAppId.value)
     await loadData(true) // Force refetch
 })
 
 watch(
   () => [route.path, route.params.app as string | undefined] as const,
   async ([path, packageId], old) => {
+    if (props.appId)
+      return
     const oldPackageId = old?.[1]
     // Check for app route pattern
     if (path.includes('/app/') && packageId) {
@@ -715,11 +703,41 @@ watch(
   },
   { immediate: true },
 )
+
+watch(
+  () => [props.appId, props.usageKind] as const,
+  async ([packageId, usageKind], old) => {
+    const oldPackageId = old?.[0]
+    const oldUsageKind = old?.[1]
+    const usageKindChanged = oldUsageKind !== undefined && usageKind !== oldUsageKind
+
+    if (!packageId && !usageKindChanged)
+      return
+
+    if (packageId)
+      appId.value = packageId
+
+    if (!activeAppId.value)
+      return
+
+    const packageChanged = !!packageId && packageId !== oldPackageId
+
+    if (packageChanged || usageKindChanged) {
+      cachedBillingData.value = null
+      cached30DayData.value = null
+      await loadData(true)
+    }
+    else if (!rawChartData.value) {
+      await loadData(true)
+    }
+  },
+  { immediate: true },
+)
 </script>
 
 <template>
   <ChartCard
-    :title="t('active_users_by_version')"
+    :title="t(titleKey)"
     :is-loading="isLoading"
     :has-data="hasData"
     :is-demo-data="isDemoMode"
@@ -727,16 +745,20 @@ watch(
     <template #header>
       <div class="flex items-start justify-between flex-1 gap-2">
         <h2 class="flex-1 min-w-0 text-2xl font-semibold leading-tight dark:text-white text-slate-600">
-          {{ t('active_users_by_version') }}
+          {{ t(titleKey) }}
         </h2>
 
-        <div class="flex flex-col items-end text-right shrink-0">
+        <div class="flex max-w-[11rem] flex-col items-end text-right shrink-0">
           <div
             class="inline-flex items-center justify-center px-2 py-1 text-xs font-bold text-white rounded-full shadow-lg whitespace-nowrap bg-cyan-500"
           >
             {{ latestVersionPercentageDisplay }}
           </div>
-          <div v-if="latestVersion" class="text-3xl font-bold dark:text-white text-slate-600">
+          <div
+            v-if="latestVersion"
+            class="font-bold leading-tight break-words dark:text-white text-slate-600"
+            :class="isNativeUsage ? 'text-xl sm:text-2xl' : 'text-3xl'"
+          >
             {{ latestVersion.name }}
           </div>
           <div v-if="latestVersion" class="text-xs text-slate-500 dark:text-slate-400">
@@ -746,6 +768,6 @@ watch(
       </div>
     </template>
 
-    <Line :data="processedChartData!" :options="chartOptions" :plugins="chartPlugins" />
+    <Line class="h-full w-full" :data="processedChartData!" :options="chartOptions" :plugins="chartPlugins" />
   </ChartCard>
 </template>

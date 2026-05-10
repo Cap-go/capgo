@@ -45,9 +45,9 @@ const props = defineProps<{
 }>()
 
 const canRollbackBundle = computedAsync(async () => {
-  if (!props.appId)
+  if (!props.appId || !props.channelId)
     return false
-  return await checkPermissions('channel.rollback_bundle', { appId: props.appId })
+  return await checkPermissions('channel.rollback_bundle', { appId: props.appId, channelId: props.channelId })
 }, false)
 
 const members = ref([] as ExtendedOrganizationMembers)
@@ -145,8 +145,7 @@ const columns = computed<TableColumn[]>(() => {
     ]
   }
 
-  // Channel mode: show bundle name and rollback action
-  return [
+  const channelColumns: TableColumn[] = [
     {
       label: t('bundle-number'),
       key: 'version.name',
@@ -168,6 +167,12 @@ const columns = computed<TableColumn[]>(() => {
       mobile: false,
       displayFunction: item => item.user?.email || '-',
     },
+  ]
+
+  if (!canRollbackBundle.value)
+    return channelColumns
+
+  channelColumns.push(
     {
       label: t('action'),
       key: 'rollback',
@@ -188,7 +193,8 @@ const columns = computed<TableColumn[]>(() => {
         }
       },
     },
-  ]
+  )
+  return channelColumns
 })
 
 async function openOneVersion(item: DeployHistory) {

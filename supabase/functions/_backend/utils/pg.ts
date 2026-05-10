@@ -49,14 +49,11 @@ function buildPlanValidationExpression(
   )`
   // IMPORTANT: read replicas replicate table data but not views/functions.
   // Keep this expression replica-safe by relying on a replicated org flag.
-  //
-  // Semantics note: this flag means "org uses credits/top-up billing", not
-  // "org currently has a positive balance". This avoids plugin read-path
-  // depending on credit ledger tables/views which are not present on replicas.
+  // has_usage_credits means the org currently has positive, unexpired credits.
   //
   // Backward compatibility for replicas that haven't replicated the column yet:
   // read via `to_jsonb(row)->>'has_usage_credits'` so the query still parses
-  // even if the column doesn't exist.
+  // even if the column doesn't exist. Missing column fails closed.
   const hasCreditsExpression = sql`EXISTS (
     SELECT 1
     FROM ${schema.orgs}
@@ -1144,6 +1141,8 @@ export interface AdminGlobalStatsTrend {
   build_avg_seconds_day_android: number
   build_count_day_ios: number
   build_count_day_android: number
+  builder_active_paying_clients_60d: number
+  live_updates_active_paying_clients_60d: number
 }
 
 export async function getAdminGlobalStatsTrend(
@@ -1249,7 +1248,9 @@ export async function getAdminGlobalStatsTrend(
           0
         )::float AS build_avg_seconds_day_android,
         COALESCE(NULLIF(to_jsonb(gs) ->> 'build_count_day_ios', '')::int, NULLIF(to_jsonb(gs) ->> 'builds_day_ios', '')::int, 0)::int AS build_count_day_ios,
-        COALESCE(NULLIF(to_jsonb(gs) ->> 'build_count_day_android', '')::int, NULLIF(to_jsonb(gs) ->> 'builds_day_android', '')::int, 0)::int AS build_count_day_android
+        COALESCE(NULLIF(to_jsonb(gs) ->> 'build_count_day_android', '')::int, NULLIF(to_jsonb(gs) ->> 'builds_day_android', '')::int, 0)::int AS build_count_day_android,
+        COALESCE(NULLIF(to_jsonb(gs) ->> 'builder_active_paying_clients_60d', '')::int, 0)::int AS builder_active_paying_clients_60d,
+        COALESCE(NULLIF(to_jsonb(gs) ->> 'live_updates_active_paying_clients_60d', '')::int, 0)::int AS live_updates_active_paying_clients_60d
       FROM global_stats gs
       WHERE date_id <= ${endDateOnly}
       )
@@ -1324,6 +1325,8 @@ export async function getAdminGlobalStatsTrend(
       build_avg_seconds_day_android: Number(row.build_avg_seconds_day_android) || 0,
       build_count_day_ios: Number(row.build_count_day_ios) || 0,
       build_count_day_android: Number(row.build_count_day_android) || 0,
+      builder_active_paying_clients_60d: Number(row.builder_active_paying_clients_60d) || 0,
+      live_updates_active_paying_clients_60d: Number(row.live_updates_active_paying_clients_60d) || 0,
     }))
 
     cloudlog({ requestId: c.get('requestId'), message: 'getAdminGlobalStatsTrend result', resultCount: data.length })

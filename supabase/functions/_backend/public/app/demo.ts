@@ -770,6 +770,7 @@ export async function createDemoApp(c: Context<MiddlewareKeyVariables>, body: Cr
           buildNumber: build.version.replace(/\./g, ''),
         },
         builder_job_id: build.status === 'succeeded' ? `demo-job-${buildId.slice(0, 8)}` : null,
+        runner_wait_seconds: build.status === 'succeeded' ? 20 + build.daysAgo * 3 : 0,
         created_at: createdAt,
         upload_expires_at: expiresAt,
         upload_path: `builds/${appId}/${build.platform}/${build.version}`,

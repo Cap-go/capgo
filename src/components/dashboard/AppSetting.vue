@@ -14,11 +14,22 @@ import gearSix from '~icons/ph/gear-six?raw'
 import iconName from '~icons/ph/user?raw'
 import Toggle from '~/components/Toggle.vue'
 import { checkPermissions } from '~/services/permissions'
-import { createSignedImageUrl } from '~/services/storage'
+import { createSignedImageUrl, getImmediateImageUrl } from '~/services/storage'
 import { useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
 
 const props = defineProps<{ appId: string }>()
+const DOWNLOAD_PLATFORMS = ['ios', 'android', 'electron'] as const
+type DownloadPlatform = typeof DOWNLOAD_PLATFORMS[number]
+interface DownloadChannel {
+  id: number
+  name: string
+  ios: boolean
+  android: boolean
+  electron: boolean
+  public: boolean
+}
+
 const isLoading = ref(false)
 const isFirstLoading = ref(true)
 const router = useRouter()
@@ -32,13 +43,12 @@ const organizationStore = useOrganizationStore()
 const transferAppIdInput = ref('')
 const selectedChannel = ref('')
 const uploadSearch = ref('')
-const channels = ref<Array<{ id: number, name: string, ios: boolean, android: boolean, electron: boolean, public: boolean }>>([])
-const selectedDownloadChannels = ref<{ ios: string, android: string }>({ ios: '', android: '' })
+const channels = ref<DownloadChannel[]>([])
+const selectedDownloadChannelIds = ref<Record<DownloadPlatform, number | null>>({ ios: null, android: null, electron: null })
 const splitDownloadDefaults = ref(false)
-const selectedCombinedChannel = ref('')
+const selectedCombinedChannelId = ref<number | null>(null)
 const combinedSearch = ref('')
-const iosSearch = ref('')
-const androidSearch = ref('')
+const downloadSearches = reactive<Record<DownloadPlatform, string>>({ ios: '', android: '', electron: '' })
 
 const canUpdateSettings = computedAsync(async () => {
   if (!appRef.value)
@@ -51,6 +61,10 @@ const canDeleteApp = computedAsync(async () => {
     return false
   return await checkPermissions('app.delete', { appId: props.appId })
 }, false)
+
+const DEFAULT_BUILD_TIMEOUT_SECONDS = 15 * 60
+const MIN_BUILD_TIMEOUT_MINUTES = 5
+const MAX_BUILD_TIMEOUT_MINUTES = 360
 
 // Retention presets (value in seconds)
 const RETENTION_PRESETS = [
@@ -67,6 +81,7 @@ const RETENTION_PRESETS = [
 const selectedRetentionPreset = ref<number>(2592000)
 const customRetentionValue = ref<number>(0)
 const isImportingStoreIcon = ref(false)
+const isAppIconLoading = ref(false)
 
 const isCustomRetention = computed(() => selectedRetentionPreset.value === -1)
 
@@ -83,6 +98,8 @@ const effectiveRetentionValue = computed(() => {
     : selectedRetentionPreset.value
 })
 
+const buildTimeoutMinutes = computed(() => Math.trunc((appRef.value?.build_timeout_seconds ?? DEFAULT_BUILD_TIMEOUT_SECONDS) / 60))
+
 function initializeRetentionPreset() {
   const current = appRef.value?.retention ?? 2592000
   const preset = RETENTION_PRESETS.find(p => p.value !== -1 && p.value === current)
@@ -92,6 +109,31 @@ function initializeRetentionPreset() {
   else {
     selectedRetentionPreset.value = -1
     customRetentionValue.value = current
+  }
+}
+
+let appIconLoadRun = 0
+async function loadAppSettingIcon(rawIconUrl: string | null | undefined, run: number) {
+  if (!rawIconUrl || getImmediateImageUrl(rawIconUrl)) {
+    if (run === appIconLoadRun)
+      isAppIconLoading.value = false
+    return
+  }
+
+  isAppIconLoading.value = true
+  try {
+    const signedIconUrl = await createSignedImageUrl(rawIconUrl)
+    if (!signedIconUrl || run !== appIconLoadRun || !appRef.value)
+      return
+
+    appRef.value.icon_url = signedIconUrl
+  }
+  catch (error) {
+    console.warn('Cannot load signed app setting icon', { appId: props.appId, error })
+  }
+  finally {
+    if (run === appIconLoadRun)
+      isAppIconLoading.value = false
   }
 }
 
@@ -112,9 +154,13 @@ onMounted(async () => {
   }
 
   await organizationStore.awaitInitialLoad()
-  appRef.value = data as any
-  if (appRef.value?.icon_url)
-    appRef.value.icon_url = await createSignedImageUrl(appRef.value.icon_url)
+  const rawIconUrl = data.icon_url
+  const iconLoadRun = ++appIconLoadRun
+  appRef.value = {
+    ...(data as any),
+    icon_url: getImmediateImageUrl(rawIconUrl) || null,
+  }
+  void loadAppSettingIcon(rawIconUrl, iconLoadRun)
   initializeRetentionPreset()
   await loadChannels()
   isLoading.value = false
@@ -191,6 +237,7 @@ async function submit(form: {
   expose_metadata: boolean
   allow_preview: boolean
   allow_device_custom_id: boolean
+  build_timeout_minutes?: number | string
 }) {
   isLoading.value = true
   if (!canUpdateSettings.value) {
@@ -215,6 +262,13 @@ async function submit(form: {
 
   try {
     await updateAppRetention(effectiveRetentionValue.value)
+  }
+  catch (error) {
+    toast.error(error as string)
+  }
+
+  try {
+    await updateBuildTimeout(form.build_timeout_minutes)
   }
   catch (error) {
     toast.error(error as string)
@@ -247,7 +301,7 @@ async function submit(form: {
 }
 
 const storeImportUrl = computed(() => appRef.value?.ios_store_url || appRef.value?.android_store_url || '')
-const shouldShowStoreIconImport = computed(() => !appRef.value?.icon_url && !!storeImportUrl.value)
+const shouldShowStoreIconImport = computed(() => !appRef.value?.icon_url && !isAppIconLoading.value && !!storeImportUrl.value)
 
 function normalizeStoreUrl(rawUrl: string, expectedHost: 'apps.apple.com' | 'play.google.com') {
   const trimmedUrl = rawUrl.trim()
@@ -331,6 +385,7 @@ async function uploadIconFromSource(iconSourceUrl: string) {
   }
 
   appRef.value.icon_url = await createSignedImageUrl(iconPath)
+  isAppIconLoading.value = false
 }
 
 async function importIconFromStore() {
@@ -415,6 +470,28 @@ async function updateAppRetention(newRetention: number) {
     appRef.value.retention = newRetention
 }
 
+async function updateBuildTimeout(rawTimeoutMinutes: number | string | undefined) {
+  const timeoutMinutes = Number(rawTimeoutMinutes)
+  if (!Number.isFinite(timeoutMinutes))
+    throw t('build-timeout-invalid')
+
+  const normalizedMinutes = Math.trunc(timeoutMinutes)
+  if (normalizedMinutes < MIN_BUILD_TIMEOUT_MINUTES || normalizedMinutes > MAX_BUILD_TIMEOUT_MINUTES)
+    throw t('build-timeout-invalid')
+
+  const timeoutSeconds = normalizedMinutes * 60
+  if (timeoutSeconds === appRef.value?.build_timeout_seconds)
+    return
+
+  const { error } = await supabase.from('apps').update({ build_timeout_seconds: timeoutSeconds }).eq('app_id', props.appId)
+  if (error)
+    throw t('cannot-change-build-timeout')
+
+  toast.success(t('changed-build-timeout'))
+  if (appRef.value)
+    appRef.value.build_timeout_seconds = timeoutSeconds
+}
+
 async function updateExposeMetadata(newExposeMetadata: boolean) {
   if (newExposeMetadata === appRef.value?.expose_metadata) {
     return Promise.resolve()
@@ -475,11 +552,18 @@ async function loadChannels() {
   channels.value = data ?? []
 }
 
-const iosChannels = computed(() => channels.value.filter(channel => channel.ios))
-const androidChannels = computed(() => channels.value.filter(channel => channel.android))
-const combinedOptions = computed(() => channels.value.filter(channel => channel.ios && channel.android))
-const iosSingleOptions = computed(() => channels.value.filter(channel => channel.ios && !channel.android))
-const androidSingleOptions = computed(() => channels.value.filter(channel => channel.android && !channel.ios))
+const platformOptions = computed<Record<DownloadPlatform, DownloadChannel[]>>(() => ({
+  ios: channels.value.filter(channel => channel.ios),
+  android: channels.value.filter(channel => channel.android),
+  electron: channels.value.filter(channel => channel.electron),
+}))
+const availableDownloadPlatforms = computed(() => DOWNLOAD_PLATFORMS.filter(platform => platformOptions.value[platform].length > 0))
+const combinedOptions = computed(() => {
+  const platforms = availableDownloadPlatforms.value
+  if (!platforms.length)
+    return []
+  return channels.value.filter(channel => platforms.every(platform => channel[platform]))
+})
 const uploadChannelOptions = computed(() => {
   const seen = new Set<string>()
   return channels.value
@@ -578,10 +662,7 @@ async function setDefaultChannel() {
   })
 }
 
-const iosDefaultChannel = computed(() => channels.value.find(channel => channel.public && channel.ios) ?? null)
-const androidDefaultChannel = computed(() => channels.value.find(channel => channel.public && channel.android) ?? null)
-
-const canSplitDownloadDefaults = computed(() => iosSingleOptions.value.length > 0 || androidSingleOptions.value.length > 0)
+const canSplitDownloadDefaults = computed(() => availableDownloadPlatforms.value.some(platform => platformOptions.value[platform].length > 0))
 const hasCombinedOptions = computed(() => combinedOptions.value.length > 0)
 
 function filterChannels(list: Array<{ id: number, name: string }>, search: string) {
@@ -591,52 +672,125 @@ function filterChannels(list: Array<{ id: number, name: string }>, search: strin
   return list.filter(channel => channel.name.toLowerCase().includes(term))
 }
 
+function getDefaultChannel(platform: DownloadPlatform) {
+  return channels.value.find(channel => channel.public && channel[platform]) ?? null
+}
+
+const defaultChannelByPlatform = computed<Record<DownloadPlatform, DownloadChannel | null>>(() => ({
+  ios: getDefaultChannel('ios'),
+  android: getDefaultChannel('android'),
+  electron: getDefaultChannel('electron'),
+}))
+
 const filteredCombinedOptions = computed(() => filterChannels(combinedOptions.value, combinedSearch.value))
-const visibleCombinedOptions = computed(() => combinedSearch.value.trim() ? filteredCombinedOptions.value : filteredCombinedOptions.value.slice(0, 3))
-const combinedHasHidden = computed(() => !combinedSearch.value.trim() && filteredCombinedOptions.value.length > 3)
+const visibleCombinedOptions = computed(() => {
+  const filtered = filteredCombinedOptions.value
+  if (combinedSearch.value.trim())
+    return filtered
 
-const filteredIosSingleOptions = computed(() => filterChannels(iosSingleOptions.value, iosSearch.value))
-const visibleIosSingleOptions = computed(() => iosSearch.value.trim() ? filteredIosSingleOptions.value : filteredIosSingleOptions.value.slice(0, 3))
-const iosHasHidden = computed(() => !iosSearch.value.trim() && filteredIosSingleOptions.value.length > 3)
+  const visible = filtered.slice(0, 3)
+  const selected = filtered.find(channel => channel.id === selectedCombinedChannelId.value)
+  return selected && !visible.some(channel => channel.id === selected.id)
+    ? [...visible, selected]
+    : visible
+})
+const combinedHasHidden = computed(() => !combinedSearch.value.trim() && filteredCombinedOptions.value.length > visibleCombinedOptions.value.length)
 
-const filteredAndroidSingleOptions = computed(() => filterChannels(androidSingleOptions.value, androidSearch.value))
-const visibleAndroidSingleOptions = computed(() => androidSearch.value.trim() ? filteredAndroidSingleOptions.value : filteredAndroidSingleOptions.value.slice(0, 3))
-const androidHasHidden = computed(() => !androidSearch.value.trim() && filteredAndroidSingleOptions.value.length > 3)
+function getFilteredPlatformOptions(platform: DownloadPlatform) {
+  return filterChannels(platformOptions.value[platform], downloadSearches[platform])
+}
+
+function getVisiblePlatformOptions(platform: DownloadPlatform) {
+  const filtered = getFilteredPlatformOptions(platform)
+  if (downloadSearches[platform].trim())
+    return filtered
+
+  const visible = filtered.slice(0, 3)
+  const selected = filtered.find(channel => channel.id === selectedDownloadChannelIds.value[platform])
+  return selected && !visible.some(channel => channel.id === selected.id)
+    ? [...visible, selected]
+    : visible
+}
+
+function platformHasHidden(platform: DownloadPlatform) {
+  return !downloadSearches[platform].trim() && getFilteredPlatformOptions(platform).length > getVisiblePlatformOptions(platform).length
+}
+
+const downloadChannelSections = computed(() => availableDownloadPlatforms.value.map(platform => ({
+  platform,
+  title: t(`default-download-channel-${platform}-only-title`),
+  description: t(`default-download-channel-${platform}-only-desc`),
+  empty: t(`default-download-channel-${platform}-only-empty`),
+})))
+
+function getSelectedDownloadChannelIds() {
+  return Object.fromEntries(DOWNLOAD_PLATFORMS.map(platform => [
+    platform,
+    platformOptions.value[platform].find(channel => channel.id === defaultChannelByPlatform.value[platform]?.id)?.id ?? null,
+  ])) as Record<DownloadPlatform, number | null>
+}
+
+function resetDownloadSearches() {
+  for (const platform of DOWNLOAD_PLATFORMS)
+    downloadSearches[platform] = ''
+}
 
 const downloadChannelWarning = computed(() => {
-  const iosDefaults = channels.value.filter(channel => channel.public && channel.ios)
-  const androidDefaults = channels.value.filter(channel => channel.public && channel.android)
+  for (const platform of DOWNLOAD_PLATFORMS) {
+    const defaults = channels.value.filter(channel => channel.public && channel[platform])
+    if (defaults.length > 1)
+      return t('default-download-channel-conflict')
+  }
 
-  if (iosDefaults.length > 1 || androidDefaults.length > 1)
-    return t('default-download-channel-conflict')
+  const platforms = availableDownloadPlatforms.value
+  for (const sourcePlatform of platforms) {
+    const sourceDefault = defaultChannelByPlatform.value[sourcePlatform]
+    if (!sourceDefault)
+      continue
 
-  const iosDefault = iosDefaults[0]
-  const androidDefault = androidDefaults[0]
+    for (const targetPlatform of platforms) {
+      if (sourcePlatform === targetPlatform)
+        continue
 
-  if (iosDefault && androidDefault && iosDefault.id !== androidDefault.id && (iosDefault.android || androidDefault.ios))
-    return t('default-download-channel-conflict')
+      const targetDefault = defaultChannelByPlatform.value[targetPlatform]
+      if (targetDefault && sourceDefault.id !== targetDefault.id && sourceDefault[targetPlatform])
+        return t('default-download-channel-conflict')
+    }
+  }
 
   return ''
 })
+
+function joinPlatformLabels(platforms: readonly DownloadPlatform[]) {
+  const labels = platforms.map(platform => t(`platform-${platform}`))
+  if (labels.length <= 1)
+    return labels[0] ?? ''
+  if (labels.length === 2)
+    return labels.join(' & ')
+  return `${labels.slice(0, -1).join(', ')} & ${labels[labels.length - 1]}`
+}
 
 const downloadChannelLabel = computed(() => {
   if (!channels.value.length)
     return t('default-download-channel-empty')
 
-  const iosDefault = iosDefaultChannel.value
-  const androidDefault = androidDefaultChannel.value
+  const platforms = availableDownloadPlatforms.value
+  const defaults = platforms.map(platform => defaultChannelByPlatform.value[platform])
 
-  if (!iosDefault && !androidDefault)
+  if (!defaults.some(Boolean))
     return t('default-download-channel-empty')
 
-  if (iosDefault && androidDefault && iosDefault.id === androidDefault.id) {
-    return `${iosDefault.name} (${t('platform-ios')} & ${t('platform-android')})`
-  }
+  const firstDefault = defaults[0]
+  if (firstDefault && defaults.every(channel => channel?.id === firstDefault.id))
+    return `${firstDefault.name} (${joinPlatformLabels(platforms)})`
 
-  const iosLabel = iosDefault ? iosDefault.name : t('not-set')
-  const androidLabel = androidDefault ? androidDefault.name : t('not-set')
-
-  return `${t('platform-ios')}: ${iosLabel} • ${t('platform-android')}: ${androidLabel}`
+  return platforms
+    .map((platform) => {
+      const channel = defaultChannelByPlatform.value[platform]
+      const label = t(`platform-${platform}`)
+      return `${label}: ${channel ? channel.name : t('not-set')}`
+    })
+    .join(' • ')
 })
 
 async function openDefaultDownloadChannelDialog() {
@@ -653,36 +807,33 @@ async function openDefaultDownloadChannelDialog() {
   }
 
   combinedSearch.value = ''
-  iosSearch.value = ''
-  androidSearch.value = ''
+  resetDownloadSearches()
 
-  const sameDefaultChannel = iosDefaultChannel.value
-    && androidDefaultChannel.value
-    && iosDefaultChannel.value.id === androidDefaultChannel.value.id
-    && iosDefaultChannel.value.ios
-    && iosDefaultChannel.value.android
+  const platforms = availableDownloadPlatforms.value
+  const defaultChannels = platforms.map(platform => defaultChannelByPlatform.value[platform])
+  const firstDefault = defaultChannels[0]
+  const sameDefaultChannel = !!firstDefault
+    && defaultChannels.every(channel => channel?.id === firstDefault.id)
+    && platforms.every(platform => firstDefault[platform])
 
   if (hasCombinedOptions.value && (!canSplitDownloadDefaults.value || sameDefaultChannel))
     splitDownloadDefaults.value = false
   else if (!hasCombinedOptions.value && canSplitDownloadDefaults.value)
     splitDownloadDefaults.value = true
-  else if (iosDefaultChannel.value && androidDefaultChannel.value && iosDefaultChannel.value.id !== androidDefaultChannel.value.id)
+  else if (defaultChannels.filter(Boolean).some(channel => channel?.id !== firstDefault?.id))
     splitDownloadDefaults.value = true
   else
     splitDownloadDefaults.value = !hasCombinedOptions.value
 
-  const combinedFallback = combinedOptions.value.find(channel =>
-    channel.id === iosDefaultChannel.value?.id || channel.id === androidDefaultChannel.value?.id,
-  ) ?? combinedOptions.value[0] ?? null
-  selectedCombinedChannel.value = combinedFallback?.name ?? ''
+  const combinedFallback = combinedOptions.value.find(channel => platforms.some(platform => channel.id === defaultChannelByPlatform.value[platform]?.id))
+    ?? combinedOptions.value[0]
+    ?? null
+  selectedCombinedChannelId.value = combinedFallback?.id ?? null
 
-  selectedDownloadChannels.value = {
-    ios: iosSingleOptions.value.find(channel => channel.id === iosDefaultChannel.value?.id)?.name ?? '',
-    android: androidSingleOptions.value.find(channel => channel.id === androidDefaultChannel.value?.id)?.name ?? '',
-  }
+  selectedDownloadChannelIds.value = getSelectedDownloadChannelIds()
 
-  if (!splitDownloadDefaults.value && !selectedCombinedChannel.value && combinedFallback)
-    selectedCombinedChannel.value = combinedFallback.name
+  if (!splitDownloadDefaults.value && selectedCombinedChannelId.value == null && combinedFallback)
+    selectedCombinedChannelId.value = combinedFallback.id
 
   dialogStore.openDialog({
     title: t('select-default-download-channel-header'),
@@ -697,55 +848,62 @@ async function openDefaultDownloadChannelDialog() {
         text: t('button-confirm'),
         role: 'primary',
         handler: async () => {
-          let iosChannel: (typeof channels.value)[number] | null = null
-          let androidChannel: (typeof channels.value)[number] | null = null
+          const selectedChannels: Record<DownloadPlatform, DownloadChannel | null> = { ios: null, android: null, electron: null }
+          const activePlatforms = availableDownloadPlatforms.value
 
           if (!splitDownloadDefaults.value) {
-            if (!selectedCombinedChannel.value) {
+            if (selectedCombinedChannelId.value == null) {
               toast.error(t('please-select-combined-channel'))
               return false
             }
-            const combinedChannel = combinedOptions.value.find(channel => channel.name === selectedCombinedChannel.value) ?? null
+            const combinedChannel = combinedOptions.value.find(channel => channel.id === selectedCombinedChannelId.value) ?? null
             if (!combinedChannel) {
               toast.error(t('please-select-combined-channel'))
               return false
             }
-            iosChannel = combinedChannel
-            androidChannel = combinedChannel
+            for (const platform of activePlatforms)
+              selectedChannels[platform] = combinedChannel
           }
           else {
-            const iosSelection = selectedDownloadChannels.value.ios
-            const androidSelection = selectedDownloadChannels.value.android
+            for (const platform of activePlatforms) {
+              const selectedId = selectedDownloadChannelIds.value[platform]
 
-            if (!iosSelection && iosSingleOptions.value.length) {
-              toast.error(t('please-select-channel-ios'))
-              return false
-            }
+              if (selectedId == null && platformOptions.value[platform].length) {
+                toast.error(t(`please-select-channel-${platform}`))
+                return false
+              }
 
-            if (!androidSelection && androidSingleOptions.value.length) {
-              toast.error(t('please-select-channel-android'))
-              return false
-            }
+              const selectedChannel = selectedId == null
+                ? null
+                : channels.value.find(channel => channel.id === selectedId) ?? null
 
-            iosChannel = iosSelection
-              ? channels.value.find(channel => channel.name === iosSelection) ?? null
-              : null
-            androidChannel = androidSelection
-              ? channels.value.find(channel => channel.name === androidSelection) ?? null
-              : null
+              if (selectedChannel && !selectedChannel[platform]) {
+                toast.error(t(`channel-not-compatible-with-${platform}`))
+                return false
+              }
 
-            if (iosChannel && (!iosChannel.ios || iosChannel.android)) {
-              toast.error(t('channel-not-compatible-with-ios'))
-              return false
-            }
-
-            if (androidChannel && (!androidChannel.android || androidChannel.ios)) {
-              toast.error(t('channel-not-compatible-with-android'))
-              return false
+              selectedChannels[platform] = selectedChannel
             }
           }
 
-          const idsToEnable = Array.from(new Set([iosChannel?.id, androidChannel?.id].filter((id): id is number => typeof id === 'number')))
+          for (const sourcePlatform of activePlatforms) {
+            const sourceChannel = selectedChannels[sourcePlatform]
+            if (!sourceChannel)
+              continue
+
+            for (const targetPlatform of activePlatforms) {
+              if (sourcePlatform === targetPlatform)
+                continue
+
+              const targetChannel = selectedChannels[targetPlatform]
+              if (sourceChannel[targetPlatform] && targetChannel?.id !== sourceChannel.id) {
+                toast.error(t('default-download-channel-conflict'))
+                return false
+              }
+            }
+          }
+
+          const idsToEnable = Array.from(new Set(Object.values(selectedChannels).map(channel => channel?.id).filter((id): id is number => typeof id === 'number')))
 
           if (idsToEnable.length > 0) {
             const { error } = await supabase
@@ -759,31 +917,21 @@ async function openDefaultDownloadChannelDialog() {
             }
           }
 
-          if (iosChannels.value.length) {
-            const iosUpdate = supabase
-              .from('channels')
-              .update({ public: false })
-              .eq('app_id', props.appId)
-              .eq('ios', true)
-            if (iosChannel)
-              iosUpdate.neq('id', iosChannel.id)
-            const { error } = await iosUpdate
-            if (error) {
-              toast.error(t('cannot-change-default-download-channel'))
-              console.error(error)
-              return false
-            }
-          }
+          for (const platform of DOWNLOAD_PLATFORMS) {
+            if (!platformOptions.value[platform].length)
+              continue
 
-          if (androidChannels.value.length) {
-            const androidUpdate = supabase
+            const selectedChannel = selectedChannels[platform]
+            let platformUpdate = supabase
               .from('channels')
               .update({ public: false })
               .eq('app_id', props.appId)
-              .eq('android', true)
-            if (androidChannel)
-              androidUpdate.neq('id', androidChannel.id)
-            const { error } = await androidUpdate
+              .eq(platform, true)
+
+            if (selectedChannel)
+              platformUpdate = platformUpdate.neq('id', selectedChannel.id)
+
+            const { error } = await platformUpdate
             if (error) {
               toast.error(t('cannot-change-default-download-channel'))
               console.error(error)
@@ -828,10 +976,10 @@ function setUnifiedDownloadMode(unified: boolean) {
       return
     }
     splitDownloadDefaults.value = false
-    const fallback = combinedOptions.value.find(channel => channel.name === selectedCombinedChannel.value)
-      ?? combinedOptions.value.find(channel => channel.id === iosDefaultChannel.value?.id || channel.id === androidDefaultChannel.value?.id)
+    const fallback = combinedOptions.value.find(channel => channel.id === selectedCombinedChannelId.value)
+      ?? combinedOptions.value.find(channel => availableDownloadPlatforms.value.some(platform => channel.id === defaultChannelByPlatform.value[platform]?.id))
       ?? combinedOptions.value[0]
-    selectedCombinedChannel.value = fallback?.name ?? ''
+    selectedCombinedChannelId.value = fallback?.id ?? null
   }
   else {
     if (!canSplitDownloadDefaults.value) {
@@ -839,10 +987,7 @@ function setUnifiedDownloadMode(unified: boolean) {
       return
     }
     splitDownloadDefaults.value = true
-    selectedDownloadChannels.value = {
-      ios: iosSingleOptions.value.find(channel => channel.id === iosDefaultChannel.value?.id)?.name ?? '',
-      android: androidSingleOptions.value.find(channel => channel.id === androidDefaultChannel.value?.id)?.name ?? '',
-    }
+    selectedDownloadChannelIds.value = getSelectedDownloadChannelIds()
   }
 }
 
@@ -910,8 +1055,10 @@ async function editPhoto() {
             return false
           }
 
-          if (appRef.value)
+          if (appRef.value) {
             appRef.value.icon_url = await createSignedImageUrl(iconPath)
+            isAppIconLoading.value = false
+          }
 
           toast.success(t('picture-uploaded'))
         },
@@ -1092,6 +1239,14 @@ async function transferAppOwnership() {
                 v-if="appRef?.icon_url" class="object-cover w-20 h-20 d-mask d-mask-squircle" :src="appRef?.icon_url"
                 width="80" height="80" alt="User upload"
               >
+              <div
+                v-else-if="isAppIconLoading"
+                class="flex items-center justify-center w-20 h-20 bg-gray-700 d-mask d-mask-squircle"
+                :aria-label="t('loading')"
+              >
+                <span class="w-8 h-8 rounded-full border-2 border-blue-400 border-t-transparent animate-spin" />
+                <span class="sr-only">{{ t('loading') }}</span>
+              </div>
               <div v-else class="p-6 text-xl bg-gray-700 d-mask d-mask-squircle">
                 <span class="font-medium text-gray-300">
                   {{ acronym }}
@@ -1271,6 +1426,17 @@ async function transferAppOwnership() {
               <p v-if="effectiveRetentionValue >= 63113904" class="text-xs font-medium text-blue-600 dark:text-blue-400">
                 {{ t('retention-never-info') }}
               </p>
+              <FormKit
+                type="number"
+                number="integer"
+                name="build_timeout_minutes"
+                :prefix-icon="gearSix"
+                :value="buildTimeoutMinutes"
+                :label="t('build-timeout-label')"
+                :help="t('build-timeout-help')"
+                :min="MIN_BUILD_TIMEOUT_MINUTES"
+                :max="MAX_BUILD_TIMEOUT_MINUTES"
+              />
               <FormKit
                 type="checkbox"
                 name="expose_metadata"
@@ -1454,9 +1620,9 @@ async function transferAppOwnership() {
               >
                 <input
                   :id="`combined-channel-${channel.id}`"
-                  v-model="selectedCombinedChannel"
+                  v-model="selectedCombinedChannelId"
                   type="radio"
-                  :value="channel.name"
+                  :value="channel.id"
                   class="mt-1 radio radio-primary"
                 >
                 <div class="flex flex-col">
@@ -1474,32 +1640,38 @@ async function transferAppOwnership() {
         </div>
 
         <div v-if="splitDownloadDefaults" class="space-y-6">
-          <div class="space-y-3">
+          <div
+            v-for="section in downloadChannelSections"
+            :key="`download-${section.platform}`"
+            class="space-y-3"
+          >
             <h3 class="text-sm font-semibold text-slate-800 dark:text-slate-100">
-              {{ t('default-download-channel-ios-only-title') }}
+              {{ section.title }}
             </h3>
             <p class="text-xs text-slate-500 dark:text-slate-300">
-              {{ t('default-download-channel-ios-only-desc') }}
+              {{ section.description }}
             </p>
             <input
-              v-if="iosSingleOptions.length"
-              v-model="iosSearch"
+              v-if="platformOptions[section.platform].length"
+              v-model="downloadSearches[section.platform]"
               type="text"
+              :name="`download-search-${section.platform}`"
+              :aria-label="section.title"
               :placeholder="t('default-download-channel-search-placeholder')"
               class="w-full px-3 py-2 text-sm bg-white border rounded-lg focus:border-blue-500 focus:ring-2 border-slate-200 text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 focus:outline-hidden focus:ring-blue-500/20"
             >
-            <div v-if="visibleIosSingleOptions.length" class="space-y-2">
+            <div v-if="getVisiblePlatformOptions(section.platform).length" class="space-y-2">
               <label
-                v-for="channel in visibleIosSingleOptions"
-                :key="`ios-${channel.id}`"
-                :for="`ios-channel-${channel.id}`"
+                v-for="channel in getVisiblePlatformOptions(section.platform)"
+                :key="`${section.platform}-${channel.id}`"
+                :for="`${section.platform}-channel-${channel.id}`"
                 class="flex items-start gap-3 p-3 transition border rounded-lg hover:border-blue-400 border-slate-200 dark:border-slate-700 dark:hover:border-blue-500"
               >
                 <input
-                  :id="`ios-channel-${channel.id}`"
-                  v-model="selectedDownloadChannels.ios"
+                  :id="`${section.platform}-channel-${channel.id}`"
+                  v-model="selectedDownloadChannelIds[section.platform]"
                   type="radio"
-                  :value="channel.name"
+                  :value="channel.id"
                   class="mt-1 radio radio-primary"
                 >
                 <div class="flex flex-col">
@@ -1508,50 +1680,9 @@ async function transferAppOwnership() {
               </label>
             </div>
             <div v-else class="px-3 py-6 text-sm text-center border border-dashed rounded-lg border-slate-200 text-slate-500 dark:border-slate-700 dark:text-slate-300">
-              {{ iosSearch.trim() ? t('default-download-channel-no-results') : t('default-download-channel-ios-only-empty') }}
+              {{ downloadSearches[section.platform].trim() ? t('default-download-channel-no-results') : section.empty }}
             </div>
-            <p v-if="iosHasHidden" class="text-xs text-slate-500 dark:text-slate-300">
-              {{ t('default-download-channel-more') }}
-            </p>
-          </div>
-
-          <div class="space-y-3">
-            <h3 class="text-sm font-semibold text-slate-800 dark:text-slate-100">
-              {{ t('default-download-channel-android-only-title') }}
-            </h3>
-            <p class="text-xs text-slate-500 dark:text-slate-300">
-              {{ t('default-download-channel-android-only-desc') }}
-            </p>
-            <input
-              v-if="androidSingleOptions.length"
-              v-model="androidSearch"
-              type="text"
-              :placeholder="t('default-download-channel-search-placeholder')"
-              class="w-full px-3 py-2 text-sm bg-white border rounded-lg focus:border-blue-500 focus:ring-2 border-slate-200 text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 focus:outline-hidden focus:ring-blue-500/20"
-            >
-            <div v-if="visibleAndroidSingleOptions.length" class="space-y-2">
-              <label
-                v-for="channel in visibleAndroidSingleOptions"
-                :key="`android-${channel.id}`"
-                :for="`android-channel-${channel.id}`"
-                class="flex items-start gap-3 p-3 transition border rounded-lg hover:border-blue-400 border-slate-200 dark:border-slate-700 dark:hover:border-blue-500"
-              >
-                <input
-                  :id="`android-channel-${channel.id}`"
-                  v-model="selectedDownloadChannels.android"
-                  type="radio"
-                  :value="channel.name"
-                  class="mt-1 radio radio-primary"
-                >
-                <div class="flex flex-col">
-                  <span class="text-sm font-medium">{{ channel.name }}</span>
-                </div>
-              </label>
-            </div>
-            <div v-else class="px-3 py-6 text-sm text-center border border-dashed rounded-lg border-slate-200 text-slate-500 dark:border-slate-700 dark:text-slate-300">
-              {{ androidSearch.trim() ? t('default-download-channel-no-results') : t('default-download-channel-android-only-empty') }}
-            </div>
-            <p v-if="androidHasHidden" class="text-xs text-slate-500 dark:text-slate-300">
+            <p v-if="platformHasHidden(section.platform)" class="text-xs text-slate-500 dark:text-slate-300">
               {{ t('default-download-channel-more') }}
             </p>
           </div>

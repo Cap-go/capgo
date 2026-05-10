@@ -4,7 +4,7 @@ const defaultStarOwner = 'Cap-go'
 export const defaultStarRepo = 'capacitor-updater'
 const defaultStarTarget = `${defaultStarOwner}/${defaultStarRepo}`
 const defaultStarPrefix = 'capacitor-'
-const additionalDefaultStarRepositories = [`${defaultStarOwner}/CLI`, `${defaultStarOwner}/capgo`, `${defaultStarOwner}/capgo-skills`] as const
+const additionalDefaultStarRepositories = [`${defaultStarOwner}/capgo`, `${defaultStarOwner}/capgo-skills`] as const
 const fallbackStarRepositories = [defaultStarTarget, ...additionalDefaultStarRepositories] as const
 const defaultMinStarDelayMs = 20
 const defaultMaxStarDelayMs = 180
@@ -222,7 +222,7 @@ function executeGhCommandAsync(args: string[], signal?: AbortSignal): Promise<Gh
     let stderr = ''
     let settled = false
     let child: ReturnType<typeof spawn> | undefined
-    let onAbort = () => {}
+    let onAbort = () => { }
 
     const finish = (result: GhCommandResult) => {
       if (settled)

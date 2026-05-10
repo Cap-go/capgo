@@ -1,16 +1,18 @@
-// CapacitorConfig
+interface CapacitorCliConfig {
+  app: {
+    extConfig: import('../schemas/config').CapacitorConfig
+    extConfigFilePath: string
+  }
+}
 
 declare module '@capacitor/cli/dist/config' {
-  export function loadConfig(): CapacitorConfig
-  export function writeConfig(extConfig: CapacitorConfig, extConfigFilePath: string): void
-};
+  export function loadConfig(): Promise<CapacitorCliConfig>
+  export function writeConfig(extConfig: import('../schemas/config').CapacitorConfig, extConfigFilePath: string): Promise<void>
+}
 
 declare module '@capacitor/cli/dist/util/monorepotools' {
   export function findMonorepoRoot(currentPath: string): string
-  // isMonorepo
   export function isMonorepo(currentPath: string): boolean
-  // isNXMonorepo
   export function isNXMonorepo(currentPath: string): boolean
-  // findNXMonorepoRoot
   export function findNXMonorepoRoot(currentPath: string): string
 }

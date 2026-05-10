@@ -3,6 +3,7 @@ import sourceMessages from '../../messages/en.json' with { type: 'json' }
 
 const CACHE_TTL_SECONDS = 5 * 60
 const PENDING_TRANSLATION_STORE_TTL_SECONDS = 60 * 60
+const READY_TRANSLATION_STORE_TTL_SECONDS = 7 * 24 * 60 * 60
 const DEFAULT_TRANSLATION_MODEL = '@cf/meta/llama-3.1-8b-instruct-fast'
 const MAX_BATCH_CHARACTERS = 6_000
 const MAX_BATCH_ITEMS = 60
@@ -563,6 +564,10 @@ function isPendingTranslationStale(entry: TranslationStoreEntry) {
   return entry.status === 'pending' && nowSeconds() - entry.updatedAt >= TRANSLATION_REQUEUE_AFTER_SECONDS
 }
 
+function isReadyTranslationFresh(entry: TranslationStoreEntry) {
+  return entry.status === 'ready' && nowSeconds() - entry.updatedAt < CACHE_TTL_SECONDS
+}
+
 function isTranslationBatchLeaseExpired(entry: TranslationStoreEntry) {
   return entry.status === 'pending' && nowSeconds() - entry.updatedAt >= TRANSLATION_BATCH_LEASE_SECONDS
 }
@@ -604,8 +609,25 @@ async function readTranslationStoreEntry(env: TranslationWorkerBindings, checksu
   return parseTranslationStoreEntry(row)
 }
 
+async function readLatestReadyTranslationStoreEntry(env: TranslationWorkerBindings, targetLanguage: string) {
+  const db = getTranslationStore(env)
+  await ensureTranslationStore(db)
+  await deleteExpiredTranslationStoreEntries(db)
+  const row = await db.prepare(
+    `SELECT checksum, messages, model, next_batch_index, status, target_language, updated_at
+     FROM ${TRANSLATION_STORE_TABLE}
+     WHERE target_language = ?
+       AND status = 'ready'
+       AND expires_at > unixepoch()
+     ORDER BY updated_at DESC
+     LIMIT 1`,
+  ).bind(targetLanguage).first()
+
+  return parseTranslationStoreEntry(row)
+}
+
 function translationStoreTtlSeconds(entry: Pick<TranslationStoreEntry, 'status'>) {
-  return entry.status === 'pending' ? PENDING_TRANSLATION_STORE_TTL_SECONDS : CACHE_TTL_SECONDS
+  return entry.status === 'pending' ? PENDING_TRANSLATION_STORE_TTL_SECONDS : READY_TRANSLATION_STORE_TTL_SECONDS
 }
 
 async function upsertTranslationStoreEntry(db: D1Database, entry: TranslationStoreEntry, ttlSeconds = translationStoreTtlSeconds(entry)) {
@@ -698,7 +720,7 @@ async function touchTranslationStoreEntry(env: TranslationWorkerBindings, entry:
          updated_at = unixepoch()
      WHERE target_language = ?
        AND checksum = ?`,
-  ).bind(PENDING_TRANSLATION_STORE_TTL_SECONDS, entry.targetLanguage, entry.checksum).run()
+  ).bind(translationStoreTtlSeconds(entry), entry.targetLanguage, entry.checksum).run()
 }
 
 async function claimTranslationBatch(env: TranslationWorkerBindings, checksum: string, targetLanguage: string, batchIndex: number) {
@@ -856,6 +878,21 @@ async function readyTranslationResponse(requestId: string | undefined, readyRequ
   })
 }
 
+function latestReadyTranslationResponse(entry: TranslationStoreEntry, checksum: string) {
+  return jsonResponse(readyPayloadFromStore(entry), 200, {
+    'Cache-Control': 'no-store',
+    'X-Capgo-Translation-Refreshing-Checksum': checksum,
+    'X-Capgo-Translation-Stale': '1',
+  })
+}
+
+async function readyOrLatestTranslationResponse(requestId: string | undefined, readyRequest: Request, entry: TranslationStoreEntry, targetLanguage: string, checksum: string) {
+  if (entry.checksum === checksum)
+    return readyTranslationResponse(requestId, readyRequest, entry, targetLanguage)
+
+  return latestReadyTranslationResponse(entry, checksum)
+}
+
 async function requeueStaleTranslation(env: TranslationWorkerBindings, storedEntry: TranslationStoreEntry, checksum: string, targetLanguage: string, requestId: string) {
   const claimedBatchIndex = claimedTranslationBatchIndex(storedEntry.nextBatchIndex)
   if (claimedBatchIndex !== null && !isTranslationBatchLeaseExpired(storedEntry))
@@ -903,20 +940,25 @@ async function handleTranslationMessages(request: Request, env: TranslationWorke
     })
   }
 
-  const storedEntry = await readTranslationStoreEntry(env, checksum, targetLanguage)
-  if (storedEntry?.status === 'ready')
-    return readyTranslationResponse(requestId, readyRequest, storedEntry, targetLanguage)
+  const latestReadyEntry = await readLatestReadyTranslationStoreEntry(env, targetLanguage)
+  if (latestReadyEntry) {
+    if (isReadyTranslationFresh(latestReadyEntry))
+      return readyOrLatestTranslationResponse(requestId, readyRequest, latestReadyEntry, targetLanguage, checksum)
 
-  if (storedEntry?.status === 'pending') {
-    if (isPendingTranslationStale(storedEntry))
-      await requeueStaleTranslation(env, storedEntry, checksum, targetLanguage, requestId)
-    return pendingTranslationResponse(checksum)
+    if (latestReadyEntry.checksum === checksum) {
+      await touchTranslationStoreEntry(env, latestReadyEntry)
+      return readyTranslationResponse(requestId, readyRequest, latestReadyEntry, targetLanguage)
+    }
   }
 
   try {
     const queuedEntry = await queueTranslationIfNeeded(env, translationQueuePayload(checksum, targetLanguage, model, 0), requestId)
-    if (queuedEntry.status === 'ready')
+    if (queuedEntry.status === 'ready') {
+      await touchTranslationStoreEntry(env, queuedEntry)
       return readyTranslationResponse(requestId, readyRequest, queuedEntry, targetLanguage)
+    }
+    if (queuedEntry.status === 'pending' && isPendingTranslationStale(queuedEntry))
+      await requeueStaleTranslation(env, queuedEntry, checksum, targetLanguage, requestId)
   }
   catch (error) {
     cloudlogErr({
@@ -925,8 +967,13 @@ async function handleTranslationMessages(request: Request, env: TranslationWorke
       error: serializeError(error),
       targetLanguage,
     })
+    if (latestReadyEntry)
+      return latestReadyTranslationResponse(latestReadyEntry, checksum)
     fail(503, 'translation_unavailable', 'Translation queue is not available')
   }
+
+  if (latestReadyEntry)
+    return latestReadyTranslationResponse(latestReadyEntry, checksum)
 
   return pendingTranslationResponse(checksum)
 }
@@ -1153,6 +1200,7 @@ export default {
 export const __translationWorkerTestUtils__ = {
   buildBatches,
   claimedTranslationBatchIndex,
+  isReadyTranslationFresh,
   isTranslationBatchLeaseExpired,
   keepTranslation,
   normalizeBatchIndex,

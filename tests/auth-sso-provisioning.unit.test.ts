@@ -145,6 +145,7 @@ vi.mock('~/services/posthog', () => ({
 
 vi.mock('~/services/storage', () => ({
   createSignedImageUrl: (value: string) => getContext().mockCreateSignedImageUrl(value),
+  getImmediateImageUrl: (value?: string | null) => value ?? '',
 }))
 
 vi.mock('~/services/tracking', () => ({

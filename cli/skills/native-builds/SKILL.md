@@ -86,7 +86,7 @@ interface BuildLogger {
 - Core options:
   - `--path <path>`
   - `--node-modules <nodeModules>`: paths to `node_modules` directories for monorepos, comma-separated.
-  - `--platform <platform>`: `ios` or `android`, required.
+  - `--platform <platform>`: `ios` or `android`. If omitted in an interactive terminal, the CLI prompts for the platform; non-interactive runs must pass it explicitly.
   - `--build-mode <buildMode>`: `debug` or `release`.
   - `-a, --apikey <apikey>`
   - `--verbose`

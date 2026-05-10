@@ -235,6 +235,14 @@ async function copyOrganizationId() {
                   id="org-avatar" class="object-cover w-20 h-20 d-mask d-mask-squircle" :src="currentOrganization.logo"
                   width="80" height="80" alt="User upload"
                 >
+                <div
+                  v-else-if="currentOrganization?.logo_is_loading"
+                  class="flex items-center justify-center w-20 h-20 bg-gray-700 d-mask d-mask-squircle"
+                  :aria-label="t('loading')"
+                >
+                  <span class="w-8 h-8 rounded-full border-2 border-blue-400 border-t-transparent animate-spin" />
+                  <span class="sr-only">{{ t('loading') }}</span>
+                </div>
                 <div v-else class="p-6 text-xl bg-gray-700 d-mask d-mask-squircle">
                   <span class="font-medium text-gray-300">
                     {{ acronym }}

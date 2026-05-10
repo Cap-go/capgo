@@ -34,6 +34,7 @@ import { createKey, deleteOldKey, saveKeyCommand } from './key'
 import { login } from './login'
 import { startMcpServer } from './mcp/server'
 import { addOrganization, deleteOrganization, listMembers, listOrganizations, setOrganization } from './organization'
+import { capturePosthogException, getCommandPath, shouldCapturePosthogException } from './posthog'
 import { probe } from './probe'
 import { testRunDeviceCommand } from './run/device'
 import { getUserId } from './user/account'
@@ -58,6 +59,12 @@ program
   .name(pack.name)
   .description(`📦 Manage packages and bundle versions in Capgo Cloud`)
   .version(pack.version, '-v, --version', `output the current version`)
+
+let currentCommandPath = 'unknown'
+
+program.hook('preAction', (_thisCommand, actionCommand) => {
+  currentCommandPath = getCommandPath(actionCommand)
+})
 
 program
   .command('init [apikey] [appId]')
@@ -1027,21 +1034,37 @@ program.configureOutput({
   },
 })
 
-program.parseAsync().catch((error: unknown) => {
+program.parseAsync().catch(async (error: unknown) => {
   if (typeof error === 'object' && error !== null && 'code' in error) {
     const commanderError = error as { code: string, exitCode?: number, message?: string }
     // These are normal Commander.js exits (help, version, etc.) - exit silently
     if (commanderError.code === 'commander.version' || commanderError.code === 'commander.helpDisplayed') {
       exit(0)
     }
+    const capturePromise = shouldCapturePosthogException(error)
+      ? capturePosthogException({
+          error,
+          functionName: currentCommandPath,
+          kind: 'unhandled_error',
+          status: commanderError.exitCode ?? 1,
+        })
+      : Promise.resolve(false)
     // For actual errors, show just the message without the full stack trace
     if (commanderError.message) {
       log.error(commanderError.message)
     }
+    await capturePromise
     const exitCode = commanderError.exitCode ?? 1
     exit(exitCode)
   }
+  const capturePromise = capturePosthogException({
+    error,
+    functionName: currentCommandPath,
+    kind: 'unhandled_error',
+    status: 1,
+  })
   // For non-Commander errors, show full error details
   log.error(`Error: ${formatError(error)}`)
+  await capturePromise
   exit(1)
 })

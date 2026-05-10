@@ -24,6 +24,7 @@ function globalStatsRow(dateId: string) {
     date_id: dateId,
     mrr: 0,
     new_paying_orgs: 0,
+    paying: 0,
     paying_monthly: 0,
     paying_yearly: 0,
     plan_enterprise: 0,
@@ -43,20 +44,23 @@ function globalStatsRow(dateId: string) {
     revenue_solo: 0,
     revenue_team: 0,
     total_revenue: 0,
+    upgraded_orgs: 0,
   }
 }
 
-function subscriptionItem(priceId: string, currentPeriodEnd?: number, usageType = 'licensed') {
+function subscriptionItem(priceId: string, currentPeriodEnd?: number, usageType = 'licensed', interval?: 'month' | 'year') {
   return {
     id: `si_${priceId}`,
     object: 'subscription_item',
     current_period_end: currentPeriodEnd,
     plan: {
       id: priceId,
+      ...(interval ? { interval } : {}),
       usage_type: usageType,
     },
     price: {
       id: priceId,
+      ...(interval ? { recurring: { interval } } : {}),
     },
   } as unknown as Stripe.SubscriptionItem
 }
@@ -68,6 +72,7 @@ function subscription(
   created = DAY_1,
   status: Stripe.Subscription.Status = 'active',
   currentPeriodEnd?: number,
+  interval?: 'month' | 'year',
 ) {
   return {
     id: subscriptionId,
@@ -78,7 +83,7 @@ function subscription(
     customer: customerId,
     ended_at: status === 'canceled' ? created : null,
     items: {
-      data: [subscriptionItem(priceId, currentPeriodEnd)],
+      data: [subscriptionItem(priceId, currentPeriodEnd, 'licensed', interval)],
     },
     status,
   } as unknown as Stripe.Subscription
@@ -94,7 +99,9 @@ function subscriptionEvent(
   options: {
     currentPeriodEnd?: number
     previousPriceId?: string
+    previousPriceInterval?: 'month' | 'year'
     previousStatus?: Stripe.Subscription.Status
+    priceInterval?: 'month' | 'year'
     status?: Stripe.Subscription.Status
     subscriptionCreated?: number
   } = {},
@@ -106,12 +113,13 @@ function subscriptionEvent(
     options.subscriptionCreated ?? created,
     options.status ?? (type === 'customer.subscription.deleted' ? 'canceled' : 'active'),
     options.currentPeriodEnd,
+    options.priceInterval,
   )
 
   const previousAttributes: Partial<Stripe.Subscription> = {}
   if (options.previousPriceId) {
     previousAttributes.items = {
-      data: [subscriptionItem(options.previousPriceId)],
+      data: [subscriptionItem(options.previousPriceId, undefined, 'licensed', options.previousPriceInterval)],
     } as unknown as Stripe.ApiList<Stripe.SubscriptionItem>
   }
   if (options.previousStatus)
@@ -149,6 +157,7 @@ describe('revenue trend backfill metrics', () => {
       churn_revenue: 0,
       mrr: 12,
       new_paying_orgs: 1,
+      paying: 1,
       paying_monthly: 1,
       paying_yearly: 0,
       plan_solo: 1,
@@ -162,6 +171,7 @@ describe('revenue trend backfill metrics', () => {
       churn_revenue_solo: 12,
       mrr: 0,
       new_paying_orgs: 0,
+      paying: 0,
       paying_monthly: 0,
       plan_solo: 0,
       total_revenue: 0,
@@ -219,6 +229,7 @@ describe('revenue trend backfill metrics', () => {
 
     expect(rows[0]).toMatchObject({
       mrr: 78,
+      paying: 2,
       paying_monthly: 1,
       paying_yearly: 1,
       plan_maker: 1,
@@ -260,6 +271,7 @@ describe('revenue trend backfill metrics', () => {
       churn_revenue: 0,
       mrr: 49,
       plan_solo: 0,
+      upgraded_orgs: 1,
       plan_team: 1,
       revenue_team: 588,
     })
@@ -310,8 +322,118 @@ describe('revenue trend backfill metrics', () => {
     expect(rows[0]).toMatchObject({
       mrr: 12,
       new_paying_orgs: 1,
+      paying: 1,
       paying_monthly: 1,
       plan_solo: 1,
+    })
+  })
+
+  it.concurrent('counts monthly-to-yearly changes as upgraded orgs', () => {
+    const rows = buildRevenueTrendBackfillRows([
+      globalStatsRow('2026-04-01'),
+    ], {
+      events: [
+        subscriptionEvent('evt_yearly_upgrade', 'customer.subscription.updated', DAY_1 + 3600, 'cus_yearly_upgrade', 'sub_yearly_upgrade', 'price_solo_yearly', {
+          previousPriceId: 'price_solo_monthly',
+          subscriptionCreated: DAY_1 - 86400,
+        }),
+      ],
+      fromDateId: '2026-04-01',
+      plans,
+      toDateId: '2026-04-01',
+    })
+
+    expect(rows[0]).toMatchObject({
+      mrr: 10,
+      paying: 1,
+      paying_monthly: 0,
+      paying_yearly: 1,
+      plan_solo: 1,
+      plan_solo_monthly: 0,
+      plan_solo_yearly: 1,
+      revenue_solo: 120,
+      total_revenue: 120,
+      upgraded_orgs: 1,
+    })
+  })
+
+  it.concurrent('counts activation cadence changes as new paying and upgraded orgs', () => {
+    const rows = buildRevenueTrendBackfillRows([
+      globalStatsRow('2026-04-01'),
+    ], {
+      events: [
+        subscriptionEvent('evt_activation_yearly_upgrade', 'customer.subscription.updated', DAY_1 + 3600, 'cus_activation_yearly_upgrade', 'sub_activation_yearly_upgrade', 'price_solo_yearly', {
+          previousPriceId: 'price_solo_monthly',
+          previousStatus: 'incomplete',
+          subscriptionCreated: DAY_1 - 86400,
+        }),
+      ],
+      fromDateId: '2026-04-01',
+      plans,
+      toDateId: '2026-04-01',
+    })
+
+    expect(rows[0]).toMatchObject({
+      mrr: 10,
+      new_paying_orgs: 1,
+      paying: 1,
+      paying_monthly: 0,
+      paying_yearly: 1,
+      plan_solo: 1,
+      plan_solo_yearly: 1,
+      upgraded_orgs: 1,
+    })
+  })
+
+  it.concurrent('counts active legacy price subscriptions as paying organizations', () => {
+    const rows = buildRevenueTrendBackfillRows([
+      globalStatsRow('2026-04-01'),
+    ], {
+      baselineSubscriptions: [
+        subscription('cus_legacy', 'sub_legacy', 'price_legacy_monthly', DAY_1 - 86400, 'active', undefined, 'month'),
+      ],
+      events: [],
+      fromDateId: '2026-04-01',
+      plans,
+      toDateId: '2026-04-01',
+    })
+
+    expect(rows[0]).toMatchObject({
+      mrr: 0,
+      new_paying_orgs: 0,
+      paying: 1,
+      paying_monthly: 1,
+      paying_yearly: 0,
+      plan_solo: 0,
+      total_revenue: 0,
+    })
+  })
+
+  it.concurrent('counts legacy monthly-to-yearly cadence changes as upgraded orgs', () => {
+    const rows = buildRevenueTrendBackfillRows([
+      globalStatsRow('2026-04-01'),
+    ], {
+      events: [
+        subscriptionEvent('evt_legacy_yearly_upgrade', 'customer.subscription.updated', DAY_1 + 3600, 'cus_legacy_yearly_upgrade', 'sub_legacy_yearly_upgrade', 'price_legacy_yearly', {
+          previousPriceId: 'price_legacy_monthly',
+          previousPriceInterval: 'month',
+          priceInterval: 'year',
+          subscriptionCreated: DAY_1 - 86400,
+        }),
+      ],
+      fromDateId: '2026-04-01',
+      plans,
+      toDateId: '2026-04-01',
+    })
+
+    expect(rows[0]).toMatchObject({
+      mrr: 0,
+      paying: 1,
+      paying_monthly: 0,
+      paying_yearly: 1,
+      plan_solo: 0,
+      total_revenue: 0,
+      upgraded_orgs: 1,
     })
   })
 

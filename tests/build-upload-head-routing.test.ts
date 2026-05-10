@@ -1,4 +1,4 @@
-import { Hono } from 'hono'
+import { Hono } from 'hono/tiny'
 import { describe, expect, it } from 'vitest'
 import { app as buildApp } from '../supabase/functions/_backend/public/build/index.ts'
 
@@ -15,6 +15,15 @@ describe('build upload HEAD routing', () => {
       headers: {
         'Tus-Resumable': '1.0.0',
       },
+    }))
+
+    expect(response.status).not.toBe(404)
+    expect([400, 401]).toContain(response.status)
+  })
+
+  it.concurrent('routes HEAD /build/upload/:jobId/* without Tus-Resumable through auth middleware', async () => {
+    const response = await createMountedBuildApp().request(new Request('http://localhost/build/upload/test-job/file.zip', {
+      method: 'HEAD',
     }))
 
     expect(response.status).not.toBe(404)

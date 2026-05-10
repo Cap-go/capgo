@@ -18,7 +18,8 @@ const supabase = useSupabase()
 const { t } = useI18n()
 const displayStore = useDisplayStore()
 type AppRow = Database['public']['Tables']['apps']['Row']
-const apps = ref<AppRow[]>([])
+type AppRowWithIconState = AppRow & { icon_url_loading?: boolean }
+const apps = ref<AppRowWithIconState[]>([])
 const currentPage = ref(1)
 const pageSize = 10
 const totalApps = ref(0)
@@ -39,40 +40,47 @@ function appWithImmediateIcon(app: AppRow) {
   return {
     ...app,
     icon_url: shouldSign ? '' : normalized,
+    icon_url_loading: shouldSign,
   }
 }
 
-async function loadAppIcons(sourceApps: AppRow[], runId: number) {
-  const signedIcons = (await Promise.all(sourceApps.map(async (app) => {
-    const { shouldSign } = resolveImagePath(app.icon_url)
-    if (!shouldSign)
-      return null
-
-    try {
-      const signedIcon = await createSignedImageUrl(app.icon_url)
-      return signedIcon ? { appId: app.app_id, signedIcon } : null
-    }
-    catch (error) {
-      console.warn('Cannot load signed app icon', { appId: app.app_id, error })
-      return null
-    }
-  })))
-    .filter((entry): entry is { appId: string, signedIcon: string } => !!entry)
-
-  if (appIconLoadRun !== runId || signedIcons.length === 0)
+function updateAppIconState(appId: string, patch: Partial<AppRowWithIconState>, runId: number) {
+  if (appIconLoadRun !== runId)
     return
 
-  const iconByAppId = new Map<string, string>(signedIcons.map(({ appId, signedIcon }) => [appId, signedIcon]))
-  let hasIconUpdate = false
   for (const app of apps.value) {
-    const signedIcon = iconByAppId.get(app.app_id)
-    if (signedIcon) {
-      app.icon_url = signedIcon
-      hasIconUpdate = true
+    if (app.app_id === appId) {
+      Object.assign(app, patch)
+      return
     }
   }
-  if (hasIconUpdate)
-    apps.value = Array.from(apps.value)
+}
+
+async function loadAppIcon(app: AppRow, runId: number) {
+  const { shouldSign } = resolveImagePath(app.icon_url)
+  if (!shouldSign)
+    return
+
+  try {
+    const signedIcon = await createSignedImageUrl(app.icon_url)
+    updateAppIconState(app.app_id, {
+      icon_url: signedIcon || '',
+      icon_url_loading: false,
+    }, runId)
+  }
+  catch (error) {
+    console.warn('Cannot load signed app icon', { appId: app.app_id, error })
+    updateAppIconState(app.app_id, { icon_url_loading: false }, runId)
+  }
+}
+
+function loadAppIcons(sourceApps: AppRow[], runId: number) {
+  for (const app of sourceApps) {
+    loadAppIcon(app, runId).catch((error) => {
+      console.warn('Cannot load signed app icon', { appId: app.app_id, error })
+      updateAppIconState(app.app_id, { icon_url_loading: false }, runId)
+    })
+  }
 }
 
 async function getMyApps() {
@@ -129,7 +137,7 @@ async function getMyApps() {
 
     apps.value = data?.map(appWithImmediateIcon) ?? []
     if (data?.length)
-      void loadAppIcons(data, currentRun)
+      loadAppIcons(data, currentRun)
   }
   finally {
     isTableLoading.value = false
