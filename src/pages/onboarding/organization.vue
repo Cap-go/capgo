@@ -90,14 +90,19 @@ const hasSavedLogo = computed(() => currentOrganization.value?.gid === activeOrg
 const userCountStops = computed<UserCountStop[]>(() => {
   const planStops = planNameOrder
     .map(planName => main.plans.find(plan => plan.name === planName))
-    .filter(plan => plan?.mau)
-    .map((plan) => {
-      const mau = Number(plan!.mau)
-      return {
+    .flatMap((plan) => {
+      if (!plan?.mau)
+        return []
+
+      const mau = Number(plan.mau)
+      if (!Number.isFinite(mau) || mau <= 0)
+        return []
+
+      return [{
         value: mau,
-        label: formatUserCount(mau, plan!.name === 'Enterprise'),
-        planName: plan!.name,
-      }
+        label: formatUserCount(mau, plan.name === 'Enterprise'),
+        planName: plan.name,
+      }]
     })
 
   if (planStops.length === planNameOrder.length) {
