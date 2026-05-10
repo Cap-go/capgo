@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { getEndpointUrl, getSupabaseClient, TEST_EMAIL, USER_ID, USER_ID_2 } from './test-utils.ts'
+import { getEndpointUrl, getSupabaseClient, USER_ID_2 } from './test-utils.ts'
 
 const globalId = randomUUID()
 const numericGlobalId = Number.parseInt(globalId.replaceAll('-', '').slice(0, 12), 16)
@@ -23,9 +23,28 @@ let delegatedApiKeyId: number | null = null
 let delegatedApiKeyValue: string | null = null
 let createdWebhookId: string | null = null
 let createdDeliveryId: string | null = null
+let policyOwnerUserId: string | null = null
 
 beforeAll(async () => {
   const supabase = getSupabaseClient()
+  const policyOwnerEmail = `webhook-policy-owner-${globalId}@capgo.test`
+
+  const { data: policyOwnerAuth, error: policyOwnerAuthError } = await supabase.auth.admin.createUser({
+    email: policyOwnerEmail,
+    password: 'testtest',
+    email_confirm: true,
+  })
+  if (policyOwnerAuthError || !policyOwnerAuth.user) {
+    throw policyOwnerAuthError ?? new Error('Failed to create webhook policy owner auth user')
+  }
+  policyOwnerUserId = policyOwnerAuth.user.id
+
+  const { error: policyOwnerUserError } = await supabase.from('users').insert({
+    id: policyOwnerUserId,
+    email: policyOwnerEmail,
+  })
+  if (policyOwnerUserError)
+    throw policyOwnerUserError
 
   const { error: stripeError } = await supabase.from('stripe_info').insert({
     customer_id: policyCustomerId,
@@ -41,8 +60,8 @@ beforeAll(async () => {
   const { error: orgError } = await supabase.from('orgs').insert({
     id: policyOrgId,
     name: `Webhook Policy Org ${globalId}`,
-    management_email: TEST_EMAIL,
-    created_by: USER_ID,
+    management_email: policyOwnerEmail,
+    created_by: policyOwnerUserId,
     customer_id: policyCustomerId,
   })
   if (orgError)
@@ -50,7 +69,7 @@ beforeAll(async () => {
 
   const { error: memberError } = await supabase.from('org_users').insert({
     org_id: policyOrgId,
-    user_id: USER_ID,
+    user_id: policyOwnerUserId,
     user_right: 'super_admin',
   })
   if (memberError)
@@ -58,7 +77,7 @@ beforeAll(async () => {
 
   const { data: legacyKeyData, error: legacyKeyError } = await supabase.from('apikeys').insert({
     id: legacyApiKeySeedId,
-    user_id: USER_ID,
+    user_id: policyOwnerUserId,
     key: `legacy-webhook-key-${globalId}`,
     key_hash: null,
     mode: 'all',
@@ -81,7 +100,7 @@ beforeAll(async () => {
     url: 'https://example.com/webhook-policy',
     events: ['orgs'],
     enabled: true,
-    created_by: USER_ID,
+    created_by: policyOwnerUserId,
   })
   if (webhookError)
     throw webhookError
@@ -117,7 +136,7 @@ beforeAll(async () => {
 
   const { data: expiringKeyData, error: expiringKeyError } = await supabase.from('apikeys').insert({
     id: expiringSubkeySeedId,
-    user_id: USER_ID,
+    user_id: policyOwnerUserId,
     key: `expiring-webhook-subkey-${globalId}`,
     key_hash: null,
     mode: 'all',
@@ -164,7 +183,7 @@ beforeAll(async () => {
     role_id: orgAdminRole.id,
     scope_type: 'org',
     org_id: policyOrgId,
-    granted_by: USER_ID,
+    granted_by: policyOwnerUserId,
     reason: 'Webhook delegated API key regression test',
     is_direct: true,
   })
@@ -195,6 +214,10 @@ afterAll(async () => {
   await supabase.from('org_users').delete().eq('org_id', policyOrgId)
   await supabase.from('orgs').delete().eq('id', policyOrgId)
   await supabase.from('stripe_info').delete().eq('customer_id', policyCustomerId)
+  if (policyOwnerUserId) {
+    await supabase.from('users').delete().eq('id', policyOwnerUserId)
+    await supabase.auth.admin.deleteUser(policyOwnerUserId)
+  }
 }, 60000)
 
 describe('webhook endpoints enforce org API key expiration policy', () => {
