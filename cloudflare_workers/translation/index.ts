@@ -919,6 +919,28 @@ async function requeueStaleTranslation(env: TranslationWorkerBindings, storedEnt
   }
 }
 
+async function currentReadyTranslationResponse(env: TranslationWorkerBindings, requestId: string | undefined, readyRequest: Request, entry: TranslationStoreEntry, targetLanguage: string, checksum: string) {
+  if (isReadyTranslationFresh(entry))
+    return readyOrLatestTranslationResponse(requestId, readyRequest, entry, targetLanguage, checksum)
+
+  if (entry.checksum !== checksum)
+    return null
+
+  await touchTranslationStoreEntry(env, entry)
+  return readyTranslationResponse(requestId, readyRequest, entry, targetLanguage)
+}
+
+async function queueCurrentTranslationResponse(env: TranslationWorkerBindings, requestId: string, readyRequest: Request, checksum: string, targetLanguage: string, model: string) {
+  const queuedEntry = await queueTranslationIfNeeded(env, translationQueuePayload(checksum, targetLanguage, model, 0), requestId)
+  if (queuedEntry.status === 'ready') {
+    await touchTranslationStoreEntry(env, queuedEntry)
+    return readyTranslationResponse(requestId, readyRequest, queuedEntry, targetLanguage)
+  }
+  if (queuedEntry.status === 'pending' && isPendingTranslationStale(queuedEntry))
+    await requeueStaleTranslation(env, queuedEntry, checksum, targetLanguage, requestId)
+  return null
+}
+
 async function handleTranslationMessages(request: Request, env: TranslationWorkerBindings) {
   const requestId = requestIdFrom(request)
   const body = await parseJsonBody<TranslationBody>(request)
@@ -942,23 +964,15 @@ async function handleTranslationMessages(request: Request, env: TranslationWorke
 
   const latestReadyEntry = await readLatestReadyTranslationStoreEntry(env, targetLanguage)
   if (latestReadyEntry) {
-    if (isReadyTranslationFresh(latestReadyEntry))
-      return readyOrLatestTranslationResponse(requestId, readyRequest, latestReadyEntry, targetLanguage, checksum)
-
-    if (latestReadyEntry.checksum === checksum) {
-      await touchTranslationStoreEntry(env, latestReadyEntry)
-      return readyTranslationResponse(requestId, readyRequest, latestReadyEntry, targetLanguage)
-    }
+    const readyResponse = await currentReadyTranslationResponse(env, requestId, readyRequest, latestReadyEntry, targetLanguage, checksum)
+    if (readyResponse)
+      return readyResponse
   }
 
   try {
-    const queuedEntry = await queueTranslationIfNeeded(env, translationQueuePayload(checksum, targetLanguage, model, 0), requestId)
-    if (queuedEntry.status === 'ready') {
-      await touchTranslationStoreEntry(env, queuedEntry)
-      return readyTranslationResponse(requestId, readyRequest, queuedEntry, targetLanguage)
-    }
-    if (queuedEntry.status === 'pending' && isPendingTranslationStale(queuedEntry))
-      await requeueStaleTranslation(env, queuedEntry, checksum, targetLanguage, requestId)
+    const queuedResponse = await queueCurrentTranslationResponse(env, requestId, readyRequest, checksum, targetLanguage, model)
+    if (queuedResponse)
+      return queuedResponse
   }
   catch (error) {
     cloudlogErr({
