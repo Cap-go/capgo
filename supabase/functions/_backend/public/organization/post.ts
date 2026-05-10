@@ -4,14 +4,68 @@ import type { Database } from '../../utils/supabase.types.ts'
 import { type } from 'arktype'
 import { safeParseSchema } from '../../utils/ark_validation.ts'
 import { simpleError } from '../../utils/hono.ts'
-import { supabaseWithAuth } from '../../utils/supabase.ts'
+import { supabaseAdmin, supabaseWithAuth } from '../../utils/supabase.ts'
 import { normalizeWebsiteUrl } from './website.ts'
+
+const MAX_ESTIMATED_MAU = 1_000_000
+
+const estimatedMauSchema = type('number.integer >= 0').narrow((value, ctx) => {
+  if (value > MAX_ESTIMATED_MAU) {
+    return ctx.reject({
+      expected: `a value <= ${MAX_ESTIMATED_MAU}`,
+      actual: JSON.stringify(value),
+    })
+  }
+
+  return true
+})
 
 const bodySchema = type({
   'name': 'string >= 3',
   'email?': 'string.email',
+  'estimatedMau?': estimatedMauSchema,
   'website?': 'string',
 })
+
+async function getInitialPlanForMau(c: Context<MiddlewareKeyVariables>, estimatedMau: number) {
+  const adminClient = supabaseAdmin(c)
+  const { data: plan, error } = await adminClient
+    .from('plans')
+    .select('name, stripe_id, mau')
+    .gte('mau', estimatedMau)
+    .order('mau', { ascending: true })
+    .limit(1)
+    .single()
+
+  if (error || !plan?.stripe_id) {
+    throw simpleError('cannot_get_plan', 'Cannot get plan', { error: error?.message, estimatedMau })
+  }
+
+  return plan
+}
+
+async function createPendingStripeInfo(c: Context<MiddlewareKeyVariables>, orgId: string, estimatedMau: number) {
+  const plan = await getInitialPlanForMau(c, estimatedMau)
+  const pendingCustomerId = `pending_${orgId}`
+  const trialAt = new Date()
+  trialAt.setDate(trialAt.getDate() + 15)
+
+  const { error } = await supabaseAdmin(c)
+    .from('stripe_info')
+    .insert({
+      customer_id: pendingCustomerId,
+      product_id: plan.stripe_id,
+      trial_at: trialAt.toISOString(),
+      status: null,
+      is_good_plan: true,
+    })
+
+  if (error) {
+    throw simpleError('cannot_create_org_plan', 'Cannot create org plan', { error: error.message, estimatedMau, plan: plan.name })
+  }
+
+  return pendingCustomerId
+}
 
 export async function post(
   c: Context<MiddlewareKeyVariables>,
@@ -24,6 +78,7 @@ export async function post(
   }
   const body = bodyParsed.data
   const website = normalizeWebsiteUrl(body.website)
+  const estimatedMau = body.estimatedMau ?? 0
 
   const auth = c.get('auth') as AuthInfo | undefined
   if (!auth?.userId) {
@@ -35,10 +90,14 @@ export async function post(
   if (userErr || !self?.email) {
     throw simpleError('cannot_get_user', 'Cannot get user', { error: userErr?.message })
   }
+  const orgId = crypto.randomUUID()
+  const pendingCustomerId = await createPendingStripeInfo(c, orgId, estimatedMau)
   const newOrg = {
+    id: orgId,
     name: body.name,
     created_by: auth.userId,
     management_email: body.email ?? self.email ?? '',
+    customer_id: pendingCustomerId,
     website,
   }
   const { error: errorOrg } = await supabase
@@ -46,17 +105,13 @@ export async function post(
     .insert(newOrg)
 
   if (errorOrg) {
+    await supabaseAdmin(c)
+      .from('stripe_info')
+      .delete()
+      .eq('customer_id', pendingCustomerId)
+
     throw simpleError('cannot_create_org', 'Cannot create org', { error: errorOrg?.message })
   }
-  // Read the created org - the insert trigger creates org_users so RLS should allow access
-  const { data: dataOrg, error: errorOrg2 } = await supabase
-    .from('orgs')
-    .select('id')
-    .eq('created_by', auth.userId)
-    .eq('name', body.name)
-    .single()
-  if (errorOrg2 || !dataOrg) {
-    throw simpleError('cannot_get_org', 'Cannot get created org', { error: errorOrg2?.message })
-  }
-  return c.json({ id: dataOrg.id })
+
+  return c.json({ id: orgId })
 }

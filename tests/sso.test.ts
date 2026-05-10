@@ -289,6 +289,63 @@ describe('[GET] /private/sso/sp-metadata', () => {
   })
 })
 
+describe('[POST] /private/sso/providers', () => {
+  it.concurrent('rejects pending Enterprise onboarding plans for SSO provider creation', async () => {
+    const orgId = randomUUID()
+    const pendingCustomerId = `pending_${orgId}`
+
+    try {
+      const { error: stripeError } = await getSupabaseClient().from('stripe_info').insert({
+        customer_id: pendingCustomerId,
+        status: null,
+        product_id: ENTERPRISE_PRODUCT_ID,
+        subscription_id: null,
+        trial_at: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString(),
+        is_good_plan: true,
+      })
+      if (stripeError)
+        throw stripeError
+
+      const { error: orgError } = await getSupabaseClient().from('orgs').insert({
+        id: orgId,
+        name: `Pending Enterprise SSO ${orgId}`,
+        management_email: `pending-enterprise-${orgId}@capgo.app`,
+        created_by: USER_ID,
+        customer_id: pendingCustomerId,
+      })
+      if (orgError)
+        throw orgError
+
+      const { error: orgUserError } = await getSupabaseClient().from('org_users').insert({
+        org_id: orgId,
+        user_id: USER_ID,
+        user_right: 'super_admin' as const,
+      })
+      if (orgUserError)
+        throw orgUserError
+
+      const response = await fetchWithRetry(getEndpointUrl('/private/sso/providers'), {
+        method: 'POST',
+        headers: authHeaders,
+        body: JSON.stringify({
+          org_id: orgId,
+          domain: `${randomUUID()}.sso.test`,
+          metadata_url: 'https://idp.example.com/metadata.xml',
+        }),
+      })
+
+      expect(response.status).toBe(403)
+      const data = await response.json() as { error: string }
+      expect(data.error).toBe('enterprise_plan_required')
+    }
+    finally {
+      await getSupabaseClient().from('org_users').delete().eq('org_id', orgId)
+      await getSupabaseClient().from('orgs').delete().eq('id', orgId)
+      await getSupabaseClient().from('stripe_info').delete().eq('customer_id', pendingCustomerId)
+    }
+  })
+})
+
 describe('[POST] /private/sso/prelink-users', () => {
   it.concurrent('only unlinks password identities for members of the provider org', async () => {
     const prelinkOrgId = randomUUID()
