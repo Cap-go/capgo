@@ -191,34 +191,21 @@ function getMemberRoleLabel(member: OrganizationMemberRow) {
   return member.role.replaceAll('_', ' ')
 }
 
-function getMemberStatusLabel(member: OrganizationMemberRow) {
-  return isInviteMember(member) ? t('sso-status-pending') : t('sso-status-active')
-}
-
-function getMemberStatusClasses(member: OrganizationMemberRow) {
-  if (isInviteMember(member)) {
-    return {
-      pill: 'border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-400/25 dark:bg-amber-500/8 dark:text-amber-200',
-      dot: 'bg-amber-400 dark:bg-amber-300',
-    }
-  }
-
-  return {
-    pill: 'border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-400/25 dark:bg-emerald-500/8 dark:text-emerald-200',
-    dot: 'bg-emerald-500 dark:bg-emerald-300',
-  }
-}
-
 function renderRoleCell(member: OrganizationMemberRow) {
-  const statusClasses = getMemberStatusClasses(member)
-
-  return h('div', { class: 'flex flex-wrap items-center gap-2 min-w-0 whitespace-normal' }, [
+  const content = [
     h('span', { class: 'truncate text-slate-700 dark:text-slate-200' }, getMemberRoleLabel(member)),
-    h('span', { class: `inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-medium rounded-full border shrink-0 ${statusClasses.pill}` }, [
-      h('span', { class: `w-1.5 h-1.5 rounded-full ${statusClasses.dot}` }),
-      h('span', getMemberStatusLabel(member)),
-    ]),
-  ])
+  ]
+
+  if (isInviteMember(member)) {
+    content.push(
+      h('div', { class: 'inline-flex items-center gap-1 rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-[0.625rem] font-medium text-amber-700 shrink-0 dark:border-amber-400/25 dark:bg-amber-500/8 dark:text-amber-200' }, [
+        h('span', { class: 'size-1.5 rounded-full bg-amber-400 dark:bg-amber-300' }),
+        h('span', t('sso-status-pending')),
+      ]),
+    )
+  }
+
+  return h('div', { class: 'flex flex-wrap items-center gap-2 min-w-0 whitespace-normal' }, content)
 }
 
 async function checkRbacEnabled() {
