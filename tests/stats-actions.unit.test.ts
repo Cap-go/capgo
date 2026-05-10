@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { actionToFilter, filterToAction, statsActionFilters } from '../src/services/statsActions.ts'
+import { actionToFilter, filterToAction, statsActionFilters } from '~/services/statsActions'
 import { ALLOWED_STATS_ACTIONS } from '../supabase/functions/_backend/plugins/stats_actions.ts'
 
 const HEALTH_STATS_ACTIONS = [
@@ -21,8 +21,10 @@ const HEALTH_STATS_ACTIONS = [
 
 describe('stats action filters', () => {
   it('keeps the frontend action filters in sync with the backend action enum', () => {
+    const frontendFilterKeys = statsActionFilters.map(([filterKey]) => filterKey)
     const frontendActions = statsActionFilters.map(([, action]) => action)
 
+    expect(new Set(frontendFilterKeys).size).toBe(frontendFilterKeys.length)
     expect(new Set(frontendActions).size).toBe(frontendActions.length)
     expect([...frontendActions].sort()).toEqual([...ALLOWED_STATS_ACTIONS].sort())
   })
