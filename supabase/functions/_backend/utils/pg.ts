@@ -1206,31 +1206,11 @@ export async function getAdminGlobalStatsTrend(
         canceled_orgs::int,
         COALESCE(upgraded_orgs, 0)::int AS upgraded_orgs,
         mrr::float,
-        COALESCE((
-          SELECT prev.mrr
-          FROM global_stats prev
-          WHERE prev.date_id = (gs.date_id::date - 1)::text
-        ), 0)::float AS previous_mrr,
-        (COALESCE((
-          SELECT prev.revenue_solo
-          FROM global_stats prev
-          WHERE prev.date_id = (gs.date_id::date - 1)::text
-        ), 0)::float / 12)::float AS previous_mrr_solo,
-        (COALESCE((
-          SELECT prev.revenue_maker
-          FROM global_stats prev
-          WHERE prev.date_id = (gs.date_id::date - 1)::text
-        ), 0)::float / 12)::float AS previous_mrr_maker,
-        (COALESCE((
-          SELECT prev.revenue_team
-          FROM global_stats prev
-          WHERE prev.date_id = (gs.date_id::date - 1)::text
-        ), 0)::float / 12)::float AS previous_mrr_team,
-        (COALESCE((
-          SELECT prev.revenue_enterprise
-          FROM global_stats prev
-          WHERE prev.date_id = (gs.date_id::date - 1)::text
-        ), 0)::float / 12)::float AS previous_mrr_enterprise,
+        COALESCE(prev.mrr, 0)::float AS previous_mrr,
+        (COALESCE(prev.revenue_solo, 0)::float / 12)::float AS previous_mrr_solo,
+        (COALESCE(prev.revenue_maker, 0)::float / 12)::float AS previous_mrr_maker,
+        (COALESCE(prev.revenue_team, 0)::float / 12)::float AS previous_mrr_team,
+        (COALESCE(prev.revenue_enterprise, 0)::float / 12)::float AS previous_mrr_enterprise,
         COALESCE(NULLIF(to_jsonb(gs) ->> 'nrr', '')::float, 100)::float AS nrr,
         COALESCE(NULLIF(to_jsonb(gs) ->> 'churn_revenue', '')::float, 0)::float AS churn_revenue,
         COALESCE(NULLIF(to_jsonb(gs) ->> 'churn_revenue_solo', '')::float, 0)::float AS churn_revenue_solo,
@@ -1290,6 +1270,7 @@ export async function getAdminGlobalStatsTrend(
         COALESCE(NULLIF(to_jsonb(gs) ->> 'builder_active_paying_clients_60d', '')::int, 0)::int AS builder_active_paying_clients_60d,
         COALESCE(NULLIF(to_jsonb(gs) ->> 'live_updates_active_paying_clients_60d', '')::int, 0)::int AS live_updates_active_paying_clients_60d
       FROM global_stats gs
+      LEFT JOIN global_stats prev ON prev.date_id = (gs.date_id::date - 1)::text
       WHERE gs.date_id <= ${endDateOnly}
       )
       SELECT *

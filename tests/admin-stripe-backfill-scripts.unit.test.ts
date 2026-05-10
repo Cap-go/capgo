@@ -88,6 +88,47 @@ describe('admin Stripe backfill scripts', () => {
     ])
   })
 
+  it.concurrent('marks rows changed when only plan conversion rate differs', () => {
+    const rows = buildOrgConversionRateBackfillRows([
+      {
+        date_id: '2026-04-10',
+        paying: 40,
+        org_conversion_rate: 20,
+        plan_enterprise: 0,
+        plan_enterprise_conversion_rate: 0,
+        plan_maker: 10,
+        plan_maker_conversion_rate: 4.5,
+        plan_solo: 30,
+        plan_solo_conversion_rate: 15,
+        plan_team: 0,
+        plan_team_conversion_rate: 0,
+      },
+    ] as any, Array.from({ length: 200 }, () => ({ created_at: '2026-04-01T12:00:00.000Z' })))
+
+    expect(rows).toEqual([
+      {
+        date_id: '2026-04-10',
+        orgs: 200,
+        paying: 40,
+        current_plan_rates: {
+          enterprise: 0,
+          maker: 4.5,
+          solo: 15,
+          team: 0,
+        },
+        current_rate: 20,
+        next_plan_rates: {
+          enterprise: 0,
+          maker: 5,
+          solo: 15,
+          team: 0,
+        },
+        next_rate: 20,
+        changed: true,
+      },
+    ])
+  })
+
   it.concurrent('normalizes Stripe country codes', () => {
     expect(normalizeStripeCountryCode(' us ')).toBe('US')
     expect(normalizeStripeCountryCode('USA')).toBeNull()
