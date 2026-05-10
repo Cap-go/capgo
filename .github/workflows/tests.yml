@@ -1,7 +1,7 @@
 name: Run tests
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.event_name == 'workflow_call' && github.sha || github.ref }}
   cancel-in-progress: true
 
 on:
