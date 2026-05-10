@@ -1409,13 +1409,13 @@ export async function getAdminPaidProductActivityTrend(
         SELECT
           ds.date,
           COUNT(DISTINCT po.org_id)::int AS paying_clients,
-          COUNT(DISTINCT po.org_id) FILTER (WHERE ba.org_id IS NOT NULL)::int AS builder_active_clients,
+          COUNT(DISTINCT po.org_id) FILTER (WHERE builder.org_id IS NOT NULL)::int AS builder_active_clients,
           COUNT(DISTINCT po.org_id) FILTER (WHERE lua.org_id IS NOT NULL)::int AS live_updates_active_clients
         FROM date_series ds
         LEFT JOIN paying_orgs_by_day po ON po.date = ds.date
-        LEFT JOIN builder_activity ba
-          ON ba.org_id = po.org_id
-          AND ba.date BETWEEN (ds.date - interval '59 days')::date AND ds.date
+        LEFT JOIN builder_activity builder
+          ON builder.org_id = po.org_id
+          AND builder.date BETWEEN (ds.date - interval '59 days')::date AND ds.date
         LEFT JOIN live_updates_activity lua
           ON lua.org_id = po.org_id
           AND lua.date BETWEEN (ds.date - interval '59 days')::date AND ds.date
