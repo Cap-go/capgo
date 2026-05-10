@@ -63,6 +63,20 @@ describe('is_platform_admin SQL function', () => {
     }
   }
 
+  async function setAuthClaims(query: QueryFn, claims: Record<string, unknown>) {
+    const sub = typeof claims.sub === 'string' ? claims.sub : ''
+    const email = typeof claims.email === 'string' ? claims.email : ''
+
+    await query('SELECT set_config(\'role\', \'authenticated\', true)')
+    await query('SELECT set_config(\'request.jwt.claim.sub\', $1, true)', [sub])
+    await query('SELECT set_config(\'request.jwt.claim.email\', $1, true)', [email])
+    await query('SELECT set_config(\'request.jwt.claim.role\', \'authenticated\', true)')
+    await query('SELECT set_config(\'request.jwt.claims\', $1, true)', [JSON.stringify({
+      role: 'authenticated',
+      ...claims,
+    })])
+  }
+
   afterAll(async () => {
     await pool.end()
   })
@@ -143,6 +157,50 @@ describe('is_platform_admin SQL function', () => {
 
       expect(rbacUserResults.rows[0].is_platform_admin).toBe(false)
       expect(regularUserResults.rows[0].is_platform_admin).toBe(false)
+    })
+  })
+
+  it.concurrent('does not treat email OTP sessions as platform-admin MFA', async () => {
+    await withTransaction(async (query) => {
+      const legacyAdmin = await getAdminUserId(query)
+
+      expect(legacyAdmin).toBeTruthy()
+
+      await query(`
+        INSERT INTO public.user_security (user_id, email_otp_verified_at, created_at, updated_at)
+        VALUES ($1::uuid, NOW(), NOW(), NOW())
+        ON CONFLICT (user_id) DO UPDATE
+        SET
+          email_otp_verified_at = EXCLUDED.email_otp_verified_at,
+          updated_at = NOW();
+      `, [legacyAdmin])
+
+      await query(`
+        INSERT INTO auth.mfa_factors (id, user_id, friendly_name, factor_type, status, created_at, updated_at)
+        VALUES (gen_random_uuid(), $1::uuid, 'Admin TOTP', 'totp'::auth.factor_type, 'verified'::auth.factor_status, NOW(), NOW());
+      `, [legacyAdmin])
+
+      await setAuthClaims(query, {
+        sub: legacyAdmin,
+        email: 'admin@example.test',
+        aal: 'aal1',
+        amr: [{ method: 'otp' }],
+      })
+
+      const otpOnly = await query('SELECT public.is_platform_admin() as is_platform_admin')
+
+      expect(otpOnly.rows[0].is_platform_admin).toBe(false)
+
+      await setAuthClaims(query, {
+        sub: legacyAdmin,
+        email: 'admin@example.test',
+        aal: 'aal2',
+        amr: [{ method: 'password' }, { method: 'totp' }],
+      })
+
+      const totpVerified = await query('SELECT public.is_platform_admin() as is_platform_admin')
+
+      expect(totpVerified.rows[0].is_platform_admin).toBe(true)
     })
   })
 })
