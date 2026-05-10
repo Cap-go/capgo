@@ -1843,6 +1843,8 @@
   "version-builtin": "Version builtin",
   "version-deleted-cannot-rollback": "Bundle deleted, cannot rollback to it",
   "version-name-missing": "Version name is missing",
+  "version-rules-tester": "Version rules tester",
+  "version-rules-tester-description": "Learn how versions work and simulate update scenarios",
   "view": "View",
   "view-adoption": "View adoption",
   "view-deliveries": "View Deliveries",
