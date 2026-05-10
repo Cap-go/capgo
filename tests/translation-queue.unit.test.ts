@@ -125,7 +125,7 @@ describe('translation queue helpers', () => {
       headers: { 'Content-Type': 'application/json' },
       method: 'POST',
     }), {
-      DB_STOREAPPS: db,
+      DB_TRANSLATIONS: db,
       TRANSLATION_MESSAGES_QUEUE: queue,
     } as any)
     const payload = await response.json() as { checksum: string, messages: Record<string, string>, status: string }
@@ -163,7 +163,7 @@ describe('translation queue helpers', () => {
       headers: { 'Content-Type': 'application/json' },
       method: 'POST',
     }), {
-      DB_STOREAPPS: db,
+      DB_TRANSLATIONS: db,
       TRANSLATION_MESSAGES_QUEUE: queue,
     } as any)
     const payload = await response.json() as { checksum: string, messages: Record<string, string>, status: string }
@@ -186,7 +186,7 @@ describe('translation queue helpers', () => {
       headers: { 'Content-Type': 'application/json' },
       method: 'POST',
     }), {
-      DB_STOREAPPS: db,
+      DB_TRANSLATIONS: db,
       TRANSLATION_MESSAGES_QUEUE: queue,
     } as any)
     const payload = await response.json() as { status: string }

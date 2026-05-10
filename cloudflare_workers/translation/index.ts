@@ -62,7 +62,7 @@ interface AiBinding {
 
 interface TranslationWorkerBindings {
   AI?: AiBinding
-  DB_STOREAPPS?: D1Database
+  DB_TRANSLATIONS?: D1Database
   ENV_NAME?: string
   TRANSLATION_MESSAGES_QUEUE?: Queue<Required<TranslationQueuePayload>>
   TRANSLATION_MODEL?: string
@@ -468,10 +468,10 @@ function messageCatalogOf(value: unknown): Record<string, string> {
 }
 
 function getTranslationStore(env: TranslationWorkerBindings) {
-  if (!env.DB_STOREAPPS)
+  if (!env.DB_TRANSLATIONS)
     fail(503, 'translation_unavailable', 'Cloudflare D1 translation store is not configured')
 
-  return env.DB_STOREAPPS
+  return env.DB_TRANSLATIONS
 }
 
 function getTranslationQueue(env: TranslationWorkerBindings) {

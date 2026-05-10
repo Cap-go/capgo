@@ -30,9 +30,9 @@
       },
       "d1_databases": [
         {
-          "binding": "DB_STOREAPPS",
-          "database_name": "capgo_prod_storeapp",
-          "database_id": "81236a0c-db6e-454d-87da-944fa9bc100c"
+          "binding": "DB_TRANSLATIONS",
+          "database_name": "capgo_translation_console",
+          "database_id": "af3c37eb-e571-43d6-acca-57c14ba0b9d5"
         }
       ],
       "queues": {
@@ -76,9 +76,9 @@
       },
       "d1_databases": [
         {
-          "binding": "DB_STOREAPPS",
-          "database_name": "capgo_prod_storeapp",
-          "database_id": "81236a0c-db6e-454d-87da-944fa9bc100c"
+          "binding": "DB_TRANSLATIONS",
+          "database_name": "capgo_translation_console",
+          "database_id": "af3c37eb-e571-43d6-acca-57c14ba0b9d5"
         }
       ],
       "queues": {
@@ -122,9 +122,9 @@
       },
       "d1_databases": [
         {
-          "binding": "DB_STOREAPPS",
-          "database_name": "capgo_prod_storeapp",
-          "database_id": "81236a0c-db6e-454d-87da-944fa9bc100c"
+          "binding": "DB_TRANSLATIONS",
+          "database_name": "capgo_translation_console",
+          "database_id": "af3c37eb-e571-43d6-acca-57c14ba0b9d5"
         }
       ],
       "queues": {
@@ -165,9 +165,9 @@
       },
       "d1_databases": [
         {
-          "binding": "DB_STOREAPPS",
-          "database_name": "capgo_prod_storeapp",
-          "database_id": "81236a0c-db6e-454d-87da-944fa9bc100c"
+          "binding": "DB_TRANSLATIONS",
+          "database_name": "capgo_translation_console",
+          "database_id": "af3c37eb-e571-43d6-acca-57c14ba0b9d5"
         }
       ],
       "queues": {
