@@ -437,11 +437,9 @@ async function deleteElement(element: Element) {
 
   isLoading.value = true
   try {
-    // Delete directly via RLS
-    const { error } = await supabase
-      .from('role_bindings')
-      .delete()
-      .eq('id', element.id)
+    const { error } = await supabase.functions.invoke(`private/role_bindings/${element.id}`, {
+      method: 'DELETE',
+    })
 
     if (error)
       throw error

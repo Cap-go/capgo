@@ -387,10 +387,6 @@ function getAppName(appId: string) {
   return app ? (app.name || app.app_id) : appId
 }
 
-function getRoleIdByName(roleName: string) {
-  return roles.value.find((r: Role) => r.name === roleName)?.id
-}
-
 function toggleApp(appId: string) {
   if (appId in pendingAppBindings.value) {
     const updated = { ...pendingAppBindings.value }
@@ -404,6 +400,44 @@ function toggleApp(appId: string) {
 
 function setAppRole(appId: string, roleName: string) {
   pendingAppBindings.value = { ...pendingAppBindings.value, [appId]: roleName }
+}
+
+async function createRoleBinding(roleName: string, scopeType: 'org' | 'app', appId: string | null = null) {
+  const { error } = await supabase.functions.invoke('private/role_bindings', {
+    method: 'POST',
+    body: {
+      principal_type: 'group',
+      principal_id: group.value!.id,
+      role_name: roleName,
+      scope_type: scopeType,
+      org_id: group.value!.org_id,
+      app_id: appId,
+      channel_id: null,
+      reason: null,
+    },
+  })
+
+  if (error)
+    throw error
+}
+
+async function updateRoleBinding(bindingId: string, roleName: string) {
+  const { error } = await supabase.functions.invoke(`private/role_bindings/${bindingId}`, {
+    method: 'PATCH',
+    body: { role_name: roleName },
+  })
+
+  if (error)
+    throw error
+}
+
+async function deleteRoleBinding(bindingId: string) {
+  const { error } = await supabase.functions.invoke(`private/role_bindings/${bindingId}`, {
+    method: 'DELETE',
+  })
+
+  if (error)
+    throw error
 }
 
 function onAppRoleChange(appId: string, event: Event) {
@@ -521,9 +555,7 @@ async function saveGroupOrgRole() {
 
   if (!targetRoleName) {
     if (existing) {
-      const { error } = await supabase.from('role_bindings').delete().eq('id', existing.id)
-      if (error)
-        throw error
+      await deleteRoleBinding(existing.id)
     }
     return
   }
@@ -531,33 +563,11 @@ async function saveGroupOrgRole() {
   if (existing && existing.role_name === targetRoleName)
     return
 
-  const roleId = getRoleIdByName(targetRoleName)
-  if (!roleId)
-    throw new Error('Role not found')
-
   if (existing) {
-    const { error } = await supabase.from('role_bindings').update({ role_id: roleId }).eq('id', existing.id)
-    if (error)
-      throw error
+    await updateRoleBinding(existing.id, targetRoleName)
   }
   else {
-    if (!main.user?.id)
-      throw new Error('No user')
-
-    const { error } = await supabase.from('role_bindings').insert({
-      principal_type: 'group',
-      principal_id: group.value!.id,
-      role_id: roleId,
-      scope_type: 'org',
-      org_id: group.value!.org_id,
-      app_id: null,
-      channel_id: null,
-      granted_by: main.user.id,
-      reason: null,
-      is_direct: true,
-    })
-    if (error)
-      throw error
+    await createRoleBinding(targetRoleName, 'org')
   }
 }
 
@@ -568,9 +578,7 @@ async function syncAppBindings() {
   // Delete bindings for apps no longer selected
   for (const binding of existing) {
     if (!binding.app_id || !(binding.app_id in pending)) {
-      const { error } = await supabase.from('role_bindings').delete().eq('id', binding.id)
-      if (error)
-        throw error
+      await deleteRoleBinding(binding.id)
     }
   }
 
@@ -580,37 +588,15 @@ async function syncAppBindings() {
     if (!roleName)
       continue
 
-    const roleId = getRoleIdByName(roleName)
-    if (!roleId)
-      continue
-
     const existingBinding = existing.find((b: RoleBinding) => b.app_id === appId)
 
     if (existingBinding) {
       if (existingBinding.role_name !== roleName) {
-        const { error } = await supabase.from('role_bindings').update({ role_id: roleId }).eq('id', existingBinding.id)
-        if (error)
-          throw error
+        await updateRoleBinding(existingBinding.id, roleName)
       }
     }
     else {
-      if (!main.user?.id)
-        throw new Error('No user')
-
-      const { error } = await supabase.from('role_bindings').insert({
-        principal_type: 'group',
-        principal_id: group.value!.id,
-        role_id: roleId,
-        scope_type: 'app',
-        org_id: group.value!.org_id,
-        app_id: appId,
-        channel_id: null,
-        granted_by: main.user.id,
-        reason: null,
-        is_direct: true,
-      })
-      if (error)
-        throw error
+      await createRoleBinding(roleName, 'app', appId)
     }
   }
 
