@@ -40,7 +40,6 @@ beforeEach(() => {
   fetchMock.mockReset()
   cloudlogErrMock.mockReset()
   cloudlogMock.mockReset()
-  vi.stubGlobal('fetch', fetchMock)
 })
 
 afterEach(() => {
@@ -130,6 +129,7 @@ describe('discord alert redaction', () => {
     const { sendDiscordAlert } = await import('../supabase/functions/_backend/utils/discord.ts')
     envState.discordAlert = 'https://discord.com/api/webhooks/app-id/discord-webhook-secret-token'
     fetchMock.mockRejectedValue(new Error(`connect failed: ${envState.discordAlert}`))
+    vi.stubGlobal('fetch', fetchMock)
 
     await sendDiscordAlert(createContext(), {
       content: 'hello',
