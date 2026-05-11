@@ -17,18 +17,45 @@ export interface CreateApp {
   android_store_url?: string
 }
 
+const createAppMetadataFields = [
+  'android_store_url',
+  'app_id',
+  'existing_app',
+  'icon',
+  'ios_store_url',
+  'name',
+  'need_onboarding',
+  'owner_org',
+] as const
+
+export function getCreateAppBodyMetadata(body: unknown) {
+  if (!body || typeof body !== 'object') {
+    return { hasBody: false }
+  }
+
+  const bodyRecord = body as Record<string, unknown>
+  const presentFields = createAppMetadataFields.filter(field => field in bodyRecord)
+
+  return {
+    fieldCount: Object.keys(bodyRecord).length,
+    hasBody: true,
+    presentFields,
+    unknownFieldCount: Math.max(0, Object.keys(bodyRecord).length - presentFields.length),
+  }
+}
+
 export async function post(c: Context<MiddlewareKeyVariables>, body: CreateApp): Promise<Response> {
   if (!body.app_id) {
-    throw simpleError('missing_app_id', 'Missing app_id', { body })
+    throw simpleError('missing_app_id', 'Missing app_id', { body: getCreateAppBodyMetadata(body) })
   }
   if (!isValidAppId(body.app_id)) {
     throw simpleError('invalid_app_id', 'App ID must be a reverse domain string', { app_id: body.app_id })
   }
   if (!body.name) {
-    throw simpleError('missing_name', 'Missing name', { body })
+    throw simpleError('missing_name', 'Missing name', { body: getCreateAppBodyMetadata(body) })
   }
   if (!body.owner_org) {
-    throw quickError(400, 'missing_owner_org', 'Missing owner_org', { body })
+    throw quickError(400, 'missing_owner_org', 'Missing owner_org', { body: getCreateAppBodyMetadata(body) })
   }
 
   // Check if the user is allowed to create an app in this organization (auth context set by middlewareKey)
