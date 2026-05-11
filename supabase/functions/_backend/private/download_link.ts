@@ -20,7 +20,7 @@ app.use('/', useCors)
 
 app.post('/', middlewareAuth, async (c) => {
   const body = await parseBody<DataDownload>(c)
-  cloudlog({ requestId: c.get('requestId'), message: 'post download link body', body })
+  cloudlog({ requestId: c.get('requestId'), message: 'post download link body', has_app_id: !!body.app_id, has_id: !!body.id, has_manifest: !!body.isManifest })
   const authorization = c.get('authorization')
   if (!authorization)
     throw simpleError('cannot_find_authorization', 'Cannot find authorization')
@@ -37,7 +37,7 @@ app.post('/', middlewareAuth, async (c) => {
 
   // Auth context is already set by middlewareAuth
   if (!(await checkPermission(c, 'app.read_bundles', { appId: body.app_id })))
-    throw simpleError('app_access_denied', 'You can\'t access this app', { app_id: body.app_id })
+    throw simpleError('app_access_denied', 'You can\'t access this app')
 
   const { data: bundle, error: getBundleError } = await supabase
     .from('app_versions')
@@ -53,7 +53,7 @@ app.post('/', middlewareAuth, async (c) => {
   }
 
   if (!ownerOrg) {
-    throw simpleError('cannot_get_owner_org', 'Cannot get owner org', { bundle })
+    throw simpleError('cannot_get_owner_org', 'Cannot get owner org', { has_bundle: !!bundle, has_owner_org: !!bundle?.owner_org })
   }
 
   if (body.isManifest) {
