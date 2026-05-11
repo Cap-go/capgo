@@ -110,6 +110,35 @@ export function getStripe(c: Context): Stripe {
   })
 }
 
+function getLicensedSubscriptionItem(items: Stripe.SubscriptionItem[] | undefined) {
+  return items?.find(item => item.plan.usage_type === 'licensed') ?? items?.[0] ?? null
+}
+
+function getSubscriptionProductId(c: Context, item: Stripe.SubscriptionItem | null) {
+  if (!item)
+    return null
+
+  const price = item.price
+  if (typeof price === 'object' && price !== null && typeof price.product === 'string')
+    return price.product
+
+  cloudlog({ requestId: c.get('requestId'), message: 'Price or product data missing/invalid type in subscription item', itemId: item.id })
+  return null
+}
+
+function stripeTimestampToIso(seconds: number | null | undefined) {
+  return seconds ? new Date(seconds * 1000).toISOString() : null
+}
+
+function getSubscriptionEndDate(subscription: Stripe.Subscription, item: Stripe.SubscriptionItem | null) {
+  const endSeconds = subscription.ended_at
+    ?? subscription.cancel_at
+    ?? (subscription.cancel_at_period_end ? item?.current_period_end : null)
+    ?? null
+
+  return stripeTimestampToIso(endSeconds)
+}
+
 export async function getSubscriptionData(c: Context, customerId: string, subscriptionId: string | null) {
   if (!subscriptionId)
     return null
@@ -129,40 +158,18 @@ export async function getSubscriptionData(c: Context, customerId: string, subscr
       subscriptionStatus: subscription.status,
     })
 
-    // // Get the subscription - Removed: already have the subscription object
-    // const subscription = subscriptions.data[0]
-
-    // Extract product ID from the first subscription item
-    let productId = null
-    if (subscription.items.data.length > 0) {
-      const item = subscription.items.data[0]
-      // Ensure price and product are objects before accessing properties
-      if (typeof item.price === 'object' && item.price !== null && typeof item.price.product === 'string') {
-        productId = item.price.product
-      }
-      else {
-        cloudlog({ requestId: c.get('requestId'), message: 'Price or product data missing/invalid type in subscription item', itemId: item.id })
-      }
-    }
-
-    // subscription.billing_cycle_anchor - Not used, using current period from item
-    // Format dates from epoch to ISO string
-    // Access cycle dates from the first item
-    const firstItem = subscription.items.data.length > 0 ? subscription.items.data[0] : null
-
-    const cycleStart = firstItem?.current_period_start
-      ? new Date(firstItem.current_period_start * 1000).toISOString()
-      : null
-
-    const cycleEnd = firstItem?.current_period_end
-      ? new Date(firstItem.current_period_end * 1000).toISOString()
-      : null
+    const currentItem = getLicensedSubscriptionItem(subscription.items.data)
+    const productId = getSubscriptionProductId(c, currentItem)
+    const cycleStart = stripeTimestampToIso(currentItem?.current_period_start)
+    const cycleEnd = stripeTimestampToIso(currentItem?.current_period_end)
+    const canceledAt = getSubscriptionEndDate(subscription, currentItem)
 
     return {
       productId,
       status: subscription.status,
       cycleStart,
       cycleEnd,
+      canceledAt,
       subscriptionId: subscription.id,
       cancel_at_period_end: subscription.cancel_at_period_end,
     }
@@ -276,6 +283,8 @@ export async function syncSubscriptionData(c: Context, customerId: string, subsc
     if (subscriptionData?.cycleEnd) {
       updateData.subscription_anchor_end = subscriptionData.cycleEnd
     }
+    if (subscriptionData)
+      updateData.canceled_at = subscriptionData.canceledAt ?? null
 
     const { error: updateError } = await supabaseAdmin(c)
       .from('stripe_info')
