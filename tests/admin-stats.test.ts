@@ -42,6 +42,7 @@ const ONBOARDING_LATE_SUBSCRIPTION_APP_CREATED_AT = '2026-02-02T14:00:00.000Z'
 const ONBOARDING_LATE_SUBSCRIPTION_CHANNEL_CREATED_AT = '2026-02-03T14:00:00.000Z'
 const ONBOARDING_LATE_SUBSCRIPTION_BUNDLE_CREATED_AT = '2026-02-04T14:00:00.000Z'
 const ONBOARDING_LATE_SUBSCRIPTION_PAID_AT = '2026-02-10T14:00:00.000Z'
+const GLOBAL_STATS_TREND_DATES = ['2099-12-30', '2099-12-31'] as const
 
 let adminHeaders: Record<string, string>
 let soloPlan: {
@@ -73,6 +74,79 @@ beforeAll(async () => {
 
   soloPlan = planRow
   creatorUserCreatedAt = new Date(userRow.created_at).toISOString()
+
+  const { error: globalStatsError } = await supabase.from('global_stats').upsert([
+    {
+      date_id: GLOBAL_STATS_TREND_DATES[0],
+      apps: 10,
+      apps_active: 7,
+      users: 20,
+      users_active: 8,
+      paying: 4,
+      org_conversion_rate: 20,
+      trial: 2,
+      not_paying: 14,
+      updates: 100,
+      updates_external: 5,
+      success_rate: 98.5,
+      bundle_storage_gb: 1.25,
+      plan_solo: 1,
+      plan_maker: 2,
+      plan_team: 1,
+      plan_enterprise: 0,
+      registers_today: 3,
+      devices_last_month: 9,
+      stars: 1,
+      need_upgrade: 0,
+      paying_yearly: 1,
+      paying_monthly: 3,
+      new_paying_orgs: 1,
+      canceled_orgs: 0,
+      upgraded_orgs: 0,
+      mrr: 120,
+      total_revenue: 1440,
+      revenue_solo: 120,
+      revenue_maker: 240,
+      revenue_team: 1080,
+      revenue_enterprise: 0,
+    },
+    {
+      date_id: GLOBAL_STATS_TREND_DATES[1],
+      apps: 11,
+      apps_active: 8,
+      users: 22,
+      users_active: 9,
+      paying: 5,
+      org_conversion_rate: 22.7,
+      trial: 2,
+      not_paying: 15,
+      updates: 150,
+      updates_external: 10,
+      success_rate: 99.1,
+      bundle_storage_gb: 1.5,
+      plan_solo: 2,
+      plan_maker: 2,
+      plan_team: 1,
+      plan_enterprise: 0,
+      registers_today: 4,
+      devices_last_month: 12,
+      stars: 2,
+      need_upgrade: 1,
+      paying_yearly: 2,
+      paying_monthly: 3,
+      new_paying_orgs: 2,
+      canceled_orgs: 1,
+      upgraded_orgs: 1,
+      mrr: 240,
+      total_revenue: 2880,
+      revenue_solo: 240,
+      revenue_maker: 480,
+      revenue_team: 2160,
+      revenue_enterprise: 0,
+    },
+  ], { onConflict: 'date_id' })
+  if (globalStatsError)
+    throw globalStatsError
 
   const { error: stripeError } = await supabase.from('stripe_info').insert([
     {
@@ -307,6 +381,7 @@ beforeAll(async () => {
 afterAll(async () => {
   const supabase = getSupabaseClient()
 
+  await supabase.from('global_stats').delete().in('date_id', [...GLOBAL_STATS_TREND_DATES])
   await supabase.from('channels').delete().in('app_id', [ONBOARDING_APP_ID, ONBOARDING_LATE_SUBSCRIPTION_APP_ID])
   await supabase.from('app_versions').delete().in('app_id', [TRIAL_APP_ID, ONBOARDING_APP_ID, ONBOARDING_LATE_SUBSCRIPTION_APP_ID])
   await supabase.from('apps').delete().in('app_id', [TRIAL_APP_ID, ONBOARDING_APP_ID, ONBOARDING_LATE_SUBSCRIPTION_APP_ID])
@@ -315,6 +390,40 @@ afterAll(async () => {
 }, 90000)
 
 describe('/private/admin_stats', () => {
+  it.concurrent('returns global stats trend rows from the self-joined global_stats table', async () => {
+    const response = await fetchWithRetry(`${BASE_URL}/private/admin_stats`, {
+      method: 'POST',
+      headers: adminHeaders,
+      body: JSON.stringify({
+        metric_category: 'global_stats_trend',
+        start_date: '2099-12-30T00:00:00.000Z',
+        end_date: '2099-12-31T23:59:59.000Z',
+      }),
+    })
+
+    expect(response.status).toBe(200)
+    const payload = await response.json() as {
+      success: boolean
+      data: Array<{
+        date: string
+        apps: number
+        updates: number
+        updates_external: number
+        previous_mrr: number
+      }>
+    }
+
+    expect(payload.success).toBe(true)
+    expect(payload.data).toHaveLength(2)
+
+    const latest = payload.data.find(row => row.date === GLOBAL_STATS_TREND_DATES[1])
+    expect(latest).toBeTruthy()
+    expect(latest?.apps).toBe(11)
+    expect(latest?.updates).toBe(150)
+    expect(latest?.updates_external).toBe(10)
+    expect(latest?.previous_mrr).toBe(120)
+  })
+
   it.concurrent('returns last bundle upload for trial organizations and excludes builtin versions', async () => {
     const response = await fetchWithRetry(`${BASE_URL}/private/admin_stats`, {
       method: 'POST',
