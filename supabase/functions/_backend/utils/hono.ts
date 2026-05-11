@@ -12,6 +12,7 @@ import { logger } from 'hono/logger'
 import { requestId } from 'hono/request-id'
 import { Hono } from 'hono/tiny'
 import { timingSafeEqual } from 'hono/utils/buffer'
+import { redactQueryForLog, redactUrlForLog } from './log_redaction.ts'
 import { cloudlog } from './logging.ts'
 import { onError } from './on_error.ts'
 import { getEnv } from './utils.ts'
@@ -157,7 +158,7 @@ export async function getBodyOrQuery<T>(c: Context<MiddlewareKeyVariables, any, 
     }
   }
   if (!body || Object.keys(body).length === 0) {
-    cloudlog({ requestId: c.get('requestId'), message: 'Cannot find body', query: c.req.query() })
+    cloudlog({ requestId: c.get('requestId'), message: 'Cannot find body', query: redactQueryForLog(c.req.query()) })
     throw simpleError('invalid_json_parse_body', 'Invalid JSON body')
   }
   if ((body as any).device_id) {
@@ -169,7 +170,7 @@ export async function getBodyOrQuery<T>(c: Context<MiddlewareKeyVariables, any, 
 export const middlewareAuth = honoFactory.createMiddleware(async (c, next) => {
   const authorization = c.req.header('authorization')
   if (!authorization) {
-    cloudlog({ requestId: c.get('requestId'), message: 'Cannot find authorization', query: c.req.query() })
+    cloudlog({ requestId: c.get('requestId'), message: 'Cannot find authorization', query: redactQueryForLog(c.req.query()) })
     return quickError(401, 'no_jwt_apikey_or_subkey', 'No JWT, apikey or subkey provided')
   }
   c.set('authorization', authorization)
@@ -198,11 +199,11 @@ export const middlewareAPISecret = honoFactory.createMiddleware(async (c, next) 
 
   // timingSafeEqual is here to prevent a timing attack
   if (!authorizationSecret || !API_SECRET) {
-    cloudlog({ requestId: c.get('requestId'), message: 'Cannot find authorizationSecret or API_SECRET', query: c.req.query() })
+    cloudlog({ requestId: c.get('requestId'), message: 'Cannot find authorizationSecret or API_SECRET', query: redactQueryForLog(c.req.query()) })
     throw simpleError('cannot_find_authorization_secret', 'Cannot find authorization')
   }
   if (!await timingSafeEqual(authorizationSecret, API_SECRET)) {
-    cloudlog({ requestId: c.get('requestId'), message: 'Invalid API secret', query: c.req.query() })
+    cloudlog({ requestId: c.get('requestId'), message: 'Invalid API secret', query: redactQueryForLog(c.req.query()) })
     throw simpleError('invalid_api_secret', 'Invalid API secret')
   }
   c.set('APISecret', authorizationSecret)
@@ -267,7 +268,7 @@ export function createHono(functionName: string, _version: string) {
 
 export function createAllCatch(appGlobal: Hono<MiddlewareKeyVariables>, functionName: string) {
   appGlobal.all('*', (c) => {
-    cloudlog({ requestId: c.get('requestId'), functionName, message: 'Not found', url: c.req.url })
+    cloudlog({ requestId: c.get('requestId'), functionName, message: 'Not found', url: redactUrlForLog(c.req.url) })
     return c.json({ error: 'not_found', message: 'Not found' }, 404)
   })
   appGlobal.onError(onError(functionName))
