@@ -1,7 +1,7 @@
 {
   "name": "capgo-app",
   "type": "module",
-  "version": "12.136.3",
+  "version": "12.136.4",
   "private": true,
   "workspaces": [
     "cli"
@@ -287,7 +287,7 @@
     "vite-plugin-webfont-dl": "^3.12.0",
     "vitest": "^4.1.5",
     "vue-tsc": "3.2.7",
-    "wrangler": "^4.86.0"
+    "wrangler": "^4.90.0"
   },
   "gitmoji": {
     "autoAdd": false,
