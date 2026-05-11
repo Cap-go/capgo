@@ -22,7 +22,7 @@ export const app = new Hono<MiddlewareKeyVariables>()
 
 app.use('/', useCors)
 
-interface CreateDeviceBody {
+export interface CreateDeviceBody {
   device_id: string
   app_id: string
   org_id: string
@@ -30,16 +30,20 @@ interface CreateDeviceBody {
   version_name: string
 }
 
+export function parseCreateDeviceBody(body: unknown): CreateDeviceBody {
+  const parsedBodyResult = safeParseSchema(bodySchema, body)
+  if (!parsedBodyResult.success) {
+    throw simpleError('invalid_json_body', 'Invalid JSON body')
+  }
+
+  return parsedBodyResult.data
+}
+
 app.post('/', middlewareV2(['all', 'write']), async (c) => {
   const auth = c.get('auth')!
 
   const body = await parseBody<CreateDeviceBody>(c)
-  const parsedBodyResult = safeParseSchema(bodySchema, body)
-  if (!parsedBodyResult.success) {
-    throw simpleError('invalid_json_body', 'Invalid JSON body', { body, parsedBodyResult })
-  }
-
-  const safeBody = parsedBodyResult.data
+  const safeBody = parseCreateDeviceBody(body)
   const normalizedOrgId = safeBody.org_id.toLowerCase()
 
   // Use authenticated client for data queries - RLS will enforce access
