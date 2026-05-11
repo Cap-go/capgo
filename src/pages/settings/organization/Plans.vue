@@ -100,6 +100,9 @@ function planFeatures(plan: Database['public']['Tables']['plans']['Row']) {
     : `${plan.bandwidth.toLocaleString()} ${t('plan-bandwidth')}`
 
   const buildTimeFeature = buildTimeDisplay ? planFeature(buildTimeDisplay, true) : null
+  const nativeBuildConcurrencyFeature = plan.native_build_concurrency
+    ? planFeature(t('plan-native-build-concurrency', { count: plan.native_build_concurrency.toLocaleString() }))
+    : null
 
   const planName = plan.name?.toLowerCase() ?? ''
   const extraFeatures = (planFeatureLabelKeysByPlan[planName] ?? [])
@@ -110,6 +113,7 @@ function planFeatures(plan: Database['public']['Tables']['plans']['Row']) {
     planFeature(storageFeature),
     planFeature(bandwidthFeature),
     buildTimeFeature,
+    nativeBuildConcurrencyFeature,
     ...extraFeatures,
   ].filter((feature): feature is PlanFeature => !!feature)
 }
@@ -427,6 +431,11 @@ function buttonStyle(p: Database['public']['Tables']['plans']['Row']) {
           </div>
           <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
             {{ t('plan-desc') }}
+          </p>
+          <p class="mt-2 text-sm">
+            <a class="font-medium text-blue-600 hover:underline dark:text-blue-300" href="https://capgo.app/pricing/#compare-plans">
+              {{ t('plan-full-comparison-link') }}
+            </a>
           </p>
         </div>
 

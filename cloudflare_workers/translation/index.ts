@@ -3,6 +3,7 @@ import sourceMessages from '../../messages/en.json' with { type: 'json' }
 
 const CACHE_TTL_SECONDS = 5 * 60
 const PENDING_TRANSLATION_STORE_TTL_SECONDS = 60 * 60
+const READY_TRANSLATION_STORE_TTL_SECONDS = 7 * 24 * 60 * 60
 const DEFAULT_TRANSLATION_MODEL = '@cf/meta/llama-3.1-8b-instruct-fast'
 const MAX_BATCH_CHARACTERS = 6_000
 const MAX_BATCH_ITEMS = 60
@@ -61,7 +62,7 @@ interface AiBinding {
 
 interface TranslationWorkerBindings {
   AI?: AiBinding
-  DB_STOREAPPS?: D1Database
+  DB_TRANSLATIONS?: D1Database
   ENV_NAME?: string
   TRANSLATION_MESSAGES_QUEUE?: Queue<Required<TranslationQueuePayload>>
   TRANSLATION_MODEL?: string
@@ -467,10 +468,10 @@ function messageCatalogOf(value: unknown): Record<string, string> {
 }
 
 function getTranslationStore(env: TranslationWorkerBindings) {
-  if (!env.DB_STOREAPPS)
+  if (!env.DB_TRANSLATIONS)
     fail(503, 'translation_unavailable', 'Cloudflare D1 translation store is not configured')
 
-  return env.DB_STOREAPPS
+  return env.DB_TRANSLATIONS
 }
 
 function getTranslationQueue(env: TranslationWorkerBindings) {
@@ -563,6 +564,10 @@ function isPendingTranslationStale(entry: TranslationStoreEntry) {
   return entry.status === 'pending' && nowSeconds() - entry.updatedAt >= TRANSLATION_REQUEUE_AFTER_SECONDS
 }
 
+function isReadyTranslationFresh(entry: TranslationStoreEntry) {
+  return entry.status === 'ready' && nowSeconds() - entry.updatedAt < CACHE_TTL_SECONDS
+}
+
 function isTranslationBatchLeaseExpired(entry: TranslationStoreEntry) {
   return entry.status === 'pending' && nowSeconds() - entry.updatedAt >= TRANSLATION_BATCH_LEASE_SECONDS
 }
@@ -604,8 +609,25 @@ async function readTranslationStoreEntry(env: TranslationWorkerBindings, checksu
   return parseTranslationStoreEntry(row)
 }
 
+async function readLatestReadyTranslationStoreEntry(env: TranslationWorkerBindings, targetLanguage: string) {
+  const db = getTranslationStore(env)
+  await ensureTranslationStore(db)
+  await deleteExpiredTranslationStoreEntries(db)
+  const row = await db.prepare(
+    `SELECT checksum, messages, model, next_batch_index, status, target_language, updated_at
+     FROM ${TRANSLATION_STORE_TABLE}
+     WHERE target_language = ?
+       AND status = 'ready'
+       AND expires_at > unixepoch()
+     ORDER BY updated_at DESC
+     LIMIT 1`,
+  ).bind(targetLanguage).first()
+
+  return parseTranslationStoreEntry(row)
+}
+
 function translationStoreTtlSeconds(entry: Pick<TranslationStoreEntry, 'status'>) {
-  return entry.status === 'pending' ? PENDING_TRANSLATION_STORE_TTL_SECONDS : CACHE_TTL_SECONDS
+  return entry.status === 'pending' ? PENDING_TRANSLATION_STORE_TTL_SECONDS : READY_TRANSLATION_STORE_TTL_SECONDS
 }
 
 async function upsertTranslationStoreEntry(db: D1Database, entry: TranslationStoreEntry, ttlSeconds = translationStoreTtlSeconds(entry)) {
@@ -698,7 +720,7 @@ async function touchTranslationStoreEntry(env: TranslationWorkerBindings, entry:
          updated_at = unixepoch()
      WHERE target_language = ?
        AND checksum = ?`,
-  ).bind(PENDING_TRANSLATION_STORE_TTL_SECONDS, entry.targetLanguage, entry.checksum).run()
+  ).bind(translationStoreTtlSeconds(entry), entry.targetLanguage, entry.checksum).run()
 }
 
 async function claimTranslationBatch(env: TranslationWorkerBindings, checksum: string, targetLanguage: string, batchIndex: number) {
@@ -856,6 +878,21 @@ async function readyTranslationResponse(requestId: string | undefined, readyRequ
   })
 }
 
+function latestReadyTranslationResponse(entry: TranslationStoreEntry, checksum: string) {
+  return jsonResponse(readyPayloadFromStore(entry), 200, {
+    'Cache-Control': 'no-store',
+    'X-Capgo-Translation-Refreshing-Checksum': checksum,
+    'X-Capgo-Translation-Stale': '1',
+  })
+}
+
+async function readyOrLatestTranslationResponse(requestId: string | undefined, readyRequest: Request, entry: TranslationStoreEntry, targetLanguage: string, checksum: string) {
+  if (entry.checksum === checksum)
+    return readyTranslationResponse(requestId, readyRequest, entry, targetLanguage)
+
+  return latestReadyTranslationResponse(entry, checksum)
+}
+
 async function requeueStaleTranslation(env: TranslationWorkerBindings, storedEntry: TranslationStoreEntry, checksum: string, targetLanguage: string, requestId: string) {
   const claimedBatchIndex = claimedTranslationBatchIndex(storedEntry.nextBatchIndex)
   if (claimedBatchIndex !== null && !isTranslationBatchLeaseExpired(storedEntry))
@@ -882,6 +919,28 @@ async function requeueStaleTranslation(env: TranslationWorkerBindings, storedEnt
   }
 }
 
+async function currentReadyTranslationResponse(env: TranslationWorkerBindings, requestId: string | undefined, readyRequest: Request, entry: TranslationStoreEntry, targetLanguage: string, checksum: string) {
+  if (isReadyTranslationFresh(entry))
+    return readyOrLatestTranslationResponse(requestId, readyRequest, entry, targetLanguage, checksum)
+
+  if (entry.checksum !== checksum)
+    return null
+
+  await touchTranslationStoreEntry(env, entry)
+  return readyTranslationResponse(requestId, readyRequest, entry, targetLanguage)
+}
+
+async function queueCurrentTranslationResponse(env: TranslationWorkerBindings, requestId: string, readyRequest: Request, checksum: string, targetLanguage: string, model: string) {
+  const queuedEntry = await queueTranslationIfNeeded(env, translationQueuePayload(checksum, targetLanguage, model, 0), requestId)
+  if (queuedEntry.status === 'ready') {
+    await touchTranslationStoreEntry(env, queuedEntry)
+    return readyTranslationResponse(requestId, readyRequest, queuedEntry, targetLanguage)
+  }
+  if (queuedEntry.status === 'pending' && isPendingTranslationStale(queuedEntry))
+    await requeueStaleTranslation(env, queuedEntry, checksum, targetLanguage, requestId)
+  return null
+}
+
 async function handleTranslationMessages(request: Request, env: TranslationWorkerBindings) {
   const requestId = requestIdFrom(request)
   const body = await parseJsonBody<TranslationBody>(request)
@@ -903,20 +962,17 @@ async function handleTranslationMessages(request: Request, env: TranslationWorke
     })
   }
 
-  const storedEntry = await readTranslationStoreEntry(env, checksum, targetLanguage)
-  if (storedEntry?.status === 'ready')
-    return readyTranslationResponse(requestId, readyRequest, storedEntry, targetLanguage)
-
-  if (storedEntry?.status === 'pending') {
-    if (isPendingTranslationStale(storedEntry))
-      await requeueStaleTranslation(env, storedEntry, checksum, targetLanguage, requestId)
-    return pendingTranslationResponse(checksum)
+  const latestReadyEntry = await readLatestReadyTranslationStoreEntry(env, targetLanguage)
+  if (latestReadyEntry) {
+    const readyResponse = await currentReadyTranslationResponse(env, requestId, readyRequest, latestReadyEntry, targetLanguage, checksum)
+    if (readyResponse)
+      return readyResponse
   }
 
   try {
-    const queuedEntry = await queueTranslationIfNeeded(env, translationQueuePayload(checksum, targetLanguage, model, 0), requestId)
-    if (queuedEntry.status === 'ready')
-      return readyTranslationResponse(requestId, readyRequest, queuedEntry, targetLanguage)
+    const queuedResponse = await queueCurrentTranslationResponse(env, requestId, readyRequest, checksum, targetLanguage, model)
+    if (queuedResponse)
+      return queuedResponse
   }
   catch (error) {
     cloudlogErr({
@@ -925,8 +981,13 @@ async function handleTranslationMessages(request: Request, env: TranslationWorke
       error: serializeError(error),
       targetLanguage,
     })
+    if (latestReadyEntry)
+      return latestReadyTranslationResponse(latestReadyEntry, checksum)
     fail(503, 'translation_unavailable', 'Translation queue is not available')
   }
+
+  if (latestReadyEntry)
+    return latestReadyTranslationResponse(latestReadyEntry, checksum)
 
   return pendingTranslationResponse(checksum)
 }
@@ -1153,6 +1214,7 @@ export default {
 export const __translationWorkerTestUtils__ = {
   buildBatches,
   claimedTranslationBatchIndex,
+  isReadyTranslationFresh,
   isTranslationBatchLeaseExpired,
   keepTranslation,
   normalizeBatchIndex,

@@ -168,6 +168,7 @@ Capgo relies on two layered caches for plugin endpoints (`/updates`, `/stats`, `
    - When explicitly discussing the Capgo CLI command itself, always use `@latest`.
    - Use the public shape like `npx @capgo/cli@latest ...` for customer-facing command examples.
    - Use internal execution equivalents (for example, `bunx @capgo/cli@latest ...`) only in internal tooling context.
+   - CLI command names must be lowercase and should use kebab-case for multiple words. Do not add camelCase, PascalCase, or other cased command names.
 
 ### Email Templates
 

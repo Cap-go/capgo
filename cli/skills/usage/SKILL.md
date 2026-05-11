@@ -64,6 +64,7 @@ Load `skills/release-management/SKILL.md` when working with:
 Load `skills/native-builds/SKILL.md` when working with:
 
 - `build request`
+- `build needed`
 - `build credentials save`
 - `build credentials list`
 - `build credentials clear`

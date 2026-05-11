@@ -1086,6 +1086,11 @@ export interface AdminGlobalStatsTrend {
   users_active: number
   paying: number
   org_conversion_rate: number
+  plan_total_conversion_rate: number
+  plan_solo_conversion_rate: number
+  plan_maker_conversion_rate: number
+  plan_team_conversion_rate: number
+  plan_enterprise_conversion_rate: number
   trial: number
   not_paying: number
   updates: number
@@ -1109,6 +1114,11 @@ export interface AdminGlobalStatsTrend {
   canceled_orgs: number
   upgraded_orgs: number
   mrr: number
+  previous_mrr: number
+  previous_mrr_solo: number
+  previous_mrr_maker: number
+  previous_mrr_team: number
+  previous_mrr_enterprise: number
   nrr: number
   churn_revenue: number
   churn_revenue_solo: number
@@ -1120,6 +1130,9 @@ export interface AdminGlobalStatsTrend {
   revenue_maker: number
   revenue_team: number
   revenue_enterprise: number
+  average_ltv: number
+  shortest_ltv: number
+  longest_ltv: number
   credits_bought: number
   credits_consumed: number
   builds_total: number
@@ -1163,13 +1176,18 @@ export async function getAdminGlobalStatsTrend(
     const query = sql`
       WITH stats AS (
         SELECT
-        date_id AS date,
+        gs.date_id AS date,
         apps::int,
         apps_active::int,
         users::int,
         users_active::int,
         paying::int,
         org_conversion_rate::float,
+        COALESCE(NULLIF(to_jsonb(gs) ->> 'plan_total_conversion_rate', '')::float, 0)::float AS plan_total_conversion_rate,
+        COALESCE(NULLIF(to_jsonb(gs) ->> 'plan_solo_conversion_rate', '')::float, 0)::float AS plan_solo_conversion_rate,
+        COALESCE(NULLIF(to_jsonb(gs) ->> 'plan_maker_conversion_rate', '')::float, 0)::float AS plan_maker_conversion_rate,
+        COALESCE(NULLIF(to_jsonb(gs) ->> 'plan_team_conversion_rate', '')::float, 0)::float AS plan_team_conversion_rate,
+        COALESCE(NULLIF(to_jsonb(gs) ->> 'plan_enterprise_conversion_rate', '')::float, 0)::float AS plan_enterprise_conversion_rate,
         trial::int,
         not_paying::int,
         updates::int,
@@ -1193,6 +1211,11 @@ export async function getAdminGlobalStatsTrend(
         canceled_orgs::int,
         COALESCE(upgraded_orgs, 0)::int AS upgraded_orgs,
         mrr::float,
+        COALESCE(prev.mrr, 0)::float AS previous_mrr,
+        (COALESCE(prev.revenue_solo, 0)::float / 12)::float AS previous_mrr_solo,
+        (COALESCE(prev.revenue_maker, 0)::float / 12)::float AS previous_mrr_maker,
+        (COALESCE(prev.revenue_team, 0)::float / 12)::float AS previous_mrr_team,
+        (COALESCE(prev.revenue_enterprise, 0)::float / 12)::float AS previous_mrr_enterprise,
         COALESCE(NULLIF(to_jsonb(gs) ->> 'nrr', '')::float, 100)::float AS nrr,
         COALESCE(NULLIF(to_jsonb(gs) ->> 'churn_revenue', '')::float, 0)::float AS churn_revenue,
         COALESCE(NULLIF(to_jsonb(gs) ->> 'churn_revenue_solo', '')::float, 0)::float AS churn_revenue_solo,
@@ -1204,6 +1227,9 @@ export async function getAdminGlobalStatsTrend(
         revenue_maker::float,
         revenue_team::float,
         revenue_enterprise::float,
+        COALESCE(NULLIF(to_jsonb(gs) ->> 'average_ltv', '')::float, 0)::float AS average_ltv,
+        COALESCE(NULLIF(to_jsonb(gs) ->> 'shortest_ltv', '')::float, 0)::float AS shortest_ltv,
+        COALESCE(NULLIF(to_jsonb(gs) ->> 'longest_ltv', '')::float, 0)::float AS longest_ltv,
         COALESCE(credits_bought, 0)::float AS credits_bought,
         COALESCE(credits_consumed, 0)::float AS credits_consumed,
         COALESCE(builds_total, 0)::int AS builds_total,
@@ -1252,7 +1278,23 @@ export async function getAdminGlobalStatsTrend(
         COALESCE(NULLIF(to_jsonb(gs) ->> 'builder_active_paying_clients_60d', '')::int, 0)::int AS builder_active_paying_clients_60d,
         COALESCE(NULLIF(to_jsonb(gs) ->> 'live_updates_active_paying_clients_60d', '')::int, 0)::int AS live_updates_active_paying_clients_60d
       FROM global_stats gs
-      WHERE date_id <= ${endDateOnly}
+      LEFT JOIN global_stats prev ON prev.date_id = (
+        CASE
+          WHEN gs.date_id ~ '^\\d{4}-\\d{2}-\\d{2}$' THEN
+            CASE
+              WHEN to_char(to_date(gs.date_id, 'YYYY-MM-DD'), 'YYYY-MM-DD') = gs.date_id
+                THEN (to_date(gs.date_id, 'YYYY-MM-DD') - 1)::text
+              ELSE NULL
+            END
+          ELSE NULL
+        END
+      )
+      WHERE CASE
+          WHEN gs.date_id ~ '^\\d{4}-\\d{2}-\\d{2}$'
+            THEN to_char(to_date(gs.date_id, 'YYYY-MM-DD'), 'YYYY-MM-DD') = gs.date_id
+          ELSE false
+        END
+        AND gs.date_id <= ${endDateOnly}
       )
       SELECT *
       FROM stats
@@ -1270,6 +1312,11 @@ export async function getAdminGlobalStatsTrend(
       users_active: Number(row.users_active) || 0,
       paying: Number(row.paying) || 0,
       org_conversion_rate: Number(row.org_conversion_rate) || 0,
+      plan_total_conversion_rate: Number(row.plan_total_conversion_rate) || 0,
+      plan_solo_conversion_rate: Number(row.plan_solo_conversion_rate) || 0,
+      plan_maker_conversion_rate: Number(row.plan_maker_conversion_rate) || 0,
+      plan_team_conversion_rate: Number(row.plan_team_conversion_rate) || 0,
+      plan_enterprise_conversion_rate: Number(row.plan_enterprise_conversion_rate) || 0,
       trial: Number(row.trial) || 0,
       not_paying: Number(row.not_paying) || 0,
       updates: Number(row.updates) || 0,
@@ -1293,6 +1340,11 @@ export async function getAdminGlobalStatsTrend(
       canceled_orgs: Number(row.canceled_orgs) || 0,
       upgraded_orgs: Number(row.upgraded_orgs) || 0,
       mrr: Number(row.mrr) || 0,
+      previous_mrr: Number(row.previous_mrr) || 0,
+      previous_mrr_solo: Number(row.previous_mrr_solo) || 0,
+      previous_mrr_maker: Number(row.previous_mrr_maker) || 0,
+      previous_mrr_team: Number(row.previous_mrr_team) || 0,
+      previous_mrr_enterprise: Number(row.previous_mrr_enterprise) || 0,
       nrr: Number(row.nrr) || 0,
       churn_revenue: Number(row.churn_revenue) || 0,
       churn_revenue_solo: Number(row.churn_revenue_solo) || 0,
@@ -1304,6 +1356,9 @@ export async function getAdminGlobalStatsTrend(
       revenue_maker: Number(row.revenue_maker) || 0,
       revenue_team: Number(row.revenue_team) || 0,
       revenue_enterprise: Number(row.revenue_enterprise) || 0,
+      average_ltv: Number(row.average_ltv) || 0,
+      shortest_ltv: Number(row.shortest_ltv) || 0,
+      longest_ltv: Number(row.longest_ltv) || 0,
       credits_bought: Number(row.credits_bought) || 0,
       credits_consumed: Number(row.credits_consumed) || 0,
       builds_total: Number(row.builds_total) || 0,
@@ -1808,6 +1863,7 @@ export interface AdminTrialOrganization {
   org_id: string
   org_name: string
   management_email: string
+  plan_name: string | null
   trial_end_date: string
   days_remaining: number
   trial_extension_count: number
@@ -1835,7 +1891,9 @@ export async function getAdminTrialOrganizations(
   offset: number = 0,
 ): Promise<AdminTrialOrganizationsResult> {
   try {
-    const pgClient = getPgClient(c, true) // Read-only query
+    // The admin dashboard needs plans.name, and plans is not replicated to
+    // PlanetScale read replicas.
+    const pgClient = getPgClient(c)
     const drizzleClient = getDrizzleClient(pgClient)
 
     // Query to get trial organizations ordered by days remaining (ascending - expiring soon first)
@@ -1857,6 +1915,7 @@ export async function getAdminTrialOrganizations(
         o.id AS org_id,
         o.name AS org_name,
         o.management_email,
+        p.name AS plan_name,
         si.trial_at AS trial_end_date,
         GREATEST(0, (si.trial_at::date - CURRENT_DATE)) AS days_remaining,
         CASE
@@ -1868,6 +1927,7 @@ export async function getAdminTrialOrganizations(
         lbu.last_bundle_upload_at
       FROM orgs o
       INNER JOIN stripe_info si ON si.customer_id = o.customer_id
+      LEFT JOIN plans p ON p.stripe_id = si.product_id
       LEFT JOIN latest_bundle_uploads lbu ON lbu.owner_org = o.id
       WHERE si.trial_at::date >= CURRENT_DATE
         AND (si.status IS NULL OR si.status != 'succeeded')
@@ -1894,6 +1954,7 @@ export async function getAdminTrialOrganizations(
       org_id: row.org_id,
       org_name: row.org_name,
       management_email: row.management_email,
+      plan_name: row.plan_name ?? null,
       trial_end_date: normalizeTimestamp(row.trial_end_date) ?? '',
       days_remaining: Number(row.days_remaining),
       trial_extension_count: Number(row.trial_extension_count) || 0,

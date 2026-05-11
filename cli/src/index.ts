@@ -10,6 +10,7 @@ import { listApp } from './app/list'
 import { setApp } from './app/set'
 import { setSetting } from './app/setting'
 import { clearCredentialsCommand, listCredentialsCommand, migrateCredentialsCommand, saveCredentialsCommand, updateCredentialsCommand } from './build/credentials-command'
+import { checkBuildNeeded } from './build/needed'
 import { onboardingBuilderCommand } from './build/onboarding/command'
 import { requestBuildCommand } from './build/request'
 import { cleanupBundle } from './bundle/cleanup'
@@ -744,7 +745,7 @@ const build = program
   .command('build')
   .description(`🏗️  Manage native iOS/Android builds through Capgo Cloud.
 
-⚠️ This feature is currently in PUBLIC BETA and cannot be used by anyone at this time.
+⚠️ Native cloud build requests are currently in LIMITED BETA. Access is restricted.
 
  🔒 SECURITY GUARANTEE:
     Build credentials are NEVER stored on Capgo servers.
@@ -755,6 +756,20 @@ const build = program
    Save your credentials first:
    npx @capgo/cli build credentials save --appId <your-app-id> --platform ios
    npx @capgo/cli build credentials save --appId <your-app-id> --platform android`)
+
+build
+  .command('needed [appId]')
+  .description(`🧭 Print "yes" and exit with code 1 if a native build is required; otherwise print "no" and exit with code 0. Command failures exit with code 2.
+
+Example: npx @capgo/cli@latest build needed com.example.app --channel production --verbose`)
+  .action(checkBuildNeeded)
+  .option('-a, --apikey <apikey>', optionDescriptions.apikey)
+  .option('-c, --channel <channel>', `Channel to compare against. Defaults to CapacitorUpdater.defaultChannel or the public default channel`)
+  .option('--package-json <packageJson>', optionDescriptions.packageJson)
+  .option('--node-modules <nodeModules>', optionDescriptions.nodeModules)
+  .option('--verbose', optionDescriptions.verbose)
+  .option('--supa-host <supaHost>', optionDescriptions.supaHost)
+  .option('--supa-anon <supaAnon>', optionDescriptions.supaAnon)
 
 build
   .command('init')

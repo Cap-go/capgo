@@ -11,7 +11,7 @@ import { supabaseApikey, supabaseWithAuth } from '../../utils/supabase.ts'
 import {
   getDeliveryById,
   getWebhookById,
-  getWebhookUrlValidationError,
+  getWebhookPublicUrlValidationError,
   queueWebhookDelivery,
 } from '../../utils/webhook.ts'
 import { checkWebhookPermission, checkWebhookPermissionV2 } from './index.ts'
@@ -144,7 +144,7 @@ export async function retryDelivery(c: Context<MiddlewareKeyVariables, any, any>
     throw simpleError('webhook_disabled', 'Webhook is disabled')
   }
 
-  const urlError = getWebhookUrlValidationError(c, webhook.url)
+  const urlError = await getWebhookPublicUrlValidationError(c, webhook.url)
   if (urlError)
     throw simpleError('invalid_url', urlError, { url: webhook.url })
 

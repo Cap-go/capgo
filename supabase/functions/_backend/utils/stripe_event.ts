@@ -29,6 +29,15 @@ function getSubscriptionInterval(item: Stripe.SubscriptionItem | undefined) {
   return undefined
 }
 
+function getSubscriptionEndDate(subscription: Stripe.Subscription, item: Stripe.SubscriptionItem | null) {
+  const itemPeriodEnd = typeof item?.current_period_end === 'number' ? item.current_period_end : null
+  const endSeconds = subscription.ended_at
+    ?? subscription.cancel_at
+    ?? (subscription.cancel_at_period_end ? itemPeriodEnd : null)
+
+  return endSeconds ? new Date(endSeconds * 1000).toISOString() : null
+}
+
 function subscriptionUpdated(c: Context, event: Stripe.CustomerSubscriptionCreatedEvent | Stripe.CustomerSubscriptionDeletedEvent | Stripe.CustomerSubscriptionUpdatedEvent, data: Database['public']['Tables']['stripe_info']['Insert']) {
   let isUpgrade = false
   const subscription = event.data.object
@@ -50,13 +59,14 @@ function subscriptionUpdated(c: Context, event: Stripe.CustomerSubscriptionCreat
   // current_period_start is epoch and current_period_end is epoch
   // subscription_anchor_start is date and subscription_anchor_end is date
   // convert epoch to date
-  const firstItem = subscription.items.data.length > 0 ? subscription.items.data[0] : null
-  data.subscription_anchor_start = firstItem?.current_period_start
-    ? new Date(firstItem.current_period_start * 1000).toISOString()
+  const currentCycleItem = currentLicensedItem ?? null
+  data.subscription_anchor_start = currentCycleItem?.current_period_start
+    ? new Date(currentCycleItem.current_period_start * 1000).toISOString()
     : undefined
-  data.subscription_anchor_end = firstItem?.current_period_end
-    ? new Date(firstItem.current_period_end * 1000).toISOString()
+  data.subscription_anchor_end = currentCycleItem?.current_period_end
+    ? new Date(currentCycleItem.current_period_end * 1000).toISOString()
     : undefined
+  data.canceled_at = getSubscriptionEndDate(subscription, currentCycleItem)
   data.price_id = currentLicensedItem?.plan.id
   data.product_id = currentLicensedItem?.plan.product
     ? String(currentLicensedItem.plan.product)

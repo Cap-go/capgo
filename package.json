@@ -1,7 +1,7 @@
 {
   "name": "capgo-app",
   "type": "module",
-  "version": "12.130.5",
+  "version": "12.136.4",
   "private": true,
   "workspaces": [
     "cli"
@@ -85,9 +85,12 @@
     "admin:backfill-paid-product-activity": "bun scripts/backfill_paid_product_activity.ts",
     "admin:backfill-plugin-version-ladder": "bun scripts/backfill_plugin_version_ladder.ts",
     "admin:backfill-missing-app-icons": "bun scripts/backfill_missing_app_icons.ts",
+    "admin:backfill-missing-store-urls": "bun scripts/backfill_missing_store_urls.ts",
     "stripe:backfill-retention-metrics": "bun scripts/backfill_retention_metrics.ts",
     "stripe:backfill-org-conversion-rate": "bun scripts/backfill_org_conversion_rate_trend.ts",
     "stripe:backfill-customer-countries": "bun scripts/backfill_stripe_customer_countries.ts",
+    "stripe:backfill-subscription-end-dates": "bun scripts/backfill_stripe_subscription_end_dates.ts",
+    "stripe:backfill-ltv-metrics": "bun scripts/backfill_ltv_metrics.ts",
     "stripe:backfill-revenue-trends": "bun scripts/backfill_revenue_trend_metrics.ts",
     "stripe:backfill-admin-revenue-dashboard": "bun scripts/backfill_admin_revenue_dashboard_metrics.ts",
     "stripe:sync-org-names": "bun scripts/sync_stripe_org_names.ts",
@@ -286,7 +289,7 @@
     "vite-plugin-webfont-dl": "^3.12.0",
     "vitest": "^4.1.5",
     "vue-tsc": "3.2.7",
-    "wrangler": "^4.86.0"
+    "wrangler": "^4.90.0"
   },
   "gitmoji": {
     "autoAdd": false,
