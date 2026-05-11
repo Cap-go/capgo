@@ -1289,6 +1289,7 @@ export type Database = {
           plan_team_conversion_rate: number
           plan_team_monthly: number
           plan_team_yearly: number
+          plan_total_conversion_rate: number
           plugin_major_breakdown: Json
           plugin_version_breakdown: Json
           plugin_version_ladder: Json
@@ -1369,6 +1370,7 @@ export type Database = {
           plan_team_conversion_rate?: number
           plan_team_monthly?: number
           plan_team_yearly?: number
+          plan_total_conversion_rate?: number
           plugin_major_breakdown?: Json
           plugin_version_breakdown?: Json
           plugin_version_ladder?: Json
@@ -1449,6 +1451,7 @@ export type Database = {
           plan_team_conversion_rate?: number
           plan_team_monthly?: number
           plan_team_yearly?: number
+          plan_total_conversion_rate?: number
           plugin_major_breakdown?: Json
           plugin_version_breakdown?: Json
           plugin_version_ladder?: Json
