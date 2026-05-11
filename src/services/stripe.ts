@@ -28,7 +28,6 @@ async function presentActionSheetOpen(url: string) {
   return dialogStore.onDialogDismiss()
 }
 export function openBlank(link: string) {
-  console.log('openBlank', link)
   if (Capacitor.getPlatform() === 'ios')
     presentActionSheetOpen(link)
   else
