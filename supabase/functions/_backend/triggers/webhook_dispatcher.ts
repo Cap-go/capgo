@@ -9,7 +9,7 @@ import {
   buildWebhookPayload,
   createDeliveryRecord,
   findWebhooksForEvent,
-  getWebhookUrlValidationError,
+  getWebhookUrlValidationErrorAsync,
   queueWebhookDelivery,
   updateDeliveryResult,
 } from '../utils/webhook.ts'
@@ -99,7 +99,7 @@ app.post('/', middlewareAPISecret, async (c) => {
           return
         }
 
-        const urlError = getWebhookUrlValidationError(c, webhook.url)
+        const urlError = await getWebhookUrlValidationErrorAsync(c, webhook.url)
         if (urlError) {
           await updateDeliveryResult(
             c,

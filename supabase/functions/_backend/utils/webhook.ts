@@ -47,6 +47,7 @@ export type WebhookEventType = typeof WEBHOOK_EVENT_TYPES[number]
 
 const LOCALHOST_SUFFIX = '.localhost'
 const IPV4_REGEX = /^\d{1,3}(?:\.\d{1,3}){3}$/
+const DNS_LOOKUP_URL = 'https://cloudflare-dns.com/dns-query'
 
 function allowLocalWebhookUrls(c: Context): boolean {
   return getEnv(c, 'CAPGO_ALLOW_LOCAL_WEBHOOK_URLS') === 'true'
@@ -62,6 +63,57 @@ function isLocalhostHostname(hostname: string): boolean {
 
 function isIpLiteral(hostname: string): boolean {
   return IPV4_REGEX.test(hostname) || hostname.includes(':')
+}
+
+function isPrivateIpv4(ip: string) {
+  const octets = ip.split('.').map(part => Number.parseInt(part, 10))
+  if (octets.length !== 4 || octets.some(part => Number.isNaN(part) || part < 0 || part > 255))
+    return true
+
+  const [a, b] = octets
+  return a === 0
+    || a === 10
+    || a === 127
+    || (a === 169 && b === 254)
+    || (a === 172 && b >= 16 && b <= 31)
+    || (a === 192 && b === 168)
+    || (a === 100 && b >= 64 && b <= 127)
+    || (a === 198 && (b === 18 || b === 19))
+    || (a === 192 && b === 0)
+    || (a === 198 && b === 51 && octets[2] === 100)
+    || (a === 203 && b === 0 && octets[2] === 113)
+}
+
+function isPrivateIpv6(ip: string) {
+  const normalized = ip.toLowerCase()
+  if (normalized === '::1' || normalized === '::')
+    return true
+  if (normalized.startsWith('fe80:') || normalized.startsWith('fc') || normalized.startsWith('fd'))
+    return true
+  if (normalized.startsWith('::ffff:'))
+    return isPrivateIpv4(normalized.slice(7))
+  return false
+}
+
+function isPrivateIp(ip: string) {
+  return ip.includes(':') ? isPrivateIpv6(ip) : isPrivateIpv4(ip)
+}
+
+async function resolveHostnameIps(hostname: string, type: 'A' | 'AAAA') {
+  const dnsUrl = new URL(DNS_LOOKUP_URL)
+  dnsUrl.searchParams.set('name', hostname)
+  dnsUrl.searchParams.set('type', type)
+
+  const response = await fetch(dnsUrl.toString(), {
+    headers: { Accept: 'application/dns-json' },
+  })
+  if (!response.ok)
+    return []
+
+  const data = await response.json() as { Answer?: Array<{ data?: string }> }
+  return (data.Answer ?? [])
+    .map(answer => answer.data?.trim() ?? '')
+    .filter(answer => !!answer && isIpLiteral(answer))
 }
 
 export function getWebhookUrlValidationError(c: Context, urlString: string): string | null {
@@ -88,6 +140,29 @@ export function getWebhookUrlValidationError(c: Context, urlString: string): str
 
   if (url.protocol !== 'https:')
     return 'Webhook URL must use HTTPS'
+
+  return null
+}
+
+export async function getWebhookUrlValidationErrorAsync(c: Context, urlString: string): Promise<string | null> {
+  const validationError = getWebhookUrlValidationError(c, urlString)
+  if (validationError)
+    return validationError
+
+  if (allowLocalWebhookUrls(c))
+    return null
+
+  const url = new URL(urlString)
+  const hostname = normalizeHostname(url.hostname)
+  const ips = [
+    ...await resolveHostnameIps(hostname, 'A'),
+    ...await resolveHostnameIps(hostname, 'AAAA'),
+  ]
+
+  if (ips.length === 0)
+    return 'Webhook URL host could not be resolved'
+  if (ips.some(isPrivateIp))
+    return 'Webhook URL must point to a public host'
 
   return null
 }
@@ -215,7 +290,7 @@ export async function deliverWebhook(
 ): Promise<{ success: boolean, status?: number, body?: string, duration?: number }> {
   const startTime = Date.now()
 
-  const urlValidationError = getWebhookUrlValidationError(c, url)
+  const urlValidationError = await getWebhookUrlValidationErrorAsync(c, url)
   if (urlValidationError) {
     const duration = Date.now() - startTime
     cloudlogErr({

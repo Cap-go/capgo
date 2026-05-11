@@ -4,7 +4,7 @@ import { type } from 'arktype'
 import { safeParseSchema } from '../../utils/ark_validation.ts'
 import { simpleError } from '../../utils/hono.ts'
 import { supabaseApikey } from '../../utils/supabase.ts'
-import { getWebhookUrlValidationError, WEBHOOK_EVENT_TYPES } from '../../utils/webhook.ts'
+import { getWebhookUrlValidationErrorAsync, WEBHOOK_EVENT_TYPES } from '../../utils/webhook.ts'
 import { checkWebhookPermission } from './index.ts'
 
 const bodySchema = type({
@@ -57,7 +57,7 @@ export async function put(c: Context, bodyRaw: any, apikey: Database['public']['
 
   // Validate URL if provided
   if (body.url) {
-    const urlError = getWebhookUrlValidationError(c, body.url)
+    const urlError = await getWebhookUrlValidationErrorAsync(c, body.url)
     if (urlError)
       throw simpleError('invalid_url', urlError, { url: body.url })
   }
