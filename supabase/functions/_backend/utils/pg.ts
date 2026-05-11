@@ -1272,12 +1272,20 @@ export async function getAdminGlobalStatsTrend(
       FROM global_stats gs
       LEFT JOIN global_stats prev ON prev.date_id = (
         CASE
-          WHEN gs.date_id ~ '^\\d{4}-\\d{2}-\\d{2}$'
-            THEN (gs.date_id::date - 1)::text
+          WHEN gs.date_id ~ '^\\d{4}-\\d{2}-\\d{2}$' THEN
+            CASE
+              WHEN to_char(to_date(gs.date_id, 'YYYY-MM-DD'), 'YYYY-MM-DD') = gs.date_id
+                THEN (to_date(gs.date_id, 'YYYY-MM-DD') - 1)::text
+              ELSE NULL
+            END
           ELSE NULL
         END
       )
-      WHERE gs.date_id ~ '^\\d{4}-\\d{2}-\\d{2}$'
+      WHERE CASE
+          WHEN gs.date_id ~ '^\\d{4}-\\d{2}-\\d{2}$'
+            THEN to_char(to_date(gs.date_id, 'YYYY-MM-DD'), 'YYYY-MM-DD') = gs.date_id
+          ELSE false
+        END
         AND gs.date_id <= ${endDateOnly}
       )
       SELECT *
