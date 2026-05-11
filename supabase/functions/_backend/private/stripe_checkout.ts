@@ -2,10 +2,9 @@ import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { Hono } from 'hono/tiny'
 import { middlewareAuth, parseBody, simpleError, useCors } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
-import { checkPermission } from '../utils/rbac.ts'
 import { createCheckout } from '../utils/stripe.ts'
-import { supabaseClient } from '../utils/supabase.ts'
 import { getEnv } from '../utils/utils.ts'
+import { resolveStripeBillingCustomer } from './stripe_billing_context.ts'
 
 interface CheckoutData {
   priceId: string
@@ -40,33 +39,7 @@ app.post('/', middlewareAuth, async (c) => {
   if (!body.orgId)
     throw simpleError('no_org_id_provided', 'No org_id provided')
 
-  const authorization = c.get('authorization')
-  if (!authorization)
-    throw simpleError('not_authorized', 'Not authorized')
-
-  // Get user ID from auth context (already validated by middlewareAuth)
-  const authContext = c.get('auth')
-  if (!authContext?.userId)
-    throw simpleError('not_authorized', 'Not authorized')
-
-  // Use authenticated client - RLS will enforce access based on JWT
-  const supabase = supabaseClient(c, authorization)
-
-  cloudlog({ requestId: c.get('requestId'), message: 'stripe checkout auth context', auth: { authenticated: true } })
-  const { data: org, error: dbError } = await supabase
-    .from('orgs')
-    .select('customer_id')
-    .eq('id', body.orgId)
-    .single()
-  if (dbError || !org)
-    throw simpleError('not_authorized', 'Not authorized')
-  if (!org.customer_id)
-    throw simpleError('no_customer', 'No customer')
-
-  if (!await checkPermission(c, 'org.update_billing', { orgId: body.orgId }))
-    throw simpleError('not_authorize', 'Not authorize')
-
-  cloudlog({ requestId: c.get('requestId'), message: 'stripe checkout org lookup result', org: { found: true, hasCustomerId: Boolean(org.customer_id) } })
-  const checkout = await createCheckout(c, org.customer_id, body.recurrence ?? 'month', body.priceId ?? 'price_1KkINoGH46eYKnWwwEi97h1B', body.successUrl ?? `${getEnv(c, 'WEBAPP_URL')}/app/usage`, body.cancelUrl ?? `${getEnv(c, 'WEBAPP_URL')}/app/usage`, body.clientReferenceId, body.attributionId)
+  const customerId = await resolveStripeBillingCustomer(c, 'checkout', body.orgId)
+  const checkout = await createCheckout(c, customerId, body.recurrence ?? 'month', body.priceId ?? 'price_1KkINoGH46eYKnWwwEi97h1B', body.successUrl ?? `${getEnv(c, 'WEBAPP_URL')}/app/usage`, body.cancelUrl ?? `${getEnv(c, 'WEBAPP_URL')}/app/usage`, body.clientReferenceId, body.attributionId)
   return c.json({ url: checkout.url })
 })
