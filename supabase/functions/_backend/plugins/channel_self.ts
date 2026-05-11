@@ -14,6 +14,7 @@ import { sendNotifOrgCached } from '../utils/notifications.ts'
 import { sendNotifToOrgMembersCached } from '../utils/org_email_notifications.ts'
 import { closeClient, deleteChannelDevicePg, getAppByIdPg, getAppOwnerPostgres, getChannelByNamePg, getChannelDeviceOverridePg, getChannelsPg, getCompatibleChannelsPg, getDrizzleClient, getMainChannelsPg, getPgClient, setReplicationLagHeader, upsertChannelDevicePg } from '../utils/pg.ts'
 import { convertQueryToBody, makeDevice, parsePluginBody } from '../utils/plugin_parser.ts'
+import { summarizePluginRequestForLog } from '../utils/plugin_request_log.ts'
 import { channelSelfGetRequestSchema, channelSelfRequestSchema, isDevicePlatform } from '../utils/plugin_validation.ts'
 import { buildRateLimitInfo } from '../utils/rateLimitInfo.ts'
 import { sendStatsAndDevice } from '../utils/stats.ts'
@@ -140,7 +141,7 @@ function isChannelSelfLocalChannelStorageVersion(c: Context, body: DeviceLink, o
 }
 
 async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClient>, body: DeviceLink): Promise<Response> {
-  cloudlog({ requestId: c.get('requestId'), message: 'post channel self body', body })
+  cloudlog({ requestId: c.get('requestId'), message: 'post channel self request', request: summarizePluginRequestForLog(body) })
   const { app_id, device_id, channel } = body
 
   const cachedAppStatus = await getAppStatus(c, app_id)
@@ -300,7 +301,7 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
 }
 
 async function put(c: Context, drizzleClient: ReturnType<typeof getDrizzleClient>, body: DeviceLink): Promise<Response> {
-  cloudlog({ requestId: c.get('requestId'), message: 'put channel self body', body })
+  cloudlog({ requestId: c.get('requestId'), message: 'put channel self request', request: summarizePluginRequestForLog(body) })
   const { app_id, defaultChannel, device_id } = body
 
   const cachedAppStatus = await getAppStatus(c, app_id)
@@ -380,7 +381,7 @@ async function put(c: Context, drizzleClient: ReturnType<typeof getDrizzleClient
 }
 
 async function deleteOverride(c: Context, drizzleClient: ReturnType<typeof getDrizzleClient>, body: DeviceLink): Promise<Response> {
-  cloudlog({ requestId: c.get('requestId'), message: 'delete channel self body', body })
+  cloudlog({ requestId: c.get('requestId'), message: 'delete channel self request', request: summarizePluginRequestForLog(body) })
   const {
     app_id,
     device_id,
@@ -502,7 +503,7 @@ async function parseChannelSelfPluginRequest(
   schema: StandardSchema<DeviceLink>,
   requireDevice = true,
 ): Promise<{ response: Response } | { body: DeviceLink, bodyParsed: DeviceLink }> {
-  cloudlog({ requestId: c.get('requestId'), message: logMessage, body })
+  cloudlog({ requestId: c.get('requestId'), message: logMessage, request: summarizePluginRequestForLog(body) })
 
   if (isLimited(c, body.app_id)) {
     return { response: simpleRateLimit(body) }
