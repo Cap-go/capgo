@@ -1,6 +1,27 @@
 import { acceptHMRUpdate, defineStore } from 'pinia'
 import { ref, watch } from 'vue'
 
+const safeDialogHrefProtocols = new Set(['https:', 'mailto:', 'tel:'])
+const localHttpHostnames = new Set(['localhost', '127.0.0.1', '::1', '[::1]'])
+const fallbackDialogHrefBase = 'https://app.capgo.app'
+
+export function isSafeDialogHref(href?: string): href is string {
+  const trimmedHref = href?.trim()
+  if (!trimmedHref)
+    return false
+  if (trimmedHref.startsWith('//'))
+    return false
+
+  try {
+    const base = globalThis.location?.origin || fallbackDialogHrefBase
+    const url = new URL(trimmedHref, base)
+    return safeDialogHrefProtocols.has(url.protocol) || (url.protocol === 'http:' && localHttpHostnames.has(url.hostname))
+  }
+  catch {
+    return false
+  }
+}
+
 export interface DialogV2Button {
   text: string
   id?: string
@@ -37,10 +58,11 @@ export const useDialogV2Store = defineStore('dialogv2', () => {
   }
 
   const openButtonHref = (button: DialogV2Button) => {
-    if (!button.href)
+    const href = button.href?.trim()
+    if (!isSafeDialogHref(href))
       return
 
-    if (typeof window === 'undefined')
+    if (globalThis.window === undefined)
       return
 
     if (button.target === '_blank') {
@@ -52,14 +74,14 @@ export const useDialogV2Store = defineStore('dialogv2', () => {
       if (relTokens.includes('noreferrer'))
         relSet.add('noreferrer')
       const relFeatures = Array.from(relSet).join(',')
-      window.open(button.href, button.target, relFeatures)
+      globalThis.window.open(href, button.target, relFeatures)
       return
     }
 
     if (button.target && button.target !== '_self')
-      window.open(button.href, button.target)
+      globalThis.window.open(href, button.target)
     else
-      window.location.assign(button.href)
+      globalThis.window.location.assign(href)
   }
 
   const closeDialog = async (button?: DialogV2Button) => {

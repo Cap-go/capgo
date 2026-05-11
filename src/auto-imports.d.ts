@@ -51,6 +51,7 @@ declare global {
   const isReactive: typeof import('vue').isReactive
   const isReadonly: typeof import('vue').isReadonly
   const isRef: typeof import('vue').isRef
+  const isSafeDialogHref: typeof import('./stores/dialogv2').isSafeDialogHref
   const isShallow: typeof import('vue').isShallow
   const isSuperAdminRole: typeof import('./stores/organization').isSuperAdminRole
   const makeDestructurable: typeof import('@vueuse/core').makeDestructurable
@@ -399,6 +400,7 @@ declare module 'vue' {
     readonly isReactive: UnwrapRef<typeof import('vue')['isReactive']>
     readonly isReadonly: UnwrapRef<typeof import('vue')['isReadonly']>
     readonly isRef: UnwrapRef<typeof import('vue')['isRef']>
+    readonly isSafeDialogHref: UnwrapRef<typeof import('./stores/dialogv2')['isSafeDialogHref']>
     readonly isShallow: UnwrapRef<typeof import('vue')['isShallow']>
     readonly isSuperAdminRole: UnwrapRef<typeof import('./stores/organization')['isSuperAdminRole']>
     readonly makeDestructurable: UnwrapRef<typeof import('@vueuse/core')['makeDestructurable']>

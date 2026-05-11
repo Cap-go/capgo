@@ -2,7 +2,7 @@
 import type { WatchStopHandle } from 'vue'
 import type { DialogV2Button } from '~/stores/dialogv2'
 import { onMounted, onUnmounted, watch } from 'vue'
-import { useDialogV2Store } from '~/stores/dialogv2'
+import { isSafeDialogHref, useDialogV2Store } from '~/stores/dialogv2'
 
 const dialogStore = useDialogV2Store()
 const route = useRoute()
@@ -18,6 +18,10 @@ function normalizeRel(rel?: string, target?: string) {
   if (relSet.size === 0)
     return undefined
   return Array.from(relSet).join(' ')
+}
+
+function getSafeDialogHref(button: DialogV2Button) {
+  return isSafeDialogHref(button.href) ? button.href.trim() : undefined
 }
 
 const sizeClasses = {
@@ -59,21 +63,29 @@ function handleButtonClick(button: DialogV2Button, event?: Event) {
     return
   }
 
+  const safeHref = getSafeDialogHref(button)
   const safeButton: DialogV2Button = {
     ...button,
+    href: safeHref,
     rel: normalizeRel(button.rel, button.target),
+  }
+
+  if (button.href && !safeHref) {
+    event?.preventDefault()
+    close(safeButton)
+    return
   }
 
   const mouseEvent = event instanceof MouseEvent ? event : undefined
   const hasModifier = !!(mouseEvent && (mouseEvent.metaKey || mouseEvent.ctrlKey || mouseEvent.shiftKey || mouseEvent.altKey))
-  const isModifiedLinkClick = !!(button.href && mouseEvent && (mouseEvent.button !== 0 || hasModifier))
+  const isModifiedLinkClick = !!(safeHref && mouseEvent && (mouseEvent.button !== 0 || hasModifier))
 
   if (isModifiedLinkClick) {
     close({ ...safeButton, skipNavigation: true })
     return
   }
 
-  const shouldPreventNavigation = button.href && (!mouseEvent || (mouseEvent.button === 0 && !hasModifier))
+  const shouldPreventNavigation = safeHref && (!mouseEvent || (mouseEvent.button === 0 && !hasModifier))
   if (shouldPreventNavigation)
     event?.preventDefault()
 
@@ -170,7 +182,7 @@ onUnmounted(() => {
 
               <a
                 v-else
-                :href="button.href"
+                :href="getSafeDialogHref(button)"
                 :target="button.target"
                 :rel="normalizeRel(button.rel, button.target)"
                 :class="[getButtonClasses(button), button.disabled ? 'pointer-events-none' : '']"
