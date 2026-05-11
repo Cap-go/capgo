@@ -49,7 +49,7 @@ export async function post(c: Context<MiddlewareKeyVariables>, body: CreateApp):
     throw simpleError('missing_app_id', 'Missing app_id', { body: getCreateAppBodyMetadata(body) })
   }
   if (!isValidAppId(body.app_id)) {
-    throw simpleError('invalid_app_id', 'App ID must be a reverse domain string', { app_id: body.app_id })
+    throw simpleError('invalid_app_id', 'App ID must be a reverse domain string', { body: getCreateAppBodyMetadata(body) })
   }
   if (!body.name) {
     throw simpleError('missing_name', 'Missing name', { body: getCreateAppBodyMetadata(body) })

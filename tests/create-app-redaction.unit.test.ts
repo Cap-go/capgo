@@ -68,4 +68,25 @@ describe('create app error redaction', () => {
     expect(JSON.stringify(cause.moreInfo)).not.toContain('secret-org-id')
     expect(JSON.stringify(cause.moreInfo)).not.toContain('apps.apple.com')
   })
+
+  it('redacts raw invalid app ids from create-app validation errors', async () => {
+    const cause = await getRejectedCause(() => post({} as any, {
+      app_id: 'https://internal.example/secret-token',
+      name: 'Secret App',
+      owner_org: 'secret-org-id',
+    } as any))
+
+    expect(cause.error).toBe('invalid_app_id')
+    expect(cause.moreInfo).toEqual({
+      body: {
+        fieldCount: 3,
+        hasBody: true,
+        presentFields: ['app_id', 'name', 'owner_org'],
+        unknownFieldCount: 0,
+      },
+    })
+    expect(JSON.stringify(cause.moreInfo)).not.toContain('secret-token')
+    expect(JSON.stringify(cause.moreInfo)).not.toContain('internal.example')
+    expect(JSON.stringify(cause.moreInfo)).not.toContain('secret-org-id')
+  })
 })
