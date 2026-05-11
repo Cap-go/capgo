@@ -68,6 +68,15 @@ function getSafeErrorName(error: Error) {
   return 'Error'
 }
 
+function getErrorLogMetadata(error: unknown) {
+  const errorMessage = error instanceof Error ? error.message : String(error)
+  return {
+    errorName: error instanceof Error ? getSafeErrorName(error) : 'Error',
+    hasMessage: errorMessage.length > 0,
+    messageLength: errorMessage.length,
+  }
+}
+
 function getDiscordPayloadLogMetadata(payload: RESTPostAPIWebhookWithTokenJSONBody) {
   const body = typeof payload === 'string'
     ? { content: payload }
@@ -166,7 +175,11 @@ export async function sendDiscordAlert(c: Context, payload: RESTPostAPIWebhookWi
     return true
   }
   catch (error) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Discord webhook error', error })
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: 'Discord webhook error',
+      error: getErrorLogMetadata(error),
+    })
     return true
   }
 }
@@ -195,11 +208,17 @@ export function sendDiscordAlert500(c: Context, functionName: string, body: stri
   })
 
   return sendDiscordAlert(c, payload).catch((e: any) => {
-    cloudlogErr({ requestId, functionName, message: 'sendDiscordAlert500 failed', error: e })
+    cloudlogErr({
+      requestId,
+      functionName,
+      message: 'sendDiscordAlert500 failed',
+      error: getErrorLogMetadata(e),
+    })
   })
 }
 
 export const __discordTestUtils__ = {
   buildDiscordAlert500Payload,
+  getErrorLogMetadata,
   getDiscordPayloadLogMetadata,
 }

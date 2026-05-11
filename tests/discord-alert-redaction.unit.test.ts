@@ -1,8 +1,55 @@
-import { describe, expect, it } from 'vitest'
-import { __discordTestUtils__ } from '../supabase/functions/_backend/utils/discord.ts'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+
+const {
+  cloudlogErrMock,
+  cloudlogMock,
+  envState,
+  fetchMock,
+} = vi.hoisted(() => ({
+  cloudlogErrMock: vi.fn(),
+  cloudlogMock: vi.fn(),
+  envState: {
+    discordAlert: '',
+  },
+  fetchMock: vi.fn(),
+}))
+
+vi.mock('../supabase/functions/_backend/utils/logging.ts', () => ({
+  cloudlog: cloudlogMock,
+  cloudlogErr: cloudlogErrMock,
+}))
+
+vi.mock('../supabase/functions/_backend/utils/utils.ts', () => ({
+  getEnv: (_c: unknown, key: string) => {
+    if (key === 'DISCORD_ALERT')
+      return envState.discordAlert
+    if (key === 'ENVIRONMENT')
+      return 'production'
+    return ''
+  },
+}))
+
+function createContext() {
+  return {
+    get: (key: string) => key === 'requestId' ? 'request-id' : undefined,
+  } as any
+}
+
+beforeEach(() => {
+  envState.discordAlert = ''
+  fetchMock.mockReset()
+  cloudlogErrMock.mockReset()
+  cloudlogMock.mockReset()
+  vi.stubGlobal('fetch', fetchMock)
+})
+
+afterEach(() => {
+  vi.unstubAllGlobals()
+})
 
 describe('discord alert redaction', () => {
-  it.concurrent('keeps raw request and error details out of 500 alert payloads', () => {
+  it('keeps raw request and error details out of 500 alert payloads', async () => {
+    const { __discordTestUtils__ } = await import('../supabase/functions/_backend/utils/discord.ts')
     const error = new Error('failed for alice@capgo.app with token super-secret-error-token')
     error.name = 'SensitiveError'
     error.stack = 'Error: failed\n    at secret-token-stack-frame'
@@ -53,8 +100,10 @@ describe('discord alert redaction', () => {
     expect(serialized).not.toContain('url-token')
   })
 
-  it.concurrent('summarizes disabled Discord payload logs without serializing payload content', () => {
-    const metadata = __discordTestUtils__.getDiscordPayloadLogMetadata({
+  it('summarizes disabled Discord payload logs without serializing payload content', async () => {
+    const { sendDiscordAlert } = await import('../supabase/functions/_backend/utils/discord.ts')
+
+    await sendDiscordAlert(createContext(), {
       content: 'contains token raw-token-value',
       embeds: [
         {
@@ -64,14 +113,39 @@ describe('discord alert redaction', () => {
       ],
     } as any)
 
-    const serialized = JSON.stringify(metadata)
+    const serialized = JSON.stringify(cloudlogMock.mock.calls)
 
-    expect(metadata).toEqual({
-      embedCount: 1,
-      hasContent: true,
-      payloadType: 'object',
-    })
+    expect(cloudlogMock).toHaveBeenCalledWith(expect.objectContaining({
+      payload: {
+        embedCount: 1,
+        hasContent: true,
+        payloadType: 'object',
+      },
+    }))
     expect(serialized).not.toContain('raw-token-value')
     expect(serialized).not.toContain('raw-password-value')
+  })
+
+  it('summarizes Discord fetch errors without retaining webhook tokens', async () => {
+    const { sendDiscordAlert } = await import('../supabase/functions/_backend/utils/discord.ts')
+    envState.discordAlert = 'https://discord.com/api/webhooks/app-id/discord-webhook-secret-token'
+    fetchMock.mockRejectedValue(new Error(`connect failed: ${envState.discordAlert}`))
+
+    await sendDiscordAlert(createContext(), {
+      content: 'hello',
+    } as any)
+
+    const serialized = JSON.stringify(cloudlogErrMock.mock.calls)
+
+    expect(cloudlogErrMock).toHaveBeenCalledWith(expect.objectContaining({
+      error: {
+        errorName: 'Error',
+        hasMessage: true,
+        messageLength: envState.discordAlert.length + 'connect failed: '.length,
+      },
+      message: 'Discord webhook error',
+    }))
+    expect(serialized).not.toContain('discord-webhook-secret-token')
+    expect(serialized).not.toContain(envState.discordAlert)
   })
 })
