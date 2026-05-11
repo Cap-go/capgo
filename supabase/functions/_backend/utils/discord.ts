@@ -8,7 +8,7 @@ import { getEnv } from './utils.ts'
 // Fields that should be completely removed from logs (never logged)
 const REMOVED_FIELDS = ['password']
 // Fields that should show first 4 and last 4 characters
-const PARTIALLY_REDACTED_FIELDS = ['secret', 'token', 'apikey', 'api_key', 'authorization', 'credential', 'private_key']
+const PARTIALLY_REDACTED_FIELDS = ['secret', 'token', 'apikey', 'api_key', 'api-key', 'authorization', 'credential', 'private_key', 'capgkey']
 
 // Partially redact a value - show first 4 and last 4 characters
 function partialRedact(value: string): string {
@@ -18,14 +18,83 @@ function partialRedact(value: string): string {
   return `${value.slice(0, 4)}...${value.slice(-4)}`
 }
 
-// Remove or redact sensitive fields from a string that might contain JSON
-function sanitizeSensitiveFromString(str: string): string {
+function shouldRemoveField(key: string): boolean {
+  const lowerKey = key.toLowerCase()
+  return REMOVED_FIELDS.some(field => lowerKey.includes(field))
+}
+
+function shouldPartiallyRedactField(key: string): boolean {
+  const lowerKey = key.toLowerCase()
+  return PARTIALLY_REDACTED_FIELDS.some(field => lowerKey.includes(field))
+}
+
+function sanitizeSensitiveValue(value: unknown): unknown {
+  if (Array.isArray(value))
+    return value.map(item => sanitizeSensitiveValue(item))
+
+  if (typeof value === 'string')
+    return sanitizeSensitiveText(value)
+
+  if (value && typeof value === 'object') {
+    const sanitized: Record<string, unknown> = {}
+    for (const [key, fieldValue] of Object.entries(value)) {
+      if (shouldRemoveField(key))
+        continue
+
+      if (shouldPartiallyRedactField(key)) {
+        sanitized[key] = partialRedact(String(fieldValue ?? ''))
+        continue
+      }
+
+      sanitized[key] = sanitizeSensitiveValue(fieldValue)
+    }
+    return sanitized
+  }
+
+  return value
+}
+
+function sanitizeUrl(url: string): string {
+  try {
+    const parsed = new URL(url)
+    const keys = Array.from(parsed.searchParams.keys())
+
+    for (const key of keys) {
+      if (shouldRemoveField(key)) {
+        parsed.searchParams.delete(key)
+        continue
+      }
+
+      if (shouldPartiallyRedactField(key)) {
+        const value = parsed.searchParams.get(key) ?? ''
+        parsed.searchParams.set(key, partialRedact(value))
+      }
+    }
+
+    return parsed.toString()
+  }
+  catch {
+    return sanitizeSensitiveKeyValues(url)
+  }
+}
+
+function sanitizeSensitiveKeyValues(str: string): string {
   let result = str
 
-  // Completely remove password fields (including the key)
+  // Redact sensitive key/value pairs in free-form text, query strings, and form bodies.
   for (const field of REMOVED_FIELDS) {
-    // Remove "password":"value", or "password": "value" (with optional trailing comma)
-    const jsonRegexWithComma = new RegExp(`"${field}"\\s*:\\s*"[^"]*"\\s*,?\\s*`, 'gi')
+    const keyValueRegex = new RegExp(`([^\\s&?;=:]*${field}[^\\s&?;=:]*)(\\s*[=:]\\s*)([^\\s&;]*)`, 'gi')
+    result = result.replace(keyValueRegex, (_match, key, separator) => `${key}${separator}***REDACTED***`)
+  }
+
+  for (const field of PARTIALLY_REDACTED_FIELDS) {
+    const keyValueRegex = new RegExp(`([^\\s&?;=:]*${field}[^\\s&?;=:]*)(\\s*[=:]\\s*)([^\\s&;]*)`, 'gi')
+    result = result.replace(keyValueRegex, (_match, key, separator, value) => `${key}${separator}${partialRedact(value)}`)
+  }
+
+  // Completely remove password-like fields (including the key)
+  for (const field of REMOVED_FIELDS) {
+    const jsonRegexWithComma = new RegExp(`"[^"]*${field}[^"]*"\\s*:\\s*"[^"]*"\\s*,?\\s*`, 'gi')
     result = result.replace(jsonRegexWithComma, '')
     // Clean up any resulting double commas or leading/trailing commas in objects
     result = result.replace(/,\s*,/g, ',')
@@ -33,9 +102,9 @@ function sanitizeSensitiveFromString(str: string): string {
     result = result.replace(/,\s*\}/g, '}')
   }
 
-  // Partially redact other sensitive fields (show first 4 and last 4 chars)
+  // Partially redact other sensitive field values (show first 4 and last 4 chars)
   for (const field of PARTIALLY_REDACTED_FIELDS) {
-    const jsonRegex = new RegExp(`("${field}"\\s*:\\s*)"([^"]*)"`, 'gi')
+    const jsonRegex = new RegExp(`("[^"]*${field}[^"]*"\\s*:\\s*)"([^"]*)"`, 'gi')
     result = result.replace(jsonRegex, (_match, prefix, value) => {
       return `${prefix}"${partialRedact(value)}"`
     })
@@ -44,16 +113,31 @@ function sanitizeSensitiveFromString(str: string): string {
   return result
 }
 
+function sanitizeSensitiveText(str: string): string {
+  const result = str.replace(/https?:\/\/[^\s`"'<>]+/gi, value => sanitizeUrl(value))
+  return sanitizeSensitiveKeyValues(result)
+}
+
+// Remove or redact sensitive fields from a string that might contain JSON
+function sanitizeSensitiveFromString(str: string): string {
+  try {
+    const parsed = JSON.parse(str)
+    return JSON.stringify(sanitizeSensitiveValue(parsed))
+  }
+  catch {
+    return sanitizeSensitiveText(str)
+  }
+}
+
 // Sanitize sensitive headers - remove or redact
 function sanitizeSensitiveHeaders(headers: Record<string, string>): Record<string, string> {
   const sanitized: Record<string, string> = {}
   for (const [key, value] of Object.entries(headers)) {
-    const lowerKey = key.toLowerCase()
     // Skip password-related headers entirely
-    if (REMOVED_FIELDS.some(field => lowerKey.includes(field))) {
+    if (shouldRemoveField(key)) {
       continue
     }
-    else if (PARTIALLY_REDACTED_FIELDS.some(field => lowerKey.includes(field))) {
+    else if (shouldPartiallyRedactField(key)) {
       sanitized[key] = partialRedact(value)
     }
     else {
@@ -103,14 +187,15 @@ export function sendDiscordAlert500(c: Context, functionName: string, body: stri
   const userAgent = c.req.header('user-agent') ?? 'unknown'
   const ip = c.req.header('cf-connecting-ip') ?? c.req.header('x-forwarded-for') ?? 'unknown'
   const method = c.req.method
-  const url = c.req.url
+  const url = sanitizeUrl(c.req.url)
   const rawHeaders = Object.fromEntries((c.req.raw.headers as any).entries())
   const headers = sanitizeSensitiveHeaders(rawHeaders)
-  const errorMessage = e?.message ?? 'Unknown error'
-  const errorStack = e?.stack ?? 'No stack trace'
+  const errorMessage = sanitizeSensitiveFromString(e?.message ?? 'Unknown error')
+  const errorStack = sanitizeSensitiveFromString(e?.stack ?? 'No stack trace')
   const errorName = e?.name ?? 'Error'
   // Defense-in-depth: remove/sanitize sensitive fields from body string
   const safeBody = sanitizeSensitiveFromString(body)
+  const safeErrorObject = sanitizeSensitiveFromString(JSON.stringify(e, Object.getOwnPropertyNames(e), 2))
   return sendDiscordAlert(c, {
     content: `🚨 **${functionName}** Error Alert`,
     embeds: [
@@ -147,7 +232,7 @@ export function sendDiscordAlert500(c: Context, functionName: string, body: stri
           },
           {
             name: '🔍 Full Error Object',
-            value: `\`\`\`json\n${JSON.stringify(e, Object.getOwnPropertyNames(e), 2).substring(0, 1000)}\n\`\`\``,
+            value: `\`\`\`json\n${safeErrorObject.substring(0, 1000)}\n\`\`\``,
             inline: false,
           },
         ],
