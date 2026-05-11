@@ -154,6 +154,20 @@ function getCustomerProfile(customer: Stripe.Customer | Stripe.DeletedCustomer):
   }
 }
 
+async function fetchCustomerProfile(stripe: Stripe, customerId: string): Promise<StripeCustomerProfile> {
+  try {
+    return getCustomerProfile(await stripe.customers.retrieve(customerId))
+  }
+  catch (error) {
+    console.warn(`Unable to retrieve Stripe customer ${customerId}:`, error)
+    return {
+      deleted: false,
+      email: null,
+      name: null,
+    }
+  }
+}
+
 async function fetchCustomerProfiles(
   stripe: Stripe,
   summaries: CustomerPaidSummary[],
@@ -162,8 +176,7 @@ async function fetchCustomerProfiles(
   const profilesByCustomerId = new Map<string, StripeCustomerProfile>()
 
   await asyncPool(concurrency, summaries, async (summary) => {
-    const customer = await stripe.customers.retrieve(summary.customerId)
-    profilesByCustomerId.set(summary.customerId, getCustomerProfile(customer))
+    profilesByCustomerId.set(summary.customerId, await fetchCustomerProfile(stripe, summary.customerId))
   })
 
   return profilesByCustomerId
@@ -180,10 +193,9 @@ async function fetchStripeCustomersWithoutOrg(
     if (orgCustomerIds.has(customerId))
       return customers
 
-    const customer = await stripe.customers.retrieve(customerId)
     customers.push({
       customerId,
-      profile: getCustomerProfile(customer),
+      profile: await fetchCustomerProfile(stripe, customerId),
     })
     return customers
   }

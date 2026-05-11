@@ -1,5 +1,5 @@
 import type Stripe from 'stripe'
-import { mkdir, writeFile } from 'node:fs/promises'
+import { chmod, mkdir, writeFile } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
 
 const ONE_DAY_MS = 24 * 60 * 60 * 1000
@@ -272,7 +272,10 @@ export function buildPaidCustomerSummaries(
 }
 
 export function escapeCsv(value: string | number | boolean | null) {
-  const text = String(value ?? '')
+  const rawText = String(value ?? '')
+  const text = typeof value === 'string' && /^[=+\-@]/.test(rawText)
+    ? `'${rawText}`
+    : rawText
   if (!/[",\n\r]/.test(text))
     return text
   return `"${text.replaceAll('"', '""')}"`
@@ -281,5 +284,6 @@ export function escapeCsv(value: string | number | boolean | null) {
 export async function writeCsv(outputPath: string, csv: string) {
   const resolvedOutputPath = resolve(outputPath)
   await mkdir(dirname(resolvedOutputPath), { recursive: true })
-  await writeFile(resolvedOutputPath, csv)
+  await writeFile(resolvedOutputPath, csv, { mode: 0o600 })
+  await chmod(resolvedOutputPath, 0o600)
 }
