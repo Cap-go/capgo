@@ -157,9 +157,9 @@ export async function getBuildStatus(
       message: 'Builder status fetch failed',
       job_id,
       status: builderResponse.status,
-      error: errorText,
+      error_length: errorText.length,
     })
-    throw simpleError('builder_error', `Failed to get build status: ${errorText}`)
+    throw simpleError('builder_error', 'Failed to get build status', { status: builderResponse.status })
   }
 
   const builderJob = await builderResponse.json() as BuilderStatusResponse
