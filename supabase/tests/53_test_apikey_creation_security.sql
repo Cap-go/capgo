@@ -1,6 +1,6 @@
 BEGIN;
 
-SELECT plan(10);
+SELECT plan(12);
 
 SELECT tests.authenticate_as_service_role();
 SELECT tests.create_supabase_user('apikey_creation_owner', 'apikey_creation_owner@test.local');
@@ -157,6 +157,27 @@ SELECT throws_ok(
   $q$,
   'RBAC_MANAGED_APIKEY_REQUIRES_BINDINGS',
   'public create_hashed_apikey rejects null-mode RBAC keys without bindings'
+);
+
+SELECT is(
+  (
+    SELECT COUNT(*)
+    FROM public.apikeys
+    WHERE user_id = tests.get_supabase_uid('apikey_creation_owner')
+  ),
+  0::bigint,
+  'unrestricted all API key cannot enumerate account API keys through anon table select'
+);
+
+DELETE FROM public.apikeys
+WHERE id = 53002;
+
+SELECT tests.authenticate_as_service_role();
+
+SELECT is(
+  (SELECT COUNT(*) FROM public.apikeys WHERE id = 53002),
+  1::bigint,
+  'unrestricted all API key cannot delete account API keys through anon table delete'
 );
 
 SELECT tests.clear_authentication();
