@@ -45,19 +45,19 @@ export function makeDevice(devBody: AppInfos | DeviceLink | AppStats, allowCusto
 
 export function parsePluginBody<T extends AppInfos | DeviceLink | AppStats>(c: Context, body: T, schema: StandardSchema<T>, requireDevice = true) {
   if (Object.keys(body ?? {}).length === 0) {
-    throw simpleError(getInvalidCode(c), 'Cannot parse body', { body })
+    throw simpleError(getInvalidCode(c), 'Cannot parse body', { has_fields: false })
   }
   if (requireDevice && !body.device_id) {
-    throw simpleError('missing_device_id', 'Cannot find device_id', { body })
+    throw simpleError('missing_device_id', 'Cannot find device_id', { has_device_id: false, has_app_id: !!body.app_id })
   }
   if (!body.app_id) {
-    throw simpleError('missing_app_id', 'Cannot find app_id', { body })
+    throw simpleError('missing_app_id', 'Cannot find app_id', { has_device_id: !!body.device_id, has_app_id: false })
   }
   // Only validate version_build if it's provided (not required for GET /channel_self)
   if (body.version_build) {
     const coerce = tryParse(fixSemver(body.version_build))
     if (!coerce) {
-      throw simpleError('semver_error', `Native version: ${body.version_build} doesn't follow semver convention, please check https://capgo.app/semver_tester/ to learn more about semver usage in Capgo`, { version_build: body.version_build })
+      throw simpleError('semver_error', 'Native version does not follow semver convention, please check https://capgo.app/semver_tester/ to learn more about semver usage in Capgo', { version_build_length: typeof body.version_build === 'string' ? body.version_build.length : 0 })
     }
     body.version_build = format(coerce)
   }
@@ -69,7 +69,11 @@ export function parsePluginBody<T extends AppInfos | DeviceLink | AppStats>(c: C
   }
   const parseResult = safeParseSchema(schema, body)
   if (!parseResult.success) {
-    throw simpleError(getInvalidCode(c), 'Cannot parse body', { parseResult })
+    const safeIssues = (parseResult.error?.issues ?? []).map((issue: any) => ({
+      code: issue.code ?? 'unknown',
+      path: Array.isArray(issue.path) ? issue.path.map(String) : [],
+    }))
+    throw simpleError(getInvalidCode(c), 'Cannot parse body', { issue_count: safeIssues.length, issues: safeIssues })
   }
   return parseResult.data
 }
