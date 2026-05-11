@@ -721,11 +721,12 @@ onUnmounted(() => {
 
               <div v-if="mode === 'website'" class="space-y-4 border-t border-slate-200 pt-6 dark:border-white/10">
                 <div>
-                  <label class="text-sm font-medium text-slate-800 dark:text-slate-200">
+                  <label for="onboarding-website-input" class="text-sm font-medium text-slate-800 dark:text-slate-200">
                     {{ t('organization-onboarding-website-label') }}
                   </label>
                   <div class="mt-2 flex flex-col gap-3 sm:flex-row">
                     <input
+                      id="onboarding-website-input"
                       v-model="websiteInput"
                       type="url"
                       placeholder="https://capgo.app"
@@ -759,10 +760,11 @@ onUnmounted(() => {
 
               <template v-if="canShowOrgDetails">
                 <div class="border-t border-slate-200 pt-6 dark:border-white/10">
-                  <label class="text-sm font-medium text-slate-800 dark:text-slate-200">
+                  <label for="onboarding-org-name-input" class="text-sm font-medium text-slate-800 dark:text-slate-200">
                     {{ t('organization-name') }}
                   </label>
                   <input
+                    id="onboarding-org-name-input"
                     v-model="orgNameInput"
                     type="text"
                     :placeholder="t('organization-name')"
