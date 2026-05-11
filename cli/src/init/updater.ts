@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
-import { dirname, isAbsolute, join, relative, resolve } from 'node:path'
+import { dirname, join } from 'node:path'
 
 export const CAPGO_UPDATER_PACKAGE = '@capgo/capacitor-updater'
 
@@ -55,34 +55,12 @@ function getDeclaredDependency(packageJsonPath: string, packageName: string) {
   return { version: null, section: null }
 }
 
-function isPathInside(childPath: string, parentPath: string) {
-  const relativePath = relative(resolve(parentPath), resolve(childPath))
-  return relativePath === '' || (!!relativePath && !relativePath.startsWith('..') && !isAbsolute(relativePath))
-}
-
-function isResolvedFromProjectNodeModules(resolvedPath: string, projectDir: string) {
-  let currentDir = projectDir
-  while (true) {
-    if (isPathInside(resolvedPath, join(currentDir, 'node_modules')))
-      return true
-
-    const parentDir = dirname(currentDir)
-    if (parentDir === currentDir)
-      break
-    currentDir = parentDir
-  }
-
-  return false
-}
-
 function readInstalledPackageVersion(packageJsonPath: string, packageName: string): string | null {
   const projectDir = dirname(packageJsonPath)
 
   try {
     const requireFromProject = createRequire(join(projectDir, 'package.json'))
     const resolvedPath = requireFromProject.resolve(`${packageName}/package.json`)
-    if (!isResolvedFromProjectNodeModules(resolvedPath, projectDir))
-      throw new Error(`Resolved ${packageName} outside project node_modules`)
     const packageJson = JSON.parse(readFileSync(resolvedPath, 'utf-8')) as { version?: unknown }
     if (typeof packageJson.version === 'string')
       return packageJson.version
