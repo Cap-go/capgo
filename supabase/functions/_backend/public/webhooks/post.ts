@@ -18,7 +18,11 @@ const bodySchema = type({
 export async function post(c: Context, bodyRaw: any, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
   const bodyParsed = safeParseSchema(bodySchema, bodyRaw)
   if (!bodyParsed.success) {
-    throw simpleError('invalid_body', 'Invalid body', { error: bodyParsed.error })
+    const safeIssues = (bodyParsed.error?.issues ?? []).map((issue: any) => ({
+      code: issue.code ?? 'unknown',
+      path: Array.isArray(issue.path) ? issue.path.map(String) : [],
+    }))
+    throw simpleError('invalid_body', 'Invalid body', { issue_count: safeIssues.length, issues: safeIssues })
   }
   const body = bodyParsed.data
 
@@ -35,7 +39,7 @@ export async function post(c: Context, bodyRaw: any, apikey: Database['public'][
 
   const urlError = getWebhookUrlValidationError(c, body.url)
   if (urlError)
-    throw simpleError('invalid_url', urlError, { url: body.url })
+    throw simpleError('invalid_url', urlError, { url_provided: true })
 
   // Create webhook using authenticated client - RLS will enforce access
   // Note: Using type assertion as webhooks table types are not yet generated

@@ -33,7 +33,11 @@ const DELIVERIES_PER_PAGE = 50
 export async function getDeliveries(c: Context<MiddlewareKeyVariables, any, any>, bodyRaw: any, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
   const bodyParsed = safeParseSchema(getDeliveriesSchema, bodyRaw)
   if (!bodyParsed.success) {
-    throw simpleError('invalid_body', 'Invalid body', { error: bodyParsed.error })
+    const safeIssues = (bodyParsed.error?.issues ?? []).map((issue: any) => ({
+      code: issue.code ?? 'unknown',
+      path: Array.isArray(issue.path) ? issue.path.map(String) : [],
+    }))
+    throw simpleError('invalid_body', 'Invalid body', { issue_count: safeIssues.length, issues: safeIssues })
   }
   const body = bodyParsed.data
 
@@ -110,7 +114,11 @@ export async function getDeliveries(c: Context<MiddlewareKeyVariables, any, any>
 export async function retryDelivery(c: Context<MiddlewareKeyVariables, any, any>, bodyRaw: any, auth: AuthInfo): Promise<Response> {
   const bodyParsed = safeParseSchema(retryDeliverySchema, bodyRaw)
   if (!bodyParsed.success) {
-    throw simpleError('invalid_body', 'Invalid body', { error: bodyParsed.error })
+    const safeIssues = (bodyParsed.error?.issues ?? []).map((issue: any) => ({
+      code: issue.code ?? 'unknown',
+      path: Array.isArray(issue.path) ? issue.path.map(String) : [],
+    }))
+    throw simpleError('invalid_body', 'Invalid body', { issue_count: safeIssues.length, issues: safeIssues })
   }
   const body = bodyParsed.data
 
