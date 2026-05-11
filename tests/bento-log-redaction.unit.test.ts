@@ -1,3 +1,4 @@
+import type { Context } from 'hono'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const {
@@ -22,15 +23,22 @@ vi.mock('../supabase/functions/_backend/utils/utils.ts', () => ({
   getEnv: getEnvMock,
 }))
 
-function createContext() {
-  return {
+interface BentoMockContext {
+  env: Record<string, string>
+  get: (key: string) => string | undefined
+}
+
+function createContext(): Context {
+  const context = {
     env: {
       BENTO_PUBLISHABLE_KEY: 'pub-key',
       BENTO_SECRET_KEY: 'secret-key',
       BENTO_SITE_UUID: 'site-uuid',
     },
     get: (key: string) => key === 'requestId' ? 'request-id' : undefined,
-  } as any
+  } satisfies BentoMockContext
+
+  return context as unknown as Context
 }
 
 beforeEach(() => {
