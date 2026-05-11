@@ -144,7 +144,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
     initialProgress?.completedSteps.googleSignInComplete || null,
   )
   const [accessToken, setAccessToken] = useState<string>('')
-  const [refreshTokenState, setRefreshTokenState] = useState<string>(initialProgress?._oauthRefreshToken || '')
+  const [refreshTokenState, setRefreshTokenState] = useState<string>('')
   const [oauthClientId, setOauthClientId] = useState<string>('')
   const [oauthStatusMessages, setOauthStatusMessages] = useState<string[]>([])
 
@@ -181,9 +181,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
   const [, setPlayInviteProvisioned] = useState<PlayInviteProvisioned | null>(
     initialProgress?.completedSteps.playInviteProvisioned || null,
   )
-  const [serviceAccountKeyBase64, setServiceAccountKeyBase64] = useState<string>(
-    initialProgress?._serviceAccountKeyBase64 || '',
-  )
+  const [serviceAccountKeyBase64, setServiceAccountKeyBase64] = useState<string>('')
 
   // Phase 6 — build output
   const [buildUrl, setBuildUrl] = useState('')
@@ -526,7 +524,6 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
           setGoogleSignIn(complete)
           await persist((p) => ({
             ...p,
-            _oauthRefreshToken: tokens.refreshToken,
             completedSteps: { ...p.completedSteps, googleSignInComplete: complete },
           }))
           addLog(`✔ Signed in as ${info.email}`)
@@ -639,7 +636,6 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
           setServiceAccountKeyBase64(key.privateKeyDataBase64)
           await persist((p) => ({
             ...p,
-            _serviceAccountKeyBase64: key.privateKeyDataBase64,
             completedSteps: { ...p.completedSteps, serviceAccountProvisioned: saProv },
           }))
           addSetupStatus('✔ Key created')

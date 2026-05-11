@@ -52,10 +52,12 @@
       "entry": [
         "src/index.ts!",
         "src/sdk.ts!",
-        "src/mcp/server.ts!"
+        "src/mcp/server.ts!",
+        "test/**/*.mjs!"
       ],
       "project": [
-        "src/**/*.{ts,tsx}!"
+        "src/**/*.{ts,tsx}!",
+        "test/**/*.mjs!"
       ]
     }
   }

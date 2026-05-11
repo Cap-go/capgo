@@ -115,12 +115,8 @@ export interface AndroidOnboardingProgress {
     playInviteProvisioned?: PlayInviteProvisioned
   }
 
-  // Ephemeral — wiped when onboarding finishes. Held on disk only so resume
-  // across a crash doesn't force a full re-auth. NEVER written to credentials.
-  _oauthRefreshToken?: string
+  // Ephemeral keystore data, wiped when onboarding finishes.
   _keystoreBase64?: string
-  /** Base64 of the downloaded SA JSON key — saved as PLAY_CONFIG_JSON at end. */
-  _serviceAccountKeyBase64?: string
 }
 
 export const ANDROID_STEP_PROGRESS: Record<AndroidOnboardingStep, number> = {

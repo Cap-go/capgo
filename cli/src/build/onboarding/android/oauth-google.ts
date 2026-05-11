@@ -31,7 +31,6 @@ export const GOOGLE_OAUTH_SCOPES_ANDROIDPUBLISHER = [
 const GOOGLE_AUTH_ENDPOINT = 'https://accounts.google.com/o/oauth2/v2/auth'
 const GOOGLE_TOKEN_ENDPOINT = 'https://oauth2.googleapis.com/token'
 const GOOGLE_USERINFO_ENDPOINT = 'https://openidconnect.googleapis.com/v1/userinfo'
-const GOOGLE_REVOKE_ENDPOINT = 'https://oauth2.googleapis.com/revoke'
 
 const DEFAULT_FLOW_TIMEOUT_MS = 5 * 60 * 1000
 const LOOPBACK_HOST = '127.0.0.1'
@@ -249,23 +248,6 @@ export async function fetchUserInfo(accessToken: string): Promise<GoogleUserInfo
     emailVerified: !!data.email_verified,
     name: data.name,
     picture: data.picture,
-  }
-}
-
-/**
- * Revoke a Google OAuth token. Accepts either an access or refresh token —
- * revoking a refresh token also invalidates any access tokens minted from it.
- */
-export async function revokeToken(token: string): Promise<void> {
-  const res = await fetch(GOOGLE_REVOKE_ENDPOINT, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({ token }).toString(),
-  })
-  // Google returns 400 when the token is already invalid/revoked — treat as success.
-  if (!res.ok && res.status !== 400) {
-    const text = await res.text().catch(() => '')
-    throw new Error(`revoke failed (${res.status}): ${text.slice(0, 200)}`)
   }
 }
 
