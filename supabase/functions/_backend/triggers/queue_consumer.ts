@@ -191,6 +191,24 @@ function sanitizeQueueLogValue(value: unknown): unknown {
   ]))
 }
 
+function getQueueLogUrlMetadata(value: string): Record<string, unknown> {
+  try {
+    const parsed = new URL(value)
+    return {
+      host: parsed.host,
+      pathSegments: parsed.pathname.split('/').filter(Boolean).length,
+      hasQuery: parsed.search.length > 0,
+    }
+  }
+  catch {
+    return {
+      host: null,
+      pathSegments: 0,
+      hasQuery: value.includes('?'),
+    }
+  }
+}
+
 // Helper function to generate UUID v4
 function generateUUID(): string {
   return crypto.randomUUID()
@@ -515,7 +533,8 @@ export async function http_post_helper(
   try {
     cloudlog({
       requestId: c.get('requestId'),
-      message: `[${function_name}] Making HTTP POST request to "${url}" with body:`,
+      message: `[${function_name}] Making HTTP POST request with body:`,
+      url: getQueueLogUrlMetadata(url),
       body: sanitizeQueueLogValue(body),
     })
     const response = await fetch(url, {
@@ -665,5 +684,6 @@ export const __queueConsumerTestUtils__ = {
   extractMessageBody,
   getActionableQueueFailures,
   sanitizeDiscordResponseBody,
+  getQueueLogUrlMetadata,
   sanitizeQueueLogValue,
 }

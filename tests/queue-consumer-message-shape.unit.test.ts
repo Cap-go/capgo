@@ -1,6 +1,15 @@
-import { describe, expect, it } from 'vitest'
-import { __queueConsumerTestUtils__, MAX_QUEUE_READS, messagesArraySchema } from '../supabase/functions/_backend/triggers/queue_consumer.ts'
+import { describe, expect, it, vi } from 'vitest'
+import { __queueConsumerTestUtils__, http_post_helper, MAX_QUEUE_READS, messagesArraySchema } from '../supabase/functions/_backend/triggers/queue_consumer.ts'
 import { parseSchema } from '../supabase/functions/_backend/utils/ark_validation.ts'
+
+const { cloudlogMock } = vi.hoisted(() => ({
+  cloudlogMock: vi.fn(),
+}))
+
+vi.mock('../supabase/functions/_backend/utils/logging.ts', () => ({
+  cloudlog: cloudlogMock,
+  cloudlogErr: vi.fn(),
+}))
 
 describe('queue_consumer legacy message compatibility', () => {
   it.concurrent('uses the payload envelope when it is present', () => {
@@ -159,6 +168,40 @@ describe('queue_consumer legacy message compatibility', () => {
     expect(body.authorization).toContain('Bearer')
     expect(JSON.stringify(sanitized)).not.toContain('alice@capgo.app')
     expect(JSON.stringify(sanitized)).not.toContain('super-secret-token-value')
+  })
+
+  it('does not write sensitive queue request URL query values to logs', async () => {
+    cloudlogMock.mockClear()
+    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 204 }))
+    const previousApiSecret = process.env.API_SECRET
+    const previousCloudflareFunctionUrl = process.env.CLOUDFLARE_FUNCTION_URL
+    process.env.API_SECRET = 'api-secret'
+    process.env.CLOUDFLARE_FUNCTION_URL = 'https://example.test/hook?token=secret-url-token'
+    vi.stubGlobal('fetch', fetchMock)
+
+    try {
+      await http_post_helper({
+        get: vi.fn(() => 'request-id'),
+      } as any, 'sync_job', 'cloudflare', { metadata: 'token=secret-body-token' }, 'cf-id')
+
+      const loggedPayload = JSON.stringify(cloudlogMock.mock.calls)
+      expect(loggedPayload).toContain('"hasQuery":true')
+      expect(loggedPayload).not.toContain('secret-url-token')
+      expect(loggedPayload).not.toContain('secret-body-token')
+      expect(fetchMock).toHaveBeenCalled()
+    }
+    finally {
+      vi.unstubAllGlobals()
+      if (previousApiSecret === undefined)
+        delete process.env.API_SECRET
+      else
+        process.env.API_SECRET = previousApiSecret
+
+      if (previousCloudflareFunctionUrl === undefined)
+        delete process.env.CLOUDFLARE_FUNCTION_URL
+      else
+        process.env.CLOUDFLARE_FUNCTION_URL = previousCloudflareFunctionUrl
+    }
   })
 
   it.concurrent('keeps message-only JSON error details actionable', async () => {
