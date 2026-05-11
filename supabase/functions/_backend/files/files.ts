@@ -368,8 +368,9 @@ async function assertReadableAppScopedAttachment(c: Context, fileId: unknown): P
             r2_path = $3
             OR EXISTS (
               SELECT 1
-              FROM unnest(manifest) AS manifest_entry
-              WHERE manifest_entry.s3_path = $3
+              FROM public.manifest m
+              WHERE m.app_version_id = public.app_versions.id
+                AND m.s3_path = $3
             )
           )
         LIMIT 1

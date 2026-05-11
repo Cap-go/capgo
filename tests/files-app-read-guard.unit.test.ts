@@ -149,7 +149,7 @@ describe('files app-scoped read guard', () => {
     expect(bucketPut).not.toHaveBeenCalled()
   })
 
-  it('returns 404 for soft-deleted manifest asset paths before serving cached content', async () => {
+  it('returns 404 for soft-deleted persisted manifest asset paths before serving cached content', async () => {
     getAppByAppIdPgMock.mockResolvedValue({ app_id: 'test-app', owner_org: 'test-org' })
     pgClientMock.query.mockResolvedValue({ rows: [{ id: 123 }] })
 
@@ -184,9 +184,10 @@ describe('files app-scoped read guard', () => {
 
     expect(response.status).toBe(404)
     expect(pgClientMock.query).toHaveBeenCalledWith(
-      expect.stringContaining('unnest(manifest)'),
+      expect.stringContaining('FROM public.manifest'),
       ['test-org', 'test-app', filePath],
     )
+    expect(pgClientMock.query.mock.calls[0]?.[0]).not.toContain('unnest(manifest)')
     expect(bucketPut).not.toHaveBeenCalled()
   })
 
