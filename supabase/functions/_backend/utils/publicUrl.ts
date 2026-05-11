@@ -42,7 +42,7 @@ function isPrivateIpv4(ip: string) {
   if (octets.length !== 4 || octets.some(part => Number.isNaN(part) || part < 0 || part > 255))
     return true
 
-  const [a, b, c, d] = octets
+  const [a, b, c] = octets
   return a === 0
     || a === 10
     || a === 127
@@ -57,7 +57,6 @@ function isPrivateIpv4(ip: string) {
     || (a === 198 && b === 51 && c === 100)
     || (a === 203 && b === 0 && c === 113)
     || a >= 224
-    || (a === 255 && b === 255 && c === 255 && d === 255)
 }
 
 function isPrivateIpv6(ip: string) {
@@ -151,10 +150,11 @@ export async function getPublicHostnameValidationError(urlString: string, option
     return options.messages.invalidUrl
   }
 
-  const ips = [
-    ...await resolveHostnameIps(url.hostname, 'A'),
-    ...await resolveHostnameIps(url.hostname, 'AAAA'),
-  ]
+  const [ipv4Answers, ipv6Answers] = await Promise.all([
+    resolveHostnameIps(url.hostname, 'A'),
+    resolveHostnameIps(url.hostname, 'AAAA'),
+  ])
+  const ips = [...ipv4Answers, ...ipv6Answers]
 
   if (ips.some(isPrivateIp))
     return options.messages.publicHost
