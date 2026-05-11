@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { getSafeRedirectPath, isSafeRedirectPath } from '../src/services/redirects.ts'
+import { getSafeRedirectPath, isSafeRedirectPath } from '~/services/redirects'
 
 describe('redirect path validation', () => {
   it.concurrent('accepts same-origin application paths', () => {
@@ -30,6 +30,12 @@ describe('redirect path validation', () => {
     expect(getSafeRedirectPath('/onboarding/organization', '/login', {
       blockedPrefixes: ['/onboarding'],
     })).toBe('/login')
+    expect(getSafeRedirectPath('/settings/account', '/onboarding/organization', {
+      blockedPrefixes: ['/onboarding'],
+    })).toBe('/settings/account')
+    expect(getSafeRedirectPath('/onboarding/organization', '/onboarding/organization', {
+      blockedPrefixes: ['/onboarding'],
+    })).toBe('/dashboard')
     expect(getSafeRedirectPath('/accountDisabled?restored=1', '/dashboard', {
       blockedPrefixes: ['/accountDisabled'],
     })).toBe('/dashboard')

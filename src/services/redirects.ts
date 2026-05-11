@@ -45,7 +45,8 @@ function isBlockedRedirectPath(path: string, options: SafeRedirectOptions): bool
 }
 
 export function getSafeRedirectPath(target: unknown, fallback = defaultRedirectPath, options: SafeRedirectOptions = {}): string {
-  const fallbackPath = fallback === '' || isSafeRedirectPath(fallback)
+  const fallbackPath = fallback === ''
+    || (isSafeRedirectPath(fallback) && !isBlockedRedirectPath(fallback, options))
     ? fallback
     : defaultRedirectPath
 
