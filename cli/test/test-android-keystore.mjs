@@ -38,8 +38,8 @@ async function importKeystore() {
   return await import('../src/build/onboarding/android/keystore.ts')
 }
 
-await test('generateKeystore produces a valid PKCS#12 that round-trips', async () => {
-  const { generateKeystore, verifyKeystore } = await importKeystore()
+await test('generateKeystore returns base64 + bytes + alias', async () => {
+  const { generateKeystore } = await importKeystore()
   const result = generateKeystore({
     alias: 'release',
     storePassword: 'storepass123',
@@ -50,21 +50,7 @@ await test('generateKeystore produces a valid PKCS#12 that round-trips', async (
   assert(result.p12Base64.length > 0, 'p12Base64 should not be empty')
   assert(result.p12Bytes.length > 0, 'p12Bytes should not be empty')
   assertEquals(result.alias, 'release')
-
-  const verified = verifyKeystore(result.p12Base64, 'storepass123')
-  assert(verified.valid, `expected valid keystore, got: ${verified.reason}`)
-})
-
-await test('verifyKeystore rejects wrong password', async () => {
-  const { generateKeystore, verifyKeystore } = await importKeystore()
-  const result = generateKeystore({
-    alias: 'release',
-    storePassword: 'correct',
-    keyPassword: 'correct',
-    dname: { commonName: 'com.example.app' },
-  })
-  const verified = verifyKeystore(result.p12Base64, 'wrong-password')
-  assert(!verified.valid, 'wrong password must fail verification')
+  // Round-trip is covered by the `tryUnlockPrivateKey` and `listKeystoreAliases` tests below.
 })
 
 await test('validity defaults to 27 years', async () => {

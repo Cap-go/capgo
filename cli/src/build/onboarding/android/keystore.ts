@@ -105,28 +105,6 @@ export function generateKeystore(options: KeystoreOptions): KeystoreResult {
   }
 }
 
-/**
- * Parse a PKCS#12 keystore from base64 and verify the password + key integrity.
- * Used by tests — also useful if we ever need to validate a user-supplied keystore.
- */
-export function verifyKeystore(p12Base64: string, password: string): { valid: boolean, reason?: string } {
-  try {
-    const p12Der = forge.util.decode64(p12Base64)
-    const p12Asn1 = forge.asn1.fromDer(p12Der)
-    const p12 = forge.pkcs12.pkcs12FromAsn1(p12Asn1, password)
-    const hasKey = p12.getBags({ bagType: forge.pki.oids.pkcs8ShroudedKeyBag })[forge.pki.oids.pkcs8ShroudedKeyBag]?.length
-    const hasCert = p12.getBags({ bagType: forge.pki.oids.certBag })[forge.pki.oids.certBag]?.length
-    if (!hasKey)
-      return { valid: false, reason: 'no private key' }
-    if (!hasCert)
-      return { valid: false, reason: 'no certificate' }
-    return { valid: true }
-  }
-  catch (err) {
-    return { valid: false, reason: err instanceof Error ? err.message : 'parse failed' }
-  }
-}
-
 export type ProbeKeyPasswordResult
   = | { ok: true }
     | { ok: false, reason: 'wrong-password' | 'unsupported-format' | 'parse-error' | 'no-private-key', message: string }

@@ -59,11 +59,3 @@ export function openKeystorePicker(): Promise<string | null> {
   )
 }
 
-/**
- * Open the macOS native file picker filtered to JSON service-account keys.
- */
-export function openServiceAccountJsonPicker(): Promise<string | null> {
-  return openMacFilePicker(
-    'POSIX path of (choose file of type {"json"} with prompt "Select your service-account JSON key")',
-  )
-}
