@@ -254,6 +254,40 @@ describe('webhook endpoints enforce org API key expiration policy', () => {
     expect(data).toEqual([])
   })
 
+  it('allows direct REST webhook reads for compliant expiring org keys', async () => {
+    if (!expiringSubkeyValue || !createdWebhookId)
+      throw new Error('Expiring direct REST webhook prerequisites were not created')
+
+    const response = await fetch(`${SUPABASE_BASE_URL}/rest/v1/webhooks?select=id,org_id&id=eq.${createdWebhookId}`, {
+      headers: {
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+        capgkey: expiringSubkeyValue,
+      },
+    })
+
+    expect(response.status).toBe(200)
+    const data = await response.json() as Array<{ id: string, org_id: string }>
+    expect(data).toContainEqual({ id: createdWebhookId, org_id: policyOrgId })
+  })
+
+  it('allows direct REST webhook delivery reads for compliant expiring org keys', async () => {
+    if (!expiringSubkeyValue || !createdDeliveryId)
+      throw new Error('Expiring direct REST delivery prerequisites were not created')
+
+    const response = await fetch(`${SUPABASE_BASE_URL}/rest/v1/webhook_deliveries?select=id,org_id,webhook_id&id=eq.${createdDeliveryId}`, {
+      headers: {
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+        capgkey: expiringSubkeyValue,
+      },
+    })
+
+    expect(response.status).toBe(200)
+    const data = await response.json() as Array<{ id: string, org_id: string, webhook_id: string }>
+    expect(data).toContainEqual({ id: createdDeliveryId, org_id: policyOrgId, webhook_id: createdWebhookId })
+  })
+
   it('rejects webhook creation for legacy non-expiring org key', async () => {
     if (!legacyApiKeyValue)
       throw new Error('Legacy API key was not created')
