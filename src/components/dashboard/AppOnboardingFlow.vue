@@ -67,6 +67,7 @@ const hasEditedAppId = ref(false)
 
 const localCommand = isLocal(config.supaHost) ? ` --supa-host ${config.supaHost} --supa-anon ${config.supaKey}` : ''
 const cliCommand = computed(() => `npx @capgo/cli@latest i ${apiKey.value ?? '[APIKEY]'}${localCommand}`)
+const redactedCliCommand = computed(() => `npx @capgo/cli@latest i [YOUR_CAPGO_API_KEY]${localCommand}`)
 const cliCommandArgs = computed(() => {
   const args: string[] = []
 
@@ -94,7 +95,9 @@ const suggestedAppId = computed(() => {
   if (createdApp.value)
     return createdApp.value.app_id
 
-  const storeAppId = importedStoreAppId.value || extractAndroidAppId(storeUrl.value)
+  const storeAppId = existingAppSetup.value === 'import'
+    ? importedStoreAppId.value || extractAndroidAppId(storeUrl.value)
+    : ''
   if (existingApp.value === true && storeAppId)
     return storeAppId
 
@@ -114,7 +117,7 @@ const aiHelpPrompt = computed(() => {
     appName: resolvedAppName,
     appId: resolvedAppId,
     appStatus,
-    command: cliCommand.value,
+    command: redactedCliCommand.value,
   })
 })
 const appOnboardingSteps = computed<Array<{ id: 'details' | 'choice' | 'install', label: string }>>(() => [
@@ -213,6 +216,14 @@ function getStoreUrls(url: string) {
   return { iosStoreUrl: null, androidStoreUrl: null }
 }
 
+function resetStoreImportState() {
+  storeUrl.value = ''
+  storeIconPreview.value = ''
+  storeScreenshotPreview.value = ''
+  importedStoreAppId.value = ''
+  isImportingStore.value = false
+}
+
 let resumeIconLoadRun = 0
 async function loadResumeIconPreview(rawIconUrl: string | null | undefined, appId: string, run: number) {
   if (!rawIconUrl || getImmediateImageUrl(rawIconUrl)) {
@@ -307,7 +318,7 @@ async function loadResumeApp() {
 }
 
 async function importStoreMetadata() {
-  if (!storeUrl.value)
+  if (!storeUrl.value || existingAppSetup.value !== 'import')
     return
 
   isImportingStore.value = true
@@ -494,7 +505,9 @@ async function createAppRecord() {
 
   isSubmitting.value = true
   try {
-    const normalizedStoreUrls = getStoreUrls(storeUrl.value.trim())
+    const normalizedStoreUrls = existingApp.value === true && existingAppSetup.value === 'import'
+      ? getStoreUrls(storeUrl.value.trim())
+      : { iosStoreUrl: null, androidStoreUrl: null }
 
     let appId = generatedAppId.value
     let responseData: AppRow | null = null
@@ -675,13 +688,15 @@ onBeforeUnmount(() => {
 watch(existingApp, (value) => {
   existingAppSetup.value = value === true ? null : value === false ? 'manual' : null
   if (value !== true) {
-    storeUrl.value = ''
-    storeIconPreview.value = ''
-    storeScreenshotPreview.value = ''
-    importedStoreAppId.value = ''
+    resetStoreImportState()
   }
   appIdSuggestions.value = []
   appIdFeedback.value = ''
+})
+
+watch(existingAppSetup, (value) => {
+  if (value === 'manual')
+    resetStoreImportState()
 })
 
 watch(suggestedAppId, (value) => {
