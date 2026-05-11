@@ -63,7 +63,7 @@ function setNotifCacheStatus(c: Context, orgId: string, eventName: string, uniqI
 }
 
 function getEventDataSummary(eventData: EventData) {
-  const fields = Object.keys(eventData).sort()
+  const fields = Object.keys(eventData).sort((a, b) => a.localeCompare(b))
   return {
     fieldCount: fields.length,
     fields,
