@@ -306,6 +306,10 @@ export function apikeyHasOrgRight(key: Database['public']['Tables']['apikeys']['
 /**
  * Check if API key has org access AND meets org's API key policy requirements
  * Returns { valid: true } if all checks pass, or { valid: false, error: string } if not
+ *
+ * @param _supabase Deprecated compatibility parameter; policy lookups use
+ * supabaseAdmin(c) after local org-scope validation so RBAC denials do not hide
+ * the org policy row.
  */
 export async function apikeyHasOrgRightWithPolicy(
   c: Context,
