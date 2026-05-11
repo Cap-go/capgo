@@ -130,7 +130,10 @@ function toBase64Url(bytes: Uint8Array): string {
   bytes.forEach((byte) => {
     binary += String.fromCharCode(byte)
   })
-  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '')
+  let encoded = btoa(binary).split('+').join('-').split('/').join('_')
+  while (encoded.endsWith('='))
+    encoded = encoded.slice(0, -1)
+  return encoded
 }
 
 function fromBase64Url(value: string): Uint8Array {
