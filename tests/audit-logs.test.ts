@@ -441,8 +441,8 @@ describe('audit log triggers', () => {
 // These tests verify that audit logs are created when using API key authentication
 // This was a bug where CLI/API users were not logged because get_identity() didn't check API keys
 describe('audit logs for app_versions via API key', () => {
-  const testVersionName = `99.0.0-audit-test-${randomUUID()}`
   let createdVersionId: number | null = null
+  let createdVersionName: string | null = null
 
   afterAll(async () => {
     // Clean up: delete the test version if it was created
@@ -454,6 +454,9 @@ describe('audit logs for app_versions via API key', () => {
   })
 
   it('app_version INSERT via API creates audit log with user_id from API key', async () => {
+    const testVersionName = `99.0.0-audit-test-${randomUUID()}`
+    createdVersionName = testVersionName
+
     // Create a bundle via the API (uses API key authentication)
     const response = await fetchWithRetry(`${BASE_URL}/bundle`, {
       method: 'POST',
@@ -475,34 +478,20 @@ describe('audit logs for app_versions via API key', () => {
     // Wait for the trigger to execute
     await new Promise(resolve => setTimeout(resolve, 200))
 
-    // Fetch audit logs for the dedicated test org
-    const auditResponse = await fetchWithRetry(`${BASE_URL}/organization/audit?orgId=${ORG_ID}&tableName=app_versions&operation=INSERT`, {
-      headers: authHeaders,
-    })
-    expect(auditResponse.status).toBe(200)
-    const auditData = await auditResponse.json()
-    const safe = parseAuditLogsResponse(auditData)
-    expect(safe.success).toBe(true)
+    const versionAuditLog = await waitForAuditLog(
+      `${BASE_URL}/organization/audit?orgId=${ORG_ID}&tableName=app_versions&operation=INSERT`,
+      log => log.record_id === createdVersionId?.toString(),
+    )
 
-    if (safe.success) {
-      // Find the audit log for our created version
-      const versionAuditLog = safe.data.data.find(
-        log => log.record_id === createdVersionId?.toString(),
-      )
-
-      expect(versionAuditLog).toBeTruthy()
-      if (versionAuditLog) {
-        expect(versionAuditLog.operation).toBe('INSERT')
-        expect(versionAuditLog.table_name).toBe('app_versions')
-        expect(versionAuditLog.org_id).toBe(ORG_ID)
-        // This is the key assertion: user_id should be set from the API key
-        expect(versionAuditLog.user_id).toBe(USER_ID)
-        expect(versionAuditLog.old_record).toBeNull()
-        expect(versionAuditLog.new_record).toBeTruthy()
-        if (versionAuditLog.new_record && typeof versionAuditLog.new_record === 'object') {
-          expect((versionAuditLog.new_record as Record<string, unknown>).name).toBe(testVersionName)
-        }
-      }
+    expect(versionAuditLog.operation).toBe('INSERT')
+    expect(versionAuditLog.table_name).toBe('app_versions')
+    expect(versionAuditLog.org_id).toBe(ORG_ID)
+    // This is the key assertion: user_id should be set from the API key
+    expect(versionAuditLog.user_id).toBe(USER_ID)
+    expect(versionAuditLog.old_record).toBeNull()
+    expect(versionAuditLog.new_record).toBeTruthy()
+    if (versionAuditLog.new_record && typeof versionAuditLog.new_record === 'object') {
+      expect((versionAuditLog.new_record as Record<string, unknown>).name).toBe(testVersionName)
     }
   })
 
@@ -545,7 +534,7 @@ describe('audit logs for app_versions via API key', () => {
 
   it('app_version soft-DELETE via API creates UPDATE audit log with user_id from API key', async () => {
     // Skip if we don't have a version to delete
-    if (!createdVersionId) {
+    if (!createdVersionId || !createdVersionName) {
       console.warn('Skipping DELETE test: no version was created')
       return
     }
@@ -558,7 +547,7 @@ describe('audit logs for app_versions via API key', () => {
       headers: apiKeyAuthHeaders,
       body: JSON.stringify({
         app_id: APIKEY_AUDIT_APP_ID,
-        version: testVersionName,
+        version: createdVersionName,
       }),
     })
 
