@@ -13,6 +13,9 @@ const TRANSLATION_STORE_CLEANUP_INTERVAL_SECONDS = 60
 const TRANSLATION_REQUEUE_AFTER_SECONDS = 60
 const TRANSLATION_BATCH_LEASE_SECONDS = 15 * 60
 const TRANSLATION_STORE_TABLE = 'translation_messages_cache'
+const TRANSLATION_RATE_LIMIT_PATH = '/translation/messages-rate-limit'
+const TRANSLATION_RATE_LIMIT_TTL_SECONDS = 60
+const DEFAULT_TRANSLATION_REQUEST_LIMIT = 30
 const CLAIMED_TRANSLATION_BATCH_INDEX_OFFSET = 1_000_000_000
 const PLACEHOLDER_PATTERN = /\{[\w.]+\}|%\w+%?|\$\d+/g
 
@@ -64,6 +67,7 @@ interface TranslationWorkerBindings {
   AI?: AiBinding
   DB_TRANSLATIONS?: D1Database
   ENV_NAME?: string
+  TRANSLATION_MESSAGES_RATE_LIMIT?: string
   TRANSLATION_MESSAGES_QUEUE?: Queue<Required<TranslationQueuePayload>>
   TRANSLATION_MODEL?: string
 }
@@ -96,6 +100,11 @@ interface TranslationQueuePayload {
   checksum?: string
   model?: string
   targetLanguage?: string
+}
+
+interface RateLimitEntry {
+  count: number
+  resetAt: number
 }
 
 type MessageEntry = [string, string]
@@ -140,7 +149,8 @@ function jsonResponse(data: unknown, status = 200, headers: HeadersInit = {}) {
 }
 
 function errorResponse(status: number, code: string, message: string) {
-  return jsonResponse({ error: code, message }, status)
+  const headers = status === 429 ? { 'Retry-After': String(TRANSLATION_RATE_LIMIT_TTL_SECONDS) } : {}
+  return jsonResponse({ error: code, message }, status, headers)
 }
 
 function serializeError(error: unknown) {
@@ -191,6 +201,53 @@ async function sha256Hex(value: string) {
   for (const byte of new Uint8Array(hash))
     encoded += byte.toString(16).padStart(2, '0')
   return encoded
+}
+
+function clientIP(request: Request) {
+  return request.headers.get('cf-connecting-ip')
+    ?? request.headers.get('x-real-ip')
+    ?? request.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
+    ?? ''
+}
+
+function translationRequestLimit(env: TranslationWorkerBindings) {
+  const configured = Number.parseInt(env.TRANSLATION_MESSAGES_RATE_LIMIT ?? '', 10)
+  return Number.isFinite(configured) && configured > 0 ? configured : DEFAULT_TRANSLATION_REQUEST_LIMIT
+}
+
+function rateLimitResetAt(now = Date.now()) {
+  return now + TRANSLATION_RATE_LIMIT_TTL_SECONDS * 1000
+}
+
+async function translationRateLimitCacheRequest(ip: string) {
+  const ipHash = await sha256Hex(ip)
+  const url = new URL(TRANSLATION_RATE_LIMIT_PATH, 'https://translation-cache.capgo.local')
+  url.searchParams.set('ip', ipHash)
+  return new Request(url)
+}
+
+async function checkTranslationRequestRateLimit(request: Request, env: TranslationWorkerBindings) {
+  const ip = clientIP(request)
+  if (!ip)
+    return
+
+  const cache = globalThis.caches?.default
+  if (!cache)
+    return
+
+  const cacheRequest = await translationRateLimitCacheRequest(ip)
+  const cached = await cache.match(cacheRequest)
+  const existing = cached ? await cached.json().catch(() => null) as RateLimitEntry | null : null
+  const count = (existing?.count ?? 0) + 1
+  const resetAt = existing?.resetAt && existing.resetAt > Date.now() ? existing.resetAt : rateLimitResetAt()
+  const entry: RateLimitEntry = { count, resetAt }
+
+  await cache.put(cacheRequest, jsonResponse(entry, 200, {
+    'Cache-Control': `max-age=${TRANSLATION_RATE_LIMIT_TTL_SECONDS}`,
+  }))
+
+  if (count > translationRequestLimit(env))
+    fail(429, 'rate_limited', 'Too many translation requests')
 }
 
 function recordOf(value: unknown): Record<string, unknown> | null {
@@ -968,6 +1025,8 @@ async function handleTranslationMessages(request: Request, env: TranslationWorke
     if (readyResponse)
       return readyResponse
   }
+
+  await checkTranslationRequestRateLimit(request, env)
 
   try {
     const queuedResponse = await queueCurrentTranslationResponse(env, requestId, readyRequest, checksum, targetLanguage, model)
