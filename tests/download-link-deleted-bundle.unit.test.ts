@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createAllCatch, createHono } from '../supabase/functions/_backend/utils/hono.ts'
 import { version } from '../supabase/functions/_backend/utils/version.ts'
 
@@ -46,10 +46,11 @@ vi.mock('../supabase/functions/_backend/utils/hono.ts', async (importOriginal) =
 })
 
 describe('private download_link deleted bundle guard', () => {
-  it('filters deleted bundles before creating download URLs', async () => {
-    vi.resetModules()
+  beforeEach(() => {
     vi.clearAllMocks()
+  })
 
+  it('filters deleted bundles before creating download URLs', async () => {
     const query = {
       eq: eqMock,
       single: singleMock,
