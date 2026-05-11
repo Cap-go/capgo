@@ -272,8 +272,8 @@ app.post('/', async (c) => {
   }
 
   const baseBody = baseValidationResult.data
-  const { password: _password, captchaToken: _captchaToken, ...baseBodyWithoutSecrets } = baseBody
-  cloudlog({ requestId: c.get('requestId'), context: 'accept_invitation raw body', rawBody: baseBodyWithoutSecrets })
+  const { password: _password, captchaToken: _captchaToken, magic_invite_string: _magic, ...baseBodyWithoutSecrets } = baseBody
+  cloudlog({ requestId: c.get('requestId'), context: 'accept_invitation raw body', rawBody: { ...baseBodyWithoutSecrets, has_magic_invite_string: true } })
 
   const supabaseAdmin = useSupabaseAdmin(c)
 
@@ -373,8 +373,8 @@ app.post('/', async (c) => {
     ...baseBody,
     password: baseBody.password,
   }
-  const { password: _pwd, captchaToken: _cap, ...bodyWithoutSecrets } = body
-  cloudlog({ requestId: c.get('requestId'), context: 'accept_invitation validated body', body: bodyWithoutSecrets })
+  const { password: _pwd, captchaToken: _cap, magic_invite_string: _inv, ...bodyWithoutSecrets } = body
+  cloudlog({ requestId: c.get('requestId'), context: 'accept_invitation validated body', body: { ...bodyWithoutSecrets, has_magic_invite_string: true } })
 
   // here the real magic happens
   const { data: user, error: userError } = await supabaseAdmin.auth.admin.createUser({
