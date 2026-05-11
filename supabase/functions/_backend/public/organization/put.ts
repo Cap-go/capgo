@@ -344,9 +344,10 @@ export async function put(
     await updateCustomerEmail(c, currentOrg.customer_id, body.management_email!)
   }
 
+  const writeSupabase = shouldSyncStripeEmail ? supabaseAdmin(c) : supabase
   let dataOrg: Database['public']['Tables']['orgs']['Row']
   try {
-    dataOrg = await updateOrg(supabase, body.orgId, updateFields, {
+    dataOrg = await updateOrg(writeSupabase, body.orgId, updateFields, {
       expectedCurrentName: shouldSyncStripeName ? currentOrg?.name : undefined,
     })
   }
@@ -373,7 +374,7 @@ export async function put(
         const rollbackFields = buildRollbackFields(currentOrg, updateFields)
 
         try {
-          await updateOrg(supabase, body.orgId, rollbackFields, {
+          await updateOrg(writeSupabase, body.orgId, rollbackFields, {
             expectedCurrentName: dataOrg.name,
             expectedCurrentFields: buildExpectedCurrentFields(dataOrg, updateFields),
           })

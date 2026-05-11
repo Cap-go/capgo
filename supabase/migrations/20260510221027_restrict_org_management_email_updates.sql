@@ -1,11 +1,13 @@
-CREATE OR REPLACE FUNCTION "public"."prevent_org_management_email_non_super_admin_update"()
+DROP TRIGGER IF EXISTS "prevent_org_management_email_non_super_admin_update" ON "public"."orgs";
+DROP TRIGGER IF EXISTS "prevent_org_management_email_direct_update" ON "public"."orgs";
+DROP FUNCTION IF EXISTS "public"."prevent_org_management_email_non_super_admin_update"();
+
+CREATE OR REPLACE FUNCTION "public"."prevent_org_management_email_direct_update"()
 RETURNS trigger
 LANGUAGE "plpgsql"
 SECURITY DEFINER
 SET "search_path" TO ''
 AS $$
-DECLARE
-  v_request_user uuid;
 BEGIN
   IF NEW.management_email IS NOT DISTINCT FROM OLD.management_email THEN
     RETURN NEW;
@@ -15,31 +17,20 @@ BEGIN
     RETURN NEW;
   END IF;
 
-  v_request_user := public.get_identity_org_allowed('{all,write}'::public.key_mode[], OLD.id);
-
-  IF v_request_user IS NULL OR NOT public.check_min_rights(
-    'super_admin'::public.user_min_right,
-    v_request_user,
-    OLD.id,
-    NULL::character varying,
-    NULL::bigint
-  ) THEN
-    RAISE EXCEPTION 'Only organization super admins can update the management email'
-      USING ERRCODE = '42501';
-  END IF;
+  RAISE EXCEPTION 'Management email updates must use the organization email sync endpoint'
+    USING ERRCODE = '42501';
 
   RETURN NEW;
 END;
 $$;
 
-ALTER FUNCTION "public"."prevent_org_management_email_non_super_admin_update"() OWNER TO "postgres";
-REVOKE ALL ON FUNCTION "public"."prevent_org_management_email_non_super_admin_update"() FROM PUBLIC;
-REVOKE ALL ON FUNCTION "public"."prevent_org_management_email_non_super_admin_update"() FROM "anon";
-REVOKE ALL ON FUNCTION "public"."prevent_org_management_email_non_super_admin_update"() FROM "authenticated";
-GRANT ALL ON FUNCTION "public"."prevent_org_management_email_non_super_admin_update"() TO "service_role";
+ALTER FUNCTION "public"."prevent_org_management_email_direct_update"() OWNER TO "postgres";
+REVOKE ALL ON FUNCTION "public"."prevent_org_management_email_direct_update"() FROM PUBLIC;
+REVOKE ALL ON FUNCTION "public"."prevent_org_management_email_direct_update"() FROM "anon";
+REVOKE ALL ON FUNCTION "public"."prevent_org_management_email_direct_update"() FROM "authenticated";
+GRANT ALL ON FUNCTION "public"."prevent_org_management_email_direct_update"() TO "service_role";
 
-DROP TRIGGER IF EXISTS "prevent_org_management_email_non_super_admin_update" ON "public"."orgs";
-CREATE TRIGGER "prevent_org_management_email_non_super_admin_update"
+CREATE TRIGGER "prevent_org_management_email_direct_update"
 BEFORE UPDATE OF "management_email" ON "public"."orgs"
 FOR EACH ROW
-EXECUTE FUNCTION "public"."prevent_org_management_email_non_super_admin_update"();
+EXECUTE FUNCTION "public"."prevent_org_management_email_direct_update"();

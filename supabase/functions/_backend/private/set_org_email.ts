@@ -5,7 +5,7 @@ import { safeParseSchema } from '../utils/ark_validation.ts'
 import { BRES, parseBody, quickError, simpleError, useCors } from '../utils/hono.ts'
 import { middlewareV2 } from '../utils/hono_middleware.ts'
 import { updateCustomerEmail } from '../utils/stripe.ts'
-import { supabaseWithAuth } from '../utils/supabase.ts'
+import { supabaseAdmin, supabaseWithAuth } from '../utils/supabase.ts'
 
 const bodySchema = type({
   email: 'string.email',
@@ -66,7 +66,8 @@ app.post('/', middlewareV2(['all', 'write']), async (c) => {
   await updateCustomerEmail(c, organization.customer_id, safeBody.email)
 
   // Update supabase
-  const { error: updateOrgErr } = await supabase.from('orgs')
+  const { error: updateOrgErr } = await supabaseAdmin(c)
+    .from('orgs')
     .update({ management_email: safeBody.email })
     .eq('id', safeBody.org_id)
 

@@ -9,6 +9,7 @@ const {
   apikeyHasOrgRightWithPolicyMock,
   supabaseAdminMock,
   updateCustomerOrganizationNameMock,
+  updateCustomerEmailMock,
   getStripeCustomerNameMock,
   isDeterministicStripeCustomerUpdateErrorMock,
 } = vi.hoisted(() => ({
@@ -18,6 +19,7 @@ const {
   apikeyHasOrgRightWithPolicyMock: vi.fn(),
   supabaseAdminMock: vi.fn(),
   updateCustomerOrganizationNameMock: vi.fn(),
+  updateCustomerEmailMock: vi.fn(),
   getStripeCustomerNameMock: vi.fn(),
   isDeterministicStripeCustomerUpdateErrorMock: vi.fn(),
 }))
@@ -27,6 +29,7 @@ vi.mock('../supabase/functions/_backend/utils/rbac.ts', () => ({
 }))
 
 vi.mock('../supabase/functions/_backend/utils/stripe.ts', () => ({
+  updateCustomerEmail: (...args: unknown[]) => updateCustomerEmailMock(...args),
   updateCustomerOrganizationName: (...args: unknown[]) => updateCustomerOrganizationNameMock(...args),
   getStripeCustomerName: (...args: unknown[]) => getStripeCustomerNameMock(...args),
   isDeterministicStripeCustomerUpdateError: (...args: unknown[]) => isDeterministicStripeCustomerUpdateErrorMock(...args),
@@ -126,10 +129,45 @@ describe('organization put Stripe sync', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     checkPermissionMock.mockResolvedValue(true)
+    updateCustomerEmailMock.mockResolvedValue(undefined)
     updateCustomerOrganizationNameMock.mockResolvedValue(undefined)
     getStripeCustomerNameMock.mockResolvedValue(undefined)
     isDeterministicStripeCustomerUpdateErrorMock.mockReturnValue(false)
     apikeyHasOrgRightWithPolicyMock.mockResolvedValue({ valid: true })
+  })
+
+  it('writes management email changes with the service-role client after Stripe sync', async () => {
+    const currentOrg = createOrgRow({
+      id: 'org-123',
+      name: 'Old Name',
+      customer_id: 'cus_123',
+    })
+    const selectBuilder = createOrgSelectBuilder(currentOrg)
+    const updateBuilder = createOrgUpdateBuilder({
+      ...currentOrg,
+      management_email: 'new-billing@capgo.app',
+    })
+    const userFrom = vi.fn().mockReturnValueOnce(selectBuilder)
+    const adminFrom = vi.fn().mockReturnValueOnce(updateBuilder)
+
+    supabaseClientMock.mockReturnValue({
+      from: userFrom,
+      rpc: vi.fn().mockResolvedValue({ data: true, error: null }),
+    })
+    supabaseAdminMock.mockReturnValue({
+      from: adminFrom,
+    })
+
+    const response = await put(createContext(), {
+      orgId: 'org-123',
+      management_email: 'new-billing@capgo.app',
+    }, undefined)
+
+    expect(response.status).toBe(200)
+    expect(updateCustomerEmailMock).toHaveBeenCalledWith(expect.anything(), 'cus_123', 'new-billing@capgo.app')
+    expect(adminFrom).toHaveBeenCalledWith('orgs')
+    expect(updateBuilder.update).toHaveBeenCalledWith({ management_email: 'new-billing@capgo.app' })
+    expect(userFrom).toHaveBeenCalledWith('orgs')
   })
 
   it('updates the org row before syncing Stripe customer name', async () => {
