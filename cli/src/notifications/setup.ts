@@ -3,8 +3,8 @@ import { existsSync, mkdirSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { cwd } from 'node:process'
 import { intro, log, outro, spinner } from '@clack/prompts'
-import { defaultApiHost, formatError, getConfig, getPMAndCommand, updateConfigbyKey } from '../utils'
 import { formatRunnerCommand, splitRunnerCommand } from '../runner-command'
+import { defaultApiHost, formatError, getConfig, getPMAndCommand, updateConfigbyKey } from '../utils'
 import { writeFileAtomic } from '../utils/safeWrites'
 
 const notificationPackages = [
