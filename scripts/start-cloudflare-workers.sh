@@ -84,7 +84,16 @@ if command -v node >/dev/null 2>&1; then
   NODE_MAJOR="$(node -p "process.versions.node.split('.')[0]" 2>/dev/null || echo 0)"
   if [ "${NODE_MAJOR}" -lt 22 ]; then
     WRANGLER_BIN="${ROOT_DIR}/node_modules/wrangler/bin/wrangler.js"
-    WRANGLER_CMD=(bunx node@24 "${WRANGLER_BIN}")
+    if [ -x "${WRANGLER_BIN}" ]; then
+      WRANGLER_CMD=(bunx node@24 "${WRANGLER_BIN}")
+    elif command -v wrangler >/dev/null 2>&1; then
+      echo -e "${YELLOW}Warning: local wrangler binary not found at ${WRANGLER_BIN}; using global wrangler command.${NC}"
+      WRANGLER_CMD=(wrangler)
+    else
+      echo -e "${YELLOW}Wrangler requires Node.js 22+, but local wrangler was not found at ${WRANGLER_BIN}.${NC}"
+      echo "Run 'bun install' from ${ROOT_DIR}, or install a compatible global wrangler command."
+      exit 1
+    fi
   fi
 fi
 
