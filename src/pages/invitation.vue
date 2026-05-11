@@ -137,13 +137,18 @@ async function submitForm() {
       throw new Error(error.message || 'Failed to accept invitation')
     }
 
-    // Store tokens in local storage or cookies
     if (data?.access_token && data?.refresh_token) {
-      // Login successful, redirect to dashboard
-      // window.location.href = '/dashboard';
-      router.push(`/login?access_token=${data.access_token}&refresh_token=${data.refresh_token}`)
+      const { error: sessionError } = await supabase.auth.setSession({
+        access_token: data.access_token,
+        refresh_token: data.refresh_token,
+      })
 
-      // MagicCapgo12@#
+      if (sessionError) {
+        captchaComponent.value?.reset()
+        throw new Error(sessionError.message || 'Failed to start session')
+      }
+
+      await router.replace('/dashboard')
     }
     else {
       captchaComponent.value?.reset()
