@@ -15,7 +15,11 @@ export interface UploadMetadata {
 // https://tus.io/protocols/resumable-upload#upload-metadata
 export function parseUploadMetadata(c: Context, headers: Headers): UploadMetadata {
   const uploadMetadata: string | null = headers.get('Upload-Metadata')
-  cloudlog({ requestId: c.get('requestId'), message: 'parseUploadMetadata', uploadMetadata })
+  cloudlog({
+    requestId: c.get('requestId'),
+    message: 'parseUploadMetadata',
+    hasUploadMetadata: uploadMetadata != null,
+  })
   if (uploadMetadata == null) {
     return {}
   }

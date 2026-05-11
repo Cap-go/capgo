@@ -1,6 +1,7 @@
 import type { Context, Next } from 'hono'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { Database } from '../utils/supabase.types.ts'
+import type { UploadMetadata } from './parse.ts'
 import { getRuntimeKey } from 'hono/adapter'
 import { HTTPException } from 'hono/http-exception'
 import { Hono } from 'hono/tiny'
@@ -36,6 +37,32 @@ type AppScopedAttachmentPath
     | { kind: 'invalid_scoped' }
 
 export const app = new Hono<MiddlewareKeyVariables>()
+
+function summarizeUploadMetadata(metadata: UploadMetadata) {
+  return {
+    keysCount: Object.keys(metadata).length,
+    hasFilename: metadata.filename != null,
+    hasFiletype: metadata.filetype != null,
+  }
+}
+
+function summarizeFileId(fileId: string | null | undefined) {
+  return {
+    present: fileId != null,
+    containsSlash: fileId?.includes('/') ?? false,
+  }
+}
+
+function summarizeFilePath(fileId: string | null | undefined) {
+  if (fileId == null) {
+    return { present: false, segmentCount: 0 }
+  }
+
+  return {
+    present: true,
+    segmentCount: fileId.split('/').filter(Boolean).length,
+  }
+}
 
 function isRetryableDurableObjectFetchError(error: unknown): boolean {
   return isRetryableDurableObjectResetError(error)
@@ -664,7 +691,13 @@ async function uploadHandler(c: Context) {
   }
 
   const handler = durableObjNs.get(durableObjNs.idFromName(normalizedRequestId))
-  cloudlog({ requestId: c.get('requestId'), message: 'upload handler - forwarding to DO', method: c.req.raw.method, url: c.req.url })
+  cloudlog({
+    requestId: c.get('requestId'),
+    message: 'upload handler - forwarding to DO',
+    method: c.req.raw.method,
+    hasQueryString: new URL(c.req.url).search.length > 0,
+    fileId: summarizeFilePath(normalizedRequestId),
+  })
 
   const method = c.req.raw.method
   // Pass requestId to DO via header so it can use it in logs. For create requests,
@@ -692,8 +725,8 @@ async function setKeyFromMetadata(c: Context, next: Next) {
   const uploadMetadata = parseUploadMetadata(c, c.req.raw.headers)
   cloudlog({
     requestId: c.get('requestId'),
-    message: 'setKeyFromMetadata - raw metadata',
-    metadata: uploadMetadata,
+    message: 'setKeyFromMetadata - metadata received',
+    metadata: summarizeUploadMetadata(uploadMetadata),
   })
 
   const fileId = uploadMetadata.filename
@@ -706,7 +739,7 @@ async function setKeyFromMetadata(c: Context, next: Next) {
     return c.json({ error: 'not_found', message: 'Not found' }, 404)
   }
 
-  cloudlog({ requestId: c.get('requestId'), message: 'setKeyFromMetadata - raw fileId', fileId })
+  cloudlog({ requestId: c.get('requestId'), message: 'setKeyFromMetadata - fileId received', fileId: summarizeFileId(fileId) })
 
   // Decode base64 if necessary
   // Check if it looks like base64 (no slashes, only valid base64 chars)
@@ -716,13 +749,17 @@ async function setKeyFromMetadata(c: Context, next: Next) {
   if (looksLikeBase64) {
     try {
       decodedFileId = atob(fileId)
-      cloudlog({ requestId: c.get('requestId'), message: 'setKeyFromMetadata - decoded from base64', decodedFileId })
+      cloudlog({
+        requestId: c.get('requestId'),
+        message: 'setKeyFromMetadata - decoded from base64',
+        decodedFileId: summarizeFilePath(decodedFileId),
+      })
     }
     catch (decodeError) {
       cloudlog({
         requestId: c.get('requestId'),
         message: 'setKeyFromMetadata - base64 decode failed, using raw',
-        fileId,
+        fileId: summarizeFileId(fileId),
         error: decodeError instanceof Error ? decodeError.message : String(decodeError),
       })
     }
@@ -731,12 +768,16 @@ async function setKeyFromMetadata(c: Context, next: Next) {
     cloudlog({
       requestId: c.get('requestId'),
       message: 'setKeyFromMetadata - fileId already decoded (contains slashes)',
-      fileId,
+      fileId: summarizeFilePath(fileId),
     })
   }
 
   const normalizedFileId = decodedFileId
-  cloudlog({ requestId: c.get('requestId'), message: 'setKeyFromMetadata - final normalized fileId', normalizedFileId })
+  cloudlog({
+    requestId: c.get('requestId'),
+    message: 'setKeyFromMetadata - final normalized fileId',
+    normalizedFileId: summarizeFilePath(normalizedFileId),
+  })
   c.set('fileId', normalizedFileId)
   await next()
 }
@@ -746,8 +787,8 @@ async function setKeyFromIdParam(c: Context, next: Next) {
   cloudlog({
     requestId: c.get('requestId'),
     message: 'setKeyFromIdParam - raw param',
-    fileId,
-    url: c.req.url,
+    fileId: summarizeFileId(fileId),
+    hasQueryString: new URL(c.req.url).search.length > 0,
     method: c.req.method,
   })
   if (fileId == null) {
@@ -783,8 +824,8 @@ async function setKeyFromIdParam(c: Context, next: Next) {
         cloudlog({
           requestId: c.get('requestId'),
           message: 'setKeyFromIdParam - detected Supabase TUS upload ID',
-          decoded,
-          parts,
+          decoded: summarizeFilePath(decoded),
+          partCount: parts.length,
         })
         // Extract file path: remove bucket prefix (capgo/) and UUID suffix
         // Resulting path starts with "orgs/..."
@@ -794,17 +835,17 @@ async function setKeyFromIdParam(c: Context, next: Next) {
           cloudlog({
             requestId: c.get('requestId'),
             message: 'setKeyFromIdParam - extracted fileId from TUS ID',
-            extractedFileId,
-            originalParts: parts,
-            pathParts,
+            extractedFileId: summarizeFilePath(extractedFileId),
+            originalPartCount: parts.length,
+            pathPartCount: pathParts.length,
           })
         }
         else {
           cloudlog({
             requestId: c.get('requestId'),
             message: 'setKeyFromIdParam - TUS ID decoded but pathParts is empty, using normalizedFileId as fileId',
-            decoded,
-            parts,
+            decoded: summarizeFilePath(decoded),
+            partCount: parts.length,
           })
         }
       }
@@ -812,8 +853,8 @@ async function setKeyFromIdParam(c: Context, next: Next) {
         cloudlog({
           requestId: c.get('requestId'),
           message: 'setKeyFromIdParam - decoded TUS ID has unexpected structure, using normalizedFileId as fileId',
-          decoded,
-          parts,
+          decoded: summarizeFilePath(decoded),
+          partCount: parts.length,
         })
       }
     }
@@ -825,8 +866,8 @@ async function setKeyFromIdParam(c: Context, next: Next) {
   cloudlog({
     requestId: c.get('requestId'),
     message: 'setKeyFromIdParam - final fileId',
-    originalFileId: fileId,
-    extractedFileId,
+    originalFileId: summarizeFileId(fileId),
+    extractedFileId: summarizeFilePath(extractedFileId),
   })
   c.set('fileId', extractedFileId)
   await next()
