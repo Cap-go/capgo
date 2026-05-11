@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { summarizePluginRequestForLog } from '../supabase/functions/_backend/utils/plugin_request_log.ts'
 
 describe('plugin request logging', () => {
-  it('keeps public plugin request logs metadata-only', () => {
+  it.concurrent('keeps public plugin request logs metadata-only', () => {
     const summary = summarizePluginRequestForLog({
       app_id: 'com.example.app',
       device_id: 'device-secret-123',
@@ -43,7 +43,7 @@ describe('plugin request logging', () => {
     expect(serialized).not.toContain('production')
   })
 
-  it('handles empty plugin requests without throwing', () => {
+  it.concurrent('handles empty plugin requests without throwing', () => {
     expect(summarizePluginRequestForLog(undefined)).toMatchObject({
       has_device_id: false,
       has_custom_id: false,
