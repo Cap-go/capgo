@@ -164,16 +164,16 @@ const onboardingSubtitle = computed(() => isCompactCreateOrgFlow.value
 
 function whiteCardToggleButtonClass(active: boolean) {
   return active
-    ? 'border-primary-500 bg-slate-100 text-slate-950 ring-2 ring-primary-500/15 dark:border-primary-500 dark:bg-primary-500/20 dark:text-white dark:ring-primary-500/20'
-    : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50 dark:border-white/10 dark:bg-slate-900/70 dark:text-slate-200 dark:hover:border-white/20 dark:hover:bg-slate-900'
+    ? 'border-primary-500 bg-slate-100 text-slate-950 ring-2 ring-primary-500/15 dark:border-primary-500/80 dark:bg-primary-500/25 dark:text-white dark:ring-primary-500/30'
+    : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50 dark:border-white/15 dark:bg-slate-950/90 dark:text-slate-200 dark:hover:border-white/30 dark:hover:bg-slate-900'
 }
 
 function whiteCardSecondaryButtonClass() {
-  return 'border-slate-300 bg-white text-slate-700 hover:border-slate-400 hover:bg-slate-50 disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400 disabled:opacity-100 dark:border-white/15 dark:bg-slate-900 dark:text-slate-100 dark:hover:border-white/25 dark:hover:bg-slate-800 dark:disabled:border-white/10 dark:disabled:bg-slate-900/60 dark:disabled:text-slate-500'
+  return 'border-slate-300 bg-white text-slate-700 hover:border-slate-400 hover:bg-slate-50 disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400 disabled:opacity-100 dark:border-white/20 dark:bg-slate-950/90 dark:text-slate-100 dark:hover:border-white/30 dark:hover:bg-slate-900 dark:disabled:border-white/15 dark:disabled:bg-slate-900 dark:disabled:text-slate-500'
 }
 
 function whiteCardPrimaryButtonClass() {
-  return 'border-primary-500 bg-primary-500 text-white hover:border-primary-500 hover:bg-primary-500/90 disabled:border-slate-300 disabled:bg-slate-300 disabled:text-white disabled:opacity-100 dark:border-primary-500 dark:bg-primary-500 dark:hover:border-primary-500 dark:hover:bg-primary-500/90 dark:disabled:border-white/10 dark:disabled:bg-slate-800 dark:disabled:text-slate-500'
+  return 'border-primary-500 bg-primary-500 text-white hover:border-primary-500 hover:bg-primary-500/90 disabled:border-slate-300 disabled:bg-slate-300 disabled:text-white disabled:opacity-100 dark:border-primary-500/90 dark:bg-primary-500 dark:hover:border-primary-500 dark:hover:bg-primary-500/90 dark:disabled:border-white/15 dark:disabled:bg-slate-800 dark:disabled:text-slate-500'
 }
 
 function formatUserCount(value: number, plus = false) {
@@ -624,7 +624,7 @@ onUnmounted(() => {
       <div class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start">
         <div class="space-y-6">
           <div>
-            <div class="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1 text-sm font-semibold text-slate-700 shadow-sm dark:border-white/10 dark:bg-slate-900 dark:text-slate-200">
+            <div class="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1 text-sm font-semibold text-slate-700 shadow-sm dark:border-white/15 dark:bg-slate-900/95 dark:text-slate-200 dark:shadow-lg dark:shadow-black/20">
               <IconSparkles class="h-4 w-4" />
               {{ onboardingBadge }}
             </div>
@@ -636,7 +636,7 @@ onUnmounted(() => {
             </p>
           </div>
 
-          <div class="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm dark:border-white/10 dark:bg-slate-900">
+          <div class="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm dark:border-white/15 dark:bg-slate-900/95 dark:shadow-2xl dark:shadow-black/30">
             <div class="grid gap-2 sm:grid-cols-3">
               <div
                 v-for="(entry, index) in onboardingSteps"
@@ -644,9 +644,9 @@ onUnmounted(() => {
                 class="flex min-h-16 items-center gap-3 rounded-xl border px-3 py-2 transition"
                 :aria-current="isStepActive(entry.id) ? 'step' : undefined"
                 :class="[
-                  isStepActive(entry.id) ? 'border-primary-500/30 bg-slate-100 text-slate-950 ring-1 ring-primary-500/10 dark:border-primary-500/40 dark:bg-primary-500/15 dark:text-white' : '',
-                  !isStepActive(entry.id) && isStepDone(entry.id) ? 'border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-400/20 dark:bg-emerald-400/10 dark:text-emerald-200' : '',
-                  !isStepActive(entry.id) && !isStepDone(entry.id) ? 'border-transparent bg-slate-50 text-slate-500 dark:bg-slate-950/60 dark:text-slate-400' : '',
+                  isStepActive(entry.id) ? 'border-primary-500/30 bg-slate-100 text-slate-950 ring-1 ring-primary-500/10 dark:border-primary-500/60 dark:bg-primary-500/25 dark:text-white dark:ring-primary-500/20' : '',
+                  !isStepActive(entry.id) && isStepDone(entry.id) ? 'border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-400/40 dark:bg-emerald-400/15 dark:text-emerald-100' : '',
+                  !isStepActive(entry.id) && !isStepDone(entry.id) ? 'border-transparent bg-slate-50 text-slate-500 dark:border-white/10 dark:bg-slate-950/90 dark:text-slate-400' : '',
                 ]"
               >
                 <span
@@ -664,12 +664,12 @@ onUnmounted(() => {
                 </span>
               </div>
             </div>
-            <div class="mt-3 h-1.5 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800" aria-hidden="true">
+            <div class="mt-3 h-1.5 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-950" aria-hidden="true">
               <div class="h-full rounded-full bg-primary-500 transition-all duration-300" :style="{ width: stepProgress }" />
             </div>
           </div>
 
-          <div v-if="step === 'details'" class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6 dark:border-white/10 dark:bg-slate-900">
+          <div v-if="step === 'details'" class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6 dark:border-white/15 dark:bg-slate-900/95 dark:shadow-2xl dark:shadow-black/30">
             <div class="space-y-6">
               <div>
                 <p class="text-sm font-semibold text-primary-500 dark:text-slate-300">
@@ -719,7 +719,7 @@ onUnmounted(() => {
                 </button>
               </div>
 
-              <div v-if="mode === 'website'" class="space-y-4 border-t border-slate-200 pt-6 dark:border-white/10">
+              <div v-if="mode === 'website'" class="space-y-4 border-t border-slate-200 pt-6 dark:border-white/15">
                 <div>
                   <label for="onboarding-website-input" class="text-sm font-medium text-slate-800 dark:text-slate-200">
                     {{ t('organization-onboarding-website-label') }}
@@ -731,7 +731,7 @@ onUnmounted(() => {
                       type="url"
                       placeholder="https://capgo.app"
                       data-test="onboarding-website"
-                      class="min-h-12 w-full rounded-xl border border-slate-300 bg-white px-4 text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/10 dark:border-white/15 dark:bg-slate-950 dark:text-white dark:placeholder:text-slate-500 dark:focus:border-primary-500 dark:focus:ring-primary-500/25"
+                      class="min-h-12 w-full rounded-xl border border-slate-300 bg-white px-4 text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/10 dark:border-white/20 dark:bg-slate-950/90 dark:text-white dark:placeholder:text-slate-500 dark:focus:border-primary-500 dark:focus:ring-primary-500/30"
                     >
                     <button
                       type="button"
@@ -754,12 +754,12 @@ onUnmounted(() => {
                 </div>
               </div>
 
-              <div v-else-if="!mode" class="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-5 text-sm leading-6 text-slate-500 dark:border-white/15 dark:bg-slate-950/60 dark:text-slate-400">
+              <div v-else-if="!mode" class="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-5 text-sm leading-6 text-slate-500 dark:border-white/20 dark:bg-slate-950/90 dark:text-slate-400">
                 {{ t('organization-onboarding-choice-hint') }}
               </div>
 
               <template v-if="canShowOrgDetails">
-                <div class="border-t border-slate-200 pt-6 dark:border-white/10">
+                <div class="border-t border-slate-200 pt-6 dark:border-white/15">
                   <label for="onboarding-org-name-input" class="text-sm font-medium text-slate-800 dark:text-slate-200">
                     {{ t('organization-name') }}
                   </label>
@@ -769,7 +769,7 @@ onUnmounted(() => {
                     type="text"
                     :placeholder="t('organization-name')"
                     data-test="onboarding-org-name"
-                    class="mt-2 min-h-12 w-full rounded-xl border border-slate-300 bg-white px-4 text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/10 dark:border-white/15 dark:bg-slate-950 dark:text-white dark:placeholder:text-slate-500 dark:focus:border-primary-500 dark:focus:ring-primary-500/25"
+                    class="mt-2 min-h-12 w-full rounded-xl border border-slate-300 bg-white px-4 text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/10 dark:border-white/20 dark:bg-slate-950/90 dark:text-white dark:placeholder:text-slate-500 dark:focus:border-primary-500 dark:focus:ring-primary-500/30"
                   >
                   <p v-if="mode === 'website'" class="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400">
                     {{ importedLogoUrl
@@ -778,7 +778,7 @@ onUnmounted(() => {
                   </p>
                 </div>
 
-                <div class="border-t border-slate-200 pt-6 dark:border-white/10">
+                <div class="border-t border-slate-200 pt-6 dark:border-white/15">
                   <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div class="min-w-0">
                       <p id="estimated-users-label" class="flex items-center gap-2 text-sm font-medium text-slate-800 dark:text-slate-200">
@@ -791,7 +791,7 @@ onUnmounted(() => {
                     </div>
                     <div
                       class="shrink-0 rounded-xl border px-3 py-2 text-left sm:text-right"
-                      :class="selectedUserCountStop ? 'border-primary-500/20 bg-slate-100 text-slate-900 dark:border-primary-500/40 dark:bg-primary-500/15 dark:text-slate-100' : 'border-slate-200 bg-slate-50 text-slate-500 dark:border-white/10 dark:bg-slate-950/60 dark:text-slate-400'"
+                      :class="selectedUserCountStop ? 'border-primary-500/20 bg-slate-100 text-slate-900 dark:border-primary-500/60 dark:bg-primary-500/25 dark:text-slate-100' : 'border-slate-200 bg-slate-50 text-slate-500 dark:border-white/15 dark:bg-slate-950/90 dark:text-slate-400'"
                     >
                       <div class="text-xs font-medium uppercase">
                         {{ t('organization-onboarding-starting-plan') }}
@@ -830,8 +830,8 @@ onUnmounted(() => {
                       <span
                         class="flex min-h-20 items-center justify-between gap-3 rounded-xl border p-4 text-left transition peer-focus-visible:outline-none peer-focus-visible:ring-2 peer-focus-visible:ring-primary-500 peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-white dark:peer-focus-visible:ring-offset-slate-900"
                         :class="isUserCountStopSelected(index)
-                          ? 'border-primary-500 bg-slate-100 text-slate-950 ring-2 ring-primary-500/15 dark:border-primary-500 dark:bg-primary-500/20 dark:text-white dark:ring-primary-500/20'
-                          : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50 dark:border-white/10 dark:bg-slate-950 dark:text-slate-200 dark:hover:border-white/20 dark:hover:bg-slate-800'"
+                          ? 'border-primary-500 bg-slate-100 text-slate-950 ring-2 ring-primary-500/15 dark:border-primary-500/80 dark:bg-primary-500/25 dark:text-white dark:ring-primary-500/30'
+                          : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50 dark:border-white/15 dark:bg-slate-950/90 dark:text-slate-200 dark:hover:border-white/30 dark:hover:bg-slate-900'"
                       >
                         <span class="min-w-0">
                           <span class="block text-sm font-semibold">
@@ -853,7 +853,7 @@ onUnmounted(() => {
                   </div>
                 </div>
 
-                <div class="flex flex-col-reverse gap-3 border-t border-slate-200 pt-6 sm:flex-row sm:justify-between dark:border-white/10">
+                <div class="flex flex-col-reverse gap-3 border-t border-slate-200 pt-6 sm:flex-row sm:justify-between dark:border-white/15">
                   <button type="button" class="d-btn min-h-12" :class="whiteCardSecondaryButtonClass()" @click="goBack">
                     {{ t('cancel') }}
                   </button>
@@ -880,7 +880,7 @@ onUnmounted(() => {
             </div>
           </div>
 
-          <div v-else-if="step === 'logo'" class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6 dark:border-white/10 dark:bg-slate-900">
+          <div v-else-if="step === 'logo'" class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6 dark:border-white/15 dark:bg-slate-900/95 dark:shadow-2xl dark:shadow-black/30">
             <div class="space-y-5">
               <div>
                 <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-primary-500 text-white">
@@ -897,7 +897,7 @@ onUnmounted(() => {
                 </p>
               </div>
 
-              <div class="flex flex-col gap-5 rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-5 sm:flex-row sm:items-center dark:border-white/15 dark:bg-slate-950/60">
+              <div class="flex flex-col gap-5 rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-5 sm:flex-row sm:items-center dark:border-white/20 dark:bg-slate-950/90">
                 <div class="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-slate-900 text-2xl font-semibold text-white dark:bg-slate-800">
                   <img
                     v-if="currentOrganization?.gid === activeOrgId && currentOrganization?.logo"
@@ -958,7 +958,7 @@ onUnmounted(() => {
             </div>
           </div>
 
-          <div v-else class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6 dark:border-white/10 dark:bg-slate-900">
+          <div v-else class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6 dark:border-white/15 dark:bg-slate-900/95 dark:shadow-2xl dark:shadow-black/30">
             <div class="space-y-5">
               <div>
                 <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-primary-500 text-white">
@@ -975,7 +975,7 @@ onUnmounted(() => {
                 </p>
               </div>
 
-              <div class="rounded-2xl border border-slate-200 bg-slate-50 p-5 dark:border-white/10 dark:bg-slate-950/60">
+              <div class="rounded-2xl border border-slate-200 bg-slate-50 p-5 dark:border-white/15 dark:bg-slate-950/90">
                 <div class="flex items-start gap-4">
                   <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-slate-900 text-white dark:bg-slate-800">
                     <IconBuilding class="h-5 w-5" />
@@ -996,7 +996,7 @@ onUnmounted(() => {
                   <li
                     v-for="invite in sentInvites"
                     :key="invite.email"
-                    class="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 dark:border-white/10 dark:bg-slate-900"
+                    class="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 dark:border-white/15 dark:bg-slate-900/95"
                   >
                     <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary-500 text-xs font-semibold text-white">
                       {{ getInviteInitials(invite) }}
@@ -1027,7 +1027,7 @@ onUnmounted(() => {
           </div>
         </div>
 
-        <aside class="rounded-2xl border border-slate-900 bg-slate-950 p-5 text-white shadow-xl lg:sticky lg:top-8 dark:border-white/10">
+        <aside class="rounded-2xl border border-slate-900 bg-slate-950 p-5 text-white shadow-xl lg:sticky lg:top-8 dark:border-white/15 dark:bg-slate-900/95 dark:shadow-2xl dark:shadow-black/30">
           <div class="flex items-center gap-4">
             <div class="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-slate-800 text-2xl font-semibold">
               <img

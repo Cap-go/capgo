@@ -152,16 +152,16 @@ const previewStatusLabel = computed(() => {
 
 function whiteCardToggleButtonClass(active: boolean) {
   return active
-    ? 'border-primary-500 bg-slate-100 text-slate-950 ring-2 ring-primary-500/15 hover:border-primary-500 hover:bg-slate-100 dark:border-primary-500 dark:bg-primary-500/20 dark:text-white dark:ring-primary-500/20 dark:hover:bg-primary-500/25'
-    : 'border-slate-200 bg-white text-slate-700 hover:border-primary-500/40 hover:bg-slate-50 hover:text-slate-950 dark:border-white/10 dark:bg-slate-950 dark:text-slate-200 dark:hover:border-white/25 dark:hover:bg-slate-900 dark:hover:text-white'
+    ? 'border-primary-500 bg-slate-100 text-slate-950 ring-2 ring-primary-500/15 hover:border-primary-500 hover:bg-slate-100 dark:border-primary-500/80 dark:bg-primary-500/25 dark:text-white dark:ring-primary-500/30 dark:hover:bg-primary-500/30'
+    : 'border-slate-200 bg-white text-slate-700 hover:border-primary-500/40 hover:bg-slate-50 hover:text-slate-950 dark:border-white/15 dark:bg-slate-950/90 dark:text-slate-200 dark:hover:border-white/30 dark:hover:bg-slate-900 dark:hover:text-white'
 }
 
 function whiteCardSecondaryButtonClass() {
-  return 'border-slate-300 bg-white text-slate-700 hover:border-slate-400 hover:bg-slate-50 disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400 disabled:opacity-100 dark:border-white/15 dark:bg-slate-950 dark:text-slate-200 dark:hover:border-white/30 dark:hover:bg-slate-900 dark:disabled:border-white/10 dark:disabled:bg-slate-900 dark:disabled:text-slate-500'
+  return 'border-slate-300 bg-white text-slate-700 hover:border-slate-400 hover:bg-slate-50 disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400 disabled:opacity-100 dark:border-white/20 dark:bg-slate-950/90 dark:text-slate-100 dark:hover:border-white/30 dark:hover:bg-slate-900 dark:disabled:border-white/15 dark:disabled:bg-slate-900 dark:disabled:text-slate-500'
 }
 
 function whiteCardPrimaryButtonClass() {
-  return 'border-primary-500 bg-primary-500 text-white hover:border-primary-500 hover:bg-primary-500/90 disabled:border-slate-300 disabled:bg-slate-300 disabled:text-white disabled:opacity-100 dark:border-primary-500 dark:bg-primary-500 dark:hover:border-primary-500 dark:hover:bg-primary-500/90 dark:disabled:border-slate-700 dark:disabled:bg-slate-800 dark:disabled:text-slate-500'
+  return 'border-primary-500 bg-primary-500 text-white hover:border-primary-500 hover:bg-primary-500/90 disabled:border-slate-300 disabled:bg-slate-300 disabled:text-white disabled:opacity-100 dark:border-primary-500/90 dark:bg-primary-500 dark:hover:border-primary-500 dark:hover:bg-primary-500/90 dark:disabled:border-white/15 dark:disabled:bg-slate-800 dark:disabled:text-slate-500'
 }
 
 function slugify(value: string) {
@@ -728,7 +728,7 @@ watch(suggestedAppId, (value) => {
       <div v-else class="space-y-6">
         <header class="grid gap-5 lg:grid-cols-[minmax(0,1fr)_25rem] lg:items-end">
           <div>
-            <div class="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1 text-sm font-semibold text-slate-700 shadow-sm dark:border-white/10 dark:bg-slate-900 dark:text-slate-200">
+            <div class="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1 text-sm font-semibold text-slate-700 shadow-sm dark:border-white/15 dark:bg-slate-900/95 dark:text-slate-200 dark:shadow-lg dark:shadow-black/20">
               <IconSparkles class="h-4 w-4" />
               {{ t('app-onboarding-badge') }}
             </div>
@@ -742,7 +742,7 @@ watch(suggestedAppId, (value) => {
             </p>
           </div>
 
-          <div class="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm dark:border-white/10 dark:bg-slate-900">
+          <div class="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm dark:border-white/15 dark:bg-slate-900/95 dark:shadow-2xl dark:shadow-black/30">
             <div class="grid gap-2 sm:grid-cols-3 lg:grid-cols-1">
               <div
                 v-for="(entry, index) in appOnboardingSteps"
@@ -750,9 +750,9 @@ watch(suggestedAppId, (value) => {
                 class="flex min-h-14 items-center gap-3 rounded-xl border px-3 py-2 transition"
                 :aria-current="flowStep === entry.id ? 'step' : undefined"
                 :class="[
-                  flowStep === entry.id ? 'border-primary-500/30 bg-slate-100 text-slate-950 ring-1 ring-primary-500/10 dark:border-primary-500/40 dark:bg-primary-500/15 dark:text-white' : '',
-                  flowStep !== entry.id && index < currentStepIndex ? 'border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-400/20 dark:bg-emerald-400/10 dark:text-emerald-200' : '',
-                  flowStep !== entry.id && index > currentStepIndex ? 'border-transparent bg-slate-50 text-slate-500 dark:bg-slate-950/60 dark:text-slate-400' : '',
+                  flowStep === entry.id ? 'border-primary-500/30 bg-slate-100 text-slate-950 ring-1 ring-primary-500/10 dark:border-primary-500/60 dark:bg-primary-500/25 dark:text-white dark:ring-primary-500/20' : '',
+                  flowStep !== entry.id && index < currentStepIndex ? 'border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-400/40 dark:bg-emerald-400/15 dark:text-emerald-100' : '',
+                  flowStep !== entry.id && index > currentStepIndex ? 'border-transparent bg-slate-50 text-slate-500 dark:border-white/10 dark:bg-slate-950/90 dark:text-slate-400' : '',
                 ]"
               >
                 <span
@@ -770,14 +770,14 @@ watch(suggestedAppId, (value) => {
                 </span>
               </div>
             </div>
-            <div class="mt-3 h-1.5 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800" aria-hidden="true">
+            <div class="mt-3 h-1.5 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-950" aria-hidden="true">
               <div class="h-full rounded-full bg-primary-500 transition-all duration-300" :style="{ width: stepProgress }" />
             </div>
           </div>
         </header>
 
         <div v-if="flowStep === 'details'" class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_24rem] lg:items-start">
-          <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6 dark:border-white/10 dark:bg-slate-900">
+          <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6 dark:border-white/15 dark:bg-slate-900/95 dark:shadow-2xl dark:shadow-black/30">
             <div class="space-y-6">
               <div>
                 <p class="text-sm font-semibold text-primary-500 dark:text-slate-300">
@@ -833,7 +833,7 @@ watch(suggestedAppId, (value) => {
                 </button>
               </div>
 
-              <div class="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-4 dark:border-white/15 dark:bg-slate-950/60">
+              <div class="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-4 dark:border-white/20 dark:bg-slate-950/90">
                 <button
                   type="button"
                   class="inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-slate-600 transition hover:text-slate-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-slate-300 dark:hover:text-white"
@@ -868,7 +868,7 @@ watch(suggestedAppId, (value) => {
                 </div>
               </div>
 
-              <div v-if="existingApp === true" class="space-y-5 border-t border-slate-200 pt-6 dark:border-white/10">
+              <div v-if="existingApp === true" class="space-y-5 border-t border-slate-200 pt-6 dark:border-white/15">
                 <div>
                   <p class="text-sm font-semibold text-slate-950 dark:text-white">
                     {{ t('app-onboarding-start-question') }}
@@ -910,7 +910,7 @@ watch(suggestedAppId, (value) => {
                       <input
                         id="app-onboarding-store-url"
                         v-model="storeUrl"
-                        class="min-h-12 w-full rounded-xl border border-slate-300 bg-white px-4 text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/10 dark:border-white/15 dark:bg-slate-950 dark:text-white dark:placeholder:text-slate-500 dark:focus:border-primary-500 dark:focus:ring-primary-500/25"
+                        class="min-h-12 w-full rounded-xl border border-slate-300 bg-white px-4 text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/10 dark:border-white/20 dark:bg-slate-950/90 dark:text-white dark:placeholder:text-slate-500 dark:focus:border-primary-500 dark:focus:ring-primary-500/30"
                         :placeholder="t('app-onboarding-store-link-placeholder')"
                         type="url"
                       >
@@ -930,12 +930,12 @@ watch(suggestedAppId, (value) => {
               </div>
 
               <template v-if="canShowAppDetails">
-                <div class="border-t border-slate-200 pt-6 dark:border-white/10">
+                <div class="border-t border-slate-200 pt-6 dark:border-white/15">
                   <label for="app-onboarding-name" class="text-sm font-medium text-slate-800 dark:text-slate-200">{{ t('app-name') }}</label>
                   <input
                     id="app-onboarding-name"
                     v-model="appName"
-                    class="mt-2 min-h-12 w-full rounded-xl border border-slate-300 bg-white px-4 text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/10 dark:border-white/15 dark:bg-slate-950 dark:text-white dark:placeholder:text-slate-500 dark:focus:border-primary-500 dark:focus:ring-primary-500/25"
+                    class="mt-2 min-h-12 w-full rounded-xl border border-slate-300 bg-white px-4 text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/10 dark:border-white/20 dark:bg-slate-950/90 dark:text-white dark:placeholder:text-slate-500 dark:focus:border-primary-500 dark:focus:ring-primary-500/30"
                     :placeholder="t('app-onboarding-name-placeholder')"
                     maxlength="100"
                   >
@@ -946,7 +946,7 @@ watch(suggestedAppId, (value) => {
                   <input
                     id="app-onboarding-app-id"
                     :value="manualAppId"
-                    class="mt-2 min-h-12 w-full rounded-xl border border-slate-300 bg-white px-4 font-mono text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/10 dark:border-white/15 dark:bg-slate-950 dark:text-white dark:placeholder:text-slate-500 dark:focus:border-primary-500 dark:focus:ring-primary-500/25"
+                    class="mt-2 min-h-12 w-full rounded-xl border border-slate-300 bg-white px-4 font-mono text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/10 dark:border-white/20 dark:bg-slate-950/90 dark:text-white dark:placeholder:text-slate-500 dark:focus:border-primary-500 dark:focus:ring-primary-500/30"
                     :placeholder="t('app-onboarding-appid-placeholder')"
                     @input="onAppIdInput"
                   >
@@ -963,7 +963,7 @@ watch(suggestedAppId, (value) => {
                       v-for="suggestion in appIdSuggestions"
                       :key="suggestion"
                       type="button"
-                      class="min-h-9 rounded-full border border-slate-300 bg-white px-3 py-1 font-mono text-xs text-slate-700 transition hover:border-primary-500/40 hover:text-primary-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:border-white/15 dark:bg-slate-950 dark:text-slate-200 dark:hover:border-white/25 dark:hover:text-white"
+                      class="min-h-9 rounded-full border border-slate-300 bg-white px-3 py-1 font-mono text-xs text-slate-700 transition hover:border-primary-500/40 hover:text-primary-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:border-white/20 dark:bg-slate-950/90 dark:text-slate-200 dark:hover:border-white/30 dark:hover:text-white"
                       @click="applyAppIdSuggestion(suggestion)"
                     >
                       {{ suggestion }}
@@ -971,7 +971,7 @@ watch(suggestedAppId, (value) => {
                   </div>
                 </div>
 
-                <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-white/10 dark:bg-slate-950/60">
+                <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-white/15 dark:bg-slate-950/90">
                   <div class="flex items-start gap-3">
                     <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-primary-500 ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-white/10">
                       <IconImage class="h-5 w-5" />
@@ -993,7 +993,7 @@ watch(suggestedAppId, (value) => {
                   </div>
                 </div>
 
-                <div class="flex flex-col-reverse gap-3 border-t border-slate-200 pt-6 sm:flex-row sm:items-center sm:justify-between dark:border-white/10">
+                <div class="flex flex-col-reverse gap-3 border-t border-slate-200 pt-6 sm:flex-row sm:items-center sm:justify-between dark:border-white/15">
                   <button class="d-btn min-h-12" :class="whiteCardSecondaryButtonClass()" @click="router.push('/apps')">
                     {{ t('button-cancel') }}
                   </button>
@@ -1007,7 +1007,7 @@ watch(suggestedAppId, (value) => {
             </div>
           </div>
 
-          <aside class="rounded-2xl border border-slate-800 bg-slate-950 p-5 text-white shadow-sm lg:sticky lg:top-6 dark:border-white/10" :aria-label="t('app-onboarding-preview-label')">
+          <aside class="rounded-2xl border border-slate-800 bg-slate-950 p-5 text-white shadow-sm lg:sticky lg:top-6 dark:border-white/15 dark:bg-slate-900/95 dark:shadow-2xl dark:shadow-black/30" :aria-label="t('app-onboarding-preview-label')">
             <div class="flex items-center gap-4">
               <div class="flex h-18 w-18 items-center justify-center overflow-hidden rounded-[22px] bg-slate-900 ring-1 ring-white/10">
                 <img v-if="iconPreview" :src="iconPreview" :alt="t('app-onboarding-icon-preview-alt')" class="h-full w-full object-cover">
@@ -1081,7 +1081,7 @@ watch(suggestedAppId, (value) => {
         </div>
 
         <div v-else-if="flowStep === 'choice' && createdApp" class="space-y-6">
-          <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6 dark:border-white/10 dark:bg-slate-900">
+          <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6 dark:border-white/15 dark:bg-slate-900/95 dark:shadow-2xl dark:shadow-black/30">
             <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
               <div>
                 <p class="text-sm font-semibold text-primary-500 dark:text-slate-300">
@@ -1094,14 +1094,14 @@ watch(suggestedAppId, (value) => {
                   {{ t('app-onboarding-choice-subtitle') }}
                 </p>
               </div>
-              <div class="rounded-xl bg-slate-50 px-3 py-2 text-sm dark:bg-slate-950/60">
+              <div class="rounded-xl bg-slate-50 px-3 py-2 text-sm dark:border dark:border-white/10 dark:bg-slate-950/90">
                 <span class="text-slate-500 dark:text-slate-400">{{ t('app-id') }}</span>
                 <span class="ml-2 font-mono font-medium text-slate-950 dark:text-white">{{ createdApp.app_id }}</span>
               </div>
             </div>
 
             <div class="mt-6 grid gap-4 md:grid-cols-2">
-              <button class="group rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-sm transition hover:border-primary-500/40 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:border-white/10 dark:bg-slate-950 dark:hover:border-white/25 dark:hover:bg-slate-900" @click="goToInstallStep">
+              <button class="group rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-sm transition hover:border-primary-500/40 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:border-white/15 dark:bg-slate-950/90 dark:hover:border-white/30 dark:hover:bg-slate-900" @click="goToInstallStep">
                 <div class="flex items-start gap-4">
                   <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary-500 text-white">
                     <IconTerminal class="h-5 w-5" />
@@ -1122,7 +1122,7 @@ watch(suggestedAppId, (value) => {
               </button>
 
               <button
-                class="group rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-sm transition hover:border-emerald-300 hover:bg-emerald-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 disabled:cursor-wait disabled:opacity-70 dark:border-white/10 dark:bg-slate-950 dark:hover:border-emerald-400/60 dark:hover:bg-emerald-400/10"
+                class="group rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-sm transition hover:border-emerald-300 hover:bg-emerald-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 disabled:cursor-wait disabled:opacity-70 dark:border-white/15 dark:bg-slate-950/90 dark:hover:border-emerald-400/60 dark:hover:bg-emerald-400/10"
                 :disabled="isSeedingDemo"
                 @click="seedDemoData"
               >
@@ -1152,7 +1152,7 @@ watch(suggestedAppId, (value) => {
         </div>
 
         <div v-else-if="flowStep === 'install' && createdApp" class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start">
-          <div class="space-y-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6 dark:border-white/10 dark:bg-slate-900">
+          <div class="space-y-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6 dark:border-white/15 dark:bg-slate-900/95 dark:shadow-2xl dark:shadow-black/30">
             <div class="flex flex-wrap items-start justify-between gap-4">
               <div>
                 <p class="text-sm font-semibold text-primary-500 dark:text-slate-300">
@@ -1191,7 +1191,7 @@ watch(suggestedAppId, (value) => {
               <IconCopy class="absolute right-4 top-4 h-5 w-5 text-muted-blue-300 transition group-hover:text-white" />
             </div>
 
-            <div class="rounded-2xl border border-slate-200 bg-slate-50/80 p-4 text-sm text-slate-700 dark:border-white/10 dark:bg-slate-950/60 dark:text-slate-200">
+            <div class="rounded-2xl border border-slate-200 bg-slate-50/80 p-4 text-sm text-slate-700 dark:border-white/15 dark:bg-slate-950/90 dark:text-slate-200">
               <div class="flex flex-wrap items-start justify-between gap-3">
                 <div class="max-w-2xl">
                   <p class="font-medium text-slate-950 dark:text-white">
@@ -1219,7 +1219,7 @@ watch(suggestedAppId, (value) => {
             </div>
           </div>
 
-          <aside class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-slate-900" :aria-label="t('app-onboarding-install-ready-title')">
+          <aside class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/15 dark:bg-slate-900/95 dark:shadow-2xl dark:shadow-black/30" :aria-label="t('app-onboarding-install-ready-title')">
             <div class="flex items-center gap-3">
               <span class="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-500 text-white">
                 <IconBadgeCheck class="h-5 w-5" />
