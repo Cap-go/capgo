@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { getEndpointUrl, getSupabaseClient, USER_ID_2 } from './test-utils.ts'
+import { getEndpointUrl, getSupabaseClient, SUPABASE_ANON_KEY, SUPABASE_BASE_URL, USER_ID_2 } from './test-utils.ts'
 
 const globalId = randomUUID()
 const numericGlobalId = Number.parseInt(globalId.replaceAll('-', '').slice(0, 12), 16)
@@ -235,6 +235,23 @@ describe('webhook endpoints enforce org API key expiration policy', () => {
     expect(response.status).toBe(401)
     const data = await response.json() as { error: string }
     expect(data.error).toBe('org_requires_expiring_key')
+  })
+
+  it('prevents direct REST webhook reads for legacy non-expiring org keys', async () => {
+    if (!legacyApiKeyValue || !createdWebhookId)
+      throw new Error('Legacy direct REST prerequisites were not created')
+
+    const response = await fetch(`${SUPABASE_BASE_URL}/rest/v1/webhooks?select=id,org_id&id=eq.${createdWebhookId}`, {
+      headers: {
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+        capgkey: legacyApiKeyValue,
+      },
+    })
+
+    expect(response.status).toBe(200)
+    const data = await response.json() as Array<{ id: string }>
+    expect(data).toEqual([])
   })
 
   it('rejects webhook creation for legacy non-expiring org key', async () => {

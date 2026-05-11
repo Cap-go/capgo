@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
-import { BASE_URL, fetchWithRetry, getSupabaseClient, headers, TEST_EMAIL, USER_ID } from './test-utils.ts'
+import { BASE_URL, fetchWithRetry, getSupabaseClient, headers, SUPABASE_ANON_KEY, SUPABASE_BASE_URL, TEST_EMAIL, USER_ID } from './test-utils.ts'
 
 // Test org and webhook IDs
 const WEBHOOK_TEST_ORG_ID = randomUUID()
@@ -293,6 +293,23 @@ describe('[GET] /webhooks (single webhook)', () => {
     expect(data.id).toBe(createdWebhookId)
     expect(data.name).toBe(webhookName)
     expect(data.stats_24h).toBeDefined()
+  })
+
+  it('prevents app-scoped API keys from reading webhooks through direct REST access', async () => {
+    if (!createdWebhookId || !appScopedKey)
+      throw new Error('Direct REST app-scoped webhook prerequisites were not created')
+
+    const response = await fetchWithRetry(`${SUPABASE_BASE_URL}/rest/v1/webhooks?select=id,org_id&id=eq.${createdWebhookId}`, {
+      headers: {
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+        capgkey: appScopedKey,
+      },
+    })
+
+    expect(response.status).toBe(200)
+    const data = await response.json() as Array<{ id: string }>
+    expect(data).toEqual([])
   })
 
   it('get webhook with invalid webhookId', async () => {
