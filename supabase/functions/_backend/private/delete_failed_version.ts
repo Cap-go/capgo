@@ -13,11 +13,19 @@ interface DataUpload {
   name: string
 }
 
+export function getDeleteFailedVersionBodyMetadata(body: Partial<DataUpload>) {
+  return {
+    hasAppId: typeof body.app_id === 'string' && body.app_id.length > 0,
+    hasName: typeof body.name === 'string' && body.name.length > 0,
+  }
+}
+
 export const app = new Hono<MiddlewareKeyVariables>()
 
 app.delete('/', middlewareKey(['all', 'write', 'upload']), async (c) => {
   const body = await parseBody<DataUpload>(c)
-  cloudlog({ requestId: c.get('requestId'), message: 'delete failed version body', body })
+  const bodyMetadata = getDeleteFailedVersionBodyMetadata(body)
+  cloudlog({ requestId: c.get('requestId'), message: 'delete failed version body', ...bodyMetadata })
   const apikey = c.get('apikey')
   const capgkey = c.get('capgkey') as string
   if (apikey && typeof apikey === 'object') {
@@ -44,10 +52,10 @@ app.delete('/', middlewareKey(['all', 'write', 'upload']), async (c) => {
   }
 
   if (!body.app_id) {
-    return quickError(400, 'error_app_id_missing', 'Error bundle name missing', { body })
+    return quickError(400, 'error_app_id_missing', 'Error bundle name missing', bodyMetadata)
   }
   if (!body.name) {
-    return quickError(400, 'error_bundle_name_missing', 'Error bundle name missing', { body })
+    return quickError(400, 'error_bundle_name_missing', 'Error bundle name missing', bodyMetadata)
   }
 
   const { data: version, error: errorVersion } = await supabaseApikey(c, capgkey)
