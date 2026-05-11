@@ -373,8 +373,8 @@ export function getPgClient(c: Context, readOnly = false) {
   return pool
 }
 
-export function getDrizzleClient(db: ReturnType<typeof getPgClient>) {
-  return drizzle({ client: db, logger: true })
+export function getDrizzleClient(db: ReturnType<typeof getPgClient>, logger = false) {
+  return drizzle({ client: db, logger })
 }
 
 // Helper to extract detailed error information from pg errors
