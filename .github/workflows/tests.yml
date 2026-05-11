@@ -234,6 +234,10 @@ jobs:
           echo "::endgroup::"
       - name: Reset Supabase DB before Cloudflare Workers tests
         run: supabase db reset
+      - name: Setup Node.js for Wrangler
+        uses: actions/setup-node@v6 # v6
+        with:
+          node-version: 24
       - id: start_cloudflare_workers
         name: Start Cloudflare Workers for testing
         env:
