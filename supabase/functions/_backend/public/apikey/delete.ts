@@ -3,6 +3,7 @@ import type { Database } from '../../utils/supabase.types.ts'
 import { BRES, honoFactory, quickError, simpleError } from '../../utils/hono.ts'
 import { middlewareV2 } from '../../utils/hono_middleware.ts'
 import { supabaseWithAuth } from '../../utils/supabase.ts'
+import { getApiKeyLookupFilter } from './lookup.ts'
 
 const app = honoFactory.createApp()
 
@@ -37,7 +38,13 @@ app.delete('/:id', middlewareV2(['all']), async (c) => {
   // Use supabaseWithAuth which handles both JWT and API key authentication
   const supabase = supabaseWithAuth(c, auth)
 
-  const { data: apikey, error: apikeyError } = await supabase.from('apikeys').select('*').or(`key.eq.${id},id.eq.${id}`).eq('user_id', auth.userId).single()
+  const lookup = getApiKeyLookupFilter(id)
+  const { data: apikey, error: apikeyError } = await supabase
+    .from('apikeys')
+    .select('id')
+    .eq('user_id', auth.userId)
+    .eq(lookup.column, lookup.value)
+    .single()
   if (!apikey || apikeyError) {
     throw quickError(404, 'api_key_not_found', 'API key not found', { supabaseError: apikeyError })
   }
@@ -45,7 +52,7 @@ app.delete('/:id', middlewareV2(['all']), async (c) => {
   const { error } = await supabase
     .from('apikeys')
     .delete()
-    .or(`key.eq.${id},id.eq.${id}`)
+    .eq('id', apikey.id)
     .eq('user_id', auth.userId)
 
   if (error) {

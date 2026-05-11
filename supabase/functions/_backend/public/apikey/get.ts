@@ -3,6 +3,7 @@ import type { Database } from '../../utils/supabase.types.ts'
 import { honoFactory, quickError, simpleError } from '../../utils/hono.ts'
 import { middlewareV2 } from '../../utils/hono_middleware.ts'
 import { supabaseWithAuth } from '../../utils/supabase.ts'
+import { getApiKeyLookupFilter } from './lookup.ts'
 
 const app = honoFactory.createApp()
 
@@ -61,11 +62,12 @@ app.get('/:id', middlewareV2(['all']), async (c) => {
 
   // Use supabaseWithAuth which handles both JWT and API key authentication
   const supabase = supabaseWithAuth(c, auth)
+  const lookup = getApiKeyLookupFilter(id)
   const { data: fetchedApikey, error } = await supabase
     .from('apikeys')
     .select('*')
-    .or(`key.eq.${id},id.eq.${id}`)
     .eq('user_id', auth.userId)
+    .eq(lookup.column, lookup.value)
     .single()
   if (error) {
     throw quickError(404, 'failed_to_get_apikey', 'Failed to get API key', { supabaseError: error })

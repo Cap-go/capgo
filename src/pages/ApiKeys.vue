@@ -16,10 +16,12 @@ import IconTrash from '~icons/heroicons/trash'
 import {
   confirmApiKeyDeletion,
   confirmApiKeyRegeneration,
+  deleteApiKey,
   formatApiKeyScope,
   isApiKeyExpired,
   showApiKeySecretModal,
   sortApiKeyRows,
+  updateApiKey,
 } from '~/services/apikeys'
 import { formatLocalDate } from '~/services/date'
 import { useSupabase } from '~/services/supabase'
@@ -496,13 +498,7 @@ async function regenrateKey(apikey: Database['public']['Tables']['apikeys']['Row
 
   const wasHashed = isHashedKey(apikey)
 
-  const { data, error } = await supabase.functions.invoke('apikey', {
-    method: 'PUT',
-    body: {
-      id: apikey.id,
-      regenerate: true,
-    },
-  })
+  const { data, error } = await updateApiKey(supabase, apikey.id, { regenerate: true })
 
   if (error || !data) {
     console.error('Error regenerating API key:', error)
@@ -535,10 +531,7 @@ async function deleteKey(key: Database['public']['Tables']['apikeys']['Row']) {
   if (!await confirmApiKeyDeletion(dialogStore, t))
     return
 
-  const { error } = await supabase
-    .from('apikeys')
-    .delete()
-    .eq('id', key.id)
+  const { error } = await deleteApiKey(supabase, key.id)
 
   if (error)
     throw error
@@ -580,9 +573,7 @@ async function changeName(key: Database['public']['Tables']['apikeys']['Row']) {
             return false
           }
 
-          const { error } = await supabase.from('apikeys')
-            .update({ name: newName })
-            .eq('id', key.id)
+          const { error } = await updateApiKey(supabase, key.id, { name: newName })
 
           if (error) {
             toast.error(t('cannot-change-name'))

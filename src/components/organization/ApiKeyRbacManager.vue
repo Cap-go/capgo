@@ -12,10 +12,12 @@ import DataTable from '~/components/DataTable.vue'
 import {
   confirmApiKeyDeletion,
   confirmApiKeyRegeneration,
+  deleteApiKey,
   formatApiKeyScope,
   isApiKeyExpired,
   showApiKeySecretModal,
   sortApiKeyRows,
+  updateApiKey,
 } from '~/services/apikeys'
 import { formatDate, formatLocalDate } from '~/services/date'
 import { useSupabase } from '~/services/supabase'
@@ -362,7 +364,7 @@ async function deleteKey(apiKey: OrgApiKey) {
 
   isSubmitting.value = true
   try {
-    const { error } = await supabase.from('apikeys').delete().eq('id', apiKey.id)
+    const { error } = await deleteApiKey(supabase, apiKey.id)
     if (error)
       throw error
     toast.success(t('removed-apikey'))
@@ -381,10 +383,7 @@ async function regenerateKey(apiKey: OrgApiKey) {
   if (!await confirmApiKeyRegeneration(dialogStore, t))
     return
 
-  const { data, error } = await supabase.functions.invoke('apikey', {
-    method: 'PUT',
-    body: { id: apiKey.id, regenerate: true },
-  })
+  const { data, error } = await updateApiKey(supabase, apiKey.id, { regenerate: true })
   if (error || !data) {
     toast.error(t('failed-to-regenerate-api-key'))
     return

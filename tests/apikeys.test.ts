@@ -6,6 +6,21 @@ import { BASE_URL, getSupabaseClient, headers, resetAndSeedAppData, resetAppData
 const id = randomUUID()
 const APPNAME = `com.app.key.${id}`
 
+async function createPlainApiKey(name: string) {
+  const response = await fetch(`${BASE_URL}/apikey`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      name,
+      mode: 'all',
+      hashed: false,
+    }),
+  })
+  const data = await response.json<{ id: number, key: string }>()
+  expect(response.status).toBe(200)
+  return data
+}
+
 beforeAll(async () => {
   await resetAndSeedAppData(APPNAME)
 })
@@ -36,6 +51,25 @@ describe('[GET] /apikey operations', () => {
     const data = await response.json()
     expect(response.status).toBe(200)
     expect(data).toHaveProperty('id', 10)
+  })
+
+  it('get specific api key by key UUID', async () => {
+    const createData = await createPlainApiKey('key-to-get-by-uuid')
+
+    const response = await fetch(`${BASE_URL}/apikey/${createData.key}`, {
+      method: 'GET',
+      headers,
+    })
+
+    const data = await response.json() as { id: number, key: string }
+    expect(response.status).toBe(200)
+    expect(data).toHaveProperty('id', createData.id)
+    expect(data).toHaveProperty('key', createData.key)
+
+    await fetch(`${BASE_URL}/apikey/${createData.id}`, {
+      method: 'DELETE',
+      headers,
+    })
   })
 
   it('get api key with invalid id', async () => {
@@ -500,6 +534,22 @@ describe('[DELETE] /apikey/:id operations', () => {
     expect(data).toHaveProperty('status', 'ok')
 
     // Verify deletion
+    const verifyResponse = await fetch(`${BASE_URL}/apikey/${createData.id}`, { headers })
+    expect(verifyResponse.status).toBe(404)
+  })
+
+  it('delete api key by key UUID', async () => {
+    const createData = await createPlainApiKey('key-to-delete-by-uuid')
+
+    const response = await fetch(`${BASE_URL}/apikey/${createData.key}`, {
+      method: 'DELETE',
+      headers,
+    })
+
+    const data = await response.json() as { status: string }
+    expect(response.status).toBe(200)
+    expect(data).toHaveProperty('status', 'ok')
+
     const verifyResponse = await fetch(`${BASE_URL}/apikey/${createData.id}`, { headers })
     expect(verifyResponse.status).toBe(404)
   })

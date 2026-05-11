@@ -10,6 +10,7 @@ import { toast } from 'vue-sonner'
 import IconCalendar from '~icons/heroicons/calendar'
 import IconClipboard from '~icons/heroicons/clipboard-document'
 import IconTrash from '~icons/heroicons/trash'
+import { updateApiKey } from '~/services/apikeys'
 import { checkPermissions } from '~/services/permissions'
 import { useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
@@ -641,14 +642,11 @@ async function saveKey() {
 
   isSubmitting.value = true
   try {
-    const { error } = await supabase
-      .from('apikeys')
-      .update({
-        name: editName.value.trim(),
-        limited_to_orgs: [currentOrganization.value!.gid],
-        limited_to_apps: configuredLimitedAppIds.value,
-      })
-      .eq('id', apiKey.value.id)
+    const { error } = await updateApiKey(supabase, apiKey.value.id, {
+      name: editName.value.trim(),
+      limited_to_orgs: [currentOrganization.value!.gid],
+      limited_to_apps: configuredLimitedAppIds.value,
+    })
     if (error)
       throw error
 

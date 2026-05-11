@@ -3,6 +3,19 @@ import type { TableColumn } from '~/components/comp_def'
 import type { DialogV2Button, DialogV2Options } from '~/stores/dialogv2'
 import type { Database } from '~/types/supabase.types'
 
+type ApiKeyId = number | string
+
+type ApiKeyUpdatePayload = Pick<
+  Database['public']['Tables']['apikeys']['Update'],
+  'name' | 'mode' | 'limited_to_apps' | 'limited_to_orgs' | 'expires_at'
+> & {
+  regenerate?: boolean
+}
+
+function getApiKeyRoute(id: ApiKeyId) {
+  return `apikey/${encodeURIComponent(String(id))}`
+}
+
 export async function createDefaultApiKey(
   supabase: SupabaseClient<Database>,
   name: string,
@@ -13,6 +26,26 @@ export async function createDefaultApiKey(
       name,
       mode: 'all',
     },
+  })
+}
+
+export async function updateApiKey(
+  supabase: SupabaseClient<Database>,
+  id: ApiKeyId,
+  updates: ApiKeyUpdatePayload,
+) {
+  return supabase.functions.invoke(getApiKeyRoute(id), {
+    method: 'PUT',
+    body: updates,
+  })
+}
+
+export async function deleteApiKey(
+  supabase: SupabaseClient<Database>,
+  id: ApiKeyId,
+) {
+  return supabase.functions.invoke(getApiKeyRoute(id), {
+    method: 'DELETE',
   })
 }
 
