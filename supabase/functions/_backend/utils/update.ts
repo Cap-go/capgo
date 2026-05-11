@@ -17,6 +17,7 @@ import { cloudlog } from './logging.ts'
 import { sendNotifOrgCached } from './notifications.ts'
 import { closeClient, getAppOwnerPostgres, getDrizzleClient, getPgClient, requestInfosPostgres, setReplicationLagHeader } from './pg.ts'
 import { makeDevice } from './plugin_parser.ts'
+import { summarizePluginRequestForLog } from './plugin_request_log.ts'
 import { s3 } from './s3.ts'
 import { createStatsBandwidth, createStatsMau, createStatsVersion, onPremStats, sendStatsAndDevice } from './stats.ts'
 import { isUpdateEnumerationLimited, recordUpdateEnumerationMiss, updateEnumerationLimitedResponse } from './updateOracleGuard.ts'
@@ -98,7 +99,7 @@ export async function updateWithPG(
   body: AppInfos,
   drizzleClient: ReturnType<typeof getDrizzleClient>,
 ) {
-  cloudlog({ requestId: c.get('requestId'), message: 'body', body, date: new Date().toISOString() })
+  cloudlog({ requestId: c.get('requestId'), message: 'update request', request: summarizePluginRequestForLog(body), date: new Date().toISOString() })
   const {
     version_name,
     version_build,
