@@ -9,6 +9,7 @@ import IconShield from '~icons/lucide/shield-check'
 import IconX from '~icons/lucide/x'
 import { authGhostButtonClass, authInsetCardClass, authPrimaryButtonClass, authSecondaryButtonClass } from '~/components/auth/pageStyles'
 import Toggle from '~/components/Toggle.vue'
+import { openExternalLink } from '~/services/externalLinks'
 import { useSupabase } from '~/services/supabase'
 import { openSupport } from '~/services/support'
 
@@ -166,11 +167,11 @@ function joinCapgo() {
 
 // Open ToS and Privacy Policy in new tabs
 function openTos() {
-  window.open('https://capgo.app/tos/', '_blank')
+  openExternalLink('https://capgo.app/tos/')
 }
 
 function openPrivacy() {
-  window.open('https://capgo.app/privacy/', '_blank')
+  openExternalLink('https://capgo.app/privacy/')
 }
 </script>
 

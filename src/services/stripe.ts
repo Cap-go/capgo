@@ -3,6 +3,7 @@ import { Capacitor } from '@capacitor/core'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import { useDialogV2Store } from '~/stores/dialogv2'
+import { openExternalLink } from './externalLinks'
 import { useSupabase } from './supabase'
 
 async function presentActionSheetOpen(url: string) {
@@ -20,7 +21,7 @@ async function presentActionSheetOpen(url: string) {
         text: t('continue'),
         id: 'continue-button',
         handler: async () => {
-          window.open(url, '_blank')
+          openExternalLink(url)
         },
       },
     ],
@@ -32,7 +33,7 @@ export function openBlank(link: string) {
   if (Capacitor.getPlatform() === 'ios')
     presentActionSheetOpen(link)
   else
-    window.open(link, '_blank')
+    openExternalLink(link)
 }
 export async function openPortal(orgId: string, t: ComposerTranslation) {
   let url = ''
