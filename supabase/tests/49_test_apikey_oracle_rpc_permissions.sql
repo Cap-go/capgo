@@ -1,6 +1,6 @@
 BEGIN;
 
-SELECT plan(27);
+SELECT plan(42);
 
 SELECT
     is(
@@ -156,6 +156,202 @@ SELECT
         'service_role keeps execute privilege on'
         || ' get_org_perm_for_apikey(text, text)'
     );
+
+SELECT
+    is(
+        has_function_privilege(
+            'anon'::name,
+            'public.check_min_rights_legacy(public.user_min_right, uuid, uuid, character varying, bigint)'::regprocedure,
+            'EXECUTE'
+        ),
+        false,
+        'anon role has no execute privilege on direct legacy rights helper'
+    );
+
+SELECT
+    is(
+        has_function_privilege(
+            'authenticated'::name,
+            'public.check_min_rights_legacy(public.user_min_right, uuid, uuid, character varying, bigint)'::regprocedure,
+            'EXECUTE'
+        ),
+        false,
+        'authenticated role has no execute privilege on direct legacy rights helper'
+    );
+
+SELECT
+    is(
+        has_function_privilege(
+            'service_role'::name,
+            'public.check_min_rights_legacy(public.user_min_right, uuid, uuid, character varying, bigint)'::regprocedure,
+            'EXECUTE'
+        ),
+        true,
+        'service_role keeps execute privilege on direct legacy rights helper'
+    );
+
+SELECT
+    is(
+        has_function_privilege(
+            'anon'::name,
+            'public.rbac_check_permission_direct(text, uuid, uuid, character varying, bigint, text)'::regprocedure,
+            'EXECUTE'
+        ),
+        false,
+        'anon role has no execute privilege on direct RBAC helper'
+    );
+
+SELECT
+    is(
+        has_function_privilege(
+            'anon'::name,
+            'public.rbac_check_permission_direct_no_password_policy(text, uuid, uuid, character varying, bigint, text)'::regprocedure,
+            'EXECUTE'
+        ),
+        false,
+        'anon role has no execute privilege on direct RBAC no-policy helper'
+    );
+
+SELECT
+    is(
+        has_function_privilege(
+            'authenticated'::name,
+            'public.rbac_check_permission_direct(text, uuid, uuid, character varying, bigint, text)'::regprocedure,
+            'EXECUTE'
+        ),
+        false,
+        'authenticated role has no execute privilege on direct RBAC helper'
+    );
+
+SELECT
+    is(
+        has_function_privilege(
+            'authenticated'::name,
+            'public.rbac_check_permission_direct_no_password_policy(text, uuid, uuid, character varying, bigint, text)'::regprocedure,
+            'EXECUTE'
+        ),
+        false,
+        'authenticated role has no execute privilege on direct RBAC no-policy helper'
+    );
+
+SELECT
+    is(
+        has_function_privilege(
+            'service_role'::name,
+            'public.rbac_check_permission_direct(text, uuid, uuid, character varying, bigint, text)'::regprocedure,
+            'EXECUTE'
+        ),
+        true,
+        'service_role keeps execute privilege on direct RBAC helper'
+    );
+
+SELECT
+    is(
+        has_function_privilege(
+            'service_role'::name,
+            'public.rbac_check_permission_direct_no_password_policy(text, uuid, uuid, character varying, bigint, text)'::regprocedure,
+            'EXECUTE'
+        ),
+        true,
+        'service_role keeps execute privilege on direct RBAC no-policy helper'
+    );
+
+SELECT tests.clear_authentication();
+SELECT set_config('request.headers', '{}', true);
+
+SELECT
+    is(
+        public.check_min_rights(
+            'read'::public.user_min_right,
+            tests.get_supabase_uid('test_user'),
+            '046a36ac-e03c-4590-9257-bd6c9dba9ee8'::uuid,
+            'com.demo.app',
+            NULL::bigint
+        ),
+        false,
+        'anon cannot query a known user subject without a matching capgkey'
+    );
+
+SELECT set_config('request.headers', '{"capgkey": "ae6e7458-c46d-4c00-aa3b-153b0b8520ea"}', true);
+
+SELECT
+    is(
+        public.check_min_rights(
+            'read'::public.user_min_right,
+            tests.get_supabase_uid('test_user'),
+            '046a36ac-e03c-4590-9257-bd6c9dba9ee8'::uuid,
+            'com.demo.app',
+            NULL::bigint
+        ),
+        true,
+        'anon can query the subject bound to the request capgkey'
+    );
+
+SELECT tests.authenticate_as('test_user2');
+SELECT set_config('request.headers', '{}', true);
+
+SELECT
+    is(
+        public.check_min_rights(
+            'read'::public.user_min_right,
+            tests.get_supabase_uid('test_user'),
+            '046a36ac-e03c-4590-9257-bd6c9dba9ee8'::uuid,
+            'com.demo.app',
+            NULL::bigint
+        ),
+        false,
+        'authenticated caller cannot query another user subject without capgkey proof'
+    );
+
+SELECT tests.authenticate_as('test_user');
+
+SELECT
+    is(
+        public.check_min_rights(
+            'read'::public.user_min_right,
+            tests.get_supabase_uid('test_user'),
+            '046a36ac-e03c-4590-9257-bd6c9dba9ee8'::uuid,
+            'com.demo.app',
+            NULL::bigint
+        ),
+        true,
+        'authenticated caller can query their own subject'
+    );
+
+SELECT set_config('request.headers', '{"capgkey": "ac4d9a98-ec25-4af8-933c-2aae4aa52b85"}', true);
+
+SELECT
+    is(
+        public.check_min_rights(
+            'read'::public.user_min_right,
+            tests.get_supabase_uid('test_user'),
+            '046a36ac-e03c-4590-9257-bd6c9dba9ee8'::uuid,
+            'com.demo.app',
+            NULL::bigint
+        ),
+        false,
+        'authenticated caller cannot pair own JWT with another user capgkey'
+    );
+
+SELECT set_config('request.headers', '{}', true);
+
+SELECT
+    is(
+        public.check_min_rights(
+            'read'::public.user_min_right,
+            tests.get_supabase_uid('test_user'),
+            '046a36ac-e03c-4590-9257-bd6c9dba9ee8'::uuid,
+            'com.demo.app',
+            4::bigint
+        ),
+        false,
+        'authenticated caller cannot mix demo app/org with another app channel'
+    );
+
+SELECT tests.clear_authentication();
+SELECT set_config('request.headers', '{}', true);
+
+SELECT tests.authenticate_as_service_role();
 
 INSERT INTO storage.objects (bucket_id, name)
 VALUES (

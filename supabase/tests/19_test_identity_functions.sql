@@ -216,6 +216,8 @@ SELECT
 SELECT tests.clear_authentication();
 
 -- Test has_app_right_userid
+SELECT tests.authenticate_as('test_user');
+
 SELECT
     is(
         has_app_right_userid(
