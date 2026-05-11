@@ -144,7 +144,6 @@ async function loadData() {
   defaultChannels.value = []
   latestBundle.value = null
   selectedChannelIds.value = []
-  console.log('[DeploymentBanner] Loading data for app:', props.appId)
 
   try {
     // Step 1: Get default channels configuration (public download channels)
@@ -161,7 +160,6 @@ async function loadData() {
     }))
 
     defaultChannels.value = allowedChannels.filter((channel): channel is DefaultChannel => channel !== null)
-    console.log('[DeploymentBanner] Default channels:', defaultChannels.value)
 
     // Step 2: Get latest bundle (excluding special bundle types)
     // We filter out 'unknown' and 'builtin' bundles as these are not deployable
@@ -175,8 +173,6 @@ async function loadData() {
       .neq('name', 'builtin')
       .order('created_at', { ascending: false })
       .limit(1)
-
-    console.log('[DeploymentBanner] Latest bundle:', bundles?.[0])
 
     latestBundle.value = bundles?.[0] ?? null
   }
@@ -224,21 +220,13 @@ async function executeDeployment() {
   deploying.value = true
 
   try {
-    console.log('[DeploymentBanner] Starting deployment:', {
-      bundleId: bundle.id,
-      bundleName: bundle.name,
-      channelIds: targetIds,
-    })
-
     // Perform the deployment by updating the channel versions in bulk
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from('channels')
       .update({ version: bundle.id })
       .in('id', targetIds)
       .eq('app_id', props.appId) // Extra safety: ensure we're updating the right channels
       .select()
-
-    console.log('[DeploymentBanner] Deployment result:', { data, error })
 
     if (error) {
       // Deployment failed - show error and return early
