@@ -13,6 +13,10 @@ const deleteBodySchema = type({
   email: 'string.email',
 })
 
+function memberNotFoundError(orgId: string): never {
+  throw quickError(404, 'organization_member_not_found', 'User is not a member of this organization', { orgId })
+}
+
 export async function deleteMember(c: Context<MiddlewareKeyVariables>, bodyRaw: any, _apikey: Database['public']['Tables']['apikeys']['Row']) {
   const bodyParsed = safeParseSchema(deleteBodySchema, bodyRaw)
   if (!bodyParsed.success) {
@@ -33,13 +37,11 @@ export async function deleteMember(c: Context<MiddlewareKeyVariables>, bodyRaw: 
     .single()
 
   if (userError || !userData) {
-    throw quickError(404, 'user_not_found', 'User not found', { error: userError })
+    memberNotFoundError(body.orgId)
   }
 
   // Use authenticated client for the delete operation - RLS will enforce org access
   const supabase = supabaseApikey(c, c.get('capgkey') as string)
-  cloudlog({ requestId: c.get('requestId'), message: 'userData.id', data: userData.id })
-  cloudlog({ requestId: c.get('requestId'), message: 'body.orgId', data: body.orgId })
   const { data: deletedMembership, error } = await supabase
     .from('org_users')
     .delete()
@@ -53,7 +55,7 @@ export async function deleteMember(c: Context<MiddlewareKeyVariables>, bodyRaw: 
   }
 
   if (!deletedMembership) {
-    throw quickError(404, 'organization_member_not_found', 'User is not a member of this organization', { orgId: body.orgId, email: body.email })
+    memberNotFoundError(body.orgId)
   }
 
   // The org_users delete trigger should resync role_bindings, but keep this

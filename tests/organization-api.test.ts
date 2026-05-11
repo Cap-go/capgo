@@ -945,7 +945,8 @@ describe('[DELETE] /organization/members', () => {
     })
     expect(response.status).toBe(404)
     const responseData = await response.json() as { error: string }
-    expect(responseData.error).toBe('user_not_found')
+    expect(responseData.error).toBe('organization_member_not_found')
+    expect(JSON.stringify(responseData)).not.toContain(nonExistentEmail)
   })
 })
 
