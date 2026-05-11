@@ -22,6 +22,7 @@ describe('redirect path validation', () => {
 
   it.concurrent('falls back when a query redirect is unsafe', () => {
     expect(getSafeRedirectPath('//example.com/phish')).toBe('/dashboard')
+    expect(getSafeRedirectPath(undefined, '//example.com/phish')).toBe('/dashboard')
     expect(getSafeRedirectPath('/settings/account')).toBe('/settings/account')
     expect(getSafeRedirectPath(undefined, '/login')).toBe('/login')
   })
