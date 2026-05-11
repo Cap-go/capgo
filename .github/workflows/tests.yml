@@ -175,6 +175,10 @@ jobs:
           fetch-depth: 2
       - name: Setup bun
         run: bash scripts/setup-bun.sh
+      - name: Setup Node.js for Wrangler
+        uses: actions/setup-node@v6 # v6
+        with:
+          node-version: 22
       - name: Validate migration timestamps
         if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
         run: bash scripts/check-supabase-migration-order.sh
