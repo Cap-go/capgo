@@ -93,6 +93,12 @@ export async function post(c: Context<MiddlewareKeyVariables>, bodyRaw: any, _ap
   if (data && data !== 'OK') {
     throw simpleError('error_inviting_user_to_organization', 'Error inviting user to organization', { data })
   }
-  cloudlog({ requestId: c.get('requestId'), message: 'User invited to organization', data: { email: body.email, org_id: body.orgId } })
+  cloudlog({
+    requestId: c.get('requestId'),
+    message: 'User invited to organization',
+    hasOrgId: !!body.orgId,
+    inviteType: body.invite_type,
+    emailPresent: !!body.email,
+  })
   return c.json(BRES)
 }

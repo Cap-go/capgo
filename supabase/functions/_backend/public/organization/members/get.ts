@@ -21,6 +21,24 @@ const memberSchema = type({
   is_tmp: 'boolean',
 }).array()
 
+interface MemberForLog {
+  image_url?: string | null
+  is_tmp: boolean
+  role: string
+}
+
+function summarizeMembersForLog(members: MemberForLog[]) {
+  return {
+    count: members.length,
+    withImage: members.filter(member => !!member.image_url).length,
+    tmpCount: members.filter(member => member.is_tmp).length,
+    roles: members.reduce<Record<string, number>>((acc, member) => {
+      acc[member.role] = (acc[member.role] ?? 0) + 1
+      return acc
+    }, {}),
+  }
+}
+
 export async function get(c: Context<MiddlewareKeyVariables>, bodyRaw: any, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
   const bodyParsed = safeParseSchema(bodySchema, bodyRaw)
   if (!bodyParsed.success) {
@@ -51,7 +69,14 @@ export async function get(c: Context<MiddlewareKeyVariables>, bodyRaw: any, apik
       guild_id: body.orgId,
     })
 
-  cloudlog({ requestId: c.get('requestId'), message: 'data', data, error })
+  cloudlog({
+    requestId: c.get('requestId'),
+    message: 'organization members query',
+    hasOrgId: !!body.orgId,
+    hasData: Array.isArray(data),
+    memberCount: Array.isArray(data) ? data.length : 0,
+    hasError: !!error,
+  })
   if (error) {
     throw simpleError('cannot_get_organization_members', 'Cannot get organization members', { error })
   }
@@ -74,6 +99,11 @@ export async function get(c: Context<MiddlewareKeyVariables>, bodyRaw: any, apik
     }
   }))
 
-  cloudlog({ requestId: c.get('requestId'), message: 'Members', data: signedMembers })
+  cloudlog({
+    requestId: c.get('requestId'),
+    message: 'organization members response',
+    hasOrgId: !!body.orgId,
+    ...summarizeMembersForLog(parsed.data),
+  })
   return c.json(signedMembers)
 }
