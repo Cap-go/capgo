@@ -110,4 +110,36 @@ describe.sequential('sendNotifOrgOnce', () => {
       expect.any(Error),
     )
   })
+
+  it('does not log recipient email or raw event data when Bento returns false', async () => {
+    trackBentoEventMock.mockResolvedValue(false)
+    const { client } = createWriteClient()
+
+    const { sendNotifOrgOnce } = await import('../supabase/functions/_backend/utils/notifications.ts')
+
+    const sent = await sendNotifOrgOnce(
+      createContext(),
+      'user:need_onboarding',
+      { org_id: 'org-123', sensitive_value: 'keep-me-out' },
+      'org-123',
+      'org-123:recipient',
+      'billing@example.com',
+      {} as any,
+      client,
+    )
+
+    expect(sent).toEqual({ sent: false, cleanupFailed: false })
+    expect(cloudlogMock).toHaveBeenCalledWith(expect.objectContaining({
+      eventDataSummary: {
+        fieldCount: 2,
+        fields: ['org_id', 'sensitive_value'],
+      },
+      eventName: 'user:need_onboarding',
+      message: 'trackEvent failed for one-time notif',
+      recipientEmailPresent: true,
+    }))
+    const cloudlogPayload = JSON.stringify(cloudlogMock.mock.calls)
+    expect(cloudlogPayload).not.toContain('billing@example.com')
+    expect(cloudlogPayload).not.toContain('keep-me-out')
+  })
 })

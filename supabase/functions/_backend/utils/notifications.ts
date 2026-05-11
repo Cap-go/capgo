@@ -14,6 +14,14 @@ interface EventData {
   [key: string]: any
 }
 
+interface NotificationLogDetails {
+  eventDataSummary?: {
+    fieldCount: number
+    fields: string[]
+  }
+  recipientEmailPresent: boolean
+}
+
 export interface SendNotifOrgOnceResult {
   cleanupFailed: boolean
   sent: boolean
@@ -52,6 +60,21 @@ function setNotifCacheStatus(c: Context, orgId: string, eventName: string, uniqI
       return
     await cacheEntry.helper.putJson(cacheEntry.request, { sendable }, ttlSeconds)
   })
+}
+
+function getEventDataSummary(eventData: EventData) {
+  const fields = Object.keys(eventData).sort()
+  return {
+    fieldCount: fields.length,
+    fields,
+  }
+}
+
+function getNotificationLogDetails(recipientEmail: string, eventData?: EventData): NotificationLogDetails {
+  return {
+    recipientEmailPresent: Boolean(recipientEmail),
+    ...(eventData ? { eventDataSummary: getEventDataSummary(eventData) } : {}),
+  }
 }
 
 /**
@@ -235,12 +258,12 @@ export async function sendNotifOrg(
       cloudlog({ requestId: c.get('requestId'), message: isFirstSend ? 'notif never sent' : 'notif ready to sent', event: eventName, uniqId })
       const res = await trackBentoEvent(c, managementEmail, eventData, eventName)
       if (!res) {
-        cloudlog({ requestId: c.get('requestId'), message: 'trackEvent failed', eventName, email: managementEmail, eventData })
+        cloudlog({ requestId: c.get('requestId'), message: 'trackEvent failed', eventName, ...getNotificationLogDetails(managementEmail, eventData) })
         // Note: We already claimed it in DB, but email failed. On next attempt, cron will determine if we retry.
         return false
       }
 
-      cloudlog({ requestId: c.get('requestId'), message: 'send notif done', eventName, email: managementEmail })
+      cloudlog({ requestId: c.get('requestId'), message: 'send notif done', eventName, ...getNotificationLogDetails(managementEmail) })
       return true
     }
 
@@ -301,11 +324,11 @@ export async function sendNotifOrgOnce(
     const res = await trackBentoEvent(c, recipientEmail, eventData, eventName)
     if (!res) {
       const cleanupSucceeded = await cleanupClaim()
-      cloudlog({ requestId: c.get('requestId'), message: 'trackEvent failed for one-time notif', eventName, email: recipientEmail, eventData })
+      cloudlog({ requestId: c.get('requestId'), message: 'trackEvent failed for one-time notif', eventName, ...getNotificationLogDetails(recipientEmail, eventData) })
       return { sent: false, cleanupFailed: !cleanupSucceeded }
     }
 
-    cloudlog({ requestId: c.get('requestId'), message: 'send one-time notif done', eventName, email: recipientEmail, uniqId })
+    cloudlog({ requestId: c.get('requestId'), message: 'send one-time notif done', eventName, uniqId, ...getNotificationLogDetails(recipientEmail) })
     return { sent: true, cleanupFailed: false }
   }
   catch (e: unknown) {
