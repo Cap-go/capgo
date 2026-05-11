@@ -9,23 +9,8 @@ import { buildRateLimitInfo } from '../../utils/rateLimitInfo.ts'
 import { backgroundTask } from '../../utils/utils.ts'
 import { deleteOverride } from './delete.ts'
 import { get } from './get.ts'
+import { logDeviceRequestContext } from './logging.ts'
 import { post } from './post.ts'
-
-function logDeviceRequestContext(
-  c: Context,
-  operation: 'set' | 'get' | 'delete',
-  body: Partial<DeviceLink>,
-  apikey: Database['public']['Tables']['apikeys']['Row'],
-) {
-  cloudlog({ requestId: c.get('requestId'), message: `device ${operation} body`, body })
-  cloudlog({
-    requestId: c.get('requestId'),
-    message: `device ${operation} apikey context`,
-    apikeyId: apikey.id,
-    userId: apikey.user_id,
-    mode: apikey.mode,
-  })
-}
 
 async function assertDeviceIPRateLimit(c: Context, appId: string) {
   const ipRateLimitStatus = await checkChannelSelfIPRateLimit(c, appId, 'Device API IP rate limited')
