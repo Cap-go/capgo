@@ -129,7 +129,7 @@ beforeAll(async () => {
 
   const { error: policyError } = await supabase.from('orgs').update({
     require_apikey_expiration: true,
-    max_apikey_expiration_days: 30,
+    max_apikey_expiration_days: null,
   }).eq('id', policyOrgId)
   if (policyError)
     throw policyError

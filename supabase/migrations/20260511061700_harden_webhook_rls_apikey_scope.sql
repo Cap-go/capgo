@@ -2,9 +2,9 @@
 -- Harden webhook RLS API-key identity resolution.
 --
 -- Route-level webhook handlers already reject app-scoped API keys and enforce
--- org API-key expiration policy before managing org-level webhooks. Direct
--- PostgREST access to webhooks/webhook_deliveries must fail closed with the
--- same constraints without changing non-webhook callers of the shared helper.
+-- the org required-expiration API-key policy before managing org-level webhooks.
+-- Direct PostgREST access to webhooks/webhook_deliveries must fail closed with
+-- the same constraints without changing non-webhook callers of the shared helper.
 -- =============================================================================
 
 CREATE OR REPLACE FUNCTION "public"."get_identity_org_allowed_apikey_only" (
@@ -68,7 +68,6 @@ DECLARE
     api_key_text text;
     api_key record;
     v_require_apikey_expiration boolean := false;
-    v_max_apikey_expiration_days integer;
 BEGIN
   SELECT "public"."get_apikey_header"() into api_key_text;
 
@@ -92,21 +91,13 @@ BEGIN
       RETURN NULL;
     END IF;
 
-    SELECT o.require_apikey_expiration, o.max_apikey_expiration_days
-      INTO v_require_apikey_expiration, v_max_apikey_expiration_days
+    SELECT o.require_apikey_expiration
+      INTO v_require_apikey_expiration
       FROM public.orgs o
       WHERE o.id = get_identity_webhook_org_allowed_apikey_only.org_id;
 
     IF COALESCE(v_require_apikey_expiration, false) AND api_key.expires_at IS NULL THEN
       PERFORM public.pg_log('deny: WEBHOOK_IDENTITY_ORG_EXPIRATION_REQUIRED', jsonb_build_object('key_id', api_key.id, 'org_id', org_id));
-      RETURN NULL;
-    END IF;
-
-    IF api_key.expires_at IS NOT NULL
-      AND v_max_apikey_expiration_days IS NOT NULL
-      AND api_key.expires_at > (now() + make_interval(days => v_max_apikey_expiration_days))
-    THEN
-      PERFORM public.pg_log('deny: WEBHOOK_IDENTITY_ORG_EXPIRATION_TOO_LONG', jsonb_build_object('key_id', api_key.id, 'org_id', org_id, 'max_days', v_max_apikey_expiration_days));
       RETURN NULL;
     END IF;
 
