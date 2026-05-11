@@ -1,6 +1,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-    <application> <!-- NOSONAR: Library manifest must inherit host app backup and cleartext traffic policy. -->
+    <application
+        android:allowBackup="false"
+        android:usesCleartextTraffic="false">
         <service android:name="app.capgo.capacitornotifications.MessagingService" android:exported="false">
             <intent-filter>
                 <action android:name="com.google.firebase.MESSAGING_EVENT" />
