@@ -8,13 +8,25 @@ function summarizeBentoResult(result: unknown) {
 
   const item = result as Record<string, unknown>
   const errors = item.errors
-  const results = item.results
+  const resultItems = item.results
+  let errorCount: number | undefined
+  let resultCount: number | undefined
+
+  if (Array.isArray(errors))
+    errorCount = errors.length
+  else if (errors !== undefined)
+    errorCount = 1
+
+  if (Array.isArray(resultItems))
+    resultCount = resultItems.length
+  else if (typeof resultItems === 'number')
+    resultCount = resultItems
 
   return {
     failed: typeof item.failed === 'number' ? item.failed : undefined,
-    errorCount: Array.isArray(errors) ? errors.length : errors === undefined ? undefined : 1,
+    errorCount,
     hasErrors: Array.isArray(errors) ? errors.length > 0 : errors !== undefined,
-    results: Array.isArray(results) ? results.length : typeof results === 'number' ? results : undefined,
+    results: resultCount,
   }
 }
 
