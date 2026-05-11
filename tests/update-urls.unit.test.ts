@@ -12,6 +12,7 @@ describe('update URL validation', () => {
   it.concurrent('allows local HTTP URLs for development', () => {
     expect(normalizeUpdateUrl('http://localhost:5173/bundle.zip')).toBe('http://localhost:5173/bundle.zip')
     expect(normalizeUpdateUrl('http://preview.localhost/bundle.zip')).toBe('http://preview.localhost/bundle.zip')
+    expect(normalizeUpdateUrl('http://[::1]:5173/bundle.zip')).toBe('http://[::1]:5173/bundle.zip')
   })
 
   it.concurrent('rejects insecure or non-web update targets', () => {

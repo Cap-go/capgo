@@ -2,7 +2,11 @@ const explicitSchemePattern = /^[a-z][a-z\d+.-]*:/i
 const localHttpHosts = new Set(['localhost', '127.0.0.1', '::1'])
 
 function isLocalHttpHost(hostname: string): boolean {
-  return localHttpHosts.has(hostname) || hostname.endsWith('.localhost')
+  const normalizedHostname = hostname.startsWith('[') && hostname.endsWith(']')
+    ? hostname.slice(1, -1)
+    : hostname
+
+  return localHttpHosts.has(normalizedHostname) || normalizedHostname.endsWith('.localhost')
 }
 
 export function normalizeUpdateUrl(value: string): string {
