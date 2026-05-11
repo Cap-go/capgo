@@ -1,8 +1,8 @@
 -- Enforce org API-key expiration policy during RBAC permission checks.
 --
--- API-key create/update triggers already reject new non-expiring keys for orgs
--- that require expiration. Existing non-expiring keys can predate a policy
--- change, so the RBAC direct permission functions must deny them at runtime.
+-- API-key create/update triggers already reject new keys that violate org
+-- expiration policy. Existing keys can predate a policy change, so the RBAC
+-- direct permission functions must deny them at runtime.
 
 CREATE OR REPLACE FUNCTION "public"."rbac_check_permission_direct"(
   "p_permission_key" "text",
@@ -28,6 +28,7 @@ DECLARE
   v_channel_scope boolean := false;
   v_org_enforcing_2fa boolean;
   v_org_requires_apikey_expiration boolean := false;
+  v_org_max_apikey_expiration_days integer;
   v_password_policy_ok boolean;
   v_api_key public.apikeys%ROWTYPE;
   v_channel_org_id uuid;
@@ -111,8 +112,12 @@ BEGIN
       RETURN false;
     END IF;
 
-    SELECT COALESCE(o.require_apikey_expiration, false)
-    INTO v_org_requires_apikey_expiration
+    SELECT
+      COALESCE(o.require_apikey_expiration, false),
+      o.max_apikey_expiration_days
+    INTO
+      v_org_requires_apikey_expiration,
+      v_org_max_apikey_expiration_days
     FROM public.orgs o
     WHERE o.id = v_effective_org_id
     LIMIT 1;
@@ -124,6 +129,22 @@ BEGIN
         'org_id', v_effective_org_id,
         'app_id', v_effective_app_id,
         'channel_id', p_channel_id
+      ));
+      RETURN false;
+    END IF;
+
+    IF v_org_max_apikey_expiration_days IS NOT NULL
+      AND v_api_key.expires_at IS NOT NULL
+      AND v_api_key.expires_at > now() + make_interval(days => v_org_max_apikey_expiration_days)
+    THEN
+      PERFORM public.pg_log('deny: RBAC_CHECK_PERM_APIKEY_EXPIRATION_EXCEEDS_MAX', jsonb_build_object(
+        'permission', p_permission_key,
+        'key_id', v_api_key.id,
+        'org_id', v_effective_org_id,
+        'app_id', v_effective_app_id,
+        'channel_id', p_channel_id,
+        'max_apikey_expiration_days', v_org_max_apikey_expiration_days,
+        'expires_at', v_api_key.expires_at
       ));
       RETURN false;
     END IF;
@@ -373,6 +394,7 @@ DECLARE
   v_channel_scope boolean := false;
   v_org_enforcing_2fa boolean;
   v_org_requires_apikey_expiration boolean := false;
+  v_org_max_apikey_expiration_days integer;
   v_api_key public.apikeys%ROWTYPE;
   v_channel_org_id uuid;
   v_channel_app_id character varying;
@@ -455,8 +477,12 @@ BEGIN
       RETURN false;
     END IF;
 
-    SELECT COALESCE(o.require_apikey_expiration, false)
-    INTO v_org_requires_apikey_expiration
+    SELECT
+      COALESCE(o.require_apikey_expiration, false),
+      o.max_apikey_expiration_days
+    INTO
+      v_org_requires_apikey_expiration,
+      v_org_max_apikey_expiration_days
     FROM public.orgs o
     WHERE o.id = v_effective_org_id
     LIMIT 1;
@@ -468,6 +494,22 @@ BEGIN
         'org_id', v_effective_org_id,
         'app_id', v_effective_app_id,
         'channel_id', p_channel_id
+      ));
+      RETURN false;
+    END IF;
+
+    IF v_org_max_apikey_expiration_days IS NOT NULL
+      AND v_api_key.expires_at IS NOT NULL
+      AND v_api_key.expires_at > now() + make_interval(days => v_org_max_apikey_expiration_days)
+    THEN
+      PERFORM public.pg_log('deny: RBAC_CHECK_PERM_APIKEY_EXPIRATION_EXCEEDS_MAX', jsonb_build_object(
+        'permission', p_permission_key,
+        'key_id', v_api_key.id,
+        'org_id', v_effective_org_id,
+        'app_id', v_effective_app_id,
+        'channel_id', p_channel_id,
+        'max_apikey_expiration_days', v_org_max_apikey_expiration_days,
+        'expires_at', v_api_key.expires_at
       ));
       RETURN false;
     END IF;

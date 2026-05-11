@@ -882,6 +882,146 @@ describe('rbac permission system', () => {
         expect(afterPolicyFlip.rows[0].direct_no_password_allowed).toBe(false)
       })
 
+      it('should deny existing overlong api keys after org lowers max expiration days', async () => {
+        const testId = randomUUID()
+        const orgId = randomUUID()
+        const appUuid = randomUUID()
+        const appId = `com.rbac.max-expiration-policy.${testId}`
+        const scopedKey = `rbac-max-expiration-policy-${testId}`
+
+        await query(`
+          INSERT INTO public.orgs (
+            id,
+            name,
+            management_email,
+            created_by,
+            use_new_rbac,
+            require_apikey_expiration,
+            max_apikey_expiration_days,
+            enforcing_2fa
+          ) VALUES (
+            $1::uuid,
+            $2,
+            $3,
+            $4::uuid,
+            true,
+            false,
+            NULL,
+            false
+          )
+        `, [
+          orgId,
+          `rbac-permissions.test max expiration policy ${testId}`,
+          `rbac-max-expiration-policy-${testId}@capgo.app`,
+          USER_ID,
+        ])
+
+        await query(`
+          INSERT INTO public.apps (id, app_id, name, icon_url, owner_org)
+          VALUES ($1::uuid, $2, $3, $4, $5::uuid)
+        `, [
+          appUuid,
+          appId,
+          `RBAC max expiration policy app ${testId}`,
+          'rbac-max-expiration-policy-icon',
+          orgId,
+        ])
+
+        await query(`
+          INSERT INTO public.role_bindings (
+            principal_type,
+            principal_id,
+            role_id,
+            scope_type,
+            org_id,
+            app_id,
+            granted_by,
+            is_direct
+          )
+          SELECT
+            public.rbac_principal_user(),
+            $1::uuid,
+            r.id,
+            public.rbac_scope_app(),
+            $2::uuid,
+            $3::uuid,
+            $1::uuid,
+            true
+          FROM public.roles r
+          WHERE r.name = public.rbac_role_app_reader()
+          LIMIT 1
+        `, [USER_ID, orgId, appUuid])
+
+        await query(`
+          INSERT INTO public.apikeys (
+            user_id,
+            key,
+            key_hash,
+            mode,
+            name,
+            limited_to_orgs,
+            limited_to_apps,
+            expires_at
+          ) VALUES (
+            $1::uuid,
+            $2,
+            NULL,
+            'write',
+            $3,
+            ARRAY[$4::uuid],
+            ARRAY[$5]::text[],
+            now() + interval '120 days'
+          )
+        `, [
+          USER_ID,
+          scopedKey,
+          `RBAC max expiration policy ${scopedKey}`,
+          orgId,
+          appId,
+        ])
+
+        const beforePolicyFlip = await query(`
+          SELECT public.rbac_check_permission_direct(
+            'app.read',
+            $1::uuid,
+            $2::uuid,
+            $3,
+            NULL::bigint,
+            $4
+          ) AS allowed
+        `, [USER_ID, orgId, appId, scopedKey])
+
+        await query(`
+          UPDATE public.orgs
+          SET max_apikey_expiration_days = 30
+          WHERE id = $1::uuid
+        `, [orgId])
+
+        const afterPolicyFlip = await query(`
+          SELECT
+            public.rbac_check_permission_direct(
+              'app.read',
+              $1::uuid,
+              $2::uuid,
+              $3,
+              NULL::bigint,
+              $4
+            ) AS direct_allowed,
+            public.rbac_check_permission_direct_no_password_policy(
+              'app.read',
+              $1::uuid,
+              $2::uuid,
+              $3,
+              NULL::bigint,
+              $4
+            ) AS direct_no_password_allowed
+        `, [USER_ID, orgId, appId, scopedKey])
+
+        expect(beforePolicyFlip.rows[0].allowed).toBe(true)
+        expect(afterPolicyFlip.rows[0].direct_allowed).toBe(false)
+        expect(afterPolicyFlip.rows[0].direct_no_password_allowed).toBe(false)
+      })
+
       it('should apply channel deny overrides in no-password direct checks', async () => {
         const testId = randomUUID()
         const orgId = randomUUID()
