@@ -7,6 +7,22 @@ import { fixSemver } from '../utils/utils.ts'
 import { safeParseSchema } from './ark_validation.ts'
 import { simpleError } from './hono.ts'
 
+const PLUGIN_BODY_FIELDS = [
+  'app_id',
+  'channel',
+  'custom_id',
+  'defaultChannel',
+  'device_id',
+  'is_emulator',
+  'is_prod',
+  'key_id',
+  'platform',
+  'plugin_version',
+  'version_build',
+  'version_name',
+  'version_os',
+] as const
+
 export interface DeviceLink extends AppInfos {
   channel?: string
 }
@@ -20,6 +36,42 @@ function normalizeCustomId(customId: unknown): string | undefined {
 
 function getInvalidCode(c: Context) {
   return c.req.method === 'GET' || c.req.method === 'DELETE' ? 'invalid_query_parameters' : 'invalid_json_body'
+}
+
+export function getPluginBodyMetadata(body: unknown) {
+  if (!body || typeof body !== 'object') {
+    return {
+      fieldCount: 0,
+      hasBody: false,
+      presentFields: [],
+      unknownFieldCount: 0,
+    }
+  }
+
+  const keys = Object.keys(body)
+  const knownFields = new Set<string>(PLUGIN_BODY_FIELDS)
+  return {
+    fieldCount: keys.length,
+    hasBody: true,
+    presentFields: PLUGIN_BODY_FIELDS.filter(field => keys.includes(field)),
+    unknownFieldCount: keys.filter(key => !knownFields.has(key)).length,
+  }
+}
+
+export function getPluginParseFailureMetadata(parseResult: ReturnType<typeof safeParseSchema>) {
+  if (parseResult.success) {
+    return {
+      success: true,
+    }
+  }
+
+  return {
+    success: false,
+    issueCount: parseResult.error.issues.length,
+    issues: parseResult.error.issues.slice(0, 5).map(issue => ({
+      code: issue.code,
+    })),
+  }
 }
 
 export function makeDevice(devBody: AppInfos | DeviceLink | AppStats, allowCustomID = true): DeviceWithoutCreatedAt {
@@ -45,19 +97,19 @@ export function makeDevice(devBody: AppInfos | DeviceLink | AppStats, allowCusto
 
 export function parsePluginBody<T extends AppInfos | DeviceLink | AppStats>(c: Context, body: T, schema: StandardSchema<T>, requireDevice = true) {
   if (Object.keys(body ?? {}).length === 0) {
-    throw simpleError(getInvalidCode(c), 'Cannot parse body', { body })
+    throw simpleError(getInvalidCode(c), 'Cannot parse body', { body: getPluginBodyMetadata(body) })
   }
   if (requireDevice && !body.device_id) {
-    throw simpleError('missing_device_id', 'Cannot find device_id', { body })
+    throw simpleError('missing_device_id', 'Cannot find device_id', { body: getPluginBodyMetadata(body) })
   }
   if (!body.app_id) {
-    throw simpleError('missing_app_id', 'Cannot find app_id', { body })
+    throw simpleError('missing_app_id', 'Cannot find app_id', { body: getPluginBodyMetadata(body) })
   }
   // Only validate version_build if it's provided (not required for GET /channel_self)
   if (body.version_build) {
     const coerce = tryParse(fixSemver(body.version_build))
     if (!coerce) {
-      throw simpleError('semver_error', `Native version: ${body.version_build} doesn't follow semver convention, please check https://capgo.app/semver_tester/ to learn more about semver usage in Capgo`, { version_build: body.version_build })
+      throw simpleError('semver_error', 'Native version doesn\'t follow semver convention, please check https://capgo.app/semver_tester/ to learn more about semver usage in Capgo', { body: getPluginBodyMetadata(body) })
     }
     body.version_build = format(coerce)
   }
@@ -69,7 +121,7 @@ export function parsePluginBody<T extends AppInfos | DeviceLink | AppStats>(c: C
   }
   const parseResult = safeParseSchema(schema, body)
   if (!parseResult.success) {
-    throw simpleError(getInvalidCode(c), 'Cannot parse body', { parseResult })
+    throw simpleError(getInvalidCode(c), 'Cannot parse body', { parseResult: getPluginParseFailureMetadata(parseResult) })
   }
   return parseResult.data
 }
