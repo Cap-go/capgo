@@ -25,9 +25,7 @@ export function getWebhookValidationErrorMetadata(error: unknown) {
 export function parseWebhookBody<T>(schema: StandardSchema<T>, bodyRaw: unknown): T {
   const bodyParsed = safeParseSchema(schema, bodyRaw)
   if (!bodyParsed.success) {
-    throw simpleError('invalid_body', 'Invalid body', {
-      parseResult: getWebhookValidationErrorMetadata(bodyParsed.error),
-    })
+    throw simpleError('invalid_body', 'Invalid body')
   }
 
   return bodyParsed.data
