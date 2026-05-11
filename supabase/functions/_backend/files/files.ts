@@ -356,6 +356,23 @@ async function assertReadableAppScopedAttachment(c: Context, fileId: unknown): P
     if (!app || app.owner_org !== scopedPath.owner_org) {
       quickError(404, 'not_found', 'Not found')
     }
+
+    const deletedBundlePath = await pgClient.query<{ id: number }>(
+      `
+        SELECT id
+        FROM public.app_versions
+        WHERE owner_org = $1
+          AND app_id = $2
+          AND r2_path = $3
+          AND COALESCE(deleted, false) = true
+        LIMIT 1
+      `,
+      [scopedPath.owner_org, scopedPath.app_id, fileId],
+    )
+
+    if (deletedBundlePath.rows.length > 0) {
+      quickError(404, 'not_found', 'Not found')
+    }
   }
   finally {
     await closeClient(c, pgClient)
