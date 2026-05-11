@@ -218,7 +218,7 @@ export const useOrganizationStore = defineStore('organization', () => {
         return signedImageUrl ? [source.key, signedImageUrl] as const : null
       }
       catch (error) {
-        console.warn('Cannot load signed member image', { memberKey: source.key, error })
+        console.warn('Cannot load signed member image', { hasMemberKey: !!source.key, error })
         return null
       }
     }))
@@ -274,7 +274,7 @@ export const useOrganizationStore = defineStore('organization', () => {
       }, run)
     }
     catch (error) {
-      console.warn('Cannot load signed organization logo', { orgId: org.gid, error })
+      console.warn('Cannot load signed organization logo', { hasOrgId: !!org.gid, error })
       updateOrganizationLogoState(org.gid, { logo_is_loading: false }, run)
     }
   }
@@ -282,7 +282,7 @@ export const useOrganizationStore = defineStore('organization', () => {
   const loadOrganizationLogos = (sourceOrganizations: Array<Organization & { id: number }>, run: number) => {
     for (const org of sourceOrganizations) {
       loadOrganizationLogo(org, run).catch((error) => {
-        console.warn('Cannot load signed organization logo', { orgId: org.gid, error })
+        console.warn('Cannot load signed organization logo', { hasOrgId: !!org.gid, error })
         updateOrganizationLogoState(org.gid, { logo_is_loading: false }, run)
       })
     }
@@ -367,7 +367,10 @@ export const useOrganizationStore = defineStore('organization', () => {
       // This is needed for the "banner"
       const org = selectableOrganizations.find(org => org.gid === app.owner_org)
       if (!org) {
-        console.error(`Cannot find organization for app`, app)
+        console.error('Cannot find organization for app', {
+          hasAppId: !!app.app_id,
+          hasOwnerOrg: !!app.owner_org,
+        })
         _initialLoadPromise.value.reject(`Cannot find organization for app ${app}`)
         return
       }
@@ -643,7 +646,12 @@ export const useOrganizationStore = defineStore('organization', () => {
 
     // Verify user has super_admin or owner role for this organization
     const currentOrg = _organizations.value.get(orgId)
-    console.log('Delete org check:', { orgId, currentOrg, role: currentOrg?.role, userId: currentUserId })
+    console.log('Delete org check:', {
+      hasOrgId: !!orgId,
+      hasCurrentOrg: !!currentOrg,
+      role: currentOrg?.role,
+      hasUserId: !!currentUserId,
+    })
     if (!currentOrg || !canDeleteOrganization(orgId)) {
       console.error('Permission denied:', { role: currentOrg?.role, required: ['super_admin', 'owner', 'org_super_admin'] })
       return { data: null, error: new Error('Insufficient permissions') }
