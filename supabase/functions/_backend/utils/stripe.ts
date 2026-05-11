@@ -9,6 +9,27 @@ import { getEnv, isStripeConfigured } from './utils.ts'
 const ISO_COUNTRY_CODE_REGEX = /^[A-Z]{2}$/
 const TRAILING_SLASHES_REGEX = /\/+$/
 
+function summarizePriceList(prices: Stripe.ApiList<Stripe.Price>) {
+  return {
+    count: prices.data.length,
+    priceIds: prices.data.map(price => price.id),
+    productIds: prices.data
+      .map(price => typeof price.product === 'string' ? price.product : price.product?.id)
+      .filter((id): id is string => typeof id === 'string'),
+  }
+}
+
+function summarizeSubscriptionItems(prices: Stripe.SubscriptionItem[]) {
+  return {
+    count: prices.length,
+    itemIds: prices.map(item => item.id),
+    priceIds: prices.map(item => item.plan.id),
+    productIds: prices
+      .map(item => item.plan.product)
+      .filter((id): id is string => typeof id === 'string'),
+  }
+}
+
 // Checks if SUPABASE_URL points to a local instance
 function isLocalSupabase(c: Context): boolean {
   const supabaseUrl = getEnv(c, 'SUPABASE_URL')
@@ -429,7 +450,7 @@ async function getPriceIds(c: Context, planId: string, recurrence: string): Prom
     return { priceId }
   try {
     const prices = await listPricesByProduct(c, planId)
-    cloudlog({ requestId: c.get('requestId'), message: 'prices stripe', prices })
+    cloudlog({ requestId: c.get('requestId'), message: 'prices stripe', prices: summarizePriceList(prices) })
     prices.data.forEach((price) => {
       if (price.recurring && price.recurring.interval === recurrence && price.active && price.recurring.usage_type === 'licensed')
         priceId = price.id
@@ -475,7 +496,7 @@ export function parsePriceIds(c: Context, prices: Stripe.SubscriptionItem[]): { 
   if (!isStripeConfigured(c))
     return { priceId, productId }
   try {
-    cloudlog({ requestId: c.get('requestId'), message: 'prices stripe', prices })
+    cloudlog({ requestId: c.get('requestId'), message: 'prices stripe', prices: summarizeSubscriptionItems(prices) })
     prices.forEach((price) => {
       if (price.plan.usage_type === 'licensed') {
         priceId = price.plan.id
@@ -708,7 +729,7 @@ export interface StripeCustomer {
 }
 
 export async function createCustomer(c: Context, email: string, userId: string, orgId: string, name: string) {
-  cloudlog({ requestId: c.get('requestId'), message: 'createCustomer', email, userId, orgId, name })
+  cloudlog({ requestId: c.get('requestId'), message: 'createCustomer', userId, orgId, hasEmail: Boolean(email), hasName: Boolean(name) })
   const baseConsoleUrl = (getEnv(c, 'WEBAPP_URL') || '').replace(TRAILING_SLASHES_REGEX, '')
   const metadata: Record<string, string> = {
     user_id: userId,
@@ -718,7 +739,7 @@ export async function createCustomer(c: Context, email: string, userId: string, 
     metadata.log_as = `${baseConsoleUrl}/log-as/${userId}`
   }
   if (!isStripeConfigured(c)) {
-    cloudlog({ requestId: c.get('requestId'), message: 'createCustomer no stripe key', email, userId, name })
+    cloudlog({ requestId: c.get('requestId'), message: 'createCustomer no stripe key', userId, hasEmail: Boolean(email), hasName: Boolean(name) })
     // create a fake customer id like stripe one and random id
     const randomId = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15)
     return { id: `cus_${randomId}`, email, name, metadata }
