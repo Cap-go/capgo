@@ -1,4 +1,5 @@
 import type { Context } from 'hono'
+import type { SchemaError } from '../../utils/ark_validation.ts'
 import type { AuthInfo } from '../../utils/hono.ts'
 import { type } from 'arktype'
 import { safeParseSchema } from '../../utils/ark_validation.ts'
@@ -28,10 +29,20 @@ const auditLogSchema = type({
 
 const auditLogsSchema = auditLogSchema.array()
 
+export function getAuditSchemaErrorMetadata(error: SchemaError) {
+  return {
+    issueCount: error.issues.length,
+    issues: Array.from(error.issues, issue => ({
+      code: String(issue.code ?? 'schema'),
+      path: Array.from(issue.path ?? [], String),
+    })),
+  }
+}
+
 export async function getAuditLogs(c: Context, bodyRaw: any): Promise<Response> {
   const bodyParsed = safeParseSchema(bodySchema, bodyRaw)
   if (!bodyParsed.success) {
-    throw simpleError('invalid_body', 'Invalid body', { error: bodyParsed.error })
+    throw simpleError('invalid_body', 'Invalid body', { error: getAuditSchemaErrorMetadata(bodyParsed.error) })
   }
   const body = bodyParsed.data
 
