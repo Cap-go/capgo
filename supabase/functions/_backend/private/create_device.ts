@@ -26,7 +26,7 @@ export interface CreateDeviceBody {
   device_id: string
   app_id: string
   org_id: string
-  platform: string
+  platform: 'ios' | 'android'
   version_name: string
 }
 
