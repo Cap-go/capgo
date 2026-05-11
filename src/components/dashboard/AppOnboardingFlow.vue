@@ -923,9 +923,9 @@ watch(suggestedAppId, (value) => {
                       ? t('app-onboarding-appid-help-existing')
                       : t('app-onboarding-appid-help-new') }}
                   </p>
-                  <p v-if="appIdFeedback" class="mt-2 text-sm font-medium text-amber-700 dark:text-amber-300" role="status">
+                  <output v-if="appIdFeedback" class="mt-2 block text-sm font-medium text-amber-700 dark:text-amber-300" for="app-onboarding-app-id">
                     {{ appIdFeedback }}
-                  </p>
+                  </output>
                   <div v-if="appIdSuggestions.length > 0" class="mt-3 flex flex-wrap gap-2">
                     <button
                       v-for="suggestion in appIdSuggestions"
@@ -975,7 +975,7 @@ watch(suggestedAppId, (value) => {
             </div>
           </div>
 
-          <aside class="rounded-2xl border border-slate-800 bg-slate-950 p-5 text-white shadow-sm lg:sticky lg:top-6 dark:border-white/10">
+          <aside class="rounded-2xl border border-slate-800 bg-slate-950 p-5 text-white shadow-sm lg:sticky lg:top-6 dark:border-white/10" :aria-label="t('app-onboarding-preview-label')">
             <div class="flex items-center gap-4">
               <div class="flex h-18 w-18 items-center justify-center overflow-hidden rounded-[22px] bg-slate-900 ring-1 ring-white/10">
                 <img v-if="iconPreview" :src="iconPreview" :alt="t('app-onboarding-icon-preview-alt')" class="h-full w-full object-cover">
@@ -1187,7 +1187,7 @@ watch(suggestedAppId, (value) => {
             </div>
           </div>
 
-          <aside class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-slate-900">
+          <aside class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-slate-900" :aria-label="t('app-onboarding-install-ready-title')">
             <div class="flex items-center gap-3">
               <span class="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-500 text-white">
                 <IconBadgeCheck class="h-5 w-5" />
