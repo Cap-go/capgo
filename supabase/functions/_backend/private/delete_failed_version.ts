@@ -17,7 +17,7 @@ export const app = new Hono<MiddlewareKeyVariables>()
 
 app.delete('/', middlewareKey(['all', 'write', 'upload']), async (c) => {
   const body = await parseBody<DataUpload>(c)
-  cloudlog({ requestId: c.get('requestId'), message: 'delete failed version body', body })
+  cloudlog({ requestId: c.get('requestId'), message: 'delete failed version request', app_id: body.app_id, hasName: !!body.name })
   const apikey = c.get('apikey')
   const capgkey = c.get('capgkey') as string
   if (apikey && typeof apikey === 'object') {
