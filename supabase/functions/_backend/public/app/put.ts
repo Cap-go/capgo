@@ -8,14 +8,16 @@ import { quickError, simpleError } from '../../utils/hono.ts'
 import { cloudlog } from '../../utils/logging.ts'
 import { checkPermission } from '../../utils/rbac.ts'
 import { createSignedImageUrl, normalizeImagePath } from '../../utils/storage.ts'
-import { supabaseAdmin, supabaseApikey } from '../../utils/supabase.ts'
+import { supabaseAdmin, supabaseWithAuth } from '../../utils/supabase.ts'
 import { isValidAppId } from '../../utils/utils.ts'
 
 interface UpdateApp {
   name?: string
   icon?: string
   retention?: number
+  build_timeout_seconds?: number
   expose_metadata?: boolean
+  allow_preview?: boolean
   allow_device_custom_id?: boolean
   need_onboarding?: boolean
   existing_app?: boolean
@@ -23,7 +25,7 @@ interface UpdateApp {
   android_store_url?: string | null
 }
 
-export async function put(c: Context<MiddlewareKeyVariables>, appId: string, body: UpdateApp, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
+export async function put(c: Context<MiddlewareKeyVariables>, appId: string, body: UpdateApp, _apikey?: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
   if (!appId) {
     throw quickError(400, 'missing_app_id', 'Missing app_id')
   }
@@ -41,8 +43,18 @@ export async function put(c: Context<MiddlewareKeyVariables>, appId: string, bod
   else if (body.retention && body.retention < 0) {
     throw quickError(400, 'retention_to_small', 'Retention cannot be smaller than 0', { retention: body.retention })
   }
+  if (body.build_timeout_seconds !== undefined) {
+    if (!Number.isSafeInteger(body.build_timeout_seconds) || body.build_timeout_seconds < 300 || body.build_timeout_seconds > 21600) {
+      throw quickError(400, 'invalid_build_timeout', 'Build timeout must be between 5 minutes and 6 hours', { build_timeout_seconds: body.build_timeout_seconds })
+    }
+  }
 
-  const { data: previousApp, error: previousAppError } = await supabaseApikey(c, apikey.key)
+  const auth = c.get('auth')
+  if (!auth)
+    throw quickError(401, 'not_authorized', 'Not authorized')
+
+  const supabase = supabaseWithAuth(c, auth)
+  const { data: previousApp, error: previousAppError } = await supabase
     .from('apps')
     .select('need_onboarding, owner_org, name, app_id')
     .eq('app_id', appId)
@@ -60,13 +72,15 @@ export async function put(c: Context<MiddlewareKeyVariables>, appId: string, bod
 
   const { data, error: dbError } = await (async () => {
     try {
-      return await supabaseApikey(c, apikey.key)
+      return await supabase
         .from('apps')
         .update({
           name: body.name,
           icon_url: normalizedIcon ?? body.icon,
           retention: body.retention,
+          build_timeout_seconds: body.build_timeout_seconds,
           expose_metadata: body.expose_metadata,
+          allow_preview: body.allow_preview,
           allow_device_custom_id: body.allow_device_custom_id,
           need_onboarding: body.need_onboarding,
           existing_app: body.existing_app,

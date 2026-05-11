@@ -15,7 +15,7 @@ import iconName from '~icons/ph/user?raw'
 import Toggle from '~/components/Toggle.vue'
 import { checkPermissions } from '~/services/permissions'
 import { createSignedImageUrl, getImmediateImageUrl } from '~/services/storage'
-import { useSupabase } from '~/services/supabase'
+import { defaultApiHost, useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
 
 const props = defineProps<{ appId: string }>()
@@ -84,6 +84,25 @@ const isImportingStoreIcon = ref(false)
 const isAppIconLoading = ref(false)
 
 const isCustomRetention = computed(() => selectedRetentionPreset.value === -1)
+
+async function updateAppSettings(payload: Partial<Database['public']['Tables']['apps']['Update']>) {
+  const { data: currentSession } = await supabase.auth.getSession()
+  const currentJwt = currentSession.session?.access_token
+  if (!currentJwt)
+    throw new Error('Not authorized')
+
+  const response = await fetch(`${defaultApiHost}/app/${props.appId}`, {
+    method: 'PUT',
+    headers: {
+      'Authorization': `Bearer ${currentJwt}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  })
+
+  if (!response.ok)
+    throw new Error(`Unable to update app settings: HTTP ${response.status}`)
+}
 
 const retentionOptions = computed(() => {
   return RETENTION_PRESETS.map(preset => ({
@@ -435,8 +454,10 @@ async function updateAppName(newName: string) {
     return Promise.reject(t('new-name-to-long'))
   }
 
-  const { error } = await supabase.from('apps').update({ name: newName }).eq('app_id', props.appId)
-  if (error) {
+  try {
+    await updateAppSettings({ name: newName })
+  }
+  catch (error) {
     toast.error(t('cannot-change-name'))
     console.error(error)
     return
@@ -461,8 +482,10 @@ async function updateAppRetention(newRetention: number) {
     return Promise.reject(t('retention-to-big'))
   }
 
-  const { error } = await supabase.from('apps').update({ retention: newRetention }).eq('app_id', props.appId)
-  if (error) {
+  try {
+    await updateAppSettings({ retention: newRetention })
+  }
+  catch {
     return Promise.reject(t('cannot-change-retention'))
   }
   toast.success(t('changed-app-retention'))
@@ -483,9 +506,12 @@ async function updateBuildTimeout(rawTimeoutMinutes: number | string | undefined
   if (timeoutSeconds === appRef.value?.build_timeout_seconds)
     return
 
-  const { error } = await supabase.from('apps').update({ build_timeout_seconds: timeoutSeconds }).eq('app_id', props.appId)
-  if (error)
+  try {
+    await updateAppSettings({ build_timeout_seconds: timeoutSeconds })
+  }
+  catch {
     throw t('cannot-change-build-timeout')
+  }
 
   toast.success(t('changed-build-timeout'))
   if (appRef.value)
@@ -497,8 +523,10 @@ async function updateExposeMetadata(newExposeMetadata: boolean) {
     return Promise.resolve()
   }
 
-  const { error } = await supabase.from('apps').update({ expose_metadata: newExposeMetadata }).eq('app_id', props.appId)
-  if (error) {
+  try {
+    await updateAppSettings({ expose_metadata: newExposeMetadata })
+  }
+  catch {
     return Promise.reject(t('cannot-change-expose-metadata'))
   }
   toast.success(t('changed-expose-metadata'))
@@ -511,8 +539,10 @@ async function updateAllowPreview(newAllowPreview: boolean) {
     return Promise.resolve()
   }
 
-  const { error } = await supabase.from('apps').update({ allow_preview: newAllowPreview }).eq('app_id', props.appId)
-  if (error) {
+  try {
+    await updateAppSettings({ allow_preview: newAllowPreview })
+  }
+  catch {
     return Promise.reject(t('cannot-change-allow-preview'))
   }
   toast.success(t('changed-allow-preview'))
@@ -528,8 +558,10 @@ async function updateAllowDeviceCustomId(newAllowDeviceCustomId: boolean) {
     return Promise.resolve()
   }
 
-  const { error } = await supabase.from('apps').update({ allow_device_custom_id: newAllowDeviceCustomId }).eq('app_id', props.appId)
-  if (error) {
+  try {
+    await updateAppSettings({ allow_device_custom_id: newAllowDeviceCustomId })
+  }
+  catch {
     return Promise.reject(t('cannot-change-allow-device-custom-id'))
   }
   toast.success(t('changed-allow-device-custom-id'))
