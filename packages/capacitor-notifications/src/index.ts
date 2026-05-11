@@ -446,5 +446,3 @@ export const CapgoNotifications: CapgoNotificationsPlugin = {
     return NativeCapgoNotifications.addListener('registration', listenerFunc as (token: CapgoNotificationToken) => void)
   },
 }
-
-export default CapgoNotifications
