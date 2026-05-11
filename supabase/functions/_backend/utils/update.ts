@@ -65,6 +65,21 @@ function summarizeUpdateRequest(body: AppInfos) {
   }
 }
 
+function summarizeUpdateDevice(device: ReturnType<typeof makeDevice>) {
+  return {
+    hasDeviceId: Boolean(device.device_id),
+    hasCustomId: Boolean(device.custom_id),
+    hasAppId: Boolean(device.app_id),
+    hasVersionBuild: Boolean(device.version_build),
+    hasVersionName: Boolean(device.version_name),
+    hasPluginVersion: Boolean(device.plugin_version),
+    hasOsVersion: Boolean(device.os_version),
+    platform: device.platform,
+    is_prod: device.is_prod,
+    is_emulator: device.is_emulator,
+  }
+}
+
 export function getUpdateResponseKind(errorCode: string): UpdateResponseKind {
   if (UPDATE_UP_TO_DATE_CODES.has(errorCode))
     return 'up_to_date'
@@ -228,7 +243,7 @@ export async function updateWithPG(
 
   await backgroundTask(c, createStatsMau(c, device_id, app_id, appOwner.owner_org, platform, version_build))
 
-  cloudlog({ requestId: c.get('requestId'), message: 'vals', platform, device })
+  cloudlog({ requestId: c.get('requestId'), message: 'vals', platform, device: summarizeUpdateDevice(device) })
 
   // Only query link/comment if plugin supports it (v5.35.0+, v6.35.0+, v7.35.0+, v8.35.0+) AND app has expose_metadata enabled
   const needsMetadata = appOwner.expose_metadata && !isDeprecatedPluginVersion(pluginVersion, '5.35.0', '6.35.0', '7.35.0', '8.35.0')
