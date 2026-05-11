@@ -677,8 +677,6 @@ async function showInviteModal() {
 }
 
 async function sendInvitation(email: string, type: Database['public']['Enums']['user_min_right'] | string): Promise<boolean> {
-  console.log(`Invite ${email} with perm ${type}`)
-
   const orgId = currentOrganization.value?.gid
   if (!orgId) {
     toast.error('Organization ID not found.')
