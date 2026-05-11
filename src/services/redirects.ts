@@ -8,13 +8,14 @@ const redirectBaseUrl = 'https://app.capgo.local'
 
 function hasControlCharacter(path: string): boolean {
   return Array.from(path).some((char) => {
-    const codePoint = char.charCodeAt(0)
+    const codePoint = char.codePointAt(0) ?? 0
     return codePoint <= 31 || codePoint === 127
   })
 }
 
 export function isSafeRedirectPath(path: string): boolean {
-  if (!path || path !== path.trim())
+  const trimmedPath = path.trim()
+  if (trimmedPath.length === 0 || path !== trimmedPath)
     return false
 
   if (!path.startsWith('/') || path.startsWith('//'))
