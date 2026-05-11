@@ -49,11 +49,11 @@ const displayNoDataMessage = computed(() => props.noDataMessage ?? t('no-data'))
 </script>
 
 <template>
-  <div class="relative col-span-full flex h-[460px] flex-col overflow-hidden rounded-[1.75rem] border border-slate-200/80 bg-white/95 shadow-[0_20px_60px_-38px_rgba(15,23,42,0.3)] backdrop-blur dark:border-slate-700/70 dark:bg-slate-900/85 dark:shadow-[0_24px_70px_-42px_rgba(2,6,23,0.72)]">
-    <div class="pointer-events-none absolute inset-x-0 top-0 h-28 bg-gradient-to-br from-slate-50 via-white to-transparent dark:from-slate-800/70 dark:via-slate-900/40 dark:to-transparent" />
+  <div class="relative col-span-full flex min-h-[380px] flex-col overflow-hidden rounded-xl border border-slate-200/80 bg-white/95 shadow-[0_18px_50px_-36px_rgba(15,23,42,0.32)] backdrop-blur dark:border-slate-700/70 dark:bg-slate-900/85 dark:shadow-[0_22px_64px_-42px_rgba(2,6,23,0.72)] sm:h-[460px]">
+    <div class="pointer-events-none absolute inset-x-0 top-0 h-24 bg-gradient-to-br from-slate-50 via-white to-transparent dark:from-slate-800/70 dark:via-slate-900/40 dark:to-transparent" />
 
     <!-- Header with title and stats -->
-    <div class="relative overflow-hidden px-5 pt-5">
+    <div class="relative overflow-hidden px-4 pt-4 sm:px-5 sm:pt-5">
       <!-- Custom header slot or default header -->
       <div class="flex flex-col gap-4">
         <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -91,7 +91,7 @@ const displayNoDataMessage = computed(() => props.noDataMessage ?? t('no-data'))
     </div>
 
     <!-- Chart content area -->
-    <div class="relative min-h-0 flex-1 px-5 pb-5 pt-4">
+    <div class="relative min-h-0 flex-1 px-4 pb-4 pt-4 sm:px-5 sm:pb-5">
       <!-- Loading state -->
       <div v-if="isLoading" class="flex justify-center items-center h-full">
         <Spinner size="w-24 h-24" />
