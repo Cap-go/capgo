@@ -28,9 +28,20 @@ const isLoading = ref(false)
 const isLoadingMain = ref(true)
 const cardDescription = computed(() => step.value === 1 ? t('enter-your-email-add') : t('enter-your-new-passw'))
 
-function getRecoveryParams() {
-  const hashParams = new URLSearchParams(route.hash.replace('#', ''))
-  const queryParams = new URLSearchParams(window.location.search)
+interface RecoveryParams {
+  accessToken: string
+  refreshToken: string
+  code: string
+  error: string
+  errorDescription: string
+}
+
+const recoveryParams = ref<RecoveryParams | null>(null)
+
+function readRecoveryParamsFromUrl(): RecoveryParams {
+  const parsedUrl = new URL(window.location.href)
+  const hashParams = new URLSearchParams(parsedUrl.hash.replace('#', ''))
+  const queryParams = parsedUrl.searchParams
   return {
     accessToken: hashParams.get('access_token') ?? queryParams.get('access_token') ?? '',
     refreshToken: hashParams.get('refresh_token') ?? queryParams.get('refresh_token') ?? '',
@@ -38,6 +49,50 @@ function getRecoveryParams() {
     error: queryParams.get('error') ?? hashParams.get('error') ?? '',
     errorDescription: queryParams.get('error_description') ?? hashParams.get('error_description') ?? '',
   }
+}
+
+function hasRecoveryParams(params: RecoveryParams) {
+  return !!(params.accessToken || params.refreshToken || params.code || params.error)
+}
+
+function clearRecoveryParamsFromUrl() {
+  const parsedUrl = new URL(window.location.href)
+  const hashParams = new URLSearchParams(parsedUrl.hash.replace('#', ''))
+  const authParamNames = [
+    'access_token',
+    'refresh_token',
+    'code',
+    'error',
+    'error_description',
+    'expires_at',
+    'expires_in',
+    'provider_refresh_token',
+    'provider_token',
+    'token_type',
+    'type',
+  ]
+
+  for (const paramName of authParamNames) {
+    parsedUrl.searchParams.delete(paramName)
+    hashParams.delete(paramName)
+  }
+
+  const nextHash = hashParams.toString()
+  parsedUrl.hash = nextHash ? `#${nextHash}` : ''
+  window.history.replaceState({}, '', parsedUrl.toString())
+}
+
+function getRecoveryParams() {
+  return recoveryParams.value ?? readRecoveryParamsFromUrl()
+}
+
+function cacheRecoveryParamsFromUrl() {
+  const params = readRecoveryParamsFromUrl()
+  if (hasRecoveryParams(params)) {
+    recoveryParams.value = params
+    clearRecoveryParamsFromUrl()
+  }
+  return recoveryParams.value ?? params
 }
 
 function finishWithError(message: string, error?: unknown) {
@@ -146,6 +201,7 @@ async function step2(form: { password: string, password_confirm: string }) {
     setErrors('forgot-password', [signOutError.message], {})
     return
   }
+  recoveryParams.value = null
   toast.success(t('forgot-success'))
   router.push('/dashboard')
 }
@@ -164,9 +220,10 @@ watchEffect(() => {
   isLoadingMain.value = true
   if (route && (route.path === '/forgot_password' || route.path === '/forgot_password/')) {
     // console.log('router.currentRoute.value.query', router.currentRoute.value.query)
+    const params = cacheRecoveryParamsFromUrl()
     if (router.currentRoute.value.query && router.currentRoute.value.query.step)
       step.value = Number.parseInt(router.currentRoute.value.query.step as string)
-    else if (getRecoveryParams().accessToken || getRecoveryParams().refreshToken || getRecoveryParams().code)
+    else if (params.accessToken || params.refreshToken || params.code)
       step.value = 2
     isLoadingMain.value = false
   }
