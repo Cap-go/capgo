@@ -109,7 +109,7 @@ async function loadReplicationStatus() {
     const { data: { session } } = await supabase.auth.getSession()
 
     if (!session?.access_token)
-      throw new Error('No session available and replication secret is not configured')
+      throw new Error('No Supabase session available for replication status')
 
     headers.Authorization = `Bearer ${session.access_token}`
 
