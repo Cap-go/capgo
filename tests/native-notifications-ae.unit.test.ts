@@ -115,6 +115,19 @@ describe('native notification AE registry', () => {
     expect(query).toContain("recipient_key = 'recipient-key'")
   })
 
+  it.concurrent('searches every registry bucket for device-key-only lookups', () => {
+    const query = buildNotificationRegistryLookupQuery({
+      dataset: 'notification_registry',
+      appId: 'com.demo.app',
+      deviceKey: 'device-key',
+      now: new Date('2026-05-06T00:00:00Z'),
+    })
+
+    expect(query).toContain("index1 IN ('com.demo.app:00'")
+    expect(query).toContain("'com.demo.app:ff'")
+    expect(query).toContain("device_key = 'device-key'")
+  })
+
   it.concurrent('builds notification event stats from AE only', () => {
     const query = buildNotificationStatsQuery({
       dataset: 'notification_events',

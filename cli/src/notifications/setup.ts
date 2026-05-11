@@ -87,11 +87,15 @@ function runSync() {
   runCommand(runner.command, [...runner.args, 'cap', 'sync'], 'Capacitor sync')
 }
 
-async function writeHelperFile(filePath: string, appId: string, serverUrl: string, force: boolean | undefined) {
+function assertHelperFileWritable(filePath: string, force: boolean | undefined) {
   const absolutePath = resolve(cwd(), filePath)
   if (existsSync(absolutePath) && !force)
     throw new Error(`${filePath} already exists. Re-run with --force to overwrite it.`)
+  return absolutePath
+}
 
+async function writeHelperFile(filePath: string, appId: string, serverUrl: string, force: boolean | undefined) {
+  const absolutePath = assertHelperFileWritable(filePath, force)
   mkdirSync(dirname(absolutePath), { recursive: true })
   await writeFileAtomic(absolutePath, renderNotificationHelper(appId, serverUrl), { mode: 0o644 })
   return absolutePath
@@ -109,6 +113,7 @@ export async function setupNotifications(appIdArg: string | undefined, options: 
 
     const serverUrl = options.serverUrl || defaultApiHost
     const helperFile = options.file || 'src/capgo-notifications.ts'
+    assertHelperFileWritable(helperFile, options.force)
 
     if (options.install !== false)
       runInstall()

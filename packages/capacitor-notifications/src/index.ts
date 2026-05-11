@@ -43,6 +43,13 @@ interface UpdaterPlugin {
   set: (options: { id: string }) => Promise<unknown>
 }
 
+interface ListenerState {
+  notificationReceived: Set<(notification: CapgoPushNotificationSchema) => void>
+  notificationOpened: Set<(event: CapgoNotificationOpenedEvent) => void>
+  backgroundNotification: Set<(event: CapgoBackgroundNotificationEvent) => void>
+  registrationChanged: Set<(token: CapgoNotificationToken) => void>
+}
+
 interface RuntimeState {
   config?: CapgoNotificationsConfig
   externalId?: string
@@ -57,6 +64,7 @@ interface RuntimeState {
   bridgeListenersPromise?: Promise<void>
   lastRegistration?: CapgoNotificationRegistration
   handledUpdateNotifications: Set<string>
+  listeners: ListenerState
   updater: Required<Pick<CapgoUpdaterIntegrationOptions, 'enabled'>> & {
     installMode: CapgoNotificationInstallMode
     channel?: string
@@ -70,6 +78,12 @@ const state: RuntimeState = {
   badge: 0,
   bridgeListenersReady: false,
   handledUpdateNotifications: new Set(),
+  listeners: {
+    notificationReceived: new Set(),
+    notificationOpened: new Set(),
+    backgroundNotification: new Set(),
+    registrationChanged: new Set(),
+  },
   updater: {
     enabled: true,
     installMode: 'next',
@@ -218,6 +232,25 @@ function isUpdateCheckNotification(notification?: CapgoPushNotificationSchema) {
   return action === 'update_check' || action === 'capgo_update_check'
 }
 
+function notifyListeners<T>(listeners: Set<(event: T) => void>, event: T) {
+  for (const listener of [...listeners]) {
+    try {
+      listener(event)
+    }
+    catch (error) {
+      setTimeout(() => {
+        throw error
+      }, 0)
+    }
+  }
+}
+
+function createListenerHandle(remove: () => void): PluginListenerHandle {
+  return {
+    remove: async () => remove(),
+  }
+}
+
 function updateOptionsFromNotification(notification?: CapgoPushNotificationSchema): CapgoUpdaterIntegrationOptions {
   const data = notificationData(notification)
   const requestedInstallMode = getStringData(data, 'capgoUpdateInstallMode', 'capgo_update_install_mode')
@@ -359,9 +392,30 @@ async function ensureBridgeListeners() {
             consent: state.consent,
           }, token)
         }
+        notifyListeners(state.listeners.registrationChanged, token)
       }))
-      handles.push(await NativeCapgoNotifications.addListener('notificationReceived', notification => void maybeRunUpdateCheck(notification)))
-      handles.push(await NativeCapgoNotifications.addListener('backgroundNotification', notification => void maybeRunUpdateCheck(notification)))
+      handles.push(await NativeCapgoNotifications.addListener('notificationReceived', (notification) => {
+        void trackEvent('received', eventFromNotification(notification))
+        void maybeRunUpdateCheck(notification)
+        notifyListeners(state.listeners.notificationReceived, notification)
+      }))
+      handles.push(await NativeCapgoNotifications.addListener('notificationOpened', (event) => {
+        void trackEvent('opened', eventFromNotification(event.notification))
+        notifyListeners(state.listeners.notificationOpened, event)
+      }))
+      handles.push(await NativeCapgoNotifications.addListener('backgroundNotification', (notification) => {
+        if (!isUpdateCheckNotification(notification))
+          void trackEvent('background_started', eventFromNotification(notification))
+        void maybeRunUpdateCheck(notification)
+        let finished = false
+        const finish = async () => {
+          if (finished)
+            return
+          finished = true
+          await trackEvent('background_finished', eventFromNotification(notification))
+        }
+        notifyListeners(state.listeners.backgroundNotification, { notification, finish })
+      }))
       state.bridgeListenersReady = true
     }
     catch (error) {
@@ -498,29 +552,27 @@ export const CapgoNotifications: CapgoNotificationsPlugin = {
   },
 
   async addListener(eventName, listenerFunc) {
+    await ensureBridgeListeners()
     if (eventName === 'notificationReceived') {
-      return NativeCapgoNotifications.addListener('notificationReceived', (notification) => {
-        void trackEvent('received', eventFromNotification(notification))
-        void maybeRunUpdateCheck(notification)
-        ;(listenerFunc as (notification: CapgoPushNotificationSchema) => void)(notification)
-      })
+      const listener = listenerFunc as (notification: CapgoPushNotificationSchema) => void
+      state.listeners.notificationReceived.add(listener)
+      return createListenerHandle(() => state.listeners.notificationReceived.delete(listener))
     }
 
     if (eventName === 'notificationOpened') {
-      return NativeCapgoNotifications.addListener('notificationOpened', (event) => {
-        void trackEvent('opened', eventFromNotification(event.notification))
-        ;(listenerFunc as (event: CapgoNotificationOpenedEvent) => void)(event)
-      })
+      const listener = listenerFunc as (event: CapgoNotificationOpenedEvent) => void
+      state.listeners.notificationOpened.add(listener)
+      return createListenerHandle(() => state.listeners.notificationOpened.delete(listener))
     }
 
     if (eventName === 'backgroundNotification') {
-      return NativeCapgoNotifications.addListener('backgroundNotification', (notification) => {
-        void maybeRunUpdateCheck(notification)
-        const finish = async () => trackEvent('background_finished', eventFromNotification(notification))
-        ;(listenerFunc as (event: CapgoBackgroundNotificationEvent) => void)({ notification, finish })
-      })
+      const listener = listenerFunc as (event: CapgoBackgroundNotificationEvent) => void
+      state.listeners.backgroundNotification.add(listener)
+      return createListenerHandle(() => state.listeners.backgroundNotification.delete(listener))
     }
 
-    return NativeCapgoNotifications.addListener('registration', listenerFunc as (token: CapgoNotificationToken) => void)
+    const listener = listenerFunc as (token: CapgoNotificationToken) => void
+    state.listeners.registrationChanged.add(listener)
+    return createListenerHandle(() => state.listeners.registrationChanged.delete(listener))
   },
 }

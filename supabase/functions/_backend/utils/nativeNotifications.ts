@@ -353,7 +353,7 @@ export async function trackNotificationRegistrationCF(c: Context<MiddlewareKeyVa
 export function buildNotificationRegistryLookupQuery(params: {
   dataset: string
   appId: string
-  buckets: string[]
+  buckets?: string[]
   recipientKey?: string
   deviceKey?: string
   tag?: string
@@ -361,7 +361,7 @@ export function buildNotificationRegistryLookupQuery(params: {
   now?: Date
 }) {
   const since = new Date((params.now?.getTime() ?? Date.now()) - NOTIFICATION_REGISTRY_RETENTION_DAYS * 24 * 60 * 60 * 1000)
-  const indexes = params.buckets.map(bucket => `'${escapeSqlString(getNotificationIndex(params.appId, bucket))}'`).join(', ')
+  const indexes = resolveNotificationBuckets(params).map(bucket => `'${escapeSqlString(getNotificationIndex(params.appId, bucket))}'`).join(', ')
   const innerConditions = [
     `index1 IN (${indexes})`,
     `timestamp >= toDateTime('${formatDateCF(since)}')`,
@@ -414,8 +414,6 @@ function resolveNotificationBuckets(params: {
     return params.buckets
   if (params.recipientKey)
     return [getNotificationBucket(params.recipientKey)]
-  if (params.deviceKey)
-    return [getNotificationBucket(params.deviceKey)]
   return getAllNotificationBuckets()
 }
 
