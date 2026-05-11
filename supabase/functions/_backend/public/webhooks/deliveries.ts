@@ -5,16 +5,15 @@ import type {
   WebhookPayload,
 } from '../../utils/webhook.ts'
 import { type } from 'arktype'
-import { safeParseSchema } from '../../utils/ark_validation.ts'
 import { simpleError } from '../../utils/hono.ts'
 import { supabaseApikey, supabaseWithAuth } from '../../utils/supabase.ts'
 import {
   getDeliveryById,
   getWebhookById,
-  getWebhookUrlValidationError,
   queueWebhookDelivery,
 } from '../../utils/webhook.ts'
 import { checkWebhookPermission, checkWebhookPermissionV2 } from './index.ts'
+import { parseWebhookBody, throwIfInvalidWebhookUrl } from './redaction.ts'
 
 const getDeliveriesSchema = type({
   'orgId': 'string',
@@ -31,11 +30,7 @@ const retryDeliverySchema = type({
 const DELIVERIES_PER_PAGE = 50
 
 export async function getDeliveries(c: Context<MiddlewareKeyVariables, any, any>, bodyRaw: any, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
-  const bodyParsed = safeParseSchema(getDeliveriesSchema, bodyRaw)
-  if (!bodyParsed.success) {
-    throw simpleError('invalid_body', 'Invalid body', { error: bodyParsed.error })
-  }
-  const body = bodyParsed.data
+  const body = parseWebhookBody(getDeliveriesSchema, bodyRaw)
 
   await checkWebhookPermission(c, body.orgId, apikey)
 
@@ -108,11 +103,7 @@ export async function getDeliveries(c: Context<MiddlewareKeyVariables, any, any>
 }
 
 export async function retryDelivery(c: Context<MiddlewareKeyVariables, any, any>, bodyRaw: any, auth: AuthInfo): Promise<Response> {
-  const bodyParsed = safeParseSchema(retryDeliverySchema, bodyRaw)
-  if (!bodyParsed.success) {
-    throw simpleError('invalid_body', 'Invalid body', { error: bodyParsed.error })
-  }
-  const body = bodyParsed.data
+  const body = parseWebhookBody(retryDeliverySchema, bodyRaw)
 
   await checkWebhookPermissionV2(c, body.orgId, auth)
 
@@ -144,9 +135,7 @@ export async function retryDelivery(c: Context<MiddlewareKeyVariables, any, any>
     throw simpleError('webhook_disabled', 'Webhook is disabled')
   }
 
-  const urlError = getWebhookUrlValidationError(c, webhook.url)
-  if (urlError)
-    throw simpleError('invalid_url', urlError, { url: webhook.url })
+  throwIfInvalidWebhookUrl(c, webhook.url)
 
   // Reset delivery status and queue for retry
   await supabase

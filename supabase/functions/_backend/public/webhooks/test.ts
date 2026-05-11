@@ -1,17 +1,16 @@
 import type { Context } from 'hono'
 import type { AuthInfo, MiddlewareKeyVariables } from '../../utils/hono.ts'
 import { type } from 'arktype'
-import { safeParseSchema } from '../../utils/ark_validation.ts'
 import { simpleError } from '../../utils/hono.ts'
 import { supabaseWithAuth } from '../../utils/supabase.ts'
 import {
   createDeliveryRecord,
   createTestPayload,
   deliverWebhook,
-  getWebhookUrlValidationError,
   updateDeliveryResult,
 } from '../../utils/webhook.ts'
 import { checkWebhookPermissionV2 } from './index.ts'
+import { parseWebhookBody, throwIfInvalidWebhookUrl } from './redaction.ts'
 
 const bodySchema = type({
   orgId: 'string',
@@ -19,11 +18,7 @@ const bodySchema = type({
 })
 
 export async function test(c: Context<MiddlewareKeyVariables, any, any>, bodyRaw: any, auth: AuthInfo): Promise<Response> {
-  const bodyParsed = safeParseSchema(bodySchema, bodyRaw)
-  if (!bodyParsed.success) {
-    throw simpleError('invalid_body', 'Invalid body', { error: bodyParsed.error })
-  }
-  const body = bodyParsed.data
+  const body = parseWebhookBody(bodySchema, bodyRaw)
 
   await checkWebhookPermissionV2(c, body.orgId, auth)
 
@@ -46,9 +41,7 @@ export async function test(c: Context<MiddlewareKeyVariables, any, any>, bodyRaw
     throw simpleError('no_permission', 'Webhook does not belong to this organization', { webhookId: body.webhookId })
   }
 
-  const urlError = getWebhookUrlValidationError(c, webhook.url)
-  if (urlError)
-    throw simpleError('invalid_url', urlError, { url: webhook.url })
+  throwIfInvalidWebhookUrl(c, webhook.url)
 
   // Create test payload
   const payload = createTestPayload(body.orgId)

@@ -1,11 +1,11 @@
 import type { Context } from 'hono'
 import type { Database } from '../../utils/supabase.types.ts'
 import { type } from 'arktype'
-import { safeParseSchema } from '../../utils/ark_validation.ts'
 import { simpleError } from '../../utils/hono.ts'
 import { supabaseApikey } from '../../utils/supabase.ts'
-import { getWebhookUrlValidationError, WEBHOOK_EVENT_TYPES } from '../../utils/webhook.ts'
+import { WEBHOOK_EVENT_TYPES } from '../../utils/webhook.ts'
 import { checkWebhookPermission } from './index.ts'
+import { parseWebhookBody, throwIfInvalidWebhookUrl } from './redaction.ts'
 
 const bodySchema = type({
   'orgId': 'string',
@@ -17,11 +17,7 @@ const bodySchema = type({
 })
 
 export async function put(c: Context, bodyRaw: any, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
-  const bodyParsed = safeParseSchema(bodySchema, bodyRaw)
-  if (!bodyParsed.success) {
-    throw simpleError('invalid_body', 'Invalid body', { error: bodyParsed.error })
-  }
-  const body = bodyParsed.data
+  const body = parseWebhookBody(bodySchema, bodyRaw)
 
   await checkWebhookPermission(c, body.orgId, apikey)
 
@@ -57,9 +53,7 @@ export async function put(c: Context, bodyRaw: any, apikey: Database['public']['
 
   // Validate URL if provided
   if (body.url) {
-    const urlError = getWebhookUrlValidationError(c, body.url)
-    if (urlError)
-      throw simpleError('invalid_url', urlError, { url: body.url })
+    throwIfInvalidWebhookUrl(c, body.url)
   }
 
   // Build update object

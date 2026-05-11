@@ -1,10 +1,10 @@
 import type { Context } from 'hono'
 import type { Database } from '../../utils/supabase.types.ts'
 import { type } from 'arktype'
-import { safeParseSchema } from '../../utils/ark_validation.ts'
 import { simpleError } from '../../utils/hono.ts'
 import { supabaseApikey } from '../../utils/supabase.ts'
 import { checkWebhookPermission } from './index.ts'
+import { parseWebhookBody } from './redaction.ts'
 
 const bodySchema = type({
   orgId: 'string',
@@ -12,11 +12,7 @@ const bodySchema = type({
 })
 
 export async function deleteWebhook(c: Context, bodyRaw: any, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
-  const bodyParsed = safeParseSchema(bodySchema, bodyRaw)
-  if (!bodyParsed.success) {
-    throw simpleError('invalid_body', 'Invalid body', { error: bodyParsed.error })
-  }
-  const body = bodyParsed.data
+  const body = parseWebhookBody(bodySchema, bodyRaw)
 
   await checkWebhookPermission(c, body.orgId, apikey)
 
