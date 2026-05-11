@@ -148,4 +148,46 @@ describe('files app-scoped read guard', () => {
     )
     expect(bucketPut).not.toHaveBeenCalled()
   })
+
+  it('serves cached content for non-deleted bundle paths', async () => {
+    getAppByAppIdPgMock.mockResolvedValue({ app_id: 'test-app', owner_org: 'test-org' })
+    pgClientMock.query.mockResolvedValue({ rows: [] })
+
+    const bucketPut = vi.fn()
+    globalThis.caches = {
+      default: {
+        match: async () => new Response('cached bundle bytes', {
+          headers: {
+            'content-type': 'application/zip',
+          },
+        }),
+        put: async () => { },
+      },
+    } as any
+
+    const { app: files } = await import('../supabase/functions/_backend/files/files.ts')
+    const { createAllCatch, createHono } = await import('../supabase/functions/_backend/utils/hono.ts')
+    const { version } = await import('../supabase/functions/_backend/utils/version.ts')
+
+    const appGlobal = createHono('files', version)
+    appGlobal.route('/', files)
+    createAllCatch(appGlobal, 'files')
+
+    const filePath = 'orgs/test-org/apps/test-app/1.0.0.zip'
+    const response = await appGlobal.fetch(
+      new Request(`http://localhost/read/attachments/${filePath}`),
+      {
+        ATTACHMENT_BUCKET: { put: bucketPut },
+      },
+      { waitUntil: () => { } } as any,
+    )
+
+    expect(response.status).toBe(200)
+    expect(await response.text()).toBe('cached bundle bytes')
+    expect(pgClientMock.query).toHaveBeenCalledWith(
+      expect.stringContaining('FROM public.app_versions'),
+      ['test-org', 'test-app', filePath],
+    )
+    expect(bucketPut).not.toHaveBeenCalled()
+  })
 })
