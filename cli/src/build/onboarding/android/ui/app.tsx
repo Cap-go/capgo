@@ -284,13 +284,18 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
     const inKeystorePhase = keystorePhaseSteps.has(resumeStep)
 
     // Keystore phase: if we're routing back into it, show partial-input
-    // breadcrumbs ("keystore selected", "alias known") instead of a
-    // misleading "✔ Keystore ready". Otherwise show the full ready line.
+    // breadcrumbs for every field already in progress (path / alias /
+    // store password / key password) instead of a misleading
+    // "✔ Keystore ready". Otherwise show the full ready line.
     if (inKeystorePhase) {
       if (initialProgress.keystoreExistingPath)
         addLog(`✔ Keystore selected · ${initialProgress.keystoreExistingPath}`)
       if (initialProgress.keystoreAlias)
         addLog(`✔ Key alias · ${initialProgress.keystoreAlias}`)
+      if (initialProgress.keystoreStorePassword)
+        addLog('✔ Store password set')
+      if (initialProgress.keystoreKeyPassword)
+        addLog('✔ Key password set')
       addLog('↺ Re-confirming a missing keystore input', 'yellow')
     }
     else if (completedSteps.keystoreReady) {
@@ -1158,6 +1163,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
             onSubmit={(val) => {
               const keyPw = val || keystoreStorePassword
               setKeystoreKeyPassword(keyPw)
+              addLog('✔ Key password set')
               ;(async () => {
                 try {
                   const bytes = await readFile(keystoreExistingPath)
