@@ -154,7 +154,19 @@ app.post('/', middlewareAuth, async (c) => {
   }
 
   if (!isAdmin) {
-    cloudlog({ requestId: c.get('requestId'), message: 'not_admin', body })
+    // Log only whitelisted schema fields — never caller-supplied extra fields
+    const { metric_category, start_date, end_date, app_id, org_id, limit, offset } = parsedBodyResult.data
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'not_admin',
+      metric_category,
+      start_date,
+      end_date,
+      app_id: app_id ?? null,
+      org_id: org_id ?? null,
+      limit: limit ?? null,
+      offset: offset ?? null,
+    })
     throw simpleError('not_admin', 'Not admin - only admin users can access platform statistics')
   }
 
