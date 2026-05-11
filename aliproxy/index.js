@@ -17,11 +17,17 @@ const SENSITIVE_QUERY_KEYS = new Set([
   'token',
 ])
 
+function isSensitiveQueryKey(key) {
+  const lowerKey = key.toLowerCase()
+  const normalizedKey = lowerKey.replace(/[^a-z0-9]/g, '')
+  return SENSITIVE_QUERY_KEYS.has(lowerKey) || /(token|secret|password|apikey|auth|signature|session|code|key)/.test(normalizedKey)
+}
+
 function safeLogPath(path) {
   try {
     const url = new URL(path, `https://${TARGET_HOST}`)
     for (const key of [...url.searchParams.keys()]) {
-      if (SENSITIVE_QUERY_KEYS.has(key.toLowerCase())) {
+      if (isSensitiveQueryKey(key)) {
         url.searchParams.set(key, 'REDACTED')
       }
     }
