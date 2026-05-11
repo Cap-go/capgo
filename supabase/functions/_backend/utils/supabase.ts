@@ -1694,7 +1694,7 @@ export async function checkApikeyMeetsOrgPolicy(
 ): Promise<{ valid: boolean, error?: string }> {
   const { data: org, error } = await supabase
     .from('orgs')
-    .select('require_apikey_expiration')
+    .select('require_apikey_expiration, max_apikey_expiration_days')
     .eq('id', orgId)
     .single()
 
@@ -1710,6 +1710,14 @@ export async function checkApikeyMeetsOrgPolicy(
 
   if (org.require_apikey_expiration && !key.expires_at) {
     return { valid: false, error: 'org_requires_expiring_key' }
+  }
+
+  if (org.max_apikey_expiration_days && key.expires_at) {
+    const maxDate = new Date()
+    maxDate.setDate(maxDate.getDate() + org.max_apikey_expiration_days)
+    if (new Date(key.expires_at) > maxDate) {
+      return { valid: false, error: 'expiration_exceeds_max' }
+    }
   }
 
   return { valid: true }

@@ -12,6 +12,7 @@ const WEBHOOKS_RETRY_URL = getEndpointUrl('/webhooks/deliveries/retry')
 const legacyApiKeySeedId = numericGlobalId * 2
 const expiringSubkeySeedId = legacyApiKeySeedId + 1
 const delegatedApiKeySeedId = expiringSubkeySeedId + 1
+const overlongApiKeySeedId = delegatedApiKeySeedId + 1
 const seededWebhookId = randomUUID()
 const seededDeliveryId = randomUUID()
 
@@ -21,6 +22,8 @@ let expiringSubkeyId: number | null = null
 let expiringSubkeyValue: string | null = null
 let delegatedApiKeyId: number | null = null
 let delegatedApiKeyValue: string | null = null
+let overlongApiKeyId: number | null = null
+let overlongApiKeyValue: string | null = null
 let createdWebhookId: string | null = null
 let createdDeliveryId: string | null = null
 let policyOwnerUserId: string | null = null
@@ -91,6 +94,23 @@ beforeAll(async () => {
   }
   legacyApiKeyId = legacyKeyData.id
   legacyApiKeyValue = legacyKeyData.key
+
+  const { data: overlongKeyData, error: overlongKeyError } = await supabase.from('apikeys').insert({
+    id: overlongApiKeySeedId,
+    user_id: policyOwnerUserId,
+    key: `overlong-webhook-key-${globalId}`,
+    key_hash: null,
+    mode: 'all',
+    name: `overlong-webhook-key-${globalId}`,
+    limited_to_apps: [],
+    limited_to_orgs: [policyOrgId],
+    expires_at: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString(),
+  }).select('id, key').single()
+  if (overlongKeyError || !overlongKeyData) {
+    throw new Error(`Failed to seed overlong webhook API key: ${overlongKeyError?.message ?? 'missing key data'}`)
+  }
+  overlongApiKeyId = overlongKeyData.id
+  overlongApiKeyValue = overlongKeyData.key
 
   // Seed preconditions directly so policy tests do not depend on webhook delivery side effects.
   const { error: webhookError } = await (supabase as any).from('webhooks').insert({
@@ -210,6 +230,10 @@ afterAll(async () => {
     await supabase.from('apikeys').delete().eq('id', delegatedApiKeyId)
   }
 
+  if (overlongApiKeyId) {
+    await supabase.from('apikeys').delete().eq('id', overlongApiKeyId)
+  }
+
   await supabase.from('role_bindings').delete().eq('org_id', policyOrgId)
   await supabase.from('org_users').delete().eq('org_id', policyOrgId)
   await supabase.from('orgs').delete().eq('id', policyOrgId)
@@ -258,6 +282,22 @@ describe('webhook endpoints enforce org API key expiration policy', () => {
     expect(response.status).toBe(401)
     const data = await response.json() as { error: string }
     expect(data.error).toBe('org_requires_expiring_key')
+  })
+
+  it('rejects webhook listing for existing org key beyond lowered max expiration days', async () => {
+    if (!overlongApiKeyValue)
+      throw new Error('Overlong API key was not created')
+
+    const response = await fetch(`${WEBHOOKS_URL}?orgId=${policyOrgId}`, {
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': overlongApiKeyValue,
+      },
+    })
+
+    expect(response.status).toBe(401)
+    const data = await response.json() as { error: string }
+    expect(data.error).toBe('expiration_exceeds_max')
   })
 
   it('rejects webhook deletion for legacy non-expiring org key', async () => {

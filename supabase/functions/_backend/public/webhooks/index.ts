@@ -40,6 +40,9 @@ async function assertWebhookOrgPolicy(
   if (orgCheck.error === 'org_requires_expiring_key') {
     throw quickError(401, 'org_requires_expiring_key', 'This organization requires API keys with an expiration date. Please use a different key or update this key with an expiration date.')
   }
+  if (orgCheck.error === 'expiration_exceeds_max') {
+    throw quickError(401, 'expiration_exceeds_max', 'API key expiration exceeds this organization\'s maximum allowed validity window. Please use a different key or update this key with a shorter expiration date.')
+  }
 
   throw simpleError('invalid_org_id', 'You can\'t access this organization', { org_id: orgId })
 }
