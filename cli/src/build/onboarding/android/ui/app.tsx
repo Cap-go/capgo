@@ -228,6 +228,33 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
     [appId],
   )
 
+  /**
+   * Persist a progress update AND transition to the next step, in that order.
+   *
+   * Replaces the racy `void persist(...) ; setStep(next)` pattern. The old
+   * pattern issued the persist fire-and-forget, then synchronously called
+   * setStep. The next step's onSubmit handler could then issue its own
+   * persist, read the on-disk progress BEFORE the first persist had written,
+   * and clobber the just-typed field when it saved.
+   *
+   * `persistAndStep` awaits the disk write before advancing, which serializes
+   * consecutive persists by gating each step transition on the previous
+   * write completing. Side effect: the step transition happens after one
+   * IO round-trip (~few ms) rather than immediately. Worth it.
+   */
+  const persistAndStep = useCallback(
+    (
+      updater: (p: AndroidOnboardingProgress) => AndroidOnboardingProgress,
+      nextStep: AndroidOnboardingStep,
+    ): void => {
+      ;(async () => {
+        await persist(updater)
+        setStep(nextStep)
+      })()
+    },
+    [persist],
+  )
+
   useEffect(() => {
     if (!initialProgress)
       return
@@ -940,13 +967,11 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
               }
               else if (value === 'existing') {
                 setKeystoreMethod('existing')
-                void persist((p) => ({ ...p, keystoreMethod: 'existing' }))
-                setStep('keystore-existing-path')
+                persistAndStep((p) => ({ ...p, keystoreMethod: 'existing' }), 'keystore-existing-path')
               }
               else {
                 setKeystoreMethod('generate')
-                void persist((p) => ({ ...p, keystoreMethod: 'generate' }))
-                setStep('keystore-new-alias')
+                persistAndStep((p) => ({ ...p, keystoreMethod: 'generate' }), 'keystore-new-alias')
               }
             }}
           />
@@ -1012,8 +1037,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
                         return
                       }
                       setKeystoreExistingPath(abs)
-                      void persist((p) => ({ ...p, keystoreExistingPath: abs }))
-                      setStep('keystore-existing-store-password')
+                      persistAndStep((p) => ({ ...p, keystoreExistingPath: abs }), 'keystore-existing-store-password')
                     }}
                   />
                 </>
@@ -1042,8 +1066,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
                 return
               }
               setKeystoreStorePassword(val)
-              void persist((p) => ({ ...p, keystoreStorePassword: val }))
-              setStep('keystore-existing-detecting-alias')
+              persistAndStep((p) => ({ ...p, keystoreStorePassword: val }), 'keystore-existing-detecting-alias')
             }}
           />
         </Box>
@@ -1061,9 +1084,8 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
             options={detectedAliases.map(a => ({ label: a, value: a }))}
             onChange={(value) => {
               setKeystoreAlias(value)
-              void persist((p) => ({ ...p, keystoreAlias: value }))
               addLog(`✔ Alias selected · ${value}`)
-              setStep('keystore-existing-key-password')
+              persistAndStep((p) => ({ ...p, keystoreAlias: value }), 'keystore-existing-key-password')
             }}
           />
         </Box>
@@ -1080,8 +1102,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
             onSubmit={(val) => {
               const alias = val.trim() || RELEASE_ALIAS_DEFAULT
               setKeystoreAlias(alias)
-              void persist((p) => ({ ...p, keystoreAlias: alias }))
-              setStep('keystore-existing-key-password')
+              persistAndStep((p) => ({ ...p, keystoreAlias: alias }), 'keystore-existing-key-password')
             }}
           />
         </Box>
@@ -1137,8 +1158,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
             onSubmit={(val) => {
               const alias = val.trim() || RELEASE_ALIAS_DEFAULT
               setKeystoreAlias(alias)
-              void persist((p) => ({ ...p, keystoreAlias: alias }))
-              setStep('keystore-new-password-method')
+              persistAndStep((p) => ({ ...p, keystoreAlias: alias }), 'keystore-new-password-method')
             }}
           />
         </Box>
@@ -1159,8 +1179,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
                 setKeystoreStorePassword(pw)
                 setKeystoreKeyPassword(pw)
                 setRandomPasswordGenerated(true)
-                void persist((p) => ({ ...p, keystoreStorePassword: pw, keystoreKeyPassword: pw }))
-                setStep('keystore-new-cn')
+                persistAndStep((p) => ({ ...p, keystoreStorePassword: pw, keystoreKeyPassword: pw }), 'keystore-new-cn')
               }
               else {
                 setStep('keystore-new-store-password')
@@ -1186,8 +1205,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
                 return
               }
               setKeystoreStorePassword(val)
-              void persist((p) => ({ ...p, keystoreStorePassword: val }))
-              setStep('keystore-new-key-password')
+              persistAndStep((p) => ({ ...p, keystoreStorePassword: val }), 'keystore-new-key-password')
             }}
           />
         </Box>
@@ -1204,8 +1222,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
             onSubmit={(val) => {
               const keyPw = val || keystoreStorePassword
               setKeystoreKeyPassword(keyPw)
-              void persist((p) => ({ ...p, keystoreKeyPassword: keyPw }))
-              setStep('keystore-new-cn')
+              persistAndStep((p) => ({ ...p, keystoreKeyPassword: keyPw }), 'keystore-new-cn')
             }}
           />
         </Box>
@@ -1222,8 +1239,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
             onSubmit={(val) => {
               const cn = val.trim() || appId
               setKeystoreCommonName(cn)
-              void persist((p) => ({ ...p, keystoreCommonName: cn }))
-              setStep('keystore-generating')
+              persistAndStep((p) => ({ ...p, keystoreCommonName: cn }), 'keystore-generating')
             }}
           />
         </Box>
@@ -1373,12 +1389,14 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
               }
               const choice: PlayDeveloperAccountChoice = { developerId: id }
               setPlayAccountChoice(choice)
-              void persist((p) => ({
-                ...p,
-                completedSteps: { ...p.completedSteps, playAccountChosen: choice },
-              }))
               addLog(`✔ Play Developer account — ${id}`)
-              setStep('gcp-projects-loading')
+              persistAndStep(
+                (p) => ({
+                  ...p,
+                  completedSteps: { ...p.completedSteps, playAccountChosen: choice },
+                }),
+                'gcp-projects-loading',
+              )
             }}
           />
         </Box>
@@ -1420,12 +1438,14 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
                 createdByOnboarding: false,
               }
               setGcpProjectChoice(choice)
-              void persist((p) => ({
-                ...p,
-                completedSteps: { ...p.completedSteps, gcpProjectChosen: choice },
-              }))
               addLog(`✔ GCP project — ${chosen.name}`)
-              setStep('android-package-select')
+              persistAndStep(
+                (p) => ({
+                  ...p,
+                  completedSteps: { ...p.completedSteps, gcpProjectChosen: choice },
+                }),
+                'android-package-select',
+              )
             }}
           />
         </Box>
@@ -1451,14 +1471,16 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
               }
               setGcpProjectChoice(choice)
               setNewProjectDisplayName(displayName)
-              void persist((p) => ({
-                ...p,
-                pendingNewProjectId: projectId,
-                pendingNewProjectDisplayName: displayName,
-                completedSteps: { ...p.completedSteps, gcpProjectChosen: choice },
-              }))
               addLog(`✔ GCP project (new) — ${displayName} / ${projectId}`)
-              setStep('android-package-select')
+              persistAndStep(
+                (p) => ({
+                  ...p,
+                  pendingNewProjectId: projectId,
+                  pendingNewProjectDisplayName: displayName,
+                  completedSteps: { ...p.completedSteps, gcpProjectChosen: choice },
+                }),
+                'android-package-select',
+              )
             }}
           />
         </Box>
@@ -1495,12 +1517,14 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
                         source: 'gradle',
                       }
                       setAndroidPackageChoice(choice)
-                      void persist((p) => ({
-                        ...p,
-                        completedSteps: { ...p.completedSteps, androidPackageChosen: choice },
-                      }))
                       addLog(`✔ Android package — ${value}`)
-                      setStep('gcp-setup-running')
+                      persistAndStep(
+                        (p) => ({
+                          ...p,
+                          completedSteps: { ...p.completedSteps, androidPackageChosen: choice },
+                        }),
+                        'gcp-setup-running',
+                      )
                     }}
                   />
                 </>
@@ -1525,12 +1549,14 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
                         source: detectedPackageIds.includes(name) ? 'gradle' : 'user-input',
                       }
                       setAndroidPackageChoice(choice)
-                      void persist((p) => ({
-                        ...p,
-                        completedSteps: { ...p.completedSteps, androidPackageChosen: choice },
-                      }))
                       addLog(`✔ Android package — ${name}`)
-                      setStep('gcp-setup-running')
+                      persistAndStep(
+                        (p) => ({
+                          ...p,
+                          completedSteps: { ...p.completedSteps, androidPackageChosen: choice },
+                        }),
+                        'gcp-setup-running',
+                      )
                     }}
                   />
                 </>
