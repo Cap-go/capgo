@@ -909,12 +909,12 @@ app.get('/org/:org_id', async (c) => {
   }
   if (auth.authType === 'apikey' && auth.apikey!.limited_to_orgs && auth.apikey!.limited_to_orgs.length > 0) {
     if (!auth.apikey!.limited_to_orgs.includes(orgId)) {
-      throw quickError(401, 'invalid_apikey', 'Invalid apikey', { data: auth.apikey!.key })
+      throw quickError(401, 'invalid_apikey', 'Invalid apikey', { apikeyId: auth.apikey!.id })
     }
   }
 
   if (auth.authType === 'apikey' && auth.apikey!.limited_to_apps && auth.apikey!.limited_to_apps.length > 0) {
-    throw quickError(401, 'invalid_apikey', 'Invalid apikey', { data: auth.apikey!.key })
+    throw quickError(401, 'invalid_apikey', 'Invalid apikey', { apikeyId: auth.apikey!.id })
   }
 
   // Use authenticated client - RLS will enforce access
