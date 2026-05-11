@@ -744,6 +744,245 @@ describe('rbac permission system', () => {
         expect(allowedResult.rows[0].allowed).toBe(true)
       })
 
+      it('should deny existing non-expiring api keys after org starts requiring expiration', async () => {
+        const testId = randomUUID()
+        const orgId = randomUUID()
+        const appUuid = randomUUID()
+        const appId = `com.rbac.expiration-policy.${testId}`
+        const scopedKey = `rbac-expiration-policy-${testId}`
+
+        await query(`
+          INSERT INTO public.orgs (
+            id,
+            name,
+            management_email,
+            created_by,
+            use_new_rbac,
+            require_apikey_expiration,
+            enforcing_2fa
+          ) VALUES (
+            $1::uuid,
+            $2,
+            $3,
+            $4::uuid,
+            true,
+            false,
+            false
+          )
+        `, [
+          orgId,
+          `rbac-permissions.test expiration policy ${testId}`,
+          `rbac-expiration-policy-${testId}@capgo.app`,
+          USER_ID,
+        ])
+
+        await query(`
+          INSERT INTO public.apps (id, app_id, name, icon_url, owner_org)
+          VALUES ($1::uuid, $2, $3, $4, $5::uuid)
+        `, [
+          appUuid,
+          appId,
+          `RBAC expiration policy app ${testId}`,
+          'rbac-expiration-policy-icon',
+          orgId,
+        ])
+
+        await query(`
+          INSERT INTO public.role_bindings (
+            principal_type,
+            principal_id,
+            role_id,
+            scope_type,
+            org_id,
+            app_id,
+            granted_by,
+            is_direct
+          )
+          SELECT
+            public.rbac_principal_user(),
+            $1::uuid,
+            r.id,
+            public.rbac_scope_app(),
+            $2::uuid,
+            $3::uuid,
+            $1::uuid,
+            true
+          FROM public.roles r
+          WHERE r.name = public.rbac_role_app_reader()
+          LIMIT 1
+        `, [USER_ID, orgId, appUuid])
+
+        await query(`
+          INSERT INTO public.apikeys (
+            user_id,
+            key,
+            key_hash,
+            mode,
+            name,
+            limited_to_orgs,
+            limited_to_apps,
+            expires_at
+          ) VALUES (
+            $1::uuid,
+            $2,
+            NULL,
+            'write',
+            $3,
+            ARRAY[$4::uuid],
+            ARRAY[$5]::text[],
+            NULL
+          )
+        `, [
+          USER_ID,
+          scopedKey,
+          `RBAC expiration policy ${scopedKey}`,
+          orgId,
+          appId,
+        ])
+
+        const beforePolicyFlip = await query(`
+          SELECT public.rbac_check_permission_direct(
+            'app.read',
+            $1::uuid,
+            $2::uuid,
+            $3,
+            NULL::bigint,
+            $4
+          ) AS allowed
+        `, [USER_ID, orgId, appId, scopedKey])
+
+        await query(`
+          UPDATE public.orgs
+          SET require_apikey_expiration = true
+          WHERE id = $1::uuid
+        `, [orgId])
+
+        const afterPolicyFlip = await query(`
+          SELECT
+            public.rbac_check_permission_direct(
+              'app.read',
+              $1::uuid,
+              $2::uuid,
+              $3,
+              NULL::bigint,
+              $4
+            ) AS direct_allowed,
+            public.rbac_check_permission_direct_no_password_policy(
+              'app.read',
+              $1::uuid,
+              $2::uuid,
+              $3,
+              NULL::bigint,
+              $4
+            ) AS direct_no_password_allowed
+        `, [USER_ID, orgId, appId, scopedKey])
+
+        expect(beforePolicyFlip.rows[0].allowed).toBe(true)
+        expect(afterPolicyFlip.rows[0].direct_allowed).toBe(false)
+        expect(afterPolicyFlip.rows[0].direct_no_password_allowed).toBe(false)
+      })
+
+      it('should apply channel deny overrides in no-password direct checks', async () => {
+        const testId = randomUUID()
+        const orgId = randomUUID()
+        const appUuid = randomUUID()
+        const appId = `com.rbac.no-password-channel-deny.${testId}`
+
+        await query(`
+          INSERT INTO public.orgs (
+            id,
+            name,
+            management_email,
+            created_by,
+            use_new_rbac,
+            enforcing_2fa
+          ) VALUES ($1::uuid, $2, $3, $4::uuid, true, false)
+        `, [
+          orgId,
+          `rbac-permissions.test no password channel deny ${testId}`,
+          `rbac-no-password-channel-deny-${testId}@capgo.app`,
+          USER_ID,
+        ])
+
+        await query(`
+          INSERT INTO public.apps (id, app_id, name, icon_url, owner_org)
+          VALUES ($1::uuid, $2, $3, $4, $5::uuid)
+        `, [
+          appUuid,
+          appId,
+          `RBAC no password channel deny app ${testId}`,
+          'rbac-no-password-channel-deny-icon',
+          orgId,
+        ])
+
+        await query(`
+          INSERT INTO public.role_bindings (
+            principal_type,
+            principal_id,
+            role_id,
+            scope_type,
+            org_id,
+            app_id,
+            granted_by,
+            is_direct
+          )
+          SELECT
+            public.rbac_principal_user(),
+            $1::uuid,
+            r.id,
+            public.rbac_scope_app(),
+            $2::uuid,
+            $3::uuid,
+            $1::uuid,
+            true
+          FROM public.roles r
+          WHERE r.name = public.rbac_role_app_developer()
+          LIMIT 1
+        `, [USER_ID, orgId, appUuid])
+
+        const versionResult = await query(`
+          INSERT INTO public.app_versions (app_id, name, owner_org, user_id, storage_provider)
+          VALUES ($1, $2, $3::uuid, $4::uuid, 'r2-direct')
+          RETURNING id
+        `, [appId, `1.0.0-no-password-channel-deny-${testId}`, orgId, USER_ID])
+
+        const channelResult = await query(`
+          INSERT INTO public.channels (name, app_id, version, created_by, owner_org)
+          VALUES ($1, $2, $3::bigint, $4::uuid, $5::uuid)
+          RETURNING id
+        `, [`production-${testId}`, appId, versionResult.rows[0].id, USER_ID, orgId])
+
+        await query(`
+          INSERT INTO public.channel_permission_overrides (
+            principal_type,
+            principal_id,
+            channel_id,
+            permission_key,
+            is_allowed
+          )
+          VALUES (
+            public.rbac_principal_user(),
+            $1::uuid,
+            $2::bigint,
+            public.rbac_perm_channel_promote_bundle(),
+            false
+          )
+        `, [USER_ID, channelResult.rows[0].id])
+
+        const result = await query(`
+          SELECT public.rbac_check_permission_direct_no_password_policy(
+            public.rbac_perm_channel_promote_bundle(),
+            $1::uuid,
+            $2::uuid,
+            $3,
+            $4::bigint,
+            NULL
+          ) AS allowed
+        `, [USER_ID, orgId, appId, channelResult.rows[0].id])
+
+        expect(result.rows[0].allowed).toBe(false)
+      })
+
       it('should block direct channel version updates when promote_bundle is denied for the channel', async () => {
         const testId = randomUUID()
         const orgId = randomUUID()

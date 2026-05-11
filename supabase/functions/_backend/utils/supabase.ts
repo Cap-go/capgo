@@ -311,15 +311,17 @@ export async function apikeyHasOrgRightWithPolicy(
   c: Context,
   key: Database['public']['Tables']['apikeys']['Row'],
   orgId: string,
-  supabase: SupabaseClient<Database>,
+  _supabase: SupabaseClient<Database>,
 ): Promise<{ valid: boolean, error?: string }> {
   // First check basic org access
   if (!apikeyHasOrgRight(key, orgId)) {
     return { valid: false, error: 'invalid_org_id' }
   }
 
-  // Then check if org requires expiring keys
-  const policyCheck = await checkApikeyMeetsOrgPolicy(c, key, orgId, supabase)
+  // Then check if org requires expiring keys. The scope check above proves the
+  // key is org-scoped; use service role for the policy lookup so runtime
+  // permission denials for non-expiring keys do not hide the policy row.
+  const policyCheck = await checkApikeyMeetsOrgPolicy(c, key, orgId, supabaseAdmin(c))
   if (!policyCheck.valid) {
     return policyCheck
   }
