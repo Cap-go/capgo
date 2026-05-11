@@ -20,7 +20,7 @@ app.use('/', useCors)
 
 app.post('/', middlewareAuth, async (c) => {
   const body = await parseBody<DataDownload>(c)
-  cloudlog({ requestId: c.get('requestId'), message: 'post download link request', app_id: body.app_id, bundleId: body.id, storage_provider: body.storage_provider, isManifest: !!body.isManifest })
+  cloudlog({ requestId: c.get('requestId'), message: 'post download link request', hasAppId: !!body.app_id, hasBundleId: !!body.id, storage_provider: body.storage_provider, isManifest: !!body.isManifest })
   const authorization = c.get('authorization')
   if (!authorization)
     throw simpleError('cannot_find_authorization', 'Cannot find authorization')

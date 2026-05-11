@@ -17,7 +17,7 @@ app.use('/', useCors)
 
 app.post('/', middlewareAuth, async (c) => {
   const body = await parseBody<PortalData>(c)
-  cloudlog({ requestId: c.get('requestId'), message: 'post stripe portal request', orgId: body.orgId, hasCallbackUrl: !!body.callbackUrl })
+  cloudlog({ requestId: c.get('requestId'), message: 'post stripe portal request', hasOrgId: !!body.orgId, hasCallbackUrl: !!body.callbackUrl })
   const authorization = c.get('authorization')
   if (!authorization)
     throw simpleError('not_authorized', 'Not authorized')

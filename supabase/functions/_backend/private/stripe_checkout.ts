@@ -23,7 +23,7 @@ app.use('/', useCors)
 
 app.post('/', middlewareAuth, async (c) => {
   const body = await parseBody<CheckoutData>(c)
-  cloudlog({ requestId: c.get('requestId'), message: 'post stripe checkout request', orgId: body.orgId, recurrence: body.recurrence, hasClientReferenceId: !!body.clientReferenceId, hasAttributionId: !!body.attributionId, hasSuccessUrl: !!body.successUrl, hasCancelUrl: !!body.cancelUrl })
+  cloudlog({ requestId: c.get('requestId'), message: 'post stripe checkout request', hasOrgId: !!body.orgId, recurrence: body.recurrence, hasClientReferenceId: !!body.clientReferenceId, hasAttributionId: !!body.attributionId, hasSuccessUrl: !!body.successUrl, hasCancelUrl: !!body.cancelUrl })
 
   if (!body.orgId)
     throw simpleError('no_org_id_provided', 'No org_id provided')
