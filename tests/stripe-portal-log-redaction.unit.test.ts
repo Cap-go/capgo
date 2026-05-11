@@ -15,6 +15,42 @@ const mockedModules = [
   '../supabase/functions/_backend/utils/supabase.ts',
 ]
 
+function mockOrgLookup(customerId: string) {
+  const singleMock = vi.fn().mockResolvedValue({
+    data: { customer_id: customerId },
+    error: null,
+  })
+  const eqMock = vi.fn(() => ({ single: singleMock }))
+  const selectMock = vi.fn(() => ({ eq: eqMock }))
+  const fromMock = vi.fn(() => ({ select: selectMock }))
+
+  supabaseClientMock.mockReturnValue({ from: fromMock })
+  checkPermissionMock.mockResolvedValue(true)
+}
+
+function expectAuthAndOrgLookupLogs(area: 'checkout' | 'portal') {
+  expect(cloudlogMock).toHaveBeenCalledWith({
+    requestId: undefined,
+    message: `stripe ${area} auth context`,
+    auth: { authenticated: true },
+  })
+  expect(cloudlogMock).toHaveBeenCalledWith({
+    requestId: undefined,
+    message: `stripe ${area} org lookup result`,
+    org: {
+      found: true,
+      hasCustomerId: true,
+    },
+  })
+}
+
+function expectNoLoggedSecrets(...secrets: string[]) {
+  const serializedLogs = JSON.stringify(cloudlogMock.mock.calls)
+  for (const secret of secrets) {
+    expect(serializedLogs).not.toContain(secret)
+  }
+}
+
 describe('stripe billing log redaction', () => {
   beforeEach(() => {
     vi.resetModules()
@@ -62,16 +98,7 @@ describe('stripe billing log redaction', () => {
   })
 
   it('does not log portal callback, org, user, or customer identifiers', async () => {
-    const singleMock = vi.fn().mockResolvedValue({
-      data: { customer_id: 'cus_sensitive_customer' },
-      error: null,
-    })
-    const eqMock = vi.fn(() => ({ single: singleMock }))
-    const selectMock = vi.fn(() => ({ eq: eqMock }))
-    const fromMock = vi.fn(() => ({ select: selectMock }))
-
-    supabaseClientMock.mockReturnValue({ from: fromMock })
-    checkPermissionMock.mockResolvedValue(true)
+    mockOrgLookup('cus_sensitive_customer')
     createPortalMock.mockResolvedValue({ url: 'https://billing.stripe.com/session_sensitive' })
 
     const { app: stripePortal } = await import('../supabase/functions/_backend/private/stripe_portal.ts')
@@ -101,38 +128,17 @@ describe('stripe billing log redaction', () => {
         hasOrgId: true,
       },
     })
-    expect(cloudlogMock).toHaveBeenCalledWith({
-      requestId: undefined,
-      message: 'stripe portal auth context',
-      auth: { authenticated: true },
-    })
-    expect(cloudlogMock).toHaveBeenCalledWith({
-      requestId: undefined,
-      message: 'stripe portal org lookup result',
-      org: {
-        found: true,
-        hasCustomerId: true,
-      },
-    })
-
-    const serializedLogs = JSON.stringify(cloudlogMock.mock.calls)
-    expect(serializedLogs).not.toContain('callback-secret')
-    expect(serializedLogs).not.toContain('org-sensitive-id')
-    expect(serializedLogs).not.toContain('user-sensitive-id')
-    expect(serializedLogs).not.toContain('cus_sensitive_customer')
+    expectAuthAndOrgLookupLogs('portal')
+    expectNoLoggedSecrets(
+      'callback-secret',
+      'org-sensitive-id',
+      'user-sensitive-id',
+      'cus_sensitive_customer',
+    )
   })
 
   it('does not log checkout URLs or billing identifiers', async () => {
-    const singleMock = vi.fn().mockResolvedValue({
-      data: { customer_id: 'cus_checkout_sensitive_customer' },
-      error: null,
-    })
-    const eqMock = vi.fn(() => ({ single: singleMock }))
-    const selectMock = vi.fn(() => ({ eq: eqMock }))
-    const fromMock = vi.fn(() => ({ select: selectMock }))
-
-    supabaseClientMock.mockReturnValue({ from: fromMock })
-    checkPermissionMock.mockResolvedValue(true)
+    mockOrgLookup('cus_checkout_sensitive_customer')
     createCheckoutMock.mockResolvedValue({ url: 'https://checkout.stripe.com/session_sensitive' })
 
     const { app: stripeCheckout } = await import('../supabase/functions/_backend/private/stripe_checkout.ts')
@@ -177,28 +183,16 @@ describe('stripe billing log redaction', () => {
         hasOrgId: true,
       },
     })
-    expect(cloudlogMock).toHaveBeenCalledWith({
-      requestId: undefined,
-      message: 'stripe checkout auth context',
-      auth: { authenticated: true },
-    })
-    expect(cloudlogMock).toHaveBeenCalledWith({
-      requestId: undefined,
-      message: 'stripe checkout org lookup result',
-      org: {
-        found: true,
-        hasCustomerId: true,
-      },
-    })
-
-    const serializedLogs = JSON.stringify(cloudlogMock.mock.calls)
-    expect(serializedLogs).not.toContain('price_sensitive_plan')
-    expect(serializedLogs).not.toContain('client-sensitive-reference')
-    expect(serializedLogs).not.toContain('attribution-sensitive-id')
-    expect(serializedLogs).not.toContain('success-secret')
-    expect(serializedLogs).not.toContain('cancel-secret')
-    expect(serializedLogs).not.toContain('org-checkout-sensitive-id')
-    expect(serializedLogs).not.toContain('user-sensitive-id')
-    expect(serializedLogs).not.toContain('cus_checkout_sensitive_customer')
+    expectAuthAndOrgLookupLogs('checkout')
+    expectNoLoggedSecrets(
+      'price_sensitive_plan',
+      'client-sensitive-reference',
+      'attribution-sensitive-id',
+      'success-secret',
+      'cancel-secret',
+      'org-checkout-sensitive-id',
+      'user-sensitive-id',
+      'cus_checkout_sensitive_customer',
+    )
   })
 })
