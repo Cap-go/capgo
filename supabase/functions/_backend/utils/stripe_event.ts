@@ -104,6 +104,20 @@ function invoiceUpcoming(event: Stripe.InvoiceUpcomingEvent, data: Database['pub
   return data
 }
 
+function getStripeEventLogMetadata(event: Stripe.Event) {
+  const stripeObject = event.data?.object as { object?: unknown } | undefined
+
+  return {
+    eventId: event.id,
+    eventType: event.type,
+    objectType: typeof stripeObject?.object === 'string' ? stripeObject.object : undefined,
+    apiVersion: event.api_version,
+    livemode: event.livemode,
+    created: event.created,
+    hasPreviousAttributes: !!event.data?.previous_attributes,
+  }
+}
+
 export function extractDataEvent(c: Context, event: Stripe.Event): StripeData {
   let data: Database['public']['Tables']['stripe_info']['Insert'] = {
     product_id: undefined as any, // Changed from '' to undefined to avoid FK constraint violations
@@ -122,7 +136,7 @@ export function extractDataEvent(c: Context, event: Stripe.Event): StripeData {
   let previousPriceId: string | undefined
   let previousProductId: string | undefined
 
-  cloudlog({ requestId: c.get('requestId'), message: 'event', event: JSON.stringify(event, null, 2) })
+  cloudlog({ requestId: c.get('requestId'), message: 'stripe event received', ...getStripeEventLogMetadata(event) })
   if (!event?.data?.object) {
     return { data, isUpgrade, previousPriceId, previousProductId }
   }
@@ -153,7 +167,7 @@ export function extractDataEvent(c: Context, event: Stripe.Event): StripeData {
     data.status = 'updated'
   }
   else {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Other event', event })
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Other event', ...getStripeEventLogMetadata(event) })
   }
   return { data, isUpgrade, previousPriceId, previousProductId }
 }
