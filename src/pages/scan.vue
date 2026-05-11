@@ -12,6 +12,7 @@ import IconArrowPath from '~icons/heroicons/arrow-path-20-solid'
 import IconLink from '~icons/heroicons/link-20-solid'
 import IconQrCode from '~icons/heroicons/qr-code-20-solid'
 import IconShieldCheck from '~icons/heroicons/shield-check-20-solid'
+import { normalizeUpdateUrl } from '~/services/updateUrls'
 import { useDisplayStore } from '~/stores/display'
 
 const router = useRouter()
@@ -27,32 +28,10 @@ const manualUrl = ref('')
 
 let downloadListener: Awaited<ReturnType<typeof CapacitorUpdater.addListener>> | null = null
 
-function isValidUrl(value: string) {
-  if (!value)
-    return false
-
-  if (typeof URL.canParse === 'function')
-    return URL.canParse(value)
-
-  try {
-    const parsedUrl = new URL(value)
-    return !!parsedUrl.href
-  }
-  catch {
-    return false
-  }
-}
-
 const isFallbackMode = computed(() => !isNativePlatform || !!errorMessage.value)
 const progressPercentage = computed(() => Math.round(downloadProgress.value))
-const normalizedManualUrl = computed(() => {
-  const value = manualUrl.value.trim()
-  if (!value)
-    return ''
-
-  return /^https?:\/\//i.test(value) ? value : `https://${value}`
-})
-const canSubmitManualUrl = computed(() => !isLoading.value && isValidUrl(normalizedManualUrl.value))
+const normalizedManualUrl = computed(() => normalizeUpdateUrl(manualUrl.value))
+const canSubmitManualUrl = computed(() => !isLoading.value && !!normalizedManualUrl.value)
 const manualActionLabel = computed(() => (isNativePlatform ? 'Download update' : 'Open update URL'))
 const scannerStatusLabel = computed(() => {
   if (isLoading.value)
@@ -64,10 +43,11 @@ const scannerStatusLabel = computed(() => {
   return 'Ready'
 })
 const downloadHost = computed(() => {
-  if (!scannedUrl.value || !isValidUrl(scannedUrl.value))
+  const updateUrl = normalizeUpdateUrl(scannedUrl.value)
+  if (!updateUrl)
     return ''
 
-  return new URL(scannedUrl.value).host
+  return new URL(updateUrl).host
 })
 
 onMounted(async () => {
@@ -122,15 +102,16 @@ async function startScanner() {
 }
 
 async function handleBarcodeScan(scannedValue: string) {
-  if (!isValidUrl(scannedValue)) {
-    errorMessage.value = 'The scanned QR code does not contain a valid update URL.'
-    toast.error('Scanned QR code is not a valid URL')
+  const updateUrl = normalizeUpdateUrl(scannedValue)
+  if (!updateUrl) {
+    errorMessage.value = 'The scanned QR code does not contain a secure update URL.'
+    toast.error('Scanned QR code is not a secure update URL')
     return
   }
 
-  scannedUrl.value = scannedValue
-  manualUrl.value = scannedValue
-  await downloadUpdate(scannedValue)
+  scannedUrl.value = updateUrl
+  manualUrl.value = updateUrl
+  await downloadUpdate(updateUrl)
 }
 
 async function downloadUpdate(updateUrl: string) {
@@ -169,20 +150,21 @@ async function downloadUpdate(updateUrl: string) {
 
 async function submitManualUrl() {
   if (!canSubmitManualUrl.value) {
-    toast.error('Enter a valid update URL')
+    toast.error('Enter a secure update URL')
     return
   }
 
+  const updateUrl = normalizedManualUrl.value
   errorMessage.value = ''
-  scannedUrl.value = normalizedManualUrl.value
+  scannedUrl.value = updateUrl
 
   if (!isNativePlatform) {
-    toast.success(`Opening ${new URL(normalizedManualUrl.value).host}`)
-    window.location.assign(normalizedManualUrl.value)
+    toast.success(`Opening ${new URL(updateUrl).host}`)
+    window.location.assign(updateUrl)
     return
   }
 
-  await downloadUpdate(normalizedManualUrl.value)
+  await downloadUpdate(updateUrl)
 }
 
 async function retryScanning() {
