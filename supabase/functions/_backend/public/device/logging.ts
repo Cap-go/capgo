@@ -33,3 +33,17 @@ export function logDeviceRequestContext(
     mode: apikey.mode,
   })
 }
+
+export function logDeviceRateLimitRecordError(
+  c: Context,
+  operation: DeviceOperation,
+  body: Partial<DeviceLink>,
+  error: unknown,
+) {
+  cloudlog({
+    requestId: c.get('requestId'),
+    message: `Failed to record device ${operation} rate limit`,
+    ...getDeviceRequestLogMetadata(body),
+    error,
+  })
+}

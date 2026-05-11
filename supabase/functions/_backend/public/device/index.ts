@@ -9,7 +9,7 @@ import { buildRateLimitInfo } from '../../utils/rateLimitInfo.ts'
 import { backgroundTask } from '../../utils/utils.ts'
 import { deleteOverride } from './delete.ts'
 import { get } from './get.ts'
-import { logDeviceRequestContext } from './logging.ts'
+import { logDeviceRateLimitRecordError, logDeviceRequestContext } from './logging.ts'
 import { post } from './post.ts'
 
 async function assertDeviceIPRateLimit(c: Context, appId: string) {
@@ -57,7 +57,7 @@ async function recordDeviceRateLimitSafely(
       await recordChannelSelfRequest(c, body.app_id, body.device_id, operation, rateLimitChannel)
     }
     catch (error) {
-      cloudlog({ requestId: c.get('requestId'), message: `Failed to record device ${operation} rate limit`, app_id: body.app_id, device_id: body.device_id, error })
+      logDeviceRateLimitRecordError(c, operation, body, error)
     }
   }
   if (body.app_id) {
