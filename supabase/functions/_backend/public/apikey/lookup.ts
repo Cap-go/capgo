@@ -11,6 +11,8 @@ export function getApiKeyLookupFilter(id: string): ApiKeyLookupFilter {
     }
   }
 
+  // Legacy compatibility only. New clients should use numeric API key IDs so
+  // plaintext key values are not placed in request URLs.
   return {
     column: 'key',
     value: id,

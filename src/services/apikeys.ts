@@ -3,7 +3,7 @@ import type { TableColumn } from '~/components/comp_def'
 import type { DialogV2Button, DialogV2Options } from '~/stores/dialogv2'
 import type { Database } from '~/types/supabase.types'
 
-type ApiKeyId = number | string
+type ApiKeyId = number
 
 type ApiKeyUpdatePayload = Pick<
   Database['public']['Tables']['apikeys']['Update'],

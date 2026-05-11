@@ -1,13 +1,13 @@
 import { randomUUID } from 'node:crypto'
 import { createClient } from '@supabase/supabase-js'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { BASE_URL, getSupabaseClient, headers, resetAndSeedAppData, resetAppData } from './test-utils.ts'
+import { BASE_URL, getEndpointUrl, getSupabaseClient, headers, resetAndSeedAppData, resetAppData } from './test-utils.ts'
 
 const id = randomUUID()
 const APPNAME = `com.app.key.${id}`
 
 async function createPlainApiKey(name: string) {
-  const response = await fetch(`${BASE_URL}/apikey`, {
+  const response = await fetch(getEndpointUrl('/apikey'), {
     method: 'POST',
     headers,
     body: JSON.stringify({
@@ -53,10 +53,12 @@ describe('[GET] /apikey operations', () => {
     expect(data).toHaveProperty('id', 10)
   })
 
-  it('get specific api key by key UUID', async () => {
+  it('gets specific api key by legacy key UUID path', async () => {
     const createData = await createPlainApiKey('key-to-get-by-uuid')
 
-    const response = await fetch(`${BASE_URL}/apikey/${createData.key}`, {
+    // Legacy compatibility only: new clients should use numeric ids so API
+    // key material is not placed in URLs.
+    const response = await fetch(getEndpointUrl(`/apikey/${createData.key}`), {
       method: 'GET',
       headers,
     })
@@ -66,7 +68,7 @@ describe('[GET] /apikey operations', () => {
     expect(data).toHaveProperty('id', createData.id)
     expect(data).toHaveProperty('key', createData.key)
 
-    await fetch(`${BASE_URL}/apikey/${createData.id}`, {
+    await fetch(getEndpointUrl(`/apikey/${createData.id}`), {
       method: 'DELETE',
       headers,
     })
@@ -538,10 +540,12 @@ describe('[DELETE] /apikey/:id operations', () => {
     expect(verifyResponse.status).toBe(404)
   })
 
-  it('delete api key by key UUID', async () => {
+  it('deletes api key by legacy key UUID path', async () => {
     const createData = await createPlainApiKey('key-to-delete-by-uuid')
 
-    const response = await fetch(`${BASE_URL}/apikey/${createData.key}`, {
+    // Legacy compatibility only: new clients should use numeric ids so API
+    // key material is not placed in URLs.
+    const response = await fetch(getEndpointUrl(`/apikey/${createData.key}`), {
       method: 'DELETE',
       headers,
     })
@@ -550,7 +554,7 @@ describe('[DELETE] /apikey/:id operations', () => {
     expect(response.status).toBe(200)
     expect(data).toHaveProperty('status', 'ok')
 
-    const verifyResponse = await fetch(`${BASE_URL}/apikey/${createData.id}`, { headers })
+    const verifyResponse = await fetch(getEndpointUrl(`/apikey/${createData.id}`), { headers })
     expect(verifyResponse.status).toBe(404)
   })
 
