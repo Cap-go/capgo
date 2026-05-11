@@ -3,10 +3,50 @@ import { cloudlogErr } from '../utils/logging.ts'
 import { getEnv } from '../utils/utils.ts'
 
 const CPU_THRESHOLD_PERCENT = 50
+const GRAFANA_ERROR_BODY_LOG_BYTES = 4 * 1024
+const GRAFANA_QUERY_RESPONSE_BYTES = 128 * 1024
 
 export const app = honoFactory.createApp()
 
 app.use('*', useCors)
+
+async function readResponseTextWithLimit(response: Response, limit: number) {
+  const contentLength = Number.parseInt(response.headers.get('content-length') ?? '', 10)
+  if (Number.isFinite(contentLength) && contentLength > limit) {
+    await response.body?.cancel().catch(() => undefined)
+    return null
+  }
+
+  if (!response.body) {
+    const text = await response.text()
+    return new TextEncoder().encode(text).byteLength > limit ? null : text
+  }
+
+  const reader = response.body.getReader()
+  const decoder = new TextDecoder()
+  let total = 0
+  let text = ''
+
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) {
+      text += decoder.decode()
+      break
+    }
+
+    if (!value)
+      continue
+
+    total += value.byteLength
+    if (total > limit) {
+      await reader.cancel()
+      return null
+    }
+    text += decoder.decode(value, { stream: true })
+  }
+
+  return text
+}
 
 app.get('/', middlewareAPISecret, async (c) => {
   const grafanaUrl = getEnv(c, 'GRAFANA_URL')
@@ -30,11 +70,18 @@ app.get('/', middlewareAPISecret, async (c) => {
     })
 
     if (!response.ok) {
-      cloudlogErr({ requestId: c.get('requestId'), message: 'check_cpu_usage_grafana_error', status: response.status, detail: await response.text() })
+      const detail = await readResponseTextWithLimit(response, GRAFANA_ERROR_BODY_LOG_BYTES)
+      cloudlogErr({ requestId: c.get('requestId'), message: 'check_cpu_usage_grafana_error', status: response.status, detail: detail ?? 'response_body_too_large' })
       return c.json({ status: 'error', error: 'grafana_request_failed', message: `Grafana returned ${response.status}` }, 502)
     }
 
-    const data = await response.json() as { status: string, data?: { result?: Array<{ value?: [number, string] }> } }
+    const text = await readResponseTextWithLimit(response, GRAFANA_QUERY_RESPONSE_BYTES)
+    if (text === null) {
+      cloudlogErr({ requestId: c.get('requestId'), message: 'check_cpu_usage_grafana_response_too_large' })
+      return c.json({ status: 'error', error: 'grafana_response_too_large', message: 'Grafana response is too large' }, 502)
+    }
+
+    const data = JSON.parse(text) as { status: string, data?: { result?: Array<{ value?: [number, string] }> } }
 
     if (data.status !== 'success' || !data.data?.result?.length) {
       cloudlogErr({ requestId: c.get('requestId'), message: 'check_cpu_usage_no_data', data })
@@ -64,3 +111,7 @@ app.get('/', middlewareAPISecret, async (c) => {
     return c.json({ status: 'error', error: 'cpu_check_failed', message: 'Failed to check CPU usage' }, 502)
   }
 })
+
+export const checkCpuUsageTestUtils = {
+  readResponseTextWithLimit,
+}
