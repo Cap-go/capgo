@@ -2,6 +2,18 @@ import type { Context } from 'hono'
 import { cloudlog, cloudlogErr, serializeError } from './logging.ts'
 import { getEnv } from './utils.ts'
 
+function summarizeBentoResult(result: unknown) {
+  if (!result || typeof result !== 'object')
+    return { resultType: typeof result }
+
+  const item = result as Record<string, unknown>
+  return {
+    failed: typeof item.failed === 'number' ? item.failed : undefined,
+    hasErrors: item.errors !== undefined,
+    results: typeof item.results === 'number' ? item.results : undefined,
+  }
+}
+
 export function isBentoConfigured(c: Context) {
   const publishableKey = (getEnv(c, 'BENTO_PUBLISHABLE_KEY') || '').trim()
   const secretKey = (getEnv(c, 'BENTO_SECRET_KEY') || '').trim()
@@ -52,8 +64,7 @@ async function bentoFetch(c: Context, path: string, siteUuid: string, body: any)
   })
 
   if (!response.ok) {
-    const error = await response.text()
-    throw new Error(`Bento API error: ${response.status} ${error}`)
+    throw new Error(`Bento API error: ${response.status}`)
   }
 
   return response.json()
@@ -77,7 +88,7 @@ export async function trackBentoEvent(c: Context, email: string, data: any, even
 
     const res = await bentoFetch(c, 'batch/events', siteUuid, payload) as { results: number, failed: number }
     if (res.failed > 0) {
-      cloudlogErr({ requestId: c.get('requestId'), message: 'trackBentoEvent', error: res })
+      cloudlogErr({ requestId: c.get('requestId'), message: 'trackBentoEvent', error: summarizeBentoResult(res) })
       return false
     }
     return true
@@ -112,7 +123,14 @@ export async function addTagBento(c: Context, email: string, segments: { segment
       bentoFetch(c, 'fetch/commands', siteUuid, { command }),
     ))
 
-    cloudlog({ requestId: c.get('requestId'), message: 'addTagBento', email, commands, results })
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'addTagBento',
+      addTagCount: segments.segments.length,
+      removeTagCount: segments.deleteSegments.length,
+      commandCount: commands.length,
+      results: results.map(summarizeBentoResult),
+    })
     return true
   }
   catch (e) {
@@ -152,7 +170,7 @@ export async function syncBentoSubscriberTags(
       const payload = { subscribers: chunk }
       const res = await bentoFetch(c, 'batch/subscribers', siteUuid, payload) as { results?: number, failed?: number, errors?: unknown }
       if (res?.failed && res.failed > 0) {
-        cloudlogErr({ requestId: c.get('requestId'), message: 'syncBentoSubscriberTags', error: res })
+        cloudlogErr({ requestId: c.get('requestId'), message: 'syncBentoSubscriberTags', error: summarizeBentoResult(res) })
         return false
       }
     }
@@ -177,11 +195,11 @@ export async function unsubscribeBento(c: Context, email: string) {
 
     const result = await bentoFetch(c, 'fetch/commands', siteUuid, { command })
 
-    cloudlog({ requestId: c.get('requestId'), message: 'unsubscribeBento', email, result })
+    cloudlog({ requestId: c.get('requestId'), message: 'unsubscribeBento', result: summarizeBentoResult(result) })
     return true
   }
   catch (e) {
-    cloudlog({ requestId: c.get('requestId'), message: 'unsubscribeBento error', error: e })
+    cloudlogErr({ requestId: c.get('requestId'), message: 'unsubscribeBento error', error: serializeError(e) })
     return false
   }
 }
