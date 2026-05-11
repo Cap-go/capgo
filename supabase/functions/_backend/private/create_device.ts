@@ -36,7 +36,11 @@ app.post('/', middlewareV2(['all', 'write']), async (c) => {
   const body = await parseBody<CreateDeviceBody>(c)
   const parsedBodyResult = safeParseSchema(bodySchema, body)
   if (!parsedBodyResult.success) {
-    throw simpleError('invalid_json_body', 'Invalid JSON body', { body, parsedBodyResult })
+    const safeIssues = (parsedBodyResult.error?.issues ?? []).map((issue: any) => ({
+      code: issue.code ?? 'unknown',
+      path: Array.isArray(issue.path) ? issue.path.map(String) : [],
+    }))
+    throw simpleError('invalid_json_body', 'Invalid JSON body', { issue_count: safeIssues.length, issues: safeIssues })
   }
 
   const safeBody = parsedBodyResult.data
