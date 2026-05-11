@@ -3,13 +3,14 @@ import type { Database } from '../utils/supabase.types.ts'
 import { Hono } from 'hono/tiny'
 import { BRES, middlewareAPISecret, triggerValidator } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
+import { getAppVersionTriggerRecordLogMetadata, logTriggerRecord } from './logging.ts'
 import { deleteIt } from './on_version_update.ts'
 
 export const app = new Hono<MiddlewareKeyVariables>()
 
 app.post('/', middlewareAPISecret, triggerValidator('app_versions', 'DELETE'), (c) => {
   const record = c.get('webhookBody') as Database['public']['Tables']['app_versions']['Row']
-  cloudlog({ requestId: c.get('requestId'), message: 'record', record })
+  logTriggerRecord(c, 'app version delete trigger record', record, getAppVersionTriggerRecordLogMetadata)
 
   if (!record.app_id || !record.user_id) {
     cloudlog({ requestId: c.get('requestId'), message: 'no app_id or user_id' })

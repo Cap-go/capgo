@@ -7,12 +7,13 @@ import { groupIdentifyPosthog } from '../utils/posthog.ts'
 import { createStripeCustomer, finalizePendingStripeCustomer } from '../utils/supabase.ts'
 import { sendEventToTracking } from '../utils/tracking.ts'
 import { backgroundTask } from '../utils/utils.ts'
+import { getOrgTriggerRecordLogMetadata, logTriggerRecord } from './logging.ts'
 
 export const app = new Hono<MiddlewareKeyVariables>()
 
 app.post('/', middlewareAPISecret, triggerValidator('orgs', 'INSERT'), async (c) => {
   const record = c.get('webhookBody') as Database['public']['Tables']['orgs']['Row']
-  cloudlog({ requestId: c.get('requestId'), message: 'record', record })
+  logTriggerRecord(c, 'org insert trigger record', record, getOrgTriggerRecordLogMetadata)
 
   if (!record.id) {
     cloudlog({ requestId: c.get('requestId'), message: 'No id' })

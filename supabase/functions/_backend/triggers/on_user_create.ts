@@ -6,12 +6,13 @@ import { cloudlog } from '../utils/logging.ts'
 import { createApiKey } from '../utils/supabase.ts'
 import { sendEventToTracking } from '../utils/tracking.ts'
 import { syncUserPreferenceTags } from '../utils/user_preferences.ts'
+import { getUserTriggerRecordLogMetadata, logTriggerRecord } from './logging.ts'
 
 export const app = new Hono<MiddlewareKeyVariables>()
 
 app.post('/', middlewareAPISecret, triggerValidator('users', 'INSERT'), async (c) => {
   const record = c.get('webhookBody') as Database['public']['Tables']['users']['Row']
-  cloudlog({ requestId: c.get('requestId'), message: 'record', record })
+  logTriggerRecord(c, 'user insert trigger record', record, getUserTriggerRecordLogMetadata)
   await createApiKey(c, record.id)
   cloudlog({ requestId: c.get('requestId'), message: 'createCustomer stripe' })
   await syncUserPreferenceTags(c, record.email, record)

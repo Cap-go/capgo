@@ -8,6 +8,7 @@ import { cloudlog, cloudlogErr } from '../utils/logging.ts'
 import { isRetryablePostgrestResult, retryWithBackoff } from '../utils/retry.ts'
 import { s3 } from '../utils/s3.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
+import { getManifestTriggerRecordLogMetadata, logTriggerRecord } from './logging.ts'
 
 const SIZE_RETRY_ATTEMPTS = 3
 const SIZE_RETRY_DELAY_MS = 500
@@ -103,7 +104,7 @@ export const app = new Hono<MiddlewareKeyVariables>()
 
 app.post('/', middlewareAPISecret, triggerValidator('manifest', 'INSERT'), (c) => {
   const record = c.get('webhookBody') as Database['public']['Tables']['manifest']['Row']
-  cloudlog({ requestId: c.get('requestId'), message: 'record', record })
+  logTriggerRecord(c, 'manifest insert trigger record', record, getManifestTriggerRecordLogMetadata)
 
   if (!record.app_version_id || !record.s3_path) {
     cloudlog({ requestId: c.get('requestId'), message: 'no app_version_id or s3_path' })

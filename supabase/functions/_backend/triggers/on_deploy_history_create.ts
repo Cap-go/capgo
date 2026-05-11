@@ -9,12 +9,13 @@ import { closeClient, getDrizzleClient, getPgClient } from '../utils/pg.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
 import { sendEventToTracking } from '../utils/tracking.ts'
 import { backgroundTask } from '../utils/utils.ts'
+import { getDeployHistoryTriggerRecordLogMetadata, logTriggerRecord } from './logging.ts'
 
 export const app = new Hono<MiddlewareKeyVariables>()
 
 app.post('/', middlewareAPISecret, triggerValidator('deploy_history', 'INSERT'), async (c) => {
   const record = c.get('webhookBody') as Database['public']['Tables']['deploy_history']['Row']
-  cloudlog({ requestId: c.get('requestId'), message: 'record', record })
+  logTriggerRecord(c, 'deploy history insert trigger record', record, getDeployHistoryTriggerRecordLogMetadata)
 
   if (!record.id) {
     cloudlog({ requestId: c.get('requestId'), message: 'No id' })

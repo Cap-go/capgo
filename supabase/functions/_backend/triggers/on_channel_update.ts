@@ -6,6 +6,7 @@ import { BRES, middlewareAPISecret, simpleError, triggerValidator } from '../uti
 import { cloudlog, cloudlogErr } from '../utils/logging.ts'
 import { retryWithBackoff } from '../utils/retry.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
+import { getChannelTriggerRecordLogMetadata, logTriggerRecord } from './logging.ts'
 
 export const app = new Hono<MiddlewareKeyVariables>()
 
@@ -95,7 +96,7 @@ async function getCurrentPublicWinner(
 
 app.post('/', middlewareAPISecret, triggerValidator('channels', 'UPDATE'), async (c) => {
   const record = c.get('webhookBody') as Database['public']['Tables']['channels']['Row']
-  cloudlog({ requestId: c.get('requestId'), message: 'record', record })
+  logTriggerRecord(c, 'channel update trigger record', record, getChannelTriggerRecordLogMetadata)
 
   if (!record.id) {
     cloudlog({ requestId: c.get('requestId'), message: 'No id' })

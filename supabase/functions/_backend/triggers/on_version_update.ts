@@ -11,6 +11,7 @@ import { getPath, s3 } from '../utils/s3.ts'
 import { createStatsMeta } from '../utils/stats.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
 import { backgroundTask } from '../utils/utils.ts'
+import { getAppVersionTriggerRecordLogMetadata, logTriggerRecord } from './logging.ts'
 
 /**
  * Resolves `owner_org` for an app version row.
@@ -341,10 +342,10 @@ export const app = new Hono<MiddlewareKeyVariables>()
 app.post('/', middlewareAPISecret, triggerValidator('app_versions', 'UPDATE'), (c) => {
   const record = c.get('webhookBody') as Database['public']['Tables']['app_versions']['Row']
   const oldRecord = c.get('oldRecord') as Database['public']['Tables']['app_versions']['Row']
-  cloudlog({ requestId: c.get('requestId'), message: 'record', record })
+  logTriggerRecord(c, 'app version update trigger record', record, getAppVersionTriggerRecordLogMetadata)
 
   if (!record.app_id) {
-    cloudlog({ requestId: c.get('requestId'), message: 'no app_id', record })
+    logTriggerRecord(c, 'no app_id', record, getAppVersionTriggerRecordLogMetadata)
     return c.json(BRES)
   }
   // check if version was soft-deleted (deleted_at was set)
@@ -352,7 +353,7 @@ app.post('/', middlewareAPISecret, triggerValidator('app_versions', 'UPDATE'), (
     return deleteIt(c, record)
 
   if (!record.r2_path && !record.manifest) {
-    cloudlog({ requestId: c.get('requestId'), message: 'no r2_path and no manifest, skipping update', record })
+    logTriggerRecord(c, 'no r2_path and no manifest, skipping update', record, getAppVersionTriggerRecordLogMetadata)
     return c.json(BRES)
   }
 

@@ -5,19 +5,20 @@ import { BRES, middlewareAPISecret, triggerValidator } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
 import { cancelSubscription } from '../utils/stripe.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
+import { getOrgTriggerRecordLogMetadata, logTriggerRecord } from './logging.ts'
 
 export const app = new Hono<MiddlewareKeyVariables>()
 
 app.post('/', middlewareAPISecret, triggerValidator('orgs', 'DELETE'), async (c) => {
   const record = c.get('webhookBody') as Database['public']['Tables']['orgs']['Row']
-  cloudlog({ requestId: c.get('requestId'), message: 'record', record })
+  logTriggerRecord(c, 'org delete trigger record', record, getOrgTriggerRecordLogMetadata)
 
   if (!record.id) {
     cloudlog({ requestId: c.get('requestId'), message: 'no org id' })
     return c.json(BRES)
   }
 
-  cloudlog({ requestId: c.get('requestId'), message: 'org delete', record })
+  logTriggerRecord(c, 'org delete', record, getOrgTriggerRecordLogMetadata)
 
   // Cancel subscription if customer_id exists
   if (record.customer_id) {

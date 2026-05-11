@@ -7,6 +7,7 @@ import { BRES, middlewareAPISecret, triggerValidator } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
 import { cancelSubscription } from '../utils/stripe.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
+import { getUserTriggerRecordLogMetadata, logTriggerRecord } from './logging.ts'
 
 export const app = new Hono<MiddlewareKeyVariables>()
 
@@ -448,7 +449,7 @@ async function deleteUser(c: Context, record: Database['public']['Tables']['user
 
 app.post('/', middlewareAPISecret, triggerValidator('users', 'DELETE'), async (c) => {
   const record = c.get('webhookBody') as Database['public']['Tables']['users']['Row']
-  cloudlog({ requestId: c.get('requestId'), message: 'record', record })
+  logTriggerRecord(c, 'user delete trigger record', record, getUserTriggerRecordLogMetadata)
 
   if (!record?.id) {
     cloudlog({ requestId: c.get('requestId'), message: 'no user id' })

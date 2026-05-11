@@ -6,13 +6,14 @@ import { cleanStoredImageMetadata } from '../utils/image.ts'
 import { cloudlog } from '../utils/logging.ts'
 import { createApiKey } from '../utils/supabase.ts'
 import { syncUserPreferenceTags } from '../utils/user_preferences.ts'
+import { getUserTriggerRecordLogMetadata, logTriggerRecord } from './logging.ts'
 
 export const app = new Hono<MiddlewareKeyVariables>()
 
 app.post('/', middlewareAPISecret, triggerValidator('users', 'UPDATE'), async (c) => {
   const record = c.get('webhookBody') as Database['public']['Tables']['users']['Row']
   const oldRecord = c.get('oldRecord') as Database['public']['Tables']['users']['Row'] | undefined
-  cloudlog({ requestId: c.get('requestId'), message: 'record', record })
+  logTriggerRecord(c, 'user update trigger record', record, getUserTriggerRecordLogMetadata)
   if (!record.email) {
     cloudlog({ requestId: c.get('requestId'), message: 'No email' })
     return c.json(BRES)

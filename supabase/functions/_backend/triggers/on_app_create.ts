@@ -12,12 +12,13 @@ import * as schema from '../utils/postgres_schema.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
 import { sendEventToTracking } from '../utils/tracking.ts'
 import { backgroundTask } from '../utils/utils.ts'
+import { getAppTriggerRecordLogMetadata, logTriggerRecord } from './logging.ts'
 
 export const app = new Hono<MiddlewareKeyVariables>()
 
 app.post('/', middlewareAPISecret, triggerValidator('apps', 'INSERT'), async (c) => {
   const record = c.get('webhookBody') as Database['public']['Tables']['apps']['Row']
-  cloudlog({ requestId: c.get('requestId'), message: 'record', record })
+  logTriggerRecord(c, 'app insert trigger record', record, getAppTriggerRecordLogMetadata)
 
   if (!record.id) {
     cloudlog({ requestId: c.get('requestId'), message: 'No id' })
@@ -54,7 +55,7 @@ app.post('/', middlewareAPISecret, triggerValidator('apps', 'INSERT'), async (c)
   if (!appExists) {
     ownerOrg = ownerOrg ?? (record.owner_org ?? undefined)
     if (!ownerOrg) {
-      cloudlog({ requestId: c.get('requestId'), message: 'App missing and no owner_org in webhook payload, skipping', record })
+      logTriggerRecord(c, 'App missing and no owner_org in webhook payload, skipping', record, getAppTriggerRecordLogMetadata)
       return c.json(BRES)
     }
 
@@ -83,7 +84,7 @@ app.post('/', middlewareAPISecret, triggerValidator('apps', 'INSERT'), async (c)
       throw simpleError('error_fetching_organization', 'Error fetching organization', { error })
     }
 
-    cloudlog({ requestId: c.get('requestId'), message: 'App missing, skipping onboarding and default versions', record })
+    logTriggerRecord(c, 'App missing, skipping onboarding and default versions', record, getAppTriggerRecordLogMetadata)
     return c.json(BRES)
   }
 
@@ -99,7 +100,7 @@ app.post('/', middlewareAPISecret, triggerValidator('apps', 'INSERT'), async (c)
 
   // Can't proceed with onboarding/default versions without an org id.
   if (!ownerOrg) {
-    cloudlog({ requestId: c.get('requestId'), message: 'App missing or no owner_org, skipping onboarding and default versions', record })
+    logTriggerRecord(c, 'App missing or no owner_org, skipping onboarding and default versions', record, getAppTriggerRecordLogMetadata)
     return c.json(BRES)
   }
 

@@ -4,12 +4,13 @@ import { Hono } from 'hono/tiny'
 import { BRES, middlewareAPISecret, simpleError, triggerValidator } from '../utils/hono.ts'
 import { cleanStoredImageMetadata } from '../utils/image.ts'
 import { cloudlog } from '../utils/logging.ts'
+import { getOrgTriggerRecordLogMetadata, logTriggerRecord } from './logging.ts'
 
 export const app = new Hono<MiddlewareKeyVariables>()
 
 app.post('/', middlewareAPISecret, triggerValidator('orgs', 'UPDATE'), async (c) => {
   const record = c.get('webhookBody') as Database['public']['Tables']['orgs']['Row']
-  cloudlog({ requestId: c.get('requestId'), message: 'record', record })
+  logTriggerRecord(c, 'org update trigger record', record, getOrgTriggerRecordLogMetadata)
 
   if (!record.id) {
     cloudlog({ requestId: c.get('requestId'), message: 'No org id' })

@@ -10,6 +10,7 @@ import { closeClient, getDrizzleClient, getPgClient } from '../utils/pg.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
 import { sendEventToTracking } from '../utils/tracking.ts'
 import { backgroundTask } from '../utils/utils.ts'
+import { getAppVersionTriggerRecordLogMetadata, logTriggerRecord } from './logging.ts'
 
 // Special bundle names that should not trigger email notifications
 const SKIP_EMAIL_BUNDLE_NAMES = ['unknown', 'builtin']
@@ -18,7 +19,7 @@ export const app = new Hono<MiddlewareKeyVariables>()
 
 app.post('/', middlewareAPISecret, triggerValidator('app_versions', 'INSERT'), async (c) => {
   const record = c.get('webhookBody') as Database['public']['Tables']['app_versions']['Row']
-  cloudlog({ requestId: c.get('requestId'), message: 'record', record })
+  logTriggerRecord(c, 'app version insert trigger record', record, getAppVersionTriggerRecordLogMetadata)
 
   if (!record.id) {
     cloudlog({ requestId: c.get('requestId'), message: 'No id' })
