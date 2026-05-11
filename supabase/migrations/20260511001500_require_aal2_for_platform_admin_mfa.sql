@@ -8,6 +8,8 @@ BEGIN
   -- Email OTP and magic-link first-factor sessions can carry amr.method = 'otp'
   -- while remaining aal1, so MFA authorization must use the authoritative aal
   -- claim instead of accepting OTP method metadata.
+  -- Zero-factor users are intentionally allowed at aal1 here; platform-admin
+  -- paths must independently require aal2 before calling the admin-secret check.
   RETURN (
     array[(SELECT coalesce(auth.jwt()->>'aal', 'aal1'))] <@ (
       SELECT
@@ -47,5 +49,5 @@ $$;
 
 ALTER FUNCTION "public"."is_platform_admin"() OWNER TO "postgres";
 REVOKE ALL ON FUNCTION "public"."is_platform_admin"() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION "public"."is_platform_admin"() FROM "service_role";
 GRANT EXECUTE ON FUNCTION "public"."is_platform_admin"() TO "authenticated";
-GRANT EXECUTE ON FUNCTION "public"."is_platform_admin"() TO "service_role";

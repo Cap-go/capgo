@@ -1,7 +1,7 @@
 BEGIN;
 
 
-SELECT plan(16);
+SELECT plan(18);
 
 -- Test is_platform_admin wrapper
 SELECT tests.authenticate_as('test_admin');
@@ -30,6 +30,28 @@ SELECT
     );
 
 SELECT tests.clear_authentication();
+
+SELECT
+    is(
+        has_function_privilege(
+            'service_role'::name,
+            'public.is_platform_admin()'::regprocedure,
+            'EXECUTE'
+        ),
+        false,
+        'is_platform_admin wrapper test - service_role cannot execute user-context wrapper'
+    );
+
+SELECT
+    is(
+        has_function_privilege(
+            'service_role'::name,
+            'public.is_platform_admin(uuid)'::regprocedure,
+            'EXECUTE'
+        ),
+        true,
+        'is_platform_admin wrapper test - service_role can execute private uuid overload'
+    );
 
 -- Test split behavior when an RBAC role exists (RBAC roles should not affect is_platform_admin)
 SET LOCAL ROLE service_role;
