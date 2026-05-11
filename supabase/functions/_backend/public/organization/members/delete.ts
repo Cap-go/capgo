@@ -33,7 +33,9 @@ export async function deleteMember(c: Context<MiddlewareKeyVariables>, bodyRaw: 
     .single()
 
   if (userError || !userData) {
-    throw quickError(404, 'user_not_found', 'User not found', { error: userError })
+    // Return the same sanitized 404 for both nonexistent email and lookup errors
+    // to avoid revealing whether an email address is registered
+    throw quickError(404, 'organization_member_not_found', 'User is not a member of this organization', { orgId: body.orgId })
   }
 
   // Use authenticated client for the delete operation - RLS will enforce org access
@@ -53,7 +55,7 @@ export async function deleteMember(c: Context<MiddlewareKeyVariables>, bodyRaw: 
   }
 
   if (!deletedMembership) {
-    throw quickError(404, 'organization_member_not_found', 'User is not a member of this organization', { orgId: body.orgId, email: body.email })
+    throw quickError(404, 'organization_member_not_found', 'User is not a member of this organization', { orgId: body.orgId })
   }
 
   // The org_users delete trigger should resync role_bindings, but keep this
