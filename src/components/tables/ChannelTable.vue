@@ -85,7 +85,6 @@ async function addChannel(name: string) {
   if (!name || !versionId.value || !main.user)
     return
   try {
-    console.log('addChannel', name, versionId.value, main.user)
     const currentGid = organizationStore.currentOrganization?.gid
     if (!currentGid)
       return
@@ -368,7 +367,6 @@ async function showAddModal() {
         role: 'primary',
         handler: async () => {
           const name = newChannelName.value.trim()
-          console.log('newName', name)
           if (!name) {
             toast.error(t('missing-name'))
             return false
