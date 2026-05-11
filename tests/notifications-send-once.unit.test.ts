@@ -142,4 +142,32 @@ describe.sequential('sendNotifOrgOnce', () => {
     expect(cloudlogPayload).not.toContain('billing@example.com')
     expect(cloudlogPayload).not.toContain('keep-me-out')
   })
+
+  it('does not log recipient email or unique recipient identifier when Bento succeeds', async () => {
+    trackBentoEventMock.mockResolvedValue(true)
+    const { client } = createWriteClient()
+
+    const { sendNotifOrgOnce } = await import('../supabase/functions/_backend/utils/notifications.ts')
+
+    const sent = await sendNotifOrgOnce(
+      createContext(),
+      'user:need_onboarding',
+      { org_id: 'org-123' },
+      'org-123',
+      'org-123:recipient-email-hash',
+      'billing@example.com',
+      {} as any,
+      client,
+    )
+
+    expect(sent).toEqual({ sent: true, cleanupFailed: false })
+    expect(cloudlogMock).toHaveBeenCalledWith(expect.objectContaining({
+      eventName: 'user:need_onboarding',
+      message: 'send one-time notif done',
+      recipientEmailPresent: true,
+    }))
+    const cloudlogPayload = JSON.stringify(cloudlogMock.mock.calls)
+    expect(cloudlogPayload).not.toContain('billing@example.com')
+    expect(cloudlogPayload).not.toContain('org-123:recipient-email-hash')
+  })
 })

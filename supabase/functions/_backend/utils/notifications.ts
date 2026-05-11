@@ -328,7 +328,7 @@ export async function sendNotifOrgOnce(
       return { sent: false, cleanupFailed: !cleanupSucceeded }
     }
 
-    cloudlog({ requestId: c.get('requestId'), message: 'send one-time notif done', eventName, uniqId, ...getNotificationLogDetails(recipientEmail) })
+    cloudlog({ requestId: c.get('requestId'), message: 'send one-time notif done', eventName, ...getNotificationLogDetails(recipientEmail) })
     return { sent: true, cleanupFailed: false }
   }
   catch (e: unknown) {
