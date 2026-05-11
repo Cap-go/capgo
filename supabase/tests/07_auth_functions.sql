@@ -5,6 +5,11 @@ SELECT plan(16);
 
 -- Test is_platform_admin wrapper
 SELECT tests.authenticate_as('test_admin');
+SELECT set_config(
+    'request.jwt.claims',
+    (current_setting('request.jwt.claims', true)::jsonb || jsonb_build_object('aal', 'aal2'))::text,
+    true
+);
 
 SELECT
     is(
