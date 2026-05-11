@@ -82,8 +82,9 @@ const resumeAppId = computed(() => {
   const value = route.query.resume
   return typeof value === 'string' ? value : ''
 })
-const iconPreview = computed(() => localIconPreview.value || storeIconPreview.value || '')
-const hasImportedStoreMetadata = computed(() => !!(importedStoreAppId.value || storeIconPreview.value || storeScreenshotPreview.value))
+const canUseStoreImportPreview = computed(() => existingApp.value === true && existingAppSetup.value === 'import')
+const iconPreview = computed(() => localIconPreview.value || (canUseStoreImportPreview.value ? storeIconPreview.value : '') || '')
+const hasImportedStoreMetadata = computed(() => canUseStoreImportPreview.value && !!(importedStoreAppId.value || storeIconPreview.value || storeScreenshotPreview.value))
 const canShowAppDetails = computed(() => {
   if (existingApp.value === false)
     return true
@@ -216,7 +217,9 @@ function getStoreUrls(url: string) {
   return { iosStoreUrl: null, androidStoreUrl: null }
 }
 
+let storeImportRun = 0
 function resetStoreImportState() {
+  storeImportRun += 1
   storeUrl.value = ''
   storeIconPreview.value = ''
   storeScreenshotPreview.value = ''
@@ -318,15 +321,20 @@ async function loadResumeApp() {
 }
 
 async function importStoreMetadata() {
-  if (!storeUrl.value || existingAppSetup.value !== 'import')
+  const requestedUrl = storeUrl.value.trim()
+  if (!requestedUrl || existingAppSetup.value !== 'import')
     return
 
+  const requestedRun = ++storeImportRun
   isImportingStore.value = true
   try {
     const { data, error } = await supabase.functions.invoke('app/store-metadata', {
       method: 'POST',
-      body: { url: storeUrl.value },
+      body: { url: requestedUrl },
     })
+
+    if (requestedRun !== storeImportRun || existingAppSetup.value !== 'import' || storeUrl.value.trim() !== requestedUrl)
+      return
 
     if (error)
       throw error
@@ -349,11 +357,15 @@ async function importStoreMetadata() {
       importedStoreAppId.value = data.app_id.trim()
   }
   catch (error) {
+    if (requestedRun !== storeImportRun || existingAppSetup.value !== 'import' || storeUrl.value.trim() !== requestedUrl)
+      return
+
     console.error('Cannot import store metadata', error)
     toast.error(t('app-onboarding-toast-store-metadata-error'))
   }
   finally {
-    isImportingStore.value = false
+    if (requestedRun === storeImportRun)
+      isImportingStore.value = false
   }
 }
 
@@ -569,7 +581,8 @@ async function createAppRecord() {
       return
     }
 
-    await uploadIcon(appId, storeIconPreview.value)
+    const importedIconSource = canUseStoreImportPreview.value ? storeIconPreview.value : ''
+    await uploadIcon(appId, importedIconSource)
     const { data: refreshed } = await supabase
       .from('apps')
       .select()
@@ -778,6 +791,7 @@ watch(suggestedAppId, (value) => {
               <div class="grid gap-3 sm:grid-cols-2">
                 <button
                   type="button"
+                  :aria-pressed="existingApp === true"
                   class="group flex min-h-32 items-start gap-4 rounded-2xl border p-4 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-azure-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-900"
                   :class="whiteCardToggleButtonClass(existingApp === true)"
                   @click="existingApp = true"
@@ -798,6 +812,7 @@ watch(suggestedAppId, (value) => {
                 </button>
                 <button
                   type="button"
+                  :aria-pressed="existingApp === false"
                   class="group flex min-h-32 items-start gap-4 rounded-2xl border p-4 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-azure-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-900"
                   :class="whiteCardToggleButtonClass(existingApp === false)"
                   @click="existingApp = false"
@@ -861,6 +876,7 @@ watch(suggestedAppId, (value) => {
                   <div class="mt-3 grid gap-3 sm:grid-cols-2">
                     <button
                       type="button"
+                      :aria-pressed="existingAppSetup === 'import'"
                       class="flex min-h-24 items-start gap-3 rounded-2xl border p-4 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-azure-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-900"
                       :class="whiteCardToggleButtonClass(existingAppSetup === 'import')"
                       @click="existingAppSetup = 'import'"
@@ -873,6 +889,7 @@ watch(suggestedAppId, (value) => {
                     </button>
                     <button
                       type="button"
+                      :aria-pressed="existingAppSetup === 'manual'"
                       class="flex min-h-24 items-start gap-3 rounded-2xl border p-4 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-azure-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-900"
                       :class="whiteCardToggleButtonClass(existingAppSetup === 'manual')"
                       @click="existingAppSetup = 'manual'"
