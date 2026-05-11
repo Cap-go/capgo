@@ -195,4 +195,55 @@ describe('translation queue helpers', () => {
     expect(payload.status).toBe('pending')
     expect(queue.send).toHaveBeenCalledTimes(1)
   })
+
+  it('rejects oversized translation request bodies before touching storage', async () => {
+    stubWorkerCache()
+    const db = createTranslationStoreMock(null)
+    const queue = {
+      send: vi.fn(),
+    }
+    const response = await translationWorker.fetch(new Request('https://api.capgo.app/translation/messages', {
+      body: JSON.stringify({
+        targetLanguage: 'fr',
+        padding: 'x'.repeat(2048),
+      }),
+      headers: { 'Content-Type': 'application/json' },
+      method: 'POST',
+    }), {
+      DB_TRANSLATIONS: db,
+      TRANSLATION_MESSAGES_QUEUE: queue,
+    } as any)
+    const payload = await response.json() as { error: string }
+
+    expect(response.status).toBe(413)
+    expect(payload.error).toBe('request_body_too_large')
+    expect(db.prepare).not.toHaveBeenCalled()
+    expect(queue.send).not.toHaveBeenCalled()
+  })
+
+  it('rejects oversized translation content-length before reading the body', async () => {
+    stubWorkerCache()
+    const db = createTranslationStoreMock(null)
+    const queue = {
+      send: vi.fn(),
+    }
+    const response = await translationWorker.fetch(new Request('https://api.capgo.app/translation/messages', {
+      body: JSON.stringify({ targetLanguage: 'fr' }),
+      duplex: 'half',
+      headers: {
+        'Content-Length': '2048',
+        'Content-Type': 'application/json',
+      },
+      method: 'POST',
+    } as RequestInit), {
+      DB_TRANSLATIONS: db,
+      TRANSLATION_MESSAGES_QUEUE: queue,
+    } as any)
+    const payload = await response.json() as { error: string }
+
+    expect(response.status).toBe(413)
+    expect(payload.error).toBe('request_body_too_large')
+    expect(db.prepare).not.toHaveBeenCalled()
+    expect(queue.send).not.toHaveBeenCalled()
+  })
 })

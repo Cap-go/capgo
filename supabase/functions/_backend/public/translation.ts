@@ -1,7 +1,8 @@
 import type { Context } from 'hono'
+import { HTTPException } from 'hono/http-exception'
 import sourceMessages from '../../../../messages/en.json'
 import { CacheHelper } from '../utils/cache.ts'
-import { honoFactory, parseBody, quickError, useCors } from '../utils/hono.ts'
+import { honoFactory, quickError, useCors } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
 import { backgroundTask, getEnv } from '../utils/utils.ts'
 
@@ -9,6 +10,7 @@ const CACHE_TTL_SECONDS = 5 * 60
 const DEFAULT_TRANSLATION_MODEL = '@cf/meta/llama-3.1-8b-instruct-fast'
 const MAX_BATCH_CHARACTERS = 6_000
 const MAX_BATCH_ITEMS = 60
+const MAX_TRANSLATION_REQUEST_BODY_BYTES = 1024
 const TRANSLATION_ATTEMPTS = 3
 const TRANSLATION_CACHE_PATH = '/translation/messages-cache'
 const PLACEHOLDER_PATTERN = /\{[\w.]+\}|%\w+%?|\$\d+/g
@@ -79,6 +81,55 @@ function getTranslationModel(c: Context) {
 
 function getTargetLanguageName(targetLanguage: string) {
   return LANGUAGE_NAMES[targetLanguage] ?? targetLanguage
+}
+
+async function readLimitedRequestBody(request: Request, maxBytes: number) {
+  const contentLength = request.headers.get('content-length')
+  if (contentLength && Number(contentLength) > maxBytes)
+    quickError(413, 'request_body_too_large', 'Request body is too large')
+
+  if (!request.body)
+    return ''
+
+  const reader = request.body.getReader()
+  const chunks: Uint8Array[] = []
+  let totalBytes = 0
+
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done)
+      break
+    if (!value)
+      continue
+
+    totalBytes += value.byteLength
+    if (totalBytes > maxBytes) {
+      await reader.cancel().catch(() => {})
+      quickError(413, 'request_body_too_large', 'Request body is too large')
+    }
+    chunks.push(value)
+  }
+
+  const body = new Uint8Array(totalBytes)
+  let offset = 0
+  for (const chunk of chunks) {
+    body.set(chunk, offset)
+    offset += chunk.byteLength
+  }
+
+  return new TextDecoder().decode(body)
+}
+
+async function parseTranslationBody(c: Context): Promise<TranslationBody> {
+  try {
+    const text = await readLimitedRequestBody(c.req.raw, MAX_TRANSLATION_REQUEST_BODY_BYTES)
+    return text ? JSON.parse(text) as TranslationBody : {}
+  }
+  catch (error) {
+    if (error instanceof HTTPException)
+      throw error
+    quickError(400, 'invalid_json_parse_body', 'Invalid JSON body', { error })
+  }
 }
 
 async function sha256Hex(value: string) {
@@ -340,7 +391,7 @@ export const app = honoFactory.createApp()
 app.use('*', useCors)
 
 app.post('/messages', async (c) => {
-  const body = await parseBody<TranslationBody>(c)
+  const body = await parseTranslationBody(c)
   const targetLanguage = typeof body.targetLanguage === 'string' ? body.targetLanguage.trim().toLowerCase() : ''
   if (!SUPPORTED_LANGUAGES.has(targetLanguage))
     quickError(400, 'unsupported_translation_language', 'Target language is not supported')

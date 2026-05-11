@@ -14,6 +14,7 @@ const TRANSLATION_REQUEUE_AFTER_SECONDS = 60
 const TRANSLATION_BATCH_LEASE_SECONDS = 15 * 60
 const TRANSLATION_STORE_TABLE = 'translation_messages_cache'
 const CLAIMED_TRANSLATION_BATCH_INDEX_OFFSET = 1_000_000_000
+const MAX_TRANSLATION_REQUEST_BODY_BYTES = 1024
 const PLACEHOLDER_PATTERN = /\{[\w.]+\}|%\w+%?|\$\d+/g
 
 const SUPPORTED_LANGUAGES = new Set([
@@ -162,11 +163,51 @@ function cloudlogErr(payload: Record<string, unknown>) {
   console.error(JSON.stringify(payload))
 }
 
-async function parseJsonBody<T>(request: Request): Promise<T> {
-  try {
-    return await request.json() as T
+async function readLimitedRequestBody(request: Request, maxBytes: number) {
+  const contentLength = request.headers.get('content-length')
+  if (contentLength && Number(contentLength) > maxBytes)
+    fail(413, 'request_body_too_large', 'Request body is too large')
+
+  if (!request.body)
+    return ''
+
+  const reader = request.body.getReader()
+  const chunks: Uint8Array[] = []
+  let totalBytes = 0
+
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done)
+      break
+    if (!value)
+      continue
+
+    totalBytes += value.byteLength
+    if (totalBytes > maxBytes) {
+      await reader.cancel().catch(() => {})
+      fail(413, 'request_body_too_large', 'Request body is too large')
+    }
+    chunks.push(value)
   }
-  catch {
+
+  const body = new Uint8Array(totalBytes)
+  let offset = 0
+  for (const chunk of chunks) {
+    body.set(chunk, offset)
+    offset += chunk.byteLength
+  }
+
+  return new TextDecoder().decode(body)
+}
+
+async function parseJsonBody<T>(request: Request, maxBytes = MAX_TRANSLATION_REQUEST_BODY_BYTES): Promise<T> {
+  try {
+    const text = await readLimitedRequestBody(request, maxBytes)
+    return text ? JSON.parse(text) as T : {} as T
+  }
+  catch (error) {
+    if (error instanceof PublicHttpError)
+      throw error
     return {} as T
   }
 }
