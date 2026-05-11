@@ -334,6 +334,7 @@ describe('/private/admin_stats', () => {
       data: {
         organizations: Array<{
           org_id: string
+          plan_name: string | null
           last_bundle_upload_at: string | null
           trial_extension_count: number
         }>
@@ -343,6 +344,7 @@ describe('/private/admin_stats', () => {
     expect(payload.success).toBe(true)
     const organization = payload.data.organizations.find(org => org.org_id === TRIAL_ORG_ID)
     expect(organization).toBeTruthy()
+    expect(organization?.plan_name).toBe(soloPlan?.name)
     expect(organization?.last_bundle_upload_at).toBe(TRIAL_LAST_UPLOAD_AT)
     expect(organization?.trial_extension_count).toBe(2)
   })

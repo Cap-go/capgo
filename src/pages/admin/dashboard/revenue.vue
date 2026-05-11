@@ -33,6 +33,7 @@ const globalStatsTrendData = ref<Array<{
   users_active: number
   paying: number
   org_conversion_rate: number
+  plan_total_conversion_rate: number
   plan_solo_conversion_rate: number
   plan_maker_conversion_rate: number
   plan_team_conversion_rate: number
@@ -73,6 +74,9 @@ const globalStatsTrendData = ref<Array<{
   revenue_maker: number
   revenue_team: number
   revenue_enterprise: number
+  average_ltv: number
+  shortest_ltv: number
+  longest_ltv: number
 }>>([])
 
 const isLoadingGlobalStatsTrend = ref(false)
@@ -178,10 +182,10 @@ const planConversionSeries = computed(() => {
 
   return [
     {
-      label: 'Total Conversion (%)',
+      label: 'All Paid Plans (%)',
       data: globalStatsTrendData.value.map(item => ({
         date: item.date,
-        value: item.org_conversion_rate || 0,
+        value: item.plan_total_conversion_rate || 0,
       })),
       color: '#3b82f6', // blue
     },
@@ -434,6 +438,38 @@ const planARRSeries = computed(() => {
         value: item.revenue_enterprise || 0,
       })),
       color: '#f59e0b', // amber
+    },
+  ]
+})
+
+const ltvSeries = computed(() => {
+  if (globalStatsTrendData.value.length === 0)
+    return []
+
+  return [
+    {
+      label: 'Average LTV ($)',
+      data: globalStatsTrendData.value.map(item => ({
+        date: item.date,
+        value: item.average_ltv || 0,
+      })),
+      color: '#119eff',
+    },
+    {
+      label: 'Shortest LTV ($)',
+      data: globalStatsTrendData.value.map(item => ({
+        date: item.date,
+        value: item.shortest_ltv || 0,
+      })),
+      color: '#f59e0b',
+    },
+    {
+      label: 'Longest LTV ($)',
+      data: globalStatsTrendData.value.map(item => ({
+        date: item.date,
+        value: item.longest_ltv || 0,
+      })),
+      color: '#10b981',
     },
   ]
 })
@@ -697,7 +733,7 @@ displayStore.defaultBack = '/dashboard'
 
           <div class="grid grid-cols-1 gap-6">
             <ChartCard
-              title="Plan Conversion Rate"
+              title="Paid Plan Conversion Rate"
               :is-loading="isLoadingGlobalStatsTrend"
               :has-data="planConversionSeries.length > 0"
             >
@@ -745,6 +781,18 @@ displayStore.defaultBack = '/dashboard'
             >
               <AdminMultiLineChart
                 :series="planARRSeries"
+                :is-loading="isLoadingGlobalStatsTrend"
+                value-prefix="$"
+              />
+            </ChartCard>
+
+            <ChartCard
+              title="LTV by Customer"
+              :is-loading="isLoadingGlobalStatsTrend"
+              :has-data="ltvSeries.length > 0"
+            >
+              <AdminMultiLineChart
+                :series="ltvSeries"
                 :is-loading="isLoadingGlobalStatsTrend"
                 value-prefix="$"
               />
