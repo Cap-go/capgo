@@ -512,9 +512,14 @@ SELECT
         'get_organization_cli_warnings test - returns single warning for invalid API key'
     );
 
--- Test 2b: RBAC v2 path — NULL-mode apikey with org_member binding gets org.read
--- Set up: create a NULL-mode (RBAC v2) apikey owned by the same user as the
--- legacy fixture key, and grant it org_member on the test org.
+-- Test 2b: RBAC v2 path — NULL-mode apikey with org_member binding gets org.read.
+-- Owned by the legacy fixture user (super_admin of the test org). In this
+-- codebase's RBAC v2 model the apikey binding mirrors the user's right (see
+-- supabase/functions/_backend/public/apikey/post.ts where the apikey creation
+-- flow auto-inserts org_member bindings to "carry" org.read alongside any
+-- app-level bindings). The fix this test guards proves the mode=NULL path
+-- still resolves correctly through cli_check_permission rather than failing
+-- in get_identity_apikey_only as it did before.
 SELECT tests.clear_authentication();
 SELECT tests.authenticate_as_service_role();
 
@@ -553,9 +558,9 @@ BEGIN
         v_user_id
     );
 
-    -- Second RBAC v2 key SCOPED to a different org (via limited_to_orgs) — used for
-    -- the "no read access" case. The owning user is super_admin of the test org, so we
-    -- can't rely on absence of bindings alone to deny access; limited_to_orgs restricts
+    -- Second RBAC v2 key SCOPED away from the test org via limited_to_orgs.
+    -- The owning user is super_admin of the test org, so we can't rely on
+    -- absence of bindings alone to deny access; limited_to_orgs restricts
     -- the key away from the test org even though the user has broader rights.
     INSERT INTO public.apikeys (id, user_id, key, mode, name, limited_to_orgs)
     VALUES (
@@ -567,7 +572,7 @@ BEGIN
         ARRAY['00000000-0000-0000-0000-000000000001'::uuid]
     );
 
-    -- Expired RBAC v2 key (with a valid binding) — used for the expired-key case
+    -- Expired RBAC v2 key (with a valid binding) — expiry must override the binding
     INSERT INTO public.apikeys (id, user_id, key, mode, name, expires_at)
     VALUES (
         99020003,
