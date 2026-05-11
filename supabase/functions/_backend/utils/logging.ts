@@ -26,6 +26,32 @@ export function serializeError(err: unknown) {
   }
 }
 
+export function summarizeRecordForLog<T extends object>(
+  record: T | null | undefined,
+  options: {
+    presenceFields?: string[]
+  } = {},
+) {
+  const summary: Record<string, unknown> = {
+    fieldCount: 0,
+    hasRecord: !!record,
+  }
+
+  if (!record) {
+    return summary
+  }
+
+  const recordValues = record as Record<string, unknown>
+  summary.fieldCount = Object.keys(recordValues).length
+
+  for (const field of options.presenceFields ?? []) {
+    const value = recordValues[field]
+    summary[`has_${field}`] = value !== undefined && value !== null && value !== ''
+  }
+
+  return summary
+}
+
 export function cloudlogErr(message: any) {
   if (getRuntimeKey() === 'workerd') {
     console.error(message)

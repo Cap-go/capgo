@@ -3,7 +3,7 @@ import type { Database } from '../utils/supabase.types.ts'
 import { Hono } from 'hono/tiny'
 import { BRES, middlewareAPISecret, simpleError, triggerValidator } from '../utils/hono.ts'
 import { cleanStoredImageMetadata } from '../utils/image.ts'
-import { cloudlog } from '../utils/logging.ts'
+import { cloudlog, summarizeRecordForLog } from '../utils/logging.ts'
 import { createApiKey } from '../utils/supabase.ts'
 import { syncUserPreferenceTags } from '../utils/user_preferences.ts'
 
@@ -12,14 +12,24 @@ export const app = new Hono<MiddlewareKeyVariables>()
 app.post('/', middlewareAPISecret, triggerValidator('users', 'UPDATE'), async (c) => {
   const record = c.get('webhookBody') as Database['public']['Tables']['users']['Row']
   const oldRecord = c.get('oldRecord') as Database['public']['Tables']['users']['Row'] | undefined
-  cloudlog({ requestId: c.get('requestId'), message: 'record', record })
+  cloudlog({
+    requestId: c.get('requestId'),
+    message: 'user update trigger record',
+    record: summarizeRecordForLog(record, {
+      presenceFields: ['id', 'email', 'image_url'],
+    }),
+  })
   if (!record.email) {
     cloudlog({ requestId: c.get('requestId'), message: 'No email' })
     return c.json(BRES)
   }
   if (!record.id) {
     cloudlog({ requestId: c.get('requestId'), message: 'No id' })
-    throw simpleError('no_id', 'No id', { record })
+    throw simpleError('no_id', 'No id', {
+      record: summarizeRecordForLog(record, {
+        presenceFields: ['id', 'email', 'image_url'],
+      }),
+    })
   }
   await createApiKey(c, record.id)
   await syncUserPreferenceTags(c, record.email, record, oldRecord, oldRecord?.email)

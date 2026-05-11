@@ -4,7 +4,7 @@ import type { Database } from '../utils/supabase.types.ts'
 import { Hono } from 'hono/tiny'
 import { unsubscribeBento } from '../utils/bento.ts'
 import { BRES, middlewareAPISecret, triggerValidator } from '../utils/hono.ts'
-import { cloudlog } from '../utils/logging.ts'
+import { cloudlog, summarizeRecordForLog } from '../utils/logging.ts'
 import { cancelSubscription } from '../utils/stripe.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
 
@@ -448,7 +448,13 @@ async function deleteUser(c: Context, record: Database['public']['Tables']['user
 
 app.post('/', middlewareAPISecret, triggerValidator('users', 'DELETE'), async (c) => {
   const record = c.get('webhookBody') as Database['public']['Tables']['users']['Row']
-  cloudlog({ requestId: c.get('requestId'), message: 'record', record })
+  cloudlog({
+    requestId: c.get('requestId'),
+    message: 'user delete trigger record',
+    record: summarizeRecordForLog(record, {
+      presenceFields: ['id', 'email', 'image_url'],
+    }),
+  })
 
   if (!record?.id) {
     cloudlog({ requestId: c.get('requestId'), message: 'no user id' })

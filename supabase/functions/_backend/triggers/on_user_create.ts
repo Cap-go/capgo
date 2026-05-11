@@ -2,7 +2,7 @@ import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import { Hono } from 'hono/tiny'
 import { BRES, middlewareAPISecret, triggerValidator } from '../utils/hono.ts'
-import { cloudlog } from '../utils/logging.ts'
+import { cloudlog, summarizeRecordForLog } from '../utils/logging.ts'
 import { createApiKey } from '../utils/supabase.ts'
 import { sendEventToTracking } from '../utils/tracking.ts'
 import { syncUserPreferenceTags } from '../utils/user_preferences.ts'
@@ -11,7 +11,13 @@ export const app = new Hono<MiddlewareKeyVariables>()
 
 app.post('/', middlewareAPISecret, triggerValidator('users', 'INSERT'), async (c) => {
   const record = c.get('webhookBody') as Database['public']['Tables']['users']['Row']
-  cloudlog({ requestId: c.get('requestId'), message: 'record', record })
+  cloudlog({
+    requestId: c.get('requestId'),
+    message: 'user create trigger record',
+    record: summarizeRecordForLog(record, {
+      presenceFields: ['id', 'email', 'image_url', 'created_via_invite'],
+    }),
+  })
   await createApiKey(c, record.id)
   cloudlog({ requestId: c.get('requestId'), message: 'createCustomer stripe' })
   await syncUserPreferenceTags(c, record.email, record)
