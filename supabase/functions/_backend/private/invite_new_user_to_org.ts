@@ -85,7 +85,13 @@ async function validateInvite(c: Context, rawBody: any) {
   }
 
   const body = validationResult.data
-  cloudlog({ requestId: c.get('requestId'), context: 'invite_new_user_to_org validated body', body })
+  cloudlog({
+    requestId: c.get('requestId'),
+    context: 'invite_new_user_to_org validated body',
+    orgId: body.org_id,
+    inviteType: body.invite_type,
+    hasCaptchaToken: Boolean(body.captcha_token),
+  })
 
   const authorization = c.get('authorization')
   if (!authorization)
