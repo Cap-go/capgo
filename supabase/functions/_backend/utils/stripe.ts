@@ -729,7 +729,16 @@ export interface StripeCustomer {
 }
 
 export async function createCustomer(c: Context, email: string, userId: string, orgId: string, name: string) {
-  cloudlog({ requestId: c.get('requestId'), message: 'createCustomer', userId, orgId, hasEmail: Boolean(email), hasName: Boolean(name) })
+  const stripeConfigured = isStripeConfigured(c)
+  cloudlog({
+    requestId: c.get('requestId'),
+    message: 'createCustomer',
+    hasUserId: Boolean(userId),
+    hasOrgId: Boolean(orgId),
+    hasEmail: Boolean(email),
+    hasName: Boolean(name),
+    stripeConfigured,
+  })
   const baseConsoleUrl = (getEnv(c, 'WEBAPP_URL') || '').replace(TRAILING_SLASHES_REGEX, '')
   const metadata: Record<string, string> = {
     user_id: userId,
@@ -738,8 +747,16 @@ export async function createCustomer(c: Context, email: string, userId: string, 
   if (baseConsoleUrl) {
     metadata.log_as = `${baseConsoleUrl}/log-as/${userId}`
   }
-  if (!isStripeConfigured(c)) {
-    cloudlog({ requestId: c.get('requestId'), message: 'createCustomer no stripe key', userId, hasEmail: Boolean(email), hasName: Boolean(name) })
+  if (!stripeConfigured) {
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'createCustomer no stripe key',
+      hasUserId: Boolean(userId),
+      hasOrgId: Boolean(orgId),
+      hasEmail: Boolean(email),
+      hasName: Boolean(name),
+      stripeConfigured: false,
+    })
     // create a fake customer id like stripe one and random id
     const randomId = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15)
     return { id: `cus_${randomId}`, email, name, metadata }
