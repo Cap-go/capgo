@@ -308,8 +308,10 @@ describe('sendNotifToOrgMembersOnce', () => {
     expect(claimNotifOrgOnceMock).not.toHaveBeenCalled()
     expect(cloudlogMock).toHaveBeenCalledWith(expect.objectContaining({
       message: 'sendNotifToOrgMembersOnce: recipient cleanup failed',
-      cleanupFailedRecipients: ['billing@example.com', 'admin@example.com'],
+      cleanupFailedRecipientsCount: 2,
     }))
+    expect(JSON.stringify(cloudlogMock.mock.calls)).not.toContain('billing@example.com')
+    expect(JSON.stringify(cloudlogMock.mock.calls)).not.toContain('admin@example.com')
   })
 
   it('reads one-time recipients from the primary client before finalizing the org claim', async () => {

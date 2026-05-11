@@ -561,7 +561,7 @@ export async function sendNotifToOrgMembers(
     eventName,
     preferenceKey,
     orgId,
-    primaryEmail,
+    hasPrimaryEmail: true,
     additionalRecipients: additionalEmails.length,
     managementEmailIncluded: !!managementEmail,
   })
@@ -664,24 +664,18 @@ export async function sendNotifToOrgMembersOnce(
     sendResults.push({ ...recipient, ...sendResult })
   }
 
-  const sentEmails = sendResults
-    .filter(result => result.sent)
-    .map(result => result.email)
-  const cleanupFailedEmails = sendResults
-    .filter(result => result.cleanupFailed)
-    .map(result => result.email)
-  const alreadyClaimedBeforeRunEmails = sendResults
-    .filter(result => result.wasAlreadyClaimedBeforeRun)
-    .map(result => result.email)
+  const deliveredRecipientCount = sendResults.filter(result => result.sent).length
+  const cleanupFailedRecipientCount = sendResults.filter(result => result.cleanupFailed).length
+  const alreadyClaimedRecipientCount = sendResults.filter(result => result.wasAlreadyClaimedBeforeRun).length
 
-  if (cleanupFailedEmails.length > 0) {
+  if (cleanupFailedRecipientCount > 0) {
     cloudlog({
       requestId: c.get('requestId'),
       message: 'sendNotifToOrgMembersOnce: recipient cleanup failed',
       eventName,
       preferenceKey,
       orgId,
-      cleanupFailedRecipients: cleanupFailedEmails,
+      cleanupFailedRecipientsCount: cleanupFailedRecipientCount,
     })
     return false
   }
@@ -698,10 +692,10 @@ export async function sendNotifToOrgMembersOnce(
     eventName,
     preferenceKey,
     orgId,
-    primaryEmail,
+    hasPrimaryEmail: true,
     additionalRecipients: additionalEmails.length,
-    deliveredRecipients: sentEmails.length,
-    alreadyClaimedRecipients: alreadyClaimedBeforeRunEmails.length,
+    deliveredRecipients: deliveredRecipientCount,
+    alreadyClaimedRecipients: alreadyClaimedRecipientCount,
     firstOrgSend,
     managementEmailIncluded: !!managementEmail,
   })

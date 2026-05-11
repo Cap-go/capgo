@@ -6,6 +6,7 @@ import { and, eq } from 'drizzle-orm'
 import { trackBentoEvent } from './bento.ts'
 import { CacheHelper } from './cache.ts'
 import { cloudlog } from './logging.ts'
+import { getEventDataLogMetadata, getRecipientEmailLogMetadata } from './notification_logging.ts'
 import { getDrizzleClient as createDrizzleClient, getPgClient, logPgError } from './pg.ts'
 import * as schema from './postgres_schema.ts'
 import { backgroundTask } from './utils.ts'
@@ -235,12 +236,23 @@ export async function sendNotifOrg(
       cloudlog({ requestId: c.get('requestId'), message: isFirstSend ? 'notif never sent' : 'notif ready to sent', event: eventName, uniqId })
       const res = await trackBentoEvent(c, managementEmail, eventData, eventName)
       if (!res) {
-        cloudlog({ requestId: c.get('requestId'), message: 'trackEvent failed', eventName, email: managementEmail, eventData })
+        cloudlog({
+          requestId: c.get('requestId'),
+          message: 'trackEvent failed',
+          eventName,
+          ...getRecipientEmailLogMetadata(managementEmail),
+          ...getEventDataLogMetadata(eventData),
+        })
         // Note: We already claimed it in DB, but email failed. On next attempt, cron will determine if we retry.
         return false
       }
 
-      cloudlog({ requestId: c.get('requestId'), message: 'send notif done', eventName, email: managementEmail })
+      cloudlog({
+        requestId: c.get('requestId'),
+        message: 'send notif done',
+        eventName,
+        ...getRecipientEmailLogMetadata(managementEmail),
+      })
       return true
     }
 
@@ -301,11 +313,23 @@ export async function sendNotifOrgOnce(
     const res = await trackBentoEvent(c, recipientEmail, eventData, eventName)
     if (!res) {
       const cleanupSucceeded = await cleanupClaim()
-      cloudlog({ requestId: c.get('requestId'), message: 'trackEvent failed for one-time notif', eventName, email: recipientEmail, eventData })
+      cloudlog({
+        requestId: c.get('requestId'),
+        message: 'trackEvent failed for one-time notif',
+        eventName,
+        ...getRecipientEmailLogMetadata(recipientEmail),
+        ...getEventDataLogMetadata(eventData),
+      })
       return { sent: false, cleanupFailed: !cleanupSucceeded }
     }
 
-    cloudlog({ requestId: c.get('requestId'), message: 'send one-time notif done', eventName, email: recipientEmail, uniqId })
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'send one-time notif done',
+      eventName,
+      uniqId,
+      ...getRecipientEmailLogMetadata(recipientEmail),
+    })
     return { sent: true, cleanupFailed: false }
   }
   catch (e: unknown) {
