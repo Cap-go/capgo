@@ -152,8 +152,8 @@ const previewStatusLabel = computed(() => {
 
 function whiteCardToggleButtonClass(active: boolean) {
   return active
-    ? 'border-azure-500 bg-azure-500 text-white shadow-sm hover:border-azure-600 hover:bg-azure-600 dark:border-azure-400 dark:bg-azure-500 dark:text-white dark:hover:border-azure-300 dark:hover:bg-azure-400'
-    : 'border-slate-200 bg-white text-slate-700 hover:border-azure-300 hover:bg-slate-50 hover:text-slate-950 dark:border-white/10 dark:bg-slate-950 dark:text-slate-200 dark:hover:border-azure-400/60 dark:hover:bg-azure-400/10 dark:hover:text-white'
+    ? 'border-primary-500 bg-slate-100 text-slate-950 ring-2 ring-primary-500/15 hover:border-primary-500 hover:bg-slate-100 dark:border-primary-500 dark:bg-primary-500/20 dark:text-white dark:ring-primary-500/20 dark:hover:bg-primary-500/25'
+    : 'border-slate-200 bg-white text-slate-700 hover:border-primary-500/40 hover:bg-slate-50 hover:text-slate-950 dark:border-white/10 dark:bg-slate-950 dark:text-slate-200 dark:hover:border-white/25 dark:hover:bg-slate-900 dark:hover:text-white'
 }
 
 function whiteCardSecondaryButtonClass() {
@@ -161,7 +161,7 @@ function whiteCardSecondaryButtonClass() {
 }
 
 function whiteCardPrimaryButtonClass() {
-  return 'border-azure-500 bg-azure-500 text-white hover:border-azure-600 hover:bg-azure-600 disabled:border-slate-300 disabled:bg-slate-300 disabled:text-white disabled:opacity-100 dark:border-azure-400 dark:bg-azure-500 dark:hover:border-azure-300 dark:hover:bg-azure-400 dark:disabled:border-slate-700 dark:disabled:bg-slate-800 dark:disabled:text-slate-500'
+  return 'border-primary-500 bg-primary-500 text-white hover:border-primary-500 hover:bg-primary-500/90 disabled:border-slate-300 disabled:bg-slate-300 disabled:text-white disabled:opacity-100 dark:border-primary-500 dark:bg-primary-500 dark:hover:border-primary-500 dark:hover:bg-primary-500/90 dark:disabled:border-slate-700 dark:disabled:bg-slate-800 dark:disabled:text-slate-500'
 }
 
 function slugify(value: string) {
@@ -728,7 +728,7 @@ watch(suggestedAppId, (value) => {
       <div v-else class="space-y-6">
         <header class="grid gap-5 lg:grid-cols-[minmax(0,1fr)_25rem] lg:items-end">
           <div>
-            <div class="inline-flex items-center gap-2 rounded-full border border-azure-500 bg-azure-500 px-3 py-1 text-sm font-semibold text-white dark:border-azure-400 dark:bg-azure-500 dark:text-white">
+            <div class="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1 text-sm font-semibold text-slate-700 shadow-sm dark:border-white/10 dark:bg-slate-900 dark:text-slate-200">
               <IconSparkles class="h-4 w-4" />
               {{ t('app-onboarding-badge') }}
             </div>
@@ -750,14 +750,14 @@ watch(suggestedAppId, (value) => {
                 class="flex min-h-14 items-center gap-3 rounded-xl border px-3 py-2 transition"
                 :aria-current="flowStep === entry.id ? 'step' : undefined"
                 :class="[
-                  flowStep === entry.id ? 'border-azure-300 bg-azure-50 text-slate-950 dark:border-azure-400/40 dark:bg-azure-400/10 dark:text-white' : '',
+                  flowStep === entry.id ? 'border-primary-500/30 bg-slate-100 text-slate-950 ring-1 ring-primary-500/10 dark:border-primary-500/40 dark:bg-primary-500/15 dark:text-white' : '',
                   flowStep !== entry.id && index < currentStepIndex ? 'border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-400/20 dark:bg-emerald-400/10 dark:text-emerald-200' : '',
                   flowStep !== entry.id && index > currentStepIndex ? 'border-transparent bg-slate-50 text-slate-500 dark:bg-slate-950/60 dark:text-slate-400' : '',
                 ]"
               >
                 <span
                   class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-semibold"
-                  :class="index < currentStepIndex ? 'bg-emerald-500 text-white' : flowStep === entry.id ? 'bg-azure-500 text-white' : 'bg-slate-200 text-slate-600 dark:bg-slate-800 dark:text-slate-300'"
+                  :class="index < currentStepIndex ? 'bg-emerald-500 text-white' : flowStep === entry.id ? 'bg-primary-500 text-white' : 'bg-slate-200 text-slate-600 dark:bg-slate-800 dark:text-slate-300'"
                 >
                   <IconCheck v-if="index < currentStepIndex" class="h-4 w-4" />
                   <span v-else>{{ index + 1 }}</span>
@@ -771,7 +771,7 @@ watch(suggestedAppId, (value) => {
               </div>
             </div>
             <div class="mt-3 h-1.5 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800" aria-hidden="true">
-              <div class="h-full rounded-full bg-azure-500 transition-all duration-300" :style="{ width: stepProgress }" />
+              <div class="h-full rounded-full bg-primary-500 transition-all duration-300" :style="{ width: stepProgress }" />
             </div>
           </div>
         </header>
@@ -780,7 +780,7 @@ watch(suggestedAppId, (value) => {
           <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6 dark:border-white/10 dark:bg-slate-900">
             <div class="space-y-6">
               <div>
-                <p class="text-sm font-semibold text-azure-600 dark:text-azure-300">
+                <p class="text-sm font-semibold text-primary-500 dark:text-slate-300">
                   {{ t('app-onboarding-step-details') }}
                 </p>
                 <h2 class="mt-2 text-2xl font-semibold text-slate-950 dark:text-white">
@@ -792,18 +792,18 @@ watch(suggestedAppId, (value) => {
                 <button
                   type="button"
                   :aria-pressed="existingApp === true"
-                  class="group flex min-h-32 items-start gap-4 rounded-2xl border p-4 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-azure-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-900"
+                  class="group flex min-h-32 items-start gap-4 rounded-2xl border p-4 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-900"
                   :class="whiteCardToggleButtonClass(existingApp === true)"
                   @click="existingApp = true"
                 >
-                  <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-azure-500 text-white">
+                  <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary-500 text-white">
                     <IconStore class="h-5 w-5" />
                   </span>
                   <span class="min-w-0 flex-1">
                     <span class="block text-base font-semibold">{{ t('app-onboarding-existing-yes') }}</span>
                     <span
                       class="mt-1 block text-sm leading-6"
-                      :class="existingApp === true ? 'text-white/85' : 'text-slate-500 dark:text-slate-400'"
+                      :class="existingApp === true ? 'text-slate-600 dark:text-slate-200' : 'text-slate-500 dark:text-slate-400'"
                     >
                       {{ t('app-onboarding-existing-yes-helper') }}
                     </span>
@@ -813,7 +813,7 @@ watch(suggestedAppId, (value) => {
                 <button
                   type="button"
                   :aria-pressed="existingApp === false"
-                  class="group flex min-h-32 items-start gap-4 rounded-2xl border p-4 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-azure-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-900"
+                  class="group flex min-h-32 items-start gap-4 rounded-2xl border p-4 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-900"
                   :class="whiteCardToggleButtonClass(existingApp === false)"
                   @click="existingApp = false"
                 >
@@ -824,7 +824,7 @@ watch(suggestedAppId, (value) => {
                     <span class="block text-base font-semibold">{{ t('app-onboarding-existing-no') }}</span>
                     <span
                       class="mt-1 block text-sm leading-6"
-                      :class="existingApp === false ? 'text-white/85' : 'text-slate-500 dark:text-slate-400'"
+                      :class="existingApp === false ? 'text-slate-600 dark:text-slate-200' : 'text-slate-500 dark:text-slate-400'"
                     >
                       {{ t('app-onboarding-existing-no-helper') }}
                     </span>
@@ -836,7 +836,7 @@ watch(suggestedAppId, (value) => {
               <div class="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-4 dark:border-white/15 dark:bg-slate-950/60">
                 <button
                   type="button"
-                  class="inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-slate-600 transition hover:text-slate-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-azure-500 dark:text-slate-300 dark:hover:text-white"
+                  class="inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-slate-600 transition hover:text-slate-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-slate-300 dark:hover:text-white"
                   @click="isCliCommandVisible = !isCliCommandVisible"
                 >
                   <IconTerminal class="h-4 w-4" />
@@ -877,7 +877,7 @@ watch(suggestedAppId, (value) => {
                     <button
                       type="button"
                       :aria-pressed="existingAppSetup === 'import'"
-                      class="flex min-h-24 items-start gap-3 rounded-2xl border p-4 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-azure-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-900"
+                      class="flex min-h-24 items-start gap-3 rounded-2xl border p-4 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-900"
                       :class="whiteCardToggleButtonClass(existingAppSetup === 'import')"
                       @click="existingAppSetup = 'import'"
                     >
@@ -890,7 +890,7 @@ watch(suggestedAppId, (value) => {
                     <button
                       type="button"
                       :aria-pressed="existingAppSetup === 'manual'"
-                      class="flex min-h-24 items-start gap-3 rounded-2xl border p-4 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-azure-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-900"
+                      class="flex min-h-24 items-start gap-3 rounded-2xl border p-4 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-900"
                       :class="whiteCardToggleButtonClass(existingAppSetup === 'manual')"
                       @click="existingAppSetup = 'manual'"
                     >
@@ -910,7 +910,7 @@ watch(suggestedAppId, (value) => {
                       <input
                         id="app-onboarding-store-url"
                         v-model="storeUrl"
-                        class="min-h-12 w-full rounded-xl border border-slate-300 bg-white px-4 text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-azure-500 focus:ring-2 focus:ring-azure-100 dark:border-white/15 dark:bg-slate-950 dark:text-white dark:placeholder:text-slate-500 dark:focus:border-azure-400 dark:focus:ring-azure-400/20"
+                        class="min-h-12 w-full rounded-xl border border-slate-300 bg-white px-4 text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/10 dark:border-white/15 dark:bg-slate-950 dark:text-white dark:placeholder:text-slate-500 dark:focus:border-primary-500 dark:focus:ring-primary-500/25"
                         :placeholder="t('app-onboarding-store-link-placeholder')"
                         type="url"
                       >
@@ -935,7 +935,7 @@ watch(suggestedAppId, (value) => {
                   <input
                     id="app-onboarding-name"
                     v-model="appName"
-                    class="mt-2 min-h-12 w-full rounded-xl border border-slate-300 bg-white px-4 text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-azure-500 focus:ring-2 focus:ring-azure-100 dark:border-white/15 dark:bg-slate-950 dark:text-white dark:placeholder:text-slate-500 dark:focus:border-azure-400 dark:focus:ring-azure-400/20"
+                    class="mt-2 min-h-12 w-full rounded-xl border border-slate-300 bg-white px-4 text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/10 dark:border-white/15 dark:bg-slate-950 dark:text-white dark:placeholder:text-slate-500 dark:focus:border-primary-500 dark:focus:ring-primary-500/25"
                     :placeholder="t('app-onboarding-name-placeholder')"
                     maxlength="100"
                   >
@@ -946,7 +946,7 @@ watch(suggestedAppId, (value) => {
                   <input
                     id="app-onboarding-app-id"
                     :value="manualAppId"
-                    class="mt-2 min-h-12 w-full rounded-xl border border-slate-300 bg-white px-4 font-mono text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-azure-500 focus:ring-2 focus:ring-azure-100 dark:border-white/15 dark:bg-slate-950 dark:text-white dark:placeholder:text-slate-500 dark:focus:border-azure-400 dark:focus:ring-azure-400/20"
+                    class="mt-2 min-h-12 w-full rounded-xl border border-slate-300 bg-white px-4 font-mono text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/10 dark:border-white/15 dark:bg-slate-950 dark:text-white dark:placeholder:text-slate-500 dark:focus:border-primary-500 dark:focus:ring-primary-500/25"
                     :placeholder="t('app-onboarding-appid-placeholder')"
                     @input="onAppIdInput"
                   >
@@ -963,7 +963,7 @@ watch(suggestedAppId, (value) => {
                       v-for="suggestion in appIdSuggestions"
                       :key="suggestion"
                       type="button"
-                      class="min-h-9 rounded-full border border-slate-300 bg-white px-3 py-1 font-mono text-xs text-slate-700 transition hover:border-azure-300 hover:text-azure-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-azure-500 dark:border-white/15 dark:bg-slate-950 dark:text-slate-200 dark:hover:border-azure-400 dark:hover:text-azure-300"
+                      class="min-h-9 rounded-full border border-slate-300 bg-white px-3 py-1 font-mono text-xs text-slate-700 transition hover:border-primary-500/40 hover:text-primary-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:border-white/15 dark:bg-slate-950 dark:text-slate-200 dark:hover:border-white/25 dark:hover:text-white"
                       @click="applyAppIdSuggestion(suggestion)"
                     >
                       {{ suggestion }}
@@ -973,7 +973,7 @@ watch(suggestedAppId, (value) => {
 
                 <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-white/10 dark:bg-slate-950/60">
                   <div class="flex items-start gap-3">
-                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-azure-500 ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-white/10">
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-primary-500 ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-white/10">
                       <IconImage class="h-5 w-5" />
                     </span>
                     <div class="min-w-0 flex-1">
@@ -1011,7 +1011,7 @@ watch(suggestedAppId, (value) => {
             <div class="flex items-center gap-4">
               <div class="flex h-18 w-18 items-center justify-center overflow-hidden rounded-[22px] bg-slate-900 ring-1 ring-white/10">
                 <img v-if="iconPreview" :src="iconPreview" :alt="t('app-onboarding-icon-preview-alt')" class="h-full w-full object-cover">
-                <span v-else-if="isResumeIconLoading" class="h-7 w-7 rounded-full border-2 border-azure-400 border-t-transparent animate-spin" :aria-label="t('loading')" />
+                <span v-else-if="isResumeIconLoading" class="h-7 w-7 rounded-full border-2 border-primary-500 border-t-transparent animate-spin" :aria-label="t('loading')" />
                 <IconSmartphone v-else class="h-8 w-8 text-slate-500" aria-hidden="true" />
               </div>
               <div class="min-w-0">
@@ -1084,7 +1084,7 @@ watch(suggestedAppId, (value) => {
           <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6 dark:border-white/10 dark:bg-slate-900">
             <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
               <div>
-                <p class="text-sm font-semibold text-azure-600 dark:text-azure-300">
+                <p class="text-sm font-semibold text-primary-500 dark:text-slate-300">
                   {{ t('app-onboarding-step-choice') }}
                 </p>
                 <h2 class="mt-2 text-2xl font-semibold text-slate-950 dark:text-white">
@@ -1101,13 +1101,13 @@ watch(suggestedAppId, (value) => {
             </div>
 
             <div class="mt-6 grid gap-4 md:grid-cols-2">
-              <button class="group rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-sm transition hover:border-azure-300 hover:bg-azure-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-azure-500 dark:border-white/10 dark:bg-slate-950 dark:hover:border-azure-400/60 dark:hover:bg-azure-400/10" @click="goToInstallStep">
+              <button class="group rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-sm transition hover:border-primary-500/40 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:border-white/10 dark:bg-slate-950 dark:hover:border-white/25 dark:hover:bg-slate-900" @click="goToInstallStep">
                 <div class="flex items-start gap-4">
-                  <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-azure-500 text-white">
+                  <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary-500 text-white">
                     <IconTerminal class="h-5 w-5" />
                   </span>
                   <span class="min-w-0 flex-1">
-                    <span class="text-sm font-semibold uppercase text-azure-600 dark:text-azure-300">
+                    <span class="text-sm font-semibold uppercase text-primary-500 dark:text-slate-300">
                       {{ t('app-onboarding-choice-real-badge') }}
                     </span>
                     <span class="mt-2 block text-xl font-semibold text-slate-950 dark:text-white">
@@ -1117,7 +1117,7 @@ watch(suggestedAppId, (value) => {
                       {{ t('app-onboarding-choice-real-subtitle') }} <span class="font-mono">{{ createdApp.app_id }}</span>.
                     </span>
                   </span>
-                  <IconArrowRight class="mt-1 h-5 w-5 shrink-0 text-slate-400 transition group-hover:translate-x-0.5 group-hover:text-azure-500" />
+                  <IconArrowRight class="mt-1 h-5 w-5 shrink-0 text-slate-400 transition group-hover:translate-x-0.5 group-hover:text-primary-500" />
                 </div>
               </button>
 
@@ -1155,7 +1155,7 @@ watch(suggestedAppId, (value) => {
           <div class="space-y-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6 dark:border-white/10 dark:bg-slate-900">
             <div class="flex flex-wrap items-start justify-between gap-4">
               <div>
-                <p class="text-sm font-semibold text-azure-600 dark:text-azure-300">
+                <p class="text-sm font-semibold text-primary-500 dark:text-slate-300">
                   {{ t('app-onboarding-install-badge') }}
                 </p>
                 <h2 class="mt-2 text-2xl font-semibold text-slate-950 dark:text-white">
@@ -1191,7 +1191,7 @@ watch(suggestedAppId, (value) => {
               <IconCopy class="absolute right-4 top-4 h-5 w-5 text-muted-blue-300 transition group-hover:text-white" />
             </div>
 
-            <div class="rounded-2xl border border-azure-100 bg-azure-50/80 p-4 text-sm text-slate-700 dark:border-azure-400/20 dark:bg-azure-400/10 dark:text-slate-200">
+            <div class="rounded-2xl border border-slate-200 bg-slate-50/80 p-4 text-sm text-slate-700 dark:border-white/10 dark:bg-slate-950/60 dark:text-slate-200">
               <div class="flex flex-wrap items-start justify-between gap-3">
                 <div class="max-w-2xl">
                   <p class="font-medium text-slate-950 dark:text-white">
