@@ -4,6 +4,33 @@ const { Buffer } = require('node:buffer')
 const https = require('node:https')
 
 const TARGET_HOST = 'updater.capgo.com.cn'
+const SENSITIVE_QUERY_KEYS = new Set([
+  'apikey',
+  'api_key',
+  'authorization',
+  'code',
+  'key',
+  'password',
+  'secret',
+  'session',
+  'signature',
+  'token',
+])
+
+function safeLogPath(path) {
+  try {
+    const url = new URL(path, `https://${TARGET_HOST}`)
+    for (const key of [...url.searchParams.keys()]) {
+      if (SENSITIVE_QUERY_KEYS.has(key.toLowerCase())) {
+        url.searchParams.set(key, 'REDACTED')
+      }
+    }
+    return `${url.pathname}${url.search}`
+  }
+  catch {
+    return '/'
+  }
+}
 
 exports.handler = function (event, _context, callback) {
   try {
@@ -23,7 +50,7 @@ exports.handler = function (event, _context, callback) {
 
     console.log('[DEBUG] Parsed request data:', {
       version: requestData.version,
-      rawPath: requestData.rawPath,
+      rawPath: safeLogPath(requestData.rawPath || requestData.path || '/'),
       hasHeaders: !!requestData.headers,
       hasBody: !!requestData.body,
       method: requestData.requestContext?.http?.method,
@@ -62,7 +89,7 @@ exports.handler = function (event, _context, callback) {
     }
 
     console.log('[DEBUG] Proxying request:', {
-      url: `https://${TARGET_HOST}${path}`,
+      url: `https://${TARGET_HOST}${safeLogPath(path)}`,
       method,
       hasBody: !!bodyBuffer,
       bodySize: bodyBuffer ? bodyBuffer.length : 0,
@@ -103,12 +130,12 @@ exports.handler = function (event, _context, callback) {
       })
     })
 
-    req.on('error', (err) => {
-      console.error('[ERROR] Request failed:', err)
+    req.on('error', () => {
+      console.error('[ERROR] Request failed')
       callback(null, {
         statusCode: 502,
         headers: { 'content-type': 'text/plain' },
-        body: `upstream error: ${err.message}`,
+        body: 'upstream error',
       })
     })
 
@@ -117,12 +144,12 @@ exports.handler = function (event, _context, callback) {
     }
     req.end()
   }
-  catch (err) {
-    console.error('[ERROR] Handler exception:', err)
+  catch {
+    console.error('[ERROR] Handler exception')
     callback(null, {
       statusCode: 500,
       headers: { 'content-type': 'text/plain' },
-      body: `internal error: ${err.message}`,
+      body: 'internal error',
     })
   }
 }
