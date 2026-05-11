@@ -2053,8 +2053,12 @@ BEGIN
     LIMIT 1;
   END IF;
 
-  -- Enforce 2FA if the org requires it.
-  IF v_effective_org_id IS NOT NULL THEN
+  SELECT public.get_apikey_header() INTO v_apikey;
+
+  -- RBAC-managed API keys have apikeys.mode = NULL, so get_identity_org_appid()
+  -- returns NULL and rbac_check_permission_direct() must resolve the key before
+  -- org identity gates can be evaluated.
+  IF v_effective_org_id IS NOT NULL AND NOT (v_apikey IS NOT NULL AND user_id IS NULL) THEN
     SELECT enforcing_2fa INTO v_org_enforcing_2fa
     FROM public.orgs
     WHERE id = v_effective_org_id;
@@ -2069,10 +2073,7 @@ BEGIN
       ));
       RETURN false;
     END IF;
-  END IF;
 
-  -- Enforce password policy if enabled for the org.
-  IF v_effective_org_id IS NOT NULL THEN
     v_password_policy_ok := public.user_meets_password_policy(user_id, v_effective_org_id);
     IF v_password_policy_ok = false THEN
       PERFORM public.pg_log('deny: CHECK_MIN_RIGHTS_PASSWORD_POLICY_ENFORCEMENT', jsonb_build_object(
@@ -2100,7 +2101,6 @@ BEGIN
   END IF;
 
   v_perm := public.rbac_permission_for_legacy(min_right, v_scope);
-  SELECT public.get_apikey_header() INTO v_apikey;
 
   -- Keep RLS authorization semantics aligned with explicit RBAC checks. In
   -- particular, an API key with direct role bindings must be evaluated as the
@@ -16266,7 +16266,14 @@ CREATE TABLE IF NOT EXISTS "public"."global_stats" (
     "churn_revenue_maker" double precision DEFAULT 0 NOT NULL,
     "churn_revenue_team" double precision DEFAULT 0 NOT NULL,
     "churn_revenue_enterprise" double precision DEFAULT 0 NOT NULL,
-    "plugin_version_ladder" "jsonb" DEFAULT '[]'::"jsonb" NOT NULL
+    "plugin_version_ladder" "jsonb" DEFAULT '[]'::"jsonb" NOT NULL,
+    "builder_active_paying_clients_60d" integer DEFAULT 0 NOT NULL,
+    "live_updates_active_paying_clients_60d" integer DEFAULT 0 NOT NULL,
+    "plan_solo_conversion_rate" double precision DEFAULT 0 NOT NULL,
+    "plan_maker_conversion_rate" double precision DEFAULT 0 NOT NULL,
+    "plan_team_conversion_rate" double precision DEFAULT 0 NOT NULL,
+    "plan_enterprise_conversion_rate" double precision DEFAULT 0 NOT NULL,
+    "plan_total_conversion_rate" double precision DEFAULT 0 NOT NULL
 );
 
 
@@ -16438,6 +16445,34 @@ COMMENT ON COLUMN "public"."global_stats"."churn_revenue_team" IS 'Team plan MRR
 
 
 COMMENT ON COLUMN "public"."global_stats"."churn_revenue_enterprise" IS 'Enterprise plan MRR lost to churn and downgrades on the day.';
+
+
+
+COMMENT ON COLUMN "public"."global_stats"."builder_active_paying_clients_60d" IS 'Number of paying clients with Capgo Builder activity in the trailing 60 days for the UTC day.';
+
+
+
+COMMENT ON COLUMN "public"."global_stats"."live_updates_active_paying_clients_60d" IS 'Number of paying clients with Live Updates activity in the trailing 60 days for the UTC day.';
+
+
+
+COMMENT ON COLUMN "public"."global_stats"."plan_solo_conversion_rate" IS 'Percentage of organizations converted to the Solo plan (plan_solo / orgs * 100)';
+
+
+
+COMMENT ON COLUMN "public"."global_stats"."plan_maker_conversion_rate" IS 'Percentage of organizations converted to the Maker plan (plan_maker / orgs * 100)';
+
+
+
+COMMENT ON COLUMN "public"."global_stats"."plan_team_conversion_rate" IS 'Percentage of organizations converted to the Team plan (plan_team / orgs * 100)';
+
+
+
+COMMENT ON COLUMN "public"."global_stats"."plan_enterprise_conversion_rate" IS 'Percentage of organizations converted to the Enterprise plan (plan_enterprise / orgs * 100)';
+
+
+
+COMMENT ON COLUMN "public"."global_stats"."plan_total_conversion_rate" IS 'Percentage of organizations converted to any paid plan ((plan_solo + plan_maker + plan_team + plan_enterprise) / orgs * 100)';
 
 
 

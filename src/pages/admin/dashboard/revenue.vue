@@ -21,6 +21,8 @@ const mainStore = useMainStore()
 const adminStore = useAdminDashboardStore()
 const router = useRouter()
 const isLoading = ref(true)
+type ChurnChartMode = 'revenue' | 'rate'
+const churnChartMode = ref<ChurnChartMode>('revenue')
 
 // Global stats trend data
 const globalStatsTrendData = ref<Array<{
@@ -30,6 +32,12 @@ const globalStatsTrendData = ref<Array<{
   users: number
   users_active: number
   paying: number
+  org_conversion_rate: number
+  plan_total_conversion_rate: number
+  plan_solo_conversion_rate: number
+  plan_maker_conversion_rate: number
+  plan_team_conversion_rate: number
+  plan_enterprise_conversion_rate: number
   trial: number
   not_paying: number
   updates: number
@@ -50,6 +58,11 @@ const globalStatsTrendData = ref<Array<{
   canceled_orgs: number
   upgraded_orgs: number
   mrr: number
+  previous_mrr: number
+  previous_mrr_solo: number
+  previous_mrr_maker: number
+  previous_mrr_team: number
+  previous_mrr_enterprise: number
   nrr: number
   churn_revenue: number
   churn_revenue_solo: number
@@ -64,6 +77,12 @@ const globalStatsTrendData = ref<Array<{
 }>>([])
 
 const isLoadingGlobalStatsTrend = ref(false)
+
+function toChurnRate(lostRevenue: number, previousMrr: number) {
+  if (!Number.isFinite(previousMrr) || previousMrr <= 0)
+    return 0
+  return Number(((lostRevenue / previousMrr) * 100).toFixed(2))
+}
 
 async function loadGlobalStatsTrend() {
   isLoadingGlobalStatsTrend.value = true
@@ -154,6 +173,54 @@ const upgradeTrendSeries = computed(() => {
   ]
 })
 
+const planConversionSeries = computed(() => {
+  if (globalStatsTrendData.value.length === 0)
+    return []
+
+  return [
+    {
+      label: 'All Paid Plans (%)',
+      data: globalStatsTrendData.value.map(item => ({
+        date: item.date,
+        value: item.plan_total_conversion_rate || 0,
+      })),
+      color: '#3b82f6', // blue
+    },
+    {
+      label: 'Solo Conversion (%)',
+      data: globalStatsTrendData.value.map(item => ({
+        date: item.date,
+        value: item.plan_solo_conversion_rate || 0,
+      })),
+      color: '#8b5cf6', // purple
+    },
+    {
+      label: 'Maker Conversion (%)',
+      data: globalStatsTrendData.value.map(item => ({
+        date: item.date,
+        value: item.plan_maker_conversion_rate || 0,
+      })),
+      color: '#ec4899', // pink
+    },
+    {
+      label: 'Team Conversion (%)',
+      data: globalStatsTrendData.value.map(item => ({
+        date: item.date,
+        value: item.plan_team_conversion_rate || 0,
+      })),
+      color: '#10b981', // green
+    },
+    {
+      label: 'Enterprise Conversion (%)',
+      data: globalStatsTrendData.value.map(item => ({
+        date: item.date,
+        value: item.plan_enterprise_conversion_rate || 0,
+      })),
+      color: '#f59e0b', // amber
+    },
+  ]
+})
+
 const mrrSeries = computed(() => {
   if (globalStatsTrendData.value.length === 0)
     return []
@@ -238,6 +305,64 @@ const churnRevenueSeries = computed(() => {
 
   return [totalSeries]
 })
+
+const churnRateSeries = computed(() => {
+  if (globalStatsTrendData.value.length === 0)
+    return []
+
+  const totalSeries = {
+    label: 'Total Churn Rate (%)',
+    data: globalStatsTrendData.value.map(item => ({
+      date: item.date,
+      value: toChurnRate(item.churn_revenue || 0, item.previous_mrr || 0),
+    })),
+    color: '#ef4444', // red
+  }
+  const planSeries = [
+    {
+      label: 'Solo Churn (%)',
+      data: globalStatsTrendData.value.map(item => ({
+        date: item.date,
+        value: toChurnRate(item.churn_revenue_solo || 0, item.previous_mrr_solo || 0),
+      })),
+      color: '#8b5cf6', // purple
+    },
+    {
+      label: 'Maker Churn (%)',
+      data: globalStatsTrendData.value.map(item => ({
+        date: item.date,
+        value: toChurnRate(item.churn_revenue_maker || 0, item.previous_mrr_maker || 0),
+      })),
+      color: '#ec4899', // pink
+    },
+    {
+      label: 'Team Churn (%)',
+      data: globalStatsTrendData.value.map(item => ({
+        date: item.date,
+        value: toChurnRate(item.churn_revenue_team || 0, item.previous_mrr_team || 0),
+      })),
+      color: '#10b981', // green
+    },
+    {
+      label: 'Enterprise Churn (%)',
+      data: globalStatsTrendData.value.map(item => ({
+        date: item.date,
+        value: toChurnRate(item.churn_revenue_enterprise || 0, item.previous_mrr_enterprise || 0),
+      })),
+      color: '#f59e0b', // amber
+    },
+  ]
+
+  if (planSeries.some(series => series.data.some(point => point.value > 0)))
+    return [totalSeries, ...planSeries]
+
+  return [totalSeries]
+})
+
+const churnChartSeries = computed(() => churnChartMode.value === 'rate' ? churnRateSeries.value : churnRevenueSeries.value)
+const churnChartTitle = computed(() => churnChartMode.value === 'rate' ? 'Churn Rate by Plan' : 'Churn Revenue - Lost MRR by Plan')
+const churnChartValuePrefix = computed(() => churnChartMode.value === 'revenue' ? '$' : '')
+const churnChartValueSuffix = computed(() => churnChartMode.value === 'rate' ? '%' : '')
 
 const arrSeries = computed(() => {
   if (globalStatsTrendData.value.length === 0)
@@ -571,6 +696,20 @@ displayStore.defaultBack = '/dashboard'
             </ChartCard>
           </div>
 
+          <div class="grid grid-cols-1 gap-6">
+            <ChartCard
+              title="Paid Plan Conversion Rate"
+              :is-loading="isLoadingGlobalStatsTrend"
+              :has-data="planConversionSeries.length > 0"
+            >
+              <AdminMultiLineChart
+                :series="planConversionSeries"
+                :is-loading="isLoadingGlobalStatsTrend"
+                value-suffix="%"
+              />
+            </ChartCard>
+          </div>
+
           <!-- Revenue Charts - Full Width -->
           <div class="grid grid-cols-1 gap-6">
             <!-- MRR - Monthly Recurring Revenue -->
@@ -631,14 +770,44 @@ displayStore.defaultBack = '/dashboard'
             </ChartCard>
 
             <ChartCard
-              title="Churn Revenue - Lost MRR by Plan"
+              :title="churnChartTitle"
               :is-loading="isLoadingGlobalStatsTrend"
-              :has-data="churnRevenueSeries.length > 0"
+              :has-data="churnChartSeries.length > 0"
             >
+              <template #header>
+                <div class="flex w-full flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <h2 class="text-xl font-semibold leading-tight text-slate-900 dark:text-white sm:text-2xl">
+                    {{ churnChartTitle }}
+                  </h2>
+                  <div class="d-join shrink-0" role="group" aria-label="Churn chart unit">
+                    <button
+                      type="button"
+                      class="d-btn d-btn-xs d-join-item min-w-10"
+                      :class="churnChartMode === 'revenue' ? 'd-btn-primary' : 'd-btn-outline'"
+                      :aria-pressed="churnChartMode === 'revenue'"
+                      aria-label="Show churn in dollars"
+                      @click="churnChartMode = 'revenue'"
+                    >
+                      $
+                    </button>
+                    <button
+                      type="button"
+                      class="d-btn d-btn-xs d-join-item min-w-10"
+                      :class="churnChartMode === 'rate' ? 'd-btn-primary' : 'd-btn-outline'"
+                      :aria-pressed="churnChartMode === 'rate'"
+                      aria-label="Show churn as percent"
+                      @click="churnChartMode = 'rate'"
+                    >
+                      %
+                    </button>
+                  </div>
+                </div>
+              </template>
               <AdminMultiLineChart
-                :series="churnRevenueSeries"
+                :series="churnChartSeries"
                 :is-loading="isLoadingGlobalStatsTrend"
-                value-prefix="$"
+                :value-prefix="churnChartValuePrefix"
+                :value-suffix="churnChartValueSuffix"
               />
             </ChartCard>
           </div>

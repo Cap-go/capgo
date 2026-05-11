@@ -62,6 +62,13 @@ interface PlanRevenue {
   plan_enterprise_monthly: number
   plan_enterprise_yearly: number
 }
+interface PlanConversionRates {
+  enterprise: number
+  maker: number
+  solo: number
+  team: number
+  total: number
+}
 interface DailyRevenueChangeSummary {
   churnMrr: number
   contractionMrr: number
@@ -116,6 +123,26 @@ interface CustomerIdRow {
 
 function getDateId(targetDate = new Date()): string {
   return new Date(Date.UTC(targetDate.getUTCFullYear(), targetDate.getUTCMonth(), targetDate.getUTCDate())).toISOString().slice(0, 10)
+}
+
+function calculateConversionRate(converted: number | null | undefined, totalOrgs: number) {
+  if (totalOrgs <= 0)
+    return 0
+  return Number((((converted ?? 0) * 100) / totalOrgs).toFixed(1))
+}
+
+function getPaidPlanTotal(plans: PlanTotal) {
+  return (plans.Solo ?? 0) + (plans.Maker ?? 0) + (plans.Team ?? 0) + (plans.Enterprise ?? 0)
+}
+
+function getPlanConversionRates(plans: PlanTotal, totalOrgs: number): PlanConversionRates {
+  return {
+    solo: calculateConversionRate(plans.Solo, totalOrgs),
+    maker: calculateConversionRate(plans.Maker, totalOrgs),
+    team: calculateConversionRate(plans.Team, totalOrgs),
+    enterprise: calculateConversionRate(plans.Enterprise, totalOrgs),
+    total: calculateConversionRate(getPaidPlanTotal(plans), totalOrgs),
+  }
 }
 
 function getDailyWindow(referenceDate = new Date()): DailyWindow {
@@ -1014,7 +1041,8 @@ app.post('/', middlewareAPISecret, async (c) => {
     res.paid_product_activity_stats,
   ])
   const not_paying = users - customers.total - plans.Trial
-  const org_conversion_rate = orgs > 0 ? Number((((paying_orgs_for_conversion * 100) / orgs)).toFixed(1)) : 0
+  const org_conversion_rate = calculateConversionRate(paying_orgs_for_conversion, orgs)
+  const planConversionRates = getPlanConversionRates(plans, orgs)
   cloudlog({
     requestId: c.get('requestId'),
     message: 'All Promises',
@@ -1047,6 +1075,11 @@ app.post('/', middlewareAPISecret, async (c) => {
     stars,
     paying: customers.total,
     org_conversion_rate,
+    plan_total_conversion_rate: planConversionRates.total,
+    plan_solo_conversion_rate: planConversionRates.solo,
+    plan_maker_conversion_rate: planConversionRates.maker,
+    plan_team_conversion_rate: planConversionRates.team,
+    plan_enterprise_conversion_rate: planConversionRates.enterprise,
     paying_yearly: customers.yearly,
     paying_monthly: customers.monthly,
     onboarded,
