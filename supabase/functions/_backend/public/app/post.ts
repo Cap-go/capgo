@@ -19,16 +19,16 @@ export interface CreateApp {
 
 export async function post(c: Context<MiddlewareKeyVariables>, body: CreateApp): Promise<Response> {
   if (!body.app_id) {
-    throw simpleError('missing_app_id', 'Missing app_id', { body })
+    throw simpleError('missing_app_id', 'Missing app_id', { has_app_id: false, has_name: !!body.name, has_owner_org: !!body.owner_org })
   }
   if (!isValidAppId(body.app_id)) {
-    throw simpleError('invalid_app_id', 'App ID must be a reverse domain string', { app_id: body.app_id })
+    throw simpleError('invalid_app_id', 'App ID must be a reverse domain string')
   }
   if (!body.name) {
-    throw simpleError('missing_name', 'Missing name', { body })
+    throw simpleError('missing_name', 'Missing name', { has_app_id: !!body.app_id, has_name: false, has_owner_org: !!body.owner_org })
   }
   if (!body.owner_org) {
-    throw quickError(400, 'missing_owner_org', 'Missing owner_org', { body })
+    throw quickError(400, 'missing_owner_org', 'Missing owner_org', { has_app_id: !!body.app_id, has_name: !!body.name, has_owner_org: false })
   }
 
   // Check if the user is allowed to create an app in this organization (auth context set by middlewareKey)
