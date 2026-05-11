@@ -5,6 +5,7 @@ import { cloudlog, cloudlogErr } from '../../utils/logging.ts'
 import { checkPermission } from '../../utils/rbac.ts'
 import { supabaseAdmin, supabaseApikey } from '../../utils/supabase.ts'
 import { getEnv } from '../../utils/utils.ts'
+import { formatBuilderErrorBody, readBuilderErrorBody } from './builder_response.ts'
 
 export interface RequestBuildBody {
   app_id: string
@@ -217,7 +218,7 @@ export async function requestBuild(
       })
     }
     else {
-      const errorText = await builderResponse.text()
+      const errorText = formatBuilderErrorBody(await readBuilderErrorBody(builderResponse))
       const responseHeaders: Record<string, string> = {}
       builderResponse.headers.forEach((value, key) => {
         responseHeaders[key] = value

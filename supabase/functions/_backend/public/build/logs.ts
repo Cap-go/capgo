@@ -5,6 +5,7 @@ import { cloudlog, cloudlogErr } from '../../utils/logging.ts'
 import { checkPermission } from '../../utils/rbac.ts'
 import { supabaseApikey } from '../../utils/supabase.ts'
 import { getEnv } from '../../utils/utils.ts'
+import { formatBuilderErrorBody, readBuilderErrorBody } from './builder_response.ts'
 
 async function cancelBuildOnDisconnect(
   builderUrl: string,
@@ -38,7 +39,7 @@ async function cancelBuildOnDisconnect(
       })
     }
     else {
-      const errorText = await response.text()
+      const errorText = formatBuilderErrorBody(await readBuilderErrorBody(response))
       cloudlogErr({
         requestId,
         message: 'Failed to cancel build after client disconnect',
@@ -142,7 +143,7 @@ export async function streamBuildLogs(
   })
 
   if (!builderResponse.ok) {
-    const errorText = await builderResponse.text()
+    const errorText = formatBuilderErrorBody(await readBuilderErrorBody(builderResponse))
     cloudlogErr({
       requestId: c.get('requestId'),
       message: 'Builder logs fetch failed',

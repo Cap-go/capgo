@@ -15,6 +15,7 @@ import { cloudlog, cloudlogErr } from '../../utils/logging.ts'
 import { checkPermission } from '../../utils/rbac.ts'
 import { recordBuildTime, supabaseAdmin, supabaseApikey } from '../../utils/supabase.ts'
 import { getEnv } from '../../utils/utils.ts'
+import { formatBuilderErrorBody, readBuilderErrorBody } from './builder_response.ts'
 
 export interface BuildStatusParams {
   job_id: string
@@ -47,7 +48,7 @@ async function cancelTimedOutBuilderJob(c: Context, jobId: string, appId: string
     })
 
     if (!builderResponse.ok) {
-      const errorText = await builderResponse.text()
+      const errorText = formatBuilderErrorBody(await readBuilderErrorBody(builderResponse))
       cloudlogErr({
         requestId: c.get('requestId'),
         message: 'Builder timeout cancel failed',
@@ -151,7 +152,7 @@ export async function getBuildStatus(
   })
 
   if (!builderResponse.ok) {
-    const errorText = await builderResponse.text()
+    const errorText = formatBuilderErrorBody(await readBuilderErrorBody(builderResponse))
     cloudlogErr({
       requestId: c.get('requestId'),
       message: 'Builder status fetch failed',

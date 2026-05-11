@@ -6,6 +6,7 @@ import { cloudlog, cloudlogErr } from '../../utils/logging.ts'
 import { checkPermission } from '../../utils/rbac.ts'
 import { supabaseAdmin, supabaseApikey } from '../../utils/supabase.ts'
 import { getEnv } from '../../utils/utils.ts'
+import { formatBuilderErrorBody, readBuilderErrorBody } from './builder_response.ts'
 import { reserveNativeBuildSlot } from './concurrency.ts'
 
 interface BuilderStartResponse {
@@ -210,7 +211,7 @@ export async function startBuild(
     })
 
     if (!builderResponse.ok) {
-      const errorText = await builderResponse.text()
+      const errorText = formatBuilderErrorBody(await readBuilderErrorBody(builderResponse))
       const errorMsg = `Failed to start build: ${errorText}`
       cloudlogErr({
         requestId: c.get('requestId'),
