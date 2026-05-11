@@ -100,11 +100,11 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
     const appVersion2 = await getAppVersionPostgres(c, app_id, 'unknown', allowedDeleted, drizzleClient as ReturnType<typeof getDrizzleClient>)
     if (appVersion2) {
       appVersion = appVersion2
-      cloudlog({ requestId: c.get('requestId'), message: `Version name ${version_name} not found, using unknown instead`, app_id, version_name })
+      cloudlog({ requestId: c.get('requestId'), message: 'Version name not found, using unknown instead', has_version_name: !!version_name, version_name_length: version_name.length })
     }
     else {
       backgroundTask(c, ensurePlaceholderVersions(c, app_id))
-      return { success: false, error: 'version_not_found', message: 'Version not found', moreInfo: { app_id, version_name } }
+      return { success: false, error: 'version_not_found', message: 'Version not found' }
     }
   }
   // device.version = appVersion.id
