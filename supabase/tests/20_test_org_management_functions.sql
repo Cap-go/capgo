@@ -1,7 +1,7 @@
 BEGIN;
 
 
-SELECT plan(45);
+SELECT plan(49);
 
 -- Test accept_invitation_to_org (user is already a member, so should return INVALID_ROLE)
 SELECT tests.authenticate_as('test_user');
@@ -511,6 +511,176 @@ SELECT
         ) = 1,
         'get_organization_cli_warnings test - returns single warning for invalid API key'
     );
+
+-- Test 2b: RBAC v2 path — NULL-mode apikey with org_member binding gets org.read
+-- Set up: create a NULL-mode (RBAC v2) apikey owned by the same user as the
+-- legacy fixture key, and grant it org_member on the test org.
+SELECT tests.clear_authentication();
+SELECT tests.authenticate_as_service_role();
+
+DO $$
+DECLARE
+    v_user_id uuid;
+    v_apikey_rbac_id uuid;
+    v_org_member_role_id uuid;
+BEGIN
+    SELECT user_id INTO v_user_id FROM public.apikeys
+    WHERE key = '67eeaff4-ae4c-49a6-8eb1-0875f5369de1';
+
+    INSERT INTO public.apikeys (id, user_id, key, mode, name)
+    VALUES (
+        99020001,
+        v_user_id,
+        'rbac-v2-cli-warnings-test-key',
+        NULL,
+        'rbac-v2-cli-warnings-test'
+    )
+    RETURNING rbac_id INTO v_apikey_rbac_id;
+
+    SELECT id INTO v_org_member_role_id
+    FROM public.roles
+    WHERE name = public.rbac_role_org_member();
+
+    INSERT INTO public.role_bindings (
+        principal_type, principal_id, role_id, scope_type, org_id, granted_by
+    )
+    VALUES (
+        'apikey',
+        v_apikey_rbac_id,
+        v_org_member_role_id,
+        'org',
+        '22dbad8a-b885-4309-9b3b-a09f8460fb6d',
+        v_user_id
+    );
+
+    -- Second RBAC v2 key SCOPED to a different org (via limited_to_orgs) — used for
+    -- the "no read access" case. The owning user is super_admin of the test org, so we
+    -- can't rely on absence of bindings alone to deny access; limited_to_orgs restricts
+    -- the key away from the test org even though the user has broader rights.
+    INSERT INTO public.apikeys (id, user_id, key, mode, name, limited_to_orgs)
+    VALUES (
+        99020002,
+        v_user_id,
+        'rbac-v2-cli-warnings-test-key-no-binding',
+        NULL,
+        'rbac-v2-cli-warnings-test-no-binding',
+        ARRAY['00000000-0000-0000-0000-000000000001'::uuid]
+    );
+
+    -- Expired RBAC v2 key (with a valid binding) — used for the expired-key case
+    INSERT INTO public.apikeys (id, user_id, key, mode, name, expires_at)
+    VALUES (
+        99020003,
+        v_user_id,
+        'rbac-v2-cli-warnings-test-key-expired',
+        NULL,
+        'rbac-v2-cli-warnings-test-expired',
+        NOW() - INTERVAL '1 day'
+    )
+    RETURNING rbac_id INTO v_apikey_rbac_id;
+
+    INSERT INTO public.role_bindings (
+        principal_type, principal_id, role_id, scope_type, org_id, granted_by
+    )
+    VALUES (
+        'apikey',
+        v_apikey_rbac_id,
+        v_org_member_role_id,
+        'org',
+        '22dbad8a-b885-4309-9b3b-a09f8460fb6d',
+        v_user_id
+    );
+END $$;
+
+-- Case A: RBAC v2 key WITH org.read binding — expect NO fatal "no read access" warning
+SELECT set_config(
+    'request.headers',
+    '{"capgkey": "rbac-v2-cli-warnings-test-key"}',
+    TRUE
+);
+
+SELECT ok(
+    NOT EXISTS (
+        SELECT 1
+        FROM unnest(
+            get_organization_cli_warnings(
+                '22dbad8a-b885-4309-9b3b-a09f8460fb6d', '1.0.0'
+            )
+        ) AS msg
+        WHERE msg->>'message' = 'API key does not have read access to this organization'
+    ),
+    'get_organization_cli_warnings RBAC v2 - NULL-mode key with org.read binding has no fatal no-read-access warning'
+);
+
+-- Case B: RBAC v2 key WITHOUT a binding for this org — expect the fatal warning
+SELECT set_config(
+    'request.headers',
+    '{"capgkey": "rbac-v2-cli-warnings-test-key-no-binding"}',
+    TRUE
+);
+
+SELECT ok(
+    EXISTS (
+        SELECT 1
+        FROM unnest(
+            get_organization_cli_warnings(
+                '22dbad8a-b885-4309-9b3b-a09f8460fb6d', '1.0.0'
+            )
+        ) AS msg
+        WHERE msg->>'message' = 'API key does not have read access to this organization'
+          AND (msg->>'fatal')::boolean = true
+    ),
+    'get_organization_cli_warnings RBAC v2 - NULL-mode key scoped away from this org returns fatal no-read-access warning'
+);
+
+-- Case C: Expired RBAC v2 key (even with a valid binding) — expect the fatal warning
+SELECT set_config(
+    'request.headers',
+    '{"capgkey": "rbac-v2-cli-warnings-test-key-expired"}',
+    TRUE
+);
+
+SELECT ok(
+    EXISTS (
+        SELECT 1
+        FROM unnest(
+            get_organization_cli_warnings(
+                '22dbad8a-b885-4309-9b3b-a09f8460fb6d', '1.0.0'
+            )
+        ) AS msg
+        WHERE msg->>'message' = 'API key does not have read access to this organization'
+          AND (msg->>'fatal')::boolean = true
+    ),
+    'get_organization_cli_warnings RBAC v2 - expired key returns fatal no-read-access warning'
+);
+
+-- Case D: No capgkey header at all — expect the fatal warning
+SELECT set_config(
+    'request.headers',
+    '{}',
+    TRUE
+);
+
+SELECT ok(
+    EXISTS (
+        SELECT 1
+        FROM unnest(
+            get_organization_cli_warnings(
+                '22dbad8a-b885-4309-9b3b-a09f8460fb6d', '1.0.0'
+            )
+        ) AS msg
+        WHERE msg->>'message' = 'API key does not have read access to this organization'
+          AND (msg->>'fatal')::boolean = true
+    ),
+    'get_organization_cli_warnings RBAC v2 - missing capgkey header returns fatal no-read-access warning'
+);
+
+-- Restore the legacy fixture key for any tests that follow this block
+SELECT set_config(
+    'request.headers',
+    '{"capgkey": "67eeaff4-ae4c-49a6-8eb1-0875f5369de1"}',
+    TRUE
+);
 
 -- Test 3: Test is_paying_and_good_plan_org_action directly with valid setup
 SELECT
