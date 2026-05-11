@@ -724,6 +724,22 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
     if (step === 'saving-credentials') {
       ;(async () => {
         try {
+          // Self-heal: re-validate progress before attempting the save. If
+          // the resume logic says we should be somewhere earlier (e.g. a
+          // race lost the keystoreStorePassword between phases), route back
+          // to the matching input step instead of crashing on a thrown
+          // "keystore inputs missing" error.
+          const fresh = await loadAndroidProgress(appId)
+          if (fresh) {
+            const expectedStep = getAndroidResumeStep(fresh)
+            if (expectedStep !== 'saving-credentials') {
+              if (cancelled)
+                return
+              addLog('ℹ Some required input was missing — sending you back to fill it in.', 'yellow')
+              setStep(expectedStep)
+              return
+            }
+          }
           await doSaveCredentials()
           if (cancelled)
             return
