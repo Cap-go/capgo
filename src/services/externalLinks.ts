@@ -1,10 +1,10 @@
 const externalWindowFeatures = 'noopener,noreferrer'
 
 export function openExternalLink(url?: string): void {
-  if (!url || typeof window === 'undefined')
+  if (!url || typeof globalThis.window === 'undefined')
     return
 
-  const openedWindow = window.open(url, '_blank', externalWindowFeatures)
+  const openedWindow = globalThis.window.open(url, '_blank', externalWindowFeatures)
   if (openedWindow)
     openedWindow.opener = null
 }
