@@ -14,13 +14,46 @@ interface DataDownload {
   isManifest?: boolean
 }
 
+export function getDownloadLinkRequestMetadata(body: Partial<DataDownload> | null | undefined) {
+  return {
+    hasAppId: typeof body?.app_id === 'string' && body.app_id.length > 0,
+    hasStorageProvider: typeof body?.storage_provider === 'string' && body.storage_provider.length > 0,
+    hasUserId: typeof body?.user_id === 'string' && body.user_id.length > 0,
+    hasVersionId: body?.id !== undefined && body.id !== null,
+    isManifest: body?.isManifest === true,
+  }
+}
+
+export function getDownloadLinkBundleMetadata(bundle: unknown) {
+  if (!bundle || typeof bundle !== 'object') {
+    return {
+      hasBundle: false,
+    }
+  }
+
+  const bundleRecord = bundle as {
+    checksum?: unknown
+    id?: unknown
+    owner_org?: unknown
+    r2_path?: unknown
+  }
+
+  return {
+    hasBundle: true,
+    hasBundleId: bundleRecord.id !== undefined && bundleRecord.id !== null,
+    hasChecksum: typeof bundleRecord.checksum === 'string' && bundleRecord.checksum.length > 0,
+    hasOwnerOrg: !!bundleRecord.owner_org,
+    hasR2Path: typeof bundleRecord.r2_path === 'string' && bundleRecord.r2_path.length > 0,
+  }
+}
+
 export const app = new Hono<MiddlewareKeyVariables>()
 
 app.use('/', useCors)
 
 app.post('/', middlewareAuth, async (c) => {
   const body = await parseBody<DataDownload>(c)
-  cloudlog({ requestId: c.get('requestId'), message: 'post download link body', body })
+  cloudlog({ requestId: c.get('requestId'), message: 'post download link body', body: getDownloadLinkRequestMetadata(body) })
   const authorization = c.get('authorization')
   if (!authorization)
     throw simpleError('cannot_find_authorization', 'Cannot find authorization')
@@ -37,7 +70,7 @@ app.post('/', middlewareAuth, async (c) => {
 
   // Auth context is already set by middlewareAuth
   if (!(await checkPermission(c, 'app.read_bundles', { appId: body.app_id })))
-    throw simpleError('app_access_denied', 'You can\'t access this app', { app_id: body.app_id })
+    throw simpleError('app_access_denied', 'You can\'t access this app', { body: getDownloadLinkRequestMetadata(body) })
 
   const { data: bundle, error: getBundleError } = await supabase
     .from('app_versions')
@@ -46,14 +79,14 @@ app.post('/', middlewareAuth, async (c) => {
     .eq('id', body.id)
     .single()
 
-  const ownerOrg = bundle?.owner_org.created_by
+  const ownerOrg = bundle?.owner_org?.created_by
 
   if (getBundleError) {
     throw simpleError('cannot_get_bundle', 'Cannot get bundle', { getBundleError })
   }
 
   if (!ownerOrg) {
-    throw simpleError('cannot_get_owner_org', 'Cannot get owner org', { bundle })
+    throw simpleError('cannot_get_owner_org', 'Cannot get owner org', { bundle: getDownloadLinkBundleMetadata(bundle) })
   }
 
   if (body.isManifest) {
