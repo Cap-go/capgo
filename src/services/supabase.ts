@@ -57,7 +57,7 @@ export async function getRemoteConfig() {
   try {
     const response = await fetch(`${defaultApiHost}/private/config`)
     if (!response.ok) {
-      console.log('Local config', localConfig)
+      console.log('Using local config fallback', { status: response.status })
       stripeEnabled.value = localConfig.stripeEnabled ?? stripeEnabled.value
       return localConfig as CapgoConfig
     }
@@ -68,7 +68,7 @@ export async function getRemoteConfig() {
     return merged
   }
   catch {
-    console.log('Local config', localConfig)
+    console.log('Using local config fallback')
     stripeEnabled.value = localConfig.stripeEnabled ?? stripeEnabled.value
     return localConfig as CapgoConfig
   }
