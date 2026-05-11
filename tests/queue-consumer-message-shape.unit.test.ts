@@ -105,6 +105,37 @@ describe('queue_consumer legacy message compatibility', () => {
     ])).toEqual([])
   })
 
+  it.concurrent('summarizes queued POST logs without raw payload values', () => {
+    const payload = {
+      customerId: 'cus_secret_123',
+      email: 'alice@capgo.app',
+      token: 'sk_live_secret_123',
+    }
+    const metadata = __queueConsumerTestUtils__.getQueuePostLogMetadata('cron_sync_sub', 'cloudflare', payload)
+    const serializedMetadata = JSON.stringify(metadata)
+
+    expect(metadata).toMatchObject({
+      functionName: 'cron_sync_sub',
+      payloadKeys: 3,
+      payloadSize: JSON.stringify(payload).length,
+      payloadType: 'object',
+      targetKind: 'cloudflare',
+    })
+    expect(serializedMetadata).not.toContain('alice@capgo.app')
+    expect(serializedMetadata).not.toContain('cus_secret_123')
+    expect(serializedMetadata).not.toContain('sk_live_secret_123')
+    expect(serializedMetadata).not.toContain('customerId')
+    expect(serializedMetadata).not.toContain('email')
+    expect(serializedMetadata).not.toContain('token')
+  })
+
+  it.concurrent('classifies queued POST targets without exposing configured URLs', () => {
+    expect(__queueConsumerTestUtils__.getQueuePostTargetKind('cloudflare_pp', 'https://pp.example.com', 'https://cf.example.com')).toBe('cloudflare_pp')
+    expect(__queueConsumerTestUtils__.getQueuePostTargetKind('cloudflare', 'https://pp.example.com', 'https://cf.example.com')).toBe('cloudflare')
+    expect(__queueConsumerTestUtils__.getQueuePostTargetKind('', '', 'https://cf.example.com')).toBe('cloudflare_legacy')
+    expect(__queueConsumerTestUtils__.getQueuePostTargetKind('cloudflare', '', '')).toBe('supabase')
+  })
+
   it.concurrent('redacts sensitive data before queue failures are sent to Discord', () => {
     const sanitized = __queueConsumerTestUtils__.sanitizeDiscordResponseBody(JSON.stringify({
       authorization: 'Bearer abcdefghijklmnopqrstuvwxyz1234567890',

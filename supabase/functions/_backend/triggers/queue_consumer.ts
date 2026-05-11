@@ -54,6 +54,8 @@ interface FailureDetail {
   cf_id: string
 }
 
+type QueuePostTargetKind = 'cloudflare' | 'cloudflare_legacy' | 'cloudflare_pp' | 'supabase'
+
 function extractMessageBody(message: Message): Record<string, unknown> {
   if (message.message?.payload !== undefined)
     return (message.message.payload ?? {}) as Record<string, unknown>
@@ -161,6 +163,54 @@ function sanitizeDiscordResponseBody(value: string): string {
 // Helper function to generate UUID v4
 function generateUUID(): string {
   return crypto.randomUUID()
+}
+
+function getQueuePostTargetKind(functionType: string | null | undefined, cfPpUrl: string, cfUrl: string): QueuePostTargetKind {
+  const normalizedType = (functionType ?? '').trim()
+
+  if (normalizedType === 'cloudflare_pp' && cfPpUrl)
+    return 'cloudflare_pp'
+  if (normalizedType === 'cloudflare' && cfUrl)
+    return 'cloudflare'
+  if (normalizedType === '' && cfUrl)
+    return 'cloudflare_legacy'
+  return 'supabase'
+}
+
+function getQueuePayloadLogMetadata(body: unknown): {
+  payloadKeys: number
+  payloadSize: number
+  payloadType: string
+} {
+  let payloadSize = 0
+  try {
+    payloadSize = JSON.stringify(body)?.length ?? 0
+  }
+  catch {
+    payloadSize = 0
+  }
+
+  return {
+    payloadKeys: body && typeof body === 'object' && !Array.isArray(body) ? Object.keys(body).length : 0,
+    payloadSize,
+    payloadType: Array.isArray(body) ? 'array' : typeof body,
+  }
+}
+
+function getQueuePostLogMetadata(functionName: string, targetKind: QueuePostTargetKind, body: unknown): {
+  functionName: string
+  message: string
+  payloadKeys: number
+  payloadSize: number
+  payloadType: string
+  targetKind: QueuePostTargetKind
+} {
+  return {
+    functionName,
+    message: `[${functionName}] Making queued HTTP POST request.`,
+    targetKind,
+    ...getQueuePayloadLogMetadata(body),
+  }
 }
 
 async function processQueue(c: Context, db: ReturnType<typeof getPgClient>, queueName: string, batchSize: number = DEFAULT_BATCH_SIZE) {
@@ -457,15 +507,15 @@ export async function http_post_helper(
   let url: string
   const cfPpUrl = getEnv(c, 'CLOUDFLARE_PP_FUNCTION_URL')
   const cfUrl = getEnv(c, 'CLOUDFLARE_FUNCTION_URL')
-  const normalizedType = (function_type ?? '').trim()
+  const targetKind = getQueuePostTargetKind(function_type, cfPpUrl, cfUrl)
 
-  if (normalizedType === 'cloudflare_pp' && cfPpUrl) {
+  if (targetKind === 'cloudflare_pp') {
     url = `${cfPpUrl}/triggers/${function_name}`
   }
-  else if (normalizedType === 'cloudflare' && cfUrl) {
+  else if (targetKind === 'cloudflare') {
     url = `${cfUrl}/triggers/${function_name}`
   }
-  else if (normalizedType === '' && cfUrl) {
+  else if (targetKind === 'cloudflare_legacy') {
     // Backward compatibility: older queue messages may not have function_type set.
     // If a Cloudflare URL is configured, prefer it.
     url = `${cfUrl}/triggers/${function_name}`
@@ -480,7 +530,10 @@ export async function http_post_helper(
   // 15 second timeout, as the queue consumer is running every 10 seconds and the visibility timeout is 60 seconds
 
   try {
-    cloudlog({ requestId: c.get('requestId'), message: `[${function_name}] Making HTTP POST request to "${url}" with body:`, body })
+    cloudlog({
+      requestId: c.get('requestId'),
+      ...getQueuePostLogMetadata(function_name, targetKind, body),
+    })
     const response = await fetch(url, {
       method: 'POST',
       headers,
@@ -627,5 +680,8 @@ export const __queueConsumerTestUtils__ = {
   extractErrorDetails,
   extractMessageBody,
   getActionableQueueFailures,
+  getQueuePayloadLogMetadata,
+  getQueuePostLogMetadata,
+  getQueuePostTargetKind,
   sanitizeDiscordResponseBody,
 }
