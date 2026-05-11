@@ -24,8 +24,8 @@ app.delete('/', middlewareKey(['all', 'write', 'upload']), async (c) => {
     cloudlog({
       requestId: c.get('requestId'),
       message: 'apikey context',
-      apikeyId: (apikey as { id?: number }).id,
-      userId: (apikey as { user_id?: string }).user_id,
+      hasApikey: !!(apikey as { id?: number }).id,
+      hasUser: !!(apikey as { user_id?: string }).user_id,
       mode: (apikey as { mode?: string }).mode,
     })
   }
