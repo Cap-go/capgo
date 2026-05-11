@@ -1287,6 +1287,7 @@ export type Database = {
           plan_solo_yearly: number
           plan_team: number | null
           plan_team_conversion_rate: number
+          plan_total_conversion_rate: number
           plan_team_monthly: number
           plan_team_yearly: number
           plugin_major_breakdown: Json
@@ -1367,6 +1368,7 @@ export type Database = {
           plan_solo_yearly?: number
           plan_team?: number | null
           plan_team_conversion_rate?: number
+          plan_total_conversion_rate?: number
           plan_team_monthly?: number
           plan_team_yearly?: number
           plugin_major_breakdown?: Json
@@ -1447,6 +1449,7 @@ export type Database = {
           plan_solo_yearly?: number
           plan_team?: number | null
           plan_team_conversion_rate?: number
+          plan_total_conversion_rate?: number
           plan_team_monthly?: number
           plan_team_yearly?: number
           plugin_major_breakdown?: Json

@@ -33,6 +33,7 @@ const globalStatsTrendData = ref<Array<{
   users_active: number
   paying: number
   org_conversion_rate: number
+  plan_total_conversion_rate: number
   plan_solo_conversion_rate: number
   plan_maker_conversion_rate: number
   plan_team_conversion_rate: number
@@ -178,10 +179,10 @@ const planConversionSeries = computed(() => {
 
   return [
     {
-      label: 'Total Conversion (%)',
+      label: 'All Paid Plans (%)',
       data: globalStatsTrendData.value.map(item => ({
         date: item.date,
-        value: item.org_conversion_rate || 0,
+        value: item.plan_total_conversion_rate || 0,
       })),
       color: '#3b82f6', // blue
     },
@@ -697,7 +698,7 @@ displayStore.defaultBack = '/dashboard'
 
           <div class="grid grid-cols-1 gap-6">
             <ChartCard
-              title="Plan Conversion Rate"
+              title="Paid Plan Conversion Rate"
               :is-loading="isLoadingGlobalStatsTrend"
               :has-data="planConversionSeries.length > 0"
             >
