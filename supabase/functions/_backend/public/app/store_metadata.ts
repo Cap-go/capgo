@@ -63,7 +63,7 @@ function assertAllowedStoreUrl(rawUrl: string) {
   const parsedUrl = new URL(rawUrl)
 
   if (parsedUrl.protocol !== 'https:' || !ALLOWED_STORE_HOSTS.has(parsedUrl.hostname.toLowerCase()))
-    throw quickError(400, 'invalid_url', 'Only official App Store and Google Play URLs are allowed', { url: rawUrl })
+    throw quickError(400, 'invalid_url', 'Only official App Store and Google Play URLs are allowed', { allowed_hosts: [...ALLOWED_STORE_HOSTS] })
 
   return parsedUrl
 }
@@ -162,7 +162,7 @@ export async function fetchStoreMetadata(c: Context<MiddlewareKeyVariables>, bod
     parsedUrl = assertAllowedStoreUrl(body.url)
   }
   catch {
-    throw quickError(400, 'invalid_url', 'Invalid store URL', { url: body.url })
+    throw quickError(400, 'invalid_url', 'Invalid store URL')
   }
 
   const response = await fetch(parsedUrl.toString(), {
@@ -175,7 +175,7 @@ export async function fetchStoreMetadata(c: Context<MiddlewareKeyVariables>, bod
   if (!response.ok) {
     throw quickError(400, 'cannot_fetch_store_metadata', 'Unable to fetch store metadata', {
       status: response.status,
-      url: parsedUrl.toString(),
+      host: parsedUrl.hostname,
     })
   }
 
