@@ -52,6 +52,10 @@ function allowLocalWebhookUrls(c: Context): boolean {
   return getEnv(c, 'CAPGO_ALLOW_LOCAL_WEBHOOK_URLS') === 'true'
 }
 
+function isLocalWebhookProtocol(protocol: string): boolean {
+  return protocol === 'http:' || protocol === 'https:'
+}
+
 function normalizeHostname(hostname: string): string {
   return hostname.replace(/\.$/, '').toLowerCase()
 }
@@ -73,8 +77,11 @@ export function getWebhookUrlValidationError(c: Context, urlString: string): str
     return 'Webhook URL is invalid'
   }
 
-  if (allowLocalWebhookUrls(c))
-    return null
+  if (allowLocalWebhookUrls(c)) {
+    return isLocalWebhookProtocol(url.protocol)
+      ? null
+      : 'Webhook URL must use HTTP or HTTPS'
+  }
 
   // We intentionally stop at syntactic/public-host checks: webhook delivery runs
   // entirely from serverless infrastructure, so private/internal addresses are not

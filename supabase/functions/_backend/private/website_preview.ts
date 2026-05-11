@@ -1,5 +1,6 @@
 import type { Context } from 'hono'
 import { createHono, middlewareAuth, parseBody, quickError, useCors } from '../utils/hono.ts'
+import { readResponseBytesWithLimit } from '../utils/response.ts'
 import { version } from '../utils/version.ts'
 import { getWebhookUrlValidationError } from '../utils/webhook.ts'
 
@@ -220,40 +221,9 @@ async function getPublicHostnameValidationError(c: Context, urlString: string) {
 }
 
 async function readResponseTextWithLimit(response: Response, limit: number) {
-  const contentLength = Number.parseInt(response.headers.get('content-length') ?? '', 10)
-  if (Number.isFinite(contentLength) && contentLength > limit)
+  const bytes = await readResponseBytesWithLimit(response, limit)
+  if (!bytes)
     return null
-
-  if (!response.body)
-    return await response.text()
-
-  const reader = response.body.getReader()
-  const chunks: Uint8Array[] = []
-  let total = 0
-
-  while (true) {
-    const { done, value } = await reader.read()
-    if (done)
-      break
-
-    if (!value)
-      continue
-
-    total += value.byteLength
-    if (total > limit) {
-      await reader.cancel()
-      return null
-    }
-    chunks.push(value)
-  }
-
-  const bytes = new Uint8Array(total)
-  let offset = 0
-  for (const chunk of chunks) {
-    bytes.set(chunk, offset)
-    offset += chunk.byteLength
-  }
-
   return new TextDecoder().decode(bytes)
 }
 

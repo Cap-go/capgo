@@ -1,10 +1,13 @@
 import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../../utils/hono.ts'
 import { quickError } from '../../utils/hono.ts'
+import { readResponseBytesWithLimit } from '../../utils/response.ts'
 
 export interface FetchStoreMetadataBody {
   url?: string
 }
+
+const MAX_ICON_BYTES = 512 * 1024
 
 interface AppleLookupResult {
   trackName?: string
@@ -51,7 +54,10 @@ async function fetchIconDataUrl(iconUrl: string | null) {
       return null
 
     const contentType = response.headers.get('content-type')?.split(';')[0]?.trim() || 'image/png'
-    const bytes = new Uint8Array(await response.arrayBuffer())
+    const bytes = await readResponseBytesWithLimit(response, MAX_ICON_BYTES)
+    if (!bytes)
+      return null
+
     return `data:${contentType};base64,${uint8ArrayToBase64(bytes)}`
   }
   catch {

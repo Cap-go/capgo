@@ -22,6 +22,17 @@ function createContext() {
   } as any
 }
 
+function enableLocalWebhookUrls(enabled: boolean) {
+  mockGetEnv.mockImplementation((_c: unknown, key: string) =>
+    key === 'CAPGO_ALLOW_LOCAL_WEBHOOK_URLS' && enabled ? 'true' : '',
+  )
+}
+
+async function validateWebhookUrl(url: string) {
+  const { getWebhookUrlValidationError } = await import('../supabase/functions/_backend/utils/webhook.ts')
+  return getWebhookUrlValidationError(createContext(), url)
+}
+
 afterEach(() => {
   vi.restoreAllMocks()
   vi.unstubAllGlobals()
@@ -102,5 +113,27 @@ describe('webhook delivery redirect handling', () => {
     expect(result.success).toBe(false)
     expect(result.status).toBe(302)
     expect(fetchMock).toHaveBeenCalledOnce()
+  })
+})
+
+describe('webhook URL validation', () => {
+  it('allows HTTP and HTTPS webhooks when local webhook URLs are enabled', async () => {
+    enableLocalWebhookUrls(true)
+
+    await expect(validateWebhookUrl('http://localhost:3000/webhook')).resolves.toBeNull()
+    await expect(validateWebhookUrl('https://localhost/webhook')).resolves.toBeNull()
+  })
+
+  it('rejects unsupported URL schemes even when local webhook URLs are enabled', async () => {
+    enableLocalWebhookUrls(true)
+
+    await expect(validateWebhookUrl('ftp://localhost/webhook')).resolves.toBe('Webhook URL must use HTTP or HTTPS')
+    await expect(validateWebhookUrl('file:///tmp/webhook')).resolves.toBe('Webhook URL must use HTTP or HTTPS')
+  })
+
+  it('continues to reject HTTP URLs when local webhook URLs are disabled', async () => {
+    enableLocalWebhookUrls(false)
+
+    await expect(validateWebhookUrl('http://example.com/webhook')).resolves.toBe('Webhook URL must use HTTPS')
   })
 })
