@@ -367,6 +367,9 @@ function generateTotp(secret: string, now = Date.now()): string {
   return (binary % 1_000_000).toString().padStart(6, '0')
 }
 
+const MFA_TEST_FACTOR_PREFIX = 'Capgo test MFA '
+const MFA_TEST_FACTOR_LIKE = `${MFA_TEST_FACTOR_PREFIX}%`
+
 export async function getAal2AuthHeadersForCredentials(email: string, password: string): Promise<Record<string, string>> {
   hydrateLocalSupabaseEnvFromStatus()
 
@@ -394,7 +397,13 @@ export async function getAal2AuthHeadersForCredentials(email: string, password: 
     throw signInError ?? new Error('Unable to obtain JWT for MFA tests')
   }
 
-  await executeSQL('DELETE FROM auth.mfa_factors WHERE user_id = $1::uuid', [signInData.user.id])
+  // Keep MFA cleanup scoped to factors enrolled by this helper.
+  await executeSQL(`
+    DELETE FROM auth.mfa_factors
+    WHERE user_id = $1::uuid
+      AND friendly_name LIKE $2
+      AND created_at < NOW() - INTERVAL '10 minutes';
+  `, [signInData.user.id, MFA_TEST_FACTOR_LIKE])
   await executeSQL(`
     INSERT INTO public.user_security (user_id, email_otp_verified_at, created_at, updated_at)
     VALUES ($1::uuid, NOW(), NOW(), NOW())
@@ -404,43 +413,58 @@ export async function getAal2AuthHeadersForCredentials(email: string, password: 
       updated_at = NOW();
   `, [signInData.user.id])
 
-  const { data: enrollData, error: enrollError } = await supabase.auth.mfa.enroll({
-    factorType: 'totp',
-    friendlyName: `Capgo test MFA ${Date.now()}`,
-  })
+  let enrolledFactorId: string | undefined
+  try {
+    const { data: enrollData, error: enrollError } = await supabase.auth.mfa.enroll({
+      factorType: 'totp',
+      friendlyName: `${MFA_TEST_FACTOR_PREFIX}${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    })
 
-  const totpSecret = enrollData?.totp?.secret
-  if (enrollError || !enrollData?.id || !totpSecret) {
-    throw enrollError ?? new Error('Unable to enroll TOTP factor for MFA tests')
+    enrolledFactorId = enrollData?.id
+
+    const totpSecret = enrollData?.totp?.secret
+    if (enrollError || !enrollData?.id || !totpSecret) {
+      throw enrollError ?? new Error('Unable to enroll TOTP factor for MFA tests')
+    }
+
+    const { data: challengeData, error: challengeError } = await supabase.auth.mfa.challenge({
+      factorId: enrollData.id,
+    })
+
+    if (challengeError || !challengeData?.id) {
+      throw challengeError ?? new Error('Unable to create TOTP challenge for MFA tests')
+    }
+
+    const { data: verifyData, error: verifyError } = await supabase.auth.mfa.verify({
+      factorId: enrollData.id,
+      challengeId: challengeData.id,
+      code: generateTotp(totpSecret),
+    })
+
+    if (verifyError)
+      throw verifyError
+
+    const { data: sessionData } = await supabase.auth.getSession()
+    const accessToken = (verifyData as any)?.access_token
+      ?? (verifyData as any)?.session?.access_token
+      ?? sessionData.session?.access_token
+    if (!accessToken)
+      throw new Error('Unable to obtain aal2 JWT for MFA tests')
+
+    return {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${accessToken}`,
+    }
   }
-
-  const { data: challengeData, error: challengeError } = await supabase.auth.mfa.challenge({
-    factorId: enrollData.id,
-  })
-
-  if (challengeError || !challengeData?.id) {
-    throw challengeError ?? new Error('Unable to create TOTP challenge for MFA tests')
-  }
-
-  const { data: verifyData, error: verifyError } = await supabase.auth.mfa.verify({
-    factorId: enrollData.id,
-    challengeId: challengeData.id,
-    code: generateTotp(totpSecret),
-  })
-
-  if (verifyError)
-    throw verifyError
-
-  const { data: sessionData } = await supabase.auth.getSession()
-  const accessToken = (verifyData as any)?.access_token
-    ?? (verifyData as any)?.session?.access_token
-    ?? sessionData.session?.access_token
-  if (!accessToken)
-    throw new Error('Unable to obtain aal2 JWT for MFA tests')
-
-  return {
-    'Content-Type': 'application/json',
-    'Authorization': `Bearer ${accessToken}`,
+  finally {
+    if (enrolledFactorId) {
+      await executeSQL(`
+        DELETE FROM auth.mfa_factors
+        WHERE id = $1::uuid
+          AND user_id = $2::uuid
+          AND friendly_name LIKE $3;
+      `, [enrolledFactorId, signInData.user.id, MFA_TEST_FACTOR_LIKE])
+    }
   }
 }
 
