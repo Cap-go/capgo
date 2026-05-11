@@ -11,13 +11,20 @@ interface PortalData {
   orgId: string
 }
 
+function getPortalRequestLogMetadata(body: PortalData) {
+  return {
+    hasCallbackUrl: Boolean(body.callbackUrl),
+    hasOrgId: Boolean(body.orgId),
+  }
+}
+
 export const app = new Hono<MiddlewareKeyVariables>()
 
 app.use('/', useCors)
 
 app.post('/', middlewareAuth, async (c) => {
   const body = await parseBody<PortalData>(c)
-  cloudlog({ requestId: c.get('requestId'), message: 'post stripe portal body', body })
+  cloudlog({ requestId: c.get('requestId'), message: 'post stripe portal request', request: getPortalRequestLogMetadata(body) })
   const authorization = c.get('authorization')
   if (!authorization)
     throw simpleError('not_authorized', 'Not authorized')
@@ -30,7 +37,7 @@ app.post('/', middlewareAuth, async (c) => {
   if (!authContext?.userId)
     throw simpleError('not_authorized', 'Not authorized')
 
-  cloudlog({ requestId: c.get('requestId'), message: 'auth', auth: authContext.userId })
+  cloudlog({ requestId: c.get('requestId'), message: 'stripe portal auth context', auth: { authenticated: true } })
   const { data: org, error: dbError } = await supabase
     .from('orgs')
     .select('customer_id')
@@ -44,7 +51,7 @@ app.post('/', middlewareAuth, async (c) => {
   if (!await checkPermission(c, 'org.update_billing', { orgId: body.orgId }))
     throw simpleError('not_authorize', 'Not authorize')
 
-  cloudlog({ requestId: c.get('requestId'), message: 'org', org })
+  cloudlog({ requestId: c.get('requestId'), message: 'stripe portal org lookup result', org: { found: true, hasCustomerId: Boolean(org.customer_id) } })
   const link = await createPortal(c, org.customer_id, body.callbackUrl)
   return c.json({ url: link.url })
 })
