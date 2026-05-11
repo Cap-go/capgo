@@ -1,8 +1,6 @@
 import { randomUUID } from 'node:crypto'
-import { env } from 'node:process'
-import { createClient } from '@supabase/supabase-js'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { BASE_URL, getSupabaseClient, headers, ORG_ID, TEST_EMAIL, USER_ID } from './test-utils.ts'
+import { BASE_URL, getAal2AuthHeadersForCredentials, getSupabaseClient, headers, ORG_ID, TEST_EMAIL, USER_ID } from './test-utils.ts'
 
 // Test organization for admin credits tests
 const TEST_ORG_ID = randomUUID()
@@ -17,34 +15,7 @@ async function getAdminHeaders() {
   if (adminHeadersCache)
     return adminHeadersCache
 
-  const supabaseUrl = env.SUPABASE_URL
-  const supabaseAnonKey = env.SUPABASE_ANON_KEY
-
-  if (!supabaseUrl || !supabaseAnonKey) {
-    throw new Error('SUPABASE_URL or SUPABASE_ANON_KEY is missing for admin auth headers')
-  }
-
-  const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-    auth: {
-      persistSession: false,
-      autoRefreshToken: false,
-      detectSessionInUrl: false,
-    },
-  })
-
-  const { data, error } = await supabase.auth.signInWithPassword({
-    email: ADMIN_EMAIL,
-    password: ADMIN_PASSWORD,
-  })
-
-  if (error || !data.session?.access_token) {
-    throw error ?? new Error('Unable to obtain admin JWT for tests')
-  }
-
-  adminHeadersCache = {
-    'Content-Type': 'application/json',
-    'Authorization': `Bearer ${data.session.access_token}`,
-  }
+  adminHeadersCache = await getAal2AuthHeadersForCredentials(ADMIN_EMAIL, ADMIN_PASSWORD)
 
   return adminHeadersCache
 }

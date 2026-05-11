@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { BASE_URL, fetchWithRetry, getAuthHeadersForCredentials, getSupabaseClient, PRODUCT_ID, TEST_EMAIL, USER_ADMIN_EMAIL, USER_ID } from './test-utils.ts'
+import { BASE_URL, fetchWithRetry, getAal2AuthHeadersForCredentials, getSupabaseClient, PRODUCT_ID, TEST_EMAIL, USER_ADMIN_EMAIL, USER_ID } from './test-utils.ts'
 
 const DAY_IN_MS = 24 * 60 * 60 * 1000
 const NOW = Date.now()
@@ -55,7 +55,7 @@ let creatorUserCreatedAt = ''
 beforeAll(async () => {
   const supabase = getSupabaseClient()
 
-  adminHeaders = await getAuthHeadersForCredentials(USER_ADMIN_EMAIL, 'adminadmin')
+  adminHeaders = await getAal2AuthHeadersForCredentials(USER_ADMIN_EMAIL, 'adminadmin')
 
   const [{ data: planRow, error: planError }, { data: userRow, error: userError }] = await Promise.all([
     supabase.from('plans').select('name, price_m_id, price_y_id, stripe_id').eq('stripe_id', PRODUCT_ID).single(),

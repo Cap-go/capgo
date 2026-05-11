@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '../src/types/supabase.types'
 import { spawnSync } from 'node:child_process'
+import { createHmac } from 'node:crypto'
 import process, { env } from 'node:process'
 import { createClient } from '@supabase/supabase-js'
 import { Pool } from 'pg'
@@ -331,6 +332,118 @@ export async function getAuthHeaders(): Promise<Record<string, string>> {
 export async function getAuthHeadersForCredentials(email: string, password: string): Promise<Record<string, string>> {
   return signInAndBuildAuthHeaders(email, password)
 }
+
+function decodeBase32(value: string): Buffer {
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567'
+  let bits = ''
+
+  for (const char of value.toUpperCase().replace(/[\s=]/g, '')) {
+    const index = alphabet.indexOf(char)
+    if (index < 0)
+      throw new Error('Invalid TOTP secret')
+    bits += index.toString(2).padStart(5, '0')
+  }
+
+  const bytes: number[] = []
+  for (let offset = 0; offset + 8 <= bits.length; offset += 8)
+    bytes.push(Number.parseInt(bits.slice(offset, offset + 8), 2))
+
+  return Buffer.from(bytes)
+}
+
+function generateTotp(secret: string, now = Date.now()): string {
+  const key = decodeBase32(secret)
+  const counter = Math.floor(now / 30000)
+  const buffer = Buffer.alloc(8)
+  buffer.writeBigUInt64BE(BigInt(counter))
+
+  const digest = createHmac('sha1', key).update(buffer).digest()
+  const offset = digest[digest.length - 1] & 0x0F
+  const binary = ((digest[offset] & 0x7F) << 24)
+    | ((digest[offset + 1] & 0xFF) << 16)
+    | ((digest[offset + 2] & 0xFF) << 8)
+    | (digest[offset + 3] & 0xFF)
+
+  return (binary % 1_000_000).toString().padStart(6, '0')
+}
+
+export async function getAal2AuthHeadersForCredentials(email: string, password: string): Promise<Record<string, string>> {
+  hydrateLocalSupabaseEnvFromStatus()
+
+  const supabaseBaseUrl = normalizeLocalhostUrl(env.SUPABASE_URL) ?? SUPABASE_BASE_URL
+  const supabaseAnonKey = env.SUPABASE_ANON_KEY ?? SUPABASE_ANON_KEY
+
+  if (!supabaseBaseUrl || !supabaseAnonKey) {
+    throw new Error('SUPABASE_URL or SUPABASE_ANON_KEY is missing for MFA auth headers')
+  }
+
+  const supabase = createClient<Database>(supabaseBaseUrl, supabaseAnonKey, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+      detectSessionInUrl: false,
+    },
+  })
+
+  const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+    email,
+    password,
+  })
+
+  if (signInError || !signInData.session?.access_token || !signInData.user?.id) {
+    throw signInError ?? new Error('Unable to obtain JWT for MFA tests')
+  }
+
+  await executeSQL('DELETE FROM auth.mfa_factors WHERE user_id = $1::uuid', [signInData.user.id])
+  await executeSQL(`
+    INSERT INTO public.user_security (user_id, email_otp_verified_at, created_at, updated_at)
+    VALUES ($1::uuid, NOW(), NOW(), NOW())
+    ON CONFLICT (user_id) DO UPDATE
+    SET
+      email_otp_verified_at = EXCLUDED.email_otp_verified_at,
+      updated_at = NOW();
+  `, [signInData.user.id])
+
+  const { data: enrollData, error: enrollError } = await supabase.auth.mfa.enroll({
+    factorType: 'totp',
+    friendlyName: `Capgo test MFA ${Date.now()}`,
+  })
+
+  const totpSecret = enrollData?.totp?.secret
+  if (enrollError || !enrollData?.id || !totpSecret) {
+    throw enrollError ?? new Error('Unable to enroll TOTP factor for MFA tests')
+  }
+
+  const { data: challengeData, error: challengeError } = await supabase.auth.mfa.challenge({
+    factorId: enrollData.id,
+  })
+
+  if (challengeError || !challengeData?.id) {
+    throw challengeError ?? new Error('Unable to create TOTP challenge for MFA tests')
+  }
+
+  const { data: verifyData, error: verifyError } = await supabase.auth.mfa.verify({
+    factorId: enrollData.id,
+    challengeId: challengeData.id,
+    code: generateTotp(totpSecret),
+  })
+
+  if (verifyError)
+    throw verifyError
+
+  const { data: sessionData } = await supabase.auth.getSession()
+  const accessToken = (verifyData as any)?.access_token
+    ?? (verifyData as any)?.session?.access_token
+    ?? sessionData.session?.access_token
+  if (!accessToken)
+    throw new Error('Unable to obtain aal2 JWT for MFA tests')
+
+  return {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${accessToken}`,
+  }
+}
+
 export const headersStats = {
   'Content-Type': 'application/json',
   'Authorization': APIKEY_STATS,
