@@ -65,13 +65,12 @@ describe('webhook delivery redirect handling', () => {
       'whsec_test_secret',
     )
 
-    expect(fetchMock).toHaveBeenCalledWith(
-      'https://example.com/webhook',
-      expect.objectContaining({
-        method: 'POST',
-        redirect: 'manual',
-      }),
-    )
+    const webhookCalls = fetchMock.mock.calls.filter(([url]) => url === 'https://example.com/webhook')
+    expect(webhookCalls).toHaveLength(1)
+    expect(webhookCalls[0]?.[1]).toMatchObject({
+      method: 'POST',
+      redirect: 'manual',
+    })
     expect(result).toMatchObject({
       success: false,
       status: 302,
