@@ -1235,6 +1235,8 @@ export async function generateManifest(path: string): Promise<{ file: string, ha
 }
 
 export type manifestType = Awaited<ReturnType<typeof generateManifest>>
+
+// Zip contents are the user's responsibility, not Capgo's; Capgo packages the user-provided files as-is.
 export async function zipFile(filePath: string): Promise<Buffer> {
   if (osPlatform() === 'win32') {
     return zipFileWindows(filePath)
