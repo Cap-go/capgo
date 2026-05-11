@@ -23,7 +23,7 @@ app.use('/', useCors)
 
 app.post('/', middlewareAuth, async (c) => {
   const body = await parseBody<CheckoutData>(c)
-  cloudlog({ requestId: c.get('requestId'), message: 'post stripe checkout body', body })
+  cloudlog({ requestId: c.get('requestId'), message: 'post stripe checkout body', has_org_id: !!body.orgId, has_price_id: !!body.priceId, has_success_url: !!body.successUrl, has_cancel_url: !!body.cancelUrl })
 
   if (!body.orgId)
     throw simpleError('no_org_id_provided', 'No org_id provided')
@@ -40,7 +40,7 @@ app.post('/', middlewareAuth, async (c) => {
   // Use authenticated client - RLS will enforce access based on JWT
   const supabase = supabaseClient(c, authorization)
 
-  cloudlog({ requestId: c.get('requestId'), message: 'auth', auth: authContext.userId })
+  cloudlog({ requestId: c.get('requestId'), message: 'auth', has_user_id: !!authContext.userId })
   const { data: org, error: dbError } = await supabase
     .from('orgs')
     .select('customer_id')
@@ -54,7 +54,7 @@ app.post('/', middlewareAuth, async (c) => {
   if (!await checkPermission(c, 'org.update_billing', { orgId: body.orgId }))
     throw simpleError('not_authorize', 'Not authorize')
 
-  cloudlog({ requestId: c.get('requestId'), message: 'user', org })
+  cloudlog({ requestId: c.get('requestId'), message: 'user', has_customer_id: !!org.customer_id })
   const checkout = await createCheckout(c, org.customer_id, body.recurrence ?? 'month', body.priceId ?? 'price_1KkINoGH46eYKnWwwEi97h1B', body.successUrl ?? `${getEnv(c, 'WEBAPP_URL')}/app/usage`, body.cancelUrl ?? `${getEnv(c, 'WEBAPP_URL')}/app/usage`, body.clientReferenceId, body.attributionId)
   return c.json({ url: checkout.url })
 })
