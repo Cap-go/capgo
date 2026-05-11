@@ -447,9 +447,10 @@ function resolveAuthHeaders(c: Context) {
 
 function resolveKeyHeaders(c: Context) {
   const capgkeyString = c.req.header('capgkey')
+  const xApiKeyString = c.req.header('x-api-key')
   const apikeyString = c.req.header('authorization')
-  const key = capgkeyString ?? apikeyString
-  return { capgkeyString, apikeyString, key }
+  const key = capgkeyString ?? xApiKeyString ?? apikeyString
+  return { capgkeyString, xApiKeyString, apikeyString, key }
 }
 
 async function resolveApiKey(
@@ -622,7 +623,7 @@ export function middlewareKey(rights: Database['public']['Enums']['key_mode'][],
       return simpleRateLimit({ reason: 'too_many_failed_auth_attempts', ...buildRateLimitInfo(ipRateLimited.resetAt) })
     }
 
-    const { capgkeyString, apikeyString, key } = resolveKeyHeaders(c)
+    const { capgkeyString, xApiKeyString, apikeyString, key } = resolveKeyHeaders(c)
     const subkey_id = await getSubkeyId(c)
 
     cloudlog({
@@ -631,6 +632,7 @@ export function middlewareKey(rights: Database['public']['Enums']['key_mode'][],
       method: c.req.method,
       url: c.req.url,
       hasCapgkey: !!capgkeyString,
+      hasXApiKey: !!xApiKeyString,
       hasAuthorization: !!apikeyString,
       hasKey: !!key,
       usePostgres,
