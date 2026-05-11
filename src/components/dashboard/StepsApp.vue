@@ -12,7 +12,6 @@ import { pushEvent } from '~/services/posthog'
 import { getLocalConfig, isLocal, useSupabase } from '~/services/supabase'
 import { sendEvent } from '~/services/tracking'
 import { useDialogV2Store } from '~/stores/dialogv2'
-import { useDisplayStore } from '~/stores/display'
 import { useMainStore } from '~/stores/main'
 import { useOrganizationStore } from '~/stores/organization'
 
@@ -20,7 +19,6 @@ const props = defineProps<{
   onboarding: boolean
 }>()
 const emit = defineEmits(['done', 'closeStep'])
-const displayStore = useDisplayStore()
 const isLoading = ref(false)
 const isDemoLoading = ref(false)
 const step = ref(0)
@@ -94,7 +92,6 @@ function setLog() {
     pushEvent(`user:onboarding-step-${stepToName(step.value)}`, config.supaHost)
   }
   if (step.value === 2) {
-    console.log('Finished onboarding for app ID:', appId.value)
     emit('done', appId.value)
   }
 }
@@ -102,7 +99,6 @@ function setLog() {
 function scrollToElement(id: string) {
   // Get the element with the id
   const el = document.getElementById(id)
-  console.log('el', el)
   if (el) {
     // Use el.scrollIntoView() to instantly scroll to the element
     el.scrollIntoView({ behavior: 'smooth' })
@@ -190,7 +186,6 @@ async function createDemoApp() {
 
 function clearWatchers() {
   if (pollTimer.value !== null) {
-    console.log('clear poll timer', pollTimer.value)
     clearInterval(pollTimer.value)
     pollTimer.value = null
   }
@@ -200,7 +195,6 @@ async function copyToast(allowed: boolean, _id: string, text?: string) {
     return
   try {
     await navigator.clipboard.writeText(text)
-    console.log('displayStore.messageToast', displayStore.messageToast)
     toast.success(t('copied-to-clipboard'))
   }
   catch (err) {
@@ -229,7 +223,6 @@ async function addNewApiKey() {
   const userId = claimsData?.claims?.sub
 
   if (!userId) {
-    console.log('Not logged in, cannot regenerate API key')
     return
   }
   const { error } = await createDefaultApiKey(supabase, t('api-key'))
@@ -289,14 +282,11 @@ async function getLatestAppId(): Promise<string | undefined> {
 
   if (error || !data || data.length === 0)
     return undefined
-  console.log('data', data)
-  console.log('latest app id', data[0].app_id)
   return data[0].app_id as string
 }
 
 watchEffect(async () => {
   if (step.value === 1 && !realtimeListener.value) {
-    console.log('watch app change step 1 via polling')
     realtimeListener.value = true
     await organizationStore.awaitInitialLoad()
     // establish baseline

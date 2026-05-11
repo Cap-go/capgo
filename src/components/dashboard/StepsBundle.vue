@@ -10,7 +10,6 @@ import { pushEvent } from '~/services/posthog'
 import { getLocalConfig, isLocal, useSupabase } from '~/services/supabase'
 import { sendEvent } from '~/services/tracking'
 import { useDialogV2Store } from '~/stores/dialogv2'
-import { useDisplayStore } from '~/stores/display'
 import { useMainStore } from '~/stores/main'
 import { useOrganizationStore } from '~/stores/organization'
 
@@ -19,7 +18,6 @@ const props = defineProps<{
   appId: string
 }>()
 const emit = defineEmits(['done', 'closeStep'])
-const displayStore = useDisplayStore()
 const isLoading = ref(false)
 const step = ref(0)
 const clicked = ref(0)
@@ -69,7 +67,6 @@ function stepToName(stepNumber: number): string {
 }
 
 function setLog() {
-  console.log('setLog', props.onboarding, main.user?.id, step.value)
   if (props.onboarding && main.user?.id) {
     sendEvent({
       channel: 'onboarding-bundle',
@@ -87,7 +84,6 @@ function setLog() {
 
 function clearWatchers() {
   if (pollTimer.value !== null) {
-    console.log('clear poll timer', pollTimer.value)
     clearInterval(pollTimer.value)
     pollTimer.value = null
   }
@@ -96,7 +92,6 @@ function clearWatchers() {
 function scrollToElement(id: string) {
   // Get the element with the id
   const el = document.getElementById(id)
-  console.log('el', el)
   if (el) {
     // Use el.scrollIntoView() to instantly scroll to the element
     el.scrollIntoView({ behavior: 'smooth' })
@@ -108,7 +103,6 @@ async function copyToast(allowed: boolean, id: string, text?: string) {
     return
   try {
     await navigator.clipboard.writeText(text)
-    console.log('displayStore.messageToast', displayStore.messageToast)
     toast.success(t('copied-to-clipboard'))
   }
   catch (err) {
@@ -142,7 +136,6 @@ async function addNewApiKey() {
   const userId = claimsData?.claims?.sub
 
   if (!userId) {
-    console.log('Not logged in, cannot regenerate API key')
     return
   }
   const { error } = await createDefaultApiKey(supabase, t('api-key'))
@@ -224,7 +217,6 @@ function onInviteSuccess() {
 
 watchEffect(async () => {
   if (step.value === 1 && !realtimeListener.value) {
-    console.log('watch app change step 1 via polling')
     realtimeListener.value = true
     await organizationStore.awaitInitialLoad()
 
