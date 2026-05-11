@@ -54,6 +54,97 @@ function transformMetadataForSupabase(c: Context, objectName: string): string {
   return metadata
 }
 
+function summarizePathLike(value: string | null | undefined) {
+  if (!value) {
+    return {
+      present: false,
+      isAbsoluteUrl: false,
+      segmentCount: 0,
+      hasQueryString: false,
+      hasHash: false,
+    }
+  }
+
+  let path = value
+  let isAbsoluteUrl = false
+  let hasQueryString = false
+  let hasHash = false
+
+  try {
+    const parsed = new URL(value)
+    path = parsed.pathname
+    isAbsoluteUrl = true
+    hasQueryString = parsed.search.length > 0
+    hasHash = parsed.hash.length > 0
+  }
+  catch {
+    const queryStart = value.indexOf('?')
+    const hashStart = value.indexOf('#')
+    hasQueryString = queryStart >= 0
+    hasHash = hashStart >= 0
+
+    const end = [queryStart, hashStart]
+      .filter(index => index >= 0)
+      .sort((a, b) => a - b)[0]
+    path = end == null ? value : value.slice(0, end)
+  }
+
+  return {
+    present: true,
+    isAbsoluteUrl,
+    segmentCount: path.split('/').filter(Boolean).length,
+    hasQueryString,
+    hasHash,
+  }
+}
+
+function summarizeIdentifier(value: unknown) {
+  if (typeof value !== 'string') {
+    return {
+      present: value != null,
+      type: typeof value,
+      segmentCount: 0,
+      containsSlash: false,
+    }
+  }
+
+  return {
+    present: value.length > 0,
+    type: 'string',
+    segmentCount: value.split('/').filter(Boolean).length,
+    containsSlash: value.includes('/'),
+  }
+}
+
+function summarizeTusEndpoint(url: string, uploadId?: string) {
+  return {
+    ...summarizePathLike(url),
+    hasUploadId: uploadId != null,
+  }
+}
+
+function summarizeTusMetadata(metadata: string) {
+  const keys = metadata
+    .split(',')
+    .map(part => part.trim().split(/\s+/, 1)[0])
+    .filter(Boolean)
+
+  return {
+    present: metadata.length > 0,
+    keyCount: keys.length,
+    hasBucketName: keys.includes('bucketName'),
+    hasObjectName: keys.includes('objectName'),
+    hasFilename: keys.includes('filename'),
+    hasFiletype: keys.includes('filetype'),
+  }
+}
+
+function summarizeError(error: unknown) {
+  return {
+    type: error instanceof Error ? error.name : typeof error,
+  }
+}
+
 /**
  * Rewrite Supabase Location header to Capgo API URL
  */
@@ -74,7 +165,11 @@ function rewriteLocationHeader(c: Context, supabaseLocation: string): string {
   }
 
   if (!uploadId) {
-    cloudlog({ requestId, message: 'rewriteLocationHeader - failed to extract uploadId', supabaseLocation })
+    cloudlog({
+      requestId,
+      message: 'rewriteLocationHeader - failed to extract uploadId',
+      location: summarizePathLike(supabaseLocation),
+    })
     throw new Error('Failed to extract uploadId from Supabase Location header')
   }
 
@@ -95,7 +190,17 @@ function rewriteLocationHeader(c: Context, supabaseLocation: string): string {
     forwardedHost = `${forwardedHost}:${portToUse}`
   }
 
-  cloudlog({ requestId, message: 'rewriteLocationHeader debug', supabaseUrl, forwardedHost, forwardedProto, isLocalDev })
+  cloudlog({
+    requestId,
+    message: 'rewriteLocationHeader debug',
+    supabaseEndpoint: summarizeTusEndpoint(supabaseUrl),
+    hasForwardedHost: forwardedHost != null,
+    hasForwardedPort: forwardedPort != null,
+    hasForwardedProto: forwardedProtoRaw != null,
+    forwardedProtoIsHttps: forwardedProto === 'https',
+    hasHostHeader: hostHeader != null,
+    isLocalDev,
+  })
 
   let baseUrl: string
   if (forwardedHost) {
@@ -109,12 +214,28 @@ function rewriteLocationHeader(c: Context, supabaseLocation: string): string {
     cloudlog({
       requestId,
       message: 'rewriteLocationHeader - WARNING: Using SUPABASE_URL as fallback. Consider setting X-Forwarded-Host.',
-      supabaseUrl,
+      supabaseEndpoint: summarizeTusEndpoint(supabaseUrl),
     })
     baseUrl = supabaseUrl
   }
 
-  cloudlog({ requestId, message: 'rewriteLocationHeader result', baseUrl })
+  let baseUrlSource: 'forwarded-host' | 'local-host' | 'supabase-url'
+  if (forwardedHost) {
+    baseUrlSource = 'forwarded-host'
+  }
+  else if (isLocalDev) {
+    baseUrlSource = 'local-host'
+  }
+  else {
+    baseUrlSource = 'supabase-url'
+  }
+
+  cloudlog({
+    requestId,
+    message: 'rewriteLocationHeader result',
+    baseUrl: summarizePathLike(baseUrl),
+    baseUrlSource,
+  })
   return `${baseUrl}/functions/v1/files/upload/attachments/${uploadId}`
 }
 
@@ -183,7 +304,7 @@ async function proxyToSupabase(
     })
   }
   catch (error) {
-    cloudlog({ requestId, message: `${handlerName} fetch error`, error: error instanceof Error ? error.message : String(error) })
+    cloudlog({ requestId, message: `${handlerName} fetch error`, error: summarizeError(error) })
     return {
       error: true,
       response: new Response(JSON.stringify({ error: 'upstream_error', message: 'Failed to communicate with storage backend' }), {
@@ -217,14 +338,14 @@ export async function supabaseTusCreateHandler(c: Context): Promise<Response> {
   const rawFileId = c.get('fileId')
 
   if (typeof rawFileId !== 'string' || rawFileId.length === 0) {
-    cloudlog({ requestId, message: 'supabaseTusCreateHandler missing or invalid fileId', fileId: rawFileId })
+    cloudlog({ requestId, message: 'supabaseTusCreateHandler missing or invalid fileId', fileId: summarizeIdentifier(rawFileId) })
     return new Response(JSON.stringify({ error: 'internal_error', message: 'Internal server error: missing fileId' }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' },
     })
   }
 
-  cloudlog({ requestId, message: 'supabaseTusCreateHandler', fileId: rawFileId })
+  cloudlog({ requestId, message: 'supabaseTusCreateHandler', fileId: summarizeIdentifier(rawFileId) })
 
   const supabaseUrl = buildSupabaseTusUrl(c)
   const headers = buildSupabaseAuthHeaders(c)
@@ -233,7 +354,12 @@ export async function supabaseTusCreateHandler(c: Context): Promise<Response> {
   const transformedMetadata = transformMetadataForSupabase(c, rawFileId)
   headers.set('Upload-Metadata', transformedMetadata)
 
-  cloudlog({ requestId, message: 'supabaseTusCreateHandler forwarding', supabaseUrl, transformedMetadata })
+  cloudlog({
+    requestId,
+    message: 'supabaseTusCreateHandler forwarding',
+    supabaseEndpoint: summarizeTusEndpoint(supabaseUrl),
+    metadata: summarizeTusMetadata(transformedMetadata),
+  })
 
   const result = await proxyToSupabase(requestId, 'supabaseTusCreateHandler', supabaseUrl, {
     method: 'POST',
@@ -254,7 +380,12 @@ export async function supabaseTusCreateHandler(c: Context): Promise<Response> {
   if (location) {
     const rewrittenLocation = rewriteLocationHeader(c, location)
     responseHeaders.set('Location', rewrittenLocation)
-    cloudlog({ requestId, message: 'supabaseTusCreateHandler location rewritten', original: location, rewritten: rewrittenLocation })
+    cloudlog({
+      requestId,
+      message: 'supabaseTusCreateHandler location rewritten',
+      original: summarizePathLike(location),
+      rewritten: summarizePathLike(rewrittenLocation),
+    })
   }
 
   let responseBody: BodyInit | null = null
@@ -277,13 +408,13 @@ export async function supabaseTusPatchHandler(c: Context): Promise<Response> {
   const requestId = c.get('requestId')
   const uploadId = c.req.param('id')
 
-  cloudlog({ requestId, message: 'supabaseTusPatchHandler', uploadId })
+  cloudlog({ requestId, message: 'supabaseTusPatchHandler', uploadId: summarizeIdentifier(uploadId) })
 
   const supabaseUrl = buildSupabaseTusUrl(c, uploadId)
   const headers = buildSupabaseAuthHeaders(c)
   forwardHeaders(c, headers, ['Upload-Offset', 'Content-Type', 'Content-Length', 'Upload-Length'])
 
-  cloudlog({ requestId, message: 'supabaseTusPatchHandler forwarding', supabaseUrl })
+  cloudlog({ requestId, message: 'supabaseTusPatchHandler forwarding', supabaseEndpoint: summarizeTusEndpoint(supabaseUrl, uploadId) })
 
   const result = await proxyToSupabase(requestId, 'supabaseTusPatchHandler', supabaseUrl, {
     method: 'PATCH',
@@ -311,12 +442,12 @@ export async function supabaseTusHeadHandler(c: Context): Promise<Response> {
   const requestId = c.get('requestId')
   const uploadId = c.req.param('id')
 
-  cloudlog({ requestId, message: 'supabaseTusHeadHandler', uploadId })
+  cloudlog({ requestId, message: 'supabaseTusHeadHandler', uploadId: summarizeIdentifier(uploadId) })
 
   const supabaseUrl = buildSupabaseTusUrl(c, uploadId)
   const headers = buildSupabaseAuthHeaders(c)
 
-  cloudlog({ requestId, message: 'supabaseTusHeadHandler forwarding', supabaseUrl })
+  cloudlog({ requestId, message: 'supabaseTusHeadHandler forwarding', supabaseEndpoint: summarizeTusEndpoint(supabaseUrl, uploadId) })
 
   const result = await proxyToSupabase(requestId, 'supabaseTusHeadHandler', supabaseUrl, {
     method: 'HEAD',
