@@ -10,7 +10,7 @@ import { appIdSchema, cursorSchema, deviceIdSchema, hasInvalidQueryLimitInput, h
 import { checkPermission } from '../utils/rbac.ts'
 import { countDevices, readDevices } from '../utils/stats.ts'
 
-interface DataDevice {
+export interface DataDevice {
   appId: string
   count?: boolean
   versionName?: string
@@ -43,6 +43,21 @@ const devicesBodySchema = type({
   'limit?': queryLimitSchema,
 })
 
+export function getPrivateDevicesRequestLogMetadata(body: DataDevice) {
+  const deviceIds = body.devicesId ?? body.deviceIds ?? []
+  return {
+    hasAppId: typeof body.appId === 'string' && body.appId.trim().length > 0,
+    count: body.count ?? false,
+    hasVersionName: typeof body.versionName === 'string' && body.versionName.trim().length > 0,
+    deviceIdsCount: deviceIds.length,
+    hasSearch: typeof body.search === 'string' && body.search.trim().length > 0,
+    customIdMode: body.customIdMode ?? false,
+    orderCount: body.order?.length ?? 0,
+    hasCursor: typeof body.cursor === 'string' && body.cursor.trim().length > 0,
+    limit: body.limit,
+  }
+}
+
 export const app = new Hono<MiddlewareKeyVariables>()
 
 app.use('/', useCors)
@@ -59,7 +74,7 @@ app.post('/', middlewareV2(['read', 'write', 'all', 'upload']), async (c) => {
   if (hasUnsafeDevicesQueryText(body)) {
     throw simpleError('invalid_body', 'Invalid body')
   }
-  cloudlog({ requestId: c.get('requestId'), message: 'post devices body', body })
+  cloudlog({ requestId: c.get('requestId'), message: 'post devices request', request: getPrivateDevicesRequestLogMetadata(body) })
   if (!(await checkPermission(c, 'app.read_devices', { appId: body.appId }))) {
     throw simpleError('app_access_denied', 'You can\'t access this app', { app_id: body.appId })
   }
