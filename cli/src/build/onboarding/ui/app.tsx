@@ -1,5 +1,6 @@
 import type { FC } from 'react'
 import type { BuildLogger } from '../../request.js'
+import type { DiscoveredProfile, IdentityProfileMatch, SigningIdentity } from '../macos-signing.js'
 import type { ApiKeyData, CertificateData, OnboardingProgress, OnboardingStep, ProfileData } from '../types.js'
 import { handleCustomMsg } from '../../qr.js'
 import { spawn } from 'node:child_process'
@@ -22,6 +23,7 @@ import { requestBuildInternal } from '../../request.js'
 import { CertificateLimitError, createCertificate, createProfile, deleteProfile, DuplicateProfileError, ensureBundleId, generateJwt, revokeCertificate, verifyApiKey } from '../apple-api.js'
 import { createP12, DEFAULT_P12_PASSWORD, generateCsr } from '../csr.js'
 import { canUseFilePicker, openFilePicker } from '../file-picker.js'
+import { exportP12FromKeychain, isMacOS, listSigningIdentities, matchIdentitiesToProfiles, scanProvisioningProfiles } from '../macos-signing.js'
 import { deleteProgress, getResumeStep, loadProgress, saveProgress } from '../progress.js'
 import { getBuildOnboardingRecoveryAdvice } from '../recovery.js'
 import {
@@ -137,6 +139,16 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
   const [buildUrl, setBuildUrl] = useState('')
   const [buildOutput, setBuildOutput] = useState<string[]>([])
   const [supportBundlePath, setSupportBundlePath] = useState<string | null>(null)
+
+  // Import-existing sub-flow state (macOS only)
+  const [importMatches, setImportMatches] = useState<IdentityProfileMatch[]>([])
+  const [importProfiles, setImportProfiles] = useState<DiscoveredProfile[]>([])
+  const [chosenIdentity, setChosenIdentity] = useState<SigningIdentity | null>(null)
+  const [chosenProfile, setChosenProfile] = useState<DiscoveredProfile | null>(null)
+  const [importDistribution, setImportDistribution] = useState<'app_store' | 'ad_hoc' | null>(null)
+  const [importedP12Password, setImportedP12Password] = useState<string>('')
+  /** Tracks whether we're in the import flow so saving-credentials knows which writer to use */
+  const [importMode, setImportMode] = useState(false)
 
   const addLog = useCallback((text: string, color = 'green') => {
     setLog(prev => [...prev, { text, color }])
@@ -283,35 +295,53 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
   // ── Credential save logic ──
 
   async function doSaveCredentials() {
-    // Re-read .p8 for APPLE_KEY_CONTENT (use refs for fresh values)
+    // For import mode in ad_hoc distribution, no .p8 is needed at all.
+    const needsAscKey = !importMode || importDistribution === 'app_store'
+
     let keyContent = p8ContentRef.current
-    if (!keyContent && p8PathRef.current) {
-      try {
-        keyContent = await readFile(p8PathRef.current, 'utf-8')
-        setP8Content(keyContent)
-      }
-      catch {
-        throw new Error('Could not read .p8 file. Please provide the path again.')
+    if (needsAscKey) {
+      // Re-read .p8 for APPLE_KEY_CONTENT (use refs for fresh values)
+      if (!keyContent && p8PathRef.current) {
+        try {
+          keyContent = await readFile(p8PathRef.current, 'utf-8')
+          setP8Content(keyContent)
+        }
+        catch {
+          throw new Error('Could not read .p8 file. Please provide the path again.')
+        }
       }
     }
 
+    // Use the bundle ID from the imported profile when available; falls back
+    // to the Capacitor app ID for the create-new path.
+    const provisioningBundleId = importMode && chosenProfile?.bundleId ? chosenProfile.bundleId : appId
     const provisioningMap: Record<string, { profile: string, name: string }> = {
-      [appId]: {
+      [provisioningBundleId]: {
         profile: profileData!.profileBase64,
         name: profileData!.profileName,
       },
     }
 
-    await updateSavedCredentials(appId, 'ios', {
+    // Import mode uses the random passphrase generated at export time;
+    // create-new uses the well-known DEFAULT_P12_PASSWORD that csr.ts produces.
+    const p12Password = importMode && importedP12Password ? importedP12Password : DEFAULT_P12_PASSWORD
+    const distribution = importMode ? (importDistribution || 'app_store') : 'app_store'
+
+    const credentials = {
       BUILD_CERTIFICATE_BASE64: certData!.p12Base64,
-      P12_PASSWORD: DEFAULT_P12_PASSWORD,
+      P12_PASSWORD: p12Password,
       CAPGO_IOS_PROVISIONING_MAP: JSON.stringify(provisioningMap),
-      APPLE_KEY_ID: keyIdRef.current,
-      APPLE_ISSUER_ID: issuerIdRef.current,
-      APPLE_KEY_CONTENT: Buffer.from(keyContent).toString('base64'),
       APP_STORE_CONNECT_TEAM_ID: teamId || certData!.teamId,
-      CAPGO_IOS_DISTRIBUTION: 'app_store',
-    })
+      CAPGO_IOS_DISTRIBUTION: distribution,
+    } as Parameters<typeof updateSavedCredentials>[2]
+
+    if (needsAscKey && keyContent) {
+      credentials.APPLE_KEY_ID = keyIdRef.current
+      credentials.APPLE_ISSUER_ID = issuerIdRef.current
+      credentials.APPLE_KEY_CONTENT = Buffer.from(keyContent).toString('base64')
+    }
+
+    await updateSavedCredentials(appId, 'ios', credentials)
 
     await deleteProgress(appId)
     addLog('✔ Credentials saved')
@@ -345,7 +375,14 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
             return
           addLog('⚠ Could not backup credentials (file may not exist yet)', 'yellow')
         }
-        setStep('api-key-instructions')
+        // After backup, offer the setup-method fork on macOS so the user can
+        // pick between import and create-new. Non-macOS goes straight to ASC.
+        if (isMacOS()) {
+          setStep('setup-method-select')
+        }
+        else {
+          setStep('api-key-instructions')
+        }
       })()
     }
 
@@ -378,6 +415,85 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
           ? `\n${result.output.slice(-6).join('\n')}`
           : ''
         handleError(new Error(`Could not add the iOS platform automatically.${detail}`), 'adding-platform')
+      })()
+    }
+
+    // ── Import-existing sub-flow (macOS only) ──
+
+    if (step === 'import-scanning') {
+      ;(async () => {
+        try {
+          const [identities, profiles] = await Promise.all([
+            listSigningIdentities(),
+            scanProvisioningProfiles(),
+          ])
+          if (cancelled)
+            return
+          const distOnly = identities.filter(i => i.type === 'distribution')
+          if (distOnly.length === 0) {
+            handleError(
+              new Error(
+                'No iOS Distribution identities found in your default Keychain. '
+                + 'If you have certificates in a custom keychain, the v1 import flow does not support that — '
+                + 'use "Create new" instead, or run `build credentials save` directly.',
+              ),
+              'import-scanning',
+            )
+            return
+          }
+          const matches = matchIdentitiesToProfiles(distOnly, profiles)
+          setImportProfiles(profiles)
+          setImportMatches(matches)
+          addLog(`✔ Found ${distOnly.length} distribution identity${distOnly.length === 1 ? '' : 'ies'} and ${profiles.length} profile${profiles.length === 1 ? '' : 's'} on this Mac`)
+          setStep('import-pick-identity')
+        }
+        catch (err) {
+          if (!cancelled)
+            handleError(err, 'import-scanning')
+        }
+      })()
+    }
+
+    if (step === 'import-exporting') {
+      ;(async () => {
+        try {
+          if (!chosenIdentity || !chosenProfile)
+            throw new Error('Internal error: no identity or profile chosen for export.')
+          const exported = await exportP12FromKeychain(chosenIdentity.sha1)
+          if (cancelled)
+            return
+          // Build cert + profile records to drop into doSaveCredentials. We
+          // synthesize a CertificateData record (Apple-API-only fields stay empty).
+          const importedCertData: CertificateData = {
+            certificateId: '',
+            expirationDate: chosenProfile.expirationDate,
+            teamId: chosenIdentity.teamId,
+            p12Base64: exported.base64,
+          }
+          const importedProfileData: ProfileData = {
+            profileId: chosenProfile.uuid,
+            profileName: chosenProfile.name,
+            profileBase64: Buffer.from(await readFile(chosenProfile.path)).toString('base64'),
+          }
+          setCertData(importedCertData)
+          setProfileData(importedProfileData)
+          if (chosenIdentity.teamId)
+            setTeamId(chosenIdentity.teamId)
+          setImportedP12Password(exported.passphrase)
+          addLog(`✔ Exported "${chosenIdentity.name}" from Keychain`)
+          // For app_store mode we need an ASC API key for TestFlight upload —
+          // route through the existing .p8 input screens. For ad_hoc, save now.
+          if (importDistribution === 'app_store') {
+            setStep('api-key-instructions')
+          }
+          else {
+            setStep('saving-credentials')
+          }
+        }
+        catch (err) {
+          if (!cancelled)
+            handleError(err, 'import-exporting')
+        }
       })()
     }
 
@@ -739,7 +855,12 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
               if (existing?.ios) {
                 setStep('credentials-exist')
               }
+              else if (isMacOS()) {
+                // macOS users see the fork: import existing or create new
+                setStep('setup-method-select')
+              }
               else {
+                // Non-macOS hosts can only create new (importing requires Keychain)
                 setStep('api-key-instructions')
               }
             }}
@@ -830,6 +951,228 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
       {step === 'backing-up' && (
         <Box flexDirection="column" marginTop={1}>
           <SpinnerLine text="Backing up existing credentials..." />
+        </Box>
+      )}
+
+      {/* Setup-method fork (macOS only) */}
+      {step === 'setup-method-select' && (
+        <Box flexDirection="column" marginTop={1}>
+          <Alert variant="info">
+            How do you want to set up iOS credentials?
+          </Alert>
+          <Newline />
+          <Select
+            options={[
+              { label: '📥  Import existing from this Mac (Keychain + Xcode profiles)', value: 'import' },
+              { label: '🆕  Create new via App Store Connect API', value: 'create' },
+            ]}
+            onChange={(value) => {
+              if (value === 'import') {
+                setImportMode(true)
+                setStep('import-scanning')
+              }
+              else {
+                setImportMode(false)
+                setStep('api-key-instructions')
+              }
+            }}
+          />
+          <Newline />
+          <Text dimColor>
+            Tip: Importing reuses the certificate Xcode already installed,
+            so it doesn't count against Apple's 3-cert limit.
+          </Text>
+        </Box>
+      )}
+
+      {/* Import: scanning */}
+      {step === 'import-scanning' && (
+        <Box flexDirection="column" marginTop={1}>
+          <SpinnerLine text="Scanning Keychain and provisioning profiles..." />
+          <Text dimColor>This is read-only — no Keychain password prompt yet.</Text>
+        </Box>
+      )}
+
+      {/* Import: pick identity */}
+      {step === 'import-pick-identity' && (
+        <Box flexDirection="column" marginTop={1}>
+          <Text bold>
+            Found
+            {' '}
+            {importMatches.length}
+            {' '}
+            distribution identity
+            {importMatches.length === 1 ? '' : 'ies'}
+            {' '}
+            in your Keychain. Pick one:
+          </Text>
+          <Newline />
+          <Select
+            options={[
+              ...importMatches.map((m) => {
+                const matchCount = m.profiles.length
+                const label = matchCount > 0
+                  ? `🔑  ${m.identity.name} · ${matchCount} matching profile${matchCount === 1 ? '' : 's'}`
+                  : `🔑  ${m.identity.name} · ⚠ no matching profiles found`
+                return { label, value: m.identity.sha1 }
+              }),
+              { label: '↩️   Cancel and use Create new instead', value: '__cancel__' },
+            ]}
+            onChange={(value) => {
+              if (value === '__cancel__') {
+                setImportMode(false)
+                setStep('api-key-instructions')
+                return
+              }
+              const match = importMatches.find(m => m.identity.sha1 === value)
+              if (!match)
+                return
+              setChosenIdentity(match.identity)
+              addLog(`✔ Identity · ${match.identity.name}`)
+              if (match.profiles.length === 0) {
+                handleError(
+                  new Error(
+                    `No provisioning profile on this Mac is linked to "${match.identity.name}". `
+                    + `Open Xcode → Settings → Accounts → Download Manual Profiles, then retry.`,
+                  ),
+                  'import-pick-identity',
+                )
+                return
+              }
+              setStep('import-pick-profile')
+            }}
+          />
+        </Box>
+      )}
+
+      {/* Import: pick profile */}
+      {step === 'import-pick-profile' && chosenIdentity && (() => {
+        const matchedProfiles = importMatches.find(m => m.identity.sha1 === chosenIdentity.sha1)?.profiles || []
+        return (
+          <Box flexDirection="column" marginTop={1}>
+            <Text bold>
+              Pick a provisioning profile (
+              {matchedProfiles.length}
+              {' '}
+              available for this identity):
+            </Text>
+            <Newline />
+            <Select
+              options={[
+                ...matchedProfiles.map(p => ({
+                  label: `📜  ${p.name} · bundle ${p.bundleId} · ${p.profileType} · expires ${p.expirationDate.split('T')[0]}`,
+                  value: p.path,
+                })),
+                { label: '↩️   Back to identity selection', value: '__back__' },
+              ]}
+              onChange={(value) => {
+                if (value === '__back__') {
+                  setStep('import-pick-identity')
+                  return
+                }
+                const profile = matchedProfiles.find(p => p.path === value)
+                if (!profile)
+                  return
+                setChosenProfile(profile)
+                addLog(`✔ Profile · ${profile.name}`)
+                // Pre-select distribution from the profile type when unambiguous
+                if (profile.profileType === 'app_store')
+                  setImportDistribution('app_store')
+                else if (profile.profileType === 'ad_hoc')
+                  setImportDistribution('ad_hoc')
+                setStep('import-distribution-mode')
+              }}
+            />
+          </Box>
+        )
+      })()}
+
+      {/* Import: distribution mode */}
+      {step === 'import-distribution-mode' && (
+        <Box flexDirection="column" marginTop={1}>
+          <Text bold>How will Capgo distribute your build?</Text>
+          <Newline />
+          <Text dimColor>
+            • App Store: builds upload to TestFlight automatically (requires an App Store Connect API key next)
+          </Text>
+          <Text dimColor>
+            • Ad-hoc: builds are signed and either downloaded from Capgo or installed via QR. No ASC key needed.
+          </Text>
+          <Newline />
+          <Select
+            options={[
+              { label: '🛫  App Store / TestFlight', value: 'app_store' },
+              { label: '📦  Ad-hoc (no TestFlight upload)', value: 'ad_hoc' },
+            ]}
+            onChange={(value) => {
+              const mode = value as 'app_store' | 'ad_hoc'
+              setImportDistribution(mode)
+              addLog(`✔ Distribution · ${mode}`)
+              setStep('import-export-warning')
+            }}
+          />
+        </Box>
+      )}
+
+      {/* Import: export warning (heads-up before the one Keychain dialog) */}
+      {step === 'import-export-warning' && chosenIdentity && (
+        <Box flexDirection="column" marginTop={1}>
+          <Alert variant="warning">
+            macOS will now ask permission to access your private key.
+          </Alert>
+          <Newline />
+          <Box flexDirection="column" marginLeft={2}>
+            <Text>
+              <Text bold color="white">1.</Text>
+              {' '}
+              A Keychain dialog will pop up asking
+              {' '}
+              <Text bold>"security wants to use your confidential information"</Text>
+            </Text>
+            <Text>
+              <Text bold color="white">2.</Text>
+              {' '}
+              Click
+              {' '}
+              <Text bold color="green">"Always Allow"</Text>
+              {' '}
+              so it doesn't ask again on retry
+            </Text>
+            <Text>
+              <Text bold color="white">3.</Text>
+              {' '}
+              That's the only prompt — the export is otherwise non-interactive
+            </Text>
+          </Box>
+          <Newline />
+          <Select
+            options={[
+              { label: `🔓  Export "${chosenIdentity.name}" now`, value: 'go' },
+              { label: '↩️   Back', value: 'back' },
+              { label: '✖  Exit onboarding', value: 'exit' },
+            ]}
+            onChange={(value) => {
+              if (value === 'go') {
+                setStep('import-exporting')
+              }
+              else if (value === 'back') {
+                setStep('import-distribution-mode')
+              }
+              else {
+                exitOnboarding('Exiting. Re-run `build init` whenever you\'re ready.')
+              }
+            }}
+          />
+        </Box>
+      )}
+
+      {/* Import: exporting (the one Keychain prompt happens here) */}
+      {step === 'import-exporting' && (
+        <Box flexDirection="column" marginTop={1}>
+          <SpinnerLine text="Exporting from Keychain — check for the macOS dialog..." />
+          <Text dimColor>
+            If you don't see a dialog, look behind other windows or check the menu bar.
+          </Text>
         </Box>
       )}
 

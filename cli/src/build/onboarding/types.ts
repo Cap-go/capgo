@@ -8,6 +8,16 @@ export type OnboardingStep
     | 'adding-platform'
     | 'credentials-exist'
     | 'backing-up'
+    // ── Setup-method fork (macOS only) ──
+    | 'setup-method-select'
+    // ── Import-existing sub-flow (macOS only) ──
+    | 'import-scanning'
+    | 'import-pick-identity'
+    | 'import-pick-profile'
+    | 'import-distribution-mode'
+    | 'import-export-warning'
+    | 'import-exporting'
+    // ── Existing create-new sub-flow (and ASC API key step reused by import for app_store) ──
     | 'api-key-instructions'
     | 'p8-method-select'
     | 'input-p8-path'
@@ -70,6 +80,15 @@ export const STEP_PROGRESS: Record<OnboardingStep, number> = {
   'adding-platform': 0,
   'credentials-exist': 0,
   'backing-up': 0,
+  // Import-existing sub-flow
+  'setup-method-select': 5,
+  'import-scanning': 10,
+  'import-pick-identity': 25,
+  'import-pick-profile': 35,
+  'import-distribution-mode': 45,
+  'import-export-warning': 55,
+  'import-exporting': 65,
+  // Create-new sub-flow
   'api-key-instructions': 5,
   'p8-method-select': 8,
   'input-p8-path': 10,
@@ -98,6 +117,19 @@ export function getPhaseLabel(step: OnboardingStep): string {
     case 'credentials-exist':
     case 'backing-up':
       return ''
+    case 'setup-method-select':
+      return 'Setup method'
+    case 'import-scanning':
+      return 'Step 1 of 3 · Scanning your Mac'
+    case 'import-pick-identity':
+      return 'Step 1 of 3 · Choose certificate'
+    case 'import-pick-profile':
+      return 'Step 2 of 3 · Choose provisioning profile'
+    case 'import-distribution-mode':
+      return 'Step 2 of 3 · Distribution mode'
+    case 'import-export-warning':
+    case 'import-exporting':
+      return 'Step 3 of 3 · Export from Keychain'
     case 'api-key-instructions':
     case 'p8-method-select':
     case 'input-p8-path':
