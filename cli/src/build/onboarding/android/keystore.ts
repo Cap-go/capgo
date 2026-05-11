@@ -127,6 +127,62 @@ export function verifyKeystore(p12Base64: string, password: string): { valid: bo
   }
 }
 
+export type ProbeKeyPasswordResult
+  = | { ok: true }
+    | { ok: false, reason: 'wrong-password' | 'unsupported-format' | 'parse-error' | 'no-private-key', message: string }
+
+/**
+ * Check whether the given password can both unlock a PKCS#12 keystore AND
+ * decrypt the private key inside it.
+ *
+ * Useful for the "skip the key-password prompt if it's the same as the store
+ * password" UX path: in practice most PKCS#12 keystores use a single password
+ * for both the integrity MAC and the encrypted private-key bag. If this
+ * returns `ok: true`, the CLI can use the store password as the key password
+ * without asking the user.
+ *
+ * Returns `unsupported-format` for JKS (node-forge can't parse it) — caller
+ * should fall back to prompting.
+ */
+export function tryUnlockPrivateKey(bytes: Uint8Array, password: string): ProbeKeyPasswordResult {
+  try {
+    const binary = Buffer.from(bytes).toString('binary')
+    const p12Asn1 = forge.asn1.fromDer(binary)
+    let p12: forge.pkcs12.Pkcs12Pfx
+    try {
+      p12 = forge.pkcs12.pkcs12FromAsn1(p12Asn1, password)
+    }
+    catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      const looksLikeBadPassword = /PKCS#?12 MAC|Invalid password|mac could not be verified/i.test(msg)
+      return {
+        ok: false,
+        reason: looksLikeBadPassword ? 'wrong-password' : 'parse-error',
+        message: msg,
+      }
+    }
+    // pkcs12FromAsn1 succeeded → store password verified the MAC. Now check
+    // the private-key bag actually decrypted with the same password.
+    // node-forge sets `.key` on the bag when decryption succeeds.
+    const bags = p12.getBags({ bagType: forge.pki.oids.pkcs8ShroudedKeyBag })
+    const keyBag = bags[forge.pki.oids.pkcs8ShroudedKeyBag]?.[0]
+    if (keyBag?.key)
+      return { ok: true }
+    return {
+      ok: false,
+      reason: 'no-private-key',
+      message: 'PKCS#12 unlocked but did not contain a decryptable private key bag',
+    }
+  }
+  catch (err) {
+    return {
+      ok: false,
+      reason: 'unsupported-format',
+      message: err instanceof Error ? err.message : 'not a PKCS#12 file',
+    }
+  }
+}
+
 export type ListAliasesResult
   = | { ok: true, aliases: string[] }
     | { ok: false, reason: 'wrong-password' | 'unsupported-format' | 'parse-error', message: string }

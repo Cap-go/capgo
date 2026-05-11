@@ -41,7 +41,7 @@ import {
   sanitizeGcpProjectDisplayName,
   createProject as gcpCreateProject,
 } from '../gcp-api.js'
-import { generateKeystore, generateRandomPassword, listKeystoreAliases } from '../keystore.js'
+import { generateKeystore, generateRandomPassword, listKeystoreAliases, tryUnlockPrivateKey } from '../keystore.js'
 import {
   fetchUserInfo,
   GOOGLE_OAUTH_SCOPES_ANDROIDPUBLISHER,
@@ -140,6 +140,12 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
   const [keystoreBase64, setKeystoreBase64] = useState(initialProgress?._keystoreBase64 || '')
   const [randomPasswordGenerated, setRandomPasswordGenerated] = useState(false)
   const [detectedAliases, setDetectedAliases] = useState<string[]>([])
+  /** Phase 1.5 — key-password auto-skip probe. `null` = haven't decided yet,
+   *  `'auto'` = key password resolved without asking (either from progress or
+   *  by verifying it matches the store password), `'prompt'` = need to ask
+   *  the user (different key password, JKS file we can't parse, etc.) */
+  const [keyPasswordProbe, setKeyPasswordProbe] = useState<null | 'auto' | 'prompt'>(null)
+  const keyPasswordProbeRef = useRef(false)
 
   // Phase 2 — Google sign-in
   const [, setGoogleSignIn] = useState<GoogleSignInComplete | null>(
@@ -500,6 +506,92 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
           else if (listed.ok)
             addLog('ℹ Couldn\'t auto-detect alias from the keystore — enter it manually.', 'yellow')
           setStep('keystore-existing-alias')
+        }
+        catch (err) {
+          if (!cancelled)
+            handleError(err, 'keystore-existing-path')
+        }
+      })()
+    }
+
+    // Reset the key-password probe whenever the user leaves the step.
+    if (step !== 'keystore-existing-key-password') {
+      keyPasswordProbeRef.current = false
+      if (keyPasswordProbe !== null)
+        setKeyPasswordProbe(null)
+    }
+
+    if (step === 'keystore-existing-key-password' && !keyPasswordProbeRef.current) {
+      keyPasswordProbeRef.current = true
+      ;(async () => {
+        // Two ways to auto-resolve key password without asking:
+        //   1. Resume: we already have keystoreKeyPassword from progress.
+        //   2. PKCS#12 probe: the store password also unlocks the private
+        //      key bag (true for ~all keystores that use one password for
+        //      both, including everything Capgo generates).
+        // Either way, fall through into the same readFile + persist +
+        // advance flow the prompt's onSubmit would run, no UI needed.
+        let resolvedKeyPw: string | null = null
+        let resolution: 'progress' | 'probed-same' | null = null
+
+        if (keystoreKeyPassword) {
+          resolvedKeyPw = keystoreKeyPassword
+          resolution = 'progress'
+        }
+        else if (keystoreStorePassword && keystoreExistingPath) {
+          try {
+            const bytes = await readFile(keystoreExistingPath)
+            const result = tryUnlockPrivateKey(bytes, keystoreStorePassword)
+            if (result.ok) {
+              resolvedKeyPw = keystoreStorePassword
+              resolution = 'probed-same'
+            }
+          }
+          catch {
+            // readFile failed — let the prompt step handle the error path.
+          }
+        }
+
+        if (cancelled)
+          return
+
+        if (!resolvedKeyPw) {
+          setKeyPasswordProbe('prompt')
+          return
+        }
+
+        // Auto-resolved — log what happened and run the same complete-the
+        // -keystore-phase work the prompt's onSubmit handler does.
+        setKeyPasswordProbe('auto')
+        if (resolution === 'probed-same')
+          addLog('ℹ Key password matches store password — using the same value')
+        const keyPw = resolvedKeyPw
+        setKeystoreKeyPassword(keyPw)
+        addLog('✔ Key password set')
+        try {
+          const bytes = await readFile(keystoreExistingPath)
+          if (cancelled)
+            return
+          const base64 = bytes.toString('base64')
+          const ready: KeystoreReady = {
+            keystorePath: keystoreExistingPath,
+            alias: keystoreAlias || RELEASE_ALIAS_DEFAULT,
+            isGenerated: false,
+          }
+          setKeystoreBase64(base64)
+          setKeystoreReady(ready)
+          await persist((p) => ({
+            ...p,
+            keystoreKeyPassword: keyPw,
+            _keystoreBase64: base64,
+            completedSteps: { ...p.completedSteps, keystoreReady: ready },
+          }))
+          addLog(`✔ Keystore loaded — ${keystoreExistingPath}`)
+          // Smart-route: skip phases already complete (e.g. on resume).
+          const fresh = await loadAndroidProgress(appId)
+          if (cancelled)
+            return
+          setStep(fresh ? getAndroidResumeStep(fresh) : 'google-sign-in')
         }
         catch (err) {
           if (!cancelled)
@@ -1152,7 +1244,13 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
         </Box>
       )}
 
-      {step === 'keystore-existing-key-password' && (
+      {step === 'keystore-existing-key-password' && keyPasswordProbe !== 'prompt' && (
+        <Box marginTop={1}>
+          <SpinnerLine text="Checking if the key uses the same password as the store..." />
+        </Box>
+      )}
+
+      {step === 'keystore-existing-key-password' && keyPasswordProbe === 'prompt' && (
         <Box flexDirection="column" marginTop={1}>
           <Text bold>Key password (press Enter to use the same as store password):</Text>
           <Newline />

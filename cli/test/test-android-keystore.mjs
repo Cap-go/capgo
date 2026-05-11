@@ -192,6 +192,41 @@ await test('listKeystoreAliases reports wrong-password cleanly', async () => {
   assertEquals(listed.reason, 'wrong-password', `expected wrong-password reason, got ${listed.reason}`)
 })
 
+await test('tryUnlockPrivateKey returns ok when same password unlocks both MAC and private key', async () => {
+  const { generateKeystore, tryUnlockPrivateKey } = await importKeystore()
+  const result = generateKeystore({
+    alias: 'release',
+    storePassword: 'matching-pw',
+    keyPassword: 'matching-pw',
+    dname: { commonName: 'com.example.app' },
+  })
+  const probe = tryUnlockPrivateKey(result.p12Bytes, 'matching-pw')
+  assert(probe.ok === true, `expected ok, got: ${JSON.stringify(probe)}`)
+})
+
+await test('tryUnlockPrivateKey reports wrong-password when MAC fails', async () => {
+  const { generateKeystore, tryUnlockPrivateKey } = await importKeystore()
+  const result = generateKeystore({
+    alias: 'release',
+    storePassword: 'correct',
+    keyPassword: 'correct',
+    dname: { commonName: 'com.example.app' },
+  })
+  const probe = tryUnlockPrivateKey(result.p12Bytes, 'wrong')
+  assert(probe.ok === false, 'wrong password should fail')
+  assertEquals(probe.reason, 'wrong-password')
+})
+
+await test('tryUnlockPrivateKey reports unsupported-format for non-PKCS12 bytes', async () => {
+  const { tryUnlockPrivateKey } = await importKeystore()
+  const probe = tryUnlockPrivateKey(Buffer.from('definitely not a p12'), 'anything')
+  assert(probe.ok === false, 'garbage input should fail')
+  assert(
+    probe.reason === 'unsupported-format' || probe.reason === 'parse-error',
+    `expected unsupported-format or parse-error, got ${probe.reason}`,
+  )
+})
+
 await test('listKeystoreAliases reports unsupported-format for non-PKCS12 input', async () => {
   const { listKeystoreAliases } = await importKeystore()
   const garbage = Buffer.from('this is not a keystore, just text')
