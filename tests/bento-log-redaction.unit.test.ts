@@ -80,6 +80,70 @@ describe('bento log redaction', () => {
     expect(logged).not.toContain('subscriber failed')
   })
 
+  it('keeps failed event logs free of recipient emails, event details, and Bento error bodies', async () => {
+    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({
+      errors: [{ email: 'alice@example.com', message: 'event rejected' }],
+      failed: 1,
+      results: [{ email: 'alice@example.com', status: 'failed' }],
+    }), { status: 200 }))
+
+    const { trackBentoEvent } = await import('../supabase/functions/_backend/utils/bento.ts')
+
+    await expect(trackBentoEvent(createContext(), 'alice@example.com', {
+      plan: 'enterprise',
+      userId: 'user-123',
+    }, 'subscription_created')).resolves.toBe(false)
+
+    expect(cloudlogErrMock).toHaveBeenCalledWith(expect.objectContaining({
+      error: expect.objectContaining({
+        errorCount: 1,
+        failed: 1,
+        hasErrors: true,
+        results: 1,
+      }),
+      message: 'trackBentoEvent',
+    }))
+
+    const logged = JSON.stringify(cloudlogErrMock.mock.calls)
+    expect(logged).not.toContain('alice@example.com')
+    expect(logged).not.toContain('event rejected')
+    expect(logged).not.toContain('enterprise')
+    expect(logged).not.toContain('subscription_created')
+    expect(logged).not.toContain('user-123')
+  })
+
+  it('keeps subscriber sync failure logs free of recipient emails and tag payloads', async () => {
+    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({
+      errors: [{ email: 'alice@example.com', message: 'subscriber rejected' }],
+      failed: 1,
+      results: [{ email: 'alice@example.com', status: 'failed' }],
+    }), { status: 200 }))
+
+    const { syncBentoSubscriberTags } = await import('../supabase/functions/_backend/utils/bento.ts')
+
+    await expect(syncBentoSubscriberTags(createContext(), {
+      deleteSegments: ['trial'],
+      email: 'alice@example.com',
+      segments: ['paying'],
+    })).resolves.toBe(false)
+
+    expect(cloudlogErrMock).toHaveBeenCalledWith(expect.objectContaining({
+      error: expect.objectContaining({
+        errorCount: 1,
+        failed: 1,
+        hasErrors: true,
+        results: 1,
+      }),
+      message: 'syncBentoSubscriberTags',
+    }))
+
+    const logged = JSON.stringify(cloudlogErrMock.mock.calls)
+    expect(logged).not.toContain('alice@example.com')
+    expect(logged).not.toContain('subscriber rejected')
+    expect(logged).not.toContain('paying')
+    expect(logged).not.toContain('trial')
+  })
+
   it('keeps unsubscribe logs free of recipient emails and result payloads', async () => {
     const { unsubscribeBento } = await import('../supabase/functions/_backend/utils/bento.ts')
 

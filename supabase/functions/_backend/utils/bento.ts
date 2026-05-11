@@ -7,10 +7,14 @@ function summarizeBentoResult(result: unknown) {
     return { resultType: typeof result }
 
   const item = result as Record<string, unknown>
+  const errors = item.errors
+  const results = item.results
+
   return {
     failed: typeof item.failed === 'number' ? item.failed : undefined,
-    hasErrors: item.errors !== undefined,
-    results: typeof item.results === 'number' ? item.results : undefined,
+    errorCount: Array.isArray(errors) ? errors.length : errors === undefined ? undefined : 1,
+    hasErrors: Array.isArray(errors) ? errors.length > 0 : errors !== undefined,
+    results: Array.isArray(results) ? results.length : typeof results === 'number' ? results : undefined,
   }
 }
 
