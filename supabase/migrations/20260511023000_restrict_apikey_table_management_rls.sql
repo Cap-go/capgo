@@ -14,6 +14,10 @@ ALTER FUNCTION "public"."create_hashed_apikey"(
   "p_expires_at" timestamp with time zone
 ) SECURITY DEFINER;
 
+ALTER FUNCTION "public"."regenerate_hashed_apikey"(
+  "p_apikey_id" bigint
+) SECURITY DEFINER;
+
 DROP POLICY IF EXISTS "Allow owner to select own apikeys" ON "public"."apikeys";
 CREATE POLICY "Allow owner to select own apikeys" ON "public"."apikeys"
 FOR SELECT

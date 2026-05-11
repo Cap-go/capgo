@@ -2,7 +2,7 @@ import type { AuthInfo } from '../../utils/hono.ts'
 import type { Database } from '../../utils/supabase.types.ts'
 import { BRES, honoFactory, quickError, simpleError } from '../../utils/hono.ts'
 import { middlewareV2 } from '../../utils/hono_middleware.ts'
-import { supabaseWithAuth } from '../../utils/supabase.ts'
+import { supabaseAdmin } from '../../utils/supabase.ts'
 
 const app = honoFactory.createApp()
 
@@ -34,8 +34,10 @@ app.delete('/:id', middlewareV2(['all']), async (c) => {
     throw simpleError('invalid_id_format', 'API key ID must be a valid UUID or number')
   }
 
-  // Use supabaseWithAuth which handles both JWT and API key authentication
-  const supabase = supabaseWithAuth(c, auth)
+  // Direct PostgREST table access is intentionally stricter for API-key
+  // callers. This endpoint already authenticated the caller, so use the
+  // service-role client and keep the explicit owner filter below.
+  const supabase = supabaseAdmin(c)
 
   const { data: apikey, error: apikeyError } = await supabase.from('apikeys').select('*').or(`key.eq.${id},id.eq.${id}`).eq('user_id', auth.userId).single()
   if (!apikey || apikeyError) {

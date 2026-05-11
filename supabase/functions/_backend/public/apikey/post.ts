@@ -165,6 +165,7 @@ app.post('/', middlewareV2(['all']), async (c) => {
   // Use supabaseWithAuth which handles both JWT and API key authentication
   const supabase = supabaseWithAuth(c, auth)
   const policyLookupSupabase = supabaseAdmin(c)
+  const apikeyWriteSupabase = supabaseAdmin(c)
 
   if (orgId) {
     const { data: org, error } = await supabase.from('orgs').select('*').eq('id', orgId).single()
@@ -309,7 +310,7 @@ app.post('/', middlewareV2(['all']), async (c) => {
     }
   }
   else {
-    const { data, error } = await supabase
+    const { data, error } = await apikeyWriteSupabase
       .from('apikeys')
       .insert({
         user_id: auth.userId,

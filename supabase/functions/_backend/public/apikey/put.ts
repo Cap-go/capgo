@@ -103,10 +103,14 @@ async function handlePut(c: Context<MiddlewareKeyVariables>, idParam?: string) {
 
   // Use supabaseWithAuth which handles both JWT and API key authentication
   const supabase = supabaseWithAuth(c, auth)
+  // Direct PostgREST table access is intentionally stricter for API-key
+  // callers. This endpoint already authenticated the caller, so use the
+  // service-role client and keep explicit owner filters on every mutation.
+  const apikeyWriteSupabase = supabaseAdmin(c)
   const policyLookupSupabase = supabaseAdmin(c)
 
-  // Check if the apikey to update exists (RLS handles ownership)
-  const baseQuery = supabase
+  // Check if the apikey to update exists and belongs to the authenticated user.
+  const baseQuery = apikeyWriteSupabase
     .from('apikeys')
     .select('id, limited_to_orgs, limited_to_apps, expires_at, key, key_hash') // Also fetch scope + expires_at for policy validation
     .eq('user_id', auth.userId)
@@ -147,7 +151,7 @@ async function handlePut(c: Context<MiddlewareKeyVariables>, idParam?: string) {
 
   let updatedApikey = existingApikey
   if (hasUpdates) {
-    const { data: updatedData, error: updateError } = await supabase
+    const { data: updatedData, error: updateError } = await apikeyWriteSupabase
       .from('apikeys')
       .update(updateData)
       .eq('id', existingApikey.id) // Use the fetched ID to ensure we update the correct record
@@ -163,8 +167,9 @@ async function handlePut(c: Context<MiddlewareKeyVariables>, idParam?: string) {
 
   if (regenerate) {
     if (isHashedKey) {
-      const { data: regeneratedApikey, error: regenerateError } = await supabase.rpc('regenerate_hashed_apikey', {
+      const { data: regeneratedApikey, error: regenerateError } = await apikeyWriteSupabase.rpc('regenerate_hashed_apikey_for_user', {
         p_apikey_id: existingApikey.id,
+        p_user_id: auth.userId,
       })
       if (regenerateError || !regeneratedApikey) {
         throw quickError(500, 'failed_to_update_apikey', 'Failed to regenerate API key', { requestId, supabaseError: regenerateError })
@@ -172,7 +177,7 @@ async function handlePut(c: Context<MiddlewareKeyVariables>, idParam?: string) {
       return c.json(regeneratedApikey)
     }
 
-    const { data: updatedData, error: updateError } = await supabase
+    const { data: updatedData, error: updateError } = await apikeyWriteSupabase
       .from('apikeys')
       // Any non-null value different from the current key will trigger the
       // `apikeys_force_server_key()` database trigger to regenerate the key.
