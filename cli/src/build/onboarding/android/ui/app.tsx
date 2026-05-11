@@ -259,9 +259,45 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
     if (!initialProgress)
       return
     const { completedSteps } = initialProgress
-    if (completedSteps.keystoreReady)
+    // Where will the resume logic actually drop the user? We compare each
+    // phase against this so a partially-completed phase (marker set, but
+    // a top-level ephemeral field missing) isn't logged as "✔ ready" when
+    // we're actually about to re-prompt for one of its inputs.
+    const resumeStep = getAndroidResumeStep(initialProgress)
+    const keystorePhaseSteps = new Set<AndroidOnboardingStep>([
+      'keystore-method-select',
+      'keystore-explainer',
+      'keystore-existing-path',
+      'keystore-existing-picker',
+      'keystore-existing-store-password',
+      'keystore-existing-detecting-alias',
+      'keystore-existing-alias-select',
+      'keystore-existing-alias',
+      'keystore-existing-key-password',
+      'keystore-new-alias',
+      'keystore-new-password-method',
+      'keystore-new-store-password',
+      'keystore-new-key-password',
+      'keystore-new-cn',
+      'keystore-generating',
+    ])
+    const inKeystorePhase = keystorePhaseSteps.has(resumeStep)
+
+    // Keystore phase: if we're routing back into it, show partial-input
+    // breadcrumbs ("keystore selected", "alias known") instead of a
+    // misleading "✔ Keystore ready". Otherwise show the full ready line.
+    if (inKeystorePhase) {
+      if (initialProgress.keystoreExistingPath)
+        addLog(`✔ Keystore selected · ${initialProgress.keystoreExistingPath}`)
+      if (initialProgress.keystoreAlias)
+        addLog(`✔ Key alias · ${initialProgress.keystoreAlias}`)
+      addLog('↺ Re-confirming a missing keystore input', 'yellow')
+    }
+    else if (completedSteps.keystoreReady) {
       addLog(`✔ Keystore ready — ${completedSteps.keystoreReady.keystorePath}`)
-    if (completedSteps.googleSignInComplete)
+    }
+
+    if (completedSteps.googleSignInComplete && resumeStep !== 'google-sign-in')
       addLog(`✔ Signed in as ${completedSteps.googleSignInComplete.email}`)
     if (completedSteps.playAccountChosen)
       addLog(`✔ Play Developer account — ${completedSteps.playAccountChosen.displayName || completedSteps.playAccountChosen.developerId}`)
@@ -1037,6 +1073,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
                         return
                       }
                       setKeystoreExistingPath(abs)
+                      addLog(`✔ Keystore selected · ${abs}`)
                       persistAndStep((p) => ({ ...p, keystoreExistingPath: abs }), 'keystore-existing-store-password')
                     }}
                   />
@@ -1066,6 +1103,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
                 return
               }
               setKeystoreStorePassword(val)
+              addLog('✔ Store password set')
               persistAndStep((p) => ({ ...p, keystoreStorePassword: val }), 'keystore-existing-detecting-alias')
             }}
           />
@@ -1102,6 +1140,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
             onSubmit={(val) => {
               const alias = val.trim() || RELEASE_ALIAS_DEFAULT
               setKeystoreAlias(alias)
+              addLog(`✔ Key alias · ${alias}`)
               persistAndStep((p) => ({ ...p, keystoreAlias: alias }), 'keystore-existing-key-password')
             }}
           />
@@ -1158,6 +1197,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
             onSubmit={(val) => {
               const alias = val.trim() || RELEASE_ALIAS_DEFAULT
               setKeystoreAlias(alias)
+              addLog(`✔ Key alias · ${alias}`)
               persistAndStep((p) => ({ ...p, keystoreAlias: alias }), 'keystore-new-password-method')
             }}
           />
@@ -1179,6 +1219,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
                 setKeystoreStorePassword(pw)
                 setKeystoreKeyPassword(pw)
                 setRandomPasswordGenerated(true)
+                addLog('✔ Store + key passwords generated')
                 persistAndStep((p) => ({ ...p, keystoreStorePassword: pw, keystoreKeyPassword: pw }), 'keystore-new-cn')
               }
               else {
@@ -1205,6 +1246,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
                 return
               }
               setKeystoreStorePassword(val)
+              addLog('✔ Store password set')
               persistAndStep((p) => ({ ...p, keystoreStorePassword: val }), 'keystore-new-key-password')
             }}
           />
@@ -1222,6 +1264,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
             onSubmit={(val) => {
               const keyPw = val || keystoreStorePassword
               setKeystoreKeyPassword(keyPw)
+              addLog('✔ Key password set')
               persistAndStep((p) => ({ ...p, keystoreKeyPassword: keyPw }), 'keystore-new-cn')
             }}
           />
@@ -1239,6 +1282,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
             onSubmit={(val) => {
               const cn = val.trim() || appId
               setKeystoreCommonName(cn)
+              addLog(`✔ Common name · ${cn}`)
               persistAndStep((p) => ({ ...p, keystoreCommonName: cn }), 'keystore-generating')
             }}
           />
