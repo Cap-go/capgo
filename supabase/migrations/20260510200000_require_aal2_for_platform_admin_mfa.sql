@@ -5,6 +5,9 @@ SECURITY DEFINER
 SET "search_path" TO ''
 AS $$
 BEGIN
+  -- Email OTP and magic-link first-factor sessions can carry amr.method = 'otp'
+  -- while remaining aal1, so MFA authorization must use the authoritative aal
+  -- claim instead of accepting OTP method metadata.
   RETURN (
     array[(SELECT coalesce(auth.jwt()->>'aal', 'aal1'))] <@ (
       SELECT
@@ -24,3 +27,25 @@ REVOKE ALL ON FUNCTION "public"."verify_mfa"() FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION "public"."verify_mfa"() TO "anon";
 GRANT EXECUTE ON FUNCTION "public"."verify_mfa"() TO "authenticated";
 GRANT EXECUTE ON FUNCTION "public"."verify_mfa"() TO "service_role";
+
+CREATE OR REPLACE FUNCTION "public"."is_platform_admin"()
+RETURNS boolean
+LANGUAGE "plpgsql"
+SECURITY DEFINER
+SET "search_path" TO ''
+AS $$
+BEGIN
+  -- Platform-admin actions are privileged even for admins without an enrolled
+  -- factor row, so require an MFA-verified session before checking the secret.
+  IF coalesce(auth.jwt()->>'aal', 'aal1') <> 'aal2' THEN
+    RETURN false;
+  END IF;
+
+  RETURN public.is_platform_admin((SELECT auth.uid()));
+END;
+$$;
+
+ALTER FUNCTION "public"."is_platform_admin"() OWNER TO "postgres";
+REVOKE ALL ON FUNCTION "public"."is_platform_admin"() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION "public"."is_platform_admin"() TO "authenticated";
+GRANT EXECUTE ON FUNCTION "public"."is_platform_admin"() TO "service_role";

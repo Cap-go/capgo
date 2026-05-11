@@ -203,4 +203,28 @@ describe('is_platform_admin SQL function', () => {
       expect(totpVerified.rows[0].is_platform_admin).toBe(true)
     })
   })
+
+  it.concurrent('requires aal2 for platform admins without enrolled factors', async () => {
+    await withTransaction(async (query) => {
+      const legacyAdmin = await getAdminUserId(query)
+
+      expect(legacyAdmin).toBeTruthy()
+
+      await query(`
+        DELETE FROM auth.mfa_factors
+        WHERE user_id = $1::uuid;
+      `, [legacyAdmin])
+
+      await setAuthClaims(query, {
+        sub: legacyAdmin,
+        email: 'admin@example.test',
+        aal: 'aal1',
+        amr: [{ method: 'password' }],
+      })
+
+      const aal1Admin = await query('SELECT public.is_platform_admin() as is_platform_admin')
+
+      expect(aal1Admin.rows[0].is_platform_admin).toBe(false)
+    })
+  })
 })
