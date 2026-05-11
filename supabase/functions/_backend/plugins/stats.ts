@@ -16,6 +16,10 @@ import { backgroundTask, INVALID_STRING_APP_ID, isLimited, MISSING_STRING_APP_ID
 
 const PLAN_ERROR = 'Cannot send stats, upgrade plan to continue to update'
 
+export function getVersionNotFoundResult(): PostResult {
+  return { success: false, error: 'version_not_found', message: 'Version not found' }
+}
+
 export interface BatchStatsResult {
   status: 'ok' | 'error'
   error?: string
@@ -100,11 +104,14 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
     const appVersion2 = await getAppVersionPostgres(c, app_id, 'unknown', allowedDeleted, drizzleClient as ReturnType<typeof getDrizzleClient>)
     if (appVersion2) {
       appVersion = appVersion2
-      cloudlog({ requestId: c.get('requestId'), message: `Version name ${version_name} not found, using unknown instead`, app_id, version_name })
+      cloudlog({
+        requestId: c.get('requestId'),
+        message: 'Version name not found, using unknown instead',
+      })
     }
     else {
       backgroundTask(c, ensurePlaceholderVersions(c, app_id))
-      return { success: false, error: 'version_not_found', message: 'Version not found', moreInfo: { app_id, version_name } }
+      return getVersionNotFoundResult()
     }
   }
   // device.version = appVersion.id
