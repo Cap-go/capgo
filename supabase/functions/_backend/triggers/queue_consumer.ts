@@ -150,12 +150,45 @@ function redactEmailLikeSubstrings(value: string): string {
   return `${result}${value.slice(cursor)}`
 }
 
-function sanitizeDiscordResponseBody(value: string): string {
+function sanitizeSensitiveString(value: string): string {
   return redactEmailLikeSubstrings(value)
     .replace(/\b(Bearer\s+)[\w.~+/-]+=*/gi, '$1[REDACTED_TOKEN]')
     .replace(/((?:api[-_]?key|token|authorization|password|secret|access[-_]?token|refresh[-_]?token)["']?\s*[:=]\s*["']?)([^"',\s}]+)/gi, '$1[REDACTED]')
     .replace(/\b[\dA-F]{32,}\b/gi, '[REDACTED_TOKEN]')
     .replace(/\b[\w+/=-]{40,}\b/g, '[REDACTED_TOKEN]')
+}
+
+function sanitizeDiscordResponseBody(value: string): string {
+  return sanitizeSensitiveString(value)
+}
+
+function isSensitiveLogKey(key: string): boolean {
+  const normalized = key.toLowerCase().replace(/[^a-z0-9]/g, '')
+  return normalized.includes('apikey')
+    || normalized.includes('authorization')
+    || normalized.includes('password')
+    || normalized.includes('secret')
+    || normalized.includes('token')
+    || normalized.includes('jwt')
+    || normalized.includes('sessionkey')
+    || normalized.includes('capgkey')
+    || normalized.includes('captcha')
+}
+
+function sanitizeQueueLogValue(value: unknown): unknown {
+  if (typeof value === 'string')
+    return sanitizeSensitiveString(value)
+
+  if (value === null || typeof value !== 'object')
+    return value
+
+  if (Array.isArray(value))
+    return value.map(item => sanitizeQueueLogValue(item))
+
+  return Object.fromEntries(Object.entries(value as Record<string, unknown>).map(([key, item]) => [
+    key,
+    isSensitiveLogKey(key) ? '[REDACTED]' : sanitizeQueueLogValue(item),
+  ]))
 }
 
 // Helper function to generate UUID v4
@@ -480,7 +513,11 @@ export async function http_post_helper(
   // 15 second timeout, as the queue consumer is running every 10 seconds and the visibility timeout is 60 seconds
 
   try {
-    cloudlog({ requestId: c.get('requestId'), message: `[${function_name}] Making HTTP POST request to "${url}" with body:`, body })
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: `[${function_name}] Making HTTP POST request to "${url}" with body:`,
+      body: sanitizeQueueLogValue(body),
+    })
     const response = await fetch(url, {
       method: 'POST',
       headers,
@@ -628,4 +665,5 @@ export const __queueConsumerTestUtils__ = {
   extractMessageBody,
   getActionableQueueFailures,
   sanitizeDiscordResponseBody,
+  sanitizeQueueLogValue,
 }

@@ -122,6 +122,45 @@ describe('queue_consumer legacy message compatibility', () => {
     expect(sanitized).toContain('builder unavailable')
   })
 
+  it.concurrent('redacts sensitive queue request bodies before logging', () => {
+    const body = {
+      appId: 'com.capgo.demo',
+      authorization: 'Bearer abcdefghijklmnopqrstuvwxyz1234567890',
+      userEmail: 'alice@capgo.app',
+      nested: {
+        session_key: '1234567890abcdefghijklmnopqrstuvwxyz1234567890',
+        metadata: 'token=super-secret-token-value',
+      },
+      rows: [
+        {
+          refreshToken: 'refresh-token-value',
+          status: 'pending',
+        },
+      ],
+    }
+
+    const sanitized = __queueConsumerTestUtils__.sanitizeQueueLogValue(body)
+
+    expect(sanitized).toEqual({
+      appId: 'com.capgo.demo',
+      authorization: '[REDACTED]',
+      userEmail: '[REDACTED_EMAIL]',
+      nested: {
+        session_key: '[REDACTED]',
+        metadata: 'token=[REDACTED]',
+      },
+      rows: [
+        {
+          refreshToken: '[REDACTED]',
+          status: 'pending',
+        },
+      ],
+    })
+    expect(body.authorization).toContain('Bearer')
+    expect(JSON.stringify(sanitized)).not.toContain('alice@capgo.app')
+    expect(JSON.stringify(sanitized)).not.toContain('super-secret-token-value')
+  })
+
   it.concurrent('keeps message-only JSON error details actionable', async () => {
     const response = new Response(JSON.stringify({
       message: 'builder unavailable',
