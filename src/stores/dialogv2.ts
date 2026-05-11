@@ -9,6 +9,10 @@ const safeExternalDialogHostnames = new Set([
 const localHttpHostnames = new Set(['localhost', '127.0.0.1', '::1', '[::1]'])
 const fallbackDialogHrefBase = 'https://app.capgo.app'
 
+function isLocalHttpUrl(url: URL) {
+  return url.protocol === 'http:' && localHttpHostnames.has(url.hostname)
+}
+
 export function isSafeDialogHref(href?: string): href is string {
   const trimmedHref = href?.trim()
   if (!trimmedHref)
@@ -19,12 +23,13 @@ export function isSafeDialogHref(href?: string): href is string {
   try {
     const base = globalThis.location?.origin || fallbackDialogHrefBase
     const url = new URL(trimmedHref, base)
-    const baseOrigin = new URL(base).origin
+    const baseUrl = new URL(base)
+    const baseOrigin = baseUrl.origin
 
     if (safeDialogHrefProtocols.has(url.protocol))
       return true
     if (url.protocol === 'http:')
-      return localHttpHostnames.has(url.hostname)
+      return isLocalHttpUrl(url) && isLocalHttpUrl(baseUrl)
     if (url.protocol !== 'https:')
       return false
 

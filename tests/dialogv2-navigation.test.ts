@@ -11,8 +11,6 @@ describe('dialog v2 navigation', () => {
   it.each([
     'https://checkout.stripe.com/pay/cs_test_123',
     'https://billing.stripe.com/p/session/test_123',
-    'http://localhost:5173/settings',
-    'http://[::1]:5173/settings',
     '/settings/organization/plans',
     'mailto:support@capgo.app',
     'tel:+16504202207',
@@ -27,6 +25,8 @@ describe('dialog v2 navigation', () => {
     '//evil.test/path',
     'https://evil.test/path',
     'http://evil.test/path',
+    'http://localhost:5173/settings',
+    'http://[::1]:5173/settings',
     'javascript:alert(document.domain)',
     ' data:text/html,<script>alert(1)</script>',
     'vbscript:msgbox(1)',
@@ -34,6 +34,18 @@ describe('dialog v2 navigation', () => {
     const { isSafeDialogHref } = await import('~/stores/dialogv2')
 
     expect(isSafeDialogHref(href)).toBe(false)
+  })
+
+  it.each([
+    'http://localhost:5173/settings',
+    'http://[::1]:5173/settings',
+    '/settings/organization/plans',
+  ])('allows local HTTP dialog href %s from local app origins', async (href) => {
+    vi.stubGlobal('location', { origin: 'http://localhost:5173' })
+
+    const { isSafeDialogHref } = await import('~/stores/dialogv2')
+
+    expect(isSafeDialogHref(href)).toBe(true)
   })
 
   it('does not navigate unsafe dialog hrefs', async () => {
