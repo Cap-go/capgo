@@ -500,6 +500,7 @@ export async function createCheckout(c: Context, customerId: string, recurrence:
   const allowedSuccessUrl = getAllowedRedirectUrl(c, successUrl, 'success_url')
   const allowedCancelUrl = getAllowedRedirectUrl(c, cancelUrl, 'cancel_url')
   const session = await getStripe(c).checkout.sessions.create({
+    allow_promotion_codes: true,
     billing_address_collection: 'auto',
     mode: 'subscription',
     customer: customerId,
