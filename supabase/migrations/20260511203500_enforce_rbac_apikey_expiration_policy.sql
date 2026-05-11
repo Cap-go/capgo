@@ -135,7 +135,10 @@ BEGIN
 
     IF v_org_max_apikey_expiration_days IS NOT NULL
       AND v_api_key.expires_at IS NOT NULL
-      AND v_api_key.expires_at > now() + make_interval(days => v_org_max_apikey_expiration_days)
+      AND (
+        v_api_key.created_at IS NULL
+        OR v_api_key.expires_at > v_api_key.created_at + make_interval(days => v_org_max_apikey_expiration_days)
+      )
     THEN
       PERFORM public.pg_log('deny: RBAC_CHECK_PERM_APIKEY_EXPIRATION_EXCEEDS_MAX', jsonb_build_object(
         'permission', p_permission_key,
@@ -144,6 +147,7 @@ BEGIN
         'app_id', v_effective_app_id,
         'channel_id', p_channel_id,
         'max_apikey_expiration_days', v_org_max_apikey_expiration_days,
+        'created_at', v_api_key.created_at,
         'expires_at', v_api_key.expires_at
       ));
       RETURN false;
@@ -500,7 +504,10 @@ BEGIN
 
     IF v_org_max_apikey_expiration_days IS NOT NULL
       AND v_api_key.expires_at IS NOT NULL
-      AND v_api_key.expires_at > now() + make_interval(days => v_org_max_apikey_expiration_days)
+      AND (
+        v_api_key.created_at IS NULL
+        OR v_api_key.expires_at > v_api_key.created_at + make_interval(days => v_org_max_apikey_expiration_days)
+      )
     THEN
       PERFORM public.pg_log('deny: RBAC_CHECK_PERM_APIKEY_EXPIRATION_EXCEEDS_MAX', jsonb_build_object(
         'permission', p_permission_key,
@@ -509,6 +516,7 @@ BEGIN
         'app_id', v_effective_app_id,
         'channel_id', p_channel_id,
         'max_apikey_expiration_days', v_org_max_apikey_expiration_days,
+        'created_at', v_api_key.created_at,
         'expires_at', v_api_key.expires_at
       ));
       RETURN false;

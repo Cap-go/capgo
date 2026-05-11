@@ -1713,9 +1713,14 @@ export async function checkApikeyMeetsOrgPolicy(
   }
 
   if (org.max_apikey_expiration_days && key.expires_at) {
-    const maxDate = new Date()
+    const createdAt = key.created_at ? new Date(key.created_at) : null
+    const expiresAt = new Date(key.expires_at)
+    if (!createdAt || Number.isNaN(createdAt.getTime()) || Number.isNaN(expiresAt.getTime())) {
+      return { valid: false, error: 'expiration_exceeds_max' }
+    }
+    const maxDate = new Date(createdAt)
     maxDate.setDate(maxDate.getDate() + org.max_apikey_expiration_days)
-    if (new Date(key.expires_at) > maxDate) {
+    if (expiresAt > maxDate) {
       return { valid: false, error: 'expiration_exceeds_max' }
     }
   }
