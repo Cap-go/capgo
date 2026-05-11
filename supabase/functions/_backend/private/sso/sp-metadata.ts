@@ -60,7 +60,7 @@ app.get('/', (c: Context<MiddlewareKeyVariables>) => {
   const auth = c.get('auth')
   const requestId = c.get('requestId')
   if (!auth) {
-    cloudlog({ requestId, message: 'Unauthorized request to sp-metadata — no auth context', auth })
+    cloudlog({ requestId, message: 'Unauthorized request to sp-metadata - no auth context' })
     return quickError(401, 'not_authorized', 'Not authorized')
   }
 

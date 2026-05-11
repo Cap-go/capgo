@@ -2,6 +2,7 @@ import { createHono, getClaimsFromJWT, middlewareAuth, parseBody, quickError, us
 import { cloudlog } from '../../utils/logging.ts'
 import { supabaseWithAuth } from '../../utils/supabase.ts'
 import { version } from '../../utils/version.ts'
+import { getSsoLogMetadata } from './logging.ts'
 
 export const app = createHono('', version)
 
@@ -26,7 +27,7 @@ app.post('/', middlewareAuth, async (c) => {
   const email = claims?.email
 
   if (!email) {
-    cloudlog({ requestId, context: 'check_enforcement - no email in JWT claims', userId })
+    cloudlog({ requestId, context: 'check_enforcement - no email in JWT claims', data: getSsoLogMetadata({ userId }) })
     return quickError(400, 'no_email', 'Email not found in authentication token')
   }
 
@@ -42,7 +43,7 @@ app.post('/', middlewareAuth, async (c) => {
 
   // SSO authentication is always allowed
   if (isSsoAuth) {
-    cloudlog({ requestId, context: 'check_enforcement - SSO auth always allowed', email, provider, providers })
+    cloudlog({ requestId, context: 'check_enforcement - SSO auth always allowed', data: getSsoLogMetadata({ email, provider, providers }) })
     return c.json({ allowed: true })
   }
 
@@ -56,12 +57,12 @@ app.post('/', middlewareAuth, async (c) => {
   try {
     const { data: providerData, error: providerError } = await (supabase.rpc as any)('check_domain_sso', { p_domain: domain })
     if (providerError) {
-      cloudlog({ requestId, context: 'check_enforcement - provider query error', error: providerError.message, domain })
+      cloudlog({ requestId, context: 'check_enforcement - provider query error', data: getSsoLogMetadata({ domain, error: providerError }) })
       return quickError(500, 'query_error', 'Failed to check SSO enforcement')
     }
 
     if (!providerData || (Array.isArray(providerData) && providerData.length === 0)) {
-      cloudlog({ requestId, context: 'check_enforcement - no SSO provider found', domain })
+      cloudlog({ requestId, context: 'check_enforcement - no SSO provider found', data: getSsoLogMetadata({ domain }) })
       return c.json({ allowed: true })
     }
 
@@ -70,12 +71,12 @@ app.post('/', middlewareAuth, async (c) => {
     })
 
     if (enforcementError) {
-      cloudlog({ requestId, context: 'check_enforcement - enforcement query error', error: enforcementError.message, domain })
+      cloudlog({ requestId, context: 'check_enforcement - enforcement query error', data: getSsoLogMetadata({ domain, error: enforcementError }) })
       return quickError(500, 'query_error', 'Failed to check SSO enforcement')
     }
 
     if (!enforcementData || (Array.isArray(enforcementData) && enforcementData.length === 0)) {
-      cloudlog({ requestId, context: 'check_enforcement - no SSO enforcement data found', domain })
+      cloudlog({ requestId, context: 'check_enforcement - no SSO enforcement data found', data: getSsoLogMetadata({ domain }) })
       return c.json({ allowed: true })
     }
 
@@ -84,7 +85,7 @@ app.post('/', middlewareAuth, async (c) => {
 
     // If enforcement is not enabled, allow password auth
     if (!enforcementRow.enforce_sso) {
-      cloudlog({ requestId, context: 'check_enforcement - SSO not enforced', domain })
+      cloudlog({ requestId, context: 'check_enforcement - SSO not enforced', data: getSsoLogMetadata({ domain, enforceSso: false }) })
       return c.json({ allowed: true })
     }
 
@@ -97,7 +98,7 @@ app.post('/', middlewareAuth, async (c) => {
 
     if (roleError && roleError.code !== 'PGRST116') {
       // PGRST116 = no rows found (user not in org), which is expected
-      cloudlog({ requestId, context: 'check_enforcement - role query error', error: roleError.message, orgId, userId })
+      cloudlog({ requestId, context: 'check_enforcement - role query error', data: getSsoLogMetadata({ orgId, userId, error: roleError }) })
       return quickError(500, 'query_error', 'Failed to check user role')
     }
 
@@ -105,16 +106,16 @@ app.post('/', middlewareAuth, async (c) => {
     const isSuperAdmin = roleData?.user_right === 'super_admin'
 
     if (isSuperAdmin) {
-      cloudlog({ requestId, context: 'check_enforcement - super admin bypass', email, orgId })
+      cloudlog({ requestId, context: 'check_enforcement - super admin bypass', data: getSsoLogMetadata({ email, orgId }) })
       return c.json({ allowed: true })
     }
 
     // SSO is enforced and user is not super admin
-    cloudlog({ requestId, context: 'check_enforcement - SSO enforced, password blocked', email, orgId })
+    cloudlog({ requestId, context: 'check_enforcement - SSO enforced, password blocked', data: getSsoLogMetadata({ email, orgId, enforceSso: true }) })
     return c.json({ allowed: false, reason: 'sso_enforced' })
   }
   catch (err) {
-    cloudlog({ requestId, context: 'check_enforcement - unexpected error', error: String(err), email })
+    cloudlog({ requestId, context: 'check_enforcement - unexpected error', data: getSsoLogMetadata({ email, error: err }) })
     return quickError(500, 'internal_error', 'Internal server error')
   }
 })

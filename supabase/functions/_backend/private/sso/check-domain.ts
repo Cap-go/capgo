@@ -7,6 +7,7 @@ import { cloudlog } from '../../utils/logging.ts'
 import { getClientIP } from '../../utils/rate_limit.ts'
 import { emptySupabase } from '../../utils/supabase.ts'
 import { version } from '../../utils/version.ts'
+import { getSsoLogMetadata } from './logging.ts'
 
 // Rate limiting: 10 requests per minute per IP
 const RATE_LIMIT_WINDOW_SECONDS = 60
@@ -33,7 +34,7 @@ async function checkDomainRateLimit(c: Context): Promise<boolean> {
   await cacheHelper.putJson(cacheKey, { count, resetAt } satisfies RateLimitCounter, Math.max(1, Math.ceil((resetAt - now) / 1000)))
 
   if (count > RATE_LIMIT_MAX_REQUESTS) {
-    cloudlog({ requestId: c.get('requestId'), message: 'check-domain rate limited', ip, count })
+    cloudlog({ requestId: c.get('requestId'), message: 'check-domain rate limited', data: getSsoLogMetadata({ ip, count }) })
     return true
   }
 
@@ -85,9 +86,11 @@ app.post('/', async (c) => {
       cloudlog({
         requestId,
         context: 'check_domain - query error',
-        domain,
-        enforcementError: enforcementError?.message,
-        legacyError: legacyError?.message,
+        data: {
+          ...getSsoLogMetadata({ domain }),
+          enforcement: getSsoLogMetadata({ error: enforcementError }),
+          legacy: getSsoLogMetadata({ error: legacyError }),
+        },
       })
       return quickError(500, 'query_error', 'Failed to check domain')
     }
@@ -96,17 +99,19 @@ app.post('/', async (c) => {
     const legacyRow = Array.isArray(legacyData) ? legacyData[0] : legacyData
 
     if (!enforcementRow && !legacyRow) {
-      cloudlog({ requestId, context: 'check_domain - no SSO provider found', domain })
+      cloudlog({ requestId, context: 'check_domain - no SSO provider found', data: getSsoLogMetadata({ domain }) })
       return c.json({ has_sso: false })
     }
 
     cloudlog({
       requestId,
       context: 'check_domain - SSO provider found',
-      domain,
-      enforce_sso: enforcementRow?.enforce_sso,
-      provider_id: legacyRow?.provider_id,
-      org_id: enforcementRow?.org_id ?? legacyRow?.org_id,
+      data: getSsoLogMetadata({
+        domain,
+        enforceSso: enforcementRow?.enforce_sso,
+        providerId: legacyRow?.provider_id,
+        orgId: enforcementRow?.org_id ?? legacyRow?.org_id,
+      }),
     })
 
     return c.json({
@@ -115,7 +120,7 @@ app.post('/', async (c) => {
     })
   }
   catch (err) {
-    cloudlog({ requestId, context: 'check_domain - unexpected error', error: String(err), domain })
+    cloudlog({ requestId, context: 'check_domain - unexpected error', data: getSsoLogMetadata({ domain, error: err }) })
     return quickError(500, 'internal_error', 'Internal server error')
   }
 })
