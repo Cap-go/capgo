@@ -74,6 +74,9 @@ const globalStatsTrendData = ref<Array<{
   revenue_maker: number
   revenue_team: number
   revenue_enterprise: number
+  average_ltv: number
+  shortest_ltv: number
+  longest_ltv: number
 }>>([])
 
 const isLoadingGlobalStatsTrend = ref(false)
@@ -439,6 +442,38 @@ const planARRSeries = computed(() => {
   ]
 })
 
+const ltvSeries = computed(() => {
+  if (globalStatsTrendData.value.length === 0)
+    return []
+
+  return [
+    {
+      label: 'Average LTV ($)',
+      data: globalStatsTrendData.value.map(item => ({
+        date: item.date,
+        value: item.average_ltv || 0,
+      })),
+      color: '#119eff',
+    },
+    {
+      label: 'Shortest LTV ($)',
+      data: globalStatsTrendData.value.map(item => ({
+        date: item.date,
+        value: item.shortest_ltv || 0,
+      })),
+      color: '#f59e0b',
+    },
+    {
+      label: 'Longest LTV ($)',
+      data: globalStatsTrendData.value.map(item => ({
+        date: item.date,
+        value: item.longest_ltv || 0,
+      })),
+      color: '#10b981',
+    },
+  ]
+})
+
 const totalPayingOrgsSeries = computed(() => {
   if (globalStatsTrendData.value.length === 0)
     return []
@@ -746,6 +781,18 @@ displayStore.defaultBack = '/dashboard'
             >
               <AdminMultiLineChart
                 :series="planARRSeries"
+                :is-loading="isLoadingGlobalStatsTrend"
+                value-prefix="$"
+              />
+            </ChartCard>
+
+            <ChartCard
+              title="LTV by Customer"
+              :is-loading="isLoadingGlobalStatsTrend"
+              :has-data="ltvSeries.length > 0"
+            >
+              <AdminMultiLineChart
+                :series="ltvSeries"
                 :is-loading="isLoadingGlobalStatsTrend"
                 value-prefix="$"
               />
