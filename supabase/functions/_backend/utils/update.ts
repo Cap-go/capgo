@@ -48,6 +48,23 @@ const UPDATE_BLOCKED_CODES = new Set([
   'key_id_mismatch',
 ])
 
+function summarizeUpdateRequest(body: AppInfos) {
+  return {
+    app_id: body.app_id,
+    platform: body.platform,
+    plugin_version: body.plugin_version,
+    version_name: body.version_name,
+    version_os: body.version_os,
+    hasVersionBuild: Boolean(body.version_build),
+    hasDeviceId: Boolean(body.device_id),
+    hasCustomId: Boolean(body.custom_id),
+    hasDefaultChannel: Boolean(body.defaultChannel),
+    hasKeyId: Boolean(body.key_id),
+    is_prod: body.is_prod,
+    is_emulator: body.is_emulator,
+  }
+}
+
 export function getUpdateResponseKind(errorCode: string): UpdateResponseKind {
   if (UPDATE_UP_TO_DATE_CODES.has(errorCode))
     return 'up_to_date'
@@ -98,7 +115,7 @@ export async function updateWithPG(
   body: AppInfos,
   drizzleClient: ReturnType<typeof getDrizzleClient>,
 ) {
-  cloudlog({ requestId: c.get('requestId'), message: 'body', body, date: new Date().toISOString() })
+  cloudlog({ requestId: c.get('requestId'), message: 'update request', body: summarizeUpdateRequest(body), date: new Date().toISOString() })
   const {
     version_name,
     version_build,
