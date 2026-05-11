@@ -148,13 +148,13 @@ async function getWebsitePublicHostnameValidationError(urlString: string) {
   })
 }
 
-async function readResponseTextWithLimit(response: Response, limit: number) {
+async function readResponseBytesWithLimit(response: Response, limit: number) {
   const contentLength = Number.parseInt(response.headers.get('content-length') ?? '', 10)
   if (Number.isFinite(contentLength) && contentLength > limit)
     return null
 
   if (!response.body)
-    return await response.text()
+    return new Uint8Array()
 
   const reader = response.body.getReader()
   const chunks: Uint8Array[] = []
@@ -183,6 +183,14 @@ async function readResponseTextWithLimit(response: Response, limit: number) {
     offset += chunk.byteLength
   }
 
+  return bytes
+}
+
+async function readResponseTextWithLimit(response: Response, limit: number) {
+  const bytes = await readResponseBytesWithLimit(response, limit)
+  if (!bytes)
+    return null
+
   return new TextDecoder().decode(bytes)
 }
 
@@ -209,15 +217,10 @@ async function fetchIconDataUrl(iconUrl: string) {
   if (!contentType.startsWith('image/'))
     return null
 
-  const contentLength = Number.parseInt(response.headers.get('content-length') ?? '', 10)
-  if (Number.isFinite(contentLength) && contentLength > MAX_ICON_BYTES)
+  const bytes = await readResponseBytesWithLimit(response, MAX_ICON_BYTES)
+  if (!bytes || bytes.byteLength === 0)
     return null
 
-  const arrayBuffer = await response.arrayBuffer()
-  if (arrayBuffer.byteLength === 0 || arrayBuffer.byteLength > MAX_ICON_BYTES)
-    return null
-
-  const bytes = new Uint8Array(arrayBuffer)
   let binary = ''
   const chunkSize = 0x8000
   for (let index = 0; index < bytes.length; index += chunkSize)
@@ -278,3 +281,8 @@ app.post('/', middlewareAuth, async (c) => {
     icon,
   })
 })
+
+export const websitePreviewTestUtils = {
+  fetchIconDataUrl,
+  readResponseBytesWithLimit,
+}
