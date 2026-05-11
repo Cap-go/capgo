@@ -8,6 +8,7 @@ import { cloudlog } from '../../../utils/logging.ts'
 import { checkPermission } from '../../../utils/rbac.ts'
 import { createSignedImageUrl } from '../../../utils/storage.ts'
 import { apikeyHasOrgRightWithPolicy, supabaseApikey } from '../../../utils/supabase.ts'
+import { getOrganizationMembersLogMetadata, getOrganizationMembersQueryLogMetadata } from './logging.ts'
 
 const bodySchema = type({
   orgId: 'string',
@@ -51,7 +52,11 @@ export async function get(c: Context<MiddlewareKeyVariables>, bodyRaw: any, apik
       guild_id: body.orgId,
     })
 
-  cloudlog({ requestId: c.get('requestId'), message: 'data', data, error })
+  cloudlog({
+    requestId: c.get('requestId'),
+    message: 'Organization members query result',
+    data: getOrganizationMembersQueryLogMetadata(data, error),
+  })
   if (error) {
     throw simpleError('cannot_get_organization_members', 'Cannot get organization members', { error })
   }
@@ -74,6 +79,10 @@ export async function get(c: Context<MiddlewareKeyVariables>, bodyRaw: any, apik
     }
   }))
 
-  cloudlog({ requestId: c.get('requestId'), message: 'Members', data: signedMembers })
+  cloudlog({
+    requestId: c.get('requestId'),
+    message: 'Organization members prepared',
+    data: getOrganizationMembersLogMetadata(signedMembers),
+  })
   return c.json(signedMembers)
 }

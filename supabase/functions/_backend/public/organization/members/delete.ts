@@ -7,6 +7,7 @@ import { BRES, quickError, simpleError } from '../../../utils/hono.ts'
 import { cloudlog } from '../../../utils/logging.ts'
 import { checkPermission } from '../../../utils/rbac.ts'
 import { supabaseAdmin, supabaseApikey } from '../../../utils/supabase.ts'
+import { getOrganizationMemberDeleteLogMetadata } from './logging.ts'
 
 const deleteBodySchema = type({
   orgId: 'string',
@@ -38,8 +39,6 @@ export async function deleteMember(c: Context<MiddlewareKeyVariables>, bodyRaw: 
 
   // Use authenticated client for the delete operation - RLS will enforce org access
   const supabase = supabaseApikey(c, c.get('capgkey') as string)
-  cloudlog({ requestId: c.get('requestId'), message: 'userData.id', data: userData.id })
-  cloudlog({ requestId: c.get('requestId'), message: 'body.orgId', data: body.orgId })
   const { data: deletedMembership, error } = await supabase
     .from('org_users')
     .delete()
@@ -69,6 +68,10 @@ export async function deleteMember(c: Context<MiddlewareKeyVariables>, bodyRaw: 
     throw simpleError('error_deleting_role_bindings', 'Error deleting role bindings for user', { error: rbacError })
   }
 
-  cloudlog({ requestId: c.get('requestId'), message: 'User deleted from organization', data: { user_id: userData.id, org_id: body.orgId } })
+  cloudlog({
+    requestId: c.get('requestId'),
+    message: 'User deleted from organization',
+    data: getOrganizationMemberDeleteLogMetadata(body, userData.id),
+  })
   return c.json(BRES)
 }
