@@ -10,7 +10,6 @@ import {
   deriveRecipientKey,
   enqueueNativeNotification,
   getAllNotificationBuckets,
-
   readNotificationRegistrationsCF,
   readNotificationStatsCF,
   trackNotificationEventCF,
@@ -68,8 +67,8 @@ interface EventBody {
   nativeInstallId?: string
   recipientKey?: string
   deviceKey?: string
-  provider?: string
-  platform?: string
+  provider?: NativeNotificationProvider
+  platform?: NativeNotificationPlatform
   error?: string
   badge?: number
 }
@@ -129,6 +128,21 @@ interface UpdateCheckBody {
   limit?: number
 }
 
+interface ProviderConfigRow {
+  provider: NativeNotificationProvider
+  status: string
+  config: Record<string, unknown> | null
+  secret_ref: string | null
+}
+
+interface OwnerOrgRow {
+  owner_org?: string
+}
+
+interface CampaignRecordRow {
+  id: string
+}
+
 function assertString(value: unknown, field: string, maxLength: number): string {
   if (typeof value !== 'string')
     throw simpleError('invalid_body', 'Invalid body', { field })
@@ -181,11 +195,11 @@ async function getNotificationProviderConfigs(c: Context<MiddlewareKeyVariables>
         AND status = 'configured'
       ORDER BY provider ASC
     `)
-    return result.rows.map(row => ({
-      provider: String((row as any).provider),
-      status: String((row as any).status),
-      config: ((row as any).config ?? {}) as Record<string, unknown>,
-      secretRef: ((row as any).secret_ref ?? null) as string | null,
+    return (result.rows as unknown as ProviderConfigRow[]).map(row => ({
+      provider: row.provider,
+      status: row.status,
+      config: row.config ?? {},
+      secretRef: row.secret_ref,
     }))
   }
   finally {
@@ -200,7 +214,7 @@ async function getAppOwnerOrg(c: Context<MiddlewareKeyVariables>, appId: string)
     pgClient = getPgClient(c)
     const drizzleClient = getDrizzleClient(pgClient)
     const result = await drizzleClient.execute(sql`SELECT owner_org::text AS owner_org FROM public.apps WHERE app_id = ${appId} LIMIT 1`)
-    const ownerOrg = (result.rows[0] as any)?.owner_org
+    const ownerOrg = (result.rows[0] as OwnerOrgRow | undefined)?.owner_org
     if (!ownerOrg)
       throw quickError(404, 'app_not_found', 'App not found', { app_id: appId })
     return String(ownerOrg)
@@ -374,6 +388,10 @@ app.post('/events', async (c) => {
     return limitedResponse
   if (!NOTIFICATION_EVENTS.has(body.event))
     throw simpleError('invalid_notification_event', 'Invalid notification event')
+  if (body.provider && !NOTIFICATION_PROVIDERS.has(body.provider))
+    throw simpleError('invalid_provider', 'Invalid notification provider')
+  if (body.platform && !NOTIFICATION_PLATFORMS.has(body.platform))
+    throw simpleError('invalid_platform', 'Invalid notification platform')
   await trackNotificationEventCF(c, { ...body, appId })
   return c.json(BRES)
 })
@@ -449,7 +467,7 @@ app.post('/update-check', middlewareV2(['write', 'all']), async (c) => {
     payload: { installMode, channel, silent: true, background: true },
     scheduledAt: null,
   })
-  const campaignId = body.campaignId || String((campaignRecord as any).id)
+  const campaignId = body.campaignId || String((campaignRecord as unknown as CampaignRecordRow).id)
   const payload = {
     silent: true,
     background: true,

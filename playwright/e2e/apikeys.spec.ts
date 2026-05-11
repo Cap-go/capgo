@@ -3,8 +3,11 @@ import { expect, test } from '../support/commands'
 
 async function createReadApiKey(page: Page, keyName: string) {
   await page.click('[data-test="create-key"]')
-  await page.locator('#dialog-v2-content input[type="text"]').fill(keyName)
-  await page.locator('#dialog-v2-content input[name="key-type"][value="read"]').check()
+  const dialog = page.locator('#dialog-v2-content')
+  await expect(dialog).toBeVisible()
+  await dialog.locator('input[type="text"]').fill(keyName)
+  await dialog.getByText('Read', { exact: true }).click()
+  await expect(dialog.locator('input[name="key-type"][value="read"]')).toBeChecked()
   await page.getByRole('button', { name: 'Create' }).click()
   await expect(page.locator('[data-test="toast"]')).toContainText('Added new API key successfully')
 }

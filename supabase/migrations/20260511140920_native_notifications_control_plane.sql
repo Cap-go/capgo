@@ -1,3 +1,6 @@
+CREATE UNIQUE INDEX IF NOT EXISTS idx_apps_owner_org_app_id
+ON public.apps (owner_org, app_id);
+
 CREATE TABLE IF NOT EXISTS public.notification_provider_configs (
   id uuid DEFAULT gen_random_uuid() NOT NULL,
   created_at timestamp with time zone DEFAULT now() NOT NULL,
@@ -14,6 +17,7 @@ CREATE TABLE IF NOT EXISTS public.notification_provider_configs (
   CONSTRAINT notification_provider_configs_provider_check CHECK (provider IN ('fcm', 'apns')),
   CONSTRAINT notification_provider_configs_status_check CHECK (status IN ('draft', 'configured', 'disabled', 'error')),
   CONSTRAINT notification_provider_configs_app_id_fkey FOREIGN KEY (app_id) REFERENCES public.apps(app_id) ON DELETE CASCADE,
+  CONSTRAINT notification_provider_configs_owner_org_app_id_fkey FOREIGN KEY (owner_org, app_id) REFERENCES public.apps(owner_org, app_id) ON DELETE CASCADE,
   CONSTRAINT notification_provider_configs_owner_org_fkey FOREIGN KEY (owner_org) REFERENCES public.orgs(id) ON DELETE CASCADE
 );
 
@@ -37,6 +41,7 @@ CREATE TABLE IF NOT EXISTS public.notification_app_settings (
   CONSTRAINT notification_app_settings_app_key UNIQUE (app_id),
   CONSTRAINT notification_app_settings_install_mode_check CHECK (push_update_install_mode IN ('next', 'set')),
   CONSTRAINT notification_app_settings_app_id_fkey FOREIGN KEY (app_id) REFERENCES public.apps(app_id) ON DELETE CASCADE,
+  CONSTRAINT notification_app_settings_owner_org_app_id_fkey FOREIGN KEY (owner_org, app_id) REFERENCES public.apps(owner_org, app_id) ON DELETE CASCADE,
   CONSTRAINT notification_app_settings_owner_org_fkey FOREIGN KEY (owner_org) REFERENCES public.orgs(id) ON DELETE CASCADE
 );
 
@@ -63,6 +68,7 @@ CREATE TABLE IF NOT EXISTS public.notification_campaigns (
   CONSTRAINT notification_campaigns_kind_check CHECK (kind IN ('alert', 'background', 'badge', 'update_check')),
   CONSTRAINT notification_campaigns_status_check CHECK (status IN ('draft', 'scheduled', 'queued', 'sending', 'sent', 'paused', 'failed', 'cancelled')),
   CONSTRAINT notification_campaigns_app_id_fkey FOREIGN KEY (app_id) REFERENCES public.apps(app_id) ON DELETE CASCADE,
+  CONSTRAINT notification_campaigns_owner_org_app_id_fkey FOREIGN KEY (owner_org, app_id) REFERENCES public.apps(owner_org, app_id) ON DELETE CASCADE,
   CONSTRAINT notification_campaigns_owner_org_fkey FOREIGN KEY (owner_org) REFERENCES public.orgs(id) ON DELETE CASCADE
 );
 
@@ -82,18 +88,21 @@ ALTER TABLE public.notification_campaigns ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Deny all notification provider config access"
 ON public.notification_provider_configs
+AS RESTRICTIVE
 FOR ALL
 USING (false)
 WITH CHECK (false);
 
 CREATE POLICY "Deny all notification app settings access"
 ON public.notification_app_settings
+AS RESTRICTIVE
 FOR ALL
 USING (false)
 WITH CHECK (false);
 
 CREATE POLICY "Deny all notification campaign access"
 ON public.notification_campaigns
+AS RESTRICTIVE
 FOR ALL
 USING (false)
 WITH CHECK (false);

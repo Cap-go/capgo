@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { Database } from '~/types/supabase.types'
-import { computed, ref, watchEffect } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import { toast } from 'vue-sonner'
@@ -66,7 +66,6 @@ const supabase = useSupabase()
 const displayStore = useDisplayStore()
 
 const id = ref('')
-const lastPath = ref('')
 const isLoading = ref(false)
 const isSaving = ref(false)
 const app = ref<Database['public']['Tables']['apps']['Row']>()
@@ -103,6 +102,7 @@ const totalEvents = computed(() => stats.value.reduce((total, item) => total + N
 const configuredProviders = computed(() => providers.value.filter(provider => provider.status === 'configured').length)
 const latestCampaigns = computed(() => campaigns.value.slice(0, 6))
 const hasStats = computed(() => stats.value.length > 0)
+let activeRefreshId = 0
 
 async function authHeaders() {
   const { data } = await supabase.auth.getSession()
@@ -166,42 +166,66 @@ function shortKey(value: string) {
   return value ? value.slice(0, 18) : ''
 }
 
-async function loadAppInfo() {
-  const { data } = await supabase
+async function loadAppInfo(appId: string) {
+  const { data, error } = await supabase
     .from('apps')
     .select()
-    .eq('app_id', id.value)
-    .single()
-  app.value = data || app.value
+    .eq('app_id', appId)
+    .maybeSingle()
+  if (error)
+    throw error
+  return data ?? undefined
 }
 
-async function loadNotifications() {
-  const query = encodeURIComponent(id.value)
+async function loadNotifications(appId = id.value) {
+  const query = encodeURIComponent(appId)
   const [providerResponse, campaignResponse, statsResponse, settingsResponse] = await Promise.all([
     notificationFetch<{ data: NotificationProviderConfig[] }>(`/providers?app_id=${query}`),
     notificationFetch<{ data: NotificationCampaign[] }>(`/campaigns?app_id=${query}`),
     notificationFetch<{ data: NotificationStat[] }>(`/stats?app_id=${query}&days=30`),
     notificationFetch<NotificationSettings>(`/settings?app_id=${query}`),
   ])
-  providers.value = providerResponse.data || []
-  campaigns.value = campaignResponse.data || []
-  stats.value = statsResponse.data || []
-  settings.value = settingsResponse
-  pushUpdateChannel.value = settingsResponse.pushUpdateChannel || ''
+  return {
+    campaigns: campaignResponse.data || [],
+    providers: providerResponse.data || [],
+    settings: settingsResponse,
+    stats: statsResponse.data || [],
+  }
 }
 
-async function refreshData() {
+function applyNotificationData(data: Awaited<ReturnType<typeof loadNotifications>>) {
+  campaigns.value = data.campaigns
+  providers.value = data.providers
+  settings.value = data.settings
+  stats.value = data.stats
+  pushUpdateChannel.value = data.settings.pushUpdateChannel || ''
+}
+
+async function reloadNotifications() {
+  applyNotificationData(await loadNotifications())
+}
+
+async function refreshData(appId = id.value, refreshId = ++activeRefreshId) {
   isLoading.value = true
   try {
-    await loadAppInfo()
-    await loadNotifications()
+    const [appData, notificationData] = await Promise.all([
+      loadAppInfo(appId),
+      loadNotifications(appId),
+    ])
+    if (refreshId !== activeRefreshId)
+      return
+    app.value = appData
+    applyNotificationData(notificationData)
   }
   catch (error) {
+    if (refreshId !== activeRefreshId)
+      return
     console.error(error)
     toast.error(t('notification-load-error'))
   }
   finally {
-    isLoading.value = false
+    if (refreshId === activeRefreshId)
+      isLoading.value = false
   }
 }
 
@@ -219,7 +243,7 @@ async function saveProvider() {
       }),
     })
     toast.success(t('notification-save-success'))
-    await loadNotifications()
+    await reloadNotifications()
   }
   catch (error) {
     console.error(error)
@@ -245,7 +269,7 @@ async function createCampaign() {
     })
     campaignForm.value.name = ''
     toast.success(t('notification-create-success'))
-    await loadNotifications()
+    await reloadNotifications()
   }
   catch (error) {
     console.error(error)
@@ -314,7 +338,7 @@ async function pushUpdateNow() {
       }),
     })
     toast.success(t('notification-update-push-success'))
-    await loadNotifications()
+    await reloadNotifications()
   }
   catch (error) {
     console.error(error)
@@ -340,7 +364,7 @@ async function sendTest() {
       }),
     })
     toast.success(t('notification-send-success'))
-    await loadNotifications()
+    await reloadNotifications()
   }
   catch (error) {
     console.error(error)
@@ -351,17 +375,28 @@ async function sendTest() {
   }
 }
 
-watchEffect(async () => {
+watch(() => {
   const params = route.params as { app?: string | string[] }
-  const appParam = typeof params.app === 'string' ? params.app : ''
-  if (appParam && lastPath.value !== route.path) {
-    lastPath.value = route.path
-    id.value = appParam
-    await refreshData()
+  return typeof params.app === 'string' ? params.app : ''
+}, async (appParam) => {
+  const refreshId = ++activeRefreshId
+  id.value = appParam
+  if (!appParam) {
+    app.value = undefined
+    providers.value = []
+    campaigns.value = []
+    stats.value = []
+    devices.value = []
+    isLoading.value = false
+    return
+  }
+
+  await refreshData(appParam, refreshId)
+  if (refreshId === activeRefreshId) {
     displayStore.NavTitle = ''
     displayStore.defaultBack = '/apps'
   }
-})
+}, { immediate: true })
 </script>
 
 <template>
@@ -385,7 +420,7 @@ watchEffect(async () => {
                 </div>
               </div>
             </div>
-            <button class="min-h-11 d-btn d-btn-outline" :disabled="isLoading" @click="refreshData">
+            <button class="min-h-11 d-btn d-btn-outline" :disabled="isLoading" @click="() => refreshData()">
               <span v-if="isLoading" class="d-loading d-loading-spinner d-loading-xs" />
               <IconRefresh v-else class="w-4 h-4" aria-hidden="true" />
               {{ t('refresh') }}

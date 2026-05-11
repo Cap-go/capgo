@@ -1,5 +1,6 @@
 import type { MessageBatch } from '@cloudflare/workers-types'
 import type {
+  NativeNotificationProvider,
   NativeNotificationProviderConfig,
   NativeNotificationQueueMessage,
   NativeNotificationRegistryRow,
@@ -7,6 +8,7 @@ import type {
 import { getNotificationBucket, getNotificationIndex } from './nativeNotifications.ts'
 
 type NotificationEnv = Record<string, unknown>
+const MAX_NOTIFICATION_RETRY_ATTEMPTS = 3
 
 interface SendOutcome {
   ok: boolean
@@ -76,8 +78,13 @@ async function decryptToken(env: NotificationEnv, encryptedToken: string): Promi
   if (version !== 'v1' || !ivValue || !cipherValue)
     throw new Error('Invalid notification token ciphertext')
   const key = await aesKeyFromSecret(secret)
-  const decrypted = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: new Uint8Array(fromBase64Url(ivValue)) }, key, new Uint8Array(fromBase64Url(cipherValue)))
-  return new TextDecoder().decode(decrypted)
+  try {
+    const decrypted = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: new Uint8Array(fromBase64Url(ivValue)) }, key, new Uint8Array(fromBase64Url(cipherValue)))
+    return new TextDecoder().decode(decrypted)
+  }
+  catch {
+    throw new Error('Invalid notification token ciphertext')
+  }
 }
 
 function getString(value: unknown): string {
@@ -102,7 +109,7 @@ function parseSecretValue(env: NotificationEnv, secretRef: string | null | undef
   }
 }
 
-function getProviderConfig(message: NativeNotificationQueueMessage, provider: string): NativeNotificationProviderConfig | null {
+function getProviderConfig(message: NativeNotificationQueueMessage, provider: NativeNotificationProvider): NativeNotificationProviderConfig | null {
   return message.providerConfigs?.find(config => config.provider === provider && config.status === 'configured') ?? null
 }
 
@@ -231,6 +238,39 @@ function buildFcmBody(token: string, message: NativeNotificationQueueMessage) {
   return { message: fcmMessage }
 }
 
+interface FcmErrorDetail {
+  '@type'?: string
+  'errorCode'?: string
+  'fieldViolations'?: Array<{ field?: string }>
+}
+
+interface FcmSendError {
+  name?: string
+  error?: {
+    status?: string
+    message?: string
+    details?: FcmErrorDetail[]
+  }
+}
+
+function isFcmTokenFieldViolation(detail: FcmErrorDetail): boolean {
+  return Array.isArray(detail.fieldViolations) && detail.fieldViolations.some((violation) => {
+    const field = violation.field ?? ''
+    return field === 'message.token' || field.endsWith('.token')
+  })
+}
+
+function isInvalidFcmToken(json: FcmSendError): boolean {
+  const status = json.error?.status ?? ''
+  if (status === 'UNREGISTERED')
+    return true
+  if (status !== 'INVALID_ARGUMENT')
+    return false
+  return (json.error?.details ?? []).some(detail =>
+    detail.errorCode === 'UNREGISTERED' || isFcmTokenFieldViolation(detail),
+  )
+}
+
 async function sendFcm(env: NotificationEnv, providerConfig: NativeNotificationProviderConfig, token: string, message: NativeNotificationQueueMessage): Promise<SendOutcome> {
   const secretValue = parseSecretValue(env, providerConfig.secretRef)
   const secretObject = secretValue && typeof secretValue === 'object' ? secretValue as Record<string, unknown> : {}
@@ -247,16 +287,15 @@ async function sendFcm(env: NotificationEnv, providerConfig: NativeNotificationP
     },
     body: JSON.stringify(buildFcmBody(token, message)),
   })
-  const json = await response.json().catch(() => ({})) as { name?: string, error?: { status?: string, message?: string } }
+  const json = await response.json().catch(() => ({})) as FcmSendError
   if (response.ok)
     return { ok: true, transient: false, notificationId: json.name }
 
   const status = json.error?.status ?? ''
-  const invalidToken = status === 'UNREGISTERED' || status === 'INVALID_ARGUMENT'
   return {
     ok: false,
     transient: response.status === 429 || response.status >= 500,
-    invalidToken,
+    invalidToken: isInvalidFcmToken(json),
     error: json.error?.message || status || 'FCM rejected notification',
   }
 }
@@ -404,8 +443,28 @@ async function sendToDevice(env: NotificationEnv, message: NativeNotificationQue
   return { ok: false, transient: false, error: `Unsupported provider ${device.provider}` }
 }
 
+function retryAttempt(message: NativeNotificationQueueMessage): number {
+  const attempt = Number(message.attempt ?? 0)
+  return Number.isFinite(attempt) ? Math.max(0, Math.trunc(attempt)) : 0
+}
+
+function canRetry(message: NativeNotificationQueueMessage): boolean {
+  return retryAttempt(message) < MAX_NOTIFICATION_RETRY_ATTEMPTS
+}
+
+function shouldRetryThrownError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error)
+  return ![
+    'Invalid notification token ciphertext',
+    'Missing notification token secret',
+    'Missing FCM service account secret',
+    'Missing APNs team id or key id',
+  ].some(permanentError => message.includes(permanentError))
+}
+
 export async function processNativeNotificationQueueMessage(message: NativeNotificationQueueMessage, env: NotificationEnv): Promise<NativeNotificationRegistryRow[]> {
   const retryDevices: NativeNotificationRegistryRow[] = []
+  const shouldRetry = canRetry(message)
 
   for (const device of message.devices) {
     try {
@@ -419,12 +478,13 @@ export async function processNativeNotificationQueueMessage(message: NativeNotif
       writeNotificationEvent(env, { appId: message.appId, campaignId: message.campaignId, event: 'failed', device, error: outcome.error, badge: message.badge })
       if (outcome.invalidToken)
         tombstoneDevice(env, message.appId, device)
-      if (outcome.transient)
+      if (shouldRetry && outcome.transient)
         retryDevices.push(device)
     }
     catch (error) {
       writeNotificationEvent(env, { appId: message.appId, campaignId: message.campaignId, event: 'failed', device, error: error instanceof Error ? error.message : 'notification send failed', badge: message.badge })
-      retryDevices.push(device)
+      if (shouldRetry && shouldRetryThrownError(error))
+        retryDevices.push(device)
     }
   }
 
@@ -439,7 +499,7 @@ export async function processNativeNotificationQueueBatch(batch: MessageBatch<Na
         const queue = env.NOTIFICATION_QUEUE as { send?: (body: NativeNotificationQueueMessage) => Promise<void> } | undefined
         if (!queue?.send)
           throw new Error('Notification retry queue is not configured')
-        await queue.send({ ...queueMessage.body, devices: retryDevices })
+        await queue.send({ ...queueMessage.body, attempt: retryAttempt(queueMessage.body) + 1, devices: retryDevices })
       }
       queueMessage.ack()
     }

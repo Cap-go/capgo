@@ -4,3 +4,5 @@ dist
 .build
 android/.gradle
 android/build
+android/local.properties
+local.properties

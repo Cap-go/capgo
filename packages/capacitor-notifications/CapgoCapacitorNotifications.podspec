@@ -10,7 +10,7 @@ Pod::Spec.new do |s|
   s.homepage = 'https://capgo.app'
   s.author = 'Capgo <support@capgo.app>'
   s.source = { :git => 'https://github.com/Cap-go/capgo.git', :tag => package['name'] + '@' + package['version'] }
-  s.source_files = 'ios/Sources/**/*.{swift,h,m,c,cc,mm,cpp}', 'capacitor-notifications/ios/Sources/**/*.{swift,h,m,c,cc,mm,cpp}'
+  s.source_files = 'ios/Sources/**/*.{swift,h,m,c,cc,mm,cpp}'
   s.ios.deployment_target = '15.0'
   s.dependency 'Capacitor'
   s.swift_version = '5.1'

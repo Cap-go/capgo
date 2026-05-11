@@ -28,7 +28,9 @@ import com.google.firebase.messaging.CommonNotificationBuilder;
 import com.google.firebase.messaging.FirebaseMessaging;
 import com.google.firebase.messaging.NotificationParams;
 import com.google.firebase.messaging.RemoteMessage;
+import java.util.ArrayDeque;
 import java.util.Arrays;
+import java.util.Queue;
 import java.util.UUID;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -45,9 +47,11 @@ public class CapgoNotificationsPlugin extends Plugin {
     private static final String PREFS_NAME = "capgo_notifications";
     private static final String INSTALL_ID_KEY = "nativeInstallId";
     private static final String BADGE_KEY = "badge";
+    private static final int MAX_PENDING_MESSAGES = 64;
+    private static final Object pendingMessagesLock = new Object();
+    private static final Queue<RemoteMessage> pendingMessages = new ArrayDeque<>();
 
     public static Bridge staticBridge = null;
-    public static RemoteMessage lastMessage = null;
     public NotificationManager notificationManager;
     private NotificationChannelManager notificationChannelManager;
     private SharedPreferences preferences;
@@ -56,11 +60,17 @@ public class CapgoNotificationsPlugin extends Plugin {
         notificationManager = (NotificationManager) getActivity().getSystemService(Context.NOTIFICATION_SERVICE);
         preferences = getContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
         staticBridge = this.bridge;
-        if (lastMessage != null) {
-            fireNotification(lastMessage);
-            lastMessage = null;
+        while (true) {
+            RemoteMessage pendingMessage;
+            synchronized (pendingMessagesLock) {
+                pendingMessage = pendingMessages.poll();
+            }
+            if (pendingMessage == null) {
+                break;
+            }
+            fireNotification(pendingMessage);
         }
-        notificationChannelManager = new NotificationChannelManager(getActivity(), notificationManager, getConfig());
+        notificationChannelManager = new NotificationChannelManager(getActivity(), notificationManager);
     }
 
     @Override
@@ -293,7 +303,12 @@ public class CapgoNotificationsPlugin extends Plugin {
         if (plugin != null) {
             plugin.fireNotification(remoteMessage);
         } else {
-            lastMessage = remoteMessage;
+            synchronized (pendingMessagesLock) {
+                if (pendingMessages.size() >= MAX_PENDING_MESSAGES) {
+                    pendingMessages.poll();
+                }
+                pendingMessages.add(remoteMessage);
+            }
         }
     }
 

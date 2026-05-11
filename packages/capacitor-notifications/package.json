@@ -20,7 +20,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "prepublishOnly": "bun run build"
+    "prepublishOnly": "bun run typecheck && bun run build"
   },
   "peerDependencies": {
     "@capacitor/core": "^8.0.0"

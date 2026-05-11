@@ -1,3 +1,4 @@
+import { Capacitor, registerPlugin } from '@capacitor/core'
 import type { PluginListenerHandle } from '@capacitor/core'
 import type {
   CapgoBackgroundNotificationEvent,
@@ -17,7 +18,6 @@ import type {
   CapgoUpdateCheckResult,
   CapgoUpdaterIntegrationOptions,
 } from './definitions'
-import { Capacitor, registerPlugin } from '@capacitor/core'
 
 export * from './definitions'
 
@@ -25,11 +25,22 @@ const NativeCapgoNotifications = registerPlugin<CapgoNotificationsNativePlugin>(
 const DEFAULT_SERVER_URL = 'https://api.capgo.app'
 const PLUGIN_VERSION = '0.0.1-private.0'
 
-type UpdaterPlugin = {
-  getLatest(options?: { channel?: string }): Promise<{ version: string, url?: string, checksum?: string, sessionKey?: string, manifest?: unknown[], error?: string, message?: string }>
-  download(options: { url: string, version: string, checksum?: string, sessionKey?: string, manifest?: unknown[] }): Promise<{ id: string, version: string }>
-  next(options: { id: string }): Promise<unknown>
-  set(options: { id: string }): Promise<unknown>
+interface UpdaterTriggerResult {
+  status?: string
+  version?: string
+  bundleId?: string
+  id?: string
+  queued?: boolean
+  error?: string
+  message?: string
+}
+
+interface UpdaterPlugin {
+  triggerUpdateCheck?: (options?: { channel?: string, installMode?: CapgoNotificationInstallMode }) => Promise<UpdaterTriggerResult>
+  getLatest: (options?: { channel?: string }) => Promise<{ version: string, url?: string, checksum?: string, sessionKey?: string, manifest?: unknown[], error?: string, message?: string }>
+  download: (options: { url: string, version: string, checksum?: string, sessionKey?: string, manifest?: unknown[] }) => Promise<{ id: string, version: string }>
+  next: (options: { id: string }) => Promise<unknown>
+  set: (options: { id: string }) => Promise<unknown>
 }
 
 interface RuntimeState {
@@ -114,30 +125,55 @@ async function requestToken(): Promise<CapgoNotificationToken> {
     let registrationHandle: PluginListenerHandle | undefined
     let errorHandle: PluginListenerHandle | undefined
 
-    Promise.all([
-      NativeCapgoNotifications.addListener('registration', (token) => {
-        if (resolved)
-          return
-        resolved = true
-        state.token = token
-        void registrationHandle?.remove()
-        void errorHandle?.remove()
-        resolve(token)
-      }),
-      NativeCapgoNotifications.addListener('registrationError', (error) => {
-        if (resolved)
-          return
-        resolved = true
-        void registrationHandle?.remove()
-        void errorHandle?.remove()
-        reject(new Error(error.error))
-      }),
-    ]).then(([registration, registrationError]) => {
-      registrationHandle = registration
-      errorHandle = registrationError
-      return NativeCapgoNotifications.registerPush()
-    }).catch(reject)
+    const cleanup = () => {
+      void registrationHandle?.remove()
+      void errorHandle?.remove()
+    }
+    const fail = (error: unknown) => {
+      if (resolved)
+        return
+      resolved = true
+      cleanup()
+      reject(error instanceof Error ? error : new Error(String(error)))
+    }
+
+    void (async () => {
+      try {
+        registrationHandle = await NativeCapgoNotifications.addListener('registration', (token) => {
+          if (resolved)
+            return
+          resolved = true
+          state.token = token
+          cleanup()
+          resolve(token)
+        })
+        errorHandle = await NativeCapgoNotifications.addListener('registrationError', (error) => {
+          fail(new Error(error.error))
+        })
+        await NativeCapgoNotifications.registerPush()
+      }
+      catch (error) {
+        fail(error)
+      }
+    })()
   })
+}
+
+function normalizeUpdaterResult(result: UpdaterTriggerResult): CapgoUpdateCheckResult {
+  if (result.status === 'disabled' || result.status === 'unavailable' || result.status === 'no_update' || result.status === 'installed' || result.status === 'failed') {
+    return {
+      status: result.status,
+      version: result.version,
+      bundleId: result.bundleId || result.id,
+      error: result.error || result.message,
+    }
+  }
+  return {
+    status: result.queued ? 'installed' : 'failed',
+    version: result.version,
+    bundleId: result.bundleId || result.id,
+    error: result.error || result.message || 'Update check failed',
+  }
 }
 
 function notificationData(notification?: CapgoPushNotificationSchema): Record<string, unknown> {
@@ -386,7 +422,15 @@ export const CapgoNotifications: CapgoNotificationsPlugin = {
     if (!updater)
       return { status: 'unavailable', error: 'CapacitorUpdater plugin is not installed' }
     try {
-      const latest = await updater.getLatest({ channel: options?.channel || state.updater.channel })
+      const installMode = options?.installMode || state.updater.installMode
+      const channel = options?.channel || state.updater.channel
+      if (updater.triggerUpdateCheck) {
+        return normalizeUpdaterResult(await updater.triggerUpdateCheck({
+          channel,
+          installMode,
+        }))
+      }
+      const latest = await updater.getLatest({ channel })
       if (!latest.url)
         return { status: 'no_update', version: latest.version, error: latest.message || latest.error }
       const bundle = await updater.download({
@@ -396,7 +440,6 @@ export const CapgoNotifications: CapgoNotificationsPlugin = {
         sessionKey: latest.sessionKey,
         manifest: latest.manifest,
       })
-      const installMode = options?.installMode || state.updater.installMode
       if (installMode === 'set')
         await updater.set({ id: bundle.id })
       else

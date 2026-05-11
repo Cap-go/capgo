@@ -12,7 +12,6 @@ import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Logger;
 import com.getcapacitor.PluginCall;
-import com.getcapacitor.PluginConfig;
 import com.getcapacitor.util.WebColor;
 import java.util.List;
 
@@ -20,7 +19,6 @@ public class NotificationChannelManager {
 
     private final Context context;
     private final NotificationManager notificationManager;
-    private final PluginConfig config;
 
     private static final String CHANNEL_ID = "id";
     private static final String CHANNEL_NAME = "name";
@@ -33,10 +31,9 @@ public class NotificationChannelManager {
     private static final String CHANNEL_LIGHT_COLOR = "lightColor";
     private static final String CHANNEL_SHOW_BADGE = "showBadge";
 
-    public NotificationChannelManager(Context context, NotificationManager manager, PluginConfig config) {
+    public NotificationChannelManager(Context context, NotificationManager manager) {
         this.context = context;
         this.notificationManager = manager;
-        this.config = config;
     }
 
     public void createDefaultChannel(PluginCall call) {

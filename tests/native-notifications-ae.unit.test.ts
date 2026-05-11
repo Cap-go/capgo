@@ -23,7 +23,29 @@ async function encryptToken(secret: string, token: string) {
   const key = await crypto.subtle.importKey('raw', digest, { name: 'AES-GCM' }, false, ['encrypt'])
   const iv = new Uint8Array(12)
   const encrypted = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, textEncoder.encode(token))
-  return 'v1:' + toBase64Url(iv) + ':' + toBase64Url(new Uint8Array(encrypted))
+  return `v1:${toBase64Url(iv)}:${toBase64Url(new Uint8Array(encrypted))}`
+}
+
+function fcmDevice(encryptedToken: string) {
+  return {
+    device_key: 'device-key',
+    recipient_key: 'aa-recipient',
+    encrypted_token: encryptedToken,
+    token_hash: 'hash',
+    provider: 'fcm' as const,
+    platform: 'android' as const,
+    locale: '',
+    timezone: '',
+    app_version: '',
+    plugin_version: '',
+    tags: '',
+    attributes: '',
+    active: 1,
+    badge: 0,
+    permission: 2,
+    consent: 1,
+    updated_at: '',
+  }
 }
 
 describe('native notification AE registry', () => {
@@ -84,25 +106,7 @@ describe('native notification queue sender', () => {
         secretRef: 'FCM_SECRET',
         config: { projectId: 'demo-project' },
       }],
-      devices: [{
-        device_key: 'device-key',
-        recipient_key: 'aa-recipient',
-        encrypted_token: encryptedToken,
-        token_hash: 'hash',
-        provider: 'fcm',
-        platform: 'android',
-        locale: '',
-        timezone: '',
-        app_version: '',
-        plugin_version: '',
-        tags: '',
-        attributes: '',
-        active: 1,
-        badge: 0,
-        permission: 2,
-        consent: 1,
-        updated_at: '',
-      }],
+      devices: [fcmDevice(encryptedToken)],
     }, {
       API_SECRET: 'secret',
       FCM_SECRET: JSON.stringify({ access_token: 'token', project_id: 'demo-project' }),
@@ -137,25 +141,7 @@ describe('native notification queue sender', () => {
         secretRef: 'FCM_SECRET',
         config: { projectId: 'demo-project' },
       }],
-      devices: [{
-        device_key: 'device-key',
-        recipient_key: 'aa-recipient',
-        encrypted_token: encryptedToken,
-        token_hash: 'hash',
-        provider: 'fcm',
-        platform: 'android',
-        locale: '',
-        timezone: '',
-        app_version: '',
-        plugin_version: '',
-        tags: '',
-        attributes: '',
-        active: 1,
-        badge: 0,
-        permission: 2,
-        consent: 1,
-        updated_at: '',
-      }],
+      devices: [fcmDevice(encryptedToken)],
     }, {
       API_SECRET: 'secret',
       FCM_SECRET: JSON.stringify({ access_token: 'token', project_id: 'demo-project' }),
@@ -168,6 +154,93 @@ describe('native notification queue sender', () => {
     expect(registry).toHaveLength(1)
     expect(registry[0].doubles[0]).toBe(0)
     expect(registry[0].indexes[0]).toBe('com.demo.app:aa')
+    fetchMock.mockRestore()
+  })
+
+  it('does not tombstone non-token FCM invalid argument errors', async () => {
+    const registry: any[] = []
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async () => {
+      return new Response(JSON.stringify({
+        error: {
+          status: 'INVALID_ARGUMENT',
+          message: 'Invalid payload',
+          details: [{
+            '@type': 'type.googleapis.com/google.rpc.BadRequest',
+            fieldViolations: [{ field: 'message.notification.title' }],
+          }],
+        },
+      }), { status: 400 })
+    })
+
+    const encryptedToken = await encryptToken('secret', 'push-token')
+    const retryDevices = await processNativeNotificationQueueMessage({
+      kind: 'send',
+      appId: 'com.demo.app',
+      campaignId: 'campaign-1',
+      payload: { title: 'Hello', body: 'World' },
+      providerConfigs: [{
+        provider: 'fcm',
+        status: 'configured',
+        secretRef: 'FCM_SECRET',
+        config: { projectId: 'demo-project' },
+      }],
+      devices: [fcmDevice(encryptedToken)],
+    }, {
+      API_SECRET: 'secret',
+      FCM_SECRET: JSON.stringify({ access_token: 'token', project_id: 'demo-project' }),
+      NOTIFICATION_EVENTS: { writeDataPoint: () => undefined },
+      NOTIFICATION_REGISTRY: { writeDataPoint: (point: any) => registry.push(point) },
+    })
+
+    expect(retryDevices).toHaveLength(0)
+    expect(registry).toHaveLength(0)
+    fetchMock.mockRestore()
+  })
+
+  it('does not retry permanent or exhausted notification send failures', async () => {
+    const encryptedToken = await encryptToken('wrong-secret', 'push-token')
+    const permanentRetryDevices = await processNativeNotificationQueueMessage({
+      kind: 'send',
+      appId: 'com.demo.app',
+      campaignId: 'campaign-1',
+      payload: { title: 'Hello', body: 'World' },
+      providerConfigs: [{
+        provider: 'fcm',
+        status: 'configured',
+        secretRef: 'FCM_SECRET',
+        config: { projectId: 'demo-project' },
+      }],
+      devices: [fcmDevice(encryptedToken)],
+    }, {
+      API_SECRET: 'secret',
+      FCM_SECRET: JSON.stringify({ access_token: 'token', project_id: 'demo-project' }),
+      NOTIFICATION_EVENTS: { writeDataPoint: () => undefined },
+    })
+
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async () => {
+      return new Response(JSON.stringify({ error: { status: 'UNAVAILABLE', message: 'Try later' } }), { status: 503 })
+    })
+    const exhaustedRetryDevices = await processNativeNotificationQueueMessage({
+      kind: 'send',
+      appId: 'com.demo.app',
+      campaignId: 'campaign-1',
+      attempt: 3,
+      payload: { title: 'Hello', body: 'World' },
+      providerConfigs: [{
+        provider: 'fcm',
+        status: 'configured',
+        secretRef: 'FCM_SECRET',
+        config: { projectId: 'demo-project' },
+      }],
+      devices: [await encryptToken('secret', 'push-token').then(fcmDevice)],
+    }, {
+      API_SECRET: 'secret',
+      FCM_SECRET: JSON.stringify({ access_token: 'token', project_id: 'demo-project' }),
+      NOTIFICATION_EVENTS: { writeDataPoint: () => undefined },
+    })
+
+    expect(permanentRetryDevices).toHaveLength(0)
+    expect(exhaustedRetryDevices).toHaveLength(0)
     fetchMock.mockRestore()
   })
 })

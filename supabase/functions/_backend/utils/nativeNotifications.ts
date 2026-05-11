@@ -38,7 +38,7 @@ export interface NativeNotificationTarget {
 }
 
 export interface NativeNotificationProviderConfig {
-  provider: NativeNotificationProvider | string
+  provider: NativeNotificationProvider
   status: string
   config: Record<string, unknown>
   secretRef?: string | null
@@ -76,8 +76,8 @@ export interface NativeNotificationRegistryRow {
   recipient_key: string
   encrypted_token: string
   token_hash: string
-  provider: NativeNotificationProvider | string
-  platform: NativeNotificationPlatform | string
+  provider: NativeNotificationProvider
+  platform: NativeNotificationPlatform
   locale: string
   timezone: string
   app_version: string
@@ -100,8 +100,8 @@ export interface NativeNotificationEventInput {
   nativeInstallId?: string
   recipientKey?: string
   deviceKey?: string
-  provider?: string
-  platform?: string
+  provider?: NativeNotificationProvider
+  platform?: NativeNotificationPlatform
   error?: string
   badge?: number
 }
@@ -114,6 +114,7 @@ export interface NativeNotificationQueueMessage {
   devices: NativeNotificationRegistryRow[]
   badge?: number
   providerConfigs?: NativeNotificationProviderConfig[]
+  attempt?: number
 }
 
 export interface NativeNotificationStatsRow {
@@ -221,7 +222,7 @@ function normalizeAttributes(attributes: Record<string, unknown> | undefined): s
   if (!attributes || typeof attributes !== 'object')
     return ''
   const json = JSON.stringify(attributes)
-  return json.length > MAX_ATTRIBUTES_BLOB_LENGTH ? json.slice(0, MAX_ATTRIBUTES_BLOB_LENGTH) : json
+  return json.length > MAX_ATTRIBUTES_BLOB_LENGTH ? '' : json
 }
 
 export function getNotificationBucket(key: string): string {
@@ -234,8 +235,7 @@ export function getAllNotificationBuckets(): string[] {
 }
 
 export function getNotificationIndex(appId: string, bucket: string): string {
-  return `
-${appId}:${bucket}`.trim()
+  return `${appId}:${bucket}`
 }
 
 export async function deriveNativeNotificationIdentity(
@@ -373,6 +373,20 @@ ORDER BY updated_at DESC
 LIMIT ${limit}`
 }
 
+function resolveNotificationBuckets(params: {
+  buckets?: string[]
+  recipientKey?: string
+  deviceKey?: string
+}) {
+  if (params.buckets?.length)
+    return params.buckets
+  if (params.recipientKey)
+    return [getNotificationBucket(params.recipientKey)]
+  if (params.deviceKey)
+    return [getNotificationBucket(params.deviceKey)]
+  return getAllNotificationBuckets()
+}
+
 export async function readNotificationRegistrationsCF(c: Context<MiddlewareKeyVariables>, params: {
   appId: string
   recipientKey?: string
@@ -384,18 +398,10 @@ export async function readNotificationRegistrationsCF(c: Context<MiddlewareKeyVa
   if (!getEnv(c, 'CF_ANALYTICS_TOKEN') || !getEnv(c, 'CF_ACCOUNT_ANALYTICS_ID'))
     return [] as NativeNotificationRegistryRow[]
 
-  const buckets = params.buckets?.length
-    ? params.buckets
-    : params.recipientKey
-      ? [getNotificationBucket(params.recipientKey)]
-      : params.deviceKey
-        ? [getNotificationBucket(params.deviceKey)]
-        : getAllNotificationBuckets()
-
   const query = buildNotificationRegistryLookupQuery({
     dataset: getRegistryDataset(c),
     appId: params.appId,
-    buckets,
+    buckets: resolveNotificationBuckets(params),
     recipientKey: params.recipientKey,
     deviceKey: params.deviceKey,
     tag: params.tag,
