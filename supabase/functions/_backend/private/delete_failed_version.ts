@@ -17,7 +17,7 @@ export const app = new Hono<MiddlewareKeyVariables>()
 
 app.delete('/', middlewareKey(['all', 'write', 'upload']), async (c) => {
   const body = await parseBody<DataUpload>(c)
-  cloudlog({ requestId: c.get('requestId'), message: 'delete failed version body', body })
+  cloudlog({ requestId: c.get('requestId'), message: 'delete failed version body', has_app_id: !!body.app_id, has_name: !!body.name })
   const apikey = c.get('apikey')
   const capgkey = c.get('capgkey') as string
   if (apikey && typeof apikey === 'object') {
@@ -31,7 +31,7 @@ app.delete('/', middlewareKey(['all', 'write', 'upload']), async (c) => {
   }
   // Auth context is already set by middlewareKey
   if (!(await checkPermission(c, 'bundle.delete', { appId: body.app_id }))) {
-    return quickError(401, 'not_authorized', 'You can\'t access this app', { app_id: body.app_id })
+    return quickError(401, 'not_authorized', 'You can\'t access this app')
   }
 
   const { error: errorApp } = await supabaseApikey(c, capgkey)
@@ -44,10 +44,10 @@ app.delete('/', middlewareKey(['all', 'write', 'upload']), async (c) => {
   }
 
   if (!body.app_id) {
-    return quickError(400, 'error_app_id_missing', 'Error bundle name missing', { body })
+    return quickError(400, 'error_app_id_missing', 'Error bundle name missing', { has_app_id: false, has_name: !!body.name })
   }
   if (!body.name) {
-    return quickError(400, 'error_bundle_name_missing', 'Error bundle name missing', { body })
+    return quickError(400, 'error_bundle_name_missing', 'Error bundle name missing', { has_app_id: !!body.app_id, has_name: false })
   }
 
   const { data: version, error: errorVersion } = await supabaseApikey(c, capgkey)
