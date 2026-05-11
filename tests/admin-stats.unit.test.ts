@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { adminStatsBodySchema, MAX_ADMIN_STATS_LIMIT, MAX_ADMIN_STATS_OFFSET } from '../supabase/functions/_backend/private/admin_stats.ts'
+import { adminStatsBodySchema, buildAdminStatsLogContext, MAX_ADMIN_STATS_LIMIT, MAX_ADMIN_STATS_OFFSET } from '../supabase/functions/_backend/private/admin_stats.ts'
 import { safeParseSchema } from '../supabase/functions/_backend/utils/ark_validation.ts'
 import { buildPluginBreakdownResult, normalizeAnalyticsLimit } from '../supabase/functions/_backend/utils/cloudflare.ts'
 
@@ -47,6 +47,32 @@ describe('admin stats validation', () => {
     })
 
     expect(parsed.success).toBe(true)
+  })
+
+  it('keeps caller-supplied extra fields out of admin stats log context', () => {
+    const parsed = safeParseSchema(adminStatsBodySchema, {
+      ...baseBody,
+      app_id: 'com.capgo.app',
+      limit: 25,
+      token: 'secret-token',
+      authorization: 'Bearer secret',
+    })
+
+    expect(parsed.success).toBe(true)
+    if (!parsed.success)
+      return
+
+    const context = buildAdminStatsLogContext(parsed.data)
+
+    expect(context).toEqual({
+      metric_category: 'org_metrics',
+      start_date: '2025-01-01T00:00:00.000Z',
+      end_date: '2025-01-31T00:00:00.000Z',
+      app_id: 'com.capgo.app',
+      limit: 25,
+    })
+    expect(context).not.toHaveProperty('token')
+    expect(context).not.toHaveProperty('authorization')
   })
 
   it.each([

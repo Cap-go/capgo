@@ -91,6 +91,25 @@ interface AdminStatsBody {
   offset?: number
 }
 
+export function buildAdminStatsLogContext(body: Partial<AdminStatsBody>) {
+  const context: Partial<AdminStatsBody> = {
+    metric_category: body.metric_category,
+    start_date: body.start_date,
+    end_date: body.end_date,
+  }
+
+  if (body.app_id)
+    context.app_id = body.app_id
+  if (body.org_id)
+    context.org_id = body.org_id
+  if (typeof body.limit === 'number')
+    context.limit = body.limit
+  if (typeof body.offset === 'number')
+    context.offset = body.offset
+
+  return context
+}
+
 type CancellationDetails = Stripe.Subscription.CancellationDetails
 
 const cancellationFeedbackLabels: Record<string, string> = {
@@ -154,7 +173,7 @@ app.post('/', middlewareAuth, async (c) => {
   }
 
   if (!isAdmin) {
-    cloudlog({ requestId: c.get('requestId'), message: 'not_admin', body })
+    cloudlog({ requestId: c.get('requestId'), message: 'not_admin', body: buildAdminStatsLogContext(parsedBodyResult.data) })
     throw simpleError('not_admin', 'Not admin - only admin users can access platform statistics')
   }
 
