@@ -224,28 +224,28 @@ layer(base);
   --text-sm--line-height: 1.5715;
   --text-base: 1rem;
   --text-base--line-height: 1.5;
-  --text-base--letter-spacing: -0.01em;
+  --text-base--letter-spacing: 0;
   --text-lg: 1.125rem;
   --text-lg--line-height: 1.5;
-  --text-lg--letter-spacing: -0.01em;
+  --text-lg--letter-spacing: 0;
   --text-xl: 1.25rem;
   --text-xl--line-height: 1.5;
-  --text-xl--letter-spacing: -0.01em;
+  --text-xl--letter-spacing: 0;
   --text-2xl: 1.5rem;
   --text-2xl--line-height: 1.33;
-  --text-2xl--letter-spacing: -0.01em;
+  --text-2xl--letter-spacing: 0;
   --text-3xl: 1.88rem;
   --text-3xl--line-height: 1.33;
-  --text-3xl--letter-spacing: -0.01em;
+  --text-3xl--letter-spacing: 0;
   --text-4xl: 2.25rem;
   --text-4xl--line-height: 1.25;
-  --text-4xl--letter-spacing: -0.02em;
+  --text-4xl--letter-spacing: 0;
   --text-5xl: 3rem;
   --text-5xl--line-height: 1.25;
-  --text-5xl--letter-spacing: -0.02em;
+  --text-5xl--letter-spacing: 0;
   --text-6xl: 3.75rem;
   --text-6xl--line-height: 1.2;
-  --text-6xl--letter-spacing: -0.02em;
+  --text-6xl--letter-spacing: 0;
   
   /* Screens */
   --breakpoint-xs: 480px;
@@ -300,6 +300,8 @@ layer(base);
 html {
   height: 100%;
   overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 #app {

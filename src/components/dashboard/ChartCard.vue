@@ -49,8 +49,8 @@ const displayNoDataMessage = computed(() => props.noDataMessage ?? t('no-data'))
 </script>
 
 <template>
-  <div class="relative col-span-full flex h-[460px] flex-col overflow-hidden rounded-[1.75rem] border border-slate-200/80 bg-white/95 shadow-[0_20px_60px_-38px_rgba(15,23,42,0.3)] backdrop-blur dark:border-slate-700/70 dark:bg-slate-900/85 dark:shadow-[0_24px_70px_-42px_rgba(2,6,23,0.72)]">
-    <div class="pointer-events-none absolute inset-x-0 top-0 h-28 bg-gradient-to-br from-slate-50 via-white to-transparent dark:from-slate-800/70 dark:via-slate-900/40 dark:to-transparent" />
+  <div class="relative col-span-full flex h-[460px] flex-col overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-[0_18px_48px_-38px_rgba(15,23,42,0.45)] dark:border-slate-700/80 dark:bg-slate-900 dark:shadow-[0_24px_70px_-48px_rgba(2,6,23,0.82)]">
+    <div class="pointer-events-none absolute inset-x-0 top-0 h-24 bg-gradient-to-br from-slate-50 via-white to-transparent dark:from-slate-800/70 dark:via-slate-900/40 dark:to-transparent" />
 
     <!-- Header with title and stats -->
     <div class="relative overflow-hidden px-5 pt-5">
@@ -71,7 +71,7 @@ const displayNoDataMessage = computed(() => props.noDataMessage ?? t('no-data'))
             <div
               v-if="showEvolutionBadge"
               class="inline-flex justify-center items-center rounded-full px-3 py-1 text-xs font-bold text-white shadow-sm"
-              :class="{ 'bg-cyan-500': (lastDayEvolution ?? 0) >= 0, 'bg-amber-500': (lastDayEvolution ?? 0) < 0 }"
+              :class="{ 'bg-cyan-600': (lastDayEvolution ?? 0) >= 0, 'bg-amber-600': (lastDayEvolution ?? 0) < 0 }"
             >
               {{ (lastDayEvolution ?? 0) < 0 ? '-' : '+' }}{{ Math.abs(lastDayEvolution ?? 0).toFixed(2) }}%
             </div>

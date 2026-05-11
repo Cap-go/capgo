@@ -183,7 +183,7 @@ function handleSecondaryTab(key: string) {
       @update:active-tab="handleTab"
       @update:secondary-active-tab="handleSecondaryTab"
     />
-    <main class="relative flex flex-1 w-full min-h-0 mt-0 overflow-hidden bg-blue-50 dark:bg-slate-800/40">
+    <main class="relative flex flex-1 w-full min-h-0 mt-0 overflow-hidden bg-slate-50 dark:bg-slate-950/40">
       <div
         class="flex-1 w-full min-h-0 mx-auto overflow-y-auto"
         :class="{ 'blur-sm pointer-events-none select-none': showPaymentOverlay }"

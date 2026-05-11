@@ -66,9 +66,9 @@ const loginHeroHighlights = computed(() => [
 ])
 const authCardShellClass = [
   'rounded-none border-0 bg-transparent p-0 shadow-none backdrop-blur-0',
-  'sm:rounded-[1.75rem] sm:border sm:border-slate-200/75 sm:bg-[linear-gradient(180deg,rgba(255,255,255,0.94)_0%,rgba(255,255,255,0.84)_100%)]',
-  'sm:p-7 sm:shadow-[0_34px_80px_-42px_rgba(15,23,42,0.5)] sm:backdrop-blur-[18px]',
-  'sm:dark:border-slate-600/70 sm:dark:bg-[linear-gradient(180deg,rgba(15,23,42,0.88)_0%,rgba(15,23,42,0.7)_100%)]',
+  'sm:rounded-2xl sm:border sm:border-slate-200/80 sm:bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(255,255,255,0.88)_100%)]',
+  'sm:p-7 sm:shadow-[0_30px_70px_-46px_rgba(15,23,42,0.52)] sm:backdrop-blur-[18px]',
+  'sm:dark:border-slate-600/70 sm:dark:bg-[linear-gradient(180deg,rgba(15,23,42,0.9)_0%,rgba(15,23,42,0.74)_100%)]',
 ].join(' ')
 const authCardHeaderClass = 'flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between'
 const authStepCardClass = 'min-w-0'
@@ -610,8 +610,7 @@ onMounted(checkLogin)
     class="relative flex h-dvh min-h-dvh w-full overflow-y-auto bg-[linear-gradient(180deg,rgba(248,250,252,0.98)_0%,rgba(238,244,255,0.9)_55%,rgba(248,250,252,0.98)_100%)] dark:bg-[linear-gradient(180deg,rgba(15,23,42,0.98)_0%,rgba(20,29,53,0.96)_52%,rgba(15,23,42,0.98)_100%)]"
   >
     <div class="pointer-events-none absolute inset-0 hidden overflow-hidden lg:block" aria-hidden="true">
-      <div class="absolute top-[10%] -left-32 h-[22rem] w-[22rem] rounded-full bg-[rgba(17,158,255,0.22)] opacity-55 blur-[52px]" />
-      <div class="absolute right-[-7rem] bottom-[8%] h-[18rem] w-[18rem] rounded-full bg-[rgba(104,118,225,0.18)] opacity-55 blur-[52px]" />
+      <div class="absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(17,158,255,0.13)_0%,transparent_44%)]" />
       <div
         class="absolute inset-0 opacity-40 [background-image:linear-gradient(rgba(148,163,184,0.12)_1px,transparent_1px),linear-gradient(90deg,rgba(148,163,184,0.12)_1px,transparent_1px)] [background-size:3rem_3rem] [mask-image:radial-gradient(circle_at_center,black_40%,transparent_82%)]"
       />
@@ -631,7 +630,7 @@ onMounted(checkLogin)
           </div>
 
           <div class="mt-8 space-y-5">
-            <div class="inline-flex h-14 w-14 items-center justify-center rounded-2xl border border-slate-200/70 bg-white/80 shadow-lg shadow-slate-900/5 backdrop-blur dark:border-slate-700/80 dark:bg-slate-900/70">
+            <div class="inline-flex h-14 w-14 items-center justify-center rounded-xl border border-slate-200/70 bg-white/80 shadow-lg shadow-slate-900/5 backdrop-blur dark:border-slate-700/80 dark:bg-slate-900/70">
               <img src="/capgo.webp" alt="Capgo logo" class="h-8 w-8 rounded-sm invert dark:invert-0">
             </div>
             <div>
@@ -651,7 +650,7 @@ onMounted(checkLogin)
             <article
               v-for="highlight in loginHeroHighlights"
               :key="highlight.title"
-              class="rounded-3xl border border-white/70 bg-white/78 p-5 shadow-[0_20px_50px_-30px_rgba(15,23,42,0.45)] backdrop-blur dark:border-slate-700/70 dark:bg-slate-900/72"
+              class="rounded-2xl border border-white/70 bg-white/78 p-5 shadow-[0_20px_50px_-34px_rgba(15,23,42,0.45)] backdrop-blur dark:border-slate-700/70 dark:bg-slate-900/72"
             >
               <div class="mb-3 h-2 w-12 rounded-full bg-gradient-to-r from-sky-500 via-sky-400 to-indigo-500" />
               <h2 class="text-base font-semibold text-slate-900 dark:text-white">

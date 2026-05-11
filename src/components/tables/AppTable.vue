@@ -321,6 +321,7 @@ const filteredApps = computed(() => {
         v-model:search="internalSearch"
         :show-add="!isMobile"
         :total="props.total ?? filteredApps.length"
+        :page-size="10"
         :element-list="filteredApps"
         :search-placeholder="t('search-by-name-or-app-id')"
         :is-loading="props.isLoading ?? false"

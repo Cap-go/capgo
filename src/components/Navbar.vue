@@ -33,14 +33,14 @@ const { t } = useI18n()
 </script>
 
 <template>
-  <header class="bg-slate-100 backdrop-blur-xl dark:bg-slate-900">
+  <header class="sticky top-0 z-30 border-b border-slate-200/80 bg-slate-50/95 backdrop-blur-xl dark:border-slate-800 dark:bg-slate-950/90">
     <div class="px-2 sm:px-4 lg:px-6">
       <div class="relative flex items-center justify-between h-16 -mb-px">
         <!-- Header: Left side -->
         <div class="flex items-center space-x-4">
           <div v-if="displayStore.NavTitle && isMobile" class="pr-2">
             <button
-              class="flex p-2 rounded-sm dark:text-white focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:outline-none text-slate-500 dark:hover:bg-slate-600 hover:bg-slate-300"
+              class="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-slate-200 hover:text-slate-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:outline-none dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:text-white"
               :aria-label="t('button-back')"
               @click="back()"
             >
@@ -50,7 +50,7 @@ const { t } = useI18n()
           </div>
           <!-- Hamburger button -->
           <button
-            class="p-1 rounded-md lg:hidden dark:text-white focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:outline-none text-slate-500 dark:hover:text-slate-50 hover:text-slate-600"
+            class="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-slate-200 hover:text-slate-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:outline-none dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:text-white lg:hidden"
             aria-controls="sidebar"
             :aria-expanded="props.sidebarOpen"
             :aria-label="props.sidebarOpen ? t('close-sidebar') : t('open-sidebar')"
@@ -63,14 +63,14 @@ const { t } = useI18n()
           <!-- Title on desktop -->
           <div class="hidden lg:block">
             <div class="flex items-center space-x-2 font-bold truncate md:text-2xl dark:text-white text-md text-dark">
-              <nav class="text-sm font-normal text-slate-600 dark:text-slate-400" aria-label="Breadcrumb">
+              <nav class="text-sm font-normal text-slate-600 dark:text-slate-300" aria-label="Breadcrumb">
                 <ol class="inline-flex items-center space-x-1">
                   <li v-for="(breadcrumb, i) in displayStore.pathTitle" :key="i" class="flex items-center">
                     <span v-if="i > 0" class="mx-1" aria-hidden="true"> / </span>
                     <router-link
                       :to="breadcrumb.path"
-                      class="px-1 rounded-sm hover:underline focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 focus:outline-none"
-                      :class="i === displayStore.pathTitle.length - 1 ? 'font-bold text-slate-600 dark:text-slate-100' : ''"
+                      class="px-1.5 py-1 rounded-md transition-colors hover:bg-slate-200/70 hover:text-slate-900 focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 focus:outline-none dark:hover:bg-slate-800 dark:hover:text-white"
+                      :class="i === displayStore.pathTitle.length - 1 ? 'font-bold text-slate-800 dark:text-slate-50' : ''"
                     >
                       {{ breadcrumb.translate === false ? breadcrumb.name : t(breadcrumb.name) }}
                     </router-link>
