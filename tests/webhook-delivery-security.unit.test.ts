@@ -114,6 +114,46 @@ describe('webhook delivery redirect handling', () => {
     expect(result.status).toBe(302)
     expect(fetchMock).toHaveBeenCalledOnce()
   })
+
+  it('does not log raw blocked webhook URLs with query secrets', async () => {
+    mockGetEnv.mockReturnValue('')
+
+    const { deliverWebhook } = await import('../supabase/functions/_backend/utils/webhook.ts')
+    const result = await deliverWebhook(
+      createContext(),
+      'delivery-3',
+      'http://localhost/webhook?token=secret-token',
+      {
+        event: 'app_versions.INSERT',
+        event_id: 'event-3',
+        timestamp: new Date().toISOString(),
+        org_id: 'org-1',
+        data: {
+          table: 'app_versions',
+          operation: 'INSERT',
+          record_id: 'record-3',
+          old_record: null,
+          new_record: null,
+          changed_fields: null,
+        },
+      },
+      'secret',
+    )
+
+    expect(result.success).toBe(false)
+    expect(mockCloudlogErr).toHaveBeenCalledOnce()
+    const logged = JSON.stringify(mockCloudlogErr.mock.calls)
+    expect(logged).not.toContain('secret-token')
+    expect(logged).not.toContain('http://localhost/webhook')
+    expect(mockCloudlogErr.mock.calls[0]?.[0]).toMatchObject({
+      message: 'Webhook delivery blocked by URL validation',
+      urlInfo: {
+        protocol: 'http:',
+        hasHostname: true,
+        hasQuery: true,
+      },
+    })
+  })
 })
 
 describe('webhook URL validation', () => {
@@ -135,5 +175,17 @@ describe('webhook URL validation', () => {
     enableLocalWebhookUrls(false)
 
     await expect(validateWebhookUrl('http://example.com/webhook')).resolves.toBe('Webhook URL must use HTTPS')
+  })
+
+  it('allows public HTTPS URLs when local webhook URLs are enabled', async () => {
+    enableLocalWebhookUrls(true)
+
+    await expect(validateWebhookUrl('https://example.com/webhook')).resolves.toBeNull()
+  })
+
+  it('rejects localhost URLs when local webhook URLs are disabled', async () => {
+    enableLocalWebhookUrls(false)
+
+    await expect(validateWebhookUrl('https://localhost/webhook')).resolves.toBe('Webhook URL must point to a public host')
   })
 })

@@ -68,6 +68,26 @@ function isIpLiteral(hostname: string): boolean {
   return IPV4_REGEX.test(hostname) || hostname.includes(':')
 }
 
+function getWebhookUrlLogInfo(urlString: string) {
+  try {
+    const url = new URL(urlString)
+    return {
+      protocol: url.protocol,
+      hasHostname: url.hostname !== '',
+      hostnameLength: url.hostname.length,
+      pathSegmentCount: url.pathname.split('/').filter(Boolean).length,
+      hasQuery: url.search !== '',
+      hasCredentials: url.username !== '' || url.password !== '',
+    }
+  }
+  catch {
+    return {
+      invalid: true,
+      length: urlString.length,
+    }
+  }
+}
+
 export function getWebhookUrlValidationError(c: Context, urlString: string): string | null {
   let url: URL
   try {
@@ -229,7 +249,7 @@ export async function deliverWebhook(
       requestId: c.get('requestId'),
       message: 'Webhook delivery blocked by URL validation',
       deliveryId,
-      url,
+      urlInfo: getWebhookUrlLogInfo(url),
       error: urlValidationError,
       duration,
     })
