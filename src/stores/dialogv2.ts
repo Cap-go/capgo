@@ -1,7 +1,11 @@
 import { acceptHMRUpdate, defineStore } from 'pinia'
 import { ref, watch } from 'vue'
 
-const safeDialogHrefProtocols = new Set(['https:', 'mailto:', 'tel:'])
+const safeDialogHrefProtocols = new Set(['mailto:', 'tel:'])
+const safeExternalDialogHostnames = new Set([
+  'billing.stripe.com',
+  'checkout.stripe.com',
+])
 const localHttpHostnames = new Set(['localhost', '127.0.0.1', '::1', '[::1]'])
 const fallbackDialogHrefBase = 'https://app.capgo.app'
 
@@ -15,7 +19,16 @@ export function isSafeDialogHref(href?: string): href is string {
   try {
     const base = globalThis.location?.origin || fallbackDialogHrefBase
     const url = new URL(trimmedHref, base)
-    return safeDialogHrefProtocols.has(url.protocol) || (url.protocol === 'http:' && localHttpHostnames.has(url.hostname))
+    const baseOrigin = new URL(base).origin
+
+    if (safeDialogHrefProtocols.has(url.protocol))
+      return true
+    if (url.protocol === 'http:')
+      return localHttpHostnames.has(url.hostname)
+    if (url.protocol !== 'https:')
+      return false
+
+    return url.origin === baseOrigin || safeExternalDialogHostnames.has(url.hostname)
   }
   catch {
     return false

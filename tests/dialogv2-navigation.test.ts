@@ -10,6 +10,7 @@ describe('dialog v2 navigation', () => {
 
   it.each([
     'https://checkout.stripe.com/pay/cs_test_123',
+    'https://billing.stripe.com/p/session/test_123',
     'http://localhost:5173/settings',
     'http://[::1]:5173/settings',
     '/settings/organization/plans',
@@ -24,6 +25,7 @@ describe('dialog v2 navigation', () => {
   it.each([
     '',
     '//evil.test/path',
+    'https://evil.test/path',
     'http://evil.test/path',
     'javascript:alert(document.domain)',
     ' data:text/html,<script>alert(1)</script>',
