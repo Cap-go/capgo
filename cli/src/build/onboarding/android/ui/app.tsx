@@ -45,6 +45,7 @@ import { generateKeystore, generateRandomPassword, listKeystoreAliases } from '.
 import {
   fetchUserInfo,
   GOOGLE_OAUTH_SCOPES_ANDROIDPUBLISHER,
+  MissingScopesError,
   refreshAccessToken,
   revokeToken,
   runOAuthFlow,
@@ -538,8 +539,21 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
           setStep('play-developer-id-input')
         }
         catch (err) {
-          if (!cancelled)
-            handleError(err, 'google-sign-in')
+          if (cancelled)
+            return
+          // User deselected one or more scopes on the consent screen.
+          // Treat this as a recoverable input error: explain in the CLI
+          // which scopes were missing and route back to the pre-consent
+          // screen so the user can try again. Don't burn a retry strike.
+          if (err instanceof MissingScopesError) {
+            addLog('✖ Sign-in did not grant all required permissions.', 'red')
+            for (const scope of err.missing)
+              addLog(`  • Missing: ${scope}`, 'yellow')
+            addLog('Please retry sign-in and leave every requested permission checked.', 'yellow')
+            setStep('google-sign-in')
+            return
+          }
+          handleError(err, 'google-sign-in')
         }
       })()
     }

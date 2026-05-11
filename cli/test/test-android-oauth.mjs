@@ -193,6 +193,64 @@ await test('revokeToken throws on 5xx so caller can log the failure', async () =
   assert(threw, 'expected revokeToken to throw on 5xx')
 })
 
+await test('findMissingScopes returns empty when every requested scope was granted', async () => {
+  const { findMissingScopes } = await importOAuth()
+  const result = findMissingScopes(
+    'openid https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/androidpublisher https://www.googleapis.com/auth/cloud-platform',
+    [
+      'openid',
+      'https://www.googleapis.com/auth/userinfo.email',
+      'https://www.googleapis.com/auth/androidpublisher',
+      'https://www.googleapis.com/auth/cloud-platform',
+    ],
+  )
+  assertEquals(result.length, 0, `expected no missing scopes, got: ${JSON.stringify(result)}`)
+})
+
+await test('findMissingScopes detects a deselected sensitive scope', async () => {
+  const { findMissingScopes } = await importOAuth()
+  // User unchecked cloud-platform on consent screen
+  const granted = 'openid https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/androidpublisher'
+  const requested = [
+    'openid',
+    'https://www.googleapis.com/auth/userinfo.email',
+    'https://www.googleapis.com/auth/androidpublisher',
+    'https://www.googleapis.com/auth/cloud-platform',
+  ]
+  const result = findMissingScopes(granted, requested)
+  assertEquals(result.length, 1)
+  assertEquals(result[0], 'https://www.googleapis.com/auth/cloud-platform')
+})
+
+await test('findMissingScopes returns all requested when the response is empty', async () => {
+  const { findMissingScopes } = await importOAuth()
+  const requested = ['openid', 'https://www.googleapis.com/auth/androidpublisher']
+  const result = findMissingScopes('', requested)
+  assertEquals(result.length, 2)
+  assertEquals(result[0], 'openid')
+  assertEquals(result[1], 'https://www.googleapis.com/auth/androidpublisher')
+})
+
+await test('findMissingScopes tolerates extra granted scopes the CLI didn\'t request', async () => {
+  const { findMissingScopes } = await importOAuth()
+  // User account had a broader earlier consent — Google may include those
+  // older scopes in the response. We only care about ours.
+  const granted = 'openid https://www.googleapis.com/auth/drive.metadata.readonly https://www.googleapis.com/auth/androidpublisher'
+  const requested = ['openid', 'https://www.googleapis.com/auth/androidpublisher']
+  const result = findMissingScopes(granted, requested)
+  assertEquals(result.length, 0)
+})
+
+await test('MissingScopesError exposes missing list + granted string for downstream UX', async () => {
+  const { MissingScopesError } = await importOAuth()
+  const err = new MissingScopesError(['https://www.googleapis.com/auth/cloud-platform'], 'openid')
+  assert(err instanceof Error, 'must extend Error')
+  assertEquals(err.name, 'MissingScopesError')
+  assertEquals(err.missing.length, 1)
+  assertEquals(err.granted, 'openid')
+  assert(/cloud-platform/.test(err.message), 'message should name the missing scope')
+})
+
 console.log(`\n📊 Results: ${testsPassed} passed, ${testsFailed} failed`)
 if (testsFailed > 0)
   process.exit(1)

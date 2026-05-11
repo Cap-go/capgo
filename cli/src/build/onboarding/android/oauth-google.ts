@@ -269,6 +269,10 @@ export async function revokeToken(token: string): Promise<void> {
   }
 }
 
+function escapeHtml(s: string): string {
+  return s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', '\'': '&#39;' }[c] as string))
+}
+
 function successHtml(): string {
   return `<!doctype html><html><head><meta charset="utf-8"><title>Capgo — signed in</title>
 <style>body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;max-width:480px;margin:80px auto;padding:0 20px;color:#222}h1{font-size:22px}p{color:#555;line-height:1.5}</style>
@@ -278,12 +282,67 @@ function successHtml(): string {
 }
 
 function errorHtml(message: string): string {
-  const escaped = message.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', '\'': '&#39;' }[c] as string))
   return `<!doctype html><html><head><meta charset="utf-8"><title>Capgo — sign-in failed</title>
 <style>body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;max-width:480px;margin:80px auto;padding:0 20px;color:#222}h1{font-size:22px;color:#b00020}pre{background:#f6f6f6;padding:12px;border-radius:6px;font-size:13px;overflow-x:auto}</style>
 </head><body><h1>Sign-in failed</h1>
 <p>You can close this tab and try again in the terminal.</p>
-<pre>${escaped}</pre></body></html>`
+<pre>${escapeHtml(message)}</pre></body></html>`
+}
+
+function scopeMissingHtml(missing: readonly string[]): string {
+  const items = missing.map(s => `<li><code>${escapeHtml(s)}</code></li>`).join('')
+  return `<!doctype html><html><head><meta charset="utf-8"><title>Capgo — missing permissions</title>
+<style>body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;max-width:520px;margin:80px auto;padding:0 20px;color:#222;line-height:1.55}h1{font-size:22px;color:#b85c00}p{color:#444}ul{background:#fff7e6;padding:14px 18px 14px 36px;border-radius:6px;border:1px solid #f0d59c}code{font-family:ui-monospace,Menlo,monospace;font-size:13px}</style>
+</head><body>
+<h1>⚠️ Some required permissions weren't granted</h1>
+<p>Capgo needs every permission it asks for in order to set up Play Store publishing. The following requested permissions were not approved on the consent screen:</p>
+<ul>${items}</ul>
+<p>Head back to your terminal — the CLI will offer to retry sign-in. When the consent screen appears again, please make sure every requested permission is checked before approving.</p>
+</body></html>`
+}
+
+/**
+ * Error thrown by runOAuthFlow when the user approves the consent screen but
+ * deselects one or more requested scopes. The CLI catches this specifically
+ * to route the user back to a "please grant all permissions" re-sign-in step
+ * instead of failing several phases later with confusing API errors.
+ */
+export class MissingScopesError extends Error {
+  readonly missing: readonly string[]
+  readonly granted: string
+
+  constructor(missing: readonly string[], granted: string) {
+    super(`User did not grant all required OAuth scopes. Missing: ${missing.join(', ')}`)
+    this.name = 'MissingScopesError'
+    this.missing = missing
+    this.granted = granted
+  }
+}
+
+/**
+ * Compare a space-separated `scope` string from a token response against the
+ * scopes the CLI requested. Returns the subset of requested scopes that the
+ * user did not grant.
+ *
+ * Google's tokeninfo response uses a space-separated, unordered list — the
+ * order in `requestedScopes` is not preserved. Empty strings are filtered out.
+ */
+export function findMissingScopes(grantedScope: string, requestedScopes: readonly string[]): string[] {
+  const granted = new Set(grantedScope.split(/\s+/).filter(s => s.length > 0))
+  return requestedScopes.filter(s => !granted.has(s))
+}
+
+export interface LoopbackCallbackResult {
+  /** Authorization code Google returned in the query string. */
+  code: string
+  /**
+   * Finishes the browser response with the given HTML. Call this AFTER doing
+   * the token exchange and scope validation so the user sees a result that
+   * reflects the post-exchange state (e.g. "missing permissions") rather than
+   * a generic "you can close this tab" page that's stale by the time it
+   * matters. Idempotent — second call is a no-op.
+   */
+  finishResponse: (html: string, statusCode?: number) => void
 }
 
 interface LoopbackServerHandle {
@@ -291,8 +350,8 @@ interface LoopbackServerHandle {
   port: number
   /** Full redirect URI the caller should use when building the auth URL. */
   redirectUri: string
-  /** Resolves with the code once the browser redirects back; rejects on error, timeout, or abort. */
-  code: Promise<string>
+  /** Resolves with the code + a finishResponse callback. */
+  code: Promise<LoopbackCallbackResult>
   /** Force-close the server (safe to call after `code` settles). */
   close: () => void
 }
@@ -312,9 +371,9 @@ function startLoopbackServer(args: {
   signal?: AbortSignal
 }): Promise<LoopbackServerHandle> {
   return new Promise<LoopbackServerHandle>((resolveHandle, rejectHandle) => {
-    let codeResolve: (code: string) => void
+    let codeResolve: (result: LoopbackCallbackResult) => void
     let codeReject: (err: Error) => void
-    const codePromise = new Promise<string>((resolve, reject) => {
+    const codePromise = new Promise<LoopbackCallbackResult>((resolve, reject) => {
       codeResolve = resolve
       codeReject = reject
     })
@@ -354,10 +413,25 @@ function startLoopbackServer(args: {
           return
         }
 
-        res.setHeader('Content-Type', 'text/html; charset=utf-8')
-        res.statusCode = 200
-        res.end(successHtml())
-        codeResolve(code)
+        // Hold the response open until the CLI calls finishResponse() after
+        // token exchange + scope validation. This lets the browser show a
+        // result that reflects the post-exchange state ("missing permissions"
+        // vs "you're done") instead of a stale generic success page.
+        let finished = false
+        const finishResponse = (html: string, statusCode = 200) => {
+          if (finished)
+            return
+          finished = true
+          try {
+            res.setHeader('Content-Type', 'text/html; charset=utf-8')
+            res.statusCode = statusCode
+            res.end(html)
+          }
+          catch {
+            // Response already closed by the client — ignore.
+          }
+        }
+        codeResolve({ code, finishResponse })
       }
       catch (err) {
         res.statusCode = 500
@@ -461,16 +535,35 @@ export async function runOAuthFlow(
     }
     options.onStatus?.('Waiting for browser redirect...')
 
-    const code = await server.code
+    const { code, finishResponse } = await server.code
 
     options.onStatus?.('Exchanging code for tokens...')
-    const tokens = await exchangeAuthCode({
-      config,
-      code,
-      codeVerifier: pkce.verifier,
-      redirectUri: server.redirectUri,
-    })
+    let tokens: GoogleOAuthTokens
+    try {
+      tokens = await exchangeAuthCode({
+        config,
+        code,
+        codeVerifier: pkce.verifier,
+        redirectUri: server.redirectUri,
+      })
+    }
+    catch (err) {
+      finishResponse(errorHtml(err instanceof Error ? err.message : String(err)), 500)
+      throw err
+    }
 
+    // Scope validation — Google lets users deselect scopes on the consent
+    // screen, and grants whatever subset they approved. Detect that here so
+    // the user gets a clear "please grant all permissions" message in BOTH
+    // the browser tab and the CLI, instead of failing several API calls
+    // later with confusing 403s.
+    const missing = findMissingScopes(tokens.scope, config.scopes)
+    if (missing.length > 0) {
+      finishResponse(scopeMissingHtml(missing), 400)
+      throw new MissingScopesError(missing, tokens.scope)
+    }
+
+    finishResponse(successHtml())
     return tokens
   }
   finally {
