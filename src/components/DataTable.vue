@@ -172,7 +172,6 @@ function loadFromUrlParams() {
       newFilters[key] = filterParams.includes(key)
     })
     if (JSON.stringify(newFilters) !== JSON.stringify(props.filters)) {
-      console.log('update filters', newFilters, props.filters)
       emit('update:filters', newFilters)
     }
   }

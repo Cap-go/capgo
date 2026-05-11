@@ -489,7 +489,6 @@ async function reload() {
 }
 
 async function massDelete() {
-  console.log('massDelete')
   if (!canDeleteBundle.value) {
     toast.error(t('no-permission'))
     return
@@ -576,7 +575,6 @@ async function massDelete() {
 }
 
 function selectedElementsFilter(val: boolean[]) {
-  console.log('selectedElementsFilter', val)
   selectedElements.value = (elements.value as any).filter((_: any, i: number) => val[i])
 }
 

@@ -26,7 +26,6 @@ function findTab(key: string) {
 }
 
 watch(props, (p) => {
-  // console.log('activeTab', p.activeTab)
   const tab = findTab(p.activeTab)
   if (!tab || props.noRoute)
     return
@@ -42,7 +41,6 @@ watch(router.currentRoute, (p) => {
 })
 onMounted(() => {
   if (props.activeTab && props.activeTab !== router.currentRoute.value.path) {
-    console.log('activeTab', props.activeTab)
     openLink(props.activeTab)
   }
 })
