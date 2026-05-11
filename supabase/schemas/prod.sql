@@ -3087,7 +3087,7 @@ ALTER FUNCTION "public"."count_non_compliant_bundles"("org_id" "uuid", "required
 
 
 CREATE OR REPLACE FUNCTION "public"."create_hashed_apikey"("p_mode" "public"."key_mode" DEFAULT NULL::"public"."key_mode", "p_name" "text" DEFAULT ''::"text", "p_limited_to_orgs" "uuid"[] DEFAULT '{}'::"uuid"[], "p_limited_to_apps" "text"[] DEFAULT '{}'::"text"[], "p_expires_at" timestamp with time zone DEFAULT NULL::timestamp with time zone) RETURNS "public"."apikeys"
-    LANGUAGE "plpgsql"
+    LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
     AS $$
 DECLARE
@@ -22891,7 +22891,6 @@ ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT SELECT,INS
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLES TO "anon";
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLES TO "authenticated";
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLES TO "service_role";
-
 
 
 
