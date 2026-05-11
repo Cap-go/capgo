@@ -5,7 +5,7 @@ import type {
   NativeNotificationQueueMessage,
   NativeNotificationRegistryRow,
 } from './nativeNotifications.ts'
-import { getNotificationBucket, getNotificationIndex } from './nativeNotifications.ts'
+import { getNotificationBucket, getNotificationEventIndex, getNotificationIndex } from './nativeNotifications.ts'
 
 type NotificationEnv = Record<string, unknown>
 const MAX_NOTIFICATION_RETRY_ATTEMPTS = 3
@@ -402,7 +402,7 @@ function writeNotificationEvent(env: NotificationEnv, input: {
       input.device.platform,
     ],
     doubles: [Math.max(0, Math.trunc(input.badge ?? 0))],
-    indexes: [(`${input.appId}:${input.campaignId}`).slice(0, 96)],
+    indexes: [getNotificationEventIndex(input.appId, input.campaignId)],
   })
 }
 

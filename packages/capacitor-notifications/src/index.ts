@@ -54,6 +54,7 @@ interface RuntimeState {
   token?: CapgoNotificationToken
   installId?: string
   bridgeListenersReady: boolean
+  bridgeListenersPromise?: Promise<void>
   lastRegistration?: CapgoNotificationRegistration
   handledUpdateNotifications: Set<string>
   updater: Required<Pick<CapgoUpdaterIntegrationOptions, 'enabled'>> & {
@@ -339,23 +340,40 @@ async function maybeRunUpdateCheck(notification?: CapgoPushNotificationSchema) {
 async function ensureBridgeListeners() {
   if (state.bridgeListenersReady)
     return
-  state.bridgeListenersReady = true
-  await NativeCapgoNotifications.addListener('registration', (token) => {
-    state.token = token
-    if (state.externalId) {
-      void registerToken({
-        appId: state.config?.appId,
-        serverUrl: state.config?.serverUrl,
-        externalId: state.externalId,
-        identityProof: state.identityProof || '',
-        tags: state.tags,
-        attributes: state.attributes,
-        consent: state.consent,
-      }, token)
+  if (state.bridgeListenersPromise)
+    return state.bridgeListenersPromise
+
+  state.bridgeListenersPromise = (async () => {
+    const handles: PluginListenerHandle[] = []
+    try {
+      handles.push(await NativeCapgoNotifications.addListener('registration', (token) => {
+        state.token = token
+        if (state.externalId) {
+          void registerToken({
+            appId: state.config?.appId,
+            serverUrl: state.config?.serverUrl,
+            externalId: state.externalId,
+            identityProof: state.identityProof || '',
+            tags: state.tags,
+            attributes: state.attributes,
+            consent: state.consent,
+          }, token)
+        }
+      }))
+      handles.push(await NativeCapgoNotifications.addListener('notificationReceived', notification => void maybeRunUpdateCheck(notification)))
+      handles.push(await NativeCapgoNotifications.addListener('backgroundNotification', notification => void maybeRunUpdateCheck(notification)))
+      state.bridgeListenersReady = true
     }
-  })
-  await NativeCapgoNotifications.addListener('notificationReceived', notification => void maybeRunUpdateCheck(notification))
-  await NativeCapgoNotifications.addListener('backgroundNotification', notification => void maybeRunUpdateCheck(notification))
+    catch (error) {
+      await Promise.allSettled(handles.map(handle => handle.remove()))
+      throw error
+    }
+    finally {
+      state.bridgeListenersPromise = undefined
+    }
+  })()
+
+  return state.bridgeListenersPromise
 }
 
 async function getUpdater(): Promise<UpdaterPlugin | null> {

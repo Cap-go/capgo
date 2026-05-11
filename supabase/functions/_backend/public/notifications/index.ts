@@ -3,8 +3,7 @@ import type { MiddlewareKeyVariables } from '../../utils/hono.ts'
 import type { NativeNotificationEvent, NativeNotificationPlatform, NativeNotificationProvider, NativeNotificationProviderConfig, NativeNotificationRegisterInput, NativeNotificationRegistryRow } from '../../utils/nativeNotifications.ts'
 import type { Permission } from '../../utils/rbac.ts'
 import { sql } from 'drizzle-orm'
-import { Hono } from 'hono/tiny'
-import { BRES, parseBody, quickError, simpleError, simpleRateLimit, useCors } from '../../utils/hono.ts'
+import { BRES, createHono, parseBody, quickError, simpleError, simpleRateLimit, useCors } from '../../utils/hono.ts'
 import { middlewareV2 } from '../../utils/hono_middleware.ts'
 import {
   createNotificationEventProof,
@@ -22,8 +21,9 @@ import {
 import { closeClient, getDrizzleClient, getPgClient } from '../../utils/pg.ts'
 import { checkPermission } from '../../utils/rbac.ts'
 import { isLimited, isValidAppId } from '../../utils/utils.ts'
+import { version } from '../../utils/version.ts'
 
-export const app = new Hono<MiddlewareKeyVariables>()
+export const app = createHono('', version)
 
 app.use('*', useCors)
 
@@ -254,6 +254,24 @@ function publicDevice(row: NativeNotificationRegistryRow) {
   }
 }
 
+async function trackQueuedNotificationEvents(c: Context<MiddlewareKeyVariables>, params: {
+  appId: string
+  campaignId: string
+  devices: NativeNotificationRegistryRow[]
+  badge?: number
+}) {
+  await Promise.all(params.devices.map(device => trackNotificationEventCF(c, {
+    appId: params.appId,
+    campaignId: params.campaignId,
+    event: 'queued',
+    recipientKey: device.recipient_key,
+    deviceKey: device.device_key,
+    provider: device.provider,
+    platform: device.platform,
+    badge: params.badge,
+  })))
+}
+
 function publicNotificationSettings(row: Record<string, unknown> | undefined, appId: string) {
   return {
     appId,
@@ -471,16 +489,8 @@ app.post('/badge', middlewareV2(['write', 'all']), async (c) => {
     throw simpleError('missing_notification_provider', 'Missing configured notification provider')
   const campaignId = body.campaignId || crypto.randomUUID()
   const queued = await enqueueNativeNotification(c, { kind: 'badge', appId, campaignId, payload: {}, devices, badge, providerConfigs })
-  await Promise.all(devices.map(device => trackNotificationEventCF(c, {
-    appId,
-    campaignId,
-    event: 'queued',
-    recipientKey: device.recipient_key,
-    deviceKey: device.device_key,
-    provider: device.provider,
-    platform: device.platform,
-    badge,
-  })))
+  if (queued)
+    await trackQueuedNotificationEvents(c, { appId, campaignId, devices, badge })
   return c.json({ ...BRES, campaignId, queued, targeted: devices.length })
 })
 
@@ -524,15 +534,8 @@ app.post('/update-check', middlewareV2(['write', 'all']), async (c) => {
     },
   }
   const queued = await enqueueNativeNotification(c, { kind: 'update_check', appId, campaignId, payload, devices, providerConfigs })
-  await Promise.all(devices.map(device => trackNotificationEventCF(c, {
-    appId,
-    campaignId,
-    event: 'queued',
-    recipientKey: device.recipient_key,
-    deviceKey: device.device_key,
-    provider: device.provider,
-    platform: device.platform,
-  })))
+  if (queued)
+    await trackQueuedNotificationEvents(c, { appId, campaignId, devices })
   return c.json({ ...BRES, campaignId, queued, targeted: devices.length })
 })
 
@@ -547,15 +550,8 @@ app.post('/send', middlewareV2(['write', 'all']), async (c) => {
   if (!providerConfigs.length)
     throw simpleError('missing_notification_provider', 'Missing configured notification provider')
   const queued = await enqueueNativeNotification(c, { kind: 'send', appId, campaignId, payload, devices, providerConfigs })
-  await Promise.all(devices.map(device => trackNotificationEventCF(c, {
-    appId,
-    campaignId,
-    event: 'queued',
-    recipientKey: device.recipient_key,
-    deviceKey: device.device_key,
-    provider: device.provider,
-    platform: device.platform,
-  })))
+  if (queued)
+    await trackQueuedNotificationEvents(c, { appId, campaignId, devices })
   return c.json({ ...BRES, campaignId, queued, targeted: devices.length })
 })
 

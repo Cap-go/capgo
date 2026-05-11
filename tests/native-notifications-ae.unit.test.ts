@@ -6,6 +6,7 @@ import {
   createNotificationIdentityProof,
   getAllNotificationBuckets,
   getNotificationBucket,
+  getNotificationEventIndex,
   getNotificationIndex,
   verifyNotificationEventProof,
   verifyNotificationIdentityProof,
@@ -125,7 +126,25 @@ describe('native notification AE registry', () => {
 
     expect(query).toContain('FROM notification_events')
     expect(query).toContain("index1 = 'com.demo.app:campaign-1'")
+    expect(query).toContain("blob2 = 'campaign-1'")
     expect(query).toContain('GROUP BY blob1')
+  })
+
+  it.concurrent('normalizes notification event indexes consistently for long IDs', () => {
+    const appId = 'com.demo.'.concat('a'.repeat(120))
+    const campaignId = 'campaign-'.concat('b'.repeat(120))
+    const expectedIndex = `${appId}:${campaignId}`.slice(0, 96)
+    const query = buildNotificationStatsQuery({
+      dataset: 'notification_events',
+      appId,
+      campaignId,
+      days: 7,
+      now: new Date('2026-05-06T00:00:00Z'),
+    })
+
+    expect(getNotificationEventIndex(appId, campaignId)).toBe(expectedIndex)
+    expect(query).toContain(`index1 = '${expectedIndex}'`)
+    expect(query).toContain(`blob2 = '${campaignId}'`)
   })
 
   it.concurrent('verifies server-minted identity and event proofs', async () => {

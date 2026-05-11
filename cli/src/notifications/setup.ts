@@ -28,6 +28,9 @@ function getConfigAppId(config: Awaited<ReturnType<typeof getConfig>>) {
 }
 
 function renderNotificationHelper(appId: string, serverUrl: string) {
+  const appIdLiteral = JSON.stringify(appId)
+  const serverUrlLiteral = JSON.stringify(serverUrl)
+
   return `import { CapgoNotifications } from '@capgo/capacitor-notifications'
 
 export interface CapgoNotificationIdentity {
@@ -45,8 +48,8 @@ export async function setupCapgoNotifications(identity: CapgoNotificationIdentit
     throw new Error('Capgo notification identityProof is required')
 
   await CapgoNotifications.configure({
-    appId: '${appId}',
-    serverUrl: '${serverUrl}',
+    appId: ${appIdLiteral},
+    serverUrl: ${serverUrlLiteral},
   })
 
   return CapgoNotifications.register({

@@ -240,6 +240,10 @@ export function getNotificationIndex(appId: string, bucket: string): string {
   return `${appId}:${bucket}`
 }
 
+export function getNotificationEventIndex(appId: string, campaignId?: string): string {
+  return (campaignId ? `${appId}:${campaignId}` : appId).slice(0, 96)
+}
+
 export async function deriveNativeNotificationIdentity(
   c: Context,
   appId: string,
@@ -455,9 +459,9 @@ export function buildNotificationStatsQuery(params: {
 }) {
   const days = Math.min(Math.max(Math.trunc(params.days ?? 30), 1), 92)
   const since = new Date((params.now?.getTime() ?? Date.now()) - days * 24 * 60 * 60 * 1000)
-  const appIndex = escapeSqlString(params.appId)
+  const appIndex = escapeSqlString(getNotificationEventIndex(params.appId))
   const indexCondition = params.campaignId
-    ? `index1 = '${appIndex}:${escapeSqlString(params.campaignId)}'`
+    ? `index1 = '${escapeSqlString(getNotificationEventIndex(params.appId, params.campaignId))}' AND blob2 = '${escapeSqlString(params.campaignId)}'`
     : `(index1 = '${appIndex}' OR startsWith(index1, '${appIndex}:'))`
 
   return `SELECT blob1 AS event, count() AS count\n`
@@ -501,7 +505,7 @@ export async function trackNotificationEventCF(c: Context<MiddlewareKeyVariables
   if (!deviceKey && input.nativeInstallId)
     deviceKey = await deriveDeviceKey(c, input.appId, input.nativeInstallId)
 
-  const index = input.campaignId ? `${input.appId}:${input.campaignId}` : input.appId
+  const index = getNotificationEventIndex(input.appId, input.campaignId)
   c.env.NOTIFICATION_EVENTS.writeDataPoint({
     blobs: [
       input.event,
@@ -514,7 +518,7 @@ export async function trackNotificationEventCF(c: Context<MiddlewareKeyVariables
       input.platform ?? '',
     ],
     doubles: [Math.max(0, Math.trunc(input.badge ?? 0))],
-    indexes: [index.slice(0, 96)],
+    indexes: [index],
   })
 }
 
