@@ -65,7 +65,7 @@ SELECT
         ARRAY[
             'Allow delete for auth, api keys (write+)',
             'Allow insert for auth (write+)',
-            'Allow read for auth, api keys (read+)',
+            'Allow read for auth (read+)',
             'Allow update for auth, api keys (write+)',
             'Prevent non 2FA access'
         ],

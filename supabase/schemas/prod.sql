@@ -19079,7 +19079,7 @@ CREATE POLICY "Allow delete for auth (admin+) (all apikey)" ON "public"."channel
 
 
 
-CREATE POLICY "Allow delete for auth, api keys (write+)" ON "public"."channel_devices" FOR DELETE TO "anon", "authenticated" USING ("public"."check_min_rights"('write'::"public"."user_min_right", "public"."get_identity_org_appid"('{write,all}'::"public"."key_mode"[], "owner_org", "app_id"), "owner_org", "app_id", NULL::bigint));
+CREATE POLICY "Allow delete for auth, api keys (write+)" ON "public"."channel_devices" FOR DELETE TO "anon", "authenticated" USING ("public"."rbac_check_permission_request"("public"."rbac_perm_channel_manage_forced_devices"(), "owner_org", "app_id", "channel_id"));
 
 
 
@@ -19099,7 +19099,7 @@ CREATE POLICY "Allow insert for apikey (write,all) (admin+)" ON "public"."apps" 
 
 
 
-CREATE POLICY "Allow insert for auth (write+)" ON "public"."channel_devices" FOR INSERT TO "authenticated" WITH CHECK ("public"."check_min_rights"('write'::"public"."user_min_right", "public"."get_identity"(), "owner_org", "app_id", NULL::bigint));
+CREATE POLICY "Allow insert for auth (write+)" ON "public"."channel_devices" FOR INSERT TO "authenticated" WITH CHECK ("public"."rbac_check_permission_request"("public"."rbac_perm_channel_manage_forced_devices"(), "owner_org", "app_id", "channel_id"));
 
 
 
@@ -19231,7 +19231,7 @@ CREATE POLICY "Allow read for auth (read+)" ON "public"."app_versions_meta" FOR 
 
 
 
-CREATE POLICY "Allow read for auth (read+)" ON "public"."channel_devices" FOR SELECT TO "anon", "authenticated" USING ("public"."check_min_rights"('read'::"public"."user_min_right", "public"."get_identity_org_appid"('{read,upload,write,all}'::"public"."key_mode"[], "owner_org", "app_id"), "owner_org", "app_id", NULL::bigint));
+CREATE POLICY "Allow read for auth (read+)" ON "public"."channel_devices" FOR SELECT TO "anon", "authenticated" USING ("public"."rbac_check_permission_request"("public"."rbac_perm_channel_read_forced_devices"(), "owner_org", "app_id", "channel_id"));
 
 
 
@@ -19313,7 +19313,7 @@ CREATE POLICY "Allow update for auth (write+)" ON "public"."app_versions" FOR UP
 
 
 
-CREATE POLICY "Allow update for auth, api keys (write+)" ON "public"."channel_devices" FOR UPDATE TO "anon", "authenticated" USING ("public"."check_min_rights"('write'::"public"."user_min_right", "public"."get_identity_org_appid"('{write,all}'::"public"."key_mode"[], "owner_org", "app_id"), "owner_org", "app_id", NULL::bigint)) WITH CHECK ("public"."check_min_rights"('write'::"public"."user_min_right", "public"."get_identity_org_appid"('{write,all}'::"public"."key_mode"[], "owner_org", "app_id"), "owner_org", "app_id", NULL::bigint));
+CREATE POLICY "Allow update for auth, api keys (write+)" ON "public"."channel_devices" FOR UPDATE TO "anon", "authenticated" USING ("public"."rbac_check_permission_request"("public"."rbac_perm_channel_manage_forced_devices"(), "owner_org", "app_id", "channel_id")) WITH CHECK ("public"."rbac_check_permission_request"("public"."rbac_perm_channel_manage_forced_devices"(), "owner_org", "app_id", "channel_id"));
 
 
 
@@ -19553,6 +19553,22 @@ ALTER TABLE "public"."channel_devices" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."channel_permission_overrides" ENABLE ROW LEVEL SECURITY;
+
+
+COMMENT ON POLICY "Allow delete for auth, api keys (write+)" ON "public"."channel_devices" IS 'Direct channel_devices deletes require channel.manage_forced_devices for the target channel.';
+
+
+
+COMMENT ON POLICY "Allow insert for auth (write+)" ON "public"."channel_devices" IS 'Direct channel_devices inserts require channel.manage_forced_devices for the target channel.';
+
+
+
+COMMENT ON POLICY "Allow read for auth (read+)" ON "public"."channel_devices" IS 'Direct channel_devices reads require channel.read_forced_devices for the target channel.';
+
+
+
+COMMENT ON POLICY "Allow update for auth, api keys (write+)" ON "public"."channel_devices" IS 'Direct channel_devices updates require channel.manage_forced_devices for both old and new target channels.';
+
 
 
 CREATE POLICY "channel_permission_overrides_admin_delete" ON "public"."channel_permission_overrides" FOR DELETE TO "authenticated" USING ((EXISTS ( SELECT 1
@@ -22891,8 +22907,6 @@ ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT SELECT,INS
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLES TO "anon";
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLES TO "authenticated";
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLES TO "service_role";
-
-
 
 
 
