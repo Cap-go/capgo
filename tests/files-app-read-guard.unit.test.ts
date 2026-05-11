@@ -149,6 +149,47 @@ describe('files app-scoped read guard', () => {
     expect(bucketPut).not.toHaveBeenCalled()
   })
 
+  it('returns 404 for soft-deleted manifest asset paths before serving cached content', async () => {
+    getAppByAppIdPgMock.mockResolvedValue({ app_id: 'test-app', owner_org: 'test-org' })
+    pgClientMock.query.mockResolvedValue({ rows: [{ id: 123 }] })
+
+    const bucketPut = vi.fn()
+    globalThis.caches = {
+      default: {
+        match: async () => new Response('cached deleted manifest bytes', {
+          headers: {
+            'content-type': 'text/javascript',
+          },
+        }),
+        put: async () => { },
+      },
+    } as any
+
+    const { app: files } = await import('../supabase/functions/_backend/files/files.ts')
+    const { createAllCatch, createHono } = await import('../supabase/functions/_backend/utils/hono.ts')
+    const { version } = await import('../supabase/functions/_backend/utils/version.ts')
+
+    const appGlobal = createHono('files', version)
+    appGlobal.route('/', files)
+    createAllCatch(appGlobal, 'files')
+
+    const filePath = 'orgs/test-org/apps/test-app/assets/main.js'
+    const response = await appGlobal.fetch(
+      new Request(new URL(filePath, 'http://localhost/read/attachments/')),
+      {
+        ATTACHMENT_BUCKET: { put: bucketPut },
+      },
+      { waitUntil: () => { } } as any,
+    )
+
+    expect(response.status).toBe(404)
+    expect(pgClientMock.query).toHaveBeenCalledWith(
+      expect.stringContaining('unnest(manifest)'),
+      ['test-org', 'test-app', filePath],
+    )
+    expect(bucketPut).not.toHaveBeenCalled()
+  })
+
   it('serves cached content for non-deleted bundle paths', async () => {
     getAppByAppIdPgMock.mockResolvedValue({ app_id: 'test-app', owner_org: 'test-org' })
     pgClientMock.query.mockResolvedValue({ rows: [] })

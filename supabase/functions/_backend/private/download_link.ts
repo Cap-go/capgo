@@ -44,6 +44,7 @@ app.post('/', middlewareAuth, async (c) => {
     .select('*, owner_org ( created_by )')
     .eq('app_id', body.app_id)
     .eq('id', body.id)
+    .eq('deleted', false)
     .single()
 
   const ownerOrg = bundle?.owner_org.created_by

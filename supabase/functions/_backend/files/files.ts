@@ -363,8 +363,15 @@ async function assertReadableAppScopedAttachment(c: Context, fileId: unknown): P
         FROM public.app_versions
         WHERE owner_org = $1
           AND app_id = $2
-          AND r2_path = $3
-          AND COALESCE(deleted, false) = true
+          AND deleted = true
+          AND (
+            r2_path = $3
+            OR EXISTS (
+              SELECT 1
+              FROM unnest(manifest) AS manifest_entry
+              WHERE manifest_entry.s3_path = $3
+            )
+          )
         LIMIT 1
       `,
       [scopedPath.owner_org, scopedPath.app_id, fileId],
