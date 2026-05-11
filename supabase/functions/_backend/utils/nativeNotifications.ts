@@ -12,6 +12,8 @@ const DEFAULT_NOTIFICATION_EVENTS_DATASET = 'notification_events'
 const MAX_TAGS = 32
 const MAX_TAG_LENGTH = 64
 const MAX_ATTRIBUTES_BLOB_LENGTH = 2048
+const IDENTITY_PROOF_PREFIX = 'identity-proof:v1'
+const EVENT_PROOF_PREFIX = 'event-proof:v1'
 
 const textEncoder = new TextEncoder()
 
@@ -263,6 +265,32 @@ export async function deriveRecipientKey(c: Context, appId: string, externalId: 
 
 export async function deriveDeviceKey(c: Context, appId: string, nativeInstallId: string): Promise<string> {
   return hmacHex(getNotificationHashSecret(c), `device:${appId}:${nativeInstallId}`)
+}
+
+function secureCompare(left: string, right: string): boolean {
+  if (!left || !right)
+    return false
+  let diff = left.length ^ right.length
+  const length = Math.max(left.length, right.length)
+  for (let index = 0; index < length; index++)
+    diff |= (left.codePointAt(index % left.length) ?? 0) ^ (right.codePointAt(index % right.length) ?? 0)
+  return diff === 0
+}
+
+export async function createNotificationIdentityProof(c: Context, appId: string, externalId: string): Promise<string> {
+  return hmacHex(getNotificationHashSecret(c), `${IDENTITY_PROOF_PREFIX}:${appId}:${externalId}`)
+}
+
+export async function verifyNotificationIdentityProof(c: Context, appId: string, externalId: string, proof: string): Promise<boolean> {
+  return secureCompare(proof, await createNotificationIdentityProof(c, appId, externalId))
+}
+
+export async function createNotificationEventProof(c: Context, appId: string, recipientKey: string, deviceKey: string): Promise<string> {
+  return hmacHex(getNotificationHashSecret(c), `${EVENT_PROOF_PREFIX}:${appId}:${recipientKey}:${deviceKey}`)
+}
+
+export async function verifyNotificationEventProof(c: Context, appId: string, recipientKey: string, deviceKey: string, proof: string): Promise<boolean> {
+  return secureCompare(proof, await createNotificationEventProof(c, appId, recipientKey, deviceKey))
 }
 
 export async function encryptNotificationToken(c: Context, token: string): Promise<string> {

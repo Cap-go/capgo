@@ -46,6 +46,7 @@ interface UpdaterPlugin {
 interface RuntimeState {
   config?: CapgoNotificationsConfig
   externalId?: string
+  identityProof?: string
   tags: string[]
   attributes: Record<string, unknown>
   consent: boolean
@@ -252,6 +253,9 @@ async function registerToken(options: CapgoNotificationRegisterOptions, token: C
   const permission = await getPermissionState()
   const appId = getAppId(options)
   const serverUrl = getServerUrl(options)
+  const identityProof = options.identityProof || state.identityProof
+  if (!identityProof)
+    throw new Error('Capgo notification identityProof is required')
 
   const response = await postJson(serverUrl, '/notifications/register', {
     appId,
@@ -264,6 +268,7 @@ async function registerToken(options: CapgoNotificationRegisterOptions, token: C
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || '',
     appVersion: options.appVersion || appInfo.version || '',
     pluginVersion: PLUGIN_VERSION,
+    identityProof,
     tags: options.tags ?? state.tags,
     attributes: options.attributes ?? state.attributes,
     permission,
@@ -280,6 +285,7 @@ async function registerToken(options: CapgoNotificationRegisterOptions, token: C
     provider: getProvider(platform),
     platform,
     permission,
+    eventProof: String(response.eventProof),
   }
   state.lastRegistration = registration
   return registration
@@ -297,6 +303,7 @@ async function trackEvent(event: 'received' | 'opened' | 'background_started' | 
     externalId: input?.externalId || state.externalId,
     recipientKey: input?.recipientKey || state.lastRegistration?.recipientKey,
     deviceKey: input?.deviceKey || state.lastRegistration?.deviceKey,
+    eventProof: input?.eventProof || state.lastRegistration?.eventProof,
     provider: input?.provider || getProvider(platform),
     platform: input?.platform || platform,
     campaignId: input?.campaignId,
@@ -340,6 +347,7 @@ async function ensureBridgeListeners() {
         appId: state.config?.appId,
         serverUrl: state.config?.serverUrl,
         externalId: state.externalId,
+        identityProof: state.identityProof || '',
         tags: state.tags,
         attributes: state.attributes,
         consent: state.consent,
@@ -369,6 +377,7 @@ export const CapgoNotifications: CapgoNotificationsPlugin = {
 
   async register(options) {
     state.externalId = options.externalId
+    state.identityProof = options.identityProof
     state.tags = options.tags ?? state.tags
     state.attributes = options.attributes ?? state.attributes
     state.consent = options.consent ?? state.consent
@@ -384,30 +393,31 @@ export const CapgoNotifications: CapgoNotificationsPlugin = {
     return registerToken(options, token)
   },
 
-  async setExternalId(externalId) {
+  async setExternalId(externalId, identityProof) {
     state.externalId = externalId
+    state.identityProof = identityProof ?? state.identityProof
     if (state.token)
-      await registerToken({ externalId, tags: state.tags, attributes: state.attributes, consent: state.consent }, state.token)
+      await registerToken({ externalId, identityProof: state.identityProof || '', tags: state.tags, attributes: state.attributes, consent: state.consent }, state.token)
   },
 
   async setTags(tags) {
     state.tags = tags
     if (state.token && state.externalId)
-      await registerToken({ externalId: state.externalId, tags, attributes: state.attributes, consent: state.consent }, state.token)
+      await registerToken({ externalId: state.externalId, identityProof: state.identityProof || '', tags, attributes: state.attributes, consent: state.consent }, state.token)
   },
 
   async setBadge(count) {
     state.badge = Math.max(0, Math.trunc(count))
     await NativeCapgoNotifications.setBadge({ count: state.badge })
     if (state.token && state.externalId)
-      await registerToken({ externalId: state.externalId, tags: state.tags, attributes: state.attributes, consent: state.consent }, state.token)
+      await registerToken({ externalId: state.externalId, identityProof: state.identityProof || '', tags: state.tags, attributes: state.attributes, consent: state.consent }, state.token)
   },
 
   async clearBadge() {
     state.badge = 0
     await NativeCapgoNotifications.clearBadge()
     if (state.token && state.externalId)
-      await registerToken({ externalId: state.externalId, tags: state.tags, attributes: state.attributes, consent: state.consent }, state.token)
+      await registerToken({ externalId: state.externalId, identityProof: state.identityProof || '', tags: state.tags, attributes: state.attributes, consent: state.consent }, state.token)
   },
 
   async incrementBadge(by = 1) {

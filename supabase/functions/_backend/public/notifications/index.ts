@@ -7,6 +7,8 @@ import { Hono } from 'hono/tiny'
 import { BRES, parseBody, quickError, simpleError, simpleRateLimit, useCors } from '../../utils/hono.ts'
 import { middlewareV2 } from '../../utils/hono_middleware.ts'
 import {
+  createNotificationEventProof,
+  createNotificationIdentityProof,
   deriveRecipientKey,
   enqueueNativeNotification,
   getAllNotificationBuckets,
@@ -14,6 +16,8 @@ import {
   readNotificationStatsCF,
   trackNotificationEventCF,
   trackNotificationRegistrationCF,
+  verifyNotificationEventProof,
+  verifyNotificationIdentityProof,
 } from '../../utils/nativeNotifications.ts'
 import { closeClient, getDrizzleClient, getPgClient } from '../../utils/pg.ts'
 import { checkPermission } from '../../utils/rbac.ts'
@@ -56,6 +60,7 @@ interface RegisterBody {
   badge?: number
   active?: boolean
   consent?: boolean
+  identityProof: string
 }
 
 interface EventBody {
@@ -71,6 +76,12 @@ interface EventBody {
   platform?: NativeNotificationPlatform
   error?: string
   badge?: number
+  eventProof: string
+}
+
+interface RecipientProofBody {
+  appId: string
+  externalId: string
 }
 
 interface CampaignBody {
@@ -354,6 +365,9 @@ app.post('/register', async (c) => {
   const externalId = assertString(body.externalId, 'externalId', 512)
   const nativeInstallId = assertString(body.nativeInstallId, 'nativeInstallId', 512)
   const pushToken = assertString(body.pushToken, 'pushToken', 4096)
+  const identityProof = assertString(body.identityProof, 'identityProof', 256)
+  if (!(await verifyNotificationIdentityProof(c, appId, externalId, identityProof)))
+    throw quickError(401, 'invalid_notification_identity_proof', 'Invalid notification identity proof', { appId })
   if (!NOTIFICATION_PROVIDERS.has(body.provider))
     throw simpleError('invalid_provider', 'Invalid notification provider')
   if (!NOTIFICATION_PLATFORMS.has(body.platform))
@@ -377,7 +391,9 @@ app.post('/register', async (c) => {
     badge: body.badge,
   })
 
-  return c.json({ ...BRES, recipientKey: identity.recipientKey, deviceKey: identity.deviceKey, bucket: identity.bucket })
+  const eventProof = await createNotificationEventProof(c, appId, identity.recipientKey, identity.deviceKey)
+
+  return c.json({ ...BRES, recipientKey: identity.recipientKey, deviceKey: identity.deviceKey, bucket: identity.bucket, eventProof })
 })
 
 app.post('/events', async (c) => {
@@ -392,8 +408,32 @@ app.post('/events', async (c) => {
     throw simpleError('invalid_provider', 'Invalid notification provider')
   if (body.platform && !NOTIFICATION_PLATFORMS.has(body.platform))
     throw simpleError('invalid_platform', 'Invalid notification platform')
-  await trackNotificationEventCF(c, { ...body, appId })
+  const recipientKey = assertString(body.recipientKey, 'recipientKey', 128)
+  const deviceKey = assertString(body.deviceKey, 'deviceKey', 128)
+  const eventProof = assertString(body.eventProof, 'eventProof', 256)
+  if (!(await verifyNotificationEventProof(c, appId, recipientKey, deviceKey, eventProof)))
+    throw quickError(401, 'invalid_notification_event_proof', 'Invalid notification event proof', { appId })
+  await trackNotificationEventCF(c, {
+    appId,
+    event: body.event,
+    campaignId: body.campaignId,
+    notificationId: body.notificationId,
+    recipientKey,
+    deviceKey,
+    provider: body.provider,
+    platform: body.platform,
+    error: body.error,
+    badge: body.badge,
+  })
   return c.json(BRES)
+})
+
+app.post('/recipients/proof', middlewareV2(['write', 'all']), async (c) => {
+  const body = await parseBody<RecipientProofBody>(c)
+  const appId = assertString(body.appId, 'appId', 128)
+  const externalId = assertString(body.externalId, 'externalId', 512)
+  await assertAppPermission(c, 'app.manage_devices', appId)
+  return c.json({ identityProof: await createNotificationIdentityProof(c, appId, externalId) })
 })
 
 app.post('/recipients/lookup', middlewareV2(['read', 'write', 'all']), async (c) => {
@@ -458,16 +498,19 @@ app.post('/update-check', middlewareV2(['write', 'all']), async (c) => {
   const providerConfigs = await getNotificationProviderConfigs(c, appId)
   if (!providerConfigs.length)
     throw simpleError('missing_notification_provider', 'Missing configured notification provider')
-  const campaignRecord = await createCampaignRecord(c, {
-    appId,
-    name: 'Push update check',
-    kind: 'update_check',
-    status: 'queued',
-    audience: target,
-    payload: { installMode, channel, silent: true, background: true },
-    scheduledAt: null,
-  })
-  const campaignId = body.campaignId || String((campaignRecord as unknown as CampaignRecordRow).id)
+  let campaignId = body.campaignId
+  if (!campaignId) {
+    const campaignRecord = await createCampaignRecord(c, {
+      appId,
+      name: 'Push update check',
+      kind: 'update_check',
+      status: 'queued',
+      audience: target,
+      payload: { installMode, channel, silent: true, background: true },
+      scheduledAt: null,
+    })
+    campaignId = String((campaignRecord as unknown as CampaignRecordRow).id)
+  }
   const payload = {
     silent: true,
     background: true,

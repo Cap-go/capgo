@@ -249,12 +249,20 @@ public class CapgoNotificationsPlugin extends Plugin {
     @PluginMethod
     public void removeDeliveredNotifications(PluginCall call) {
         JSArray notifications = call.getArray("notifications");
+        if (notifications == null) {
+            call.reject("notifications is required");
+            return;
+        }
         try {
             for (Object item : notifications.toList()) {
                 if (item instanceof JSONObject) {
                     JSObject notif = JSObject.fromJSONObject((JSONObject) item);
                     String tag = notif.getString("tag");
                     Integer id = notif.getInteger("id");
+                    if (id == null) {
+                        call.reject("notification id is required");
+                        return;
+                    }
                     if (tag == null) {
                         notificationManager.cancel(id);
                     } else {

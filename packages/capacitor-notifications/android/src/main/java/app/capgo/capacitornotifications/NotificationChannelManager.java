@@ -121,6 +121,10 @@ public class NotificationChannelManager {
     public void deleteChannel(PluginCall call) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             String channelId = call.getString("id");
+            if (channelId == null) {
+                call.reject("Channel id is required");
+                return;
+            }
             notificationManager.deleteNotificationChannel(channelId);
             call.resolve();
         } else {

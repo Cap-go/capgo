@@ -39,6 +39,7 @@ await CapgoNotifications.configure({
 
 await CapgoNotifications.register({
   externalId: 'customer-user-123',
+  identityProof: '<server-minted-proof>',
   tags: ['paid'],
   attributes: { plan: 'team' },
   consent: true,
@@ -52,6 +53,8 @@ CapgoNotifications.addListener('notificationOpened', (event) => {
   console.log('Opened', event)
 })
 ```
+
+Mint `identityProof` from your backend with `POST /notifications/recipients/proof` using your Capgo API key, then pass it to the app after your own user authentication succeeds.
 
 ## Silent Update Checks
 

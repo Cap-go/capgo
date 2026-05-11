@@ -32,6 +32,7 @@ function renderNotificationHelper(appId: string, serverUrl: string) {
 
 export interface CapgoNotificationIdentity {
   externalId: string
+  identityProof: string
   tags?: string[]
   attributes?: Record<string, unknown>
   consent?: boolean
@@ -40,6 +41,8 @@ export interface CapgoNotificationIdentity {
 export async function setupCapgoNotifications(identity: CapgoNotificationIdentity) {
   if (!identity.externalId)
     return
+  if (!identity.identityProof)
+    throw new Error('Capgo notification identityProof is required')
 
   await CapgoNotifications.configure({
     appId: '${appId}',
@@ -48,6 +51,7 @@ export async function setupCapgoNotifications(identity: CapgoNotificationIdentit
 
   return CapgoNotifications.register({
     externalId: identity.externalId,
+    identityProof: identity.identityProof,
     tags: identity.tags ?? [],
     attributes: identity.attributes ?? {},
     consent: identity.consent ?? true,

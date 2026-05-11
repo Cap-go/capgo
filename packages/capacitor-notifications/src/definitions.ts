@@ -19,6 +19,7 @@ export interface CapgoNotificationRegisterOptions {
   appId?: string
   serverUrl?: string
   externalId: string
+  identityProof: string
   tags?: string[]
   attributes?: Record<string, unknown>
   consent?: boolean
@@ -33,6 +34,7 @@ export interface CapgoNotificationRegistration {
   provider: CapgoNotificationProvider
   platform: CapgoNotificationPlatform
   permission: CapgoNotificationPermission
+  eventProof: string
 }
 
 export interface CapgoNotificationEvent {
@@ -43,6 +45,7 @@ export interface CapgoNotificationEvent {
   nativeInstallId?: string
   recipientKey?: string
   deviceKey?: string
+  eventProof?: string
   provider?: CapgoNotificationProvider
   platform?: CapgoNotificationPlatform
   error?: string
@@ -165,7 +168,7 @@ export interface CapgoNotificationsNativePlugin {
 export interface CapgoNotificationsPlugin {
   configure: (config: CapgoNotificationsConfig) => Promise<void>
   register: (options: CapgoNotificationRegisterOptions) => Promise<CapgoNotificationRegistration>
-  setExternalId: (externalId: string) => Promise<void>
+  setExternalId: (externalId: string, identityProof?: string) => Promise<void>
   setTags: (tags: string[]) => Promise<void>
   setBadge: (count: number) => Promise<void>
   clearBadge: () => Promise<void>

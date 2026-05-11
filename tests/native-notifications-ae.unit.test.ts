@@ -1,10 +1,14 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterAll, describe, expect, it, vi } from 'vitest'
 import {
   buildNotificationRegistryLookupQuery,
   buildNotificationStatsQuery,
+  createNotificationEventProof,
+  createNotificationIdentityProof,
   getAllNotificationBuckets,
   getNotificationBucket,
   getNotificationIndex,
+  verifyNotificationEventProof,
+  verifyNotificationIdentityProof,
 } from '../supabase/functions/_backend/utils/nativeNotifications'
 import { processNativeNotificationQueueMessage } from '../supabase/functions/_backend/utils/nativeNotificationSender'
 
@@ -13,9 +17,9 @@ const textEncoder = new TextEncoder()
 function toBase64Url(bytes: Uint8Array): string {
   let binary = ''
   bytes.forEach((byte) => {
-    binary += String.fromCharCode(byte)
+    binary += String.fromCodePoint(byte)
   })
-  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '')
+  return btoa(binary).replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/g, '')
 }
 
 async function encryptToken(secret: string, token: string) {
@@ -48,8 +52,46 @@ function fcmDevice(encryptedToken: string) {
   }
 }
 
+const fetchRequests = new Map<string, any[]>()
+const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (_url, init) => {
+  const requestBody = JSON.parse(String(init?.body || '{}'))
+  const token = typeof requestBody?.message?.token === 'string' ? requestBody.message.token : ''
+  if (token) {
+    const requests = fetchRequests.get(token) ?? []
+    requests.push(requestBody)
+    fetchRequests.set(token, requests)
+  }
+
+  if (token === 'push-token-invalid')
+    return new Response(JSON.stringify({ error: { status: 'UNREGISTERED', message: 'Token is gone' } }), { status: 404 })
+  if (token === 'push-token-invalid-payload') {
+    return new Response(JSON.stringify({
+      error: {
+        status: 'INVALID_ARGUMENT',
+        message: 'Invalid payload',
+        details: [{
+          '@type': 'type.googleapis.com/google.rpc.BadRequest',
+          fieldViolations: [{ field: 'message.notification.title' }],
+        }],
+      },
+    }), { status: 400 })
+  }
+  if (token === 'push-token-transient')
+    return new Response(JSON.stringify({ error: { status: 'UNAVAILABLE', message: 'Try later' } }), { status: 503 })
+
+  return new Response(JSON.stringify({ name: 'projects/demo/messages/1' }), { status: 200 })
+})
+
+afterAll(() => {
+  fetchMock.mockRestore()
+})
+
+function requestsFor(token: string) {
+  return fetchRequests.get(token) ?? []
+}
+
 describe('native notification AE registry', () => {
-  it('uses deterministic app bucket indexes and argMax latest-device lookup', () => {
+  it.concurrent('uses deterministic app bucket indexes and argMax latest-device lookup', () => {
     expect(getNotificationBucket('ff00')).toBe('ff')
     expect(getNotificationBucket('not-hex')).toBe('e0')
     expect(getAllNotificationBuckets()).toHaveLength(256)
@@ -72,7 +114,7 @@ describe('native notification AE registry', () => {
     expect(query).toContain("recipient_key = 'recipient-key'")
   })
 
-  it('builds notification event stats from AE only', () => {
+  it.concurrent('builds notification event stats from AE only', () => {
     const query = buildNotificationStatsQuery({
       dataset: 'notification_events',
       appId: 'com.demo.app',
@@ -85,16 +127,28 @@ describe('native notification AE registry', () => {
     expect(query).toContain("index1 = 'com.demo.app:campaign-1'")
     expect(query).toContain('GROUP BY blob1')
   })
+
+  it.concurrent('verifies server-minted identity and event proofs', async () => {
+    vi.stubEnv('NOTIFICATIONS_HMAC_SECRET', 'secret')
+    try {
+      const context = {} as any
+      const identityProof = await createNotificationIdentityProof(context, 'com.demo.app', 'user-1')
+      const eventProof = await createNotificationEventProof(context, 'com.demo.app', 'recipient-key', 'device-key')
+
+      expect(await verifyNotificationIdentityProof(context, 'com.demo.app', 'user-1', identityProof)).toBe(true)
+      expect(await verifyNotificationIdentityProof(context, 'com.demo.app', 'user-2', identityProof)).toBe(false)
+      expect(await verifyNotificationEventProof(context, 'com.demo.app', 'recipient-key', 'device-key', eventProof)).toBe(true)
+      expect(await verifyNotificationEventProof(context, 'com.demo.app', 'recipient-key', 'other-device', eventProof)).toBe(false)
+    }
+    finally {
+      vi.unstubAllEnvs()
+    }
+  })
 })
 describe('native notification queue sender', () => {
-  it('builds silent update-check payloads for Capgo updater', async () => {
-    const requests: any[] = []
-    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (_url, init) => {
-      requests.push(JSON.parse(String(init?.body || '{}')))
-      return new Response(JSON.stringify({ name: 'projects/demo/messages/1' }), { status: 200 })
-    })
-
-    const encryptedToken = await encryptToken('secret', 'push-token')
+  it.concurrent('builds silent update-check payloads for Capgo updater', async () => {
+    const token = 'push-token-update'
+    const encryptedToken = await encryptToken('secret', token)
     const retryDevices = await processNativeNotificationQueueMessage({
       kind: 'update_check',
       appId: 'com.demo.app',
@@ -114,22 +168,19 @@ describe('native notification queue sender', () => {
     })
 
     expect(retryDevices).toHaveLength(0)
+    const requests = requestsFor(token)
     expect(requests[0].message.notification).toBeUndefined()
     expect(requests[0].message.data.capgoAction).toBe('update_check')
     expect(requests[0].message.data.capgoUpdateInstallMode).toBe('next')
     expect(requests[0].message.android.priority).toBe('high')
     expect(requests[0].message.apns.payload.aps['content-available']).toBe(1)
-    fetchMock.mockRestore()
   })
 
-  it('tombstones invalid FCM tokens in AE without a DB write', async () => {
+  it.concurrent('tombstones invalid FCM tokens in AE without a DB write', async () => {
     const events: any[] = []
     const registry: any[] = []
-    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async () => {
-      return new Response(JSON.stringify({ error: { status: 'UNREGISTERED', message: 'Token is gone' } }), { status: 404 })
-    })
 
-    const encryptedToken = await encryptToken('secret', 'push-token')
+    const encryptedToken = await encryptToken('secret', 'push-token-invalid')
     const retryDevices = await processNativeNotificationQueueMessage({
       kind: 'send',
       appId: 'com.demo.app',
@@ -154,25 +205,12 @@ describe('native notification queue sender', () => {
     expect(registry).toHaveLength(1)
     expect(registry[0].doubles[0]).toBe(0)
     expect(registry[0].indexes[0]).toBe('com.demo.app:aa')
-    fetchMock.mockRestore()
   })
 
-  it('does not tombstone non-token FCM invalid argument errors', async () => {
+  it.concurrent('does not tombstone non-token FCM invalid argument errors', async () => {
     const registry: any[] = []
-    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async () => {
-      return new Response(JSON.stringify({
-        error: {
-          status: 'INVALID_ARGUMENT',
-          message: 'Invalid payload',
-          details: [{
-            '@type': 'type.googleapis.com/google.rpc.BadRequest',
-            fieldViolations: [{ field: 'message.notification.title' }],
-          }],
-        },
-      }), { status: 400 })
-    })
 
-    const encryptedToken = await encryptToken('secret', 'push-token')
+    const encryptedToken = await encryptToken('secret', 'push-token-invalid-payload')
     const retryDevices = await processNativeNotificationQueueMessage({
       kind: 'send',
       appId: 'com.demo.app',
@@ -194,11 +232,10 @@ describe('native notification queue sender', () => {
 
     expect(retryDevices).toHaveLength(0)
     expect(registry).toHaveLength(0)
-    fetchMock.mockRestore()
   })
 
-  it('does not retry permanent or exhausted notification send failures', async () => {
-    const encryptedToken = await encryptToken('wrong-secret', 'push-token')
+  it.concurrent('does not retry permanent or exhausted notification send failures', async () => {
+    const encryptedToken = await encryptToken('wrong-secret', 'push-token-permanent')
     const permanentRetryDevices = await processNativeNotificationQueueMessage({
       kind: 'send',
       appId: 'com.demo.app',
@@ -217,9 +254,6 @@ describe('native notification queue sender', () => {
       NOTIFICATION_EVENTS: { writeDataPoint: () => undefined },
     })
 
-    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async () => {
-      return new Response(JSON.stringify({ error: { status: 'UNAVAILABLE', message: 'Try later' } }), { status: 503 })
-    })
     const exhaustedRetryDevices = await processNativeNotificationQueueMessage({
       kind: 'send',
       appId: 'com.demo.app',
@@ -232,7 +266,7 @@ describe('native notification queue sender', () => {
         secretRef: 'FCM_SECRET',
         config: { projectId: 'demo-project' },
       }],
-      devices: [await encryptToken('secret', 'push-token').then(fcmDevice)],
+      devices: [await encryptToken('secret', 'push-token-transient').then(fcmDevice)],
     }, {
       API_SECRET: 'secret',
       FCM_SECRET: JSON.stringify({ access_token: 'token', project_id: 'demo-project' }),
@@ -241,6 +275,5 @@ describe('native notification queue sender', () => {
 
     expect(permanentRetryDevices).toHaveLength(0)
     expect(exhaustedRetryDevices).toHaveLength(0)
-    fetchMock.mockRestore()
   })
 })
