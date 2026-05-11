@@ -135,6 +135,7 @@ COMMENT ON FUNCTION "public"."webhook_allowed_org_ids" ("min_right" "public"."us
 'Returns org IDs whose webhook rows are accessible to the current authenticated user or Capgo API key. It evaluates candidate orgs from legacy/RBAC bindings once per statement, applies webhook-specific API-key constraints, then verifies each candidate with check_min_rights() so webhook RLS can filter by indexed org_id instead of invoking authorization helpers per row.';
 
 DROP POLICY IF EXISTS "Allow admin to select webhooks" ON public.webhooks;
+DROP POLICY IF EXISTS "Allow org members to select webhooks" ON public.webhooks;
 DROP POLICY IF EXISTS "Allow admin to insert webhooks" ON public.webhooks;
 DROP POLICY IF EXISTS "Allow admin to update webhooks" ON public.webhooks;
 DROP POLICY IF EXISTS "Allow admin to delete webhooks" ON public.webhooks;
