@@ -374,6 +374,10 @@ import_map = "./functions/deno.json"
 verify_jwt = false
 import_map = "./functions/deno.json"
 
+[functions.notifications]
+verify_jwt = false
+import_map = "./functions/deno.json"
+
 # PLUGIN ENDPOINTS
 
 [functions.channel_self]

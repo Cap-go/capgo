@@ -4,7 +4,8 @@
   "version": "12.136.1",
   "private": true,
   "workspaces": [
-    "cli"
+    "cli",
+    "packages/*"
   ],
   "license": "GPL-3.0",
   "scripts": {
