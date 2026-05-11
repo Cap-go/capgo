@@ -1130,6 +1130,9 @@ export interface AdminGlobalStatsTrend {
   revenue_maker: number
   revenue_team: number
   revenue_enterprise: number
+  average_ltv: number
+  shortest_ltv: number
+  longest_ltv: number
   credits_bought: number
   credits_consumed: number
   builds_total: number
@@ -1224,6 +1227,9 @@ export async function getAdminGlobalStatsTrend(
         revenue_maker::float,
         revenue_team::float,
         revenue_enterprise::float,
+        COALESCE(NULLIF(to_jsonb(gs) ->> 'average_ltv', '')::float, 0)::float AS average_ltv,
+        COALESCE(NULLIF(to_jsonb(gs) ->> 'shortest_ltv', '')::float, 0)::float AS shortest_ltv,
+        COALESCE(NULLIF(to_jsonb(gs) ->> 'longest_ltv', '')::float, 0)::float AS longest_ltv,
         COALESCE(credits_bought, 0)::float AS credits_bought,
         COALESCE(credits_consumed, 0)::float AS credits_consumed,
         COALESCE(builds_total, 0)::int AS builds_total,
@@ -1350,6 +1356,9 @@ export async function getAdminGlobalStatsTrend(
       revenue_maker: Number(row.revenue_maker) || 0,
       revenue_team: Number(row.revenue_team) || 0,
       revenue_enterprise: Number(row.revenue_enterprise) || 0,
+      average_ltv: Number(row.average_ltv) || 0,
+      shortest_ltv: Number(row.shortest_ltv) || 0,
+      longest_ltv: Number(row.longest_ltv) || 0,
       credits_bought: Number(row.credits_bought) || 0,
       credits_consumed: Number(row.credits_consumed) || 0,
       builds_total: Number(row.builds_total) || 0,

@@ -983,13 +983,32 @@ async function getOrg(c: Context, stripeData: StripeData) {
   return org
 }
 
-async function cancelingOrFinished(c: Context, stripeEvent: Stripe.Event, stripeData: Database['public']['Tables']['stripe_info']['Insert']) {
+async function cancelingOrFinished(
+  c: Context,
+  stripeEvent: Stripe.Event,
+  stripeData: Database['public']['Tables']['stripe_info']['Insert'],
+  currentStripeInfo: Pick<StripeInfoRow, 'last_stripe_event_at'> | null | undefined,
+) {
+  const eventOccurredAtIso = new Date(stripeEvent.created * 1000).toISOString()
+  if (isStaleStripeEvent(currentStripeInfo, eventOccurredAtIso)) {
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'Skipping stale Stripe cancel-at-period-end toggle',
+      customerId: stripeData.customer_id,
+      eventOccurredAtIso,
+      currentStripeInfoLastStripeEventAt: currentStripeInfo?.last_stripe_event_at,
+      subscriptionId: stripeData.subscription_id,
+    })
+    return c.json(BRES)
+  }
+
   const previousAttributes = stripeEvent.data.previous_attributes ?? {} as any
   if (stripeEvent.data.object.object === 'subscription' && stripeEvent.data.object.cancel_at_period_end === true && typeof previousAttributes.cancel_at_period_end === 'boolean' && previousAttributes.cancel_at_period_end === false) {
     // cloudlog('USER CANCELLED!!!!!!!!!!!!!!!')
+    const canceledAt = stripeData.canceled_at ?? new Date().toISOString()
     const { error: dbError2 } = await supabaseAdmin(c)
       .from('stripe_info')
-      .update({ canceled_at: new Date().toISOString() })
+      .update({ canceled_at: canceledAt })
       .eq('customer_id', stripeData.customer_id)
     if (dbError2) {
       return quickError(404, 'user_cancelled_customer_id_not_found', `USER CANCELLED, customer_id not found`, { dbError2, stripeData })
@@ -1129,7 +1148,7 @@ app.post('/', middlewareStripeWebhook(), async (c) => {
       cloudlog({ requestId: c.get('requestId'), message: 'Ignoring canceled/deleted webhook for subscription not in database', subscriptionInDb: customer?.subscription_id, webhookSubscription: stripeData.data.subscription_id })
     }
   }
-  return cancelingOrFinished(c, stripeEvent, stripeData.data)
+  return cancelingOrFinished(c, stripeEvent, stripeData.data, customer)
 })
 
 export const stripeEventTestUtils = {
