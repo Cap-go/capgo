@@ -7,6 +7,7 @@ import { parseSchema, safeParseSchema } from '../supabase/functions/_backend/uti
 
 import {
   BASE_URL,
+  getAuthHeaders,
   getAuthHeadersForCredentials,
   getSupabaseClient,
   headers,
@@ -1118,7 +1119,7 @@ describe('[PUT] /organization', () => {
       throw orgUserError
 
     try {
-      const adminHeaders = await getAuthHeadersForCredentials(USER_EMAIL, USER_PASSWORD)
+      const adminHeaders = await getAuthHeaders()
       const response = await fetch(`${BASE_URL}/organization`, {
         headers: adminHeaders,
         method: 'PUT',
@@ -1165,7 +1166,7 @@ describe('[PUT] /organization', () => {
       throw orgUserError
 
     try {
-      const adminHeaders = await getAuthHeadersForCredentials(USER_EMAIL, USER_PASSWORD)
+      const adminHeaders = await getAuthHeaders()
       const adminClient = createClient(normalizedSupabaseBaseUrl, SUPABASE_ANON_KEY, {
         auth: {
           persistSession: false,
@@ -1220,7 +1221,7 @@ describe('[PUT] /organization', () => {
       throw orgUserError
 
     try {
-      const superAdminHeaders = await getAuthHeadersForCredentials(USER_EMAIL, USER_PASSWORD)
+      const superAdminHeaders = await getAuthHeaders()
       const superAdminClient = createClient(normalizedSupabaseBaseUrl, SUPABASE_ANON_KEY, {
         auth: {
           persistSession: false,
