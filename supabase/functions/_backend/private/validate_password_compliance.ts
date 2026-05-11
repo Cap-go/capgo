@@ -12,6 +12,7 @@ import { clearFailedAccountAuth, isAccountRateLimited, isIPRateLimited, recordFa
 import { buildRateLimitInfo } from '../utils/rateLimitInfo.ts'
 import { emptySupabase, supabaseClient, supabaseAdmin as useSupabaseAdmin } from '../utils/supabase.ts'
 import { getEnv } from '../utils/utils.ts'
+import { getPasswordComplianceBodyLogMetadata, getPasswordComplianceSuccessLogMetadata } from './validate_password_compliance_logging.ts'
 
 interface ValidatePasswordCompliance {
   email: string
@@ -154,8 +155,7 @@ app.post('/', async (c) => {
     return simpleRateLimit({ reason: 'too_many_failed_account_auth_attempts', ...buildRateLimitInfo(accountRateLimitStatus.resetAt) })
   }
 
-  const { password: _password, captcha_token: _captchaToken, ...bodyWithoutPassword } = body
-  cloudlog({ requestId: c.get('requestId'), context: 'validate_password_compliance raw body', rawBody: bodyWithoutPassword })
+  cloudlog({ requestId: c.get('requestId'), context: 'validate_password_compliance raw body', rawBody: getPasswordComplianceBodyLogMetadata(body) })
 
   const adminClient = useSupabaseAdmin(c)
 
@@ -279,7 +279,7 @@ app.post('/', async (c) => {
     return quickError(500, 'compliance_update_failed', 'Failed to update compliance record', { error: upsertError.message })
   }
 
-  cloudlog({ requestId: c.get('requestId'), context: 'validate_password_compliance - success', userId, orgId: body.org_id })
+  cloudlog({ requestId: c.get('requestId'), context: 'validate_password_compliance - success', ...getPasswordComplianceSuccessLogMetadata(userId, body.org_id) })
 
   return c.json({
     status: 'ok',
