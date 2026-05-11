@@ -4,6 +4,7 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import IconExternalLink from '~icons/lucide/external-link'
 import IconSmartphone from '~icons/lucide/smartphone'
+import { openExternalLink } from '~/services/externalLinks'
 import { buildChannelPreviewSubdomain, buildPreviewSubdomain } from '../../shared/preview-subdomain.ts'
 
 const props = defineProps<{
@@ -114,9 +115,7 @@ function generateQRCode() {
 watch(previewUrl, generateQRCode)
 
 function openExternal() {
-  if (!previewUrl.value)
-    return
-  window.open(previewUrl.value, '_blank')
+  openExternalLink(previewUrl.value ?? undefined)
 }
 </script>
 

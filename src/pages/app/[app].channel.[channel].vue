@@ -18,6 +18,7 @@ import IconWarning from '~icons/lucide/alert-triangle'
 import IconExternalLink from '~icons/lucide/external-link'
 import IconDown from '~icons/material-symbols/keyboard-arrow-down-rounded'
 import { formatDate, formatLocalDate } from '~/services/date'
+import { openExternalLink } from '~/services/externalLinks'
 import { checkPermissions } from '~/services/permissions'
 import { checkCompatibilityNativePackages, defaultApiHost, isCompatible, useSupabase } from '~/services/supabase'
 import { isInternalVersionName } from '~/services/versions'
@@ -496,11 +497,7 @@ async function onSelectAutoUpdate(value: Database['public']['Enums']['disable_up
 }
 
 function openLink(url?: string): void {
-  if (url) {
-    const win = window.open(url, '_blank')
-    if (win)
-      win.opener = null
-  }
+  openExternalLink(url)
 }
 
 // Get the platform to use for testing based on channel settings

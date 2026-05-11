@@ -656,6 +656,7 @@ watch(props, async () => {
           <a
             href="https://capgo.app/docs/webapp/bundles/#delete-a-bundle"
             target="_blank"
+            rel="noopener noreferrer"
             class="ml-1 text-blue-500 underline hover:text-blue-600"
           >
             {{ t('here') }}

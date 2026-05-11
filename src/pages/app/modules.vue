@@ -2,6 +2,7 @@
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import IconNext from '~icons/ic/round-keyboard-arrow-right'
+import { openExternalLink } from '~/services/externalLinks'
 import { useDisplayStore } from '~/stores/display'
 
 const { t } = useI18n()
@@ -25,8 +26,7 @@ Object.keys(dependencies).forEach((dep) => {
   }
 })
 function openLink(url?: string) {
-  if (url)
-    window.open(url, '_blank')
+  openExternalLink(url)
 }
 // console.log('modules', modules.value)
 displayStore.NavTitle = t('module-heading')
