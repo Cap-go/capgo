@@ -3,6 +3,7 @@ import type { Database } from '../../utils/supabase.types.ts'
 import { BRES, honoFactory, quickError, simpleError } from '../../utils/hono.ts'
 import { middlewareV2 } from '../../utils/hono_middleware.ts'
 import { supabaseAdmin } from '../../utils/supabase.ts'
+import { selectOwnedApikeys } from './queries.ts'
 
 const app = honoFactory.createApp()
 
@@ -34,12 +35,9 @@ app.delete('/:id', middlewareV2(['all']), async (c) => {
     throw simpleError('invalid_id_format', 'API key ID must be a valid UUID or number')
   }
 
-  // Direct PostgREST table access is intentionally stricter for API-key
-  // callers. This endpoint already authenticated the caller, so use the
-  // service-role client and keep the explicit owner filter below.
   const supabase = supabaseAdmin(c)
 
-  const { data: apikey, error: apikeyError } = await supabase.from('apikeys').select('*').or(`key.eq.${id},id.eq.${id}`).eq('user_id', auth.userId).single()
+  const { data: apikey, error: apikeyError } = await selectOwnedApikeys(c, auth.userId).or(`key.eq.${id},id.eq.${id}`).single()
   if (!apikey || apikeyError) {
     throw quickError(404, 'api_key_not_found', 'API key not found', { supabaseError: apikeyError })
   }
