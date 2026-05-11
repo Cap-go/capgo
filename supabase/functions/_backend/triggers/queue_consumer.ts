@@ -538,7 +538,7 @@ export async function http_post_helper(
       method: 'POST',
       headers,
       body: JSON.stringify(body),
-      // signal: controller.signal,
+      signal: controller.signal,
     })
     return response
   }

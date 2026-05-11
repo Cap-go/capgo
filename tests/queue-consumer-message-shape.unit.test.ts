@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest'
-import { __queueConsumerTestUtils__, MAX_QUEUE_READS, messagesArraySchema } from '../supabase/functions/_backend/triggers/queue_consumer.ts'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { __queueConsumerTestUtils__, http_post_helper, MAX_QUEUE_READS, messagesArraySchema } from '../supabase/functions/_backend/triggers/queue_consumer.ts'
 import { parseSchema } from '../supabase/functions/_backend/utils/ark_validation.ts'
 
 describe('queue_consumer legacy message compatibility', () => {
@@ -188,5 +188,63 @@ describe('queue_consumer legacy message compatibility', () => {
     expect(details.errorMessage).toBe('invalid token [REDACTED_TOKEN] for user [REDACTED_EMAIL]')
     expect(details.errorMessage).not.toContain(token)
     expect(details.errorMessage).not.toContain('alice@capgo.app')
+  })
+})
+
+describe('queue_consumer HTTP POST helper timeout', () => {
+  afterEach(() => {
+    vi.useRealTimers()
+    vi.restoreAllMocks()
+  })
+
+  it('aborts slow queue POST targets after the timeout elapses', async () => {
+    vi.useFakeTimers()
+
+    const body = { queued: true }
+    let capturedSignal: AbortSignal | undefined
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation((_input, init) => {
+      const signal = init?.signal as AbortSignal | undefined
+      capturedSignal = signal
+      if (!signal)
+        return Promise.reject(new Error('missing abort signal'))
+
+      return new Promise<Response>((_resolve, reject) => {
+        signal.addEventListener('abort', () => {
+          reject(new DOMException('Aborted', 'AbortError'))
+        }, { once: true })
+      })
+    })
+
+    const context = {
+      env: {
+        API_SECRET: 'test-api-secret',
+        CLOUDFLARE_FUNCTION_URL: '',
+        CLOUDFLARE_PP_FUNCTION_URL: '',
+        SUPABASE_URL: 'https://supabase.example.com',
+      },
+      get: (key: string) => key === 'requestId' ? 'req-queue-timeout' : undefined,
+    }
+
+    const request = http_post_helper(context as any, 'slow_function', 'supabase', body, 'cf-1')
+      .then(
+        () => undefined,
+        (error: unknown) => error,
+      )
+
+    expect(capturedSignal).toBeInstanceOf(AbortSignal)
+    expect(capturedSignal?.aborted).toBe(false)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(fetchMock.mock.calls[0]?.[1]).toEqual(expect.objectContaining({
+      body: JSON.stringify(body),
+      method: 'POST',
+      signal: capturedSignal,
+    }))
+
+    await vi.advanceTimersByTimeAsync(15000)
+
+    expect(capturedSignal?.aborted).toBe(true)
+    const error = await request
+    expect(error).toBeInstanceOf(Error)
+    expect((error as Error).message).toBe('Request Timeout (Internal QUEUE handling error)')
   })
 })
