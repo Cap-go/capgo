@@ -125,16 +125,20 @@ async function requestToken(): Promise<CapgoNotificationToken> {
     let registrationHandle: PluginListenerHandle | undefined
     let errorHandle: PluginListenerHandle | undefined
 
-    const cleanup = () => {
-      void registrationHandle?.remove()
-      void errorHandle?.remove()
+    const cleanup = async () => {
+      await Promise.allSettled([registrationHandle?.remove(), errorHandle?.remove()].filter((promise): promise is Promise<void> => Boolean(promise)))
+    }
+    const settleAfterCleanup = (callback: () => void) => {
+      cleanup()
+        .catch(() => undefined)
+        .then(callback)
+        .catch(() => undefined)
     }
     const fail = (error: unknown) => {
       if (resolved)
         return
       resolved = true
-      cleanup()
-      reject(error instanceof Error ? error : new Error(String(error)))
+      settleAfterCleanup(() => reject(error instanceof Error ? error : new Error(String(error))))
     }
 
     void (async () => {
@@ -144,8 +148,7 @@ async function requestToken(): Promise<CapgoNotificationToken> {
             return
           resolved = true
           state.token = token
-          cleanup()
-          resolve(token)
+          settleAfterCleanup(() => resolve(token))
         })
         errorHandle = await NativeCapgoNotifications.addListener('registrationError', (error) => {
           fail(new Error(error.error))
@@ -215,11 +218,15 @@ function isUpdateCheckNotification(notification?: CapgoPushNotificationSchema) {
 
 function updateOptionsFromNotification(notification?: CapgoPushNotificationSchema): CapgoUpdaterIntegrationOptions {
   const data = notificationData(notification)
-  const installMode = getStringData(data, 'capgoUpdateInstallMode', 'capgo_update_install_mode')
+  const requestedInstallMode = getStringData(data, 'capgoUpdateInstallMode', 'capgo_update_install_mode')
   const channel = getStringData(data, 'capgoUpdateChannel', 'capgo_update_channel')
+  let installMode: CapgoUpdaterIntegrationOptions['installMode']
+  if (requestedInstallMode === 'set' || requestedInstallMode === 'next')
+    installMode = requestedInstallMode
+
   return {
     enabled: true,
-    installMode: installMode === 'set' ? 'set' : installMode === 'next' ? 'next' : undefined,
+    installMode,
     channel: channel || undefined,
   }
 }

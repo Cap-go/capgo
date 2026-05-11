@@ -32,20 +32,20 @@ function readEnv(env: NotificationEnv, name: string): string {
 function toBase64Url(bytes: Uint8Array): string {
   let binary = ''
   bytes.forEach((byte) => {
-    binary += String.fromCharCode(byte)
+    binary += String.fromCodePoint(byte)
   })
-  let encoded = btoa(binary).split('+').join('-').split('/').join('_')
+  let encoded = btoa(binary).replaceAll('+', '-').replaceAll('/', '_')
   while (encoded.endsWith('='))
     encoded = encoded.slice(0, -1)
   return encoded
 }
 
 function fromBase64Url(value: string): Uint8Array {
-  const padded = value.replace(/-/g, '+').replace(/_/g, '/').padEnd(Math.ceil(value.length / 4) * 4, '=')
+  const padded = value.replaceAll('-', '+').replaceAll('_', '/').padEnd(Math.ceil(value.length / 4) * 4, '=')
   const binary = atob(padded)
   const bytes = new Uint8Array(binary.length)
   for (let i = 0; i < binary.length; i++)
-    bytes[i] = binary.charCodeAt(i)
+    bytes[i] = binary.codePointAt(i) ?? 0
   return bytes
 }
 
@@ -57,7 +57,7 @@ function pemToArrayBuffer(pem: string): ArrayBuffer {
   const binary = atob(base64)
   const bytes = new Uint8Array(binary.length)
   for (let i = 0; i < binary.length; i++)
-    bytes[i] = binary.charCodeAt(i)
+    bytes[i] = binary.codePointAt(i) ?? 0
   return bytes.buffer
 }
 
@@ -462,6 +462,27 @@ function shouldRetryThrownError(error: unknown): boolean {
   ].some(permanentError => message.includes(permanentError))
 }
 
+function writeSuccessfulSend(env: NotificationEnv, message: NativeNotificationQueueMessage, device: NativeNotificationRegistryRow, outcome: SendOutcome) {
+  writeNotificationEvent(env, { appId: message.appId, campaignId: message.campaignId, event: 'sent', notificationId: outcome.notificationId, device, badge: message.badge })
+  writeNotificationEvent(env, { appId: message.appId, campaignId: message.campaignId, event: 'provider_accepted', notificationId: outcome.notificationId, device, badge: message.badge })
+}
+
+function writeFailedSend(env: NotificationEnv, message: NativeNotificationQueueMessage, device: NativeNotificationRegistryRow, error?: string) {
+  writeNotificationEvent(env, { appId: message.appId, campaignId: message.campaignId, event: 'failed', device, error, badge: message.badge })
+}
+
+function shouldRetryOutcome(env: NotificationEnv, message: NativeNotificationQueueMessage, device: NativeNotificationRegistryRow, outcome: SendOutcome, shouldRetry: boolean): boolean {
+  if (outcome.ok) {
+    writeSuccessfulSend(env, message, device, outcome)
+    return false
+  }
+
+  writeFailedSend(env, message, device, outcome.error)
+  if (outcome.invalidToken)
+    tombstoneDevice(env, message.appId, device)
+  return shouldRetry && outcome.transient
+}
+
 export async function processNativeNotificationQueueMessage(message: NativeNotificationQueueMessage, env: NotificationEnv): Promise<NativeNotificationRegistryRow[]> {
   const retryDevices: NativeNotificationRegistryRow[] = []
   const shouldRetry = canRetry(message)
@@ -469,20 +490,11 @@ export async function processNativeNotificationQueueMessage(message: NativeNotif
   for (const device of message.devices) {
     try {
       const outcome = await sendToDevice(env, message, device)
-      if (outcome.ok) {
-        writeNotificationEvent(env, { appId: message.appId, campaignId: message.campaignId, event: 'sent', notificationId: outcome.notificationId, device, badge: message.badge })
-        writeNotificationEvent(env, { appId: message.appId, campaignId: message.campaignId, event: 'provider_accepted', notificationId: outcome.notificationId, device, badge: message.badge })
-        continue
-      }
-
-      writeNotificationEvent(env, { appId: message.appId, campaignId: message.campaignId, event: 'failed', device, error: outcome.error, badge: message.badge })
-      if (outcome.invalidToken)
-        tombstoneDevice(env, message.appId, device)
-      if (shouldRetry && outcome.transient)
+      if (shouldRetryOutcome(env, message, device, outcome, shouldRetry))
         retryDevices.push(device)
     }
     catch (error) {
-      writeNotificationEvent(env, { appId: message.appId, campaignId: message.campaignId, event: 'failed', device, error: error instanceof Error ? error.message : 'notification send failed', badge: message.badge })
+      writeFailedSend(env, message, device, error instanceof Error ? error.message : 'notification send failed')
       if (shouldRetry && shouldRetryThrownError(error))
         retryDevices.push(device)
     }

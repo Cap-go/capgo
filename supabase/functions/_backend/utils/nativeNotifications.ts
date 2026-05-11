@@ -118,7 +118,7 @@ export interface NativeNotificationQueueMessage {
 }
 
 export interface NativeNotificationStatsRow {
-  event: NativeNotificationEvent | string
+  event: string
   count: number
 }
 
@@ -129,20 +129,20 @@ function toHex(buffer: ArrayBuffer): string {
 function toBase64Url(bytes: Uint8Array): string {
   let binary = ''
   bytes.forEach((byte) => {
-    binary += String.fromCharCode(byte)
+    binary += String.fromCodePoint(byte)
   })
-  let encoded = btoa(binary).split('+').join('-').split('/').join('_')
+  let encoded = btoa(binary).replaceAll('+', '-').replaceAll('/', '_')
   while (encoded.endsWith('='))
     encoded = encoded.slice(0, -1)
   return encoded
 }
 
 function fromBase64Url(value: string): Uint8Array {
-  const padded = value.replace(/-/g, '+').replace(/_/g, '/').padEnd(Math.ceil(value.length / 4) * 4, '=')
+  const padded = value.replaceAll('-', '+').replaceAll('_', '/').padEnd(Math.ceil(value.length / 4) * 4, '=')
   const binary = atob(padded)
   const bytes = new Uint8Array(binary.length)
   for (let i = 0; i < binary.length; i++)
-    bytes[i] = binary.charCodeAt(i)
+    bytes[i] = binary.codePointAt(i) ?? 0
   return bytes
 }
 

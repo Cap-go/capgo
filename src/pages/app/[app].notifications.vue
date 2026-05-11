@@ -117,12 +117,11 @@ async function authHeaders() {
 
 async function notificationFetch<T = any>(path: string, init: RequestInit = {}): Promise<T> {
   const headers = await authHeaders()
+  const requestHeaders = new Headers(init.headers)
+  Object.entries(headers).forEach(([key, value]) => requestHeaders.set(key, value))
   const response = await fetch(`${defaultApiHost}/notifications${path}`, {
     ...init,
-    headers: {
-      ...headers,
-      ...(init.headers || {}),
-    },
+    headers: requestHeaders,
   })
   if (!response.ok)
     throw new Error(await response.text())
