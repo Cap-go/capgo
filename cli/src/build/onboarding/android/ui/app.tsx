@@ -46,6 +46,7 @@ import {
   fetchUserInfo,
   GOOGLE_OAUTH_SCOPES_ANDROIDPUBLISHER,
   refreshAccessToken,
+  revokeToken,
   runOAuthFlow,
 } from '../oauth-google.js'
 import open from 'open'
@@ -147,6 +148,9 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
   const [refreshTokenState, setRefreshTokenState] = useState<string>(initialProgress?._oauthRefreshToken || '')
   const [oauthClientId, setOauthClientId] = useState<string>('')
   const [oauthStatusMessages, setOauthStatusMessages] = useState<string[]>([])
+  /** Two-pane toggle on the pre-consent screen: default shows the short
+   *  trust headline + scopes; "Learn more" expands the long-form Q&A. */
+  const [showOAuthLearnMore, setShowOAuthLearnMore] = useState(false)
 
   // Phase 3 — Play developer account (user pastes ID or URL)
   const [playAccountChoice, setPlayAccountChoice] = useState<PlayDeveloperAccountChoice | null>(
@@ -682,6 +686,30 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
             completedSteps: { ...p.completedSteps, playInviteProvisioned: invite },
           }))
           addSetupStatus(`✔ Play Console invite confirmed`)
+
+          // Step F: ask Google to revoke our OAuth tokens now that
+          // provisioning has succeeded. From this point forward Capgo's build
+          // workers authenticate via the service account JSON key — the
+          // user's OAuth tokens are no longer needed. Revoking enforces the
+          // trust statement on the pre-consent screen ("your tokens never
+          // reach Capgo and we revoke them as soon as we're done"). Failure
+          // is non-fatal: the token expires within ~1 hour regardless.
+          if (refreshTokenState) {
+            addSetupStatus('Revoking OAuth token (we don\'t need it anymore)...')
+            try {
+              await revokeToken(refreshTokenState)
+              if (cancelled)
+                return
+              addSetupStatus('✔ OAuth token revoked')
+            }
+            catch (err) {
+              if (cancelled)
+                return
+              const msg = err instanceof Error ? err.message : String(err)
+              addSetupStatus(`⚠ Revoke request failed (${msg}) — token will expire on its own`)
+            }
+          }
+
           addLog(`✔ Google Cloud + Play setup complete`)
           setRetryCount(0)
           setStep('saving-credentials')
@@ -1177,32 +1205,63 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
 
       {/* ── Phase 2 — Google sign-in ── */}
 
-      {step === 'google-sign-in' && (
+      {step === 'google-sign-in' && !showOAuthLearnMore && (
         <Box flexDirection="column" marginTop={1}>
           <Alert variant="info">
-            Sign in with Google so Capgo can set up a GCP project + service account and invite it to your Play Console — automatically.
+            Sign in with Google so Capgo can set up Play Store publishing on your account — your tokens never reach Capgo's servers.
           </Alert>
           <Newline />
-          <Text>We'll open your browser to Google's consent screen. We ask for:</Text>
+          <Text>We'll open Google's consent screen. The two access requests are:</Text>
           <Box flexDirection="column" marginLeft={2} marginTop={1}>
-            <Text>• <Text bold>Google Cloud access</Text> (to create a project + service account)</Text>
-            <Text>• <Text bold>Google Play Developer access</Text> (to invite the service account with Release permissions)</Text>
-            <Text>• Your email (so we can show which account you're signed in as)</Text>
+            <Text>• <Text bold>Google Cloud access</Text> — to create a service account in a project you pick</Text>
+            <Text>• <Text bold>Google Play Developer access</Text> — to invite that service account to your Play Console with release-only permissions</Text>
           </Box>
-          <Newline />
-          <Text dimColor>No OAuth tokens are written to long-term credentials — they're used once to provision the service account, then discarded.</Text>
           <Newline />
           <Select
             options={[
               { label: '🔐  Continue to Google sign-in', value: 'go' },
+              { label: 'ℹ️   Learn why the onboarding via Google is secure', value: 'learn' },
               { label: '✖  Exit (I\'ll do it later)', value: 'exit' },
             ]}
             onChange={(value) => {
               if (value === 'go')
                 setStep('google-sign-in-running')
+              else if (value === 'learn')
+                setShowOAuthLearnMore(true)
               else
                 exitOnboarding('Run `capgo build init --platform android` again when ready.')
             }}
+          />
+        </Box>
+      )}
+
+      {step === 'google-sign-in' && showOAuthLearnMore && (
+        <Box flexDirection="column" marginTop={1}>
+          <Alert variant="info">
+            What Capgo can and can't do with the access you're about to grant.
+          </Alert>
+          <Newline />
+          <Box flexDirection="column" marginLeft={2}>
+            <Text bold>Can Capgo touch other GCP projects on my account?</Text>
+            <Text>The scope allows it, but this CLI only calls APIs against the project you'll pick on the next screen. It creates one service account named <Text color="cyan">capgo-native-build</Text> in that one project and stops.</Text>
+            <Newline />
+            <Text bold>Will Capgo upload anything to Play Store without me knowing?</Text>
+            <Text>No. The flow invites one service account into one app (the package you confirm) with release-only permissions. Future builds use that service account, not your OAuth tokens.</Text>
+            <Newline />
+            <Text bold>Can Capgo employees access my Google account?</Text>
+            <Text>No. The refresh token never leaves your machine. Capgo's servers only serve the OAuth client ID — they never see your tokens. When provisioning finishes, the CLI asks Google to revoke that token, so even your local copy stops working.</Text>
+            <Newline />
+            <Text bold>What if I change my mind later?</Text>
+            <Text>Revoke anytime at <Text color="cyan">myaccount.google.com/permissions</Text>, or just delete the service account in Google Cloud. Neither needs Capgo's involvement.</Text>
+            <Newline />
+            <Text dimColor>Capgo passed Google's OAuth verification on 2026-05-02 for these scopes. Source code: github.com/Cap-go/capgo</Text>
+          </Box>
+          <Newline />
+          <Select
+            options={[
+              { label: '← Back to sign-in', value: 'back' },
+            ]}
+            onChange={() => setShowOAuthLearnMore(false)}
           />
         </Box>
       )}

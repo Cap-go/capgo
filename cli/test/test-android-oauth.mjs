@@ -141,6 +141,58 @@ await test('GOOGLE_OAUTH_SCOPES_ANDROIDPUBLISHER has the expected three scopes',
   assert(GOOGLE_OAUTH_SCOPES_ANDROIDPUBLISHER.includes('https://www.googleapis.com/auth/androidpublisher'))
 })
 
+await test('revokeToken POSTs the token to Google\'s revoke endpoint', async () => {
+  const { revokeToken } = await importOAuth()
+  let captured = null
+  const originalFetch = globalThis.fetch
+  globalThis.fetch = async (url, init) => {
+    captured = { url: String(url), method: init?.method, body: init?.body }
+    return new Response('', { status: 200 })
+  }
+  try {
+    await revokeToken('rt-abc-123')
+  }
+  finally {
+    globalThis.fetch = originalFetch
+  }
+  assert(captured !== null, 'fetch should have been called')
+  assertEquals(captured.url, 'https://oauth2.googleapis.com/revoke')
+  assertEquals(captured.method, 'POST')
+  const params = new URLSearchParams(captured.body)
+  assertEquals(params.get('token'), 'rt-abc-123')
+})
+
+await test('revokeToken treats 400 as "already revoked" without throwing', async () => {
+  const { revokeToken } = await importOAuth()
+  const originalFetch = globalThis.fetch
+  globalThis.fetch = async () => new Response('invalid_token', { status: 400 })
+  try {
+    await revokeToken('stale-token')
+    // No throw — pass
+  }
+  finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
+await test('revokeToken throws on 5xx so caller can log the failure', async () => {
+  const { revokeToken } = await importOAuth()
+  const originalFetch = globalThis.fetch
+  globalThis.fetch = async () => new Response('upstream error', { status: 503 })
+  let threw = false
+  try {
+    await revokeToken('any-token')
+  }
+  catch (err) {
+    threw = true
+    assert(/revoke failed.*503/i.test(err.message), `expected revoke failure message, got: ${err.message}`)
+  }
+  finally {
+    globalThis.fetch = originalFetch
+  }
+  assert(threw, 'expected revokeToken to throw on 5xx')
+})
+
 console.log(`\n📊 Results: ${testsPassed} passed, ${testsFailed} failed`)
 if (testsFailed > 0)
   process.exit(1)
