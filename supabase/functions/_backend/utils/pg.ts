@@ -1272,8 +1272,23 @@ export async function getAdminGlobalStatsTrend(
         COALESCE(NULLIF(to_jsonb(gs) ->> 'builder_active_paying_clients_60d', '')::int, 0)::int AS builder_active_paying_clients_60d,
         COALESCE(NULLIF(to_jsonb(gs) ->> 'live_updates_active_paying_clients_60d', '')::int, 0)::int AS live_updates_active_paying_clients_60d
       FROM global_stats gs
-      LEFT JOIN global_stats prev ON prev.date_id = (gs.date_id::date - 1)::text
-      WHERE gs.date_id <= ${endDateOnly}
+      LEFT JOIN global_stats prev ON prev.date_id = (
+        CASE
+          WHEN gs.date_id ~ '^\\d{4}-\\d{2}-\\d{2}$' THEN
+            CASE
+              WHEN to_char(to_date(gs.date_id, 'YYYY-MM-DD'), 'YYYY-MM-DD') = gs.date_id
+                THEN (to_date(gs.date_id, 'YYYY-MM-DD') - 1)::text
+              ELSE NULL
+            END
+          ELSE NULL
+        END
+      )
+      WHERE CASE
+          WHEN gs.date_id ~ '^\\d{4}-\\d{2}-\\d{2}$'
+            THEN to_char(to_date(gs.date_id, 'YYYY-MM-DD'), 'YYYY-MM-DD') = gs.date_id
+          ELSE false
+        END
+        AND gs.date_id <= ${endDateOnly}
       )
       SELECT *
       FROM stats
