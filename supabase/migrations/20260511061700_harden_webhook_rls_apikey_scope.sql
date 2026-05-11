@@ -7,166 +7,132 @@
 -- the same constraints without changing non-webhook callers of the shared helper.
 -- =============================================================================
 
-CREATE OR REPLACE FUNCTION "public"."get_identity_org_allowed_apikey_only" (
-  "keymode" "public"."key_mode" [],
-  "org_id" uuid
-) RETURNS uuid
-LANGUAGE "plpgsql"
-SECURITY DEFINER
+CREATE OR REPLACE FUNCTION "public"."webhook_allowed_org_ids" (
+  "min_right" "public"."user_min_right",
+  "keymode" "public"."key_mode" []
+) RETURNS uuid[]
+LANGUAGE "plpgsql" STABLE SECURITY DEFINER
 SET search_path = ''
 AS $$
 DECLARE
-    api_key_text text;
-    api_key record;
+  v_auth_user_id uuid;
+  v_user_id uuid;
+  v_api_key_text text;
+  v_api_key public.apikeys%ROWTYPE;
+  v_allowed uuid[] := '{}'::uuid[];
 BEGIN
-  SELECT "public"."get_apikey_header"() into api_key_text;
+  SELECT auth.uid() INTO v_auth_user_id;
+  SELECT public.get_apikey_header() INTO v_api_key_text;
 
-  -- No api key found in headers, return
-  IF api_key_text IS NULL THEN
-    PERFORM public.pg_log('deny: IDENTITY_ORG_NO_AUTH', jsonb_build_object('org_id', org_id));
-    RETURN NULL;
-  END IF;
+  IF v_api_key_text IS NOT NULL THEN
+    SELECT * FROM public.find_apikey_by_value(v_api_key_text) INTO v_api_key;
 
-  -- Use find_apikey_by_value to support both plain and hashed keys
-  SELECT * FROM public.find_apikey_by_value(api_key_text) INTO api_key;
-
-  -- Check if key was found (api_key.id will be NULL if no match) and mode matches
-  IF api_key.id IS NOT NULL AND api_key.mode = ANY(keymode) THEN
-    -- Check if key is expired
-    IF public.is_apikey_expired(api_key.expires_at) THEN
-      PERFORM public.pg_log('deny: IDENTITY_ORG_EXPIRED', jsonb_build_object('key_id', api_key.id, 'org_id', org_id));
-      RETURN NULL;
+    IF v_api_key.id IS NULL OR v_api_key.mode IS NULL OR NOT (v_api_key.mode = ANY(webhook_allowed_org_ids.keymode)) THEN
+      PERFORM public.pg_log('deny: WEBHOOK_ALLOWED_ORGS_NO_MATCH', '{}'::jsonb);
+      RETURN v_allowed;
     END IF;
 
-    -- Check org restrictions
-    IF COALESCE(array_length(api_key.limited_to_orgs, 1), 0) > 0 THEN
-      IF NOT (org_id = ANY(api_key.limited_to_orgs)) THEN
-        PERFORM public.pg_log('deny: IDENTITY_ORG_UNALLOWED', jsonb_build_object('org_id', org_id));
-        RETURN NULL;
-      END IF;
-    END IF;
-
-    RETURN api_key.user_id;
-  END IF;
-
-  PERFORM public.pg_log('deny: IDENTITY_ORG_NO_MATCH', jsonb_build_object('org_id', org_id));
-  RETURN NULL;
-END;
-$$;
-
-ALTER FUNCTION "public"."get_identity_org_allowed_apikey_only" ("keymode" "public"."key_mode" [], "org_id" uuid) OWNER TO "postgres";
-
-CREATE OR REPLACE FUNCTION "public"."get_identity_webhook_org_allowed_apikey_only" (
-  "keymode" "public"."key_mode" [],
-  "org_id" uuid
-) RETURNS uuid
-LANGUAGE "plpgsql"
-SECURITY DEFINER
-SET search_path = ''
-AS $$
-DECLARE
-    api_key_text text;
-    api_key record;
-    v_require_apikey_expiration boolean := false;
-BEGIN
-  SELECT "public"."get_apikey_header"() into api_key_text;
-
-  IF api_key_text IS NULL THEN
-    PERFORM public.pg_log('deny: WEBHOOK_IDENTITY_ORG_NO_AUTH', jsonb_build_object('org_id', org_id));
-    RETURN NULL;
-  END IF;
-
-  SELECT * FROM public.find_apikey_by_value(api_key_text) INTO api_key;
-
-  IF api_key.id IS NOT NULL AND api_key.mode = ANY(keymode) THEN
     -- Webhooks are organization-level resources. App-scoped API keys must not
     -- satisfy direct table policies even when their owner is an org admin.
-    IF COALESCE(array_length(api_key.limited_to_apps, 1), 0) > 0 THEN
-      PERFORM public.pg_log('deny: WEBHOOK_IDENTITY_ORG_APP_SCOPED', jsonb_build_object('key_id', api_key.id, 'org_id', org_id));
-      RETURN NULL;
+    IF COALESCE(array_length(v_api_key.limited_to_apps, 1), 0) > 0 THEN
+      PERFORM public.pg_log('deny: WEBHOOK_ALLOWED_ORGS_APP_SCOPED', jsonb_build_object('key_id', v_api_key.id));
+      RETURN v_allowed;
     END IF;
 
-    IF public.is_apikey_expired(api_key.expires_at) THEN
-      PERFORM public.pg_log('deny: WEBHOOK_IDENTITY_ORG_EXPIRED', jsonb_build_object('key_id', api_key.id, 'org_id', org_id));
-      RETURN NULL;
+    IF public.is_apikey_expired(v_api_key.expires_at) THEN
+      PERFORM public.pg_log('deny: WEBHOOK_ALLOWED_ORGS_EXPIRED', jsonb_build_object('key_id', v_api_key.id));
+      RETURN v_allowed;
     END IF;
 
-    SELECT o.require_apikey_expiration
-      INTO v_require_apikey_expiration
-      FROM public.orgs o
-      WHERE o.id = get_identity_webhook_org_allowed_apikey_only.org_id;
-
-    IF COALESCE(v_require_apikey_expiration, false) AND api_key.expires_at IS NULL THEN
-      PERFORM public.pg_log('deny: WEBHOOK_IDENTITY_ORG_EXPIRATION_REQUIRED', jsonb_build_object('key_id', api_key.id, 'org_id', org_id));
-      RETURN NULL;
-    END IF;
-
-    IF COALESCE(array_length(api_key.limited_to_orgs, 1), 0) > 0 THEN
-      IF NOT (get_identity_webhook_org_allowed_apikey_only.org_id = ANY(api_key.limited_to_orgs)) THEN
-        PERFORM public.pg_log('deny: WEBHOOK_IDENTITY_ORG_UNALLOWED', jsonb_build_object('org_id', org_id));
-        RETURN NULL;
-      END IF;
-    END IF;
-
-    RETURN api_key.user_id;
-  END IF;
-
-  PERFORM public.pg_log('deny: WEBHOOK_IDENTITY_ORG_NO_MATCH', jsonb_build_object('org_id', org_id));
-  RETURN NULL;
-END;
-$$;
-
-ALTER FUNCTION "public"."get_identity_webhook_org_allowed_apikey_only" ("keymode" "public"."key_mode" [], "org_id" uuid) OWNER TO "postgres";
-REVOKE ALL ON FUNCTION "public"."get_identity_webhook_org_allowed_apikey_only" ("keymode" "public"."key_mode" [], "org_id" uuid) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION "public"."get_identity_webhook_org_allowed_apikey_only" ("keymode" "public"."key_mode" [], "org_id" uuid) TO "anon";
-GRANT EXECUTE ON FUNCTION "public"."get_identity_webhook_org_allowed_apikey_only" ("keymode" "public"."key_mode" [], "org_id" uuid) TO "authenticated";
-GRANT EXECUTE ON FUNCTION "public"."get_identity_webhook_org_allowed_apikey_only" ("keymode" "public"."key_mode" [], "org_id" uuid) TO "service_role";
-
-CREATE OR REPLACE FUNCTION "public"."check_webhook_min_rights" (
-  "min_right" "public"."user_min_right",
-  "keymode" "public"."key_mode" [],
-  "org_id" uuid,
-  "app_id" character varying,
-  "channel_id" bigint
-) RETURNS boolean
-LANGUAGE "plpgsql"
-SECURITY DEFINER
-SET search_path = ''
-AS $$
-DECLARE
-  v_apikey text;
-  v_user_id uuid;
-BEGIN
-  SELECT public.get_apikey_header() INTO v_apikey;
-
-  IF v_apikey IS NOT NULL THEN
-    SELECT public.get_identity_webhook_org_allowed_apikey_only(
-      check_webhook_min_rights.keymode,
-      check_webhook_min_rights.org_id
-    ) INTO v_user_id;
-
-    IF v_user_id IS NULL THEN
-      RETURN false;
-    END IF;
+    v_user_id := v_api_key.user_id;
   ELSE
-    SELECT auth.uid() INTO v_user_id;
+    v_user_id := v_auth_user_id;
   END IF;
 
-  RETURN public.check_min_rights(
-    min_right,
-    v_user_id,
-    org_id,
-    app_id,
-    channel_id
-  );
+  IF v_user_id IS NULL THEN
+    RETURN v_allowed;
+  END IF;
+
+  WITH candidate_orgs AS (
+    SELECT org_users.org_id
+    FROM public.org_users
+    WHERE org_users.user_id = v_user_id
+      AND org_users.user_right >= webhook_allowed_org_ids.min_right
+      AND org_users.app_id IS NULL
+      AND org_users.channel_id IS NULL
+
+    UNION
+
+    SELECT role_bindings.org_id
+    FROM public.role_bindings
+    WHERE role_bindings.scope_type = public.rbac_scope_org()
+      AND role_bindings.org_id IS NOT NULL
+      AND role_bindings.principal_type = public.rbac_principal_user()
+      AND role_bindings.principal_id = v_user_id
+      AND (role_bindings.expires_at IS NULL OR role_bindings.expires_at > now())
+
+    UNION
+
+    SELECT role_bindings.org_id
+    FROM public.role_bindings
+    WHERE v_api_key_text IS NOT NULL
+      AND v_api_key.rbac_id IS NOT NULL
+      AND role_bindings.scope_type = public.rbac_scope_org()
+      AND role_bindings.org_id IS NOT NULL
+      AND role_bindings.principal_type = public.rbac_principal_apikey()
+      AND role_bindings.principal_id = v_api_key.rbac_id
+      AND (role_bindings.expires_at IS NULL OR role_bindings.expires_at > now())
+
+    UNION
+
+    SELECT role_bindings.org_id
+    FROM public.group_members
+    INNER JOIN public.groups ON groups.id = group_members.group_id
+    INNER JOIN public.role_bindings
+      ON role_bindings.principal_type = public.rbac_principal_group()
+      AND role_bindings.principal_id = group_members.group_id
+      AND role_bindings.scope_type = public.rbac_scope_org()
+      AND role_bindings.org_id = groups.org_id
+    WHERE group_members.user_id = v_user_id
+      AND role_bindings.org_id IS NOT NULL
+      AND (role_bindings.expires_at IS NULL OR role_bindings.expires_at > now())
+  )
+  SELECT COALESCE(array_agg(DISTINCT candidate_orgs.org_id), '{}'::uuid[])
+  INTO v_allowed
+  FROM candidate_orgs
+  INNER JOIN public.orgs ON orgs.id = candidate_orgs.org_id
+  WHERE (
+      v_api_key_text IS NULL
+      OR COALESCE(array_length(v_api_key.limited_to_orgs, 1), 0) = 0
+      OR candidate_orgs.org_id = ANY(v_api_key.limited_to_orgs)
+    )
+    AND (
+      v_api_key_text IS NULL
+      OR NOT COALESCE(orgs.require_apikey_expiration, false)
+      OR v_api_key.expires_at IS NOT NULL
+    )
+    -- Candidate collection is intentionally broad; this exact check preserves
+    -- legacy/RBAC permission semantics, 2FA, password policy, and API-key scope.
+    AND public.check_min_rights(
+      webhook_allowed_org_ids.min_right,
+      v_user_id,
+      candidate_orgs.org_id,
+      NULL::character varying,
+      NULL::bigint
+    );
+
+  RETURN v_allowed;
 END;
 $$;
 
-ALTER FUNCTION "public"."check_webhook_min_rights" ("min_right" "public"."user_min_right", "keymode" "public"."key_mode" [], "org_id" uuid, "app_id" character varying, "channel_id" bigint) OWNER TO "postgres";
-REVOKE ALL ON FUNCTION "public"."check_webhook_min_rights" ("min_right" "public"."user_min_right", "keymode" "public"."key_mode" [], "org_id" uuid, "app_id" character varying, "channel_id" bigint) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION "public"."check_webhook_min_rights" ("min_right" "public"."user_min_right", "keymode" "public"."key_mode" [], "org_id" uuid, "app_id" character varying, "channel_id" bigint) TO "anon";
-GRANT EXECUTE ON FUNCTION "public"."check_webhook_min_rights" ("min_right" "public"."user_min_right", "keymode" "public"."key_mode" [], "org_id" uuid, "app_id" character varying, "channel_id" bigint) TO "authenticated";
-GRANT EXECUTE ON FUNCTION "public"."check_webhook_min_rights" ("min_right" "public"."user_min_right", "keymode" "public"."key_mode" [], "org_id" uuid, "app_id" character varying, "channel_id" bigint) TO "service_role";
+ALTER FUNCTION "public"."webhook_allowed_org_ids" ("min_right" "public"."user_min_right", "keymode" "public"."key_mode" []) OWNER TO "postgres";
+REVOKE ALL ON FUNCTION "public"."webhook_allowed_org_ids" ("min_right" "public"."user_min_right", "keymode" "public"."key_mode" []) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION "public"."webhook_allowed_org_ids" ("min_right" "public"."user_min_right", "keymode" "public"."key_mode" []) TO "anon";
+GRANT EXECUTE ON FUNCTION "public"."webhook_allowed_org_ids" ("min_right" "public"."user_min_right", "keymode" "public"."key_mode" []) TO "authenticated";
+GRANT EXECUTE ON FUNCTION "public"."webhook_allowed_org_ids" ("min_right" "public"."user_min_right", "keymode" "public"."key_mode" []) TO "service_role";
+
+COMMENT ON FUNCTION "public"."webhook_allowed_org_ids" ("min_right" "public"."user_min_right", "keymode" "public"."key_mode" []) IS
+'Returns org IDs whose webhook rows are accessible to the current authenticated user or Capgo API key. It evaluates candidate orgs from legacy/RBAC bindings once per statement, applies webhook-specific API-key constraints, then verifies each candidate with check_min_rights() so webhook RLS can filter by indexed org_id instead of invoking authorization helpers per row.';
 
 DROP POLICY IF EXISTS "Allow admin to select webhooks" ON public.webhooks;
 DROP POLICY IF EXISTS "Allow admin to insert webhooks" ON public.webhooks;
@@ -178,13 +144,10 @@ ON public.webhooks
 FOR SELECT
 TO authenticated, anon
 USING (
-  public.check_webhook_min_rights(
+  org_id = ANY(COALESCE((SELECT public.webhook_allowed_org_ids(
     'admin'::public.user_min_right,
-    '{all,write,upload}'::public.key_mode [],
-    org_id,
-    NULL::character varying,
-    NULL::bigint
-  )
+    '{all,write,upload}'::public.key_mode []
+  )), '{}'::uuid[]))
 );
 
 CREATE POLICY "Allow admin to insert webhooks"
@@ -192,13 +155,10 @@ ON public.webhooks
 FOR INSERT
 TO authenticated, anon
 WITH CHECK (
-  public.check_webhook_min_rights(
+  org_id = ANY(COALESCE((SELECT public.webhook_allowed_org_ids(
     'admin'::public.user_min_right,
-    '{all,write,upload}'::public.key_mode [],
-    org_id,
-    NULL::character varying,
-    NULL::bigint
-  )
+    '{all,write,upload}'::public.key_mode []
+  )), '{}'::uuid[]))
 );
 
 CREATE POLICY "Allow admin to update webhooks"
@@ -206,22 +166,16 @@ ON public.webhooks
 FOR UPDATE
 TO authenticated, anon
 USING (
-  public.check_webhook_min_rights(
+  org_id = ANY(COALESCE((SELECT public.webhook_allowed_org_ids(
     'admin'::public.user_min_right,
-    '{all,write,upload}'::public.key_mode [],
-    org_id,
-    NULL::character varying,
-    NULL::bigint
-  )
+    '{all,write,upload}'::public.key_mode []
+  )), '{}'::uuid[]))
 )
 WITH CHECK (
-  public.check_webhook_min_rights(
+  org_id = ANY(COALESCE((SELECT public.webhook_allowed_org_ids(
     'admin'::public.user_min_right,
-    '{all,write,upload}'::public.key_mode [],
-    org_id,
-    NULL::character varying,
-    NULL::bigint
-  )
+    '{all,write,upload}'::public.key_mode []
+  )), '{}'::uuid[]))
 );
 
 CREATE POLICY "Allow admin to delete webhooks"
@@ -229,13 +183,10 @@ ON public.webhooks
 FOR DELETE
 TO authenticated, anon
 USING (
-  public.check_webhook_min_rights(
+  org_id = ANY(COALESCE((SELECT public.webhook_allowed_org_ids(
     'admin'::public.user_min_right,
-    '{all,write,upload}'::public.key_mode [],
-    org_id,
-    NULL::character varying,
-    NULL::bigint
-  )
+    '{all,write,upload}'::public.key_mode []
+  )), '{}'::uuid[]))
 );
 
 DROP POLICY IF EXISTS "Allow org members to select webhook_deliveries" ON public.webhook_deliveries;
@@ -247,13 +198,10 @@ ON public.webhook_deliveries
 FOR SELECT
 TO authenticated, anon
 USING (
-  public.check_webhook_min_rights(
+  org_id = ANY(COALESCE((SELECT public.webhook_allowed_org_ids(
     'read'::public.user_min_right,
-    '{read,write,upload,all}'::public.key_mode [],
-    org_id,
-    NULL::character varying,
-    NULL::bigint
-  )
+    '{read,write,upload,all}'::public.key_mode []
+  )), '{}'::uuid[]))
 );
 
 CREATE POLICY "Allow admin to insert webhook_deliveries"
@@ -261,13 +209,10 @@ ON public.webhook_deliveries
 FOR INSERT
 TO authenticated, anon
 WITH CHECK (
-  public.check_webhook_min_rights(
+  org_id = ANY(COALESCE((SELECT public.webhook_allowed_org_ids(
     'admin'::public.user_min_right,
-    '{all,write,upload}'::public.key_mode [],
-    org_id,
-    NULL::character varying,
-    NULL::bigint
-  )
+    '{all,write,upload}'::public.key_mode []
+  )), '{}'::uuid[]))
 );
 
 CREATE POLICY "Allow admin to update webhook_deliveries"
@@ -275,11 +220,8 @@ ON public.webhook_deliveries
 FOR UPDATE
 TO authenticated, anon
 USING (
-  public.check_webhook_min_rights(
+  org_id = ANY(COALESCE((SELECT public.webhook_allowed_org_ids(
     'admin'::public.user_min_right,
-    '{all,write,upload}'::public.key_mode [],
-    org_id,
-    NULL::character varying,
-    NULL::bigint
-  )
+    '{all,write,upload}'::public.key_mode []
+  )), '{}'::uuid[]))
 );
