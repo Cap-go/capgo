@@ -5,69 +5,143 @@ import type { Context } from 'hono'
 import { cloudlog, cloudlogErr } from './logging.ts'
 import { getEnv } from './utils.ts'
 
-// Fields that should be completely removed from logs (never logged)
-const REMOVED_FIELDS = ['password']
-// Fields that should show first 4 and last 4 characters
-const PARTIALLY_REDACTED_FIELDS = ['secret', 'token', 'apikey', 'api_key', 'authorization', 'credential', 'private_key']
-
-// Partially redact a value - show first 4 and last 4 characters
-function partialRedact(value: string): string {
-  if (value.length <= 8) {
-    return '***REDACTED***'
-  }
-  return `${value.slice(0, 4)}...${value.slice(-4)}`
+interface DiscordAlert500PayloadInput {
+  body: string
+  environment: string
+  error: Error
+  functionName: string
+  hasClientIp: boolean
+  hasUserAgent: boolean
+  method: string
+  rawHeaders: Record<string, string>
+  requestId: string
+  timestamp: string
+  url: string
 }
 
-// Remove or redact sensitive fields from a string that might contain JSON
-function sanitizeSensitiveFromString(str: string): string {
-  let result = str
-
-  // Completely remove password fields (including the key)
-  for (const field of REMOVED_FIELDS) {
-    // Remove "password":"value", or "password": "value" (with optional trailing comma)
-    const jsonRegexWithComma = new RegExp(`"${field}"\\s*:\\s*"[^"]*"\\s*,?\\s*`, 'gi')
-    result = result.replace(jsonRegexWithComma, '')
-    // Clean up any resulting double commas or leading/trailing commas in objects
-    result = result.replace(/,\s*,/g, ',')
-    result = result.replace(/\{\s*,/g, '{')
-    result = result.replace(/,\s*\}/g, '}')
-  }
-
-  // Partially redact other sensitive fields (show first 4 and last 4 chars)
-  for (const field of PARTIALLY_REDACTED_FIELDS) {
-    const jsonRegex = new RegExp(`("${field}"\\s*:\\s*)"([^"]*)"`, 'gi')
-    result = result.replace(jsonRegex, (_match, prefix, value) => {
-      return `${prefix}"${partialRedact(value)}"`
-    })
-  }
-
-  return result
+function boolLabel(value: boolean) {
+  return value ? 'yes' : 'no'
 }
 
-// Sanitize sensitive headers - remove or redact
-function sanitizeSensitiveHeaders(headers: Record<string, string>): Record<string, string> {
-  const sanitized: Record<string, string> = {}
-  for (const [key, value] of Object.entries(headers)) {
-    const lowerKey = key.toLowerCase()
-    // Skip password-related headers entirely
-    if (REMOVED_FIELDS.some(field => lowerKey.includes(field))) {
-      continue
-    }
-    else if (PARTIALLY_REDACTED_FIELDS.some(field => lowerKey.includes(field))) {
-      sanitized[key] = partialRedact(value)
-    }
-    else {
-      sanitized[key] = value
+function getPathSegmentCount(path: string) {
+  return path.split('/').filter(Boolean).length
+}
+
+function getUrlSummary(rawUrl: string) {
+  try {
+    const parsed = new URL(rawUrl)
+    return {
+      hasQuery: parsed.search.length > 0,
+      hasPath: parsed.pathname.length > 0,
+      pathSegmentCount: getPathSegmentCount(parsed.pathname),
     }
   }
-  return sanitized
+  catch {
+    const [path = ''] = rawUrl.split('?')
+    return {
+      hasQuery: rawUrl.includes('?'),
+      hasPath: path.length > 0,
+      pathSegmentCount: getPathSegmentCount(path),
+    }
+  }
+}
+
+function getHeaderSummary(headers: Record<string, string>) {
+  const headerNames = Object.keys(headers).map(headerName => headerName.toLowerCase())
+  return {
+    count: headerNames.length,
+    hasApiKey: headerNames.some(headerName =>
+      headerName === 'capgkey'
+      || headerName === 'x-api-key'
+      || headerName.includes('apikey')
+      || headerName.includes('api-key'),
+    ),
+    hasAuthorization: headerNames.includes('authorization'),
+    hasCookie: headerNames.includes('cookie') || headerNames.includes('set-cookie'),
+  }
+}
+
+function getSafeErrorName(error: Error) {
+  const errorName = error?.name ?? 'Error'
+  if (/^[\w .:-]{1,80}$/.test(errorName))
+    return errorName
+  return 'Error'
+}
+
+function getDiscordPayloadLogMetadata(payload: RESTPostAPIWebhookWithTokenJSONBody) {
+  const body = typeof payload === 'string'
+    ? { content: payload }
+    : payload
+  const maybeBody = body as {
+    content?: unknown
+    embeds?: unknown
+  }
+
+  return {
+    embedCount: Array.isArray(maybeBody.embeds) ? maybeBody.embeds.length : 0,
+    hasContent: typeof maybeBody.content === 'string' && maybeBody.content.length > 0,
+    payloadType: typeof payload,
+  }
+}
+
+function buildDiscordAlert500Payload(input: DiscordAlert500PayloadInput): RESTPostAPIWebhookWithTokenJSONBody {
+  const urlSummary = getUrlSummary(input.url)
+  const headerSummary = getHeaderSummary(input.rawHeaders)
+  const errorMessage = input.error?.message ?? ''
+  const errorStack = input.error?.stack ?? ''
+
+  return {
+    content: `🚨 **${input.functionName}** Error Alert`,
+    embeds: [
+      {
+        title: `❌ ${input.functionName} Function Failed`,
+        description: `**Error:** ${getSafeErrorName(input.error)}`,
+        color: 0xFF0000, // Red color
+        timestamp: input.timestamp,
+        fields: [
+          {
+            name: '🔍 Request Details',
+            value: `**Method:** ${input.method}\n**Path present:** ${boolLabel(urlSummary.hasPath)}\n**Path segments:** ${urlSummary.pathSegmentCount}\n**Has query:** ${boolLabel(urlSummary.hasQuery)}\n**Request ID:** ${input.requestId}`,
+            inline: false,
+          },
+          {
+            name: '🌐 Client Info',
+            value: `**IP present:** ${boolLabel(input.hasClientIp)}\n**User-Agent present:** ${boolLabel(input.hasUserAgent)}`,
+            inline: false,
+          },
+          {
+            name: '📝 Request Body',
+            value: `**Present:** ${boolLabel(input.body.length > 0)}\n**Character length:** ${input.body.length}`,
+            inline: false,
+          },
+          {
+            name: '🔧 Headers',
+            value: `**Count:** ${headerSummary.count}\n**Authorization present:** ${boolLabel(headerSummary.hasAuthorization)}\n**Cookie present:** ${boolLabel(headerSummary.hasCookie)}\n**API key present:** ${boolLabel(headerSummary.hasApiKey)}`,
+            inline: false,
+          },
+          {
+            name: '💥 Error Summary',
+            value: `**Message present:** ${boolLabel(errorMessage.length > 0)}\n**Message length:** ${errorMessage.length}\n**Stack present:** ${boolLabel(errorStack.length > 0)}`,
+            inline: false,
+          },
+        ],
+        footer: {
+          text: `Function: ${input.functionName} | Environment: ${input.environment || 'unknown'}`,
+        },
+      },
+    ],
+  }
 }
 
 export async function sendDiscordAlert(c: Context, payload: RESTPostAPIWebhookWithTokenJSONBody): Promise<boolean> {
   const webhookUrl = getEnv(c, 'DISCORD_ALERT')
 
   if (!webhookUrl) {
-    cloudlog({ requestId: c.get('requestId'), message: 'Discord not set', payload: JSON.stringify(payload) })
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'Discord not set',
+      payload: getDiscordPayloadLogMetadata(payload),
+    })
     return true
   }
 
@@ -100,63 +174,32 @@ export async function sendDiscordAlert(c: Context, payload: RESTPostAPIWebhookWi
 export function sendDiscordAlert500(c: Context, functionName: string, body: string, e: Error) {
   const requestId = c.get('requestId') ?? 'unknown'
   const timestamp = new Date().toISOString()
-  const userAgent = c.req.header('user-agent') ?? 'unknown'
-  const ip = c.req.header('cf-connecting-ip') ?? c.req.header('x-forwarded-for') ?? 'unknown'
+  const userAgent = c.req.header('user-agent')
+  const ip = c.req.header('cf-connecting-ip') ?? c.req.header('x-forwarded-for')
   const method = c.req.method
   const url = c.req.url
   const rawHeaders = Object.fromEntries((c.req.raw.headers as any).entries())
-  const headers = sanitizeSensitiveHeaders(rawHeaders)
-  const errorMessage = e?.message ?? 'Unknown error'
-  const errorStack = e?.stack ?? 'No stack trace'
-  const errorName = e?.name ?? 'Error'
-  // Defense-in-depth: remove/sanitize sensitive fields from body string
-  const safeBody = sanitizeSensitiveFromString(body)
-  return sendDiscordAlert(c, {
-    content: `🚨 **${functionName}** Error Alert`,
-    embeds: [
-      {
-        title: `❌ ${functionName} Function Failed`,
-        description: `**Error:** ${errorName}\n**Message:** ${errorMessage}`,
-        color: 0xFF0000, // Red color
-        timestamp,
-        fields: [
-          {
-            name: '🔍 Request Details',
-            value: `**Method:** ${method}\n**URL:** ${url}\n**Request ID:** ${requestId}`,
-            inline: false,
-          },
-          {
-            name: '🌐 Client Info',
-            value: `**IP:** ${ip}\n**User-Agent:** ${userAgent}`,
-            inline: false,
-          },
-          {
-            name: '📝 Request Body',
-            value: `\`\`\`\n${safeBody}\n\`\`\``,
-            inline: false,
-          },
-          {
-            name: '🔧 Headers',
-            value: `\`\`\`json\n${JSON.stringify(headers, null, 2).substring(0, 1000)}\n\`\`\``,
-            inline: false,
-          },
-          {
-            name: '💥 Error Stack',
-            value: `\`\`\`\n${errorStack.substring(0, 1000)}\n\`\`\``,
-            inline: false,
-          },
-          {
-            name: '🔍 Full Error Object',
-            value: `\`\`\`json\n${JSON.stringify(e, Object.getOwnPropertyNames(e), 2).substring(0, 1000)}\n\`\`\``,
-            inline: false,
-          },
-        ],
-        footer: {
-          text: `Function: ${functionName} | Environment: ${getEnv(c, 'ENVIRONMENT') || 'unknown'}`,
-        },
-      },
-    ],
-  }).catch((e: any) => {
+
+  const payload = buildDiscordAlert500Payload({
+    body,
+    environment: getEnv(c, 'ENVIRONMENT') || 'unknown',
+    error: e,
+    functionName,
+    hasClientIp: !!ip,
+    hasUserAgent: !!userAgent,
+    method,
+    rawHeaders,
+    requestId,
+    timestamp,
+    url,
+  })
+
+  return sendDiscordAlert(c, payload).catch((e: any) => {
     cloudlogErr({ requestId, functionName, message: 'sendDiscordAlert500 failed', error: e })
   })
+}
+
+export const __discordTestUtils__ = {
+  buildDiscordAlert500Payload,
+  getDiscordPayloadLogMetadata,
 }
