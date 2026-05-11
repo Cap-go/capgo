@@ -2,7 +2,10 @@ import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const createSignedUrlMock = vi.fn()
 const getAppByAppIdPgMock = vi.fn()
-const getPgClientMock = vi.fn(() => ({}))
+const pgClientMock = {
+  query: vi.fn(),
+}
+const getPgClientMock = vi.fn(() => pgClientMock)
 const storageFromMock = vi.fn(() => ({
   createSignedUrl: createSignedUrlMock,
 }))
@@ -46,6 +49,7 @@ describe('files local read proxy', () => {
   beforeEach(() => {
     vi.resetModules()
     vi.clearAllMocks()
+    pgClientMock.query.mockResolvedValue({ rows: [] })
     globalThis.fetch = originalFetch
   })
 
