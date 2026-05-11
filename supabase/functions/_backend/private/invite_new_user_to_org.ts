@@ -161,7 +161,7 @@ async function validateInvite(c: Context, rawBody: any) {
 
 app.post('/', middlewareAuth, async (c) => {
   const rawBody = await parseBody<any>(c)
-  cloudlog({ requestId: c.get('requestId'), context: 'invite_new_user_to_org raw body', rawBody })
+  cloudlog({ requestId: c.get('requestId'), context: 'invite_new_user_to_org request' })
 
   const res = await validateInvite(c, rawBody)
   if (!res.inviteCreatorUser) {

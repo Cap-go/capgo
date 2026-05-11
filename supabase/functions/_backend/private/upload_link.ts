@@ -19,7 +19,7 @@ export const app = new Hono<MiddlewareKeyVariables>()
 
 app.post('/', middlewareKey(['all', 'write', 'upload']), async (c) => {
   const body = await parseBody<DataUpload>(c)
-  cloudlog({ requestId: c.get('requestId'), message: 'post upload link body', body })
+  cloudlog({ requestId: c.get('requestId'), message: 'post upload link request' })
   const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
   const capgkey = c.get('capgkey') as string
   cloudlog({

@@ -17,7 +17,7 @@ app.use('/', useCors)
 
 app.post('/', middlewareAuth, async (c) => {
   const body = await parseBody<PortalData>(c)
-  cloudlog({ requestId: c.get('requestId'), message: 'post stripe portal body', body })
+  cloudlog({ requestId: c.get('requestId'), message: 'post stripe portal request' })
   const authorization = c.get('authorization')
   if (!authorization)
     throw simpleError('not_authorized', 'Not authorized')
@@ -44,7 +44,7 @@ app.post('/', middlewareAuth, async (c) => {
   if (!await checkPermission(c, 'org.update_billing', { orgId: body.orgId }))
     throw simpleError('not_authorize', 'Not authorize')
 
-  cloudlog({ requestId: c.get('requestId'), message: 'org', org })
+  cloudlog({ requestId: c.get('requestId'), message: 'stripe portal org loaded', hasCustomer: Boolean(org.customer_id) })
   const link = await createPortal(c, org.customer_id, body.callbackUrl)
   return c.json({ url: link.url })
 })
