@@ -6,6 +6,8 @@ describe('update URL validation', () => {
   it.concurrent('accepts HTTPS update URLs and normalizes schemeless hosts', () => {
     expect(normalizeUpdateUrl('https://updates.example.com/bundle.zip')).toBe('https://updates.example.com/bundle.zip')
     expect(normalizeUpdateUrl('updates.example.com/bundle.zip')).toBe('https://updates.example.com/bundle.zip')
+    expect(normalizeUpdateUrl('updates.example.com:8443/bundle.zip')).toBe('https://updates.example.com:8443/bundle.zip')
+    expect(normalizeUpdateUrl('localhost:5173/bundle.zip')).toBe('https://localhost:5173/bundle.zip')
     expect(isAllowedUpdateUrl('https://updates.example.com/bundle.zip')).toBe(true)
   })
 

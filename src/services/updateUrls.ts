@@ -1,4 +1,5 @@
-const explicitSchemePattern = /^[a-z][a-z\d+.-]*:/i
+const explicitWebUrlPattern = /^https?:\/\//i
+const explicitSchemeUrlPattern = /^[a-z][a-z\d+.-]*:\/\//i
 const localHttpHosts = new Set(['localhost', '127.0.0.1', '::1'])
 
 function isLocalHttpHost(hostname: string): boolean {
@@ -14,7 +15,10 @@ export function normalizeUpdateUrl(value: string): string {
   if (!trimmed || trimmed.startsWith('//') || trimmed.includes('\\'))
     return ''
 
-  const urlValue = explicitSchemePattern.test(trimmed) ? trimmed : `https://${trimmed}`
+  if (explicitSchemeUrlPattern.test(trimmed) && !explicitWebUrlPattern.test(trimmed))
+    return ''
+
+  const urlValue = explicitWebUrlPattern.test(trimmed) ? trimmed : `https://${trimmed}`
 
   let parsedUrl: URL
   try {
