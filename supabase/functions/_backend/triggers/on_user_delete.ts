@@ -4,7 +4,7 @@ import type { Database } from '../utils/supabase.types.ts'
 import { Hono } from 'hono/tiny'
 import { unsubscribeBento } from '../utils/bento.ts'
 import { BRES, middlewareAPISecret, triggerValidator } from '../utils/hono.ts'
-import { cloudlog, summarizeRecordForLog } from '../utils/logging.ts'
+import { cloudlog, summarizePresenceForLog, summarizeRecordForLog } from '../utils/logging.ts'
 import { cancelSubscription } from '../utils/stripe.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
 
@@ -339,11 +339,21 @@ async function deleteUserImages(
         .storage
         .from('images')
         .remove(filePaths)
-      cloudlog({ requestId: c.get('requestId'), message: 'deleted user images', count: files.length, user_id: userId })
+      cloudlog({
+        requestId: c.get('requestId'),
+        message: 'deleted user images',
+        count: files.length,
+        ...summarizePresenceForLog('user_id', userId),
+      })
     }
   }
   catch (error) {
-    cloudlog({ requestId: c.get('requestId'), message: 'error deleting user images', error, user_id: userId })
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'error deleting user images',
+      error,
+      ...summarizePresenceForLog('user_id', userId),
+    })
   }
 }
 
@@ -440,7 +450,7 @@ async function deleteUser(c: Context, record: Database['public']['Tables']['user
     requestId: c.get('requestId'),
     context: 'user deletion completed',
     duration_ms: duration,
-    user_id: record.id,
+    ...summarizePresenceForLog('user_id', record.id),
   })
 
   return c.json(BRES)

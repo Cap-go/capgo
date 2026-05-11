@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { summarizeRecordForLog } from '../supabase/functions/_backend/utils/logging.ts'
+import { summarizePresenceForLog, summarizeRecordForLog } from '../supabase/functions/_backend/utils/logging.ts'
 
 describe('summarizeRecordForLog', () => {
   it.concurrent('keeps field presence while redacting raw profile fields', () => {
@@ -33,5 +33,12 @@ describe('summarizeRecordForLog', () => {
       fieldCount: 0,
       hasRecord: false,
     })
+  })
+
+  it.concurrent('summarizes standalone identifiers without retaining raw values', () => {
+    const summary = summarizePresenceForLog('user_id', 'user-123')
+
+    expect(summary).toEqual({ has_user_id: true })
+    expect(JSON.stringify(summary)).not.toContain('user-123')
   })
 })

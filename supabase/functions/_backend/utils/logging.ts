@@ -26,6 +26,16 @@ export function serializeError(err: unknown) {
   }
 }
 
+function hasLogValue(value: unknown) {
+  return value !== undefined && value !== null && value !== ''
+}
+
+export function summarizePresenceForLog(field: string, value: unknown) {
+  return {
+    [`has_${field}`]: hasLogValue(value),
+  }
+}
+
 export function summarizeRecordForLog<T extends object>(
   record: T | null | undefined,
   options: {
@@ -46,7 +56,7 @@ export function summarizeRecordForLog<T extends object>(
 
   for (const field of options.presenceFields ?? []) {
     const value = recordValues[field]
-    summary[`has_${field}`] = value !== undefined && value !== null && value !== ''
+    summary[`has_${field}`] = hasLogValue(value)
   }
 
   return summary
