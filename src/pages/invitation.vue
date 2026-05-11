@@ -76,10 +76,22 @@ const organizationInitials = computed(() => {
     .join('')
 })
 
+function scrubInviteMagicStringFromUrl() {
+  const url = new URL(window.location.href)
+  url.searchParams.delete('invite_magic_string')
+  window.history.replaceState(window.history.state, '', url.toString())
+}
+
 onMounted(async () => {
   const supabase = useSupabase()
-  if (route.query.invite_magic_string) {
-    inviteMagicString.value = route.query.invite_magic_string as string
+  const inviteMagicLookup = Array.isArray(route.query.invite_magic_string)
+    ? route.query.invite_magic_string[0]
+    : route.query.invite_magic_string
+
+  if (inviteMagicLookup) {
+    inviteMagicString.value = inviteMagicLookup
+    scrubInviteMagicStringFromUrl()
+
     const { data, error } = await supabase.rpc('get_invite_by_magic_lookup', {
       lookup: inviteMagicString.value,
     }).single()
