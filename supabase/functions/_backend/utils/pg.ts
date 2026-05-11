@@ -1854,6 +1854,7 @@ export interface AdminTrialOrganization {
   org_id: string
   org_name: string
   management_email: string
+  plan_name: string | null
   trial_end_date: string
   days_remaining: number
   trial_extension_count: number
@@ -1881,7 +1882,9 @@ export async function getAdminTrialOrganizations(
   offset: number = 0,
 ): Promise<AdminTrialOrganizationsResult> {
   try {
-    const pgClient = getPgClient(c, true) // Read-only query
+    // The admin dashboard needs plans.name, and plans is not replicated to
+    // PlanetScale read replicas.
+    const pgClient = getPgClient(c)
     const drizzleClient = getDrizzleClient(pgClient)
 
     // Query to get trial organizations ordered by days remaining (ascending - expiring soon first)
@@ -1903,6 +1906,7 @@ export async function getAdminTrialOrganizations(
         o.id AS org_id,
         o.name AS org_name,
         o.management_email,
+        p.name AS plan_name,
         si.trial_at AS trial_end_date,
         GREATEST(0, (si.trial_at::date - CURRENT_DATE)) AS days_remaining,
         CASE
@@ -1914,6 +1918,7 @@ export async function getAdminTrialOrganizations(
         lbu.last_bundle_upload_at
       FROM orgs o
       INNER JOIN stripe_info si ON si.customer_id = o.customer_id
+      LEFT JOIN plans p ON p.stripe_id = si.product_id
       LEFT JOIN latest_bundle_uploads lbu ON lbu.owner_org = o.id
       WHERE si.trial_at::date >= CURRENT_DATE
         AND (si.status IS NULL OR si.status != 'succeeded')
@@ -1940,6 +1945,7 @@ export async function getAdminTrialOrganizations(
       org_id: row.org_id,
       org_name: row.org_name,
       management_email: row.management_email,
+      plan_name: row.plan_name ?? null,
       trial_end_date: normalizeTimestamp(row.trial_end_date) ?? '',
       days_remaining: Number(row.days_remaining),
       trial_extension_count: Number(row.trial_extension_count) || 0,

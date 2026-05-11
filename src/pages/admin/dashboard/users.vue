@@ -112,6 +112,7 @@ interface TrialOrganization {
   org_id: string
   org_name: string
   management_email: string
+  plan_name: string | null
   trial_end_date: string
   days_remaining: number
   trial_extension_count: number
@@ -179,6 +180,13 @@ const trialOrganizationsColumns = ref<TableColumn[]>([
     ]),
   },
   { label: t('email'), key: 'management_email', mobile: false, sortable: false },
+  {
+    label: t('plan'),
+    key: 'plan_name',
+    mobile: true,
+    sortable: false,
+    displayFunction: (item: TrialOrganization) => item.plan_name || t('unknown'),
+  },
   {
     label: t('days-remaining'),
     key: 'days_remaining',
