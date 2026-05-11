@@ -109,7 +109,7 @@ async function loadReplicationStatus() {
     const { data: { session } } = await supabase.auth.getSession()
 
     if (!session?.access_token)
-      throw new Error('No Supabase session available for replication status')
+      throw new Error('No active session available')
 
     headers.Authorization = `Bearer ${session.access_token}`
 
@@ -202,7 +202,7 @@ displayStore.defaultBack = '/dashboard'
           {{ errorMessage }}
         </div>
 
-        <div v-else-if="isLoading && !data" class="flex items-center justify-center min-h-75">
+        <div v-else-if="isLoading && !data" class="flex items-center justify-center min-h-80">
           <Spinner size="w-24 h-24" />
         </div>
 

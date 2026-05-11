@@ -27,8 +27,27 @@ const route = useRoute()
 
 onClickOutside(sidebar, () => emit('closeSidebar'))
 
+function normalizeSidebarPath(path: string) {
+  let normalizedPath = path
+
+  while (normalizedPath.length > 1 && normalizedPath.endsWith('/'))
+    normalizedPath = normalizedPath.slice(0, -1)
+
+  return normalizedPath || '/'
+}
+
 function isTabActive(tab: string) {
-  return route.path.includes(tab)
+  if (tab === '#')
+    return false
+
+  const currentPath = normalizeSidebarPath(route.path)
+  const activePaths = tab === '/apps' ? ['/apps', '/app'] : [tab]
+
+  return activePaths.some((activePath) => {
+    const tabPath = normalizeSidebarPath(activePath)
+
+    return currentPath === tabPath || currentPath.startsWith(`${tabPath}/`)
+  })
 }
 function openTab(tab: Tab) {
   if (tab.onClick)

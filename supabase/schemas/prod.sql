@@ -16272,7 +16272,8 @@ CREATE TABLE IF NOT EXISTS "public"."global_stats" (
     "plan_solo_conversion_rate" double precision DEFAULT 0 NOT NULL,
     "plan_maker_conversion_rate" double precision DEFAULT 0 NOT NULL,
     "plan_team_conversion_rate" double precision DEFAULT 0 NOT NULL,
-    "plan_enterprise_conversion_rate" double precision DEFAULT 0 NOT NULL
+    "plan_enterprise_conversion_rate" double precision DEFAULT 0 NOT NULL,
+    "plan_total_conversion_rate" double precision DEFAULT 0 NOT NULL
 );
 
 
@@ -16468,6 +16469,10 @@ COMMENT ON COLUMN "public"."global_stats"."plan_team_conversion_rate" IS 'Percen
 
 
 COMMENT ON COLUMN "public"."global_stats"."plan_enterprise_conversion_rate" IS 'Percentage of organizations converted to the Enterprise plan (plan_enterprise / orgs * 100)';
+
+
+
+COMMENT ON COLUMN "public"."global_stats"."plan_total_conversion_rate" IS 'Percentage of organizations converted to any paid plan ((plan_solo + plan_maker + plan_team + plan_enterprise) / orgs * 100)';
 
 
 
