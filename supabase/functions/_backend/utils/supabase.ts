@@ -7,7 +7,7 @@ import { createClient } from '@supabase/supabase-js'
 import { buildNormalizedDeviceForWrite, hasComparableDeviceChanged, nullableString } from './deviceComparison.ts'
 import { simpleError } from './hono.ts'
 import { cloudlog, cloudlogErr } from './logging.ts'
-import { createCustomer } from './stripe.ts'
+import { createCustomer, getCreateStripeCustomerInfoLogMetadata } from './stripe.ts'
 import { Constants } from './supabase.types.ts'
 import { getEnv, isStripeConfigured } from './utils.ts'
 
@@ -963,11 +963,7 @@ export async function createStripeCustomer(c: Context, org: Database['public']['
   cloudlog({
     requestId: c.get('requestId'),
     message: 'createInfo',
-    planName: selectedPlan.name,
-    planId: selectedPlan.id,
-    stripeProductId: selectedPlan.stripe_id,
-    hasCustomerId: Boolean(customer.id),
-    orgId: org.id,
+    ...getCreateStripeCustomerInfoLogMetadata(org.id, selectedPlan, customer.id),
   })
   const { error: createInfoError } = await supabaseAdmin(c)
     .from('stripe_info')
