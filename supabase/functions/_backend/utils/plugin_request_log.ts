@@ -2,6 +2,9 @@ import type { AppInfos, AppStats } from './types.ts'
 
 type PluginRequestLogBody = Partial<AppInfos & AppStats & { channel?: string }>
 
+/**
+ * Builds a metadata-only representation of plugin request bodies for logs.
+ */
 export function summarizePluginRequestForLog(body: PluginRequestLogBody | null | undefined) {
   return {
     app_id: body?.app_id,
