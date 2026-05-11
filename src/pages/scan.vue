@@ -160,7 +160,7 @@ async function submitManualUrl() {
 
   if (!isNativePlatform) {
     toast.success(`Opening ${new URL(updateUrl).host}`)
-    window.location.assign(updateUrl)
+    globalThis.location.assign(updateUrl)
     return
   }
 
