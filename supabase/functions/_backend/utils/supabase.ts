@@ -960,7 +960,15 @@ export async function createStripeCustomer(c: Context, org: Database['public']['
     cloudlog({ requestId: c.get('requestId'), message: 'no default plan' })
     throw new Error('no default plan')
   }
-  cloudlog({ requestId: c.get('requestId'), message: 'createInfo', plan: selectedPlan, customer })
+  cloudlog({
+    requestId: c.get('requestId'),
+    message: 'createInfo',
+    planName: selectedPlan.name,
+    planId: selectedPlan.id,
+    stripeProductId: selectedPlan.stripe_id,
+    hasCustomerId: Boolean(customer.id),
+    orgId: org.id,
+  })
   const { error: createInfoError } = await supabaseAdmin(c)
     .from('stripe_info')
     .insert({
