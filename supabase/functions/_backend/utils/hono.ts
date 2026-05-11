@@ -211,6 +211,21 @@ export const middlewareAPISecret = honoFactory.createMiddleware(async (c, next) 
 
 export const BRES = { status: 'ok' }
 
+export function buildWorkerSourceHeaders(functionName: string, envName: string, versionMetadata?: Partial<Bindings['CF_VERSION_METADATA']>) {
+  const headers: Record<string, string> = {
+    'X-Worker-Source': `${envName || functionName}-${CapgoVersion}`,
+  }
+
+  if (versionMetadata?.id)
+    headers['X-Worker-Version-Id'] = versionMetadata.id
+  if (versionMetadata?.tag)
+    headers['X-Worker-Version-Tag'] = versionMetadata.tag
+  if (versionMetadata?.timestamp)
+    headers['X-Worker-Version-Timestamp'] = versionMetadata.timestamp
+
+  return headers
+}
+
 export function createHono(functionName: string, _version: string) {
   let appGlobal
   if (getRuntimeKey() === 'deno') {
@@ -221,8 +236,9 @@ export function createHono(functionName: string, _version: string) {
   }
   appGlobal.use('*', (c, next): Promise<any> => {
     // ADD HEADER TO IDENTIFY WORKER SOURCE
-    const name = `${getEnv(c, 'ENV_NAME') || functionName}-${CapgoVersion}`
-    c.header('X-Worker-Source', name)
+    const headers = buildWorkerSourceHeaders(functionName, getEnv(c, 'ENV_NAME'), c.env?.CF_VERSION_METADATA)
+    for (const [header, value] of Object.entries(headers))
+      c.header(header, value)
     return next()
   })
 
