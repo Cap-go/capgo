@@ -34,7 +34,7 @@ afterEach(() => {
 describe('webhook delivery redirect handling', () => {
   it('sends webhook requests with manual redirect handling', async () => {
     mockGetEnv.mockReturnValue('')
-    const fetchMock = vi.fn().mockResolvedValue(new Response('ok', { status: 200 }))
+    const fetchMock = vi.fn().mockImplementation(async () => new Response('ok', { status: 200 }))
     vi.stubGlobal('fetch', fetchMock)
 
     const { deliverWebhook } = await import('../supabase/functions/_backend/utils/webhook.ts')
@@ -60,8 +60,9 @@ describe('webhook delivery redirect handling', () => {
     )
 
     expect(result.success).toBe(true)
-    expect(fetchMock).toHaveBeenCalledOnce()
-    expect(fetchMock.mock.calls[0]?.[1]).toMatchObject({
+    const webhookCalls = fetchMock.mock.calls.filter(([url]) => url === 'https://example.com/webhook')
+    expect(webhookCalls).toHaveLength(1)
+    expect(webhookCalls[0]?.[1]).toMatchObject({
       method: 'POST',
       redirect: 'manual',
     })
@@ -101,6 +102,53 @@ describe('webhook delivery redirect handling', () => {
 
     expect(result.success).toBe(false)
     expect(result.status).toBe(302)
-    expect(fetchMock).toHaveBeenCalledOnce()
+    const webhookCalls = fetchMock.mock.calls.filter(([url]) => url === 'https://example.com/webhook')
+    expect(webhookCalls).toHaveLength(1)
+  })
+
+  it('blocks webhook hosts that resolve to private addresses before delivery', async () => {
+    mockGetEnv.mockReturnValue('')
+    const fetchMock = vi.fn(async (input: string | URL | Request) => {
+      const urlString = String(input)
+      const url = new URL(urlString)
+
+      if (url.hostname === 'cloudflare-dns.com') {
+        const type = url.searchParams.get('type')
+        return new Response(JSON.stringify({
+          Answer: type === 'A' ? [{ data: '127.0.0.1' }] : [],
+        }))
+      }
+
+      return new Response('should not post', { status: 200 })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const { deliverWebhook } = await import('../supabase/functions/_backend/utils/webhook.ts')
+    const result = await deliverWebhook(
+      createContext(),
+      'delivery-3',
+      'https://private.example/webhook',
+      {
+        event: 'app_versions.INSERT',
+        event_id: 'event-3',
+        timestamp: new Date().toISOString(),
+        org_id: 'org-1',
+        data: {
+          table: 'app_versions',
+          operation: 'INSERT',
+          record_id: 'record-3',
+          old_record: null,
+          new_record: null,
+          changed_fields: null,
+        },
+      },
+      'secret',
+    )
+
+    expect(result).toMatchObject({
+      success: false,
+      body: 'Error: Webhook URL must point to a public host',
+    })
+    expect(fetchMock.mock.calls.some(([url]) => url === 'https://private.example/webhook')).toBe(false)
   })
 })
