@@ -19199,7 +19199,7 @@ CREATE POLICY "Allow org super_admins to delete sso_providers" ON "public"."sso_
 
 
 
-CREATE POLICY "Allow owner to delete own apikeys" ON "public"."apikeys" FOR DELETE TO "anon", "authenticated" USING (("user_id" = ( SELECT "public"."get_identity"('{write,all}'::"public"."key_mode"[]) AS "get_identity")));
+CREATE POLICY "Allow owner to delete own apikeys" ON "public"."apikeys" FOR DELETE TO "anon", "authenticated" USING (("user_id" = ( SELECT "public"."get_identity_for_apikey_creation"() AS "get_identity_for_apikey_creation")));
 
 
 
@@ -19211,7 +19211,7 @@ CREATE POLICY "Allow owner to insert own users" ON "public"."users" FOR INSERT T
 
 
 
-CREATE POLICY "Allow owner to select own apikeys" ON "public"."apikeys" FOR SELECT TO "anon", "authenticated" USING (("user_id" = ( SELECT "public"."get_identity"('{read,upload,write,all}'::"public"."key_mode"[]) AS "get_identity")));
+CREATE POLICY "Allow owner to select own apikeys" ON "public"."apikeys" FOR SELECT TO "anon", "authenticated" USING (("user_id" = ( SELECT "public"."get_identity_for_apikey_creation"() AS "get_identity_for_apikey_creation")));
 
 
 
@@ -22891,7 +22891,6 @@ ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT SELECT,INS
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLES TO "anon";
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLES TO "authenticated";
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLES TO "service_role";
-
 
 
 

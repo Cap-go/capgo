@@ -1,6 +1,6 @@
 BEGIN;
 
-SELECT plan(8);
+SELECT plan(10);
 
 SELECT tests.authenticate_as_service_role();
 SELECT tests.create_supabase_user('apikey_creation_owner', 'apikey_creation_owner@test.local');
@@ -85,6 +85,30 @@ SELECT throws_ok(
   'new row violates row-level security policy for table "apikeys"',
   'limited API key cannot create a broader key through direct table insert'
 );
+
+SELECT is(
+  (
+    SELECT COUNT(*)
+    FROM public.apikeys
+    WHERE user_id = tests.get_supabase_uid('apikey_creation_owner')
+  ),
+  0::bigint,
+  'limited API key cannot enumerate sibling API keys through direct table select'
+);
+
+DELETE FROM public.apikeys
+WHERE id = 53002;
+
+SELECT tests.authenticate_as_service_role();
+
+SELECT is(
+  (SELECT COUNT(*) FROM public.apikeys WHERE id = 53002),
+  1::bigint,
+  'limited API key cannot delete sibling API keys through direct table delete'
+);
+
+SELECT tests.clear_authentication();
+SELECT set_config('request.headers', '{"capgkey": "apikey-create-limited-key"}', true);
 
 UPDATE public.apikeys
 SET limited_to_orgs = '{}'::uuid[]
