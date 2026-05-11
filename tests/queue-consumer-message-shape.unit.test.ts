@@ -170,4 +170,23 @@ describe('queue_consumer legacy message compatibility', () => {
       errorMessage: 'builder unavailable',
     })
   })
+
+  it.concurrent('redacts sensitive data from extracted JSON error messages', async () => {
+    const token = 'abcdefghijklmnopqrstuvwxyz1234567890ABCDEFGH'
+    const response = new Response(JSON.stringify({
+      message: `invalid token ${token} for user alice@capgo.app`,
+    }), {
+      headers: {
+        'content-type': 'application/json',
+      },
+      status: 401,
+      statusText: 'Unauthorized',
+    })
+
+    const details = await __queueConsumerTestUtils__.extractErrorDetails(response)
+
+    expect(details.errorMessage).toBe('invalid token [REDACTED_TOKEN] for user [REDACTED_EMAIL]')
+    expect(details.errorMessage).not.toContain(token)
+    expect(details.errorMessage).not.toContain('alice@capgo.app')
+  })
 })

@@ -435,7 +435,7 @@ async function extractErrorDetails(response: Response): Promise<{
     return {
       bodyPreview,
       errorCode: typeof errorCode === 'string' ? errorCode : null,
-      errorMessage: typeof errorMessage === 'string' ? errorMessage : null,
+      errorMessage: typeof errorMessage === 'string' ? sanitizeDiscordResponseBody(errorMessage) : null,
     }
   }
   return {
