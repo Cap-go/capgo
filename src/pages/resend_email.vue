@@ -8,6 +8,7 @@ import { toast } from 'vue-sonner'
 import iconEmail from '~icons/oui/email?raw'
 import { authGhostButtonClass, authInsetCardClass, authPanelClass, authPrimaryButtonClass } from '~/components/auth/pageStyles'
 import { getRecentEmailOtpVerification, sendEmailOtpVerification, verifyEmailOtp } from '~/services/emailOtp'
+import { getSafeRedirectPath } from '~/services/redirects'
 import { useSupabase } from '~/services/supabase'
 import { openSupport } from '~/services/support'
 import { useMainStore } from '~/stores/main'
@@ -25,7 +26,9 @@ const otpVerificationLoading = ref(false)
 const currentUserId = ref('')
 const currentUserEmail = ref('')
 const emailVerificationBlockingReason = computed(() => route.query.reason === 'email_not_verified')
-const returnTo = computed(() => (typeof route.query.return_to === 'string' ? route.query.return_to : ''))
+const rawReturnTo = computed(() => (typeof route.query.return_to === 'string' ? route.query.return_to : ''))
+const returnTo = computed(() => getSafeRedirectPath(rawReturnTo.value, '/settings/account'))
+const returnToLabel = computed(() => rawReturnTo.value ? returnTo.value : '')
 const usesEmailOtpFlow = computed(() => emailVerificationBlockingReason.value && !!currentUserId.value && !!currentUserEmail.value)
 
 async function submit(form: { email: string }) {
@@ -56,7 +59,7 @@ async function loadDeleteEmailVerificationState() {
 
     const { isVerified } = await getRecentEmailOtpVerification(supabase, currentUserId.value)
     if (isVerified)
-      await router.replace(returnTo.value || '/settings/account')
+      await router.replace(returnTo.value)
   }
   catch (error) {
     console.error('Cannot load email verification state', error)
@@ -102,7 +105,7 @@ async function verifyOtpCode() {
     return
   }
 
-  await router.replace(returnTo.value || '/settings/account')
+  await router.replace(returnTo.value)
 }
 
 onMounted(async () => {
@@ -131,8 +134,8 @@ onMounted(async () => {
         <p class="mt-2 text-sm leading-6">
           {{ t('email-not-verified-banner-body') }}
         </p>
-        <p v-if="returnTo" class="mt-3 text-xs font-medium tracking-[0.12em] uppercase">
-          {{ t('attempted-destination') }} {{ returnTo }}
+        <p v-if="returnToLabel" class="mt-3 text-xs font-medium tracking-[0.12em] uppercase">
+          {{ t('attempted-destination') }} {{ returnToLabel }}
         </p>
       </div>
 

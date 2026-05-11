@@ -9,6 +9,7 @@ import IconUsers from '~icons/lucide/users-round'
 import IconBack from '~icons/material-symbols/arrow-back-ios-rounded'
 import InviteTeammateModal from '~/components/dashboard/InviteTeammateModal.vue'
 import { uploadOrgLogoFile } from '~/services/photos'
+import { getSafeRedirectPath } from '~/services/redirects'
 import { useSupabase } from '~/services/supabase'
 import { useDisplayStore } from '~/stores/display'
 import { useMainStore } from '~/stores/main'
@@ -241,9 +242,9 @@ async function goBack() {
     return
   }
 
-  const fallbackPath = typeof route.query.to === 'string' && route.query.to && !route.query.to.startsWith('/onboarding/')
-    ? route.query.to
-    : '/login'
+  const fallbackPath = getSafeRedirectPath(route.query.to, '/login', {
+    blockedPrefixes: ['/onboarding'],
+  })
   await router.push(fallbackPath)
 }
 
@@ -267,12 +268,16 @@ async function logoutFromOnboarding() {
 }
 
 async function syncRouteQuery(nextStep: OnboardingStep, orgId = createdOrgId.value) {
+  const redirectTarget = getSafeRedirectPath(route.query.to, '', {
+    blockedPrefixes: ['/onboarding'],
+  })
+
   await router.replace({
     path: '/onboarding/organization',
     query: {
       ...(orgId ? { org: orgId } : {}),
       ...(typeof route.query.source === 'string' ? { source: route.query.source } : {}),
-      ...(typeof route.query.to === 'string' ? { to: route.query.to } : {}),
+      ...(redirectTarget ? { to: redirectTarget } : {}),
       step: nextStep,
     },
   })

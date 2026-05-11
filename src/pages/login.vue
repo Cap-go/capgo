@@ -14,6 +14,7 @@ import iconEmail from '~icons/oui/email?raw'
 import iconPassword from '~icons/ph/key?raw'
 import mfaIcon from '~icons/simple-icons/2fas?raw'
 import { hideLoader } from '~/services/loader'
+import { getSafeRedirectPath } from '~/services/redirects'
 import { autoAuth, defaultApiHost, hashEmail, useSupabase } from '~/services/supabase'
 import { openSupport } from '~/services/support'
 
@@ -166,12 +167,7 @@ onBeforeUnmount(() => {
 })
 
 async function nextLogin() {
-  if (route.query.to && typeof route.query.to === 'string') {
-    await router.replace(route.query.to)
-  }
-  else {
-    await router.replace('/dashboard')
-  }
+  await router.replace(getSafeRedirectPath(route.query.to))
   setTimeout(async () => {
     isLoading.value = false
   }, 500)
@@ -342,8 +338,9 @@ async function handleSsoLogin() {
 
   try {
     const redirectUrl = new URL('/sso-callback', window.location.origin)
-    if (route.query.to && typeof route.query.to === 'string') {
-      redirectUrl.searchParams.set('to', route.query.to)
+    const redirectTarget = getSafeRedirectPath(route.query.to, '')
+    if (redirectTarget) {
+      redirectUrl.searchParams.set('to', redirectTarget)
     }
 
     const { data, error } = await supabase.auth.signInWithSSO({
