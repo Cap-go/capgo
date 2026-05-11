@@ -13,6 +13,10 @@ function isLocalHttpUrl(url: URL) {
   return url.protocol === 'http:' && localHttpHostnames.has(url.hostname)
 }
 
+function isLocalHttpDialogHrefAllowed() {
+  return import.meta.env.DEV
+}
+
 export function isSafeDialogHref(href?: string): href is string {
   const trimmedHref = href?.trim()
   if (!trimmedHref)
@@ -29,7 +33,7 @@ export function isSafeDialogHref(href?: string): href is string {
     if (safeDialogHrefProtocols.has(url.protocol))
       return true
     if (url.protocol === 'http:')
-      return isLocalHttpUrl(url) && isLocalHttpUrl(baseUrl)
+      return isLocalHttpDialogHrefAllowed() && isLocalHttpUrl(url) && isLocalHttpUrl(baseUrl)
     if (url.protocol !== 'https:')
       return false
 

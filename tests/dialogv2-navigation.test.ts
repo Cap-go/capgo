@@ -5,6 +5,7 @@ describe('dialog v2 navigation', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     vi.unstubAllGlobals()
+    vi.unstubAllEnvs()
     setActivePinia(createPinia())
   })
 
@@ -46,6 +47,18 @@ describe('dialog v2 navigation', () => {
     const { isSafeDialogHref } = await import('~/stores/dialogv2')
 
     expect(isSafeDialogHref(href)).toBe(true)
+  })
+
+  it.each([
+    'http://localhost:5173/settings',
+    'http://[::1]:5173/settings',
+  ])('rejects local HTTP dialog href %s outside dev mode', async (href) => {
+    vi.stubEnv('DEV', false)
+    vi.stubGlobal('location', { origin: 'http://localhost:5173' })
+
+    const { isSafeDialogHref } = await import('~/stores/dialogv2')
+
+    expect(isSafeDialogHref(href)).toBe(false)
   })
 
   it('does not navigate unsafe dialog hrefs', async () => {
