@@ -115,7 +115,7 @@ describe('redactUrl', () => {
     expect(redactUrl(url)).toBe(url)
   })
 
-  it('handles unparseable URL gracefully', () => {
+  it('handles unparsable URL gracefully', () => {
     const bad = 'not-a-url'
     expect(redactUrl(bad)).toBe(bad)
   })
