@@ -5,16 +5,9 @@ import { describe, expect, it } from 'vitest'
  * in error details from the organization audit endpoint.
  */
 
-function buildSafeIssues(issues: any[]) {
-  return issues.map((issue: any) => ({
-    code: issue.code ?? 'unknown',
-    path: Array.isArray(issue.path) ? issue.path.map(String) : [],
-  }))
-}
-
+// The simplified redaction approach: only expose issue_count
 function buildRedactedError(rawIssues: any[]) {
-  const safeIssues = buildSafeIssues(rawIssues)
-  return { issue_count: safeIssues.length, issues: safeIssues }
+  return { issue_count: rawIssues.length }
 }
 
 describe('organization audit — schema error redaction', () => {
@@ -27,24 +20,23 @@ describe('organization audit — schema error redaction', () => {
     const error = buildRedactedError(rawIssues)
     expect(JSON.stringify(error)).not.toContain(sensitiveValue)
     expect(error.issue_count).toBe(1)
-    expect(error.issues[0]).toEqual({ code: 'invalid_type', path: ['orgId'] })
   })
 
-  it('preserves issue count and safe metadata', () => {
+  it('preserves issue count but not raw issue content', () => {
     const rawIssues = [
-      { code: 'invalid_type', path: ['limit'] },
-      { code: 'missing_key', path: ['orgId'] },
+      { code: 'invalid_type', path: ['limit'], data: 'sensitive-limit-value' },
+      { code: 'missing_key', path: ['orgId'], data: 'sensitive-org-id' },
     ]
     const error = buildRedactedError(rawIssues)
     expect(error.issue_count).toBe(2)
-    expect(error.issues).toHaveLength(2)
-    expect(error.issues[0].code).toBe('invalid_type')
-    expect(error.issues[1].code).toBe('missing_key')
+    expect(JSON.stringify(error)).not.toContain('sensitive-limit-value')
+    expect(JSON.stringify(error)).not.toContain('sensitive-org-id')
+    // issues array is not exposed
+    expect((error as any).issues).toBeUndefined()
   })
 
-  it('handles issues with no path gracefully', () => {
-    const rawIssues = [{ code: 'invalid_union' }]
-    const error = buildRedactedError(rawIssues)
-    expect(error.issues[0]).toEqual({ code: 'invalid_union', path: [] })
+  it('handles empty issues gracefully', () => {
+    const error = buildRedactedError([])
+    expect(error.issue_count).toBe(0)
   })
 })

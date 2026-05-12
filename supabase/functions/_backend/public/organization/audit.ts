@@ -32,12 +32,9 @@ export async function getAuditLogs(c: Context, bodyRaw: any): Promise<Response> 
   const bodyParsed = safeParseSchema(bodySchema, bodyRaw)
   if (!bodyParsed.success) {
     // Redact raw ArkType issue data — it can reflect submitted values back to the caller.
-    // Instead surface only issue count, codes, and paths.
-    const safeIssues = (bodyParsed.error?.issues ?? []).map((issue: any) => ({
-      code: issue.code ?? 'unknown',
-      path: Array.isArray(issue.path) ? issue.path.map(String) : [],
-    }))
-    throw simpleError('invalid_body', 'Invalid body', { issue_count: safeIssues.length, issues: safeIssues })
+    // Surface only the issue count; never echo codes, paths, or data from the request body.
+    const issueCount = bodyParsed.error?.issues?.length ?? 0
+    throw simpleError('invalid_body', 'Invalid body', { issue_count: issueCount })
   }
   const body = bodyParsed.data
 
