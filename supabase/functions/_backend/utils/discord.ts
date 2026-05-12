@@ -46,7 +46,7 @@ export function sendDiscordAlert500(c: Context, functionName: string, body: stri
   const userAgent = c.req.header('user-agent') ?? 'unknown'
   const ip = c.req.header('cf-connecting-ip') ?? c.req.header('x-forwarded-for') ?? 'unknown'
   const method = c.req.method
-  const url = c.req.url
+  const url = sanitizeSensitiveFromString(c.req.url)
   const rawHeaders = Object.fromEntries((c.req.raw.headers as any).entries())
   const headers = sanitizeSensitiveHeaders(rawHeaders)
   const errorMessage = sanitizeSensitiveFromString(e?.message ?? 'Unknown error')

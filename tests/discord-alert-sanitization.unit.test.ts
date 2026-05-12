@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { sendDiscordAlert500 } from '../supabase/functions/_backend/utils/discord.ts'
 import {
   sanitizeSensitiveFromString,
   sanitizeSensitiveHeaders,
@@ -9,6 +10,10 @@ function sampleValue(prefix: string) {
 }
 
 describe('Discord alert sanitization', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
   it('removes password-like JSON fields and redacts token-like JSON fields', () => {
     const accessToken = sampleValue('access-token')
     const passwordConfirmation = sampleValue('confirmation')
@@ -93,5 +98,42 @@ describe('Discord alert sanitization', () => {
     expect(sanitized['x-session-key']).toBe('sess...xxxx')
     expect(sanitized['user-agent']).toBe('vitest')
     expect(sanitized).not.toHaveProperty('x-password-confirm')
+  })
+
+  it('redacts sensitive query parameters from Discord request details URL', async () => {
+    const accessToken = sampleValue('access-token')
+    const requestUrl = `https://api.example.test/callback?access_token=${accessToken}&next=/dashboard`
+    const fetchMock = vi.fn().mockResolvedValue(new Response('', { status: 204 }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const headers = new Headers({
+      'user-agent': 'vitest',
+    })
+    const context = {
+      env: {
+        DISCORD_ALERT: 'https://discord.example.test/webhook',
+        ENVIRONMENT: 'test',
+      },
+      get: (key: string) => key === 'requestId' ? 'request-1' : undefined,
+      req: {
+        method: 'GET',
+        url: requestUrl,
+        header: (key: string) => headers.get(key) ?? undefined,
+        raw: { headers },
+      },
+    }
+
+    await sendDiscordAlert500(context as any, 'callback', '{}', new Error('boom'))
+
+    expect(fetchMock).toHaveBeenCalledOnce()
+    const [, init] = fetchMock.mock.calls[0]
+    const payload = JSON.parse(String((init as RequestInit).body))
+    const requestDetails = payload.embeds[0].fields.find(
+      (field: { name: string }) => field.name.includes('Request Details'),
+    )?.value
+
+    expect(requestDetails).toContain('access_token=acce...xxxx')
+    expect(requestDetails).toContain('next=/dashboard')
+    expect(JSON.stringify(payload)).not.toContain(accessToken)
   })
 })
