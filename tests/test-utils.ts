@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '../src/types/supabase.types'
+import { Buffer } from 'node:buffer'
 import { spawnSync } from 'node:child_process'
 import { createHmac } from 'node:crypto'
 import process, { env } from 'node:process'
