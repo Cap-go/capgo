@@ -196,7 +196,7 @@ describe('queue_consumer batch failure handling', () => {
     vi.restoreAllMocks()
   })
 
-  it('turns queued POST exceptions into failed message results without rejecting the batch', async () => {
+  it.concurrent('turns queued POST exceptions into failed message results without rejecting the batch', async () => {
     const context = {
       get: (key: string) => key === 'requestId' ? 'req-queue-batch' : undefined,
     }
@@ -263,7 +263,7 @@ describe('queue_consumer HTTP POST helper timeout', () => {
     vi.restoreAllMocks()
   })
 
-  it('aborts slow queue POST targets after the timeout elapses', async () => {
+  it.concurrent('aborts slow queue POST targets after the timeout elapses', async () => {
     vi.useFakeTimers()
 
     const body = { queued: true }
@@ -292,10 +292,9 @@ describe('queue_consumer HTTP POST helper timeout', () => {
     }
 
     const request = http_post_helper(context as any, 'slow_function', 'supabase', body, 'cf-1')
-      .then(
-        () => undefined,
-        (error: unknown) => error,
-      )
+    const rejection = expect(request).rejects.toMatchObject({
+      message: 'Request Timeout (Internal QUEUE handling error)',
+    })
 
     expect(capturedSignal).toBeInstanceOf(AbortSignal)
     expect(capturedSignal?.aborted).toBe(false)
@@ -309,8 +308,6 @@ describe('queue_consumer HTTP POST helper timeout', () => {
     await vi.advanceTimersByTimeAsync(15000)
 
     expect(capturedSignal?.aborted).toBe(true)
-    const error = await request
-    expect(error).toBeInstanceOf(Error)
-    expect((error as Error).message).toBe('Request Timeout (Internal QUEUE handling error)')
+    await rejection
   })
 })
