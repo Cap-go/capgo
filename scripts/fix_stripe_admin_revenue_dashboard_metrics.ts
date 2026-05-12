@@ -646,7 +646,7 @@ async function getInvoiceLines(stripe: Stripe, invoice: Stripe.Invoice) {
   if (!invoice.lines.has_more)
     return lines
 
-  const params = { limit: STRIPE_PAGE_SIZE, expand: ['data.price.product'] } as Stripe.InvoiceListLineItemsParams
+  const params = { limit: STRIPE_PAGE_SIZE } as Stripe.InvoiceListLineItemsParams
   const startingAfter = lines.at(-1)?.id
   if (startingAfter)
     params.starting_after = startingAfter
@@ -679,7 +679,6 @@ async function fetchStripeRevenueIntervals(
   let checkedInvoices = 0
   let matchedLines = 0
   const invoiceParams = {
-    expand: ['data.lines.data.price.product'],
     limit: STRIPE_PAGE_SIZE,
     status: 'paid',
   } as Stripe.InvoiceListParams
@@ -702,7 +701,6 @@ async function fetchStripeRevenueIntervals(
 
   let checkedSubscriptions = 0
   const subscriptionParams = {
-    expand: ['data.items.data.price.product'],
     limit: STRIPE_PAGE_SIZE,
     status: 'all',
   } as Stripe.SubscriptionListParams
