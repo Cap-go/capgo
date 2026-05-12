@@ -2,6 +2,9 @@ import type { Context } from 'hono'
 import { cloudlog, cloudlogErr, serializeError } from './logging.ts'
 import { getEnv } from './utils.ts'
 
+const MAX_BENTO_ERROR_BODY_BYTES = 4 * 1024
+const BENTO_ERROR_BODY_TOO_LARGE = '[bento_error_body_too_large]'
+
 export function isBentoConfigured(c: Context) {
   const publishableKey = (getEnv(c, 'BENTO_PUBLISHABLE_KEY') || '').trim()
   const secretKey = (getEnv(c, 'BENTO_SECRET_KEY') || '').trim()
@@ -37,6 +40,53 @@ function getBentoHeaders(c: Context) {
   }
 }
 
+function isOversizedContentLength(response: Response, maxBytes: number) {
+  const contentLength = response.headers.get('content-length')
+  if (!contentLength)
+    return false
+
+  const parsed = Number.parseInt(contentLength, 10)
+  return Number.isFinite(parsed) && parsed > maxBytes
+}
+
+async function readLimitedBentoErrorBody(response: Response, maxBytes: number) {
+  if (isOversizedContentLength(response, maxBytes)) {
+    await response.body?.cancel().catch(() => undefined)
+    return BENTO_ERROR_BODY_TOO_LARGE
+  }
+
+  if (!response.body) {
+    const text = await response.text()
+    return new TextEncoder().encode(text).byteLength > maxBytes ? BENTO_ERROR_BODY_TOO_LARGE : text
+  }
+
+  const reader = response.body.getReader()
+  const chunks: Uint8Array[] = []
+  let receivedBytes = 0
+
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done)
+      break
+
+    receivedBytes += value.byteLength
+    if (receivedBytes > maxBytes) {
+      await reader.cancel().catch(() => undefined)
+      return BENTO_ERROR_BODY_TOO_LARGE
+    }
+    chunks.push(value)
+  }
+
+  const body = new Uint8Array(receivedBytes)
+  let offset = 0
+  for (const chunk of chunks) {
+    body.set(chunk, offset)
+    offset += chunk.byteLength
+  }
+
+  return new TextDecoder().decode(body)
+}
+
 async function bentoFetch(c: Context, path: string, siteUuid: string, body: any) {
   const headers = getBentoHeaders(c)
   if (!headers)
@@ -52,7 +102,7 @@ async function bentoFetch(c: Context, path: string, siteUuid: string, body: any)
   })
 
   if (!response.ok) {
-    const error = await response.text()
+    const error = await readLimitedBentoErrorBody(response, MAX_BENTO_ERROR_BODY_BYTES)
     throw new Error(`Bento API error: ${response.status} ${error}`)
   }
 
@@ -184,4 +234,9 @@ export async function unsubscribeBento(c: Context, email: string) {
     cloudlog({ requestId: c.get('requestId'), message: 'unsubscribeBento error', error: e })
     return false
   }
+}
+
+export const bentoTestUtils = {
+  BENTO_ERROR_BODY_TOO_LARGE,
+  MAX_BENTO_ERROR_BODY_BYTES,
 }
