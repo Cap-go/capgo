@@ -25,6 +25,8 @@ export type Webhook = Omit<Database['public']['Tables']['webhooks']['Row'], 'sec
   secret?: string
 }
 
+export type WebhookDeliveryVersion = 'legacy' | 'standard'
+
 // Supported event types
 export const WEBHOOK_EVENT_TYPES = [
   { value: 'apps', label: 'App Changes', description: 'When apps are created, updated, or deleted' },
@@ -131,6 +133,7 @@ export const useWebhooksStore = defineStore('webhooks', () => {
     name: string
     url: string
     events: string[]
+    deliveryVersion?: WebhookDeliveryVersion
   }): Promise<{ success: boolean, webhook?: Webhook, error?: string }> {
     const organizationStore = useOrganizationStore()
     const orgId = organizationStore.currentOrganization?.gid
@@ -168,6 +171,7 @@ export const useWebhooksStore = defineStore('webhooks', () => {
           url: webhookData.url,
           events: webhookData.events,
           enabled: true,
+          deliveryVersion: webhookData.deliveryVersion ?? 'legacy',
         },
       })
 
@@ -198,6 +202,7 @@ export const useWebhooksStore = defineStore('webhooks', () => {
       url: string
       events: string[]
       enabled: boolean
+      deliveryVersion: WebhookDeliveryVersion
     }>,
   ): Promise<{ success: boolean, webhook?: Webhook, error?: string }> {
     const organizationStore = useOrganizationStore()

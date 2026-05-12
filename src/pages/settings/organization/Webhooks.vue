@@ -75,7 +75,7 @@ function openEditForm(webhook: Webhook) {
   showForm.value = true
 }
 
-async function handleFormSubmit(data: { name: string, url: string, events: string[], enabled: boolean }) {
+async function handleFormSubmit(data: { name: string, url: string, events: string[], enabled: boolean, deliveryVersion: 'legacy' | 'standard' }) {
   if (editingWebhook.value) {
     // When editing, pass all fields including enabled
     const result = await webhooksStore.updateWebhook(editingWebhook.value.id, data)
@@ -232,6 +232,48 @@ function verifyWebhookSignature(rawBody, headers, secret) {
 
   return true
 }`
+
+const legacySignatureVerificationCode = `import crypto from 'crypto'
+
+function verifyWebhookSignature(rawBody, headers, secret) {
+  const signature = headers['x-capgo-signature'] ?? headers['X-Capgo-Signature']
+  const match = signature?.match(/^v1=(\\d+)\\.([a-f0-9]{64})$/i)
+
+  if (!match) {
+    throw new Error('Invalid webhook signature format')
+  }
+
+  const [, timestamp, receivedHmac] = match
+
+  // Check timestamp to prevent replay attacks (5 min tolerance)
+  const currentTime = Math.floor(Date.now() / 1000)
+  if (Math.abs(currentTime - parseInt(timestamp)) > 300) {
+    throw new Error('Webhook timestamp too old')
+  }
+
+  const signaturePayload = \`\${timestamp}.\${rawBody}\`
+  const expectedHmac = crypto
+    .createHmac('sha256', secret)
+    .update(signaturePayload)
+    .digest('hex')
+
+  const isValid = receivedHmac.length === expectedHmac.length
+    && crypto.timingSafeEqual(Buffer.from(receivedHmac), Buffer.from(expectedHmac))
+
+  if (!isValid) {
+    throw new Error('Invalid webhook signature')
+  }
+
+  return true
+}`
+
+function getSignatureVerificationCode(webhook: Webhook) {
+  return webhook.delivery_version === 'standard' ? signatureVerificationCode : legacySignatureVerificationCode
+}
+
+function getDeliveryVersionLabel(webhook: Webhook) {
+  return webhook.delivery_version === 'standard' ? t('webhook-version-standard') : t('webhook-version-legacy')
+}
 </script>
 
 <template>
@@ -398,20 +440,28 @@ function verifyWebhookSignature(rawBody, headers, secret) {
                       {{ t('signature-verification-intro') }}
                     </p>
                     <ul class="mb-3 space-y-1 text-xs text-gray-600 list-disc list-inside dark:text-gray-400">
-                      <li><code class="px-1 bg-gray-200 rounded dark:bg-gray-700">webhook-signature</code>: {{ t('header-signature-desc') }}</li>
-                      <li><code class="px-1 bg-gray-200 rounded dark:bg-gray-700">webhook-timestamp</code>: {{ t('header-timestamp-desc') }}</li>
-                      <li><code class="px-1 bg-gray-200 rounded dark:bg-gray-700">webhook-id</code>: {{ t('header-event-id-desc') }}</li>
+                      <template v-if="webhook.delivery_version === 'standard'">
+                        <li><code class="px-1 bg-gray-200 rounded dark:bg-gray-700">webhook-signature</code>: {{ t('header-signature-desc') }}</li>
+                        <li><code class="px-1 bg-gray-200 rounded dark:bg-gray-700">webhook-timestamp</code>: {{ t('header-timestamp-desc') }}</li>
+                        <li><code class="px-1 bg-gray-200 rounded dark:bg-gray-700">webhook-id</code>: {{ t('header-event-id-desc') }}</li>
+                      </template>
+                      <template v-else>
+                        <li><code class="px-1 bg-gray-200 rounded dark:bg-gray-700">X-Capgo-Signature</code>: {{ t('legacy-header-signature-desc') }}</li>
+                        <li><code class="px-1 bg-gray-200 rounded dark:bg-gray-700">X-Capgo-Timestamp</code>: {{ t('header-timestamp-desc') }}</li>
+                        <li><code class="px-1 bg-gray-200 rounded dark:bg-gray-700">X-Capgo-Event-ID</code>: {{ t('header-event-id-desc') }}</li>
+                      </template>
                     </ul>
                     <p class="mb-2 text-xs font-medium text-gray-700 dark:text-gray-300">
                       {{ t('signature-example-title') }}
                     </p>
-                    <pre class="p-3 overflow-x-auto text-xs text-gray-100 bg-gray-900 rounded"><code>{{ signatureVerificationCode }}</code></pre>
+                    <pre class="p-3 overflow-x-auto text-xs text-gray-100 bg-gray-900 rounded"><code>{{ getSignatureVerificationCode(webhook) }}</code></pre>
                   </div>
                 </details>
               </div>
 
               <!-- Metadata -->
               <div class="mb-4 text-sm text-gray-500 dark:text-gray-400">
+                <p>{{ t('webhook-delivery-version') }}: {{ getDeliveryVersionLabel(webhook) }}</p>
                 <p>{{ t('created-at') }}: {{ formatDate(webhook.created_at) }}</p>
                 <p>{{ t('updated-at') }}: {{ formatDate(webhook.updated_at) }}</p>
               </div>

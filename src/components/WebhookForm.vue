@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { Webhook } from '~/stores/webhooks'
+import type { Webhook, WebhookDeliveryVersion } from '~/stores/webhooks'
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import IconX from '~icons/heroicons/x-mark'
@@ -10,7 +10,7 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  (e: 'submit', data: { name: string, url: string, events: string[], enabled: boolean }): void
+  (e: 'submit', data: { name: string, url: string, events: string[], enabled: boolean, deliveryVersion: WebhookDeliveryVersion }): void
   (e: 'close'): void
 }>()
 
@@ -20,6 +20,7 @@ const name = ref('')
 const url = ref('')
 const selectedEvents = ref<string[]>([])
 const enabled = ref(true)
+const deliveryVersion = ref<WebhookDeliveryVersion>('legacy')
 const urlError = ref('')
 
 const isEditing = computed(() => !!props.webhook)
@@ -39,6 +40,7 @@ onMounted(() => {
     url.value = props.webhook.url
     selectedEvents.value = [...props.webhook.events]
     enabled.value = props.webhook.enabled
+    deliveryVersion.value = props.webhook.delivery_version === 'standard' ? 'standard' : 'legacy'
   }
 })
 
@@ -81,6 +83,7 @@ function handleSubmit() {
     url: url.value.trim(),
     events: selectedEvents.value,
     enabled: enabled.value,
+    deliveryVersion: deliveryVersion.value,
   })
 }
 
@@ -147,6 +150,27 @@ function handleBackdropClick(event: MouseEvent) {
           </p>
           <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
             {{ t('webhook-url-hint') }}
+          </p>
+        </div>
+
+        <!-- Delivery Version -->
+        <div>
+          <label class="block mb-1 text-sm font-medium text-gray-700 dark:text-gray-300">
+            {{ t('webhook-delivery-version') }}
+          </label>
+          <select
+            v-model="deliveryVersion"
+            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+          >
+            <option value="legacy">
+              {{ t('webhook-version-legacy') }}
+            </option>
+            <option value="standard">
+              {{ t('webhook-version-standard') }}
+            </option>
+          </select>
+          <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+            {{ deliveryVersion === 'standard' ? t('webhook-version-standard-hint') : t('webhook-version-legacy-hint') }}
           </p>
         </div>
 

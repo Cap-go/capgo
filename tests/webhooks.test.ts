@@ -18,6 +18,7 @@ const webhookUrl = 'https://example.com/webhook'
 const customerId = `cus_test_${WEBHOOK_TEST_ORG_ID}`
 
 let createdWebhookId: string | null = null
+let standardWebhookId: string | null = null
 let lastDeliveryId: string | null = null
 let appScopedKeyId: number | null = null
 let appScopedKey: string | null = null
@@ -116,6 +117,9 @@ afterAll(async () => {
   if (createdWebhookId) {
     await (getSupabaseClient() as any).from('webhooks').delete().eq('id', createdWebhookId)
   }
+  if (standardWebhookId) {
+    await (getSupabaseClient() as any).from('webhooks').delete().eq('id', standardWebhookId)
+  }
   if (appScopedKeyId) {
     await getSupabaseClient().from('apikeys').delete().eq('id', appScopedKeyId)
   }
@@ -189,14 +193,35 @@ describe('[POST] /webhooks', () => {
     })
 
     expect(response.status).toBe(201)
-    const data = await response.json() as { status: string, webhook: { id: string, name: string, url: string, secret: string } }
+    const data = await response.json() as { status: string, webhook: { id: string, name: string, url: string, secret: string, delivery_version: string } }
     expect(data.status).toBe('Webhook created')
     expect(data.webhook).toBeDefined()
     expect(data.webhook.name).toBe(webhookName)
     expect(data.webhook.url).toBe(webhookUrl)
+    expect(data.webhook.delivery_version).toBe('legacy')
     expect(data.webhook.secret).toMatch(/^whsec_[A-Za-z0-9+/]+={0,2}$/)
 
     createdWebhookId = data.webhook.id
+  })
+
+  it('create webhook with Standard Webhooks delivery version', async () => {
+    const response = await fetch(webhookEndpoint(), {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        orgId: WEBHOOK_TEST_ORG_ID,
+        name: `Standard Webhook ${globalId}`,
+        url: webhookUrl,
+        events: ['app_versions'],
+        deliveryVersion: 'standard',
+      }),
+    })
+
+    expect(response.status).toBe(201)
+    const data = await response.json() as { webhook: { id: string, delivery_version: string, secret: string } }
+    expect(data.webhook.delivery_version).toBe('standard')
+    expect(data.webhook.secret).toMatch(/^whsec_[A-Za-z0-9+/]+={0,2}$/)
+    standardWebhookId = data.webhook.id
   })
 
   it('allows console JWT webhook listing through the API', async () => {
@@ -309,6 +334,23 @@ describe('[POST] /webhooks', () => {
     expect(data.error).toBe('invalid_events')
   })
 
+  it('create webhook with invalid delivery version', async () => {
+    const response = await fetch(webhookEndpoint(), {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        orgId: WEBHOOK_TEST_ORG_ID,
+        name: 'Invalid Version Webhook',
+        url: webhookUrl,
+        events: ['app_versions'],
+        deliveryVersion: 'invalid',
+      }),
+    })
+    expect(response.status).toBe(400)
+    const data = await response.json() as { error: string }
+    expect(data.error).toBe('invalid_delivery_version')
+  })
+
   it('create webhook with empty events array', async () => {
     const response = await fetch(webhookEndpoint(), {
       method: 'POST',
@@ -366,9 +408,10 @@ describe('[GET] /webhooks (single webhook)', () => {
       headers,
     })
     expect(response.status).toBe(200)
-    const data = await response.json() as { id: string, name: string, secret?: string, stats_24h: object }
+    const data = await response.json() as { id: string, name: string, delivery_version: string, secret?: string, stats_24h: object }
     expect(data.id).toBe(createdWebhookId)
     expect(data.name).toBe(webhookName)
+    expect(data.delivery_version).toBe('legacy')
     expect(data.secret).toBeUndefined()
     expect(data.stats_24h).toBeDefined()
   })
@@ -473,6 +516,37 @@ describe('[PUT] /webhooks', () => {
     })
   })
 
+  it('update webhook delivery version', async () => {
+    if (!createdWebhookId)
+      throw new Error('Webhook was not created in previous test')
+
+    const standardResponse = await fetch(webhookEndpoint(), {
+      method: 'PUT',
+      headers,
+      body: JSON.stringify({
+        orgId: WEBHOOK_TEST_ORG_ID,
+        webhookId: createdWebhookId,
+        deliveryVersion: 'standard',
+      }),
+    })
+    expect(standardResponse.status).toBe(200)
+    const standardData = await standardResponse.json() as { webhook: { delivery_version: string } }
+    expect(standardData.webhook.delivery_version).toBe('standard')
+
+    const legacyResponse = await fetch(webhookEndpoint(), {
+      method: 'PUT',
+      headers,
+      body: JSON.stringify({
+        orgId: WEBHOOK_TEST_ORG_ID,
+        webhookId: createdWebhookId,
+        deliveryVersion: 'legacy',
+      }),
+    })
+    expect(legacyResponse.status).toBe(200)
+    const legacyData = await legacyResponse.json() as { webhook: { delivery_version: string } }
+    expect(legacyData.webhook.delivery_version).toBe('legacy')
+  })
+
   it('update webhook with no fields', async () => {
     if (!createdWebhookId)
       throw new Error('Webhook was not created in previous test')
@@ -563,6 +637,22 @@ describe('[POST] /webhooks/test', () => {
     expect(data.delivery_id).toBeDefined()
     expect(data.message).toBeDefined()
     lastDeliveryId = data.delivery_id
+  })
+
+  it('stores legacy test deliveries without the Standard Webhooks type field', async () => {
+    if (!lastDeliveryId)
+      throw new Error('Webhook test delivery was not created')
+
+    const { data: delivery, error } = await (getSupabaseClient() as any)
+      .from('webhook_deliveries')
+      .select('delivery_version, request_payload')
+      .eq('id', lastDeliveryId)
+      .single()
+
+    expect(error).toBeNull()
+    expect(delivery.delivery_version).toBe('legacy')
+    expect(delivery.request_payload.type).toBeUndefined()
+    expect(delivery.request_payload.event).toBe('test.ping')
   })
 
   it('test webhook with invalid webhookId', async () => {

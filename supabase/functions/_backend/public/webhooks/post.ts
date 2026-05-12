@@ -4,7 +4,7 @@ import { type } from 'arktype'
 import { safeParseSchema } from '../../utils/ark_validation.ts'
 import { simpleError } from '../../utils/hono.ts'
 import { supabaseAdmin } from '../../utils/supabase.ts'
-import { getWebhookPublicUrlValidationError, WEBHOOK_EVENT_TYPES } from '../../utils/webhook.ts'
+import { getWebhookPublicUrlValidationError, parseWebhookDeliveryVersion, WEBHOOK_EVENT_TYPES } from '../../utils/webhook.ts'
 import { checkWebhookPermissionV2 } from './index.ts'
 import { webhookCreatedSelect } from './response.ts'
 
@@ -14,6 +14,8 @@ const bodySchema = type({
   'url': 'string.url',
   'events': 'string[] > 0',
   'enabled?': 'boolean',
+  'deliveryVersion?': 'string',
+  'delivery_version?': 'string',
 })
 
 export async function post(c: Context<MiddlewareKeyVariables, any, any>, bodyRaw: any, auth: AuthInfo): Promise<Response> {
@@ -24,6 +26,13 @@ export async function post(c: Context<MiddlewareKeyVariables, any, any>, bodyRaw
   const body = bodyParsed.data
 
   await checkWebhookPermissionV2(c, body.orgId, auth)
+
+  const deliveryVersion = parseWebhookDeliveryVersion(body.deliveryVersion ?? body.delivery_version ?? 'legacy')
+  if (!deliveryVersion) {
+    throw simpleError('invalid_delivery_version', 'Invalid webhook delivery version', {
+      allowed: ['legacy', 'standard'],
+    })
+  }
 
   // Validate events are allowed
   const invalidEvents = body.events.filter(e => !WEBHOOK_EVENT_TYPES.includes(e as any))
@@ -47,6 +56,7 @@ export async function post(c: Context<MiddlewareKeyVariables, any, any>, bodyRaw
       url: body.url,
       events: body.events,
       enabled: body.enabled ?? true,
+      delivery_version: deliveryVersion,
       created_by: auth.userId,
     })
     // Return the secret once on creation so admins can store it; read/update endpoints never expose it.

@@ -1,5 +1,5 @@
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
-import type { WebhookPayload } from '../utils/webhook.ts'
+import type { WebhookDeliveryPayload } from '../utils/webhook.ts'
 import { Hono } from 'hono/tiny'
 import { BRES, middlewareAPISecret } from '../utils/hono.ts'
 import { cloudlog, cloudlogErr, serializeError } from '../utils/logging.ts'
@@ -11,12 +11,14 @@ import {
   disableWebhook,
   getDeliveryById,
   getWebhookById,
+  getWebhookPayloadEvent,
+  getWebhookPayloadEventId,
   incrementAttemptCount,
   markDeliveryFailed,
+  normalizeWebhookDeliveryVersion,
   queueWebhookDeliveryWithDelay,
   scheduleRetry,
   updateDeliveryResult,
-
 } from '../utils/webhook.ts'
 
 export const app = new Hono<MiddlewareKeyVariables>()
@@ -25,7 +27,7 @@ interface DeliveryMessage {
   delivery_id: string
   webhook_id: string
   url: string
-  payload: WebhookPayload
+  payload: WebhookDeliveryPayload
 }
 
 /**
@@ -102,6 +104,7 @@ app.post('/', middlewareAPISecret, async (c) => {
 
     // Increment attempt count
     const attemptCount = await incrementAttemptCount(c, deliveryData.delivery_id)
+    const deliveryVersion = normalizeWebhookDeliveryVersion(delivery.delivery_version ?? webhook.delivery_version)
 
     // Attempt delivery with signature
     const result = await deliverWebhook(
@@ -110,6 +113,7 @@ app.post('/', middlewareAPISecret, async (c) => {
       deliveryData.url,
       deliveryData.payload,
       webhook.secret,
+      deliveryVersion,
     )
 
     // Update delivery record with result
@@ -203,13 +207,13 @@ app.post('/', middlewareAPISecret, async (c) => {
             {
               webhook_name: webhook.name,
               webhook_url: webhook.url,
-              event_type: deliveryData.payload.event,
+              event_type: getWebhookPayloadEvent(deliveryData.payload),
               attempts: attemptCount,
               last_error: result.body?.slice(0, 500) || 'Unknown error',
               delivery_id: deliveryData.delivery_id,
             },
             webhook.org_id,
-            `webhook_failure_${webhook.id}_${deliveryData.payload.event_id}`,
+            `webhook_failure_${webhook.id}_${getWebhookPayloadEventId(deliveryData.payload)}`,
             '0 0 * * *', // Rate limit to once per day per webhook+event
             webhook.orgs.management_email,
             drizzleClient,

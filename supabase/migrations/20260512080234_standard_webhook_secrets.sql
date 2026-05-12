@@ -8,6 +8,32 @@ ALTER COLUMN secret SET DEFAULT (
 COMMENT ON COLUMN public.webhooks.secret IS
 'Standard Webhooks HMAC-SHA256 secret in whsec_ base64 format.';
 
+ALTER TABLE public.webhooks
+ADD COLUMN IF NOT EXISTS delivery_version text NOT NULL DEFAULT 'legacy';
+
+ALTER TABLE public.webhooks
+DROP CONSTRAINT IF EXISTS webhooks_delivery_version_check;
+
+ALTER TABLE public.webhooks
+ADD CONSTRAINT webhooks_delivery_version_check
+CHECK (delivery_version IN ('legacy', 'standard'));
+
+COMMENT ON COLUMN public.webhooks.delivery_version IS
+'Webhook delivery format version. legacy preserves existing Capgo payloads; standard uses Standard Webhooks payload and headers.';
+
+ALTER TABLE public.webhook_deliveries
+ADD COLUMN IF NOT EXISTS delivery_version text NOT NULL DEFAULT 'legacy';
+
+ALTER TABLE public.webhook_deliveries
+DROP CONSTRAINT IF EXISTS webhook_deliveries_delivery_version_check;
+
+ALTER TABLE public.webhook_deliveries
+ADD CONSTRAINT webhook_deliveries_delivery_version_check
+CHECK (delivery_version IN ('legacy', 'standard'));
+
+COMMENT ON COLUMN public.webhook_deliveries.delivery_version IS
+'Delivery format version used for this webhook attempt.';
+
 ALTER TABLE public.webhook_deliveries
 ALTER COLUMN max_attempts SET DEFAULT 10;
 

@@ -64,6 +64,7 @@ describe('webhook delivery redirect handling', () => {
       'https://example.com/webhook',
       payload,
       'whsec_test_secret',
+      'standard',
     )
 
     const webhookCalls = fetchMock.mock.calls.filter(([url]) => url === 'https://example.com/webhook')

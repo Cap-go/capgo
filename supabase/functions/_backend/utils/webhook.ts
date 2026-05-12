@@ -22,6 +22,43 @@ export interface WebhookPayload {
   }
 }
 
+export type LegacyWebhookPayload = Omit<WebhookPayload, 'type'>
+export type WebhookDeliveryPayload = WebhookPayload | LegacyWebhookPayload
+
+export const WEBHOOK_DELIVERY_VERSIONS = ['legacy', 'standard'] as const
+export type WebhookDeliveryVersion = typeof WEBHOOK_DELIVERY_VERSIONS[number]
+
+export function parseWebhookDeliveryVersion(value: unknown): WebhookDeliveryVersion | null {
+  return value === 'legacy' || value === 'standard' ? value : null
+}
+
+export function normalizeWebhookDeliveryVersion(value: unknown): WebhookDeliveryVersion {
+  return parseWebhookDeliveryVersion(value) ?? 'legacy'
+}
+
+export function buildWebhookDeliveryPayload(
+  payload: WebhookDeliveryPayload,
+  deliveryVersion: WebhookDeliveryVersion,
+): WebhookDeliveryPayload {
+  if (deliveryVersion === 'standard') {
+    return {
+      ...payload,
+      type: 'type' in payload ? payload.type : payload.event,
+    }
+  }
+
+  const { type: _type, ...legacyPayload } = payload as WebhookPayload
+  return legacyPayload
+}
+
+export function getWebhookPayloadEvent(payload: WebhookDeliveryPayload): string {
+  return payload.event
+}
+
+export function getWebhookPayloadEventId(payload: WebhookDeliveryPayload): string {
+  return payload.event_id
+}
+
 // Audit log data from the database trigger
 export interface AuditLogData {
   audit_log_id: number
@@ -146,8 +183,11 @@ export async function createDeliveryRecord(
   orgId: string,
   auditLogId: number | null,
   eventType: string,
-  payload: WebhookPayload,
+  payload: WebhookDeliveryPayload,
+  deliveryVersion: WebhookDeliveryVersion = 'legacy',
 ) {
+  const requestPayload = buildWebhookDeliveryPayload(payload, deliveryVersion)
+
   // Note: Using type assertion as webhook_deliveries table types are not yet generated
   const { data: delivery, error } = await supabaseAdmin(c)
     .from('webhook_deliveries')
@@ -156,7 +196,8 @@ export async function createDeliveryRecord(
       org_id: orgId,
       audit_log_id: auditLogId,
       event_type: eventType,
-      request_payload: payload as any,
+      request_payload: requestPayload as any,
+      delivery_version: deliveryVersion,
       status: 'pending',
     })
     .select()
@@ -373,8 +414,9 @@ export async function deliverWebhook(
   c: Context,
   deliveryId: string,
   url: string,
-  payload: WebhookPayload,
+  payload: WebhookDeliveryPayload,
   secret: string,
+  deliveryVersion: WebhookDeliveryVersion = 'legacy',
 ): Promise<{ success: boolean, status?: number, body?: string, duration?: number, retryAfter?: string | null }> {
   const startTime = Date.now()
 
@@ -397,22 +439,28 @@ export async function deliverWebhook(
     }
   }
 
-  const payloadString = JSON.stringify(payload)
+  const deliveryPayload = buildWebhookDeliveryPayload(payload, deliveryVersion)
+  const payloadString = JSON.stringify(deliveryPayload)
   const timestamp = Math.floor(Date.now() / 1000).toString()
+  const eventId = getWebhookPayloadEventId(deliveryPayload)
+  const event = getWebhookPayloadEvent(deliveryPayload)
 
   const legacySignature = await generateWebhookSignature(secret, timestamp, payloadString)
-  const standardSignature = await generateStandardWebhookSignature(secret, payload.event_id, timestamp, payloadString)
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     'User-Agent': 'Capgo-Webhook/1.0',
-    'webhook-id': payload.event_id,
-    'webhook-timestamp': timestamp,
-    'webhook-signature': standardSignature,
-    'X-Capgo-Event': payload.event,
-    'X-Capgo-Event-ID': payload.event_id,
+    'X-Capgo-Event': event,
+    'X-Capgo-Event-ID': eventId,
     'X-Capgo-Timestamp': timestamp,
     'X-Capgo-Signature': legacySignature,
+  }
+
+  if (deliveryVersion === 'standard') {
+    const standardSignature = await generateStandardWebhookSignature(secret, eventId, timestamp, payloadString)
+    headers['webhook-id'] = eventId
+    headers['webhook-timestamp'] = timestamp
+    headers['webhook-signature'] = standardSignature
   }
 
   try {
@@ -686,7 +734,7 @@ export async function queueWebhookDelivery(
   deliveryId: string,
   webhookId: string,
   url: string,
-  payload: WebhookPayload,
+  payload: WebhookDeliveryPayload,
 ): Promise<void> {
   const message = {
     function_name: 'webhook_delivery',
@@ -728,7 +776,7 @@ export async function queueWebhookDeliveryWithDelay(
   deliveryId: string,
   webhookId: string,
   url: string,
-  payload: WebhookPayload,
+  payload: WebhookDeliveryPayload,
   delaySeconds: number,
 ): Promise<void> {
   const message = {

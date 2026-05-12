@@ -58,6 +58,7 @@ describe('webhook delivery redirect handling', () => {
         },
       },
       'secret',
+      'standard',
     )
 
     expect(result.success).toBe(true)
@@ -71,6 +72,47 @@ describe('webhook delivery redirect handling', () => {
     expect((webhookCalls[0]?.[1]?.headers as Record<string, string>)['webhook-timestamp']).toMatch(/^\d+$/)
     expect((webhookCalls[0]?.[1]?.headers as Record<string, string>)['webhook-signature']).toMatch(/^v1,[A-Za-z0-9+/]+={0,2}$/)
     expect((webhookCalls[0]?.[1]?.headers as Record<string, string>)['X-Capgo-Signature']).toMatch(/^v1=\d+\.[a-f0-9]{64}$/)
+  })
+
+  it('uses the legacy payload and headers by default', async () => {
+    mockGetEnv.mockReturnValue('')
+    const fetchMock = vi.fn().mockImplementation(async () => new Response('ok', { status: 200 }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const { deliverWebhook } = await import('../supabase/functions/_backend/utils/webhook.ts')
+    const result = await deliverWebhook(
+      createContext(),
+      'delivery-legacy',
+      'https://example.com/webhook',
+      {
+        type: 'app_versions.INSERT',
+        event: 'app_versions.INSERT',
+        event_id: 'event-legacy',
+        timestamp: new Date().toISOString(),
+        org_id: 'org-1',
+        data: {
+          table: 'app_versions',
+          operation: 'INSERT',
+          record_id: 'record-legacy',
+          old_record: null,
+          new_record: null,
+          changed_fields: null,
+        },
+      },
+      'secret',
+    )
+
+    expect(result.success).toBe(true)
+    const webhookCalls = fetchMock.mock.calls.filter(([url]) => url === 'https://example.com/webhook')
+    expect(webhookCalls).toHaveLength(1)
+    const headers = webhookCalls[0]?.[1]?.headers as Record<string, string>
+    const body = JSON.parse(webhookCalls[0]?.[1]?.body as string) as Record<string, unknown>
+    expect(headers['webhook-id']).toBeUndefined()
+    expect(headers['webhook-signature']).toBeUndefined()
+    expect(headers['X-Capgo-Event-ID']).toBe('event-legacy')
+    expect(headers['X-Capgo-Signature']).toMatch(/^v1=\d+\.[a-f0-9]{64}$/)
+    expect(body.type).toBeUndefined()
+    expect(body.event).toBe('app_versions.INSERT')
   })
 
   it('does not treat redirect responses as successful deliveries', async () => {
@@ -104,6 +146,7 @@ describe('webhook delivery redirect handling', () => {
         },
       },
       'secret',
+      'standard',
     )
 
     expect(result.success).toBe(false)
@@ -148,6 +191,7 @@ describe('webhook delivery redirect handling', () => {
         },
       },
       'secret',
+      'standard',
     )
 
     expect(result.success).toBe(false)
@@ -193,6 +237,7 @@ describe('webhook delivery redirect handling', () => {
         },
       },
       'secret',
+      'standard',
     )
 
     expect(result).toMatchObject({

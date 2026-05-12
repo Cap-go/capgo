@@ -240,6 +240,7 @@ describe('webhook creation and secret generation', () => {
         name: `Signature Test Webhook ${globalId}`,
         url: webhookUrl,
         events: ['app_versions'],
+        deliveryVersion: 'standard',
       }),
     })
 

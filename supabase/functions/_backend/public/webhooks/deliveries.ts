@@ -1,7 +1,7 @@
 import type { Context } from 'hono'
 import type { AuthInfo, MiddlewareKeyVariables } from '../../utils/hono.ts'
 import type {
-  WebhookPayload,
+  WebhookDeliveryPayload,
 } from '../../utils/webhook.ts'
 import { type } from 'arktype'
 import { safeParseSchema } from '../../utils/ark_validation.ts'
@@ -172,7 +172,7 @@ export async function retryDelivery(c: Context<MiddlewareKeyVariables, any, any>
     delivery.id,
     webhook.id,
     webhook.url,
-    delivery.request_payload as any as WebhookPayload,
+    delivery.request_payload as any as WebhookDeliveryPayload,
   )
 
   return c.json({

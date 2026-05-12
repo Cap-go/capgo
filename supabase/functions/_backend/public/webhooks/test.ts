@@ -9,6 +9,7 @@ import {
   createTestPayload,
   deliverWebhook,
   getWebhookPublicUrlValidationError,
+  normalizeWebhookDeliveryVersion,
   updateDeliveryResult,
 } from '../../utils/webhook.ts'
 import { checkWebhookPermissionV2 } from './index.ts'
@@ -50,6 +51,7 @@ export async function test(c: Context<MiddlewareKeyVariables, any, any>, bodyRaw
 
   // Create test payload
   const payload = createTestPayload(body.orgId)
+  const deliveryVersion = normalizeWebhookDeliveryVersion(webhook.delivery_version)
 
   // Create delivery record for the test
   const delivery = await createDeliveryRecord(
@@ -59,6 +61,7 @@ export async function test(c: Context<MiddlewareKeyVariables, any, any>, bodyRaw
     null, // No audit_log_id for test events
     'test.ping',
     payload,
+    deliveryVersion,
   )
 
   if (!delivery) {
@@ -66,7 +69,7 @@ export async function test(c: Context<MiddlewareKeyVariables, any, any>, bodyRaw
   }
 
   // Immediately deliver the test webhook (bypass queue)
-  const result = await deliverWebhook(c, delivery.id, webhook.url, payload, webhook.secret)
+  const result = await deliverWebhook(c, delivery.id, webhook.url, payload, webhook.secret, deliveryVersion)
 
   // Update delivery record with result
   await updateDeliveryResult(
