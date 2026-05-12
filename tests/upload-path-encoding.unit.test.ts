@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { encodeR2KeyForUploadLocation, getSafeAttachmentReadCandidateKeys, headFirstExistingAttachmentCandidate } from '../supabase/functions/_backend/files/util.ts'
+import { encodeR2KeyForUploadLocation, getSafeAttachmentReadCandidateKeys, headFirstExistingAttachmentCandidate, shouldBypassAttachmentCache } from '../supabase/functions/_backend/files/util.ts'
 
 describe('upload path encoding', () => {
   it.concurrent('encodes returned upload locations so literal percent signs are valid URLs', () => {
@@ -46,6 +46,20 @@ describe('upload path encoding', () => {
 
     expect(objectInfo).toBe(legacyObjectInfo)
     expect(checkedKeys).toEqual([decodedRouteKey, encodedStoragePath])
+  })
+
+  it.concurrent('bypasses cache for same-app decoded/raw percent route fallbacks', () => {
+    expect(shouldBypassAttachmentCache(
+      'orgs/org-id/apps/app-id/delta/hash_sad_post_grey@2x.png',
+      'orgs/org-id/apps/app-id/delta/hash_sad_post_grey%402x.png',
+    )).toBe(true)
+  })
+
+  it.concurrent('keeps cache enabled when raw percent route fallback is outside the app scope', () => {
+    expect(shouldBypassAttachmentCache(
+      'orgs/org-id/apps/app-id/delta/hash_sad_post_grey@2x.png',
+      'orgs/org-id/apps/other-app-id/delta/hash_sad_post_grey%402x.png',
+    )).toBe(false)
   })
 
   it.concurrent('does not try raw percent route keys outside the authorized app scope', () => {
