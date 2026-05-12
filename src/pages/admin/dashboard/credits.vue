@@ -14,6 +14,7 @@ import MagnifyingGlassIcon from '~icons/heroicons/magnifying-glass'
 import XMarkIcon from '~icons/heroicons/x-mark'
 import AdminFilterBar from '~/components/admin/AdminFilterBar.vue'
 import AdminMultiLineChart from '~/components/admin/AdminMultiLineChart.vue'
+import AdminStatsCard from '~/components/admin/AdminStatsCard.vue'
 import ChartCard from '~/components/dashboard/ChartCard.vue'
 import Spinner from '~/components/Spinner.vue'
 import { formatLocalDateTime } from '~/services/date'
@@ -159,6 +160,20 @@ const monthlyCreditSummary = computed(() => {
   }
 
   return Array.from(monthlyBuckets.values())
+})
+
+const periodCreditTotals = computed(() => {
+  return globalStatsTrendData.value.reduce(
+    (totals, row) => {
+      totals.creditsBought += Number(row.credits_bought || 0)
+      totals.creditsConsumed += Number(row.credits_consumed || 0)
+      return totals
+    },
+    {
+      creditsBought: 0,
+      creditsConsumed: 0,
+    },
+  )
 })
 
 const dailyCreditsSeries = computed(() => {
@@ -454,6 +469,23 @@ onMounted(async () => {
               </p>
             </div>
             <AdminFilterBar />
+          </div>
+
+          <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
+            <AdminStatsCard
+              :title="t('admin-credits-period-total-bought')"
+              :value="formatCredits(periodCreditTotals.creditsBought)"
+              :is-loading="isLoadingCreditAnalytics"
+              color-class="text-[#119eff]"
+              :subtitle="t('admin-credits-period-total-subtitle')"
+            />
+            <AdminStatsCard
+              :title="t('admin-credits-period-total-used')"
+              :value="formatCredits(periodCreditTotals.creditsConsumed)"
+              :is-loading="isLoadingCreditAnalytics"
+              color-class="text-red-500"
+              :subtitle="t('admin-credits-period-total-subtitle')"
+            />
           </div>
 
           <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
