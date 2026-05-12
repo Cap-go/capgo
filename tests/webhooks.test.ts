@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
-import { BASE_URL, fetchWithRetry, getSupabaseClient, headers, TEST_EMAIL, USER_ID } from './test-utils.ts'
+import { BASE_URL, fetchWithRetry, getAuthHeaders, getSupabaseClient, headers, TEST_EMAIL, USER_ID } from './test-utils.ts'
 
 // Test org and webhook IDs
 const WEBHOOK_TEST_ORG_ID = randomUUID()
@@ -12,10 +12,19 @@ const webhookUrl = 'https://example.com/webhook'
 const customerId = `cus_test_${WEBHOOK_TEST_ORG_ID}`
 
 let createdWebhookId: string | null = null
+let jwtCreatedWebhookId: string | null = null
 let lastDeliveryId: string | null = null
 let appScopedKeyId: number | null = null
 let appScopedKey: string | null = null
 let orgScopedSubkeyId: number | null = null
+
+async function sendJwtWebhookRequest(method: 'POST' | 'PUT' | 'DELETE', body: Record<string, unknown>): Promise<Response> {
+  return fetch(`${BASE_URL}/webhooks`, {
+    method,
+    headers: await getAuthHeaders(),
+    body: JSON.stringify({ orgId: WEBHOOK_TEST_ORG_ID, ...body }),
+  })
+}
 
 beforeAll(async () => {
   // Create stripe_info for this test org
@@ -87,6 +96,9 @@ afterAll(async () => {
   // Note: Using type assertion as webhooks table types are not yet generated
   if (createdWebhookId) {
     await (getSupabaseClient() as any).from('webhooks').delete().eq('id', createdWebhookId)
+  }
+  if (jwtCreatedWebhookId) {
+    await (getSupabaseClient() as any).from('webhooks').delete().eq('id', jwtCreatedWebhookId)
   }
   if (appScopedKeyId) {
     await getSupabaseClient().from('apikeys').delete().eq('id', appScopedKeyId)
@@ -167,6 +179,37 @@ describe('[POST] /webhooks', () => {
     expect(data.webhook.url).toBe(webhookUrl)
 
     createdWebhookId = data.webhook.id
+  })
+
+  it('create, update, and delete webhook with JWT auth', async () => {
+    const createResponse = await sendJwtWebhookRequest('POST', {
+      name: `JWT Webhook ${globalId}`,
+      url: 'https://example.com/webhook-jwt',
+      events: ['apps'],
+    })
+
+    expect(createResponse.status).toBe(201)
+    const createData = await createResponse.json() as { webhook: { id: string, name: string } }
+    expect(createData.webhook.name).toBe(`JWT Webhook ${globalId}`)
+    jwtCreatedWebhookId = createData.webhook.id
+
+    const updateResponse = await sendJwtWebhookRequest('PUT', {
+      webhookId: jwtCreatedWebhookId,
+      enabled: false,
+    })
+
+    expect(updateResponse.status).toBe(200)
+    const updateData = await updateResponse.json() as { webhook: { enabled: boolean } }
+    expect(updateData.webhook.enabled).toBe(false)
+
+    const deleteResponse = await sendJwtWebhookRequest('DELETE', {
+      webhookId: jwtCreatedWebhookId,
+    })
+
+    expect(deleteResponse.status).toBe(200)
+    const deleteData = await deleteResponse.json() as { webhookId: string }
+    expect(deleteData.webhookId).toBe(jwtCreatedWebhookId)
+    jwtCreatedWebhookId = null
   })
 
   it('create webhook with missing required fields', async () => {

@@ -3,7 +3,7 @@ import type { AuthInfo, MiddlewareKeyVariables } from '../../utils/hono.ts'
 import type { Database } from '../../utils/supabase.types.ts'
 import { getBodyOrQuery, honoFactory, quickError, simpleError } from '../../utils/hono.ts'
 import { middlewareKey, middlewareV2 } from '../../utils/hono_middleware.ts'
-import { apikeyHasOrgRight, apikeyHasOrgRightWithPolicy, hasOrgRight, hasOrgRightApikey, supabaseApikey } from '../../utils/supabase.ts'
+import { apikeyHasOrgRight, apikeyHasOrgRightWithPolicy, hasOrgRight, hasOrgRightApikey, supabaseApikey, supabaseWithAuth } from '../../utils/supabase.ts'
 import { deleteWebhook } from './delete.ts'
 import { getDeliveries, retryDelivery } from './deliveries.ts'
 import { get } from './get.ts'
@@ -113,6 +113,24 @@ export async function checkWebhookPermissionV2(
   }
 }
 
+export async function getWebhookSupabaseWithAuth(
+  c: Context<MiddlewareKeyVariables, any, any>,
+  orgId: string,
+  auth: AuthInfo,
+) {
+  await checkWebhookPermissionV2(c, orgId, auth)
+  return supabaseWithAuth(c, auth)
+}
+
+async function handleWebhookWrite(
+  c: Context<MiddlewareKeyVariables, any, any>,
+  handler: (c: Context<MiddlewareKeyVariables, any, any>, body: any, auth: AuthInfo) => Promise<Response>,
+): Promise<Response> {
+  const body = await getBodyOrQuery<any>(c)
+  const auth = c.get('auth') as AuthInfo
+  return handler(c, body, auth)
+}
+
 // List all webhooks for org
 app.get('/', middlewareKey(['all', 'write']), async (c) => {
   const body = await getBodyOrQuery<any>(c)
@@ -121,24 +139,18 @@ app.get('/', middlewareKey(['all', 'write']), async (c) => {
 })
 
 // Create webhook
-app.post('/', middlewareKey(['all', 'write']), async (c) => {
-  const body = await getBodyOrQuery<any>(c)
-  const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
-  return post(c, body, apikey)
+app.post('/', middlewareV2(['all', 'write']), async (c) => {
+  return handleWebhookWrite(c, post)
 })
 
 // Update webhook
-app.put('/', middlewareKey(['all', 'write']), async (c) => {
-  const body = await getBodyOrQuery<any>(c)
-  const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
-  return put(c, body, apikey)
+app.put('/', middlewareV2(['all', 'write']), async (c) => {
+  return handleWebhookWrite(c, put)
 })
 
 // Delete webhook
-app.delete('/', middlewareKey(['all', 'write']), async (c) => {
-  const body = await getBodyOrQuery<any>(c)
-  const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
-  return deleteWebhook(c, body, apikey)
+app.delete('/', middlewareV2(['all', 'write']), async (c) => {
+  return handleWebhookWrite(c, deleteWebhook)
 })
 
 // Test webhook (supports both JWT and API key auth)

@@ -34,8 +34,71 @@ const DELIVERIES_PER_PAGE = 50
 
 const supabase = useSupabase()
 
+type WebhookRow = Database['public']['Tables']['webhooks']['Row']
+type WebhookWriteData = Partial<{
+  name: string
+  url: string
+  events: string[]
+  enabled: boolean
+}>
+
+function getCurrentOrgId(): string | undefined {
+  return useOrganizationStore().currentOrganization?.gid
+}
+
+function validateWebhookUrl(url: string): string | undefined {
+  try {
+    const parsedUrl = new URL(url)
+    const isLocalhost = parsedUrl.hostname === 'localhost' || parsedUrl.hostname.endsWith('.localhost')
+    const isLoopback = parsedUrl.hostname === '127.0.0.1' || parsedUrl.hostname === '::1'
+    if (parsedUrl.protocol !== 'https:' && !isLocalhost && !isLoopback) {
+      return 'Webhook URL must use HTTPS'
+    }
+  }
+  catch {
+    return 'Invalid URL'
+  }
+}
+
+function validateWebhookEvents(events: string[]): string | undefined {
+  const validEvents = WEBHOOK_EVENT_TYPES.map(e => e.value)
+  const invalidEvents = events.filter(e => !validEvents.includes(e as any))
+  if (invalidEvents.length > 0) {
+    return `Invalid event types: ${invalidEvents.join(', ')}`
+  }
+}
+
+function validateWebhookData(webhookData: WebhookWriteData): string | undefined {
+  if (webhookData.url) {
+    const urlError = validateWebhookUrl(webhookData.url)
+    if (urlError)
+      return urlError
+  }
+
+  if (webhookData.events) {
+    const eventsError = validateWebhookEvents(webhookData.events)
+    if (eventsError)
+      return eventsError
+  }
+}
+
+async function invokeWebhookApi(
+  method: 'POST' | 'PUT' | 'DELETE',
+  body: Record<string, unknown>,
+  failureMessage: string,
+  exceptionMessage: string,
+): Promise<{ data?: any, error?: string }> {
+  try {
+    const { data, error } = await supabase.functions.invoke('webhooks', { method, body })
+    return error ? { error: error.message || failureMessage } : { data }
+  }
+  catch (err: any) {
+    return { error: err?.message || exceptionMessage }
+  }
+}
+
 export const useWebhooksStore = defineStore('webhooks', () => {
-  const webhooks: Ref<Database['public']['Tables']['webhooks']['Row'][]> = ref([])
+  const webhooks: Ref<WebhookRow[]> = ref([])
   const deliveries: Ref<Database['public']['Tables']['webhook_deliveries']['Row'][]> = ref([])
   const deliveryPagination: Ref<DeliveryPagination | null> = ref(null)
   const isLoading = ref(false)
@@ -81,7 +144,7 @@ export const useWebhooksStore = defineStore('webhooks', () => {
    * Get a single webhook
    * Uses direct Supabase SDK - RLS handles permissions
    */
-  async function getWebhook(webhookId: string): Promise<Database['public']['Tables']['webhooks']['Row'] | null> {
+  async function getWebhook(webhookId: string): Promise<WebhookRow | null> {
     const organizationStore = useOrganizationStore()
     const orgId = organizationStore.currentOrganization?.gid
 
@@ -113,172 +176,82 @@ export const useWebhooksStore = defineStore('webhooks', () => {
 
   /**
    * Create a new webhook
-   * Uses direct Supabase SDK - RLS handles permissions
+   * Uses the webhook API so backend permission checks stay centralized
    */
   async function createWebhook(webhookData: {
     name: string
     url: string
     events: string[]
-  }): Promise<{ success: boolean, webhook?: Database['public']['Tables']['webhooks']['Row'], error?: string }> {
-    const organizationStore = useOrganizationStore()
-    const orgId = organizationStore.currentOrganization?.gid
-
+  }): Promise<{ success: boolean, webhook?: WebhookRow, error?: string }> {
+    const orgId = getCurrentOrgId()
     if (!orgId) {
       return { success: false, error: 'No organization selected' }
     }
 
-    // Validate URL is HTTPS (except localhost for testing)
-    try {
-      const parsedUrl = new URL(webhookData.url)
-      const isLocalhost = parsedUrl.hostname === 'localhost' || parsedUrl.hostname.endsWith('.localhost')
-      const isLoopback = parsedUrl.hostname === '127.0.0.1' || parsedUrl.hostname === '::1'
-      if (parsedUrl.protocol !== 'https:' && !isLocalhost && !isLoopback) {
-        return { success: false, error: 'Webhook URL must use HTTPS' }
-      }
-    }
-    catch {
-      return { success: false, error: 'Invalid URL' }
-    }
+    const validationError = validateWebhookData(webhookData)
+    if (validationError)
+      return { success: false, error: validationError }
 
-    // Validate events
-    const validEvents = WEBHOOK_EVENT_TYPES.map(e => e.value)
-    const invalidEvents = webhookData.events.filter(e => !validEvents.includes(e as any))
-    if (invalidEvents.length > 0) {
-      return { success: false, error: `Invalid event types: ${invalidEvents.join(', ')}` }
+    const result = await invokeWebhookApi('POST', { orgId, ...webhookData, enabled: true }, 'Failed to create webhook', 'Error creating webhook')
+    if (result.error)
+      return { success: false, error: result.error }
+
+    const webhook = result.data?.webhook as WebhookRow | undefined
+    if (webhook) {
+      webhooks.value.unshift(webhook)
     }
 
-    try {
-      const { data, error } = await supabase
-        .from('webhooks')
-        .insert({
-          org_id: orgId,
-          name: webhookData.name,
-          url: webhookData.url,
-          events: webhookData.events,
-          enabled: true, // Always enabled on creation
-        })
-        .select()
-        .single()
-
-      if (error) {
-        return { success: false, error: error.message || 'Failed to create webhook' }
-      }
-
-      // Add to local list
-      if (data) {
-        webhooks.value.unshift(data)
-      }
-
-      return { success: true, webhook: data }
-    }
-    catch (err: any) {
-      return { success: false, error: err?.message || 'Error creating webhook' }
-    }
+    return { success: true, webhook }
   }
 
   /**
    * Update an existing webhook
-   * Uses direct Supabase SDK - RLS handles permissions
+   * Uses the webhook API so backend permission checks stay centralized
    */
   async function updateWebhook(
     webhookId: string,
-    webhookData: Partial<{
-      name: string
-      url: string
-      events: string[]
-      enabled: boolean
-    }>,
-  ): Promise<{ success: boolean, webhook?: Database['public']['Tables']['webhooks']['Row'], error?: string }> {
-    const organizationStore = useOrganizationStore()
-    const orgId = organizationStore.currentOrganization?.gid
-
+    webhookData: WebhookWriteData,
+  ): Promise<{ success: boolean, webhook?: WebhookRow, error?: string }> {
+    const orgId = getCurrentOrgId()
     if (!orgId) {
       return { success: false, error: 'No organization selected' }
     }
 
-    // Validate URL if provided
-    if (webhookData.url) {
-      try {
-        const parsedUrl = new URL(webhookData.url)
-        const isLocalhost = parsedUrl.hostname === 'localhost' || parsedUrl.hostname.endsWith('.localhost')
-        const isLoopback = parsedUrl.hostname === '127.0.0.1' || parsedUrl.hostname === '::1'
-        if (parsedUrl.protocol !== 'https:' && !isLocalhost && !isLoopback) {
-          return { success: false, error: 'Webhook URL must use HTTPS' }
-        }
-      }
-      catch {
-        return { success: false, error: 'Invalid URL' }
-      }
-    }
+    const validationError = validateWebhookData(webhookData)
+    if (validationError)
+      return { success: false, error: validationError }
 
-    // Validate events if provided
-    if (webhookData.events) {
-      const validEvents = WEBHOOK_EVENT_TYPES.map(e => e.value)
-      const invalidEvents = webhookData.events.filter(e => !validEvents.includes(e as any))
-      if (invalidEvents.length > 0) {
-        return { success: false, error: `Invalid event types: ${invalidEvents.join(', ')}` }
+    const result = await invokeWebhookApi('PUT', { orgId, webhookId, ...webhookData }, 'Failed to update webhook', 'Error updating webhook')
+    if (result.error)
+      return { success: false, error: result.error }
+
+    const webhook = result.data?.webhook as WebhookRow | undefined
+    if (webhook) {
+      const index = webhooks.value.findIndex(w => w.id === webhookId)
+      if (index !== -1) {
+        webhooks.value[index] = webhook
       }
     }
 
-    try {
-      const { data, error } = await supabase
-        .from('webhooks')
-        .update(webhookData)
-        .eq('id', webhookId)
-        .eq('org_id', orgId)
-        .select()
-        .single()
-
-      if (error) {
-        return { success: false, error: error.message || 'Failed to update webhook' }
-      }
-
-      // Update local list
-      if (data) {
-        const index = webhooks.value.findIndex(w => w.id === webhookId)
-        if (index !== -1) {
-          webhooks.value[index] = data
-        }
-      }
-
-      return { success: true, webhook: data }
-    }
-    catch (err: any) {
-      return { success: false, error: err?.message || 'Error updating webhook' }
-    }
+    return { success: true, webhook }
   }
 
   /**
    * Delete a webhook
-   * Uses direct Supabase SDK - RLS handles permissions
+   * Uses the webhook API so backend permission checks stay centralized
    */
   async function deleteWebhook(webhookId: string): Promise<{ success: boolean, error?: string }> {
-    const organizationStore = useOrganizationStore()
-    const orgId = organizationStore.currentOrganization?.gid
-
+    const orgId = getCurrentOrgId()
     if (!orgId) {
       return { success: false, error: 'No organization selected' }
     }
 
-    try {
-      const { error } = await supabase
-        .from('webhooks')
-        .delete()
-        .eq('id', webhookId)
-        .eq('org_id', orgId)
+    const result = await invokeWebhookApi('DELETE', { orgId, webhookId }, 'Failed to delete webhook', 'Error deleting webhook')
+    if (result.error)
+      return { success: false, error: result.error }
 
-      if (error) {
-        return { success: false, error: error.message || 'Failed to delete webhook' }
-      }
-
-      // Remove from local list
-      webhooks.value = webhooks.value.filter(w => w.id !== webhookId)
-
-      return { success: true }
-    }
-    catch (err: any) {
-      return { success: false, error: err?.message || 'Error deleting webhook' }
-    }
+    webhooks.value = webhooks.value.filter(w => w.id !== webhookId)
+    return { success: true }
   }
 
   /**

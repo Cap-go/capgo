@@ -1,11 +1,10 @@
 import type { Context } from 'hono'
-import type { Database } from '../../utils/supabase.types.ts'
+import type { AuthInfo, MiddlewareKeyVariables } from '../../utils/hono.ts'
 import { type } from 'arktype'
 import { safeParseSchema } from '../../utils/ark_validation.ts'
 import { simpleError } from '../../utils/hono.ts'
-import { supabaseApikey } from '../../utils/supabase.ts'
 import { getWebhookPublicUrlValidationError, WEBHOOK_EVENT_TYPES } from '../../utils/webhook.ts'
-import { checkWebhookPermission } from './index.ts'
+import { getWebhookSupabaseWithAuth } from './index.ts'
 
 const bodySchema = type({
   'orgId': 'string',
@@ -15,14 +14,12 @@ const bodySchema = type({
   'enabled?': 'boolean',
 })
 
-export async function post(c: Context, bodyRaw: any, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
+export async function post(c: Context<MiddlewareKeyVariables, any, any>, bodyRaw: any, auth: AuthInfo): Promise<Response> {
   const bodyParsed = safeParseSchema(bodySchema, bodyRaw)
   if (!bodyParsed.success) {
     throw simpleError('invalid_body', 'Invalid body', { error: bodyParsed.error })
   }
   const body = bodyParsed.data
-
-  await checkWebhookPermission(c, body.orgId, apikey)
 
   // Validate events are allowed
   const invalidEvents = body.events.filter(e => !WEBHOOK_EVENT_TYPES.includes(e as any))
@@ -37,9 +34,8 @@ export async function post(c: Context, bodyRaw: any, apikey: Database['public'][
   if (urlError)
     throw simpleError('invalid_url', urlError, { url: body.url })
 
-  // Create webhook using authenticated client - RLS will enforce access
   // Note: Using type assertion as webhooks table types are not yet generated
-  const supabase = supabaseApikey(c, c.get('capgkey') as string)
+  const supabase = await getWebhookSupabaseWithAuth(c, body.orgId, auth)
   const { data, error } = await (supabase as any)
     .from('webhooks')
     .insert({
@@ -48,7 +44,7 @@ export async function post(c: Context, bodyRaw: any, apikey: Database['public'][
       url: body.url,
       events: body.events,
       enabled: body.enabled ?? true,
-      created_by: apikey.user_id,
+      created_by: auth.userId,
     })
     .select()
     .single()
