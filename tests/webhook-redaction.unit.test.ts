@@ -56,7 +56,7 @@ describe('webhook schema validation redaction', () => {
 
     safeIssues.forEach((issue) => {
       expect(Array.isArray(issue.path)).toBe(true)
-      issue.path.forEach(p => expect(typeof p).toBe('string'))
+      issue.path.forEach((p: string) => expect(typeof p).toBe('string'))
     })
   })
 })
