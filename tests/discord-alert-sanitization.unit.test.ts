@@ -103,7 +103,7 @@ describe('Discord alert sanitization', () => {
   it('redacts sensitive query parameters from Discord request details URL', async () => {
     const accessToken = sampleValue('access-token')
     const requestUrl = `https://api.example.test/callback?access_token=${accessToken}&next=/dashboard`
-    const fetchMock = vi.fn().mockResolvedValue(new Response('', { status: 204 }))
+    const fetchMock = vi.fn().mockResolvedValue(new Response('', { status: 200 }))
     vi.stubGlobal('fetch', fetchMock)
 
     const headers = new Headers({
