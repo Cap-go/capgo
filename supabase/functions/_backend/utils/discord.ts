@@ -2,66 +2,9 @@ import type {
   RESTPostAPIWebhookWithTokenJSONBody,
 } from 'discord-api-types/v10'
 import type { Context } from 'hono'
+import { sanitizeSensitiveFromString, sanitizeSensitiveHeaders } from './discord_sanitization.ts'
 import { cloudlog, cloudlogErr } from './logging.ts'
 import { getEnv } from './utils.ts'
-
-// Fields that should be completely removed from logs (never logged)
-const REMOVED_FIELDS = ['password']
-// Fields that should show first 4 and last 4 characters
-const PARTIALLY_REDACTED_FIELDS = ['secret', 'token', 'apikey', 'api_key', 'authorization', 'credential', 'private_key']
-
-// Partially redact a value - show first 4 and last 4 characters
-function partialRedact(value: string): string {
-  if (value.length <= 8) {
-    return '***REDACTED***'
-  }
-  return `${value.slice(0, 4)}...${value.slice(-4)}`
-}
-
-// Remove or redact sensitive fields from a string that might contain JSON
-function sanitizeSensitiveFromString(str: string): string {
-  let result = str
-
-  // Completely remove password fields (including the key)
-  for (const field of REMOVED_FIELDS) {
-    // Remove "password":"value", or "password": "value" (with optional trailing comma)
-    const jsonRegexWithComma = new RegExp(`"${field}"\\s*:\\s*"[^"]*"\\s*,?\\s*`, 'gi')
-    result = result.replace(jsonRegexWithComma, '')
-    // Clean up any resulting double commas or leading/trailing commas in objects
-    result = result.replace(/,\s*,/g, ',')
-    result = result.replace(/\{\s*,/g, '{')
-    result = result.replace(/,\s*\}/g, '}')
-  }
-
-  // Partially redact other sensitive fields (show first 4 and last 4 chars)
-  for (const field of PARTIALLY_REDACTED_FIELDS) {
-    const jsonRegex = new RegExp(`("${field}"\\s*:\\s*)"([^"]*)"`, 'gi')
-    result = result.replace(jsonRegex, (_match, prefix, value) => {
-      return `${prefix}"${partialRedact(value)}"`
-    })
-  }
-
-  return result
-}
-
-// Sanitize sensitive headers - remove or redact
-function sanitizeSensitiveHeaders(headers: Record<string, string>): Record<string, string> {
-  const sanitized: Record<string, string> = {}
-  for (const [key, value] of Object.entries(headers)) {
-    const lowerKey = key.toLowerCase()
-    // Skip password-related headers entirely
-    if (REMOVED_FIELDS.some(field => lowerKey.includes(field))) {
-      continue
-    }
-    else if (PARTIALLY_REDACTED_FIELDS.some(field => lowerKey.includes(field))) {
-      sanitized[key] = partialRedact(value)
-    }
-    else {
-      sanitized[key] = value
-    }
-  }
-  return sanitized
-}
 
 export async function sendDiscordAlert(c: Context, payload: RESTPostAPIWebhookWithTokenJSONBody): Promise<boolean> {
   const webhookUrl = getEnv(c, 'DISCORD_ALERT')
@@ -106,11 +49,12 @@ export function sendDiscordAlert500(c: Context, functionName: string, body: stri
   const url = c.req.url
   const rawHeaders = Object.fromEntries((c.req.raw.headers as any).entries())
   const headers = sanitizeSensitiveHeaders(rawHeaders)
-  const errorMessage = e?.message ?? 'Unknown error'
-  const errorStack = e?.stack ?? 'No stack trace'
+  const errorMessage = sanitizeSensitiveFromString(e?.message ?? 'Unknown error')
+  const errorStack = sanitizeSensitiveFromString(e?.stack ?? 'No stack trace')
   const errorName = e?.name ?? 'Error'
   // Defense-in-depth: remove/sanitize sensitive fields from body string
   const safeBody = sanitizeSensitiveFromString(body)
+  const safeErrorObject = sanitizeSensitiveFromString(JSON.stringify(e, Object.getOwnPropertyNames(e), 2))
   return sendDiscordAlert(c, {
     content: `🚨 **${functionName}** Error Alert`,
     embeds: [
@@ -147,7 +91,7 @@ export function sendDiscordAlert500(c: Context, functionName: string, body: stri
           },
           {
             name: '🔍 Full Error Object',
-            value: `\`\`\`json\n${JSON.stringify(e, Object.getOwnPropertyNames(e), 2).substring(0, 1000)}\n\`\`\``,
+            value: `\`\`\`json\n${safeErrorObject.substring(0, 1000)}\n\`\`\``,
             inline: false,
           },
         ],
