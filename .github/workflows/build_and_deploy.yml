@@ -140,6 +140,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
       - name: Setup bun
         uses: oven-sh/setup-bun@v2
         with:
@@ -166,6 +169,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
       - name: Setup bun
         uses: oven-sh/setup-bun@v2
         with:
@@ -192,6 +198,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
       - name: Setup bun
         uses: oven-sh/setup-bun@v2
         with:
@@ -251,6 +260,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
       - name: Setup bun
         uses: oven-sh/setup-bun@v2
         with:
