@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
-import { normalizeLegacyEncodedManifestFileName } from '../supabase/functions/_backend/utils/manifest_encoding.ts'
 import { getManifestUrl } from '../supabase/functions/_backend/utils/downloadUrl.ts'
+import { normalizeLegacyEncodedManifestFileName } from '../supabase/functions/_backend/utils/manifest_encoding.ts'
 
 describe('manifest path encoding', () => {
   it.concurrent.each([

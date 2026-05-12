@@ -21,8 +21,8 @@ function isSafeManifestPath(path: string): boolean {
 }
 
 export function normalizeLegacyEncodedManifestFileName(fileName: string | null | undefined, s3Path: string | null | undefined): string | null {
-  if (!fileName)
-    return fileName ?? null
+  if (fileName == null)
+    return null
 
   if (!s3Path || !PERCENT_ENCODED_OCTET_RE.test(fileName) || !s3Path.endsWith(`_${fileName}`))
     return fileName
