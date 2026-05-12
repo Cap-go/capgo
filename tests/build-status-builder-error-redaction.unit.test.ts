@@ -1,4 +1,6 @@
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+beforeEach(() => vi.clearAllMocks())
 
 vi.mock('../supabase/functions/_backend/utils/hono.ts', () => ({
   simpleError: (code: string, message: string, data?: Record<string, unknown>) => {
