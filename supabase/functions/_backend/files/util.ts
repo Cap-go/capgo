@@ -113,6 +113,20 @@ export function getSafeAttachmentReadCandidateKeys(decodedKey: string, rawRouteK
   return [decodedKey]
 }
 
+export interface AttachmentHeadReader<T> {
+  head: (key: string) => Promise<T | null>
+}
+
+export async function headFirstExistingAttachmentCandidate<T>(reader: AttachmentHeadReader<T>, candidateKeys: string[]): Promise<T | null> {
+  for (const candidateKey of candidateKeys) {
+    const objectInfo = await reader.head(candidateKey)
+    if (objectInfo != null)
+      return objectInfo
+  }
+
+  return null
+}
+
 export function withNoTransformCacheControl(cacheControl: string | null | undefined): string {
   if (cacheControl == null || cacheControl.trim() === '') {
     return NO_TRANSFORM_CACHE_CONTROL

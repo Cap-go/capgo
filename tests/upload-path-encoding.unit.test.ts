@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { encodeR2KeyForUploadLocation, getSafeAttachmentReadCandidateKeys } from '../supabase/functions/_backend/files/util.ts'
+import { encodeR2KeyForUploadLocation, getSafeAttachmentReadCandidateKeys, headFirstExistingAttachmentCandidate } from '../supabase/functions/_backend/files/util.ts'
 
 describe('upload path encoding', () => {
   it.concurrent('encodes returned upload locations so literal percent signs are valid URLs', () => {
@@ -29,6 +29,23 @@ describe('upload path encoding', () => {
       decodedRouteKey,
       encodedStoragePath,
     ])
+  })
+
+  it.concurrent('heads legacy raw percent candidates when decoded object keys are missing', async () => {
+    const checkedKeys: string[] = []
+    const decodedRouteKey = 'orgs/org-id/apps/app-id/delta/hash_assets/suite-marketing/images/social-media/sad_post_grey@2x.png'
+    const encodedStoragePath = 'orgs/org-id/apps/app-id/delta/hash_assets/suite-marketing/images/social-media/sad_post_grey%402x.png'
+    const legacyObjectInfo = { size: 42 }
+
+    const objectInfo = await headFirstExistingAttachmentCandidate({
+      async head(key: string) {
+        checkedKeys.push(key)
+        return key === encodedStoragePath ? legacyObjectInfo : null
+      },
+    }, getSafeAttachmentReadCandidateKeys(decodedRouteKey, encodedStoragePath))
+
+    expect(objectInfo).toBe(legacyObjectInfo)
+    expect(checkedKeys).toEqual([decodedRouteKey, encodedStoragePath])
   })
 
   it.concurrent('does not try raw percent route keys outside the authorized app scope', () => {
