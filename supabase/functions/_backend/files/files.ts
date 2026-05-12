@@ -21,7 +21,7 @@ import { app as files_config } from './files_config.ts'
 import { parseUploadMetadata } from './parse.ts'
 import { DEFAULT_RETRY_PARAMS, RetryBucket } from './retry.ts'
 import { supabaseTusCreateHandler, supabaseTusHeadHandler, supabaseTusPatchHandler } from './supabaseTusProxy.ts'
-import { ALLOWED_HEADERS, ALLOWED_METHODS, buildFileHttpMetadata, EXPOSED_HEADERS, isRetryableDurableObjectResetError, MAX_UPLOAD_LENGTH_BYTES, toBase64, TUS_EXTENSIONS, TUS_VERSION, withNoTransformCacheControl, X_CHECKSUM_SHA256, X_UPLOAD_HANDLER_RETRYABLE } from './util.ts'
+import { ALLOWED_HEADERS, ALLOWED_METHODS, buildFileHttpMetadata, EXPOSED_HEADERS, getSafeAttachmentReadCandidateKeys, headFirstExistingAttachmentCandidate, isRetryableDurableObjectResetError, MAX_UPLOAD_LENGTH_BYTES, parseAppScopedAttachmentPath, toBase64, TUS_EXTENSIONS, TUS_VERSION, withNoTransformCacheControl, X_CHECKSUM_SHA256, X_UPLOAD_HANDLER_RETRYABLE } from './util.ts'
 
 const DO_CALL_TIMEOUT = 1000 * 60 * 30 // 30 minutes
 const DO_FETCH_RETRY_ATTEMPTS = 3
@@ -30,10 +30,6 @@ const DO_FETCH_RETRY_DELAY_MS = 250
 const ATTACHMENT_PREFIX = 'attachments'
 const ATTACHMENT_PLAN_LIMIT: Array<'mau' | 'bandwidth' | 'storage'> = ['mau', 'bandwidth', 'storage']
 const TUS_UPLOAD_CONTENT_TYPE = 'application/offset+octet-stream'
-
-type AppScopedAttachmentPath
-  = | { kind: 'scoped', app_id: string, owner_org: string }
-    | { kind: 'invalid_scoped' }
 
 export const app = new Hono<MiddlewareKeyVariables>()
 
@@ -321,23 +317,6 @@ async function saveBandwidthUsage(c: Context, fileSize: number | null | undefine
   }
 }
 
-function parseAppScopedAttachmentPath(fileId: unknown): AppScopedAttachmentPath | null {
-  if (typeof fileId !== 'string') {
-    return null
-  }
-
-  const [orgs, owner_org, apps, app_id, ...suffix] = fileId.split('/')
-  if (orgs !== 'orgs') {
-    return null
-  }
-
-  if (!owner_org || apps !== 'apps' || !app_id || suffix.length === 0 || suffix.some(part => part.length === 0)) {
-    return { kind: 'invalid_scoped' }
-  }
-
-  return { kind: 'scoped', app_id, owner_org }
-}
-
 async function assertReadableAppScopedAttachment(c: Context, fileId: unknown): Promise<void> {
   const scopedPath = parseAppScopedAttachmentPath(fileId)
   if (scopedPath?.kind === 'invalid_scoped') {
@@ -438,6 +417,8 @@ async function getHandler(c: Context): Promise<Response> {
   // Support for deno cache or CF cache do not remove this
   // @ts-expect-error-next-line
   const cache = getRuntimeKey() === 'workerd' ? caches.default : caches
+  const rawFileId = getRawAttachmentRouteId(c)
+  const candidateKeys = getSafeAttachmentReadCandidateKeys(fileId, rawFileId)
   const cacheUrl = new URL(c.req.url)
   cacheUrl.searchParams.set('range', c.req.header('range') || '')
   const cacheKey = new Request(cacheUrl, c.req)
@@ -448,9 +429,11 @@ async function getHandler(c: Context): Promise<Response> {
     // Best-effort restore: if file is cached but missing in R2, write it back.
     await backgroundTask(c, async () => {
       try {
-        const head = await new RetryBucket(bucket, DEFAULT_RETRY_PARAMS).head(fileId)
-        if (head != null)
+        const retryBucket = new RetryBucket(bucket, DEFAULT_RETRY_PARAMS)
+        const existingObject = await headFirstExistingAttachmentCandidate(retryBucket, candidateKeys)
+        if (existingObject != null)
           return
+
         const cached = response.clone()
         const data = await cached.arrayBuffer()
         const contentType = cached.headers.get('content-type') || undefined
@@ -472,7 +455,8 @@ async function getHandler(c: Context): Promise<Response> {
   if (rangeHeaderFromRequest) {
     cloudlog({ requestId: c.get('requestId'), message: 'getHandler files range request', range: rangeHeaderFromRequest })
     try {
-      const objectInfo = await new RetryBucket(bucket, DEFAULT_RETRY_PARAMS).head(fileId)
+      const retryBucket = new RetryBucket(bucket, DEFAULT_RETRY_PARAMS)
+      const objectInfo = await headFirstExistingAttachmentCandidate(retryBucket, candidateKeys)
       if (objectInfo != null) {
         const fileSize = objectInfo.size
         const rangeMatch = rangeHeaderFromRequest.match(/bytes=(\d+)-(\d*)/)
@@ -493,9 +477,13 @@ async function getHandler(c: Context): Promise<Response> {
 
   let object: R2ObjectBody | null = null
   try {
-    object = await new RetryBucket(bucket, DEFAULT_RETRY_PARAMS).get(fileId, {
-      range: c.req.raw.headers,
-    })
+    for (const candidateKey of candidateKeys) {
+      object = await new RetryBucket(bucket, DEFAULT_RETRY_PARAMS).get(candidateKey, {
+        range: c.req.raw.headers,
+      })
+      if (object != null)
+        break
+    }
   }
   catch (error) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'getHandler files get failed', fileId, error })
