@@ -113,6 +113,10 @@ export function getSafeAttachmentReadCandidateKeys(decodedKey: string, rawRouteK
   return [decodedKey]
 }
 
+export function shouldBypassAttachmentCache(decodedKey: string, rawRouteKey: string | null): boolean {
+  return getSafeAttachmentReadCandidateKeys(decodedKey, rawRouteKey).length > 1
+}
+
 export interface AttachmentHeadReader<T> {
   head: (key: string) => Promise<T | null>
 }

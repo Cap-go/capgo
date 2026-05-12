@@ -21,7 +21,7 @@ import { app as files_config } from './files_config.ts'
 import { parseUploadMetadata } from './parse.ts'
 import { DEFAULT_RETRY_PARAMS, RetryBucket } from './retry.ts'
 import { supabaseTusCreateHandler, supabaseTusHeadHandler, supabaseTusPatchHandler } from './supabaseTusProxy.ts'
-import { ALLOWED_HEADERS, ALLOWED_METHODS, buildFileHttpMetadata, EXPOSED_HEADERS, getSafeAttachmentReadCandidateKeys, headFirstExistingAttachmentCandidate, isRetryableDurableObjectResetError, MAX_UPLOAD_LENGTH_BYTES, parseAppScopedAttachmentPath, toBase64, TUS_EXTENSIONS, TUS_VERSION, withNoTransformCacheControl, X_CHECKSUM_SHA256, X_UPLOAD_HANDLER_RETRYABLE } from './util.ts'
+import { ALLOWED_HEADERS, ALLOWED_METHODS, buildFileHttpMetadata, EXPOSED_HEADERS, getSafeAttachmentReadCandidateKeys, headFirstExistingAttachmentCandidate, isRetryableDurableObjectResetError, MAX_UPLOAD_LENGTH_BYTES, parseAppScopedAttachmentPath, shouldBypassAttachmentCache, toBase64, TUS_EXTENSIONS, TUS_VERSION, withNoTransformCacheControl, X_CHECKSUM_SHA256, X_UPLOAD_HANDLER_RETRYABLE } from './util.ts'
 
 const DO_CALL_TIMEOUT = 1000 * 60 * 30 // 30 minutes
 const DO_FETCH_RETRY_ATTEMPTS = 3
@@ -419,36 +419,42 @@ async function getHandler(c: Context): Promise<Response> {
   const cache = getRuntimeKey() === 'workerd' ? caches.default : caches
   const rawFileId = getRawAttachmentRouteId(c)
   const candidateKeys = getSafeAttachmentReadCandidateKeys(fileId, rawFileId)
+  const bypassAttachmentCache = shouldBypassAttachmentCache(fileId, rawFileId)
   const cacheUrl = new URL(c.req.url)
   cacheUrl.searchParams.set('range', c.req.header('range') || '')
   const cacheKey = new Request(cacheUrl, c.req)
-  let response = await cache.match(cacheKey)
-  if (response != null) {
-    response = ensureNoTransformResponse(response)
-    cloudlog({ requestId: c.get('requestId'), message: 'getHandler files cache hit' })
-    // Best-effort restore: if file is cached but missing in R2, write it back.
-    await backgroundTask(c, async () => {
-      try {
-        const retryBucket = new RetryBucket(bucket, DEFAULT_RETRY_PARAMS)
-        const existingObject = await headFirstExistingAttachmentCandidate(retryBucket, candidateKeys)
-        if (existingObject != null)
-          return
+  if (bypassAttachmentCache) {
+    cloudlog({ requestId: c.get('requestId'), message: 'getHandler files cache bypass for encoded route key', fileId, rawFileId })
+  }
+  else {
+    let cachedResponse = await cache.match(cacheKey)
+    if (cachedResponse != null) {
+      cachedResponse = ensureNoTransformResponse(cachedResponse)
+      cloudlog({ requestId: c.get('requestId'), message: 'getHandler files cache hit' })
+      // Best-effort restore: if file is cached but missing in R2, write it back.
+      await backgroundTask(c, async () => {
+        try {
+          const retryBucket = new RetryBucket(bucket, DEFAULT_RETRY_PARAMS)
+          const existingObject = await headFirstExistingAttachmentCandidate(retryBucket, candidateKeys)
+          if (existingObject != null)
+            return
 
-        const cached = response.clone()
-        const data = await cached.arrayBuffer()
-        const contentType = cached.headers.get('content-type') || undefined
-        const httpMetadata = buildFileHttpMetadata(contentType, cached.headers.get('cache-control'))
-        await bucket.put(fileId, data, { httpMetadata })
-        cloudlog({ requestId: c.get('requestId'), message: 'Restored cached file to R2', fileId })
-        await sendDiscordAlert(c, {
-          content: `🛠️ Restored cached file to R2\nFile: ${fileId}\nRequest ID: ${c.get('requestId') ?? 'unknown'}`,
-        })
-      }
-      catch (err) {
-        cloudlog({ requestId: c.get('requestId'), message: 'Failed to restore cached file to R2', fileId, error: String(err) })
-      }
-    })
-    return response
+          const cached = cachedResponse.clone()
+          const data = await cached.arrayBuffer()
+          const contentType = cached.headers.get('content-type') || undefined
+          const httpMetadata = buildFileHttpMetadata(contentType, cached.headers.get('cache-control'))
+          await bucket.put(fileId, data, { httpMetadata })
+          cloudlog({ requestId: c.get('requestId'), message: 'Restored cached file to R2', fileId })
+          await sendDiscordAlert(c, {
+            content: `🛠️ Restored cached file to R2\nFile: ${fileId}\nRequest ID: ${c.get('requestId') ?? 'unknown'}`,
+          })
+        }
+        catch (err) {
+          cloudlog({ requestId: c.get('requestId'), message: 'Failed to restore cached file to R2', fileId, error: String(err) })
+        }
+      })
+      return cachedResponse
+    }
   }
 
   const rangeHeaderFromRequest = c.req.header('range')
@@ -499,15 +505,17 @@ async function getHandler(c: Context): Promise<Response> {
   if (object.range != null && c.req.header('range')) {
     cloudlog({ requestId: c.get('requestId'), message: 'getHandler files range request', range: rangeHeader(object.size, object.range) })
     headers.set('content-range', rangeHeader(object.size, object.range))
-    response = new Response(object.body, { headers, status: 206 })
+    const response = new Response(object.body, { headers, status: 206 })
     return response
   }
   headers.set('Content-Disposition', `attachment; filename="${object.key}"`)
-  response = new Response(object.body, { headers })
-  await backgroundTask(c, () => {
-    cloudlog({ requestId: c.get('requestId'), message: 'getHandler files cache saved', fileId })
-    cache.put(cacheKey, response.clone())
-  })
+  const response = new Response(object.body, { headers })
+  if (!bypassAttachmentCache) {
+    await backgroundTask(c, () => {
+      cloudlog({ requestId: c.get('requestId'), message: 'getHandler files cache saved', fileId })
+      cache.put(cacheKey, response.clone())
+    })
+  }
   return response
 }
 
