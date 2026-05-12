@@ -339,10 +339,10 @@ export async function pollOperation(
  */
 export function sanitizeGcpProjectDisplayName(input: string): string {
   const fallback = 'Capgo Build'
-  const allowed = input.replace(/[^A-Za-z0-9 \-'!.]/g, ' ').replace(/\s+/g, ' ').trim()
+  const allowed = input.replace(/[^A-Z0-9 \-'!.]/gi, ' ').replace(/\s+/g, ' ').trim()
   // Must start and end with a letter or digit.
-  const trimmed = allowed.replace(/^[^A-Za-z0-9]+/, '').replace(/[^A-Za-z0-9]+$/, '')
-  let result = trimmed.slice(0, 30).replace(/[^A-Za-z0-9]+$/, '')
+  const trimmed = allowed.replace(/^[^A-Z0-9]+/i, '').replace(/[^A-Z0-9]+$/i, '')
+  let result = trimmed.slice(0, 30).replace(/[^A-Z0-9]+$/i, '')
   if (result.length < 4)
     result = fallback
   return result

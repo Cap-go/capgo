@@ -60,8 +60,11 @@ export async function deleteAndroidProgress(
   try {
     await unlink(filePath)
   }
-  catch {
-    // Not found — fine
+  catch (err) {
+    // ENOENT (file already absent) is the happy path — swallow only that.
+    // EACCES / EPERM / EBUSY indicate a real problem the caller should see.
+    if ((err as NodeJS.ErrnoException)?.code !== 'ENOENT')
+      throw err
   }
 }
 

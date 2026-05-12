@@ -58,4 +58,3 @@ export function openKeystorePicker(): Promise<string | null> {
     'POSIX path of (choose file of type {"jks", "keystore", "p12"} with prompt "Select your Android keystore")',
   )
 }
-

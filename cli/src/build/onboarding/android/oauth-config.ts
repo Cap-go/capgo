@@ -30,8 +30,10 @@ export const PLAY_DEV_ID_TUTORIAL_URL = 'https://www.youtube.com/watch?v=Y1_Ngj8
 export interface CapgoOAuthClientConfig {
   clientId: string
   clientSecret: string
-  /** Scopes the backend tells the CLI to request. Always at least
-   *  `https://www.googleapis.com/auth/androidpublisher`. */
+  /**
+   * Scopes the backend tells the CLI to request. Always at least
+   * `https://www.googleapis.com/auth/androidpublisher`.
+   */
   scopes: string[]
 }
 

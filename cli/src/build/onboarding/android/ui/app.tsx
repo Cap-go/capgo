@@ -248,14 +248,30 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
    * write completing. Side effect: the step transition happens after one
    * IO round-trip (~few ms) rather than immediately. Worth it.
    */
+  // Forward-reference indirection. `handleError` is declared below this point
+  // because it uses `retryCount` (declared earlier). `persistAndStep` needs to
+  // call it from a catch handler; threading it through a ref lets us avoid a
+  // useCallback dep churn (handleError changes every time retryCount does).
+  const handleErrorRef = useRef<((err: unknown, failedStep: AndroidOnboardingStep) => void) | null>(null)
+
   const persistAndStep = useCallback(
     (
       updater: (p: AndroidOnboardingProgress) => AndroidOnboardingProgress,
       nextStep: AndroidOnboardingStep,
     ): void => {
       ;(async () => {
-        await persist(updater)
-        setStep(nextStep)
+        try {
+          await persist(updater)
+          setStep(nextStep)
+        }
+        catch (err) {
+          // saveAndroidProgress failures (disk full, permission, etc.) used to
+          // become unhandled rejections and stall the UI silently. Route them
+          // through the same retry/error UX as inline await failures. The
+          // failedStep is `nextStep` because we never advanced — on resume,
+          // getAndroidResumeStep recomputes from progress.json anyway.
+          handleErrorRef.current?.(err, nextStep)
+        }
       })()
     },
     [persist],
@@ -339,6 +355,13 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
     },
     [retryCount, addLog, exitOnboarding],
   )
+
+  // Wire the forward-declared ref so `persistAndStep`'s catch can surface
+  // saveAndroidProgress failures through the same retry/error UX without
+  // making `handleError` a useCallback dep (it changes every retryCount tick).
+  useEffect(() => {
+    handleErrorRef.current = handleError
+  }, [handleError])
 
   /**
    * Capgo OAuth client config — fetched once from the backend and cached
@@ -1280,7 +1303,12 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
                     completedSteps: { ...p.completedSteps, keystoreReady: ready },
                   }))
                   addLog(`✔ Keystore loaded — ${keystoreExistingPath}`)
-                  setStep('google-sign-in')
+                  // Smart-route: skip phases already complete (same pattern as
+                  // the auto-probe branch in the useEffect above) so a resume
+                  // that re-enters key-password doesn't drag the user back to
+                  // google-sign-in if they've already completed it.
+                  const fresh = await loadAndroidProgress(appId)
+                  setStep(fresh ? getAndroidResumeStep(fresh) : 'google-sign-in')
                 }
                 catch (err) {
                   handleError(err, 'keystore-existing-path')
@@ -1498,15 +1526,25 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
             ]}
             onChange={async (value) => {
               if (value === 'open') {
-                try { await open(PLAY_DEVELOPERS_URL) }
-                catch {}
-                addLog('🌐 Opened Play Console in your browser', 'cyan')
+                try {
+                  await open(PLAY_DEVELOPERS_URL)
+                  addLog('🌐 Opened Play Console in your browser', 'cyan')
+                }
+                catch {
+                  // Headless / WSL / SSH session — `open` has no display to
+                  // hand off to. Don't pretend it worked.
+                  addLog(`⚠ Couldn't auto-open the browser. Visit ${PLAY_DEVELOPERS_URL} manually.`, 'yellow')
+                }
                 setPlayDevIdMode('input')
               }
               else if (value === 'tutorial') {
-                try { await open(PLAY_DEV_ID_TUTORIAL_URL) }
-                catch {}
-                addLog('🎬 Opened video tutorial in your browser', 'cyan')
+                try {
+                  await open(PLAY_DEV_ID_TUTORIAL_URL)
+                  addLog('🎬 Opened video tutorial in your browser', 'cyan')
+                }
+                catch {
+                  addLog(`⚠ Couldn't auto-open the browser. Visit ${PLAY_DEV_ID_TUTORIAL_URL} manually.`, 'yellow')
+                }
                 // Stay on the actions screen so the user can still choose
                 // "Open Play Console" or "I have my developer ID" after
                 // watching.

@@ -445,7 +445,12 @@ function startLoopbackServer(args: {
     }, args.timeoutMs)
 
     function onAbort() {
-      codeReject(new Error('OAuth flow aborted'))
+      const err = new Error('OAuth flow aborted')
+      codeReject(err)
+      // Also reject the outer Promise. Before `server.listen` resolves this is
+      // the only path to surface the abort to the caller; afterwards
+      // `rejectHandle` is a no-op on an already-resolved promise.
+      rejectHandle(err)
     }
     if (args.signal) {
       if (args.signal.aborted) {
