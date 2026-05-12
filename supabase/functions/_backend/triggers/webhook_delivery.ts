@@ -8,11 +8,13 @@ import { closeClient, getDrizzleClient, getPgClient } from '../utils/pg.ts'
 import { backgroundTask } from '../utils/utils.ts'
 import {
   deliverWebhook,
+  disableWebhook,
   getDeliveryById,
   getWebhookById,
   incrementAttemptCount,
   markDeliveryFailed,
   queueWebhookDeliveryWithDelay,
+  scheduleRetry,
   updateDeliveryResult,
 
 } from '../utils/webhook.ts'
@@ -131,12 +133,32 @@ app.post('/', middlewareAPISecret, async (c) => {
       return c.json(BRES)
     }
 
+    // 410 Gone is an explicit opt-out: disable the endpoint and stop retrying.
+    if (result.status === 410) {
+      await markDeliveryFailed(c, deliveryData.delivery_id)
+      await disableWebhook(c, deliveryData.webhook_id)
+
+      cloudlog({
+        requestId: c.get('requestId'),
+        message: 'Webhook endpoint disabled after 410 Gone response',
+        deliveryId: deliveryData.delivery_id,
+        webhookId: deliveryData.webhook_id,
+      })
+
+      return c.json(BRES)
+    }
+
     // Handle failure
-    const maxAttempts = delivery.max_attempts || 3
+    const maxAttempts = delivery.max_attempts || 10
 
     if (attemptCount < maxAttempts) {
-      // Schedule retry with exponential backoff
-      const retryDelaySeconds = 2 ** attemptCount * 60 // 2min, 4min, 8min
+      const retryDelaySeconds = await scheduleRetry(
+        c,
+        deliveryData.delivery_id,
+        attemptCount,
+        result.retryAfter,
+        result.status ?? null,
+      )
 
       cloudlog({
         requestId: c.get('requestId'),
@@ -160,6 +182,7 @@ app.post('/', middlewareAPISecret, async (c) => {
     else {
       // Max retries reached, mark as permanently failed
       await markDeliveryFailed(c, deliveryData.delivery_id)
+      await disableWebhook(c, deliveryData.webhook_id)
 
       cloudlog({
         requestId: c.get('requestId'),

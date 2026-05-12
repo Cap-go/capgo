@@ -43,6 +43,7 @@ describe('webhook delivery redirect handling', () => {
       'delivery-1',
       'https://example.com/webhook',
       {
+        type: 'app_versions.INSERT',
         event: 'app_versions.INSERT',
         event_id: 'event-1',
         timestamp: new Date().toISOString(),
@@ -66,6 +67,10 @@ describe('webhook delivery redirect handling', () => {
       method: 'POST',
       redirect: 'manual',
     })
+    expect((webhookCalls[0]?.[1]?.headers as Record<string, string>)['webhook-id']).toBe('event-1')
+    expect((webhookCalls[0]?.[1]?.headers as Record<string, string>)['webhook-timestamp']).toMatch(/^\d+$/)
+    expect((webhookCalls[0]?.[1]?.headers as Record<string, string>)['webhook-signature']).toMatch(/^v1,[A-Za-z0-9+/]+={0,2}$/)
+    expect((webhookCalls[0]?.[1]?.headers as Record<string, string>)['X-Capgo-Signature']).toMatch(/^v1=\d+\.[a-f0-9]{64}$/)
   })
 
   it('does not treat redirect responses as successful deliveries', async () => {
@@ -84,6 +89,7 @@ describe('webhook delivery redirect handling', () => {
       'delivery-2',
       'https://example.com/webhook',
       {
+        type: 'app_versions.INSERT',
         event: 'app_versions.INSERT',
         event_id: 'event-2',
         timestamp: new Date().toISOString(),
@@ -104,6 +110,49 @@ describe('webhook delivery redirect handling', () => {
     expect(result.status).toBe(302)
     const webhookCalls = fetchMock.mock.calls.filter(([url]) => url === 'https://example.com/webhook')
     expect(webhookCalls).toHaveLength(1)
+  })
+
+  it('caps response bodies while reading webhook delivery previews', async () => {
+    mockGetEnv.mockReturnValue('')
+    let streamCancelled = false
+    const oversizedChunk = new Uint8Array(12000).fill('a'.charCodeAt(0))
+    const responseBody = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(oversizedChunk)
+      },
+      cancel() {
+        streamCancelled = true
+      },
+    })
+    const fetchMock = vi.fn().mockResolvedValue(new Response(responseBody, { status: 500 }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const { deliverWebhook } = await import('../supabase/functions/_backend/utils/webhook.ts')
+    const result = await deliverWebhook(
+      createContext(),
+      'delivery-large-body',
+      'https://example.com/webhook',
+      {
+        type: 'app_versions.INSERT',
+        event: 'app_versions.INSERT',
+        event_id: 'event-large-body',
+        timestamp: new Date().toISOString(),
+        org_id: 'org-1',
+        data: {
+          table: 'app_versions',
+          operation: 'INSERT',
+          record_id: 'record-large-body',
+          old_record: null,
+          new_record: null,
+          changed_fields: null,
+        },
+      },
+      'secret',
+    )
+
+    expect(result.success).toBe(false)
+    expect(result.body).toHaveLength(10000)
+    expect(streamCancelled).toBe(true)
   })
 
   it('blocks webhook hosts that resolve to private addresses before delivery', async () => {
@@ -129,6 +178,7 @@ describe('webhook delivery redirect handling', () => {
       'delivery-3',
       'https://private.example/webhook',
       {
+        type: 'app_versions.INSERT',
         event: 'app_versions.INSERT',
         event_id: 'event-3',
         timestamp: new Date().toISOString(),
@@ -150,5 +200,26 @@ describe('webhook delivery redirect handling', () => {
       body: 'Error: Webhook URL must point to a public host',
     })
     expect(fetchMock.mock.calls.some(([url]) => url === 'https://private.example/webhook')).toBe(false)
+  })
+})
+
+describe('webhook retry scheduling', () => {
+  it('uses the multi-day retry schedule with deterministic jitter', async () => {
+    const { getWebhookRetryDelaySeconds } = await import('../supabase/functions/_backend/utils/webhook.ts')
+
+    expect(getWebhookRetryDelaySeconds(1, null, 500, 0.5)).toBe(5)
+    expect(getWebhookRetryDelaySeconds(2, null, 500, 0.5)).toBe(5 * 60)
+    expect(getWebhookRetryDelaySeconds(3, null, 500, 0.5)).toBe(30 * 60)
+    expect(getWebhookRetryDelaySeconds(9, null, 500, 0.5)).toBe(24 * 60 * 60)
+  })
+
+  it('honors retry-after and throttles rate-limit responses', async () => {
+    const { getWebhookRetryDelaySeconds, parseRetryAfterSeconds } = await import('../supabase/functions/_backend/utils/webhook.ts')
+
+    expect(parseRetryAfterSeconds('120')).toBe(120)
+    expect(getWebhookRetryDelaySeconds(1, '600', 429, 0.5)).toBe(600)
+    expect(getWebhookRetryDelaySeconds(1, null, 429, 0.5)).toBe(5 * 60)
+    expect(getWebhookRetryDelaySeconds(1, '600', 429, 0)).toBe(600)
+    expect(getWebhookRetryDelaySeconds(1, null, 429, 0)).toBe(5 * 60)
   })
 })

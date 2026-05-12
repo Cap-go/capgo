@@ -21,6 +21,10 @@ export interface TestResult {
   message: string
 }
 
+export type Webhook = Omit<Database['public']['Tables']['webhooks']['Row'], 'secret'> & {
+  secret?: string
+}
+
 // Supported event types
 export const WEBHOOK_EVENT_TYPES = [
   { value: 'apps', label: 'App Changes', description: 'When apps are created, updated, or deleted' },
@@ -30,12 +34,25 @@ export const WEBHOOK_EVENT_TYPES = [
   { value: 'orgs', label: 'Organization Changes', description: 'When organization settings are updated' },
 ] as const
 
-const DELIVERIES_PER_PAGE = 50
-
 const supabase = useSupabase()
 
+function buildWebhookFunctionPath(path: string, params: Record<string, string | number | undefined>) {
+  const query = new URLSearchParams()
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined)
+      query.set(key, String(value))
+  })
+
+  const queryString = query.toString()
+  return queryString ? `${path}?${queryString}` : path
+}
+
+function getFunctionErrorMessage(error: { message?: string } | null | undefined, fallback: string) {
+  return error?.message || fallback
+}
+
 export const useWebhooksStore = defineStore('webhooks', () => {
-  const webhooks: Ref<Database['public']['Tables']['webhooks']['Row'][]> = ref([])
+  const webhooks: Ref<Webhook[]> = ref([])
   const deliveries: Ref<Database['public']['Tables']['webhook_deliveries']['Row'][]> = ref([])
   const deliveryPagination: Ref<DeliveryPagination | null> = ref(null)
   const isLoading = ref(false)
@@ -43,7 +60,7 @@ export const useWebhooksStore = defineStore('webhooks', () => {
 
   /**
    * Fetch all webhooks for the current organization
-   * Uses direct Supabase SDK - RLS handles permissions
+   * Uses the webhook API so secrets and delivery data never go through direct table access.
    */
   async function fetchWebhooks(): Promise<void> {
     const organizationStore = useOrganizationStore()
@@ -56,18 +73,16 @@ export const useWebhooksStore = defineStore('webhooks', () => {
 
     isLoading.value = true
     try {
-      const { data, error } = await supabase
-        .from('webhooks')
-        .select('*')
-        .eq('org_id', orgId)
-        .order('created_at', { ascending: false })
+      const { data, error } = await supabase.functions.invoke(buildWebhookFunctionPath('webhooks', { orgId }), {
+        method: 'GET',
+      })
 
       if (error) {
         console.error('Failed to fetch webhooks:', error)
         return
       }
 
-      webhooks.value = data || []
+      webhooks.value = Array.isArray(data) ? data : []
     }
     catch (err) {
       console.error('Error fetching webhooks:', err)
@@ -79,9 +94,9 @@ export const useWebhooksStore = defineStore('webhooks', () => {
 
   /**
    * Get a single webhook
-   * Uses direct Supabase SDK - RLS handles permissions
+   * Uses the webhook API so secrets and delivery data never go through direct table access.
    */
-  async function getWebhook(webhookId: string): Promise<Database['public']['Tables']['webhooks']['Row'] | null> {
+  async function getWebhook(webhookId: string): Promise<Webhook | null> {
     const organizationStore = useOrganizationStore()
     const orgId = organizationStore.currentOrganization?.gid
 
@@ -91,12 +106,9 @@ export const useWebhooksStore = defineStore('webhooks', () => {
     }
 
     try {
-      const { data, error } = await supabase
-        .from('webhooks')
-        .select('*')
-        .eq('id', webhookId)
-        .eq('org_id', orgId)
-        .single()
+      const { data, error } = await supabase.functions.invoke(buildWebhookFunctionPath('webhooks', { orgId, webhookId }), {
+        method: 'GET',
+      })
 
       if (error) {
         console.error('Failed to fetch webhook:', error)
@@ -113,13 +125,13 @@ export const useWebhooksStore = defineStore('webhooks', () => {
 
   /**
    * Create a new webhook
-   * Uses direct Supabase SDK - RLS handles permissions
+   * Uses the webhook API so secrets and delivery data never go through direct table access.
    */
   async function createWebhook(webhookData: {
     name: string
     url: string
     events: string[]
-  }): Promise<{ success: boolean, webhook?: Database['public']['Tables']['webhooks']['Row'], error?: string }> {
+  }): Promise<{ success: boolean, webhook?: Webhook, error?: string }> {
     const organizationStore = useOrganizationStore()
     const orgId = organizationStore.currentOrganization?.gid
 
@@ -148,28 +160,27 @@ export const useWebhooksStore = defineStore('webhooks', () => {
     }
 
     try {
-      const { data, error } = await supabase
-        .from('webhooks')
-        .insert({
-          org_id: orgId,
+      const { data, error } = await supabase.functions.invoke('webhooks', {
+        method: 'POST',
+        body: {
+          orgId,
           name: webhookData.name,
           url: webhookData.url,
           events: webhookData.events,
-          enabled: true, // Always enabled on creation
-        })
-        .select()
-        .single()
+          enabled: true,
+        },
+      })
 
       if (error) {
-        return { success: false, error: error.message || 'Failed to create webhook' }
+        return { success: false, error: getFunctionErrorMessage(error, 'Failed to create webhook') }
       }
 
       // Add to local list
-      if (data) {
-        webhooks.value.unshift(data)
+      if (data?.webhook) {
+        webhooks.value.unshift(data.webhook)
       }
 
-      return { success: true, webhook: data }
+      return { success: true, webhook: data?.webhook }
     }
     catch (err: any) {
       return { success: false, error: err?.message || 'Error creating webhook' }
@@ -178,7 +189,7 @@ export const useWebhooksStore = defineStore('webhooks', () => {
 
   /**
    * Update an existing webhook
-   * Uses direct Supabase SDK - RLS handles permissions
+   * Uses the webhook API so secrets and delivery data never go through direct table access.
    */
   async function updateWebhook(
     webhookId: string,
@@ -188,7 +199,7 @@ export const useWebhooksStore = defineStore('webhooks', () => {
       events: string[]
       enabled: boolean
     }>,
-  ): Promise<{ success: boolean, webhook?: Database['public']['Tables']['webhooks']['Row'], error?: string }> {
+  ): Promise<{ success: boolean, webhook?: Webhook, error?: string }> {
     const organizationStore = useOrganizationStore()
     const orgId = organizationStore.currentOrganization?.gid
 
@@ -221,27 +232,28 @@ export const useWebhooksStore = defineStore('webhooks', () => {
     }
 
     try {
-      const { data, error } = await supabase
-        .from('webhooks')
-        .update(webhookData)
-        .eq('id', webhookId)
-        .eq('org_id', orgId)
-        .select()
-        .single()
+      const { data, error } = await supabase.functions.invoke('webhooks', {
+        method: 'PUT',
+        body: {
+          orgId,
+          webhookId,
+          ...webhookData,
+        },
+      })
 
       if (error) {
-        return { success: false, error: error.message || 'Failed to update webhook' }
+        return { success: false, error: getFunctionErrorMessage(error, 'Failed to update webhook') }
       }
 
       // Update local list
-      if (data) {
+      if (data?.webhook) {
         const index = webhooks.value.findIndex(w => w.id === webhookId)
         if (index !== -1) {
-          webhooks.value[index] = data
+          webhooks.value[index] = data.webhook
         }
       }
 
-      return { success: true, webhook: data }
+      return { success: true, webhook: data?.webhook }
     }
     catch (err: any) {
       return { success: false, error: err?.message || 'Error updating webhook' }
@@ -250,7 +262,7 @@ export const useWebhooksStore = defineStore('webhooks', () => {
 
   /**
    * Delete a webhook
-   * Uses direct Supabase SDK - RLS handles permissions
+   * Uses the webhook API so secrets and delivery data never go through direct table access.
    */
   async function deleteWebhook(webhookId: string): Promise<{ success: boolean, error?: string }> {
     const organizationStore = useOrganizationStore()
@@ -261,14 +273,13 @@ export const useWebhooksStore = defineStore('webhooks', () => {
     }
 
     try {
-      const { error } = await supabase
-        .from('webhooks')
-        .delete()
-        .eq('id', webhookId)
-        .eq('org_id', orgId)
+      const { error } = await supabase.functions.invoke('webhooks', {
+        method: 'DELETE',
+        body: { orgId, webhookId },
+      })
 
       if (error) {
-        return { success: false, error: error.message || 'Failed to delete webhook' }
+        return { success: false, error: getFunctionErrorMessage(error, 'Failed to delete webhook') }
       }
 
       // Remove from local list
@@ -312,7 +323,7 @@ export const useWebhooksStore = defineStore('webhooks', () => {
           duration_ms: null,
           response_preview: null,
           delivery_id: '',
-          message: error.message || 'Failed to test webhook',
+          message: getFunctionErrorMessage(error, 'Failed to test webhook'),
         }
       }
 
@@ -332,7 +343,7 @@ export const useWebhooksStore = defineStore('webhooks', () => {
 
   /**
    * Fetch deliveries for a webhook
-   * Uses direct Supabase SDK - RLS handles permissions
+   * Uses the webhook API so secrets and delivery data never go through direct table access.
    */
   async function fetchDeliveries(webhookId: string, page = 0, status?: string): Promise<void> {
     const organizationStore = useOrganizationStore()
@@ -345,35 +356,22 @@ export const useWebhooksStore = defineStore('webhooks', () => {
 
     isLoadingDeliveries.value = true
     try {
-      const from = page * DELIVERIES_PER_PAGE
-      const to = (page + 1) * DELIVERIES_PER_PAGE - 1
-
-      let query = supabase
-        .from('webhook_deliveries')
-        .select('*', { count: 'exact' })
-        .eq('webhook_id', webhookId)
-        .eq('org_id', orgId)
-
-      if (status) {
-        query = query.eq('status', status)
-      }
-
-      query = query.order('created_at', { ascending: false }).range(from, to)
-
-      const { data, error, count } = await query
+      const { data, error } = await supabase.functions.invoke(buildWebhookFunctionPath('webhooks/deliveries', {
+        orgId,
+        webhookId,
+        page,
+        status,
+      }), {
+        method: 'GET',
+      })
 
       if (error) {
         console.error('Failed to fetch deliveries:', error)
         return
       }
 
-      deliveries.value = data || []
-      deliveryPagination.value = {
-        page,
-        per_page: DELIVERIES_PER_PAGE,
-        total: count ?? 0,
-        has_more: (data?.length ?? 0) === DELIVERIES_PER_PAGE,
-      }
+      deliveries.value = data?.deliveries || []
+      deliveryPagination.value = data?.pagination || null
     }
     catch (err) {
       console.error('Error fetching deliveries:', err)
@@ -401,7 +399,7 @@ export const useWebhooksStore = defineStore('webhooks', () => {
       })
 
       if (error) {
-        return { success: false, error: error.message || 'Failed to retry delivery' }
+        return { success: false, error: getFunctionErrorMessage(error, 'Failed to retry delivery') }
       }
 
       // Update local delivery status

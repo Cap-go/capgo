@@ -1,12 +1,12 @@
 <script setup lang="ts">
-import type { Database } from '~/types/supabase.types'
+import type { Webhook } from '~/stores/webhooks'
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import IconX from '~icons/heroicons/x-mark'
 import { WEBHOOK_EVENT_TYPES } from '~/stores/webhooks'
 
 const props = defineProps<{
-  webhook: Database['public']['Tables']['webhooks']['Row'] | null
+  webhook: Webhook | null
 }>()
 
 const emit = defineEmits<{

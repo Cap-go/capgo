@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { Database } from '~/types/supabase.types'
+import type { Webhook } from '~/stores/webhooks'
 import { computedAsync } from '@vueuse/core'
 import { storeToRefs } from 'pinia'
 import { onMounted, ref, watch } from 'vue'
@@ -35,9 +35,9 @@ const { currentOrganization } = storeToRefs(organizationStore)
 const { webhooks, isLoading } = storeToRefs(webhooksStore)
 
 const showForm = ref(false)
-const editingWebhook = ref<Database['public']['Tables']['webhooks']['Row'] | null>(null)
+const editingWebhook = ref<Webhook | null>(null)
 const showDeliveryLog = ref(false)
-const selectedWebhookForLog = ref<Database['public']['Tables']['webhooks']['Row'] | null>(null)
+const selectedWebhookForLog = ref<Webhook | null>(null)
 const testingWebhookId = ref<string | null>(null)
 const expandedWebhookId = ref<string | null>(null)
 
@@ -66,7 +66,7 @@ function openCreateForm() {
   showForm.value = true
 }
 
-function openEditForm(webhook: Database['public']['Tables']['webhooks']['Row']) {
+function openEditForm(webhook: Webhook) {
   if (!canManageWebhooks.value) {
     toast.error(t('no-permission'))
     return
@@ -101,7 +101,7 @@ async function handleFormSubmit(data: { name: string, url: string, events: strin
   }
 }
 
-async function deleteWebhook(webhook: Database['public']['Tables']['webhooks']['Row']) {
+async function deleteWebhook(webhook: Webhook) {
   if (!canManageWebhooks.value) {
     toast.error(t('no-permission'))
     return
@@ -132,7 +132,7 @@ async function deleteWebhook(webhook: Database['public']['Tables']['webhooks']['
   })
 }
 
-async function testWebhook(webhook: Database['public']['Tables']['webhooks']['Row']) {
+async function testWebhook(webhook: Webhook) {
   if (!canManageWebhooks.value) {
     toast.error(t('no-permission'))
     return
@@ -150,7 +150,7 @@ async function testWebhook(webhook: Database['public']['Tables']['webhooks']['Ro
   }
 }
 
-async function toggleWebhook(webhook: Database['public']['Tables']['webhooks']['Row']) {
+async function toggleWebhook(webhook: Webhook) {
   if (!canManageWebhooks.value) {
     toast.error(t('no-permission'))
     return
@@ -166,7 +166,7 @@ async function toggleWebhook(webhook: Database['public']['Tables']['webhooks']['
   }
 }
 
-function viewDeliveries(webhook: Database['public']['Tables']['webhooks']['Row']) {
+function viewDeliveries(webhook: Webhook) {
   selectedWebhookForLog.value = webhook
   showDeliveryLog.value = true
 }
@@ -202,10 +202,10 @@ async function copySecret(secret: string) {
 
 const signatureVerificationCode = `import crypto from 'crypto'
 
-function verifyWebhookSignature(req, secret) {
-  const signature = req.headers['x-capgo-signature']
-  const timestamp = req.headers['x-capgo-timestamp']
-  const payload = JSON.stringify(req.body)
+function verifyWebhookSignature(rawBody, headers, secret) {
+  const messageId = headers['webhook-id']
+  const timestamp = headers['webhook-timestamp']
+  const signatures = headers['webhook-signature']?.split(' ') ?? []
 
   // Check timestamp to prevent replay attacks (5 min tolerance)
   const currentTime = Math.floor(Date.now() / 1000)
@@ -214,16 +214,19 @@ function verifyWebhookSignature(req, secret) {
   }
 
   // Compute expected signature
-  const signaturePayload = \`\${timestamp}.\${payload}\`
-  const hmac = crypto.createHmac('sha256', secret)
+  const secretBytes = Buffer.from(secret.replace(/^whsec_/, ''), 'base64')
+  const signaturePayload = \`\${messageId}.\${timestamp}.\${rawBody}\`
+  const hmac = crypto.createHmac('sha256', secretBytes)
   hmac.update(signaturePayload)
-  const expectedSignature = \`v1=\${timestamp}.\${hmac.digest('hex')}\`
+  const expectedSignature = \`v1,\${hmac.digest('base64')}\`
 
   // Compare signatures (timing-safe)
-  if (!crypto.timingSafeEqual(
-    Buffer.from(signature),
-    Buffer.from(expectedSignature)
-  )) {
+  const isValid = signatures.some(signature =>
+    signature.length === expectedSignature.length
+    && crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expectedSignature))
+  )
+
+  if (!isValid) {
     throw new Error('Invalid webhook signature')
   }
 
@@ -366,7 +369,7 @@ function verifyWebhookSignature(req, secret) {
                 <h4 class="mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
                   {{ t('signing-secret') }}
                 </h4>
-                <div class="flex items-center gap-2">
+                <div v-if="webhook.secret" class="flex items-center gap-2">
                   <code class="flex-1 px-3 py-2 font-mono text-sm text-gray-700 truncate bg-gray-100 border border-gray-200 rounded dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300">
                     {{ webhook.secret }}
                   </code>
@@ -378,6 +381,9 @@ function verifyWebhookSignature(req, secret) {
                     <IconClipboard class="w-4 h-4" />
                   </button>
                 </div>
+                <p v-else class="px-3 py-2 text-sm text-gray-600 border border-gray-200 rounded bg-gray-100 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300">
+                  {{ t('signing-secret-unavailable') }}
+                </p>
                 <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
                   {{ t('signing-secret-hint') }}
                 </p>
@@ -392,10 +398,9 @@ function verifyWebhookSignature(req, secret) {
                       {{ t('signature-verification-intro') }}
                     </p>
                     <ul class="mb-3 space-y-1 text-xs text-gray-600 list-disc list-inside dark:text-gray-400">
-                      <li><code class="px-1 bg-gray-200 rounded dark:bg-gray-700">X-Capgo-Signature</code>: {{ t('header-signature-desc') }}</li>
-                      <li><code class="px-1 bg-gray-200 rounded dark:bg-gray-700">X-Capgo-Timestamp</code>: {{ t('header-timestamp-desc') }}</li>
-                      <li><code class="px-1 bg-gray-200 rounded dark:bg-gray-700">X-Capgo-Event</code>: {{ t('header-event-desc') }}</li>
-                      <li><code class="px-1 bg-gray-200 rounded dark:bg-gray-700">X-Capgo-Event-ID</code>: {{ t('header-event-id-desc') }}</li>
+                      <li><code class="px-1 bg-gray-200 rounded dark:bg-gray-700">webhook-signature</code>: {{ t('header-signature-desc') }}</li>
+                      <li><code class="px-1 bg-gray-200 rounded dark:bg-gray-700">webhook-timestamp</code>: {{ t('header-timestamp-desc') }}</li>
+                      <li><code class="px-1 bg-gray-200 rounded dark:bg-gray-700">webhook-id</code>: {{ t('header-event-id-desc') }}</li>
                     </ul>
                     <p class="mb-2 text-xs font-medium text-gray-700 dark:text-gray-300">
                       {{ t('signature-example-title') }}

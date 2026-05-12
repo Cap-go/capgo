@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { Webhook } from '~/stores/webhooks'
 import type { Database } from '~/types/supabase.types'
 import { storeToRefs } from 'pinia'
 import { onMounted, ref, watch } from 'vue'
@@ -16,7 +17,7 @@ import Spinner from '~/components/Spinner.vue'
 import { useWebhooksStore } from '~/stores/webhooks'
 
 const props = defineProps<{
-  webhook: Database['public']['Tables']['webhooks']['Row']
+  webhook: Webhook
 }>()
 
 const emit = defineEmits<{
