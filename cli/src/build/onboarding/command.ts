@@ -102,6 +102,7 @@ export async function onboardingBuilderCommand(options: OnboardingBuilderOptions
         appId,
         initialProgress: androidProgress,
         androidDir,
+        apikey: options.apikey,
       }),
     )
     await waitUntilExit()

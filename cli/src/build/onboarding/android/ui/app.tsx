@@ -72,6 +72,8 @@ interface AppProps {
   appId: string
   initialProgress: AndroidOnboardingProgress | null
   androidDir: string
+  /** Optional Capgo API key passed via -a/--apikey flag; takes precedence over saved key. */
+  apikey?: string
 }
 
 const RELEASE_ALIAS_DEFAULT = 'release'
@@ -108,7 +110,7 @@ function emptyProgress(appId: string): AndroidOnboardingProgress {
   }
 }
 
-const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir }) => {
+const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir, apikey }) => {
   const { exit } = useApp()
   const startStep: AndroidOnboardingStep = getAndroidResumeStep(initialProgress)
 
@@ -656,8 +658,9 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
             completedSteps: { ...p.completedSteps, keystoreReady: ready },
           }))
           addLog(`✔ Keystore generated — alias: ${result.alias}, valid until ${result.notAfter.getFullYear()}`)
-          if (randomPasswordGenerated)
-            addLog(`  ℹ The generated password is stored in ~/.capgo-credentials/credentials.json — back up that file.`, 'yellow')
+          // Backup hint is emitted after `saving-credentials` succeeds, not
+          // here — at this point the password lives only in the in-memory
+          // state and the progress file, not in `credentials.json`.
           setRetryCount(0)
           setStep('google-sign-in')
         }
@@ -940,6 +943,13 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
           await doSaveCredentials()
           if (cancelled)
             return
+          // Random-password backup hint: emitted only here (post-save) so the
+          // claim "stored in credentials.json" is true. Note: on resume from a
+          // crash that wiped the in-memory state, `randomPasswordGenerated` is
+          // false and the hint is skipped — acceptable trade-off versus
+          // persisting a one-off flag to progress.json.
+          if (randomPasswordGenerated)
+            addLog(`  ℹ Your auto-generated keystore password is now in ~/.capgo-credentials/credentials.json — back up that file.`, 'yellow')
           setStep('ask-build')
         }
         catch (err) {
@@ -952,11 +962,17 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
     if (step === 'requesting-build') {
       ;(async () => {
         try {
-          let capgoKey: string | undefined
-          try {
-            capgoKey = findSavedKey(true)
+          // CLI-flag key takes precedence over the saved one — same precedence
+          // the iOS path uses (build/onboarding/ui/app.tsx#624). Without this,
+          // `build init --platform android --apikey FOO` silently ignored FOO
+          // and fell back to whichever key was on disk.
+          let capgoKey: string | undefined = apikey
+          if (!capgoKey) {
+            try {
+              capgoKey = findSavedKey(true)
+            }
+            catch {}
           }
-          catch {}
           if (!capgoKey) {
             setBuildOutput(prev => [...prev, '⚠ No Capgo API key found.'])
             setBuildOutput(prev => [...prev, 'Run `capgo login` first, then `capgo build request --platform android`.'])

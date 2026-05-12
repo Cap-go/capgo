@@ -67,11 +67,21 @@ function isAlreadyDoneOperation(op: GcpOperation): boolean {
   return typeof op.name === 'string' && /\bnoop\.DONE_OPERATION\b/.test(op.name)
 }
 
+/**
+ * Default per-request timeout for Google API calls. 30s is well above the
+ * latency budget for every endpoint we hit here (project create/get, service
+ * usage, IAM, operation-kickoff). Long-running operations are polled via
+ * `pollOperation`, which carries its own multi-minute budget.
+ */
+const GCP_FETCH_DEFAULT_TIMEOUT_MS = 30_000
+
 async function gcpFetch<T>(args: {
   method: 'GET' | 'POST'
   url: string
   accessToken: string
   body?: unknown
+  /** Override the default 30s per-request timeout. */
+  timeoutMs?: number
 }): Promise<T> {
   const headers: Record<string, string> = {
     Authorization: `Bearer ${args.accessToken}`,
@@ -80,11 +90,32 @@ async function gcpFetch<T>(args: {
   if (args.body !== undefined)
     headers['Content-Type'] = 'application/json'
 
-  const res = await fetch(args.url, {
-    method: args.method,
-    headers,
-    body: args.body !== undefined ? JSON.stringify(args.body) : undefined,
-  })
+  const timeoutMs = args.timeoutMs ?? GCP_FETCH_DEFAULT_TIMEOUT_MS
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), timeoutMs)
+
+  let res: Response
+  try {
+    res = await fetch(args.url, {
+      method: args.method,
+      headers,
+      body: args.body !== undefined ? JSON.stringify(args.body) : undefined,
+      signal: controller.signal,
+    })
+  }
+  catch (err) {
+    // Re-throw with a timeout-specific message so callers can distinguish a
+    // stall from any other network error. `AbortController.abort()` surfaces
+    // as either `AbortError` (Node 18+) or the `'AbortError'` `name` field.
+    const isAbort = (err as { name?: string })?.name === 'AbortError'
+    if (isAbort)
+      throw new Error(`Google API request to ${args.url} timed out after ${timeoutMs}ms`)
+    throw err
+  }
+  finally {
+    clearTimeout(timer)
+  }
+
   const text = await res.text()
   if (!res.ok) {
     let detail: string = text
