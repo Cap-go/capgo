@@ -1164,7 +1164,10 @@ export async function getAdminGlobalStatsTrend(
   end_date: string,
 ): Promise<AdminGlobalStatsTrend[]> {
   try {
-    const pgClient = getPgClient(c, true) // Read-only query
+    // Admin global stats are low traffic and depend on recently migrated
+    // global_stats columns. Use primary DB so replica schema/data drift does not
+    // silently blank the dashboard.
+    const pgClient = getPgClient(c)
     const drizzleClient = getDrizzleClient(pgClient)
 
     // Extract just the date portion (YYYY-MM-DD) from ISO timestamps
@@ -1390,7 +1393,7 @@ export async function getAdminGlobalStatsTrend(
   }
   catch (e: unknown) {
     logPgError(c, 'getAdminGlobalStatsTrend', e)
-    return []
+    throw e
   }
 }
 

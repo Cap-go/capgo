@@ -3,73 +3,73 @@ include ':capacitor-android'
 project(':capacitor-android').projectDir = new File('../node_modules/@capacitor/android/capacitor')
 
 include ':capacitor-action-sheet'
-project(':capacitor-action-sheet').projectDir = new File('../node_modules/@capacitor/action-sheet/android')
+project(':capacitor-action-sheet').projectDir = new File('../node_modules/.bun/@capacitor+action-sheet@8.1.1+2a604cb248d57ff2/node_modules/@capacitor/action-sheet/android')
 
 include ':capacitor-app'
-project(':capacitor-app').projectDir = new File('../node_modules/@capacitor/app/android')
+project(':capacitor-app').projectDir = new File('../node_modules/.bun/@capacitor+app@8.1.0+2a604cb248d57ff2/node_modules/@capacitor/app/android')
 
 include ':capacitor-app-launcher'
-project(':capacitor-app-launcher').projectDir = new File('../node_modules/@capacitor/app-launcher/android')
+project(':capacitor-app-launcher').projectDir = new File('../node_modules/.bun/@capacitor+app-launcher@8.0.1+2a604cb248d57ff2/node_modules/@capacitor/app-launcher/android')
 
 include ':capacitor-barcode-scanner'
-project(':capacitor-barcode-scanner').projectDir = new File('../node_modules/@capacitor/barcode-scanner/android')
+project(':capacitor-barcode-scanner').projectDir = new File('../node_modules/.bun/@capacitor+barcode-scanner@3.0.2+2a604cb248d57ff2/node_modules/@capacitor/barcode-scanner/android')
 
 include ':capacitor-browser'
-project(':capacitor-browser').projectDir = new File('../node_modules/@capacitor/browser/android')
+project(':capacitor-browser').projectDir = new File('../node_modules/.bun/@capacitor+browser@8.0.3+2a604cb248d57ff2/node_modules/@capacitor/browser/android')
 
 include ':capacitor-camera'
-project(':capacitor-camera').projectDir = new File('../node_modules/@capacitor/camera/android')
+project(':capacitor-camera').projectDir = new File('../node_modules/.bun/@capacitor+camera@8.2.0+2a604cb248d57ff2/node_modules/@capacitor/camera/android')
 
 include ':capacitor-clipboard'
-project(':capacitor-clipboard').projectDir = new File('../node_modules/@capacitor/clipboard/android')
+project(':capacitor-clipboard').projectDir = new File('../node_modules/.bun/@capacitor+clipboard@8.0.1+2a604cb248d57ff2/node_modules/@capacitor/clipboard/android')
 
 include ':capacitor-device'
-project(':capacitor-device').projectDir = new File('../node_modules/@capacitor/device/android')
+project(':capacitor-device').projectDir = new File('../node_modules/.bun/@capacitor+device@8.0.2+2a604cb248d57ff2/node_modules/@capacitor/device/android')
 
 include ':capacitor-dialog'
-project(':capacitor-dialog').projectDir = new File('../node_modules/@capacitor/dialog/android')
+project(':capacitor-dialog').projectDir = new File('../node_modules/.bun/@capacitor+dialog@8.0.1+2a604cb248d57ff2/node_modules/@capacitor/dialog/android')
 
 include ':capacitor-filesystem'
-project(':capacitor-filesystem').projectDir = new File('../node_modules/@capacitor/filesystem/android')
+project(':capacitor-filesystem').projectDir = new File('../node_modules/.bun/@capacitor+filesystem@8.1.2+2a604cb248d57ff2/node_modules/@capacitor/filesystem/android')
 
 include ':capacitor-geolocation'
-project(':capacitor-geolocation').projectDir = new File('../node_modules/@capacitor/geolocation/android')
+project(':capacitor-geolocation').projectDir = new File('../node_modules/.bun/@capacitor+geolocation@8.2.0+2a604cb248d57ff2/node_modules/@capacitor/geolocation/android')
 
 include ':capacitor-haptics'
-project(':capacitor-haptics').projectDir = new File('../node_modules/@capacitor/haptics/android')
+project(':capacitor-haptics').projectDir = new File('../node_modules/.bun/@capacitor+haptics@8.0.2+2a604cb248d57ff2/node_modules/@capacitor/haptics/android')
 
 include ':capacitor-keyboard'
-project(':capacitor-keyboard').projectDir = new File('../node_modules/@capacitor/keyboard/android')
+project(':capacitor-keyboard').projectDir = new File('../node_modules/.bun/@capacitor+keyboard@8.0.3+2a604cb248d57ff2/node_modules/@capacitor/keyboard/android')
 
 include ':capacitor-local-notifications'
 project(':capacitor-local-notifications').projectDir = new File('../node_modules/@capacitor/local-notifications/android')
 
 include ':capacitor-network'
-project(':capacitor-network').projectDir = new File('../node_modules/@capacitor/network/android')
+project(':capacitor-network').projectDir = new File('../node_modules/.bun/@capacitor+network@8.0.1+2a604cb248d57ff2/node_modules/@capacitor/network/android')
 
 include ':capacitor-preferences'
-project(':capacitor-preferences').projectDir = new File('../node_modules/@capacitor/preferences/android')
+project(':capacitor-preferences').projectDir = new File('../node_modules/.bun/@capacitor+preferences@8.0.1+2a604cb248d57ff2/node_modules/@capacitor/preferences/android')
 
 include ':capacitor-push-notifications'
 project(':capacitor-push-notifications').projectDir = new File('../node_modules/@capacitor/push-notifications/android')
 
 include ':capacitor-screen-reader'
-project(':capacitor-screen-reader').projectDir = new File('../node_modules/@capacitor/screen-reader/android')
+project(':capacitor-screen-reader').projectDir = new File('../node_modules/.bun/@capacitor+screen-reader@8.0.1+2a604cb248d57ff2/node_modules/@capacitor/screen-reader/android')
 
 include ':capacitor-share'
-project(':capacitor-share').projectDir = new File('../node_modules/@capacitor/share/android')
+project(':capacitor-share').projectDir = new File('../node_modules/.bun/@capacitor+share@8.0.1+2a604cb248d57ff2/node_modules/@capacitor/share/android')
 
 include ':capacitor-splash-screen'
-project(':capacitor-splash-screen').projectDir = new File('../node_modules/@capacitor/splash-screen/android')
+project(':capacitor-splash-screen').projectDir = new File('../node_modules/.bun/@capacitor+splash-screen@8.0.1+2a604cb248d57ff2/node_modules/@capacitor/splash-screen/android')
 
 include ':capacitor-status-bar'
-project(':capacitor-status-bar').projectDir = new File('../node_modules/@capacitor/status-bar/android')
+project(':capacitor-status-bar').projectDir = new File('../node_modules/.bun/@capacitor+status-bar@8.0.2+2a604cb248d57ff2/node_modules/@capacitor/status-bar/android')
 
 include ':capacitor-text-zoom'
-project(':capacitor-text-zoom').projectDir = new File('../node_modules/@capacitor/text-zoom/android')
+project(':capacitor-text-zoom').projectDir = new File('../node_modules/.bun/@capacitor+text-zoom@8.0.1+2a604cb248d57ff2/node_modules/@capacitor/text-zoom/android')
 
 include ':capacitor-toast'
-project(':capacitor-toast').projectDir = new File('../node_modules/@capacitor/toast/android')
+project(':capacitor-toast').projectDir = new File('../node_modules/.bun/@capacitor+toast@8.0.1+2a604cb248d57ff2/node_modules/@capacitor/toast/android')
 
 include ':capgo-capacitor-crisp'
 project(':capgo-capacitor-crisp').projectDir = new File('../node_modules/@capgo/capacitor-crisp/android')
@@ -102,13 +102,13 @@ include ':capgo-inappbrowser'
 project(':capgo-inappbrowser').projectDir = new File('../node_modules/@capgo/inappbrowser/android')
 
 include ':capgo-keep-awake'
-project(':capgo-keep-awake').projectDir = new File('../node_modules/@capgo/keep-awake/android')
+project(':capgo-keep-awake').projectDir = new File('../node_modules/.bun/@capgo+keep-awake@8.1.1+2a604cb248d57ff2/node_modules/@capgo/keep-awake/android')
 
 include ':capgo-native-audio'
-project(':capgo-native-audio').projectDir = new File('../node_modules/@capgo/native-audio/android')
+project(':capgo-native-audio').projectDir = new File('../node_modules/.bun/@capgo+native-audio@8.4.2+2a604cb248d57ff2/node_modules/@capgo/native-audio/android')
 
 include ':capgo-native-market'
 project(':capgo-native-market').projectDir = new File('../node_modules/@capgo/native-market/android')
 
 include ':revenuecat-purchases-capacitor'
-project(':revenuecat-purchases-capacitor').projectDir = new File('../node_modules/@revenuecat/purchases-capacitor/android')
+project(':revenuecat-purchases-capacitor').projectDir = new File('../node_modules/.bun/@revenuecat+purchases-capacitor@13.0.1+2a604cb248d57ff2/node_modules/@revenuecat/purchases-capacitor/android')

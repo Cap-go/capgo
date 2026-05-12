@@ -5,6 +5,7 @@ import { eq } from 'drizzle-orm'
 import { Hono } from 'hono/tiny'
 import { BRES, middlewareAPISecret, simpleError, triggerValidator } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
+import { normalizeLegacyEncodedManifestFileName } from '../utils/manifest_encoding.ts'
 import { closeClient, getDrizzleClient, getPgClient } from '../utils/pg.ts'
 import { manifest } from '../utils/postgres_schema.ts'
 import { getPath, s3 } from '../utils/s3.ts'
@@ -99,7 +100,7 @@ async function handleManifest(c: Context, record: Database['public']['Tables']['
       .filter(entry => entry.file_name && entry.file_hash && entry.s3_path)
       .map(entry => ({
         app_version_id: record.id,
-        file_name: entry.file_name!,
+        file_name: normalizeLegacyEncodedManifestFileName(entry.file_name, entry.s3_path)!,
         file_hash: entry.file_hash!,
         s3_path: entry.s3_path!,
         file_size: 0,
