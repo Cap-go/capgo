@@ -60,6 +60,7 @@ const isLoadingOrganizations = ref(false)
 const planOptions = ref<string[]>([])
 const selectedPlan = ref('')
 const selectedBilling = ref<BillingFilter>('all')
+const paidOnly = ref(false)
 const searchQuery = ref('')
 
 function formatNumber(value: number) {
@@ -103,6 +104,8 @@ async function loadOrganizations() {
       body.plan_name = selectedPlan.value
     if (selectedBilling.value !== 'all')
       body.billing_type = selectedBilling.value
+    if (paidOnly.value)
+      body.paid_only = true
     if (searchQuery.value.trim())
       body.search = searchQuery.value.trim()
 
@@ -249,7 +252,7 @@ watch(() => adminStore.refreshTrigger, () => {
   loadOrganizations()
 })
 
-watch([selectedPlan, selectedBilling], () => {
+watch([selectedPlan, selectedBilling, paidOnly], () => {
   resetToFirstPageAndLoad()
 })
 
@@ -284,7 +287,7 @@ displayStore.defaultBack = '/dashboard'
               {{ t('organization-insights') }}
             </h3>
 
-            <div class="grid grid-cols-1 gap-3 sm:grid-cols-3 lg:min-w-[720px]">
+            <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:min-w-[840px] lg:grid-cols-[minmax(180px,1fr)_minmax(140px,0.7fr)_minmax(150px,0.8fr)_auto] lg:items-center">
               <input
                 v-model="searchQuery"
                 type="search"
@@ -318,6 +321,15 @@ displayStore.defaultBack = '/dashboard'
                   {{ t('yearly') }}
                 </option>
               </select>
+
+              <label class="flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-200">
+                <input
+                  v-model="paidOnly"
+                  type="checkbox"
+                  class="d-toggle d-toggle-primary d-toggle-sm"
+                >
+                <span>{{ t('paid-orgs-only') }}</span>
+              </label>
             </div>
           </div>
 

@@ -55,6 +55,7 @@ describe('admin stats validation', () => {
       metric_category: 'organization_insights',
       plan_name: 'Solo',
       billing_type: 'monthly',
+      paid_only: true,
       search: 'admin stats',
       limit: 50,
       offset: 0,
@@ -66,6 +67,7 @@ describe('admin stats validation', () => {
 
     expect(parsed.data.plan_name).toBe('Solo')
     expect(parsed.data.billing_type).toBe('monthly')
+    expect(parsed.data.paid_only).toBe(true)
     expect(parsed.data.search).toBe('admin stats')
   })
 

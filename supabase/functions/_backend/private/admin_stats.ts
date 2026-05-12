@@ -80,6 +80,7 @@ export const adminStatsBodySchema = type({
   'org_id?': 'string > 0',
   'plan_name?': 'string <= 128',
   'billing_type?': literalUnion(['monthly', 'yearly']),
+  'paid_only?': 'boolean',
   'search?': 'string <= 128',
   'limit?': limitSchema,
   'offset?': offsetSchema,
@@ -93,6 +94,7 @@ interface AdminStatsBody {
   org_id?: string
   plan_name?: string
   billing_type?: 'monthly' | 'yearly'
+  paid_only?: boolean
   search?: string
   limit?: number
   offset?: number
@@ -165,7 +167,7 @@ app.post('/', middlewareAuth, async (c) => {
     throw simpleError('not_admin', 'Not admin - only admin users can access platform statistics')
   }
 
-  const { metric_category, start_date, end_date, app_id, org_id, plan_name, billing_type, search, limit, offset } = parsedBodyResult.data
+  const { metric_category, start_date, end_date, app_id, org_id, plan_name, billing_type, paid_only, search, limit, offset } = parsedBodyResult.data
 
   cloudlog({
     requestId: c.get('requestId'),
@@ -297,6 +299,7 @@ app.post('/', middlewareAuth, async (c) => {
           offset: offset || 0,
           plan_name,
           billing_type,
+          paid_only,
           search,
         })
         break

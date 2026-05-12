@@ -1782,6 +1782,7 @@ interface AdminOrganizationInsightsFilters {
   offset?: number
   plan_name?: string
   billing_type?: 'monthly' | 'yearly'
+  paid_only?: boolean
   search?: string
 }
 
@@ -1822,6 +1823,7 @@ export async function getAdminOrganizationInsights(
     `
     const planFilter = trimmedPlanName ? sql`AND p.name = ${trimmedPlanName}` : sql``
     const billingFilter = filters.billing_type ? sql`AND ${billingTypeExpression} = ${filters.billing_type}` : sql``
+    const paidFilter = filters.paid_only ? sql`AND si.status = 'succeeded'` : sql``
     const searchFilter = trimmedSearch
       ? sql`AND (
           o.name ILIKE ${`%${trimmedSearch}%`}
@@ -1846,6 +1848,7 @@ export async function getAdminOrganizationInsights(
         WHERE true
           ${planFilter}
           ${billingFilter}
+          ${paidFilter}
           ${searchFilter}
         ORDER BY o.created_at DESC NULLS LAST, o.id
         LIMIT ${safeLimit}
@@ -1962,6 +1965,7 @@ export async function getAdminOrganizationInsights(
       WHERE true
         ${planFilter}
         ${billingFilter}
+        ${paidFilter}
         ${searchFilter}
     `
 

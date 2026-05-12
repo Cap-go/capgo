@@ -1460,6 +1460,7 @@
   "overview": "Overview",
   "package-name": "Package Name",
   "pages": "Pages",
+  "paid-orgs-only": "Paid orgs only",
   "paid-subscriptions-to-cancel": "Subscriptions to be cancelled",
   "partial-adoption": "Partial adoption - {percent}% on latest",
   "password": "Password",

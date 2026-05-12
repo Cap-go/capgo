@@ -573,6 +573,35 @@ describe('/private/admin_stats', () => {
     expect(organization?.mau).toBe(7)
     expect(organization?.members_count).toBe(1)
     expect(organization?.last_build_at).toBe(INSIGHTS_LAST_BUILD_AT)
+
+    const paidOnlyResponse = await fetchWithRetry(`${BASE_URL}/private/admin_stats`, {
+      method: 'POST',
+      headers: adminHeaders,
+      body: JSON.stringify({
+        metric_category: 'organization_insights',
+        start_date: INSIGHTS_START,
+        end_date: INSIGHTS_END,
+        plan_name: soloPlan.name,
+        billing_type: 'monthly',
+        paid_only: true,
+        search: TRIAL_ORG_ID,
+        limit: 100,
+        offset: 0,
+      }),
+    })
+
+    expect(paidOnlyResponse.status).toBe(200)
+    const paidOnlyPayload = await paidOnlyResponse.json() as {
+      success: boolean
+      data: {
+        organizations: Array<{ org_id: string }>
+        total: number
+      }
+    }
+
+    expect(paidOnlyPayload.success).toBe(true)
+    expect(paidOnlyPayload.data.organizations).toEqual([])
+    expect(paidOnlyPayload.data.total).toBe(0)
   })
 
   it.concurrent('returns cancellation billing metadata and subscription-or-signup dates', async () => {
