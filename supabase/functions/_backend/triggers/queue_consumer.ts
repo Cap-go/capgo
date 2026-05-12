@@ -56,6 +56,21 @@ interface FailureDetail {
 
 type QueuePostTargetKind = 'cloudflare' | 'cloudflare_legacy' | 'cloudflare_pp' | 'supabase'
 
+interface QueuePostErrorDetails {
+  errorCode: string | null
+  errorMessage: string | null
+  bodyPreview: string | null
+}
+
+interface QueuePostProcessResult extends Message {
+  httpResponse: Response
+  errorDetails: QueuePostErrorDetails
+  cfId: string
+  payloadSize: number
+}
+
+type QueuePostHelper = typeof http_post_helper
+
 function extractMessageBody(message: Message): Record<string, unknown> {
   if (message.message?.payload !== undefined)
     return (message.message.payload ?? {}) as Record<string, unknown>
@@ -213,6 +228,93 @@ function getQueuePostLogMetadata(functionName: string, targetKind: QueuePostTarg
   }
 }
 
+function getQueuePostExceptionResult(error: unknown): Pick<QueuePostProcessResult, 'errorDetails' | 'httpResponse'> {
+  const cause = error instanceof Error && error.cause && typeof error.cause === 'object'
+    ? error.cause as Record<string, unknown>
+    : null
+  const errorCode = typeof cause?.error === 'string' ? cause.error : 'queue_dispatch_error'
+  const rawMessage = typeof cause?.message === 'string'
+    ? cause.message
+    : error instanceof Error
+      ? error.message
+      : String(error)
+  const errorStatus = typeof (error as { status?: unknown })?.status === 'number'
+    ? (error as { status: number }).status
+    : 500
+  const status = errorCode === 'request_timeout'
+    ? 408
+    : errorStatus >= 400 && errorStatus <= 599
+      ? errorStatus
+      : 500
+  const statusText = errorCode === 'request_timeout' ? 'Request Timeout' : 'Queue Dispatch Error'
+
+  return {
+    httpResponse: new Response(null, {
+      status,
+      statusText,
+    }),
+    errorDetails: {
+      bodyPreview: null,
+      errorCode,
+      errorMessage: sanitizeDiscordResponseBody(rawMessage),
+    },
+  }
+}
+
+async function processQueueMessage(
+  c: Context,
+  queueName: string,
+  message: Message,
+  postHelper: QueuePostHelper = http_post_helper,
+): Promise<QueuePostProcessResult> {
+  const function_name = message.message?.function_name ?? 'unknown'
+  const function_type = message.message?.function_type ?? 'supabase'
+  const body = extractMessageBody(message)
+  if (message.message?.payload === undefined && Object.keys(body).length > 0) {
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: `[${queueName}] Using legacy queue message body shape for ${function_name}.`,
+      msgId: message.msg_id,
+    })
+  }
+  const cfId = generateUUID()
+  const payloadSize = JSON.stringify(body).length
+
+  try {
+    const httpResponse = await postHelper(c, function_name, function_type, body, cfId)
+    const errorDetails = await extractErrorDetails(httpResponse)
+
+    return {
+      httpResponse,
+      errorDetails,
+      cfId,
+      payloadSize,
+      ...message,
+    }
+  }
+  catch (error) {
+    const { httpResponse, errorDetails } = getQueuePostExceptionResult(error)
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: `[${queueName}] Queued HTTP POST failed for ${function_name}.`,
+      msgId: message.msg_id,
+      functionName: function_name,
+      functionType: function_type,
+      errorCode: errorDetails.errorCode,
+      errorMessage: errorDetails.errorMessage,
+      errorName: error instanceof Error ? error.name : typeof error,
+    })
+
+    return {
+      httpResponse,
+      errorDetails,
+      cfId,
+      payloadSize,
+      ...message,
+    }
+  }
+}
+
 async function processQueue(c: Context, db: ReturnType<typeof getPgClient>, queueName: string, batchSize: number = DEFAULT_BATCH_SIZE) {
   const messages = await readQueue(c, db, queueName, batchSize)
 
@@ -235,29 +337,7 @@ async function processQueue(c: Context, db: ReturnType<typeof getPgClient>, queu
   }
 
   // Process messages that have been read less than 5 times
-  const results = await Promise.all(messagesToProcess.map(async (message) => {
-    const function_name = message.message?.function_name ?? 'unknown'
-    const function_type = message.message?.function_type ?? 'supabase'
-    const body = extractMessageBody(message)
-    if (message.message?.payload === undefined && Object.keys(body).length > 0) {
-      cloudlog({
-        requestId: c.get('requestId'),
-        message: `[${queueName}] Using legacy queue message body shape for ${function_name}.`,
-        msgId: message.msg_id,
-      })
-    }
-    const cfId = generateUUID()
-    const httpResponse = await http_post_helper(c, function_name, function_type, body, cfId)
-    const errorDetails = await extractErrorDetails(httpResponse)
-
-    return {
-      httpResponse,
-      errorDetails,
-      cfId,
-      payloadSize: JSON.stringify(body).length,
-      ...message,
-    }
-  }))
+  const results = await Promise.all(messagesToProcess.map(message => processQueueMessage(c, queueName, message)))
 
   // Update all messages with their CF IDs
   const cfIdUpdates = results.map(result => ({
@@ -391,11 +471,7 @@ async function processQueue(c: Context, db: ReturnType<typeof getPgClient>, queu
   }
 }
 
-async function extractErrorDetails(response: Response): Promise<{
-  errorCode: string | null
-  errorMessage: string | null
-  bodyPreview: string | null
-}> {
+async function extractErrorDetails(response: Response): Promise<QueuePostErrorDetails> {
   if (response.status < 400) {
     return {
       bodyPreview: null,
@@ -680,8 +756,10 @@ export const __queueConsumerTestUtils__ = {
   extractErrorDetails,
   extractMessageBody,
   getActionableQueueFailures,
+  getQueuePostExceptionResult,
   getQueuePayloadLogMetadata,
   getQueuePostLogMetadata,
   getQueuePostTargetKind,
+  processQueueMessage,
   sanitizeDiscordResponseBody,
 }

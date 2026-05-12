@@ -191,6 +191,72 @@ describe('queue_consumer legacy message compatibility', () => {
   })
 })
 
+describe('queue_consumer batch failure handling', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('turns queued POST exceptions into failed message results without rejecting the batch', async () => {
+    const context = {
+      get: (key: string) => key === 'requestId' ? 'req-queue-batch' : undefined,
+    }
+    const timeoutError = new Error('Request Timeout (Internal QUEUE handling error)')
+    Object.defineProperty(timeoutError, 'cause', {
+      value: {
+        error: 'request_timeout',
+        message: 'Request Timeout (Internal QUEUE handling error)',
+      },
+    })
+
+    const postHelper = vi.fn()
+      .mockRejectedValueOnce(timeoutError)
+      .mockResolvedValueOnce(new Response(null, {
+        status: 204,
+        statusText: 'No Content',
+      }))
+
+    const [failedResult, successResult] = await Promise.all([
+      __queueConsumerTestUtils__.processQueueMessage(context as any, 'test_queue', {
+        msg_id: 10,
+        read_ct: MAX_QUEUE_READS,
+        message: {
+          function_name: 'slow_function',
+          payload: { queued: true },
+        },
+      }, postHelper),
+      __queueConsumerTestUtils__.processQueueMessage(context as any, 'test_queue', {
+        msg_id: 11,
+        read_ct: 1,
+        message: {
+          function_name: 'fast_function',
+          payload: { queued: true },
+        },
+      }, postHelper),
+    ])
+
+    expect(postHelper).toHaveBeenCalledTimes(2)
+    expect(failedResult).toMatchObject({
+      msg_id: 10,
+      errorDetails: {
+        bodyPreview: null,
+        errorCode: 'request_timeout',
+        errorMessage: 'Request Timeout (Internal QUEUE handling error)',
+      },
+    })
+    expect(failedResult.httpResponse.status).toBe(408)
+    expect(failedResult.httpResponse.statusText).toBe('Request Timeout')
+    expect(successResult).toMatchObject({
+      msg_id: 11,
+      errorDetails: {
+        bodyPreview: null,
+        errorCode: null,
+        errorMessage: null,
+      },
+    })
+    expect(successResult.httpResponse.status).toBe(204)
+  })
+})
+
 describe('queue_consumer HTTP POST helper timeout', () => {
   afterEach(() => {
     vi.useRealTimers()
