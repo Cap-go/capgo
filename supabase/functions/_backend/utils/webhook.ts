@@ -109,7 +109,7 @@ interface WebhookLogUrlMetadata {
   hasCredentials?: boolean
 }
 
-function getWebhookLogUrlMetadata(urlString: string): WebhookLogUrlMetadata {
+export function getWebhookLogUrlMetadata(urlString: string): WebhookLogUrlMetadata {
   try {
     const parsedUrl = new URL(urlString)
     return {

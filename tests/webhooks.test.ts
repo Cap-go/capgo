@@ -26,6 +26,16 @@ let orgScopedSubkeyId: number | null = null
 
 const webhookEndpoint = (path = '') => getEndpointUrl(`/webhooks${path}`)
 
+function expectSanitizedUrlInfo(data: any, protocol = 'http') {
+  expect(JSON.stringify(data)).not.toContain('secret-token')
+  expect(data.moreInfo?.urlInfo).toMatchObject({
+    valid: true,
+    protocol,
+    hasQuery: true,
+    hasCredentials: false,
+  })
+}
+
 async function getAuthenticatedAnonClient() {
   const authHeaders = await getAuthHeaders()
   return createClient(SUPABASE_BASE_URL, SUPABASE_ANON_KEY, {
@@ -140,6 +150,15 @@ describe('[GET] /webhooks', () => {
     })
     expect(response.status).toBe(200)
     const data = await response.json() as { secret?: string }[]
+    expect(Array.isArray(data)).toBe(true)
+  })
+
+  it('list webhooks with query-string pagination', async () => {
+    const response = await fetchWithRetry(webhookEndpoint(`?orgId=${WEBHOOK_TEST_ORG_ID}&page=0`), {
+      headers,
+    })
+    expect(response.status).toBe(200)
+    const data = await response.json() as unknown[]
     expect(Array.isArray(data)).toBe(true)
   })
 
@@ -309,13 +328,14 @@ describe('[POST] /webhooks', () => {
       body: JSON.stringify({
         orgId: WEBHOOK_TEST_ORG_ID,
         name: 'HTTP URL Webhook',
-        url: 'http://example.com/webhook',
+        url: 'http://example.com/webhook?token=secret-token',
         events: ['app_versions'],
       }),
     })
     expect(response.status).toBe(400)
-    const data = await response.json() as { error: string }
+    const data = await response.json() as { error: string, moreInfo?: any }
     expect(data.error).toBe('invalid_url')
+    expectSanitizedUrlInfo(data)
   })
 
   it('create webhook with invalid events', async () => {
@@ -608,12 +628,13 @@ describe('[PUT] /webhooks', () => {
       body: JSON.stringify({
         orgId: WEBHOOK_TEST_ORG_ID,
         webhookId: createdWebhookId,
-        url: 'http://example.com/webhook',
+        url: 'http://example.com/webhook?token=secret-token',
       }),
     })
     expect(response.status).toBe(400)
-    const data = await response.json() as { error: string }
+    const data = await response.json() as { error: string, moreInfo?: any }
     expect(data.error).toBe('invalid_url')
+    expectSanitizedUrlInfo(data)
   })
 })
 
@@ -668,6 +689,38 @@ describe('[POST] /webhooks/test', () => {
     expect(response.status).toBe(400)
     const data = await response.json() as { error: string }
     expect(data.error).toBe('webhook_not_found')
+  })
+
+  it('test webhook with invalid stored URL omits raw URL details', async () => {
+    if (!createdWebhookId)
+      throw new Error('Webhook was not created in previous test')
+
+    const { error: updateError } = await (getSupabaseClient() as any)
+      .from('webhooks')
+      .update({ url: 'http://example.com/webhook-test?token=secret-token' })
+      .eq('id', createdWebhookId)
+    expect(updateError).toBeNull()
+
+    try {
+      const response = await fetch(webhookEndpoint('/test'), {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          orgId: WEBHOOK_TEST_ORG_ID,
+          webhookId: createdWebhookId,
+        }),
+      })
+      expect(response.status).toBe(400)
+      const data = await response.json() as { error: string, moreInfo?: any }
+      expect(data.error).toBe('invalid_url')
+      expectSanitizedUrlInfo(data)
+    }
+    finally {
+      await (getSupabaseClient() as any)
+        .from('webhooks')
+        .update({ url: webhookUrl })
+        .eq('id', createdWebhookId)
+    }
   })
 
   it('test webhook with missing body', async () => {
@@ -925,6 +978,72 @@ describe('[POST] /webhooks/deliveries/retry', () => {
         .from('webhook_deliveries')
         .delete()
         .eq('id', pendingDeliveryId)
+    }
+  })
+
+  it('retry delivery with invalid webhook URL omits raw URL details', async () => {
+    if (!createdWebhookId)
+      throw new Error('Webhook was not created in previous test')
+
+    const failedDeliveryId = randomUUID()
+    const { error: insertError } = await (getSupabaseClient() as any)
+      .from('webhook_deliveries')
+      .insert({
+        id: failedDeliveryId,
+        webhook_id: createdWebhookId,
+        org_id: WEBHOOK_TEST_ORG_ID,
+        event_type: 'app_versions.INSERT',
+        request_payload: {
+          event: 'app_versions.INSERT',
+          event_id: randomUUID(),
+          timestamp: new Date().toISOString(),
+          org_id: WEBHOOK_TEST_ORG_ID,
+          data: {
+            table: 'app_versions',
+            operation: 'INSERT',
+            record_id: randomUUID(),
+            old_record: null,
+            new_record: null,
+            changed_fields: null,
+          },
+        },
+        delivery_version: 'legacy',
+        status: 'failed',
+        response_status: 500,
+        response_body: 'failed test delivery',
+        attempt_count: 1,
+      })
+    expect(insertError).toBeNull()
+
+    const { error: updateError } = await (getSupabaseClient() as any)
+      .from('webhooks')
+      .update({ url: 'http://example.com/retry-webhook?token=secret-token' })
+      .eq('id', createdWebhookId)
+    expect(updateError).toBeNull()
+
+    try {
+      const response = await fetch(webhookEndpoint('/deliveries/retry'), {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          orgId: WEBHOOK_TEST_ORG_ID,
+          deliveryId: failedDeliveryId,
+        }),
+      })
+      expect(response.status).toBe(400)
+      const data = await response.json() as { error: string, moreInfo?: any }
+      expect(data.error).toBe('invalid_url')
+      expectSanitizedUrlInfo(data)
+    }
+    finally {
+      await (getSupabaseClient() as any)
+        .from('webhooks')
+        .update({ url: webhookUrl })
+        .eq('id', createdWebhookId)
+      await (getSupabaseClient() as any)
+        .from('webhook_deliveries')
+        .delete()
+        .eq('id', failedDeliveryId)
     }
   })
 

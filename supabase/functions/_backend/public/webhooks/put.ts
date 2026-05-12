@@ -6,7 +6,7 @@ import { type } from 'arktype'
 import { safeParseSchema } from '../../utils/ark_validation.ts'
 import { simpleError } from '../../utils/hono.ts'
 import { supabaseAdmin } from '../../utils/supabase.ts'
-import { getWebhookPublicUrlValidationError, parseWebhookDeliveryVersion, WEBHOOK_EVENT_TYPES } from '../../utils/webhook.ts'
+import { getWebhookLogUrlMetadata, getWebhookPublicUrlValidationError, parseWebhookDeliveryVersion, WEBHOOK_EVENT_TYPES } from '../../utils/webhook.ts'
 import { checkWebhookPermissionV2 } from './index.ts'
 import { webhookPublicSelect } from './response.ts'
 
@@ -75,7 +75,7 @@ export async function put(c: Context<MiddlewareKeyVariables, any, any>, bodyRaw:
   if (body.url) {
     const urlError = await getWebhookPublicUrlValidationError(c, body.url)
     if (urlError)
-      throw simpleError('invalid_url', urlError, { url: body.url })
+      throw simpleError('invalid_url', urlError, { urlInfo: getWebhookLogUrlMetadata(body.url) })
   }
 
   // Build update object

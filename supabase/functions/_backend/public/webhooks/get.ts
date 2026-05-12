@@ -11,7 +11,7 @@ import { webhookPublicSchema, webhookPublicSelect, webhooksPublicSchema } from '
 const bodySchema = type({
   'orgId': 'string',
   'webhookId?': 'string',
-  'page?': 'number',
+  'page?': 'number | string.numeric.parse',
 })
 
 export async function get(c: Context<MiddlewareKeyVariables, any, any>, bodyRaw: any, auth: AuthInfo): Promise<Response> {

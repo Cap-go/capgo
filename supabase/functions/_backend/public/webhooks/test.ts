@@ -8,6 +8,7 @@ import {
   createDeliveryRecord,
   createTestPayload,
   deliverWebhook,
+  getWebhookLogUrlMetadata,
   getWebhookPublicUrlValidationError,
   normalizeWebhookDeliveryVersion,
   updateDeliveryResult,
@@ -47,7 +48,7 @@ export async function test(c: Context<MiddlewareKeyVariables, any, any>, bodyRaw
 
   const urlError = await getWebhookPublicUrlValidationError(c, webhook.url)
   if (urlError)
-    throw simpleError('invalid_url', urlError, { url: webhook.url })
+    throw simpleError('invalid_url', urlError, { urlInfo: getWebhookLogUrlMetadata(webhook.url) })
 
   // Create test payload
   const payload = createTestPayload(body.orgId)

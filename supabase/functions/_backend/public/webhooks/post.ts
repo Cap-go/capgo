@@ -4,7 +4,7 @@ import { type } from 'arktype'
 import { safeParseSchema } from '../../utils/ark_validation.ts'
 import { simpleError } from '../../utils/hono.ts'
 import { supabaseAdmin } from '../../utils/supabase.ts'
-import { getWebhookPublicUrlValidationError, parseWebhookDeliveryVersion, WEBHOOK_EVENT_TYPES } from '../../utils/webhook.ts'
+import { getWebhookLogUrlMetadata, getWebhookPublicUrlValidationError, parseWebhookDeliveryVersion, WEBHOOK_EVENT_TYPES } from '../../utils/webhook.ts'
 import { checkWebhookPermissionV2 } from './index.ts'
 import { webhookCreatedSelect } from './response.ts'
 
@@ -45,7 +45,7 @@ export async function post(c: Context<MiddlewareKeyVariables, any, any>, bodyRaw
 
   const urlError = await getWebhookPublicUrlValidationError(c, body.url)
   if (urlError)
-    throw simpleError('invalid_url', urlError, { url: body.url })
+    throw simpleError('invalid_url', urlError, { urlInfo: getWebhookLogUrlMetadata(body.url) })
 
   // Direct RLS access to webhook tables is intentionally denied; use service-role only after explicit permission checks.
   const { data, error } = await supabaseAdmin(c)

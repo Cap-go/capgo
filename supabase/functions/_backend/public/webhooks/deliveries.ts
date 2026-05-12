@@ -10,6 +10,7 @@ import { supabaseAdmin } from '../../utils/supabase.ts'
 import {
   getDeliveryById,
   getWebhookById,
+  getWebhookLogUrlMetadata,
   getWebhookPublicUrlValidationError,
   queueWebhookDelivery,
 } from '../../utils/webhook.ts'
@@ -146,7 +147,7 @@ export async function retryDelivery(c: Context<MiddlewareKeyVariables, any, any>
 
   const urlError = await getWebhookPublicUrlValidationError(c, webhook.url)
   if (urlError)
-    throw simpleError('invalid_url', urlError, { url: webhook.url })
+    throw simpleError('invalid_url', urlError, { urlInfo: getWebhookLogUrlMetadata(webhook.url) })
 
   // Reset delivery status and queue for retry
   const { error: updateError } = await supabase
