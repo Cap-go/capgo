@@ -1859,7 +1859,7 @@ export async function getAdminOrganizationInsights(
           a.owner_org AS org_id,
           COUNT(*)::int AS apps_count
         FROM apps a
-        INNER JOIN filtered_orgs fo ON fo.org_id = a.owner_org
+        INNER JOIN filtered_orgs filtered ON filtered.org_id = a.owner_org
         GROUP BY a.owner_org
       ),
       members_by_org AS (
@@ -1867,7 +1867,7 @@ export async function getAdminOrganizationInsights(
           ou.org_id,
           COUNT(DISTINCT ou.user_id)::int AS members_count
         FROM org_users ou
-        INNER JOIN filtered_orgs fo ON fo.org_id = ou.org_id
+        INNER JOIN filtered_orgs filtered ON filtered.org_id = ou.org_id
         WHERE ou.user_right IS NULL OR ou.user_right::text NOT LIKE 'invite_%'
         GROUP BY ou.org_id
       ),
@@ -1875,8 +1875,8 @@ export async function getAdminOrganizationInsights(
         SELECT
           a.owner_org AS org_id,
           COALESCE(SUM(dm.mau), 0)::bigint AS mau
-        FROM filtered_orgs fo
-        INNER JOIN apps a ON a.owner_org = fo.org_id
+        FROM filtered_orgs filtered
+        INNER JOIN apps a ON a.owner_org = filtered.org_id
         INNER JOIN daily_mau dm ON dm.app_id = a.app_id
         WHERE dm.date >= ${startDateOnly}::date
           AND dm.date <= ${endDateOnly}::date
@@ -1887,8 +1887,8 @@ export async function getAdminOrganizationInsights(
           a.owner_org AS org_id,
           COALESCE(SUM(COALESCE(dv.fail, 0)), 0)::bigint AS fails,
           COALESCE(SUM(COALESCE(dv.install, 0)), 0)::bigint AS installs
-        FROM filtered_orgs fo
-        INNER JOIN apps a ON a.owner_org = fo.org_id
+        FROM filtered_orgs filtered
+        INNER JOIN apps a ON a.owner_org = filtered.org_id
         INNER JOIN daily_version dv ON dv.app_id = a.app_id
         WHERE dv.date >= ${startDateOnly}::date
           AND dv.date <= ${endDateOnly}::date
@@ -1898,8 +1898,8 @@ export async function getAdminOrganizationInsights(
         SELECT
           a.owner_org AS org_id,
           COALESCE(SUM(dbt.build_count), 0)::bigint AS build_count
-        FROM filtered_orgs fo
-        INNER JOIN apps a ON a.owner_org = fo.org_id
+        FROM filtered_orgs filtered
+        INNER JOIN apps a ON a.owner_org = filtered.org_id
         INNER JOIN daily_build_time dbt ON dbt.app_id = a.app_id
         WHERE dbt.date >= ${startDateOnly}::date
           AND dbt.date <= ${endDateOnly}::date
@@ -1914,7 +1914,7 @@ export async function getAdminOrganizationInsights(
           )::int AS upload_count,
           MAX(av.created_at) AS last_upload_at
         FROM app_versions av
-        INNER JOIN filtered_orgs fo ON fo.org_id = av.owner_org
+        INNER JOIN filtered_orgs filtered ON filtered.org_id = av.owner_org
         WHERE av.name NOT IN ('builtin', 'unknown')
         GROUP BY av.owner_org
       ),
@@ -1923,15 +1923,15 @@ export async function getAdminOrganizationInsights(
           bl.org_id,
           MAX(bl.created_at) AS last_build_at
         FROM build_logs bl
-        INNER JOIN filtered_orgs fo ON fo.org_id = bl.org_id
+        INNER JOIN filtered_orgs filtered ON filtered.org_id = bl.org_id
         GROUP BY bl.org_id
       )
       SELECT
-        fo.org_id,
-        fo.org_name,
-        fo.management_email,
-        fo.plan_name,
-        fo.billing_type,
+        filtered.org_id,
+        filtered.org_name,
+        filtered.management_email,
+        filtered.plan_name,
+        filtered.billing_type,
         COALESCE(buo.upload_count, 0)::int AS upload_count,
         COALESCE(bu.build_count, 0)::bigint AS build_count,
         CASE
@@ -1944,17 +1944,17 @@ export async function getAdminOrganizationInsights(
         COALESCE(apps.apps_count, 0)::int AS apps_count,
         buo.last_upload_at,
         lb.last_build_at,
-        fo.paid_at,
-        fo.registered_at
-      FROM filtered_orgs fo
-      LEFT JOIN apps_by_org apps ON apps.org_id = fo.org_id
-      LEFT JOIN members_by_org members ON members.org_id = fo.org_id
-      LEFT JOIN mau_by_org mau ON mau.org_id = fo.org_id
-      LEFT JOIN version_usage_by_org vu ON vu.org_id = fo.org_id
-      LEFT JOIN build_usage_by_org bu ON bu.org_id = fo.org_id
-      LEFT JOIN bundle_uploads_by_org buo ON buo.org_id = fo.org_id
-      LEFT JOIN last_builds_by_org lb ON lb.org_id = fo.org_id
-      ORDER BY fo.registered_at DESC NULLS LAST, fo.org_id
+        filtered.paid_at,
+        filtered.registered_at
+      FROM filtered_orgs filtered
+      LEFT JOIN apps_by_org apps ON apps.org_id = filtered.org_id
+      LEFT JOIN members_by_org members ON members.org_id = filtered.org_id
+      LEFT JOIN mau_by_org mau ON mau.org_id = filtered.org_id
+      LEFT JOIN version_usage_by_org vu ON vu.org_id = filtered.org_id
+      LEFT JOIN build_usage_by_org bu ON bu.org_id = filtered.org_id
+      LEFT JOIN bundle_uploads_by_org buo ON buo.org_id = filtered.org_id
+      LEFT JOIN last_builds_by_org lb ON lb.org_id = filtered.org_id
+      ORDER BY filtered.registered_at DESC NULLS LAST, filtered.org_id
     `
 
     const countQuery = sql`
