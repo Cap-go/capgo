@@ -126,9 +126,12 @@ export async function retryDelivery(c: Context<MiddlewareKeyVariables, any, any>
     throw simpleError('no_permission', 'Delivery does not belong to this organization', { deliveryId: body.deliveryId })
   }
 
-  // Can only retry failed deliveries
-  if (delivery.status === 'success') {
-    throw simpleError('already_successful', 'Delivery was already successful', { deliveryId: body.deliveryId })
+  // Can only retry failed deliveries. Pending deliveries are already queued or in flight.
+  if (delivery.status !== 'failed') {
+    throw simpleError('delivery_not_failed', 'Only failed deliveries can be retried', {
+      deliveryId: body.deliveryId,
+      status: delivery.status,
+    })
   }
 
   // Get webhook for URL

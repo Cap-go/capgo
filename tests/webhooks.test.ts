@@ -876,6 +876,58 @@ describe('[POST] /webhooks/deliveries/retry', () => {
     expect(data.message).toContain('App-scoped API keys')
   })
 
+  it('rejects retrying pending deliveries', async () => {
+    if (!createdWebhookId)
+      throw new Error('Webhook was not created in previous test')
+
+    const pendingDeliveryId = randomUUID()
+    const { error: insertError } = await (getSupabaseClient() as any)
+      .from('webhook_deliveries')
+      .insert({
+        id: pendingDeliveryId,
+        webhook_id: createdWebhookId,
+        org_id: WEBHOOK_TEST_ORG_ID,
+        event_type: 'app_versions.INSERT',
+        request_payload: {
+          event: 'app_versions.INSERT',
+          event_id: randomUUID(),
+          timestamp: new Date().toISOString(),
+          org_id: WEBHOOK_TEST_ORG_ID,
+          data: {
+            table: 'app_versions',
+            operation: 'INSERT',
+            record_id: randomUUID(),
+            old_record: null,
+            new_record: null,
+            changed_fields: null,
+          },
+        },
+        delivery_version: 'legacy',
+        status: 'pending',
+      })
+    expect(insertError).toBeNull()
+
+    try {
+      const response = await fetch(webhookEndpoint('/deliveries/retry'), {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          orgId: WEBHOOK_TEST_ORG_ID,
+          deliveryId: pendingDeliveryId,
+        }),
+      })
+      expect(response.status).toBe(400)
+      const data = await response.json() as { error: string }
+      expect(data.error).toBe('delivery_not_failed')
+    }
+    finally {
+      await (getSupabaseClient() as any)
+        .from('webhook_deliveries')
+        .delete()
+        .eq('id', pendingDeliveryId)
+    }
+  })
+
   it('retry delivery with missing body', async () => {
     const response = await fetch(webhookEndpoint('/deliveries/retry'), {
       method: 'POST',

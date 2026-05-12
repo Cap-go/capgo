@@ -37,6 +37,11 @@ COMMENT ON COLUMN public.webhook_deliveries.delivery_version IS
 ALTER TABLE public.webhook_deliveries
 ALTER COLUMN max_attempts SET DEFAULT 10;
 
+UPDATE public.webhook_deliveries
+SET max_attempts = 10
+WHERE status = 'pending'
+  AND (max_attempts IS NULL OR max_attempts < 10);
+
 -- Webhook secrets and delivery payloads must be accessed only through the API.
 -- Service-role jobs keep access for dispatch, delivery, and API handlers.
 REVOKE ALL ON TABLE public.webhooks FROM anon;

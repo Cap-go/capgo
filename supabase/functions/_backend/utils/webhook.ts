@@ -100,6 +100,32 @@ const WEBHOOK_RETRY_DELAYS_SECONDS = [
   24 * 60 * 60,
 ]
 
+interface WebhookLogUrlMetadata {
+  valid: boolean
+  protocol?: string
+  hostnameLength?: number
+  pathSegmentCount?: number
+  hasQuery?: boolean
+  hasCredentials?: boolean
+}
+
+function getWebhookLogUrlMetadata(urlString: string): WebhookLogUrlMetadata {
+  try {
+    const parsedUrl = new URL(urlString)
+    return {
+      valid: true,
+      protocol: parsedUrl.protocol.replace(/:$/, ''),
+      hostnameLength: parsedUrl.hostname.length,
+      pathSegmentCount: parsedUrl.pathname.split('/').filter(Boolean).length,
+      hasQuery: parsedUrl.search.length > 0,
+      hasCredentials: Boolean(parsedUrl.username || parsedUrl.password),
+    }
+  }
+  catch {
+    return { valid: false }
+  }
+}
+
 function allowLocalWebhookUrls(c: Context): boolean {
   return getEnv(c, 'CAPGO_ALLOW_LOCAL_WEBHOOK_URLS') === 'true'
 }
@@ -419,6 +445,7 @@ export async function deliverWebhook(
   deliveryVersion: WebhookDeliveryVersion = 'legacy',
 ): Promise<{ success: boolean, status?: number, body?: string, duration?: number, retryAfter?: string | null }> {
   const startTime = Date.now()
+  const urlInfo = getWebhookLogUrlMetadata(url)
 
   const urlValidationError = await getWebhookPublicUrlValidationError(c, url)
   if (urlValidationError) {
@@ -427,7 +454,7 @@ export async function deliverWebhook(
       requestId: c.get('requestId'),
       message: 'Webhook delivery blocked by URL validation',
       deliveryId,
-      url,
+      urlInfo,
       error: urlValidationError,
       duration,
     })
@@ -484,7 +511,7 @@ export async function deliverWebhook(
         requestId: c.get('requestId'),
         message: 'Webhook delivery attempt',
         deliveryId,
-        url,
+        urlInfo,
         status: response.status,
         success: response.ok,
         duration,
@@ -510,7 +537,7 @@ export async function deliverWebhook(
       requestId: c.get('requestId'),
       message: 'Webhook delivery failed',
       deliveryId,
-      url,
+      urlInfo,
       error: errorMessage,
       duration,
     })
