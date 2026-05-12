@@ -48,12 +48,21 @@ function createContext() {
   } as any
 }
 
+async function expectOversizedPostHogError(sender: (context: ReturnType<typeof createContext>) => Promise<boolean>, message: string) {
+  const oversizedBody = 'x'.repeat(4097)
+  fetchMock.mockResolvedValue(new Response(oversizedBody, { status: 503 }))
+
+  await expect(sender(createContext())).resolves.toBe(false)
+  expect(cloudlogErrMock).toHaveBeenCalledWith(expect.objectContaining({
+    message,
+    error: 'posthog_error_body_too_large',
+  }))
+  expect(JSON.stringify(cloudlogErrMock.mock.calls)).not.toContain(oversizedBody)
+}
+
 beforeEach(() => {
   envState.posthogApiHost = 'https://eu.i.posthog.com'
-  fetchMock.mockResolvedValue({
-    ok: true,
-    text: vi.fn().mockResolvedValue(''),
-  })
+  fetchMock.mockResolvedValue(new Response('', { status: 200 }))
   vi.stubGlobal('fetch', fetchMock)
 })
 
@@ -130,5 +139,38 @@ describe('posthog helper', () => {
       message: 'Invalid PostHog host',
       host: '://bad-host',
     }))
+  })
+
+  it('does not log oversized PostHog capture error bodies', async () => {
+    const { trackPosthogEvent } = await import('../supabase/functions/_backend/utils/posthog.ts')
+
+    await expectOversizedPostHogError(context => trackPosthogEvent(context, {
+      event: 'Tracked Event',
+      channel: 'usage',
+      user_id: 'user-id',
+    }), 'PostHog error')
+  })
+
+  it('does not log oversized PostHog exception error bodies', async () => {
+    const { capturePosthogException } = await import('../supabase/functions/_backend/utils/posthog.ts')
+
+    await expectOversizedPostHogError(context => capturePosthogException(context, {
+      error: new Error('boom'),
+      functionName: 'app',
+      kind: 'unhandled_error',
+      status: 500,
+    }), 'PostHog exception error')
+  })
+
+  it('rejects oversized PostHog error bodies from content-length before reading', async () => {
+    const { posthogTestUtils } = await import('../supabase/functions/_backend/utils/posthog.ts')
+    const response = new Response('too large', {
+      status: 503,
+      headers: {
+        'content-length': String(posthogTestUtils.MAX_POSTHOG_ERROR_BODY_BYTES + 1),
+      },
+    })
+
+    await expect(posthogTestUtils.readPostHogErrorBody(response)).resolves.toBeNull()
   })
 })

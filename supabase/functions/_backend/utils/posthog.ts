@@ -5,6 +5,7 @@ import { existInEnv, getEnv } from './utils.ts'
 
 const POSTHOG_CAPTURE_URL = 'https://eu.i.posthog.com/capture/'
 const POSTHOG_EXCEPTION_URL = 'https://eu.i.posthog.com/i/v0/e/'
+const MAX_POSTHOG_ERROR_BODY_BYTES = 4 * 1024
 
 export type PostHogGroups = Record<string, string>
 
@@ -15,6 +16,48 @@ interface PostHogCapturePayload extends Pick<TrackOptions, 'event'>, Pick<TrackO
   setPersonProperties?: boolean
   tags?: Record<string, any>
   user_id?: string
+}
+
+async function readPostHogErrorBody(response: Response, limit = MAX_POSTHOG_ERROR_BODY_BYTES) {
+  const contentLength = Number.parseInt(response.headers.get('content-length') ?? '', 10)
+  if (Number.isFinite(contentLength) && contentLength > limit) {
+    await response.body?.cancel().catch(() => undefined)
+    return null
+  }
+
+  if (!response.body) {
+    const text = await response.text()
+    return new TextEncoder().encode(text).byteLength > limit ? null : text
+  }
+
+  const reader = response.body.getReader()
+  const decoder = new TextDecoder()
+  let total = 0
+  let text = ''
+
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) {
+      text += decoder.decode()
+      break
+    }
+
+    if (!value)
+      continue
+
+    total += value.byteLength
+    if (total > limit) {
+      await reader.cancel()
+      return null
+    }
+    text += decoder.decode(value, { stream: true })
+  }
+
+  return text
+}
+
+function formatPostHogErrorBody(errorBody: string | null) {
+  return errorBody ?? 'posthog_error_body_too_large'
 }
 
 export async function trackPosthogEvent(c: Context, payload: PostHogCapturePayload) {
@@ -60,7 +103,7 @@ export async function trackPosthogEvent(c: Context, payload: PostHogCapturePaylo
     })
 
     if (!res.ok) {
-      const error = await res.text()
+      const error = formatPostHogErrorBody(await readPostHogErrorBody(res))
       cloudlogErr({ requestId: c.get('requestId'), message: 'PostHog error', status: res.status, error, event: payload.event, distinctId })
       return false
     }
@@ -221,7 +264,7 @@ export async function capturePosthogException(c: Context, payload: {
     }
 
     if (!res.ok) {
-      const error = await res.text()
+      const error = formatPostHogErrorBody(await readPostHogErrorBody(res))
       cloudlogErr({ requestId: c.get('requestId'), message: 'PostHog exception error', status: res.status, error, event: '$exception', distinctId })
       return false
     }
@@ -273,7 +316,7 @@ export async function groupIdentifyPosthog(c: Context, payload: PostHogGroupIden
     })
 
     if (!res.ok) {
-      const error = await res.text()
+      const error = formatPostHogErrorBody(await readPostHogErrorBody(res))
       cloudlogErr({
         requestId: c.get('requestId'),
         message: 'PostHog $groupidentify error',
@@ -303,4 +346,10 @@ export async function groupIdentifyPosthog(c: Context, payload: PostHogGroupIden
     })
     return false
   }
+}
+
+export const posthogTestUtils = {
+  MAX_POSTHOG_ERROR_BODY_BYTES,
+  formatPostHogErrorBody,
+  readPostHogErrorBody,
 }
