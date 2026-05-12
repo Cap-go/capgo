@@ -60,7 +60,7 @@ const isLoadingOrganizations = ref(false)
 const planOptions = ref<string[]>([])
 const selectedPlan = ref('')
 const selectedBilling = ref<BillingFilter>('all')
-const paidOnly = ref(false)
+const paidOnly = ref(true)
 const searchQuery = ref('')
 let loadOrganizationsSequence = 0
 
