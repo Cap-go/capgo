@@ -21,26 +21,81 @@ const bodySchema = type({
   'delivery_version?': 'string',
 })
 
+interface PutWebhookBody {
+  orgId: string
+  webhookId: string
+  name?: string
+  url?: string
+  events?: string[]
+  enabled?: boolean
+  deliveryVersion?: string
+  delivery_version?: string
+}
+
+function parseRequestedDeliveryVersion(requestedDeliveryVersion: string | undefined): WebhookDeliveryVersion | undefined {
+  if (requestedDeliveryVersion === undefined)
+    return undefined
+
+  const deliveryVersion = parseWebhookDeliveryVersion(requestedDeliveryVersion)
+  if (!deliveryVersion) {
+    throw simpleError('invalid_delivery_version', 'Invalid webhook delivery version', {
+      allowed: ['legacy', 'standard'],
+    })
+  }
+
+  return deliveryVersion
+}
+
+function validateEvents(events: string[] | undefined): void {
+  if (!events)
+    return
+
+  const invalidEvents = events.filter(e => !WEBHOOK_EVENT_TYPES.includes(e as any))
+  if (invalidEvents.length > 0) {
+    throw simpleError('invalid_events', 'Invalid event types', {
+      invalid: invalidEvents,
+      allowed: WEBHOOK_EVENT_TYPES,
+    })
+  }
+}
+
+async function validateWebhookUrl(c: Context<MiddlewareKeyVariables, any, any>, url: string | undefined): Promise<void> {
+  if (!url)
+    return
+
+  const urlError = await getWebhookPublicUrlValidationError(c, url)
+  if (urlError)
+    throw simpleError('invalid_url', urlError, { urlInfo: getWebhookLogUrlMetadata(url) })
+}
+
+function buildWebhookUpdateData(
+  body: PutWebhookBody,
+  deliveryVersion: WebhookDeliveryVersion | undefined,
+): Database['public']['Tables']['webhooks']['Update'] {
+  const updateData: Database['public']['Tables']['webhooks']['Update'] = {}
+  if (body.name !== undefined)
+    updateData.name = body.name
+  if (body.url !== undefined)
+    updateData.url = body.url
+  if (body.events !== undefined)
+    updateData.events = body.events
+  if (body.enabled !== undefined)
+    updateData.enabled = body.enabled
+  if (deliveryVersion !== undefined)
+    updateData.delivery_version = deliveryVersion
+
+  return updateData
+}
+
 export async function put(c: Context<MiddlewareKeyVariables, any, any>, bodyRaw: any, auth: AuthInfo): Promise<Response> {
   const bodyParsed = safeParseSchema(bodySchema, bodyRaw)
   if (!bodyParsed.success) {
     throw simpleError('invalid_body', 'Invalid body', { error: bodyParsed.error })
   }
-  const body = bodyParsed.data
+  const body = bodyParsed.data as PutWebhookBody
 
   await checkWebhookPermissionV2(c, body.orgId, auth)
-  const requestedDeliveryVersion = body.deliveryVersion ?? body.delivery_version
-  let deliveryVersion: WebhookDeliveryVersion | undefined
-
-  if (requestedDeliveryVersion !== undefined) {
-    const parsedDeliveryVersion = parseWebhookDeliveryVersion(requestedDeliveryVersion)
-    if (!parsedDeliveryVersion) {
-      throw simpleError('invalid_delivery_version', 'Invalid webhook delivery version', {
-        allowed: ['legacy', 'standard'],
-      })
-    }
-    deliveryVersion = parsedDeliveryVersion
-  }
+  const deliveryVersion = parseRequestedDeliveryVersion(body.deliveryVersion ?? body.delivery_version)
 
   // Direct RLS access to webhook tables is intentionally denied; use service-role only after explicit permission checks.
   const supabase = supabaseAdmin(c)
@@ -60,37 +115,11 @@ export async function put(c: Context<MiddlewareKeyVariables, any, any>, bodyRaw:
     throw simpleError('no_permission', 'Webhook does not belong to this organization', { webhookId: body.webhookId })
   }
 
-  // Validate events if provided
-  if (body.events) {
-    const invalidEvents = body.events.filter(e => !WEBHOOK_EVENT_TYPES.includes(e as any))
-    if (invalidEvents.length > 0) {
-      throw simpleError('invalid_events', 'Invalid event types', {
-        invalid: invalidEvents,
-        allowed: WEBHOOK_EVENT_TYPES,
-      })
-    }
-  }
-
-  // Validate URL if provided
-  if (body.url) {
-    const urlError = await getWebhookPublicUrlValidationError(c, body.url)
-    if (urlError)
-      throw simpleError('invalid_url', urlError, { urlInfo: getWebhookLogUrlMetadata(body.url) })
-  }
+  validateEvents(body.events)
+  await validateWebhookUrl(c, body.url)
 
   // Build update object
-  const updateData: Database['public']['Tables']['webhooks']['Update'] = {}
-  if (body.name !== undefined)
-    updateData.name = body.name
-  if (body.url !== undefined)
-    updateData.url = body.url
-  if (body.events !== undefined)
-    updateData.events = body.events
-  if (body.enabled !== undefined)
-    updateData.enabled = body.enabled
-  if (deliveryVersion !== undefined)
-    updateData.delivery_version = deliveryVersion
-
+  const updateData = buildWebhookUpdateData(body, deliveryVersion)
   if (Object.keys(updateData).length === 0) {
     throw simpleError('no_updates', 'No fields to update')
   }

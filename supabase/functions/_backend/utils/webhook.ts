@@ -362,7 +362,7 @@ export function parseRetryAfterSeconds(retryAfter: string | null | undefined, no
 function getWebhookRetryRandomValue(): number {
   const randomBytes = new Uint32Array(1)
   crypto.getRandomValues(randomBytes)
-  return randomBytes[0] / 0x1_0000_0000
+  return randomBytes[0] / 0x100000000
 }
 
 export function getWebhookRetryDelaySeconds(

@@ -22,6 +22,9 @@ const selectedEvents = ref<string[]>([])
 const enabled = ref(true)
 const deliveryVersion = ref<WebhookDeliveryVersion>('legacy')
 const urlError = ref('')
+const nameInputId = 'webhook-form-name'
+const urlInputId = 'webhook-form-url'
+const deliveryVersionInputId = 'webhook-form-delivery-version'
 
 const isEditing = computed(() => !!props.webhook)
 
@@ -121,10 +124,11 @@ function handleBackdropClick(event: MouseEvent) {
       <div class="p-4 space-y-4">
         <!-- Name -->
         <div>
-          <label class="block mb-1 text-sm font-medium text-gray-700 dark:text-gray-300">
+          <label :for="nameInputId" class="block mb-1 text-sm font-medium text-gray-700 dark:text-gray-300">
             {{ t('webhook-name') }} <span class="text-red-500">*</span>
           </label>
           <input
+            :id="nameInputId"
             v-model="name"
             type="text"
             class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
@@ -134,10 +138,11 @@ function handleBackdropClick(event: MouseEvent) {
 
         <!-- URL -->
         <div>
-          <label class="block mb-1 text-sm font-medium text-gray-700 dark:text-gray-300">
+          <label :for="urlInputId" class="block mb-1 text-sm font-medium text-gray-700 dark:text-gray-300">
             {{ t('webhook-url') }} <span class="text-red-500">*</span>
           </label>
           <input
+            :id="urlInputId"
             v-model="url"
             type="url"
             class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
@@ -155,10 +160,11 @@ function handleBackdropClick(event: MouseEvent) {
 
         <!-- Delivery Version -->
         <div>
-          <label class="block mb-1 text-sm font-medium text-gray-700 dark:text-gray-300">
+          <label :for="deliveryVersionInputId" class="block mb-1 text-sm font-medium text-gray-700 dark:text-gray-300">
             {{ t('webhook-delivery-version') }}
           </label>
           <select
+            :id="deliveryVersionInputId"
             v-model="deliveryVersion"
             class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
           >
