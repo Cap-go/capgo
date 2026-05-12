@@ -323,9 +323,28 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
     let cancelled = false
 
     if (step === 'welcome') {
+      // Platform was already chosen in command.ts before this Ink app rendered.
+      // Skip the legacy platform-select Select and go straight to the iOS-specific
+      // checks that platform-select used to gatekeep:
+      //   1. If ios/ doesn't exist → no-platform recovery flow
+      //   2. If iOS credentials already exist → credentials-exist confirmation
+      //   3. Otherwise → api-key-instructions
       setTimeout(() => {
-        if (!cancelled)
-          setStep('platform-select')
+        if (cancelled)
+          return
+        if (!existsSync(join(process.cwd(), iosDir))) {
+          setStep('no-platform')
+          return
+        }
+        ;(async () => {
+          const existing = await loadSavedCredentials(appId)
+          if (cancelled)
+            return
+          if (existing?.ios)
+            setStep('credentials-exist')
+          else
+            setStep('api-key-instructions')
+        })()
       }, 800)
     }
 
@@ -370,7 +389,17 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
           addLog(`✔ Native iOS platform created with ${addIosCommand}`)
           setError(null)
           setRetryCount(0)
-          setStep('platform-select')
+          // Re-run the welcome → platform check inline rather than detouring
+          // through the legacy platform-select step.
+          ;(async () => {
+            const existing = await loadSavedCredentials(appId)
+            if (cancelled)
+              return
+            if (existing?.ios)
+              setStep('credentials-exist')
+            else
+              setStep('api-key-instructions')
+          })()
           return
         }
 
@@ -731,9 +760,18 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
           <Newline />
           <Select
             options={[
-              { label: '  iOS', value: 'ios' },
+              { label: '🍎  iOS', value: 'ios' },
+              { label: '🤖  Android', value: 'android' },
             ]}
-            onChange={async () => {
+            onChange={async (value) => {
+              if (value === 'android') {
+                // The Android flow lives in a separate Ink app — this iOS app
+                // can't host it inline. Exit cleanly and tell the user to
+                // re-run with --platform android.
+                addLog('Re-run with `npx @capgo/cli@latest build init --platform android` to set up Android.', 'cyan')
+                exitOnboarding()
+                return
+              }
               // Check for existing credentials before proceeding
               const existing = await loadSavedCredentials(appId)
               if (existing?.ios) {
@@ -744,13 +782,6 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
               }
             }}
           />
-          <Newline />
-          <Text dimColor>
-            Android onboarding coming soon. Use
-            <Text bold color="white">capgo build credentials save</Text>
-            {' '}
-            for Android.
-          </Text>
         </Box>
       )}
 
@@ -776,7 +807,13 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
               else if (value === 'recheck') {
                 if (existsSync(join(process.cwd(), iosDir))) {
                   addLog(`✔ Found ${iosDir}/ — resuming onboarding.`)
-                  setStep('platform-select')
+                  ;(async () => {
+                    const existing = await loadSavedCredentials(appId)
+                    if (existing?.ios)
+                      setStep('credentials-exist')
+                    else
+                      setStep('api-key-instructions')
+                  })()
                 }
                 else {
                   addLog(`⚠ ${iosDir}/ is still missing. Try ${addIosCommand} or ${doctorCommand}.`, 'yellow')
