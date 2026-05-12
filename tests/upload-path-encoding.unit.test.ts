@@ -22,7 +22,7 @@ describe('upload path encoding', () => {
   it.concurrent('uses the same raw percent route fallback for new raw manifest file names', () => {
     const newManifestFileName = 'assets/suite-marketing/images/social-media/sad_post_grey@2x.png'
     const encodedStoragePath = 'orgs/org-id/apps/app-id/delta/hash_assets/suite-marketing/images/social-media/sad_post_grey%402x.png'
-    const decodedRouteKey = encodedStoragePath.replace('%40', '@')
+    const decodedRouteKey = encodedStoragePath.split('/').map(segment => decodeURIComponent(segment)).join('/')
 
     expect(newManifestFileName).toContain('@2x')
     expect(getSafeAttachmentReadCandidateKeys(decodedRouteKey, encodedStoragePath)).toEqual([
