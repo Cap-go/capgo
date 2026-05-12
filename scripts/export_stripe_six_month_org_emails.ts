@@ -1,5 +1,5 @@
 /*
- * Export org member emails for Stripe customers with at least six months of paid invoice coverage.
+ * Export org member emails by Stripe customer billing status.
  *
  * Run:
  *   bun run stripe:export-six-month-org-emails
@@ -7,11 +7,12 @@
  * Optional:
  *   bun run stripe:export-six-month-org-emails --output=./tmp/export.csv
  *   bun run stripe:export-six-month-org-emails --min-months=6
+ *   bun run stripe:export-six-month-org-emails --status=active
  *   bun run stripe:export-six-month-org-emails --customer-id=cus_...
  *   bun run stripe:export-six-month-org-emails --env-file=./internal/cloudflare/.env.preprod
  */
 import type { Database } from '../supabase/functions/_backend/utils/supabase.types.ts'
-import type { CustomerPaidSummary } from './stripe_paid_invoice_export_utils.ts'
+import type { CustomerPaidCoverage, CustomerPaidSummary } from './stripe_paid_invoice_export_utils.ts'
 import process from 'node:process'
 import {
   createStripeClient,
@@ -35,12 +36,15 @@ const DEFAULT_OUTPUT = './tmp/stripe_six_month_org_emails.csv'
 const DEFAULT_MIN_MONTHS = 6
 const DEFAULT_PAGE_SIZE = 1000
 const DB_CHUNK_SIZE = 200
+const DEFAULT_STATUS_FILTER = 'paid'
+const STATUS_FILTERS = ['paid', 'active', 'canceled', 'never_paid', 'all'] as const
 
 type SupabaseClient = ReturnType<typeof createSupabaseServiceClient>
 type OrgRow = Pick<Database['public']['Tables']['orgs']['Row'], 'id' | 'customer_id'>
 type OrgUserRow = Pick<Database['public']['Tables']['org_users']['Row'], 'org_id' | 'user_id' | 'user_right'>
 type RoleBindingRow = Pick<Database['public']['Tables']['role_bindings']['Row'], 'expires_at' | 'org_id' | 'principal_id'>
 type UserEmailRow = Pick<Database['public']['Tables']['users']['Row'], 'email' | 'id'>
+type StatusFilter = typeof STATUS_FILTERS[number]
 
 interface ExportRow {
   activePaying: boolean
@@ -50,16 +54,17 @@ interface ExportRow {
 }
 
 function printHelp() {
-  console.log(`Export org member emails for Stripe customers who stayed paying for at least six months.
+  console.log(`Export org member emails by Stripe customer billing status.
 
 Usage:
   bun run stripe:export-six-month-org-emails [options]
 
 Options:
   --output=PATH        CSV output path. Default: ${DEFAULT_OUTPUT}.
-  --min-months=N      Minimum paid duration in 30-day months. Default: ${DEFAULT_MIN_MONTHS}.
+  --min-months=N      Minimum paid duration for paid, active, and canceled statuses. Default: ${DEFAULT_MIN_MONTHS}.
+  --status=VALUE      One of: paid, active, canceled, never_paid, all. Default: ${DEFAULT_STATUS_FILTER}.
   --customer-id=ID    Limit export to one Stripe customer.
-  --limit=N           Stop after N paid Stripe invoices. Useful for smoke tests.
+  --limit=N           Stop after N paid Stripe invoices. Only allowed for paid, active, canceled.
   --env-file=PATH     Env file to load. Default: ${DEFAULT_ENV_FILE}.
   --help              Show this help.
 
@@ -78,6 +83,13 @@ function chunkItems<T>(items: T[], size: number) {
 function normalizeEmail(email: string | null | undefined) {
   const normalized = email?.trim().toLowerCase()
   return normalized || null
+}
+
+function parseStatusFilter(value: string | null) {
+  const statusFilter = value ?? DEFAULT_STATUS_FILTER
+  if (!STATUS_FILTERS.includes(statusFilter as StatusFilter))
+    throw new Error(`--status must be one of: ${STATUS_FILTERS.join(', ')}`)
+  return statusFilter as StatusFilter
 }
 
 async function fetchActionableOrgs(supabase: SupabaseClient, customerId: string | null) {
@@ -225,6 +237,34 @@ async function fetchOrgMemberEmailsByOrgId(supabase: SupabaseClient, orgIds: str
   return emailsByOrgId
 }
 
+function filterCustomerSummaries(customerSummaries: CustomerPaidSummary[], statusFilter: StatusFilter) {
+  if (statusFilter === 'active')
+    return customerSummaries.filter(summary => summary.activePaying)
+  if (statusFilter === 'canceled')
+    return customerSummaries.filter(summary => !summary.activePaying)
+  if (statusFilter === 'never_paid')
+    return []
+  return customerSummaries
+}
+
+function buildNeverPaidCustomerSummaries(
+  customerIds: Set<string>,
+  coverageByCustomerId: Map<string, CustomerPaidCoverage>,
+  statusFilter: StatusFilter,
+) {
+  if (statusFilter !== 'never_paid' && statusFilter !== 'all')
+    return []
+
+  return [...customerIds]
+    .filter(customerId => !coverageByCustomerId.has(customerId))
+    .map((customerId): CustomerPaidSummary => ({
+      activePaying: false,
+      customerId,
+      paidDurationMs: 0,
+      paidDurationMonths: 0,
+    }))
+}
+
 function buildExportRows(
   customerSummaries: CustomerPaidSummary[],
   orgsByCustomerId: Map<string, OrgRow[]>,
@@ -279,12 +319,15 @@ async function main(args = process.argv.slice(2), runtimeEnv: Record<string, str
   const outputPath = getArgValue(args, '--output') ?? DEFAULT_OUTPUT
   const customerId = getArgValue(args, '--customer-id')
   const minMonths = parsePositiveInteger(getArgValue(args, '--min-months'), '--min-months', DEFAULT_MIN_MONTHS)
+  const statusFilter = parseStatusFilter(getArgValue(args, '--status'))
   const invoiceLimit = getArgValue(args, '--limit')
     ? parsePositiveInteger(getArgValue(args, '--limit'), '--limit', 0)
     : null
 
   if (customerId && !isActionableStripeCustomerId(customerId))
     throw new Error('--customer-id must be a real Stripe customer id')
+  if (invoiceLimit && (statusFilter === 'never_paid' || statusFilter === 'all'))
+    throw new Error('--limit cannot be used with --status=never_paid or --status=all because it would misclassify paid org customers')
 
   const fileEnv = await loadEnv(envFile)
   const env = {
@@ -306,6 +349,7 @@ async function main(args = process.argv.slice(2), runtimeEnv: Record<string, str
   console.log(`Loaded ${orgs.length} orgs with actionable Stripe customer ids`)
   console.log(`Env file: ${envFile}`)
   console.log(`Minimum paid duration: ${minMonths} months`)
+  console.log(`Status filter: ${statusFilter}`)
   if (customerId)
     console.log(`Scoped to customer: ${customerId}`)
 
@@ -321,10 +365,14 @@ async function main(args = process.argv.slice(2), runtimeEnv: Record<string, str
     invoiceLimit,
     nowMs,
   })
-  const customerSummaries = buildPaidCustomerSummaries(coverageByCustomerId, {
+  const paidCustomerSummaries = buildPaidCustomerSummaries(coverageByCustomerId, {
     minMonths,
     nowMs,
   })
+  const customerSummaries = [
+    ...filterCustomerSummaries(paidCustomerSummaries, statusFilter),
+    ...buildNeverPaidCustomerSummaries(customerIds, coverageByCustomerId, statusFilter),
+  ]
   const qualifyingOrgIds = customerSummaries
     .flatMap(summary => orgsByCustomerId.get(summary.customerId) ?? [])
     .map(org => org.id)
