@@ -5,8 +5,7 @@ meta:
 
 <script setup lang="ts">
 import type { TableColumn } from '~/components/comp_def'
-import { useDebounceFn } from '@vueuse/core'
-import { computed, h, onMounted, ref, watch } from 'vue'
+import { computed, h, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import AdminFilterBar from '~/components/admin/AdminFilterBar.vue'
@@ -63,6 +62,7 @@ const selectedBilling = ref<BillingFilter>('all')
 const paidOnly = ref(true)
 const searchQuery = ref('')
 let loadOrganizationsSequence = 0
+let searchReloadTimer: ReturnType<typeof setTimeout> | undefined
 
 function formatNumber(value: number) {
   return Number(value || 0).toLocaleString(locale.value || 'en')
@@ -143,8 +143,7 @@ async function loadOrganizations() {
     console.error('[Admin Dashboard Organizations] Error loading organization insights:', error)
     organizations.value = []
     totalOrganizations.value = 0
-    planOptions.value = []
-    selectedPlan.value = ''
+    planOptions.value = selectedPlan.value ? [selectedPlan.value] : []
   }
   finally {
     if (sequence === loadOrganizationsSequence)
@@ -157,7 +156,31 @@ function resetToFirstPageAndLoad() {
   loadOrganizations()
 }
 
-const debouncedSearchReload = useDebounceFn(resetToFirstPageAndLoad, 350)
+function cancelDebouncedSearchReload() {
+  if (!searchReloadTimer)
+    return
+
+  clearTimeout(searchReloadTimer)
+  searchReloadTimer = undefined
+}
+
+function loadOrganizationsImmediately() {
+  cancelDebouncedSearchReload()
+  loadOrganizations()
+}
+
+function resetToFirstPageAndLoadImmediately() {
+  currentPage.value = 1
+  loadOrganizationsImmediately()
+}
+
+function scheduleSearchReload() {
+  cancelDebouncedSearchReload()
+  searchReloadTimer = setTimeout(() => {
+    searchReloadTimer = undefined
+    resetToFirstPageAndLoad()
+  }, 350)
+}
 
 const organizationColumns = computed<TableColumn[]>(() => [
   {
@@ -256,19 +279,19 @@ const organizationColumns = computed<TableColumn[]>(() => [
 ])
 
 watch(() => adminStore.activeDateRange, () => {
-  resetToFirstPageAndLoad()
+  resetToFirstPageAndLoadImmediately()
 }, { deep: true })
 
 watch(() => adminStore.refreshTrigger, () => {
-  loadOrganizations()
+  loadOrganizationsImmediately()
 })
 
 watch([selectedPlan, selectedBilling, paidOnly], () => {
-  resetToFirstPageAndLoad()
+  resetToFirstPageAndLoadImmediately()
 })
 
 watch(searchQuery, () => {
-  debouncedSearchReload()
+  scheduleSearchReload()
 })
 
 onMounted(async () => {
@@ -281,6 +304,8 @@ onMounted(async () => {
   await loadOrganizations()
   displayStore.NavTitle = t('admin-organizations')
 })
+
+onBeforeUnmount(cancelDebouncedSearchReload)
 
 displayStore.NavTitle = t('admin-organizations')
 displayStore.defaultBack = '/dashboard'
@@ -351,9 +376,9 @@ displayStore.defaultBack = '/dashboard'
             :columns="organizationColumns"
             :element-list="organizations"
             :auto-reload="false"
-            @reload="loadOrganizations"
-            @reset="loadOrganizations"
-            @update:current-page="(page: number) => { currentPage = page; loadOrganizations() }"
+            @reload="loadOrganizationsImmediately"
+            @reset="loadOrganizationsImmediately"
+            @update:current-page="(page: number) => { currentPage = page; loadOrganizationsImmediately() }"
           />
         </div>
       </div>
