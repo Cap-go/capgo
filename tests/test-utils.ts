@@ -399,12 +399,22 @@ export async function getAal2AuthHeadersForCredentials(email: string, password: 
   }
 
   // Keep MFA cleanup scoped to factors enrolled by this helper.
-  await executeSQL(`
-    DELETE FROM auth.mfa_factors
-    WHERE user_id = $1::uuid
-      AND friendly_name LIKE $2
-      AND created_at < NOW() - INTERVAL '10 minutes';
-  `, [signInData.user.id, MFA_TEST_FACTOR_LIKE])
+  try {
+    await executeSQL(`
+      DELETE FROM auth.mfa_factors
+      WHERE user_id = $1::uuid
+        AND friendly_name LIKE $2
+        AND created_at < NOW() - INTERVAL '10 minutes';
+    `, [signInData.user.id, MFA_TEST_FACTOR_LIKE])
+  }
+  catch (cleanupError) {
+    console.warn('Failed to clean up old MFA test factors', {
+      cleanupError,
+      userId: signInData.user.id,
+      friendlyNameLike: MFA_TEST_FACTOR_LIKE,
+    })
+  }
+
   await executeSQL(`
     INSERT INTO public.user_security (user_id, email_otp_verified_at, created_at, updated_at)
     VALUES ($1::uuid, NOW(), NOW(), NOW())
