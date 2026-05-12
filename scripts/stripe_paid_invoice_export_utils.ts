@@ -23,6 +23,11 @@ export interface CustomerPaidSummary {
   paidDurationMs: number
 }
 
+export interface CustomerPaidCoverageResult {
+  coverageByCustomerId: Map<string, CustomerPaidCoverage>
+  customerIdsWithPositivePaidInvoices: Set<string>
+}
+
 interface CollectPaidCoverageOptions {
   customerId?: string | null
   excludeCustomerIds?: Set<string>
@@ -174,8 +179,9 @@ function shouldIncludeCustomer(customerId: string, options: CollectPaidCoverageO
 export async function collectPaidCoverageByCustomerId(
   stripe: Stripe,
   options: CollectPaidCoverageOptions,
-) {
+): Promise<CustomerPaidCoverageResult> {
   const coverageByCustomerId = new Map<string, CustomerPaidCoverage>()
+  const customerIdsWithPositivePaidInvoices = new Set<string>()
   const invoiceListParams: Stripe.InvoiceListParams = {
     limit: 100,
     status: 'paid',
@@ -191,6 +197,9 @@ export async function collectPaidCoverageByCustomerId(
 
     const customerId = toStripeId(invoice.customer)
     if (customerId && shouldIncludeCustomer(customerId, options)) {
+      if (getInvoiceAmountPaid(invoice) > 0)
+        customerIdsWithPositivePaidInvoices.add(customerId)
+
       const intervals = await getInvoicePaidIntervals(stripe, invoice)
       if (intervals.length > 0) {
         addPaidCoverage(coverageByCustomerId, customerId, intervals, options.nowMs)
@@ -206,7 +215,10 @@ export async function collectPaidCoverageByCustomerId(
   }
 
   console.log(`Checked ${checkedInvoices} paid Stripe invoices (${matchedInvoices} matched subscription invoices)`)
-  return coverageByCustomerId
+  return {
+    coverageByCustomerId,
+    customerIdsWithPositivePaidInvoices,
+  }
 }
 
 function mergeElapsedIntervals(intervals: PaidInterval[], nowMs: number) {
