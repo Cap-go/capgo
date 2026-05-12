@@ -52,7 +52,7 @@ export function redactUrl(rawUrl: string): string {
     parsed = new URL(rawUrl)
   }
   catch {
-    // If URL is unparseable, return without any modification
+    // If URL is unparsable, return without any modification
     return rawUrl
   }
 
