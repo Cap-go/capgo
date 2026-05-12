@@ -1797,8 +1797,9 @@ export async function getAdminOrganizationInsights(
   end_date: string,
   filters: AdminOrganizationInsightsFilters = {},
 ): Promise<AdminOrganizationInsightsResult> {
+  let pgClient: ReturnType<typeof getPgClient> | undefined
   try {
-    const pgClient = getPgClient(c)
+    pgClient = getPgClient(c)
     const drizzleClient = getDrizzleClient(pgClient)
     const safeLimit = Math.max(1, Math.min(Math.floor(filters.limit ?? 50), 500))
     const safeOffset = Math.max(0, Math.floor(filters.offset ?? 0))
@@ -2012,6 +2013,10 @@ export async function getAdminOrganizationInsights(
   catch (e: unknown) {
     logPgError(c, 'getAdminOrganizationInsights', e)
     return { organizations: [], total: 0, plan_options: [] }
+  }
+  finally {
+    if (pgClient)
+      await closeClient(c, pgClient)
   }
 }
 

@@ -49,7 +49,7 @@ describe('admin stats validation', () => {
     expect(parsed.success).toBe(true)
   })
 
-  it('accepts organization insights filters', () => {
+  it.concurrent('accepts organization insights filters', () => {
     const parsed = safeParseSchema(adminStatsBodySchema, {
       ...baseBody,
       metric_category: 'organization_insights',

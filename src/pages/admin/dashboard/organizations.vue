@@ -62,6 +62,7 @@ const selectedPlan = ref('')
 const selectedBilling = ref<BillingFilter>('all')
 const paidOnly = ref(false)
 const searchQuery = ref('')
+let loadOrganizationsSequence = 0
 
 function formatNumber(value: number) {
   return Number(value || 0).toLocaleString(locale.value || 'en')
@@ -84,6 +85,7 @@ function formatDateOrNever(value: string | null) {
 }
 
 async function loadOrganizations() {
+  const sequence = ++loadOrganizationsSequence
   isLoadingOrganizations.value = true
   try {
     const supabase = useSupabase()
@@ -127,17 +129,26 @@ async function loadOrganizations() {
     if (!payload.success)
       throw new Error('Failed to fetch organization insights')
 
+    if (sequence !== loadOrganizationsSequence)
+      return
+
     organizations.value = payload.data.organizations || []
     totalOrganizations.value = payload.data.total || 0
     planOptions.value = payload.data.plan_options || []
   }
   catch (error) {
+    if (sequence !== loadOrganizationsSequence)
+      return
+
     console.error('[Admin Dashboard Organizations] Error loading organization insights:', error)
     organizations.value = []
     totalOrganizations.value = 0
+    planOptions.value = []
+    selectedPlan.value = ''
   }
   finally {
-    isLoadingOrganizations.value = false
+    if (sequence === loadOrganizationsSequence)
+      isLoadingOrganizations.value = false
   }
 }
 
