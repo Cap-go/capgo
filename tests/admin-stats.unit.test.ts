@@ -49,6 +49,26 @@ describe('admin stats validation', () => {
     expect(parsed.success).toBe(true)
   })
 
+  it('accepts organization insights filters', () => {
+    const parsed = safeParseSchema(adminStatsBodySchema, {
+      ...baseBody,
+      metric_category: 'organization_insights',
+      plan_name: 'Solo',
+      billing_type: 'monthly',
+      search: 'admin stats',
+      limit: 50,
+      offset: 0,
+    })
+
+    expect(parsed.success).toBe(true)
+    if (!parsed.success)
+      return
+
+    expect(parsed.data.plan_name).toBe('Solo')
+    expect(parsed.data.billing_type).toBe('monthly')
+    expect(parsed.data.search).toBe('admin stats')
+  })
+
   it.each([
     ['plain date start', { start_date: '2025-01-01' }],
     ['plain date end', { end_date: '2025-01-31' }],
