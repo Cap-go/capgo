@@ -34,7 +34,7 @@ vi.mock('../supabase/functions/_backend/utils/utils.ts', () => ({
 
 const { cloudlogErr } = await import('../supabase/functions/_backend/utils/logging.ts')
 const { getBuildStatus } = await import('../supabase/functions/_backend/public/build/status.ts')
-const { supabaseApikey, supabaseAdmin } = await import('../supabase/functions/_backend/utils/supabase.ts')
+const { supabaseApikey } = await import('../supabase/functions/_backend/utils/supabase.ts')
 
 function makeMockContext() {
   return {
