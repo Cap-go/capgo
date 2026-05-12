@@ -365,10 +365,10 @@ async function main(args = process.argv.slice(2), runtimeEnv: Record<string, str
     invoiceLimit,
     nowMs,
   })
-  const paidCustomerSummaries = buildPaidCustomerSummaries(coverageByCustomerId, {
-    minMonths,
-    nowMs,
-  })
+  const paidCustomerSummaries = buildPaidCustomerSummaries(
+    coverageByCustomerId,
+    statusFilter === 'all' ? { nowMs } : { minMonths, nowMs },
+  )
   const customerSummaries = [
     ...filterCustomerSummaries(paidCustomerSummaries, statusFilter),
     ...buildNeverPaidCustomerSummaries(customerIds, coverageByCustomerId, statusFilter),
