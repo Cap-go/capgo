@@ -4,6 +4,9 @@ import { LogSnag } from '@logsnag/node'
 import { cloudlog, cloudlogErr, serializeError } from './logging.ts'
 import { getEnv } from './utils.ts'
 
+const MAX_LOGSNAG_ERROR_BODY_BYTES = 4 * 1024
+const LOGSNAG_ERROR_BODY_TOO_LARGE = '[logsnag_error_body_too_large]'
+
 function logsnag(c: Context) {
   const ls = getEnv(c, 'LOGSNAG_TOKEN')
     ? new LogSnag({
@@ -19,6 +22,53 @@ function logsnag(c: Context) {
         },
       }
   return ls as LogSnag
+}
+
+function isOversizedContentLength(response: Response, maxBytes: number) {
+  const contentLength = response.headers.get('content-length')
+  if (!contentLength)
+    return false
+
+  const parsed = Number.parseInt(contentLength, 10)
+  return Number.isFinite(parsed) && parsed > maxBytes
+}
+
+async function readLimitedResponseText(response: Response, maxBytes: number) {
+  if (isOversizedContentLength(response, maxBytes)) {
+    await response.body?.cancel().catch(() => undefined)
+    return LOGSNAG_ERROR_BODY_TOO_LARGE
+  }
+
+  if (!response.body) {
+    const text = await response.text()
+    return new TextEncoder().encode(text).byteLength > maxBytes ? LOGSNAG_ERROR_BODY_TOO_LARGE : text
+  }
+
+  const reader = response.body.getReader()
+  const chunks: Uint8Array[] = []
+  let receivedBytes = 0
+
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done)
+      break
+
+    receivedBytes += value.byteLength
+    if (receivedBytes > maxBytes) {
+      await reader.cancel().catch(() => undefined)
+      return LOGSNAG_ERROR_BODY_TOO_LARGE
+    }
+    chunks.push(value)
+  }
+
+  const body = new Uint8Array(receivedBytes)
+  let offset = 0
+  for (const chunk of chunks) {
+    body.set(chunk, offset)
+    offset += chunk.byteLength
+  }
+
+  return new TextDecoder().decode(body)
 }
 
 async function logsnagInsights(c: Context, data: { title: string, value: string | boolean | number, icon: string }[]) {
@@ -48,7 +98,7 @@ async function logsnagInsights(c: Context, data: { title: string, value: string 
       })
 
       if (!response.ok) {
-        const error = await response.text()
+        const error = await readLimitedResponseText(response, MAX_LOGSNAG_ERROR_BODY_BYTES)
         cloudlogErr({ requestId: c.get('requestId'), message: 'logsnagInsights error', status: response.status, error, payload })
         return false
       }
@@ -62,6 +112,11 @@ async function logsnagInsights(c: Context, data: { title: string, value: string 
   })
 
   return Promise.all(promises)
+}
+
+export const logsnagTestUtils = {
+  LOGSNAG_ERROR_BODY_TOO_LARGE,
+  MAX_LOGSNAG_ERROR_BODY_BYTES,
 }
 
 export { logsnag, logsnagInsights }
