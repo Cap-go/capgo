@@ -16,7 +16,12 @@ vi.mock('../supabase/functions/_backend/utils/utils.ts', () => ({
   getEnv: mockGetEnv,
 }))
 
-const { deliverWebhook } = await import('../supabase/functions/_backend/utils/webhook.ts')
+vi.mock('../supabase/functions/_backend/utils/publicUrl.ts', () => ({
+  getPublicHostnameValidationError: vi.fn().mockResolvedValue(null),
+  getPublicUrlSyntaxValidationError: vi.fn().mockReturnValue(null),
+}))
+
+const { deliverWebhook, webhookTestUtils } = await import('../supabase/functions/_backend/utils/webhook.ts')
 
 describe('webhook delivery redirect handling', () => {
   const payload = {
@@ -47,9 +52,10 @@ describe('webhook delivery redirect handling', () => {
 
   afterEach(() => {
     vi.restoreAllMocks()
+    vi.useRealTimers()
   })
 
-  it.concurrent('uses manual redirect mode for outbound webhook delivery', async () => {
+  it('uses manual redirect mode for outbound webhook delivery', async () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('redirect blocked', {
       status: 302,
       headers: {
@@ -76,5 +82,69 @@ describe('webhook delivery redirect handling', () => {
       status: 302,
       body: 'redirect blocked',
     })
+  })
+
+  it('does not read or store oversized webhook response bodies', async () => {
+    const oversizedBody = 'x'.repeat(webhookTestUtils.WEBHOOK_RESPONSE_BODY_LIMIT_BYTES + 1)
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(oversizedBody, {
+      status: 200,
+      headers: { 'content-length': String(webhookTestUtils.WEBHOOK_RESPONSE_BODY_LIMIT_BYTES + 1) },
+    }))
+
+    const result = await deliverWebhook(
+      context as any,
+      'delivery-oversized',
+      'https://example.com/webhook',
+      payload,
+      'whsec_test_secret',
+    )
+
+    expect(result).toMatchObject({
+      success: true,
+      status: 200,
+      body: webhookTestUtils.WEBHOOK_RESPONSE_BODY_TOO_LARGE,
+    })
+    expect(JSON.stringify(result)).not.toContain(oversizedBody)
+  })
+
+  it('keeps the delivery timeout active while reading the response body', async () => {
+    vi.useFakeTimers()
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (_url, init) => {
+      const signal = init?.signal as AbortSignal
+      const body = new ReadableStream({
+        start(controller) {
+          controller.enqueue(new TextEncoder().encode('partial body'))
+          signal.addEventListener('abort', () => {
+            controller.error(new DOMException('aborted', 'AbortError'))
+          })
+        },
+      })
+      return new Response(body, { status: 200 })
+    })
+
+    const resultPromise = deliverWebhook(
+      context as any,
+      'delivery-slow-body',
+      'https://example.com/webhook',
+      payload,
+      'whsec_test_secret',
+    )
+
+    await Promise.resolve()
+    await Promise.resolve()
+    await vi.advanceTimersByTimeAsync(10000)
+    const result = await resultPromise
+
+    expect(result).toMatchObject({
+      success: false,
+      body: 'Error: Webhook delivery failed',
+      duration: 10000,
+    })
+    expect(mockCloudlogErr).toHaveBeenCalledWith(expect.objectContaining({
+      message: 'Webhook delivery failed',
+      deliveryId: 'delivery-slow-body',
+      error: 'aborted',
+      duration: 10000,
+    }))
   })
 })

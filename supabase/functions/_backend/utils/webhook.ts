@@ -58,6 +58,9 @@ const WEBHOOK_URL_VALIDATION_MESSAGES = {
   dnsResolution: 'Webhook URL host could not be resolved',
 }
 
+const WEBHOOK_RESPONSE_BODY_LIMIT_BYTES = 10000
+const WEBHOOK_RESPONSE_BODY_TOO_LARGE = '[webhook_response_body_too_large]'
+
 export function getWebhookUrlValidationError(c: Context, urlString: string): string | null {
   return getPublicUrlSyntaxValidationError(urlString, {
     allowLocalUrls: allowLocalWebhookUrls(c),
@@ -185,6 +188,53 @@ export async function generateWebhookSignature(
   return `v1=${timestamp}.${hexSignature}`
 }
 
+function isOversizedContentLength(response: Response, maxBytes: number) {
+  const contentLength = response.headers.get('content-length')
+  if (!contentLength)
+    return false
+
+  const parsed = Number.parseInt(contentLength, 10)
+  return Number.isFinite(parsed) && parsed > maxBytes
+}
+
+async function readLimitedWebhookResponseBody(response: Response, maxBytes: number) {
+  if (isOversizedContentLength(response, maxBytes)) {
+    await response.body?.cancel().catch(() => undefined)
+    return WEBHOOK_RESPONSE_BODY_TOO_LARGE
+  }
+
+  if (!response.body) {
+    const text = await response.text()
+    return new TextEncoder().encode(text).byteLength > maxBytes ? WEBHOOK_RESPONSE_BODY_TOO_LARGE : text
+  }
+
+  const reader = response.body.getReader()
+  const chunks: Uint8Array[] = []
+  let receivedBytes = 0
+
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done)
+      break
+
+    receivedBytes += value.byteLength
+    if (receivedBytes > maxBytes) {
+      await reader.cancel().catch(() => undefined)
+      return WEBHOOK_RESPONSE_BODY_TOO_LARGE
+    }
+    chunks.push(value)
+  }
+
+  const body = new Uint8Array(receivedBytes)
+  let offset = 0
+  for (const chunk of chunks) {
+    body.set(chunk, offset)
+    offset += chunk.byteLength
+  }
+
+  return new TextDecoder().decode(body)
+}
+
 /**
  * Deliver a webhook to the user's endpoint
  */
@@ -235,33 +285,37 @@ export async function deliverWebhook(
     const controller = new AbortController()
     const timeoutId = setTimeout(() => controller.abort(), 10000) // 10s timeout
 
-    const response = await fetch(url, {
-      method: 'POST',
-      headers,
-      body: payloadString,
-      redirect: 'manual',
-      signal: controller.signal,
-    })
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers,
+        body: payloadString,
+        redirect: 'manual',
+        signal: controller.signal,
+      })
 
-    clearTimeout(timeoutId)
-    const duration = Date.now() - startTime
-    const responseBody = await response.text()
+      const responseBody = await readLimitedWebhookResponseBody(response, WEBHOOK_RESPONSE_BODY_LIMIT_BYTES)
+      const duration = Date.now() - startTime
 
-    cloudlog({
-      requestId: c.get('requestId'),
-      message: 'Webhook delivery attempt',
-      deliveryId,
-      url,
-      status: response.status,
-      success: response.ok,
-      duration,
-    })
+      cloudlog({
+        requestId: c.get('requestId'),
+        message: 'Webhook delivery attempt',
+        deliveryId,
+        url,
+        status: response.status,
+        success: response.ok,
+        duration,
+      })
 
-    return {
-      success: response.ok,
-      status: response.status,
-      body: responseBody.slice(0, 10000), // Limit stored body size
-      duration,
+      return {
+        success: response.ok,
+        status: response.status,
+        body: responseBody,
+        duration,
+      }
+    }
+    finally {
+      clearTimeout(timeoutId)
     }
   }
   catch (error) {
@@ -283,6 +337,11 @@ export async function deliverWebhook(
       duration,
     }
   }
+}
+
+export const webhookTestUtils = {
+  WEBHOOK_RESPONSE_BODY_LIMIT_BYTES,
+  WEBHOOK_RESPONSE_BODY_TOO_LARGE,
 }
 
 /**
