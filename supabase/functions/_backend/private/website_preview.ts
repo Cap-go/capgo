@@ -1,12 +1,12 @@
 import type { Context } from 'hono'
 import { createHono, middlewareAuth, parseBody, quickError, useCors } from '../utils/hono.ts'
+import { isPrivateIp, resolveHostnameIps } from '../utils/ip.ts'
 import { version } from '../utils/version.ts'
 import { getWebhookUrlValidationError } from '../utils/webhook.ts'
 
 const MAX_ICON_BYTES = 512 * 1024
 const MAX_HTML_BYTES = 1024 * 1024
 const MAX_REDIRECTS = 5
-const DNS_LOOKUP_URL = 'https://cloudflare-dns.com/dns-query'
 
 export const app = createHono('', version)
 
@@ -73,7 +73,7 @@ function normalizeCandidateName(value: string, hostname: string, options?: { pre
   }
 
   const parts = options?.preferLeadingSegment
-    ? trimmed.split(/\s[|·•:–—-]\s|[|·•:–—]/).map(part => part.trim()).filter(Boolean)
+    ? trimmed.split(/\s[|·•:–—-]\s|[|·•:–—-]/).map(part => part.trim()).filter(Boolean)
     : [trimmed]
 
   const candidate = parts[0] ?? trimmed
@@ -132,65 +132,6 @@ function findIconHref(html: string) {
   }
 
   return candidates.sort((a, b) => b.priority - a.priority)[0]?.href ?? ''
-}
-
-function isPrivateIpv4(ip: string) {
-  const octets = ip.split('.').map(part => Number.parseInt(part, 10))
-  if (octets.length !== 4 || octets.some(part => Number.isNaN(part) || part < 0 || part > 255))
-    return true
-
-  const [a, b] = octets
-  return a === 0
-    || a === 10
-    || a === 127
-    || (a === 169 && b === 254)
-    || (a === 172 && b >= 16 && b <= 31)
-    || (a === 192 && b === 168)
-    || (a === 100 && b >= 64 && b <= 127)
-    || (a === 198 && (b === 18 || b === 19))
-  // Reserved TEST-NET ranges are also non-public for this fetch path.
-    || (a === 192 && b === 0)
-    || (a === 192 && b === 0 && octets[2] === 2)
-    || (a === 198 && b === 51 && octets[2] === 100)
-    || (a === 203 && b === 0 && octets[2] === 113)
-}
-
-function isPrivateIpv6(ip: string) {
-  const normalized = ip.toLowerCase()
-  if (normalized === '::1' || normalized === '::')
-    return true
-  if (normalized.startsWith('fe80:') || normalized.startsWith('fc') || normalized.startsWith('fd'))
-    return true
-  if (normalized.startsWith('::ffff:')) {
-    const mappedIpv4 = normalized.slice(7)
-    return isPrivateIpv4(mappedIpv4)
-  }
-  return false
-}
-
-function isPrivateIp(ip: string) {
-  return ip.includes(':') ? isPrivateIpv6(ip) : isPrivateIpv4(ip)
-}
-
-function isIpLiteral(value: string) {
-  return /^[0-9.]+$/.test(value) || value.includes(':')
-}
-
-async function resolveHostnameIps(hostname: string, type: 'A' | 'AAAA') {
-  const dnsUrl = new URL(DNS_LOOKUP_URL)
-  dnsUrl.searchParams.set('name', hostname)
-  dnsUrl.searchParams.set('type', type)
-
-  const response = await fetch(dnsUrl.toString(), {
-    headers: { Accept: 'application/dns-json' },
-  })
-  if (!response.ok)
-    return []
-
-  const data = await response.json() as { Answer?: Array<{ data?: string }> }
-  return (data.Answer ?? [])
-    .map(answer => answer.data?.trim() ?? '')
-    .filter(answer => !!answer && isIpLiteral(answer))
 }
 
 async function getPublicHostnameValidationError(c: Context, urlString: string) {

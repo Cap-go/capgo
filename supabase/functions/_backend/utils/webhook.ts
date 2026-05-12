@@ -1,4 +1,5 @@
 import type { Context } from 'hono'
+import { isIpLiteral, isPrivateIp, resolveHostnameIps } from './ip.ts'
 import { cloudlog, cloudlogErr, serializeError } from './logging.ts'
 import { closeClient, getPgClient } from './pg.ts'
 import { supabaseAdmin } from './supabase.ts'
@@ -46,8 +47,6 @@ export const WEBHOOK_EVENT_TYPES = [
 export type WebhookEventType = typeof WEBHOOK_EVENT_TYPES[number]
 
 const LOCALHOST_SUFFIX = '.localhost'
-const IPV4_REGEX = /^\d{1,3}(?:\.\d{1,3}){3}$/
-const DNS_LOOKUP_URL = 'https://cloudflare-dns.com/dns-query'
 
 function allowLocalWebhookUrls(c: Context): boolean {
   return getEnv(c, 'CAPGO_ALLOW_LOCAL_WEBHOOK_URLS') === 'true'
@@ -59,61 +58,6 @@ function normalizeHostname(hostname: string): string {
 
 function isLocalhostHostname(hostname: string): boolean {
   return hostname === 'localhost' || hostname.endsWith(LOCALHOST_SUFFIX)
-}
-
-function isIpLiteral(hostname: string): boolean {
-  return IPV4_REGEX.test(hostname) || hostname.includes(':')
-}
-
-function isPrivateIpv4(ip: string) {
-  const octets = ip.split('.').map(part => Number.parseInt(part, 10))
-  if (octets.length !== 4 || octets.some(part => Number.isNaN(part) || part < 0 || part > 255))
-    return true
-
-  const [a, b] = octets
-  return a === 0
-    || a === 10
-    || a === 127
-    || (a === 169 && b === 254)
-    || (a === 172 && b >= 16 && b <= 31)
-    || (a === 192 && b === 168)
-    || (a === 100 && b >= 64 && b <= 127)
-    || (a === 198 && (b === 18 || b === 19))
-    || (a === 192 && b === 0)
-    || (a === 198 && b === 51 && octets[2] === 100)
-    || (a === 203 && b === 0 && octets[2] === 113)
-}
-
-function isPrivateIpv6(ip: string) {
-  const normalized = ip.toLowerCase()
-  if (normalized === '::1' || normalized === '::')
-    return true
-  if (normalized.startsWith('fe80:') || normalized.startsWith('fc') || normalized.startsWith('fd'))
-    return true
-  if (normalized.startsWith('::ffff:'))
-    return isPrivateIpv4(normalized.slice(7))
-  return false
-}
-
-function isPrivateIp(ip: string) {
-  return ip.includes(':') ? isPrivateIpv6(ip) : isPrivateIpv4(ip)
-}
-
-async function resolveHostnameIps(hostname: string, type: 'A' | 'AAAA') {
-  const dnsUrl = new URL(DNS_LOOKUP_URL)
-  dnsUrl.searchParams.set('name', hostname)
-  dnsUrl.searchParams.set('type', type)
-
-  const response = await fetch(dnsUrl.toString(), {
-    headers: { Accept: 'application/dns-json' },
-  })
-  if (!response.ok)
-    return []
-
-  const data = await response.json() as { Answer?: Array<{ data?: string }> }
-  return (data.Answer ?? [])
-    .map(answer => answer.data?.trim() ?? '')
-    .filter(answer => !!answer && isIpLiteral(answer))
 }
 
 export function getWebhookUrlValidationError(c: Context, urlString: string): string | null {
@@ -128,9 +72,6 @@ export function getWebhookUrlValidationError(c: Context, urlString: string): str
   if (allowLocalWebhookUrls(c))
     return null
 
-  // We intentionally stop at syntactic/public-host checks: webhook delivery runs
-  // entirely from serverless infrastructure, so private/internal addresses are not
-  // reachable by design.
   const hostname = normalizeHostname(url.hostname)
   if (isLocalhostHostname(hostname))
     return 'Webhook URL must point to a public host'
@@ -154,9 +95,18 @@ export async function getWebhookUrlValidationErrorAsync(c: Context, urlString: s
 
   const url = new URL(urlString)
   const hostname = normalizeHostname(url.hostname)
+  const dnsOptions = {
+    dnsLookupUrl: getEnv(c, 'CAPGO_WEBHOOK_DNS_LOOKUP_URL'),
+    onError: (error: unknown) => cloudlogErr({
+      requestId: c.get('requestId'),
+      message: 'Webhook DNS validation lookup failed',
+      hostname,
+      error: serializeError(error),
+    }),
+  }
   const ips = [
-    ...await resolveHostnameIps(hostname, 'A'),
-    ...await resolveHostnameIps(hostname, 'AAAA'),
+    ...await resolveHostnameIps(hostname, 'A', dnsOptions),
+    ...await resolveHostnameIps(hostname, 'AAAA', dnsOptions),
   ]
 
   if (ips.length === 0)
@@ -325,6 +275,10 @@ export async function deliverWebhook(
   }
 
   try {
+    // DNS is validated immediately before delivery and redirects are disabled to
+    // avoid revalidating attacker-controlled Location targets. There is still a
+    // small DNS-rebinding window between DoH validation and the runtime fetch;
+    // closing it fully requires connect-time egress enforcement or IP pinning.
     const controller = new AbortController()
     const timeoutId = setTimeout(() => controller.abort(), 10000) // 10s timeout
 
