@@ -417,6 +417,8 @@ async function getHandler(c: Context): Promise<Response> {
   // Support for deno cache or CF cache do not remove this
   // @ts-expect-error-next-line
   const cache = getRuntimeKey() === 'workerd' ? caches.default : caches
+  const rawFileId = getRawAttachmentRouteId(c)
+  const candidateKeys = getSafeAttachmentReadCandidateKeys(fileId, rawFileId)
   const cacheUrl = new URL(c.req.url)
   cacheUrl.searchParams.set('range', c.req.header('range') || '')
   const cacheKey = new Request(cacheUrl, c.req)
@@ -427,9 +429,13 @@ async function getHandler(c: Context): Promise<Response> {
     // Best-effort restore: if file is cached but missing in R2, write it back.
     await backgroundTask(c, async () => {
       try {
-        const head = await new RetryBucket(bucket, DEFAULT_RETRY_PARAMS).head(fileId)
-        if (head != null)
-          return
+        const retryBucket = new RetryBucket(bucket, DEFAULT_RETRY_PARAMS)
+        for (const candidateKey of candidateKeys) {
+          const head = await retryBucket.head(candidateKey)
+          if (head != null)
+            return
+        }
+
         const cached = response.clone()
         const data = await cached.arrayBuffer()
         const contentType = cached.headers.get('content-type') || undefined
@@ -471,8 +477,6 @@ async function getHandler(c: Context): Promise<Response> {
   }
 
   let object: R2ObjectBody | null = null
-  const rawFileId = getRawAttachmentRouteId(c)
-  const candidateKeys = getSafeAttachmentReadCandidateKeys(fileId, rawFileId)
   try {
     for (const candidateKey of candidateKeys) {
       object = await new RetryBucket(bucket, DEFAULT_RETRY_PARAMS).get(candidateKey, {
