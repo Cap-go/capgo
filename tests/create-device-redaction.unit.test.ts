@@ -42,10 +42,14 @@ vi.mock('../supabase/functions/_backend/utils/supabase.ts', () => ({
   supabaseWithAuth: vi.fn(),
 }))
 
+// Local helper matching the shape of the mocked simpleError (avoids `never` return type issue)
+function makeSimpleError(code: string, message: string, data?: Record<string, unknown>): { code: string; message: string; data: Record<string, unknown> | null } {
+  return { code, message, data: data ?? null }
+}
+
 // Import the validation pieces directly
 const { safeParseSchema } = await import('../supabase/functions/_backend/utils/ark_validation.ts')
 const { type } = await import('arktype')
-const { simpleError } = await import('../supabase/functions/_backend/utils/hono.ts')
 
 // Replicate the bodySchema from create_device.ts
 const bodySchema = type({
@@ -75,7 +79,7 @@ describe('create_device validation body redaction', () => {
         code: issue.code ?? 'unknown',
         path: Array.isArray(issue.path) ? issue.path.map(String) : [],
       }))
-      const thrown = simpleError('invalid_json_body', 'Invalid JSON body', { issue_count: safeIssues.length, issues: safeIssues })
+      const thrown = makeSimpleError('invalid_json_body', 'Invalid JSON body', { issue_count: safeIssues.length, issues: safeIssues })
 
       const serialized = JSON.stringify(thrown.data ?? {})
 
@@ -95,7 +99,7 @@ describe('create_device validation body redaction', () => {
         expect(issue).toHaveProperty('path')
         expect(Array.isArray(issue.path)).toBe(true)
         // path entries are field names (safe), not values
-        issue.path.forEach((p: any) => expect(typeof p).toBe('string'))
+        issue.path.forEach((p: string) => expect(typeof p).toBe('string'))
       })
     }
   })
@@ -110,7 +114,7 @@ describe('create_device validation body redaction', () => {
         code: issue.code ?? 'unknown',
         path: Array.isArray(issue.path) ? issue.path.map(String) : [],
       }))
-      const thrown = simpleError('invalid_json_body', 'Invalid JSON body', { issue_count: safeIssues.length, issues: safeIssues })
+      const thrown = makeSimpleError('invalid_json_body', 'Invalid JSON body', { issue_count: safeIssues.length, issues: safeIssues })
 
       const serialized = JSON.stringify(thrown.data ?? {})
 
@@ -135,7 +139,7 @@ describe('create_device validation body redaction', () => {
         code: issue.code ?? 'unknown',
         path: Array.isArray(issue.path) ? issue.path.map(String) : [],
       }))
-      const thrown = simpleError('invalid_json_body', 'Invalid JSON body', { issue_count: safeIssues.length, issues: safeIssues })
+      const thrown = makeSimpleError('invalid_json_body', 'Invalid JSON body', { issue_count: safeIssues.length, issues: safeIssues })
 
       // The raw body must never appear in the error data
       expect(thrown.data).not.toHaveProperty('body')
