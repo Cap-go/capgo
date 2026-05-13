@@ -64,6 +64,35 @@ function parseFirstHextet(ip: string) {
   return Number.isNaN(hextet) ? null : hextet
 }
 
+function parseIpv6Hextets(ip: string) {
+  const parts = ip.split('::')
+  if (parts.length > 2)
+    return null
+
+  const left = parts[0] ? parts[0].split(':') : []
+  const right = parts.length === 2 && parts[1] ? parts[1].split(':') : []
+  if (left.length + right.length > 8)
+    return null
+
+  const zeroFill = parts.length === 2 ? 8 - left.length - right.length : 0
+  const hextetStrings = [
+    ...left,
+    ...Array.from({ length: zeroFill }).fill('0'),
+    ...right,
+  ]
+  if (hextetStrings.length !== 8 || hextetStrings.some(part => !/^[0-9a-f]{1,4}$/i.test(part)))
+    return null
+
+  return hextetStrings.map((part) => {
+    const hextet = Number.parseInt(part, 16)
+    return Number.isNaN(hextet) ? null : hextet
+  })
+}
+
+function hasIpv6Prefix(hextets: Array<number | null>, prefix: number[]) {
+  return prefix.every((hextet, index) => hextets[index] === hextet)
+}
+
 function isPrivateIpv6(ip: string) {
   const normalized = ip.toLowerCase()
   if (normalized === '::1' || normalized === '::')
@@ -75,18 +104,17 @@ function isPrivateIpv6(ip: string) {
   }
 
   const firstHextet = parseFirstHextet(normalized)
-  if (firstHextet === null)
+  const hextets = parseIpv6Hextets(normalized)
+  if (firstHextet === null || !hextets)
     return true
 
   return (firstHextet & 0xFFC0) === 0xFE80
     || (firstHextet & 0xFFC0) === 0xFEC0
     || (firstHextet & 0xFE00) === 0xFC00
     || (firstHextet & 0xFF00) === 0xFF00
-    || normalized === '100::'
-    || normalized.startsWith('100::')
-    || normalized === '64:ff9b::'
-    || normalized.startsWith('64:ff9b:')
-    || normalized.startsWith('2001:db8:')
+    || hasIpv6Prefix(hextets, [0x0100, 0, 0, 0])
+    || hasIpv6Prefix(hextets, [0x0064, 0xFF9B, 0, 0, 0, 0])
+    || hasIpv6Prefix(hextets, [0x2001, 0x0DB8])
 }
 
 export function isIpLiteral(value: string) {
