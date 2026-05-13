@@ -56,7 +56,7 @@ const displayNoDataMessage = computed(() => props.noDataMessage ?? t('no-data'))
     <div class="relative overflow-hidden px-5 pt-5">
       <!-- Custom header slot or default header -->
       <div class="flex flex-col gap-4">
-        <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div class="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div class="min-w-0 flex-1">
             <slot name="header">
               <div class="min-w-0">
@@ -67,7 +67,7 @@ const displayNoDataMessage = computed(() => props.noDataMessage ?? t('no-data'))
             </slot>
           </div>
 
-          <div class="flex items-center gap-2 sm:justify-end">
+          <div class="flex shrink-0 items-center gap-2 sm:justify-end">
             <div
               v-if="showEvolutionBadge"
               class="inline-flex justify-center items-center rounded-full px-3 py-1 text-xs font-bold text-white shadow-sm"
@@ -79,8 +79,8 @@ const displayNoDataMessage = computed(() => props.noDataMessage ?? t('no-data'))
           </div>
         </div>
 
-        <div v-if="total !== undefined" class="flex items-end gap-2">
-          <div class="max-w-full text-3xl font-semibold leading-none tracking-tight break-words text-slate-900 dark:text-white sm:text-4xl">
+        <div v-if="total !== undefined" class="flex min-w-0 flex-wrap items-end gap-x-2 gap-y-1">
+          <div class="min-w-0 max-w-full break-all text-[clamp(1.75rem,3.5vw,2.25rem)] font-semibold leading-none tracking-tight text-slate-900 dark:text-white">
             {{ total?.toLocaleString() }}
           </div>
           <span v-if="unit" class="pb-1 text-sm font-semibold tracking-[0.2em] text-slate-400 uppercase dark:text-slate-500">
