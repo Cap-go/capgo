@@ -8,16 +8,16 @@ SET search_path = ''
 AS $$
 BEGIN
   DELETE FROM "public"."audit_logs"
-  WHERE created_at < NOW() - INTERVAL '90 days';
+  WHERE created_at < pg_catalog.now() - INTERVAL '90 days';
 END;
 $$;
 
 ALTER FUNCTION public.cleanup_old_audit_logs() OWNER TO "postgres";
 
-REVOKE EXECUTE ON FUNCTION public.cleanup_old_audit_logs() FROM public;
-REVOKE EXECUTE ON FUNCTION public.cleanup_old_audit_logs() FROM anon;
-REVOKE EXECUTE ON FUNCTION public.cleanup_old_audit_logs() FROM authenticated;
-GRANT EXECUTE ON FUNCTION public.cleanup_old_audit_logs() TO service_role;
+REVOKE ALL ON FUNCTION public.cleanup_old_audit_logs() FROM public;
+REVOKE ALL ON FUNCTION public.cleanup_old_audit_logs() FROM anon;
+REVOKE ALL ON FUNCTION public.cleanup_old_audit_logs() FROM authenticated;
+GRANT ALL ON FUNCTION public.cleanup_old_audit_logs() TO service_role;
 
 INSERT INTO public.cron_tasks (
     name,
@@ -68,4 +68,4 @@ ON CONFLICT (name) DO UPDATE SET
     run_on_dow = excluded.run_on_dow,
     run_on_day = excluded.run_on_day,
     enabled = excluded.enabled,
-    updated_at = NOW();
+    updated_at = pg_catalog.now();

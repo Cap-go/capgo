@@ -1,12 +1,42 @@
 BEGIN;
 
-SELECT plan(4);
+SELECT plan(7);
 
 SELECT tests.authenticate_as_service_role();
 
 SELECT ok(
     to_regprocedure('public.cleanup_old_audit_logs()') IS NOT NULL,
     'cleanup_old_audit_logs exists'
+);
+
+SELECT is(
+    has_function_privilege(
+        'anon',
+        'public.cleanup_old_audit_logs()',
+        'EXECUTE'
+    ),
+    FALSE,
+    'anon cannot execute cleanup_old_audit_logs'
+);
+
+SELECT is(
+    has_function_privilege(
+        'authenticated',
+        'public.cleanup_old_audit_logs()',
+        'EXECUTE'
+    ),
+    FALSE,
+    'authenticated cannot execute cleanup_old_audit_logs'
+);
+
+SELECT is(
+    has_function_privilege(
+        'service_role',
+        'public.cleanup_old_audit_logs()',
+        'EXECUTE'
+    ),
+    TRUE,
+    'service_role can execute cleanup_old_audit_logs'
 );
 
 SELECT ok(
