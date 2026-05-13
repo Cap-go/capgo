@@ -963,8 +963,8 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
           <Newline />
           <Select
             options={[
-              { label: '📥  Import existing from this Mac (Keychain + Xcode profiles)', value: 'import' },
               { label: '🆕  Create new via App Store Connect API', value: 'create' },
+              { label: '📥  Import existing from this Mac (Keychain + Xcode profiles)', value: 'import' },
             ]}
             onChange={(value) => {
               if (value === 'import') {
