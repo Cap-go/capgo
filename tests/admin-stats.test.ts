@@ -12,6 +12,12 @@ const TRIAL_ORG_CREATED_AT = new Date(NOW).toISOString()
 const TRIAL_END_DATE = new Date(NOW + (45 * DAY_IN_MS)).toISOString()
 const TRIAL_LAST_UPLOAD_AT = new Date(NOW - DAY_IN_MS).toISOString()
 const TRIAL_BUILTIN_UPLOAD_AT = new Date(NOW - (12 * 60 * 60 * 1000)).toISOString()
+const INSIGHTS_DATE = '2026-04-10'
+const INSIGHTS_START = '2026-04-01T00:00:00.000Z'
+const INSIGHTS_END = '2026-04-30T23:59:59.000Z'
+const INSIGHTS_UPLOAD_AT = '2026-04-10T10:00:00.000Z'
+const INSIGHTS_LAST_BUILD_AT = '2026-04-11T12:00:00.000Z'
+const INSIGHTS_BUILD_ID = `admin-stats-build-${TRIAL_ORG_ID.slice(0, 8)}`
 
 const CANCELLED_YEARLY_ORG_ID = randomUUID()
 const CANCELLED_YEARLY_CUSTOMER_ID = `cus_admin_stats_cancelled_yearly_${CANCELLED_YEARLY_ORG_ID.slice(0, 8)}`
@@ -329,6 +335,14 @@ beforeAll(async () => {
       created_at: TRIAL_BUILTIN_UPLOAD_AT,
     },
     {
+      app_id: TRIAL_APP_ID,
+      name: '2.0.0',
+      owner_org: TRIAL_ORG_ID,
+      user_id: USER_ID,
+      storage_provider: 'r2-direct',
+      created_at: INSIGHTS_UPLOAD_AT,
+    },
+    {
       app_id: ONBOARDING_APP_ID,
       name: '1.0.0',
       owner_org: ONBOARDING_ORG_ID,
@@ -356,6 +370,10 @@ beforeAll(async () => {
   if (!onboardingLateSubscriptionVersion)
     throw new Error('Expected onboarding late subscription app version to be created')
 
+  const insightsVersion = versionRows?.find(version => version.app_id === TRIAL_APP_ID && version.name === '2.0.0')
+  if (!insightsVersion)
+    throw new Error('Expected organization insights app version to be created')
+
   const { error: channelError } = await supabase.from('channels').insert([
     {
       name: 'production',
@@ -376,11 +394,58 @@ beforeAll(async () => {
   ])
   if (channelError)
     throw channelError
+
+  const { error: dailyMauError } = await supabase.from('daily_mau').insert({
+    app_id: TRIAL_APP_ID,
+    date: INSIGHTS_DATE,
+    mau: 7,
+  })
+  if (dailyMauError)
+    throw dailyMauError
+
+  const { error: dailyVersionError } = await supabase.from('daily_version').insert({
+    app_id: TRIAL_APP_ID,
+    date: INSIGHTS_DATE,
+    version_id: insightsVersion.id,
+    version_name: '2.0.0',
+    get: 5,
+    fail: 2,
+    install: 8,
+    uninstall: 0,
+  })
+  if (dailyVersionError)
+    throw dailyVersionError
+
+  const { error: buildLogError } = await supabase.from('build_logs').insert({
+    org_id: TRIAL_ORG_ID,
+    user_id: USER_ID,
+    build_id: INSIGHTS_BUILD_ID,
+    platform: 'ios',
+    billable_seconds: 180,
+    build_time_unit: 180,
+    app_id: TRIAL_APP_ID,
+    created_at: INSIGHTS_LAST_BUILD_AT,
+  })
+  if (buildLogError)
+    throw buildLogError
+
+  const { error: orgUserError } = await supabase.from('org_users').insert({
+    org_id: TRIAL_ORG_ID,
+    user_id: USER_ID,
+    user_right: 'admin',
+  })
+  if (orgUserError)
+    throw orgUserError
 }, 90000)
 
 afterAll(async () => {
   const supabase = getSupabaseClient()
 
+  await supabase.from('org_users').delete().eq('org_id', TRIAL_ORG_ID).eq('user_id', USER_ID)
+  await supabase.from('build_logs').delete().eq('org_id', TRIAL_ORG_ID).eq('build_id', INSIGHTS_BUILD_ID)
+  await supabase.from('daily_build_time').delete().eq('app_id', TRIAL_APP_ID).eq('date', INSIGHTS_DATE)
+  await supabase.from('daily_version').delete().eq('app_id', TRIAL_APP_ID).eq('date', INSIGHTS_DATE)
+  await supabase.from('daily_mau').delete().eq('app_id', TRIAL_APP_ID).eq('date', INSIGHTS_DATE)
   await supabase.from('global_stats').delete().in('date_id', [...GLOBAL_STATS_TREND_DATES])
   await supabase.from('channels').delete().in('app_id', [ONBOARDING_APP_ID, ONBOARDING_LATE_SUBSCRIPTION_APP_ID])
   await supabase.from('app_versions').delete().in('app_id', [TRIAL_APP_ID, ONBOARDING_APP_ID, ONBOARDING_LATE_SUBSCRIPTION_APP_ID])
@@ -456,6 +521,87 @@ describe('/private/admin_stats', () => {
     expect(organization?.plan_name).toBe(soloPlan?.name)
     expect(organization?.last_bundle_upload_at).toBe(TRIAL_LAST_UPLOAD_AT)
     expect(organization?.trial_extension_count).toBe(2)
+  })
+
+  it.concurrent('returns organization insights with plan filtering and preprocessed period usage', async () => {
+    if (!soloPlan)
+      throw new Error('Expected Solo plan to be loaded')
+
+    const response = await fetchWithRetry(`${BASE_URL}/private/admin_stats`, {
+      method: 'POST',
+      headers: adminHeaders,
+      body: JSON.stringify({
+        metric_category: 'organization_insights',
+        start_date: INSIGHTS_START,
+        end_date: INSIGHTS_END,
+        plan_name: soloPlan.name,
+        billing_type: 'monthly',
+        limit: 100,
+        offset: 0,
+      }),
+    })
+
+    expect(response.status).toBe(200)
+    const payload = await response.json() as {
+      success: boolean
+      data: {
+        organizations: Array<{
+          org_id: string
+          plan_name: string | null
+          billing_type: 'monthly' | 'yearly' | null
+          upload_count: number
+          build_count: number
+          fail_rate: number
+          mau: number
+          members_count: number
+          last_build_at: string | null
+        }>
+        plan_options: string[]
+      }
+    }
+
+    expect(payload.success).toBe(true)
+    expect(payload.data.plan_options).toContain(soloPlan.name)
+
+    const organization = payload.data.organizations.find(org => org.org_id === TRIAL_ORG_ID)
+    expect(organization).toBeTruthy()
+    expect(organization?.plan_name).toBe(soloPlan.name)
+    expect(organization?.billing_type).toBe('monthly')
+    expect(organization?.upload_count).toBe(1)
+    expect(organization?.build_count).toBe(1)
+    expect(organization?.fail_rate).toBe(20)
+    expect(organization?.mau).toBe(7)
+    expect(organization?.members_count).toBe(1)
+    expect(organization?.last_build_at).toBe(INSIGHTS_LAST_BUILD_AT)
+
+    const paidOnlyResponse = await fetchWithRetry(`${BASE_URL}/private/admin_stats`, {
+      method: 'POST',
+      headers: adminHeaders,
+      body: JSON.stringify({
+        metric_category: 'organization_insights',
+        start_date: INSIGHTS_START,
+        end_date: INSIGHTS_END,
+        plan_name: soloPlan.name,
+        billing_type: 'monthly',
+        paid_only: true,
+        search: TRIAL_ORG_ID,
+        limit: 100,
+        offset: 0,
+      }),
+    })
+
+    expect(paidOnlyResponse.status).toBe(200)
+    const paidOnlyPayload = await paidOnlyResponse.json() as {
+      success: boolean
+      data: {
+        organizations: Array<{ org_id: string }>
+        total: number
+      }
+    }
+
+    expect(paidOnlyPayload.success).toBe(true)
+    expect(paidOnlyPayload.data.organizations).toEqual([])
+    expect(paidOnlyPayload.data.total).toBe(0)
   })
 
   it.concurrent('returns cancellation billing metadata and subscription-or-signup dates', async () => {

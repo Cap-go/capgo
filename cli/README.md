@@ -79,6 +79,7 @@ Follow the documentation here: https://capacitorjs.com/docs/getting-started/
     - [List](#build-credentials-list)
     - [Clear](#build-credentials-clear)
     - [Update](#build-credentials-update)
+    - [Manage](#build-credentials-manage)
     - [Migrate](#build-credentials-migrate)
 - 🔹 [Probe](#probe)
 - 🔹 [Generate-docs](#generate-docs)
@@ -1418,6 +1419,29 @@ Examples:
 | **--output-retention** | <code>string</code> | Output link TTL: 1h to 7d. Examples: 1h, 6h, 2d |
 | **--skip-build-number-bump** | <code>boolean</code> | Skip automatic build number/version code incrementing on future builds |
 | **--no-skip-build-number-bump** | <code>boolean</code> | Re-enable automatic build number incrementing (default behavior) |
+
+#### <a id="build-credentials-manage"></a> 🔹 **Manage**
+
+```bash
+npx @capgo/cli@latest build credentials manage
+```
+
+Interactively manage saved build credentials.
+Browse stored credentials, view what's configured, export a CI/CD-ready .env file,
+or delete a platform's credentials. Reuses the same TUI as `capgo init`.
+Examples:
+  npx @capgo/cli build credentials manage
+  npx @capgo/cli build credentials manage --appId com.example.app
+  npx @capgo/cli build credentials manage --appId com.example.app --platform ios
+  npx @capgo/cli build credentials manage --local
+
+**Options:**
+
+| Param          | Type          | Description          |
+| -------------- | ------------- | -------------------- |
+| **--appId** | <code>string</code> | App ID to manage (optional, prompts to pick if omitted) |
+| **--platform** | <code>string</code> | Platform to manage: ios or android (optional, prompts to pick if omitted) |
+| **--local** | <code>boolean</code> | Only browse local .capgo-credentials.json |
 
 #### <a id="build-credentials-migrate"></a> 🔹 **Migrate**
 

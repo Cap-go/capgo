@@ -317,30 +317,6 @@ async function saveBandwidthUsage(c: Context, fileSize: number | null | undefine
   }
 }
 
-async function assertReadableAppScopedAttachment(c: Context, fileId: unknown): Promise<void> {
-  const scopedPath = parseAppScopedAttachmentPath(fileId)
-  if (scopedPath?.kind === 'invalid_scoped') {
-    quickError(404, 'not_found', 'Not found')
-  }
-  if (!scopedPath) {
-    return
-  }
-
-  // Attachment reads must use the primary to avoid replica lag serving deleted-app files.
-  const pgClient = getPgClient(c, false)
-  const drizzleClient = getDrizzleClient(pgClient)
-
-  try {
-    const app = await getAppByAppIdPg(c, scopedPath.app_id, drizzleClient)
-    if (!app || app.owner_org !== scopedPath.owner_org) {
-      quickError(404, 'not_found', 'Not found')
-    }
-  }
-  finally {
-    await closeClient(c, pgClient)
-  }
-}
-
 async function getSupabaseStorageResponse(c: Context, fileId: string): Promise<Response> {
   const { data: signedUrlData, error: signedUrlError } = await supabaseAdmin(c).storage.from('capgo').createSignedUrl(fileId, 60)
 
@@ -400,7 +376,10 @@ async function getSupabaseStorageResponse(c: Context, fileId: string): Promise<R
 
 async function getHandler(c: Context): Promise<Response> {
   const fileId = c.get('fileId')
-  await assertReadableAppScopedAttachment(c, fileId)
+  // It is imperative and inalthat we read file without any Database READ to avoid any potential bottlenecks and ensure high performance and availability of file downloads, especially under heavy load.
+  // This had beed designed that way and access to file going to be delete is non imporant compared to availability of file download, so we are not doing any check in DB or R2 before serving the file, if file is missing in R2 it will be 404 and that is expected and we want to avoid any potential bottlenecks.
+  // File access security is not a matter here and will NERVER BE.
+
   cloudlog({ requestId: c.get('requestId'), message: 'getHandler files', fileId })
   if (getRuntimeKey() !== 'workerd') {
     cloudlog({ requestId: c.get('requestId'), message: 'getHandler files using supabase storage' })
