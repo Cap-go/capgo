@@ -20,7 +20,7 @@ import { formatRunnerCommand, splitRunnerCommand } from '../../../runner-command
 import { findSavedKeySilent, getPMAndCommand } from '../../../utils.js'
 import { loadSavedCredentials, updateSavedCredentials } from '../../credentials.js'
 import { requestBuildInternal } from '../../request.js'
-import { CertificateLimitError, createCertificate, createProfile, deleteProfile, DuplicateProfileError, ensureBundleId, generateJwt, revokeCertificate, verifyApiKey } from '../apple-api.js'
+import { CertificateLimitError, createCertificate, createProfile, deleteProfile, DuplicateProfileError, ensureBundleId, findCertIdBySha1, generateJwt, listProfilesForCert, revokeCertificate, verifyApiKey } from '../apple-api.js'
 import { createP12, DEFAULT_P12_PASSWORD, generateCsr } from '../csr.js'
 import { canUseFilePicker, openFilePicker } from '../file-picker.js'
 import { exportP12FromKeychain, isMacOS, listSigningIdentities, matchIdentitiesToProfiles, scanProvisioningProfiles } from '../macos-signing.js'
@@ -149,6 +149,13 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
   const [importedP12Password, setImportedP12Password] = useState<string>('')
   /** Tracks whether we're in the import flow so saving-credentials knows which writer to use */
   const [importMode, setImportMode] = useState(false)
+  /**
+   * When the user hits no-match recovery in ad_hoc mode and needs to provide a
+   * .p8 inline for an action, this records the action to resume *after* the
+   * .p8 → verifying-key chain completes. `null` means there's no pending action
+   * (i.e. .p8 was the entry point for app_store, not a recovery side-trip).
+   */
+  const [pendingRecoveryAction, setPendingRecoveryAction] = useState<'fetching-profile' | 'create-profile-only' | null>(null)
 
   const addLog = useCallback((text: string, color = 'green') => {
     setLog(prev => [...prev, { text, color }])
@@ -445,7 +452,9 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
           setImportProfiles(profiles)
           setImportMatches(matches)
           addLog(`✔ Found ${distOnly.length} distribution identity${distOnly.length === 1 ? '' : 'ies'} and ${profiles.length} profile${profiles.length === 1 ? '' : 's'} on this Mac`)
-          setStep('import-pick-identity')
+          // Distribution-mode is now the first visible question; .p8 input
+          // (if needed) routes through it before identity selection.
+          setStep('import-distribution-mode')
         }
         catch (err) {
           if (!cancelled)
@@ -470,10 +479,16 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
             teamId: chosenIdentity.teamId,
             p12Base64: exported.base64,
           }
+          // chosenProfile.path can be empty when the profile was synthesized
+          // from an Apple API response (D2 path) — in that case, profileBase64
+          // is already set in chosenProfile.profileContent-equivalent.
+          const profileBase64 = chosenProfile.path
+            ? Buffer.from(await readFile(chosenProfile.path)).toString('base64')
+            : (chosenProfile as DiscoveredProfile & { profileBase64?: string }).profileBase64 || ''
           const importedProfileData: ProfileData = {
             profileId: chosenProfile.uuid,
             profileName: chosenProfile.name,
-            profileBase64: Buffer.from(await readFile(chosenProfile.path)).toString('base64'),
+            profileBase64,
           }
           setCertData(importedCertData)
           setProfileData(importedProfileData)
@@ -481,18 +496,123 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
             setTeamId(chosenIdentity.teamId)
           setImportedP12Password(exported.passphrase)
           addLog(`✔ Exported "${chosenIdentity.name}" from Keychain`)
-          // For app_store mode we need an ASC API key for TestFlight upload —
-          // route through the existing .p8 input screens. For ad_hoc, save now.
-          if (importDistribution === 'app_store') {
-            setStep('api-key-instructions')
-          }
-          else {
-            setStep('saving-credentials')
-          }
+          // .p8 was handled upfront for app_store via the distribution-mode
+          // fork; ad_hoc never needs it. So we go straight to save.
+          setStep('saving-credentials')
         }
         catch (err) {
           if (!cancelled)
             handleError(err, 'import-exporting')
+        }
+      })()
+    }
+
+    if (step === 'import-fetching-profile') {
+      ;(async () => {
+        try {
+          if (!chosenIdentity)
+            throw new Error('Internal error: no identity chosen for profile fetch.')
+          const token = await getFreshToken()
+          const certId = await findCertIdBySha1(token, chosenIdentity.sha1)
+          if (cancelled)
+            return
+          if (!certId) {
+            throw new Error(
+              `Apple does not have a certificate matching the Keychain identity "${chosenIdentity.name}". `
+              + `Either it was revoked on Apple's side or it was never uploaded. Use "Create new" instead.`,
+            )
+          }
+          const profiles = await listProfilesForCert(token, certId)
+          if (cancelled)
+            return
+          if (profiles.length === 0) {
+            addLog('⚠ Apple has the cert but no profiles linked to it — try "Create new profile" instead.', 'yellow')
+            setStep('import-no-match-recovery')
+            return
+          }
+          // Synthesize DiscoveredProfile entries from the Apple-side data so
+          // they can be picked through the normal `import-pick-profile` UI.
+          // path is left empty; the export step reads profileBase64 directly.
+          const synthesized: DiscoveredProfile[] = profiles.map(p => ({
+            path: '',
+            uuid: p.id,
+            name: p.name,
+            applicationIdentifier: '',
+            bundleId: p.bundleIdentifier,
+            teamId: chosenIdentity.teamId,
+            expirationDate: p.expirationDate,
+            profileType: (p.profileType === 'IOS_APP_STORE' ? 'app_store' : p.profileType === 'IOS_APP_ADHOC' ? 'ad_hoc' : 'unknown') as DiscoveredProfile['profileType'],
+            certificateSha1s: [chosenIdentity.sha1],
+            // Embed the base64 so the export step can use it without reading from disk
+            profileBase64: p.profileContent,
+          } as DiscoveredProfile & { profileBase64: string }))
+          // Inject into the match list so import-pick-profile shows them
+          setImportMatches(prev => prev.map(m => m.identity.sha1 === chosenIdentity.sha1
+            ? { ...m, profiles: [...m.profiles, ...synthesized] }
+            : m,
+          ))
+          addLog(`✔ Apple returned ${profiles.length} profile${profiles.length === 1 ? '' : 's'} for this cert`)
+          setStep('import-pick-profile')
+        }
+        catch (err) {
+          if (!cancelled)
+            handleError(err, 'import-fetching-profile')
+        }
+      })()
+    }
+
+    if (step === 'import-create-profile-only') {
+      ;(async () => {
+        try {
+          if (!chosenIdentity)
+            throw new Error('Internal error: no identity chosen for profile creation.')
+          const token = await getFreshToken()
+          const certId = await findCertIdBySha1(token, chosenIdentity.sha1)
+          if (cancelled)
+            return
+          if (!certId) {
+            throw new Error(
+              `Apple does not have a certificate matching "${chosenIdentity.name}". `
+              + `Cannot create a profile without an Apple-side cert ID. Use "Create new" path instead.`,
+            )
+          }
+          const { bundleIdResourceId } = await ensureBundleId(token, appId)
+          if (cancelled)
+            return
+          const profile = await createProfile(token, bundleIdResourceId, certId, appId)
+          if (cancelled)
+            return
+          // Use the freshly-created profile directly as the chosen profile.
+          const synthesized = {
+            path: '',
+            uuid: profile.profileId,
+            name: profile.profileName,
+            applicationIdentifier: '',
+            bundleId: appId,
+            teamId: chosenIdentity.teamId,
+            expirationDate: profile.expirationDate,
+            profileType: 'app_store' as const,
+            certificateSha1s: [chosenIdentity.sha1],
+            profileBase64: profile.profileContent,
+          } as DiscoveredProfile & { profileBase64: string }
+          setChosenProfile(synthesized)
+          addLog(`✔ Created new profile "${profile.profileName}" on Apple, linked to your existing cert`)
+          setStep('import-export-warning')
+        }
+        catch (err) {
+          if (cancelled)
+            return
+          if (err instanceof DuplicateProfileError) {
+            // Existing flow already handles this case for the create-new path —
+            // route to the existing duplicate-profile-prompt step, which on
+            // resume will retry creation. Set the duplicateProfiles state so
+            // the prompt renders correctly.
+            setDuplicateProfiles(err.profiles)
+            setStep('duplicate-profile-prompt')
+          }
+          else {
+            handleError(err, 'import-create-profile-only')
+          }
         }
       })()
     }
@@ -550,7 +670,21 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
           await saveProgress(appId, progress)
           addLog(`✔ API Key verified — Key: ${keyId}`)
           setRetryCount(0)
-          setStep('creating-certificate')
+          // Branch on flow mode:
+          //  - import + pending recovery action → resume the action
+          //  - import (no pending action, app_store entry point) → continue to identity pick
+          //  - create-new (default) → continue to certificate creation
+          if (importMode && pendingRecoveryAction) {
+            const action = pendingRecoveryAction
+            setPendingRecoveryAction(null)
+            setStep(`import-${action}` as OnboardingStep)
+          }
+          else if (importMode) {
+            setStep('import-pick-identity')
+          }
+          else {
+            setStep('creating-certificate')
+          }
         }
         catch (err) {
           if (!cancelled)
@@ -993,6 +1127,47 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
         </Box>
       )}
 
+      {/* Import: distribution mode (now FIRST visible step in import flow) */}
+      {step === 'import-distribution-mode' && (
+        <Box flexDirection="column" marginTop={1}>
+          <Text bold>How will Capgo distribute your build?</Text>
+          <Newline />
+          <Text dimColor>
+            • App Store: builds upload to TestFlight automatically (requires an App Store Connect API key)
+          </Text>
+          <Text dimColor>
+            • Ad-hoc: builds are signed and either downloaded from Capgo or installed via QR. No ASC key needed.
+          </Text>
+          <Newline />
+          <Select
+            options={[
+              { label: '🛫  App Store / TestFlight', value: 'app_store' },
+              { label: '📦  Ad-hoc (no TestFlight upload)', value: 'ad_hoc' },
+              { label: '↩️   Cancel and use Create new instead', value: '__cancel__' },
+            ]}
+            onChange={(value) => {
+              if (value === '__cancel__') {
+                setImportMode(false)
+                setStep('api-key-instructions')
+                return
+              }
+              const mode = value as 'app_store' | 'ad_hoc'
+              setImportDistribution(mode)
+              addLog(`✔ Distribution · ${mode}`)
+              if (mode === 'app_store') {
+                // Need .p8 for TestFlight upload AND for any profile auto-recovery.
+                // After verifying-key the import-mode branch routes back to import-pick-identity.
+                setStep('api-key-instructions')
+              }
+              else {
+                // ad_hoc skips .p8; can opt into it later from no-match recovery.
+                setStep('import-pick-identity')
+              }
+            }}
+          />
+        </Box>
+      )}
+
       {/* Import: pick identity */}
       {step === 'import-pick-identity' && (
         <Box flexDirection="column" marginTop={1}>
@@ -1013,7 +1188,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
                 const matchCount = m.profiles.length
                 const label = matchCount > 0
                   ? `🔑  ${m.identity.name} · ${matchCount} matching profile${matchCount === 1 ? '' : 's'}`
-                  : `🔑  ${m.identity.name} · ⚠ no matching profiles found`
+                  : `🔑  ${m.identity.name} · ⚠ no matching profiles on this Mac (recovery available)`
                 return { label, value: m.identity.sha1 }
               }),
               { label: '↩️   Cancel and use Create new instead', value: '__cancel__' },
@@ -1030,13 +1205,8 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
               setChosenIdentity(match.identity)
               addLog(`✔ Identity · ${match.identity.name}`)
               if (match.profiles.length === 0) {
-                handleError(
-                  new Error(
-                    `No provisioning profile on this Mac is linked to "${match.identity.name}". `
-                    + `Open Xcode → Settings → Accounts → Download Manual Profiles, then retry.`,
-                  ),
-                  'import-pick-identity',
-                )
+                // No local match — offer recovery instead of dead-ending
+                setStep('import-no-match-recovery')
                 return
               }
               setStep('import-pick-profile')
@@ -1075,42 +1245,92 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
                   return
                 setChosenProfile(profile)
                 addLog(`✔ Profile · ${profile.name}`)
-                // Pre-select distribution from the profile type when unambiguous
-                if (profile.profileType === 'app_store')
-                  setImportDistribution('app_store')
-                else if (profile.profileType === 'ad_hoc')
-                  setImportDistribution('ad_hoc')
-                setStep('import-distribution-mode')
+                setStep('import-export-warning')
               }}
             />
           </Box>
         )
       })()}
 
-      {/* Import: distribution mode */}
-      {step === 'import-distribution-mode' && (
+      {/* Import: no-match recovery menu */}
+      {step === 'import-no-match-recovery' && chosenIdentity && (() => {
+        const hasAscKey = !!(p8ContentRef.current || p8PathRef.current)
+        return (
+          <Box flexDirection="column" marginTop={1}>
+            <Alert variant="warning">
+              No provisioning profile on this Mac is linked to "
+              {chosenIdentity.name}
+              ".
+            </Alert>
+            <Newline />
+            <Text dimColor>
+              The cert is in your Keychain but the matching profile isn't on disk. Pick a recovery path:
+            </Text>
+            <Newline />
+            <Select
+              options={[
+                {
+                  label: `🌐  Open Apple Developer Portal (download manually, then re-scan)`,
+                  value: 'browser',
+                },
+                {
+                  label: hasAscKey
+                    ? `🔍  Fetch matching profile from Apple now`
+                    : `🔍  Provide ASC API key, then fetch profile from Apple`,
+                  value: 'fetch',
+                },
+                {
+                  label: hasAscKey
+                    ? `✨  Create a new profile for this cert via Apple`
+                    : `✨  Provide ASC API key, then create a new profile for this cert`,
+                  value: 'create',
+                },
+                { label: '↩️   Back to identity selection', value: 'back' },
+              ]}
+              onChange={(value) => {
+                if (value === 'browser') {
+                  open('https://developer.apple.com/account/resources/profiles/list')
+                  addLog('✔ Opened Apple Developer Portal — re-running scan in 5s', 'yellow')
+                  setTimeout(() => {
+                    if (!exitRequestedRef.current)
+                      setStep('import-scanning')
+                  }, 5000)
+                  return
+                }
+                if (value === 'back') {
+                  setStep('import-pick-identity')
+                  return
+                }
+                if (value === 'fetch' || value === 'create') {
+                  const action = value === 'fetch' ? 'fetching-profile' : 'create-profile-only'
+                  if (hasAscKey) {
+                    setStep(`import-${action}` as OnboardingStep)
+                  }
+                  else {
+                    setPendingRecoveryAction(action)
+                    setStep('api-key-instructions')
+                  }
+                }
+              }}
+            />
+          </Box>
+        )
+      })()}
+
+      {/* Import: fetching profile from Apple by cert SHA1 */}
+      {step === 'import-fetching-profile' && (
         <Box flexDirection="column" marginTop={1}>
-          <Text bold>How will Capgo distribute your build?</Text>
-          <Newline />
+          <SpinnerLine text="Looking up your cert on Apple and listing its profiles..." />
+        </Box>
+      )}
+
+      {/* Import: D2 — creating a new profile via Apple for the existing cert */}
+      {step === 'import-create-profile-only' && (
+        <Box flexDirection="column" marginTop={1}>
+          <SpinnerLine text="Creating a new App Store profile via Apple for your existing certificate..." />
           <Text dimColor>
-            • App Store: builds upload to TestFlight automatically (requires an App Store Connect API key next)
+            (Skipping cert creation — using the cert already in your Keychain.)
           </Text>
-          <Text dimColor>
-            • Ad-hoc: builds are signed and either downloaded from Capgo or installed via QR. No ASC key needed.
-          </Text>
-          <Newline />
-          <Select
-            options={[
-              { label: '🛫  App Store / TestFlight', value: 'app_store' },
-              { label: '📦  Ad-hoc (no TestFlight upload)', value: 'ad_hoc' },
-            ]}
-            onChange={(value) => {
-              const mode = value as 'app_store' | 'ad_hoc'
-              setImportDistribution(mode)
-              addLog(`✔ Distribution · ${mode}`)
-              setStep('import-export-warning')
-            }}
-          />
         </Box>
       )}
 
@@ -1156,7 +1376,8 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
                 setStep('import-exporting')
               }
               else if (value === 'back') {
-                setStep('import-distribution-mode')
+                // Back goes to profile selection (distribution mode is now upstream of this step)
+                setStep('import-pick-profile')
               }
               else {
                 exitOnboarding('Exiting. Re-run `build init` whenever you\'re ready.')
