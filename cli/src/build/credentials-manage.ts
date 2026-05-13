@@ -16,8 +16,9 @@ import {
   select as pSelect,
   text as pText,
 } from '../init/prompts'
-import { clearInitLogs, setInitScreen } from '../init/runtime'
+import { clearInitLogs, setInitScreen, stopInitInkSession } from '../init/runtime'
 import { getAppId, getConfig } from '../utils'
+import { onboardingBuilderCommand } from './onboarding/command'
 import { canUseFilePicker, openSaveFilePicker } from './onboarding/file-picker'
 import {
   clearSavedCredentials,
@@ -56,10 +57,18 @@ const SECRET_KEYS = new Set([
 
 type FieldScope = 'ios' | 'android' | 'shared'
 type FieldType = 'string' | 'boolean' | 'duration' | 'base64' | 'json' | 'enum'
+type FieldCategory = 'credential' | 'configuration'
 
 interface FieldKnowledge {
   scope: FieldScope
   type: FieldType
+  /**
+   * `credential` = signing/auth material (certs, passwords, API keys) — added
+   * via the platform onboarding wizard, not the manage UI's "Add" flow.
+   * `configuration` = behaviour knobs (booleans, enums, durations, simple
+   * strings) — addable through "Add credential → Add configuration option".
+   */
+  category: FieldCategory
   enumValues?: string[]
   explain: string
 }
@@ -72,57 +81,68 @@ const CREDENTIAL_KNOWLEDGE: Record<string, FieldKnowledge> = {
   BUILD_CERTIFICATE_BASE64: {
     scope: 'ios',
     type: 'base64',
+    category: 'credential',
     explain: 'Base64-encoded .p12 distribution certificate. The .p12 contains the iOS Distribution certificate + private key that signs your app. Sent to Capgo build workers per build, then deleted.',
   },
   P12_PASSWORD: {
     scope: 'ios',
     type: 'string',
+    category: 'credential',
     explain: 'Password for the .p12 certificate file. Can be empty if the .p12 was exported without one. Stored locally; never leaves your machine permanently.',
   },
   APPLE_KEY_ID: {
     scope: 'ios',
     type: 'string',
+    category: 'credential',
     explain: 'App Store Connect API key ID (10-char alphanumeric). Used to upload signed builds to TestFlight/App Store. Find it in App Store Connect → Users and Access → Keys. Optional for ad_hoc distribution.',
   },
   APPLE_ISSUER_ID: {
     scope: 'ios',
     type: 'string',
+    category: 'credential',
     explain: 'App Store Connect API issuer ID (UUID). Pairs with APPLE_KEY_ID and APPLE_KEY_CONTENT to authenticate uploads. Found alongside the key ID in App Store Connect. Optional for ad_hoc distribution.',
   },
   APPLE_KEY_CONTENT: {
     scope: 'ios',
     type: 'base64',
+    category: 'credential',
     explain: 'Base64-encoded contents of the .p8 App Store Connect API private key. Needed to upload to TestFlight/App Store. Capgo uses it server-side per build then discards it.',
   },
   APP_STORE_CONNECT_TEAM_ID: {
     scope: 'ios',
     type: 'string',
+    category: 'credential',
     explain: 'Apple Developer team ID (10-char alphanumeric). Found at developer.apple.com → Membership. Used by xcodebuild to scope the signing context.',
   },
   CAPGO_IOS_PROVISIONING_MAP: {
     scope: 'ios',
     type: 'json',
+    category: 'credential',
     explain: 'JSON map of bundle IDs → { profile (base64 .mobileprovision), name }. Supports apps with multiple signable targets (main app + widget + notification service extension, etc.). Replaces the legacy single-profile BUILD_PROVISION_PROFILE_BASE64 — run `build credentials migrate` to convert.',
   },
   CAPGO_IOS_DISTRIBUTION: {
     scope: 'ios',
     type: 'enum',
+    category: 'configuration',
     enumValues: ['app_store', 'ad_hoc'],
     explain: 'iOS distribution mode. `app_store` (default) exports for TestFlight/App Store and validates the App Store Connect API key. `ad_hoc` exports for direct device distribution and skips the API-key validation — useful for QA, internal builds, and device-specific testing.',
   },
   CAPGO_IOS_SCHEME: {
     scope: 'ios',
     type: 'string',
+    category: 'configuration',
     explain: 'Xcode scheme name to build. Auto-detected from the .xcodeproj if there is only one shared scheme; required when multiple schemes exist.',
   },
   CAPGO_IOS_TARGET: {
     scope: 'ios',
     type: 'string',
+    category: 'configuration',
     explain: 'Xcode target name. Auto-detected from the project; override only if your project has unusual target naming and the build picks the wrong one.',
   },
   BUILD_PROVISION_PROFILE_BASE64: {
     scope: 'ios',
     type: 'base64',
+    category: 'credential',
     explain: 'LEGACY single-profile format. Use `build credentials migrate --platform ios` to convert this into the multi-target CAPGO_IOS_PROVISIONING_MAP. Builds will fail with this key still present.',
   },
 
@@ -130,36 +150,43 @@ const CREDENTIAL_KNOWLEDGE: Record<string, FieldKnowledge> = {
   ANDROID_KEYSTORE_FILE: {
     scope: 'android',
     type: 'base64',
+    category: 'credential',
     explain: 'Base64-encoded .keystore / .jks / .p12 file used to sign your Android APK/AAB. Losing this means losing the ability to update your Play Store listing forever — keep a backup.',
   },
   KEYSTORE_KEY_ALIAS: {
     scope: 'android',
     type: 'string',
+    category: 'credential',
     explain: 'Alias name of the key inside the keystore. PKCS#12 keystores expose readable aliases; JKS keystores often need this entered manually. The CLI wizard auto-detects aliases when possible.',
   },
   KEYSTORE_KEY_PASSWORD: {
     scope: 'android',
     type: 'string',
+    category: 'credential',
     explain: 'Password protecting the individual key inside the keystore. In ~99% of keystores it equals KEYSTORE_STORE_PASSWORD; the CLI defaults to that when only one is provided.',
   },
   KEYSTORE_STORE_PASSWORD: {
     scope: 'android',
     type: 'string',
+    category: 'credential',
     explain: 'Password protecting the keystore file as a whole. Asked first by the wizard; defaults the key password to the same value.',
   },
   PLAY_CONFIG_JSON: {
     scope: 'android',
     type: 'base64',
+    category: 'credential',
     explain: 'Base64-encoded Google Play service-account JSON key. Authenticates uploads to Play Console via the Android Publisher API. Capgo provisions one for you via the OAuth onboarding (creates a GCP project + service account + invites it into your Play Console).',
   },
   GOOGLE_OAUTH_REFRESH_TOKEN: {
     scope: 'android',
     type: 'string',
+    category: 'credential',
     explain: 'Long-lived OAuth refresh token from the Google sign-in step of `build init --platform android`. Lets the CLI re-mint short-lived access tokens for Play Console operations without re-prompting. Capgo never stores it server-side.',
   },
   CAPGO_ANDROID_FLAVOR: {
     scope: 'android',
     type: 'string',
+    category: 'configuration',
     explain: 'Gradle product flavor to build (e.g. `production`, `staging`). Required when your `app/build.gradle` defines multiple flavors; ignored if empty.',
   },
 
@@ -167,16 +194,19 @@ const CREDENTIAL_KNOWLEDGE: Record<string, FieldKnowledge> = {
   BUILD_OUTPUT_UPLOAD_ENABLED: {
     scope: 'shared',
     type: 'boolean',
+    category: 'configuration',
     explain: 'When true, the build worker uploads the resulting IPA/APK/AAB to Capgo storage and emits a time-limited download link (and a QR code) at the end of the build. When false, the artifact only goes to the app store.',
   },
   BUILD_OUTPUT_RETENTION_SECONDS: {
     scope: 'shared',
     type: 'duration',
+    category: 'configuration',
     explain: 'How long the BUILD_OUTPUT_UPLOAD download link stays valid. Range: 1h (3600) to 7d (604800). Stored as seconds. The CLI accepts shorthand like 6h, 2d on save.',
   },
   SKIP_BUILD_NUMBER_BUMP: {
     scope: 'shared',
     type: 'boolean',
+    category: 'configuration',
     explain: 'When true, the builder uses the version code/build number already in your project files instead of auto-incrementing. Useful when you manage versions manually or via your own CI script.',
   },
 }
@@ -314,6 +344,8 @@ export async function manageCredentialsCommand(options: ManageCredentialsOptions
     if (detectedFromCapacitor && targetAppId)
       oneShotIntro = [`✨ Detected app from capacitor.config: ${targetAppId}`]
 
+    let handedOffToOnboarding = false
+
     while (true) {
       if (!currentEntry) {
         const picked = await pickEntry(entries, oneShotIntro)
@@ -349,6 +381,23 @@ export async function manageCredentialsCommand(options: ManageCredentialsOptions
           }
         }
       }
+      else if (action === 'add') {
+        const result = await handleAddCredential(currentEntry)
+        if (result.handoff) {
+          handedOffToOnboarding = true
+          break
+        }
+        if (result.mutated) {
+          const refreshed = await loadSavedCredentials(currentEntry.appId, currentEntry.local)
+          if (refreshed) {
+            currentEntry = {
+              ...currentEntry,
+              saved: refreshed,
+              platforms: refreshedPlatforms(refreshed),
+            }
+          }
+        }
+      }
       else if (action === 'export') {
         const exported = await exportToEnvFile(currentEntry)
         if (!exported)
@@ -379,7 +428,8 @@ export async function manageCredentialsCommand(options: ManageCredentialsOptions
       }
     }
 
-    pOutro('Done.')
+    if (!handedOffToOnboarding)
+      pOutro('Done.')
   }
   catch (error) {
     pCancel(`Failed: ${error instanceof Error ? error.message : String(error)}`)
@@ -519,6 +569,7 @@ async function pickAction(entry: AppEntry, canGoBack: boolean, extraIntro?: stri
       platformsLine,
       '',
       'View    — flat list of every credential across platforms (show, decode, copy, edit, explain, remove).',
+      'Add…    — add a new platform via onboarding, or add a configuration option.',
       'Export  — write a .env file ready for CI/CD secrets (asks which platform if both are configured).',
       'Delete  — wipe all credentials for one platform (asks which if both are configured).',
     ],
@@ -526,6 +577,7 @@ async function pickAction(entry: AppEntry, canGoBack: boolean, extraIntro?: stri
   })
   const options = [
     { value: 'view', label: 'View credentials', hint: 'inspect, decode, copy, edit, explain, remove' },
+    { value: 'add', label: 'Add credential…', hint: 'add platform support or a configuration option' },
     { value: 'export', label: 'Export to .env', hint: 'CI/CD-ready file' },
     { value: 'delete', label: 'Delete', hint: 'remove a platform from storage' },
     ...(canGoBack ? [{ value: 'back', label: 'Back', hint: 'previous picker' }] : []),
@@ -1171,4 +1223,284 @@ async function deletePlatformInteractive(entry: AppEntry): Promise<boolean> {
   await clearSavedCredentials(entry.appId, platform, entry.local)
   pLog.success(`✓ Deleted ${platform} credentials for ${entry.appId} (${entry.local ? 'local' : 'global'}).`)
   return true
+}
+
+interface AddCredentialResult {
+  /** True when the user picked "Add platform support" and the manager has handed off to the onboarding wizard. The caller must exit immediately. */
+  handoff: boolean
+  /** True when on-disk credentials were written and the caller should reload `currentEntry.saved`. */
+  mutated: boolean
+}
+
+async function handleAddCredential(entry: AppEntry): Promise<AddCredentialResult> {
+  const missingPlatforms: Array<'ios' | 'android'> = (['ios', 'android'] as const).filter(p => !entry.platforms.includes(p))
+  const canAddPlatform = missingPlatforms.length > 0
+  const addableConfigCount = countAddableConfigurations(entry)
+
+  setManagerScreen({
+    title: `${entry.appId} · add credential`,
+    introLines: [
+      `Source: ${entry.local ? 'local' : 'global'} store`,
+      '',
+      'Add platform support — run the build onboarding wizard for a platform you have not yet set up.',
+      '   Note: this CLOSES the credentials manager. You will not return here automatically.',
+      '',
+      'Add configuration option — set a behaviour knob (QR code upload, retention, version bump, distribution mode, flavor, …).',
+      '   Credential material (certificates, keystores, API keys) is set up via the onboarding flow, not here.',
+    ],
+    statusLine: 'Esc returns to the action menu, Ctrl+C quits.',
+  })
+
+  const options: Array<{ value: string, label: string, hint: string }> = []
+  options.push({
+    value: 'platform',
+    label: canAddPlatform ? 'Add platform support' : 'Add platform support (all configured)',
+    hint: canAddPlatform ? missingPlatforms.map(p => p === 'ios' ? 'iOS' : 'Android').join(' or ') : 'iOS and Android both set up',
+  })
+  options.push({
+    value: 'config',
+    label: addableConfigCount > 0 ? 'Add configuration option' : 'Add configuration option (none available)',
+    hint: addableConfigCount > 0 ? `${addableConfigCount} option${addableConfigCount === 1 ? '' : 's'} unset` : 'all known options are already set',
+  })
+  options.push({ value: 'back', label: 'Back', hint: 'return to the action menu' })
+
+  const choice = await pSelect({ message: 'Add credential', options })
+  if (pIsCancel(choice) || choice === 'back')
+    return { handoff: false, mutated: false }
+
+  if (choice === 'platform') {
+    if (!canAddPlatform) {
+      pLog.warn('Both platforms are already configured for this app.')
+      return { handoff: false, mutated: false }
+    }
+    const handed = await handleAddPlatform(entry, missingPlatforms)
+    return { handoff: handed, mutated: false }
+  }
+
+  if (choice === 'config') {
+    if (addableConfigCount === 0) {
+      pLog.warn('All known configuration options are already set.')
+      return { handoff: false, mutated: false }
+    }
+    const added = await handleAddConfiguration(entry)
+    return { handoff: false, mutated: added }
+  }
+
+  return { handoff: false, mutated: false }
+}
+
+async function handleAddPlatform(entry: AppEntry, missingPlatforms: Array<'ios' | 'android'>): Promise<boolean> {
+  let target: 'ios' | 'android'
+  if (missingPlatforms.length === 1) {
+    target = missingPlatforms[0]
+  }
+  else {
+    const picked = await pSelect<'ios' | 'android'>({
+      message: 'Which platform to add?',
+      options: missingPlatforms.map(p => ({ value: p, label: p === 'ios' ? 'iOS' : 'Android' })),
+    })
+    if (pIsCancel(picked))
+      return false
+    target = picked
+  }
+
+  const platformLabel = target === 'ios' ? 'iOS' : 'Android'
+  const proceed = await pConfirm({
+    message: `This will close the credentials manager and launch the ${platformLabel} onboarding wizard. You won't return here automatically — re-run \`capgo build credentials manage\` afterwards. Continue?`,
+    initialValue: false,
+  })
+  if (pIsCancel(proceed) || !proceed)
+    return false
+
+  // Hand off: stop the Ink session cleanly and launch the build-onboarding
+  // wizard. It runs its own Ink render(), then exits. The caller signals exit
+  // so we do not print a "Done." outro.
+  stopInitInkSession({ text: `Launching ${platformLabel} onboarding…`, tone: 'green' })
+  await onboardingBuilderCommand({})
+  return true
+}
+
+function countAddableConfigurations(entry: AppEntry): number {
+  return enumerateAddableConfigurations(entry).length
+}
+
+interface ConfigurationCandidate {
+  key: string
+  knowledge: FieldKnowledge
+  /** Platforms that do NOT yet have this key set (and to which the new value could be written). */
+  missingOn: Array<'ios' | 'android'>
+}
+
+function enumerateAddableConfigurations(entry: AppEntry): ConfigurationCandidate[] {
+  const candidates: ConfigurationCandidate[] = []
+  for (const [key, knowledge] of Object.entries(CREDENTIAL_KNOWLEDGE)) {
+    if (knowledge.category !== 'configuration')
+      continue
+    if (knowledge.scope === 'shared') {
+      const missingOn = entry.platforms.filter(p => !hasValue(entry.saved[p], key))
+      if (missingOn.length > 0)
+        candidates.push({ key, knowledge, missingOn })
+    }
+    else {
+      const platform = knowledge.scope
+      if (entry.platforms.includes(platform) && !hasValue(entry.saved[platform], key))
+        candidates.push({ key, knowledge, missingOn: [platform] })
+    }
+  }
+  return candidates
+}
+
+function hasValue(creds: Partial<BuildCredentials> | undefined, key: string): boolean {
+  if (!creds)
+    return false
+  const value = (creds as Record<string, unknown>)[key]
+  return typeof value === 'string' && value.length > 0
+}
+
+async function handleAddConfiguration(entry: AppEntry): Promise<boolean> {
+  const candidates = enumerateAddableConfigurations(entry)
+  if (candidates.length === 0) {
+    pLog.info('Nothing to add — every known configuration option is already set.')
+    return false
+  }
+
+  setManagerScreen({
+    title: `${entry.appId} · add configuration`,
+    introLines: [
+      `${candidates.length} option${candidates.length === 1 ? '' : 's'} available to add.`,
+      'Each option shows its scope tag — [SHARED] writes to both platforms, [ios]/[android] to one.',
+    ],
+    statusLine: 'Esc returns to the previous menu.',
+  })
+
+  const pickedIndex = await pSelect({
+    message: 'Which configuration option to add?',
+    options: candidates.map((c, i) => ({
+      value: String(i),
+      label: `[${c.knowledge.scope === 'shared' ? 'SHARED' : c.knowledge.scope}] ${c.key}`,
+      hint: shortenForHint(c.knowledge.explain),
+    })),
+  })
+  if (pIsCancel(pickedIndex))
+    return false
+
+  const picked = candidates[Number.parseInt(pickedIndex, 10)]
+  if (!picked)
+    return false
+
+  // For shared keys, decide which platform(s) to write to.
+  let writePlatforms: Array<'ios' | 'android'> = picked.missingOn
+  if (picked.knowledge.scope === 'shared' && picked.missingOn.length > 1) {
+    const choice = await pSelect<'both' | 'ios' | 'android'>({
+      message: `Write ${picked.key} to which platform(s)?`,
+      options: [
+        { value: 'both', label: 'Both', hint: 'recommended for shared settings' },
+        { value: 'ios', label: 'iOS only' },
+        { value: 'android', label: 'Android only' },
+      ],
+    })
+    if (pIsCancel(choice))
+      return false
+    if (choice === 'ios')
+      writePlatforms = ['ios']
+    else if (choice === 'android')
+      writePlatforms = ['android']
+  }
+
+  const newValue = await promptValueForType(picked.key, picked.knowledge)
+  if (newValue === null)
+    return false
+
+  for (const platform of writePlatforms)
+    await updateSavedCredentials(entry.appId, platform, { [picked.key]: newValue }, entry.local)
+
+  pLog.success(`✓ Added ${picked.key} = ${formatValueForLog(picked.knowledge, newValue)} on ${writePlatforms.join(' + ')}.`)
+  return true
+}
+
+function shortenForHint(text: string): string {
+  const firstSentence = text.split('. ')[0] ?? text
+  if (firstSentence.length <= 70)
+    return firstSentence
+  return `${firstSentence.slice(0, 67)}…`
+}
+
+function formatValueForLog(knowledge: FieldKnowledge, value: string): string {
+  if (knowledge.type === 'duration')
+    return `${value}s`
+  if (value.length > 40)
+    return `${value.slice(0, 37)}… (${value.length} chars)`
+  return value
+}
+
+async function promptValueForType(key: string, knowledge: FieldKnowledge): Promise<string | null> {
+  if (knowledge.type === 'boolean') {
+    const picked = await pSelect<'true' | 'false'>({
+      message: `Set ${key}`,
+      options: [
+        { value: 'true', label: 'true' },
+        { value: 'false', label: 'false' },
+      ],
+    })
+    if (pIsCancel(picked))
+      return null
+    return picked
+  }
+
+  if (knowledge.type === 'enum') {
+    const enumValues = knowledge.enumValues ?? []
+    if (enumValues.length === 0) {
+      pLog.error(`Enum field ${key} has no allowed values configured.`)
+      return null
+    }
+    const picked = await pSelect<string>({
+      message: `Set ${key}`,
+      options: enumValues.map(v => ({ value: v, label: v })),
+    })
+    if (pIsCancel(picked))
+      return null
+    return picked
+  }
+
+  if (knowledge.type === 'duration') {
+    const entered = await pText({
+      message: `Duration for ${key}`,
+      placeholder: '1h, 6h, 2d (1h–7d range)',
+      validate: (value) => {
+        if (!value || value.trim().length === 0)
+          return 'Required'
+        try {
+          parseOutputRetentionLocal(value)
+        }
+        catch (error) {
+          return error instanceof Error ? error.message : 'Invalid duration'
+        }
+        return undefined
+      },
+    })
+    if (pIsCancel(entered))
+      return null
+    return String(parseOutputRetentionLocal(entered))
+  }
+
+  if (knowledge.type === 'string') {
+    const entered = await pText({
+      message: `Value for ${key}`,
+      placeholder: 'enter a value',
+      validate: (value) => {
+        if (!value || value.trim().length === 0)
+          return 'Required'
+        if (value.includes('\n'))
+          return 'Single-line values only'
+        return undefined
+      },
+    })
+    if (pIsCancel(entered))
+      return null
+    return entered.trim()
+  }
+
+  // base64 / json — not addable via this flow. Surface a hint instead of crashing.
+  pLog.warn(`${key} is credential material (type=${knowledge.type}) and must be added via the platform onboarding wizard, not the configuration flow.`)
+  return null
 }
