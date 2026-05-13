@@ -1,7 +1,7 @@
 name: Run tests
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event_name == 'workflow_call' && github.sha || github.ref }}
+  group: ${{ github.workflow }}-${{ github.event_name == 'workflow_call' && github.sha || github.head_ref || github.ref_name || github.ref }}
   cancel-in-progress: true
 
 on:
@@ -218,6 +218,8 @@ jobs:
         run: supabase --version
       - name: Link Supabase templates
         run: ln -sfn supabase/templates templates
+      - name: Stop leftover Supabase containers
+        run: supabase stop --no-backup || true
       - name: Run Supabase Start
         run: supabase start -x imgproxy,studio,mailpit,realtime,postgres-meta,supavisor,studio,logflare,vector,realtime
       - name: Reset Supabase DB
@@ -735,6 +737,8 @@ jobs:
           version: 2.84.2
       - name: Link Supabase templates
         run: ln -sfn supabase/templates templates
+      - name: Stop leftover Supabase containers
+        run: supabase stop --no-backup || true
       - name: Run Supabase Start
         run: supabase start -x imgproxy,studio,mailpit,realtime,postgres-meta,supavisor,studio,logflare,vector,realtime
       - name: Reset Supabase DB
@@ -758,7 +762,7 @@ jobs:
           tail -n 200 "${{ steps.bootstrap_cli_edge_server.outputs.log_path }}" || true
           echo "::endgroup::"
       - name: Upload CLI background service logs
-        if: failure()
+        if: failure() && steps.bootstrap_cli_edge_server.outputs.log_path != ''
         uses: actions/upload-artifact@v6 # v6
         with:
           name: cli-background-service-logs
