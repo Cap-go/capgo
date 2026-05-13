@@ -1231,6 +1231,7 @@ export type Database = {
         Row: {
           apps: number
           apps_active: number | null
+          average_ltv: number
           build_avg_seconds_day_android: number
           build_avg_seconds_day_ios: number
           build_count_day_android: number
@@ -1262,7 +1263,6 @@ export type Database = {
           devices_last_month: number | null
           devices_last_month_android: number | null
           devices_last_month_ios: number | null
-          average_ltv: number
           live_updates_active_paying_clients_60d: number
           longest_ltv: number
           mrr: number
@@ -1315,6 +1315,7 @@ export type Database = {
         Insert: {
           apps: number
           apps_active?: number | null
+          average_ltv?: number
           build_avg_seconds_day_android?: number
           build_avg_seconds_day_ios?: number
           build_count_day_android?: number
@@ -1346,7 +1347,6 @@ export type Database = {
           devices_last_month?: number | null
           devices_last_month_android?: number | null
           devices_last_month_ios?: number | null
-          average_ltv?: number
           live_updates_active_paying_clients_60d?: number
           longest_ltv?: number
           mrr?: number
@@ -1399,6 +1399,7 @@ export type Database = {
         Update: {
           apps?: number
           apps_active?: number | null
+          average_ltv?: number
           build_avg_seconds_day_android?: number
           build_avg_seconds_day_ios?: number
           build_count_day_android?: number
@@ -1430,7 +1431,6 @@ export type Database = {
           devices_last_month?: number | null
           devices_last_month_android?: number | null
           devices_last_month_ios?: number | null
-          average_ltv?: number
           live_updates_active_paying_clients_60d?: number
           longest_ltv?: number
           mrr?: number

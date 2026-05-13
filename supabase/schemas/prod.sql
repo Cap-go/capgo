@@ -2584,7 +2584,7 @@ CREATE OR REPLACE FUNCTION "public"."cleanup_old_audit_logs"() RETURNS "void"
     AS $$
 BEGIN
   DELETE FROM "public"."audit_logs"
-  WHERE created_at < NOW() - INTERVAL '90 days';
+  WHERE created_at < pg_catalog.now() - INTERVAL '90 days';
 END;
 $$;
 
@@ -6322,18 +6322,34 @@ CREATE OR REPLACE FUNCTION "public"."get_organization_cli_warnings"("orgid" "uui
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
     AS $$
-DECLARE messages jsonb[] := ARRAY[]::jsonb[]; has_read_access boolean;
+DECLARE
+    messages jsonb[] := ARRAY[]::jsonb[];
 BEGIN
-  PERFORM cli_version;
-  SELECT public.check_min_rights('read'::public.user_min_right, public.get_identity_apikey_only('{write,all,upload,read}'::public.key_mode[]), orgid, NULL::varchar, NULL::bigint) INTO has_read_access;
-  IF NOT has_read_access THEN
-    messages := array_append(messages, jsonb_build_object('message','API key does not have read access to this organization','fatal',true));
+    PERFORM cli_version;
+
+    IF NOT public.cli_check_permission(
+        permission_key := public.rbac_perm_org_read(),
+        org_id := orgid
+    ) THEN
+        messages := array_append(messages, jsonb_build_object(
+            'message', 'API key does not have read access to this organization',
+            'fatal', true
+        ));
+        RETURN messages;
+    END IF;
+
+    IF (
+        public.is_paying_and_good_plan_org_action(orgid, ARRAY['mau']::public.action_type[]) = true
+        AND public.is_paying_and_good_plan_org_action(orgid, ARRAY['bandwidth']::public.action_type[]) = true
+        AND public.is_paying_and_good_plan_org_action(orgid, ARRAY['storage']::public.action_type[]) = false
+    ) THEN
+        messages := array_append(messages, jsonb_build_object(
+            'message', 'You have exceeded your storage limit.\nUpload will fail, but you can still download your data.\nMAU and bandwidth limits are not exceeded.\nIn order to upload your plan, please upgrade your plan here: https://console.capgo.app/settings/plans.',
+            'fatal', true
+        ));
+    END IF;
+
     RETURN messages;
-  END IF;
-  IF (public.is_paying_and_good_plan_org_action(orgid, ARRAY['mau']::public.action_type[]) = true AND public.is_paying_and_good_plan_org_action(orgid, ARRAY['bandwidth']::public.action_type[]) = true AND public.is_paying_and_good_plan_org_action(orgid, ARRAY['storage']::public.action_type[]) = false) THEN
-    messages := array_append(messages, jsonb_build_object('message','You have exceeded your storage limit.\nUpload will fail, but you can still download your data.\nMAU and bandwidth limits are not exceeded.\nIn order to upload your plan, please upgrade your plan here: https://console.capgo.app/settings/plans.','fatal',true));
-  END IF;
-  RETURN messages;
 END;
 $$;
 
@@ -16273,7 +16289,10 @@ CREATE TABLE IF NOT EXISTS "public"."global_stats" (
     "plan_maker_conversion_rate" double precision DEFAULT 0 NOT NULL,
     "plan_team_conversion_rate" double precision DEFAULT 0 NOT NULL,
     "plan_enterprise_conversion_rate" double precision DEFAULT 0 NOT NULL,
-    "plan_total_conversion_rate" double precision DEFAULT 0 NOT NULL
+    "plan_total_conversion_rate" double precision DEFAULT 0 NOT NULL,
+    "average_ltv" double precision DEFAULT 0 NOT NULL,
+    "shortest_ltv" double precision DEFAULT 0 NOT NULL,
+    "longest_ltv" double precision DEFAULT 0 NOT NULL
 );
 
 
@@ -16473,6 +16492,18 @@ COMMENT ON COLUMN "public"."global_stats"."plan_enterprise_conversion_rate" IS '
 
 
 COMMENT ON COLUMN "public"."global_stats"."plan_total_conversion_rate" IS 'Percentage of organizations converted to any paid plan ((plan_solo + plan_maker + plan_team + plan_enterprise) / orgs * 100)';
+
+
+
+COMMENT ON COLUMN "public"."global_stats"."average_ltv" IS 'Average estimated customer LTV in dollars for the daily snapshot.';
+
+
+
+COMMENT ON COLUMN "public"."global_stats"."shortest_ltv" IS 'Lowest estimated customer LTV in dollars for the daily snapshot.';
+
+
+
+COMMENT ON COLUMN "public"."global_stats"."longest_ltv" IS 'Highest estimated customer LTV in dollars for the daily snapshot.';
 
 
 
@@ -17843,6 +17874,10 @@ CREATE INDEX "app_versions_cli_version_idx" ON "public"."app_versions" USING "bt
 
 
 CREATE INDEX "app_versions_meta_app_id_idx" ON "public"."app_versions_meta" USING "btree" ("app_id");
+
+
+
+CREATE INDEX "app_versions_r2_path_idx" ON "public"."app_versions" USING "btree" ("r2_path");
 
 
 
@@ -20471,6 +20506,7 @@ REVOKE ALL ON FUNCTION "public"."cleanup_job_run_details_7days"() FROM PUBLIC;
 
 
 REVOKE ALL ON FUNCTION "public"."cleanup_old_audit_logs"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."cleanup_old_audit_logs"() TO "service_role";
 
 
 
