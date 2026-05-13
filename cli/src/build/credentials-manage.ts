@@ -1233,60 +1233,84 @@ interface AddCredentialResult {
 }
 
 async function handleAddCredential(entry: AppEntry): Promise<AddCredentialResult> {
-  const missingPlatforms: Array<'ios' | 'android'> = (['ios', 'android'] as const).filter(p => !entry.platforms.includes(p))
-  const canAddPlatform = missingPlatforms.length > 0
-  const addableConfigCount = countAddableConfigurations(entry)
+  let workingEntry = entry
+  let mutatedAnyTime = false
 
-  setManagerScreen({
-    title: `${entry.appId} · add credential`,
-    introLines: [
-      `Source: ${entry.local ? 'local' : 'global'} store`,
-      '',
-      'Add platform support — run the build onboarding wizard for a platform you have not yet set up.',
-      '   Note: this CLOSES the credentials manager. You will not return here automatically.',
-      '',
-      'Add configuration option — set a behaviour knob (QR code upload, retention, version bump, distribution mode, flavor, …).',
-      '   Credential material (certificates, keystores, API keys) is set up via the onboarding flow, not here.',
-    ],
-    statusLine: 'Esc returns to the action menu, Ctrl+C quits.',
-  })
+  while (true) {
+    // Recompute on every iteration: after an Add config completes the missing
+    // platforms set is unchanged but the addable-config count decreases.
+    const missingPlatforms: Array<'ios' | 'android'> = (['ios', 'android'] as const).filter(p => !workingEntry.platforms.includes(p))
+    const canAddPlatform = missingPlatforms.length > 0
+    const addableConfigCount = countAddableConfigurations(workingEntry)
 
-  const options: Array<{ value: string, label: string, hint: string }> = []
-  options.push({
-    value: 'platform',
-    label: canAddPlatform ? 'Add platform support' : 'Add platform support (all configured)',
-    hint: canAddPlatform ? missingPlatforms.map(p => p === 'ios' ? 'iOS' : 'Android').join(' or ') : 'iOS and Android both set up',
-  })
-  options.push({
-    value: 'config',
-    label: addableConfigCount > 0 ? 'Add configuration option' : 'Add configuration option (none available)',
-    hint: addableConfigCount > 0 ? `${addableConfigCount} option${addableConfigCount === 1 ? '' : 's'} unset` : 'all known options are already set',
-  })
-  options.push({ value: 'back', label: 'Back', hint: 'return to the action menu' })
+    setManagerScreen({
+      title: `${workingEntry.appId} · add credential`,
+      introLines: [
+        `Source: ${workingEntry.local ? 'local' : 'global'} store`,
+        '',
+        'Add platform support — run the build onboarding wizard for a platform you have not yet set up.',
+        '   Note: this CLOSES the credentials manager. You will not return here automatically.',
+        '',
+        'Add configuration option — set a behaviour knob (QR code upload, retention, version bump, distribution mode, flavor, …).',
+        '   Credential material (certificates, keystores, API keys) is set up via the onboarding flow, not here.',
+      ],
+      statusLine: 'Esc returns to the action menu, Ctrl+C quits.',
+    })
 
-  const choice = await pSelect({ message: 'Add credential', options })
-  if (pIsCancel(choice) || choice === 'back')
-    return { handoff: false, mutated: false }
+    const options: Array<{ value: string, label: string, hint: string }> = []
+    options.push({
+      value: 'platform',
+      label: canAddPlatform ? 'Add platform support' : 'Add platform support (all configured)',
+      hint: canAddPlatform ? missingPlatforms.map(p => p === 'ios' ? 'iOS' : 'Android').join(' or ') : 'iOS and Android both set up',
+    })
+    options.push({
+      value: 'config',
+      label: addableConfigCount > 0 ? 'Add configuration option' : 'Add configuration option (none available)',
+      hint: addableConfigCount > 0 ? `${addableConfigCount} option${addableConfigCount === 1 ? '' : 's'} unset` : 'all known options are already set',
+    })
+    options.push({ value: 'back', label: 'Back', hint: 'return to the action menu' })
 
-  if (choice === 'platform') {
-    if (!canAddPlatform) {
-      pLog.warn('Both platforms are already configured for this app.')
-      return { handoff: false, mutated: false }
+    const choice = await pSelect({ message: 'Add credential', options })
+    // Esc at this level — bubble back to the main action menu.
+    if (pIsCancel(choice) || choice === 'back')
+      return { handoff: false, mutated: mutatedAnyTime }
+
+    if (choice === 'platform') {
+      if (!canAddPlatform) {
+        pLog.warn('Both platforms are already configured for this app.')
+        continue
+      }
+      const handed = await handleAddPlatform(workingEntry, missingPlatforms)
+      if (handed)
+        return { handoff: true, mutated: mutatedAnyTime }
+      // Handoff was declined — stay in the Add sub-menu so Esc only goes one
+      // level up from the confirm prompt.
+      continue
     }
-    const handed = await handleAddPlatform(entry, missingPlatforms)
-    return { handoff: handed, mutated: false }
-  }
 
-  if (choice === 'config') {
-    if (addableConfigCount === 0) {
-      pLog.warn('All known configuration options are already set.')
-      return { handoff: false, mutated: false }
+    if (choice === 'config') {
+      if (addableConfigCount === 0) {
+        pLog.warn('All known configuration options are already set.')
+        continue
+      }
+      const added = await handleAddConfiguration(workingEntry)
+      if (added) {
+        mutatedAnyTime = true
+        // Reload so the next iteration excludes just-added keys.
+        const refreshed = await loadSavedCredentials(workingEntry.appId, workingEntry.local)
+        if (refreshed) {
+          workingEntry = {
+            ...workingEntry,
+            saved: refreshed,
+            platforms: refreshedPlatforms(refreshed),
+          }
+        }
+      }
+      // Whether the inner flow added something or the user cancelled out of
+      // it, we stay in the Add sub-menu.
+      continue
     }
-    const added = await handleAddConfiguration(entry)
-    return { handoff: false, mutated: added }
   }
-
-  return { handoff: false, mutated: false }
 }
 
 async function handleAddPlatform(entry: AppEntry, missingPlatforms: Array<'ios' | 'android'>): Promise<boolean> {
@@ -1358,64 +1382,83 @@ function hasValue(creds: Partial<BuildCredentials> | undefined, key: string): bo
 }
 
 async function handleAddConfiguration(entry: AppEntry): Promise<boolean> {
-  const candidates = enumerateAddableConfigurations(entry)
-  if (candidates.length === 0) {
-    pLog.info('Nothing to add — every known configuration option is already set.')
-    return false
-  }
+  let workingEntry = entry
+  let mutatedAnyTime = false
 
-  setManagerScreen({
-    title: `${entry.appId} · add configuration`,
-    introLines: [
-      `${candidates.length} option${candidates.length === 1 ? '' : 's'} available to add.`,
-      'Each option shows its scope tag — [SHARED] writes to both platforms, [ios]/[android] to one.',
-    ],
-    statusLine: 'Esc returns to the previous menu.',
-  })
+  while (true) {
+    const candidates = enumerateAddableConfigurations(workingEntry)
+    if (candidates.length === 0) {
+      pLog.info('Every known configuration option is now set.')
+      return mutatedAnyTime
+    }
 
-  const pickedIndex = await pSelect({
-    message: 'Which configuration option to add?',
-    options: candidates.map((c, i) => ({
-      value: String(i),
-      label: `[${c.knowledge.scope === 'shared' ? 'SHARED' : c.knowledge.scope}] ${c.key}`,
-      hint: shortenForHint(c.knowledge.explain),
-    })),
-  })
-  if (pIsCancel(pickedIndex))
-    return false
-
-  const picked = candidates[Number.parseInt(pickedIndex, 10)]
-  if (!picked)
-    return false
-
-  // For shared keys, decide which platform(s) to write to.
-  let writePlatforms: Array<'ios' | 'android'> = picked.missingOn
-  if (picked.knowledge.scope === 'shared' && picked.missingOn.length > 1) {
-    const choice = await pSelect<'both' | 'ios' | 'android'>({
-      message: `Write ${picked.key} to which platform(s)?`,
-      options: [
-        { value: 'both', label: 'Both', hint: 'recommended for shared settings' },
-        { value: 'ios', label: 'iOS only' },
-        { value: 'android', label: 'Android only' },
+    setManagerScreen({
+      title: `${workingEntry.appId} · add configuration`,
+      introLines: [
+        `${candidates.length} option${candidates.length === 1 ? '' : 's'} available to add.`,
+        'Each option shows its scope tag — [SHARED] writes to both platforms, [ios]/[android] to one.',
       ],
+      statusLine: 'Esc returns to the Add credential menu.',
     })
-    if (pIsCancel(choice))
-      return false
-    if (choice === 'ios')
-      writePlatforms = ['ios']
-    else if (choice === 'android')
-      writePlatforms = ['android']
+
+    const pickedIndex = await pSelect({
+      message: 'Which configuration option to add?',
+      options: candidates.map((c, i) => ({
+        value: String(i),
+        label: `[${c.knowledge.scope === 'shared' ? 'SHARED' : c.knowledge.scope}] ${c.key}`,
+        hint: shortenForHint(c.knowledge.explain),
+      })),
+    })
+    // Esc at the config picker — return to the Add credential sub-menu.
+    if (pIsCancel(pickedIndex))
+      return mutatedAnyTime
+
+    const picked = candidates[Number.parseInt(pickedIndex, 10)]
+    if (!picked)
+      continue
+
+    // For shared keys, decide which platform(s) to write to.
+    let writePlatforms: Array<'ios' | 'android'> = picked.missingOn
+    if (picked.knowledge.scope === 'shared' && picked.missingOn.length > 1) {
+      const choice = await pSelect<'both' | 'ios' | 'android'>({
+        message: `Write ${picked.key} to which platform(s)?`,
+        options: [
+          { value: 'both', label: 'Both', hint: 'recommended for shared settings' },
+          { value: 'ios', label: 'iOS only' },
+          { value: 'android', label: 'Android only' },
+        ],
+      })
+      // Esc at the platform-target picker — return to the config picker, not
+      // out of the whole Add flow.
+      if (pIsCancel(choice))
+        continue
+      if (choice === 'ios')
+        writePlatforms = ['ios']
+      else if (choice === 'android')
+        writePlatforms = ['android']
+    }
+
+    const newValue = await promptValueForType(picked.key, picked.knowledge)
+    // Esc at the value prompt — return to the config picker.
+    if (newValue === null)
+      continue
+
+    for (const platform of writePlatforms)
+      await updateSavedCredentials(workingEntry.appId, platform, { [picked.key]: newValue }, workingEntry.local)
+
+    pLog.success(`✓ Added ${picked.key} = ${formatValueForLog(picked.knowledge, newValue)} on ${writePlatforms.join(' + ')}.`)
+    mutatedAnyTime = true
+
+    // Reload so the just-added key drops out of the picker on the next iteration.
+    const refreshed = await loadSavedCredentials(workingEntry.appId, workingEntry.local)
+    if (refreshed) {
+      workingEntry = {
+        ...workingEntry,
+        saved: refreshed,
+        platforms: refreshedPlatforms(refreshed),
+      }
+    }
   }
-
-  const newValue = await promptValueForType(picked.key, picked.knowledge)
-  if (newValue === null)
-    return false
-
-  for (const platform of writePlatforms)
-    await updateSavedCredentials(entry.appId, platform, { [picked.key]: newValue }, entry.local)
-
-  pLog.success(`✓ Added ${picked.key} = ${formatValueForLog(picked.knowledge, newValue)} on ${writePlatforms.join(' + ')}.`)
-  return true
 }
 
 function shortenForHint(text: string): string {
