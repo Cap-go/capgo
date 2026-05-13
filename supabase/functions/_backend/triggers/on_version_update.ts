@@ -229,9 +229,11 @@ async function deleteManifest(c: Context, record: Database['public']['Tables']['
                 // This avoids race condition where concurrent deletes both skip S3 cleanup
                 return supabaseAdmin(c)
                   .from('manifest')
-                  .select('*', { count: 'exact', head: true })
-                  .eq('file_name', entry.file_name)
+                  .select('id')
                   .eq('file_hash', entry.file_hash)
+                  .eq('file_name', entry.file_name)
+                  .limit(1)
+                  .maybeSingle()
               })
               .then((v) => {
                 if (!v)
@@ -240,8 +242,7 @@ async function deleteManifest(c: Context, record: Database['public']['Tables']['
                   cloudlog({ requestId: c.get('requestId'), message: 'error checking manifest references', error: v.error })
                   return // Don't delete S3 if we can't confirm no other references
                 }
-                const count = v.count ?? 0
-                if (count) {
+                if (v.data) {
                   // Other versions still use this file, S3 cleanup not needed
                   return
                 }

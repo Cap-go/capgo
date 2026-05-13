@@ -98,7 +98,6 @@ describe('files local read proxy', () => {
   })
 
   it('preserves HEAD requests without downloading bytes from the signed URL proxy', async () => {
-    getAppByAppIdPgMock.mockResolvedValue({ app_id: 'test-app', owner_org: 'test-org' })
     createSignedUrlMock.mockResolvedValue({
       data: { signedUrl: 'https://storage.example/object?token=test' },
       error: null,

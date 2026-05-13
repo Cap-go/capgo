@@ -217,7 +217,7 @@ describe('attachment reads after app deletion', () => {
     await cleanupSeededOrg(appId, orgId, stripeCustomerId, [uploadKeyId, deleteKeyId])
   }, 60_000)
 
-  it.concurrent('serves uploaded attachments after the app is deleted', async () => {
+  it.concurrent('continues serving cached uploaded attachments after the app is deleted', async () => {
     await seedApp(appId, orgId, stripeCustomerId)
 
     const body = new TextEncoder().encode('delete-me-after-app-delete')
