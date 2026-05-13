@@ -314,8 +314,45 @@ function refreshedPlatforms(saved: SavedCredentials): Array<'ios' | 'android'> {
   return platforms
 }
 
+/**
+ * Narrow an entry to a single platform: drops the other platform's saved data
+ * from the working copy so the flat inspector, exporter, deleter, and Add
+ * flows all see the entry as if it only had `platform` configured. Returns
+ * null when the platform isn't actually configured on this entry.
+ *
+ * On-disk credentials are NOT touched — this is purely a view filter for the
+ * scoped session.
+ */
+function narrowEntryToPlatform(entry: AppEntry, platform: 'ios' | 'android'): AppEntry | null {
+  const platformSaved = entry.saved[platform]
+  if (!platformSaved || !hasAnyValue(platformSaved))
+    return null
+  return {
+    ...entry,
+    saved: { [platform]: platformSaved } as SavedCredentials,
+    platforms: [platform],
+  }
+}
+
+function applyPlatformFilter(entries: AppEntry[], platform: 'ios' | 'android' | undefined): AppEntry[] {
+  if (!platform)
+    return entries
+  return entries
+    .map(entry => narrowEntryToPlatform(entry, platform))
+    .filter((entry): entry is AppEntry => entry !== null)
+}
+
 export async function manageCredentialsCommand(options: ManageCredentialsOptions = {}): Promise<void> {
   pIntro('Capgo build credentials manager')
+
+  // Validate the --platform flag before doing anything expensive. The
+  // CLI option string is untyped at the commander layer, so reject any value
+  // that isn't one of the two supported platforms.
+  if (options.platform !== undefined && options.platform !== 'ios' && options.platform !== 'android') {
+    pCancel(`--platform must be "ios" or "android" (got "${String(options.platform)}").`)
+    return
+  }
+  const scopedPlatform = options.platform
 
   try {
     let entries = await loadEntries(options.local)
@@ -335,6 +372,16 @@ export async function manageCredentialsCommand(options: ManageCredentialsOptions
       if (filtered.length > 0) {
         detectedFromCapacitor = !options.appId
         entries = filtered
+      }
+    }
+
+    // Honour --platform: narrow every entry to just the requested platform.
+    // Entries that don't have that platform configured drop out of the list.
+    if (scopedPlatform) {
+      entries = applyPlatformFilter(entries, scopedPlatform)
+      if (entries.length === 0) {
+        pCancel(`No ${scopedPlatform} credentials found${options.appId ? ` for ${options.appId}` : ''}.`)
+        return
       }
     }
 
@@ -367,6 +414,9 @@ export async function manageCredentialsCommand(options: ManageCredentialsOptions
           const refreshed = await loadSavedCredentials(currentEntry.appId, currentEntry.local)
           if (!refreshed || (!hasAnyValue(refreshed.ios ?? {}) && !hasAnyValue(refreshed.android ?? {}))) {
             entries = await loadEntries(options.local)
+            if (options.appId)
+              entries = entries.filter(entry => entry.appId === options.appId)
+            entries = applyPlatformFilter(entries, scopedPlatform)
             if (entries.length === 0) {
               pOutro('All credentials cleared.')
               return
@@ -374,11 +424,20 @@ export async function manageCredentialsCommand(options: ManageCredentialsOptions
             currentEntry = entries.length === 1 ? entries[0] : undefined
             continue
           }
-          currentEntry = {
+          let nextEntry: AppEntry = {
             ...currentEntry,
             saved: refreshed,
             platforms: refreshedPlatforms(refreshed),
           }
+          if (scopedPlatform) {
+            const narrowed = narrowEntryToPlatform(nextEntry, scopedPlatform)
+            if (!narrowed) {
+              pOutro(`All ${scopedPlatform} credentials cleared.`)
+              return
+            }
+            nextEntry = narrowed
+          }
+          currentEntry = nextEntry
         }
       }
       else if (action === 'add') {
@@ -390,11 +449,17 @@ export async function manageCredentialsCommand(options: ManageCredentialsOptions
         if (result.mutated) {
           const refreshed = await loadSavedCredentials(currentEntry.appId, currentEntry.local)
           if (refreshed) {
-            currentEntry = {
+            let nextEntry: AppEntry = {
               ...currentEntry,
               saved: refreshed,
               platforms: refreshedPlatforms(refreshed),
             }
+            if (scopedPlatform) {
+              const narrowed = narrowEntryToPlatform(nextEntry, scopedPlatform)
+              if (narrowed)
+                nextEntry = narrowed
+            }
+            currentEntry = nextEntry
           }
         }
       }
@@ -409,6 +474,7 @@ export async function manageCredentialsCommand(options: ManageCredentialsOptions
           entries = await loadEntries(options.local)
           if (options.appId)
             entries = entries.filter(entry => entry.appId === options.appId)
+          entries = applyPlatformFilter(entries, scopedPlatform)
           if (entries.length === 0) {
             pOutro('All credentials cleared.')
             return
