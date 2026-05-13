@@ -7,6 +7,7 @@ import { Hono } from 'hono/tiny'
 import { app as download_link } from '../private/download_link.ts'
 import { app as upload_link } from '../private/upload_link.ts'
 import { app as ok } from '../public/ok.ts'
+import { CacheHelper } from '../utils/cache.ts'
 import { sendDiscordAlert } from '../utils/discord.ts'
 import { quickError, simpleError } from '../utils/hono.ts'
 import { middlewareKey } from '../utils/hono_middleware.ts'
@@ -30,8 +31,19 @@ const DO_FETCH_RETRY_DELAY_MS = 250
 const ATTACHMENT_PREFIX = 'attachments'
 const ATTACHMENT_PLAN_LIMIT: Array<'mau' | 'bandwidth' | 'storage'> = ['mau', 'bandwidth', 'storage']
 const TUS_UPLOAD_CONTENT_TYPE = 'application/offset+octet-stream'
+const ATTACHMENT_WRITE_ACCESS_CACHE_PATH = '/.files-upload-write-access-v1'
+const ATTACHMENT_WRITE_ACCESS_CACHE_TTL_SECONDS = 60
 
 export const app = new Hono<MiddlewareKeyVariables>()
+
+interface AttachmentWriteAccessCachePayload {
+  status: 'allowed' | 'ready_bundle'
+  apikeyId: number
+  appId: string
+  ownerOrg: string
+  fileId: string
+  expiresAt: number
+}
 
 function isRetryableDurableObjectFetchError(error: unknown): boolean {
   return isRetryableDurableObjectResetError(error)
@@ -640,6 +652,105 @@ function buildNormalizedUploadMetadataHeader(c: Context, filename: string): stri
   return metadata.join(',')
 }
 
+function shouldReadAttachmentWriteAccessCache(c: Context) {
+  const method = c.req.raw.method
+  return method === 'HEAD' || method === 'PATCH'
+}
+
+function buildAttachmentWriteAccessCacheEntry(
+  c: Context,
+  apikeyId: number,
+  ownerOrg: string,
+  appId: string,
+  fileId: string,
+) {
+  const helper = new CacheHelper(c)
+  const request = helper.buildRequest(ATTACHMENT_WRITE_ACCESS_CACHE_PATH, {
+    apikey_id: String(apikeyId),
+    owner_org: ownerOrg,
+    app_id: appId,
+    file_id: fileId,
+  })
+  return { helper, request }
+}
+
+function isMatchingAttachmentWriteAccessCache(
+  payload: AttachmentWriteAccessCachePayload | null,
+  apikeyId: number,
+  ownerOrg: string,
+  appId: string,
+  fileId: string,
+  now = Date.now(),
+): payload is AttachmentWriteAccessCachePayload {
+  return !!payload
+    && payload.apikeyId === apikeyId
+    && payload.ownerOrg === ownerOrg
+    && payload.appId === appId
+    && payload.fileId === fileId
+    && payload.expiresAt > now
+}
+
+async function getCachedAttachmentWriteAccess(
+  c: Context,
+  apikeyId: number,
+  ownerOrg: string,
+  appId: string,
+  fileId: string,
+) {
+  if (!shouldReadAttachmentWriteAccessCache(c))
+    return null
+
+  const cacheEntry = buildAttachmentWriteAccessCacheEntry(c, apikeyId, ownerOrg, appId, fileId)
+  const cached = await cacheEntry.helper.matchJson<AttachmentWriteAccessCachePayload>(cacheEntry.request)
+  if (!isMatchingAttachmentWriteAccessCache(cached, apikeyId, ownerOrg, appId, fileId))
+    return null
+
+  // Active TUS uploads may span many HEAD/PATCH calls. Extend only fresh,
+  // exact-match cache entries; POST creation still performs the full primary DB check.
+  await backgroundTask(
+    c,
+    cacheAttachmentWriteAccess(c, apikeyId, ownerOrg, appId, fileId, cached.status),
+  )
+
+  return cached.status
+}
+
+async function cacheAttachmentWriteAccess(
+  c: Context,
+  apikeyId: number,
+  ownerOrg: string,
+  appId: string,
+  fileId: string,
+  status: AttachmentWriteAccessCachePayload['status'],
+) {
+  const cacheEntry = buildAttachmentWriteAccessCacheEntry(c, apikeyId, ownerOrg, appId, fileId)
+  await cacheEntry.helper.putJson(cacheEntry.request, {
+    status,
+    apikeyId,
+    ownerOrg,
+    appId,
+    fileId,
+    expiresAt: Date.now() + ATTACHMENT_WRITE_ACCESS_CACHE_TTL_SECONDS * 1000,
+  } satisfies AttachmentWriteAccessCachePayload, ATTACHMENT_WRITE_ACCESS_CACHE_TTL_SECONDS)
+}
+
+function throwReadyBundlePathConflict(c: Context, appId: string, ownerOrg: string, fileId: string): never {
+  cloudlog({
+    requestId: c.get('requestId'),
+    message: 'checkWriteAppAccess - ready bundle path mutation blocked',
+    app_id: appId,
+    owner_org: ownerOrg,
+    fileId,
+  })
+  throw new HTTPException(409, {
+    res: c.json({
+      error: 'bundle_already_ready',
+      message: 'Bundle content cannot be changed after upload is complete. Upload a new bundle instead.',
+      moreInfo: { app_id: appId, requestId: c.get('requestId') },
+    }),
+  })
+}
+
 // TUS protocol requests (POST/PATCH/HEAD) that get forwarded to a durable object
 async function uploadHandler(c: Context) {
   const requestId = c.get('fileId') as string
@@ -867,8 +978,24 @@ async function checkWriteAppAccess(c: Context, next: Next) {
     userId: apikey.user_id,
   })
 
+  const cachedWriteAccess = await getCachedAttachmentWriteAccess(c, apikey.id, owner_org, app_id, requestId)
+  if (cachedWriteAccess === 'allowed') {
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'checkWriteAppAccess - cache hit',
+      app_id,
+      owner_org,
+      fileId: requestId,
+    })
+    await next()
+    return
+  }
+  if (cachedWriteAccess === 'ready_bundle') {
+    throwReadyBundlePathConflict(c, app_id, owner_org, requestId)
+  }
+
   // Use Postgres instead of Supabase SDK
-  const pgClient = getPgClient(c, false) // authz + plan gating must read primary
+  const pgClient = getPgClient(c, false) // authz, plan gating, and ready-bundle guards must read primary
   const drizzleClient = getDrizzleClient(pgClient)
 
   try {
@@ -1002,20 +1129,8 @@ async function checkWriteAppAccess(c: Context, next: Next) {
     )
 
     if (readyBundlePath.rows.length > 0) {
-      cloudlog({
-        requestId: c.get('requestId'),
-        message: 'checkWriteAppAccess - ready bundle path mutation blocked',
-        app_id,
-        owner_org,
-        fileId: requestId,
-      })
-      throw new HTTPException(409, {
-        res: c.json({
-          error: 'bundle_already_ready',
-          message: 'Bundle content cannot be changed after upload is complete. Upload a new bundle instead.',
-          moreInfo: { app_id, requestId: c.get('requestId') },
-        }),
-      })
+      await cacheAttachmentWriteAccess(c, apikey.id, owner_org, app_id, requestId, 'ready_bundle')
+      throwReadyBundlePathConflict(c, app_id, owner_org, requestId)
     }
 
     cloudlog({
@@ -1024,6 +1139,7 @@ async function checkWriteAppAccess(c: Context, next: Next) {
       app_id,
       owner_org,
     })
+    await cacheAttachmentWriteAccess(c, apikey.id, owner_org, app_id, requestId, 'allowed')
   }
   finally {
     // Always close the connection
