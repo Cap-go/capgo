@@ -2,7 +2,7 @@ import type { BuildCredentials, SavedCredentials } from '../schemas/build'
 import { Buffer } from 'node:buffer'
 import { spawnSync } from 'node:child_process'
 import { existsSync, readFileSync, unlinkSync } from 'node:fs'
-import { writeFile } from 'node:fs/promises'
+import { chmod, writeFile } from 'node:fs/promises'
 import { homedir, tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { cwd, exit, platform as osPlatform } from 'node:process'
@@ -1194,6 +1194,11 @@ async function exportToEnvFile(entry: AppEntry): Promise<boolean> {
 
   const content = renderEnvFile(entry, platform, creds)
   await writeFile(target.path, content, { mode: 0o600 })
+  // Node's writeFile mode option only applies when the file is newly created;
+  // an overwrite leaves the existing permission bits untouched. Force 0o600
+  // explicitly so a pre-existing 0644/0660 file is tightened down to match
+  // the success message — credentials must not be world- or group-readable.
+  await chmod(target.path, 0o600)
 
   const fieldCount = Object.values(creds).filter(v => typeof v === 'string' && v.length > 0).length
   pLog.success(`✓ Exported ${fieldCount} field${fieldCount === 1 ? '' : 's'} → ${target.path} (mode 0600).`)
