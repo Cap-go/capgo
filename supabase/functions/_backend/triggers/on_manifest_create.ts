@@ -3,6 +3,7 @@ import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { RetryableResult } from '../utils/retry.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import { Hono } from 'hono/tiny'
+import { recordUploadedFileSize } from '../files/uploadSize.ts'
 import { BRES, middlewareAPISecret, simpleError, triggerValidator } from '../utils/hono.ts'
 import { cloudlog, cloudlogErr } from '../utils/logging.ts'
 import { isRetryablePostgrestResult, retryWithBackoff } from '../utils/retry.ts'
@@ -67,6 +68,11 @@ async function runManifestUpdateWithRetry(
 }
 
 async function updateManifestSize(c: Context, record: Database['public']['Tables']['manifest']['Row']) {
+  if (record.file_size && record.file_size > 0) {
+    cloudlog({ requestId: c.get('requestId'), message: 'manifest file_size already set', id: record.id, file_size: record.file_size })
+    return c.json(BRES)
+  }
+
   if (!record.s3_path) {
     cloudlog({ requestId: c.get('requestId'), message: 'No s3 path', id: record.id })
     throw simpleError('no_s3_path', 'No s3 path', { record })
@@ -90,6 +96,7 @@ async function updateManifestSize(c: Context, record: Database['public']['Tables
       .from('manifest')
       .update({ file_size: size })
       .eq('id', record.id))
+    await recordUploadedFileSize(c, record.s3_path, size)
   }
   catch (updateError) {
     cloudlog({ requestId: c.get('requestId'), message: 'error update manifest size', error: updateError })

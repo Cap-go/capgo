@@ -1,7 +1,9 @@
 import type { Context } from 'hono'
-import { cloudlog } from '../utils/logging.ts'
+import { cloudlog, cloudlogErr } from '../utils/logging.ts'
+import { closeClient, getPgClient } from '../utils/pg.ts'
 import { getEnv } from '../utils/utils.ts'
 import { parseUploadMetadata } from './parse.ts'
+import { getCompletedTusUploadSize, recordUploadedFileSize } from './uploadSize.ts'
 import { ALLOWED_HEADERS, ALLOWED_METHODS, EXPOSED_HEADERS, MAX_UPLOAD_LENGTH_BYTES, TUS_EXTENSIONS, TUS_VERSION } from './util.ts'
 
 const BUCKET_NAME = 'capgo'
@@ -55,12 +57,9 @@ function transformMetadataForSupabase(c: Context, objectName: string): string {
 }
 
 /**
- * Rewrite Supabase Location header to Capgo API URL
+ * Extract uploadId from Supabase URL in a robust way.
  */
-function rewriteLocationHeader(c: Context, supabaseLocation: string): string {
-  const requestId = c.get('requestId')
-
-  // Extract uploadId from Supabase URL in a robust way
+function extractUploadIdFromLocation(supabaseLocation: string): string | undefined {
   let uploadId: string | undefined
   try {
     const url = new URL(supabaseLocation)
@@ -72,6 +71,15 @@ function rewriteLocationHeader(c: Context, supabaseLocation: string): string {
     const pathSegments = pathWithoutQuery.split('/').filter(Boolean)
     uploadId = pathSegments[pathSegments.length - 1]
   }
+  return uploadId
+}
+
+/**
+ * Rewrite Supabase Location header to Capgo API URL
+ */
+function rewriteLocationHeader(c: Context, supabaseLocation: string): string {
+  const requestId = c.get('requestId')
+  const uploadId = extractUploadIdFromLocation(supabaseLocation)
 
   if (!uploadId) {
     cloudlog({ requestId, message: 'rewriteLocationHeader - failed to extract uploadId', supabaseLocation })
@@ -209,6 +217,91 @@ async function readErrorBody(response: Response): Promise<string | null> {
   }
 }
 
+async function readSupabaseTusProgressHeaders(c: Context, uploadId: string): Promise<Headers | null> {
+  const requestId = c.get('requestId')
+  const result = await proxyToSupabase(requestId, 'supabaseTusProgressHead', buildSupabaseTusUrl(c, uploadId), {
+    method: 'HEAD',
+    headers: buildSupabaseAuthHeaders(c),
+  })
+
+  if ('error' in result || !result.ok)
+    return null
+
+  return result.headers
+}
+
+async function readSupabaseStorageObjectSize(c: Context, s3Path: string): Promise<number | null> {
+  const pgClient = getPgClient(c, false)
+  try {
+    const result = await pgClient.query<{ file_size: string | number | null }>(
+      `
+        SELECT
+          CASE
+            WHEN metadata ->> 'size' ~ '^[0-9]+$' THEN (metadata ->> 'size')::bigint
+            WHEN metadata ->> 'contentLength' ~ '^[0-9]+$' THEN (metadata ->> 'contentLength')::bigint
+            ELSE NULL
+          END AS file_size
+        FROM storage.objects
+        WHERE bucket_id = $1
+          AND name = $2
+        LIMIT 1
+      `,
+      [BUCKET_NAME, s3Path],
+    )
+    const fileSize = Number(result.rows[0]?.file_size)
+    return Number.isFinite(fileSize) && fileSize > 0 ? fileSize : null
+  }
+  finally {
+    await closeClient(c, pgClient)
+  }
+}
+
+async function recordSupabaseCompletedTusUpload(c: Context, uploadId: string, responseHeaders: Headers): Promise<void> {
+  const requestId = c.get('requestId')
+  const rawFileId = c.get('fileId')
+  if (typeof rawFileId !== 'string' || rawFileId.length === 0) {
+    cloudlog({ requestId, message: 'recordSupabaseCompletedTusUpload missing fileId', uploadId })
+    return
+  }
+
+  const s3Path = rawFileId
+  // Request Upload-Length is protocol input, not a trusted source for manifest sizes.
+  const hasCompleteProgressHeaders = responseHeaders.has('Upload-Offset') && responseHeaders.has('Upload-Length')
+  let fileSize = getCompletedTusUploadSize(responseHeaders)
+  if (hasCompleteProgressHeaders && fileSize == null)
+    return
+
+  if (fileSize == null) {
+    const progressHeaders = await readSupabaseTusProgressHeaders(c, uploadId)
+    const hasProgressHeaders = progressHeaders?.has('Upload-Offset') && progressHeaders.has('Upload-Length')
+    fileSize = progressHeaders ? getCompletedTusUploadSize(progressHeaders) : null
+    if (hasProgressHeaders && fileSize == null)
+      return
+  }
+
+  if (fileSize == null)
+    fileSize = await readSupabaseStorageObjectSize(c, s3Path)
+
+  if (fileSize != null)
+    await recordUploadedFileSize(c, s3Path, fileSize)
+}
+
+async function safeRecordSupabaseCompletedTusUpload(c: Context, uploadId: string, responseHeaders: Headers): Promise<void> {
+  try {
+    await recordSupabaseCompletedTusUpload(c, uploadId, responseHeaders)
+  }
+  catch (error) {
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: 'recordSupabaseCompletedTusUpload failed',
+      uploadId,
+      uploadOffset: responseHeaders.get('Upload-Offset'),
+      uploadLength: responseHeaders.get('Upload-Length'),
+      error,
+    })
+  }
+}
+
 /**
  * Handle TUS POST request - create a new upload
  */
@@ -248,7 +341,7 @@ export async function supabaseTusCreateHandler(c: Context): Promise<Response> {
   cloudlog({ requestId, message: 'supabaseTusCreateHandler response', status: response.status })
 
   const responseHeaders = buildTusResponseHeaders()
-  copyResponseHeaders(response.headers, responseHeaders, ['Upload-Offset', 'Upload-Expires'])
+  copyResponseHeaders(response.headers, responseHeaders, ['Upload-Offset', 'Upload-Length', 'Upload-Expires'])
 
   const location = response.headers.get('Location')
   if (location) {
@@ -266,6 +359,10 @@ export async function supabaseTusCreateHandler(c: Context): Promise<Response> {
         responseHeaders.set('Content-Type', contentType)
     }
   }
+
+  const uploadId = location ? extractUploadIdFromLocation(location) : undefined
+  if (response.status >= 200 && response.status < 300 && uploadId)
+    await safeRecordSupabaseCompletedTusUpload(c, uploadId, responseHeaders)
 
   return new Response(responseBody, { status: response.status, headers: responseHeaders })
 }
@@ -298,9 +395,12 @@ export async function supabaseTusPatchHandler(c: Context): Promise<Response> {
   cloudlog({ requestId, message: 'supabaseTusPatchHandler response', status: response.status })
 
   const responseHeaders = buildTusResponseHeaders()
-  copyResponseHeaders(response.headers, responseHeaders, ['Upload-Offset', 'Upload-Expires'])
+  copyResponseHeaders(response.headers, responseHeaders, ['Upload-Offset', 'Upload-Length', 'Upload-Expires'])
 
   const body = await readErrorBody(response)
+  if (response.status >= 200 && response.status < 300 && uploadId)
+    await safeRecordSupabaseCompletedTusUpload(c, uploadId, responseHeaders)
+
   return new Response(body, { status: response.status, headers: responseHeaders })
 }
 

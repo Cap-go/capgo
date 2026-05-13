@@ -187,6 +187,12 @@ interface PartialEncryptionOptions {
   ivSessionKey: string
 }
 
+interface PartialUploadManifestEntry {
+  file_name: string
+  s3_path: string
+  file_hash: string
+}
+
 export async function uploadPartial(
   apikey: string,
   manifest: manifestType,
@@ -195,7 +201,7 @@ export async function uploadPartial(
   orgId: string,
   encryptionOptions: PartialEncryptionOptions | undefined,
   options: OptionsUpload,
-): Promise<any[] | null> {
+): Promise<PartialUploadManifestEntry[] | null> {
   const spinner = spinnerC()
   spinner.start('Preparing partial update with TUS protocol')
   const startTime = performance.now()
@@ -238,7 +244,7 @@ export async function uploadPartial(
     spinner.message(`Uploading ${totalFiles} files using TUS protocol`)
 
     // Helper function to upload a single file
-    const uploadFile = async (file: manifestType[number]) => {
+    const uploadFile = async (file: manifestType[number]): Promise<PartialUploadManifestEntry> => {
       const finalFilePath = join(path, file.file)
       const filePathUnix = convertToUnixPath(file.file)
 
@@ -285,7 +291,7 @@ export async function uploadPartial(
         })
       }
 
-      return new Promise((resolve, reject) => {
+      return new Promise<PartialUploadManifestEntry>((resolve, reject) => {
         spinner.message(`Prepare upload partial file: ${filePathUnix}`)
         // Get the MIME type for this file (based on original filename, not the R2 path)
         const filetype = getContentType(uploadPathUnix)
@@ -341,9 +347,9 @@ export async function uploadPartial(
       })
     }
 
-    // Process files in batches of 1000 to avoid overwhelming the server
+    // Process files in batches to avoid overwhelming the server
     const BATCH_SIZE = 500
-    const results: any[] = []
+    const results: PartialUploadManifestEntry[] = []
 
     for (let i = 0; i < manifest.length; i += BATCH_SIZE) {
       const batch = manifest.slice(i, i + BATCH_SIZE)

@@ -2330,6 +2330,33 @@ export type Database = {
           },
         ]
       }
+      uploaded_file_sizes: {
+        Row: {
+          app_id: string
+          created_at: string
+          file_size: number
+          owner_org: string
+          s3_path: string
+          updated_at: string
+        }
+        Insert: {
+          app_id: string
+          created_at?: string
+          file_size: number
+          owner_org: string
+          s3_path: string
+          updated_at?: string
+        }
+        Update: {
+          app_id?: string
+          created_at?: string
+          file_size?: number
+          owner_org?: string
+          s3_path?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       usage_credit_consumptions: {
         Row: {
           applied_at: string
