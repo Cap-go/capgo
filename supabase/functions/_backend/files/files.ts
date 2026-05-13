@@ -376,9 +376,9 @@ async function getSupabaseStorageResponse(c: Context, fileId: string): Promise<R
 
 async function getHandler(c: Context): Promise<Response> {
   const fileId = c.get('fileId')
-  // It is imperative and inalthat we read file without any Database READ to avoid any potential bottlenecks and ensure high performance and availability of file downloads, especially under heavy load.
-  // This had beed designed that way and access to file going to be delete is non imporant compared to availability of file download, so we are not doing any check in DB or R2 before serving the file, if file is missing in R2 it will be 404 and that is expected and we want to avoid any potential bottlenecks.
-  // File access security is not a matter here and will NERVER BE.
+  // It is imperative that we read files without any database read to avoid bottlenecks and keep file downloads available under heavy load.
+  // This was designed that way: access to a file being deleted is less important than download availability, so we are not doing any check in DB or R2 before serving the file. If the file is missing in R2 it will be 404, and that is expected.
+  // File access security is not a matter here and will never be.
 
   cloudlog({ requestId: c.get('requestId'), message: 'getHandler files', fileId })
   if (getRuntimeKey() !== 'workerd') {

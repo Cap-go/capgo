@@ -28,13 +28,13 @@ vi.mock('../supabase/functions/_backend/utils/pg_files.ts', () => ({
   getUserIdFromApikey: vi.fn(),
 }))
 
-describe('files app-scoped read guard', () => {
+describe('files app-scoped read availability', () => {
   beforeEach(() => {
     vi.resetModules()
     vi.clearAllMocks()
   })
 
-  it('returns 404 for deleted app-scoped files before serving cached content', async () => {
+  it('serves cached app-scoped files without checking app deletion state', async () => {
     getAppByAppIdPgMock.mockResolvedValue(null)
 
     const bucketPut = vi.fn()
@@ -65,12 +65,14 @@ describe('files app-scoped read guard', () => {
       { waitUntil: () => { } } as any,
     )
 
-    expect(response.status).toBe(404)
+    expect(response.status).toBe(200)
+    expect(await response.text()).toBe('cached orphan bytes')
     expect(bucketPut).not.toHaveBeenCalled()
-    expect(getPgClientMock).toHaveBeenCalledWith(expect.anything(), false)
+    expect(getPgClientMock).not.toHaveBeenCalled()
+    expect(getAppByAppIdPgMock).not.toHaveBeenCalled()
   })
 
-  it('returns 404 for malformed app-scoped paths before serving cached content', async () => {
+  it('serves cached malformed app-scoped paths without database reads', async () => {
     const bucketPut = vi.fn()
     globalThis.caches = {
       default: {
@@ -99,8 +101,10 @@ describe('files app-scoped read guard', () => {
       { waitUntil: () => { } } as any,
     )
 
-    expect(response.status).toBe(404)
+    expect(response.status).toBe(200)
+    expect(await response.text()).toBe('cached malformed bytes')
     expect(bucketPut).not.toHaveBeenCalled()
     expect(getAppByAppIdPgMock).not.toHaveBeenCalled()
+    expect(getPgClientMock).not.toHaveBeenCalled()
   })
 })
