@@ -204,7 +204,7 @@ async function main() {
   const client = new Client({
     application_name: 'capgo_cleanup_stuck_manifest_backlog',
     connectionString: databaseUrl,
-    ssl: shouldUseSsl(databaseUrl) ? { rejectUnauthorized: false } : undefined,
+    ssl: shouldUseSsl(databaseUrl) ? { rejectUnauthorized: true } : undefined,
   })
 
   await client.connect()
