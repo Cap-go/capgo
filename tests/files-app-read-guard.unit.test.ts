@@ -34,13 +34,13 @@ describe('files app-scoped read guard', () => {
     vi.clearAllMocks()
   })
 
-  it('serves cached app-scoped files without checking the app in the database', async () => {
+  it.concurrent('serves cached app-scoped files without checking the app in the database', async () => {
     getAppByAppIdPgMock.mockResolvedValue(null)
 
     const bucketPut = vi.fn()
     globalThis.caches = {
       default: {
-        match: async () => new Response('cached orphan bytes', {
+        match: async () => new Response('cached bytes', {
           headers: {
             'content-type': 'text/plain',
           },
@@ -66,17 +66,17 @@ describe('files app-scoped read guard', () => {
     )
 
     expect(response.status).toBe(200)
-    expect(await response.text()).toBe('cached orphan bytes')
+    expect(await response.text()).toBe('cached bytes')
     expect(bucketPut).not.toHaveBeenCalled()
     expect(getPgClientMock).not.toHaveBeenCalled()
     expect(getAppByAppIdPgMock).not.toHaveBeenCalled()
   })
 
-  it('serves cached malformed app-scoped paths without a database lookup', async () => {
+  it.concurrent('serves cached malformed app-scoped paths without a database lookup', async () => {
     const bucketPut = vi.fn()
     globalThis.caches = {
       default: {
-        match: async () => new Response('cached malformed bytes', {
+        match: async () => new Response('cached bytes', {
           headers: {
             'content-type': 'text/plain',
           },
@@ -102,7 +102,7 @@ describe('files app-scoped read guard', () => {
     )
 
     expect(response.status).toBe(200)
-    expect(await response.text()).toBe('cached malformed bytes')
+    expect(await response.text()).toBe('cached bytes')
     expect(bucketPut).not.toHaveBeenCalled()
     expect(getPgClientMock).not.toHaveBeenCalled()
     expect(getAppByAppIdPgMock).not.toHaveBeenCalled()

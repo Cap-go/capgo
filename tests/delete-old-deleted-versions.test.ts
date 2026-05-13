@@ -27,7 +27,7 @@ describe('delete_old_deleted_versions', () => {
   beforeAll(async () => {
     pool = new Pool({
       connectionString: POSTGRES_URL,
-      max: 1,
+      max: 3,
       idleTimeoutMillis: 2000,
     })
     await resetAndSeedAppData(cleanupAppId, {

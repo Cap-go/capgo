@@ -50,21 +50,33 @@ REVOKE ALL ON FUNCTION "public"."delete_old_deleted_versions"() FROM anon;
 REVOKE ALL ON FUNCTION "public"."delete_old_deleted_versions"() FROM authenticated;
 GRANT EXECUTE ON FUNCTION "public"."delete_old_deleted_versions"() TO service_role;
 
-UPDATE "public"."cron_tasks"
-SET
-  "description" = 'Permanently delete app versions 90 days after soft delete',
-  "task_type" = 'function'::"public"."cron_task_type",
-  "target" = 'public.delete_old_deleted_versions()',
-  "batch_size" = NULL,
-  "payload" = NULL,
-  "second_interval" = NULL,
-  "minute_interval" = NULL,
-  "hour_interval" = NULL,
-  "run_at_hour" = 3,
-  "run_at_minute" = 0,
-  "run_at_second" = 0,
-  "run_on_dow" = NULL,
-  "run_on_day" = NULL,
-  "enabled" = true,
-  "updated_at" = pg_catalog.now()
-WHERE "name" = 'delete_old_versions';
+DO $$
+DECLARE
+  updated_count bigint;
+BEGIN
+  UPDATE "public"."cron_tasks"
+  SET
+    "description" = 'Permanently delete app versions 90 days after soft delete',
+    "task_type" = 'function'::"public"."cron_task_type",
+    "target" = 'public.delete_old_deleted_versions()',
+    "batch_size" = NULL,
+    "payload" = NULL,
+    "second_interval" = NULL,
+    "minute_interval" = NULL,
+    "hour_interval" = NULL,
+    "run_at_hour" = 3,
+    "run_at_minute" = 0,
+    "run_at_second" = 0,
+    "run_on_dow" = NULL,
+    "run_on_day" = NULL,
+    "enabled" = true,
+    "updated_at" = pg_catalog.now()
+  WHERE "name" = 'delete_old_versions';
+
+  GET DIAGNOSTICS updated_count = ROW_COUNT;
+
+  IF updated_count = 0 THEN
+    RAISE EXCEPTION 'cron_tasks row with name = delete_old_versions not found';
+  END IF;
+END;
+$$;
