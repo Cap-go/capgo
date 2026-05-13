@@ -70,18 +70,29 @@ export const BROTLI_MIN_UPDATER_VERSION_V5 = '5.10.0'
 export const BROTLI_MIN_UPDATER_VERSION_V6 = '6.25.0'
 export const BROTLI_MIN_UPDATER_VERSION_V7 = '7.0.35'
 
+const semverCache = new Map<string, SemVer>()
+
+function parseCachedSemver(version: string): SemVer {
+  let parsed = semverCache.get(version)
+  if (!parsed) {
+    parsed = parse(version)
+    semverCache.set(version, parsed)
+  }
+  return parsed
+}
+
 export function isDeprecatedPluginVersion(parsedPluginVersion: SemVer, minFive = '5.10.0', minSix = '6.25.0', minSeven = '7.25.0', minEight = '8.0.0'): boolean {
   // v5 is deprecated if < 5.10.0, v6 is deprecated if < 6.25.0, v7 is deprecated if < 7.25.0, v8 is deprecated if < 8.0.0
-  if (parsedPluginVersion.major === 5 && lessThan(parsedPluginVersion, parse(minFive))) {
+  if (parsedPluginVersion.major === 5 && lessThan(parsedPluginVersion, parseCachedSemver(minFive))) {
     return true
   }
-  if (parsedPluginVersion.major === 6 && lessThan(parsedPluginVersion, parse(minSix))) {
+  if (parsedPluginVersion.major === 6 && lessThan(parsedPluginVersion, parseCachedSemver(minSix))) {
     return true
   }
-  if (parsedPluginVersion.major === 7 && lessThan(parsedPluginVersion, parse(minSeven))) {
+  if (parsedPluginVersion.major === 7 && lessThan(parsedPluginVersion, parseCachedSemver(minSeven))) {
     return true
   }
-  if (parsedPluginVersion.major === 8 && lessThan(parsedPluginVersion, parse(minEight))) {
+  if (parsedPluginVersion.major === 8 && lessThan(parsedPluginVersion, parseCachedSemver(minEight))) {
     return true
   }
   return false
