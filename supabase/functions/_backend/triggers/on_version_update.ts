@@ -317,19 +317,18 @@ export async function deleteIt(c: Context, record: Database['public']['Tables'][
     .single()
   if (dbError || !data) {
     cloudlog({ requestId: c.get('requestId'), message: 'Cannot find version meta', id: record.id })
-    return c.json(BRES)
   }
-  const { error: errorCreateStatsMeta } = await createStatsMeta(c, record.app_id, record.id, -data.size)
-  if (errorCreateStatsMeta)
-    cloudlog({ requestId: c.get('requestId'), message: 'error createStatsMeta', error: errorCreateStatsMeta })
-  // set app_versions_meta versionSize = 0
-  const { error: errorUpdate } = await supabaseAdmin(c)
-    .from('app_versions_meta')
-    .update({ size: 0 })
-    .eq('id', record.id)
-  if (errorUpdate) {
-    cloudlog({ requestId: c.get('requestId'), message: 'error', error: errorUpdate })
-    throw simpleError('cannot_update_version_meta', 'Cannot update version metadata for deleted version', { id: record.id }, errorUpdate)
+  else {
+    const { error: errorCreateStatsMeta } = await createStatsMeta(c, record.app_id, record.id, -data.size)
+    if (errorCreateStatsMeta)
+      cloudlog({ requestId: c.get('requestId'), message: 'error createStatsMeta', error: errorCreateStatsMeta })
+    // set app_versions_meta versionSize = 0
+    const { error: errorUpdate } = await supabaseAdmin(c)
+      .from('app_versions_meta')
+      .update({ size: 0 })
+      .eq('id', record.id)
+    if (errorUpdate)
+      cloudlog({ requestId: c.get('requestId'), message: 'error update version meta size during delete', id: record.id, error: errorUpdate })
   }
 
   await deleteManifest(c, record)

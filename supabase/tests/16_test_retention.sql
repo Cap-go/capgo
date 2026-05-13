@@ -1,7 +1,7 @@
 BEGIN;
 
 
-SELECT plan(15);
+SELECT plan(17);
 
 CREATE OR REPLACE FUNCTION my_tests() RETURNS SETOF TEXT AS $$
 DECLARE
@@ -15,6 +15,7 @@ DECLARE
   version_id_recent BIGINT;
   version_id_2year BIGINT;
   version_id_zero BIGINT;
+  remaining_batch_versions BIGINT;
 BEGIN
 
 -- Clean up any existing test data
@@ -237,6 +238,53 @@ RETURN NEXT IS (
     (SELECT COUNT(*) FROM app_versions WHERE name = 'unknown' AND app_id = test_app_id) > 0,
     true,
     'unknown version should never be hard-deleted'
+);
+
+-- Test 16 & 17: hard-delete should run in a bounded batch and cascade manifest rows
+CREATE TEMP TABLE retention_batch_targets(id BIGINT PRIMARY KEY) ON COMMIT DROP;
+
+WITH inserted_versions AS (
+  INSERT INTO app_versions (app_id, name, deleted, deleted_at, storage_provider, owner_org)
+  SELECT
+    test_app_id,
+    'batch-hard-delete-' || gs::text,
+    true,
+    '2019-01-01'::timestamp,
+    'r2',
+    (SELECT owner_org FROM apps WHERE app_id = test_app_id)
+  FROM generate_series(1, 505) AS gs
+  RETURNING id
+)
+INSERT INTO retention_batch_targets(id)
+SELECT id
+FROM inserted_versions;
+
+INSERT INTO manifest (app_version_id, file_name, s3_path, file_hash, file_size)
+SELECT
+  id,
+  'file-' || id::text,
+  'path-' || id::text,
+  'hash-' || id::text,
+  1
+FROM retention_batch_targets;
+
+PERFORM delete_old_deleted_versions();
+
+SELECT COUNT(*)
+INTO remaining_batch_versions
+FROM app_versions
+WHERE id IN (SELECT id FROM retention_batch_targets);
+
+RETURN NEXT IS (
+    remaining_batch_versions,
+    5::BIGINT,
+    'delete_old_deleted_versions should delete one bounded batch per run'
+);
+
+RETURN NEXT IS (
+    (SELECT COUNT(*) FROM manifest WHERE app_version_id IN (SELECT id FROM retention_batch_targets)),
+    remaining_batch_versions,
+    'manifest rows should cascade for hard-deleted batch versions'
 );
 
 END;
