@@ -232,6 +232,7 @@ async function deleteManifest(c: Context, record: Database['public']['Tables']['
                   .select('*', { count: 'exact', head: true })
                   .eq('file_name', entry.file_name)
                   .eq('file_hash', entry.file_hash)
+                  .eq('s3_path', entry.s3_path)
               })
               .then((v) => {
                 if (!v)
@@ -291,6 +292,7 @@ async function deleteManifest(c: Context, record: Database['public']['Tables']['
 
 export async function deleteIt(c: Context, record: Database['public']['Tables']['app_versions']['Row']) {
   cloudlog({ requestId: c.get('requestId'), message: 'Delete', r2_path: record.r2_path })
+  let deferredError: (() => never) | null = null
 
   if (record.r2_path) {
     let deleted = false
@@ -299,40 +301,45 @@ export async function deleteIt(c: Context, record: Database['public']['Tables'][
     }
     catch (error) {
       cloudlog({ requestId: c.get('requestId'), message: 'Cannot delete s3 (v2)', error })
-      throw simpleError('cannot_delete_s3', 'Cannot delete S3 object for deleted version', { id: record.id, r2_path: record.r2_path }, error)
+      deferredError = () => simpleError('cannot_delete_s3', 'Cannot delete S3 object for deleted version', { id: record.id, r2_path: record.r2_path }, error)
     }
 
-    if (!deleted) {
-      throw simpleError('cannot_delete_s3', 'Cannot delete S3 object for deleted version', { id: record.id, r2_path: record.r2_path })
-    }
+    if (!deleted && !deferredError)
+      deferredError = () => simpleError('cannot_delete_s3', 'Cannot delete S3 object for deleted version', { id: record.id, r2_path: record.r2_path })
   }
   else {
     cloudlog({ requestId: c.get('requestId'), message: 'No r2 path for deleted version', id: record.id })
   }
 
-  const { data, error: dbError } = await supabaseAdmin(c)
-    .from('app_versions_meta')
-    .select()
-    .eq('id', record.id)
-    .single()
-  if (dbError || !data) {
-    cloudlog({ requestId: c.get('requestId'), message: 'Cannot find version meta', id: record.id })
-    return c.json(BRES)
-  }
-  const { error: errorCreateStatsMeta } = await createStatsMeta(c, record.app_id, record.id, -data.size)
-  if (errorCreateStatsMeta)
-    cloudlog({ requestId: c.get('requestId'), message: 'error createStatsMeta', error: errorCreateStatsMeta })
-  // set app_versions_meta versionSize = 0
-  const { error: errorUpdate } = await supabaseAdmin(c)
-    .from('app_versions_meta')
-    .update({ size: 0 })
-    .eq('id', record.id)
-  if (errorUpdate) {
-    cloudlog({ requestId: c.get('requestId'), message: 'error', error: errorUpdate })
-    throw simpleError('cannot_update_version_meta', 'Cannot update version metadata for deleted version', { id: record.id }, errorUpdate)
+  if (!deferredError) {
+    const { data, error: dbError } = await supabaseAdmin(c)
+      .from('app_versions_meta')
+      .select()
+      .eq('id', record.id)
+      .single()
+    if (dbError || !data) {
+      cloudlog({ requestId: c.get('requestId'), message: 'Cannot find version meta', id: record.id })
+    }
+    else {
+      const { error: errorCreateStatsMeta } = await createStatsMeta(c, record.app_id, record.id, -data.size)
+      if (errorCreateStatsMeta)
+        cloudlog({ requestId: c.get('requestId'), message: 'error createStatsMeta', error: errorCreateStatsMeta })
+      // set app_versions_meta versionSize = 0
+      const { error: errorUpdate } = await supabaseAdmin(c)
+        .from('app_versions_meta')
+        .update({ size: 0 })
+        .eq('id', record.id)
+      if (errorUpdate) {
+        cloudlog({ requestId: c.get('requestId'), message: 'error', error: errorUpdate })
+        deferredError ??= () => simpleError('cannot_update_version_meta', 'Cannot update version metadata for deleted version', { id: record.id }, errorUpdate)
+      }
+    }
   }
 
   await deleteManifest(c, record)
+
+  if (deferredError)
+    deferredError()
 
   return c.json(BRES)
 }
