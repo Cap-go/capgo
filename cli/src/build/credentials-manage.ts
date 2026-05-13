@@ -18,8 +18,6 @@ import {
 } from '../init/prompts'
 import { clearInitLogs, setInitScreen, stopInitInkSession } from '../init/runtime'
 import { getAppId, getConfig } from '../utils'
-import { onboardingBuilderCommand } from './onboarding/command'
-import { canUseFilePicker, openSaveFilePicker } from './onboarding/file-picker'
 import {
   clearSavedCredentials,
   getGlobalCredentialsPath,
@@ -29,6 +27,8 @@ import {
   removeSavedCredentialKeys,
   updateSavedCredentials,
 } from './credentials'
+import { onboardingBuilderCommand } from './onboarding/command'
+import { canUseFilePicker, openSaveFilePicker } from './onboarding/file-picker'
 
 interface ManageCredentialsOptions {
   appId?: string
@@ -213,10 +213,6 @@ const CREDENTIAL_KNOWLEDGE: Record<string, FieldKnowledge> = {
 
 function getFieldKnowledge(key: string): FieldKnowledge | undefined {
   return CREDENTIAL_KNOWLEDGE[key]
-}
-
-function getFieldScope(key: string): FieldScope {
-  return CREDENTIAL_KNOWLEDGE[key]?.scope ?? 'shared'
 }
 
 interface FieldRow {
@@ -810,6 +806,50 @@ function actionShowField(row: FieldRow): void {
   pLog.success(`✓ Showed ${row.key}.`)
 }
 
+// JSON object keys whose values must never be printed by the Decode action.
+// Covers service-account JSON (private_key, private_key_id), generic OAuth /
+// API patterns (client_secret, api_key, access_token, refresh_token), and the
+// catch-all "secret" / "password". Match is case-insensitive.
+const SENSITIVE_JSON_KEYS = new Set<string>([
+  'private_key',
+  'private_key_id',
+  'client_secret',
+  'api_key',
+  'apikey',
+  'secret',
+  'password',
+  'access_token',
+  'refresh_token',
+])
+
+interface RedactedJson {
+  value: unknown
+  redactedKeys: string[]
+}
+
+function redactSensitiveJson(input: unknown): RedactedJson {
+  const redactedKeys: string[] = []
+  const walk = (value: unknown): unknown => {
+    if (Array.isArray(value))
+      return value.map(walk)
+    if (value !== null && typeof value === 'object') {
+      const result: Record<string, unknown> = {}
+      for (const [key, child] of Object.entries(value)) {
+        if (SENSITIVE_JSON_KEYS.has(key.toLowerCase())) {
+          redactedKeys.push(key)
+          result[key] = '[REDACTED]'
+        }
+        else {
+          result[key] = walk(child)
+        }
+      }
+      return result
+    }
+    return value
+  }
+  return { value: walk(input), redactedKeys }
+}
+
 function actionDecodeField(row: FieldRow): void {
   let decoded: Buffer
   try {
@@ -823,8 +863,12 @@ function actionDecodeField(row: FieldRow): void {
   const text = decoded.toString('utf-8')
   try {
     const parsed: unknown = JSON.parse(text)
-    pLog.info(`──── [${row.tag}] ${row.key} (decoded JSON, ${decoded.length} bytes) ────`)
-    pLog.info(JSON.stringify(parsed, null, 2))
+    const { value: redacted, redactedKeys } = redactSensitiveJson(parsed)
+    const tagSuffix = redactedKeys.length > 0 ? `, ${redactedKeys.length} sensitive key${redactedKeys.length === 1 ? '' : 's'} redacted` : ''
+    pLog.info(`──── [${row.tag}] ${row.key} (decoded JSON, ${decoded.length} bytes${tagSuffix}) ────`)
+    pLog.info(JSON.stringify(redacted, null, 2))
+    if (redactedKeys.length > 0)
+      pLog.warn(`Redacted: ${redactedKeys.join(', ')}. Use "Show value" to view the raw base64.`)
     pLog.success(`✓ Decoded ${row.key} as JSON (${decoded.length} bytes → ${text.length} chars).`)
     return
   }
@@ -1107,7 +1151,7 @@ function looksLikeJson(value: string): boolean {
 }
 
 function sanitizeForFilename(value: string): string {
-  return value.replace(/[^a-z0-9_-]/gi, '_').slice(0, 40)
+  return value.replace(/[^\w-]/g, '_').slice(0, 40)
 }
 
 function summarizeProvisioningMap(raw: string): string {
