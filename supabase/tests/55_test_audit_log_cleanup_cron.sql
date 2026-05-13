@@ -96,7 +96,9 @@ SELECT is(
     (
         SELECT count(*)::int
         FROM public.audit_logs
-        WHERE record_id = 'audit-log-retention-old'
+        WHERE
+            record_id = 'audit-log-retention-old'
+            AND table_name = 'audit_log_retention_test'
     ),
     0,
     'cleanup_old_audit_logs deletes rows older than 90 days'
@@ -106,7 +108,9 @@ SELECT is(
     (
         SELECT count(*)::int
         FROM public.audit_logs
-        WHERE record_id = 'audit-log-retention-fresh'
+        WHERE
+            record_id = 'audit-log-retention-fresh'
+            AND table_name = 'audit_log_retention_test'
     ),
     1,
     'cleanup_old_audit_logs keeps rows newer than 90 days'
