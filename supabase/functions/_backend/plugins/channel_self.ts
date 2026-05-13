@@ -593,7 +593,7 @@ app.put('/', async (c) => {
     return simpleRateLimit({ app_id: bodyParsed.app_id, device_id: bodyParsed.device_id, ...buildRateLimitInfo(rateLimitStatus.resetAt) })
   }
 
-  const pgClient = getPgClient(c)
+  const pgClient = getPgClient(c, isChannelSelfLocalChannelStorageVersion(c, bodyParsed, 'PUT'))
 
   return await runChannelSelfWithPgClient(
     c,
