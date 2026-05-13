@@ -298,6 +298,8 @@ INTO remaining_batch_versions
 FROM app_versions
 WHERE id IN (SELECT id FROM retention_batch_targets);
 
+-- delete_old_deleted_versions deletes up to 500 rows per call, so the
+-- retention_batch_targets fixture starts with 505 rows and expects 5 remaining.
 RETURN NEXT IS (
     remaining_batch_versions,
     5::BIGINT,
