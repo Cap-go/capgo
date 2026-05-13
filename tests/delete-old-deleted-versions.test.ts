@@ -87,6 +87,101 @@ describe('delete_old_deleted_versions', () => {
     }
   })
 
+  it.concurrent('keeps stale deleted versions until bundle and manifest cleanup is complete', async () => {
+    const cleanName = `clean-${randomUUID()}`
+    const manifestPendingName = `manifest-pending-${randomUUID()}`
+    const bundlePendingName = `bundle-pending-${randomUUID()}`
+    const client = await pool.connect()
+
+    try {
+      await client.query('BEGIN')
+      const inserted = await client.query<{ id: string, name: string }>(
+        `
+        INSERT INTO public.app_versions (
+          app_id,
+          name,
+          owner_org,
+          deleted,
+          deleted_at,
+          r2_path,
+          storage_provider
+        )
+        VALUES
+          ($1, $2, $5, true, pg_catalog.now() - INTERVAL '91 days', 'cleanup/clean.zip', 'r2'),
+          ($1, $3, $5, true, pg_catalog.now() - INTERVAL '91 days', 'cleanup/manifest-pending.zip', 'r2'),
+          ($1, $4, $5, true, pg_catalog.now() - INTERVAL '91 days', 'cleanup/bundle-pending.zip', 'r2')
+        RETURNING id, name
+        `,
+        [cleanupAppId, cleanName, manifestPendingName, bundlePendingName, ORG_ID_CRON_QUEUE],
+      )
+      const ids = Object.fromEntries(inserted.rows.map(row => [row.name, row.id]))
+
+      await client.query(
+        `
+        INSERT INTO public.app_versions_meta (
+          app_id,
+          checksum,
+          size,
+          id,
+          owner_org
+        )
+        VALUES
+          ($1, 'clean-checksum', 0, $2, $5),
+          ($1, 'manifest-pending-checksum', 0, $3, $5),
+          ($1, 'bundle-pending-checksum', 64, $4, $5)
+        `,
+        [
+          cleanupAppId,
+          ids[cleanName],
+          ids[manifestPendingName],
+          ids[bundlePendingName],
+          ORG_ID_CRON_QUEUE,
+        ],
+      )
+
+      await client.query(
+        `
+        INSERT INTO public.manifest (
+          app_version_id,
+          file_name,
+          s3_path,
+          file_hash,
+          file_size
+        )
+        VALUES ($1, 'delta.js', 'cleanup/delta.js', 'delta-hash', 12)
+        `,
+        [ids[manifestPendingName]],
+      )
+
+      await client.query('SELECT public.delete_old_deleted_versions()')
+
+      const remaining = await client.query<{ name: string }>(
+        `
+        SELECT name
+        FROM public.app_versions
+        WHERE app_id = $1
+          AND name = ANY($2::varchar[])
+        ORDER BY name
+        `,
+        [cleanupAppId, [cleanName, manifestPendingName, bundlePendingName]],
+      )
+      const manifestRows = await client.query<{ count: string }>(
+        `
+        SELECT COUNT(*) AS count
+        FROM public.manifest
+        WHERE app_version_id = $1
+        `,
+        [ids[manifestPendingName]],
+      )
+
+      expect(remaining.rows.map(row => row.name)).toEqual([bundlePendingName, manifestPendingName].sort())
+      expect(manifestRows.rows[0].count).toBe('1')
+    }
+    finally {
+      await rollbackAndRelease(client)
+    }
+  })
+
   it.concurrent('keeps the deleted-version cleanup cron task enabled daily', async () => {
     const result = await pool.query<{
       description: string

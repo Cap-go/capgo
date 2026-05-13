@@ -14,6 +14,20 @@ BEGIN
     AND "app_versions"."name" NOT IN ('builtin', 'unknown')
     AND NOT EXISTS (
       SELECT 1
+      FROM "public"."manifest"
+      WHERE "manifest"."app_version_id" = "app_versions"."id"
+    )
+    AND (
+      "app_versions"."r2_path" IS NULL
+      OR EXISTS (
+        SELECT 1
+        FROM "public"."app_versions_meta"
+        WHERE "app_versions_meta"."id" = "app_versions"."id"
+          AND "app_versions_meta"."size" = 0
+      )
+    )
+    AND NOT EXISTS (
+      SELECT 1
       FROM "public"."channels"
       WHERE "channels"."version" = "app_versions"."id"
     );
@@ -29,7 +43,7 @@ $$;
 ALTER FUNCTION "public"."delete_old_deleted_versions"() OWNER TO "postgres";
 
 COMMENT ON FUNCTION "public"."delete_old_deleted_versions"() IS
-  'Permanently deletes app_versions that have been soft-deleted for at least 90 days, excluding builtin/unknown placeholders and channel-linked versions.';
+  'Permanently deletes app_versions that have been soft-deleted for at least 90 days after storage cleanup is reflected in app_versions_meta and manifest rows.';
 
 REVOKE ALL ON FUNCTION "public"."delete_old_deleted_versions"() FROM PUBLIC;
 REVOKE ALL ON FUNCTION "public"."delete_old_deleted_versions"() FROM anon;
