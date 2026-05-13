@@ -13,6 +13,7 @@ const {
   manifestEntries,
   manifestSelectFileNameEq,
   manifestSelectHashEq,
+  manifestSelectPathEq,
   pgQuery,
   supabaseAdmin,
 } = vi.hoisted(() => {
@@ -23,7 +24,8 @@ const {
   const manifestEntries: any[] = []
   const manifestDeleteEq = vi.fn()
   const manifestDelete = vi.fn(() => ({ eq: manifestDeleteEq }))
-  const manifestSelectHashEq = vi.fn()
+  const manifestSelectPathEq = vi.fn()
+  const manifestSelectHashEq = vi.fn(() => ({ eq: manifestSelectPathEq }))
   const manifestSelectFileNameEq = vi.fn(() => ({ eq: manifestSelectHashEq }))
   const manifestSelect = vi.fn(() => ({ eq: manifestSelectFileNameEq }))
   const supabaseFrom = vi.fn((table: string) => {
@@ -62,6 +64,7 @@ const {
     manifestEntries,
     manifestSelectFileNameEq,
     manifestSelectHashEq,
+    manifestSelectPathEq,
     pgQuery,
     supabaseAdmin: vi.fn(() => ({ from: supabaseFrom })),
     supabaseFrom,
@@ -126,7 +129,7 @@ describe('on_version_update deleted version cleanup', () => {
     deleteObject.mockResolvedValue(true)
     createStatsMeta.mockResolvedValue({ error: null })
     manifestDeleteEq.mockResolvedValue({ error: null })
-    manifestSelectHashEq.mockResolvedValue({ error: null, count: 0 })
+    manifestSelectPathEq.mockResolvedValue({ error: null, count: 0 })
     pgQuery.mockResolvedValue({ rows: [], rowCount: 1 })
     appVersionsMetaSelectEq.mockReturnValue({
       single: vi.fn(async () => ({ data: { size: 1234 }, error: null })),
@@ -181,7 +184,28 @@ describe('on_version_update deleted version cleanup', () => {
     expect(manifestDeleteEq).toHaveBeenCalledWith('id', 456)
     expect(manifestSelectFileNameEq).toHaveBeenCalledWith('file_name', 'www/app.js')
     expect(manifestSelectHashEq).toHaveBeenCalledWith('file_hash', 'hash-1')
+    expect(manifestSelectPathEq).toHaveBeenCalledWith('s3_path', 'orgs/org-1/apps/com.cleanup.test/manifest/www/app.js')
     expect(deleteObject).toHaveBeenCalledWith(expect.anything(), 'orgs/org-1/apps/com.cleanup.test/manifest/www/app.js')
+  })
+
+  it('keeps shared manifest files in storage when another version still references them', async () => {
+    manifestEntries.push({
+      id: 654,
+      app_version_id: 123,
+      file_name: 'www/shared.js',
+      file_hash: 'hash-shared',
+      s3_path: 'orgs/org-1/apps/com.cleanup.test/manifest/www/shared.js',
+    })
+    manifestSelectPathEq.mockResolvedValue({ error: null, count: 1 })
+
+    const response = await deleteIt(createContext(), createVersion({ r2_path: null }))
+
+    expect(response.status).toBe(200)
+    expect(manifestDeleteEq).toHaveBeenCalledWith('id', 654)
+    expect(manifestSelectFileNameEq).toHaveBeenCalledWith('file_name', 'www/shared.js')
+    expect(manifestSelectHashEq).toHaveBeenCalledWith('file_hash', 'hash-shared')
+    expect(manifestSelectPathEq).toHaveBeenCalledWith('s3_path', 'orgs/org-1/apps/com.cleanup.test/manifest/www/shared.js')
+    expect(deleteObject).not.toHaveBeenCalledWith(expect.anything(), 'orgs/org-1/apps/com.cleanup.test/manifest/www/shared.js')
   })
 
   it('resets manifest counters after deleting manifest entries', async () => {

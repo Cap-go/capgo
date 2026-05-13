@@ -232,6 +232,7 @@ async function deleteManifest(c: Context, record: Database['public']['Tables']['
                   .select('*', { count: 'exact', head: true })
                   .eq('file_name', entry.file_name)
                   .eq('file_hash', entry.file_hash)
+                  .eq('s3_path', entry.s3_path)
               })
               .then((v) => {
                 if (!v)
