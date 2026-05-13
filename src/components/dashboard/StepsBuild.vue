@@ -93,7 +93,7 @@ const setupStep = computed<Step>(() => {
     return {
       key: 'setup-ios',
       title: t('build-step-ios-setup-title'),
-      command: `npx @capgo/cli@latest build init -a ${apiKey.value}`,
+      command: `npx @capgo/cli@latest build init -a ${apiKey.value} --platform ios`,
       subtitle: t('build-step-ios-setup-subtitle'),
       icon: IconSettings,
     }
@@ -102,7 +102,7 @@ const setupStep = computed<Step>(() => {
   return {
     key: 'setup-android',
     title: t('build-step-android-setup-title'),
-    command: `npx @capgo/cli@latest build credentials save --appId ${props.appId} --platform android`,
+    command: `npx @capgo/cli@latest build init -a ${apiKey.value} --platform android`,
     subtitle: t('build-step-android-setup-subtitle'),
     icon: IconSettings,
   }
