@@ -49,6 +49,28 @@ export function openPackageJsonPicker(): Promise<string | null> {
     })
 }
 
+export interface SaveFilePickerOptions {
+  prompt: string
+  defaultName?: string
+  defaultLocation?: string
+}
+
+/**
+ * Open the macOS native "Save As…" dialog. Returns the chosen path, or null if
+ * the user cancelled. macOS prompts for overwrite confirmation natively, so
+ * callers do not need to re-confirm.
+ */
+export function openSaveFilePicker(opts: SaveFilePickerOptions): Promise<string | null> {
+  const escape = (value: string): string => value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
+  let script = `POSIX path of (choose file name with prompt "${escape(opts.prompt)}"`
+  if (opts.defaultName)
+    script += ` default name "${escape(opts.defaultName)}"`
+  if (opts.defaultLocation)
+    script += ` default location (POSIX file "${escape(opts.defaultLocation)}")`
+  script += ')'
+  return openMacFilePicker(script)
+}
+
 /**
  * Open the macOS native file picker filtered to Android keystore files.
  * Accepts .jks, .keystore, and .p12 extensions.
