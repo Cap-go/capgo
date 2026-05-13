@@ -54,7 +54,6 @@ describe('files local read proxy', () => {
   })
 
   it('proxies local storage reads instead of redirecting to a public URL', async () => {
-    getAppByAppIdPgMock.mockResolvedValue({ app_id: 'test-app', owner_org: 'test-org' })
     createSignedUrlMock.mockResolvedValue({
       data: { signedUrl: 'https://storage.example/object?token=test' },
       error: null,
@@ -91,13 +90,13 @@ describe('files local read proxy', () => {
     expect(await response.text()).toBe('proxied local bytes')
     expect(response.headers.get('cache-control')).toBe('public, max-age=60, no-transform')
     expect(response.headers.get('content-disposition')).toBe('attachment; filename="orgs/test-org/apps/test-app/local.txt"')
-    expect(getPgClientMock).toHaveBeenCalledWith(expect.anything(), false)
+    expect(getPgClientMock).not.toHaveBeenCalled()
+    expect(getAppByAppIdPgMock).not.toHaveBeenCalled()
     expect(storageFromMock).toHaveBeenCalledWith('capgo')
     expect(createSignedUrlMock).toHaveBeenCalledWith('orgs/test-org/apps/test-app/local.txt', 60)
   })
 
   it('preserves HEAD requests without downloading bytes from the signed URL proxy', async () => {
-    getAppByAppIdPgMock.mockResolvedValue({ app_id: 'test-app', owner_org: 'test-org' })
     createSignedUrlMock.mockResolvedValue({
       data: { signedUrl: 'https://storage.example/object?token=test' },
       error: null,
@@ -132,5 +131,7 @@ describe('files local read proxy', () => {
     expect(response.status).toBe(200)
     expect(response.headers.get('cache-control')).toBe('public, max-age=60, no-transform')
     expect(response.headers.get('content-disposition')).toBe('attachment; filename="orgs/test-org/apps/test-app/local.txt"')
+    expect(getPgClientMock).not.toHaveBeenCalled()
+    expect(getAppByAppIdPgMock).not.toHaveBeenCalled()
   })
 })
