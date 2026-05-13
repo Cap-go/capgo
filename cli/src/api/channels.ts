@@ -177,14 +177,6 @@ export function findChannel(supabase: SupabaseClient<Database>, appId: string, n
     .single()
 }
 
-export function findChannelDevices(supabase: SupabaseClient<Database>, appId: string, channelId: number) {
-  return supabase
-    .from('channel_devices')
-    .select('id')
-    .eq('app_id', appId)
-    .eq('channel_id', channelId)
-}
-
 export function delChannelDevices(supabase: SupabaseClient<Database>, appId: string, channelId: number) {
   return supabase
     .from('channel_devices')

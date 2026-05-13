@@ -1,4 +1,3 @@
-import type { BundleUnlinkOptions } from '../schemas/bundle'
 import { intro, log, outro } from '@clack/prompts'
 import { check2FAComplianceForApp, checkAppExistsAndHasPermissionOrgErr } from '../api/app'
 import { checkVersionNotUsedInChannel } from '../api/channels'
@@ -16,6 +15,14 @@ import {
   resolveUserIdFromApiKey,
   sendEvent,
 } from '../utils'
+
+interface BundleUnlinkOptions {
+  bundle?: string
+  packageJson?: string
+  apikey?: string
+  supaHost?: string
+  supaAnon?: string
+}
 
 export async function unlinkDeviceInternal(
   channel: string,

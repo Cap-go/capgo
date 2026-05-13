@@ -1,6 +1,6 @@
 BEGIN;
 
-SELECT plan(7);
+SELECT plan(9);
 
 -- Test fixtures - DEDICATED DATA FOR TEST ISOLATION (parallel test execution)
 -- Create dedicated test users to avoid conflicts with other parallel tests
@@ -191,6 +191,23 @@ SELECT
     'rbac-test-apikey'
 FROM seed_data;
 
+-- Restricted API key principal owned by an org admin. The explicit key binding
+-- must limit the key even though the owner user has broader app permissions.
+WITH seed_data AS (
+    SELECT
+        '44444444-4444-4444-8444-444444444444'::uuid AS member_user,
+        'rbac-test-restricted-key-phase1'::text AS api_key_value
+)
+
+INSERT INTO public.apikeys (id, user_id, key, mode, name)
+SELECT
+    33002,
+    member_user,
+    api_key_value,
+    'all'::public.key_mode,
+    'rbac-test-restricted-apikey'
+FROM seed_data;
+
 -- RBAC bindings (org_admin to user, app_admin to apikey)
 WITH seed_data AS (
     SELECT
@@ -276,6 +293,35 @@ WHERE
     AND r.name = 'app_admin'
     AND a.app_id = 'com.rbac.new';
 
+-- Explicit org_member binding for restricted API key. org_member has no app.read
+-- permission, so apps RLS must not fall back to the owner user's org_admin role.
+WITH seed_data AS (
+    SELECT
+        'rbac-test-restricted-key-phase1'::text AS api_key_value,
+        '33333333-3333-4333-8333-333333333333'::uuid AS admin_user,
+        '22222222-2222-4222-8222-222222222222'::uuid AS org_rbac
+)
+
+INSERT INTO public.role_bindings (
+    principal_type,
+    principal_id,
+    role_id,
+    scope_type,
+    org_id,
+    granted_by
+)
+SELECT
+    'apikey',
+    api.rbac_id,
+    r.id,
+    'org',
+    org_rbac,
+    admin_user
+FROM public.apikeys AS api, public.roles AS r, seed_data
+WHERE
+    api.key = api_key_value
+    AND r.name = public.rbac_role_org_member();
+
 -- 1) Legacy path still works when RBAC flag is off
 SELECT
     ok(
@@ -344,6 +390,37 @@ SELECT
         ),
         'App admin binding on apikey grants app.update_settings permission'
     );
+
+
+SELECT tests.clear_authentication();
+SELECT set_config('request.headers', '{"capgkey":"rbac-test-restricted-key-phase1"}', true);
+
+SELECT
+    is(
+        (
+            SELECT count(*)::integer
+            FROM public.apps
+            WHERE app_id = 'com.rbac.new'
+        ),
+        0,
+        'Apps RLS denies explicitly restricted API key even when owner has org_admin'
+    );
+
+SELECT set_config('request.headers', '{"capgkey":"rbac-test-key-phase1"}', true);
+
+SELECT
+    is(
+        (
+            SELECT count(*)::integer
+            FROM public.apps
+            WHERE app_id = 'com.rbac.new'
+        ),
+        1,
+        'Apps RLS allows API key with explicit app read permission'
+    );
+
+SELECT tests.authenticate_as_service_role();
+SELECT set_config('request.headers', '{}', true);
 
 -- 6) Disabling RBAC removes RBAC-granted access when no legacy rights exist
 UPDATE public.orgs SET use_new_rbac = false

@@ -82,6 +82,8 @@ const isCompletingTopUp = ref(false)
 const isProcessingCheckout = computed(() => isStartingCheckout.value || isCompletingTopUp.value)
 const currentPage = ref(1)
 const pageSize = 5
+const CREDIT_PRICING_HASH = '#credit-pricing'
+const isCreditPricingOpen = ref(route.hash === CREDIT_PRICING_HASH)
 const DEFAULT_TOP_UP_QUANTITY = 100
 const QUICK_TOP_UP_OPTIONS = [50, 500, 5000] as const
 const CREDIT_TAX_MULTIPLIER = 1.2
@@ -181,7 +183,6 @@ function formatCurrency(value: number) {
 function formatMetricAmount(metric: Database['public']['Enums']['credit_metric_type'], value: number) {
   // Apply ceil to round up the metric value
   const ceiledValue = Math.ceil(value)
-  const min = new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 }).format(ceiledValue)
   switch (metric) {
     case 'mau':
       return `${new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 }).format(ceiledValue)} ${t('users')}`
@@ -191,13 +192,20 @@ function formatMetricAmount(metric: Database['public']['Enums']['credit_metric_t
       const gib = Math.ceil(ceiledValue / 1073741824)
       return `${new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 }).format(gib)} GiB`
     }
-    case 'build_time':
-      // Convert minutes to hours if > 60
-      if (ceiledValue >= 60) {
-        const hours = new Intl.NumberFormat(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(ceiledValue / 60)
+    case 'build_time': {
+      // ceiledValue is in seconds: computeUsageFromCredits inverts the SQL pricing
+      // formula (credits = ceil(seconds / unit_factor) * price_per_unit) where
+      // unit_factor = 60, so the inverse hands back raw seconds. Convert to hours
+      // when >= 1h, otherwise show whole minutes (rounded up to match billing).
+      if (ceiledValue >= 3600) {
+        const hours = new Intl.NumberFormat(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })
+          .format(ceiledValue / 3600)
         return t('x-hours-short', { hours })
       }
-      return t('minutes-short', { minutes: min })
+      const minutes = new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 })
+        .format(Math.ceil(ceiledValue / 60))
+      return t('minutes-short', { minutes })
+    }
     default:
       return new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }).format(ceiledValue)
   }
@@ -415,6 +423,10 @@ async function handleBuyCredits() {
   }
 }
 
+function handleCreditPricingToggle(event: Event) {
+  isCreditPricingOpen.value = (event.currentTarget as HTMLDetailsElement).open
+}
+
 async function handleCreditCheckoutReturn() {
   if (isCompletingTopUp.value)
     return
@@ -460,6 +472,11 @@ async function handleCreditCheckoutReturn() {
     await router.replace({ query: newQuery })
   }
 }
+
+watch(() => route.hash, (hash) => {
+  if (hash === CREDIT_PRICING_HASH)
+    isCreditPricingOpen.value = true
+})
 
 onMounted(async () => {
   displayStore.NavTitle = t('credits')
@@ -617,7 +634,7 @@ watch(() => currentOrganization.value?.gid, async (newOrgId: string | undefined,
       </div>
     </div>
 
-    <details class="group rounded-3xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
+    <details id="credit-pricing" class="group rounded-3xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800" :open="isCreditPricingOpen" @toggle="handleCreditPricingToggle">
       <summary class="flex w-full cursor-pointer items-center justify-between gap-4 p-6 text-left [&::-webkit-details-marker]:hidden">
         <div>
           <h2 class="text-2xl font-semibold text-gray-900 dark:text-white">

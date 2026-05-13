@@ -140,6 +140,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
       - name: Setup bun
         uses: oven-sh/setup-bun@v2
         with:
@@ -159,6 +162,35 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
+  deploy_translation_worker:
+    needs: deploy_api
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+      - name: Setup bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - name: Install dependencies
+        run: bun install
+      - name: Set environment variable
+        run: |
+          if [[ ${{ github.ref }} == *-alpha* ]]; then
+            echo "ENV=dev" >> $GITHUB_ENV
+          else
+            echo "ENV=prod" >> $GITHUB_ENV
+          fi
+      - name: Deploy CF Worker Translation
+        run: bun run deploy:cloudflare:translation:${{ env.ENV }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
   deploy_files:
     needs: supabase_deploy
     runs-on: ubuntu-latest
@@ -166,6 +198,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
       - name: Setup bun
         uses: oven-sh/setup-bun@v2
         with:
@@ -192,7 +227,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        region: [eu, as, us, sa, oc, af, me, hk]
+        region: [eu, as, us, sa, oc, af, me, hk, jp]
         include:
           - region: eu
             region_label: Europe (EU)
@@ -218,10 +253,16 @@ jobs:
           - region: hk
             region_label: Hong Kong (HK)
             cf_target: plugin_hk
+          - region: jp
+            region_label: Japan (JP)
+            cf_target: plugin_jp
     name: Deploy CF Worker Plugin (${{ matrix.region_label }})
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
       - name: Setup bun
         uses: oven-sh/setup-bun@v2
         with:

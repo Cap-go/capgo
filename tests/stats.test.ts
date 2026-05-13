@@ -22,6 +22,7 @@ type StatsAction = Database['public']['Enums']['stats_action']
 
 interface StatsPayload extends ReturnType<typeof getBaseData> {
   action: StatsAction
+  metadata?: Record<string, string>
 }
 
 async function postStats(data: object) {
@@ -147,6 +148,38 @@ describe('[POST] /stats', () => {
     expect(statsData?.device_id).toBe(uuid)
 
     // Clean up
+    await getSupabaseClient().from('devices').delete().eq('device_id', uuid).eq('app_id', APP_NAME_STATS)
+  })
+
+  it('stores metadata for app and WebView health stats', async () => {
+    const uuid = randomUUID().toLowerCase()
+    const baseData = getBaseData(APP_NAME_STATS) as StatsPayload
+    baseData.device_id = uuid
+    baseData.action = 'webview_javascript_error'
+    baseData.version_build = getVersionFromAction('webview_javascript_error')
+    baseData.metadata = {
+      error_type: 'javascript_error',
+      message: 'boom',
+      href: 'capacitor://localhost/index.html',
+    }
+
+    const version = await createAppVersions(baseData.version_build, APP_NAME_STATS)
+    baseData.version_name = version.name
+    const response = await postStats(baseData)
+    expect(response.status).toBe(200)
+    expect(await response.json<StatsRes>()).toEqual({ status: 'ok' })
+
+    const { error: statsError, data: statsData } = await getSupabaseClient()
+      .from('stats')
+      .select('action, metadata')
+      .eq('device_id', uuid)
+      .eq('app_id', APP_NAME_STATS)
+      .single()
+
+    expect(statsError).toBeNull()
+    expect(statsData?.action).toBe('webview_javascript_error')
+    expect(statsData?.metadata).toEqual(baseData.metadata)
+
     await getSupabaseClient().from('devices').delete().eq('device_id', uuid).eq('app_id', APP_NAME_STATS)
   })
 

@@ -29,7 +29,7 @@ describe('normalizeAnalyticsLimit', () => {
     normalizeAnalyticsLimit(99.7)
   })
 
-  bench('NaN and Infinity', () => {
+  bench('nan and infinity', () => {
     normalizeAnalyticsLimit(Number.NaN)
     normalizeAnalyticsLimit(Number.POSITIVE_INFINITY)
   })

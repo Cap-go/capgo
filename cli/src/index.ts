@@ -11,6 +11,7 @@ import { setApp } from './app/set'
 import { setSetting } from './app/setting'
 import { clearCredentialsCommand, listCredentialsCommand, migrateCredentialsCommand, saveCredentialsCommand, updateCredentialsCommand } from './build/credentials-command'
 import { manageCredentialsCommand } from './build/credentials-manage'
+import { checkBuildNeeded } from './build/needed'
 import { onboardingBuilderCommand } from './build/onboarding/command'
 import { requestBuildCommand } from './build/request'
 import { cleanupBundle } from './bundle/cleanup'
@@ -35,6 +36,7 @@ import { createKey, deleteOldKey, saveKeyCommand } from './key'
 import { login } from './login'
 import { startMcpServer } from './mcp/server'
 import { addOrganization, deleteOrganization, listMembers, listOrganizations, setOrganization } from './organization'
+import { capturePosthogException, getCommandPath, shouldCapturePosthogException } from './posthog'
 import { probe } from './probe'
 import { testRunDeviceCommand } from './run/device'
 import { getUserId } from './user/account'
@@ -59,6 +61,12 @@ program
   .name(pack.name)
   .description(`📦 Manage packages and bundle versions in Capgo Cloud`)
   .version(pack.version, '-v, --version', `output the current version`)
+
+let currentCommandPath = 'unknown'
+
+program.hook('preAction', (_thisCommand, actionCommand) => {
+  currentCommandPath = getCommandPath(actionCommand)
+})
 
 program
   .command('init [apikey] [appId]')
@@ -738,7 +746,7 @@ const build = program
   .command('build')
   .description(`🏗️  Manage native iOS/Android builds through Capgo Cloud.
 
-⚠️ This feature is currently in PUBLIC BETA and cannot be used by anyone at this time.
+⚠️ Native cloud build requests are currently in LIMITED BETA. Access is restricted.
 
  🔒 SECURITY GUARANTEE:
     Build credentials are NEVER stored on Capgo servers.
@@ -751,10 +759,25 @@ const build = program
    npx @capgo/cli build credentials save --appId <your-app-id> --platform android`)
 
 build
+  .command('needed [appId]')
+  .description(`🧭 Print "yes" and exit with code 1 if a native build is required; otherwise print "no" and exit with code 0. Command failures exit with code 2.
+
+Example: npx @capgo/cli@latest build needed com.example.app --channel production --verbose`)
+  .action(checkBuildNeeded)
+  .option('-a, --apikey <apikey>', optionDescriptions.apikey)
+  .option('-c, --channel <channel>', `Channel to compare against. Defaults to CapacitorUpdater.defaultChannel or the public default channel`)
+  .option('--package-json <packageJson>', optionDescriptions.packageJson)
+  .option('--node-modules <nodeModules>', optionDescriptions.nodeModules)
+  .option('--verbose', optionDescriptions.verbose)
+  .option('--supa-host <supaHost>', optionDescriptions.supaHost)
+  .option('--supa-anon <supaAnon>', optionDescriptions.supaAnon)
+
+build
   .command('init')
   .alias('onboarding')
-  .description('Set up iOS build credentials interactively (creates certificates and profiles automatically)')
+  .description('Set up build credentials interactively (iOS: certificates + profiles automated; Android: keystore + Google OAuth provisions GCP service account and Play Console invite)')
   .option('-a, --apikey <apikey>', 'API key to link to your account')
+  .option('-p, --platform <platform>', 'Platform to onboard (ios or android). If omitted, auto-detects when only one native folder exists; prompts otherwise.')
   .action(onboardingBuilderCommand)
 
 build
@@ -1045,21 +1068,37 @@ program.configureOutput({
   },
 })
 
-program.parseAsync().catch((error: unknown) => {
+program.parseAsync().catch(async (error: unknown) => {
   if (typeof error === 'object' && error !== null && 'code' in error) {
     const commanderError = error as { code: string, exitCode?: number, message?: string }
     // These are normal Commander.js exits (help, version, etc.) - exit silently
     if (commanderError.code === 'commander.version' || commanderError.code === 'commander.helpDisplayed') {
       exit(0)
     }
+    const capturePromise = shouldCapturePosthogException(error)
+      ? capturePosthogException({
+          error,
+          functionName: currentCommandPath,
+          kind: 'unhandled_error',
+          status: commanderError.exitCode ?? 1,
+        })
+      : Promise.resolve(false)
     // For actual errors, show just the message without the full stack trace
     if (commanderError.message) {
       log.error(commanderError.message)
     }
+    await capturePromise
     const exitCode = commanderError.exitCode ?? 1
     exit(exitCode)
   }
+  const capturePromise = capturePosthogException({
+    error,
+    functionName: currentCommandPath,
+    kind: 'unhandled_error',
+    status: 1,
+  })
   // For non-Commander errors, show full error details
   log.error(`Error: ${formatError(error)}`)
+  await capturePromise
   exit(1)
 })

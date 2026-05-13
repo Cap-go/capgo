@@ -9,14 +9,11 @@
     "moduleResolution": "Bundler",
     "paths": {
       "*": [
-        "src/types/*"
-      ],
-      "@capacitor/cli/dist/config": [
-        "src/types/capacitor-cli.d.ts"
+        "types/*"
       ]
     },
     "resolveJsonModule": true,
-    "typeRoots": ["src/types/*", "node_modules/@types"],
+    "typeRoots": ["src/types", "node_modules/@types"],
     "strict": true,
     "declaration": true,
     "emitDeclarationOnly": true,

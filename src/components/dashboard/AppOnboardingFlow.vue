@@ -7,8 +7,19 @@ import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import IconCopy from '~icons/ion/copy-outline'
+import IconAppWindow from '~icons/lucide/app-window'
+import IconArrowRight from '~icons/lucide/arrow-right'
+import IconBadgeCheck from '~icons/lucide/badge-check'
 import IconCheck from '~icons/lucide/check'
+import IconCode from '~icons/lucide/code-2'
+import IconGlobe from '~icons/lucide/globe-2'
+import IconImage from '~icons/lucide/image'
 import IconLoader from '~icons/lucide/loader-2'
+import IconPackage from '~icons/lucide/package'
+import IconSmartphone from '~icons/lucide/smartphone'
+import IconSparkles from '~icons/lucide/sparkles'
+import IconStore from '~icons/lucide/store'
+import IconTerminal from '~icons/lucide/terminal'
 import { createDefaultApiKey } from '~/services/apikeys'
 import { createSignedImageUrl, getImmediateImageUrl } from '~/services/storage'
 import { getLocalConfig, isLocal, useSupabase } from '~/services/supabase'
@@ -34,6 +45,7 @@ type AppRow = Database['public']['Tables']['apps']['Row']
 const isLoading = ref(true)
 const isSubmitting = ref(false)
 const isImportingStore = ref(false)
+const isResumeIconLoading = ref(false)
 const isSeedingDemo = ref(false)
 const isCliCommandVisible = ref(false)
 const apiKey = ref<string | null>(null)
@@ -55,6 +67,7 @@ const hasEditedAppId = ref(false)
 
 const localCommand = isLocal(config.supaHost) ? ` --supa-host ${config.supaHost} --supa-anon ${config.supaKey}` : ''
 const cliCommand = computed(() => `npx @capgo/cli@latest i ${apiKey.value ?? '[APIKEY]'}${localCommand}`)
+const redactedCliCommand = computed(() => `npx @capgo/cli@latest i [YOUR_CAPGO_API_KEY]${localCommand}`)
 const cliCommandArgs = computed(() => {
   const args: string[] = []
 
@@ -69,8 +82,9 @@ const resumeAppId = computed(() => {
   const value = route.query.resume
   return typeof value === 'string' ? value : ''
 })
-const iconPreview = computed(() => localIconPreview.value || storeIconPreview.value || '')
-const hasImportedStoreMetadata = computed(() => !!(importedStoreAppId.value || storeIconPreview.value || storeScreenshotPreview.value))
+const canUseStoreImportPreview = computed(() => existingApp.value === true && existingAppSetup.value === 'import')
+const iconPreview = computed(() => localIconPreview.value || (canUseStoreImportPreview.value ? storeIconPreview.value : '') || '')
+const hasImportedStoreMetadata = computed(() => canUseStoreImportPreview.value && !!(importedStoreAppId.value || storeIconPreview.value || storeScreenshotPreview.value))
 const canShowAppDetails = computed(() => {
   if (existingApp.value === false)
     return true
@@ -82,7 +96,9 @@ const suggestedAppId = computed(() => {
   if (createdApp.value)
     return createdApp.value.app_id
 
-  const storeAppId = importedStoreAppId.value || extractAndroidAppId(storeUrl.value)
+  const storeAppId = existingAppSetup.value === 'import'
+    ? importedStoreAppId.value || extractAndroidAppId(storeUrl.value)
+    : ''
   if (existingApp.value === true && storeAppId)
     return storeAppId
 
@@ -102,22 +118,50 @@ const aiHelpPrompt = computed(() => {
     appName: resolvedAppName,
     appId: resolvedAppId,
     appStatus,
-    command: cliCommand.value,
+    command: redactedCliCommand.value,
   })
+})
+const appOnboardingSteps = computed<Array<{ id: 'details' | 'choice' | 'install', label: string }>>(() => [
+  { id: 'details', label: t('app-onboarding-step-details') },
+  { id: 'choice', label: t('app-onboarding-step-choice') },
+  { id: 'install', label: t('app-onboarding-step-install') },
+])
+const currentStepIndex = computed(() => Math.max(0, appOnboardingSteps.value.findIndex(entry => entry.id === flowStep.value)))
+const stepProgress = computed(() => `${((currentStepIndex.value + 1) / appOnboardingSteps.value.length) * 100}%`)
+const selectedStartLabel = computed(() => {
+  if (existingApp.value === true)
+    return t('app-onboarding-existing-yes')
+  if (existingApp.value === false)
+    return t('app-onboarding-existing-no')
+  return t('app-onboarding-not-selected')
+})
+const selectedSetupLabel = computed(() => {
+  if (existingApp.value === false)
+    return t('app-onboarding-mode-manual')
+  if (existingAppSetup.value === 'import')
+    return t('app-onboarding-mode-import')
+  if (existingAppSetup.value === 'manual')
+    return t('app-onboarding-mode-manual')
+  return t('app-onboarding-not-selected')
+})
+const previewStatusLabel = computed(() => {
+  if (createdApp.value?.existing_app || existingApp.value === true)
+    return t('app-onboarding-ai-help-status-existing')
+  return t('app-onboarding-ai-help-status-new')
 })
 
 function whiteCardToggleButtonClass(active: boolean) {
   return active
-    ? 'border-slate-900 bg-slate-900 text-white hover:border-slate-800 hover:bg-slate-800'
-    : 'border-slate-300 bg-white text-slate-700 hover:border-slate-400 hover:bg-slate-50'
+    ? 'border-primary-500 bg-slate-100 text-slate-950 ring-2 ring-primary-500/15 hover:border-primary-500 hover:bg-slate-100 dark:border-primary-500/80 dark:bg-primary-500/25 dark:text-white dark:ring-primary-500/30 dark:hover:bg-primary-500/30'
+    : 'border-slate-200 bg-white text-slate-700 hover:border-primary-500/40 hover:bg-slate-50 hover:text-slate-950 dark:border-white/15 dark:bg-slate-950/90 dark:text-slate-200 dark:hover:border-white/30 dark:hover:bg-slate-900 dark:hover:text-white'
 }
 
 function whiteCardSecondaryButtonClass() {
-  return 'border-slate-300 bg-white text-slate-700 hover:border-slate-400 hover:bg-slate-50 disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400 disabled:opacity-100'
+  return 'border-slate-300 bg-white text-slate-700 hover:border-slate-400 hover:bg-slate-50 disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400 disabled:opacity-100 dark:border-white/20 dark:bg-slate-950/90 dark:text-slate-100 dark:hover:border-white/30 dark:hover:bg-slate-900 dark:disabled:border-white/15 dark:disabled:bg-slate-900 dark:disabled:text-slate-500'
 }
 
 function whiteCardPrimaryButtonClass() {
-  return 'border-slate-900 bg-slate-900 text-white hover:border-slate-800 hover:bg-slate-800 disabled:border-slate-300 disabled:bg-slate-300 disabled:text-white disabled:opacity-100'
+  return 'border-primary-500 bg-primary-500 text-white hover:border-primary-500 hover:bg-primary-500/90 disabled:border-slate-300 disabled:bg-slate-300 disabled:text-white disabled:opacity-100 dark:border-primary-500/90 dark:bg-primary-500 dark:hover:border-primary-500 dark:hover:bg-primary-500/90 dark:disabled:border-white/15 dark:disabled:bg-slate-800 dark:disabled:text-slate-500'
 }
 
 function slugify(value: string) {
@@ -173,11 +217,25 @@ function getStoreUrls(url: string) {
   return { iosStoreUrl: null, androidStoreUrl: null }
 }
 
+let storeImportRun = 0
+function resetStoreImportState() {
+  storeImportRun += 1
+  storeUrl.value = ''
+  storeIconPreview.value = ''
+  storeScreenshotPreview.value = ''
+  importedStoreAppId.value = ''
+  isImportingStore.value = false
+}
+
 let resumeIconLoadRun = 0
 async function loadResumeIconPreview(rawIconUrl: string | null | undefined, appId: string, run: number) {
-  if (!rawIconUrl || getImmediateImageUrl(rawIconUrl))
+  if (!rawIconUrl || getImmediateImageUrl(rawIconUrl)) {
+    if (run === resumeIconLoadRun)
+      isResumeIconLoading.value = false
     return
+  }
 
+  isResumeIconLoading.value = true
   try {
     const signedIconUrl = await createSignedImageUrl(rawIconUrl)
     if (!signedIconUrl || run !== resumeIconLoadRun || createdApp.value?.app_id !== appId)
@@ -187,6 +245,10 @@ async function loadResumeIconPreview(rawIconUrl: string | null | undefined, appI
   }
   catch (error) {
     console.warn('Cannot load signed resume app icon', { appId, error })
+  }
+  finally {
+    if (run === resumeIconLoadRun)
+      isResumeIconLoading.value = false
   }
 }
 
@@ -259,15 +321,20 @@ async function loadResumeApp() {
 }
 
 async function importStoreMetadata() {
-  if (!storeUrl.value)
+  const requestedUrl = storeUrl.value.trim()
+  if (!requestedUrl || existingAppSetup.value !== 'import')
     return
 
+  const requestedRun = ++storeImportRun
   isImportingStore.value = true
   try {
     const { data, error } = await supabase.functions.invoke('app/store-metadata', {
       method: 'POST',
-      body: { url: storeUrl.value },
+      body: { url: requestedUrl },
     })
+
+    if (requestedRun !== storeImportRun || existingAppSetup.value !== 'import' || storeUrl.value.trim() !== requestedUrl)
+      return
 
     if (error)
       throw error
@@ -290,11 +357,15 @@ async function importStoreMetadata() {
       importedStoreAppId.value = data.app_id.trim()
   }
   catch (error) {
+    if (requestedRun !== storeImportRun || existingAppSetup.value !== 'import' || storeUrl.value.trim() !== requestedUrl)
+      return
+
     console.error('Cannot import store metadata', error)
     toast.error(t('app-onboarding-toast-store-metadata-error'))
   }
   finally {
-    isImportingStore.value = false
+    if (requestedRun === storeImportRun)
+      isImportingStore.value = false
   }
 }
 
@@ -310,6 +381,7 @@ function onSelectIconFormKit(value: unknown) {
   if (localIconPreview.value.startsWith('blob:'))
     URL.revokeObjectURL(localIconPreview.value)
   localIconPreview.value = file ? URL.createObjectURL(file) : ''
+  isResumeIconLoading.value = false
 }
 
 function onAppIdInput(event: Event) {
@@ -445,7 +517,9 @@ async function createAppRecord() {
 
   isSubmitting.value = true
   try {
-    const normalizedStoreUrls = getStoreUrls(storeUrl.value.trim())
+    const normalizedStoreUrls = existingApp.value === true && existingAppSetup.value === 'import'
+      ? getStoreUrls(storeUrl.value.trim())
+      : { iosStoreUrl: null, androidStoreUrl: null }
 
     let appId = generatedAppId.value
     let responseData: AppRow | null = null
@@ -507,7 +581,8 @@ async function createAppRecord() {
       return
     }
 
-    await uploadIcon(appId, storeIconPreview.value)
+    const importedIconSource = canUseStoreImportPreview.value ? storeIconPreview.value : ''
+    await uploadIcon(appId, importedIconSource)
     const { data: refreshed } = await supabase
       .from('apps')
       .select()
@@ -626,13 +701,15 @@ onBeforeUnmount(() => {
 watch(existingApp, (value) => {
   existingAppSetup.value = value === true ? null : value === false ? 'manual' : null
   if (value !== true) {
-    storeUrl.value = ''
-    storeIconPreview.value = ''
-    storeScreenshotPreview.value = ''
-    importedStoreAppId.value = ''
+    resetStoreImportState()
   }
   appIdSuggestions.value = []
   appIdFeedback.value = ''
+})
+
+watch(existingAppSetup, (value) => {
+  if (value === 'manual')
+    resetStoreImportState()
 })
 
 watch(suggestedAppId, (value) => {
@@ -642,134 +719,251 @@ watch(suggestedAppId, (value) => {
 </script>
 
 <template>
-  <section class="h-full py-10 overflow-y-auto sm:py-16 max-h-fit">
-    <div class="px-4 mx-auto max-w-5xl sm:px-6 lg:px-8">
-      <div v-if="isLoading" class="flex items-center justify-center min-h-[50vh]">
+  <section class="min-h-full overflow-y-auto bg-slate-50 px-4 py-6 sm:px-6 lg:px-8 dark:bg-slate-950">
+    <div class="mx-auto w-full max-w-7xl">
+      <div v-if="isLoading" class="flex min-h-[50vh] items-center justify-center">
         <Spinner size="w-32 h-32" />
       </div>
 
       <div v-else class="space-y-6">
-        <div class="text-center">
-          <p class="text-sm font-semibold tracking-[0.18em] uppercase text-azure-500">
-            {{ t('app-onboarding-badge') }}
-          </p>
-          <h1 class="mt-3 text-3xl font-semibold text-slate-900 sm:text-4xl dark:text-slate-50">
-            {{ props.onboarding
-              ? t('app-onboarding-title-first')
-              : t('app-onboarding-title-return') }}
-          </h1>
-          <p class="max-w-2xl mx-auto mt-3 text-base text-slate-600 dark:text-slate-300">
-            {{ t('app-onboarding-subtitle') }}
-          </p>
-        </div>
+        <header class="grid gap-5 lg:grid-cols-[minmax(0,1fr)_25rem] lg:items-end">
+          <div>
+            <div class="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1 text-sm font-semibold text-slate-700 shadow-sm dark:border-white/15 dark:bg-slate-900/95 dark:text-slate-200 dark:shadow-lg dark:shadow-black/20">
+              <IconSparkles class="h-4 w-4" />
+              {{ t('app-onboarding-badge') }}
+            </div>
+            <h1 class="mt-4 max-w-3xl text-3xl font-semibold text-slate-950 sm:text-4xl dark:text-white">
+              {{ props.onboarding
+                ? t('app-onboarding-title-first')
+                : t('app-onboarding-title-return') }}
+            </h1>
+            <p class="mt-3 max-w-2xl text-base leading-7 text-slate-600 dark:text-slate-300">
+              {{ t('app-onboarding-subtitle') }}
+            </p>
+          </div>
 
-        <div v-if="flowStep === 'details'" class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-200 dark:bg-white">
-          <div class="grid gap-6 md:grid-cols-[1.25fr_0.9fr]">
-            <div class="space-y-5">
-              <div class="rounded-2xl border border-slate-200 bg-slate-50/70 p-4 dark:border-slate-200 dark:bg-slate-50/70">
-                <p class="text-sm font-medium text-slate-900 dark:text-slate-900">
-                  {{ t('app-onboarding-existing-question') }}
+          <div class="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm dark:border-white/15 dark:bg-slate-900/95 dark:shadow-2xl dark:shadow-black/30">
+            <div class="grid gap-2 sm:grid-cols-3 lg:grid-cols-1">
+              <div
+                v-for="(entry, index) in appOnboardingSteps"
+                :key="entry.id"
+                class="flex min-h-14 items-center gap-3 rounded-xl border px-3 py-2 transition"
+                :aria-current="flowStep === entry.id ? 'step' : undefined"
+                :class="[
+                  flowStep === entry.id ? 'border-primary-500/30 bg-slate-100 text-slate-950 ring-1 ring-primary-500/10 dark:border-primary-500/60 dark:bg-primary-500/25 dark:text-white dark:ring-primary-500/20' : '',
+                  flowStep !== entry.id && index < currentStepIndex ? 'border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-400/40 dark:bg-emerald-400/15 dark:text-emerald-100' : '',
+                  flowStep !== entry.id && index > currentStepIndex ? 'border-transparent bg-slate-50 text-slate-500 dark:border-white/10 dark:bg-slate-950/90 dark:text-slate-400' : '',
+                ]"
+              >
+                <span
+                  class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-semibold"
+                  :class="index < currentStepIndex ? 'bg-emerald-500 text-white' : flowStep === entry.id ? 'bg-primary-500 text-white' : 'bg-slate-200 text-slate-600 dark:bg-slate-800 dark:text-slate-300'"
+                >
+                  <IconCheck v-if="index < currentStepIndex" class="h-4 w-4" />
+                  <span v-else>{{ index + 1 }}</span>
+                </span>
+                <span class="min-w-0">
+                  <span class="block truncate text-sm font-semibold">{{ entry.label }}</span>
+                  <span class="mt-0.5 block text-xs opacity-75">
+                    {{ t('app-onboarding-progress-count', { current: index + 1, total: appOnboardingSteps.length }) }}
+                  </span>
+                </span>
+              </div>
+            </div>
+            <div class="mt-3 h-1.5 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-950" aria-hidden="true">
+              <div class="h-full rounded-full bg-primary-500 transition-all duration-300" :style="{ width: stepProgress }" />
+            </div>
+          </div>
+        </header>
+
+        <div v-if="flowStep === 'details'" class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_24rem] lg:items-start">
+          <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6 dark:border-white/15 dark:bg-slate-900/95 dark:shadow-2xl dark:shadow-black/30">
+            <div class="space-y-6">
+              <div>
+                <p class="text-sm font-semibold text-primary-500 dark:text-slate-300">
+                  {{ t('app-onboarding-step-details') }}
                 </p>
-                <div class="flex flex-wrap gap-3 mt-4">
-                  <button class="d-btn" :class="whiteCardToggleButtonClass(existingApp === true)" @click="existingApp = true">
-                    {{ t('app-onboarding-existing-yes') }}
-                  </button>
-                  <button class="d-btn" :class="whiteCardToggleButtonClass(existingApp === false)" @click="existingApp = false">
-                    {{ t('app-onboarding-existing-no') }}
-                  </button>
-                </div>
-                <div class="mt-4">
-                  <button
-                    class="text-xs font-medium text-slate-400 underline decoration-slate-300 underline-offset-3 transition hover:text-slate-600 dark:text-slate-500 dark:decoration-slate-600 dark:hover:text-slate-300"
-                    @click="isCliCommandVisible = !isCliCommandVisible"
-                  >
-                    {{ isCliCommandVisible ? t('app-onboarding-command-hide') : t('app-onboarding-command-show') }}
-                  </button>
-                  <p class="mt-1 text-xs text-slate-400 dark:text-slate-500">
-                    {{ t('app-onboarding-command-help') }}
-                  </p>
-                  <div
-                    v-if="isCliCommandVisible"
-                    class="group relative mt-3 cursor-pointer rounded-xl bg-black p-4 pr-14 ring-1 ring-white/10 transition hover:ring-white/20 dark:bg-slate-950"
-                    role="button"
-                    tabindex="0"
-                    @click="copyCliCommand"
-                    @keydown.enter.prevent="copyCliCommand"
-                    @keydown.space.prevent="copyCliCommand"
-                  >
-                    <code class="block whitespace-pre-wrap break-all text-sm">
-                      <span class="text-slate-500">npx</span>
-                      <span class="text-sky-300"> @capgo/cli@latest</span>
-                      <span class="text-violet-300 font-bold mr-1"> i</span>
-                      <span class="text-emerald-300"> {{ apiKey ?? '[APIKEY]' }}</span>
-                      <template v-for="(arg, index) in cliCommandArgs" :key="`${arg}-${index}`">
-                        <span :class="index % 2 === 0 ? 'text-amber-300' : 'text-cyan-300'"> {{ arg }}</span>
-                      </template>
-                    </code>
-                    <IconCopy class="absolute right-4 top-4 h-5 w-5 text-muted-blue-300 transition group-hover:text-white" />
-                  </div>
+                <h2 class="mt-2 text-2xl font-semibold text-slate-950 dark:text-white">
+                  {{ t('app-onboarding-existing-question') }}
+                </h2>
+              </div>
+
+              <div class="grid gap-3 sm:grid-cols-2">
+                <button
+                  type="button"
+                  :aria-pressed="existingApp === true"
+                  class="group flex min-h-32 items-start gap-4 rounded-2xl border p-4 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-900"
+                  :class="whiteCardToggleButtonClass(existingApp === true)"
+                  @click="existingApp = true"
+                >
+                  <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary-500 text-white">
+                    <IconStore class="h-5 w-5" />
+                  </span>
+                  <span class="min-w-0 flex-1">
+                    <span class="block text-base font-semibold">{{ t('app-onboarding-existing-yes') }}</span>
+                    <span
+                      class="mt-1 block text-sm leading-6"
+                      :class="existingApp === true ? 'text-slate-600 dark:text-slate-200' : 'text-slate-500 dark:text-slate-400'"
+                    >
+                      {{ t('app-onboarding-existing-yes-helper') }}
+                    </span>
+                  </span>
+                  <IconCheck v-if="existingApp === true" class="h-5 w-5 shrink-0 text-current" />
+                </button>
+                <button
+                  type="button"
+                  :aria-pressed="existingApp === false"
+                  class="group flex min-h-32 items-start gap-4 rounded-2xl border p-4 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-900"
+                  :class="whiteCardToggleButtonClass(existingApp === false)"
+                  @click="existingApp = false"
+                >
+                  <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-slate-900 text-white dark:bg-white dark:text-slate-950">
+                    <IconAppWindow class="h-5 w-5" />
+                  </span>
+                  <span class="min-w-0 flex-1">
+                    <span class="block text-base font-semibold">{{ t('app-onboarding-existing-no') }}</span>
+                    <span
+                      class="mt-1 block text-sm leading-6"
+                      :class="existingApp === false ? 'text-slate-600 dark:text-slate-200' : 'text-slate-500 dark:text-slate-400'"
+                    >
+                      {{ t('app-onboarding-existing-no-helper') }}
+                    </span>
+                  </span>
+                  <IconCheck v-if="existingApp === false" class="h-5 w-5 shrink-0 text-current" />
+                </button>
+              </div>
+
+              <div class="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-4 dark:border-white/20 dark:bg-slate-950/90">
+                <button
+                  type="button"
+                  class="inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-slate-600 transition hover:text-slate-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-slate-300 dark:hover:text-white"
+                  @click="isCliCommandVisible = !isCliCommandVisible"
+                >
+                  <IconTerminal class="h-4 w-4" />
+                  {{ isCliCommandVisible ? t('app-onboarding-command-hide') : t('app-onboarding-command-show') }}
+                </button>
+                <p class="mt-1 text-sm leading-6 text-slate-500 dark:text-slate-400">
+                  {{ t('app-onboarding-command-help') }}
+                </p>
+                <div
+                  v-if="isCliCommandVisible"
+                  class="group relative mt-3 cursor-pointer rounded-xl bg-slate-950 p-4 pr-14 ring-1 ring-white/10 transition hover:ring-white/20"
+                  role="button"
+                  tabindex="0"
+                  :aria-label="t('app-onboarding-command-copy')"
+                  @click="copyCliCommand"
+                  @keydown.enter.prevent="copyCliCommand"
+                  @keydown.space.prevent="copyCliCommand"
+                >
+                  <code class="block whitespace-pre-wrap break-all text-sm">
+                    <span class="text-slate-500">npx</span>
+                    <span class="text-sky-300"> @capgo/cli@latest</span>
+                    <span class="mr-1 font-bold text-violet-300"> i</span>
+                    <span class="text-emerald-300"> {{ apiKey ?? '[APIKEY]' }}</span>
+                    <template v-for="(arg, index) in cliCommandArgs" :key="`${arg}-${index}`">
+                      <span :class="index % 2 === 0 ? 'text-amber-300' : 'text-cyan-300'"> {{ arg }}</span>
+                    </template>
+                  </code>
+                  <IconCopy class="absolute right-4 top-4 h-5 w-5 text-muted-blue-300 transition group-hover:text-white" />
                 </div>
               </div>
 
-              <div v-if="existingApp === true" class="grid gap-4 rounded-2xl border border-slate-200 bg-slate-50/70 p-4 dark:border-slate-200 dark:bg-slate-50/70">
+              <div v-if="existingApp === true" class="space-y-5 border-t border-slate-200 pt-6 dark:border-white/15">
                 <div>
-                  <p class="text-sm font-medium text-slate-900 dark:text-slate-900">
+                  <p class="text-sm font-semibold text-slate-950 dark:text-white">
                     {{ t('app-onboarding-start-question') }}
                   </p>
-                  <div class="flex flex-wrap gap-3 mt-4">
-                    <button class="d-btn" :class="whiteCardToggleButtonClass(existingAppSetup === 'import')" @click="existingAppSetup = 'import'">
-                      {{ t('app-onboarding-mode-import') }}
+                  <div class="mt-3 grid gap-3 sm:grid-cols-2">
+                    <button
+                      type="button"
+                      :aria-pressed="existingAppSetup === 'import'"
+                      class="flex min-h-24 items-start gap-3 rounded-2xl border p-4 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-900"
+                      :class="whiteCardToggleButtonClass(existingAppSetup === 'import')"
+                      @click="existingAppSetup = 'import'"
+                    >
+                      <IconGlobe class="mt-0.5 h-5 w-5 shrink-0" />
+                      <span>
+                        <span class="block text-sm font-semibold">{{ t('app-onboarding-mode-import') }}</span>
+                        <span class="mt-1 block text-sm leading-6 opacity-75">{{ t('app-onboarding-mode-import-helper') }}</span>
+                      </span>
                     </button>
-                    <button class="d-btn" :class="whiteCardToggleButtonClass(existingAppSetup === 'manual')" @click="existingAppSetup = 'manual'">
-                      {{ t('app-onboarding-mode-manual') }}
+                    <button
+                      type="button"
+                      :aria-pressed="existingAppSetup === 'manual'"
+                      class="flex min-h-24 items-start gap-3 rounded-2xl border p-4 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-900"
+                      :class="whiteCardToggleButtonClass(existingAppSetup === 'manual')"
+                      @click="existingAppSetup = 'manual'"
+                    >
+                      <IconCode class="mt-0.5 h-5 w-5 shrink-0" />
+                      <span>
+                        <span class="block text-sm font-semibold">{{ t('app-onboarding-mode-manual') }}</span>
+                        <span class="mt-1 block text-sm leading-6 opacity-75">{{ t('app-onboarding-mode-manual-helper') }}</span>
+                      </span>
                     </button>
                   </div>
                 </div>
 
                 <template v-if="existingAppSetup === 'import'">
                   <div>
-                    <label class="text-sm font-medium text-slate-800 dark:text-slate-800">{{ t('app-onboarding-store-link-label') }}</label>
-                    <input v-model="storeUrl" class="mt-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-azure-400 focus:ring-2 focus:ring-azure-100 dark:border-slate-300 dark:bg-white dark:text-slate-900 dark:placeholder:text-slate-400 dark:focus:border-azure-400 dark:focus:ring-azure-100" :placeholder="t('app-onboarding-store-link-placeholder')" type="url">
+                    <label for="app-onboarding-store-url" class="text-sm font-medium text-slate-800 dark:text-slate-200">{{ t('app-onboarding-store-link-label') }}</label>
+                    <div class="mt-2 flex flex-col gap-3 sm:flex-row">
+                      <input
+                        id="app-onboarding-store-url"
+                        v-model="storeUrl"
+                        class="min-h-12 w-full rounded-xl border border-slate-300 bg-white px-4 text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/10 dark:border-white/20 dark:bg-slate-950/90 dark:text-white dark:placeholder:text-slate-500 dark:focus:border-primary-500 dark:focus:ring-primary-500/30"
+                        :placeholder="t('app-onboarding-store-link-placeholder')"
+                        type="url"
+                      >
+                      <button class="d-btn min-h-12 shrink-0" :class="whiteCardSecondaryButtonClass()" :disabled="isImportingStore || !storeUrl" @click="importStoreMetadata()">
+                        <IconLoader v-if="isImportingStore" class="h-4 w-4 animate-spin" />
+                        <IconSparkles v-else class="h-4 w-4" />
+                        <span>{{ t('app-onboarding-store-import-button') }}</span>
+                      </button>
+                    </div>
+                    <p class="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400" aria-live="polite">
+                      {{ hasImportedStoreMetadata
+                        ? t('app-onboarding-store-imported-help')
+                        : t('app-onboarding-store-help') }}
+                    </p>
                   </div>
-                  <button class="d-btn w-fit" :class="whiteCardSecondaryButtonClass()" :disabled="isImportingStore || !storeUrl" @click="importStoreMetadata()">
-                    <IconLoader v-if="isImportingStore" class="w-4 h-4 animate-spin" />
-                    <span v-else>{{ t('app-onboarding-store-import-button') }}</span>
-                  </button>
-                  <p class="text-xs text-slate-500 dark:text-slate-500">
-                    {{ hasImportedStoreMetadata
-                      ? t('app-onboarding-store-imported-help')
-                      : t('app-onboarding-store-help') }}
-                  </p>
                 </template>
               </div>
 
               <template v-if="canShowAppDetails">
-                <div>
-                  <label class="text-sm font-medium text-slate-800 dark:text-slate-800">{{ t('app-name') }}</label>
-                  <input v-model="appName" class="mt-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-azure-400 focus:ring-2 focus:ring-azure-100 dark:border-slate-300 dark:bg-white dark:text-slate-900 dark:placeholder:text-slate-400 dark:focus:border-azure-400 dark:focus:ring-azure-100" :placeholder="t('app-onboarding-name-placeholder')" maxlength="100">
+                <div class="border-t border-slate-200 pt-6 dark:border-white/15">
+                  <label for="app-onboarding-name" class="text-sm font-medium text-slate-800 dark:text-slate-200">{{ t('app-name') }}</label>
+                  <input
+                    id="app-onboarding-name"
+                    v-model="appName"
+                    class="mt-2 min-h-12 w-full rounded-xl border border-slate-300 bg-white px-4 text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/10 dark:border-white/20 dark:bg-slate-950/90 dark:text-white dark:placeholder:text-slate-500 dark:focus:border-primary-500 dark:focus:ring-primary-500/30"
+                    :placeholder="t('app-onboarding-name-placeholder')"
+                    maxlength="100"
+                  >
                 </div>
 
                 <div>
-                  <label class="text-sm font-medium text-slate-800 dark:text-slate-800">{{ t('app-id') }}</label>
+                  <label for="app-onboarding-app-id" class="text-sm font-medium text-slate-800 dark:text-slate-200">{{ t('app-id') }}</label>
                   <input
+                    id="app-onboarding-app-id"
                     :value="manualAppId"
-                    class="mt-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-azure-400 focus:ring-2 focus:ring-azure-100 dark:border-slate-300 dark:bg-white dark:text-slate-900 dark:placeholder:text-slate-400 dark:focus:border-azure-400 dark:focus:ring-azure-100"
+                    class="mt-2 min-h-12 w-full rounded-xl border border-slate-300 bg-white px-4 font-mono text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/10 dark:border-white/20 dark:bg-slate-950/90 dark:text-white dark:placeholder:text-slate-500 dark:focus:border-primary-500 dark:focus:ring-primary-500/30"
                     :placeholder="t('app-onboarding-appid-placeholder')"
                     @input="onAppIdInput"
                   >
-                  <p class="mt-2 text-xs text-slate-500 dark:text-slate-500">
+                  <p class="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400">
                     {{ existingApp
                       ? t('app-onboarding-appid-help-existing')
                       : t('app-onboarding-appid-help-new') }}
                   </p>
-                  <p v-if="appIdFeedback" class="mt-2 text-xs font-medium text-amber-600 dark:text-amber-400">
+                  <output v-if="appIdFeedback" class="mt-2 block text-sm font-medium text-amber-700 dark:text-amber-300" for="app-onboarding-app-id">
                     {{ appIdFeedback }}
-                  </p>
+                  </output>
                   <div v-if="appIdSuggestions.length > 0" class="mt-3 flex flex-wrap gap-2">
                     <button
                       v-for="suggestion in appIdSuggestions"
                       :key="suggestion"
-                      class="rounded-full border border-slate-300 bg-white px-3 py-1 text-xs text-slate-700 transition hover:border-azure-300 hover:text-azure-600 dark:border-slate-300 dark:bg-white dark:text-slate-700 dark:hover:border-azure-300 dark:hover:text-azure-600"
+                      type="button"
+                      class="min-h-9 rounded-full border border-slate-300 bg-white px-3 py-1 font-mono text-xs text-slate-700 transition hover:border-primary-500/40 hover:text-primary-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:border-white/20 dark:bg-slate-950/90 dark:text-slate-200 dark:hover:border-white/30 dark:hover:text-white"
                       @click="applyAppIdSuggestion(suggestion)"
                     >
                       {{ suggestion }}
@@ -777,189 +971,284 @@ watch(suggestedAppId, (value) => {
                   </div>
                 </div>
 
-                <div>
-                  <FormKit
-                    type="file"
-                    :label="t('app-onboarding-icon-label')"
-                    accept="image/*"
-                    outer-class="mt-0"
-                    label-class="text-sm font-medium text-slate-800 dark:text-slate-800"
-                    input-class="mt-2 block w-full text-sm text-slate-600 dark:text-slate-600"
-                    @update:model-value="onSelectIconFormKit"
-                  />
-                  <p class="text-xs text-slate-500 dark:text-slate-500">
-                    {{ t('app-onboarding-icon-help') }}
-                  </p>
+                <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-white/15 dark:bg-slate-950/90">
+                  <div class="flex items-start gap-3">
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-primary-500 ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-white/10">
+                      <IconImage class="h-5 w-5" />
+                    </span>
+                    <div class="min-w-0 flex-1">
+                      <FormKit
+                        type="file"
+                        :label="t('app-onboarding-icon-label')"
+                        accept="image/*"
+                        outer-class="mt-0"
+                        label-class="text-sm font-medium text-slate-800 dark:text-slate-200"
+                        input-class="mt-2 block w-full min-h-11 text-sm text-slate-600 file:mr-3 file:min-h-9 file:rounded-lg file:border-0 file:bg-white file:px-3 file:text-sm file:font-medium file:text-slate-700 dark:text-slate-300 dark:file:bg-slate-900 dark:file:text-slate-200"
+                        @update:model-value="onSelectIconFormKit"
+                      />
+                      <p class="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400">
+                        {{ t('app-onboarding-icon-help') }}
+                      </p>
+                    </div>
+                  </div>
                 </div>
 
-                <div class="flex flex-wrap gap-3">
-                  <button class="d-btn" :class="whiteCardPrimaryButtonClass()" :disabled="isSubmitting" @click="createAppRecord">
-                    <IconLoader v-if="isSubmitting" class="w-4 h-4 animate-spin" />
-                    <span v-else>{{ t('app-onboarding-continue') }}</span>
-                  </button>
-                  <button class="d-btn" :class="whiteCardSecondaryButtonClass()" @click="router.push('/apps')">
+                <div class="flex flex-col-reverse gap-3 border-t border-slate-200 pt-6 sm:flex-row sm:items-center sm:justify-between dark:border-white/15">
+                  <button class="d-btn min-h-12" :class="whiteCardSecondaryButtonClass()" @click="router.push('/apps')">
                     {{ t('button-cancel') }}
                   </button>
+                  <button class="d-btn min-h-12" :class="whiteCardPrimaryButtonClass()" :disabled="isSubmitting" @click="createAppRecord">
+                    <IconLoader v-if="isSubmitting" class="h-4 w-4 animate-spin" />
+                    <span v-else>{{ t('app-onboarding-continue') }}</span>
+                    <IconArrowRight v-if="!isSubmitting" class="h-4 w-4" />
+                  </button>
                 </div>
               </template>
             </div>
+          </div>
 
-            <div class="rounded-[28px] border border-slate-200 bg-slate-950 p-5 text-white dark:border-slate-800 dark:bg-linear-to-br dark:from-slate-900 dark:via-slate-900 dark:to-slate-950">
-              <div class="rounded-3xl border border-white/10 bg-slate-900 p-5 dark:border-slate-800 dark:bg-slate-900/90">
-                <div class="flex items-center gap-4">
-                  <div class="flex h-18 w-18 items-center justify-center overflow-hidden rounded-[22px] bg-slate-800 text-3xl">
-                    <img v-if="iconPreview" :src="iconPreview" :alt="t('app-onboarding-icon-preview-alt')" class="h-full w-full object-cover">
-                    <span v-else>📱</span>
-                  </div>
-                  <div class="min-w-0">
-                    <p class="text-xs uppercase tracking-[0.2em] text-slate-300 dark:text-slate-400">
-                      {{ t('app-onboarding-preview-label') }}
-                    </p>
-                    <p class="truncate text-lg font-semibold">
-                      {{ appName || t('app-onboarding-preview-placeholder') }}
-                    </p>
-                    <p class="mt-1 truncate text-xs text-slate-300 dark:text-slate-400">
-                      {{ generatedAppId }}
-                    </p>
-                  </div>
-                </div>
-                <div v-if="storeScreenshotPreview" class="mt-6 overflow-hidden rounded-3xl border border-white/10 bg-slate-950/40">
-                  <img :src="storeScreenshotPreview" :alt="t('app-onboarding-store-screenshot-alt')" class="aspect-9/19.5 w-full object-cover object-top">
-                </div>
-                <ul class="mt-6 space-y-3 text-sm text-slate-200 dark:text-slate-300">
-                  <li class="flex gap-3">
-                    <IconCheck class="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" />
-                    {{ t('app-onboarding-preview-bullet-one') }}
-                  </li>
-                  <li class="flex gap-3">
-                    <IconCheck class="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" />
-                    {{ t('app-onboarding-preview-bullet-two') }}
-                  </li>
-                  <li class="flex gap-3">
-                    <IconCheck class="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" />
-                    {{ t('app-onboarding-preview-bullet-three') }}
-                  </li>
-                </ul>
+          <aside class="rounded-2xl border border-slate-800 bg-slate-950 p-5 text-white shadow-sm lg:sticky lg:top-6 dark:border-white/15 dark:bg-slate-900/95 dark:shadow-2xl dark:shadow-black/30" :aria-label="t('app-onboarding-preview-label')">
+            <div class="flex items-center gap-4">
+              <div class="flex h-18 w-18 items-center justify-center overflow-hidden rounded-[22px] bg-slate-900 ring-1 ring-white/10">
+                <img v-if="iconPreview" :src="iconPreview" :alt="t('app-onboarding-icon-preview-alt')" class="h-full w-full object-cover">
+                <span v-else-if="isResumeIconLoading" class="h-7 w-7 rounded-full border-2 border-primary-500 border-t-transparent animate-spin" :aria-label="t('loading')" />
+                <IconSmartphone v-else class="h-8 w-8 text-slate-500" aria-hidden="true" />
               </div>
+              <div class="min-w-0">
+                <p class="text-xs font-semibold uppercase text-slate-400">
+                  {{ t('app-onboarding-preview-label') }}
+                </p>
+                <p class="truncate text-lg font-semibold">
+                  {{ appName || t('app-onboarding-preview-placeholder') }}
+                </p>
+                <p class="mt-1 truncate font-mono text-xs text-slate-400">
+                  {{ generatedAppId }}
+                </p>
+              </div>
+            </div>
+
+            <div v-if="storeScreenshotPreview" class="mt-6 overflow-hidden rounded-2xl border border-white/10 bg-slate-900">
+              <img :src="storeScreenshotPreview" :alt="t('app-onboarding-store-screenshot-alt')" class="aspect-9/19.5 w-full object-cover object-top">
+            </div>
+
+            <dl class="mt-6 grid gap-3 text-sm">
+              <div class="rounded-xl bg-white/5 p-3">
+                <dt class="text-xs font-semibold uppercase text-slate-400">
+                  {{ t('app-onboarding-summary-source') }}
+                </dt>
+                <dd class="mt-1 text-slate-100">
+                  {{ selectedStartLabel }}
+                </dd>
+              </div>
+              <div class="rounded-xl bg-white/5 p-3">
+                <dt class="text-xs font-semibold uppercase text-slate-400">
+                  {{ t('app-onboarding-summary-method') }}
+                </dt>
+                <dd class="mt-1 text-slate-100">
+                  {{ selectedSetupLabel }}
+                </dd>
+              </div>
+              <div class="rounded-xl bg-white/5 p-3">
+                <dt class="text-xs font-semibold uppercase text-slate-400">
+                  {{ t('app-onboarding-summary-status') }}
+                </dt>
+                <dd class="mt-1 text-slate-100">
+                  {{ previewStatusLabel }}
+                </dd>
+              </div>
+            </dl>
+
+            <div class="mt-6 border-t border-white/10 pt-5">
+              <p class="text-sm font-semibold text-white">
+                {{ t('app-onboarding-next-title') }}
+              </p>
+              <ul class="mt-3 space-y-3 text-sm leading-6 text-slate-300">
+                <li class="flex gap-3">
+                  <IconCheck class="mt-1 h-4 w-4 shrink-0 text-emerald-400" />
+                  {{ t('app-onboarding-preview-bullet-one') }}
+                </li>
+                <li class="flex gap-3">
+                  <IconCheck class="mt-1 h-4 w-4 shrink-0 text-emerald-400" />
+                  {{ t('app-onboarding-preview-bullet-two') }}
+                </li>
+                <li class="flex gap-3">
+                  <IconCheck class="mt-1 h-4 w-4 shrink-0 text-emerald-400" />
+                  {{ t('app-onboarding-preview-bullet-three') }}
+                </li>
+              </ul>
+            </div>
+          </aside>
+        </div>
+
+        <div v-else-if="flowStep === 'choice' && createdApp" class="space-y-6">
+          <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6 dark:border-white/15 dark:bg-slate-900/95 dark:shadow-2xl dark:shadow-black/30">
+            <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <p class="text-sm font-semibold text-primary-500 dark:text-slate-300">
+                  {{ t('app-onboarding-step-choice') }}
+                </p>
+                <h2 class="mt-2 text-2xl font-semibold text-slate-950 dark:text-white">
+                  {{ t('app-onboarding-choice-title') }}
+                </h2>
+                <p class="mt-2 max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-300">
+                  {{ t('app-onboarding-choice-subtitle') }}
+                </p>
+              </div>
+              <div class="rounded-xl bg-slate-50 px-3 py-2 text-sm dark:border dark:border-white/10 dark:bg-slate-950/90">
+                <span class="text-slate-500 dark:text-slate-400">{{ t('app-id') }}</span>
+                <span class="ml-2 font-mono font-medium text-slate-950 dark:text-white">{{ createdApp.app_id }}</span>
+              </div>
+            </div>
+
+            <div class="mt-6 grid gap-4 md:grid-cols-2">
+              <button class="group rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-sm transition hover:border-primary-500/40 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:border-white/15 dark:bg-slate-950/90 dark:hover:border-white/30 dark:hover:bg-slate-900" @click="goToInstallStep">
+                <div class="flex items-start gap-4">
+                  <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary-500 text-white">
+                    <IconTerminal class="h-5 w-5" />
+                  </span>
+                  <span class="min-w-0 flex-1">
+                    <span class="text-sm font-semibold uppercase text-primary-500 dark:text-slate-300">
+                      {{ t('app-onboarding-choice-real-badge') }}
+                    </span>
+                    <span class="mt-2 block text-xl font-semibold text-slate-950 dark:text-white">
+                      {{ t('app-onboarding-choice-real-title') }}
+                    </span>
+                    <span class="mt-2 block text-sm leading-6 text-slate-600 dark:text-slate-300">
+                      {{ t('app-onboarding-choice-real-subtitle') }} <span class="font-mono">{{ createdApp.app_id }}</span>.
+                    </span>
+                  </span>
+                  <IconArrowRight class="mt-1 h-5 w-5 shrink-0 text-slate-400 transition group-hover:translate-x-0.5 group-hover:text-primary-500" />
+                </div>
+              </button>
+
+              <button
+                class="group rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-sm transition hover:border-emerald-300 hover:bg-emerald-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 disabled:cursor-wait disabled:opacity-70 dark:border-white/15 dark:bg-slate-950/90 dark:hover:border-emerald-400/60 dark:hover:bg-emerald-400/10"
+                :disabled="isSeedingDemo"
+                @click="seedDemoData"
+              >
+                <div class="flex items-start gap-4">
+                  <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-emerald-500 text-white">
+                    <IconPackage class="h-5 w-5" />
+                  </span>
+                  <span class="min-w-0 flex-1">
+                    <span class="text-sm font-semibold uppercase text-emerald-600 dark:text-emerald-300">
+                      {{ t('app-onboarding-choice-demo-badge') }}
+                    </span>
+                    <span class="mt-2 block text-xl font-semibold text-slate-950 dark:text-white">
+                      {{ t('app-onboarding-choice-demo-title') }}
+                    </span>
+                    <span class="mt-2 block text-sm leading-6 text-slate-600 dark:text-slate-300">
+                      {{ t('app-onboarding-choice-demo-subtitle') }}
+                    </span>
+                    <span v-if="isSeedingDemo" class="mt-4 inline-flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-200">
+                      <IconLoader class="h-4 w-4 animate-spin" />
+                      {{ t('app-onboarding-choice-demo-loading') }}
+                    </span>
+                  </span>
+                </div>
+              </button>
             </div>
           </div>
         </div>
 
-        <div v-else-if="flowStep === 'choice' && createdApp" class="grid gap-6 md:grid-cols-2">
-          <button class="rounded-3xl border border-slate-200 bg-white p-6 text-left shadow-sm transition hover:border-azure-300 hover:shadow-md dark:border-slate-800 dark:bg-slate-900 dark:hover:border-azure-500 dark:hover:bg-slate-900/90 dark:hover:shadow-none" @click="goToInstallStep">
-            <p class="text-sm font-semibold uppercase tracking-[0.18em] text-azure-500">
-              {{ t('app-onboarding-choice-real-badge') }}
-            </p>
-            <h2 class="mt-3 text-2xl font-semibold text-slate-900 dark:text-slate-50">
-              {{ t('app-onboarding-choice-real-title') }}
-            </h2>
-            <p class="mt-3 text-sm text-slate-600 dark:text-slate-300">
-              {{ t('app-onboarding-choice-real-subtitle') }} <span class="font-mono">{{ createdApp.app_id }}</span>.
-            </p>
-          </button>
-
-          <button
-            class="rounded-3xl border border-slate-200 bg-white p-6 text-left shadow-sm transition hover:border-emerald-300 hover:shadow-md dark:border-slate-800 dark:bg-slate-900 dark:hover:border-emerald-500 dark:hover:bg-slate-900/90 dark:hover:shadow-none"
-            :disabled="isSeedingDemo"
-            @click="seedDemoData"
-          >
-            <p class="text-sm font-semibold uppercase tracking-[0.18em] text-emerald-500">
-              {{ t('app-onboarding-choice-demo-badge') }}
-            </p>
-            <h2 class="mt-3 text-2xl font-semibold text-slate-900 dark:text-slate-50">
-              {{ t('app-onboarding-choice-demo-title') }}
-            </h2>
-            <p class="mt-3 text-sm text-slate-600 dark:text-slate-300">
-              {{ t('app-onboarding-choice-demo-subtitle') }}
-            </p>
-            <p v-if="isSeedingDemo" class="mt-4 inline-flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-200">
-              <IconLoader class="h-4 w-4 animate-spin" />
-              {{ t('app-onboarding-choice-demo-loading') }}
-            </p>
-          </button>
-        </div>
-
-        <div v-else-if="flowStep === 'install' && createdApp" class="space-y-5 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900 dark:shadow-none">
-          <div class="flex flex-wrap items-start justify-between gap-4">
-            <div>
-              <p class="text-sm font-semibold uppercase tracking-[0.18em] text-azure-500">
-                {{ t('app-onboarding-install-badge') }}
-              </p>
-              <h2 class="mt-2 text-2xl font-semibold text-slate-900 dark:text-slate-50">
-                {{ t('app-onboarding-install-title') }}
-              </h2>
-              <p class="mt-2 max-w-2xl text-sm text-slate-600 dark:text-slate-300">
-                {{ t('app-onboarding-install-subtitle') }}
-              </p>
-            </div>
-            <button class="d-btn d-btn-outline" @click="openDashboard">
-              {{ t('app-onboarding-open-dashboard') }}
-            </button>
-          </div>
-
-          <div
-            class="group relative cursor-pointer rounded-2xl bg-black p-5 pr-14 ring-1 ring-white/10 transition hover:ring-white/20 dark:bg-slate-950"
-            role="button"
-            tabindex="0"
-            @click="copyCliCommand"
-            @keydown.enter.prevent="copyCliCommand"
-            @keydown.space.prevent="copyCliCommand"
-          >
-            <code class="block whitespace-pre-wrap break-all text-sm">
-              <span class="text-slate-500">npx</span>
-              <span class="text-sky-300"> @capgo/cli@latest</span>
-              <span class="text-violet-300 font-bold mr-1"> i</span>
-              <span class="text-emerald-300"> {{ apiKey ?? '[APIKEY]' }}</span>
-              <template v-for="(arg, index) in cliCommandArgs" :key="`${arg}-${index}`">
-                <span :class="index % 2 === 0 ? 'text-amber-300' : 'text-cyan-300'"> {{ arg }}</span>
-              </template>
-            </code>
-            <IconCopy class="absolute right-4 top-4 h-5 w-5 text-muted-blue-300 transition group-hover:text-white" />
-          </div>
-
-          <div class="rounded-2xl border border-azure-100 bg-azure-50/80 p-4 text-sm text-slate-700 dark:border-azure-900/30 dark:bg-azure-950/20 dark:text-slate-200">
-            <div class="flex flex-wrap items-start justify-between gap-3">
-              <div class="max-w-2xl">
-                <p class="font-medium text-slate-900 dark:text-slate-50">
-                  {{ t('app-onboarding-ai-help-title') }}
+        <div v-else-if="flowStep === 'install' && createdApp" class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start">
+          <div class="space-y-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6 dark:border-white/15 dark:bg-slate-900/95 dark:shadow-2xl dark:shadow-black/30">
+            <div class="flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <p class="text-sm font-semibold text-primary-500 dark:text-slate-300">
+                  {{ t('app-onboarding-install-badge') }}
                 </p>
-                <p class="mt-1 text-xs text-slate-600 dark:text-slate-300">
-                  {{ t('app-onboarding-ai-help-caption') }}
+                <h2 class="mt-2 text-2xl font-semibold text-slate-950 dark:text-white">
+                  {{ t('app-onboarding-install-title') }}
+                </h2>
+                <p class="mt-2 max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-300">
+                  {{ t('app-onboarding-install-subtitle') }}
                 </p>
               </div>
-              <button class="d-btn" :class="whiteCardSecondaryButtonClass()" @click="copyAiInstructions">
-                <IconCopy class="h-4 w-4" />
-                {{ t('app-onboarding-ai-help-button') }}
+              <button class="d-btn min-h-11" :class="whiteCardSecondaryButtonClass()" @click="openDashboard">
+                {{ t('app-onboarding-open-dashboard') }}
+              </button>
+            </div>
+
+            <div
+              class="group relative cursor-pointer rounded-2xl bg-slate-950 p-5 pr-14 ring-1 ring-white/10 transition hover:ring-white/20"
+              role="button"
+              tabindex="0"
+              :aria-label="t('app-onboarding-command-copy')"
+              @click="copyCliCommand"
+              @keydown.enter.prevent="copyCliCommand"
+              @keydown.space.prevent="copyCliCommand"
+            >
+              <code class="block whitespace-pre-wrap break-all text-sm">
+                <span class="text-slate-500">npx</span>
+                <span class="text-sky-300"> @capgo/cli@latest</span>
+                <span class="mr-1 font-bold text-violet-300"> i</span>
+                <span class="text-emerald-300"> {{ apiKey ?? '[APIKEY]' }}</span>
+                <template v-for="(arg, index) in cliCommandArgs" :key="`${arg}-${index}`">
+                  <span :class="index % 2 === 0 ? 'text-amber-300' : 'text-cyan-300'"> {{ arg }}</span>
+                </template>
+              </code>
+              <IconCopy class="absolute right-4 top-4 h-5 w-5 text-muted-blue-300 transition group-hover:text-white" />
+            </div>
+
+            <div class="rounded-2xl border border-slate-200 bg-slate-50/80 p-4 text-sm text-slate-700 dark:border-white/15 dark:bg-slate-950/90 dark:text-slate-200">
+              <div class="flex flex-wrap items-start justify-between gap-3">
+                <div class="max-w-2xl">
+                  <p class="font-medium text-slate-950 dark:text-white">
+                    {{ t('app-onboarding-ai-help-title') }}
+                  </p>
+                  <p class="mt-1 text-sm leading-6 text-slate-600 dark:text-slate-300">
+                    {{ t('app-onboarding-ai-help-caption') }}
+                  </p>
+                </div>
+                <button class="d-btn min-h-11" :class="whiteCardSecondaryButtonClass()" @click="copyAiInstructions">
+                  <IconCopy class="h-4 w-4" />
+                  {{ t('app-onboarding-ai-help-button') }}
+                </button>
+              </div>
+            </div>
+
+            <div class="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <button class="d-btn min-h-11" :class="whiteCardSecondaryButtonClass()" @click="flowStep = 'choice'">
+                {{ t('button-back') }}
+              </button>
+              <button class="d-btn min-h-11" :class="whiteCardPrimaryButtonClass()" @click="openDashboard">
+                {{ t('app-onboarding-install-later') }}
+                <IconArrowRight class="h-4 w-4" />
               </button>
             </div>
           </div>
 
-          <div class="rounded-2xl bg-slate-50 p-4 text-sm text-slate-700 dark:bg-slate-950/60 dark:text-slate-300">
-            <p class="font-medium text-slate-900 dark:text-slate-100">
+          <aside class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/15 dark:bg-slate-900/95 dark:shadow-2xl dark:shadow-black/30" :aria-label="t('app-onboarding-install-ready-title')">
+            <div class="flex items-center gap-3">
+              <span class="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-500 text-white">
+                <IconBadgeCheck class="h-5 w-5" />
+              </span>
+              <div>
+                <p class="text-sm font-semibold text-slate-950 dark:text-white">
+                  {{ t('app-onboarding-install-ready-title') }}
+                </p>
+                <p class="text-sm text-slate-500 dark:text-slate-400">
+                  {{ createdApp.app_id }}
+                </p>
+              </div>
+            </div>
+            <p class="mt-6 text-sm font-semibold text-slate-950 dark:text-white">
               {{ t('app-onboarding-next-title') }}
             </p>
-            <ul class="mt-3 space-y-2">
+            <ul class="mt-3 space-y-3 text-sm leading-6 text-slate-600 dark:text-slate-300">
               <li class="flex gap-3">
-                <IconCheck class="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" />
+                <IconCheck class="mt-1 h-4 w-4 shrink-0 text-emerald-500" />
                 {{ createdApp.existing_app
                   ? t('app-onboarding-next-existing')
                   : t('app-onboarding-next-new') }}
               </li>
               <li class="flex gap-3">
-                <IconCheck class="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" />
+                <IconCheck class="mt-1 h-4 w-4 shrink-0 text-emerald-500" />
                 {{ t('app-onboarding-next-cleanup') }}
               </li>
             </ul>
-          </div>
-
-          <div class="flex flex-wrap gap-3">
-            <button class="d-btn d-btn-primary" @click="openDashboard">
-              {{ t('app-onboarding-install-later') }}
-            </button>
-            <button class="d-btn d-btn-outline" @click="flowStep = 'choice'">
-              {{ t('button-back') }}
-            </button>
-          </div>
+          </aside>
         </div>
       </div>
     </div>

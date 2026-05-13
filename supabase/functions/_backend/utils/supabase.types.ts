@@ -256,6 +256,8 @@ export type Database = {
           allow_preview: boolean
           android_store_url: string | null
           app_id: string
+          build_timeout_seconds: number
+          build_timeout_updated_at: string
           channel_device_count: number
           created_at: string | null
           default_upload_channel: string
@@ -281,6 +283,8 @@ export type Database = {
           allow_preview?: boolean
           android_store_url?: string | null
           app_id: string
+          build_timeout_seconds?: number
+          build_timeout_updated_at?: string
           channel_device_count?: number
           created_at?: string | null
           default_upload_channel?: string
@@ -306,6 +310,8 @@ export type Database = {
           allow_preview?: boolean
           android_store_url?: string | null
           app_id?: string
+          build_timeout_seconds?: number
+          build_timeout_updated_at?: string
           channel_device_count?: number
           created_at?: string | null
           default_upload_channel?: string
@@ -484,6 +490,7 @@ export type Database = {
           owner_org: string
           platform: string
           requested_by: string
+          runner_wait_seconds: number
           status: string
           updated_at: string
           upload_expires_at: string
@@ -502,6 +509,7 @@ export type Database = {
           owner_org: string
           platform: string
           requested_by: string
+          runner_wait_seconds?: number
           status?: string
           updated_at?: string
           upload_expires_at: string
@@ -520,6 +528,7 @@ export type Database = {
           owner_org?: string
           platform?: string
           requested_by?: string
+          runner_wait_seconds?: number
           status?: string
           updated_at?: string
           upload_expires_at?: string
@@ -1140,21 +1149,27 @@ export type Database = {
           device_id: string
           id: number
           org_id: string
+          platform: string | null
           timestamp: string
+          version_build: string | null
         }
         Insert: {
           app_id: string
           device_id: string
           id?: number
           org_id: string
+          platform?: string | null
           timestamp?: string
+          version_build?: string | null
         }
         Update: {
           app_id?: string
           device_id?: string
           id?: number
           org_id?: string
+          platform?: string | null
           timestamp?: string
+          version_build?: string | null
         }
         Relationships: []
       }
@@ -1222,6 +1237,7 @@ export type Database = {
           build_count_day_ios: number
           build_total_seconds_day_android: number
           build_total_seconds_day_ios: number
+          builder_active_paying_clients_60d: number
           builds_android: number | null
           builds_ios: number | null
           builds_last_month: number | null
@@ -1246,6 +1262,9 @@ export type Database = {
           devices_last_month: number | null
           devices_last_month_android: number | null
           devices_last_month_ios: number | null
+          average_ltv: number
+          live_updates_active_paying_clients_60d: number
+          longest_ltv: number
           mrr: number
           need_upgrade: number | null
           new_paying_orgs: number
@@ -1257,17 +1276,22 @@ export type Database = {
           paying_monthly: number | null
           paying_yearly: number | null
           plan_enterprise: number | null
+          plan_enterprise_conversion_rate: number
           plan_enterprise_monthly: number
           plan_enterprise_yearly: number
           plan_maker: number | null
+          plan_maker_conversion_rate: number
           plan_maker_monthly: number
           plan_maker_yearly: number
           plan_solo: number | null
+          plan_solo_conversion_rate: number
           plan_solo_monthly: number
           plan_solo_yearly: number
           plan_team: number | null
+          plan_team_conversion_rate: number
           plan_team_monthly: number
           plan_team_yearly: number
+          plan_total_conversion_rate: number
           plugin_major_breakdown: Json
           plugin_version_breakdown: Json
           plugin_version_ladder: Json
@@ -1276,6 +1300,7 @@ export type Database = {
           revenue_maker: number
           revenue_solo: number
           revenue_team: number
+          shortest_ltv: number
           stars: number
           success_rate: number | null
           total_revenue: number
@@ -1296,6 +1321,7 @@ export type Database = {
           build_count_day_ios?: number
           build_total_seconds_day_android?: number
           build_total_seconds_day_ios?: number
+          builder_active_paying_clients_60d?: number
           builds_android?: number | null
           builds_ios?: number | null
           builds_last_month?: number | null
@@ -1320,6 +1346,9 @@ export type Database = {
           devices_last_month?: number | null
           devices_last_month_android?: number | null
           devices_last_month_ios?: number | null
+          average_ltv?: number
+          live_updates_active_paying_clients_60d?: number
+          longest_ltv?: number
           mrr?: number
           need_upgrade?: number | null
           new_paying_orgs?: number
@@ -1331,17 +1360,22 @@ export type Database = {
           paying_monthly?: number | null
           paying_yearly?: number | null
           plan_enterprise?: number | null
+          plan_enterprise_conversion_rate?: number
           plan_enterprise_monthly?: number
           plan_enterprise_yearly?: number
           plan_maker?: number | null
+          plan_maker_conversion_rate?: number
           plan_maker_monthly?: number
           plan_maker_yearly?: number
           plan_solo?: number | null
+          plan_solo_conversion_rate?: number
           plan_solo_monthly?: number
           plan_solo_yearly?: number
           plan_team?: number | null
+          plan_team_conversion_rate?: number
           plan_team_monthly?: number
           plan_team_yearly?: number
+          plan_total_conversion_rate?: number
           plugin_major_breakdown?: Json
           plugin_version_breakdown?: Json
           plugin_version_ladder?: Json
@@ -1350,6 +1384,7 @@ export type Database = {
           revenue_maker?: number
           revenue_solo?: number
           revenue_team?: number
+          shortest_ltv?: number
           stars: number
           success_rate?: number | null
           total_revenue?: number
@@ -1370,6 +1405,7 @@ export type Database = {
           build_count_day_ios?: number
           build_total_seconds_day_android?: number
           build_total_seconds_day_ios?: number
+          builder_active_paying_clients_60d?: number
           builds_android?: number | null
           builds_ios?: number | null
           builds_last_month?: number | null
@@ -1394,6 +1430,9 @@ export type Database = {
           devices_last_month?: number | null
           devices_last_month_android?: number | null
           devices_last_month_ios?: number | null
+          average_ltv?: number
+          live_updates_active_paying_clients_60d?: number
+          longest_ltv?: number
           mrr?: number
           need_upgrade?: number | null
           new_paying_orgs?: number
@@ -1405,17 +1444,22 @@ export type Database = {
           paying_monthly?: number | null
           paying_yearly?: number | null
           plan_enterprise?: number | null
+          plan_enterprise_conversion_rate?: number
           plan_enterprise_monthly?: number
           plan_enterprise_yearly?: number
           plan_maker?: number | null
+          plan_maker_conversion_rate?: number
           plan_maker_monthly?: number
           plan_maker_yearly?: number
           plan_solo?: number | null
+          plan_solo_conversion_rate?: number
           plan_solo_monthly?: number
           plan_solo_yearly?: number
           plan_team?: number | null
+          plan_team_conversion_rate?: number
           plan_team_monthly?: number
           plan_team_yearly?: number
+          plan_total_conversion_rate?: number
           plugin_major_breakdown?: Json
           plugin_version_breakdown?: Json
           plugin_version_ladder?: Json
@@ -1424,6 +1468,7 @@ export type Database = {
           revenue_maker?: number
           revenue_solo?: number
           revenue_team?: number
+          shortest_ltv?: number
           stars?: number
           success_rate?: number | null
           total_revenue?: number
@@ -1838,6 +1883,7 @@ export type Database = {
           market_desc: string | null
           mau: number
           name: string
+          native_build_concurrency: number
           price_m: number
           price_m_id: string
           price_y: number
@@ -1856,6 +1902,7 @@ export type Database = {
           market_desc?: string | null
           mau?: number
           name?: string
+          native_build_concurrency?: number
           price_m?: number
           price_m_id: string
           price_y?: number
@@ -1874,6 +1921,7 @@ export type Database = {
           market_desc?: string | null
           mau?: number
           name?: string
+          native_build_concurrency?: number
           price_m?: number
           price_m_id?: string
           price_y?: number
@@ -2145,6 +2193,7 @@ export type Database = {
           created_at: string
           device_id: string
           id: number
+          metadata: Json | null
           version_name: string
         }
         Insert: {
@@ -2153,6 +2202,7 @@ export type Database = {
           created_at: string
           device_id: string
           id?: never
+          metadata?: Json | null
           version_name?: string
         }
         Update: {
@@ -2161,6 +2211,7 @@ export type Database = {
           created_at?: string
           device_id?: string
           id?: never
+          metadata?: Json | null
           version_name?: string
         }
         Relationships: []
@@ -2886,6 +2937,7 @@ export type Database = {
     }
     Functions: {
       accept_invitation_to_org: { Args: { org_id: string }; Returns: string }
+      app_versions_readable_app_ids: { Args: never; Returns: string[] }
       apply_usage_overage: {
         Args: {
           p_billing_cycle_end: string
@@ -3040,11 +3092,11 @@ export type Database = {
       }
       cli_check_permission: {
         Args: {
-          apikey: string
+          apikey?: string
           app_id?: string
           channel_id?: number
           org_id?: string
-          permission_key: string
+          permission_key?: string
         }
         Returns: boolean
       }
@@ -3209,12 +3261,14 @@ export type Database = {
         }[]
       }
       get_accessible_apps_for_apikey_v2: {
-        Args: { apikey: string }
+        Args: { apikey?: string }
         Returns: {
           allow_device_custom_id: boolean
           allow_preview: boolean
           android_store_url: string | null
           app_id: string
+          build_timeout_seconds: number
+          build_timeout_updated_at: string
           channel_device_count: number
           created_at: string | null
           default_upload_channel: string
@@ -3323,6 +3377,7 @@ export type Database = {
           bandwidth: number
           build_time_unit: number
           mau: number
+          native_build_concurrency: number
           storage: number
         }[]
       }
@@ -3636,6 +3691,10 @@ export type Database = {
               website: string
             }[]
           }
+      get_owner_org_by_app_id_internal: {
+        Args: { p_app_id: string }
+        Returns: string
+      }
       get_password_policy_hash: {
         Args: { policy_config: Json }
         Returns: string
@@ -4212,6 +4271,15 @@ export type Database = {
           mau: number
         }[]
       }
+      read_native_version_usage: {
+        Args: { p_app_id: string; p_period_end: string; p_period_start: string }
+        Returns: {
+          date: string
+          devices: number
+          platform: string
+          version_build: string
+        }[]
+      }
       read_storage_usage: {
         Args: { p_app_id: string; p_period_end: string; p_period_start: string }
         Returns: {
@@ -4439,6 +4507,7 @@ export type Database = {
         Args: { p_app_id: string; p_size: number; p_version_id: number }
         Returns: boolean
       }
+      usage_credit_readable_org_ids: { Args: never; Returns: string[] }
       user_has_app_update_user_roles: {
         Args: { p_app_id: string; p_user_id: string }
         Returns: boolean
@@ -4536,6 +4605,20 @@ export type Database = {
         | "disableDevice"
         | "disablePlatformElectron"
         | "customIdBlocked"
+        | "app_crash"
+        | "app_crash_native"
+        | "app_anr"
+        | "app_killed_low_memory"
+        | "app_killed_excessive_resource_usage"
+        | "app_initialization_failure"
+        | "app_memory_warning"
+        | "webview_javascript_error"
+        | "webview_unhandled_rejection"
+        | "webview_resource_error"
+        | "webview_security_policy_violation"
+        | "webview_unclean_restart"
+        | "webview_render_process_gone"
+        | "webview_content_process_terminated"
       stripe_status:
         | "created"
         | "succeeded"
@@ -4791,6 +4874,20 @@ export const Constants = {
         "disableDevice",
         "disablePlatformElectron",
         "customIdBlocked",
+        "app_crash",
+        "app_crash_native",
+        "app_anr",
+        "app_killed_low_memory",
+        "app_killed_excessive_resource_usage",
+        "app_initialization_failure",
+        "app_memory_warning",
+        "webview_javascript_error",
+        "webview_unhandled_rejection",
+        "webview_resource_error",
+        "webview_security_policy_violation",
+        "webview_unclean_restart",
+        "webview_render_process_gone",
+        "webview_content_process_terminated",
       ],
       stripe_status: [
         "created",

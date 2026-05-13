@@ -276,7 +276,7 @@ async function fetchWithRetry(
   throw new Error('Unexpected error in fetchWithRetry')
 }
 
-export type { BuildCredentials, BuildRequestOptions, BuildRequestResponse, BuildRequestResult } from '../schemas/build'
+export type { BuildCredentials, BuildRequestOptions, BuildRequestResult } from '../schemas/build'
 
 /**
  * Stream build logs from the server via WebSocket.
@@ -1088,6 +1088,7 @@ function addNativePackagesFromNodeModules(
  * - ios/ OR android/ folder (based on platform)
  * - node_modules with native code (from Podfile/settings.gradle)
  * - capacitor.config.*, package.json, package-lock.json
+ * Zip contents are the user's responsibility, not Capgo's; Capgo packages the user-provided files as-is.
  */
 export async function zipDirectory(projectDir: string, outputPath: string, platform: 'ios' | 'android', capConfig: any, options: ZipDirectoryOptions = {}): Promise<void> {
   const platformDir = getPlatformDirFromCapacitorConfig(capConfig, platform)

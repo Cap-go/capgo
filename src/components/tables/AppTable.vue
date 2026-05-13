@@ -110,6 +110,36 @@ watchEffect(async () => {
     await loadAppRoles()
 })
 
+function renderAvatar(item: any) {
+  const sourceItem = props.apps.find((app: any) => app.app_id === item.app_id) as any || item
+  const appName = sourceItem.name || item.name
+
+  if (sourceItem.icon_url) {
+    return h('img', {
+      src: sourceItem.icon_url,
+      alt: `App icon ${appName}`,
+      class: 'mr-2 rounded-sm shrink-0 sm:mr-3 d-mask d-mask-squircle',
+      width: 42,
+      height: 42,
+    })
+  }
+
+  if (sourceItem.icon_url_loading) {
+    return h('div', {
+      'class': 'flex items-center justify-center mr-2 bg-gray-700 rounded-sm shrink-0 sm:mr-3 d-mask d-mask-squircle',
+      'style': 'width: 42px; height: 42px;',
+      'aria-label': t('loading'),
+    }, [
+      h('span', { class: 'w-5 h-5 rounded-full border-2 border-blue-400 border-t-transparent animate-spin' }),
+      h('span', { class: 'sr-only' }, t('loading')),
+    ])
+  }
+
+  return h('div', { class: 'p-2 mr-2 text-xl bg-gray-700 d-mask d-mask-squircle' }, [
+    h('span', { class: 'font-medium text-gray-300' }, (appName?.slice(0, 2).toUpperCase() || 'AP')),
+  ])
+}
+
 const columns = ref<TableColumn[]>([
   {
     label: t('name'),
@@ -119,17 +149,7 @@ const columns = ref<TableColumn[]>([
     head: true,
     onClick: item => openPackage(item),
     renderFunction: (item) => {
-      const avatar = item.icon_url
-        ? h('img', {
-            src: item.icon_url,
-            alt: `App icon ${item.name}`,
-            class: 'mr-2 rounded-sm shrink-0 sm:mr-3 d-mask d-mask-squircle',
-            width: 42,
-            height: 42,
-          })
-        : h('div', { class: 'p-2 mr-2 text-xl bg-gray-700 d-mask d-mask-squircle' }, [
-            h('span', { class: 'font-medium text-gray-300' }, (item.name?.slice(0, 2).toUpperCase() || 'AP')),
-          ])
+      const avatar = renderAvatar(item)
 
       return h('div', { class: 'flex flex-wrap items-center text-slate-800 dark:text-white' }, [
         avatar,

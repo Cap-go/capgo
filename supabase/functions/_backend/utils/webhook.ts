@@ -1,6 +1,7 @@
 import type { Context } from 'hono'
 import { cloudlog, cloudlogErr, serializeError } from './logging.ts'
 import { closeClient, getPgClient } from './pg.ts'
+import { getPublicHostnameValidationError, getPublicUrlSyntaxValidationError } from './publicUrl.ts'
 import { supabaseAdmin } from './supabase.ts'
 import { getEnv } from './utils.ts'
 
@@ -45,48 +46,32 @@ export const WEBHOOK_EVENT_TYPES = [
 
 export type WebhookEventType = typeof WEBHOOK_EVENT_TYPES[number]
 
-const LOCALHOST_SUFFIX = '.localhost'
-const IPV4_REGEX = /^\d{1,3}(?:\.\d{1,3}){3}$/
-
 function allowLocalWebhookUrls(c: Context): boolean {
   return getEnv(c, 'CAPGO_ALLOW_LOCAL_WEBHOOK_URLS') === 'true'
 }
 
-function normalizeHostname(hostname: string): string {
-  return hostname.replace(/\.$/, '').toLowerCase()
-}
-
-function isLocalhostHostname(hostname: string): boolean {
-  return hostname === 'localhost' || hostname.endsWith(LOCALHOST_SUFFIX)
-}
-
-function isIpLiteral(hostname: string): boolean {
-  return IPV4_REGEX.test(hostname) || hostname.includes(':')
+const WEBHOOK_URL_VALIDATION_MESSAGES = {
+  invalidUrl: 'Webhook URL is invalid',
+  publicHost: 'Webhook URL must point to a public host',
+  ipLiteral: 'Webhook URL must use a hostname, not an IP address',
+  https: 'Webhook URL must use HTTPS',
+  dnsResolution: 'Webhook URL host could not be resolved',
 }
 
 export function getWebhookUrlValidationError(c: Context, urlString: string): string | null {
-  let url: URL
-  try {
-    url = new URL(urlString)
-  }
-  catch {
-    return 'Webhook URL is invalid'
-  }
+  return getPublicUrlSyntaxValidationError(urlString, {
+    allowLocalUrls: allowLocalWebhookUrls(c),
+    messages: WEBHOOK_URL_VALIDATION_MESSAGES,
+  })
+}
 
-  if (allowLocalWebhookUrls(c))
-    return null
-
-  const hostname = normalizeHostname(url.hostname)
-  if (isLocalhostHostname(hostname))
-    return 'Webhook URL must point to a public host'
-
-  if (isIpLiteral(hostname))
-    return 'Webhook URL must use a hostname, not an IP address'
-
-  if (url.protocol !== 'https:')
-    return 'Webhook URL must use HTTPS'
-
-  return null
+export async function getWebhookPublicUrlValidationError(c: Context, urlString: string): Promise<string | null> {
+  return await getPublicHostnameValidationError(urlString, {
+    allowLocalUrls: allowLocalWebhookUrls(c),
+    // Do not fail customer webhooks when DNS preflight is unavailable; block only explicit private answers.
+    requireDnsResolution: false,
+    messages: WEBHOOK_URL_VALIDATION_MESSAGES,
+  })
 }
 
 /**
@@ -212,7 +197,7 @@ export async function deliverWebhook(
 ): Promise<{ success: boolean, status?: number, body?: string, duration?: number }> {
   const startTime = Date.now()
 
-  const urlValidationError = getWebhookUrlValidationError(c, url)
+  const urlValidationError = await getWebhookPublicUrlValidationError(c, url)
   if (urlValidationError) {
     const duration = Date.now() - startTime
     cloudlogErr({

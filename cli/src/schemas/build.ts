@@ -64,23 +64,18 @@ export const buildRequestOptionsSchema = optionsBaseSchema.extend({
 
 export type BuildRequestOptions = z.infer<typeof buildRequestOptionsSchema>
 
+export const buildNeededOptionsSchema = optionsBaseSchema.extend({
+  channel: z.string().optional(),
+  packageJson: z.string().optional(),
+  nodeModules: z.string().optional(),
+  verbose: z.boolean().optional(),
+})
+
+export type BuildNeededOptions = z.infer<typeof buildNeededOptionsSchema>
+
 // ============================================================================
 // Build Response Schemas
 // ============================================================================
-
-export const buildRequestResponseSchema = z.object({
-  jobId: z.string(),
-  folder: z.string(),
-  status: z.enum(['queued', 'reserved']),
-  artifactKey: z.string(),
-  uploadUrl: z.string(),
-  machine: z.object({
-    id: z.string(),
-    ip: z.string(),
-  }).catchall(z.unknown()).nullable().optional(),
-})
-
-export type BuildRequestResponse = z.infer<typeof buildRequestResponseSchema>
 
 export const buildRequestResultSchema = z.object({
   success: z.boolean(),

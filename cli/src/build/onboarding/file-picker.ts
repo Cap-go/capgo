@@ -70,3 +70,13 @@ export function openSaveFilePicker(opts: SaveFilePickerOptions): Promise<string 
   script += ')'
   return openMacFilePicker(script)
 }
+
+/**
+ * Open the macOS native file picker filtered to Android keystore files.
+ * Accepts .jks, .keystore, and .p12 extensions.
+ */
+export function openKeystorePicker(): Promise<string | null> {
+  return openMacFilePicker(
+    'POSIX path of (choose file of type {"jks", "keystore", "p12"} with prompt "Select your Android keystore")',
+  )
+}

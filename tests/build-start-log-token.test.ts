@@ -2,18 +2,25 @@ import { jwtVerify } from 'jose'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { startBuild } from '../supabase/functions/_backend/public/build/start.ts'
 
-const { mockSupabaseApikey, mockCheckPermission, mockGetEnv } = vi.hoisted(() => ({
+const { mockSupabaseAdmin, mockSupabaseApikey, mockCheckPermission, mockGetEnv, mockReserveNativeBuildSlot } = vi.hoisted(() => ({
+  mockSupabaseAdmin: vi.fn(),
   mockSupabaseApikey: vi.fn(),
   mockCheckPermission: vi.fn(),
   mockGetEnv: vi.fn(),
+  mockReserveNativeBuildSlot: vi.fn(),
 }))
 
 vi.mock('../supabase/functions/_backend/utils/supabase.ts', () => ({
+  supabaseAdmin: mockSupabaseAdmin,
   supabaseApikey: mockSupabaseApikey,
 }))
 
 vi.mock('../supabase/functions/_backend/utils/rbac.ts', () => ({
   checkPermission: mockCheckPermission,
+}))
+
+vi.mock('../supabase/functions/_backend/public/build/concurrency.ts', () => ({
+  reserveNativeBuildSlot: mockReserveNativeBuildSlot,
 }))
 
 vi.mock('../supabase/functions/_backend/utils/utils.ts', () => ({
@@ -31,14 +38,20 @@ describe('build start direct log token', () => {
   const builderApiKey = 'builder-api-key'
 
   beforeEach(() => {
+    mockSupabaseAdmin.mockReset()
     mockSupabaseApikey.mockReset()
     mockCheckPermission.mockReset()
     mockGetEnv.mockReset()
+    mockReserveNativeBuildSlot.mockReset()
 
     const selectBuilder = {
       eq: vi.fn().mockReturnThis(),
       maybeSingle: vi.fn().mockResolvedValue({
-        data: { app_id: appId },
+        data: {
+          id: '3eb4f870-720d-46b9-843f-2e6d57d54000',
+          app_id: appId,
+          owner_org: '3eb4f870-720d-46b9-843f-2e6d57d54001',
+        },
         error: null,
       }),
     }
@@ -54,12 +67,26 @@ describe('build start direct log token', () => {
         expect(table).toBe('build_requests')
         return {
           select: vi.fn().mockReturnValue(selectBuilder),
+        }
+      }),
+    })
+
+    mockSupabaseAdmin.mockReturnValue({
+      from: vi.fn().mockImplementation((table: string) => {
+        expect(table).toBe('build_requests')
+        return {
           update: vi.fn().mockReturnValue(updateBuilder),
         }
       }),
     })
 
     mockCheckPermission.mockResolvedValue(true)
+    mockReserveNativeBuildSlot.mockResolvedValue({
+      activeBuilds: 0,
+      limit: 2,
+      planName: 'Solo',
+      status: 'starting',
+    })
     mockGetEnv.mockImplementation((_, key: string) => {
       if (key === 'BUILDER_URL')
         return builderUrl
@@ -150,6 +177,12 @@ describe('build start direct log token', () => {
         headers: {
           'x-api-key': builderApiKey,
         },
+      })
+      expect(mockReserveNativeBuildSlot).toHaveBeenCalledWith(context, {
+        buildRequestId: '3eb4f870-720d-46b9-843f-2e6d57d54000',
+        orgId: '3eb4f870-720d-46b9-843f-2e6d57d54001',
+        appId,
+        jobId,
       })
     }
     finally {

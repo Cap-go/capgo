@@ -505,7 +505,10 @@ async function parseChannelSelfPluginRequest(
   cloudlog({ requestId: c.get('requestId'), message: logMessage, body })
 
   if (isLimited(c, body.app_id)) {
-    return { response: simpleRateLimit(body) }
+    // Pass curated metadata only — see simpleRateLimit contract in hono.ts.
+    // Reflecting the raw `body` would echo the client's full DeviceLink
+    // payload back inside the 429 response's `moreInfo`.
+    return { response: simpleRateLimit({ app_id: body.app_id, device_id: body.device_id }) }
   }
 
   const bodyParsed = parsePluginBody<DeviceLink>(c, body, schema, requireDevice)
@@ -535,6 +538,10 @@ async function runChannelSelfWithPgClient(
   }
 }
 
+// Plugin endpoints are intentionally public device endpoints: their responses are
+// considered public data, so we do not require Capgo JWT/API-key auth or add
+// checks beyond Supabase/platform protections. Endpoint-specific validation, plan
+// checks, and rate limits still apply.
 export const app = new Hono<MiddlewareKeyVariables>()
 
 app.post('/', async (c) => {

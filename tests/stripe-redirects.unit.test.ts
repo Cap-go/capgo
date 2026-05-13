@@ -136,6 +136,7 @@ describe('stripe redirect URL allowlist', () => {
 
     expect(result.url).toBe('https://pay.capgo.test/p/pay')
     expect(createSession).toHaveBeenCalledWith(expect.objectContaining({
+      allow_promotion_codes: true,
       success_url: 'https://capgo.test/app/success?success=true',
       cancel_url: 'https://capgo.test/app/cancel',
     }))

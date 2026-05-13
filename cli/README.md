@@ -71,6 +71,7 @@ Follow the documentation here: https://capacitorjs.com/docs/getting-started/
   - [Set](#organisation-set)
   - [Delete](#organisation-delete)
 - 🔹 [Build](#build)
+  - [Needed](#build-needed)
   - [Init](#build-init)
   - [Request](#build-request)
   - [Credentials](#build-credentials)
@@ -1146,7 +1147,7 @@ npx @capgo/cli@latest organisation delete
 ## <a id="build"></a> 🔹 **Build**
 
 🏗️  Manage native iOS/Android builds through Capgo Cloud.
-⚠️ This feature is currently in PUBLIC BETA and cannot be used by anyone at this time.
+⚠️ Native cloud build requests are currently in LIMITED BETA. Access is restricted.
  🔒 SECURITY GUARANTEE:
     Build credentials are NEVER stored on Capgo servers.
     They are used only during the build and auto-deleted after.
@@ -1156,6 +1157,32 @@ npx @capgo/cli@latest organisation delete
    npx @capgo/cli build credentials save --appId <your-app-id> --platform ios
    npx @capgo/cli build credentials save --appId <your-app-id> --platform android
 
+### <a id="build-needed"></a> 🔹 **Needed**
+
+```bash
+npx @capgo/cli@latest build needed
+```
+
+🧭 Print "yes" and exit with code 1 if a native build is required; otherwise print "no" and exit with code 0. Command failures exit with code 2.
+
+**Example:**
+
+```bash
+npx @capgo/cli@latest build needed com.example.app --channel production --verbose
+```
+
+**Options:**
+
+| Param          | Type          | Description          |
+| -------------- | ------------- | -------------------- |
+| **-a** | <code>string</code> | API key to link to your account |
+| **-c** | <code>string</code> | Channel to compare against. Defaults to CapacitorUpdater.defaultChannel or the public default channel |
+| **--package-json** | <code>string</code> | Paths to package.json files for monorepos (comma-separated) |
+| **--node-modules** | <code>string</code> | Paths to node_modules directories for monorepos (comma-separated) |
+| **--verbose** | <code>boolean</code> | Enable verbose output with detailed logging |
+| **--supa-host** | <code>string</code> | Custom Supabase host URL (for self-hosting or Capgo development) |
+| **--supa-anon** | <code>string</code> | Custom Supabase anon key (for self-hosting) |
+
 ### <a id="build-init"></a> 🚀 **Init**
 
 **Alias:** `onboarding`
@@ -1164,13 +1191,14 @@ npx @capgo/cli@latest organisation delete
 npx @capgo/cli@latest build init
 ```
 
-Set up iOS build credentials interactively (creates certificates and profiles automatically)
+Set up build credentials interactively (iOS: certificates + profiles automated; Android: keystore + Google OAuth provisions GCP service account and Play Console invite)
 
 **Options:**
 
 | Param          | Type          | Description          |
 | -------------- | ------------- | -------------------- |
 | **-a** | <code>string</code> | API key to link to your account |
+| **-p** | <code>string</code> | Platform to onboard (ios or android). If omitted, auto-detects when only one native folder exists; prompts otherwise. |
 
 ### <a id="build-request"></a> 🔹 **Request**
 
@@ -1185,7 +1213,6 @@ The build will be processed and sent directly to app stores.
     after build completion. Build outputs may optionally be uploaded for time-limited download links.
 📋 PREREQUISITE: Save credentials first with:
    `npx @capgo/cli build credentials save --appId <app-id> --platform <ios|android>`
-If you omit `--platform` in an interactive terminal, the CLI asks whether to build iOS or Android.
 
 **Example:**
 
@@ -1199,7 +1226,7 @@ npx @capgo/cli@latest build request com.example.app --platform ios --path .
 | -------------- | ------------- | -------------------- |
 | **--path** | <code>string</code> | Path to the project directory to build (default: current directory) |
 | **--node-modules** | <code>string</code> | Paths to node_modules directories for monorepos (comma-separated) |
-| **--platform** | <code>string</code> | Target platform: ios or android. In an interactive terminal, omit it to choose from a prompt. Non-interactive runs must pass it explicitly. |
+| **--platform** | <code>string</code> | Target platform: ios or android (required) |
 | **--build-mode** | <code>string</code> | Build mode: debug or release (default: release) |
 | **--build-certificate-base64** | <code>string</code> | iOS: Base64-encoded .p12 certificate |
 | **--p12-password** | <code>string</code> | iOS: Certificate password (optional if cert has no password) |

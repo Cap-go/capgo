@@ -2,7 +2,7 @@ import type { AnalyticsEngineDataPoint, D1Database, Hyperdrive } from '@cloudfla
 import type { Context } from 'hono'
 import type { DeviceComparable } from './deviceComparison.ts'
 import type { Database } from './supabase.types.ts'
-import type { DeviceRes, DeviceWithoutCreatedAt, ReadDevicesParams, ReadStatsParams, VersionUsage } from './types.ts'
+import type { DeviceRes, DeviceWithoutCreatedAt, NativeVersionUsage, ReadDevicesParams, ReadStatsParams, StatsMetadata, VersionUsage } from './types.ts'
 import dayjs from 'dayjs'
 import { CacheHelper } from './cache.ts'
 import { hasComparableDeviceChanged, toComparableDevice } from './deviceComparison.ts'
@@ -61,6 +61,22 @@ const TRACK_DEVICE_USAGE_CACHE_PATH = '/.track-device-usage-cache'
 // Cache per device per day to ensure rolling windows still see active devices.
 const TRACK_DEVICE_USAGE_CACHE_MAX_AGE_SECONDS = 2 * 24 * 60 * 60
 
+function normalizeUsagePlatform(platform?: string | null) {
+  return platform?.trim().toLowerCase() || 'unknown'
+}
+
+function getUsagePlatformValue(platform?: string | null) {
+  const normalized = normalizeUsagePlatform(platform)
+  if (normalized === 'ios')
+    return 1
+  if (normalized === 'electron')
+    return 2
+  if (normalized === 'android')
+    return 0
+
+  return -1
+}
+
 /**
  * Track device usage (MAU) in Cloudflare Analytics Engine
  *
@@ -79,9 +95,12 @@ const TRACK_DEVICE_USAGE_CACHE_MAX_AGE_SECONDS = 2 * 24 * 60 * 60
  * @param org_id - Organization identifier (optional, defaults to empty string)
  * @param platform - Device platform ('ios' or 'android')
  */
-export async function trackDeviceUsageCF(c: Context, device_id: string, app_id: string, org_id: string, platform: string) {
+export async function trackDeviceUsageCF(c: Context, device_id: string, app_id: string, org_id: string, platform: string, version_build?: string | null) {
   if (!c.env.DEVICE_USAGE)
     return
+
+  const normalizedPlatform = normalizeUsagePlatform(platform)
+  const normalizedVersionBuild = version_build || 'unknown'
 
   try {
     const usageCache = new CacheHelper(c)
@@ -89,38 +108,38 @@ export async function trackDeviceUsageCF(c: Context, device_id: string, app_id: 
       app_id,
       device_id,
       day: dayjs().format('YYYY-MM-DD'),
+      platform: normalizedPlatform,
+      version_build: normalizedVersionBuild,
     })
 
-    // Check if device was already tracked within the cache period (29 days)
+    // Check if device/version was already tracked for the current day
     if (usageCache.available) {
       const cachedUsage = await usageCache.matchJson<{ t: number }>(usageCacheRequest)
       if (cachedUsage) {
-        // Device already tracked within 29 days, skip write
+        // Device/version already tracked for this day, skip write
         return
       }
     }
 
-    // Platform: 0 = android, 1 = ios
-    const platformValue = platform?.toLowerCase() === 'ios' ? 1 : 0
+    const platformValue = getUsagePlatformValue(normalizedPlatform)
 
     // Write to Analytics Engine
     c.env.DEVICE_USAGE.writeDataPoint({
-      blobs: [device_id, org_id],
+      blobs: [device_id, org_id, normalizedVersionBuild, normalizedPlatform],
       doubles: [platformValue],
       indexes: [app_id],
     })
 
-    // Cache the write for 29 days
+    // Cache the write for this native version during the current day
     if (usageCache.available) {
       await usageCache.putJson(usageCacheRequest, { t: Date.now() }, TRACK_DEVICE_USAGE_CACHE_MAX_AGE_SECONDS)
     }
   }
   catch {
-    // Platform: 0 = android, 1 = ios
-    const platformValue = platform?.toLowerCase() === 'ios' ? 1 : 0
+    const platformValue = getUsagePlatformValue(normalizedPlatform)
     // On error, still try to write to Analytics Engine without caching
     c.env.DEVICE_USAGE.writeDataPoint({
-      blobs: [device_id, org_id],
+      blobs: [device_id, org_id, normalizedVersionBuild, normalizedPlatform],
       doubles: [platformValue],
       indexes: [app_id],
     })
@@ -152,24 +171,43 @@ export function trackVersionUsageCF(c: Context, version_name: string, app_id: st
   return Promise.resolve()
 }
 
-export function trackLogsCF(c: Context, app_id: string, device_id: string, action: string, version_name: string) {
+function serializeStatsMetadata(metadata?: StatsMetadata): string {
+  return metadata && Object.keys(metadata).length > 0 ? JSON.stringify(metadata) : ''
+}
+
+function parseStatsMetadata(metadata: unknown): StatsMetadata | null {
+  if (typeof metadata !== 'string' || metadata === '')
+    return null
+
+  try {
+    const parsed = JSON.parse(metadata)
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed))
+      return null
+    return parsed as StatsMetadata
+  }
+  catch {
+    return null
+  }
+}
+
+export function trackLogsCF(c: Context, app_id: string, device_id: string, action: string, version_name: string, metadata?: StatsMetadata) {
   if (!c.env.APP_LOG)
     return Promise.resolve()
 
   c.env.APP_LOG.writeDataPoint({
-    blobs: [device_id, action, version_name],
+    blobs: [device_id, action, version_name, serializeStatsMetadata(metadata)],
     indexes: [app_id],
   })
 
   return Promise.resolve()
 }
 
-export function trackLogsCFExternal(c: Context, app_id: string, device_id: string, action: Database['public']['Enums']['stats_action'], version_name: string) {
+export function trackLogsCFExternal(c: Context, app_id: string, device_id: string, action: Database['public']['Enums']['stats_action'], version_name: string, metadata?: StatsMetadata) {
   if (!c.env.APP_LOG_EXTERNAL)
     return Promise.resolve()
 
   c.env.APP_LOG_EXTERNAL.writeDataPoint({
-    blobs: [device_id, action, version_name],
+    blobs: [device_id, action, version_name, serializeStatsMetadata(metadata)],
     indexes: [app_id],
   })
 
@@ -511,6 +549,33 @@ ORDER BY date`
   return []
 }
 
+export async function readNativeVersionUsageCF(c: Context, app_id: string, period_start: string, period_end: string): Promise<NativeVersionUsage[]> {
+  if (!c.env.DEVICE_USAGE)
+    return []
+
+  const query = `SELECT
+  formatDateTime(toStartOfInterval(timestamp, INTERVAL '1' DAY), '%Y-%m-%d') AS date,
+  multiIf(blob4 != '', blob4, double1 = 1, 'ios', double1 = 2, 'electron', double1 = 0, 'android', 'unknown') AS platform,
+  if(blob3 = '', 'unknown', blob3) AS version_build,
+  COUNT(DISTINCT blob1) AS devices
+FROM device_usage
+WHERE
+  index1 = '${escapeSqlString(app_id)}'
+  AND timestamp >= toDateTime('${formatDateCF(period_start)}')
+  AND timestamp < toDateTime('${formatDateCF(period_end)}')
+GROUP BY date, platform, version_build
+ORDER BY date, platform, version_build`
+
+  cloudlog({ requestId: c.get('requestId'), message: 'readNativeVersionUsageCF query', query })
+  try {
+    return await runQueryToCFA<NativeVersionUsage>(c, query)
+  }
+  catch (e) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Error reading native version usage', error: serializeError(e), query })
+  }
+  return []
+}
+
 export async function readDeviceVersionCountsCF(c: Context, app_id: string, channelName?: string): Promise<Record<string, number>> {
   if (!c.env.DEVICE_INFO)
     return {}
@@ -625,15 +690,18 @@ function getReadDevicesCFOrder(params: ReadDevicesParams): DevicesOrderCF | null
 }
 
 function buildReadDevicesCFCursorFilter(cursor: string | undefined, devicesOrder: DevicesOrderCF | null) {
-  if (!(cursor && devicesOrder))
+  if (!cursor)
     return ''
 
   const [cursorTime, cursorDeviceId] = cursor.split('|')
   if (!(cursorTime && cursorDeviceId))
     return ''
 
-  const safeCursorTime = escapeSqlString(cursorTime)
   const safeCursorDeviceId = escapeSqlString(cursorDeviceId)
+  if (!devicesOrder)
+    return `WHERE device_id > '${safeCursorDeviceId}'`
+
+  const safeCursorTime = escapeSqlString(cursorTime)
   const comparison = devicesOrder.ascending ? '>' : '<'
 
   return `WHERE (updated_at ${comparison} toDateTime('${safeCursorTime}') OR (updated_at = toDateTime('${safeCursorTime}') AND device_id > '${safeCursorDeviceId}'))`
@@ -762,6 +830,7 @@ interface StatRowCF {
   device_id: string
   action: string
   version_name: string
+  metadata: string | null
   created_at: string
 }
 
@@ -800,9 +869,9 @@ export async function readStatsCF(c: Context, params: ReadStatsParams) {
   if (params.search) {
     const searchLower = params.search.toLowerCase()
     if (params.deviceIds?.length)
-      searchFilter = `AND (position('${escapeSqlString(searchLower)}' IN toLower(action)) > 0 OR position('${escapeSqlString(searchLower)}' IN toLower(blob3)) > 0)`
+      searchFilter = `AND (position('${escapeSqlString(searchLower)}' IN toLower(action)) > 0 OR position('${escapeSqlString(searchLower)}' IN toLower(blob3)) > 0 OR position('${escapeSqlString(searchLower)}' IN toLower(blob4)) > 0)`
     else
-      searchFilter = `AND (position('${escapeSqlString(searchLower)}' IN toLower(device_id)) > 0 OR position('${escapeSqlString(searchLower)}' IN toLower(action)) > 0 OR position('${escapeSqlString(searchLower)}' IN toLower(blob3)) > 0)`
+      searchFilter = `AND (position('${escapeSqlString(searchLower)}' IN toLower(device_id)) > 0 OR position('${escapeSqlString(searchLower)}' IN toLower(action)) > 0 OR position('${escapeSqlString(searchLower)}' IN toLower(blob3)) > 0 OR position('${escapeSqlString(searchLower)}' IN toLower(blob4)) > 0)`
   }
   const orderFilters: string[] = []
   const allowedOrderKeys = new Set(['created_at', 'app_id', 'device_id', 'action', 'version_name'])
@@ -824,17 +893,22 @@ export async function readStatsCF(c: Context, params: ReadStatsParams) {
   blob1 as device_id,
   blob2 as action,
   blob3 as version_name,
+  blob4 as metadata,
   timestamp as created_at
 FROM app_log
 WHERE
   app_id = '${escapeSqlString(params.app_id)}' ${deviceFilter} ${actionsFilter} ${searchFilter} ${startFilter} ${endFilter}
-GROUP BY app_id, created_at, action, device_id, version_name
+GROUP BY app_id, created_at, action, device_id, version_name, metadata
 ${orderFilter}
 LIMIT ${limit}`
 
   cloudlog({ requestId: c.get('requestId'), message: 'readStatsCF query', query })
   try {
-    return await runQueryToCFA<StatRowCF>(c, query)
+    const rows = await runQueryToCFA<StatRowCF>(c, query)
+    return rows.map(row => ({
+      ...row,
+      metadata: parseStatsMetadata(row.metadata),
+    }))
   }
   catch (e) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'Error reading stats list', error: serializeError(e), query })

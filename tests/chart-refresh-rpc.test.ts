@@ -10,8 +10,10 @@ import {
   SUPABASE_ANON_KEY,
   SUPABASE_BASE_URL,
   USER_EMAIL,
+  USER_EMAIL_NONMEMBER,
   USER_ID,
   USER_PASSWORD,
+  USER_PASSWORD_NONMEMBER,
 } from './test-utils.ts'
 
 const orgId = randomUUID()
@@ -59,14 +61,17 @@ describe('chart refresh RPCs', () => {
   const unauthorizedClient = createAuthClient()
 
   beforeAll(async () => {
-    await authorizedClient.auth.signInWithPassword({
+    const { error: authorizedSignInError } = await authorizedClient.auth.signInWithPassword({
       email: USER_EMAIL,
       password: USER_PASSWORD,
     })
-    await unauthorizedClient.auth.signInWithPassword({
-      email: 'test2@capgo.app',
-      password: USER_PASSWORD,
+    expect(authorizedSignInError).toBeNull()
+
+    const { error: unauthorizedSignInError } = await unauthorizedClient.auth.signInWithPassword({
+      email: USER_EMAIL_NONMEMBER,
+      password: USER_PASSWORD_NONMEMBER,
     })
+    expect(unauthorizedSignInError).toBeNull()
 
     await getSupabaseClient().from('orgs').insert({
       created_by: USER_ID,

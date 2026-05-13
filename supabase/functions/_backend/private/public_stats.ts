@@ -8,13 +8,25 @@ export const app = new Hono<MiddlewareKeyVariables>()
 
 app.use('/', useCors)
 
+export function getLatestCompletedGlobalStatsDateId(referenceDate = new Date()) {
+  const completedDay = new Date(Date.UTC(
+    referenceDate.getUTCFullYear(),
+    referenceDate.getUTCMonth(),
+    referenceDate.getUTCDate() - 1,
+  ))
+
+  return completedDay.toISOString().slice(0, 10)
+}
+
 app.get('/', async (c) => {
-  const date_id = new Date().toISOString().slice(0, 10)
+  const latestCompletedDateId = getLatestCompletedGlobalStatsDateId()
   const { data, error } = await supabaseAdmin(c)
     .from('global_stats')
     .select()
-    .eq('date_id', date_id)
-    .single()
+    .lte('date_id', latestCompletedDateId)
+    .order('date_id', { ascending: false })
+    .limit(1)
+    .maybeSingle()
   if (data && !error) {
     return c.json({
       apps: data.apps,
@@ -22,7 +34,7 @@ app.get('/', async (c) => {
       stars: data.stars,
     })
   }
-  cloudlog({ requestId: c.get('requestId'), message: 'Supabase error:', error })
+  cloudlog({ requestId: c.get('requestId'), message: 'Missing completed global_stats row', latestCompletedDateId, error })
   return c.json({
     apps: 1688,
     updates: 1862788600,
