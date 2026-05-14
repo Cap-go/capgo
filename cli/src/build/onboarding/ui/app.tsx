@@ -142,7 +142,10 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
 
   // Import-existing sub-flow state (macOS only)
   const [importMatches, setImportMatches] = useState<IdentityProfileMatch[]>([])
-  const [importProfiles, setImportProfiles] = useState<DiscoveredProfile[]>([])
+  // Setter only — the value isn't read in render (we use importMatches for
+  // display) but we keep the state hook so future refs stay stable and any
+  // pending update calls in import-scanning useEffect remain valid.
+  const [, setImportProfiles] = useState<DiscoveredProfile[]>([])
   const [chosenIdentity, setChosenIdentity] = useState<SigningIdentity | null>(null)
   const [chosenProfile, setChosenProfile] = useState<DiscoveredProfile | null>(null)
   const [importDistribution, setImportDistribution] = useState<'app_store' | 'ad_hoc' | null>(null)

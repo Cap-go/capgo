@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { writeFileSync, mkdtempSync, rmSync } from 'fs'
 import { join } from 'path'
 import { tmpdir } from 'os'
-import { createHash } from 'node:crypto'
+import { createHash, randomBytes } from 'node:crypto'
 import { parseMobileprovision, parseMobileprovisionDetailed, parseMobileprovisionFromBase64 } from '../src/build/mobileprovision-parser.ts'
 
 function t(name, fn) {
@@ -118,7 +118,10 @@ t('parses base64-encoded mobileprovision', () => {
 // ─── parseMobileprovisionDetailed ─────────────────────────────────────
 
 function detailedFixture({ profileType = 'app_store', includeCerts = true }) {
-  const fakeDer = Buffer.from(`fake-der-${profileType}-${Math.random()}`)
+  // Use crypto.randomBytes (not Math.random) so each test run gets a unique
+  // fake DER without tripping CodeQL's "weak RNG feeding into a hash" rule.
+  // The bytes themselves carry no security weight — they're just test scaffolding.
+  const fakeDer = Buffer.from(`fake-der-${profileType}-${randomBytes(8).toString('hex')}`)
   const sha1 = createHash('sha1').update(fakeDer).digest('hex').toLowerCase()
   const certBlock = includeCerts
     ? `<key>DeveloperCertificates</key>\n  <array>\n    <data>${fakeDer.toString('base64')}</data>\n  </array>`

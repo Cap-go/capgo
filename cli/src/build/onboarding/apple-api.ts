@@ -140,6 +140,13 @@ export async function listDistributionCerts(
  * Compute the SHA1 hash of an ASC certificate's base64-DER content. Returns
  * the lowercase 40-char hex string used elsewhere as the canonical identity
  * key — matches the SHA1 reported by `security find-identity` on macOS.
+ *
+ * SECURITY NOTE on SHA1: this is NOT a security primitive. macOS itself
+ * reports code-signing identities as cert-DER SHA1 (via `security
+ * find-identity`), and we have to use the same hash to look up an Apple-side
+ * cert by its on-Mac counterpart. SHA1 here is a non-secret identifier, not
+ * a message digest protecting any data. CodeQL's "weak cryptographic
+ * algorithm" rule is suppressed for this reason.
  */
 export function computeCertSha1(certificateContentBase64: string): string {
   // Lazy require — keep crypto out of the import-time graph
@@ -148,6 +155,8 @@ export function computeCertSha1(certificateContentBase64: string): string {
   // eslint-disable-next-line ts/no-require-imports
   const { createHash } = require('node:crypto') as typeof import('node:crypto')
   const der = Buffer.from(certificateContentBase64, 'base64')
+  // lgtm[js/weak-cryptographic-algorithm] SHA1 is required for compatibility
+  // with `security find-identity` output — see comment above.
   return createHash('sha1').update(der).digest('hex').toLowerCase()
 }
 

@@ -142,6 +142,13 @@ function deriveProfileType(xml: string): MobileprovisionDetail['profileType'] {
 /**
  * Extract SHA1 of every DeveloperCertificate in the profile.
  * The plist stores certs as base64-encoded DER inside a <data> element.
+ *
+ * SECURITY NOTE on SHA1: this is NOT a security primitive. macOS itself
+ * reports code-signing identities as cert-DER SHA1 (via `security
+ * find-identity`), and we have to use the same hash to match a profile's
+ * embedded certs against a Keychain identity. SHA1 here is a non-secret
+ * identifier, not a message digest protecting any data. CodeQL's "weak
+ * cryptographic algorithm" rule is suppressed for this reason.
  */
 function extractCertificateSha1s(xml: string): string[] {
   const arrayMatch = xml.match(/<key>DeveloperCertificates<\/key>\s*<array>([\s\S]*?)<\/array>/)
@@ -155,6 +162,8 @@ function extractCertificateSha1s(xml: string): string[] {
       continue
     try {
       const der = Buffer.from(base64, 'base64')
+      // lgtm[js/weak-cryptographic-algorithm] SHA1 required for compatibility
+      // with `security find-identity` output — see comment above.
       const sha1 = createHash('sha1').update(der).digest('hex').toLowerCase()
       sha1s.push(sha1)
     }
