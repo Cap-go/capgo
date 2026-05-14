@@ -8,15 +8,16 @@
 // Everything in this module shells out to `/usr/bin/security` and reads files
 // under the user's home directory. macOS-only.
 
-import type * as forgeTypes from 'node-forge'
 import type { Buffer } from 'node:buffer'
 import type { MobileprovisionDetail } from '../mobileprovision-parser.js'
 import { spawn } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
-import { mkdtemp, readdir, readFile, rm } from 'node:fs/promises'
+import { existsSync } from 'node:fs'
+import { chmod, mkdtemp, readdir, readFile, rename, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import process from 'node:process'
+import { fileURLToPath } from 'node:url'
 import { parseMobileprovisionDetailed } from '../mobileprovision-parser.js'
 
 /** Absolute path to the system `security` binary. */
@@ -270,33 +271,165 @@ export function generateP12Passphrase(): string {
   return randomBytes(32).toString('hex')
 }
 
-export interface ExportP12Options {
-  /** Optional keychain path; defaults to the user's login keychain (login.keychain-db) */
-  keychain?: string
-  /** Optional injection point for the `security` subprocess runner — used in tests */
-  runner?: SecurityRunner
-  /**
-   * Optional override for the P12 filter step (used in tests to avoid loading
-   * node-forge against a real P12). Default uses the bundled node-forge.
-   */
-  forgeFilter?: (allP12Base64: string, passphrase: string, targetSha1: string) => string
+// ─── Native helper (Swift) for single-prompt P12 export ──────────────
+
+/**
+ * Output shape from the Swift helper's stdout — always emitted as one line of
+ * JSON regardless of success or failure. See keychain-export.swift for the
+ * source of truth.
+ */
+interface SwiftHelperResult {
+  ok: boolean
+  // Success fields:
+  p12Path?: string
+  p12SizeBytes?: number
+  identityName?: string
+  // Failure fields:
+  errorCode?: 'INVALID_ARGS' | 'NO_IDENTITY' | 'USER_DENIED' | 'EXPORT_FAILED' | 'WRITE_FAILED' | 'INTERNAL'
+  message?: string
+  osStatus?: number
 }
 
 /**
- * Export the chosen identity from the user's login keychain as a base64'd
- * PKCS#12 blob.
+ * Resolve the bundled keychain-export.swift source file.
  *
- * THIS IS THE ONE CALL THAT TRIGGERS A MACOS KEYCHAIN PROMPT.
+ * In production (installed npm package) the .swift sits next to dist/index.js
+ * — copied there by build.mjs. In dev the bundle and source share a parent.
+ * In tests the file resolves relative to this module's source path. We try
+ * each in order so the helper Just Works in every environment.
+ */
+function resolveSwiftSourcePath(): string | null {
+  const candidates: string[] = []
+
+  // 1. Production: dist/keychain-export.swift next to the bundled CLI
+  try {
+    const here = dirname(fileURLToPath(import.meta.url))
+    candidates.push(join(here, 'keychain-export.swift'))
+    // 2. Dev: src/build/onboarding/keychain-export.swift relative to this module
+    candidates.push(join(here, '..', '..', '..', 'src', 'build', 'onboarding', 'keychain-export.swift'))
+  }
+  catch {
+    // import.meta.url can throw under certain bundlers — fall through
+  }
+
+  for (const candidate of candidates) {
+    if (existsSync(candidate))
+      return candidate
+  }
+  return null
+}
+
+/**
+ * Return the path to the cached compiled Swift helper. The cache lives in
+ * the OS temp dir keyed by CLI version, so:
+ *   - Same CLI version → reuses the cached binary
+ *   - CLI upgrade → triggers a fresh compile
+ *   - macOS `periodic` cleans tmp eventually → triggers a fresh compile
  *
- * macOS will display a single GUI dialog asking permission for `security` to
- * access the private key. The user should click "Always Allow" to avoid
- * being prompted again on retry.
+ * The version is read at runtime from CLI_VERSION env (set by callers/tests)
+ * or falls back to the package.json version embedded at build time.
+ */
+function compiledHelperPath(): string {
+  // CLI_VERSION env lets us pin in tests; otherwise use the npm version.
+  const version = process.env.CAPGO_CLI_VERSION || process.env.npm_package_version || 'dev'
+  return join(tmpdir(), `capgo-keychain-export-v${version}`)
+}
+
+/**
+ * Compile keychain-export.swift to the cached path. Returns the path on
+ * success. Atomic: writes to `<path>.tmp` then renames so a partial compile
+ * never lands at the cache key.
+ */
+async function compileSwiftHelper(swiftSrc: string, outPath: string): Promise<string> {
+  const tmpOut = `${outPath}.${randomBytes(6).toString('hex')}.tmp`
+  const result = await spawnCapture('swiftc', [
+    swiftSrc,
+    '-framework',
+    'Security',
+    '-O',
+    '-o',
+    tmpOut,
+  ])
+  if (result.code !== 0) {
+    await rm(tmpOut, { force: true }).catch(() => { /* best-effort */ })
+    throw new MacOSSigningError(
+      `Failed to compile keychain-export.swift with swiftc (exit ${result.code}). `
+      + `Make sure Xcode Command Line Tools are installed (xcode-select --install). `
+      + `Stderr: ${result.stderr.trim() || '(empty)'}`,
+    )
+  }
+  await chmod(tmpOut, 0o755)
+  await rename(tmpOut, outPath)
+  return outPath
+}
+
+/**
+ * Get or build the Swift helper binary. Caches at `compiledHelperPath()`.
+ */
+async function ensureSwiftHelper(): Promise<string> {
+  const cached = compiledHelperPath()
+  if (existsSync(cached))
+    return cached
+  const src = resolveSwiftSourcePath()
+  if (!src) {
+    throw new MacOSSigningError(
+      'Could not locate bundled keychain-export.swift source file. '
+      + 'This is a packaging bug — please report it.',
+    )
+  }
+  return compileSwiftHelper(src, cached)
+}
+
+/**
+ * Spawn an arbitrary command, capturing stdout/stderr/exit-code. Used for
+ * `swiftc` and the Swift helper itself.
+ */
+interface SpawnResult {
+  stdout: string
+  stderr: string
+  code: number | null
+}
+
+function spawnCapture(command: string, args: readonly string[]): Promise<SpawnResult> {
+  return new Promise((resolveRun) => {
+    const child = spawn(command, [...args], { stdio: ['ignore', 'pipe', 'pipe'] })
+    let stdout = ''
+    let stderr = ''
+    child.stdout.on('data', (chunk: Buffer) => {
+      stdout += chunk.toString('utf-8')
+    })
+    child.stderr.on('data', (chunk: Buffer) => {
+      stderr += chunk.toString('utf-8')
+    })
+    child.once('error', (err) => {
+      resolveRun({ stdout, stderr: stderr + (err instanceof Error ? err.message : String(err)), code: null })
+    })
+    child.once('close', (code) => {
+      resolveRun({ stdout, stderr, code })
+    })
+  })
+}
+
+export interface ExportP12Options {
+  /**
+   * Pre-resolved Swift helper binary path. Used in tests to inject a fake
+   * binary; in production this is computed automatically.
+   */
+  helperPathOverride?: string
+}
+
+/**
+ * Export the chosen identity from the user's Keychain as a base64'd PKCS#12.
  *
- * Implementation note: `security export -t identities` exports ALL identities
- * in the chosen keychain to a single P12. We then filter that P12 down to
- * the chosen identity using node-forge before returning. This keeps the
- * Keychain prompt count to exactly one, regardless of how many identities
- * the user has.
+ * Triggers exactly TWO macOS Keychain prompts on the user's first run for
+ * a given identity (one for "access" ACL, one for "export" ACL). Both
+ * decisions are cached when the user clicks "Always Allow", so subsequent
+ * runs against the same identity from the same binary are silent.
+ *
+ * Internally calls the bundled Swift helper (compiled on first use to the
+ * OS temp folder via `swiftc`). The helper uses Security framework's
+ * `SecItemExport(.formatPKCS12)` — the only Apple-supported path that works
+ * on Xcode-imported (non-extractable) signing keys.
  *
  * @param targetSha1 SHA1 of the identity to export (from {@link listSigningIdentities})
  * @param options    See {@link ExportP12Options}
@@ -313,122 +446,81 @@ export async function exportP12FromKeychain(
     throw new MacOSSigningError(`Invalid SHA1 for identity export: "${targetSha1}"`)
   }
 
-  const keychain = options.keychain ?? DEFAULT_LOGIN_KEYCHAIN
+  const helperPath = options.helperPathOverride ?? await ensureSwiftHelper()
   const passphrase = generateP12Passphrase()
-  const runner = options.runner ?? defaultRunner
 
-  // Write into a fresh temp dir so we can rm -rf cleanly even if the export fails
+  // Temp dir for the .p12 file — removed in finally{} regardless of outcome.
   const workDir = await mkdtemp(join(tmpdir(), 'capgo-p12-'))
-  const allP12Path = join(workDir, 'all.p12')
+  const p12Path = join(workDir, 'identity.p12')
 
   try {
-    const exportResult = await runner([
-      'export',
-      '-k',
-      keychain,
-      '-t',
-      'identities',
-      '-f',
-      'pkcs12',
-      '-P',
+    const result = await spawnCapture(helperPath, [
+      '--sha1',
+      sha1,
+      '--output',
+      p12Path,
+      '--passphrase',
       passphrase,
-      '-o',
-      allP12Path,
     ])
-    if (exportResult.code !== 0) {
+
+    // The helper ALWAYS emits one line of JSON on stdout — success or fail.
+    // Parse it before checking exit code so we get the structured errorCode.
+    const parsed = parseHelperJson(result.stdout, result.stderr, result.code)
+
+    if (!parsed.ok) {
+      const code = parsed.errorCode ?? 'INTERNAL'
+      const msg = parsed.message ?? 'Unknown error from keychain-export helper'
+      const osStatus = parsed.osStatus !== undefined ? ` [OSStatus ${parsed.osStatus}]` : ''
       throw new MacOSSigningError(
-        `security export failed (exit ${exportResult.code}). `
-        + `Most common cause: the private key isn't marked exportable in Keychain Access, `
-        + `or the user denied the access prompt. `
-        + `Stderr: ${exportResult.stderr.trim() || '(empty)'}`,
+        `keychain-export ${code}: ${msg}${osStatus}`,
       )
     }
 
-    const allP12Buffer = await readFile(allP12Path)
-    const allP12Base64 = allP12Buffer.toString('base64')
-
-    // Filter the multi-identity P12 down to just the chosen one
-    const filterFn = options.forgeFilter ?? filterP12ToSingleIdentity
-    const filtered = filterFn(allP12Base64, passphrase, sha1)
-
-    return { base64: filtered, passphrase }
+    const p12Buffer = await readFile(p12Path)
+    return { base64: p12Buffer.toString('base64'), passphrase }
   }
   finally {
-    await rm(workDir, { recursive: true, force: true }).catch(() => { /* best-effort cleanup */ })
+    await rm(workDir, { recursive: true, force: true }).catch(() => { /* best-effort */ })
   }
 }
 
 /**
- * Re-encode a multi-identity PKCS#12 to contain only the entry whose
- * certificate matches `targetSha1`. Uses the same 3DES PBE that the rest of
- * the pipeline produces so `security import` on the build server accepts it.
+ * Parse the helper's JSON output. Tolerates: extra whitespace, trailing
+ * newline, BOM. Throws a clear error if the output is unparseable — that
+ * indicates the helper crashed without emitting JSON, which our Swift code
+ * tries hard to never do (see keychain-export.swift's top-level catch).
  *
- * Exported for tests; call sites should use exportP12FromKeychain instead.
+ * Exported for tests.
  */
-export function filterP12ToSingleIdentity(
-  allP12Base64: string,
-  passphrase: string,
-  targetSha1: string,
-): string {
-  // Lazy require — node-forge has heavy import-time cost we don't want to pay
-  // when the module is loaded on non-macOS hosts.
-  // eslint-disable-next-line ts/no-require-imports
-  const forge: typeof import('node-forge') = require('node-forge')
-
-  const p12Der = forge.util.decode64(allP12Base64)
-  const p12Asn1 = forge.asn1.fromDer(p12Der)
-  const p12 = forge.pkcs12.pkcs12FromAsn1(p12Asn1, false, passphrase)
-
-  const wantSha1 = targetSha1.toLowerCase()
-  let chosenKey: forgeTypes.pki.PrivateKey | undefined
-
-  // Walk safe contents and bag entries to find matching cert + paired key
-  const certCandidates: Array<{ sha1: string, cert: forgeTypes.pki.Certificate, localKeyId?: string }> = []
-  const keyCandidates: Array<{ key: forgeTypes.pki.PrivateKey, localKeyId?: string }> = []
-
-  for (const safeContent of p12.safeContents) {
-    for (const safeBag of safeContent.safeBags) {
-      const localKeyId = safeBag.attributes?.localKeyId?.[0] as string | undefined
-      if (safeBag.type === forge.pki.oids.certBag && safeBag.cert) {
-        const certDer = forge.asn1.toDer(forge.pki.certificateToAsn1(safeBag.cert)).getBytes()
-        const sha1 = forge.md.sha1.create().update(certDer).digest().toHex().toLowerCase()
-        certCandidates.push({ sha1, cert: safeBag.cert, localKeyId })
-      }
-      else if (
-        (safeBag.type === forge.pki.oids.pkcs8ShroudedKeyBag || safeBag.type === forge.pki.oids.keyBag)
-        && safeBag.key
-      ) {
-        keyCandidates.push({ key: safeBag.key, localKeyId })
-      }
-    }
+export function parseHelperJson(
+  stdout: string,
+  stderr: string,
+  exitCode: number | null,
+): SwiftHelperResult {
+  const trimmed = stdout.trim().replace(/^\uFEFF/, '')
+  if (!trimmed) {
+    // No JSON at all — helper crashed before reaching emitFailureAndExit.
+    throw new MacOSSigningError(
+      `keychain-export helper produced no JSON output (exit ${exitCode}). `
+      + `Stderr: ${stderr.trim() || '(empty)'}`,
+    )
   }
-
-  const matchingCert = certCandidates.find(c => c.sha1 === wantSha1)
-  if (!matchingCert) {
-    throw new MacOSSigningError(`Exported P12 did not contain identity with SHA1 ${targetSha1}`)
+  // Only parse the LAST line in case there's incidental stdout chatter.
+  const lastLine = trimmed.split('\n').filter(Boolean).pop() ?? ''
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(lastLine)
   }
-  const chosenCert = matchingCert.cert
-  // Pair by localKeyId if present (PKCS#12 standard linkage), else fall back
-  // to the only key in the file.
-  if (matchingCert.localKeyId) {
-    chosenKey = keyCandidates.find(k => k.localKeyId === matchingCert.localKeyId)?.key
+  catch (err) {
+    throw new MacOSSigningError(
+      `keychain-export helper emitted unparseable JSON (exit ${exitCode}): "${lastLine}". `
+      + `Parse error: ${err instanceof Error ? err.message : String(err)}`,
+    )
   }
-  if (!chosenKey && keyCandidates.length === 1) {
-    chosenKey = keyCandidates[0].key
+  if (!parsed || typeof parsed !== 'object') {
+    throw new MacOSSigningError(
+      `keychain-export helper JSON was not an object (exit ${exitCode}): "${lastLine}"`,
+    )
   }
-  if (!chosenKey) {
-    throw new MacOSSigningError(`Exported P12 did not contain a private key paired to identity ${targetSha1}`)
-  }
-
-  // Re-encode with 3DES PBE — matches the existing csr.ts createP12() output.
-  // node-forge's `PrivateKey` union also covers symmetric keys; the export came
-  // from `security export -t identities` so we know it's an RSA key.
-  const filteredAsn1 = forge.pkcs12.toPkcs12Asn1(
-    chosenKey as forgeTypes.pki.rsa.PrivateKey,
-    [chosenCert],
-    passphrase,
-    { algorithm: '3des' },
-  )
-  const filteredDer = forge.asn1.toDer(filteredAsn1).getBytes()
-  return forge.util.encode64(filteredDer)
+  return parsed as SwiftHelperResult
 }

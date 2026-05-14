@@ -9,6 +9,7 @@ import {
   isMacOS,
   matchIdentitiesToProfiles,
   parseFindIdentityOutput,
+  parseHelperJson,
   scanProvisioningProfiles,
 } from '../src/build/onboarding/macos-signing.ts'
 
@@ -203,6 +204,51 @@ await tAsync('scan returns empty list when no profile dirs exist', async () => {
   finally {
     rmSync(fakeHome, { recursive: true, force: true })
   }
+})
+
+// ─── parseHelperJson ─────────────────────────────────────────────────
+
+t('parseHelperJson parses success output', () => {
+  const stdout = '{"ok":true,"p12Path":"/tmp/x.p12","p12SizeBytes":4096,"identityName":"Apple Distribution: Acme"}\n'
+  const parsed = parseHelperJson(stdout, '', 0)
+  assert.equal(parsed.ok, true)
+  assert.equal(parsed.p12Path, '/tmp/x.p12')
+  assert.equal(parsed.p12SizeBytes, 4096)
+  assert.equal(parsed.identityName, 'Apple Distribution: Acme')
+})
+
+t('parseHelperJson parses failure with error code + osStatus', () => {
+  const stdout = '{"ok":false,"errorCode":"USER_DENIED","message":"denied","osStatus":-128}\n'
+  const parsed = parseHelperJson(stdout, '', 4)
+  assert.equal(parsed.ok, false)
+  assert.equal(parsed.errorCode, 'USER_DENIED')
+  assert.equal(parsed.message, 'denied')
+  assert.equal(parsed.osStatus, -128)
+})
+
+t('parseHelperJson tolerates trailing whitespace + newlines', () => {
+  const stdout = '\n\n  {"ok":true,"p12Path":"/x"}  \n\n'
+  const parsed = parseHelperJson(stdout, '', 0)
+  assert.equal(parsed.ok, true)
+  assert.equal(parsed.p12Path, '/x')
+})
+
+t('parseHelperJson uses the LAST line when multiple lines present', () => {
+  const stdout = 'incidental log line\n{"ok":true,"p12Path":"/x"}\n'
+  const parsed = parseHelperJson(stdout, '', 0)
+  assert.equal(parsed.ok, true)
+})
+
+t('parseHelperJson throws clearly when stdout is empty', () => {
+  assert.throws(() => parseHelperJson('', 'helper segfaulted', 139), /no JSON output.*helper segfaulted/)
+})
+
+t('parseHelperJson throws clearly when stdout is unparseable', () => {
+  assert.throws(() => parseHelperJson('not json at all', '', 1), /unparseable JSON/)
+})
+
+t('parseHelperJson throws clearly when JSON is not an object', () => {
+  assert.throws(() => parseHelperJson('"a string, not object"', '', 1), /not an object/)
 })
 
 process.stdout.write('OK\n')
