@@ -23,7 +23,7 @@ import { requestBuildInternal } from '../../request.js'
 import { CertificateLimitError, createCertificate, createProfile, deleteProfile, DuplicateProfileError, ensureBundleId, findCertIdBySha1, generateJwt, listProfilesForCert, revokeCertificate, verifyApiKey } from '../apple-api.js'
 import { createP12, DEFAULT_P12_PASSWORD, generateCsr } from '../csr.js'
 import { canUseFilePicker, openFilePicker } from '../file-picker.js'
-import { exportP12FromKeychain, isMacOS, listSigningIdentities, matchIdentitiesToProfiles, scanProvisioningProfiles } from '../macos-signing.js'
+import { exportP12FromKeychain, isHelperCached, isMacOS, listSigningIdentities, matchIdentitiesToProfiles, precompileSwiftHelper, scanProvisioningProfiles } from '../macos-signing.js'
 import { deleteProgress, getResumeStep, loadProgress, saveProgress } from '../progress.js'
 import { getBuildOnboardingRecoveryAdvice } from '../recovery.js'
 import {
@@ -459,6 +459,24 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
         catch (err) {
           if (!cancelled)
             handleError(err, 'import-scanning')
+        }
+      })()
+    }
+
+    if (step === 'import-compiling-helper') {
+      ;(async () => {
+        try {
+          const startedAt = Date.now()
+          await precompileSwiftHelper()
+          if (cancelled)
+            return
+          const elapsedMs = Date.now() - startedAt
+          addLog(`✔ Compiled keychain-export helper in ${elapsedMs}ms`)
+          setStep('import-exporting')
+        }
+        catch (err) {
+          if (!cancelled)
+            handleError(err, 'import-compiling-helper')
         }
       })()
     }
@@ -1002,6 +1020,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
           <Newline />
           <Text dimColor>
             Android onboarding coming soon. Use
+            {' '}
             <Text bold color="white">capgo build credentials save</Text>
             {' '}
             for Android.
@@ -1100,7 +1119,20 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
               { label: '🆕  Create new via App Store Connect API', value: 'create' },
               { label: '📥  Import existing from this Mac (Keychain + Xcode profiles)', value: 'import' },
             ]}
-            onChange={(value) => {
+            onChange={async (value) => {
+              // Persist the fork choice to progress so resume after CLI close
+              // routes to the right path. Without this, an interrupted import
+              // run resumes into the create-new path's `creating-certificate`
+              // step and triggers the cert-limit error.
+              const existing = await loadProgress(appId) || {
+                platform: 'ios' as const,
+                appId,
+                startedAt: new Date().toISOString(),
+                completedSteps: {},
+              }
+              existing.setupMethod = value === 'import' ? 'import-existing' : 'create-new'
+              await saveProgress(appId, existing)
+
               if (value === 'import') {
                 setImportMode(true)
                 setStep('import-scanning')
@@ -1373,7 +1405,12 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
             ]}
             onChange={(value) => {
               if (value === 'go') {
-                setStep('import-exporting')
+                // First run on this CLI version: compile the Swift helper
+                // explicitly so the user sees what's happening, instead of
+                // staring at the "look for the macOS dialog" spinner while
+                // we silently do a 2-3s swiftc invocation. Cache hit skips
+                // straight to export.
+                setStep(isHelperCached() ? 'import-exporting' : 'import-compiling-helper')
               }
               else if (value === 'back') {
                 // Back goes to profile selection (distribution mode is now upstream of this step)
@@ -1384,6 +1421,31 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
               }
             }}
           />
+        </Box>
+      )}
+
+      {/* Import: compiling helper (one-time per CLI version) */}
+      {step === 'import-compiling-helper' && (
+        <Box flexDirection="column" marginTop={1}>
+          <SpinnerLine text="Compiling keychain-export helper (one-time, ~2-3s)..." />
+          <Newline />
+          <Box flexDirection="column" marginLeft={2}>
+            <Text dimColor>
+              We ship a small Swift program (~350 lines) that wraps Apple's
+              Security framework. It compiles via
+              {' '}
+              <Text bold>swiftc</Text>
+              {' '}
+              into your OS temp folder.
+            </Text>
+            <Text dimColor>
+              The result is cached for this CLI version — future runs of
+              {' '}
+              <Text bold>build init</Text>
+              {' '}
+              skip this step.
+            </Text>
+          </Box>
         </Box>
       )}
 
@@ -1543,6 +1605,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
                 <>
                   <Text bold>
                     Key ID
+                    {' '}
                     <Text dimColor>(detected from filename)</Text>
                     :
                   </Text>
@@ -1569,6 +1632,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
                 <>
                   <Text bold>
                     Key ID
+                    {' '}
                     <Text dimColor>(shown next to the key name in App Store Connect)</Text>
                     :
                   </Text>
@@ -1596,6 +1660,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
         <Box flexDirection="column" marginTop={1}>
           <Text bold>
             Issuer ID
+            {' '}
             <Text dimColor>(UUID at the very top of the API keys page, above the key list)</Text>
             :
           </Text>
@@ -1838,17 +1903,34 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
                   { label: '↩️   Restart onboarding', value: 'restart' },
                   { label: '❌  Exit', value: 'exit' },
                 ]}
-                onChange={(value) => {
+                onChange={async (value) => {
                   if (value === 'retry') {
                     setError(null)
                     pickerOpenedRef.current = false
                     setStep(retryStep)
                   }
                   else if (value === 'restart') {
+                    // Wipe persisted progress so the next run starts truly fresh.
+                    // Without this, getResumeStep would skip the user back to
+                    // wherever they were — re-triggering the same broken state.
+                    await deleteProgress(appId).catch(() => { /* best-effort */ })
+                    // Also reset all in-memory import-flow state so a previously-
+                    // chosen identity/profile/distribution doesn't leak across.
+                    setImportMode(false)
+                    setImportMatches([])
+                    setImportProfiles([])
+                    setChosenIdentity(null)
+                    setChosenProfile(null)
+                    setImportDistribution(null)
+                    setImportedP12Password('')
+                    setPendingRecoveryAction(null)
+                    setCertData(null)
+                    setProfileData(null)
                     setError(null)
                     setRetryCount(0)
                     pickerOpenedRef.current = false
                     setSupportBundlePath(null)
+                    addLog('↩️  Onboarding reset — starting fresh', 'yellow')
                     setStep('welcome')
                   }
                   else {
@@ -1884,6 +1966,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
                     <Text>Your iOS app is building in the cloud.</Text>
                     <Text>
                       Track it at
+                      {' '}
                       <Text color="cyan" underline>{buildUrl}</Text>
                     </Text>
                   </>

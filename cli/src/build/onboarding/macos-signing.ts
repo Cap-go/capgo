@@ -364,6 +364,18 @@ async function compileSwiftHelper(swiftSrc: string, outPath: string): Promise<st
 }
 
 /**
+ * Returns true if the Swift helper is already cached at the version-keyed
+ * tmp path. Lets the UI decide whether to show a "compiling…" step or skip
+ * straight to the export step (the cached case is effectively instant).
+ *
+ * Sync + cheap (single existsSync). Safe to call from a React onChange
+ * handler.
+ */
+export function isHelperCached(): boolean {
+  return existsSync(compiledHelperPath())
+}
+
+/**
  * Get or build the Swift helper binary. Caches at `compiledHelperPath()`.
  */
 async function ensureSwiftHelper(): Promise<string> {
@@ -378,6 +390,18 @@ async function ensureSwiftHelper(): Promise<string> {
     )
   }
   return compileSwiftHelper(src, cached)
+}
+
+/**
+ * Pre-compile the Swift helper without doing anything else. Used by the UI
+ * to show an explicit "compiling helper" step before the export, so the user
+ * isn't left staring at a spinner that says "look for the macOS dialog"
+ * while we silently build a binary.
+ *
+ * Returns the path to the compiled binary (same as `ensureSwiftHelper`).
+ */
+export async function precompileSwiftHelper(): Promise<string> {
+  return ensureSwiftHelper()
 }
 
 /**

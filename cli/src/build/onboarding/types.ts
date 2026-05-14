@@ -19,6 +19,7 @@ export type OnboardingStep
     | 'import-fetching-profile'
     | 'import-create-profile-only'
     | 'import-export-warning'
+    | 'import-compiling-helper'
     | 'import-exporting'
     // ── Existing create-new sub-flow (and ASC API key step reused by import for app_store) ──
     | 'api-key-instructions'
@@ -67,6 +68,16 @@ export interface OnboardingProgress {
   /** Partial input — saved incrementally so resume works mid-flow */
   keyId?: string
   issuerId?: string
+  /**
+   * Records which fork the user picked at `setup-method-select`. Crucial for
+   * resume — without this, a partial import-flow run would resume at
+   * `creating-certificate` (the create-new path) and immediately hit the
+   * Apple cert-limit error.
+   *
+   * Absent on legacy progress files (created before this field existed) →
+   * resume defaults to `create-new` for backward compatibility.
+   */
+  setupMethod?: 'create-new' | 'import-existing'
   completedSteps: {
     apiKeyVerified?: ApiKeyData
     certificateCreated?: CertificateData
@@ -93,6 +104,7 @@ export const STEP_PROGRESS: Record<OnboardingStep, number> = {
   'import-fetching-profile': 60,
   'import-create-profile-only': 60,
   'import-export-warning': 70,
+  'import-compiling-helper': 72,
   'import-exporting': 75,
   // Create-new sub-flow
   'api-key-instructions': 5,
@@ -140,6 +152,7 @@ export function getPhaseLabel(step: OnboardingStep): string {
     case 'import-create-profile-only':
       return 'Step 3 of 4 · Creating profile via Apple'
     case 'import-export-warning':
+    case 'import-compiling-helper':
     case 'import-exporting':
       return 'Step 4 of 4 · Export from Keychain'
     case 'api-key-instructions':
