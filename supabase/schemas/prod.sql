@@ -18185,10 +18185,6 @@ CREATE INDEX "idx_manifest_app_version_id" ON "public"."manifest" USING "btree" 
 
 
 
-CREATE INDEX "idx_manifest_file_name_hash_version" ON "public"."manifest" USING "btree" ("file_name", "file_hash", "app_version_id");
-
-
-
 CREATE INDEX "idx_orgs_customer_id" ON "public"."orgs" USING "btree" ("customer_id");
 
 
