@@ -53,7 +53,8 @@ describe('files local read proxy', () => {
     globalThis.fetch = originalFetch
   })
 
-  it('proxies local storage reads instead of redirecting to a public URL', async () => {
+  it.concurrent('proxies local storage reads without checking the app in the database', async () => {
+    getAppByAppIdPgMock.mockResolvedValue({ app_id: 'test-app', owner_org: 'test-org' })
     createSignedUrlMock.mockResolvedValue({
       data: { signedUrl: 'https://storage.example/object?token=test' },
       error: null,

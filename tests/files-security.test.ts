@@ -192,7 +192,7 @@ describe('ready bundle upload immutability regression', () => {
   })
 })
 
-describe('attachment cleanup on app deletion regression', () => {
+describe('attachment reads after app deletion', () => {
   const scopeId = randomUUID().replaceAll('-', '')
   const orgId = randomUUID()
   const stripeCustomerId = `cus_files_delete_${scopeId}`

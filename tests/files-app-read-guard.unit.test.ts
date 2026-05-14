@@ -104,6 +104,7 @@ describe('files app-scoped cached reads', () => {
     expect(response.status).toBe(200)
     expect(await response.text()).toBe('cached malformed bytes')
     expect(bucketPut).not.toHaveBeenCalled()
+    expect(getPgClientMock).not.toHaveBeenCalled()
     expect(getAppByAppIdPgMock).not.toHaveBeenCalled()
     expect(getPgClientMock).not.toHaveBeenCalled()
   })
