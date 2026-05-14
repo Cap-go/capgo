@@ -48,8 +48,9 @@ export const ErrorLine: FC<{ text: string }> = ({ text }) => (
 export const FilteredTextInput: FC<{
   placeholder?: string
   filter?: string
+  mask?: boolean
   onSubmit: (value: string) => void
-}> = ({ placeholder = '', filter = '=', onSubmit }) => {
+}> = ({ placeholder = '', filter = '=', mask = false, onSubmit }) => {
   const [value, setValue] = useState('')
 
   useInput((input, key) => {
@@ -72,11 +73,12 @@ export const FilteredTextInput: FC<{
     }
   })
 
+  const display = mask ? '•'.repeat(value.length) : value
   return (
     <Box>
       <Text color="cyan">❯ </Text>
       {value
-        ? <Text>{value}</Text>
+        ? <Text>{display}</Text>
         : <Text dimColor>{placeholder}</Text>}
       <Text color="white">█</Text>
     </Box>

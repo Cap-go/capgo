@@ -1231,6 +1231,7 @@ export type Database = {
         Row: {
           apps: number
           apps_active: number | null
+          average_ltv: number
           build_avg_seconds_day_android: number
           build_avg_seconds_day_ios: number
           build_count_day_android: number
@@ -1263,6 +1264,7 @@ export type Database = {
           devices_last_month_android: number | null
           devices_last_month_ios: number | null
           live_updates_active_paying_clients_60d: number
+          longest_ltv: number
           mrr: number
           need_upgrade: number | null
           new_paying_orgs: number
@@ -1298,6 +1300,7 @@ export type Database = {
           revenue_maker: number
           revenue_solo: number
           revenue_team: number
+          shortest_ltv: number
           stars: number
           success_rate: number | null
           total_revenue: number
@@ -1312,6 +1315,7 @@ export type Database = {
         Insert: {
           apps: number
           apps_active?: number | null
+          average_ltv?: number
           build_avg_seconds_day_android?: number
           build_avg_seconds_day_ios?: number
           build_count_day_android?: number
@@ -1344,6 +1348,7 @@ export type Database = {
           devices_last_month_android?: number | null
           devices_last_month_ios?: number | null
           live_updates_active_paying_clients_60d?: number
+          longest_ltv?: number
           mrr?: number
           need_upgrade?: number | null
           new_paying_orgs?: number
@@ -1379,6 +1384,7 @@ export type Database = {
           revenue_maker?: number
           revenue_solo?: number
           revenue_team?: number
+          shortest_ltv?: number
           stars: number
           success_rate?: number | null
           total_revenue?: number
@@ -1393,6 +1399,7 @@ export type Database = {
         Update: {
           apps?: number
           apps_active?: number | null
+          average_ltv?: number
           build_avg_seconds_day_android?: number
           build_avg_seconds_day_ios?: number
           build_count_day_android?: number
@@ -1425,6 +1432,7 @@ export type Database = {
           devices_last_month_android?: number | null
           devices_last_month_ios?: number | null
           live_updates_active_paying_clients_60d?: number
+          longest_ltv?: number
           mrr?: number
           need_upgrade?: number | null
           new_paying_orgs?: number
@@ -1460,6 +1468,7 @@ export type Database = {
           revenue_maker?: number
           revenue_solo?: number
           revenue_team?: number
+          shortest_ltv?: number
           stars?: number
           success_rate?: number | null
           total_revenue?: number

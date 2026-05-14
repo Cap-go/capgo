@@ -12,6 +12,12 @@ const TRIAL_ORG_CREATED_AT = new Date(NOW).toISOString()
 const TRIAL_END_DATE = new Date(NOW + (45 * DAY_IN_MS)).toISOString()
 const TRIAL_LAST_UPLOAD_AT = new Date(NOW - DAY_IN_MS).toISOString()
 const TRIAL_BUILTIN_UPLOAD_AT = new Date(NOW - (12 * 60 * 60 * 1000)).toISOString()
+const INSIGHTS_DATE = '2026-04-10'
+const INSIGHTS_START = '2026-04-01T00:00:00.000Z'
+const INSIGHTS_END = '2026-04-30T23:59:59.000Z'
+const INSIGHTS_UPLOAD_AT = '2026-04-10T10:00:00.000Z'
+const INSIGHTS_LAST_BUILD_AT = '2026-04-11T12:00:00.000Z'
+const INSIGHTS_BUILD_ID = `admin-stats-build-${TRIAL_ORG_ID.slice(0, 8)}`
 
 const CANCELLED_YEARLY_ORG_ID = randomUUID()
 const CANCELLED_YEARLY_CUSTOMER_ID = `cus_admin_stats_cancelled_yearly_${CANCELLED_YEARLY_ORG_ID.slice(0, 8)}`
@@ -42,6 +48,7 @@ const ONBOARDING_LATE_SUBSCRIPTION_APP_CREATED_AT = '2026-02-02T14:00:00.000Z'
 const ONBOARDING_LATE_SUBSCRIPTION_CHANNEL_CREATED_AT = '2026-02-03T14:00:00.000Z'
 const ONBOARDING_LATE_SUBSCRIPTION_BUNDLE_CREATED_AT = '2026-02-04T14:00:00.000Z'
 const ONBOARDING_LATE_SUBSCRIPTION_PAID_AT = '2026-02-10T14:00:00.000Z'
+const GLOBAL_STATS_TREND_DATES = ['2099-12-30', '2099-12-31'] as const
 
 let adminHeaders: Record<string, string>
 let soloPlan: {
@@ -73,6 +80,79 @@ beforeAll(async () => {
 
   soloPlan = planRow
   creatorUserCreatedAt = new Date(userRow.created_at).toISOString()
+
+  const { error: globalStatsError } = await supabase.from('global_stats').upsert([
+    {
+      date_id: GLOBAL_STATS_TREND_DATES[0],
+      apps: 10,
+      apps_active: 7,
+      users: 20,
+      users_active: 8,
+      paying: 4,
+      org_conversion_rate: 20,
+      trial: 2,
+      not_paying: 14,
+      updates: 100,
+      updates_external: 5,
+      success_rate: 98.5,
+      bundle_storage_gb: 1.25,
+      plan_solo: 1,
+      plan_maker: 2,
+      plan_team: 1,
+      plan_enterprise: 0,
+      registers_today: 3,
+      devices_last_month: 9,
+      stars: 1,
+      need_upgrade: 0,
+      paying_yearly: 1,
+      paying_monthly: 3,
+      new_paying_orgs: 1,
+      canceled_orgs: 0,
+      upgraded_orgs: 0,
+      mrr: 120,
+      total_revenue: 1440,
+      revenue_solo: 120,
+      revenue_maker: 240,
+      revenue_team: 1080,
+      revenue_enterprise: 0,
+    },
+    {
+      date_id: GLOBAL_STATS_TREND_DATES[1],
+      apps: 11,
+      apps_active: 8,
+      users: 22,
+      users_active: 9,
+      paying: 5,
+      org_conversion_rate: 22.7,
+      trial: 2,
+      not_paying: 15,
+      updates: 150,
+      updates_external: 10,
+      success_rate: 99.1,
+      bundle_storage_gb: 1.5,
+      plan_solo: 2,
+      plan_maker: 2,
+      plan_team: 1,
+      plan_enterprise: 0,
+      registers_today: 4,
+      devices_last_month: 12,
+      stars: 2,
+      need_upgrade: 1,
+      paying_yearly: 2,
+      paying_monthly: 3,
+      new_paying_orgs: 2,
+      canceled_orgs: 1,
+      upgraded_orgs: 1,
+      mrr: 240,
+      total_revenue: 2880,
+      revenue_solo: 240,
+      revenue_maker: 480,
+      revenue_team: 2160,
+      revenue_enterprise: 0,
+    },
+  ], { onConflict: 'date_id' })
+  if (globalStatsError)
+    throw globalStatsError
 
   const { error: stripeError } = await supabase.from('stripe_info').insert([
     {
@@ -255,6 +335,14 @@ beforeAll(async () => {
       created_at: TRIAL_BUILTIN_UPLOAD_AT,
     },
     {
+      app_id: TRIAL_APP_ID,
+      name: '2.0.0',
+      owner_org: TRIAL_ORG_ID,
+      user_id: USER_ID,
+      storage_provider: 'r2-direct',
+      created_at: INSIGHTS_UPLOAD_AT,
+    },
+    {
       app_id: ONBOARDING_APP_ID,
       name: '1.0.0',
       owner_org: ONBOARDING_ORG_ID,
@@ -282,6 +370,10 @@ beforeAll(async () => {
   if (!onboardingLateSubscriptionVersion)
     throw new Error('Expected onboarding late subscription app version to be created')
 
+  const insightsVersion = versionRows?.find(version => version.app_id === TRIAL_APP_ID && version.name === '2.0.0')
+  if (!insightsVersion)
+    throw new Error('Expected organization insights app version to be created')
+
   const { error: channelError } = await supabase.from('channels').insert([
     {
       name: 'production',
@@ -302,11 +394,59 @@ beforeAll(async () => {
   ])
   if (channelError)
     throw channelError
+
+  const { error: dailyMauError } = await supabase.from('daily_mau').insert({
+    app_id: TRIAL_APP_ID,
+    date: INSIGHTS_DATE,
+    mau: 7,
+  })
+  if (dailyMauError)
+    throw dailyMauError
+
+  const { error: dailyVersionError } = await supabase.from('daily_version').insert({
+    app_id: TRIAL_APP_ID,
+    date: INSIGHTS_DATE,
+    version_id: insightsVersion.id,
+    version_name: '2.0.0',
+    get: 5,
+    fail: 2,
+    install: 8,
+    uninstall: 0,
+  })
+  if (dailyVersionError)
+    throw dailyVersionError
+
+  const { error: buildLogError } = await supabase.from('build_logs').insert({
+    org_id: TRIAL_ORG_ID,
+    user_id: USER_ID,
+    build_id: INSIGHTS_BUILD_ID,
+    platform: 'ios',
+    billable_seconds: 180,
+    build_time_unit: 180,
+    app_id: TRIAL_APP_ID,
+    created_at: INSIGHTS_LAST_BUILD_AT,
+  })
+  if (buildLogError)
+    throw buildLogError
+
+  const { error: orgUserError } = await supabase.from('org_users').insert({
+    org_id: TRIAL_ORG_ID,
+    user_id: USER_ID,
+    user_right: 'admin',
+  })
+  if (orgUserError)
+    throw orgUserError
 }, 90000)
 
 afterAll(async () => {
   const supabase = getSupabaseClient()
 
+  await supabase.from('org_users').delete().eq('org_id', TRIAL_ORG_ID).eq('user_id', USER_ID)
+  await supabase.from('build_logs').delete().eq('org_id', TRIAL_ORG_ID).eq('build_id', INSIGHTS_BUILD_ID)
+  await supabase.from('daily_build_time').delete().eq('app_id', TRIAL_APP_ID).eq('date', INSIGHTS_DATE)
+  await supabase.from('daily_version').delete().eq('app_id', TRIAL_APP_ID).eq('date', INSIGHTS_DATE)
+  await supabase.from('daily_mau').delete().eq('app_id', TRIAL_APP_ID).eq('date', INSIGHTS_DATE)
+  await supabase.from('global_stats').delete().in('date_id', [...GLOBAL_STATS_TREND_DATES])
   await supabase.from('channels').delete().in('app_id', [ONBOARDING_APP_ID, ONBOARDING_LATE_SUBSCRIPTION_APP_ID])
   await supabase.from('app_versions').delete().in('app_id', [TRIAL_APP_ID, ONBOARDING_APP_ID, ONBOARDING_LATE_SUBSCRIPTION_APP_ID])
   await supabase.from('apps').delete().in('app_id', [TRIAL_APP_ID, ONBOARDING_APP_ID, ONBOARDING_LATE_SUBSCRIPTION_APP_ID])
@@ -315,6 +455,40 @@ afterAll(async () => {
 }, 90000)
 
 describe('/private/admin_stats', () => {
+  it.concurrent('returns global stats trend rows from the self-joined global_stats table', async () => {
+    const response = await fetchWithRetry(`${BASE_URL}/private/admin_stats`, {
+      method: 'POST',
+      headers: adminHeaders,
+      body: JSON.stringify({
+        metric_category: 'global_stats_trend',
+        start_date: '2099-12-30T00:00:00.000Z',
+        end_date: '2099-12-31T23:59:59.000Z',
+      }),
+    })
+
+    expect(response.status).toBe(200)
+    const payload = await response.json() as {
+      success: boolean
+      data: Array<{
+        date: string
+        apps: number
+        updates: number
+        updates_external: number
+        previous_mrr: number
+      }>
+    }
+
+    expect(payload.success).toBe(true)
+    expect(payload.data).toHaveLength(2)
+
+    const latest = payload.data.find(row => row.date === GLOBAL_STATS_TREND_DATES[1])
+    expect(latest).toBeTruthy()
+    expect(latest?.apps).toBe(11)
+    expect(latest?.updates).toBe(150)
+    expect(latest?.updates_external).toBe(10)
+    expect(latest?.previous_mrr).toBe(120)
+  })
+
   it.concurrent('returns last bundle upload for trial organizations and excludes builtin versions', async () => {
     const response = await fetchWithRetry(`${BASE_URL}/private/admin_stats`, {
       method: 'POST',
@@ -347,6 +521,87 @@ describe('/private/admin_stats', () => {
     expect(organization?.plan_name).toBe(soloPlan?.name)
     expect(organization?.last_bundle_upload_at).toBe(TRIAL_LAST_UPLOAD_AT)
     expect(organization?.trial_extension_count).toBe(2)
+  })
+
+  it.concurrent('returns organization insights with plan filtering and preprocessed period usage', async () => {
+    if (!soloPlan)
+      throw new Error('Expected Solo plan to be loaded')
+
+    const response = await fetchWithRetry(`${BASE_URL}/private/admin_stats`, {
+      method: 'POST',
+      headers: adminHeaders,
+      body: JSON.stringify({
+        metric_category: 'organization_insights',
+        start_date: INSIGHTS_START,
+        end_date: INSIGHTS_END,
+        plan_name: soloPlan.name,
+        billing_type: 'monthly',
+        limit: 100,
+        offset: 0,
+      }),
+    })
+
+    expect(response.status).toBe(200)
+    const payload = await response.json() as {
+      success: boolean
+      data: {
+        organizations: Array<{
+          org_id: string
+          plan_name: string | null
+          billing_type: 'monthly' | 'yearly' | null
+          upload_count: number
+          build_count: number
+          fail_rate: number
+          mau: number
+          members_count: number
+          last_build_at: string | null
+        }>
+        plan_options: string[]
+      }
+    }
+
+    expect(payload.success).toBe(true)
+    expect(payload.data.plan_options).toContain(soloPlan.name)
+
+    const organization = payload.data.organizations.find(org => org.org_id === TRIAL_ORG_ID)
+    expect(organization).toBeTruthy()
+    expect(organization?.plan_name).toBe(soloPlan.name)
+    expect(organization?.billing_type).toBe('monthly')
+    expect(organization?.upload_count).toBe(1)
+    expect(organization?.build_count).toBe(1)
+    expect(organization?.fail_rate).toBe(20)
+    expect(organization?.mau).toBe(7)
+    expect(organization?.members_count).toBe(1)
+    expect(organization?.last_build_at).toBe(INSIGHTS_LAST_BUILD_AT)
+
+    const paidOnlyResponse = await fetchWithRetry(`${BASE_URL}/private/admin_stats`, {
+      method: 'POST',
+      headers: adminHeaders,
+      body: JSON.stringify({
+        metric_category: 'organization_insights',
+        start_date: INSIGHTS_START,
+        end_date: INSIGHTS_END,
+        plan_name: soloPlan.name,
+        billing_type: 'monthly',
+        paid_only: true,
+        search: TRIAL_ORG_ID,
+        limit: 100,
+        offset: 0,
+      }),
+    })
+
+    expect(paidOnlyResponse.status).toBe(200)
+    const paidOnlyPayload = await paidOnlyResponse.json() as {
+      success: boolean
+      data: {
+        organizations: Array<{ org_id: string }>
+        total: number
+      }
+    }
+
+    expect(paidOnlyPayload.success).toBe(true)
+    expect(paidOnlyPayload.data.organizations).toEqual([])
+    expect(paidOnlyPayload.data.total).toBe(0)
   })
 
   it.concurrent('returns cancellation billing metadata and subscription-or-signup dates', async () => {
