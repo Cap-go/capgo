@@ -91,6 +91,7 @@ describe('delete_old_deleted_versions', () => {
     const cleanName = `clean-${randomUUID()}`
     const manifestPendingName = `manifest-pending-${randomUUID()}`
     const bundlePendingName = `bundle-pending-${randomUUID()}`
+    const manifestSignalPendingName = `manifest-signal-pending-${randomUUID()}`
     const client = await pool.connect()
 
     try {
@@ -104,15 +105,17 @@ describe('delete_old_deleted_versions', () => {
           deleted,
           deleted_at,
           r2_path,
-          storage_provider
+          storage_provider,
+          manifest_count
         )
         VALUES
-          ($1, $2, $5, true, pg_catalog.now() - INTERVAL '91 days', 'cleanup/clean.zip', 'r2'),
-          ($1, $3, $5, true, pg_catalog.now() - INTERVAL '91 days', 'cleanup/manifest-pending.zip', 'r2'),
-          ($1, $4, $5, true, pg_catalog.now() - INTERVAL '91 days', 'cleanup/bundle-pending.zip', 'r2')
+          ($1, $2, $6, true, pg_catalog.now() - INTERVAL '91 days', 'cleanup/clean.zip', 'r2', 0),
+          ($1, $3, $6, true, pg_catalog.now() - INTERVAL '91 days', 'cleanup/manifest-pending.zip', 'r2', 1),
+          ($1, $4, $6, true, pg_catalog.now() - INTERVAL '91 days', 'cleanup/bundle-pending.zip', 'r2', 0),
+          ($1, $5, $6, true, pg_catalog.now() - INTERVAL '91 days', 'cleanup/manifest-signal-pending.zip', 'r2', 1)
         RETURNING id, name
         `,
-        [cleanupAppId, cleanName, manifestPendingName, bundlePendingName, ORG_ID_CRON_QUEUE],
+        [cleanupAppId, cleanName, manifestPendingName, bundlePendingName, manifestSignalPendingName, ORG_ID_CRON_QUEUE],
       )
       const ids = Object.fromEntries(inserted.rows.map(row => [row.name, row.id]))
 
@@ -126,15 +129,17 @@ describe('delete_old_deleted_versions', () => {
           owner_org
         )
         VALUES
-          ($1, 'clean-checksum', 0, $2, $5),
-          ($1, 'manifest-pending-checksum', 0, $3, $5),
-          ($1, 'bundle-pending-checksum', 64, $4, $5)
+          ($1, 'clean-checksum', 0, $2, $6),
+          ($1, 'manifest-pending-checksum', 0, $3, $6),
+          ($1, 'bundle-pending-checksum', 64, $4, $6),
+          ($1, 'manifest-signal-pending-checksum', 0, $5, $6)
         `,
         [
           cleanupAppId,
           ids[cleanName],
           ids[manifestPendingName],
           ids[bundlePendingName],
+          ids[manifestSignalPendingName],
           ORG_ID_CRON_QUEUE,
         ],
       )
@@ -153,6 +158,15 @@ describe('delete_old_deleted_versions', () => {
         [ids[manifestPendingName]],
       )
 
+      const signalOnlyManifestRowsBefore = await client.query<{ count: string }>(
+        `
+        SELECT COUNT(*) AS count
+        FROM public.manifest
+        WHERE app_version_id = $1
+        `,
+        [ids[manifestSignalPendingName]],
+      )
+
       await client.query('SELECT public.delete_old_deleted_versions()')
 
       const remaining = await client.query<{ name: string }>(
@@ -163,7 +177,7 @@ describe('delete_old_deleted_versions', () => {
           AND name = ANY($2::varchar[])
         ORDER BY name
         `,
-        [cleanupAppId, [cleanName, manifestPendingName, bundlePendingName]],
+        [cleanupAppId, [cleanName, manifestPendingName, bundlePendingName, manifestSignalPendingName]],
       )
       const manifestRows = await client.query<{ count: string }>(
         `
@@ -174,8 +188,9 @@ describe('delete_old_deleted_versions', () => {
         [ids[manifestPendingName]],
       )
 
-      expect(remaining.rows.map(row => row.name)).toEqual([bundlePendingName, manifestPendingName].sort())
+      expect(remaining.rows.map(row => row.name)).toEqual([bundlePendingName, manifestPendingName, manifestSignalPendingName].sort())
       expect(manifestRows.rows[0].count).toBe('1')
+      expect(signalOnlyManifestRowsBefore.rows[0].count).toBe('0')
     }
     finally {
       await rollbackAndRelease(client)

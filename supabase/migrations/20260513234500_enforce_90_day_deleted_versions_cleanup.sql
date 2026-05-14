@@ -12,11 +12,7 @@ BEGIN
     AND "app_versions"."deleted_at" IS NOT NULL
     AND "app_versions"."deleted_at" <= pg_catalog.now() - INTERVAL '90 days'
     AND "app_versions"."name" NOT IN ('builtin', 'unknown')
-    AND NOT EXISTS (
-      SELECT 1
-      FROM "public"."manifest"
-      WHERE "manifest"."app_version_id" = "app_versions"."id"
-    )
+    AND "app_versions"."manifest_count" = 0
     AND (
       "app_versions"."r2_path" IS NULL
       OR EXISTS (
@@ -43,7 +39,7 @@ $$;
 ALTER FUNCTION "public"."delete_old_deleted_versions"() OWNER TO "postgres";
 
 COMMENT ON FUNCTION "public"."delete_old_deleted_versions"() IS
-  'Permanently deletes app_versions that have been soft-deleted for at least 90 days after storage cleanup is reflected in app_versions_meta and manifest rows.';
+  'Permanently deletes app_versions that have been soft-deleted for at least 90 days after storage cleanup is reflected in app_versions_meta and app_versions.manifest_count.';
 
 REVOKE ALL ON FUNCTION "public"."delete_old_deleted_versions"() FROM PUBLIC;
 REVOKE ALL ON FUNCTION "public"."delete_old_deleted_versions"() FROM anon;

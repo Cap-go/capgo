@@ -11,7 +11,6 @@ import { manifest } from '../utils/postgres_schema.ts'
 import { getPath, s3 } from '../utils/s3.ts'
 import { createStatsMeta } from '../utils/stats.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
-import { backgroundTask } from '../utils/utils.ts'
 
 /**
  * Resolves `owner_org` for an app version row.
@@ -249,11 +248,16 @@ async function deleteManifest(c: Context, record: Database['public']['Tables']['
                 // No other versions use this file, delete from S3
                 cloudlog({ requestId: c.get('requestId'), message: 'deleted manifest file from S3', s3_path: entry.s3_path })
                 return s3.deleteObject(c, entry.s3_path)
+                  .then((deleted) => {
+                    if (!deleted) {
+                      throw simpleError('cannot_delete_manifest_s3', 'Cannot delete S3 object for deleted manifest file', { id: entry.id, s3_path: entry.s3_path })
+                    }
+                  })
               }),
           )
         }
       }
-      await backgroundTask(c, Promise.all(promisesDeleteS3))
+      await Promise.all(promisesDeleteS3)
 
       // After deleting manifest entries, update manifest_count and decrement manifest_bundle_count
       const updatePgClient = getPgClient(c, false)
@@ -283,7 +287,7 @@ async function deleteManifest(c: Context, record: Database['public']['Tables']['
     }
   }
   catch (error) {
-    cloudlog({ requestId: c.get('requestId'), message: 'error fetch manifest entries', error })
+    cloudlog({ requestId: c.get('requestId'), message: 'error deleting manifest entries', error })
   }
   finally {
     await closeClient(c, pgClient)
