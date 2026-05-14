@@ -3517,30 +3517,41 @@ CREATE OR REPLACE FUNCTION "public"."delete_old_deleted_versions"() RETURNS "voi
 DECLARE
   deleted_count bigint;
 BEGIN
-    -- Delete versions that are:
-    -- 1. Have deleted_at set (soft deleted)
-    -- 2. Soft-deleted more than 1 year ago
-    -- 3. NOT builtin or unknown (these are special placeholder versions)
-    -- 4. NOT currently linked to any channel (safety check)
-    DELETE FROM "public"."app_versions"
-    WHERE deleted_at IS NOT NULL
-      AND deleted_at < NOW() - INTERVAL '3 months'
-      AND name NOT IN ('builtin', 'unknown')
-      AND NOT EXISTS (
-        SELECT 1 FROM "public"."channels"
-        WHERE channels.version = app_versions.id
-      );
+  DELETE FROM "public"."app_versions"
+  WHERE "app_versions"."deleted" = true
+    AND "app_versions"."deleted_at" IS NOT NULL
+    AND "app_versions"."deleted_at" <= pg_catalog.now() - INTERVAL '90 days'
+    AND "app_versions"."name" NOT IN ('builtin', 'unknown')
+    AND "app_versions"."manifest_count" = 0
+    AND (
+      "app_versions"."r2_path" IS NULL
+      OR EXISTS (
+        SELECT 1
+        FROM "public"."app_versions_meta"
+        WHERE "app_versions_meta"."id" = "app_versions"."id"
+          AND "app_versions_meta"."size" = 0
+      )
+    )
+    AND NOT EXISTS (
+      SELECT 1
+      FROM "public"."channels"
+      WHERE "channels"."version" = "app_versions"."id"
+    );
 
-    GET DIAGNOSTICS deleted_count = ROW_COUNT;
+  GET DIAGNOSTICS deleted_count = ROW_COUNT;
 
-    IF deleted_count > 0 THEN
-      RAISE NOTICE 'delete_old_deleted_versions: permanently deleted % app versions', deleted_count;
-    END IF;
+  IF deleted_count > 0 THEN
+    RAISE NOTICE 'delete_old_deleted_versions: permanently deleted % app versions', deleted_count;
+  END IF;
 END;
 $$;
 
 
 ALTER FUNCTION "public"."delete_old_deleted_versions"() OWNER TO "postgres";
+
+
+COMMENT ON FUNCTION "public"."delete_old_deleted_versions"() IS 'Permanently deletes app_versions that have been soft-deleted for at least 90 days after storage cleanup is reflected in app_versions_meta and app_versions.manifest_count.';
+
 
 
 CREATE OR REPLACE FUNCTION "public"."delete_org_member_role"("p_org_id" "uuid", "p_user_id" "uuid") RETURNS "text"
