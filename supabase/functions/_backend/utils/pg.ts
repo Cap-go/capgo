@@ -267,56 +267,56 @@ export function getDatabaseURL(c: Context, readOnly = false): string {
     // Hyperdrive main read replica regional routing in Cloudflare Workers
     // When using Hyperdrive we use session databases directly to avoid supabase pooler overhead and allow prepared statements
     // Asia region - Japan
-    if (c.env.HYPERDRIVE_CAPGO_PS_AS_JAPAN && dbRegion === 'AS_JAPAN') {
-      setDatabaseSource(c, 'HYPERDRIVE_CAPGO_PLANETSCALE_AS_JAPAN')
-      cloudlog({ requestId: c.get('requestId'), message: 'Using HYPERDRIVE_CAPGO_PLANETSCALE_AS_JAPAN for read-only' })
-      return c.env.HYPERDRIVE_CAPGO_PS_AS_JAPAN.connectionString
+    if (c.env.HYPERDRIVE_CAPGO_READ_AS_JAPAN && dbRegion === 'AS_JAPAN') {
+      setDatabaseSource(c, 'HYPERDRIVE_CAPGO_READ_AS_JAPAN')
+      cloudlog({ requestId: c.get('requestId'), message: 'Using HYPERDRIVE_CAPGO_READ_AS_JAPAN for read-only' })
+      return c.env.HYPERDRIVE_CAPGO_READ_AS_JAPAN.connectionString
     }
     // Asia region - India
-    if (c.env.HYPERDRIVE_CAPGO_PS_AS_INDIA && dbRegion === 'AS_INDIA') {
-      setDatabaseSource(c, 'HYPERDRIVE_CAPGO_PLANETSCALE_AS_INDIA')
-      cloudlog({ requestId: c.get('requestId'), message: 'Using HYPERDRIVE_CAPGO_PLANETSCALE_AS_INDIA for read-only' })
-      return c.env.HYPERDRIVE_CAPGO_PS_AS_INDIA.connectionString
+    if (c.env.HYPERDRIVE_CAPGO_READ_AS_INDIA && dbRegion === 'AS_INDIA') {
+      setDatabaseSource(c, 'HYPERDRIVE_CAPGO_READ_AS_INDIA')
+      cloudlog({ requestId: c.get('requestId'), message: 'Using HYPERDRIVE_CAPGO_READ_AS_INDIA for read-only' })
+      return c.env.HYPERDRIVE_CAPGO_READ_AS_INDIA.connectionString
     }
     // // US region
-    if (c.env.HYPERDRIVE_CAPGO_PS_NA && dbRegion === 'NA') {
-      setDatabaseSource(c, 'HYPERDRIVE_CAPGO_PLANETSCALE_NA')
-      cloudlog({ requestId: c.get('requestId'), message: 'Using HYPERDRIVE_CAPGO_PLANETSCALE_NA for read-only' })
-      return c.env.HYPERDRIVE_CAPGO_PS_NA.connectionString
+    if (c.env.HYPERDRIVE_CAPGO_READ_NA && dbRegion === 'NA') {
+      setDatabaseSource(c, 'HYPERDRIVE_CAPGO_READ_NA')
+      cloudlog({ requestId: c.get('requestId'), message: 'Using HYPERDRIVE_CAPGO_READ_NA for read-only' })
+      return c.env.HYPERDRIVE_CAPGO_READ_NA.connectionString
     }
     // // EU region
-    if (c.env.HYPERDRIVE_CAPGO_PS_EU && dbRegion === 'EU') {
-      setDatabaseSource(c, 'HYPERDRIVE_CAPGO_PLANETSCALE_EU')
-      cloudlog({ requestId: c.get('requestId'), message: 'Using HYPERDRIVE_CAPGO_PLANETSCALE_EU for read-only' })
-      return c.env.HYPERDRIVE_CAPGO_PS_EU.connectionString
+    if (c.env.HYPERDRIVE_CAPGO_READ_EU && dbRegion === 'EU') {
+      setDatabaseSource(c, 'HYPERDRIVE_CAPGO_READ_EU')
+      cloudlog({ requestId: c.get('requestId'), message: 'Using HYPERDRIVE_CAPGO_READ_EU for read-only' })
+      return c.env.HYPERDRIVE_CAPGO_READ_EU.connectionString
     }
     // // OC region
-    if (c.env.HYPERDRIVE_CAPGO_PS_OC && dbRegion === 'OC') {
-      setDatabaseSource(c, 'HYPERDRIVE_CAPGO_PLANETSCALE_OC')
-      cloudlog({ requestId: c.get('requestId'), message: 'Using HYPERDRIVE_CAPGO_PLANETSCALE_OC for read-only' })
-      return c.env.HYPERDRIVE_CAPGO_PS_OC.connectionString
+    if (c.env.HYPERDRIVE_CAPGO_READ_OC && dbRegion === 'OC') {
+      setDatabaseSource(c, 'HYPERDRIVE_CAPGO_READ_OC')
+      cloudlog({ requestId: c.get('requestId'), message: 'Using HYPERDRIVE_CAPGO_READ_OC for read-only' })
+      return c.env.HYPERDRIVE_CAPGO_READ_OC.connectionString
     }
     // // SA region
-    if (c.env.HYPERDRIVE_CAPGO_PS_SA && dbRegion === 'SA') {
-      setDatabaseSource(c, 'HYPERDRIVE_CAPGO_PLANETSCALE_SA')
-      cloudlog({ requestId: c.get('requestId'), message: 'Using HYPERDRIVE_CAPGO_PLANETSCALE_SA for read-only' })
-      return c.env.HYPERDRIVE_CAPGO_PS_SA.connectionString
+    if (c.env.HYPERDRIVE_CAPGO_READ_SA && dbRegion === 'SA') {
+      setDatabaseSource(c, 'HYPERDRIVE_CAPGO_READ_SA')
+      cloudlog({ requestId: c.get('requestId'), message: 'Using HYPERDRIVE_CAPGO_READ_SA for read-only' })
+      return c.env.HYPERDRIVE_CAPGO_READ_SA.connectionString
     }
     // Google Cloud Hyperdrive read replica routing
-    if (c.env.HYPERDRIVE_CAPGO_GG_ME && dbRegion === 'ME') {
-      setDatabaseSource(c, 'HYPERDRIVE_CAPGO_GOOGLE_ME')
-      cloudlog({ requestId: c.get('requestId'), message: 'Using HYPERDRIVE_CAPGO_GOOGLE_ME for read-only' })
-      return c.env.HYPERDRIVE_CAPGO_GG_ME.connectionString
+    if (c.env.HYPERDRIVE_CAPGO_READ_ME && dbRegion === 'ME') {
+      setDatabaseSource(c, 'HYPERDRIVE_CAPGO_READ_ME')
+      cloudlog({ requestId: c.get('requestId'), message: 'Using HYPERDRIVE_CAPGO_READ_ME for read-only' })
+      return c.env.HYPERDRIVE_CAPGO_READ_ME.connectionString
     }
-    if (c.env.HYPERDRIVE_CAPGO_GG_AF && dbRegion === 'AF') {
-      setDatabaseSource(c, 'HYPERDRIVE_CAPGO_GOOGLE_AF')
-      cloudlog({ requestId: c.get('requestId'), message: 'Using HYPERDRIVE_CAPGO_GOOGLE_AF for read-only' })
-      return c.env.HYPERDRIVE_CAPGO_GG_AF.connectionString
+    if (c.env.HYPERDRIVE_CAPGO_READ_AF && dbRegion === 'AF') {
+      setDatabaseSource(c, 'HYPERDRIVE_CAPGO_READ_AF')
+      cloudlog({ requestId: c.get('requestId'), message: 'Using HYPERDRIVE_CAPGO_READ_AF for read-only' })
+      return c.env.HYPERDRIVE_CAPGO_READ_AF.connectionString
     }
-    if (c.env.HYPERDRIVE_CAPGO_GG_HK && dbRegion === 'HK') {
-      setDatabaseSource(c, 'HYPERDRIVE_CAPGO_GOOGLE_HK')
-      cloudlog({ requestId: c.get('requestId'), message: 'Using HYPERDRIVE_CAPGO_GOOGLE_HK for read-only' })
-      return c.env.HYPERDRIVE_CAPGO_GG_HK.connectionString
+    if (c.env.HYPERDRIVE_CAPGO_READ_HK && dbRegion === 'HK') {
+      setDatabaseSource(c, 'HYPERDRIVE_CAPGO_READ_HK')
+      cloudlog({ requestId: c.get('requestId'), message: 'Using HYPERDRIVE_CAPGO_READ_HK for read-only' })
+      return c.env.HYPERDRIVE_CAPGO_READ_HK.connectionString
     }
   }
 
@@ -564,19 +564,19 @@ export function requestInfosChannelPostgres(
     .where(
       !defaultChannel
         ? and(
-            eq(channelAlias.public, true),
-            eq(channelAlias.app_id, app_id),
-            eq(platformQuery, true),
-          )
+          eq(channelAlias.public, true),
+          eq(channelAlias.app_id, app_id),
+          eq(platformQuery, true),
+        )
         : and(
-            eq(channelAlias.app_id, app_id),
-            eq(channelAlias.name, defaultChannel),
-            eq(platformQuery, true),
-            or(
-              eq(channelAlias.public, true),
-              eq(channelAlias.allow_device_self_set, true),
-            ),
+          eq(channelAlias.app_id, app_id),
+          eq(channelAlias.name, defaultChannel),
+          eq(platformQuery, true),
+          or(
+            eq(channelAlias.public, true),
+            eq(channelAlias.allow_device_self_set, true),
           ),
+        ),
     )
     .groupBy(channelAlias.id, versionAlias.id)
     .limit(1)
@@ -603,10 +603,10 @@ export function requestInfosPostgres(
   const channelDevice = shouldQueryChannelOverride
     ? requestInfosChannelDevicePostgres(c, app_id, device_id, drizzleClient, shouldFetchManifest, includeMetadata)
     : Promise.resolve(undefined)
-        .then(() => {
-          cloudlog({ requestId: c.get('requestId'), message: 'Skipping channel device override query' })
-          return null
-        })
+      .then(() => {
+        cloudlog({ requestId: c.get('requestId'), message: 'Skipping channel device override query' })
+        return null
+      })
   const channel = requestInfosChannelPostgres(c, platform, app_id, defaultChannel, drizzleClient, shouldFetchManifest, includeMetadata)
 
   return Promise.all([channelDevice, channel])
