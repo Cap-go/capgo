@@ -1,8 +1,9 @@
+BEGIN;
+
 --
 -- PostgreSQL database dump
 --
 
-\restrict 6txHlQQT1Jf4fvOatYYGbivb4NGBDRCpvjh4R0iDrgqqFZdOOq5KImqZInB3h3K
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 17.9 (Homebrew)
@@ -82,13 +83,11 @@ $$;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 6txHlQQT1Jf4fvOatYYGbivb4NGBDRCpvjh4R0iDrgqqFZdOOq5KImqZInB3h3K
 
 --
 -- PostgreSQL database dump
 --
 
-\restrict JqxPwCYKNc5TgVVbDfgpvT3n1JfeMuXSDlzgn7JZPF12NwSRxYyGeI2QnKh4aOo
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 17.9 (Homebrew)
@@ -880,5 +879,6 @@ CREATE INDEX stripe_info_paid_at_idx ON public.stripe_info USING btree (paid_at)
 -- PostgreSQL database dump complete
 --
 
-\unrestrict JqxPwCYKNc5TgVVbDfgpvT3n1JfeMuXSDlzgn7JZPF12NwSRxYyGeI2QnKh4aOo
 
+
+COMMIT;

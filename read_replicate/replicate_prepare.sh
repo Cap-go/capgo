@@ -100,20 +100,29 @@ if [[ -f "$TYPES_DUMP" ]]; then
   rm -f "$TYPES_DUMP"
 fi
 
-# 5) Optional: drop pg_dump SET noise
+# 5) Drop pg_dump SET noise and psql-only restrict wrappers.
 perl -0777 -i -pe '
   s/^SET[^\n]*\n//mg;
   s/^SELECT pg_catalog\.set_config\([^\n]*\);\n//mg;
+  s/^\\(?:un)?restrict\b[^\n]*\n//mg;
 ' "$OUT_SQL"
 
-# 6) Sanity checks (should be empty; indexes should still exist)
+# 6) Wrap the full schema restore in one transaction.
+{
+  printf 'BEGIN;\n\n'
+  cat "$OUT_SQL"
+  printf '\nCOMMIT;\n'
+} > "${OUT_SQL}.tmp"
+mv "${OUT_SQL}.tmp" "$OUT_SQL"
+
+# 7) Sanity checks (should be empty; indexes should still exist)
 echo "==> Should be empty:"
-grep -nE 'CREATE POLICY|ROW LEVEL SECURITY|FK CONSTRAINT|FOREIGN KEY|CREATE TRIGGER' "$OUT_SQL" || true
+grep -nE 'CREATE POLICY|ROW LEVEL SECURITY|FK CONSTRAINT|FOREIGN KEY|CREATE TRIGGER|^\\(un)?restrict([[:space:]]|$)' "$OUT_SQL" || true
 
 echo "==> Index count:"
 grep -cE '^\s*CREATE (UNIQUE )?INDEX\b' "$OUT_SQL" || true
 
-# 7) Cleanup temporary files
+# 8) Cleanup temporary files
 echo "==> Cleaning up temporary files..."
 rm -f "$DUMP_FILE" "$LIST_FILE" "$FILTERED_LIST" "$TYPES_DUMP" "$TYPES_SQL" 2>/dev/null || true
 echo "==> Done. Output: $OUT_SQL"
