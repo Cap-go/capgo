@@ -44,7 +44,8 @@ trusted base checkout, lists changed files through GitHub's PR files API,
 fetches the PR head commit by SHA, copies changed PR files into a
 sanitized `scan-target`, and passes that copy to deepsec as scan input.
 The copy is built from regular git blobs, so symlinks are skipped instead
-of dereferenced.
+of dereferenced. Oversized individual blobs and oversized cumulative scan
+targets are skipped before copying to keep the privileged check bounded.
 Repository instruction files such as `AGENTS.md` and `CLAUDE.md` are
 excluded from the agent root so fork-controlled instructions cannot
 steer the privileged scan. DeepSec runs in a Docker container with only

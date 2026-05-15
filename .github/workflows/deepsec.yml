@@ -78,6 +78,10 @@ jobs:
         env:
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
+          max_scan_file_bytes=$((512 * 1024))
+          max_scan_total_bytes=$((5 * 1024 * 1024))
+          scan_total_bytes=0
+
           rm -rf scan-target
           mkdir -p scan-target
           : > scan-files.txt
@@ -123,8 +127,20 @@ jobs:
                 ;;
             esac
 
+            size="$(git -C target cat-file -s "$HEAD_SHA:$file")"
+            if ! [[ "$size" =~ ^[0-9]+$ ]]; then
+              echo "Skipping changed file with unexpected blob size: $file"
+              continue
+            fi
+
+            if [ "$size" -gt "$max_scan_file_bytes" ] || [ $((scan_total_bytes + size)) -gt "$max_scan_total_bytes" ]; then
+              echo "Skipping oversized file from DeepSec scan target: $file"
+              continue
+            fi
+
             mkdir -p "scan-target/$(dirname "$file")"
             git -C target show "$HEAD_SHA:$file" > "scan-target/$file"
+            scan_total_bytes=$((scan_total_bytes + size))
             printf '%s\n' "$file" >> scan-files.txt
           done < changed-files.txt
 
@@ -216,7 +232,7 @@ jobs:
 
   comment:
     needs: analyze
-    if: always() && needs.analyze.result == 'failure'
+    if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
     name: Post findings comment
@@ -259,5 +275,24 @@ jobs:
                 repo: context.repo.repo,
                 issue_number: context.issue.number,
                 body,
+              })
+            }
+      - name: Clear PR comment
+        if: steps.download-comment.outcome != 'success'
+        uses: actions/github-script@v8 # v8
+        with:
+          script: |
+            const marker = '<!-- capgo-deepsec-findings -->'
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            })
+            const existing = comments.find((comment) => comment.user.type === 'Bot' && comment.body?.startsWith(marker))
+            if (existing) {
+              await github.rest.issues.deleteComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
               })
             }
