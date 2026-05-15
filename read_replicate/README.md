@@ -16,7 +16,8 @@ Prepares the schema for replica import by:
 - Dumping schema from Supabase (tables: `apps`, `app_versions`, `manifest`, `channels`, `channel_devices`, `orgs`, `stripe_info`, `org_users`)
 - Filtering out foreign keys, triggers, RLS policies
 - Keeping indexes
-- Adding required extensions (`uuid-ossp`)
+- Wrapping the generated schema in one transaction
+- Resetting only replica-managed objects, without dropping the `public` schema
 - Cleaning up temporary files
 
 **Output:** `schema_replicate.sql`

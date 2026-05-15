@@ -107,9 +107,15 @@ perl -0777 -i -pe '
   s/^\\(?:un)?restrict\b[^\n]*\n//mg;
 ' "$OUT_SQL"
 
-# 6) Wrap the full schema restore in one transaction.
+# 6) Wrap the full schema restore in one transaction and reset only the
+# replica-managed objects. Do not drop the public schema; target databases can
+# have grants/extensions/objects that are unrelated to this replica import.
 {
   printf 'BEGIN;\n\n'
+  printf 'DROP TABLE IF EXISTS public.channel_devices, public.manifest, public.app_versions, public.channels, public.apps, public.notifications, public.org_users, public.orgs, public.stripe_info CASCADE;\n'
+  printf 'DROP SEQUENCE IF EXISTS public.app_versions_id_seq, public.channel_devices_id_seq, public.channel_id_seq, public.manifest_id_seq, public.org_users_id_seq, public.stripe_info_id_seq CASCADE;\n'
+  printf 'DROP FUNCTION IF EXISTS public.one_month_ahead();\n'
+  printf 'DROP TYPE IF EXISTS public.manifest_entry, public.disable_update, public.user_min_right, public.stripe_status;\n\n'
   cat "$OUT_SQL"
   printf '\nCOMMIT;\n'
 } > "${OUT_SQL}.tmp"

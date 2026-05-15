@@ -1,5 +1,10 @@
 BEGIN;
 
+DROP TABLE IF EXISTS public.channel_devices, public.manifest, public.app_versions, public.channels, public.apps, public.notifications, public.org_users, public.orgs, public.stripe_info CASCADE;
+DROP SEQUENCE IF EXISTS public.app_versions_id_seq, public.channel_devices_id_seq, public.channel_id_seq, public.manifest_id_seq, public.org_users_id_seq, public.stripe_info_id_seq CASCADE;
+DROP FUNCTION IF EXISTS public.one_month_ahead();
+DROP TYPE IF EXISTS public.manifest_entry, public.disable_update, public.user_min_right, public.stripe_status;
+
 --
 -- PostgreSQL database dump
 --
