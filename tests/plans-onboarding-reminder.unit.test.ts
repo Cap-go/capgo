@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 const {
   cloudlogErrMock,
@@ -14,13 +14,13 @@ const {
 } = vi.hoisted(() => ({
   cloudlogErrMock: vi.fn(),
   cloudlogMock: vi.fn(),
-  isGoodPlanOrgMock: vi.fn(),
-  isOnboardedOrgMock: vi.fn(),
-  isOnboardingNeededMock: vi.fn(),
-  isTrialOrgMock: vi.fn(),
-  sendEventToTrackingMock: vi.fn(),
-  sendNotifToOrgMembersMock: vi.fn(),
-  sendNotifToOrgMembersOnceMock: vi.fn(),
+  isGoodPlanOrgMock: vi.fn(async () => false),
+  isOnboardedOrgMock: vi.fn(async (_c: unknown, orgId: string) => !orgId.includes('onboarding')),
+  isOnboardingNeededMock: vi.fn(async (_c: unknown, orgId: string) => orgId.includes('onboarding')),
+  isTrialOrgMock: vi.fn(async () => 0),
+  sendEventToTrackingMock: vi.fn(async () => undefined),
+  sendNotifToOrgMembersMock: vi.fn(async () => true),
+  sendNotifToOrgMembersOnceMock: vi.fn(async () => true),
   supabaseAdminMock: vi.fn(),
 }))
 
@@ -73,26 +73,19 @@ function createContext() {
   } as any
 }
 
+function orgNotificationCalls(mock: typeof sendNotifToOrgMembersMock, orgId: string) {
+  return (mock.mock.calls as unknown[][]).filter(call => call[4] === orgId && call[5] === orgId)
+}
+
+function trackingCalls(orgId: string) {
+  return (sendEventToTrackingMock.mock.calls as unknown[][])
+    .filter(([, event]) => (event as { user_id?: string } | undefined)?.user_id === orgId)
+}
+
 describe('handleOrgNotificationsAndEvents onboarding reminder', () => {
-  beforeEach(() => {
-    isOnboardedOrgMock.mockResolvedValue(false)
-    isOnboardingNeededMock.mockResolvedValue(true)
-    isTrialOrgMock.mockResolvedValue(0)
-    isGoodPlanOrgMock.mockResolvedValue(false)
-    sendNotifToOrgMembersMock.mockReset()
-    sendNotifToOrgMembersOnceMock.mockReset()
-    sendNotifToOrgMembersOnceMock.mockResolvedValue(true)
-    sendEventToTrackingMock.mockReset()
-    sendEventToTrackingMock.mockResolvedValue(undefined)
-    supabaseAdminMock.mockReset()
-  })
-
-  afterEach(() => {
-    vi.restoreAllMocks()
-  })
-
   it.concurrent('sends the trial-expired onboarding reminder only through the one-time helper with org context', async () => {
     const { handleOrgNotificationsAndEvents } = await import('../supabase/functions/_backend/utils/plans.ts')
+    const orgId = 'org-onboarding-reminder'
 
     const result = await handleOrgNotificationsAndEvents(
       createContext(),
@@ -102,7 +95,7 @@ describe('handleOrgNotificationsAndEvents onboarding reminder', () => {
         stripe_info: null,
         website: 'https://acme.example/',
       },
-      'org-123',
+      orgId,
       false,
       {
         total_percent: 0,
@@ -115,18 +108,18 @@ describe('handleOrgNotificationsAndEvents onboarding reminder', () => {
     )
 
     expect(result).toBe(false)
-    expect(sendNotifToOrgMembersMock).not.toHaveBeenCalled()
+    expect(orgNotificationCalls(sendNotifToOrgMembersMock, orgId)).toHaveLength(0)
     expect(sendNotifToOrgMembersOnceMock).toHaveBeenCalledWith(
       expect.anything(),
       'user:need_onboarding',
       'onboarding',
       {
-        org_id: 'org-123',
+        org_id: orgId,
         org_name: 'Acme Mobile',
         org_website: 'https://acme.example/',
       },
-      'org-123',
-      'org-123',
+      orgId,
+      orgId,
       expect.anything(),
     )
     expect(sendEventToTrackingMock).toHaveBeenCalledWith(
@@ -134,15 +127,14 @@ describe('handleOrgNotificationsAndEvents onboarding reminder', () => {
       expect.objectContaining({
         channel: 'usage',
         event: 'User need onboarding',
-        user_id: 'org-123',
+        user_id: orgId,
       }),
     )
   })
 
   it.concurrent('does not send plan usage alerts from stale total percent alone', async () => {
-    isOnboardedOrgMock.mockResolvedValue(true)
-    isOnboardingNeededMock.mockResolvedValue(false)
     const { handleOrgNotificationsAndEvents } = await import('../supabase/functions/_backend/utils/plans.ts')
+    const orgId = 'org-usage-stale'
 
     const result = await handleOrgNotificationsAndEvents(
       createContext(),
@@ -152,7 +144,7 @@ describe('handleOrgNotificationsAndEvents onboarding reminder', () => {
         stripe_info: null,
         website: 'https://acme.example/',
       },
-      'org-123',
+      orgId,
       true,
       {
         total_percent: 51,
@@ -165,15 +157,13 @@ describe('handleOrgNotificationsAndEvents onboarding reminder', () => {
     )
 
     expect(result).toBe(true)
-    expect(sendNotifToOrgMembersMock).not.toHaveBeenCalled()
-    expect(sendEventToTrackingMock).not.toHaveBeenCalled()
+    expect(orgNotificationCalls(sendNotifToOrgMembersMock, orgId)).toHaveLength(0)
+    expect(trackingCalls(orgId)).toHaveLength(0)
   })
 
   it.concurrent('sends plan usage alerts with the metric that crossed the threshold', async () => {
-    isOnboardedOrgMock.mockResolvedValue(true)
-    isOnboardingNeededMock.mockResolvedValue(false)
-    sendNotifToOrgMembersMock.mockResolvedValue(true)
     const { handleOrgNotificationsAndEvents } = await import('../supabase/functions/_backend/utils/plans.ts')
+    const orgId = 'org-usage-storage'
 
     const result = await handleOrgNotificationsAndEvents(
       createContext(),
@@ -183,7 +173,7 @@ describe('handleOrgNotificationsAndEvents onboarding reminder', () => {
         stripe_info: null,
         website: 'https://acme.example/',
       },
-      'org-123',
+      orgId,
       true,
       {
         total_percent: 20,
@@ -212,8 +202,8 @@ describe('handleOrgNotificationsAndEvents onboarding reminder', () => {
         },
         threshold: 50,
       },
-      'org-123',
-      'org-123',
+      orgId,
+      orgId,
       '0 0 1 * *',
       expect.anything(),
     )
@@ -222,6 +212,7 @@ describe('handleOrgNotificationsAndEvents onboarding reminder', () => {
       expect.objectContaining({
         channel: 'usage',
         event: 'User is at 50% of plan usage',
+        user_id: orgId,
         tags: {
           metric: 'storage',
           metric_percent: '51',
