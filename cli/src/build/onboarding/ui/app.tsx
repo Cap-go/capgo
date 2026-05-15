@@ -148,10 +148,27 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
   const [, setImportProfiles] = useState<DiscoveredProfile[]>([])
   const [chosenIdentity, setChosenIdentity] = useState<SigningIdentity | null>(null)
   const [chosenProfile, setChosenProfile] = useState<DiscoveredProfile | null>(null)
-  const [importDistribution, setImportDistribution] = useState<'app_store' | 'ad_hoc' | null>(null)
+  // Hydrate importDistribution from progress so resumed sessions don't lose
+  // the user's earlier choice. Without this, `doSaveCredentials`'s
+  // `needsAscKey = !importMode || importDistribution === 'app_store'` would
+  // mis-route (e.g. saving ad_hoc credentials with APPLE_KEY_* fields).
+  const [importDistribution, setImportDistribution] = useState<'app_store' | 'ad_hoc' | null>(
+    initialProgress?.importDistribution ?? null,
+  )
   const [importedP12Password, setImportedP12Password] = useState<string>('')
-  /** Tracks whether we're in the import flow so saving-credentials knows which writer to use */
-  const [importMode, setImportMode] = useState(false)
+  /**
+   * Tracks whether we're in the import flow so saving-credentials knows which
+   * writer to use AND so `verifying-key` routes back to import-pick-identity
+   * instead of creating-certificate.
+   *
+   * MUST be hydrated from progress — without this, a CLI restart mid-import-flow
+   * lands the user back at `verifying-key` (or wherever getResumeStep chose)
+   * with importMode=false, which silently re-routes them into the create-new
+   * path. That's the exact failure mode Codex caught: a resumed app_store
+   * import would re-verify .p8, then try to CREATE a new distribution cert
+   * via Apple — exactly the cert-limit blow-up users hit before this fix.
+   */
+  const [importMode, setImportMode] = useState(initialProgress?.setupMethod === 'import-existing')
   /**
    * When the user hits no-match recovery in ad_hoc mode and needs to provide a
    * .p8 inline for an action, this records the action to resume *after* the
@@ -1216,14 +1233,36 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
               { label: '📦  Ad-hoc (no TestFlight upload)', value: 'ad_hoc' },
               { label: '↩️   Cancel and use Create new instead', value: '__cancel__' },
             ]}
-            onChange={(value) => {
+            onChange={async (value) => {
               if (value === '__cancel__') {
                 setImportMode(false)
+                // Clear the persisted import-distribution and setupMethod since
+                // the user is bailing to the create-new path.
+                const existing = await loadProgress(appId)
+                if (existing) {
+                  existing.setupMethod = 'create-new'
+                  delete existing.importDistribution
+                  await saveProgress(appId, existing)
+                }
                 setStep('api-key-instructions')
                 return
               }
               const mode = value as 'app_store' | 'ad_hoc'
               setImportDistribution(mode)
+              // Persist so a CLI restart at any later step (incl. verifying-key
+              // or saving-credentials) knows we're in app_store vs ad_hoc.
+              // Codex caught a bug where without this, resumed sessions
+              // re-entered the create-new path via the stale `importMode=false`
+              // default — fixed here by hydrating both fields on mount.
+              const existing = await loadProgress(appId) || {
+                platform: 'ios' as const,
+                appId,
+                startedAt: new Date().toISOString(),
+                completedSteps: {},
+              }
+              existing.setupMethod = 'import-existing'
+              existing.importDistribution = mode
+              await saveProgress(appId, existing)
               addLog(`✔ Distribution · ${mode}`)
               if (mode === 'app_store') {
                 // Need .p8 for TestFlight upload AND for any profile auto-recovery.

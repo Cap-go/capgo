@@ -78,6 +78,18 @@ export interface OnboardingProgress {
    * resume defaults to `create-new` for backward compatibility.
    */
   setupMethod?: 'create-new' | 'import-existing'
+  /**
+   * Records the distribution mode picked at `import-distribution-mode`.
+   *
+   * Persisted (not derived from .p8 presence) because ad_hoc users can
+   * legitimately enter a one-shot .p8 during no-match recovery, which would
+   * otherwise make .p8-presence-implies-app_store an incorrect heuristic. On
+   * resume the UI hydrates `importDistribution` from this field so the
+   * `verifying-key` branch and `doSaveCredentials` route correctly.
+   *
+   * Only meaningful when `setupMethod === 'import-existing'`.
+   */
+  importDistribution?: 'app_store' | 'ad_hoc'
   completedSteps: {
     apiKeyVerified?: ApiKeyData
     certificateCreated?: CertificateData
