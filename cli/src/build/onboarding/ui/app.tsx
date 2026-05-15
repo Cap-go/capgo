@@ -1341,7 +1341,17 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
               options={[
                 ...matchedProfiles.map(p => ({
                   label: `📜  ${p.name} · bundle ${p.bundleId} · ${p.profileType} · expires ${p.expirationDate.split('T')[0]}`,
-                  value: p.path,
+                  // Key by UUID, NOT path. Disk-discovered profiles have a
+                  // unique path, but Apple-fetched profiles (from the D
+                  // no-match-recovery path) are synthesized with path=''.
+                  // Keying by path collapses every Apple-fetched profile to
+                  // value="" and onChange's `find(p => p.path === '')` only
+                  // ever resolves the first synthesized entry — user can't
+                  // pick any other.
+                  // UUID is unique for both kinds: disk profiles use the
+                  // mobileprovision UUID, synthesized ones use Apple's
+                  // profile resource ID.
+                  value: p.uuid,
                 })),
                 { label: '↩️   Back to identity selection', value: '__back__' },
               ]}
@@ -1350,7 +1360,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
                   setStep('import-pick-identity')
                   return
                 }
-                const profile = matchedProfiles.find(p => p.path === value)
+                const profile = matchedProfiles.find(p => p.uuid === value)
                 if (!profile)
                   return
                 setChosenProfile(profile)
