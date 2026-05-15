@@ -39,10 +39,11 @@ state goes to `data/capgo/`.
 
 `.github/workflows/deepsec.yml` runs on `pull_request_target` so the
 same required check can scan same-repo PRs and fork PRs. The workflow
-does not execute the PR checkout; it installs deepsec from the trusted
-base checkout, copies changed PR files into a sanitized `scan-target`,
-and passes that copy to deepsec as scan input. The copy is built from
-regular git blobs, so symlinks are skipped instead of dereferenced.
+does not check out a PR working tree; it installs deepsec from the
+trusted base checkout, fetches PR git objects by SHA, copies changed PR
+files into a sanitized `scan-target`, and passes that copy to deepsec as
+scan input. The copy is built from regular git blobs, so symlinks are
+skipped instead of dereferenced.
 Repository instruction files such as `AGENTS.md` and `CLAUDE.md` are
 excluded from the agent root so fork-controlled instructions cannot
 steer the privileged scan. DeepSec runs in a Docker container with only
