@@ -91,7 +91,7 @@ describe('handleOrgNotificationsAndEvents onboarding reminder', () => {
     vi.restoreAllMocks()
   })
 
-  it('sends the trial-expired onboarding reminder only through the one-time helper with org context', async () => {
+  it.concurrent('sends the trial-expired onboarding reminder only through the one-time helper with org context', async () => {
     const { handleOrgNotificationsAndEvents } = await import('../supabase/functions/_backend/utils/plans.ts')
 
     const result = await handleOrgNotificationsAndEvents(
@@ -139,7 +139,7 @@ describe('handleOrgNotificationsAndEvents onboarding reminder', () => {
     )
   })
 
-  it('does not send plan usage alerts from stale total percent alone', async () => {
+  it.concurrent('does not send plan usage alerts from stale total percent alone', async () => {
     isOnboardedOrgMock.mockResolvedValue(true)
     isOnboardingNeededMock.mockResolvedValue(false)
     const { handleOrgNotificationsAndEvents } = await import('../supabase/functions/_backend/utils/plans.ts')
@@ -169,7 +169,7 @@ describe('handleOrgNotificationsAndEvents onboarding reminder', () => {
     expect(sendEventToTrackingMock).not.toHaveBeenCalled()
   })
 
-  it('sends plan usage alerts with the metric that crossed the threshold', async () => {
+  it.concurrent('sends plan usage alerts with the metric that crossed the threshold', async () => {
     isOnboardedOrgMock.mockResolvedValue(true)
     isOnboardingNeededMock.mockResolvedValue(false)
     sendNotifToOrgMembersMock.mockResolvedValue(true)
