@@ -161,7 +161,15 @@ CREATE TABLE public.apps (
     manifest_bundle_count bigint DEFAULT 0 NOT NULL,
     expose_metadata boolean DEFAULT false NOT NULL,
     allow_preview boolean DEFAULT false NOT NULL,
-    allow_device_custom_id boolean DEFAULT true NOT NULL
+    allow_device_custom_id boolean DEFAULT true NOT NULL,
+    need_onboarding boolean DEFAULT false NOT NULL,
+    existing_app boolean DEFAULT false NOT NULL,
+    ios_store_url text,
+    android_store_url text,
+    stats_updated_at timestamp without time zone,
+    stats_refresh_requested_at timestamp without time zone,
+    build_timeout_seconds bigint DEFAULT 900 NOT NULL,
+    build_timeout_updated_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
 ALTER TABLE ONLY public.apps REPLICA IDENTITY FULL;
@@ -353,8 +361,10 @@ CREATE TABLE public.orgs (
     required_encryption_key character varying(
         21
     ) DEFAULT null::character varying,
-    use_new_rbac boolean DEFAULT false NOT NULL,
-    has_usage_credits boolean DEFAULT false NOT NULL
+    use_new_rbac boolean DEFAULT true NOT NULL,
+    has_usage_credits boolean DEFAULT false NOT NULL,
+    website text,
+    stats_refresh_requested_at timestamp without time zone
 );
 
 ALTER TABLE ONLY public.orgs REPLICA IDENTITY FULL;
@@ -384,7 +394,10 @@ CREATE TABLE public.stripe_info (
     id integer NOT NULL,
     plan_calculated_at timestamp with time zone,
     build_time_exceeded boolean DEFAULT false,
-    upgraded_at timestamp with time zone
+    upgraded_at timestamp with time zone,
+    paid_at timestamp with time zone,
+    customer_country character varying(2),
+    last_stripe_event_at timestamp with time zone
 );
 
 ALTER TABLE ONLY public.stripe_info REPLICA IDENTITY FULL;
@@ -574,12 +587,48 @@ CREATE INDEX app_versions_cli_version_idx ON public.app_versions USING btree (
 
 
 --
+-- Name: app_versions_r2_path_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX app_versions_r2_path_idx ON public.app_versions USING btree (
+    r2_path
+);
+
+
+--
 -- Name: channel_devices_device_id_idx; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX channel_devices_device_id_idx ON public.channel_devices USING btree (
     device_id
 );
+
+
+--
+-- Name: channels_one_public_android_per_app_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX channels_one_public_android_per_app_key ON public.channels USING btree (
+    app_id
+) WHERE ((public = true) AND (android = true));
+
+
+--
+-- Name: channels_one_public_electron_per_app_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX channels_one_public_electron_per_app_key ON public.channels USING btree (
+    app_id
+) WHERE ((public = true) AND (electron = true));
+
+
+--
+-- Name: channels_one_public_ios_per_app_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX channels_one_public_ios_per_app_key ON public.channels USING btree (
+    app_id
+) WHERE ((public = true) AND (ios = true));
 
 
 --
@@ -815,15 +864,6 @@ CREATE INDEX idx_manifest_app_version_id ON public.manifest USING btree (
 
 
 --
--- Name: idx_manifest_file_name_hash_version; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_manifest_file_name_hash_version ON public.manifest USING btree (
-    file_name, file_hash, app_version_id
-);
-
-
---
 -- Name: idx_orgs_customer_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -891,6 +931,15 @@ CREATE UNIQUE INDEX si_customer_cover_uidx ON public.stripe_info USING btree (
 CREATE INDEX si_customer_status_trial_idx ON public.stripe_info USING btree (
     customer_id, status, trial_at
 ) INCLUDE (mau_exceeded, storage_exceeded, bandwidth_exceeded);
+
+
+--
+-- Name: stripe_info_paid_at_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX stripe_info_paid_at_idx ON public.stripe_info USING btree (
+    paid_at
+) WHERE (paid_at IS NOT null);
 
 
 --
