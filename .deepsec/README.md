@@ -10,12 +10,11 @@ Currently configured project: `capgo` (target: `..`).
 ## Setup
 
 1. `bun install` — installs deepsec.
-2. Add an AI Gateway / Anthropic / OpenAI token to `.env.local`. If
-   you already have `claude` or `codex` CLI logged in on this
-   machine, you can skip the token for non-sandbox runs (`process` /
-   `revalidate` / `triage`); deepsec auto-detects and reuses the
-   subscription. See
-   `node_modules/deepsec/dist/docs/vercel-setup.md` after install.
+2. For CI, configure the repository secret `OPENAI_API_TOKEN`. The
+   workflow brokers it through a local OpenAI proxy so the real token is
+   not exposed to the DeepSec agent process. For local direct runs, set
+   `OPENAI_API_KEY` in `.env.local`, or use an existing `codex` CLI
+   login.
 3. Keep `data/capgo/INFO.md` short and project-specific. Refresh it
    when auth, API-key, storage, or plugin endpoint architecture changes.
 
@@ -35,6 +34,29 @@ bun deepsec export      --format md-dir --out ./findings
 `scan` is free (regex only). `process` is the AI stage; cost depends on
 the selected agent/model and the number of files investigated. Run
 state goes to `data/capgo/`.
+
+## PR checks
+
+`.github/workflows/deepsec.yml` runs on `pull_request_target` so the
+same required check can scan same-repo PRs and fork PRs. The workflow
+does not execute the PR checkout; it installs deepsec from the trusted
+base checkout, copies changed PR files into a sanitized `scan-target`,
+and passes that copy to deepsec as scan input. The copy is built from
+regular git blobs, so symlinks are skipped instead of dereferenced.
+Repository instruction files such as `AGENTS.md` and `CLAUDE.md` are
+excluded from the agent root so fork-controlled instructions cannot
+steer the privileged scan. DeepSec runs in a Docker container with only
+the scanner workspace, `scan-target`, and `scan-files.txt` mounted. The
+OpenAI token stays in a minimal local proxy; DeepSec receives only a
+per-run local token and a scrubbed environment. The proxy only allows
+`gpt-5.5` OpenAI requests and enforces per-run request, output-token,
+request-byte, and response-byte budgets.
+
+For fork PRs to be on-demand but mandatory, configure the
+`deepsec-fork-pr` GitHub Environment with required reviewers, then mark
+the `Scan PR changes` job as a required branch protection check. Fork
+PRs will stay pending until a maintainer approves that environment run.
+Same-repo PRs use the `deepsec-pr` environment.
 
 ## Adding another project
 
