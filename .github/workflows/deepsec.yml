@@ -20,6 +20,7 @@ jobs:
       name: ${{ github.event.pull_request.head.repo.full_name == github.repository && 'deepsec-pr' || 'deepsec-fork-pr' }}
     permissions:
       contents: read
+      pull-requests: read
     steps:
       - name: Checkout trusted scanner
         uses: actions/checkout@v6 # v6
@@ -30,35 +31,48 @@ jobs:
           persist-credentials: false
       - name: Setup bun
         run: bash scanner/scripts/setup-bun.sh
-      - name: Fetch PR source objects
+      - name: Fetch PR source commit
         env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          BASE_REPO: ${{ github.repository }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
         run: |
-          if ! [[ "$BASE_SHA" =~ ^[0-9a-f]{40}$ && "$HEAD_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+          if ! [[ "$HEAD_SHA" =~ ^[0-9a-f]{40}$ ]]; then
             echo "Unexpected pull request SHA format."
             exit 1
           fi
 
-          if ! [[ "$BASE_REPO" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ && "$HEAD_REPO" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]]; then
+          if ! [[ "$HEAD_REPO" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]]; then
             echo "Unexpected pull request repository format."
             exit 1
           fi
 
           rm -rf target
           git init target
-          git -C target remote add base "https://github.com/$BASE_REPO.git"
           git -C target remote add head "https://github.com/$HEAD_REPO.git"
-          git -C target fetch --no-tags --depth=1 base "$BASE_SHA"
           git -C target fetch --no-tags --depth=1 head "$HEAD_SHA"
       - name: List changed files
         env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPOSITORY: ${{ github.repository }}
         run: |
-          git -C target diff --name-only -z --diff-filter=ACMRT "$BASE_SHA" "$HEAD_SHA" > changed-files.txt
+          if ! [[ "$PR_NUMBER" =~ ^[0-9]+$ && "$REPOSITORY" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]]; then
+            echo "Unexpected pull request metadata format."
+            exit 1
+          fi
+
+          gh api --paginate --slurp "repos/$REPOSITORY/pulls/$PR_NUMBER/files" > pr-files.json
+          bun -e '
+            const fs = require("node:fs")
+            const pages = JSON.parse(fs.readFileSync("pr-files.json", "utf8"))
+            for (const page of pages) {
+              for (const file of page) {
+                if (!file || file.status === "removed" || typeof file.filename !== "string")
+                  continue
+                process.stdout.write(`${file.filename}\0`)
+              }
+            }
+          ' > changed-files.txt
           tr '\0' '\n' < changed-files.txt
       - name: Prepare DeepSec scan target
         env:

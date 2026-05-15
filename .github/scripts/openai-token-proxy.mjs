@@ -21,6 +21,64 @@ const forwardedHeaders = new Set([
   'content-type',
   'user-agent',
 ])
+const allowedResponseFields = new Set([
+  'client_metadata',
+  'include',
+  'input',
+  'instructions',
+  'max_output_tokens',
+  'model',
+  'parallel_tool_calls',
+  'prompt_cache_key',
+  'reasoning',
+  'store',
+  'stream',
+  'text',
+  'tool_choice',
+  'tools',
+])
+const allowedChatFields = new Set([
+  'frequency_penalty',
+  'max_completion_tokens',
+  'max_tokens',
+  'messages',
+  'model',
+  'presence_penalty',
+  'reasoning_effort',
+  'stop',
+  'stream',
+  'temperature',
+  'top_p',
+  'user',
+])
+const allowedResponseToolNames = new Set([
+  'apply_patch',
+  'close_agent',
+  'exec_command',
+  'request_user_input',
+  'resume_agent',
+  'send_input',
+  'spawn_agent',
+  'update_plan',
+  'view_image',
+  'wait_agent',
+  'write_stdin',
+])
+const allowedResponseInclude = new Set([
+  'reasoning.encrypted_content',
+])
+const allowedReasoningEfforts = new Set([
+  'minimal',
+  'low',
+  'medium',
+  'high',
+  'xhigh',
+])
+const allowedTextVerbosities = new Set([
+  'low',
+  'medium',
+  'high',
+])
 
 let requestCount = 0
 let totalRequestBytes = 0
@@ -64,6 +122,108 @@ function capTokenField(body, field) {
     body[field] = maxOutputTokens
 }
 
+function isPlainObject(value) {
+  return !!value && typeof value === 'object' && !Array.isArray(value)
+}
+
+function hasOnlyAllowedFields(body, allowedFields) {
+  return Object.keys(body).every(field => allowedFields.has(field))
+}
+
+function hasOnlyKeys(body, allowedKeys) {
+  return Object.keys(body).every(field => allowedKeys.includes(field))
+}
+
+function isValidResponseTools(tools) {
+  if (tools === undefined)
+    return true
+
+  if (!Array.isArray(tools))
+    return false
+
+  return tools.every((tool) => {
+    if (!isPlainObject(tool) || typeof tool.name !== 'string' || !allowedResponseToolNames.has(tool.name))
+      return false
+
+    if (tool.type === 'function') {
+      return hasOnlyKeys(tool, ['type', 'name', 'description', 'strict', 'parameters'])
+        && typeof tool.description === 'string'
+        && typeof tool.strict === 'boolean'
+        && isPlainObject(tool.parameters)
+    }
+
+    if (tool.type === 'custom') {
+      return tool.name === 'apply_patch'
+        && hasOnlyKeys(tool, ['type', 'name', 'description', 'format'])
+        && typeof tool.description === 'string'
+        && isPlainObject(tool.format)
+    }
+
+    return false
+  })
+}
+
+function isValidResponseInclude(include) {
+  return include === undefined || (Array.isArray(include) && include.every(item => allowedResponseInclude.has(item)))
+}
+
+function isValidResponseReasoning(reasoning) {
+  return reasoning === undefined
+    || (
+      isPlainObject(reasoning)
+      && hasOnlyKeys(reasoning, ['effort'])
+      && allowedReasoningEfforts.has(reasoning.effort)
+    )
+}
+
+function isValidResponseText(text) {
+  return text === undefined
+    || (
+      isPlainObject(text)
+      && hasOnlyKeys(text, ['verbosity'])
+      && allowedTextVerbosities.has(text.verbosity)
+    )
+}
+
+function normalizeResponsesBody(body) {
+  if (!hasOnlyAllowedFields(body, allowedResponseFields))
+    return undefined
+
+  if (!isValidResponseTools(body.tools) || !isValidResponseInclude(body.include) || !isValidResponseReasoning(body.reasoning) || !isValidResponseText(body.text))
+    return undefined
+
+  if (body.tool_choice !== undefined && body.tool_choice !== 'auto')
+    return undefined
+
+  if (body.store !== undefined && body.store !== false)
+    return undefined
+
+  if (body.stream !== undefined && body.stream !== true)
+    return undefined
+
+  body.tool_choice = 'auto'
+  body.parallel_tool_calls = false
+  body.store = false
+  body.stream = true
+  capTokenField(body, 'max_output_tokens')
+
+  return body
+}
+
+function normalizeChatBody(body) {
+  if (!hasOnlyAllowedFields(body, allowedChatFields))
+    return undefined
+
+  if (!Array.isArray(body.messages))
+    return undefined
+
+  if (body.max_tokens !== undefined)
+    capTokenField(body, 'max_tokens')
+  capTokenField(body, 'max_completion_tokens')
+
+  return body
+}
+
 function buildPolicyBody(pathname, body) {
   const json = readJsonBody(body)
   if (!json)
@@ -72,12 +232,14 @@ function buildPolicyBody(pathname, body) {
   if (typeof json.model !== 'string' || !allowedModels.has(json.model))
     return undefined
 
-  if (pathname === '/v1/responses')
-    capTokenField(json, 'max_output_tokens')
-  else
-    capTokenField(json, 'max_completion_tokens')
+  const policyBody = pathname === '/v1/responses'
+    ? normalizeResponsesBody(json)
+    : normalizeChatBody(json)
 
-  return Buffer.from(JSON.stringify(json))
+  if (!policyBody)
+    return undefined
+
+  return Buffer.from(JSON.stringify(policyBody))
 }
 
 const server = http.createServer(async (req, res) => {
