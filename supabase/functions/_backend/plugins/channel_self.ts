@@ -505,7 +505,10 @@ async function parseChannelSelfPluginRequest(
   cloudlog({ requestId: c.get('requestId'), message: logMessage, body })
 
   if (isLimited(c, body.app_id)) {
-    return { response: simpleRateLimit(body) }
+    // Pass curated metadata only — see simpleRateLimit contract in hono.ts.
+    // Reflecting the raw `body` would echo the client's full DeviceLink
+    // payload back inside the 429 response's `moreInfo`.
+    return { response: simpleRateLimit({ app_id: body.app_id, device_id: body.device_id }) }
   }
 
   const bodyParsed = parsePluginBody<DeviceLink>(c, body, schema, requireDevice)
@@ -590,7 +593,7 @@ app.put('/', async (c) => {
     return simpleRateLimit({ app_id: bodyParsed.app_id, device_id: bodyParsed.device_id, ...buildRateLimitInfo(rateLimitStatus.resetAt) })
   }
 
-  const pgClient = getPgClient(c)
+  const pgClient = getPgClient(c, isChannelSelfLocalChannelStorageVersion(c, bodyParsed, 'PUT'))
 
   return await runChannelSelfWithPgClient(
     c,

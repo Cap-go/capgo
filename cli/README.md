@@ -71,6 +71,7 @@ Follow the documentation here: https://capacitorjs.com/docs/getting-started/
   - [Set](#organisation-set)
   - [Delete](#organisation-delete)
 - 🔹 [Build](#build)
+  - [Needed](#build-needed)
   - [Init](#build-init)
   - [Request](#build-request)
   - [Credentials](#build-credentials)
@@ -78,6 +79,7 @@ Follow the documentation here: https://capacitorjs.com/docs/getting-started/
     - [List](#build-credentials-list)
     - [Clear](#build-credentials-clear)
     - [Update](#build-credentials-update)
+    - [Manage](#build-credentials-manage)
     - [Migrate](#build-credentials-migrate)
 - 🔹 [Probe](#probe)
 - 🔹 [Generate-docs](#generate-docs)
@@ -1146,7 +1148,7 @@ npx @capgo/cli@latest organisation delete
 ## <a id="build"></a> 🔹 **Build**
 
 🏗️  Manage native iOS/Android builds through Capgo Cloud.
-⚠️ This feature is currently in PUBLIC BETA and cannot be used by anyone at this time.
+⚠️ Native cloud build requests are currently in LIMITED BETA. Access is restricted.
  🔒 SECURITY GUARANTEE:
     Build credentials are NEVER stored on Capgo servers.
     They are used only during the build and auto-deleted after.
@@ -1156,6 +1158,32 @@ npx @capgo/cli@latest organisation delete
    npx @capgo/cli build credentials save --appId <your-app-id> --platform ios
    npx @capgo/cli build credentials save --appId <your-app-id> --platform android
 
+### <a id="build-needed"></a> 🔹 **Needed**
+
+```bash
+npx @capgo/cli@latest build needed
+```
+
+🧭 Print "yes" and exit with code 1 if a native build is required; otherwise print "no" and exit with code 0. Command failures exit with code 2.
+
+**Example:**
+
+```bash
+npx @capgo/cli@latest build needed com.example.app --channel production --verbose
+```
+
+**Options:**
+
+| Param          | Type          | Description          |
+| -------------- | ------------- | -------------------- |
+| **-a** | <code>string</code> | API key to link to your account |
+| **-c** | <code>string</code> | Channel to compare against. Defaults to CapacitorUpdater.defaultChannel or the public default channel |
+| **--package-json** | <code>string</code> | Paths to package.json files for monorepos (comma-separated) |
+| **--node-modules** | <code>string</code> | Paths to node_modules directories for monorepos (comma-separated) |
+| **--verbose** | <code>boolean</code> | Enable verbose output with detailed logging |
+| **--supa-host** | <code>string</code> | Custom Supabase host URL (for self-hosting or Capgo development) |
+| **--supa-anon** | <code>string</code> | Custom Supabase anon key (for self-hosting) |
+
 ### <a id="build-init"></a> 🚀 **Init**
 
 **Alias:** `onboarding`
@@ -1164,13 +1192,14 @@ npx @capgo/cli@latest organisation delete
 npx @capgo/cli@latest build init
 ```
 
-Set up iOS build credentials interactively (creates certificates and profiles automatically)
+Set up build credentials interactively (iOS: certificates + profiles automated; Android: keystore + Google OAuth provisions GCP service account and Play Console invite)
 
 **Options:**
 
 | Param          | Type          | Description          |
 | -------------- | ------------- | -------------------- |
 | **-a** | <code>string</code> | API key to link to your account |
+| **-p** | <code>string</code> | Platform to onboard (ios or android). If omitted, auto-detects when only one native folder exists; prompts otherwise. |
 
 ### <a id="build-request"></a> 🔹 **Request**
 
@@ -1390,6 +1419,29 @@ Examples:
 | **--output-retention** | <code>string</code> | Output link TTL: 1h to 7d. Examples: 1h, 6h, 2d |
 | **--skip-build-number-bump** | <code>boolean</code> | Skip automatic build number/version code incrementing on future builds |
 | **--no-skip-build-number-bump** | <code>boolean</code> | Re-enable automatic build number incrementing (default behavior) |
+
+#### <a id="build-credentials-manage"></a> 🔹 **Manage**
+
+```bash
+npx @capgo/cli@latest build credentials manage
+```
+
+Interactively manage saved build credentials.
+Browse stored credentials, view what's configured, export a CI/CD-ready .env file,
+or delete a platform's credentials. Reuses the same TUI as `capgo init`.
+Examples:
+  npx @capgo/cli build credentials manage
+  npx @capgo/cli build credentials manage --appId com.example.app
+  npx @capgo/cli build credentials manage --appId com.example.app --platform ios
+  npx @capgo/cli build credentials manage --local
+
+**Options:**
+
+| Param          | Type          | Description          |
+| -------------- | ------------- | -------------------- |
+| **--appId** | <code>string</code> | App ID to manage (optional, prompts to pick if omitted) |
+| **--platform** | <code>string</code> | Platform to manage: ios or android (optional, prompts to pick if omitted) |
+| **--local** | <code>boolean</code> | Only browse local .capgo-credentials.json |
 
 #### <a id="build-credentials-migrate"></a> 🔹 **Migrate**
 

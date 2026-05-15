@@ -183,6 +183,32 @@ describe('[POST] /stats', () => {
     await getSupabaseClient().from('devices').delete().eq('device_id', uuid).eq('app_id', APP_NAME_STATS)
   })
 
+  it('uses deleted unknown placeholder instead of scheduling repeated placeholder inserts', async () => {
+    const uuid = randomUUID().toLowerCase()
+    const appId = `${APP_NAME}.deleted.unknown.${randomUUID().split('-')[0]}`
+    await resetAndSeedAppData(appId)
+    await resetAndSeedAppDataStats(appId)
+
+    try {
+      await createAppVersions('unknown', appId, { deleted: true })
+
+      const baseData = getBaseData(appId) as StatsPayload
+      baseData.device_id = uuid
+      baseData.action = 'set'
+      baseData.version_build = '1.0.0-missing.1'
+      baseData.version_name = '1.0.0-missing.1'
+
+      const response = await postStats(baseData)
+      expect(response.status).toBe(200)
+      expect(await response.json<StatsRes>()).toEqual({ status: 'ok' })
+    }
+    finally {
+      await getSupabaseClient().from('devices').delete().eq('device_id', uuid).eq('app_id', appId)
+      await resetAppData(appId)
+      await resetAppDataStats(appId)
+    }
+  })
+
   it('should ignore custom_id when app disables allow_device_custom_id and emit customIdBlocked stat', async () => {
     const shortId = randomUUID().split('-')[0]
     const appId = `${APP_NAME}.cidb.${shortId}`

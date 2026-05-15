@@ -67,6 +67,7 @@ interface PlanConversionRates {
   maker: number
   solo: number
   team: number
+  total: number
 }
 interface DailyRevenueChangeSummary {
   churnMrr: number
@@ -84,6 +85,11 @@ interface RevenueRetentionMetrics {
 interface PaidProductActivityStats {
   builder_active_paying_clients_60d: number
   live_updates_active_paying_clients_60d: number
+}
+interface LtvStats {
+  average_ltv: number
+  shortest_ltv: number
+  longest_ltv: number
 }
 interface GlobalStats {
   apps: PromiseLike<number>
@@ -115,6 +121,7 @@ interface GlobalStats {
   build_stats: PromiseLike<BuildStats>
   retention_metrics: PromiseLike<RevenueRetentionMetrics>
   paid_product_activity_stats: PromiseLike<PaidProductActivityStats>
+  ltv_stats: PromiseLike<LtvStats>
 }
 interface CustomerIdRow {
   customer_id: string
@@ -130,12 +137,17 @@ function calculateConversionRate(converted: number | null | undefined, totalOrgs
   return Number((((converted ?? 0) * 100) / totalOrgs).toFixed(1))
 }
 
+function getPaidPlanTotal(plans: PlanTotal) {
+  return (plans.Solo ?? 0) + (plans.Maker ?? 0) + (plans.Team ?? 0) + (plans.Enterprise ?? 0)
+}
+
 function getPlanConversionRates(plans: PlanTotal, totalOrgs: number): PlanConversionRates {
   return {
     solo: calculateConversionRate(plans.Solo, totalOrgs),
     maker: calculateConversionRate(plans.Maker, totalOrgs),
     team: calculateConversionRate(plans.Team, totalOrgs),
     enterprise: calculateConversionRate(plans.Enterprise, totalOrgs),
+    total: calculateConversionRate(getPaidPlanTotal(plans), totalOrgs),
   }
 }
 
@@ -572,6 +584,87 @@ async function getPaidProductActivityStats(c: Context, window: CurrentDayWindow)
   }
 }
 
+async function getLtvStats(c: Context, window: CurrentDayWindow): Promise<LtvStats> {
+  const pgClient = getPgClient(c, false)
+  const drizzleClient = getDrizzleClient(pgClient)
+  const snapshotExclusiveEnd = window.nextDayStart.toISOString()
+  const monthSeconds = (365.2425 / 12) * 24 * 60 * 60
+
+  try {
+    const result = await drizzleClient.execute(sql`
+      WITH source AS (
+        SELECT
+          CASE
+            WHEN si.price_id = p.price_y_id THEN p.price_y::double precision
+            WHEN si.price_id = p.price_m_id THEN p.price_m::double precision
+            ELSE 0::double precision
+          END AS amount,
+          CASE
+            WHEN si.price_id = p.price_y_id THEN 12::double precision
+            WHEN si.price_id = p.price_m_id THEN 1::double precision
+            ELSE NULL::double precision
+          END AS period_months,
+          si.paid_at AS paid_start,
+          COALESCE(
+            si.canceled_at,
+            CASE
+              WHEN si.status IN ('canceled', 'deleted') THEN si.subscription_anchor_end
+              ELSE NULL
+            END
+          ) AS known_end
+        FROM public.stripe_info si
+        INNER JOIN public.plans p ON p.stripe_id = si.product_id
+        WHERE si.is_good_plan = true
+          AND si.paid_at IS NOT NULL
+      ),
+      ltv_values AS (
+        SELECT
+          amount
+            * GREATEST(
+              1::double precision,
+              CEIL(
+                (
+                  EXTRACT(EPOCH FROM (
+                    LEAST(COALESCE(known_end, ${snapshotExclusiveEnd}::timestamptz), ${snapshotExclusiveEnd}::timestamptz)
+                    - paid_start
+                  ))
+                  / (${monthSeconds}::double precision * period_months)
+                ) - 0.000000001
+              )
+            ) AS ltv
+        FROM source
+        WHERE amount > 0
+          AND period_months IS NOT NULL
+          AND paid_start < ${snapshotExclusiveEnd}::timestamptz
+          AND LEAST(COALESCE(known_end, ${snapshotExclusiveEnd}::timestamptz), ${snapshotExclusiveEnd}::timestamptz) > paid_start
+      )
+      SELECT
+        COALESCE(ROUND(AVG(ltv)::numeric, 2), 0)::double precision AS average_ltv,
+        COALESCE(ROUND(MIN(ltv)::numeric, 2), 0)::double precision AS shortest_ltv,
+        COALESCE(ROUND(MAX(ltv)::numeric, 2), 0)::double precision AS longest_ltv
+      FROM ltv_values
+    `)
+
+    const row = result.rows[0] as Partial<LtvStats> | undefined
+    return {
+      average_ltv: Number(row?.average_ltv) || 0,
+      shortest_ltv: Number(row?.shortest_ltv) || 0,
+      longest_ltv: Number(row?.longest_ltv) || 0,
+    }
+  }
+  catch (error) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'ltv stats error', error })
+    return {
+      average_ltv: 0,
+      shortest_ltv: 0,
+      longest_ltv: 0,
+    }
+  }
+  finally {
+    closeClient(c, pgClient)
+  }
+}
+
 async function getRevenueRetentionMetrics(c: Context, dateId: string): Promise<RevenueRetentionMetrics> {
   const pgClient = getPgClient(c, false)
   const drizzleClient = getDrizzleClient(pgClient)
@@ -952,6 +1045,7 @@ function getStats(c: Context, window?: DailyWindow): GlobalStats {
     build_stats: getBuildStats(c, window),
     retention_metrics: getRevenueRetentionMetrics(c, metricWindow.dayDateId),
     paid_product_activity_stats: getPaidProductActivityStats(c, metricWindow),
+    ltv_stats: getLtvStats(c, metricWindow),
   }
 }
 
@@ -1000,6 +1094,7 @@ app.post('/', middlewareAPISecret, async (c) => {
     build_stats,
     retention_metrics,
     paid_product_activity_stats,
+    ltv_stats,
   ] = await Promise.all([
     res.apps,
     res.updates,
@@ -1033,6 +1128,7 @@ app.post('/', middlewareAPISecret, async (c) => {
       return null
     }),
     res.paid_product_activity_stats,
+    res.ltv_stats,
   ])
   const not_paying = users - customers.total - plans.Trial
   const org_conversion_rate = calculateConversionRate(paying_orgs_for_conversion, orgs)
@@ -1069,6 +1165,7 @@ app.post('/', middlewareAPISecret, async (c) => {
     stars,
     paying: customers.total,
     org_conversion_rate,
+    plan_total_conversion_rate: planConversionRates.total,
     plan_solo_conversion_rate: planConversionRates.solo,
     plan_maker_conversion_rate: planConversionRates.maker,
     plan_team_conversion_rate: planConversionRates.team,
@@ -1118,6 +1215,9 @@ app.post('/', middlewareAPISecret, async (c) => {
     plugin_version_ladder: plugin_breakdown.version_ladder as unknown as Json,
     builder_active_paying_clients_60d: paid_product_activity_stats.builder_active_paying_clients_60d,
     live_updates_active_paying_clients_60d: paid_product_activity_stats.live_updates_active_paying_clients_60d,
+    average_ltv: ltv_stats.average_ltv,
+    shortest_ltv: ltv_stats.shortest_ltv,
+    longest_ltv: ltv_stats.longest_ltv,
     // Build statistics (all time)
     builds_total: build_stats.total,
     builds_ios: build_stats.ios,

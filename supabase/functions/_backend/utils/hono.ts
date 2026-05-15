@@ -314,6 +314,17 @@ export function quickError(status: number, errorCode: string, message: string, m
   })
 }
 
+/**
+ * Throw a 429 "too_many_requests" HTTPException.
+ *
+ * IMPORTANT: `moreInfo` is reflected to the client as the `moreInfo` field of
+ * the 429 response body (see `onError` in `on_error.ts`). Pass curated
+ * diagnostic metadata only — fields like `app_id`, `device_id`, `reason`,
+ * `apikey_id`, `rateLimitResetAt`, `retryAfterSeconds`. Do NOT pass the raw
+ * parsed request body: that turns the rate-limit response into a reflective
+ * echo of whatever the client submitted and means any future field added to
+ * the request schema (sensitive or not) silently lands in the error payload.
+ */
 export function simpleRateLimit(moreInfo: any = {}, cause?: any): never {
   const status = 429
   const message = 'Too many requests'

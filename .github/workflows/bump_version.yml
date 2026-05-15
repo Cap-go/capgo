@@ -22,6 +22,10 @@ jobs:
       has_migration_changes: ${{ steps.migration_scope.outputs.has_migration_changes }}
       run_any: ${{ steps.capgo.outputs.should_release == 'true' || steps.cli.outputs.should_release == 'true' }}
     steps:
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24.x
       - name: Checkout
         uses: actions/checkout@v6
         with:
@@ -67,6 +71,10 @@ jobs:
     permissions:
       contents: write
     steps:
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24.x
       - name: Check out
         uses: actions/checkout@v6
         with:
@@ -144,6 +152,10 @@ jobs:
     permissions:
       contents: write
     steps:
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24.x
       - name: Checkout
         uses: actions/checkout@v6
         with:

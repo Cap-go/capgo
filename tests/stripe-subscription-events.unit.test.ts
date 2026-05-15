@@ -7,22 +7,26 @@ const mockContext = {
 } as any
 
 function makeSubscriptionItem({
+  currentPeriodEnd = 1_714_517_200,
   interval,
   priceId,
   productId,
+  usageType = 'licensed',
 }: {
+  currentPeriodEnd?: number
   interval: 'month' | 'year'
   priceId: string
   productId: string
+  usageType?: 'licensed' | 'metered'
 }) {
   return {
-    current_period_end: 1_714_517_200,
+    current_period_end: currentPeriodEnd,
     current_period_start: 1_711_925_200,
     plan: {
       id: priceId,
       interval,
       product: productId,
-      usage_type: 'licensed',
+      usage_type: usageType,
     },
   } as any
 }
@@ -102,6 +106,40 @@ describe('stripe subscription event classification', () => {
       previous_plan_name: 'Solo',
       previous_plan_type: 'monthly',
     })
+  })
+
+  it.concurrent('uses the licensed subscription item for cancel-at-period-end timestamps', () => {
+    const stripeData = extractDataEvent(mockContext, {
+      data: {
+        object: {
+          cancel_at_period_end: true,
+          customer: 'cus_multi_item',
+          id: 'sub_multi_item',
+          items: {
+            data: [
+              makeSubscriptionItem({
+                currentPeriodEnd: 1_720_000_000,
+                interval: 'month',
+                priceId: 'price_metered',
+                productId: 'prod_metered',
+                usageType: 'metered',
+              }),
+              makeSubscriptionItem({
+                currentPeriodEnd: 1_714_517_200,
+                interval: 'month',
+                priceId: 'price_licensed',
+                productId: 'prod_licensed',
+              }),
+            ],
+          },
+        },
+      },
+      type: 'customer.subscription.updated',
+    } as any)
+
+    expect(stripeData.data.canceled_at).toBe('2024-04-30T22:46:40.000Z')
+    expect(stripeData.data.product_id).toBe('prod_licensed')
+    expect(stripeData.data.price_id).toBe('price_licensed')
   })
 
   it.concurrent('keeps same-cadence plan switches as plan changes instead of upgrades', () => {
