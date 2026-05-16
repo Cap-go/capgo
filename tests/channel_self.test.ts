@@ -1166,7 +1166,7 @@ describe('[POST] /channel_self - new plugin version (>= 7.34.0) behavior', () =>
     }
   })
 
-  it('should clean up old channel_devices entry when migrating from old to new version', async () => {
+  it('should leave old channel_devices entry untouched when migrating from old to new version', async () => {
     const deviceId = randomUUID()
     const data = getUniqueBaseData(APPNAME)
     data.device_id = deviceId
@@ -1204,7 +1204,7 @@ describe('[POST] /channel_self - new plugin version (>= 7.34.0) behavior', () =>
 
       expect(oldChannelDevice).toBeTruthy()
 
-      // Then, set channel with new version (should clean up old entry)
+      // Then, set channel with new version (should not read or write old server-side storage)
       data.plugin_version = '7.34.0'
       data.channel = 'development'
 
@@ -1215,7 +1215,7 @@ describe('[POST] /channel_self - new plugin version (>= 7.34.0) behavior', () =>
       expect(result.status).toBe('ok')
       expect(result.allowSet).toBe(true)
 
-      // Verify old entry was deleted
+      // Verify old entry was left untouched
       const { data: newChannelDevice } = await getSupabaseClient()
         .from('channel_devices')
         .select('*')
@@ -1223,9 +1223,16 @@ describe('[POST] /channel_self - new plugin version (>= 7.34.0) behavior', () =>
         .eq('app_id', APPNAME)
         .maybeSingle()
 
-      expect(newChannelDevice).toBeNull()
+      expect(newChannelDevice).toBeTruthy()
+      expect(newChannelDevice?.channel_id).toBe(oldChannelDevice?.channel_id)
     }
     finally {
+      await getSupabaseClient()
+        .from('channel_devices')
+        .delete()
+        .eq('device_id', deviceId)
+        .eq('app_id', APPNAME)
+
       // Reset beta channel
       await getSupabaseClient()
         .from('channels')
@@ -1274,7 +1281,7 @@ describe('[PUT] /channel_self - new plugin version (>= 7.34.0) behavior', () => 
 })
 
 describe('[DELETE] /channel_self - new plugin version (>= 7.34.0) behavior', () => {
-  it('should return success and clean up old channel_devices entries for new plugin versions', async () => {
+  it('should return success and leave old channel_devices entries untouched for new plugin versions', async () => {
     const deviceId = randomUUID()
     const data = getUniqueBaseData(APPNAME)
     data.device_id = deviceId
@@ -1299,32 +1306,42 @@ describe('[DELETE] /channel_self - new plugin version (>= 7.34.0) behavior', () 
         owner_org: productionChannel!.owner_org,
       })
 
-    // Verify the old entry exists
-    const { data: beforeDelete } = await getSupabaseClient()
-      .from('channel_devices')
-      .select('*')
-      .eq('device_id', deviceId)
-      .eq('app_id', APPNAME)
-      .maybeSingle()
+    try {
+      // Verify the old entry exists
+      const { data: beforeDelete } = await getSupabaseClient()
+        .from('channel_devices')
+        .select('*')
+        .eq('device_id', deviceId)
+        .eq('app_id', APPNAME)
+        .maybeSingle()
 
-    expect(beforeDelete).toBeTruthy()
+      expect(beforeDelete).toBeTruthy()
 
-    // Call DELETE with new plugin version
-    const response = await fetchEndpoint('DELETE', data)
-    expect(response.status).toBe(200)
+      // Call DELETE with new plugin version
+      const response = await fetchEndpoint('DELETE', data)
+      expect(response.status).toBe(200)
 
-    const result = await response.json<{ status: string }>()
-    expect(result.status).toBe('ok')
+      const result = await response.json<{ status: string }>()
+      expect(result.status).toBe('ok')
 
-    // Verify the old entry was cleaned up
-    const { data: afterDelete } = await getSupabaseClient()
-      .from('channel_devices')
-      .select('*')
-      .eq('device_id', deviceId)
-      .eq('app_id', APPNAME)
-      .maybeSingle()
+      // Verify the old entry was left untouched
+      const { data: afterDelete } = await getSupabaseClient()
+        .from('channel_devices')
+        .select('*')
+        .eq('device_id', deviceId)
+        .eq('app_id', APPNAME)
+        .maybeSingle()
 
-    expect(afterDelete).toBeNull()
+      expect(afterDelete).toBeTruthy()
+      expect(afterDelete?.channel_id).toBe(productionChannel!.id)
+    }
+    finally {
+      await getSupabaseClient()
+        .from('channel_devices')
+        .delete()
+        .eq('device_id', deviceId)
+        .eq('app_id', APPNAME)
+    }
   })
 
   it('should return success even when no old channel_devices entry exists', async () => {
