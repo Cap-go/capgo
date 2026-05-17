@@ -22,7 +22,7 @@ const webhookSchema = type({
   events: 'string[]',
   created_at: 'string',
   updated_at: 'string',
-  created_by: 'string | null',
+  created_by: 'string',
 })
 
 const webhooksSchema = webhookSchema.array()
