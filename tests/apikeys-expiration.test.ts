@@ -63,6 +63,29 @@ async function seedPlainApiKey(name: string, expiresAt: string | null, orgId = B
 
   const extraOrgIds = [...new Set((memberships ?? []).map(row => row.org_id).filter((membershipOrgId): membershipOrgId is string => !!membershipOrgId && membershipOrgId !== orgId))]
   if (extraOrgIds.length > 0) {
+    const { data: orgPolicies, error: orgPoliciesError } = await supabase
+      .from('orgs')
+      .select('id, require_apikey_expiration, max_apikey_expiration_days')
+      .in('id', extraOrgIds)
+
+    if (orgPoliciesError)
+      throw orgPoliciesError
+
+    const expiresAtTime = expiresAt ? new Date(expiresAt).getTime() : null
+    const compatibleExtraOrgIds = (orgPolicies ?? [])
+      .filter((org) => {
+        if (org.require_apikey_expiration && expiresAt === null)
+          return false
+        if (org.max_apikey_expiration_days !== null && expiresAtTime !== null) {
+          return expiresAtTime <= Date.now() + org.max_apikey_expiration_days * 24 * 60 * 60 * 1000
+        }
+        return true
+      })
+      .map(org => org.id)
+
+    if (compatibleExtraOrgIds.length === 0)
+      return { id: data.id, key: data.key, expires_at: data.expires_at }
+
     const { data: role, error: roleError } = await supabase
       .from('roles')
       .select('id')
@@ -72,7 +95,7 @@ async function seedPlainApiKey(name: string, expiresAt: string | null, orgId = B
     if (roleError || !role)
       throw roleError ?? new Error('Unable to resolve org_admin role')
 
-    const { error: bindingError } = await supabase.from('role_bindings').insert(extraOrgIds.map(extraOrgId => ({
+    const { error: bindingError } = await supabase.from('role_bindings').insert(compatibleExtraOrgIds.map(extraOrgId => ({
       principal_type: 'apikey' as const,
       principal_id: data.rbac_id,
       role_id: role.id,
