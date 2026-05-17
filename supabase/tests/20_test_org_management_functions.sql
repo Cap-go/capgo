@@ -1,7 +1,7 @@
 BEGIN;
 
 
-SELECT plan(49);
+SELECT plan(51);
 
 -- Test accept_invitation_to_org (user is already a member, so should return INVALID_ROLE)
 SELECT tests.authenticate_as('test_user');
@@ -528,6 +528,8 @@ DECLARE
     v_user_id uuid;
     v_apikey_rbac_id uuid;
     v_org_member_role_id uuid;
+    v_app_uploader_role_id uuid;
+    v_demoadmin_app_uuid uuid;
 BEGIN
     SELECT user_id INTO v_user_id FROM public.apikeys
     WHERE key = '67eeaff4-ae4c-49a6-8eb1-0875f5369de1';
@@ -545,6 +547,84 @@ BEGIN
     SELECT id INTO v_org_member_role_id
     FROM public.roles
     WHERE name = public.rbac_role_org_member();
+
+    SELECT id INTO v_app_uploader_role_id
+    FROM public.roles
+    WHERE name = public.rbac_role_app_uploader();
+
+    SELECT id INTO v_demoadmin_app_uuid
+    FROM public.apps
+    WHERE app_id = 'com.demoadmin.app';
+
+    INSERT INTO public.role_bindings (
+        principal_type, principal_id, role_id, scope_type, org_id, granted_by
+    )
+    VALUES (
+        'apikey',
+        v_apikey_rbac_id,
+        v_org_member_role_id,
+        'org',
+        '22dbad8a-b885-4309-9b3b-a09f8460fb6d',
+        v_user_id
+    );
+
+    -- App-scoped RBAC v2 key with org_member + app_uploader bindings. This
+    -- mirrors the org API key UI when an API key is limited to one app.
+    INSERT INTO public.apikeys (
+        id, user_id, key, mode, name, limited_to_orgs, limited_to_apps
+    )
+    VALUES (
+        99020004,
+        v_user_id,
+        'rbac-v2-cli-warnings-test-key-app-scoped',
+        NULL,
+        'rbac-v2-cli-warnings-test-app-scoped',
+        ARRAY['22dbad8a-b885-4309-9b3b-a09f8460fb6d'::uuid],
+        ARRAY['com.demoadmin.app']
+    )
+    RETURNING rbac_id INTO v_apikey_rbac_id;
+
+    INSERT INTO public.role_bindings (
+        principal_type, principal_id, role_id, scope_type, org_id, granted_by
+    )
+    VALUES (
+        'apikey',
+        v_apikey_rbac_id,
+        v_org_member_role_id,
+        'org',
+        '22dbad8a-b885-4309-9b3b-a09f8460fb6d',
+        v_user_id
+    );
+
+    INSERT INTO public.role_bindings (
+        principal_type, principal_id, role_id, scope_type, org_id, app_id,
+        granted_by
+    )
+    VALUES (
+        'apikey',
+        v_apikey_rbac_id,
+        v_app_uploader_role_id,
+        'app',
+        '22dbad8a-b885-4309-9b3b-a09f8460fb6d',
+        v_demoadmin_app_uuid,
+        v_user_id
+    );
+
+    -- App-scoped key whose only limited app belongs to another org. The fallback
+    -- must not turn this into org read access for the requested org.
+    INSERT INTO public.apikeys (
+        id, user_id, key, mode, name, limited_to_orgs, limited_to_apps
+    )
+    VALUES (
+        99020005,
+        v_user_id,
+        'rbac-v2-cli-warnings-test-key-app-scoped-away',
+        NULL,
+        'rbac-v2-cli-warnings-test-app-scoped-away',
+        ARRAY['22dbad8a-b885-4309-9b3b-a09f8460fb6d'::uuid],
+        ARRAY['com.demo.app']
+    )
+    RETURNING rbac_id INTO v_apikey_rbac_id;
 
     INSERT INTO public.role_bindings (
         principal_type, principal_id, role_id, scope_type, org_id, granted_by
@@ -615,6 +695,49 @@ SELECT ok(
         WHERE msg->>'message' = 'API key does not have read access to this organization'
     ),
     'get_organization_cli_warnings RBAC v2 - NULL-mode key with org.read binding has no fatal no-read-access warning'
+);
+
+-- Case A2: RBAC v2 key limited to this org and app - expect NO fatal warning.
+-- Existing CLIs call this RPC with only org id, so the function must bridge the
+-- org-read warning check through one allowed app in that org.
+SELECT set_config(
+    'request.headers',
+    '{"capgkey": "rbac-v2-cli-warnings-test-key-app-scoped"}',
+    TRUE
+);
+
+SELECT ok(
+    NOT EXISTS (
+        SELECT 1
+        FROM unnest(
+            get_organization_cli_warnings(
+                '22dbad8a-b885-4309-9b3b-a09f8460fb6d', '1.0.0'
+            )
+        ) AS msg
+        WHERE msg->>'message' = 'API key does not have read access to this organization'
+    ),
+    'get_organization_cli_warnings RBAC v2 - app-scoped key for this org passes'
+);
+
+-- Case A3: RBAC v2 key limited to an app outside this org - expect fatal.
+SELECT set_config(
+    'request.headers',
+    '{"capgkey": "rbac-v2-cli-warnings-test-key-app-scoped-away"}',
+    TRUE
+);
+
+SELECT ok(
+    EXISTS (
+        SELECT 1
+        FROM unnest(
+            get_organization_cli_warnings(
+                '22dbad8a-b885-4309-9b3b-a09f8460fb6d', '1.0.0'
+            )
+        ) AS msg
+        WHERE msg->>'message' = 'API key does not have read access to this organization'
+          AND (msg->>'fatal')::boolean = true
+    ),
+    'get_organization_cli_warnings RBAC v2 - app-scoped key outside org fails'
 );
 
 -- Case B: RBAC v2 key WITHOUT a binding for this org — expect the fatal warning
