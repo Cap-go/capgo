@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { APIKEY_STATS, getEndpointUrl, getSupabaseClient, headers, NON_OWNER_ORG_ID, ORG_ID, resetAndSeedAppData, resetAppData, USER_ID } from './test-utils.ts'
+import { APIKEY_STATS, createDirectApiKeyWithBindings, getEndpointUrl, getSupabaseClient, headers, NON_OWNER_ORG_ID, ORG_ID, resetAndSeedAppData, resetAppData, USER_ID } from './test-utils.ts'
 
 const id = randomUUID()
 const APPNAME = `com.private.error.${id}`
@@ -8,6 +8,9 @@ const APPNAME = `com.private.error.${id}`
 const testOrgId = randomUUID()
 const testOrgEmail = `test-private-error-${id}@capgo.app`
 const testCustomerId = `cus_test_${id}`
+const testOrgApiKey = randomUUID()
+let testOrgHeaders: Record<string, string>
+let testOrgApiKeyId: number | null = null
 
 beforeAll(async () => {
   await resetAndSeedAppData(APPNAME)
@@ -47,12 +50,29 @@ beforeAll(async () => {
   })
   if (orgUserError)
     throw orgUserError
+
+  const apiKey = await createDirectApiKeyWithBindings({
+    key: testOrgApiKey,
+    name: `private-error-org-${id}`,
+    orgId: testOrgId,
+    roleName: 'org_super_admin',
+  })
+  if (!apiKey.key)
+    throw new Error('Failed to create private error API key')
+
+  testOrgApiKeyId = apiKey.id
+  testOrgHeaders = {
+    'Content-Type': 'application/json',
+    'Authorization': apiKey.key,
+  }
 })
 
 afterAll(async () => {
   await resetAppData(APPNAME)
 
   // Clean up the unique test organization
+  if (testOrgApiKeyId !== null)
+    await getSupabaseClient().from('apikeys').delete().eq('id', testOrgApiKeyId)
   await getSupabaseClient().from('org_users').delete().eq('org_id', testOrgId)
   await getSupabaseClient().from('orgs').delete().eq('id', testOrgId)
   await getSupabaseClient().from('stripe_info').delete().eq('customer_id', testCustomerId)
@@ -76,7 +96,7 @@ describe('[POST] /private/create_device - Error Cases', () => {
     const deviceId = randomUUID()
     const response = await fetch(getEndpointUrl('/private/create_device'), {
       method: 'POST',
-      headers,
+      headers: testOrgHeaders,
       body: JSON.stringify({
         app_id: APPNAME,
         org_id: testOrgId,
@@ -153,7 +173,7 @@ describe('[POST] /private/create_device - Error Cases', () => {
     // Use testOrgId where user has super_admin rights to properly test app not found
     const response = await fetch(getEndpointUrl('/private/create_device'), {
       method: 'POST',
-      headers,
+      headers: testOrgHeaders,
       body: JSON.stringify({
         app_id: 'nonexistent.app',
         org_id: testOrgId,
@@ -432,7 +452,7 @@ describe('[POST] /private/set_org_email - Error Cases', () => {
 
     const response = await fetch(getEndpointUrl('/private/set_org_email'), {
       method: 'POST',
-      headers,
+      headers: testOrgHeaders,
       body: JSON.stringify({
         org_id: testOrgId,
         email: 'test@example.com',

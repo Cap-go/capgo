@@ -1,13 +1,16 @@
 import { createHmac, randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { BASE_URL, getSupabaseClient, headers, TEST_EMAIL, USER_ID } from './test-utils.ts'
+import { BASE_URL, createDirectApiKeyWithBindings, getSupabaseClient, TEST_EMAIL, USER_ID } from './test-utils.ts'
 
 // Test data
 const WEBHOOK_TEST_ORG_ID = randomUUID()
 const globalId = randomUUID()
 const customerId = `cus_test_${WEBHOOK_TEST_ORG_ID}`
+const webhookApiKey = randomUUID()
 let createdWebhookId: string | null = null
 let webhookSecret: string | null = null
+let headers: Record<string, string>
+let webhookApiKeyId: number | null = null
 
 /**
  * Generate webhook signature using the same algorithm as the backend
@@ -104,6 +107,21 @@ beforeAll(async () => {
   })
   if (error)
     throw error
+
+  const apiKey = await createDirectApiKeyWithBindings({
+    key: webhookApiKey,
+    name: `webhook-signature-${globalId}`,
+    orgId: WEBHOOK_TEST_ORG_ID,
+    roleName: 'org_admin',
+  })
+  if (!apiKey.key)
+    throw new Error('Failed to create webhook API key')
+
+  webhookApiKeyId = apiKey.id
+  headers = {
+    'Content-Type': 'application/json',
+    'Authorization': apiKey.key,
+  }
 })
 
 afterAll(async () => {
@@ -113,6 +131,8 @@ afterAll(async () => {
     await (getSupabaseClient() as any).from('webhooks').delete().eq('id', createdWebhookId)
   }
   // Clean up test organization and stripe_info
+  if (webhookApiKeyId !== null)
+    await getSupabaseClient().from('apikeys').delete().eq('id', webhookApiKeyId)
   await getSupabaseClient().from('orgs').delete().eq('id', WEBHOOK_TEST_ORG_ID)
   await getSupabaseClient().from('stripe_info').delete().eq('customer_id', customerId)
 })
