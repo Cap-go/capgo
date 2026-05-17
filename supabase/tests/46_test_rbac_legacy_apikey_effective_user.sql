@@ -43,11 +43,7 @@ SELECT tests.create_v2_apikey(
   45046,
   tests.get_supabase_uid('legacy_apikey_effective_member'),
   'legacy-effective-user-key',
-  'legacy-effective-user-key',
-  '70000000-0000-4000-8000-000000000046'::uuid,
-  public.rbac_role_org_super_admin(),
-  'com.test.legacyeffective.read',
-  public.rbac_role_app_admin()
+  'legacy-effective-user-key'
 );
 
 SELECT ok(

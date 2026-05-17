@@ -829,7 +829,22 @@ export async function createApiKey(c: Context, userId: string) {
   }
 
   const pgClient = getPgClient(c)
+  let inTransaction = false
   try {
+    await pgClient.query('BEGIN')
+    inTransaction = true
+
+    const userLockResult = await pgClient.query(
+      'SELECT id FROM auth.users WHERE id = $1::uuid FOR UPDATE',
+      [userId],
+    )
+    if (userLockResult.rowCount === 0) {
+      cloudlogErr({ requestId: c.get('requestId'), message: 'createApiKey error', userId, error: 'user not found' })
+      await pgClient.query('ROLLBACK')
+      inTransaction = false
+      return
+    }
+
     const totalResult = await pgClient.query<{ count: string }>(
       'SELECT count(*)::text AS count FROM public.apikeys WHERE user_id = $1::uuid',
       [userId],
@@ -837,10 +852,15 @@ export async function createApiKey(c: Context, userId: string) {
     const total = Number(totalResult.rows[0]?.count ?? '0')
     if (!Number.isFinite(total)) {
       cloudlogErr({ requestId: c.get('requestId'), message: 'createApiKey error', userId, error: 'total is invalid' })
+      await pgClient.query('ROLLBACK')
+      inTransaction = false
       return
     }
-    if (total > 0)
+    if (total > 0) {
+      await pgClient.query('ROLLBACK')
+      inTransaction = false
       return
+    }
 
     const orgResult = await pgClient.query<{ org_id: string }>(
       `SELECT DISTINCT rb.org_id
@@ -866,10 +886,11 @@ export async function createApiKey(c: Context, userId: string) {
     )
     if (orgResult.rows.length === 0) {
       cloudlog({ requestId: c.get('requestId'), message: 'createApiKey skipped, no org membership', userId })
+      await pgClient.query('ROLLBACK')
+      inTransaction = false
       return
     }
 
-    await pgClient.query('BEGIN')
     await pgClient.query(
       `WITH inserted AS (
          INSERT INTO public.apikeys (
@@ -971,9 +992,12 @@ export async function createApiKey(c: Context, userId: string) {
       [userId],
     )
     await pgClient.query('COMMIT')
+    inTransaction = false
   }
   catch (error) {
-    await pgClient.query('ROLLBACK').catch(() => {})
+    if (inTransaction) {
+      await pgClient.query('ROLLBACK').catch(() => {})
+    }
     cloudlogErr({ requestId: c.get('requestId'), message: 'createApiKey error', userId, error })
   }
   finally {

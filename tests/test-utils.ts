@@ -12,9 +12,9 @@ function normalizePostgresUrl(raw: string): string {
 
 function getPostgresUrlFromEnv(): string {
   return normalizePostgresUrl(
-  env.SUPABASE_DB_URL
-  ?? env.DB_URL
-  ?? 'postgresql://postgres:postgres@127.0.0.1:54322/postgres',
+    env.SUPABASE_DB_URL
+    ?? env.DB_URL
+    ?? 'postgresql://postgres:postgres@127.0.0.1:54322/postgres',
   )
 }
 
@@ -236,7 +236,7 @@ export const headers = {
   'Authorization': APIKEY_TEST_ALL,
 }
 
-type ApiKeyBinding = {
+interface ApiKeyBinding {
   role_name: string
   scope_type: 'org' | 'app' | 'channel'
   org_id: string
@@ -330,63 +330,73 @@ export async function createDirectApiKeyWithBindings(options: {
   if (!apiKey)
     throw new Error('Unable to create API key')
 
-  const bindingRows: Database['public']['Tables']['role_bindings']['Insert'][] = []
-  const { data: orgRole, error: orgRoleError } = await supabase
-    .from('roles')
-    .select('id')
-    .eq('name', options.roleName ?? 'org_admin')
-    .single()
-  if (orgRoleError || !orgRole)
-    throw orgRoleError ?? new Error('Unable to resolve org role')
-
-  bindingRows.push({
-    principal_type: 'apikey',
-    principal_id: apiKey.rbac_id,
-    role_id: orgRole.id,
-    scope_type: 'org',
-    org_id: options.orgId,
-    granted_by: apiKey.user_id,
-    reason: 'Test API key binding',
-    is_direct: true,
-  })
-
-  if (options.appId) {
-    const { data: app, error: appError } = await supabase
-      .from('apps')
-      .select('id, owner_org')
-      .eq('app_id', options.appId)
-      .single()
-    if (appError || !app?.id)
-      throw appError ?? new Error(`Unable to resolve app ${options.appId}`)
-
-    const { data: appRole, error: appRoleError } = await supabase
+  try {
+    const bindingRows: Database['public']['Tables']['role_bindings']['Insert'][] = []
+    const { data: orgRole, error: orgRoleError } = await supabase
       .from('roles')
       .select('id')
-      .eq('name', options.appRoleName ?? 'app_admin')
+      .eq('name', options.roleName ?? 'org_admin')
       .single()
-    if (appRoleError || !appRole)
-      throw appRoleError ?? new Error('Unable to resolve app role')
+    if (orgRoleError || !orgRole)
+      throw orgRoleError ?? new Error('Unable to resolve org role')
 
     bindingRows.push({
       principal_type: 'apikey',
       principal_id: apiKey.rbac_id,
-      role_id: appRole.id,
-      scope_type: 'app',
-      org_id: app.owner_org ?? options.orgId,
-      app_id: app.id,
+      role_id: orgRole.id,
+      scope_type: 'org',
+      org_id: options.orgId,
       granted_by: apiKey.user_id,
-      reason: 'Test API key app binding',
+      reason: 'Test API key binding',
       is_direct: true,
     })
+
+    if (options.appId) {
+      const { data: app, error: appError } = await supabase
+        .from('apps')
+        .select('id, owner_org')
+        .eq('app_id', options.appId)
+        .single()
+      if (appError || !app?.id || !app.owner_org)
+        throw appError ?? new Error(`Unable to resolve app ${options.appId}`)
+      if (app.owner_org !== options.orgId)
+        throw new Error(`App ${options.appId} belongs to org ${app.owner_org}, expected ${options.orgId}`)
+
+      const { data: appRole, error: appRoleError } = await supabase
+        .from('roles')
+        .select('id')
+        .eq('name', options.appRoleName ?? 'app_admin')
+        .single()
+      if (appRoleError || !appRole)
+        throw appRoleError ?? new Error('Unable to resolve app role')
+
+      bindingRows.push({
+        principal_type: 'apikey',
+        principal_id: apiKey.rbac_id,
+        role_id: appRole.id,
+        scope_type: 'app',
+        org_id: options.orgId,
+        app_id: app.id,
+        granted_by: apiKey.user_id,
+        reason: 'Test API key app binding',
+        is_direct: true,
+      })
+    }
+
+    const { error: bindingError } = await supabase
+      .from('role_bindings')
+      .insert(bindingRows)
+    if (bindingError)
+      throw bindingError
+
+    return apiKey
   }
-
-  const { error: bindingError } = await supabase
-    .from('role_bindings')
-    .insert(bindingRows)
-  if (bindingError)
-    throw bindingError
-
-  return apiKey
+  catch (error) {
+    const { error: cleanupError } = await supabase.from('apikeys').delete().eq('id', apiKey.id)
+    if (cleanupError)
+      console.warn(`Failed to clean up API key ${apiKey.id} after binding setup error:`, cleanupError)
+    throw error
+  }
 }
 
 let cachedAuthHeaders: Record<string, string> | null = null

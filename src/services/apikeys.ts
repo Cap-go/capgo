@@ -25,8 +25,12 @@ export async function createDefaultApiKey(
     if (error)
       throw error
 
+    if (orgId && app?.owner_org && orgId !== app.owner_org) {
+      throw new Error('appId does not belong to orgId')
+    }
+
     appUuid = app?.id ?? null
-    orgId ||= app?.owner_org ?? null
+    orgId = orgId ?? app?.owner_org ?? null
   }
 
   if (!orgId) {
@@ -74,8 +78,10 @@ export async function findUsablePlainApiKey(
   supabase: SupabaseClient<Database>,
   userId: string,
   orgId?: string | null,
+  appId?: string | null,
 ): Promise<string | null> {
   const isLiveKey = (expiresAt: string | null) => !expiresAt || new Date(expiresAt).getTime() > Date.now()
+  let appUuid: string | null = null
 
   const { data: keys, error } = await supabase
     .from('apikeys')
@@ -94,13 +100,29 @@ export async function findUsablePlainApiKey(
   if (!orgId)
     return liveKeys[0].key ?? null
 
+  if (appId) {
+    const { data: app, error: appError } = await supabase
+      .from('apps')
+      .select('id, owner_org')
+      .eq('app_id', appId)
+      .single()
+
+    if (appError || !app?.id || !app.owner_org)
+      return null
+
+    if (app.owner_org !== orgId)
+      return null
+
+    appUuid = app.id
+  }
+
   const rbacIds = liveKeys.map(key => key.rbac_id).filter((rbacId): rbacId is string => !!rbacId)
   if (!rbacIds.length)
     return null
 
   const { data: bindings, error: bindingsError } = await supabase
     .from('role_bindings')
-    .select('principal_id')
+    .select('principal_id, scope_type, app_id, roles(name)')
     .eq('principal_type', 'apikey')
     .eq('org_id', orgId)
     .in('principal_id', rbacIds)
@@ -108,7 +130,20 @@ export async function findUsablePlainApiKey(
   if (bindingsError || !bindings?.length)
     return null
 
-  const scopedKeyIds = new Set(bindings.map(binding => binding.principal_id))
+  const orgAdminRoles = new Set(['org_super_admin', 'org_admin'])
+  const scopedKeyIds = new Set(((bindings ?? []) as any[])
+    .filter((binding) => {
+      const roleName = Array.isArray(binding.roles) ? binding.roles[0]?.name : binding.roles?.name
+      if (binding.scope_type === 'org' && orgAdminRoles.has(roleName))
+        return true
+      return !!appUuid && binding.scope_type === 'app' && binding.app_id === appUuid
+    })
+    .map(binding => binding.principal_id)
+    .filter((principalId): principalId is string => typeof principalId === 'string'))
+
+  if (!scopedKeyIds.size)
+    return null
+
   return liveKeys.find(key => scopedKeyIds.has(key.rbac_id))?.key ?? null
 }
 

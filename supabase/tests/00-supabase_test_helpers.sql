@@ -481,8 +481,8 @@ BEGIN
     ON CONFLICT (id) DO UPDATE
     SET
         user_id = EXCLUDED.user_id,
-        key = EXCLUDED.key,
-        key_hash = EXCLUDED.key_hash,
+        key = COALESCE(EXCLUDED.key, public.apikeys.key),
+        key_hash = COALESCE(EXCLUDED.key_hash, public.apikeys.key_hash),
         name = EXCLUDED.name,
         expires_at = EXCLUDED.expires_at
     RETURNING rbac_id INTO v_rbac_id;

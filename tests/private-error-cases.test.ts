@@ -72,7 +72,7 @@ afterAll(async () => {
 
   // Clean up the unique test organization
   if (testOrgApiKeyId !== null)
-    await getSupabaseClient().from('apikeys').delete().eq('id', testOrgApiKeyId)
+    await getSupabaseClient().from('apikeys').delete().eq('id', testOrgApiKeyId).throwOnError()
   await getSupabaseClient().from('org_users').delete().eq('org_id', testOrgId)
   await getSupabaseClient().from('orgs').delete().eq('id', testOrgId)
   await getSupabaseClient().from('stripe_info').delete().eq('customer_id', testCustomerId)

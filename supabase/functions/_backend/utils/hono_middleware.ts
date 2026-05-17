@@ -392,27 +392,30 @@ async function hasLimitedRbacSubkeyScope(
           AND (rb.expires_at IS NULL OR rb.expires_at > now())
       )
       SELECT (
-        EXISTS (
-          SELECT 1
-          FROM active_bindings
-          WHERE scope_type <> public.rbac_scope_org()
-        )
-        OR EXISTS (
-          SELECT 1
-          FROM user_orgs u
-          WHERE NOT EXISTS (
+        EXISTS (SELECT 1 FROM active_bindings)
+        AND (
+          EXISTS (
+            SELECT 1
+            FROM active_bindings
+            WHERE scope_type <> public.rbac_scope_org()
+          )
+          OR EXISTS (
+            SELECT 1
+            FROM user_orgs u
+            WHERE NOT EXISTS (
+              SELECT 1
+              FROM active_bindings b
+              WHERE b.scope_type = public.rbac_scope_org()
+                AND b.org_id = u.org_id
+                AND b.role_name IN (public.rbac_role_org_super_admin(), public.rbac_role_org_admin())
+            )
+          )
+          OR NOT EXISTS (
             SELECT 1
             FROM active_bindings b
             WHERE b.scope_type = public.rbac_scope_org()
-              AND b.org_id = u.org_id
               AND b.role_name IN (public.rbac_role_org_super_admin(), public.rbac_role_org_admin())
           )
-        )
-        OR NOT EXISTS (
-          SELECT 1
-          FROM active_bindings b
-          WHERE b.scope_type = public.rbac_scope_org()
-            AND b.role_name IN (public.rbac_role_org_super_admin(), public.rbac_role_org_admin())
         )
       ) AS is_limited
       `,

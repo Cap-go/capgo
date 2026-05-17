@@ -8,9 +8,10 @@
  * IMPORTANT: This test uses a completely isolated user (USER_ID_RLS) with its own
  * org and API key to prevent interference with other tests that create/delete API keys.
  */
+import type { PoolClient } from 'pg'
 import { randomUUID } from 'node:crypto'
 import { createClient } from '@supabase/supabase-js'
-import { Pool, type PoolClient } from 'pg'
+import { Pool } from 'pg'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import {
   APP_NAME_RLS,

@@ -216,6 +216,8 @@ describe('[GET] /app operations with subkey', () => {
       headers: { ...headers, ...subkeyHeaders },
     })
     expect(deleteApp.status).toBe(400)
+    const deleteAppData = await deleteApp.json() as { error: string }
+    expect(deleteAppData.error).toBe('cannot_delete_app')
   })
 
   it('should get all apps with subkey', async () => {

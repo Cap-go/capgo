@@ -406,10 +406,50 @@ SET search_path = ''
 AS $$
 DECLARE
   api_key public.apikeys%ROWTYPE;
+  required_org_permission text;
+  required_app_permission text;
 BEGIN
-  PERFORM keymode;
   SELECT * INTO api_key FROM public.find_apikey_by_value(apikey) LIMIT 1;
-  RETURN api_key.id IS NOT NULL AND NOT public.is_apikey_expired(api_key.expires_at);
+  IF api_key.id IS NULL OR public.is_apikey_expired(api_key.expires_at) THEN
+    RETURN false;
+  END IF;
+
+  required_org_permission := public.apikey_permission_for_keymode(keymode, public.rbac_scope_org());
+  required_app_permission := public.apikey_permission_for_keymode(keymode, public.rbac_scope_app());
+
+  RETURN EXISTS (
+    SELECT 1
+    FROM public.role_bindings rb
+    WHERE rb.principal_type = public.rbac_principal_apikey()
+      AND rb.principal_id = api_key.rbac_id
+      AND rb.org_id IS NOT NULL
+      AND (rb.expires_at IS NULL OR rb.expires_at > now())
+      AND public.rbac_has_permission(
+        public.rbac_principal_apikey(),
+        api_key.rbac_id,
+        required_org_permission,
+        rb.org_id,
+        NULL::character varying,
+        NULL::bigint
+      )
+  )
+  OR EXISTS (
+    SELECT 1
+    FROM public.role_bindings rb
+    JOIN public.apps ON public.apps.id = rb.app_id
+    WHERE rb.principal_type = public.rbac_principal_apikey()
+      AND rb.principal_id = api_key.rbac_id
+      AND rb.app_id IS NOT NULL
+      AND (rb.expires_at IS NULL OR rb.expires_at > now())
+      AND public.rbac_has_permission(
+        public.rbac_principal_apikey(),
+        api_key.rbac_id,
+        required_app_permission,
+        public.apps.owner_org,
+        public.apps.app_id,
+        NULL::bigint
+      )
+  );
 END;
 $$;
 
@@ -1914,10 +1954,6 @@ BEGIN
     RETURN NEW;
   END IF;
 
-  IF TG_OP = 'INSERT' THEN
-    RETURN NEW;
-  END IF;
-
   FOR scoped_org IN
     SELECT DISTINCT
       public.orgs.id,
@@ -1954,6 +1990,77 @@ $$;
 ALTER FUNCTION "public"."enforce_apikey_expiration_policy"() OWNER TO "postgres";
 REVOKE ALL ON FUNCTION "public"."enforce_apikey_expiration_policy"() FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION "public"."enforce_apikey_expiration_policy"() TO "service_role";
+
+CREATE OR REPLACE FUNCTION "public"."enforce_apikey_role_binding_expiration_policy"()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+  api_key_row public.apikeys%ROWTYPE;
+  scoped_org record;
+BEGIN
+  IF NEW.principal_type <> public.rbac_principal_apikey()
+    OR NEW.org_id IS NULL
+    OR (NEW.expires_at IS NOT NULL AND NEW.expires_at <= now()) THEN
+    RETURN NEW;
+  END IF;
+
+  SELECT *
+  INTO api_key_row
+  FROM public.apikeys
+  WHERE public.apikeys.rbac_id = NEW.principal_id
+  LIMIT 1;
+
+  IF api_key_row.id IS NULL THEN
+    RETURN NEW;
+  END IF;
+
+  SELECT
+    public.orgs.id,
+    public.orgs.require_apikey_expiration,
+    public.orgs.max_apikey_expiration_days
+  INTO scoped_org
+  FROM public.orgs
+  WHERE public.orgs.id = NEW.org_id
+  LIMIT 1;
+
+  IF scoped_org.id IS NULL THEN
+    RETURN NEW;
+  END IF;
+
+  IF scoped_org.require_apikey_expiration AND api_key_row.expires_at IS NULL THEN
+    RAISE EXCEPTION USING
+      ERRCODE = 'P0001',
+      MESSAGE = 'expiration_required',
+      DETAIL = 'This organization requires API keys to have an expiration date';
+  END IF;
+
+  IF scoped_org.max_apikey_expiration_days IS NOT NULL
+    AND api_key_row.expires_at IS NOT NULL
+    AND api_key_row.expires_at > clock_timestamp() + make_interval(days => scoped_org.max_apikey_expiration_days)
+  THEN
+    RAISE EXCEPTION USING
+      ERRCODE = 'P0001',
+      MESSAGE = 'expiration_exceeds_max',
+      DETAIL = format('API key expiration cannot exceed %s days for this organization', scoped_org.max_apikey_expiration_days);
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+ALTER FUNCTION "public"."enforce_apikey_role_binding_expiration_policy"() OWNER TO "postgres";
+REVOKE ALL ON FUNCTION "public"."enforce_apikey_role_binding_expiration_policy"() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION "public"."enforce_apikey_role_binding_expiration_policy"() TO "service_role";
+
+DROP TRIGGER IF EXISTS "role_bindings_enforce_apikey_expiration_policy" ON "public"."role_bindings";
+CREATE TRIGGER "role_bindings_enforce_apikey_expiration_policy"
+BEFORE INSERT OR UPDATE OF principal_type, principal_id, org_id, expires_at
+ON "public"."role_bindings"
+FOR EACH ROW
+EXECUTE FUNCTION "public"."enforce_apikey_role_binding_expiration_policy"();
 
 CREATE OR REPLACE FUNCTION "public"."check_apikey_hashed_key_enforcement"("apikey_row" "public"."apikeys")
 RETURNS boolean
@@ -2055,8 +2162,6 @@ $$;
 
 ALTER FUNCTION "public"."find_apikey_by_value"("key_value" "text") OWNER TO "postgres";
 REVOKE ALL ON FUNCTION "public"."find_apikey_by_value"("key_value" "text") FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION "public"."find_apikey_by_value"("key_value" "text") TO "anon";
-GRANT EXECUTE ON FUNCTION "public"."find_apikey_by_value"("key_value" "text") TO "authenticated";
 GRANT EXECUTE ON FUNCTION "public"."find_apikey_by_value"("key_value" "text") TO "service_role";
 
 DROP POLICY IF EXISTS "Allow admin to select webhooks" ON "public"."webhooks";

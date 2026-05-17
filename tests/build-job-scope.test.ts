@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { BASE_URL, USER_ID_2, createDirectApiKeyWithBindings, getSupabaseClient, resetAndSeedAppData, resetAppData } from './test-utils.ts'
+import { BASE_URL, createDirectApiKeyWithBindings, getSupabaseClient, resetAndSeedAppData, resetAppData, USER_ID_2 } from './test-utils.ts'
 
 describe('Build Endpoints Job/App Binding', () => {
   const id = randomUUID()

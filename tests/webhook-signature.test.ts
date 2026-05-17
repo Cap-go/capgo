@@ -132,7 +132,7 @@ afterAll(async () => {
   }
   // Clean up test organization and stripe_info
   if (webhookApiKeyId !== null)
-    await getSupabaseClient().from('apikeys').delete().eq('id', webhookApiKeyId)
+    await getSupabaseClient().from('apikeys').delete().eq('id', webhookApiKeyId).throwOnError()
   await getSupabaseClient().from('orgs').delete().eq('id', WEBHOOK_TEST_ORG_ID)
   await getSupabaseClient().from('stripe_info').delete().eq('customer_id', customerId)
 })

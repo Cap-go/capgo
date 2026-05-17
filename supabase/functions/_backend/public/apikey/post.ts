@@ -70,8 +70,11 @@ app.post('/', middlewareV2(['all']), async (c) => {
 
   const name = body.name ?? ''
 
-  if (auth.authType === 'apikey') {
-    throw simpleError('cannot_create_apikey', 'API keys cannot create other API keys')
+  if (auth.authType !== 'jwt' || !auth.userId) {
+    if (auth.authType === 'apikey') {
+      throw simpleError('cannot_create_apikey', 'API keys cannot create other API keys')
+    }
+    throw simpleError('not_authorized', 'Only user sessions can create API keys')
   }
   const expiresAt = body.expires_at ?? null
   const isHashed = body.hashed === true

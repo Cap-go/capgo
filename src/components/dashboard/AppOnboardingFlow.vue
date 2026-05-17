@@ -204,7 +204,7 @@ async function ensureApiKey() {
   if (!userId)
     return
 
-  const existingKey = await findUsablePlainApiKey(supabase, userId, currentOrg.value?.gid)
+  const existingKey = await findUsablePlainApiKey(supabase, userId, currentOrg.value?.gid, resumeAppId.value)
   if (existingKey) {
     apiKey.value = existingKey
     return
@@ -224,7 +224,7 @@ async function ensureApiKey() {
 
   apiKey.value = typeof data?.key === 'string'
     ? data.key
-    : await findUsablePlainApiKey(supabase, claimsUserId, currentOrg.value?.gid)
+    : await findUsablePlainApiKey(supabase, claimsUserId, currentOrg.value?.gid, resumeAppId.value)
 }
 
 async function loadResumeApp() {

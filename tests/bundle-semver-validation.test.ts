@@ -39,6 +39,7 @@ afterAll(async () => {
       .from('apikeys')
       .delete()
       .eq('id', semverApiKeyId)
+      .throwOnError()
   }
 
   // Clean up all versions created during tests

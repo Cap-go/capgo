@@ -240,7 +240,7 @@ async function getKey(retry = true): Promise<void> {
   if (!main?.user?.id)
     return
 
-  const existingKey = await findUsablePlainApiKey(supabase, main.user.id, organizationStore.currentOrganization?.gid)
+  const existingKey = await findUsablePlainApiKey(supabase, main.user.id, organizationStore.currentOrganization?.gid, props.appId)
   if (existingKey) {
     apiKey.value = existingKey
   }

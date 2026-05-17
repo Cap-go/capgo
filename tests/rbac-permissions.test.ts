@@ -48,7 +48,7 @@ describe('rbac permission system', () => {
     const apiKeyRbacId = apiKeyResult.rows[0]?.rbac_id
     expect(apiKeyRbacId).toBeTruthy()
 
-    await query(`
+    const bindingResult = await query(`
       INSERT INTO public.role_bindings (principal_type, principal_id, role_id, scope_type, org_id, granted_by)
       SELECT
         'apikey',
@@ -60,7 +60,9 @@ describe('rbac permission system', () => {
       FROM public.roles
       WHERE roles.name = $4
       LIMIT 1
+      RETURNING id
     `, [apiKeyRbacId, orgId, USER_ID, roleName])
+    expect(bindingResult.rowCount).toBe(1)
 
     return apiKeyRbacId
   }
