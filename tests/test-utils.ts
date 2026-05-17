@@ -285,6 +285,7 @@ export async function createDirectApiKeyWithBindings(options: {
 }) {
   const supabase = getSupabaseClient()
   const keyHash = options.hashed
+    // codeql[js/insufficient-password-hash] API keys are lookup tokens, not passwords.
     ? createHash('sha256').update(options.key).digest('hex')
     : null
   const { data: apiKey, error: apiKeyError } = await supabase

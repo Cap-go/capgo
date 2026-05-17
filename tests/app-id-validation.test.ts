@@ -11,11 +11,14 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { isValidAppId } from '../supabase/functions/_backend/utils/utils.ts'
-import { BASE_URL, getSupabaseClient, headers, resetAndSeedAppData, resetAppData, TEST_EMAIL, USER_ID } from './test-utils.ts'
+import { BASE_URL, createDirectApiKeyWithBindings, getSupabaseClient, headers, resetAndSeedAppData, resetAppData, TEST_EMAIL, USER_ID } from './test-utils.ts'
 
 const id = randomUUID()
 const VALID_APPNAME = `com.app.valid.${id}`
+const appCreationApiKey = randomUUID()
 let testOrgId: string
+let testOrgApiKeyId: number | null = null
+let testOrgHeaders: Record<string, string>
 
 beforeAll(async () => {
   await resetAndSeedAppData(VALID_APPNAME)
@@ -31,10 +34,27 @@ beforeAll(async () => {
   if (orgError)
     throw orgError
   testOrgId = orgData.id
+
+  const apiKey = await createDirectApiKeyWithBindings({
+    key: appCreationApiKey,
+    name: `app-id-validation-${id}`,
+    orgId: testOrgId,
+    roleName: 'org_super_admin',
+  })
+  if (!apiKey.key)
+    throw new Error('Failed to create app id validation API key')
+
+  testOrgApiKeyId = apiKey.id
+  testOrgHeaders = {
+    'Content-Type': 'application/json',
+    'Authorization': apiKey.key,
+  }
 })
 
 afterAll(async () => {
   await resetAppData(VALID_APPNAME)
+  if (testOrgApiKeyId !== null)
+    await getSupabaseClient().from('apikeys').delete().eq('id', testOrgApiKeyId)
   await getSupabaseClient().from('orgs').delete().eq('id', testOrgId)
 })
 
@@ -100,7 +120,7 @@ describe('[POST] /app - app_id validation', () => {
     const validAppId = `com.test.valid.${randomUUID()}`
     const response = await fetch(`${BASE_URL}/app`, {
       method: 'POST',
-      headers,
+      headers: testOrgHeaders,
       body: JSON.stringify({
         app_id: validAppId,
         name: 'Test Valid App',
