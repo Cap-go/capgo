@@ -654,7 +654,6 @@ LANGUAGE "plpgsql" SECURITY DEFINER
 SET search_path = ''
 AS $$
 DECLARE
-  v_allowed boolean := false;
   v_use_rbac boolean;
   v_effective_org_id uuid := p_org_id;
   v_effective_user_id uuid := p_user_id;
