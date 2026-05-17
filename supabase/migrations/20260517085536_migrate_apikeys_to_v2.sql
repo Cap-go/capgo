@@ -1699,6 +1699,97 @@ GRANT EXECUTE ON FUNCTION "public"."invite_user_to_org"("email" character varyin
 
 COMMENT ON FUNCTION "public"."invite_user_to_org"("email" character varying, "org_id" "uuid", "invite_type" "public"."user_min_right") IS 'Compatibility wrapper for old invite callers. Legacy role inputs are converted to RBAC roles.';
 
+CREATE OR REPLACE FUNCTION "public"."accept_invitation_to_org"("org_id" "uuid") RETURNS character varying
+LANGUAGE "plpgsql" SECURITY DEFINER
+SET search_path = ''
+SET row_security = off
+AS $$
+DECLARE
+  invite public.org_users%ROWTYPE;
+  legacy_right public.user_min_right;
+  role_name text;
+  role_id uuid;
+BEGIN
+  SELECT public.org_users.*
+  INTO invite
+  FROM public.org_users
+  WHERE public.org_users.org_id = accept_invitation_to_org.org_id
+    AND public.org_users.user_id = (SELECT auth.uid())
+    AND public.org_users.user_right::text LIKE 'invite_%'
+  ORDER BY public.org_users.created_at DESC NULLS LAST, public.org_users.id DESC
+  LIMIT 1;
+
+  IF invite.id IS NULL THEN
+    RETURN 'NO_INVITE';
+  END IF;
+
+  legacy_right := public.transform_role_to_non_invite(invite.user_right);
+  role_name := COALESCE(invite.rbac_role_name, public.rbac_org_role_for_legacy_right(legacy_right));
+
+  IF role_name IS NULL THEN
+    RETURN 'ROLE_NOT_FOUND';
+  END IF;
+
+  SELECT public.roles.id INTO role_id
+  FROM public.roles
+  WHERE public.roles.name = role_name
+    AND public.roles.scope_type = public.rbac_scope_org()
+    AND public.roles.is_assignable = true
+  LIMIT 1;
+
+  IF role_id IS NULL THEN
+    RETURN 'ROLE_NOT_FOUND';
+  END IF;
+
+  UPDATE public.org_users
+  SET user_right = legacy_right,
+      rbac_role_name = role_name,
+      updated_at = CURRENT_TIMESTAMP
+  WHERE public.org_users.id = invite.id;
+
+  DELETE FROM public.role_bindings
+  WHERE public.role_bindings.principal_type = public.rbac_principal_user()
+    AND public.role_bindings.principal_id = invite.user_id
+    AND public.role_bindings.scope_type = public.rbac_scope_org()
+    AND public.role_bindings.org_id = invite.org_id;
+
+  INSERT INTO public.role_bindings (
+    principal_type,
+    principal_id,
+    role_id,
+    scope_type,
+    org_id,
+    app_id,
+    channel_id,
+    granted_by,
+    granted_at,
+    reason,
+    is_direct
+  ) VALUES (
+    public.rbac_principal_user(),
+    invite.user_id,
+    role_id,
+    public.rbac_scope_org(),
+    invite.org_id,
+    NULL,
+    NULL,
+    auth.uid(),
+    now(),
+    'Accepted invitation',
+    true
+  ) ON CONFLICT DO NOTHING;
+
+  RETURN 'OK';
+END;
+$$;
+
+ALTER FUNCTION "public"."accept_invitation_to_org"("org_id" "uuid") OWNER TO "postgres";
+REVOKE ALL ON FUNCTION "public"."accept_invitation_to_org"("org_id" "uuid") FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION "public"."accept_invitation_to_org"("org_id" "uuid") TO "authenticated";
+GRANT EXECUTE ON FUNCTION "public"."accept_invitation_to_org"("org_id" "uuid") TO "service_role";
+
+COMMENT ON FUNCTION "public"."accept_invitation_to_org"("org_id" "uuid") IS 'Accepts a pending org invite and creates the active RBAC binding. Kept for old clients.';
+
 CREATE OR REPLACE FUNCTION "public"."modify_permissions_tmp"(
   "email" "text",
   "org_id" "uuid",
