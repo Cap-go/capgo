@@ -281,7 +281,7 @@ BEGIN
     );
 
     INSERT INTO public.org_users (org_id, user_id, user_right)
-    VALUES (org_disabled_policy_id, noncompliant_user_id, 'write'::public.user_min_right);
+    VALUES (org_disabled_policy_id, noncompliant_user_id, 'admin'::public.user_min_right);
 
     PERFORM set_config('test.org_disabled_policy', org_disabled_policy_id::text, false);
 END $$;
