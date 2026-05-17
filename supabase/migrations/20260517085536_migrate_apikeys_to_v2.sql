@@ -1645,6 +1645,14 @@ BEGIN
       INSERT INTO public.org_users (user_id, org_id, user_right, rbac_role_name)
       VALUES (invited_user.id, invite_user_to_org_rbac.org_id, invite_right, invite_user_to_org_rbac.role_name);
 
+      INSERT INTO public.role_bindings (
+        principal_type, principal_id, role_id, scope_type, org_id,
+        granted_by, granted_at, expires_at, reason, is_direct
+      ) VALUES (
+        public.rbac_principal_user(), invited_user.id, role_id, public.rbac_scope_org(), invite_user_to_org_rbac.org_id,
+        COALESCE(v_granted_by, invited_user.id), now(), now() - INTERVAL '1 second', 'Pending invitation', true
+      ) ON CONFLICT DO NOTHING;
+
       RETURN 'OK';
     END IF;
   ELSE
@@ -1706,6 +1714,8 @@ SET row_security = off
 AS $$
 DECLARE
   invite public.org_users%ROWTYPE;
+  invite_user_id uuid;
+  invite_org_id uuid;
   legacy_right public.user_min_right;
   role_name text;
   role_id uuid;
@@ -1715,16 +1725,41 @@ BEGIN
   FROM public.org_users
   WHERE public.org_users.org_id = accept_invitation_to_org.org_id
     AND public.org_users.user_id = (SELECT auth.uid())
-    AND public.org_users.user_right::text LIKE 'invite_%'
-  ORDER BY public.org_users.created_at DESC NULLS LAST, public.org_users.id DESC
+  ORDER BY (public.org_users.user_right::text LIKE 'invite_%') DESC,
+    public.org_users.created_at DESC NULLS LAST,
+    public.org_users.id DESC
   LIMIT 1;
 
-  IF invite.id IS NULL THEN
-    RETURN 'NO_INVITE';
+  IF invite.id IS NOT NULL AND invite.user_right::text NOT LIKE 'invite_%' THEN
+    RETURN 'INVALID_ROLE';
   END IF;
 
-  legacy_right := public.transform_role_to_non_invite(invite.user_right);
-  role_name := COALESCE(invite.rbac_role_name, public.rbac_org_role_for_legacy_right(legacy_right));
+  IF invite.id IS NOT NULL THEN
+    invite_user_id := invite.user_id;
+    invite_org_id := invite.org_id;
+    legacy_right := public.transform_role_to_non_invite(invite.user_right);
+    role_name := COALESCE(invite.rbac_role_name, public.rbac_org_role_for_legacy_right(legacy_right));
+  ELSE
+    SELECT rb.principal_id, rb.org_id, r.name
+    INTO invite_user_id, invite_org_id, role_name
+    FROM public.role_bindings rb
+    JOIN public.roles r
+      ON r.id = rb.role_id
+      AND r.scope_type = rb.scope_type
+    WHERE rb.principal_type = public.rbac_principal_user()
+      AND rb.principal_id = (SELECT auth.uid())
+      AND rb.org_id = accept_invitation_to_org.org_id
+      AND rb.scope_type = public.rbac_scope_org()
+      AND rb.reason IN ('Pending invitation', 'Invited via invite_user_to_org_rbac')
+    ORDER BY rb.granted_at DESC NULLS LAST
+    LIMIT 1;
+
+    IF invite_user_id IS NULL THEN
+      RETURN 'NO_INVITE';
+    END IF;
+
+    legacy_right := public.rbac_legacy_right_for_org_role(role_name);
+  END IF;
 
   IF role_name IS NULL THEN
     RETURN 'ROLE_NOT_FOUND';
@@ -1747,11 +1782,16 @@ BEGIN
       updated_at = CURRENT_TIMESTAMP
   WHERE public.org_users.id = invite.id;
 
+  IF invite.id IS NULL THEN
+    INSERT INTO public.org_users (user_id, org_id, user_right, rbac_role_name)
+    VALUES (invite_user_id, invite_org_id, legacy_right, role_name);
+  END IF;
+
   DELETE FROM public.role_bindings
   WHERE public.role_bindings.principal_type = public.rbac_principal_user()
-    AND public.role_bindings.principal_id = invite.user_id
+    AND public.role_bindings.principal_id = invite_user_id
     AND public.role_bindings.scope_type = public.rbac_scope_org()
-    AND public.role_bindings.org_id = invite.org_id;
+    AND public.role_bindings.org_id = invite_org_id;
 
   INSERT INTO public.role_bindings (
     principal_type,
@@ -1767,10 +1807,10 @@ BEGIN
     is_direct
   ) VALUES (
     public.rbac_principal_user(),
-    invite.user_id,
+    invite_user_id,
     role_id,
     public.rbac_scope_org(),
-    invite.org_id,
+    invite_org_id,
     NULL,
     NULL,
     auth.uid(),
