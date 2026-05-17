@@ -467,7 +467,7 @@ describe('[POST] /private/set_org_email - Error Cases', () => {
     await getSupabaseClient().from('orgs').update({ customer_id: testCustomerId }).eq('id', testOrgId)
   })
 
-  it('should return 400 when the API key is not authorized for org', async () => {
+  it('should return 400 when the scoped API key cannot read the org', async () => {
     const response = await fetch(getEndpointUrl('/private/set_org_email'), {
       method: 'POST',
       headers: testOrgHeaders,
@@ -479,7 +479,7 @@ describe('[POST] /private/set_org_email - Error Cases', () => {
 
     expect(response.status).toBe(400)
     const data = await response.json() as { error: string }
-    expect(data.error).toBe('cannot_access_organization')
+    expect(data.error).toBe('org_not_found')
   })
 })
 
