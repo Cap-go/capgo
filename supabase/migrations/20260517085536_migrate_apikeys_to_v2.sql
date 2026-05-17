@@ -12,6 +12,12 @@ BEGIN
 END;
 $$;
 
+-- Existing-user invites used to create role_bindings before the user accepted
+-- the invitation. Pending invites must not grant active RBAC access.
+DELETE FROM public.role_bindings
+WHERE principal_type = public.rbac_principal_user()
+  AND reason = 'Invited via invite_user_to_org_rbac';
+
 UPDATE public.orgs
 SET use_new_rbac = true
 WHERE use_new_rbac IS DISTINCT FROM true;
@@ -1639,14 +1645,6 @@ BEGIN
       INSERT INTO public.org_users (user_id, org_id, user_right, rbac_role_name)
       VALUES (invited_user.id, invite_user_to_org_rbac.org_id, invite_right, invite_user_to_org_rbac.role_name);
 
-      INSERT INTO public.role_bindings (
-        principal_type, principal_id, role_id, scope_type, org_id,
-        granted_by, granted_at, reason, is_direct
-      ) VALUES (
-        public.rbac_principal_user(), invited_user.id, role_id, public.rbac_scope_org(), invite_user_to_org_rbac.org_id,
-        COALESCE(v_granted_by, invited_user.id), now(), 'Invited via invite_user_to_org_rbac', true
-      ) ON CONFLICT DO NOTHING;
-
       RETURN 'OK';
     END IF;
   ELSE
@@ -1768,7 +1766,6 @@ $$;
 
 ALTER FUNCTION "public"."modify_permissions_tmp"("email" "text", "org_id" "uuid", "new_role" "public"."user_min_right") OWNER TO "postgres";
 REVOKE ALL ON FUNCTION "public"."modify_permissions_tmp"("email" "text", "org_id" "uuid", "new_role" "public"."user_min_right") FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION "public"."modify_permissions_tmp"("email" "text", "org_id" "uuid", "new_role" "public"."user_min_right") TO "anon";
 GRANT EXECUTE ON FUNCTION "public"."modify_permissions_tmp"("email" "text", "org_id" "uuid", "new_role" "public"."user_min_right") TO "authenticated";
 GRANT EXECUTE ON FUNCTION "public"."modify_permissions_tmp"("email" "text", "org_id" "uuid", "new_role" "public"."user_min_right") TO "service_role";
 

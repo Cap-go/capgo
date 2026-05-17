@@ -1,5 +1,5 @@
 import type { Context } from 'hono'
-import type { MiddlewareKeyVariables } from '../utils/hono.ts'
+import type { AuthInfo, MiddlewareKeyVariables } from '../utils/hono.ts'
 import { type } from 'arktype'
 import { safeParseSchema } from '../utils/ark_validation.ts'
 import { trackBentoEvent } from '../utils/bento.ts'
@@ -53,6 +53,81 @@ export function getInviteResendRequiredPermission(
   if (userRight === 'invite_super_admin')
     return canUpdateUserRoles ? null : 'org.update_user_roles'
   return canInviteUser ? null : 'org.invite_user'
+}
+
+function getInviteTargetRoleName(userRight: string, rbacRoleName?: string | null) {
+  if (rbacRoleName?.trim())
+    return rbacRoleName.trim()
+
+  switch (userRight) {
+    case 'invite_super_admin':
+      return 'org_super_admin'
+    case 'invite_admin':
+      return 'org_admin'
+    case 'invite_read':
+    case 'invite_upload':
+    case 'invite_write':
+      return 'org_member'
+    default:
+      return null
+  }
+}
+
+async function canCallerResendInviteRole(
+  c: AppContext,
+  auth: AuthInfo,
+  orgId: string,
+  userRight: string,
+  rbacRoleName?: string | null,
+) {
+  const targetRoleName = getInviteTargetRoleName(userRight, rbacRoleName)
+  if (!targetRoleName)
+    return false
+
+  let principalType = 'user'
+  let principalId = auth.userId
+  if (auth.authType === 'apikey' && auth.apikey?.rbac_id) {
+    principalType = 'apikey'
+    principalId = auth.apikey.rbac_id
+  }
+  if (!principalId)
+    return false
+
+  const pgClient = getPgClient(c)
+  try {
+    const result = await pgClient.query<{ allowed: boolean }>(`
+      WITH target_role AS (
+        SELECT r.priority_rank
+        FROM public.roles r
+        WHERE r.name = $4
+          AND r.scope_type = public.rbac_scope_org()
+          AND r.is_assignable = true
+        LIMIT 1
+      ),
+      caller_priority AS (
+        SELECT COALESCE(MAX(r.priority_rank), 0) AS max_priority
+        FROM public.role_bindings rb
+        JOIN public.roles r
+          ON r.id = rb.role_id
+          AND r.scope_type = rb.scope_type
+        WHERE rb.principal_type = $1
+          AND rb.principal_id = $2::uuid
+          AND rb.scope_type = public.rbac_scope_org()
+          AND rb.org_id = $3::uuid
+          AND (rb.expires_at IS NULL OR rb.expires_at > now())
+      )
+      SELECT
+        (SELECT max_priority FROM caller_priority) >= COALESCE(
+          (SELECT priority_rank FROM target_role),
+          2147483647
+        ) AS allowed
+    `, [principalType, principalId, orgId, targetRoleName])
+
+    return result.rows[0]?.allowed === true
+  }
+  finally {
+    closeClient(c, pgClient)
+  }
 }
 
 async function lockInviteNotification(c: AppContext, orgId: string, userId: string) {
@@ -203,7 +278,7 @@ app.post('/', middlewareAuth, async (c) => {
   })
   const { data: membership, error: membershipError } = await supabaseAdminClient
     .from('org_users')
-    .select('id, user_right')
+    .select('id, user_right, rbac_role_name')
     .eq('org_id', body.org_id)
     .eq('user_id', invitedUser.id)
     .maybeSingle()
@@ -229,6 +304,20 @@ app.post('/', middlewareAuth, async (c) => {
   if (missingPermission) {
     return quickError(403, 'not_authorized', 'Not authorized', {
       requiredPermission: missingPermission,
+      orgId: body.org_id,
+    })
+  }
+
+  const canManageInviteRole = await canCallerResendInviteRole(
+    c,
+    authContext,
+    body.org_id,
+    membership.user_right,
+    membership.rbac_role_name,
+  )
+  if (!canManageInviteRole) {
+    return quickError(403, 'not_authorized', 'Not authorized', {
+      requiredPermission: 'org.update_user_roles',
       orgId: body.org_id,
     })
   }

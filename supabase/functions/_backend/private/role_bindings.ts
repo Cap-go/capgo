@@ -166,22 +166,6 @@ async function validateUserPrincipalAccess(
   principalId: string,
   orgId: string,
 ): Promise<ValidationResult<null>> {
-  const pendingInvite = await drizzle
-    .select({ user_right: schema.org_users.user_right })
-    .from(schema.org_users)
-    .where(
-      and(
-        eq(schema.org_users.user_id, principalId),
-        eq(schema.org_users.org_id, orgId),
-        sql`${schema.org_users.user_right}::text LIKE 'invite_%'`,
-      ),
-    )
-    .limit(1)
-
-  if (pendingInvite.length) {
-    return { ok: false, status: 400, error: 'User has not accepted the org invitation yet' }
-  }
-
   const targetRbacAccess = await drizzle
     .select({ id: schema.role_bindings.id })
     .from(schema.role_bindings)
@@ -199,11 +183,27 @@ async function validateUserPrincipalAccess(
     )
     .limit(1)
 
-  if (!targetRbacAccess.length) {
-    return { ok: false, status: 400, error: 'User is not a member of this org' }
+  if (targetRbacAccess.length) {
+    return { ok: true, data: null }
   }
 
-  return { ok: true, data: null }
+  const pendingInvite = await drizzle
+    .select({ user_right: schema.org_users.user_right })
+    .from(schema.org_users)
+    .where(
+      and(
+        eq(schema.org_users.user_id, principalId),
+        eq(schema.org_users.org_id, orgId),
+        sql`${schema.org_users.user_right}::text LIKE 'invite_%'`,
+      ),
+    )
+    .limit(1)
+
+  if (pendingInvite.length) {
+    return { ok: false, status: 400, error: 'User has not accepted the org invitation yet' }
+  }
+
+  return { ok: false, status: 400, error: 'User is not a member of this org' }
 }
 
 async function validateGroupPrincipalAccess(
@@ -251,6 +251,23 @@ async function validateApiKeyPrincipalAccess(
     return { ok: false, status: 400, error: INVALID_APIKEY_ACCESS_ERROR }
   }
 
+  const [ownerRbacAccess] = await drizzle
+    .select({ id: schema.role_bindings.id })
+    .from(schema.role_bindings)
+    .where(
+      and(
+        eq(schema.role_bindings.principal_type, 'user'),
+        eq(schema.role_bindings.principal_id, apiKey.user_id),
+        eq(schema.role_bindings.org_id, orgId),
+        sql`(${schema.role_bindings.expires_at} IS NULL OR ${schema.role_bindings.expires_at} > now())`,
+      ),
+    )
+    .limit(1)
+
+  if (ownerRbacAccess) {
+    return { ok: true, data: null }
+  }
+
   const [pendingInvite] = await drizzle
     .select({ id: schema.org_users.id })
     .from(schema.org_users)
@@ -273,29 +290,13 @@ async function validateApiKeyPrincipalAccess(
     return { ok: false, status: 400, error: INVALID_APIKEY_ACCESS_ERROR }
   }
 
-  const [ownerRbacAccess] = await drizzle
-    .select({ id: schema.role_bindings.id })
-    .from(schema.role_bindings)
-    .where(
-      and(
-        eq(schema.role_bindings.principal_type, 'user'),
-        eq(schema.role_bindings.principal_id, apiKey.user_id),
-        eq(schema.role_bindings.org_id, orgId),
-      ),
-    )
-    .limit(1)
-
-  if (!ownerRbacAccess) {
-    cloudlogErr({
-      message: 'validatePrincipalAccess: apiKey owner RBAC access not found',
-      principalId,
-      orgId,
-      apiKeyUserId: apiKey.user_id,
-    })
-    return { ok: false, status: 400, error: INVALID_APIKEY_ACCESS_ERROR }
-  }
-
-  return { ok: true, data: null }
+  cloudlogErr({
+    message: 'validatePrincipalAccess: apiKey owner RBAC access not found',
+    principalId,
+    orgId,
+    apiKeyUserId: apiKey.user_id,
+  })
+  return { ok: false, status: 400, error: INVALID_APIKEY_ACCESS_ERROR }
 }
 
 export async function validatePrincipalAccess(

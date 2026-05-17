@@ -7,7 +7,7 @@ import { randomUUID } from 'node:crypto'
  */
 import { Pool } from 'pg'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
-import { APIKEY_TEST_ALL, ORG_ID, POSTGRES_URL, USER_ID, USER_ID_2 } from './test-utils'
+import { APIKEY_TEST_ALL, ORG_ID, POSTGRES_URL, USER_ID, USER_ID_2, USER_PASSWORD_HASH } from './test-utils'
 
 // Test constants
 const TEST_APP_ID = 'com.demo.app'
@@ -208,6 +208,11 @@ describe('rbac permission system', () => {
         const staleOrgId = randomUUID()
         const staleUserId = randomUUID()
         const staleEmail = `stale-rbac-${staleOrgId}@capgo.app`
+
+        await query(`
+          INSERT INTO auth.users (id, email, encrypted_password, email_confirmed_at, created_at, updated_at, raw_user_meta_data)
+          VALUES ($1::uuid, $2, $3, NOW(), NOW(), NOW(), '{}'::jsonb)
+        `, [staleUserId, staleEmail, USER_PASSWORD_HASH])
 
         await query(`
           INSERT INTO public.users (id, email, first_name, last_name)
