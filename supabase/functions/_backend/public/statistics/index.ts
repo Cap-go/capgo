@@ -161,20 +161,6 @@ function getAuthenticatedSupabase(c: Context, auth: AuthInfo) {
   return supabaseClient(c, authorization)
 }
 
-function denyAppLimitedApiKeyOutsideScope(auth: AuthInfo, appId: string) {
-  if (auth.authType !== 'apikey')
-    return
-
-  const limitedToApps = auth.apikey?.limited_to_apps
-  if (!Array.isArray(limitedToApps) || limitedToApps.length === 0)
-    return
-
-  // Deny before app lookups so real sibling apps and missing apps are indistinguishable to scoped keys.
-  if (!limitedToApps.includes(appId)) {
-    throw quickError(401, 'no_access_to_app', 'No access to app', { data: auth.userId ?? null })
-  }
-}
-
 function isRetryableStatsError(error: unknown) {
   return isRetryablePostgrestError(error)
 }
@@ -696,8 +682,6 @@ function buildNativeVersionCounts(rows: NativeVersionUsageRow[], dates: string[]
 async function getAuthorizedStatsAppClient(c: Context, appId: string) {
   const auth = c.get('auth') as AuthInfo
 
-  denyAppLimitedApiKeyOutsideScope(auth, appId)
-
   if (!await checkPermission(c, 'app.read', { appId })) {
     throw quickError(401, 'no_access_to_app', 'No access to app', { data: auth?.userId ?? null })
   }
@@ -871,8 +855,6 @@ app.get('/app/:app_id', async (c) => {
   const body = bodyParsed.data
   const auth = c.get('auth') as AuthInfo
 
-  denyAppLimitedApiKeyOutsideScope(auth, appId)
-
   // Use unified RBAC permission check
   if (!await checkPermission(c, 'app.read', { appId })) {
     throw quickError(401, 'no_access_to_app', 'No access to app', { data: auth?.userId ?? null })
@@ -907,16 +889,6 @@ app.get('/org/:org_id', async (c) => {
   if (!(await checkPermission(c, 'org.read', { orgId }))) {
     throw quickError(401, 'no_access_to_organization', 'No access to organization', { data: auth?.userId ?? null })
   }
-  if (auth.authType === 'apikey' && auth.apikey!.limited_to_orgs && auth.apikey!.limited_to_orgs.length > 0) {
-    if (!auth.apikey!.limited_to_orgs.includes(orgId)) {
-      throw quickError(401, 'invalid_apikey', 'Invalid apikey', { data: auth.apikey!.key })
-    }
-  }
-
-  if (auth.authType === 'apikey' && auth.apikey!.limited_to_apps && auth.apikey!.limited_to_apps.length > 0) {
-    throw quickError(401, 'invalid_apikey', 'Invalid apikey', { data: auth.apikey!.key })
-  }
-
   // Use authenticated client - RLS will enforce access
   const supabase = getAuthenticatedSupabase(c, auth)
 
@@ -1008,8 +980,14 @@ app.get('/user', async (c) => {
   }
 
   let stats: Array<{ data: any, error: any }> = []
-  if (auth.authType === 'apikey' && auth.apikey!.limited_to_apps && auth.apikey!.limited_to_apps.length > 0) {
-    stats = await Promise.all(auth.apikey!.limited_to_apps.map(appId => getNormalStats(c, appId, null, body.from, body.to, supabase, auth.authType === 'jwt', false, body.noAccumulate ?? false)))
+  if (auth.authType === 'apikey') {
+    const { data: apps, error: appsError } = await supabase.rpc('get_accessible_apps_for_apikey_v2', {
+      apikey: c.get('capgkey') as string,
+    })
+    if (appsError) {
+      throw quickError(404, 'apps_not_found', 'Apps not found', { error: appsError })
+    }
+    stats = await Promise.all((apps ?? []).map(app => getNormalStats(c, app.app_id, null, body.from, body.to, supabase, false, false, body.noAccumulate ?? false)))
   }
   else {
     stats = await Promise.all(orgIds.map(orgId => getNormalStats(c, null, orgId, body.from, body.to, supabase, auth.authType === 'jwt', false, body.noAccumulate ?? false)))

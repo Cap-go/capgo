@@ -9,7 +9,7 @@ import { toast } from 'vue-sonner'
 import IconCopy from '~icons/ion/copy-outline'
 import IconCheck from '~icons/lucide/check'
 import IconLoader from '~icons/lucide/loader-2'
-import { createDefaultApiKey } from '~/services/apikeys'
+import { createDefaultApiKey, findUsablePlainApiKey } from '~/services/apikeys'
 import { createSignedImageUrl, getImmediateImageUrl } from '~/services/storage'
 import { getLocalConfig, isLocal, useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
@@ -204,18 +204,9 @@ async function ensureApiKey() {
   if (!userId)
     return
 
-  const isLiveKey = (expiresAt: string | null) => !expiresAt || new Date(expiresAt).getTime() > Date.now()
-
-  const { data, error } = await supabase
-    .from('apikeys')
-    .select('key, expires_at')
-    .eq('user_id', userId)
-    .eq('mode', 'all')
-    .order('created_at', { ascending: false })
-
-  const validKey = !error ? data?.find(key => !!key.key && isLiveKey(key.expires_at)) : null
-  if (validKey?.key) {
-    apiKey.value = validKey.key
+  const existingKey = await findUsablePlainApiKey(supabase, userId, currentOrg.value?.gid)
+  if (existingKey) {
+    apiKey.value = existingKey
     return
   }
 
@@ -224,18 +215,16 @@ async function ensureApiKey() {
   if (!claimsUserId)
     return
 
-  const { error: createError } = await createDefaultApiKey(supabase, 'api-key')
+  const { data, error: createError } = await createDefaultApiKey(supabase, 'api-key', {
+    orgId: currentOrg.value?.gid,
+    appId: resumeAppId.value,
+  })
   if (createError)
     throw createError
 
-  const { data: refreshedData } = await supabase
-    .from('apikeys')
-    .select('key, expires_at')
-    .eq('user_id', claimsUserId)
-    .eq('mode', 'all')
-    .order('created_at', { ascending: false })
-
-  apiKey.value = refreshedData?.find(key => !!key.key && isLiveKey(key.expires_at))?.key ?? null
+  apiKey.value = typeof data?.key === 'string'
+    ? data.key
+    : await findUsablePlainApiKey(supabase, claimsUserId, currentOrg.value?.gid)
 }
 
 async function loadResumeApp() {

@@ -7,6 +7,7 @@ import { createClient } from '@supabase/supabase-js'
 import { buildNormalizedDeviceForWrite, hasComparableDeviceChanged, nullableString } from './deviceComparison.ts'
 import { simpleError } from './hono.ts'
 import { cloudlog, cloudlogErr } from './logging.ts'
+import { closeClient, getPgClient } from './pg.ts'
 import { createCustomer } from './stripe.ts'
 import { Constants } from './supabase.types.ts'
 import { getEnv, isStripeConfigured } from './utils.ts'
@@ -295,12 +296,31 @@ export async function hasAppRightApikey(c: Context<MiddlewareKeyVariables, any, 
   return data
 }
 
-export function apikeyHasOrgRight(key: Database['public']['Tables']['apikeys']['Row'], orgId: string) {
-  if (key.limited_to_apps?.length)
+export async function apikeyHasOrgRight(c: Context, key: Database['public']['Tables']['apikeys']['Row'], orgId: string) {
+  if (!key.rbac_id)
     return false
-  if (!key.limited_to_orgs || key.limited_to_orgs.length === 0)
-    return true
-  return key.limited_to_orgs.includes(orgId)
+
+  const pgClient = getPgClient(c)
+  try {
+    const result = await pgClient.query<{ allowed: boolean }>(
+      `
+      SELECT public.rbac_has_permission(
+        public.rbac_principal_apikey(),
+        $1::uuid,
+        public.rbac_perm_org_read(),
+        $2::uuid,
+        NULL::varchar,
+        NULL::bigint
+      ) AS allowed
+      `,
+      [key.rbac_id, orgId],
+    )
+
+    return result.rows[0]?.allowed === true
+  }
+  finally {
+    closeClient(c, pgClient)
+  }
 }
 
 /**
@@ -313,12 +333,10 @@ export async function apikeyHasOrgRightWithPolicy(
   orgId: string,
   supabase: SupabaseClient<Database>,
 ): Promise<{ valid: boolean, error?: string }> {
-  // First check basic org access
-  if (!apikeyHasOrgRight(key, orgId)) {
+  if (!(await apikeyHasOrgRight(c, key, orgId))) {
     return { valid: false, error: 'invalid_org_id' }
   }
 
-  // Then check if org requires expiring keys
   const policyCheck = await checkApikeyMeetsOrgPolicy(c, key, orgId, supabase)
   if (!policyCheck.valid) {
     return policyCheck
@@ -805,46 +823,132 @@ export async function isAllowedActionOrg(c: Context, orgId: string): Promise<boo
 }
 
 export async function createApiKey(c: Context, userId: string) {
-  // check if user has apikeys
   if (!userId) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'createApiKey error', userId, error: 'userId is null' })
     return
   }
-  const total = await supabaseAdmin(c)
-    .from('apikeys')
-    .select('id', { count: 'exact', head: true })
-    .eq('user_id', userId)
-    .then(res => res.count ?? null)
-  if (total === null) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'createApiKey error', userId, error: 'total is null' })
-    return
+
+  const pgClient = getPgClient(c)
+  try {
+    const totalResult = await pgClient.query<{ count: string }>(
+      'SELECT count(*)::text AS count FROM public.apikeys WHERE user_id = $1::uuid',
+      [userId],
+    )
+    const total = Number(totalResult.rows[0]?.count ?? '0')
+    if (!Number.isFinite(total)) {
+      cloudlogErr({ requestId: c.get('requestId'), message: 'createApiKey error', userId, error: 'total is invalid' })
+      return
+    }
+    if (total > 0)
+      return
+
+    const orgResult = await pgClient.query<{ org_id: string }>(
+      `SELECT DISTINCT org_id
+       FROM public.org_users
+       WHERE user_id = $1::uuid
+         AND (user_right IS NULL OR user_right::text NOT LIKE 'invite_%')`,
+      [userId],
+    )
+    if (orgResult.rows.length === 0) {
+      cloudlog({ requestId: c.get('requestId'), message: 'createApiKey skipped, no org membership', userId })
+      return
+    }
+
+    await pgClient.query('BEGIN')
+    await pgClient.query(
+      `WITH inserted AS (
+         INSERT INTO public.apikeys (
+           user_id,
+           key,
+           key_hash,
+           name
+         )
+         SELECT
+           $1::uuid,
+           gen_random_uuid()::text,
+           NULL,
+           default_key.name
+         FROM (VALUES ('all'), ('upload'), ('read')) AS default_key(name)
+         RETURNING user_id, rbac_id, name
+       ),
+       current_orgs AS (
+         SELECT DISTINCT org_id
+         FROM public.org_users
+         WHERE user_id = $1::uuid
+           AND (user_right IS NULL OR user_right::text NOT LIKE 'invite_%')
+       ),
+       org_bindings AS (
+         INSERT INTO public.role_bindings (
+           principal_type,
+           principal_id,
+           role_id,
+           scope_type,
+           org_id,
+           granted_by,
+           reason,
+           is_direct
+         )
+         SELECT
+           public.rbac_principal_apikey(),
+           inserted.rbac_id,
+           roles.id,
+           public.rbac_scope_org(),
+           current_orgs.org_id,
+           inserted.user_id,
+           'Default API key V2 binding',
+           true
+         FROM inserted
+         CROSS JOIN current_orgs
+         JOIN public.roles roles
+           ON roles.name = CASE
+             WHEN inserted.name = 'all' THEN public.rbac_role_org_admin()
+             ELSE public.rbac_role_org_member()
+           END
+         ON CONFLICT DO NOTHING
+       )
+       INSERT INTO public.role_bindings (
+         principal_type,
+         principal_id,
+         role_id,
+         scope_type,
+         org_id,
+         app_id,
+         granted_by,
+         reason,
+         is_direct
+       )
+       SELECT
+         public.rbac_principal_apikey(),
+         inserted.rbac_id,
+         roles.id,
+         public.rbac_scope_app(),
+         apps.owner_org,
+         apps.id,
+         inserted.user_id,
+         'Default API key V2 app binding',
+         true
+       FROM inserted
+       JOIN current_orgs ON true
+       JOIN public.apps apps ON apps.owner_org = current_orgs.org_id
+       JOIN public.roles roles
+         ON roles.name = CASE inserted.name
+           WHEN 'upload' THEN public.rbac_role_app_uploader()
+           WHEN 'read' THEN public.rbac_role_app_reader()
+           ELSE NULL
+         END
+       WHERE inserted.name IN ('upload', 'read')
+       ON CONFLICT DO NOTHING`,
+      [userId],
+    )
+    await pgClient.query('COMMIT')
   }
-  if (total === 0) {
-    // create apikeys
-    return supabaseAdmin(c)
-      .from('apikeys')
-      .insert([
-        {
-          user_id: userId,
-          key: crypto.randomUUID(),
-          mode: 'all',
-          name: 'all',
-        },
-        {
-          user_id: userId,
-          key: crypto.randomUUID(),
-          mode: 'upload',
-          name: 'upload',
-        },
-        {
-          user_id: userId,
-          key: crypto.randomUUID(),
-          mode: 'read',
-          name: 'read',
-        },
-      ])
+  catch (error) {
+    await pgClient.query('ROLLBACK').catch(() => {})
+    cloudlogErr({ requestId: c.get('requestId'), message: 'createApiKey error', userId, error })
   }
-  return Promise.resolve()
+  finally {
+    closeClient(c, pgClient)
+  }
 }
 
 export async function customerToSegmentOrg(
@@ -1502,12 +1606,6 @@ export async function checkKey(c: Context, authorization: string | undefined, su
       return null
     }
 
-    // Check if mode is allowed (NULL mode = RBAC-managed, always passes mode check)
-    if (data.mode !== null && !allowed.includes(data.mode)) {
-      cloudlog({ requestId: c.get('requestId'), message: 'Invalid apikey mode', authorizationPrefix: authorization?.substring(0, 8), allowed, mode: data.mode })
-      return null
-    }
-
     // Check if key is expired
     if (data.expires_at && new Date(data.expires_at) < new Date()) {
       cloudlog({ requestId: c.get('requestId'), message: 'Apikey expired', authorizationPrefix: authorization?.substring(0, 8) })
@@ -1530,7 +1628,7 @@ export async function checkKeyById(
   c: Context,
   id: number,
   supabase: SupabaseClient<Database>,
-  allowed: Database['public']['Enums']['key_mode'][],
+  _allowed: Database['public']['Enums']['key_mode'][],
   userId?: string,
 ): Promise<Database['public']['Tables']['apikeys']['Row'] | null> {
   if (!id)
@@ -1541,7 +1639,6 @@ export async function checkKeyById(
       .from('apikeys')
       .select('*')
       .eq('id', id)
-      .or(`mode.is.null,mode.in.(${allowed.join(',')})`)
       .or('expires_at.is.null,expires_at.gt.now()')
     if (userId) {
       query = query.eq('user_id', userId)

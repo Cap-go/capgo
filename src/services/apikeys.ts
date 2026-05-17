@@ -6,19 +6,114 @@ import type { Database } from '~/types/supabase.types'
 export async function createDefaultApiKey(
   supabase: SupabaseClient<Database>,
   name: string,
+  options: {
+    orgId?: string | null
+    appId?: string | null
+    hashed?: boolean
+  } = {},
 ) {
+  let orgId = options.orgId ?? null
+  let appUuid: string | null = null
+
+  if (options.appId) {
+    const { data: app, error } = await supabase
+      .from('apps')
+      .select('id, owner_org')
+      .eq('app_id', options.appId)
+      .single()
+
+    if (error)
+      throw error
+
+    appUuid = app?.id ?? null
+    orgId ||= app?.owner_org ?? null
+  }
+
+  if (!orgId) {
+    throw new Error('Cannot create a default API key without an organization')
+  }
+
+  const bindings: Array<{
+    role_name: string
+    scope_type: 'org' | 'app'
+    org_id: string
+    app_id?: string
+  }> = appUuid && !options.orgId
+    ? [
+        {
+          role_name: 'org_member',
+          scope_type: 'org',
+          org_id: orgId,
+        },
+        {
+          role_name: 'app_admin',
+          scope_type: 'app',
+          org_id: orgId,
+          app_id: appUuid,
+        },
+      ]
+    : [
+        {
+          role_name: 'org_admin',
+          scope_type: 'org',
+          org_id: orgId,
+        },
+      ]
+
   return supabase.functions.invoke('apikey', {
     method: 'POST',
     body: {
       name,
-      mode: 'all',
+      hashed: options.hashed === true,
+      bindings,
     },
   })
 }
 
+export async function findUsablePlainApiKey(
+  supabase: SupabaseClient<Database>,
+  userId: string,
+  orgId?: string | null,
+): Promise<string | null> {
+  const isLiveKey = (expiresAt: string | null) => !expiresAt || new Date(expiresAt).getTime() > Date.now()
+
+  const { data: keys, error } = await supabase
+    .from('apikeys')
+    .select('key, expires_at, rbac_id, created_at')
+    .eq('user_id', userId)
+    .not('key', 'is', null)
+    .order('created_at', { ascending: false })
+
+  if (error || !keys?.length)
+    return null
+
+  const liveKeys = keys.filter(key => key.key && isLiveKey(key.expires_at))
+  if (!liveKeys.length)
+    return null
+
+  if (!orgId)
+    return liveKeys[0].key ?? null
+
+  const rbacIds = liveKeys.map(key => key.rbac_id).filter((rbacId): rbacId is string => !!rbacId)
+  if (!rbacIds.length)
+    return null
+
+  const { data: bindings, error: bindingsError } = await supabase
+    .from('role_bindings')
+    .select('principal_id')
+    .eq('principal_type', 'apikey')
+    .eq('org_id', orgId)
+    .in('principal_id', rbacIds)
+
+  if (bindingsError || !bindings?.length)
+    return null
+
+  const scopedKeyIds = new Set(bindings.map(binding => binding.principal_id))
+  return liveKeys.find(key => scopedKeyIds.has(key.rbac_id))?.key ?? null
+}
+
 interface ApiKeyListRow {
   name?: string | null
-  mode: string | null
   created_at: string | null
 }
 
@@ -78,10 +173,6 @@ export function sortApiKeyRows<T extends ApiKeyListRow>(
         case 'name':
           aValue = a.name?.toLowerCase() || ''
           bValue = b.name?.toLowerCase() || ''
-          break
-        case 'mode':
-          aValue = (a.mode ?? '').toLowerCase()
-          bValue = (b.mode ?? '').toLowerCase()
           break
         case 'created_at':
           aValue = a.created_at ? new Date(a.created_at).getTime() : 0

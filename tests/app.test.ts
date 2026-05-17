@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { BASE_URL, fetchWithRetry, getSupabaseClient, headers, NON_OWNER_ORG_ID, ORG_ID, resetAndSeedAppData, resetAppData, resetAppDataStats, USER_ID, USER_ID_2 } from './test-utils.ts'
+import { BASE_URL, createDirectApiKeyWithBindings, fetchWithRetry, getAuthHeaders, getSupabaseClient, headers, NON_OWNER_ORG_ID, ORG_ID, ORG_ID_2, resetAndSeedAppData, resetAppData, resetAppDataStats, USER_ID, USER_ID_2 } from './test-utils.ts'
 
 function isDuplicateAppCreationError(body: any): boolean {
   if (!body || typeof body !== 'object')
@@ -125,18 +125,15 @@ describe('[GET] /app operations with subkey', () => {
       }
     }
 
-    // Create a subkey with limited rights to this app
-    const createSubkey = await fetch(`${BASE_URL}/apikey`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({
-        name: 'Limited Subkey',
-        mode: 'all',
-        limited_to_apps: [APPNAME],
-      }),
+    // Create a V2 subkey with limited rights to this app.
+    const subkeyData = await createDirectApiKeyWithBindings({
+      key: randomUUID(),
+      name: `Limited Subkey ${id}`,
+      orgId: ORG_ID,
+      roleName: 'org_member',
+      appId: APPNAME,
+      appRoleName: 'app_admin',
     })
-    expect(createSubkey.status).toBe(200)
-    const subkeyData = await createSubkey.json() as { id: number }
     subkey = subkeyData.id
   })
 
@@ -205,23 +202,20 @@ describe('[GET] /app operations with subkey', () => {
 
   it('should not delete app with subkey if rights are read-only', async () => {
     // Attempt to delete app with subkey
-    const createSubkey = await fetch(`${BASE_URL}/apikey`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({
-        name: 'Limited Subkey2',
-        mode: 'read',
-        limited_to_apps: [APPNAME],
-      }),
+    const subkeyData = await createDirectApiKeyWithBindings({
+      key: randomUUID(),
+      name: `Limited reader subkey ${id}`,
+      orgId: ORG_ID,
+      roleName: 'org_member',
+      appId: APPNAME,
+      appRoleName: 'app_reader',
     })
-    expect(createSubkey.status).toBe(200)
-    const subkeyData = await createSubkey.json() as { id: number }
     const subkeyHeaders = { 'x-limited-key-id': String(subkeyData.id) }
     const deleteApp = await fetch(`${BASE_URL}/app/${APPNAME}`, {
       method: 'DELETE',
       headers: { ...headers, ...subkeyHeaders },
     })
-    expect(deleteApp.status).toBe(401)
+    expect(deleteApp.status).toBe(400)
   })
 
   it('should get all apps with subkey', async () => {
@@ -261,22 +255,17 @@ describe('[GET] /app subkey ownership enforcement', () => {
   })
 
   it('should reject subkey id owned by another user', async () => {
-    const { data: subkeyData, error } = await getSupabaseClient()
-      .from('apikeys')
-      .insert({
-        user_id: USER_ID_2,
-        key: randomUUID(),
-        key_hash: null,
-        mode: 'read',
-        name: `Cross-tenant subkey ${randomUUID()}`,
-        limited_to_apps: [appId],
-      })
-      .select('id')
-      .single()
-
-    expect(error).toBeNull()
+    const subkeyData = await createDirectApiKeyWithBindings({
+      userId: USER_ID_2,
+      key: randomUUID(),
+      name: `Cross-tenant subkey ${randomUUID()}`,
+      orgId: ORG_ID_2,
+      roleName: 'org_member',
+      appId,
+      appRoleName: 'app_reader',
+    })
     expect(subkeyData?.id).toBeTruthy()
-    subkeyId = subkeyData!.id
+    subkeyId = subkeyData.id
 
     const subkeyHeaders = { 'x-limited-key-id': String(subkeyId) }
     const response = await fetch(`${BASE_URL}/app/${appId}`, {
@@ -318,18 +307,15 @@ describe('/app hashed subkey enforcement', () => {
 
   beforeAll(async () => {
     await createAppForTest(ALLOWED_APPNAME)
-    const createSubkey = await fetch(`${BASE_URL}/apikey`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({
-        name: SUBKEY_NAME,
-        mode: 'all',
-        limited_to_apps: [ALLOWED_APPNAME],
-        hashed: true,
-      }),
+    const subkeyData = await createDirectApiKeyWithBindings({
+      key: randomUUID(),
+      name: SUBKEY_NAME,
+      orgId: ORG_ID,
+      roleName: 'org_member',
+      appId: ALLOWED_APPNAME,
+      appRoleName: 'app_admin',
+      hashed: true,
     })
-    expect(createSubkey.status).toBe(200)
-    const subkeyData = await createSubkey.json() as { id: number }
     subkeyId = subkeyData.id
   })
 
@@ -395,6 +381,11 @@ describe('[GET] /app invalid subkey header handling', () => {
 describe('[POST] /app operations with non-owner user', () => {
   const id = randomUUID()
   const APPNAME = `com.nonowner.${id}`
+  let authHeaders: Record<string, string>
+
+  beforeAll(async () => {
+    authHeaders = await getAuthHeaders()
+  })
 
   afterAll(async () => {
     await resetAppData(APPNAME)
@@ -415,7 +406,7 @@ describe('[POST] /app operations with non-owner user', () => {
       throw new Error(`Failed to update user rights for non-owner org: ${JSON.stringify(error2)}`)
     const createApp = await fetch(`${BASE_URL}/app`, {
       method: 'POST',
-      headers,
+      headers: authHeaders,
       body: JSON.stringify({
         owner_org: NON_OWNER_ORG_ID,
         app_id: APPNAME,
@@ -438,7 +429,7 @@ describe('[POST] /app operations with non-owner user', () => {
       throw new Error(`Failed to update user rights for non-owner org: ${JSON.stringify(error2)}`)
     const createApp = await fetch(`${BASE_URL}/app`, {
       method: 'POST',
-      headers,
+      headers: authHeaders,
       body: JSON.stringify({
         owner_org: NON_OWNER_ORG_ID,
         app_id: APPNAME,

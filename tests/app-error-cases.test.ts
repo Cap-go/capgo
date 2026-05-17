@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { BASE_URL, getAuthHeaders, getSupabaseClient, NON_ACCESS_APP_NAME, resetAndSeedAppData, resetAppData, USER_ID } from './test-utils.ts'
+import { BASE_URL, getAuthHeaders, getSupabaseClient, NON_ACCESS_APP_NAME, orgApiKeyBindings, resetAndSeedAppData, resetAppData, USER_ID } from './test-utils.ts'
 
 const id = randomUUID().replace(/-/g, '').slice(0, 12)
 const APPNAME = `com.app.error.${id}`
@@ -27,7 +27,7 @@ beforeAll(async () => {
     headers: authHeaders,
     body: JSON.stringify({
       name: `app-error-cases-${id}`,
-      mode: 'all',
+      bindings: orgApiKeyBindings(testOrgId, 'org_super_admin'),
     }),
   })
 

@@ -1,6 +1,5 @@
 import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
-import type { Database } from '../utils/supabase.types.ts'
 import { sValidator } from '@hono/standard-validator'
 import { and, eq, sql } from 'drizzle-orm'
 import { createHono, useCors } from '../utils/hono.ts'
@@ -53,13 +52,11 @@ async function requireAuthAndGuardLimitedKeys(c: Context<MiddlewareKeyVariables>
     return c.json({ error: 'Unauthorized' }, 401)
   }
 
-  // Prevent limited-scope API keys from managing role bindings
+  // API keys must not manage role bindings. V2 API-key permissions are scoped
+  // by these bindings, so allowing keys to mutate them would let a key widen
+  // its own access or mint another broad key.
   if (auth.authType === 'apikey') {
-    const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row'] | undefined
-    const hasLimitedScope = (apikey?.limited_to_orgs?.length ?? 0) > 0 || (apikey?.limited_to_apps?.length ?? 0) > 0
-    if (hasLimitedScope) {
-      return c.json({ error: 'Limited-scope API keys cannot manage role bindings' }, 403)
-    }
+    return c.json({ error: 'API keys cannot manage role bindings' }, 403)
   }
 
   await next()
@@ -256,7 +253,6 @@ async function validateApiKeyPrincipalAccess(
   const [apiKey] = await drizzle
     .select({
       user_id: schema.apikeys.user_id,
-      limited_to_orgs: schema.apikeys.limited_to_orgs,
     })
     .from(schema.apikeys)
     .where(eq(schema.apikeys.rbac_id, principalId))
@@ -267,16 +263,6 @@ async function validateApiKeyPrincipalAccess(
       message: 'validatePrincipalAccess: missing apiKey for role binding principal',
       principalId,
       orgId,
-    })
-    return { ok: false, status: 400, error: INVALID_APIKEY_ACCESS_ERROR }
-  }
-
-  if (apiKey.limited_to_orgs?.length && !apiKey.limited_to_orgs.includes(orgId)) {
-    cloudlogErr({
-      message: 'validatePrincipalAccess: apiKey limited_to_orgs scope excludes target org',
-      principalId,
-      orgId,
-      apiKeyUserId: apiKey.user_id,
     })
     return { ok: false, status: 400, error: INVALID_APIKEY_ACCESS_ERROR }
   }

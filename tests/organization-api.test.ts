@@ -7,10 +7,12 @@ import { parseSchema, safeParseSchema } from '../supabase/functions/_backend/uti
 
 import {
   BASE_URL,
+  createDirectApiKeyWithBindings,
+  getAuthHeaders,
   getAuthHeadersForCredentials,
   getSupabaseClient,
-  headers,
   normalizeLocalhostUrl,
+  orgApiKeyBindings,
   SUPABASE_ANON_KEY,
   SUPABASE_BASE_URL,
   TEST_EMAIL,
@@ -28,8 +30,13 @@ const globalId = randomUUID()
 const name = `Test Organization ${globalId}`
 const customerId = `cus_test_${ORG_ID}`
 const website = 'https://test-organization.example/'
+let headers: Record<string, string>
+let authHeaders: Record<string, string>
+let organizationApiKeyId = 0
 
 beforeAll(async () => {
+  authHeaders = await getAuthHeaders()
+
   // Create stripe_info for this test org
   const { error: stripeError } = await getSupabaseClient().from('stripe_info').insert({
     customer_id: customerId,
@@ -62,16 +69,35 @@ beforeAll(async () => {
   })
   if (orgUserError)
     throw orgUserError
+
+  const createdKey = await createDirectApiKeyWithBindings({
+    userId: USER_ID,
+    key: randomUUID(),
+    name: `Organization API suite ${randomUUID()}`,
+    orgId: ORG_ID,
+    roleName: 'org_super_admin',
+  })
+  if (!createdKey?.key || typeof createdKey.id !== 'number') {
+    throw new Error('Failed to seed organization API key')
+  }
+  organizationApiKeyId = createdKey.id
+  headers = {
+    'Content-Type': 'application/json',
+    'capgkey': createdKey.key,
+  }
 })
 
 afterAll(async () => {
   // Clean up test organization, org_users relation, and stripe_info
+  if (organizationApiKeyId) {
+    await getSupabaseClient().from('apikeys').delete().eq('id', organizationApiKeyId)
+  }
   await getSupabaseClient().from('org_users').delete().eq('org_id', ORG_ID)
   await getSupabaseClient().from('orgs').delete().eq('id', ORG_ID)
   await getSupabaseClient().from('stripe_info').delete().eq('customer_id', customerId)
 })
 
-describe('read-mode API keys cannot access destructive organization routes', () => {
+describe('read-only API keys cannot access destructive organization routes', () => {
   const readOnlyOrgId = randomUUID()
   const readOnlyGlobalId = randomUUID()
   const readOnlyName = `Test Read-Only Organization ${readOnlyGlobalId}`
@@ -111,22 +137,13 @@ describe('read-mode API keys cannot access destructive organization routes', () 
     })
     expect(orgUserError).toBeNull()
 
-    // Seed the key directly so this suite stays focused on organization-route auth.
-    // API key creation behavior is covered in apikey-specific tests and can run in parallel.
-    const { data: createdKey, error: createError } = await getSupabaseClient()
-      .from('apikeys')
-      .insert({
-        user_id: USER_ID,
-        key: randomUUID(),
-        key_hash: null,
-        mode: 'read',
-        name: `Organization read-only regression ${randomUUID()}`,
-        limited_to_orgs: [readOnlyOrgId],
-      })
-      .select('id, key')
-      .single()
-
-    expect(createError).toBeNull()
+    const createdKey = await createDirectApiKeyWithBindings({
+      userId: USER_ID,
+      key: randomUUID(),
+      name: `Organization read-only regression ${randomUUID()}`,
+      orgId: readOnlyOrgId,
+      roleName: 'org_member',
+    })
     expect(createdKey?.id).toBeTypeOf('number')
     expect(createdKey?.key).toBeTypeOf('string')
     if (!createdKey?.key || typeof createdKey.id !== 'number') {
@@ -157,7 +174,9 @@ describe('read-mode API keys cannot access destructive organization routes', () 
       }),
     })
 
-    expect(response.status).toBe(401)
+    expect(response.status).toBe(400)
+    const payload = await response.json() as { error: string }
+    expect(payload.error).toBe('cannot_access_organization')
   })
 
   it.concurrent('rejects DELETE /organization/members', async () => {
@@ -166,7 +185,9 @@ describe('read-mode API keys cannot access destructive organization routes', () 
       method: 'DELETE',
     })
 
-    expect(response.status).toBe(401)
+    expect(response.status).toBe(400)
+    const payload = await response.json() as { error: string }
+    expect(payload.error).toBe('cannot_access_organization')
   })
 
   it.concurrent('rejects PUT /organization', async () => {
@@ -179,7 +200,9 @@ describe('read-mode API keys cannot access destructive organization routes', () 
       }),
     })
 
-    expect(response.status).toBe(401)
+    expect(response.status).toBe(400)
+    const payload = await response.json() as { error: string }
+    expect(payload.error).toBe('cannot_access_organization')
   })
 
   it.concurrent('rejects POST /organization', async () => {
@@ -193,7 +216,7 @@ describe('read-mode API keys cannot access destructive organization routes', () 
     })
 
     expect(response.status).toBe(401)
-    // Ensure this is blocked by API-key auth (key mode allowlist), not by RLS deeper in the handler.
+    // Ensure this is blocked by API-key auth, not by RLS deeper in the handler.
     const payload = await response.json() as { error?: string }
     expect(payload.error).toBe('invalid_apikey')
   })
@@ -204,7 +227,9 @@ describe('read-mode API keys cannot access destructive organization routes', () 
       method: 'DELETE',
     })
 
-    expect(response.status).toBe(401)
+    expect(response.status).toBe(403)
+    const payload = await response.json() as { error: string }
+    expect(payload.error).toBe('invalid_org_id')
   })
 
   it.concurrent('allows GET /organization for accessible organizations', async () => {
@@ -248,7 +273,7 @@ describe('read-mode API keys cannot access destructive organization routes', () 
     expect(parseSchema(members, await response.json()).some(member => member.uid === USER_ID)).toBe(true)
   })
 
-  it.concurrent('rejects GET /organization/members outside limited_to_orgs scope', async () => {
+  it.concurrent('rejects GET /organization/members outside bound organization scope', async () => {
     const response = await fetch(`${BASE_URL}/organization/members?orgId=${ORG_ID}`, {
       headers: { ...readOnlyHeaders, capgkey: readOnlyKey },
       method: 'GET',
@@ -266,7 +291,7 @@ describe('read-mode API keys cannot access destructive organization routes', () 
     })
 
     expect(response.status).toBe(200)
-    // The audit endpoint is allowed for read-mode keys; payload may be empty for a new org.
+    // The audit endpoint is allowed for read-only keys; payload may be empty for a new org.
     expect(await response.json()).toBeDefined()
   })
 })
@@ -311,20 +336,13 @@ describe('scoped write API keys cannot cross organization boundaries', () => {
     })
     expect(targetOrgError).toBeNull()
 
-    const { data: createdKey, error: createKeyError } = await getSupabaseClient()
-      .from('apikeys')
-      .insert({
-        user_id: USER_ID,
-        key: randomUUID(),
-        key_hash: null,
-        mode: 'write',
-        name: scopedKeyName,
-        limited_to_orgs: [allowedOrgId],
-      })
-      .select('id, key')
-      .single()
-
-    expect(createKeyError).toBeNull()
+    const createdKey = await createDirectApiKeyWithBindings({
+      userId: USER_ID,
+      key: randomUUID(),
+      name: scopedKeyName,
+      orgId: allowedOrgId,
+      roleName: 'org_admin',
+    })
     expect(createdKey?.key).toBeTruthy()
     expect(createdKey?.id).toBeTypeOf('number')
 
@@ -362,7 +380,7 @@ describe('scoped write API keys cannot cross organization boundaries', () => {
     await getSupabaseClient().from('stripe_info').delete().eq('customer_id', targetCustomerId)
   })
 
-  it.concurrent('rejects DELETE /organization outside limited_to_orgs scope without deleting images', async () => {
+  it.concurrent('rejects DELETE /organization outside bound organization scope without deleting images', async () => {
     const response = await fetch(`${BASE_URL}/organization?orgId=${targetOrgId}`, {
       headers: {
         'Content-Type': 'application/json',
@@ -393,9 +411,23 @@ describe('scoped write API keys cannot cross organization boundaries', () => {
     expect(imageList?.some(file => file.name === imagePath.split('/').at(-1))).toBe(true)
   })
 
-  it.concurrent('rejects DELETE /organization/members outside limited_to_orgs scope without deleting role bindings', async () => {
+  it.concurrent('rejects DELETE /organization/members outside bound organization scope without deleting role bindings', async () => {
+    const setupKey = await createDirectApiKeyWithBindings({
+      userId: USER_ID,
+      key: randomUUID(),
+      name: `Scoped target setup ${randomUUID()}`,
+      orgId: targetOrgId,
+      roleName: 'org_super_admin',
+    })
+    if (!setupKey?.key || typeof setupKey.id !== 'number')
+      throw new Error('Failed to seed scoped setup API key')
+    const setupHeaders = {
+      'Content-Type': 'application/json',
+      'capgkey': setupKey.key,
+    }
+
     const addMemberResponse = await fetch(`${BASE_URL}/organization/members`, {
-      headers,
+      headers: setupHeaders,
       method: 'POST',
       body: JSON.stringify({
         orgId: targetOrgId,
@@ -452,6 +484,7 @@ describe('scoped write API keys cannot cross organization boundaries', () => {
     expect(bindingsAfter!.length).toBeGreaterThan(0)
 
     await getSupabaseClient().from('org_users').delete().eq('org_id', targetOrgId).eq('user_id', userData!.id)
+    await getSupabaseClient().from('apikeys').delete().eq('id', setupKey.id)
   })
 })
 
@@ -513,40 +546,47 @@ describe('x-limited-key-id subkeys enforce organization scope on middlewareKey r
     ])
     expect(orgUsersError).toBeNull()
 
-    const { data: parentKeyData, error: parentKeyError } = await supabase
-      .from('apikeys')
-      .insert({
-        user_id: USER_ID,
-        key: randomUUID(),
-        key_hash: null,
-        mode: 'all',
-        name: `Parent key ${randomUUID()}`,
-        limited_to_orgs: [],
-        limited_to_apps: [],
-      })
-      .select('id, key')
-      .single()
-    expect(parentKeyError).toBeNull()
+    const parentKeyData = await createDirectApiKeyWithBindings({
+      userId: USER_ID,
+      key: randomUUID(),
+      name: `Parent key ${randomUUID()}`,
+      orgId: scopedOrgId,
+      roleName: 'org_admin',
+    })
     if (!parentKeyData?.key || typeof parentKeyData.id !== 'number') {
       throw new TypeError('Failed to seed parent API key')
     }
     parentKey = parentKeyData.key
     parentKeyId = parentKeyData.id
 
-    const { data: subkeyData, error: subkeyError } = await supabase
-      .from('apikeys')
-      .insert({
-        user_id: USER_ID,
-        key: randomUUID(),
-        key_hash: null,
-        mode: 'read',
-        name: `Scoped subkey ${randomUUID()}`,
-        limited_to_orgs: [scopedOrgId],
-        limited_to_apps: [],
-      })
+    const { data: orgAdminRole, error: orgAdminRoleError } = await supabase
+      .from('roles')
       .select('id')
+      .eq('name', 'org_admin')
       .single()
-    expect(subkeyError).toBeNull()
+    expect(orgAdminRoleError).toBeNull()
+    if (!orgAdminRole?.id)
+      throw new TypeError('Failed to resolve org_admin role')
+
+    const { error: parentBlockedBindingError } = await supabase.from('role_bindings').insert({
+      principal_type: 'apikey',
+      principal_id: parentKeyData.rbac_id,
+      role_id: orgAdminRole.id,
+      scope_type: 'org',
+      org_id: blockedOrgId,
+      granted_by: USER_ID,
+      reason: 'Organization middleware parent key test binding',
+      is_direct: true,
+    })
+    expect(parentBlockedBindingError).toBeNull()
+
+    const subkeyData = await createDirectApiKeyWithBindings({
+      userId: USER_ID,
+      key: randomUUID(),
+      name: `Scoped subkey ${randomUUID()}`,
+      orgId: scopedOrgId,
+      roleName: 'org_member',
+    })
     if (typeof subkeyData?.id !== 'number') {
       throw new TypeError('Failed to seed scoped subkey')
     }
@@ -953,7 +993,7 @@ describe('[POST] /organization', () => {
   async function expectCreatedOrganizationPlan(estimatedMau: number, planName: string) {
     const name = `Created ${planName} Plan Organization ${randomUUID()}`
     const response = await fetch(`${BASE_URL}/organization`, {
-      headers,
+      headers: authHeaders,
       method: 'POST',
       body: JSON.stringify({ name, estimatedMau }),
     })
@@ -1004,7 +1044,7 @@ describe('[POST] /organization', () => {
     const name = `Created Organization ${new Date().toISOString()}`
     const website = 'HTTPS://capgo.app'
     const response = await fetch(`${BASE_URL}/organization`, {
-      headers,
+      headers: authHeaders,
       method: 'POST',
       body: JSON.stringify({ name, website }),
     })
@@ -1034,7 +1074,7 @@ describe('[POST] /organization', () => {
 
   it('create organization with missing name', async () => {
     const response = await fetch(`${BASE_URL}/organization`, {
-      headers,
+      headers: authHeaders,
       method: 'POST',
       body: JSON.stringify({}), // Missing name
     })
@@ -1045,7 +1085,7 @@ describe('[POST] /organization', () => {
 
   it('create organization with invalid body format', async () => {
     const response = await fetch(`${BASE_URL}/organization`, {
-      headers,
+      headers: authHeaders,
       method: 'POST',
       body: 'invalid json', // Invalid JSON
     })
@@ -1054,7 +1094,7 @@ describe('[POST] /organization', () => {
 
   it('create organization with empty name', async () => {
     const response = await fetch(`${BASE_URL}/organization`, {
-      headers,
+      headers: authHeaders,
       method: 'POST',
       body: JSON.stringify({ name: '' }), // Empty name
     })
@@ -1065,7 +1105,7 @@ describe('[POST] /organization', () => {
 
   it.concurrent('create organization rejects invalid website scheme', async () => {
     const response = await fetch(`${BASE_URL}/organization`, {
-      headers,
+      headers: authHeaders,
       method: 'POST',
       body: JSON.stringify({
         name: `Created Organization ${new Date().toISOString()}`,
@@ -1079,7 +1119,7 @@ describe('[POST] /organization', () => {
 
   it.concurrent('create organization rejects credential-bearing website urls', async () => {
     const response = await fetch(`${BASE_URL}/organization`, {
-      headers,
+      headers: authHeaders,
       method: 'POST',
       body: JSON.stringify({
         name: `Created Organization ${new Date().toISOString()}`,
@@ -1105,7 +1145,7 @@ describe('[POST] /organization', () => {
 
   it.concurrent('create organization rejects an estimated active user count above the largest plan stop', async () => {
     const response = await fetch(`${BASE_URL}/organization`, {
-      headers,
+      headers: authHeaders,
       method: 'POST',
       body: JSON.stringify({
         name: `Created Organization ${randomUUID()}`,
@@ -1144,7 +1184,7 @@ describe('[PUT] /organization', () => {
 
     try {
       const response = await fetch(`${BASE_URL}/organization`, {
-        headers,
+        headers: authHeaders,
         method: 'PUT',
         body: JSON.stringify({ orgId, name, website }),
       })
@@ -1282,8 +1322,22 @@ describe('[DELETE] /organization', () => {
     })
     expect(metricsCacheError).toBeNull()
 
+    const deleteKey = await createDirectApiKeyWithBindings({
+      userId: USER_ID,
+      key: randomUUID(),
+      name: `Delete org key ${randomUUID()}`,
+      orgId: id,
+      roleName: 'org_super_admin',
+    })
+    if (!deleteKey?.key || typeof deleteKey.id !== 'number')
+      throw new Error('Failed to seed delete organization API key')
+    const deleteHeaders = {
+      'Content-Type': 'application/json',
+      'capgkey': deleteKey.key,
+    }
+
     const response = await fetch(`${BASE_URL}/organization?orgId=${id}`, {
-      headers,
+      headers: deleteHeaders,
       method: 'DELETE',
     })
     expect(response.status).toBe(200)
@@ -1302,6 +1356,7 @@ describe('[DELETE] /organization', () => {
     expect(cachedMetricsError).toBeNull()
     expect(cachedMetrics).toBeNull()
 
+    await getSupabaseClient().from('apikeys').delete().eq('id', deleteKey.id)
     await getSupabaseClient().from('stripe_info').delete().eq('customer_id', customerId)
   })
 
@@ -1389,9 +1444,23 @@ describe('[DELETE] /organization', () => {
     })
     expect(memberError).toBeNull()
 
+    const orgAdminKey = await createDirectApiKeyWithBindings({
+      userId: USER_ID,
+      key: randomUUID(),
+      name: `Non-owner org key ${randomUUID()}`,
+      orgId: id,
+      roleName: 'org_admin',
+    })
+    if (!orgAdminKey?.key || typeof orgAdminKey.id !== 'number')
+      throw new Error('Failed to seed non-owner organization API key')
+    const orgAdminHeaders = {
+      'Content-Type': 'application/json',
+      'capgkey': orgAdminKey.key,
+    }
+
     // Try to delete the organization
     const response = await fetch(`${BASE_URL}/organization?orgId=${id}`, {
-      headers,
+      headers: orgAdminHeaders,
       method: 'DELETE',
     })
 
@@ -1406,6 +1475,7 @@ describe('[DELETE] /organization', () => {
     expect(dataOrgAfter).toBeTruthy()
 
     // Clean up
+    await getSupabaseClient().from('apikeys').delete().eq('id', orgAdminKey.id)
     await getSupabaseClient().from('org_users').delete().eq('org_id', id).eq('user_id', USER_ID)
     await getSupabaseClient().from('orgs').delete().eq('id', id)
     await getSupabaseClient().from('stripe_info').delete().eq('customer_id', customerId)
@@ -1639,6 +1709,9 @@ const globalIdRbac = randomUUID()
 const nameRbac = `RBAC Test Organization ${globalIdRbac}`
 
 describe('rbac mode - organization member operations', () => {
+  let rbacHeaders: Record<string, string>
+  let rbacApiKeyId = 0
+
   beforeAll(async () => {
     const { error } = await getSupabaseClient().from('orgs').insert({
       id: ORG_ID_RBAC,
@@ -1652,9 +1725,26 @@ describe('rbac mode - organization member operations', () => {
 
     // The generate_org_user_on_org_create trigger creates org_users(super_admin)
     // and role_bindings(org_super_admin) for created_by automatically.
+    const createdKey = await createDirectApiKeyWithBindings({
+      userId: USER_ID,
+      key: randomUUID(),
+      name: `RBAC organization suite ${randomUUID()}`,
+      orgId: ORG_ID_RBAC,
+      roleName: 'org_super_admin',
+    })
+    if (!createdKey?.key || typeof createdKey.id !== 'number')
+      throw new Error('Failed to seed RBAC organization API key')
+    rbacApiKeyId = createdKey.id
+    rbacHeaders = {
+      'Content-Type': 'application/json',
+      'capgkey': createdKey.key,
+    }
   })
 
   afterAll(async () => {
+    if (rbacApiKeyId) {
+      await getSupabaseClient().from('apikeys').delete().eq('id', rbacApiKeyId)
+    }
     await getSupabaseClient().from('role_bindings').delete().eq('org_id', ORG_ID_RBAC)
     await getSupabaseClient().from('org_users').delete().eq('org_id', ORG_ID_RBAC)
     await getSupabaseClient().from('orgs').delete().eq('id', ORG_ID_RBAC)
@@ -1662,7 +1752,7 @@ describe('rbac mode - organization member operations', () => {
 
   it('[GET] /organization - get RBAC org by id', async () => {
     const response = await fetch(`${BASE_URL}/organization?orgId=${ORG_ID_RBAC}`, {
-      headers,
+      headers: rbacHeaders,
     })
     expect(response.status).toBe(200)
     const responseType = type({ id: 'string', name: 'string' })
@@ -1675,7 +1765,7 @@ describe('rbac mode - organization member operations', () => {
 
   it('[GET] /organization/members - returns members via role_bindings (RBAC path)', async () => {
     const response = await fetch(`${BASE_URL}/organization/members?orgId=${ORG_ID_RBAC}`, {
-      headers,
+      headers: rbacHeaders,
     })
     expect(response.status).toBe(200)
     const responseType = type({
@@ -1698,7 +1788,7 @@ describe('rbac mode - organization member operations', () => {
   it('[PUT] /organization - update RBAC org name', async () => {
     const updatedName = `RBAC Updated ${new Date().toISOString()}`
     const response = await fetch(`${BASE_URL}/organization`, {
-      headers,
+      headers: rbacHeaders,
       method: 'PUT',
       body: JSON.stringify({ orgId: ORG_ID_RBAC, name: updatedName }),
     })
@@ -1713,7 +1803,7 @@ describe('rbac mode - organization member operations', () => {
 
   it('[POST] /organization/members - add member in RBAC mode (sync trigger creates role_binding)', async () => {
     const response = await fetch(`${BASE_URL}/organization/members`, {
-      headers,
+      headers: rbacHeaders,
       method: 'POST',
       body: JSON.stringify({
         orgId: ORG_ID_RBAC,
@@ -1755,7 +1845,7 @@ describe('rbac mode - organization member operations', () => {
     expect(bindingsBefore!.length).toBeGreaterThan(0)
 
     const response = await fetch(`${BASE_URL}/organization/members?orgId=${ORG_ID_RBAC}&email=${USER_ADMIN_EMAIL}`, {
-      headers,
+      headers: rbacHeaders,
       method: 'DELETE',
     })
     expect(response.status).toBe(200)
@@ -1774,11 +1864,11 @@ describe('hashed API key enforcement integration', () => {
   it('find_apikey_by_value finds hashed key', async () => {
     // Create a hashed API key via API
     const createResponse = await fetch(`${BASE_URL}/apikey`, {
-      headers,
+      headers: authHeaders,
       method: 'POST',
       body: JSON.stringify({
         name: 'test-hashed-key-for-find',
-        mode: 'all',
+        bindings: orgApiKeyBindings(ORG_ID),
         hashed: true,
       }),
     })
@@ -1799,7 +1889,7 @@ describe('hashed API key enforcement integration', () => {
 
     // Cleanup
     await fetch(`${BASE_URL}/apikey/${createData.id}`, {
-      headers,
+      headers: authHeaders,
       method: 'DELETE',
     })
   })
@@ -1826,11 +1916,11 @@ describe('hashed API key enforcement integration', () => {
     // Calculate correct hash using the function itself
     // We can test this by creating a hashed key and verifying
     const createResponse = await fetch(`${BASE_URL}/apikey`, {
-      headers,
+      headers: authHeaders,
       method: 'POST',
       body: JSON.stringify({
         name: 'test-verify-hash-key',
-        mode: 'all',
+        bindings: orgApiKeyBindings(ORG_ID),
         hashed: true,
       }),
     })
@@ -1847,7 +1937,7 @@ describe('hashed API key enforcement integration', () => {
 
     // Cleanup
     await fetch(`${BASE_URL}/apikey/${createData.id}`, {
-      headers,
+      headers: authHeaders,
       method: 'DELETE',
     })
   })

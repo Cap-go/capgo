@@ -96,39 +96,6 @@ export interface RbacContextVariables {
   resolvedOrgId?: string
 }
 
-function deniesExplicitApiKeyScope(
-  c: Context<MiddlewareKeyVariables>,
-  scope: PermissionScope,
-) {
-  const auth = c.get('auth')
-  if (auth?.authType !== 'apikey' || !auth.apikey)
-    return false
-
-  const limitedToApps = auth.apikey.limited_to_apps
-  if (scope.appId && Array.isArray(limitedToApps) && limitedToApps.length > 0 && !limitedToApps.includes(scope.appId)) {
-    cloudlog({
-      requestId: c.get('requestId'),
-      message: 'checkPermission: explicit api key app scope denied',
-      appId: scope.appId,
-      keyId: auth.apikey.id,
-    })
-    return true
-  }
-
-  const limitedToOrgs = auth.apikey.limited_to_orgs
-  if (scope.orgId && Array.isArray(limitedToOrgs) && limitedToOrgs.length > 0 && !limitedToOrgs.includes(scope.orgId)) {
-    cloudlog({
-      requestId: c.get('requestId'),
-      message: 'checkPermission: explicit api key org scope denied',
-      orgId: scope.orgId,
-      keyId: auth.apikey.id,
-    })
-    return true
-  }
-
-  return false
-}
-
 // =============================================================================
 // Legacy Mapping
 // =============================================================================
@@ -272,8 +239,6 @@ export async function checkPermission(
   }
 
   const { userId, apikey } = auth
-  if (deniesExplicitApiKeyScope(c, scope))
-    return false
 
   // For hashed keys, apikey.key is null, so we use capgkey from the request header
   const apikeyString = apikey?.key ?? c.get('capgkey') ?? null
@@ -293,7 +258,33 @@ export async function checkPermission(
     pgClient = getPgClient(c)
     const drizzleClient = getDrizzleClient(pgClient)
 
-    // Use the unified SQL function that handles legacy/RBAC routing
+    if (auth.authType === 'apikey' && apikey?.rbac_id) {
+      if (!apikeyString)
+        return false
+
+      const rbacOnlyResult = await drizzleClient.execute(
+        sql`SELECT public.rbac_check_permission_direct(
+          ${permission},
+          ${userId}::uuid,
+          ${orgId}::uuid,
+          ${appId},
+          ${channelId}::bigint,
+          ${apikeyString}
+        ) AS allowed`,
+      )
+
+      const rbacOnlyAllowed = (rbacOnlyResult.rows[0] as any)?.allowed === true
+      cloudlog({
+        requestId: c.get('requestId'),
+        message: 'checkPermission: rbac-only apikey result',
+        permission,
+        scope,
+        allowed: rbacOnlyAllowed,
+      })
+      return rbacOnlyAllowed
+    }
+
+    // Use the unified SQL function for JWT checks and non-key fallbacks.
     const result = await drizzleClient.execute(
       sql`SELECT public.rbac_check_permission_direct(
         ${permission},
@@ -417,6 +408,7 @@ export async function checkPermissionPg(
   }
 
   const { orgId = null, appId = null, channelId = null } = scope
+  const auth = c.get('auth')
 
   cloudlog({
     requestId: c.get('requestId'),
@@ -428,7 +420,33 @@ export async function checkPermissionPg(
   })
 
   try {
-    // Use the unified SQL function that handles legacy/RBAC routing
+    if (auth?.authType === 'apikey' && auth.apikey?.rbac_id) {
+      if (!apikeyString)
+        return false
+
+      const rbacOnlyResult = await drizzleClient.execute(
+        sql`SELECT public.rbac_check_permission_direct(
+          ${permission},
+          ${userId}::uuid,
+          ${orgId}::uuid,
+          ${appId},
+          ${channelId}::bigint,
+          ${apikeyString}
+        ) AS allowed`,
+      )
+
+      const rbacOnlyAllowed = (rbacOnlyResult.rows[0] as any)?.allowed === true
+      cloudlog({
+        requestId: c.get('requestId'),
+        message: 'checkPermissionPg: rbac-only apikey result',
+        permission,
+        scope,
+        allowed: rbacOnlyAllowed,
+      })
+      return rbacOnlyAllowed
+    }
+
+    // Use the unified SQL function for JWT checks and non-key fallbacks.
     const result = await drizzleClient.execute(
       sql`SELECT public.rbac_check_permission_direct(
         ${permission},

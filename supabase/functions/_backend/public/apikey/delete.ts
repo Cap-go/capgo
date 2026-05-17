@@ -3,6 +3,7 @@ import type { Database } from '../../utils/supabase.types.ts'
 import { BRES, honoFactory, quickError, simpleError } from '../../utils/hono.ts'
 import { middlewareV2 } from '../../utils/hono_middleware.ts'
 import { supabaseWithAuth } from '../../utils/supabase.ts'
+import { apiKeyHasLimitedScope } from './scope.ts'
 
 const app = honoFactory.createApp()
 
@@ -18,9 +19,7 @@ app.delete('/:id', middlewareV2(['all']), async (c) => {
   const auth = c.get('auth') as AuthInfo
   const authApikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row'] | undefined
 
-  const callerHasLimitedScope = (authApikey?.limited_to_orgs?.length ?? 0) > 0
-    || (authApikey?.limited_to_apps?.length ?? 0) > 0
-  if (auth.authType === 'apikey' && callerHasLimitedScope) {
+  if (auth.authType === 'apikey' && await apiKeyHasLimitedScope(c, authApikey)) {
     throw quickError(401, 'cannot_delete_apikey', 'You cannot do that as a limited API key', { apikeyId: authApikey?.id })
   }
 

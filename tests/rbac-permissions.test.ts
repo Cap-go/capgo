@@ -40,6 +40,32 @@ describe('rbac permission system', () => {
     ])
   }
 
+  const createApiKeyForOrg = async (key: string, name: string, orgId: string, roleName = 'org_super_admin') => {
+    const apiKeyResult = await query(`
+      INSERT INTO public.apikeys (user_id, key, name)
+      VALUES ($1::uuid, $2, $3)
+      RETURNING rbac_id
+    `, [USER_ID, key, name])
+    const apiKeyRbacId = apiKeyResult.rows[0]?.rbac_id
+    expect(apiKeyRbacId).toBeTruthy()
+
+    await query(`
+      INSERT INTO public.role_bindings (principal_type, principal_id, role_id, scope_type, org_id, granted_by)
+      SELECT
+        'apikey',
+        $1::uuid,
+        roles.id,
+        'org',
+        $2::uuid,
+        $3::uuid
+      FROM public.roles
+      WHERE roles.name = $4
+      LIMIT 1
+    `, [apiKeyRbacId, orgId, USER_ID, roleName])
+
+    return apiKeyRbacId
+  }
+
   beforeAll(async () => {
     pool = new Pool({ connectionString: POSTGRES_URL })
   })
@@ -132,17 +158,17 @@ describe('rbac permission system', () => {
         expect(result.rows[0].allowed).toBe(false)
       })
 
-      it('should deny org permissions outside limited_to_orgs for scoped api keys', async () => {
+      it('should deny org permissions outside bound org for api keys', async () => {
         const allowedOrgId = randomUUID()
         const targetOrgId = randomUUID()
-        const scopedKey = `legacy-scope-${randomUUID()}`
+        const scopedKey = `org-bound-${randomUUID()}`
 
         await query(`
           INSERT INTO public.orgs (id, name, management_email, created_by, use_new_rbac)
           VALUES
             ($1::uuid, $3, $5, $6::uuid, false),
             ($2::uuid, $4, $5, $6::uuid, false)
-        `, [allowedOrgId, targetOrgId, `Legacy Allowed ${allowedOrgId}`, `Legacy Target ${targetOrgId}`, `legacy-scope-${randomUUID()}@capgo.app`, USER_ID])
+        `, [allowedOrgId, targetOrgId, `API Key Allowed ${allowedOrgId}`, `API Key Target ${targetOrgId}`, `org-bound-${randomUUID()}@capgo.app`, USER_ID])
 
         await query(`
           INSERT INTO public.org_users (org_id, user_id, user_right)
@@ -151,10 +177,7 @@ describe('rbac permission system', () => {
             ($2::uuid, $3::uuid, 'super_admin')
         `, [allowedOrgId, targetOrgId, USER_ID])
 
-        await query(`
-          INSERT INTO public.apikeys (user_id, key, key_hash, mode, name, limited_to_orgs, limited_to_apps)
-          VALUES ($1::uuid, $2, NULL, 'write', $3, ARRAY[$4::uuid], ARRAY[]::text[])
-        `, [USER_ID, scopedKey, `Legacy scoped ${allowedOrgId}`, allowedOrgId])
+        await createApiKeyForOrg(scopedKey, `Org bound ${allowedOrgId}`, allowedOrgId)
 
         const deniedResult = await query(`
           SELECT public.rbac_check_permission_direct(
@@ -678,45 +701,19 @@ describe('rbac permission system', () => {
         expect(result.rows[0].allowed).toBe(false)
       })
 
-      it('should deny org permissions outside limited_to_orgs for scoped api keys', async () => {
+      it('should deny org permissions outside bound org for api keys', async () => {
         const allowedOrgId = randomUUID()
         const targetOrgId = randomUUID()
-        const scopedKey = `rbac-scope-${randomUUID()}`
+        const scopedKey = `rbac-bound-${randomUUID()}`
 
         await query(`
           INSERT INTO public.orgs (id, name, management_email, created_by, use_new_rbac)
           VALUES
             ($1::uuid, $3, $5, $6::uuid, true),
             ($2::uuid, $4, $5, $6::uuid, true)
-        `, [allowedOrgId, targetOrgId, `RBAC Allowed ${allowedOrgId}`, `RBAC Target ${targetOrgId}`, `rbac-scope-${randomUUID()}@capgo.app`, USER_ID])
+        `, [allowedOrgId, targetOrgId, `RBAC Allowed ${allowedOrgId}`, `RBAC Target ${targetOrgId}`, `rbac-bound-${randomUUID()}@capgo.app`, USER_ID])
 
-        await query(`
-          INSERT INTO public.apikeys (user_id, key, key_hash, mode, name, limited_to_orgs, limited_to_apps)
-          VALUES ($1::uuid, $2, NULL, 'write', $3, ARRAY[$4::uuid], ARRAY[]::text[])
-        `, [USER_ID, scopedKey, `RBAC scoped ${allowedOrgId}`, allowedOrgId])
-
-        const apiKeyResult = await query(`
-          SELECT rbac_id
-          FROM public.apikeys
-          WHERE key = $1
-          LIMIT 1
-        `, [scopedKey])
-        const apiKeyRbacId = apiKeyResult.rows[0]?.rbac_id
-        expect(apiKeyRbacId).toBeTruthy()
-
-        await query(`
-          INSERT INTO public.role_bindings (principal_type, principal_id, role_id, scope_type, org_id, granted_by)
-          SELECT
-            'apikey',
-            $1::uuid,
-            r.id,
-            'org',
-            $2::uuid,
-            $3::uuid
-          FROM public.roles r
-          WHERE r.name = 'org_super_admin'
-          LIMIT 1
-        `, [apiKeyRbacId, allowedOrgId, USER_ID])
+        await createApiKeyForOrg(scopedKey, `RBAC bound ${allowedOrgId}`, allowedOrgId)
 
         const deniedResult = await query(`
           SELECT public.rbac_check_permission_direct(

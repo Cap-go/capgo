@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '../src/types/supabase.types'
+import { createHash } from 'node:crypto'
 import { spawnSync } from 'node:child_process'
 import process, { env } from 'node:process'
 import { createClient } from '@supabase/supabase-js'
@@ -234,6 +235,130 @@ export const NON_ACCESS_APP_NAME = 'com.demoadmin.app'
 export const headers = {
   'Content-Type': 'application/json',
   'Authorization': APIKEY_TEST_ALL,
+}
+
+type ApiKeyBinding = {
+  role_name: string
+  scope_type: 'org' | 'app' | 'channel'
+  org_id: string
+  app_id?: string | null
+  channel_id?: string | number | null
+  reason?: string
+}
+
+export function orgApiKeyBindings(orgId = ORG_ID, roleName = 'org_admin'): ApiKeyBinding[] {
+  return [{
+    role_name: roleName,
+    scope_type: 'org',
+    org_id: orgId,
+  }]
+}
+
+export async function appApiKeyBindings(appId: string, roleName = 'app_admin'): Promise<ApiKeyBinding[]> {
+  const { data, error } = await getSupabaseClient()
+    .from('apps')
+    .select('id, owner_org')
+    .eq('app_id', appId)
+    .single()
+
+  if (error || !data?.id || !data.owner_org)
+    throw error ?? new Error(`Unable to resolve app ${appId}`)
+
+  return [{
+    role_name: roleName,
+    scope_type: 'app',
+    org_id: data.owner_org,
+    app_id: data.id,
+  }]
+}
+
+export async function createDirectApiKeyWithBindings(options: {
+  userId?: string
+  key: string
+  name: string
+  orgId: string
+  roleName?: string
+  appId?: string
+  appRoleName?: string
+  expiresAt?: string | null
+  hashed?: boolean
+}) {
+  const supabase = getSupabaseClient()
+  const keyHash = options.hashed
+    ? createHash('sha256').update(options.key).digest('hex')
+    : null
+  const { data: apiKey, error: apiKeyError } = await supabase
+    .from('apikeys')
+    .insert({
+      user_id: options.userId ?? USER_ID,
+      key: options.hashed ? null : options.key,
+      key_hash: keyHash,
+      name: options.name,
+      expires_at: options.expiresAt ?? null,
+    })
+    .select('id, key, rbac_id, user_id, expires_at')
+    .single()
+
+  if (apiKeyError || !apiKey)
+    throw apiKeyError ?? new Error('Unable to create API key')
+
+  const bindingRows: Database['public']['Tables']['role_bindings']['Insert'][] = []
+  const { data: orgRole, error: orgRoleError } = await supabase
+    .from('roles')
+    .select('id')
+    .eq('name', options.roleName ?? 'org_admin')
+    .single()
+  if (orgRoleError || !orgRole)
+    throw orgRoleError ?? new Error('Unable to resolve org role')
+
+  bindingRows.push({
+    principal_type: 'apikey',
+    principal_id: apiKey.rbac_id,
+    role_id: orgRole.id,
+    scope_type: 'org',
+    org_id: options.orgId,
+    granted_by: apiKey.user_id,
+    reason: 'Test API key binding',
+    is_direct: true,
+  })
+
+  if (options.appId) {
+    const { data: app, error: appError } = await supabase
+      .from('apps')
+      .select('id, owner_org')
+      .eq('app_id', options.appId)
+      .single()
+    if (appError || !app?.id)
+      throw appError ?? new Error(`Unable to resolve app ${options.appId}`)
+
+    const { data: appRole, error: appRoleError } = await supabase
+      .from('roles')
+      .select('id')
+      .eq('name', options.appRoleName ?? 'app_admin')
+      .single()
+    if (appRoleError || !appRole)
+      throw appRoleError ?? new Error('Unable to resolve app role')
+
+    bindingRows.push({
+      principal_type: 'apikey',
+      principal_id: apiKey.rbac_id,
+      role_id: appRole.id,
+      scope_type: 'app',
+      org_id: app.owner_org ?? options.orgId,
+      app_id: app.id,
+      granted_by: apiKey.user_id,
+      reason: 'Test API key app binding',
+      is_direct: true,
+    })
+  }
+
+  const { error: bindingError } = await supabase
+    .from('role_bindings')
+    .insert(bindingRows)
+  if (bindingError)
+    throw bindingError
+
+  return apiKey
 }
 
 let cachedAuthHeaders: Record<string, string> | null = null

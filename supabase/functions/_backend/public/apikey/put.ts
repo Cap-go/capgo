@@ -3,8 +3,8 @@ import type { AuthInfo, MiddlewareKeyVariables } from '../../utils/hono.ts'
 import type { Database } from '../../utils/supabase.types.ts'
 import { honoFactory, parseBody, quickError, simpleError } from '../../utils/hono.ts'
 import { middlewareV2 } from '../../utils/hono_middleware.ts'
-import { resolveApikeyPolicyOrgIds, supabaseAdmin, supabaseWithAuth, validateExpirationAgainstOrgPolicies, validateExpirationDate } from '../../utils/supabase.ts'
-import { Constants } from '../../utils/supabase.types.ts'
+import { supabaseAdmin, supabaseWithAuth, validateExpirationAgainstOrgPolicies, validateExpirationDate } from '../../utils/supabase.ts'
+import { apiKeyHasLimitedScope } from './scope.ts'
 
 const app = honoFactory.createApp()
 
@@ -19,9 +19,6 @@ function isValidIdFormat(id: string): boolean {
 interface ApiKeyPut {
   id?: string | number
   name?: string
-  mode?: 'read' | 'write' | 'all' | 'upload'
-  limited_to_apps?: string[]
-  limited_to_orgs?: string[]
   expires_at?: string | null
   regenerate?: boolean
 }
@@ -32,14 +29,12 @@ async function handlePut(c: Context<MiddlewareKeyVariables>, idParam?: string) {
   const authApikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row'] | undefined
 
   // Block any constrained API key from mutating other keys owned by the same user.
-  const callerHasLimitedScope = (authApikey?.limited_to_orgs?.length ?? 0) > 0
-    || (authApikey?.limited_to_apps?.length ?? 0) > 0
-  if (auth.authType === 'apikey' && callerHasLimitedScope) {
+  if (auth.authType === 'apikey' && await apiKeyHasLimitedScope(c, authApikey)) {
     throw quickError(401, 'cannot_update_apikey', 'You cannot do that as a limited API key', { requestId, apikeyId: authApikey?.id })
   }
 
   const body = await parseBody<ApiKeyPut>(c)
-  const { id, name, mode, limited_to_apps, limited_to_orgs, expires_at, regenerate } = body
+  const { id, name, expires_at, regenerate } = body
 
   const resolvedId = typeof idParam === 'string' && idParam.length > 0 ? idParam : (id !== undefined ? String(id) : '')
   if (!resolvedId) {
@@ -60,15 +55,6 @@ async function handlePut(c: Context<MiddlewareKeyVariables>, idParam?: string) {
   if (name !== undefined) {
     updateData.name = name
   }
-  if (mode !== undefined) {
-    updateData.mode = mode
-  }
-  if (limited_to_apps !== undefined) {
-    updateData.limited_to_apps = limited_to_apps
-  }
-  if (limited_to_orgs !== undefined) {
-    updateData.limited_to_orgs = limited_to_orgs
-  }
   // Handle expires_at: null means remove expiration, undefined means don't update.
   if (expires_at !== undefined) {
     updateData.expires_at = expires_at
@@ -80,25 +66,12 @@ async function handlePut(c: Context<MiddlewareKeyVariables>, idParam?: string) {
     throw simpleError('name_must_be_a_string', 'Name must be a string', { requestId })
   }
 
-  const validModes = Constants.public.Enums.key_mode
-  if (mode !== undefined && (typeof mode !== 'string' || !validModes.includes(mode as any))) {
-    throw simpleError('invalid_mode', `Invalid mode. Must be one of: ${validModes.join(', ')}`, { requestId })
-  }
-
-  if (limited_to_apps !== undefined && (!Array.isArray(limited_to_apps) || !limited_to_apps.every(item => typeof item === 'string'))) {
-    throw simpleError('limited_to_apps_must_be_an_array_of_strings', 'limited_to_apps must be an array of strings', { requestId })
-  }
-
-  if (limited_to_orgs !== undefined && (!Array.isArray(limited_to_orgs) || !limited_to_orgs.every(item => typeof item === 'string'))) {
-    throw simpleError('limited_to_orgs_must_be_an_array_of_strings', 'limited_to_orgs must be an array of strings', { requestId })
-  }
-
   if (regenerate !== undefined && typeof regenerate !== 'boolean') {
     throw simpleError('regenerate_must_be_boolean', 'regenerate must be a boolean', { requestId })
   }
 
   if (!hasUpdates && !regenerate) {
-    throw simpleError('no_valid_fields_provided_for_update', 'No valid fields provided for update. Provide name, mode, limited_to_apps, limited_to_orgs, or expires_at.', { requestId })
+    throw simpleError('no_valid_fields_provided_for_update', 'No valid fields provided for update. Provide name, expires_at, or regenerate.', { requestId })
   }
 
   // Use supabaseWithAuth which handles both JWT and API key authentication
@@ -108,7 +81,7 @@ async function handlePut(c: Context<MiddlewareKeyVariables>, idParam?: string) {
   // Check if the apikey to update exists (RLS handles ownership)
   const baseQuery = supabase
     .from('apikeys')
-    .select('id, limited_to_orgs, limited_to_apps, expires_at, key, key_hash') // Also fetch scope + expires_at for policy validation
+    .select('id, rbac_id, expires_at, key, key_hash')
     .eq('user_id', auth.userId)
 
   // Avoid PostgREST cast errors by querying only the relevant column:
@@ -128,19 +101,20 @@ async function handlePut(c: Context<MiddlewareKeyVariables>, idParam?: string) {
     throw quickError(404, 'api_key_not_found_or_access_denied', 'API key not found or access denied', { requestId })
   }
 
-  const nextLimitedToOrgs = limited_to_orgs !== undefined ? limited_to_orgs : (existingApikey.limited_to_orgs || [])
-  const nextLimitedToApps = limited_to_apps !== undefined ? limited_to_apps : (existingApikey.limited_to_apps || [])
-
   // Validate expiration against org policies (only if expiration or scopes are changing)
-  if (expires_at !== undefined || limited_to_orgs !== undefined || limited_to_apps !== undefined) {
-    // Use new expires_at if provided, otherwise fall back to existing
-    const expirationToValidate = expires_at !== undefined ? expires_at : (existingApikey.expires_at ?? null)
-    const orgsToValidate = await resolveApikeyPolicyOrgIds(supabase, {
-      limitedToApps: nextLimitedToApps,
-      limitedToOrgs: nextLimitedToOrgs,
-      policyLookupSupabase,
-    })
-    await validateExpirationAgainstOrgPolicies(orgsToValidate, expirationToValidate, supabase)
+  if (expires_at !== undefined) {
+    const { data: bindings, error: bindingError } = await policyLookupSupabase
+      .from('role_bindings')
+      .select('org_id')
+      .eq('principal_type', 'apikey')
+      .eq('principal_id', existingApikey.rbac_id)
+
+    if (bindingError) {
+      throw quickError(500, 'failed_to_load_apikey_bindings', 'Failed to load API key bindings', { requestId, supabaseError: bindingError })
+    }
+
+    const orgsToValidate = [...new Set((bindings || []).map(binding => binding.org_id).filter((orgId): orgId is string => !!orgId))]
+    await validateExpirationAgainstOrgPolicies(orgsToValidate, expires_at, supabase)
   }
 
   const isHashedKey = existingApikey.key_hash !== null
