@@ -72,15 +72,7 @@ SELECT tests.authenticate_as('test_user');
 
 SELECT
     is(
-        accept_invitation_to_org(
-            (
-                SELECT id
-                FROM
-                    orgs
-                WHERE
-                    created_by = tests.get_supabase_uid('test_admin')
-            )
-        ),
+        accept_invitation_to_org('22dbad8a-b885-4309-9b3b-a09f8460fb6d'),
         'NO_INVITE',
         'accept_invitation_to_org test - no invite'
     );
@@ -94,13 +86,7 @@ SELECT
     is(
         invite_user_to_org(
             'test3@capgo.app',
-            (
-                SELECT id
-                FROM
-                    orgs
-                WHERE
-                    created_by = tests.get_supabase_uid('test_admin')
-            ),
+            '22dbad8a-b885-4309-9b3b-a09f8460fb6d',
             'read'
         ),
         'NO_EMAIL',
@@ -116,13 +102,7 @@ SELECT
     is(
         invite_user_to_org(
             'test@capgo.app',
-            (
-                SELECT id
-                FROM
-                    orgs
-                WHERE
-                    created_by = tests.get_supabase_uid('test_admin')
-            ),
+            '22dbad8a-b885-4309-9b3b-a09f8460fb6d',
             'read'
         ),
         'OK',
@@ -131,37 +111,11 @@ SELECT
 
 SELECT tests.clear_authentication();
 
--- Keep the acceptance assertion focused on the legacy accept RPC. The invite
--- wrapper compatibility is covered above, while this row shape is what old
--- clients submit when accepting an invite.
-SELECT tests.authenticate_as_service_role();
-
-INSERT INTO public.org_users (org_id, user_id, user_right, rbac_role_name)
-SELECT
-    (
-        SELECT id
-        FROM orgs
-        WHERE created_by = tests.get_supabase_uid('test_admin')
-    ),
-    tests.get_supabase_uid('test_user'),
-    'invite_read'::public.user_min_right,
-    'org_member';
-
-SELECT tests.clear_authentication();
-
 SELECT tests.authenticate_as('test_user');
 
 SELECT
     is(
-        accept_invitation_to_org(
-            (
-                SELECT id
-                FROM
-                    orgs
-                WHERE
-                    created_by = tests.get_supabase_uid('test_admin')
-            )
-        ),
+        accept_invitation_to_org('22dbad8a-b885-4309-9b3b-a09f8460fb6d'),
         'OK',
         'accept_invitation_to_org test - legacy invite input accepted through RBAC wrapper'
     );
