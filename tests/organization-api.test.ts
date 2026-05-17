@@ -284,15 +284,15 @@ describe('read-only API keys cannot access destructive organization routes', () 
     expect(payload.error).toBe('cannot_access_organization')
   })
 
-  it.concurrent('allows GET /organization/audit for accessible organizations', async () => {
+  it.concurrent('rejects GET /organization/audit without audit-log permission', async () => {
     const response = await fetch(`${BASE_URL}/organization/audit?orgId=${readOnlyOrgId}`, {
       headers: { ...readOnlyHeaders, capgkey: readOnlyKey },
       method: 'GET',
     })
 
-    expect(response.status).toBe(200)
-    // The audit endpoint is allowed for read-only keys; payload may be empty for a new org.
-    expect(await response.json()).toBeDefined()
+    expect(response.status).toBe(400)
+    const payload = await response.json() as { error: string }
+    expect(payload.error).toBe('invalid_org_id')
   })
 })
 

@@ -470,7 +470,7 @@ describe('[POST] /private/set_org_email - Error Cases', () => {
   it('should return 403 when not authorized for org', async () => {
     const response = await fetch(getEndpointUrl('/private/set_org_email'), {
       method: 'POST',
-      headers,
+      headers: testOrgHeaders,
       body: JSON.stringify({
         org_id: NON_OWNER_ORG_ID,
         email: 'test@example.com',

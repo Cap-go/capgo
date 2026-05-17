@@ -1264,7 +1264,7 @@ describe('webhook and webhook_delivery rls with api-key org bindings', () => {
   })
 
   it('prevents webhook_delivery org_id changes when update payload org_id is unauthorized', async () => {
-    const updateResult = await execWithRoleClaims(
+    await expect(execWithRoleClaims(
       'UPDATE public.webhook_deliveries SET org_id = $1 WHERE id = $2',
       {
         role: 'authenticated',
@@ -1276,9 +1276,7 @@ describe('webhook and webhook_delivery rls with api-key org bindings', () => {
         headers: { capgkey: authorizedKey.key },
         params: [ORG_ID_2, deliveryId],
       },
-    )
-
-    expect(updateResult.rowCount).toBe(0)
+    )).rejects.toMatchObject({ code: '42501' })
 
     const { rows } = await pool.query(
       'SELECT org_id FROM public.webhook_deliveries WHERE id = $1',

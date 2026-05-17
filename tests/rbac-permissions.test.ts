@@ -222,7 +222,7 @@ describe('rbac permission system', () => {
         await query(`
           INSERT INTO public.orgs (id, name, management_email, created_by, use_new_rbac)
           VALUES ($1::uuid, $2, $3, $4::uuid, false)
-        `, [staleOrgId, `Stale RBAC ${staleOrgId}`, staleEmail, staleUserId])
+        `, [staleOrgId, `Stale RBAC ${staleOrgId}`, staleEmail, USER_ID])
 
         await query(`
           INSERT INTO public.org_users (org_id, user_id, user_right)
