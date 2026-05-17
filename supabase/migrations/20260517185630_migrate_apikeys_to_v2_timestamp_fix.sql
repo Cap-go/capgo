@@ -2393,3 +2393,90 @@ GRANT EXECUTE ON FUNCTION "public"."get_accessible_apps_for_apikey_v2"("apikey" 
 GRANT EXECUTE ON FUNCTION "public"."get_accessible_apps_for_apikey_v2"("apikey" "text") TO "authenticated";
 GRANT EXECUTE ON FUNCTION "public"."get_accessible_apps_for_apikey_v2"("apikey" "text") TO "service_role";
 COMMENT ON FUNCTION "public"."get_accessible_apps_for_apikey_v2"("apikey" "text") IS 'Returns apps visible to the request capgkey using RBAC permission checks. The apikey argument is retained for CLI compatibility and must match the header when provided.';
+
+CREATE OR REPLACE FUNCTION "public"."get_organization_cli_warnings"(
+  "orgid" "uuid",
+  "cli_version" "text"
+) RETURNS "jsonb"[]
+LANGUAGE "plpgsql" SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+  messages jsonb[] := ARRAY[]::jsonb[];
+  request_apikey text;
+  api_key public.apikeys%ROWTYPE;
+  fallback_app_id text;
+  has_org_read boolean;
+BEGIN
+  PERFORM cli_version;
+
+  has_org_read := public.cli_check_permission(
+    permission_key := public.rbac_perm_org_read(),
+    org_id := orgid
+  );
+
+  IF NOT has_org_read THEN
+    SELECT public.get_apikey_header() INTO request_apikey;
+
+    IF request_apikey IS NOT NULL AND request_apikey <> '' THEN
+      SELECT *
+      INTO api_key
+      FROM public.find_apikey_by_value(request_apikey)
+      LIMIT 1;
+
+      IF api_key.id IS NOT NULL
+        AND NOT public.is_apikey_expired(api_key.expires_at)
+      THEN
+        SELECT public.apps.app_id
+        INTO fallback_app_id
+        FROM public.role_bindings rb
+        JOIN public.apps ON public.apps.id = rb.app_id
+        WHERE rb.principal_type = public.rbac_principal_apikey()
+          AND rb.principal_id = api_key.rbac_id
+          AND rb.scope_type = public.rbac_scope_app()
+          AND rb.app_id IS NOT NULL
+          AND public.apps.owner_org = orgid
+          AND (rb.expires_at IS NULL OR rb.expires_at > now())
+        ORDER BY public.apps.app_id
+        LIMIT 1;
+
+        IF fallback_app_id IS NOT NULL THEN
+          has_org_read := public.cli_check_permission(
+            permission_key := public.rbac_perm_app_read(),
+            org_id := orgid,
+            app_id := fallback_app_id
+          );
+        END IF;
+      END IF;
+    END IF;
+  END IF;
+
+  IF NOT has_org_read THEN
+    messages := array_append(messages, jsonb_build_object(
+      'message', 'API key does not have read access to this organization',
+      'fatal', true
+    ));
+    RETURN messages;
+  END IF;
+
+  IF (
+    public.is_paying_and_good_plan_org_action(orgid, ARRAY['mau']::public.action_type[]) = true
+    AND public.is_paying_and_good_plan_org_action(orgid, ARRAY['bandwidth']::public.action_type[]) = true
+    AND public.is_paying_and_good_plan_org_action(orgid, ARRAY['storage']::public.action_type[]) = false
+  ) THEN
+    messages := array_append(messages, jsonb_build_object(
+      'message', 'You have exceeded your storage limit.\nUpload will fail, but you can still download your data.\nMAU and bandwidth limits are not exceeded.\nIn order to upload your plan, please upgrade your plan here: https://console.capgo.app/settings/plans.',
+      'fatal', true
+    ));
+  END IF;
+
+  RETURN messages;
+END;
+$$;
+
+ALTER FUNCTION "public"."get_organization_cli_warnings"("orgid" "uuid", "cli_version" "text") OWNER TO "postgres";
+REVOKE ALL ON FUNCTION "public"."get_organization_cli_warnings"("orgid" "uuid", "cli_version" "text") FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION "public"."get_organization_cli_warnings"("orgid" "uuid", "cli_version" "text") TO "anon";
+GRANT EXECUTE ON FUNCTION "public"."get_organization_cli_warnings"("orgid" "uuid", "cli_version" "text") TO "authenticated";
+GRANT EXECUTE ON FUNCTION "public"."get_organization_cli_warnings"("orgid" "uuid", "cli_version" "text") TO "service_role";
+COMMENT ON FUNCTION "public"."get_organization_cli_warnings"("orgid" "uuid", "cli_version" "text") IS 'CLI compatibility warning helper backed by RBAC API key bindings. App-scoped V2 keys are accepted for old CLI warning checks when they can read at least one app in the requested org.';
