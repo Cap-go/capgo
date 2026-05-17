@@ -88,7 +88,7 @@ SELECT
 FROM seed_data
 ON CONFLICT (id) DO NOTHING;
 
--- Legacy app + membership (exercises fallback path)
+-- Compatibility app + membership (org_users insert syncs into RBAC)
 WITH seed_data AS (
     SELECT
         '33333333-3333-4333-8333-333333333333'::uuid AS admin_user,
@@ -320,7 +320,7 @@ WHERE
     api.key = api_key_value
     AND r.name = public.rbac_role_org_member();
 
--- 1) Legacy path still works when RBAC flag is off
+-- 1) org_users compatibility writes are synced into RBAC even when the old flag is false
 SELECT
     ok(
         public.rbac_check_permission_direct(
@@ -331,7 +331,7 @@ SELECT
             null::bigint,
             null::varchar
         ),
-        'Legacy org_users rights honored when RBAC disabled'
+        'org_users compatibility write grants RBAC permission'
     );
 
 -- 2) RBAC grants org_admin via role_binding (no org_users row)
@@ -420,13 +420,13 @@ SELECT
 SELECT tests.authenticate_as_service_role();
 SELECT set_config('request.headers', '{}', true);
 
--- 6) Disabling RBAC removes RBAC-granted access when no legacy rights exist
+-- 6) The old RBAC flag is now compatibility-only; RBAC grants remain authoritative
 UPDATE public.orgs SET use_new_rbac = false
 WHERE id = '22222222-2222-4222-8222-222222222222';
 
 SELECT
     ok(
-        NOT public.rbac_check_permission_direct(
+        public.rbac_check_permission_direct(
             'org.update_user_roles',
             '44444444-4444-4444-8444-444444444444',
             '22222222-2222-4222-8222-222222222222',
@@ -434,7 +434,7 @@ SELECT
             null::bigint,
             null::varchar
         ),
-        'RBAC-disabled org falls back to legacy (no rights without org_users row)'
+        'RBAC compatibility flag does not disable role bindings'
     );
 
 UPDATE public.orgs SET use_new_rbac = true

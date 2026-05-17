@@ -25,6 +25,18 @@ VALUES
   (tests.get_supabase_uid('org_create_app_writer'), '70000000-0000-4000-8000-000000000002', 'write'::public.user_min_right)
 ON CONFLICT DO NOTHING;
 
+INSERT INTO public.role_bindings (principal_type, principal_id, role_id, scope_type, org_id, granted_by)
+SELECT
+  public.rbac_principal_user(),
+  tests.get_supabase_uid('org_create_app_writer'),
+  r.id,
+  public.rbac_scope_org(),
+  '70000000-0000-4000-8000-000000000002',
+  tests.get_supabase_uid('org_create_app_admin')
+FROM public.roles r
+WHERE r.name = public.rbac_role_org_member()
+ON CONFLICT DO NOTHING;
+
 DELETE FROM public.role_bindings
 WHERE principal_type = public.rbac_principal_user()
   AND principal_id = tests.get_supabase_uid('org_create_app_member')
@@ -99,7 +111,7 @@ SELECT ok(
 );
 
 SELECT ok(
-  NOT public.rbac_check_permission_direct(
+  public.rbac_check_permission_direct(
     public.rbac_perm_org_create_app(),
     tests.get_supabase_uid('org_create_app_member'),
     '70000000-0000-4000-8000-000000000002',
@@ -107,7 +119,7 @@ SELECT ok(
     NULL::bigint,
     NULL::text
   ),
-  'Legacy fallback for org.create_app remains stricter than org_member/read'
+  'RBAC compatibility flag still honors org_member create-app permission'
 );
 
 SELECT ok(
@@ -119,7 +131,7 @@ SELECT ok(
     NULL::bigint,
     NULL::text
   ),
-  'Legacy write membership still grants org.create_app'
+  'Compatibility write membership synced into RBAC grants org.create_app'
 );
 
 SELECT tests.authenticate_as('org_create_app_member');
@@ -189,7 +201,7 @@ SELECT ok(
     WHERE app_id = 'com.test.orgcreateapp.legacy.user'
       AND owner_org = '70000000-0000-4000-8000-000000000002'
   ),
-  'apps INSERT RLS allows legacy write user to create apps'
+  'apps INSERT RLS allows compatibility write user to create apps'
 );
 
 SELECT tests.clear_authentication();

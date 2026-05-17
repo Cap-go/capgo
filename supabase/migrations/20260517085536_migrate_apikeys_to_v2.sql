@@ -1546,6 +1546,134 @@ ALTER FUNCTION "public"."rbac_org_role_for_legacy_right"("public"."user_min_righ
 REVOKE ALL ON FUNCTION "public"."rbac_org_role_for_legacy_right"("public"."user_min_right") FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION "public"."rbac_org_role_for_legacy_right"("public"."user_min_right") TO "service_role";
 
+CREATE OR REPLACE FUNCTION "public"."invite_user_to_org_rbac"("email" character varying, "org_id" "uuid", "role_name" "text") RETURNS character varying
+LANGUAGE "plpgsql" SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+  org record;
+  invited_user record;
+  current_record record;
+  current_tmp_user record;
+  role_id uuid;
+  role_priority integer;
+  caller_max_priority integer := 0;
+  legacy_right public.user_min_right;
+  invite_right public.user_min_right;
+  api_key_text text;
+  api_key_row public.apikeys%ROWTYPE;
+  v_granted_by uuid;
+  v_principal_type text;
+  v_principal_id uuid;
+BEGIN
+  SELECT * INTO org FROM public.orgs WHERE public.orgs.id = invite_user_to_org_rbac.org_id;
+  IF org IS NULL THEN
+    RETURN 'NO_ORG';
+  END IF;
+
+  SELECT r.id, r.priority_rank INTO role_id, role_priority
+  FROM public.roles r
+  WHERE r.name = invite_user_to_org_rbac.role_name
+    AND r.scope_type = public.rbac_scope_org()
+    AND r.is_assignable = true
+  LIMIT 1;
+
+  IF role_id IS NULL THEN
+    RETURN 'ROLE_NOT_FOUND';
+  END IF;
+
+  SELECT public.get_apikey_header() INTO api_key_text;
+  IF api_key_text IS NOT NULL THEN
+    SELECT * INTO api_key_row FROM public.find_apikey_by_value(api_key_text) LIMIT 1;
+    v_granted_by := api_key_row.user_id;
+    v_principal_type := public.rbac_principal_apikey();
+    v_principal_id := api_key_row.rbac_id;
+  ELSE
+    v_granted_by := auth.uid();
+    v_principal_type := public.rbac_principal_user();
+    v_principal_id := auth.uid();
+  END IF;
+
+  IF invite_user_to_org_rbac.role_name = public.rbac_role_org_super_admin() THEN
+    IF NOT public.rbac_check_permission_direct(public.rbac_perm_org_update_user_roles(), auth.uid(), invite_user_to_org_rbac.org_id, NULL, NULL, api_key_text) THEN
+      RETURN 'NO_RIGHTS';
+    END IF;
+  ELSE
+    IF NOT public.rbac_check_permission_direct(public.rbac_perm_org_invite_user(), auth.uid(), invite_user_to_org_rbac.org_id, NULL, NULL, api_key_text) THEN
+      RETURN 'NO_RIGHTS';
+    END IF;
+  END IF;
+
+  IF v_principal_id IS NULL THEN
+    RETURN 'NO_RIGHTS';
+  END IF;
+
+  SELECT COALESCE(MAX(r.priority_rank), 0) INTO caller_max_priority
+  FROM public.role_bindings rb
+  JOIN public.roles r
+    ON r.id = rb.role_id
+    AND r.scope_type = rb.scope_type
+  WHERE rb.principal_type = v_principal_type
+    AND rb.principal_id = v_principal_id
+    AND rb.org_id = invite_user_to_org_rbac.org_id
+    AND (rb.expires_at IS NULL OR rb.expires_at > now());
+
+  IF caller_max_priority < role_priority THEN
+    RETURN 'NO_RIGHTS';
+  END IF;
+
+  legacy_right := public.rbac_legacy_right_for_org_role(invite_user_to_org_rbac.role_name);
+  invite_right := public.transform_role_to_invite(legacy_right);
+
+  SELECT public.users.id INTO invited_user FROM public.users WHERE public.users.email = invite_user_to_org_rbac.email;
+
+  IF invited_user IS NOT NULL THEN
+    SELECT public.org_users.id INTO current_record
+    FROM public.org_users
+    WHERE public.org_users.user_id = invited_user.id
+      AND public.org_users.org_id = invite_user_to_org_rbac.org_id;
+
+    IF current_record IS NOT NULL THEN
+      RETURN 'ALREADY_INVITED';
+    ELSE
+      INSERT INTO public.org_users (user_id, org_id, user_right, rbac_role_name)
+      VALUES (invited_user.id, invite_user_to_org_rbac.org_id, invite_right, invite_user_to_org_rbac.role_name);
+
+      INSERT INTO public.role_bindings (
+        principal_type, principal_id, role_id, scope_type, org_id,
+        granted_by, granted_at, reason, is_direct
+      ) VALUES (
+        public.rbac_principal_user(), invited_user.id, role_id, public.rbac_scope_org(), invite_user_to_org_rbac.org_id,
+        COALESCE(v_granted_by, invited_user.id), now(), 'Invited via invite_user_to_org_rbac', true
+      ) ON CONFLICT DO NOTHING;
+
+      RETURN 'OK';
+    END IF;
+  ELSE
+    SELECT * INTO current_tmp_user
+    FROM public.tmp_users
+    WHERE public.tmp_users.email = invite_user_to_org_rbac.email
+      AND public.tmp_users.org_id = invite_user_to_org_rbac.org_id;
+
+    IF current_tmp_user IS NOT NULL THEN
+      IF current_tmp_user.cancelled_at IS NOT NULL THEN
+        IF current_tmp_user.cancelled_at > (CURRENT_TIMESTAMP - INTERVAL '3 hours') THEN
+          RETURN 'TOO_RECENT_INVITATION_CANCELATION';
+        ELSE
+          RETURN 'NO_EMAIL';
+        END IF;
+      ELSE
+        RETURN 'ALREADY_INVITED';
+      END IF;
+    ELSE
+      RETURN 'NO_EMAIL';
+    END IF;
+  END IF;
+END;
+$$;
+
+ALTER FUNCTION "public"."invite_user_to_org_rbac"("email" character varying, "org_id" "uuid", "role_name" "text") OWNER TO "postgres";
+
 CREATE OR REPLACE FUNCTION "public"."invite_user_to_org"(
   "email" character varying,
   "org_id" "uuid",

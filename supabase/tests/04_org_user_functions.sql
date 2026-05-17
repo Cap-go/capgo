@@ -87,7 +87,7 @@ SELECT
 
 SELECT tests.clear_authentication();
 
--- Test 2: Check if the function returns 'INVALID_ROLE' when the user_right is not an invite role
+-- Test 2: Legacy invite input is converted to an RBAC-backed invite row
 SELECT tests.authenticate_as('test_admin');
 
 SELECT
@@ -144,8 +144,8 @@ SELECT
                     created_by = tests.get_supabase_uid('test_admin')
             )
         ),
-        'INVALID_ROLE',
-        'accept_invitation_to_org test - invalid role'
+        'OK',
+        'accept_invitation_to_org test - legacy invite input accepted through RBAC wrapper'
     );
 
 SELECT tests.clear_authentication();
@@ -156,7 +156,8 @@ SELECT tests.authenticate_as_service_role();
 
 UPDATE org_users
 SET
-    user_right = 'invite_admin'
+    user_right = 'invite_admin',
+    rbac_role_name = 'org_admin'
 WHERE
     user_id = tests.get_supabase_uid('test_user')
     AND org_id = '22dbad8a-b885-4309-9b3b-a09f8460fb6d';
