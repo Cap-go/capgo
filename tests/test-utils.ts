@@ -1,6 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '../src/types/supabase.types'
-import { createHash } from 'node:crypto'
 import { spawnSync } from 'node:child_process'
 import process, { env } from 'node:process'
 import { createClient } from '@supabase/supabase-js'
@@ -284,24 +283,52 @@ export async function createDirectApiKeyWithBindings(options: {
   hashed?: boolean
 }) {
   const supabase = getSupabaseClient()
-  const keyHash = options.hashed
-    // codeql[js/insufficient-password-hash] API keys are lookup tokens, not passwords.
-    ? createHash('sha256').update(options.key).digest('hex')
-    : null
-  const { data: apiKey, error: apiKeyError } = await supabase
-    .from('apikeys')
-    .insert({
-      user_id: options.userId ?? USER_ID,
-      key: options.hashed ? null : options.key,
-      key_hash: keyHash,
-      name: options.name,
-      expires_at: options.expiresAt ?? null,
-    })
-    .select('id, key, rbac_id, user_id, expires_at')
-    .single()
+  let apiKey: {
+    id: number
+    key: string | null
+    rbac_id: string
+    user_id: string
+    expires_at: string | null
+  } | null = null
 
-  if (apiKeyError || !apiKey)
-    throw apiKeyError ?? new Error('Unable to create API key')
+  if (options.hashed) {
+    const [insertedKey] = await executeSQL(
+      `INSERT INTO public.apikeys (user_id, key, key_hash, name, expires_at)
+       VALUES ($1, NULL, encode(extensions.digest($2, 'sha256'), 'hex'), $3, $4)
+       RETURNING id, key, rbac_id, user_id, expires_at`,
+      [options.userId ?? USER_ID, options.key, options.name, options.expiresAt ?? null],
+    )
+    apiKey = insertedKey
+      ? {
+          id: Number(insertedKey.id),
+          key: insertedKey.key,
+          rbac_id: insertedKey.rbac_id,
+          user_id: insertedKey.user_id,
+          expires_at: insertedKey.expires_at,
+        }
+      : null
+  }
+  else {
+    const { data, error: apiKeyError } = await supabase
+      .from('apikeys')
+      .insert({
+        user_id: options.userId ?? USER_ID,
+        key: options.key,
+        key_hash: null,
+        name: options.name,
+        expires_at: options.expiresAt ?? null,
+      })
+      .select('id, key, rbac_id, user_id, expires_at')
+      .single()
+
+    if (apiKeyError)
+      throw apiKeyError
+
+    apiKey = data
+  }
+
+  if (!apiKey)
+    throw new Error('Unable to create API key')
 
   const bindingRows: Database['public']['Tables']['role_bindings']['Insert'][] = []
   const { data: orgRole, error: orgRoleError } = await supabase
