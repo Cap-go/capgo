@@ -196,7 +196,7 @@ describe('ready bundle upload immutability regression', () => {
   })
 })
 
-describe('attachment cleanup on app deletion regression', () => {
+describe('attachment reads after app deletion', () => {
   const scopeId = randomUUID().replaceAll('-', '')
   const orgId = randomUUID()
   const stripeCustomerId = `cus_files_delete_${scopeId}`
@@ -221,7 +221,7 @@ describe('attachment cleanup on app deletion regression', () => {
     await cleanupSeededOrg(appId, orgId, stripeCustomerId, [uploadKeyId, deleteKeyId])
   }, 60_000)
 
-  it('returns not_found for uploaded attachments after the app is deleted', async () => {
+  it.concurrent('continues serving cached uploaded attachments after the app is deleted', async () => {
     await seedApp(appId, orgId, stripeCustomerId)
 
     const body = new TextEncoder().encode('delete-me-after-app-delete')
@@ -267,6 +267,7 @@ describe('attachment cleanup on app deletion regression', () => {
     expect(deleteResponse.status).toBe(200)
 
     const readAfterDelete = await fetch(getEndpointUrl(`/files/read/attachments/${filePath}`))
-    expect(readAfterDelete.status).toBe(404)
+    expect(readAfterDelete.status).toBe(200)
+    expect(await readAfterDelete.text()).toBe('delete-me-after-app-delete')
   })
 })

@@ -1088,6 +1088,7 @@ function addNativePackagesFromNodeModules(
  * - ios/ OR android/ folder (based on platform)
  * - node_modules with native code (from Podfile/settings.gradle)
  * - capacitor.config.*, package.json, package-lock.json
+ * Zip contents are the user's responsibility, not Capgo's; Capgo packages the user-provided files as-is.
  */
 export async function zipDirectory(projectDir: string, outputPath: string, platform: 'ios' | 'android', capConfig: any, options: ZipDirectoryOptions = {}): Promise<void> {
   const platformDir = getPlatformDirFromCapacitorConfig(capConfig, platform)

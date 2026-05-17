@@ -12,6 +12,9 @@ const webhookUrl = 'https://example.com/webhook'
 const customerId = `cus_test_${WEBHOOK_TEST_ORG_ID}`
 
 let createdWebhookId: string | null = null
+let directCreatedWebhookId: string | null = null
+let reassignCreatedWebhookId: string | null = null
+let reassignCreatorUserId: string | null = null
 let lastDeliveryId: string | null = null
 let appScopedKeyId: number | null = null
 let appScopedKey: string | null = null
@@ -91,6 +94,16 @@ afterAll(async () => {
   if (createdWebhookId) {
     await (getSupabaseClient() as any).from('webhooks').delete().eq('id', createdWebhookId)
   }
+  if (directCreatedWebhookId) {
+    await (getSupabaseClient() as any).from('webhooks').delete().eq('id', directCreatedWebhookId)
+  }
+  if (reassignCreatedWebhookId) {
+    await (getSupabaseClient() as any).from('webhooks').delete().eq('id', reassignCreatedWebhookId)
+  }
+  if (reassignCreatorUserId) {
+    await getSupabaseClient().from('users').delete().eq('id', reassignCreatorUserId)
+    await getSupabaseClient().auth.admin.deleteUser(reassignCreatorUserId)
+  }
   if (appScopedKeyId) {
     await getSupabaseClient().from('apikeys').delete().eq('id', appScopedKeyId)
   }
@@ -163,13 +176,89 @@ describe('[POST] /webhooks', () => {
     })
 
     expect(response.status).toBe(201)
-    const data = await response.json() as { status: string, webhook: { id: string, name: string, url: string } }
+    const data = await response.json() as { status: string, webhook: { id: string, name: string, url: string, created_by: string } }
     expect(data.status).toBe('Webhook created')
     expect(data.webhook).toBeDefined()
     expect(data.webhook.name).toBe(webhookName)
     expect(data.webhook.url).toBe(webhookUrl)
+    expect(data.webhook.created_by).toBe(USER_ID)
 
     createdWebhookId = data.webhook.id
+  })
+
+  it.concurrent('fills created_by for direct inserts that omit it', async () => {
+    const webhookId = randomUUID()
+    const { data, error } = await (getSupabaseClient() as any)
+      .from('webhooks')
+      .insert({
+        id: webhookId,
+        org_id: WEBHOOK_TEST_ORG_ID,
+        name: `Direct Insert Webhook ${globalId}`,
+        url: webhookUrl,
+        events: ['app_versions'],
+        enabled: true,
+      })
+      .select('id, created_by')
+      .single()
+
+    expect(error).toBeNull()
+    expect(data?.created_by).toBe(USER_ID)
+
+    directCreatedWebhookId = webhookId
+  })
+
+  it.concurrent('reassigns created_by when a non-owner webhook creator is deleted', async () => {
+    const creatorEmail = `webhook-creator-${globalId}@capgo.test`
+    const { data: authData, error: authError } = await getSupabaseClient().auth.admin.createUser({
+      email: creatorEmail,
+      password: 'testtest',
+      email_confirm: true,
+    })
+
+    expect(authError).toBeNull()
+    expect(authData.user?.id).toBeDefined()
+
+    reassignCreatorUserId = authData.user!.id
+
+    const { error: userError } = await getSupabaseClient().from('users').insert({
+      id: reassignCreatorUserId,
+      email: creatorEmail,
+    })
+    expect(userError).toBeNull()
+
+    const webhookId = randomUUID()
+    const { error: webhookError } = await (getSupabaseClient() as any)
+      .from('webhooks')
+      .insert({
+        id: webhookId,
+        org_id: WEBHOOK_TEST_ORG_ID,
+        name: `Reassign Creator Webhook ${globalId}`,
+        url: webhookUrl,
+        events: ['app_versions'],
+        enabled: true,
+        created_by: reassignCreatorUserId,
+      })
+
+    expect(webhookError).toBeNull()
+    reassignCreatedWebhookId = webhookId
+
+    const { error: deleteError } = await getSupabaseClient()
+      .from('users')
+      .delete()
+      .eq('id', reassignCreatorUserId)
+    expect(deleteError).toBeNull()
+
+    const { data, error } = await (getSupabaseClient() as any)
+      .from('webhooks')
+      .select('created_by')
+      .eq('id', webhookId)
+      .single()
+
+    expect(error).toBeNull()
+    expect(data?.created_by).toBe(USER_ID)
+
+    await getSupabaseClient().auth.admin.deleteUser(reassignCreatorUserId)
+    reassignCreatorUserId = null
   })
 
   it('create webhook with missing required fields', async () => {

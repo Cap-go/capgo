@@ -21,6 +21,10 @@ jobs:
       contents: read
       actions: write
     steps:
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24.x
       - uses: actions/checkout@v6
         with:
           ref: ${{ github.event.inputs.tag }}

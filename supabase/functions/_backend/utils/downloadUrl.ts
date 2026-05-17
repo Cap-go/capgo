@@ -2,6 +2,7 @@ import type { Context } from 'hono'
 import type { Database } from './supabase.types.ts'
 import { getRuntimeKey } from 'hono/adapter'
 import { cloudlog, cloudlogErr } from './logging.ts'
+import { normalizeLegacyEncodedManifestFileName } from './manifest_encoding.ts'
 import { s3 } from './s3.ts'
 
 const EXPIRATION_SECONDS = 604800
@@ -98,7 +99,7 @@ export function getManifestUrl(c: Context, versionId: number, manifest: Partial<
         return null
 
       return {
-        file_name: entry.file_name,
+        file_name: normalizeLegacyEncodedManifestFileName(entry.file_name, entry.s3_path),
         file_hash: entry.file_hash,
         download_url: `${url.protocol}//${url.host}/${finalPath}/${entry.s3_path}?key=${signKey}&device_id=${deviceId}`,
       }

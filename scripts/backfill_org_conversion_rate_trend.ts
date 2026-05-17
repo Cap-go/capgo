@@ -37,6 +37,7 @@ type GlobalStatsRow = Pick<
   | 'plan_solo_conversion_rate'
   | 'plan_team'
   | 'plan_team_conversion_rate'
+  | 'plan_total_conversion_rate'
 >
 type OrgCreatedAtRow = Pick<Database['public']['Tables']['orgs']['Row'], 'created_at'>
 
@@ -45,6 +46,7 @@ export interface PlanConversionRates {
   maker: number
   solo: number
   team: number
+  total: number
 }
 
 export interface OrgConversionRateBackfillRow {
@@ -94,11 +96,17 @@ export function calculateOrgConversionRate(paying: number | string | null | unde
 }
 
 function calculatePlanConversionRates(row: GlobalStatsRow, orgs: number): PlanConversionRates {
+  const total = toMetricNumber(row.plan_solo)
+    + toMetricNumber(row.plan_maker)
+    + toMetricNumber(row.plan_team)
+    + toMetricNumber(row.plan_enterprise)
+
   return {
     solo: calculateOrgConversionRate(row.plan_solo, orgs),
     maker: calculateOrgConversionRate(row.plan_maker, orgs),
     team: calculateOrgConversionRate(row.plan_team, orgs),
     enterprise: calculateOrgConversionRate(row.plan_enterprise, orgs),
+    total: calculateOrgConversionRate(total, orgs),
   }
 }
 
@@ -108,6 +116,7 @@ function getCurrentPlanConversionRates(row: GlobalStatsRow): PlanConversionRates
     maker: toMetricNumber(row.plan_maker_conversion_rate),
     team: toMetricNumber(row.plan_team_conversion_rate),
     enterprise: toMetricNumber(row.plan_enterprise_conversion_rate),
+    total: toMetricNumber(row.plan_total_conversion_rate),
   }
 }
 
@@ -120,6 +129,7 @@ function havePlanRatesChanged(currentRates: PlanConversionRates, nextRates: Plan
     || hasRateChanged(currentRates.maker, nextRates.maker)
     || hasRateChanged(currentRates.team, nextRates.team)
     || hasRateChanged(currentRates.enterprise, nextRates.enterprise)
+    || hasRateChanged(currentRates.total, nextRates.total)
 }
 
 function buildOrgCountsByDateId(dateIds: string[], orgRows: OrgCreatedAtRow[]) {
@@ -181,7 +191,8 @@ async function fetchGlobalStatsRows(supabase: SupabaseClient, fromDateId: string
         plan_solo_conversion_rate,
         plan_maker_conversion_rate,
         plan_team_conversion_rate,
-        plan_enterprise_conversion_rate
+        plan_enterprise_conversion_rate,
+        plan_total_conversion_rate
       `)
       .order('date_id', { ascending: true })
       .range(offset, offset + DEFAULT_PAGE_SIZE - 1)
@@ -240,6 +251,7 @@ async function updateConversionRate(supabase: SupabaseClient, row: OrgConversion
     .from('global_stats')
     .update({
       org_conversion_rate: row.next_rate,
+      plan_total_conversion_rate: row.next_plan_rates.total,
       plan_solo_conversion_rate: row.next_plan_rates.solo,
       plan_maker_conversion_rate: row.next_plan_rates.maker,
       plan_team_conversion_rate: row.next_plan_rates.team,
@@ -291,7 +303,7 @@ async function main(args = process.argv.slice(2), runtimeEnv: Record<string, str
   if (sampleRows.length > 0) {
     console.log('Sample updates:')
     for (const row of sampleRows) {
-      console.log(`${row.date_id}: total ${row.current_rate}% -> ${row.next_rate}% (${row.paying}/${row.orgs}); plans ${row.current_plan_rates.solo}/${row.current_plan_rates.maker}/${row.current_plan_rates.team}/${row.current_plan_rates.enterprise}% -> ${row.next_plan_rates.solo}/${row.next_plan_rates.maker}/${row.next_plan_rates.team}/${row.next_plan_rates.enterprise}%`)
+      console.log(`${row.date_id}: org ${row.current_rate}% -> ${row.next_rate}% (${row.paying}/${row.orgs}); paid plans ${row.current_plan_rates.total}% -> ${row.next_plan_rates.total}%; plans ${row.current_plan_rates.solo}/${row.current_plan_rates.maker}/${row.current_plan_rates.team}/${row.current_plan_rates.enterprise}% -> ${row.next_plan_rates.solo}/${row.next_plan_rates.maker}/${row.next_plan_rates.team}/${row.next_plan_rates.enterprise}%`)
     }
   }
 

@@ -267,56 +267,56 @@ export function getDatabaseURL(c: Context, readOnly = false): string {
     // Hyperdrive main read replica regional routing in Cloudflare Workers
     // When using Hyperdrive we use session databases directly to avoid supabase pooler overhead and allow prepared statements
     // Asia region - Japan
-    if (c.env.HYPERDRIVE_CAPGO_PS_AS_JAPAN && dbRegion === 'AS_JAPAN') {
-      setDatabaseSource(c, 'HYPERDRIVE_CAPGO_PLANETSCALE_AS_JAPAN')
-      cloudlog({ requestId: c.get('requestId'), message: 'Using HYPERDRIVE_CAPGO_PLANETSCALE_AS_JAPAN for read-only' })
-      return c.env.HYPERDRIVE_CAPGO_PS_AS_JAPAN.connectionString
+    if (c.env.HYPERDRIVE_CAPGO_READ_AS_JAPAN && dbRegion === 'AS_JAPAN') {
+      setDatabaseSource(c, 'HYPERDRIVE_CAPGO_READ_AS_JAPAN')
+      cloudlog({ requestId: c.get('requestId'), message: 'Using HYPERDRIVE_CAPGO_READ_AS_JAPAN for read-only' })
+      return c.env.HYPERDRIVE_CAPGO_READ_AS_JAPAN.connectionString
     }
     // Asia region - India
-    if (c.env.HYPERDRIVE_CAPGO_PS_AS_INDIA && dbRegion === 'AS_INDIA') {
-      setDatabaseSource(c, 'HYPERDRIVE_CAPGO_PLANETSCALE_AS_INDIA')
-      cloudlog({ requestId: c.get('requestId'), message: 'Using HYPERDRIVE_CAPGO_PLANETSCALE_AS_INDIA for read-only' })
-      return c.env.HYPERDRIVE_CAPGO_PS_AS_INDIA.connectionString
+    if (c.env.HYPERDRIVE_CAPGO_READ_AS_INDIA && dbRegion === 'AS_INDIA') {
+      setDatabaseSource(c, 'HYPERDRIVE_CAPGO_READ_AS_INDIA')
+      cloudlog({ requestId: c.get('requestId'), message: 'Using HYPERDRIVE_CAPGO_READ_AS_INDIA for read-only' })
+      return c.env.HYPERDRIVE_CAPGO_READ_AS_INDIA.connectionString
     }
     // // US region
-    if (c.env.HYPERDRIVE_CAPGO_PS_NA && dbRegion === 'NA') {
-      setDatabaseSource(c, 'HYPERDRIVE_CAPGO_PLANETSCALE_NA')
-      cloudlog({ requestId: c.get('requestId'), message: 'Using HYPERDRIVE_CAPGO_PLANETSCALE_NA for read-only' })
-      return c.env.HYPERDRIVE_CAPGO_PS_NA.connectionString
+    if (c.env.HYPERDRIVE_CAPGO_READ_NA && dbRegion === 'NA') {
+      setDatabaseSource(c, 'HYPERDRIVE_CAPGO_READ_NA')
+      cloudlog({ requestId: c.get('requestId'), message: 'Using HYPERDRIVE_CAPGO_READ_NA for read-only' })
+      return c.env.HYPERDRIVE_CAPGO_READ_NA.connectionString
     }
     // // EU region
-    if (c.env.HYPERDRIVE_CAPGO_PS_EU && dbRegion === 'EU') {
-      setDatabaseSource(c, 'HYPERDRIVE_CAPGO_PLANETSCALE_EU')
-      cloudlog({ requestId: c.get('requestId'), message: 'Using HYPERDRIVE_CAPGO_PLANETSCALE_EU for read-only' })
-      return c.env.HYPERDRIVE_CAPGO_PS_EU.connectionString
+    if (c.env.HYPERDRIVE_CAPGO_READ_EU && dbRegion === 'EU') {
+      setDatabaseSource(c, 'HYPERDRIVE_CAPGO_READ_EU')
+      cloudlog({ requestId: c.get('requestId'), message: 'Using HYPERDRIVE_CAPGO_READ_EU for read-only' })
+      return c.env.HYPERDRIVE_CAPGO_READ_EU.connectionString
     }
     // // OC region
-    if (c.env.HYPERDRIVE_CAPGO_PS_OC && dbRegion === 'OC') {
-      setDatabaseSource(c, 'HYPERDRIVE_CAPGO_PLANETSCALE_OC')
-      cloudlog({ requestId: c.get('requestId'), message: 'Using HYPERDRIVE_CAPGO_PLANETSCALE_OC for read-only' })
-      return c.env.HYPERDRIVE_CAPGO_PS_OC.connectionString
+    if (c.env.HYPERDRIVE_CAPGO_READ_OC && dbRegion === 'OC') {
+      setDatabaseSource(c, 'HYPERDRIVE_CAPGO_READ_OC')
+      cloudlog({ requestId: c.get('requestId'), message: 'Using HYPERDRIVE_CAPGO_READ_OC for read-only' })
+      return c.env.HYPERDRIVE_CAPGO_READ_OC.connectionString
     }
     // // SA region
-    if (c.env.HYPERDRIVE_CAPGO_PS_SA && dbRegion === 'SA') {
-      setDatabaseSource(c, 'HYPERDRIVE_CAPGO_PLANETSCALE_SA')
-      cloudlog({ requestId: c.get('requestId'), message: 'Using HYPERDRIVE_CAPGO_PLANETSCALE_SA for read-only' })
-      return c.env.HYPERDRIVE_CAPGO_PS_SA.connectionString
+    if (c.env.HYPERDRIVE_CAPGO_READ_SA && dbRegion === 'SA') {
+      setDatabaseSource(c, 'HYPERDRIVE_CAPGO_READ_SA')
+      cloudlog({ requestId: c.get('requestId'), message: 'Using HYPERDRIVE_CAPGO_READ_SA for read-only' })
+      return c.env.HYPERDRIVE_CAPGO_READ_SA.connectionString
     }
     // Google Cloud Hyperdrive read replica routing
-    if (c.env.HYPERDRIVE_CAPGO_GG_ME && dbRegion === 'ME') {
-      setDatabaseSource(c, 'HYPERDRIVE_CAPGO_GOOGLE_ME')
-      cloudlog({ requestId: c.get('requestId'), message: 'Using HYPERDRIVE_CAPGO_GOOGLE_ME for read-only' })
-      return c.env.HYPERDRIVE_CAPGO_GG_ME.connectionString
+    if (c.env.HYPERDRIVE_CAPGO_READ_ME && dbRegion === 'ME') {
+      setDatabaseSource(c, 'HYPERDRIVE_CAPGO_READ_ME')
+      cloudlog({ requestId: c.get('requestId'), message: 'Using HYPERDRIVE_CAPGO_READ_ME for read-only' })
+      return c.env.HYPERDRIVE_CAPGO_READ_ME.connectionString
     }
-    if (c.env.HYPERDRIVE_CAPGO_GG_AF && dbRegion === 'AF') {
-      setDatabaseSource(c, 'HYPERDRIVE_CAPGO_GOOGLE_AF')
-      cloudlog({ requestId: c.get('requestId'), message: 'Using HYPERDRIVE_CAPGO_GOOGLE_AF for read-only' })
-      return c.env.HYPERDRIVE_CAPGO_GG_AF.connectionString
+    if (c.env.HYPERDRIVE_CAPGO_READ_AF && dbRegion === 'AF') {
+      setDatabaseSource(c, 'HYPERDRIVE_CAPGO_READ_AF')
+      cloudlog({ requestId: c.get('requestId'), message: 'Using HYPERDRIVE_CAPGO_READ_AF for read-only' })
+      return c.env.HYPERDRIVE_CAPGO_READ_AF.connectionString
     }
-    if (c.env.HYPERDRIVE_CAPGO_GG_HK && dbRegion === 'HK') {
-      setDatabaseSource(c, 'HYPERDRIVE_CAPGO_GOOGLE_HK')
-      cloudlog({ requestId: c.get('requestId'), message: 'Using HYPERDRIVE_CAPGO_GOOGLE_HK for read-only' })
-      return c.env.HYPERDRIVE_CAPGO_GG_HK.connectionString
+    if (c.env.HYPERDRIVE_CAPGO_READ_HK && dbRegion === 'HK') {
+      setDatabaseSource(c, 'HYPERDRIVE_CAPGO_READ_HK')
+      cloudlog({ requestId: c.get('requestId'), message: 'Using HYPERDRIVE_CAPGO_READ_HK for read-only' })
+      return c.env.HYPERDRIVE_CAPGO_READ_HK.connectionString
     }
   }
 
@@ -1086,6 +1086,7 @@ export interface AdminGlobalStatsTrend {
   users_active: number
   paying: number
   org_conversion_rate: number
+  plan_total_conversion_rate: number
   plan_solo_conversion_rate: number
   plan_maker_conversion_rate: number
   plan_team_conversion_rate: number
@@ -1129,6 +1130,9 @@ export interface AdminGlobalStatsTrend {
   revenue_maker: number
   revenue_team: number
   revenue_enterprise: number
+  average_ltv: number
+  shortest_ltv: number
+  longest_ltv: number
   credits_bought: number
   credits_consumed: number
   builds_total: number
@@ -1160,7 +1164,10 @@ export async function getAdminGlobalStatsTrend(
   end_date: string,
 ): Promise<AdminGlobalStatsTrend[]> {
   try {
-    const pgClient = getPgClient(c, true) // Read-only query
+    // Admin global stats are low traffic and depend on recently migrated
+    // global_stats columns. Use primary DB so replica schema/data drift does not
+    // silently blank the dashboard.
+    const pgClient = getPgClient(c)
     const drizzleClient = getDrizzleClient(pgClient)
 
     // Extract just the date portion (YYYY-MM-DD) from ISO timestamps
@@ -1173,39 +1180,40 @@ export async function getAdminGlobalStatsTrend(
       WITH stats AS (
         SELECT
         gs.date_id AS date,
-        apps::int,
-        apps_active::int,
-        users::int,
-        users_active::int,
-        paying::int,
-        org_conversion_rate::float,
+        gs.apps::int AS apps,
+        gs.apps_active::int AS apps_active,
+        gs.users::int AS users,
+        gs.users_active::int AS users_active,
+        gs.paying::int AS paying,
+        gs.org_conversion_rate::float AS org_conversion_rate,
+        COALESCE(NULLIF(to_jsonb(gs) ->> 'plan_total_conversion_rate', '')::float, 0)::float AS plan_total_conversion_rate,
         COALESCE(NULLIF(to_jsonb(gs) ->> 'plan_solo_conversion_rate', '')::float, 0)::float AS plan_solo_conversion_rate,
         COALESCE(NULLIF(to_jsonb(gs) ->> 'plan_maker_conversion_rate', '')::float, 0)::float AS plan_maker_conversion_rate,
         COALESCE(NULLIF(to_jsonb(gs) ->> 'plan_team_conversion_rate', '')::float, 0)::float AS plan_team_conversion_rate,
         COALESCE(NULLIF(to_jsonb(gs) ->> 'plan_enterprise_conversion_rate', '')::float, 0)::float AS plan_enterprise_conversion_rate,
-        trial::int,
-        not_paying::int,
-        updates::int,
-        updates_external::int,
-        success_rate::float,
-        bundle_storage_gb::float,
-        plan_solo::int,
-        plan_maker::int,
-        plan_team::int,
-        plan_enterprise::int,
-        registers_today::int,
-        COALESCE(demo_apps_created, 0)::int AS demo_apps_created,
-        devices_last_month::int,
-        COALESCE(devices_last_month_ios, 0)::int AS devices_last_month_ios,
-        COALESCE(devices_last_month_android, 0)::int AS devices_last_month_android,
-        stars::int,
-        need_upgrade::int,
-        paying_yearly::int,
-        paying_monthly::int,
-        new_paying_orgs::int,
-        canceled_orgs::int,
-        COALESCE(upgraded_orgs, 0)::int AS upgraded_orgs,
-        mrr::float,
+        gs.trial::int AS trial,
+        gs.not_paying::int AS not_paying,
+        gs.updates::int AS updates,
+        gs.updates_external::int AS updates_external,
+        gs.success_rate::float AS success_rate,
+        gs.bundle_storage_gb::float AS bundle_storage_gb,
+        gs.plan_solo::int AS plan_solo,
+        gs.plan_maker::int AS plan_maker,
+        gs.plan_team::int AS plan_team,
+        gs.plan_enterprise::int AS plan_enterprise,
+        gs.registers_today::int AS registers_today,
+        COALESCE(gs.demo_apps_created, 0)::int AS demo_apps_created,
+        gs.devices_last_month::int AS devices_last_month,
+        COALESCE(gs.devices_last_month_ios, 0)::int AS devices_last_month_ios,
+        COALESCE(gs.devices_last_month_android, 0)::int AS devices_last_month_android,
+        gs.stars::int AS stars,
+        gs.need_upgrade::int AS need_upgrade,
+        gs.paying_yearly::int AS paying_yearly,
+        gs.paying_monthly::int AS paying_monthly,
+        gs.new_paying_orgs::int AS new_paying_orgs,
+        gs.canceled_orgs::int AS canceled_orgs,
+        COALESCE(gs.upgraded_orgs, 0)::int AS upgraded_orgs,
+        gs.mrr::float AS mrr,
         COALESCE(prev.mrr, 0)::float AS previous_mrr,
         (COALESCE(prev.revenue_solo, 0)::float / 12)::float AS previous_mrr_solo,
         (COALESCE(prev.revenue_maker, 0)::float / 12)::float AS previous_mrr_maker,
@@ -1217,22 +1225,25 @@ export async function getAdminGlobalStatsTrend(
         COALESCE(NULLIF(to_jsonb(gs) ->> 'churn_revenue_maker', '')::float, 0)::float AS churn_revenue_maker,
         COALESCE(NULLIF(to_jsonb(gs) ->> 'churn_revenue_team', '')::float, 0)::float AS churn_revenue_team,
         COALESCE(NULLIF(to_jsonb(gs) ->> 'churn_revenue_enterprise', '')::float, 0)::float AS churn_revenue_enterprise,
-        total_revenue::float,
-        revenue_solo::float,
-        revenue_maker::float,
-        revenue_team::float,
-        revenue_enterprise::float,
-        COALESCE(credits_bought, 0)::float AS credits_bought,
-        COALESCE(credits_consumed, 0)::float AS credits_consumed,
-        COALESCE(builds_total, 0)::int AS builds_total,
-        COALESCE(builds_ios, 0)::int AS builds_ios,
-        COALESCE(builds_android, 0)::int AS builds_android,
-        COALESCE(builds_success_total, 0)::int AS builds_success_total,
-        COALESCE(builds_success_ios, 0)::int AS builds_success_ios,
-        COALESCE(builds_success_android, 0)::int AS builds_success_android,
-        COALESCE(builds_last_month, 0)::int AS builds_last_month,
-        COALESCE(builds_last_month_ios, 0)::int AS builds_last_month_ios,
-        COALESCE(builds_last_month_android, 0)::int AS builds_last_month_android,
+        gs.total_revenue::float AS total_revenue,
+        gs.revenue_solo::float AS revenue_solo,
+        gs.revenue_maker::float AS revenue_maker,
+        gs.revenue_team::float AS revenue_team,
+        gs.revenue_enterprise::float AS revenue_enterprise,
+        COALESCE(NULLIF(to_jsonb(gs) ->> 'average_ltv', '')::float, 0)::float AS average_ltv,
+        COALESCE(NULLIF(to_jsonb(gs) ->> 'shortest_ltv', '')::float, 0)::float AS shortest_ltv,
+        COALESCE(NULLIF(to_jsonb(gs) ->> 'longest_ltv', '')::float, 0)::float AS longest_ltv,
+        COALESCE(gs.credits_bought, 0)::float AS credits_bought,
+        COALESCE(gs.credits_consumed, 0)::float AS credits_consumed,
+        COALESCE(gs.builds_total, 0)::int AS builds_total,
+        COALESCE(gs.builds_ios, 0)::int AS builds_ios,
+        COALESCE(gs.builds_android, 0)::int AS builds_android,
+        COALESCE(gs.builds_success_total, 0)::int AS builds_success_total,
+        COALESCE(gs.builds_success_ios, 0)::int AS builds_success_ios,
+        COALESCE(gs.builds_success_android, 0)::int AS builds_success_android,
+        COALESCE(gs.builds_last_month, 0)::int AS builds_last_month,
+        COALESCE(gs.builds_last_month_ios, 0)::int AS builds_last_month_ios,
+        COALESCE(gs.builds_last_month_android, 0)::int AS builds_last_month_android,
         COALESCE(
           NULLIF(to_jsonb(gs) ->> 'build_minutes_day_ios', '')::float,
           COALESCE(NULLIF(to_jsonb(gs) ->> 'build_total_seconds_day_ios', '')::bigint, 0)::float / 60,
@@ -1270,8 +1281,23 @@ export async function getAdminGlobalStatsTrend(
         COALESCE(NULLIF(to_jsonb(gs) ->> 'builder_active_paying_clients_60d', '')::int, 0)::int AS builder_active_paying_clients_60d,
         COALESCE(NULLIF(to_jsonb(gs) ->> 'live_updates_active_paying_clients_60d', '')::int, 0)::int AS live_updates_active_paying_clients_60d
       FROM global_stats gs
-      LEFT JOIN global_stats prev ON prev.date_id = (gs.date_id::date - 1)::text
-      WHERE gs.date_id <= ${endDateOnly}
+      LEFT JOIN global_stats prev ON prev.date_id = (
+        CASE
+          WHEN gs.date_id ~ '^\\d{4}-\\d{2}-\\d{2}$' THEN
+            CASE
+              WHEN to_char(to_date(gs.date_id, 'YYYY-MM-DD'), 'YYYY-MM-DD') = gs.date_id
+                THEN (to_date(gs.date_id, 'YYYY-MM-DD') - 1)::text
+              ELSE NULL
+            END
+          ELSE NULL
+        END
+      )
+      WHERE CASE
+          WHEN gs.date_id ~ '^\\d{4}-\\d{2}-\\d{2}$'
+            THEN to_char(to_date(gs.date_id, 'YYYY-MM-DD'), 'YYYY-MM-DD') = gs.date_id
+          ELSE false
+        END
+        AND gs.date_id <= ${endDateOnly}
       )
       SELECT *
       FROM stats
@@ -1289,6 +1315,7 @@ export async function getAdminGlobalStatsTrend(
       users_active: Number(row.users_active) || 0,
       paying: Number(row.paying) || 0,
       org_conversion_rate: Number(row.org_conversion_rate) || 0,
+      plan_total_conversion_rate: Number(row.plan_total_conversion_rate) || 0,
       plan_solo_conversion_rate: Number(row.plan_solo_conversion_rate) || 0,
       plan_maker_conversion_rate: Number(row.plan_maker_conversion_rate) || 0,
       plan_team_conversion_rate: Number(row.plan_team_conversion_rate) || 0,
@@ -1332,6 +1359,9 @@ export async function getAdminGlobalStatsTrend(
       revenue_maker: Number(row.revenue_maker) || 0,
       revenue_team: Number(row.revenue_team) || 0,
       revenue_enterprise: Number(row.revenue_enterprise) || 0,
+      average_ltv: Number(row.average_ltv) || 0,
+      shortest_ltv: Number(row.shortest_ltv) || 0,
+      longest_ltv: Number(row.longest_ltv) || 0,
       credits_bought: Number(row.credits_bought) || 0,
       credits_consumed: Number(row.credits_consumed) || 0,
       builds_total: Number(row.builds_total) || 0,
@@ -1363,7 +1393,7 @@ export async function getAdminGlobalStatsTrend(
   }
   catch (e: unknown) {
     logPgError(c, 'getAdminGlobalStatsTrend', e)
-    return []
+    throw e
   }
 }
 
@@ -1723,6 +1753,273 @@ function normalizeTimestamp(value: unknown): string | null {
   return parsed.toISOString()
 }
 
+export interface AdminOrganizationInsightRow {
+  org_id: string
+  org_name: string
+  management_email: string
+  plan_name: string | null
+  billing_type: 'monthly' | 'yearly' | null
+  upload_count: number
+  build_count: number
+  fail_rate: number
+  mau: number
+  members_count: number
+  apps_count: number
+  last_upload_at: string | null
+  last_build_at: string | null
+  paid_at: string | null
+  registered_at: string
+}
+
+export interface AdminOrganizationInsightsResult {
+  organizations: AdminOrganizationInsightRow[]
+  total: number
+  plan_options: string[]
+}
+
+interface AdminOrganizationInsightsFilters {
+  limit?: number
+  offset?: number
+  plan_name?: string
+  billing_type?: 'monthly' | 'yearly'
+  paid_only?: boolean
+  search?: string
+}
+
+/**
+ * Fetches admin organization rows with selected-period usage rollups.
+ * Uses daily_* preprocessed tables for MAU, update failures, and build counts;
+ * raw tables are only used for org metadata, bundle upload counts, and latest timestamps.
+ */
+export async function getAdminOrganizationInsights(
+  c: Context,
+  start_date: string,
+  end_date: string,
+  filters: AdminOrganizationInsightsFilters = {},
+): Promise<AdminOrganizationInsightsResult> {
+  let pgClient: ReturnType<typeof getPgClient> | undefined
+  try {
+    pgClient = getPgClient(c)
+    const drizzleClient = getDrizzleClient(pgClient)
+    const safeLimit = Math.max(1, Math.min(Math.floor(filters.limit ?? 50), 500))
+    const safeOffset = Math.max(0, Math.floor(filters.offset ?? 0))
+    const startDateOnly = start_date.split('T')[0]
+    const endDateOnly = end_date.split('T')[0]
+    const trimmedPlanName = filters.plan_name?.trim()
+    const trimmedSearch = filters.search?.trim()
+
+    const billingTypeExpression = sql`
+      CASE
+        WHEN si.price_id = p.price_y_id THEN 'yearly'
+        WHEN si.price_id = p.price_m_id THEN 'monthly'
+        WHEN si.subscription_anchor_start IS NOT NULL
+          AND si.subscription_anchor_end IS NOT NULL
+          AND si.subscription_anchor_end::timestamp - si.subscription_anchor_start::timestamp >= INTERVAL '330 days'
+          THEN 'yearly'
+        WHEN si.subscription_anchor_start IS NOT NULL
+          AND si.subscription_anchor_end IS NOT NULL
+          THEN 'monthly'
+        ELSE NULL
+      END
+    `
+    const planFilter = trimmedPlanName ? sql`AND p.name = ${trimmedPlanName}` : sql``
+    const billingFilter = filters.billing_type ? sql`AND ${billingTypeExpression} = ${filters.billing_type}` : sql``
+    const paidFilter = filters.paid_only ? sql`AND si.status = 'succeeded'` : sql``
+    const searchFilter = trimmedSearch
+      ? sql`AND (
+          o.name ILIKE ${`%${trimmedSearch}%`}
+          OR o.management_email ILIKE ${`%${trimmedSearch}%`}
+          OR o.id::text = ${trimmedSearch}
+        )`
+      : sql``
+
+    const dataQuery = sql`
+      WITH filtered_orgs AS (
+        SELECT
+          o.id AS org_id,
+          o.name AS org_name,
+          o.management_email,
+          o.created_at AS registered_at,
+          si.paid_at,
+          p.name AS plan_name,
+          ${billingTypeExpression} AS billing_type
+        FROM orgs o
+        LEFT JOIN stripe_info si ON si.customer_id = o.customer_id
+        LEFT JOIN plans p ON p.stripe_id = si.product_id
+        WHERE true
+          ${planFilter}
+          ${billingFilter}
+          ${paidFilter}
+          ${searchFilter}
+        ORDER BY o.created_at DESC NULLS LAST, o.id
+        LIMIT ${safeLimit}
+        OFFSET ${safeOffset}
+      ),
+      apps_by_org AS (
+        SELECT
+          a.owner_org AS org_id,
+          COUNT(*)::int AS apps_count
+        FROM apps a
+        INNER JOIN filtered_orgs filtered ON filtered.org_id = a.owner_org
+        GROUP BY a.owner_org
+      ),
+      members_by_org AS (
+        SELECT
+          ou.org_id,
+          COUNT(DISTINCT ou.user_id)::int AS members_count
+        FROM org_users ou
+        INNER JOIN filtered_orgs filtered ON filtered.org_id = ou.org_id
+        WHERE ou.user_right IS NULL OR ou.user_right::text NOT LIKE 'invite_%'
+        GROUP BY ou.org_id
+      ),
+      mau_by_org AS (
+        SELECT
+          a.owner_org AS org_id,
+          COALESCE(SUM(dm.mau), 0)::bigint AS mau
+        FROM filtered_orgs filtered
+        INNER JOIN apps a ON a.owner_org = filtered.org_id
+        INNER JOIN daily_mau dm ON dm.app_id = a.app_id
+        WHERE dm.date >= ${startDateOnly}::date
+          AND dm.date <= ${endDateOnly}::date
+        GROUP BY a.owner_org
+      ),
+      version_usage_by_org AS (
+        SELECT
+          a.owner_org AS org_id,
+          COALESCE(SUM(COALESCE(dv.fail, 0)), 0)::bigint AS fails,
+          COALESCE(SUM(COALESCE(dv.install, 0)), 0)::bigint AS installs
+        FROM filtered_orgs filtered
+        INNER JOIN apps a ON a.owner_org = filtered.org_id
+        INNER JOIN daily_version dv ON dv.app_id = a.app_id
+        WHERE dv.date >= ${startDateOnly}::date
+          AND dv.date <= ${endDateOnly}::date
+        GROUP BY a.owner_org
+      ),
+      build_usage_by_org AS (
+        SELECT
+          a.owner_org AS org_id,
+          COALESCE(SUM(dbt.build_count), 0)::bigint AS build_count
+        FROM filtered_orgs filtered
+        INNER JOIN apps a ON a.owner_org = filtered.org_id
+        INNER JOIN daily_build_time dbt ON dbt.app_id = a.app_id
+        WHERE dbt.date >= ${startDateOnly}::date
+          AND dbt.date <= ${endDateOnly}::date
+        GROUP BY a.owner_org
+      ),
+      bundle_uploads_by_org AS (
+        SELECT
+          av.owner_org AS org_id,
+          COUNT(*) FILTER (
+            WHERE av.created_at >= ${start_date}::timestamp
+              AND av.created_at < ${end_date}::timestamp
+          )::int AS upload_count,
+          MAX(av.created_at) AS last_upload_at
+        FROM app_versions av
+        INNER JOIN filtered_orgs filtered ON filtered.org_id = av.owner_org
+        WHERE av.name NOT IN ('builtin', 'unknown')
+        GROUP BY av.owner_org
+      ),
+      last_builds_by_org AS (
+        SELECT
+          bl.org_id,
+          MAX(bl.created_at) AS last_build_at
+        FROM build_logs bl
+        INNER JOIN filtered_orgs filtered ON filtered.org_id = bl.org_id
+        GROUP BY bl.org_id
+      )
+      SELECT
+        filtered.org_id,
+        filtered.org_name,
+        filtered.management_email,
+        filtered.plan_name,
+        filtered.billing_type,
+        COALESCE(buo.upload_count, 0)::int AS upload_count,
+        COALESCE(bu.build_count, 0)::bigint AS build_count,
+        CASE
+          WHEN COALESCE(vu.installs, 0) + COALESCE(vu.fails, 0) > 0
+            THEN (COALESCE(vu.fails, 0)::float / (COALESCE(vu.installs, 0) + COALESCE(vu.fails, 0))::float) * 100
+          ELSE 0
+        END::float AS fail_rate,
+        COALESCE(mau.mau, 0)::bigint AS mau,
+        COALESCE(members.members_count, 0)::int AS members_count,
+        COALESCE(apps.apps_count, 0)::int AS apps_count,
+        buo.last_upload_at,
+        lb.last_build_at,
+        filtered.paid_at,
+        filtered.registered_at
+      FROM filtered_orgs filtered
+      LEFT JOIN apps_by_org apps ON apps.org_id = filtered.org_id
+      LEFT JOIN members_by_org members ON members.org_id = filtered.org_id
+      LEFT JOIN mau_by_org mau ON mau.org_id = filtered.org_id
+      LEFT JOIN version_usage_by_org vu ON vu.org_id = filtered.org_id
+      LEFT JOIN build_usage_by_org bu ON bu.org_id = filtered.org_id
+      LEFT JOIN bundle_uploads_by_org buo ON buo.org_id = filtered.org_id
+      LEFT JOIN last_builds_by_org lb ON lb.org_id = filtered.org_id
+      ORDER BY filtered.registered_at DESC NULLS LAST, filtered.org_id
+    `
+
+    const countQuery = sql`
+      SELECT COUNT(*)::int AS total
+      FROM orgs o
+      LEFT JOIN stripe_info si ON si.customer_id = o.customer_id
+      LEFT JOIN plans p ON p.stripe_id = si.product_id
+      WHERE true
+        ${planFilter}
+        ${billingFilter}
+        ${paidFilter}
+        ${searchFilter}
+    `
+
+    const planOptionsQuery = sql`
+      SELECT DISTINCT name
+      FROM plans
+      WHERE name IS NOT NULL AND name != ''
+      ORDER BY name ASC
+    `
+
+    const [result, countResult, planOptionsResult] = await Promise.all([
+      drizzleClient.execute(dataQuery),
+      drizzleClient.execute(countQuery),
+      drizzleClient.execute(planOptionsQuery),
+    ])
+
+    const organizations: AdminOrganizationInsightRow[] = result.rows.map((row: any) => ({
+      org_id: row.org_id,
+      org_name: row.org_name,
+      management_email: row.management_email,
+      plan_name: row.plan_name ?? null,
+      billing_type: row.billing_type ?? null,
+      upload_count: Number(row.upload_count) || 0,
+      build_count: Number(row.build_count) || 0,
+      fail_rate: Number(row.fail_rate) || 0,
+      mau: Number(row.mau) || 0,
+      members_count: Number(row.members_count) || 0,
+      apps_count: Number(row.apps_count) || 0,
+      last_upload_at: normalizeTimestamp(row.last_upload_at),
+      last_build_at: normalizeTimestamp(row.last_build_at),
+      paid_at: normalizeTimestamp(row.paid_at),
+      registered_at: normalizeTimestamp(row.registered_at) ?? '',
+    }))
+
+    const total = Number((countResult.rows[0] as any)?.total) || 0
+    const plan_options = planOptionsResult.rows
+      .map((row: any) => String(row.name || '').trim())
+      .filter(Boolean)
+
+    cloudlog({ requestId: c.get('requestId'), message: 'getAdminOrganizationInsights result', resultCount: organizations.length, total })
+
+    return { organizations, total, plan_options }
+  }
+  catch (e: unknown) {
+    logPgError(c, 'getAdminOrganizationInsights', e)
+    return { organizations: [], total: 0, plan_options: [] }
+  }
+  finally {
+    if (pgClient)
+      await closeClient(c, pgClient)
+  }
+}
+
 // Admin Cancelled Organizations List
 export interface AdminCancelledOrganizationRow {
   org_id: string
@@ -1836,6 +2133,7 @@ export interface AdminTrialOrganization {
   org_id: string
   org_name: string
   management_email: string
+  plan_name: string | null
   trial_end_date: string
   days_remaining: number
   trial_extension_count: number
@@ -1863,7 +2161,9 @@ export async function getAdminTrialOrganizations(
   offset: number = 0,
 ): Promise<AdminTrialOrganizationsResult> {
   try {
-    const pgClient = getPgClient(c, true) // Read-only query
+    // The admin dashboard needs plans.name, and plans is not replicated to
+    // PlanetScale read replicas.
+    const pgClient = getPgClient(c)
     const drizzleClient = getDrizzleClient(pgClient)
 
     // Query to get trial organizations ordered by days remaining (ascending - expiring soon first)
@@ -1885,6 +2185,7 @@ export async function getAdminTrialOrganizations(
         o.id AS org_id,
         o.name AS org_name,
         o.management_email,
+        p.name AS plan_name,
         si.trial_at AS trial_end_date,
         GREATEST(0, (si.trial_at::date - CURRENT_DATE)) AS days_remaining,
         CASE
@@ -1896,6 +2197,7 @@ export async function getAdminTrialOrganizations(
         lbu.last_bundle_upload_at
       FROM orgs o
       INNER JOIN stripe_info si ON si.customer_id = o.customer_id
+      LEFT JOIN plans p ON p.stripe_id = si.product_id
       LEFT JOIN latest_bundle_uploads lbu ON lbu.owner_org = o.id
       WHERE si.trial_at::date >= CURRENT_DATE
         AND (si.status IS NULL OR si.status != 'succeeded')
@@ -1922,6 +2224,7 @@ export async function getAdminTrialOrganizations(
       org_id: row.org_id,
       org_name: row.org_name,
       management_email: row.management_email,
+      plan_name: row.plan_name ?? null,
       trial_end_date: normalizeTimestamp(row.trial_end_date) ?? '',
       days_remaining: Number(row.days_remaining),
       trial_extension_count: Number(row.trial_extension_count) || 0,

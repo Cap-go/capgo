@@ -148,6 +148,12 @@ export const useWebhooksStore = defineStore('webhooks', () => {
     }
 
     try {
+      const { data: claimsData, error: claimsError } = await supabase.auth.getClaims()
+      const userId = claimsData?.claims?.sub
+      if (claimsError || !userId) {
+        return { success: false, error: 'Cannot identify current user' }
+      }
+
       const { data, error } = await supabase
         .from('webhooks')
         .insert({
@@ -156,6 +162,7 @@ export const useWebhooksStore = defineStore('webhooks', () => {
           url: webhookData.url,
           events: webhookData.events,
           enabled: true, // Always enabled on creation
+          created_by: userId,
         })
         .select()
         .single()

@@ -88,7 +88,7 @@ DB_T="${!SELECTED_REGION}"
 # Ask about reset mode
 echo ""
 echo "Reset mode:"
-echo "  1) Full reset (drops schema, reimports data, recreates subscription)"
+echo "  1) Full reset (resets replicated tables, reimports data, recreates subscription)"
 echo "  2) Subscription only (keeps existing data/schema, just recreates subscription)"
 echo ""
 read -rp "Enter choice [1-2]: " RESET_CHOICE
@@ -257,7 +257,7 @@ if [[ "$SUBSCRIPTION_ONLY" == "true" ]]; then
   echo "==> SUBSCRIPTION_ONLY mode: skipping schema reset, only recreating subscription"
 else
   # ========================================================================
-  # FULL RESET: Drop everything and start fresh
+  # FULL RESET: Reset only replicated objects and start fresh
   # ========================================================================
 
   echo "==> Dropping replication slot for ${SUBSCRIPTION_NAME} on SOURCE (Supabase) if present..."
@@ -293,14 +293,13 @@ END
 \$\$;
 SQL
 
-  echo "==> Cleaning up public schema on target replica (full reset)..."
+  echo "==> Ensuring public schema exists on target replica..."
   psql-17 "$TARGET_DB_URL" -v ON_ERROR_STOP=1 <<'SQL'
-DROP SCHEMA IF EXISTS public CASCADE;
-CREATE SCHEMA public;
+CREATE SCHEMA IF NOT EXISTS public;
 GRANT ALL ON SCHEMA public TO PUBLIC;
 SQL
 
-  echo "==> Importing schema into target replica..."
+  echo "==> Importing schema into target replica (replicated objects only; public schema is kept)..."
   psql-17 "$TARGET_DB_URL" -v ON_ERROR_STOP=1 -f "schema_replicate.sql"
 
   echo "==> Ensuring publication has all tables on SOURCE..."

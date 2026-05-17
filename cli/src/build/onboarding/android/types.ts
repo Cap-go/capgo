@@ -1,0 +1,211 @@
+// src/build/onboarding/android/types.ts
+
+export type AndroidOnboardingStep
+  = | 'welcome'
+    | 'credentials-exist'
+    | 'backing-up'
+    | 'no-platform'
+  // Phase 1 — Keystore (automated)
+    | 'keystore-method-select'
+    | 'keystore-explainer'
+    | 'keystore-existing-path'
+    | 'keystore-existing-picker'
+    | 'keystore-existing-store-password'
+    | 'keystore-existing-detecting-alias'
+    | 'keystore-existing-alias-select'
+    | 'keystore-existing-alias'
+    | 'keystore-existing-key-password'
+    | 'keystore-new-alias'
+    | 'keystore-new-password-method'
+    | 'keystore-new-store-password'
+    | 'keystore-new-key-password'
+    | 'keystore-new-cn'
+    | 'keystore-generating'
+  // Phase 2 — Google sign-in (OAuth)
+    | 'google-sign-in'
+    | 'google-sign-in-running'
+  // Phase 3 — Play developer account ID (pasted by the user — Play Developer API
+  // has no endpoint to enumerate accounts, so the user copies the ID from the
+  // Play Console URL)
+    | 'play-developer-id-input'
+  // Phase 4 — GCP project pick or create
+    | 'gcp-projects-loading'
+    | 'gcp-projects-select'
+    | 'gcp-project-create-name'
+  // Phase 4.5 — Pick the Android package name to grant SA access to
+    | 'android-package-select'
+  // Phase 5 — Automated provisioning (create project if needed, enable API, SA, key, invite)
+    | 'gcp-setup-running'
+  // Phase 6 — Save + build
+    | 'saving-credentials'
+    | 'ask-build'
+    | 'requesting-build'
+    | 'build-complete'
+    | 'error'
+
+export type KeystoreMethod = 'existing' | 'generate'
+
+export interface KeystoreReady {
+  keystorePath: string
+  alias: string
+  isGenerated: boolean
+}
+
+export interface GoogleSignInComplete {
+  email: string
+  googleSubject: string
+  scope: string
+}
+
+export interface PlayDeveloperAccountChoice {
+  developerId: string
+  displayName?: string
+}
+
+export interface GcpProjectChoice {
+  projectId: string
+  projectNumber?: string
+  displayName: string
+  /** Whether this onboarding run created the project (vs. reusing an existing one). */
+  createdByOnboarding: boolean
+}
+
+export interface ServiceAccountProvisioned {
+  email: string
+  projectId: string
+  uniqueId?: string
+}
+
+export interface PlayInviteProvisioned {
+  developerId: string
+  serviceAccountEmail: string
+}
+
+export interface AndroidPackageChoice {
+  /** The Android applicationId that Play Console uses for this app. */
+  packageName: string
+  /** How we picked it — useful for telemetry / resume clarity. */
+  source: 'gradle' | 'capacitor-config' | 'user-input'
+}
+
+export interface AndroidOnboardingProgress {
+  platform: 'android'
+  appId: string
+  startedAt: string
+
+  // Keystore — partial input for resume
+  keystoreMethod?: KeystoreMethod
+  keystoreExistingPath?: string
+  keystoreAlias?: string
+  keystoreStorePassword?: string
+  keystoreKeyPassword?: string
+  keystoreCommonName?: string
+
+  // Chosen project name for a fresh create — remembered while the async op runs
+  pendingNewProjectId?: string
+  pendingNewProjectDisplayName?: string
+
+  completedSteps: {
+    keystoreReady?: KeystoreReady
+    googleSignInComplete?: GoogleSignInComplete
+    playAccountChosen?: PlayDeveloperAccountChoice
+    gcpProjectChosen?: GcpProjectChoice
+    androidPackageChosen?: AndroidPackageChoice
+    serviceAccountProvisioned?: ServiceAccountProvisioned
+    playInviteProvisioned?: PlayInviteProvisioned
+  }
+
+  // Ephemeral — wiped when onboarding finishes. Held on disk only so resume
+  // across a crash doesn't force a full re-auth. NEVER written to credentials.
+  _oauthRefreshToken?: string
+  _keystoreBase64?: string
+  /** Base64 of the downloaded SA JSON key — saved as PLAY_CONFIG_JSON at end. */
+  _serviceAccountKeyBase64?: string
+}
+
+export const ANDROID_STEP_PROGRESS: Record<AndroidOnboardingStep, number> = {
+  'welcome': 0,
+  'credentials-exist': 0,
+  'backing-up': 0,
+  'no-platform': 0,
+
+  'keystore-method-select': 5,
+  'keystore-explainer': 5,
+  'keystore-existing-path': 8,
+  'keystore-existing-picker': 8,
+  'keystore-existing-store-password': 10,
+  'keystore-existing-detecting-alias': 12,
+  'keystore-existing-alias-select': 13,
+  'keystore-existing-alias': 13,
+  'keystore-existing-key-password': 14,
+  'keystore-new-alias': 8,
+  'keystore-new-password-method': 10,
+  'keystore-new-store-password': 12,
+  'keystore-new-key-password': 14,
+  'keystore-new-cn': 16,
+  'keystore-generating': 20,
+
+  'google-sign-in': 25,
+  'google-sign-in-running': 35,
+
+  'play-developer-id-input': 48,
+
+  'gcp-projects-loading': 55,
+  'gcp-projects-select': 58,
+  'gcp-project-create-name': 60,
+
+  'android-package-select': 65,
+
+  'gcp-setup-running': 70,
+
+  'saving-credentials': 85,
+  'ask-build': 90,
+  'requesting-build': 95,
+  'build-complete': 100,
+  'error': 0,
+}
+
+export function getAndroidPhaseLabel(step: AndroidOnboardingStep): string {
+  switch (step) {
+    case 'welcome':
+    case 'credentials-exist':
+    case 'backing-up':
+    case 'no-platform':
+      return ''
+    case 'keystore-method-select':
+    case 'keystore-explainer':
+    case 'keystore-existing-path':
+    case 'keystore-existing-picker':
+    case 'keystore-existing-store-password':
+    case 'keystore-existing-detecting-alias':
+    case 'keystore-existing-alias-select':
+    case 'keystore-existing-alias':
+    case 'keystore-existing-key-password':
+    case 'keystore-new-alias':
+    case 'keystore-new-password-method':
+    case 'keystore-new-store-password':
+    case 'keystore-new-key-password':
+    case 'keystore-new-cn':
+    case 'keystore-generating':
+      return 'Step 1 of 4 · Keystore'
+    case 'google-sign-in':
+    case 'google-sign-in-running':
+      return 'Step 2 of 4 · Sign in with Google'
+    case 'play-developer-id-input':
+      return 'Step 3 of 4 · Play Developer Account'
+    case 'gcp-projects-loading':
+    case 'gcp-projects-select':
+    case 'gcp-project-create-name':
+    case 'android-package-select':
+    case 'gcp-setup-running':
+      return 'Step 3 of 4 · Google Cloud Project'
+    case 'saving-credentials':
+    case 'ask-build':
+    case 'requesting-build':
+      return 'Step 4 of 4 · Save & Build'
+    case 'build-complete':
+      return 'Complete'
+    case 'error':
+      return ''
+  }
+}
