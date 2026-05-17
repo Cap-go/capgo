@@ -183,7 +183,7 @@ describe('[POST] /webhooks', () => {
     createdWebhookId = data.webhook.id
   })
 
-  it('fills created_by for direct inserts that omit it', async () => {
+  it.concurrent('fills created_by for direct inserts that omit it', async () => {
     const webhookId = randomUUID()
     const { data, error } = await (getSupabaseClient() as any)
       .from('webhooks')
@@ -204,7 +204,7 @@ describe('[POST] /webhooks', () => {
     directCreatedWebhookId = webhookId
   })
 
-  it('reassigns created_by when a non-owner webhook creator is deleted', async () => {
+  it.concurrent('reassigns created_by when a non-owner webhook creator is deleted', async () => {
     const creatorEmail = `webhook-creator-${globalId}@capgo.test`
     const { data: authData, error: authError } = await getSupabaseClient().auth.admin.createUser({
       email: creatorEmail,
