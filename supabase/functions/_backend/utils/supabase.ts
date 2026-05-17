@@ -841,7 +841,6 @@ export async function createApiKey(c: Context, userId: string) {
     if (userLockResult.rowCount === 0) {
       cloudlogErr({ requestId: c.get('requestId'), message: 'createApiKey error', userId, error: 'user not found' })
       await pgClient.query('ROLLBACK')
-      inTransaction = false
       return
     }
 
@@ -853,12 +852,10 @@ export async function createApiKey(c: Context, userId: string) {
     if (!Number.isFinite(total)) {
       cloudlogErr({ requestId: c.get('requestId'), message: 'createApiKey error', userId, error: 'total is invalid' })
       await pgClient.query('ROLLBACK')
-      inTransaction = false
       return
     }
     if (total > 0) {
       await pgClient.query('ROLLBACK')
-      inTransaction = false
       return
     }
 
@@ -887,7 +884,6 @@ export async function createApiKey(c: Context, userId: string) {
     if (orgResult.rows.length === 0) {
       cloudlog({ requestId: c.get('requestId'), message: 'createApiKey skipped, no org membership', userId })
       await pgClient.query('ROLLBACK')
-      inTransaction = false
       return
     }
 
@@ -992,7 +988,6 @@ export async function createApiKey(c: Context, userId: string) {
       [userId],
     )
     await pgClient.query('COMMIT')
-    inTransaction = false
   }
   catch (error) {
     if (inTransaction) {
