@@ -145,17 +145,7 @@ SELECT
     ),
     tests.get_supabase_uid('test_user'),
     'invite_read'::public.user_min_right,
-    'org_member'
-WHERE NOT EXISTS (
-    SELECT 1
-    FROM public.org_users
-    WHERE org_id = (
-        SELECT id
-        FROM orgs
-        WHERE created_by = tests.get_supabase_uid('test_admin')
-    )
-    AND user_id = tests.get_supabase_uid('test_user')
-);
+    'org_member';
 
 SELECT tests.clear_authentication();
 
