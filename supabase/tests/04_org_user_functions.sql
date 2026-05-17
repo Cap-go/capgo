@@ -131,6 +131,34 @@ SELECT
 
 SELECT tests.clear_authentication();
 
+-- Keep the acceptance assertion focused on the legacy accept RPC. The invite
+-- wrapper compatibility is covered above, while this row shape is what old
+-- clients submit when accepting an invite.
+SELECT tests.authenticate_as_service_role();
+
+INSERT INTO public.org_users (org_id, user_id, user_right, rbac_role_name)
+SELECT
+    (
+        SELECT id
+        FROM orgs
+        WHERE created_by = tests.get_supabase_uid('test_admin')
+    ),
+    tests.get_supabase_uid('test_user'),
+    'invite_read'::public.user_min_right,
+    'org_member'
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM public.org_users
+    WHERE org_id = (
+        SELECT id
+        FROM orgs
+        WHERE created_by = tests.get_supabase_uid('test_admin')
+    )
+    AND user_id = tests.get_supabase_uid('test_user')
+);
+
+SELECT tests.clear_authentication();
+
 SELECT tests.authenticate_as('test_user');
 
 SELECT
