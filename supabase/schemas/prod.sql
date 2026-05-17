@@ -6335,13 +6335,48 @@ CREATE OR REPLACE FUNCTION "public"."get_organization_cli_warnings"("orgid" "uui
     AS $$
 DECLARE
     messages jsonb[] := ARRAY[]::jsonb[];
+    request_apikey text;
+    api_key public.apikeys%ROWTYPE;
+    fallback_app_id text;
+    has_org_read boolean;
 BEGIN
     PERFORM cli_version;
 
-    IF NOT public.cli_check_permission(
+    has_org_read := public.cli_check_permission(
         permission_key := public.rbac_perm_org_read(),
         org_id := orgid
-    ) THEN
+    );
+
+    IF NOT has_org_read THEN
+        SELECT public.get_apikey_header() INTO request_apikey;
+
+        IF request_apikey IS NOT NULL AND request_apikey <> '' THEN
+            SELECT * INTO api_key
+            FROM public.find_apikey_by_value(request_apikey)
+            LIMIT 1;
+
+            IF api_key.id IS NOT NULL
+                AND COALESCE(array_length(api_key.limited_to_apps, 1), 0) > 0
+            THEN
+                SELECT public.apps.app_id INTO fallback_app_id
+                FROM public.apps
+                WHERE public.apps.owner_org = orgid
+                    AND public.apps.app_id = ANY(api_key.limited_to_apps)
+                ORDER BY public.apps.app_id
+                LIMIT 1;
+
+                IF fallback_app_id IS NOT NULL THEN
+                    has_org_read := public.cli_check_permission(
+                        permission_key := public.rbac_perm_org_read(),
+                        org_id := orgid,
+                        app_id := fallback_app_id
+                    );
+                END IF;
+            END IF;
+        END IF;
+    END IF;
+
+    IF NOT has_org_read THEN
         messages := array_append(messages, jsonb_build_object(
             'message', 'API key does not have read access to this organization',
             'fatal', true
@@ -7747,7 +7782,8 @@ CREATE TABLE IF NOT EXISTS "public"."app_versions" (
     "key_id" character varying(20),
     "cli_version" character varying,
     "deleted_at" timestamp with time zone
-);
+)
+WITH ("autovacuum_vacuum_scale_factor"='0.05', "autovacuum_analyze_scale_factor"='0.02');
 
 ALTER TABLE ONLY "public"."app_versions" REPLICA IDENTITY FULL;
 
@@ -15674,7 +15710,7 @@ CREATE TABLE IF NOT EXISTS "public"."build_requests" (
     "upload_expires_at" timestamp with time zone NOT NULL,
     "last_error" "text",
     "runner_wait_seconds" bigint DEFAULT 0 NOT NULL,
-    CONSTRAINT "build_requests_platform_check" CHECK ((("platform")::"text" = ANY ((ARRAY['ios'::character varying, 'android'::character varying])::"text"[])))
+    CONSTRAINT "build_requests_platform_check" CHECK ((("platform")::"text" = ANY (ARRAY[('ios'::character varying)::"text", ('android'::character varying)::"text"])))
 );
 
 
@@ -15905,7 +15941,8 @@ CREATE TABLE IF NOT EXISTS "public"."daily_bandwidth" (
     "app_id" character varying(255) NOT NULL,
     "date" "date" NOT NULL,
     "bandwidth" bigint NOT NULL
-);
+)
+WITH ("autovacuum_vacuum_scale_factor"='0.05', "autovacuum_analyze_scale_factor"='0.02');
 
 
 ALTER TABLE "public"."daily_bandwidth" OWNER TO "postgres";
@@ -15945,7 +15982,8 @@ CREATE TABLE IF NOT EXISTS "public"."daily_mau" (
     "app_id" character varying(255) NOT NULL,
     "date" "date" NOT NULL,
     "mau" bigint NOT NULL
-);
+)
+WITH ("autovacuum_vacuum_scale_factor"='0.05', "autovacuum_analyze_scale_factor"='0.02');
 
 
 ALTER TABLE "public"."daily_mau" OWNER TO "postgres";
@@ -16052,7 +16090,8 @@ CREATE TABLE IF NOT EXISTS "public"."daily_storage" (
     "app_id" character varying(255) NOT NULL,
     "date" "date" NOT NULL,
     "storage" bigint NOT NULL
-);
+)
+WITH ("autovacuum_vacuum_scale_factor"='0.05', "autovacuum_analyze_scale_factor"='0.02');
 
 
 ALTER TABLE "public"."daily_storage" OWNER TO "postgres";
@@ -16083,7 +16122,8 @@ CREATE TABLE IF NOT EXISTS "public"."daily_version" (
     "install" bigint,
     "uninstall" bigint,
     "version_name" character varying(255) NOT NULL
-);
+)
+WITH ("autovacuum_vacuum_scale_factor"='0.05', "autovacuum_analyze_scale_factor"='0.02');
 
 
 ALTER TABLE "public"."daily_version" OWNER TO "postgres";
@@ -17799,11 +17839,6 @@ ALTER TABLE ONLY "public"."to_delete_accounts"
 
 ALTER TABLE ONLY "public"."orgs"
     ADD CONSTRAINT "unique customer_id on orgs" UNIQUE ("customer_id");
-
-
-
-ALTER TABLE ONLY "public"."channel_devices"
-    ADD CONSTRAINT "unique_device_app" UNIQUE ("device_id", "app_id");
 
 
 
@@ -19964,6 +19999,12 @@ ALTER TABLE "public"."webhook_deliveries" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."webhooks" ENABLE ROW LEVEL SECURITY;
 
 
+CREATE PUBLICATION "capgo_google_eu_2_pub" WITH (publish = 'insert, update, delete, truncate');
+
+
+ALTER PUBLICATION "capgo_google_eu_2_pub" OWNER TO "postgres";
+
+
 CREATE PUBLICATION "planetscale_replicate" WITH (publish = 'insert, update, delete, truncate');
 
 
@@ -19979,7 +20020,15 @@ ALTER PUBLICATION "supabase_realtime" OWNER TO "postgres";
 
 
 
+ALTER PUBLICATION "capgo_google_eu_2_pub" ADD TABLE ONLY "public"."app_versions";
+
+
+
 ALTER PUBLICATION "planetscale_replicate" ADD TABLE ONLY "public"."app_versions";
+
+
+
+ALTER PUBLICATION "capgo_google_eu_2_pub" ADD TABLE ONLY "public"."apps";
 
 
 
@@ -19987,7 +20036,15 @@ ALTER PUBLICATION "planetscale_replicate" ADD TABLE ONLY "public"."apps";
 
 
 
+ALTER PUBLICATION "capgo_google_eu_2_pub" ADD TABLE ONLY "public"."channel_devices";
+
+
+
 ALTER PUBLICATION "planetscale_replicate" ADD TABLE ONLY "public"."channel_devices";
+
+
+
+ALTER PUBLICATION "capgo_google_eu_2_pub" ADD TABLE ONLY "public"."channels";
 
 
 
@@ -19995,7 +20052,15 @@ ALTER PUBLICATION "planetscale_replicate" ADD TABLE ONLY "public"."channels";
 
 
 
+ALTER PUBLICATION "capgo_google_eu_2_pub" ADD TABLE ONLY "public"."manifest";
+
+
+
 ALTER PUBLICATION "planetscale_replicate" ADD TABLE ONLY "public"."manifest";
+
+
+
+ALTER PUBLICATION "capgo_google_eu_2_pub" ADD TABLE ONLY "public"."notifications";
 
 
 
@@ -20003,11 +20068,23 @@ ALTER PUBLICATION "planetscale_replicate" ADD TABLE ONLY "public"."notifications
 
 
 
+ALTER PUBLICATION "capgo_google_eu_2_pub" ADD TABLE ONLY "public"."org_users";
+
+
+
 ALTER PUBLICATION "planetscale_replicate" ADD TABLE ONLY "public"."org_users";
 
 
 
+ALTER PUBLICATION "capgo_google_eu_2_pub" ADD TABLE ONLY "public"."orgs";
+
+
+
 ALTER PUBLICATION "planetscale_replicate" ADD TABLE ONLY "public"."orgs";
+
+
+
+ALTER PUBLICATION "capgo_google_eu_2_pub" ADD TABLE ONLY "public"."stripe_info";
 
 
 
@@ -20973,6 +21050,7 @@ GRANT ALL ON FUNCTION "public"."get_org_user_access_rbac"("p_user_id" "uuid", "p
 
 
 
+REVOKE ALL ON FUNCTION "public"."get_organization_cli_warnings"("orgid" "uuid", "cli_version" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."get_organization_cli_warnings"("orgid" "uuid", "cli_version" "text") TO "anon";
 GRANT ALL ON FUNCTION "public"."get_organization_cli_warnings"("orgid" "uuid", "cli_version" "text") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."get_organization_cli_warnings"("orgid" "uuid", "cli_version" "text") TO "service_role";
