@@ -39,6 +39,56 @@ VALUES (
 )
 ON CONFLICT (app_id) DO NOTHING;
 
+INSERT INTO public.role_bindings (
+  principal_type,
+  principal_id,
+  role_id,
+  scope_type,
+  org_id,
+  granted_by,
+  reason,
+  is_direct
+)
+SELECT
+  public.rbac_principal_user(),
+  tests.get_supabase_uid('legacy_apikey_effective_member'),
+  roles.id,
+  public.rbac_scope_org(),
+  '70000000-0000-4000-8000-000000000046'::uuid,
+  tests.get_supabase_uid('legacy_apikey_effective_admin'),
+  'Legacy effective API key test user org binding',
+  true
+FROM public.roles
+WHERE roles.name = public.rbac_role_org_member()
+ON CONFLICT DO NOTHING;
+
+INSERT INTO public.role_bindings (
+  principal_type,
+  principal_id,
+  role_id,
+  scope_type,
+  org_id,
+  app_id,
+  granted_by,
+  reason,
+  is_direct
+)
+SELECT
+  public.rbac_principal_user(),
+  tests.get_supabase_uid('legacy_apikey_effective_member'),
+  roles.id,
+  public.rbac_scope_app(),
+  '70000000-0000-4000-8000-000000000046'::uuid,
+  apps.id,
+  tests.get_supabase_uid('legacy_apikey_effective_admin'),
+  'Legacy effective API key test user app binding',
+  true
+FROM public.roles
+CROSS JOIN public.apps
+WHERE roles.name = public.rbac_role_app_reader()
+  AND apps.app_id = 'com.test.legacyeffective.read'
+ON CONFLICT DO NOTHING;
+
 SELECT tests.create_v2_apikey(
   45046,
   tests.get_supabase_uid('legacy_apikey_effective_member'),
