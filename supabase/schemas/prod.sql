@@ -12677,6 +12677,27 @@ $$;
 ALTER FUNCTION "public"."read_version_usage"("p_app_id" character varying, "p_period_start" timestamp without time zone, "p_period_end" timestamp without time zone) OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."reassign_webhook_created_by_before_user_delete"() RETURNS "trigger"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+BEGIN
+  -- Preserve org-owned webhooks when a non-owner creator deletes their account.
+  UPDATE "public"."webhooks" AS "webhook"
+  SET "created_by" = "orgs"."created_by"
+  FROM "public"."orgs" AS "orgs"
+  WHERE "webhook"."org_id" = "orgs"."id"
+    AND "webhook"."created_by" = OLD."id"
+    AND "orgs"."created_by" <> OLD."id";
+
+  RETURN OLD;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."reassign_webhook_created_by_before_user_delete"() OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."record_build_time"("p_org_id" "uuid", "p_user_id" "uuid", "p_build_id" character varying, "p_platform" character varying, "p_build_time_unit" bigint, "p_app_id" character varying) RETURNS "uuid"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -13948,6 +13969,45 @@ $$;
 
 
 ALTER FUNCTION "public"."set_deleted_at_on_soft_delete"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."set_webhook_created_by"() RETURNS "trigger"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+DECLARE
+  "creator_id" uuid;
+BEGIN
+  IF (SELECT "public"."get_apikey_header"()) IS NOT NULL THEN
+    "creator_id" := "public"."get_identity_org_allowed_apikey_only"(
+      '{all,write,upload}'::"public"."key_mode"[],
+      NEW."org_id"
+    );
+  ELSE
+    "creator_id" := "auth"."uid"();
+  END IF;
+
+  IF "creator_id" IS NOT NULL THEN
+    NEW."created_by" := "creator_id";
+  ELSIF NEW."created_by" IS NULL THEN
+    SELECT "orgs"."created_by"
+    INTO "creator_id"
+    FROM "public"."orgs" AS "orgs"
+    WHERE "orgs"."id" = NEW."org_id";
+
+    NEW."created_by" := "creator_id";
+  END IF;
+
+  IF NEW."created_by" IS NULL THEN
+    RAISE EXCEPTION 'webhooks.created_by cannot be null';
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."set_webhook_created_by"() OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."strip_html"("input" "text") RETURNS "text"
@@ -17466,7 +17526,7 @@ CREATE TABLE IF NOT EXISTS "public"."webhooks" (
     "events" "text"[] NOT NULL,
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
-    "created_by" "uuid"
+    "created_by" "uuid" NOT NULL
 );
 
 
@@ -18671,6 +18731,10 @@ CREATE OR REPLACE TRIGGER "prevent_last_super_admin_update" BEFORE UPDATE OF "ro
 
 
 
+CREATE OR REPLACE TRIGGER "reassign_webhook_created_by_before_user_delete" BEFORE DELETE ON "public"."users" FOR EACH ROW EXECUTE FUNCTION "public"."reassign_webhook_created_by_before_user_delete"();
+
+
+
 CREATE OR REPLACE TRIGGER "record_deployment_history_trigger" AFTER UPDATE OF "version" ON "public"."channels" FOR EACH ROW EXECUTE FUNCTION "public"."record_deployment_history"();
 
 
@@ -18684,6 +18748,10 @@ CREATE OR REPLACE TRIGGER "sanitize_orgs_text_fields" BEFORE INSERT OR UPDATE ON
 
 
 CREATE OR REPLACE TRIGGER "set_deleted_at_trigger" BEFORE UPDATE ON "public"."app_versions" FOR EACH ROW EXECUTE FUNCTION "public"."set_deleted_at_on_soft_delete"();
+
+
+
+CREATE OR REPLACE TRIGGER "set_webhook_created_by" BEFORE INSERT ON "public"."webhooks" FOR EACH ROW EXECUTE FUNCTION "public"."set_webhook_created_by"();
 
 
 
@@ -19075,7 +19143,7 @@ ALTER TABLE ONLY "public"."webhook_deliveries"
 
 
 ALTER TABLE ONLY "public"."webhooks"
-    ADD CONSTRAINT "webhooks_created_by_fkey" FOREIGN KEY ("created_by") REFERENCES "public"."users"("id") ON DELETE SET NULL;
+    ADD CONSTRAINT "webhooks_created_by_fkey" FOREIGN KEY ("created_by") REFERENCES "public"."users"("id") ON DELETE CASCADE;
 
 
 
@@ -22189,6 +22257,11 @@ GRANT ALL ON FUNCTION "public"."read_version_usage"("p_app_id" character varying
 
 
 
+REVOKE ALL ON FUNCTION "public"."reassign_webhook_created_by_before_user_delete"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."reassign_webhook_created_by_before_user_delete"() TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."record_build_time"("p_org_id" "uuid", "p_user_id" "uuid", "p_build_id" character varying, "p_platform" character varying, "p_build_time_unit" bigint, "p_app_id" character varying) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."record_build_time"("p_org_id" "uuid", "p_user_id" "uuid", "p_build_id" character varying, "p_platform" character varying, "p_build_time_unit" bigint, "p_app_id" character varying) TO "service_role";
 
@@ -22336,6 +22409,11 @@ GRANT ALL ON FUNCTION "public"."set_build_time_exceeded_by_org"("org_id" "uuid",
 GRANT ALL ON FUNCTION "public"."set_deleted_at_on_soft_delete"() TO "anon";
 GRANT ALL ON FUNCTION "public"."set_deleted_at_on_soft_delete"() TO "authenticated";
 GRANT ALL ON FUNCTION "public"."set_deleted_at_on_soft_delete"() TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."set_webhook_created_by"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."set_webhook_created_by"() TO "service_role";
 
 
 
