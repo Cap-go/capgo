@@ -1,5 +1,42 @@
 -- Move every existing API key to RBAC-backed bindings and remove the old key scope columns.
 
+DO $$
+DECLARE
+  v_org_id uuid;
+BEGIN
+  FOR v_org_id IN
+    SELECT id FROM public.orgs
+  LOOP
+    PERFORM public.rbac_migrate_org_users_to_bindings(v_org_id, NULL::uuid);
+  END LOOP;
+END;
+$$;
+
+UPDATE public.orgs
+SET use_new_rbac = true
+WHERE use_new_rbac IS DISTINCT FROM true;
+
+ALTER TABLE public.orgs
+  ALTER COLUMN use_new_rbac SET DEFAULT true;
+
+CREATE OR REPLACE FUNCTION public.rbac_is_enabled_for_org(p_org_id uuid) RETURNS boolean
+LANGUAGE plpgsql
+STABLE
+SET search_path = ''
+AS $$
+BEGIN
+  PERFORM p_org_id;
+  RETURN true;
+END;
+$$;
+
+ALTER FUNCTION public.rbac_is_enabled_for_org(uuid) OWNER TO "postgres";
+REVOKE ALL ON FUNCTION public.rbac_is_enabled_for_org(uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.rbac_is_enabled_for_org(uuid) TO "authenticated";
+GRANT EXECUTE ON FUNCTION public.rbac_is_enabled_for_org(uuid) TO "service_role";
+
+COMMENT ON FUNCTION public.rbac_is_enabled_for_org(uuid) IS 'Compatibility helper retained for old callers. RBAC is always enabled.';
+
 CREATE TEMP TABLE _apikey_v2_current_orgs ON COMMIT DROP AS
 SELECT DISTINCT source.user_id, source.org_id
 FROM (
@@ -496,11 +533,9 @@ SET search_path = ''
 AS $$
 DECLARE
   v_allowed boolean := false;
-  v_use_rbac boolean;
   v_effective_org_id uuid := p_org_id;
   v_effective_user_id uuid := p_user_id;
   v_effective_app_id character varying := p_app_id;
-  v_legacy_right public.user_min_right;
   v_api_key public.apikeys%ROWTYPE;
   v_channel_org_id uuid;
   v_channel_app_id character varying;
@@ -597,46 +632,34 @@ BEGIN
     END IF;
   END IF;
 
-  v_use_rbac := public.rbac_is_enabled_for_org(v_effective_org_id);
-  IF v_use_rbac THEN
-    IF v_effective_user_id IS NOT NULL THEN
-      v_allowed := public.rbac_has_permission(
-        public.rbac_principal_user(),
-        v_effective_user_id,
-        p_permission_key,
-        v_effective_org_id,
-        v_effective_app_id,
-        p_channel_id
-      );
-    END IF;
-
-    IF v_channel_scope THEN
-      SELECT o.is_allowed INTO v_override
-      FROM public.channel_permission_overrides o
-      WHERE o.principal_type = public.rbac_principal_user()
-        AND o.principal_id = v_effective_user_id
-        AND o.channel_id = p_channel_id
-        AND o.permission_key = p_permission_key
-      LIMIT 1;
-
-      IF v_override IS NOT NULL THEN
-        v_allowed := v_override;
-      END IF;
-    END IF;
-
-    RETURN v_allowed;
-  END IF;
-
-  v_legacy_right := public.rbac_legacy_right_for_permission(p_permission_key);
-  IF v_legacy_right IS NULL THEN
+  IF v_effective_user_id IS NULL THEN
     RETURN false;
   END IF;
 
-  IF v_effective_app_id IS NOT NULL THEN
-    RETURN public.has_app_right_userid(v_effective_app_id, v_legacy_right, v_effective_user_id);
+  v_allowed := public.rbac_has_permission(
+    public.rbac_principal_user(),
+    v_effective_user_id,
+    p_permission_key,
+    v_effective_org_id,
+    v_effective_app_id,
+    p_channel_id
+  );
+
+  IF v_channel_scope THEN
+    SELECT o.is_allowed INTO v_override
+    FROM public.channel_permission_overrides o
+    WHERE o.principal_type = public.rbac_principal_user()
+      AND o.principal_id = v_effective_user_id
+      AND o.channel_id = p_channel_id
+      AND o.permission_key = p_permission_key
+    LIMIT 1;
+
+    IF v_override IS NOT NULL THEN
+      v_allowed := v_override;
+    END IF;
   END IF;
 
-  RETURN public.check_min_rights_legacy(v_legacy_right, v_effective_user_id, v_effective_org_id, v_effective_app_id, p_channel_id);
+  RETURN v_allowed;
 END;
 $$;
 
@@ -654,11 +677,9 @@ LANGUAGE "plpgsql" SECURITY DEFINER
 SET search_path = ''
 AS $$
 DECLARE
-  v_use_rbac boolean;
   v_effective_org_id uuid := p_org_id;
   v_effective_user_id uuid := p_user_id;
   v_effective_app_id character varying := p_app_id;
-  v_legacy_right public.user_min_right;
   v_api_key public.apikeys%ROWTYPE;
   v_channel_org_id uuid;
   v_channel_app_id character varying;
@@ -729,36 +750,187 @@ BEGIN
     END IF;
   END IF;
 
-  v_use_rbac := public.rbac_is_enabled_for_org(v_effective_org_id);
-  IF v_use_rbac THEN
-    IF v_effective_user_id IS NULL THEN
-      RETURN false;
-    END IF;
-
-    RETURN public.rbac_has_permission(
-      public.rbac_principal_user(),
-      v_effective_user_id,
-      p_permission_key,
-      v_effective_org_id,
-      v_effective_app_id,
-      p_channel_id
-    );
-  END IF;
-
-  v_legacy_right := public.rbac_legacy_right_for_permission(p_permission_key);
-  IF v_legacy_right IS NULL THEN
+  IF v_effective_user_id IS NULL THEN
     RETURN false;
   END IF;
 
-  IF v_effective_app_id IS NOT NULL THEN
-    RETURN public.has_app_right_userid(v_effective_app_id, v_legacy_right, v_effective_user_id);
-  END IF;
-
-  RETURN public.check_min_rights_legacy_no_password_policy(v_legacy_right, v_effective_user_id, v_effective_org_id, v_effective_app_id, p_channel_id);
+  RETURN public.rbac_has_permission(
+    public.rbac_principal_user(),
+    v_effective_user_id,
+    p_permission_key,
+    v_effective_org_id,
+    v_effective_app_id,
+    p_channel_id
+  );
 END;
 $$;
 
 ALTER FUNCTION "public"."rbac_check_permission_direct_no_password_policy"("p_permission_key" "text", "p_user_id" "uuid", "p_org_id" "uuid", "p_app_id" character varying, "p_channel_id" bigint, "p_apikey" "text") OWNER TO "postgres";
+
+CREATE OR REPLACE FUNCTION "public"."check_min_rights"(
+  "min_right" "public"."user_min_right",
+  "org_id" "uuid",
+  "app_id" character varying,
+  "channel_id" bigint
+) RETURNS boolean
+LANGUAGE "plpgsql"
+SET search_path = ''
+AS $$
+BEGIN
+  RETURN public.check_min_rights(min_right, (SELECT auth.uid()), org_id, app_id, channel_id);
+END;
+$$;
+
+ALTER FUNCTION "public"."check_min_rights"("min_right" "public"."user_min_right", "org_id" "uuid", "app_id" character varying, "channel_id" bigint) OWNER TO "postgres";
+
+CREATE OR REPLACE FUNCTION "public"."check_min_rights"(
+  "min_right" "public"."user_min_right",
+  "user_id" "uuid",
+  "org_id" "uuid",
+  "app_id" character varying,
+  "channel_id" bigint
+) RETURNS boolean
+LANGUAGE "plpgsql" SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+  v_perm text;
+  v_scope text;
+  v_apikey text;
+  v_effective_org_id uuid := org_id;
+  v_app_owner_org uuid;
+  v_org_enforcing_2fa boolean;
+  v_password_policy_ok boolean;
+BEGIN
+  IF app_id IS NOT NULL THEN
+    SELECT owner_org INTO v_app_owner_org
+    FROM public.apps
+    WHERE public.apps.app_id = check_min_rights.app_id
+    LIMIT 1;
+
+    IF v_app_owner_org IS NOT NULL THEN
+      IF v_effective_org_id IS NOT NULL AND v_effective_org_id IS DISTINCT FROM v_app_owner_org THEN
+        PERFORM public.pg_log('deny: CHECK_MIN_RIGHTS_APP_ORG_MISMATCH', jsonb_build_object(
+          'org_id', v_effective_org_id,
+          'app_owner_org', v_app_owner_org,
+          'app_id', app_id,
+          'channel_id', channel_id,
+          'min_right', min_right::text,
+          'user_id', user_id
+        ));
+        RETURN false;
+      END IF;
+
+      v_effective_org_id := v_app_owner_org;
+    END IF;
+  END IF;
+
+  IF v_effective_org_id IS NULL AND channel_id IS NOT NULL THEN
+    SELECT owner_org INTO v_effective_org_id
+    FROM public.channels
+    WHERE public.channels.id = channel_id
+    LIMIT 1;
+  END IF;
+
+  SELECT public.get_apikey_header() INTO v_apikey;
+
+  IF v_effective_org_id IS NOT NULL AND NOT (v_apikey IS NOT NULL AND user_id IS NULL) THEN
+    SELECT enforcing_2fa INTO v_org_enforcing_2fa
+    FROM public.orgs
+    WHERE id = v_effective_org_id;
+
+    IF v_org_enforcing_2fa = true AND (user_id IS NULL OR NOT public.has_2fa_enabled(user_id)) THEN
+      PERFORM public.pg_log('deny: CHECK_MIN_RIGHTS_2FA_ENFORCEMENT', jsonb_build_object(
+        'org_id', COALESCE(org_id, v_effective_org_id),
+        'app_id', app_id,
+        'channel_id', channel_id,
+        'min_right', min_right::text,
+        'user_id', user_id
+      ));
+      RETURN false;
+    END IF;
+
+    v_password_policy_ok := public.user_meets_password_policy(user_id, v_effective_org_id);
+    IF v_password_policy_ok = false THEN
+      PERFORM public.pg_log('deny: CHECK_MIN_RIGHTS_PASSWORD_POLICY_ENFORCEMENT', jsonb_build_object(
+        'org_id', COALESCE(org_id, v_effective_org_id),
+        'app_id', app_id,
+        'channel_id', channel_id,
+        'min_right', min_right::text,
+        'user_id', user_id
+      ));
+      RETURN false;
+    END IF;
+  END IF;
+
+  IF channel_id IS NOT NULL THEN
+    v_scope := public.rbac_scope_channel();
+  ELSIF app_id IS NOT NULL THEN
+    v_scope := public.rbac_scope_app();
+  ELSE
+    v_scope := public.rbac_scope_org();
+  END IF;
+
+  v_perm := public.rbac_permission_for_legacy(min_right, v_scope);
+  RETURN public.rbac_check_permission_direct(v_perm, user_id, v_effective_org_id, app_id, channel_id, v_apikey);
+END;
+$$;
+
+ALTER FUNCTION "public"."check_min_rights"("min_right" "public"."user_min_right", "user_id" "uuid", "org_id" "uuid", "app_id" character varying, "channel_id" bigint) OWNER TO "postgres";
+REVOKE ALL ON FUNCTION "public"."check_min_rights"("min_right" "public"."user_min_right", "user_id" "uuid", "org_id" "uuid", "app_id" character varying, "channel_id" bigint) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION "public"."check_min_rights"("min_right" "public"."user_min_right", "user_id" "uuid", "org_id" "uuid", "app_id" character varying, "channel_id" bigint) TO "anon";
+GRANT EXECUTE ON FUNCTION "public"."check_min_rights"("min_right" "public"."user_min_right", "user_id" "uuid", "org_id" "uuid", "app_id" character varying, "channel_id" bigint) TO "authenticated";
+GRANT EXECUTE ON FUNCTION "public"."check_min_rights"("min_right" "public"."user_min_right", "user_id" "uuid", "org_id" "uuid", "app_id" character varying, "channel_id" bigint) TO "service_role";
+
+CREATE OR REPLACE FUNCTION "public"."check_min_rights_legacy"(
+  "min_right" "public"."user_min_right",
+  "user_id" "uuid",
+  "org_id" "uuid",
+  "app_id" character varying,
+  "channel_id" bigint
+) RETURNS boolean
+LANGUAGE "plpgsql" SECURITY DEFINER
+SET search_path = ''
+AS $$
+BEGIN
+  RETURN public.check_min_rights(min_right, user_id, org_id, app_id, channel_id);
+END;
+$$;
+
+ALTER FUNCTION "public"."check_min_rights_legacy"("min_right" "public"."user_min_right", "user_id" "uuid", "org_id" "uuid", "app_id" character varying, "channel_id" bigint) OWNER TO "postgres";
+REVOKE ALL ON FUNCTION "public"."check_min_rights_legacy"("min_right" "public"."user_min_right", "user_id" "uuid", "org_id" "uuid", "app_id" character varying, "channel_id" bigint) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION "public"."check_min_rights_legacy"("min_right" "public"."user_min_right", "user_id" "uuid", "org_id" "uuid", "app_id" character varying, "channel_id" bigint) TO "service_role";
+
+CREATE OR REPLACE FUNCTION "public"."check_min_rights_legacy_no_password_policy"(
+  "min_right" "public"."user_min_right",
+  "user_id" "uuid",
+  "org_id" "uuid",
+  "app_id" character varying,
+  "channel_id" bigint
+) RETURNS boolean
+LANGUAGE "plpgsql" SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+  v_perm text;
+  v_scope text;
+BEGIN
+  IF channel_id IS NOT NULL THEN
+    v_scope := public.rbac_scope_channel();
+  ELSIF app_id IS NOT NULL THEN
+    v_scope := public.rbac_scope_app();
+  ELSE
+    v_scope := public.rbac_scope_org();
+  END IF;
+
+  v_perm := public.rbac_permission_for_legacy(min_right, v_scope);
+  RETURN public.rbac_check_permission_direct_no_password_policy(v_perm, user_id, org_id, app_id, channel_id, NULL);
+END;
+$$;
+
+ALTER FUNCTION "public"."check_min_rights_legacy_no_password_policy"("min_right" "public"."user_min_right", "user_id" "uuid", "org_id" "uuid", "app_id" character varying, "channel_id" bigint) OWNER TO "postgres";
+REVOKE ALL ON FUNCTION "public"."check_min_rights_legacy_no_password_policy"("min_right" "public"."user_min_right", "user_id" "uuid", "org_id" "uuid", "app_id" character varying, "channel_id" bigint) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION "public"."check_min_rights_legacy_no_password_policy"("min_right" "public"."user_min_right", "user_id" "uuid", "org_id" "uuid", "app_id" character varying, "channel_id" bigint) TO "service_role";
 
 CREATE OR REPLACE FUNCTION "public"."app_versions_readable_app_ids"() RETURNS character varying[]
 LANGUAGE "plpgsql" STABLE SECURITY DEFINER
@@ -942,12 +1114,6 @@ BEGIN
   RETURN QUERY
   SELECT DISTINCT scoped.org_uuid
   FROM (
-    SELECT org_users.org_id AS org_uuid
-    FROM public.org_users
-    WHERE org_users.user_id = v_user_id
-
-    UNION
-
     SELECT rb.org_id AS org_uuid
     FROM public.role_bindings rb
     WHERE rb.principal_type = public.rbac_principal_user()
@@ -974,6 +1140,13 @@ BEGIN
       AND gm.user_id = v_user_id
       AND rb.org_id IS NOT NULL
       AND (rb.expires_at IS NULL OR rb.expires_at > now())
+
+    UNION
+
+    SELECT ou.org_id AS org_uuid
+    FROM public.org_users ou
+    WHERE ou.user_id = v_user_id
+      AND ou.user_right::text LIKE 'invite_%'
   ) scoped
   WHERE scoped.org_uuid IS NOT NULL;
 END;
@@ -1017,6 +1190,254 @@ END;
 $$;
 
 ALTER FUNCTION "public"."get_orgs_v6"() OWNER TO "postgres";
+
+CREATE OR REPLACE FUNCTION "public"."get_orgs_v7"("userid" "uuid") RETURNS TABLE("gid" "uuid", "created_by" "uuid", "created_at" timestamp with time zone, "logo" "text", "website" "text", "name" "text", "role" character varying, "paying" boolean, "trial_left" integer, "can_use_more" boolean, "is_canceled" boolean, "app_count" bigint, "subscription_start" timestamp with time zone, "subscription_end" timestamp with time zone, "management_email" "text", "is_yearly" boolean, "stats_updated_at" timestamp without time zone, "stats_refresh_requested_at" timestamp without time zone, "next_stats_update_at" timestamp with time zone, "credit_available" numeric, "credit_total" numeric, "credit_next_expiration" timestamp with time zone, "enforcing_2fa" boolean, "2fa_has_access" boolean, "enforce_hashed_api_keys" boolean, "password_policy_config" "jsonb", "password_has_access" boolean, "require_apikey_expiration" boolean, "max_apikey_expiration_days" integer, "enforce_encrypted_bundles" boolean, "required_encryption_key" character varying, "use_new_rbac" boolean)
+LANGUAGE "plpgsql" SECURITY DEFINER
+SET search_path = ''
+AS $$
+BEGIN
+  RETURN QUERY
+  WITH app_counts AS (
+    SELECT owner_org, COUNT(*) AS cnt
+    FROM public.apps
+    GROUP BY owner_org
+  ),
+  rbac_role_candidates AS (
+    SELECT rb.org_id, r.name, r.priority_rank
+    FROM public.role_bindings rb
+    JOIN public.roles r ON rb.role_id = r.id
+    WHERE rb.principal_type = public.rbac_principal_user()
+      AND rb.principal_id = userid
+      AND rb.scope_type = public.rbac_scope_org()
+      AND rb.org_id IS NOT NULL
+      AND (rb.expires_at IS NULL OR rb.expires_at > now())
+    UNION ALL
+    SELECT rb.org_id, r.name, r.priority_rank
+    FROM public.role_bindings rb
+    JOIN public.group_members gm ON gm.group_id = rb.principal_id
+    JOIN public.roles r ON rb.role_id = r.id
+    WHERE rb.principal_type = public.rbac_principal_group()
+      AND gm.user_id = userid
+      AND rb.scope_type = public.rbac_scope_org()
+      AND rb.org_id IS NOT NULL
+      AND (rb.expires_at IS NULL OR rb.expires_at > now())
+  ),
+  rbac_org_roles AS (
+    SELECT org_id, (ARRAY_AGG(rbac_role_candidates.name ORDER BY rbac_role_candidates.priority_rank DESC))[1] AS role_name
+    FROM rbac_role_candidates
+    GROUP BY org_id
+  ),
+  rbac_org_ids AS (
+    SELECT org_id
+    FROM rbac_org_roles
+    UNION
+    SELECT apps.owner_org
+    FROM public.role_bindings rb
+    JOIN public.apps ON apps.id = rb.app_id
+    WHERE rb.principal_type = public.rbac_principal_user()
+      AND rb.principal_id = userid
+      AND rb.app_id IS NOT NULL
+      AND (rb.expires_at IS NULL OR rb.expires_at > now())
+    UNION
+    SELECT apps.owner_org
+    FROM public.role_bindings rb
+    JOIN public.channels ch ON ch.rbac_id = rb.channel_id
+    JOIN public.apps ON apps.app_id = ch.app_id
+    WHERE rb.principal_type = public.rbac_principal_user()
+      AND rb.principal_id = userid
+      AND rb.channel_id IS NOT NULL
+      AND (rb.expires_at IS NULL OR rb.expires_at > now())
+    UNION
+    SELECT rb.org_id
+    FROM public.role_bindings rb
+    JOIN public.group_members gm ON gm.group_id = rb.principal_id
+    WHERE rb.principal_type = public.rbac_principal_group()
+      AND gm.user_id = userid
+      AND rb.org_id IS NOT NULL
+      AND (rb.expires_at IS NULL OR rb.expires_at > now())
+    UNION
+    SELECT apps.owner_org
+    FROM public.role_bindings rb
+    JOIN public.group_members gm ON gm.group_id = rb.principal_id
+    JOIN public.apps ON apps.id = rb.app_id
+    WHERE rb.principal_type = public.rbac_principal_group()
+      AND gm.user_id = userid
+      AND rb.app_id IS NOT NULL
+      AND (rb.expires_at IS NULL OR rb.expires_at > now())
+    UNION
+    SELECT apps.owner_org
+    FROM public.role_bindings rb
+    JOIN public.group_members gm ON gm.group_id = rb.principal_id
+    JOIN public.channels ch ON ch.rbac_id = rb.channel_id
+    JOIN public.apps ON apps.app_id = ch.app_id
+    WHERE rb.principal_type = public.rbac_principal_group()
+      AND gm.user_id = userid
+      AND rb.channel_id IS NOT NULL
+      AND (rb.expires_at IS NULL OR rb.expires_at > now())
+  ),
+  user_orgs AS (
+    SELECT rbac_org_ids.org_id
+    FROM rbac_org_ids
+    WHERE rbac_org_ids.org_id IS NOT NULL
+    UNION
+    SELECT ou.org_id
+    FROM public.org_users ou
+    WHERE ou.user_id = userid
+      AND ou.user_right::text LIKE 'invite_%'
+  ),
+  time_constants AS (
+    SELECT
+      NOW() AS current_time,
+      date_trunc('MONTH', NOW()) AS current_month_start,
+      '0 DAYS'::INTERVAL AS zero_day_interval
+  ),
+  paying_orgs_ordered AS (
+    SELECT
+      o.id,
+      ROW_NUMBER() OVER (ORDER BY o.id ASC) - 1 AS preceding_count
+    FROM public.orgs o
+    JOIN public.stripe_info si ON o.customer_id = si.customer_id
+    CROSS JOIN time_constants tc
+    WHERE (
+      (si.status = 'succeeded'
+        AND (si.canceled_at IS NULL OR si.canceled_at > tc.current_time)
+        AND si.subscription_anchor_end > tc.current_time)
+      OR si.trial_at > tc.current_time
+    )
+  ),
+  billing_cycles AS (
+    SELECT
+      o.id AS org_id,
+      CASE
+        WHEN COALESCE(si.subscription_anchor_start - date_trunc('MONTH', si.subscription_anchor_start), tc.zero_day_interval)
+             > tc.current_time - tc.current_month_start
+        THEN date_trunc('MONTH', tc.current_time - INTERVAL '1 MONTH')
+             + COALESCE(si.subscription_anchor_start - date_trunc('MONTH', si.subscription_anchor_start), tc.zero_day_interval)
+        ELSE tc.current_month_start
+             + COALESCE(si.subscription_anchor_start - date_trunc('MONTH', si.subscription_anchor_start), tc.zero_day_interval)
+      END AS cycle_start
+    FROM public.orgs o
+    CROSS JOIN time_constants tc
+    LEFT JOIN public.stripe_info si ON o.customer_id = si.customer_id
+  ),
+  two_fa_access AS (
+    SELECT
+      o.id AS org_id,
+      o.enforcing_2fa,
+      CASE
+        WHEN o.enforcing_2fa = false THEN true
+        ELSE public.has_2fa_enabled(userid)
+      END AS "2fa_has_access",
+      (o.enforcing_2fa = true AND NOT public.has_2fa_enabled(userid)) AS should_redact_2fa
+    FROM public.orgs o
+    JOIN user_orgs uo ON uo.org_id = o.id
+  ),
+  password_policy_access AS (
+    SELECT
+      o.id AS org_id,
+      o.password_policy_config,
+      public.user_meets_password_policy(userid, o.id) AS password_has_access,
+      NOT public.user_meets_password_policy(userid, o.id) AS should_redact_password
+    FROM public.orgs o
+    JOIN user_orgs uo ON uo.org_id = o.id
+  )
+  SELECT
+    o.id AS gid,
+    o.created_by,
+    CASE
+      WHEN tfa.should_redact_2fa OR ppa.should_redact_password THEN NULL::timestamptz
+      ELSE o.created_at
+    END AS created_at,
+    o.logo,
+    o.website,
+    o.name,
+    COALESCE(ou.user_right::varchar, ror.role_name::varchar, public.rbac_role_org_member()::varchar) AS role,
+    CASE
+      WHEN tfa.should_redact_2fa OR ppa.should_redact_password THEN false
+      ELSE COALESCE(si.status = 'succeeded', false)
+    END AS paying,
+    CASE
+      WHEN tfa.should_redact_2fa OR ppa.should_redact_password THEN 0
+      ELSE GREATEST(COALESCE((si.trial_at::date - NOW()::date), 0), 0)::integer
+    END AS trial_left,
+    CASE
+      WHEN tfa.should_redact_2fa OR ppa.should_redact_password THEN false
+      ELSE COALESCE((si.status = 'succeeded' AND si.is_good_plan = true)
+        OR (si.trial_at::date - NOW()::date > 0)
+        OR COALESCE(ucb.available_credits, 0) > 0, false)
+    END AS can_use_more,
+    CASE
+      WHEN tfa.should_redact_2fa OR ppa.should_redact_password THEN false
+      ELSE COALESCE(si.status = 'canceled', false)
+    END AS is_canceled,
+    CASE
+      WHEN tfa.should_redact_2fa OR ppa.should_redact_password THEN 0::bigint
+      ELSE COALESCE(ac.cnt, 0)
+    END AS app_count,
+    CASE
+      WHEN tfa.should_redact_2fa OR ppa.should_redact_password THEN NULL::timestamptz
+      ELSE bc.cycle_start
+    END AS subscription_start,
+    CASE
+      WHEN tfa.should_redact_2fa OR ppa.should_redact_password THEN NULL::timestamptz
+      ELSE (bc.cycle_start + INTERVAL '1 MONTH')
+    END AS subscription_end,
+    CASE
+      WHEN tfa.should_redact_2fa OR ppa.should_redact_password THEN NULL::text
+      ELSE o.management_email
+    END AS management_email,
+    CASE
+      WHEN tfa.should_redact_2fa OR ppa.should_redact_password THEN false
+      ELSE COALESCE(si.price_id = p.price_y_id, false)
+    END AS is_yearly,
+    o.stats_updated_at,
+    o.stats_refresh_requested_at,
+    CASE
+      WHEN poo.id IS NOT NULL THEN
+        public.get_next_cron_time('0 3 * * *', NOW()) + make_interval(mins => poo.preceding_count::int * 4)
+      ELSE NULL
+    END AS next_stats_update_at,
+    CASE
+      WHEN tfa.should_redact_2fa OR ppa.should_redact_password THEN NULL::numeric
+      ELSE COALESCE(ucb.available_credits, 0)
+    END AS credit_available,
+    CASE
+      WHEN tfa.should_redact_2fa OR ppa.should_redact_password THEN NULL::numeric
+      ELSE COALESCE(ucb.total_credits, 0)
+    END AS credit_total,
+    CASE
+      WHEN tfa.should_redact_2fa OR ppa.should_redact_password THEN NULL::timestamptz
+      ELSE ucb.next_expiration
+    END AS credit_next_expiration,
+    tfa.enforcing_2fa,
+    tfa."2fa_has_access",
+    o.enforce_hashed_api_keys,
+    ppa.password_policy_config,
+    ppa.password_has_access,
+    o.require_apikey_expiration,
+    o.max_apikey_expiration_days,
+    o.enforce_encrypted_bundles,
+    o.required_encryption_key,
+    true AS use_new_rbac
+  FROM public.orgs o
+  JOIN user_orgs uo ON uo.org_id = o.id
+  LEFT JOIN public.org_users ou
+    ON ou.user_id = userid
+    AND o.id = ou.org_id
+    AND ou.user_right::text LIKE 'invite_%'
+  LEFT JOIN rbac_org_roles ror ON ror.org_id = o.id
+  LEFT JOIN two_fa_access tfa ON tfa.org_id = o.id
+  LEFT JOIN password_policy_access ppa ON ppa.org_id = o.id
+  LEFT JOIN public.stripe_info si ON o.customer_id = si.customer_id
+  LEFT JOIN public.plans p ON si.product_id = p.stripe_id
+  LEFT JOIN app_counts ac ON ac.owner_org = o.id
+  LEFT JOIN public.usage_credit_balances ucb ON ucb.org_id = o.id
+  LEFT JOIN paying_orgs_ordered poo ON poo.id = o.id
+  LEFT JOIN billing_cycles bc ON bc.org_id = o.id;
+END;
+$$;
+
+ALTER FUNCTION "public"."get_orgs_v7"("userid" "uuid") OWNER TO "postgres";
 
 CREATE OR REPLACE FUNCTION "public"."get_orgs_v7"() RETURNS TABLE("gid" "uuid", "created_by" "uuid", "created_at" timestamp with time zone, "logo" "text", "website" "text", "name" "text", "role" character varying, "paying" boolean, "trial_left" integer, "can_use_more" boolean, "is_canceled" boolean, "app_count" bigint, "subscription_start" timestamp with time zone, "subscription_end" timestamp with time zone, "management_email" "text", "is_yearly" boolean, "stats_updated_at" timestamp without time zone, "stats_refresh_requested_at" timestamp without time zone, "next_stats_update_at" timestamp with time zone, "credit_available" numeric, "credit_total" numeric, "credit_next_expiration" timestamp with time zone, "enforcing_2fa" boolean, "2fa_has_access" boolean, "enforce_hashed_api_keys" boolean, "password_policy_config" "jsonb", "password_has_access" boolean, "require_apikey_expiration" boolean, "max_apikey_expiration_days" integer, "enforce_encrypted_bundles" boolean, "required_encryption_key" character varying, "use_new_rbac" boolean)
 LANGUAGE "plpgsql" SECURITY DEFINER
@@ -1103,6 +1524,125 @@ ALTER FUNCTION "public"."get_org_apikeys"("p_org_id" "uuid") OWNER TO "postgres"
 REVOKE ALL ON FUNCTION "public"."get_org_apikeys"("p_org_id" "uuid") FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION "public"."get_org_apikeys"("p_org_id" "uuid") TO "service_role";
 GRANT EXECUTE ON FUNCTION "public"."get_org_apikeys"("p_org_id" "uuid") TO "authenticated";
+
+CREATE OR REPLACE FUNCTION "public"."rbac_org_role_for_legacy_right"("legacy_right" "public"."user_min_right")
+RETURNS text
+LANGUAGE "plpgsql"
+IMMUTABLE
+SET search_path = ''
+AS $$
+BEGIN
+  IF legacy_right >= public.rbac_right_super_admin()::public.user_min_right THEN
+    RETURN public.rbac_role_org_super_admin();
+  ELSIF legacy_right >= public.rbac_right_admin()::public.user_min_right THEN
+    RETURN public.rbac_role_org_admin();
+  END IF;
+
+  RETURN public.rbac_role_org_member();
+END;
+$$;
+
+ALTER FUNCTION "public"."rbac_org_role_for_legacy_right"("public"."user_min_right") OWNER TO "postgres";
+REVOKE ALL ON FUNCTION "public"."rbac_org_role_for_legacy_right"("public"."user_min_right") FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION "public"."rbac_org_role_for_legacy_right"("public"."user_min_right") TO "service_role";
+
+CREATE OR REPLACE FUNCTION "public"."invite_user_to_org"(
+  "email" character varying,
+  "org_id" "uuid",
+  "invite_type" "public"."user_min_right"
+) RETURNS character varying
+LANGUAGE "plpgsql" SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+  legacy_right public.user_min_right;
+  role_name text;
+BEGIN
+  legacy_right := public.transform_role_to_non_invite(invite_type);
+  role_name := public.rbac_org_role_for_legacy_right(legacy_right);
+
+  RETURN public.invite_user_to_org_rbac(email, org_id, role_name);
+END;
+$$;
+
+ALTER FUNCTION "public"."invite_user_to_org"("email" character varying, "org_id" "uuid", "invite_type" "public"."user_min_right") OWNER TO "postgres";
+REVOKE ALL ON FUNCTION "public"."invite_user_to_org"("email" character varying, "org_id" "uuid", "invite_type" "public"."user_min_right") FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION "public"."invite_user_to_org"("email" character varying, "org_id" "uuid", "invite_type" "public"."user_min_right") TO "anon";
+GRANT EXECUTE ON FUNCTION "public"."invite_user_to_org"("email" character varying, "org_id" "uuid", "invite_type" "public"."user_min_right") TO "authenticated";
+GRANT EXECUTE ON FUNCTION "public"."invite_user_to_org"("email" character varying, "org_id" "uuid", "invite_type" "public"."user_min_right") TO "service_role";
+
+COMMENT ON FUNCTION "public"."invite_user_to_org"("email" character varying, "org_id" "uuid", "invite_type" "public"."user_min_right") IS 'Compatibility wrapper for old invite callers. Legacy role inputs are converted to RBAC roles.';
+
+CREATE OR REPLACE FUNCTION "public"."modify_permissions_tmp"(
+  "email" "text",
+  "org_id" "uuid",
+  "new_role" "public"."user_min_right"
+) RETURNS character varying
+LANGUAGE "plpgsql" SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+  tmp_user record;
+  non_invite_role public.user_min_right;
+  v_rbac_role_name text;
+BEGIN
+  non_invite_role := public.transform_role_to_non_invite(new_role);
+  v_rbac_role_name := public.rbac_org_role_for_legacy_right(non_invite_role);
+
+  PERFORM 1 FROM public.orgs WHERE public.orgs.id = modify_permissions_tmp.org_id;
+  IF NOT FOUND THEN
+    RETURN 'NO_ORG';
+  END IF;
+
+  IF NOT public.check_min_rights(
+    'admin'::public.user_min_right,
+    (SELECT public.get_identity_org_allowed('{read,upload,write,all}'::public.key_mode[], modify_permissions_tmp.org_id)),
+    modify_permissions_tmp.org_id,
+    NULL::varchar,
+    NULL::bigint
+  ) THEN
+    RETURN 'NO_RIGHTS';
+  END IF;
+
+  IF non_invite_role = 'super_admin'::public.user_min_right
+    AND NOT public.check_min_rights(
+      'super_admin'::public.user_min_right,
+      (SELECT public.get_identity_org_allowed('{read,upload,write,all}'::public.key_mode[], modify_permissions_tmp.org_id)),
+      modify_permissions_tmp.org_id,
+      NULL::varchar,
+      NULL::bigint
+    )
+  THEN
+    RETURN 'NO_RIGHTS_FOR_SUPER_ADMIN';
+  END IF;
+
+  SELECT * INTO tmp_user
+  FROM public.tmp_users
+  WHERE public.tmp_users.email = modify_permissions_tmp.email
+    AND public.tmp_users.org_id = modify_permissions_tmp.org_id;
+
+  IF NOT FOUND THEN
+    RETURN 'NO_INVITATION';
+  END IF;
+  IF tmp_user.cancelled_at IS NOT NULL THEN
+    RETURN 'INVITATION_CANCELLED';
+  END IF;
+
+  UPDATE public.tmp_users
+  SET role = non_invite_role,
+      rbac_role_name = v_rbac_role_name,
+      updated_at = CURRENT_TIMESTAMP
+  WHERE public.tmp_users.id = tmp_user.id;
+
+  RETURN 'OK';
+END;
+$$;
+
+ALTER FUNCTION "public"."modify_permissions_tmp"("email" "text", "org_id" "uuid", "new_role" "public"."user_min_right") OWNER TO "postgres";
+REVOKE ALL ON FUNCTION "public"."modify_permissions_tmp"("email" "text", "org_id" "uuid", "new_role" "public"."user_min_right") FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION "public"."modify_permissions_tmp"("email" "text", "org_id" "uuid", "new_role" "public"."user_min_right") TO "anon";
+GRANT EXECUTE ON FUNCTION "public"."modify_permissions_tmp"("email" "text", "org_id" "uuid", "new_role" "public"."user_min_right") TO "authenticated";
+GRANT EXECUTE ON FUNCTION "public"."modify_permissions_tmp"("email" "text", "org_id" "uuid", "new_role" "public"."user_min_right") TO "service_role";
 
 CREATE OR REPLACE FUNCTION "public"."enforce_apikey_expiration_policy"()
 RETURNS trigger

@@ -56,7 +56,7 @@ beforeAll(async () => {
     created_by: USER_ID,
     customer_id: customerId,
     website,
-    use_new_rbac: false, // Explicitly legacy — this suite tests the legacy permission path
+    use_new_rbac: false, // Compatibility flag is ignored; permissions are RBAC-backed.
   })
   if (error)
     throw error
@@ -126,7 +126,7 @@ describe('read-only API keys cannot access destructive organization routes', () 
       created_by: USER_ID,
       customer_id: readOnlyCustomerId,
       require_apikey_expiration: false,
-      use_new_rbac: false, // Explicitly legacy — this suite tests the legacy permission path
+      use_new_rbac: false, // Compatibility flag is ignored; permissions are RBAC-backed.
     })
     expect(orgError).toBeNull()
 

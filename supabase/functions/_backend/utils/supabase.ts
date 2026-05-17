@@ -843,10 +843,25 @@ export async function createApiKey(c: Context, userId: string) {
       return
 
     const orgResult = await pgClient.query<{ org_id: string }>(
-      `SELECT DISTINCT org_id
-       FROM public.org_users
-       WHERE user_id = $1::uuid
-         AND (user_right IS NULL OR user_right::text NOT LIKE 'invite_%')`,
+      `SELECT DISTINCT rb.org_id
+       FROM public.role_bindings rb
+       WHERE rb.principal_type = public.rbac_principal_user()
+         AND rb.principal_id = $1::uuid
+         AND rb.org_id IS NOT NULL
+         AND (rb.expires_at IS NULL OR rb.expires_at > now())
+
+       UNION
+
+       SELECT DISTINCT g.org_id
+       FROM public.group_members gm
+       INNER JOIN public.groups g ON g.id = gm.group_id
+       INNER JOIN public.role_bindings rb
+         ON rb.principal_type = public.rbac_principal_group()
+         AND rb.principal_id = gm.group_id
+         AND rb.org_id = g.org_id
+       WHERE gm.user_id = $1::uuid
+         AND rb.org_id IS NOT NULL
+         AND (rb.expires_at IS NULL OR rb.expires_at > now())`,
       [userId],
     )
     if (orgResult.rows.length === 0) {
@@ -872,10 +887,25 @@ export async function createApiKey(c: Context, userId: string) {
          RETURNING user_id, rbac_id, name
        ),
        current_orgs AS (
-         SELECT DISTINCT org_id
-         FROM public.org_users
-         WHERE user_id = $1::uuid
-           AND (user_right IS NULL OR user_right::text NOT LIKE 'invite_%')
+         SELECT DISTINCT rb.org_id
+         FROM public.role_bindings rb
+         WHERE rb.principal_type = public.rbac_principal_user()
+           AND rb.principal_id = $1::uuid
+           AND rb.org_id IS NOT NULL
+           AND (rb.expires_at IS NULL OR rb.expires_at > now())
+
+         UNION
+
+         SELECT DISTINCT g.org_id
+         FROM public.group_members gm
+         INNER JOIN public.groups g ON g.id = gm.group_id
+         INNER JOIN public.role_bindings rb
+           ON rb.principal_type = public.rbac_principal_group()
+           AND rb.principal_id = gm.group_id
+           AND rb.org_id = g.org_id
+         WHERE gm.user_id = $1::uuid
+           AND rb.org_id IS NOT NULL
+           AND (rb.expires_at IS NULL OR rb.expires_at > now())
        ),
        org_bindings AS (
          INSERT INTO public.role_bindings (

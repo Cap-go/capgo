@@ -2,9 +2,7 @@
  * RBAC Permission System - Frontend
  *
  * This module provides the frontend interface to the backend RBAC permission system.
- * It calls the SQL function rbac_check_permission() which automatically routes
- * between legacy (org_users) and new RBAC (role_bindings) systems based on the org's
- * use_new_rbac flag.
+ * It calls the SQL function rbac_check_permission(), backed by role_bindings.
  *
  * Usage:
  *   import { checkPermissions } from '~/services/permissions'
@@ -125,15 +123,11 @@ export async function hasPermission(
 /**
  * Main permission check function.
  *
- * Calls the SQL function rbac_check_permission() which automatically
- * routes between legacy (check_min_rights) and RBAC systems based on the org's
- * feature flag.
+ * Calls the SQL function rbac_check_permission(), backed by role_bindings.
  *
  * The backend will:
  * 1. Auto-derive parent scopes (orgId from appId, appId from channelId) if needed
- * 2. Detect if the org has use_new_rbac enabled
- * 3. If RBAC: check role_bindings → roles → role_permissions → permissions
- * 4. If legacy: map permission to min_right and check org_users table
+ * 2. Check role_bindings → roles → role_permissions → permissions
  *
  * @param permissions - A permission key or a list of permission keys
  * @param scope - Scope identifiers. Parent scopes are auto-derived by the backend.

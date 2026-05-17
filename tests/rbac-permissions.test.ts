@@ -3,8 +3,7 @@ import { randomUUID } from 'node:crypto'
 /**
  * RBAC Permission System Tests
  *
- * Tests the checkPermission function with both legacy and RBAC modes
- * to ensure feature flag routing works correctly.
+ * Tests the checkPermission function with legacy-compatible inputs backed by RBAC.
  */
 import { Pool } from 'pg'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
@@ -91,7 +90,7 @@ describe('rbac permission system', () => {
   })
 
   describe('rbac_check_permission_direct SQL function', () => {
-    describe('legacy mode (use_new_rbac = false)', () => {
+    describe('legacy-compatible inputs with RBAC enforced', () => {
       beforeEach(async () => {
         await query(`SELECT set_config('capgo.rbac_enabled', 'false', true)`)
         await query(`UPDATE public.orgs SET use_new_rbac = false WHERE id = $1`, [ORG_ID])
@@ -204,16 +203,55 @@ describe('rbac permission system', () => {
         expect(deniedResult.rows[0].allowed).toBe(false)
         expect(allowedResult.rows[0].allowed).toBe(true)
       })
+
+      it('should deny stale org_users rights when RBAC bindings are missing', async () => {
+        const staleOrgId = randomUUID()
+        const staleUserId = randomUUID()
+        const staleEmail = `stale-rbac-${staleOrgId}@capgo.app`
+
+        await query(`
+          INSERT INTO public.users (id, email, first_name, last_name)
+          VALUES ($1::uuid, $2, 'Stale', 'Rights')
+        `, [staleUserId, staleEmail])
+
+        await query(`
+          INSERT INTO public.orgs (id, name, management_email, created_by, use_new_rbac)
+          VALUES ($1::uuid, $2, $3, $4::uuid, false)
+        `, [staleOrgId, `Stale RBAC ${staleOrgId}`, staleEmail, staleUserId])
+
+        await query(`
+          INSERT INTO public.org_users (org_id, user_id, user_right)
+          VALUES ($1::uuid, $2::uuid, 'super_admin')
+        `, [staleOrgId, staleUserId])
+
+        await query(`
+          DELETE FROM public.role_bindings
+          WHERE principal_type = public.rbac_principal_user()
+            AND principal_id = $1::uuid
+            AND org_id = $2::uuid
+        `, [staleUserId, staleOrgId])
+
+        const result = await query(`
+          SELECT public.rbac_check_permission_direct(
+            'org.delete',
+            $1::uuid,
+            $2::uuid,
+            NULL::text,
+            NULL::bigint,
+            NULL
+          ) AS allowed
+        `, [staleUserId, staleOrgId])
+
+        expect(result.rows[0].allowed).toBe(false)
+      })
     })
 
-    describe('rbac mode (use_new_rbac = true)', () => {
+    describe('rbac permission checks', () => {
       beforeEach(async () => {
-        // Enable RBAC globally for tests
         await query(`SELECT set_config('capgo.rbac_enabled', 'true', true)`)
       })
 
       afterEach(async () => {
-        // Reset to legacy mode
         await query(`SELECT set_config('capgo.rbac_enabled', 'false', true)`)
       })
 
@@ -848,8 +886,8 @@ describe('rbac permission system', () => {
       })
     })
 
-    describe('feature flag routing', () => {
-      it('should use legacy for orgs without RBAC flag', async () => {
+    describe('RBAC compatibility flag', () => {
+      it('should keep using RBAC when the old org flag is false', async () => {
         await query(`UPDATE public.orgs SET use_new_rbac = false WHERE id = $1`, [ORG_ID])
         await query(`SELECT set_config('capgo.rbac_enabled', 'false', true)`)
 
@@ -868,7 +906,6 @@ describe('rbac permission system', () => {
       })
 
       it('should use RBAC for orgs with RBAC flag enabled', async () => {
-        // Enable RBAC for the org
         await query(`
           UPDATE public.orgs SET use_new_rbac = true WHERE id = $1;
         `, [ORG_ID])
@@ -883,11 +920,6 @@ describe('rbac permission system', () => {
             NULL
           ) as allowed
         `, [USER_ID, ORG_ID, TEST_APP_ID])
-
-        // Reset
-        await query(`
-          UPDATE public.orgs SET use_new_rbac = false WHERE id = $1;
-        `, [ORG_ID])
 
         expect(result.rows[0].allowed).toBe(true)
       })
@@ -955,7 +987,7 @@ describe('rbac permission system', () => {
         expect(result.rows[0].enabled).toBe(true)
       })
 
-      it('should return false when both flags are disabled', async () => {
+      it('should return true even when old flags are disabled', async () => {
         await query(`SELECT set_config('capgo.rbac_enabled', 'false', true)`)
         await query(`UPDATE public.orgs SET use_new_rbac = false WHERE id = $1`, [ORG_ID])
 
@@ -963,7 +995,7 @@ describe('rbac permission system', () => {
           SELECT public.rbac_is_enabled_for_org($1::uuid) as enabled
         `, [ORG_ID])
 
-        expect(result.rows[0].enabled).toBe(false)
+        expect(result.rows[0].enabled).toBe(true)
       })
     })
 

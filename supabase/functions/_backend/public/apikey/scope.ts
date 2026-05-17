@@ -17,13 +17,6 @@ export async function apiKeyHasLimitedScope(c: Context<MiddlewareKeyVariables>, 
     const result = await pgClient.query<{ is_limited: boolean }>(
       `
       WITH user_orgs AS (
-        SELECT org_id
-        FROM public.org_users
-        WHERE user_id = $1::uuid
-          AND (user_right IS NULL OR user_right::text NOT LIKE 'invite_%')
-
-        UNION
-
         SELECT rb.org_id
         FROM public.role_bindings rb
         WHERE rb.principal_type = public.rbac_principal_user()

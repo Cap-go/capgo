@@ -52,14 +52,7 @@ function generateInviteMagicString() {
   return Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('')
 }
 
-function resolveInviteRoles(inviteType: string, useNewRbac: boolean) {
-  if (!useNewRbac) {
-    if (rbacInviteRoles.includes(inviteType as RbacInviteRole)) {
-      throw simpleError('invalid_request', 'Invalid invite type')
-    }
-    return { legacyInviteType: inviteType as Database['public']['Enums']['user_min_right'], rbacRoleName: null }
-  }
-
+function resolveInviteRoles(inviteType: string) {
   if (rbacInviteRoles.includes(inviteType as RbacInviteRole)) {
     const rbacRoleName = inviteType as RbacInviteRole
     return { legacyInviteType: rbacRoleToLegacy[rbacRoleName], rbacRoleName }
@@ -137,8 +130,7 @@ async function validateInvite(c: Context, rawBody: any) {
     return { message: 'Failed to invite user', error: orgError?.message ?? 'Organization not found', status: 500 }
   }
 
-  const useNewRbac = org.use_new_rbac === true
-  const { legacyInviteType, rbacRoleName } = resolveInviteRoles(body.invite_type, useNewRbac)
+  const { legacyInviteType, rbacRoleName } = resolveInviteRoles(body.invite_type)
 
   // Get current user ID from JWT
   const authContext = c.get('auth')

@@ -1,9 +1,7 @@
 /**
  * RBAC Permission System
  *
- * This module provides a unified permission checking system that routes between
- * legacy role-based checks (check_min_rights) and the new RBAC permission system
- * based on the org's feature flag.
+ * This module provides permission checks backed by role_bindings.
  *
  * Usage:
  *   import { checkPermission } from './rbac.ts'
@@ -97,12 +95,11 @@ export interface RbacContextVariables {
 }
 
 // =============================================================================
-// Legacy Mapping
+// Compatibility Mapping
 // =============================================================================
 
 /**
- * Maps RBAC permissions to legacy user_min_right values.
- * Used for fallback when org doesn't have RBAC enabled.
+ * Maps RBAC permissions to user_min_right values for compatibility callers.
  */
 const PERMISSION_TO_LEGACY_RIGHT: Record<Permission, Database['public']['Enums']['user_min_right']> = {
   // Org permissions
@@ -196,9 +193,7 @@ export async function isRbacEnabledForOrg(
 /**
  * Main permission check function.
  *
- * Uses the SQL function rbac_check_permission_direct which automatically
- * routes between legacy (check_min_rights) and RBAC systems based on
- * the org's feature flag.
+ * Uses the SQL function rbac_check_permission_direct.
  *
  * @param c - Hono context with auth info
  * @param permission - The RBAC permission to check (e.g., 'app.upload_bundle')

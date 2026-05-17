@@ -110,9 +110,7 @@ watchEffect(() => {
 
 watchEffect(() => {
   const billingEnabled = stripeEnabled.value
-  const hasOrgRbacEnabled = !!organizationStore.currentOrganization?.use_new_rbac
-
-  const needsGroups = hasOrgRbacEnabled
+  const needsGroups = !!organizationStore.currentOrganization?.gid
   const hasGroups = organizationTabs.value.find(tab => tab.key === '/settings/organization/groups')
   if (needsGroups && !hasGroups) {
     const base = baseOrgTabs.find(t => t.key === '/settings/organization/groups')
@@ -125,7 +123,7 @@ watchEffect(() => {
   if (!needsGroups && hasGroups)
     organizationTabs.value = organizationTabs.value.filter(tab => tab.key !== '/settings/organization/groups')
 
-  const needsApiKeys = hasOrgRbacEnabled
+  const needsApiKeys = !!organizationStore.currentOrganization?.gid
   const hasApiKeys = organizationTabs.value.find(tab => tab.key === '/settings/organization/api-keys')
   if (needsApiKeys && !hasApiKeys) {
     const base = baseOrgTabs.find(t => t.key === '/settings/organization/api-keys')

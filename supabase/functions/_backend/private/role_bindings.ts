@@ -166,22 +166,6 @@ async function validateUserPrincipalAccess(
   principalId: string,
   orgId: string,
 ): Promise<ValidationResult<null>> {
-  const activeMembership = await drizzle
-    .select({ user_right: schema.org_users.user_right })
-    .from(schema.org_users)
-    .where(
-      and(
-        eq(schema.org_users.user_id, principalId),
-        eq(schema.org_users.org_id, orgId),
-        sql`(${schema.org_users.user_right} IS NULL OR ${schema.org_users.user_right}::text NOT LIKE 'invite_%')`,
-      ),
-    )
-    .limit(1)
-
-  if (activeMembership.length) {
-    return { ok: true, data: null }
-  }
-
   const pendingInvite = await drizzle
     .select({ user_right: schema.org_users.user_right })
     .from(schema.org_users)
@@ -267,24 +251,6 @@ async function validateApiKeyPrincipalAccess(
     return { ok: false, status: 400, error: INVALID_APIKEY_ACCESS_ERROR }
   }
 
-  // Mirror the user-principal checks: only accept active (non-invite) memberships
-  const [activeMembership] = await drizzle
-    .select({ id: schema.org_users.id })
-    .from(schema.org_users)
-    .where(
-      and(
-        eq(schema.org_users.user_id, apiKey.user_id),
-        eq(schema.org_users.org_id, orgId),
-        sql`(${schema.org_users.user_right} IS NULL OR ${schema.org_users.user_right}::text NOT LIKE 'invite_%')`,
-      ),
-    )
-    .limit(1)
-
-  if (activeMembership) {
-    return { ok: true, data: null }
-  }
-
-  // Check if the owner has a pending invite (same as user-principal validation)
   const [pendingInvite] = await drizzle
     .select({ id: schema.org_users.id })
     .from(schema.org_users)
@@ -306,13 +272,6 @@ async function validateApiKeyPrincipalAccess(
     })
     return { ok: false, status: 400, error: INVALID_APIKEY_ACCESS_ERROR }
   }
-
-  cloudlogErr({
-    message: 'validatePrincipalAccess: apiKey owner legacy membership not found',
-    principalId,
-    orgId,
-    apiKeyUserId: apiKey.user_id,
-  })
 
   const [ownerRbacAccess] = await drizzle
     .select({ id: schema.role_bindings.id })
@@ -382,15 +341,6 @@ async function loadManagedBinding(
   return { ok: true, data: binding }
 }
 
-// Maps legacy org_users.user_right values to their equivalent RBAC role names.
-// Only admin-level rights are mapped because lower rights (write/upload/read)
-// cannot pass the checkPermission('org.update_user_roles') gate that precedes
-// every anti-escalation check.
-const LEGACY_RIGHT_TO_ROLE_NAME: Record<string, string> = {
-  super_admin: 'org_super_admin',
-  admin: 'org_admin',
-}
-
 async function loadAssignableRoleForBinding(
   c: Context<MiddlewareKeyVariables>,
   drizzle: ReturnType<typeof getDrizzleClient>,
@@ -449,42 +399,7 @@ async function getCallerMaxPriorityRank(
     )
     .limit(1)
 
-  let maxRank = result[0]?.max_rank ?? 0
-
-  // For JWT callers, also consider legacy org_users.user_right so that admins
-  // who passed checkPermission via check_min_rights (legacy path) are not
-  // blocked by the anti-escalation check when they have no RBAC bindings yet.
-  if (authType === 'jwt') {
-    const [membership] = await drizzle
-      .select({ user_right: schema.org_users.user_right })
-      .from(schema.org_users)
-      .where(
-        and(
-          eq(schema.org_users.user_id, principalId),
-          eq(schema.org_users.org_id, orgId),
-          sql`${schema.org_users.user_right}::text NOT LIKE 'invite_%'`,
-        ),
-      )
-      .limit(1)
-
-    const mappedRoleName = membership?.user_right
-      ? LEGACY_RIGHT_TO_ROLE_NAME[membership.user_right]
-      : undefined
-
-    if (mappedRoleName) {
-      const [role] = await drizzle
-        .select({ priority_rank: schema.roles.priority_rank })
-        .from(schema.roles)
-        .where(eq(schema.roles.name, mappedRoleName))
-        .limit(1)
-
-      if (role && role.priority_rank > maxRank) {
-        maxRank = role.priority_rank
-      }
-    }
-  }
-
-  return maxRank
+  return result[0]?.max_rank ?? 0
 }
 
 // Reusable binding creation logic - used by both the POST route and apikey/post.ts
