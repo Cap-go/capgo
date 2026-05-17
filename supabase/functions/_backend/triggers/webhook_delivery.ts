@@ -11,6 +11,7 @@ import {
   disableWebhook,
   getDeliveryById,
   getWebhookById,
+  getWebhookLogUrlMetadata,
   getWebhookPayloadEvent,
   getWebhookPayloadEventId,
   incrementAttemptCount,
@@ -52,20 +53,25 @@ app.post('/', middlewareAPISecret, async (c) => {
     const deliveryData: DeliveryMessage = body?.delivery_id && body?.webhook_id && body?.url
       ? body
       : (body.payload || body)
+    const urlInfo = getWebhookLogUrlMetadata(typeof deliveryData?.url === 'string' ? deliveryData.url : '')
 
     cloudlog({
       requestId: c.get('requestId'),
       message: 'Webhook delivery handler received',
       deliveryId: deliveryData.delivery_id,
       webhookId: deliveryData.webhook_id,
-      url: deliveryData.url,
+      urlInfo,
     })
 
     if (!deliveryData.delivery_id || !deliveryData.webhook_id || !deliveryData.url || !deliveryData.payload) {
       cloudlogErr({
         requestId: c.get('requestId'),
         message: 'Invalid delivery data',
-        deliveryData,
+        hasDeliveryId: Boolean(deliveryData.delivery_id),
+        hasWebhookId: Boolean(deliveryData.webhook_id),
+        hasUrl: Boolean(deliveryData.url),
+        hasPayload: Boolean(deliveryData.payload),
+        urlInfo,
       })
       return c.json(BRES)
     }
@@ -206,7 +212,8 @@ app.post('/', middlewareAPISecret, async (c) => {
             'webhook:delivery_failed',
             {
               webhook_name: webhook.name,
-              webhook_url: webhook.url,
+              webhook_id: webhook.id,
+              webhook_url_info: getWebhookLogUrlMetadata(webhook.url),
               event_type: getWebhookPayloadEvent(deliveryData.payload),
               attempts: attemptCount,
               last_error: result.body?.slice(0, 500) || 'Unknown error',
