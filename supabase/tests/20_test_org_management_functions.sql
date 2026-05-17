@@ -114,14 +114,7 @@ SELECT
         'get_orgs_v6 API key test - throws correct error message for invalid API key'
     );
 
--- Test 3: API key with limited_to_orgs restrictions
--- Use existing admin all key and temporarily modify it
-UPDATE apikeys
-SET
-    limited_to_orgs = '{"22dbad8a-b885-4309-9b3b-a09f8460fb6d"}'
-WHERE
-    key = 'ae6e7458-c46d-4c00-aa3b-153b0b8520eb';
-
+-- Test 3: V2 API key with org RBAC bindings
 SELECT
     set_config(
         'request.headers',
@@ -136,10 +129,10 @@ SELECT
             FROM
                 get_orgs_v6()
         ) >= 0,
-        'get_orgs_v6 API key test - works with limited_to_orgs API key'
+        'get_orgs_v6 API key test - works with org-bound V2 API key'
     );
 
--- Verify that limited API key only returns allowed orgs
+-- Verify that the V2 API key can see its bound organization
 SELECT
     ok(
         (
@@ -149,16 +142,10 @@ SELECT
             WHERE
                 gid = '22dbad8a-b885-4309-9b3b-a09f8460fb6d'
         ) >= 0,
-        'get_orgs_v6 API key test - limited API key filters organizations correctly'
+        'get_orgs_v6 API key test - V2 API key returns bound organizations'
     );
 
--- Test 4: API key with empty limited_to_orgs (should work normally)
-UPDATE apikeys
-SET
-    limited_to_orgs = '{}'
-WHERE
-    key = 'ae6e7458-c46d-4c00-aa3b-153b0b8520eb';
-
+-- Test 4: V2 API key can be reused across calls
 SELECT
     set_config(
         'request.headers',
@@ -173,16 +160,10 @@ SELECT
             FROM
                 get_orgs_v6()
         ) >= 0,
-        'get_orgs_v6 API key test - API key with empty limitations works normally'
+        'get_orgs_v6 API key test - V2 API key works normally'
     );
 
--- Test 5: API key with NULL limited_to_orgs (should work normally like empty array)
-UPDATE apikeys
-SET
-    limited_to_orgs = NULL
-WHERE
-    key = 'ae6e7458-c46d-4c00-aa3b-153b0b8520eb';
-
+-- Test 5: V2 API key without legacy scope columns continues to work
 SELECT
     set_config(
         'request.headers',
@@ -197,7 +178,7 @@ SELECT
             FROM
                 get_orgs_v6()
         ) >= 0,
-        'get_orgs_v6 API key test - API key with NULL limitations works normally'
+        'get_orgs_v6 API key test - API key without legacy limitations works normally'
     );
 
 -- Test 6: No API key header (should fall back to identity and throw error)
@@ -219,13 +200,6 @@ SELECT
         '%No authentication provided - API key or valid session required%',
         'get_orgs_v6 API key test - throws correct error when null headers'
     );
-
--- Reset the test key back to no limitations
-UPDATE apikeys
-SET
-    limited_to_orgs = '{}'
-WHERE
-    key = 'ae6e7458-c46d-4c00-aa3b-153b0b8520eb';
 
 -- Test get_org_members
 SELECT tests.authenticate_as('test_admin');

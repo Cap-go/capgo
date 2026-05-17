@@ -359,9 +359,9 @@ SELECT
         'apikeys',
         ARRAY[
             'Allow owner to delete own apikeys',
-            'Allow owner to insert own apikeys',
             'Allow owner to select own apikeys',
             'Allow owner to update own apikeys',
+            'Deny client insert on apikeys',
             'Prevent non 2FA access'
         ],
         'apikeys should have correct policies'

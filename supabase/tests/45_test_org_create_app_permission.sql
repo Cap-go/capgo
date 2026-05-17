@@ -42,27 +42,23 @@ SELECT
 FROM public.roles r
 WHERE r.name = public.rbac_role_org_member();
 
-INSERT INTO public.apikeys (id, user_id, key, mode, name, limited_to_orgs)
-VALUES (
+SELECT tests.create_v2_apikey(
   45001,
   tests.get_supabase_uid('org_create_app_member'),
   'org-create-app-rbac-key',
-  'all'::public.key_mode,
   'org-create-app-rbac-key',
-  ARRAY['70000000-0000-4000-8000-000000000001'::uuid]
-)
-ON CONFLICT (id) DO NOTHING;
+  '70000000-0000-4000-8000-000000000001'::uuid,
+  public.rbac_role_org_member()
+);
 
-INSERT INTO public.apikeys (id, user_id, key, mode, name, limited_to_orgs)
-VALUES (
+SELECT tests.create_v2_apikey(
   45002,
   tests.get_supabase_uid('org_create_app_writer'),
   'org-create-app-legacy-key',
-  'all'::public.key_mode,
   'org-create-app-legacy-key',
-  ARRAY['70000000-0000-4000-8000-000000000002'::uuid]
-)
-ON CONFLICT (id) DO NOTHING;
+  '70000000-0000-4000-8000-000000000002'::uuid,
+  public.rbac_role_org_admin()
+);
 
 SELECT ok(
   EXISTS (
@@ -215,7 +211,7 @@ SELECT ok(
     WHERE app_id = 'com.test.orgcreateapp.legacy.apikey'
       AND owner_org = '70000000-0000-4000-8000-000000000002'
   ),
-  'apps INSERT RLS allows legacy all key owned by a write user'
+  'apps INSERT RLS allows V2 org admin API key owned by a write user'
 );
 
 SELECT set_config('request.headers', '{}', true);

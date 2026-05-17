@@ -4,7 +4,9 @@ import { expect, test } from '../support/commands'
 async function createReadApiKey(page: Page, keyName: string) {
   await page.click('[data-test="create-key"]')
   await page.locator('#dialog-v2-content input[type="text"]').fill(keyName)
-  await page.locator('#dialog-v2-content input[name="key-type"][value="read"]').check()
+  await page.locator('#dialog-v2-content label').filter({ hasText: 'Read' }).click()
+  await page.locator('#dialog-v2-content label').filter({ hasText: 'Limit the API key to selected organizations?' }).click()
+  await page.locator('#dialog-v2-content label').filter({ hasText: 'Demo org' }).click()
   await page.getByRole('button', { name: 'Create' }).click()
   await expect(page.locator('[data-test="toast"]')).toContainText('Added new API key successfully')
 }

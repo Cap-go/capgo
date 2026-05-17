@@ -64,49 +64,39 @@ FROM public.roles r
 WHERE r.name = public.rbac_role_org_member()
 ON CONFLICT DO NOTHING;
 
-INSERT INTO public.apikeys (id, user_id, key, mode, name, limited_to_orgs)
-VALUES (
+SELECT tests.create_v2_apikey(
   45047,
   tests.get_supabase_uid('get_org_apikeys_owner'),
   'get-org-apikeys-key',
-  'all'::public.key_mode,
   'get-org-apikeys-key',
-  ARRAY['70000000-0000-4000-8000-000000000047'::uuid]
-)
-ON CONFLICT (id) DO NOTHING;
+  '70000000-0000-4000-8000-000000000047'::uuid,
+  public.rbac_role_org_member()
+);
 
-INSERT INTO public.apikeys (id, user_id, key, mode, name, limited_to_orgs)
-VALUES (
+SELECT tests.create_v2_apikey(
   45048,
   tests.get_supabase_uid('get_org_apikeys_apikey_only_owner'),
   'get-org-apikeys-apikey-bound-key',
-  'all'::public.key_mode,
-  'get-org-apikeys-apikey-bound-key',
-  ARRAY['70000000-0000-4000-8000-000000000047'::uuid]
-)
-ON CONFLICT (id) DO NOTHING;
+  'get-org-apikeys-apikey-bound-key'
+);
 
-INSERT INTO public.apikeys (id, user_id, key, mode, name, limited_to_apps)
-VALUES (
+SELECT tests.create_v2_apikey(
   45049,
   tests.get_supabase_uid('get_org_apikeys_app_limited_owner'),
   'get-org-apikeys-app-limited-key',
-  'all'::public.key_mode,
   'get-org-apikeys-app-limited-key',
-  ARRAY['com.test.getorgapikeys.app'::varchar]
-)
-ON CONFLICT (id) DO NOTHING;
+  '70000000-0000-4000-8000-000000000047'::uuid,
+  NULL,
+  'com.test.getorgapikeys.app',
+  public.rbac_role_app_reader()
+);
 
-INSERT INTO public.apikeys (id, user_id, key, mode, name, limited_to_apps)
-VALUES (
+SELECT tests.create_v2_apikey(
   45050,
   tests.get_supabase_uid('get_org_apikeys_app_bound_owner'),
   'get-org-apikeys-app-bound-key',
-  'all'::public.key_mode,
-  'get-org-apikeys-app-bound-key',
-  ARRAY['com.test.getorgapikeys.app'::varchar]
-)
-ON CONFLICT (id) DO NOTHING;
+  'get-org-apikeys-app-bound-key'
+);
 
 INSERT INTO public.role_bindings (principal_type, principal_id, role_id, scope_type, org_id, granted_by)
 SELECT
@@ -187,7 +177,7 @@ SELECT ok(
     FROM public.get_org_apikeys('70000000-0000-4000-8000-000000000047'::uuid)
     WHERE id = 45049
   ) = 1,
-  'get_org_apikeys includes keys limited to apps that belong to the org'
+  'get_org_apikeys includes V2 keys bound to apps that belong to the org'
 );
 
 SELECT ok(

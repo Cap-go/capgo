@@ -537,14 +537,28 @@ BEGIN
     LIMIT 1;
 
     IF v_api_key.id IS NULL
-      OR public.is_apikey_expired(v_api_key.expires_at)
       OR (p_user_id IS NOT NULL AND p_user_id IS DISTINCT FROM v_api_key.user_id)
       OR v_effective_org_id IS NULL
     THEN
       RETURN false;
     END IF;
 
+    IF public.is_apikey_expired(v_api_key.expires_at) THEN
+      RETURN false;
+    END IF;
+
     v_effective_user_id := v_api_key.user_id;
+
+    IF (SELECT enforcing_2fa FROM public.orgs WHERE id = v_effective_org_id)
+      AND NOT public.has_2fa_enabled(v_effective_user_id)
+    THEN
+      RETURN false;
+    END IF;
+
+    IF public.user_meets_password_policy(v_effective_user_id, v_effective_org_id) = false THEN
+      RETURN false;
+    END IF;
+
     v_allowed := public.rbac_has_permission(
       public.rbac_principal_apikey(),
       v_api_key.rbac_id,
@@ -680,9 +694,20 @@ BEGIN
     LIMIT 1;
 
     IF v_api_key.id IS NULL
-      OR public.is_apikey_expired(v_api_key.expires_at)
       OR (p_user_id IS NOT NULL AND p_user_id IS DISTINCT FROM v_api_key.user_id)
       OR v_effective_org_id IS NULL
+    THEN
+      RETURN false;
+    END IF;
+
+    IF public.is_apikey_expired(v_api_key.expires_at) THEN
+      RETURN false;
+    END IF;
+
+    v_effective_user_id := v_api_key.user_id;
+
+    IF (SELECT enforcing_2fa FROM public.orgs WHERE id = v_effective_org_id)
+      AND NOT public.has_2fa_enabled(v_effective_user_id)
     THEN
       RETURN false;
     END IF;
@@ -868,8 +893,11 @@ BEGIN
 
   IF api_key_text IS NOT NULL THEN
     SELECT * INTO api_key FROM public.find_apikey_by_value(api_key_text) LIMIT 1;
-    IF api_key.id IS NULL OR public.is_apikey_expired(api_key.expires_at) THEN
+    IF api_key.id IS NULL THEN
       RAISE EXCEPTION 'Invalid API key provided';
+    END IF;
+    IF public.is_apikey_expired(api_key.expires_at) THEN
+      RAISE EXCEPTION 'API key has expired';
     END IF;
 
     RETURN QUERY
@@ -967,8 +995,11 @@ BEGIN
   SELECT public.get_apikey_header() INTO v_api_key_text;
   IF v_api_key_text IS NOT NULL THEN
     SELECT * INTO v_api_key FROM public.find_apikey_by_value(v_api_key_text) LIMIT 1;
-    IF v_api_key.id IS NULL OR public.is_apikey_expired(v_api_key.expires_at) THEN
+    IF v_api_key.id IS NULL THEN
       RAISE EXCEPTION 'Invalid API key provided';
+    END IF;
+    IF public.is_apikey_expired(v_api_key.expires_at) THEN
+      RAISE EXCEPTION 'API key has expired';
     END IF;
     v_user_id := v_api_key.user_id;
   ELSE
@@ -1000,8 +1031,11 @@ BEGIN
   SELECT public.get_apikey_header() INTO v_api_key_text;
   IF v_api_key_text IS NOT NULL THEN
     SELECT * INTO v_api_key FROM public.find_apikey_by_value(v_api_key_text) LIMIT 1;
-    IF v_api_key.id IS NULL OR public.is_apikey_expired(v_api_key.expires_at) THEN
+    IF v_api_key.id IS NULL THEN
       RAISE EXCEPTION 'Invalid API key provided';
+    END IF;
+    IF public.is_apikey_expired(v_api_key.expires_at) THEN
+      RAISE EXCEPTION 'API key has expired';
     END IF;
     v_user_id := v_api_key.user_id;
   ELSE

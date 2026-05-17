@@ -182,13 +182,12 @@ WITH seed_data AS (
         'rbac-test-key-phase1'::text AS api_key_value
 )
 
-INSERT INTO public.apikeys (id, user_id, key, mode, name)
-SELECT
+SELECT tests.create_v2_apikey(
     33001,
     member_user,
     api_key_value,
-    'all'::public.key_mode,
     'rbac-test-apikey'
+)
 FROM seed_data;
 
 -- Restricted API key principal owned by an org admin. The explicit key binding
@@ -199,13 +198,12 @@ WITH seed_data AS (
         'rbac-test-restricted-key-phase1'::text AS api_key_value
 )
 
-INSERT INTO public.apikeys (id, user_id, key, mode, name)
-SELECT
+SELECT tests.create_v2_apikey(
     33002,
     member_user,
     api_key_value,
-    'all'::public.key_mode,
     'rbac-test-restricted-apikey'
+)
 FROM seed_data;
 
 -- RBAC bindings (org_admin to user, app_admin to apikey)
