@@ -632,7 +632,7 @@ async function pickAction(entry: AppEntry, canGoBack: boolean, extraIntro?: stri
       '',
       'View    — flat list of every credential across platforms (show, decode, copy, edit, explain, remove).',
       'Add…    — add a new platform via onboarding, or add a configuration option.',
-      'Export  — write a .env file ready for CI/CD secrets (asks which platform if both are configured).',
+      'Export  — write a .env file ready for CI/CD secrets (combined across platforms; pass --platform to scope to one).',
       'Delete  — wipe all credentials for one platform (asks which if both are configured).',
     ],
     statusLine: canGoBack ? 'Esc = back, Ctrl+C = quit.' : 'Ctrl+C or Esc to quit.',
@@ -1175,10 +1175,15 @@ async function exportToEnvFile(entry: AppEntry): Promise<boolean> {
     return false
   }
 
-  const platform = await resolvePlatformChoice(entry, 'Pick which platform to export')
-  if (platform === null)
-    return false
+  // When both platforms are in scope, write a single combined .env file. iOS and
+  // Android env-var names are disjoint, so combining them avoids forcing the user
+  // to run `gh secret set -f` (or equivalent) once per platform. Callers that
+  // want a single platform's file pass `--platform ios` (or android) at the
+  // manage command, which narrows the entry to one platform upstream.
+  if (entry.platforms.length > 1)
+    return exportCombinedEnvFile(entry)
 
+  const platform = entry.platforms[0]
   const creds = entry.saved[platform]
   if (!creds || !hasAnyValue(creds)) {
     pLog.warn('Nothing to export.')
@@ -1207,6 +1212,123 @@ async function exportToEnvFile(entry: AppEntry): Promise<boolean> {
   return true
 }
 
+async function exportCombinedEnvFile(entry: AppEntry): Promise<boolean> {
+  const sections: Array<{ platform: 'ios' | 'android', creds: Partial<BuildCredentials> }> = []
+  for (const platform of entry.platforms) {
+    const creds = entry.saved[platform]
+    if (creds && hasAnyValue(creds))
+      sections.push({ platform, creds })
+  }
+
+  if (sections.length === 0) {
+    pLog.warn('Nothing to export.')
+    return false
+  }
+
+  // If only one of the listed platforms actually has values, fall back to the
+  // per-platform file name so the user isn't surprised by a generic name.
+  if (sections.length === 1) {
+    const { platform, creds } = sections[0]
+    const defaultName = `.env.capgo.${entry.appId}.${platform}`
+    const target = await resolveExportTarget(entry, platform, defaultName)
+    if (target === null) {
+      pLog.info('✗ Export cancelled.')
+      return false
+    }
+    const content = renderEnvFile(entry, platform, creds)
+    await writeFile(target.path, content, { mode: 0o600 })
+    await chmod(target.path, 0o600)
+    const fieldCount = Object.values(creds).filter(v => typeof v === 'string' && v.length > 0).length
+    pLog.success(`✓ Exported ${fieldCount} field${fieldCount === 1 ? '' : 's'} → ${target.path} (mode 0600).`)
+    pLog.info('Add it to .gitignore — never commit this file.')
+    pLog.info('Reference: https://capgo.app/docs/cli/cloud-build/')
+    return true
+  }
+
+  // The manager allows the same key to be stored under both platforms (the View
+  // screen tags these as [SHARED]), and the stored values can drift. When the
+  // combined file gets ingested by `gh secret set -f`, shell sourcing, or any
+  // other dotenv consumer, the LAST occurrence wins — so a drifted key silently
+  // produces wrong CI behaviour for at least one platform. Detect and surface.
+  const conflicts = findCombinedExportConflicts(sections)
+  if (conflicts.length > 0) {
+    pLog.warn(`⚠️  ${conflicts.length} key${conflicts.length === 1 ? '' : 's'} differ across platforms — dotenv ingestion keeps only the LAST value per key, so at least one platform will get the wrong setting:`)
+    for (const { key, occurrences } of conflicts) {
+      const summary = occurrences.map(o => `${o.platform}=${maskConflictValue(o.value)}`).join(', ')
+      pLog.warn(`  • ${key}: ${summary}`)
+    }
+    pLog.info('Fix: cancel and re-export per-platform (`--platform ios`, then `--platform android`), or reconcile the values in the View screen first.')
+
+    const proceed = await pConfirm({
+      message: 'Write the combined file anyway?',
+      initialValue: false,
+    })
+    if (pIsCancel(proceed) || !proceed) {
+      pLog.info('✗ Export cancelled.')
+      return false
+    }
+  }
+
+  const defaultName = `.env.capgo.${entry.appId}`
+  const target = await resolveExportTarget(entry, 'combined', defaultName)
+  if (target === null) {
+    pLog.info('✗ Export cancelled.')
+    return false
+  }
+
+  const content = renderEnvFileCombined(entry, sections, conflicts)
+  await writeFile(target.path, content, { mode: 0o600 })
+  await chmod(target.path, 0o600)
+
+  const totalFields = sections.reduce(
+    (sum, { creds }) => sum + Object.values(creds).filter(v => typeof v === 'string' && v.length > 0).length,
+    0,
+  )
+  const platformList = sections.map(s => s.platform).join(' + ')
+  pLog.success(`✓ Exported ${totalFields} fields (${platformList}) → ${target.path} (mode 0600).`)
+  pLog.info('Add it to .gitignore — never commit this file.')
+  pLog.info('Reference: https://capgo.app/docs/cli/cloud-build/')
+  return true
+}
+
+interface CombinedKeyConflict {
+  key: string
+  occurrences: Array<{ platform: 'ios' | 'android', value: string }>
+}
+
+function findCombinedExportConflicts(
+  sections: Array<{ platform: 'ios' | 'android', creds: Partial<BuildCredentials> }>,
+): CombinedKeyConflict[] {
+  if (sections.length < 2)
+    return []
+  const occurrencesByKey = new Map<string, Array<{ platform: 'ios' | 'android', value: string }>>()
+  for (const { platform, creds } of sections) {
+    for (const [key, value] of Object.entries(creds)) {
+      if (typeof value !== 'string' || value.length === 0)
+        continue
+      const list = occurrencesByKey.get(key) ?? []
+      list.push({ platform, value })
+      occurrencesByKey.set(key, list)
+    }
+  }
+  const conflicts: CombinedKeyConflict[] = []
+  for (const [key, occurrences] of occurrencesByKey) {
+    if (occurrences.length < 2)
+      continue
+    const distinctValues = new Set(occurrences.map(o => o.value))
+    if (distinctValues.size > 1)
+      conflicts.push({ key, occurrences })
+  }
+  return conflicts
+}
+
+// Conflicting values are usually short config toggles (booleans, retention
+// strings) where the actual value is what the user needs to see to decide.
+// Mask anything long enough to plausibly be a secret instead.
+function maskConflictValue(value: string): string {
+  return value.length <= 32 ? value : `(${value.length} chars)`
+}
+
 async function resolvePlatformChoice(entry: AppEntry, message: string): Promise<'ios' | 'android' | null> {
   if (entry.platforms.length === 1)
     return entry.platforms[0]
@@ -1227,10 +1349,10 @@ interface ExportTarget {
   path: string
 }
 
-async function resolveExportTarget(entry: AppEntry, platform: 'ios' | 'android', defaultName: string): Promise<ExportTarget | null> {
+async function resolveExportTarget(entry: AppEntry, label: 'ios' | 'android' | 'combined', defaultName: string): Promise<ExportTarget | null> {
   if (canUseFilePicker()) {
     const picked = await openSaveFilePicker({
-      prompt: `Save Capgo .env for ${entry.appId} (${platform})`,
+      prompt: `Save Capgo .env for ${entry.appId} (${label})`,
       defaultName,
       defaultLocation: cwd(),
     })
@@ -1300,6 +1422,57 @@ function renderEnvFile(entry: AppEntry, platform: 'ios' | 'android', creds: Part
     lines.push('# Provisioning map — base64 form is preferred to avoid newline/quoting issues in CI.')
     lines.push(`CAPGO_IOS_PROVISIONING_MAP_BASE64=${base64}`)
     lines.push(`# CAPGO_IOS_PROVISIONING_MAP=${escapeDotenvValue(provisioningMapRaw)}`)
+  }
+
+  lines.push('')
+  return lines.join('\n')
+}
+
+function renderEnvFileCombined(
+  entry: AppEntry,
+  sections: Array<{ platform: 'ios' | 'android', creds: Partial<BuildCredentials> }>,
+  conflicts: CombinedKeyConflict[] = [],
+): string {
+  const lines: string[] = []
+  const generated = new Date().toISOString()
+  const platformList = sections.map(s => s.platform).join(', ')
+  lines.push('# Capgo build credentials — CI/CD environment file')
+  lines.push(`# App: ${entry.appId}`)
+  lines.push(`# Platforms: ${platformList}`)
+  lines.push(`# Source: ${entry.local ? 'local' : 'global'} credentials store`)
+  lines.push(`# Generated: ${generated}`)
+  lines.push('#')
+  lines.push('# Paste these into your CI/CD provider as secrets, or source the file locally:')
+  lines.push('#   set -a; . ./this-file; set +a')
+  lines.push('#')
+  lines.push('# DO NOT commit this file. Add to .gitignore: .env.capgo.*')
+  if (conflicts.length > 0) {
+    lines.push('#')
+    lines.push('# ⚠️  CONFLICTING KEYS: the following appear in multiple platform sections')
+    lines.push('# with different values. Dotenv ingestion (gh secret set -f, shell sourcing)')
+    lines.push('# keeps only the LAST occurrence per key — re-export per-platform to preserve both.')
+    for (const { key, occurrences } of conflicts)
+      lines.push(`#   ${key} (${occurrences.map(o => o.platform).join(' & ')})`)
+  }
+
+  for (const { platform, creds } of sections) {
+    lines.push('')
+    lines.push(`# === ${platform.toUpperCase()} ===`)
+    const provisioningMapRaw = creds.CAPGO_IOS_PROVISIONING_MAP
+    for (const [key, value] of Object.entries(creds)) {
+      if (typeof value !== 'string' || value.length === 0)
+        continue
+      if (key === 'CAPGO_IOS_PROVISIONING_MAP')
+        continue
+      lines.push(`${key}=${escapeDotenvValue(value)}`)
+    }
+    if (provisioningMapRaw) {
+      const base64 = Buffer.from(provisioningMapRaw, 'utf-8').toString('base64')
+      lines.push('')
+      lines.push('# Provisioning map — base64 form is preferred to avoid newline/quoting issues in CI.')
+      lines.push(`CAPGO_IOS_PROVISIONING_MAP_BASE64=${base64}`)
+      lines.push(`# CAPGO_IOS_PROVISIONING_MAP=${escapeDotenvValue(provisioningMapRaw)}`)
+    }
   }
 
   lines.push('')

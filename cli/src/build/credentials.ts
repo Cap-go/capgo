@@ -91,6 +91,17 @@ export function parseOptionalBoolean(value: boolean | string | undefined): boole
   throw new Error('output-upload must be true/false (examples: --output-upload, --output-upload false)')
 }
 
+export function parseInAppUpdatePriority(value: number | string): number {
+  // Reject blank/whitespace-only strings before numeric coercion — Number('') and Number('   ')
+  // both yield 0, which would silently apply priority 0 to a Play release.
+  if (typeof value === 'string' && value.trim() === '')
+    throw new Error('in-app-update-priority must be an integer between 0 and 5')
+  const num = typeof value === 'number' ? value : Number(value)
+  if (!Number.isInteger(num) || num < 0 || num > 5)
+    throw new Error('in-app-update-priority must be an integer between 0 and 5')
+  return num
+}
+
 /**
  * Convert a file to base64 string
  */
@@ -202,6 +213,7 @@ export function loadCredentialsFromEnv(): Partial<BuildCredentials> {
   const keystoreKeyPassword = readRuntimeEnv('KEYSTORE_KEY_PASSWORD')
   const keystoreStorePassword = readRuntimeEnv('KEYSTORE_STORE_PASSWORD')
   const playConfigJson = readRuntimeEnv('PLAY_CONFIG_JSON')
+  const playStoreInAppUpdatePriority = readRuntimeEnv('PLAY_STORE_IN_APP_UPDATE_PRIORITY')
   const buildOutputUploadEnabled = readRuntimeEnv('BUILD_OUTPUT_UPLOAD_ENABLED')
   const buildOutputRetentionSeconds = readRuntimeEnv('BUILD_OUTPUT_RETENTION_SECONDS')
   const skipBuildNumberBump = readRuntimeEnv('SKIP_BUILD_NUMBER_BUMP')
@@ -243,6 +255,9 @@ export function loadCredentialsFromEnv(): Partial<BuildCredentials> {
     credentials.KEYSTORE_STORE_PASSWORD = keystoreStorePassword
   if (playConfigJson)
     credentials.PLAY_CONFIG_JSON = playConfigJson
+  if (playStoreInAppUpdatePriority) {
+    credentials.PLAY_STORE_IN_APP_UPDATE_PRIORITY = String(parseInAppUpdatePriority(playStoreInAppUpdatePriority))
+  }
   if (buildOutputUploadEnabled) {
     credentials.BUILD_OUTPUT_UPLOAD_ENABLED = parseOptionalBoolean(buildOutputUploadEnabled) ? 'true' : 'false'
   }

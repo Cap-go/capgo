@@ -819,6 +819,7 @@ Example: npx @capgo/cli@latest build request com.example.app --platform ios --pa
   .option('--keystore-store-password <password>', 'Android: Keystore store password')
   .option('--play-config-json <json>', 'Android: Base64-encoded Google Play service account JSON')
   .option('--android-flavor <flavor>', 'Android: Product flavor to build (e.g. production). Required if your project has multiple flavors.')
+  .option('--in-app-update-priority <priority>', 'Android: Google Play in-app update priority for this release (integer 0–5; higher = more urgent). See https://developer.android.com/guide/playcore/in-app-updates. Precedence: CLI > env > saved credentials')
   .option('--no-playstore-upload', 'Skip Play Store upload for this build (nulls out saved play config). Requires --output-upload.')
   .option('--output-upload', 'Override output upload behavior for this build only (enable). Precedence: CLI > env > saved credentials')
   .option('--no-output-upload', 'Override output upload behavior for this build only (disable). Precedence: CLI > env > saved credentials')
@@ -904,6 +905,7 @@ Local storage (per-project):
   .option('--keystore-store-password <password>', 'Android: Keystore store password')
   .option('--play-config <path>', 'Android: Path to Play Store service account JSON')
   .option('--android-flavor <flavor>', 'Android: Product flavor to build (e.g. production). Required if your project has multiple flavors.')
+  .option('--in-app-update-priority <priority>', 'Android: Google Play in-app update priority for future releases (integer 0–5; higher = more urgent). Omit to leave Play’s existing value untouched.')
   // Storage option
   .option('--local', 'Save to .capgo-credentials.json in project root instead of global ~/.capgo-credentials/')
   .option('--output-upload', 'Upload build outputs (IPA/APK/AAB) to Capgo storage and print download links')
@@ -972,6 +974,7 @@ Examples:
   .option('--keystore-store-password <password>', 'Keystore store password')
   .option('--play-config <path>', 'Path to Google Play service account JSON')
   .option('--android-flavor <flavor>', 'Android: Product flavor to build (e.g. production). Required if your project has multiple flavors.')
+  .option('--in-app-update-priority <priority>', 'Android: Google Play in-app update priority for future releases (integer 0–5; higher = more urgent).')
   .option('--output-upload', 'Upload build outputs (IPA/APK/AAB) to Capgo storage and print download links')
   .option('--no-output-upload', 'Do not upload build outputs (IPA/APK/AAB) to Capgo storage')
   .option('--output-retention <duration>', 'Output link TTL: 1h to 7d. Examples: 1h, 6h, 2d')

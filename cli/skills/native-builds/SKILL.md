@@ -125,6 +125,7 @@ interface BuildLogger {
 - `--keystore-store-password <password>`
 - `--play-config-json <json>`
 - `--android-flavor <flavor>`
+- `--in-app-update-priority <0-5>`: Google Play in-app update priority (higher = more urgent)
 
 #### Output behavior options
 

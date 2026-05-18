@@ -1,7 +1,6 @@
 import UIKit
 import Capacitor
 import CapacitorUpdaterPlugin
-import ScreenOrientationPlugin
 
 @UIApplicationMain
 class AppDelegate: UIResponder, UIApplicationDelegate {
@@ -18,9 +17,6 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
             }
         }
         return true
-    }
-    func application(_ application: UIApplication, supportedInterfaceOrientationsFor window: UIWindow?) -> UIInterfaceOrientationMask {
-        return ScreenOrientation.getSupportedInterfaceOrientations()
     }
 
     func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
@@ -67,4 +63,3 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     }
 
 }
-
