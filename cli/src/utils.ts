@@ -842,8 +842,13 @@ export async function checkPlanValidUpload(supabase: SupabaseClient<Database>, o
 
   // Pass appid so check_min_rights gets the app context. Without it,
   // RBAC denies API keys with limited_to_apps set and the org-scope
-  // plan check returns false even when the plan is healthy.
-  const { data: validPlan, error: validPlanError } = await supabase.rpc('is_allowed_action_org_action', { orgid: orgId, actions: ['storage'], appid: appId })
+  // plan check returns false even when the plan is healthy. PostgREST
+  // routes to the 3-arg overload at runtime; the `as never` cast bypasses
+  // a `supabase gen types` quirk that collapses overloads sharing the
+  // same name (the 3-arg signature exists in the DB but is not emitted
+  // by the generator).
+  const args = { orgid: orgId, actions: ['storage'], appid: appId } as never
+  const { data: validPlan, error: validPlanError } = await supabase.rpc('is_allowed_action_org_action', args)
   if (validPlanError) {
     const message = `Cannot validate upload plan: ${formatError(validPlanError)}`
     log.error(message)
