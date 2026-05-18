@@ -22,7 +22,7 @@ import { Alert, ProgressBar, Select } from '@inkjs/ui'
 import { Box, Newline, Text, useApp, useInput, useStdout } from 'ink'
 // src/build/onboarding/android/ui/app.tsx
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { findSavedKey } from '../../../../utils.js'
+import { createSupabaseClient, findSavedKey, findSavedKeySilent, getOrganizationId } from '../../../../utils.js'
 import { loadSavedCredentials, updateSavedCredentials } from '../../../credentials.js'
 import { requestBuildInternal } from '../../../request.js'
 import { canUseFilePicker, openKeystorePicker } from '../../file-picker.js'
@@ -64,6 +64,7 @@ import {
   PLAY_DEVELOPERS_URL,
 } from '../play-api.js'
 import { deleteAndroidProgress, getAndroidResumeStep, loadAndroidProgress, saveAndroidProgress } from '../progress.js'
+import { trackBuilderOnboardingStep } from '../../telemetry.js'
 import { ANDROID_STEP_PROGRESS, getAndroidPhaseLabel } from '../types.js'
 
 interface LogEntry { text: string, color?: string }
@@ -117,8 +118,73 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
   const [step, setStep] = useState<AndroidOnboardingStep>(
     startStep === 'welcome' ? 'welcome' : startStep,
   )
+
+  // Telemetry: resolve org id once + emit per-step events
+  const stepTimingRef = useRef<{ step: AndroidOnboardingStep, startedAt: number }>({
+    step: startStep === 'welcome' ? 'welcome' : startStep,
+    startedAt: Date.now(),
+  })
+  const [resolvedOrgId, setResolvedOrgId] = useState<string | null>(null)
+  const resolvedApiKeyRef = useRef<string | null>(apikey ?? null)
+  const orgIdResolvedRef = useRef(false)
+
+  useEffect(() => {
+    if (resolvedApiKeyRef.current)
+      return
+    const saved = findSavedKeySilent()
+    if (saved)
+      resolvedApiKeyRef.current = saved
+  }, [])
+
+  useEffect(() => {
+    if (orgIdResolvedRef.current || !resolvedApiKeyRef.current)
+      return
+    orgIdResolvedRef.current = true
+
+    let cancelled = false
+    void (async () => {
+      const supabase = await createSupabaseClient(resolvedApiKeyRef.current!, undefined, undefined, true)
+        .catch(() => null)
+      if (!supabase || cancelled)
+        return
+      const orgId = await getOrganizationId(supabase, appId).catch(() => null)
+      if (orgId && !cancelled)
+        setResolvedOrgId(orgId)
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [appId])
+
   const [logLines, setLogLines] = useState<LogEntry[]>([])
   const [error, setError] = useState<string | null>(null)
+
+  // Emit telemetry on every step transition (including initial mount)
+  useEffect(() => {
+    if (!resolvedApiKeyRef.current || !resolvedOrgId)
+      return
+
+    const previous = stepTimingRef.current
+    if (previous.step === step && step !== 'error')
+      return
+
+    const now = Date.now()
+    const durationMs = previous.step === step ? undefined : now - previous.startedAt
+
+    void trackBuilderOnboardingStep({
+      apikey: resolvedApiKeyRef.current,
+      appId,
+      orgId: resolvedOrgId,
+      platform: 'android',
+      step,
+      durationMs,
+      error: step === 'error' && error ? new Error(error) : undefined,
+    })
+
+    stepTimingRef.current = { step, startedAt: now }
+  }, [step, appId, resolvedOrgId, error])
+
   const [retryCount, setRetryCount] = useState(0)
   const [retryStep, setRetryStep] = useState<AndroidOnboardingStep | null>(null)
   const exitRequestedRef = useRef(false)
