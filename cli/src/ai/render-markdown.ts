@@ -41,15 +41,21 @@ export function renderMarkdown(md: string, isTTY: boolean = process.stdout.isTTY
   const out: string[] = []
   let inCodeBlock = false
 
+  // Vertical bar prefix for code-block lines (git-diff / GitHub-review style).
+  // Hide the ``` fence lines themselves — the bar IS the visual signal that
+  // this is code, no need to also show the markdown syntax.
+  const CODE_BAR = stylize(ANSI.gray, '▎ ')
+
   for (const raw of lines) {
-    // Fenced code block: toggle and render fence dimly so the user sees the boundary
     if (raw.trimStart().startsWith('```')) {
       inCodeBlock = !inCodeBlock
-      out.push(stylize(ANSI.gray, raw))
-      continue
+      continue // hide fence lines
     }
     if (inCodeBlock) {
-      out.push(stylize(ANSI.cyan, raw))
+      // Keep content in the terminal's default color so it's readable; the bar
+      // alone is enough of a "this is code" signal. Empty code lines still get
+      // a bar so the block's left edge is unbroken.
+      out.push(`${CODE_BAR}${raw}`)
       continue
     }
 

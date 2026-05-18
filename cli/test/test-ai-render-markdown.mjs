@@ -31,15 +31,28 @@ test('header line gets bold+cyan styling in TTY mode', () => {
     throw new Error(`missing styled header in: ${JSON.stringify(out)}`)
 })
 
-// Code block: lines between ``` fences get colored
-test('fenced code block lines get cyan, fence lines get gray', () => {
+// Code block: fence lines hidden, each line prefixed with a gray vertical bar
+test('fenced code block: fences hidden, lines prefixed with gray bar', () => {
   const out = renderMarkdown('```\nfoo\n```', true)
-  // foo should be cyan
-  if (!out.includes('\x1B[36mfoo\x1B[0m'))
-    throw new Error(`code line not cyan: ${JSON.stringify(out)}`)
-  // ``` should be gray
-  if (!out.includes('\x1B[90m```\x1B[0m'))
-    throw new Error(`fence not gray: ${JSON.stringify(out)}`)
+  // The ``` fence lines must NOT appear in the output
+  if (out.includes('```'))
+    throw new Error(`fence line leaked through: ${JSON.stringify(out)}`)
+  // Each content line should have the gray vertical bar prefix
+  if (!out.includes('\x1B[90m▎ \x1B[0mfoo'))
+    throw new Error(`code line missing bar prefix: ${JSON.stringify(out)}`)
+})
+
+test('multi-line code block: every line including blanks gets the bar', () => {
+  const out = renderMarkdown('```\nline1\n\nline3\n```', true)
+  const bar = '\x1B[90m▎ \x1B[0m'
+  if (!out.includes(`${bar}line1`))
+    throw new Error(`line1 missing bar: ${JSON.stringify(out)}`)
+  if (!out.includes(`${bar}line3`))
+    throw new Error(`line3 missing bar: ${JSON.stringify(out)}`)
+  // The blank line in the middle should still get the bar so the left edge is unbroken
+  const linesWithBar = out.split('\n').filter(l => l.startsWith(bar))
+  if (linesWithBar.length !== 3)
+    throw new Error(`expected 3 barred lines (incl. blank), got ${linesWithBar.length}: ${JSON.stringify(out)}`)
 })
 
 // Numbered list: number colored, rest plain
