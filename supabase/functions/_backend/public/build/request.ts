@@ -4,6 +4,7 @@ import { quickError, simpleError } from '../../utils/hono.ts'
 import { cloudlog, cloudlogErr } from '../../utils/logging.ts'
 import { checkPermission } from '../../utils/rbac.ts'
 import { supabaseAdmin, supabaseApikey } from '../../utils/supabase.ts'
+import { sendEventToTracking } from '../../utils/tracking.ts'
 import { getEnv } from '../../utils/utils.ts'
 
 export interface RequestBuildBody {
@@ -311,6 +312,20 @@ export async function requestBuild(
     org_id,
     app_id,
     platform,
+  })
+
+  await sendEventToTracking(c, {
+    event: 'Build Requested',
+    channel: 'build-lifecycle',
+    icon: '🛠️',
+    notify: false,
+    user_id: org_id,
+    groups: { organization: org_id },
+    tags: {
+      app_id,
+      platform,
+      build_mode,
+    },
   })
 
   return c.json({
