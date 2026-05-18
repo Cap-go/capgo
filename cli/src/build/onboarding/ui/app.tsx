@@ -758,12 +758,27 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
           if (verifyResult.teamId)
             setTeamId(verifyResult.teamId)
           const apiKeyData: ApiKeyData = { keyId: keyIdRef.current, issuerId: issuerIdRef.current }
+          // Merge into existing progress instead of constructing fresh. The
+          // previous fresh-object approach wiped setupMethod / importDistribution
+          // (set by import-distribution-mode upstream), so a CLI restart after
+          // verifying-key succeeded but before saving-credentials would lose
+          // the import-flow context and resume into create-new — exactly the
+          // class of resume regression we already fixed once via the importMode
+          // hydration patch in commit 81a6f1c7. Same root cause, different
+          // site: every saveProgress must preserve fields it doesn't own.
+          const existing = await loadProgress(appId)
           const progress: OnboardingProgress = {
-            platform: 'ios',
-            appId,
+            ...(existing ?? {
+              platform: 'ios' as const,
+              appId,
+              startedAt: new Date().toISOString(),
+              completedSteps: {},
+            }),
             p8Path: p8PathRef.current,
-            startedAt: new Date().toISOString(),
-            completedSteps: { apiKeyVerified: apiKeyData },
+            completedSteps: {
+              ...(existing?.completedSteps ?? {}),
+              apiKeyVerified: apiKeyData,
+            },
           }
           await saveProgress(appId, progress)
           addLog(`✔ API Key verified — Key: ${keyId}`)
