@@ -40,7 +40,7 @@ import * as tus from 'tus-js-client'
 import WS from 'ws' // TODO: remove when min version nodejs 22 is bump, should do it in july 2026 as it become deprecated
 import pack from '../../package.json'
 import { assertCliPermission, canPromptInteractively, createSupabaseClient, findSavedKey, getConfig, getOrganizationId, sendEvent } from '../utils'
-import { mergeCredentials, MIN_OUTPUT_RETENTION_SECONDS, parseOptionalBoolean, parseOutputRetentionSeconds } from './credentials'
+import { mergeCredentials, MIN_OUTPUT_RETENTION_SECONDS, parseInAppUpdatePriority, parseOptionalBoolean, parseOutputRetentionSeconds } from './credentials'
 import { buildProvisioningMap } from './credentials-command'
 import { getPlatformDirFromCapacitorConfig } from './platform-paths'
 import { handleCustomMsg } from './qr.js'
@@ -1335,6 +1335,9 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
     }
     if (options.playConfigJson)
       cliCredentials.PLAY_CONFIG_JSON = options.playConfigJson
+    if (options.inAppUpdatePriority !== undefined) {
+      cliCredentials.PLAY_STORE_IN_APP_UPDATE_PRIORITY = String(parseInAppUpdatePriority(options.inAppUpdatePriority as number | string))
+    }
     if (options.outputUpload !== undefined) {
       cliCredentials.BUILD_OUTPUT_UPLOAD_ENABLED = parseOptionalBoolean(options.outputUpload) ? 'true' : 'false'
     }
