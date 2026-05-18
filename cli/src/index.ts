@@ -11,6 +11,7 @@ import { setApp } from './app/set'
 import { setSetting } from './app/setting'
 import { clearCredentialsCommand, listCredentialsCommand, migrateCredentialsCommand, saveCredentialsCommand, updateCredentialsCommand } from './build/credentials-command'
 import { manageCredentialsCommand } from './build/credentials-manage'
+import { lastOutputCommand } from './build/last-output-command'
 import { checkBuildNeeded } from './build/needed'
 import { onboardingBuilderCommand } from './build/onboarding/command'
 import { requestBuildCommand } from './build/request'
@@ -824,12 +825,30 @@ Example: npx @capgo/cli@latest build request com.example.app --platform ios --pa
   .option('--output-upload', 'Override output upload behavior for this build only (enable). Precedence: CLI > env > saved credentials')
   .option('--no-output-upload', 'Override output upload behavior for this build only (disable). Precedence: CLI > env > saved credentials')
   .option('--output-retention <duration>', 'Override output link TTL for this build only (1h to 7d). Examples: 1h, 6h, 2d. Precedence: CLI > env > saved credentials')
+  .option('--output-record <path>', 'After a successful build, write a JSON record (jobId, status, outputUrl, qrCodeAscii, qrCodePngPath, finishedAt) to <path>. A PNG QR code is also written next to it as <path>.qr.png. Read fields back with `build last-output`.')
   .option('--skip-build-number-bump', 'Skip automatic build number/version code incrementing. Uses whatever version is already in the project files.')
   .option('--no-skip-build-number-bump', 'Override saved credentials to re-enable automatic build number incrementing for this build only.')
   .option('-a, --apikey <apikey>', optionDescriptions.apikey)
   .option('--supa-host <supaHost>', optionDescriptions.supaHost)
   .option('--supa-anon <supaAnon>', optionDescriptions.supaAnon)
   .option('--verbose', optionDescriptions.verbose)
+
+build
+  .command('last-output')
+  .description(`Read the build output record written by a previous \`build request --output-record\`.
+
+Prints the full JSON by default, a single field with --field, or the ASCII QR
+code with --qr. Useful in CI to grab the download URL or QR for posting back
+to a PR or issue.
+
+Examples:
+  npx @capgo/cli build last-output --path /tmp/build.json
+  npx @capgo/cli build last-output --path /tmp/build.json --field outputUrl
+  npx @capgo/cli build last-output --path /tmp/build.json --qr`)
+  .action(lastOutputCommand)
+  .option('--path <path>', 'Path to the JSON record written by --output-record (required)')
+  .option('--field <field>', 'Print a single field (one of: jobId, appId, platform, buildMode, status, outputUrl, qrCodeAscii, qrCodePngPath, finishedAt, schemaVersion)')
+  .option('--qr', 'Print the rendered ASCII QR code (shortcut for --field qrCodeAscii)')
 
 const buildCredentials = build
   .command('credentials')

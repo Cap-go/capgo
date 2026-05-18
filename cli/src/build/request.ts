@@ -42,6 +42,7 @@ import pack from '../../package.json'
 import { assertCliPermission, canPromptInteractively, createSupabaseClient, findSavedKey, getConfig, getOrganizationId, sendEvent } from '../utils'
 import { mergeCredentials, MIN_OUTPUT_RETENTION_SECONDS, parseInAppUpdatePriority, parseOptionalBoolean, parseOutputRetentionSeconds } from './credentials'
 import { buildProvisioningMap } from './credentials-command'
+import { writeBuildOutputRecord } from './output-record'
 import { getPlatformDirFromCapacitorConfig } from './platform-paths'
 import { handleCustomMsg } from './qr.js'
 
@@ -1244,7 +1245,23 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
   // Track build time
   const buildStartTime = Date.now()
   const verbose = options.verbose ?? false
-  const log = logger || createDefaultLogger(silent)
+  const baseLogger = logger || createDefaultLogger(silent)
+
+  // Capture the artifact download URL from the qr_download_link custom message so
+  // we can persist it (and a derived QR PNG) when --output-record is set. We wrap
+  // the logger rather than duplicating dispatch logic so the existing print
+  // behaviour stays intact.
+  let capturedOutputUrl: string | null = null
+  const log: BuildLogger = options.outputRecord
+    ? {
+        ...baseLogger,
+        customMsg: async (kind, data) => {
+          if (kind === 'qr_download_link' && typeof data.url === 'string')
+            capturedOutputUrl = data.url
+          await baseLogger.customMsg(kind, data)
+        },
+      }
+    : baseLogger
 
   try {
     options.apikey = options.apikey || findSavedKey(silent)
@@ -1849,6 +1866,31 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
       }
       else {
         log.warn(`Build finished with status: ${finalStatus}`)
+      }
+
+      if (options.outputRecord && finalStatus === 'succeeded') {
+        try {
+          const record = await writeBuildOutputRecord(
+            options.outputRecord,
+            {
+              jobId: buildRequest.job_id,
+              appId,
+              platform,
+              buildMode: (options.buildMode ?? 'release') as 'debug' | 'release',
+              status: finalStatus,
+              outputUrl: capturedOutputUrl,
+            },
+            (msg: string) => log.warn(msg),
+          )
+          log.success(`Build output record written to ${options.outputRecord}`)
+          if (!record.outputUrl)
+            log.info('ℹ️  Record contains no download URL — pass --output-upload to publish one.')
+          if (record.qrCodePngPath)
+            log.info(`ℹ️  QR code PNG written to ${record.qrCodePngPath}`)
+        }
+        catch (error) {
+          log.warn(`Failed to write build output record to ${options.outputRecord}: ${error instanceof Error ? error.message : String(error)}`)
+        }
       }
 
       // Calculate build time (in seconds with 2 decimal places, matching upload behavior)
