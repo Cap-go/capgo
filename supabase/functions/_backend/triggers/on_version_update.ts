@@ -79,6 +79,33 @@ async function v2PathSize(c: Context, record: Database['public']['Tables']['app_
   return true
 }
 
+async function getUploadedFileSizes(c: Context, s3Paths: string[]): Promise<Map<string, number>> {
+  const uniquePaths = Array.from(new Set(s3Paths.filter(path => path.length > 0)))
+  if (uniquePaths.length === 0)
+    return new Map()
+
+  const pgClient = getPgClient(c, false)
+  try {
+    const result = await pgClient.query<{ s3_path: string, file_size: string | number }>(
+      `
+        SELECT s3_path, file_size
+        FROM public.uploaded_file_sizes
+        WHERE s3_path = ANY($1::text[])
+      `,
+      [uniquePaths],
+    )
+
+    return new Map(result.rows.map(row => [row.s3_path, Number(row.file_size)]))
+  }
+  catch (error) {
+    cloudlog({ requestId: c.get('requestId'), message: 'error loading uploaded file sizes', error })
+    return new Map()
+  }
+  finally {
+    await closeClient(c, pgClient)
+  }
+}
+
 /**
  * Persists manifest rows and updates aggregate counters when a version includes a manifest payload.
  */
@@ -95,6 +122,13 @@ async function handleManifest(c: Context, record: Database['public']['Tables']['
 
   // Only create entries if none exist
   if (!existingEntries?.length && manifestEntries.length > 0) {
+    const uploadedFileSizes = await getUploadedFileSizes(
+      c,
+      manifestEntries
+        .map(entry => entry.s3_path)
+        .filter((s3Path): s3Path is string => typeof s3Path === 'string'),
+    )
+
     const validEntries = manifestEntries
       .filter(entry => entry.file_name && entry.file_hash && entry.s3_path)
       .map(entry => ({
@@ -102,7 +136,8 @@ async function handleManifest(c: Context, record: Database['public']['Tables']['
         file_name: normalizeLegacyEncodedManifestFileName(entry.file_name, entry.s3_path)!,
         file_hash: entry.file_hash!,
         s3_path: entry.s3_path!,
-        file_size: 0,
+        // Never trust client-provided manifest sizes. Only use sizes observed by the upload backend.
+        file_size: uploadedFileSizes.get(entry.s3_path!) ?? 0,
       }))
 
     if (validEntries.length > 0) {
@@ -365,3 +400,8 @@ app.post('/', middlewareAPISecret, triggerValidator('app_versions', 'UPDATE'), (
   cloudlog({ requestId: c.get('requestId'), message: 'Update but not deleted' })
   return updateIt(c, record)
 })
+
+export const onVersionUpdateTestUtils = {
+  getUploadedFileSizes,
+  handleManifest,
+}

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { __queueConsumerTestUtils__, MAX_QUEUE_READS, messagesArraySchema } from '../supabase/functions/_backend/triggers/queue_consumer.ts'
 import { parseSchema } from '../supabase/functions/_backend/utils/ark_validation.ts'
 
@@ -137,6 +137,50 @@ describe('queue_consumer legacy message compatibility', () => {
       bodyPreview: '{"message":"builder unavailable"}',
       errorCode: null,
       errorMessage: 'builder unavailable',
+    })
+  })
+
+  it.concurrent('keeps one thrown message failure from failing the whole batch', async () => {
+    const messages = parseSchema(messagesArraySchema, [
+      {
+        msg_id: 10,
+        read_ct: 1,
+        message: {
+          function_name: 'ok',
+          payload: { ok: true },
+        },
+      },
+      {
+        msg_id: 11,
+        read_ct: 1,
+        message: {
+          function_name: 'bad',
+          payload: { ok: false },
+        },
+      },
+    ])
+
+    const postHelper = vi.fn(async (_c, functionName: string) => {
+      if (functionName === 'bad')
+        throw new Error('network down')
+      return new Response(JSON.stringify({ status: 'ok' }), {
+        headers: { 'content-type': 'application/json' },
+        status: 200,
+      })
+    })
+
+    const context = { get: vi.fn(() => 'test-request') } as any
+    const results = await Promise.all(messages.map(message =>
+      __queueConsumerTestUtils__.processQueueMessage(context, 'test_queue', message, postHelper as any),
+    ))
+
+    expect(results.map(result => [result.msg_id, result.httpResponse.status])).toEqual([
+      [10, 200],
+      [11, 500],
+    ])
+    expect(results[1]?.errorDetails).toMatchObject({
+      errorCode: 'queue_message_processing_failed',
+      errorMessage: 'network down',
     })
   })
 })

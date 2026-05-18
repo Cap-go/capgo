@@ -38,6 +38,13 @@ interface Message {
   }
 }
 
+interface QueueProcessingResult extends Message {
+  httpResponse: Response
+  errorDetails: Awaited<ReturnType<typeof extractErrorDetails>>
+  cfId: string
+  payloadSize: number
+}
+
 export const messagesArraySchema = messageSchema.array()
 
 interface FailureDetail {
@@ -163,6 +170,72 @@ function generateUUID(): string {
   return crypto.randomUUID()
 }
 
+async function processQueueMessage(
+  c: Context,
+  queueName: string,
+  message: Message,
+  postHelper: typeof http_post_helper = http_post_helper,
+): Promise<QueueProcessingResult> {
+  const function_name = message.message?.function_name ?? 'unknown'
+  const function_type = message.message?.function_type ?? 'supabase'
+  const body = extractMessageBody(message)
+  if (message.message?.payload === undefined && Object.keys(body).length > 0) {
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: `[${queueName}] Using legacy queue message body shape for ${function_name}.`,
+      msgId: message.msg_id,
+    })
+  }
+
+  const cfId = generateUUID()
+  const payloadSize = JSON.stringify(body).length
+
+  try {
+    const httpResponse = await postHelper(c, function_name, function_type, body, cfId)
+    const errorDetails = await extractErrorDetails(httpResponse)
+
+    return {
+      httpResponse,
+      errorDetails,
+      cfId,
+      payloadSize,
+      ...message,
+    }
+  }
+  catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    const publicErrorMessage = 'Queue message processing failed'
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: `[${queueName}] Message processing failed before HTTP response`,
+      error,
+      function_name,
+      function_type,
+      msgId: message.msg_id,
+      cfId,
+    })
+
+    return {
+      httpResponse: new Response(JSON.stringify({
+        error: 'queue_message_processing_failed',
+        message: publicErrorMessage,
+      }), {
+        status: 500,
+        statusText: publicErrorMessage,
+        headers: { 'content-type': 'application/json' },
+      }),
+      errorDetails: {
+        errorCode: 'queue_message_processing_failed',
+        errorMessage,
+        bodyPreview: errorMessage.slice(0, 500),
+      },
+      cfId,
+      payloadSize,
+      ...message,
+    }
+  }
+}
+
 async function processQueue(c: Context, db: ReturnType<typeof getPgClient>, queueName: string, batchSize: number = DEFAULT_BATCH_SIZE) {
   const messages = await readQueue(c, db, queueName, batchSize)
 
@@ -185,29 +258,7 @@ async function processQueue(c: Context, db: ReturnType<typeof getPgClient>, queu
   }
 
   // Process messages that have been read less than 5 times
-  const results = await Promise.all(messagesToProcess.map(async (message) => {
-    const function_name = message.message?.function_name ?? 'unknown'
-    const function_type = message.message?.function_type ?? 'supabase'
-    const body = extractMessageBody(message)
-    if (message.message?.payload === undefined && Object.keys(body).length > 0) {
-      cloudlog({
-        requestId: c.get('requestId'),
-        message: `[${queueName}] Using legacy queue message body shape for ${function_name}.`,
-        msgId: message.msg_id,
-      })
-    }
-    const cfId = generateUUID()
-    const httpResponse = await http_post_helper(c, function_name, function_type, body, cfId)
-    const errorDetails = await extractErrorDetails(httpResponse)
-
-    return {
-      httpResponse,
-      errorDetails,
-      cfId,
-      payloadSize: JSON.stringify(body).length,
-      ...message,
-    }
-  }))
+  const results = await Promise.all(messagesToProcess.map(message => processQueueMessage(c, queueName, message)))
 
   // Update all messages with their CF IDs
   const cfIdUpdates = results.map(result => ({
@@ -218,7 +269,12 @@ async function processQueue(c: Context, db: ReturnType<typeof getPgClient>, queu
 
   if (cfIdUpdates.length > 0) {
     cloudlog({ requestId: c.get('requestId'), message: `[${queueName}] Updating ${cfIdUpdates.length} messages with CF IDs.` })
-    await mass_edit_queue_messages_cf_ids(c, db, cfIdUpdates)
+    try {
+      await mass_edit_queue_messages_cf_ids(c, db, cfIdUpdates)
+    }
+    catch (error) {
+      cloudlogErr({ requestId: c.get('requestId'), message: `[${queueName}] Failed to update CF IDs, continuing queue cleanup.`, error })
+    }
   }
 
   // Batch remove all messages that have succeeded
@@ -627,5 +683,6 @@ export const __queueConsumerTestUtils__ = {
   extractErrorDetails,
   extractMessageBody,
   getActionableQueueFailures,
+  processQueueMessage,
   sanitizeDiscordResponseBody,
 }

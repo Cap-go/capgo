@@ -367,18 +367,22 @@ export class UploadHandler extends DurableObject {
     const uploadOffset = hasContent
       ? await this.appendBody(c, r2Key, c.req.raw.body as ReadableStream<Uint8Array>, 0, uploadInfo)
       : 0
+    const headers = new Headers({
+      'Location': uploadLocation.href,
+      'Upload-Expires': expiration.toString(),
+      'Upload-Offset': uploadOffset.toString(),
+      'Tus-Resumable': TUS_VERSION,
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': ALLOWED_METHODS,
+      'Access-Control-Allow-Headers': ALLOWED_HEADERS,
+      'Access-Control-Expose-Headers': EXPOSED_HEADERS,
+    })
+    if (uploadInfo.uploadLength != null)
+      headers.set('Upload-Length', uploadInfo.uploadLength.toString())
+
     return new Response(null, {
       status: 201,
-      headers: new Headers({
-        'Location': uploadLocation.href,
-        'Upload-Expires': expiration.toString(),
-        'Upload-Offset': uploadOffset.toString(),
-        'Tus-Resumable': TUS_VERSION,
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': ALLOWED_METHODS,
-        'Access-Control-Allow-Headers': ALLOWED_HEADERS,
-        'Access-Control-Expose-Headers': EXPOSED_HEADERS,
-      }),
+      headers,
     })
   }
 
@@ -463,17 +467,21 @@ export class UploadHandler extends DurableObject {
 
     uploadOffset = await this.appendBody(c, r2Key, c.req.raw.body, currentUploadOffset, uploadInfo)
 
+    const headers = new Headers({
+      'Upload-Offset': uploadOffset.toString(),
+      'Upload-Expires': (await this.expirationTime()).toString(),
+      'Tus-Resumable': TUS_VERSION,
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': ALLOWED_METHODS,
+      'Access-Control-Allow-Headers': ALLOWED_HEADERS,
+      'Access-Control-Expose-Headers': EXPOSED_HEADERS,
+    })
+    if (uploadInfo.uploadLength != null)
+      headers.set('Upload-Length', uploadInfo.uploadLength.toString())
+
     return new Response(null, {
       status: 204,
-      headers: new Headers({
-        'Upload-Offset': uploadOffset.toString(),
-        'Upload-Expires': (await this.expirationTime()).toString(),
-        'Tus-Resumable': TUS_VERSION,
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': ALLOWED_METHODS,
-        'Access-Control-Allow-Headers': ALLOWED_HEADERS,
-        'Access-Control-Expose-Headers': EXPOSED_HEADERS,
-      }),
+      headers,
     })
   }
 

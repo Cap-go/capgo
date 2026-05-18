@@ -21,6 +21,7 @@ import { app as files_config } from './files_config.ts'
 import { parseUploadMetadata } from './parse.ts'
 import { DEFAULT_RETRY_PARAMS, RetryBucket } from './retry.ts'
 import { supabaseTusCreateHandler, supabaseTusHeadHandler, supabaseTusPatchHandler } from './supabaseTusProxy.ts'
+import { getCompletedTusUploadSize, recordUploadedFileSize } from './uploadSize.ts'
 import { ALLOWED_HEADERS, ALLOWED_METHODS, buildFileHttpMetadata, EXPOSED_HEADERS, getSafeAttachmentReadCandidateKeys, headFirstExistingAttachmentCandidate, isRetryableDurableObjectResetError, MAX_UPLOAD_LENGTH_BYTES, parseAppScopedAttachmentPath, toBase64, TUS_EXTENSIONS, TUS_VERSION, withNoTransformCacheControl, X_CHECKSUM_SHA256, X_UPLOAD_HANDLER_RETRYABLE } from './util.ts'
 
 const DO_CALL_TIMEOUT = 1000 * 60 * 30 // 30 minutes
@@ -619,6 +620,17 @@ function buildNormalizedUploadMetadataHeader(c: Context, filename: string): stri
   return metadata.join(',')
 }
 
+async function recordCompletedTusUpload(c: Context, response: Response) {
+  if (response.status < 200 || response.status >= 300)
+    return
+
+  const fileSize = getCompletedTusUploadSize(response.headers)
+  if (fileSize == null)
+    return
+
+  await recordUploadedFileSize(c, c.get('fileId') as string, fileSize)
+}
+
 // TUS protocol requests (POST/PATCH/HEAD) that get forwarded to a durable object
 async function uploadHandler(c: Context) {
   const requestId = c.get('fileId') as string
@@ -652,7 +664,9 @@ async function uploadHandler(c: Context) {
     requestInit.duplex = 'half'
   }
   const request = new Request(c.req.url, requestInit)
-  return await fetchUploadHandlerWithRetry(c, handler, request)
+  const response = await fetchUploadHandlerWithRetry(c, handler, request)
+  await recordCompletedTusUpload(c, response)
+  return response
 }
 
 async function setKeyFromMetadata(c: Context, next: Next) {
