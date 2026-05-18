@@ -43,7 +43,10 @@ export type PostAnalyzeResult
     | { kind: 'error', status?: number, message?: string }
 
 export async function postAnalyzeRequest(input: PostAnalyzeInput): Promise<PostAnalyzeResult> {
-  const url = `${input.apiHost}/functions/v1/build/ai_analyze`
+  // apiHost is the Capgo CF Workers API gateway (e.g. https://api.capgo.app),
+  // NOT a Supabase Edge Functions URL — so no '/functions/v1/' prefix. All other
+  // /build/* endpoints (start, cancel, status, logs) live directly under the host.
+  const url = `${input.apiHost}/build/ai_analyze`
   try {
     const res = await fetch(url, {
       method: 'POST',

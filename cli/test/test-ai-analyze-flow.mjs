@@ -82,7 +82,7 @@ await test('postAnalyzeRequest sends POST with correct shape and returns analysi
 
   globalThis.fetch = origFetch
 
-  if (captured.url !== 'https://api.test/functions/v1/build/ai_analyze')
+  if (captured.url !== 'https://api.test/build/ai_analyze')
     throw new Error(`url: ${captured.url}`)
   if (captured.init.method !== 'POST')
     throw new Error(`method: ${captured.init.method}`)
