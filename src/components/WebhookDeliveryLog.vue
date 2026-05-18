@@ -142,10 +142,9 @@ function formatJson(data: any): string {
 </script>
 
 <template>
-  <div
-    class="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
-    role="dialog"
-    aria-modal="true"
+  <dialog
+    open
+    class="fixed inset-0 z-50 flex items-center justify-center w-full h-full max-w-none max-h-none p-0 m-0 border-0 bg-black/50"
     :aria-labelledby="modalTitleId"
     @click="handleBackdropClick"
     @keydown.esc.stop.prevent="handleClose"
@@ -347,5 +346,5 @@ function formatJson(data: any): string {
         </div>
       </div>
     </div>
-  </div>
+  </dialog>
 </template>

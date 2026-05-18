@@ -125,10 +125,9 @@ function handleDeliveryVersionChange() {
 </script>
 
 <template>
-  <div
-    class="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto bg-black/50"
-    role="dialog"
-    aria-modal="true"
+  <dialog
+    open
+    class="fixed inset-0 z-50 flex items-center justify-center w-full h-full max-w-none max-h-none p-4 m-0 overflow-y-auto border-0 bg-black/50"
     :aria-labelledby="modalTitleId"
     @click="handleBackdropClick"
     @keydown.esc.stop.prevent="handleClose"
@@ -297,5 +296,5 @@ function handleDeliveryVersionChange() {
         </button>
       </div>
     </div>
-  </div>
+  </dialog>
 </template>
