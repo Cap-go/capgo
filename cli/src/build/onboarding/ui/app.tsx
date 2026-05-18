@@ -176,6 +176,14 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
    * (i.e. .p8 was the entry point for app_store, not a recovery side-trip).
    */
   const [pendingRecoveryAction, setPendingRecoveryAction] = useState<'fetching-profile' | 'create-profile-only' | null>(null)
+  /**
+   * Records which step triggered the shared `duplicate-profile-prompt` so the
+   * `deleting-duplicate-profiles` handler routes the retry correctly. Without
+   * this, an import-flow duplicate (raised from `import-create-profile-only`)
+   * would retry `creating-profile` — the create-new path — which can't
+   * succeed in import mode because `certData.certificateId` is never set.
+   */
+  const [duplicateProfileOrigin, setDuplicateProfileOrigin] = useState<'creating-profile' | 'import-create-profile-only'>('creating-profile')
 
   const addLog = useCallback((text: string, color = 'green') => {
     setLog(prev => [...prev, { text, color }])
@@ -633,6 +641,18 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
         try {
           if (!chosenIdentity)
             throw new Error('Internal error: no identity chosen for profile creation.')
+          // Defensive: D2 only synthesizes app_store profiles right now (the
+          // underlying apple-api.ts createProfile hardcodes IOS_APP_STORE).
+          // The no-match-recovery menu already hides "Create" for ad_hoc, but
+          // if some code path bypasses the menu we still refuse rather than
+          // silently produce a mismatched provisioning_map / distribution
+          // pair in credentials.json.
+          if (importDistribution === 'ad_hoc') {
+            throw new Error(
+              'Creating a new profile via Apple is not implemented for ad_hoc distribution yet. '
+              + 'Use "Fetch matching profile from Apple" or "Open Apple Developer Portal" instead.',
+            )
+          }
           const token = await getFreshToken()
           const certId = await findCertIdBySha1(token, chosenIdentity.sha1)
           if (cancelled)
@@ -670,10 +690,12 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
           if (cancelled)
             return
           if (err instanceof DuplicateProfileError) {
-            // Existing flow already handles this case for the create-new path —
-            // route to the existing duplicate-profile-prompt step, which on
-            // resume will retry creation. Set the duplicateProfiles state so
-            // the prompt renders correctly.
+            // Route to the shared duplicate-profile-prompt, but record where
+            // to RESUME after the deletion so the retry runs the import-side
+            // re-creation (which goes back through findCertIdBySha1) instead
+            // of the create-new path's creating-certificate→creating-profile
+            // chain (which can't succeed in import mode — no certData).
+            setDuplicateProfileOrigin('import-create-profile-only')
             setDuplicateProfiles(err.profiles)
             setStep('duplicate-profile-prompt')
           }
@@ -859,6 +881,9 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
           if (cancelled)
             return
           if (err instanceof DuplicateProfileError) {
+            // Record origin so deleting-duplicate-profiles retries the
+            // right path (create-new vs import D2).
+            setDuplicateProfileOrigin('creating-profile')
             setDuplicateProfiles(err.profiles)
             setStep('duplicate-profile-prompt')
           }
@@ -881,12 +906,14 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
             return
           addLog(`✔ Removed ${duplicateProfiles.length} old profile(s)`)
           setDuplicateProfiles([])
-          // Retry creating the profile
-          setStep('creating-profile')
+          // Retry the step that originally raised the duplicate — import D2
+          // or the create-new path. duplicateProfileOrigin is set wherever
+          // DuplicateProfileError is caught and routed here.
+          setStep(duplicateProfileOrigin)
         }
         catch (err) {
           if (!cancelled)
-            handleError(err, 'creating-profile')
+            handleError(err, duplicateProfileOrigin)
         }
       })()
     }
@@ -1327,15 +1354,40 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
 
       {/* Import: pick profile */}
       {step === 'import-pick-profile' && chosenIdentity && (() => {
-        const matchedProfiles = importMatches.find(m => m.identity.sha1 === chosenIdentity.sha1)?.profiles || []
+        const allMatchedProfiles = importMatches.find(m => m.identity.sha1 === chosenIdentity.sha1)?.profiles || []
+        // Filter to profiles that are actually usable for THIS app + THIS
+        // distribution mode. Without this filter, a user with a cert reused
+        // across multiple apps (or with both app_store and ad_hoc profiles
+        // linked to one cert) could pick a profile whose bundleId !== appId
+        // or whose profileType !== importDistribution. `doSaveCredentials`
+        // would then persist a mismatched provisioning_map / distribution
+        // pair, producing unusable signing credentials.
+        const matchedProfiles = allMatchedProfiles.filter(p =>
+          p.bundleId === appId
+          && (!importDistribution || p.profileType === importDistribution),
+        )
+        const droppedCount = allMatchedProfiles.length - matchedProfiles.length
         return (
           <Box flexDirection="column" marginTop={1}>
             <Text bold>
               Pick a provisioning profile (
               {matchedProfiles.length}
               {' '}
-              available for this identity):
+              matching this app's bundle ID
+              {importDistribution ? ` and ${importDistribution} distribution` : ''}
+              ):
             </Text>
+            {droppedCount > 0 && (
+              <Text dimColor>
+                (
+                {droppedCount}
+                {' '}
+                other profile
+                {droppedCount === 1 ? '' : 's'}
+                {' '}
+                hidden — wrong bundle ID or distribution mode)
+              </Text>
+            )}
             <Newline />
             <Select
               options={[
@@ -1344,10 +1396,6 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
                   // Key by UUID, NOT path. Disk-discovered profiles have a
                   // unique path, but Apple-fetched profiles (from the D
                   // no-match-recovery path) are synthesized with path=''.
-                  // Keying by path collapses every Apple-fetched profile to
-                  // value="" and onChange's `find(p => p.path === '')` only
-                  // ever resolves the first synthesized entry — user can't
-                  // pick any other.
                   // UUID is unique for both kinds: disk profiles use the
                   // mobileprovision UUID, synthesized ones use Apple's
                   // profile resource ID.
@@ -1363,6 +1411,22 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
                 const profile = matchedProfiles.find(p => p.uuid === value)
                 if (!profile)
                   return
+                // Defense in depth: verify bundleId + profileType match before
+                // committing. The filter above should make this unreachable,
+                // but if the filter regresses, we'd rather hard-fail than
+                // silently save bad creds.
+                if (profile.bundleId !== appId
+                  || (importDistribution && profile.profileType !== importDistribution)) {
+                  handleError(
+                    new Error(
+                      `Profile "${profile.name}" doesn't match this app: `
+                      + `bundle ${profile.bundleId} (expected ${appId}), `
+                      + `type ${profile.profileType} (expected ${importDistribution ?? 'any'}).`,
+                    ),
+                    'import-pick-profile',
+                  )
+                  return
+                }
                 setChosenProfile(profile)
                 addLog(`✔ Profile · ${profile.name}`)
                 setStep('import-export-warning')
@@ -1375,6 +1439,14 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
       {/* Import: no-match recovery menu */}
       {step === 'import-no-match-recovery' && chosenIdentity && (() => {
         const hasAscKey = !!(p8ContentRef.current || p8PathRef.current)
+        // D2 (create-profile-only) currently only knows how to create
+        // IOS_APP_STORE profiles via apple-api.ts createProfile, which
+        // hardcodes that profileType. For ad_hoc we'd need a separate
+        // create path that calls Apple with IOS_APP_ADHOC. Until that
+        // exists, hide the "Create" option for ad_hoc users so they
+        // can't end up with an app_store profile saved under
+        // CAPGO_IOS_DISTRIBUTION='ad_hoc'. Browser + Fetch still work.
+        const canCreateProfile = importDistribution !== 'ad_hoc'
         return (
           <Box flexDirection="column" marginTop={1}>
             <Alert variant="warning">
@@ -1399,12 +1471,14 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
                     : `🔍  Provide ASC API key, then fetch profile from Apple`,
                   value: 'fetch',
                 },
-                {
-                  label: hasAscKey
-                    ? `✨  Create a new profile for this cert via Apple`
-                    : `✨  Provide ASC API key, then create a new profile for this cert`,
-                  value: 'create',
-                },
+                ...(canCreateProfile
+                  ? [{
+                      label: hasAscKey
+                        ? `✨  Create a new App Store profile for this cert via Apple`
+                        : `✨  Provide ASC API key, then create a new App Store profile for this cert`,
+                      value: 'create',
+                    }]
+                  : []),
                 { label: '↩️   Back to identity selection', value: 'back' },
               ]}
               onChange={(value) => {
