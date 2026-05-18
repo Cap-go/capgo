@@ -1623,16 +1623,7 @@ async function maybeReusePendingOnboardingApp(
     await syncPendingAppIdToCapacitorConfig(selectedAppId)
   }
 
-  const cleanupSpinner = pSpinner()
-  cleanupSpinner.start(`Preparing ${selectedAppId} for real onboarding`)
-  try {
-    await completePendingOnboardingApp(supabase, organization.gid, selectedAppId)
-    cleanupSpinner.stop('Pending onboarding app prepared ✅')
-  }
-  catch (error) {
-    cleanupSpinner.stop('Could not prepare pending onboarding app ❌')
-    throw error
-  }
+  await maybeCompletePendingOnboardingAppForLegacyBackend(supabase, organization, selectedAppId)
 
   await markStep(organization.gid, apikey, 'add-app', selectedAppId)
 
@@ -1789,11 +1780,18 @@ async function checkPrerequisitesStep(orgId: string, apikey: string) {
 
 type ExistingAppConflictResolution = 'use-existing' | 'recreate' | 'choose-different' | 'not-owned'
 
-async function completeExistingAppPendingOnboarding(
+function shouldCompleteOnboardingInCliForLegacyBackend() {
+  return env.CAPGO_CLI_COMPLETE_ONBOARDING === 'true'
+}
+
+async function maybeCompletePendingOnboardingAppForLegacyBackend(
   supabase: Awaited<ReturnType<typeof createSupabaseClient>>,
   organization: Organization,
   appId: string,
 ) {
+  if (!shouldCompleteOnboardingInCliForLegacyBackend())
+    return
+
   const s = pSpinner()
   s.start(`Preparing existing app ${appId}`)
   try {
@@ -1829,7 +1827,7 @@ async function resolveExistingAppConflict(
 
   if (useExistingApp === true) {
     if (existingApp.need_onboarding)
-      await completeExistingAppPendingOnboarding(supabase, organization, appId)
+      await maybeCompletePendingOnboardingAppForLegacyBackend(supabase, organization, appId)
 
     await saveAppIdToCapacitorConfig(appId)
     return 'use-existing'
