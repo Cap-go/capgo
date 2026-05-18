@@ -92,6 +92,10 @@ export function parseOptionalBoolean(value: boolean | string | undefined): boole
 }
 
 export function parseInAppUpdatePriority(value: number | string): number {
+  // Reject blank/whitespace-only strings before numeric coercion — Number('') and Number('   ')
+  // both yield 0, which would silently apply priority 0 to a Play release.
+  if (typeof value === 'string' && value.trim() === '')
+    throw new Error('in-app-update-priority must be an integer between 0 and 5')
   const num = typeof value === 'number' ? value : Number(value)
   if (!Number.isInteger(num) || num < 0 || num > 5)
     throw new Error('in-app-update-priority must be an integer between 0 and 5')
