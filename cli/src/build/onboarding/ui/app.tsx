@@ -17,7 +17,7 @@ import open from 'open'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { writeOnboardingSupportBundle } from '../../../onboarding-support.js'
 import { formatRunnerCommand, splitRunnerCommand } from '../../../runner-command.js'
-import { findSavedKeySilent, getPMAndCommand } from '../../../utils.js'
+import { createSupabaseClient, findSavedKeySilent, getOrganizationId, getPMAndCommand } from '../../../utils.js'
 import { loadSavedCredentials, updateSavedCredentials } from '../../credentials.js'
 import { requestBuildInternal } from '../../request.js'
 import { CertificateLimitError, createCertificate, createProfile, deleteProfile, DuplicateProfileError, ensureBundleId, findCertIdBySha1, generateJwt, listProfilesForCert, revokeCertificate, verifyApiKey } from '../apple-api.js'
@@ -26,6 +26,7 @@ import { canUseFilePicker, openFilePicker } from '../file-picker.js'
 import { exportP12FromKeychain, isHelperCached, isMacOS, listSigningIdentities, matchIdentitiesToProfiles, precompileSwiftHelper, scanProvisioningProfiles } from '../macos-signing.js'
 import { deleteProgress, getResumeStep, loadProgress, saveProgress } from '../progress.js'
 import { getBuildOnboardingRecoveryAdvice } from '../recovery.js'
+import { trackBuilderOnboardingStep } from '../telemetry.js'
 import {
   getPhaseLabel,
 
@@ -89,6 +90,45 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
   const startStep = getResumeStep(initialProgress)
 
   const [step, setStep] = useState<OnboardingStep>(startStep === 'welcome' ? 'welcome' : startStep)
+
+  // Telemetry: resolve org id once + emit per-step events
+  const stepTimingRef = useRef<{ step: OnboardingStep, startedAt: number }>({
+    step: startStep === 'welcome' ? 'welcome' : startStep,
+    startedAt: Date.now(),
+  })
+  const [resolvedOrgId, setResolvedOrgId] = useState<string | null>(null)
+  const resolvedApiKeyRef = useRef<string | null>(apikey ?? null)
+  const orgIdResolvedRef = useRef(false)
+
+  useEffect(() => {
+    if (resolvedApiKeyRef.current)
+      return
+    const saved = findSavedKeySilent()
+    if (saved)
+      resolvedApiKeyRef.current = saved
+  }, [])
+
+  useEffect(() => {
+    if (orgIdResolvedRef.current || !resolvedApiKeyRef.current)
+      return
+    orgIdResolvedRef.current = true
+
+    let cancelled = false
+    void (async () => {
+      const supabase = await createSupabaseClient(resolvedApiKeyRef.current!, undefined, undefined, true)
+        .catch(() => null)
+      if (!supabase || cancelled)
+        return
+      const orgId = await getOrganizationId(supabase, appId).catch(() => null)
+      if (orgId && !cancelled)
+        setResolvedOrgId(orgId)
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [appId])
+
   const [log, setLog] = useState<LogEntry[]>([])
   const [error, setError] = useState<string | null>(null)
   const [retryCount, setRetryCount] = useState(0)
@@ -133,6 +173,32 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
   useEffect(() => {
     issuerIdRef.current = issuerId
   }, [issuerId])
+
+  // Emit telemetry on every step transition (including initial mount)
+  useEffect(() => {
+    if (!resolvedApiKeyRef.current || !resolvedOrgId)
+      return
+
+    const previous = stepTimingRef.current
+    if (previous.step === step && step !== 'error')
+      return
+
+    const now = Date.now()
+    const durationMs = previous.step === step ? undefined : now - previous.startedAt
+
+    void trackBuilderOnboardingStep({
+      apikey: resolvedApiKeyRef.current,
+      appId,
+      orgId: resolvedOrgId,
+      platform: 'ios',
+      step,
+      durationMs,
+      error: step === 'error' && error ? new Error(error) : undefined,
+    })
+
+    stepTimingRef.current = { step, startedAt: now }
+  }, [step, appId, resolvedOrgId, error])
+
   const [teamId, setTeamId] = useState(initialProgress?.completedSteps.certificateCreated?.teamId || '')
   const [certData, setCertData] = useState<CertificateData | null>(initialProgress?.completedSteps.certificateCreated || null)
   const [profileData, setProfileData] = useState<ProfileData | null>(initialProgress?.completedSteps.profileCreated || null)
