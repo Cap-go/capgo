@@ -221,8 +221,8 @@ displayStore.defaultBack = '/apps'
       <dl class="divide-y divide-slate-200 dark:divide-slate-500">
         <InfoRow :label="t('available-in-the-san')" />
         <InfoRow :label="t('plugin-sandbox-native-bridge-tests')" :value="String(pluginTests.length)" />
-        <InfoRow v-for="module in pluginTests" :key="pluginKey(module)" :value="lastResults[pluginKey(module)] || module.packageName" :label="`${module.label}@${module.method}`" :is-link="true" @click="runMethod(module)">
-          <button class="ml-auto w-7 h-7 bg-transparent">
+        <InfoRow v-for="module in pluginTests" :key="pluginKey(module)" :value="lastResults[pluginKey(module)] ?? module.packageName" :label="`${module.label}@${module.method}`" :is-link="true" @click="runMethod(module)">
+          <button type="button" class="d-btn d-btn-ghost d-btn-sm ml-auto w-7 h-7 p-0">
             <IconNext />
           </button>
         </InfoRow>
