@@ -151,7 +151,8 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
   // Hydrate importDistribution from progress so resumed sessions don't lose
   // the user's earlier choice. Without this, `doSaveCredentials`'s
   // `needsAscKey = !importMode || importDistribution === 'app_store'` would
-  // mis-route (e.g. saving ad_hoc credentials with APPLE_KEY_* fields).
+  // take the wrong branch (e.g. saving ad_hoc credentials with APPLE_KEY_*
+  // fields).
   const [importDistribution, setImportDistribution] = useState<'app_store' | 'ad_hoc' | null>(
     initialProgress?.importDistribution ?? null,
   )

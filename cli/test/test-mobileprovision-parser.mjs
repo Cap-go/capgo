@@ -132,10 +132,10 @@ function detailedFixture({ profileType = 'app_store', includeCerts = true }) {
     provisionsBlock = `<key>ProvisionsAllDevices</key>\n  <true/>`
   }
   else if (profileType === 'ad_hoc') {
-    provisionsBlock = `<key>ProvisionedDevices</key>\n  <array><string>fake-udid</string></array>`
+    provisionsBlock = `<key>ProvisionedDevices</key>\n  <array><string>fake-device-id</string></array>`
   }
   else if (profileType === 'development') {
-    provisionsBlock = `<key>ProvisionedDevices</key>\n  <array><string>fake-udid</string></array>`
+    provisionsBlock = `<key>ProvisionedDevices</key>\n  <array><string>fake-device-id</string></array>`
     entitlementsExtra = `<key>get-task-allow</key>\n    <true/>`
   }
 

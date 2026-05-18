@@ -243,8 +243,8 @@ t('parseHelperJson throws clearly when stdout is empty', () => {
   assert.throws(() => parseHelperJson('', 'helper segfaulted', 139), /no JSON output.*helper segfaulted/)
 })
 
-t('parseHelperJson throws clearly when stdout is unparseable', () => {
-  assert.throws(() => parseHelperJson('not json at all', '', 1), /unparseable JSON/)
+t('parseHelperJson throws clearly when stdout is unparsable', () => {
+  assert.throws(() => parseHelperJson('not json at all', '', 1), /unparsable JSON/)
 })
 
 t('parseHelperJson throws clearly when JSON is not an object', () => {

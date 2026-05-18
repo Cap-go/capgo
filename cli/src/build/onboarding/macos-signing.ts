@@ -23,9 +23,6 @@ import { parseMobileprovisionDetailed } from '../mobileprovision-parser.js'
 /** Absolute path to the system `security` binary. */
 const SECURITY_BIN = '/usr/bin/security'
 
-/** Default user keychain. macOS uses `.keychain-db` since 10.12. */
-export const DEFAULT_LOGIN_KEYCHAIN = 'login.keychain-db'
-
 /** Standard locations Xcode writes provisioning profiles into. */
 export const PROVISIONING_PROFILE_DIRS = [
   // Xcode 16+ default
@@ -78,13 +75,6 @@ export class NotMacOSError extends MacOSSigningError {
   constructor() {
     super('Importing existing iOS credentials is only supported on macOS.')
     this.name = 'NotMacOSError'
-  }
-}
-
-export class NoIdentitiesError extends MacOSSigningError {
-  constructor() {
-    super('No iOS distribution identities were found in your default Keychain.')
-    this.name = 'NoIdentitiesError'
   }
 }
 
@@ -510,7 +500,7 @@ export async function exportP12FromKeychain(
 
 /**
  * Parse the helper's JSON output. Tolerates: extra whitespace, trailing
- * newline, BOM. Throws a clear error if the output is unparseable — that
+ * newline, BOM. Throws a clear error if the output is unparsable — that
  * indicates the helper crashed without emitting JSON, which our Swift code
  * tries hard to never do (see keychain-export.swift's top-level catch).
  *
@@ -537,7 +527,7 @@ export function parseHelperJson(
   }
   catch (err) {
     throw new MacOSSigningError(
-      `keychain-export helper emitted unparseable JSON (exit ${exitCode}): "${lastLine}". `
+      `keychain-export helper emitted unparsable JSON (exit ${exitCode}): "${lastLine}". `
       + `Parse error: ${err instanceof Error ? err.message : String(err)}`,
     )
   }
