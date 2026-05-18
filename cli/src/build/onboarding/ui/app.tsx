@@ -683,6 +683,15 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
             profileBase64: profile.profileContent,
           } as DiscoveredProfile & { profileBase64: string }
           setChosenProfile(synthesized)
+          // Also append to importMatches so the picker shows the new profile
+          // if the user clicks Back from import-export-warning. Without this,
+          // import-pick-profile renders from importMatches (which doesn't
+          // include the freshly-created one) and the user gets stuck in a
+          // loop with no way to select what they just created.
+          setImportMatches(prev => prev.map(m => m.identity.sha1 === chosenIdentity.sha1
+            ? { ...m, profiles: [...m.profiles, synthesized] }
+            : m,
+          ))
           addLog(`✔ Created new profile "${profile.profileName}" on Apple, linked to your existing cert`)
           setStep('import-export-warning')
         }
@@ -1330,9 +1339,18 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
               }),
               { label: '↩️   Cancel and use Create new instead', value: '__cancel__' },
             ]}
-            onChange={(value) => {
+            onChange={async (value) => {
               if (value === '__cancel__') {
                 setImportMode(false)
+                // Persist the switch so a CLI restart doesn't resume into
+                // the import flow the user just abandoned. Mirrors the same
+                // pattern in import-distribution-mode's cancel path.
+                const existing = await loadProgress(appId)
+                if (existing) {
+                  existing.setupMethod = 'create-new'
+                  delete existing.importDistribution
+                  await saveProgress(appId, existing)
+                }
                 setStep('api-key-instructions')
                 return
               }
