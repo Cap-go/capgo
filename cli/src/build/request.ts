@@ -1913,7 +1913,10 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
           const isInteractive = process.stdout.isTTY === true
           const stream = isInteractive ? process.stdout : process.stderr
           const aiSpinner = isInteractive ? spinnerC() : null
-          aiSpinner?.start('Analyzing build log with Capgo AI (Kimi K2.5)…')
+          // @clack/prompts spinner appends its own animated dots — don't add an
+          // ellipsis here or the user sees "…..." (6 dots: our 1-char ellipsis
+          // plus the spinner's cycling 3-dot animation).
+          aiSpinner?.start('Analyzing build log with Capgo AI (Kimi K2.5)')
 
           let result: PostAnalyzeResult
           try {
