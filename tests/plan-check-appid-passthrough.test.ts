@@ -137,6 +137,8 @@ describe.skipIf(USE_CLOUDFLARE_WORKERS)('plan-check appid passthrough (RBAC + li
       .single()
     if (primaryAppError)
       throw primaryAppError
+    if (!primaryAppRow.id)
+      throw new Error('Expected primary app insert to return an id')
     primaryAppUuid = primaryAppRow.id
 
     const { data: otherAppRow, error: otherAppError } = await serviceRoleSupabase
@@ -152,6 +154,8 @@ describe.skipIf(USE_CLOUDFLARE_WORKERS)('plan-check appid passthrough (RBAC + li
       .single()
     if (otherAppError)
       throw otherAppError
+    if (!otherAppRow.id)
+      throw new Error('Expected other app insert to return an id')
     otherAppUuid = otherAppRow.id
 
     // 5. RBAC-managed API key: mode = NULL, limited_to_apps = [PRIMARY_APP_ID],
@@ -178,10 +182,12 @@ describe.skipIf(USE_CLOUDFLARE_WORKERS)('plan-check appid passthrough (RBAC + li
       .single()
     if (apikeyError)
       throw apikeyError
+    if (!apikeyRow.rbac_id)
+      throw new Error('Expected apikey insert to return rbac_id')
+    if (!apikeyRow.key)
+      throw new Error('Expected plaintext key in apikey insert RETURNING row')
     apiKeyRow = { id: apikeyRow.id, rbac_id: apikeyRow.rbac_id }
     apiKeyPlain = apikeyRow.key
-    if (!apiKeyPlain)
-      throw new Error('Expected plaintext key in apikey insert RETURNING row')
 
     // 6. Role bindings: org_member at org scope gives org.read,
     //    app_uploader at app scope gives app.read / app.upload_bundle.
