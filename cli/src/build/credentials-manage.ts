@@ -34,7 +34,6 @@ interface ManageCredentialsOptions {
   appId?: string
   platform?: 'ios' | 'android'
   local?: boolean
-  perPlatform?: boolean
 }
 
 interface AppEntry {
@@ -461,7 +460,7 @@ export async function manageCredentialsCommand(options: ManageCredentialsOptions
         }
       }
       else if (action === 'export') {
-        const exported = await exportToEnvFile(currentEntry, options.perPlatform === true)
+        const exported = await exportToEnvFile(currentEntry)
         if (!exported)
           pLog.warn('Export cancelled.')
       }
@@ -633,7 +632,7 @@ async function pickAction(entry: AppEntry, canGoBack: boolean, extraIntro?: stri
       '',
       'View    — flat list of every credential across platforms (show, decode, copy, edit, explain, remove).',
       'Add…    — add a new platform via onboarding, or add a configuration option.',
-      'Export  — write a .env file ready for CI/CD secrets (combined across platforms by default; pass --per-platform for separate files).',
+      'Export  — write a .env file ready for CI/CD secrets (combined across platforms; pass --platform to scope to one).',
       'Delete  — wipe all credentials for one platform (asks which if both are configured).',
     ],
     statusLine: canGoBack ? 'Esc = back, Ctrl+C = quit.' : 'Ctrl+C or Esc to quit.',
@@ -1170,22 +1169,21 @@ function summarizeProvisioningMap(raw: string): string {
   }
 }
 
-async function exportToEnvFile(entry: AppEntry, perPlatform: boolean): Promise<boolean> {
+async function exportToEnvFile(entry: AppEntry): Promise<boolean> {
   if (entry.platforms.length === 0) {
     pLog.warn('Nothing to export — no platforms configured for this app.')
     return false
   }
 
-  // Default for multi-platform apps: write a single combined .env file. iOS and
+  // When both platforms are in scope, write a single combined .env file. iOS and
   // Android env-var names are disjoint, so combining them avoids forcing the user
-  // to run `gh secret set -f` (or equivalent) once per platform.
-  if (!perPlatform && entry.platforms.length > 1)
+  // to run `gh secret set -f` (or equivalent) once per platform. Callers that
+  // want a single platform's file pass `--platform ios` (or android) at the
+  // manage command, which narrows the entry to one platform upstream.
+  if (entry.platforms.length > 1)
     return exportCombinedEnvFile(entry)
 
-  const platform = await resolvePlatformChoice(entry, 'Pick which platform to export')
-  if (platform === null)
-    return false
-
+  const platform = entry.platforms[0]
   const creds = entry.saved[platform]
   if (!creds || !hasAnyValue(creds)) {
     pLog.warn('Nothing to export.')

@@ -988,13 +988,11 @@ Examples:
   npx @capgo/cli build credentials manage
   npx @capgo/cli build credentials manage --appId com.example.app
   npx @capgo/cli build credentials manage --appId com.example.app --platform ios
-  npx @capgo/cli build credentials manage --local
-  npx @capgo/cli build credentials manage --per-platform`)
+  npx @capgo/cli build credentials manage --local`)
   .action(manageCredentialsCommand)
   .option('--appId <appId>', 'App ID to manage (optional, prompts to pick if omitted)')
   .option('--platform <platform>', 'Platform to manage: ios or android (optional, prompts to pick if omitted)')
   .option('--local', 'Only browse local .capgo-credentials.json')
-  .option('--per-platform', 'When exporting to .env, write one file per platform instead of a single combined file (default: combined when both platforms are configured)')
 
 buildCredentials
   .command('migrate')
