@@ -1,0 +1,128 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+
+const sendEventMock = vi.hoisted(() => vi.fn())
+
+vi.mock('../cli/src/utils.ts', () => ({
+  sendEvent: sendEventMock,
+}))
+
+import { trackBuilderOnboardingStep } from '../cli/src/build/onboarding/telemetry.ts'
+
+describe('trackBuilderOnboardingStep', () => {
+  beforeEach(() => {
+    sendEventMock.mockReset()
+    sendEventMock.mockResolvedValue(undefined)
+    delete process.env.CAPGO_DISABLE_TELEMETRY
+    delete process.env.CAPGO_DISABLE_POSTHOG
+  })
+
+  afterEach(() => {
+    delete process.env.CAPGO_DISABLE_TELEMETRY
+    delete process.env.CAPGO_DISABLE_POSTHOG
+  })
+
+  it('builds the expected payload and calls sendEvent once', async () => {
+    await trackBuilderOnboardingStep({
+      apikey: 'cap_test_key',
+      step: 'api-key-instructions',
+      platform: 'ios',
+      appId: 'com.example.app',
+      orgId: 'org-uuid-1',
+      durationMs: 1234,
+    })
+
+    expect(sendEventMock).toHaveBeenCalledTimes(1)
+    const [calledKey, payload] = sendEventMock.mock.calls[0]
+    expect(calledKey).toBe('cap_test_key')
+    expect(payload).toMatchObject({
+      event: 'Builder Onboarding Step',
+      channel: 'builder-onboarding',
+      icon: '🧭',
+      notify: false,
+      user_id: 'org-uuid-1',
+      tags: {
+        step: 'api-key-instructions',
+        platform: 'ios',
+        app_id: 'com.example.app',
+        duration_ms: '1234',
+      },
+    })
+    expect(payload.tags.error_category).toBeUndefined()
+  })
+
+  it('includes error_category only when an error is provided', async () => {
+    await trackBuilderOnboardingStep({
+      apikey: 'cap_test_key',
+      step: 'error',
+      platform: 'ios',
+      appId: 'com.example.app',
+      orgId: 'org-uuid-1',
+      error: Object.assign(new Error('Unauthorized'), { status: 401 }),
+    })
+
+    const [, payload] = sendEventMock.mock.calls[0]
+    expect(payload.tags.error_category).toBe('apple_api_unauthorized')
+  })
+
+  it('uses the Android mapper when platform is android', async () => {
+    await trackBuilderOnboardingStep({
+      apikey: 'cap_test_key',
+      step: 'error',
+      platform: 'android',
+      appId: 'com.example.app',
+      orgId: 'org-uuid-1',
+      error: Object.assign(new Error('Bad keystore'), { phase: 'keystore' }),
+    })
+
+    const [, payload] = sendEventMock.mock.calls[0]
+    expect(payload.tags.error_category).toBe('keystore_invalid')
+  })
+
+  it('skips when CAPGO_DISABLE_TELEMETRY is set', async () => {
+    process.env.CAPGO_DISABLE_TELEMETRY = '1'
+    await trackBuilderOnboardingStep({
+      apikey: 'cap_test_key',
+      step: 'welcome',
+      platform: 'ios',
+      appId: 'com.example.app',
+      orgId: 'org-uuid-1',
+    })
+    expect(sendEventMock).not.toHaveBeenCalled()
+  })
+
+  it('skips when CAPGO_DISABLE_POSTHOG is set', async () => {
+    process.env.CAPGO_DISABLE_POSTHOG = 'true'
+    await trackBuilderOnboardingStep({
+      apikey: 'cap_test_key',
+      step: 'welcome',
+      platform: 'ios',
+      appId: 'com.example.app',
+      orgId: 'org-uuid-1',
+    })
+    expect(sendEventMock).not.toHaveBeenCalled()
+  })
+
+  it('swallows errors thrown by sendEvent', async () => {
+    sendEventMock.mockRejectedValueOnce(new Error('network down'))
+    await expect(trackBuilderOnboardingStep({
+      apikey: 'cap_test_key',
+      step: 'welcome',
+      platform: 'ios',
+      appId: 'com.example.app',
+      orgId: 'org-uuid-1',
+    })).resolves.toBeUndefined()
+  })
+
+  it('does not include duration_ms when undefined', async () => {
+    await trackBuilderOnboardingStep({
+      apikey: 'cap_test_key',
+      step: 'welcome',
+      platform: 'ios',
+      appId: 'com.example.app',
+      orgId: 'org-uuid-1',
+    })
+
+    const [, payload] = sendEventMock.mock.calls[0]
+    expect(payload.tags.duration_ms).toBeUndefined()
+  })
+})
