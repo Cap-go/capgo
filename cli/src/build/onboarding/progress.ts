@@ -81,12 +81,40 @@ export async function deleteProgress(
 /**
  * Determine the first incomplete step based on saved progress.
  * Returns the step to resume from.
+ *
+ * For init-mode progress (the default, including legacy files without a `mode`
+ * field), resumes the onboarding chain. For renew-mode progress, resumes the
+ * renewal chain — analysis re-runs unless we have a stored plan; otherwise we
+ * pick up at the cert or profile step depending on what's already completed.
  */
 export function getResumeStep(progress: OnboardingProgress | null): OnboardingStep {
   if (!progress)
     return 'welcome'
 
   const { completedSteps } = progress
+
+  if (progress.mode === 'renew') {
+    if (!completedSteps.renewPlan)
+      return 'renew-analyzing'
+    if (!completedSteps.apiKeyVerified) {
+      if (progress.issuerId && progress.keyId && progress.p8Path)
+        return 'verifying-key'
+      if (progress.keyId && progress.p8Path)
+        return 'input-issuer-id'
+      if (progress.p8Path)
+        return 'input-key-id'
+      return 'api-key-instructions'
+    }
+    if (!completedSteps.certificateCreated) {
+      // Plan tells us whether the cert needs renewing; the renew-revoking-cert
+      // and creating-certificate handlers will short-circuit when it doesn't.
+      return 'renew-revoking-cert'
+    }
+    // Cert is done (or wasn't needed). Profiles either in progress or about to save.
+    if ((completedSteps.renewedProfiles?.length ?? 0) === 0)
+      return 'renew-creating-profiles'
+    return 'renew-creating-profiles'
+  }
 
   if (!completedSteps.apiKeyVerified) {
     // Resume at the furthest partial input step

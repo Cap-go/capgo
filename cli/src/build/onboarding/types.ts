@@ -2,6 +2,8 @@
 
 export type Platform = 'ios' | 'android'
 
+export type OnboardingMode = 'init' | 'renew'
+
 export type OnboardingStep
   = | 'welcome'
     | 'platform-select'
@@ -26,6 +28,15 @@ export type OnboardingStep
     | 'build-complete'
     | 'no-platform'
     | 'error'
+    // Renew-mode steps
+    | 'renew-analyzing'
+    | 'renew-no-credentials'
+    | 'renew-nothing-to-do'
+    | 'renew-plan'
+    | 'renew-revoking-cert'
+    | 'renew-creating-profiles'
+    | 'renew-saving'
+    | 'renew-complete'
 
 export interface ApiKeyData {
   keyId: string
@@ -49,6 +60,8 @@ export interface OnboardingProgress {
   platform: Platform
   appId: string
   startedAt: string
+  /** 'init' (default, fresh onboarding) or 'renew' (renewing existing creds). Missing = 'init' for backward compat. */
+  mode?: OnboardingMode
   /** Path to the .p8 file on disk (content is NOT stored, only the path) */
   p8Path?: string
   /** Partial input — saved incrementally so resume works mid-flow */
@@ -58,6 +71,10 @@ export interface OnboardingProgress {
     apiKeyVerified?: ApiKeyData
     certificateCreated?: CertificateData
     profileCreated?: ProfileData
+    /** Set during renew: bundleIds whose new profile has been successfully created. Lets us resume the per-profile loop. */
+    renewedProfiles?: string[]
+    /** Set during renew once the in-memory plan has been built. Holds the JSON-stringified RenewPlan so resume can skip re-analysis. */
+    renewPlan?: string
   }
   /** Temporary — wiped after .p12 creation */
   _privateKeyPem?: string
@@ -88,6 +105,14 @@ export const STEP_PROGRESS: Record<OnboardingStep, number> = {
   'build-complete': 100,
   'no-platform': 0,
   'error': 0,
+  'renew-analyzing': 10,
+  'renew-no-credentials': 0,
+  'renew-nothing-to-do': 100,
+  'renew-plan': 20,
+  'renew-revoking-cert': 40,
+  'renew-creating-profiles': 70,
+  'renew-saving': 90,
+  'renew-complete': 100,
 }
 
 export function getPhaseLabel(step: OnboardingStep): string {
@@ -122,5 +147,56 @@ export function getPhaseLabel(step: OnboardingStep): string {
     case 'no-platform':
     case 'error':
       return ''
+    case 'renew-analyzing':
+    case 'renew-plan':
+    case 'renew-no-credentials':
+    case 'renew-nothing-to-do':
+      return 'Renew · Analyze'
+    case 'renew-revoking-cert':
+      return 'Renew · Distribution Certificate'
+    case 'renew-creating-profiles':
+      return 'Renew · Provisioning Profiles'
+    case 'renew-saving':
+      return 'Renew · Save'
+    case 'renew-complete':
+      return 'Renew · Complete'
   }
+}
+
+// ─── Renew plan types ──────────────────────────────────────────────
+
+export type CertRenewReason = 'expired' | 'expiring' | 'forced' | 'ok'
+export type ProfileRenewReason
+  = | 'expired'
+    | 'expiring'
+    | 'forced'
+    | 'cert-renewed'
+    | 'ok'
+    | 'skipped-non-capgo'
+
+export interface CertRenewDecision {
+  needsRenewal: boolean
+  currentExpiry: Date | null
+  reason: CertRenewReason
+}
+
+export interface ProfileRenewDecision {
+  bundleId: string
+  name: string
+  needsRenewal: boolean
+  currentExpiry: Date | null
+  reason: ProfileRenewReason
+  isCapgoCreated: boolean
+}
+
+export interface RenewPlan {
+  appId: string
+  cert: CertRenewDecision
+  profiles: ProfileRenewDecision[]
+  hasAnythingToRenew: boolean
+}
+
+export interface RenewOptions {
+  thresholdDays: number
+  force: boolean
 }

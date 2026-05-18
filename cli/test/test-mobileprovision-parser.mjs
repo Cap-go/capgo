@@ -50,6 +50,63 @@ t('extracts Name from embedded plist', () => {
     assert.equal(result.applicationIdentifier, 'TEAM123.com.example.app')
     assert.equal(result.bundleId, 'com.example.app')
     assert.equal(result.uuid, 'A1B2C3D4-E5F6-G7H8-I9J0-K1L2M3N4O5P6')
+    // ExpirationDate is not in `fullPlist`, so it must be null (not undefined).
+    assert.equal(result.expirationDate, null)
+  }
+  finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+t('extracts ExpirationDate when present', () => {
+  const plist = `<?xml version="1.0" encoding="UTF-8"?>
+<plist version="1.0">
+<dict>
+  <key>Name</key>
+  <string>Capgo com.example.app AppStore</string>
+  <key>UUID</key>
+  <string>test-uuid</string>
+  <key>Entitlements</key>
+  <dict>
+    <key>application-identifier</key>
+    <string>TEAM.com.example.app</string>
+  </dict>
+  <key>ExpirationDate</key>
+  <date>2027-06-14T12:00:00Z</date>
+</dict>
+</plist>`
+  const dir = mkdtempSync(join(tmpdir(), 'mp-test-'))
+  try {
+    const path = join(dir, 'expiring.mobileprovision')
+    writeFileSync(path, createFakeProfile(plist))
+
+    const result = parseMobileprovision(path)
+
+    assert.ok(result.expirationDate instanceof Date)
+    assert.equal(result.expirationDate.toISOString(), '2027-06-14T12:00:00.000Z')
+  }
+  finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+t('expirationDate is null when value is malformed', () => {
+  const plist = `<?xml version="1.0" encoding="UTF-8"?>
+<plist version="1.0">
+<dict>
+  <key>Name</key>
+  <string>Capgo broken AppStore</string>
+  <key>ExpirationDate</key>
+  <date>not-a-date</date>
+</dict>
+</plist>`
+  const dir = mkdtempSync(join(tmpdir(), 'mp-test-'))
+  try {
+    const path = join(dir, 'broken.mobileprovision')
+    writeFileSync(path, createFakeProfile(plist))
+
+    const result = parseMobileprovision(path)
+    assert.equal(result.expirationDate, null)
   }
   finally {
     rmSync(dir, { recursive: true, force: true })

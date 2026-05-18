@@ -1,9 +1,9 @@
 import type { FC } from 'react'
 import type { BuildLogger } from '../../request.js'
-import type { ApiKeyData, CertificateData, OnboardingProgress, OnboardingStep, ProfileData } from '../types.js'
-import { handleCustomMsg } from '../../qr.js'
-import { spawn } from 'node:child_process'
+import type { ApiKeyData, CertificateData, OnboardingMode, OnboardingProgress, OnboardingStep, ProfileData, RenewPlan } from '../types.js'
+import type { RenewCompleteSummary } from './renew-complete.js'
 import { Buffer } from 'node:buffer'
+import { spawn } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { copyFile, readFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
@@ -18,23 +18,40 @@ import { writeOnboardingSupportBundle } from '../../../onboarding-support.js'
 import { formatRunnerCommand, splitRunnerCommand } from '../../../runner-command.js'
 import { findSavedKeySilent, getPMAndCommand } from '../../../utils.js'
 import { loadSavedCredentials, updateSavedCredentials } from '../../credentials.js'
+import { handleCustomMsg } from '../../qr.js'
 import { requestBuildInternal } from '../../request.js'
-import { CertificateLimitError, createCertificate, createProfile, deleteProfile, DuplicateProfileError, ensureBundleId, generateJwt, revokeCertificate, verifyApiKey } from '../apple-api.js'
+import { CertificateLimitError, createCertificate, createProfile, deleteProfile, DuplicateProfileError, ensureBundleId, findCapgoProfiles, generateJwt, revokeCertificate, verifyApiKey } from '../apple-api.js'
 import { createP12, DEFAULT_P12_PASSWORD, generateCsr } from '../csr.js'
 import { canUseFilePicker, openFilePicker } from '../file-picker.js'
 import { deleteProgress, getResumeStep, loadProgress, saveProgress } from '../progress.js'
 import { getBuildOnboardingRecoveryAdvice } from '../recovery.js'
+import { computeRenewPlan, hasAnyIosCredentials, isLegacyProfileFormat } from '../renew-detection.js'
+import { assembleProvisioningMap, assembleRenewedCredentials, bundleIdsToRenew, findRevokeCandidate } from '../renew-execution.js'
 import {
   getPhaseLabel,
 
   STEP_PROGRESS,
 } from '../types.js'
 import { Divider, ErrorLine, FilteredTextInput, Header, SpinnerLine, SuccessLine } from './components.js'
+import { RenewCompleteScreen } from './renew-complete.js'
+import { RenewPlanScreen } from './renew-plan.js'
+import { RenewProgressScreen } from './renew-progress.js'
 
 const OUTPUT_LINE_SPLIT_RE = /\r?\n/
 const CARRIAGE_RETURN_RE = /\r/g
 
 interface LogEntry { text: string, color?: string }
+
+interface RenewModeOptions {
+  /** Days threshold for "expiring soon" (default 30 — applied by command.ts). */
+  thresholdDays: number
+  /** --force: renew everything regardless of expiry. */
+  force: boolean
+  /** --dry-run: render the plan, then exit without making changes. */
+  dryRun: boolean
+  /** --local: operate on .capgo-credentials.json instead of the global file. */
+  local: boolean
+}
 
 interface AppProps {
   appId: string
@@ -43,6 +60,10 @@ interface AppProps {
   iosDir: string
   /** Optional Capgo API key passed via -a/--apikey flag; takes precedence over saved key */
   apikey?: string
+  /** 'init' (default fresh onboarding) or 'renew' (renewing existing creds). */
+  mode?: OnboardingMode
+  /** Only meaningful when mode === 'renew'. */
+  renewOptions?: RenewModeOptions
 }
 
 async function runRunnerCommand(runner: string, args: string[]): Promise<{ success: boolean, output: string[] }> {
@@ -82,11 +103,22 @@ async function runRunnerCommand(runner: string, args: string[]): Promise<{ succe
   })
 }
 
-const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey }) => {
+const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey, mode = 'init', renewOptions }) => {
   const { exit } = useApp()
   const startStep = getResumeStep(initialProgress)
+  const modeRef = useRef(mode)
 
-  const [step, setStep] = useState<OnboardingStep>(startStep === 'welcome' ? 'welcome' : startStep)
+  // In renew mode, bypass the welcome/platform-select chain and jump straight
+  // into analysis. Resume from saved progress only when its mode matches.
+  const renewResumeStep: OnboardingStep | null = mode === 'renew' && initialProgress?.mode === 'renew'
+    ? startStep
+    : null
+
+  const [step, setStep] = useState<OnboardingStep>(
+    mode === 'renew'
+      ? (renewResumeStep ?? 'renew-analyzing')
+      : (startStep === 'welcome' ? 'welcome' : startStep),
+  )
   const [log, setLog] = useState<LogEntry[]>([])
   const [error, setError] = useState<string | null>(null)
   const [retryCount, setRetryCount] = useState(0)
@@ -138,6 +170,42 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
   const [buildOutput, setBuildOutput] = useState<string[]>([])
   const [supportBundlePath, setSupportBundlePath] = useState<string | null>(null)
 
+  // ── Renew-mode state ──
+  const [renewPlan, setRenewPlan] = useState<RenewPlan | null>(() => {
+    if (mode !== 'renew')
+      return null
+    const raw = initialProgress?.completedSteps.renewPlan
+    if (!raw)
+      return null
+    try {
+      const parsed = JSON.parse(raw) as RenewPlan
+      // Re-hydrate Date instances (lost via JSON serialization).
+      if (parsed.cert.currentExpiry)
+        parsed.cert.currentExpiry = new Date(parsed.cert.currentExpiry as unknown as string)
+      for (const p of parsed.profiles) {
+        if (p.currentExpiry)
+          p.currentExpiry = new Date(p.currentExpiry as unknown as string)
+      }
+      return parsed
+    }
+    catch {
+      return null
+    }
+  })
+  const renewPlanRef = useRef<RenewPlan | null>(renewPlan)
+  const [renewCompletedProfiles, setRenewCompletedProfiles] = useState<Array<{ bundleId: string, profileBase64: string, profileName: string }>>([])
+  const renewCompletedProfilesRef = useRef(renewCompletedProfiles)
+  const [renewCurrentBundleId, setRenewCurrentBundleId] = useState<string | null>(null)
+  const [renewSummary, setRenewSummary] = useState<RenewCompleteSummary | null>(null)
+  const renewSavedKeyRejectedRef = useRef(false)
+
+  useEffect(() => {
+    renewPlanRef.current = renewPlan
+  }, [renewPlan])
+  useEffect(() => {
+    renewCompletedProfilesRef.current = renewCompletedProfiles
+  }, [renewCompletedProfiles])
+
   const addLog = useCallback((text: string, color = 'green') => {
     setLog(prev => [...prev, { text, color }])
   }, [])
@@ -156,7 +224,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
     exitRequestedRef.current = true
     if (message)
       addLog(message, 'yellow')
-    setTimeout(() => exit(), 50)
+    setTimeout(exit, 50)
   }, [addLog, exit])
 
   // Open browser on Ctrl+O (FilteredTextInput ignores ctrl keys, so no conflict)
@@ -206,6 +274,22 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
       super('Need .p8 file')
       this.name = 'NeedP8Error'
     }
+  }
+
+  /**
+   * Detect an Apple authentication error (401/403). Used in renew mode to
+   * fall back to the onboarding p8 input chain when the saved key is rejected.
+   */
+  function isLikelyAuthError(err: unknown): boolean {
+    if (err instanceof NeedP8Error)
+      return true
+    const message = err instanceof Error ? err.message : String(err)
+    if (!message)
+      return false
+    return /\b(?:401|403)\b/.test(message)
+      || /api key verification failed/i.test(message)
+      || /unauthorized/i.test(message)
+      || /forbidden/i.test(message)
   }
 
   async function getFreshToken(): Promise<string> {
@@ -453,21 +537,48 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
           if (verifyResult.teamId)
             setTeamId(verifyResult.teamId)
           const apiKeyData: ApiKeyData = { keyId: keyIdRef.current, issuerId: issuerIdRef.current }
-          const progress: OnboardingProgress = {
-            platform: 'ios',
-            appId,
-            p8Path: p8PathRef.current,
-            startedAt: new Date().toISOString(),
-            completedSteps: { apiKeyVerified: apiKeyData },
-          }
+          const existing = await loadProgress(appId)
+          const progress: OnboardingProgress = existing
+            ? { ...existing, completedSteps: { ...existing.completedSteps, apiKeyVerified: apiKeyData } }
+            : {
+                platform: 'ios',
+                appId,
+                p8Path: p8PathRef.current,
+                startedAt: new Date().toISOString(),
+                mode: modeRef.current,
+                completedSteps: { apiKeyVerified: apiKeyData },
+              }
           await saveProgress(appId, progress)
           addLog(`✔ API Key verified — Key: ${keyId}`)
           setRetryCount(0)
-          setStep('creating-certificate')
+          if (modeRef.current === 'renew') {
+            const plan = renewPlanRef.current
+            if (plan?.cert.needsRenewal) {
+              setStep('renew-revoking-cert')
+            }
+            else {
+              setStep('renew-creating-profiles')
+            }
+          }
+          else {
+            setStep('creating-certificate')
+          }
         }
         catch (err) {
-          if (!cancelled)
+          if (!cancelled) {
+            if (modeRef.current === 'renew' && !renewSavedKeyRejectedRef.current && isLikelyAuthError(err)) {
+              // Saved API key was rejected — drop into the onboarding p8 input chain.
+              renewSavedKeyRejectedRef.current = true
+              addLog('⚠ Saved App Store Connect API key was rejected. Please re-enter the key details.', 'yellow')
+              // Wipe the cached key material so the input chain starts clean.
+              setP8Content('')
+              setKeyId('')
+              setIssuerId('')
+              setStep('api-key-instructions')
+              return
+            }
             handleError(err, 'verifying-key')
+          }
         }
       })()
     }
@@ -505,7 +616,10 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
           }
           addLog(`✔ Distribution certificate created — Expires ${cert.expirationDate}`)
           setRetryCount(0)
-          setStep('creating-profile')
+          if (modeRef.current === 'renew')
+            setStep('renew-creating-profiles')
+          else
+            setStep('creating-profile')
         }
         catch (err) {
           if (cancelled)
@@ -594,11 +708,14 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
           addLog(`✔ Removed ${duplicateProfiles.length} old profile(s)`)
           setDuplicateProfiles([])
           // Retry creating the profile
-          setStep('creating-profile')
+          if (modeRef.current === 'renew')
+            setStep('renew-creating-profiles')
+          else
+            setStep('creating-profile')
         }
         catch (err) {
           if (!cancelled)
-            handleError(err, 'creating-profile')
+            handleError(err, modeRef.current === 'renew' ? 'renew-creating-profiles' : 'creating-profile')
         }
       })()
     }
@@ -697,6 +814,304 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
         cancelled = true
         clearTimeout(timer)
       }
+    }
+
+    // ── Renew-mode handlers ──
+
+    if (step === 'renew-analyzing') {
+      ;(async () => {
+        try {
+          const saved = await loadSavedCredentials(appId, renewOptions?.local)
+          if (cancelled)
+            return
+          const ios = saved?.ios
+          if (!ios || !hasAnyIosCredentials(ios)) {
+            setStep('renew-no-credentials')
+            return
+          }
+          if (isLegacyProfileFormat(ios)) {
+            handleError(
+              new Error(
+                'Saved iOS credentials use the legacy BUILD_PROVISION_PROFILE_BASE64 format. '
+                + 'Run `build credentials migrate --platform ios` before renewing.',
+              ),
+              'renew-analyzing',
+            )
+            return
+          }
+
+          const opts = {
+            thresholdDays: renewOptions?.thresholdDays ?? 30,
+            force: renewOptions?.force ?? false,
+          }
+          const plan = computeRenewPlan(ios, appId, opts)
+          if (cancelled)
+            return
+          setRenewPlan(plan)
+          renewPlanRef.current = plan
+
+          // Re-hydrate APPLE_KEY_CONTENT into the key-input state so verifying-key works without prompting.
+          if (ios.APPLE_KEY_CONTENT) {
+            try {
+              const decoded = Buffer.from(ios.APPLE_KEY_CONTENT, 'base64').toString('utf-8')
+              setP8Content(decoded)
+            }
+            catch {
+              // ignore; we'll fall back to the input chain on key failure
+            }
+          }
+          if (ios.APPLE_KEY_ID)
+            setKeyId(ios.APPLE_KEY_ID)
+          if (ios.APPLE_ISSUER_ID)
+            setIssuerId(ios.APPLE_ISSUER_ID)
+          if (ios.APP_STORE_CONNECT_TEAM_ID)
+            setTeamId(ios.APP_STORE_CONNECT_TEAM_ID)
+
+          // Persist plan into progress for resume — Dates serialize fine via toJSON.
+          const existing = await loadProgress(appId)
+          const progressPayload: OnboardingProgress = existing
+            ? { ...existing, mode: 'renew', completedSteps: { ...existing.completedSteps, renewPlan: JSON.stringify(plan) } }
+            : {
+                platform: 'ios',
+                appId,
+                startedAt: new Date().toISOString(),
+                mode: 'renew',
+                completedSteps: { renewPlan: JSON.stringify(plan) },
+              }
+          await saveProgress(appId, progressPayload)
+
+          if (!plan.hasAnythingToRenew) {
+            setStep('renew-nothing-to-do')
+            return
+          }
+          setStep('renew-plan')
+        }
+        catch (err) {
+          if (!cancelled)
+            handleError(err, 'renew-analyzing')
+        }
+      })()
+    }
+
+    if (step === 'renew-revoking-cert') {
+      ;(async () => {
+        try {
+          const saved = await loadSavedCredentials(appId, renewOptions?.local)
+          if (cancelled)
+            return
+          const ios = saved?.ios
+          if (!ios?.BUILD_CERTIFICATE_BASE64) {
+            // Nothing to revoke; fall through to cert creation.
+            setStep('creating-certificate')
+            return
+          }
+          const token = await getFreshToken()
+          const candidate = await findRevokeCandidate(token, ios.BUILD_CERTIFICATE_BASE64, ios.P12_PASSWORD)
+          if (cancelled)
+            return
+          if (candidate) {
+            await revokeCertificate(token, candidate.certId)
+            if (cancelled)
+              return
+            addLog(`✔ Old certificate revoked (serial ${candidate.serialNumber})`)
+          }
+          else {
+            addLog('ℹ Saved certificate not found on Apple side — proceeding to fresh create.', 'cyan')
+          }
+          setStep('creating-certificate')
+        }
+        catch (err) {
+          if (!cancelled)
+            handleError(err, 'renew-revoking-cert')
+        }
+      })()
+    }
+
+    if (step === 'renew-creating-profiles') {
+      ;(async () => {
+        try {
+          const plan = renewPlanRef.current
+          if (!plan) {
+            handleError(new Error('Renew plan was not loaded; cannot create profiles.'), 'renew-creating-profiles')
+            return
+          }
+          const targets = bundleIdsToRenew(plan)
+          if (targets.length === 0) {
+            // Nothing to do for profiles — go straight to save.
+            setStep('renew-saving')
+            return
+          }
+
+          // Determine the cert ID to bind profiles to.
+          // If the cert was just renewed in this run, certData has the new ID.
+          // If the cert wasn't renewed, look up the existing one matching the saved P12 serial.
+          let certificateId = certData?.certificateId || ''
+          if (!certificateId) {
+            const saved = await loadSavedCredentials(appId, renewOptions?.local)
+            if (cancelled)
+              return
+            const ios = saved?.ios
+            if (ios?.BUILD_CERTIFICATE_BASE64) {
+              const token = await getFreshToken()
+              const candidate = await findRevokeCandidate(token, ios.BUILD_CERTIFICATE_BASE64, ios.P12_PASSWORD)
+              if (candidate)
+                certificateId = candidate.certId
+            }
+          }
+          if (!certificateId) {
+            handleError(new Error('Could not determine which Apple certificate to bind new profiles to.'), 'renew-creating-profiles')
+            return
+          }
+
+          const completedSoFar = renewCompletedProfilesRef.current
+          const remaining = targets.filter(bid => !completedSoFar.some(c => c.bundleId === bid))
+          const token = await getFreshToken()
+
+          for (const bundleId of remaining) {
+            if (cancelled)
+              return
+            setRenewCurrentBundleId(bundleId)
+            const { bundleIdResourceId } = await ensureBundleId(token, bundleId)
+            if (cancelled)
+              return
+            // Clean up any existing Capgo-named profiles for this app before creating a new one.
+            const existingProfiles = await findCapgoProfiles(token, appId)
+            for (const existing of existingProfiles) {
+              if (cancelled)
+                return
+              try {
+                await deleteProfile(token, existing.id)
+              }
+              catch {
+                // Best effort — the create call below will report duplicate if it matters.
+              }
+            }
+            try {
+              const created = await createProfile(token, bundleIdResourceId, certificateId, appId)
+              if (cancelled)
+                return
+              const completed = { bundleId, profileBase64: created.profileContent, profileName: created.profileName }
+              setRenewCompletedProfiles((prev) => {
+                const next = [...prev, completed]
+                renewCompletedProfilesRef.current = next
+                return next
+              })
+              // Persist progress per profile so we can resume.
+              const progress = await loadProgress(appId)
+              if (progress) {
+                const renewedList = progress.completedSteps.renewedProfiles ?? []
+                if (!renewedList.includes(bundleId))
+                  renewedList.push(bundleId)
+                progress.completedSteps.renewedProfiles = renewedList
+                await saveProgress(appId, progress)
+              }
+              addLog(`✔ Provisioning profile renewed for ${bundleId}`)
+            }
+            catch (err) {
+              if (err instanceof DuplicateProfileError) {
+                setDuplicateProfiles(err.profiles)
+                setStep('duplicate-profile-prompt')
+                return
+              }
+              throw err
+            }
+          }
+
+          if (cancelled)
+            return
+          setRenewCurrentBundleId(null)
+          setStep('renew-saving')
+        }
+        catch (err) {
+          if (!cancelled)
+            handleError(err, 'renew-creating-profiles')
+        }
+      })()
+    }
+
+    if (step === 'renew-saving') {
+      ;(async () => {
+        try {
+          const plan = renewPlanRef.current
+          if (!plan) {
+            handleError(new Error('Renew plan was not loaded; cannot save.'), 'renew-saving')
+            return
+          }
+          const saved = await loadSavedCredentials(appId, renewOptions?.local)
+          if (cancelled)
+            return
+          const existingMap = (() => {
+            const raw = saved?.ios?.CAPGO_IOS_PROVISIONING_MAP
+            if (!raw)
+              return {}
+            try {
+              return JSON.parse(raw) as Record<string, { profile: string, name: string }>
+            }
+            catch {
+              return {}
+            }
+          })()
+
+          const renewedRecord: Record<string, { profileContent: string, profileName: string }> = {}
+          for (const completed of renewCompletedProfilesRef.current) {
+            renewedRecord[completed.bundleId] = {
+              profileContent: completed.profileBase64,
+              profileName: completed.profileName,
+            }
+          }
+          const mergedMap = assembleProvisioningMap(existingMap, renewedRecord)
+
+          const update = assembleRenewedCredentials({
+            newP12Base64: certData?.p12Base64,
+            mergedProvisioningMap: mergedMap,
+          })
+
+          // Carry forward the (possibly refreshed) Apple API key material.
+          let keyContent = p8ContentRef.current
+          if (!keyContent && p8PathRef.current) {
+            try {
+              keyContent = await readFile(p8PathRef.current, 'utf-8')
+            }
+            catch {
+              // ignore; saved key content (if any) still works
+            }
+          }
+          if (keyContent)
+            update.APPLE_KEY_CONTENT = Buffer.from(keyContent).toString('base64')
+          if (keyIdRef.current)
+            update.APPLE_KEY_ID = keyIdRef.current
+          if (issuerIdRef.current)
+            update.APPLE_ISSUER_ID = issuerIdRef.current
+          if (teamId || certData?.teamId)
+            update.APP_STORE_CONNECT_TEAM_ID = teamId || certData!.teamId
+          if (certData?.p12Base64)
+            update.P12_PASSWORD = DEFAULT_P12_PASSWORD
+
+          await updateSavedCredentials(appId, 'ios', update, renewOptions?.local)
+          if (cancelled)
+            return
+          await deleteProgress(appId)
+
+          const certBefore = plan.cert.currentExpiry
+          const certAfterIso = certData?.expirationDate
+          const certAfter = certAfterIso ? new Date(certAfterIso) : plan.cert.currentExpiry
+          const summary: RenewCompleteSummary = {
+            appId,
+            certBefore,
+            certAfter,
+            certRenewed: !!certData?.p12Base64,
+            profilesRenewed: renewCompletedProfilesRef.current.map(c => c.bundleId),
+            profilesSkippedNonCapgo: plan.profiles.filter(p => p.reason === 'skipped-non-capgo').map(p => p.bundleId),
+          }
+          setRenewSummary(summary)
+          addLog('✔ Credentials renewed')
+          setStep('renew-complete')
+        }
+        catch (err) {
+          if (!cancelled)
+            handleError(err, 'renew-saving')
+        }
+      })()
     }
 
     return () => {
@@ -1375,6 +1790,100 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
           </Box>
           <Newline />
         </Box>
+      )}
+
+      {/* ── Renew-mode screens ── */}
+
+      {step === 'renew-analyzing' && (
+        <Box flexDirection="column" marginTop={1}>
+          <SpinnerLine text={`Inspecting saved credentials for ${appId}…`} />
+        </Box>
+      )}
+
+      {step === 'renew-no-credentials' && (
+        <Box flexDirection="column" marginTop={1}>
+          <ErrorLine text={`No saved iOS credentials for ${appId}.`} />
+          <Newline />
+          <Text>Run </Text>
+          <Text bold>{buildInitCommand}</Text>
+          <Text> first to onboard, then come back to </Text>
+          <Text bold>build init --renew</Text>
+          <Text>.</Text>
+          <Newline />
+          <Select
+            options={[{ label: 'Exit', value: 'exit' }]}
+            onChange={() => exitOnboarding()}
+          />
+        </Box>
+      )}
+
+      {step === 'renew-nothing-to-do' && renewPlan && (
+        <Box flexDirection="column" marginTop={1}>
+          <SuccessLine text="Nothing to renew" />
+          <Newline />
+          <Text>
+            {`Certificate and all Capgo-managed profiles are valid for more than ${renewOptions?.thresholdDays ?? 30} days.`}
+          </Text>
+          <Text dimColor>
+            Use
+            {' '}
+            <Text bold>--force</Text>
+            {' '}
+            to renew anyway.
+          </Text>
+          <Newline />
+          <Select
+            options={[{ label: 'Exit', value: 'exit' }]}
+            onChange={() => exitOnboarding()}
+          />
+        </Box>
+      )}
+
+      {step === 'renew-plan' && renewPlan && (
+        <RenewPlanScreen
+          plan={renewPlan}
+          dryRun={!!renewOptions?.dryRun}
+          onConfirm={() => {
+            // After plan confirm: verify the saved API key first.
+            // If the saved key was already loaded into refs in renew-analyzing, this
+            // flows through directly. Otherwise the input chain kicks in.
+            setStep('verifying-key')
+          }}
+          onCancel={() => {
+            ;(async () => {
+              await deleteProgress(appId)
+              exitOnboarding('Renewal cancelled.')
+            })()
+          }}
+        />
+      )}
+
+      {step === 'renew-revoking-cert' && (
+        <Box flexDirection="column" marginTop={1}>
+          <SpinnerLine text="Revoking expiring certificate…" />
+        </Box>
+      )}
+
+      {step === 'renew-creating-profiles' && renewPlan && (
+        <RenewProgressScreen
+          totalProfiles={bundleIdsToRenew(renewPlan).length}
+          completedProfiles={renewCompletedProfiles.map(c => c.bundleId)}
+          currentBundleId={renewCurrentBundleId}
+        />
+      )}
+
+      {step === 'renew-saving' && (
+        <Box flexDirection="column" marginTop={1}>
+          <SpinnerLine text="Saving renewed credentials…" />
+        </Box>
+      )}
+
+      {step === 'renew-complete' && renewSummary && (
+        <RenewCompleteScreen
+          summary={renewSummary}
+          onRunBuild={() => setStep('requesting-build')}
+          onExit={() => exitOnboarding()}
+        />
       )}
     </Box>
   )

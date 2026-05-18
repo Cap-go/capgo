@@ -15,6 +15,18 @@ import OnboardingApp from './ui/app.js'
 export interface OnboardingBuilderOptions {
   apikey?: string
   platform?: string
+  /** Explicit app ID override; defaults to the one in capacitor.config. */
+  appId?: string
+  /** Renew mode flag (build init --renew). */
+  renew?: boolean
+  /** Renew --force: re-issue everything regardless of expiry. */
+  force?: boolean
+  /** Renew --days N: threshold for "expiring soon" (default 30). */
+  days?: number
+  /** Renew --dry-run: print the plan, take no action. */
+  dryRun?: boolean
+  /** Renew --local: operate on local .capgo-credentials.json instead of global. */
+  local?: boolean
 }
 
 type Platform = 'ios' | 'android'
@@ -80,7 +92,7 @@ export async function onboardingBuilderCommand(options: OnboardingBuilderOptions
   let androidDir = 'android'
   try {
     const extConfig = await getConfig()
-    appId = getAppId(undefined, extConfig?.config)
+    appId = getAppId(options.appId, extConfig?.config)
     iosDir = getPlatformDirFromCapacitorConfig(extConfig?.config, 'ios')
     androidDir = getPlatformDirFromCapacitorConfig(extConfig?.config, 'android')
   }
@@ -91,6 +103,34 @@ export async function onboardingBuilderCommand(options: OnboardingBuilderOptions
   if (!appId) {
     log.error('Could not detect app ID from capacitor.config.ts. Make sure you are in a Capacitor project directory.')
     process.exit(1)
+  }
+
+  // Renew mode short-circuits platform resolution: iOS-only.
+  if (options.renew) {
+    const requested = (options.platform || '').toLowerCase()
+    if (requested && requested !== 'ios') {
+      log.info('Android keystores do not expire and do not need periodic renewal.')
+      log.info('If you need to refresh the Play OAuth token, re-run `build init --platform android`.')
+      return
+    }
+    const progress = await loadProgress(appId)
+    const { waitUntilExit } = render(
+      React.createElement(OnboardingApp, {
+        appId,
+        initialProgress: progress,
+        iosDir,
+        apikey: options.apikey,
+        mode: 'renew',
+        renewOptions: {
+          thresholdDays: options.days ?? 30,
+          force: !!options.force,
+          dryRun: !!options.dryRun,
+          local: !!options.local,
+        },
+      }),
+    )
+    await waitUntilExit()
+    return
   }
 
   const platform = await resolvePlatform(options, iosDir, androidDir)

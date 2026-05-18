@@ -6,6 +6,7 @@ export interface MobileprovisionInfo {
   uuid: string
   applicationIdentifier: string
   bundleId: string
+  expirationDate: Date | null
 }
 
 export function parseMobileprovision(filePath: string): MobileprovisionInfo {
@@ -41,7 +42,10 @@ function parseMobileprovisionBuffer(data: Buffer, source: string): Mobileprovisi
   const dotIndex = applicationIdentifier.indexOf('.')
   const bundleId = dotIndex !== -1 ? applicationIdentifier.slice(dotIndex + 1) : applicationIdentifier
 
-  return { name, uuid, applicationIdentifier, bundleId }
+  const expirationRaw = extractPlistDate(plistXml, 'ExpirationDate')
+  const expirationDate = expirationRaw ? parseIsoOrNull(expirationRaw) : null
+
+  return { name, uuid, applicationIdentifier, bundleId, expirationDate }
 }
 
 function extractPlistValue(xml: string, key: string): string | null {
@@ -56,6 +60,17 @@ function extractNestedPlistValue(xml: string, dictKey: string, valueKey: string)
   if (!dictMatch)
     return null
   return extractPlistValue(dictMatch[1], valueKey)
+}
+
+function extractPlistDate(xml: string, key: string): string | null {
+  const regex = new RegExp(`<key>${escapeRegex(key)}</key>\\s*<date>([^<]*)</date>`)
+  const match = xml.match(regex)
+  return match ? match[1] : null
+}
+
+function parseIsoOrNull(value: string): Date | null {
+  const parsed = new Date(value)
+  return Number.isNaN(parsed.getTime()) ? null : parsed
 }
 
 function escapeRegex(str: string): string {

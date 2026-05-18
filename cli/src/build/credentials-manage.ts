@@ -459,6 +459,24 @@ export async function manageCredentialsCommand(options: ManageCredentialsOptions
           }
         }
       }
+      else if (action === 'renew') {
+        const proceed = await pConfirm({
+          message: `This will close the credentials manager and launch the iOS renewal flow for ${currentEntry.appId}. You won't return here automatically — re-run \`capgo build credentials manage\` afterwards. Continue?`,
+          initialValue: false,
+        })
+        if (pIsCancel(proceed) || !proceed)
+          continue
+
+        stopInitInkSession({ text: 'Launching iOS renewal…', tone: 'green' })
+        await onboardingBuilderCommand({
+          renew: true,
+          platform: 'ios',
+          appId: currentEntry.appId,
+          local: currentEntry.local,
+        })
+        handedOffToOnboarding = true
+        break
+      }
       else if (action === 'export') {
         const exported = await exportToEnvFile(currentEntry)
         if (!exported)
@@ -632,14 +650,19 @@ async function pickAction(entry: AppEntry, canGoBack: boolean, extraIntro?: stri
       '',
       'View    — flat list of every credential across platforms (show, decode, copy, edit, explain, remove).',
       'Add…    — add a new platform via onboarding, or add a configuration option.',
+      'Renew   — re-issue an expiring iOS cert and Capgo-managed provisioning profiles.',
       'Export  — write a .env file ready for CI/CD secrets (asks which platform if both are configured).',
       'Delete  — wipe all credentials for one platform (asks which if both are configured).',
     ],
     statusLine: canGoBack ? 'Esc = back, Ctrl+C = quit.' : 'Ctrl+C or Esc to quit.',
   })
+  const hasIos = entry.platforms.includes('ios')
   const options = [
     { value: 'view', label: 'View credentials', hint: 'inspect, decode, copy, edit, explain, remove' },
     { value: 'add', label: 'Add credential…', hint: 'add platform support or a configuration option' },
+    ...(hasIos
+      ? [{ value: 'renew', label: 'Renew expired credentials', hint: 'iOS cert + Capgo-managed profiles' }]
+      : []),
     { value: 'export', label: 'Export to .env', hint: 'CI/CD-ready file' },
     { value: 'delete', label: 'Delete', hint: 'remove a platform from storage' },
     ...(canGoBack ? [{ value: 'back', label: 'Back', hint: 'previous picker' }] : []),

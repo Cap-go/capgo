@@ -775,9 +775,15 @@ Example: npx @capgo/cli@latest build needed com.example.app --channel production
 build
   .command('init')
   .alias('onboarding')
-  .description('Set up build credentials interactively (iOS: certificates + profiles automated; Android: keystore + Google OAuth provisions GCP service account and Play Console invite)')
+  .description('Set up build credentials interactively (iOS: certificates + profiles automated; Android: keystore + Google OAuth provisions GCP service account and Play Console invite). Use --renew to refresh an existing iOS cert / Capgo-managed provisioning profiles.')
   .option('-a, --apikey <apikey>', 'API key to link to your account')
   .option('-p, --platform <platform>', 'Platform to onboard (ios or android). If omitted, auto-detects when only one native folder exists; prompts otherwise.')
+  .option('--appId <appId>', 'App ID override (defaults to capacitor.config). Useful with --renew when not run from the project root.')
+  .option('--renew', 'Renew iOS distribution certificate and Capgo-managed provisioning profiles using the saved App Store Connect API key.')
+  .option('--force', '(--renew) Re-issue cert and profiles regardless of expiry.')
+  .option('--days <days>', '(--renew) Threshold in days for "expiring soon" (default: 30).', value => Number.parseInt(value, 10))
+  .option('--dry-run', '(--renew) Print the renewal plan and exit without making changes.')
+  .option('--local', '(--renew) Operate on local .capgo-credentials.json instead of the global file.')
   .action(onboardingBuilderCommand)
 
 build
