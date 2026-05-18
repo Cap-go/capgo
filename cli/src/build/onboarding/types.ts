@@ -41,6 +41,14 @@ export type OnboardingStep
     | 'no-platform'
     | 'error'
 
+export type OnboardingErrorCategory
+  = | 'apple_api_unauthorized'
+    | 'apple_api_rate_limited'
+    | 'cert_limit_reached'
+    | 'profile_creation_failed'
+    | 'p8_invalid'
+    | 'unknown'
+
 export interface ApiKeyData {
   keyId: string
   issuerId: string
