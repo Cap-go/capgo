@@ -840,8 +840,10 @@ export async function checkPlanValid(supabase: SupabaseClient<Database>, orgId: 
 export async function checkPlanValidUpload(supabase: SupabaseClient<Database>, orgId: string, apikey: string, appId?: string, warning = true) {
   const config = await getRemoteConfig()
 
-  // isAllowedActionAppIdApiKey was updated in the orgs_v3 migration to work with the new system
-  const { data: validPlan } = await supabase.rpc('is_allowed_action_org_action', { orgid: orgId, actions: ['storage'] })
+  // Pass appid so check_min_rights gets the app context. Without it,
+  // RBAC denies API keys with limited_to_apps set and the org-scope
+  // plan check returns false even when the plan is healthy.
+  const { data: validPlan } = await supabase.rpc('is_allowed_action_org_action', { orgid: orgId, actions: ['storage'], appid: appId })
   if (!validPlan) {
     log.error(`You need to upgrade your plan to continue to use capgo.\n Upgrade here: ${config.hostWeb}/settings/organization/plans\n`)
     wait(100)

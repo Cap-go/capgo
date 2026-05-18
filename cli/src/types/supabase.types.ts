@@ -3786,13 +3786,22 @@ export type Database = {
         Returns: boolean
       }
       is_allowed_action_org: { Args: { orgid: string }; Returns: boolean }
-      is_allowed_action_org_action: {
-        Args: {
-          actions: Database["public"]["Enums"]["action_type"][]
-          orgid: string
-        }
-        Returns: boolean
-      }
+      is_allowed_action_org_action:
+        | {
+            Args: {
+              actions: Database["public"]["Enums"]["action_type"][]
+              orgid: string
+            }
+            Returns: boolean
+          }
+        | {
+            Args: {
+              actions: Database["public"]["Enums"]["action_type"][]
+              appid: string | null
+              orgid: string
+            }
+            Returns: boolean
+          }
       is_allowed_capgkey:
         | {
             Args: {
