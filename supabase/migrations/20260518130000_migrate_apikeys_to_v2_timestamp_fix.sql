@@ -73,9 +73,42 @@ FROM (
 WHERE source.user_id IS NOT NULL
   AND source.org_id IS NOT NULL;
 
-CREATE TEMP TABLE _apikey_v2_seed AS
-SELECT ak.id, ak.user_id, ak.rbac_id, ak.mode
+CREATE TEMP TABLE _apikey_v2_seed ON COMMIT DROP AS
+SELECT
+  ak.id,
+  ak.user_id,
+  ak.rbac_id,
+  ak.mode,
+  COALESCE(ak.limited_to_orgs, '{}'::uuid[]) AS limited_to_orgs,
+  COALESCE(ak.limited_to_apps, '{}'::text[]) AS limited_to_apps,
+  COALESCE(array_length(ak.limited_to_orgs, 1), 0) > 0 AS has_org_limit,
+  COALESCE(array_length(ak.limited_to_apps, 1), 0) > 0 AS has_app_limit
 FROM public.apikeys ak;
+
+CREATE TEMP TABLE _apikey_v2_target_orgs ON COMMIT DROP AS
+SELECT DISTINCT
+  keys.id AS key_id,
+  keys.user_id,
+  keys.rbac_id,
+  orgs.org_id
+FROM _apikey_v2_seed keys
+JOIN _apikey_v2_current_orgs orgs ON orgs.user_id = keys.user_id
+WHERE NOT keys.has_org_limit
+  OR orgs.org_id = ANY(keys.limited_to_orgs);
+
+CREATE TEMP TABLE _apikey_v2_target_apps ON COMMIT DROP AS
+SELECT DISTINCT
+  keys.id AS key_id,
+  keys.user_id,
+  keys.rbac_id,
+  apps.owner_org,
+  apps.id AS app_uuid,
+  apps.app_id
+FROM _apikey_v2_seed keys
+JOIN _apikey_v2_target_orgs orgs ON orgs.key_id = keys.id
+JOIN public.apps apps ON apps.owner_org = orgs.org_id
+WHERE NOT keys.has_app_limit
+  OR apps.app_id::text = ANY(keys.limited_to_apps);
 
 INSERT INTO public.role_bindings (
   principal_type,
@@ -89,20 +122,40 @@ INSERT INTO public.role_bindings (
 )
 SELECT
   public.rbac_principal_apikey(),
-  keys.rbac_id,
+  bindings.rbac_id,
   roles.id,
   public.rbac_scope_org(),
-  orgs.org_id,
-  keys.user_id,
+  bindings.org_id,
+  bindings.user_id,
   'Migrated API key to RBAC bindings',
   true
-FROM _apikey_v2_seed keys
-JOIN _apikey_v2_current_orgs orgs ON orgs.user_id = keys.user_id
-JOIN public.roles roles
-  ON roles.name = CASE
-    WHEN keys.mode = 'all'::public.key_mode THEN public.rbac_role_org_super_admin()
-    ELSE public.rbac_role_org_member()
-  END
+FROM (
+  SELECT
+    keys.id AS key_id,
+    keys.user_id,
+    keys.rbac_id,
+    orgs.org_id,
+    CASE
+      WHEN keys.mode = 'all'::public.key_mode THEN public.rbac_role_org_super_admin()
+      ELSE public.rbac_role_org_member()
+    END AS role_name
+  FROM _apikey_v2_seed keys
+  JOIN _apikey_v2_target_orgs orgs ON orgs.key_id = keys.id
+  WHERE NOT keys.has_app_limit
+
+  UNION
+
+  SELECT
+    keys.id AS key_id,
+    keys.user_id,
+    keys.rbac_id,
+    apps.owner_org AS org_id,
+    public.rbac_role_org_member() AS role_name
+  FROM _apikey_v2_seed keys
+  JOIN _apikey_v2_target_apps apps ON apps.key_id = keys.id
+  WHERE keys.has_app_limit
+) bindings
+JOIN public.roles roles ON roles.name = bindings.role_name
 ON CONFLICT DO NOTHING;
 
 INSERT INTO public.role_bindings (
@@ -122,21 +175,22 @@ SELECT
   roles.id,
   public.rbac_scope_app(),
   apps.owner_org,
-  apps.id,
+  apps.app_uuid,
   keys.user_id,
   'Migrated API key app binding',
   true
 FROM _apikey_v2_seed keys
-JOIN _apikey_v2_current_orgs orgs ON orgs.user_id = keys.user_id
-JOIN public.apps apps ON apps.owner_org = orgs.org_id
+JOIN _apikey_v2_target_apps apps ON apps.key_id = keys.id
 JOIN public.roles roles
   ON roles.name = CASE keys.mode
+    WHEN 'all'::public.key_mode THEN public.rbac_role_app_admin()
     WHEN 'write'::public.key_mode THEN public.rbac_role_app_developer()
     WHEN 'upload'::public.key_mode THEN public.rbac_role_app_uploader()
     WHEN 'read'::public.key_mode THEN public.rbac_role_app_reader()
     ELSE NULL
   END
 WHERE keys.mode IN ('read'::public.key_mode, 'upload'::public.key_mode, 'write'::public.key_mode)
+  OR (keys.mode = 'all'::public.key_mode AND keys.has_app_limit)
 ON CONFLICT DO NOTHING;
 
 DO $$
@@ -145,19 +199,58 @@ DECLARE
 BEGIN
   SELECT count(*)
   INTO missing_count
-  FROM _apikey_v2_seed keys
-  JOIN _apikey_v2_current_orgs orgs ON orgs.user_id = keys.user_id
+  FROM (
+    SELECT
+      keys.id AS key_id,
+      keys.rbac_id,
+      orgs.org_id
+    FROM _apikey_v2_seed keys
+    JOIN _apikey_v2_target_orgs orgs ON orgs.key_id = keys.id
+    WHERE NOT keys.has_app_limit
+
+    UNION
+
+    SELECT
+      keys.id AS key_id,
+      keys.rbac_id,
+      apps.owner_org AS org_id
+    FROM _apikey_v2_seed keys
+    JOIN _apikey_v2_target_apps apps ON apps.key_id = keys.id
+    WHERE keys.has_app_limit
+  ) expected_orgs
   WHERE NOT EXISTS (
     SELECT 1
     FROM public.role_bindings rb
     WHERE rb.principal_type = public.rbac_principal_apikey()
-      AND rb.principal_id = keys.rbac_id
+      AND rb.principal_id = expected_orgs.rbac_id
       AND rb.scope_type = public.rbac_scope_org()
-      AND rb.org_id = orgs.org_id
+      AND rb.org_id = expected_orgs.org_id
   );
 
   IF missing_count > 0 THEN
     RAISE EXCEPTION 'apikey_v2_migration_missing_org_bindings: %', missing_count;
+  END IF;
+
+  SELECT count(*)
+  INTO missing_count
+  FROM _apikey_v2_seed keys
+  JOIN _apikey_v2_target_apps apps ON apps.key_id = keys.id
+  WHERE (
+      keys.mode IN ('read'::public.key_mode, 'upload'::public.key_mode, 'write'::public.key_mode)
+      OR (keys.mode = 'all'::public.key_mode AND keys.has_app_limit)
+    )
+    AND NOT EXISTS (
+      SELECT 1
+      FROM public.role_bindings rb
+      WHERE rb.principal_type = public.rbac_principal_apikey()
+        AND rb.principal_id = keys.rbac_id
+        AND rb.scope_type = public.rbac_scope_app()
+        AND rb.org_id = apps.owner_org
+        AND rb.app_id = apps.app_uuid
+    );
+
+  IF missing_count > 0 THEN
+    RAISE EXCEPTION 'apikey_v2_migration_missing_app_bindings: %', missing_count;
   END IF;
 END;
 $$;
@@ -2335,6 +2428,316 @@ USING (
 WITH CHECK (
   "user_id" = (SELECT public.get_identity_for_apikey_creation())
 );
+
+-- API-key compatibility identity functions are intentionally not authorization
+-- gates for owner-scoped user/account tables. Those rows stay JWT-only.
+DROP POLICY IF EXISTS "Allow owner to select own apikeys" ON "public"."apikeys";
+CREATE POLICY "Allow owner to select own apikeys" ON "public"."apikeys"
+FOR SELECT
+TO "authenticated"
+USING (
+  "user_id" = (SELECT auth.uid())
+);
+
+DROP POLICY IF EXISTS "Allow owner to delete own apikeys" ON "public"."apikeys";
+CREATE POLICY "Allow owner to delete own apikeys" ON "public"."apikeys"
+FOR DELETE
+TO "authenticated"
+USING (
+  "user_id" = (SELECT auth.uid())
+);
+
+DROP POLICY IF EXISTS "Allow owner to insert own users" ON "public"."users";
+CREATE POLICY "Allow owner to insert own users" ON "public"."users"
+FOR INSERT
+TO "authenticated"
+WITH CHECK (
+  "id" = (SELECT auth.uid())
+  AND (SELECT public.is_not_deleted("users"."email"))
+);
+
+DROP POLICY IF EXISTS "Allow owner to select own user" ON "public"."users";
+CREATE POLICY "Allow owner to select own user" ON "public"."users"
+FOR SELECT
+TO "authenticated"
+USING (
+  "id" = (SELECT auth.uid())
+  AND (SELECT public.is_not_deleted("users"."email"))
+);
+
+DROP POLICY IF EXISTS "Allow owner to update own users" ON "public"."users";
+CREATE POLICY "Allow owner to update own users" ON "public"."users"
+FOR UPDATE
+TO "authenticated"
+USING (
+  "id" = (SELECT auth.uid())
+  AND (SELECT public.is_not_deleted("users"."email"))
+)
+WITH CHECK (
+  "id" = (SELECT auth.uid())
+  AND (SELECT public.is_not_deleted("users"."email"))
+);
+
+DROP POLICY IF EXISTS "Allow insert org for apikey or user" ON "public"."orgs";
+DROP POLICY IF EXISTS "Allow insert org for user" ON "public"."orgs";
+CREATE POLICY "Allow insert org for user" ON "public"."orgs"
+FOR INSERT
+TO "authenticated"
+WITH CHECK (
+  "created_by" = (SELECT auth.uid())
+);
+
+DROP POLICY IF EXISTS "Allow all for auth (super_admin+)" ON "public"."apps";
+CREATE POLICY "Allow all for auth (super_admin+)" ON "public"."apps"
+FOR DELETE
+TO "authenticated", "anon"
+USING (
+  public.check_min_rights(
+    'super_admin'::public.user_min_right,
+    CASE
+      WHEN (SELECT public.get_apikey_header()) IS NOT NULL THEN NULL::uuid
+      ELSE (SELECT auth.uid())
+    END,
+    owner_org,
+    app_id,
+    NULL::bigint
+  )
+);
+
+DROP POLICY IF EXISTS "Allow all for auth (super_admin+)" ON "public"."app_versions";
+CREATE POLICY "Allow all for auth (super_admin+)" ON "public"."app_versions"
+FOR DELETE
+TO "authenticated", "anon"
+USING (
+  public.check_min_rights(
+    'super_admin'::public.user_min_right,
+    CASE
+      WHEN (SELECT public.get_apikey_header()) IS NOT NULL THEN NULL::uuid
+      ELSE (SELECT auth.uid())
+    END,
+    owner_org,
+    app_id,
+    NULL::bigint
+  )
+);
+
+DROP POLICY IF EXISTS "Allow insert for auth (write+)" ON "public"."channel_devices";
+CREATE POLICY "Allow insert for auth (write+)" ON "public"."channel_devices"
+FOR INSERT
+TO "authenticated", "anon"
+WITH CHECK (
+  public.check_min_rights(
+    'write'::public.user_min_right,
+    CASE
+      WHEN (SELECT public.get_apikey_header()) IS NOT NULL THEN NULL::uuid
+      ELSE (SELECT auth.uid())
+    END,
+    owner_org,
+    app_id,
+    NULL::bigint
+  )
+);
+
+DROP POLICY IF EXISTS "Allow read for auth (read+)" ON "public"."daily_bandwidth";
+CREATE POLICY "Allow read for auth (read+)" ON "public"."daily_bandwidth"
+FOR SELECT
+TO "authenticated", "anon"
+USING (
+  EXISTS (
+    SELECT 1
+    FROM public.apps
+    WHERE apps.app_id = daily_bandwidth.app_id
+      AND public.check_min_rights(
+        'read'::public.user_min_right,
+        CASE
+          WHEN (SELECT public.get_apikey_header()) IS NOT NULL THEN NULL::uuid
+          ELSE (SELECT auth.uid())
+        END,
+        apps.owner_org,
+        daily_bandwidth.app_id,
+        NULL::bigint
+      )
+  )
+);
+
+DROP POLICY IF EXISTS "Allow read for auth (read+)" ON "public"."daily_mau";
+CREATE POLICY "Allow read for auth (read+)" ON "public"."daily_mau"
+FOR SELECT
+TO "authenticated", "anon"
+USING (
+  EXISTS (
+    SELECT 1
+    FROM public.apps
+    WHERE apps.app_id = daily_mau.app_id
+      AND public.check_min_rights(
+        'read'::public.user_min_right,
+        CASE
+          WHEN (SELECT public.get_apikey_header()) IS NOT NULL THEN NULL::uuid
+          ELSE (SELECT auth.uid())
+        END,
+        apps.owner_org,
+        daily_mau.app_id,
+        NULL::bigint
+      )
+  )
+);
+
+DROP POLICY IF EXISTS "Allow read for auth (read+)" ON "public"."daily_storage";
+CREATE POLICY "Allow read for auth (read+)" ON "public"."daily_storage"
+FOR SELECT
+TO "authenticated", "anon"
+USING (
+  EXISTS (
+    SELECT 1
+    FROM public.apps
+    WHERE apps.app_id = daily_storage.app_id
+      AND public.check_min_rights(
+        'read'::public.user_min_right,
+        CASE
+          WHEN (SELECT public.get_apikey_header()) IS NOT NULL THEN NULL::uuid
+          ELSE (SELECT auth.uid())
+        END,
+        apps.owner_org,
+        daily_storage.app_id,
+        NULL::bigint
+      )
+  )
+);
+
+DROP POLICY IF EXISTS "Allow read for auth (read+)" ON "public"."daily_version";
+CREATE POLICY "Allow read for auth (read+)" ON "public"."daily_version"
+FOR SELECT
+TO "authenticated", "anon"
+USING (
+  EXISTS (
+    SELECT 1
+    FROM public.apps
+    WHERE apps.app_id = daily_version.app_id
+      AND public.check_min_rights(
+        'read'::public.user_min_right,
+        CASE
+          WHEN (SELECT public.get_apikey_header()) IS NOT NULL THEN NULL::uuid
+          ELSE (SELECT auth.uid())
+        END,
+        apps.owner_org,
+        daily_version.app_id,
+        NULL::bigint
+      )
+  )
+);
+
+DROP POLICY IF EXISTS "Allow apikey to read" ON "public"."stats";
+DROP POLICY IF EXISTS "Allow read for auth (read+)" ON "public"."stats";
+CREATE POLICY "Allow read for auth (read+)" ON "public"."stats"
+FOR SELECT
+TO "authenticated", "anon"
+USING (
+  EXISTS (
+    SELECT 1
+    FROM public.apps
+    WHERE apps.app_id = stats.app_id
+      AND public.check_min_rights(
+        'read'::public.user_min_right,
+        CASE
+          WHEN (SELECT public.get_apikey_header()) IS NOT NULL THEN NULL::uuid
+          ELSE (SELECT auth.uid())
+        END,
+        apps.owner_org,
+        stats.app_id,
+        NULL::bigint
+      )
+  )
+);
+
+CREATE OR REPLACE FUNCTION "public"."get_total_metrics"() RETURNS TABLE(
+  "mau" bigint,
+  "storage" bigint,
+  "bandwidth" bigint,
+  "build_time_unit" bigint,
+  "get" bigint,
+  "fail" bigint,
+  "install" bigint,
+  "uninstall" bigint
+)
+LANGUAGE "plpgsql" SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+  v_request_org_id uuid;
+  v_org_id_text text;
+  v_auth_uid uuid;
+  v_request_apikey text;
+BEGIN
+  SELECT auth.uid() INTO v_auth_uid;
+  SELECT public.get_apikey_header() INTO v_request_apikey;
+
+  IF v_auth_uid IS NULL AND (v_request_apikey IS NULL OR v_request_apikey = '') THEN
+    RETURN;
+  END IF;
+
+  SELECT current_setting('request.jwt.claim.org_id', true) INTO v_org_id_text;
+
+  IF v_org_id_text IS NOT NULL AND v_org_id_text <> '' THEN
+    BEGIN
+      v_request_org_id := v_org_id_text::uuid;
+    EXCEPTION WHEN invalid_text_representation THEN
+      v_request_org_id := NULL;
+    END;
+  END IF;
+
+  IF v_request_org_id IS NOT NULL AND NOT EXISTS (
+    SELECT 1
+    FROM public.get_user_org_ids() allowed_orgs
+    WHERE allowed_orgs.org_id = v_request_org_id
+  ) THEN
+    RETURN;
+  END IF;
+
+  IF v_request_org_id IS NULL THEN
+    SELECT allowed_orgs.org_id
+    INTO v_request_org_id
+    FROM public.get_user_org_ids() allowed_orgs
+    ORDER BY allowed_orgs.org_id
+    LIMIT 1;
+  END IF;
+
+  IF v_request_org_id IS NULL THEN
+    RETURN;
+  END IF;
+
+  RETURN QUERY
+  SELECT
+    metrics.mau,
+    metrics.storage,
+    metrics.bandwidth,
+    metrics.build_time_unit,
+    metrics.get,
+    metrics.fail,
+    metrics.install,
+    metrics.uninstall
+  FROM public.get_total_metrics(v_request_org_id) AS metrics;
+END;
+$$;
+
+ALTER FUNCTION "public"."get_total_metrics"() OWNER TO "postgres";
+
+CREATE OR REPLACE FUNCTION "public"."regenerate_hashed_apikey"("p_apikey_id" bigint) RETURNS "public"."apikeys"
+LANGUAGE "plpgsql"
+SET search_path = ''
+AS $$
+DECLARE
+  v_user_id uuid;
+BEGIN
+  SELECT public.get_identity_for_apikey_creation() INTO v_user_id;
+  IF v_user_id IS NULL THEN
+    RAISE EXCEPTION 'No authentication provided';
+  END IF;
+
+  RETURN public.regenerate_hashed_apikey_for_user(p_apikey_id, v_user_id);
+END;
+$$;
+
+ALTER FUNCTION "public"."regenerate_hashed_apikey"("p_apikey_id" bigint) OWNER TO "postgres";
 
 DROP FUNCTION IF EXISTS "public"."create_hashed_apikey"("public"."key_mode", "text", "uuid"[], "text"[], timestamp with time zone);
 DROP FUNCTION IF EXISTS "public"."create_hashed_apikey_for_user"("uuid", "public"."key_mode", "text", "uuid"[], "text"[], timestamp with time zone);

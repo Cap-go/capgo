@@ -51,7 +51,6 @@ SELECT
         'public',
         'stats',
         ARRAY[
-            'Allow apikey to read',
             'Allow read for auth (read+)'
         ],
         'stats should have correct policies'
@@ -108,7 +107,7 @@ SELECT
         'public',
         'orgs',
         ARRAY[
-            'Allow insert org for apikey or user',
+            'Allow insert org for user',
             'Allow org delete for super_admin',
             'Allow select for auth, api keys (read+)',
             'Allow update for auth (admin+)',

@@ -52,29 +52,21 @@ SELECT isnt(
 
 SELECT is(
   (
-    WITH active_owner_orgs AS (
-      SELECT DISTINCT org_users.user_id, org_users.org_id
-      FROM public.org_users
-      WHERE org_users.user_id IS NOT NULL
-        AND org_users.org_id IS NOT NULL
-    ),
-    missing_bindings AS (
-      SELECT apikeys.id, active_owner_orgs.org_id
-      FROM public.apikeys
-      JOIN active_owner_orgs ON active_owner_orgs.user_id = apikeys.user_id
-      WHERE NOT EXISTS (
-        SELECT 1
-        FROM public.role_bindings
-        WHERE role_bindings.principal_type = public.rbac_principal_apikey()
-          AND role_bindings.principal_id = apikeys.rbac_id
-          AND role_bindings.scope_type = public.rbac_scope_org()
-          AND role_bindings.org_id = active_owner_orgs.org_id
+    SELECT count(*)::int
+    FROM pg_policies
+    WHERE schemaname = 'public'
+      AND (
+        (tablename = 'apikeys' AND policyname IN ('Allow owner to select own apikeys', 'Allow owner to delete own apikeys'))
+        OR (tablename = 'users' AND policyname IN ('Allow owner to insert own users', 'Allow owner to select own user', 'Allow owner to update own users'))
+        OR (tablename = 'orgs' AND policyname IN ('Allow insert org for apikey or user', 'Allow insert org for user'))
       )
-    )
-    SELECT count(*)::int FROM missing_bindings
+      AND (
+        COALESCE(qual, '') LIKE '%get_identity(%'
+        OR COALESCE(with_check, '') LIKE '%get_identity(%'
+      )
   ),
   0,
-  'every migrated API key is bound to every current owner organization'
+  'owner-scoped policies do not authorize through compatibility get_identity'
 );
 
 SELECT tests.clear_authentication();

@@ -1,6 +1,6 @@
 -- Reproduce org creation behavior with API key vs JWT (RLS)
 -- This test isolates the INSERT INTO public.orgs policy behavior
--- Expectation: INSERT with API key context (anon role + capgkey header) succeeds when created_by matches API key user
+-- Expectation: INSERT with API key context (anon role + capgkey header) is rejected.
 --              INSERT with JWT-authenticated context succeeds when user is authenticated
 BEGIN;
 
@@ -9,7 +9,7 @@ BEGIN;
 -- USER_ID: 6aa76066-55ef-4238-ade6-0b32334a4097
 SELECT plan(3);
 
--- Test 1: Create an org using API key context (anon role + capgkey header)
+-- Test 1: API key identity compatibility remains, but org creation is JWT-only.
 -- Set up the API key context first
 DO $$
 BEGIN
@@ -24,34 +24,29 @@ SELECT
         'get_identity function works with API key - prerequisite check'
     );
 
--- Since manual tests work but pgTAP context doesn't preserve role/headers, 
--- test that the policy logic itself is correct by checking the condition
 DO $$
 DECLARE
-  result_check boolean;
+  captured_sqlstate text;
 BEGIN
   SET LOCAL role TO anon;
   PERFORM set_config('request.headers', '{"capgkey": "ae6e7458-c46d-4c00-aa3b-153b0b8520ea"}', true);
-  
-  -- Check if the policy condition would pass
-  SELECT ('6aa76066-55ef-4238-ade6-0b32334a4097'::uuid = public.get_identity('{write,all}')) INTO result_check;
-  
-  IF result_check THEN
+
+  BEGIN
     INSERT INTO public.orgs (created_by, name, management_email)
     VALUES ('6aa76066-55ef-4238-ade6-0b32334a4097', 'SQL Apikey Org', 'test@capgo.app');
-    RAISE NOTICE 'API key insert test passed';
-  ELSE
-    RAISE EXCEPTION 'API key policy condition failed';
+  EXCEPTION WHEN OTHERS THEN
+    captured_sqlstate := SQLSTATE;
+  END;
+
+  IF captured_sqlstate IS DISTINCT FROM '42501' THEN
+    RAISE EXCEPTION 'Expected API key org insert to fail with 42501, got %', COALESCE(captured_sqlstate, 'success');
   END IF;
-EXCEPTION
-  WHEN OTHERS THEN
-    RAISE EXCEPTION 'API key insert failed: %', SQLERRM;
 END $$;
 
 SELECT
     ok(
         true,
-        'API key insert succeeded when created_by matches API key user'
+        'API key insert is rejected for JWT-only org creation'
     );
 
 -- Test 2: Create an org using JWT-authenticated context 
