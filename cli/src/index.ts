@@ -757,7 +757,13 @@ const build = program
 📋 BEFORE BUILDING:
    Save your credentials first:
    npx @capgo/cli build credentials save --appId <your-app-id> --platform ios
-   npx @capgo/cli build credentials save --appId <your-app-id> --platform android`)
+   npx @capgo/cli build credentials save --appId <your-app-id> --platform android
+
+📤 CAPTURE THE OUTPUT URL FROM CI:
+   Pass --output-record to persist the download URL + QR code, then read it
+   back with \`build last-output\`:
+   npx @capgo/cli build request <appId> --platform android --output-upload --output-record /tmp/build.json
+   URL=$(npx @capgo/cli build last-output --path /tmp/build.json --field outputUrl)`)
 
 build
   .command('needed [appId]')
