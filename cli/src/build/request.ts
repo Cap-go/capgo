@@ -1837,7 +1837,10 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
           () => {
             showStatusChecks = true
           },
-          silent && !logger ? undefined : log,
+          // Force pass `log` whenever --output-record is set so the customMsg
+          // wrapper that captures the artifact URL fires even in silent mode
+          // without a user-supplied logger.
+          silent && !logger && !options.outputRecord ? undefined : log,
         )
       }
       finally {

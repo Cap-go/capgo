@@ -42,6 +42,11 @@ export async function writeBuildOutputRecord(
   const absoluteRecordPath = resolve(cwd(), recordPath)
   const pngPath = `${absoluteRecordPath}.qr.png`
 
+  // Create the parent directory once up-front so QRCode.toFile (called before
+  // the JSON write below) does not fail with ENOENT for callers who passed
+  // --output-record under a not-yet-created directory.
+  await mkdir(dirname(absoluteRecordPath), { recursive: true })
+
   let qrCodeAscii: string | null = null
   let qrCodePngPath: string | null = null
   if (input.outputUrl) {
@@ -73,7 +78,6 @@ export async function writeBuildOutputRecord(
     finishedAt: new Date().toISOString(),
   }
 
-  await mkdir(dirname(absoluteRecordPath), { recursive: true })
   await writeFile(absoluteRecordPath, `${JSON.stringify(record, null, 2)}\n`, 'utf-8')
 
   return record
