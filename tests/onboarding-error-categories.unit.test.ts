@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
+import { MissingScopesError } from '../cli/src/build/onboarding/android/oauth-google.ts'
 import { CertificateLimitError } from '../cli/src/build/onboarding/apple-api.ts'
-import { mapIosOnboardingError } from '../cli/src/build/onboarding/error-categories.ts'
+import { mapAndroidOnboardingError, mapIosOnboardingError } from '../cli/src/build/onboarding/error-categories.ts'
 
 describe('mapIosOnboardingError', () => {
   it.concurrent('maps 401 from App Store Connect to apple_api_unauthorized', () => {
@@ -31,5 +32,31 @@ describe('mapIosOnboardingError', () => {
     expect(mapIosOnboardingError(new Error('something else'))).toBe('unknown')
     expect(mapIosOnboardingError('a string')).toBe('unknown')
     expect(mapIosOnboardingError(undefined)).toBe('unknown')
+  })
+})
+
+describe('mapAndroidOnboardingError', () => {
+  it.concurrent('maps MissingScopesError to google_oauth_failed', () => {
+    expect(mapAndroidOnboardingError(new MissingScopesError(['scope1'], ''))).toBe('google_oauth_failed')
+  })
+
+  it.concurrent('maps keystore parse failures to keystore_invalid', () => {
+    const err = Object.assign(new Error('Bad keystore'), { phase: 'keystore' as const })
+    expect(mapAndroidOnboardingError(err)).toBe('keystore_invalid')
+  })
+
+  it.concurrent('maps oauth token failures to google_oauth_failed', () => {
+    const err = Object.assign(new Error('Token refresh failed'), { phase: 'oauth' as const })
+    expect(mapAndroidOnboardingError(err)).toBe('google_oauth_failed')
+  })
+
+  it.concurrent('maps play account id failures to play_account_id_invalid', () => {
+    const err = Object.assign(new Error('Bad ID'), { phase: 'play_account_id' as const })
+    expect(mapAndroidOnboardingError(err)).toBe('play_account_id_invalid')
+  })
+
+  it.concurrent('returns unknown for everything else', () => {
+    expect(mapAndroidOnboardingError(new Error('???'))).toBe('unknown')
+    expect(mapAndroidOnboardingError(null)).toBe('unknown')
   })
 })

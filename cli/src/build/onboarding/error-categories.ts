@@ -1,4 +1,6 @@
+import type { AndroidOnboardingErrorCategory } from './android/types.js'
 import type { OnboardingErrorCategory } from './types.js'
+import { MissingScopesError } from './android/oauth-google.js'
 import { CertificateLimitError } from './apple-api.js'
 
 interface MaybeStatus {
@@ -38,6 +40,23 @@ export function mapIosOnboardingError(error: unknown): OnboardingErrorCategory {
     return 'profile_creation_failed'
   if (phase === 'p8')
     return 'p8_invalid'
+
+  return 'unknown'
+}
+
+export function mapAndroidOnboardingError(error: unknown): AndroidOnboardingErrorCategory {
+  // MissingScopesError has no `phase` property, so the instanceof check must
+  // precede the phase-based dispatching below.
+  if (error instanceof MissingScopesError)
+    return 'google_oauth_failed'
+
+  const phase = getPhase(error)
+  if (phase === 'keystore')
+    return 'keystore_invalid'
+  if (phase === 'oauth')
+    return 'google_oauth_failed'
+  if (phase === 'play_account_id')
+    return 'play_account_id_invalid'
 
   return 'unknown'
 }
