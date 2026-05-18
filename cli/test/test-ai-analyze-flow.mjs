@@ -47,7 +47,7 @@ await test('matrix: non-interactive + flag unset → skip', () => {
 })
 
 // ---- writeLocalAiFile ----
-await test('writeLocalAiFile writes prompt + ---LOGS--- + logs', async () => {
+await test('writeLocalAiFile writes prompt + <BUILD_LOG> boundary + logs', async () => {
   await writeFile(join(TEST_DIR, `${JOB_ID}.log`), 'line1\nline2\n')
   const promptPath = await writeLocalAiFile(JOB_ID)
   if (!existsSync(promptPath))
@@ -55,8 +55,8 @@ await test('writeLocalAiFile writes prompt + ---LOGS--- + logs', async () => {
   const content = readFileSync(promptPath, 'utf8')
   if (!content.includes('You are a build engineer'))
     throw new Error('system prompt missing from local-AI file')
-  if (!content.includes('---LOGS---'))
-    throw new Error('---LOGS--- separator missing')
+  if (!content.includes('<BUILD_LOG>') || !content.includes('</BUILD_LOG>'))
+    throw new Error('BUILD_LOG boundary tags missing')
   if (!content.includes('line1\nline2'))
     throw new Error('log content missing')
 })

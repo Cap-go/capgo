@@ -23,7 +23,10 @@ export async function writeLocalAiFile(jobId: string): Promise<string> {
   const logsPath = getLogCapturePath(jobId)
   const logs = await readFile(logsPath, 'utf8')
   const promptPath = getAiPromptPath(jobId)
-  const content = `${SYSTEM_PROMPT}\n\n---LOGS---\n${logs}`
+  // Wrap the log in the same <BUILD_LOG>...</BUILD_LOG> boundary the worker
+  // uses, so SYSTEM_PROMPT's anti-prompt-injection instructions apply when
+  // a user runs this file against any LLM.
+  const content = `${SYSTEM_PROMPT}\n\n<BUILD_LOG>\n${logs}\n</BUILD_LOG>\n`
   await writeFile(promptPath, content)
   return promptPath
 }

@@ -44,7 +44,6 @@ import {
   decideAnalyzeBehavior,
   isLogTooBig,
   postAnalyzeRequest,
-
   writeLocalAiFile,
 } from '../ai/analyze'
 import {
@@ -53,6 +52,7 @@ import {
   shouldCaptureLogs,
   startCaptureForJob,
 } from '../ai/log-capture'
+import { renderMarkdown } from '../ai/render-markdown'
 import { assertCliPermission, canPromptInteractively, createSupabaseClient, findSavedKey, getConfig, getOrganizationId, sendEvent } from '../utils'
 import { mergeCredentials, MIN_OUTPUT_RETENTION_SECONDS, parseOptionalBoolean, parseOutputRetentionSeconds } from './credentials'
 import { buildProvisioningMap } from './credentials-command'
@@ -1896,6 +1896,8 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
           aiAnalyticsFlag: options.aiAnalytics === true,
         })
 
+        const AI_WARNING = '⚠ AI can make mistakes. Always verify the diagnosis against the full log before applying the suggested fix.'
+
         const runCapgoAi = async (): Promise<void> => {
           const logsPath = `${process.env.CAPGO_AI_LOG_BASE_DIR || '/tmp/capgo-builds'}/${capturedJobId}.log`
           let logs = ''
@@ -1906,16 +1908,29 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
           catch {
             return
           }
-          const result: PostAnalyzeResult = await postAnalyzeRequest({
-            apiHost: host,
-            apikey: options.apikey,
-            jobId: capturedJobId!,
-            appId,
-            logs,
-          })
-          const stream = process.stdout.isTTY ? process.stdout : process.stderr
+
+          // Spinner only when interactive — in CI it'd just dump noise.
+          const isInteractive = process.stdout.isTTY === true
+          const stream = isInteractive ? process.stdout : process.stderr
+          const aiSpinner = isInteractive ? spinnerC() : null
+          aiSpinner?.start('Analyzing build log with Capgo AI (Kimi K2.5)…')
+
+          let result: PostAnalyzeResult
+          try {
+            result = await postAnalyzeRequest({
+              apiHost: host,
+              apikey: options.apikey,
+              jobId: capturedJobId!,
+              appId,
+              logs,
+            })
+          }
+          finally {
+            aiSpinner?.stop('Capgo AI finished')
+          }
+
           if (result.kind === 'ok') {
-            stream.write(`\n--- AI analysis ---\n${result.analysis}\n`)
+            stream.write(`\n--- AI analysis ---\n${renderMarkdown(result.analysis, isInteractive)}\n\n${AI_WARNING}\n`)
           }
           else if (result.kind === 'already_analyzed') {
             stream.write('\nAI analysis already requested for this job (only one per job).\n')
@@ -1931,7 +1946,7 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
         const runLocalAi = async (): Promise<void> => {
           const promptPath = await writeLocalAiFile(capturedJobId!)
           keepPromptFile = true
-          process.stdout.write(`\nSaved prompt to ${promptPath}\nPoint your local AI (Claude, Codex, aider, etc.) at this file.\n`)
+          process.stdout.write(`\nSaved prompt to ${promptPath}\nPoint your local AI (Claude, Codex, aider, etc.) at this file.\n${AI_WARNING}\n`)
         }
 
         async function showMenu(): Promise<void> {
