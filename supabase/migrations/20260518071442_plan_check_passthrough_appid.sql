@@ -122,11 +122,15 @@ REVOKE ALL ON FUNCTION public.is_allowed_action_org_action(
     "actions" public.action_type [],
     "appid" character varying
 ) FROM public;
-REVOKE ALL ON FUNCTION public.is_allowed_action_org_action(
+-- The CLI connects with the Supabase anon key and authenticates per-call via
+-- the capgkey header, so PostgREST sets role = anon. The existing 2-arg
+-- overload grants EXECUTE to anon (see 20260427105151); the new 3-arg overload
+-- must match or the CLI upload path will fail with a permission error.
+GRANT EXECUTE ON FUNCTION public.is_allowed_action_org_action(
     "orgid" uuid,
     "actions" public.action_type [],
     "appid" character varying
-) FROM anon;
+) TO anon;
 GRANT EXECUTE ON FUNCTION public.is_allowed_action_org_action(
     "orgid" uuid,
     "actions" public.action_type [],
