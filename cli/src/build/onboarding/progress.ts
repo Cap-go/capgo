@@ -81,13 +81,43 @@ export async function deleteProgress(
 /**
  * Determine the first incomplete step based on saved progress.
  * Returns the step to resume from.
+ *
+ * Branches on `setupMethod` so the import flow doesn't accidentally resume
+ * into the create-new path's `creating-certificate` step (which would trigger
+ * the Apple 3-cert-limit error for users at the limit).
  */
 export function getResumeStep(progress: OnboardingProgress | null): OnboardingStep {
   if (!progress)
     return 'welcome'
 
-  const { completedSteps } = progress
+  const { completedSteps, setupMethod } = progress
 
+  // Import flow: identity/profile selection state is ephemeral (lives only in
+  // React UI state, never persisted). On resume we re-run the silent inventory
+  // and re-render the picker — the user's previously verified .p8 / Key ID /
+  // Issuer ID are reused so they don't have to re-enter those.
+  if (setupMethod === 'import-existing') {
+    if (!completedSteps.apiKeyVerified) {
+      // For app_store mode the .p8 chain hadn't completed yet — resume there.
+      // For ad_hoc mode this branch is normally unreachable (.p8 isn't asked
+      // until no-match recovery), so we fall through to import-scanning,
+      // which is the safe default.
+      if (progress.issuerId && progress.keyId && progress.p8Path)
+        return 'verifying-key'
+      if (progress.keyId && progress.p8Path)
+        return 'input-issuer-id'
+      if (progress.p8Path)
+        return 'input-key-id'
+      // Distribution mode is gone from progress, so re-ask: jump back to the
+      // setup-method fork. The user will pick "Import existing" again and
+      // re-enter the (cheap) distribution-mode question.
+      return 'setup-method-select'
+    }
+    // .p8 verified, but no cert/profile completed yet — resume at scanning.
+    return 'import-scanning'
+  }
+
+  // Create-new flow (default for legacy progress files lacking setupMethod).
   if (!completedSteps.apiKeyVerified) {
     // Resume at the furthest partial input step
     if (progress.issuerId && progress.keyId && progress.p8Path)
