@@ -45,7 +45,7 @@ export async function postAnalyzeRequest(input: PostAnalyzeInput): Promise<PostA
     const res = await fetch(url, {
       method: 'POST',
       headers: {
-        'capgo-api-key': input.apikey,
+        capgkey: input.apikey,
         'content-type': 'application/json',
       },
       body: JSON.stringify({ jobId: input.jobId, appId: input.appId, logs: input.logs }),
