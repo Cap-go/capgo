@@ -33,7 +33,7 @@ function createContext() {
   } as any
 }
 
-function mockBuildRequestRow(row: { app_id: string; status: string; ai_analyzed: boolean } | null) {
+function mockBuildRequestRow(row: { app_id: string, status: string, ai_analyzed: boolean } | null) {
   const eqAppId = { maybeSingle: vi.fn().mockResolvedValue({ data: row, error: null }) }
   const eqJob = { eq: vi.fn().mockReturnValue(eqAppId) }
   const select = { eq: vi.fn().mockReturnValue(eqJob) }
@@ -56,8 +56,10 @@ beforeEach(() => {
   mockCheckPermission.mockReset()
   mockGetEnv.mockReset()
   mockGetEnv.mockImplementation((_: unknown, key: string) => {
-    if (key === 'BUILDER_URL') return builderUrl
-    if (key === 'BUILDER_API_KEY') return builderApiKey
+    if (key === 'BUILDER_URL')
+      return builderUrl
+    if (key === 'BUILDER_API_KEY')
+      return builderApiKey
     return ''
   })
   globalThis.fetch = vi.fn()
@@ -67,21 +69,24 @@ describe('aiAnalyzeBuild', () => {
   it('throws unauthorized when checkPermission denies', async () => {
     mockCheckPermission.mockResolvedValue(false)
     await expect(aiAnalyzeBuild(createContext(), jobId, appId, apikey, 'logs'))
-      .rejects.toThrow(/permission to analyze/i)
+      .rejects
+      .toThrow(/permission to analyze/i)
   })
 
   it('throws unauthorized when build_request row not found', async () => {
     mockCheckPermission.mockResolvedValue(true)
     mockBuildRequestRow(null)
     await expect(aiAnalyzeBuild(createContext(), jobId, appId, apikey, 'logs'))
-      .rejects.toThrow(/permission to analyze/i)
+      .rejects
+      .toThrow(/permission to analyze/i)
   })
 
   it('throws invalid_state when status is not failed', async () => {
     mockCheckPermission.mockResolvedValue(true)
     mockBuildRequestRow({ app_id: appId, status: 'succeeded', ai_analyzed: false })
     await expect(aiAnalyzeBuild(createContext(), jobId, appId, apikey, 'logs'))
-      .rejects.toThrow(/only available for failed builds/i)
+      .rejects
+      .toThrow(/only available for failed builds/i)
   })
 
   it('throws already_analyzed with HTTP 409 status when ai_analyzed is true', async () => {
@@ -89,7 +94,8 @@ describe('aiAnalyzeBuild', () => {
     mockBuildRequestRow({ app_id: appId, status: 'failed', ai_analyzed: true })
     // The CLI branches on res.status === 409 — verify both the message and the status code
     await expect(aiAnalyzeBuild(createContext(), jobId, appId, apikey, 'logs'))
-      .rejects.toMatchObject({ status: 409, message: expect.stringMatching(/already requested for this job/i) })
+      .rejects
+      .toMatchObject({ status: 409, message: expect.stringMatching(/already requested for this job/i) })
   })
 
   it('does NOT flip the flag when builder proxy returns non-2xx', async () => {
@@ -98,7 +104,8 @@ describe('aiAnalyzeBuild', () => {
     ;(globalThis.fetch as any).mockResolvedValue(new Response('upstream broken', { status: 503 }))
 
     await expect(aiAnalyzeBuild(createContext(), jobId, appId, apikey, 'small logs'))
-      .rejects.toThrow(/AI analysis failed/i)
+      .rejects
+      .toThrow(/AI analysis failed/i)
 
     expect(updateEqApp).not.toHaveBeenCalled()
   })
@@ -107,7 +114,7 @@ describe('aiAnalyzeBuild', () => {
     mockCheckPermission.mockResolvedValue(true)
     const { updateEqApp } = mockBuildRequestRow({ app_id: appId, status: 'failed', ai_analyzed: false })
     ;(globalThis.fetch as any).mockResolvedValue(
-      new Response(JSON.stringify({ analysis: '### Likely cause\nfoo' }), { status: 200, headers: { 'content-type': 'application/json' } })
+      new Response(JSON.stringify({ analysis: '### Likely cause\nfoo' }), { status: 200, headers: { 'content-type': 'application/json' } }),
     )
 
     const result = await aiAnalyzeBuild(createContext(), jobId, appId, apikey, 'small logs')

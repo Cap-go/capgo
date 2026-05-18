@@ -1905,7 +1905,12 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
             const { readFile } = await import('node:fs/promises')
             logs = await readFile(logsPath, 'utf8')
           }
-          catch {
+          catch (err) {
+            // Don't crash the CLI on a missing/unreadable log file, but DO tell
+            // the user why we're bailing — otherwise the auto_upload path
+            // silently no-ops and it looks like nothing happened.
+            const msg = err instanceof Error ? err.message : String(err)
+            process.stderr.write(`AI analysis skipped: could not read captured log at ${logsPath}: ${msg}\n`)
             return
           }
 
