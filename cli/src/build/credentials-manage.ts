@@ -34,6 +34,7 @@ interface ManageCredentialsOptions {
   appId?: string
   platform?: 'ios' | 'android'
   local?: boolean
+  perPlatform?: boolean
 }
 
 interface AppEntry {
@@ -460,7 +461,7 @@ export async function manageCredentialsCommand(options: ManageCredentialsOptions
         }
       }
       else if (action === 'export') {
-        const exported = await exportToEnvFile(currentEntry)
+        const exported = await exportToEnvFile(currentEntry, options.perPlatform === true)
         if (!exported)
           pLog.warn('Export cancelled.')
       }
@@ -632,7 +633,7 @@ async function pickAction(entry: AppEntry, canGoBack: boolean, extraIntro?: stri
       '',
       'View    — flat list of every credential across platforms (show, decode, copy, edit, explain, remove).',
       'Add…    — add a new platform via onboarding, or add a configuration option.',
-      'Export  — write a .env file ready for CI/CD secrets (asks which platform if both are configured).',
+      'Export  — write a .env file ready for CI/CD secrets (combined across platforms by default; pass --per-platform for separate files).',
       'Delete  — wipe all credentials for one platform (asks which if both are configured).',
     ],
     statusLine: canGoBack ? 'Esc = back, Ctrl+C = quit.' : 'Ctrl+C or Esc to quit.',
@@ -1169,11 +1170,17 @@ function summarizeProvisioningMap(raw: string): string {
   }
 }
 
-async function exportToEnvFile(entry: AppEntry): Promise<boolean> {
+async function exportToEnvFile(entry: AppEntry, perPlatform: boolean): Promise<boolean> {
   if (entry.platforms.length === 0) {
     pLog.warn('Nothing to export — no platforms configured for this app.')
     return false
   }
+
+  // Default for multi-platform apps: write a single combined .env file. iOS and
+  // Android env-var names are disjoint, so combining them avoids forcing the user
+  // to run `gh secret set -f` (or equivalent) once per platform.
+  if (!perPlatform && entry.platforms.length > 1)
+    return exportCombinedEnvFile(entry)
 
   const platform = await resolvePlatformChoice(entry, 'Pick which platform to export')
   if (platform === null)
@@ -1207,6 +1214,61 @@ async function exportToEnvFile(entry: AppEntry): Promise<boolean> {
   return true
 }
 
+async function exportCombinedEnvFile(entry: AppEntry): Promise<boolean> {
+  const sections: Array<{ platform: 'ios' | 'android', creds: Partial<BuildCredentials> }> = []
+  for (const platform of entry.platforms) {
+    const creds = entry.saved[platform]
+    if (creds && hasAnyValue(creds))
+      sections.push({ platform, creds })
+  }
+
+  if (sections.length === 0) {
+    pLog.warn('Nothing to export.')
+    return false
+  }
+
+  // If only one of the listed platforms actually has values, fall back to the
+  // per-platform file name so the user isn't surprised by a generic name.
+  if (sections.length === 1) {
+    const { platform, creds } = sections[0]
+    const defaultName = `.env.capgo.${entry.appId}.${platform}`
+    const target = await resolveExportTarget(entry, platform, defaultName)
+    if (target === null) {
+      pLog.info('✗ Export cancelled.')
+      return false
+    }
+    const content = renderEnvFile(entry, platform, creds)
+    await writeFile(target.path, content, { mode: 0o600 })
+    await chmod(target.path, 0o600)
+    const fieldCount = Object.values(creds).filter(v => typeof v === 'string' && v.length > 0).length
+    pLog.success(`✓ Exported ${fieldCount} field${fieldCount === 1 ? '' : 's'} → ${target.path} (mode 0600).`)
+    pLog.info('Add it to .gitignore — never commit this file.')
+    pLog.info('Reference: https://capgo.app/docs/cli/cloud-build/')
+    return true
+  }
+
+  const defaultName = `.env.capgo.${entry.appId}`
+  const target = await resolveExportTarget(entry, 'combined', defaultName)
+  if (target === null) {
+    pLog.info('✗ Export cancelled.')
+    return false
+  }
+
+  const content = renderEnvFileCombined(entry, sections)
+  await writeFile(target.path, content, { mode: 0o600 })
+  await chmod(target.path, 0o600)
+
+  const totalFields = sections.reduce(
+    (sum, { creds }) => sum + Object.values(creds).filter(v => typeof v === 'string' && v.length > 0).length,
+    0,
+  )
+  const platformList = sections.map(s => s.platform).join(' + ')
+  pLog.success(`✓ Exported ${totalFields} fields (${platformList}) → ${target.path} (mode 0600).`)
+  pLog.info('Add it to .gitignore — never commit this file.')
+  pLog.info('Reference: https://capgo.app/docs/cli/cloud-build/')
+  return true
+}
+
 async function resolvePlatformChoice(entry: AppEntry, message: string): Promise<'ios' | 'android' | null> {
   if (entry.platforms.length === 1)
     return entry.platforms[0]
@@ -1227,10 +1289,10 @@ interface ExportTarget {
   path: string
 }
 
-async function resolveExportTarget(entry: AppEntry, platform: 'ios' | 'android', defaultName: string): Promise<ExportTarget | null> {
+async function resolveExportTarget(entry: AppEntry, label: 'ios' | 'android' | 'combined', defaultName: string): Promise<ExportTarget | null> {
   if (canUseFilePicker()) {
     const picked = await openSaveFilePicker({
-      prompt: `Save Capgo .env for ${entry.appId} (${platform})`,
+      prompt: `Save Capgo .env for ${entry.appId} (${label})`,
       defaultName,
       defaultLocation: cwd(),
     })
@@ -1300,6 +1362,48 @@ function renderEnvFile(entry: AppEntry, platform: 'ios' | 'android', creds: Part
     lines.push('# Provisioning map — base64 form is preferred to avoid newline/quoting issues in CI.')
     lines.push(`CAPGO_IOS_PROVISIONING_MAP_BASE64=${base64}`)
     lines.push(`# CAPGO_IOS_PROVISIONING_MAP=${escapeDotenvValue(provisioningMapRaw)}`)
+  }
+
+  lines.push('')
+  return lines.join('\n')
+}
+
+function renderEnvFileCombined(
+  entry: AppEntry,
+  sections: Array<{ platform: 'ios' | 'android', creds: Partial<BuildCredentials> }>,
+): string {
+  const lines: string[] = []
+  const generated = new Date().toISOString()
+  const platformList = sections.map(s => s.platform).join(', ')
+  lines.push('# Capgo build credentials — CI/CD environment file')
+  lines.push(`# App: ${entry.appId}`)
+  lines.push(`# Platforms: ${platformList}`)
+  lines.push(`# Source: ${entry.local ? 'local' : 'global'} credentials store`)
+  lines.push(`# Generated: ${generated}`)
+  lines.push('#')
+  lines.push('# Paste these into your CI/CD provider as secrets, or source the file locally:')
+  lines.push('#   set -a; . ./this-file; set +a')
+  lines.push('#')
+  lines.push('# DO NOT commit this file. Add to .gitignore: .env.capgo.*')
+
+  for (const { platform, creds } of sections) {
+    lines.push('')
+    lines.push(`# === ${platform.toUpperCase()} ===`)
+    const provisioningMapRaw = creds.CAPGO_IOS_PROVISIONING_MAP
+    for (const [key, value] of Object.entries(creds)) {
+      if (typeof value !== 'string' || value.length === 0)
+        continue
+      if (key === 'CAPGO_IOS_PROVISIONING_MAP')
+        continue
+      lines.push(`${key}=${escapeDotenvValue(value)}`)
+    }
+    if (provisioningMapRaw) {
+      const base64 = Buffer.from(provisioningMapRaw, 'utf-8').toString('base64')
+      lines.push('')
+      lines.push('# Provisioning map — base64 form is preferred to avoid newline/quoting issues in CI.')
+      lines.push(`CAPGO_IOS_PROVISIONING_MAP_BASE64=${base64}`)
+      lines.push(`# CAPGO_IOS_PROVISIONING_MAP=${escapeDotenvValue(provisioningMapRaw)}`)
+    }
   }
 
   lines.push('')
