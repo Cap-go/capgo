@@ -68,28 +68,28 @@ describe('aiAnalyzeBuild', () => {
   it('throws unauthorized when checkPermission denies', async () => {
     mockCheckPermission.mockResolvedValue(false)
     await expect(aiAnalyzeBuild(createContext(), jobId, appId, apikey, 'logs'))
-      .rejects.toThrow(/unauthorized/i)
+      .rejects.toThrow(/permission to analyze/i)
   })
 
   it('throws unauthorized when build_request row not found', async () => {
     mockCheckPermission.mockResolvedValue(true)
     mockBuildRequestRow(null)
     await expect(aiAnalyzeBuild(createContext(), jobId, appId, apikey, 'logs'))
-      .rejects.toThrow(/unauthorized/i)
+      .rejects.toThrow(/permission to analyze/i)
   })
 
   it('throws invalid_state when status is not failed', async () => {
     mockCheckPermission.mockResolvedValue(true)
     mockBuildRequestRow({ app_id: appId, status: 'succeeded', ai_analyzed: false })
     await expect(aiAnalyzeBuild(createContext(), jobId, appId, apikey, 'logs'))
-      .rejects.toThrow(/invalid_state/i)
+      .rejects.toThrow(/only available for failed builds/i)
   })
 
   it('throws already_analyzed when ai_analyzed is true', async () => {
     mockCheckPermission.mockResolvedValue(true)
     mockBuildRequestRow({ app_id: appId, status: 'failed', ai_analyzed: true })
     await expect(aiAnalyzeBuild(createContext(), jobId, appId, apikey, 'logs'))
-      .rejects.toThrow(/already_analyzed/i)
+      .rejects.toThrow(/already requested for this job/i)
   })
 
   it('does NOT flip the flag when builder proxy returns non-2xx', async () => {
@@ -98,7 +98,7 @@ describe('aiAnalyzeBuild', () => {
     ;(global.fetch as any).mockResolvedValue(new Response('upstream broken', { status: 503 }))
 
     await expect(aiAnalyzeBuild(createContext(), jobId, appId, apikey, 'small logs'))
-      .rejects.toThrow(/builder_error/i)
+      .rejects.toThrow(/AI analysis failed/i)
 
     expect(updateEqApp).not.toHaveBeenCalled()
   })
