@@ -53,5 +53,5 @@ jobs:
           KEYSTORE_KEY_PASSWORD: ${{ secrets.KEYSTORE_KEY_PASSWORD }}
           KEYSTORE_STORE_PASSWORD: ${{ secrets.KEYSTORE_STORE_PASSWORD }}
           BUILD_OUTPUT_UPLOAD_ENABLED: "true"
-          BUILD_OUTPUT_RETENTION_SECONDS: "7d"
+          BUILD_OUTPUT_RETENTION_SECONDS: "604800"
         run: bunx @capgo/cli@latest build request --platform android --path .
