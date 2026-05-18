@@ -116,6 +116,18 @@ await test('postAnalyzeRequest returns error on 5xx', async () => {
     throw new Error(`got ${JSON.stringify(result)}`)
 })
 
+await test('postAnalyzeRequest returns too_big on 413', async () => {
+  globalThis.fetch = async () => new Response(
+    JSON.stringify({ error: 'logs_too_big' }),
+    { status: 413, headers: { 'content-type': 'application/json' } },
+  )
+  const result = await postAnalyzeRequest({
+    apiHost: 'x', apikey: 'y', jobId: JOB_ID, appId: 'a', logs: 'l',
+  })
+  if (result.kind !== 'too_big')
+    throw new Error(`got ${JSON.stringify(result)}`)
+})
+
 await rm(TEST_DIR, { recursive: true, force: true })
 
 console.log(`\n${passed} passed, ${failed} failed`)

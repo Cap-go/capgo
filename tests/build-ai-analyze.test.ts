@@ -60,8 +60,7 @@ beforeEach(() => {
     if (key === 'BUILDER_API_KEY') return builderApiKey
     return ''
   })
-  // @ts-expect-error global fetch mock
-  global.fetch = vi.fn()
+  globalThis.fetch = vi.fn()
 })
 
 describe('aiAnalyzeBuild', () => {
@@ -96,7 +95,7 @@ describe('aiAnalyzeBuild', () => {
   it('does NOT flip the flag when builder proxy returns non-2xx', async () => {
     mockCheckPermission.mockResolvedValue(true)
     const { updateEqApp } = mockBuildRequestRow({ app_id: appId, status: 'failed', ai_analyzed: false })
-    ;(global.fetch as any).mockResolvedValue(new Response('upstream broken', { status: 503 }))
+    ;(globalThis.fetch as any).mockResolvedValue(new Response('upstream broken', { status: 503 }))
 
     await expect(aiAnalyzeBuild(createContext(), jobId, appId, apikey, 'small logs'))
       .rejects.toThrow(/AI analysis failed/i)
@@ -107,7 +106,7 @@ describe('aiAnalyzeBuild', () => {
   it('flips the flag and returns analysis on builder 200', async () => {
     mockCheckPermission.mockResolvedValue(true)
     const { updateEqApp } = mockBuildRequestRow({ app_id: appId, status: 'failed', ai_analyzed: false })
-    ;(global.fetch as any).mockResolvedValue(
+    ;(globalThis.fetch as any).mockResolvedValue(
       new Response(JSON.stringify({ analysis: '### Likely cause\nfoo' }), { status: 200, headers: { 'content-type': 'application/json' } })
     )
 
@@ -117,7 +116,7 @@ describe('aiAnalyzeBuild', () => {
     expect(await result.json()).toEqual({ analysis: '### Likely cause\nfoo' })
 
     // Verify the builder URL and headers
-    const fetchCall = (global.fetch as any).mock.calls[0]
+    const fetchCall = (globalThis.fetch as any).mock.calls[0]
     expect(fetchCall[0]).toBe(`${builderUrl}/jobs/${jobId}/ai-analyze`)
     expect(fetchCall[1].headers['x-api-key']).toBe(builderApiKey)
     expect(fetchCall[1].method).toBe('POST')

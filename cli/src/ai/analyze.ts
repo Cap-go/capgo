@@ -1,6 +1,6 @@
-import { readFile, writeFile, stat } from 'node:fs/promises'
+import { readFile, stat, writeFile } from 'node:fs/promises'
+import { getAiPromptPath, getLogCapturePath } from './log-capture'
 import { SYSTEM_PROMPT } from './prompt'
-import { getLogCapturePath, getAiPromptPath } from './log-capture'
 
 export type AnalyzeBehavior = 'show_menu' | 'ask_then_menu' | 'auto_upload' | 'skip'
 
@@ -10,9 +10,12 @@ export interface DecideInput {
 }
 
 export function decideAnalyzeBehavior(input: DecideInput): AnalyzeBehavior {
-  if (input.isTTY && input.aiAnalyticsFlag) return 'show_menu'
-  if (input.isTTY && !input.aiAnalyticsFlag) return 'ask_then_menu'
-  if (!input.isTTY && input.aiAnalyticsFlag) return 'auto_upload'
+  if (input.isTTY && input.aiAnalyticsFlag)
+    return 'show_menu'
+  if (input.isTTY && !input.aiAnalyticsFlag)
+    return 'ask_then_menu'
+  if (!input.isTTY && input.aiAnalyticsFlag)
+    return 'auto_upload'
   return 'skip'
 }
 
@@ -33,11 +36,11 @@ export interface PostAnalyzeInput {
   logs: string
 }
 
-export type PostAnalyzeResult =
-  | { kind: 'ok', analysis: string }
-  | { kind: 'already_analyzed' }
-  | { kind: 'too_big' }
-  | { kind: 'error', status?: number, message?: string }
+export type PostAnalyzeResult
+  = | { kind: 'ok', analysis: string }
+    | { kind: 'already_analyzed' }
+    | { kind: 'too_big' }
+    | { kind: 'error', status?: number, message?: string }
 
 export async function postAnalyzeRequest(input: PostAnalyzeInput): Promise<PostAnalyzeResult> {
   const url = `${input.apiHost}/functions/v1/build/ai_analyze`
@@ -45,7 +48,7 @@ export async function postAnalyzeRequest(input: PostAnalyzeInput): Promise<PostA
     const res = await fetch(url, {
       method: 'POST',
       headers: {
-        capgkey: input.apikey,
+        'capgkey': input.apikey,
         'content-type': 'application/json',
       },
       body: JSON.stringify({ jobId: input.jobId, appId: input.appId, logs: input.logs }),
@@ -60,12 +63,19 @@ export async function postAnalyzeRequest(input: PostAnalyzeInput): Promise<PostA
     if (res.status === 409) {
       return { kind: 'already_analyzed' }
     }
+    if (res.status === 413) {
+      // Backend rejected the payload as too large (>10 MB). Surface this as
+      // the dedicated variant so callers can fall back to local AI cleanly.
+      return { kind: 'too_big' }
+    }
     let message: string | undefined
     try {
       const body = await res.json() as { error?: string, message?: string }
       message = body.error || body.message
     }
-    catch { /* ignore */ }
+    catch {
+      // ignore
+    }
     return { kind: 'error', status: res.status, message }
   }
   catch (err) {

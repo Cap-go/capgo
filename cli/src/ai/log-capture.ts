@@ -1,4 +1,4 @@
-import { mkdir, unlink, writeFile, appendFile } from 'node:fs/promises'
+import { appendFile, mkdir, unlink, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import process from 'node:process'
 
@@ -28,7 +28,7 @@ export async function startCaptureForJob(jobId: string): Promise<void> {
 export async function appendCapturedLine(jobId: string, line: string): Promise<void> {
   // Best-effort: if append fails we don't want to break the build stream
   try {
-    await appendFile(getLogCapturePath(jobId), line + '\n')
+    await appendFile(getLogCapturePath(jobId), `${line}\n`)
   }
   catch {
     // swallow
@@ -41,9 +41,19 @@ export interface CleanupOptions {
 
 export async function cleanupCapturedJobFiles(jobId: string, opts: CleanupOptions): Promise<void> {
   // Both unlinks are best-effort
-  try { await unlink(getLogCapturePath(jobId)) } catch { /* ignore */ }
+  try {
+    await unlink(getLogCapturePath(jobId))
+  }
+  catch {
+    // ignore
+  }
   if (!opts.keepAiPromptFile) {
-    try { await unlink(getAiPromptPath(jobId)) } catch { /* ignore */ }
+    try {
+      await unlink(getAiPromptPath(jobId))
+    }
+    catch {
+      // ignore
+    }
   }
 }
 
@@ -54,16 +64,31 @@ export async function cleanupCapturedJobFiles(jobId: string, opts: CleanupOption
 export function registerCleanupHandlers(jobId: string, getKeepPromptFile: () => boolean): () => void {
   let cleanedUp = false
   const cleanup = () => {
-    if (cleanedUp) return
+    if (cleanedUp)
+      return
     cleanedUp = true
     void cleanupCapturedJobFiles(jobId, { keepAiPromptFile: getKeepPromptFile() })
   }
-  // The signal handler does NOT call process.exit() — the build command's own
-  // SIGINT handler needs to run to send /build/cancel/:jobId, and Node will
-  // exit naturally afterward. We just clean up our /tmp files and yield.
+  // Signal handlers (SIGINT/SIGTERM) clean up and YIELD — they intentionally
+  // don't call process.exit() so the build command's own SIGINT handler can
+  // still run /build/cancel/:jobId before Node exits naturally.
+  //
+  // uncaughtException IS different: registering ANY handler suppresses Node's
+  // default exit-with-code-1 behavior, and continuing after a thrown error
+  // leaves the process in an unknown state. We clean up, then re-throw so the
+  // default Node behavior (print + exit) takes over.
   const onExit = () => cleanup()
-  const onSignal = () => { cleanup() }
-  const onUncaught = () => cleanup()
+  const onSignal = () => {
+    cleanup()
+  }
+  const onUncaught = (err: Error) => {
+    cleanup()
+    // Re-throw on the next tick so Node's default uncaughtException handling
+    // (print stack + exit non-zero) still happens after our cleanup is queued.
+    setImmediate(() => {
+      throw err
+    })
+  }
 
   process.once('exit', onExit)
   process.once('SIGINT', onSignal)

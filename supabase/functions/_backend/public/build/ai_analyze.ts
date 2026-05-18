@@ -76,14 +76,31 @@ export async function aiAnalyzeBuild(
     throw simpleError('config_error', 'Builder service not configured')
   }
 
-  const builderResp = await fetch(`${builderUrl}/jobs/${jobId}/ai-analyze`, {
-    method: 'POST',
-    headers: {
-      'x-api-key': builderApiKey,
-      'content-type': 'application/json',
-    },
-    body: JSON.stringify({ logs }),
-  })
+  // 60s timeout — matches the CLI's own request timeout. Without this, a hung
+  // Workers AI call would hold the edge fn open until the platform's own
+  // 150s wall-clock timeout, wasting compute and producing a vaguer error.
+  let builderResp: Response
+  try {
+    builderResp = await fetch(`${builderUrl}/jobs/${jobId}/ai-analyze`, {
+      method: 'POST',
+      headers: {
+        'x-api-key': builderApiKey,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({ logs }),
+      signal: AbortSignal.timeout(60_000),
+    })
+  }
+  catch (err) {
+    const isTimeout = err instanceof Error && (err.name === 'TimeoutError' || err.name === 'AbortError')
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: isTimeout ? 'Builder AI analyze timed out' : 'Builder AI analyze fetch errored',
+      job_id: jobId,
+      error: err instanceof Error ? err.message : String(err),
+    })
+    throw simpleError('builder_error', isTimeout ? 'AI analysis timed out' : 'AI analysis request failed')
+  }
 
   if (!builderResp.ok) {
     const errText = await builderResp.text().catch(() => '<no body>')

@@ -26,6 +26,7 @@
  * - Use `build credentials clear` to remove saved credentials
  */
 
+import type { PostAnalyzeResult } from '../ai/analyze'
 import type { BuildCredentials, BuildOptionsPayload, BuildRequestOptions, BuildRequestResult } from '../schemas/build'
 import { Buffer } from 'node:buffer'
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
@@ -33,30 +34,30 @@ import { mkdir, readFile as readFileAsync, rm, stat, writeFile } from 'node:fs/p
 import { tmpdir } from 'node:os'
 import { basename, join, resolve } from 'node:path'
 import process, { chdir, cwd, exit } from 'node:process'
-import { confirm, isCancel as clackIsCancel, log as clackLog, select, select as clackSelect, spinner as spinnerC } from '@clack/prompts'
+import { isCancel as clackIsCancel, log as clackLog, select as clackSelect, confirm, select, spinner as spinnerC } from '@clack/prompts'
 import AdmZip from 'adm-zip'
 import { WebSocket as PartySocket } from 'partysocket'
 import * as tus from 'tus-js-client'
 import WS from 'ws' // TODO: remove when min version nodejs 22 is bump, should do it in july 2026 as it become deprecated
 import pack from '../../package.json'
+import {
+  decideAnalyzeBehavior,
+  isLogTooBig,
+  postAnalyzeRequest,
+
+  writeLocalAiFile,
+} from '../ai/analyze'
+import {
+  appendCapturedLine,
+  registerCleanupHandlers,
+  shouldCaptureLogs,
+  startCaptureForJob,
+} from '../ai/log-capture'
 import { assertCliPermission, canPromptInteractively, createSupabaseClient, findSavedKey, getConfig, getOrganizationId, sendEvent } from '../utils'
 import { mergeCredentials, MIN_OUTPUT_RETENTION_SECONDS, parseOptionalBoolean, parseOutputRetentionSeconds } from './credentials'
 import { buildProvisioningMap } from './credentials-command'
 import { getPlatformDirFromCapacitorConfig } from './platform-paths'
 import { handleCustomMsg } from './qr.js'
-import {
-  shouldCaptureLogs,
-  startCaptureForJob,
-  appendCapturedLine,
-  registerCleanupHandlers,
-} from '../ai/log-capture'
-import {
-  decideAnalyzeBehavior,
-  writeLocalAiFile,
-  postAnalyzeRequest,
-  isLogTooBig,
-  type PostAnalyzeResult,
-} from '../ai/analyze'
 
 /**
  * Callback interface for build logging.
@@ -1914,7 +1915,7 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
           })
           const stream = process.stdout.isTTY ? process.stdout : process.stderr
           if (result.kind === 'ok') {
-            stream.write('\n--- AI analysis ---\n' + result.analysis + '\n')
+            stream.write(`\n--- AI analysis ---\n${result.analysis}\n`)
           }
           else if (result.kind === 'already_analyzed') {
             stream.write('\nAI analysis already requested for this job (only one per job).\n')
@@ -1947,8 +1948,10 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
               { value: 'skip', label: 'Skip' },
             ],
           })
-          if (choice === 'capgo') await runCapgoAi()
-          else if (choice === 'local') await runLocalAi()
+          if (choice === 'capgo')
+            await runCapgoAi()
+          else if (choice === 'local')
+            await runLocalAi()
         }
 
         try {
