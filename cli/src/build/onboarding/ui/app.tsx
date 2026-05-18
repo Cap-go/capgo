@@ -1,7 +1,7 @@
 import type { FC } from 'react'
 import type { BuildLogger } from '../../request.js'
 import type { DiscoveredProfile, IdentityProfileMatch, SigningIdentity } from '../macos-signing.js'
-import type { ApiKeyData, CertificateData, OnboardingProgress, OnboardingStep, ProfileData } from '../types.js'
+import type { ApiKeyData, CertificateData, OnboardingErrorCategory, OnboardingProgress, OnboardingStep, ProfileData } from '../types.js'
 import { handleCustomMsg } from '../../qr.js'
 import { spawn } from 'node:child_process'
 import { Buffer } from 'node:buffer'
@@ -22,6 +22,7 @@ import { loadSavedCredentials, updateSavedCredentials } from '../../credentials.
 import { requestBuildInternal } from '../../request.js'
 import { CertificateLimitError, createCertificate, createProfile, deleteProfile, DuplicateProfileError, ensureBundleId, findCertIdBySha1, generateJwt, listProfilesForCert, revokeCertificate, verifyApiKey } from '../apple-api.js'
 import { createP12, DEFAULT_P12_PASSWORD, generateCsr } from '../csr.js'
+import { mapIosOnboardingError } from '../error-categories.js'
 import { canUseFilePicker, openFilePicker } from '../file-picker.js'
 import { exportP12FromKeychain, isHelperCached, isMacOS, listSigningIdentities, matchIdentitiesToProfiles, precompileSwiftHelper, scanProvisioningProfiles } from '../macos-signing.js'
 import { deleteProgress, getResumeStep, loadProgress, saveProgress } from '../progress.js'
@@ -99,6 +100,10 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
   const [resolvedOrgId, setResolvedOrgId] = useState<string | null>(null)
   const resolvedApiKeyRef = useRef<string | null>(apikey ?? null)
   const orgIdResolvedRef = useRef(false)
+  // Captures the mapped error category at handleError time so the telemetry
+  // useEffect can pass it through without re-mapping a reconstructed Error
+  // (which would have lost the .status / .phase / instanceof discriminators).
+  const errorCategoryRef = useRef<OnboardingErrorCategory | undefined>(undefined)
 
   useEffect(() => {
     if (resolvedApiKeyRef.current)
@@ -193,7 +198,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
       platform: 'ios',
       step,
       durationMs,
-      error: step === 'error' && error ? new Error(error) : undefined,
+      errorCategory: step === 'error' ? errorCategoryRef.current : undefined,
     })
 
     stepTimingRef.current = { step, startedAt: now }
@@ -368,6 +373,10 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
       setStep('api-key-instructions')
       return
     }
+    // Capture the mapped category BEFORE we collapse err to a string.
+    // The telemetry useEffect will read this ref instead of re-mapping a
+    // reconstructed `new Error(message)` (which has no discriminators).
+    errorCategoryRef.current = mapIosOnboardingError(err)
     const message = err instanceof Error ? err.message : String(err)
     const nextRetryCount = retryCount + 1
     const bundlePath = writeOnboardingSupportBundle({
@@ -527,6 +536,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
         if (result.success && existsSync(join(process.cwd(), iosDir))) {
           addLog(`✔ Native iOS platform created with ${addIosCommand}`)
           setError(null)
+          errorCategoryRef.current = undefined
           setRetryCount(0)
           // Re-run the welcome → platform check inline rather than detouring
           // through the legacy platform-select step.
@@ -2168,6 +2178,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
                 onChange={async (value) => {
                   if (value === 'retry') {
                     setError(null)
+                    errorCategoryRef.current = undefined
                     pickerOpenedRef.current = false
                     setStep(retryStep)
                   }
@@ -2189,6 +2200,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
                     setCertData(null)
                     setProfileData(null)
                     setError(null)
+                    errorCategoryRef.current = undefined
                     setRetryCount(0)
                     pickerOpenedRef.current = false
                     setSupportBundlePath(null)

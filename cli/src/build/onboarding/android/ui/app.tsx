@@ -2,6 +2,7 @@ import type { FC } from 'react'
 import type { BuildLogger } from '../../../request.js'
 import type { GcpProject } from '../gcp-api.js'
 import type {
+  AndroidOnboardingErrorCategory,
   AndroidOnboardingProgress,
   AndroidOnboardingStep,
   AndroidPackageChoice,
@@ -64,6 +65,7 @@ import {
   PLAY_DEVELOPERS_URL,
 } from '../play-api.js'
 import { deleteAndroidProgress, getAndroidResumeStep, loadAndroidProgress, saveAndroidProgress } from '../progress.js'
+import { mapAndroidOnboardingError } from '../../error-categories.js'
 import { trackBuilderOnboardingStep } from '../../telemetry.js'
 import { ANDROID_STEP_PROGRESS, getAndroidPhaseLabel } from '../types.js'
 
@@ -127,6 +129,10 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
   const [resolvedOrgId, setResolvedOrgId] = useState<string | null>(null)
   const resolvedApiKeyRef = useRef<string | null>(apikey ?? null)
   const orgIdResolvedRef = useRef(false)
+  // Captures the mapped error category at handleError time so the telemetry
+  // useEffect can pass it through without re-mapping a reconstructed Error
+  // (which would have lost the .phase / instanceof discriminators).
+  const errorCategoryRef = useRef<AndroidOnboardingErrorCategory | undefined>(undefined)
 
   useEffect(() => {
     if (resolvedApiKeyRef.current)
@@ -179,7 +185,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
       platform: 'android',
       step,
       durationMs,
-      error: step === 'error' && error ? new Error(error) : undefined,
+      errorCategory: step === 'error' ? errorCategoryRef.current : undefined,
     })
 
     stepTimingRef.current = { step, startedAt: now }
@@ -408,6 +414,10 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
 
   const handleError = useCallback(
     (err: unknown, failedStep: AndroidOnboardingStep) => {
+      // Capture the mapped category BEFORE we collapse err to a string.
+      // The telemetry useEffect will read this ref instead of re-mapping a
+      // reconstructed `new Error(message)` (which has no discriminators).
+      errorCategoryRef.current = mapAndroidOnboardingError(err)
       const message = err instanceof Error ? err.message : String(err)
       if (retryCount === 0) {
         setError(message)
@@ -1900,6 +1910,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
             onChange={(value) => {
               if (value === 'retry') {
                 setError(null)
+                errorCategoryRef.current = undefined
                 const target = retryStep
                 setRetryStep(null)
                 setStep(target)

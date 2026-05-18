@@ -125,4 +125,19 @@ describe('trackBuilderOnboardingStep', () => {
     const [, payload] = sendEventMock.mock.calls[0]
     expect(payload.tags.duration_ms).toBeUndefined()
   })
+
+  it('uses pre-computed errorCategory when provided (skipping the mapper)', async () => {
+    await trackBuilderOnboardingStep({
+      apikey: 'cap_test_key',
+      step: 'error',
+      platform: 'ios',
+      appId: 'com.example.app',
+      orgId: 'org-uuid-1',
+      errorCategory: 'profile_creation_failed',
+      // error intentionally omitted
+    })
+
+    const [, payload] = sendEventMock.mock.calls[0]
+    expect(payload.tags.error_category).toBe('profile_creation_failed')
+  })
 })

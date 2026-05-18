@@ -1,5 +1,5 @@
-import type { AndroidOnboardingStep } from './android/types.js'
-import type { OnboardingStep, Platform } from './types.js'
+import type { AndroidOnboardingErrorCategory, AndroidOnboardingStep } from './android/types.js'
+import type { OnboardingErrorCategory, OnboardingStep, Platform } from './types.js'
 import process from 'node:process'
 import { sendEvent } from '../../utils.js'
 import { mapAndroidOnboardingError, mapIosOnboardingError } from './error-categories.js'
@@ -11,7 +11,10 @@ export interface TrackBuilderOnboardingStepInput {
   platform: Platform
   step: OnboardingStep | AndroidOnboardingStep
   durationMs?: number
+  /** Raw caught error — mapped via the platform's category mapper. Use this OR errorCategory, not both. */
   error?: unknown
+  /** Pre-computed category. Takes precedence over `error` if both are present. */
+  errorCategory?: OnboardingErrorCategory | AndroidOnboardingErrorCategory
 }
 
 function isTruthyEnv(value: string | undefined): boolean {
@@ -36,7 +39,10 @@ export async function trackBuilderOnboardingStep(input: TrackBuilderOnboardingSt
   if (typeof input.durationMs === 'number' && Number.isFinite(input.durationMs))
     tags.duration_ms = String(Math.round(input.durationMs))
 
-  if (input.error !== undefined) {
+  if (input.errorCategory !== undefined) {
+    tags.error_category = input.errorCategory
+  }
+  else if (input.error !== undefined) {
     tags.error_category = input.platform === 'ios'
       ? mapIosOnboardingError(input.error)
       : mapAndroidOnboardingError(input.error)
