@@ -178,6 +178,15 @@ $$;
 ALTER FUNCTION "public"."cleanup_onboarding_app_data_on_complete"() OWNER TO "postgres";
 REVOKE ALL ON FUNCTION "public"."cleanup_onboarding_app_data_on_complete"() FROM PUBLIC;
 
+DROP TRIGGER IF EXISTS "cleanup_onboarding_app_data_on_complete" ON "public"."apps";
+
+CREATE TRIGGER "cleanup_onboarding_app_data_on_complete"
+AFTER UPDATE OF "need_onboarding"
+ON "public"."apps"
+FOR EACH ROW
+WHEN (OLD.need_onboarding IS TRUE AND NEW.need_onboarding IS FALSE)
+EXECUTE FUNCTION "public"."cleanup_onboarding_app_data_on_complete"();
+
 CREATE OR REPLACE FUNCTION "public"."complete_onboarding_after_first_upload"()
 RETURNS trigger
 LANGUAGE "plpgsql"
