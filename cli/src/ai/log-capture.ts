@@ -58,8 +58,11 @@ export function registerCleanupHandlers(jobId: string, getKeepPromptFile: () => 
     cleanedUp = true
     void cleanupCapturedJobFiles(jobId, { keepAiPromptFile: getKeepPromptFile() })
   }
+  // The signal handler does NOT call process.exit() — the build command's own
+  // SIGINT handler needs to run to send /build/cancel/:jobId, and Node will
+  // exit naturally afterward. We just clean up our /tmp files and yield.
   const onExit = () => cleanup()
-  const onSignal = () => { cleanup(); process.exit(130) }
+  const onSignal = () => { cleanup() }
   const onUncaught = () => cleanup()
 
   process.once('exit', onExit)
