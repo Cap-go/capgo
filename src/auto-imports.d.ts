@@ -346,7 +346,7 @@ declare global {
   export type { PasswordPolicyConfig, Organization, OrganizationRole, ExtendedOrganizationMember, ExtendedOrganizationMembers } from './stores/organization'
   import('./stores/organization')
   // @ts-ignore
-  export type { DeliveryPagination, TestResult } from './stores/webhooks'
+  export type { DeliveryPagination, TestResult, Webhook, WebhookDeliveryVersion } from './stores/webhooks'
   import('./stores/webhooks')
 }
 
