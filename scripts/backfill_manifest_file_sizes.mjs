@@ -11,12 +11,12 @@
  *   bun scripts/backfill_manifest_file_sizes.mjs --all --apply
  */
 
-import { mkdirSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 import { S3Client } from '@bradenmacdonald/s3-lite-client'
-import { config } from 'dotenv'
+import { parse } from 'dotenv'
 import pg from 'pg'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -56,19 +56,34 @@ function getTarget() {
 }
 
 const target = getTarget()
-const envPaths = target === 'prod'
+const sharedEnvPaths = [
+  '../.env',
+]
+const targetEnvPaths = target === 'prod'
   ? [
-      '../.env',
       '../internal/cloudflare/.env.prod',
     ]
   : [
-      '../.env',
       '../.env.local',
       '../internal/cloudflare/.env.local',
     ]
 
-for (const envPath of envPaths) {
-  config({ path: resolve(__dirname, envPath), override: true, quiet: true })
+function loadEnvFiles(envPaths) {
+  const loaded = {}
+  for (const envPath of envPaths) {
+    const resolvedPath = resolve(__dirname, envPath)
+    if (!existsSync(resolvedPath))
+      continue
+    Object.assign(loaded, parse(readFileSync(resolvedPath)))
+  }
+  return loaded
+}
+
+const targetEnv = loadEnvFiles(targetEnvPaths)
+const runtimeEnv = loadEnvFiles([...sharedEnvPaths, ...targetEnvPaths])
+
+for (const [key, value] of Object.entries(runtimeEnv)) {
+  process.env[key] = value
 }
 
 const DB_URL_ENV_KEYS = [
@@ -90,27 +105,32 @@ function getNumberArg(name, fallback) {
   return parsed
 }
 
-function getDatabaseUrl() {
+function getDatabaseUrl(databaseEnv) {
   for (const key of DB_URL_ENV_KEYS) {
-    const value = process.env[key]
+    const value = databaseEnv[key]
     if (value)
       return value
   }
-  throw new Error(`Missing Postgres URL. Set one of: ${DB_URL_ENV_KEYS.join(', ')}`)
+  throw new Error(`Missing Postgres URL in ${targetEnvPaths.join(', ')}. Set one of: ${DB_URL_ENV_KEYS.join(', ')}`)
 }
 
 function isLocalDatabaseUrl(databaseUrl) {
   try {
-    const { hostname } = new URL(databaseUrl)
+    let { hostname } = new URL(databaseUrl)
+    if (hostname.startsWith('[') && hostname.endsWith(']'))
+      hostname = hostname.slice(1, -1)
     return ['127.0.0.1', 'localhost', '::1'].includes(hostname)
   }
   catch {
-    return databaseUrl.includes('127.0.0.1') || databaseUrl.includes('localhost')
+    return databaseUrl.includes('127.0.0.1')
+      || databaseUrl.includes('localhost')
+      || databaseUrl.includes('::1')
+      || databaseUrl.includes('[::1]')
   }
 }
 
 function getSafeDatabaseUrl() {
-  const databaseUrl = getDatabaseUrl()
+  const databaseUrl = getDatabaseUrl(targetEnv)
   if (target === 'prod' && isLocalDatabaseUrl(databaseUrl)) {
     throw new Error('Refusing to use a local Postgres URL for the default prod target. Pass --target=local only when you intentionally want local.')
   }
