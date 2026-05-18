@@ -1,7 +1,7 @@
 import type { Context } from 'hono'
 import type { Database } from '../utils/supabase.types.ts'
 import { S3Client } from '@bradenmacdonald/s3-lite-client'
-import { cloudlog } from './logging.ts'
+import { cloudlog, cloudlogErr, serializeError } from './logging.ts'
 import { getEnv } from './utils.ts'
 
 function firstForwardedHeaderValue(value: string | undefined): string | undefined {
@@ -175,77 +175,134 @@ async function getSignedUrl(c: Context, fileId: string, expirySeconds: number) {
   return url
 }
 
+function parseObjectSizeFromHeaders(contentRange: string | null, contentLength: string | null): number {
+  if (contentRange && contentRange.includes('/')) {
+    const total = Number.parseInt(contentRange.split('/').at(1) ?? '0', 10)
+    if (Number.isFinite(total) && total > 0)
+      return total
+  }
+
+  if (contentLength) {
+    const len = Number.parseInt(contentLength, 10)
+    if (Number.isFinite(len) && len > 0)
+      return len
+  }
+
+  return 0
+}
+
+function serializeStorageError(error: unknown) {
+  const serialized = serializeError(error)
+  const status = error && typeof error === 'object'
+    ? ((error as { status?: unknown, statusCode?: unknown, code?: unknown }).status
+      ?? (error as { statusCode?: unknown }).statusCode
+      ?? (error as { code?: unknown }).code)
+    : undefined
+
+  return {
+    ...serialized,
+    status,
+  }
+}
+
+async function getSizeFromRangeFallback(
+  c: Context,
+  client: ReturnType<typeof initS3>,
+  fileId: string,
+  reason: 'head_error' | 'missing_head_size',
+): Promise<number> {
+  try {
+    const url = await client.getPresignedUrl('GET', fileId, {
+      parameters: { 'x-id': 'GetObject' },
+    })
+    const res = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Range': 'bytes=0-0', // minimal range; forces Content-Range with total length
+        'Accept-Encoding': 'identity',
+      },
+    })
+
+    const contentRange = res.headers.get('content-range') || res.headers.get('Content-Range')
+    const contentLength = res.headers.get('content-length') || res.headers.get('Content-Length')
+    const size = parseObjectSizeFromHeaders(contentRange, contentLength)
+    res.body?.cancel()
+
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'getSize range fallback result',
+      fileId,
+      reason,
+      status: res.status,
+      statusText: res.statusText,
+      contentRange,
+      contentLength,
+      size,
+    })
+    return size
+  }
+  catch (fallbackError) {
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: 'getSize range fallback failed',
+      fileId,
+      reason,
+      error: serializeStorageError(fallbackError),
+      bucket: getEnv(c, 'S3_BUCKET'),
+      endpoint: getEnv(c, 'S3_ENDPOINT'),
+    })
+    return 0
+  }
+}
+
 async function getSize(c: Context, fileId: string) {
   const client = initS3(c)
+  let size = 0
+  let headError: unknown
+  let usedFallback = false
   try {
     // Ask Cloudflare/R2 for the raw object (no brotli/gzip) so Content-Length is preserved.
     const file = await client.statObject(fileId, {
       headers: { 'Accept-Encoding': 'identity' },
     })
-
-    let size = Number.isFinite(file.size) ? file.size : 0
-    cloudlog({ requestId: c.get('requestId'), message: 'getSize head result', fileId, headSize: size, headRawSize: file.size })
-
-    // Fallback: some proxied HEAD responses still omit Content-Length (size becomes NaN)
-    if (!size) {
-      try {
-        const url = await client.getPresignedUrl('GET', fileId, {
-          parameters: { 'x-id': 'GetObject' },
-        })
-        const res = await fetch(url, {
-          method: 'GET',
-          headers: {
-            'Range': 'bytes=0-0', // minimal range; forces Content-Range with total length
-            'Accept-Encoding': 'identity',
-          },
-        })
-
-        const contentRange = res.headers.get('content-range') || res.headers.get('Content-Range')
-        const contentLength = res.headers.get('content-length') || res.headers.get('Content-Length')
-
-        cloudlog({
-          requestId: c.get('requestId'),
-          message: 'getSize fallback headers',
-          fileId,
-          status: res.status,
-          contentRange,
-          contentLength,
-        })
-
-        if (contentRange && contentRange.includes('/')) {
-          const total = Number.parseInt(contentRange.split('/').at(1) ?? '0', 10)
-          if (Number.isFinite(total) && total > 0)
-            size = total
-        }
-
-        if (!size && contentLength) {
-          const len = Number.parseInt(contentLength, 10)
-          if (Number.isFinite(len) && len > 0)
-            size = len
-        }
-
-        cloudlog({ requestId: c.get('requestId'), message: 'getSize fallback parsed', fileId, sizeAfterFallback: size })
-      }
-      catch (fallbackError) {
-        cloudlog({ requestId: c.get('requestId'), message: 'getSize fallback failed', fileId, fallbackError })
-      }
-    }
-
+    size = Number.isFinite(file.size) ? file.size : 0
     cloudlog({
       requestId: c.get('requestId'),
-      message: 'getSize',
-      file,
+      message: 'getSize head result',
       fileId,
+      headSize: size,
+      headRawSize: file.size,
       bucket: getEnv(c, 'S3_BUCKET'),
       endpoint: getEnv(c, 'S3_ENDPOINT'),
-      finalSize: size,
     })
-    return size
   }
   catch (error) {
-    cloudlog({ requestId: c.get('requestId'), message: 'getSize', error })
-    return 0
+    headError = error
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: 'getSize head failed',
+      fileId,
+      error: serializeStorageError(error),
+      bucket: getEnv(c, 'S3_BUCKET'),
+      endpoint: getEnv(c, 'S3_ENDPOINT'),
+    })
   }
+
+  if (!size) {
+    usedFallback = true
+    size = await getSizeFromRangeFallback(c, client, fileId, headError ? 'head_error' : 'missing_head_size')
+  }
+
+  cloudlog({
+    requestId: c.get('requestId'),
+    message: 'getSize final',
+    fileId,
+    bucket: getEnv(c, 'S3_BUCKET'),
+    endpoint: getEnv(c, 'S3_ENDPOINT'),
+    finalSize: size,
+    usedFallback,
+  })
+  return size
 }
 
 async function getObject(c: Context, fileId: string): Promise<Response | null> {

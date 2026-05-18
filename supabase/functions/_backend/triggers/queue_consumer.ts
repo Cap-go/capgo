@@ -12,6 +12,9 @@ import { backgroundTask, getEnv } from '../utils/utils.ts'
 
 // Define constants
 const DEFAULT_BATCH_SIZE = 950 // Default batch size for queue reads limit of CF is 1000 fetches so we take a safe margin
+const MANIFEST_QUEUE_BATCH_SIZE = 100
+const DEFAULT_QUEUE_HTTP_CONCURRENCY = 25
+const MANIFEST_QUEUE_HTTP_CONCURRENCY = 10
 export const MAX_QUEUE_READS = 5
 const DISCORD_IGNORED_ERROR_CODES = new Set(['version_not_found', 'no_channel'])
 
@@ -39,6 +42,12 @@ interface Message {
 }
 
 export const messagesArraySchema = messageSchema.array()
+
+interface QueueMessageMetadata {
+  queueName: string
+  msgId: number
+  readCount: number
+}
 
 interface FailureDetail {
   function_name: string
@@ -163,6 +172,38 @@ function generateUUID(): string {
   return crypto.randomUUID()
 }
 
+function getQueueBatchSize(queueName: string, requestedBatchSize: number): number {
+  if (queueName === 'on_manifest_create')
+    return Math.min(requestedBatchSize, MANIFEST_QUEUE_BATCH_SIZE)
+  return requestedBatchSize
+}
+
+function getQueueHttpConcurrency(queueName: string): number {
+  if (queueName === 'on_manifest_create')
+    return MANIFEST_QUEUE_HTTP_CONCURRENCY
+  return DEFAULT_QUEUE_HTTP_CONCURRENCY
+}
+
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  concurrency: number,
+  mapper: (item: T, index: number) => Promise<R>,
+): Promise<R[]> {
+  const results: R[] = []
+  let cursor = 0
+
+  async function worker() {
+    while (cursor < items.length) {
+      const index = cursor++
+      results[index] = await mapper(items[index]!, index)
+    }
+  }
+
+  const workerCount = Math.min(Math.max(1, concurrency), items.length)
+  await Promise.all(Array.from({ length: workerCount }, () => worker()))
+  return results
+}
+
 async function processQueue(c: Context, db: ReturnType<typeof getPgClient>, queueName: string, batchSize: number = DEFAULT_BATCH_SIZE) {
   const messages = await readQueue(c, db, queueName, batchSize)
 
@@ -172,20 +213,21 @@ async function processQueue(c: Context, db: ReturnType<typeof getPgClient>, queu
   }
 
   const [messagesToProcess, messagesToSkip] = messages.reduce((acc, message) => {
-    acc[message.read_ct <= 5 ? 0 : 1].push(message)
+    acc[message.read_ct <= MAX_QUEUE_READS ? 0 : 1].push(message)
     return acc
   }, [[], []] as [typeof messages, typeof messages])
 
-  cloudlog(`[${queueName}] Processing ${messagesToProcess.length} messages and skipping ${messagesToSkip.length} messages.`)
+  const processConcurrency = getQueueHttpConcurrency(queueName)
+  cloudlog(`[${queueName}] Processing ${messagesToProcess.length} messages and skipping ${messagesToSkip.length} messages with concurrency ${processConcurrency}.`)
 
-  // Archive messages that have been read 5 or more times
+  // Archive messages after the configured retry budget is exhausted.
   if (messagesToSkip.length > 0) {
-    cloudlog(`[${queueName}] Archiving ${messagesToSkip.length} messages that have been read 5 or more times.`)
+    cloudlog(`[${queueName}] Archiving ${messagesToSkip.length} messages that exceeded the retry budget.`)
     await archive_queue_messages(c, db, queueName, messagesToSkip.map(msg => msg.msg_id))
   }
 
-  // Process messages that have been read less than 5 times
-  const results = await Promise.all(messagesToProcess.map(async (message) => {
+  // Process messages that are still within the retry budget.
+  const results = await mapWithConcurrency(messagesToProcess, processConcurrency, async (message) => {
     const function_name = message.message?.function_name ?? 'unknown'
     const function_type = message.message?.function_type ?? 'supabase'
     const body = extractMessageBody(message)
@@ -197,7 +239,11 @@ async function processQueue(c: Context, db: ReturnType<typeof getPgClient>, queu
       })
     }
     const cfId = generateUUID()
-    const httpResponse = await http_post_helper(c, function_name, function_type, body, cfId)
+    const httpResponse = await http_post_helper(c, function_name, function_type, body, cfId, {
+      msgId: message.msg_id,
+      queueName,
+      readCount: message.read_ct,
+    })
     const errorDetails = await extractErrorDetails(httpResponse)
 
     return {
@@ -207,7 +253,7 @@ async function processQueue(c: Context, db: ReturnType<typeof getPgClient>, queu
       payloadSize: JSON.stringify(body).length,
       ...message,
     }
-  }))
+  })
 
   // Update all messages with their CF IDs
   const cfIdUpdates = results.map(result => ({
@@ -347,6 +393,7 @@ async function extractErrorDetails(response: Response): Promise<{
   bodyPreview: string | null
 }> {
   if (response.status < 400) {
+    response.body?.cancel()
     return {
       bodyPreview: null,
       errorCode: null,
@@ -447,11 +494,17 @@ export async function http_post_helper(
   function_type: string | null | undefined,
   body: any,
   cfId: string,
+  metadata?: QueueMessageMetadata,
 ): Promise<Response> {
-  const headers = {
+  const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     'apisecret': getEnv(c, 'API_SECRET'),
     'x-capgo-cf-id': cfId,
+  }
+  if (metadata) {
+    headers['x-capgo-queue-name'] = metadata.queueName
+    headers['x-capgo-queue-msg-id'] = String(metadata.msgId)
+    headers['x-capgo-queue-read-count'] = String(metadata.readCount)
   }
 
   let url: string
@@ -602,8 +655,17 @@ app.post('/sync', async (c) => {
     }
   }
 
-  // Compute finalBatchSize: use provided batchSize capped with DEFAULT_BATCH_SIZE, or fall back to DEFAULT_BATCH_SIZE
-  const finalBatchSize = batchSize !== undefined ? Math.min(batchSize, DEFAULT_BATCH_SIZE) : DEFAULT_BATCH_SIZE
+  // Compute finalBatchSize: use provided batchSize capped with DEFAULT_BATCH_SIZE, or fall back to DEFAULT_BATCH_SIZE.
+  const requestedBatchSize = batchSize !== undefined ? Math.min(batchSize, DEFAULT_BATCH_SIZE) : DEFAULT_BATCH_SIZE
+  const finalBatchSize = getQueueBatchSize(queueName, requestedBatchSize)
+  if (finalBatchSize !== requestedBatchSize) {
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: `[Sync Request] Queue batch size capped for ${queueName}.`,
+      requestedBatchSize,
+      finalBatchSize,
+    })
+  }
 
   await backgroundTask(c, (async () => {
     cloudlog({ requestId: c.get('requestId'), message: `[Background Queue Sync] Starting background execution for queue: ${queueName} with batch size: ${finalBatchSize}` })
@@ -627,5 +689,7 @@ export const __queueConsumerTestUtils__ = {
   extractErrorDetails,
   extractMessageBody,
   getActionableQueueFailures,
+  getQueueBatchSize,
+  getQueueHttpConcurrency,
   sanitizeDiscordResponseBody,
 }
