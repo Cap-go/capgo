@@ -11,6 +11,12 @@ on:
     paths:
       - 'cli/src/ai/prompt.ts'
 
+# Minimum permissions — workflow only checks out code and runs `gh api` with
+# its own scoped PAT (GH_TOKEN_READ_BUILDER); GITHUB_TOKEN itself only needs
+# read access to repo contents.
+permissions:
+  contents: read
+
 jobs:
   check-prompt-sync:
     runs-on: ubuntu-latest
