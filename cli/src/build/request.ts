@@ -44,6 +44,12 @@ import { mergeCredentials, MIN_OUTPUT_RETENTION_SECONDS, parseOptionalBoolean, p
 import { buildProvisioningMap } from './credentials-command'
 import { getPlatformDirFromCapacitorConfig } from './platform-paths'
 import { handleCustomMsg } from './qr.js'
+import {
+  shouldCaptureLogs,
+  startCaptureForJob,
+  appendCapturedLine,
+  registerCleanupHandlers,
+} from '../ai/log-capture'
 
 /**
  * Callback interface for build logging.
@@ -1590,6 +1596,31 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
       log.info(`Upload expires: ${buildRequest.upload_expires_at}`)
     }
 
+    // --- Task 19: /tmp log capture setup ---
+    const captureEnabled = shouldCaptureLogs()
+    let capturedJobId: string | null = null
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    let _unregisterCleanup: (() => void) | null = null
+    const keepPromptFile = false // remains false in Task 19; Task 20 will mutate this
+
+    if (captureEnabled && buildRequest.job_id) {
+      capturedJobId = buildRequest.job_id
+      await startCaptureForJob(buildRequest.job_id)
+      _unregisterCleanup = registerCleanupHandlers(buildRequest.job_id, () => keepPromptFile)
+    }
+
+    // Wrap the logger so every buildLog line is also captured to /tmp
+    const captureWrappedLogger: BuildLogger = {
+      ...log,
+      buildLog: (msg: string) => {
+        log.buildLog(msg)
+        if (captureEnabled && capturedJobId) {
+          void appendCapturedLine(capturedJobId, msg)
+        }
+      },
+    }
+    // --- end Task 19 ---
+
     // Send analytics event for build request
     await sendEvent(options.apikey, {
       channel: 'native-builder',
@@ -1817,7 +1848,7 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
           () => {
             showStatusChecks = true
           },
-          silent && !logger ? undefined : log,
+          silent && !logger ? undefined : captureWrappedLogger,
         )
       }
       finally {
