@@ -92,9 +92,9 @@ export function parseOptionalBoolean(value: boolean | string | undefined): boole
 }
 
 export function parseInAppUpdatePriority(value: number | string): number {
-  const num = typeof value === 'number' ? value : Number(typeof value === 'string' ? value.trim() : value)
+  const num = typeof value === 'number' ? value : Number(value)
   if (!Number.isInteger(num) || num < 0 || num > 5)
-    throw new Error('in-app-update-priority must be an integer between 0 and 5 (Google Play accepts 0–5; higher = more urgent)')
+    throw new Error('in-app-update-priority must be an integer between 0 and 5')
   return num
 }
 
