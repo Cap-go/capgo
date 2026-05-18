@@ -98,22 +98,125 @@ export async function verifyApiKey(token: string): Promise<{ valid: true, teamId
   }
 }
 
+export interface AscDistributionCert {
+  id: string
+  name: string
+  serialNumber: string
+  expirationDate: string
+  /**
+   * Base64-encoded DER of the certificate. Populated when {@link listDistributionCerts}
+   * is called with `includeContent: true` — kept optional so existing callers don't pay
+   * the larger payload when they don't need it.
+   */
+  certificateContent?: string
+}
+
 /**
  * List all iOS distribution certificates.
+ *
+ * Set `includeContent: true` when you need to compute the cert's SHA1 for
+ * matching against a local Keychain identity ({@link findCertIdBySha1}).
  */
 export async function listDistributionCerts(
   token: string,
-): Promise<Array<{ id: string, name: string, serialNumber: string, expirationDate: string }>> {
+  options: { includeContent?: boolean } = {},
+): Promise<AscDistributionCert[]> {
   const body = await ascFetch(
     '/certificates?filter[certificateType]=IOS_DISTRIBUTION&limit=10',
     token,
   )
-  return (body.data || []).map((c: any) => ({
+  return (body.data || []).map((c: any): AscDistributionCert => ({
     id: c.id,
     name: c.attributes.name || c.attributes.displayName || 'iOS Distribution',
     serialNumber: c.attributes.serialNumber || '',
     expirationDate: c.attributes.expirationDate,
+    ...(options.includeContent && c.attributes.certificateContent
+      ? { certificateContent: c.attributes.certificateContent as string }
+      : {}),
   }))
+}
+
+/**
+ * Compute the SHA1 hash of an ASC certificate's base64-DER content. Returns
+ * the lowercase 40-char hex string used elsewhere as the canonical identity
+ * key — matches the SHA1 reported by `security find-identity` on macOS.
+ *
+ * SECURITY NOTE on SHA1: this is NOT a security primitive. macOS itself
+ * reports code-signing identities as cert-DER SHA1 (via `security
+ * find-identity`), and we have to use the same hash to look up an Apple-side
+ * cert by its on-Mac counterpart. SHA1 here is a non-secret identifier, not
+ * a message digest protecting any data. CodeQL's "weak cryptographic
+ * algorithm" rule is suppressed for this reason.
+ */
+export function computeCertSha1(certificateContentBase64: string): string {
+  // Lazy require — keep crypto out of the import-time graph
+  // eslint-disable-next-line ts/no-require-imports
+  const { Buffer } = require('node:buffer') as typeof import('node:buffer')
+  // eslint-disable-next-line ts/no-require-imports
+  const { createHash } = require('node:crypto') as typeof import('node:crypto')
+  const der = Buffer.from(certificateContentBase64, 'base64')
+  // lgtm[js/weak-cryptographic-algorithm] SHA1 is required for compatibility
+  // with `security find-identity` output — see comment above.
+  return createHash('sha1').update(der).digest('hex').toLowerCase()
+}
+
+/**
+ * Match a local Keychain identity (by its SHA1) against an Apple-side
+ * certificate and return the Apple certificate ID needed for profile
+ * creation. Returns null if no Apple-side cert matches the SHA1.
+ */
+export async function findCertIdBySha1(token: string, sha1: string): Promise<string | null> {
+  const target = sha1.toLowerCase()
+  const certs = await listDistributionCerts(token, { includeContent: true })
+  for (const cert of certs) {
+    if (!cert.certificateContent)
+      continue
+    if (computeCertSha1(cert.certificateContent) === target)
+      return cert.id
+  }
+  return null
+}
+
+/**
+ * List all provisioning profiles linked to a specific Apple-side certificate.
+ * Used by the import-flow no-match-recovery menu to surface profiles that
+ * exist on Apple but haven't been downloaded to the user's Mac.
+ */
+export interface AscProfileSummary {
+  id: string
+  name: string
+  profileType: string
+  profileContent: string
+  expirationDate: string
+  bundleIdentifier: string
+}
+
+export async function listProfilesForCert(
+  token: string,
+  certificateId: string,
+): Promise<AscProfileSummary[]> {
+  // The relationships filter does the server-side join for us
+  const body = await ascFetch(
+    `/profiles?filter[certificates]=${encodeURIComponent(certificateId)}&include=bundleId&limit=50`,
+    token,
+  )
+  const included: any[] = body.included || []
+  const bundleById = new Map<string, string>()
+  for (const item of included) {
+    if (item.type === 'bundleIds' && item.attributes?.identifier)
+      bundleById.set(item.id, item.attributes.identifier)
+  }
+  return (body.data || []).map((p: any): AscProfileSummary => {
+    const bundleRelId = p.relationships?.bundleId?.data?.id as string | undefined
+    return {
+      id: p.id,
+      name: p.attributes.name || '',
+      profileType: p.attributes.profileType || '',
+      profileContent: p.attributes.profileContent || '',
+      expirationDate: p.attributes.expirationDate || '',
+      bundleIdentifier: bundleRelId ? bundleById.get(bundleRelId) || '' : '',
+    }
+  })
 }
 
 /**
@@ -129,7 +232,7 @@ export async function revokeCertificate(token: string, certId: string): Promise<
  */
 export class CertificateLimitError extends Error {
   constructor(
-    public readonly certificates: Array<{ id: string, name: string, serialNumber: string, expirationDate: string }>,
+    public readonly certificates: AscDistributionCert[],
   ) {
     super(`Certificate limit reached. Found ${certificates.length} existing iOS distribution certificate(s).`)
     this.name = 'CertificateLimitError'

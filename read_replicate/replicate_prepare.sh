@@ -7,13 +7,10 @@ set -euo pipefail
 DUMP_FILE="schema_replicate.dump"
 LIST_FILE="schema_replicate.list"
 FILTERED_LIST="schema_replicate.filtered.list"
-OUT_SQL="schema_replicate.sql"
+OUT_SQL="read_replicate/schema_replicate.sql"
 
 # Load DB_SB from .env.preprod (fallback to .env.prod)
-ENV_FILE="$(dirname "$0")/../internal/cloudflare/.env.preprod"
-if [[ ! -f "$ENV_FILE" ]]; then
-  ENV_FILE="$(dirname "$0")/../internal/cloudflare/.env.prod"
-fi
+ENV_FILE="$(dirname "$0")/../internal/cloudflare/.env.prod"
 if [[ -f "$ENV_FILE" ]]; then
   DB_SB=$(grep '^MAIN_SUPABASE_DB_URL=' "$ENV_FILE" | cut -d'=' -f2-)
   # Convert ssl=false to sslmode=disable for pg_dump compatibility
@@ -103,20 +100,35 @@ if [[ -f "$TYPES_DUMP" ]]; then
   rm -f "$TYPES_DUMP"
 fi
 
-# 5) Optional: drop pg_dump SET noise
+# 5) Drop pg_dump SET noise and psql-only restrict wrappers.
 perl -0777 -i -pe '
   s/^SET[^\n]*\n//mg;
   s/^SELECT pg_catalog\.set_config\([^\n]*\);\n//mg;
+  s/^\\(?:un)?restrict\b[^\n]*\n//mg;
 ' "$OUT_SQL"
 
-# 6) Sanity checks (should be empty; indexes should still exist)
+# 6) Wrap the full schema restore in one transaction and reset only the
+# replica-managed objects. Do not drop the public schema; target databases can
+# have grants/extensions/objects that are unrelated to this replica import.
+{
+  printf 'BEGIN;\n\n'
+  printf 'DROP TABLE IF EXISTS public.channel_devices, public.manifest, public.app_versions, public.channels, public.apps, public.notifications, public.org_users, public.orgs, public.stripe_info CASCADE;\n'
+  printf 'DROP SEQUENCE IF EXISTS public.app_versions_id_seq, public.channel_devices_id_seq, public.channel_id_seq, public.manifest_id_seq, public.org_users_id_seq, public.stripe_info_id_seq CASCADE;\n'
+  printf 'DROP FUNCTION IF EXISTS public.one_month_ahead();\n'
+  printf 'DROP TYPE IF EXISTS public.manifest_entry, public.disable_update, public.user_min_right, public.stripe_status;\n\n'
+  cat "$OUT_SQL"
+  printf '\nCOMMIT;\n'
+} > "${OUT_SQL}.tmp"
+mv "${OUT_SQL}.tmp" "$OUT_SQL"
+
+# 7) Sanity checks (should be empty; indexes should still exist)
 echo "==> Should be empty:"
-grep -nE 'CREATE POLICY|ROW LEVEL SECURITY|FK CONSTRAINT|FOREIGN KEY|CREATE TRIGGER' "$OUT_SQL" || true
+grep -nE 'CREATE POLICY|ROW LEVEL SECURITY|FK CONSTRAINT|FOREIGN KEY|CREATE TRIGGER|^\\(un)?restrict([[:space:]]|$)' "$OUT_SQL" || true
 
 echo "==> Index count:"
 grep -cE '^\s*CREATE (UNIQUE )?INDEX\b' "$OUT_SQL" || true
 
-# 7) Cleanup temporary files
+# 8) Cleanup temporary files
 echo "==> Cleaning up temporary files..."
 rm -f "$DUMP_FILE" "$LIST_FILE" "$FILTERED_LIST" "$TYPES_DUMP" "$TYPES_SQL" 2>/dev/null || true
 echo "==> Done. Output: $OUT_SQL"

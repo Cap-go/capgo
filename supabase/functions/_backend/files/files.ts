@@ -317,30 +317,6 @@ async function saveBandwidthUsage(c: Context, fileSize: number | null | undefine
   }
 }
 
-async function assertReadableAppScopedAttachment(c: Context, fileId: unknown): Promise<void> {
-  const scopedPath = parseAppScopedAttachmentPath(fileId)
-  if (scopedPath?.kind === 'invalid_scoped') {
-    quickError(404, 'not_found', 'Not found')
-  }
-  if (!scopedPath) {
-    return
-  }
-
-  // Attachment reads must use the primary to avoid replica lag serving deleted-app files.
-  const pgClient = getPgClient(c, false)
-  const drizzleClient = getDrizzleClient(pgClient)
-
-  try {
-    const app = await getAppByAppIdPg(c, scopedPath.app_id, drizzleClient)
-    if (!app || app.owner_org !== scopedPath.owner_org) {
-      quickError(404, 'not_found', 'Not found')
-    }
-  }
-  finally {
-    await closeClient(c, pgClient)
-  }
-}
-
 async function getSupabaseStorageResponse(c: Context, fileId: string): Promise<Response> {
   const { data: signedUrlData, error: signedUrlError } = await supabaseAdmin(c).storage.from('capgo').createSignedUrl(fileId, 60)
 
@@ -400,7 +376,10 @@ async function getSupabaseStorageResponse(c: Context, fileId: string): Promise<R
 
 async function getHandler(c: Context): Promise<Response> {
   const fileId = c.get('fileId')
-  await assertReadableAppScopedAttachment(c, fileId)
+  // It is imperative that files are read without any database read to avoid bottlenecks and keep file downloads highly available, especially under heavy load.
+  // This was designed that way, and access to a file that is going to be deleted is not important compared to download availability.
+  // Do not add DB or R2 checks before serving the file; if the file is missing in R2, a 404 is expected.
+
   cloudlog({ requestId: c.get('requestId'), message: 'getHandler files', fileId })
   if (getRuntimeKey() !== 'workerd') {
     cloudlog({ requestId: c.get('requestId'), message: 'getHandler files using supabase storage' })

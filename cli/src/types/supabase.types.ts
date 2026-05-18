@@ -2761,7 +2761,7 @@ export type Database = {
       webhooks: {
         Row: {
           created_at: string
-          created_by: string | null
+          created_by: string
           enabled: boolean
           events: string[]
           id: string
@@ -2773,7 +2773,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
-          created_by?: string | null
+          created_by: string
           enabled?: boolean
           events: string[]
           id?: string
@@ -2785,7 +2785,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
-          created_by?: string | null
+          created_by?: string
           enabled?: boolean
           events?: string[]
           id?: string

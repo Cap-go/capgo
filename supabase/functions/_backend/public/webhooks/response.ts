@@ -13,7 +13,7 @@ export const webhookPublicSchema = type({
   delivery_version: 'string',
   created_at: 'string',
   updated_at: 'string',
-  created_by: 'string | null',
+  created_by: 'string',
 })
 
 export const webhooksPublicSchema = webhookPublicSchema.array()

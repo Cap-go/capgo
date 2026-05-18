@@ -26,6 +26,20 @@ import { sendEventToTracking } from './tracking.ts'
 import { isStripeConfigured } from './utils.ts'
 
 type CreditMetric = Database['public']['Enums']['credit_metric_type']
+type PlanUsageMetric = Exclude<keyof PlanUsage, 'total_percent'>
+
+const PLAN_USAGE_ALERT_THRESHOLDS = [90, 70, 50] as const
+const PLAN_USAGE_ALERT_EVENT_BY_THRESHOLD: Record<(typeof PLAN_USAGE_ALERT_THRESHOLDS)[number], string> = {
+  50: 'user:usage_50_percent_of_plan',
+  70: 'user:usage_70_percent_of_plan',
+  90: 'user:usage_90_percent_of_plan',
+}
+const PLAN_USAGE_METRICS: Array<{ key: PlanUsageMetric, metric: CreditMetric }> = [
+  { key: 'mau_percent', metric: 'mau' },
+  { key: 'bandwidth_percent', metric: 'bandwidth' },
+  { key: 'storage_percent', metric: 'storage' },
+  { key: 'build_time_percent', metric: 'build_time' },
+]
 
 interface BillingCycleInfo {
   subscription_anchor_start: string | null
@@ -45,6 +59,46 @@ interface CreditApplicationResult {
   overage_covered: number
   overage_unpaid: number
   credit_step_id: number | null
+}
+
+function getHighestPlanUsage(percentUsage: PlanUsage) {
+  return PLAN_USAGE_METRICS.reduce((highest, current) => {
+    const percent = Number(percentUsage[current.key] ?? 0)
+    if (percent > highest.percent) {
+      return {
+        metric: current.metric,
+        percent,
+      }
+    }
+    return highest
+  }, {
+    metric: 'mau' as CreditMetric,
+    percent: 0,
+  })
+}
+
+function normalizePlanUsage(percentUsage: PlanUsage): PlanUsage {
+  const highestUsage = getHighestPlanUsage(percentUsage)
+  return {
+    ...percentUsage,
+    total_percent: highestUsage.percent,
+  }
+}
+
+function getPlanUsageAlert(percentUsage: PlanUsage) {
+  const normalizedUsage = normalizePlanUsage(percentUsage)
+  const highestUsage = getHighestPlanUsage(normalizedUsage)
+  const threshold = PLAN_USAGE_ALERT_THRESHOLDS.find(value => highestUsage.percent >= value)
+  if (!threshold)
+    return null
+
+  return {
+    eventName: PLAN_USAGE_ALERT_EVENT_BY_THRESHOLD[threshold],
+    metric: highestUsage.metric,
+    metricPercent: highestUsage.percent,
+    percentUsage: normalizedUsage,
+    threshold,
+  }
 }
 
 function getDefaultBillingCycleRange(referenceDate = new Date()): BillingCycleRange {
@@ -335,47 +389,30 @@ async function userIsAtPlanUsage(c: Context, orgId: string, customerId: string |
   await set_bandwidth_exceeded(c, customerId, false, orgId)
   await set_build_time_exceeded(c, orgId, false)
 
-  // check if user is at more than 90%, 50% or 70% of plan usage
-  if (percentUsage.total_percent >= 90) {
-    // cron every month
-    const sent = await sendNotifToOrgMembers(c, 'user:usage_90_percent_of_plan', 'usage_limit', { percent: percentUsage }, orgId, orgId, '0 0 1 * *', drizzleClient)
-    if (sent) {
-      await sendEventToTracking(c, {
-        channel: 'usage',
-        event: 'User is at 90% of plan usage',
-        icon: '⚠️',
-        user_id: orgId,
-        groups: { organization: orgId },
-        notify: false,
-      }).catch()
-    }
-  }
-  else if (percentUsage.total_percent >= 70) {
-    // cron every month
-    const sent = await sendNotifToOrgMembers(c, 'user:usage_70_percent_of_plan', 'usage_limit', { percent: percentUsage }, orgId, orgId, '0 0 1 * *', drizzleClient)
-    if (sent) {
-      await sendEventToTracking(c, {
-        channel: 'usage',
-        event: 'User is at 70% of plan usage',
-        icon: '⚠️',
-        user_id: orgId,
-        groups: { organization: orgId },
-        notify: false,
-      }).catch()
-    }
-  }
-  else if (percentUsage.total_percent >= 50) {
-    const sent = await sendNotifToOrgMembers(c, 'user:usage_50_percent_of_plan', 'usage_limit', { percent: percentUsage }, orgId, orgId, '0 0 1 * *', drizzleClient)
-    if (sent) {
-      await sendEventToTracking(c, {
-        channel: 'usage',
-        event: 'User is at 50% of plan usage',
-        icon: '⚠️',
-        user_id: orgId,
-        groups: { organization: orgId },
-        notify: false,
-      }).catch()
-    }
+  const alert = getPlanUsageAlert(percentUsage)
+  if (!alert)
+    return
+
+  const sent = await sendNotifToOrgMembers(c, alert.eventName, 'usage_limit', {
+    metric: alert.metric,
+    metric_percent: alert.metricPercent,
+    percent: alert.percentUsage,
+    threshold: alert.threshold,
+  }, orgId, orgId, '0 0 1 * *', drizzleClient)
+  if (sent) {
+    await sendEventToTracking(c, {
+      channel: 'usage',
+      event: `User is at ${alert.threshold}% of plan usage`,
+      icon: '⚠️',
+      user_id: orgId,
+      groups: { organization: orgId },
+      notify: false,
+      tags: {
+        metric: alert.metric,
+        metric_percent: alert.metricPercent.toString(),
+        threshold: alert.threshold.toString(),
+      },
+    }).catch()
   }
 }
 
@@ -419,7 +456,7 @@ export async function handleTrialOrg(c: Context, orgId: string, org: any): Promi
 export async function calculatePlanStatus(c: Context, orgId: string) {
   const planUsage = await getPlanUsageAndFit(c, orgId)
   const { is_good_plan, total_percent, mau_percent, bandwidth_percent, storage_percent, build_time_percent } = planUsage
-  const percentUsage = { total_percent, mau_percent, bandwidth_percent, storage_percent, build_time_percent }
+  const percentUsage = normalizePlanUsage({ total_percent, mau_percent, bandwidth_percent, storage_percent, build_time_percent })
   return { is_good_plan, percentUsage }
 }
 
@@ -427,12 +464,12 @@ export async function calculatePlanStatusFresh(c: Context, orgId: string) {
   try {
     const planUsage = await getPlanUsageAndFitUncached(c, orgId)
     const { is_good_plan, total_percent, mau_percent, bandwidth_percent, storage_percent, build_time_percent } = planUsage
-    const percentUsage = { total_percent, mau_percent, bandwidth_percent, storage_percent, build_time_percent }
+    const percentUsage = normalizePlanUsage({ total_percent, mau_percent, bandwidth_percent, storage_percent, build_time_percent })
     return { is_good_plan, percentUsage }
   }
   catch (error) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'calculatePlanStatusFresh fallback', orgId, error })
-    const percentUsage = await getPlanUsagePercent(c, orgId)
+    const percentUsage = normalizePlanUsage(await getPlanUsagePercent(c, orgId))
     const is_good_plan = await isGoodPlanOrg(c, orgId)
     return { is_good_plan, percentUsage }
   }
@@ -476,11 +513,12 @@ export async function handleOrgNotificationsAndEvents(c: Context, org: any, orgI
 
 // Update stripe_info with plan status
 export async function updatePlanStatus(c: Context, org: any, is_good_plan: boolean, percentUsage: PlanUsage): Promise<void> {
+  const normalizedUsage = normalizePlanUsage(percentUsage)
   await supabaseAdmin(c)
     .from('stripe_info')
     .update({
       is_good_plan,
-      plan_usage: Math.round(percentUsage.total_percent),
+      plan_usage: Math.round(normalizedUsage.total_percent),
     })
     .eq('customer_id', org.customer_id!)
     .then()

@@ -274,6 +274,10 @@ function getSignatureVerificationCode(webhook: Webhook) {
 function getDeliveryVersionLabel(webhook: Webhook) {
   return webhook.delivery_version === 'standard' ? t('webhook-version-standard') : t('webhook-version-legacy')
 }
+
+function getWebhookDetailsId(webhookId: string) {
+  return `webhook-details-${webhookId}`
+}
 </script>
 
 <template>
@@ -338,22 +342,26 @@ function getDeliveryVersionLabel(webhook: Webhook) {
             class="overflow-hidden border rounded-lg border-slate-200 dark:border-slate-700"
           >
             <!-- Webhook Header -->
-            <div
-              class="p-4 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50"
+            <button
+              type="button"
+              class="w-full p-4 text-left hover:bg-gray-50 dark:hover:bg-gray-700/50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-inset"
+              :aria-expanded="expandedWebhookId === webhook.id"
+              :aria-controls="getWebhookDetailsId(webhook.id)"
               @click="toggleExpand(webhook.id)"
             >
               <div class="flex items-center justify-between">
                 <div class="flex items-center gap-3">
                   <div
-                    class="w-3 h-3 rounded-full" :class="[
+                    aria-hidden="true"
+                    class="w-3 h-3 rounded-full shrink-0" :class="[
                       webhook.enabled ? 'bg-green-500' : 'bg-gray-400',
                     ]"
-                    :title="webhook.enabled ? t('enabled') : t('disabled')"
                   />
                   <div>
                     <h3 class="font-medium text-gray-900 dark:text-white">
                       {{ webhook.name }}
                     </h3>
+                    <span class="sr-only">{{ webhook.enabled ? t('enabled') : t('disabled') }}</span>
                     <p class="max-w-xs text-sm text-gray-500 truncate dark:text-gray-400 sm:max-w-md">
                       {{ webhook.url }}
                     </p>
@@ -383,11 +391,12 @@ function getDeliveryVersionLabel(webhook: Webhook) {
                   />
                 </div>
               </div>
-            </div>
+            </button>
 
             <!-- Expanded Content -->
             <div
               v-if="expandedWebhookId === webhook.id"
+              :id="getWebhookDetailsId(webhook.id)"
               class="p-4 border-t border-slate-200 dark:border-slate-700 bg-gray-50 dark:bg-gray-900/50"
             >
               <!-- Events -->
@@ -416,8 +425,10 @@ function getDeliveryVersionLabel(webhook: Webhook) {
                     {{ webhook.secret }}
                   </code>
                   <button
-                    class="p-2 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+                    type="button"
+                    class="flex items-center justify-center text-gray-500 rounded-lg size-11 hover:bg-gray-200 hover:text-gray-700 dark:hover:bg-gray-700 dark:hover:text-gray-300"
                     :title="t('copy-secret')"
+                    :aria-label="t('copy-secret')"
                     @click.stop="copySecret(webhook.secret)"
                   >
                     <IconClipboard class="w-4 h-4" />
@@ -469,7 +480,7 @@ function getDeliveryVersionLabel(webhook: Webhook) {
               <!-- Actions -->
               <div class="flex flex-wrap gap-2">
                 <button
-                  class="flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-600 dark:hover:bg-gray-700"
+                  class="flex items-center gap-1 px-3 py-1.5 min-h-11 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-600 dark:hover:bg-gray-700"
                   :disabled="testingWebhookId === webhook.id"
                   @click.stop="testWebhook(webhook)"
                 >
@@ -478,7 +489,7 @@ function getDeliveryVersionLabel(webhook: Webhook) {
                   {{ t('test') }}
                 </button>
                 <button
-                  class="flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-600 dark:hover:bg-gray-700"
+                  class="flex items-center gap-1 px-3 py-1.5 min-h-11 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-600 dark:hover:bg-gray-700"
                   @click.stop="viewDeliveries(webhook)"
                 >
                   <IconClock class="w-4 h-4" />
@@ -486,7 +497,7 @@ function getDeliveryVersionLabel(webhook: Webhook) {
                 </button>
                 <button
                   v-if="canManageWebhooks"
-                  class="flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-600 dark:hover:bg-gray-700"
+                  class="flex items-center gap-1 px-3 py-1.5 min-h-11 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-600 dark:hover:bg-gray-700"
                   @click.stop="toggleWebhook(webhook)"
                 >
                   <IconCheck v-if="!webhook.enabled" class="w-4 h-4" />
@@ -495,7 +506,7 @@ function getDeliveryVersionLabel(webhook: Webhook) {
                 </button>
                 <button
                   v-if="canManageWebhooks"
-                  class="flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-600 dark:hover:bg-gray-700"
+                  class="flex items-center gap-1 px-3 py-1.5 min-h-11 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-600 dark:hover:bg-gray-700"
                   @click.stop="openEditForm(webhook)"
                 >
                   <IconPencil class="w-4 h-4" />
@@ -503,7 +514,7 @@ function getDeliveryVersionLabel(webhook: Webhook) {
                 </button>
                 <button
                   v-if="canManageWebhooks"
-                  class="flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-red-600 bg-white border border-red-300 rounded-lg hover:bg-red-50 dark:bg-gray-800 dark:border-red-600 dark:hover:bg-red-900/20"
+                  class="flex items-center gap-1 px-3 py-1.5 min-h-11 text-sm font-medium text-red-600 bg-white border border-red-300 rounded-lg hover:bg-red-50 dark:bg-gray-800 dark:border-red-600 dark:hover:bg-red-900/20"
                   @click.stop="deleteWebhook(webhook)"
                 >
                   <IconTrash class="w-4 h-4" />

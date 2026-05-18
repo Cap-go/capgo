@@ -267,56 +267,56 @@ export function getDatabaseURL(c: Context, readOnly = false): string {
     // Hyperdrive main read replica regional routing in Cloudflare Workers
     // When using Hyperdrive we use session databases directly to avoid supabase pooler overhead and allow prepared statements
     // Asia region - Japan
-    if (c.env.HYPERDRIVE_CAPGO_PS_AS_JAPAN && dbRegion === 'AS_JAPAN') {
-      setDatabaseSource(c, 'HYPERDRIVE_CAPGO_PLANETSCALE_AS_JAPAN')
-      cloudlog({ requestId: c.get('requestId'), message: 'Using HYPERDRIVE_CAPGO_PLANETSCALE_AS_JAPAN for read-only' })
-      return c.env.HYPERDRIVE_CAPGO_PS_AS_JAPAN.connectionString
+    if (c.env.HYPERDRIVE_CAPGO_READ_AS_JAPAN && dbRegion === 'AS_JAPAN') {
+      setDatabaseSource(c, 'HYPERDRIVE_CAPGO_READ_AS_JAPAN')
+      cloudlog({ requestId: c.get('requestId'), message: 'Using HYPERDRIVE_CAPGO_READ_AS_JAPAN for read-only' })
+      return c.env.HYPERDRIVE_CAPGO_READ_AS_JAPAN.connectionString
     }
     // Asia region - India
-    if (c.env.HYPERDRIVE_CAPGO_PS_AS_INDIA && dbRegion === 'AS_INDIA') {
-      setDatabaseSource(c, 'HYPERDRIVE_CAPGO_PLANETSCALE_AS_INDIA')
-      cloudlog({ requestId: c.get('requestId'), message: 'Using HYPERDRIVE_CAPGO_PLANETSCALE_AS_INDIA for read-only' })
-      return c.env.HYPERDRIVE_CAPGO_PS_AS_INDIA.connectionString
+    if (c.env.HYPERDRIVE_CAPGO_READ_AS_INDIA && dbRegion === 'AS_INDIA') {
+      setDatabaseSource(c, 'HYPERDRIVE_CAPGO_READ_AS_INDIA')
+      cloudlog({ requestId: c.get('requestId'), message: 'Using HYPERDRIVE_CAPGO_READ_AS_INDIA for read-only' })
+      return c.env.HYPERDRIVE_CAPGO_READ_AS_INDIA.connectionString
     }
     // // US region
-    if (c.env.HYPERDRIVE_CAPGO_PS_NA && dbRegion === 'NA') {
-      setDatabaseSource(c, 'HYPERDRIVE_CAPGO_PLANETSCALE_NA')
-      cloudlog({ requestId: c.get('requestId'), message: 'Using HYPERDRIVE_CAPGO_PLANETSCALE_NA for read-only' })
-      return c.env.HYPERDRIVE_CAPGO_PS_NA.connectionString
+    if (c.env.HYPERDRIVE_CAPGO_READ_NA && dbRegion === 'NA') {
+      setDatabaseSource(c, 'HYPERDRIVE_CAPGO_READ_NA')
+      cloudlog({ requestId: c.get('requestId'), message: 'Using HYPERDRIVE_CAPGO_READ_NA for read-only' })
+      return c.env.HYPERDRIVE_CAPGO_READ_NA.connectionString
     }
     // // EU region
-    if (c.env.HYPERDRIVE_CAPGO_PS_EU && dbRegion === 'EU') {
-      setDatabaseSource(c, 'HYPERDRIVE_CAPGO_PLANETSCALE_EU')
-      cloudlog({ requestId: c.get('requestId'), message: 'Using HYPERDRIVE_CAPGO_PLANETSCALE_EU for read-only' })
-      return c.env.HYPERDRIVE_CAPGO_PS_EU.connectionString
+    if (c.env.HYPERDRIVE_CAPGO_READ_EU && dbRegion === 'EU') {
+      setDatabaseSource(c, 'HYPERDRIVE_CAPGO_READ_EU')
+      cloudlog({ requestId: c.get('requestId'), message: 'Using HYPERDRIVE_CAPGO_READ_EU for read-only' })
+      return c.env.HYPERDRIVE_CAPGO_READ_EU.connectionString
     }
     // // OC region
-    if (c.env.HYPERDRIVE_CAPGO_PS_OC && dbRegion === 'OC') {
-      setDatabaseSource(c, 'HYPERDRIVE_CAPGO_PLANETSCALE_OC')
-      cloudlog({ requestId: c.get('requestId'), message: 'Using HYPERDRIVE_CAPGO_PLANETSCALE_OC for read-only' })
-      return c.env.HYPERDRIVE_CAPGO_PS_OC.connectionString
+    if (c.env.HYPERDRIVE_CAPGO_READ_OC && dbRegion === 'OC') {
+      setDatabaseSource(c, 'HYPERDRIVE_CAPGO_READ_OC')
+      cloudlog({ requestId: c.get('requestId'), message: 'Using HYPERDRIVE_CAPGO_READ_OC for read-only' })
+      return c.env.HYPERDRIVE_CAPGO_READ_OC.connectionString
     }
     // // SA region
-    if (c.env.HYPERDRIVE_CAPGO_PS_SA && dbRegion === 'SA') {
-      setDatabaseSource(c, 'HYPERDRIVE_CAPGO_PLANETSCALE_SA')
-      cloudlog({ requestId: c.get('requestId'), message: 'Using HYPERDRIVE_CAPGO_PLANETSCALE_SA for read-only' })
-      return c.env.HYPERDRIVE_CAPGO_PS_SA.connectionString
+    if (c.env.HYPERDRIVE_CAPGO_READ_SA && dbRegion === 'SA') {
+      setDatabaseSource(c, 'HYPERDRIVE_CAPGO_READ_SA')
+      cloudlog({ requestId: c.get('requestId'), message: 'Using HYPERDRIVE_CAPGO_READ_SA for read-only' })
+      return c.env.HYPERDRIVE_CAPGO_READ_SA.connectionString
     }
     // Google Cloud Hyperdrive read replica routing
-    if (c.env.HYPERDRIVE_CAPGO_GG_ME && dbRegion === 'ME') {
-      setDatabaseSource(c, 'HYPERDRIVE_CAPGO_GOOGLE_ME')
-      cloudlog({ requestId: c.get('requestId'), message: 'Using HYPERDRIVE_CAPGO_GOOGLE_ME for read-only' })
-      return c.env.HYPERDRIVE_CAPGO_GG_ME.connectionString
+    if (c.env.HYPERDRIVE_CAPGO_READ_ME && dbRegion === 'ME') {
+      setDatabaseSource(c, 'HYPERDRIVE_CAPGO_READ_ME')
+      cloudlog({ requestId: c.get('requestId'), message: 'Using HYPERDRIVE_CAPGO_READ_ME for read-only' })
+      return c.env.HYPERDRIVE_CAPGO_READ_ME.connectionString
     }
-    if (c.env.HYPERDRIVE_CAPGO_GG_AF && dbRegion === 'AF') {
-      setDatabaseSource(c, 'HYPERDRIVE_CAPGO_GOOGLE_AF')
-      cloudlog({ requestId: c.get('requestId'), message: 'Using HYPERDRIVE_CAPGO_GOOGLE_AF for read-only' })
-      return c.env.HYPERDRIVE_CAPGO_GG_AF.connectionString
+    if (c.env.HYPERDRIVE_CAPGO_READ_AF && dbRegion === 'AF') {
+      setDatabaseSource(c, 'HYPERDRIVE_CAPGO_READ_AF')
+      cloudlog({ requestId: c.get('requestId'), message: 'Using HYPERDRIVE_CAPGO_READ_AF for read-only' })
+      return c.env.HYPERDRIVE_CAPGO_READ_AF.connectionString
     }
-    if (c.env.HYPERDRIVE_CAPGO_GG_HK && dbRegion === 'HK') {
-      setDatabaseSource(c, 'HYPERDRIVE_CAPGO_GOOGLE_HK')
-      cloudlog({ requestId: c.get('requestId'), message: 'Using HYPERDRIVE_CAPGO_GOOGLE_HK for read-only' })
-      return c.env.HYPERDRIVE_CAPGO_GG_HK.connectionString
+    if (c.env.HYPERDRIVE_CAPGO_READ_HK && dbRegion === 'HK') {
+      setDatabaseSource(c, 'HYPERDRIVE_CAPGO_READ_HK')
+      cloudlog({ requestId: c.get('requestId'), message: 'Using HYPERDRIVE_CAPGO_READ_HK for read-only' })
+      return c.env.HYPERDRIVE_CAPGO_READ_HK.connectionString
     }
   }
 
@@ -1751,6 +1751,273 @@ function normalizeTimestamp(value: unknown): string | null {
     return null
 
   return parsed.toISOString()
+}
+
+export interface AdminOrganizationInsightRow {
+  org_id: string
+  org_name: string
+  management_email: string
+  plan_name: string | null
+  billing_type: 'monthly' | 'yearly' | null
+  upload_count: number
+  build_count: number
+  fail_rate: number
+  mau: number
+  members_count: number
+  apps_count: number
+  last_upload_at: string | null
+  last_build_at: string | null
+  paid_at: string | null
+  registered_at: string
+}
+
+export interface AdminOrganizationInsightsResult {
+  organizations: AdminOrganizationInsightRow[]
+  total: number
+  plan_options: string[]
+}
+
+interface AdminOrganizationInsightsFilters {
+  limit?: number
+  offset?: number
+  plan_name?: string
+  billing_type?: 'monthly' | 'yearly'
+  paid_only?: boolean
+  search?: string
+}
+
+/**
+ * Fetches admin organization rows with selected-period usage rollups.
+ * Uses daily_* preprocessed tables for MAU, update failures, and build counts;
+ * raw tables are only used for org metadata, bundle upload counts, and latest timestamps.
+ */
+export async function getAdminOrganizationInsights(
+  c: Context,
+  start_date: string,
+  end_date: string,
+  filters: AdminOrganizationInsightsFilters = {},
+): Promise<AdminOrganizationInsightsResult> {
+  let pgClient: ReturnType<typeof getPgClient> | undefined
+  try {
+    pgClient = getPgClient(c)
+    const drizzleClient = getDrizzleClient(pgClient)
+    const safeLimit = Math.max(1, Math.min(Math.floor(filters.limit ?? 50), 500))
+    const safeOffset = Math.max(0, Math.floor(filters.offset ?? 0))
+    const startDateOnly = start_date.split('T')[0]
+    const endDateOnly = end_date.split('T')[0]
+    const trimmedPlanName = filters.plan_name?.trim()
+    const trimmedSearch = filters.search?.trim()
+
+    const billingTypeExpression = sql`
+      CASE
+        WHEN si.price_id = p.price_y_id THEN 'yearly'
+        WHEN si.price_id = p.price_m_id THEN 'monthly'
+        WHEN si.subscription_anchor_start IS NOT NULL
+          AND si.subscription_anchor_end IS NOT NULL
+          AND si.subscription_anchor_end::timestamp - si.subscription_anchor_start::timestamp >= INTERVAL '330 days'
+          THEN 'yearly'
+        WHEN si.subscription_anchor_start IS NOT NULL
+          AND si.subscription_anchor_end IS NOT NULL
+          THEN 'monthly'
+        ELSE NULL
+      END
+    `
+    const planFilter = trimmedPlanName ? sql`AND p.name = ${trimmedPlanName}` : sql``
+    const billingFilter = filters.billing_type ? sql`AND ${billingTypeExpression} = ${filters.billing_type}` : sql``
+    const paidFilter = filters.paid_only ? sql`AND si.status = 'succeeded'` : sql``
+    const searchFilter = trimmedSearch
+      ? sql`AND (
+          o.name ILIKE ${`%${trimmedSearch}%`}
+          OR o.management_email ILIKE ${`%${trimmedSearch}%`}
+          OR o.id::text = ${trimmedSearch}
+        )`
+      : sql``
+
+    const dataQuery = sql`
+      WITH filtered_orgs AS (
+        SELECT
+          o.id AS org_id,
+          o.name AS org_name,
+          o.management_email,
+          o.created_at AS registered_at,
+          si.paid_at,
+          p.name AS plan_name,
+          ${billingTypeExpression} AS billing_type
+        FROM orgs o
+        LEFT JOIN stripe_info si ON si.customer_id = o.customer_id
+        LEFT JOIN plans p ON p.stripe_id = si.product_id
+        WHERE true
+          ${planFilter}
+          ${billingFilter}
+          ${paidFilter}
+          ${searchFilter}
+        ORDER BY o.created_at DESC NULLS LAST, o.id
+        LIMIT ${safeLimit}
+        OFFSET ${safeOffset}
+      ),
+      apps_by_org AS (
+        SELECT
+          a.owner_org AS org_id,
+          COUNT(*)::int AS apps_count
+        FROM apps a
+        INNER JOIN filtered_orgs filtered ON filtered.org_id = a.owner_org
+        GROUP BY a.owner_org
+      ),
+      members_by_org AS (
+        SELECT
+          ou.org_id,
+          COUNT(DISTINCT ou.user_id)::int AS members_count
+        FROM org_users ou
+        INNER JOIN filtered_orgs filtered ON filtered.org_id = ou.org_id
+        WHERE ou.user_right IS NULL OR ou.user_right::text NOT LIKE 'invite_%'
+        GROUP BY ou.org_id
+      ),
+      mau_by_org AS (
+        SELECT
+          a.owner_org AS org_id,
+          COALESCE(SUM(dm.mau), 0)::bigint AS mau
+        FROM filtered_orgs filtered
+        INNER JOIN apps a ON a.owner_org = filtered.org_id
+        INNER JOIN daily_mau dm ON dm.app_id = a.app_id
+        WHERE dm.date >= ${startDateOnly}::date
+          AND dm.date <= ${endDateOnly}::date
+        GROUP BY a.owner_org
+      ),
+      version_usage_by_org AS (
+        SELECT
+          a.owner_org AS org_id,
+          COALESCE(SUM(COALESCE(dv.fail, 0)), 0)::bigint AS fails,
+          COALESCE(SUM(COALESCE(dv.install, 0)), 0)::bigint AS installs
+        FROM filtered_orgs filtered
+        INNER JOIN apps a ON a.owner_org = filtered.org_id
+        INNER JOIN daily_version dv ON dv.app_id = a.app_id
+        WHERE dv.date >= ${startDateOnly}::date
+          AND dv.date <= ${endDateOnly}::date
+        GROUP BY a.owner_org
+      ),
+      build_usage_by_org AS (
+        SELECT
+          a.owner_org AS org_id,
+          COALESCE(SUM(dbt.build_count), 0)::bigint AS build_count
+        FROM filtered_orgs filtered
+        INNER JOIN apps a ON a.owner_org = filtered.org_id
+        INNER JOIN daily_build_time dbt ON dbt.app_id = a.app_id
+        WHERE dbt.date >= ${startDateOnly}::date
+          AND dbt.date <= ${endDateOnly}::date
+        GROUP BY a.owner_org
+      ),
+      bundle_uploads_by_org AS (
+        SELECT
+          av.owner_org AS org_id,
+          COUNT(*) FILTER (
+            WHERE av.created_at >= ${start_date}::timestamp
+              AND av.created_at < ${end_date}::timestamp
+          )::int AS upload_count,
+          MAX(av.created_at) AS last_upload_at
+        FROM app_versions av
+        INNER JOIN filtered_orgs filtered ON filtered.org_id = av.owner_org
+        WHERE av.name NOT IN ('builtin', 'unknown')
+        GROUP BY av.owner_org
+      ),
+      last_builds_by_org AS (
+        SELECT
+          bl.org_id,
+          MAX(bl.created_at) AS last_build_at
+        FROM build_logs bl
+        INNER JOIN filtered_orgs filtered ON filtered.org_id = bl.org_id
+        GROUP BY bl.org_id
+      )
+      SELECT
+        filtered.org_id,
+        filtered.org_name,
+        filtered.management_email,
+        filtered.plan_name,
+        filtered.billing_type,
+        COALESCE(buo.upload_count, 0)::int AS upload_count,
+        COALESCE(bu.build_count, 0)::bigint AS build_count,
+        CASE
+          WHEN COALESCE(vu.installs, 0) + COALESCE(vu.fails, 0) > 0
+            THEN (COALESCE(vu.fails, 0)::float / (COALESCE(vu.installs, 0) + COALESCE(vu.fails, 0))::float) * 100
+          ELSE 0
+        END::float AS fail_rate,
+        COALESCE(mau.mau, 0)::bigint AS mau,
+        COALESCE(members.members_count, 0)::int AS members_count,
+        COALESCE(apps.apps_count, 0)::int AS apps_count,
+        buo.last_upload_at,
+        lb.last_build_at,
+        filtered.paid_at,
+        filtered.registered_at
+      FROM filtered_orgs filtered
+      LEFT JOIN apps_by_org apps ON apps.org_id = filtered.org_id
+      LEFT JOIN members_by_org members ON members.org_id = filtered.org_id
+      LEFT JOIN mau_by_org mau ON mau.org_id = filtered.org_id
+      LEFT JOIN version_usage_by_org vu ON vu.org_id = filtered.org_id
+      LEFT JOIN build_usage_by_org bu ON bu.org_id = filtered.org_id
+      LEFT JOIN bundle_uploads_by_org buo ON buo.org_id = filtered.org_id
+      LEFT JOIN last_builds_by_org lb ON lb.org_id = filtered.org_id
+      ORDER BY filtered.registered_at DESC NULLS LAST, filtered.org_id
+    `
+
+    const countQuery = sql`
+      SELECT COUNT(*)::int AS total
+      FROM orgs o
+      LEFT JOIN stripe_info si ON si.customer_id = o.customer_id
+      LEFT JOIN plans p ON p.stripe_id = si.product_id
+      WHERE true
+        ${planFilter}
+        ${billingFilter}
+        ${paidFilter}
+        ${searchFilter}
+    `
+
+    const planOptionsQuery = sql`
+      SELECT DISTINCT name
+      FROM plans
+      WHERE name IS NOT NULL AND name != ''
+      ORDER BY name ASC
+    `
+
+    const [result, countResult, planOptionsResult] = await Promise.all([
+      drizzleClient.execute(dataQuery),
+      drizzleClient.execute(countQuery),
+      drizzleClient.execute(planOptionsQuery),
+    ])
+
+    const organizations: AdminOrganizationInsightRow[] = result.rows.map((row: any) => ({
+      org_id: row.org_id,
+      org_name: row.org_name,
+      management_email: row.management_email,
+      plan_name: row.plan_name ?? null,
+      billing_type: row.billing_type ?? null,
+      upload_count: Number(row.upload_count) || 0,
+      build_count: Number(row.build_count) || 0,
+      fail_rate: Number(row.fail_rate) || 0,
+      mau: Number(row.mau) || 0,
+      members_count: Number(row.members_count) || 0,
+      apps_count: Number(row.apps_count) || 0,
+      last_upload_at: normalizeTimestamp(row.last_upload_at),
+      last_build_at: normalizeTimestamp(row.last_build_at),
+      paid_at: normalizeTimestamp(row.paid_at),
+      registered_at: normalizeTimestamp(row.registered_at) ?? '',
+    }))
+
+    const total = Number((countResult.rows[0] as any)?.total) || 0
+    const plan_options = planOptionsResult.rows
+      .map((row: any) => String(row.name || '').trim())
+      .filter(Boolean)
+
+    cloudlog({ requestId: c.get('requestId'), message: 'getAdminOrganizationInsights result', resultCount: organizations.length, total })
+
+    return { organizations, total, plan_options }
+  }
+  catch (e: unknown) {
+    logPgError(c, 'getAdminOrganizationInsights', e)
+    return { organizations: [], total: 0, plan_options: [] }
+  }
+  finally {
+    if (pgClient)
+      await closeClient(c, pgClient)
+  }
 }
 
 // Admin Cancelled Organizations List

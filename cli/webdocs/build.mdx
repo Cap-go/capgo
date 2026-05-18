@@ -107,6 +107,7 @@ npx @capgo/cli@latest build request com.example.app --platform ios --path .
 | **--keystore-store-password** | <code>string</code> | Android: Keystore store password |
 | **--play-config-json** | <code>string</code> | Android: Base64-encoded Google Play service account JSON |
 | **--android-flavor** | <code>string</code> | Android: Product flavor to build (e.g. production). Required if your project has multiple flavors. |
+| **--in-app-update-priority** | <code>string</code> | Android: Google Play in-app update priority for this release (integer 0–5; higher = more urgent). See https://developer.android.com/guide/playcore/in-app-updates. Precedence: CLI > env > saved credentials |
 | **--no-playstore-upload** | <code>boolean</code> | Skip Play Store upload for this build (nulls out saved play config). Requires --output-upload. |
 | **--output-upload** | <code>boolean</code> | Override output upload behavior for this build only (enable). Precedence: CLI > env > saved credentials |
 | **--no-output-upload** | <code>boolean</code> | Override output upload behavior for this build only (disable). Precedence: CLI > env > saved credentials |
@@ -191,6 +192,7 @@ iOS Example:
 | **--keystore-store-password** | <code>string</code> | Android: Keystore store password |
 | **--play-config** | <code>string</code> | Android: Path to Play Store service account JSON |
 | **--android-flavor** | <code>string</code> | Android: Product flavor to build (e.g. production). Required if your project has multiple flavors. |
+| **--in-app-update-priority** | <code>string</code> | Android: Google Play in-app update priority for future releases (integer 0–5; higher = more urgent). Omit to leave Play’s existing value untouched. |
 | **--local** | <code>boolean</code> | Save to .capgo-credentials.json in project root instead of global ~/.capgo-credentials/ |
 | **--output-upload** | <code>boolean</code> | Upload build outputs (IPA/APK/AAB) to Capgo storage and print download links |
 | **--no-output-upload** | <code>boolean</code> | Do not upload build outputs (IPA/APK/AAB) to Capgo storage |
@@ -274,11 +276,35 @@ Examples:
 | **--keystore-store-password** | <code>string</code> | Keystore store password |
 | **--play-config** | <code>string</code> | Path to Google Play service account JSON |
 | **--android-flavor** | <code>string</code> | Android: Product flavor to build (e.g. production). Required if your project has multiple flavors. |
+| **--in-app-update-priority** | <code>string</code> | Android: Google Play in-app update priority for future releases (integer 0–5; higher = more urgent). |
 | **--output-upload** | <code>boolean</code> | Upload build outputs (IPA/APK/AAB) to Capgo storage and print download links |
 | **--no-output-upload** | <code>boolean</code> | Do not upload build outputs (IPA/APK/AAB) to Capgo storage |
 | **--output-retention** | <code>string</code> | Output link TTL: 1h to 7d. Examples: 1h, 6h, 2d |
 | **--skip-build-number-bump** | <code>boolean</code> | Skip automatic build number/version code incrementing on future builds |
 | **--no-skip-build-number-bump** | <code>boolean</code> | Re-enable automatic build number incrementing (default behavior) |
+
+#### <a id="build-credentials-manage"></a> 🔹 **Manage**
+
+```bash
+npx @capgo/cli@latest build credentials manage
+```
+
+Interactively manage saved build credentials.
+Browse stored credentials, view what's configured, export a CI/CD-ready .env file,
+or delete a platform's credentials. Reuses the same TUI as `capgo init`.
+Examples:
+  npx @capgo/cli build credentials manage
+  npx @capgo/cli build credentials manage --appId com.example.app
+  npx @capgo/cli build credentials manage --appId com.example.app --platform ios
+  npx @capgo/cli build credentials manage --local
+
+**Options:**
+
+| Param          | Type          | Description          |
+| -------------- | ------------- | -------------------- |
+| **--appId** | <code>string</code> | App ID to manage (optional, prompts to pick if omitted) |
+| **--platform** | <code>string</code> | Platform to manage: ios or android (optional, prompts to pick if omitted) |
+| **--local** | <code>boolean</code> | Only browse local .capgo-credentials.json |
 
 #### <a id="build-credentials-migrate"></a> 🔹 **Migrate**
 

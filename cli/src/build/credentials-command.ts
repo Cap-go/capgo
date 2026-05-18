@@ -13,6 +13,7 @@ import {
   listAllApps,
   loadSavedCredentials,
   MIN_OUTPUT_RETENTION_SECONDS,
+  parseInAppUpdatePriority,
   parseOptionalBoolean,
   parseOutputRetentionSeconds,
   removeSavedCredentialKeys,
@@ -48,6 +49,7 @@ interface SaveCredentialsOptions {
   keystoreStorePassword?: string
   playConfig?: string
   androidFlavor?: string
+  inAppUpdatePriority?: number | string
 }
 
 /**
@@ -348,6 +350,18 @@ export async function saveCredentialsCommand(options: SaveCredentialsOptions): P
       else {
         log.info('ℹ️  --android-flavor not specified, no product flavor will be used')
       }
+
+      if (options.inAppUpdatePriority !== undefined) {
+        try {
+          const priority = parseInAppUpdatePriority(options.inAppUpdatePriority)
+          credentials.PLAY_STORE_IN_APP_UPDATE_PRIORITY = String(priority)
+          log.info(`✓ In-app update priority: ${priority}`)
+        }
+        catch (error) {
+          log.error(`❌ ${(error as Error).message}`)
+          exit(1)
+        }
+      }
     }
 
     // Convert files to base64 and merge with other credentials
@@ -458,6 +472,10 @@ export async function saveCredentialsCommand(options: SaveCredentialsOptions): P
     // flavor so it doesn't silently carry over to future builds.
     if (platform === 'android' && !options.androidFlavor) {
       await removeSavedCredentialKeys(appId, platform, ['CAPGO_ANDROID_FLAVOR'], options.local)
+    }
+    // Same semantics for --in-app-update-priority: re-saving without it clears the prior value.
+    if (platform === 'android' && options.inAppUpdatePriority === undefined) {
+      await removeSavedCredentialKeys(appId, platform, ['PLAY_STORE_IN_APP_UPDATE_PRIORITY'], options.local)
     }
 
     // Send analytics event
@@ -577,6 +595,8 @@ export async function listCredentialsCommand(options?: { appId?: string, local?:
           log.info('    ✓ Key Password: ********')
         if (android.KEYSTORE_STORE_PASSWORD)
           log.info('    ✓ Store Password: ********')
+        if (android.PLAY_STORE_IN_APP_UPDATE_PRIORITY)
+          log.info(`    ✓ In-app Update Priority: ${android.PLAY_STORE_IN_APP_UPDATE_PRIORITY}`)
       }
     }
 
@@ -654,7 +674,7 @@ export async function updateCredentialsCommand(options: SaveCredentialsOptions):
       || options.p12Password || options.appleKey || options.appleKeyId || options.appleIssuerId
       || options.appleTeamId)
     const hasAndroidOptions = !!(options.keystore || options.keystoreAlias || options.keystoreKeyPassword
-      || options.keystoreStorePassword || options.playConfig || options.androidFlavor)
+      || options.keystoreStorePassword || options.playConfig || options.androidFlavor || options.inAppUpdatePriority !== undefined)
     const hasCrossPlatformOptions = options.outputUpload !== undefined || options.outputRetention !== undefined || options.skipBuildNumberBump !== undefined
 
     let platform = options.platform
@@ -848,6 +868,17 @@ export async function updateCredentialsCommand(options: SaveCredentialsOptions):
         }
         else {
           log.warn('Ignoring whitespace-only --android-flavor value')
+        }
+      }
+      if (options.inAppUpdatePriority !== undefined) {
+        try {
+          const priority = parseInAppUpdatePriority(options.inAppUpdatePriority)
+          credentials.PLAY_STORE_IN_APP_UPDATE_PRIORITY = String(priority)
+          log.info(`✓ Updating in-app update priority: ${priority}`)
+        }
+        catch (error) {
+          log.error(`❌ ${(error as Error).message}`)
+          exit(1)
         }
       }
     }

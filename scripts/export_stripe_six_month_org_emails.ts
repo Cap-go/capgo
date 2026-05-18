@@ -8,11 +8,12 @@
  *   bun run stripe:export-six-month-org-emails --output=./tmp/export.csv
  *   bun run stripe:export-six-month-org-emails --min-months=6
  *   bun run stripe:export-six-month-org-emails --status=active
+ *   bun run stripe:export-six-month-org-emails --status=never_paid
  *   bun run stripe:export-six-month-org-emails --customer-id=cus_...
  *   bun run stripe:export-six-month-org-emails --env-file=./internal/cloudflare/.env.preprod
  */
 import type { Database } from '../supabase/functions/_backend/utils/supabase.types.ts'
-import type { CustomerPaidCoverage, CustomerPaidSummary } from './stripe_paid_invoice_export_utils.ts'
+import type { CustomerPaidSummary } from './stripe_paid_invoice_export_utils.ts'
 import process from 'node:process'
 import {
   createStripeClient,
@@ -62,7 +63,7 @@ Usage:
 Options:
   --output=PATH        CSV output path. Default: ${DEFAULT_OUTPUT}.
   --min-months=N      Minimum paid duration for paid, active, and canceled statuses. Default: ${DEFAULT_MIN_MONTHS}.
-  --status=VALUE      One of: paid, active, canceled, never_paid, all. Default: ${DEFAULT_STATUS_FILTER}.
+  --status=VALUE      One of: paid, active, canceled, never_paid, all. never_paid means trial orgs with no positive paid invoice. Default: ${DEFAULT_STATUS_FILTER}.
   --customer-id=ID    Limit export to one Stripe customer.
   --limit=N           Stop after N paid Stripe invoices. Only allowed for paid, active, canceled.
   --env-file=PATH     Env file to load. Default: ${DEFAULT_ENV_FILE}.
@@ -249,14 +250,14 @@ function filterCustomerSummaries(customerSummaries: CustomerPaidSummary[], statu
 
 function buildNeverPaidCustomerSummaries(
   customerIds: Set<string>,
-  coverageByCustomerId: Map<string, CustomerPaidCoverage>,
+  customerIdsWithPositivePaidInvoices: Set<string>,
   statusFilter: StatusFilter,
 ) {
   if (statusFilter !== 'never_paid' && statusFilter !== 'all')
     return []
 
   return [...customerIds]
-    .filter(customerId => !coverageByCustomerId.has(customerId))
+    .filter(customerId => !customerIdsWithPositivePaidInvoices.has(customerId))
     .map((customerId): CustomerPaidSummary => ({
       activePaying: false,
       customerId,
@@ -359,7 +360,10 @@ async function main(args = process.argv.slice(2), runtimeEnv: Record<string, str
     return
   }
 
-  const coverageByCustomerId = await collectPaidCoverageByCustomerId(stripe, {
+  const {
+    coverageByCustomerId,
+    customerIdsWithPositivePaidInvoices,
+  } = await collectPaidCoverageByCustomerId(stripe, {
     customerId,
     includeCustomerIds: customerIds,
     invoiceLimit,
@@ -371,7 +375,7 @@ async function main(args = process.argv.slice(2), runtimeEnv: Record<string, str
   )
   const customerSummaries = [
     ...filterCustomerSummaries(paidCustomerSummaries, statusFilter),
-    ...buildNeverPaidCustomerSummaries(customerIds, coverageByCustomerId, statusFilter),
+    ...buildNeverPaidCustomerSummaries(customerIds, customerIdsWithPositivePaidInvoices, statusFilter),
   ]
   const qualifyingOrgIds = customerSummaries
     .flatMap(summary => orgsByCustomerId.get(summary.customerId) ?? [])
