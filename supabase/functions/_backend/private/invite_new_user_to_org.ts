@@ -85,6 +85,7 @@ async function validateInvite(c: Context, rawBody: any) {
   }
 
   const body = validationResult.data
+  body.email = body.email.trim().toLowerCase()
   cloudlog({ requestId: c.get('requestId'), context: 'invite_new_user_to_org validated body', body })
 
   const authorization = c.get('authorization')

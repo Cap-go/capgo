@@ -108,6 +108,25 @@ async function updateUser(
   }
 }
 
+async function hasPendingInvitations(supabase: SupabaseClient) {
+  try {
+    const { data, error } = await supabase.functions.invoke('private/pending_invitations', {
+      method: 'GET',
+    })
+
+    if (error) {
+      console.error('Failed to load pending organization invitations', error)
+      return false
+    }
+
+    return (data?.invitations?.length ?? 0) > 0
+  }
+  catch (error) {
+    console.error('Failed to load pending organization invitations', error)
+    return false
+  }
+}
+
 async function maybeProvisionSsoMembership(
   supabase: SupabaseClient,
   session: Awaited<ReturnType<SupabaseClient['auth']['getSession']>>['data']['session'] | null,
@@ -209,6 +228,14 @@ async function guard(
     return !organizationStore.organizations.some(org => org.gid === inviteOrgId && org.role.startsWith('invite'))
   }
 
+  async function shouldRedirectToPendingInviteOnboarding(organizationsLoaded: boolean) {
+    if (!organizationsLoaded || organizationStore.hasOrganizations)
+      return false
+    if (to.path.startsWith('/onboarding/invitation'))
+      return false
+    return await hasPendingInvitations(supabase)
+  }
+
   if (hasAuth && sessionUser) {
     const authConfirmedAt = main.auth?.email_confirmed_at
     if (!main.auth || main.auth.id !== sessionUser.id || authConfirmedAt !== sessionUser.email_confirmed_at) {
@@ -266,6 +293,15 @@ async function guard(
     }
 
     const organizationsLoaded = await tryLoadOrganizations(() => organizationStore.fetchOrganizations())
+    if (await shouldRedirectToPendingInviteOnboarding(organizationsLoaded)) {
+      return next({
+        path: '/onboarding/invitation',
+        query: {
+          to: to.path.startsWith('/onboarding/') ? '/dashboard' : to.fullPath,
+        },
+      })
+    }
+
     if (organizationsLoaded && isAdminRoute) {
       try {
         main.isAdmin = await isPlatformAdmin()
@@ -332,6 +368,15 @@ async function guard(
     }
 
     let organizationsLoaded = await tryLoadOrganizations(() => organizationStore.dedupFetchOrganizations())
+    if (await shouldRedirectToPendingInviteOnboarding(organizationsLoaded)) {
+      return next({
+        path: '/onboarding/invitation',
+        query: {
+          to: to.path.startsWith('/onboarding/') ? '/dashboard' : to.fullPath,
+        },
+      })
+    }
+
     if (organizationsLoaded && !organizationStore.hasOrganizations && isSsoUser(sessionUser)) {
       const didProvisionSsoMembership = await maybeProvisionSsoMembership(supabase, sessionData?.session ?? null)
       if (didProvisionSsoMembership === 'redirect_login') {

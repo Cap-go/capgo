@@ -15,6 +15,7 @@ import { app as invite_existing_user_to_org } from '../_backend/private/invite_e
 import { app as invite_new_user_to_org } from '../_backend/private/invite_new_user_to_org.ts'
 import { app as latency } from '../_backend/private/latency.ts'
 import { app as log_as } from '../_backend/private/log_as.ts'
+import { app as pending_invitations } from '../_backend/private/pending_invitations.ts'
 // Webapps API
 import { app as plans } from '../_backend/private/plans.ts'
 import { app as publicStats } from '../_backend/private/public_stats.ts'
@@ -72,6 +73,7 @@ appGlobal.route('/roles', roles)
 appGlobal.route('/invite_new_user_to_org', invite_new_user_to_org)
 appGlobal.route('/invite_existing_user_to_org', invite_existing_user_to_org)
 appGlobal.route('/accept_invitation', accept_invitation)
+appGlobal.route('/pending_invitations', pending_invitations)
 appGlobal.route('/validate_password_compliance', validate_password_compliance)
 appGlobal.route('/verify_email_otp', verify_email_otp)
 appGlobal.route('/website_preview', website_preview)
