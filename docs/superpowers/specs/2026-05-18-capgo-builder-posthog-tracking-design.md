@@ -112,8 +112,8 @@ ONBOARDING:
 
   CLI wizard step reducer
     └─→ trackOnboardingStep(step, platform, appId, error?)        [cli/src/build/onboarding/telemetry.ts]
-          └─→ POST /private/track_onboarding  (auth: existing JWT)
-                └─→ backend resolves orgId from JWT, validates body
+          └─→ POST /private/events                                [reuses existing endpoint]
+                └─→ backend validates body, resolves orgId via resolveTrackingUserId
                       └─→ sendEventToTracking(...)                 [supabase/functions/_backend/utils/tracking.ts]
                             ├─→ logsnag(c).track(...)
                             └─→ trackPosthogEvent(c, {...})
@@ -144,6 +144,10 @@ The CLI already has `capgo/cli/src/posthog.ts`, but it is scoped to exception ca
 - Auth-gated event source (anyone with a CLI token is a real user)
 - Consistency with `on_app_create.ts` and the other backend trackers
 
+### Why reuse `/private/events` instead of a new endpoint
+
+The existing `/private/events` Hono handler (lines 79–162 of `events.ts`) already implements every concern the spec needed for a new endpoint: auth via `middlewareV2`, org resolution via `resolveTrackingUserId` (verifies the caller can post for that org), app_id permission check from `tags.app_id`, sendEventToTracking with org grouping. Adding a second endpoint would duplicate ~80 lines of working code. The CLI helper just POSTs with `event: 'Builder Onboarding Step'` and the new event flows through the same code path.
+
 ### Why `build_started` does not need capgo_builder changes
 
 The existing reconciliation cron already fetches builder job status for every stale build. We can detect the queued → running transition by comparing the new builder status against the persisted `build_requests.status` before this pass overwrites it. The transition fires the event; the existing update writes the new status.
@@ -154,9 +158,7 @@ All paths relative to the `capgo` repo root.
 
 ### New files
 
-- `supabase/functions/_backend/private/track_onboarding.ts` — Hono handler. Auth-gated. Validates a small zod schema (`step`, `platform`, `app_id`, optional `duration_ms`, optional `error_category`). Calls `sendEventToTracking`. Returns `200 { success: true }` even on downstream tracking failure (matches existing pattern; `sendEventToTracking` already swallows per-provider errors).
-- `cli/src/build/onboarding/telemetry.ts` — Exposes `trackOnboardingStep(input)`. Best-effort `fetch` with `AbortController` timeout (1500ms, matches `posthog.ts`). Honors `CAPGO_DISABLE_TELEMETRY` / `CAPGO_DISABLE_POSTHOG` (same env vars as `posthog.ts`). Never throws.
-- `tests/track-onboarding.unit.test.ts` — Backend endpoint tests: auth required, payload validation, `sendEventToTracking` called with the expected shape.
+- `cli/src/build/onboarding/telemetry.ts` — Exposes `trackOnboardingStep(input)`. Best-effort `fetch` to the existing `/private/events` endpoint with `AbortController` timeout (1500ms, matches `posthog.ts`). Honors `CAPGO_DISABLE_TELEMETRY` / `CAPGO_DISABLE_POSTHOG` (same env vars as `posthog.ts`). Never throws.
 - `tests/build-lifecycle-tracking.unit.test.ts` — Cron-side tests: transitions emit the right events, idempotency when re-running on the same build, `failure_category` mapping.
 
 ### Modified files
