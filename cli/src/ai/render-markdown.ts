@@ -31,11 +31,12 @@ function renderInline(line: string): string {
     .replace(/\*\*([^*]+)\*\*/g, (_, b: string) => stylize(ANSI.bold, b))
     // *italic* -> italic. Negative-lookahead/behind avoid ** false-matches and
     // bare * in log content.
-    .replace(/(^|[^*])\*([^*\s][^*]*?)\*(?!\*)/g, (_, prefix: string, i: string) => `${prefix}${stylize(ANSI.italic, i)}`)
+    .replace(/(^|[^*])\*([^*\s][^*]*)\*(?!\*)/g, (_, prefix: string, i: string) => `${prefix}${stylize(ANSI.italic, i)}`)
 }
 
 export function renderMarkdown(md: string, isTTY: boolean = process.stdout.isTTY === true): string {
-  if (!isTTY) return md // keep raw markdown when piped/redirected
+  if (!isTTY)
+    return md // keep raw markdown when piped/redirected
 
   const lines = md.split('\n')
   const out: string[] = []
@@ -59,8 +60,11 @@ export function renderMarkdown(md: string, isTTY: boolean = process.stdout.isTTY
       continue
     }
 
-    // Headers
-    const headerMatch = raw.match(/^(#{1,6})\s+(.+)$/)
+    // Headers. Anchor the captured text to start with `\S` (non-space) so the
+    // regex engine can't backtrack into the ` +` separator, defusing the
+    // `regexp/no-super-linear-backtracking` lint. Real markdown headers
+    // require a space and non-empty content anyway.
+    const headerMatch = raw.match(/^(#{1,6}) +(\S.*)$/)
     if (headerMatch) {
       const text = headerMatch[2]
       out.push('')
@@ -69,7 +73,7 @@ export function renderMarkdown(md: string, isTTY: boolean = process.stdout.isTTY
     }
 
     // Numbered list (preserve the number)
-    const numberedMatch = raw.match(/^(\s*)(\d+)\.\s+(.*)$/)
+    const numberedMatch = raw.match(/^([ \t]*)(\d+)\. +(\S.*)$/)
     if (numberedMatch) {
       const [, indent, n, rest] = numberedMatch
       out.push(`${indent}${stylize(ANSI.yellow, `${n}.`)} ${renderInline(rest)}`)
@@ -77,7 +81,7 @@ export function renderMarkdown(md: string, isTTY: boolean = process.stdout.isTTY
     }
 
     // Bullet list
-    const bulletMatch = raw.match(/^(\s*)[-*]\s+(.*)$/)
+    const bulletMatch = raw.match(/^([ \t]*)[-*] +(\S.*)$/)
     if (bulletMatch) {
       const [, indent, rest] = bulletMatch
       out.push(`${indent}${stylize(ANSI.yellow, '•')} ${renderInline(rest)}`)
