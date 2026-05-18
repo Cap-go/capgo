@@ -569,12 +569,14 @@ useEffect(() => {
     platform: 'ios',
     step,
     durationMs,
-    error: step === 'error' && error ? new Error(error) : undefined,
+    errorCategory: step === 'error' ? errorCategoryRef.current : undefined,
   })
 
   stepTimingRef.current = { step, startedAt: now }
 }, [step, appId, resolvedOrgId, error])
 ```
+
+> The wizard stores only `err.message` (string) in React state, which loses `.status` / `.phase` / `instanceof` discriminators that `mapIosOnboardingError` needs. Capture the mapped category at `handleError` time via a `errorCategoryRef = useRef<OnboardingErrorCategory>()`, set it to `mapIosOnboardingError(err)` before the existing `setError(message)`, clear it on `setError(null)` retry sites, and read it here. The telemetry helper takes the pre-computed `errorCategory` field directly — no `new Error(string)` reconstruction.
 
 If `createSupabaseClient` and `isAllowedAppOrg` aren't already imported in this file, add them:
 
@@ -682,7 +684,7 @@ useEffect(() => {
     platform: 'android',
     step,
     durationMs,
-    error: step === 'error' && error ? new Error(error) : undefined,
+    errorCategory: step === 'error' ? errorCategoryRef.current : undefined,
   })
 
   stepTimingRef.current = { step, startedAt: now }

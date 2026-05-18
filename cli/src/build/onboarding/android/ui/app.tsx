@@ -26,9 +26,11 @@ import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { createSupabaseClient, findSavedKey, findSavedKeySilent, getOrganizationId } from '../../../../utils.js'
 import { loadSavedCredentials, updateSavedCredentials } from '../../../credentials.js'
 import { requestBuildInternal } from '../../../request.js'
+import { mapAndroidOnboardingError } from '../../error-categories.js'
 import { canUseFilePicker, openKeystorePicker } from '../../file-picker.js'
-import { findAndroidApplicationIds } from '../gradle-parser.js'
+import { trackBuilderOnboardingStep } from '../../telemetry.js'
 import { Divider, ErrorLine, FilteredTextInput, Header, SpinnerLine, SuccessLine } from '../../ui/components.js'
+import { findAndroidApplicationIds } from '../gradle-parser.js'
 import {
   ANDROIDPUBLISHER_API,
   createServiceAccountKey,
@@ -65,8 +67,6 @@ import {
   PLAY_DEVELOPERS_URL,
 } from '../play-api.js'
 import { deleteAndroidProgress, getAndroidResumeStep, loadAndroidProgress, saveAndroidProgress } from '../progress.js'
-import { mapAndroidOnboardingError } from '../../error-categories.js'
-import { trackBuilderOnboardingStep } from '../../telemetry.js'
 import { ANDROID_STEP_PROGRESS, getAndroidPhaseLabel } from '../types.js'
 
 interface LogEntry { text: string, color?: string }

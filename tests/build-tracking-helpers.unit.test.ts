@@ -40,6 +40,10 @@ describe('classifyBuildTransition', () => {
     expect(classifyBuildTransition({ previous: 'pending', next: 'pending', timeoutApplied: false })).toBeNull()
     expect(classifyBuildTransition({ previous: 'running', next: 'running', timeoutApplied: false })).toBeNull()
   })
+
+  it.concurrent('returns "timed_out" even when previous === next (timeout overrides no-change)', () => {
+    expect(classifyBuildTransition({ previous: 'running', next: 'running', timeoutApplied: true })).toBe('timed_out')
+  })
 })
 
 describe('mapBuildFailureCategory', () => {

@@ -20,7 +20,7 @@ Mirror the existing Capgo onboarding-progress PostHog tracking onto the **Capgo 
 
 ### 1. Onboarding step events
 
-One event per CLI wizard step transition. Sent from the CLI through a new backend endpoint so the existing dual-writer (LogSnag + PostHog) and org grouping apply automatically.
+One event per CLI wizard step transition. Sent from the CLI through the existing `/private/events` endpoint so the existing dual-writer (LogSnag + PostHog) and org grouping apply automatically.
 
 **Event:** `Builder Onboarding Step`
 **Channel:** `builder-onboarding`
@@ -107,7 +107,7 @@ Mapping happens in `cron_reconcile_build_status.ts` next to the existing status-
 
 ## Architecture
 
-```
+```text
 ONBOARDING:
 
   CLI wizard step reducer
@@ -202,5 +202,5 @@ All paths relative to the `capgo` repo root.
 ## Open items / explicit decisions
 
 - **No `Build Cancelled` event** for now. `public/build/cancel.ts` exists and could fire it, but cancellations were not in the user's scope. Easy to add later.
-- **No per-org rate limit** on the new `/private/track_onboarding` endpoint. The wizard has fewer than 35 transitions per run; abuse risk is low. Revisit if we ever see > 1000 events/org/day.
+- **No per-org rate limit** on onboarding events at the reused `/private/events` endpoint. The wizard has fewer than 35 transitions per run; abuse risk is low. Revisit if we ever see > 1000 events/org/day.
 - **Duration timing is wall-clock from CLI**. Users who walk away mid-wizard and return next day will produce one huge `duration_ms` value. We accept this — it is also signal (long pauses mean drop-off).

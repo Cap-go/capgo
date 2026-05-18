@@ -16,11 +16,13 @@ export function classifyBuildTransition(input: ClassifyInput): BuildTransition |
   if (TERMINAL_BUILD_STATUSES.has(input.previous))
     return null
 
-  if (input.previous === input.next)
-    return null
-
+  // Timeout overrides the no-change check: a stale snapshot with the same
+  // previous/next must still emit `timed_out` when the cron applied a timeout.
   if (input.timeoutApplied)
     return 'timed_out'
+
+  if (input.previous === input.next)
+    return null
 
   if (input.next === 'running')
     return 'started'

@@ -1,12 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { trackBuilderOnboardingStep } from '../cli/src/build/onboarding/telemetry.ts'
 
 const sendEventMock = vi.hoisted(() => vi.fn())
 
 vi.mock('../cli/src/utils.ts', () => ({
   sendEvent: sendEventMock,
 }))
-
-import { trackBuilderOnboardingStep } from '../cli/src/build/onboarding/telemetry.ts'
 
 describe('trackBuilderOnboardingStep', () => {
   beforeEach(() => {
