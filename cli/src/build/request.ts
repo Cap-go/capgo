@@ -1603,17 +1603,19 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
       log.info(`Upload expires: ${buildRequest.upload_expires_at}`)
     }
 
-    // --- Task 19: /tmp log capture setup ---
-    const captureEnabled = shouldCaptureLogs()
+    // --- /tmp log capture setup ---
+    // Capture when interactive (so the on-failure menu has logs to send) OR when
+    // --ai-analytics is set in CI (so auto-upload has logs to send). Without the
+    // flag-OR, the CI auto_upload branch from decideAnalyzeBehavior would never
+    // have a log file to read.
+    const captureEnabled = shouldCaptureLogs() || options.aiAnalytics === true
     let capturedJobId: string | null = null
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    let _unregisterCleanup: (() => void) | null = null
-    let keepPromptFile = false // Task 20: mutable so local-AI flow can set it true
+    let keepPromptFile = false // mutable so local-AI flow can set it true
 
     if (captureEnabled && buildRequest.job_id) {
       capturedJobId = buildRequest.job_id
       await startCaptureForJob(buildRequest.job_id)
-      _unregisterCleanup = registerCleanupHandlers(buildRequest.job_id, () => keepPromptFile)
+      registerCleanupHandlers(buildRequest.job_id, () => keepPromptFile)
     }
 
     // Wrap the logger so every buildLog line is also captured to /tmp
