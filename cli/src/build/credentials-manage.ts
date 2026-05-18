@@ -1245,6 +1245,30 @@ async function exportCombinedEnvFile(entry: AppEntry): Promise<boolean> {
     return true
   }
 
+  // The manager allows the same key to be stored under both platforms (the View
+  // screen tags these as [SHARED]), and the stored values can drift. When the
+  // combined file gets ingested by `gh secret set -f`, shell sourcing, or any
+  // other dotenv consumer, the LAST occurrence wins — so a drifted key silently
+  // produces wrong CI behaviour for at least one platform. Detect and surface.
+  const conflicts = findCombinedExportConflicts(sections)
+  if (conflicts.length > 0) {
+    pLog.warn(`⚠️  ${conflicts.length} key${conflicts.length === 1 ? '' : 's'} differ across platforms — dotenv ingestion keeps only the LAST value per key, so at least one platform will get the wrong setting:`)
+    for (const { key, occurrences } of conflicts) {
+      const summary = occurrences.map(o => `${o.platform}=${maskConflictValue(o.value)}`).join(', ')
+      pLog.warn(`  • ${key}: ${summary}`)
+    }
+    pLog.info('Fix: cancel and re-export per-platform (`--platform ios`, then `--platform android`), or reconcile the values in the View screen first.')
+
+    const proceed = await pConfirm({
+      message: 'Write the combined file anyway?',
+      initialValue: false,
+    })
+    if (pIsCancel(proceed) || !proceed) {
+      pLog.info('✗ Export cancelled.')
+      return false
+    }
+  }
+
   const defaultName = `.env.capgo.${entry.appId}`
   const target = await resolveExportTarget(entry, 'combined', defaultName)
   if (target === null) {
@@ -1252,7 +1276,7 @@ async function exportCombinedEnvFile(entry: AppEntry): Promise<boolean> {
     return false
   }
 
-  const content = renderEnvFileCombined(entry, sections)
+  const content = renderEnvFileCombined(entry, sections, conflicts)
   await writeFile(target.path, content, { mode: 0o600 })
   await chmod(target.path, 0o600)
 
@@ -1265,6 +1289,44 @@ async function exportCombinedEnvFile(entry: AppEntry): Promise<boolean> {
   pLog.info('Add it to .gitignore — never commit this file.')
   pLog.info('Reference: https://capgo.app/docs/cli/cloud-build/')
   return true
+}
+
+interface CombinedKeyConflict {
+  key: string
+  occurrences: Array<{ platform: 'ios' | 'android', value: string }>
+}
+
+function findCombinedExportConflicts(
+  sections: Array<{ platform: 'ios' | 'android', creds: Partial<BuildCredentials> }>,
+): CombinedKeyConflict[] {
+  if (sections.length < 2)
+    return []
+  const occurrencesByKey = new Map<string, Array<{ platform: 'ios' | 'android', value: string }>>()
+  for (const { platform, creds } of sections) {
+    for (const [key, value] of Object.entries(creds)) {
+      if (typeof value !== 'string' || value.length === 0)
+        continue
+      const list = occurrencesByKey.get(key) ?? []
+      list.push({ platform, value })
+      occurrencesByKey.set(key, list)
+    }
+  }
+  const conflicts: CombinedKeyConflict[] = []
+  for (const [key, occurrences] of occurrencesByKey) {
+    if (occurrences.length < 2)
+      continue
+    const distinctValues = new Set(occurrences.map(o => o.value))
+    if (distinctValues.size > 1)
+      conflicts.push({ key, occurrences })
+  }
+  return conflicts
+}
+
+// Conflicting values are usually short config toggles (booleans, retention
+// strings) where the actual value is what the user needs to see to decide.
+// Mask anything long enough to plausibly be a secret instead.
+function maskConflictValue(value: string): string {
+  return value.length <= 32 ? value : `(${value.length} chars)`
 }
 
 async function resolvePlatformChoice(entry: AppEntry, message: string): Promise<'ios' | 'android' | null> {
@@ -1369,6 +1431,7 @@ function renderEnvFile(entry: AppEntry, platform: 'ios' | 'android', creds: Part
 function renderEnvFileCombined(
   entry: AppEntry,
   sections: Array<{ platform: 'ios' | 'android', creds: Partial<BuildCredentials> }>,
+  conflicts: CombinedKeyConflict[] = [],
 ): string {
   const lines: string[] = []
   const generated = new Date().toISOString()
@@ -1383,6 +1446,14 @@ function renderEnvFileCombined(
   lines.push('#   set -a; . ./this-file; set +a')
   lines.push('#')
   lines.push('# DO NOT commit this file. Add to .gitignore: .env.capgo.*')
+  if (conflicts.length > 0) {
+    lines.push('#')
+    lines.push('# ⚠️  CONFLICTING KEYS: the following appear in multiple platform sections')
+    lines.push('# with different values. Dotenv ingestion (gh secret set -f, shell sourcing)')
+    lines.push('# keeps only the LAST occurrence per key — re-export per-platform to preserve both.')
+    for (const { key, occurrences } of conflicts)
+      lines.push(`#   ${key} (${occurrences.map(o => o.platform).join(' & ')})`)
+  }
 
   for (const { platform, creds } of sections) {
     lines.push('')
