@@ -61,6 +61,7 @@ export const buildRequestOptionsSchema = optionsBaseSchema.extend({
   // Output control
   outputUpload: z.boolean().optional(),
   outputRetention: z.string().optional(),
+  outputRecord: z.string().optional(),
   skipBuildNumberBump: z.boolean().optional(),
   playstoreUpload: z.boolean().optional(),
   verbose: z.boolean().optional(),
