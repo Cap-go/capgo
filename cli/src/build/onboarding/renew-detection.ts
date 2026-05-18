@@ -57,7 +57,7 @@ function decideCert(expiry: Date | null, now: Date, options: RenewOptions): Cert
     return { needsRenewal: true, currentExpiry: expiry, reason: 'forced' }
   }
   if (expiry === null) {
-    // No cert at all, or cert is unparseable — needs renewal to recover.
+    // No cert at all, or cert is unparsable — needs renewal to recover.
     return { needsRenewal: true, currentExpiry: null, reason: 'expired' }
   }
 
@@ -123,7 +123,7 @@ function decideProfile(
   }
 
   if (expiry === null) {
-    // Unparseable profile — renew to recover.
+    // Unparsable profile — renew to recover.
     return {
       bundleId,
       name,
