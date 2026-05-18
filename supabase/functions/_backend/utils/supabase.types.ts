@@ -480,6 +480,7 @@ export type Database = {
       }
       build_requests: {
         Row: {
+          ai_analyzed: boolean
           app_id: string
           build_config: Json | null
           build_mode: string
@@ -499,6 +500,7 @@ export type Database = {
           upload_url: string
         }
         Insert: {
+          ai_analyzed?: boolean
           app_id: string
           build_config?: Json | null
           build_mode?: string
@@ -518,6 +520,7 @@ export type Database = {
           upload_url: string
         }
         Update: {
+          ai_analyzed?: boolean
           app_id?: string
           build_config?: Json | null
           build_mode?: string
