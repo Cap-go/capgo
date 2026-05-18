@@ -60,6 +60,7 @@ export const buildRequestOptionsSchema = optionsBaseSchema.extend({
   skipBuildNumberBump: z.boolean().optional(),
   playstoreUpload: z.boolean().optional(),
   verbose: z.boolean().optional(),
+  aiAnalytics: z.boolean().optional(),
 })
 
 export type BuildRequestOptions = z.infer<typeof buildRequestOptionsSchema>

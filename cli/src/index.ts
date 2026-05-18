@@ -825,6 +825,7 @@ Example: npx @capgo/cli@latest build request com.example.app --platform ios --pa
   .option('--output-retention <duration>', 'Override output link TTL for this build only (1h to 7d). Examples: 1h, 6h, 2d. Precedence: CLI > env > saved credentials')
   .option('--skip-build-number-bump', 'Skip automatic build number/version code incrementing. Uses whatever version is already in the project files.')
   .option('--no-skip-build-number-bump', 'Override saved credentials to re-enable automatic build number incrementing for this build only.')
+  .option('--ai-analytics', 'On build failure, send logs to Capgo AI for diagnosis. In interactive terminals this skips the upfront confirmation; in CI this auto-uploads and prints the analysis to stderr.')
   .option('-a, --apikey <apikey>', optionDescriptions.apikey)
   .option('--supa-host <supaHost>', optionDescriptions.supaHost)
   .option('--supa-anon <supaAnon>', optionDescriptions.supaAnon)

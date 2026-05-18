@@ -33,7 +33,7 @@ import { mkdir, readFile as readFileAsync, rm, stat, writeFile } from 'node:fs/p
 import { tmpdir } from 'node:os'
 import { basename, join, resolve } from 'node:path'
 import process, { chdir, cwd, exit } from 'node:process'
-import { isCancel as clackIsCancel, log as clackLog, select as clackSelect, spinner as spinnerC } from '@clack/prompts'
+import { confirm, isCancel as clackIsCancel, log as clackLog, select, select as clackSelect, spinner as spinnerC } from '@clack/prompts'
 import AdmZip from 'adm-zip'
 import { WebSocket as PartySocket } from 'partysocket'
 import * as tus from 'tus-js-client'
@@ -50,6 +50,13 @@ import {
   appendCapturedLine,
   registerCleanupHandlers,
 } from '../ai/log-capture'
+import {
+  decideAnalyzeBehavior,
+  writeLocalAiFile,
+  postAnalyzeRequest,
+  isLogTooBig,
+  type PostAnalyzeResult,
+} from '../ai/analyze'
 
 /**
  * Callback interface for build logging.
@@ -1601,7 +1608,7 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
     let capturedJobId: string | null = null
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     let _unregisterCleanup: (() => void) | null = null
-    const keepPromptFile = false // remains false in Task 19; Task 20 will mutate this
+    let keepPromptFile = false // Task 20: mutable so local-AI flow can set it true
 
     if (captureEnabled && buildRequest.job_id) {
       capturedJobId = buildRequest.job_id
@@ -1878,6 +1885,103 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
       else {
         log.warn(`Build finished with status: ${finalStatus}`)
       }
+
+      // --- Task 20: AI failure flow ---
+      if (finalStatus === 'failed' && captureEnabled && capturedJobId) {
+        const behavior = decideAnalyzeBehavior({
+          isTTY: process.stdout.isTTY === true,
+          aiAnalyticsFlag: options.aiAnalytics === true,
+        })
+
+        const runCapgoAi = async (): Promise<void> => {
+          const logsPath = `${process.env.CAPGO_AI_LOG_BASE_DIR || '/tmp/capgo-builds'}/${capturedJobId}.log`
+          let logs = ''
+          try {
+            const { readFile } = await import('node:fs/promises')
+            logs = await readFile(logsPath, 'utf8')
+          }
+          catch {
+            return
+          }
+          const result: PostAnalyzeResult = await postAnalyzeRequest({
+            apiHost: host,
+            apikey: options.apikey,
+            jobId: capturedJobId!,
+            appId,
+            logs,
+          })
+          const stream = process.stdout.isTTY ? process.stdout : process.stderr
+          if (result.kind === 'ok') {
+            stream.write('\n--- AI analysis ---\n' + result.analysis + '\n')
+          }
+          else if (result.kind === 'already_analyzed') {
+            stream.write('\nAI analysis already requested for this job (only one per job).\n')
+          }
+          else if (result.kind === 'too_big') {
+            stream.write('\nLog too big for AI analysis.\n')
+          }
+          else {
+            stream.write(`\nAI analysis failed${result.status ? ` (${result.status})` : ''}${result.message ? `: ${result.message}` : ''}.\n`)
+          }
+        }
+
+        const runLocalAi = async (): Promise<void> => {
+          const promptPath = await writeLocalAiFile(capturedJobId!)
+          keepPromptFile = true
+          process.stdout.write(`\nSaved prompt to ${promptPath}\nPoint your local AI (Claude, Codex, aider, etc.) at this file.\n`)
+        }
+
+        async function showMenu(): Promise<void> {
+          if (await isLogTooBig(capturedJobId!)) {
+            process.stdout.write('Log too big for AI analysis (>10 MB). Offering local AI instead.\n')
+            await runLocalAi()
+            return
+          }
+          const choice = await select({
+            message: 'Choose AI analysis',
+            options: [
+              { value: 'capgo', label: 'Capgo AI (Kimi K2.5)' },
+              { value: 'local', label: 'Local AI (write prompt to file)' },
+              { value: 'skip', label: 'Skip' },
+            ],
+          })
+          if (choice === 'capgo') await runCapgoAi()
+          else if (choice === 'local') await runLocalAi()
+        }
+
+        try {
+          if (behavior === 'skip') {
+            // nothing
+          }
+          else if (behavior === 'auto_upload') {
+            if (await isLogTooBig(capturedJobId)) {
+              process.stderr.write('Log too big for AI analysis (>10 MB), skipping\n')
+            }
+            else {
+              await runCapgoAi()
+            }
+          }
+          else {
+            // interactive: show_menu or ask_then_menu
+            if (behavior === 'ask_then_menu') {
+              const wants = await confirm({ message: 'Build failed. Run AI analysis?' })
+              if (!wants || typeof wants === 'symbol') {
+                // user cancelled or declined — skip
+              }
+              else {
+                await showMenu()
+              }
+            }
+            else {
+              await showMenu()
+            }
+          }
+        }
+        catch (err) {
+          process.stderr.write(`AI analysis flow errored: ${err instanceof Error ? err.message : String(err)}\n`)
+        }
+      }
+      // --- end Task 20 ---
 
       // Calculate build time (in seconds with 2 decimal places, matching upload behavior)
       const buildTime = ((Date.now() - buildStartTime) / 1000).toFixed(2)
