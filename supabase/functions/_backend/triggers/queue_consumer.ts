@@ -218,11 +218,25 @@ async function processQueue(c: Context, db: ReturnType<typeof getPgClient>, queu
   }, [[], []] as [typeof messages, typeof messages])
 
   const processConcurrency = getQueueHttpConcurrency(queueName)
-  cloudlog(`[${queueName}] Processing ${messagesToProcess.length} messages and skipping ${messagesToSkip.length} messages with concurrency ${processConcurrency}.`)
+  cloudlog({
+    requestId: c.get('requestId'),
+    message: `[${queueName}] Processing queue batch.`,
+    queueName,
+    processingCount: messagesToProcess.length,
+    skippedCount: messagesToSkip.length,
+    concurrency: processConcurrency,
+    retryBudget: MAX_QUEUE_READS,
+  })
 
   // Archive messages after the configured retry budget is exhausted.
   if (messagesToSkip.length > 0) {
-    cloudlog(`[${queueName}] Archiving ${messagesToSkip.length} messages that exceeded the retry budget.`)
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: `[${queueName}] Archiving messages that exceeded the retry budget.`,
+      queueName,
+      archiveCount: messagesToSkip.length,
+      retryBudget: MAX_QUEUE_READS,
+    })
     await archive_queue_messages(c, db, queueName, messagesToSkip.map(msg => msg.msg_id))
   }
 

@@ -27,7 +27,7 @@ for (const envPath of [
   '../internal/cloudflare/.env.prod',
   '../internal/cloudflare/.env.local',
 ]) {
-  config({ path: resolve(__dirname, envPath) })
+  config({ path: resolve(__dirname, envPath), override: true, quiet: true })
 }
 
 const DB_URL_ENV_KEYS = [
@@ -46,12 +46,20 @@ function hasFlag(name) {
 function getArgValue(name) {
   const prefix = `${name}=`
   const match = process.argv.find(arg => arg.startsWith(prefix))
-  if (match)
-    return match.slice(prefix.length)
+  if (match) {
+    const value = match.slice(prefix.length)
+    if (!value)
+      throw new Error(`${name} requires a value`)
+    return value
+  }
 
   const index = process.argv.indexOf(name)
-  if (index !== -1)
-    return process.argv[index + 1]
+  if (index !== -1) {
+    const value = process.argv[index + 1]
+    if (!value || value.startsWith('--'))
+      throw new Error(`${name} requires a value`)
+    return value
+  }
 
   return undefined
 }
@@ -147,8 +155,12 @@ async function getObjectSizeWithRange(s3, s3Path, reason) {
     })
     const contentRange = response.headers.get('content-range') || response.headers.get('Content-Range')
     const contentLength = response.headers.get('content-length') || response.headers.get('Content-Length')
-    const size = parseObjectSizeFromHeaders(contentRange, contentLength)
-    response.body?.cancel()
+    const size = response.status === 206 && contentRange
+      ? parseObjectSizeFromHeaders(contentRange, null)
+      : response.status === 200
+        ? parseObjectSizeFromHeaders(null, contentLength)
+        : 0
+    await response.body?.cancel()
     return {
       contentLength,
       contentRange,
@@ -176,7 +188,7 @@ async function mapWithConcurrency(items, concurrency, mapper) {
   async function worker() {
     while (cursor < items.length) {
       const index = cursor++
-      results[index] = await mapper(items[index], index)
+      results[index] = await mapper(items[index])
     }
   }
 

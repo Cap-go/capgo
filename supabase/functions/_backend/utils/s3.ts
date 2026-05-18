@@ -225,8 +225,28 @@ async function getSizeFromRangeFallback(
 
     const contentRange = res.headers.get('content-range') || res.headers.get('Content-Range')
     const contentLength = res.headers.get('content-length') || res.headers.get('Content-Length')
-    const size = parseObjectSizeFromHeaders(contentRange, contentLength)
-    res.body?.cancel()
+    if (!res.ok) {
+      await res.body?.cancel()
+      cloudlog({
+        requestId: c.get('requestId'),
+        message: 'getSize range fallback returned non-success response',
+        fileId,
+        reason,
+        status: res.status,
+        statusText: res.statusText,
+        contentRange,
+        contentLength,
+        size: 0,
+      })
+      return 0
+    }
+
+    const size = res.status === 206 && contentRange
+      ? parseObjectSizeFromHeaders(contentRange, null)
+      : res.status === 200
+        ? parseObjectSizeFromHeaders(null, contentLength)
+        : 0
+    await res.body?.cancel()
 
     cloudlog({
       requestId: c.get('requestId'),
