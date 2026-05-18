@@ -213,6 +213,7 @@ export function loadCredentialsFromEnv(): Partial<BuildCredentials> {
   const keystoreKeyPassword = readRuntimeEnv('KEYSTORE_KEY_PASSWORD')
   const keystoreStorePassword = readRuntimeEnv('KEYSTORE_STORE_PASSWORD')
   const playConfigJson = readRuntimeEnv('PLAY_CONFIG_JSON')
+  const playStoreInAppUpdatePriority = readRuntimeEnv('PLAY_STORE_IN_APP_UPDATE_PRIORITY')
   const buildOutputUploadEnabled = readRuntimeEnv('BUILD_OUTPUT_UPLOAD_ENABLED')
   const buildOutputRetentionSeconds = readRuntimeEnv('BUILD_OUTPUT_RETENTION_SECONDS')
   const skipBuildNumberBump = readRuntimeEnv('SKIP_BUILD_NUMBER_BUMP')
@@ -254,6 +255,9 @@ export function loadCredentialsFromEnv(): Partial<BuildCredentials> {
     credentials.KEYSTORE_STORE_PASSWORD = keystoreStorePassword
   if (playConfigJson)
     credentials.PLAY_CONFIG_JSON = playConfigJson
+  if (playStoreInAppUpdatePriority) {
+    credentials.PLAY_STORE_IN_APP_UPDATE_PRIORITY = String(parseInAppUpdatePriority(playStoreInAppUpdatePriority))
+  }
   if (buildOutputUploadEnabled) {
     credentials.BUILD_OUTPUT_UPLOAD_ENABLED = parseOptionalBoolean(buildOutputUploadEnabled) ? 'true' : 'false'
   }
