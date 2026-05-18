@@ -1,6 +1,6 @@
 import type { Context } from 'hono'
 import type { Database } from '../../utils/supabase.types.ts'
-import { simpleError } from '../../utils/hono.ts'
+import { quickError, simpleError } from '../../utils/hono.ts'
 import { cloudlog, cloudlogErr } from '../../utils/logging.ts'
 import { checkPermission } from '../../utils/rbac.ts'
 import { supabaseApikey } from '../../utils/supabase.ts'
@@ -65,7 +65,8 @@ export async function aiAnalyzeBuild(
   }
 
   if (row.ai_analyzed === true) {
-    throw simpleError('already_analyzed', 'AI analysis already requested for this job')
+    // 409 (not the simpleError default of 400) — CLI branches on res.status === 409 for this case
+    throw quickError(409, 'already_analyzed', 'AI analysis already requested for this job')
   }
 
   // 3. Proxy to capgo_builder

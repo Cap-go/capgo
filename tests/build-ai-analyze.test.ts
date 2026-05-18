@@ -85,11 +85,12 @@ describe('aiAnalyzeBuild', () => {
       .rejects.toThrow(/only available for failed builds/i)
   })
 
-  it('throws already_analyzed when ai_analyzed is true', async () => {
+  it('throws already_analyzed with HTTP 409 status when ai_analyzed is true', async () => {
     mockCheckPermission.mockResolvedValue(true)
     mockBuildRequestRow({ app_id: appId, status: 'failed', ai_analyzed: true })
+    // The CLI branches on res.status === 409 — verify both the message and the status code
     await expect(aiAnalyzeBuild(createContext(), jobId, appId, apikey, 'logs'))
-      .rejects.toThrow(/already requested for this job/i)
+      .rejects.toMatchObject({ status: 409, message: expect.stringMatching(/already requested for this job/i) })
   })
 
   it('does NOT flip the flag when builder proxy returns non-2xx', async () => {
