@@ -135,6 +135,109 @@ VALUES (
   now() + interval '1 day'
 );
 
+SELECT public.track_onboarding_demo_data(
+  'com.test.demo.cleanup',
+  '046a36ac-e03c-4590-9257-bd6c9dba9ee8',
+  'app_versions',
+  ARRAY['910103'],
+  '33333333-3333-3333-3333-333333333333'
+);
+
+SELECT public.track_onboarding_demo_data(
+  'com.test.demo.cleanup',
+  '046a36ac-e03c-4590-9257-bd6c9dba9ee8',
+  'channels',
+  ARRAY['910101'],
+  '33333333-3333-3333-3333-333333333333'
+);
+
+SELECT public.track_onboarding_demo_data(
+  'com.test.demo.cleanup',
+  '046a36ac-e03c-4590-9257-bd6c9dba9ee8',
+  'channel_devices',
+  ARRAY[
+    (
+      SELECT id::text
+      FROM public.channel_devices
+      WHERE app_id = 'com.test.demo.cleanup'
+        AND channel_id = 910101
+        AND device_id = 'demo-cleanup-device'
+    )
+  ],
+  '33333333-3333-3333-3333-333333333333'
+);
+
+SELECT public.track_onboarding_demo_data(
+  'com.test.demo.cleanup',
+  '046a36ac-e03c-4590-9257-bd6c9dba9ee8',
+  'deploy_history',
+  ARRAY[
+    (
+      SELECT id::text
+      FROM public.deploy_history
+      WHERE app_id = 'com.test.demo.cleanup'
+        AND channel_id = 910101
+        AND version_id = 910103
+    )
+  ],
+  '33333333-3333-3333-3333-333333333333'
+);
+
+SELECT public.track_onboarding_demo_data(
+  'com.test.demo.cleanup',
+  '046a36ac-e03c-4590-9257-bd6c9dba9ee8',
+  'devices',
+  ARRAY[
+    (
+      SELECT id::text
+      FROM public.devices
+      WHERE app_id = 'com.test.demo.cleanup'
+        AND device_id = 'demo-cleanup-device'
+    )
+  ],
+  '33333333-3333-3333-3333-333333333333'
+);
+
+SELECT public.track_onboarding_demo_data(
+  'com.test.demo.cleanup',
+  '046a36ac-e03c-4590-9257-bd6c9dba9ee8',
+  'daily_mau',
+  ARRAY[CURRENT_DATE::text],
+  '33333333-3333-3333-3333-333333333333'
+);
+
+SELECT public.track_onboarding_demo_data(
+  'com.test.demo.cleanup',
+  '046a36ac-e03c-4590-9257-bd6c9dba9ee8',
+  'daily_bandwidth',
+  ARRAY[CURRENT_DATE::text],
+  '33333333-3333-3333-3333-333333333333'
+);
+
+SELECT public.track_onboarding_demo_data(
+  'com.test.demo.cleanup',
+  '046a36ac-e03c-4590-9257-bd6c9dba9ee8',
+  'daily_storage',
+  ARRAY[CURRENT_DATE::text],
+  '33333333-3333-3333-3333-333333333333'
+);
+
+SELECT public.track_onboarding_demo_data(
+  'com.test.demo.cleanup',
+  '046a36ac-e03c-4590-9257-bd6c9dba9ee8',
+  'daily_version',
+  ARRAY[CURRENT_DATE::text || '|1.0.0'],
+  '33333333-3333-3333-3333-333333333333'
+);
+
+SELECT public.track_onboarding_demo_data(
+  'com.test.demo.cleanup',
+  '046a36ac-e03c-4590-9257-bd6c9dba9ee8',
+  'build_requests',
+  ARRAY['22222222-2222-2222-2222-222222222222'],
+  '33333333-3333-3333-3333-333333333333'
+);
+
 UPDATE public.apps
 SET
   need_onboarding = false
