@@ -355,8 +355,6 @@ export async function createDemoApp(c: Context<MiddlewareKeyVariables>, body: Cr
 
     // Demo versions to create - simulates app development lifecycle
     const demoVersions: DemoVersion[] = [
-      { name: 'unknown', daysAgo: 14 },
-      { name: 'builtin', daysAgo: 14 },
       { name: '1.0.0', daysAgo: 13, comment: 'Initial release' },
       { name: '1.0.1', daysAgo: 10, comment: 'Bug fixes for login screen' },
       { name: '1.1.0', daysAgo: 7, comment: 'Added dark mode support' },
@@ -364,15 +362,14 @@ export async function createDemoApp(c: Context<MiddlewareKeyVariables>, body: Cr
       { name: '1.2.0', daysAgo: 1, comment: 'New dashboard features', link: 'https://github.com/example/demo-app/pull/123' },
     ]
 
-    // Create all versions with manifest and native_packages for real versions
+    // Create all versions with manifest and native_packages
     const versionInserts = demoVersions.map((v) => {
-      const isSystemVersion = v.name === 'unknown' || v.name === 'builtin'
-      const manifest = isSystemVersion ? null : getDemoManifest(v.name, appId)
-      const nativePackages = isSystemVersion ? null : getDemoNativePackages(v.name)
+      const manifest = getDemoManifest(v.name, appId)
+      const nativePackages = getDemoNativePackages(v.name)
 
       return {
         owner_org: body.owner_org,
-        deleted: isSystemVersion,
+        deleted: false,
         name: v.name,
         app_id: appId,
         created_at: daysAgoDate(v.daysAgo),
@@ -417,9 +414,6 @@ export async function createDemoApp(c: Context<MiddlewareKeyVariables>, body: Cr
     const manifestInserts: Database['public']['Tables']['manifest']['Insert'][] = []
 
     for (const version of demoVersions) {
-      if (version.name === 'unknown' || version.name === 'builtin')
-        continue
-
       const versionId = versionMap.get(version.name)
       if (!versionId)
         continue

@@ -1,5 +1,5 @@
 import type { Context } from 'hono'
-import { and, eq, or, sql } from 'drizzle-orm'
+import { and, eq, isNotNull, isNull, or, sql } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/node-postgres'
 import { alias } from 'drizzle-orm/pg-core'
 import { getRuntimeKey } from 'hono/adapter'
@@ -446,12 +446,12 @@ function getSchemaUpdatesAlias(includeMetadata = false) {
   const { versionAlias, channelDevicesAlias, channelAlias } = getAlias()
 
   const versionSelect: any = {
-    id: sql<number>`${versionAlias.id}`.as('vid'),
-    name: sql<string>`${versionAlias.name}`.as('vname'),
+    id: sql<number | null>`${versionAlias.id}`.as('vid'),
+    name: sql<string>`CASE WHEN ${channelAlias.version} IS NULL THEN 'builtin' ELSE ${versionAlias.name} END`.as('vname'),
     checksum: sql<string | null>`${versionAlias.checksum}`.as('vchecksum'),
     session_key: sql<string | null>`${versionAlias.session_key}`.as('vsession_key'),
     key_id: sql<string | null>`${versionAlias.key_id}`.as('vkey_id'),
-    storage_provider: sql<string>`${versionAlias.storage_provider}`.as('vstorage_provider'),
+    storage_provider: sql<string>`COALESCE(${versionAlias.storage_provider}, 'r2')`.as('vstorage_provider'),
     external_url: sql<string | null>`${versionAlias.external_url}`.as('vexternal_url'),
     min_update_version: sql<string | null>`${versionAlias.min_update_version}`.as('vminUpdateVersion'),
     r2_path: sql`${versionAlias.r2_path}`.mapWith(versionAlias.r2_path).as('vr2_path'),
@@ -523,12 +523,16 @@ export function requestInfosChannelDevicePostgres(
     .select(selectShape)
     .from(channelDevicesAlias)
     .innerJoin(channelAlias, eq(channelDevicesAlias.channel_id, channelAlias.id))
-    .innerJoin(versionAlias, activeChannelVersionJoin(channelAlias.version, versionAlias))
+    .leftJoin(versionAlias, activeChannelVersionJoin(channelAlias.version, versionAlias))
 
   const channelDevice = (includeManifest
     ? baseQuery.leftJoin(schema.manifest, eq(schema.manifest.app_version_id, versionAlias.id))
     : baseQuery)
-    .where(and(eq(channelDevicesAlias.device_id, device_id), eq(channelDevicesAlias.app_id, app_id)))
+    .where(and(
+      eq(channelDevicesAlias.device_id, device_id),
+      eq(channelDevicesAlias.app_id, app_id),
+      or(isNull(channelAlias.version), isNotNull(versionAlias.id)),
+    ))
     .groupBy(channelDevicesAlias.device_id, channelDevicesAlias.app_id, channelAlias.id, versionAlias.id)
     .limit(1)
   cloudlog({ requestId: c.get('requestId'), message: 'channelDevice Query:', channelDeviceQuery: channelDevice.toSQL() })
@@ -556,12 +560,12 @@ export function requestInfosChannelPostgres(
   const baseQuery = drizzleClient
     .select(selectShape)
     .from(channelAlias)
-    .innerJoin(versionAlias, activeChannelVersionJoin(channelAlias.version, versionAlias))
+    .leftJoin(versionAlias, activeChannelVersionJoin(channelAlias.version, versionAlias))
 
   const channelQuery = (includeManifest
     ? baseQuery.leftJoin(schema.manifest, eq(schema.manifest.app_version_id, versionAlias.id))
     : baseQuery)
-    .where(
+    .where(and(
       !defaultChannel
         ? and(
             eq(channelAlias.public, true),
@@ -577,7 +581,8 @@ export function requestInfosChannelPostgres(
               eq(channelAlias.allow_device_self_set, true),
             ),
           ),
-    )
+      or(isNull(channelAlias.version), isNotNull(versionAlias.id)),
+    ))
     .groupBy(channelAlias.id, versionAlias.id)
     .limit(1)
   cloudlog({ requestId: c.get('requestId'), message: 'channel Query:', channelQuery: channelQuery.toSQL() })
@@ -713,27 +718,6 @@ export async function getAppVersionPostgres(
   catch (e: unknown) {
     logPgError(c, 'getAppVersionPostgres', e)
     return null
-  }
-}
-
-export async function ensurePlaceholderVersions(c: Context, appId: string) {
-  let pgClient: ReturnType<typeof getPgClient> | undefined
-  try {
-    pgClient = getPgClient(c)
-    await pgClient.query(
-      `INSERT INTO public.app_versions (name, app_id, storage_provider)
-       VALUES ('builtin', $1, 'r2'), ('unknown', $1, 'r2')
-       ON CONFLICT (name, app_id) DO NOTHING`,
-      [appId],
-    )
-  }
-  catch (e: unknown) {
-    logPgError(c, 'ensurePlaceholderVersions', e)
-  }
-  finally {
-    if (pgClient) {
-      await closeClient(c, pgClient)
-    }
   }
 }
 

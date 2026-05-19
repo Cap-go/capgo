@@ -28,6 +28,7 @@ vi.mock('../supabase/functions/_backend/utils/supabase.ts', () => ({
 }))
 
 vi.mock('../supabase/functions/_backend/utils/utils.ts', () => ({
+  isInternalVersionName: (version: string) => version === 'builtin' || version === 'unknown',
   isValidAppId,
 }))
 

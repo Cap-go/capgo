@@ -9,6 +9,7 @@ import { toast } from 'vue-sonner'
 import plusOutline from '~icons/ion/add-outline'
 import IconAlertCircle from '~icons/lucide/alert-circle'
 import { useSupabase } from '~/services/supabase'
+import { withBuiltinChannelVersion } from '~/services/versions'
 import { useAppDetailStore } from '~/stores/appDetail'
 import { useDialogV2Store } from '~/stores/dialogv2'
 import { useDisplayStore } from '~/stores/display'
@@ -96,7 +97,7 @@ async function customDeviceOverwritePart4(
 ) {
   dialogStore.openDialog({
     title: t('confirm-overwrite'),
-    description: t('confirm-overwrite-msg').replace('$1', deviceId).replace('$2', channel.value?.name ?? '').replace('$3', channel.value?.version.name ?? ''),
+    description: t('confirm-overwrite-msg').replace('$1', deviceId).replace('$2', channel.value?.name ?? '').replace('$3', channel.value?.version?.name ?? t('channel-builtin')),
     buttons: [
       {
         text: t('no'),
@@ -130,7 +131,7 @@ async function customDeviceOverwritePart5(
       app_id: route.params.app as string,
       org_id: channel.value?.owner_org ?? '',
       platform,
-      version_name: channel.value?.version.name ?? 'unknown',
+      version_name: channel.value?.version?.name ?? 'builtin',
     },
   })
 
@@ -166,7 +167,7 @@ async function getDeviceIds() {
       .from('channel_devices')
       .select('device_id')
       .eq('channel_id', id.value)
-      .eq('app_id', channel.value.version.app_id)
+      .eq('app_id', channel.value.app_id)
     if (dataDevices && dataDevices.length)
       deviceIds.value = dataDevices.map(d => d.device_id)
     else
@@ -183,7 +184,7 @@ async function getChannel() {
 
   // Check if we already have this channel in the store
   if (appDetailStore.currentChannelId === id.value && appDetailStore.currentChannel) {
-    channel.value = appDetailStore.currentChannel as any
+    channel.value = withBuiltinChannelVersion(appDetailStore.currentChannel as any) as any
     if (channel.value?.name)
       displayStore.setChannelName(String(channel.value.id), channel.value.name)
     displayStore.NavTitle = channel.value?.name ?? t('channel')
@@ -228,7 +229,7 @@ async function getChannel() {
       return
     }
 
-    channel.value = data as unknown as Database['public']['Tables']['channels']['Row'] & Channel
+    channel.value = withBuiltinChannelVersion(data as any) as unknown as Database['public']['Tables']['channels']['Row'] & Channel
 
     // Store in appDetailStore
     appDetailStore.setChannel(id.value, channel.value)

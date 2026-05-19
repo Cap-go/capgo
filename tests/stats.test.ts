@@ -183,15 +183,13 @@ describe('[POST] /stats', () => {
     await getSupabaseClient().from('devices').delete().eq('device_id', uuid).eq('app_id', APP_NAME_STATS)
   })
 
-  it('uses deleted unknown placeholder instead of scheduling repeated placeholder inserts', async () => {
+  it.concurrent('does not recreate unknown placeholder rows for missing versions', async () => {
     const uuid = randomUUID().toLowerCase()
     const appId = `${APP_NAME}.deleted.unknown.${randomUUID().split('-')[0]}`
     await resetAndSeedAppData(appId)
     await resetAndSeedAppDataStats(appId)
 
     try {
-      await createAppVersions('unknown', appId, { deleted: true })
-
       const baseData = getBaseData(appId) as StatsPayload
       baseData.device_id = uuid
       baseData.action = 'set'
@@ -200,7 +198,16 @@ describe('[POST] /stats', () => {
 
       const response = await postStats(baseData)
       expect(response.status).toBe(200)
-      expect(await response.json<StatsRes>()).toEqual({ status: 'ok' })
+      expect(await response.json<StatsRes>()).toMatchObject({ error: 'version_not_found' })
+
+      const { count, error } = await getSupabaseClient()
+        .from('app_versions')
+        .select('id', { count: 'exact', head: true })
+        .eq('app_id', appId)
+        .eq('name', 'unknown')
+
+      expect(error).toBeNull()
+      expect(count).toBe(0)
     }
     finally {
       await getSupabaseClient().from('devices').delete().eq('device_id', uuid).eq('app_id', appId)

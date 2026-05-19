@@ -5,7 +5,7 @@ import { BRES, simpleError } from '../../utils/hono.ts'
 import { cloudlogErr } from '../../utils/logging.ts'
 import { checkPermission } from '../../utils/rbac.ts'
 import { supabaseApikey, updateOrCreateChannel } from '../../utils/supabase.ts'
-import { isValidAppId } from '../../utils/utils.ts'
+import { isInternalVersionName, isValidAppId } from '../../utils/utils.ts'
 
 interface ChannelSet {
   app_id: string
@@ -31,7 +31,7 @@ async function findVersion(c: Context, appID: string, version: string, ownerOrg:
     .eq('app_id', appID)
     .eq('name', version)
     .eq('owner_org', ownerOrg)
-    .eq('deleted', version === 'unknown')
+    .eq('deleted', false)
     .single()
   if (vError || !data) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot find version', data: { appID, version, ownerOrg, vError } })
@@ -71,11 +71,13 @@ export async function post(c: Context<MiddlewareKeyVariables>, body: ChannelSet,
     ...(body.ios == null ? {} : { ios: body.ios }),
     ...(body.android == null ? {} : { android: body.android }),
     ...(inferredElectron == null ? {} : { electron: inferredElectron }),
-    version: -1,
+    version: null,
     owner_org: org.owner_org,
   }
 
-  channel.version = await findVersion(c, body.app_id, body.version ?? 'unknown', org.owner_org, apikey)
+  if (body.version && !isInternalVersionName(body.version))
+    channel.version = await findVersion(c, body.app_id, body.version, org.owner_org, apikey)
+
   await updateOrCreateChannel(c, channel)
   return c.json(BRES)
 }
