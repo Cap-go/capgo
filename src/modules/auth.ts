@@ -223,13 +223,15 @@ async function guard(
   function shouldRedirectToOrgOnboarding() {
     if (to.path.startsWith('/onboarding/organization'))
       return false
+    if (to.path.startsWith('/onboarding/invitation'))
+      return false
     if (!inviteOrgId)
       return true
     return !organizationStore.organizations.some(org => org.gid === inviteOrgId && org.role.startsWith('invite'))
   }
 
   async function shouldRedirectToPendingInviteOnboarding(organizationsLoaded: boolean) {
-    if (!organizationsLoaded || organizationStore.hasOrganizations)
+    if (!organizationsLoaded)
       return false
     if (to.path.startsWith('/onboarding/invitation'))
       return false

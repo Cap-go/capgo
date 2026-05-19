@@ -6,8 +6,8 @@ import IconArrowRight from '~icons/lucide/arrow-right'
 import IconBuilding from '~icons/lucide/building-2'
 import IconCheck from '~icons/lucide/check'
 import IconLoader from '~icons/lucide/loader-2'
-import IconPlus from '~icons/lucide/plus'
 import IconUserPlus from '~icons/lucide/user-plus'
+import IconX from '~icons/lucide/x'
 import { useSupabase } from '~/services/supabase'
 import { useDisplayStore } from '~/stores/display'
 import { useOrganizationStore } from '~/stores/organization'
@@ -29,11 +29,13 @@ const organizationStore = useOrganizationStore()
 
 const invitations = ref<PendingInvitation[]>([])
 const isLoading = ref(true)
-const joiningInvitationId = ref<number | null>(null)
-const isCreatingOrg = ref(false)
+const resolvingInvitationId = ref<number | null>(null)
+const resolvingInvitationAction = ref<'accept' | 'decline' | null>(null)
+const isDecliningAll = ref(false)
 const errorMessage = ref('')
 
 const hasMultipleInvitations = computed(() => invitations.value.length > 1)
+const isResolvingInvitation = computed(() => resolvingInvitationId.value !== null || isDecliningAll.value)
 const title = computed(() => hasMultipleInvitations.value
   ? t('pending-invite-title-multiple')
   : t('pending-invite-title'))
@@ -46,6 +48,22 @@ const targetPath = computed(() => {
     return target
   return '/dashboard'
 })
+
+async function continueAfterInvitationsResolved() {
+  await organizationStore.dedupFetchOrganizations()
+
+  if (organizationStore.hasOrganizations) {
+    await router.replace(targetPath.value)
+    return
+  }
+
+  await router.replace({
+    path: '/onboarding/organization',
+    query: {
+      to: targetPath.value,
+    },
+  })
+}
 
 function getInitials(name: string) {
   const parts = name.trim().split(/\s+/).filter(Boolean)
@@ -67,12 +85,7 @@ async function loadPendingInvitations() {
 
     invitations.value = data?.invitations ?? []
     if (invitations.value.length === 0) {
-      await router.replace({
-        path: '/onboarding/organization',
-        query: {
-          to: targetPath.value,
-        },
-      })
+      await continueAfterInvitationsResolved()
     }
   }
   catch (error) {
@@ -84,13 +97,14 @@ async function loadPendingInvitations() {
   }
 }
 
-async function joinInvitation(invitation: PendingInvitation) {
-  joiningInvitationId.value = invitation.id
+async function resolveInvitation(invitation: PendingInvitation, action: 'accept' | 'decline') {
+  resolvingInvitationId.value = invitation.id
+  resolvingInvitationAction.value = action
   errorMessage.value = ''
   try {
     const { data, error } = await supabase.functions.invoke('private/pending_invitations', {
       body: {
-        action: 'accept',
+        action,
         invitation_id: invitation.id,
       },
     })
@@ -98,24 +112,33 @@ async function joinInvitation(invitation: PendingInvitation) {
     if (error)
       throw error
 
-    await organizationStore.fetchOrganizations()
-    if (data?.accepted_org_id)
-      organizationStore.setCurrentOrganization(data.accepted_org_id)
+    if (action === 'accept') {
+      await organizationStore.fetchOrganizations()
+      if (data?.accepted_org_id)
+        organizationStore.setCurrentOrganization(data.accepted_org_id)
 
-    toast.success(t('pending-invite-joined'))
-    await router.replace(targetPath.value)
+      toast.success(t('pending-invite-joined'))
+    }
+    else {
+      toast.success(t('pending-invite-declined'))
+    }
+
+    invitations.value = invitations.value.filter(item => item.id !== invitation.id)
+    if (invitations.value.length === 0)
+      await continueAfterInvitationsResolved()
   }
   catch (error) {
-    console.error('Failed to join pending organization invitation', error)
-    errorMessage.value = t('pending-invite-join-failed')
+    console.error(`Failed to ${action} pending organization invitation`, error)
+    errorMessage.value = t(action === 'accept' ? 'pending-invite-join-failed' : 'pending-invite-decline-failed')
   }
   finally {
-    joiningInvitationId.value = null
+    resolvingInvitationId.value = null
+    resolvingInvitationAction.value = null
   }
 }
 
-async function createOwnOrganization() {
-  isCreatingOrg.value = true
+async function declineAllInvitations() {
+  isDecliningAll.value = true
   errorMessage.value = ''
   try {
     const { error } = await supabase.functions.invoke('private/pending_invitations', {
@@ -127,19 +150,16 @@ async function createOwnOrganization() {
     if (error)
       throw error
 
-    await router.replace({
-      path: '/onboarding/organization',
-      query: {
-        to: targetPath.value,
-      },
-    })
+    invitations.value = []
+    toast.success(t('pending-invite-declined'))
+    await continueAfterInvitationsResolved()
   }
   catch (error) {
     console.error('Failed to decline pending organization invitations', error)
     errorMessage.value = t('pending-invite-decline-failed')
   }
   finally {
-    isCreatingOrg.value = false
+    isDecliningAll.value = false
   }
 }
 
@@ -153,7 +173,7 @@ onMounted(async () => {
   <section class="min-h-screen overflow-y-auto bg-slate-950 text-slate-100">
     <div class="mx-auto flex min-h-screen w-full max-w-5xl flex-col px-5 py-8 sm:px-8 lg:px-10">
       <div class="flex flex-1 items-center justify-center py-8">
-        <div class="w-full max-w-3xl">
+        <div class="w-full max-w-5xl">
           <div class="mb-8 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-4 py-2 text-sm font-semibold text-slate-200">
             <IconUserPlus class="h-4 w-4 text-slate-300" />
             {{ t('pending-invite-badge') }}
@@ -206,32 +226,46 @@ onMounted(async () => {
                         </div>
                       </div>
 
-                      <button
-                        type="button"
-                        class="d-btn min-h-11 shrink-0 border-primary-500 bg-primary-500 text-white hover:border-primary-500 hover:bg-primary-500/90 disabled:border-white/15 disabled:bg-slate-800 disabled:text-slate-500"
-                        :disabled="joiningInvitationId !== null || isCreatingOrg"
-                        data-test="pending-invite-join"
-                        @click="joinInvitation(invitation)"
-                      >
-                        <IconLoader v-if="joiningInvitationId === invitation.id" class="h-4 w-4 animate-spin" />
-                        <IconCheck v-else class="h-4 w-4" />
-                        {{ t('pending-invite-join') }}
-                      </button>
+                      <div class="flex shrink-0 flex-col gap-2 sm:flex-row">
+                        <button
+                          type="button"
+                          class="d-btn min-h-11 border-white/15 bg-white/5 text-slate-100 hover:border-white/25 hover:bg-white/10 disabled:border-white/10 disabled:bg-slate-900 disabled:text-slate-500"
+                          :disabled="isResolvingInvitation"
+                          data-test="pending-invite-decline"
+                          @click="resolveInvitation(invitation, 'decline')"
+                        >
+                          <IconLoader v-if="resolvingInvitationId === invitation.id && resolvingInvitationAction === 'decline'" class="h-4 w-4 animate-spin" />
+                          <IconX v-else class="h-4 w-4" />
+                          {{ t('pending-invite-decline') }}
+                        </button>
+
+                        <button
+                          type="button"
+                          class="d-btn min-h-11 border-primary-500 bg-primary-500 text-white hover:border-primary-500 hover:bg-primary-500/90 disabled:border-white/15 disabled:bg-slate-800 disabled:text-slate-500"
+                          :disabled="isResolvingInvitation"
+                          data-test="pending-invite-join"
+                          @click="resolveInvitation(invitation, 'accept')"
+                        >
+                          <IconLoader v-if="resolvingInvitationId === invitation.id && resolvingInvitationAction === 'accept'" class="h-4 w-4 animate-spin" />
+                          <IconCheck v-else class="h-4 w-4" />
+                          {{ t('pending-invite-join') }}
+                        </button>
+                      </div>
                     </div>
                   </article>
                 </div>
               </div>
 
-              <div v-if="!isLoading" class="mt-5 flex flex-col gap-3 sm:flex-row">
+              <div v-if="!isLoading && hasMultipleInvitations" class="mt-5 flex flex-col gap-3 sm:flex-row">
                 <button
                   type="button"
                   class="d-btn min-h-11 border-white/15 bg-white/5 text-slate-100 hover:border-white/25 hover:bg-white/10 disabled:border-white/10 disabled:bg-slate-900 disabled:text-slate-500"
-                  :disabled="joiningInvitationId !== null || isCreatingOrg"
-                  data-test="pending-invite-create-org"
-                  @click="createOwnOrganization"
+                  :disabled="isResolvingInvitation"
+                  data-test="pending-invite-decline-all"
+                  @click="declineAllInvitations"
                 >
-                  <IconLoader v-if="isCreatingOrg" class="h-4 w-4 animate-spin" />
-                  <IconPlus v-else class="h-4 w-4" />
+                  <IconLoader v-if="isDecliningAll" class="h-4 w-4 animate-spin" />
+                  <IconX v-else class="h-4 w-4" />
                   {{ t('pending-invite-create-org') }}
                 </button>
               </div>
