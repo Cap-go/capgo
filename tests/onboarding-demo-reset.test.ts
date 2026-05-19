@@ -4,6 +4,7 @@ import { cleanupPostgresClient, executeSQL, ORG_ID, USER_ID } from './test-utils
 
 const RELATIONS = {
   appVersions: 'app_versions',
+  appVersionsMeta: 'app_versions_meta',
   manifest: 'manifest',
   channels: 'channels',
   channelDevices: 'channel_devices',
@@ -319,6 +320,80 @@ describe('onboarding demo reset', () => {
     expect(state.last_version).toBe('2.0.0')
     expect(Number(state.manifest_bundle_count)).toBe(1)
     expect(Number(state.channel_device_count)).toBe(1)
+  })
+
+  it('preserves system placeholder versions even if old provenance tracked them', async () => {
+    const appId = testAppId('placeholders')
+    const appUuid = await createPendingApp(appId)
+    const seedId = randomUUID()
+    const deviceId = `real-placeholder-${randomUUID()}`
+
+    const versionRows = await executeSQL(
+      `INSERT INTO public.app_versions (
+        app_id,
+        name,
+        owner_org,
+        user_id,
+        storage_provider,
+        deleted,
+        manifest_count,
+        created_at
+      ) VALUES
+        ($1, 'unknown', $2, $3, 'r2', true, 0, NOW() - interval '2 days'),
+        ($1, 'builtin', $2, $3, 'r2', true, 0, NOW() - interval '2 days'),
+        ($1, '1.0.0', $2, $3, 'r2', false, 1, NOW() - interval '1 day')
+      RETURNING id, name`,
+      [appId, ORG_ID, USER_ID],
+    ) as Array<{ id: number, name: string }>
+    const unknownVersionId = versionRows.find(row => row.name === 'unknown')!.id
+    const builtinVersionId = versionRows.find(row => row.name === 'builtin')!.id
+    const demoVersionId = versionRows.find(row => row.name === '1.0.0')!.id
+
+    await track(appId, RELATIONS.appVersions, [unknownVersionId, builtinVersionId, demoVersionId], seedId)
+    await track(appId, RELATIONS.appVersionsMeta, [unknownVersionId, builtinVersionId], seedId)
+
+    await executeSQL(
+      `INSERT INTO public.devices (
+        updated_at,
+        device_id,
+        version,
+        app_id,
+        platform,
+        plugin_version,
+        os_version,
+        version_build,
+        is_prod,
+        is_emulator,
+        version_name
+      ) VALUES (
+        NOW(), $1, $2, $3, 'ios', '6.0.0', '17.0', '1', true, false, 'builtin'
+      )`,
+      [deviceId, builtinVersionId, appId],
+    )
+
+    await executeSQL('SELECT public.reset_onboarding_demo_app_data($1::uuid)', [appUuid])
+
+    const [state] = await executeSQL(
+      `SELECT
+        EXISTS (SELECT 1 FROM public.app_versions WHERE id = $1 AND name = 'unknown') AS unknown_exists,
+        EXISTS (SELECT 1 FROM public.app_versions WHERE id = $2 AND name = 'builtin') AS builtin_exists,
+        EXISTS (SELECT 1 FROM public.app_versions WHERE id = $3 AND name = '1.0.0') AS demo_version_exists,
+        (SELECT version FROM public.devices WHERE device_id = $4) AS device_version,
+        (SELECT COUNT(*)::int FROM public.onboarding_demo_data WHERE app_id = $5) AS tracked_rows`,
+      [unknownVersionId, builtinVersionId, demoVersionId, deviceId, appId],
+    ) as Array<{
+      unknown_exists: boolean
+      builtin_exists: boolean
+      demo_version_exists: boolean
+      device_version: number | null
+      tracked_rows: number
+    }>
+
+    expect(state.unknown_exists).toBe(true)
+    expect(state.builtin_exists).toBe(true)
+    expect(state.demo_version_exists).toBe(false)
+    expect(state.device_version).toBe(builtinVersionId)
+    expect(state.tracked_rows).toBe(0)
   })
 
   it('refuses to delete tracked demo versions with non-nullable version metrics', async () => {

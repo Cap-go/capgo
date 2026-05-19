@@ -21,6 +21,12 @@ interface DemoVersion {
   link?: string
 }
 
+const SYSTEM_DEMO_VERSION_NAMES = new Set(['unknown', 'builtin'])
+
+function isSystemDemoVersionName(versionName: string): boolean {
+  return SYSTEM_DEMO_VERSION_NAMES.has(versionName)
+}
+
 /** Native package structure for demo apps */
 interface DemoNativePackage {
   name: string
@@ -401,9 +407,11 @@ export async function createDemoApp(c: Context<MiddlewareKeyVariables>, body: Cr
       { name: '1.2.0', daysAgo: 1, comment: 'New dashboard features', link: 'https://github.com/example/demo-app/pull/123' },
     ]
 
-    // Create all versions with manifest and native_packages for real versions
-    const versionInserts = demoVersions.map((v) => {
-      const isSystemVersion = v.name === 'unknown' || v.name === 'builtin'
+    const systemDemoVersions = demoVersions.filter(version => isSystemDemoVersionName(version.name))
+    const appDemoVersions = demoVersions.filter(version => !isSystemDemoVersionName(version.name))
+
+    const buildVersionInsert = (v: DemoVersion): Database['public']['Tables']['app_versions']['Insert'] => {
+      const isSystemVersion = isSystemDemoVersionName(v.name)
       const manifest = isSystemVersion ? null : getDemoManifest(v.name, appId)
       const nativePackages = isSystemVersion ? null : getDemoNativePackages(v.name)
 
@@ -421,7 +429,40 @@ export async function createDemoApp(c: Context<MiddlewareKeyVariables>, body: Cr
         manifest_count: manifest?.length ?? 0,
         native_packages: nativePackages as any,
       }
-    })
+    }
+
+    const { data: existingSystemVersions, error: existingSystemVersionsError } = await supabase
+      .from('app_versions')
+      .select('id, name')
+      .eq('app_id', appId)
+      .in('name', systemDemoVersions.map(version => version.name))
+
+    if (existingSystemVersionsError || !existingSystemVersions) {
+      cloudlog({ requestId, message: 'Error loading demo system versions', error: existingSystemVersionsError })
+      throw simpleError('cannot_create_demo_versions', 'Cannot create demo versions', { error: existingSystemVersionsError })
+    }
+
+    let systemVersionsData = existingSystemVersions
+    const existingSystemVersionNames = new Set(existingSystemVersions.map(version => version.name))
+    const missingSystemVersionInserts = systemDemoVersions
+      .filter(version => !existingSystemVersionNames.has(version.name))
+      .map(buildVersionInsert)
+
+    if (missingSystemVersionInserts.length > 0) {
+      const { data: insertedSystemVersions, error: insertedSystemVersionsError } = await supabase
+        .from('app_versions')
+        .insert(missingSystemVersionInserts)
+        .select('id, name')
+
+      if (insertedSystemVersionsError || !insertedSystemVersions) {
+        cloudlog({ requestId, message: 'Error creating demo system versions', error: insertedSystemVersionsError })
+        throw simpleError('cannot_create_demo_versions', 'Cannot create demo versions', { error: insertedSystemVersionsError })
+      }
+
+      systemVersionsData = [...systemVersionsData, ...insertedSystemVersions]
+    }
+
+    const versionInserts = appDemoVersions.map(buildVersionInsert)
 
     const { data: versionsData, error: versionsError } = await supabase
       .from('app_versions')
@@ -436,16 +477,13 @@ export async function createDemoApp(c: Context<MiddlewareKeyVariables>, body: Cr
     await trackOnboardingDemoRows(c, appId, body.owner_org, 'app_versions', versionsData.map(v => String(v.id)), demoSeedId)
     cloudlog({ requestId, message: 'Demo versions created', count: versionsData.length })
 
-    const versionMap = new Map(versionsData.map(v => [v.name, v.id]))
+    const versionMap = new Map([...systemVersionsData, ...versionsData].map(v => [v.name, v.id]))
 
     // Insert manifest entries into the manifest table for each version
     // This is required for the bundle file list to show in the UI
     const manifestInserts: Database['public']['Tables']['manifest']['Insert'][] = []
 
-    for (const version of demoVersions) {
-      if (version.name === 'unknown' || version.name === 'builtin')
-        continue
-
+    for (const version of appDemoVersions) {
       const versionId = versionMap.get(version.name)
       if (!versionId)
         continue

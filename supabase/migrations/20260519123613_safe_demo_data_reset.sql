@@ -367,7 +367,7 @@ BEGIN
     p_app_uuid
   FROM "public"."app_versions" av
   WHERE av."app_id" = v_app_id
-    AND av."name" IN ('unknown', 'builtin', '1.0.0', '1.0.1', '1.1.0', '1.1.1', '1.2.0')
+    AND av."name" IN ('1.0.0', '1.0.1', '1.1.0', '1.1.1', '1.2.0')
   ON CONFLICT ("app_id", "relation_name", "row_key") DO UPDATE
   SET
     "owner_org" = EXCLUDED."owner_org",
@@ -391,7 +391,7 @@ BEGIN
   INNER JOIN "public"."app_versions" av
     ON av."id" = avm."id"
   WHERE av."app_id" = v_app_id
-    AND av."name" IN ('unknown', 'builtin', '1.0.0', '1.0.1', '1.1.0', '1.1.1', '1.2.0')
+    AND av."name" IN ('1.0.0', '1.0.1', '1.1.0', '1.1.1', '1.2.0')
   ON CONFLICT ("app_id", "relation_name", "row_key") DO UPDATE
   SET
     "owner_org" = EXCLUDED."owner_org",
@@ -555,6 +555,16 @@ BEGIN
   END IF;
 
   PERFORM "public"."claim_legacy_onboarding_demo_data"(p_app_uuid);
+
+  -- unknown/builtin are system placeholders maintained by app creation. They
+  -- are allowed in demo-shaped legacy apps, but must never be demo-owned rows.
+  DELETE FROM "public"."onboarding_demo_data" odd
+  USING "public"."app_versions" av
+  WHERE odd."app_id" = v_app_id
+    AND odd."relation_name" IN ('app_versions', 'app_versions_meta')
+    AND odd."row_key" = av."id"::text
+    AND av."app_id" = v_app_id
+    AND av."name" IN ('unknown', 'builtin');
 
   -- Refuse to delete tracked parents when any untracked child row points at
   -- them. Without these guards, ON DELETE CASCADE could remove real data that
