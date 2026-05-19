@@ -516,6 +516,7 @@ BEGIN
   -- This legacy helper used to delete broad app data. Keep the name for older
   -- callers, but make it provenance-based so completing/resetting onboarding
   -- can never wipe untracked production rows.
+  PERFORM p_preserve_app_version_id;
   PERFORM "public"."reset_onboarding_demo_app_data"(p_app_uuid);
 END;
 $$;
