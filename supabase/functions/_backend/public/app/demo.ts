@@ -4,7 +4,8 @@ import type { Database } from '../../utils/supabase.types.ts'
 import { lockOnboardingApp, unlockOnboardingApp } from '../../utils/demo.ts'
 import { simpleError } from '../../utils/hono.ts'
 import { cloudlog } from '../../utils/logging.ts'
-import { hasOrgRight, supabaseAdmin, updateOrCreateChannel } from '../../utils/supabase.ts'
+import { closeClient, getPgClient, logPgError } from '../../utils/pg.ts'
+import { hasOrgRight, supabaseAdmin } from '../../utils/supabase.ts'
 
 /** Request body for creating a demo app */
 export interface CreateDemoApp {
@@ -217,6 +218,47 @@ function generateDeviceId(): string {
   return crypto.randomUUID()
 }
 
+async function resetOnboardingDemoData(c: Context<MiddlewareKeyVariables>, appUuid: string): Promise<void> {
+  const pgClient = getPgClient(c)
+  try {
+    await pgClient.query('SELECT public.reset_onboarding_demo_app_data($1::uuid)', [appUuid])
+  }
+  catch (error) {
+    logPgError(c, 'resetOnboardingDemoData', error)
+    throw simpleError('cannot_prepare_demo_app', 'Cannot prepare app for demo data', { error: (error as Error)?.message })
+  }
+  finally {
+    await closeClient(c, pgClient)
+  }
+}
+
+async function trackOnboardingDemoRows(
+  c: Context<MiddlewareKeyVariables>,
+  appId: string,
+  ownerOrg: string,
+  relationName: string,
+  rowKeys: string[],
+  seedId: string,
+): Promise<void> {
+  if (rowKeys.length === 0)
+    return
+
+  const pgClient = getPgClient(c)
+  try {
+    await pgClient.query(
+      'SELECT public.track_onboarding_demo_data($1::text, $2::uuid, $3::text, $4::text[], $5::uuid)',
+      [appId, ownerOrg, relationName, rowKeys, seedId],
+    )
+  }
+  catch (error) {
+    logPgError(c, 'trackOnboardingDemoRows', error)
+    throw simpleError('cannot_track_demo_data', 'Cannot track demo data for safe resets', { error: (error as Error)?.message })
+  }
+  finally {
+    await closeClient(c, pgClient)
+  }
+}
+
 async function getExistingPendingApp(
   c: Context<MiddlewareKeyVariables>,
   supabase: ReturnType<typeof supabaseAdmin>,
@@ -335,13 +377,8 @@ export async function createDemoApp(c: Context<MiddlewareKeyVariables>, body: Cr
       throw simpleError('cannot_find_app', 'Cannot find app for demo onboarding', { owner_org: body.owner_org, app_id: lockedAppId })
     }
     const appId = appData.app_id
-    const { error: cleanupError } = await supabase
-      .rpc('clear_onboarding_app_data', { p_app_uuid: appData.id })
-
-    if (cleanupError) {
-      cloudlog({ requestId, message: 'Error clearing onboarding data before demo seeding', error: cleanupError, app_id: appId })
-      throw simpleError('cannot_prepare_demo_app', 'Cannot prepare app for demo data', { error: cleanupError })
-    }
+    const demoSeedId = crypto.randomUUID()
+    await resetOnboardingDemoData(c, appData.id)
 
     cloudlog({ requestId, message: 'Creating demo app with demo data', appId, owner_org: body.owner_org })
 
@@ -388,29 +425,18 @@ export async function createDemoApp(c: Context<MiddlewareKeyVariables>, body: Cr
 
     const { data: versionsData, error: versionsError } = await supabase
       .from('app_versions')
-      .upsert(versionInserts, { onConflict: 'name,app_id', ignoreDuplicates: true })
-      .select()
-
-    if (versionsError) {
-      cloudlog({ requestId, message: 'Error creating demo versions', error: versionsError })
-    }
-    else {
-      cloudlog({ requestId, message: 'Demo versions created', count: versionsData?.length })
-    }
-
-    // Get all version IDs for channel and deploy history creation
-    const { data: allVersions, error: allVersionsError } = await supabase
-      .from('app_versions')
+      .insert(versionInserts)
       .select('id, name')
-      .eq('app_id', appId)
-      .eq('owner_org', body.owner_org)
 
-    if (allVersionsError || !allVersions) {
-      cloudlog({ requestId, message: 'Error getting versions', error: allVersionsError })
-      throw simpleError('cannot_get_versions', 'Cannot get versions', { error: allVersionsError })
+    if (versionsError || !versionsData) {
+      cloudlog({ requestId, message: 'Error creating demo versions', error: versionsError })
+      throw simpleError('cannot_create_demo_versions', 'Cannot create demo versions', { error: versionsError })
     }
 
-    const versionMap = new Map(allVersions.map(v => [v.name, v.id]))
+    await trackOnboardingDemoRows(c, appId, body.owner_org, 'app_versions', versionsData.map(v => String(v.id)), demoSeedId)
+    cloudlog({ requestId, message: 'Demo versions created', count: versionsData.length })
+
+    const versionMap = new Map(versionsData.map(v => [v.name, v.id]))
 
     // Insert manifest entries into the manifest table for each version
     // This is required for the bundle file list to show in the UI
@@ -437,16 +463,18 @@ export async function createDemoApp(c: Context<MiddlewareKeyVariables>, body: Cr
     }
 
     if (manifestInserts.length > 0) {
-      const { error: manifestError } = await supabase
+      const { data: manifestData, error: manifestError } = await supabase
         .from('manifest')
         .insert(manifestInserts)
+        .select('id')
 
-      if (manifestError) {
+      if (manifestError || !manifestData) {
         cloudlog({ requestId, message: 'Error creating manifest entries', error: manifestError })
+        throw simpleError('cannot_create_demo_manifest', 'Cannot create demo manifest entries', { error: manifestError })
       }
-      else {
-        cloudlog({ requestId, message: 'Manifest entries created', count: manifestInserts.length })
-      }
+
+      await trackOnboardingDemoRows(c, appId, body.owner_org, 'manifest', manifestData.map(row => String(row.id)), demoSeedId)
+      cloudlog({ requestId, message: 'Manifest entries created', count: manifestInserts.length })
     }
 
     // Demo channels configuration
@@ -463,8 +491,9 @@ export async function createDemoApp(c: Context<MiddlewareKeyVariables>, body: Cr
       'pr-123': '1.2.0',
     }
 
-    // Create channels
-    const createdChannels: Map<string, number> = new Map()
+    // Create channels. Do not upsert here: if a real channel already uses one
+    // of these names/public-platform slots, failing is safer than overwriting it.
+    const channelInserts: Database['public']['Tables']['channels']['Insert'][] = []
 
     for (const channel of demoChannels) {
       const versionName = channelVersions[channel.name]
@@ -475,7 +504,7 @@ export async function createDemoApp(c: Context<MiddlewareKeyVariables>, body: Cr
         continue
       }
 
-      const channelInsert: Database['public']['Tables']['channels']['Insert'] = {
+      channelInserts.push({
         created_by: auth.userId,
         app_id: appId,
         name: channel.name,
@@ -492,31 +521,24 @@ export async function createDemoApp(c: Context<MiddlewareKeyVariables>, body: Cr
         allow_prod: true,
         version: versionId,
         owner_org: body.owner_org,
-      }
-
-      try {
-        await updateOrCreateChannel(c, channelInsert)
-        cloudlog({ requestId, message: 'Channel created', channel: channel.name })
-      }
-      catch (error) {
-        cloudlog({ requestId, message: 'Error creating channel', channel: channel.name, error })
-      }
+      })
     }
 
-    // Get all channel IDs for deploy history creation
     const { data: allChannels, error: allChannelsError } = await supabase
       .from('channels')
+      .insert(channelInserts)
       .select('id, name')
-      .eq('app_id', appId)
-      .eq('owner_org', body.owner_org)
 
-    if (allChannelsError) {
+    if (allChannelsError || !allChannels) {
       cloudlog({ requestId, message: 'Error getting channels', error: allChannelsError })
+      throw simpleError('cannot_create_demo_channels', 'Cannot create demo channels', { error: allChannelsError })
     }
-    else if (allChannels) {
-      for (const ch of allChannels) {
-        createdChannels.set(ch.name, ch.id)
-      }
+
+    await trackOnboardingDemoRows(c, appId, body.owner_org, 'channels', allChannels.map(row => String(row.id)), demoSeedId)
+
+    const createdChannels: Map<string, number> = new Map()
+    for (const ch of allChannels) {
+      createdChannels.set(ch.name, ch.id)
     }
 
     // Create deploy history to show progression
@@ -545,16 +567,18 @@ export async function createDemoApp(c: Context<MiddlewareKeyVariables>, body: Cr
       }))
 
     if (deployInserts.length > 0) {
-      const { error: deployError } = await supabase
+      const { data: deployData, error: deployError } = await supabase
         .from('deploy_history')
         .insert(deployInserts)
+        .select('id')
 
-      if (deployError) {
+      if (deployError || !deployData) {
         cloudlog({ requestId, message: 'Error creating deploy history', error: deployError })
+        throw simpleError('cannot_create_demo_deploy_history', 'Cannot create demo deploy history', { error: deployError })
       }
-      else {
-        cloudlog({ requestId, message: 'Deploy history created', count: deployInserts.length })
-      }
+
+      await trackOnboardingDemoRows(c, appId, body.owner_org, 'deploy_history', deployData.map(row => String(row.id)), demoSeedId)
+      cloudlog({ requestId, message: 'Deploy history created', count: deployInserts.length })
     }
 
     // Create fake devices - mix of iOS and Android
@@ -585,16 +609,18 @@ export async function createDemoApp(c: Context<MiddlewareKeyVariables>, body: Cr
       })
     }
 
-    const { error: devicesError } = await supabase
+    const { data: devicesData, error: devicesError } = await supabase
       .from('devices')
       .insert(deviceInserts)
+      .select('id')
 
-    if (devicesError) {
+    if (devicesError || !devicesData) {
       cloudlog({ requestId, message: 'Error creating demo devices', error: devicesError })
+      throw simpleError('cannot_create_demo_devices', 'Cannot create demo devices', { error: devicesError })
     }
-    else {
-      cloudlog({ requestId, message: 'Demo devices created', count: deviceInserts.length })
-    }
+
+    await trackOnboardingDemoRows(c, appId, body.owner_org, 'devices', devicesData.map(row => String(row.id)), demoSeedId)
+    cloudlog({ requestId, message: 'Demo devices created', count: deviceInserts.length })
 
     // Create chart data for the past 14 days
     // Insert directly into daily_* tables (which the frontend queries via get_app_metrics RPC)
@@ -694,43 +720,47 @@ export async function createDemoApp(c: Context<MiddlewareKeyVariables>, body: Cr
 
     // Insert chart data into daily_* tables
     if (dailyMauInserts.length > 0) {
-      const { error: mauError } = await supabase.from('daily_mau').upsert(dailyMauInserts, { onConflict: 'app_id,date' })
-      if (mauError) {
+      const { data: mauData, error: mauError } = await supabase.from('daily_mau').insert(dailyMauInserts).select('date')
+      if (mauError || !mauData) {
         cloudlog({ requestId, message: 'Error creating daily_mau data', error: mauError })
+        throw simpleError('cannot_create_demo_daily_mau', 'Cannot create demo MAU data', { error: mauError })
       }
-      else {
-        cloudlog({ requestId, message: 'Daily MAU data created', count: dailyMauInserts.length })
-      }
+
+      await trackOnboardingDemoRows(c, appId, body.owner_org, 'daily_mau', mauData.map(row => String(row.date)), demoSeedId)
+      cloudlog({ requestId, message: 'Daily MAU data created', count: dailyMauInserts.length })
     }
 
     if (dailyBandwidthInserts.length > 0) {
-      const { error: bandwidthError } = await supabase.from('daily_bandwidth').upsert(dailyBandwidthInserts, { onConflict: 'app_id,date' })
-      if (bandwidthError) {
+      const { data: bandwidthData, error: bandwidthError } = await supabase.from('daily_bandwidth').insert(dailyBandwidthInserts).select('date')
+      if (bandwidthError || !bandwidthData) {
         cloudlog({ requestId, message: 'Error creating daily_bandwidth data', error: bandwidthError })
+        throw simpleError('cannot_create_demo_daily_bandwidth', 'Cannot create demo bandwidth data', { error: bandwidthError })
       }
-      else {
-        cloudlog({ requestId, message: 'Daily bandwidth data created', count: dailyBandwidthInserts.length })
-      }
+
+      await trackOnboardingDemoRows(c, appId, body.owner_org, 'daily_bandwidth', bandwidthData.map(row => String(row.date)), demoSeedId)
+      cloudlog({ requestId, message: 'Daily bandwidth data created', count: dailyBandwidthInserts.length })
     }
 
     if (dailyStorageInserts.length > 0) {
-      const { error: storageError } = await supabase.from('daily_storage').upsert(dailyStorageInserts, { onConflict: 'app_id,date' })
-      if (storageError) {
+      const { data: storageData, error: storageError } = await supabase.from('daily_storage').insert(dailyStorageInserts).select('date')
+      if (storageError || !storageData) {
         cloudlog({ requestId, message: 'Error creating daily_storage data', error: storageError })
+        throw simpleError('cannot_create_demo_daily_storage', 'Cannot create demo storage data', { error: storageError })
       }
-      else {
-        cloudlog({ requestId, message: 'Daily storage data created', count: dailyStorageInserts.length })
-      }
+
+      await trackOnboardingDemoRows(c, appId, body.owner_org, 'daily_storage', storageData.map(row => String(row.date)), demoSeedId)
+      cloudlog({ requestId, message: 'Daily storage data created', count: dailyStorageInserts.length })
     }
 
     if (dailyVersionInserts.length > 0) {
-      const { error: versionError } = await supabase.from('daily_version').upsert(dailyVersionInserts as any, { onConflict: 'app_id,date,version_name' })
-      if (versionError) {
+      const { data: versionData, error: versionError } = await supabase.from('daily_version').insert(dailyVersionInserts as any).select('date, version_name')
+      if (versionError || !versionData) {
         cloudlog({ requestId, message: 'Error creating daily_version data', error: versionError })
+        throw simpleError('cannot_create_demo_daily_version', 'Cannot create demo version data', { error: versionError })
       }
-      else {
-        cloudlog({ requestId, message: 'Daily version data created', count: dailyVersionInserts.length })
-      }
+
+      await trackOnboardingDemoRows(c, appId, body.owner_org, 'daily_version', versionData.map(row => `${row.date}|${row.version_name}`), demoSeedId)
+      cloudlog({ requestId, message: 'Daily version data created', count: dailyVersionInserts.length })
     }
 
     cloudlog({ requestId, message: 'Chart data created for 14 days' })
@@ -780,16 +810,18 @@ export async function createDemoApp(c: Context<MiddlewareKeyVariables>, body: Cr
     }
 
     if (buildInserts.length > 0) {
-      const { error: buildError } = await supabase
+      const { data: buildData, error: buildError } = await supabase
         .from('build_requests')
         .insert(buildInserts)
+        .select('id')
 
-      if (buildError) {
+      if (buildError || !buildData) {
         cloudlog({ requestId, message: 'Error creating demo build requests', error: buildError })
+        throw simpleError('cannot_create_demo_build_requests', 'Cannot create demo build requests', { error: buildError })
       }
-      else {
-        cloudlog({ requestId, message: 'Demo build requests created', count: buildInserts.length })
-      }
+
+      await trackOnboardingDemoRows(c, appId, body.owner_org, 'build_requests', buildData.map(row => String(row.id)), demoSeedId)
+      cloudlog({ requestId, message: 'Demo build requests created', count: buildInserts.length })
     }
 
     // Invalidate the app_metrics_cache so the dashboard shows fresh data immediately
