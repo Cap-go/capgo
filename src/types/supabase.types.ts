@@ -2776,6 +2776,7 @@ export type Database = {
           audit_log_id: number | null
           completed_at: string | null
           created_at: string
+          delivery_version: string
           duration_ms: number | null
           event_type: string
           id: string
@@ -2794,6 +2795,7 @@ export type Database = {
           audit_log_id?: number | null
           completed_at?: string | null
           created_at?: string
+          delivery_version?: string
           duration_ms?: number | null
           event_type: string
           id?: string
@@ -2812,6 +2814,7 @@ export type Database = {
           audit_log_id?: number | null
           completed_at?: string | null
           created_at?: string
+          delivery_version?: string
           duration_ms?: number | null
           event_type?: string
           id?: string
@@ -2846,6 +2849,7 @@ export type Database = {
         Row: {
           created_at: string
           created_by: string
+          delivery_version: string
           enabled: boolean
           events: string[]
           id: string
@@ -2858,6 +2862,7 @@ export type Database = {
         Insert: {
           created_at?: string
           created_by: string
+          delivery_version?: string
           enabled?: boolean
           events: string[]
           id?: string
@@ -2870,6 +2875,7 @@ export type Database = {
         Update: {
           created_at?: string
           created_by?: string
+          delivery_version?: string
           enabled?: boolean
           events?: string[]
           id?: string
