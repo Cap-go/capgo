@@ -7,30 +7,10 @@ export type Json =
   | Json[]
 
 export type Database = {
-  graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          extensions?: Json
-          operationName?: string
-          query?: string
-          variables?: Json
-        }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
+  __InternalSupabase: {
+    PostgrestVersion: "14.5"
   }
   public: {
     Tables: {
@@ -488,6 +468,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "apps"
             referencedColumns: ["app_id"]
+          },
+          {
+            foreignKeyName: "build_logs_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -1291,7 +1278,7 @@ export type Database = {
           paying: number | null
           paying_monthly: number | null
           paying_yearly: number | null
-          plan_enterprise: number
+          plan_enterprise: number | null
           plan_enterprise_conversion_rate: number
           plan_enterprise_monthly: number
           plan_enterprise_yearly: number
@@ -1375,7 +1362,7 @@ export type Database = {
           paying?: number | null
           paying_monthly?: number | null
           paying_yearly?: number | null
-          plan_enterprise?: number
+          plan_enterprise?: number | null
           plan_enterprise_conversion_rate?: number
           plan_enterprise_monthly?: number
           plan_enterprise_yearly?: number
@@ -1459,7 +1446,7 @@ export type Database = {
           paying?: number | null
           paying_monthly?: number | null
           paying_yearly?: number | null
-          plan_enterprise?: number
+          plan_enterprise?: number | null
           plan_enterprise_conversion_rate?: number
           plan_enterprise_monthly?: number
           plan_enterprise_yearly?: number
@@ -1638,51 +1625,6 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "owner_org_id_fkey"
-            columns: ["owner_org"]
-            isOneToOne: false
-            referencedRelation: "orgs"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      onboarding_demo_data: {
-        Row: {
-          app_id: string
-          created_at: string
-          id: string
-          owner_org: string
-          relation_name: string
-          row_key: string
-          seed_id: string
-        }
-        Insert: {
-          app_id: string
-          created_at?: string
-          id?: string
-          owner_org: string
-          relation_name: string
-          row_key: string
-          seed_id: string
-        }
-        Update: {
-          app_id?: string
-          created_at?: string
-          id?: string
-          owner_org?: string
-          relation_name?: string
-          row_key?: string
-          seed_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "onboarding_demo_data_app_id_fkey"
-            columns: ["app_id"]
-            isOneToOne: false
-            referencedRelation: "apps"
-            referencedColumns: ["app_id"]
-          },
-          {
-            foreignKeyName: "onboarding_demo_data_owner_org_fkey"
             columns: ["owner_org"]
             isOneToOne: false
             referencedRelation: "orgs"
@@ -3144,10 +3086,6 @@ export type Database = {
         Args: { appid: string }
         Returns: number
       }
-      claim_legacy_onboarding_demo_data: {
-        Args: { p_app_uuid: string }
-        Returns: undefined
-      }
       cleanup_expired_apikeys: { Args: never; Returns: undefined }
       cleanup_expired_demo_apps: { Args: never; Returns: undefined }
       cleanup_frequent_job_details: { Args: never; Returns: undefined }
@@ -3332,6 +3270,42 @@ export type Database = {
         Returns: {
           name: string
         }[]
+      }
+      get_accessible_apps_for_apikey_v2: {
+        Args: { apikey?: string }
+        Returns: {
+          allow_device_custom_id: boolean
+          allow_preview: boolean
+          android_store_url: string | null
+          app_id: string
+          build_timeout_seconds: number
+          build_timeout_updated_at: string
+          channel_device_count: number
+          created_at: string | null
+          default_upload_channel: string
+          existing_app: boolean
+          expose_metadata: boolean
+          icon_url: string
+          id: string | null
+          ios_store_url: string | null
+          last_version: string | null
+          manifest_bundle_count: number
+          name: string | null
+          need_onboarding: boolean
+          owner_org: string
+          retention: number
+          stats_refresh_requested_at: string | null
+          stats_updated_at: string | null
+          transfer_history: Json[] | null
+          updated_at: string | null
+          user_id: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "apps"
+          isOneToOne: false
+          isSetofReturn: true
+        }
       }
       get_account_removal_date: { Args: never; Returns: string }
       get_apikey: { Args: never; Returns: string }
@@ -3619,24 +3593,18 @@ export type Database = {
               app_count: number
               can_use_more: boolean
               created_by: string
-              credit_available: number
-              credit_next_expiration: string
-              credit_total: number
               gid: string
               is_canceled: boolean
               is_yearly: boolean
               logo: string
               management_email: string
-              max_apikey_expiration_days: number
               name: string
-              next_stats_update_at: string
               paying: boolean
-              require_apikey_expiration: boolean
               role: string
-              stats_updated_at: string
               subscription_end: string
               subscription_start: string
               trial_left: number
+              use_new_rbac: boolean
             }[]
           }
         | {
@@ -3645,24 +3613,18 @@ export type Database = {
               app_count: number
               can_use_more: boolean
               created_by: string
-              credit_available: number
-              credit_next_expiration: string
-              credit_total: number
               gid: string
               is_canceled: boolean
               is_yearly: boolean
               logo: string
               management_email: string
-              max_apikey_expiration_days: number
               name: string
-              next_stats_update_at: string
               paying: boolean
-              require_apikey_expiration: boolean
               role: string
-              stats_updated_at: string
               subscription_end: string
               subscription_start: string
               trial_left: number
+              use_new_rbac: boolean
             }[]
           }
       get_orgs_v7:
@@ -3959,22 +3921,13 @@ export type Database = {
         Returns: boolean
       }
       is_allowed_action_org: { Args: { orgid: string }; Returns: boolean }
-      is_allowed_action_org_action:
-        | {
-            Args: {
-              actions: Database["public"]["Enums"]["action_type"][]
-              orgid: string
-            }
-            Returns: boolean
-          }
-        | {
-            Args: {
-              actions: Database["public"]["Enums"]["action_type"][]
-              appid: string
-              orgid: string
-            }
-            Returns: boolean
-          }
+      is_allowed_action_org_action: {
+        Args: {
+          actions: Database["public"]["Enums"]["action_type"][]
+          orgid: string
+        }
+        Returns: boolean
+      }
       is_allowed_capgkey:
         | {
             Args: {
@@ -4022,29 +3975,20 @@ export type Database = {
       is_onboarding_needed_org: { Args: { orgid: string }; Returns: boolean }
       is_org_yearly: { Args: { orgid: string }; Returns: boolean }
       is_paying_and_good_plan_org: { Args: { orgid: string }; Returns: boolean }
-      is_paying_and_good_plan_org_action:
-        | {
-            Args: {
-              actions: Database["public"]["Enums"]["action_type"][]
-              orgid: string
-            }
-            Returns: boolean
-          }
-        | {
-            Args: {
-              actions: Database["public"]["Enums"]["action_type"][]
-              appid: string
-              orgid: string
-            }
-            Returns: boolean
-          }
+      is_paying_and_good_plan_org_action: {
+        Args: {
+          actions: Database["public"]["Enums"]["action_type"][]
+          orgid: string
+        }
+        Returns: boolean
+      }
       is_paying_org: { Args: { orgid: string }; Returns: boolean }
       is_platform_admin:
         | { Args: never; Returns: boolean }
         | { Args: { userid: string }; Returns: boolean }
       is_rbac_enabled_globally: { Args: never; Returns: boolean }
       is_recent_email_otp_verified: {
-        Args: { p_user_id: string }
+        Args: { user_id: string }
         Returns: boolean
       }
       is_storage_exceeded_by_org: { Args: { org_id: string }; Returns: boolean }
@@ -4382,10 +4326,6 @@ export type Database = {
         Args: { p_user_id: string }
         Returns: string
       }
-      refresh_app_rollups_after_demo_reset: {
-        Args: { p_app_id: string; p_app_uuid: string; p_owner_org: string }
-        Returns: undefined
-      }
       refresh_orgs_has_usage_credits: { Args: never; Returns: undefined }
       regenerate_hashed_apikey: {
         Args: { p_apikey_id: number }
@@ -4481,29 +4421,6 @@ export type Database = {
         Args: { email: string; org_id: string }
         Returns: string
       }
-      reset_and_seed_app_data: {
-        Args: {
-          p_admin_user_id?: string
-          p_app_id: string
-          p_org_id?: string
-          p_plan_product_id?: string
-          p_stripe_customer_id?: string
-          p_user_id?: string
-        }
-        Returns: undefined
-      }
-      reset_and_seed_app_stats_data: {
-        Args: { p_app_id: string }
-        Returns: undefined
-      }
-      reset_and_seed_data: { Args: never; Returns: undefined }
-      reset_and_seed_stats_data: { Args: never; Returns: undefined }
-      reset_app_data: { Args: { p_app_id: string }; Returns: undefined }
-      reset_app_stats_data: { Args: { p_app_id: string }; Returns: undefined }
-      reset_onboarding_demo_app_data: {
-        Args: { p_app_uuid: string }
-        Returns: undefined
-      }
       restore_deleted_account: { Args: never; Returns: undefined }
       resync_org_user_role_bindings: {
         Args: { p_org_id: string; p_user_id: string }
@@ -4572,16 +4489,6 @@ export type Database = {
         }[]
       }
       total_bundle_storage_bytes: { Args: never; Returns: number }
-      track_onboarding_demo_data: {
-        Args: {
-          p_app_id: string
-          p_owner_org: string
-          p_relation_name: string
-          p_row_keys: string[]
-          p_seed_id: string
-        }
-        Returns: undefined
-      }
       transfer_app: {
         Args: { p_app_id: string; p_new_org_id: string }
         Returns: undefined
@@ -4684,9 +4591,7 @@ export type Database = {
         | "disableAutoUpdateMetadata"
         | "disableAutoUpdateUnderNative"
         | "disableDevBuild"
-        | "disableProdBuild"
         | "disableEmulator"
-        | "disableDevice"
         | "cannotGetBundle"
         | "checksum_fail"
         | "NoChannelOrOverride"
@@ -4707,6 +4612,8 @@ export type Database = {
         | "download_manifest_brotli_fail"
         | "backend_refusal"
         | "download_0"
+        | "disableProdBuild"
+        | "disableDevice"
         | "disablePlatformElectron"
         | "customIdBlocked"
         | "app_crash"
@@ -4897,9 +4804,6 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  graphql_public: {
-    Enums: {},
-  },
   public: {
     Enums: {
       action_type: ["mau", "storage", "bandwidth", "build_time"],
@@ -4956,9 +4860,7 @@ export const Constants = {
         "disableAutoUpdateMetadata",
         "disableAutoUpdateUnderNative",
         "disableDevBuild",
-        "disableProdBuild",
         "disableEmulator",
-        "disableDevice",
         "cannotGetBundle",
         "checksum_fail",
         "NoChannelOrOverride",
@@ -4979,6 +4881,8 @@ export const Constants = {
         "download_manifest_brotli_fail",
         "backend_refusal",
         "download_0",
+        "disableProdBuild",
+        "disableDevice",
         "disablePlatformElectron",
         "customIdBlocked",
         "app_crash",
