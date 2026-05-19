@@ -24,11 +24,6 @@ CREATE TABLE IF NOT EXISTS "public"."onboarding_demo_data" (
       'channel_devices'::text,
       'deploy_history'::text,
       'devices'::text,
-      'daily_mau'::text,
-      'daily_bandwidth'::text,
-      'daily_storage'::text,
-      'daily_version'::text,
-      'daily_build_time'::text,
       'build_requests'::text
     ])
   )
@@ -37,7 +32,7 @@ CREATE TABLE IF NOT EXISTS "public"."onboarding_demo_data" (
 ALTER TABLE "public"."onboarding_demo_data" OWNER TO "postgres";
 
 COMMENT ON TABLE "public"."onboarding_demo_data" IS 'Tracks rows created by onboarding demo seeding so demo resets can delete only demo-owned data.';
-COMMENT ON COLUMN "public"."onboarding_demo_data"."row_key" IS 'Primary-row identifier as text. For date-keyed daily tables this is the date; for daily_version this is date|version_name.';
+COMMENT ON COLUMN "public"."onboarding_demo_data"."row_key" IS 'Primary-row identifier as text. Only exact rows created or confidently fingerprinted by onboarding demo seeding are tracked.';
 
 ALTER TABLE ONLY "public"."onboarding_demo_data"
   ADD CONSTRAINT "onboarding_demo_data_pkey" PRIMARY KEY ("id");
@@ -105,11 +100,6 @@ BEGIN
       'channel_devices'::text,
       'deploy_history'::text,
       'devices'::text,
-      'daily_mau'::text,
-      'daily_bandwidth'::text,
-      'daily_storage'::text,
-      'daily_version'::text,
-      'daily_build_time'::text,
       'build_requests'::text
     ])
   ) THEN
@@ -145,6 +135,354 @@ REVOKE ALL ON FUNCTION "public"."track_onboarding_demo_data"(text, uuid, text, t
 REVOKE ALL ON FUNCTION "public"."track_onboarding_demo_data"(text, uuid, text, text[], uuid) FROM "anon";
 REVOKE ALL ON FUNCTION "public"."track_onboarding_demo_data"(text, uuid, text, text[], uuid) FROM "authenticated";
 GRANT EXECUTE ON FUNCTION "public"."track_onboarding_demo_data"(text, uuid, text, text[], uuid) TO "service_role";
+
+CREATE OR REPLACE FUNCTION "public"."claim_legacy_onboarding_demo_data"("p_app_uuid" uuid)
+RETURNS void
+LANGUAGE "plpgsql"
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+  v_app_id text;
+  v_owner_org uuid;
+  v_can_claim_full_seed boolean := false;
+BEGIN
+  SELECT "app_id", "owner_org"
+  INTO v_app_id, v_owner_org
+  FROM "public"."apps"
+  WHERE "id" = p_app_uuid
+    AND "need_onboarding" IS TRUE;
+
+  IF v_app_id IS NULL THEN
+    RETURN;
+  END IF;
+
+  -- Legacy demo rows created before this provenance table had no durable owner
+  -- marker. Only claim rows with hard demo storage/build markers. Names alone
+  -- are not enough because customers can create normal 1.0.0/production rows.
+  INSERT INTO "public"."onboarding_demo_data" (
+    "app_id",
+    "owner_org",
+    "relation_name",
+    "row_key",
+    "seed_id"
+  )
+  SELECT
+    v_app_id,
+    v_owner_org,
+    'manifest',
+    m."id"::text,
+    p_app_uuid
+  FROM "public"."manifest" m
+  INNER JOIN "public"."app_versions" av
+    ON av."id" = m."app_version_id"
+  WHERE av."app_id" = v_app_id
+    AND m."s3_path" LIKE ('demo/' || v_app_id || '/%')
+  ON CONFLICT ("app_id", "relation_name", "row_key") DO UPDATE
+  SET
+    "owner_org" = EXCLUDED."owner_org",
+    "seed_id" = EXCLUDED."seed_id",
+    "created_at" = "now"();
+
+  INSERT INTO "public"."onboarding_demo_data" (
+    "app_id",
+    "owner_org",
+    "relation_name",
+    "row_key",
+    "seed_id"
+  )
+  SELECT
+    v_app_id,
+    v_owner_org,
+    'build_requests',
+    br."id"::text,
+    p_app_uuid
+  FROM "public"."build_requests" br
+  WHERE br."app_id" = v_app_id
+    AND br."upload_session_key" LIKE 'demo-session-%'
+    AND br."upload_path" LIKE ('builds/' || v_app_id || '/%')
+    AND br."upload_url" LIKE ('https://demo-builds.example.com/' || v_app_id || '/%')
+    AND COALESCE(br."build_config"->>'bundleId', '') = v_app_id
+    AND (
+      br."builder_job_id" LIKE 'demo-job-%'
+      OR br."builder_job_id" IS NULL
+    )
+  ON CONFLICT ("app_id", "relation_name", "row_key") DO UPDATE
+  SET
+    "owner_org" = EXCLUDED."owner_org",
+    "seed_id" = EXCLUDED."seed_id",
+    "created_at" = "now"();
+
+  SELECT
+    EXISTS (
+      SELECT 1
+      FROM "public"."manifest" m
+      INNER JOIN "public"."app_versions" av
+        ON av."id" = m."app_version_id"
+      WHERE av."app_id" = v_app_id
+        AND m."s3_path" LIKE ('demo/' || v_app_id || '/%')
+    )
+    AND EXISTS (
+      SELECT 1
+      FROM "public"."build_requests" br
+      WHERE br."app_id" = v_app_id
+        AND br."upload_session_key" LIKE 'demo-session-%'
+        AND br."upload_url" LIKE ('https://demo-builds.example.com/' || v_app_id || '/%')
+    )
+    AND NOT EXISTS (
+      SELECT 1
+      FROM "public"."app_versions" av
+      WHERE av."app_id" = v_app_id
+        AND av."name" NOT IN ('unknown', 'builtin', '1.0.0', '1.0.1', '1.1.0', '1.1.1', '1.2.0')
+    )
+    AND NOT EXISTS (
+      SELECT 1
+      FROM "public"."manifest" m
+      INNER JOIN "public"."app_versions" av
+        ON av."id" = m."app_version_id"
+      WHERE av."app_id" = v_app_id
+        AND m."s3_path" NOT LIKE ('demo/' || v_app_id || '/%')
+    )
+    AND NOT EXISTS (
+      SELECT 1
+      FROM "public"."channels" c
+      INNER JOIN "public"."app_versions" av
+        ON av."id" = c."version"
+      WHERE c."app_id" = v_app_id
+        AND NOT (
+          c."disable_auto_update_under_native" IS TRUE
+          AND c."disable_auto_update" = 'major'::"public"."disable_update"
+          AND c."ios" IS TRUE
+          AND c."android" IS TRUE
+          AND c."electron" IS TRUE
+          AND c."allow_emulator" IS TRUE
+          AND c."allow_device" IS TRUE
+          AND c."allow_prod" IS TRUE
+          AND (
+            (
+              c."name" = 'production'
+              AND c."public" IS TRUE
+              AND c."allow_device_self_set" IS FALSE
+              AND c."allow_dev" IS FALSE
+              AND av."name" = '1.1.1'
+            )
+            OR (
+              c."name" = 'development'
+              AND c."public" IS FALSE
+              AND c."allow_device_self_set" IS FALSE
+              AND c."allow_dev" IS TRUE
+              AND av."name" = '1.2.0'
+            )
+            OR (
+              c."name" = 'pr-123'
+              AND c."public" IS FALSE
+              AND c."allow_device_self_set" IS TRUE
+              AND c."allow_dev" IS TRUE
+              AND av."name" = '1.2.0'
+            )
+          )
+        )
+    )
+    AND NOT EXISTS (
+      SELECT 1
+      FROM "public"."channel_devices" cd
+      WHERE cd."app_id" = v_app_id
+    )
+    AND NOT EXISTS (
+      SELECT 1
+      FROM "public"."devices" d
+      WHERE d."app_id" = v_app_id
+        AND NOT (
+          d."plugin_version" = '6.0.0'
+          AND d."version_name" = '1.1.1'
+          AND COALESCE(d."version_build", '') = '1'
+          AND d."platform" IN ('ios'::"public"."platform_os", 'android'::"public"."platform_os")
+          AND COALESCE(d."os_version", '') IN ('17.0', '14')
+          AND COALESCE(d."is_prod", false) IS TRUE
+          AND COALESCE(d."is_emulator", true) IS FALSE
+        )
+    )
+    AND NOT EXISTS (
+      SELECT 1
+      FROM "public"."build_requests" br
+      WHERE br."app_id" = v_app_id
+        AND NOT (
+          br."upload_session_key" LIKE 'demo-session-%'
+          AND br."upload_path" LIKE ('builds/' || v_app_id || '/%')
+          AND br."upload_url" LIKE ('https://demo-builds.example.com/' || v_app_id || '/%')
+          AND COALESCE(br."build_config"->>'bundleId', '') = v_app_id
+          AND (
+            br."builder_job_id" LIKE 'demo-job-%'
+            OR br."builder_job_id" IS NULL
+          )
+        )
+    )
+    AND NOT EXISTS (
+      WITH expected_deploys AS (
+        SELECT *
+        FROM (VALUES
+          ('production'::text, '1.0.0'::text),
+          ('development'::text, '1.0.1'::text),
+          ('production'::text, '1.0.1'::text),
+          ('development'::text, '1.1.0'::text),
+          ('production'::text, '1.1.0'::text),
+          ('development'::text, '1.1.1'::text),
+          ('production'::text, '1.1.1'::text),
+          ('pr-123'::text, '1.2.0'::text),
+          ('development'::text, '1.2.0'::text)
+        ) AS expected("channel_name", "version_name")
+      )
+      SELECT 1
+      FROM "public"."deploy_history" dh
+      INNER JOIN "public"."channels" c
+        ON c."id" = dh."channel_id"
+      INNER JOIN "public"."app_versions" av
+        ON av."id" = dh."version_id"
+      WHERE dh."app_id" = v_app_id
+        AND NOT EXISTS (
+          SELECT 1
+          FROM expected_deploys expected
+          WHERE expected."channel_name" = c."name"
+            AND expected."version_name" = av."name"
+        )
+    )
+  INTO v_can_claim_full_seed;
+
+  IF NOT v_can_claim_full_seed THEN
+    RETURN;
+  END IF;
+
+  INSERT INTO "public"."onboarding_demo_data" (
+    "app_id",
+    "owner_org",
+    "relation_name",
+    "row_key",
+    "seed_id"
+  )
+  SELECT
+    v_app_id,
+    v_owner_org,
+    'app_versions',
+    av."id"::text,
+    p_app_uuid
+  FROM "public"."app_versions" av
+  WHERE av."app_id" = v_app_id
+    AND av."name" IN ('unknown', 'builtin', '1.0.0', '1.0.1', '1.1.0', '1.1.1', '1.2.0')
+  ON CONFLICT ("app_id", "relation_name", "row_key") DO UPDATE
+  SET
+    "owner_org" = EXCLUDED."owner_org",
+    "seed_id" = EXCLUDED."seed_id",
+    "created_at" = "now"();
+
+  INSERT INTO "public"."onboarding_demo_data" (
+    "app_id",
+    "owner_org",
+    "relation_name",
+    "row_key",
+    "seed_id"
+  )
+  SELECT
+    v_app_id,
+    v_owner_org,
+    'app_versions_meta',
+    avm."id"::text,
+    p_app_uuid
+  FROM "public"."app_versions_meta" avm
+  INNER JOIN "public"."app_versions" av
+    ON av."id" = avm."id"
+  WHERE av."app_id" = v_app_id
+    AND av."name" IN ('unknown', 'builtin', '1.0.0', '1.0.1', '1.1.0', '1.1.1', '1.2.0')
+  ON CONFLICT ("app_id", "relation_name", "row_key") DO UPDATE
+  SET
+    "owner_org" = EXCLUDED."owner_org",
+    "seed_id" = EXCLUDED."seed_id",
+    "created_at" = "now"();
+
+  INSERT INTO "public"."onboarding_demo_data" (
+    "app_id",
+    "owner_org",
+    "relation_name",
+    "row_key",
+    "seed_id"
+  )
+  SELECT
+    v_app_id,
+    v_owner_org,
+    'channels',
+    c."id"::text,
+    p_app_uuid
+  FROM "public"."channels" c
+  WHERE c."app_id" = v_app_id
+    AND c."name" IN ('production', 'development', 'pr-123')
+  ON CONFLICT ("app_id", "relation_name", "row_key") DO UPDATE
+  SET
+    "owner_org" = EXCLUDED."owner_org",
+    "seed_id" = EXCLUDED."seed_id",
+    "created_at" = "now"();
+
+  INSERT INTO "public"."onboarding_demo_data" (
+    "app_id",
+    "owner_org",
+    "relation_name",
+    "row_key",
+    "seed_id"
+  )
+  SELECT
+    v_app_id,
+    v_owner_org,
+    'deploy_history',
+    dh."id"::text,
+    p_app_uuid
+  FROM "public"."deploy_history" dh
+  WHERE dh."app_id" = v_app_id
+  ON CONFLICT ("app_id", "relation_name", "row_key") DO UPDATE
+  SET
+    "owner_org" = EXCLUDED."owner_org",
+    "seed_id" = EXCLUDED."seed_id",
+    "created_at" = "now"();
+
+  INSERT INTO "public"."onboarding_demo_data" (
+    "app_id",
+    "owner_org",
+    "relation_name",
+    "row_key",
+    "seed_id"
+  )
+  SELECT
+    v_app_id,
+    v_owner_org,
+    'devices',
+    d."id"::text,
+    p_app_uuid
+  FROM "public"."devices" d
+  WHERE d."app_id" = v_app_id
+  ON CONFLICT ("app_id", "relation_name", "row_key") DO UPDATE
+  SET
+    "owner_org" = EXCLUDED."owner_org",
+    "seed_id" = EXCLUDED."seed_id",
+    "created_at" = "now"();
+END;
+$$;
+
+ALTER FUNCTION "public"."claim_legacy_onboarding_demo_data"(uuid) OWNER TO "postgres";
+REVOKE ALL ON FUNCTION "public"."claim_legacy_onboarding_demo_data"(uuid) FROM PUBLIC;
+REVOKE ALL ON FUNCTION "public"."claim_legacy_onboarding_demo_data"(uuid) FROM "anon";
+REVOKE ALL ON FUNCTION "public"."claim_legacy_onboarding_demo_data"(uuid) FROM "authenticated";
+GRANT EXECUTE ON FUNCTION "public"."claim_legacy_onboarding_demo_data"(uuid) TO "service_role";
+
+DO $$
+DECLARE
+  v_app_uuid uuid;
+BEGIN
+  FOR v_app_uuid IN
+    SELECT "id"
+    FROM "public"."apps"
+    WHERE "need_onboarding" IS TRUE
+  LOOP
+    PERFORM "public"."claim_legacy_onboarding_demo_data"(v_app_uuid);
+  END LOOP;
+END;
+$$;
 
 CREATE OR REPLACE FUNCTION "public"."refresh_app_rollups_after_demo_reset"("p_app_uuid" uuid, "p_app_id" text, "p_owner_org" uuid)
 RETURNS void
@@ -215,6 +553,8 @@ BEGIN
   IF v_app_id IS NULL THEN
     RETURN;
   END IF;
+
+  PERFORM "public"."claim_legacy_onboarding_demo_data"(p_app_uuid);
 
   -- Refuse to delete tracked parents when any untracked child row points at
   -- them. Without these guards, ON DELETE CASCADE could remove real data that
@@ -328,6 +668,21 @@ BEGIN
   END IF;
 
   IF EXISTS (
+    WITH tracked_versions AS (
+      SELECT "row_key"::bigint AS "id"
+      FROM "public"."onboarding_demo_data"
+      WHERE "app_id" = v_app_id
+        AND "relation_name" = 'app_versions'
+    )
+    SELECT 1
+    FROM "public"."version_meta" vm
+    INNER JOIN tracked_versions tv ON tv."id" = vm."version_id"
+    WHERE vm."app_id" = v_app_id
+  ) THEN
+    RAISE EXCEPTION 'reset_onboarding_demo_app_data: refusing to delete demo versions with non-nullable version metrics for app %', v_app_id;
+  END IF;
+
+  IF EXISTS (
     WITH tracked_channels AS (
       SELECT "row_key"::bigint AS "id"
       FROM "public"."onboarding_demo_data"
@@ -433,42 +788,6 @@ BEGIN
     AND odd."relation_name" = 'build_requests'
     AND odd."row_key" = br."id"::text;
 
-  DELETE FROM "public"."daily_version" dv
-  USING "public"."onboarding_demo_data" odd
-  WHERE odd."app_id" = v_app_id
-    AND odd."relation_name" = 'daily_version'
-    AND dv."app_id" = v_app_id
-    AND dv."date" = "split_part"(odd."row_key", '|', 1)::date
-    AND dv."version_name" = "substr"(odd."row_key", "strpos"(odd."row_key", '|') + 1);
-
-  DELETE FROM "public"."daily_mau" dm
-  USING "public"."onboarding_demo_data" odd
-  WHERE odd."app_id" = v_app_id
-    AND odd."relation_name" = 'daily_mau'
-    AND dm."app_id" = v_app_id
-    AND dm."date" = odd."row_key"::date;
-
-  DELETE FROM "public"."daily_bandwidth" db
-  USING "public"."onboarding_demo_data" odd
-  WHERE odd."app_id" = v_app_id
-    AND odd."relation_name" = 'daily_bandwidth'
-    AND db."app_id" = v_app_id
-    AND db."date" = odd."row_key"::date;
-
-  DELETE FROM "public"."daily_storage" ds
-  USING "public"."onboarding_demo_data" odd
-  WHERE odd."app_id" = v_app_id
-    AND odd."relation_name" = 'daily_storage'
-    AND ds."app_id" = v_app_id
-    AND ds."date" = odd."row_key"::date;
-
-  DELETE FROM "public"."daily_build_time" dbt
-  USING "public"."onboarding_demo_data" odd
-  WHERE odd."app_id" = v_app_id
-    AND odd."relation_name" = 'daily_build_time'
-    AND dbt."app_id" = v_app_id
-    AND dbt."date" = odd."row_key"::date;
-
   DELETE FROM "public"."devices" d
   USING "public"."onboarding_demo_data" odd
   WHERE odd."app_id" = v_app_id
@@ -486,6 +805,39 @@ BEGIN
   WHERE odd."app_id" = v_app_id
     AND odd."relation_name" = 'app_versions_meta'
     AND odd."row_key" = avm."id"::text;
+
+  UPDATE "public"."devices" d
+  SET "version" = NULL
+  WHERE d."app_id" = v_app_id
+    AND EXISTS (
+      SELECT 1
+      FROM "public"."onboarding_demo_data" odd
+      WHERE odd."app_id" = v_app_id
+        AND odd."relation_name" = 'app_versions'
+        AND odd."row_key" = d."version"::text
+    );
+
+  UPDATE "public"."daily_version" dv
+  SET "version_id" = NULL
+  WHERE dv."app_id" = v_app_id
+    AND EXISTS (
+      SELECT 1
+      FROM "public"."onboarding_demo_data" odd
+      WHERE odd."app_id" = v_app_id
+        AND odd."relation_name" = 'app_versions'
+        AND odd."row_key" = dv."version_id"::text
+    );
+
+  UPDATE "public"."version_usage" vu
+  SET "version_id" = NULL
+  WHERE vu."app_id" = v_app_id
+    AND EXISTS (
+      SELECT 1
+      FROM "public"."onboarding_demo_data" odd
+      WHERE odd."app_id" = v_app_id
+        AND odd."relation_name" = 'app_versions'
+        AND odd."row_key" = vu."version_id"::text
+    );
 
   DELETE FROM "public"."app_versions" av
   USING "public"."onboarding_demo_data" odd

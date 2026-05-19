@@ -718,48 +718,46 @@ export async function createDemoApp(c: Context<MiddlewareKeyVariables>, body: Cr
       }
     }
 
-    // Insert chart data into daily_* tables
+    // Daily rollups are aggregate buckets. Seed only empty buckets and never
+    // track them for reset, because real usage can later be folded into the
+    // same app/date row by stats refresh jobs.
     if (dailyMauInserts.length > 0) {
-      const { data: mauData, error: mauError } = await supabase.from('daily_mau').insert(dailyMauInserts).select('date')
-      if (mauError || !mauData) {
+      const { error: mauError } = await supabase.from('daily_mau').upsert(dailyMauInserts, { onConflict: 'app_id,date', ignoreDuplicates: true })
+      if (mauError) {
         cloudlog({ requestId, message: 'Error creating daily_mau data', error: mauError })
         throw simpleError('cannot_create_demo_daily_mau', 'Cannot create demo MAU data', { error: mauError })
       }
 
-      await trackOnboardingDemoRows(c, appId, body.owner_org, 'daily_mau', mauData.map(row => String(row.date)), demoSeedId)
       cloudlog({ requestId, message: 'Daily MAU data created', count: dailyMauInserts.length })
     }
 
     if (dailyBandwidthInserts.length > 0) {
-      const { data: bandwidthData, error: bandwidthError } = await supabase.from('daily_bandwidth').insert(dailyBandwidthInserts).select('date')
-      if (bandwidthError || !bandwidthData) {
+      const { error: bandwidthError } = await supabase.from('daily_bandwidth').upsert(dailyBandwidthInserts, { onConflict: 'app_id,date', ignoreDuplicates: true })
+      if (bandwidthError) {
         cloudlog({ requestId, message: 'Error creating daily_bandwidth data', error: bandwidthError })
         throw simpleError('cannot_create_demo_daily_bandwidth', 'Cannot create demo bandwidth data', { error: bandwidthError })
       }
 
-      await trackOnboardingDemoRows(c, appId, body.owner_org, 'daily_bandwidth', bandwidthData.map(row => String(row.date)), demoSeedId)
       cloudlog({ requestId, message: 'Daily bandwidth data created', count: dailyBandwidthInserts.length })
     }
 
     if (dailyStorageInserts.length > 0) {
-      const { data: storageData, error: storageError } = await supabase.from('daily_storage').insert(dailyStorageInserts).select('date')
-      if (storageError || !storageData) {
+      const { error: storageError } = await supabase.from('daily_storage').upsert(dailyStorageInserts, { onConflict: 'app_id,date', ignoreDuplicates: true })
+      if (storageError) {
         cloudlog({ requestId, message: 'Error creating daily_storage data', error: storageError })
         throw simpleError('cannot_create_demo_daily_storage', 'Cannot create demo storage data', { error: storageError })
       }
 
-      await trackOnboardingDemoRows(c, appId, body.owner_org, 'daily_storage', storageData.map(row => String(row.date)), demoSeedId)
       cloudlog({ requestId, message: 'Daily storage data created', count: dailyStorageInserts.length })
     }
 
     if (dailyVersionInserts.length > 0) {
-      const { data: versionData, error: versionError } = await supabase.from('daily_version').insert(dailyVersionInserts as any).select('date, version_name')
-      if (versionError || !versionData) {
+      const { error: versionError } = await supabase.from('daily_version').upsert(dailyVersionInserts as any, { onConflict: 'app_id,date,version_name', ignoreDuplicates: true })
+      if (versionError) {
         cloudlog({ requestId, message: 'Error creating daily_version data', error: versionError })
         throw simpleError('cannot_create_demo_daily_version', 'Cannot create demo version data', { error: versionError })
       }
 
-      await trackOnboardingDemoRows(c, appId, body.owner_org, 'daily_version', versionData.map(row => `${row.date}|${row.version_name}`), demoSeedId)
       cloudlog({ requestId, message: 'Daily version data created', count: dailyVersionInserts.length })
     }
 

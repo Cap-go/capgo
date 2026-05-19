@@ -9,10 +9,6 @@ const RELATIONS = {
   channelDevices: 'channel_devices',
   deployHistory: 'deploy_history',
   devices: 'devices',
-  dailyMau: 'daily_mau',
-  dailyBandwidth: 'daily_bandwidth',
-  dailyStorage: 'daily_storage',
-  dailyVersion: 'daily_version',
   buildRequests: 'build_requests',
 } as const
 
@@ -177,11 +173,12 @@ describe('onboarding demo reset', () => {
         version_name
       ) VALUES
         (NOW(), $1, $2, $3, 'ios', '6.0.0', '17.0', '2', true, false, '2.0.0'),
-        (NOW(), $4, $5, $3, 'android', '6.0.0', '14', '1', true, false, '1.0.0')
-      RETURNING id, version_name`,
-      [`real-${randomUUID()}`, realVersionId, appId, `demo-${randomUUID()}`, demoVersionId],
-    ) as Array<{ id: number, version_name: string }>
-    await track(appId, RELATIONS.devices, [deviceRows.find(row => row.version_name === '1.0.0')!.id], seedId)
+        (NOW(), $4, $5, $3, 'android', '6.0.0', '14', '1', true, false, '1.0.0'),
+        (NOW(), $6, $5, $3, 'ios', '6.0.0', '17.0', '1', true, false, '1.0.0')
+      RETURNING id, device_id, version_name`,
+      [`real-${randomUUID()}`, realVersionId, appId, `demo-${randomUUID()}`, demoVersionId, `real-on-demo-version-${randomUUID()}`],
+    ) as Array<{ id: number, device_id: string, version_name: string }>
+    await track(appId, RELATIONS.devices, [deviceRows.find(row => row.device_id.startsWith('demo-'))!.id], seedId)
 
     await executeSQL(
       `INSERT INTO public.daily_mau (app_id, date, mau) VALUES
@@ -189,7 +186,6 @@ describe('onboarding demo reset', () => {
         ($1, $3, 3)`,
       [appId, realDate, demoDate],
     )
-    await track(appId, RELATIONS.dailyMau, [demoDate], seedId)
 
     await executeSQL(
       `INSERT INTO public.daily_bandwidth (app_id, date, bandwidth) VALUES
@@ -197,7 +193,6 @@ describe('onboarding demo reset', () => {
         ($1, $3, 200)`,
       [appId, realDate, demoDate],
     )
-    await track(appId, RELATIONS.dailyBandwidth, [demoDate], seedId)
 
     await executeSQL(
       `INSERT INTO public.daily_storage (app_id, date, storage) VALUES
@@ -205,7 +200,6 @@ describe('onboarding demo reset', () => {
         ($1, $3, 200)`,
       [appId, realDate, demoDate],
     )
-    await track(appId, RELATIONS.dailyStorage, [demoDate], seedId)
 
     await executeSQL(
       `INSERT INTO public.daily_version (
@@ -222,7 +216,21 @@ describe('onboarding demo reset', () => {
         ($1, $4, $5, '1.0.0', 4, 0, 3, 0)`,
       [appId, realDate, realVersionId, demoDate, demoVersionId],
     )
-    await track(appId, RELATIONS.dailyVersion, [`${demoDate}|1.0.0`], seedId)
+
+    await executeSQL(
+      `INSERT INTO public.version_usage (
+        app_id,
+        version_id,
+        action,
+        version_name
+      ) VALUES (
+        $1,
+        $2,
+        'get',
+        '1.0.0'
+      )`,
+      [appId, demoVersionId],
+    )
 
     const buildRows = await executeSQL(
       `INSERT INTO public.build_requests (
@@ -252,9 +260,15 @@ describe('onboarding demo reset', () => {
         EXISTS (SELECT 1 FROM public.channels WHERE app_id = $1 AND name = 'real-channel') AS real_channel_exists,
         EXISTS (SELECT 1 FROM public.channels WHERE app_id = $1 AND name = 'demo-channel') AS demo_channel_exists,
         EXISTS (SELECT 1 FROM public.devices WHERE app_id = $1 AND version_name = '2.0.0') AS real_device_exists,
-        EXISTS (SELECT 1 FROM public.devices WHERE app_id = $1 AND version_name = '1.0.0') AS demo_device_exists,
+        EXISTS (SELECT 1 FROM public.devices WHERE app_id = $1 AND device_id LIKE 'demo-%') AS demo_device_exists,
+        EXISTS (SELECT 1 FROM public.devices WHERE app_id = $1 AND device_id LIKE 'real-on-demo-version-%') AS real_device_on_demo_version_exists,
+        EXISTS (SELECT 1 FROM public.devices WHERE app_id = $1 AND device_id LIKE 'real-on-demo-version-%' AND version IS NULL) AS real_device_version_was_nulled,
         EXISTS (SELECT 1 FROM public.daily_mau WHERE app_id = $1 AND date = $2::date) AS real_mau_exists,
         EXISTS (SELECT 1 FROM public.daily_mau WHERE app_id = $1 AND date = $3::date) AS demo_mau_exists,
+        EXISTS (SELECT 1 FROM public.daily_version WHERE app_id = $1 AND date = $3::date AND version_name = '1.0.0') AS demo_daily_version_exists,
+        EXISTS (SELECT 1 FROM public.daily_version WHERE app_id = $1 AND date = $3::date AND version_name = '1.0.0' AND version_id IS NULL) AS demo_daily_version_id_was_nulled,
+        EXISTS (SELECT 1 FROM public.version_usage WHERE app_id = $1 AND version_name = '1.0.0') AS demo_version_usage_exists,
+        EXISTS (SELECT 1 FROM public.version_usage WHERE app_id = $1 AND version_name = '1.0.0' AND version_id IS NULL) AS demo_version_usage_id_was_nulled,
         EXISTS (SELECT 1 FROM public.build_requests WHERE app_id = $1 AND upload_path = 'builds/real') AS real_build_exists,
         EXISTS (SELECT 1 FROM public.build_requests WHERE app_id = $1 AND upload_path = 'builds/demo') AS demo_build_exists,
         (SELECT COUNT(*)::int FROM public.onboarding_demo_data WHERE app_id = $1) AS tracked_rows,
@@ -269,8 +283,14 @@ describe('onboarding demo reset', () => {
       demo_channel_exists: boolean
       real_device_exists: boolean
       demo_device_exists: boolean
+      real_device_on_demo_version_exists: boolean
+      real_device_version_was_nulled: boolean
       real_mau_exists: boolean
       demo_mau_exists: boolean
+      demo_daily_version_exists: boolean
+      demo_daily_version_id_was_nulled: boolean
+      demo_version_usage_exists: boolean
+      demo_version_usage_id_was_nulled: boolean
       real_build_exists: boolean
       demo_build_exists: boolean
       tracked_rows: number
@@ -285,14 +305,80 @@ describe('onboarding demo reset', () => {
     expect(state.demo_channel_exists).toBe(false)
     expect(state.real_device_exists).toBe(true)
     expect(state.demo_device_exists).toBe(false)
+    expect(state.real_device_on_demo_version_exists).toBe(true)
+    expect(state.real_device_version_was_nulled).toBe(true)
     expect(state.real_mau_exists).toBe(true)
-    expect(state.demo_mau_exists).toBe(false)
+    expect(state.demo_mau_exists).toBe(true)
+    expect(state.demo_daily_version_exists).toBe(true)
+    expect(state.demo_daily_version_id_was_nulled).toBe(true)
+    expect(state.demo_version_usage_exists).toBe(true)
+    expect(state.demo_version_usage_id_was_nulled).toBe(true)
     expect(state.real_build_exists).toBe(true)
     expect(state.demo_build_exists).toBe(false)
     expect(state.tracked_rows).toBe(0)
     expect(state.last_version).toBe('2.0.0')
     expect(Number(state.manifest_bundle_count)).toBe(1)
     expect(Number(state.channel_device_count)).toBe(1)
+  })
+
+  it('refuses to delete tracked demo versions with non-nullable version metrics', async () => {
+    const appId = testAppId('version-meta')
+    const appUuid = await createPendingApp(appId)
+    const seedId = randomUUID()
+
+    const [version] = await executeSQL(
+      `INSERT INTO public.app_versions (
+        app_id,
+        name,
+        owner_org,
+        user_id,
+        storage_provider,
+        deleted
+      ) VALUES (
+        $1,
+        '1.0.0',
+        $2,
+        $3,
+        'r2',
+        false
+      )
+      RETURNING id`,
+      [appId, ORG_ID, USER_ID],
+    ) as Array<{ id: number }>
+    await track(appId, RELATIONS.appVersions, [version.id], seedId)
+
+    await executeSQL(
+      `INSERT INTO public.version_meta (
+        app_id,
+        version_id,
+        size
+      ) VALUES (
+        $1,
+        $2,
+        123
+      )`,
+      [appId, version.id],
+    )
+
+    await expect(
+      executeSQL('SELECT public.reset_onboarding_demo_app_data($1::uuid)', [appUuid]),
+    ).rejects.toThrow(/non-nullable version metrics/)
+
+    const [state] = await executeSQL(
+      `SELECT
+        EXISTS (SELECT 1 FROM public.app_versions WHERE id = $1) AS version_exists,
+        EXISTS (SELECT 1 FROM public.version_meta WHERE app_id = $2 AND version_id = $1) AS version_meta_exists,
+        (SELECT COUNT(*)::int FROM public.onboarding_demo_data WHERE app_id = $2) AS tracked_rows`,
+      [version.id, appId],
+    ) as Array<{
+      version_exists: boolean
+      version_meta_exists: boolean
+      tracked_rows: number
+    }>
+
+    expect(state.version_exists).toBe(true)
+    expect(state.version_meta_exists).toBe(true)
+    expect(state.tracked_rows).toBe(1)
   })
 
   it('refuses to cascade from tracked demo versions into untracked channels', async () => {
@@ -375,6 +461,194 @@ describe('onboarding demo reset', () => {
     expect(state.tracked_rows).toBe(1)
   })
 
+  it('claims and resets clean legacy demo rows from hard demo markers', async () => {
+    const appId = testAppId('legacy-clean')
+    const appUuid = await createPendingApp(appId)
+
+    const [legacyVersion] = await executeSQL(
+      `INSERT INTO public.app_versions (
+        app_id,
+        name,
+        owner_org,
+        user_id,
+        storage_provider,
+        deleted,
+        manifest_count
+      ) VALUES (
+        $1,
+        '1.0.0',
+        $2,
+        $3,
+        'r2',
+        false,
+        1
+      )
+      RETURNING id`,
+      [appId, ORG_ID, USER_ID],
+    ) as Array<{ id: number }>
+
+    const [manifest] = await executeSQL(
+      `INSERT INTO public.manifest (
+        app_version_id,
+        file_name,
+        s3_path,
+        file_hash,
+        file_size
+      ) VALUES (
+        $1,
+        'index.html',
+        $2,
+        'demo-hash',
+        100
+      )
+      RETURNING id`,
+      [legacyVersion.id, `demo/${appId}/1.0.0/index.html`],
+    ) as Array<{ id: number }>
+
+    const [build] = await executeSQL(
+      `INSERT INTO public.build_requests (
+        app_id,
+        owner_org,
+        requested_by,
+        platform,
+        status,
+        build_config,
+        builder_job_id,
+        upload_session_key,
+        upload_path,
+        upload_url,
+        upload_expires_at
+      ) VALUES (
+        $1,
+        $2,
+        $3,
+        'ios',
+        'succeeded',
+        jsonb_build_object('version', '1.0.0', 'bundleId', $6::text),
+        'demo-job-legacy',
+        'demo-session-legacy',
+        $4,
+        $5,
+        NOW() + interval '1 day'
+      )
+      RETURNING id`,
+      [appId, ORG_ID, USER_ID, `builds/${appId}/ios/1.0.0`, `https://demo-builds.example.com/${appId}/ios/1.0.0`, appId],
+    ) as Array<{ id: string }>
+
+    await executeSQL('SELECT public.reset_onboarding_demo_app_data($1::uuid)', [appUuid])
+
+    const [state] = await executeSQL(
+      `SELECT
+        EXISTS (SELECT 1 FROM public.app_versions WHERE id = $1) AS legacy_version_exists,
+        EXISTS (SELECT 1 FROM public.manifest WHERE id = $2) AS legacy_manifest_exists,
+        EXISTS (SELECT 1 FROM public.build_requests WHERE id = $3::uuid) AS legacy_build_exists,
+        (SELECT COUNT(*)::int FROM public.onboarding_demo_data WHERE app_id = $4) AS tracked_rows`,
+      [legacyVersion.id, manifest.id, build.id, appId],
+    ) as Array<{
+      legacy_version_exists: boolean
+      legacy_manifest_exists: boolean
+      legacy_build_exists: boolean
+      tracked_rows: number
+    }>
+
+    expect(state.legacy_version_exists).toBe(false)
+    expect(state.legacy_manifest_exists).toBe(false)
+    expect(state.legacy_build_exists).toBe(false)
+    expect(state.tracked_rows).toBe(0)
+  })
+
+  it('does not claim legacy demo versions by name when real rows are present', async () => {
+    const appId = testAppId('legacy-mixed')
+    const appUuid = await createPendingApp(appId)
+
+    const versions = await executeSQL(
+      `INSERT INTO public.app_versions (
+        app_id,
+        name,
+        owner_org,
+        user_id,
+        storage_provider,
+        deleted,
+        manifest_count
+      ) VALUES
+        ($1, '1.0.0', $2, $3, 'r2', false, 1),
+        ($1, '2.0.0', $2, $3, 'r2', false, 1)
+      RETURNING id, name`,
+      [appId, ORG_ID, USER_ID],
+    ) as Array<{ id: number, name: string }>
+    const legacyNamedVersionId = versions.find(row => row.name === '1.0.0')!.id
+    const realVersionId = versions.find(row => row.name === '2.0.0')!.id
+
+    const [manifest] = await executeSQL(
+      `INSERT INTO public.manifest (
+        app_version_id,
+        file_name,
+        s3_path,
+        file_hash,
+        file_size
+      ) VALUES (
+        $1,
+        'index.html',
+        $2,
+        'demo-hash',
+        100
+      )
+      RETURNING id`,
+      [legacyNamedVersionId, `demo/${appId}/1.0.0/index.html`],
+    ) as Array<{ id: number }>
+
+    const [build] = await executeSQL(
+      `INSERT INTO public.build_requests (
+        app_id,
+        owner_org,
+        requested_by,
+        platform,
+        status,
+        build_config,
+        builder_job_id,
+        upload_session_key,
+        upload_path,
+        upload_url,
+        upload_expires_at
+      ) VALUES (
+        $1,
+        $2,
+        $3,
+        'ios',
+        'succeeded',
+        jsonb_build_object('version', '1.0.0', 'bundleId', $6::text),
+        'demo-job-legacy',
+        'demo-session-legacy',
+        $4,
+        $5,
+        NOW() + interval '1 day'
+      )
+      RETURNING id`,
+      [appId, ORG_ID, USER_ID, `builds/${appId}/ios/1.0.0`, `https://demo-builds.example.com/${appId}/ios/1.0.0`, appId],
+    ) as Array<{ id: string }>
+
+    await executeSQL('SELECT public.reset_onboarding_demo_app_data($1::uuid)', [appUuid])
+
+    const [state] = await executeSQL(
+      `SELECT
+        EXISTS (SELECT 1 FROM public.app_versions WHERE id = $1) AS legacy_named_version_exists,
+        EXISTS (SELECT 1 FROM public.app_versions WHERE id = $2) AS real_version_exists,
+        EXISTS (SELECT 1 FROM public.manifest WHERE id = $3) AS legacy_manifest_exists,
+        EXISTS (SELECT 1 FROM public.build_requests WHERE id = $4::uuid) AS legacy_build_exists`,
+      [legacyNamedVersionId, realVersionId, manifest.id, build.id],
+    ) as Array<{
+      legacy_named_version_exists: boolean
+      real_version_exists: boolean
+      legacy_manifest_exists: boolean
+      legacy_build_exists: boolean
+    }>
+
+    expect(state.legacy_named_version_exists).toBe(true)
+    expect(state.real_version_exists).toBe(true)
+    expect(state.legacy_manifest_exists).toBe(false)
+    expect(state.legacy_build_exists).toBe(false)
+  })
+
   it('lets onboarding completion clear only tracked demo rows', async () => {
     const appId = testAppId('complete')
     const appUuid = await createPendingApp(appId)
@@ -431,7 +705,10 @@ describe('onboarding demo reset', () => {
         has_function_privilege('authenticated', 'public.reset_onboarding_demo_app_data(uuid)', 'EXECUTE') AS reset_authenticated,
         has_function_privilege('service_role', 'public.track_onboarding_demo_data(text, uuid, text, text[], uuid)', 'EXECUTE') AS track_service_role,
         has_function_privilege('anon', 'public.track_onboarding_demo_data(text, uuid, text, text[], uuid)', 'EXECUTE') AS track_anon,
-        has_function_privilege('authenticated', 'public.track_onboarding_demo_data(text, uuid, text, text[], uuid)', 'EXECUTE') AS track_authenticated`,
+        has_function_privilege('authenticated', 'public.track_onboarding_demo_data(text, uuid, text, text[], uuid)', 'EXECUTE') AS track_authenticated,
+        has_function_privilege('service_role', 'public.claim_legacy_onboarding_demo_data(uuid)', 'EXECUTE') AS claim_service_role,
+        has_function_privilege('anon', 'public.claim_legacy_onboarding_demo_data(uuid)', 'EXECUTE') AS claim_anon,
+        has_function_privilege('authenticated', 'public.claim_legacy_onboarding_demo_data(uuid)', 'EXECUTE') AS claim_authenticated`,
     ) as Array<{
       reset_service_role: boolean
       reset_anon: boolean
@@ -439,6 +716,9 @@ describe('onboarding demo reset', () => {
       track_service_role: boolean
       track_anon: boolean
       track_authenticated: boolean
+      claim_service_role: boolean
+      claim_anon: boolean
+      claim_authenticated: boolean
     }>
 
     expect(row.reset_service_role).toBe(true)
@@ -447,5 +727,8 @@ describe('onboarding demo reset', () => {
     expect(row.track_service_role).toBe(true)
     expect(row.track_anon).toBe(false)
     expect(row.track_authenticated).toBe(false)
+    expect(row.claim_service_role).toBe(true)
+    expect(row.claim_anon).toBe(false)
+    expect(row.claim_authenticated).toBe(false)
   })
 })

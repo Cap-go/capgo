@@ -3144,6 +3144,10 @@ export type Database = {
         Args: { appid: string }
         Returns: number
       }
+      claim_legacy_onboarding_demo_data: {
+        Args: { p_app_uuid: string }
+        Returns: undefined
+      }
       cleanup_expired_apikeys: { Args: never; Returns: undefined }
       cleanup_expired_demo_apps: { Args: never; Returns: undefined }
       cleanup_frequent_job_details: { Args: never; Returns: undefined }
@@ -3955,13 +3959,22 @@ export type Database = {
         Returns: boolean
       }
       is_allowed_action_org: { Args: { orgid: string }; Returns: boolean }
-      is_allowed_action_org_action: {
-        Args: {
-          actions: Database["public"]["Enums"]["action_type"][]
-          orgid: string
-        }
-        Returns: boolean
-      }
+      is_allowed_action_org_action:
+        | {
+            Args: {
+              actions: Database["public"]["Enums"]["action_type"][]
+              orgid: string
+            }
+            Returns: boolean
+          }
+        | {
+            Args: {
+              actions: Database["public"]["Enums"]["action_type"][]
+              appid: string
+              orgid: string
+            }
+            Returns: boolean
+          }
       is_allowed_capgkey:
         | {
             Args: {
@@ -4009,13 +4022,22 @@ export type Database = {
       is_onboarding_needed_org: { Args: { orgid: string }; Returns: boolean }
       is_org_yearly: { Args: { orgid: string }; Returns: boolean }
       is_paying_and_good_plan_org: { Args: { orgid: string }; Returns: boolean }
-      is_paying_and_good_plan_org_action: {
-        Args: {
-          actions: Database["public"]["Enums"]["action_type"][]
-          orgid: string
-        }
-        Returns: boolean
-      }
+      is_paying_and_good_plan_org_action:
+        | {
+            Args: {
+              actions: Database["public"]["Enums"]["action_type"][]
+              orgid: string
+            }
+            Returns: boolean
+          }
+        | {
+            Args: {
+              actions: Database["public"]["Enums"]["action_type"][]
+              appid: string
+              orgid: string
+            }
+            Returns: boolean
+          }
       is_paying_org: { Args: { orgid: string }; Returns: boolean }
       is_platform_admin:
         | { Args: never; Returns: boolean }
