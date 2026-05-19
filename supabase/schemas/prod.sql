@@ -2652,9 +2652,15 @@ CREATE OR REPLACE FUNCTION "public"."cleanup_onboarding_app_data_on_complete"() 
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
     AS $$
+DECLARE
+  v_preserve_setting text;
+  v_preserve_app_version_id bigint;
 BEGIN
   IF OLD.need_onboarding IS TRUE AND NEW.need_onboarding IS FALSE THEN
-    PERFORM public.clear_onboarding_app_data(NEW.id);
+    v_preserve_setting := current_setting('capgo.onboarding_preserve_app_version_id', true);
+    v_preserve_app_version_id := NULLIF(v_preserve_setting, '')::bigint;
+
+    PERFORM public.clear_onboarding_app_data(NEW.id, v_preserve_app_version_id);
   END IF;
 
   RETURN NEW;
@@ -2722,9 +2728,25 @@ CREATE OR REPLACE FUNCTION "public"."clear_onboarding_app_data"("p_app_uuid" "uu
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
     AS $$
+BEGIN
+  PERFORM public.clear_onboarding_app_data(p_app_uuid, NULL::bigint);
+END;
+$$;
+
+
+ALTER FUNCTION "public"."clear_onboarding_app_data"("p_app_uuid" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."clear_onboarding_app_data"("p_app_uuid" "uuid", "p_preserve_app_version_id" bigint) RETURNS "void"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
 DECLARE
   v_app_id text;
   v_owner_org uuid;
+  v_last_version text;
+  v_manifest_bundle_count bigint := 0;
+  v_channel_device_count bigint := 0;
 BEGIN
   SELECT app_id, owner_org
   INTO v_app_id, v_owner_org
@@ -2736,19 +2758,40 @@ BEGIN
   END IF;
 
   DELETE FROM public.channel_devices
-  WHERE app_id = v_app_id;
+  WHERE app_id = v_app_id
+    AND (
+      p_preserve_app_version_id IS NULL
+      OR NOT EXISTS (
+        SELECT 1
+        FROM public.channels
+        WHERE channels.id = channel_devices.channel_id
+          AND channels.version = p_preserve_app_version_id
+      )
+    );
 
   DELETE FROM public.deploy_history
-  WHERE app_id = v_app_id;
+  WHERE app_id = v_app_id
+    AND (
+      p_preserve_app_version_id IS NULL
+      OR version_id IS DISTINCT FROM p_preserve_app_version_id
+    );
 
   DELETE FROM public.channels
-  WHERE app_id = v_app_id;
+  WHERE app_id = v_app_id
+    AND (
+      p_preserve_app_version_id IS NULL
+      OR version IS DISTINCT FROM p_preserve_app_version_id
+    );
 
   DELETE FROM public.devices
   WHERE app_id = v_app_id;
 
   DELETE FROM public.app_versions_meta
-  WHERE app_id = v_app_id;
+  WHERE app_id = v_app_id
+    AND (
+      p_preserve_app_version_id IS NULL
+      OR id IS DISTINCT FROM p_preserve_app_version_id
+    );
 
   DELETE FROM public.daily_version
   WHERE app_id = v_app_id;
@@ -2770,7 +2813,11 @@ BEGIN
 
   DELETE FROM public.app_versions
   WHERE app_id = v_app_id
-    AND name NOT IN ('builtin', 'unknown');
+    AND name NOT IN ('builtin', 'unknown')
+    AND (
+      p_preserve_app_version_id IS NULL
+      OR id IS DISTINCT FROM p_preserve_app_version_id
+    );
 
   INSERT INTO public.app_versions (
     owner_org,
@@ -2794,11 +2841,28 @@ BEGIN
     comment = NULL,
     updated_at = now();
 
+  IF p_preserve_app_version_id IS NOT NULL THEN
+    SELECT name, CASE WHEN manifest_count > 0 THEN 1 ELSE 0 END
+    INTO v_last_version, v_manifest_bundle_count
+    FROM public.app_versions
+    WHERE id = p_preserve_app_version_id
+      AND app_id = v_app_id
+      AND deleted IS FALSE;
+
+    SELECT COUNT(*)::bigint
+    INTO v_channel_device_count
+    FROM public.channel_devices
+    INNER JOIN public.channels
+      ON channels.id = channel_devices.channel_id
+    WHERE channel_devices.app_id = v_app_id
+      AND channels.version = p_preserve_app_version_id;
+  END IF;
+
   UPDATE public.apps
   SET
-    channel_device_count = 0,
-    manifest_bundle_count = 0,
-    last_version = NULL
+    channel_device_count = v_channel_device_count,
+    manifest_bundle_count = v_manifest_bundle_count,
+    last_version = v_last_version
   WHERE id = p_app_uuid;
 
   IF v_owner_org IS NOT NULL THEN
@@ -2809,7 +2873,7 @@ END;
 $$;
 
 
-ALTER FUNCTION "public"."clear_onboarding_app_data"("p_app_uuid" "uuid") OWNER TO "postgres";
+ALTER FUNCTION "public"."clear_onboarding_app_data"("p_app_uuid" "uuid", "p_preserve_app_version_id" bigint) OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."cli_check_permission"("apikey" "text" DEFAULT NULL::"text", "permission_key" "text" DEFAULT NULL::"text", "org_id" "uuid" DEFAULT NULL::"uuid", "app_id" "text" DEFAULT NULL::"text", "channel_id" bigint DEFAULT NULL::bigint) RETURNS boolean
@@ -2859,6 +2923,55 @@ ALTER FUNCTION "public"."cli_check_permission"("apikey" "text", "permission_key"
 
 COMMENT ON FUNCTION "public"."cli_check_permission"("apikey" "text", "permission_key" "text", "org_id" "uuid", "app_id" "text", "channel_id" bigint) IS 'CLI permission wrapper bound to the request capgkey header. The apikey argument is retained for CLI compatibility and must match the header when provided.';
 
+
+
+CREATE OR REPLACE FUNCTION "public"."complete_onboarding_after_first_upload"() RETURNS "trigger"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+DECLARE
+  v_app_uuid uuid;
+BEGIN
+  IF NEW.name IN ('builtin', 'unknown') THEN
+    RETURN NEW;
+  END IF;
+
+  IF COALESCE(NEW.deleted, false) IS TRUE THEN
+    RETURN NEW;
+  END IF;
+
+  IF NOT (
+    (NEW.storage_provider = 'external' AND NULLIF(BTRIM(COALESCE(NEW.external_url, '')), '') IS NOT NULL)
+    OR (NEW.storage_provider <> 'r2-direct' AND NULLIF(BTRIM(COALESCE(NEW.r2_path, '')), '') IS NOT NULL)
+  ) THEN
+    RETURN NEW;
+  END IF;
+
+  SELECT id
+  INTO v_app_uuid
+  FROM public.apps
+  WHERE app_id = NEW.app_id
+    AND owner_org = NEW.owner_org
+    AND need_onboarding IS TRUE
+  LIMIT 1;
+
+  IF v_app_uuid IS NULL THEN
+    RETURN NEW;
+  END IF;
+
+  PERFORM set_config('capgo.onboarding_preserve_app_version_id', NEW.id::text, true);
+
+  UPDATE public.apps
+  SET need_onboarding = false
+  WHERE id = v_app_uuid
+    AND need_onboarding IS TRUE;
+
+  RETURN NEW;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."complete_onboarding_after_first_upload"() OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."convert_bytes_to_gb"("bytes_value" double precision) RETURNS double precision
@@ -15770,6 +15883,7 @@ CREATE TABLE IF NOT EXISTS "public"."build_requests" (
     "upload_expires_at" timestamp with time zone NOT NULL,
     "last_error" "text",
     "runner_wait_seconds" bigint DEFAULT 0 NOT NULL,
+    "ai_analyzed" boolean DEFAULT false NOT NULL,
     CONSTRAINT "build_requests_platform_check" CHECK ((("platform")::"text" = ANY (ARRAY[('ios'::character varying)::"text", ('android'::character varying)::"text"])))
 );
 
@@ -15778,6 +15892,10 @@ ALTER TABLE "public"."build_requests" OWNER TO "postgres";
 
 
 COMMENT ON COLUMN "public"."build_requests"."runner_wait_seconds" IS 'Self-hosted runner wait time reported by builder, in seconds. Informational only; not used for billing.';
+
+
+
+COMMENT ON COLUMN "public"."build_requests"."ai_analyzed" IS 'Set true after a successful AI analysis of this failed build. Enforces one-analysis-per-job for cost control.';
 
 
 
@@ -18531,6 +18649,10 @@ CREATE OR REPLACE TRIGGER "cleanup_onboarding_app_data_on_complete" AFTER UPDATE
 
 
 
+CREATE OR REPLACE TRIGGER "complete_onboarding_after_first_upload" AFTER INSERT OR UPDATE OF "deleted", "external_url", "r2_path", "storage_provider", "name", "app_id", "owner_org" ON "public"."app_versions" FOR EACH ROW WHEN (((("new"."name")::"text" <> ALL ((ARRAY['builtin'::character varying, 'unknown'::character varying])::"text"[])) AND (COALESCE("new"."deleted", false) IS FALSE) AND ((("new"."storage_provider" = 'external'::"text") AND (NULLIF("btrim"((COALESCE("new"."external_url", ''::character varying))::"text"), ''::"text") IS NOT NULL)) OR (("new"."storage_provider" <> 'r2-direct'::"text") AND (NULLIF("btrim"((COALESCE("new"."r2_path", ''::character varying))::"text"), ''::"text") IS NOT NULL))))) EXECUTE FUNCTION "public"."complete_onboarding_after_first_upload"();
+
+
+
 CREATE OR REPLACE TRIGGER "credit_usage_alert_on_transactions" AFTER INSERT ON "public"."usage_credit_transactions" FOR EACH ROW EXECUTE FUNCTION "public"."enqueue_credit_usage_alert"();
 
 
@@ -20692,10 +20814,20 @@ GRANT ALL ON FUNCTION "public"."clear_onboarding_app_data"("p_app_uuid" "uuid") 
 
 
 
+REVOKE ALL ON FUNCTION "public"."clear_onboarding_app_data"("p_app_uuid" "uuid", "p_preserve_app_version_id" bigint) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."clear_onboarding_app_data"("p_app_uuid" "uuid", "p_preserve_app_version_id" bigint) TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."cli_check_permission"("apikey" "text", "permission_key" "text", "org_id" "uuid", "app_id" "text", "channel_id" bigint) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."cli_check_permission"("apikey" "text", "permission_key" "text", "org_id" "uuid", "app_id" "text", "channel_id" bigint) TO "service_role";
 GRANT ALL ON FUNCTION "public"."cli_check_permission"("apikey" "text", "permission_key" "text", "org_id" "uuid", "app_id" "text", "channel_id" bigint) TO "anon";
 GRANT ALL ON FUNCTION "public"."cli_check_permission"("apikey" "text", "permission_key" "text", "org_id" "uuid", "app_id" "text", "channel_id" bigint) TO "authenticated";
+
+
+
+REVOKE ALL ON FUNCTION "public"."complete_onboarding_after_first_upload"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."complete_onboarding_after_first_upload"() TO "service_role";
 
 
 

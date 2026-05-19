@@ -73,6 +73,29 @@ describe('queue_consumer legacy message compatibility', () => {
     ])).toEqual([])
   })
 
+  it.concurrent('keeps manifest size lookup failures retrying until the queue budget is exhausted', () => {
+    expect(__queueConsumerTestUtils__.getActionableQueueFailures([
+      {
+        cf_id: 'cf-manifest',
+        error_code: 'manifest_size_not_found',
+        function_name: 'on_manifest_create',
+        function_type: 'supabase',
+        msg_id: 10,
+        payload_size: 10,
+        read_count: MAX_QUEUE_READS - 1,
+        status: 503,
+        status_text: 'Service Unavailable',
+      },
+    ])).toEqual([])
+  })
+
+  it.concurrent('caps manifest queue batches and concurrency to avoid storage bursts', () => {
+    expect(__queueConsumerTestUtils__.getQueueBatchSize('on_manifest_create', 950)).toBe(100)
+    expect(__queueConsumerTestUtils__.getQueueBatchSize('cron_email', 950)).toBe(950)
+    expect(__queueConsumerTestUtils__.getQueueHttpConcurrency('on_manifest_create')).toBe(10)
+    expect(__queueConsumerTestUtils__.getQueueHttpConcurrency('cron_email')).toBe(25)
+  })
+
   it.concurrent('alerts Discord after retry budget is exhausted', () => {
     const failure = {
       cf_id: 'cf-1',

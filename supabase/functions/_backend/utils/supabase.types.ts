@@ -3089,10 +3089,12 @@ export type Database = {
       cleanup_queue_messages: { Args: never; Returns: undefined }
       cleanup_tmp_users: { Args: never; Returns: undefined }
       cleanup_webhook_deliveries: { Args: never; Returns: undefined }
-      clear_onboarding_app_data: {
-        Args: { p_app_uuid: string }
-        Returns: undefined
-      }
+      clear_onboarding_app_data:
+        | { Args: { p_app_uuid: string }; Returns: undefined }
+        | {
+            Args: { p_app_uuid: string; p_preserve_app_version_id: number }
+            Returns: undefined
+          }
       cli_check_permission: {
         Args: {
           apikey?: string
