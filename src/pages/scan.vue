@@ -77,6 +77,32 @@ const downloadHost = computed(() => {
   return new URL(scannedUrl.value).host
 })
 
+async function getPreviousChannel() {
+  try {
+    const result = await CapacitorUpdater.getChannel()
+    return { channel: result.channel }
+  }
+  catch (error) {
+    console.warn('Could not read current update channel before preview:', error)
+    return null
+  }
+}
+
+async function restorePreviousChannel(previousChannel: Awaited<ReturnType<typeof getPreviousChannel>>) {
+  if (!previousChannel)
+    return
+
+  try {
+    if (previousChannel.channel)
+      await CapacitorUpdater.setChannel({ channel: previousChannel.channel, triggerAutoUpdate: false })
+    else
+      await CapacitorUpdater.unsetChannel({ triggerAutoUpdate: false })
+  }
+  catch (error) {
+    console.warn('Could not restore previous update channel after preview failure:', error)
+  }
+}
+
 onMounted(async () => {
   displayStore.NavTitle = 'Scan update'
   displayStore.defaultBack = '/apps'
@@ -105,32 +131,6 @@ async function removeDownloadListener() {
 
   await downloadListener.remove()
   downloadListener = null
-}
-
-async function getPreviousChannel() {
-  try {
-    const result = await CapacitorUpdater.getChannel()
-    return { channel: result.channel }
-  }
-  catch (error) {
-    console.warn('Could not read current update channel before preview:', error)
-    return null
-  }
-}
-
-async function restorePreviousChannel(previousChannel: Awaited<ReturnType<typeof getPreviousChannel>>) {
-  if (!previousChannel)
-    return
-
-  try {
-    if (previousChannel.channel)
-      await CapacitorUpdater.setChannel({ channel: previousChannel.channel, triggerAutoUpdate: false })
-    else
-      await CapacitorUpdater.unsetChannel({ triggerAutoUpdate: false })
-  }
-  catch (error) {
-    console.warn('Could not restore previous update channel after preview failure:', error)
-  }
 }
 
 async function startScanner() {
