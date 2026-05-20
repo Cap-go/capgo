@@ -102,9 +102,10 @@ describe('/private/pending_invitations', () => {
   it.concurrent('lists pending invitations without joining the organization', async () => {
     const fixture = createFixture()
     await cleanup(fixture)
-    await seedPendingInvitation(fixture)
 
     try {
+      await seedPendingInvitation(fixture)
+
       const response = await fetch(getEndpointUrl('/private/pending_invitations'), {
         method: 'GET',
         headers: await getInvitedUserHeaders(fixture),
@@ -136,9 +137,10 @@ describe('/private/pending_invitations', () => {
   it.concurrent('accepts a pending invitation only after an explicit join action', async () => {
     const fixture = createFixture()
     await cleanup(fixture)
-    const invitationId = await seedPendingInvitation(fixture)
 
     try {
+      const invitationId = await seedPendingInvitation(fixture)
+
       const response = await fetch(getEndpointUrl('/private/pending_invitations'), {
         method: 'POST',
         headers: await getInvitedUserHeaders(fixture),
@@ -200,9 +202,10 @@ describe('/private/pending_invitations', () => {
   it.concurrent('declines pending invitations before creating an organization', async () => {
     const fixture = createFixture()
     await cleanup(fixture)
-    await seedPendingInvitation(fixture)
 
     try {
+      await seedPendingInvitation(fixture)
+
       const response = await fetch(getEndpointUrl('/private/pending_invitations'), {
         method: 'POST',
         headers: await getInvitedUserHeaders(fixture),
