@@ -580,6 +580,9 @@ describe('onboarding demo reset', () => {
       [legacyVersion.id, `demo/${appId}/1.0.0/index.html`],
     ) as Array<{ id: number }>
 
+    const buildJobId = `demo-job-${appId}`
+    const buildSessionKey = `demo-session-${appId}`
+
     const [build] = await executeSQL(
       `INSERT INTO public.build_requests (
         app_id,
@@ -600,14 +603,14 @@ describe('onboarding demo reset', () => {
         'ios',
         'succeeded',
         jsonb_build_object('version', '1.0.0', 'bundleId', $6::text),
-        'demo-job-legacy',
-        'demo-session-legacy',
+        $7,
+        $8,
         $4,
         $5,
         NOW() + interval '1 day'
       )
       RETURNING id`,
-      [appId, ORG_ID, USER_ID, `builds/${appId}/ios/1.0.0`, `https://demo-builds.example.com/${appId}/ios/1.0.0`, appId],
+      [appId, ORG_ID, USER_ID, `builds/${appId}/ios/1.0.0`, `https://demo-builds.example.com/${appId}/ios/1.0.0`, appId, buildJobId, buildSessionKey],
     ) as Array<{ id: string }>
 
     await executeSQL('SELECT public.reset_onboarding_demo_app_data($1::uuid)', [appUuid])
@@ -672,6 +675,9 @@ describe('onboarding demo reset', () => {
       [legacyNamedVersionId, `demo/${appId}/1.0.0/index.html`],
     ) as Array<{ id: number }>
 
+    const buildJobId = `demo-job-${appId}`
+    const buildSessionKey = `demo-session-${appId}`
+
     const [build] = await executeSQL(
       `INSERT INTO public.build_requests (
         app_id,
@@ -692,14 +698,14 @@ describe('onboarding demo reset', () => {
         'ios',
         'succeeded',
         jsonb_build_object('version', '1.0.0', 'bundleId', $6::text),
-        'demo-job-legacy',
-        'demo-session-legacy',
+        $7,
+        $8,
         $4,
         $5,
         NOW() + interval '1 day'
       )
       RETURNING id`,
-      [appId, ORG_ID, USER_ID, `builds/${appId}/ios/1.0.0`, `https://demo-builds.example.com/${appId}/ios/1.0.0`, appId],
+      [appId, ORG_ID, USER_ID, `builds/${appId}/ios/1.0.0`, `https://demo-builds.example.com/${appId}/ios/1.0.0`, appId, buildJobId, buildSessionKey],
     ) as Array<{ id: string }>
 
     await executeSQL('SELECT public.reset_onboarding_demo_app_data($1::uuid)', [appUuid])
