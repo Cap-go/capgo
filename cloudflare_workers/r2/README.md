@@ -2,7 +2,10 @@
 
 This directory stores bucket-level R2 lifecycle configuration.
 
-`lifecycle.capgo.json` deletes objects under `deleted-after-7-days/` after 7 days. That prefix must stay aligned with `R2_TRASH_PREFIX` in `supabase/functions/_backend/utils/s3.ts`.
+`lifecycle.capgo.json` defines the `capgo` bucket lifecycle rules:
+
+- Delete objects under `deleted-after-7-days/` after 7 days. That prefix must stay aligned with `R2_TRASH_PREFIX` in `supabase/functions/_backend/utils/s3.ts`.
+- Abort incomplete multipart uploads after 1 day across the bucket.
 
 Apply the tracked config:
 
