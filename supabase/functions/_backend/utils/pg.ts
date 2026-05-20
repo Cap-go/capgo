@@ -1397,6 +1397,32 @@ export interface AdminEmailTypeBreakdown {
   }>
 }
 
+interface AdminUtcDateRange {
+  startDay: Date
+  seriesEndDay: Date
+  endExclusive: Date
+}
+
+function getAdminUtcDateRange(start_date: string, end_date: string): AdminUtcDateRange {
+  const startTimestamp = new Date(start_date)
+  const endTimestamp = new Date(end_date)
+  const startDay = new Date(Date.UTC(startTimestamp.getUTCFullYear(), startTimestamp.getUTCMonth(), startTimestamp.getUTCDate()))
+  const endDay = new Date(Date.UTC(endTimestamp.getUTCFullYear(), endTimestamp.getUTCMonth(), endTimestamp.getUTCDate()))
+  const endIsExactUtcDayBoundary = endTimestamp.getTime() === endDay.getTime()
+  const seriesEndDay = new Date(endDay)
+
+  if (endIsExactUtcDayBoundary)
+    seriesEndDay.setUTCDate(seriesEndDay.getUTCDate() - 1)
+
+  return {
+    startDay,
+    seriesEndDay,
+    endExclusive: endIsExactUtcDayBoundary
+      ? endTimestamp
+      : new Date(endDay.getTime() + 24 * 60 * 60 * 1000),
+  }
+}
+
 export async function getAdminEmailTypeBreakdown(
   c: Context,
   start_date: string,
@@ -1415,17 +1441,7 @@ export async function getAdminEmailTypeBreakdown(
   try {
     const pgClient = getPgClient(c, true)
     const drizzleClient = getDrizzleClient(pgClient)
-    const startTimestamp = new Date(start_date)
-    const endTimestamp = new Date(end_date)
-    const startDay = new Date(Date.UTC(startTimestamp.getUTCFullYear(), startTimestamp.getUTCMonth(), startTimestamp.getUTCDate()))
-    const endDay = new Date(Date.UTC(endTimestamp.getUTCFullYear(), endTimestamp.getUTCMonth(), endTimestamp.getUTCDate()))
-    const endIsExactUtcDayBoundary = endTimestamp.getTime() === endDay.getTime()
-    const seriesEndDay = new Date(endDay)
-    if (endIsExactUtcDayBoundary)
-      seriesEndDay.setUTCDate(seriesEndDay.getUTCDate() - 1)
-    const endExclusive = endIsExactUtcDayBoundary
-      ? endTimestamp
-      : new Date(endDay.getTime() + 24 * 60 * 60 * 1000)
+    const { startDay, seriesEndDay, endExclusive } = getAdminUtcDateRange(start_date, end_date)
 
     const personalDomainsSql = sql.join(PERSONAL_EMAIL_DOMAINS.map(domain => sql`${domain}`), sql`, `)
     const disposableDomainsSql = sql.join(DISPOSABLE_EMAIL_DOMAINS.map(domain => sql`${domain}`), sql`, `)
@@ -2225,6 +2241,129 @@ export async function getAdminTrialOrganizations(
   catch (e: unknown) {
     logPgError(c, 'getAdminTrialOrganizations', e)
     return { organizations: [], total: 0 }
+  }
+}
+
+export interface AdminTrialPlanBreakdown {
+  totals: Array<{
+    plan_name: string
+    total: number
+  }>
+  trend: Array<{
+    date: string
+    total: number
+    plans: Record<string, number>
+  }>
+}
+
+function createAdminTrialPlanTrendDay(date: string): AdminTrialPlanBreakdown['trend'][number] {
+  return { date, total: 0, plans: {} }
+}
+
+export async function getAdminTrialPlanBreakdown(
+  c: Context,
+  start_date: string,
+  end_date: string,
+): Promise<AdminTrialPlanBreakdown> {
+  const emptyResult: AdminTrialPlanBreakdown = {
+    totals: [],
+    trend: [],
+  }
+
+  let pgClient: ReturnType<typeof getPgClient> | undefined
+  try {
+    // The admin dashboard needs plans.name, and plans is not available on every read replica.
+    pgClient = getPgClient(c)
+    const drizzleClient = getDrizzleClient(pgClient)
+    const { startDay, seriesEndDay, endExclusive } = getAdminUtcDateRange(start_date, end_date)
+
+    const query = sql`
+      WITH date_series AS (
+        SELECT generate_series(
+          ${startDay.toISOString()}::timestamptz::date,
+          ${seriesEndDay.toISOString()}::timestamptz::date,
+          interval '1 day'
+        )::date AS date
+      ),
+      daily_trials AS (
+        SELECT
+          (o.created_at AT TIME ZONE 'UTC')::date AS date,
+          COALESCE(NULLIF(BTRIM(p.name), ''), 'Unknown') AS plan_name,
+          COUNT(DISTINCT o.id)::int AS trials
+        FROM orgs o
+        INNER JOIN stripe_info si ON si.customer_id = o.customer_id
+        LEFT JOIN plans p ON p.stripe_id = si.product_id
+        WHERE o.created_at >= ${startDay.toISOString()}::timestamptz
+          AND o.created_at < ${endExclusive.toISOString()}::timestamptz
+          AND si.trial_at IS NOT NULL
+        GROUP BY (o.created_at AT TIME ZONE 'UTC')::date, COALESCE(NULLIF(BTRIM(p.name), ''), 'Unknown')
+      ),
+      plan_names AS (
+        SELECT BTRIM(name) AS plan_name
+        FROM plans
+        WHERE BTRIM(name) != ''
+        UNION
+        SELECT plan_name
+        FROM daily_trials
+      ),
+      filled AS (
+        SELECT
+          ds.date,
+          plan_name_set.plan_name,
+          COALESCE(dt.trials, 0)::int AS trials
+        FROM date_series ds
+        CROSS JOIN plan_names plan_name_set
+        LEFT JOIN daily_trials dt ON dt.date = ds.date AND dt.plan_name = plan_name_set.plan_name
+      )
+      SELECT
+        date,
+        plan_name,
+        trials
+      FROM filled
+      ORDER BY date ASC, plan_name ASC
+    `
+
+    const result = await drizzleClient.execute(query)
+    const totalsByPlan = new Map<string, number>()
+    const trendByDate = new Map<string, { date: string, total: number, plans: Record<string, number> }>()
+
+    for (const row of result.rows as any[]) {
+      const date = row.date instanceof Date ? row.date.toISOString().split('T')[0] : String(row.date)
+      const planName = String(row.plan_name || 'Unknown')
+      const trials = Number(row.trials) || 0
+      const day = trendByDate.get(date) ?? createAdminTrialPlanTrendDay(date)
+
+      day.plans[planName] = trials
+      day.total += trials
+      trendByDate.set(date, day)
+      totalsByPlan.set(planName, (totalsByPlan.get(planName) ?? 0) + trials)
+    }
+
+    const totals = Array.from(totalsByPlan.entries())
+      .map(([plan_name, total]) => ({ plan_name, total }))
+      .sort((a, b) => b.total - a.total || a.plan_name.localeCompare(b.plan_name))
+
+    const trend = Array.from(trendByDate.values())
+
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'getAdminTrialPlanBreakdown result',
+      resultCount: trend.length,
+      planCount: totals.length,
+    })
+
+    return {
+      totals,
+      trend,
+    }
+  }
+  catch (e: unknown) {
+    logPgError(c, 'getAdminTrialPlanBreakdown', e)
+    return emptyResult
+  }
+  finally {
+    if (pgClient)
+      await closeClient(c, pgClient)
   }
 }
 

@@ -211,6 +211,8 @@
   "admin-users-email-type-professional": "Professional Emails",
   "admin-users-email-type-professional-description": "Work and company domains",
   "admin-users-email-type-trend": "Email Type Trend",
+  "admin-users-trial-plan-breakdown": "New Trials by Plan",
+  "admin-users-trial-plan-breakdown-description": "Daily new trial organizations in the selected period, grouped by their plan.",
   "admin-users-country-breakdown": "Billing Country Breakdown",
   "admin-users-country-breakdown-description": "Stripe billing countries for organizations created during the selected period.",
   "admin-users-country-chart": "Top Billing Countries",

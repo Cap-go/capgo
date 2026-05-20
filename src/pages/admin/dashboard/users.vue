@@ -75,12 +75,26 @@ interface CustomerCountryBreakdown {
   }>
 }
 
+interface TrialPlanBreakdown {
+  totals: Array<{
+    plan_name: string
+    total: number
+  }>
+  trend: Array<{
+    date: string
+    total: number
+    plans: Record<string, number>
+  }>
+}
+
 const onboardingFunnelData = ref<OnboardingFunnelData | null>(null)
 const isLoadingOnboardingFunnel = ref(false)
 const emailTypeBreakdown = ref<EmailTypeBreakdown | null>(null)
 const isLoadingEmailTypeBreakdown = ref(false)
 const customerCountryBreakdown = ref<CustomerCountryBreakdown | null>(null)
 const isLoadingCustomerCountryBreakdown = ref(false)
+const trialPlanBreakdown = ref<TrialPlanBreakdown | null>(null)
+const isLoadingTrialPlanBreakdown = ref(false)
 
 // Global stats trend data
 const globalStatsTrendData = ref<Array<{
@@ -431,6 +445,21 @@ async function loadCustomerCountryBreakdown() {
   }
 }
 
+async function loadTrialPlanBreakdown() {
+  isLoadingTrialPlanBreakdown.value = true
+  try {
+    const data = await adminStore.fetchStats('trial_plan_breakdown')
+    trialPlanBreakdown.value = data as TrialPlanBreakdown
+  }
+  catch (error) {
+    console.error('[Admin Dashboard Users] Error loading trial plan breakdown:', error)
+    trialPlanBreakdown.value = null
+  }
+  finally {
+    isLoadingTrialPlanBreakdown.value = false
+  }
+}
+
 const countryDisplayNames = computed(() => {
   try {
     return new Intl.DisplayNames([locale.value || 'en'], { type: 'region' })
@@ -542,6 +571,42 @@ const leadingCustomerCountrySubtitle = computed(() => {
 
 const customerCountryChartLabels = computed(() => topCustomerCountryEntries.value.map(country => `${getCountryFlag(country.country_code)} ${getCountryLabel(country.country_code)}`))
 const customerCountryChartValues = computed(() => topCustomerCountryEntries.value.map(country => country.organizations))
+
+const trialPlanBreakdownTotal = computed(() => {
+  const totals = trialPlanBreakdown.value?.totals ?? []
+  return totals.reduce((sum, plan) => sum + plan.total, 0)
+})
+
+const trialPlanBreakdownPlanNames = computed(() => {
+  const totals = trialPlanBreakdown.value?.totals ?? []
+  return totals.map(plan => plan.plan_name)
+})
+
+function getTrialPlanChartColor(planName: string) {
+  const colors = ['#119eff', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6', '#14b8a6', '#ef4444']
+  let hash = 0
+  for (let index = 0; index < planName.length; index++)
+    hash = (hash * 31 + planName.charCodeAt(index)) >>> 0
+
+  return colors[hash % colors.length]
+}
+
+const trialPlanBreakdownTrendSeries = computed(() => {
+  const trend = trialPlanBreakdown.value?.trend ?? []
+  if (trend.length === 0 || trialPlanBreakdownPlanNames.value.length === 0)
+    return []
+
+  return trialPlanBreakdownPlanNames.value
+    .map(planName => ({
+      label: planName,
+      data: trend.map(item => ({
+        date: item.date,
+        value: item.plans[planName] ?? 0,
+      })),
+      color: getTrialPlanChartColor(planName),
+    }))
+    .filter(series => series.data.some(item => item.value > 0))
+})
 
 const registrationsTrendSeries = computed(() => {
   if (globalStatsTrendData.value.length === 0)
@@ -774,6 +839,7 @@ watch(() => adminStore.activeDateRange, () => {
   loadOnboardingFunnel()
   loadEmailTypeBreakdown()
   loadCustomerCountryBreakdown()
+  loadTrialPlanBreakdown()
   loadCancelledOrganizations()
 }, { deep: true })
 
@@ -783,6 +849,7 @@ watch(() => adminStore.refreshTrigger, () => {
   loadOnboardingFunnel()
   loadEmailTypeBreakdown()
   loadCustomerCountryBreakdown()
+  loadTrialPlanBreakdown()
   loadTrialOrganizations()
   loadCancelledOrganizations()
 })
@@ -795,7 +862,7 @@ onMounted(async () => {
   }
 
   isLoading.value = true
-  await Promise.all([loadGlobalStatsTrend(), loadOnboardingFunnel(), loadEmailTypeBreakdown(), loadCustomerCountryBreakdown(), loadTrialOrganizations(), loadCancelledOrganizations()])
+  await Promise.all([loadGlobalStatsTrend(), loadOnboardingFunnel(), loadEmailTypeBreakdown(), loadCustomerCountryBreakdown(), loadTrialPlanBreakdown(), loadTrialOrganizations(), loadCancelledOrganizations()])
   isLoading.value = false
 
   displayStore.NavTitle = t('users-and-revenue')
@@ -1118,6 +1185,28 @@ displayStore.defaultBack = '/dashboard'
               </div>
             </div>
           </div>
+
+          <ChartCard
+            :title="t('admin-users-trial-plan-breakdown')"
+            :total="trialPlanBreakdownTotal"
+            :is-loading="isLoadingTrialPlanBreakdown"
+            :has-data="trialPlanBreakdownTrendSeries.length > 0"
+          >
+            <template #header>
+              <div class="min-w-0">
+                <h2 class="text-xl font-semibold leading-tight text-slate-900 dark:text-white sm:text-2xl">
+                  {{ t('admin-users-trial-plan-breakdown') }}
+                </h2>
+                <p class="mt-1 text-sm text-slate-600 dark:text-slate-400">
+                  {{ t('admin-users-trial-plan-breakdown-description') }}
+                </p>
+              </div>
+            </template>
+            <AdminMultiLineChart
+              :series="trialPlanBreakdownTrendSeries"
+              :is-loading="isLoadingTrialPlanBreakdown"
+            />
+          </ChartCard>
 
           <!-- Trial Organizations Table -->
           <div class="p-6 bg-white border rounded-lg shadow-lg border-slate-300 dark:bg-gray-800 dark:border-slate-900">
