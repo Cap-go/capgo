@@ -274,6 +274,7 @@ async function dispatchQueueMessage(
   body: Record<string, unknown>,
   cfId: string,
   metadata: QueueMessageMetadata,
+  targetUrl: string,
 ): Promise<{ response: Response, targetUrl: string }> {
   if (function_name === 'on_manifest_create') {
     const record = getManifestRecordFromQueueBody(body)
@@ -283,10 +284,9 @@ async function dispatchQueueMessage(
       queueName: metadata.queueName,
       queueReadCount: String(metadata.readCount),
     })
-    return { response, targetUrl: 'direct:on_manifest_create' }
+    return { response, targetUrl }
   }
 
-  const targetUrl = resolveFunctionUrl(c, function_name, function_type)
   const response = await http_post_helper(c, function_name, function_type, body, cfId, metadata, targetUrl)
   return { response, targetUrl }
 }
@@ -306,15 +306,14 @@ async function processQueueMessage(c: Context, queueName: string, message: Messa
   const cfId = generateUUID()
   const payloadSize = JSON.stringify(body).length
   const start = Date.now()
-  let targetUrl: string | null = null
+  const targetUrl = function_name === 'on_manifest_create' ? 'direct:on_manifest_create' : resolveFunctionUrl(c, function_name, function_type)
 
   try {
     const result = await dispatchQueueMessage(c, function_name, function_type, body, cfId, {
       msgId: message.msg_id,
       queueName,
       readCount: message.read_ct,
-    })
-    targetUrl = result.targetUrl
+    }, targetUrl)
     const errorDetails = await extractErrorDetails(result.response)
 
     return {
