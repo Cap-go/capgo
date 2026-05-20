@@ -576,84 +576,95 @@ describe('[POST] /updates parallel tests', () => {
     expect(json.major).toBeUndefined()
   })
 
-  it('allows preview requests to fetch a private target channel when app preview is enabled', async () => {
+  it.concurrent('allows preview requests to fetch a private target channel when app preview is enabled', async () => {
     const supabase = getSupabaseClient()
+    const previewAppId = `${APP_NAME_UPDATE}.preview.${randomUUID().slice(0, 8)}`
     const versionName = `9.6.${Math.floor(Math.random() * 100000) + 1000}`
     const channelName = `preview-private-${randomUUID().slice(0, 8)}`
 
-    const version = await createAppVersions(versionName, APP_NAME_UPDATE, {
-      external_url: `https://example.com/${channelName}.zip`,
-    })
-
-    await supabase
-      .from('channels')
-      .insert({
-        name: channelName,
-        app_id: APP_NAME_UPDATE,
-        version: version.id,
-        owner_org: ORG_ID,
-        created_by: USER_ID,
-        public: false,
-        disable_auto_update_under_native: true,
-        disable_auto_update: 'major',
-        allow_device_self_set: false,
-        allow_emulator: false,
-        allow_device: false,
-        allow_dev: false,
-        allow_prod: false,
-        ios: false,
-        android: false,
-        electron: false,
+    await resetAndSeedAppData(previewAppId)
+    try {
+      const version = await createAppVersions(versionName, previewAppId, {
+        external_url: `https://example.com/${channelName}.zip`,
       })
-      .throwOnError()
 
-    await supabase
-      .from('apps')
-      .update({ allow_preview: true })
-      .eq('app_id', APP_NAME_UPDATE)
-      .throwOnError()
+      await supabase
+        .from('channels')
+        .insert({
+          name: channelName,
+          app_id: previewAppId,
+          version: version.id,
+          owner_org: ORG_ID,
+          created_by: USER_ID,
+          public: false,
+          disable_auto_update_under_native: true,
+          disable_auto_update: 'major',
+          allow_device_self_set: false,
+          allow_emulator: false,
+          allow_device: false,
+          allow_dev: false,
+          allow_prod: false,
+          ios: false,
+          android: false,
+          electron: false,
+        })
+        .throwOnError()
 
-    const baseData = getBaseData(APP_NAME_UPDATE)
-    baseData.platform = 'android'
-    baseData.defaultChannel = channelName
-    baseData.version_build = '99.0.0'
-    baseData.version_name = versionName
-    baseData.preview = true
+      await supabase
+        .from('apps')
+        .update({ allow_preview: true })
+        .eq('app_id', previewAppId)
+        .throwOnError()
 
-    const response = await postUpdate(baseData)
-    expect(response.status).toBe(200)
+      const baseData = getBaseData(previewAppId)
+      baseData.platform = 'android'
+      baseData.defaultChannel = channelName
+      baseData.version_build = '99.0.0'
+      baseData.version_name = versionName
+      baseData.preview = true
 
-    const json = await response.json<UpdateRes>()
-    expect(() => parseSchema(updateNewScheme, json)).not.toThrow()
-    expect(json.version).toBe(versionName)
-    expect(json.error).toBeUndefined()
+      const response = await postUpdate(baseData)
+      expect(response.status).toBe(200)
 
-    await supabase
-      .from('apps')
-      .update({ allow_preview: false })
-      .eq('app_id', APP_NAME_UPDATE)
-      .throwOnError()
+      const json = await response.json<UpdateRes>()
+      expect(() => parseSchema(updateNewScheme, json)).not.toThrow()
+      expect(json.version).toBe(versionName)
+      expect(json.error).toBeUndefined()
+    }
+    finally {
+      await resetAppData(previewAppId)
+      await resetAppDataStats(previewAppId)
+    }
   })
 
-  it('blocks preview requests when app preview is disabled', async () => {
+  it.concurrent('blocks preview requests when app preview is disabled', async () => {
     const supabase = getSupabaseClient()
-    await supabase
-      .from('apps')
-      .update({ allow_preview: false })
-      .eq('app_id', APP_NAME_UPDATE)
-      .throwOnError()
+    const previewDisabledAppId = `${APP_NAME_UPDATE}.preview-disabled.${randomUUID().slice(0, 8)}`
 
-    const baseData = getBaseData(APP_NAME_UPDATE)
-    baseData.defaultChannel = 'production'
-    baseData.preview = true
+    await resetAndSeedAppData(previewDisabledAppId)
+    try {
+      await supabase
+        .from('apps')
+        .update({ allow_preview: false })
+        .eq('app_id', previewDisabledAppId)
+        .throwOnError()
 
-    const response = await postUpdate(baseData)
-    expect(response.status).toBe(200)
+      const baseData = getBaseData(previewDisabledAppId)
+      baseData.defaultChannel = 'production'
+      baseData.preview = true
 
-    const json = await response.json<UpdateRes>()
-    expect(json.error).toBe('preview_disabled')
-    expect(json.kind).toBe('blocked')
-    expect(json.version).toBeUndefined()
+      const response = await postUpdate(baseData)
+      expect(response.status).toBe(200)
+
+      const json = await response.json<UpdateRes>()
+      expect(json.error).toBe('preview_disabled')
+      expect(json.kind).toBe('blocked')
+      expect(json.version).toBeUndefined()
+    }
+    finally {
+      await resetAppData(previewDisabledAppId)
+      await resetAppDataStats(previewDisabledAppId)
+    }
   })
 
   it('allows private self-settable platform-compatible defaultChannel', async () => {
