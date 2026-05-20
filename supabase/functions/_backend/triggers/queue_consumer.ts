@@ -236,13 +236,15 @@ function httpExceptionToQueueResponse(error: unknown): Response | null {
       message?: unknown
       moreInfo?: unknown
     }
+    const resolvedMessage = typeof causeData.message === 'string'
+      ? causeData.message
+      : typeof maybeException.message === 'string'
+        ? maybeException.message
+        : 'Queue handler failed'
+
     return queueFailureResponse(
       typeof causeData.error === 'string' ? causeData.error : 'http_exception',
-      typeof causeData.message === 'string'
-        ? causeData.message
-        : typeof maybeException.message === 'string'
-          ? maybeException.message
-          : 'Queue handler failed',
+      resolvedMessage,
       causeData.moreInfo && typeof causeData.moreInfo === 'object'
         ? causeData.moreInfo as Record<string, unknown>
         : {},
