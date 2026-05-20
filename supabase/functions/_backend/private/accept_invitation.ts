@@ -34,6 +34,10 @@ const DEFAULT_PASSWORD_POLICY: PasswordPolicy = {
   require_special: true,
 }
 
+function isErrorResponse(value: unknown): value is Response {
+  return value instanceof Response
+}
+
 // Base schema for initial validation (without password)
 const baseInvitationSchema = type({
   'password': 'string',
@@ -218,7 +222,9 @@ app.post('/', async (c) => {
     }
 
     const userId = session.user?.id ?? existingUser.id
-    await ensureOrgMembership(supabaseAdmin, userId, invitation, org)
+    const membershipResult = await ensureOrgMembership(supabaseAdmin, userId, invitation, org)
+    if (isErrorResponse(membershipResult))
+      return membershipResult
 
     // Remove the invite only after the org membership is created successfully.
     const { error: tmpUserDeleteError } = await supabaseAdmin.from('tmp_users').delete().eq('invite_magic_string', baseBody.magic_invite_string)
@@ -282,8 +288,13 @@ app.post('/', async (c) => {
       })
 
       if (!sessionError && session.user?.id) {
-        await ensurePublicUserRowExists(c, supabaseAdmin, session.user.id, invitation, body.opt_for_newsletters)
-        await ensureOrgMembership(supabaseAdmin, session.user.id, invitation, org)
+        const publicUserResult = await ensurePublicUserRowExists(c, supabaseAdmin, session.user.id, invitation, body.opt_for_newsletters)
+        if (isErrorResponse(publicUserResult))
+          return publicUserResult
+
+        const membershipResult = await ensureOrgMembership(supabaseAdmin, session.user.id, invitation, org)
+        if (isErrorResponse(membershipResult))
+          return membershipResult
 
         const { error: tmpUserDeleteError } = await supabaseAdmin.from('tmp_users').delete().eq('invite_magic_string', body.magic_invite_string)
         if (tmpUserDeleteError) {
@@ -366,7 +377,12 @@ app.post('/', async (c) => {
       return quickError(400, 'sign_in_failed', 'Sign in failed, please retry', { error: sessionError.message })
     }
 
-    await ensureOrgMembership(supabaseAdmin, user.user.id, invitation, org)
+    const membershipResult = await ensureOrgMembership(supabaseAdmin, user.user.id, invitation, org)
+    if (isErrorResponse(membershipResult)) {
+      didRollback = true
+      await rollbackCreatedUser(c, user.user.id)
+      return membershipResult
+    }
 
     // Remove the invite only after the account + org membership are created successfully.
     const { error: tmpUserDeleteError } = await supabaseAdmin.from('tmp_users').delete().eq('invite_magic_string', body.magic_invite_string)

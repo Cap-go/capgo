@@ -26,6 +26,10 @@ interface PendingInvitationAction {
   invitation_id?: number
 }
 
+function isErrorResponse(value: unknown): value is Response {
+  return value instanceof Response
+}
+
 async function getAuthenticatedEmail(supabaseAdmin: ReturnType<typeof useSupabaseAdmin>, userId: string) {
   const { data: authUserData, error: authUserError } = await supabaseAdmin.auth.admin.getUserById(userId)
   if (authUserError) {
@@ -79,10 +83,14 @@ app.get('/', middlewareAuth, async (c) => {
 
   const supabaseAdmin = useSupabaseAdmin(c)
   const email = await getAuthenticatedEmail(supabaseAdmin, auth.userId)
+  if (isErrorResponse(email))
+    return email
   if (!email)
     return quickError(400, 'missing_email', 'Authenticated user has no email')
 
   const invitations = await getPendingInvitations(c, email)
+  if (isErrorResponse(invitations))
+    return invitations
 
   return c.json({
     ...BRES,
@@ -108,11 +116,16 @@ app.post('/', middlewareAuth, async (c) => {
 
   const supabaseAdmin = useSupabaseAdmin(c)
   const email = await getAuthenticatedEmail(supabaseAdmin, auth.userId)
+  if (isErrorResponse(email))
+    return email
   if (!email)
     return quickError(400, 'missing_email', 'Authenticated user has no email')
 
   if (action === 'decline_all') {
     const invitations = await getPendingInvitations(c, email)
+    if (isErrorResponse(invitations))
+      return invitations
+
     const declinedOrgIds: string[] = []
 
     for (const invitation of invitations) {
@@ -139,6 +152,9 @@ app.post('/', middlewareAuth, async (c) => {
     return quickError(400, 'missing_invitation_id', 'Missing invitation id')
 
   const invitations = await getPendingInvitations(c, email, body.invitation_id)
+  if (isErrorResponse(invitations))
+    return invitations
+
   const invitation = invitations[0]
   if (!invitation)
     return quickError(404, 'pending_invitation_not_found', 'Pending invitation not found')
@@ -175,9 +191,11 @@ app.post('/', middlewareAuth, async (c) => {
   const alreadyJoined = existingMembership?.user_right
     && !existingMembership.user_right.startsWith('invite_')
   if (!alreadyJoined) {
-    await ensureOrgMembership(supabaseAdmin, auth.userId, invitation, {
+    const membershipResult = await ensureOrgMembership(supabaseAdmin, auth.userId, invitation, {
       use_new_rbac: invitation.use_new_rbac,
     })
+    if (isErrorResponse(membershipResult))
+      return membershipResult
   }
 
   const { error: tmpUserDeleteError } = await supabaseAdmin

@@ -44,7 +44,8 @@ const subtitle = computed(() => hasMultipleInvitations.value
   : t('pending-invite-subtitle'))
 const targetPath = computed(() => {
   const target = typeof route.query.to === 'string' ? route.query.to : ''
-  if (target.startsWith('/') && !target.startsWith('/onboarding/'))
+  const isOnboardingTarget = /^\/onboarding(?:\/|\?|$)/.test(target)
+  if (target.startsWith('/') && !isOnboardingTarget)
     return target
   return '/dashboard'
 })
