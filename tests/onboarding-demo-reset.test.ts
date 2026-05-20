@@ -61,7 +61,7 @@ afterAll(async () => {
 })
 
 describe('onboarding demo reset', () => {
-  it('deletes tracked demo rows while preserving real app data', async () => {
+  it.concurrent('deletes tracked demo rows while preserving real app data', async () => {
     const appId = testAppId('mixed')
     const appUuid = await createPendingApp(appId)
     const seedId = randomUUID()
@@ -322,7 +322,7 @@ describe('onboarding demo reset', () => {
     expect(Number(state.channel_device_count)).toBe(1)
   })
 
-  it('preserves system placeholder versions even if old provenance tracked them', async () => {
+  it.concurrent('preserves system placeholder versions even if old provenance tracked them', async () => {
     const appId = testAppId('placeholders')
     const appUuid = await createPendingApp(appId)
     const seedId = randomUUID()
@@ -396,7 +396,7 @@ describe('onboarding demo reset', () => {
     expect(state.tracked_rows).toBe(0)
   })
 
-  it('refuses to delete tracked demo versions with non-nullable version metrics', async () => {
+  it.concurrent('refuses to delete tracked demo versions with non-nullable version metrics', async () => {
     const appId = testAppId('version-meta')
     const appUuid = await createPendingApp(appId)
     const seedId = randomUUID()
@@ -456,7 +456,7 @@ describe('onboarding demo reset', () => {
     expect(state.tracked_rows).toBe(1)
   })
 
-  it('refuses to cascade from tracked demo versions into untracked channels', async () => {
+  it.concurrent('refuses to cascade from tracked demo versions into untracked channels', async () => {
     const appId = testAppId('guard')
     const appUuid = await createPendingApp(appId)
     const seedId = randomUUID()
@@ -536,7 +536,7 @@ describe('onboarding demo reset', () => {
     expect(state.tracked_rows).toBe(1)
   })
 
-  it('claims and resets clean legacy demo rows from hard demo markers', async () => {
+  it.concurrent('claims and resets clean legacy demo rows from hard demo markers', async () => {
     const appId = testAppId('legacy-clean')
     const appUuid = await createPendingApp(appId)
 
@@ -632,7 +632,7 @@ describe('onboarding demo reset', () => {
     expect(state.tracked_rows).toBe(0)
   })
 
-  it('does not claim legacy demo versions by name when real rows are present', async () => {
+  it.concurrent('does not claim legacy demo versions by name when real rows are present', async () => {
     const appId = testAppId('legacy-mixed')
     const appUuid = await createPendingApp(appId)
 
@@ -724,7 +724,7 @@ describe('onboarding demo reset', () => {
     expect(state.legacy_build_exists).toBe(false)
   })
 
-  it('lets onboarding completion clear only tracked demo rows', async () => {
+  it.concurrent('lets onboarding completion clear only tracked demo rows', async () => {
     const appId = testAppId('complete')
     const appUuid = await createPendingApp(appId)
     const seedId = randomUUID()
@@ -772,7 +772,7 @@ describe('onboarding demo reset', () => {
     expect(state.tracked_rows).toBe(0)
   })
 
-  it('keeps demo reset RPCs service-role only', async () => {
+  it.concurrent('keeps demo reset RPCs service-role only', async () => {
     const [row] = await executeSQL(
       `SELECT
         has_function_privilege('service_role', 'public.reset_onboarding_demo_app_data(uuid)', 'EXECUTE') AS reset_service_role,

@@ -788,7 +788,6 @@ async function seedOnboardingDemoDataInTransaction(
 
     await pgClient.query('DELETE FROM public.app_metrics_cache WHERE org_id = $1::uuid', [options.ownerOrg])
     await pgClient.query('COMMIT')
-    shouldRollback = false
   }
   catch (error) {
     if (shouldRollback)
