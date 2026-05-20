@@ -37,6 +37,11 @@ for table in "${REPLICA_TABLES[@]}"; do
   fi
 done
 
+if [[ ${#TABLE_ARGS[@]} -eq 0 ]]; then
+  echo "Error: no configured replica tables were found in the source database."
+  exit 1
+fi
+
 # 1) Dump schema in custom format (includes everything, but we will filter on restore)
 # Include custom types and tables
 "$PG_DUMP_BIN" -Fc --schema-only \
@@ -63,6 +68,7 @@ perl -ne '
   next if /\bTRIGGER\b/;
   next if /\bPOLICY\b/;
   next if /\bROW SECURITY\b/;
+  next if /\bINDEX\b/ && /\bidx_stripe_info_customer_id\b/;
   print;
 ' "$LIST_FILE" > "$FILTERED_LIST"
 

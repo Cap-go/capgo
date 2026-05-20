@@ -36,9 +36,11 @@ psql-17 "$REPLICA_TARGET_DB_URL" -c "
 echo ""
 echo "==> Target table states"
 psql-17 "$REPLICA_TARGET_DB_URL" -c "
-  SELECT srrelid::regclass AS table_name, srsubstate, srsublsn
-  FROM pg_subscription_rel
-  ORDER BY srrelid::regclass;
+  SELECT sr.srrelid::regclass AS table_name, sr.srsubstate, sr.srsublsn
+  FROM pg_subscription_rel sr
+  INNER JOIN pg_subscription s ON s.oid = sr.srsubid
+  WHERE s.subname = '${REPLICA_SUBSCRIPTION_NAME}'
+  ORDER BY sr.srrelid::regclass;
 "
 
 echo ""

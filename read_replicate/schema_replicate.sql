@@ -855,13 +855,6 @@ CREATE INDEX idx_stripe_info_customer_covering ON public.stripe_info USING btree
 
 
 --
--- Name: idx_stripe_info_customer_id; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_stripe_info_customer_id ON public.stripe_info USING btree (customer_id);
-
-
---
 -- Name: idx_stripe_info_status_plan; Type: INDEX; Schema: public; Owner: -
 --
 

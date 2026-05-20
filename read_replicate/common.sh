@@ -119,6 +119,34 @@ sanitize_identifier_part() {
   printf '%s' "$value" | tr '[:upper:]' '[:lower:]'
 }
 
+uri_decode() {
+  perl -e 'my $s = shift; $s =~ tr/+/ /; $s =~ s/%([0-9A-Fa-f]{2})/chr(hex($1))/eg; print $s;' "$1"
+}
+
+libpq_escape_value() {
+  local value="$1"
+  local escaped_quote
+  escaped_quote=$'\\\''
+  value="${value//\\/\\\\}"
+  value="${value//\'/$escaped_quote}"
+  printf "'%s'" "$value"
+}
+
+sql_literal_escape() {
+  local value="$1"
+  printf "%s" "${value//\'/''}"
+}
+
+validate_public_identifier() {
+  local value="$1"
+  local label="${2:-identifier}"
+
+  if [[ ! "$value" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]]; then
+    echo "Error: invalid ${label}: ${value}"
+    exit 1
+  fi
+}
+
 load_source_db_url() {
   local db_url
 
@@ -133,9 +161,11 @@ load_source_db_url() {
 
 build_source_connection_parts() {
   local db_url="$1"
+  local source_password_encoded
 
   SOURCE_USER=$(echo "$db_url" | sed -E 's|postgresql://([^:]+):.*|\1|')
-  SOURCE_PASSWORD=$(echo "$db_url" | sed -E 's|postgresql://[^:]+:(.*)@[^@]+$|\1|')
+  source_password_encoded=$(echo "$db_url" | sed -E 's|postgresql://[^:]+:(.*)@[^@]+$|\1|')
+  SOURCE_PASSWORD="$(uri_decode "$source_password_encoded")"
   _HOST_PORT_DB=$(echo "$db_url" | sed -E 's|.*@([^@]+)$|\1|')
   SOURCE_HOST=$(echo "$_HOST_PORT_DB" | sed -E 's|([^:]+):.*|\1|')
   SOURCE_PORT=$(echo "$_HOST_PORT_DB" | sed -E 's|[^:]+:([0-9]+)/.*|\1|')
@@ -153,13 +183,13 @@ build_source_connection_parts() {
   fi
 
   SOURCE_SSLMODE='require'
-  SOURCE_DB_URL="postgresql://${SOURCE_USER}:${SOURCE_PASSWORD}@${SOURCE_HOST}:${SOURCE_PORT}/${SOURCE_DB}?sslmode=${SOURCE_SSLMODE}"
-  SOURCE_CONNECTION_STRING="host=${SOURCE_HOST}
-            port=${SOURCE_PORT}
-            dbname=${SOURCE_DB}
-            user=${SOURCE_USER}
-            password=${SOURCE_PASSWORD}
-            sslmode=${SOURCE_SSLMODE}
+  SOURCE_DB_URL="postgresql://${SOURCE_USER}:${source_password_encoded}@${SOURCE_HOST}:${SOURCE_PORT}/${SOURCE_DB}?sslmode=${SOURCE_SSLMODE}"
+  SOURCE_CONNECTION_STRING="host=$(libpq_escape_value "$SOURCE_HOST")
+            port=$(libpq_escape_value "$SOURCE_PORT")
+            dbname=$(libpq_escape_value "$SOURCE_DB")
+            user=$(libpq_escape_value "$SOURCE_USER")
+            password=$(libpq_escape_value "$SOURCE_PASSWORD")
+            sslmode=$(libpq_escape_value "$SOURCE_SSLMODE")
             connect_timeout=10
             keepalives=1
             keepalives_idle=10
@@ -178,6 +208,19 @@ load_replica_target() {
   local key
   local value
   local matches_file
+  local preferred_matches=()
+  local candidate_keys=(
+    READ_REPLICATE_GOOGLE_EU1
+    READ_REPLICA_DB_URL
+    GOOGLE_READ_REPLICA_DB_URL
+    GOOGLE_PRIMARY_REPLICA_DB_URL
+    GOOGLE_REPLICA_DB_URL
+    GOOGLE_DB_URL
+    GOOGLE_EU_2
+    GOOGLE_EU
+    GOOGLE_PRIMARY
+    GOOGLE_REPLICA
+  )
   local count
 
   ensure_env_file
@@ -197,24 +240,27 @@ load_replica_target() {
     return 0
   fi
 
-  for key in \
-    READ_REPLICATE_GOOGLE_EU1 \
-    READ_REPLICA_DB_URL \
-    GOOGLE_READ_REPLICA_DB_URL \
-    GOOGLE_PRIMARY_REPLICA_DB_URL \
-    GOOGLE_REPLICA_DB_URL \
-    GOOGLE_DB_URL \
-    GOOGLE_EU_2 \
-    GOOGLE_EU \
-    GOOGLE_PRIMARY \
-    GOOGLE_REPLICA; do
+  for key in "${candidate_keys[@]}"; do
     if value="$(get_env_value "$key")" && [[ "$value" == postgresql://* ]]; then
-      REPLICA_TARGET_ENV="$key"
-      REPLICA_TARGET_DB_URL="$(ensure_connect_timeout "$(ensure_sslrootcert_system "$(normalize_cloudsql_ssl "$value")")" 10)"
-      REPLICA_TARGET_HOST="$(extract_host "$value")"
-      return 0
+      preferred_matches+=("$key")
     fi
   done
+
+  if [[ ${#preferred_matches[@]} -gt 1 ]]; then
+    echo "Error: multiple preferred Google read-replica database URLs found. Refusing to guess."
+    echo "Set READ_REPLICA_TARGET_ENV to one of:"
+    printf '  %s\n' "${preferred_matches[@]}"
+    exit 1
+  fi
+
+  if [[ ${#preferred_matches[@]} -eq 1 ]]; then
+    key="${preferred_matches[0]}"
+    value="$(get_env_value "$key")"
+    REPLICA_TARGET_ENV="$key"
+    REPLICA_TARGET_DB_URL="$(ensure_connect_timeout "$(ensure_sslrootcert_system "$(normalize_cloudsql_ssl "$value")")" 10)"
+    REPLICA_TARGET_HOST="$(extract_host "$value")"
+    return 0
+  fi
 
   matches_file="$(mktemp)"
   grep -E '^(READ_REPLICATE_[A-Z0-9_]*|GOOGLE_[A-Z0-9_]*|CLOUDSQL_[A-Z0-9_]*)=postgresql://' "$REPLICA_ENV_FILE" \

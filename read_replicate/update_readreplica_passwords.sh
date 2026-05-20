@@ -49,8 +49,8 @@ DEFAULT_SUBSCRIPTION_NAME="capgo_google_$(replica_region_name)"
 discover_subscription "$DEFAULT_SUBSCRIPTION_NAME"
 print_target_summary
 
-NEW_CONNECTION_STRING="host=${SOURCE_HOST} port=${SOURCE_PORT} dbname=${SOURCE_DB} user=${SOURCE_USER} password=${NEW_PASSWORD} sslmode=${SOURCE_SSLMODE} connect_timeout=10 keepalives=1 keepalives_idle=10 keepalives_interval=5 keepalives_count=3"
-SAFE_CONNECTION_STRING="${NEW_CONNECTION_STRING//\'/''}"
+NEW_CONNECTION_STRING="host=$(libpq_escape_value "$SOURCE_HOST") port=$(libpq_escape_value "$SOURCE_PORT") dbname=$(libpq_escape_value "$SOURCE_DB") user=$(libpq_escape_value "$SOURCE_USER") password=$(libpq_escape_value "$NEW_PASSWORD") sslmode=$(libpq_escape_value "$SOURCE_SSLMODE") connect_timeout=10 keepalives=1 keepalives_idle=10 keepalives_interval=5 keepalives_count=3"
+SAFE_CONNECTION_STRING="$(sql_literal_escape "$NEW_CONNECTION_STRING")"
 
 SUB_EXISTS=$(psql-17 "$REPLICA_TARGET_DB_URL" -t -A -c "
   SELECT 1

@@ -15,6 +15,7 @@ if [[ $# -lt 1 ]]; then
 fi
 
 TABLE_NAME="$1"
+validate_public_identifier "$TABLE_NAME" "table name"
 DUMP_DIR="${SCRIPT_DIR}/dumps"
 mkdir -p "$DUMP_DIR"
 
@@ -28,7 +29,7 @@ print_target_summary
 echo "==> Publication: ${PUBLICATION_NAME}"
 echo "==> Re-syncing table: public.${TABLE_NAME}"
 
-SAFE_CONNECTION_STRING="${SOURCE_CONNECTION_STRING//\'/''}"
+SAFE_CONNECTION_STRING="$(sql_literal_escape "$SOURCE_CONNECTION_STRING")"
 SOURCE_SLOT_STATUS=$(psql-17 "$SOURCE_DB_URL" -t -A -F '|' -c "
   SELECT COALESCE(wal_status, ''), COALESCE(invalidation_reason, '')
   FROM pg_replication_slots

@@ -53,6 +53,24 @@ for table in "${REPLICA_TABLES[@]}"; do
     WHERE relname = '${table}'
       AND relnamespace = 'public'::regnamespace;
   ")
+  HAS_PRIMARY_KEY=$(psql-17 "$SOURCE_DB_URL" -t -A -c "
+    SELECT EXISTS (
+      SELECT 1
+      FROM pg_index
+      WHERE indrelid = 'public.${table}'::regclass
+        AND indisprimary
+    );
+  ")
+  HAS_REPLICA_INDEX=$(psql-17 "$SOURCE_DB_URL" -t -A -c "
+    SELECT EXISTS (
+      SELECT 1
+      FROM pg_index
+      WHERE indrelid = 'public.${table}'::regclass
+        AND indisreplident
+        AND indisvalid
+        AND indisready
+    );
+  ")
 
   case "$REPLICA_ID" in
     d) REPLICA_DESC="DEFAULT (uses primary key)" ;;
@@ -63,9 +81,17 @@ for table in "${REPLICA_TABLES[@]}"; do
   esac
 
   if [[ "$REPLICA_ID" == "n" ]]; then
-    echo "    WARNING: ${table} has REPLICA IDENTITY NOTHING. Setting to DEFAULT..."
-    psql-17 "$SOURCE_DB_URL" -c "ALTER TABLE public.${table} REPLICA IDENTITY DEFAULT;" || true
-    REPLICA_DESC="DEFAULT (uses primary key)"
+    echo "    WARNING: ${table} has REPLICA IDENTITY NOTHING. Setting to FULL..."
+    psql-17 "$SOURCE_DB_URL" -v ON_ERROR_STOP=1 -c "ALTER TABLE public.${table} REPLICA IDENTITY FULL;"
+    REPLICA_DESC="FULL (entire row)"
+  elif [[ "$REPLICA_ID" == "d" && "$HAS_PRIMARY_KEY" != "t" ]]; then
+    echo "    WARNING: ${table} has DEFAULT replica identity without a primary key. Setting to FULL..."
+    psql-17 "$SOURCE_DB_URL" -v ON_ERROR_STOP=1 -c "ALTER TABLE public.${table} REPLICA IDENTITY FULL;"
+    REPLICA_DESC="FULL (entire row)"
+  elif [[ "$REPLICA_ID" == "i" && "$HAS_REPLICA_INDEX" != "t" ]]; then
+    echo "    WARNING: ${table} has INDEX replica identity without a valid replica identity index. Setting to FULL..."
+    psql-17 "$SOURCE_DB_URL" -v ON_ERROR_STOP=1 -c "ALTER TABLE public.${table} REPLICA IDENTITY FULL;"
+    REPLICA_DESC="FULL (entire row)"
   fi
 
   echo "    ${table}: $REPLICA_DESC"

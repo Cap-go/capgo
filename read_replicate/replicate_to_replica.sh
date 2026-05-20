@@ -35,7 +35,7 @@ elif [[ -t 0 ]]; then
   esac
 fi
 
-SAFE_CONNECTION_STRING="${SOURCE_CONNECTION_STRING//\'/''}"
+SAFE_CONNECTION_STRING="$(sql_literal_escape "$SOURCE_CONNECTION_STRING")"
 
 drop_target_subscription() {
   echo "==> Dropping target subscription ${REPLICA_SUBSCRIPTION_NAME} if present..."
@@ -90,6 +90,47 @@ END
 SQL
 }
 
+source_slot_exists() {
+  local exists
+  exists=$(psql-17 "$SOURCE_DB_URL" -t -A -c "
+    SELECT 1
+    FROM pg_replication_slots
+    WHERE slot_name = '${REPLICA_SLOT_NAME}';
+  " || true)
+  [[ -n "$exists" ]]
+}
+
+source_slot_is_lost() {
+  local slot_status
+  local wal_status
+  local invalidation_reason
+
+  slot_status=$(psql-17 "$SOURCE_DB_URL" -t -A -F '|' -c "
+    SELECT COALESCE(wal_status, ''), COALESCE(invalidation_reason, '')
+    FROM pg_replication_slots
+    WHERE slot_name = '${REPLICA_SLOT_NAME}';
+  " || true)
+  wal_status="${slot_status%%|*}"
+  invalidation_reason="${slot_status#*|}"
+
+  [[ "$wal_status" == "lost" || "$invalidation_reason" == "wal_removed" ]]
+}
+
+ensure_source_slot_before_copy() {
+  if source_slot_exists; then
+    if source_slot_is_lost; then
+      echo "==> Source slot ${REPLICA_SLOT_NAME} is lost; recreating before table copy."
+      drop_source_slot
+    else
+      echo "==> Preserving existing source slot ${REPLICA_SLOT_NAME} before table copy."
+      return 0
+    fi
+  fi
+
+  echo "==> Creating source slot ${REPLICA_SLOT_NAME} before table copy..."
+  psql-17 "$SOURCE_DB_URL" -v ON_ERROR_STOP=1 -c "SELECT pg_create_logical_replication_slot('${REPLICA_SLOT_NAME}', 'pgoutput');"
+}
+
 ensure_publication_tables() {
   echo "==> Ensuring source publication includes configured tables..."
   for table in "${REPLICA_TABLES[@]}"; do
@@ -120,6 +161,22 @@ SQL
 }
 
 create_subscription() {
+  local create_slot="${1:-auto}"
+
+  if [[ "$create_slot" == "auto" ]]; then
+    if source_slot_exists; then
+      if source_slot_is_lost; then
+        echo "==> Source slot ${REPLICA_SLOT_NAME} is lost; dropping it before subscription creation."
+        drop_source_slot
+        create_slot=true
+      else
+        create_slot=false
+      fi
+    else
+      create_slot=true
+    fi
+  fi
+
   echo "==> Creating subscription ${REPLICA_SUBSCRIPTION_NAME} using slot ${REPLICA_SLOT_NAME}..."
   psql-17 "$REPLICA_TARGET_DB_URL" -v ON_ERROR_STOP=1 <<SQL
 CREATE SUBSCRIPTION ${REPLICA_SUBSCRIPTION_NAME}
@@ -128,7 +185,7 @@ PUBLICATION ${PUBLICATION_NAME}
 WITH (
   slot_name = '${REPLICA_SLOT_NAME}',
   copy_data = false,
-  create_slot = true,
+  create_slot = ${create_slot},
   enabled = true,
   disable_on_error = false
 );
@@ -177,7 +234,6 @@ restore_table() {
 }
 
 drop_target_subscription
-drop_source_slot
 
 if [[ "$SUBSCRIPTION_ONLY" == "true" ]]; then
   echo "==> Subscription-only mode: leaving replica data/schema untouched."
@@ -185,13 +241,15 @@ if [[ "$SUBSCRIPTION_ONLY" == "true" ]]; then
   create_subscription
 else
   echo "==> Full reset mode: resetting replica-managed schema and data."
+  ensure_publication_tables
+  ensure_source_slot_before_copy
+
   psql-17 "$REPLICA_TARGET_DB_URL" -v ON_ERROR_STOP=1 <<'SQL'
 CREATE SCHEMA IF NOT EXISTS public;
 GRANT ALL ON SCHEMA public TO PUBLIC;
 SQL
 
   psql-17 "$REPLICA_TARGET_DB_URL" -v ON_ERROR_STOP=1 -f "${SCRIPT_DIR}/schema_replicate.sql"
-  ensure_publication_tables
 
   DUMP_DIR="${SCRIPT_DIR}/dumps"
   mkdir -p "$DUMP_DIR"
@@ -212,7 +270,7 @@ SQL
     fi
   done
 
-  create_subscription
+  create_subscription false
 fi
 
 echo "==> Verifying subscription health..."

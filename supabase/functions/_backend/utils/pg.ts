@@ -133,11 +133,9 @@ function toReplicationLagSeconds(value: unknown): number | null {
 async function queryReplicaLag(c: Context, pool: Pool): Promise<ReplicationLagStatus> {
   try {
     const query = `
-      SELECT EXTRACT(EPOCH FROM (now() - last_msg_receipt_time)) AS lag_seconds
+      SELECT MAX(EXTRACT(EPOCH FROM (now() - last_msg_receipt_time))) AS lag_seconds
       FROM pg_stat_subscription
       WHERE last_msg_receipt_time IS NOT NULL
-      ORDER BY last_msg_receipt_time DESC
-      LIMIT 1
     `
 
     const result = await pool.query(query)

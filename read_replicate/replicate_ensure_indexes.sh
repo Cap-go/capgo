@@ -50,7 +50,13 @@ ensure_indexes() {
       idx_sql=$(awk "/CREATE (UNIQUE )?INDEX ${idx} ON/,/;/" "${SCRIPT_DIR}/schema_replicate.sql" | tr '\n' ' ')
 
       if [[ -n "$idx_sql" ]]; then
-        psql-17 "$REPLICA_TARGET_DB_URL" -c "$idx_sql" 2>&1 || echo "      Failed to create $idx"
+        if ! psql-17 "$REPLICA_TARGET_DB_URL" -v ON_ERROR_STOP=1 -c "$idx_sql"; then
+          echo "      Failed to create $idx"
+          exit 1
+        fi
+      else
+        echo "      Could not find SQL for $idx"
+        exit 1
       fi
     fi
   done
