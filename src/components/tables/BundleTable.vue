@@ -295,32 +295,13 @@ async function refreshData() {
   }
 }
 
-async function unlinkChannels(app_id: string, unlink: LinkedChannel[]) {
+async function unlinkChannels(_appId: string, unlink: LinkedChannel[]) {
   if (unlink.length === 0) {
     return
   }
-  const { data: unknownVersion, error: unknownError } = await supabase
-    .from('app_versions')
-    .select()
-    .eq('app_id', app_id)
-    .eq('name', 'unknown')
-    .single()
-
-  if (unknownError) {
-    toast.error(t('cannot-find-unknown-version'))
-    console.error('Cannot find unknown', JSON.stringify(unknownError))
-    return Promise.reject(new Error('Cannot find unknown'))
-  }
-
-  if (!unknownVersion?.id || typeof unknownVersion.id !== 'number') {
-    toast.error(t('error-invalid-version'))
-    console.error('Invalid unknown version ID:', unknownVersion)
-    return Promise.reject(new Error('Invalid unknown version ID'))
-  }
-
   const { error: updateError } = await supabase
     .from('channels')
-    .update({ version: unknownVersion.id })
+    .update({ version: null })
     .in('id', unlink.map(c => c.id))
 
   if (updateError) {
@@ -535,7 +516,7 @@ async function massDelete() {
     }
 
     const channelsList = linkedChannelsList
-      .map(val => val.rawChannel?.map((ch: any) => `${ch.name} (${ch.version.name})`).join(', '))
+      .map(val => val.rawChannel?.map((ch: any) => `${ch.name} (${ch.version?.name ?? t('channel-builtin')})`).join(', '))
       .join(', ')
     const message = t('channel-bundle-linked', { channels: channelsList })
     const shouldUnlink = await showUnlinkDialog(message)

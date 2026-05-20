@@ -596,6 +596,7 @@
   "channel": "Channel",
   "channel-actions": "channel actions",
   "channel-allow-device-self-set": "Allow Device Self-Assignment",
+  "channel-builtin": "builtin",
   "channel-bundle-linked": "This bundle is linked to one or more channels. ({channels}) Would you like to unlink it from those channels?",
   "channel-create": "Create channel",
   "channel-created": "Channel Created",

@@ -21,12 +21,6 @@ interface DemoVersion {
   link?: string
 }
 
-const SYSTEM_DEMO_VERSION_NAMES = new Set(['unknown', 'builtin'])
-
-function isSystemDemoVersionName(versionName: string): boolean {
-  return SYSTEM_DEMO_VERSION_NAMES.has(versionName)
-}
-
 /** Native package structure for demo apps */
 interface DemoNativePackage {
   name: string
@@ -232,7 +226,6 @@ interface SeedDemoAppDataOptions {
   ownerOrg: string
   seedId: string
   userId: string
-  systemVersions: Array<Record<string, unknown>>
   appVersions: Array<Record<string, unknown>>
   manifestRows: Array<Record<string, unknown>>
   channelRows: Array<Record<string, unknown>>
@@ -285,46 +278,6 @@ async function seedOnboardingDemoDataInTransaction(
     shouldRollback = true
 
     await pgClient.query('SELECT public.reset_onboarding_demo_app_data($1::uuid)', [options.appUuid])
-
-    await pgClient.query(
-      `WITH input AS (
-        SELECT *
-        FROM jsonb_to_recordset($1::jsonb) AS version_data(
-          name text,
-          created_at timestamptz,
-          comment text,
-          link text
-        )
-      )
-      INSERT INTO public.app_versions (
-        owner_org,
-        deleted,
-        name,
-        app_id,
-        created_at,
-        comment,
-        link,
-        user_id,
-        manifest,
-        manifest_count,
-        native_packages
-      )
-      SELECT
-        $2::uuid,
-        true,
-        input.name,
-        $3::text,
-        input.created_at,
-        input.comment,
-        input.link,
-        $4::uuid,
-        NULL::public.manifest_entry[],
-        0,
-        NULL::jsonb[]
-      FROM input
-      ON CONFLICT (name, app_id) DO NOTHING`,
-      [JSON.stringify(options.systemVersions), options.ownerOrg, options.appId, options.userId],
-    )
 
     const versionResult = await pgClient.query<{ id: number, name: string, is_demo_shape: boolean }>(
       `WITH raw_input AS (
@@ -933,8 +886,6 @@ export async function createDemoApp(c: Context<MiddlewareKeyVariables>, body: Cr
 
     // Demo versions to create - simulates app development lifecycle
     const demoVersions: DemoVersion[] = [
-      { name: 'unknown', daysAgo: 14 },
-      { name: 'builtin', daysAgo: 14 },
       { name: '1.0.0', daysAgo: 13, comment: 'Initial release' },
       { name: '1.0.1', daysAgo: 10, comment: 'Bug fixes for login screen' },
       { name: '1.1.0', daysAgo: 7, comment: 'Added dark mode support' },
@@ -942,16 +893,12 @@ export async function createDemoApp(c: Context<MiddlewareKeyVariables>, body: Cr
       { name: '1.2.0', daysAgo: 1, comment: 'New dashboard features', link: 'https://github.com/example/demo-app/pull/123' },
     ]
 
-    const systemDemoVersions = demoVersions.filter(version => isSystemDemoVersionName(version.name))
-    const appDemoVersions = demoVersions.filter(version => !isSystemDemoVersionName(version.name))
-
-    const buildVersionSeed = (v: DemoVersion): Record<string, unknown> => {
-      const isSystemVersion = isSystemDemoVersionName(v.name)
-      const manifest = isSystemVersion ? null : getDemoManifest(v.name, appId)
-      const nativePackages = isSystemVersion ? null : getDemoNativePackages(v.name)
+    const appVersionRows = demoVersions.map((v): Record<string, unknown> => {
+      const manifest = getDemoManifest(v.name, appId)
+      const nativePackages = getDemoNativePackages(v.name)
 
       return {
-        deleted: isSystemVersion,
+        deleted: false,
         name: v.name,
         created_at: daysAgoDate(v.daysAgo),
         comment: v.comment ?? null,
@@ -964,16 +911,13 @@ export async function createDemoApp(c: Context<MiddlewareKeyVariables>, body: Cr
         manifest_count: manifest?.length ?? 0,
         native_packages: nativePackages ?? null,
       }
-    }
-
-    const systemVersionRows = systemDemoVersions.map(buildVersionSeed)
-    const appVersionRows = appDemoVersions.map(buildVersionSeed)
+    })
 
     // Insert manifest entries into the manifest table for each version
     // This is required for the bundle file list to show in the UI
     const manifestRows: Array<Record<string, unknown>> = []
 
-    for (const version of appDemoVersions) {
+    for (const version of demoVersions) {
       const manifestEntries = getDemoManifest(version.name, appId)
       for (const entry of manifestEntries) {
         manifestRows.push({
@@ -1188,7 +1132,6 @@ export async function createDemoApp(c: Context<MiddlewareKeyVariables>, body: Cr
       ownerOrg: body.owner_org,
       seedId: demoSeedId,
       userId: auth.userId,
-      systemVersions: systemVersionRows,
       appVersions: appVersionRows,
       manifestRows,
       channelRows,

@@ -45,8 +45,6 @@ const canManageDevices = computedAsync(async () => {
   return await checkPermissions('app.manage_devices', { appId: packageId.value })
 }, false)
 
-const revertToNativeVersion = ref<Database['public']['Functions']['check_revert_to_builtin_version']['Returns'] | null>(null)
-
 // Channel dropdown state
 const channelDropdown = ref<HTMLDetailsElement>()
 
@@ -205,28 +203,12 @@ function minVersion(val: string, min = '4.6.99') {
   return greaterThan(parse(val), parse(min))
 }
 
-async function loadRevertToNativeVersion() {
-  if (revertToNativeVersion.value !== null) {
-    return
-  }
-  const { data: revertVersionId, error } = await supabase
-    .rpc('check_revert_to_builtin_version', { appid: packageId.value })
-
-  if (error) {
-    console.error('lazy load revertVersionId fail', error)
-    return
-  }
-
-  revertToNativeVersion.value = revertVersionId
-}
-
 async function loadData() {
   isLoading.value = true
   await Promise.all([
     getDevice(),
     getChannelOverride(),
     getChannels(),
-    loadRevertToNativeVersion(),
   ])
   reloadCount.value += 1
   isLoading.value = false

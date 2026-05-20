@@ -153,7 +153,7 @@ SELECT
     channel_rbac_id,
     'rbac-channel',
     app_rbac,
-    1,
+    NULL::bigint,
     org_rbac,
     admin_user
 FROM seed_data
