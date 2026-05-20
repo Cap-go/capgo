@@ -4,12 +4,14 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import IconExternalLink from '~icons/lucide/external-link'
 import IconSmartphone from '~icons/lucide/smartphone'
+import { buildChannelPreviewDeepLink } from '~/services/previewLinks'
 import { buildChannelPreviewSubdomain, buildPreviewSubdomain } from '../../shared/preview-subdomain.ts'
 
 const props = defineProps<{
   appId: string
   versionId?: number
   channelId?: number
+  channelName?: string
 }>()
 
 const { t } = useI18n()
@@ -86,19 +88,31 @@ const previewUrl = computed<string | null>(() => {
   }
 })
 
+const qrCodeUrl = computed<string | null>(() => {
+  if (typeof props.channelId === 'number' && props.channelName) {
+    return buildChannelPreviewDeepLink({
+      appId: props.appId,
+      channelId: props.channelId,
+      channelName: props.channelName,
+    })
+  }
+
+  return previewUrl.value
+})
+
 function svgToDataUrl(svg: string): string {
   return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`
 }
 
 // Generate QR code linking to the preview URL
 function generateQRCode() {
-  if (!previewUrl.value) {
+  if (!qrCodeUrl.value) {
     qrCodeDataUrl.value = ''
     return
   }
 
   try {
-    qrCodeDataUrl.value = svgToDataUrl(toSvg(previewUrl.value, {
+    qrCodeDataUrl.value = svgToDataUrl(toSvg(qrCodeUrl.value, {
       margin: 2,
       moduleSize: 4,
       foreground: '#000000',
@@ -111,7 +125,7 @@ function generateQRCode() {
 }
 
 // Watch for URL changes to regenerate QR
-watch(previewUrl, generateQRCode)
+watch(qrCodeUrl, generateQRCode)
 
 function openExternal() {
   if (!previewUrl.value)

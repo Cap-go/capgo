@@ -2,9 +2,10 @@
 import type { DownloadEvent } from '@capgo/capacitor-updater'
 import { CapacitorBarcodeScanner } from '@capacitor/barcode-scanner'
 import { Capacitor } from '@capacitor/core'
+import { Dialog } from '@capacitor/dialog'
 import { CapacitorUpdater } from '@capgo/capacitor-updater'
 import { computed, onMounted, onUnmounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import IconDownload from '~icons/heroicons/arrow-down-tray-20-solid'
 import IconArrowLeft from '~icons/heroicons/arrow-left-20-solid'
@@ -12,8 +13,14 @@ import IconArrowPath from '~icons/heroicons/arrow-path-20-solid'
 import IconLink from '~icons/heroicons/link-20-solid'
 import IconQrCode from '~icons/heroicons/qr-code-20-solid'
 import IconShieldCheck from '~icons/heroicons/shield-check-20-solid'
+import { parseChannelPreviewDeepLink } from '~/services/previewLinks'
 import { useDisplayStore } from '~/stores/display'
 
+type PreviewUpdater = typeof CapacitorUpdater & {
+  startPreviewSession?: () => Promise<void>
+}
+
+const route = useRoute()
 const router = useRouter()
 const displayStore = useDisplayStore()
 
@@ -74,6 +81,12 @@ onMounted(async () => {
   displayStore.NavTitle = 'Scan update'
   displayStore.defaultBack = '/apps'
 
+  const previewLink = Array.isArray(route.query.preview) ? route.query.preview[0] : route.query.preview
+  if (previewLink) {
+    await handleBarcodeScan(previewLink)
+    return
+  }
+
   if (isNativePlatform) {
     await startScanner()
     return
@@ -92,6 +105,32 @@ async function removeDownloadListener() {
 
   await downloadListener.remove()
   downloadListener = null
+}
+
+async function getPreviousChannel() {
+  try {
+    const result = await CapacitorUpdater.getChannel()
+    return { channel: result.channel }
+  }
+  catch (error) {
+    console.warn('Could not read current update channel before preview:', error)
+    return null
+  }
+}
+
+async function restorePreviousChannel(previousChannel: Awaited<ReturnType<typeof getPreviousChannel>>) {
+  if (!previousChannel)
+    return
+
+  try {
+    if (previousChannel.channel)
+      await CapacitorUpdater.setChannel({ channel: previousChannel.channel, triggerAutoUpdate: false })
+    else
+      await CapacitorUpdater.unsetChannel({ triggerAutoUpdate: false })
+  }
+  catch (error) {
+    console.warn('Could not restore previous update channel after preview failure:', error)
+  }
 }
 
 async function startScanner() {
@@ -122,6 +161,14 @@ async function startScanner() {
 }
 
 async function handleBarcodeScan(scannedValue: string) {
+  const previewLink = parseChannelPreviewDeepLink(scannedValue)
+  if (previewLink) {
+    scannedUrl.value = scannedValue
+    manualUrl.value = ''
+    await startChannelPreview(previewLink)
+    return
+  }
+
   if (!isValidUrl(scannedValue)) {
     errorMessage.value = 'The scanned QR code does not contain a valid update URL.'
     toast.error('Scanned QR code is not a valid URL')
@@ -131,6 +178,69 @@ async function handleBarcodeScan(scannedValue: string) {
   scannedUrl.value = scannedValue
   manualUrl.value = scannedValue
   await downloadUpdate(scannedValue)
+}
+
+async function startPreviewSession() {
+  const updater = CapacitorUpdater as PreviewUpdater
+  if (typeof updater.startPreviewSession === 'function') {
+    await updater.startPreviewSession()
+    return
+  }
+
+  const current = await CapacitorUpdater.current()
+  await CapacitorUpdater.next({ id: current.bundle.id })
+  await CapacitorUpdater.setShakeMenu({ enabled: true })
+  await Dialog.alert({
+    title: 'Preview started',
+    message: 'Shake your device anytime to reload or leave the test app.',
+  })
+}
+
+async function startChannelPreview(previewLink: ReturnType<typeof parseChannelPreviewDeepLink>) {
+  if (!previewLink)
+    return
+
+  const previousChannel = await getPreviousChannel()
+  let previewChannelSet = false
+
+  try {
+    isLoading.value = true
+    downloadProgress.value = 0
+
+    await removeDownloadListener()
+    downloadListener = await CapacitorUpdater.addListener('download', (state: DownloadEvent) => {
+      downloadProgress.value = state.percent || 0
+    })
+
+    toast.success(`Switching to channel: ${previewLink.channelName}`)
+
+    const latest = await CapacitorUpdater.getLatest({ channel: previewLink.channelName })
+    if (!latest.url)
+      throw new Error(latest.message || latest.error || 'No preview update is available for this channel')
+
+    const bundle = await CapacitorUpdater.download({
+      checksum: latest.checksum,
+      manifest: latest.manifest,
+      sessionKey: latest.sessionKey,
+      url: latest.url,
+      version: latest.version,
+    })
+
+    await CapacitorUpdater.setChannel({ channel: previewLink.channelName, triggerAutoUpdate: false })
+    previewChannelSet = true
+    await startPreviewSession()
+    await CapacitorUpdater.set(bundle)
+  }
+  catch (error) {
+    if (previewChannelSet)
+      await restorePreviousChannel(previousChannel)
+    console.error('Failed to start channel preview:', error)
+    toast.error(`Failed to start preview: ${error}`)
+  }
+  finally {
+    isLoading.value = false
+    await removeDownloadListener()
+  }
 }
 
 async function downloadUpdate(updateUrl: string) {

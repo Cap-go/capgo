@@ -1,0 +1,54 @@
+export interface ChannelPreviewLink {
+  type: 'channel'
+  appId: string
+  channelId?: number
+  channelName: string
+}
+
+const CHANNEL_PREVIEW_PATH = '/preview/channel'
+
+function getPreviewPath(url: URL) {
+  if (url.protocol !== 'capgo:')
+    return url.pathname
+
+  const hostPath = url.hostname ? `/${url.hostname}${url.pathname}` : url.pathname
+  return hostPath.replace(/\/+/g, '/')
+}
+
+export function buildChannelPreviewDeepLink(options: {
+  appId: string
+  channelId?: number
+  channelName: string
+  origin?: string
+}) {
+  const url = new URL(CHANNEL_PREVIEW_PATH, options.origin ?? window.location.origin)
+  url.searchParams.set('appId', options.appId)
+  url.searchParams.set('channel', options.channelName)
+  if (typeof options.channelId === 'number')
+    url.searchParams.set('channelId', String(options.channelId))
+  return url.toString()
+}
+
+export function parseChannelPreviewDeepLink(value: string): ChannelPreviewLink | null {
+  if (!URL.canParse(value))
+    return null
+
+  const url = new URL(value)
+  if (getPreviewPath(url) !== CHANNEL_PREVIEW_PATH)
+    return null
+
+  const appId = url.searchParams.get('appId') ?? url.searchParams.get('app')
+  const channelName = url.searchParams.get('channel') ?? url.searchParams.get('channelName')
+  const channelIdValue = url.searchParams.get('channelId')
+  const channelId = channelIdValue ? Number(channelIdValue) : Number.NaN
+
+  if (!appId || !channelName)
+    return null
+
+  return {
+    type: 'channel',
+    appId,
+    channelId: Number.isFinite(channelId) ? channelId : undefined,
+    channelName,
+  }
+}

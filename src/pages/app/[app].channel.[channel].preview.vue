@@ -208,6 +208,7 @@ watchEffect(async () => {
       <BundlePreviewFrame
         :app-id="packageId"
         :channel-id="id"
+        :channel-name="channel.name"
       />
     </div>
   </div>
