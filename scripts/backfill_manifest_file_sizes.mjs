@@ -11,33 +11,15 @@
  *   bun scripts/backfill_manifest_file_sizes.mjs --all --apply
  */
 
-import { mkdirSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 import { S3Client } from '@bradenmacdonald/s3-lite-client'
-import { config } from 'dotenv'
+import { parse } from 'dotenv'
 import pg from 'pg'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
-
-for (const envPath of [
-  '../.env',
-  '../.env.local',
-  '../internal/cloudflare/.env.prod',
-  '../internal/cloudflare/.env.local',
-]) {
-  config({ path: resolve(__dirname, envPath), override: true, quiet: true })
-}
-
-const DB_URL_ENV_KEYS = [
-  'MAIN_SUPABASE_DB_URL',
-  'DATABASE_URL',
-  'POSTGRES_URL',
-  'SUPABASE_DB_URL',
-  'SUPABASE_DB_DIRECT_URL',
-  'DIRECT_URL',
-]
 
 function hasFlag(name) {
   return process.argv.includes(name)
@@ -64,6 +46,55 @@ function getArgValue(name) {
   return undefined
 }
 
+function getTarget() {
+  if (hasFlag('--help') || hasFlag('-h'))
+    return 'prod'
+  const target = getArgValue('--target') ?? (hasFlag('--local') ? 'local' : 'prod')
+  if (target !== 'prod' && target !== 'local')
+    throw new Error('--target must be "prod" or "local"')
+  return target
+}
+
+const target = getTarget()
+const sharedEnvPaths = [
+  '../.env',
+]
+const targetEnvPaths = target === 'prod'
+  ? [
+      '../internal/cloudflare/.env.prod',
+    ]
+  : [
+      '../.env.local',
+      '../internal/cloudflare/.env.local',
+    ]
+
+function loadEnvFiles(envPaths) {
+  const loaded = {}
+  for (const envPath of envPaths) {
+    const resolvedPath = resolve(__dirname, envPath)
+    if (!existsSync(resolvedPath))
+      continue
+    Object.assign(loaded, parse(readFileSync(resolvedPath)))
+  }
+  return loaded
+}
+
+const targetEnv = loadEnvFiles(targetEnvPaths)
+const runtimeEnv = loadEnvFiles([...sharedEnvPaths, ...targetEnvPaths])
+
+for (const [key, value] of Object.entries(runtimeEnv)) {
+  process.env[key] = value
+}
+
+const DB_URL_ENV_KEYS = [
+  'MAIN_SUPABASE_DB_URL',
+  'DATABASE_URL',
+  'POSTGRES_URL',
+  'SUPABASE_DB_URL',
+  'SUPABASE_DB_DIRECT_URL',
+  'DIRECT_URL',
+]
+
 function getNumberArg(name, fallback) {
   const value = getArgValue(name)
   if (value === undefined)
@@ -74,13 +105,46 @@ function getNumberArg(name, fallback) {
   return parsed
 }
 
-function getDatabaseUrl() {
+function getDatabaseUrl(databaseEnv) {
   for (const key of DB_URL_ENV_KEYS) {
-    const value = process.env[key]
+    const value = databaseEnv[key]
     if (value)
       return value
   }
-  throw new Error(`Missing Postgres URL. Set one of: ${DB_URL_ENV_KEYS.join(', ')}`)
+  throw new Error(`Missing Postgres URL in ${targetEnvPaths.join(', ')}. Set one of: ${DB_URL_ENV_KEYS.join(', ')}`)
+}
+
+function isLocalDatabaseUrl(databaseUrl) {
+  try {
+    let { hostname } = new URL(databaseUrl)
+    if (hostname.startsWith('[') && hostname.endsWith(']'))
+      hostname = hostname.slice(1, -1)
+    return ['127.0.0.1', 'localhost', '::1'].includes(hostname)
+  }
+  catch {
+    return databaseUrl.includes('127.0.0.1')
+      || databaseUrl.includes('localhost')
+      || databaseUrl.includes('::1')
+      || databaseUrl.includes('[::1]')
+  }
+}
+
+function getSafeDatabaseUrl() {
+  const databaseUrl = getDatabaseUrl(targetEnv)
+  if (target === 'prod' && isLocalDatabaseUrl(databaseUrl)) {
+    throw new Error('Refusing to use a local Postgres URL for the default prod target. Pass --target=local only when you intentionally want local.')
+  }
+  return databaseUrl
+}
+
+function describeDatabaseUrl(databaseUrl) {
+  try {
+    const { host } = new URL(databaseUrl)
+    return host
+  }
+  catch {
+    return 'unknown host'
+  }
 }
 
 function getRequiredEnv(name) {
@@ -257,6 +321,8 @@ Options:
   --batch-size         DB page size. Default: 500.
   --concurrency        Storage HEAD/RANGE concurrency. Default: 20.
   --include-deleted    Include deleted bundles.
+  --target prod|local  Env target. Default: prod.
+  --local              Alias for --target=local.
   --verbose            Print every checked row.
 `)
     return
@@ -278,9 +344,12 @@ Options:
   if (appVersionIdRaw && (!Number.isFinite(appVersionId) || appVersionId <= 0))
     throw new Error('--app-version-id must be a positive integer')
 
+  const databaseUrl = getSafeDatabaseUrl()
+  console.log(`Using ${target} database target: ${describeDatabaseUrl(databaseUrl)}`)
+
   const pool = new pg.Pool({
-    connectionString: getDatabaseUrl(),
-    ssl: { rejectUnauthorized: false },
+    connectionString: databaseUrl,
+    ssl: target === 'prod' ? { rejectUnauthorized: false } : false,
   })
   const s3 = new S3Client({
     accessKey: getRequiredEnv('S3_ACCESS_KEY_ID'),
@@ -301,6 +370,7 @@ Options:
     includeDeleted,
     missingSize: 0,
     scannedAt: new Date().toISOString(),
+    target,
     unchanged: 0,
   }
 

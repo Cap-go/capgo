@@ -1,20 +1,23 @@
 import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
+import type { Database } from '../utils/supabase.types.ts'
 import { type } from 'arktype'
 import { Hono } from 'hono/tiny'
 // --- Worker logic imports ---
 import { safeParseSchema } from '../utils/ark_validation.ts'
 import { sendDiscordAlert } from '../utils/discord.ts'
 import { BRES, middlewareAPISecret, parseBody, simpleError } from '../utils/hono.ts'
-import { cloudlog, cloudlogErr } from '../utils/logging.ts'
+import { cloudlog, cloudlogErr, serializeError } from '../utils/logging.ts'
 import { closeClient, getPgClient } from '../utils/pg.ts'
 import { backgroundTask, getEnv } from '../utils/utils.ts'
+import { updateManifestSize } from './on_manifest_create.ts'
 
 // Define constants
 const DEFAULT_BATCH_SIZE = 950 // Default batch size for queue reads limit of CF is 1000 fetches so we take a safe margin
 const MANIFEST_QUEUE_BATCH_SIZE = 100
 const DEFAULT_QUEUE_HTTP_CONCURRENCY = 25
 const MANIFEST_QUEUE_HTTP_CONCURRENCY = 10
+const QUEUE_HTTP_TIMEOUT_MS = 15_000
 export const MAX_QUEUE_READS = 5
 const DISCORD_IGNORED_ERROR_CODES = new Set(['version_not_found', 'no_channel'])
 
@@ -61,6 +64,17 @@ interface FailureDetail {
   response_body?: string
   payload_size: number
   cf_id: string
+  duration_ms?: number
+  target_url?: string
+}
+
+interface ProcessedQueueMessage extends Message {
+  httpResponse: Response
+  errorDetails: Awaited<ReturnType<typeof extractErrorDetails>>
+  cfId: string
+  payloadSize: number
+  durationMs: number
+  targetUrl: string | null
 }
 
 function extractMessageBody(message: Message): Record<string, unknown> {
@@ -172,6 +186,189 @@ function generateUUID(): string {
   return crypto.randomUUID()
 }
 
+function resolveFunctionUrl(c: Context, function_name: string, function_type: string | null | undefined): string {
+  const cfPpUrl = getEnv(c, 'CLOUDFLARE_PP_FUNCTION_URL')
+  const cfUrl = getEnv(c, 'CLOUDFLARE_FUNCTION_URL')
+  const normalizedType = (function_type ?? '').trim()
+
+  if (normalizedType === 'cloudflare_pp' && cfPpUrl)
+    return `${cfPpUrl}/triggers/${function_name}`
+
+  if (normalizedType === 'cloudflare' && cfUrl)
+    return `${cfUrl}/triggers/${function_name}`
+
+  if (normalizedType === '' && cfUrl)
+    return `${cfUrl}/triggers/${function_name}`
+
+  return `${getEnv(c, 'SUPABASE_URL')}/functions/v1/triggers/${function_name}`
+}
+
+function queueFailureResponse(errorCode: string, message: string, moreInfo: Record<string, unknown> = {}, status = 599): Response {
+  return new Response(JSON.stringify({
+    error: errorCode,
+    message,
+    moreInfo,
+  }), {
+    headers: {
+      'content-type': 'application/json',
+    },
+    status,
+    statusText: status === 599 ? 'Queue Transport Error' : undefined,
+  })
+}
+
+function httpExceptionToQueueResponse(error: unknown): Response | null {
+  if (!error || typeof error !== 'object')
+    return null
+
+  const maybeException = error as {
+    cause?: unknown
+    message?: unknown
+    status?: unknown
+  }
+  if (typeof maybeException.status !== 'number')
+    return null
+
+  const cause = maybeException.cause
+  if (cause && typeof cause === 'object' && 'error' in cause) {
+    const causeData = cause as {
+      error?: unknown
+      message?: unknown
+      moreInfo?: unknown
+    }
+    const resolvedMessage = typeof causeData.message === 'string'
+      ? causeData.message
+      : typeof maybeException.message === 'string'
+        ? maybeException.message
+        : 'Queue handler failed'
+
+    return queueFailureResponse(
+      typeof causeData.error === 'string' ? causeData.error : 'http_exception',
+      resolvedMessage,
+      causeData.moreInfo && typeof causeData.moreInfo === 'object'
+        ? causeData.moreInfo as Record<string, unknown>
+        : {},
+      maybeException.status,
+    )
+  }
+
+  return queueFailureResponse(
+    'http_exception',
+    typeof maybeException.message === 'string' ? maybeException.message : 'Queue handler failed',
+    {},
+    maybeException.status,
+  )
+}
+
+function getManifestRecordFromQueueBody(body: Record<string, unknown>): Database['public']['Tables']['manifest']['Row'] {
+  const record = body.record
+  if (body.type !== 'INSERT' || body.table !== 'manifest' || !record || typeof record !== 'object') {
+    throw simpleError('invalid_manifest_queue_payload', 'Invalid manifest queue payload', { body })
+  }
+
+  return record as Database['public']['Tables']['manifest']['Row']
+}
+
+async function dispatchQueueMessage(
+  c: Context,
+  function_name: string,
+  function_type: string | null | undefined,
+  body: Record<string, unknown>,
+  cfId: string,
+  metadata: QueueMessageMetadata,
+  targetUrl: string,
+): Promise<{ response: Response, targetUrl: string }> {
+  if (function_name === 'on_manifest_create') {
+    const record = getManifestRecordFromQueueBody(body)
+    const response = await updateManifestSize(c, record, {
+      cfId,
+      queueMsgId: String(metadata.msgId),
+      queueName: metadata.queueName,
+      queueReadCount: String(metadata.readCount),
+    })
+    return { response, targetUrl }
+  }
+
+  const response = await http_post_helper(c, function_name, function_type, body, cfId, metadata, targetUrl)
+  return { response, targetUrl }
+}
+
+async function processQueueMessage(c: Context, queueName: string, message: Message): Promise<ProcessedQueueMessage> {
+  const function_name = message.message?.function_name ?? 'unknown'
+  const function_type = message.message?.function_type ?? 'supabase'
+  const body = extractMessageBody(message)
+  if (message.message?.payload === undefined && Object.keys(body).length > 0) {
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: `[${queueName}] Using legacy queue message body shape for ${function_name}.`,
+      msgId: message.msg_id,
+    })
+  }
+
+  const cfId = generateUUID()
+  const payloadSize = JSON.stringify(body).length
+  const start = Date.now()
+  const targetUrl = function_name === 'on_manifest_create' ? 'direct:on_manifest_create' : resolveFunctionUrl(c, function_name, function_type)
+
+  try {
+    const result = await dispatchQueueMessage(c, function_name, function_type, body, cfId, {
+      msgId: message.msg_id,
+      queueName,
+      readCount: message.read_ct,
+    }, targetUrl)
+    const errorDetails = await extractErrorDetails(result.response)
+
+    return {
+      httpResponse: result.response,
+      errorDetails,
+      cfId,
+      payloadSize,
+      durationMs: Date.now() - start,
+      targetUrl,
+      ...message,
+    }
+  }
+  catch (error) {
+    const serializedError = serializeError(error)
+    const durationMs = Date.now() - start
+    const httpResponse = httpExceptionToQueueResponse(error) ?? queueFailureResponse('queue_message_failed', serializedError.message ?? 'Queue message failed before receiving a response', {
+      cfId,
+      durationMs,
+      error: serializedError,
+      function_name,
+      function_type,
+      msgId: message.msg_id,
+      queueName,
+      readCount: message.read_ct,
+      targetUrl,
+    })
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: `[${queueName}] Queue message failed during processing.`,
+      cfId,
+      durationMs,
+      error: serializedError,
+      responseStatus: httpResponse.status,
+      function_name,
+      function_type,
+      msgId: message.msg_id,
+      readCount: message.read_ct,
+      targetUrl,
+    })
+    const errorDetails = await extractErrorDetails(httpResponse)
+
+    return {
+      httpResponse,
+      errorDetails,
+      cfId,
+      payloadSize,
+      durationMs,
+      targetUrl,
+      ...message,
+    }
+  }
+}
+
 function getQueueBatchSize(queueName: string, requestedBatchSize: number): number {
   if (queueName === 'on_manifest_create')
     return Math.min(requestedBatchSize, MANIFEST_QUEUE_BATCH_SIZE)
@@ -241,33 +438,7 @@ async function processQueue(c: Context, db: ReturnType<typeof getPgClient>, queu
   }
 
   // Process messages that are still within the retry budget.
-  const results = await mapWithConcurrency(messagesToProcess, processConcurrency, async (message) => {
-    const function_name = message.message?.function_name ?? 'unknown'
-    const function_type = message.message?.function_type ?? 'supabase'
-    const body = extractMessageBody(message)
-    if (message.message?.payload === undefined && Object.keys(body).length > 0) {
-      cloudlog({
-        requestId: c.get('requestId'),
-        message: `[${queueName}] Using legacy queue message body shape for ${function_name}.`,
-        msgId: message.msg_id,
-      })
-    }
-    const cfId = generateUUID()
-    const httpResponse = await http_post_helper(c, function_name, function_type, body, cfId, {
-      msgId: message.msg_id,
-      queueName,
-      readCount: message.read_ct,
-    })
-    const errorDetails = await extractErrorDetails(httpResponse)
-
-    return {
-      httpResponse,
-      errorDetails,
-      cfId,
-      payloadSize: JSON.stringify(body).length,
-      ...message,
-    }
-  })
+  const results = await mapWithConcurrency(messagesToProcess, processConcurrency, async message => processQueueMessage(c, queueName, message))
 
   // Update all messages with their CF IDs
   const cfIdUpdates = results.map(result => ({
@@ -278,7 +449,18 @@ async function processQueue(c: Context, db: ReturnType<typeof getPgClient>, queu
 
   if (cfIdUpdates.length > 0) {
     cloudlog({ requestId: c.get('requestId'), message: `[${queueName}] Updating ${cfIdUpdates.length} messages with CF IDs.` })
-    await mass_edit_queue_messages_cf_ids(c, db, cfIdUpdates)
+    try {
+      await mass_edit_queue_messages_cf_ids(c, db, cfIdUpdates)
+    }
+    catch (error) {
+      cloudlogErr({
+        requestId: c.get('requestId'),
+        message: `[${queueName}] Failed to persist queue CF IDs. Continuing queue cleanup.`,
+        error: serializeError(error),
+        queueName,
+        updateCount: cfIdUpdates.length,
+      })
+    }
   }
 
   // Batch remove all messages that have succeeded
@@ -307,6 +489,8 @@ async function processQueue(c: Context, db: ReturnType<typeof getPgClient>, queu
       response_body: msg.errorDetails.bodyPreview ?? undefined,
       payload_size: msg.payloadSize,
       cf_id: msg.cfId,
+      duration_ms: msg.durationMs,
+      target_url: msg.targetUrl ?? undefined,
     }))
 
     const actionableFailures = getActionableQueueFailures(failureDetails)
@@ -343,7 +527,9 @@ async function processQueue(c: Context, db: ReturnType<typeof getPgClient>, queu
                   const cfLogUrl = `https://dash.cloudflare.com/${getEnv(c, 'CF_ACCOUNT_ANALYTICS_ID')}/workers/services/view/capgo_api-prod/production/observability/logs?workers-observability-view=%22invocations%22&filters=%5B%7B%22key%22%3A%22%24workers.event.request.headers.x-capgo-cf-id%22%2C%22type%22%3A%22string%22%2C%22value%22%3A%22${detail.cf_id}%22%2C%22operation%22%3A%22eq%22%7D%5D`
                   const errorInfo = detail.error_code ? ` | Error: ${detail.error_code}` : ''
                   const messageInfo = detail.error_message ? ` | ${truncateDiscordField(detail.error_message.replace(/\s+/g, ' ').trim(), 180)}` : ''
-                  return `**${detail.function_name}** | Status: ${detail.status} | Read: ${detail.read_count}/${MAX_QUEUE_READS}${errorInfo}${messageInfo} | [CF Logs](${cfLogUrl})`
+                  const durationInfo = typeof detail.duration_ms === 'number' ? ` | ${detail.duration_ms}ms` : ''
+                  const targetInfo = detail.target_url ? ` | Target: ${truncateDiscordField(detail.target_url, 120)}` : ''
+                  return `**${detail.function_name}** | Status: ${detail.status} | Read: ${detail.read_count}/${MAX_QUEUE_READS}${durationInfo}${errorInfo}${messageInfo}${targetInfo} | [CF Logs](${cfLogUrl})`
                 }).join('\n')),
                 inline: false,
               },
@@ -509,6 +695,7 @@ export async function http_post_helper(
   body: any,
   cfId: string,
   metadata?: QueueMessageMetadata,
+  targetUrl = resolveFunctionUrl(c, function_name, function_type),
 ): Promise<Response> {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -521,43 +708,30 @@ export async function http_post_helper(
     headers['x-capgo-queue-read-count'] = String(metadata.readCount)
   }
 
-  let url: string
-  const cfPpUrl = getEnv(c, 'CLOUDFLARE_PP_FUNCTION_URL')
-  const cfUrl = getEnv(c, 'CLOUDFLARE_FUNCTION_URL')
-  const normalizedType = (function_type ?? '').trim()
-
-  if (normalizedType === 'cloudflare_pp' && cfPpUrl) {
-    url = `${cfPpUrl}/triggers/${function_name}`
-  }
-  else if (normalizedType === 'cloudflare' && cfUrl) {
-    url = `${cfUrl}/triggers/${function_name}`
-  }
-  else if (normalizedType === '' && cfUrl) {
-    // Backward compatibility: older queue messages may not have function_type set.
-    // If a Cloudflare URL is configured, prefer it.
-    url = `${cfUrl}/triggers/${function_name}`
-  }
-  else {
-    url = `${getEnv(c, 'SUPABASE_URL')}/functions/v1/triggers/${function_name}`
-  }
-
-  // Create an AbortController for timeout
   const controller = new AbortController()
-  const timeoutId = setTimeout(() => controller.abort(), 15000)
-  // 15 second timeout, as the queue consumer is running every 10 seconds and the visibility timeout is 60 seconds
+  const timeoutId = setTimeout(() => controller.abort(), QUEUE_HTTP_TIMEOUT_MS)
 
   try {
-    cloudlog({ requestId: c.get('requestId'), message: `[${function_name}] Making HTTP POST request to "${url}" with body:`, body })
-    const response = await fetch(url, {
+    cloudlog({ requestId: c.get('requestId'), message: `[${function_name}] Making HTTP POST request to "${targetUrl}" with body:`, body })
+    const response = await fetch(targetUrl, {
       method: 'POST',
       headers,
       body: JSON.stringify(body),
-      // signal: controller.signal,
+      signal: controller.signal,
     })
     return response
   }
   catch (error) {
-    throw simpleError('request_timeout', 'Request Timeout (Internal QUEUE handling error)', { function_name }, error)
+    const serializedError = serializeError(error)
+    throw simpleError('queue_http_post_failed', 'Queue HTTP POST failed', {
+      cfId,
+      error: serializedError,
+      function_name,
+      function_type: function_type ?? null,
+      metadata: metadata ?? null,
+      targetUrl,
+      timeoutMs: QUEUE_HTTP_TIMEOUT_MS,
+    }, error)
   }
   finally {
     clearTimeout(timeoutId)
@@ -705,5 +879,8 @@ export const __queueConsumerTestUtils__ = {
   getActionableQueueFailures,
   getQueueBatchSize,
   getQueueHttpConcurrency,
+  httpExceptionToQueueResponse,
+  queueFailureResponse,
+  resolveFunctionUrl,
   sanitizeDiscordResponseBody,
 }
