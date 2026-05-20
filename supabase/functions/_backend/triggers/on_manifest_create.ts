@@ -14,7 +14,14 @@ const SIZE_RETRY_DELAY_MS = 500
 const MANIFEST_UPDATE_RETRY_ATTEMPTS = 3
 const MANIFEST_UPDATE_RETRY_DELAY_MS = 300
 
-function getQueueLogMetadata(c: Context) {
+interface QueueLogMetadata {
+  queueName: string | null
+  queueMsgId: string | null
+  queueReadCount: string | null
+  cfId: string | null
+}
+
+function getQueueLogMetadata(c: Context): QueueLogMetadata {
   return {
     queueName: c.req.header('x-capgo-queue-name') ?? null,
     queueMsgId: c.req.header('x-capgo-queue-msg-id') ?? null,
@@ -79,8 +86,7 @@ async function runManifestUpdateWithRetry(
   }
 }
 
-async function updateManifestSize(c: Context, record: Database['public']['Tables']['manifest']['Row']) {
-  const queue = getQueueLogMetadata(c)
+export async function updateManifestSize(c: Context, record: Database['public']['Tables']['manifest']['Row'], queue = getQueueLogMetadata(c)) {
   if (!record.s3_path) {
     cloudlog({ requestId: c.get('requestId'), message: 'No s3 path', id: record.id, app_version_id: record.app_version_id, file_name: record.file_name, queue })
     throw simpleError('no_s3_path', 'No s3 path', { record })

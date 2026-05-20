@@ -1,3 +1,4 @@
+import { HTTPException } from 'hono/http-exception'
 import { describe, expect, it } from 'vitest'
 import { __queueConsumerTestUtils__, MAX_QUEUE_READS, messagesArraySchema } from '../supabase/functions/_backend/triggers/queue_consumer.ts'
 import { parseSchema } from '../supabase/functions/_backend/utils/ark_validation.ts'
@@ -161,5 +162,45 @@ describe('queue_consumer legacy message compatibility', () => {
       errorCode: null,
       errorMessage: 'builder unavailable',
     })
+  })
+
+  it.concurrent('turns queue transport failures into retryable per-message responses', async () => {
+    const response = __queueConsumerTestUtils__.queueFailureResponse('queue_message_failed', 'fetch failed', {
+      cfId: 'cf-transport',
+      msgId: 12,
+      queueName: 'on_manifest_create',
+      targetUrl: 'direct:on_manifest_create',
+    })
+
+    const details = await __queueConsumerTestUtils__.extractErrorDetails(response)
+
+    expect(response.status).toBe(599)
+    expect(details.errorCode).toBe('queue_message_failed')
+    expect(details.errorMessage).toBe('fetch failed')
+    expect(details.bodyPreview).toContain('"queueName":"on_manifest_create"')
+    expect(details.bodyPreview).toContain('"targetUrl":"direct:on_manifest_create"')
+  })
+
+  it.concurrent('preserves direct handler HTTP error details for queue retries', async () => {
+    const response = __queueConsumerTestUtils__.httpExceptionToQueueResponse(new HTTPException(503, {
+      message: 'Manifest file size metadata was not found',
+      cause: {
+        error: 'manifest_size_not_found',
+        message: 'Manifest file size metadata was not found',
+        moreInfo: {
+          id: 123,
+          queue: { queueName: 'on_manifest_create' },
+        },
+      },
+    }))
+
+    expect(response).not.toBeNull()
+    const details = await __queueConsumerTestUtils__.extractErrorDetails(response!)
+
+    expect(response!.status).toBe(503)
+    expect(details.errorCode).toBe('manifest_size_not_found')
+    expect(details.errorMessage).toBe('Manifest file size metadata was not found')
+    expect(details.bodyPreview).toContain('"id":123')
+    expect(details.bodyPreview).toContain('"queueName":"on_manifest_create"')
   })
 })
