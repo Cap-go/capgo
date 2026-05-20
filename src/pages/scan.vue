@@ -191,6 +191,8 @@ async function startChannelPreview(previewLink: ReturnType<typeof parseChannelPr
     if (!latest.url)
       throw new Error(latest.message || latest.error || 'No preview update is available for this channel')
 
+    await startPreviewSession(previewLink.appId)
+
     const bundle = await CapacitorUpdater.download({
       checksum: latest.checksum,
       manifest: latest.manifest,
@@ -199,7 +201,6 @@ async function startChannelPreview(previewLink: ReturnType<typeof parseChannelPr
       version: latest.version,
     })
 
-    await startPreviewSession(previewLink.appId)
     await CapacitorUpdater.set(bundle)
   }
   catch (error) {
