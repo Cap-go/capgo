@@ -1,48 +1,57 @@
 #!/usr/bin/env bash
 set -euo pipefail
-# https://planetscale.com/docs/postgres/imports/postgres-migrate-walstream
-# CREATE PUBLICATION planetscale_replicate FOR TABLE
-#      apps, app_versions, manifest, channels, channel_devices, orgs, stripe_info, org_userss, notifications;
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+# shellcheck source=read_replicate/common.sh
+source "${SCRIPT_DIR}/common.sh"
 
 DUMP_FILE="schema_replicate.dump"
 LIST_FILE="schema_replicate.list"
 FILTERED_LIST="schema_replicate.filtered.list"
 OUT_SQL="read_replicate/schema_replicate.sql"
 
-# Load DB_SB from .env.preprod (fallback to .env.prod)
-ENV_FILE="$(dirname "$0")/../internal/cloudflare/.env.prod"
-if [[ -f "$ENV_FILE" ]]; then
-  DB_SB=$(grep '^MAIN_SUPABASE_DB_URL=' "$ENV_FILE" | cut -d'=' -f2-)
-  # Convert ssl=false to sslmode=disable for pg_dump compatibility
-  DB_SB="${DB_SB//ssl=false/sslmode=disable}"
-else
-  echo "Error: $ENV_FILE not found"
+PSQL_BIN="${PSQL_BIN:-$(command -v psql-17 || command -v psql || true)}"
+PG_DUMP_BIN="${PG_DUMP_BIN:-$(command -v pg_dump-17 || command -v pg_dump || true)}"
+PG_RESTORE_BIN="${PG_RESTORE_BIN:-$(command -v pg_restore-17 || command -v pg_restore || true)}"
+
+if [[ -z "$PSQL_BIN" || -z "$PG_DUMP_BIN" || -z "$PG_RESTORE_BIN" ]]; then
+  echo "Error: psql, pg_dump, and pg_restore are required to prepare read-replica schema."
   exit 1
 fi
-echo "==> Using target database for region: $DB_SB"
+
+DB_SB="$(load_source_db_url)"
+echo "==> Dumping replica schema from Supabase source"
+
+TABLE_ARGS=()
+for table in "${REPLICA_TABLES[@]}"; do
+  EXISTS=$("$PSQL_BIN" "$DB_SB" -t -A -c "
+    SELECT 1
+    FROM information_schema.tables
+    WHERE table_schema = 'public'
+      AND table_name = '${table}';
+  " || true)
+  if [[ -n "$EXISTS" ]]; then
+    TABLE_ARGS+=("--table=${table}")
+  else
+    echo "==> Skipping missing table public.${table}"
+  fi
+done
+
 # 1) Dump schema in custom format (includes everything, but we will filter on restore)
 # Include custom types and tables
-pg_dump-17 -Fc --schema-only \
+"$PG_DUMP_BIN" -Fc --schema-only \
   --no-owner --no-privileges --no-comments \
-  --table=channel_devices \
-  --table=apps \
-  --table=app_versions \
-  --table=manifest \
-  --table=channels \
-  --table=orgs \
-  --table=notifications \
-  --table=stripe_info \
-  --table=org_users \
+  "${TABLE_ARGS[@]}" \
   "$DB_SB" > "$DUMP_FILE"
 
 # Also dump custom types (they're not included with --table flag)
 TYPES_DUMP="types_replicate.dump"
-pg_dump-17 -Fc --schema-only \
+"$PG_DUMP_BIN" -Fc --schema-only \
   --no-owner --no-privileges --no-comments \
   "$DB_SB" > "$TYPES_DUMP" 2>/dev/null || true
 
 # 2) Create restore list
-pg_restore-17 -l "$DUMP_FILE" > "$LIST_FILE"
+"$PG_RESTORE_BIN" -l "$DUMP_FILE" > "$LIST_FILE"
 
 # 3) Filter out things you DON'T want, keep indexes
 #    - FK CONSTRAINT: remove foreign keys
@@ -58,7 +67,7 @@ perl -ne '
 ' "$LIST_FILE" > "$FILTERED_LIST"
 
 # 4) Restore to SQL using the filtered list (this includes indexes)
-pg_restore-17 -f - --no-owner --no-privileges --no-comments \
+"$PG_RESTORE_BIN" -f - --no-owner --no-privileges --no-comments \
   -L "$FILTERED_LIST" \
   "$DUMP_FILE" > "$OUT_SQL"
 
@@ -70,7 +79,7 @@ if [[ -f "$TYPES_DUMP" ]]; then
   TYPES_SQL="types_replicate.sql"
   
   # Create restore list for types dump
-  pg_restore-17 -l "$TYPES_DUMP" > "$TYPES_LIST" 2>/dev/null || true
+  "$PG_RESTORE_BIN" -l "$TYPES_DUMP" > "$TYPES_LIST" 2>/dev/null || true
   
   # Filter to only include the types and functions we need
   if [[ -f "$TYPES_LIST" ]]; then
@@ -84,7 +93,7 @@ if [[ -f "$TYPES_DUMP" ]]; then
     
     if [[ -s "$TYPES_FILTERED_LIST" ]]; then
       # Restore only the filtered types and functions to SQL
-      pg_restore-17 -f - --no-owner --no-privileges --no-comments \
+      "$PG_RESTORE_BIN" -f - --no-owner --no-privileges --no-comments \
         -L "$TYPES_FILTERED_LIST" \
         "$TYPES_DUMP" > "$TYPES_SQL" 2>/dev/null || true
       
@@ -105,6 +114,10 @@ perl -0777 -i -pe '
   s/^SET[^\n]*\n//mg;
   s/^SELECT pg_catalog\.set_config\([^\n]*\);\n//mg;
   s/^\\(?:un)?restrict\b[^\n]*\n//mg;
+  s/^-- Dumped from database version[^\n]*\n//mg;
+  s/^-- Dumped by pg_dump version[^\n]*\n//mg;
+  s/^-- PostgreSQL database dump(?: complete)?\n//mg;
+  s/\n{4,}/\n\n\n/g;
 ' "$OUT_SQL"
 
 # 6) Wrap the full schema restore in one transaction and reset only the
@@ -112,7 +125,7 @@ perl -0777 -i -pe '
 # have grants/extensions/objects that are unrelated to this replica import.
 {
   printf 'BEGIN;\n\n'
-  printf 'DROP TABLE IF EXISTS public.channel_devices, public.manifest, public.app_versions, public.channels, public.apps, public.notifications, public.org_users, public.orgs, public.stripe_info CASCADE;\n'
+  printf 'DROP TABLE IF EXISTS public.channel_devices, public.manifest, public.onboarding_demo_data, public.app_versions, public.channels, public.apps, public.notifications, public.org_users, public.orgs, public.stripe_info CASCADE;\n'
   printf 'DROP SEQUENCE IF EXISTS public.app_versions_id_seq, public.channel_devices_id_seq, public.channel_id_seq, public.manifest_id_seq, public.org_users_id_seq, public.stripe_info_id_seq CASCADE;\n'
   printf 'DROP FUNCTION IF EXISTS public.one_month_ahead();\n'
   printf 'DROP TYPE IF EXISTS public.manifest_entry, public.disable_update, public.user_min_right, public.stripe_status;\n\n'

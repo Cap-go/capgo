@@ -135,7 +135,8 @@ async function queryReplicaLag(c: Context, pool: Pool): Promise<ReplicationLagSt
     const query = `
       SELECT EXTRACT(EPOCH FROM (now() - last_msg_receipt_time)) AS lag_seconds
       FROM pg_stat_subscription
-      WHERE subname LIKE 'planetscale_subscription_%'
+      WHERE last_msg_receipt_time IS NOT NULL
+      ORDER BY last_msg_receipt_time DESC
       LIMIT 1
     `
 
@@ -2162,7 +2163,7 @@ export async function getAdminTrialOrganizations(
 ): Promise<AdminTrialOrganizationsResult> {
   try {
     // The admin dashboard needs plans.name, and plans is not replicated to
-    // PlanetScale read replicas.
+    // read replicas.
     const pgClient = getPgClient(c)
     const drizzleClient = getDrizzleClient(pgClient)
 
