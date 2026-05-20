@@ -73,6 +73,12 @@ function initS3(c: Context) {
   return client
 }
 
+const R2_TRASH_PREFIX = 'deleted-after-7-days/'
+
+function getTrashPath(fileId: string) {
+  return `${R2_TRASH_PREFIX}${fileId}`
+}
+
 export async function getPath(
   c: Context,
   record: Database['public']['Tables']['app_versions']['Row'],
@@ -119,6 +125,37 @@ async function deleteObject(c: Context, fileId: string) {
     method: 'DELETE',
   })
   return response.status >= 200 && response.status < 300
+}
+
+function isMissingObjectError(error: unknown): boolean {
+  if (!error || typeof error !== 'object')
+    return false
+
+  const candidate = error as { code?: unknown, status?: unknown, statusCode?: unknown }
+  return candidate.status === 404 || candidate.statusCode === 404 || candidate.code === 'NoSuchKey'
+}
+
+async function moveObjectToTrash(c: Context, fileId: string) {
+  if (fileId.startsWith(R2_TRASH_PREFIX))
+    return true
+
+  const client = initS3(c)
+  const trashPath = getTrashPath(fileId)
+  try {
+    await client.copyObject({ sourceKey: fileId }, trashPath)
+    await client.deleteObject(fileId)
+    cloudlog({ requestId: c.get('requestId'), message: 'moved R2 object to trash', fileId, trashPath })
+    return true
+  }
+  catch (error) {
+    if (isMissingObjectError(error)) {
+      cloudlog({ requestId: c.get('requestId'), message: 'R2 object already missing before trash move', fileId, error: serializeStorageError(error) })
+      return true
+    }
+
+    cloudlogErr({ requestId: c.get('requestId'), message: 'move R2 object to trash failed', fileId, trashPath, error: serializeStorageError(error) })
+    return false
+  }
 }
 
 async function deleteObjectsWithPrefix(c: Context, prefix: string): Promise<number> {
@@ -347,6 +384,7 @@ async function getObject(c: Context, fileId: string): Promise<Response | null> {
 export const s3 = {
   getSize,
   deleteObject,
+  moveObjectToTrash,
   deleteObjectsWithPrefix,
   checkIfExist,
   getSignedUrl,
