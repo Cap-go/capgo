@@ -14,7 +14,6 @@ import { app as invite_existing_user_to_org } from '../../supabase/functions/_ba
 import { app as invite_new_user_to_org } from '../../supabase/functions/_backend/private/invite_new_user_to_org.ts'
 import { app as latency } from '../../supabase/functions/_backend/private/latency.ts'
 import { app as log_as } from '../../supabase/functions/_backend/private/log_as.ts'
-import { app as pending_invitations } from '../../supabase/functions/_backend/private/pending_invitations.ts'
 import { app as plans } from '../../supabase/functions/_backend/private/plans.ts'
 import { app as publicStats } from '../../supabase/functions/_backend/private/public_stats.ts'
 import { app as set_org_email } from '../../supabase/functions/_backend/private/set_org_email.ts'
@@ -40,8 +39,8 @@ import { app as channel } from '../../supabase/functions/_backend/public/channel
 import { app as check_cpu_usage } from '../../supabase/functions/_backend/public/check_cpu_usage.ts'
 import { app as device } from '../../supabase/functions/_backend/public/device/index.ts'
 import { app as ok } from '../../supabase/functions/_backend/public/ok.ts'
-import { app as organization } from '../../supabase/functions/_backend/public/organization/index.ts'
 import { app as pluginRegions } from '../../supabase/functions/_backend/public/plugin_regions.ts'
+import { app as organization } from '../../supabase/functions/_backend/public/organization/index.ts'
 import { app as replication } from '../../supabase/functions/_backend/public/replication.ts'
 import { app as statistics } from '../../supabase/functions/_backend/public/statistics/index.ts'
 import { app as translation } from '../../supabase/functions/_backend/public/translation.ts'
@@ -105,7 +104,6 @@ appPrivate.route('/website_stats', publicStats)
 appPrivate.route('/config', config)
 appPrivate.route('/config/builder', configBuilder)
 appPrivate.route('/accept_invitation', accept_invitation)
-appPrivate.route('/pending_invitations', pending_invitations)
 appPrivate.route('/devices', devices_priv)
 appPrivate.route('/log_as', log_as)
 appPrivate.route('/invite_new_user_to_org', invite_new_user_to_org)

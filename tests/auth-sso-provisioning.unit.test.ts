@@ -90,12 +90,6 @@ function createTestContext() {
   const mockCreateSignedImageUrl = vi.fn(async (value: string) => value)
   const mockGetPlans = vi.fn(async () => [])
   const mockIsPlatformAdmin = vi.fn(async () => false)
-  const mockFunctionsInvoke = vi.fn<(...args: unknown[]) => Promise<{ data: { invitations: unknown[] }, error: null }>>(async () => ({
-    data: {
-      invitations: [],
-    },
-    error: null,
-  }))
   const mockFetch = vi.fn<(...args: unknown[]) => Promise<MockFetchResponse>>(async () => ({
     ok: true,
     json: async () => ({ success: true }),
@@ -107,7 +101,6 @@ function createTestContext() {
     mockCreateSignedImageUrl,
     mockFetch,
     mockFrom,
-    mockFunctionsInvoke,
     mockGetAuthenticatorAssuranceLevel,
     mockGetClaims,
     mockGetPlans,
@@ -178,9 +171,6 @@ vi.mock('~/services/supabase', () => ({
       },
       rpc: context.mockRpc,
       from: context.mockFrom,
-      functions: {
-        invoke: context.mockFunctionsInvoke,
-      },
     }
   },
   defaultApiHost: 'https://api.capgo.test',
@@ -275,93 +265,6 @@ describe('auth guard SSO provisioning', () => {
           to: '/dashboard',
         },
       })
-    })
-  })
-
-  it.concurrent('shows pending invitations to users who already have an organization before continuing', async () => {
-    await withTestContext(async (context) => {
-      context.mockGetSession.mockResolvedValue({
-        data: {
-          session: {
-            access_token: 'token-123',
-            user: {
-              id: 'user-123',
-              email: 'user@managed.test',
-              email_confirmed_at: '2026-04-15T10:00:00.000Z',
-              app_metadata: {
-                provider: 'email',
-                providers: ['email'],
-              },
-            },
-          },
-        },
-      })
-      context.mockFunctionsInvoke.mockResolvedValueOnce({
-        data: {
-          invitations: [
-            {
-              id: 123,
-              org_id: 'invited-org-123',
-              org_name: 'Invited Org',
-            },
-          ],
-        },
-        error: null,
-      })
-
-      const guard = await getGuard()
-      const next = vi.fn()
-
-      await guard(
-        { path: '/settings/account', fullPath: '/settings/account', meta: { middleware: 'auth' }, query: {} },
-        { path: '/login', fullPath: '/login', meta: {}, query: {} },
-        next,
-      )
-
-      expect(context.organizationStore.fetchOrganizations).toHaveBeenCalled()
-      expect(next).toHaveBeenCalledWith({
-        path: '/onboarding/invitation',
-        query: {
-          to: '/settings/account',
-        },
-      })
-    })
-  })
-
-  it.concurrent('keeps org-less users on the pending invitation page so they can decline before org creation', async () => {
-    await withTestContext(async (context) => {
-      context.mockGetSession.mockResolvedValue({
-        data: {
-          session: {
-            access_token: 'token-123',
-            user: {
-              id: 'user-123',
-              email: 'user@managed.test',
-              email_confirmed_at: '2026-04-15T10:00:00.000Z',
-              app_metadata: {
-                provider: 'email',
-                providers: ['email'],
-              },
-            },
-          },
-        },
-      })
-      context.organizationStore.fetchOrganizations = vi.fn(async () => {
-        context.organizationStore.organizations = []
-        context.organizationStore.hasOrganizations = false
-      })
-
-      const guard = await getGuard()
-      const next = vi.fn()
-
-      await guard(
-        { path: '/onboarding/invitation', fullPath: '/onboarding/invitation?to=/dashboard', meta: { middleware: 'auth' }, query: { to: '/dashboard' } },
-        { path: '/login', fullPath: '/login', meta: {}, query: {} },
-        next,
-      )
-
-      expect(next).toHaveBeenCalledWith()
-      expect(next).not.toHaveBeenCalledWith('/onboarding/organization')
     })
   })
 

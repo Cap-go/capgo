@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { Organization } from '~/stores/organization'
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
@@ -10,26 +11,20 @@ import IconUserPlus from '~icons/lucide/user-plus'
 import IconX from '~icons/lucide/x'
 import { useSupabase } from '~/services/supabase'
 import { useDisplayStore } from '~/stores/display'
+import { useMainStore } from '~/stores/main'
 import { useOrganizationStore } from '~/stores/organization'
-
-interface PendingInvitation {
-  id: number
-  org_id: string
-  org_name: string
-  org_logo: string | null
-  role: string
-}
 
 const route = useRoute()
 const router = useRouter()
 const { t } = useI18n()
 const supabase = useSupabase()
 const displayStore = useDisplayStore()
+const main = useMainStore()
 const organizationStore = useOrganizationStore()
 
-const invitations = ref<PendingInvitation[]>([])
+const invitations = ref<Organization[]>([])
 const isLoading = ref(true)
-const resolvingInvitationId = ref<number | null>(null)
+const resolvingInvitationId = ref<string | null>(null)
 const resolvingInvitationAction = ref<'accept' | 'decline' | null>(null)
 const isDecliningAll = ref(false)
 const errorMessage = ref('')
@@ -50,8 +45,12 @@ const targetPath = computed(() => {
   return '/dashboard'
 })
 
+function getPendingInviteOrganizations() {
+  return organizationStore.organizations.filter(org => org.role.startsWith('invite'))
+}
+
 async function continueAfterInvitationsResolved() {
-  await organizationStore.dedupFetchOrganizations()
+  await organizationStore.fetchOrganizations()
 
   if (organizationStore.hasOrganizations) {
     await router.replace(targetPath.value)
@@ -77,17 +76,10 @@ async function loadPendingInvitations() {
   isLoading.value = true
   errorMessage.value = ''
   try {
-    const { data, error } = await supabase.functions.invoke('private/pending_invitations', {
-      method: 'GET',
-    })
-
-    if (error)
-      throw error
-
-    invitations.value = data?.invitations ?? []
-    if (invitations.value.length === 0) {
+    await organizationStore.fetchOrganizations()
+    invitations.value = getPendingInviteOrganizations()
+    if (invitations.value.length === 0)
       await continueAfterInvitationsResolved()
-    }
   }
   catch (error) {
     console.error('Failed to load pending organization invitations', error)
@@ -98,33 +90,51 @@ async function loadPendingInvitations() {
   }
 }
 
-async function resolveInvitation(invitation: PendingInvitation, action: 'accept' | 'decline') {
-  resolvingInvitationId.value = invitation.id
+async function acceptInvitation(invitation: Organization) {
+  const { data, error } = await supabase.rpc('accept_invitation_to_org', {
+    org_id: invitation.gid,
+  })
+
+  if (error)
+    throw error
+  if (data !== 'OK')
+    throw new Error(typeof data === 'string' ? data : 'failed_to_accept_invitation')
+
+  await organizationStore.fetchOrganizations()
+  organizationStore.setCurrentOrganization(invitation.gid)
+}
+
+async function declineInvitation(invitation: Organization) {
+  const userId = main.user?.id ?? main.auth?.id
+  if (!userId)
+    throw new Error('missing_user')
+
+  const { error } = await supabase
+    .from('org_users')
+    .delete()
+    .eq('org_id', invitation.gid)
+    .eq('user_id', userId)
+
+  if (error)
+    throw error
+}
+
+async function resolveInvitation(invitation: Organization, action: 'accept' | 'decline') {
+  resolvingInvitationId.value = invitation.gid
   resolvingInvitationAction.value = action
   errorMessage.value = ''
   try {
-    const { data, error } = await supabase.functions.invoke('private/pending_invitations', {
-      body: {
-        action,
-        invitation_id: invitation.id,
-      },
-    })
-
-    if (error)
-      throw error
-
     if (action === 'accept') {
-      await organizationStore.fetchOrganizations()
-      if (data?.accepted_org_id)
-        organizationStore.setCurrentOrganization(data.accepted_org_id)
-
+      await acceptInvitation(invitation)
       toast.success(t('pending-invite-joined'))
     }
     else {
+      await declineInvitation(invitation)
+      await organizationStore.fetchOrganizations()
       toast.success(t('pending-invite-declined'))
     }
 
-    invitations.value = invitations.value.filter(item => item.id !== invitation.id)
+    invitations.value = getPendingInviteOrganizations()
     if (invitations.value.length === 0)
       await continueAfterInvitationsResolved()
   }
@@ -142,18 +152,24 @@ async function declineAllInvitations() {
   isDecliningAll.value = true
   errorMessage.value = ''
   try {
-    const { error } = await supabase.functions.invoke('private/pending_invitations', {
-      body: {
-        action: 'decline_all',
-      },
-    })
+    const userId = main.user?.id ?? main.auth?.id
+    if (!userId)
+      throw new Error('missing_user')
 
+    const inviteOrgIds = invitations.value.map(invitation => invitation.gid)
+    const { error } = await supabase
+      .from('org_users')
+      .delete()
+      .eq('user_id', userId)
+      .in('org_id', inviteOrgIds)
     if (error)
       throw error
 
-    invitations.value = []
+    await organizationStore.fetchOrganizations()
+    invitations.value = getPendingInviteOrganizations()
     toast.success(t('pending-invite-declined'))
-    await continueAfterInvitationsResolved()
+    if (invitations.value.length === 0)
+      await continueAfterInvitationsResolved()
   }
   catch (error) {
     console.error('Failed to decline pending organization invitations', error)
@@ -202,24 +218,24 @@ onMounted(async () => {
 
                   <article
                     v-for="invitation in invitations"
-                    :key="invitation.id"
+                    :key="invitation.gid"
                     class="rounded-lg border border-white/15 bg-slate-950/80 p-4"
                   >
                     <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                       <div class="flex min-w-0 items-center gap-4">
                         <img
-                          v-if="invitation.org_logo"
-                          :src="invitation.org_logo"
-                          :alt="t('pending-invite-logo-alt', { name: invitation.org_name })"
+                          v-if="invitation.logo"
+                          :src="invitation.logo"
+                          :alt="t('pending-invite-logo-alt', { name: invitation.name })"
                           class="h-14 w-14 shrink-0 rounded-lg border border-white/15 object-cover"
                         >
                         <div v-else class="flex h-14 w-14 shrink-0 items-center justify-center rounded-lg bg-primary-500/20 text-lg font-bold text-white">
-                          {{ getInitials(invitation.org_name) }}
+                          {{ getInitials(invitation.name) }}
                         </div>
 
                         <div class="min-w-0">
                           <h2 class="truncate text-xl font-semibold text-white">
-                            {{ invitation.org_name }}
+                            {{ invitation.name }}
                           </h2>
                           <p class="mt-1 text-sm text-slate-400">
                             {{ t('pending-invite-card-copy') }}
@@ -235,7 +251,7 @@ onMounted(async () => {
                           data-test="pending-invite-decline"
                           @click="resolveInvitation(invitation, 'decline')"
                         >
-                          <IconLoader v-if="resolvingInvitationId === invitation.id && resolvingInvitationAction === 'decline'" class="h-4 w-4 animate-spin" />
+                          <IconLoader v-if="resolvingInvitationId === invitation.gid && resolvingInvitationAction === 'decline'" class="h-4 w-4 animate-spin" />
                           <IconX v-else class="h-4 w-4" />
                           {{ t('pending-invite-decline') }}
                         </button>
@@ -247,7 +263,7 @@ onMounted(async () => {
                           data-test="pending-invite-join"
                           @click="resolveInvitation(invitation, 'accept')"
                         >
-                          <IconLoader v-if="resolvingInvitationId === invitation.id && resolvingInvitationAction === 'accept'" class="h-4 w-4 animate-spin" />
+                          <IconLoader v-if="resolvingInvitationId === invitation.gid && resolvingInvitationAction === 'accept'" class="h-4 w-4 animate-spin" />
                           <IconCheck v-else class="h-4 w-4" />
                           {{ t('pending-invite-join') }}
                         </button>
