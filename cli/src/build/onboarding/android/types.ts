@@ -38,6 +38,14 @@ export type AndroidOnboardingStep
     | 'gcp-setup-running'
   // Phase 6 — Save + build
     | 'saving-credentials'
+    | 'detecting-ci-secrets'
+    | 'ci-secrets-setup'
+    | 'ci-secrets-target-select'
+    | 'ask-ci-secrets'
+    | 'checking-ci-secrets'
+    | 'confirm-ci-secret-overwrite'
+    | 'uploading-ci-secrets'
+    | 'ci-secrets-failed'
     | 'ask-build'
     | 'requesting-build'
     | 'build-complete'
@@ -159,6 +167,14 @@ export const ANDROID_STEP_PROGRESS: Record<AndroidOnboardingStep, number> = {
   'gcp-setup-running': 70,
 
   'saving-credentials': 85,
+  'detecting-ci-secrets': 86,
+  'ci-secrets-setup': 86,
+  'ci-secrets-target-select': 86,
+  'ask-ci-secrets': 86,
+  'checking-ci-secrets': 87,
+  'confirm-ci-secret-overwrite': 87,
+  'uploading-ci-secrets': 88,
+  'ci-secrets-failed': 88,
   'ask-build': 90,
   'requesting-build': 95,
   'build-complete': 100,
@@ -200,6 +216,14 @@ export function getAndroidPhaseLabel(step: AndroidOnboardingStep): string {
     case 'gcp-setup-running':
       return 'Step 3 of 4 · Google Cloud Project'
     case 'saving-credentials':
+    case 'detecting-ci-secrets':
+    case 'ci-secrets-setup':
+    case 'ci-secrets-target-select':
+    case 'ask-ci-secrets':
+    case 'checking-ci-secrets':
+    case 'confirm-ci-secret-overwrite':
+    case 'uploading-ci-secrets':
+    case 'ci-secrets-failed':
     case 'ask-build':
     case 'requesting-build':
       return 'Step 4 of 4 · Save & Build'
