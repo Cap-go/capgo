@@ -99,6 +99,7 @@ export function convertQueryToBody(query: Record<string, string>): DeviceLink {
     is_prod: query.is_prod === 'true',
     version_os: query.version_os,
     key_id: query.key_id,
+    preview: query.preview === 'true',
   }
   return body
 }

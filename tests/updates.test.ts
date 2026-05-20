@@ -576,6 +576,86 @@ describe('[POST] /updates parallel tests', () => {
     expect(json.major).toBeUndefined()
   })
 
+  it('allows preview requests to fetch a private target channel when app preview is enabled', async () => {
+    const supabase = getSupabaseClient()
+    const versionName = `9.6.${Math.floor(Math.random() * 100000) + 1000}`
+    const channelName = `preview-private-${randomUUID().slice(0, 8)}`
+
+    const version = await createAppVersions(versionName, APP_NAME_UPDATE, {
+      external_url: `https://example.com/${channelName}.zip`,
+    })
+
+    await supabase
+      .from('channels')
+      .insert({
+        name: channelName,
+        app_id: APP_NAME_UPDATE,
+        version: version.id,
+        owner_org: ORG_ID,
+        created_by: USER_ID,
+        public: false,
+        disable_auto_update_under_native: true,
+        disable_auto_update: 'major',
+        allow_device_self_set: false,
+        allow_emulator: false,
+        allow_device: false,
+        allow_dev: false,
+        allow_prod: false,
+        ios: false,
+        android: false,
+        electron: false,
+      })
+      .throwOnError()
+
+    await supabase
+      .from('apps')
+      .update({ allow_preview: true })
+      .eq('app_id', APP_NAME_UPDATE)
+      .throwOnError()
+
+    const baseData = getBaseData(APP_NAME_UPDATE)
+    baseData.platform = 'android'
+    baseData.defaultChannel = channelName
+    baseData.version_build = '99.0.0'
+    baseData.version_name = versionName
+    baseData.preview = true
+
+    const response = await postUpdate(baseData)
+    expect(response.status).toBe(200)
+
+    const json = await response.json<UpdateRes>()
+    expect(() => parseSchema(updateNewScheme, json)).not.toThrow()
+    expect(json.version).toBe(versionName)
+    expect(json.error).toBeUndefined()
+
+    await supabase
+      .from('apps')
+      .update({ allow_preview: false })
+      .eq('app_id', APP_NAME_UPDATE)
+      .throwOnError()
+  })
+
+  it('blocks preview requests when app preview is disabled', async () => {
+    const supabase = getSupabaseClient()
+    await supabase
+      .from('apps')
+      .update({ allow_preview: false })
+      .eq('app_id', APP_NAME_UPDATE)
+      .throwOnError()
+
+    const baseData = getBaseData(APP_NAME_UPDATE)
+    baseData.defaultChannel = 'production'
+    baseData.preview = true
+
+    const response = await postUpdate(baseData)
+    expect(response.status).toBe(200)
+
+    const json = await response.json<UpdateRes>()
+    expect(json.error).toBe('preview_disabled')
+    expect(json.kind).toBe('blocked')
+    expect(json.version).toBeUndefined()
+  })
+
   it('allows private self-settable platform-compatible defaultChannel', async () => {
     const supabase = getSupabaseClient()
     const versionName = `9.7.${Math.floor(Math.random() * 100000) + 1000}`

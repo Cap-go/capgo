@@ -46,6 +46,7 @@ const UPDATE_BLOCKED_CODES = new Set([
   'disable_device',
   'disable_emulator',
   'key_id_mismatch',
+  'preview_disabled',
 ])
 
 export function getUpdateResponseKind(errorCode: string): UpdateResponseKind {
@@ -107,7 +108,9 @@ export async function updateWithPG(
     app_id,
     plugin_version = '2.3.3',
     defaultChannel,
+    preview,
   } = body
+  const isPreview = preview === true
   const cachedAppStatus = await getAppStatus(c, app_id)
   const cachedStatus = cachedAppStatus.status
   if (cachedStatus === 'onprem') {
@@ -150,6 +153,10 @@ export async function updateWithPG(
       app_id_url: app_id,
     }, appOwner.owner_org, app_id, '0 0 * * 1', appOwner.orgs.management_email, drizzleClient)) // Weekly on Monday
     return c.json({ error: 'on_premise_app', message: 'On-premise app detected' }, 429)
+  }
+  if (isPreview && !appOwner.allow_preview) {
+    cloudlog({ requestId: c.get('requestId'), message: 'Preview request denied because app preview is disabled', app_id })
+    return updateError200(c, 'preview_disabled', 'Preview is disabled for this app')
   }
   await setAppStatus(c, app_id, 'cloud', appOwner.allow_device_custom_id)
   const channelDeviceCount = appOwner.channel_device_count ?? 0
@@ -209,21 +216,23 @@ export async function updateWithPG(
     return updateError200(c, 'missing_info', 'Cannot find device_id or app_id')
   }
 
-  await backgroundTask(c, createStatsMau(c, device_id, app_id, appOwner.owner_org, platform, version_build))
+  if (!isPreview)
+    await backgroundTask(c, createStatsMau(c, device_id, app_id, appOwner.owner_org, platform, version_build))
 
   cloudlog({ requestId: c.get('requestId'), message: 'vals', platform, device })
 
   // Only query link/comment if plugin supports it (v5.35.0+, v6.35.0+, v7.35.0+, v8.35.0+) AND app has expose_metadata enabled
   const needsMetadata = appOwner.expose_metadata && !isDeprecatedPluginVersion(pluginVersion, '5.35.0', '6.35.0', '7.35.0', '8.35.0')
 
-  const requestedInto = await requestInfosPostgres(c, platform, app_id, device_id, defaultChannel, drizzleClient, channelDeviceCount, manifestBundleCount, needsMetadata)
+  const requestedInto = await requestInfosPostgres(c, platform, app_id, device_id, defaultChannel, drizzleClient, channelDeviceCount, manifestBundleCount, needsMetadata, isPreview)
   const { channelOverride } = requestedInto
   let { channelData } = requestedInto
   cloudlog({ requestId: c.get('requestId'), message: `channelData exists ? ${channelData !== undefined}, channelOverride exists ? ${channelOverride !== undefined}` })
 
   if (!channelData && !channelOverride) {
     cloudlog({ requestId: c.get('requestId'), message: 'Cannot get channel or override', id: app_id, date: new Date().toISOString() })
-    await sendStatsAndDevice(c, device, [{ action: 'NoChannelOrOverride' }])
+    if (!isPreview)
+      await sendStatsAndDevice(c, device, [{ action: 'NoChannelOrOverride' }])
     return updateError200(c, 'no_channel', 'no default channel or override')
   }
 
@@ -243,7 +252,8 @@ export async function updateWithPG(
 
   if (!version.external_url && !version.r2_path && !isInternalVersionName(version.name) && (!manifestEntries || manifestEntries.length === 0)) {
     cloudlog({ requestId: c.get('requestId'), message: 'Cannot get bundle', id: app_id, version, manifestEntriesLength: manifestEntries ? manifestEntries.length : 0, channelData: channelData ? channelData.channels.name : 'no channel data', defaultChannel })
-    await sendStatsAndDevice(c, device, [{ action: 'missingBundle', versionName: version.name }])
+    if (!isPreview)
+      await sendStatsAndDevice(c, device, [{ action: 'missingBundle', versionName: version.name }])
     return updateError200(c, 'no_bundle', 'Cannot get bundle')
   }
 
@@ -252,7 +262,8 @@ export async function updateWithPG(
   // Only enforce for plugin_version > 8.40.7 (transitional period for key_id format change from 4 to 20 chars)
   if (body.key_id && version.key_id && body.key_id !== version.key_id && greaterThan(pluginVersion, parse('8.40.7'))) {
     cloudlog({ requestId: c.get('requestId'), message: 'Encryption key mismatch', device_id, deviceKeyId: body.key_id, bundleKeyId: version.key_id, versionName: version.name })
-    await sendStatsAndDevice(c, device, [{ action: 'keyMismatch', versionName: version.name }])
+    if (!isPreview)
+      await sendStatsAndDevice(c, device, [{ action: 'keyMismatch', versionName: version.name }])
     return updateError200(c, 'key_id_mismatch', 'Device encryption key does not match bundle encryption key. The device may have a different public key than the one used to encrypt this bundle.', {
       deviceKeyId: body.key_id,
       bundleKeyId: version.key_id,
@@ -260,7 +271,7 @@ export async function updateWithPG(
   }
 
   // cloudlog(c.get('requestId'), 'signedURL', device_id, version_name, version.name)
-  if (version_name === version.name) {
+  if (!isPreview && version_name === version.name) {
     cloudlog({ requestId: c.get('requestId'), message: 'No new version available', id: device_id, version_name, version: version.name, date: new Date().toISOString() })
     // TODO: check why this event is send with wrong version_name
     await sendStatsAndDevice(c, device, [{ action: 'noNew', versionName: version.name }])
@@ -269,7 +280,7 @@ export async function updateWithPG(
 
   if (channelData) {
     // cloudlog(c.get('requestId'), 'check disableAutoUpdateToMajor', device_id)
-    if (!channelData.channels.ios && platform === 'ios') {
+    if (!isPreview && !channelData.channels.ios && platform === 'ios') {
       cloudlog({ requestId: c.get('requestId'), message: 'Cannot update, ios is disabled', id: device_id, date: new Date().toISOString() })
       await sendStatsAndDevice(c, device, [{ action: 'disablePlatformIos', versionName: version.name }])
       return updateError200(c, 'disabled_platform_ios', 'Cannot update, ios it\'s disabled', {
@@ -277,7 +288,7 @@ export async function updateWithPG(
         old: version_name,
       })
     }
-    if (!channelData.channels.android && platform === 'android') {
+    if (!isPreview && !channelData.channels.android && platform === 'android') {
       cloudlog({ requestId: c.get('requestId'), message: 'Cannot update, android is disabled', id: device_id, date: new Date().toISOString() })
       await sendStatsAndDevice(c, device, [{ action: 'disablePlatformAndroid', versionName: version.name }])
       cloudlog({ requestId: c.get('requestId'), message: 'sendStats', date: new Date().toISOString() })
@@ -286,7 +297,7 @@ export async function updateWithPG(
         old: version_name,
       })
     }
-    if (!channelData.channels.electron && platform === 'electron') {
+    if (!isPreview && !channelData.channels.electron && platform === 'electron') {
       cloudlog({ requestId: c.get('requestId'), message: 'Cannot update, electron is disabled', id: device_id, date: new Date().toISOString() })
       await sendStatsAndDevice(c, device, [{ action: 'disablePlatformElectron', versionName: version.name }])
       return updateError200(c, 'disabled_platform_electron', 'Cannot update, electron is disabled', {
@@ -294,7 +305,7 @@ export async function updateWithPG(
         old: version_name,
       })
     }
-    if (!isInternalVersionName(version.name) && channelData?.channels.disable_auto_update === 'major' && parse(version.name).major > parse(version_build).major) {
+    if (!isPreview && !isInternalVersionName(version.name) && channelData?.channels.disable_auto_update === 'major' && parse(version.name).major > parse(version_build).major) {
       cloudlog({ requestId: c.get('requestId'), message: 'Cannot upgrade major version', id: device_id, date: new Date().toISOString() })
       await sendStatsAndDevice(c, device, [{ action: 'disableAutoUpdateToMajor', versionName: version.name }])
       return updateError200(c, 'disable_auto_update_to_major', 'Cannot upgrade major version', {
@@ -304,7 +315,7 @@ export async function updateWithPG(
       })
     }
 
-    if (!channelData.channels.allow_device_self_set && !channelData.channels.public && !channelOverride) {
+    if (!isPreview && !channelData.channels.allow_device_self_set && !channelData.channels.public && !channelOverride) {
       cloudlog({ requestId: c.get('requestId'), message: 'Cannot update via a private channel', id: device_id, date: new Date().toISOString() })
       await sendStatsAndDevice(c, device, [{ action: 'cannotUpdateViaPrivateChannel', versionName: version.name }])
       const errorMessage = defaultChannel
@@ -313,7 +324,7 @@ export async function updateWithPG(
       return updateError200(c, 'cannot_update_via_private_channel', errorMessage)
     }
 
-    if (!isInternalVersionName(version.name) && channelData.channels.disable_auto_update === 'minor' && (
+    if (!isPreview && !isInternalVersionName(version.name) && channelData.channels.disable_auto_update === 'minor' && (
       parse(version.name).major !== parse(version_build).major
       || parse(version.name).minor !== parse(version_build).minor
     )) {
@@ -327,7 +338,7 @@ export async function updateWithPG(
     }
 
     cloudlog({ requestId: c.get('requestId'), message: 'version', version: version.name, old: version_name })
-    if (!isInternalVersionName(version.name) && channelData.channels.disable_auto_update === 'patch' && (
+    if (!isPreview && !isInternalVersionName(version.name) && channelData.channels.disable_auto_update === 'patch' && (
       parse(version.name).major !== parse(version_build).major
       || parse(version.name).minor !== parse(version_build).minor
       || parse(version.name).patch !== parse(version_build).patch
@@ -341,7 +352,7 @@ export async function updateWithPG(
       })
     }
 
-    if (!isInternalVersionName(version.name) && channelData.channels.disable_auto_update === 'version_number') {
+    if (!isPreview && !isInternalVersionName(version.name) && channelData.channels.disable_auto_update === 'version_number') {
       const minUpdateVersion = version.min_update_version
 
       // The channel is misconfigured
@@ -367,7 +378,7 @@ export async function updateWithPG(
     }
 
     // cloudlog(c.get('requestId'), 'check disableAutoUpdateUnderNative', device_id)
-    if (!isInternalVersionName(version.name) && channelData.channels.disable_auto_update_under_native && lessThan(parse(version.name), parse(version_build))) {
+    if (!isPreview && !isInternalVersionName(version.name) && channelData.channels.disable_auto_update_under_native && lessThan(parse(version.name), parse(version_build))) {
       cloudlog({ requestId: c.get('requestId'), message: 'Cannot revert under native version', id: device_id, date: new Date().toISOString() })
       await sendStatsAndDevice(c, device, [{ action: 'disableAutoUpdateUnderNative', versionName: version.name }])
       return updateError200(c, 'disable_auto_update_under_native', 'Cannot revert under native version', {
@@ -376,7 +387,7 @@ export async function updateWithPG(
       })
     }
 
-    if (!channelData.channels.allow_prod && body.is_prod) {
+    if (!isPreview && !channelData.channels.allow_prod && body.is_prod) {
       cloudlog({ requestId: c.get('requestId'), message: 'Cannot update prod build is disabled', id: device_id, date: new Date().toISOString() })
       await sendStatsAndDevice(c, device, [{ action: 'disableProdBuild', versionName: version.name }])
       return updateError200(c, 'disable_prod_build', 'Cannot update, prod build is disabled', {
@@ -384,7 +395,7 @@ export async function updateWithPG(
         old: version_name,
       })
     }
-    if (!channelData.channels.allow_dev && !body.is_prod) {
+    if (!isPreview && !channelData.channels.allow_dev && !body.is_prod) {
       cloudlog({ requestId: c.get('requestId'), message: 'Cannot update dev build is disabled', id: device_id, date: new Date().toISOString() })
       await sendStatsAndDevice(c, device, [{ action: 'disableDevBuild', versionName: version.name }])
       return updateError200(c, 'disable_dev_build', 'Cannot update, dev build is disabled', {
@@ -392,7 +403,7 @@ export async function updateWithPG(
         old: version_name,
       })
     }
-    if (!channelData.channels.allow_device && !body.is_emulator) {
+    if (!isPreview && !channelData.channels.allow_device && !body.is_emulator) {
       cloudlog({ requestId: c.get('requestId'), message: 'Cannot update device is disabled', id: device_id, date: new Date().toISOString() })
       await sendStatsAndDevice(c, device, [{ action: 'disableDevice', versionName: version.name }])
       return updateError200(c, 'disable_device', 'Cannot update, device is disabled', {
@@ -400,7 +411,7 @@ export async function updateWithPG(
         old: version_name,
       })
     }
-    if (!channelData.channels.allow_emulator && body.is_emulator) {
+    if (!isPreview && !channelData.channels.allow_emulator && body.is_emulator) {
       cloudlog({ requestId: c.get('requestId'), message: 'Cannot update emulator is disabled', id: device_id, date: new Date().toISOString() })
       await sendStatsAndDevice(c, device, [{ action: 'disableEmulator', versionName: version.name }])
       return updateError200(c, 'disable_emulator', 'Cannot update, emulator is disabled', {
@@ -431,7 +442,7 @@ export async function updateWithPG(
       if (url) {
         // only count the size of the bundle if it's not external and zip for now
         signedURL = url
-        if (getRuntimeKey() !== 'workerd') {
+        if (!isPreview && getRuntimeKey() !== 'workerd') {
           await backgroundTask(c, async () => {
             const size = await s3.getSize(c, version.r2_path)
             await createStatsBandwidth(c, device_id, app_id, size ?? 0)
@@ -446,7 +457,8 @@ export async function updateWithPG(
   //  check signedURL and if it's url
   if ((!signedURL || (!(signedURL.startsWith('http://') || signedURL.startsWith('https://')))) && !manifest.length) {
     cloudlog({ requestId: c.get('requestId'), message: 'Cannot get bundle signedURL', url: signedURL, id: app_id, date: new Date().toISOString() })
-    await sendStatsAndDevice(c, device, [{ action: 'cannotGetBundle', versionName: version.name }])
+    if (!isPreview)
+      await sendStatsAndDevice(c, device, [{ action: 'cannotGetBundle', versionName: version.name }])
     return updateError200(c, 'no_bundle_url', 'Cannot get bundle url')
   }
   if (manifest.length && !signedURL) {
@@ -455,10 +467,12 @@ export async function updateWithPG(
   }
   // cloudlog(c.get('requestId'), 'save stats', device_id)
   device.version_name = version.name
-  await Promise.all([
-    createStatsVersion(c, version.name, app_id, 'get'),
-    sendStatsAndDevice(c, device, [{ action: 'get', versionName: version.name }]),
-  ])
+  if (!isPreview) {
+    await Promise.all([
+      createStatsVersion(c, version.name, app_id, 'get'),
+      sendStatsAndDevice(c, device, [{ action: 'get', versionName: version.name }]),
+    ])
+  }
   cloudlog({ requestId: c.get('requestId'), message: 'New version available', app_id, version: version.name, signedURL, date: new Date().toISOString() })
   const res = resToVersion(plugin_version, signedURL, version as any, manifest, needsMetadata)
   if (!res.url && !res.manifest) {

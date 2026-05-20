@@ -17,7 +17,8 @@ import { parseChannelPreviewDeepLink } from '~/services/previewLinks'
 import { useDisplayStore } from '~/stores/display'
 
 type PreviewUpdater = typeof CapacitorUpdater & {
-  startPreviewSession?: () => Promise<void>
+  getLatest: (options?: { channel?: string, appId?: string, preview?: boolean }) => ReturnType<typeof CapacitorUpdater.getLatest>
+  startPreviewSession?: (options?: { appId?: string }) => Promise<void>
 }
 
 const route = useRoute()
@@ -76,32 +77,6 @@ const downloadHost = computed(() => {
 
   return new URL(scannedUrl.value).host
 })
-
-async function getPreviousChannel() {
-  try {
-    const result = await CapacitorUpdater.getChannel()
-    return { channel: result.channel }
-  }
-  catch (error) {
-    console.warn('Could not read current update channel before preview:', error)
-    return null
-  }
-}
-
-async function restorePreviousChannel(previousChannel: Awaited<ReturnType<typeof getPreviousChannel>>) {
-  if (!previousChannel)
-    return
-
-  try {
-    if (previousChannel.channel)
-      await CapacitorUpdater.setChannel({ channel: previousChannel.channel, triggerAutoUpdate: false })
-    else
-      await CapacitorUpdater.unsetChannel({ triggerAutoUpdate: false })
-  }
-  catch (error) {
-    console.warn('Could not restore previous update channel after preview failure:', error)
-  }
-}
 
 onMounted(async () => {
   displayStore.NavTitle = 'Scan update'
@@ -180,10 +155,10 @@ async function handleBarcodeScan(scannedValue: string) {
   await downloadUpdate(scannedValue)
 }
 
-async function startPreviewSession() {
+async function startPreviewSession(appId?: string) {
   const updater = CapacitorUpdater as PreviewUpdater
   if (typeof updater.startPreviewSession === 'function') {
-    await updater.startPreviewSession()
+    await updater.startPreviewSession({ appId })
     return
   }
 
@@ -200,9 +175,6 @@ async function startChannelPreview(previewLink: ReturnType<typeof parseChannelPr
   if (!previewLink)
     return
 
-  const previousChannel = await getPreviousChannel()
-  let previewChannelSet = false
-
   try {
     isLoading.value = true
     downloadProgress.value = 0
@@ -214,7 +186,8 @@ async function startChannelPreview(previewLink: ReturnType<typeof parseChannelPr
 
     toast.success(`Switching to channel: ${previewLink.channelName}`)
 
-    const latest = await CapacitorUpdater.getLatest({ channel: previewLink.channelName })
+    const updater = CapacitorUpdater as PreviewUpdater
+    const latest = await updater.getLatest({ appId: previewLink.appId, channel: previewLink.channelName, preview: true })
     if (!latest.url)
       throw new Error(latest.message || latest.error || 'No preview update is available for this channel')
 
@@ -226,14 +199,10 @@ async function startChannelPreview(previewLink: ReturnType<typeof parseChannelPr
       version: latest.version,
     })
 
-    await CapacitorUpdater.setChannel({ channel: previewLink.channelName, triggerAutoUpdate: false })
-    previewChannelSet = true
-    await startPreviewSession()
+    await startPreviewSession(previewLink.appId)
     await CapacitorUpdater.set(bundle)
   }
   catch (error) {
-    if (previewChannelSet)
-      await restorePreviousChannel(previousChannel)
     console.error('Failed to start channel preview:', error)
     toast.error(`Failed to start preview: ${error}`)
   }
