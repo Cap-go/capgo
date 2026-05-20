@@ -223,7 +223,7 @@ CREATE TABLE public.channels (
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     name character varying NOT NULL,
     app_id character varying NOT NULL,
-    version bigint NOT NULL,
+    version bigint,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     public boolean DEFAULT false NOT NULL,
     disable_auto_update_under_native boolean DEFAULT true NOT NULL,
@@ -553,14 +553,6 @@ ALTER TABLE ONLY public.stripe_info
 
 ALTER TABLE ONLY public.orgs
     ADD CONSTRAINT "unique customer_id on orgs" UNIQUE (customer_id);
-
-
---
--- Name: channel_devices unique_device_app; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.channel_devices
-    ADD CONSTRAINT unique_device_app UNIQUE (device_id, app_id);
 
 
 --
