@@ -639,7 +639,7 @@ describe('/private/admin_stats', () => {
     if (!soloPlan)
       throw new Error('Expected Solo plan to be loaded')
 
-    const response = await fetchWithRetry(`${BASE_URL}/private/admin_stats`, {
+    const response = await fetchWithRetry(getEndpointUrl('/private/admin_stats'), {
       method: 'POST',
       headers: adminHeaders,
       body: JSON.stringify({
