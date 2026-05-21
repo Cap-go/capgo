@@ -429,7 +429,7 @@ describe('[POST] /stats', () => {
     }
   })
 
-  it('filters legacy download_fail before saved stats and logs', async () => {
+  it.concurrent('filters legacy download_fail before saved stats and logs', async () => {
     const cases = [
       { pluginVersion: '7.16.9', shouldRecord: false },
       { pluginVersion: '7.17.0', shouldRecord: true },
