@@ -223,6 +223,24 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
     })
   }, [])
 
+  /**
+   * Append OR replace a log entry identified by a stable prefix. Used for
+   * field-update events that the user can re-enter mid-session (Key file,
+   * Key ID, Issuer ID, Distribution, Identity, Profile). When the user
+   * edits a value, the previous "✔ <field> · OLD" line is rewritten to
+   * "✔ <field> · NEW" in place instead of stacking — otherwise the log
+   * grows misleading audit-trail entries every time the user edits a typo.
+   * Pure addLog still applies for one-shot events (verified, created, etc).
+   */
+  const upsertLog = useCallback((prefix: string, text: string, color = 'green') => {
+    setLog((prev) => {
+      const idx = prev.findIndex(entry => entry.text.startsWith(prefix))
+      if (idx < 0)
+        return [...prev, { text, color }]
+      return prev.map((entry, i) => i === idx ? { text, color } : entry)
+    })
+  }, [])
+
   const pm = getPMAndCommand()
   const addIosCommand = formatRunnerCommand(pm.runner, ['cap', 'add', 'ios'])
   const syncIosCommand = formatRunnerCommand(pm.runner, ['cap', 'sync', 'ios'])
@@ -316,13 +334,13 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
       return
     // Show partial input steps
     if (initialProgress.p8Path) {
-      addLog(`✔ Key file selected · ${initialProgress.p8Path}`)
+      upsertLog('✔ Key file', `✔ Key file selected · ${initialProgress.p8Path}`)
     }
     if (initialProgress.keyId && !initialProgress.completedSteps.apiKeyVerified) {
-      addLog(`✔ Key ID · ${initialProgress.keyId}`)
+      upsertLog('✔ Key ID · ', `✔ Key ID · ${initialProgress.keyId}`)
     }
     if (initialProgress.issuerId && !initialProgress.completedSteps.apiKeyVerified) {
-      addLog(`✔ Issuer ID · ${initialProgress.issuerId}`)
+      upsertLog('✔ Issuer ID · ', `✔ Issuer ID · ${initialProgress.issuerId}`)
     }
     // Show fully completed steps
     const { completedSteps } = initialProgress
@@ -855,7 +873,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
             const extracted = extractKeyIdFromPath(selected)
             if (extracted)
               setKeyId(extracted)
-            addLog(`✔ Key file selected · ${selected}`)
+            upsertLog('✔ Key file', `✔ Key file selected · ${selected}`)
             void savePartialProgress({ p8Path: selected })
             setStep('input-key-id')
           }
@@ -1519,7 +1537,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
               existing.setupMethod = 'import-existing'
               existing.importDistribution = mode
               await saveProgress(appId, existing)
-              addLog(`✔ Distribution · ${mode}`)
+              upsertLog('✔ Distribution · ', `✔ Distribution · ${mode}`)
               if (mode === 'app_store') {
                 // Need .p8 for TestFlight upload AND for any profile auto-recovery.
                 // After verifying-key the import-mode branch routes back to import-pick-identity.
@@ -1584,7 +1602,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
                 return
               setChosenIdentity(match.identity)
               setAppleCertIdForChosen(undefined) // reset — new identity, prior check no longer applies
-              addLog(`✔ Identity · ${match.identity.name}`)
+              upsertLog('✔ Identity · ', `✔ Identity · ${match.identity.name}`)
               // Apply the same bundleId + distribution filter that
               // import-pick-profile uses. If nothing survives, route to
               // no-match-recovery so the user gets an actionable next step
@@ -1681,7 +1699,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
                   return
                 }
                 setChosenProfile(profile)
-                addLog(`✔ Profile · ${profile.name}`)
+                upsertLog('✔ Profile · ', `✔ Profile · ${profile.name}`)
                 setStep('import-export-warning')
               }}
             />
@@ -2066,7 +2084,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
                       const extracted = extractKeyIdFromPath(filePath)
                       if (extracted)
                         setKeyId(extracted)
-                      addLog(`✔ Key file found · ${filePath}`)
+                      upsertLog('✔ Key file', `✔ Key file found · ${filePath}`)
                       void savePartialProgress({ p8Path: filePath })
                       setStep('input-key-id')
                     }
@@ -2104,7 +2122,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
                   const extracted = extractKeyIdFromPath(filePath)
                   if (extracted)
                     setKeyId(extracted)
-                  addLog(`✔ Key file found · ${filePath}`)
+                  upsertLog('✔ Key file', `✔ Key file found · ${filePath}`)
                   void savePartialProgress({ p8Path: filePath })
                   setStep('input-key-id')
                 }
@@ -2149,7 +2167,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
                       onSubmit={(value) => {
                         const finalKeyId = (value || keyId).trim()
                         setKeyId(finalKeyId)
-                        addLog(`✔ Key ID · ${finalKeyId}`)
+                        upsertLog('✔ Key ID · ', `✔ Key ID · ${finalKeyId}`)
                         void savePartialProgress({ keyId: finalKeyId })
                         setStep('input-issuer-id')
                       }}
@@ -2179,7 +2197,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
                         if (!cleaned)
                           return
                         setKeyId(cleaned)
-                        addLog(`✔ Key ID · ${cleaned}`)
+                        upsertLog('✔ Key ID · ', `✔ Key ID · ${cleaned}`)
                         void savePartialProgress({ keyId: cleaned })
                         setStep('input-issuer-id')
                       }}
@@ -2223,7 +2241,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
                 if (!cleaned)
                   return
                 setIssuerId(cleaned)
-                addLog(`✔ Issuer ID · ${cleaned}`)
+                upsertLog('✔ Issuer ID · ', `✔ Issuer ID · ${cleaned}`)
                 void savePartialProgress({ issuerId: cleaned })
                 setStep('verifying-key')
               }}
