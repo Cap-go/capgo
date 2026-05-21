@@ -24,7 +24,7 @@ import { CertificateLimitError, createCertificate, createProfile, deleteProfile,
 import { createP12, DEFAULT_P12_PASSWORD, generateCsr } from '../csr.js'
 import { canUseFilePicker, openFilePicker } from '../file-picker.js'
 import { exportP12FromKeychain, isHelperCached, isMacOS, listSigningIdentities, matchIdentitiesToProfiles, precompileSwiftHelper, scanProvisioningProfiles } from '../macos-signing.js'
-import { deleteProgress, getResumeStep, loadProgress, saveProgress } from '../progress.js'
+import { deleteProgress, getImportEntryStep, getResumeStep, loadProgress, saveProgress } from '../progress.js'
 import { getBuildOnboardingRecoveryAdvice } from '../recovery.js'
 import { createCiSecretEntries, detectCiSecretTargets, getCiSecretTargetLabel, listExistingCiSecretKeys, uploadCiSecrets } from '../ci-secrets.js'
 import type { CiSecretEntry, CiSecretSetupAdvice, CiSecretTarget } from '../ci-secrets.js'
@@ -520,9 +520,12 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
           setImportProfiles(profiles)
           setImportMatches(matches)
           addLog(`✔ Found ${distOnly.length} distribution identity${distOnly.length === 1 ? '' : 'ies'} and ${profiles.length} profile${profiles.length === 1 ? '' : 's'} on this Mac`)
-          // Distribution-mode is now the first visible question; .p8 input
-          // (if needed) routes through it before identity selection.
-          setStep('import-distribution-mode')
+          // Skip questions the user already answered on a previous attempt:
+          // if importDistribution + (for app_store) apiKeyVerified are
+          // already saved in progress, jump past distribution-mode and the
+          // .p8 input chain. See progress.ts → getImportEntryStep for the
+          // full decision table and tests.
+          setStep(getImportEntryStep(await loadProgress(appId)))
         }
         catch (err) {
           if (!cancelled)
@@ -1410,7 +1413,12 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
               if (mode === 'app_store') {
                 // Need .p8 for TestFlight upload AND for any profile auto-recovery.
                 // After verifying-key the import-mode branch routes back to import-pick-identity.
-                setStep('api-key-instructions')
+                // Skip the .p8 input chain entirely if the key was already
+                // verified on a previous attempt (resume) — otherwise we
+                // re-ask "How do you want to provide the .p8 file?" even
+                // though APPLE_KEY_CONTENT is already known. Use the same
+                // routing decision as the post-scan entry point.
+                setStep(getImportEntryStep(existing))
               }
               else {
                 // ad_hoc skips .p8; can opt into it later from no-match recovery.
