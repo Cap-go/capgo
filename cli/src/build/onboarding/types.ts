@@ -15,6 +15,7 @@ export type OnboardingStep
     | 'import-distribution-mode'
     | 'import-pick-identity'
     | 'import-pick-profile'
+    | 'import-checking-apple-cert'
     | 'import-no-match-recovery'
     | 'import-fetching-profile'
     | 'import-create-profile-only'
@@ -120,6 +121,7 @@ export const STEP_PROGRESS: Record<OnboardingStep, number> = {
   'import-distribution-mode': 15,
   'import-pick-identity': 40,
   'import-pick-profile': 55,
+  'import-checking-apple-cert': 50,
   'import-no-match-recovery': 55,
   'import-fetching-profile': 60,
   'import-create-profile-only': 60,
@@ -173,6 +175,8 @@ export function getPhaseLabel(step: OnboardingStep): string {
       return 'Step 2 of 4 · Choose certificate'
     case 'import-pick-profile':
       return 'Step 3 of 4 · Choose provisioning profile'
+    case 'import-checking-apple-cert':
+      return 'Step 3 of 4 · Checking certificate on Apple'
     case 'import-no-match-recovery':
       return 'Step 3 of 4 · No matching profile — recover'
     case 'import-fetching-profile':

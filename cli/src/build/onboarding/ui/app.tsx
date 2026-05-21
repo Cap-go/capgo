@@ -194,6 +194,21 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
    * succeed in import mode because `certData.certificateId` is never set.
    */
   const [duplicateProfileOrigin, setDuplicateProfileOrigin] = useState<'creating-profile' | 'import-create-profile-only'>('creating-profile')
+  /**
+   * Result of the proactive Apple-side cert lookup for the user's chosen
+   * identity, used to curate the no-match-recovery menu so we only offer
+   * actions that can actually succeed:
+   *   - `undefined` → not checked yet (e.g. ad_hoc without ASC API key —
+   *     menu falls back to the legacy "Provide ASC API key, then …" options
+   *     which route through `api-key-instructions` first)
+   *   - `null`      → checked, Apple's API returned no match. Hide the
+   *     "Fetch profile / Create profile via Apple" options (they can't
+   *     work) and surface "Switch to Create new" as the escape hatch.
+   *   - `string`    → checked, Apple has the cert. Show the API-driven
+   *     options; the cached id is reused so the handlers don't re-query.
+   * Reset to `undefined` whenever the chosen identity changes.
+   */
+  const [appleCertIdForChosen, setAppleCertIdForChosen] = useState<string | null | undefined>(undefined)
 
   const addLog = useCallback((text: string, color = 'green') => {
     // Dedupe consecutive identical entries. The import-distribution-mode
@@ -628,8 +643,48 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
     if (step === 'import-pick-profile' && chosenIdentity) {
       const profilesForIdentity = importMatches.find(m => m.identity.sha1 === chosenIdentity.sha1)?.profiles ?? []
       const usable = filterProfilesForApp(profilesForIdentity, appId, importDistribution)
-      if (usable.length === 0)
-        setStep('import-no-match-recovery')
+      if (usable.length === 0) {
+        // Same gating as the identity-pick onChange — pre-check Apple when
+        // we have an API key so the recovery menu only offers viable
+        // options. Skip the pre-check on resume if we already have a result
+        // for this identity (avoid a redundant round-trip).
+        if (appleCertIdForChosen !== undefined) {
+          setStep('import-no-match-recovery')
+        }
+        else {
+          ;(async () => {
+            const apiKeyAvailable = !!(p8ContentRef.current || (await loadProgress(appId))?.completedSteps?.apiKeyVerified)
+            setStep(apiKeyAvailable ? 'import-checking-apple-cert' : 'import-no-match-recovery')
+          })()
+        }
+      }
+    }
+
+    if (step === 'import-checking-apple-cert' && chosenIdentity) {
+      ;(async () => {
+        try {
+          const token = await getFreshToken()
+          const certId = await findCertIdBySha1(token, chosenIdentity.sha1)
+          if (cancelled)
+            return
+          setAppleCertIdForChosen(certId) // null when Apple has no SHA1 match; string otherwise
+          if (certId) {
+            addLog(`✔ Apple recognizes this certificate (ASC id ${certId.slice(0, 8)}…)`)
+          }
+          else {
+            addLog(
+              `⚠ Apple's API didn't return a match for "${chosenIdentity.name}". `
+              + `Hiding the API-driven recovery options — use "Switch to Create new" or open the Developer Portal.`,
+              'yellow',
+            )
+          }
+          setStep('import-no-match-recovery')
+        }
+        catch (err) {
+          if (!cancelled)
+            handleError(err, 'import-checking-apple-cert')
+        }
+      })()
     }
 
     if (step === 'import-fetching-profile') {
@@ -1528,6 +1583,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
               if (!match)
                 return
               setChosenIdentity(match.identity)
+              setAppleCertIdForChosen(undefined) // reset — new identity, prior check no longer applies
               addLog(`✔ Identity · ${match.identity.name}`)
               // Apply the same bundleId + distribution filter that
               // import-pick-profile uses. If nothing survives, route to
@@ -1538,7 +1594,12 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
               // for the wrong distribution mode.
               const usableForThisApp = filterProfilesForApp(match.profiles, appId, importDistribution)
               if (usableForThisApp.length === 0) {
-                setStep('import-no-match-recovery')
+                // Proactively check Apple for the cert (when we have an API
+                // key) so the recovery menu can only offer options that will
+                // actually succeed. ad_hoc with no .p8 falls through to the
+                // legacy menu that prompts for ASC API key first.
+                const apiKeyAvailable = !!(p8ContentRef.current || (await loadProgress(appId))?.completedSteps?.apiKeyVerified)
+                setStep(apiKeyAvailable ? 'import-checking-apple-cert' : 'import-no-match-recovery')
                 return
               }
               setStep('import-pick-profile')
@@ -1628,6 +1689,14 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
         )
       })()}
 
+      {/* Import: checking Apple for the chosen cert (curates the recovery menu) */}
+      {step === 'import-checking-apple-cert' && chosenIdentity && (
+        <Box flexDirection="column" marginTop={1}>
+          <SpinnerLine text={`Checking with Apple for "${chosenIdentity.name}"...`} />
+          <Text dimColor>One quick round-trip so we only show recovery options that can succeed.</Text>
+        </Box>
+      )}
+
       {/* Import: no-match recovery menu */}
       {step === 'import-no-match-recovery' && chosenIdentity && (() => {
         const hasAscKey = !!(p8ContentRef.current || p8PathRef.current)
@@ -1645,69 +1714,94 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
         // mismatch). Both share the same recovery options.
         const identityProfiles = importMatches.find(m => m.identity.sha1 === chosenIdentity.sha1)?.profiles ?? []
         const hasAnyProfiles = identityProfiles.length > 0
+        // Pre-check result drives which actions we even offer. Three states:
+        //  - undefined → no check done (ad_hoc without ASC key). Show the
+        //    legacy "Provide ASC API key, then …" options, which route
+        //    through api-key-instructions before retrying the action.
+        //  - null      → checked, Apple doesn't recognize the cert. Hide
+        //    Fetch + Create (they'd fail). Surface "Switch to Create new"
+        //    as the only forward-progress option.
+        //  - string    → checked, Apple has the cert. Show Fetch + Create
+        //    without the "provide key" prefix; reuse cached cert id.
+        const certKnownOnApple = typeof appleCertIdForChosen === 'string'
+        const certKnownNotOnApple = appleCertIdForChosen === null
+        const checkSkipped = appleCertIdForChosen === undefined
+
+        const fetchOption = certKnownOnApple
+          ? [{ label: `🔍  Fetch matching profile from Apple now`, value: 'fetch' }]
+          : checkSkipped
+            ? [{ label: hasAscKey ? `🔍  Fetch matching profile from Apple now` : `🔍  Provide ASC API key, then fetch profile from Apple`, value: 'fetch' }]
+            : []
+
+        const createOption = canCreateProfile && certKnownOnApple
+          ? [{ label: `✨  Create a new App Store profile for this cert via Apple`, value: 'create' }]
+          : canCreateProfile && checkSkipped
+            ? [{ label: hasAscKey ? `✨  Create a new App Store profile for this cert via Apple` : `✨  Provide ASC API key, then create a new App Store profile for this cert`, value: 'create' }]
+            : []
+
+        const switchToCreateNewOption = certKnownNotOnApple
+          ? [{ label: `🆕  Switch to "Create new" (Apple generates a fresh cert + profile)`, value: 'switch-create-new' }]
+          : []
+
         return (
           <Box flexDirection="column" marginTop={1}>
             <Alert variant="warning">
-              {hasAnyProfiles
+              {certKnownNotOnApple
                 ? (
                     <>
-                      No provisioning profile on this Mac matches this app (
-                      <Text bold>{appId}</Text>
-                      {importDistribution
-                        ? (
-                            <>
-                              {' '}
-                              for
-                              {' '}
-                              <Text bold>{importDistribution}</Text>
-                              {' '}
-                              distribution
-                            </>
-                          )
-                        : null}
-                      ) under "
+                      Apple's API doesn't return a record for "
                       {chosenIdentity.name}
-                      ".
+                      " (or our lookup can't see it).
                     </>
                   )
-                : (
-                    <>
-                      No provisioning profile on this Mac is linked to "
-                      {chosenIdentity.name}
-                      ".
-                    </>
-                  )}
+                : hasAnyProfiles
+                  ? (
+                      <>
+                        No provisioning profile on this Mac matches this app (
+                        <Text bold>{appId}</Text>
+                        {importDistribution
+                          ? (
+                              <>
+                                {' '}
+                                for
+                                {' '}
+                                <Text bold>{importDistribution}</Text>
+                                {' '}
+                                distribution
+                              </>
+                            )
+                          : null}
+                        ) under "
+                        {chosenIdentity.name}
+                        ".
+                      </>
+                    )
+                  : (
+                      <>
+                        No provisioning profile on this Mac is linked to "
+                        {chosenIdentity.name}
+                        ".
+                      </>
+                    )}
             </Alert>
             <Newline />
             <Text dimColor>
-              {hasAnyProfiles
-                ? `The cert is in your Keychain but no on-disk profile matches this app's bundle ID${importDistribution ? ` and ${importDistribution} distribution` : ''}. Pick a recovery path:`
-                : `The cert is in your Keychain but the matching profile isn't on disk. Pick a recovery path:`}
+              {certKnownNotOnApple
+                ? `Apple-side actions for this cert are unavailable. Open the Developer Portal to investigate, or switch to "Create new" to generate a fresh cert + profile (reuses your already-provided .p8).`
+                : hasAnyProfiles
+                  ? `The cert is in your Keychain but no on-disk profile matches this app's bundle ID${importDistribution ? ` and ${importDistribution} distribution` : ''}. Pick a recovery path:`
+                  : `The cert is in your Keychain but the matching profile isn't on disk. Pick a recovery path:`}
             </Text>
             <Newline />
             <Select
               options={[
-                {
-                  label: `🌐  Open Apple Developer Portal (download manually, then re-scan)`,
-                  value: 'browser',
-                },
-                {
-                  label: hasAscKey
-                    ? `🔍  Fetch matching profile from Apple now`
-                    : `🔍  Provide ASC API key, then fetch profile from Apple`,
-                  value: 'fetch',
-                },
-                ...(canCreateProfile
-                  ? [{
-                      label: hasAscKey
-                        ? `✨  Create a new App Store profile for this cert via Apple`
-                        : `✨  Provide ASC API key, then create a new App Store profile for this cert`,
-                      value: 'create',
-                    }]
-                  : []),
+                { label: `🌐  Open Apple Developer Portal (download manually, then re-scan)`, value: 'browser' },
+                ...fetchOption,
+                ...createOption,
+                ...switchToCreateNewOption,
                 { label: '↩️   Back to identity selection', value: 'back' },
               ]}
-              onChange={(value) => {
+              onChange={async (value) => {
                 if (value === 'browser') {
                   open('https://developer.apple.com/account/resources/profiles/list')
                   addLog('✔ Opened Apple Developer Portal — re-running scan in 5s', 'yellow')
@@ -1719,6 +1813,26 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
                 }
                 if (value === 'back') {
                   setStep('import-pick-identity')
+                  return
+                }
+                if (value === 'switch-create-new') {
+                  // Bail out of the import flow to the create-new path. Reuses
+                  // the already-verified .p8 (apiKeyVerified stays in
+                  // progress, getResumeStep would route past the .p8 chain on
+                  // a CLI restart). No Keychain side effects — the orphan
+                  // local cert stays put and harmless.
+                  const existing = await loadProgress(appId)
+                  if (existing) {
+                    existing.setupMethod = 'create-new'
+                    delete existing.importDistribution
+                    await saveProgress(appId, existing)
+                  }
+                  setImportMode(false)
+                  addLog('✔ Switching to "Create new" — generating a fresh cert + profile via Apple', 'cyan')
+                  // apiKeyVerified is guaranteed at this point (we only show
+                  // this option when certKnownNotOnApple, which requires the
+                  // pre-check to have run, which requires a verified key).
+                  setStep('creating-certificate')
                   return
                 }
                 if (value === 'fetch' || value === 'create') {
