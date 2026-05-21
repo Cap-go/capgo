@@ -40,6 +40,23 @@ describe('manifest download size helpers', () => {
     ])
   })
 
+  it.concurrent('does not truncate large manifests', () => {
+    const input = Array.from({ length: 10050 }, (_, index) => ({
+      file_name: `file-${index}.js`,
+      file_hash: `hash-${index}`,
+    }))
+
+    const files = normalizeManifestSizeFiles(input)
+
+    expect(files).toHaveLength(input.length)
+    expect(files.at(-1)).toEqual({
+      file_name: 'file-10049.js',
+      file_hash: 'hash-10049',
+      download_url: null,
+      version_id: null,
+    })
+  })
+
   it.concurrent('sums known file sizes and marks missing metadata as unknown', () => {
     const files = normalizeManifestSizeFiles([
       {

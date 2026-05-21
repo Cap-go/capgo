@@ -29,8 +29,6 @@ export interface ManifestDownloadSizeResult {
   files: ManifestSizeResultFile[]
 }
 
-const MAX_MANIFEST_SIZE_FILES = 10000
-
 function versionIdFromDownloadUrl(downloadUrl: string | null | undefined): number | null {
   if (!downloadUrl)
     return null
@@ -54,7 +52,7 @@ export function normalizeManifestSizeFiles(files: unknown): NormalizedManifestSi
 
   const normalized: NormalizedManifestSizeFile[] = []
   const seen = new Set<string>()
-  for (const file of files.slice(0, MAX_MANIFEST_SIZE_FILES)) {
+  for (const file of files) {
     if (!file || typeof file !== 'object')
       continue
 
