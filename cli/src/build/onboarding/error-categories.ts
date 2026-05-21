@@ -1,5 +1,5 @@
 import type { AndroidOnboardingErrorCategory } from './android/types.js'
-import type { OnboardingErrorCategory } from './types.js'
+import type { OnboardingErrorCategory, OnboardingStep } from './types.js'
 import { MissingScopesError } from './android/oauth-google.js'
 import { CertificateLimitError } from './apple-api.js'
 
@@ -25,7 +25,14 @@ function getPhase(error: unknown): string | undefined {
   return typeof candidate === 'string' ? candidate : undefined
 }
 
-export function mapIosOnboardingError(error: unknown): OnboardingErrorCategory {
+export function mapIosOnboardingError(
+  error: unknown,
+  failedStep?: OnboardingStep,
+): OnboardingErrorCategory {
+  // Structural discriminators take precedence so an ASC API error thrown
+  // during an import step (e.g. fetching a profile via the API) still maps
+  // to the correct category instead of being shadowed by the step-derived
+  // fallback below.
   if (error instanceof CertificateLimitError)
     return 'cert_limit_reached'
 
@@ -40,6 +47,21 @@ export function mapIosOnboardingError(error: unknown): OnboardingErrorCategory {
     return 'profile_creation_failed'
   if (phase === 'p8')
     return 'p8_invalid'
+
+  // Import-flow step-derived categories. The import path throws
+  // MacOSSigningError / generic Error without a `phase` or `status`
+  // discriminator, so we derive the category from the step at which the
+  // failure occurred.
+  if (failedStep === 'import-scanning')
+    return 'keychain_no_identities'
+  if (failedStep === 'import-compiling-helper')
+    return 'keychain_helper_compile_failed'
+  if (failedStep === 'import-exporting')
+    return 'keychain_export_failed'
+  if (failedStep === 'import-fetching-profile')
+    return 'profile_read_failed'
+  if (failedStep === 'import-pick-profile' || failedStep === 'import-no-match-recovery')
+    return 'profile_no_match'
 
   return 'unknown'
 }

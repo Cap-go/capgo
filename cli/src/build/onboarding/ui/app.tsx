@@ -394,7 +394,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
     // Capture the mapped category BEFORE we collapse err to a string.
     // The telemetry useEffect will read this ref instead of re-mapping a
     // reconstructed `new Error(message)` (which has no discriminators).
-    errorCategoryRef.current = mapIosOnboardingError(err)
+    errorCategoryRef.current = mapIosOnboardingError(err, failedStep)
     const message = err instanceof Error ? err.message : String(err)
     const nextRetryCount = retryCount + 1
     const bundlePath = writeOnboardingSupportBundle({

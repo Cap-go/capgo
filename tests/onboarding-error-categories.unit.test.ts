@@ -33,6 +33,43 @@ describe('mapIosOnboardingError', () => {
     expect(mapIosOnboardingError('a string')).toBe('unknown')
     expect(mapIosOnboardingError(undefined)).toBe('unknown')
   })
+
+  it.concurrent('maps import-scanning failures to keychain_no_identities', () => {
+    expect(mapIosOnboardingError(new Error('no identities'), 'import-scanning')).toBe('keychain_no_identities')
+  })
+
+  it.concurrent('maps import-compiling-helper failures to keychain_helper_compile_failed', () => {
+    expect(mapIosOnboardingError(new Error('compile failed'), 'import-compiling-helper')).toBe('keychain_helper_compile_failed')
+  })
+
+  it.concurrent('maps import-exporting failures to keychain_export_failed', () => {
+    expect(mapIosOnboardingError(new Error('wrong password'), 'import-exporting')).toBe('keychain_export_failed')
+  })
+
+  it.concurrent('maps import-fetching-profile failures to profile_read_failed', () => {
+    expect(mapIosOnboardingError(new Error('fs error'), 'import-fetching-profile')).toBe('profile_read_failed')
+  })
+
+  it.concurrent('maps import-pick-profile and import-no-match-recovery to profile_no_match', () => {
+    expect(mapIosOnboardingError(new Error('no match'), 'import-pick-profile')).toBe('profile_no_match')
+    expect(mapIosOnboardingError(new Error('no match'), 'import-no-match-recovery')).toBe('profile_no_match')
+  })
+
+  it.concurrent('structural discriminators take precedence over failedStep', () => {
+    // Even if failedStep is an import step, a 401 still maps to apple_api_unauthorized
+    // (e.g. the helper precompile or fetch could theoretically throw an ASC error).
+    const err = Object.assign(new Error('Unauthorized'), { status: 401 })
+    expect(mapIosOnboardingError(err, 'import-scanning')).toBe('apple_api_unauthorized')
+  })
+
+  it.concurrent('returns unknown for non-import failedStep with no structural discriminator', () => {
+    expect(mapIosOnboardingError(new Error('???'), 'welcome')).toBe('unknown')
+    expect(mapIosOnboardingError(new Error('???'), 'creating-certificate')).toBe('unknown')
+  })
+
+  it.concurrent('returns unknown when no failedStep and no structural discriminator', () => {
+    expect(mapIosOnboardingError(new Error('something else'), undefined)).toBe('unknown')
+  })
 })
 
 describe('mapAndroidOnboardingError', () => {
