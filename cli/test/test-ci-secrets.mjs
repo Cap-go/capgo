@@ -83,6 +83,27 @@ await test('creates env entries and converts provisioning map to base64', () => 
   assert(mapEntry.masked, 'Provisioning map base64 should be masked')
 })
 
+await test('omits CAPGO_TOKEN when no API key is provided', () => {
+  const entries = createCiSecretEntries({ BUILD_CERTIFICATE_BASE64: 'cert' })
+  const keys = entries.map(entry => entry.key)
+  assert(!keys.includes('CAPGO_TOKEN'), 'CAPGO_TOKEN should be absent without an API key')
+})
+
+await test('includes a masked CAPGO_TOKEN when an API key is provided', () => {
+  // The generated GitHub Actions workflow references ${{ secrets.CAPGO_TOKEN }}
+  // for --apikey, so the wizard must push it alongside build credentials.
+  const entries = createCiSecretEntries({ BUILD_CERTIFICATE_BASE64: 'cert' }, 'cap_test_apikey_xyz')
+  const tokenEntry = entries.find(entry => entry.key === 'CAPGO_TOKEN')
+  assert(tokenEntry !== undefined, 'CAPGO_TOKEN should be pushed when API key is provided')
+  assertEquals(tokenEntry.value, 'cap_test_apikey_xyz')
+  assert(tokenEntry.masked, 'CAPGO_TOKEN must be masked')
+})
+
+await test('treats an empty-string API key as "no token" (no entry)', () => {
+  const entries = createCiSecretEntries({ BUILD_CERTIFICATE_BASE64: 'cert' }, '')
+  assert(!entries.some(e => e.key === 'CAPGO_TOKEN'), 'Empty API key must not produce a CAPGO_TOKEN entry')
+})
+
 await test('detects authenticated GitHub target from git remotes', () => {
   const runner = createRunner({
     'git remote -v': {

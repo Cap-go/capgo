@@ -28,6 +28,11 @@ import { deleteProgress, getImportEntryStep, getResumeStep, loadProgress, savePr
 import { getBuildOnboardingRecoveryAdvice } from '../recovery.js'
 import { createCiSecretEntries, detectCiSecretTargets, getCiSecretTargetLabel, listExistingCiSecretKeys, uploadCiSecrets } from '../ci-secrets.js'
 import type { CiSecretEntry, CiSecretSetupAdvice, CiSecretTarget } from '../ci-secrets.js'
+import { defaultExportPath, exportCredentialsToEnv } from '../env-export.js'
+import { writeWorkflowFile, WORKFLOW_PATH } from '../workflow-writer.js'
+import type { BuildScriptChoice, PackageManager } from '../workflow-generator.js'
+import { findBuildCommandForProjectType, findProjectType, getPackageScripts } from '../../../utils.js'
+import type { BuildCredentials } from '../../../schemas/build.js'
 import {
   getPhaseLabel,
 
@@ -84,6 +89,53 @@ async function runRunnerCommand(runner: string, args: string[]): Promise<{ succe
       resolve({ success: code === 0, output })
     })
   })
+}
+
+/**
+ * `getPMAndCommand()` returns the literal string 'unknown' when no recognizable
+ * lockfile is present. The workflow generator only knows the four real ones —
+ * fall back to 'npm' for the generator template (universal coverage, even if
+ * the user is using something exotic; they can edit the YAML after).
+ */
+function normalizePackageManager(pm: string): PackageManager {
+  if (pm === 'bun' || pm === 'npm' || pm === 'pnpm' || pm === 'yarn')
+    return pm
+  return 'npm'
+}
+
+interface BuildScriptOption {
+  label: string
+  value: string
+}
+
+/**
+ * Build the picker options for `pick-build-script`. Layout:
+ *   1. Recommended script (if any) at the top, with a hint label
+ *   2. Every other script in scripts{} in alphabetical order
+ *   3. "Type a custom command" escape hatch
+ *   4. "Skip build step" escape hatch (for raw HTML Capacitor apps)
+ *
+ * Showing ALL scripts (not just "build"-ish ones) matches what the user
+ * asked for: pick from package.json, never auto-guess. Filtering risks
+ * hiding the exotic name a user actually wants.
+ */
+function buildScriptPickerOptions(scripts: Record<string, string>, recommended: string | null): BuildScriptOption[] {
+  const options: BuildScriptOption[] = []
+  const seen = new Set<string>()
+
+  if (recommended && Object.prototype.hasOwnProperty.call(scripts, recommended)) {
+    options.push({ label: `${recommended}    (recommended — matches your project type)`, value: recommended })
+    seen.add(recommended)
+  }
+
+  const others = Object.keys(scripts).filter(name => !seen.has(name)).sort((a, b) => a.localeCompare(b))
+  for (const name of others)
+    options.push({ label: name, value: name })
+
+  options.push({ label: 'Type a custom command…', value: '__custom__' })
+  options.push({ label: 'Skip build step (my app is raw HTML)', value: '__skip__' })
+
+  return options
 }
 
 const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey }) => {
@@ -148,6 +200,26 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
   const [ciSecretExistingKeys, setCiSecretExistingKeys] = useState<string[]>([])
   const [ciSecretError, setCiSecretError] = useState<string | null>(null)
   const [ciSecretUploadSummary, setCiSecretUploadSummary] = useState<string | null>(null)
+  // GitHub Actions workflow setup state. setupMode tracks the 3-way choice at
+  // ask-github-actions-setup. After a successful secrets upload, with-workflow
+  // continues into pick-build-script + writing-workflow-file; secrets-only
+  // exits via build-complete; declined branches to ask-export-env.
+  const [setupMode, setSetupMode] = useState<'undecided' | 'with-workflow' | 'secrets-only' | 'declined'>('undecided')
+  const [availableScripts, setAvailableScripts] = useState<Record<string, string>>({})
+  const [recommendedScript, setRecommendedScript] = useState<string | null>(null)
+  const [buildScriptChoice, setBuildScriptChoice] = useState<BuildScriptChoice | null>(null)
+  const [pendingCustomCommand, setPendingCustomCommand] = useState<string>('')
+  const [workflowExistingContent, setWorkflowExistingContent] = useState<string | null>(null)
+  const [workflowProposedContent, setWorkflowProposedContent] = useState<string | null>(null)
+  const [workflowWrittenPath, setWorkflowWrittenPath] = useState<string | null>(null)
+  const [envExportPath, setEnvExportPath] = useState<string | null>(null)
+  const [envExportError, setEnvExportError] = useState<string | null>(null)
+  const [envExportTargetPath, setEnvExportTargetPath] = useState<string>('')
+  // The raw saved credentials, retained in memory so the .env export can read
+  // the same field set that doSaveCredentials wrote to disk — without CAPGO_TOKEN
+  // (which only belongs in the CI-secrets push, not in a .env meant for the
+  // developer's local reference).
+  const [savedCredentials, setSavedCredentials] = useState<Partial<BuildCredentials> | null>(null)
 
   // Import-existing sub-flow state (macOS only)
   const [importMatches, setImportMatches] = useState<IdentityProfileMatch[]>([])
@@ -981,8 +1053,19 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
           // yet — the wizard now offers that step only AFTER a successful first
           // build, so users never end up with orphan secrets in a repo whose
           // build was never proven to work.
-          const entries = createCiSecretEntries(credentials)
+          //
+          // Pass the API key so CAPGO_TOKEN gets included in the bundle — the
+          // generated GitHub Actions workflow references ${{ secrets.CAPGO_TOKEN }}
+          // for --apikey, and users who pick "secrets only" still benefit from
+          // having it ready in their repo for a workflow they'll write later.
+          const capgoKey = apikey ?? findSavedKeySilent()
+          const entries = createCiSecretEntries(credentials, capgoKey ?? undefined)
           setCiSecretEntries(entries)
+          // Stash the raw credentials so the .env-export branch can write the
+          // same shape `build credentials manage`'s export writes — without the
+          // CAPGO_TOKEN entry, which only belongs in CI secrets, not in a .env
+          // meant as a local CI-setup reference.
+          setSavedCredentials(credentials)
           setStep('ask-build')
         }
         catch (err) {
@@ -1011,8 +1094,12 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
             return
           }
           if (discovery.targets.length === 1) {
-            setCiSecretTarget(discovery.targets[0])
-            setStep('ask-ci-secrets')
+            const target = discovery.targets[0]
+            setCiSecretTarget(target)
+            // GitHub gets the new 3-option flow ("secrets + workflow" / "secrets only" / "no").
+            // GitLab keeps the existing 2-option flow — workflow generation for GitLab CI is
+            // out of scope for v1.
+            setStep(target.provider === 'github' ? 'ask-github-actions-setup' : 'ask-ci-secrets')
             return
           }
           setStep('ci-secrets-target-select')
@@ -1057,12 +1144,163 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
           const summary = `Uploaded ${ciSecretEntries.length} env var${ciSecretEntries.length === 1 ? '' : 's'} to ${getCiSecretTargetLabel(ciSecretTarget)}`
           setCiSecretUploadSummary(summary)
           addLog(`✔ ${summary}`)
+          // Branch on what the user picked at ask-github-actions-setup. The
+          // GitLab path leaves setupMode='undecided' and falls through to
+          // build-complete just like before.
+          if (setupMode === 'with-workflow') {
+            // Eager-load the package.json scripts and the project-type-aware
+            // recommendation here so the pick-build-script screen can render
+            // synchronously and the user doesn't see a loading flicker.
+            try {
+              const scripts = getPackageScripts() ?? {}
+              setAvailableScripts(scripts)
+              const projectType = await findProjectType({ quiet: true }).catch(() => null)
+              if (projectType) {
+                const recommended = await findBuildCommandForProjectType(projectType).catch(() => null)
+                if (recommended && Object.prototype.hasOwnProperty.call(scripts, recommended))
+                  setRecommendedScript(recommended)
+              }
+            }
+            catch {
+              // Detection is best-effort; pick-build-script falls back to the
+              // empty scripts list + "type a custom command" / "skip" options.
+            }
+            setStep('pick-build-script')
+            return
+          }
           setStep('build-complete')
         }
         catch (err) {
           if (!cancelled) {
             setCiSecretError(err instanceof Error ? err.message : String(err))
             setStep('ci-secrets-failed')
+          }
+        }
+      })()
+    }
+
+    if (step === 'writing-workflow-file') {
+      ;(() => {
+        try {
+          if (!buildScriptChoice)
+            throw new Error('Internal error: no build script choice recorded.')
+          const result = writeWorkflowFile({
+            appId,
+            defaultPlatform: 'ios',
+            packageManager: normalizePackageManager(pm.pm),
+            buildScript: buildScriptChoice,
+            secretKeys: ciSecretEntries.map(entry => entry.key),
+          })
+          if (cancelled)
+            return
+          if (result.kind === 'exists') {
+            setWorkflowExistingContent(result.existingContent)
+            setWorkflowProposedContent(result.newContent)
+            setStep('confirm-workflow-overwrite')
+            return
+          }
+          setWorkflowWrittenPath(result.absolutePath)
+          addLog(`✔ Wrote ${WORKFLOW_PATH}`)
+          setStep('build-complete')
+        }
+        catch (err) {
+          if (!cancelled) {
+            addLog(`⚠ Failed to write workflow file: ${err instanceof Error ? err.message : String(err)}`, 'yellow')
+            setStep('build-complete')
+          }
+        }
+      })()
+    }
+
+    if (step === 'overwrite-and-write-workflow') {
+      ;(() => {
+        try {
+          if (!buildScriptChoice)
+            throw new Error('Internal error: no build script choice recorded.')
+          const result = writeWorkflowFile(
+            {
+              appId,
+              defaultPlatform: 'ios',
+              packageManager: normalizePackageManager(pm.pm),
+              buildScript: buildScriptChoice,
+              secretKeys: ciSecretEntries.map(entry => entry.key),
+            },
+            { overwrite: true },
+          )
+          if (cancelled)
+            return
+          if (result.kind === 'written') {
+            setWorkflowWrittenPath(result.absolutePath)
+            addLog(`✔ Overwrote ${WORKFLOW_PATH}`)
+          }
+          setStep('build-complete')
+        }
+        catch (err) {
+          if (!cancelled) {
+            addLog(`⚠ Failed to overwrite workflow file: ${err instanceof Error ? err.message : String(err)}`, 'yellow')
+            setStep('build-complete')
+          }
+        }
+      })()
+    }
+
+    if (step === 'exporting-env') {
+      ;(() => {
+        try {
+          const targetPath = envExportTargetPath || defaultExportPath(appId, 'ios')
+          const result = exportCredentialsToEnv({
+            appId,
+            platform: 'ios',
+            credentials: savedCredentials ?? {},
+            targetPath,
+          })
+          if (cancelled)
+            return
+          if (result.kind === 'empty') {
+            setEnvExportError('No credentials to export — saved state is empty.')
+            setStep('build-complete')
+            return
+          }
+          if (result.kind === 'exists') {
+            setEnvExportTargetPath(result.path)
+            setStep('confirm-env-export-overwrite')
+            return
+          }
+          setEnvExportPath(result.path)
+          addLog(`✔ Exported ${result.fieldCount} field${result.fieldCount === 1 ? '' : 's'} → ${result.path}`)
+          setStep('build-complete')
+        }
+        catch (err) {
+          if (!cancelled) {
+            setEnvExportError(err instanceof Error ? err.message : String(err))
+            setStep('build-complete')
+          }
+        }
+      })()
+    }
+
+    if (step === 'overwrite-and-export-env') {
+      ;(() => {
+        try {
+          const result = exportCredentialsToEnv({
+            appId,
+            platform: 'ios',
+            credentials: savedCredentials ?? {},
+            targetPath: envExportTargetPath,
+            overwrite: true,
+          })
+          if (cancelled)
+            return
+          if (result.kind === 'written') {
+            setEnvExportPath(result.path)
+            addLog(`✔ Overwrote ${result.path} with ${result.fieldCount} field${result.fieldCount === 1 ? '' : 's'}`)
+          }
+          setStep('build-complete')
+        }
+        catch (err) {
+          if (!cancelled) {
+            setEnvExportError(err instanceof Error ? err.message : String(err))
+            setStep('build-complete')
           }
         }
       })()
@@ -2161,7 +2399,11 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
               }
               const target = ciSecretTargets.find(candidate => candidate.provider === value) || null
               setCiSecretTarget(target)
-              setStep(target ? 'ask-ci-secrets' : 'build-complete')
+              if (!target) {
+                setStep('build-complete')
+                return
+              }
+              setStep(target.provider === 'github' ? 'ask-github-actions-setup' : 'ask-ci-secrets')
             }}
           />
         </Box>
@@ -2193,6 +2435,212 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
             ]}
             onChange={(value) => {
               setStep(value === 'yes' ? 'checking-ci-secrets' : 'build-complete')
+            }}
+          />
+        </Box>
+      )}
+
+      {step === 'ask-github-actions-setup' && (
+        <Box flexDirection="column" marginTop={1}>
+          <SuccessLine text="Credentials saved · GitHub detected" />
+          <Newline />
+          <Text bold>Set up GitHub Actions for you?</Text>
+          <Text dimColor>
+            Capgo can push your
+            {' '}
+            {ciSecretEntries.length}
+            {' '}
+            build env var
+            {ciSecretEntries.length === 1 ? '' : 's'}
+            {' '}
+            as repository secrets and drop a
+            {' '}
+            .github/workflows/capgo-build.yml file you can dispatch manually.
+          </Text>
+          <Newline />
+          <Select
+            options={[
+              { label: 'Yes — set the secrets AND create a workflow file', value: 'with-workflow' },
+              { label: 'Yes — set ONLY the secrets', value: 'secrets-only' },
+              { label: 'No', value: 'no' },
+            ]}
+            onChange={(value) => {
+              if (value === 'no') {
+                setSetupMode('declined')
+                setStep('ask-export-env')
+                return
+              }
+              setSetupMode(value as 'with-workflow' | 'secrets-only')
+              setStep('checking-ci-secrets')
+            }}
+          />
+        </Box>
+      )}
+
+      {step === 'ask-export-env' && (
+        <Box flexDirection="column" marginTop={1}>
+          <Text bold>Export the credentials as a .env file instead?</Text>
+          <Text dimColor>
+            Writes
+            {' '}
+            {defaultExportPath(appId, 'ios').split('/').slice(-1)[0]}
+            {' '}
+            so you can wire up CI later via
+            {' '}
+            <Text>gh secret set -f</Text>
+            {' '}
+            or paste the values manually.
+          </Text>
+          <Newline />
+          <Select
+            options={[
+              { label: `Yes — write .env.capgo.${appId}.ios`, value: 'yes' },
+              { label: 'No, exit without exporting', value: 'no' },
+            ]}
+            onChange={(value) => {
+              if (value === 'yes') {
+                setEnvExportTargetPath(defaultExportPath(appId, 'ios'))
+                setStep('exporting-env')
+                return
+              }
+              setStep('build-complete')
+            }}
+          />
+        </Box>
+      )}
+
+      {step === 'exporting-env' && (
+        <Box flexDirection="column" marginTop={1}>
+          <SpinnerLine text={`Writing ${defaultExportPath(appId, 'ios').split('/').slice(-1)[0]}…`} />
+        </Box>
+      )}
+
+      {step === 'confirm-env-export-overwrite' && (
+        <Box flexDirection="column" marginTop={1}>
+          <Text bold color="yellow">
+            {envExportTargetPath}
+            {' '}
+            already exists.
+          </Text>
+          <Text dimColor>Replace it with a fresh export, or skip?</Text>
+          <Newline />
+          <Select
+            options={[
+              { label: 'Replace it', value: 'replace' },
+              { label: 'Skip — keep the existing file', value: 'skip' },
+            ]}
+            onChange={(value) => {
+              setStep(value === 'replace' ? 'overwrite-and-export-env' : 'build-complete')
+            }}
+          />
+        </Box>
+      )}
+
+      {step === 'pick-build-script' && (
+        <Box flexDirection="column" marginTop={1}>
+          <Text bold>Which script builds your web assets?</Text>
+          <Text dimColor>
+            Capgo will run this before invoking
+            {' '}
+            <Text>capgo build request</Text>
+            {' '}
+            in the workflow. Pick the script you use locally to produce the web build (typically into capacitor.config webDir, e.g. dist/).
+          </Text>
+          <Newline />
+          <Select
+            options={buildScriptPickerOptions(availableScripts, recommendedScript)}
+            onChange={(value) => {
+              if (value === '__skip__') {
+                setBuildScriptChoice({ type: 'skip' })
+                setStep('writing-workflow-file')
+                return
+              }
+              if (value === '__custom__') {
+                setStep('pick-build-script-custom')
+                return
+              }
+              setBuildScriptChoice({ type: 'npm-script', name: value })
+              setStep('writing-workflow-file')
+            }}
+          />
+        </Box>
+      )}
+
+      {step === 'pick-build-script-custom' && (
+        <Box flexDirection="column" marginTop={1}>
+          <Text bold>Custom build command</Text>
+          <Text dimColor>
+            Type the exact command you want the workflow to run before
+            {' '}
+            <Text>capgo build request</Text>
+            {' '}
+            (e.g.
+            {' '}
+            <Text>make web</Text>
+            ,
+            {' '}
+            <Text>bash scripts/build.sh</Text>
+            ).
+          </Text>
+          <Box marginTop={1}>
+            <FilteredTextInput
+              placeholder="make web"
+              onSubmit={(value) => {
+                const cleaned = value.trim()
+                if (!cleaned)
+                  return
+                setBuildScriptChoice({ type: 'custom', command: cleaned })
+                setPendingCustomCommand(cleaned)
+                setStep('writing-workflow-file')
+              }}
+            />
+          </Box>
+        </Box>
+      )}
+
+      {step === 'writing-workflow-file' && (
+        <Box flexDirection="column" marginTop={1}>
+          <SpinnerLine text={`Writing ${WORKFLOW_PATH}…`} />
+        </Box>
+      )}
+
+      {step === 'overwrite-and-write-workflow' && (
+        <Box flexDirection="column" marginTop={1}>
+          <SpinnerLine text={`Overwriting ${WORKFLOW_PATH}…`} />
+        </Box>
+      )}
+
+      {step === 'confirm-workflow-overwrite' && (
+        <Box flexDirection="column" marginTop={1}>
+          <Text bold color="yellow">
+            {WORKFLOW_PATH}
+            {' '}
+            already exists.
+          </Text>
+          <Text dimColor>Replace it with the new Capgo workflow, or keep your version?</Text>
+          {workflowExistingContent && workflowProposedContent && (
+            <Box flexDirection="column" marginTop={1} marginLeft={2}>
+              <Text dimColor>
+                Existing:
+                {' '}
+                {workflowExistingContent.split('\n').length}
+                {' '}
+                lines · New:
+                {' '}
+                {workflowProposedContent.split('\n').length}
+                {' '}
+                lines
+              </Text>
+            </Box>
+          )}
+          <Newline />
+          <Select
+            options={[
+              { label: 'Replace it', value: 'replace' },
+              { label: 'Skip — keep my existing workflow', value: 'skip' },
+            ]}
+            onChange={(value) => {
+              setStep(value === 'replace' ? 'overwrite-and-write-workflow' : 'build-complete')
             }}
           />
         </Box>
@@ -2436,6 +2884,54 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
             {ciSecretUploadSummary && (
               <>
                 <Text>{ciSecretUploadSummary}.</Text>
+                <Newline />
+              </>
+            )}
+            {workflowWrittenPath && (
+              <>
+                <Text color="green">
+                  ✔ Workflow file written:
+                  {' '}
+                  {workflowWrittenPath}
+                </Text>
+                <Text dimColor>
+                  Dispatch it from GitHub Actions to kick off a build, or run
+                  {' '}
+                  <Text bold>{buildRequestCommand}</Text>
+                  {' '}
+                  locally.
+                </Text>
+                <Newline />
+              </>
+            )}
+            {envExportPath && (
+              <>
+                <Text color="green">
+                  ✔ Credentials exported to:
+                  {' '}
+                  {envExportPath}
+                </Text>
+                <Text dimColor>
+                  When you're ready, push them with
+                  {' '}
+                  <Text bold>{`gh secret set -f ${envExportPath.split('/').slice(-1)[0]}`}</Text>
+                  {' '}
+                  (or your CI's equivalent). Add the file to
+                  {' '}
+                  <Text bold>.gitignore</Text>
+                  {' '}
+                  — never commit it.
+                </Text>
+                <Newline />
+              </>
+            )}
+            {envExportError && (
+              <>
+                <Text color="yellow">
+                  ⚠ Could not export .env:
+                  {' '}
+                  {envExportError}
+                </Text>
                 <Newline />
               </>
             )}

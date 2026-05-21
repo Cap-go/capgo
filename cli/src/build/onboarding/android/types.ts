@@ -46,6 +46,17 @@ export type AndroidOnboardingStep
     | 'confirm-ci-secret-overwrite'
     | 'uploading-ci-secrets'
     | 'ci-secrets-failed'
+  // GitHub Actions workflow + .env export sub-flow (post-secrets-upload)
+    | 'ask-github-actions-setup'
+    | 'ask-export-env'
+    | 'exporting-env'
+    | 'confirm-env-export-overwrite'
+    | 'overwrite-and-export-env'
+    | 'pick-build-script'
+    | 'pick-build-script-custom'
+    | 'writing-workflow-file'
+    | 'confirm-workflow-overwrite'
+    | 'overwrite-and-write-workflow'
     | 'ask-build'
     | 'requesting-build'
     | 'build-complete'
@@ -175,6 +186,17 @@ export const ANDROID_STEP_PROGRESS: Record<AndroidOnboardingStep, number> = {
   'confirm-ci-secret-overwrite': 87,
   'uploading-ci-secrets': 88,
   'ci-secrets-failed': 88,
+  // GitHub Actions + .env export branch — post-build, ~96
+  'ask-github-actions-setup': 86,
+  'ask-export-env': 96,
+  'exporting-env': 96,
+  'confirm-env-export-overwrite': 96,
+  'overwrite-and-export-env': 96,
+  'pick-build-script': 96,
+  'pick-build-script-custom': 96,
+  'writing-workflow-file': 97,
+  'confirm-workflow-overwrite': 97,
+  'overwrite-and-write-workflow': 97,
   'ask-build': 90,
   'requesting-build': 95,
   'build-complete': 100,
@@ -220,10 +242,20 @@ export function getAndroidPhaseLabel(step: AndroidOnboardingStep): string {
     case 'ci-secrets-setup':
     case 'ci-secrets-target-select':
     case 'ask-ci-secrets':
+    case 'ask-github-actions-setup':
     case 'checking-ci-secrets':
     case 'confirm-ci-secret-overwrite':
     case 'uploading-ci-secrets':
     case 'ci-secrets-failed':
+    case 'ask-export-env':
+    case 'exporting-env':
+    case 'confirm-env-export-overwrite':
+    case 'overwrite-and-export-env':
+    case 'pick-build-script':
+    case 'pick-build-script-custom':
+    case 'writing-workflow-file':
+    case 'confirm-workflow-overwrite':
+    case 'overwrite-and-write-workflow':
     case 'ask-build':
     case 'requesting-build':
       return 'Step 4 of 4 · Save & Build'

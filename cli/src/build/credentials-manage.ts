@@ -1197,7 +1197,7 @@ async function exportToEnvFile(entry: AppEntry): Promise<boolean> {
     return false
   }
 
-  const content = renderEnvFile(entry, platform, creds)
+  const content = renderEnvFile({ appId: entry.appId, local: entry.local, platform, creds })
   await writeFile(target.path, content, { mode: 0o600 })
   // Node's writeFile mode option only applies when the file is newly created;
   // an overwrite leaves the existing permission bits untouched. Force 0o600
@@ -1235,7 +1235,7 @@ async function exportCombinedEnvFile(entry: AppEntry): Promise<boolean> {
       pLog.info('✗ Export cancelled.')
       return false
     }
-    const content = renderEnvFile(entry, platform, creds)
+    const content = renderEnvFile({ appId: entry.appId, local: entry.local, platform, creds })
     await writeFile(target.path, content, { mode: 0o600 })
     await chmod(target.path, 0o600)
     const fieldCount = Object.values(creds).filter(v => typeof v === 'string' && v.length > 0).length
@@ -1392,13 +1392,20 @@ async function resolveExportTarget(entry: AppEntry, label: 'ios' | 'android' | '
   return { path: resolved }
 }
 
-function renderEnvFile(entry: AppEntry, platform: 'ios' | 'android', creds: Partial<BuildCredentials>): string {
+/**
+ * Render a single-platform .env file from credentials. Exported so the build
+ * onboarding wizard can produce the same format on the "export-instead-of-CI"
+ * branch without duplicating the section headers, escaping rules, and
+ * provisioning-map base64 trick.
+ */
+export function renderEnvFile(args: { appId: string, local: boolean, platform: 'ios' | 'android', creds: Partial<BuildCredentials> }): string {
+  const { appId, local, platform, creds } = args
   const lines: string[] = []
   const generated = new Date().toISOString()
   lines.push('# Capgo build credentials — CI/CD environment file')
-  lines.push(`# App: ${entry.appId}`)
+  lines.push(`# App: ${appId}`)
   lines.push(`# Platform: ${platform}`)
-  lines.push(`# Source: ${entry.local ? 'local' : 'global'} credentials store`)
+  lines.push(`# Source: ${local ? 'local' : 'global'} credentials store`)
   lines.push(`# Generated: ${generated}`)
   lines.push('#')
   lines.push('# Paste these into your CI/CD provider as secrets, or source the file locally:')

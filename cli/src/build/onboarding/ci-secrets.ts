@@ -60,6 +60,9 @@ const MASKED_KEYS = new Set([
   'KEYSTORE_STORE_PASSWORD',
   'ANDROID_KEYSTORE_FILE',
   'PLAY_CONFIG_JSON',
+  // CAPGO_TOKEN is the Capgo API key the workflow uses to authenticate. It's
+  // sensitive and must never be unmasked in GitLab variables.
+  'CAPGO_TOKEN',
 ])
 
 const GITHUB_TARGET: CiSecretTarget = {
@@ -89,7 +92,10 @@ export function runCommand(command: string, args: string[], options: CommandRunO
   }
 }
 
-export function createCiSecretEntries(credentials: Partial<BuildCredentials>): CiSecretEntry[] {
+export function createCiSecretEntries(
+  credentials: Partial<BuildCredentials>,
+  apiKey?: string,
+): CiSecretEntry[] {
   const entries: CiSecretEntry[] = []
   let hasProvisioningMapBase64 = false
   const provisioningMapRaw = credentials.CAPGO_IOS_PROVISIONING_MAP
@@ -112,6 +118,18 @@ export function createCiSecretEntries(credentials: Partial<BuildCredentials>): C
     entries.push({
       key: 'CAPGO_IOS_PROVISIONING_MAP_BASE64',
       value: Buffer.from(provisioningMapRaw, 'utf8').toString('base64'),
+      masked: true,
+    })
+  }
+
+  // CAPGO_TOKEN: the Capgo API key. Pushed alongside build credentials so the
+  // generated GitHub Actions workflow (and any user-authored workflow that
+  // follows the same convention) can authenticate without the user having to
+  // manually `gh secret set CAPGO_TOKEN` after the wizard finishes.
+  if (apiKey && apiKey.length > 0) {
+    entries.push({
+      key: 'CAPGO_TOKEN',
+      value: apiKey,
       masked: true,
     })
   }
