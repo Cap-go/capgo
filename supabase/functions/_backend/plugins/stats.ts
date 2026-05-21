@@ -103,6 +103,15 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
   if (allowDeviceCustomId === false && typeof body.custom_id === 'string' && body.custom_id.trim() !== '') {
     statsActions.push({ action: 'customIdBlocked' })
   }
+  const shouldRecordAction = shouldRecordStatsAction(action, plugin_version)
+
+  if (!shouldRecordAction) {
+    // Legacy plugins can report download_fail for a non-existent target version
+    // when there was no update to download, so skip version validation too.
+    await backgroundTask(c, createStatsMau(c, device.device_id, app_id, appOwner.owner_org, device.platform, device.version_build))
+    await sendStatsAndDevice(c, device, statsActions, action.endsWith('_fail'))
+    return { success: true }
+  }
 
   // Extract version from composite format if present (e.g., "1.2.3:main.js" -> "1.2.3")
   // Composite format is used for file-specific failure stats
@@ -117,7 +126,6 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
   if (!appVersion) {
     return { success: false, error: 'version_not_found', message: 'Version not found', moreInfo: { app_id, version_name } }
   }
-  const shouldRecordAction = shouldRecordStatsAction(action, plugin_version)
   // device.version = appVersion.id
   if (action === 'set' && !device.is_emulator && device.is_prod) {
     // Use versionOnly (from request body) instead of appVersion - no DB read needed for stats

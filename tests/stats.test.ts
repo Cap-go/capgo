@@ -431,10 +431,11 @@ describe('[POST] /stats', () => {
 
   it.concurrent('filters legacy download_fail before saved stats and logs', async () => {
     const cases = [
-      { pluginVersion: '7.16.9', shouldRecord: false },
-      { pluginVersion: '7.17.0', shouldRecord: true },
-      { pluginVersion: '6.14.24', shouldRecord: false },
-      { pluginVersion: '6.14.25', shouldRecord: true },
+      { pluginVersion: '7.16.9', shouldRecord: false, createVersion: true },
+      { pluginVersion: '7.16.9', shouldRecord: false, createVersion: false },
+      { pluginVersion: '7.17.0', shouldRecord: true, createVersion: true },
+      { pluginVersion: '6.14.24', shouldRecord: false, createVersion: true },
+      { pluginVersion: '6.14.25', shouldRecord: true, createVersion: true },
     ]
 
     for (const testCase of cases) {
@@ -443,9 +444,11 @@ describe('[POST] /stats', () => {
       baseData.device_id = uuid
       baseData.action = 'download_fail'
       baseData.plugin_version = testCase.pluginVersion
-      baseData.version_build = `1.0.0-download-fail-${testCase.pluginVersion.replace(/\./g, '-')}`
-      const version = await createAppVersions(baseData.version_build, APP_NAME_STATS)
-      baseData.version_name = version.name
+      baseData.version_build = `1.0.0-download-fail-${testCase.pluginVersion.replace(/\./g, '-')}-${testCase.createVersion ? 'existing' : 'missing'}`
+      const versionName = testCase.createVersion
+        ? (await createAppVersions(baseData.version_build, APP_NAME_STATS)).name
+        : baseData.version_build
+      baseData.version_name = versionName
 
       const response = await postStats(baseData)
       const responseData = await response.json<StatsRes>()
@@ -466,7 +469,7 @@ describe('[POST] /stats', () => {
         .from('version_usage')
         .select('*', { count: 'exact', head: true })
         .eq('app_id', APP_NAME_STATS)
-        .eq('version_name', version.name)
+        .eq('version_name', versionName)
         .eq('action', 'fail')
 
       expect(versionUsageError).toBeNull()
