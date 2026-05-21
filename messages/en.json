@@ -1518,6 +1518,8 @@
   "pending-invite-joined": "Organization joined",
   "pending-invite-load-failed": "Could not load your organization invitation",
   "pending-invite-logo-alt": "{name} logo",
+  "pending-invite-skip": "Skip for now",
+  "pending-invite-skip-failed": "Could not continue",
   "pending-invite-subtitle": "Review this invitation before continuing. You can join the organization or decline it.",
   "pending-invite-subtitle-multiple": "Review these invitations before continuing. You can join or decline each organization.",
   "pending-invite-summary": "Next step",
