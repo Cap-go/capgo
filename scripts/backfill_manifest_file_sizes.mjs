@@ -673,6 +673,7 @@ Options:
   const limit = all ? Number.POSITIVE_INFINITY : getNumberArg('--limit', 500)
   const workers = getNumberArg('--workers', all ? 8 : 1)
   const batchSize = getNumberArg('--batch-size', all ? 1000 : 500)
+  // In --all mode, batchSize * 25 gives each claim about 25 candidate pages before rebalancing; 50000 keeps sparse primary-key windows from causing too many DB reads.
   const idWindowSize = getNumberArg('--id-window-size', all ? Math.max(batchSize * 25, 50000) : Number.MAX_SAFE_INTEGER)
   const concurrency = getNumberArg('--concurrency', all ? 120 : 20)
   const storageAttempts = getNumberArg('--storage-attempts', 3)
