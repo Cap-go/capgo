@@ -177,7 +177,7 @@ export async function getManifestDownloadSize(
       )
       GROUP BY requested.file_hash, app_versions.id
       `,
-      [JSON.stringify(files), appId, versionName || null],
+      [JSON.stringify(files), appId, versionName ?? null],
     )
 
     return buildManifestDownloadSizeResult(files, result.rows)
