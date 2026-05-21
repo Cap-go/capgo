@@ -2137,6 +2137,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
                   <Box marginTop={1}>
                     <FilteredTextInput
                       placeholder={keyId}
+                      initialValue={keyId}
                       onSubmit={(value) => {
                         const finalKeyId = (value || keyId).trim()
                         setKeyId(finalKeyId)
@@ -2159,6 +2160,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
                   <Box marginTop={1}>
                     <FilteredTextInput
                       placeholder="ABC123DEF"
+                      initialValue={keyId}
                       onSubmit={(value) => {
                         const cleaned = value.trim()
                         if (!cleaned)
@@ -2193,6 +2195,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
           <Box marginTop={1}>
             <FilteredTextInput
               placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+              initialValue={issuerId}
               onSubmit={(value) => {
                 const cleaned = value.trim()
                 if (!cleaned)
@@ -2576,6 +2579,20 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
               <Select
                 options={[
                   { label: '🔄  Try again', value: 'retry' },
+                  // When the failed step was verifying-key (i.e. Apple
+                  // rejected the JWT), the cause is almost always a typo
+                  // in the Key ID or Issuer ID — the .p8 contents itself
+                  // doesn't typically corrupt. Offer explicit edit paths
+                  // that pre-fill the current value so users don't retype
+                  // from scratch. (FilteredTextInput now accepts
+                  // initialValue; input-key-id and input-issuer-id pass
+                  // the current state through.)
+                  ...(retryStep === 'verifying-key'
+                    ? [
+                        { label: `✏️   Edit Key ID (currently: ${keyIdRef.current || '—'})`, value: 'edit-key-id' },
+                        { label: `✏️   Edit Issuer ID (currently: ${issuerIdRef.current || '—'})`, value: 'edit-issuer-id' },
+                      ]
+                    : []),
                   { label: '↩️   Restart onboarding', value: 'restart' },
                   { label: '❌  Exit', value: 'exit' },
                 ]}
@@ -2584,6 +2601,14 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
                     setError(null)
                     pickerOpenedRef.current = false
                     setStep(retryStep)
+                  }
+                  else if (value === 'edit-key-id') {
+                    setError(null)
+                    setStep('input-key-id')
+                  }
+                  else if (value === 'edit-issuer-id') {
+                    setError(null)
+                    setStep('input-issuer-id')
                   }
                   else if (value === 'restart') {
                     // Wipe persisted progress so the next run starts truly fresh.

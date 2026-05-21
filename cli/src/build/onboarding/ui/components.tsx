@@ -49,9 +49,16 @@ export const FilteredTextInput: FC<{
   placeholder?: string
   filter?: string
   mask?: boolean
+  /**
+   * Pre-fills the input. Used when the user is editing an already-entered
+   * value (e.g. fixing a typo in their ASC Key ID / Issuer ID after a
+   * verifying-key failure) so they don't have to retype everything.
+   * Backspace works normally to delete from the pre-filled value.
+   */
+  initialValue?: string
   onSubmit: (value: string) => void
-}> = ({ placeholder = '', filter = '=', mask = false, onSubmit }) => {
-  const [value, setValue] = useState('')
+}> = ({ placeholder = '', filter = '=', mask = false, initialValue = '', onSubmit }) => {
+  const [value, setValue] = useState(initialValue)
 
   useInput((input, key) => {
     if (key.return) {
