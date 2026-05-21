@@ -62,6 +62,15 @@ export type AndroidOnboardingErrorCategory
   = | 'keystore_invalid'
     | 'google_oauth_failed'
     | 'play_account_id_invalid'
+    // Imported service-account JSON validation failures. Each value mirrors
+    // the corresponding `ValidationResult.kind` from
+    // `service-account-validation.ts` so PostHog funnel analysis can
+    // distinguish "wrong file" from "SA not invited to app" from "transient
+    // network/server issue" — each implies a different recovery for the user.
+    | 'sa_json_shape_invalid'
+    | 'sa_json_token_rejected'
+    | 'sa_json_no_app_access'
+    | 'sa_json_network_error'
     | 'unknown'
 
 export type KeystoreMethod = 'existing' | 'generate'

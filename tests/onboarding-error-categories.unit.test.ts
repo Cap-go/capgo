@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { MissingScopesError } from '../cli/src/build/onboarding/android/oauth-google.ts'
 import { CertificateLimitError } from '../cli/src/build/onboarding/apple-api.ts'
-import { mapAndroidOnboardingError, mapIosOnboardingError } from '../cli/src/build/onboarding/error-categories.ts'
+import { mapAndroidOnboardingError, mapIosOnboardingError, mapSaValidationKindToCategory } from '../cli/src/build/onboarding/error-categories.ts'
 
 describe('mapIosOnboardingError', () => {
   it.concurrent('maps 401 from App Store Connect to apple_api_unauthorized', () => {
@@ -95,5 +95,23 @@ describe('mapAndroidOnboardingError', () => {
   it.concurrent('returns unknown for everything else', () => {
     expect(mapAndroidOnboardingError(new Error('???'))).toBe('unknown')
     expect(mapAndroidOnboardingError(null)).toBe('unknown')
+  })
+})
+
+describe('mapSaValidationKindToCategory', () => {
+  it.concurrent('maps shape-error to sa_json_shape_invalid', () => {
+    expect(mapSaValidationKindToCategory('shape-error')).toBe('sa_json_shape_invalid')
+  })
+
+  it.concurrent('maps token-error to sa_json_token_rejected', () => {
+    expect(mapSaValidationKindToCategory('token-error')).toBe('sa_json_token_rejected')
+  })
+
+  it.concurrent('maps no-app-access to sa_json_no_app_access', () => {
+    expect(mapSaValidationKindToCategory('no-app-access')).toBe('sa_json_no_app_access')
+  })
+
+  it.concurrent('maps network-error to sa_json_network_error', () => {
+    expect(mapSaValidationKindToCategory('network-error')).toBe('sa_json_network_error')
   })
 })

@@ -28,7 +28,7 @@ import { loadSavedCredentials, updateSavedCredentials } from '../../../credentia
 import { requestBuildInternal } from '../../../request.js'
 import type { CiSecretEntry, CiSecretSetupAdvice, CiSecretTarget } from '../../ci-secrets.js'
 import { createCiSecretEntries, detectCiSecretTargets, getCiSecretTargetLabel, listExistingCiSecretKeys, uploadCiSecrets } from '../../ci-secrets.js'
-import { mapAndroidOnboardingError } from '../../error-categories.js'
+import { mapAndroidOnboardingError, mapSaValidationKindToCategory } from '../../error-categories.js'
 import { canUseFilePicker, openKeystorePicker, openServiceAccountJsonPicker } from '../../file-picker.js'
 import { trackBuilderOnboardingStep } from '../../telemetry.js'
 import { Divider, ErrorLine, FilteredTextInput, Header, SpinnerLine, SuccessLine } from '../../ui/components.js'
@@ -220,10 +220,19 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
       ? undefined
       : now - previous.startedAt
 
+    // Steps whose telemetry event carries an `errorCategory` dimension. The
+    // generic `'error'` step always has one (set by `handleError`); the
+    // SA-import `'sa-json-validation-failed'` step also carries one because
+    // the validation effect populates `errorCategoryRef.current` with the
+    // mapped `ValidationResult.kind` before transitioning. Funnel analysis
+    // in PostHog can split sa-json-validation-failed events by category to
+    // see whether failures are "wrong file" vs "SA not invited to app" vs
+    // transient network issues.
+    const carriesErrorCategory = step === 'error' || step === 'sa-json-validation-failed'
     const eventPayload = {
       step,
       durationMs,
-      errorCategory: step === 'error' ? errorCategoryRef.current : undefined,
+      errorCategory: carriesErrorCategory ? errorCategoryRef.current : undefined,
     }
 
     stepTimingRef.current = { step, startedAt: now }
@@ -755,6 +764,10 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
           }
 
           setSaValidationResult(result)
+          // Stash the validation failure kind so the PostHog
+          // `sa-json-validation-failed` step event carries the dimension.
+          // Read by the telemetry useEffect on the upcoming step transition.
+          errorCategoryRef.current = mapSaValidationKindToCategory(result.kind)
           // shape-error indicates the file itself is wrong — surface as a
           // banner log and route to the same recovery screen so the user
           // can pick a different file or fall back to OAuth. Other kinds
