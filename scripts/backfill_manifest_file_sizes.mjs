@@ -8,7 +8,7 @@
  *
  * Apply updates:
  *   bun scripts/backfill_manifest_file_sizes.mjs --app-version-id=180988804 --apply
- *   bun scripts/backfill_manifest_file_sizes.mjs --all --apply --workers=8 --concurrency=160
+ *   bun scripts/backfill_manifest_file_sizes.mjs --all --apply --workers=16 --concurrency=256
  */
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
@@ -443,29 +443,40 @@ function buildBulkUpdateQuery(rows) {
   }
 }
 
-function createIdRanges(minId, maxId, workers) {
+function createIdWindowClaimer(minId, maxId, idWindowSize) {
   if (!Number.isFinite(minId) || !Number.isFinite(maxId) || minId <= 0 || maxId <= 0 || minId > maxId)
-    return []
+    return { claim: () => null, totalWindows: 0 }
 
-  const rangeSize = Math.ceil((maxId - minId + 1) / workers)
-  return Array.from({ length: workers }, (_, index) => {
-    const start = minId + (index * rangeSize)
-    const end = Math.min(maxId, start + rangeSize - 1)
-    return start <= end ? { end, index, start } : null
-  }).filter(Boolean)
+  let nextStart = minId
+  let nextIndex = 0
+  const totalWindows = Math.ceil((maxId - minId + 1) / idWindowSize)
+
+  return {
+    claim() {
+      if (nextStart > maxId)
+        return null
+
+      const start = nextStart
+      const end = Math.min(maxId, start + idWindowSize - 1)
+      nextStart = end + 1
+      return { end, index: nextIndex++, start }
+    },
+    totalWindows,
+  }
 }
 
-function createWorkerReport(range) {
+function createWorkerReport() {
   return {
     checked: 0,
+    currentEndId: null,
+    currentStartId: null,
     done: false,
-    endId: range.end,
     fixed: 0,
-    lastId: range.start - 1,
+    lastId: null,
     missingSize: 0,
     pages: 0,
-    startId: range.start,
     unchanged: 0,
+    windows: 0,
   }
 }
 
@@ -486,7 +497,8 @@ function createProgressLogger(report, apply) {
     const rate = Math.round(report.checked / elapsedSeconds)
     const activeWorkers = Object.values(report.workers).filter(worker => !worker.done).length
     const maxLastId = Math.max(0, ...Object.values(report.workers).map(worker => worker.lastId ?? 0))
-    console.log(`Checked ${report.checked}, ${apply ? 'fixed' : 'fixable'} ${apply ? report.fixed : report.unchanged}, missing ${report.missingSize}, rate ${rate}/s, active workers ${activeWorkers}, last id ${maxLastId}`)
+    const windows = report.totalWindows === null ? '' : `, windows ${report.claimedWindows}/${report.totalWindows}`
+    console.log(`Checked ${report.checked}, ${apply ? 'fixed' : 'fixable'} ${apply ? report.fixed : report.unchanged}, missing ${report.missingSize}, rate ${rate}/s, active workers ${activeWorkers}, last id ${maxLastId}${windows}`)
   }
 }
 
@@ -552,30 +564,63 @@ function mergePageReport(report, workerReport, pageReport) {
   workerReport.pages += 1
 }
 
-async function runRangeWorker({ appId, appVersionId, batchSize, dbAttempts, includeDeleted, options, pool, range, report, writeProgress }) {
-  const workerReport = report.workers[range.index]
+async function processIdWindow({ appId, appVersionId, batchSize, dbAttempts, includeDeleted, options, pool, range, report, workerIndex, workerReport, writeProgress }) {
   let afterId = range.start - 1
 
+  while (afterId < range.end) {
+    const query = buildCandidateQuery({
+      afterId,
+      appId,
+      appVersionId,
+      endId: range.end,
+      includeDeleted,
+      limit: batchSize,
+    })
+    const candidates = (await queryWithRetry(pool, query.sql, query.params, `worker ${workerIndex} candidate read`, dbAttempts)).rows
+    if (candidates.length === 0) {
+      workerReport.lastId = range.end
+      break
+    }
+
+    afterId = candidates[candidates.length - 1].id
+    workerReport.lastId = afterId
+
+    const pageReport = await processCandidates(options, candidates)
+    mergePageReport(report, workerReport, pageReport)
+    writeProgress()
+  }
+}
+
+async function runRangeWorker({ appId, appVersionId, batchSize, claimRange, dbAttempts, includeDeleted, options, pool, report, workerIndex, writeProgress }) {
+  const workerReport = report.workers[workerIndex]
+
   try {
-    while (afterId < range.end) {
-      const query = buildCandidateQuery({
-        afterId,
-        appId,
-        appVersionId,
-        endId: range.end,
-        includeDeleted,
-        limit: batchSize,
-      })
-      const candidates = (await queryWithRetry(pool, query.sql, query.params, `worker ${range.index} candidate read`, dbAttempts)).rows
-      if (candidates.length === 0)
+    while (true) {
+      const range = claimRange()
+      if (!range)
         break
 
-      afterId = candidates[candidates.length - 1].id
-      workerReport.lastId = afterId
-
-      const pageReport = await processCandidates(options, candidates)
-      mergePageReport(report, workerReport, pageReport)
+      report.claimedWindows += 1
+      workerReport.currentStartId = range.start
+      workerReport.currentEndId = range.end
+      workerReport.lastId = range.start - 1
+      workerReport.windows += 1
       writeProgress()
+
+      await processIdWindow({
+        appId,
+        appVersionId,
+        batchSize,
+        dbAttempts,
+        includeDeleted,
+        options,
+        pool,
+        range,
+        report,
+        workerIndex,
+        workerReport,
+        writeProgress,
+      })
     }
   }
   catch (error) {
@@ -603,6 +648,7 @@ Options:
   --limit              Max rows to scan without --all. Default: 500.
   --batch-size         DB page size per worker. Default: 1000 for --all, 500 otherwise.
   --workers            Parallel manifest.id range workers. Default: 8 for --all, 1 otherwise.
+  --id-window-size     Max manifest.id span claimed per worker turn. Default: max(batch-size*25, 50000).
   --concurrency        Total storage HEAD/RANGE concurrency. Default: 120 for --all, 20 otherwise.
   --storage-attempts   Storage metadata attempts per file. Default: 3.
   --db-attempts        DB read/update attempts. Default: 5.
@@ -627,6 +673,7 @@ Options:
   const limit = all ? Number.POSITIVE_INFINITY : getNumberArg('--limit', 500)
   const workers = getNumberArg('--workers', all ? 8 : 1)
   const batchSize = getNumberArg('--batch-size', all ? 1000 : 500)
+  const idWindowSize = getNumberArg('--id-window-size', all ? Math.max(batchSize * 25, 50000) : Number.MAX_SAFE_INTEGER)
   const concurrency = getNumberArg('--concurrency', all ? 120 : 20)
   const storageAttempts = getNumberArg('--storage-attempts', 3)
   const dbAttempts = getNumberArg('--db-attempts', 5)
@@ -677,6 +724,7 @@ Options:
     appVersionId,
     batchSize,
     checked: 0,
+    claimedWindows: 0,
     concurrency,
     dbAttempts,
     endedAt: null,
@@ -684,6 +732,7 @@ Options:
     errors: [],
     fixed: 0,
     includeDeleted,
+    idWindowSize,
     missingSize: 0,
     poolMax,
     scannedAt: new Date().toISOString(),
@@ -692,6 +741,7 @@ Options:
     storageConcurrencyPerWorker,
     effectiveStorageConcurrency,
     target,
+    totalWindows: null,
     unchanged: 0,
     workerCount,
     workers: {},
@@ -715,19 +765,22 @@ Options:
       const bounds = (await queryWithRetry(pool, boundsQuery.sql, boundsQuery.params, 'manifest id bounds', dbAttempts)).rows[0]
       const minId = Number.parseInt(bounds?.min_id ?? '0', 10)
       const maxId = Number.parseInt(bounds?.max_id ?? '0', 10)
-      const ranges = createIdRanges(minId, maxId, workerCount)
+      const { claim, totalWindows } = createIdWindowClaimer(minId, maxId, idWindowSize)
+      const activeWorkerCount = Math.min(workerCount, totalWindows)
+      report.totalWindows = totalWindows
 
-      console.log(`Scanning manifest.id ${minId}-${maxId} with ${ranges.length} workers, page size ${batchSize}, effective storage concurrency ${effectiveStorageConcurrency}, DB pool max ${poolMax}`)
+      console.log(`Scanning manifest.id ${minId}-${maxId} with ${activeWorkerCount} workers, id window ${idWindowSize}, page size ${batchSize}, effective storage concurrency ${effectiveStorageConcurrency}, DB pool max ${poolMax}`)
 
-      for (const range of ranges) {
-        report.workers[range.index] = createWorkerReport(range)
+      for (let workerIndex = 0; workerIndex < activeWorkerCount; workerIndex++) {
+        report.workers[workerIndex] = createWorkerReport()
       }
       writeProgress(true)
 
-      const workerResults = await Promise.allSettled(ranges.map(range => runRangeWorker({
+      const workerResults = await Promise.allSettled(Array.from({ length: activeWorkerCount }, (_, workerIndex) => runRangeWorker({
         appId,
         appVersionId,
         batchSize,
+        claimRange: claim,
         dbAttempts,
         includeDeleted,
         options: {
@@ -740,8 +793,8 @@ Options:
           verbose,
         },
         pool,
-        range,
         report,
+        workerIndex,
         writeProgress,
       })))
       const failedWorkers = workerResults
@@ -757,7 +810,13 @@ Options:
         index: 0,
         start: startId + 1,
       }
-      report.workers[0] = createWorkerReport(range)
+      report.totalWindows = 1
+      report.claimedWindows = 1
+      report.workers[0] = createWorkerReport()
+      report.workers[0].currentStartId = range.start
+      report.workers[0].currentEndId = range.end
+      report.workers[0].lastId = range.start - 1
+      report.workers[0].windows = 1
       let remaining = limit
       while (remaining > 0) {
         const pageLimit = Math.min(batchSize, remaining)
