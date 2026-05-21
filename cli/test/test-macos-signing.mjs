@@ -5,6 +5,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
+  filterProfilesForApp,
   generateP12Passphrase,
   isMacOS,
   matchIdentitiesToProfiles,
@@ -249,6 +250,64 @@ t('parseHelperJson throws clearly when stdout is unparsable', () => {
 
 t('parseHelperJson throws clearly when JSON is not an object', () => {
   assert.throws(() => parseHelperJson('"a string, not object"', '', 1), /not an object/)
+})
+
+// ─── filterProfilesForApp ────────────────────────────────────────────
+
+function mockProfile({ bundleId, profileType }) {
+  return {
+    path: `/Mobile/${bundleId}-${profileType}.mobileprovision`,
+    uuid: `uuid-${bundleId}-${profileType}`,
+    name: `${bundleId} ${profileType}`,
+    applicationIdentifier: `TEAM.${bundleId}`,
+    bundleId,
+    teamId: 'TEAM',
+    expirationDate: '2099-01-01T00:00:00Z',
+    profileType,
+    certificateSha1s: ['abcd'],
+    creationDate: '2024-01-01T00:00:00Z',
+  }
+}
+
+t('filterProfilesForApp returns only profiles matching bundleId + distribution', () => {
+  const profiles = [
+    mockProfile({ bundleId: 'com.example.app', profileType: 'app_store' }),
+    mockProfile({ bundleId: 'com.example.app', profileType: 'ad_hoc' }),
+    mockProfile({ bundleId: 'com.other.app', profileType: 'app_store' }),
+  ]
+  const filtered = filterProfilesForApp(profiles, 'com.example.app', 'app_store')
+  assert.equal(filtered.length, 1)
+  assert.equal(filtered[0].bundleId, 'com.example.app')
+  assert.equal(filtered[0].profileType, 'app_store')
+})
+
+t('filterProfilesForApp returns empty when bundleId never matches', () => {
+  const profiles = [
+    mockProfile({ bundleId: 'com.other.app', profileType: 'app_store' }),
+    mockProfile({ bundleId: 'com.another.app', profileType: 'app_store' }),
+  ]
+  const filtered = filterProfilesForApp(profiles, 'com.example.app', 'app_store')
+  assert.equal(filtered.length, 0)
+})
+
+t('filterProfilesForApp returns empty when bundleId matches but distribution does not', () => {
+  const profiles = [mockProfile({ bundleId: 'com.example.app', profileType: 'ad_hoc' })]
+  const filtered = filterProfilesForApp(profiles, 'com.example.app', 'app_store')
+  assert.equal(filtered.length, 0)
+})
+
+t('filterProfilesForApp returns all bundleId matches when distribution is null/undefined', () => {
+  const profiles = [
+    mockProfile({ bundleId: 'com.example.app', profileType: 'app_store' }),
+    mockProfile({ bundleId: 'com.example.app', profileType: 'ad_hoc' }),
+    mockProfile({ bundleId: 'com.other.app', profileType: 'app_store' }),
+  ]
+  assert.equal(filterProfilesForApp(profiles, 'com.example.app', null).length, 2)
+  assert.equal(filterProfilesForApp(profiles, 'com.example.app', undefined).length, 2)
+})
+
+t('filterProfilesForApp returns empty for empty input', () => {
+  assert.equal(filterProfilesForApp([], 'com.example.app', 'app_store').length, 0)
 })
 
 process.stdout.write('OK\n')

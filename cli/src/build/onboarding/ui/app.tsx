@@ -23,7 +23,7 @@ import { requestBuildInternal } from '../../request.js'
 import { CertificateLimitError, createCertificate, createProfile, deleteProfile, DuplicateProfileError, ensureBundleId, findCertIdBySha1, generateJwt, listProfilesForCert, revokeCertificate, verifyApiKey } from '../apple-api.js'
 import { createP12, DEFAULT_P12_PASSWORD, generateCsr } from '../csr.js'
 import { canUseFilePicker, openFilePicker } from '../file-picker.js'
-import { exportP12FromKeychain, isHelperCached, isMacOS, listSigningIdentities, matchIdentitiesToProfiles, precompileSwiftHelper, scanProvisioningProfiles } from '../macos-signing.js'
+import { exportP12FromKeychain, filterProfilesForApp, isHelperCached, isMacOS, listSigningIdentities, matchIdentitiesToProfiles, precompileSwiftHelper, scanProvisioningProfiles } from '../macos-signing.js'
 import { deleteProgress, getResumeStep, loadProgress, saveProgress } from '../progress.js'
 import { getBuildOnboardingRecoveryAdvice } from '../recovery.js'
 import { createCiSecretEntries, detectCiSecretTargets, getCiSecretTargetLabel, listExistingCiSecretKeys, uploadCiSecrets } from '../ci-secrets.js'
@@ -196,7 +196,16 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
   const [duplicateProfileOrigin, setDuplicateProfileOrigin] = useState<'creating-profile' | 'import-create-profile-only'>('creating-profile')
 
   const addLog = useCallback((text: string, color = 'green') => {
-    setLog(prev => [...prev, { text, color }])
+    // Dedupe consecutive identical entries. The import-distribution-mode
+    // Select's async onChange can fire more than once on rapid Enter presses
+    // (and on resume + repick), producing repeated "✔ Distribution · …" lines.
+    // Guarding here covers every caller without changing call sites.
+    setLog((prev) => {
+      const last = prev.at(-1)
+      if (last && last.text === text && last.color === color)
+        return prev
+      return [...prev, { text, color }]
+    })
   }, [])
 
   const pm = getPMAndCommand()
@@ -591,6 +600,18 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
             handleError(err, 'import-exporting')
         }
       })()
+    }
+
+    // Defense-in-depth: if we land on `import-pick-profile` with no profile
+    // usable for THIS app + distribution mode, route to no-match-recovery
+    // instead of rendering an empty picker with only "Back". This covers
+    // every entry point uniformly (identity pick, Apple fetch, resume, back
+    // navigation from later steps).
+    if (step === 'import-pick-profile' && chosenIdentity) {
+      const profilesForIdentity = importMatches.find(m => m.identity.sha1 === chosenIdentity.sha1)?.profiles ?? []
+      const usable = filterProfilesForApp(profilesForIdentity, appId, importDistribution)
+      if (usable.length === 0)
+        setStep('import-no-match-recovery')
     }
 
     if (step === 'import-fetching-profile') {
@@ -1466,8 +1487,15 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
                 return
               setChosenIdentity(match.identity)
               addLog(`✔ Identity · ${match.identity.name}`)
-              if (match.profiles.length === 0) {
-                // No local match — offer recovery instead of dead-ending
+              // Apply the same bundleId + distribution filter that
+              // import-pick-profile uses. If nothing survives, route to
+              // no-match-recovery so the user gets an actionable next step
+              // (fetch / create via Apple, or open the portal) instead of
+              // an empty picker with only "Back" — which is what users hit
+              // when the identity has profiles for a *different* app or
+              // for the wrong distribution mode.
+              const usableForThisApp = filterProfilesForApp(match.profiles, appId, importDistribution)
+              if (usableForThisApp.length === 0) {
                 setStep('import-no-match-recovery')
                 return
               }
@@ -1487,10 +1515,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
         // or whose profileType !== importDistribution. `doSaveCredentials`
         // would then persist a mismatched provisioning_map / distribution
         // pair, producing unusable signing credentials.
-        const matchedProfiles = allMatchedProfiles.filter(p =>
-          p.bundleId === appId
-          && (!importDistribution || p.profileType === importDistribution),
-        )
+        const matchedProfiles = filterProfilesForApp(allMatchedProfiles, appId, importDistribution)
         const droppedCount = allMatchedProfiles.length - matchedProfiles.length
         return (
           <Box flexDirection="column" marginTop={1}>
@@ -1572,16 +1597,50 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
         // can't end up with an app_store profile saved under
         // CAPGO_IOS_DISTRIBUTION='ad_hoc'. Browser + Fetch still work.
         const canCreateProfile = importDistribution !== 'ad_hoc'
+        // Distinguish "no profiles at all for this identity" (alert wording
+        // about a missing on-disk file) from "profiles exist but none match
+        // this app's bundle ID + distribution mode" (alert wording about a
+        // mismatch). Both share the same recovery options.
+        const identityProfiles = importMatches.find(m => m.identity.sha1 === chosenIdentity.sha1)?.profiles ?? []
+        const hasAnyProfiles = identityProfiles.length > 0
         return (
           <Box flexDirection="column" marginTop={1}>
             <Alert variant="warning">
-              No provisioning profile on this Mac is linked to "
-              {chosenIdentity.name}
-              ".
+              {hasAnyProfiles
+                ? (
+                    <>
+                      No provisioning profile on this Mac matches this app (
+                      <Text bold>{appId}</Text>
+                      {importDistribution
+                        ? (
+                            <>
+                              {' '}
+                              for
+                              {' '}
+                              <Text bold>{importDistribution}</Text>
+                              {' '}
+                              distribution
+                            </>
+                          )
+                        : null}
+                      ) under "
+                      {chosenIdentity.name}
+                      ".
+                    </>
+                  )
+                : (
+                    <>
+                      No provisioning profile on this Mac is linked to "
+                      {chosenIdentity.name}
+                      ".
+                    </>
+                  )}
             </Alert>
             <Newline />
             <Text dimColor>
-              The cert is in your Keychain but the matching profile isn't on disk. Pick a recovery path:
+              {hasAnyProfiles
+                ? `The cert is in your Keychain but no on-disk profile matches this app's bundle ID${importDistribution ? ` and ${importDistribution} distribution` : ''}. Pick a recovery path:`
+                : `The cert is in your Keychain but the matching profile isn't on disk. Pick a recovery path:`}
             </Text>
             <Newline />
             <Select

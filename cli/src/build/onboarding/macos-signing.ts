@@ -251,6 +251,27 @@ export function matchIdentitiesToProfiles(
   }))
 }
 
+/**
+ * Filter profiles that are actually usable for a given Capacitor app + iOS
+ * distribution mode. Used by the import-existing flow to detect dead-end
+ * situations where an identity has profiles for a different app or the wrong
+ * distribution mode — in which case the no-match-recovery menu can offer
+ * "fetch / create via Apple" instead of dropping the user at an empty picker.
+ *
+ * `importDistribution` is null/undefined when the user hasn't picked yet —
+ * in that case any profileType is accepted.
+ */
+export function filterProfilesForApp(
+  profiles: readonly DiscoveredProfile[],
+  appId: string,
+  importDistribution: 'app_store' | 'ad_hoc' | null | undefined,
+): DiscoveredProfile[] {
+  return profiles.filter(p =>
+    p.bundleId === appId
+    && (!importDistribution || p.profileType === importDistribution),
+  )
+}
+
 // ─── P12 export ──────────────────────────────────────────────────────
 
 /**
