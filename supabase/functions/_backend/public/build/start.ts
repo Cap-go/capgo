@@ -89,7 +89,47 @@ async function markBuildAsFailed(
 ): Promise<void> {
   // Access was already checked before starting the build. This trusted backend
   // status write uses service role because API-key RLS must stay read-only here.
-  const { error: updateError } = await supabaseAdmin(c)
+  //
+  // Fetch the row first to capture the fields we need for the lifecycle event
+  // (previousStatus for the CAS guard + platform/build_mode/owner_org for the
+  // payload). Without this, marking a build failed here would silently miss
+  // the `Build Failed` transition event, leaving the lifecycle funnel
+  // incomplete for the builder-rejection and outer-catch paths.
+  const adminClient = supabaseAdmin(c)
+  const { data: row, error: selectError } = await adminClient
+    .from('build_requests')
+    .select('status, platform, build_mode, owner_org')
+    .eq('builder_job_id', jobId)
+    .eq('app_id', appId)
+    .maybeSingle()
+
+  if (selectError || !row) {
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: 'Failed to fetch build_request before marking as failed',
+      job_id: jobId,
+      error: selectError?.message ?? 'row not found',
+    })
+    // Best-effort: still attempt the unguarded update so the user-facing status
+    // is correct even when we can't capture pre-transition context.
+    await adminClient
+      .from('build_requests')
+      .update({
+        status: 'failed',
+        last_error: errorMessage,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('builder_job_id', jobId)
+      .eq('app_id', appId)
+    return
+  }
+
+  const previousStatus = row.status
+
+  // Optimistic concurrency-control: only one writer wins the transition.
+  // If another writer (cron, status poller, etc.) already advanced the row,
+  // the affected-row set is empty and we skip both the log and the emission.
+  const { data: updatedRows, error: updateError } = await adminClient
     .from('build_requests')
     .update({
       status: 'failed',
@@ -98,6 +138,8 @@ async function markBuildAsFailed(
     })
     .eq('builder_job_id', jobId)
     .eq('app_id', appId)
+    .eq('status', previousStatus)
+    .select('id')
 
   if (updateError) {
     cloudlogErr({
@@ -106,13 +148,27 @@ async function markBuildAsFailed(
       job_id: jobId,
       error: updateError,
     })
+    return
   }
-  else {
+
+  if (updatedRows && updatedRows.length > 0) {
     cloudlog({
       requestId: c.get('requestId'),
       message: 'Marked build_request as failed',
       job_id: jobId,
       error_message: errorMessage,
+    })
+    await emitBuildTransitionEvent(c, {
+      previousStatus,
+      effectiveStatus: 'failed',
+      timeoutApplied: false,
+      effectiveError: errorMessage,
+      build: {
+        app_id: appId,
+        platform: row.platform,
+        build_mode: row.build_mode,
+        owner_org: row.owner_org,
+      },
     })
   }
 }

@@ -215,6 +215,85 @@ describe('build start direct log token', () => {
     }
   })
 
+  it('emits Build Failed when the builder rejects the start request', async () => {
+    // Builder rejection (start.ts:213) calls markBuildAsFailed, which now:
+    //  1. fetches the row to capture previousStatus + platform/build_mode/owner_org
+    //  2. updates status to 'failed' with a CAS guard
+    //  3. emits 'Build Failed' lifecycle event
+    // Without step 3 (the bug this guards against), the builder-rejection path
+    // would silently update status='failed' but never appear in the lifecycle funnel.
+
+    // Override the admin mock to handle BOTH operations markBuildAsFailed performs:
+    //  - `.from('build_requests').select(...)` to read the row
+    //  - `.from('build_requests').update(...)` for the CAS write
+    const updateBuilder = {
+      eq: vi.fn().mockReturnThis(),
+      select: vi.fn().mockResolvedValue({ data: [{ id: 'row-1' }], error: null }),
+    }
+    const adminSelectChain = {
+      eq: vi.fn().mockReturnThis(),
+      maybeSingle: vi.fn().mockResolvedValue({
+        data: {
+          status: 'pending',
+          platform: 'ios',
+          build_mode: 'release',
+          owner_org: '3eb4f870-720d-46b9-843f-2e6d57d54001',
+        },
+        error: null,
+      }),
+    }
+    mockSupabaseAdmin.mockReturnValue({
+      from: vi.fn().mockImplementation((table: string) => {
+        expect(table).toBe('build_requests')
+        return {
+          update: vi.fn().mockReturnValue(updateBuilder),
+          select: vi.fn().mockReturnValue(adminSelectChain),
+        }
+      }),
+    })
+
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('builder is offline', {
+      status: 500,
+    }))
+
+    const context = {
+      get: vi.fn().mockImplementation((key: string) => {
+        if (key === 'requestId')
+          return requestId
+        return undefined
+      }),
+      json: (data: unknown, status = 200) => new Response(JSON.stringify(data), {
+        status,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      }),
+    }
+
+    try {
+      await expect(
+        startBuild(context as any, jobId, appId, { key: 'cli-api-key', user_id: userId } as any),
+      ).rejects.toThrow()
+
+      // Lifecycle funnel must include the terminal Build Failed transition.
+      expect(mockSendEventToTracking).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          event: 'Build Failed',
+          tags: expect.objectContaining({
+            app_id: appId,
+            platform: 'ios',
+            build_mode: 'release',
+            failure_category: expect.any(String),
+          }),
+        }),
+      )
+    }
+    finally {
+      fetchMock.mockRestore()
+    }
+  })
+
   it('skips Build Started emission when CAS guard finds no matching row (lost race)', async () => {
     // Override the default update mock: zero rows returned from .select('id')
     // simulates another writer having already advanced the row's status before
