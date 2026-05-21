@@ -53,6 +53,7 @@ import {
   startCaptureForJob,
 } from '../ai/log-capture'
 import { renderMarkdown } from '../ai/render-markdown'
+import { trackAiAnalysisChoice, trackAiAnalysisResult } from '../ai/telemetry'
 import { assertCliPermission, canPromptInteractively, createSupabaseClient, findSavedKey, getConfig, getOrganizationId, sendEvent } from '../utils'
 import { mergeCredentials, MIN_OUTPUT_RETENTION_SECONDS, parseInAppUpdatePriority, parseOptionalBoolean, parseOutputRetentionSeconds } from './credentials'
 import { buildProvisioningMap } from './credentials-command'
@@ -1985,7 +1986,29 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
 
         const AI_WARNING = '⚠ AI can make mistakes. Always verify the diagnosis against the full log before applying the suggested fix.'
 
-        const runCapgoAi = async (): Promise<void> => {
+        // Closed-enum mapper for PostAnalyzeResult.kind → telemetry result tag.
+        // Never include the analysis text itself in telemetry.
+        const mapPostAnalyzeResultKind = (kind: PostAnalyzeResult['kind']): 'success' | 'already_analyzed' | 'too_big' | 'error' => {
+          if (kind === 'ok')
+            return 'success'
+          if (kind === 'already_analyzed')
+            return 'already_analyzed'
+          if (kind === 'too_big')
+            return 'too_big'
+          return 'error'
+        }
+
+        const runCapgoAi = async (choice: 'capgo_ai' | 'auto_upload', triggeredBy: 'menu' | 'ci_flag'): Promise<void> => {
+          await trackAiAnalysisChoice({
+            apikey: options.apikey,
+            orgId,
+            appId,
+            platform,
+            jobId: capturedJobId!,
+            choice,
+            triggeredBy,
+          })
+
           const logsPath = `${process.env.CAPGO_AI_LOG_BASE_DIR || '/tmp/capgo-builds'}/${capturedJobId}.log`
           let logs = ''
           try {
@@ -2024,6 +2047,18 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
             aiSpinner?.stop('Capgo AI finished')
           }
 
+          // Telemetry — closed-enum result only, never the analysis text.
+          const resultTag = mapPostAnalyzeResultKind(result.kind)
+          await trackAiAnalysisResult({
+            apikey: options.apikey,
+            orgId,
+            appId,
+            platform,
+            jobId: capturedJobId!,
+            result: resultTag,
+            errorStatus: result.kind === 'error' ? result.status : undefined,
+          })
+
           if (result.kind === 'ok') {
             stream.write(`\n--- AI analysis ---\n${renderMarkdown(result.analysis, isInteractive)}\n\n${AI_WARNING}\n`)
           }
@@ -2039,9 +2074,30 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
         }
 
         const runLocalAi = async (): Promise<void> => {
+          await trackAiAnalysisChoice({
+            apikey: options.apikey,
+            orgId,
+            appId,
+            platform,
+            jobId: capturedJobId!,
+            choice: 'local_ai',
+            triggeredBy: 'menu',
+          })
           const promptPath = await writeLocalAiFile(capturedJobId!)
           keepPromptFile = true
           process.stdout.write(`\nSaved prompt to ${promptPath}\nPoint your local AI (Claude, Codex, aider, etc.) at this file.\n${AI_WARNING}\n`)
+        }
+
+        const emitSkipChoice = async (): Promise<void> => {
+          await trackAiAnalysisChoice({
+            apikey: options.apikey,
+            orgId,
+            appId,
+            platform,
+            jobId: capturedJobId!,
+            choice: 'skip',
+            triggeredBy: (behavior === 'auto_upload' || behavior === 'skip') ? 'ci_flag' : 'menu',
+          })
         }
 
         async function showMenu(): Promise<void> {
@@ -2059,21 +2115,24 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
             ],
           })
           if (choice === 'capgo')
-            await runCapgoAi()
+            await runCapgoAi('capgo_ai', 'menu')
           else if (choice === 'local')
             await runLocalAi()
+          else
+            await emitSkipChoice()
         }
 
         try {
           if (behavior === 'skip') {
-            // nothing
+            await emitSkipChoice()
           }
           else if (behavior === 'auto_upload') {
             if (await isLogTooBig(capturedJobId)) {
               process.stderr.write('Log too big for AI analysis (>10 MB), skipping\n')
+              await emitSkipChoice()
             }
             else {
-              await runCapgoAi()
+              await runCapgoAi('auto_upload', 'ci_flag')
             }
           }
           else {
@@ -2082,6 +2141,7 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
               const wants = await confirm({ message: 'Build failed. Run AI analysis?' })
               if (!wants || typeof wants === 'symbol') {
                 // user cancelled or declined — skip
+                await emitSkipChoice()
               }
               else {
                 await showMenu()

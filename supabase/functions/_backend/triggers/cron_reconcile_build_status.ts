@@ -12,11 +12,10 @@ import {
   shouldApplyBuildTimeout,
   TERMINAL_BUILD_STATUSES,
 } from '../utils/build_timeout.ts'
-import { classifyBuildTransition, mapBuildFailureCategory } from '../utils/build_tracking.ts'
+import { emitBuildTransitionEvent } from '../utils/build_tracking.ts'
 import { BRES, middlewareAPISecret } from '../utils/hono.ts'
 import { cloudlog, cloudlogErr } from '../utils/logging.ts'
 import { recordBuildTime, supabaseAdmin } from '../utils/supabase.ts'
-import { sendEventToTracking } from '../utils/tracking.ts'
 import { getEnv } from '../utils/utils.ts'
 
 interface BuilderStatusResponse {
@@ -249,46 +248,19 @@ app.post('/', middlewareAPISecret, async (c) => {
         }
       }
 
-      const transition = classifyBuildTransition({
-        previous: previousStatus,
-        next: effectiveStatus,
+      await emitBuildTransitionEvent(c, {
+        previousStatus,
+        effectiveStatus,
         timeoutApplied,
-      })
-
-      if (transition) {
-        const eventNameByTransition: Record<typeof transition, string> = {
-          started: 'Build Started',
-          succeeded: 'Build Succeeded',
-          failed: 'Build Failed',
-          timed_out: 'Build Timed Out',
-        }
-        const iconByTransition: Record<typeof transition, string> = {
-          started: '⏳',
-          succeeded: '✅',
-          failed: '❌',
-          timed_out: '⏰',
-        }
-
-        const tags: Record<string, string> = {
+        effectiveError,
+        effectiveBuildTimeSeconds,
+        build: {
           app_id: build.app_id,
           platform: build.platform,
           build_mode: build.build_mode,
-        }
-        if (effectiveBuildTimeSeconds !== null && (transition === 'succeeded' || transition === 'failed' || transition === 'timed_out'))
-          tags.duration_seconds = String(effectiveBuildTimeSeconds)
-        if (transition === 'failed' || transition === 'timed_out')
-          tags.failure_category = mapBuildFailureCategory({ timeoutApplied, errorMessage: effectiveError })
-
-        await sendEventToTracking(c, {
-          event: eventNameByTransition[transition],
-          channel: 'build-lifecycle',
-          icon: iconByTransition[transition],
-          notify: false,
-          user_id: build.owner_org,
-          groups: { organization: build.owner_org },
-          tags,
-        })
-      }
+          owner_org: build.owner_org,
+        },
+      })
     }),
   )
 

@@ -2,12 +2,13 @@ import { jwtVerify } from 'jose'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { startBuild } from '../supabase/functions/_backend/public/build/start.ts'
 
-const { mockSupabaseAdmin, mockSupabaseApikey, mockCheckPermission, mockGetEnv, mockReserveNativeBuildSlot } = vi.hoisted(() => ({
+const { mockSupabaseAdmin, mockSupabaseApikey, mockCheckPermission, mockGetEnv, mockReserveNativeBuildSlot, mockSendEventToTracking } = vi.hoisted(() => ({
   mockSupabaseAdmin: vi.fn(),
   mockSupabaseApikey: vi.fn(),
   mockCheckPermission: vi.fn(),
   mockGetEnv: vi.fn(),
   mockReserveNativeBuildSlot: vi.fn(),
+  mockSendEventToTracking: vi.fn(),
 }))
 
 vi.mock('../supabase/functions/_backend/utils/supabase.ts', () => ({
@@ -27,6 +28,10 @@ vi.mock('../supabase/functions/_backend/utils/utils.ts', () => ({
   getEnv: mockGetEnv,
 }))
 
+vi.mock('../supabase/functions/_backend/utils/tracking.ts', () => ({
+  sendEventToTracking: mockSendEventToTracking,
+}))
+
 describe('build start direct log token', () => {
   const requestId = 'req-build-start-log-token'
   const jobId = 'job-log-token-123'
@@ -43,6 +48,8 @@ describe('build start direct log token', () => {
     mockCheckPermission.mockReset()
     mockGetEnv.mockReset()
     mockReserveNativeBuildSlot.mockReset()
+    mockSendEventToTracking.mockReset()
+    mockSendEventToTracking.mockResolvedValue(undefined)
 
     const selectBuilder = {
       eq: vi.fn().mockReturnThis(),
@@ -51,6 +58,9 @@ describe('build start direct log token', () => {
           id: '3eb4f870-720d-46b9-843f-2e6d57d54000',
           app_id: appId,
           owner_org: '3eb4f870-720d-46b9-843f-2e6d57d54001',
+          status: 'pending',
+          platform: 'ios',
+          build_mode: 'release',
         },
         error: null,
       }),
@@ -184,6 +194,11 @@ describe('build start direct log token', () => {
         appId,
         jobId,
       })
+
+      expect(mockSendEventToTracking).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ event: 'Build Started' }),
+      )
     }
     finally {
       fetchMock.mockRestore()

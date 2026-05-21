@@ -1,6 +1,7 @@
 import type { Context } from 'hono'
 import type { Database } from '../../utils/supabase.types.ts'
 import { HTTPException } from 'hono/http-exception'
+import { emitBuildTransitionEvent } from '../../utils/build_tracking.ts'
 import { simpleError } from '../../utils/hono.ts'
 import { cloudlog, cloudlogErr } from '../../utils/logging.ts'
 import { checkPermission } from '../../utils/rbac.ts'
@@ -157,7 +158,7 @@ export async function startBuild(
 
     const { data: buildRequest, error: buildRequestError } = await supabase
       .from('build_requests')
-      .select('id, app_id, owner_org')
+      .select('id, app_id, owner_org, status, platform, build_mode')
       .eq('builder_job_id', jobId)
       .eq('app_id', appId)
       .maybeSingle()
@@ -254,6 +255,19 @@ export async function startBuild(
         message: 'Failed to update build_requests status to running',
         job_id: jobId,
         error: updateError.message,
+      })
+    }
+    else {
+      await emitBuildTransitionEvent(c, {
+        previousStatus: buildRequest.status,
+        effectiveStatus: startedStatus,
+        timeoutApplied: false,
+        build: {
+          app_id: buildRequest.app_id,
+          platform: buildRequest.platform,
+          build_mode: buildRequest.build_mode,
+          owner_org: buildRequest.owner_org,
+        },
       })
     }
 

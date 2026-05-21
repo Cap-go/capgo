@@ -10,6 +10,7 @@ import {
   normalizeBuildTimeoutSeconds,
   shouldApplyBuildTimeout,
 } from '../../utils/build_timeout.ts'
+import { emitBuildTransitionEvent } from '../../utils/build_tracking.ts'
 import { simpleError } from '../../utils/hono.ts'
 import { cloudlog, cloudlogErr } from '../../utils/logging.ts'
 import { checkPermission } from '../../utils/rbac.ts'
@@ -96,7 +97,7 @@ export async function getBuildStatus(
   // This prevents cross-app access by mixing an allowed app_id with another app's job_id.
   const { data: buildRequest, error: buildRequestError } = await supabase
     .from('build_requests')
-    .select('app_id, owner_org, platform')
+    .select('app_id, owner_org, platform, status, build_mode')
     .eq('builder_job_id', job_id)
     .maybeSingle()
 
@@ -225,6 +226,21 @@ export async function getBuildStatus(
       message: 'Failed to update build_requests status',
       job_id,
       error: updateError.message,
+    })
+  }
+  else {
+    await emitBuildTransitionEvent(c, {
+      previousStatus: buildRequest.status,
+      effectiveStatus,
+      timeoutApplied,
+      effectiveError,
+      effectiveBuildTimeSeconds,
+      build: {
+        app_id: buildRequest.app_id,
+        platform: buildRequest.platform,
+        build_mode: buildRequest.build_mode,
+        owner_org: buildRequest.owner_org,
+      },
     })
   }
 
