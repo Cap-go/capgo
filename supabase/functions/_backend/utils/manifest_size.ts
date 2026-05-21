@@ -162,19 +162,21 @@ export async function getManifestDownloadSize(
         app_versions.id AS version_id,
         MAX(manifest.file_size) AS file_size
       FROM requested
-      INNER JOIN public.manifest
-        ON manifest.file_hash = requested.file_hash
       INNER JOIN public.app_versions
-        ON app_versions.id = manifest.app_version_id
-        AND app_versions.app_id = $2
+        ON app_versions.app_id = $2
         AND app_versions.deleted = false
-      WHERE (
-        requested.version_id IS NOT NULL
-        AND app_versions.id = requested.version_id
-      ) OR (
-        requested.version_id IS NULL
-        AND ($3::text IS NULL OR app_versions.name = $3)
-      )
+        AND (
+          (
+            requested.version_id IS NOT NULL
+            AND app_versions.id = requested.version_id
+          ) OR (
+            requested.version_id IS NULL
+            AND ($3::text IS NULL OR app_versions.name = $3)
+          )
+        )
+      INNER JOIN public.manifest
+        ON manifest.app_version_id = app_versions.id
+        AND manifest.file_hash = requested.file_hash
       GROUP BY requested.file_hash, app_versions.id
       `,
       [JSON.stringify(files), appId, versionName ?? null],
