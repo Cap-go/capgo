@@ -840,8 +840,20 @@ export async function checkPlanValid(supabase: SupabaseClient<Database>, orgId: 
 export async function checkPlanValidUpload(supabase: SupabaseClient<Database>, orgId: string, apikey: string, appId?: string, warning = true) {
   const config = await getRemoteConfig()
 
-  // isAllowedActionAppIdApiKey was updated in the orgs_v3 migration to work with the new system
-  const { data: validPlan } = await supabase.rpc('is_allowed_action_org_action', { orgid: orgId, actions: ['storage'] })
+  // Pass appid so check_min_rights gets the app context. Without it,
+  // RBAC denies API keys with limited_to_apps set and the org-scope
+  // plan check returns false even when the plan is healthy. PostgREST
+  // routes to the 3-arg overload at runtime; the `as never` cast bypasses
+  // a `supabase gen types` quirk that collapses overloads sharing the
+  // same name (the 3-arg signature exists in the DB but is not emitted
+  // by the generator).
+  const args = { orgid: orgId, actions: ['storage'], appid: appId } as never
+  const { data: validPlan, error: validPlanError } = await supabase.rpc('is_allowed_action_org_action', args)
+  if (validPlanError) {
+    const message = `Cannot validate upload plan: ${formatError(validPlanError)}`
+    log.error(message)
+    throw new Error(message)
+  }
   if (!validPlan) {
     log.error(`You need to upgrade your plan to continue to use capgo.\n Upgrade here: ${config.hostWeb}/settings/organization/plans\n`)
     wait(100)
@@ -1986,7 +1998,7 @@ export async function getRemoteDependencies(supabase: SupabaseClient<Database>, 
     log.error(`Error fetching native packages: ${error.message}`)
     throw new Error(`Error fetching native packages: ${error.message}`)
   }
-  return convertNativePackages((remoteNativePackages.version.native_packages as any) ?? [])
+  return convertNativePackages(((remoteNativePackages.version as any)?.native_packages as any) ?? [])
 }
 
 export async function checkChecksum(supabase: SupabaseClient<Database>, appId: string, channel: string, currentChecksum: string) {

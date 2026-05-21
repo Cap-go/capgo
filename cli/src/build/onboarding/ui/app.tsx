@@ -25,8 +25,10 @@ import { createP12, DEFAULT_P12_PASSWORD, generateCsr } from '../csr.js'
 import { mapIosOnboardingError } from '../error-categories.js'
 import { canUseFilePicker, openFilePicker } from '../file-picker.js'
 import { exportP12FromKeychain, isHelperCached, isMacOS, listSigningIdentities, matchIdentitiesToProfiles, precompileSwiftHelper, scanProvisioningProfiles } from '../macos-signing.js'
-import { deleteProgress, getResumeStep, loadProgress, saveProgress } from '../progress.js'
+import { deleteProgress, getImportEntryStep, getResumeStep, loadProgress, saveProgress } from '../progress.js'
 import { getBuildOnboardingRecoveryAdvice } from '../recovery.js'
+import type { CiSecretEntry, CiSecretSetupAdvice, CiSecretTarget } from '../ci-secrets.js'
+import { createCiSecretEntries, detectCiSecretTargets, getCiSecretTargetLabel, listExistingCiSecretKeys, uploadCiSecrets } from '../ci-secrets.js'
 import { trackBuilderOnboardingStep } from '../telemetry.js'
 import {
   getPhaseLabel,
@@ -210,6 +212,13 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
   const [buildUrl, setBuildUrl] = useState('')
   const [buildOutput, setBuildOutput] = useState<string[]>([])
   const [supportBundlePath, setSupportBundlePath] = useState<string | null>(null)
+  const [ciSecretEntries, setCiSecretEntries] = useState<CiSecretEntry[]>([])
+  const [ciSecretTargets, setCiSecretTargets] = useState<CiSecretTarget[]>([])
+  const [ciSecretTarget, setCiSecretTarget] = useState<CiSecretTarget | null>(null)
+  const [ciSecretSetupAdvice, setCiSecretSetupAdvice] = useState<CiSecretSetupAdvice[]>([])
+  const [ciSecretExistingKeys, setCiSecretExistingKeys] = useState<string[]>([])
+  const [ciSecretError, setCiSecretError] = useState<string | null>(null)
+  const [ciSecretUploadSummary, setCiSecretUploadSummary] = useState<string | null>(null)
 
   // Import-existing sub-flow state (macOS only)
   const [importMatches, setImportMatches] = useState<IdentityProfileMatch[]>([])
@@ -330,8 +339,17 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
   async function getFreshToken(): Promise<string> {
     let content = p8ContentRef.current
     if (!content && p8PathRef.current) {
-      content = await readFile(p8PathRef.current, 'utf-8')
-      setP8Content(content)
+      try {
+        content = await readFile(p8PathRef.current, 'utf-8')
+        setP8Content(content)
+      }
+      catch {
+        // Saved p8Path was moved, deleted, or is no longer readable since
+        // the previous run. Convert to NeedP8Error so handleError routes
+        // the user back to api-key-instructions for a clean re-prompt
+        // rather than surfacing a raw ENOENT support-bundle screen.
+        throw new NeedP8Error()
+      }
     }
     if (!content) {
       throw new NeedP8Error()
@@ -405,7 +423,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
 
   // ── Credential save logic ──
 
-  async function doSaveCredentials() {
+  async function doSaveCredentials(): Promise<Parameters<typeof updateSavedCredentials>[2]> {
     // For import mode in ad_hoc distribution, no .p8 is needed at all.
     const needsAscKey = !importMode || importDistribution === 'app_store'
 
@@ -421,6 +439,12 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
           throw new Error('Could not read .p8 file. Please provide the path again.')
         }
       }
+      // Defensive guard: do NOT silently save credentials missing the ASC
+      // API key. Without this, an empty p8ContentRef + empty p8PathRef
+      // (legacy or malformed progress) would skip the `APPLE_KEY_*` writes
+      // below and leave the user with a working-looking save and no key.
+      if (!keyContent)
+        throw new Error('Internal error: app_store distribution requires a .p8 key but none was provided. Re-run `build init` and provide the key file.')
     }
 
     // Use the bundle ID from the imported profile when available; falls back
@@ -456,6 +480,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
 
     await deleteProgress(appId)
     addLog('✔ Credentials saved')
+    return credentials
   }
 
   // ── Async step handlers ──
@@ -586,9 +611,12 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
           setImportProfiles(profiles)
           setImportMatches(matches)
           addLog(`✔ Found ${distOnly.length} distribution identity${distOnly.length === 1 ? '' : 'ies'} and ${profiles.length} profile${profiles.length === 1 ? '' : 's'} on this Mac`)
-          // Distribution-mode is now the first visible question; .p8 input
-          // (if needed) routes through it before identity selection.
-          setStep('import-distribution-mode')
+          // Skip questions the user already answered on a previous attempt:
+          // if importDistribution + (for app_store) apiKeyVerified are
+          // already saved in progress, jump past distribution-mode and the
+          // .p8 input chain. See progress.ts → getImportEntryStep for the
+          // full decision table and tests.
+          setStep(getImportEntryStep(await loadProgress(appId)))
         }
         catch (err) {
           if (!cancelled)
@@ -1022,14 +1050,95 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
     if (step === 'saving-credentials') {
       ;(async () => {
         try {
-          await doSaveCredentials()
+          const credentials = await doSaveCredentials()
           if (cancelled)
             return
-          setStep('ask-build')
+          const entries = createCiSecretEntries(credentials)
+          setCiSecretEntries(entries)
+          if (entries.length === 0)
+            setStep('ask-build')
+          else
+            setStep('detecting-ci-secrets')
         }
         catch (err) {
           if (!cancelled)
             handleError(err, 'saving-credentials')
+        }
+      })()
+    }
+
+    if (step === 'detecting-ci-secrets') {
+      ;(async () => {
+        try {
+          const discovery = detectCiSecretTargets()
+          if (cancelled)
+            return
+          setCiSecretTargets(discovery.targets)
+          setCiSecretSetupAdvice(discovery.setup)
+          if (discovery.targets.length === 0) {
+            if (discovery.setup.length > 0) {
+              setStep('ci-secrets-setup')
+              return
+            }
+            for (const note of discovery.notes)
+              addLog(`ℹ ${note}`, 'yellow')
+            setStep('ask-build')
+            return
+          }
+          if (discovery.targets.length === 1) {
+            setCiSecretTarget(discovery.targets[0])
+            setStep('ask-ci-secrets')
+            return
+          }
+          setStep('ci-secrets-target-select')
+        }
+        catch (err) {
+          if (!cancelled) {
+            setCiSecretError(err instanceof Error ? err.message : String(err))
+            setStep('ci-secrets-failed')
+          }
+        }
+      })()
+    }
+
+    if (step === 'checking-ci-secrets') {
+      ;(async () => {
+        try {
+          if (!ciSecretTarget)
+            throw new Error('No git hosting target selected.')
+          const existing = listExistingCiSecretKeys(ciSecretTarget, ciSecretEntries.map(entry => entry.key))
+          if (cancelled)
+            return
+          setCiSecretExistingKeys(existing)
+          setStep(existing.length > 0 ? 'confirm-ci-secret-overwrite' : 'uploading-ci-secrets')
+        }
+        catch (err) {
+          if (!cancelled) {
+            setCiSecretError(err instanceof Error ? err.message : String(err))
+            setStep('ci-secrets-failed')
+          }
+        }
+      })()
+    }
+
+    if (step === 'uploading-ci-secrets') {
+      ;(async () => {
+        try {
+          if (!ciSecretTarget)
+            throw new Error('No git hosting target selected.')
+          uploadCiSecrets(ciSecretTarget, ciSecretEntries, ciSecretExistingKeys)
+          if (cancelled)
+            return
+          const summary = `Uploaded ${ciSecretEntries.length} env var${ciSecretEntries.length === 1 ? '' : 's'} to ${getCiSecretTargetLabel(ciSecretTarget)}`
+          setCiSecretUploadSummary(summary)
+          addLog(`✔ ${summary}`)
+          setStep('ask-build')
+        }
+        catch (err) {
+          if (!cancelled) {
+            setCiSecretError(err instanceof Error ? err.message : String(err))
+            setStep('ci-secrets-failed')
+          }
         }
       })()
     }
@@ -1395,7 +1504,12 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
               if (mode === 'app_store') {
                 // Need .p8 for TestFlight upload AND for any profile auto-recovery.
                 // After verifying-key the import-mode branch routes back to import-pick-identity.
-                setStep('api-key-instructions')
+                // Skip the .p8 input chain entirely if the key was already
+                // verified on a previous attempt (resume) — otherwise we
+                // re-ask "How do you want to provide the .p8 file?" even
+                // though APPLE_KEY_CONTENT is already known. Use the same
+                // routing decision as the post-scan entry point.
+                setStep(getImportEntryStep(existing))
               }
               else {
                 // ad_hoc skips .p8; can opt into it later from no-match recovery.
@@ -2063,6 +2177,146 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
         </Box>
       )}
 
+      {step === 'detecting-ci-secrets' && (
+        <Box flexDirection="column" marginTop={1}>
+          <SpinnerLine text="Checking git hosting..." />
+        </Box>
+      )}
+
+      {step === 'ci-secrets-setup' && (
+        <Box flexDirection="column" marginTop={1}>
+          <Text bold>Set up your git hosting CLI to upload env vars</Text>
+          <Newline />
+          {ciSecretSetupAdvice.map(advice => (
+            <Box key={advice.target.provider} flexDirection="column" marginBottom={1}>
+              <Text>{advice.target.label}</Text>
+              <Text dimColor>{advice.message}</Text>
+              {advice.commands.map(command => (
+                <Text key={`${advice.target.provider}-${command}`} color="cyan">{command}</Text>
+              ))}
+            </Box>
+          ))}
+          <Text dimColor>Run this in another terminal, then come back here.</Text>
+          <Newline />
+          <Select
+            options={[
+              { label: 'I installed and logged in, check again', value: 'retry' },
+              { label: 'Skip upload', value: 'skip' },
+            ]}
+            onChange={(value) => {
+              setStep(value === 'retry' ? 'detecting-ci-secrets' : 'ask-build')
+            }}
+          />
+        </Box>
+      )}
+
+      {step === 'ci-secrets-target-select' && (
+        <Box flexDirection="column" marginTop={1}>
+          <Text bold>Where should Capgo upload the build env vars?</Text>
+          <Newline />
+          <Select
+            options={[
+              ...ciSecretTargets.map(target => ({
+                label: target.provider === 'github' ? 'GitHub Actions repository secrets' : 'GitLab CI/CD variables',
+                value: target.provider,
+              })),
+              { label: 'Skip', value: 'skip' },
+            ]}
+            onChange={(value) => {
+              if (value === 'skip') {
+                setStep('ask-build')
+                return
+              }
+              const target = ciSecretTargets.find(candidate => candidate.provider === value) || null
+              setCiSecretTarget(target)
+              setStep(target ? 'ask-ci-secrets' : 'ask-build')
+            }}
+          />
+        </Box>
+      )}
+
+      {step === 'ask-ci-secrets' && (
+        <Box flexDirection="column" marginTop={1}>
+          <SuccessLine text="Credentials saved" />
+          <Newline />
+          <Text bold>
+            Upload
+            {' '}
+            {ciSecretEntries.length}
+            {' '}
+            build env var
+            {ciSecretEntries.length === 1 ? '' : 's'}
+            {' '}
+            to
+            {' '}
+            {getCiSecretTargetLabel(ciSecretTarget)}
+            ?
+          </Text>
+          <Text dimColor>Capgo will check for existing names first and ask before replacing anything.</Text>
+          <Newline />
+          <Select
+            options={[
+              { label: `Upload with ${ciSecretTarget?.cli || 'CLI'}`, value: 'yes' },
+              { label: 'Skip', value: 'no' },
+            ]}
+            onChange={(value) => {
+              setStep(value === 'yes' ? 'checking-ci-secrets' : 'ask-build')
+            }}
+          />
+        </Box>
+      )}
+
+      {step === 'checking-ci-secrets' && (
+        <Box flexDirection="column" marginTop={1}>
+          <SpinnerLine text={`Checking existing env vars in ${getCiSecretTargetLabel(ciSecretTarget)}...`} />
+        </Box>
+      )}
+
+      {step === 'confirm-ci-secret-overwrite' && (
+        <Box flexDirection="column" marginTop={1}>
+          <Text bold color="yellow">These env vars already exist and will be replaced:</Text>
+          <Box flexDirection="column" marginTop={1} marginLeft={2}>
+            {ciSecretExistingKeys.map(key => (
+              <Text key={key}>{`• ${key}`}</Text>
+            ))}
+          </Box>
+          <Newline />
+          <Select
+            options={[
+              { label: 'Replace existing env vars', value: 'replace' },
+              { label: 'Skip upload', value: 'skip' },
+            ]}
+            onChange={(value) => {
+              setStep(value === 'replace' ? 'uploading-ci-secrets' : 'ask-build')
+            }}
+          />
+        </Box>
+      )}
+
+      {step === 'uploading-ci-secrets' && (
+        <Box flexDirection="column" marginTop={1}>
+          <SpinnerLine text={`Uploading env vars to ${getCiSecretTargetLabel(ciSecretTarget)}...`} />
+        </Box>
+      )}
+
+      {step === 'ci-secrets-failed' && (
+        <Box flexDirection="column" marginTop={1}>
+          <ErrorLine text={ciSecretError || 'Could not upload env vars.'} />
+          <Newline />
+          <Text dimColor>You can continue; credentials are already saved locally.</Text>
+          <Newline />
+          <Select
+            options={[
+              { label: 'Try upload again', value: 'retry' },
+              { label: 'Continue without upload', value: 'continue' },
+            ]}
+            onChange={(value) => {
+              setStep(value === 'retry' ? (ciSecretTarget ? 'checking-ci-secrets' : 'detecting-ci-secrets') : 'ask-build')
+            }}
+          />
+        </Box>
+      )}
+
       {/* Ask to build */}
       {step === 'ask-build' && (
         <Box flexDirection="column" marginTop={1}>
@@ -2249,6 +2503,12 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
                   <Text>Your iOS credentials are saved and ready to use.</Text>
                 )}
             <Newline />
+            {ciSecretUploadSummary && (
+              <>
+                <Text>{ciSecretUploadSummary}.</Text>
+                <Newline />
+              </>
+            )}
             <Text dimColor>
               Run
               {' '}

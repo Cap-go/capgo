@@ -480,6 +480,7 @@ export type Database = {
       }
       build_requests: {
         Row: {
+          ai_analyzed: boolean
           app_id: string
           build_config: Json | null
           build_mode: string
@@ -499,6 +500,7 @@ export type Database = {
           upload_url: string
         }
         Insert: {
+          ai_analyzed?: boolean
           app_id: string
           build_config?: Json | null
           build_mode?: string
@@ -518,6 +520,7 @@ export type Database = {
           upload_url: string
         }
         Update: {
+          ai_analyzed?: boolean
           app_id?: string
           build_config?: Json | null
           build_mode?: string
@@ -715,7 +718,7 @@ export type Database = {
           public: boolean
           rbac_id: string
           updated_at: string
-          version: number
+          version: number | null
         }
         Insert: {
           allow_dev?: boolean
@@ -737,7 +740,7 @@ export type Database = {
           public?: boolean
           rbac_id?: string
           updated_at?: string
-          version: number
+          version?: number | null
         }
         Update: {
           allow_dev?: boolean
@@ -759,7 +762,7 @@ export type Database = {
           public?: boolean
           rbac_id?: string
           updated_at?: string
-          version?: number
+          version?: number | null
         }
         Relationships: [
           {
@@ -2773,6 +2776,7 @@ export type Database = {
           audit_log_id: number | null
           completed_at: string | null
           created_at: string
+          delivery_version: string
           duration_ms: number | null
           event_type: string
           id: string
@@ -2791,6 +2795,7 @@ export type Database = {
           audit_log_id?: number | null
           completed_at?: string | null
           created_at?: string
+          delivery_version?: string
           duration_ms?: number | null
           event_type: string
           id?: string
@@ -2809,6 +2814,7 @@ export type Database = {
           audit_log_id?: number | null
           completed_at?: string | null
           created_at?: string
+          delivery_version?: string
           duration_ms?: number | null
           event_type?: string
           id?: string
@@ -2843,6 +2849,7 @@ export type Database = {
         Row: {
           created_at: string
           created_by: string
+          delivery_version: string
           enabled: boolean
           events: string[]
           id: string
@@ -2855,6 +2862,7 @@ export type Database = {
         Insert: {
           created_at?: string
           created_by: string
+          delivery_version?: string
           enabled?: boolean
           events: string[]
           id?: string
@@ -2867,6 +2875,7 @@ export type Database = {
         Update: {
           created_at?: string
           created_by?: string
+          delivery_version?: string
           enabled?: boolean
           events?: string[]
           id?: string
@@ -3075,7 +3084,7 @@ export type Database = {
       }
       check_revert_to_builtin_version: {
         Args: { appid: string }
-        Returns: number
+        Returns: number | null
       }
       cleanup_expired_apikeys: { Args: never; Returns: undefined }
       cleanup_expired_demo_apps: { Args: never; Returns: undefined }
@@ -3086,10 +3095,12 @@ export type Database = {
       cleanup_queue_messages: { Args: never; Returns: undefined }
       cleanup_tmp_users: { Args: never; Returns: undefined }
       cleanup_webhook_deliveries: { Args: never; Returns: undefined }
-      clear_onboarding_app_data: {
-        Args: { p_app_uuid: string }
-        Returns: undefined
-      }
+      clear_onboarding_app_data:
+        | { Args: { p_app_uuid: string }; Returns: undefined }
+        | {
+            Args: { p_app_uuid: string; p_preserve_app_version_id: number }
+            Returns: undefined
+          }
       cli_check_permission: {
         Args: {
           apikey?: string

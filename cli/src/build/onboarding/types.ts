@@ -35,6 +35,14 @@ export type OnboardingStep
     | 'duplicate-profile-prompt'
     | 'deleting-duplicate-profiles'
     | 'saving-credentials'
+    | 'detecting-ci-secrets'
+    | 'ci-secrets-setup'
+    | 'ci-secrets-target-select'
+    | 'ask-ci-secrets'
+    | 'checking-ci-secrets'
+    | 'confirm-ci-secret-overwrite'
+    | 'uploading-ci-secrets'
+    | 'ci-secrets-failed'
     | 'ask-build'
     | 'requesting-build'
     | 'build-complete'
@@ -140,6 +148,14 @@ export const STEP_PROGRESS: Record<OnboardingStep, number> = {
   'duplicate-profile-prompt': 65,
   'deleting-duplicate-profiles': 68,
   'saving-credentials': 80,
+  'detecting-ci-secrets': 82,
+  'ci-secrets-setup': 82,
+  'ci-secrets-target-select': 82,
+  'ask-ci-secrets': 82,
+  'checking-ci-secrets': 83,
+  'confirm-ci-secret-overwrite': 83,
+  'uploading-ci-secrets': 84,
+  'ci-secrets-failed': 84,
   'ask-build': 85,
   'requesting-build': 90,
   'build-complete': 100,
@@ -191,6 +207,14 @@ export function getPhaseLabel(step: OnboardingStep): string {
     case 'deleting-duplicate-profiles':
       return 'Step 3 of 4 · Provisioning Profile'
     case 'saving-credentials':
+    case 'detecting-ci-secrets':
+    case 'ci-secrets-setup':
+    case 'ci-secrets-target-select':
+    case 'ask-ci-secrets':
+    case 'checking-ci-secrets':
+    case 'confirm-ci-secret-overwrite':
+    case 'uploading-ci-secrets':
+    case 'ci-secrets-failed':
     case 'ask-build':
     case 'requesting-build':
       return 'Step 4 of 4 · Save & Build'

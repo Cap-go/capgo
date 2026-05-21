@@ -162,7 +162,7 @@ describe('tests CLI channel commands', () => {
         .single()
         .throwOnError()
       expect(error).toBeNull()
-      expect(data?.version.name).toBe(bundle)
+      expect(data?.version?.name).toBe(bundle)
     })
 
     it.concurrent('should fail to set bundle for invalid channel name', async () => {

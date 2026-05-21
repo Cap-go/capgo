@@ -26,6 +26,8 @@ import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { createSupabaseClient, findSavedKey, findSavedKeySilent, getOrganizationId } from '../../../../utils.js'
 import { loadSavedCredentials, updateSavedCredentials } from '../../../credentials.js'
 import { requestBuildInternal } from '../../../request.js'
+import type { CiSecretEntry, CiSecretSetupAdvice, CiSecretTarget } from '../../ci-secrets.js'
+import { createCiSecretEntries, detectCiSecretTargets, getCiSecretTargetLabel, listExistingCiSecretKeys, uploadCiSecrets } from '../../ci-secrets.js'
 import { mapAndroidOnboardingError } from '../../error-categories.js'
 import { canUseFilePicker, openKeystorePicker } from '../../file-picker.js'
 import { trackBuilderOnboardingStep } from '../../telemetry.js'
@@ -273,6 +275,13 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
   // Phase 6 — build output
   const [buildUrl, setBuildUrl] = useState('')
   const [buildOutput, setBuildOutput] = useState<string[]>([])
+  const [ciSecretEntries, setCiSecretEntries] = useState<CiSecretEntry[]>([])
+  const [ciSecretTargets, setCiSecretTargets] = useState<CiSecretTarget[]>([])
+  const [ciSecretTarget, setCiSecretTarget] = useState<CiSecretTarget | null>(null)
+  const [ciSecretSetupAdvice, setCiSecretSetupAdvice] = useState<CiSecretSetupAdvice[]>([])
+  const [ciSecretExistingKeys, setCiSecretExistingKeys] = useState<string[]>([])
+  const [ciSecretError, setCiSecretError] = useState<string | null>(null)
+  const [ciSecretUploadSummary, setCiSecretUploadSummary] = useState<string | null>(null)
 
   const { stdout } = useStdout()
   const terminalRows = stdout?.rows ?? 24
@@ -478,7 +487,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
     return refreshed.accessToken
   }, [accessToken, refreshTokenState, oauthClientId, getCapgoConfig])
 
-  async function doSaveCredentials() {
+  async function doSaveCredentials(): Promise<Parameters<typeof updateSavedCredentials>[2]> {
     if (!keystoreReady || !keystoreBase64)
       throw new Error('keystore not ready')
     if (!serviceAccountKeyBase64)
@@ -486,15 +495,18 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
     if (!keystoreStorePassword || !keystoreAlias)
       throw new Error('keystore inputs missing')
 
-    await updateSavedCredentials(appId, 'android', {
+    const credentials = {
       ANDROID_KEYSTORE_FILE: keystoreBase64,
       KEYSTORE_KEY_ALIAS: keystoreAlias,
       KEYSTORE_STORE_PASSWORD: keystoreStorePassword,
       KEYSTORE_KEY_PASSWORD: keystoreKeyPassword || keystoreStorePassword,
       PLAY_CONFIG_JSON: serviceAccountKeyBase64,
-    })
+    } as Parameters<typeof updateSavedCredentials>[2]
+
+    await updateSavedCredentials(appId, 'android', credentials)
     await deleteAndroidProgress(appId)
     addLog('✔ Credentials saved')
+    return credentials
   }
 
   useEffect(() => {
@@ -1016,7 +1028,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
               return
             }
           }
-          await doSaveCredentials()
+          const credentials = await doSaveCredentials()
           if (cancelled)
             return
           // Random-password backup hint: emitted only here (post-save) so the
@@ -1026,11 +1038,92 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
           // persisting a one-off flag to progress.json.
           if (randomPasswordGenerated)
             addLog(`  ℹ Your auto-generated keystore password is now in ~/.capgo-credentials/credentials.json — back up that file.`, 'yellow')
-          setStep('ask-build')
+          const entries = createCiSecretEntries(credentials)
+          setCiSecretEntries(entries)
+          if (entries.length === 0)
+            setStep('ask-build')
+          else
+            setStep('detecting-ci-secrets')
         }
         catch (err) {
           if (!cancelled)
             handleError(err, 'saving-credentials')
+        }
+      })()
+    }
+
+    if (step === 'detecting-ci-secrets') {
+      ;(async () => {
+        try {
+          const discovery = detectCiSecretTargets()
+          if (cancelled)
+            return
+          setCiSecretTargets(discovery.targets)
+          setCiSecretSetupAdvice(discovery.setup)
+          if (discovery.targets.length === 0) {
+            if (discovery.setup.length > 0) {
+              setStep('ci-secrets-setup')
+              return
+            }
+            for (const note of discovery.notes)
+              addLog(`ℹ ${note}`, 'yellow')
+            setStep('ask-build')
+            return
+          }
+          if (discovery.targets.length === 1) {
+            setCiSecretTarget(discovery.targets[0])
+            setStep('ask-ci-secrets')
+            return
+          }
+          setStep('ci-secrets-target-select')
+        }
+        catch (err) {
+          if (!cancelled) {
+            setCiSecretError(err instanceof Error ? err.message : String(err))
+            setStep('ci-secrets-failed')
+          }
+        }
+      })()
+    }
+
+    if (step === 'checking-ci-secrets') {
+      ;(async () => {
+        try {
+          if (!ciSecretTarget)
+            throw new Error('No git hosting target selected.')
+          const existing = listExistingCiSecretKeys(ciSecretTarget, ciSecretEntries.map(entry => entry.key))
+          if (cancelled)
+            return
+          setCiSecretExistingKeys(existing)
+          setStep(existing.length > 0 ? 'confirm-ci-secret-overwrite' : 'uploading-ci-secrets')
+        }
+        catch (err) {
+          if (!cancelled) {
+            setCiSecretError(err instanceof Error ? err.message : String(err))
+            setStep('ci-secrets-failed')
+          }
+        }
+      })()
+    }
+
+    if (step === 'uploading-ci-secrets') {
+      ;(async () => {
+        try {
+          if (!ciSecretTarget)
+            throw new Error('No git hosting target selected.')
+          uploadCiSecrets(ciSecretTarget, ciSecretEntries, ciSecretExistingKeys)
+          if (cancelled)
+            return
+          const summary = `Uploaded ${ciSecretEntries.length} env var${ciSecretEntries.length === 1 ? '' : 's'} to ${getCiSecretTargetLabel(ciSecretTarget)}`
+          setCiSecretUploadSummary(summary)
+          addLog(`✔ ${summary}`)
+          setStep('ask-build')
+        }
+        catch (err) {
+          if (!cancelled) {
+            setCiSecretError(err instanceof Error ? err.message : String(err))
+            setStep('ci-secrets-failed')
+          }
         }
       })()
     }
@@ -1859,6 +1952,140 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
         <Box marginTop={1}><SpinnerLine text="Saving credentials..." /></Box>
       )}
 
+      {step === 'detecting-ci-secrets' && (
+        <Box marginTop={1}><SpinnerLine text="Checking git hosting..." /></Box>
+      )}
+
+      {step === 'ci-secrets-setup' && (
+        <Box flexDirection="column" marginTop={1}>
+          <Text bold>Set up your git hosting CLI to upload env vars</Text>
+          <Newline />
+          {ciSecretSetupAdvice.map(advice => (
+            <Box key={advice.target.provider} flexDirection="column" marginBottom={1}>
+              <Text>{advice.target.label}</Text>
+              <Text dimColor>{advice.message}</Text>
+              {advice.commands.map(command => (
+                <Text key={`${advice.target.provider}-${command}`} color="cyan">{command}</Text>
+              ))}
+            </Box>
+          ))}
+          <Text dimColor>Run this in another terminal, then come back here.</Text>
+          <Newline />
+          <Select
+            options={[
+              { label: 'I installed and logged in, check again', value: 'retry' },
+              { label: 'Skip upload', value: 'skip' },
+            ]}
+            onChange={(value) => {
+              setStep(value === 'retry' ? 'detecting-ci-secrets' : 'ask-build')
+            }}
+          />
+        </Box>
+      )}
+
+      {step === 'ci-secrets-target-select' && (
+        <Box flexDirection="column" marginTop={1}>
+          <Text bold>Where should Capgo upload the build env vars?</Text>
+          <Newline />
+          <Select
+            options={[
+              ...ciSecretTargets.map(target => ({
+                label: target.provider === 'github' ? 'GitHub Actions repository secrets' : 'GitLab CI/CD variables',
+                value: target.provider,
+              })),
+              { label: 'Skip', value: 'skip' },
+            ]}
+            onChange={(value) => {
+              if (value === 'skip') {
+                setStep('ask-build')
+                return
+              }
+              const target = ciSecretTargets.find(candidate => candidate.provider === value) || null
+              setCiSecretTarget(target)
+              setStep(target ? 'ask-ci-secrets' : 'ask-build')
+            }}
+          />
+        </Box>
+      )}
+
+      {step === 'ask-ci-secrets' && (
+        <Box flexDirection="column" marginTop={1}>
+          <SuccessLine text="Android credentials saved" />
+          <Newline />
+          <Text bold>
+            Upload
+            {' '}
+            {ciSecretEntries.length}
+            {' '}
+            build env var
+            {ciSecretEntries.length === 1 ? '' : 's'}
+            {' '}
+            to
+            {' '}
+            {getCiSecretTargetLabel(ciSecretTarget)}
+            ?
+          </Text>
+          <Text dimColor>Capgo will check for existing names first and ask before replacing anything.</Text>
+          <Newline />
+          <Select
+            options={[
+              { label: `Upload with ${ciSecretTarget?.cli || 'CLI'}`, value: 'yes' },
+              { label: 'Skip', value: 'no' },
+            ]}
+            onChange={(value) => {
+              setStep(value === 'yes' ? 'checking-ci-secrets' : 'ask-build')
+            }}
+          />
+        </Box>
+      )}
+
+      {step === 'checking-ci-secrets' && (
+        <Box marginTop={1}><SpinnerLine text={`Checking existing env vars in ${getCiSecretTargetLabel(ciSecretTarget)}...`} /></Box>
+      )}
+
+      {step === 'confirm-ci-secret-overwrite' && (
+        <Box flexDirection="column" marginTop={1}>
+          <Text bold color="yellow">These env vars already exist and will be replaced:</Text>
+          <Box flexDirection="column" marginTop={1} marginLeft={2}>
+            {ciSecretExistingKeys.map(key => (
+              <Text key={key}>{`• ${key}`}</Text>
+            ))}
+          </Box>
+          <Newline />
+          <Select
+            options={[
+              { label: 'Replace existing env vars', value: 'replace' },
+              { label: 'Skip upload', value: 'skip' },
+            ]}
+            onChange={(value) => {
+              setStep(value === 'replace' ? 'uploading-ci-secrets' : 'ask-build')
+            }}
+          />
+        </Box>
+      )}
+
+      {step === 'uploading-ci-secrets' && (
+        <Box marginTop={1}><SpinnerLine text={`Uploading env vars to ${getCiSecretTargetLabel(ciSecretTarget)}...`} /></Box>
+      )}
+
+      {step === 'ci-secrets-failed' && (
+        <Box flexDirection="column" marginTop={1}>
+          <ErrorLine text={ciSecretError || 'Could not upload env vars.'} />
+          <Newline />
+          <Text dimColor>You can continue; credentials are already saved locally.</Text>
+          <Newline />
+          <Select
+            options={[
+              { label: 'Try upload again', value: 'retry' },
+              { label: 'Continue without upload', value: 'continue' },
+            ]}
+            onChange={(value) => {
+              setStep(value === 'retry' ? (ciSecretTarget ? 'checking-ci-secrets' : 'detecting-ci-secrets') : 'ask-build')
+            }}
+          />
+        </Box>
+      )}
+
       {step === 'ask-build' && (
         <Box flexDirection="column" marginTop={1}>
           <SuccessLine text="Android credentials saved" />
@@ -1889,6 +2116,12 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
       {step === 'build-complete' && (
         <Box flexDirection="column" marginTop={1}>
           <SuccessLine text="Onboarding complete" />
+          {ciSecretUploadSummary && (
+            <>
+              <Newline />
+              <Text>{ciSecretUploadSummary}.</Text>
+            </>
+          )}
           {buildUrl && (
             <>
               <Newline />

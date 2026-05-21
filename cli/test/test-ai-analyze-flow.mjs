@@ -1,0 +1,134 @@
+#!/usr/bin/env node
+import { existsSync, readFileSync } from 'node:fs'
+import { mkdir, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+
+import {
+  decideAnalyzeBehavior,
+  writeLocalAiFile,
+  postAnalyzeRequest,
+} from '../src/ai/analyze.ts'
+
+let passed = 0
+let failed = 0
+
+function test(name, fn) {
+  return Promise.resolve()
+    .then(() => fn())
+    .then(() => { console.log(`✅ ${name}`); passed++ })
+    .catch((err) => { console.error(`❌ ${name}\n   ${err.message}`); failed++ })
+}
+
+const TEST_DIR = join(tmpdir(), `capgo-ai-flow-test-${Date.now()}`)
+const JOB_ID = 'job-flow-test'
+await mkdir(TEST_DIR, { recursive: true })
+process.env.CAPGO_AI_LOG_BASE_DIR = TEST_DIR
+
+// ---- decideAnalyzeBehavior matrix ----
+await test('matrix: interactive + flag set → show_menu', () => {
+  const r = decideAnalyzeBehavior({ isTTY: true, aiAnalyticsFlag: true })
+  if (r !== 'show_menu') throw new Error(`got ${r}`)
+})
+
+await test('matrix: interactive + flag unset → ask_then_menu', () => {
+  const r = decideAnalyzeBehavior({ isTTY: true, aiAnalyticsFlag: false })
+  if (r !== 'ask_then_menu') throw new Error(`got ${r}`)
+})
+
+await test('matrix: non-interactive + flag set → auto_upload', () => {
+  const r = decideAnalyzeBehavior({ isTTY: false, aiAnalyticsFlag: true })
+  if (r !== 'auto_upload') throw new Error(`got ${r}`)
+})
+
+await test('matrix: non-interactive + flag unset → skip', () => {
+  const r = decideAnalyzeBehavior({ isTTY: false, aiAnalyticsFlag: false })
+  if (r !== 'skip') throw new Error(`got ${r}`)
+})
+
+// ---- writeLocalAiFile ----
+await test('writeLocalAiFile writes prompt + <BUILD_LOG> boundary + logs', async () => {
+  await writeFile(join(TEST_DIR, `${JOB_ID}.log`), 'line1\nline2\n')
+  const promptPath = await writeLocalAiFile(JOB_ID)
+  if (!existsSync(promptPath))
+    throw new Error(`prompt file not written at ${promptPath}`)
+  const content = readFileSync(promptPath, 'utf8')
+  if (!content.includes('You are a build engineer'))
+    throw new Error('system prompt missing from local-AI file')
+  if (!content.includes('<BUILD_LOG>') || !content.includes('</BUILD_LOG>'))
+    throw new Error('BUILD_LOG boundary tags missing')
+  if (!content.includes('line1\nline2'))
+    throw new Error('log content missing')
+})
+
+// ---- postAnalyzeRequest ----
+await test('postAnalyzeRequest sends POST with correct shape and returns analysis', async () => {
+  let captured = null
+  const origFetch = globalThis.fetch
+  globalThis.fetch = async (url, init) => {
+    captured = { url, init }
+    return new Response(JSON.stringify({ analysis: '### Likely cause\ntest' }), {
+      status: 200, headers: { 'content-type': 'application/json' },
+    })
+  }
+
+  const result = await postAnalyzeRequest({
+    apiHost: 'https://api.test',
+    apikey: 'apikey-abc',
+    jobId: JOB_ID,
+    appId: 'com.app',
+    logs: 'hello logs',
+  })
+
+  globalThis.fetch = origFetch
+
+  if (captured.url !== 'https://api.test/build/ai_analyze')
+    throw new Error(`url: ${captured.url}`)
+  if (captured.init.method !== 'POST')
+    throw new Error(`method: ${captured.init.method}`)
+  if (captured.init.headers.capgkey !== 'apikey-abc')
+    throw new Error('missing capgkey header')
+  const body = JSON.parse(captured.init.body)
+  if (body.jobId !== JOB_ID || body.appId !== 'com.app' || body.logs !== 'hello logs')
+    throw new Error(`body shape wrong: ${JSON.stringify(body)}`)
+  if (result.kind !== 'ok' || result.analysis !== '### Likely cause\ntest')
+    throw new Error(`result: ${JSON.stringify(result)}`)
+})
+
+await test('postAnalyzeRequest returns already_analyzed on 409', async () => {
+  globalThis.fetch = async () => new Response(
+    JSON.stringify({ error: 'already_analyzed' }),
+    { status: 409, headers: { 'content-type': 'application/json' } }
+  )
+  const result = await postAnalyzeRequest({
+    apiHost: 'x', apikey: 'y', jobId: JOB_ID, appId: 'a', logs: 'l',
+  })
+  if (result.kind !== 'already_analyzed')
+    throw new Error(`got ${JSON.stringify(result)}`)
+})
+
+await test('postAnalyzeRequest returns error on 5xx', async () => {
+  globalThis.fetch = async () => new Response('upstream broken', { status: 503 })
+  const result = await postAnalyzeRequest({
+    apiHost: 'x', apikey: 'y', jobId: JOB_ID, appId: 'a', logs: 'l',
+  })
+  if (result.kind !== 'error')
+    throw new Error(`got ${JSON.stringify(result)}`)
+})
+
+await test('postAnalyzeRequest returns too_big on 413', async () => {
+  globalThis.fetch = async () => new Response(
+    JSON.stringify({ error: 'logs_too_big' }),
+    { status: 413, headers: { 'content-type': 'application/json' } },
+  )
+  const result = await postAnalyzeRequest({
+    apiHost: 'x', apikey: 'y', jobId: JOB_ID, appId: 'a', logs: 'l',
+  })
+  if (result.kind !== 'too_big')
+    throw new Error(`got ${JSON.stringify(result)}`)
+})
+
+await rm(TEST_DIR, { recursive: true, force: true })
+
+console.log(`\n${passed} passed, ${failed} failed`)
+process.exit(failed === 0 ? 0 : 1)

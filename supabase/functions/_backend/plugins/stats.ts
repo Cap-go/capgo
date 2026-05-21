@@ -8,7 +8,7 @@ import { getAppStatus, setAppStatus } from '../utils/appStatus.ts'
 import { BRES, simpleError, simpleError200, simpleRateLimit } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
 import { sendNotifOrgCached } from '../utils/notifications.ts'
-import { closeClient, ensurePlaceholderVersions, getAppOwnerPostgres, getAppVersionPostgres, getDrizzleClient, getPgClient } from '../utils/pg.ts'
+import { closeClient, getAppOwnerPostgres, getAppVersionPostgres, getDrizzleClient, getPgClient } from '../utils/pg.ts'
 import { makeDevice, parsePluginBody } from '../utils/plugin_parser.ts'
 import { statsRequestSchema } from '../utils/plugin_validation.ts'
 import { createStatsMau, createStatsVersion, onPremStats, sendStatsAndDevice } from '../utils/stats.ts'
@@ -95,17 +95,9 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
   if (versionOnly === 'builtin' || versionOnly === 'unknown') {
     allowedDeleted = true
   }
-  let appVersion = await getAppVersionPostgres(c, app_id, versionOnly, allowedDeleted, drizzleClient as ReturnType<typeof getDrizzleClient>)
+  const appVersion = await getAppVersionPostgres(c, app_id, versionOnly, allowedDeleted, drizzleClient as ReturnType<typeof getDrizzleClient>)
   if (!appVersion) {
-    const appVersion2 = await getAppVersionPostgres(c, app_id, 'unknown', true, drizzleClient as ReturnType<typeof getDrizzleClient>)
-    if (appVersion2) {
-      appVersion = appVersion2
-      cloudlog({ requestId: c.get('requestId'), message: `Version name ${version_name} not found, using unknown instead`, app_id, version_name })
-    }
-    else {
-      backgroundTask(c, ensurePlaceholderVersions(c, app_id))
-      return { success: false, error: 'version_not_found', message: 'Version not found', moreInfo: { app_id, version_name } }
-    }
+    return { success: false, error: 'version_not_found', message: 'Version not found', moreInfo: { app_id, version_name } }
   }
   // device.version = appVersion.id
   if (action === 'set' && !device.is_emulator && device.is_prod) {

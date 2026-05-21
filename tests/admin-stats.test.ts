@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { BASE_URL, fetchWithRetry, getAuthHeadersForCredentials, getSupabaseClient, PRODUCT_ID, TEST_EMAIL, USER_ADMIN_EMAIL, USER_ID } from './test-utils.ts'
+import { BASE_URL, fetchWithRetry, getAuthHeadersForCredentials, getEndpointUrl, getSupabaseClient, PRODUCT_ID, TEST_EMAIL, USER_ADMIN_EMAIL, USER_ID } from './test-utils.ts'
 
 const DAY_IN_MS = 24 * 60 * 60 * 1000
 const NOW = Date.now()
@@ -687,5 +687,37 @@ describe('/private/admin_stats', () => {
       new_orgs: 3,
       orgs_subscribed: 1,
     })
+  })
+
+  it.concurrent('returns daily new trial organizations grouped by plan', async () => {
+    const response = await fetchWithRetry(getEndpointUrl('/private/admin_stats'), {
+      method: 'POST',
+      headers: adminHeaders,
+      body: JSON.stringify({
+        metric_category: 'trial_plan_breakdown',
+        start_date: '2026-02-01T00:00:00.000Z',
+        end_date: '2026-02-02T00:00:00.000Z',
+      }),
+    })
+
+    expect(response.status).toBe(200)
+    const payload = await response.json() as {
+      success: boolean
+      data: {
+        totals: Array<{ plan_name: string, total: number }>
+        trend: Array<{
+          date: string
+          total: number
+          plans: Record<string, number>
+        }>
+      }
+    }
+
+    expect(payload.success).toBe(true)
+    expect(payload.data.trend).toHaveLength(1)
+    expect(payload.data.trend[0]?.date).toBe('2026-02-01')
+    expect(payload.data.trend[0]?.total).toBe(3)
+    expect(payload.data.trend[0]?.plans[soloPlan?.name ?? 'Solo']).toBe(3)
+    expect(payload.data.totals.find(plan => plan.plan_name === (soloPlan?.name ?? 'Solo'))?.total).toBe(3)
   })
 })

@@ -1209,37 +1209,38 @@ describe('webhook and webhook_delivery rls with api-key org scope precedence', (
     await deleteApiKey(scopedKey.id)
   })
 
-  it('uses API key org scope when auth context is also present for webhook reads', async () => {
-    const webhookRows = await execWithRoleClaims(
-      'SELECT id FROM public.webhooks WHERE id = $1',
-      {
-        role: 'authenticated',
-        claims: {
-          sub: USER_ID_RLS,
+  it('denies direct webhook reads even when API key scope matches', async () => {
+    await expect(
+      execWithRoleClaims(
+        'SELECT id FROM public.webhooks WHERE id = $1',
+        {
           role: 'authenticated',
-          aud: 'authenticated',
+          claims: {
+            sub: USER_ID_RLS,
+            role: 'authenticated',
+            aud: 'authenticated',
+          },
+          headers: { capgkey: scopedKey.key },
+          params: [webhookId],
         },
-        headers: { capgkey: limitedKey.key },
-        params: [webhookId],
-      },
-    ).then(result => result.rows)
+      ),
+    ).rejects.toMatchObject({ code: '42501' })
 
-    const deliveryRows = await execWithRoleClaims(
-      'SELECT id FROM public.webhook_deliveries WHERE id = $1',
-      {
-        role: 'authenticated',
-        claims: {
-          sub: USER_ID_RLS,
+    await expect(
+      execWithRoleClaims(
+        'SELECT id FROM public.webhook_deliveries WHERE id = $1',
+        {
           role: 'authenticated',
-          aud: 'authenticated',
+          claims: {
+            sub: USER_ID_RLS,
+            role: 'authenticated',
+            aud: 'authenticated',
+          },
+          headers: { capgkey: scopedKey.key },
+          params: [deliveryId],
         },
-        headers: { capgkey: limitedKey.key },
-        params: [deliveryId],
-      },
-    ).then(result => result.rows)
-
-    expect(webhookRows).toEqual([])
-    expect(deliveryRows).toEqual([])
+      ),
+    ).rejects.toMatchObject({ code: '42501' })
   })
 
   it('prevents webhook_delivery org_id changes when update payload org_id is unauthorized', async () => {
