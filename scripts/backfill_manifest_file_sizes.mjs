@@ -104,6 +104,7 @@ const FAILED_CSV_HEADERS = [
   'file_name',
   's3_path',
   'attempted_s3_path',
+  'attempted_s3_paths',
   'status',
   'method',
   'reason',
@@ -239,34 +240,47 @@ function decodeStoragePathSegments(s3Path) {
   }
 }
 
-function getLegacyDecodedStoragePath(s3Path) {
-  if (!PERCENT_ENCODED_OCTET_RE.test(s3Path))
-    return null
-
-  const decoded = decodeStoragePathSegments(s3Path)
-  return decoded && decoded !== s3Path ? decoded : null
+function encodeStoragePathSegments(s3Path) {
+  return s3Path.split('/').map(segment => encodeURIComponent(segment)).join('/')
 }
 
-function markDecodedStorageResult(result, attemptedS3Path) {
+function getStorageCandidatePaths(s3Path) {
+  const candidates = [s3Path]
+  if (PERCENT_ENCODED_OCTET_RE.test(s3Path)) {
+    const decoded = decodeStoragePathSegments(s3Path)
+    if (decoded && decoded !== s3Path)
+      candidates.push(decoded)
+
+    const encoded = encodeStoragePathSegments(s3Path)
+    if (encoded !== s3Path)
+      candidates.push(encoded)
+  }
+  return [...new Set(candidates)]
+}
+
+function markStorageCandidateResult(result, attemptedS3Path, attemptedS3Paths) {
+  const suffix = attemptedS3Path === attemptedS3Paths[0] ? '' : '_candidate'
   return {
     ...result,
     attempted_s3_path: attemptedS3Path,
-    method: `${result.method ?? 'unknown'}_decoded`,
-    reason: result.reason ? `${result.reason}_decoded_path` : 'decoded_path',
+    attempted_s3_paths: attemptedS3Paths,
+    method: `${result.method ?? 'unknown'}${suffix}`,
+    reason: suffix && result.reason ? `${result.reason}${suffix}` : result.reason,
   }
 }
 
 async function getObjectSizeWithLegacyFallback(s3, s3Path) {
-  const primary = await getObjectSize(s3, s3Path)
-  if (primary.size > 0)
-    return primary
+  const candidatePaths = getStorageCandidatePaths(s3Path)
+  let lastResult = null
 
-  const fallbackPath = primary.status === 404 ? getLegacyDecodedStoragePath(s3Path) : null
-  if (!fallbackPath)
-    return primary
+  for (const candidatePath of candidatePaths) {
+    const result = markStorageCandidateResult(await getObjectSize(s3, candidatePath), candidatePath, candidatePaths)
+    lastResult = result
+    if (result.size > 0 || shouldRetryStorageResult(result))
+      return result
+  }
 
-  const fallback = await getObjectSize(s3, fallbackPath)
-  return markDecodedStorageResult(fallback, fallbackPath)
+  return lastResult
 }
 
 async function getObjectSize(s3, s3Path) {
@@ -564,6 +578,7 @@ async function processCandidates({ apply, dbAttempts, pool, s3, storageAttempts,
       app_id: result.row.app_id,
       app_version_id: result.row.app_version_id,
       attempted_s3_path: result.storage.attempted_s3_path,
+      attempted_s3_paths: result.storage.attempted_s3_paths,
       attempts: result.storage.attempts,
       error: result.storage.error,
       file_name: result.row.file_name,
