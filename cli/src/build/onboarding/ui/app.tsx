@@ -642,10 +642,22 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
           if (cancelled)
             return
           if (!certId) {
-            throw new Error(
-              `Apple does not have a certificate matching the Keychain identity "${chosenIdentity.name}". `
-              + `Either it was revoked on Apple's side or it was never uploaded. Use "Create new" instead.`,
+            // Don't dead-end the user at the support-bundle error screen
+            // when this fires. Route back to no-match-recovery with a
+            // yellow log so they can pick a different option (Open Portal,
+            // Back to identity selection, or Exit) without restarting.
+            // Note: this null-result is sometimes a false negative — see
+            // listDistributionCerts; the current filter only matches the
+            // legacy IOS_DISTRIBUTION type and excludes newer cross-platform
+            // DISTRIBUTION certs that show up as "Apple Distribution:" in
+            // Keychain. A follow-up commit broadens the filter.
+            addLog(
+              `⚠ Apple did not return a cert match for "${chosenIdentity.name}". `
+              + `Returning to recovery menu — try "Open Apple Developer Portal" to verify the cert exists, or pick a different identity.`,
+              'yellow',
             )
+            setStep('import-no-match-recovery')
+            return
           }
           const profiles = await listProfilesForCert(token, certId)
           if (cancelled)
@@ -708,10 +720,17 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
           if (cancelled)
             return
           if (!certId) {
-            throw new Error(
-              `Apple does not have a certificate matching "${chosenIdentity.name}". `
-              + `Cannot create a profile without an Apple-side cert ID. Use "Create new" path instead.`,
+            // Same handling as import-fetching-profile: route back to the
+            // recovery menu instead of dead-ending at the support bundle.
+            // See note above re: the legacy IOS_DISTRIBUTION-only filter
+            // producing false negatives for newer cross-platform certs.
+            addLog(
+              `⚠ Apple did not return a cert match for "${chosenIdentity.name}". `
+              + `Can't create a profile without an Apple-side cert ID. Returning to recovery menu — try "Open Apple Developer Portal" or pick a different identity.`,
+              'yellow',
             )
+            setStep('import-no-match-recovery')
+            return
           }
           const { bundleIdResourceId } = await ensureBundleId(token, appId)
           if (cancelled)
