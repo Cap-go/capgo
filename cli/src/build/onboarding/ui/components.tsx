@@ -8,6 +8,101 @@ export const Divider: FC<{ width?: number }> = ({ width = 60 }) => (
   <Text dimColor>{'─'.repeat(width)}</Text>
 )
 
+/**
+ * Minimal in-house Table component. Auto-sizes each column to the widest
+ * value (header or any row cell) up to `maxColumnWidth`, truncates with
+ * an ellipsis when a cell exceeds that width, and renders box-drawing
+ * borders.
+ *
+ * Why inline instead of `ink-table`: the published `ink-table@3.1.0` is
+ * CommonJS and modern `ink` (v5+) is ESM with top-level await, so bundling
+ * fails. This component is the small subset of ink-table's API we need
+ * (rows of plain string cells) without the compat headache.
+ *
+ * The `data` rows must share a single key order so columns line up — we
+ * derive the column list from the first row's keys.
+ *
+ * `cellColor` runs per-cell and returns an Ink color name (or undefined
+ * for default). Used by the unavailable-certs table to colour the Reason
+ * column yellow while keeping Name/Team dim.
+ */
+export interface TableProps {
+  data: Record<string, string>[]
+  /** Hard cap on column width before truncation. Default 50. */
+  maxColumnWidth?: number
+  /** Optional per-cell color function. */
+  cellColor?: (column: string, value: string, rowIndex: number) => string | undefined
+  /** Optional per-cell dim flag (defaults to false). */
+  cellDim?: (column: string, value: string, rowIndex: number) => boolean
+  /** Padding inside each cell (left/right). Default 1. */
+  cellPadding?: number
+}
+
+export const Table: FC<TableProps> = ({ data, maxColumnWidth = 50, cellColor, cellDim, cellPadding = 1 }) => {
+  if (data.length === 0)
+    return null
+  const columns = Object.keys(data[0])
+  const truncate = (s: string, max: number): string => {
+    // Unicode-safe length proxy — Array.from counts code-points so emoji
+    // glyphs aren't double-counted. Terminal display width isn't perfectly
+    // captured by codepoints (combining marks, double-width chars), but
+    // it's close enough for typical ASC cert names + UTF-8 team chars.
+    const codepoints = Array.from(s)
+    return codepoints.length <= max ? s : `${codepoints.slice(0, max - 1).join('')}…`
+  }
+  // Compute column widths: max(header, all values), capped at maxColumnWidth.
+  const widths: Record<string, number> = {}
+  for (const col of columns) {
+    let max = Array.from(col).length
+    for (const row of data) {
+      const v = row[col] ?? ''
+      const w = Array.from(v).length
+      if (w > max)
+        max = w
+    }
+    widths[col] = Math.min(max, maxColumnWidth)
+  }
+  const pad = ' '.repeat(cellPadding)
+  // Total inner width: sum of column content widths + padding * 2 per column + (cols-1) separators
+  const borderRow = (left: string, mid: string, right: string, fill: string): string => {
+    const segments = columns.map(c => fill.repeat(widths[c] + cellPadding * 2))
+    return left + segments.join(mid) + right
+  }
+  const renderRow = (cells: { col: string, value: string, rowIndex?: number }[]): React.ReactNode => (
+    <Text>
+      │
+      {cells.map((cell, idx) => {
+        const truncated = truncate(cell.value, widths[cell.col])
+        const padded = truncated + ' '.repeat(Math.max(0, widths[cell.col] - Array.from(truncated).length))
+        const colorName = cellColor && cell.rowIndex !== undefined ? cellColor(cell.col, cell.value, cell.rowIndex) : undefined
+        const dim = cellDim && cell.rowIndex !== undefined ? cellDim(cell.col, cell.value, cell.rowIndex) : false
+        return (
+          <React.Fragment key={cell.col}>
+            {pad}
+            <Text color={colorName as any} dimColor={dim}>{padded}</Text>
+            {pad}
+            │
+            {idx === cells.length - 1 ? '' : ''}
+          </React.Fragment>
+        )
+      })}
+    </Text>
+  )
+  return (
+    <Box flexDirection="column">
+      <Text dimColor>{borderRow('┌', '┬', '┐', '─')}</Text>
+      {renderRow(columns.map(c => ({ col: c, value: c })))}
+      <Text dimColor>{borderRow('├', '┼', '┤', '─')}</Text>
+      {data.map((row, i) => (
+        <React.Fragment key={`row-${i}`}>
+          {renderRow(columns.map(c => ({ col: c, value: row[c] ?? '', rowIndex: i })))}
+        </React.Fragment>
+      ))}
+      <Text dimColor>{borderRow('└', '┴', '┘', '─')}</Text>
+    </Box>
+  )
+}
+
 export const SpinnerLine: FC<{ text: string }> = ({ text }) => (
   <Box>
     <Box marginRight={1}>

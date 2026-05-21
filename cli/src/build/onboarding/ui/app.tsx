@@ -33,7 +33,7 @@ import {
 
   STEP_PROGRESS,
 } from '../types.js'
-import { Divider, ErrorLine, FilteredTextInput, Header, SpinnerLine, SuccessLine } from './components.js'
+import { Divider, ErrorLine, FilteredTextInput, Header, SpinnerLine, SuccessLine, Table } from './components.js'
 
 const OUTPUT_LINE_SPLIT_RE = /\r?\n/
 const CARRIAGE_RETURN_RE = /\r/g
@@ -1633,44 +1633,41 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
             unavailable.push(m)
         }
 
-        // Column widths chosen to fit ~80 columns. Long names truncate with
-        // an ellipsis. The Select component renders its options as a single
-        // string per row, so we pad with spaces in the label to fake column
-        // alignment — works in any monospaced terminal which is the
-        // expected environment for CLI tools.
-        const NAME_W = 44
-        const TEAM_W = 12
-        const PROFILES_W = 10
-        const truncate = (s: string, max: number): string => s.length <= max ? s : `${s.slice(0, max - 1)}…`
-        const pad = (s: string, w: number): string => s.length >= w ? s.slice(0, w) : s + ' '.repeat(w - s.length)
-        const divider = '─'.repeat(NAME_W + TEAM_W + PROFILES_W + 6)
-
-        const availableOptions = available.map((m) => {
+        // Helper: build the row data shape ink-table consumes. Includes a
+        // "#" column so users can correlate the visual table row with the
+        // labelled choice in the Select below. The order of `availableRows`
+        // is identical to the order of `availableOptions` so [n] in the
+        // table maps to the (n-1)th option in the picker.
+        const availableRows = available.map((m, i) => {
           const matchCount = filterProfilesForApp(m.profiles, appId, importDistribution).length
           const totalProfiles = m.profiles.length
-          const profilesCol = matchCount > 0
-            ? `${matchCount}/${totalProfiles} ✓`
-            : `0/${totalProfiles}`
-          const nameCol = pad(`🔑 ${truncate(m.identity.name, NAME_W - 3)}`, NAME_W)
-          const teamCol = pad(m.identity.teamId, TEAM_W)
           return {
-            label: `${nameCol}${teamCol}${profilesCol}`,
-            value: m.identity.sha1,
+            '#': `${i + 1}`,
+            'Name': `🔑 ${m.identity.name}`,
+            'Team': m.identity.teamId,
+            'Profiles': matchCount > 0 ? `${matchCount}/${totalProfiles} ✓` : `0/${totalProfiles}`,
           }
         })
+
+        const unavailableRows = unavailable.map(m => ({
+          'Name': `🔒 ${m.identity.name}`,
+          'Team': m.identity.teamId,
+          'Reason': identityAvailability[m.identity.sha1]?.reasonText || 'Not classified',
+        }))
 
         return (
           <Box flexDirection="column" marginTop={1}>
             {available.length > 0 && (
               <>
                 <Text bold color="green">{`✅  AVAILABLE (${available.length})`}</Text>
-                <Text dimColor>{divider}</Text>
-                <Box flexDirection="row">
-                  <Box width={NAME_W}><Text bold dimColor>NAME</Text></Box>
-                  <Box width={TEAM_W}><Text bold dimColor>TEAM</Text></Box>
-                  <Box><Text bold dimColor>{`PROFILES (matching/total)`}</Text></Box>
-                </Box>
-                <Text dimColor>{divider}</Text>
+                <Newline />
+                <Table
+                  data={availableRows}
+                  // Green checkmarks on the matching count column; default
+                  // text elsewhere so cert names remain easy to read.
+                  cellColor={(col, val) => (col === 'Profiles' && val.includes('✓') ? 'green' : undefined)}
+                />
+                <Newline />
               </>
             )}
 
@@ -1685,15 +1682,19 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
                   identit
                   {unavailable.length === 1 ? 'y is' : 'ies are'}
                   {' '}
-                  unavailable. See the table below — or use "Create new" to generate a fresh cert + profile.
+                  unavailable on Apple's side. See the table below for the reason, or use "Create new" to generate a fresh cert + profile.
                 </Text>
                 <Newline />
               </Box>
             )}
 
+            <Text bold>Pick an option:</Text>
             <Select
               options={[
-                ...availableOptions,
+                ...available.map((m, i) => ({
+                  label: `[${i + 1}]  ${m.identity.name} · ${m.identity.teamId}`,
+                  value: m.identity.sha1,
+                })),
                 { label: '🆕  Switch to "Create new" (Apple generates a fresh cert + profile)', value: '__cancel__' },
                 { label: '✖  Exit onboarding', value: '__exit__' },
               ]}
@@ -1718,19 +1719,14 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
                 if (!match)
                   return
                 setChosenIdentity(match.identity)
-                // Reuse the cached Apple-side certId from batch validation
-                // when we have it; the per-identity pre-check at
-                // import-checking-apple-cert will skip the redundant
-                // network round-trip in that case.
+                // Reuse cached Apple-side certId from batch validation when
+                // present; downstream per-identity pre-check skips the
+                // redundant network round-trip in that case.
                 const cached = identityAvailability[match.identity.sha1]
                 setAppleCertIdForChosen(cached?.available ? (cached.appleCertId ?? null) : (cached ? null : undefined))
                 upsertLog('✔ Identity · ', `✔ Identity · ${match.identity.name}`)
                 const usableForThisApp = filterProfilesForApp(match.profiles, appId, importDistribution)
                 if (usableForThisApp.length === 0) {
-                  // No local profile matches this app. Either jump to
-                  // recovery directly if we already have a per-identity
-                  // pre-check cached (typed as cached !== undefined), or
-                  // run a fresh pre-check first.
                   const apiKeyAvailable = !!(p8ContentRef.current || (await loadProgress(appId))?.completedSteps?.apiKeyVerified)
                   setStep(apiKeyAvailable ? 'import-checking-apple-cert' : 'import-no-match-recovery')
                   return
@@ -1742,23 +1738,12 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
             {unavailable.length > 0 && (
               <Box flexDirection="column" marginTop={1}>
                 <Text bold color="yellow">{`⚠️   UNAVAILABLE (${unavailable.length})`}</Text>
-                <Text dimColor>{divider}</Text>
-                <Box flexDirection="row">
-                  <Box width={NAME_W}><Text bold dimColor>NAME</Text></Box>
-                  <Box width={TEAM_W}><Text bold dimColor>TEAM</Text></Box>
-                  <Box><Text bold dimColor>REASON</Text></Box>
-                </Box>
-                <Text dimColor>{divider}</Text>
-                {unavailable.map((m) => {
-                  const a = identityAvailability[m.identity.sha1]
-                  return (
-                    <Box flexDirection="row" key={m.identity.sha1}>
-                      <Box width={NAME_W}><Text dimColor>{pad(`🔒 ${truncate(m.identity.name, NAME_W - 3)}`, NAME_W)}</Text></Box>
-                      <Box width={TEAM_W}><Text dimColor>{pad(m.identity.teamId, TEAM_W)}</Text></Box>
-                      <Box><Text color="yellow">{a?.reasonText || 'Not classified'}</Text></Box>
-                    </Box>
-                  )
-                })}
+                <Newline />
+                <Table
+                  data={unavailableRows}
+                  cellColor={(col) => (col === 'Reason' ? 'yellow' : undefined)}
+                  cellDim={(col) => col !== 'Reason'}
+                />
                 <Newline />
                 <Text dimColor>
                   💡 Unavailable certificates can't be used to sign builds. Even downloading them from the Apple Developer Portal won't help — the private key was only on the Mac that generated the original CSR. Use "Create new" above to generate a fresh cert + profile that Apple recognizes.
