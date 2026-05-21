@@ -2,7 +2,7 @@ import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import type { AppStats, StatsActions } from '../utils/types.ts'
-import { greaterOrEqual, parse } from '@std/semver'
+import { greaterOrEqual, parse, tryParse } from '@std/semver'
 import { Hono } from 'hono/tiny'
 import { getAppStatus, setAppStatus } from '../utils/appStatus.ts'
 import { BRES, simpleError, simpleError200, simpleRateLimit } from '../utils/hono.ts'
@@ -15,6 +15,8 @@ import { createStatsMau, createStatsVersion, onPremStats, sendStatsAndDevice } f
 import { backgroundTask, INVALID_STRING_APP_ID, isLimited, MISSING_STRING_APP_ID, reverseDomainRegex } from '../utils/utils.ts'
 
 const PLAN_ERROR = 'Cannot send stats, upgrade plan to continue to update'
+const DOWNLOAD_FAIL_FIXED_PLUGIN_VERSION = parse('7.17.0')
+const DOWNLOAD_FAIL_FIXED_PLUGIN_VERSION_V6 = parse('6.14.25')
 
 export interface BatchStatsResult {
   status: 'ok' | 'error'
@@ -30,6 +32,22 @@ interface PostResult {
   message?: string
   isOnprem?: boolean
   moreInfo?: Record<string, unknown>
+}
+
+function shouldRecordStatsAction(action: string, pluginVersion: string) {
+  if (action !== 'download_fail')
+    return true
+
+  // Older updater plugins reported download_fail when there was no update to download.
+  if (typeof pluginVersion !== 'string')
+    return false
+
+  const parsedPluginVersion = tryParse(pluginVersion)
+  if (!parsedPluginVersion)
+    return false
+
+  return greaterOrEqual(parsedPluginVersion, DOWNLOAD_FAIL_FIXED_PLUGIN_VERSION)
+    || (pluginVersion.startsWith('6.') && greaterOrEqual(parsedPluginVersion, DOWNLOAD_FAIL_FIXED_PLUGIN_VERSION_V6))
 }
 
 async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClient>, body: AppStats): Promise<PostResult> {
@@ -99,6 +117,7 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
   if (!appVersion) {
     return { success: false, error: 'version_not_found', message: 'Version not found', moreInfo: { app_id, version_name } }
   }
+  const shouldRecordAction = shouldRecordStatsAction(action, plugin_version)
   // device.version = appVersion.id
   if (action === 'set' && !device.is_emulator && device.is_prod) {
     // Use versionOnly (from request body) instead of appVersion - no DB read needed for stats
@@ -112,12 +131,7 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
     }
   }
   else if (action.endsWith('_fail')) {
-    // Only exclude download_fail for plugin versions below 7.17.0 and 6.14.25 as the plugin where wrongly reporting it on these versions
-    const shouldCountDownloadFail = action !== 'download_fail'
-      || greaterOrEqual(parse(plugin_version), parse('7.17.0'))
-      || (plugin_version.startsWith('6.') && greaterOrEqual(parse(plugin_version), parse('6.14.25')))
-
-    if (shouldCountDownloadFail) {
+    if (shouldRecordAction) {
       // Use versionOnly (from request body) instead of appVersion - no DB read needed for stats
       await createStatsVersion(c, versionOnly, app_id, 'fail')
       cloudlog({ requestId: c.get('requestId'), message: 'FAIL!' })
@@ -125,7 +139,9 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
       // instead of per-device notifications. See process_daily_fail_ratio_email.
     }
   }
-  statsActions.push({ action: action as Database['public']['Enums']['stats_action'], metadata })
+  if (shouldRecordAction) {
+    statsActions.push({ action: action as Database['public']['Enums']['stats_action'], metadata })
+  }
 
   // Don't update device record on failure actions - the version_name in the request
   // is the failed version, not the actual running version on the device
