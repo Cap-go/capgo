@@ -2000,6 +2000,18 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
               if (selectFiredRef.current)
                 return
               selectFiredRef.current = true
+              // Defense-in-depth: the validation failure's errorCategory has
+              // already been emitted on the `sa-json-validation-failed` step
+              // event. Clearing the ref before leaving this step ensures any
+              // subsequent error (e.g. disk failure at `saving-credentials`,
+              // a failed re-validation, or an OAuth issue downstream) gets
+              // its own freshly-mapped category instead of inheriting the
+              // stale SA validation one. `handleError` overwrites this ref
+              // before transitioning to `'error'`, so today this is
+              // belt-and-suspenders — but it makes the ref's invariant
+              // ("most recent unresolved error context") true at every
+              // sa-json-validation-failed exit point.
+              errorCategoryRef.current = undefined
               if (value === 'retry') {
                 // Clear the saved path so the picker chooser shows fresh.
                 setServiceAccountJsonPath('')
