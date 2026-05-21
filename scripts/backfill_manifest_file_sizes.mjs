@@ -95,6 +95,7 @@ const DB_URL_ENV_KEYS = [
   'DIRECT_URL',
 ]
 const MAX_CANDIDATE_BATCH_SIZE = 1000
+const PERCENT_ENCODED_OCTET_RE = /%[0-9a-f]{2}/i
 const FAILED_CSV_HEADERS = [
   'id',
   'app_id',
@@ -102,6 +103,7 @@ const FAILED_CSV_HEADERS = [
   'version_name',
   'file_name',
   's3_path',
+  'attempted_s3_path',
   'status',
   'method',
   'reason',
@@ -228,6 +230,45 @@ function serializeError(error) {
   return { message: String(error) }
 }
 
+function decodeStoragePathSegments(s3Path) {
+  try {
+    return s3Path.split('/').map(segment => decodeURIComponent(segment)).join('/')
+  }
+  catch {
+    return null
+  }
+}
+
+function getLegacyDecodedStoragePath(s3Path) {
+  if (!PERCENT_ENCODED_OCTET_RE.test(s3Path))
+    return null
+
+  const decoded = decodeStoragePathSegments(s3Path)
+  return decoded && decoded !== s3Path ? decoded : null
+}
+
+function markDecodedStorageResult(result, attemptedS3Path) {
+  return {
+    ...result,
+    attempted_s3_path: attemptedS3Path,
+    method: `${result.method ?? 'unknown'}_decoded`,
+    reason: result.reason ? `${result.reason}_decoded_path` : 'decoded_path',
+  }
+}
+
+async function getObjectSizeWithLegacyFallback(s3, s3Path) {
+  const primary = await getObjectSize(s3, s3Path)
+  if (primary.size > 0)
+    return primary
+
+  const fallbackPath = primary.status === 404 ? getLegacyDecodedStoragePath(s3Path) : null
+  if (!fallbackPath)
+    return primary
+
+  const fallback = await getObjectSize(s3, fallbackPath)
+  return markDecodedStorageResult(fallback, fallbackPath)
+}
+
 async function getObjectSize(s3, s3Path) {
   try {
     const stat = await s3.statObject(s3Path, {
@@ -258,7 +299,7 @@ function shouldRetryStorageResult(result) {
 async function getObjectSizeWithRetry(s3, s3Path, attempts) {
   let lastResult = null
   for (let attempt = 1; attempt <= attempts; attempt++) {
-    const result = await getObjectSize(s3, s3Path)
+    const result = await getObjectSizeWithLegacyFallback(s3, s3Path)
     lastResult = { ...result, attempts: attempt }
     if (!shouldRetryStorageResult(lastResult))
       return lastResult
@@ -522,6 +563,7 @@ async function processCandidates({ apply, dbAttempts, pool, s3, storageAttempts,
     .map(result => ({
       app_id: result.row.app_id,
       app_version_id: result.row.app_version_id,
+      attempted_s3_path: result.storage.attempted_s3_path,
       attempts: result.storage.attempts,
       error: result.storage.error,
       file_name: result.row.file_name,
