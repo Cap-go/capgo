@@ -165,14 +165,11 @@ export function getAndroidResumeStep(progress: AndroidOnboardingProgress | null)
     return 'sa-json-existing-path'
   }
 
-  if (progress.serviceAccountMethod === undefined && completedSteps.keystoreReady) {
-    // Keystore finished but the user never reached the fork — drop them on
-    // the new method-select screen so they can pick. Legacy progress files
-    // (no serviceAccountMethod, no completed steps past keystoreReady) will
-    // also land here; that's the right behavior — they re-pick.
-    if (!completedSteps.googleSignInComplete)
-      return 'service-account-method-select'
-  }
+  // Backward compatibility: legacy progress files (created before the
+  // service-account fork existed) never set `serviceAccountMethod`. Per the
+  // design contract those resume into the OAuth path they were already on —
+  // we must NOT route them to the new fork screen and force them to re-pick
+  // mid-flow. Only routes through the fork explicitly set the method.
 
   // Phase 2b — Google sign-in: marker + refresh token. We need the refresh
   // token to mint access tokens for the rest of the flow on subsequent

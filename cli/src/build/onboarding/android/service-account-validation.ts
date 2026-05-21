@@ -135,6 +135,20 @@ interface GoogleTokenErrorResponse {
 }
 
 /**
+ * Marker thrown by `exchangeJwtForAccessToken` for transient/transport-class
+ * failures (5xx from Google, non-JSON, etc.) so the outer `validate*` catch
+ * can route them to `network-error` instead of `token-error`. 4xx responses
+ * still throw a plain Error and map to `token-error` (credentials genuinely
+ * rejected).
+ */
+class TokenExchangeTransientError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'TokenExchangeTransientError'
+  }
+}
+
+/**
  * Exchange a signed JWT bearer assertion for an OAuth access token at Google's
  * token endpoint. The token is short-lived (1h) and is used only for the
  * downstream `edits.insert` / `edits.delete` round trip.
@@ -178,6 +192,12 @@ async function exchangeJwtForAccessToken(args: {
       }
     }
     catch {}
+    // 5xx (and unexpected 1xx/3xx) are server-side or transport problems, not
+    // credential rejections — flag them as transient so the outer validator
+    // surfaces a network-error and the UI offers retry rather than telling
+    // the user their key is bad.
+    if (res.status >= 500 || res.status < 400)
+      throw new TokenExchangeTransientError(`Google's token endpoint returned ${detail}. Try again in a moment.`)
     throw new Error(`Google rejected the service account credentials (${detail}). The private key may be revoked or invalid.`)
   }
 
@@ -186,10 +206,10 @@ async function exchangeJwtForAccessToken(args: {
     parsed = JSON.parse(text) as GoogleTokenResponse
   }
   catch {
-    throw new Error(`Google's token endpoint returned a non-JSON response (${res.status}).`)
+    throw new TokenExchangeTransientError(`Google's token endpoint returned a non-JSON response (${res.status}).`)
   }
   if (typeof parsed.access_token !== 'string' || parsed.access_token.length === 0)
-    throw new Error('Google\'s token response was missing an access_token field.')
+    throw new TokenExchangeTransientError('Google\'s token response was missing an access_token field.')
   return parsed.access_token
 }
 
@@ -364,7 +384,10 @@ export async function validateServiceAccountJson(opts: ValidateOptions): Promise
   if (opts.signal?.aborted)
     return { ok: false, kind: 'network-error', message: 'Validation cancelled.' }
 
-  // 2. Token exchange
+  // 2. Token exchange. Distinguishes between "Google rejected the key" (real
+  // token-error) and transport/transient failures (network-error). Aborts and
+  // fetch-level rejections always go to network-error so the recovery UI can
+  // offer retry rather than a misleading "your credentials are bad" message.
   let accessToken: string
   try {
     const assertion = signSaAssertion(key)
@@ -377,10 +400,21 @@ export async function validateServiceAccountJson(opts: ValidateOptions): Promise
     })
   }
   catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    const isAbort = (err as { name?: string } | null)?.name === 'AbortError'
+    const isTransient = err instanceof TokenExchangeTransientError
+    const looksNetworky = /timeout|timed out|network|fetch failed|ENOTFOUND|EAI_AGAIN|ECONNRESET|ECONNREFUSED/i.test(message)
+    if (isAbort || isTransient || looksNetworky) {
+      return {
+        ok: false,
+        kind: 'network-error',
+        message,
+      }
+    }
     return {
       ok: false,
       kind: 'token-error',
-      message: err instanceof Error ? err.message : String(err),
+      message,
     }
   }
 

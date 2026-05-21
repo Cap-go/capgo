@@ -73,7 +73,7 @@ same auth path fastlane will take at build time).
 
 ## Flow
 
-```
+```text
 keystore phase (unchanged: existing / generate)
   ↓
 service-account-method-select   ← NEW fork
@@ -224,7 +224,7 @@ No changes to `cli/src/schemas/build.ts`.
 
 `sa-json-validation-failed` step:
 
-```
+```text
 ⚠️  Service account validation failed
 <error message tailored to the failure kind>
 

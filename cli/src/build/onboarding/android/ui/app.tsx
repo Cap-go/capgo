@@ -26,14 +26,13 @@ import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { createSupabaseClient, findSavedKey, findSavedKeySilent, getOrganizationId } from '../../../../utils.js'
 import { loadSavedCredentials, updateSavedCredentials } from '../../../credentials.js'
 import { requestBuildInternal } from '../../../request.js'
-import type { CiSecretEntry, CiSecretSetupAdvice, CiSecretTarget } from '../../ci-secrets.js'
-import { createCiSecretEntries, detectCiSecretTargets, getCiSecretTargetLabel, listExistingCiSecretKeys, uploadCiSecrets } from '../../ci-secrets.js'
+import { createCiSecretEntries, detectCiSecretTargets, getCiSecretTargetLabel, listExistingCiSecretKeys, type CiSecretEntry, type CiSecretSetupAdvice, type CiSecretTarget, uploadCiSecrets } from '../../ci-secrets.js'
 import { mapAndroidOnboardingError } from '../../error-categories.js'
 import { canUseFilePicker, openKeystorePicker, openServiceAccountJsonPicker } from '../../file-picker.js'
 import { trackBuilderOnboardingStep } from '../../telemetry.js'
-import { validateServiceAccountJson } from '../service-account-validation.js'
 import { Divider, ErrorLine, FilteredTextInput, Header, SpinnerLine, SuccessLine } from '../../ui/components.js'
 import { findAndroidApplicationIds } from '../gradle-parser.js'
+import { validateServiceAccountJson } from '../service-account-validation.js'
 import {
   ANDROIDPUBLISHER_API,
   createServiceAccountKey,
@@ -251,6 +250,32 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
   const setupStartedRef = useRef(false)
   const saPickerOpenedRef = useRef(false)
   const validationStartedRef = useRef(false)
+  // Cleanup hook for the in-flight SA validation. Invoked by the main
+  // useEffect cleanup so a step change / unmount / Ctrl+C aborts the
+  // outbound JWT exchange + Play API round trip rather than letting it run
+  // detached.
+  const validationCleanupRef = useRef<(() => void) | null>(null)
+  /**
+   * Per-step submission guard for `<Select>` `onChange` callbacks.
+   *
+   * `@inkjs/ui` v2.0.0 ships a known footgun in `use-select-state.js`: the
+   * effect that fires `onChange` lists the `onChange` callback itself in its
+   * dependency array AND never resets `state.previousValue` after a selection.
+   * Because parent re-renders create a fresh inline arrow each pass, every
+   * downstream `setState` after the first selection re-triggers `onChange`,
+   * causing duplicate log lines, double persistAndStep writes, and spammed
+   * step transitions.
+   *
+   * This ref is cleared once per step change (see the useEffect below). Any
+   * `onChange` handler that performs a one-shot action (logging, persisting,
+   * step transition) checks the ref and bails on re-fires.
+   *
+   * NOTE: handlers that only flip a sub-mode within the same step (e.g.,
+   * `setKeystorePathMode('manual')`) intentionally do NOT guard, because those
+   * unmount the `<Select>` synchronously and the effect doesn't get a chance
+   * to re-fire.
+   */
+  const selectFiredRef = useRef(false)
   const [keystorePathMode, setKeystorePathMode] = useState<'choose' | 'manual'>('choose')
   const [saJsonPathMode, setSaJsonPathMode] = useState<'choose' | 'manual'>('choose')
 
@@ -633,6 +658,9 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
       saPickerOpenedRef.current = false
     if (step !== 'sa-json-validating')
       validationStartedRef.current = false
+    // Reset the @inkjs/ui Select re-fire guard on every step transition so each
+    // new step gets a clean slate. See the JSDoc on `selectFiredRef`.
+    selectFiredRef.current = false
 
     if (step === 'keystore-existing-picker' && !pickerOpenedRef.current) {
       pickerOpenedRef.current = true
@@ -685,6 +713,12 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
 
     if (step === 'sa-json-validating' && !validationStartedRef.current) {
       validationStartedRef.current = true
+      // Bound the network round trips to the lifetime of this step. If the
+      // user Ctrl+C's, picks a different file, or unmounts the component
+      // mid-flight, the cleanup at the bottom of this effect aborts the
+      // controller and the in-flight fetch/JWT exchange unwinds promptly.
+      const validationAbort = new AbortController()
+      validationCleanupRef.current = () => validationAbort.abort()
       ;(async () => {
         try {
           if (!serviceAccountJsonPath)
@@ -699,6 +733,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
           const result = await validateServiceAccountJson({
             jsonBytes,
             packageName: androidPackageChoice.packageName,
+            signal: validationAbort.signal,
           })
           if (cancelled)
             return
@@ -849,11 +884,26 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
             completedSteps: { ...p.completedSteps, keystoreReady: ready },
           }))
           addLog(`✔ Keystore loaded — ${keystoreExistingPath}`)
-          // Smart-route: skip phases already complete (e.g. on resume).
+          // Smart-route: skip phases already complete (e.g. on resume into
+          // this step after a legacy progress file already had OAuth steps
+          // done). If progress shows nothing past keystoreReady, land on the
+          // new fork; otherwise pick up where we left off (resume contract:
+          // legacy progress without `serviceAccountMethod` defaults to OAuth
+          // via `getAndroidResumeStep`).
           const fresh = await loadAndroidProgress(appId)
           if (cancelled)
             return
-          setStep(fresh ? getAndroidResumeStep(fresh) : 'service-account-method-select')
+          const hasAnyOAuthProgress = !!(
+            fresh?.completedSteps.googleSignInComplete
+            || fresh?.completedSteps.playAccountChosen
+            || fresh?.completedSteps.gcpProjectChosen
+            || fresh?.completedSteps.androidPackageChosen
+            || fresh?._oauthRefreshToken
+          )
+          if (hasAnyOAuthProgress || fresh?.serviceAccountMethod !== undefined)
+            setStep(fresh ? getAndroidResumeStep(fresh) : 'service-account-method-select')
+          else
+            setStep('service-account-method-select')
         }
         catch (err) {
           if (!cancelled)
@@ -899,13 +949,15 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
           // here — at this point the password lives only in the in-memory
           // state and the progress file, not in `credentials.json`.
           setRetryCount(0)
-          // Smart-route: if `serviceAccountMethod` is already set on disk
-          // (resume mid-flow), getAndroidResumeStep sends the user back to
-          // the right phase. Fresh runs land on the new method-select fork.
-          const fresh = await loadAndroidProgress(appId)
+          // After keystore is freshly generated in THIS run, always land on
+          // the new method-select fork — we know there's no prior SA choice
+          // because we just finished the keystore phase. Resume mid-flow on
+          // a subsequent run goes through `getAndroidResumeStep`, which
+          // routes legacy progress (absent `serviceAccountMethod`) to the
+          // OAuth path for backward compatibility.
           if (cancelled)
             return
-          setStep(fresh ? getAndroidResumeStep(fresh) : 'service-account-method-select')
+          setStep('service-account-method-select')
         }
         catch (err) {
           if (!cancelled)
@@ -1371,10 +1423,22 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
         if (!cancelled)
           exit()
       }, 100)
-      return () => { cancelled = true; clearTimeout(timer) }
+      return () => {
+        cancelled = true
+        clearTimeout(timer)
+        validationCleanupRef.current?.()
+        validationCleanupRef.current = null
+      }
     }
 
-    return () => { cancelled = true }
+    return () => {
+      cancelled = true
+      // Abort any in-flight SA validation. Safe to call when there isn't one
+      // — the ref is reset to null on every step transition that doesn't
+      // start a new validation.
+      validationCleanupRef.current?.()
+      validationCleanupRef.current = null
+    }
   }, [step])
 
   const progressPct = ANDROID_STEP_PROGRESS[step] ?? 0
@@ -1651,13 +1715,22 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
                     completedSteps: { ...p.completedSteps, keystoreReady: ready },
                   }))
                   addLog(`✔ Keystore loaded — ${keystoreExistingPath}`)
-                  // Smart-route: skip phases already complete (same pattern as
-                  // the auto-probe branch in the useEffect above) so a resume
-                  // that re-enters key-password doesn't drag the user back
-                  // through the service-account fork if they've already past
-                  // it.
+                  // Smart-route: same pattern as the auto-probe branch above.
+                  // If the user has any OAuth-side progress (legacy resume or
+                  // mid-flow), pick up where they left off; otherwise drop
+                  // them on the new fork.
                   const fresh = await loadAndroidProgress(appId)
-                  setStep(fresh ? getAndroidResumeStep(fresh) : 'service-account-method-select')
+                  const hasAnyOAuthProgress = !!(
+                    fresh?.completedSteps.googleSignInComplete
+                    || fresh?.completedSteps.playAccountChosen
+                    || fresh?.completedSteps.gcpProjectChosen
+                    || fresh?.completedSteps.androidPackageChosen
+                    || fresh?._oauthRefreshToken
+                  )
+                  if (hasAnyOAuthProgress || fresh?.serviceAccountMethod !== undefined)
+                    setStep(fresh ? getAndroidResumeStep(fresh) : 'service-account-method-select')
+                  else
+                    setStep('service-account-method-select')
                 }
                 catch (err) {
                   handleError(err, 'keystore-existing-path')
@@ -1786,10 +1859,13 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
           <Newline />
           <Select
             options={[
-              { label: '✅  Yes, I have my service account JSON file', value: 'existing' },
               { label: '🔐  No, set one up for me via Google', value: 'generate' },
+              { label: '✅  Yes, I have my service account JSON file', value: 'existing' },
             ]}
             onChange={(value) => {
+              if (selectFiredRef.current)
+                return
+              selectFiredRef.current = true
               const method: 'existing' | 'generate' = value === 'existing' ? 'existing' : 'generate'
               setServiceAccountMethod(method)
               if (method === 'existing') {
@@ -1830,10 +1906,19 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
                       { label: '📝  Type the path', value: 'manual' },
                     ]}
                     onChange={(value) => {
-                      if (value === 'picker')
+                      // 'manual' just flips the sub-mode (Select unmounts) and
+                      // is safe from the re-fire bug. 'picker' triggers a step
+                      // transition that takes time — guard against re-fires
+                      // before commit.
+                      if (value === 'picker') {
+                        if (selectFiredRef.current)
+                          return
+                        selectFiredRef.current = true
                         setStep('sa-json-existing-picker')
-                      else
+                      }
+                      else {
                         setSaJsonPathMode('manual')
+                      }
                     }}
                   />
                 </>
@@ -1898,6 +1983,9 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
               { label: '🆕  Set up a new service account via Google', value: 'oauth' },
             ]}
             onChange={(value) => {
+              if (selectFiredRef.current)
+                return
+              selectFiredRef.current = true
               if (value === 'retry') {
                 // Clear the saved path so the picker chooser shows fresh.
                 setServiceAccountJsonPath('')
@@ -2212,10 +2300,18 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
                       { label: '✍️   Type a different package name', value: '__manual__' },
                     ]}
                     onChange={(value) => {
+                      // Mode-switch path unmounts the <Select> synchronously,
+                      // so the @inkjs/ui re-fire bug can't replay it. The
+                      // package-pick path goes through async persistAndStep,
+                      // which keeps the <Select> mounted long enough for the
+                      // bug to spam — gate it with the per-step guard.
                       if (value === '__manual__') {
                         setPackageSelectMode('manual')
                         return
                       }
+                      if (selectFiredRef.current)
+                        return
+                      selectFiredRef.current = true
                       const choice: AndroidPackageChoice = {
                         packageName: value,
                         source: 'gradle',
