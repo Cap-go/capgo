@@ -9,7 +9,7 @@ const capacitorUpdaterConfig = {
   autoSplashscreen: true,
   directUpdate: 'atInstall',
   version: pkg.version,
-} satisfies CapacitorUpdaterConfig & { allowPreview: true }
+} satisfies CapacitorUpdaterConfig
 
 const config: CapacitorConfig = {
   appId: 'ee.forgr.capacitor_go',

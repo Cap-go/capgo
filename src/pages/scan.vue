@@ -2,7 +2,6 @@
 import type { DownloadEvent } from '@capgo/capacitor-updater'
 import { CapacitorBarcodeScanner } from '@capacitor/barcode-scanner'
 import { Capacitor } from '@capacitor/core'
-import { Dialog } from '@capacitor/dialog'
 import { CapacitorUpdater } from '@capgo/capacitor-updater'
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -15,11 +14,6 @@ import IconQrCode from '~icons/heroicons/qr-code-20-solid'
 import IconShieldCheck from '~icons/heroicons/shield-check-20-solid'
 import { parseChannelPreviewDeepLink } from '~/services/previewLinks'
 import { useDisplayStore } from '~/stores/display'
-
-type PreviewUpdater = typeof CapacitorUpdater & {
-  getLatest: (options?: { channel?: string, appId?: string, preview?: boolean }) => ReturnType<typeof CapacitorUpdater.getLatest>
-  startPreviewSession?: (options?: { appId?: string }) => Promise<void>
-}
 
 const route = useRoute()
 const router = useRouter()
@@ -156,19 +150,7 @@ async function handleBarcodeScan(scannedValue: string) {
 }
 
 async function startPreviewSession(appId?: string) {
-  const updater = CapacitorUpdater as PreviewUpdater
-  if (typeof updater.startPreviewSession === 'function') {
-    await updater.startPreviewSession({ appId })
-    return
-  }
-
-  const current = await CapacitorUpdater.current()
-  await CapacitorUpdater.next({ id: current.bundle.id })
-  await CapacitorUpdater.setShakeMenu({ enabled: true })
-  await Dialog.alert({
-    title: 'Preview started',
-    message: 'Shake your device anytime to reload or leave the test app.',
-  })
+  await CapacitorUpdater.startPreviewSession({ appId })
 }
 
 async function startChannelPreview(previewLink: ReturnType<typeof parseChannelPreviewDeepLink>) {
@@ -186,8 +168,7 @@ async function startChannelPreview(previewLink: ReturnType<typeof parseChannelPr
 
     toast.success(`Switching to channel: ${previewLink.channelName}`)
 
-    const updater = CapacitorUpdater as PreviewUpdater
-    const latest = await updater.getLatest({ appId: previewLink.appId, channel: previewLink.channelName, preview: true })
+    const latest = await CapacitorUpdater.getLatest({ appId: previewLink.appId, channel: previewLink.channelName })
     if (!latest.url)
       throw new Error(latest.message || latest.error || 'No preview update is available for this channel')
 
