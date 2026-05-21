@@ -1,0 +1,20 @@
+import { describe, expect, it } from 'vitest'
+import pluginWorker from '../cloudflare_workers/plugin/index.ts'
+
+describe('cloudflare plugin CORS', () => {
+  it.concurrent('responds to manifest size preflight requests', async () => {
+    const response = await pluginWorker.fetch(new Request('https://api.capgo.app/updates/manifest_size', {
+      method: 'OPTIONS',
+      headers: {
+        'origin': 'https://web.capgo.app',
+        'access-control-request-method': 'POST',
+        'access-control-request-headers': 'content-type,authorization',
+      },
+    }))
+
+    expect(response.status).toBe(204)
+    expect(response.headers.get('access-control-allow-origin')).toBe('*')
+    expect(response.headers.get('access-control-allow-methods')).toContain('OPTIONS')
+    expect(response.headers.get('access-control-allow-headers')?.toLowerCase()).toContain('content-type')
+  })
+})
