@@ -95,10 +95,20 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
   const [step, setStep] = useState<OnboardingStep>(startStep === 'welcome' ? 'welcome' : startStep)
 
   // Telemetry: resolve org id once + emit per-step events
-  const stepTimingRef = useRef<{ step: OnboardingStep, startedAt: number }>({
-    step: startStep === 'welcome' ? 'welcome' : startStep,
+  const stepTimingRef = useRef<{ step: OnboardingStep | null, startedAt: number }>({
+    step: null,
     startedAt: Date.now(),
   })
+  // Buffer of telemetry events that occurred before `resolvedOrgId` landed.
+  // Drained in order when the org id becomes available. Without this buffer,
+  // any step transitions during the async org-id resolution (which involves
+  // two HTTP round-trips: createSupabaseClient + getOrganizationId) would be
+  // dropped from the funnel.
+  const pendingTelemetryRef = useRef<Array<{
+    step: OnboardingStep
+    durationMs?: number
+    errorCategory?: OnboardingErrorCategory
+  }>>([])
   const [resolvedOrgId, setResolvedOrgId] = useState<string | null>(null)
   const resolvedApiKeyRef = useRef<string | null>(apikey ?? null)
   const orgIdResolvedRef = useRef(false)
@@ -181,29 +191,68 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
     issuerIdRef.current = issuerId
   }, [issuerId])
 
-  // Emit telemetry on every step transition (including initial mount)
+  // Emit telemetry on every step transition (including initial mount).
+  // Sequencing:
+  //   1. If `resolvedOrgId` just became available, drain the backlog first.
+  //   2. Skip same-step re-renders (orgId-lands triggers a re-fire — we don't
+  //      want to re-emit the current step, only drain the backlog).
+  //   3. Otherwise compute the new event, then either emit immediately (orgId
+  //      available) or queue it (orgId still loading).
   useEffect(() => {
-    if (!resolvedApiKeyRef.current || !resolvedOrgId)
+    if (!resolvedApiKeyRef.current)
       return
 
     const previous = stepTimingRef.current
-    if (previous.step === step && step !== 'error')
+    const isDuplicateStep = previous.step !== null && previous.step === step && step !== 'error'
+
+    // (1) Drain the backlog if org id is now available, even when the current
+    // step is a duplicate (e.g., this effect fired because resolvedOrgId moved
+    // from null to a real value, not because step changed).
+    if (resolvedOrgId && pendingTelemetryRef.current.length > 0) {
+      for (const queued of pendingTelemetryRef.current) {
+        void trackBuilderOnboardingStep({
+          apikey: resolvedApiKeyRef.current,
+          appId,
+          orgId: resolvedOrgId,
+          platform: 'ios',
+          ...queued,
+        })
+      }
+      pendingTelemetryRef.current = []
+    }
+
+    // (2) Now safely skip the duplicate-step path.
+    if (isDuplicateStep)
       return
 
     const now = Date.now()
-    const durationMs = previous.step === step ? undefined : now - previous.startedAt
+    // Initial step (previous.step === null) and same-step error re-entries have
+    // no meaningful previous-step duration.
+    const durationMs = previous.step === null || previous.step === step
+      ? undefined
+      : now - previous.startedAt
 
-    void trackBuilderOnboardingStep({
-      apikey: resolvedApiKeyRef.current,
-      appId,
-      orgId: resolvedOrgId,
-      platform: 'ios',
+    const eventPayload = {
       step,
       durationMs,
       errorCategory: step === 'error' ? errorCategoryRef.current : undefined,
-    })
+    }
 
     stepTimingRef.current = { step, startedAt: now }
+
+    // (3) Either fire immediately or buffer.
+    if (resolvedOrgId) {
+      void trackBuilderOnboardingStep({
+        apikey: resolvedApiKeyRef.current,
+        appId,
+        orgId: resolvedOrgId,
+        platform: 'ios',
+        ...eventPayload,
+      })
+    }
+    else {
+      pendingTelemetryRef.current.push(eventPayload)
+    }
   }, [step, appId, resolvedOrgId, error])
 
   const [teamId, setTeamId] = useState(initialProgress?.completedSteps.certificateCreated?.teamId || '')
