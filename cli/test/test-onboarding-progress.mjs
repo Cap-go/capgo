@@ -48,7 +48,10 @@ t('ad_hoc skips identity selection regardless of partial .p8 state', () => {
   assert.equal(getImportEntryStep(progress), 'import-pick-identity')
 })
 
-t('app_store with apiKeyVerified skips .p8 chain → import-pick-identity', () => {
+t('app_store with apiKeyVerified + full inputs → verifying-key (re-verifies on resume)', () => {
+  // We deliberately don't short-circuit on apiKeyVerified: re-verifying
+  // catches both moved/deleted .p8 files and Apple-side key revocation
+  // that a saved verification flag can't detect.
   const progress = makeProgress({
     setupMethod: 'import-existing',
     importDistribution: 'app_store',
@@ -59,10 +62,10 @@ t('app_store with apiKeyVerified skips .p8 chain → import-pick-identity', () =
       apiKeyVerified: { keyId: 'XXX', issuerId: 'issuer-uuid' },
     },
   })
-  assert.equal(getImportEntryStep(progress), 'import-pick-identity')
+  assert.equal(getImportEntryStep(progress), 'verifying-key')
 })
 
-t('app_store with full partial inputs (no verify yet) → verifying-key', () => {
+t('app_store with full inputs (no verify yet) → verifying-key', () => {
   const progress = makeProgress({
     setupMethod: 'import-existing',
     importDistribution: 'app_store',
@@ -102,7 +105,9 @@ t('app_store with nothing yet → api-key-instructions', () => {
 
 t('app_store fix matches the real-world bug report shape', () => {
   // From a real onboarding-progress file: user has verified API key + picked
-  // app_store. Was being re-asked for .p8 file. Should jump to identity pick.
+  // app_store. Was being re-asked for .p8 file. Should land at verifying-key
+  // (which re-validates against Apple, then routes to import-pick-identity
+  // on success) — NOT the .p8 file picker.
   const progress = makeProgress({
     appId: 'ee.forgr.capacitor_go',
     setupMethod: 'import-existing',
@@ -114,7 +119,7 @@ t('app_store fix matches the real-world bug report shape', () => {
       apiKeyVerified: { keyId: '66FGQZB566', issuerId: '0cd4db4a-5598-45b8-9d32-75cdf127d005' },
     },
   })
-  assert.equal(getImportEntryStep(progress), 'import-pick-identity')
+  assert.equal(getImportEntryStep(progress), 'verifying-key')
 })
 
 // ─── getResumeStep regression — should not be affected ────────────────

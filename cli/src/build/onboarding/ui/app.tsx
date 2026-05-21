@@ -268,8 +268,17 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
   async function getFreshToken(): Promise<string> {
     let content = p8ContentRef.current
     if (!content && p8PathRef.current) {
-      content = await readFile(p8PathRef.current, 'utf-8')
-      setP8Content(content)
+      try {
+        content = await readFile(p8PathRef.current, 'utf-8')
+        setP8Content(content)
+      }
+      catch {
+        // Saved p8Path was moved, deleted, or is no longer readable since
+        // the previous run. Convert to NeedP8Error so handleError routes
+        // the user back to api-key-instructions for a clean re-prompt
+        // rather than surfacing a raw ENOENT support-bundle screen.
+        throw new NeedP8Error()
+      }
     }
     if (!content) {
       throw new NeedP8Error()
@@ -355,6 +364,12 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
           throw new Error('Could not read .p8 file. Please provide the path again.')
         }
       }
+      // Defensive guard: do NOT silently save credentials missing the ASC
+      // API key. Without this, an empty p8ContentRef + empty p8PathRef
+      // (legacy or malformed progress) would skip the `APPLE_KEY_*` writes
+      // below and leave the user with a working-looking save and no key.
+      if (!keyContent)
+        throw new Error('Internal error: app_store distribution requires a .p8 key but none was provided. Re-run `build init` and provide the key file.')
     }
 
     // Use the bundle ID from the imported profile when available; falls back
