@@ -1,0 +1,90 @@
+import { describe, expect, it } from 'vitest'
+import { buildManifestDownloadSizeResult, normalizeManifestSizeFiles } from '../supabase/functions/_backend/utils/manifest_size.ts'
+
+describe('manifest download size helpers', () => {
+  it.concurrent('normalizes valid manifest files and extracts version ids from download urls', () => {
+    const files = normalizeManifestSizeFiles([
+      {
+        file_name: 'index.html.br',
+        file_hash: 'hash-a',
+        download_url: 'https://plugin.capgo.test/files/read/attachments/path/index.html.br?key=42&device_id=device',
+      },
+      {
+        file_name: 'index.html.br',
+        file_hash: 'hash-a',
+        download_url: 'https://plugin.capgo.test/files/read/attachments/path/index.html.br?key=42&device_id=device',
+      },
+      {
+        file_name: 'main.js',
+        file_hash: 'hash-b',
+      },
+      {
+        file_name: 'bad.js',
+        file_hash: '',
+      },
+    ])
+
+    expect(files).toEqual([
+      {
+        file_name: 'index.html.br',
+        file_hash: 'hash-a',
+        download_url: 'https://plugin.capgo.test/files/read/attachments/path/index.html.br?key=42&device_id=device',
+        version_id: 42,
+      },
+      {
+        file_name: 'main.js',
+        file_hash: 'hash-b',
+        download_url: null,
+        version_id: null,
+      },
+    ])
+  })
+
+  it.concurrent('sums known file sizes and marks missing metadata as unknown', () => {
+    const files = normalizeManifestSizeFiles([
+      {
+        file_name: 'index.html.br',
+        file_hash: 'hash-a',
+        download_url: 'https://plugin.capgo.test/files/read/attachments/path/index.html.br?key=42',
+      },
+      {
+        file_name: 'main.js',
+        file_hash: 'hash-b',
+      },
+      {
+        file_name: 'style.css',
+        file_hash: 'hash-c',
+      },
+    ])
+
+    const result = buildManifestDownloadSizeResult(files, [
+      { file_hash: 'hash-a', version_id: 42, file_size: 100 },
+      { file_hash: 'hash-b', version_id: null, file_size: '50' },
+      { file_hash: 'hash-c', version_id: null, file_size: 0 },
+    ])
+
+    expect(result.totalSize).toBe(150)
+    expect(result.knownFiles).toBe(2)
+    expect(result.unknownFiles).toBe(1)
+    expect(result.files).toEqual([
+      {
+        file_name: 'index.html.br',
+        file_hash: 'hash-a',
+        download_url: 'https://plugin.capgo.test/files/read/attachments/path/index.html.br?key=42',
+        size: 100,
+      },
+      {
+        file_name: 'main.js',
+        file_hash: 'hash-b',
+        download_url: null,
+        size: 50,
+      },
+      {
+        file_name: 'style.css',
+        file_hash: 'hash-c',
+        download_url: null,
+        error: 'size_unknown',
+      },
+    ])
+  })
+})
