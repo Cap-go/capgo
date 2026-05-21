@@ -3,6 +3,37 @@ import { Box, Text, useInput } from 'ink'
 import Spinner from 'ink-spinner'
 // src/build/onboarding/ui/components.tsx
 import React, { useState } from 'react'
+import stringWidth from 'string-width'
+
+/**
+ * Truncate a string to a maximum *terminal display width* (not codepoint
+ * count). Emoji like 🔑 render as 2 columns; combining marks render as 0.
+ * Array.from(s).length is wrong for either. Uses string-width for the
+ * per-char width and leaves 1 column for the ellipsis.
+ */
+function truncateByDisplayWidth(s: string, maxWidth: number): string {
+  if (stringWidth(s) <= maxWidth)
+    return s
+  const ellipsisWidth = 1
+  let total = 0
+  let out = ''
+  for (const ch of s) {
+    const w = stringWidth(ch)
+    if (total + w > maxWidth - ellipsisWidth)
+      break
+    total += w
+    out += ch
+  }
+  return `${out}…`
+}
+
+/** Pad a string with trailing spaces until its display width hits `width`. */
+function padByDisplayWidth(s: string, width: number): string {
+  const current = stringWidth(s)
+  if (current >= width)
+    return s
+  return s + ' '.repeat(width - current)
+}
 
 export const Divider: FC<{ width?: number }> = ({ width = 60 }) => (
   <Text dimColor>{'─'.repeat(width)}</Text>
@@ -42,28 +73,21 @@ export const Table: FC<TableProps> = ({ data, maxColumnWidth = 50, cellColor, ce
   if (data.length === 0)
     return null
   const columns = Object.keys(data[0])
-  const truncate = (s: string, max: number): string => {
-    // Unicode-safe length proxy — Array.from counts code-points so emoji
-    // glyphs aren't double-counted. Terminal display width isn't perfectly
-    // captured by codepoints (combining marks, double-width chars), but
-    // it's close enough for typical ASC cert names + UTF-8 team chars.
-    const codepoints = Array.from(s)
-    return codepoints.length <= max ? s : `${codepoints.slice(0, max - 1).join('')}…`
-  }
-  // Compute column widths: max(header, all values), capped at maxColumnWidth.
+  // Column widths are computed in TERMINAL DISPLAY WIDTH (not codepoint
+  // count) — so a 🔑 emoji (2 cols wide) doesn't push the rendered row
+  // past the border. See truncateByDisplayWidth comment for the gotcha.
   const widths: Record<string, number> = {}
   for (const col of columns) {
-    let max = Array.from(col).length
+    let max = stringWidth(col)
     for (const row of data) {
       const v = row[col] ?? ''
-      const w = Array.from(v).length
+      const w = stringWidth(v)
       if (w > max)
         max = w
     }
     widths[col] = Math.min(max, maxColumnWidth)
   }
   const pad = ' '.repeat(cellPadding)
-  // Total inner width: sum of column content widths + padding * 2 per column + (cols-1) separators
   const borderRow = (left: string, mid: string, right: string, fill: string): string => {
     const segments = columns.map(c => fill.repeat(widths[c] + cellPadding * 2))
     return left + segments.join(mid) + right
@@ -71,9 +95,9 @@ export const Table: FC<TableProps> = ({ data, maxColumnWidth = 50, cellColor, ce
   const renderRow = (cells: { col: string, value: string, rowIndex?: number }[]): React.ReactNode => (
     <Text>
       │
-      {cells.map((cell, idx) => {
-        const truncated = truncate(cell.value, widths[cell.col])
-        const padded = truncated + ' '.repeat(Math.max(0, widths[cell.col] - Array.from(truncated).length))
+      {cells.map((cell) => {
+        const truncated = truncateByDisplayWidth(cell.value, widths[cell.col])
+        const padded = padByDisplayWidth(truncated, widths[cell.col])
         const colorName = cellColor && cell.rowIndex !== undefined ? cellColor(cell.col, cell.value, cell.rowIndex) : undefined
         const dim = cellDim && cell.rowIndex !== undefined ? cellDim(cell.col, cell.value, cell.rowIndex) : false
         return (
@@ -82,7 +106,6 @@ export const Table: FC<TableProps> = ({ data, maxColumnWidth = 50, cellColor, ce
             <Text color={colorName as any} dimColor={dim}>{padded}</Text>
             {pad}
             │
-            {idx === cells.length - 1 ? '' : ''}
           </React.Fragment>
         )
       })}
