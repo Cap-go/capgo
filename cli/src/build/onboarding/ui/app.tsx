@@ -741,27 +741,44 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
     if (step === 'import-checking-apple-cert' && chosenIdentity) {
       ;(async () => {
         try {
+          // Trust the cached appleCertId from the eager batch validation
+          // (`import-validating-all-certs`) when present — that step
+          // already proved Apple has this cert via the same
+          // findCertIdBySha1 call. A redundant lookup here just burns an
+          // API round-trip and exposes us to transient-blip false
+          // negatives that flip a known-good cert into "Scenario B".
+          // Falls back to the live lookup when no cache exists (e.g.
+          // resume from progress before batch validation ran).
           const token = await getFreshToken()
-          const certId = await findCertIdBySha1(token, chosenIdentity.sha1)
-          if (cancelled)
-            return
-          setAppleCertIdForChosen(certId) // null when Apple has no SHA1 match; string otherwise
-          if (!certId) {
-            addLog(
-              `⚠ Apple's API didn't return a match for "${chosenIdentity.name}". `
-              + `Hiding the API-driven recovery options — use "Switch to Create new" or open the Developer Portal.`,
-              'yellow',
-            )
-            setStep('import-no-match-recovery')
-            return
+          const cached = identityAvailability[chosenIdentity.sha1]
+          let certId: string | null
+          if (cached?.available && cached.appleCertId) {
+            certId = cached.appleCertId
           }
+          else {
+            certId = await findCertIdBySha1(token, chosenIdentity.sha1)
+            if (cancelled)
+              return
+            setAppleCertIdForChosen(certId)
+            if (!certId) {
+              // Should be unreachable from the table picker (only
+              // available certs are selectable), but kept as a defensive
+              // route — log + bounce to recovery rather than crashing.
+              addLog(
+                `⚠ Apple lookup returned no match for "${chosenIdentity.name}". `
+                + `Open Developer Portal or use "Switch to Create new" from the picker.`,
+                'yellow',
+              )
+              setStep('import-no-match-recovery')
+              return
+            }
+          }
+          setAppleCertIdForChosen(certId)
           addLog(`✔ Apple recognizes this certificate (ASC id ${certId.slice(0, 8)}…)`)
 
           // Auto-fetch profiles for this cert. Saves the user a click on
-          // "Fetch matching profile from Apple now" in the recovery menu
-          // when Apple actually has a matching profile waiting. The menu
-          // is only shown when (a) Apple has zero profiles linked, OR (b)
-          // profiles exist but none match this app's bundleId / dist mode.
+          // "Rescan Apple API for profiles" in the recovery menu when
+          // Apple actually has a matching profile waiting.
           const profiles = await listProfilesForCert(token, certId)
           if (cancelled)
             return
@@ -2064,108 +2081,113 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
         // mismatch). Both share the same recovery options.
         const identityProfiles = importMatches.find(m => m.identity.sha1 === chosenIdentity.sha1)?.profiles ?? []
         const hasAnyProfiles = identityProfiles.length > 0
-        // Pre-check result drives which actions we even offer. Three states:
-        //  - undefined → no check done (ad_hoc without ASC key). Show the
-        //    legacy "Provide ASC API key, then …" options, which route
-        //    through api-key-instructions before retrying the action.
-        //  - null      → checked, Apple doesn't recognize the cert. Hide
-        //    Fetch + Create (they'd fail). Surface "Switch to Create new"
-        //    as the only forward-progress option.
-        //  - string    → checked, Apple has the cert. Show Fetch + Create
-        //    without the "provide key" prefix; reuse cached cert id.
+        // Two states the menu cares about:
+        //  - certKnownOnApple → Apple confirmed the cert (eager batch or
+        //    live lookup). Show all API-driven options.
+        //  - checkSkipped     → No API key yet (ad_hoc users who didn't
+        //    go through verifying-key). Show options with the "Provide
+        //    ASC API key, then …" prefix so picking them routes through
+        //    api-key-instructions before retrying.
+        //
+        // The "Apple lookup returned null" case is **unreachable** from
+        // the table picker because unavailable rows aren't selectable,
+        // and the per-identity step now trusts the cached appleCertId
+        // instead of running a redundant findCertIdBySha1. We removed
+        // the Scenario B menu branch entirely; if a future code path
+        // somehow lands here with appleCertIdForChosen === null, it
+        // will render as if checkSkipped (with "Provide ASC API key"
+        // wording even though the key is verified) — visually obvious
+        // and recoverable, vs. a silent dead-end.
         const certKnownOnApple = typeof appleCertIdForChosen === 'string'
-        const certKnownNotOnApple = appleCertIdForChosen === null
-        const checkSkipped = appleCertIdForChosen === undefined
+        const checkSkipped = !certKnownOnApple
 
-        const fetchOption = certKnownOnApple
-          ? [{ label: `🔍  Fetch matching profile from Apple now`, value: 'fetch' }]
-          : checkSkipped
-            ? [{ label: hasAscKey ? `🔍  Fetch matching profile from Apple now` : `🔍  Provide ASC API key, then fetch profile from Apple`, value: 'fetch' }]
-            : []
+        const rescanOption = certKnownOnApple
+          ? [{ label: `🔄  Rescan Apple API for profiles (use after creating one in the portal)`, value: 'fetch' }]
+          : [{ label: hasAscKey ? `🔄  Rescan Apple API for profiles (use after creating one in the portal)` : `🔄  Provide ASC API key, then rescan Apple API for profiles`, value: 'fetch' }]
 
         const createOption = canCreateProfile && certKnownOnApple
           ? [{ label: `✨  Create a new App Store profile for this cert via Apple`, value: 'create' }]
-          : canCreateProfile && checkSkipped
+          : canCreateProfile
             ? [{ label: hasAscKey ? `✨  Create a new App Store profile for this cert via Apple` : `✨  Provide ASC API key, then create a new App Store profile for this cert`, value: 'create' }]
             : []
-
-        const switchToCreateNewOption = certKnownNotOnApple
-          ? [{ label: `🆕  Switch to "Create new" (Apple generates a fresh cert + profile)`, value: 'switch-create-new' }]
-          : []
 
         return (
           <Box flexDirection="column" marginTop={1}>
             <Alert variant="warning">
-              {certKnownNotOnApple
+              {hasAnyProfiles
                 ? (
                     <>
-                      Apple's API doesn't return a record for "
+                      No provisioning profile on this Mac matches this app (
+                      <Text bold>{appId}</Text>
+                      {importDistribution
+                        ? (
+                            <>
+                              {' '}
+                              for
+                              {' '}
+                              <Text bold>{importDistribution}</Text>
+                              {' '}
+                              distribution
+                            </>
+                          )
+                        : null}
+                      ) under "
                       {chosenIdentity.name}
-                      " (or our lookup can't see it).
+                      ".
                     </>
                   )
-                : hasAnyProfiles
-                  ? (
-                      <>
-                        No provisioning profile on this Mac matches this app (
-                        <Text bold>{appId}</Text>
-                        {importDistribution
-                          ? (
-                              <>
-                                {' '}
-                                for
-                                {' '}
-                                <Text bold>{importDistribution}</Text>
-                                {' '}
-                                distribution
-                              </>
-                            )
-                          : null}
-                        ) under "
-                        {chosenIdentity.name}
-                        ".
-                      </>
-                    )
-                  : (
-                      <>
-                        No provisioning profile on this Mac is linked to "
-                        {chosenIdentity.name}
-                        ".
-                      </>
-                    )}
+                : (
+                    <>
+                      No provisioning profile on this Mac is linked to "
+                      {chosenIdentity.name}
+                      ".
+                    </>
+                  )}
             </Alert>
             <Newline />
             <Text dimColor>
-              {certKnownNotOnApple
-                ? `Apple-side actions for this cert are unavailable. Open the Developer Portal to investigate, or switch to "Create new" to generate a fresh cert + profile (reuses your already-provided .p8).`
-                : hasAnyProfiles
-                  ? `The cert is in your Keychain but no on-disk profile matches this app's bundle ID${importDistribution ? ` and ${importDistribution} distribution` : ''}. Pick a recovery path:`
-                  : `The cert is in your Keychain but the matching profile isn't on disk. Pick a recovery path:`}
+              {hasAnyProfiles
+                ? `The cert is in your Keychain but no on-disk profile matches this app's bundle ID${importDistribution ? ` and ${importDistribution} distribution` : ''}. Pick a recovery path:`
+                : `The cert is in your Keychain but the matching profile isn't on disk. Pick a recovery path:`}
             </Text>
             <Newline />
             <Select
               options={[
-                { label: `🌐  Open Apple Developer Portal (download manually, then re-scan)`, value: 'browser' },
-                ...fetchOption,
+                // Order optimized for the most-likely-to-succeed first:
+                //   1. Create a fresh profile via Apple API — automatic,
+                //      one click, links to the existing cert.
+                //   2. Use a local .mobileprovision file — fastest path
+                //      when the user already has a profile they trust.
+                //   3. Open the Developer Portal — manual fallback for
+                //      cases where the API isn't sufficient.
+                //   4. Rescan Apple API — explicit re-fetch after the
+                //      user created/edited something in the portal.
+                //   5. Back to identity selection — from the picker the
+                //      user can choose "Switch to Create new" if they
+                //      want to abandon import entirely. (Removed from
+                //      this menu since the cert-not-on-Apple branch
+                //      that justified it is now unreachable.)
                 ...createOption,
                 // "Provide .mobileprovision from disk" — for users who
                 // already have a profile file in a non-standard location
                 // (downloads, artifact from another machine, shared team
                 // archive). Only shown on macOS where the native picker
-                // is available; non-macOS users would have to type the
-                // path manually, and we don't currently render that.
+                // is available.
                 ...(canUseFilePicker() ? [{ label: `📁  Use a .mobileprovision file from disk`, value: 'provide-profile-path' }] : []),
-                ...switchToCreateNewOption,
+                { label: `🌐  Open Apple Developer Portal (browse / create profiles manually)`, value: 'browser' },
+                ...rescanOption,
                 { label: '↩️   Back to identity selection', value: 'back' },
               ]}
               onChange={async (value) => {
                 if (value === 'browser') {
+                  // No auto-rescan timer here: 5 seconds is a wild guess
+                  // and "creating a profile in the portal" can take a
+                  // minute or more. The user picks the explicit
+                  // "🔄 Rescan Apple API" option below when they're
+                  // ready, which gives them precise control over
+                  // when we re-hit the API.
                   open('https://developer.apple.com/account/resources/profiles/list')
-                  addLog('✔ Opened Apple Developer Portal — re-running scan in 5s', 'yellow')
-                  setTimeout(() => {
-                    if (!exitRequestedRef.current)
-                      setStep('import-scanning')
-                  }, 5000)
+                  addLog('✔ Opened Apple Developer Portal — pick "🔄 Rescan Apple API" when you\'re done creating the profile.', 'yellow')
                   return
                 }
                 if (value === 'provide-profile-path') {
@@ -2175,26 +2197,6 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
                 }
                 if (value === 'back') {
                   setStep('import-pick-identity')
-                  return
-                }
-                if (value === 'switch-create-new') {
-                  // Bail out of the import flow to the create-new path. Reuses
-                  // the already-verified .p8 (apiKeyVerified stays in
-                  // progress, getResumeStep would route past the .p8 chain on
-                  // a CLI restart). No Keychain side effects — the orphan
-                  // local cert stays put and harmless.
-                  const existing = await loadProgress(appId)
-                  if (existing) {
-                    existing.setupMethod = 'create-new'
-                    delete existing.importDistribution
-                    await saveProgress(appId, existing)
-                  }
-                  setImportMode(false)
-                  addLog('✔ Switching to "Create new" — generating a fresh cert + profile via Apple', 'cyan')
-                  // apiKeyVerified is guaranteed at this point (we only show
-                  // this option when certKnownNotOnApple, which requires the
-                  // pre-check to have run, which requires a verified key).
-                  setStep('creating-certificate')
                   return
                 }
                 if (value === 'fetch' || value === 'create') {
