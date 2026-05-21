@@ -306,9 +306,16 @@ export async function listProfilesForCert(
   token: string,
   certificateId: string,
 ): Promise<AscProfileSummary[]> {
-  // The relationships filter does the server-side join for us
+  // Use the to-many relationship endpoint — `/v1/certificates/{id}/profiles`
+  // is the canonical "list profiles for this cert" call. The previous
+  // implementation used `/profiles?filter[certificates]=…` but Apple's
+  // /profiles endpoint doesn't accept a `certificates` filter — only
+  // filter[id], filter[name], filter[profileState], filter[profileType] —
+  // and returns HTTP 400 "'certificates' is not a valid filter type".
+  // The relationship endpoint accepts the same `include` and `limit`
+  // parameters so the rest of the function is unchanged.
   const body = await ascFetch(
-    `/profiles?filter[certificates]=${encodeURIComponent(certificateId)}&include=bundleId&limit=50`,
+    `/certificates/${encodeURIComponent(certificateId)}/profiles?include=bundleId&limit=200`,
     token,
   )
   const included: any[] = body.included || []
