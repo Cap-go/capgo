@@ -80,3 +80,18 @@ export function openKeystorePicker(): Promise<string | null> {
     'POSIX path of (choose file of type {"jks", "keystore", "p12"} with prompt "Select your Android keystore")',
   )
 }
+
+/**
+ * Open the macOS native file picker filtered to .mobileprovision files.
+ * Returns the selected path, or null if the user cancelled.
+ *
+ * Used by the no-match-recovery "Use a .mobileprovision file from disk"
+ * option — covers users who have a profile downloaded somewhere outside
+ * Xcode's standard provisioning-profile directories (e.g. a downloads
+ * folder, an artifact from another machine, a shared team archive).
+ */
+export function openMobileprovisionPicker(): Promise<string | null> {
+  return openMacFilePicker(
+    'POSIX path of (choose file of type {"mobileprovision"} with prompt "Select your .mobileprovision file")',
+  )
+}

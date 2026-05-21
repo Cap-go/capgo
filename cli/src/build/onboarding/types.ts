@@ -18,6 +18,7 @@ export type OnboardingStep
     | 'import-validating-all-certs'
     | 'import-checking-apple-cert'
     | 'import-no-match-recovery'
+    | 'import-provide-profile-path'
     | 'import-fetching-profile'
     | 'import-create-profile-only'
     | 'import-export-warning'
@@ -146,6 +147,7 @@ export const STEP_PROGRESS: Record<OnboardingStep, number> = {
   'import-validating-all-certs': 38,
   'import-checking-apple-cert': 50,
   'import-no-match-recovery': 55,
+  'import-provide-profile-path': 58,
   'import-fetching-profile': 60,
   'import-create-profile-only': 60,
   'import-export-warning': 70,
@@ -204,6 +206,8 @@ export function getPhaseLabel(step: OnboardingStep): string {
       return 'Step 3 of 4 · Checking certificate on Apple'
     case 'import-no-match-recovery':
       return 'Step 3 of 4 · No matching profile — recover'
+    case 'import-provide-profile-path':
+      return 'Step 3 of 4 · Provide .mobileprovision file'
     case 'import-fetching-profile':
       return 'Step 3 of 4 · Fetching profile from Apple'
     case 'import-create-profile-only':

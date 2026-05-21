@@ -22,7 +22,8 @@ import { loadSavedCredentials, updateSavedCredentials } from '../../credentials.
 import { requestBuildInternal } from '../../request.js'
 import { CertificateLimitError, classifyCertAvailability, createCertificate, createProfile, deleteProfile, DuplicateProfileError, ensureBundleId, findCertIdBySha1, generateJwt, listProfilesForCert, revokeCertificate, verifyApiKey } from '../apple-api.js'
 import { createP12, DEFAULT_P12_PASSWORD, generateCsr } from '../csr.js'
-import { canUseFilePicker, openFilePicker } from '../file-picker.js'
+import { canUseFilePicker, openFilePicker, openMobileprovisionPicker } from '../file-picker.js'
+import { parseMobileprovisionDetailed } from '../../mobileprovision-parser.js'
 import { exportP12FromKeychain, filterProfilesForApp, isHelperCached, isMacOS, listSigningIdentities, matchIdentitiesToProfiles, precompileSwiftHelper, scanProvisioningProfiles } from '../macos-signing.js'
 import { deleteProgress, getImportEntryStep, getResumeStep, loadProgress, saveProgress } from '../progress.js'
 import { getBuildOnboardingRecoveryAdvice } from '../recovery.js'
@@ -100,6 +101,12 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
   const [existingCerts, setExistingCerts] = useState<Array<{ id: string, name: string, serialNumber: string, expirationDate: string }>>([])
   const [certToRevoke, setCertToRevoke] = useState<string | null>(null)
   const pickerOpenedRef = useRef(false)
+  /**
+   * Separate guard for the mobileprovision picker so it doesn't re-open on
+   * re-render. Reset to false whenever the user navigates away from the
+   * import-provide-profile-path step (e.g. cancels back to recovery menu).
+   */
+  const mobileprovisionPickerOpenedRef = useRef(false)
   const exitRequestedRef = useRef(false)
   // overwriteConfirmedRef removed — credential check happens at start now
 
@@ -816,6 +823,102 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
         catch (err) {
           if (!cancelled)
             handleError(err, 'import-checking-apple-cert')
+        }
+      })()
+    }
+
+    if (step === 'import-provide-profile-path' && !mobileprovisionPickerOpenedRef.current && chosenIdentity) {
+      mobileprovisionPickerOpenedRef.current = true
+      ;(async () => {
+        const handleSelectedPath = async (filePath: string) => {
+          // Parse the .mobileprovision (CMS-signed plist) and validate
+          // every constraint that would otherwise produce a broken build
+          // far downstream: bundleId must match THIS app, profileType
+          // must match THIS distribution, and one of the linked cert
+          // SHA1s must match the user's chosen Keychain identity.
+          let detail
+          try {
+            detail = parseMobileprovisionDetailed(filePath)
+          }
+          catch (err) {
+            handleError(
+              new Error(`Couldn't parse "${filePath}": ${err instanceof Error ? err.message : String(err)}`),
+              'import-provide-profile-path',
+            )
+            return
+          }
+          if (detail.bundleId !== appId) {
+            handleError(
+              new Error(
+                `This .mobileprovision is for bundle ID "${detail.bundleId}" but the current app is "${appId}". `
+                + `Pick a profile that targets the right app, or use "Create a new App Store profile" in the recovery menu.`,
+              ),
+              'import-provide-profile-path',
+            )
+            return
+          }
+          if (importDistribution && detail.profileType !== importDistribution) {
+            handleError(
+              new Error(
+                `This .mobileprovision has distribution type "${detail.profileType}" but you picked "${importDistribution}". `
+                + `Pick a profile of the correct type, or go back and change the distribution mode.`,
+              ),
+              'import-provide-profile-path',
+            )
+            return
+          }
+          if (!detail.certificateSha1s.includes(chosenIdentity.sha1)) {
+            handleError(
+              new Error(
+                `This .mobileprovision doesn't include "${chosenIdentity.name}" in its allowed certificate list. `
+                + `The profile lists ${detail.certificateSha1s.length} cert SHA1${detail.certificateSha1s.length === 1 ? '' : 's'}, none matching this Keychain identity. `
+                + `Either pick a profile that trusts this cert, or go back to identity selection and pick the one this profile expects.`,
+              ),
+              'import-provide-profile-path',
+            )
+            return
+          }
+          // All checks pass — build a DiscoveredProfile and route to the
+          // existing export flow. We keep the file path so the
+          // import-exporting step reads the bytes (no need to embed
+          // profileBase64 here).
+          const synth: DiscoveredProfile = {
+            path: filePath,
+            uuid: detail.uuid,
+            name: detail.name,
+            applicationIdentifier: detail.applicationIdentifier,
+            bundleId: detail.bundleId,
+            teamId: detail.teamId,
+            expirationDate: detail.expirationDate,
+            profileType: detail.profileType,
+            certificateSha1s: detail.certificateSha1s,
+          }
+          setChosenProfile(synth)
+          upsertLog('✔ Profile · ', `✔ Profile · ${detail.name} (from ${filePath.split('/').pop()})`)
+          setStep('import-export-warning')
+        }
+
+        // On macOS use the native picker; everywhere else (and as a
+        // fallback when the picker fails) the user types the path in
+        // the dedicated render below — handled outside this handler.
+        if (canUseFilePicker()) {
+          try {
+            const picked = await openMobileprovisionPicker()
+            if (cancelled)
+              return
+            if (picked) {
+              await handleSelectedPath(picked)
+              return
+            }
+            // User cancelled the native dialog — bounce back to recovery
+            // menu rather than leaving them on a spinner-less screen.
+            mobileprovisionPickerOpenedRef.current = false
+            setStep('import-no-match-recovery')
+          }
+          catch (err) {
+            if (!cancelled)
+              handleError(err, 'import-provide-profile-path')
+          }
         }
       })()
     }
@@ -2045,6 +2148,13 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
                 { label: `🌐  Open Apple Developer Portal (download manually, then re-scan)`, value: 'browser' },
                 ...fetchOption,
                 ...createOption,
+                // "Provide .mobileprovision from disk" — for users who
+                // already have a profile file in a non-standard location
+                // (downloads, artifact from another machine, shared team
+                // archive). Only shown on macOS where the native picker
+                // is available; non-macOS users would have to type the
+                // path manually, and we don't currently render that.
+                ...(canUseFilePicker() ? [{ label: `📁  Use a .mobileprovision file from disk`, value: 'provide-profile-path' }] : []),
                 ...switchToCreateNewOption,
                 { label: '↩️   Back to identity selection', value: 'back' },
               ]}
@@ -2056,6 +2166,11 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
                     if (!exitRequestedRef.current)
                       setStep('import-scanning')
                   }, 5000)
+                  return
+                }
+                if (value === 'provide-profile-path') {
+                  mobileprovisionPickerOpenedRef.current = false
+                  setStep('import-provide-profile-path')
                   return
                 }
                 if (value === 'back') {
@@ -2097,6 +2212,14 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
           </Box>
         )
       })()}
+
+      {/* Import: native picker for a .mobileprovision file on disk */}
+      {step === 'import-provide-profile-path' && (
+        <Box flexDirection="column" marginTop={1}>
+          <SpinnerLine text="Opening file picker for your .mobileprovision file..." />
+          <Text dimColor>If the dialog doesn't appear, check behind other windows or in the menu bar.</Text>
+        </Box>
+      )}
 
       {/* Import: fetching profile from Apple by cert SHA1 */}
       {step === 'import-fetching-profile' && (
