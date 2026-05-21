@@ -47,7 +47,32 @@ export const ErrorLine: FC<{ text: string }> = ({ text }) => (
  */
 export const FilteredTextInput: FC<{
   placeholder?: string
+  /**
+   * Blacklist of characters to strip from input. Each char in this string is
+   * removed from the buffer after every keystroke. Used for casual filtering
+   * (e.g. stripping `=` from env-var values).
+   */
   filter?: string
+  /**
+   * Whitelist regex matched per-character. Anything not matching is dropped.
+   * Takes precedence over `filter` when both are set. Used when the field has
+   * a tight format (Apple Key ID is exactly 10 alphanumeric chars; Issuer ID
+   * is a UUID; etc.) so users can't even type invalid characters.
+   */
+  allowedPattern?: RegExp
+  /**
+   * Hard cap on input length. Extra characters past the cap are dropped
+   * silently (paste-safe). Pair with `allowedPattern` for known-format fields
+   * — e.g. Apple Key ID has `maxLength=10` so a paste of "Key ID: KDTXMK292V"
+   * truncates to the first 10 valid chars after filtering.
+   */
+  maxLength?: number
+  /**
+   * Post-filter transform applied to the entire buffer after each keystroke.
+   * Most common use: `(s) => s.toUpperCase()` for fields that are case-
+   * insensitive but conventionally uppercase. Runs after filter + maxLength.
+   */
+  transform?: (value: string) => string
   mask?: boolean
   /**
    * Pre-fills the input. Used when the user is editing an already-entered
@@ -57,8 +82,8 @@ export const FilteredTextInput: FC<{
    */
   initialValue?: string
   onSubmit: (value: string) => void
-}> = ({ placeholder = '', filter = '=', mask = false, initialValue = '', onSubmit }) => {
-  const [value, setValue] = useState(initialValue)
+}> = ({ placeholder = '', filter = '=', allowedPattern, maxLength, transform, mask = false, initialValue = '', onSubmit }) => {
+  const [value, setValue] = useState(() => applyConstraints(initialValue, { filter, allowedPattern, maxLength, transform }))
 
   useInput((input, key) => {
     if (key.return) {
@@ -73,14 +98,14 @@ export const FilteredTextInput: FC<{
     if (key.ctrl || key.meta || key.escape || key.upArrow || key.downArrow || key.leftArrow || key.rightArrow || key.tab) {
       return
     }
-    // Append input then strip all forbidden characters (handles paste)
+    // Append input then apply the full constraint pipeline (paste-safe).
     if (input) {
-      const filterRegex = new RegExp(`[${filter.replace(/[-\\^$*+?.()|[\]{}]/g, '\\$&')}]`, 'g')
-      setValue(prev => (prev + input).replace(filterRegex, ''))
+      setValue(prev => applyConstraints(prev + input, { filter, allowedPattern, maxLength, transform }))
     }
   })
 
   const display = mask ? '•'.repeat(value.length) : value
+  const showCounter = maxLength !== undefined && !mask
   return (
     <Box>
       <Text color="cyan">❯ </Text>
@@ -88,8 +113,45 @@ export const FilteredTextInput: FC<{
         ? <Text>{display}</Text>
         : <Text dimColor>{placeholder}</Text>}
       <Text color="white">█</Text>
+      {showCounter && (
+        <Text dimColor>
+          {'  '}
+          {value.length}
+          /
+          {maxLength}
+        </Text>
+      )}
     </Box>
   )
+}
+
+/**
+ * Apply the FilteredTextInput constraint pipeline in a single deterministic
+ * pass: blacklist filter → allowedPattern whitelist → maxLength truncate →
+ * transform. Pulled out so the initial-value prefill goes through the same
+ * pipeline as user keystrokes (an initialValue with invalid chars would
+ * otherwise appear briefly before the user typed anything).
+ */
+function applyConstraints(
+  raw: string,
+  opts: { filter: string, allowedPattern?: RegExp, maxLength?: number, transform?: (value: string) => string },
+): string {
+  let out = raw
+  if (opts.filter) {
+    const escape = (c: string) => c.replace(/[-\\^$*+?.()|[\]{}]/g, '\\$&')
+    out = out.replace(new RegExp(`[${escape(opts.filter)}]`, 'g'), '')
+  }
+  if (opts.allowedPattern) {
+    // Match each character against the per-character pattern. If the regex
+    // is global or anchored we still treat it as a single-char test.
+    const perChar = new RegExp(opts.allowedPattern.source, opts.allowedPattern.flags.replace(/g/g, ''))
+    out = Array.from(out).filter(ch => perChar.test(ch)).join('')
+  }
+  if (opts.maxLength !== undefined && out.length > opts.maxLength)
+    out = out.slice(0, opts.maxLength)
+  if (opts.transform)
+    out = opts.transform(out)
+  return out
 }
 
 export const Header: FC = () => (

@@ -2138,6 +2138,14 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
                     <FilteredTextInput
                       placeholder={keyId}
                       initialValue={keyId}
+                      // Apple Key ID is always exactly 10 alphanumeric
+                      // characters, uppercase by convention (e.g. KDTXMK292V).
+                      // Lock down the input so typos like leading/trailing
+                      // spaces, the issuer-UUID, or "Key ID: " prefixes are
+                      // physically impossible.
+                      allowedPattern={/[a-zA-Z0-9]/}
+                      maxLength={10}
+                      transform={s => s.toUpperCase()}
                       onSubmit={(value) => {
                         const finalKeyId = (value || keyId).trim()
                         setKeyId(finalKeyId)
@@ -2159,8 +2167,13 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
                   </Text>
                   <Box marginTop={1}>
                     <FilteredTextInput
-                      placeholder="ABC123DEF"
+                      placeholder="KDTXMK292V"
                       initialValue={keyId}
+                      // Same constraints as the auto-detected variant above —
+                      // see the comment there for the format rationale.
+                      allowedPattern={/[a-zA-Z0-9]/}
+                      maxLength={10}
+                      transform={s => s.toUpperCase()}
                       onSubmit={(value) => {
                         const cleaned = value.trim()
                         if (!cleaned)
@@ -2196,6 +2209,15 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
             <FilteredTextInput
               placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
               initialValue={issuerId}
+              // Apple Issuer ID is a standard UUID v4 — hex digits plus
+              // hyphens, total 36 chars. Whitelist hex+hyphen so accidental
+              // alphabetic chars (g-z) can't sneak in from a fat-fingered
+              // paste; cap length to prevent overflow from copying extra
+              // text around the UUID. Case is irrelevant on Apple's side so
+              // we don't transform — users who paste lowercase UUIDs (the
+              // most common form) keep them as-is.
+              allowedPattern={/[a-fA-F0-9-]/}
+              maxLength={36}
               onSubmit={(value) => {
                 const cleaned = value.trim()
                 if (!cleaned)
