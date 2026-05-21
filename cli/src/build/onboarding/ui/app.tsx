@@ -1487,7 +1487,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
             options={[
               { label: '🛫  App Store / TestFlight', value: 'app_store' },
               { label: '📦  Ad-hoc (no TestFlight upload)', value: 'ad_hoc' },
-              { label: '↩️   Cancel and use Create new instead', value: '__cancel__' },
+              { label: '🆕  Switch to "Create new" (Apple generates a fresh cert + profile)', value: '__cancel__' },
             ]}
             onChange={async (value) => {
               if (value === '__cancel__') {
@@ -1562,7 +1562,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
                   : `🔑  ${m.identity.name} · ⚠ no matching profiles on this Mac (recovery available)`
                 return { label, value: m.identity.sha1 }
               }),
-              { label: '↩️   Cancel and use Create new instead', value: '__cancel__' },
+              { label: '🆕  Switch to "Create new" (Apple generates a fresh cert + profile)', value: '__cancel__' },
             ]}
             onChange={async (value) => {
               if (value === '__cancel__') {
@@ -2021,13 +2021,31 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
                 options={[
                   { label: '📂  Open file picker', value: 'picker' },
                   { label: '📝  Type the path', value: 'manual' },
+                  // Escape hatch when the user landed here from "Switch to
+                  // Create new" in the import flow but actually wanted to
+                  // try Import again (e.g. they hit cert-limit on resume).
+                  // Only offered when we're not currently in import mode AND
+                  // macOS (since import requires Keychain access).
+                  ...(isMacOS() && !importMode
+                    ? [{ label: '🔄  Switch to Import existing (use a cert from your Keychain instead)', value: 'switch-import' }]
+                    : []),
                 ]}
-                onChange={(value) => {
+                onChange={async (value) => {
                   if (value === 'picker') {
                     setStep('p8-method-select')
                   }
-                  else {
+                  else if (value === 'manual') {
                     setStep('input-p8-path')
+                  }
+                  else if (value === 'switch-import') {
+                    const existing = await loadProgress(appId)
+                    if (existing) {
+                      existing.setupMethod = 'import-existing'
+                      await saveProgress(appId, existing)
+                    }
+                    setImportMode(true)
+                    addLog('🔄 Switched to Import existing — scanning your Keychain', 'cyan')
+                    setStep('import-scanning')
                   }
                 }}
               />
@@ -2204,12 +2222,13 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
         </Box>
       )}
 
-      {/* Certificate limit — ask which to revoke */}
+      {/* Certificate limit — ask which to revoke (or escape to Import) */}
       {step === 'cert-limit-prompt' && (
         <Box flexDirection="column" marginTop={1}>
           <ErrorLine text={`iOS distribution certificate limit reached (${existingCerts.length} existing).`} />
           <Newline />
-          <Text bold>Select a certificate to revoke:</Text>
+          <Text bold>You can revoke one of the existing certs, OR switch back to Import existing</Text>
+          <Text dimColor>(if a usable cert is already in your Keychain, importing is faster than creating a new one)</Text>
           <Newline />
           <Select
             options={[
@@ -2218,21 +2237,36 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
                 const isOurs = ourCertId === c.id
                 const creator = isOurs ? ' · 🔧 Created by Capgo' : ''
                 return {
-                  label: `🗑️   ${c.name} · expires ${c.expirationDate.split('T')[0]}${creator}`,
+                  label: `🗑️   Revoke ${c.name} · expires ${c.expirationDate.split('T')[0]}${creator}`,
                   value: c.id,
                 }
               }),
+              { label: '🔄  Switch back to Import existing (use a cert from your Keychain)', value: '__switch-import__' },
               { label: '✖  Exit onboarding', value: '__exit__' },
             ]}
-            onChange={(value) => {
+            onChange={async (value) => {
               if (value === '__exit__') {
                 addLog(`Exiting. Revoke a certificate manually in App Store Connect, then resume with ${buildInitCommand}.`, 'yellow')
                 exitOnboarding()
+                return
               }
-              else {
-                setCertToRevoke(value)
-                setStep('revoking-certificate')
+              if (value === '__switch-import__') {
+                // Reverse the destructive setupMethod=create-new commit that
+                // happens when the user clicks "Switch to Create new" from
+                // the import flow. Lets users back out of the create-new
+                // path without nuking their entire progress file.
+                const existing = await loadProgress(appId)
+                if (existing) {
+                  existing.setupMethod = 'import-existing'
+                  await saveProgress(appId, existing)
+                }
+                setImportMode(true)
+                addLog('🔄 Switched back to Import existing — scanning your Keychain again', 'cyan')
+                setStep('import-scanning')
+                return
               }
+              setCertToRevoke(value)
+              setStep('revoking-certificate')
             }}
           />
         </Box>
