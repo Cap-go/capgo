@@ -52,3 +52,11 @@ export function parseChannelPreviewDeepLink(value: string): ChannelPreviewLink |
     channelName,
   }
 }
+
+export function buildChannelPreviewLatestOptions(previewLink: ChannelPreviewLink) {
+  return {
+    appId: previewLink.appId,
+    channel: previewLink.channelName,
+    preview: true,
+  }
+}

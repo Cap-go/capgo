@@ -12,7 +12,7 @@ import IconArrowPath from '~icons/heroicons/arrow-path-20-solid'
 import IconLink from '~icons/heroicons/link-20-solid'
 import IconQrCode from '~icons/heroicons/qr-code-20-solid'
 import IconShieldCheck from '~icons/heroicons/shield-check-20-solid'
-import { parseChannelPreviewDeepLink } from '~/services/previewLinks'
+import { buildChannelPreviewLatestOptions, parseChannelPreviewDeepLink } from '~/services/previewLinks'
 import { useDisplayStore } from '~/stores/display'
 
 const route = useRoute()
@@ -168,7 +168,7 @@ async function startChannelPreview(previewLink: ReturnType<typeof parseChannelPr
 
     toast.success(`Switching to channel: ${previewLink.channelName}`)
 
-    const latest = await CapacitorUpdater.getLatest({ appId: previewLink.appId, channel: previewLink.channelName })
+    const latest = await CapacitorUpdater.getLatest(buildChannelPreviewLatestOptions(previewLink))
     if (!latest.url)
       throw new Error(latest.message || latest.error || 'No preview update is available for this channel')
 
