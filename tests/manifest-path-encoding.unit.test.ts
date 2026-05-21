@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { getManifestUrl } from '../supabase/functions/_backend/utils/downloadUrl.ts'
-import { normalizeLegacyEncodedManifestFileName } from '../supabase/functions/_backend/utils/manifest_encoding.ts'
+import { getManifestStorageCandidateKeys, normalizeLegacyEncodedManifestFileName } from '../supabase/functions/_backend/utils/manifest_encoding.ts'
 
 describe('manifest path encoding', () => {
   it.concurrent.each([
@@ -53,5 +53,15 @@ describe('manifest path encoding', () => {
       'assets/suite-marketing/images/social-media/sad_post_grey%402x.png',
       'orgs/org-id/apps/com.test.app/delta/hash_assets/suite-marketing/images/social-media/sad_post_grey%25402x.png',
     )).toBe('assets/suite-marketing/images/social-media/sad_post_grey%402x.png')
+  })
+
+  it.concurrent('checks legacy percent, decoded, and upload-location encoded storage keys', () => {
+    expect(getManifestStorageCandidateKeys(
+      'orgs/org-id/apps/com.test.app/delta/hash_assets/suite-marketing/images/social-media/sad_post_grey%402x.png',
+    )).toEqual([
+      'orgs/org-id/apps/com.test.app/delta/hash_assets/suite-marketing/images/social-media/sad_post_grey%402x.png',
+      'orgs/org-id/apps/com.test.app/delta/hash_assets/suite-marketing/images/social-media/sad_post_grey@2x.png',
+      'orgs/org-id/apps/com.test.app/delta/hash_assets/suite-marketing/images/social-media/sad_post_grey%25402x.png',
+    ])
   })
 })
