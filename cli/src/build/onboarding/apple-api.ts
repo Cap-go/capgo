@@ -306,16 +306,21 @@ export async function listProfilesForCert(
   token: string,
   certificateId: string,
 ): Promise<AscProfileSummary[]> {
-  // Use the to-many relationship endpoint — `/v1/certificates/{id}/profiles`
-  // is the canonical "list profiles for this cert" call. The previous
-  // implementation used `/profiles?filter[certificates]=…` but Apple's
-  // /profiles endpoint doesn't accept a `certificates` filter — only
-  // filter[id], filter[name], filter[profileState], filter[profileType] —
-  // and returns HTTP 400 "'certificates' is not a valid filter type".
-  // The relationship endpoint accepts the same `include` and `limit`
-  // parameters so the rest of the function is unchanged.
+  // There's no direct "profiles for a given cert" endpoint on the ASC
+  // API — both naïve attempts return 4xx:
+  //   - `/profiles?filter[certificates]=X` → 400, "'certificates' is not
+  //     a valid filter type" (filter is whitelisted to id / name /
+  //     profileState / profileType only).
+  //   - `/certificates/{id}/profiles`     → 404, "The relationship
+  //     'profiles' does not exist" (certificates is the to-many
+  //     side; profiles → certificates is the navigable direction).
+  //
+  // The supported approach is to list ALL profiles with
+  // `include=certificates,bundleId`, then filter client-side to those
+  // whose `relationships.certificates.data[]` array includes our cert id.
+  // Limit=200 is Apple's documented max for /profiles.
   const body = await ascFetch(
-    `/certificates/${encodeURIComponent(certificateId)}/profiles?include=bundleId&limit=200`,
+    `/profiles?include=certificates,bundleId&limit=200`,
     token,
   )
   const included: any[] = body.included || []
@@ -324,7 +329,14 @@ export async function listProfilesForCert(
     if (item.type === 'bundleIds' && item.attributes?.identifier)
       bundleById.set(item.id, item.attributes.identifier)
   }
-  return (body.data || []).map((p: any): AscProfileSummary => {
+  // Client-side cert-id filter on `relationships.certificates.data[].id`.
+  // Apple's included response includes the cert resources too, but we
+  // only need the reference array to decide which profiles to keep.
+  const profiles = (body.data || []).filter((p: any) => {
+    const certs: { id: string }[] = p.relationships?.certificates?.data ?? []
+    return certs.some(c => c.id === certificateId)
+  })
+  return profiles.map((p: any): AscProfileSummary => {
     const bundleRelId = p.relationships?.bundleId?.data?.id as string | undefined
     return {
       id: p.id,
