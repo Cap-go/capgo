@@ -1,7 +1,7 @@
 import type { Context } from 'hono'
 import type { Database } from '../../utils/supabase.types.ts'
 import { quickError, simpleError } from '../../utils/hono.ts'
-import { cloudlog, cloudlogErr } from '../../utils/logging.ts'
+import { cloudlog, cloudlogErr, serializeError } from '../../utils/logging.ts'
 import { checkPermission } from '../../utils/rbac.ts'
 import { supabaseApikey } from '../../utils/supabase.ts'
 import { sendEventToTracking } from '../../utils/tracking.ts'
@@ -47,15 +47,28 @@ async function emitAiAnalysisResult(c: Context, input: EmitAiAnalysisResultInput
   if (input.durationMs !== undefined && Number.isFinite(input.durationMs))
     tags.duration_ms = String(Math.round(input.durationMs))
 
-  await sendEventToTracking(c, {
-    event: 'AI Build Analysis Result',
-    channel: 'build-lifecycle',
-    icon: '🤖',
-    notify: false,
-    user_id: input.ownerOrg,
-    groups: input.ownerOrg ? { organization: input.ownerOrg } : undefined,
-    tags,
-  })
+  // Telemetry MUST NOT break the AI analyze flow. sendEventToTracking swallows
+  // per-provider errors internally, but defend against an unexpected throw at
+  // the orchestration layer (e.g. backgroundTask unavailable in tests).
+  try {
+    await sendEventToTracking(c, {
+      event: 'AI Build Analysis Result',
+      channel: 'build-lifecycle',
+      icon: '🤖',
+      notify: false,
+      user_id: input.ownerOrg,
+      groups: input.ownerOrg ? { organization: input.ownerOrg } : undefined,
+      tags,
+    })
+  }
+  catch (error) {
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: 'AI Build Analysis Result telemetry failed',
+      result: input.result,
+      error: serializeError(error),
+    })
+  }
 }
 
 export async function aiAnalyzeBuild(
@@ -130,19 +143,29 @@ export async function aiAnalyzeBuild(
   // Fire the Requested event only after structural guards pass. "Requested" means
   // a structurally valid analysis attempt for a failed, not-yet-analyzed build
   // was about to be made. Result events still fire at every exit branch.
-  await sendEventToTracking(c, {
-    event: 'AI Build Analysis Requested',
-    channel: 'build-lifecycle',
-    icon: '🤖',
-    notify: false,
-    user_id: ownerOrg,
-    groups: { organization: ownerOrg },
-    tags: {
-      app_id: appId,
-      job_id: jobId,
-      logs_bytes: String(logsBytes),
-    },
-  })
+  // Telemetry MUST NOT break the AI analyze flow.
+  try {
+    await sendEventToTracking(c, {
+      event: 'AI Build Analysis Requested',
+      channel: 'build-lifecycle',
+      icon: '🤖',
+      notify: false,
+      user_id: ownerOrg,
+      groups: { organization: ownerOrg },
+      tags: {
+        app_id: appId,
+        job_id: jobId,
+        logs_bytes: String(logsBytes),
+      },
+    })
+  }
+  catch (error) {
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: 'AI Build Analysis Requested telemetry failed',
+      error: serializeError(error),
+    })
+  }
 
   // 3. Proxy to capgo_builder
   const builderUrl = getEnv(c, 'BUILDER_URL')
