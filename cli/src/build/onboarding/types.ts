@@ -15,6 +15,7 @@ export type OnboardingStep
     | 'import-distribution-mode'
     | 'import-pick-identity'
     | 'import-pick-profile'
+    | 'import-validating-all-certs'
     | 'import-checking-apple-cert'
     | 'import-no-match-recovery'
     | 'import-fetching-profile'
@@ -53,6 +54,27 @@ export type OnboardingStep
 export interface ApiKeyData {
   keyId: string
   issuerId: string
+}
+
+/**
+ * Per-identity result of the eager Apple-side validation run. Populated by
+ * the `import-validating-all-certs` step useEffect, consumed by the two-
+ * table picker in `import-pick-identity`. Kept here (alongside the Step
+ * type) so the renderer and the validation logic share a single shape.
+ */
+export interface EnrichedIdentityAvailability {
+  /** True when Apple's API returned a SHA1 match for this identity. */
+  available: boolean
+  /**
+   * Stable reason code for unavailable identities. Drives the per-reason
+   * detail rendering in the unavailable table (e.g. notice about the
+   * Apple-managed signing constraint, or about private-key-missing).
+   */
+  reason?: 'expired' | 'managed' | 'not-visible' | 'check-failed' | 'no-private-key'
+  /** One-line summary shown in the Reason column of the unavailable table. */
+  reasonText?: string
+  /** When available — Apple-side cert resource id, reused downstream. */
+  appleCertId?: string
 }
 
 export interface CertificateData {
@@ -121,6 +143,7 @@ export const STEP_PROGRESS: Record<OnboardingStep, number> = {
   'import-distribution-mode': 15,
   'import-pick-identity': 40,
   'import-pick-profile': 55,
+  'import-validating-all-certs': 38,
   'import-checking-apple-cert': 50,
   'import-no-match-recovery': 55,
   'import-fetching-profile': 60,
@@ -173,6 +196,8 @@ export function getPhaseLabel(step: OnboardingStep): string {
       return 'Step 1 of 4 · Distribution mode'
     case 'import-pick-identity':
       return 'Step 2 of 4 · Choose certificate'
+    case 'import-validating-all-certs':
+      return 'Step 2 of 4 · Validating certificates with Apple'
     case 'import-pick-profile':
       return 'Step 3 of 4 · Choose provisioning profile'
     case 'import-checking-apple-cert':

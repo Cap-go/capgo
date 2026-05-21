@@ -1,7 +1,7 @@
 import type { FC } from 'react'
 import type { BuildLogger } from '../../request.js'
 import type { DiscoveredProfile, IdentityProfileMatch, SigningIdentity } from '../macos-signing.js'
-import type { ApiKeyData, CertificateData, OnboardingProgress, OnboardingStep, ProfileData } from '../types.js'
+import type { ApiKeyData, CertificateData, EnrichedIdentityAvailability, OnboardingProgress, OnboardingStep, ProfileData } from '../types.js'
 import { handleCustomMsg } from '../../qr.js'
 import { spawn } from 'node:child_process'
 import { Buffer } from 'node:buffer'
@@ -20,7 +20,7 @@ import { formatRunnerCommand, splitRunnerCommand } from '../../../runner-command
 import { findSavedKeySilent, getPMAndCommand } from '../../../utils.js'
 import { loadSavedCredentials, updateSavedCredentials } from '../../credentials.js'
 import { requestBuildInternal } from '../../request.js'
-import { CertificateLimitError, createCertificate, createProfile, deleteProfile, DuplicateProfileError, ensureBundleId, findCertIdBySha1, generateJwt, listProfilesForCert, revokeCertificate, verifyApiKey } from '../apple-api.js'
+import { CertificateLimitError, classifyCertAvailability, createCertificate, createProfile, deleteProfile, DuplicateProfileError, ensureBundleId, findCertIdBySha1, generateJwt, listProfilesForCert, revokeCertificate, verifyApiKey } from '../apple-api.js'
 import { createP12, DEFAULT_P12_PASSWORD, generateCsr } from '../csr.js'
 import { canUseFilePicker, openFilePicker } from '../file-picker.js'
 import { exportP12FromKeychain, filterProfilesForApp, isHelperCached, isMacOS, listSigningIdentities, matchIdentitiesToProfiles, precompileSwiftHelper, scanProvisioningProfiles } from '../macos-signing.js'
@@ -209,6 +209,15 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
    * Reset to `undefined` whenever the chosen identity changes.
    */
   const [appleCertIdForChosen, setAppleCertIdForChosen] = useState<string | null | undefined>(undefined)
+  /**
+   * Per-identity Apple-side availability — keyed by Keychain SHA1. Populated
+   * by the `import-validating-all-certs` step (when we have a verified API
+   * key) and consumed by the two-table picker to classify each identity as
+   * Available vs Unavailable with a stable reason string. Empty map = no
+   * eager check performed (e.g. ad_hoc users who haven't provided a .p8);
+   * the picker falls back to its single-list layout in that case.
+   */
+  const [identityAvailability, setIdentityAvailability] = useState<Record<string, EnrichedIdentityAvailability>>({})
 
   const addLog = useCallback((text: string, color = 'green') => {
     // Dedupe consecutive identical entries. The import-distribution-mode
@@ -678,6 +687,50 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
       }
     }
 
+    // Eager batch validation: classify every scanned distribution identity
+    // against Apple's API up-front, so the picker can show two tables
+    // (Available + Unavailable) with concrete reasons instead of
+    // user-clicks-an-option → lookup-fails-late.
+    if (step === 'import-validating-all-certs' && importMatches.length > 0) {
+      ;(async () => {
+        try {
+          const token = await getFreshToken()
+          // Run lookups in parallel — N typically 1-3 for most teams, max
+          // ~10 even for prolific accounts. Allow each to fail independently
+          // (a network blip on one lookup shouldn't disqualify all certs).
+          const results = await Promise.all(importMatches.map(async (m) => {
+            try {
+              const id = await findCertIdBySha1(token, m.identity.sha1)
+              return { sha1: m.identity.sha1, certId: id, error: null as unknown }
+            }
+            catch (err) {
+              return { sha1: m.identity.sha1, certId: null, error: err }
+            }
+          }))
+          if (cancelled)
+            return
+          const map: Record<string, EnrichedIdentityAvailability> = {}
+          let availableCount = 0
+          for (const r of results) {
+            const availability = classifyCertAvailability({
+              appleCertId: r.certId,
+              lookupError: r.error,
+            })
+            map[r.sha1] = availability
+            if (availability.available)
+              availableCount++
+          }
+          setIdentityAvailability(map)
+          addLog(`✔ Apple validation complete — ${availableCount} available, ${results.length - availableCount} unavailable`)
+          setStep('import-pick-identity')
+        }
+        catch (err) {
+          if (!cancelled)
+            handleError(err, 'import-validating-all-certs')
+        }
+      })()
+    }
+
     if (step === 'import-checking-apple-cert' && chosenIdentity) {
       ;(async () => {
         try {
@@ -935,7 +988,13 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
             setStep(`import-${action}` as OnboardingStep)
           }
           else if (importMode) {
-            setStep('import-pick-identity')
+            // Eager Apple-side validation BEFORE the picker renders: fan out
+            // findCertIdBySha1 across every scanned identity in parallel so
+            // the picker can split them into Available / Unavailable tables
+            // and surface specific reasons for the unavailable rows.
+            // Bypass when there's nothing to check (defensive — scanning
+            // already routed away on zero identities).
+            setStep(importMatches.length > 0 ? 'import-validating-all-certs' : 'import-pick-identity')
           }
           else {
             setStep('creating-certificate')
@@ -1558,73 +1617,157 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
       )}
 
       {/* Import: pick identity */}
-      {step === 'import-pick-identity' && (
-        <Box flexDirection="column" marginTop={1}>
-          <Text bold>
-            Found
-            {' '}
-            {importMatches.length}
-            {' '}
-            distribution identity
-            {importMatches.length === 1 ? '' : 'ies'}
-            {' '}
-            in your Keychain. Pick one:
-          </Text>
-          <Newline />
-          <Select
-            options={[
-              ...importMatches.map((m) => {
-                const matchCount = m.profiles.length
-                const label = matchCount > 0
-                  ? `🔑  ${m.identity.name} · ${matchCount} matching profile${matchCount === 1 ? '' : 's'}`
-                  : `🔑  ${m.identity.name} · ⚠ no matching profiles on this Mac (recovery available)`
-                return { label, value: m.identity.sha1 }
-              }),
-              { label: '🆕  Switch to "Create new" (Apple generates a fresh cert + profile)', value: '__cancel__' },
-            ]}
-            onChange={async (value) => {
-              if (value === '__cancel__') {
-                setImportMode(false)
-                // Persist the switch so a CLI restart doesn't resume into
-                // the import flow the user just abandoned. Mirrors the same
-                // pattern in import-distribution-mode's cancel path.
-                const existing = await loadProgress(appId)
-                if (existing) {
-                  existing.setupMethod = 'create-new'
-                  delete existing.importDistribution
-                  await saveProgress(appId, existing)
+      {step === 'import-pick-identity' && (() => {
+        // Partition scanned identities by Apple-side availability. When the
+        // batch validation didn't run (ad_hoc with no .p8), every identity
+        // lands in the "unclassified" bucket — rendered identically to
+        // Available since we have no evidence to mark them unusable.
+        const haveClassification = Object.keys(identityAvailability).length > 0
+        const available: IdentityProfileMatch[] = []
+        const unavailable: IdentityProfileMatch[] = []
+        for (const m of importMatches) {
+          const a = identityAvailability[m.identity.sha1]
+          if (!haveClassification || a?.available)
+            available.push(m)
+          else
+            unavailable.push(m)
+        }
+
+        // Column widths chosen to fit ~80 columns. Long names truncate with
+        // an ellipsis. The Select component renders its options as a single
+        // string per row, so we pad with spaces in the label to fake column
+        // alignment — works in any monospaced terminal which is the
+        // expected environment for CLI tools.
+        const NAME_W = 44
+        const TEAM_W = 12
+        const PROFILES_W = 10
+        const truncate = (s: string, max: number): string => s.length <= max ? s : `${s.slice(0, max - 1)}…`
+        const pad = (s: string, w: number): string => s.length >= w ? s.slice(0, w) : s + ' '.repeat(w - s.length)
+        const divider = '─'.repeat(NAME_W + TEAM_W + PROFILES_W + 6)
+
+        const availableOptions = available.map((m) => {
+          const matchCount = filterProfilesForApp(m.profiles, appId, importDistribution).length
+          const totalProfiles = m.profiles.length
+          const profilesCol = matchCount > 0
+            ? `${matchCount}/${totalProfiles} ✓`
+            : `0/${totalProfiles}`
+          const nameCol = pad(`🔑 ${truncate(m.identity.name, NAME_W - 3)}`, NAME_W)
+          const teamCol = pad(m.identity.teamId, TEAM_W)
+          return {
+            label: `${nameCol}${teamCol}${profilesCol}`,
+            value: m.identity.sha1,
+          }
+        })
+
+        return (
+          <Box flexDirection="column" marginTop={1}>
+            {available.length > 0 && (
+              <>
+                <Text bold color="green">{`✅  AVAILABLE (${available.length})`}</Text>
+                <Text dimColor>{divider}</Text>
+                <Box flexDirection="row">
+                  <Box width={NAME_W}><Text bold dimColor>NAME</Text></Box>
+                  <Box width={TEAM_W}><Text bold dimColor>TEAM</Text></Box>
+                  <Box><Text bold dimColor>{`PROFILES (matching/total)`}</Text></Box>
+                </Box>
+                <Text dimColor>{divider}</Text>
+              </>
+            )}
+
+            {available.length === 0 && (
+              <Box flexDirection="column">
+                <Text bold color="red">{`✖  NO AVAILABLE CERTIFICATES`}</Text>
+                <Text dimColor>
+                  All
+                  {' '}
+                  {unavailable.length}
+                  {' '}
+                  identit
+                  {unavailable.length === 1 ? 'y is' : 'ies are'}
+                  {' '}
+                  unavailable. See the table below — or use "Create new" to generate a fresh cert + profile.
+                </Text>
+                <Newline />
+              </Box>
+            )}
+
+            <Select
+              options={[
+                ...availableOptions,
+                { label: '🆕  Switch to "Create new" (Apple generates a fresh cert + profile)', value: '__cancel__' },
+                { label: '✖  Exit onboarding', value: '__exit__' },
+              ]}
+              onChange={async (value) => {
+                if (value === '__exit__') {
+                  addLog('Exiting. Re-run `build init` when you\'re ready.', 'yellow')
+                  exitOnboarding()
+                  return
                 }
-                setStep('api-key-instructions')
-                return
-              }
-              const match = importMatches.find(m => m.identity.sha1 === value)
-              if (!match)
-                return
-              setChosenIdentity(match.identity)
-              setAppleCertIdForChosen(undefined) // reset — new identity, prior check no longer applies
-              upsertLog('✔ Identity · ', `✔ Identity · ${match.identity.name}`)
-              // Apply the same bundleId + distribution filter that
-              // import-pick-profile uses. If nothing survives, route to
-              // no-match-recovery so the user gets an actionable next step
-              // (fetch / create via Apple, or open the portal) instead of
-              // an empty picker with only "Back" — which is what users hit
-              // when the identity has profiles for a *different* app or
-              // for the wrong distribution mode.
-              const usableForThisApp = filterProfilesForApp(match.profiles, appId, importDistribution)
-              if (usableForThisApp.length === 0) {
-                // Proactively check Apple for the cert (when we have an API
-                // key) so the recovery menu can only offer options that will
-                // actually succeed. ad_hoc with no .p8 falls through to the
-                // legacy menu that prompts for ASC API key first.
-                const apiKeyAvailable = !!(p8ContentRef.current || (await loadProgress(appId))?.completedSteps?.apiKeyVerified)
-                setStep(apiKeyAvailable ? 'import-checking-apple-cert' : 'import-no-match-recovery')
-                return
-              }
-              setStep('import-pick-profile')
-            }}
-          />
-        </Box>
-      )}
+                if (value === '__cancel__') {
+                  setImportMode(false)
+                  const existing = await loadProgress(appId)
+                  if (existing) {
+                    existing.setupMethod = 'create-new'
+                    delete existing.importDistribution
+                    await saveProgress(appId, existing)
+                  }
+                  setStep('api-key-instructions')
+                  return
+                }
+                const match = importMatches.find(m => m.identity.sha1 === value)
+                if (!match)
+                  return
+                setChosenIdentity(match.identity)
+                // Reuse the cached Apple-side certId from batch validation
+                // when we have it; the per-identity pre-check at
+                // import-checking-apple-cert will skip the redundant
+                // network round-trip in that case.
+                const cached = identityAvailability[match.identity.sha1]
+                setAppleCertIdForChosen(cached?.available ? (cached.appleCertId ?? null) : (cached ? null : undefined))
+                upsertLog('✔ Identity · ', `✔ Identity · ${match.identity.name}`)
+                const usableForThisApp = filterProfilesForApp(match.profiles, appId, importDistribution)
+                if (usableForThisApp.length === 0) {
+                  // No local profile matches this app. Either jump to
+                  // recovery directly if we already have a per-identity
+                  // pre-check cached (typed as cached !== undefined), or
+                  // run a fresh pre-check first.
+                  const apiKeyAvailable = !!(p8ContentRef.current || (await loadProgress(appId))?.completedSteps?.apiKeyVerified)
+                  setStep(apiKeyAvailable ? 'import-checking-apple-cert' : 'import-no-match-recovery')
+                  return
+                }
+                setStep('import-pick-profile')
+              }}
+            />
+
+            {unavailable.length > 0 && (
+              <Box flexDirection="column" marginTop={1}>
+                <Text bold color="yellow">{`⚠️   UNAVAILABLE (${unavailable.length})`}</Text>
+                <Text dimColor>{divider}</Text>
+                <Box flexDirection="row">
+                  <Box width={NAME_W}><Text bold dimColor>NAME</Text></Box>
+                  <Box width={TEAM_W}><Text bold dimColor>TEAM</Text></Box>
+                  <Box><Text bold dimColor>REASON</Text></Box>
+                </Box>
+                <Text dimColor>{divider}</Text>
+                {unavailable.map((m) => {
+                  const a = identityAvailability[m.identity.sha1]
+                  return (
+                    <Box flexDirection="row" key={m.identity.sha1}>
+                      <Box width={NAME_W}><Text dimColor>{pad(`🔒 ${truncate(m.identity.name, NAME_W - 3)}`, NAME_W)}</Text></Box>
+                      <Box width={TEAM_W}><Text dimColor>{pad(m.identity.teamId, TEAM_W)}</Text></Box>
+                      <Box><Text color="yellow">{a?.reasonText || 'Not classified'}</Text></Box>
+                    </Box>
+                  )
+                })}
+                <Newline />
+                <Text dimColor>
+                  💡 Unavailable certificates can't be used to sign builds. Even downloading them from the Apple Developer Portal won't help — the private key was only on the Mac that generated the original CSR. Use "Create new" above to generate a fresh cert + profile that Apple recognizes.
+                </Text>
+              </Box>
+            )}
+          </Box>
+        )
+      })()}
 
       {/* Import: pick profile */}
       {step === 'import-pick-profile' && chosenIdentity && (() => {
@@ -1708,6 +1851,14 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
       })()}
 
       {/* Import: checking Apple for the chosen cert (curates the recovery menu) */}
+      {/* Import: eager batch validation against Apple before showing the picker */}
+      {step === 'import-validating-all-certs' && (
+        <Box flexDirection="column" marginTop={1}>
+          <SpinnerLine text={`Validating ${importMatches.length} certificate${importMatches.length === 1 ? '' : 's'} with Apple...`} />
+          <Text dimColor>Splitting into Available / Unavailable so we only offer options that can succeed.</Text>
+        </Box>
+      )}
+
       {step === 'import-checking-apple-cert' && chosenIdentity && (
         <Box flexDirection="column" marginTop={1}>
           <SpinnerLine text={`Checking with Apple for "${chosenIdentity.name}"...`} />

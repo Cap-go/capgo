@@ -111,6 +111,98 @@ export interface AscDistributionCert {
   certificateContent?: string
 }
 
+// ─── Cert availability classifier ──────────────────────────────────
+
+/**
+ * Why a local Keychain cert can't be used to ship builds.
+ *
+ * Concrete enumeration so the import-pick-identity UI can render a stable
+ * Reason column and so we can add specific guidance per reason (e.g.
+ * "managed" certs get a "can't sign locally" note, "not-visible" certs get
+ * a "Open Developer Portal to verify" note).
+ */
+export type CertAvailabilityReason
+  = | 'expired'
+    | 'managed' // DISTRIBUTION_MANAGED — Apple-HSM signed, can't sign locally
+    | 'not-visible' // lookup didn't find a SHA1 match (revoked / wrong team / filter limitation)
+    | 'check-failed' // network or API error during lookup
+    | 'no-private-key' // for .p12 path — cert exists but key was stripped
+
+export interface CertAvailability {
+  available: boolean
+  reason?: CertAvailabilityReason
+  /** Short human-readable reason for display in the picker. */
+  reasonText?: string
+  /** When available — Apple-side cert resource id for downstream API calls. */
+  appleCertId?: string
+}
+
+/**
+ * Pure classifier: given a local cert + the result of an Apple-side lookup,
+ * decide whether it's usable for shipping builds and surface a short
+ * reasonText for the picker UI.
+ *
+ * Exported separately from the lookup function so we can unit-test the
+ * decision logic without mocking network calls. Callers compose:
+ *
+ *   const certId = await findCertIdBySha1(token, identity.sha1)
+ *     .catch(err => { lookupError = err; return null })
+ *   const availability = classifyCertAvailability({
+ *     localExpirationDate: identity.expirationDate,
+ *     appleCertId: certId,
+ *     lookupError,
+ *   })
+ *
+ * The `expired` and `managed` branches don't need a lookup — they're checked
+ * up-front from local metadata. Callers can pass null `appleCertId` without
+ * having run the lookup at all when those local-side conditions already
+ * disqualify the identity.
+ */
+export function classifyCertAvailability(args: {
+  localExpirationDate?: string
+  isManaged?: boolean
+  appleCertId: string | null
+  lookupError?: unknown
+}): CertAvailability {
+  // Local-side disqualifiers first — these don't require an API round-trip.
+  if (args.localExpirationDate) {
+    const exp = Date.parse(args.localExpirationDate)
+    if (!Number.isNaN(exp) && exp < Date.now()) {
+      return {
+        available: false,
+        reason: 'expired',
+        reasonText: `Expired (${args.localExpirationDate.split('T')[0]})`,
+      }
+    }
+  }
+  if (args.isManaged) {
+    return {
+      available: false,
+      reason: 'managed',
+      reasonText: 'Apple-managed — can\'t sign locally',
+    }
+  }
+  // Apple-side lookup outcomes.
+  if (args.lookupError) {
+    return {
+      available: false,
+      reason: 'check-failed',
+      reasonText: `Lookup failed: ${args.lookupError instanceof Error ? args.lookupError.message : String(args.lookupError)}`,
+    }
+  }
+  if (args.appleCertId) {
+    return { available: true, appleCertId: args.appleCertId }
+  }
+  // No match returned. We can't distinguish revoked vs. wrong-team vs. our
+  // own lookup having a buggy filter from the response alone, so surface a
+  // neutral reasonText that doesn't claim revocation we can't prove.
+  return {
+    available: false,
+    reason: 'not-visible',
+    reasonText: 'Not visible to current API key (revoked, different team, or lookup limitation)',
+  }
+}
+
 /**
  * List all iOS distribution certificates.
  *
