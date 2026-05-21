@@ -1,4 +1,3 @@
-import process from 'node:process'
 import { sendEvent } from '../utils.js'
 
 export type BuilderUploadFailureCategory
@@ -21,15 +20,6 @@ export interface TrackBuilderUploadInput {
   phase: BuilderUploadPhase
   durationSeconds?: number
   error?: unknown
-}
-
-function isTruthyEnv(value: string | undefined): boolean {
-  return value === '1' || value?.toLowerCase() === 'true' || value?.toLowerCase() === 'yes'
-}
-
-function telemetryDisabled(): boolean {
-  return isTruthyEnv(process.env.CAPGO_DISABLE_TELEMETRY)
-    || isTruthyEnv(process.env.CAPGO_DISABLE_POSTHOG)
 }
 
 interface MaybeTusResponse {
@@ -69,9 +59,6 @@ const ICON_BY_PHASE: Record<BuilderUploadPhase, string> = {
 }
 
 export async function trackBuilderUpload(input: TrackBuilderUploadInput): Promise<void> {
-  if (telemetryDisabled())
-    return
-
   const tags: Record<string, string> = {
     app_id: input.appId,
     platform: input.platform,

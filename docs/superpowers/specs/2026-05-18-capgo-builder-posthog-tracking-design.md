@@ -201,7 +201,7 @@ All paths relative to the `capgo` repo root.
 
 ### New files
 
-- `cli/src/build/onboarding/telemetry.ts` — Exposes `trackOnboardingStep(input)`. Best-effort `fetch` to the existing `/private/events` endpoint with `AbortController` timeout (1500ms, matches `posthog.ts`). Honors `CAPGO_DISABLE_TELEMETRY` / `CAPGO_DISABLE_POSTHOG` (same env vars as `posthog.ts`). Never throws.
+- `cli/src/build/onboarding/telemetry.ts` — Exposes `trackOnboardingStep(input)`. Best-effort `fetch` to the existing `/private/events` endpoint with `AbortController` timeout (1500ms, matches `posthog.ts`). Never throws.
 - `tests/build-lifecycle-tracking.unit.test.ts` — Cron-side tests: transitions emit the right events, idempotency when re-running on the same build, `failure_category` mapping.
 
 ### Modified files
@@ -225,7 +225,7 @@ All paths relative to the `capgo` repo root.
 - **Closed-enum error categories**: the CLI maps caught exceptions to a known string before sending. Raw error messages, paths, and credential material never leave the CLI process.
 - **Reused sanitizer**: where any string field is unavoidable (e.g., during future extensions), `sanitizeTelemetryText` from `cli/src/posthog.ts` is the canonical pre-send filter.
 - **No user_id fingerprinting**: `user_id` in the payload is the org id, matching `on_app_create.ts:138`. Individual users are not distinguished in PostHog.
-- **Opt-out**: `CAPGO_DISABLE_TELEMETRY=1` or `CAPGO_DISABLE_POSTHOG=1` short-circuits the CLI helper before any network call. The backend endpoint still works (other event sources may call it) but the CLI never invokes it under opt-out.
+- **No CLI opt-out env var in this PR**: this PR does not introduce a `CAPGO_DISABLE_TELEMETRY` or `CAPGO_DISABLE_POSTHOG` check in any new helper. The existing exception-capture helper (`cli/src/posthog.ts`, introduced in PR #2088) honors those vars, but the new helpers do not. Adding a unified opt-out at the `sendEvent` layer is deferred to a follow-up.
 - **App id is sent**: the user explicitly chose to include `app_id` as a tag, matching existing `on_app_create.ts:141` behavior. Bundle IDs are not treated as PII in the existing tracking surface.
 
 ## Error handling
@@ -237,7 +237,7 @@ All paths relative to the `capgo` repo root.
 
 ## Testing strategy
 
-- **Unit (CLI)**: mock `fetch`, assert payload shape, assert opt-out behavior, assert timeout behavior.
+- **Unit (CLI)**: mock `sendEvent`, assert payload shape, assert error-category mapping, assert error swallowing.
 - **Unit (backend endpoint)**: mock `sendEventToTracking`, assert it is called with the expected `event`, `tags`, `groups`. Assert 401 without auth, 400 on bad payload.
 - **Unit (cron)**: feed synthetic builder responses, assert correct transition events fire and only the expected ones. Re-run on the same build → no duplicate emission.
 - **Existing test harness**: extends patterns in `tests/tracking.unit.test.ts`, `tests/posthog.unit.test.ts`, and `tests/on-error-posthog.unit.test.ts`.

@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { trackBuilderOnboardingStep } from '../cli/src/build/onboarding/telemetry.ts'
 
 const sendEventMock = vi.hoisted(() => vi.fn())
@@ -11,13 +11,6 @@ describe('trackBuilderOnboardingStep', () => {
   beforeEach(() => {
     sendEventMock.mockReset()
     sendEventMock.mockResolvedValue(undefined)
-    delete process.env.CAPGO_DISABLE_TELEMETRY
-    delete process.env.CAPGO_DISABLE_POSTHOG
-  })
-
-  afterEach(() => {
-    delete process.env.CAPGO_DISABLE_TELEMETRY
-    delete process.env.CAPGO_DISABLE_POSTHOG
   })
 
   it('builds the expected payload and calls sendEvent once', async () => {
@@ -75,30 +68,6 @@ describe('trackBuilderOnboardingStep', () => {
 
     const [, payload] = sendEventMock.mock.calls[0]
     expect(payload.tags.error_category).toBe('keystore_invalid')
-  })
-
-  it('skips when CAPGO_DISABLE_TELEMETRY is set', async () => {
-    process.env.CAPGO_DISABLE_TELEMETRY = '1'
-    await trackBuilderOnboardingStep({
-      apikey: 'cap_test_key',
-      step: 'welcome',
-      platform: 'ios',
-      appId: 'com.example.app',
-      orgId: 'org-uuid-1',
-    })
-    expect(sendEventMock).not.toHaveBeenCalled()
-  })
-
-  it('skips when CAPGO_DISABLE_POSTHOG is set', async () => {
-    process.env.CAPGO_DISABLE_POSTHOG = 'true'
-    await trackBuilderOnboardingStep({
-      apikey: 'cap_test_key',
-      step: 'welcome',
-      platform: 'ios',
-      appId: 'com.example.app',
-      orgId: 'org-uuid-1',
-    })
-    expect(sendEventMock).not.toHaveBeenCalled()
   })
 
   it('swallows errors thrown by sendEvent', async () => {

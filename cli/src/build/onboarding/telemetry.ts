@@ -1,6 +1,5 @@
 import type { AndroidOnboardingErrorCategory, AndroidOnboardingStep } from './android/types.js'
 import type { OnboardingErrorCategory, OnboardingStep, Platform } from './types.js'
-import process from 'node:process'
 import { sendEvent } from '../../utils.js'
 import { mapAndroidOnboardingError, mapIosOnboardingError } from './error-categories.js'
 
@@ -17,19 +16,7 @@ export interface TrackBuilderOnboardingStepInput {
   errorCategory?: OnboardingErrorCategory | AndroidOnboardingErrorCategory
 }
 
-function isTruthyEnv(value: string | undefined): boolean {
-  return value === '1' || value?.toLowerCase() === 'true' || value?.toLowerCase() === 'yes'
-}
-
-function telemetryDisabled(): boolean {
-  return isTruthyEnv(process.env.CAPGO_DISABLE_TELEMETRY)
-    || isTruthyEnv(process.env.CAPGO_DISABLE_POSTHOG)
-}
-
 export async function trackBuilderOnboardingStep(input: TrackBuilderOnboardingStepInput): Promise<void> {
-  if (telemetryDisabled())
-    return
-
   const tags: Record<string, string> = {
     step: input.step,
     platform: input.platform,

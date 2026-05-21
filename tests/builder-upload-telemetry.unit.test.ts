@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { mapBuilderUploadError, trackBuilderUpload } from '../cli/src/build/telemetry.ts'
 
 const sendEventMock = vi.hoisted(() => vi.fn())
@@ -38,13 +38,6 @@ describe('trackBuilderUpload', () => {
   beforeEach(() => {
     sendEventMock.mockReset()
     sendEventMock.mockResolvedValue(undefined)
-    delete process.env.CAPGO_DISABLE_TELEMETRY
-    delete process.env.CAPGO_DISABLE_POSTHOG
-  })
-
-  afterEach(() => {
-    delete process.env.CAPGO_DISABLE_TELEMETRY
-    delete process.env.CAPGO_DISABLE_POSTHOG
   })
 
   it('emits Builder Upload Started with size but no duration or failure_category', async () => {
@@ -126,21 +119,6 @@ describe('trackBuilderUpload', () => {
         upload_duration_seconds: '5',
       },
     })
-  })
-
-  it('skips when CAPGO_DISABLE_TELEMETRY is set', async () => {
-    process.env.CAPGO_DISABLE_TELEMETRY = '1'
-    await trackBuilderUpload({
-      apikey: 'cap_test_key',
-      appId: 'com.example.app',
-      orgId: 'org-uuid-1',
-      platform: 'ios',
-      buildMode: 'release',
-      jobId: 'job-abc',
-      sizeBytes: 1,
-      phase: 'started',
-    })
-    expect(sendEventMock).not.toHaveBeenCalled()
   })
 
   it('swallows errors thrown by sendEvent', async () => {
