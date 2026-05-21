@@ -962,12 +962,13 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
           // persisting a one-off flag to progress.json.
           if (randomPasswordGenerated)
             addLog(`  ℹ Your auto-generated keystore password is now in ~/.capgo-credentials/credentials.json — back up that file.`, 'yellow')
+          // Stash CI secret entries for later. We do NOT push to GitHub/GitLab
+          // yet — the wizard now offers that step only AFTER a successful first
+          // build, so users never end up with orphan secrets in a repo whose
+          // build was never proven to work.
           const entries = createCiSecretEntries(credentials)
           setCiSecretEntries(entries)
-          if (entries.length === 0)
-            setStep('ask-build')
-          else
-            setStep('detecting-ci-secrets')
+          setStep('ask-build')
         }
         catch (err) {
           if (!cancelled)
@@ -991,7 +992,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
             }
             for (const note of discovery.notes)
               addLog(`ℹ ${note}`, 'yellow')
-            setStep('ask-build')
+            setStep('build-complete')
             return
           }
           if (discovery.targets.length === 1) {
@@ -1041,7 +1042,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
           const summary = `Uploaded ${ciSecretEntries.length} env var${ciSecretEntries.length === 1 ? '' : 's'} to ${getCiSecretTargetLabel(ciSecretTarget)}`
           setCiSecretUploadSummary(summary)
           addLog(`✔ ${summary}`)
-          setStep('ask-build')
+          setStep('build-complete')
         }
         catch (err) {
           if (!cancelled) {
@@ -1110,6 +1111,13 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
             const url = `https://capgo.app/app/${appId}/builds`
             setBuildUrl(url)
             setBuildOutput(prev => [...prev, '', `✔ Build queued — ${url}`])
+            // Only offer to push CI secrets AFTER we've successfully queued a
+            // build. If the build request failed (else branch) or we never had
+            // any credentials to push (entries empty), skip straight to exit.
+            if (ciSecretEntries.length > 0) {
+              setStep('detecting-ci-secrets')
+              return
+            }
           }
           else {
             setBuildOutput(prev => [...prev, `⚠ ${result.error || 'unknown error'}`])
@@ -1901,7 +1909,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
               { label: 'Skip upload', value: 'skip' },
             ]}
             onChange={(value) => {
-              setStep(value === 'retry' ? 'detecting-ci-secrets' : 'ask-build')
+              setStep(value === 'retry' ? 'detecting-ci-secrets' : 'build-complete')
             }}
           />
         </Box>
@@ -1921,12 +1929,12 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
             ]}
             onChange={(value) => {
               if (value === 'skip') {
-                setStep('ask-build')
+                setStep('build-complete')
                 return
               }
               const target = ciSecretTargets.find(candidate => candidate.provider === value) || null
               setCiSecretTarget(target)
-              setStep(target ? 'ask-ci-secrets' : 'ask-build')
+              setStep(target ? 'ask-ci-secrets' : 'build-complete')
             }}
           />
         </Box>
@@ -1957,7 +1965,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
               { label: 'Skip', value: 'no' },
             ]}
             onChange={(value) => {
-              setStep(value === 'yes' ? 'checking-ci-secrets' : 'ask-build')
+              setStep(value === 'yes' ? 'checking-ci-secrets' : 'build-complete')
             }}
           />
         </Box>
@@ -1982,7 +1990,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
               { label: 'Skip upload', value: 'skip' },
             ]}
             onChange={(value) => {
-              setStep(value === 'replace' ? 'uploading-ci-secrets' : 'ask-build')
+              setStep(value === 'replace' ? 'uploading-ci-secrets' : 'build-complete')
             }}
           />
         </Box>
@@ -2004,7 +2012,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
               { label: 'Continue without upload', value: 'continue' },
             ]}
             onChange={(value) => {
-              setStep(value === 'retry' ? (ciSecretTarget ? 'checking-ci-secrets' : 'detecting-ci-secrets') : 'ask-build')
+              setStep(value === 'retry' ? (ciSecretTarget ? 'checking-ci-secrets' : 'detecting-ci-secrets') : 'build-complete')
             }}
           />
         </Box>
