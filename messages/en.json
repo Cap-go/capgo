@@ -1360,6 +1360,7 @@
   "open-source-updates": "Open Source Updates",
   "open-your-portal": "Open your portal",
   "organization-insights": "Organization insights",
+  "organization-attention-high-fail-rate": "High update fail rate: {failRate} ({failed} of {total} attempts failed)",
   "org-changes-saved": "Organization updated successfully",
   "org-changes-set-email-not-unique": "The management email is not unique, please select a different one",
   "org-changes-set-email-other-error": "Cannot set the management email, please contact support",

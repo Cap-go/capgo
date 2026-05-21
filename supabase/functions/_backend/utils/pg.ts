@@ -1761,6 +1761,10 @@ export interface AdminOrganizationInsightRow {
   billing_type: 'monthly' | 'yearly' | null
   upload_count: number
   build_count: number
+  failed_update_count: number
+  install_count: number
+  update_attempt_count: number
+  needs_attention: boolean
   fail_rate: number
   mau: number
   members_count: number
@@ -1785,6 +1789,10 @@ interface AdminOrganizationInsightsFilters {
   paid_only?: boolean
   search?: string
 }
+
+const ADMIN_ORG_ATTENTION_FAIL_RATE_PERCENT = 20
+const ADMIN_ORG_ATTENTION_MIN_FAILED_UPDATES = 2
+const ADMIN_ORG_ATTENTION_MIN_UPDATE_ATTEMPTS = 10
 
 /**
  * Fetches admin organization rows with selected-period usage rollups.
@@ -1834,7 +1842,7 @@ export async function getAdminOrganizationInsights(
       : sql``
 
     const dataQuery = sql`
-      WITH filtered_orgs AS (
+      WITH filtered_orgs_all AS (
         SELECT
           o.id AS org_id,
           o.name AS org_name,
@@ -1851,7 +1859,64 @@ export async function getAdminOrganizationInsights(
           ${billingFilter}
           ${paidFilter}
           ${searchFilter}
-        ORDER BY o.created_at DESC NULLS LAST, o.id
+      ),
+      version_usage_totals AS (
+        SELECT
+          a.owner_org AS org_id,
+          COALESCE(SUM(COALESCE(dv.fail, 0)), 0)::bigint AS failed_update_count,
+          COALESCE(SUM(COALESCE(dv.install, 0)), 0)::bigint AS install_count
+        FROM filtered_orgs_all filtered
+        INNER JOIN apps a ON a.owner_org = filtered.org_id
+        INNER JOIN daily_version dv ON dv.app_id = a.app_id
+        WHERE dv.date >= ${startDateOnly}::date
+          AND dv.date <= ${endDateOnly}::date
+        GROUP BY a.owner_org
+      ),
+      version_usage_rank AS (
+        SELECT
+          vut.org_id,
+          vut.failed_update_count,
+          vut.install_count,
+          (vut.install_count + vut.failed_update_count)::bigint AS update_attempt_count,
+          CASE
+            WHEN vut.install_count + vut.failed_update_count > 0
+              THEN (vut.failed_update_count::float / (vut.install_count + vut.failed_update_count)::float) * 100
+            ELSE 0
+          END::float AS fail_rate
+        FROM version_usage_totals vut
+      ),
+      filtered_orgs_scored AS (
+        SELECT
+          filtered.org_id,
+          filtered.org_name,
+          filtered.management_email,
+          filtered.registered_at,
+          filtered.paid_at,
+          filtered.plan_name,
+          filtered.billing_type,
+          COALESCE(vur.failed_update_count, 0)::bigint AS failed_update_count,
+          COALESCE(vur.install_count, 0)::bigint AS install_count,
+          COALESCE(vur.update_attempt_count, 0)::bigint AS update_attempt_count,
+          COALESCE(vur.fail_rate, 0)::float AS fail_rate,
+          (
+            COALESCE(vur.fail_rate, 0) >= ${ADMIN_ORG_ATTENTION_FAIL_RATE_PERCENT}
+            AND COALESCE(vur.failed_update_count, 0) >= ${ADMIN_ORG_ATTENTION_MIN_FAILED_UPDATES}
+            AND COALESCE(vur.update_attempt_count, 0) >= ${ADMIN_ORG_ATTENTION_MIN_UPDATE_ATTEMPTS}
+          )::boolean AS needs_attention
+        FROM filtered_orgs_all filtered
+        LEFT JOIN version_usage_rank vur ON vur.org_id = filtered.org_id
+      ),
+      filtered_orgs AS (
+        SELECT *
+        FROM filtered_orgs_scored
+        ORDER BY
+          needs_attention DESC,
+          CASE
+            WHEN needs_attention THEN fail_rate
+            ELSE NULL
+          END DESC,
+          registered_at DESC NULLS LAST,
+          org_id
         LIMIT ${safeLimit}
         OFFSET ${safeOffset}
       ),
@@ -1881,18 +1946,6 @@ export async function getAdminOrganizationInsights(
         INNER JOIN daily_mau dm ON dm.app_id = a.app_id
         WHERE dm.date >= ${startDateOnly}::date
           AND dm.date <= ${endDateOnly}::date
-        GROUP BY a.owner_org
-      ),
-      version_usage_by_org AS (
-        SELECT
-          a.owner_org AS org_id,
-          COALESCE(SUM(COALESCE(dv.fail, 0)), 0)::bigint AS fails,
-          COALESCE(SUM(COALESCE(dv.install, 0)), 0)::bigint AS installs
-        FROM filtered_orgs filtered
-        INNER JOIN apps a ON a.owner_org = filtered.org_id
-        INNER JOIN daily_version dv ON dv.app_id = a.app_id
-        WHERE dv.date >= ${startDateOnly}::date
-          AND dv.date <= ${endDateOnly}::date
         GROUP BY a.owner_org
       ),
       build_usage_by_org AS (
@@ -1935,11 +1988,11 @@ export async function getAdminOrganizationInsights(
         filtered.billing_type,
         COALESCE(buo.upload_count, 0)::int AS upload_count,
         COALESCE(bu.build_count, 0)::bigint AS build_count,
-        CASE
-          WHEN COALESCE(vu.installs, 0) + COALESCE(vu.fails, 0) > 0
-            THEN (COALESCE(vu.fails, 0)::float / (COALESCE(vu.installs, 0) + COALESCE(vu.fails, 0))::float) * 100
-          ELSE 0
-        END::float AS fail_rate,
+        filtered.failed_update_count,
+        filtered.install_count,
+        filtered.update_attempt_count,
+        filtered.needs_attention,
+        filtered.fail_rate,
         COALESCE(mau.mau, 0)::bigint AS mau,
         COALESCE(members.members_count, 0)::int AS members_count,
         COALESCE(apps.apps_count, 0)::int AS apps_count,
@@ -1951,11 +2004,17 @@ export async function getAdminOrganizationInsights(
       LEFT JOIN apps_by_org apps ON apps.org_id = filtered.org_id
       LEFT JOIN members_by_org members ON members.org_id = filtered.org_id
       LEFT JOIN mau_by_org mau ON mau.org_id = filtered.org_id
-      LEFT JOIN version_usage_by_org vu ON vu.org_id = filtered.org_id
       LEFT JOIN build_usage_by_org bu ON bu.org_id = filtered.org_id
       LEFT JOIN bundle_uploads_by_org buo ON buo.org_id = filtered.org_id
       LEFT JOIN last_builds_by_org lb ON lb.org_id = filtered.org_id
-      ORDER BY filtered.registered_at DESC NULLS LAST, filtered.org_id
+      ORDER BY
+        filtered.needs_attention DESC,
+        CASE
+          WHEN filtered.needs_attention THEN filtered.fail_rate
+          ELSE NULL
+        END DESC,
+        filtered.registered_at DESC NULLS LAST,
+        filtered.org_id
     `
 
     const countQuery = sql`
@@ -1991,6 +2050,10 @@ export async function getAdminOrganizationInsights(
       billing_type: row.billing_type ?? null,
       upload_count: Number(row.upload_count) || 0,
       build_count: Number(row.build_count) || 0,
+      failed_update_count: Number(row.failed_update_count) || 0,
+      install_count: Number(row.install_count) || 0,
+      update_attempt_count: Number(row.update_attempt_count) || 0,
+      needs_attention: row.needs_attention === true,
       fail_rate: Number(row.fail_rate) || 0,
       mau: Number(row.mau) || 0,
       members_count: Number(row.members_count) || 0,

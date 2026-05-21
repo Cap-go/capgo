@@ -26,6 +26,10 @@ interface OrganizationInsight {
   billing_type: BillingType | null
   upload_count: number
   build_count: number
+  failed_update_count: number
+  install_count: number
+  update_attempt_count: number
+  needs_attention: boolean
   fail_rate: number
   mau: number
   members_count: number
@@ -82,6 +86,21 @@ function formatBillingTypeLabel(billingType: OrganizationInsight['billing_type']
 
 function formatDateOrNever(value: string | null) {
   return formatLocalDateTime(value) || t('never')
+}
+
+function getOrganizationAttentionLabel(item: OrganizationInsight) {
+  const failRate = Number(item.fail_rate || 0)
+  const failedUpdateCount = Number(item.failed_update_count || 0)
+  const updateAttemptCount = Number(item.update_attempt_count || 0)
+
+  if (!item.needs_attention)
+    return null
+
+  return t('organization-attention-high-fail-rate', {
+    failRate: formatPercent(failRate),
+    failed: formatNumber(failedUpdateCount),
+    total: formatNumber(updateAttemptCount),
+  })
 }
 
 async function loadOrganizations() {
@@ -189,10 +208,23 @@ const organizationColumns = computed<TableColumn[]>(() => [
     mobile: true,
     head: true,
     sortable: false,
-    renderFunction: (item: OrganizationInsight) => h('div', { class: 'min-w-0' }, [
-      h('p', { class: 'truncate font-medium text-slate-900 dark:text-white' }, item.org_name),
-      h('p', { class: 'truncate text-xs font-normal text-slate-500 dark:text-slate-400' }, item.management_email),
-    ]),
+    renderFunction: (item: OrganizationInsight) => {
+      const attentionLabel = getOrganizationAttentionLabel(item)
+
+      return h('div', { class: 'flex min-w-0 items-start gap-2' }, [
+        attentionLabel
+          ? h('span', {
+              'class': 'mt-1.5 inline-flex h-2 w-2 shrink-0 rounded-full bg-amber-500 ring-4 ring-amber-500/10 dark:bg-amber-300 dark:ring-amber-300/10',
+              'title': attentionLabel,
+              'aria-label': attentionLabel,
+            })
+          : null,
+        h('div', { class: 'min-w-0' }, [
+          h('p', { class: 'truncate font-medium text-slate-900 dark:text-white' }, item.org_name),
+          h('p', { class: 'truncate text-xs font-normal text-slate-500 dark:text-slate-400' }, item.management_email),
+        ]),
+      ])
+    },
   },
   {
     label: t('plan'),

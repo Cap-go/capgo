@@ -551,6 +551,10 @@ describe('/private/admin_stats', () => {
           billing_type: 'monthly' | 'yearly' | null
           upload_count: number
           build_count: number
+          failed_update_count: number
+          install_count: number
+          update_attempt_count: number
+          needs_attention: boolean
           fail_rate: number
           mau: number
           members_count: number
@@ -569,6 +573,10 @@ describe('/private/admin_stats', () => {
     expect(organization?.billing_type).toBe('monthly')
     expect(organization?.upload_count).toBe(1)
     expect(organization?.build_count).toBe(1)
+    expect(organization?.failed_update_count).toBe(2)
+    expect(organization?.install_count).toBe(8)
+    expect(organization?.update_attempt_count).toBe(10)
+    expect(organization?.needs_attention).toBe(true)
     expect(organization?.fail_rate).toBe(20)
     expect(organization?.mau).toBe(7)
     expect(organization?.members_count).toBe(1)
