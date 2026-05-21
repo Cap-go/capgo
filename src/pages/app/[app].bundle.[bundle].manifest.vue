@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { TableColumn } from '~/components/comp_def'
 import type { Database } from '~/types/supabase.types'
-import { computed, h, ref, watch, watchEffect } from 'vue'
+import { computed, h, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import IconAlertCircle from '~icons/lucide/alert-circle'
@@ -43,6 +43,7 @@ const compareManifestCache = ref<Record<number, ManifestEntry[]>>({})
 const diffDownloadSize = ref<ManifestDownloadSizeResult | null>(null)
 const diffDownloadSizeLoading = ref(false)
 const diffDownloadSizeRequestId = ref(0)
+const pageLoadRequestId = ref(0)
 const search = ref('')
 const currentPage = ref(1)
 const MANIFEST_PAGE_SIZE = 1000
@@ -58,6 +59,10 @@ const directUpdateConfigSnippet = `{
   }
 }`
 const differentialsDocUrl = 'https://capgo.app/docs/live-updates/differentials/'
+
+function getRouteParam(value: string | string[]): string {
+  return Array.isArray(value) ? value[0] ?? '' : value
+}
 
 function hideHash(hash: string) {
   if (!hash)
@@ -373,19 +378,27 @@ watch([diffEntries, compareVersionId, tableLoading], async ([entries, compareId,
   }
 })
 
-watchEffect(async () => {
-  if (route.path.includes('/bundle/') && route.path.includes('/manifest')) {
+watch(
+  () => [route.params.app, route.params.bundle] as const,
+  async ([appParam, bundleParam]) => {
+    const requestId = ++pageLoadRequestId.value
     loading.value = true
-    packageId.value = route.params.app as string
-    id.value = Number(route.params.bundle as string)
+    packageId.value = getRouteParam(appParam)
+    id.value = Number(getRouteParam(bundleParam))
+    version.value = undefined
+    manifestEntries.value = []
     resetCompareSelection()
     await Promise.all([getVersion(), loadManifest()])
+    if (requestId !== pageLoadRequestId.value)
+      return
     loading.value = false
-    if (!version.value?.name)
+    const loadedVersion = version.value as Database['public']['Tables']['app_versions']['Row'] | undefined
+    if (!loadedVersion?.name)
       displayStore.NavTitle = t('bundle')
     displayStore.defaultBack = `/app/${packageId.value}/bundles`
-  }
-})
+  },
+  { immediate: true },
+)
 </script>
 
 <template>
