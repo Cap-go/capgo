@@ -42,6 +42,28 @@ describe('build start direct log token', () => {
   const builderUrl = 'https://builder.capgo.test'
   const builderApiKey = 'builder-api-key'
 
+  // Mock the CAS update chain: .update(...).eq(...).eq(...).eq(...).select('id')
+  // Returns { data, error } from .select(); `data` shape decides whether
+  // emitBuildTransitionEvent fires. `mockReturnThis()` on .eq() lets the chain
+  // accept any number of guards (builder_job_id + app_id + status, currently).
+  function configureUpdateMock(selectResult: { data: Array<{ id: string }> | null, error: { message: string } | null }) {
+    const updateBuilder = {
+      eq: vi.fn().mockReturnThis(),
+      select: vi.fn().mockResolvedValue(selectResult),
+    }
+
+    mockSupabaseAdmin.mockReturnValue({
+      from: vi.fn().mockImplementation((table: string) => {
+        expect(table).toBe('build_requests')
+        return {
+          update: vi.fn().mockReturnValue(updateBuilder),
+        }
+      }),
+    })
+
+    return updateBuilder
+  }
+
   beforeEach(() => {
     mockSupabaseAdmin.mockReset()
     mockSupabaseApikey.mockReset()
@@ -66,12 +88,6 @@ describe('build start direct log token', () => {
       }),
     }
 
-    const updateBuilder = {
-      eq: vi.fn()
-        .mockImplementationOnce(() => updateBuilder)
-        .mockResolvedValueOnce({ error: null }),
-    }
-
     mockSupabaseApikey.mockReturnValue({
       from: vi.fn().mockImplementation((table: string) => {
         expect(table).toBe('build_requests')
@@ -81,14 +97,8 @@ describe('build start direct log token', () => {
       }),
     })
 
-    mockSupabaseAdmin.mockReturnValue({
-      from: vi.fn().mockImplementation((table: string) => {
-        expect(table).toBe('build_requests')
-        return {
-          update: vi.fn().mockReturnValue(updateBuilder),
-        }
-      }),
-    })
+    // Default: CAS guard succeeds, one row returned, lifecycle event should fire.
+    configureUpdateMock({ data: [{ id: 'row-1' }], error: null })
 
     mockCheckPermission.mockResolvedValue(true)
     mockReserveNativeBuildSlot.mockResolvedValue({
@@ -199,6 +209,62 @@ describe('build start direct log token', () => {
         expect.anything(),
         expect.objectContaining({ event: 'Build Started' }),
       )
+    }
+    finally {
+      fetchMock.mockRestore()
+    }
+  })
+
+  it('skips Build Started emission when CAS guard finds no matching row (lost race)', async () => {
+    // Override the default update mock: zero rows returned from .select('id')
+    // simulates another writer having already advanced the row's status before
+    // this request's UPDATE landed. The CAS guard `.eq('status', previousStatus)`
+    // matched no rows, so emitBuildTransitionEvent must NOT be called — the
+    // winning writer is responsible for emitting.
+    configureUpdateMock({ data: [], error: null })
+
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({
+      status: 'running',
+    }), {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    }))
+
+    const context = {
+      get: vi.fn().mockImplementation((key: string) => {
+        if (key === 'requestId')
+          return requestId
+        return undefined
+      }),
+      json: (data: unknown, status = 200) => new Response(JSON.stringify(data), {
+        status,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      }),
+    }
+
+    try {
+      const response = await startBuild(
+        context as any,
+        jobId,
+        appId,
+        {
+          key: 'cli-api-key',
+          user_id: userId,
+        } as any,
+      )
+
+      // Request still succeeds end-to-end — the CAS loss is silent.
+      expect(response.status).toBe(200)
+      const body = await response.json() as { status: string, job_id: string }
+      expect(body.status).toBe('running')
+      expect(body.job_id).toBe(jobId)
+
+      // Lifecycle event must NOT fire on the CAS-lost branch.
+      expect(mockSendEventToTracking).not.toHaveBeenCalled()
     }
     finally {
       fetchMock.mockRestore()

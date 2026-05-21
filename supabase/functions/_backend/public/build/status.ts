@@ -209,7 +209,15 @@ export async function getBuildStatus(
   // Use admin client: access was already verified above (RLS SELECT + checkPermission).
   // The data written comes from the trusted builder API, not from user input.
   // An RLS UPDATE policy would let API-key holders forge status/build-time, so we bypass RLS here.
-  const { error: updateError } = await supabaseAdmin(c)
+  //
+  // Optimistic concurrency-control (CAS) guard: `.eq('status', previousStatus)` ensures
+  // only one writer wins when two concurrent pollers race on the same job. The
+  // `.select('id')` lets us detect whether this writer actually advanced the row;
+  // if `updatedRows` is empty, another writer already moved the status and has
+  // (or will) emit the lifecycle event — skip emission here to avoid double-firing.
+  const previousStatus = buildRequest.status
+
+  const { data: updatedRows, error: updateError } = await supabaseAdmin(c)
     .from('build_requests')
     .update({
       status: effectiveStatus,
@@ -219,6 +227,8 @@ export async function getBuildStatus(
     })
     .eq('builder_job_id', job_id)
     .eq('app_id', buildRequest.app_id)
+    .eq('status', previousStatus)
+    .select('id')
 
   if (updateError) {
     cloudlogErr({
@@ -228,9 +238,9 @@ export async function getBuildStatus(
       error: updateError.message,
     })
   }
-  else {
+  else if (updatedRows && updatedRows.length > 0) {
     await emitBuildTransitionEvent(c, {
-      previousStatus: buildRequest.status,
+      previousStatus,
       effectiveStatus,
       timeoutApplied,
       effectiveError,
@@ -243,6 +253,10 @@ export async function getBuildStatus(
       },
     })
   }
+  // else: another writer already advanced the status (or it never matched
+  // previousStatus) — skip emission to avoid double-firing. recordBuildTime
+  // below stays unconditional: it's idempotent at the DB layer, and skipping
+  // it would let billing miss a build.
 
   const shouldRecordBuildTime = !!builderJob.job.started_at
     && (timeoutApplied || ((effectiveStatus === 'succeeded' || effectiveStatus === 'failed') && !!builderJob.job.completed_at))

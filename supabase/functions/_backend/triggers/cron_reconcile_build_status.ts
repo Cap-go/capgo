@@ -212,7 +212,14 @@ app.post('/', middlewareAPISecret, async (c) => {
 
       const previousStatus = build.status
 
-      const { error: updateError } = await supabase
+      // Optimistic concurrency-control (CAS) guard: `.eq('status', previousStatus)`
+      // ensures only one writer wins when the cron races with a CLI/dashboard
+      // poller on the same row. The `.select('id')` lets us detect whether this
+      // writer actually advanced the row; if `updatedRows` is empty, another
+      // writer already moved the status and has emitted the transition — skip
+      // emission here. The cron's per-build loop is inside Promise.allSettled,
+      // so a lost race must NOT throw: we just skip the event and continue.
+      const { data: updatedRows, error: updateError } = await supabase
         .from('build_requests')
         .update({
           status: effectiveStatus,
@@ -221,10 +228,17 @@ app.post('/', middlewareAPISecret, async (c) => {
           updated_at: new Date().toISOString(),
         })
         .eq('id', build.id)
+        .eq('status', previousStatus)
+        .select('id')
 
       if (updateError)
         throw new Error(updateError.message)
 
+      const transitionApplied = !!updatedRows && updatedRows.length > 0
+
+      // recordBuildTime stays unconditional on terminal status: it's idempotent
+      // at the DB layer, and skipping it on the CAS-lost branch would let
+      // billing miss a build (worse than the rare duplicate).
       if (
         (isTerminalBuildStatus(effectiveStatus) || timeoutApplied)
         && builderJob.job.started_at
@@ -248,19 +262,23 @@ app.post('/', middlewareAPISecret, async (c) => {
         }
       }
 
-      await emitBuildTransitionEvent(c, {
-        previousStatus,
-        effectiveStatus,
-        timeoutApplied,
-        effectiveError,
-        effectiveBuildTimeSeconds,
-        build: {
-          app_id: build.app_id,
-          platform: build.platform,
-          build_mode: build.build_mode,
-          owner_org: build.owner_org,
-        },
-      })
+      if (transitionApplied) {
+        await emitBuildTransitionEvent(c, {
+          previousStatus,
+          effectiveStatus,
+          timeoutApplied,
+          effectiveError,
+          effectiveBuildTimeSeconds,
+          build: {
+            app_id: build.app_id,
+            platform: build.platform,
+            build_mode: build.build_mode,
+            owner_org: build.owner_org,
+          },
+        })
+      }
+      // else: another writer (start.ts/status.ts, or another cron tick) already
+      // advanced this row and emitted — skip to avoid double-firing.
     }),
   )
 

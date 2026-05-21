@@ -240,7 +240,15 @@ export async function startBuild(
 
     // Update build_requests status to running. The builder response is trusted
     // backend data, and this write must not be exposed through API-key RLS.
-    const { error: updateError } = await supabaseAdmin(c)
+    //
+    // Optimistic concurrency-control (CAS) guard: `.eq('status', previousStatus)`
+    // ensures only one writer wins when concurrent start requests race. The
+    // `.select('id')` lets us detect whether this writer actually advanced the
+    // row; if `updatedRows` is empty, another writer already moved the status
+    // and emitted the transition event — skip emission to avoid double-firing.
+    const previousStatus = buildRequest.status
+
+    const { data: updatedRows, error: updateError } = await supabaseAdmin(c)
       .from('build_requests')
       .update({
         status: startedStatus,
@@ -248,6 +256,8 @@ export async function startBuild(
       })
       .eq('builder_job_id', jobId)
       .eq('app_id', boundAppId)
+      .eq('status', previousStatus)
+      .select('id')
 
     if (updateError) {
       cloudlogErr({
@@ -257,9 +267,9 @@ export async function startBuild(
         error: updateError.message,
       })
     }
-    else {
+    else if (updatedRows && updatedRows.length > 0) {
       await emitBuildTransitionEvent(c, {
-        previousStatus: buildRequest.status,
+        previousStatus,
         effectiveStatus: startedStatus,
         timeoutApplied: false,
         build: {
@@ -270,6 +280,8 @@ export async function startBuild(
         },
       })
     }
+    // else: another writer already advanced the status (or it never matched
+    // previousStatus) — skip emission to avoid double-firing.
 
     // Generate JWT token for direct log stream access
     const jwtSecret = getEnv(c, 'JWT_SECRET')
