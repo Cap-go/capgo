@@ -231,9 +231,14 @@ async function fetchWithTimeout(args: {
   const timer = setTimeout(() => timeoutController.abort(), args.timeoutMs)
 
   let combinedSignal: AbortSignal
+  // Captured so the `finally` block can detach them on success. Without this,
+  // a long-lived caller `signal` would accumulate one listener per request
+  // (each `{ once: true }` listener auto-detaches on fire, but never on
+  // successful completion).
+  let abortComposite: (() => void) | null = null
   if (args.signal) {
     const composite = new AbortController()
-    const abortComposite = () => composite.abort()
+    abortComposite = () => composite.abort()
     args.signal.addEventListener('abort', abortComposite, { once: true })
     timeoutController.signal.addEventListener('abort', abortComposite, { once: true })
     if (args.signal.aborted || timeoutController.signal.aborted)
@@ -249,6 +254,10 @@ async function fetchWithTimeout(args: {
   }
   finally {
     clearTimeout(timer)
+    if (abortComposite) {
+      args.signal?.removeEventListener('abort', abortComposite)
+      timeoutController.signal.removeEventListener('abort', abortComposite)
+    }
   }
 }
 
