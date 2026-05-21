@@ -146,14 +146,14 @@ async function isDisabledAccount(supabase: SupabaseClient, userId: string | null
 
     if (error) {
       console.error('Error checking account status:', error)
-      return true
+      return false
     }
 
     return !!isDisabled
   }
   catch (error) {
     console.error('Error checking if account is disabled:', error)
-    return true
+    return false
   }
 }
 

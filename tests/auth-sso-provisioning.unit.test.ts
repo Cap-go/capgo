@@ -325,7 +325,7 @@ describe('auth guard SSO provisioning', () => {
     })
   })
 
-  it.concurrent('fails closed when the disabled-account RPC errors', async () => {
+  it.concurrent('continues navigation when the disabled-account RPC errors', async () => {
     await withTestContext(async (context) => {
       context.mockRpc.mockResolvedValueOnce({
         data: null,
@@ -341,13 +341,42 @@ describe('auth guard SSO provisioning', () => {
         next,
       )
 
-      expect(context.organizationStore.fetchOrganizations).not.toHaveBeenCalled()
-      expect(next).toHaveBeenCalledWith({
+      expect(context.organizationStore.fetchOrganizations).toHaveBeenCalled()
+      expect(next).toHaveBeenCalledWith()
+      expect(next).not.toHaveBeenCalledWith(expect.objectContaining({
         path: '/accountDisabled',
-        query: {
-          to: '/dashboard',
-        },
+      }))
+    })
+  })
+
+  it.concurrent('redirects active users away from the recovery page when the disabled-account check errors', async () => {
+    await withTestContext(async (context) => {
+      context.mainStore.auth = {
+        id: 'user-123',
+        email: 'user@managed.test',
+        email_confirmed_at: '2026-04-15T10:00:00.000Z',
+      }
+      context.mockRpc.mockResolvedValueOnce({
+        data: null,
+        error: new Error('rpc failed'),
       })
+
+      const guard = await getGuard()
+      const next = vi.fn()
+
+      await guard(
+        {
+          path: '/accountDisabled',
+          fullPath: '/accountDisabled?to=/apps/app-123',
+          meta: { middleware: 'auth' },
+          query: { to: '/apps/app-123' },
+        },
+        { path: '/apps/app-123', fullPath: '/apps/app-123', meta: { middleware: 'auth' }, query: {} },
+        next,
+      )
+
+      expect(next).toHaveBeenCalledTimes(1)
+      expect(next).toHaveBeenCalledWith('/apps/app-123')
     })
   })
 
