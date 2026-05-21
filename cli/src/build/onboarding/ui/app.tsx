@@ -977,12 +977,13 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
           const credentials = await doSaveCredentials()
           if (cancelled)
             return
+          // Stash CI secret entries for later. We do NOT push to GitHub/GitLab
+          // yet — the wizard now offers that step only AFTER a successful first
+          // build, so users never end up with orphan secrets in a repo whose
+          // build was never proven to work.
           const entries = createCiSecretEntries(credentials)
           setCiSecretEntries(entries)
-          if (entries.length === 0)
-            setStep('ask-build')
-          else
-            setStep('detecting-ci-secrets')
+          setStep('ask-build')
         }
         catch (err) {
           if (!cancelled)
@@ -1006,7 +1007,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
             }
             for (const note of discovery.notes)
               addLog(`ℹ ${note}`, 'yellow')
-            setStep('ask-build')
+            setStep('build-complete')
             return
           }
           if (discovery.targets.length === 1) {
@@ -1056,7 +1057,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
           const summary = `Uploaded ${ciSecretEntries.length} env var${ciSecretEntries.length === 1 ? '' : 's'} to ${getCiSecretTargetLabel(ciSecretTarget)}`
           setCiSecretUploadSummary(summary)
           addLog(`✔ ${summary}`)
-          setStep('ask-build')
+          setStep('build-complete')
         }
         catch (err) {
           if (!cancelled) {
@@ -1118,6 +1119,13 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
             const url = `https://capgo.app/app/${appId}/builds`
             setBuildUrl(url)
             setBuildOutput(prev => [...prev, '', `✔ Build queued — ${url}`])
+            // Only offer to push CI secrets AFTER we've successfully queued a
+            // build. If the build request failed (else branch) or we never had
+            // any credentials to push (entries empty), skip straight to exit.
+            if (ciSecretEntries.length > 0) {
+              setStep('detecting-ci-secrets')
+              return
+            }
           }
           else {
             setBuildOutput(prev => [...prev, `⚠ ${result.error || 'unknown error'}`])
@@ -2128,7 +2136,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
               { label: 'Skip upload', value: 'skip' },
             ]}
             onChange={(value) => {
-              setStep(value === 'retry' ? 'detecting-ci-secrets' : 'ask-build')
+              setStep(value === 'retry' ? 'detecting-ci-secrets' : 'build-complete')
             }}
           />
         </Box>
@@ -2148,12 +2156,12 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
             ]}
             onChange={(value) => {
               if (value === 'skip') {
-                setStep('ask-build')
+                setStep('build-complete')
                 return
               }
               const target = ciSecretTargets.find(candidate => candidate.provider === value) || null
               setCiSecretTarget(target)
-              setStep(target ? 'ask-ci-secrets' : 'ask-build')
+              setStep(target ? 'ask-ci-secrets' : 'build-complete')
             }}
           />
         </Box>
@@ -2184,7 +2192,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
               { label: 'Skip', value: 'no' },
             ]}
             onChange={(value) => {
-              setStep(value === 'yes' ? 'checking-ci-secrets' : 'ask-build')
+              setStep(value === 'yes' ? 'checking-ci-secrets' : 'build-complete')
             }}
           />
         </Box>
@@ -2211,7 +2219,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
               { label: 'Skip upload', value: 'skip' },
             ]}
             onChange={(value) => {
-              setStep(value === 'replace' ? 'uploading-ci-secrets' : 'ask-build')
+              setStep(value === 'replace' ? 'uploading-ci-secrets' : 'build-complete')
             }}
           />
         </Box>
@@ -2235,7 +2243,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
               { label: 'Continue without upload', value: 'continue' },
             ]}
             onChange={(value) => {
-              setStep(value === 'retry' ? (ciSecretTarget ? 'checking-ci-secrets' : 'detecting-ci-secrets') : 'ask-build')
+              setStep(value === 'retry' ? (ciSecretTarget ? 'checking-ci-secrets' : 'detecting-ci-secrets') : 'build-complete')
             }}
           />
         </Box>
