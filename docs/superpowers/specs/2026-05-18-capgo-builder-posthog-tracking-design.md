@@ -63,7 +63,50 @@ Android:
 
 The CLI maps caught exceptions to one of these enum values **before** building the payload. Raw error messages never leave the CLI.
 
-### 2. Build lifecycle events
+### 2. Builder upload events (project tarball → builder storage)
+
+Three events fired from the CLI around the TUS upload between `Build Requested` and `Build Started`. Until this set was added, the gap between "build job row inserted" and "builder picks it up" was an observability blind spot — a failed CLI-to-builder upload would never surface in PostHog.
+
+**Channel:** `build-lifecycle`
+
+| Event | Source | When | Icon |
+| --- | --- | --- | --- |
+| `Builder Upload Started` | `cli/src/build/request.ts` (just before `tus.Upload.start()`) | TUS handshake about to begin | ⬆️ |
+| `Builder Upload Succeeded` | Same site, `onSuccess` callback | TUS upload completes; control passes to `/build/start/{job_id}` | 📦 |
+| `Builder Upload Failed` | Same site, `onError` callback | TUS upload fatally fails | 🚫 |
+
+**Payload:**
+```ts
+{
+  event: 'Builder Upload Started' | 'Builder Upload Succeeded' | 'Builder Upload Failed',
+  channel: 'build-lifecycle',
+  icon: /* see table */,
+  notify: false,
+  user_id: orgId,
+  groups: { organization: orgId },
+  tags: {
+    app_id,
+    platform: 'ios' | 'android',
+    build_mode: string,
+    job_id,                                       // builder job id from `Build Requested` (for correlation)
+    upload_size_bytes,                            // exact zip size from `zipStats.size`
+    upload_duration_seconds?,                     // succeeded/failed only — wall-clock from `tus.Upload.start()` to terminal callback
+    failure_category?,                            // failed only
+  },
+}
+```
+
+**Closed enum: `failure_category` for upload failures**
+
+- `network_error` — TUS error with no `originalResponse` (connection dropped, DNS, timeout)
+- `unauthorized` — HTTP 401 or 403 from the upload endpoint
+- `payload_too_large` — HTTP 413
+- `storage_failure` — HTTP 5xx from R2/S3
+- `unknown` — any other terminal status
+
+Mapping happens in the CLI helper via structural typing on `error.originalResponse?.getStatus?.()` (no hard import of `tus.DetailedError`).
+
+### 3. Build lifecycle events
 
 Fired entirely server-side. The `capgo_builder` repo is not modified — the reconciliation cron already polls the builder for status, so transition detection happens there.
 

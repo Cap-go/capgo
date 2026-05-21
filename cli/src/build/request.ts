@@ -45,6 +45,7 @@ import { buildProvisioningMap } from './credentials-command'
 import { writeBuildOutputRecord } from './output-record'
 import { getPlatformDirFromCapacitorConfig } from './platform-paths'
 import { handleCustomMsg } from './qr.js'
+import { trackBuilderUpload } from './telemetry.js'
 
 /**
  * Callback interface for build logging.
@@ -1655,6 +1656,19 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
       // Upload using TUS protocol
       log.uploadProgress(0)
 
+      const uploadStartedAt = Date.now()
+      const buildModeForTelemetry = options.buildMode || 'release'
+      void trackBuilderUpload({
+        apikey: options.apikey,
+        appId,
+        orgId,
+        platform,
+        buildMode: buildModeForTelemetry,
+        jobId: buildRequest.job_id,
+        sizeBytes: zipStats.size,
+        phase: 'started',
+      })
+
       await new Promise<void>((resolve, reject) => {
         const upload = new tus.Upload(zipBuffer as any, {
           endpoint: buildRequest.upload_url,
@@ -1684,7 +1698,19 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
             }
           },
           // Callback for errors which cannot be fixed using retries
-          onError(error) {
+          async onError(error) {
+            await trackBuilderUpload({
+              apikey: options.apikey,
+              appId,
+              orgId,
+              platform,
+              buildMode: buildModeForTelemetry,
+              jobId: buildRequest.job_id,
+              sizeBytes: zipStats.size,
+              phase: 'failed',
+              durationSeconds: (Date.now() - uploadStartedAt) / 1000,
+              error,
+            })
             log.error(`Upload error: ${error.message}`)
             if (error instanceof tus.DetailedError) {
               const body = error.originalResponse?.getBody()
@@ -1719,6 +1745,17 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
           },
           // Callback for once the upload is completed
           onSuccess() {
+            void trackBuilderUpload({
+              apikey: options.apikey,
+              appId,
+              orgId,
+              platform,
+              buildMode: buildModeForTelemetry,
+              jobId: buildRequest.job_id,
+              sizeBytes: zipStats.size,
+              phase: 'succeeded',
+              durationSeconds: (Date.now() - uploadStartedAt) / 1000,
+            })
             log.uploadProgress(100)
             if (verbose) {
               log.success('TUS upload completed successfully')
