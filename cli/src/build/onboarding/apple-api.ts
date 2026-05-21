@@ -121,8 +121,27 @@ export async function listDistributionCerts(
   token: string,
   options: { includeContent?: boolean } = {},
 ): Promise<AscDistributionCert[]> {
+  // Query BOTH cert types — the legacy iOS-specific and the newer cross-
+  // platform "Apple Distribution" — because Apple deprecated
+  // IOS_DISTRIBUTION around 2021 and new certs created from App Store
+  // Connect now default to DISTRIBUTION. A team that has churned through
+  // certs over the years almost always has both types in its ledger; an
+  // IOS_DISTRIBUTION-only filter silently excludes the newer ones and
+  // produces a false negative when matching against a local Keychain
+  // identity named "Apple Distribution:" (= DISTRIBUTION type).
+  //
+  // limit=200 is Apple's documented max for this endpoint and is wildly
+  // higher than the per-team cert limits, so pagination is unnecessary
+  // even for the most prolific teams.
+  //
+  // DISTRIBUTION_MANAGED is intentionally NOT in the filter — those certs
+  // are signed using Apple-held private keys (Xcode Cloud / managed
+  // signing) and cannot be used to sign builds on third-party CI like
+  // Capgo. Including them would surface unusable identities in the
+  // picker. They'll still appear in the Available/Unavailable table view
+  // (Phase 2) marked "Apple-managed — can't sign locally".
   const body = await ascFetch(
-    '/certificates?filter[certificateType]=IOS_DISTRIBUTION&limit=10',
+    '/certificates?filter[certificateType]=DISTRIBUTION,IOS_DISTRIBUTION&limit=200',
     token,
   )
   return (body.data || []).map((c: any): AscDistributionCert => ({
