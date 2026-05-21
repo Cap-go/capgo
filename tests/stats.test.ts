@@ -436,6 +436,7 @@ describe('[POST] /stats', () => {
       { pluginVersion: '7.17.0', shouldRecord: true, createVersion: true },
       { pluginVersion: '6.14.24', shouldRecord: false, createVersion: true },
       { pluginVersion: '6.14.25', shouldRecord: true, createVersion: true },
+      { pluginVersion: 'not-a-version', shouldRecord: false, createVersion: true },
     ]
 
     for (const testCase of cases) {
