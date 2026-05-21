@@ -8,7 +8,7 @@
  *
  * Apply updates:
  *   bun scripts/backfill_manifest_file_sizes.mjs --app-version-id=180988804 --apply
- *   bun scripts/backfill_manifest_file_sizes.mjs --all --apply --workers=16 --concurrency=256
+ *   bun scripts/backfill_manifest_file_sizes.mjs --all --apply --workers=16
  */
 
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
@@ -95,6 +95,7 @@ const DB_URL_ENV_KEYS = [
   'DIRECT_URL',
 ]
 const MAX_CANDIDATE_BATCH_SIZE = 1000
+const PERCENT_ENCODED_OCTET_RE = /%[0-9a-f]{2}/i
 const FAILED_CSV_HEADERS = [
   'id',
   'app_id',
@@ -102,6 +103,7 @@ const FAILED_CSV_HEADERS = [
   'version_name',
   'file_name',
   's3_path',
+  'attempted_s3_path',
   'status',
   'method',
   'reason',
@@ -228,6 +230,45 @@ function serializeError(error) {
   return { message: String(error) }
 }
 
+function decodeStoragePathSegments(s3Path) {
+  try {
+    return s3Path.split('/').map(segment => decodeURIComponent(segment)).join('/')
+  }
+  catch {
+    return null
+  }
+}
+
+function getLegacyDecodedStoragePath(s3Path) {
+  if (!PERCENT_ENCODED_OCTET_RE.test(s3Path))
+    return null
+
+  const decoded = decodeStoragePathSegments(s3Path)
+  return decoded && decoded !== s3Path ? decoded : null
+}
+
+function markDecodedStorageResult(result, attemptedS3Path) {
+  return {
+    ...result,
+    attempted_s3_path: attemptedS3Path,
+    method: `${result.method ?? 'unknown'}_decoded`,
+    reason: result.reason ? `${result.reason}_decoded_path` : 'decoded_path',
+  }
+}
+
+async function getObjectSizeWithLegacyFallback(s3, s3Path) {
+  const primary = await getObjectSize(s3, s3Path)
+  if (primary.size > 0)
+    return primary
+
+  const fallbackPath = primary.status === 404 ? getLegacyDecodedStoragePath(s3Path) : null
+  if (!fallbackPath)
+    return primary
+
+  const fallback = await getObjectSize(s3, fallbackPath)
+  return markDecodedStorageResult(fallback, fallbackPath)
+}
+
 async function getObjectSize(s3, s3Path) {
   try {
     const stat = await s3.statObject(s3Path, {
@@ -258,7 +299,7 @@ function shouldRetryStorageResult(result) {
 async function getObjectSizeWithRetry(s3, s3Path, attempts) {
   let lastResult = null
   for (let attempt = 1; attempt <= attempts; attempt++) {
-    const result = await getObjectSize(s3, s3Path)
+    const result = await getObjectSizeWithLegacyFallback(s3, s3Path)
     lastResult = { ...result, attempts: attempt }
     if (!shouldRetryStorageResult(lastResult))
       return lastResult
@@ -306,22 +347,6 @@ async function getObjectSizeWithRange(s3, s3Path, reason) {
       size: 0,
     }
   }
-}
-
-async function mapWithConcurrency(items, concurrency, mapper) {
-  const results = []
-  let cursor = 0
-
-  async function worker() {
-    while (cursor < items.length) {
-      const index = cursor++
-      results[index] = await mapper(items[index])
-    }
-  }
-
-  const workerCount = Math.min(Math.max(1, concurrency), items.length)
-  await Promise.all(Array.from({ length: workerCount }, () => worker()))
-  return results
 }
 
 function isRetryableDatabaseError(error) {
@@ -510,14 +535,14 @@ function createProgressLogger(report, apply) {
   }
 }
 
-async function processCandidates({ apply, dbAttempts, pool, s3, storageAttempts, storageConcurrency, verbose }, candidates) {
-  const results = await mapWithConcurrency(candidates, storageConcurrency, async (row) => {
+async function processCandidates({ apply, dbAttempts, pool, s3, storageAttempts, verbose }, candidates) {
+  const results = await Promise.all(candidates.map(async (row) => {
     const storage = await getObjectSizeWithRetry(s3, row.s3_path, storageAttempts)
     if (verbose) {
       console.log(`${row.id} ${row.file_name} size=${storage.size} method=${storage.method}${storage.status ? ` status=${storage.status}` : ''} attempts=${storage.attempts}`)
     }
     return { row, storage }
-  })
+  }))
 
   const rowsWithSize = results
     .filter(result => result.storage.size > 0)
@@ -538,6 +563,7 @@ async function processCandidates({ apply, dbAttempts, pool, s3, storageAttempts,
     .map(result => ({
       app_id: result.row.app_id,
       app_version_id: result.row.app_version_id,
+      attempted_s3_path: result.storage.attempted_s3_path,
       attempts: result.storage.attempts,
       error: result.storage.error,
       file_name: result.row.file_name,
@@ -667,7 +693,7 @@ Options:
   --limit              Max rows to scan without --all. Default: 1000.
   --batch-size         Backward-compatible alias; candidate reads are always 1000.
   --workers            Parallel shared-cursor workers. Default: 8 for --all, 1 otherwise.
-  --concurrency        Total storage HEAD/RANGE concurrency. Default: 120 for --all, 20 otherwise.
+  --concurrency        Backward-compatible no-op; storage uses full-batch parallelism for maximum throughput.
   --storage-attempts   Storage metadata attempts per file. Default: 3.
   --db-attempts        DB read/update attempts. Default: 5.
   --start-id           Exclusive lower manifest.id bound for resume.
@@ -692,7 +718,6 @@ Options:
   const limit = all ? Number.POSITIVE_INFINITY : getNumberArg('--limit', 1000)
   const workers = getNumberArg('--workers', all ? 8 : 1)
   const batchSize = getFixedBatchSizeArg()
-  const concurrency = getNumberArg('--concurrency', all ? 120 : 20)
   const storageAttempts = getNumberArg('--storage-attempts', 3)
   const dbAttempts = getNumberArg('--db-attempts', 5)
   const startId = getOptionalNumberArg('--start-id') ?? 0
@@ -724,8 +749,8 @@ Options:
   createFailedCsv(failedCsvPath)
 
   const workerCount = all ? workers : 1
-  const storageConcurrencyPerWorker = Math.max(1, Math.floor(concurrency / workerCount))
-  const effectiveStorageConcurrency = storageConcurrencyPerWorker * workerCount
+  const storageFanoutPerWorker = batchSize
+  const effectiveStorageFanout = storageFanoutPerWorker * workerCount
   const poolMax = Math.min(Math.max(workerCount * 2 + 4, 4), 40)
 
   const pool = new pg.Pool({
@@ -749,7 +774,6 @@ Options:
     batchSize,
     checked: 0,
     claimedBatches: 0,
-    concurrency,
     dbAttempts,
     endedAt: null,
     endId,
@@ -764,8 +788,8 @@ Options:
     scannedAt: new Date().toISOString(),
     startId,
     storageAttempts,
-    storageConcurrencyPerWorker,
-    effectiveStorageConcurrency,
+    storageFanoutPerWorker,
+    effectiveStorageFanout,
     target,
     unchanged: 0,
     workerCount,
@@ -779,7 +803,7 @@ Options:
   }
 
   try {
-    console.log(`Scanning manifest.id > ${startId}${endId ? ` and <= ${endId}` : ''} with ${workerCount} workers, page size ${batchSize}, effective storage concurrency ${effectiveStorageConcurrency}, DB pool max ${poolMax}`)
+    console.log(`Scanning manifest.id > ${startId}${endId ? ` and <= ${endId}` : ''} with ${workerCount} workers, page size ${batchSize}, storage fan-out ${storageFanoutPerWorker} per worker (${effectiveStorageFanout} effective), DB pool max ${poolMax}`)
 
     const claimBatch = createBatchClaimer({
       appId,
@@ -809,7 +833,6 @@ Options:
         pool,
         s3,
         storageAttempts,
-        storageConcurrency: storageConcurrencyPerWorker,
         verbose,
       },
       report,
