@@ -58,6 +58,12 @@ export type AndroidOnboardingStep
     | 'build-complete'
     | 'error'
 
+export type AndroidOnboardingErrorCategory
+  = | 'keystore_invalid'
+    | 'google_oauth_failed'
+    | 'play_account_id_invalid'
+    | 'unknown'
+
 export type KeystoreMethod = 'existing' | 'generate'
 export type ServiceAccountMethod = 'existing' | 'generate'
 

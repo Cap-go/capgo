@@ -1,7 +1,7 @@
 import type { FC } from 'react'
 import type { BuildLogger } from '../../request.js'
 import type { DiscoveredProfile, IdentityProfileMatch, SigningIdentity } from '../macos-signing.js'
-import type { ApiKeyData, CertificateData, OnboardingProgress, OnboardingStep, ProfileData } from '../types.js'
+import type { ApiKeyData, CertificateData, OnboardingErrorCategory, OnboardingProgress, OnboardingStep, ProfileData } from '../types.js'
 import { handleCustomMsg } from '../../qr.js'
 import { spawn } from 'node:child_process'
 import { Buffer } from 'node:buffer'
@@ -17,17 +17,19 @@ import open from 'open'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { writeOnboardingSupportBundle } from '../../../onboarding-support.js'
 import { formatRunnerCommand, splitRunnerCommand } from '../../../runner-command.js'
-import { findSavedKeySilent, getPMAndCommand } from '../../../utils.js'
+import { createSupabaseClient, findSavedKeySilent, getOrganizationId, getPMAndCommand } from '../../../utils.js'
 import { loadSavedCredentials, updateSavedCredentials } from '../../credentials.js'
 import { requestBuildInternal } from '../../request.js'
 import { CertificateLimitError, createCertificate, createProfile, deleteProfile, DuplicateProfileError, ensureBundleId, findCertIdBySha1, generateJwt, listProfilesForCert, revokeCertificate, verifyApiKey } from '../apple-api.js'
 import { createP12, DEFAULT_P12_PASSWORD, generateCsr } from '../csr.js'
+import { mapIosOnboardingError } from '../error-categories.js'
 import { canUseFilePicker, openFilePicker } from '../file-picker.js'
 import { exportP12FromKeychain, isHelperCached, isMacOS, listSigningIdentities, matchIdentitiesToProfiles, precompileSwiftHelper, scanProvisioningProfiles } from '../macos-signing.js'
 import { deleteProgress, getImportEntryStep, getResumeStep, loadProgress, saveProgress } from '../progress.js'
 import { getBuildOnboardingRecoveryAdvice } from '../recovery.js'
-import { createCiSecretEntries, detectCiSecretTargets, getCiSecretTargetLabel, listExistingCiSecretKeys, uploadCiSecrets } from '../ci-secrets.js'
 import type { CiSecretEntry, CiSecretSetupAdvice, CiSecretTarget } from '../ci-secrets.js'
+import { createCiSecretEntries, detectCiSecretTargets, getCiSecretTargetLabel, listExistingCiSecretKeys, uploadCiSecrets } from '../ci-secrets.js'
+import { trackBuilderOnboardingStep } from '../telemetry.js'
 import {
   getPhaseLabel,
 
@@ -91,6 +93,59 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
   const startStep = getResumeStep(initialProgress)
 
   const [step, setStep] = useState<OnboardingStep>(startStep === 'welcome' ? 'welcome' : startStep)
+
+  // Telemetry: resolve org id once + emit per-step events
+  const stepTimingRef = useRef<{ step: OnboardingStep | null, startedAt: number }>({
+    step: null,
+    startedAt: Date.now(),
+  })
+  // Buffer of telemetry events that occurred before `resolvedOrgId` landed.
+  // Drained in order when the org id becomes available. Without this buffer,
+  // any step transitions during the async org-id resolution (which involves
+  // two HTTP round-trips: createSupabaseClient + getOrganizationId) would be
+  // dropped from the funnel.
+  const pendingTelemetryRef = useRef<Array<{
+    step: OnboardingStep
+    durationMs?: number
+    errorCategory?: OnboardingErrorCategory
+  }>>([])
+  const [resolvedOrgId, setResolvedOrgId] = useState<string | null>(null)
+  const resolvedApiKeyRef = useRef<string | null>(apikey ?? null)
+  const orgIdResolvedRef = useRef(false)
+  // Captures the mapped error category at handleError time so the telemetry
+  // useEffect can pass it through without re-mapping a reconstructed Error
+  // (which would have lost the .status / .phase / instanceof discriminators).
+  const errorCategoryRef = useRef<OnboardingErrorCategory | undefined>(undefined)
+
+  useEffect(() => {
+    if (resolvedApiKeyRef.current)
+      return
+    const saved = findSavedKeySilent()
+    if (saved)
+      resolvedApiKeyRef.current = saved
+  }, [])
+
+  useEffect(() => {
+    if (orgIdResolvedRef.current || !resolvedApiKeyRef.current)
+      return
+    orgIdResolvedRef.current = true
+
+    let cancelled = false
+    void (async () => {
+      const supabase = await createSupabaseClient(resolvedApiKeyRef.current!, undefined, undefined, true)
+        .catch(() => null)
+      if (!supabase || cancelled)
+        return
+      const orgId = await getOrganizationId(supabase, appId).catch(() => null)
+      if (orgId && !cancelled)
+        setResolvedOrgId(orgId)
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [appId])
+
   const [log, setLog] = useState<LogEntry[]>([])
   const [error, setError] = useState<string | null>(null)
   const [retryCount, setRetryCount] = useState(0)
@@ -135,6 +190,71 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
   useEffect(() => {
     issuerIdRef.current = issuerId
   }, [issuerId])
+
+  // Emit telemetry on every step transition (including initial mount).
+  // Sequencing:
+  //   1. If `resolvedOrgId` just became available, drain the backlog first.
+  //   2. Skip same-step re-renders (orgId-lands triggers a re-fire — we don't
+  //      want to re-emit the current step, only drain the backlog).
+  //   3. Otherwise compute the new event, then either emit immediately (orgId
+  //      available) or queue it (orgId still loading).
+  useEffect(() => {
+    if (!resolvedApiKeyRef.current)
+      return
+
+    const previous = stepTimingRef.current
+    const isDuplicateStep = previous.step !== null && previous.step === step && step !== 'error'
+
+    // (1) Drain the backlog if org id is now available, even when the current
+    // step is a duplicate (e.g., this effect fired because resolvedOrgId moved
+    // from null to a real value, not because step changed).
+    if (resolvedOrgId && pendingTelemetryRef.current.length > 0) {
+      for (const queued of pendingTelemetryRef.current) {
+        void trackBuilderOnboardingStep({
+          apikey: resolvedApiKeyRef.current,
+          appId,
+          orgId: resolvedOrgId,
+          platform: 'ios',
+          ...queued,
+        })
+      }
+      pendingTelemetryRef.current = []
+    }
+
+    // (2) Now safely skip the duplicate-step path.
+    if (isDuplicateStep)
+      return
+
+    const now = Date.now()
+    // Initial step (previous.step === null) and same-step error re-entries have
+    // no meaningful previous-step duration.
+    const durationMs = previous.step === null || previous.step === step
+      ? undefined
+      : now - previous.startedAt
+
+    const eventPayload = {
+      step,
+      durationMs,
+      errorCategory: step === 'error' ? errorCategoryRef.current : undefined,
+    }
+
+    stepTimingRef.current = { step, startedAt: now }
+
+    // (3) Either fire immediately or buffer.
+    if (resolvedOrgId) {
+      void trackBuilderOnboardingStep({
+        apikey: resolvedApiKeyRef.current,
+        appId,
+        orgId: resolvedOrgId,
+        platform: 'ios',
+        ...eventPayload,
+      })
+    }
+    else {
+      pendingTelemetryRef.current.push(eventPayload)
+    }
+  }, [step, appId, resolvedOrgId, error])
+
   const [teamId, setTeamId] = useState(initialProgress?.completedSteps.certificateCreated?.teamId || '')
   const [certData, setCertData] = useState<CertificateData | null>(initialProgress?.completedSteps.certificateCreated || null)
   const [profileData, setProfileData] = useState<ProfileData | null>(initialProgress?.completedSteps.profileCreated || null)
@@ -320,6 +440,10 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
       setStep('api-key-instructions')
       return
     }
+    // Capture the mapped category BEFORE we collapse err to a string.
+    // The telemetry useEffect will read this ref instead of re-mapping a
+    // reconstructed `new Error(message)` (which has no discriminators).
+    errorCategoryRef.current = mapIosOnboardingError(err, failedStep)
     const message = err instanceof Error ? err.message : String(err)
     const nextRetryCount = retryCount + 1
     const bundlePath = writeOnboardingSupportBundle({
@@ -486,6 +610,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
         if (result.success && existsSync(join(process.cwd(), iosDir))) {
           addLog(`✔ Native iOS platform created with ${addIosCommand}`)
           setError(null)
+          errorCategoryRef.current = undefined
           setRetryCount(0)
           // Re-run the welcome → platform check inline rather than detouring
           // through the legacy platform-select step.
@@ -2364,6 +2489,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
                 onChange={async (value) => {
                   if (value === 'retry') {
                     setError(null)
+                    errorCategoryRef.current = undefined
                     pickerOpenedRef.current = false
                     setStep(retryStep)
                   }
@@ -2385,6 +2511,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
                     setCertData(null)
                     setProfileData(null)
                     setError(null)
+                    errorCategoryRef.current = undefined
                     setRetryCount(0)
                     pickerOpenedRef.current = false
                     setSupportBundlePath(null)
