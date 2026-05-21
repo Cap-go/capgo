@@ -141,7 +141,40 @@ export function getAndroidResumeStep(progress: AndroidOnboardingProgress | null)
   if (!keystoreFullyValid(progress))
     return keystoreResumeStep(progress)
 
-  // Phase 2 — Google sign-in: marker + refresh token. We need the refresh
+  // Phase 2 — Service-account fork. Routes onto the import path or the OAuth
+  // path. Legacy progress files don't have `serviceAccountMethod` — treat
+  // those as OAuth (existing behavior) so in-flight onboardings continue
+  // along the path they started on.
+  if (progress.serviceAccountMethod === 'existing') {
+    // Phase 2a — Import existing SA JSON.
+    //
+    // `_serviceAccountKeyBase64` is set once we accept the JSON (either
+    // validation passed or the user picked "save anyway"). After that point
+    // routing is identical to the OAuth path's tail: `saving-credentials`.
+    if (progress._serviceAccountKeyBase64)
+      return 'saving-credentials'
+
+    // Package name confirmation is the first step inside the import path.
+    if (!completedSteps.androidPackageChosen)
+      return 'android-package-select'
+
+    // We have a package but no accepted SA yet. If the user already picked a
+    // file, jump back to validation; otherwise back to file selection.
+    if (progress.serviceAccountJsonPath)
+      return 'sa-json-validating'
+    return 'sa-json-existing-path'
+  }
+
+  if (progress.serviceAccountMethod === undefined && completedSteps.keystoreReady) {
+    // Keystore finished but the user never reached the fork — drop them on
+    // the new method-select screen so they can pick. Legacy progress files
+    // (no serviceAccountMethod, no completed steps past keystoreReady) will
+    // also land here; that's the right behavior — they re-pick.
+    if (!completedSteps.googleSignInComplete)
+      return 'service-account-method-select'
+  }
+
+  // Phase 2b — Google sign-in: marker + refresh token. We need the refresh
   // token to mint access tokens for the rest of the flow on subsequent
   // resumes; if it's missing we must re-auth.
   if (!completedSteps.googleSignInComplete || !progress._oauthRefreshToken)

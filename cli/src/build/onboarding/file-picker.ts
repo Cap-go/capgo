@@ -80,3 +80,13 @@ export function openKeystorePicker(): Promise<string | null> {
     'POSIX path of (choose file of type {"jks", "keystore", "p12"} with prompt "Select your Android keystore")',
   )
 }
+
+/**
+ * Open the macOS native file picker filtered to Google Play service account
+ * JSON files. Used by the Android onboarding "import existing SA" path.
+ */
+export function openServiceAccountJsonPicker(): Promise<string | null> {
+  return openMacFilePicker(
+    'POSIX path of (choose file of type {"json"} with prompt "Select your Google Play service account JSON")',
+  )
+}

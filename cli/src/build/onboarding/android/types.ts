@@ -21,7 +21,14 @@ export type AndroidOnboardingStep
     | 'keystore-new-key-password'
     | 'keystore-new-cn'
     | 'keystore-generating'
-  // Phase 2 — Google sign-in (OAuth)
+  // Phase 2 — Service account method fork: existing JSON vs. OAuth provisioning
+    | 'service-account-method-select'
+  // Phase 2a — Import existing service account JSON
+    | 'sa-json-existing-path'
+    | 'sa-json-existing-picker'
+    | 'sa-json-validating'
+    | 'sa-json-validation-failed'
+  // Phase 2b — Google sign-in (OAuth)
     | 'google-sign-in'
     | 'google-sign-in-running'
   // Phase 3 — Play developer account ID (pasted by the user — Play Developer API
@@ -52,6 +59,7 @@ export type AndroidOnboardingStep
     | 'error'
 
 export type KeystoreMethod = 'existing' | 'generate'
+export type ServiceAccountMethod = 'existing' | 'generate'
 
 export interface KeystoreReady {
   keystorePath: string
@@ -109,6 +117,19 @@ export interface AndroidOnboardingProgress {
   keystoreKeyPassword?: string
   keystoreCommonName?: string
 
+  // Service account fork — set at `service-account-method-select`. Absent on
+  // legacy progress files (pre-2026-05) → resume defaults to `generate` so
+  // existing in-flight onboardings continue on the OAuth path they started on.
+  serviceAccountMethod?: ServiceAccountMethod
+  // Import path — path the user picked at `sa-json-existing-path` /
+  // `sa-json-existing-picker`. The file is read fresh at validation time so
+  // we never persist its contents to disk before the user explicitly accepts.
+  serviceAccountJsonPath?: string
+  // Set when the user picks "Save anyway" at `sa-json-validation-failed`.
+  // Read at `saving-credentials` to surface a yellow banner — does not affect
+  // routing.
+  serviceAccountValidationSkipped?: boolean
+
   // Chosen project name for a fresh create — remembered while the async op runs
   pendingNewProjectId?: string
   pendingNewProjectDisplayName?: string
@@ -152,6 +173,15 @@ export const ANDROID_STEP_PROGRESS: Record<AndroidOnboardingStep, number> = {
   'keystore-new-key-password': 14,
   'keystore-new-cn': 16,
   'keystore-generating': 20,
+
+  'service-account-method-select': 22,
+
+  // Import path keeps the bar moving without leaping past the OAuth path's
+  // matching milestones (Google sign-in lands at 35, GCP setup at 70).
+  'sa-json-existing-path': 28,
+  'sa-json-existing-picker': 28,
+  'sa-json-validating': 70,
+  'sa-json-validation-failed': 70,
 
   'google-sign-in': 25,
   'google-sign-in-running': 35,
@@ -204,6 +234,13 @@ export function getAndroidPhaseLabel(step: AndroidOnboardingStep): string {
     case 'keystore-new-cn':
     case 'keystore-generating':
       return 'Step 1 of 4 · Keystore'
+    case 'service-account-method-select':
+      return 'Step 2 of 4 · Service account'
+    case 'sa-json-existing-path':
+    case 'sa-json-existing-picker':
+    case 'sa-json-validating':
+    case 'sa-json-validation-failed':
+      return 'Step 3 of 4 · Service account'
     case 'google-sign-in':
     case 'google-sign-in-running':
       return 'Step 2 of 4 · Sign in with Google'
