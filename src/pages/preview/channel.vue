@@ -24,7 +24,7 @@ onMounted(() => {
       Open this preview in Capgo
     </h1>
     <p class="max-w-sm text-sm text-slate-300">
-      Install or open the Capgo mobile app on this device to start this channel preview.
+      Install or open the Capgo mobile app on this device to start this preview.
     </p>
   </div>
 </template>
