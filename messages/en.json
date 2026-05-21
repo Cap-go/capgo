@@ -1188,6 +1188,7 @@
   "manifest-status-diff": "Showing {count} files that differ from {bundle} ({unchanged} files unchanged).",
   "manifest-status-full": "Showing full manifest for this bundle.",
   "manifest-summary-files": "Files",
+  "manifest-size-partial": "{size} + {unknown} unknown",
   "manifest-to-download": "To download",
   "manifest-total-bundle": "Total bundle",
   "mau": "Monthly active users",

@@ -1,7 +1,15 @@
 import { describe, expect, it } from 'vitest'
-import { buildManifestDownloadSizeResult, normalizeManifestSizeFiles } from '../supabase/functions/_backend/utils/manifest_size.ts'
+import { buildManifestDownloadSizeResult, normalizeManifestSizeFiles, parseManifestSizeVersionId } from '../supabase/functions/_backend/utils/manifest_size.ts'
 
 describe('manifest download size helpers', () => {
+  it.concurrent('parses explicit bundle ids for console manifest size requests', () => {
+    expect(parseManifestSizeVersionId(42)).toBe(42)
+    expect(parseManifestSizeVersionId('42')).toBe(42)
+    expect(parseManifestSizeVersionId(' 42 ')).toBe(42)
+    expect(parseManifestSizeVersionId(0)).toBeUndefined()
+    expect(parseManifestSizeVersionId('42-file')).toBeUndefined()
+  })
+
   it.concurrent('normalizes valid manifest files and extracts version ids from download urls', () => {
     const files = normalizeManifestSizeFiles([
       {

@@ -6,12 +6,25 @@ import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import IconAlertCircle from '~icons/lucide/alert-circle'
 import { formatBytes } from '~/services/conversion'
-import { useSupabase } from '~/services/supabase'
+import { defaultApiHost, useSupabase } from '~/services/supabase'
 import { useDisplayStore } from '~/stores/display'
 
 type ManifestEntry = Database['public']['Tables']['manifest']['Row']
 
 type VersionRow = Pick<Database['public']['Tables']['app_versions']['Row'], 'id' | 'name' | 'created_at' | 'manifest_count' | 'app_id'>
+
+interface ManifestDownloadSizeResult {
+  totalSize: number
+  knownFiles: number
+  unknownFiles: number
+  files: Array<{
+    file_name: string | null
+    file_hash: string | null
+    download_url: string | null
+    size?: number
+    error?: string
+  }>
+}
 
 const route = useRoute('/app/[app].bundle.[bundle].manifest')
 const router = useRouter()
@@ -27,6 +40,9 @@ const manifestEntries = ref<ManifestEntry[]>([])
 const selectedCompareVersion = ref<VersionRow | null>(null)
 const compareManifestEntries = ref<ManifestEntry[]>([])
 const compareManifestCache = ref<Record<number, ManifestEntry[]>>({})
+const diffDownloadSize = ref<ManifestDownloadSizeResult | null>(null)
+const diffDownloadSizeLoading = ref(false)
+const diffDownloadSizeRequestId = ref(0)
 const search = ref('')
 const currentPage = ref(1)
 const MANIFEST_PAGE_SIZE = 1000
@@ -124,7 +140,27 @@ function formatSizeLabel(entries: ManifestEntry[]): string {
   return hasSize ? formatBytes(totalSize) : t('metadata-not-found')
 }
 
-const downloadSizeLabel = computed(() => formatSizeLabel(diffEntries.value))
+function formatManifestDownloadSize(result: ManifestDownloadSizeResult): string {
+  if (result.files.length === 0)
+    return formatBytes(0)
+  if (result.knownFiles === 0)
+    return t('metadata-not-found')
+
+  const size = formatBytes(result.totalSize)
+  if (result.unknownFiles > 0)
+    return t('manifest-size-partial', { size, unknown: result.unknownFiles })
+  return size
+}
+
+const downloadSizeLabel = computed(() => {
+  if (!compareVersionId.value)
+    return formatSizeLabel(diffEntries.value)
+  if (diffDownloadSizeLoading.value)
+    return t('loading')
+  if (diffDownloadSize.value)
+    return formatManifestDownloadSize(diffDownloadSize.value)
+  return formatSizeLabel(diffEntries.value)
+})
 const unchangedSizeLabel = computed(() => formatSizeLabel(unchangedEntries.value))
 const totalBundleSizeLabel = computed(() => formatSizeLabel(manifestEntries.value))
 
@@ -173,6 +209,52 @@ async function fetchManifestEntries(versionId: number) {
   }
 
   return allEntries
+}
+
+function isManifestDownloadSizeResult(value: unknown): value is ManifestDownloadSizeResult {
+  if (!value || typeof value !== 'object')
+    return false
+  const result = value as ManifestDownloadSizeResult
+  return typeof result.totalSize === 'number'
+    && typeof result.knownFiles === 'number'
+    && typeof result.unknownFiles === 'number'
+    && Array.isArray(result.files)
+}
+
+async function fetchManifestDownloadSize(entries: ManifestEntry[]): Promise<ManifestDownloadSizeResult | null> {
+  if (!defaultApiHost || !packageId.value || !version.value?.name)
+    return null
+
+  const response = await fetch(`${defaultApiHost}/updates/manifest_size`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      app_id: packageId.value,
+      device_id: '00000000-0000-0000-0000-000000000000',
+      version_name: '0.0.0',
+      version_build: '0.0.0',
+      version_os: '18.0',
+      is_emulator: false,
+      is_prod: true,
+      platform: 'ios',
+      plugin_version: '8.47.0',
+      version: version.value.name,
+      version_id: id.value,
+      manifest: entries.map(entry => ({
+        file_name: entry.file_name,
+        file_hash: entry.file_hash,
+        download_url: null,
+      })),
+    }),
+  })
+
+  if (!response.ok)
+    throw new Error(`Manifest size request failed with ${response.status}`)
+
+  const result = await response.json()
+  return isManifestDownloadSizeResult(result) ? result : null
 }
 
 async function getVersion() {
@@ -226,6 +308,9 @@ async function reloadManifest() {
 function resetCompareSelection() {
   selectedCompareVersion.value = null
   compareManifestEntries.value = []
+  diffDownloadSize.value = null
+  diffDownloadSizeLoading.value = false
+  diffDownloadSizeRequestId.value += 1
   tableLoading.value = false
 }
 
@@ -252,6 +337,40 @@ watch(compareVersionId, async (value) => {
   compareManifestCache.value[value] = entries
   compareManifestEntries.value = entries
   tableLoading.value = false
+})
+
+watch([diffEntries, compareVersionId, tableLoading], async ([entries, compareId, isTableLoading]) => {
+  const requestId = ++diffDownloadSizeRequestId.value
+  diffDownloadSize.value = null
+  if (!compareId || isTableLoading) {
+    diffDownloadSizeLoading.value = false
+    return
+  }
+  if (entries.length === 0) {
+    diffDownloadSize.value = {
+      totalSize: 0,
+      knownFiles: 0,
+      unknownFiles: 0,
+      files: [],
+    }
+    diffDownloadSizeLoading.value = false
+    return
+  }
+
+  diffDownloadSizeLoading.value = true
+  try {
+    const result = await fetchManifestDownloadSize(entries)
+    if (requestId !== diffDownloadSizeRequestId.value)
+      return
+    diffDownloadSize.value = result
+  }
+  catch (error) {
+    console.error('Failed to load manifest download size', error)
+  }
+  finally {
+    if (requestId === diffDownloadSizeRequestId.value)
+      diffDownloadSizeLoading.value = false
+  }
 })
 
 watchEffect(async () => {

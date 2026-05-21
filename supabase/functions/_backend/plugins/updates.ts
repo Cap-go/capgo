@@ -3,7 +3,7 @@ import type { AppInfos } from '../utils/types.ts'
 import { Hono } from 'hono/tiny'
 import { BRES, parseBody, simpleRateLimit } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
-import { getManifestDownloadSize } from '../utils/manifest_size.ts'
+import { getManifestDownloadSize, parseManifestSizeVersionId } from '../utils/manifest_size.ts'
 import { parsePluginBody } from '../utils/plugin_parser.ts'
 import { updateRequestSchema } from '../utils/plugin_validation.ts'
 import { update } from '../utils/update.ts'
@@ -35,6 +35,7 @@ app.post('/manifest_size', async (c) => {
     manifest?: unknown
     files?: unknown
     version?: string
+    version_id?: unknown
   }>(c)
   const files = body.manifest ?? body.files
   cloudlog({
@@ -43,13 +44,14 @@ app.post('/manifest_size', async (c) => {
     app_id: body.app_id,
     device_id: body.device_id,
     version: body.version,
+    version_id: body.version_id,
     files_count: Array.isArray(files) ? files.length : 0,
   })
   if (isLimited(c, body.app_id))
     return simpleRateLimit({ app_id: body.app_id })
 
   const parsedBody = parsePluginBody<AppInfos>(c, body, updateRequestSchema)
-  const size = await getManifestDownloadSize(c, parsedBody.app_id, typeof body.version === 'string' ? body.version : undefined, files)
+  const size = await getManifestDownloadSize(c, parsedBody.app_id, typeof body.version === 'string' ? body.version : undefined, parseManifestSizeVersionId(body.version_id), files)
   return c.json(size)
 })
 

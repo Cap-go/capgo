@@ -35,15 +35,25 @@ function versionIdFromDownloadUrl(downloadUrl: string | null | undefined): numbe
 
   try {
     const parsed = new URL(downloadUrl)
-    const key = parsed.searchParams.get('key')
-    if (!key)
-      return null
-    const versionId = Number.parseInt(key, 10)
-    return Number.isSafeInteger(versionId) && versionId > 0 ? versionId : null
+    return parseManifestSizeVersionId(parsed.searchParams.get('key')) ?? null
   }
   catch {
     return null
   }
+}
+
+export function parseManifestSizeVersionId(value: unknown): number | undefined {
+  if (typeof value === 'number')
+    return Number.isSafeInteger(value) && value > 0 ? value : undefined
+  if (typeof value !== 'string')
+    return undefined
+
+  const trimmed = value.trim()
+  if (!/^\d+$/.test(trimmed))
+    return undefined
+
+  const versionId = Number.parseInt(trimmed, 10)
+  return Number.isSafeInteger(versionId) && versionId > 0 ? versionId : undefined
 }
 
 export function normalizeManifestSizeFiles(files: unknown): NormalizedManifestSizeFile[] {
@@ -134,6 +144,7 @@ export async function getManifestDownloadSize(
   c: Context,
   appId: string,
   versionName: string | undefined,
+  versionId: number | undefined,
   filesInput: unknown,
 ): Promise<ManifestDownloadSizeResult> {
   const files = normalizeManifestSizeFiles(filesInput)
@@ -169,7 +180,15 @@ export async function getManifestDownloadSize(
             AND app_versions.id = requested.version_id
           ) OR (
             requested.version_id IS NULL
-            AND ($3::text IS NULL OR app_versions.name = $3)
+            AND (
+              (
+                $3::bigint IS NOT NULL
+                AND app_versions.id = $3
+              ) OR (
+                $3::bigint IS NULL
+                AND ($4::text IS NULL OR app_versions.name = $4)
+              )
+            )
           )
         )
       INNER JOIN public.manifest
@@ -177,7 +196,7 @@ export async function getManifestDownloadSize(
         AND manifest.file_hash = requested.file_hash
       GROUP BY requested.file_hash, app_versions.id
       `,
-      [JSON.stringify(files), appId, versionName ?? null],
+      [JSON.stringify(files), appId, versionId ?? null, versionName ?? null],
     )
 
     return buildManifestDownloadSizeResult(files, result.rows)
