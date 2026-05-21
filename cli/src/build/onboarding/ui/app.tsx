@@ -739,13 +739,75 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
           if (cancelled)
             return
           setAppleCertIdForChosen(certId) // null when Apple has no SHA1 match; string otherwise
-          if (certId) {
-            addLog(`✔ Apple recognizes this certificate (ASC id ${certId.slice(0, 8)}…)`)
-          }
-          else {
+          if (!certId) {
             addLog(
               `⚠ Apple's API didn't return a match for "${chosenIdentity.name}". `
               + `Hiding the API-driven recovery options — use "Switch to Create new" or open the Developer Portal.`,
+              'yellow',
+            )
+            setStep('import-no-match-recovery')
+            return
+          }
+          addLog(`✔ Apple recognizes this certificate (ASC id ${certId.slice(0, 8)}…)`)
+
+          // Auto-fetch profiles for this cert. Saves the user a click on
+          // "Fetch matching profile from Apple now" in the recovery menu
+          // when Apple actually has a matching profile waiting. The menu
+          // is only shown when (a) Apple has zero profiles linked, OR (b)
+          // profiles exist but none match this app's bundleId / dist mode.
+          const profiles = await listProfilesForCert(token, certId)
+          if (cancelled)
+            return
+
+          if (profiles.length === 0) {
+            addLog('ℹ️  Apple has the cert but no profiles are linked to it yet — use "Create a new App Store profile" to add one.', 'yellow')
+            setStep('import-no-match-recovery')
+            return
+          }
+
+          // Synthesize so `filterProfilesForApp` and the picker can use
+          // them the same way as on-disk profiles.
+          const synthesized: DiscoveredProfile[] = profiles.map(p => ({
+            path: '',
+            uuid: p.id,
+            name: p.name,
+            applicationIdentifier: '',
+            bundleId: p.bundleIdentifier,
+            teamId: chosenIdentity.teamId,
+            expirationDate: p.expirationDate,
+            profileType: (p.profileType === 'IOS_APP_STORE' ? 'app_store' : p.profileType === 'IOS_APP_ADHOC' ? 'ad_hoc' : 'unknown') as DiscoveredProfile['profileType'],
+            certificateSha1s: [chosenIdentity.sha1],
+            profileBase64: p.profileContent,
+          } as DiscoveredProfile & { profileBase64: string }))
+          setImportMatches(prev => prev.map(m => m.identity.sha1 === chosenIdentity.sha1
+            ? { ...m, profiles: [...m.profiles, ...synthesized] }
+            : m,
+          ))
+
+          const usableHere = filterProfilesForApp(synthesized, appId, importDistribution)
+          if (usableHere.length > 0) {
+            addLog(`✔ Apple has ${usableHere.length} matching profile${usableHere.length === 1 ? '' : 's'} for "${appId}" — opening the picker`)
+            setStep('import-pick-profile')
+            return
+          }
+
+          // Apple returned profiles but none target this app. Surface what
+          // WAS returned so the user understands why we're still on the
+          // recovery screen.
+          const otherBundleIds = Array.from(new Set(synthesized.map(p => p.bundleId).filter(b => b && b !== appId)))
+          const otherDistribTypes = Array.from(new Set(synthesized.filter(p => p.bundleId === appId && p.profileType !== importDistribution).map(p => p.profileType)))
+          if (otherBundleIds.length > 0) {
+            addLog(
+              `⚠ Apple returned ${profiles.length} profile${profiles.length === 1 ? '' : 's'} for this cert but none target "${appId}". `
+              + `Bundle ID${otherBundleIds.length === 1 ? '' : 's'} found: ${otherBundleIds.join(', ')}. `
+              + `Use "Create a new App Store profile for this cert" to add one for "${appId}".`,
+              'yellow',
+            )
+          }
+          else if (otherDistribTypes.length > 0) {
+            addLog(
+              `⚠ Apple has ${profiles.length} profile${profiles.length === 1 ? '' : 's'} for "${appId}" but with distribution type ${otherDistribTypes.join(', ')} (need ${importDistribution}). `
+              + `Use "Create a new App Store profile for this cert" to add the right one.`,
               'yellow',
             )
           }
@@ -1877,8 +1939,8 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
 
       {step === 'import-checking-apple-cert' && chosenIdentity && (
         <Box flexDirection="column" marginTop={1}>
-          <SpinnerLine text={`Checking with Apple for "${chosenIdentity.name}"...`} />
-          <Text dimColor>One quick round-trip so we only show recovery options that can succeed.</Text>
+          <SpinnerLine text={`Checking Apple for matching profiles for "${chosenIdentity.name}"...`} />
+          <Text dimColor>Looking up the cert + listing its profiles so we either auto-import or only show recovery options that can succeed.</Text>
         </Box>
       )}
 
