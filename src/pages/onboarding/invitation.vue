@@ -13,6 +13,7 @@ import { useSupabase } from '~/services/supabase'
 import { useDisplayStore } from '~/stores/display'
 import { useMainStore } from '~/stores/main'
 import { useOrganizationStore } from '~/stores/organization'
+import { clearPendingInviteSkip, rememberPendingInviteSkip } from '~/utils/pendingInviteSkip'
 
 const route = useRoute()
 const router = useRouter()
@@ -27,10 +28,11 @@ const isLoading = ref(true)
 const resolvingInvitationId = ref<string | null>(null)
 const resolvingInvitationAction = ref<'accept' | 'decline' | null>(null)
 const isDecliningAll = ref(false)
+const isSkipping = ref(false)
 const errorMessage = ref('')
 
 const hasMultipleInvitations = computed(() => invitations.value.length > 1)
-const isResolvingInvitation = computed(() => resolvingInvitationId.value !== null || isDecliningAll.value)
+const isResolvingInvitation = computed(() => resolvingInvitationId.value !== null || isDecliningAll.value || isSkipping.value)
 const title = computed(() => hasMultipleInvitations.value
   ? t('pending-invite-title-multiple')
   : t('pending-invite-title'))
@@ -47,6 +49,10 @@ const targetPath = computed(() => {
 
 function getPendingInviteOrganizations() {
   return organizationStore.organizations.filter(org => org.role.startsWith('invite'))
+}
+
+function getCurrentUserId() {
+  return main.user?.id ?? main.auth?.id
 }
 
 async function continueAfterInvitationsResolved() {
@@ -105,7 +111,7 @@ async function acceptInvitation(invitation: Organization) {
 }
 
 async function declineInvitation(invitation: Organization) {
-  const userId = main.user?.id ?? main.auth?.id
+  const userId = getCurrentUserId()
   if (!userId)
     throw new Error('missing_user')
 
@@ -124,6 +130,8 @@ async function resolveInvitation(invitation: Organization, action: 'accept' | 'd
   resolvingInvitationAction.value = action
   errorMessage.value = ''
   try {
+    clearPendingInviteSkip(getCurrentUserId())
+
     if (action === 'accept') {
       await acceptInvitation(invitation)
       toast.success(t('pending-invite-joined'))
@@ -152,9 +160,11 @@ async function declineAllInvitations() {
   isDecliningAll.value = true
   errorMessage.value = ''
   try {
-    const userId = main.user?.id ?? main.auth?.id
+    const userId = getCurrentUserId()
     if (!userId)
       throw new Error('missing_user')
+
+    clearPendingInviteSkip(userId)
 
     const inviteOrgIds = invitations.value.map(invitation => invitation.gid)
     const { error } = await supabase
@@ -177,6 +187,22 @@ async function declineAllInvitations() {
   }
   finally {
     isDecliningAll.value = false
+  }
+}
+
+async function skipInvitations() {
+  isSkipping.value = true
+  errorMessage.value = ''
+  try {
+    rememberPendingInviteSkip(getCurrentUserId())
+    await continueAfterInvitationsResolved()
+  }
+  catch (error) {
+    console.error('Failed to skip pending organization invitations', error)
+    errorMessage.value = t('pending-invite-skip-failed')
+  }
+  finally {
+    isSkipping.value = false
   }
 }
 
@@ -284,6 +310,19 @@ onMounted(async () => {
                   <IconLoader v-if="isDecliningAll" class="h-4 w-4 animate-spin" />
                   <IconX v-else class="h-4 w-4" />
                   {{ t('pending-invite-create-org') }}
+                </button>
+              </div>
+
+              <div v-if="!isLoading" class="mt-5 border-t border-white/10 pt-4">
+                <button
+                  type="button"
+                  class="d-btn d-btn-ghost min-h-11 px-3 text-sm font-medium text-slate-400 opacity-75 hover:bg-white/5 hover:text-slate-200 hover:opacity-100 disabled:text-slate-600 disabled:opacity-50"
+                  :disabled="isResolvingInvitation"
+                  data-test="pending-invite-skip"
+                  @click="skipInvitations"
+                >
+                  <IconLoader v-if="isSkipping" class="h-4 w-4 animate-spin" />
+                  {{ t('pending-invite-skip') }}
                 </button>
               </div>
             </div>

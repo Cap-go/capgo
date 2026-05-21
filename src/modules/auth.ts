@@ -9,6 +9,7 @@ import { getLocalConfig, useSupabase } from '~/services/supabase'
 import { sendEvent } from '~/services/tracking'
 import { useMainStore } from '~/stores/main'
 import { useOrganizationStore } from '~/stores/organization'
+import { hasPendingInviteSkip } from '~/utils/pendingInviteSkip'
 import { getPlans, isPlatformAdmin } from './../services/supabase'
 
 async function updateUser(
@@ -215,6 +216,8 @@ async function guard(
     if (!organizationsLoaded)
       return false
     if (to.path.startsWith('/onboarding/invitation'))
+      return false
+    if (hasPendingInviteSkip(sessionUser?.id ?? main.auth?.id))
       return false
     return organizationStore.organizations.some(org => org.role.startsWith('invite'))
   }
