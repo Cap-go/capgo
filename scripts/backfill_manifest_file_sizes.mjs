@@ -8,7 +8,7 @@
  *
  * Apply updates:
  *   bun scripts/backfill_manifest_file_sizes.mjs --app-version-id=180988804 --apply
- *   bun scripts/backfill_manifest_file_sizes.mjs --all --apply --workers=16 --concurrency=256
+ *   bun scripts/backfill_manifest_file_sizes.mjs --all --apply --workers=16
  */
 
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
@@ -308,22 +308,6 @@ async function getObjectSizeWithRange(s3, s3Path, reason) {
   }
 }
 
-async function mapWithConcurrency(items, concurrency, mapper) {
-  const results = []
-  let cursor = 0
-
-  async function worker() {
-    while (cursor < items.length) {
-      const index = cursor++
-      results[index] = await mapper(items[index])
-    }
-  }
-
-  const workerCount = Math.min(Math.max(1, concurrency), items.length)
-  await Promise.all(Array.from({ length: workerCount }, () => worker()))
-  return results
-}
-
 function isRetryableDatabaseError(error) {
   const code = error?.code ?? error?.errno
   const message = String(error?.message ?? '')
@@ -510,14 +494,14 @@ function createProgressLogger(report, apply) {
   }
 }
 
-async function processCandidates({ apply, dbAttempts, pool, s3, storageAttempts, storageConcurrency, verbose }, candidates) {
-  const results = await mapWithConcurrency(candidates, storageConcurrency, async (row) => {
+async function processCandidates({ apply, dbAttempts, pool, s3, storageAttempts, verbose }, candidates) {
+  const results = await Promise.all(candidates.map(async (row) => {
     const storage = await getObjectSizeWithRetry(s3, row.s3_path, storageAttempts)
     if (verbose) {
       console.log(`${row.id} ${row.file_name} size=${storage.size} method=${storage.method}${storage.status ? ` status=${storage.status}` : ''} attempts=${storage.attempts}`)
     }
     return { row, storage }
-  })
+  }))
 
   const rowsWithSize = results
     .filter(result => result.storage.size > 0)
@@ -667,7 +651,7 @@ Options:
   --limit              Max rows to scan without --all. Default: 1000.
   --batch-size         Backward-compatible alias; candidate reads are always 1000.
   --workers            Parallel shared-cursor workers. Default: 8 for --all, 1 otherwise.
-  --concurrency        Total storage HEAD/RANGE concurrency. Default: 120 for --all, 20 otherwise.
+  --concurrency        Backward-compatible no-op; each worker checks its full 1000-row batch at once.
   --storage-attempts   Storage metadata attempts per file. Default: 3.
   --db-attempts        DB read/update attempts. Default: 5.
   --start-id           Exclusive lower manifest.id bound for resume.
@@ -692,7 +676,6 @@ Options:
   const limit = all ? Number.POSITIVE_INFINITY : getNumberArg('--limit', 1000)
   const workers = getNumberArg('--workers', all ? 8 : 1)
   const batchSize = getFixedBatchSizeArg()
-  const concurrency = getNumberArg('--concurrency', all ? 120 : 20)
   const storageAttempts = getNumberArg('--storage-attempts', 3)
   const dbAttempts = getNumberArg('--db-attempts', 5)
   const startId = getOptionalNumberArg('--start-id') ?? 0
@@ -724,8 +707,8 @@ Options:
   createFailedCsv(failedCsvPath)
 
   const workerCount = all ? workers : 1
-  const storageConcurrencyPerWorker = Math.max(1, Math.floor(concurrency / workerCount))
-  const effectiveStorageConcurrency = storageConcurrencyPerWorker * workerCount
+  const storageFanoutPerWorker = batchSize
+  const effectiveStorageFanout = storageFanoutPerWorker * workerCount
   const poolMax = Math.min(Math.max(workerCount * 2 + 4, 4), 40)
 
   const pool = new pg.Pool({
@@ -749,7 +732,6 @@ Options:
     batchSize,
     checked: 0,
     claimedBatches: 0,
-    concurrency,
     dbAttempts,
     endedAt: null,
     endId,
@@ -764,8 +746,8 @@ Options:
     scannedAt: new Date().toISOString(),
     startId,
     storageAttempts,
-    storageConcurrencyPerWorker,
-    effectiveStorageConcurrency,
+    storageFanoutPerWorker,
+    effectiveStorageFanout,
     target,
     unchanged: 0,
     workerCount,
@@ -779,7 +761,7 @@ Options:
   }
 
   try {
-    console.log(`Scanning manifest.id > ${startId}${endId ? ` and <= ${endId}` : ''} with ${workerCount} workers, page size ${batchSize}, effective storage concurrency ${effectiveStorageConcurrency}, DB pool max ${poolMax}`)
+    console.log(`Scanning manifest.id > ${startId}${endId ? ` and <= ${endId}` : ''} with ${workerCount} workers, page size ${batchSize}, storage fan-out ${storageFanoutPerWorker} per worker (${effectiveStorageFanout} effective), DB pool max ${poolMax}`)
 
     const claimBatch = createBatchClaimer({
       appId,
@@ -809,7 +791,6 @@ Options:
         pool,
         s3,
         storageAttempts,
-        storageConcurrency: storageConcurrencyPerWorker,
         verbose,
       },
       report,
