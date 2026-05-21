@@ -814,7 +814,38 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
             ? { ...m, profiles: [...m.profiles, ...synthesized] }
             : m,
           ))
-          addLog(`✔ Apple returned ${profiles.length} profile${profiles.length === 1 ? '' : 's'} for this cert`)
+          // Before routing to the picker, check whether any of the
+          // returned profiles match THIS app's bundle ID + distribution.
+          // If Apple returned profiles for other apps only, surface that
+          // explicitly — otherwise the user lands on the recovery screen
+          // saying "no profile matches this app" with no indication that
+          // we actually found profiles for *other* apps.
+          const usableHere = filterProfilesForApp(synthesized, appId, importDistribution)
+          if (usableHere.length === 0) {
+            const otherBundleIds = Array.from(new Set(synthesized.map(p => p.bundleId).filter(b => b && b !== appId)))
+            const otherDistribTypes = Array.from(new Set(synthesized.filter(p => p.bundleId === appId && p.profileType !== importDistribution).map(p => p.profileType)))
+            if (otherBundleIds.length > 0) {
+              addLog(
+                `⚠ Apple returned ${profiles.length} profile${profiles.length === 1 ? '' : 's'} for this cert but none target "${appId}". `
+                + `Bundle ID${otherBundleIds.length === 1 ? '' : 's'} found: ${otherBundleIds.join(', ')}. `
+                + `Use "Create a new App Store profile for this cert" to add one for "${appId}".`,
+                'yellow',
+              )
+            }
+            else if (otherDistribTypes.length > 0) {
+              addLog(
+                `⚠ Apple returned ${profiles.length} profile${profiles.length === 1 ? '' : 's'} for "${appId}" but with distribution type ${otherDistribTypes.join(', ')} (need ${importDistribution}). `
+                + `Use "Create a new App Store profile for this cert" to add the right one.`,
+                'yellow',
+              )
+            }
+            else {
+              addLog(`⚠ Apple returned ${profiles.length} profile${profiles.length === 1 ? '' : 's'} for this cert but none match this app.`, 'yellow')
+            }
+            setStep('import-no-match-recovery')
+            return
+          }
+          addLog(`✔ Apple returned ${usableHere.length} matching profile${usableHere.length === 1 ? '' : 's'} for "${appId}"`)
           setStep('import-pick-profile')
         }
         catch (err) {
