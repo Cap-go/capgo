@@ -1,9 +1,10 @@
 import type { Context } from 'hono'
 import type { Database } from '../../utils/supabase.types.ts'
 import { quickError, simpleError } from '../../utils/hono.ts'
-import { cloudlog, cloudlogErr } from '../../utils/logging.ts'
+import { cloudlog, cloudlogErr, serializeError } from '../../utils/logging.ts'
 import { checkPermission } from '../../utils/rbac.ts'
 import { supabaseAdmin, supabaseApikey } from '../../utils/supabase.ts'
+import { sendEventToTracking } from '../../utils/tracking.ts'
 import { getEnv } from '../../utils/utils.ts'
 
 export interface RequestBuildBody {
@@ -312,6 +313,32 @@ export async function requestBuild(
     app_id,
     platform,
   })
+
+  // Telemetry MUST NOT break the build request. sendEventToTracking swallows
+  // per-provider errors internally, but defend against an unexpected throw at
+  // the orchestration layer (e.g. backgroundTask unavailable in tests).
+  try {
+    await sendEventToTracking(c, {
+      event: 'Build Requested',
+      channel: 'build-lifecycle',
+      icon: '🛠️',
+      notify: false,
+      user_id: org_id,
+      groups: { organization: org_id },
+      tags: {
+        app_id,
+        platform,
+        build_mode,
+      },
+    })
+  }
+  catch (error) {
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: 'Build Requested telemetry failed',
+      error: serializeError(error),
+    })
+  }
 
   return c.json({
     build_request_id: buildRequestRow.id,

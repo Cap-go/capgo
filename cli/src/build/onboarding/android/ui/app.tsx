@@ -2,6 +2,7 @@ import type { FC } from 'react'
 import type { BuildLogger } from '../../../request.js'
 import type { GcpProject } from '../gcp-api.js'
 import type {
+  AndroidOnboardingErrorCategory,
   AndroidOnboardingProgress,
   AndroidOnboardingStep,
   AndroidPackageChoice,
@@ -22,14 +23,16 @@ import { Alert, ProgressBar, Select } from '@inkjs/ui'
 import { Box, Newline, Text, useApp, useInput, useStdout } from 'ink'
 // src/build/onboarding/android/ui/app.tsx
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { findSavedKey } from '../../../../utils.js'
+import { createSupabaseClient, findSavedKey, findSavedKeySilent, getOrganizationId } from '../../../../utils.js'
 import { loadSavedCredentials, updateSavedCredentials } from '../../../credentials.js'
 import { requestBuildInternal } from '../../../request.js'
-import { createCiSecretEntries, detectCiSecretTargets, getCiSecretTargetLabel, listExistingCiSecretKeys, uploadCiSecrets } from '../../ci-secrets.js'
 import type { CiSecretEntry, CiSecretSetupAdvice, CiSecretTarget } from '../../ci-secrets.js'
+import { createCiSecretEntries, detectCiSecretTargets, getCiSecretTargetLabel, listExistingCiSecretKeys, uploadCiSecrets } from '../../ci-secrets.js'
+import { mapAndroidOnboardingError } from '../../error-categories.js'
 import { canUseFilePicker, openKeystorePicker } from '../../file-picker.js'
-import { findAndroidApplicationIds } from '../gradle-parser.js'
+import { trackBuilderOnboardingStep } from '../../telemetry.js'
 import { Divider, ErrorLine, FilteredTextInput, Header, SpinnerLine, SuccessLine } from '../../ui/components.js'
+import { findAndroidApplicationIds } from '../gradle-parser.js'
 import {
   ANDROIDPUBLISHER_API,
   createServiceAccountKey,
@@ -119,8 +122,126 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
   const [step, setStep] = useState<AndroidOnboardingStep>(
     startStep === 'welcome' ? 'welcome' : startStep,
   )
+
+  // Telemetry: resolve org id once + emit per-step events
+  const stepTimingRef = useRef<{ step: AndroidOnboardingStep | null, startedAt: number }>({
+    step: null,
+    startedAt: Date.now(),
+  })
+  // Buffer of telemetry events that occurred before `resolvedOrgId` landed.
+  // Drained in order when the org id becomes available. Without this buffer,
+  // any step transitions during the async org-id resolution (which involves
+  // two HTTP round-trips: createSupabaseClient + getOrganizationId) would be
+  // dropped from the funnel.
+  const pendingTelemetryRef = useRef<Array<{
+    step: AndroidOnboardingStep
+    durationMs?: number
+    errorCategory?: AndroidOnboardingErrorCategory
+  }>>([])
+  const [resolvedOrgId, setResolvedOrgId] = useState<string | null>(null)
+  const resolvedApiKeyRef = useRef<string | null>(apikey ?? null)
+  const orgIdResolvedRef = useRef(false)
+  // Captures the mapped error category at handleError time so the telemetry
+  // useEffect can pass it through without re-mapping a reconstructed Error
+  // (which would have lost the .phase / instanceof discriminators).
+  const errorCategoryRef = useRef<AndroidOnboardingErrorCategory | undefined>(undefined)
+
+  useEffect(() => {
+    if (resolvedApiKeyRef.current)
+      return
+    const saved = findSavedKeySilent()
+    if (saved)
+      resolvedApiKeyRef.current = saved
+  }, [])
+
+  useEffect(() => {
+    if (orgIdResolvedRef.current || !resolvedApiKeyRef.current)
+      return
+    orgIdResolvedRef.current = true
+
+    let cancelled = false
+    void (async () => {
+      const supabase = await createSupabaseClient(resolvedApiKeyRef.current!, undefined, undefined, true)
+        .catch(() => null)
+      if (!supabase || cancelled)
+        return
+      const orgId = await getOrganizationId(supabase, appId).catch(() => null)
+      if (orgId && !cancelled)
+        setResolvedOrgId(orgId)
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [appId])
+
   const [logLines, setLogLines] = useState<LogEntry[]>([])
   const [error, setError] = useState<string | null>(null)
+
+  // Emit telemetry on every step transition (including initial mount).
+  // Sequencing:
+  //   1. If `resolvedOrgId` just became available, drain the backlog first.
+  //   2. Skip same-step re-renders (orgId-lands triggers a re-fire — we don't
+  //      want to re-emit the current step, only drain the backlog).
+  //   3. Otherwise compute the new event, then either emit immediately (orgId
+  //      available) or queue it (orgId still loading).
+  useEffect(() => {
+    if (!resolvedApiKeyRef.current)
+      return
+
+    const previous = stepTimingRef.current
+    const isDuplicateStep = previous.step !== null && previous.step === step && step !== 'error'
+
+    // (1) Drain the backlog if org id is now available, even when the current
+    // step is a duplicate (e.g., this effect fired because resolvedOrgId moved
+    // from null to a real value, not because step changed).
+    if (resolvedOrgId && pendingTelemetryRef.current.length > 0) {
+      for (const queued of pendingTelemetryRef.current) {
+        void trackBuilderOnboardingStep({
+          apikey: resolvedApiKeyRef.current,
+          appId,
+          orgId: resolvedOrgId,
+          platform: 'android',
+          ...queued,
+        })
+      }
+      pendingTelemetryRef.current = []
+    }
+
+    // (2) Now safely skip the duplicate-step path.
+    if (isDuplicateStep)
+      return
+
+    const now = Date.now()
+    // Initial step (previous.step === null) and same-step error re-entries have
+    // no meaningful previous-step duration.
+    const durationMs = previous.step === null || previous.step === step
+      ? undefined
+      : now - previous.startedAt
+
+    const eventPayload = {
+      step,
+      durationMs,
+      errorCategory: step === 'error' ? errorCategoryRef.current : undefined,
+    }
+
+    stepTimingRef.current = { step, startedAt: now }
+
+    // (3) Either fire immediately or buffer.
+    if (resolvedOrgId) {
+      void trackBuilderOnboardingStep({
+        apikey: resolvedApiKeyRef.current,
+        appId,
+        orgId: resolvedOrgId,
+        platform: 'android',
+        ...eventPayload,
+      })
+    }
+    else {
+      pendingTelemetryRef.current.push(eventPayload)
+    }
+  }, [step, appId, resolvedOrgId, error])
+
   const [retryCount, setRetryCount] = useState(0)
   const [retryStep, setRetryStep] = useState<AndroidOnboardingStep | null>(null)
   const exitRequestedRef = useRef(false)
@@ -351,6 +472,10 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
 
   const handleError = useCallback(
     (err: unknown, failedStep: AndroidOnboardingStep) => {
+      // Capture the mapped category BEFORE we collapse err to a string.
+      // The telemetry useEffect will read this ref instead of re-mapping a
+      // reconstructed `new Error(message)` (which has no discriminators).
+      errorCategoryRef.current = mapAndroidOnboardingError(err)
       const message = err instanceof Error ? err.message : String(err)
       if (retryCount === 0) {
         setError(message)
@@ -2075,6 +2200,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
             onChange={(value) => {
               if (value === 'retry') {
                 setError(null)
+                errorCategoryRef.current = undefined
                 const target = retryStep
                 setRetryStep(null)
                 setStep(target)
