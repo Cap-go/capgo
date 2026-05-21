@@ -651,7 +651,7 @@ Options:
   --limit              Max rows to scan without --all. Default: 1000.
   --batch-size         Backward-compatible alias; candidate reads are always 1000.
   --workers            Parallel shared-cursor workers. Default: 8 for --all, 1 otherwise.
-  --concurrency        Backward-compatible no-op; each worker checks its full 1000-row batch at once.
+  --concurrency        Backward-compatible no-op; storage uses full-batch parallelism for maximum throughput.
   --storage-attempts   Storage metadata attempts per file. Default: 3.
   --db-attempts        DB read/update attempts. Default: 5.
   --start-id           Exclusive lower manifest.id bound for resume.
