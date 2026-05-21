@@ -135,3 +135,52 @@ export function getResumeStep(progress: OnboardingProgress | null): OnboardingSt
 
   return 'saving-credentials'
 }
+
+/**
+ * Pure routing decision used by the `import-scanning` useEffect to skip
+ * questions the user already answered on a previous attempt.
+ *
+ * The shipped flow always sent users to `import-distribution-mode` after
+ * scanning, and the distribution-mode picker always sent app_store users to
+ * `api-key-instructions`. That re-asked the .p8 file path on resume even
+ * though `keyId` / `issuerId` / `p8Path` were already saved in progress —
+ * exposed by users seeing "✔ API Key verified — Key: X" (hydrated log)
+ * alongside "How do you want to provide the .p8 file?" on the same screen.
+ *
+ * IMPORTANT — we intentionally do NOT short-circuit on
+ * `completedSteps.apiKeyVerified`. Going through `verifying-key` on every
+ * resume is a brief network round-trip that catches two failure modes a
+ * short-circuit would silently allow:
+ *   1. The user moved/deleted the saved .p8 between runs — `verifying-key`
+ *      surfaces this via NeedP8Error and routes back to the .p8 input.
+ *   2. The key was revoked on Apple's side — `verifying-key` gets a 401 and
+ *      the user gets a clear error instead of a late failure inside
+ *      `saving-credentials` (after the Keychain ACL prompt has already
+ *      fired for the .p12 export).
+ *
+ * Exported so the routing decision can be unit-tested without rendering Ink.
+ *
+ * Returns the step to land on after a successful Keychain scan.
+ */
+export function getImportEntryStep(progress: OnboardingProgress | null): OnboardingStep {
+  // No prior choice — ask distribution mode (existing behavior).
+  if (!progress?.importDistribution)
+    return 'import-distribution-mode'
+
+  if (progress.importDistribution === 'ad_hoc') {
+    // ad_hoc never needs the .p8 chain — go straight to identity selection.
+    return 'import-pick-identity'
+  }
+
+  // app_store: needs an ASC API key. Resume at the furthest partial input
+  // step (mirrors the create-new flow's resume logic). When all three inputs
+  // are saved we land on `verifying-key` — the brief Apple round-trip catches
+  // both stale local .p8 files and revoked Apple-side keys.
+  if (progress.issuerId && progress.keyId && progress.p8Path)
+    return 'verifying-key'
+  if (progress.keyId && progress.p8Path)
+    return 'input-issuer-id'
+  if (progress.p8Path)
+    return 'input-key-id'
+  return 'api-key-instructions'
+}
