@@ -2591,6 +2591,15 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
                     ? [
                         { label: `✏️   Edit Key ID (currently: ${keyIdRef.current || '—'})`, value: 'edit-key-id' },
                         { label: `✏️   Edit Issuer ID (currently: ${issuerIdRef.current || '—'})`, value: 'edit-issuer-id' },
+                        // "Change key file" covers the case where the wrong
+                        // .p8 was selected entirely (e.g. picked an old key
+                        // that's been revoked, or grabbed a file from the
+                        // wrong account). Routes back to api-key-instructions
+                        // so the user can re-open the file picker or type a
+                        // new path. The auto-detection in p8-method-select
+                        // will populate Key ID from the new filename;
+                        // Issuer ID stays the same since it's account-scoped.
+                        { label: `📄  Change .p8 key file (currently: ${p8PathRef.current ? p8PathRef.current.split('/').pop() : '—'})`, value: 'change-key-file' },
                       ]
                     : []),
                   { label: '↩️   Restart onboarding', value: 'restart' },
@@ -2609,6 +2618,13 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
                   else if (value === 'edit-issuer-id') {
                     setError(null)
                     setStep('input-issuer-id')
+                  }
+                  else if (value === 'change-key-file') {
+                    setError(null)
+                    // Reset the picker-opened guard so p8-method-select can
+                    // re-open the macOS file picker dialog from a fresh state.
+                    pickerOpenedRef.current = false
+                    setStep('api-key-instructions')
                   }
                   else if (value === 'restart') {
                     // Wipe persisted progress so the next run starts truly fresh.
