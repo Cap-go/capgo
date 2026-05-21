@@ -14,7 +14,11 @@ describe('cloudflare plugin CORS', () => {
 
     expect(response.status).toBe(204)
     expect(response.headers.get('access-control-allow-origin')).toBe('*')
-    expect(response.headers.get('access-control-allow-methods')).toContain('OPTIONS')
-    expect(response.headers.get('access-control-allow-headers')?.toLowerCase()).toContain('content-type')
+    const allowMethods = response.headers.get('access-control-allow-methods')?.toLowerCase()
+    const allowHeaders = response.headers.get('access-control-allow-headers')?.toLowerCase()
+    expect(allowMethods).toContain('options')
+    expect(allowMethods).toContain('post')
+    expect(allowHeaders).toContain('content-type')
+    expect(allowHeaders).toContain('authorization')
   })
 })
