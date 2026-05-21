@@ -213,11 +213,13 @@ const organizationColumns = computed<TableColumn[]>(() => [
 
       return h('div', { class: 'flex min-w-0 items-start gap-2' }, [
         attentionLabel
-          ? h('span', {
-              'class': 'mt-1.5 inline-flex h-2 w-2 shrink-0 rounded-full bg-amber-500 ring-4 ring-amber-500/10 dark:bg-amber-300 dark:ring-amber-300/10',
-              'title': attentionLabel,
-              'aria-label': attentionLabel,
-            })
+          ? h('span', { class: 'inline-flex shrink-0 items-start' }, [
+              h('span', {
+                'class': 'mt-1.5 inline-flex h-2 w-2 shrink-0 rounded-full bg-amber-500 ring-4 ring-amber-500/10 dark:bg-amber-300 dark:ring-amber-300/10',
+                'aria-hidden': 'true',
+              }),
+              h('span', { class: 'sr-only' }, attentionLabel),
+            ])
           : null,
         h('div', { class: 'min-w-0' }, [
           h('p', { class: 'truncate font-medium text-slate-900 dark:text-white' }, item.org_name),
