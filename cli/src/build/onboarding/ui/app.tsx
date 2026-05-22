@@ -5,13 +5,13 @@ import type { ApiKeyData, CertificateData, OnboardingProgress, OnboardingStep, P
 import { handleCustomMsg } from '../../qr.js'
 import { spawn } from 'node:child_process'
 import { Buffer } from 'node:buffer'
-import { existsSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { copyFile, readFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import process from 'node:process'
 import { Alert, ProgressBar, Select } from '@inkjs/ui'
-import { Box, Newline, Text, useApp, useInput, useStdout } from 'ink'
+import { Box, Newline, Text, useApp, useInput } from 'ink'
 import open from 'open'
 // src/build/onboarding/ui/app.tsx
 import React, { useCallback, useEffect, useRef, useState } from 'react'
@@ -26,7 +26,7 @@ import { canUseFilePicker, openFilePicker } from '../file-picker.js'
 import { exportP12FromKeychain, isHelperCached, isMacOS, listSigningIdentities, matchIdentitiesToProfiles, precompileSwiftHelper, scanProvisioningProfiles } from '../macos-signing.js'
 import { deleteProgress, getImportEntryStep, getResumeStep, loadProgress, saveProgress } from '../progress.js'
 import { getBuildOnboardingRecoveryAdvice } from '../recovery.js'
-import { createCiSecretEntries, detectCiSecretTargets, getCiSecretTargetLabel, listExistingCiSecretKeys, uploadCiSecrets } from '../ci-secrets.js'
+import { createCiSecretEntries, detectCiSecretTargets, getCiSecretRepoLabelAsync, getCiSecretTargetLabel, listExistingCiSecretKeysAsync, uploadCiSecretsAsync } from '../ci-secrets.js'
 import type { CiSecretEntry, CiSecretSetupAdvice, CiSecretTarget } from '../ci-secrets.js'
 import { defaultExportPath, exportCredentialsToEnv } from '../env-export.js'
 import { writeWorkflowFile, WORKFLOW_PATH } from '../workflow-writer.js'
@@ -38,7 +38,12 @@ import {
 
   STEP_PROGRESS,
 } from '../types.js'
-import { Divider, ErrorLine, FilteredTextInput, Header, SpinnerLine, SuccessLine } from './components.js'
+import { DiffSummary, Divider, ErrorLine, FilteredTextInput, FullscreenDiffViewer, Header, SecretsTable, SpinnerLine, SuccessLine } from './components.js'
+import { diffLines } from '../diff-utils.js'
+import type { DiffLine } from '../diff-utils.js'
+import { generateWorkflow, WORKFLOW_PATH as WORKFLOW_GEN_PATH } from '../workflow-generator.js'
+import { getWorkflowDiffTelemetry, trackBuildOnboardingWorkflowEvent } from '../analytics.js'
+import type { BuildOnboardingWorkflowDecision, BuildOnboardingWorkflowEvent, WorkflowDiffTelemetry } from '../analytics.js'
 
 const OUTPUT_LINE_SPLIT_RE = /\r?\n/
 const CARRIAGE_RETURN_RE = /\r/g
@@ -52,6 +57,7 @@ interface AppProps {
   iosDir: string
   /** Optional Capgo API key passed via -a/--apikey flag; takes precedence over saved key */
   apikey?: string
+  terminalRows?: number
 }
 
 async function runRunnerCommand(runner: string, args: string[]): Promise<{ success: boolean, output: string[] }> {
@@ -103,6 +109,7 @@ function normalizePackageManager(pm: string): PackageManager {
   return 'npm'
 }
 
+
 interface BuildScriptOption {
   label: string
   value: string
@@ -138,7 +145,7 @@ function buildScriptPickerOptions(scripts: Record<string, string>, recommended: 
   return options
 }
 
-const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey }) => {
+const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey, terminalRows = 24 }) => {
   const { exit } = useApp()
   const startStep = getResumeStep(initialProgress)
 
@@ -162,9 +169,6 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
   const [issuerId, setIssuerId] = useState(initialProgress?.completedSteps.apiKeyVerified?.issuerId || initialProgress?.issuerId || '')
 
   // Get terminal height for build output sizing
-  const { stdout } = useStdout()
-  const terminalRows = stdout?.rows ?? 24
-
   // Refs to avoid stale closures in useEffect async handlers
   const p8ContentRef = useRef(p8Content)
   const p8PathRef = useRef(p8Path)
@@ -198,6 +202,27 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
   const [ciSecretTarget, setCiSecretTarget] = useState<CiSecretTarget | null>(null)
   const [ciSecretSetupAdvice, setCiSecretSetupAdvice] = useState<CiSecretSetupAdvice[]>([])
   const [ciSecretExistingKeys, setCiSecretExistingKeys] = useState<string[]>([])
+  // Concrete `owner/repo` for GitHub (or group/project for GitLab). Resolved
+  // in checking-ci-secrets via `gh repo view`. Shown in confirm-secrets-push
+  // so the user knows EXACTLY which repo they're about to mutate — never let
+  // `gh secret set` run without an explicit "yes, push to <repo>" gate.
+  const [ciSecretRepoLabel, setCiSecretRepoLabel] = useState<string | null>(null)
+  // Sub-phase text rendered next to the spinner during `checking-ci-secrets`
+  // and `uploading-ci-secrets`. Updated as each gh command starts so the user
+  // sees actual progress instead of a single static "Checking…" line that
+  // freezes for several seconds while gh works.
+  const [ciSecretCheckPhase, setCiSecretCheckPhase] = useState<string>('Resolving GitHub repository…')
+  const [ciSecretUploadProgress, setCiSecretUploadProgress] = useState<{ current: number, total: number, key: string } | null>(null)
+  // Package manager chosen by the user at pick-package-manager. We DETECT via
+  // getPMAndCommand() but the user gets the final say — they may have multiple
+  // lockfiles, prefer a different runner, or be on an exotic setup.
+  const [selectedPackageManager, setSelectedPackageManager] = useState<PackageManager | null>(null)
+  // preview-workflow-file viewer state. The large diff is only shown in the
+  // bounded `view-workflow-diff` live Ink screen.
+  const [previewDiff, setPreviewDiff] = useState<DiffLine[]>([])
+  const [previewExistingPath, setPreviewExistingPath] = useState<string | null>(null)
+  const [previewIsNew, setPreviewIsNew] = useState(true)
+  const [previewTelemetry, setPreviewTelemetry] = useState<WorkflowDiffTelemetry | null>(null)
   const [ciSecretError, setCiSecretError] = useState<string | null>(null)
   const [ciSecretUploadSummary, setCiSecretUploadSummary] = useState<string | null>(null)
   // GitHub Actions workflow setup state. setupMode tracks the 3-way choice at
@@ -279,6 +304,26 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
   const buildRequestCommand = formatRunnerCommand(pm.runner, ['@capgo/cli@latest', 'build', 'request', appId, '--platform', 'ios'])
   const loginCommand = formatRunnerCommand(pm.runner, ['@capgo/cli@latest', 'login'])
 
+  const trackWorkflowEvent = (
+    event: BuildOnboardingWorkflowEvent,
+    options: { decision?: BuildOnboardingWorkflowDecision, diff?: DiffLine[], isNew?: boolean } = {},
+  ) => {
+    const telemetry = options.diff
+      ? getWorkflowDiffTelemetry(options.diff, options.isNew ?? previewIsNew)
+      : (previewTelemetry ?? getWorkflowDiffTelemetry(previewDiff, options.isNew ?? previewIsNew))
+
+    trackBuildOnboardingWorkflowEvent({
+      event,
+      appId,
+      platform: 'ios',
+      apikey,
+      packageManager: selectedPackageManager ?? normalizePackageManager(pm.pm),
+      buildScriptType: buildScriptChoice?.type,
+      decision: options.decision,
+      ...telemetry,
+    })
+  }
+
   const exitOnboarding = useCallback((message?: string) => {
     if (exitRequestedRef.current)
       return
@@ -297,6 +342,14 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
 
     if (key.ctrl && input === 'o' && (step === 'api-key-instructions' || step === 'input-issuer-id')) {
       open('https://appstoreconnect.apple.com/access/integrations/api')
+    }
+
+    // preview-workflow-file: Esc skips without writing. Arrows/Enter are
+    // handled by the Ink Select below the diff.
+    if (step === 'preview-workflow-file' && key.escape) {
+      trackWorkflowEvent('workflow-preview-action', { decision: 'escape' })
+      setPreviewDiff([])
+      setStep('build-complete')
     }
   })
 
@@ -1118,10 +1171,31 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
         try {
           if (!ciSecretTarget)
             throw new Error('No git hosting target selected.')
-          const existing = listExistingCiSecretKeys(ciSecretTarget, ciSecretEntries.map(entry => entry.key))
+          // Phase 1: Resolve the target repo. Uses async runner so the
+          // spinner keeps animating during the gh shell-out.
+          setCiSecretCheckPhase('Resolving GitHub repository…')
+          let repoLabel: string | null = null
+          if (ciSecretTarget.provider === 'github') {
+            repoLabel = await getCiSecretRepoLabelAsync(ciSecretTarget)
+            if (cancelled)
+              return
+            setCiSecretRepoLabel(repoLabel)
+          }
+          // Phase 2: List existing secrets to figure out what NEW vs REPLACE
+          // means. Uses a label that includes the resolved repo when we have it.
+          setCiSecretCheckPhase(repoLabel
+            ? `Checking existing env vars in ${repoLabel}…`
+            : `Checking existing env vars in ${getCiSecretTargetLabel(ciSecretTarget)}…`)
+          const existing = await listExistingCiSecretKeysAsync(ciSecretTarget, ciSecretEntries.map(entry => entry.key))
           if (cancelled)
             return
           setCiSecretExistingKeys(existing)
+          // GitHub: ALWAYS gate on confirm-secrets-push (target repo + full
+          // list). GitLab: legacy confirm-on-collision behaviour for v1.
+          if (ciSecretTarget.provider === 'github') {
+            setStep('confirm-secrets-push')
+            return
+          }
           setStep(existing.length > 0 ? 'confirm-ci-secret-overwrite' : 'uploading-ci-secrets')
         }
         catch (err) {
@@ -1138,9 +1212,19 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
         try {
           if (!ciSecretTarget)
             throw new Error('No git hosting target selected.')
-          uploadCiSecrets(ciSecretTarget, ciSecretEntries, ciSecretExistingKeys)
+          await uploadCiSecretsAsync(
+            ciSecretTarget,
+            ciSecretEntries,
+            ciSecretExistingKeys,
+            undefined, // default async runner
+            (current, total, key) => {
+              if (!cancelled)
+                setCiSecretUploadProgress({ current, total, key })
+            },
+          )
           if (cancelled)
             return
+          setCiSecretUploadProgress(null)
           const summary = `Uploaded ${ciSecretEntries.length} env var${ciSecretEntries.length === 1 ? '' : 's'} to ${getCiSecretTargetLabel(ciSecretTarget)}`
           setCiSecretUploadSummary(summary)
           addLog(`✔ ${summary}`)
@@ -1165,7 +1249,9 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
               // Detection is best-effort; pick-build-script falls back to the
               // empty scripts list + "type a custom command" / "skip" options.
             }
-            setStep('pick-build-script')
+            // Land at pick-package-manager first — we DETECT via getPMAndCommand
+            // but the user explicitly confirms before we generate a workflow.
+            setStep('pick-package-manager')
             return
           }
           setStep('build-complete')
@@ -1179,34 +1265,87 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
       })()
     }
 
+    if (step === 'preview-workflow-file') {
+      ;(() => {
+        try {
+          if (!buildScriptChoice)
+            throw new Error('Internal error: no build script choice recorded.')
+          // Generate proposed content for the diff. Pure function — calling
+          // it twice (once here, once in writing-workflow-file) is fine.
+          const proposed = generateWorkflow({
+            appId,
+            defaultPlatform: 'ios',
+            packageManager: selectedPackageManager ?? normalizePackageManager(pm.pm),
+            buildScript: buildScriptChoice,
+            secretKeys: ciSecretEntries.map(entry => entry.key),
+          })
+          const absolutePath = resolve(process.cwd(), WORKFLOW_GEN_PATH)
+          let existing = ''
+          let isNew = true
+          if (existsSync(absolutePath)) {
+            try {
+              existing = readFileSync(absolutePath, 'utf8')
+              isNew = false
+            }
+            catch {
+              // Treat unreadable file as "new" — the writing step will surface
+              // any real failure to the user.
+            }
+          }
+          if (cancelled)
+            return
+          const diff = diffLines(existing, proposed.content)
+          const telemetry = getWorkflowDiffTelemetry(diff, isNew)
+          setWorkflowProposedContent(proposed.content)
+          setPreviewExistingPath(absolutePath)
+          setPreviewIsNew(isNew)
+          setPreviewTelemetry(telemetry)
+          setPreviewDiff(diff)
+          trackWorkflowEvent('workflow-preview-prepared', { diff, isNew })
+        }
+        catch (err) {
+          if (!cancelled) {
+            addLog(`⚠ Failed to build workflow preview: ${err instanceof Error ? err.message : String(err)}`, 'yellow')
+            setStep('build-complete')
+          }
+        }
+      })()
+    }
+
     if (step === 'writing-workflow-file') {
       ;(() => {
         try {
           if (!buildScriptChoice)
             throw new Error('Internal error: no build script choice recorded.')
-          const result = writeWorkflowFile({
-            appId,
-            defaultPlatform: 'ios',
-            packageManager: normalizePackageManager(pm.pm),
-            buildScript: buildScriptChoice,
-            secretKeys: ciSecretEntries.map(entry => entry.key),
-          })
+          const result = writeWorkflowFile(
+            {
+              appId,
+              defaultPlatform: 'ios',
+              packageManager: selectedPackageManager ?? normalizePackageManager(pm.pm),
+              buildScript: buildScriptChoice,
+              secretKeys: ciSecretEntries.map(entry => entry.key),
+            },
+            { overwrite: true },
+          )
           if (cancelled)
             return
-          if (result.kind === 'exists') {
-            setWorkflowExistingContent(result.existingContent)
-            setWorkflowProposedContent(result.newContent)
-            setStep('confirm-workflow-overwrite')
-            return
+          if (result.kind === 'written') {
+            setWorkflowWrittenPath(result.absolutePath)
+            addLog(`✔ ${previewIsNew ? 'Wrote' : 'Overwrote'} ${WORKFLOW_PATH}`)
+            trackWorkflowEvent('workflow-file-written', { decision: 'write' })
           }
-          setWorkflowWrittenPath(result.absolutePath)
-          addLog(`✔ Wrote ${WORKFLOW_PATH}`)
-          setStep('build-complete')
+          setTimeout(() => {
+            if (!cancelled)
+              setStep('build-complete')
+          }, 150)
         }
         catch (err) {
           if (!cancelled) {
             addLog(`⚠ Failed to write workflow file: ${err instanceof Error ? err.message : String(err)}`, 'yellow')
-            setStep('build-complete')
+            setTimeout(() => {
+              if (!cancelled)
+                setStep('build-complete')
+            }, 150)
           }
         }
       })()
@@ -1403,13 +1542,45 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
 
   const progress = STEP_PROGRESS[step] ?? 0
   const phaseLabel = getPhaseLabel(step)
-  const showProgress = step !== 'welcome' && step !== 'platform-select' && step !== 'adding-platform' && step !== 'no-platform' && step !== 'error' && step !== 'build-complete' && step !== 'requesting-build'
-  const showHeader = step !== 'requesting-build'
-  const showLog = step !== 'requesting-build' && step !== 'build-complete'
+  // Tall fullscreen-style steps. Their content overflows the wizard chrome on
+  // smaller terminals and Ink can leak the previous frame above the new one
+  // on transition. Hide chrome so each tall step renders cleanly.
+  // The whole post-build GHA flow runs WITHOUT Progress + Logs so transitions
+  // don't flash chrome in and out and leftover content from a previous tall
+  // step doesn't bleed into the next short step's live area. The Header
+  // ("🚀 Capgo Cloud Build · Onboarding") stays visible for branding /
+  // orientation — only `requesting-build` (which streams live build output
+  // and needs the full terminal) hides the Header.
+  const tallStep = step === 'requesting-build'
+    || step === 'detecting-ci-secrets'
+    || step === 'checking-ci-secrets'
+    || step === 'ask-github-actions-setup'
+    || step === 'confirm-secrets-push'
+    || step === 'uploading-ci-secrets'
+    || step === 'ci-secrets-target-select'
+    || step === 'ci-secrets-setup'
+    || step === 'ask-ci-secrets'
+    || step === 'pick-package-manager'
+    || step === 'pick-build-script'
+    || step === 'pick-build-script-custom'
+    || step === 'preview-workflow-file'
+    || step === 'view-workflow-diff'
+    || step === 'writing-workflow-file'
+    || step === 'ask-export-env'
+    || step === 'exporting-env'
+    || step === 'confirm-env-export-overwrite'
+    || step === 'overwrite-and-export-env'
+    || step === 'overwrite-and-write-workflow'
+    || step === 'ci-secrets-failed'
+    || step === 'confirm-ci-secret-overwrite'
+  const showProgress = step !== 'welcome' && step !== 'platform-select' && step !== 'adding-platform' && step !== 'no-platform' && step !== 'error' && step !== 'build-complete' && !tallStep
+  // Header stays on every tall step except `requesting-build` (which streams
+  // multi-line build output and would otherwise fight for vertical space).
+  const showHeader = step !== 'requesting-build' && step !== 'view-workflow-diff'
+  const showLog = step !== 'build-complete' && !tallStep
   const recoveryAdvice = error
     ? getBuildOnboardingRecoveryAdvice(error, retryStep, pm.runner, appId)
     : null
-
   return (
     <Box flexDirection="column" padding={1}>
       {showHeader && <Header />}
@@ -2460,9 +2631,9 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
           <Newline />
           <Select
             options={[
-              { label: 'Yes — set the secrets AND create a workflow file', value: 'with-workflow' },
-              { label: 'Yes — set ONLY the secrets', value: 'secrets-only' },
-              { label: 'No', value: 'no' },
+              { label: '🚀  Yes — set the secrets AND create a workflow file', value: 'with-workflow' },
+              { label: '🔒  Yes — set ONLY the secrets', value: 'secrets-only' },
+              { label: '❌  No', value: 'no' },
             ]}
             onChange={(value) => {
               if (value === 'no') {
@@ -2494,8 +2665,8 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
           <Newline />
           <Select
             options={[
-              { label: `Yes — write .env.capgo.${appId}.ios`, value: 'yes' },
-              { label: 'No, exit without exporting', value: 'no' },
+              { label: `📝  Yes — write .env.capgo.${appId}.ios`, value: 'yes' },
+              { label: '❌  No, exit without exporting', value: 'no' },
             ]}
             onChange={(value) => {
               if (value === 'yes') {
@@ -2526,8 +2697,8 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
           <Newline />
           <Select
             options={[
-              { label: 'Replace it', value: 'replace' },
-              { label: 'Skip — keep the existing file', value: 'skip' },
+              { label: '✏️   Replace it', value: 'replace' },
+              { label: '🛑  Skip — keep the existing file', value: 'skip' },
             ]}
             onChange={(value) => {
               setStep(value === 'replace' ? 'overwrite-and-export-env' : 'build-complete')
@@ -2535,6 +2706,36 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
           />
         </Box>
       )}
+
+      {step === 'pick-package-manager' && (() => {
+        const detected = normalizePackageManager(pm.pm)
+        const detectionNote = pm.pm === 'unknown'
+          ? '(no recognizable lockfile in this project — pick whichever you actually use)'
+          : `(detected from your lockfile — ${pm.pm})`
+        return (
+          <Box flexDirection="column" marginTop={1}>
+            <Text bold>Which package manager does this project use?</Text>
+            <Text dimColor>
+              Drives the install + build steps in the generated workflow. We
+              {' '}
+              {detectionNote}
+            </Text>
+            <Newline />
+            <Select
+              options={[
+                { label: `📦  bun${detected === 'bun' ? '  (recommended — matches your lockfile)' : ''}`, value: 'bun' },
+                { label: `📦  npm${detected === 'npm' ? '  (recommended — matches your lockfile)' : ''}`, value: 'npm' },
+                { label: `📦  pnpm${detected === 'pnpm' ? '  (recommended — matches your lockfile)' : ''}`, value: 'pnpm' },
+                { label: `📦  yarn${detected === 'yarn' ? '  (recommended — matches your lockfile)' : ''}`, value: 'yarn' },
+              ]}
+              onChange={(value) => {
+                setSelectedPackageManager(value as PackageManager)
+                setStep('pick-build-script')
+              }}
+            />
+          </Box>
+        )
+      })()}
 
       {step === 'pick-build-script' && (
         <Box flexDirection="column" marginTop={1}>
@@ -2552,7 +2753,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
             onChange={(value) => {
               if (value === '__skip__') {
                 setBuildScriptChoice({ type: 'skip' })
-                setStep('writing-workflow-file')
+                setStep('preview-workflow-file')
                 return
               }
               if (value === '__custom__') {
@@ -2560,7 +2761,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
                 return
               }
               setBuildScriptChoice({ type: 'npm-script', name: value })
-              setStep('writing-workflow-file')
+              setStep('preview-workflow-file')
             }}
           />
         </Box>
@@ -2591,11 +2792,73 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
                   return
                 setBuildScriptChoice({ type: 'custom', command: cleaned })
                 setPendingCustomCommand(cleaned)
-                setStep('writing-workflow-file')
+                setStep('preview-workflow-file')
               }}
             />
           </Box>
         </Box>
+      )}
+
+      {step === 'preview-workflow-file' && previewDiff.length > 0 && (() => {
+        const allEqual = previewDiff.every(l => l.kind === 'eq')
+        const writeLabel = allEqual
+          ? '✏️   Write file anyway (re-writes identical content)'
+          : (previewIsNew ? '✏️   Write file' : '✏️   Replace existing file')
+        const skipLabel = '❌  Do not write file'
+        const title = previewIsNew
+          ? `🆕  Proposed new file — ${previewExistingPath ?? WORKFLOW_PATH}`
+          : `✏️  Proposed changes — ${previewExistingPath ?? WORKFLOW_PATH}`
+        const subtitle = previewIsNew
+          ? 'Nothing exists on disk yet. Every line below is what would be written.'
+          : 'Proposed diff vs the file on disk. Lines marked - would be removed, lines marked + would be added.'
+        return (
+          <Box flexDirection="column" marginTop={1}>
+            <DiffSummary title={title} subtitle={subtitle} lines={previewDiff} />
+            <Box marginTop={1} flexDirection="column">
+              <Text bold>What should we do with {WORKFLOW_PATH}?</Text>
+              <Select
+                options={[
+                  { label: writeLabel, value: 'write' },
+                  { label: '👀  Show proposed file diff', value: 'view' },
+                  { label: skipLabel, value: 'cancel' },
+                ]}
+                onChange={(value) => {
+                  if (value === 'view') {
+                    trackWorkflowEvent('workflow-preview-action', { decision: 'view' })
+                    trackWorkflowEvent('workflow-diff-opened', { decision: 'view' })
+                    setStep('view-workflow-diff')
+                    return
+                  }
+                  trackWorkflowEvent('workflow-preview-action', { decision: value === 'write' ? 'write' : 'cancel' })
+                  setPreviewDiff([])
+                  setStep(value === 'write' ? 'writing-workflow-file' : 'build-complete')
+                }}
+              />
+            </Box>
+          </Box>
+        )
+      })()}
+      {step === 'preview-workflow-file' && previewDiff.length === 0 && (
+        <Box flexDirection="column" marginTop={1}>
+          <SpinnerLine text={`Preparing diff for ${WORKFLOW_PATH}…`} />
+        </Box>
+      )}
+
+      {step === 'view-workflow-diff' && previewDiff.length > 0 && (
+        <FullscreenDiffViewer
+          title={previewIsNew
+            ? `🆕  Proposed new file — ${previewExistingPath ?? WORKFLOW_PATH}`
+            : `✏️  Proposed changes — ${previewExistingPath ?? WORKFLOW_PATH}`}
+          subtitle={previewIsNew
+            ? 'Nothing exists on disk yet. Every line below is what would be written.'
+            : 'Proposed diff vs the file on disk. Lines marked - would be removed, lines marked + would be added.'}
+          lines={previewDiff}
+          terminalRows={terminalRows}
+          onExit={() => {
+            trackWorkflowEvent('workflow-diff-closed', { decision: 'close' })
+            setStep('preview-workflow-file')
+          }}
+        />
       )}
 
       {step === 'writing-workflow-file' && (
@@ -2636,8 +2899,8 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
           <Newline />
           <Select
             options={[
-              { label: 'Replace it', value: 'replace' },
-              { label: 'Skip — keep my existing workflow', value: 'skip' },
+              { label: '✏️   Replace it', value: 'replace' },
+              { label: '🛑  Skip — keep my existing workflow', value: 'skip' },
             ]}
             onChange={(value) => {
               setStep(value === 'replace' ? 'overwrite-and-write-workflow' : 'build-complete')
@@ -2648,8 +2911,69 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
 
       {step === 'checking-ci-secrets' && (
         <Box flexDirection="column" marginTop={1}>
-          <SpinnerLine text={`Checking existing env vars in ${getCiSecretTargetLabel(ciSecretTarget)}...`} />
+          <SpinnerLine text={ciSecretCheckPhase} />
         </Box>
+      )}
+
+      {step === 'confirm-secrets-push' && (
+        (() => {
+          const existingSet = new Set(ciSecretExistingKeys)
+          const newCount = ciSecretEntries.filter(entry => !existingSet.has(entry.key)).length
+          const replaceCount = ciSecretEntries.length - newCount
+          const repoLine = ciSecretRepoLabel
+            ? ciSecretRepoLabel
+            : '(could not resolve repository — gh repo view failed)'
+          return (
+            <Box flexDirection="column" marginTop={1}>
+              <Text bold color="yellow">⚠  Confirm before pushing secrets</Text>
+              <Newline />
+              <Text>
+                Repository:
+                {' '}
+                <Text bold color="cyan">{repoLine}</Text>
+              </Text>
+              <Text dimColor>(resolved via `gh repo view` from this directory)</Text>
+              <Newline />
+              <Text bold>
+                {`Will push ${ciSecretEntries.length} env var${ciSecretEntries.length === 1 ? '' : 's'}`}
+                {replaceCount > 0 ? ` — ${newCount} new, ${replaceCount} REPLACING existing:` : ' — all new:'}
+              </Text>
+              <Box marginTop={1}>
+                <SecretsTable
+                  rows={ciSecretEntries.map(entry => ({
+                    name: entry.key,
+                    status: existingSet.has(entry.key) ? 'REPLACE' : 'NEW',
+                  }))}
+                />
+              </Box>
+              {replaceCount > 0 && (
+                <Box marginTop={1}>
+                  <Text dimColor color="yellow">⚠  `gh secret set` overwrites silently — replaced values cannot be recovered.</Text>
+                </Box>
+              )}
+            </Box>
+          )
+        })()
+      )}
+      {step === 'confirm-secrets-push' && (
+        <>
+          <Box marginTop={1}>
+            <Select
+              options={[
+                {
+                  label: ciSecretRepoLabel
+                    ? `✅  Yes, push to ${ciSecretRepoLabel}`
+                    : `✅  Yes, push (repo unresolved — uses gh's current context)`,
+                  value: 'confirm',
+                },
+                { label: '❌  Cancel — don\'t push anything', value: 'cancel' },
+              ]}
+              onChange={(value) => {
+                setStep(value === 'confirm' ? 'uploading-ci-secrets' : 'build-complete')
+              }}
+            />
+          </Box>
+        </>
       )}
 
       {step === 'confirm-ci-secret-overwrite' && (
@@ -2675,7 +2999,11 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
 
       {step === 'uploading-ci-secrets' && (
         <Box flexDirection="column" marginTop={1}>
-          <SpinnerLine text={`Uploading env vars to ${getCiSecretTargetLabel(ciSecretTarget)}...`} />
+          <SpinnerLine
+            text={ciSecretUploadProgress
+              ? `Pushing ${ciSecretUploadProgress.current} of ${ciSecretUploadProgress.total}: ${ciSecretUploadProgress.key}…`
+              : `Uploading env vars to ${ciSecretRepoLabel ?? getCiSecretTargetLabel(ciSecretTarget)}…`}
+          />
         </Box>
       )}
 

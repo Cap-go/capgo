@@ -3,6 +3,7 @@
 import {
   createCiSecretEntries,
   detectCiSecretTargets,
+  getCiSecretRepoLabel,
   listExistingCiSecretKeys,
   uploadCiSecrets,
 } from '../src/build/onboarding/ci-secrets.ts'
@@ -241,6 +242,47 @@ await test('uploads GitLab variables using set/update and masks only secret keys
       input: 'release',
     },
   ])
+})
+
+const GITHUB_TARGET = { provider: 'github', label: 'GitHub Actions repository secrets', cli: 'gh' }
+const GITLAB_TARGET = { provider: 'gitlab', label: 'GitLab CI/CD variables', cli: 'glab' }
+
+await test('getCiSecretRepoLabel returns the gh-resolved nameWithOwner for GitHub', () => {
+  const runner = createRunner({
+    'gh repo view --json nameWithOwner -q .nameWithOwner': { status: 0, stdout: 'Cap-go/capgo\n', stderr: '' },
+  })
+  assertEquals(getCiSecretRepoLabel(GITHUB_TARGET, runner), 'Cap-go/capgo')
+})
+
+await test('getCiSecretRepoLabel returns null when gh repo view fails', () => {
+  // No matching handler → createRunner returns status: 1 by default
+  const runner = createRunner({})
+  assertEquals(getCiSecretRepoLabel(GITHUB_TARGET, runner), null)
+})
+
+await test('getCiSecretRepoLabel trims trailing whitespace from gh output', () => {
+  const runner = createRunner({
+    'gh repo view --json nameWithOwner -q .nameWithOwner': { status: 0, stdout: '   owner/repo   \n', stderr: '' },
+  })
+  assertEquals(getCiSecretRepoLabel(GITHUB_TARGET, runner), 'owner/repo')
+})
+
+await test('getCiSecretRepoLabel parses path_with_namespace from glab JSON output', () => {
+  const runner = createRunner({
+    'glab repo view -F json': {
+      status: 0,
+      stdout: JSON.stringify({ path_with_namespace: 'group/sub/project', name: 'project' }),
+      stderr: '',
+    },
+  })
+  assertEquals(getCiSecretRepoLabel(GITLAB_TARGET, runner), 'group/sub/project')
+})
+
+await test('getCiSecretRepoLabel returns null on glab JSON parse failure', () => {
+  const runner = createRunner({
+    'glab repo view -F json': { status: 0, stdout: 'not-valid-json', stderr: '' },
+  })
+  assertEquals(getCiSecretRepoLabel(GITLAB_TARGET, runner), null)
 })
 
 if (testsFailed > 0) {

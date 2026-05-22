@@ -48,12 +48,16 @@ export type AndroidOnboardingStep
     | 'ci-secrets-failed'
   // GitHub Actions workflow + .env export sub-flow (post-secrets-upload)
     | 'ask-github-actions-setup'
+    | 'confirm-secrets-push'
     | 'ask-export-env'
     | 'exporting-env'
     | 'confirm-env-export-overwrite'
     | 'overwrite-and-export-env'
+    | 'pick-package-manager'
     | 'pick-build-script'
     | 'pick-build-script-custom'
+    | 'preview-workflow-file'
+    | 'view-workflow-diff'
     | 'writing-workflow-file'
     | 'confirm-workflow-overwrite'
     | 'overwrite-and-write-workflow'
@@ -188,13 +192,17 @@ export const ANDROID_STEP_PROGRESS: Record<AndroidOnboardingStep, number> = {
   'ci-secrets-failed': 88,
   // GitHub Actions + .env export branch — post-build, ~96
   'ask-github-actions-setup': 86,
+  'confirm-secrets-push': 87,
   'ask-export-env': 96,
   'exporting-env': 96,
   'confirm-env-export-overwrite': 96,
   'overwrite-and-export-env': 96,
+  'pick-package-manager': 95,
   'pick-build-script': 96,
   'pick-build-script-custom': 96,
-  'writing-workflow-file': 97,
+  'preview-workflow-file': 97,
+  'view-workflow-diff': 97,
+  'writing-workflow-file': 98,
   'confirm-workflow-overwrite': 97,
   'overwrite-and-write-workflow': 97,
   'ask-build': 90,
@@ -243,6 +251,7 @@ export function getAndroidPhaseLabel(step: AndroidOnboardingStep): string {
     case 'ci-secrets-target-select':
     case 'ask-ci-secrets':
     case 'ask-github-actions-setup':
+    case 'confirm-secrets-push':
     case 'checking-ci-secrets':
     case 'confirm-ci-secret-overwrite':
     case 'uploading-ci-secrets':
@@ -251,8 +260,11 @@ export function getAndroidPhaseLabel(step: AndroidOnboardingStep): string {
     case 'exporting-env':
     case 'confirm-env-export-overwrite':
     case 'overwrite-and-export-env':
+    case 'pick-package-manager':
     case 'pick-build-script':
     case 'pick-build-script-custom':
+    case 'preview-workflow-file':
+    case 'view-workflow-diff':
     case 'writing-workflow-file':
     case 'confirm-workflow-overwrite':
     case 'overwrite-and-write-workflow':
