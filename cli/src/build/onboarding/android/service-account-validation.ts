@@ -22,6 +22,11 @@ const ANDROIDPUBLISHER_SCOPE = 'https://www.googleapis.com/auth/androidpublisher
 const ANDROIDPUBLISHER_BASE = 'https://androidpublisher.googleapis.com/androidpublisher/v3'
 const JWT_LIFETIME_SECONDS = 3600
 const DEFAULT_FETCH_TIMEOUT_MS = 30_000
+const ALLOWED_GOOGLE_TOKEN_URIS = new Set([
+  'https://oauth2.googleapis.com/token',
+  'https://accounts.google.com/o/oauth2/token',
+  'https://www.googleapis.com/oauth2/v4/token',
+])
 
 export interface ServiceAccountKey {
   type: 'service_account'
@@ -80,6 +85,8 @@ export function parseServiceAccountKey(jsonBytes: Buffer): ServiceAccountKey {
     if (typeof value !== 'string' || value.length === 0)
       throw new Error(`Service account JSON is missing required field "${field}".`)
   }
+  if (!ALLOWED_GOOGLE_TOKEN_URIS.has(obj.token_uri as string))
+    throw new Error('Service account JSON has an unsupported token_uri. Expected a Google OAuth token endpoint.')
 
   return {
     type: 'service_account',
