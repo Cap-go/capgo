@@ -253,7 +253,7 @@ export const FullscreenDiffViewer: FC<{
       <Text dimColor>
         {`Showing ${firstVisibleLine}-${lastVisibleLine} of ${total} lines. Use ↑/↓ or k/j to scroll.`}
       </Text>
-      <Text color="yellow" bold>Click Escape to exit diff viewer</Text>
+      <Text color="yellow" bold>Press Escape to exit diff viewer</Text>
     </Box>
   )
 }

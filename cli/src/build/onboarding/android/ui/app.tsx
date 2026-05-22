@@ -465,8 +465,6 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
   const [availableScripts, setAvailableScripts] = useState<Record<string, string>>({})
   const [recommendedScript, setRecommendedScript] = useState<string | null>(null)
   const [buildScriptChoice, setBuildScriptChoice] = useState<BuildScriptChoice | null>(null)
-  const [workflowExistingContent, setWorkflowExistingContent] = useState<string | null>(null)
-  const [workflowProposedContent, setWorkflowProposedContent] = useState<string | null>(null)
   const [workflowWrittenPath, setWorkflowWrittenPath] = useState<string | null>(null)
   const [envExportPath, setEnvExportPath] = useState<string | null>(null)
   const [envExportError, setEnvExportError] = useState<string | null>(null)
@@ -1561,7 +1559,6 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
             return
           const diff = diffLines(existing, proposed.content)
           const telemetry = getWorkflowDiffTelemetry(diff, isNew)
-          setWorkflowProposedContent(proposed.content)
           setPreviewExistingPath(absolutePath)
           setPreviewIsNew(isNew)
           setPreviewTelemetry(telemetry)
@@ -1611,38 +1608,6 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
               if (!cancelled)
                 setStep('build-complete')
             }, 150)
-          }
-        }
-      })()
-    }
-
-    if (step === 'overwrite-and-write-workflow') {
-      ;(() => {
-        try {
-          if (!buildScriptChoice)
-            throw new Error('Internal error: no build script choice recorded.')
-          const result = writeWorkflowFile(
-            {
-              appId,
-              defaultPlatform: 'android',
-              packageManager: normalizePackageManager(pm.pm),
-              buildScript: buildScriptChoice,
-              secretKeys: ciSecretEntries.map(entry => entry.key),
-            },
-            { overwrite: true },
-          )
-          if (cancelled)
-            return
-          if (result.kind === 'written') {
-            setWorkflowWrittenPath(result.absolutePath)
-            addLog(`✔ Overwrote ${WORKFLOW_PATH}`)
-          }
-          setStep('build-complete')
-        }
-        catch (err) {
-          if (!cancelled) {
-            addLog(`⚠ Failed to overwrite workflow file: ${err instanceof Error ? err.message : String(err)}`, 'yellow')
-            setStep('build-complete')
           }
         }
       })()
@@ -1839,7 +1804,6 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
     || step === 'exporting-env'
     || step === 'confirm-env-export-overwrite'
     || step === 'overwrite-and-export-env'
-    || step === 'overwrite-and-write-workflow'
     || step === 'ci-secrets-failed'
     || step === 'confirm-ci-secret-overwrite'
   const showProgress = step !== 'welcome' && step !== 'error' && step !== 'build-complete' && !tallStep
@@ -3135,48 +3099,6 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
       {step === 'writing-workflow-file' && (
         <Box flexDirection="column" marginTop={1}>
           <SpinnerLine text={`Writing ${WORKFLOW_PATH}…`} />
-        </Box>
-      )}
-
-      {step === 'overwrite-and-write-workflow' && (
-        <Box flexDirection="column" marginTop={1}>
-          <SpinnerLine text={`Overwriting ${WORKFLOW_PATH}…`} />
-        </Box>
-      )}
-
-      {step === 'confirm-workflow-overwrite' && (
-        <Box flexDirection="column" marginTop={1}>
-          <Text bold color="yellow">
-            {WORKFLOW_PATH}
-            {' '}
-            already exists.
-          </Text>
-          <Text dimColor>Replace it with the new Capgo workflow, or keep your version?</Text>
-          {workflowExistingContent && workflowProposedContent && (
-            <Box flexDirection="column" marginTop={1} marginLeft={2}>
-              <Text dimColor>
-                Existing:
-                {' '}
-                {workflowExistingContent.split('\n').length}
-                {' '}
-                lines · New:
-                {' '}
-                {workflowProposedContent.split('\n').length}
-                {' '}
-                lines
-              </Text>
-            </Box>
-          )}
-          <Newline />
-          <Select
-            options={[
-              { label: '✏️   Replace it', value: 'replace' },
-              { label: '🛑  Skip — keep my existing workflow', value: 'skip' },
-            ]}
-            onChange={(value) => {
-              setStep(value === 'replace' ? 'overwrite-and-write-workflow' : 'build-complete')
-            }}
-          />
         </Box>
       )}
 

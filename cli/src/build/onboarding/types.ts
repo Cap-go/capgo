@@ -56,8 +56,6 @@ export type OnboardingStep
     | 'preview-workflow-file'
     | 'view-workflow-diff'
     | 'writing-workflow-file'
-    | 'confirm-workflow-overwrite'
-    | 'overwrite-and-write-workflow'
     | 'ask-build'
     | 'requesting-build'
     | 'build-complete'
@@ -190,8 +188,6 @@ export const STEP_PROGRESS: Record<OnboardingStep, number> = {
   'preview-workflow-file': 97,
   'view-workflow-diff': 97,
   'writing-workflow-file': 98,
-  'confirm-workflow-overwrite': 97,
-  'overwrite-and-write-workflow': 97,
   'ask-build': 85,
   'requesting-build': 90,
   'build-complete': 100,
@@ -263,8 +259,6 @@ export function getPhaseLabel(step: OnboardingStep): string {
     case 'preview-workflow-file':
     case 'view-workflow-diff':
     case 'writing-workflow-file':
-    case 'confirm-workflow-overwrite':
-    case 'overwrite-and-write-workflow':
     case 'ask-build':
     case 'requesting-build':
       return 'Step 4 of 4 · Save & Build'

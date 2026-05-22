@@ -66,8 +66,6 @@ export type AndroidOnboardingStep
     | 'preview-workflow-file'
     | 'view-workflow-diff'
     | 'writing-workflow-file'
-    | 'confirm-workflow-overwrite'
-    | 'overwrite-and-write-workflow'
     | 'ask-build'
     | 'requesting-build'
     | 'build-complete'
@@ -254,8 +252,6 @@ export const ANDROID_STEP_PROGRESS: Record<AndroidOnboardingStep, number> = {
   'preview-workflow-file': 97,
   'view-workflow-diff': 97,
   'writing-workflow-file': 98,
-  'confirm-workflow-overwrite': 97,
-  'overwrite-and-write-workflow': 97,
   'ask-build': 90,
   'requesting-build': 95,
   'build-complete': 100,
@@ -324,8 +320,6 @@ export function getAndroidPhaseLabel(step: AndroidOnboardingStep): string {
     case 'preview-workflow-file':
     case 'view-workflow-diff':
     case 'writing-workflow-file':
-    case 'confirm-workflow-overwrite':
-    case 'overwrite-and-write-workflow':
     case 'ask-build':
     case 'requesting-build':
       return 'Step 4 of 4 · Save & Build'
