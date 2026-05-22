@@ -115,6 +115,16 @@ function keystoreResumeStep(progress: AndroidOnboardingProgress): AndroidOnboard
   return 'keystore-method-select'
 }
 
+function hasAnyOAuthProgress(progress: AndroidOnboardingProgress): boolean {
+  return !!(
+    progress.completedSteps.googleSignInComplete
+    || progress.completedSteps.playAccountChosen
+    || progress.completedSteps.gcpProjectChosen
+    || progress.completedSteps.androidPackageChosen
+    || progress._oauthRefreshToken
+  )
+}
+
 /**
  * Determine the first incomplete step for the Android flow.
  *
@@ -167,9 +177,17 @@ export function getAndroidResumeStep(progress: AndroidOnboardingProgress | null)
 
   // Backward compatibility: legacy progress files (created before the
   // service-account fork existed) never set `serviceAccountMethod`. Per the
-  // design contract those resume into the OAuth path they were already on —
-  // we must NOT route them to the new fork screen and force them to re-pick
-  // mid-flow. Only routes through the fork explicitly set the method.
+  // design contract those resume into the OAuth path they were already on.
+  // Fresh progress files that reached the fork carry `serviceAccountForkSeen`,
+  // so quitting before choosing can restore the method-select screen without
+  // changing legacy behavior.
+  if (
+    progress.serviceAccountForkSeen
+    && progress.serviceAccountMethod === undefined
+    && !hasAnyOAuthProgress(progress)
+  ) {
+    return 'service-account-method-select'
+  }
 
   // Phase 2b — Google sign-in: marker + refresh token. We need the refresh
   // token to mint access tokens for the rest of the flow on subsequent

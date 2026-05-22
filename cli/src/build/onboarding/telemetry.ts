@@ -16,6 +16,16 @@ export interface TrackBuilderOnboardingStepInput {
   errorCategory?: OnboardingErrorCategory | AndroidOnboardingErrorCategory
 }
 
+export interface TrackBuilderOnboardingActionInput {
+  apikey: string
+  appId: string
+  orgId: string
+  platform: Platform
+  step: OnboardingStep | AndroidOnboardingStep
+  action: string
+  tags?: Record<string, boolean | number | string | undefined>
+}
+
 export async function trackBuilderOnboardingStep(input: TrackBuilderOnboardingStepInput): Promise<void> {
   const tags: Record<string, string> = {
     step: input.step,
@@ -48,5 +58,33 @@ export async function trackBuilderOnboardingStep(input: TrackBuilderOnboardingSt
   catch {
     // Telemetry must never break the wizard. sendEvent already swallows
     // fetch failures internally; this catch covers anything else.
+  }
+}
+
+export async function trackBuilderOnboardingAction(input: TrackBuilderOnboardingActionInput): Promise<void> {
+  const tags: Record<string, string> = {
+    step: input.step,
+    platform: input.platform,
+    app_id: input.appId,
+    action: input.action,
+  }
+
+  for (const [key, value] of Object.entries(input.tags ?? {})) {
+    if (value !== undefined)
+      tags[key] = String(value)
+  }
+
+  try {
+    await sendEvent(input.apikey, {
+      event: 'Builder Onboarding Action',
+      channel: 'builder-onboarding',
+      icon: '🧭',
+      notify: false,
+      user_id: input.orgId,
+      tags,
+    })
+  }
+  catch {
+    // Telemetry must never break the wizard.
   }
 }

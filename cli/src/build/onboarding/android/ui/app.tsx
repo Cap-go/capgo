@@ -30,7 +30,7 @@ import type { CiSecretEntry, CiSecretSetupAdvice, CiSecretTarget } from '../../c
 import { createCiSecretEntries, detectCiSecretTargets, getCiSecretTargetLabel, listExistingCiSecretKeys, uploadCiSecrets } from '../../ci-secrets.js'
 import { mapAndroidOnboardingError, mapSaValidationKindToCategory } from '../../error-categories.js'
 import { canUseFilePicker, openKeystorePicker, openServiceAccountJsonPicker } from '../../file-picker.js'
-import { trackBuilderOnboardingStep } from '../../telemetry.js'
+import { trackBuilderOnboardingAction, trackBuilderOnboardingStep } from '../../telemetry.js'
 import { Divider, ErrorLine, FilteredTextInput, Header, SpinnerLine, SuccessLine } from '../../ui/components.js'
 import { findAndroidApplicationIds } from '../gradle-parser.js'
 import { validateServiceAccountJson } from '../service-account-validation.js'
@@ -139,6 +139,11 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
     durationMs?: number
     errorCategory?: AndroidOnboardingErrorCategory
   }>>([])
+  const pendingActionTelemetryRef = useRef<Array<{
+    step: AndroidOnboardingStep
+    action: string
+    tags?: Record<string, boolean | number | string | undefined>
+  }>>([])
   const [resolvedOrgId, setResolvedOrgId] = useState<string | null>(null)
   const resolvedApiKeyRef = useRef<string | null>(apikey ?? null)
   const orgIdResolvedRef = useRef(false)
@@ -208,6 +213,18 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
       }
       pendingTelemetryRef.current = []
     }
+    if (resolvedOrgId && pendingActionTelemetryRef.current.length > 0) {
+      for (const queued of pendingActionTelemetryRef.current) {
+        void trackBuilderOnboardingAction({
+          apikey: resolvedApiKeyRef.current,
+          appId,
+          orgId: resolvedOrgId,
+          platform: 'android',
+          ...queued,
+        })
+      }
+      pendingActionTelemetryRef.current = []
+    }
 
     // (2) Now safely skip the duplicate-step path.
     if (isDuplicateStep)
@@ -251,6 +268,32 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
       pendingTelemetryRef.current.push(eventPayload)
     }
   }, [step, appId, resolvedOrgId, error])
+
+  const trackAction = useCallback(
+    (
+      action: string,
+      tags?: Record<string, boolean | number | string | undefined>,
+      actionStep: AndroidOnboardingStep = step,
+    ): void => {
+      if (!resolvedApiKeyRef.current)
+        return
+
+      const payload = { step: actionStep, action, tags }
+      if (resolvedOrgId) {
+        void trackBuilderOnboardingAction({
+          apikey: resolvedApiKeyRef.current,
+          appId,
+          orgId: resolvedOrgId,
+          platform: 'android',
+          ...payload,
+        })
+      }
+      else {
+        pendingActionTelemetryRef.current.push(payload)
+      }
+    },
+    [appId, resolvedOrgId, step],
+  )
 
   const [retryCount, setRetryCount] = useState(0)
   const [retryStep, setRetryStep] = useState<AndroidOnboardingStep | null>(null)
@@ -752,6 +795,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
             const base64 = jsonBytes.toString('base64')
             setServiceAccountKeyBase64(base64)
             setSaValidationResult({ ok: true })
+            trackAction('android_sa_validation_result', { result: 'success' }, 'sa-json-validating')
             await persist((p) => ({
               ...p,
               _serviceAccountKeyBase64: base64,
@@ -764,6 +808,10 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
           }
 
           setSaValidationResult(result)
+          trackAction('android_sa_validation_result', {
+            result: 'failure',
+            validation_kind: result.kind,
+          }, 'sa-json-validating')
           // Stash the validation failure kind so the PostHog
           // `sa-json-validation-failed` step event carries the dimension.
           // Read by the telemetry useEffect on the upcoming step transition.
@@ -895,6 +943,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
             ...p,
             keystoreKeyPassword: keyPw,
             _keystoreBase64: base64,
+            serviceAccountForkSeen: true,
             completedSteps: { ...p.completedSteps, keystoreReady: ready },
           }))
           addLog(`✔ Keystore loaded — ${keystoreExistingPath}`)
@@ -956,6 +1005,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
             keystoreKeyPassword: keyPw,
             keystoreCommonName: cn,
             _keystoreBase64: result.p12Base64,
+            serviceAccountForkSeen: true,
             completedSteps: { ...p.completedSteps, keystoreReady: ready },
           }))
           addLog(`✔ Keystore generated — alias: ${result.alias}, valid until ${result.notAfter.getFullYear()}`)
@@ -1726,6 +1776,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
                     ...p,
                     keystoreKeyPassword: keyPw,
                     _keystoreBase64: base64,
+                    serviceAccountForkSeen: true,
                     completedSteps: { ...p.completedSteps, keystoreReady: ready },
                   }))
                   addLog(`✔ Keystore loaded — ${keystoreExistingPath}`)
@@ -1882,6 +1933,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
               selectFiredRef.current = true
               const method: 'existing' | 'generate' = value === 'existing' ? 'existing' : 'generate'
               setServiceAccountMethod(method)
+              trackAction('android_sa_method_selected', { method })
               if (method === 'existing') {
                 // Import path needs the package name first so validation can
                 // probe edits.insert(packageName). The package-select step is
@@ -2013,6 +2065,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
               // sa-json-validation-failed exit point.
               errorCategoryRef.current = undefined
               if (value === 'retry') {
+                trackAction('android_sa_validation_recovery_selected', { recovery_action: 'retry' })
                 // Clear the saved path so the picker chooser shows fresh.
                 setServiceAccountJsonPath('')
                 setSaValidationResult(null)
@@ -2024,6 +2077,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
                 return
               }
               if (value === 'save-anyway') {
+                trackAction('android_sa_validation_recovery_selected', { recovery_action: 'save_anyway' })
                 ;(async () => {
                   try {
                     if (!serviceAccountJsonPath)
@@ -2046,6 +2100,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
                 return
               }
               // oauth — fall back to the OAuth provisioning path.
+              trackAction('android_sa_validation_recovery_selected', { recovery_action: 'fallback_oauth' })
               setServiceAccountMethod('generate')
               setSaValidationResult(null)
               persistAndStep(
