@@ -95,7 +95,7 @@ export function generateWorkflow(opts: WorkflowGeneratorOpts): GeneratedWorkflow
   if (opts.buildScript.type !== 'skip') {
     lines.push('')
     lines.push('      - name: Build web assets')
-    lines.push(`        run: ${buildCommand(opts.packageManager, opts.buildScript)}`)
+    appendRunBlock(lines, buildCommand(opts.packageManager, opts.buildScript))
   }
 
   // Capgo cloud build request. The `${{ ... }}` syntax below is GitHub Actions
@@ -199,6 +199,12 @@ function installCommand(pm: PackageManager): string {
     case 'yarn':
       return 'yarn install --frozen-lockfile'
   }
+}
+
+function appendRunBlock(lines: string[], command: string): void {
+  lines.push('        run: |')
+  for (const line of command.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n'))
+    lines.push(`          ${line}`)
 }
 
 function buildCommand(pm: PackageManager, choice: BuildScriptChoice): string {

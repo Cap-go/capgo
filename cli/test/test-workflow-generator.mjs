@@ -110,7 +110,7 @@ await test('yarn template uses yarn (not yarn run) for npm-script', () => {
   assertIncludes(content, `cache: 'yarn'`)
   assertIncludes(content, 'yarn install --frozen-lockfile')
   // yarn classic invokes scripts without `run`
-  assertIncludes(content, '\n        run: yarn build\n')
+  assertIncludes(content, '\n        run: |\n          yarn build\n')
   assertIncludes(content, 'npx @capgo/cli@latest build request')
   assertIncludes(content, 'URL=$(npx @capgo/cli@latest build last-output')
 })
@@ -123,8 +123,20 @@ await test('custom build command is rendered verbatim', () => {
     buildScript: { type: 'custom', command: 'make web' },
     secretKeys: [],
   })
-  assertIncludes(content, 'run: make web')
+  assertIncludes(content, '\n        run: |\n          make web\n')
   assertExcludes(content, 'npm run', 'should not prepend npm run for custom command')
+})
+
+await test('custom build command with YAML-significant characters uses a block scalar', () => {
+  const { content } = generateWorkflow({
+    appId: 'com.example.app',
+    defaultPlatform: 'ios',
+    packageManager: 'npm',
+    buildScript: { type: 'custom', command: 'echo "a: b" # shell comment' },
+    secretKeys: [],
+  })
+  assertIncludes(content, '\n        run: |\n          echo "a: b" # shell comment\n')
+  assertExcludes(content, 'run: echo "a: b" # shell comment')
 })
 
 await test('skip build omits the build step but keeps install', () => {
