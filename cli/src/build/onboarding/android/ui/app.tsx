@@ -3114,14 +3114,13 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
           return (
             <Box flexDirection="column" marginTop={1}>
               <Text bold color="yellow">⚠  Confirm before pushing secrets</Text>
-              <Newline />
               <Text>
                 Repository:
                 {' '}
                 <Text bold color="cyan">{ciSecretRepoLabel}</Text>
+                {' '}
+                <Text dimColor>(resolved via `gh repo view`)</Text>
               </Text>
-              <Text dimColor>(resolved via `gh repo view` from this directory)</Text>
-              <Newline />
               <Text bold>
                 {`Will push ${ciSecretEntries.length} env var${ciSecretEntries.length === 1 ? '' : 's'}`}
                 {replaceCount > 0 ? ` — ${newCount} new, ${replaceCount} REPLACING existing:` : ' — all new:'}
