@@ -848,6 +848,7 @@ async function showAddNewKeyModal() {
   dialogStore.openDialog({
     title: t('alert-add-new-key'),
     description: t('alert-generate-new-key'),
+    size: 'xl',
     buttons: [
       {
         text: t('button-cancel'),
@@ -863,20 +864,6 @@ async function showAddNewKeyModal() {
     ],
   })
   return dialogStore.onDialogDismiss()
-}
-
-function handleOrgSelection(orgId: string, checked: boolean) {
-  if (!manageableOrgIds.value.has(orgId))
-    return
-
-  if (checked) {
-    if (!selectedOrgsForCreation.value.includes(orgId)) {
-      selectedOrgsForCreation.value.push(orgId)
-    }
-  }
-  else {
-    selectedOrgsForCreation.value = selectedOrgsForCreation.value.filter(id => id !== orgId)
-  }
 }
 
 function toggleApp(appId: string) {
@@ -1072,24 +1059,23 @@ getKeys()
             <h3 class="mb-2 text-sm font-semibold uppercase text-slate-500">
               {{ t('organizations') }}
             </h3>
-            <div class="p-2 space-y-2 overflow-y-auto border rounded-lg max-h-32">
-              <div v-for="org in organizationStore.organizations" :key="org.gid" class="flex items-center gap-2">
-                <input
-                  :id="`org-create-${org.gid}`"
-                  type="checkbox"
-                  class="border-gray-500 dark:border-gray-700 checkbox"
-                  :checked="selectedOrgsForCreation.includes(org.gid)"
-                  :disabled="!manageableOrgIds.has(org.gid)"
-                  @change="handleOrgSelection(org.gid, ($event.target as HTMLInputElement).checked)"
-                >
-                <label :for="`org-create-${org.gid}`" class="text-sm" :class="!manageableOrgIds.has(org.gid) ? 'text-slate-400' : ''">
-                  {{ org.name }}
-                  <span v-if="!manageableOrgIds.has(org.gid)" class="text-xs text-slate-400">
-                    ({{ t('cannot-manage-org-api-keys') }})
-                  </span>
-                </label>
-              </div>
-            </div>
+            <select
+              v-model="selectedOrgsForCreation"
+              multiple
+              class="w-full min-h-36 d-select d-select-bordered"
+            >
+              <option
+                v-for="org in organizationStore.organizations"
+                :key="org.gid"
+                :value="org.gid"
+                :disabled="!manageableOrgIds.has(org.gid)"
+              >
+                {{ org.name }}{{ !manageableOrgIds.has(org.gid) ? ` (${t('cannot-manage-org-api-keys')})` : '' }}
+              </option>
+            </select>
+            <p class="mt-1 text-xs text-slate-500">
+              {{ t('select-multiple-organizations-help') }}
+            </p>
           </div>
 
           <!-- Organization Role -->

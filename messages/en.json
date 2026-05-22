@@ -1737,6 +1737,7 @@
   "select-expiration-date": "Select expiration date",
   "select-group": "Select a group",
   "select-member": "Select member",
+  "select-multiple-organizations-help": "Use Cmd/Ctrl or Shift to select multiple organizations.",
   "select-organization": "Select organization",
   "select-organization-to-transfer": "Select the organization to which you want to transfer this app",
   "select-role": "Select an app role",
