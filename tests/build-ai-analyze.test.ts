@@ -1,8 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { aiAnalyzeBuild } from '../supabase/functions/_backend/public/build/ai_analyze'
 
-const { mockSupabaseApikey, mockCheckPermission, mockGetEnv, mockSendEventToTracking } = vi.hoisted(() => ({
+const { mockSupabaseApikey, mockSupabaseAdmin, mockCheckPermission, mockGetEnv, mockSendEventToTracking } = vi.hoisted(() => ({
   mockSupabaseApikey: vi.fn(),
+  mockSupabaseAdmin: vi.fn(),
   mockCheckPermission: vi.fn(),
   mockGetEnv: vi.fn(),
   mockSendEventToTracking: vi.fn(),
@@ -10,6 +11,7 @@ const { mockSupabaseApikey, mockCheckPermission, mockGetEnv, mockSendEventToTrac
 
 vi.mock('../supabase/functions/_backend/utils/supabase.ts', () => ({
   supabaseApikey: mockSupabaseApikey,
+  supabaseAdmin: mockSupabaseAdmin,
 }))
 vi.mock('../supabase/functions/_backend/utils/rbac.ts', () => ({
   checkPermission: mockCheckPermission,
@@ -45,26 +47,49 @@ interface RowShape {
   owner_org: string
 }
 
-function mockBuildRequestRow(row: RowShape | null) {
+// Default admin UPDATE result: 1 row affected. Tests that exercise the
+// 0-row-update edge case can override via `adminUpdateRows`.
+function mockBuildRequestRow(row: RowShape | null, opts: { adminUpdateRows?: Array<{ builder_job_id: string }> } = {}) {
+  // ── apikey client: SELECT only ─────────────────────────────────────────
+  // The user-context client is used for the authorization SELECT against
+  // `build_requests`. It is NEVER allowed to do UPDATE — that's what this
+  // test file is regression-protecting. `apikeyUpdate` is wired so we can
+  // assert it never gets called.
   const eqAppId = { maybeSingle: vi.fn().mockResolvedValue({ data: row, error: null }) }
   const eqJob = { eq: vi.fn().mockReturnValue(eqAppId) }
   const select = { eq: vi.fn().mockReturnValue(eqJob) }
-  const updateEqApp = vi.fn().mockResolvedValue({ error: null })
-  const updateEqJob = { eq: vi.fn().mockReturnValue({ eq: updateEqApp }) }
-  const update = vi.fn().mockReturnValue(updateEqJob)
+  const apikeyUpdate = vi.fn()
   mockSupabaseApikey.mockReturnValue({
     from: vi.fn().mockImplementation((table: string) => {
       expect(table).toBe('build_requests')
-      return { select: vi.fn().mockReturnValue(select), update }
+      return { select: vi.fn().mockReturnValue(select), update: apikeyUpdate }
     }),
   })
-  return { updateEqApp }
+
+  // ── admin client: UPDATE only ──────────────────────────────────────────
+  // The service-role client is used for the post-analysis flag write.
+  // The chain is `.update().eq().eq().select('builder_job_id')` → resolves
+  // to `{ data: rows, error }`.
+  const updateRows = opts.adminUpdateRows ?? (row ? [{ builder_job_id: 'job-abc' }] : [])
+  const adminSelect = vi.fn().mockResolvedValue({ data: updateRows, error: null })
+  const adminEqApp = { eq: vi.fn().mockReturnValue({ select: adminSelect }) }
+  const adminEqJob = vi.fn().mockReturnValue(adminEqApp)
+  const adminUpdate = vi.fn().mockReturnValue({ eq: adminEqJob })
+  mockSupabaseAdmin.mockReturnValue({
+    from: vi.fn().mockImplementation((table: string) => {
+      expect(table).toBe('build_requests')
+      return { update: adminUpdate }
+    }),
+  })
+
+  return { apikeyUpdate, adminUpdate, adminSelect }
 }
 
 const apikey = { key: 'apikey-test', user_id: 'user-1' } as any
 
 beforeEach(() => {
   mockSupabaseApikey.mockReset()
+  mockSupabaseAdmin.mockReset()
   mockCheckPermission.mockReset()
   mockGetEnv.mockReset()
   mockSendEventToTracking.mockReset()
@@ -146,14 +171,16 @@ describe('aiAnalyzeBuild', () => {
 
   it('does NOT flip the flag when builder proxy returns non-2xx; fires Requested + Result(builder_error) with duration_ms', async () => {
     mockCheckPermission.mockResolvedValue(true)
-    const { updateEqApp } = mockBuildRequestRow({ app_id: appId, status: 'failed', ai_analyzed: false, owner_org: orgId })
+    const { apikeyUpdate, adminUpdate } = mockBuildRequestRow({ app_id: appId, status: 'failed', ai_analyzed: false, owner_org: orgId })
     ;(globalThis.fetch as any).mockResolvedValue(new Response('upstream broken', { status: 503 }))
 
     await expect(aiAnalyzeBuild(createContext(), jobId, appId, apikey, 'small logs'))
       .rejects
       .toThrow(/AI analysis failed/i)
 
-    expect(updateEqApp).not.toHaveBeenCalled()
+    // Builder failed → no UPDATE on EITHER client. The flag must stay false.
+    expect(apikeyUpdate).not.toHaveBeenCalled()
+    expect(adminUpdate).not.toHaveBeenCalled()
     expect(trackingCallsByEvent('AI Build Analysis Requested')).toHaveLength(1)
     const results = trackingCallsByEvent('AI Build Analysis Result')
     expect(results).toHaveLength(1)
@@ -161,16 +188,24 @@ describe('aiAnalyzeBuild', () => {
     expect(results[0][1].tags.duration_ms).toBeDefined()
   })
 
-  it('flips the flag, returns analysis on builder 200, fires Requested + Result(success); does NOT leak analysis text in tags', async () => {
+  it('flips the flag via SERVICE-ROLE client (never the apikey client), returns analysis, fires Requested + Result(success); does NOT leak analysis text in tags', async () => {
     mockCheckPermission.mockResolvedValue(true)
-    const { updateEqApp } = mockBuildRequestRow({ app_id: appId, status: 'failed', ai_analyzed: false, owner_org: orgId })
+    const { apikeyUpdate, adminUpdate } = mockBuildRequestRow({ app_id: appId, status: 'failed', ai_analyzed: false, owner_org: orgId })
     ;(globalThis.fetch as any).mockResolvedValue(
       new Response(JSON.stringify({ analysis: '### Likely cause\nfoo' }), { status: 200, headers: { 'content-type': 'application/json' } }),
     )
 
     const result = await aiAnalyzeBuild(createContext(), jobId, appId, apikey, 'small logs')
 
-    expect(updateEqApp).toHaveBeenCalledTimes(1)
+    // Regression: the UPDATE that flips `ai_analyzed=true` MUST go through
+    // the service-role client. The `build_requests` table has no RLS policy
+    // granting UPDATE to the user-context apikey client — using it would
+    // silently fail and break idempotency. We assert both halves of this:
+    // the admin client got called exactly once, and the apikey client's
+    // .update was never invoked at all.
+    expect(adminUpdate).toHaveBeenCalledTimes(1)
+    expect(adminUpdate).toHaveBeenCalledWith(expect.objectContaining({ ai_analyzed: true }))
+    expect(apikeyUpdate).not.toHaveBeenCalled()
     expect(await result.json()).toEqual({ analysis: '### Likely cause\nfoo' })
 
     // Verify the builder URL and headers
@@ -193,6 +228,34 @@ describe('aiAnalyzeBuild', () => {
       expect(tagsString).not.toContain('Likely cause')
       expect(tagsString).not.toContain('### ')
     }
+  })
+
+  it('still returns the analysis when the admin UPDATE matched zero rows (defensive — analysis already happened, but we log the broken-idempotency case)', async () => {
+    mockCheckPermission.mockResolvedValue(true)
+    // Simulate the row vanishing between the user-context SELECT and the
+    // service-role UPDATE. We still want the caller to get their analysis
+    // back (the AI work has already been done and paid for); the fix is
+    // that the production code logs this case loudly so it's findable.
+    const { adminUpdate } = mockBuildRequestRow(
+      { app_id: appId, status: 'failed', ai_analyzed: false, owner_org: orgId },
+      { adminUpdateRows: [] }, // <-- 0-row update
+    )
+    ;(globalThis.fetch as any).mockResolvedValue(
+      new Response(JSON.stringify({ analysis: '### Likely cause\nfoo' }), { status: 200, headers: { 'content-type': 'application/json' } }),
+    )
+
+    const result = await aiAnalyzeBuild(createContext(), jobId, appId, apikey, 'small logs')
+
+    // The analysis still comes back to the caller — we don't punish the
+    // user for a server-side bookkeeping miss.
+    expect(adminUpdate).toHaveBeenCalledTimes(1)
+    expect(await result.json()).toEqual({ analysis: '### Likely cause\nfoo' })
+
+    // Success Result event still fires — the AI half of the operation
+    // completed; only the persistence bookkeeping was incomplete.
+    const results = trackingCallsByEvent('AI Build Analysis Result')
+    expect(results).toHaveLength(1)
+    expect(results[0][1].tags.result).toBe('success')
   })
 
   it('fires Result(config_error) when BUILDER_URL is missing', async () => {
