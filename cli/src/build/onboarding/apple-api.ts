@@ -277,13 +277,31 @@ export function computeCertSha1(certificateContentBase64: string): string {
  * creation. Returns null if no Apple-side cert matches the SHA1.
  */
 export async function findCertIdBySha1(token: string, sha1: string): Promise<string | null> {
+  const match = await findCertBySha1(token, sha1)
+  return match ? match.id : null
+}
+
+/**
+ * Like {@link findCertIdBySha1} but returns the full Apple-side cert
+ * record (id + name + expirationDate + serialNumber) when matched. Used
+ * by the eager batch validation so the picker / manual-portal-walkthrough
+ * step can surface concrete disambiguators (expiration date, last few
+ * chars of serial number — both visible in the Apple Developer Portal
+ * when the user clicks into a cert) that help the user pick the right
+ * row when multiple distribution certs are listed for the same team.
+ *
+ * Apple's API does NOT expose a "created by" field on certs (the portal
+ * UI shows it, but `/v1/certificates` doesn't return that column). The
+ * disambiguators we can give are expirationDate + serialNumber.
+ */
+export async function findCertBySha1(token: string, sha1: string): Promise<AscDistributionCert | null> {
   const target = sha1.toLowerCase()
   const certs = await listDistributionCerts(token, { includeContent: true })
   for (const cert of certs) {
     if (!cert.certificateContent)
       continue
     if (computeCertSha1(cert.certificateContent) === target)
-      return cert.id
+      return cert
   }
   return null
 }

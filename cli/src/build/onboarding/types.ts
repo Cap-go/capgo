@@ -77,6 +77,26 @@ export interface EnrichedIdentityAvailability {
   reasonText?: string
   /** When available — Apple-side cert resource id, reused downstream. */
   appleCertId?: string
+  /**
+   * Apple-side cert name as returned by /v1/certificates. Useful when
+   * the local Keychain name differs from the portal name (e.g. multiple
+   * "iOS Distribution" certs in the same team — the portal column says
+   * exactly which one).
+   */
+  appleCertName?: string
+  /**
+   * ISO timestamp from Apple's expiration field. Shown in the manual-
+   * portal walkthrough so the user can tell which row to click when
+   * multiple certs are listed.
+   */
+  appleCertExpirationDate?: string
+  /**
+   * Full serial number from Apple. The portal shows it in the cert
+   * detail view; surfacing the last 8 chars here gives the user a
+   * concrete disambiguator without leaking the full 40-byte serial
+   * into the terminal.
+   */
+  appleCertSerialNumber?: string
 }
 
 export interface CertificateData {

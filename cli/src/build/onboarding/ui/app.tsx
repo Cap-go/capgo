@@ -20,7 +20,7 @@ import { formatRunnerCommand, splitRunnerCommand } from '../../../runner-command
 import { findSavedKeySilent, getPMAndCommand } from '../../../utils.js'
 import { loadSavedCredentials, updateSavedCredentials } from '../../credentials.js'
 import { requestBuildInternal } from '../../request.js'
-import { CertificateLimitError, classifyCertAvailability, createCertificate, createProfile, deleteProfile, DuplicateProfileError, ensureBundleId, findCertIdBySha1, generateJwt, listProfilesForCert, revokeCertificate, verifyApiKey } from '../apple-api.js'
+import { CertificateLimitError, classifyCertAvailability, createCertificate, createProfile, deleteProfile, DuplicateProfileError, ensureBundleId, findCertBySha1, findCertIdBySha1, generateJwt, listProfilesForCert, revokeCertificate, verifyApiKey } from '../apple-api.js'
 import { createP12, DEFAULT_P12_PASSWORD, generateCsr } from '../csr.js'
 import { canUseFilePicker, openFilePicker, openMobileprovisionPicker } from '../file-picker.js'
 import { parseMobileprovisionDetailed } from '../../mobileprovision-parser.js'
@@ -705,13 +705,19 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
           // Run lookups in parallel — N typically 1-3 for most teams, max
           // ~10 even for prolific accounts. Allow each to fail independently
           // (a network blip on one lookup shouldn't disqualify all certs).
+          //
+          // Uses findCertBySha1 (not findCertIdBySha1) so we capture the
+          // full Apple-side record — name, expirationDate, serialNumber —
+          // and cache it in identityAvailability. The manual-portal
+          // walkthrough surfaces those as disambiguators when multiple
+          // distribution certs are listed for the same team.
           const results = await Promise.all(importMatches.map(async (m) => {
             try {
-              const id = await findCertIdBySha1(token, m.identity.sha1)
-              return { sha1: m.identity.sha1, certId: id, error: null as unknown }
+              const cert = await findCertBySha1(token, m.identity.sha1)
+              return { sha1: m.identity.sha1, cert, error: null as unknown }
             }
             catch (err) {
-              return { sha1: m.identity.sha1, certId: null, error: err }
+              return { sha1: m.identity.sha1, cert: null, error: err }
             }
           }))
           if (cancelled)
@@ -719,12 +725,29 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
           const map: Record<string, EnrichedIdentityAvailability> = {}
           let availableCount = 0
           for (const r of results) {
-            const availability = classifyCertAvailability({
-              appleCertId: r.certId,
+            const classified = classifyCertAvailability({
+              appleCertId: r.cert ? r.cert.id : null,
               lookupError: r.error,
             })
-            map[r.sha1] = availability
-            if (availability.available)
+            // Build an EnrichedIdentityAvailability by widening the
+            // classifier output with the Apple-side cert metadata when
+            // we have it. Kept separate from CertAvailability so the
+            // pure classifier stays decoupled from rendering concerns.
+            const entry: EnrichedIdentityAvailability = {
+              available: classified.available,
+              reason: classified.reason,
+              reasonText: classified.reasonText,
+              appleCertId: classified.appleCertId,
+              ...(r.cert && classified.available
+                ? {
+                    appleCertName: r.cert.name,
+                    appleCertExpirationDate: r.cert.expirationDate,
+                    appleCertSerialNumber: r.cert.serialNumber,
+                  }
+                : {}),
+            }
+            map[r.sha1] = entry
+            if (entry.available)
               availableCount++
           }
           setIdentityAvailability(map)
@@ -2224,6 +2247,22 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
         // app_store distribution gate hides ad_hoc users from the
         // automatic create option (which currently only knows app_store).
         const canAutoCreate = typeof appleCertIdForChosen === 'string' && importDistribution !== 'ad_hoc'
+
+        // Apple-side cert metadata cached during eager batch validation
+        // (import-validating-all-certs). When present, surface concrete
+        // disambiguators in step 4 so the user knows WHICH row to click
+        // in the portal when their team has multiple distribution certs.
+        // Apple's API does not expose "created by" — the portal column
+        // is portal-internal — so we only have expirationDate + serial.
+        const certInfo = identityAvailability[chosenIdentity.sha1]
+        const expirationDate = certInfo?.appleCertExpirationDate
+        const expirationDay = expirationDate ? expirationDate.split('T')[0] : null
+        const serialNumber = certInfo?.appleCertSerialNumber
+        const serialTail = serialNumber && serialNumber.length > 8
+          ? serialNumber.slice(-8)
+          : serialNumber || null
+        const appleCertNameForPortal = certInfo?.appleCertName
+
         return (
           <Box flexDirection="column" marginTop={1}>
             <Alert variant="info">
@@ -2278,8 +2317,44 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
                 In the "Certificates" step, tick the cert that matches
                 {' '}
                 <Text bold>{chosenIdentity.name}</Text>
-                . If multiple distribution certs are listed, pick the one with the right expiry / created-by — the wrong one will silently fail at sign time.
+                {expirationDay || serialTail || appleCertNameForPortal
+                  ? (
+                      <>
+                        . If multiple are listed, pick the one matching:
+                      </>
+                    )
+                  : '. If multiple are listed, the wrong one will silently fail at sign time — pick carefully.'}
               </Text>
+              {(expirationDay || serialTail || appleCertNameForPortal) && (
+                <Box flexDirection="column" marginLeft={4}>
+                  {appleCertNameForPortal && (
+                    <Text>
+                      • Apple-side name:
+                      {' '}
+                      <Text bold>{appleCertNameForPortal}</Text>
+                    </Text>
+                  )}
+                  {expirationDay && (
+                    <Text>
+                      • Expires:
+                      {' '}
+                      <Text bold>{expirationDay}</Text>
+                    </Text>
+                  )}
+                  {serialTail && (
+                    <Text>
+                      • Serial number ends in:
+                      {' '}
+                      <Text bold>{serialTail}</Text>
+                      {' '}
+                      <Text dimColor>(visible when you click into the cert in the portal)</Text>
+                    </Text>
+                  )}
+                  <Text dimColor>
+                    Apple's API doesn't expose the "Created by" column the portal shows — those three fields above are everything we have to disambiguate. The wrong cert will silently fail at sign time.
+                  </Text>
+                </Box>
+              )}
               <Text>
                 <Text bold color="white">5.</Text>
                 {' '}
