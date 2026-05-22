@@ -7,7 +7,7 @@ import { useSupabase } from '~/services/supabase'
 import { sendEvent } from '~/services/tracking'
 import { useDialogV2Store } from '~/stores/dialogv2'
 import { useOrganizationStore } from '~/stores/organization'
-import { notifyExistingUserInvite, resolveInviteNewUserErrorMessage, shouldNotifyExistingUserInvite } from '~/utils/invites'
+import { notifyExistingUserInvite, resolveInviteNewUserErrorMessage } from '~/utils/invites'
 
 interface InviteSuccessPayload {
   email: string
@@ -230,12 +230,10 @@ async function handleEmailSubmit() {
     }
 
     if (data === 'OK') {
-      if (shouldNotifyExistingUserInvite(existingUserInviteRole, true)) {
-        const notified = await notifyExistingUserInvite(supabase, email, orgId)
-        if (!notified) {
-          console.warn('Failed to send invite email notification, but invite was created')
-          toast.warning(t('org-invite-email-notification-failed'))
-        }
+      const notified = await notifyExistingUserInvite(supabase, email, orgId)
+      if (!notified) {
+        console.warn('Failed to send invite email notification, but invite was created')
+        toast.warning(t('org-invite-email-notification-failed'))
       }
       toast.success(t('org-invited-user'))
       completeInviteSuccess({

@@ -55,24 +55,15 @@ export async function notifyExistingUserInvite(
   return true
 }
 
-export function shouldNotifyExistingUserInvite(role: string, useNewRbac: boolean) {
-  if (useNewRbac)
-    return true
-
-  return role.startsWith('invite_')
-}
-
 export function shouldAttemptExistingUserInviteNotification(
   output: string,
-  role: string,
-  useNewRbac: boolean,
   hasPendingInvite = false,
 ) {
   if (output === 'ALREADY_INVITED')
-    return hasPendingInvite && shouldNotifyExistingUserInvite(role, useNewRbac)
+    return hasPendingInvite
 
   if (output !== 'OK')
     return false
 
-  return shouldNotifyExistingUserInvite(role, useNewRbac)
+  return true
 }

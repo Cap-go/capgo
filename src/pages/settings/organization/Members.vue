@@ -35,12 +35,10 @@ const search = ref('')
 const columns: Ref<TableColumn[]> = ref<TableColumn[]>([])
 const isLoading = ref(false)
 const currentPage = ref(1)
-const rbacSystemEnabled = import.meta.env.VITE_FEATURE_RBAC_SYSTEM === 'true'
 const dialogStore = useDialogV2Store()
 const emailInput = ref('')
 const displayStore = useDisplayStore()
 displayStore.NavTitle = t('members')
-const useNewRbac = ref(true)
 
 type OrganizationMemberRow = ExtendedOrganizationMember & { is_invite?: boolean }
 type OrganizationMemberRows = OrganizationMemberRow[]
@@ -183,12 +181,9 @@ function isInviteMember(member: OrganizationMemberRow) {
 }
 
 function getMemberRoleLabel(member: OrganizationMemberRow) {
-  if (useNewRbac.value) {
-    const normalizedRole = member.role.replace(/^invite_/, '')
-    const i18nKey = getRbacRoleI18nKey(normalizedRole)
-    return i18nKey ? t(i18nKey) : normalizedRole.replaceAll('_', ' ')
-  }
-  return member.role.replaceAll('_', ' ')
+  const normalizedRole = member.role.replace(/^invite_/, '')
+  const i18nKey = getRbacRoleI18nKey(normalizedRole)
+  return i18nKey ? t(i18nKey) : normalizedRole.replaceAll('_', ' ')
 }
 
 function renderRoleCell(member: OrganizationMemberRow) {
@@ -206,10 +201,6 @@ function renderRoleCell(member: OrganizationMemberRow) {
   }
 
   return h('div', { class: 'flex flex-wrap items-center gap-2 min-w-0 whitespace-normal' }, content)
-}
-
-async function checkRbacEnabled() {
-  useNewRbac.value = true
 }
 
 const isInviteNewUserDialogOpen = ref(false)
@@ -380,7 +371,7 @@ columns.value = [
     actions: computed(() => [
       {
         icon: IconWrench,
-        title: rbacSystemEnabled ? t('edit-role') : t('actions'),
+        title: t('edit-role'),
         visible: (member: OrganizationMemberRow) => canUpdateUserRoles.value && member.uid !== currentOrganization?.value?.created_by,
         onClick: (member: OrganizationMemberRow) => {
           changeMemberPermission(member)
@@ -414,8 +405,6 @@ async function reloadData() {
   isLoading.value = true
   const imageLoadRun = ++memberImageLoadRun
   try {
-    await checkRbacEnabled()
-
     if (!currentOrganization.value)
       return
 
@@ -507,9 +496,7 @@ function validateEmail(email: string) {
 
 async function showPermModal(invite: boolean, onConfirm?: (permission: Database['public']['Enums']['user_min_right'] | string) => Promise<boolean>, currentRole?: string): Promise<Database['public']['Enums']['user_min_right'] | string | undefined> {
   const normalizedRole = currentRole?.replace(/^invite_/, '')
-  const initialRole = useNewRbac.value
-    ? (normalizedRole ? normalizedRole.trim().toLowerCase().replace(/\s+/g, '_') : '')
-    : (currentRole ?? '')
+  const initialRole = normalizedRole ? normalizedRole.trim().toLowerCase().replace(/\s+/g, '_') : ''
   selectedPermission.value = initialRole
     ? initialRole as Database['public']['Enums']['user_min_right']
     : undefined
@@ -530,10 +517,8 @@ async function showPermModal(invite: boolean, onConfirm?: (permission: Database[
   }
 
   dialogStore.openDialog({
-    title: useNewRbac.value ? t('select-user-role') : t('select-user-perms'),
-    description: useNewRbac.value
-      ? t('select-user-role-expanded')
-      : t('select-user-perms-expanded'),
+    title: t('select-user-role'),
+    description: t('select-user-role-expanded'),
     size: 'lg',
     preventAccidentalClose: !!onConfirm,
     buttons: [
@@ -677,7 +662,7 @@ async function handleSendInvitationOutput(output: string, email: string, type: D
   const existingMember = members.value.find(member => member.email.toLowerCase() === email.toLowerCase())
   const hasPendingInvite = existingMember ? isInviteMember(existingMember) : false
 
-  if (orgId && shouldAttemptExistingUserInviteNotification(output, type, useNewRbac.value, hasPendingInvite)) {
+  if (orgId && shouldAttemptExistingUserInviteNotification(output, hasPendingInvite)) {
     const notified = await notifyExistingUserInvite(supabase, email, orgId)
     if (!notified) {
       console.warn('Failed to send invite email notification')
@@ -1464,17 +1449,6 @@ async function handleInviteNewUserSubmit() {
         <h2 class="text-2xl font-bold dark:text-white text-slate-800">
           {{ t('members') }}
         </h2>
-      </div>
-      <div v-if="rbacSystemEnabled && useNewRbac" class="items-start gap-3 mb-4 d-alert d-alert-info">
-        <IconInformation class="w-6 h-6 text-sky-400 shrink-0" />
-        <div class="text-sm text-slate-100">
-          <p class="font-semibold">
-            {{ t('rbac-system-enabled') }}
-          </p>
-          <p class="text-slate-200">
-            {{ t('rbac-system-enabled-body') }}
-          </p>
-        </div>
       </div>
       <DataTable
         v-model:columns="columns"
