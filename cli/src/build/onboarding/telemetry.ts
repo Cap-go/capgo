@@ -16,14 +16,19 @@ export interface TrackBuilderOnboardingStepInput {
   errorCategory?: OnboardingErrorCategory | AndroidOnboardingErrorCategory
 }
 
+export type BuilderOnboardingAction
+  = | 'android_sa_method_selected'
+    | 'android_sa_validation_recovery_selected'
+    | 'android_sa_validation_result'
+
 export interface TrackBuilderOnboardingActionInput {
   apikey: string
   appId: string
   orgId: string
   platform: Platform
   step: OnboardingStep | AndroidOnboardingStep
-  action: string
-  tags?: Record<string, boolean | number | string | undefined>
+  action: BuilderOnboardingAction
+  tags?: Record<string, boolean | number | string>
 }
 
 export async function trackBuilderOnboardingStep(input: TrackBuilderOnboardingStepInput): Promise<void> {
@@ -69,10 +74,8 @@ export async function trackBuilderOnboardingAction(input: TrackBuilderOnboarding
     action: input.action,
   }
 
-  for (const [key, value] of Object.entries(input.tags ?? {})) {
-    if (value !== undefined)
-      tags[key] = String(value)
-  }
+  for (const [key, value] of Object.entries(input.tags ?? {}))
+    tags[key] = String(value)
 
   try {
     await sendEvent(input.apikey, {

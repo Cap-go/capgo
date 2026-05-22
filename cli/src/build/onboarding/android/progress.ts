@@ -115,7 +115,7 @@ function keystoreResumeStep(progress: AndroidOnboardingProgress): AndroidOnboard
   return 'keystore-method-select'
 }
 
-function hasAnyOAuthProgress(progress: AndroidOnboardingProgress): boolean {
+export function hasAnyOAuthProgress(progress: AndroidOnboardingProgress): boolean {
   return !!(
     progress.completedSteps.googleSignInComplete
     || progress.completedSteps.playAccountChosen

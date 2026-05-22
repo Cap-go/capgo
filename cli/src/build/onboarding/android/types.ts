@@ -132,10 +132,11 @@ export interface AndroidOnboardingProgress {
   keystoreKeyPassword?: string
   keystoreCommonName?: string
 
-  // Set once a fresh run reaches `service-account-method-select`. This lets
-  // resume return to the fork if the user quits before choosing while still
-  // letting legacy progress files (without the marker) default to OAuth.
-  serviceAccountForkSeen?: boolean
+  // Set when a fresh run completes keystore setup and becomes eligible to
+  // show `service-account-method-select`. This lets resume return to the fork
+  // if the user quits before choosing while still letting legacy progress
+  // files (without the marker) default to OAuth.
+  serviceAccountForkSeen?: true
   // Service account fork — set when the user chooses existing JSON or Google
   // OAuth provisioning. Absent on legacy progress files (pre-2026-05) → resume
   // defaults to `generate` so existing in-flight onboardings continue on the
