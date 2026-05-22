@@ -477,7 +477,9 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
       // checks that platform-select used to gatekeep:
       //   1. If ios/ doesn't exist → no-platform recovery flow
       //   2. If iOS credentials already exist → credentials-exist confirmation
-      //   3. Otherwise → api-key-instructions
+      //   3. macOS, fresh run → setup-method-select (Import vs Create new fork)
+      //   4. Non-macOS, fresh run → api-key-instructions (import needs Keychain
+      //      access, which Linux/Windows hosts don't have)
       setTimeout(() => {
         if (cancelled)
           return
@@ -491,6 +493,8 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
             return
           if (existing?.ios)
             setStep('credentials-exist')
+          else if (isMacOS())
+            setStep('setup-method-select')
           else
             setStep('api-key-instructions')
         })()
