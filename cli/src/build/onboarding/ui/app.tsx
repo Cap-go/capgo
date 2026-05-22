@@ -271,15 +271,25 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
     () => detectIosBundleIds({ cwd: process.cwd(), iosDir, capacitorAppId: iosBundleIdInitial }),
     [iosDir, iosBundleIdInitial],
   )
+  // Trust the saved override only when it was confirmed for the SAME
+  // `config.appId` we're seeing this run. If the user renamed the app
+  // (added/removed a dev-tunnel suffix, changed reverse-DNS, etc.) the
+  // previously-saved override is stale relative to the new files — fall
+  // back to `iosBundleIdInitial` so the mismatch detector can re-ask via
+  // the confirm-app-id step instead of silently using the old value.
+  const savedOverrideIsFresh = initialProgress?.iosBundleIdOverride !== undefined
+    && initialProgress.iosBundleIdContextAppId === iosBundleIdInitial
   const [iosBundleId, setIosBundleId] = useState<string>(
-    initialProgress?.iosBundleIdOverride ?? iosBundleIdInitial,
+    savedOverrideIsFresh && initialProgress?.iosBundleIdOverride
+      ? initialProgress.iosBundleIdOverride
+      : iosBundleIdInitial,
   )
   // Distinct from `iosBundleId !== iosBundleIdInitial` because the user is
   // allowed to pick the capacitor value at the confirm step — we still want
   // to suppress the question for the rest of the session in that case.
-  const [appIdConfirmed, setAppIdConfirmed] = useState<boolean>(
-    initialProgress?.iosBundleIdOverride !== undefined,
-  )
+  // Stale overrides (context drift between runs) don't count as confirmed
+  // for this session — the next redirect re-asks.
+  const [appIdConfirmed, setAppIdConfirmed] = useState<boolean>(savedOverrideIsFresh)
   // The step we would have routed to had there been no mismatch. The
   // confirm-app-id onChange handler picks this up and continues there.
   // `null` = no confirmation pending.
@@ -1795,6 +1805,11 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
             completedSteps: {},
           }
           existing.iosBundleIdOverride = chosen
+          // Snapshot the current config.appId so the next CLI run can
+          // detect "the user changed the app id, our saved override is
+          // stale" and re-ask instead of silently using `chosen`. See
+          // the savedOverrideIsFresh check at component init.
+          existing.iosBundleIdContextAppId = iosBundleIdInitial
           await saveProgress(appId, existing)
           if (chosen !== iosBundleIdInitial) {
             addLog(`✔ Using "${chosen}" as the iOS bundle ID for Apple operations (capacitor.config.appId is "${iosBundleIdInitial}")`)

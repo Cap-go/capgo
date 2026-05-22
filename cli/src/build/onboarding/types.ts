@@ -154,9 +154,19 @@ export interface OnboardingProgress {
    * credentials without forcing the user to edit `capacitor.config`.
    *
    * Persisted so the confirm-app-id step doesn't re-ask on resume — once
-   * confirmed, the override sticks for the lifetime of this onboarding run.
+   * confirmed, the override sticks unless the configuration context (see
+   * `iosBundleIdContextAppId`) changes between CLI runs.
    */
   iosBundleIdOverride?: string
+  /**
+   * Snapshot of `config.appId` at the time the user confirmed the
+   * `iosBundleIdOverride`. On the next run we compare this to the current
+   * `config.appId`; if it changed (user renamed the app, added/removed a
+   * dev-tunnel suffix, etc.) the saved override is stale and we re-ask
+   * via the confirm-app-id step. Without this we'd silently keep using a
+   * bundle id the user already moved on from.
+   */
+  iosBundleIdContextAppId?: string
   completedSteps: {
     apiKeyVerified?: ApiKeyData
     certificateCreated?: CertificateData
