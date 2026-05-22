@@ -2291,10 +2291,10 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
             <Alert variant="info">
               {canAutoCreate
                 ? 'You can do this manually in the Apple Developer Portal — but the automatic path is much easier.'
-                : 'You can do this manually in the Apple Developer Portal. Here\'s what it involves.'}
+                : `You can do this manually in the Apple Developer Portal. Here's what it involves.`}
             </Alert>
             <Newline />
-            <Text bold>What you\'d need to do manually:</Text>
+            <Text bold>{`What you'd need to do manually:`}</Text>
             <Box flexDirection="column" marginLeft={2} marginTop={1}>
               <Text>
                 <Text bold color="white">1.</Text>
@@ -2302,14 +2302,19 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
                 Sign in at
                 {' '}
                 <Text color="cyan" underline>developer.apple.com/account/resources/profiles/list</Text>
-                {' '}
-                with an account that has access to team
-                {' '}
-                <Text bold>{chosenIdentity.teamId}</Text>
                 .
               </Text>
               <Text>
                 <Text bold color="white">2.</Text>
+                {' '}
+                Select the correct team in the team selector (top right) — it must be
+                {' '}
+                <Text bold>{chosenIdentity.teamId}</Text>
+                {chosenIdentity.teamName ? <> ({chosenIdentity.teamName})</> : null}
+                . If you only see one team in the dropdown, you're already on it.
+              </Text>
+              <Text>
+                <Text bold color="white">3.</Text>
                 {' '}
                 Click
                 {' '}
@@ -2325,17 +2330,17 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
                 .
               </Text>
               <Text>
-                <Text bold color="white">3.</Text>
+                <Text bold color="white">4.</Text>
                 {' '}
                 Pick the App ID matching
                 {' '}
                 <Text bold>{appId}</Text>
-                . Create it first if it doesn\'t exist (
+                {`. Create it first if it doesn't exist (`}
                 <Text color="cyan" underline>developer.apple.com/account/resources/identifiers/list</Text>
                 ).
               </Text>
               <Text>
-                <Text bold color="white">4.</Text>
+                <Text bold color="white">5.</Text>
                 {' '}
                 In the "Certificates" step, tick the cert that matches
                 {' '}
@@ -2346,7 +2351,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
                         . If multiple are listed, pick the one matching:
                       </>
                     )
-                  : '. If multiple are listed, the wrong one will silently fail at sign time — pick carefully.'}
+                  : '. If multiple are listed, pick carefully — we double-check in the next step (see note below).'}
               </Text>
               {(expirationDay || serialTail || appleCertNameForPortal) && (
                 <Box flexDirection="column" marginLeft={4}>
@@ -2374,27 +2379,28 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
                     </Text>
                   )}
                   <Text dimColor>
-                    Apple's API doesn't expose the "Created by" column the portal shows — those three fields above are everything we have to disambiguate. The wrong cert will silently fail at sign time.
+                    {`Apple's API doesn't expose the "Created by" column the portal shows — those three fields above are everything we have to disambiguate. Don't worry if you're not 100% sure: when you pick the resulting profile back in this CLI, we re-verify the cert SHA1 matches your chosen identity and refuse with a clear error if it doesn't. So a wrong tick here is recoverable.`}
                   </Text>
                 </Box>
               )}
               <Text>
-                <Text bold color="white">5.</Text>
+                <Text bold color="white">6.</Text>
                 {' '}
-                Name the profile (any name), click Generate, then Download. Move the .mobileprovision into ~/Library/MobileDevice/Provisioning Profiles/ (or use the
+                Name the profile (any name) and click
                 {' '}
-                <Text bold>📁  Use a .mobileprovision file from disk</Text>
+                <Text bold>Generate</Text>
+                , then
                 {' '}
-                option in this CLI).
+                <Text bold>Download</Text>
+                . The .mobileprovision file lands in your Downloads folder (or wherever your browser saves to).
               </Text>
               <Text>
-                <Text bold color="white">6.</Text>
+                <Text bold color="white">7.</Text>
                 {' '}
                 Come back here and pick
                 {' '}
-                <Text bold>🔄 Rescan Apple API for profiles</Text>
-                {' '}
-                to pull the new profile in.
+                <Text bold>📁  Use a .mobileprovision file from disk</Text>
+                , then point the file picker at the file you just downloaded. We'll validate the bundle ID, distribution type, and cert match before continuing — if anything's off, you'll get a clear error naming exactly what doesn't line up.
               </Text>
             </Box>
             <Newline />
@@ -2403,7 +2409,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
                   <Box flexDirection="column">
                     <Text bold color="green">💡 Recommended: let Capgo do this for you.</Text>
                     <Text dimColor>
-                      "✨ Create a new App Store profile for this cert via Apple" does all six steps automatically via the Apple API — same cert, same bundle ID, same distribution, no portal navigation, no manual download. Fewer ways to get it wrong.
+                      "✨ Create a new App Store profile for this cert via Apple" does all of the above automatically via the Apple API — same cert, same bundle ID, same distribution, no portal navigation, no manual download. Fewer ways to get it wrong.
                     </Text>
                     <Newline />
                   </Box>
@@ -2411,7 +2417,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
               : (
                   <Box flexDirection="column">
                     <Text dimColor>
-                      The "Create profile via Apple" automatic option is only available for app_store distribution today. For ad_hoc you\'ll need to walk through the portal manually (or provide the .mobileprovision from disk).
+                      {`The "Create profile via Apple" automatic option is only available for app_store distribution today. For ad_hoc you'll need to walk through the portal manually (or provide the .mobileprovision from disk).`}
                     </Text>
                     <Newline />
                   </Box>
