@@ -229,6 +229,6 @@ function runnerCommand(pm: PackageManager): string {
     case 'pnpm':
       return 'pnpm dlx'
     case 'yarn':
-      return 'yarn dlx'
+      return 'npx'
   }
 }

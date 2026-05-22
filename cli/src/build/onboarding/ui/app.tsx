@@ -17,7 +17,7 @@ import open from 'open'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { writeOnboardingSupportBundle } from '../../../onboarding-support.js'
 import { formatRunnerCommand, splitRunnerCommand } from '../../../runner-command.js'
-import { findSavedKeySilent, getPMAndCommand } from '../../../utils.js'
+import { findBuildCommandForProjectType, findProjectType, findSavedKeySilent, getPackageScripts, getPMAndCommand } from '../../../utils.js'
 import { loadSavedCredentials, updateSavedCredentials } from '../../credentials.js'
 import { requestBuildInternal } from '../../request.js'
 import { CertificateLimitError, createCertificate, createProfile, deleteProfile, DuplicateProfileError, ensureBundleId, findCertIdBySha1, generateJwt, listProfilesForCert, revokeCertificate, verifyApiKey } from '../apple-api.js'
@@ -31,7 +31,6 @@ import type { CiSecretEntry, CiSecretSetupAdvice, CiSecretTarget } from '../ci-s
 import { defaultExportPath, exportCredentialsToEnv } from '../env-export.js'
 import { writeWorkflowFile, WORKFLOW_PATH } from '../workflow-writer.js'
 import type { BuildScriptChoice, PackageManager } from '../workflow-generator.js'
-import { findBuildCommandForProjectType, findProjectType, getPackageScripts } from '../../../utils.js'
 import type { BuildCredentials } from '../../../schemas/build.js'
 import {
   getPhaseLabel,
@@ -44,6 +43,7 @@ import type { DiffLine } from '../diff-utils.js'
 import { generateWorkflow, WORKFLOW_PATH as WORKFLOW_GEN_PATH } from '../workflow-generator.js'
 import { getWorkflowDiffTelemetry, trackBuildOnboardingWorkflowEvent } from '../analytics.js'
 import type { BuildOnboardingWorkflowDecision, BuildOnboardingWorkflowEvent, WorkflowDiffTelemetry } from '../analytics.js'
+import { buildScriptPickerOptions, normalizePackageManager } from '../workflow-ui-helpers.js'
 
 const OUTPUT_LINE_SPLIT_RE = /\r?\n/
 const CARRIAGE_RETURN_RE = /\r/g
@@ -95,54 +95,6 @@ async function runRunnerCommand(runner: string, args: string[]): Promise<{ succe
       resolve({ success: code === 0, output })
     })
   })
-}
-
-/**
- * `getPMAndCommand()` returns the literal string 'unknown' when no recognizable
- * lockfile is present. The workflow generator only knows the four real ones —
- * fall back to 'npm' for the generator template (universal coverage, even if
- * the user is using something exotic; they can edit the YAML after).
- */
-function normalizePackageManager(pm: string): PackageManager {
-  if (pm === 'bun' || pm === 'npm' || pm === 'pnpm' || pm === 'yarn')
-    return pm
-  return 'npm'
-}
-
-
-interface BuildScriptOption {
-  label: string
-  value: string
-}
-
-/**
- * Build the picker options for `pick-build-script`. Layout:
- *   1. Recommended script (if any) at the top, with a hint label
- *   2. Every other script in scripts{} in alphabetical order
- *   3. "Type a custom command" escape hatch
- *   4. "Skip build step" escape hatch (for raw HTML Capacitor apps)
- *
- * Showing ALL scripts (not just "build"-ish ones) matches what the user
- * asked for: pick from package.json, never auto-guess. Filtering risks
- * hiding the exotic name a user actually wants.
- */
-function buildScriptPickerOptions(scripts: Record<string, string>, recommended: string | null): BuildScriptOption[] {
-  const options: BuildScriptOption[] = []
-  const seen = new Set<string>()
-
-  if (recommended && Object.prototype.hasOwnProperty.call(scripts, recommended)) {
-    options.push({ label: `${recommended}    (recommended — matches your project type)`, value: recommended })
-    seen.add(recommended)
-  }
-
-  const others = Object.keys(scripts).filter(name => !seen.has(name)).sort((a, b) => a.localeCompare(b))
-  for (const name of others)
-    options.push({ label: name, value: name })
-
-  options.push({ label: 'Type a custom command…', value: '__custom__' })
-  options.push({ label: 'Skip build step (my app is raw HTML)', value: '__skip__' })
-
-  return options
 }
 
 const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey, terminalRows = 24 }) => {
@@ -233,7 +185,6 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey, t
   const [availableScripts, setAvailableScripts] = useState<Record<string, string>>({})
   const [recommendedScript, setRecommendedScript] = useState<string | null>(null)
   const [buildScriptChoice, setBuildScriptChoice] = useState<BuildScriptChoice | null>(null)
-  const [pendingCustomCommand, setPendingCustomCommand] = useState<string>('')
   const [workflowExistingContent, setWorkflowExistingContent] = useState<string | null>(null)
   const [workflowProposedContent, setWorkflowProposedContent] = useState<string | null>(null)
   const [workflowWrittenPath, setWorkflowWrittenPath] = useState<string | null>(null)
@@ -1241,7 +1192,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey, t
               const projectType = await findProjectType({ quiet: true }).catch(() => null)
               if (projectType) {
                 const recommended = await findBuildCommandForProjectType(projectType).catch(() => null)
-                if (recommended && Object.prototype.hasOwnProperty.call(scripts, recommended))
+                if (recommended && Object.hasOwn(scripts, recommended))
                   setRecommendedScript(recommended)
               }
             }
@@ -2791,7 +2742,6 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey, t
                 if (!cleaned)
                   return
                 setBuildScriptChoice({ type: 'custom', command: cleaned })
-                setPendingCustomCommand(cleaned)
                 setStep('preview-workflow-file')
               }}
             />

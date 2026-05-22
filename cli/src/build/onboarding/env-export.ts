@@ -12,7 +12,7 @@ import type { BuildCredentials } from '../../schemas/build.js'
 import { chmodSync, existsSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { cwd } from 'node:process'
-import { renderEnvFile } from '../credentials-manage.js'
+import { renderEnvFile } from '../env-render.js'
 
 export interface EnvExportOpts {
   appId: string

@@ -183,10 +183,11 @@ export function createCiSecretEntries(
   // generated GitHub Actions workflow (and any user-authored workflow that
   // follows the same convention) can authenticate without the user having to
   // manually `gh secret set CAPGO_TOKEN` after the wizard finishes.
-  if (apiKey && apiKey.length > 0) {
+  const trimmedApiKey = apiKey?.trim()
+  if (trimmedApiKey) {
     entries.push({
       key: 'CAPGO_TOKEN',
-      value: apiKey,
+      value: trimmedApiKey,
       masked: true,
     })
   }

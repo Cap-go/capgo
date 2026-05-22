@@ -22,7 +22,7 @@ import { Alert, ProgressBar, Select } from '@inkjs/ui'
 import { Box, Newline, Text, useApp, useInput } from 'ink'
 // src/build/onboarding/android/ui/app.tsx
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { findSavedKey } from '../../../../utils.js'
+import { findBuildCommandForProjectType, findProjectType, findSavedKeySilent, getPackageScripts, getPMAndCommand } from '../../../../utils.js'
 import { loadSavedCredentials, updateSavedCredentials } from '../../../credentials.js'
 import { requestBuildInternal } from '../../../request.js'
 import { createCiSecretEntries, detectCiSecretTargets, getCiSecretRepoLabelAsync, getCiSecretTargetLabel, listExistingCiSecretKeysAsync, uploadCiSecretsAsync } from '../../ci-secrets.js'
@@ -30,7 +30,6 @@ import type { CiSecretEntry, CiSecretSetupAdvice, CiSecretTarget } from '../../c
 import { defaultExportPath, exportCredentialsToEnv } from '../../env-export.js'
 import { writeWorkflowFile, WORKFLOW_PATH } from '../../workflow-writer.js'
 import type { BuildScriptChoice, PackageManager } from '../../workflow-generator.js'
-import { findBuildCommandForProjectType, findProjectType, getPackageScripts, getPMAndCommand } from '../../../../utils.js'
 import type { BuildCredentials } from '../../../../schemas/build.js'
 import { canUseFilePicker, openKeystorePicker } from '../../file-picker.js'
 import { findAndroidApplicationIds } from '../gradle-parser.js'
@@ -40,6 +39,7 @@ import type { DiffLine } from '../../diff-utils.js'
 import { generateWorkflow, WORKFLOW_PATH as WORKFLOW_GEN_PATH } from '../../workflow-generator.js'
 import { getWorkflowDiffTelemetry, trackBuildOnboardingWorkflowEvent } from '../../analytics.js'
 import type { BuildOnboardingWorkflowDecision, BuildOnboardingWorkflowEvent, WorkflowDiffTelemetry } from '../../analytics.js'
+import { buildScriptPickerOptions, normalizePackageManager } from '../../workflow-ui-helpers.js'
 import {
   ANDROIDPUBLISHER_API,
   createServiceAccountKey,
@@ -121,48 +121,6 @@ function emptyProgress(appId: string): AndroidOnboardingProgress {
     startedAt: new Date().toISOString(),
     completedSteps: {},
   }
-}
-
-/**
- * `getPMAndCommand()` returns 'unknown' when no recognizable lockfile is
- * present. The workflow generator only knows the four real ones — fall back
- * to 'npm' for the generator template.
- */
-function normalizePackageManager(pm: string): PackageManager {
-  if (pm === 'bun' || pm === 'npm' || pm === 'pnpm' || pm === 'yarn')
-    return pm
-  return 'npm'
-}
-
-
-interface BuildScriptOption {
-  label: string
-  value: string
-}
-
-/**
- * Build the picker options for `pick-build-script`. Shows ALL scripts from
- * package.json (the user picks; we don't auto-guess), with the project-type
- * recommendation surfaced at the top, plus escape hatches for custom commands
- * and "skip build entirely" (raw HTML Capacitor apps).
- */
-function buildScriptPickerOptions(scripts: Record<string, string>, recommended: string | null): BuildScriptOption[] {
-  const options: BuildScriptOption[] = []
-  const seen = new Set<string>()
-
-  if (recommended && Object.prototype.hasOwnProperty.call(scripts, recommended)) {
-    options.push({ label: `${recommended}    (recommended — matches your project type)`, value: recommended })
-    seen.add(recommended)
-  }
-
-  const others = Object.keys(scripts).filter(name => !seen.has(name)).sort((a, b) => a.localeCompare(b))
-  for (const name of others)
-    options.push({ label: name, value: name })
-
-  options.push({ label: 'Type a custom command…', value: '__custom__' })
-  options.push({ label: 'Skip build step (my app is raw HTML)', value: '__skip__' })
-
-  return options
 }
 
 const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir, apikey, terminalRows = 24 }) => {
@@ -1083,10 +1041,8 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
           // --apikey, and users who pick "secrets only" still benefit from
           // having it ready in their repo for a workflow they'll write later.
           let capgoKey: string | undefined = apikey
-          if (!capgoKey) {
-            try { capgoKey = findSavedKey(true) }
-            catch {}
-          }
+          if (!capgoKey)
+            capgoKey = findSavedKeySilent()
           const entries = createCiSecretEntries(credentials, capgoKey)
           setCiSecretEntries(entries)
           // Stash the raw credentials so the .env-export branch can write the
@@ -1207,7 +1163,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
               const projectType = await findProjectType({ quiet: true }).catch(() => null)
               if (projectType) {
                 const recommended = await findBuildCommandForProjectType(projectType).catch(() => null)
-                if (recommended && Object.prototype.hasOwnProperty.call(scripts, recommended))
+                if (recommended && Object.hasOwn(scripts, recommended))
                   setRecommendedScript(recommended)
               }
             }
@@ -1414,12 +1370,8 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
           // `build init --platform android --apikey FOO` silently ignored FOO
           // and fell back to whichever key was on disk.
           let capgoKey: string | undefined = apikey
-          if (!capgoKey) {
-            try {
-              capgoKey = findSavedKey(true)
-            }
-            catch {}
-          }
+          if (!capgoKey)
+            capgoKey = findSavedKeySilent()
           if (!capgoKey) {
             setBuildOutput(prev => [...prev, '⚠ No Capgo API key found.'])
             setBuildOutput(prev => [...prev, 'Run `capgo login` first, then `capgo build request --platform android`.'])

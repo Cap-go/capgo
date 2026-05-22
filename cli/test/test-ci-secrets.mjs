@@ -105,6 +105,14 @@ await test('treats an empty-string API key as "no token" (no entry)', () => {
   assert(!entries.some(e => e.key === 'CAPGO_TOKEN'), 'Empty API key must not produce a CAPGO_TOKEN entry')
 })
 
+await test('trims the API key before creating CAPGO_TOKEN', () => {
+  const entries = createCiSecretEntries({ BUILD_CERTIFICATE_BASE64: 'cert' }, '  capgo_token_value  ')
+  const tokenEntry = entries.find(entry => entry.key === 'CAPGO_TOKEN')
+  assert(tokenEntry !== undefined, 'Trimmed API key should produce a CAPGO_TOKEN entry')
+  assertEquals(tokenEntry.value, 'capgo_token_value')
+  assert(tokenEntry.masked, 'CAPGO_TOKEN must stay masked')
+})
+
 await test('detects authenticated GitHub target from git remotes', () => {
   const runner = createRunner({
     'git remote -v': {

@@ -115,7 +115,8 @@ await test('yarn template uses yarn (not yarn run) for npm-script', () => {
   assertIncludes(content, 'yarn install --frozen-lockfile')
   // yarn classic invokes scripts without `run`
   assertIncludes(content, '\n        run: yarn build\n')
-  assertIncludes(content, 'yarn dlx @capgo/cli@latest build request')
+  assertIncludes(content, 'npx @capgo/cli@latest build request')
+  assertIncludes(content, 'URL=$(npx @capgo/cli@latest build last-output')
 })
 
 await test('custom build command is rendered verbatim', () => {
