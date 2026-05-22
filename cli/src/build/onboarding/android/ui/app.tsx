@@ -27,10 +27,11 @@ import { createSupabaseClient, findSavedKey, findSavedKeySilent, getOrganization
 import { loadSavedCredentials, updateSavedCredentials } from '../../../credentials.js'
 import { requestBuildInternal } from '../../../request.js'
 import type { CiSecretEntry, CiSecretSetupAdvice, CiSecretTarget } from '../../ci-secrets.js'
+import type { BuilderOnboardingAction } from '../../telemetry.js'
 import { createCiSecretEntries, detectCiSecretTargets, getCiSecretTargetLabel, listExistingCiSecretKeys, uploadCiSecrets } from '../../ci-secrets.js'
 import { mapAndroidOnboardingError, mapSaValidationKindToCategory } from '../../error-categories.js'
 import { canUseFilePicker, openKeystorePicker, openServiceAccountJsonPicker } from '../../file-picker.js'
-import { trackBuilderOnboardingStep } from '../../telemetry.js'
+import { trackBuilderOnboardingAction, trackBuilderOnboardingStep } from '../../telemetry.js'
 import { Divider, ErrorLine, FilteredTextInput, Header, SpinnerLine, SuccessLine } from '../../ui/components.js'
 import { findAndroidApplicationIds } from '../gradle-parser.js'
 import { validateServiceAccountJson } from '../service-account-validation.js'
@@ -69,7 +70,7 @@ import {
   inviteServiceAccount,
   PLAY_DEVELOPERS_URL,
 } from '../play-api.js'
-import { deleteAndroidProgress, getAndroidResumeStep, loadAndroidProgress, saveAndroidProgress } from '../progress.js'
+import { deleteAndroidProgress, getAndroidResumeStep, hasAnyOAuthProgress, loadAndroidProgress, saveAndroidProgress } from '../progress.js'
 import { ANDROID_STEP_PROGRESS, getAndroidPhaseLabel } from '../types.js'
 
 interface LogEntry { text: string, color?: string }
@@ -138,6 +139,11 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
     step: AndroidOnboardingStep
     durationMs?: number
     errorCategory?: AndroidOnboardingErrorCategory
+  }>>([])
+  const pendingActionTelemetryRef = useRef<Array<{
+    step: AndroidOnboardingStep
+    action: BuilderOnboardingAction
+    tags?: Record<string, boolean | number | string>
   }>>([])
   const [resolvedOrgId, setResolvedOrgId] = useState<string | null>(null)
   const resolvedApiKeyRef = useRef<string | null>(apikey ?? null)
@@ -208,6 +214,18 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
       }
       pendingTelemetryRef.current = []
     }
+    if (resolvedOrgId && pendingActionTelemetryRef.current.length > 0) {
+      for (const queued of pendingActionTelemetryRef.current) {
+        void trackBuilderOnboardingAction({
+          apikey: resolvedApiKeyRef.current,
+          appId,
+          orgId: resolvedOrgId,
+          platform: 'android',
+          ...queued,
+        })
+      }
+      pendingActionTelemetryRef.current = []
+    }
 
     // (2) Now safely skip the duplicate-step path.
     if (isDuplicateStep)
@@ -251,6 +269,32 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
       pendingTelemetryRef.current.push(eventPayload)
     }
   }, [step, appId, resolvedOrgId, error])
+
+  const trackAction = useCallback(
+    (
+      action: BuilderOnboardingAction,
+      tags?: Record<string, boolean | number | string>,
+      actionStep: AndroidOnboardingStep = step,
+    ): void => {
+      if (!resolvedApiKeyRef.current)
+        return
+
+      const payload = { step: actionStep, action, tags }
+      if (resolvedOrgId) {
+        void trackBuilderOnboardingAction({
+          apikey: resolvedApiKeyRef.current,
+          appId,
+          orgId: resolvedOrgId,
+          platform: 'android',
+          ...payload,
+        })
+      }
+      else {
+        pendingActionTelemetryRef.current.push(payload)
+      }
+    },
+    [appId, resolvedOrgId, step],
+  )
 
   const [retryCount, setRetryCount] = useState(0)
   const [retryStep, setRetryStep] = useState<AndroidOnboardingStep | null>(null)
@@ -752,6 +796,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
             const base64 = jsonBytes.toString('base64')
             setServiceAccountKeyBase64(base64)
             setSaValidationResult({ ok: true })
+            trackAction('android_sa_validation_result', { result: 'success' }, 'sa-json-validating')
             await persist((p) => ({
               ...p,
               _serviceAccountKeyBase64: base64,
@@ -764,9 +809,13 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
           }
 
           setSaValidationResult(result)
-          // Stash the validation failure kind so the PostHog
-          // `sa-json-validation-failed` step event carries the dimension.
-          // Read by the telemetry useEffect on the upcoming step transition.
+          trackAction('android_sa_validation_result', {
+            result: 'failure',
+            validation_kind: result.kind,
+          }, 'sa-json-validating')
+          // Emit the immediate action event above, and stash the validation
+          // kind so the upcoming `sa-json-validation-failed` step event also
+          // carries the same failure category.
           errorCategoryRef.current = mapSaValidationKindToCategory(result.kind)
           // shape-error indicates the file itself is wrong — surface as a
           // banner log and route to the same recovery screen so the user
@@ -895,6 +944,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
             ...p,
             keystoreKeyPassword: keyPw,
             _keystoreBase64: base64,
+            serviceAccountForkSeen: true,
             completedSteps: { ...p.completedSteps, keystoreReady: ready },
           }))
           addLog(`✔ Keystore loaded — ${keystoreExistingPath}`)
@@ -907,14 +957,8 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
           const fresh = await loadAndroidProgress(appId)
           if (cancelled)
             return
-          const hasAnyOAuthProgress = !!(
-            fresh?.completedSteps.googleSignInComplete
-            || fresh?.completedSteps.playAccountChosen
-            || fresh?.completedSteps.gcpProjectChosen
-            || fresh?.completedSteps.androidPackageChosen
-            || fresh?._oauthRefreshToken
-          )
-          if (hasAnyOAuthProgress || fresh?.serviceAccountMethod !== undefined)
+          const hasOAuthProgress = fresh ? hasAnyOAuthProgress(fresh) : false
+          if (hasOAuthProgress || fresh?.serviceAccountMethod !== undefined)
             setStep(fresh ? getAndroidResumeStep(fresh) : 'service-account-method-select')
           else
             setStep('service-account-method-select')
@@ -956,6 +1000,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
             keystoreKeyPassword: keyPw,
             keystoreCommonName: cn,
             _keystoreBase64: result.p12Base64,
+            serviceAccountForkSeen: true,
             completedSteps: { ...p.completedSteps, keystoreReady: ready },
           }))
           addLog(`✔ Keystore generated — alias: ${result.alias}, valid until ${result.notAfter.getFullYear()}`)
@@ -1726,6 +1771,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
                     ...p,
                     keystoreKeyPassword: keyPw,
                     _keystoreBase64: base64,
+                    serviceAccountForkSeen: true,
                     completedSteps: { ...p.completedSteps, keystoreReady: ready },
                   }))
                   addLog(`✔ Keystore loaded — ${keystoreExistingPath}`)
@@ -1734,14 +1780,8 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
                   // mid-flow), pick up where they left off; otherwise drop
                   // them on the new fork.
                   const fresh = await loadAndroidProgress(appId)
-                  const hasAnyOAuthProgress = !!(
-                    fresh?.completedSteps.googleSignInComplete
-                    || fresh?.completedSteps.playAccountChosen
-                    || fresh?.completedSteps.gcpProjectChosen
-                    || fresh?.completedSteps.androidPackageChosen
-                    || fresh?._oauthRefreshToken
-                  )
-                  if (hasAnyOAuthProgress || fresh?.serviceAccountMethod !== undefined)
+                  const hasOAuthProgress = fresh ? hasAnyOAuthProgress(fresh) : false
+                  if (hasOAuthProgress || fresh?.serviceAccountMethod !== undefined)
                     setStep(fresh ? getAndroidResumeStep(fresh) : 'service-account-method-select')
                   else
                     setStep('service-account-method-select')
@@ -1882,6 +1922,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
               selectFiredRef.current = true
               const method: 'existing' | 'generate' = value === 'existing' ? 'existing' : 'generate'
               setServiceAccountMethod(method)
+              trackAction('android_sa_method_selected', { method })
               if (method === 'existing') {
                 // Import path needs the package name first so validation can
                 // probe edits.insert(packageName). The package-select step is
@@ -2013,6 +2054,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
               // sa-json-validation-failed exit point.
               errorCategoryRef.current = undefined
               if (value === 'retry') {
+                trackAction('android_sa_validation_recovery_selected', { recovery_action: 'retry' })
                 // Clear the saved path so the picker chooser shows fresh.
                 setServiceAccountJsonPath('')
                 setSaValidationResult(null)
@@ -2024,6 +2066,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
                 return
               }
               if (value === 'save-anyway') {
+                trackAction('android_sa_validation_recovery_selected', { recovery_action: 'save_anyway' })
                 ;(async () => {
                   try {
                     if (!serviceAccountJsonPath)
@@ -2046,6 +2089,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
                 return
               }
               // oauth — fall back to the OAuth provisioning path.
+              trackAction('android_sa_validation_recovery_selected', { recovery_action: 'fallback_oauth' })
               setServiceAccountMethod('generate')
               setSaValidationResult(null)
               persistAndStep(
