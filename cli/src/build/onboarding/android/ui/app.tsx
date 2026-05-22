@@ -1567,14 +1567,15 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
 
   const progressPct = ANDROID_STEP_PROGRESS[step] ?? 0
   const phaseLabel = getAndroidPhaseLabel(step)
-  // See iOS sibling for the rationale: Header is hidden across the whole
-  // AI sub-flow to avoid the duplicate-Header visual that happens when a
-  // step transition leaves the previous frame in the user's scrollback
-  // and the new frame renders the Header again below it.
+  // See iOS sibling for the rationale: keep Header on the AI prompt (entry
+  // point — gives wizard anchoring), but hide it on steps that come AFTER
+  // the prompt's Select fires so we don't render a duplicate Header below
+  // the frozen previous frame.
   const isAiResultScroll = step === 'ai-analysis-result-scroll'
-  const isAiStep = step === 'ai-analysis-prompt' || step === 'ai-analysis-running' || step === 'ai-analysis-result' || isAiResultScroll
+  const isPostPromptAiStep = step === 'ai-analysis-running' || step === 'ai-analysis-result' || isAiResultScroll
+  const isAiStep = step === 'ai-analysis-prompt' || isPostPromptAiStep
   const showProgress = step !== 'welcome' && step !== 'error' && step !== 'build-complete' && step !== 'requesting-build' && step !== 'ai-analysis-result' && !isAiResultScroll
-  const showHeader = step !== 'requesting-build' && !isAiStep
+  const showHeader = step !== 'requesting-build' && !isPostPromptAiStep
   const showLog = step !== 'requesting-build' && step !== 'build-complete' && !isAiStep
 
   return (
