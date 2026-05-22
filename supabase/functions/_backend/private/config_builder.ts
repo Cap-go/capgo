@@ -59,19 +59,11 @@ function buildTutorialVideoConfig(c: Context, requestId: string | undefined): Tu
   // youtubeFallback must be a parseable URL. We don't enforce the
   // youtube.com host because operators might want to point at a
   // different docs / Loom / Vimeo URL in the future — but it must at
-  // least be something the CLI can open in a browser. URL parsing
-  // catches typos like "wwww.youtube.com" or missing protocol.
-  let youtubeFallbackValid = false
-  if (youtubeFallback) {
-    try {
-      // eslint-disable-next-line no-new
-      new URL(youtubeFallback)
-      youtubeFallbackValid = true
-    }
-    catch {
-      youtubeFallbackValid = false
-    }
-  }
+  // least be something the CLI can open in a browser. URL.canParse()
+  // catches typos like "wwww.youtube.com" or missing protocol without
+  // the throw-and-catch overhead the linter (e18e/prefer-url-canparse)
+  // also flags as bad style.
+  const youtubeFallbackValid = youtubeFallback ? URL.canParse(youtubeFallback) : false
 
   // Combined: a misconfigured-format value is treated like a missing
   // env var so the response shape stays `{ enabled: false }` and the
