@@ -10,6 +10,9 @@ export type OnboardingStep
     | 'backing-up'
     // ── Setup-method fork (macOS only) ──
     | 'setup-method-select'
+    // ── Apple-side bundle id confirmation (only shown when capacitor.config and
+    //    project.pbxproj disagree) ──
+    | 'confirm-app-id'
     // ── Import-existing sub-flow (macOS only) ──
     | 'import-scanning'
     | 'import-distribution-mode'
@@ -142,6 +145,18 @@ export interface OnboardingProgress {
    * Only meaningful when `setupMethod === 'import-existing'`.
    */
   importDistribution?: 'app_store' | 'ad_hoc'
+  /**
+   * When set, the user explicitly confirmed an iOS bundle id different from
+   * `capacitor.config.appId`. Used for Apple-side operations (cert lookup,
+   * profile filtering, `ensureBundleId`, `createProfile`) and as the key in
+   * the provisioning_map. The progress-file key and Capgo SaaS API calls
+   * still use `appId` so existing build commands continue to find these
+   * credentials without forcing the user to edit `capacitor.config`.
+   *
+   * Persisted so the confirm-app-id step doesn't re-ask on resume — once
+   * confirmed, the override sticks for the lifetime of this onboarding run.
+   */
+  iosBundleIdOverride?: string
   completedSteps: {
     apiKeyVerified?: ApiKeyData
     certificateCreated?: CertificateData
@@ -160,6 +175,7 @@ export const STEP_PROGRESS: Record<OnboardingStep, number> = {
   'backing-up': 0,
   // Import-existing sub-flow (re-ordered: distribution-mode first)
   'setup-method-select': 5,
+  'confirm-app-id': 12,
   'import-scanning': 10,
   'import-distribution-mode': 15,
   'import-pick-identity': 40,
@@ -212,6 +228,8 @@ export function getPhaseLabel(step: OnboardingStep): string {
       return ''
     case 'setup-method-select':
       return 'Setup method'
+    case 'confirm-app-id':
+      return 'Confirm iOS bundle ID'
     case 'import-scanning':
       return 'Step 1 of 4 · Scanning your Mac'
     case 'import-distribution-mode':

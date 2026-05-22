@@ -14,13 +14,14 @@ import { Alert, ProgressBar, Select } from '@inkjs/ui'
 import { Box, Newline, Text, useApp, useInput, useStdout } from 'ink'
 import open from 'open'
 // src/build/onboarding/ui/app.tsx
-import React, { useCallback, useEffect, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { writeOnboardingSupportBundle } from '../../../onboarding-support.js'
 import { formatRunnerCommand, splitRunnerCommand } from '../../../runner-command.js'
 import { findSavedKeySilent, getPMAndCommand } from '../../../utils.js'
 import { loadSavedCredentials, updateSavedCredentials } from '../../credentials.js'
 import { requestBuildInternal } from '../../request.js'
 import { CertificateLimitError, classifyCertAvailability, createCertificate, createProfile, deleteProfile, DuplicateProfileError, ensureBundleId, findCertBySha1, findCertIdBySha1, generateJwt, listProfilesForCert, revokeCertificate, verifyApiKey } from '../apple-api.js'
+import { detectIosBundleIds } from '../bundle-id-detector.js'
 import { createP12, DEFAULT_P12_PASSWORD, generateCsr } from '../csr.js'
 import { canUseFilePicker, openFilePicker, openMobileprovisionPicker } from '../file-picker.js'
 import { parseMobileprovisionDetailed } from '../../mobileprovision-parser.js'
@@ -225,6 +226,56 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
    * the picker falls back to its single-list layout in that case.
    */
   const [identityAvailability, setIdentityAvailability] = useState<Record<string, EnrichedIdentityAvailability>>({})
+
+  // ─── iOS bundle id detection + confirmation ───────────────────────────
+  //
+  // capacitor.config.appId is the lookup key for everything Capgo-side
+  // (progress files, saved credentials, build API). For Apple-side ops
+  // (cert lookup, profile filtering, ensureBundleId, createProfile, and the
+  // provisioning_map key written into credentials.json) we use the iOS
+  // PRODUCT_BUNDLE_IDENTIFIER instead — they only line up when the user
+  // hasn't sandboxed their capacitor.config with a dev-tunnel suffix.
+  //
+  // Detection is synchronous (small files, no network), so a single useMemo
+  // captures the result for the lifetime of the component. The
+  // confirm-app-id step renders only when `detectedIds.mismatch === true`
+  // AND the user hasn't already chosen this session (tracked via
+  // `appIdConfirmed`, persisted in progress as `iosBundleIdOverride`).
+  const detectedIds = useMemo(
+    () => detectIosBundleIds({ cwd: process.cwd(), iosDir, capacitorAppId: appId }),
+    [iosDir, appId],
+  )
+  const [iosBundleId, setIosBundleId] = useState<string>(
+    initialProgress?.iosBundleIdOverride ?? appId,
+  )
+  // Distinct from `iosBundleId !== appId` because the user is allowed to
+  // pick the capacitor value at the confirm step — we still want to suppress
+  // the question for the rest of the session in that case.
+  const [appIdConfirmed, setAppIdConfirmed] = useState<boolean>(
+    initialProgress?.iosBundleIdOverride !== undefined,
+  )
+  // The step we would have routed to had there been no mismatch. The
+  // confirm-app-id onChange handler picks this up and continues there.
+  // `null` = no confirmation pending.
+  const [pendingAppIdNext, setPendingAppIdNext] = useState<OnboardingStep | null>(null)
+  // The shared sites that fan out into Apple-side work (end of
+  // import-scanning, end of verifying-key) wrap their setStep call with
+  // this so the confirmation question gets injected at the right moment
+  // without duplicating the "is there a mismatch?" logic per call site.
+  const redirectIfMismatch = (target: OnboardingStep): OnboardingStep => {
+    if (appIdConfirmed)
+      return target
+    if (!detectedIds.mismatch)
+      return target
+    setPendingAppIdNext(target)
+    return 'confirm-app-id'
+  }
+  // Sub-mode for the confirm-app-id step. `false` = render the suggestion
+  // Select; `true` = render a FilteredTextInput so the user can type a
+  // custom value (e.g. when neither pbxproj nor capacitor matches what
+  // they want to sign with). Reset when leaving the step so a future re-
+  // visit (shouldn't happen, but) starts fresh.
+  const [confirmAppIdTyping, setConfirmAppIdTyping] = useState(false)
 
   const addLog = useCallback((text: string, color = 'green') => {
     // Dedupe consecutive identical entries. The import-distribution-mode
@@ -431,8 +482,12 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
     }
 
     // Use the bundle ID from the imported profile when available; falls back
-    // to the Capacitor app ID for the create-new path.
-    const provisioningBundleId = importMode && chosenProfile?.bundleId ? chosenProfile.bundleId : appId
+    // to the user-confirmed iOS bundle id (or capacitor.config.appId when no
+    // override) for the create-new path. Whichever we end up writing here
+    // becomes the provisioning_map key, which the iOS build system looks up
+    // by PRODUCT_BUNDLE_IDENTIFIER at sign time — so capacitor.config.appId
+    // would be wrong for any project where the two diverge.
+    const provisioningBundleId = importMode && chosenProfile?.bundleId ? chosenProfile.bundleId : iosBundleId
     const provisioningMap: Record<string, { profile: string, name: string }> = {
       [provisioningBundleId]: {
         profile: profileData!.profileBase64,
@@ -602,7 +657,13 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
           // already saved in progress, jump past distribution-mode and the
           // .p8 input chain. See progress.ts → getImportEntryStep for the
           // full decision table and tests.
-          setStep(getImportEntryStep(await loadProgress(appId)))
+          //
+          // redirectIfMismatch then short-circuits to confirm-app-id when
+          // capacitor.config.appId and project.pbxproj's
+          // PRODUCT_BUNDLE_IDENTIFIER disagree — surfaced after p8 setup
+          // (i.e. by the time we reach this code path for app_store) so
+          // the user has context before Apple-side filtering kicks in.
+          setStep(redirectIfMismatch(getImportEntryStep(await loadProgress(appId))))
         }
         catch (err) {
           if (!cancelled)
@@ -680,7 +741,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
     // navigation from later steps).
     if (step === 'import-pick-profile' && chosenIdentity) {
       const profilesForIdentity = importMatches.find(m => m.identity.sha1 === chosenIdentity.sha1)?.profiles ?? []
-      const usable = filterProfilesForApp(profilesForIdentity, appId, importDistribution)
+      const usable = filterProfilesForApp(profilesForIdentity, iosBundleId, importDistribution)
       if (usable.length === 0) {
         // Same gating as the identity-pick onChange — pre-check Apple when
         // we have an API key so the recovery menu only offers viable
@@ -835,9 +896,9 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
             : m,
           ))
 
-          const usableHere = filterProfilesForApp(synthesized, appId, importDistribution)
+          const usableHere = filterProfilesForApp(synthesized, iosBundleId, importDistribution)
           if (usableHere.length > 0) {
-            addLog(`✔ Apple has ${usableHere.length} matching profile${usableHere.length === 1 ? '' : 's'} for "${appId}" — opening the picker`)
+            addLog(`✔ Apple has ${usableHere.length} matching profile${usableHere.length === 1 ? '' : 's'} for "${iosBundleId}" — opening the picker`)
             setStep('import-pick-profile')
             return
           }
@@ -845,19 +906,19 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
           // Apple returned profiles but none target this app. Surface what
           // WAS returned so the user understands why we're still on the
           // recovery screen.
-          const otherBundleIds = Array.from(new Set(synthesized.map(p => p.bundleId).filter(b => b && b !== appId)))
-          const otherDistribTypes = Array.from(new Set(synthesized.filter(p => p.bundleId === appId && p.profileType !== importDistribution).map(p => p.profileType)))
+          const otherBundleIds = Array.from(new Set(synthesized.map(p => p.bundleId).filter(b => b && b !== iosBundleId)))
+          const otherDistribTypes = Array.from(new Set(synthesized.filter(p => p.bundleId === iosBundleId && p.profileType !== importDistribution).map(p => p.profileType)))
           if (otherBundleIds.length > 0) {
             addLog(
-              `⚠ Apple returned ${profiles.length} profile${profiles.length === 1 ? '' : 's'} for this cert but none target "${appId}". `
+              `⚠ Apple returned ${profiles.length} profile${profiles.length === 1 ? '' : 's'} for this cert but none target "${iosBundleId}". `
               + `Bundle ID${otherBundleIds.length === 1 ? '' : 's'} found: ${otherBundleIds.join(', ')}. `
-              + `Use "Create a new App Store profile for this cert" to add one for "${appId}".`,
+              + `Use "Create a new App Store profile for this cert" to add one for "${iosBundleId}".`,
               'yellow',
             )
           }
           else if (otherDistribTypes.length > 0) {
             addLog(
-              `⚠ Apple has ${profiles.length} profile${profiles.length === 1 ? '' : 's'} for "${appId}" but with distribution type ${otherDistribTypes.join(', ')} (need ${importDistribution}). `
+              `⚠ Apple has ${profiles.length} profile${profiles.length === 1 ? '' : 's'} for "${iosBundleId}" but with distribution type ${otherDistribTypes.join(', ')} (need ${importDistribution}). `
               + `Use "Create a new App Store profile for this cert" to add the right one.`,
               'yellow',
             )
@@ -891,10 +952,10 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
             )
             return
           }
-          if (detail.bundleId !== appId) {
+          if (detail.bundleId !== iosBundleId) {
             handleError(
               new Error(
-                `This .mobileprovision is for bundle ID "${detail.bundleId}" but the current app is "${appId}". `
+                `This .mobileprovision is for bundle ID "${detail.bundleId}" but the current app is "${iosBundleId}". `
                 + `Pick a profile that targets the right app, or use "Create a new App Store profile" in the recovery menu.`,
               ),
               'import-provide-profile-path',
@@ -1003,10 +1064,10 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
             setStep('import-no-match-recovery')
             return
           }
-          const { bundleIdResourceId } = await ensureBundleId(token, appId)
+          const { bundleIdResourceId } = await ensureBundleId(token, iosBundleId)
           if (cancelled)
             return
-          const profile = await createProfile(token, bundleIdResourceId, certId, appId)
+          const profile = await createProfile(token, bundleIdResourceId, certId, iosBundleId)
           if (cancelled)
             return
           // Use the freshly-created profile directly as the chosen profile.
@@ -1015,7 +1076,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
             uuid: profile.profileId,
             name: profile.profileName,
             applicationIdentifier: '',
-            bundleId: appId,
+            bundleId: iosBundleId,
             teamId: chosenIdentity.teamId,
             expirationDate: profile.expirationDate,
             profileType: 'app_store' as const,
@@ -1139,7 +1200,12 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
             // and surface specific reasons for the unavailable rows.
             // Bypass when there's nothing to check (defensive — scanning
             // already routed away on zero identities).
-            setStep(importMatches.length > 0 ? 'import-validating-all-certs' : 'import-pick-identity')
+            //
+            // redirectIfMismatch wrapping covers the second entry point
+            // into Apple-side work: app_store users finish verifying-key
+            // here, and we want to confirm the bundle id BEFORE the eager
+            // batch fans out lookups using the (possibly wrong) appId.
+            setStep(redirectIfMismatch(importMatches.length > 0 ? 'import-validating-all-certs' : 'import-pick-identity'))
           }
           else {
             setStep('creating-certificate')
@@ -1227,8 +1293,8 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
       ;(async () => {
         try {
           const token = await getFreshToken()
-          const { bundleIdResourceId } = await ensureBundleId(token, appId)
-          const profile = await createProfile(token, bundleIdResourceId, certData!.certificateId, appId)
+          const { bundleIdResourceId } = await ensureBundleId(token, iosBundleId)
+          const profile = await createProfile(token, bundleIdResourceId, certData!.certificateId, iosBundleId)
           if (cancelled)
             return
           const profileResult: ProfileData = {
@@ -1685,6 +1751,126 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
         </Box>
       )}
 
+      {/* Confirm iOS bundle id when capacitor.config and project.pbxproj
+          disagree. Routed in only by redirectIfMismatch — never shown on
+          fresh runs where everything lines up. */}
+      {step === 'confirm-app-id' && (() => {
+        const onChoose = async (chosen: string) => {
+          setIosBundleId(chosen)
+          setAppIdConfirmed(true)
+          setConfirmAppIdTyping(false)
+          // Persist immediately so resume / restart picks the override
+          // without re-prompting. Merge with whatever progress already
+          // exists (setupMethod, importDistribution, etc.) — never reset.
+          const existing = await loadProgress(appId) || {
+            platform: 'ios' as const,
+            appId,
+            startedAt: new Date().toISOString(),
+            completedSteps: {},
+          }
+          existing.iosBundleIdOverride = chosen
+          await saveProgress(appId, existing)
+          if (chosen !== appId) {
+            addLog(`✔ Using "${chosen}" as the iOS bundle ID for Apple operations (capacitor.config.appId is "${appId}")`)
+          }
+          else {
+            addLog(`✔ Confirmed "${chosen}" as the iOS bundle ID`)
+          }
+          // Resume the journey at whichever step requested the redirect.
+          // Fallback to import-pick-identity for defensive completeness —
+          // every site that calls redirectIfMismatch sets the destination
+          // first, but a future code path might forget.
+          setStep(pendingAppIdNext ?? 'import-pick-identity')
+          setPendingAppIdNext(null)
+        }
+
+        if (confirmAppIdTyping) {
+          return (
+            <Box flexDirection="column" marginTop={1}>
+              <Alert variant="info">
+                Type the iOS bundle ID to use for Apple operations.
+              </Alert>
+              <Newline />
+              <Text dimColor>
+                {`Press Enter when done. This is what we'll send to Apple's API for cert and profile lookups — it must match `}
+                <Text bold>PRODUCT_BUNDLE_IDENTIFIER</Text>
+                {' in your Xcode project (and the App ID on developer.apple.com).'}
+              </Text>
+              <Newline />
+              <FilteredTextInput
+                placeholder="e.g. com.example.myapp"
+                allowedPattern={/[A-Za-z0-9._-]/}
+                maxLength={155}
+                initialValue={detectedIds.recommended.value}
+                onSubmit={(value) => {
+                  const trimmed = value.trim()
+                  if (!trimmed)
+                    return
+                  void onChoose(trimmed)
+                }}
+              />
+            </Box>
+          )
+        }
+
+        return (
+          <Box flexDirection="column" marginTop={1}>
+            <Alert variant="warning">
+              {`The iOS bundle ID in your Xcode project doesn't match capacitor.config.`}
+            </Alert>
+            <Newline />
+            <Text dimColor>
+              {`We use the iOS bundle ID for Apple Developer Portal operations (looking up certs, fetching/creating provisioning profiles). Picking the wrong one is the cause of "Apple returned X profiles but none target …" errors. capacitor.config.appId stays untouched — this only affects what we send to Apple.`}
+            </Text>
+            <Newline />
+            <Box flexDirection="column" marginLeft={2}>
+              {detectedIds.pbxproj && (
+                <Text>
+                  • Xcode (
+                  <Text bold>{detectedIds.pbxproj.label}</Text>
+                  ):
+                  {' '}
+                  <Text bold color="cyan">{detectedIds.pbxproj.value}</Text>
+                </Text>
+              )}
+              {detectedIds.plist && (
+                <Text>
+                  • Info.plist (CFBundleIdentifier):
+                  {' '}
+                  <Text bold color="cyan">{detectedIds.plist.value}</Text>
+                </Text>
+              )}
+              <Text>
+                • Capacitor (capacitor.config.appId):
+                {' '}
+                <Text bold color="cyan">{detectedIds.capacitor.value}</Text>
+              </Text>
+            </Box>
+            <Newline />
+            <Text>Which value should we use for Apple-side operations?</Text>
+            <Newline />
+            <Select
+              options={[
+                ...detectedIds.candidates.map((c, i) => ({
+                  label: i === 0
+                    ? `${c.value} — ${c.label} (recommended)`
+                    : `${c.value} — ${c.label}`,
+                  value: c.value,
+                })),
+                { label: '✏️   Type a custom bundle ID...', value: '__type__' },
+              ]}
+              onChange={(value) => {
+                if (value === '__type__') {
+                  setConfirmAppIdTyping(true)
+                  return
+                }
+                void onChoose(value)
+              }}
+            />
+          </Box>
+        )
+      })()}
+
       {/* Import: scanning */}
       {step === 'import-scanning' && (
         <Box flexDirection="column" marginTop={1}>
@@ -1784,7 +1970,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
         // is identical to the order of `availableOptions` so [n] in the
         // table maps to the (n-1)th option in the picker.
         const availableRows = available.map((m, i) => {
-          const matchCount = filterProfilesForApp(m.profiles, appId, importDistribution).length
+          const matchCount = filterProfilesForApp(m.profiles, iosBundleId, importDistribution).length
           const totalProfiles = m.profiles.length
           return {
             '#': `${i + 1}`,
@@ -1870,7 +2056,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
                 const cached = identityAvailability[match.identity.sha1]
                 setAppleCertIdForChosen(cached?.available ? (cached.appleCertId ?? null) : (cached ? null : undefined))
                 upsertLog('✔ Identity · ', `✔ Identity · ${match.identity.name}`)
-                const usableForThisApp = filterProfilesForApp(match.profiles, appId, importDistribution)
+                const usableForThisApp = filterProfilesForApp(match.profiles, iosBundleId, importDistribution)
                 if (usableForThisApp.length === 0) {
                   const apiKeyAvailable = !!(p8ContentRef.current || (await loadProgress(appId))?.completedSteps?.apiKeyVerified)
                   setStep(apiKeyAvailable ? 'import-checking-apple-cert' : 'import-no-match-recovery')
@@ -1905,11 +2091,11 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
         // Filter to profiles that are actually usable for THIS app + THIS
         // distribution mode. Without this filter, a user with a cert reused
         // across multiple apps (or with both app_store and ad_hoc profiles
-        // linked to one cert) could pick a profile whose bundleId !== appId
+        // linked to one cert) could pick a profile whose bundleId !== iosBundleId
         // or whose profileType !== importDistribution. `doSaveCredentials`
         // would then persist a mismatched provisioning_map / distribution
         // pair, producing unusable signing credentials.
-        const matchedProfiles = filterProfilesForApp(allMatchedProfiles, appId, importDistribution)
+        const matchedProfiles = filterProfilesForApp(allMatchedProfiles, iosBundleId, importDistribution)
         const droppedCount = allMatchedProfiles.length - matchedProfiles.length
         return (
           <Box flexDirection="column" marginTop={1}>
@@ -1959,12 +2145,12 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
                 // committing. The filter above should make this unreachable,
                 // but if the filter regresses, we'd rather hard-fail than
                 // silently save bad creds.
-                if (profile.bundleId !== appId
+                if (profile.bundleId !== iosBundleId
                   || (importDistribution && profile.profileType !== importDistribution)) {
                   handleError(
                     new Error(
                       `Profile "${profile.name}" doesn't match this app: `
-                      + `bundle ${profile.bundleId} (expected ${appId}), `
+                      + `bundle ${profile.bundleId} (expected ${iosBundleId}), `
                       + `type ${profile.profileType} (expected ${importDistribution ?? 'any'}).`,
                     ),
                     'import-pick-profile',
@@ -2069,7 +2255,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
                 ? (
                     <>
                       No provisioning profile on this Mac matches this app (
-                      <Text bold>{appId}</Text>
+                      <Text bold>{iosBundleId}</Text>
                       {importDistribution
                         ? (
                             <>
@@ -2244,7 +2430,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
                 {' '}
                 Pick the App ID matching
                 {' '}
-                <Text bold>{appId}</Text>
+                <Text bold>{iosBundleId}</Text>
                 {`. Create it first if it doesn't exist (`}
                 <Text color="cyan" underline>developer.apple.com/account/resources/identifiers/list</Text>
                 ).
@@ -2828,7 +3014,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
       {/* Creating profile */}
       {step === 'creating-profile' && (
         <Box flexDirection="column" marginTop={1}>
-          <SuccessLine text="Bundle ID" detail={appId} />
+          <SuccessLine text="Bundle ID" detail={iosBundleId} />
           <Newline />
           <SpinnerLine text="Creating App Store provisioning profile..." />
         </Box>
