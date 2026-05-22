@@ -11,7 +11,7 @@ import { homedir } from 'node:os'
 import { join } from 'node:path'
 import process from 'node:process'
 import { Alert, ProgressBar, Select } from '@inkjs/ui'
-import { Box, Newline, Text, useApp, useInput, useStdout } from 'ink'
+import { Box, Newline, Static, Text, useApp, useInput, useStdout } from 'ink'
 import open from 'open'
 // src/build/onboarding/ui/app.tsx
 import React, { useCallback, useEffect, useRef, useState } from 'react'
@@ -97,6 +97,11 @@ async function runRunnerCommand(runner: string, args: string[]): Promise<{ succe
     })
   })
 }
+
+// Static items passed to Ink's `<Static>` to render the Header exactly once,
+// above the dynamic render area. Using a module-level constant keeps the
+// reference stable across renders so Static doesn't think new items appeared.
+const STATIC_HEADER_ITEMS: string[] = ['header']
 
 const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey }) => {
   const { exit } = useApp()
@@ -1416,28 +1421,31 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
 
   const progress = STEP_PROGRESS[step] ?? 0
   const phaseLabel = getPhaseLabel(step)
-  // Ink renders in normal-terminal mode, so each step transition leaves
-  // the previous frame in the user's scrollback. The first AI step
-  // (`ai-analysis-prompt`) keeps the Header so the user has wizard
-  // anchoring when "Build failed" appears. Every step AFTER the prompt's
-  // Select fires (running, result, scroll) hides the Header so it doesn't
-  // re-render below the frozen previous frame and produce a visible
-  // duplicate "🚀 Capgo Cloud Build · Onboarding" box.
+  // The outer Header is rendered inside `<Static>` below — it's written to
+  // the terminal exactly once and never re-rendered, so the user sees a
+  // single persistent banner across every step (including the AI sub-flow
+  // and its transitions). That eliminates the duplicate-Header artifact
+  // that came from Ink committing each step's frame into scrollback.
   const isAiResultScroll = step === 'ai-analysis-result-scroll'
-  const isPostPromptAiStep = step === 'ai-analysis-running' || step === 'ai-analysis-result' || isAiResultScroll
-  const isAiStep = step === 'ai-analysis-prompt' || isPostPromptAiStep
+  const isAiStep = step === 'ai-analysis-prompt' || step === 'ai-analysis-running' || step === 'ai-analysis-result' || isAiResultScroll
   const showProgress = step !== 'welcome' && step !== 'platform-select' && step !== 'adding-platform' && step !== 'no-platform' && step !== 'error' && step !== 'build-complete' && step !== 'requesting-build' && step !== 'ai-analysis-result' && !isAiResultScroll
-  const showHeader = step !== 'requesting-build' && !isPostPromptAiStep
   const showLog = step !== 'requesting-build' && step !== 'build-complete' && !isAiStep
   const recoveryAdvice = error
     ? getBuildOnboardingRecoveryAdvice(error, retryStep, pm.runner, appId)
     : null
 
   return (
-    <Box flexDirection="column" padding={1}>
-      {showHeader && <Header />}
-
-      {/* Progress bar */}
+    <>
+      {/* Render the Header exactly once via Ink's `<Static>` — see the
+          STATIC_HEADER_ITEMS comment above. The dynamic render area below
+          changes step-by-step but never touches the Header, so resizing the
+          terminal or transitioning between steps cannot produce a duplicate
+          banner in scrollback. */}
+      <Static items={STATIC_HEADER_ITEMS}>
+        {item => <Header key={item} />}
+      </Static>
+      <Box flexDirection="column" padding={1}>
+        {/* Progress bar */}
       {showProgress && (
         <Box flexDirection="column" marginTop={1}>
           <Text bold color="cyan">{phaseLabel}</Text>
@@ -2855,7 +2863,8 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
           <Newline />
         </Box>
       )}
-    </Box>
+      </Box>
+    </>
   )
 }
 
