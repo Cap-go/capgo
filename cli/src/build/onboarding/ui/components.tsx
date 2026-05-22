@@ -86,19 +86,16 @@ export const FilteredTextInput: FC<{
   )
 }
 
-// Compact two-row banner rendered exactly once (via <Static>) at the top of
-// the wizard. The previous double-bordered box was 4-5 rows tall; that cost
-// was visible on `requesting-build` and the scrollable AI viewer, where
-// vertical space matters. A single bold line + a thin divider gives the
-// same "I'm in the Capgo wizard" anchoring at one third of the row cost,
-// without any borders that compete with step-level chrome below.
 export const Header: FC = () => (
-  <Box flexDirection="column">
+  <Box
+    borderStyle="double"
+    borderColor="cyan"
+    paddingX={4}
+    paddingY={1}
+    alignSelf="center"
+  >
     <Text bold color="cyan">
       🚀  Capgo Cloud Build · Onboarding
-    </Text>
-    <Text color="cyan" dimColor>
-      {'─'.repeat(60)}
     </Text>
   </Box>
 )
