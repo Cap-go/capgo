@@ -3,7 +3,7 @@ import type { Database } from '../../utils/supabase.types.ts'
 import { quickError, simpleError } from '../../utils/hono.ts'
 import { cloudlog, cloudlogErr, serializeError } from '../../utils/logging.ts'
 import { checkPermission } from '../../utils/rbac.ts'
-import { supabaseApikey } from '../../utils/supabase.ts'
+import { supabaseAdmin, supabaseApikey } from '../../utils/supabase.ts'
 import { sendEventToTracking } from '../../utils/tracking.ts'
 import { getEnv } from '../../utils/utils.ts'
 
@@ -232,12 +232,35 @@ export async function aiAnalyzeBuild(
 
   const durationMs = Date.now() - builderStartedAt
 
-  // 4. Flip the flag after the builder succeeds (idempotency)
-  const { error: updateErr } = await supabase
+  // 4. Flip the flag after the builder succeeds (idempotency).
+  //
+  // IMPORTANT: this UPDATE must use the service-role client. The
+  // `build_requests` table has RLS policies for SELECT (org members) and
+  // ALL (service role only) — there is NO policy granting UPDATE to the
+  // authenticated/anon user-context client created by `supabaseApikey()`.
+  // Using `supabase` (user-context) here silently fails the write under
+  // RLS: PostgREST reports zero rows matched, the operation returns
+  // `{ error: null }`, the flag stays false, and the idempotency guard at
+  // step 2 (`row.ai_analyzed === true`) never fires for any subsequent
+  // request — so a single job can be re-analyzed indefinitely and run up
+  // unbounded Workers AI cost.
+  //
+  // We've already verified user authorization above via `checkPermission`
+  // and the user-context SELECT, so escalating to service-role for this
+  // one targeted write is safe.
+  //
+  // `.select('builder_job_id')` returns the affected rows so we can
+  // distinguish a real success from a 0-row no-op (e.g. if the row was
+  // deleted between the SELECT and the UPDATE). The analysis has already
+  // run by this point, so we still don't throw — but a 0-row update is
+  // logged loudly because it means idempotency is broken for this job.
+  const adminClient = supabaseAdmin(c)
+  const { data: updatedRows, error: updateErr } = await adminClient
     .from('build_requests')
     .update({ ai_analyzed: true, updated_at: new Date().toISOString() })
     .eq('builder_job_id', jobId)
     .eq('app_id', appId)
+    .select('builder_job_id')
 
   if (updateErr) {
     // Log but don't throw — the analysis already happened; the user got their result.
@@ -247,6 +270,16 @@ export async function aiAnalyzeBuild(
       message: 'Failed to flip ai_analyzed flag after success',
       job_id: jobId,
       error: updateErr.message,
+    })
+  }
+  else if (!updatedRows || updatedRows.length === 0) {
+    // Row vanished between SELECT and UPDATE, or some other unexpected
+    // mismatch. Idempotency is broken for this job. Log so it's findable.
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: 'ai_analyzed UPDATE matched zero rows after successful analysis — idempotency broken for this job',
+      job_id: jobId,
+      app_id: appId,
     })
   }
 
