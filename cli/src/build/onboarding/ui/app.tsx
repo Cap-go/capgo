@@ -23,6 +23,12 @@ import { releaseCapturedLogs, runCapgoAiAnalysis } from '../../../ai/analyze.js'
 import { renderMarkdown } from '../../../ai/render-markdown.js'
 import { trackAiAnalysisChoice, trackAiAnalysisResult } from '../../../ai/telemetry.js'
 import { requestBuildInternal } from '../../request.js'
+
+// Upper bound on "I fixed it, retry build" attempts after an AI diagnosis.
+// Three total attempts (initial + two retries) caps the AI cost when a model
+// suggestion doesn't actually fix the failure mode while still giving the user
+// a couple of in-wizard chances to iterate.
+const MAX_AI_RETRIES = 2
 import { CertificateLimitError, createCertificate, createProfile, deleteProfile, DuplicateProfileError, ensureBundleId, findCertIdBySha1, generateJwt, listProfilesForCert, revokeCertificate, verifyApiKey } from '../apple-api.js'
 import { createP12, DEFAULT_P12_PASSWORD, generateCsr } from '../csr.js'
 import { mapIosOnboardingError } from '../error-categories.js'
@@ -268,9 +274,12 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
   // captured). `aiJobId` is set when entering 'ai-analysis-prompt'; the running
   // step reads it to call runCapgoAiAnalysis; the result step renders one of
   // these two state strings depending on the PostAnalyzeResult kind.
+  // `aiRetryCount` tracks how many "I fixed it, retry" attempts the user has
+  // used so we can cap them at MAX_AI_RETRIES.
   const [aiJobId, setAiJobId] = useState<string | null>(null)
   const [aiAnalysisText, setAiAnalysisText] = useState<string | null>(null)
   const [aiResultMessage, setAiResultMessage] = useState<string | null>(null)
+  const [aiRetryCount, setAiRetryCount] = useState(0)
   const [ciSecretEntries, setCiSecretEntries] = useState<CiSecretEntry[]>([])
   const [ciSecretTargets, setCiSecretTargets] = useState<CiSecretTarget[]>([])
   const [ciSecretTarget, setCiSecretTarget] = useState<CiSecretTarget | null>(null)
@@ -2574,26 +2583,74 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
         </Box>
       )}
 
-      {/* AI debug — render the diagnosis (or fallback message), then exit */}
-      {step === 'ai-analysis-result' && (
-        <Box flexDirection="column" marginTop={1}>
-          <Text bold color="cyan">AI analysis</Text>
-          <Newline />
-          {aiAnalysisText && <Text>{aiAnalysisText}</Text>}
-          {aiResultMessage && <Text>{aiResultMessage}</Text>}
-          <Newline />
-          <Text color="yellow">⚠ AI can make mistakes. Always verify the diagnosis against the full log before applying the suggested fix.</Text>
-          <Newline />
-          <Select
-            options={[
-              { label: '✔  Continue', value: 'continue' },
-            ]}
-            onChange={() => {
-              setStep('build-complete')
-            }}
-          />
-        </Box>
-      )}
+      {/* AI debug — render the diagnosis (or fallback message), then offer
+          retry-or-skip. Retry transitions back to 'requesting-build' so the
+          user can rebuild after applying the AI's fix in another terminal,
+          without re-running the credential wizard. Capped at MAX_AI_RETRIES. */}
+      {step === 'ai-analysis-result' && (() => {
+        const retriesLeft = MAX_AI_RETRIES - aiRetryCount
+        const canRetry = retriesLeft > 0
+        const retryLabel = retriesLeft === 1
+          ? '🔄  I fixed it, retry build (last retry)'
+          : `🔄  I fixed it, retry build (${retriesLeft} retries left)`
+        return (
+          <Box flexDirection="column" marginTop={1}>
+            <Text bold color="cyan">AI analysis</Text>
+            <Newline />
+            {aiAnalysisText && <Text>{aiAnalysisText}</Text>}
+            {aiResultMessage && <Text>{aiResultMessage}</Text>}
+            <Newline />
+            <Text color="yellow">⚠ AI can make mistakes. Always verify the diagnosis against the full log before applying the suggested fix.</Text>
+            <Newline />
+            {!canRetry && (
+              <>
+                <Text dimColor>You've used all {MAX_AI_RETRIES} retries. Exit and re-run the wizard if you need another attempt.</Text>
+                <Newline />
+              </>
+            )}
+            <Select
+              options={canRetry
+                ? [
+                    { label: retryLabel, value: 'retry' },
+                    { label: '⏭   Continue (skip retry)', value: 'skip' },
+                  ]
+                : [
+                    { label: '✔  Continue', value: 'continue' },
+                  ]}
+              onChange={async (value) => {
+                if (value === 'retry') {
+                  // Track the retry intent before we tear down the AI state so
+                  // the choice event carries the per-attempt context.
+                  if (aiJobId) {
+                    await trackAiAnalysisChoice({
+                      apikey: resolvedApiKeyRef.current ?? apikey ?? '',
+                      orgId: resolvedOrgId ?? '',
+                      appId,
+                      platform: 'ios',
+                      jobId: aiJobId,
+                      choice: 'retry',
+                      triggeredBy: 'onboarding',
+                    }).catch(() => { /* telemetry never breaks the wizard */ })
+                    // Free the captured log for the previous attempt; the next
+                    // attempt's `requestBuildInternal` will create a new file
+                    // tied to a new builder_job_id.
+                    void releaseCapturedLogs(aiJobId).catch(() => { /* best-effort */ })
+                  }
+                  // Reset AI state so the next failure starts clean.
+                  setAiJobId(null)
+                  setAiAnalysisText(null)
+                  setAiResultMessage(null)
+                  setAiRetryCount(prev => prev + 1)
+                  setStep('requesting-build')
+                  return
+                }
+                // 'skip' (with retries available) or 'continue' (none left).
+                setStep('build-complete')
+              }}
+            />
+          </Box>
+        )
+      })()}
 
       {/* Error with retry */}
       {step === 'error' && error && (

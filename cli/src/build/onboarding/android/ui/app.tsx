@@ -29,6 +29,12 @@ import { releaseCapturedLogs, runCapgoAiAnalysis } from '../../../../ai/analyze.
 import { renderMarkdown } from '../../../../ai/render-markdown.js'
 import { trackAiAnalysisChoice, trackAiAnalysisResult } from '../../../../ai/telemetry.js'
 import { requestBuildInternal } from '../../../request.js'
+
+// Upper bound on "I fixed it, retry build" attempts after an AI diagnosis.
+// Three total attempts (initial + two retries) caps the AI cost when a model
+// suggestion doesn't actually fix the failure mode while still giving the user
+// a couple of in-wizard chances to iterate.
+const MAX_AI_RETRIES = 2
 import type { CiSecretEntry, CiSecretSetupAdvice, CiSecretTarget } from '../../ci-secrets.js'
 import { createCiSecretEntries, detectCiSecretTargets, getCiSecretTargetLabel, listExistingCiSecretKeys, uploadCiSecrets } from '../../ci-secrets.js'
 import { mapAndroidOnboardingError, mapSaValidationKindToCategory } from '../../error-categories.js'
@@ -385,6 +391,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
   const [aiJobId, setAiJobId] = useState<string | null>(null)
   const [aiAnalysisText, setAiAnalysisText] = useState<string | null>(null)
   const [aiResultMessage, setAiResultMessage] = useState<string | null>(null)
+  const [aiRetryCount, setAiRetryCount] = useState(0)
   const [ciSecretEntries, setCiSecretEntries] = useState<CiSecretEntry[]>([])
   const [ciSecretTargets, setCiSecretTargets] = useState<CiSecretTarget[]>([])
   const [ciSecretTarget, setCiSecretTarget] = useState<CiSecretTarget | null>(null)
@@ -2723,26 +2730,67 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
         </Box>
       )}
 
-      {/* AI debug — render the diagnosis (or fallback message), then exit */}
-      {step === 'ai-analysis-result' && (
-        <Box flexDirection="column" marginTop={1}>
-          <Text bold color="cyan">AI analysis</Text>
-          <Newline />
-          {aiAnalysisText && <Text>{aiAnalysisText}</Text>}
-          {aiResultMessage && <Text>{aiResultMessage}</Text>}
-          <Newline />
-          <Text color="yellow">⚠ AI can make mistakes. Always verify the diagnosis against the full log before applying the suggested fix.</Text>
-          <Newline />
-          <Select
-            options={[
-              { label: '✔  Continue', value: 'continue' },
-            ]}
-            onChange={() => {
-              setStep('build-complete')
-            }}
-          />
-        </Box>
-      )}
+      {/* AI debug — render the diagnosis (or fallback message), then offer
+          retry-or-skip. Retry transitions back to 'requesting-build' so the
+          user can rebuild after applying the AI's fix in another terminal,
+          without re-running the credential wizard. Capped at MAX_AI_RETRIES. */}
+      {step === 'ai-analysis-result' && (() => {
+        const retriesLeft = MAX_AI_RETRIES - aiRetryCount
+        const canRetry = retriesLeft > 0
+        const retryLabel = retriesLeft === 1
+          ? '🔄  I fixed it, retry build (last retry)'
+          : `🔄  I fixed it, retry build (${retriesLeft} retries left)`
+        return (
+          <Box flexDirection="column" marginTop={1}>
+            <Text bold color="cyan">AI analysis</Text>
+            <Newline />
+            {aiAnalysisText && <Text>{aiAnalysisText}</Text>}
+            {aiResultMessage && <Text>{aiResultMessage}</Text>}
+            <Newline />
+            <Text color="yellow">⚠ AI can make mistakes. Always verify the diagnosis against the full log before applying the suggested fix.</Text>
+            <Newline />
+            {!canRetry && (
+              <>
+                <Text dimColor>You've used all {MAX_AI_RETRIES} retries. Exit and re-run the wizard if you need another attempt.</Text>
+                <Newline />
+              </>
+            )}
+            <Select
+              options={canRetry
+                ? [
+                    { label: retryLabel, value: 'retry' },
+                    { label: '⏭   Continue (skip retry)', value: 'skip' },
+                  ]
+                : [
+                    { label: '✔  Continue', value: 'continue' },
+                  ]}
+              onChange={async (value) => {
+                if (value === 'retry') {
+                  if (aiJobId) {
+                    await trackAiAnalysisChoice({
+                      apikey: resolvedApiKeyRef.current ?? apikey ?? '',
+                      orgId: resolvedOrgId ?? '',
+                      appId,
+                      platform: 'android',
+                      jobId: aiJobId,
+                      choice: 'retry',
+                      triggeredBy: 'onboarding',
+                    }).catch(() => { /* telemetry never breaks the wizard */ })
+                    void releaseCapturedLogs(aiJobId).catch(() => { /* best-effort */ })
+                  }
+                  setAiJobId(null)
+                  setAiAnalysisText(null)
+                  setAiResultMessage(null)
+                  setAiRetryCount(prev => prev + 1)
+                  setStep('requesting-build')
+                  return
+                }
+                setStep('build-complete')
+              }}
+            />
+          </Box>
+        )
+      })()}
 
       {step === 'error' && error && retryStep && (
         <Box flexDirection="column" marginTop={1}>

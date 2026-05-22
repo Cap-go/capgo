@@ -1,6 +1,6 @@
 import { sendEvent } from '../utils.js'
 
-export type AiAnalysisChoice = 'capgo_ai' | 'local_ai' | 'skip' | 'auto_upload'
+export type AiAnalysisChoice = 'capgo_ai' | 'local_ai' | 'skip' | 'auto_upload' | 'retry'
 export type AiAnalysisTriggeredBy = 'menu' | 'ci_flag' | 'onboarding'
 export type AiAnalysisResult = 'success' | 'already_analyzed' | 'too_big' | 'error'
 
