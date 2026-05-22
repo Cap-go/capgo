@@ -1418,10 +1418,20 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
   const phaseLabel = getPhaseLabel(step)
   // The scrollable AI viewer takes over the screen — hide outer chrome so it
   // gets maximum vertical space.
+  // Header is hidden across the WHOLE AI sub-flow (not just the scroll
+  // step): Ink renders in normal-terminal mode, so each step transition
+  // leaves the previous frame in the user's scrollback. If the new frame
+  // also rendered a Header, the user would see TWO identical
+  // "Capgo Cloud Build · Onboarding" boxes stacked — one frozen above
+  // (from the prompt step) and one fresh below (on the running/result
+  // step). Suppressing the Header during the AI sub-flow keeps the
+  // transition visually unambiguous: the most recent header in the
+  // scrollback is the one that belongs to the AI step.
   const isAiResultScroll = step === 'ai-analysis-result-scroll'
+  const isAiStep = step === 'ai-analysis-prompt' || step === 'ai-analysis-running' || step === 'ai-analysis-result' || isAiResultScroll
   const showProgress = step !== 'welcome' && step !== 'platform-select' && step !== 'adding-platform' && step !== 'no-platform' && step !== 'error' && step !== 'build-complete' && step !== 'requesting-build' && step !== 'ai-analysis-result' && !isAiResultScroll
-  const showHeader = step !== 'requesting-build' && step !== 'ai-analysis-result' && !isAiResultScroll
-  const showLog = step !== 'requesting-build' && step !== 'build-complete' && step !== 'ai-analysis-prompt' && step !== 'ai-analysis-running' && step !== 'ai-analysis-result' && !isAiResultScroll
+  const showHeader = step !== 'requesting-build' && !isAiStep
+  const showLog = step !== 'requesting-build' && step !== 'build-complete' && !isAiStep
   const recoveryAdvice = error
     ? getBuildOnboardingRecoveryAdvice(error, retryStep, pm.runner, appId)
     : null
