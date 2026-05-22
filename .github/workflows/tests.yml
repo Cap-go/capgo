@@ -374,7 +374,7 @@ jobs:
         name: Start Playwright frontend
         env:
           BACKGROUND_SERVICE_NAME: Playwright frontend
-          BACKGROUND_RUN_COMMAND: CAPTCHA_KEY='' bun run serve:worktree
+          BACKGROUND_RUN_COMMAND: bun run supabase:with-env -- bun scripts/playwright-frontend-preview.ts
           BACKGROUND_WAIT_ON: |
             http-get://localhost:5173
           BACKGROUND_LOG_PATH: ${{ runner.temp }}/playwright-frontend.log

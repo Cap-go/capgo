@@ -72,10 +72,16 @@ export function encodeR2KeyForUploadLocation(r2Key: string): string {
 }
 
 export function getAttachmentReadCandidateKeys(decodedKey: string, rawRouteKey: string | null | undefined): string[] {
-  if (rawRouteKey && rawRouteKey !== decodedKey)
-    return [decodedKey, rawRouteKey]
+  const candidates = [decodedKey]
+  if (rawRouteKey && rawRouteKey !== decodedKey) {
+    candidates.push(rawRouteKey)
 
-  return [decodedKey]
+    const encodedRawRouteKey = encodeR2KeyForUploadLocation(rawRouteKey)
+    if (encodedRawRouteKey !== rawRouteKey && encodedRawRouteKey !== decodedKey)
+      candidates.push(encodedRawRouteKey)
+  }
+
+  return [...new Set(candidates)]
 }
 
 export function parseAppScopedAttachmentPath(fileId: unknown): AppScopedAttachmentPath | null {

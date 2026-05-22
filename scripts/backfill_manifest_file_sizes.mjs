@@ -8,10 +8,10 @@
  *
  * Apply updates:
  *   bun scripts/backfill_manifest_file_sizes.mjs --app-version-id=180988804 --apply
- *   bun scripts/backfill_manifest_file_sizes.mjs --all --apply --workers=8 --concurrency=160
+ *   bun scripts/backfill_manifest_file_sizes.mjs --all --apply --workers=16
  */
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
@@ -94,6 +94,25 @@ const DB_URL_ENV_KEYS = [
   'SUPABASE_DB_DIRECT_URL',
   'DIRECT_URL',
 ]
+const MAX_CANDIDATE_BATCH_SIZE = 1000
+const PERCENT_ENCODED_OCTET_RE = /%[0-9a-f]{2}/i
+const FAILED_CSV_HEADERS = [
+  'id',
+  'app_id',
+  'app_version_id',
+  'version_name',
+  'file_name',
+  's3_path',
+  'attempted_s3_path',
+  'attempted_s3_paths',
+  'status',
+  'method',
+  'reason',
+  'attempts',
+  'error_name',
+  'error_status',
+  'error_message',
+]
 
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms))
@@ -117,6 +136,18 @@ function getOptionalNumberArg(name) {
   if (!Number.isFinite(parsed) || parsed < 0)
     throw new Error(`${name} must be a positive integer`)
   return parsed
+}
+
+function getFixedBatchSizeArg() {
+  const value = getArgValue('--batch-size')
+  if (value === undefined)
+    return MAX_CANDIDATE_BATCH_SIZE
+  const parsed = Number.parseInt(value, 10)
+  if (!Number.isFinite(parsed) || parsed <= 0)
+    throw new Error('--batch-size must be a positive integer')
+  if (parsed !== MAX_CANDIDATE_BATCH_SIZE)
+    console.warn(`--batch-size=${parsed} is ignored; candidate reads are fixed to ${MAX_CANDIDATE_BATCH_SIZE}`)
+  return MAX_CANDIDATE_BATCH_SIZE
 }
 
 function getDatabaseUrl(databaseEnv) {
@@ -200,6 +231,58 @@ function serializeError(error) {
   return { message: String(error) }
 }
 
+function decodeStoragePathSegments(s3Path) {
+  try {
+    return s3Path.split('/').map(segment => decodeURIComponent(segment)).join('/')
+  }
+  catch {
+    return null
+  }
+}
+
+function encodeStoragePathSegments(s3Path) {
+  return s3Path.split('/').map(segment => encodeURIComponent(segment)).join('/')
+}
+
+function getStorageCandidatePaths(s3Path) {
+  const candidates = [s3Path]
+  if (PERCENT_ENCODED_OCTET_RE.test(s3Path)) {
+    const decoded = decodeStoragePathSegments(s3Path)
+    if (decoded && decoded !== s3Path)
+      candidates.push(decoded)
+
+    const encoded = encodeStoragePathSegments(s3Path)
+    if (encoded !== s3Path)
+      candidates.push(encoded)
+  }
+  return [...new Set(candidates)]
+}
+
+function markStorageCandidateResult(result, attemptedS3Path, attemptedS3Paths) {
+  const suffix = attemptedS3Path === attemptedS3Paths[0] ? '' : '_candidate'
+  return {
+    ...result,
+    attempted_s3_path: attemptedS3Path,
+    attempted_s3_paths: attemptedS3Paths,
+    method: `${result.method ?? 'unknown'}${suffix}`,
+    reason: suffix && result.reason ? `${result.reason}${suffix}` : result.reason,
+  }
+}
+
+async function getObjectSizeWithLegacyFallback(s3, s3Path) {
+  const candidatePaths = getStorageCandidatePaths(s3Path)
+  let lastResult = null
+
+  for (const candidatePath of candidatePaths) {
+    const result = markStorageCandidateResult(await getObjectSize(s3, candidatePath), candidatePath, candidatePaths)
+    lastResult = result
+    if (result.size > 0 || shouldRetryStorageResult(result))
+      return result
+  }
+
+  return lastResult
+}
+
 async function getObjectSize(s3, s3Path) {
   try {
     const stat = await s3.statObject(s3Path, {
@@ -230,7 +313,7 @@ function shouldRetryStorageResult(result) {
 async function getObjectSizeWithRetry(s3, s3Path, attempts) {
   let lastResult = null
   for (let attempt = 1; attempt <= attempts; attempt++) {
-    const result = await getObjectSize(s3, s3Path)
+    const result = await getObjectSizeWithLegacyFallback(s3, s3Path)
     lastResult = { ...result, attempts: attempt }
     if (!shouldRetryStorageResult(lastResult))
       return lastResult
@@ -278,22 +361,6 @@ async function getObjectSizeWithRange(s3, s3Path, reason) {
       size: 0,
     }
   }
-}
-
-async function mapWithConcurrency(items, concurrency, mapper) {
-  const results = []
-  let cursor = 0
-
-  async function worker() {
-    while (cursor < items.length) {
-      const index = cursor++
-      results[index] = await mapper(items[index])
-    }
-  }
-
-  const workerCount = Math.min(Math.max(1, concurrency), items.length)
-  await Promise.all(Array.from({ length: workerCount }, () => worker()))
-  return results
 }
 
 function isRetryableDatabaseError(error) {
@@ -359,38 +426,6 @@ function appendCommonFilters(where, params, { appId, appVersionId, endId, includ
   }
 }
 
-function buildBoundsQuery({ appId, appVersionId, endId, includeDeleted, startId }) {
-  const params = []
-  const where = []
-  appendCommonFilters(where, params, { appId, appVersionId, endId, includeDeleted, startId })
-
-  return {
-    params,
-    // ORDER BY id ASC/DESC LIMIT 1 keeps this on the manifest primary-key index.
-    sql: `
-      WITH first_row AS (
-        SELECT m.id
-        FROM public.manifest m
-        INNER JOIN public.app_versions av ON av.id = m.app_version_id
-        WHERE ${where.join(' AND ')}
-        ORDER BY m.id ASC
-        LIMIT 1
-      ),
-      last_row AS (
-        SELECT m.id
-        FROM public.manifest m
-        INNER JOIN public.app_versions av ON av.id = m.app_version_id
-        WHERE ${where.join(' AND ')}
-        ORDER BY m.id DESC
-        LIMIT 1
-      )
-      SELECT
-        (SELECT id FROM first_row) AS min_id,
-        (SELECT id FROM last_row) AS max_id
-    `,
-  }
-}
-
 function buildCandidateQuery({ afterId, appId, appVersionId, endId, includeDeleted, limit }) {
   const params = [afterId]
   const where = [
@@ -443,34 +478,59 @@ function buildBulkUpdateQuery(rows) {
   }
 }
 
-function createIdRanges(minId, maxId, workers) {
-  if (!Number.isFinite(minId) || !Number.isFinite(maxId) || minId <= 0 || maxId <= 0 || minId > maxId)
-    return []
-
-  const rangeSize = Math.ceil((maxId - minId + 1) / workers)
-  return Array.from({ length: workers }, (_, index) => {
-    const start = minId + (index * rangeSize)
-    const end = Math.min(maxId, start + rangeSize - 1)
-    return start <= end ? { end, index, start } : null
-  }).filter(Boolean)
-}
-
-function createWorkerReport(range) {
+function createWorkerReport() {
   return {
+    batches: 0,
     checked: 0,
+    currentBatch: null,
+    currentFirstId: null,
+    currentLastId: null,
     done: false,
-    endId: range.end,
     fixed: 0,
-    lastId: range.start - 1,
+    lastId: null,
     missingSize: 0,
     pages: 0,
-    startId: range.start,
     unchanged: 0,
   }
 }
 
 function writeReport(outputPath, report) {
   writeFileSync(outputPath, `${JSON.stringify(report, null, 2)}\n`)
+}
+
+function csvValue(value) {
+  if (value === undefined || value === null)
+    return ''
+  const text = typeof value === 'object' ? JSON.stringify(value) : String(value)
+  return /[",\n\r]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text
+}
+
+function failedCsvRow(error) {
+  return FAILED_CSV_HEADERS.map((header) => {
+    if (header === 'error_message')
+      return csvValue(error.error?.message)
+    if (header === 'error_name')
+      return csvValue(error.error?.name)
+    if (header === 'error_status')
+      return csvValue(error.error?.status)
+    return csvValue(error[header])
+  }).join(',')
+}
+
+function createFailedCsv(outputPath) {
+  writeFileSync(outputPath, `${FAILED_CSV_HEADERS.join(',')}\n`)
+}
+
+function appendFailedCsvRows(outputPath, errors) {
+  if (errors.length === 0)
+    return
+  appendFileSync(outputPath, `${errors.map(failedCsvRow).join('\n')}\n`)
+}
+
+function defaultFailedCsvPath(outputPath) {
+  return outputPath.toLowerCase().endsWith('.json')
+    ? outputPath.replace(/\.json$/i, '-failed.csv')
+    : `${outputPath}-failed.csv`
 }
 
 function createProgressLogger(report, apply) {
@@ -485,19 +545,18 @@ function createProgressLogger(report, apply) {
     const elapsedSeconds = Math.max(1, Math.round((now - startedAt) / 1000))
     const rate = Math.round(report.checked / elapsedSeconds)
     const activeWorkers = Object.values(report.workers).filter(worker => !worker.done).length
-    const maxLastId = Math.max(0, ...Object.values(report.workers).map(worker => worker.lastId ?? 0))
-    console.log(`Checked ${report.checked}, ${apply ? 'fixed' : 'fixable'} ${apply ? report.fixed : report.unchanged}, missing ${report.missingSize}, rate ${rate}/s, active workers ${activeWorkers}, last id ${maxLastId}`)
+    console.log(`Checked ${report.checked}, ${apply ? 'fixed' : 'fixable'} ${apply ? report.fixed : report.unchanged}, missing ${report.missingSize}, rate ${rate}/s, active workers ${activeWorkers}, batches ${report.claimedBatches}, cursor id ${report.lastClaimedId}`)
   }
 }
 
-async function processCandidates({ apply, dbAttempts, pool, s3, storageAttempts, storageConcurrency, verbose }, candidates) {
-  const results = await mapWithConcurrency(candidates, storageConcurrency, async (row) => {
+async function processCandidates({ apply, dbAttempts, pool, s3, storageAttempts, verbose }, candidates) {
+  const results = await Promise.all(candidates.map(async (row) => {
     const storage = await getObjectSizeWithRetry(s3, row.s3_path, storageAttempts)
     if (verbose) {
       console.log(`${row.id} ${row.file_name} size=${storage.size} method=${storage.method}${storage.status ? ` status=${storage.status}` : ''} attempts=${storage.attempts}`)
     }
     return { row, storage }
-  })
+  }))
 
   const rowsWithSize = results
     .filter(result => result.storage.size > 0)
@@ -518,6 +577,8 @@ async function processCandidates({ apply, dbAttempts, pool, s3, storageAttempts,
     .map(result => ({
       app_id: result.row.app_id,
       app_version_id: result.row.app_version_id,
+      attempted_s3_path: result.storage.attempted_s3_path,
+      attempted_s3_paths: result.storage.attempted_s3_paths,
       attempts: result.storage.attempts,
       error: result.storage.error,
       file_name: result.row.file_name,
@@ -538,12 +599,13 @@ async function processCandidates({ apply, dbAttempts, pool, s3, storageAttempts,
   }
 }
 
-function mergePageReport(report, workerReport, pageReport) {
+function mergePageReport(report, workerReport, pageReport, failedCsvPath) {
   report.checked += pageReport.checked
   report.fixed += pageReport.fixed
   report.missingSize += pageReport.missingSize
   report.unchanged += pageReport.unchanged
   report.errors.push(...pageReport.missingErrors)
+  appendFailedCsvRows(failedCsvPath, pageReport.missingErrors)
 
   workerReport.checked += pageReport.checked
   workerReport.fixed += pageReport.fixed
@@ -552,29 +614,72 @@ function mergePageReport(report, workerReport, pageReport) {
   workerReport.pages += 1
 }
 
-async function runRangeWorker({ appId, appVersionId, batchSize, dbAttempts, includeDeleted, options, pool, range, report, writeProgress }) {
-  const workerReport = report.workers[range.index]
-  let afterId = range.start - 1
+function createBatchClaimer({ appId, appVersionId, batchSize, dbAttempts, endId, includeDeleted, limit, pool, report, startId, writeProgress }) {
+  let afterId = startId
+  let claimChain = Promise.resolve()
+  let done = false
+  let remaining = limit
 
-  try {
-    while (afterId < range.end) {
+  return async function claimBatch(workerIndex) {
+    const claim = claimChain.then(async () => {
+      if (done || remaining <= 0)
+        return null
+
       const query = buildCandidateQuery({
         afterId,
         appId,
         appVersionId,
-        endId: range.end,
+        endId,
         includeDeleted,
-        limit: batchSize,
+        limit: Math.min(batchSize, remaining),
       })
-      const candidates = (await queryWithRetry(pool, query.sql, query.params, `worker ${range.index} candidate read`, dbAttempts)).rows
-      if (candidates.length === 0)
+      const candidates = (await queryWithRetry(pool, query.sql, query.params, `worker ${workerIndex} candidate read`, dbAttempts)).rows
+      if (candidates.length === 0) {
+        done = true
+        return null
+      }
+
+      const firstId = candidates[0].id
+      const lastId = candidates[candidates.length - 1].id
+      const batch = {
+        candidates,
+        firstId,
+        index: report.claimedBatches,
+        lastId,
+      }
+
+      afterId = lastId
+      remaining -= candidates.length
+      report.claimedBatches += 1
+      report.lastClaimedId = lastId
+      writeProgress()
+
+      return batch
+    })
+
+    claimChain = claim.catch(() => {})
+    return claim
+  }
+}
+
+async function runBatchWorker({ claimBatch, failedCsvPath, options, report, workerIndex, writeProgress }) {
+  const workerReport = report.workers[workerIndex]
+
+  try {
+    while (true) {
+      const batch = await claimBatch(workerIndex)
+      if (!batch)
         break
 
-      afterId = candidates[candidates.length - 1].id
-      workerReport.lastId = afterId
+      workerReport.batches += 1
+      workerReport.currentBatch = batch.index
+      workerReport.currentFirstId = batch.firstId
+      workerReport.currentLastId = batch.lastId
+      workerReport.lastId = batch.lastId
+      writeProgress()
 
-      const pageReport = await processCandidates(options, candidates)
-      mergePageReport(report, workerReport, pageReport)
+      const pageReport = await processCandidates(options, batch.candidates)
+      mergePageReport(report, workerReport, pageReport, failedCsvPath)
       writeProgress()
     }
   }
@@ -600,15 +705,16 @@ Options:
   --all                Scan all manifest rows with missing size.
   --app-version-id     Restrict to one bundle id.
   --app-id             Restrict to one app id.
-  --limit              Max rows to scan without --all. Default: 500.
-  --batch-size         DB page size per worker. Default: 1000 for --all, 500 otherwise.
-  --workers            Parallel manifest.id range workers. Default: 8 for --all, 1 otherwise.
-  --concurrency        Total storage HEAD/RANGE concurrency. Default: 120 for --all, 20 otherwise.
+  --limit              Max rows to scan without --all. Default: 1000.
+  --batch-size         Backward-compatible alias; candidate reads are always 1000.
+  --workers            Parallel shared-cursor workers. Default: 8 for --all, 1 otherwise.
+  --concurrency        Backward-compatible no-op; storage uses full-batch parallelism for maximum throughput.
   --storage-attempts   Storage metadata attempts per file. Default: 3.
   --db-attempts        DB read/update attempts. Default: 5.
   --start-id           Exclusive lower manifest.id bound for resume.
   --end-id             Inclusive upper manifest.id bound.
   --report             Report JSON output path.
+  --failed-csv         Failed metadata CSV output path.
   --include-deleted    Include deleted bundles.
   --target prod|local  Env target. Default: prod.
   --local              Alias for --target=local.
@@ -624,15 +730,15 @@ Options:
   const appVersionIdRaw = getArgValue('--app-version-id')
   const appVersionId = appVersionIdRaw ? Number.parseInt(appVersionIdRaw, 10) : null
   const appId = getArgValue('--app-id') ?? null
-  const limit = all ? Number.POSITIVE_INFINITY : getNumberArg('--limit', 500)
+  const limit = all ? Number.POSITIVE_INFINITY : getNumberArg('--limit', 1000)
   const workers = getNumberArg('--workers', all ? 8 : 1)
-  const batchSize = getNumberArg('--batch-size', all ? 1000 : 500)
-  const concurrency = getNumberArg('--concurrency', all ? 120 : 20)
+  const batchSize = getFixedBatchSizeArg()
   const storageAttempts = getNumberArg('--storage-attempts', 3)
   const dbAttempts = getNumberArg('--db-attempts', 5)
   const startId = getOptionalNumberArg('--start-id') ?? 0
   const endId = getOptionalNumberArg('--end-id')
   const reportPathArg = getArgValue('--report')
+  const failedCsvPathArg = getArgValue('--failed-csv')
 
   if (!all && !appVersionId && !appId)
     throw new Error('Pass --app-version-id, --app-id, or --all')
@@ -650,11 +756,16 @@ Options:
   const outputPath = reportPathArg
     ? resolve(process.cwd(), reportPathArg)
     : resolve(outputDir, `manifest-file-size-backfill-${Date.now()}.json`)
+  const failedCsvPath = failedCsvPathArg
+    ? resolve(process.cwd(), failedCsvPathArg)
+    : defaultFailedCsvPath(outputPath)
   mkdirSync(dirname(outputPath), { recursive: true })
+  mkdirSync(dirname(failedCsvPath), { recursive: true })
+  createFailedCsv(failedCsvPath)
 
   const workerCount = all ? workers : 1
-  const storageConcurrencyPerWorker = Math.max(1, Math.floor(concurrency / workerCount))
-  const effectiveStorageConcurrency = storageConcurrencyPerWorker * workerCount
+  const storageFanoutPerWorker = batchSize
+  const effectiveStorageFanout = storageFanoutPerWorker * workerCount
   const poolMax = Math.min(Math.max(workerCount * 2 + 4, 4), 40)
 
   const pool = new pg.Pool({
@@ -677,20 +788,23 @@ Options:
     appVersionId,
     batchSize,
     checked: 0,
-    concurrency,
+    claimedBatches: 0,
     dbAttempts,
     endedAt: null,
     endId,
     errors: [],
+    failedCsvPath,
     fixed: 0,
     includeDeleted,
+    lastClaimedId: startId,
+    maxBatchSize: MAX_CANDIDATE_BATCH_SIZE,
     missingSize: 0,
     poolMax,
     scannedAt: new Date().toISOString(),
     startId,
     storageAttempts,
-    storageConcurrencyPerWorker,
-    effectiveStorageConcurrency,
+    storageFanoutPerWorker,
+    effectiveStorageFanout,
     target,
     unchanged: 0,
     workerCount,
@@ -704,91 +818,47 @@ Options:
   }
 
   try {
-    if (all) {
-      const boundsQuery = buildBoundsQuery({
-        appId,
-        appVersionId,
-        endId,
-        includeDeleted,
-        startId,
-      })
-      const bounds = (await queryWithRetry(pool, boundsQuery.sql, boundsQuery.params, 'manifest id bounds', dbAttempts)).rows[0]
-      const minId = Number.parseInt(bounds?.min_id ?? '0', 10)
-      const maxId = Number.parseInt(bounds?.max_id ?? '0', 10)
-      const ranges = createIdRanges(minId, maxId, workerCount)
+    console.log(`Scanning manifest.id > ${startId}${endId ? ` and <= ${endId}` : ''} with ${workerCount} workers, page size ${batchSize}, storage fan-out ${storageFanoutPerWorker} per worker (${effectiveStorageFanout} effective), DB pool max ${poolMax}`)
 
-      console.log(`Scanning manifest.id ${minId}-${maxId} with ${ranges.length} workers, page size ${batchSize}, effective storage concurrency ${effectiveStorageConcurrency}, DB pool max ${poolMax}`)
+    const claimBatch = createBatchClaimer({
+      appId,
+      appVersionId,
+      batchSize,
+      dbAttempts,
+      endId,
+      includeDeleted,
+      limit,
+      pool,
+      report,
+      startId,
+      writeProgress,
+    })
 
-      for (const range of ranges) {
-        report.workers[range.index] = createWorkerReport(range)
-      }
-      writeProgress(true)
-
-      const workerResults = await Promise.allSettled(ranges.map(range => runRangeWorker({
-        appId,
-        appVersionId,
-        batchSize,
-        dbAttempts,
-        includeDeleted,
-        options: {
-          apply,
-          dbAttempts,
-          pool,
-          s3,
-          storageAttempts,
-          storageConcurrency: storageConcurrencyPerWorker,
-          verbose,
-        },
-        pool,
-        range,
-        report,
-        writeProgress,
-      })))
-      const failedWorkers = workerResults
-        .map((result, index) => ({ index, result }))
-        .filter(({ result }) => result.status === 'rejected')
-      if (failedWorkers.length > 0) {
-        throw new Error(`${failedWorkers.length} backfill workers failed: ${failedWorkers.map(({ index, result }) => `worker ${index}: ${result.reason?.message ?? result.reason}`).join('; ')}`)
-      }
+    for (let workerIndex = 0; workerIndex < workerCount; workerIndex++) {
+      report.workers[workerIndex] = createWorkerReport()
     }
-    else {
-      const range = {
-        end: endId ?? Number.MAX_SAFE_INTEGER,
-        index: 0,
-        start: startId + 1,
-      }
-      report.workers[0] = createWorkerReport(range)
-      let remaining = limit
-      while (remaining > 0) {
-        const pageLimit = Math.min(batchSize, remaining)
-        const query = buildCandidateQuery({
-          afterId: report.workers[0].lastId,
-          appId,
-          appVersionId,
-          endId,
-          includeDeleted,
-          limit: pageLimit,
-        })
-        const candidates = (await queryWithRetry(pool, query.sql, query.params, 'candidate read', dbAttempts)).rows
-        if (candidates.length === 0)
-          break
+    writeProgress(true)
 
-        report.workers[0].lastId = candidates[candidates.length - 1].id
-        remaining -= candidates.length
-
-        const pageReport = await processCandidates({
-          apply,
-          dbAttempts,
-          pool,
-          s3,
-          storageAttempts,
-          storageConcurrency: concurrency,
-          verbose,
-        }, candidates)
-        mergePageReport(report, report.workers[0], pageReport)
-        writeProgress()
-      }
-      report.workers[0].done = true
+    const workerResults = await Promise.allSettled(Array.from({ length: workerCount }, (_, workerIndex) => runBatchWorker({
+      claimBatch,
+      failedCsvPath,
+      options: {
+        apply,
+        dbAttempts,
+        pool,
+        s3,
+        storageAttempts,
+        verbose,
+      },
+      report,
+      workerIndex,
+      writeProgress,
+    })))
+    const failedWorkers = workerResults
+      .map((result, index) => ({ index, result }))
+      .filter(({ result }) => result.status === 'rejected')
+    if (failedWorkers.length > 0) {
+      throw new Error(`${failedWorkers.length} backfill workers failed: ${failedWorkers.map(({ index, result }) => `worker ${index}: ${result.reason?.message ?? result.reason}`).join('; ')}`)
     }
   }
   finally {
@@ -803,6 +873,7 @@ Options:
   console.log(`  ${apply ? 'Fixed' : 'Fixable'}:      ${apply ? report.fixed : report.unchanged}`)
   console.log(`  Missing size: ${report.missingSize}`)
   console.log(`  Report:       ${outputPath}`)
+  console.log(`  Failed CSV:   ${failedCsvPath}`)
 
   if (report.missingSize > 0)
     process.exitCode = 1

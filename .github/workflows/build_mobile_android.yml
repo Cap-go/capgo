@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Tag to build (e.g., v1.0.0)'
+        description: "Tag to build (e.g., v1.0.0)"
         required: true
 
 permissions: {}
@@ -54,4 +54,4 @@ jobs:
           KEYSTORE_STORE_PASSWORD: ${{ secrets.KEYSTORE_STORE_PASSWORD }}
           BUILD_OUTPUT_UPLOAD_ENABLED: "true"
           BUILD_OUTPUT_RETENTION_SECONDS: "604800"
-        run: bunx @capgo/cli@latest build request --platform android --path .
+        run: bunx @capgo/cli@latest build request --platform android --path . --ai-analytics

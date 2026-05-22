@@ -64,6 +64,20 @@ export type OnboardingStep
     | 'no-platform'
     | 'error'
 
+export type OnboardingErrorCategory
+  = | 'apple_api_unauthorized'
+    | 'apple_api_rate_limited'
+    | 'cert_limit_reached'
+    | 'profile_creation_failed'
+    | 'p8_invalid'
+    // Import-existing flow (keychain / provisioning profile imports)
+    | 'keychain_no_identities'
+    | 'keychain_export_failed'
+    | 'keychain_helper_compile_failed'
+    | 'profile_no_match'
+    | 'profile_read_failed'
+    | 'unknown'
+
 export interface ApiKeyData {
   keyId: string
   issuerId: string

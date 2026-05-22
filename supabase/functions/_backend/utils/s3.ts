@@ -2,6 +2,7 @@ import type { Context } from 'hono'
 import type { Database } from '../utils/supabase.types.ts'
 import { S3Client } from '@bradenmacdonald/s3-lite-client'
 import { cloudlog, cloudlogErr, serializeError } from './logging.ts'
+import { getManifestStorageCandidateKeys } from './manifest_encoding.ts'
 import { getEnv } from './utils.ts'
 
 function firstForwardedHeaderValue(value: string | undefined): string | undefined {
@@ -312,8 +313,7 @@ async function getSizeFromRangeFallback(
   }
 }
 
-async function getSize(c: Context, fileId: string) {
-  const client = initS3(c)
+async function getSizeForKey(c: Context, client: ReturnType<typeof initS3>, fileId: string) {
   let size = 0
   let headError: unknown
   let usedFallback = false
@@ -360,6 +360,41 @@ async function getSize(c: Context, fileId: string) {
     usedFallback,
   })
   return size
+}
+
+async function getSize(c: Context, fileId: string) {
+  const client = initS3(c)
+  const candidateKeys = getManifestStorageCandidateKeys(fileId)
+
+  for (const candidateKey of candidateKeys) {
+    const size = await getSizeForKey(c, client, candidateKey)
+    if (size > 0) {
+      if (candidateKey !== fileId) {
+        cloudlog({
+          requestId: c.get('requestId'),
+          message: 'getSize recovered from manifest storage candidate',
+          fileId,
+          candidateKey,
+          candidateKeys,
+          size,
+        })
+      }
+      return size
+    }
+  }
+
+  if (candidateKeys.length > 1) {
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: 'getSize failed all manifest storage candidates',
+      fileId,
+      candidateKeys,
+      bucket: getEnv(c, 'S3_BUCKET'),
+      endpoint: getEnv(c, 'S3_ENDPOINT'),
+    })
+  }
+
+  return 0
 }
 
 async function getObject(c: Context, fileId: string): Promise<Response | null> {
