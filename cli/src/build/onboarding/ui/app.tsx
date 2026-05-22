@@ -1995,14 +1995,23 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
         // labelled choice in the Select below. The order of `availableRows`
         // is identical to the order of `availableOptions` so [n] in the
         // table maps to the (n-1)th option in the picker.
+        //
+        // "Profile" column: a binary readiness signal — does this identity
+        // already have at least one on-disk profile matching this app's
+        // bundle id + distribution mode? Previously this column showed an
+        // X/Y ratio with a checkmark, which forced users to mentally decode
+        // "1/1 ✓" → "yes that means usable". Replaced with green AVAILABLE
+        // / red UNAVAILABLE so the at-a-glance signal is unambiguous; the
+        // user can still recover from UNAVAILABLE via the no-match recovery
+        // menu (file picker, Apple create, etc.), so picking such an
+        // identity isn't fatal — just an extra step.
         const availableRows = available.map((m, i) => {
           const matchCount = filterProfilesForApp(m.profiles, iosBundleId, importDistribution).length
-          const totalProfiles = m.profiles.length
           return {
             '#': `${i + 1}`,
             'Name': `🔑 ${m.identity.name}`,
             'Team': m.identity.teamId,
-            'Profiles': matchCount > 0 ? `${matchCount}/${totalProfiles} ✓` : `0/${totalProfiles}`,
+            'Profile': matchCount > 0 ? 'AVAILABLE' : 'UNAVAILABLE',
           }
         })
 
@@ -2020,9 +2029,20 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
                 <Newline />
                 <Table
                   data={availableRows}
-                  // Green checkmarks on the matching count column; default
-                  // text elsewhere so cert names remain easy to read.
-                  cellColor={(col, val) => (col === 'Profiles' && val.includes('✓') ? 'green' : undefined)}
+                  // Color-code the binary AVAILABLE/UNAVAILABLE status:
+                  // green when there's a ready-to-use profile, red when
+                  // the user will hit the no-match recovery menu after
+                  // picking this row. Other columns keep default color so
+                  // cert names stay easy to read.
+                  cellColor={(col, val) => {
+                    if (col !== 'Profile')
+                      return undefined
+                    if (val === 'AVAILABLE')
+                      return 'green'
+                    if (val === 'UNAVAILABLE')
+                      return 'red'
+                    return undefined
+                  }}
                 />
                 <Newline />
               </>
