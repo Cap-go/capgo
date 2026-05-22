@@ -3,7 +3,7 @@ import { Box, Text, useInput, useStdout } from 'ink'
 import Spinner from 'ink-spinner'
 // src/build/onboarding/ui/components.tsx
 import React, { useEffect, useState } from 'react'
-import { computeMaxScrollOffset, pickVisibleLines } from '../ai-fit.js'
+import { computeMaxScrollOffset, pickVisibleLines, totalRenderedRows } from '../ai-fit.js'
 
 export const Divider: FC<{ width?: number }> = ({ width = 60 }) => (
   <Text dimColor>{'─'.repeat(width)}</Text>
@@ -211,6 +211,14 @@ export const FullscreenAiViewer: FC<{
   // wrap on narrow terminals (which would silently eat a viewport row).
   const dividerWidth = Math.max(10, Math.min(60, dims.cols - 1))
 
+  // Pad the content area with empty rows so the viewer's total frame height
+  // is CONSTANT across scroll positions. Without this, scrolling can change
+  // the frame height by ±1 row when lines with different wrap counts move in
+  // and out of view — Ink then writes the new (taller) frame BELOW the old
+  // one and the user perceives "scrolling just added an extra line".
+  const visibleRowsUsed = totalRenderedRows(visibleLines, dims.cols)
+  const padRows = Math.max(0, viewportRows - visibleRowsUsed)
+
   return (
     <Box flexDirection="column">
       <Text bold color="cyan">{title}</Text>
@@ -218,6 +226,9 @@ export const FullscreenAiViewer: FC<{
       <Text color="cyan">{'─'.repeat(dividerWidth)}</Text>
       {visibleLines.map((line, index) => (
         <Text key={`ai-line-${scrollOffset + index}`}>{line}</Text>
+      ))}
+      {Array.from({ length: padRows }).map((_, i) => (
+        <Text key={`ai-pad-${i}`}>{' '}</Text>
       ))}
       <Text color="cyan">{'─'.repeat(dividerWidth)}</Text>
       <Text dimColor>

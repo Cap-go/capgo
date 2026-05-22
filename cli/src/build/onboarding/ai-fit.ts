@@ -84,6 +84,21 @@ function renderedRowsForLine(line: string, terminalCols: number): number {
 }
 
 /**
+ * Sum of rendered rows for a list of logical lines.
+ *
+ * Used by the scrollable viewer to figure out how many padding rows to
+ * add below the visible content so the frame height stays constant across
+ * scroll positions (constant height = Ink renders in-place, no scrollback
+ * growth on every keystroke).
+ */
+export function totalRenderedRows(lines: string[], terminalCols: number): number {
+  let total = 0
+  for (const line of lines)
+    total += renderedRowsForLine(line, terminalCols)
+  return total
+}
+
+/**
  * Pick the slice of `lines` starting at `scrollOffset` that fits within
  * `viewportRows` *rendered* rows on a terminal `terminalCols` wide. Returns
  * fewer lines than would otherwise be sliced when individual lines wrap.
