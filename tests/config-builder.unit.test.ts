@@ -227,7 +227,7 @@ describe('get /private/config/builder', () => {
     }
   })
 
-  it('tutorialVideo: rejects unparseable youtubeFallback — enabled:false', async () => {
+  it('tutorialVideo: rejects unparsable youtubeFallback — enabled:false', async () => {
     vi.unstubAllEnvs()
     vi.stubEnv('GOOGLE_OAUTH_CLIENT_ID', '')
     vi.stubEnv('GOOGLE_OAUTH_CLIENT_SECRET', '')
@@ -249,7 +249,7 @@ describe('get /private/config/builder', () => {
     // Spot-check a single missing secret. The beforeEach baseline (all
     // seven blanked) already implicitly tests the "all missing" case via
     // every other test in this describe block, and the malformed-SHA1 /
-    // unparseable-URL tests above cover the format-validation branch of
+    // unparsable-URL tests above cover the format-validation branch of
     // the same missing-array code path. Iterating one-at-a-time across
     // every secret would be redundant.
     //
