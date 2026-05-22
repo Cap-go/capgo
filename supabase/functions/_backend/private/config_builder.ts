@@ -49,6 +49,33 @@ function buildTutorialVideoConfig(c: Context, requestId: string | undefined): Tu
   const sha1 = getEnv(c, 'BUILDER_TUTORIAL_VIDEO_SHA1').trim().toLowerCase()
   const youtubeFallback = getEnv(c, 'BUILDER_TUTORIAL_VIDEO_YOUTUBE_URL').trim()
 
+  // SHA1 must be exactly 40 lowercase hex chars. A wrong-format value
+  // (uppercase, hex with whitespace baked in past trim, a different
+  // hash algo accidentally pasted) would cause the CLI to compute the
+  // file's real SHA1, compare against garbage, and always fail the
+  // integrity check — so we reject the misconfiguration here and let
+  // the CLI fall back to YouTube instead of erroring on every request.
+  const sha1Valid = /^[a-f0-9]{40}$/.test(sha1)
+  // youtubeFallback must be a parseable URL. We don't enforce the
+  // youtube.com host because operators might want to point at a
+  // different docs / Loom / Vimeo URL in the future — but it must at
+  // least be something the CLI can open in a browser. URL parsing
+  // catches typos like "wwww.youtube.com" or missing protocol.
+  let youtubeFallbackValid = false
+  if (youtubeFallback) {
+    try {
+      // eslint-disable-next-line no-new
+      new URL(youtubeFallback)
+      youtubeFallbackValid = true
+    }
+    catch {
+      youtubeFallbackValid = false
+    }
+  }
+
+  // Combined: a misconfigured-format value is treated like a missing
+  // env var so the response shape stays `{ enabled: false }` and the
+  // CLI's fallback path runs.
   const missing: string[] = []
   if (!bucket)
     missing.push('BUILDER_TUTORIAL_VIDEO_R2_BUCKET')
@@ -62,8 +89,12 @@ function buildTutorialVideoConfig(c: Context, requestId: string | undefined): Tu
     missing.push('BUILDER_TUTORIAL_VIDEO_R2_SECRET_KEY')
   if (!sha1)
     missing.push('BUILDER_TUTORIAL_VIDEO_SHA1')
+  else if (!sha1Valid)
+    missing.push('BUILDER_TUTORIAL_VIDEO_SHA1 (invalid format — expected 40 lowercase hex chars)')
   if (!youtubeFallback)
     missing.push('BUILDER_TUTORIAL_VIDEO_YOUTUBE_URL')
+  else if (!youtubeFallbackValid)
+    missing.push('BUILDER_TUTORIAL_VIDEO_YOUTUBE_URL (invalid format — not a parseable URL)')
 
   if (missing.length > 0) {
     cloudlog({ requestId, context: 'config_builder.tutorial_video', enabled: false, reason: `missing ${missing.join(', ')}` })
@@ -73,17 +104,35 @@ function buildTutorialVideoConfig(c: Context, requestId: string | undefined): Tu
   // R2's S3-compatible endpoint is <account-id>.r2.cloudflarestorage.com;
   // objects live at <bucket>/<path>. presignUrl's `path` arg is the
   // canonical resource portion (no protocol, no host).
-  const hostname = `${accountId}.r2.cloudflarestorage.com`
-  const resourcePath = `/${bucket}/${path.replace(/^\//, '')}`
-  const presignedUrl = presignUrl({
-    method: 'GET',
-    hostname,
-    path: resourcePath,
-    region: 'auto', // R2 ignores region as long as it's consistent across signing+request.
-    accessKeyId,
-    secretAccessKey,
-    expirySeconds: TUTORIAL_VIDEO_EXPIRY_SECONDS,
-  })
+  //
+  // Wrapped in try/catch because /private/config/builder also serves
+  // the Google OAuth config to Android onboarding — a bug or bad input
+  // in the presign code path must NOT 500 the whole endpoint and break
+  // Android. On error we log + return tutorialVideo.enabled=false so
+  // the CLI quietly uses its YouTube fallback for PiP.
+  let presignedUrl: string
+  try {
+    const hostname = `${accountId}.r2.cloudflarestorage.com`
+    const resourcePath = `/${bucket}/${path.replace(/^\//, '')}`
+    presignedUrl = presignUrl({
+      method: 'GET',
+      hostname,
+      path: resourcePath,
+      region: 'auto', // R2 ignores region as long as it's consistent across signing+request.
+      accessKeyId,
+      secretAccessKey,
+      expirySeconds: TUTORIAL_VIDEO_EXPIRY_SECONDS,
+    })
+  }
+  catch (err) {
+    cloudlog({
+      requestId,
+      context: 'config_builder.tutorial_video',
+      enabled: false,
+      reason: `presignUrl failed: ${err instanceof Error ? err.message : String(err)}`,
+    })
+    return { enabled: false }
+  }
 
   return {
     enabled: true,
