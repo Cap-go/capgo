@@ -24,6 +24,7 @@ import { CertificateLimitError, classifyCertAvailability, createCertificate, cre
 import { createP12, DEFAULT_P12_PASSWORD, generateCsr } from '../csr.js'
 import { canUseFilePicker, openFilePicker, openMobileprovisionPicker } from '../file-picker.js'
 import { parseMobileprovisionDetailed } from '../../mobileprovision-parser.js'
+import { PipTamperError, precompilePipHelper, predownloadVideo, verifyAndPlayPip } from '../pip-tutorial.js'
 import { exportP12FromKeychain, filterProfilesForApp, isHelperCached, isMacOS, listSigningIdentities, matchIdentitiesToProfiles, precompileSwiftHelper, scanProvisioningProfiles } from '../macos-signing.js'
 import { deleteProgress, getImportEntryStep, getResumeStep, loadProgress, saveProgress } from '../progress.js'
 import { getBuildOnboardingRecoveryAdvice } from '../recovery.js'
@@ -107,6 +108,21 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
    * import-provide-profile-path step (e.g. cancels back to recovery menu).
    */
   const mobileprovisionPickerOpenedRef = useRef(false)
+  /**
+   * In-flight Promises for the PiP tutorial background tasks. Started on
+   * macOS when the user enters the import flow so they're either ready
+   * or close to ready by the time the recovery menu's "Open Apple
+   * Developer Portal" path tries to use them. `null` means the task was
+   * never started for this session (non-macOS, or import flow not
+   * entered yet).
+   *
+   * Resolved promises carry the binary/video path + SHA1; rejected
+   * promises mean the task failed (swiftc missing, download error,
+   * etc.) and the Open-Portal path should fall back to opening the
+   * YouTube URL in a browser instead of attempting PiP.
+   */
+  const pipHelperPromiseRef = useRef<Promise<import('../pip-tutorial.js').PrecompiledPipHelper> | null>(null)
+  const pipVideoPromiseRef = useRef<Promise<import('../pip-tutorial.js').PredownloadedVideo> | null>(null)
   const exitRequestedRef = useRef(false)
   // overwriteConfirmedRef removed — credential check happens at start now
 
@@ -257,6 +273,49 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
     })
   }, [])
 
+  /**
+   * Hardcoded tutorial-video URL and YouTube fallback. These will move
+   * to a server-fetched config (Cap-go/capgo `/private/builder-tutorial-
+   * video` endpoint, separate PR) so the R2 path + SHA1 + YouTube URL
+   * can be rotated as worker secrets without redeploying the CLI.
+   *
+   * For now they're inline so the rest of the wiring can be tested
+   * before the backend lands. The server-side SHA1 verification in
+   * `verifyAndPlayPip` is skipped when undefined.
+   */
+  const PIP_VIDEO_URL = 'https://9ee3d7479a3c359681e3fab2c8cb22c0.r2.cloudflarestorage.com/capgo/temporary/2026-04-15%2015-27-48.mov?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=1c9287c4bc76093a16976493a803f6be/20260521/wnam/s3/aws4_request&X-Amz-Date=20260521T090758Z&X-Amz-Expires=86400&X-Amz-SignedHeaders=host&X-Amz-Signature=5ef10044359385faa5ea0ad6f9445c61403a66cb125a79723b8c56d4b069cc1a'
+  const PIP_YOUTUBE_FALLBACK = 'https://www.youtube.com/results?search_query=apple+developer+portal+provisioning+profile'
+
+  /**
+   * Kick off the PiP precompile + video predownload in the background
+   * the first time the user enters the macOS import flow. Idempotent:
+   * once the refs are populated, subsequent calls no-op. On non-macOS
+   * the call is a no-op so the rest of the flow doesn't have to gate
+   * itself on platform.
+   *
+   * Failures (swiftc missing, network down, R2 5xx) are deferred — the
+   * Promise rejects rather than throwing synchronously, and the
+   * Open-Portal handler later catches and falls back to YouTube.
+   */
+  const ensurePipTasksStarted = useCallback(() => {
+    if (!isMacOS())
+      return
+    if (!pipHelperPromiseRef.current) {
+      pipHelperPromiseRef.current = precompilePipHelper().catch((err) => {
+        // Re-throw so the consumer can see why it failed. We don't
+        // null the ref here — the next call will still see the rejected
+        // promise and fall through to fallback, no need to re-trigger
+        // a compile we know will fail.
+        throw err
+      })
+    }
+    if (!pipVideoPromiseRef.current) {
+      pipVideoPromiseRef.current = predownloadVideo(PIP_VIDEO_URL).catch((err) => {
+        throw err
+      })
+    }
+  }, [])
+
   const pm = getPMAndCommand()
   const addIosCommand = formatRunnerCommand(pm.runner, ['cap', 'add', 'ios'])
   const syncIosCommand = formatRunnerCommand(pm.runner, ['cap', 'sync', 'ios'])
@@ -369,6 +428,12 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
     if (completedSteps.profileCreated) {
       addLog(`✔ Provisioning profile created — "${completedSteps.profileCreated.profileName}"`)
     }
+    // Resume-into-import case: progress already says import-existing, so
+    // we're skipping the setup-method-select step entirely. Kick off the
+    // PiP tutorial bg tasks here too so the recovery menu has them ready.
+    // The setup-method-select onChange handles the fresh-entry case.
+    if (initialProgress.setupMethod === 'import-existing')
+      ensurePipTasksStarted()
   }, []) // Only on mount
 
   const handleError = useCallback((err: unknown, failedStep: OnboardingStep) => {
@@ -1737,6 +1802,11 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
 
               if (value === 'import') {
                 setImportMode(true)
+                // Fire the PiP tutorial background tasks now so they're
+                // (ideally) ready by the time the user clicks "Open Apple
+                // Developer Portal" in the recovery menu. No-op on
+                // non-macOS, idempotent on repeat entry.
+                ensurePipTasksStarted()
                 setStep('import-scanning')
               }
               else {
@@ -2180,14 +2250,80 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
               ]}
               onChange={async (value) => {
                 if (value === 'browser') {
-                  // No auto-rescan timer here: 5 seconds is a wild guess
-                  // and "creating a profile in the portal" can take a
-                  // minute or more. The user picks the explicit
-                  // "🔄 Rescan Apple API" option below when they're
-                  // ready, which gives them precise control over
-                  // when we re-hit the API.
+                  // No auto-rescan timer for the API: 5 seconds is a wild
+                  // guess and "creating a profile in the portal" can take
+                  // a minute or more. The user picks the explicit
+                  // "🔄 Rescan Apple API" option below when they're ready.
                   open('https://developer.apple.com/account/resources/profiles/list')
                   addLog('✔ Opened Apple Developer Portal — pick "🔄 Rescan Apple API" when you\'re done creating the profile.', 'yellow')
+
+                  // Concurrently try to open the PiP tutorial. We've been
+                  // pre-compiling + pre-downloading since the user picked
+                  // "Import existing" upstream; here we race those bg
+                  // tasks against a 5-second budget so the user gets PiP
+                  // when they're ready and a clean YouTube fallback when
+                  // they aren't. The whole branch runs unawaited so the
+                  // recovery menu Select doesn't block — the user can
+                  // pick a different option while PiP is starting.
+                  if (isMacOS() && pipHelperPromiseRef.current && pipVideoPromiseRef.current) {
+                    addLog('🎬 Preparing tutorial video for Picture-in-Picture (5s budget)…', 'cyan')
+                    ;(async () => {
+                      const PIP_BUDGET_MS = 5000
+                      const timeout = new Promise<'timeout'>((resolveT) => {
+                        setTimeout(() => resolveT('timeout'), PIP_BUDGET_MS)
+                      })
+                      try {
+                        const both = Promise.all([pipHelperPromiseRef.current!, pipVideoPromiseRef.current!])
+                        const race = await Promise.race([both, timeout])
+                        if (race === 'timeout') {
+                          addLog(`⚠ PiP tutorial not ready in ${PIP_BUDGET_MS / 1000}s — opening tutorial in your browser instead.`, 'yellow')
+                          open(PIP_YOUTUBE_FALLBACK)
+                          return
+                        }
+                        const [helper, video] = race as [
+                          import('../pip-tutorial.js').PrecompiledPipHelper,
+                          import('../pip-tutorial.js').PredownloadedVideo,
+                        ]
+                        try {
+                          await verifyAndPlayPip({
+                            binaryPath: helper.binaryPath,
+                            expectedBinarySha1: helper.sha1,
+                            videoPath: video.localPath,
+                            expectedVideoSha1: video.sha1,
+                            // Server-published SHA1 wired in when the
+                            // /private/builder-tutorial-video endpoint
+                            // lands (see Capgo PR — separate worktree).
+                          })
+                          addLog('🎬 Tutorial playing in Picture-in-Picture.', 'cyan')
+                        }
+                        catch (err) {
+                          // SHA1 mismatch or spawn failure → explicit
+                          // fallback. The PipTamperError wording already
+                          // explains what mismatched; we surface the head
+                          // of the message and route the user to YouTube.
+                          const msg = err instanceof PipTamperError
+                            ? `⚠ PiP tutorial integrity check failed: ${err.message} Opening tutorial in your browser instead.`
+                            : `⚠ Couldn't start PiP tutorial: ${err instanceof Error ? err.message : String(err)}. Opening tutorial in your browser instead.`
+                          addLog(msg, 'yellow')
+                          open(PIP_YOUTUBE_FALLBACK)
+                        }
+                      }
+                      catch (err) {
+                        // One of the bg tasks rejected (swiftc missing,
+                        // download failed, etc.). Same fallback.
+                        addLog(`⚠ PiP tutorial setup failed: ${err instanceof Error ? err.message : String(err)}. Opening tutorial in your browser instead.`, 'yellow')
+                        open(PIP_YOUTUBE_FALLBACK)
+                      }
+                    })()
+                  }
+                  else if (isMacOS()) {
+                    // Tasks were never started (resumed past setup-method-
+                    // select on a code path that doesn't kick them off).
+                    // Just open YouTube — don't surprise-block on a fresh
+                    // compile+download from this click.
+                    open(PIP_YOUTUBE_FALLBACK)
+                    addLog('💡 Tutorial opened in your browser (PiP unavailable on this path).', 'yellow')
+                  }
                   return
                 }
                 if (value === 'provide-profile-path') {
