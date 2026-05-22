@@ -82,3 +82,26 @@ export function mapAndroidOnboardingError(error: unknown): AndroidOnboardingErro
 
   return 'unknown'
 }
+
+/**
+ * Map a `ValidationResult.kind` from the SA-import validation module onto an
+ * AndroidOnboardingErrorCategory so PostHog `Builder Onboarding Step` events
+ * for `sa-json-validation-failed` carry an actionable failure dimension.
+ *
+ * Kept here (alongside `mapAndroidOnboardingError`) so the full SA-error
+ * taxonomy lives in one place.
+ */
+export function mapSaValidationKindToCategory(
+  kind: 'shape-error' | 'token-error' | 'no-app-access' | 'network-error',
+): AndroidOnboardingErrorCategory {
+  switch (kind) {
+    case 'shape-error':
+      return 'sa_json_shape_invalid'
+    case 'token-error':
+      return 'sa_json_token_rejected'
+    case 'no-app-access':
+      return 'sa_json_no_app_access'
+    case 'network-error':
+      return 'sa_json_network_error'
+  }
+}

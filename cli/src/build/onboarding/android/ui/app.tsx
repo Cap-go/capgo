@@ -28,11 +28,12 @@ import { loadSavedCredentials, updateSavedCredentials } from '../../../credentia
 import { requestBuildInternal } from '../../../request.js'
 import type { CiSecretEntry, CiSecretSetupAdvice, CiSecretTarget } from '../../ci-secrets.js'
 import { createCiSecretEntries, detectCiSecretTargets, getCiSecretTargetLabel, listExistingCiSecretKeys, uploadCiSecrets } from '../../ci-secrets.js'
-import { mapAndroidOnboardingError } from '../../error-categories.js'
-import { canUseFilePicker, openKeystorePicker } from '../../file-picker.js'
+import { mapAndroidOnboardingError, mapSaValidationKindToCategory } from '../../error-categories.js'
+import { canUseFilePicker, openKeystorePicker, openServiceAccountJsonPicker } from '../../file-picker.js'
 import { trackBuilderOnboardingStep } from '../../telemetry.js'
 import { Divider, ErrorLine, FilteredTextInput, Header, SpinnerLine, SuccessLine } from '../../ui/components.js'
 import { findAndroidApplicationIds } from '../gradle-parser.js'
+import { validateServiceAccountJson } from '../service-account-validation.js'
 import {
   ANDROIDPUBLISHER_API,
   createServiceAccountKey,
@@ -219,10 +220,19 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
       ? undefined
       : now - previous.startedAt
 
+    // Steps whose telemetry event carries an `errorCategory` dimension. The
+    // generic `'error'` step always has one (set by `handleError`); the
+    // SA-import `'sa-json-validation-failed'` step also carries one because
+    // the validation effect populates `errorCategoryRef.current` with the
+    // mapped `ValidationResult.kind` before transitioning. Funnel analysis
+    // in PostHog can split sa-json-validation-failed events by category to
+    // see whether failures are "wrong file" vs "SA not invited to app" vs
+    // transient network issues.
+    const carriesErrorCategory = step === 'error' || step === 'sa-json-validation-failed'
     const eventPayload = {
       step,
       durationMs,
-      errorCategory: step === 'error' ? errorCategoryRef.current : undefined,
+      errorCategory: carriesErrorCategory ? errorCategoryRef.current : undefined,
     }
 
     stepTimingRef.current = { step, startedAt: now }
@@ -248,7 +258,36 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
   const pickerOpenedRef = useRef(false)
   const oauthStartedRef = useRef(false)
   const setupStartedRef = useRef(false)
+  const saPickerOpenedRef = useRef(false)
+  const validationStartedRef = useRef(false)
+  // Cleanup hook for the in-flight SA validation. Invoked by the main
+  // useEffect cleanup so a step change / unmount / Ctrl+C aborts the
+  // outbound JWT exchange + Play API round trip rather than letting it run
+  // detached.
+  const validationCleanupRef = useRef<(() => void) | null>(null)
+  /**
+   * Per-step submission guard for `<Select>` `onChange` callbacks.
+   *
+   * `@inkjs/ui` v2.0.0 ships a known footgun in `use-select-state.js`: the
+   * effect that fires `onChange` lists the `onChange` callback itself in its
+   * dependency array AND never resets `state.previousValue` after a selection.
+   * Because parent re-renders create a fresh inline arrow each pass, every
+   * downstream `setState` after the first selection re-triggers `onChange`,
+   * causing duplicate log lines, double persistAndStep writes, and spammed
+   * step transitions.
+   *
+   * This ref is cleared once per step change (see the useEffect below). Any
+   * `onChange` handler that performs a one-shot action (logging, persisting,
+   * step transition) checks the ref and bails on re-fires.
+   *
+   * NOTE: handlers that only flip a sub-mode within the same step (e.g.,
+   * `setKeystorePathMode('manual')`) intentionally do NOT guard, because those
+   * unmount the `<Select>` synchronously and the effect doesn't get a chance
+   * to re-fire.
+   */
+  const selectFiredRef = useRef(false)
   const [keystorePathMode, setKeystorePathMode] = useState<'choose' | 'manual'>('choose')
+  const [saJsonPathMode, setSaJsonPathMode] = useState<'choose' | 'manual'>('choose')
 
   // Phase 1 — keystore
   const [, setKeystoreMethod] = useState<'existing' | 'generate' | null>(
@@ -272,7 +311,21 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
   const [keyPasswordProbe, setKeyPasswordProbe] = useState<null | 'auto' | 'prompt'>(null)
   const keyPasswordProbeRef = useRef(false)
 
-  // Phase 2 — Google sign-in
+  // Phase 2 — Service account method fork
+  const [serviceAccountMethod, setServiceAccountMethod] = useState<'existing' | 'generate' | null>(
+    initialProgress?.serviceAccountMethod || null,
+  )
+  const [serviceAccountJsonPath, setServiceAccountJsonPath] = useState(
+    initialProgress?.serviceAccountJsonPath || '',
+  )
+  // Result of the last validation attempt — drives the sa-json-validation-failed UI.
+  // Loose typing here to avoid pulling the entire ValidationResult union into the
+  // component file; the module owns the discriminated shape.
+  const [saValidationResult, setSaValidationResult] = useState<
+    null | { ok: true } | { ok: false, kind: 'shape-error' | 'token-error' | 'no-app-access' | 'network-error', message: string }
+  >(null)
+
+  // Phase 2b — Google sign-in
   const [, setGoogleSignIn] = useState<GoogleSignInComplete | null>(
     initialProgress?.completedSteps.googleSignInComplete || null,
   )
@@ -611,6 +664,13 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
       oauthStartedRef.current = false
     if (step !== 'gcp-setup-running')
       setupStartedRef.current = false
+    if (step !== 'sa-json-existing-picker')
+      saPickerOpenedRef.current = false
+    if (step !== 'sa-json-validating')
+      validationStartedRef.current = false
+    // Reset the @inkjs/ui Select re-fire guard on every step transition so each
+    // new step gets a clean slate. See the JSDoc on `selectFiredRef`.
+    selectFiredRef.current = false
 
     if (step === 'keystore-existing-picker' && !pickerOpenedRef.current) {
       pickerOpenedRef.current = true
@@ -631,6 +691,95 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
         catch (err) {
           if (!cancelled)
             handleError(err, 'keystore-existing-path')
+        }
+      })()
+    }
+
+    if (step === 'sa-json-existing-picker' && !saPickerOpenedRef.current) {
+      saPickerOpenedRef.current = true
+      ;(async () => {
+        try {
+          const selected = await openServiceAccountJsonPicker()
+          if (cancelled)
+            return
+          if (!selected) {
+            // Cancelled — fall back to manual input. Reset the chooser screen
+            // so we don't loop back into picker mode immediately.
+            setSaJsonPathMode('manual')
+            setStep('sa-json-existing-path')
+            return
+          }
+          setServiceAccountJsonPath(selected)
+          await persist((p) => ({ ...p, serviceAccountJsonPath: selected }))
+          addLog(`✔ Service account JSON · ${selected}`)
+          setStep('sa-json-validating')
+        }
+        catch (err) {
+          if (!cancelled)
+            handleError(err, 'sa-json-existing-path')
+        }
+      })()
+    }
+
+    if (step === 'sa-json-validating' && !validationStartedRef.current) {
+      validationStartedRef.current = true
+      // Bound the network round trips to the lifetime of this step. If the
+      // user Ctrl+C's, picks a different file, or unmounts the component
+      // mid-flight, the cleanup at the bottom of this effect aborts the
+      // controller and the in-flight fetch/JWT exchange unwinds promptly.
+      const validationAbort = new AbortController()
+      validationCleanupRef.current = () => validationAbort.abort()
+      ;(async () => {
+        try {
+          if (!serviceAccountJsonPath)
+            throw new Error('No service account JSON path on record — pick the file again.')
+          if (!androidPackageChoice)
+            throw new Error('No Android package on record — pick the package again.')
+
+          const jsonBytes = await readFile(serviceAccountJsonPath)
+          if (cancelled)
+            return
+
+          const result = await validateServiceAccountJson({
+            jsonBytes,
+            packageName: androidPackageChoice.packageName,
+            signal: validationAbort.signal,
+          })
+          if (cancelled)
+            return
+
+          if (result.ok) {
+            const base64 = jsonBytes.toString('base64')
+            setServiceAccountKeyBase64(base64)
+            setSaValidationResult({ ok: true })
+            await persist((p) => ({
+              ...p,
+              _serviceAccountKeyBase64: base64,
+              // Clear any stale "skipped" flag from a previous attempt.
+              serviceAccountValidationSkipped: false,
+            }))
+            addLog(`✔ Service account verified — ${result.serviceAccountEmail}`)
+            setStep('saving-credentials')
+            return
+          }
+
+          setSaValidationResult(result)
+          // Stash the validation failure kind so the PostHog
+          // `sa-json-validation-failed` step event carries the dimension.
+          // Read by the telemetry useEffect on the upcoming step transition.
+          errorCategoryRef.current = mapSaValidationKindToCategory(result.kind)
+          // shape-error indicates the file itself is wrong — surface as a
+          // banner log and route to the same recovery screen so the user
+          // can pick a different file or fall back to OAuth. Other kinds
+          // (token, no-app-access, network) already get full text on the
+          // recovery screen.
+          if (result.kind === 'shape-error')
+            addLog(`✖ ${result.message}`, 'red')
+          setStep('sa-json-validation-failed')
+        }
+        catch (err) {
+          if (!cancelled)
+            handleError(err, 'sa-json-existing-path')
         }
       })()
     }
@@ -749,11 +898,26 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
             completedSteps: { ...p.completedSteps, keystoreReady: ready },
           }))
           addLog(`✔ Keystore loaded — ${keystoreExistingPath}`)
-          // Smart-route: skip phases already complete (e.g. on resume).
+          // Smart-route: skip phases already complete (e.g. on resume into
+          // this step after a legacy progress file already had OAuth steps
+          // done). If progress shows nothing past keystoreReady, land on the
+          // new fork; otherwise pick up where we left off (resume contract:
+          // legacy progress without `serviceAccountMethod` defaults to OAuth
+          // via `getAndroidResumeStep`).
           const fresh = await loadAndroidProgress(appId)
           if (cancelled)
             return
-          setStep(fresh ? getAndroidResumeStep(fresh) : 'google-sign-in')
+          const hasAnyOAuthProgress = !!(
+            fresh?.completedSteps.googleSignInComplete
+            || fresh?.completedSteps.playAccountChosen
+            || fresh?.completedSteps.gcpProjectChosen
+            || fresh?.completedSteps.androidPackageChosen
+            || fresh?._oauthRefreshToken
+          )
+          if (hasAnyOAuthProgress || fresh?.serviceAccountMethod !== undefined)
+            setStep(fresh ? getAndroidResumeStep(fresh) : 'service-account-method-select')
+          else
+            setStep('service-account-method-select')
         }
         catch (err) {
           if (!cancelled)
@@ -799,7 +963,15 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
           // here — at this point the password lives only in the in-memory
           // state and the progress file, not in `credentials.json`.
           setRetryCount(0)
-          setStep('google-sign-in')
+          // After keystore is freshly generated in THIS run, always land on
+          // the new method-select fork — we know there's no prior SA choice
+          // because we just finished the keystore phase. Resume mid-flow on
+          // a subsequent run goes through `getAndroidResumeStep`, which
+          // routes legacy progress (absent `serviceAccountMethod`) to the
+          // OAuth path for backward compatibility.
+          if (cancelled)
+            return
+          setStep('service-account-method-select')
         }
         catch (err) {
           if (!cancelled)
@@ -1265,10 +1437,22 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
         if (!cancelled)
           exit()
       }, 100)
-      return () => { cancelled = true; clearTimeout(timer) }
+      return () => {
+        cancelled = true
+        clearTimeout(timer)
+        validationCleanupRef.current?.()
+        validationCleanupRef.current = null
+      }
     }
 
-    return () => { cancelled = true }
+    return () => {
+      cancelled = true
+      // Abort any in-flight SA validation. Safe to call when there isn't one
+      // — the ref is reset to null on every step transition that doesn't
+      // start a new validation.
+      validationCleanupRef.current?.()
+      validationCleanupRef.current = null
+    }
   }, [step])
 
   const progressPct = ANDROID_STEP_PROGRESS[step] ?? 0
@@ -1545,12 +1729,22 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
                     completedSteps: { ...p.completedSteps, keystoreReady: ready },
                   }))
                   addLog(`✔ Keystore loaded — ${keystoreExistingPath}`)
-                  // Smart-route: skip phases already complete (same pattern as
-                  // the auto-probe branch in the useEffect above) so a resume
-                  // that re-enters key-password doesn't drag the user back to
-                  // google-sign-in if they've already completed it.
+                  // Smart-route: same pattern as the auto-probe branch above.
+                  // If the user has any OAuth-side progress (legacy resume or
+                  // mid-flow), pick up where they left off; otherwise drop
+                  // them on the new fork.
                   const fresh = await loadAndroidProgress(appId)
-                  setStep(fresh ? getAndroidResumeStep(fresh) : 'google-sign-in')
+                  const hasAnyOAuthProgress = !!(
+                    fresh?.completedSteps.googleSignInComplete
+                    || fresh?.completedSteps.playAccountChosen
+                    || fresh?.completedSteps.gcpProjectChosen
+                    || fresh?.completedSteps.androidPackageChosen
+                    || fresh?._oauthRefreshToken
+                  )
+                  if (hasAnyOAuthProgress || fresh?.serviceAccountMethod !== undefined)
+                    setStep(fresh ? getAndroidResumeStep(fresh) : 'service-account-method-select')
+                  else
+                    setStep('service-account-method-select')
                 }
                 catch (err) {
                   handleError(err, 'keystore-existing-path')
@@ -1667,7 +1861,203 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
         <Box marginTop={1}><SpinnerLine text="Generating 2048-bit RSA keystore..." /></Box>
       )}
 
-      {/* ── Phase 2 — Google sign-in ── */}
+      {/* ── Phase 2 — Service account method fork ── */}
+
+      {step === 'service-account-method-select' && (
+        <Box flexDirection="column" marginTop={1}>
+          <Alert variant="info">
+            Capgo needs a Google Play service account JSON to upload AABs on your behalf. You can bring your own or let Capgo set one up via Google sign-in.
+          </Alert>
+          <Newline />
+          <Text bold>Do you already have a service account JSON?</Text>
+          <Newline />
+          <Select
+            options={[
+              { label: '🔐  No, set one up for me via Google', value: 'generate' },
+              { label: '✅  Yes, I have my service account JSON file', value: 'existing' },
+            ]}
+            onChange={(value) => {
+              if (selectFiredRef.current)
+                return
+              selectFiredRef.current = true
+              const method: 'existing' | 'generate' = value === 'existing' ? 'existing' : 'generate'
+              setServiceAccountMethod(method)
+              if (method === 'existing') {
+                // Import path needs the package name first so validation can
+                // probe edits.insert(packageName). The package-select step is
+                // shared with the OAuth path and routes back here based on
+                // serviceAccountMethod.
+                persistAndStep(
+                  (p) => ({ ...p, serviceAccountMethod: 'existing' }),
+                  'android-package-select',
+                )
+              }
+              else {
+                persistAndStep(
+                  (p) => ({ ...p, serviceAccountMethod: 'generate' }),
+                  'google-sign-in',
+                )
+              }
+            }}
+          />
+        </Box>
+      )}
+
+      {/* ── Phase 2a — Import existing service account JSON ── */}
+
+      {step === 'sa-json-existing-path' && (
+        <Box flexDirection="column" marginTop={1}>
+          <Text bold>Existing service account JSON (.json)</Text>
+          <Newline />
+          {canUseFilePicker() && saJsonPathMode === 'choose'
+            ? (
+                <>
+                  <Text>How do you want to provide it?</Text>
+                  <Newline />
+                  <Select
+                    options={[
+                      { label: '📂  Open file picker', value: 'picker' },
+                      { label: '📝  Type the path', value: 'manual' },
+                    ]}
+                    onChange={(value) => {
+                      // 'manual' just flips the sub-mode (Select unmounts) and
+                      // is safe from the re-fire bug. 'picker' triggers a step
+                      // transition that takes time — guard against re-fires
+                      // before commit.
+                      if (value === 'picker') {
+                        if (selectFiredRef.current)
+                          return
+                        selectFiredRef.current = true
+                        setStep('sa-json-existing-picker')
+                      }
+                      else {
+                        setSaJsonPathMode('manual')
+                      }
+                    }}
+                  />
+                </>
+              )
+            : (
+                <>
+                  <Text dimColor>Tip: drag a file into this window to paste its path.</Text>
+                  <Newline />
+                  <FilteredTextInput
+                    placeholder="/path/to/service-account.json"
+                    filter=""
+                    onSubmit={(val) => {
+                      const cleaned = cleanPath(val)
+                      if (!cleaned)
+                        return
+                      const abs = resolvePath(cleaned)
+                      if (!existsSync(abs)) {
+                        setError(`File not found: ${abs}`)
+                        setRetryStep('sa-json-existing-path')
+                        setStep('error')
+                        return
+                      }
+                      setServiceAccountJsonPath(abs)
+                      addLog(`✔ Service account JSON · ${abs}`)
+                      persistAndStep(
+                        (p) => ({ ...p, serviceAccountJsonPath: abs }),
+                        'sa-json-validating',
+                      )
+                    }}
+                  />
+                </>
+              )}
+        </Box>
+      )}
+
+      {step === 'sa-json-existing-picker' && (
+        <Box marginTop={1}><SpinnerLine text="Opening file picker..." /></Box>
+      )}
+
+      {step === 'sa-json-validating' && (
+        <Box marginTop={1}>
+          <SpinnerLine text="Validating service account against Google Play..." />
+        </Box>
+      )}
+
+      {step === 'sa-json-validation-failed' && saValidationResult && !saValidationResult.ok && (
+        <Box flexDirection="column" marginTop={1}>
+          <Alert variant="warning">
+            Service account validation failed.
+          </Alert>
+          <Newline />
+          <Box flexDirection="column" marginLeft={2}>
+            <Text color="red">{saValidationResult.message}</Text>
+          </Box>
+          <Newline />
+          <Text bold>What would you like to do?</Text>
+          <Newline />
+          <Select
+            options={[
+              { label: '🔄  Try a different service account file', value: 'retry' },
+              { label: '💾  Save credentials anyway (skip validation)', value: 'save-anyway' },
+              { label: '🆕  Set up a new service account via Google', value: 'oauth' },
+            ]}
+            onChange={(value) => {
+              if (selectFiredRef.current)
+                return
+              selectFiredRef.current = true
+              // Defense-in-depth: the validation failure's errorCategory has
+              // already been emitted on the `sa-json-validation-failed` step
+              // event. Clearing the ref before leaving this step ensures any
+              // subsequent error (e.g. disk failure at `saving-credentials`,
+              // a failed re-validation, or an OAuth issue downstream) gets
+              // its own freshly-mapped category instead of inheriting the
+              // stale SA validation one. `handleError` overwrites this ref
+              // before transitioning to `'error'`, so today this is
+              // belt-and-suspenders — but it makes the ref's invariant
+              // ("most recent unresolved error context") true at every
+              // sa-json-validation-failed exit point.
+              errorCategoryRef.current = undefined
+              if (value === 'retry') {
+                // Clear the saved path so the picker chooser shows fresh.
+                setServiceAccountJsonPath('')
+                setSaValidationResult(null)
+                setSaJsonPathMode('choose')
+                persistAndStep(
+                  (p) => ({ ...p, serviceAccountJsonPath: undefined }),
+                  'sa-json-existing-path',
+                )
+                return
+              }
+              if (value === 'save-anyway') {
+                ;(async () => {
+                  try {
+                    if (!serviceAccountJsonPath)
+                      throw new Error('No service account JSON path on record.')
+                    const bytes = await readFile(serviceAccountJsonPath)
+                    const base64 = bytes.toString('base64')
+                    setServiceAccountKeyBase64(base64)
+                    await persist((p) => ({
+                      ...p,
+                      _serviceAccountKeyBase64: base64,
+                      serviceAccountValidationSkipped: true,
+                    }))
+                    addLog('⚠ Saved service account without validation — builds may fail if the SA isn\'t invited to your Play Console app.', 'yellow')
+                    setStep('saving-credentials')
+                  }
+                  catch (err) {
+                    handleError(err, 'sa-json-existing-path')
+                  }
+                })()
+                return
+              }
+              // oauth — fall back to the OAuth provisioning path.
+              setServiceAccountMethod('generate')
+              setSaValidationResult(null)
+              persistAndStep(
+                (p) => ({ ...p, serviceAccountMethod: 'generate' }),
+                'google-sign-in',
+              )
+            }}
+          />
+        </Box>
+      )}
+
+      {/* ── Phase 2b — Google sign-in ── */}
 
       {step === 'google-sign-in' && !showOAuthLearnMore && (
         <Box flexDirection="column" marginTop={1}>
@@ -1936,22 +2326,32 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
                       { label: '✍️   Type a different package name', value: '__manual__' },
                     ]}
                     onChange={(value) => {
+                      // Mode-switch path unmounts the <Select> synchronously,
+                      // so the @inkjs/ui re-fire bug can't replay it. The
+                      // package-pick path goes through async persistAndStep,
+                      // which keeps the <Select> mounted long enough for the
+                      // bug to spam — gate it with the per-step guard.
                       if (value === '__manual__') {
                         setPackageSelectMode('manual')
                         return
                       }
+                      if (selectFiredRef.current)
+                        return
+                      selectFiredRef.current = true
                       const choice: AndroidPackageChoice = {
                         packageName: value,
                         source: 'gradle',
                       }
                       setAndroidPackageChoice(choice)
                       addLog(`✔ Android package — ${value}`)
+                      const nextStep: AndroidOnboardingStep
+                        = serviceAccountMethod === 'existing' ? 'sa-json-existing-path' : 'gcp-setup-running'
                       persistAndStep(
                         (p) => ({
                           ...p,
                           completedSteps: { ...p.completedSteps, androidPackageChosen: choice },
                         }),
-                        'gcp-setup-running',
+                        nextStep,
                       )
                     }}
                   />
@@ -1978,12 +2378,14 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
                       }
                       setAndroidPackageChoice(choice)
                       addLog(`✔ Android package — ${name}`)
+                      const nextStep: AndroidOnboardingStep
+                        = serviceAccountMethod === 'existing' ? 'sa-json-existing-path' : 'gcp-setup-running'
                       persistAndStep(
                         (p) => ({
                           ...p,
                           completedSteps: { ...p.completedSteps, androidPackageChosen: choice },
                         }),
-                        'gcp-setup-running',
+                        nextStep,
                       )
                     }}
                   />
