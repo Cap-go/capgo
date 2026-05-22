@@ -12,8 +12,10 @@
 //   5. Long single line that would wrap → counted as multiple rows.
 import {
   AI_RESULT_CHROME_ROWS,
+  computeMaxScrollOffset,
   estimateRenderedRows,
   isAiAnalysisTooTall,
+  pickVisibleLines,
   stripAnsi,
 } from '../src/build/onboarding/ai-fit.ts'
 
@@ -110,6 +112,88 @@ test('isAiAnalysisTooTall: one very long wrapping line on narrow terminal → tr
   const txt = 'a'.repeat(800)
   if (isAiAnalysisTooTall(txt, 24, 40) !== true)
     throw new Error('long wrapping line should overflow')
+})
+
+// ── pickVisibleLines ─────────────────────────────────────────────────────────
+
+test('pickVisibleLines: empty input returns []', () => {
+  const out = pickVisibleLines([], 0, 10, 80)
+  if (out.length !== 0)
+    throw new Error('expected []')
+})
+
+test('pickVisibleLines: scrollOffset past end returns []', () => {
+  const out = pickVisibleLines(['a', 'b'], 5, 10, 80)
+  if (out.length !== 0)
+    throw new Error('expected []')
+})
+
+test('pickVisibleLines: returns at most viewportRows simple lines', () => {
+  const lines = ['a', 'b', 'c', 'd', 'e']
+  const out = pickVisibleLines(lines, 0, 3, 80)
+  if (out.join(',') !== 'a,b,c')
+    throw new Error(`got ${out.join(',')}`)
+})
+
+test('pickVisibleLines: stops early when wrapped lines would overflow', () => {
+  // 80-char line wraps to 4 rows on a 20-col terminal. Viewport 5 rows →
+  // 4 (first line) + 1 (second short) = 5 fits exactly, then we stop.
+  // The third short line is dropped because rowsUsed already hit viewportRows.
+  const lines = ['x'.repeat(80), 'short', 'short']
+  const out = pickVisibleLines(lines, 0, 5, 20)
+  if (out.length !== 2)
+    throw new Error(`expected 2 lines, got ${out.length}`)
+})
+
+test('pickVisibleLines: floor at one line even if it overflows by itself', () => {
+  // 200-char line wraps to 10 rows on 20-col terminal, viewport is 5 rows.
+  // We still include the line so the viewer isn't blank.
+  const lines = ['x'.repeat(200)]
+  const out = pickVisibleLines(lines, 0, 5, 20)
+  if (out.length !== 1)
+    throw new Error('expected 1 line as floor')
+})
+
+test('pickVisibleLines: starts from scrollOffset', () => {
+  const lines = ['a', 'b', 'c', 'd', 'e']
+  const out = pickVisibleLines(lines, 2, 2, 80)
+  if (out.join(',') !== 'c,d')
+    throw new Error(`got ${out.join(',')}`)
+})
+
+// ── computeMaxScrollOffset ───────────────────────────────────────────────────
+
+test('computeMaxScrollOffset: empty input is 0', () => {
+  if (computeMaxScrollOffset([], 5, 80) !== 0)
+    throw new Error('expected 0')
+})
+
+test('computeMaxScrollOffset: simple lines, viewport ≥ count → 0', () => {
+  // 5 short lines, viewport 10 — everything fits, max offset is 0
+  const lines = ['a', 'b', 'c', 'd', 'e']
+  if (computeMaxScrollOffset(lines, 10, 80) !== 0)
+    throw new Error('expected 0 when everything fits')
+})
+
+test('computeMaxScrollOffset: simple lines, viewport < count → packs from end', () => {
+  // 10 short lines, viewport 3 → max offset = 7 (lines 7,8,9 visible)
+  const lines = Array.from({ length: 10 }, (_, i) => `line ${i}`)
+  if (computeMaxScrollOffset(lines, 3, 80) !== 7)
+    throw new Error(`expected 7, got ${computeMaxScrollOffset(lines, 3, 80)}`)
+})
+
+test('computeMaxScrollOffset: long wrapping tail line counts for wrap', () => {
+  // Last line wraps to 3 rows on a 20-col terminal, viewport 5 → only 2 short
+  // tail lines + the wrapping line fit. Actually: tail line takes 3 rows,
+  // then 2 more short lines (1 row each) = 5 rows total. So 3 lines fit at
+  // the end → max offset = 10 - 3 = 7.
+  const lines = [
+    ...Array.from({ length: 9 }, (_, i) => `line ${i}`),
+    'y'.repeat(60),
+  ]
+  const got = computeMaxScrollOffset(lines, 5, 20)
+  if (got !== 7)
+    throw new Error(`expected 7, got ${got}`)
 })
 
 console.log(`\n${passed} passed, ${failed} failed`)

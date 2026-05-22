@@ -72,3 +72,73 @@ export function isAiAnalysisTooTall(
   const estimated = estimateRenderedRows(text, terminalCols)
   return estimated > availableRows
 }
+
+/**
+ * Wrap-aware rendered-row count for a single logical line.
+ * Treats blank/empty lines as one row (Ink still occupies a row for them).
+ */
+function renderedRowsForLine(line: string, terminalCols: number): number {
+  const cols = Math.max(1, Math.floor(terminalCols))
+  const visibleLen = stripAnsi(line).length
+  return Math.max(1, Math.ceil(visibleLen / cols))
+}
+
+/**
+ * Pick the slice of `lines` starting at `scrollOffset` that fits within
+ * `viewportRows` *rendered* rows on a terminal `terminalCols` wide. Returns
+ * fewer lines than would otherwise be sliced when individual lines wrap.
+ *
+ * Always returns at least one line if the input is non-empty and the
+ * `scrollOffset` is in-range — even if that line wraps to more rows than the
+ * viewport. The user can still scroll past it; without this floor the viewer
+ * would render an empty body on hostile inputs.
+ */
+export function pickVisibleLines(
+  lines: string[],
+  scrollOffset: number,
+  viewportRows: number,
+  terminalCols: number,
+): string[] {
+  if (lines.length === 0 || scrollOffset >= lines.length)
+    return []
+  const result: string[] = []
+  let rowsUsed = 0
+  for (let i = scrollOffset; i < lines.length; i++) {
+    const rows = renderedRowsForLine(lines[i], terminalCols)
+    if (result.length > 0 && rowsUsed + rows > viewportRows)
+      break
+    result.push(lines[i])
+    rowsUsed += rows
+    if (rowsUsed >= viewportRows)
+      break
+  }
+  return result
+}
+
+/**
+ * Compute the largest `scrollOffset` that still keeps content visible at the
+ * bottom of the viewport — i.e. the offset where the LAST line is rendered
+ * within the viewport. Walks backwards from the end, packing as many tail
+ * lines as fit (accounting for wrap), and returns the offset of the first
+ * fully-visible tail line.
+ */
+export function computeMaxScrollOffset(
+  lines: string[],
+  viewportRows: number,
+  terminalCols: number,
+): number {
+  if (lines.length === 0)
+    return 0
+  let rowsUsed = 0
+  let kFromEnd = 0
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const rows = renderedRowsForLine(lines[i], terminalCols)
+    if (kFromEnd > 0 && rowsUsed + rows > viewportRows)
+      break
+    rowsUsed += rows
+    kFromEnd += 1
+    if (rowsUsed >= viewportRows)
+      break
+  }
+  return Math.max(0, lines.length - kFromEnd)
+}

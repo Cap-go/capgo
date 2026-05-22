@@ -1,8 +1,9 @@
 import type { FC } from 'react'
-import { Box, Text, useInput } from 'ink'
+import { Box, Text, useInput, useStdout } from 'ink'
 import Spinner from 'ink-spinner'
 // src/build/onboarding/ui/components.tsx
 import React, { useEffect, useState } from 'react'
+import { computeMaxScrollOffset, pickVisibleLines } from '../ai-fit.js'
 
 export const Divider: FC<{ width?: number }> = ({ width = 60 }) => (
   <Text dimColor>{'─'.repeat(width)}</Text>
@@ -121,16 +122,49 @@ export const FullscreenAiViewer: FC<{
   terminalRows: number
   onExit: () => void
 }> = ({ title, subtitle, lines, terminalRows, onExit }) => {
-  // Reserve 8 rows for the viewer's own chrome: title (1) + optional subtitle
-  // (1) + top divider (1) + bottom divider (1) + position line (1) + exit
-  // hint (1) + 2 rows of breathing room. The parent wizard already hides its
-  // outer Header during this step so the viewer can use the full screen.
-  const viewportRows = Math.max(1, Math.min(lines.length || 1, terminalRows - 8))
-  const [scrollOffset, setScrollOffset] = useState(0)
-  const total = lines.length
-  const maxScrollOffset = Math.max(0, lines.length - viewportRows)
+  // Track terminal dimensions in state so the component re-renders on resize.
+  // Without this, the viewport was computed at mount and the body could
+  // overflow the live screen if the user enlarged or shrank the terminal —
+  // forcing the user to scroll their terminal emulator to see content the
+  // viewer should have paginated.
+  const { stdout } = useStdout()
+  const initialRows = stdout?.rows ?? terminalRows
+  const initialCols = stdout?.columns ?? 80
+  const [dims, setDims] = useState<{ rows: number, cols: number }>({
+    rows: initialRows,
+    cols: initialCols,
+  })
 
-  // Clamp the scroll if the viewport grows past the bottom (e.g. terminal
+  useEffect(() => {
+    if (!stdout)
+      return
+    const handler = (): void => {
+      setDims({
+        rows: stdout.rows ?? 24,
+        cols: stdout.columns ?? 80,
+      })
+    }
+    stdout.on('resize', handler)
+    return () => {
+      stdout.off('resize', handler)
+    }
+  }, [stdout])
+
+  // Reserve 10 rows for the viewer's own chrome: title + optional subtitle +
+  // two dividers + position line + exit hint + a margin to absorb chrome
+  // lines that themselves wrap on narrow terminals. The parent wizard has
+  // already hidden its outer Header for this step so the viewer owns the
+  // whole screen.
+  const VIEWER_CHROME_ROWS = 10
+  const viewportRows = Math.max(1, dims.rows - VIEWER_CHROME_ROWS)
+  const total = lines.length
+  // Wrap-aware bound: maximum offset that still places the last logical line
+  // inside the viewport. Without per-line wrap accounting the user could
+  // scroll past the end on narrow terminals.
+  const maxScrollOffset = computeMaxScrollOffset(lines, viewportRows, dims.cols)
+  const [scrollOffset, setScrollOffset] = useState(0)
+
+  // Clamp the scroll if the viewport grew past the bottom (e.g. terminal
   // resized larger after the user scrolled to the bottom).
   useEffect(() => {
     setScrollOffset(prev => Math.min(prev, maxScrollOffset))
@@ -166,20 +200,26 @@ export const FullscreenAiViewer: FC<{
     }
   })
 
-  const visibleLines = lines.slice(scrollOffset, scrollOffset + viewportRows)
+  // Wrap-aware visible slice. `pickVisibleLines` stops adding logical lines
+  // once their cumulative wrapped row count would overflow `viewportRows`,
+  // so we never render past the bottom of the live terminal.
+  const visibleLines = pickVisibleLines(lines, scrollOffset, viewportRows, dims.cols)
   const firstVisibleLine = total === 0 ? 0 : scrollOffset + 1
   const lastVisibleLine = Math.min(total, scrollOffset + visibleLines.length)
   const atBottom = scrollOffset >= maxScrollOffset
+  // Divider widths scale to the terminal so the cosmetic border doesn't
+  // wrap on narrow terminals (which would silently eat a viewport row).
+  const dividerWidth = Math.max(10, Math.min(60, dims.cols - 1))
 
   return (
     <Box flexDirection="column">
       <Text bold color="cyan">{title}</Text>
       {subtitle && <Text dimColor>{subtitle}</Text>}
-      <Text color="cyan">{'─'.repeat(60)}</Text>
+      <Text color="cyan">{'─'.repeat(dividerWidth)}</Text>
       {visibleLines.map((line, index) => (
         <Text key={`ai-line-${scrollOffset + index}`}>{line}</Text>
       ))}
-      <Text color="cyan">{'─'.repeat(60)}</Text>
+      <Text color="cyan">{'─'.repeat(dividerWidth)}</Text>
       <Text dimColor>
         {`Showing ${firstVisibleLine}-${lastVisibleLine} of ${total} lines. ↑/↓ or PgUp/PgDn to scroll.`}
       </Text>
