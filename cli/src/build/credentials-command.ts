@@ -488,7 +488,8 @@ export async function saveCredentialsCommand(options: SaveCredentialsOptions): P
           channel: 'credentials',
           event: 'Credentials saved',
           icon: '🔐',
-          user_id: orgId,
+          org_id: orgId,
+          tracking_version: 2,
           tags: {
             'app-id': appId,
             'platform': platform,

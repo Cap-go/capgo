@@ -71,14 +71,16 @@ function stepToName(stepNumber: number): string {
 function setLog() {
   console.log('setLog', props.onboarding, main.user?.id, step.value)
   if (props.onboarding && main.user?.id) {
+    const orgId = organizationStore.currentOrganization?.gid
     sendEvent({
       channel: 'onboarding-bundle',
       event: `onboarding-bundle-step-${stepToName(step.value)}`,
       icon: '👶',
-      user_id: organizationStore.currentOrganization?.gid,
+      org_id: orgId,
+      tracking_version: 2,
       notify: false,
     }).catch()
-    pushEvent(`user:onboarding-bundle-${stepToName(step.value)}`, config.supaHost)
+    pushEvent(`user:onboarding-bundle-${stepToName(step.value)}`, config.supaHost, { org_id: orgId ?? '' })
   }
   if (step.value === 2) {
     emit('done')

@@ -184,15 +184,17 @@ const confettiTimer = ref<number | null>(null)
 const timers = ref<number[]>([])
 
 function trackNoAppDemoEvent(event: string, tags: Record<string, string | number | boolean> = {}) {
+  const orgId = organizationStore.currentOrganization?.gid
   sendEvent({
     channel: 'demo-onboarding',
     event,
     icon: '🧪',
-    user_id: organizationStore.currentOrganization?.gid,
+    org_id: orgId,
+    tracking_version: 2,
     notify: false,
     tags,
   }).catch()
-  pushEvent(`user:${event}`, config.supaHost)
+  pushEvent(`user:${event}`, config.supaHost, { org_id: orgId ?? '' })
 }
 
 function trackNoAppDemoStepEvent(stepId: DemoStep | 'global', action: string, tags: Record<string, string | number | boolean> = {}) {

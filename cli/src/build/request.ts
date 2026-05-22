@@ -1658,7 +1658,8 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
       channel: 'native-builder',
       event: 'Build requested',
       icon: '🏗️',
-      user_id: orgId,
+      org_id: orgId,
+      tracking_version: 2,
       tags: {
         'app-id': appId,
         'platform': platform,
@@ -2165,7 +2166,8 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
         channel: 'native-builder',
         event: finalStatus === 'succeeded' ? 'Build succeeded' : 'Build failed',
         icon: finalStatus === 'succeeded' ? '✅' : '❌',
-        user_id: orgId,
+        org_id: orgId,
+        tracking_version: 2,
         tags: {
           'app-id': appId,
           'platform': platform,

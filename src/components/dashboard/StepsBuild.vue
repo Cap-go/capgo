@@ -141,14 +141,16 @@ function stepToName(stepNumber: number): string {
 
 function setLog() {
   if (initialOnboarding && main.user?.id) {
+    const orgId = organizationStore.currentOrganization?.gid
     sendEvent({
       channel: 'onboarding-build',
       event: `onboarding-build-step-${stepToName(step.value)}`,
       icon: 'build',
-      user_id: organizationStore.currentOrganization?.gid,
+      org_id: orgId,
+      tracking_version: 2,
       notify: false,
     }).catch()
-    pushEvent(`user:onboarding-build-${stepToName(step.value)}`, config.supaHost)
+    pushEvent(`user:onboarding-build-${stepToName(step.value)}`, config.supaHost, { org_id: orgId ?? '' })
   }
   if (step.value === completedStepIndex.value) {
     emit('done')

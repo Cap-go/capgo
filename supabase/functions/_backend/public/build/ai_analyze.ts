@@ -25,6 +25,7 @@ interface EmitAiAnalysisResultInput {
   jobId: string
   result: AiAnalysisResult
   ownerOrg?: string
+  userId: string
   logsBytes: number
   durationMs?: number
 }
@@ -44,6 +45,8 @@ async function emitAiAnalysisResult(c: Context, input: EmitAiAnalysisResultInput
     result: input.result,
     logs_bytes: String(input.logsBytes),
   }
+  if (input.ownerOrg)
+    tags.org_id = input.ownerOrg
   if (input.durationMs !== undefined && Number.isFinite(input.durationMs))
     tags.duration_ms = String(Math.round(input.durationMs))
 
@@ -56,7 +59,7 @@ async function emitAiAnalysisResult(c: Context, input: EmitAiAnalysisResultInput
       channel: 'build-lifecycle',
       icon: '🤖',
       notify: false,
-      user_id: input.ownerOrg,
+      user_id: input.userId,
       groups: input.ownerOrg ? { organization: input.ownerOrg } : undefined,
       tags,
     })
@@ -90,7 +93,7 @@ export async function aiAnalyzeBuild(
       user_id: apikey.user_id,
     })
     // No row yet — `ownerOrg` is unknown for this branch.
-    await emitAiAnalysisResult(c, { appId, jobId, result: 'unauthorized', logsBytes })
+    await emitAiAnalysisResult(c, { appId, jobId, result: 'unauthorized', userId: apikey.user_id, logsBytes })
     throw simpleError('unauthorized', 'You do not have permission to analyze this build')
   }
 
@@ -110,7 +113,7 @@ export async function aiAnalyzeBuild(
       job_id: jobId,
       error: selectErr.message,
     })
-    await emitAiAnalysisResult(c, { appId, jobId, result: 'builder_error', logsBytes })
+    await emitAiAnalysisResult(c, { appId, jobId, result: 'builder_error', userId: apikey.user_id, logsBytes })
     throw simpleError('internal_error', 'Failed to fetch build request')
   }
 
@@ -123,19 +126,19 @@ export async function aiAnalyzeBuild(
       user_id: apikey.user_id,
     })
     // Row is null — `ownerOrg` cannot be resolved for this branch.
-    await emitAiAnalysisResult(c, { appId, jobId, result: 'unauthorized', logsBytes })
+    await emitAiAnalysisResult(c, { appId, jobId, result: 'unauthorized', userId: apikey.user_id, logsBytes })
     throw simpleError('unauthorized', 'You do not have permission to analyze this build')
   }
 
   const ownerOrg = row.owner_org
 
   if (row.status !== 'failed') {
-    await emitAiAnalysisResult(c, { appId, jobId, result: 'invalid_state', ownerOrg, logsBytes })
+    await emitAiAnalysisResult(c, { appId, jobId, result: 'invalid_state', ownerOrg, userId: apikey.user_id, logsBytes })
     throw simpleError('invalid_state', 'AI analysis only available for failed builds')
   }
 
   if (row.ai_analyzed === true) {
-    await emitAiAnalysisResult(c, { appId, jobId, result: 'already_analyzed', ownerOrg, logsBytes })
+    await emitAiAnalysisResult(c, { appId, jobId, result: 'already_analyzed', ownerOrg, userId: apikey.user_id, logsBytes })
     // 409 (not the simpleError default of 400) — CLI branches on res.status === 409 for this case
     throw quickError(409, 'already_analyzed', 'AI analysis already requested for this job')
   }
@@ -150,10 +153,11 @@ export async function aiAnalyzeBuild(
       channel: 'build-lifecycle',
       icon: '🤖',
       notify: false,
-      user_id: ownerOrg,
+      user_id: apikey.user_id,
       groups: { organization: ownerOrg },
       tags: {
         app_id: appId,
+        org_id: ownerOrg,
         job_id: jobId,
         logs_bytes: String(logsBytes),
       },
@@ -171,7 +175,7 @@ export async function aiAnalyzeBuild(
   const builderUrl = getEnv(c, 'BUILDER_URL')
   const builderApiKey = getEnv(c, 'BUILDER_API_KEY')
   if (!builderUrl || !builderApiKey) {
-    await emitAiAnalysisResult(c, { appId, jobId, result: 'config_error', ownerOrg, logsBytes })
+    await emitAiAnalysisResult(c, { appId, jobId, result: 'config_error', ownerOrg, userId: apikey.user_id, logsBytes })
     throw simpleError('config_error', 'Builder service not configured')
   }
 
@@ -200,7 +204,7 @@ export async function aiAnalyzeBuild(
       job_id: jobId,
       error: err instanceof Error ? err.message : String(err),
     })
-    await emitAiAnalysisResult(c, { appId, jobId, result: 'builder_error', ownerOrg, logsBytes, durationMs })
+    await emitAiAnalysisResult(c, { appId, jobId, result: 'builder_error', ownerOrg, userId: apikey.user_id, logsBytes, durationMs })
     throw simpleError('builder_error', isTimeout ? 'AI analysis timed out' : 'AI analysis request failed')
   }
 
@@ -214,7 +218,7 @@ export async function aiAnalyzeBuild(
       status: builderResp.status,
       error: errText,
     })
-    await emitAiAnalysisResult(c, { appId, jobId, result: 'builder_error', ownerOrg, logsBytes, durationMs })
+    await emitAiAnalysisResult(c, { appId, jobId, result: 'builder_error', ownerOrg, userId: apikey.user_id, logsBytes, durationMs })
     throw simpleError('builder_error', `AI analysis failed: ${errText}`)
   }
 
@@ -226,7 +230,7 @@ export async function aiAnalyzeBuild(
       message: 'Builder AI analyze returned malformed body',
       job_id: jobId,
     })
-    await emitAiAnalysisResult(c, { appId, jobId, result: 'builder_error', ownerOrg, logsBytes, durationMs })
+    await emitAiAnalysisResult(c, { appId, jobId, result: 'builder_error', ownerOrg, userId: apikey.user_id, logsBytes, durationMs })
     throw simpleError('builder_error', 'AI analysis returned malformed response')
   }
 
@@ -258,7 +262,7 @@ export async function aiAnalyzeBuild(
     user_id: apikey.user_id,
   })
 
-  await emitAiAnalysisResult(c, { appId, jobId, result: 'success', ownerOrg, logsBytes, durationMs })
+  await emitAiAnalysisResult(c, { appId, jobId, result: 'success', ownerOrg, userId: apikey.user_id, logsBytes, durationMs })
 
   return c.json({ analysis: result.analysis }, 200)
 }

@@ -43,7 +43,8 @@ watchEffect(async () => {
         channel: 'usage',
         event: 'User visit',
         icon: '💳',
-        user_id: currentOrganization.value?.gid,
+        org_id: currentOrganization.value?.gid,
+        tracking_version: 2,
         notify: false,
       }).catch()
     }

@@ -174,11 +174,13 @@ function completeInviteSuccess(payload: InviteSuccessPayload) {
   isEmailDialogOpen.value = false
   isFullDetailsDialogOpen.value = false
   emit('success', payload)
+  const orgId = organizationStore.currentOrganization?.gid
   sendEvent({
     channel: 'onboarding-v2',
     event: `onboarding-step-invite-teammate`,
     icon: '👥',
-    user_id: organizationStore.currentOrganization?.gid,
+    org_id: orgId,
+    tracking_version: 2,
     notify: false,
   }).catch()
 }

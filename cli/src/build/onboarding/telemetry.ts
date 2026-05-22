@@ -41,7 +41,8 @@ export async function trackBuilderOnboardingStep(input: TrackBuilderOnboardingSt
       channel: 'builder-onboarding',
       icon: '🧭',
       notify: false,
-      user_id: input.orgId,
+      org_id: input.orgId,
+      tracking_version: 2,
       tags,
     })
   }

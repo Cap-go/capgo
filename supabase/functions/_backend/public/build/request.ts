@@ -323,10 +323,11 @@ export async function requestBuild(
       channel: 'build-lifecycle',
       icon: '🛠️',
       notify: false,
-      user_id: org_id,
+      user_id: apikey.user_id,
       groups: { organization: org_id },
       tags: {
         app_id,
+        org_id,
         platform,
         build_mode,
       },

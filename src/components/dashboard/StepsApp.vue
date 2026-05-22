@@ -84,14 +84,16 @@ function stepToName(stepNumber: number): string {
 
 function setLog() {
   if (props.onboarding && main.user?.id) {
+    const orgId = organizationStore.currentOrganization?.gid
     sendEvent({
       channel: 'onboarding-v2',
       event: `onboarding-step-${stepToName(step.value)}`,
       icon: '👶',
-      user_id: organizationStore.currentOrganization?.gid,
+      org_id: orgId,
+      tracking_version: 2,
       notify: false,
     }).catch()
-    pushEvent(`user:onboarding-step-${stepToName(step.value)}`, config.supaHost)
+    pushEvent(`user:onboarding-step-${stepToName(step.value)}`, config.supaHost, { org_id: orgId ?? '' })
   }
   if (step.value === 2) {
     console.log('Finished onboarding for app ID:', appId.value)
@@ -121,14 +123,16 @@ function goToNextStep(scrollTargetId?: string) {
 
 function openInviteDialog() {
   inviteModalRef.value?.openDialog()
+  const orgId = organizationStore.currentOrganization?.gid
   sendEvent({
     channel: 'onboarding-v2',
     event: `onboarding-alternative-send-invite`,
     icon: '👶',
-    user_id: organizationStore.currentOrganization?.gid,
+    org_id: orgId,
+    tracking_version: 2,
     notify: false,
   }).catch()
-  pushEvent(`user:onboarding-alternative-send-invite`, config.supaHost)
+  pushEvent(`user:onboarding-alternative-send-invite`, config.supaHost, { org_id: orgId ?? '' })
 }
 
 function onInviteSuccess() {
@@ -153,10 +157,11 @@ async function createDemoApp() {
       channel: 'onboarding-v2',
       event: 'onboarding-create-demo-app',
       icon: '👶',
-      user_id: orgId,
+      org_id: orgId,
+      tracking_version: 2,
       notify: false,
     }).catch()
-    pushEvent('user:onboarding-create-demo-app', config.supaHost)
+    pushEvent('user:onboarding-create-demo-app', config.supaHost, { org_id: orgId })
 
     const { data, error } = await supabase.functions.invoke('app/demo', {
       method: 'POST',

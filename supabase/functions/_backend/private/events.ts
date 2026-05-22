@@ -24,14 +24,57 @@ interface ResolvedTrackingId {
   orgId?: string
 }
 
+interface TrackEventBody extends TrackOptions {
+  notifyConsole?: boolean
+  org_id?: string
+  tracking_version?: number | string
+}
+
+function isTrackingV2(version: unknown) {
+  return version === 2 || version === '2'
+}
+
 async function resolveTrackingUserId(
   c: Context<MiddlewareKeyVariables>,
   requestedUserId: string | undefined,
+  requestedOrgId: string | undefined,
   appId: string | undefined,
+  trackingV2 = false,
   notifyConsole = false,
 ): Promise<ResolvedTrackingId> {
   const forbiddenError = notifyConsole ? 'Forbidden' : 'no_permission'
   const authUserId = c.get('auth')?.userId ?? ''
+
+  if (trackingV2) {
+    if (!requestedOrgId) {
+      return { trackingUserId: authUserId }
+    }
+
+    if (appId) {
+      if (!(await checkPermission(c, 'app.read', { appId }))) {
+        throw quickError(403, forbiddenError, 'You cannot send events for this organization')
+      }
+
+      const supabase = supabaseWithAuth(c, c.get('auth')!)
+      const { data: app, error } = await supabase
+        .from('apps')
+        .select('owner_org')
+        .eq('app_id', appId)
+        .single()
+
+      if (error || !app || app.owner_org !== requestedOrgId) {
+        throw quickError(403, forbiddenError, 'You cannot send events for this organization')
+      }
+
+      return { trackingUserId: authUserId, orgId: requestedOrgId }
+    }
+
+    if (await checkPermission(c, 'org.read', { orgId: requestedOrgId })) {
+      return { trackingUserId: authUserId, orgId: requestedOrgId }
+    }
+
+    throw quickError(403, forbiddenError, 'You cannot send events for this organization')
+  }
 
   if (!requestedUserId || requestedUserId === authUserId) {
     return { trackingUserId: authUserId }
@@ -77,13 +120,16 @@ function canAccessRequestedOrg(c: Context<MiddlewareKeyVariables>, orgId: string
 }
 
 app.post('/', middlewareV2(['read', 'write', 'all', 'upload']), async (c) => {
-  const body = await parseBody<TrackOptions & { notifyConsole?: boolean }>(c)
-  const { notifyConsole = false, ...trackOptions } = body
-  const requestedOrgId = body.notifyConsole && typeof body.user_id === 'string' && body.user_id.length > 0
-    ? body.user_id
-    : undefined
+  const body = await parseBody<TrackEventBody>(c)
+  const { notifyConsole = false, org_id: _orgId, tracking_version: _trackingVersion, ...trackOptions } = body
+  const trackingV2 = isTrackingV2(body.tracking_version)
+  const requestedOrgId = trackingV2 && typeof body.org_id === 'string' && body.org_id.length > 0
+    ? body.org_id
+    : body.notifyConsole && typeof body.user_id === 'string' && body.user_id.length > 0
+      ? body.user_id
+      : undefined
 
-  if (requestedOrgId && !(await canAccessRequestedOrg(c, requestedOrgId)))
+  if (body.notifyConsole && requestedOrgId && !(await canAccessRequestedOrg(c, requestedOrgId)))
     throw quickError(403, 'Forbidden', 'You cannot send events for this organization')
 
   const requestedUserId = typeof body.user_id === 'string' ? body.user_id : undefined
@@ -92,8 +138,15 @@ app.post('/', middlewareV2(['read', 'write', 'all', 'upload']), async (c) => {
     : typeof body.tags?.app_id === 'string'
       ? body.tags.app_id
       : undefined
-  const { trackingUserId, orgId: verifiedOrgId } = await resolveTrackingUserId(c, requestedUserId, appId, Boolean(body.notifyConsole))
-  const trackedBody = requestedUserId ? { ...trackOptions, user_id: trackingUserId } : trackOptions
+  const { trackingUserId, orgId: verifiedOrgId } = await resolveTrackingUserId(c, requestedUserId, requestedOrgId, appId, trackingV2, Boolean(body.notifyConsole))
+  const trackedTags = trackingV2 && verifiedOrgId
+    ? { ...(trackOptions.tags || {}), org_id: verifiedOrgId }
+    : trackOptions.tags
+  const trackedBody = trackingV2
+    ? { ...trackOptions, user_id: trackingUserId, tags: trackedTags }
+    : requestedUserId
+      ? { ...trackOptions, user_id: trackingUserId }
+      : trackOptions
 
   // notifyConsole: broadcast to Supabase Realtime only, skip all tracking
   if (notifyConsole) {

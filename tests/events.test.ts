@@ -51,6 +51,58 @@ describe('[POST] /private/events operations', () => {
     expect(data.status).toBe('ok')
   })
 
+  it('tracks v2 events with actor user and organization context', async () => {
+    const response = await fetch(`${BASE_URL}/private/events`, {
+      method: 'POST',
+      headers: {
+        capgkey: headers.Authorization,
+      },
+      body: JSON.stringify({
+        channel: 'test',
+        event: 'test_event_v2',
+        description: 'Testing v2 event tracking',
+        icon: '🧪',
+        notify: false,
+        org_id: ORG_ID,
+        tracking_version: 2,
+        tags: {
+          app_id: APPNAME_EVENT,
+          test: true,
+        },
+      }),
+    })
+
+    const data = await response.json() as { status: string }
+    expect(response.status).toBe(200)
+    expect(data.status).toBe('ok')
+  })
+
+  it('rejects v2 events for foreign organizations', async () => {
+    const response = await fetch(`${BASE_URL}/private/events`, {
+      method: 'POST',
+      headers: {
+        capgkey: headers.Authorization,
+      },
+      body: JSON.stringify({
+        channel: 'test',
+        event: 'test_event_v2',
+        description: 'Cross-org v2 spoof attempt',
+        icon: '🧪',
+        notify: false,
+        org_id: NON_OWNER_ORG_ID,
+        tracking_version: 2,
+        tags: {
+          app_id: APPNAME_EVENT,
+          test: true,
+        },
+      }),
+    })
+
+    const data = await response.json() as { error: string }
+    expect(response.status).toBe(403)
+    expect(data.error).toBe('no_permission')
+  })
+
   it('rejects notifyConsole broadcasts for foreign organizations', async () => {
     const response = await fetch(`${BASE_URL}/private/events`, {
       method: 'POST',
