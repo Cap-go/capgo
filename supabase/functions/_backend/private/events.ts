@@ -5,6 +5,7 @@ import type { BentoTrackingPayload } from '../utils/tracking.ts'
 import { Hono } from 'hono/tiny'
 import { BRES, parseBody, quickError, simpleError, useCors } from '../utils/hono.ts'
 import { middlewareV2 } from '../utils/hono_middleware.ts'
+import { cloudlog } from '../utils/logging.ts'
 import { checkPermission } from '../utils/rbac.ts'
 import { broadcastCLIEvent } from '../utils/realtime_broadcast.ts'
 import { hasOrgRight, hasOrgRightApikey, supabaseWithAuth } from '../utils/supabase.ts'
@@ -47,6 +48,10 @@ async function resolveTrackingUserId(
 
   if (trackingV2) {
     if (!requestedOrgId) {
+      cloudlog({
+        requestId: c.get('requestId'),
+        message: 'tracking v2 event missing org_id; sending actor-scoped event without organization group',
+      })
       return { trackingUserId: authUserId }
     }
 
@@ -129,6 +134,9 @@ app.post('/', middlewareV2(['read', 'write', 'all', 'upload']), async (c) => {
       ? body.user_id
       : undefined
 
+  // Legacy notifyConsole still sends the target org in `user_id`, so keep this
+  // preflight scoped to notifyConsole. Non-notify v2 events validate `org_id`
+  // inside resolveTrackingUserId(), where app ownership and org access diverge.
   if (body.notifyConsole && requestedOrgId && !(await canAccessRequestedOrg(c, requestedOrgId)))
     throw quickError(403, 'Forbidden', 'You cannot send events for this organization')
 

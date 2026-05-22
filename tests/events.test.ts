@@ -77,7 +77,32 @@ describe('[POST] /private/events operations', () => {
     expect(data.status).toBe('ok')
   })
 
-  it('rejects v2 events for foreign organizations', async () => {
+  it('tracks v2 org-scoped events without an app id', async () => {
+    const response = await fetch(`${BASE_URL}/private/events`, {
+      method: 'POST',
+      headers: {
+        capgkey: headers.Authorization,
+      },
+      body: JSON.stringify({
+        channel: 'test',
+        event: 'test_event_v2_org_scoped',
+        description: 'Testing v2 org-scoped event tracking',
+        icon: '🧪',
+        notify: false,
+        org_id: ORG_ID,
+        tracking_version: 2,
+        tags: {
+          test: true,
+        },
+      }),
+    })
+
+    const data = await response.json() as { status: string }
+    expect(response.status).toBe(200)
+    expect(data.status).toBe('ok')
+  })
+
+  it('rejects v2 app-scoped events when the requested org does not own the app', async () => {
     const response = await fetch(`${BASE_URL}/private/events`, {
       method: 'POST',
       headers: {

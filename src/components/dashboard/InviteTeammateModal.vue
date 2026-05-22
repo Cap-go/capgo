@@ -175,14 +175,16 @@ function completeInviteSuccess(payload: InviteSuccessPayload) {
   isFullDetailsDialogOpen.value = false
   emit('success', payload)
   const orgId = organizationStore.currentOrganization?.gid
-  sendEvent({
-    channel: 'onboarding-v2',
-    event: `onboarding-step-invite-teammate`,
-    icon: '👥',
-    org_id: orgId,
-    tracking_version: 2,
-    notify: false,
-  }).catch()
+  if (orgId) {
+    sendEvent({
+      channel: 'onboarding-v2',
+      event: `onboarding-step-invite-teammate`,
+      icon: '👥',
+      org_id: orgId,
+      tracking_version: 2,
+      notify: false,
+    }).catch()
+  }
 }
 
 async function handleEmailSubmit() {
