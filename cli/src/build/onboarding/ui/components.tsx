@@ -2,7 +2,7 @@ import type { FC } from 'react'
 import { Box, Text, useInput } from 'ink'
 import Spinner from 'ink-spinner'
 // src/build/onboarding/ui/components.tsx
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 
 export const Divider: FC<{ width?: number }> = ({ width = 60 }) => (
   <Text dimColor>{'─'.repeat(width)}</Text>
@@ -98,3 +98,96 @@ export const Header: FC = () => (
     </Text>
   </Box>
 )
+
+/**
+ * Scrollable, fullscreen viewer for the AI build-analysis markdown when it
+ * is taller than the user's terminal viewport. Mirrors the shape of the
+ * workflow-file diff viewer on main, but for pre-rendered ANSI lines (no
+ * `add`/`del` colouring — the markdown renderer already styled them).
+ *
+ * Keybindings:
+ *   ↑/k        scroll one line up
+ *   ↓/j        scroll one line down
+ *   PgUp/u     jump up one viewport
+ *   PgDn/d/␣   jump down one viewport
+ *   Home/g     jump to top
+ *   End/G      jump to bottom
+ *   Esc/Enter  dismiss the viewer (returns control to the parent step)
+ */
+export const FullscreenAiViewer: FC<{
+  title: string
+  subtitle?: string
+  lines: string[]
+  terminalRows: number
+  onExit: () => void
+}> = ({ title, subtitle, lines, terminalRows, onExit }) => {
+  // Reserve 8 rows for the viewer's own chrome: title (1) + optional subtitle
+  // (1) + top divider (1) + bottom divider (1) + position line (1) + exit
+  // hint (1) + 2 rows of breathing room. The parent wizard already hides its
+  // outer Header during this step so the viewer can use the full screen.
+  const viewportRows = Math.max(1, Math.min(lines.length || 1, terminalRows - 8))
+  const [scrollOffset, setScrollOffset] = useState(0)
+  const total = lines.length
+  const maxScrollOffset = Math.max(0, lines.length - viewportRows)
+
+  // Clamp the scroll if the viewport grows past the bottom (e.g. terminal
+  // resized larger after the user scrolled to the bottom).
+  useEffect(() => {
+    setScrollOffset(prev => Math.min(prev, maxScrollOffset))
+  }, [maxScrollOffset])
+
+  useInput((input, key) => {
+    if (key.escape || key.return) {
+      onExit()
+      return
+    }
+    if (key.downArrow || input === 'j') {
+      setScrollOffset(prev => Math.min(prev + 1, maxScrollOffset))
+      return
+    }
+    if (key.upArrow || input === 'k') {
+      setScrollOffset(prev => Math.max(prev - 1, 0))
+      return
+    }
+    if (key.pageDown || input === 'd' || input === ' ') {
+      setScrollOffset(prev => Math.min(prev + viewportRows, maxScrollOffset))
+      return
+    }
+    if (key.pageUp || input === 'u') {
+      setScrollOffset(prev => Math.max(prev - viewportRows, 0))
+      return
+    }
+    if (input === 'g') {
+      setScrollOffset(0)
+      return
+    }
+    if (input === 'G') {
+      setScrollOffset(maxScrollOffset)
+    }
+  })
+
+  const visibleLines = lines.slice(scrollOffset, scrollOffset + viewportRows)
+  const firstVisibleLine = total === 0 ? 0 : scrollOffset + 1
+  const lastVisibleLine = Math.min(total, scrollOffset + visibleLines.length)
+  const atBottom = scrollOffset >= maxScrollOffset
+
+  return (
+    <Box flexDirection="column">
+      <Text bold color="cyan">{title}</Text>
+      {subtitle && <Text dimColor>{subtitle}</Text>}
+      <Text color="cyan">{'─'.repeat(60)}</Text>
+      {visibleLines.map((line, index) => (
+        <Text key={`ai-line-${scrollOffset + index}`}>{line}</Text>
+      ))}
+      <Text color="cyan">{'─'.repeat(60)}</Text>
+      <Text dimColor>
+        {`Showing ${firstVisibleLine}-${lastVisibleLine} of ${total} lines. ↑/↓ or PgUp/PgDn to scroll.`}
+      </Text>
+      <Text color="yellow" bold>
+        {atBottom
+          ? 'Press Esc or Enter to continue to the retry/skip prompt.'
+          : 'Press Esc or Enter when done to continue.'}
+      </Text>
+    </Box>
+  )
+}

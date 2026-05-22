@@ -29,6 +29,7 @@ import { releaseCapturedLogs, runCapgoAiAnalysis } from '../../../../ai/analyze.
 import { renderMarkdown } from '../../../../ai/render-markdown.js'
 import { trackAiAnalysisChoice, trackAiAnalysisResult } from '../../../../ai/telemetry.js'
 import { requestBuildInternal } from '../../../request.js'
+import { isAiAnalysisTooTall } from '../../ai-fit.js'
 
 // Upper bound on "I fixed it, retry build" attempts after an AI diagnosis.
 // Three total attempts (initial + two retries) caps the AI cost when a model
@@ -40,7 +41,7 @@ import { createCiSecretEntries, detectCiSecretTargets, getCiSecretTargetLabel, l
 import { mapAndroidOnboardingError, mapSaValidationKindToCategory } from '../../error-categories.js'
 import { canUseFilePicker, openKeystorePicker, openServiceAccountJsonPicker } from '../../file-picker.js'
 import { trackBuilderOnboardingStep } from '../../telemetry.js'
-import { Divider, ErrorLine, FilteredTextInput, Header, SpinnerLine, SuccessLine } from '../../ui/components.js'
+import { Divider, ErrorLine, FilteredTextInput, FullscreenAiViewer, Header, SpinnerLine, SuccessLine } from '../../ui/components.js'
 import { findAndroidApplicationIds } from '../gradle-parser.js'
 import { validateServiceAccountJson } from '../service-account-validation.js'
 import {
@@ -392,6 +393,8 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
   const [aiAnalysisText, setAiAnalysisText] = useState<string | null>(null)
   const [aiResultMessage, setAiResultMessage] = useState<string | null>(null)
   const [aiRetryCount, setAiRetryCount] = useState(0)
+  // See iOS sibling for full notes on aiViewedFull.
+  const [aiViewedFull, setAiViewedFull] = useState(false)
   const [ciSecretEntries, setCiSecretEntries] = useState<CiSecretEntry[]>([])
   const [ciSecretTargets, setCiSecretTargets] = useState<CiSecretTarget[]>([])
   const [ciSecretTarget, setCiSecretTarget] = useState<CiSecretTarget | null>(null)
@@ -402,6 +405,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
 
   const { stdout } = useStdout()
   const terminalRows = stdout?.rows ?? 24
+  const terminalCols = stdout?.columns ?? 80
 
   const addLog = useCallback((text: string, color = 'green') => {
     setLogLines(prev => [...prev, { text, color }])
@@ -1525,6 +1529,14 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
       })()
     }
 
+    // See iOS sibling: route through fullscreen scroll viewer when the
+    // analysis is taller than the available viewport.
+    if (step === 'ai-analysis-result' && aiAnalysisText && !aiViewedFull) {
+      if (isAiAnalysisTooTall(aiAnalysisText, terminalRows, terminalCols)) {
+        setStep('ai-analysis-result-scroll')
+      }
+    }
+
     if (step === 'build-complete') {
       setBuildOutput([])
       // Best-effort cleanup of any leftover captured log.
@@ -1555,9 +1567,10 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
 
   const progressPct = ANDROID_STEP_PROGRESS[step] ?? 0
   const phaseLabel = getAndroidPhaseLabel(step)
-  const showProgress = step !== 'welcome' && step !== 'error' && step !== 'build-complete' && step !== 'requesting-build' && step !== 'ai-analysis-result'
-  const showHeader = step !== 'requesting-build' && step !== 'ai-analysis-result'
-  const showLog = step !== 'requesting-build' && step !== 'build-complete' && step !== 'ai-analysis-prompt' && step !== 'ai-analysis-running' && step !== 'ai-analysis-result'
+  const isAiResultScroll = step === 'ai-analysis-result-scroll'
+  const showProgress = step !== 'welcome' && step !== 'error' && step !== 'build-complete' && step !== 'requesting-build' && step !== 'ai-analysis-result' && !isAiResultScroll
+  const showHeader = step !== 'requesting-build' && step !== 'ai-analysis-result' && !isAiResultScroll
+  const showLog = step !== 'requesting-build' && step !== 'build-complete' && step !== 'ai-analysis-prompt' && step !== 'ai-analysis-running' && step !== 'ai-analysis-result' && !isAiResultScroll
 
   return (
     <Box flexDirection="column" padding={1}>
@@ -2744,7 +2757,12 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
           <Box flexDirection="column" marginTop={1}>
             <Text bold color="cyan">AI analysis</Text>
             <Newline />
-            {aiAnalysisText && <Text>{aiAnalysisText}</Text>}
+            {aiAnalysisText && !aiViewedFull && <Text>{aiAnalysisText}</Text>}
+            {aiAnalysisText && aiViewedFull && (
+              <Text dimColor>
+                📖  Analysis already shown above (scroll your terminal back to re-read it).
+              </Text>
+            )}
             {aiResultMessage && <Text>{aiResultMessage}</Text>}
             <Newline />
             <Text color="yellow">⚠ AI can make mistakes. Always verify the diagnosis against the full log before applying the suggested fix.</Text>
@@ -2781,6 +2799,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
                   setAiJobId(null)
                   setAiAnalysisText(null)
                   setAiResultMessage(null)
+                  setAiViewedFull(false)
                   setAiRetryCount(prev => prev + 1)
                   setStep('requesting-build')
                   return
@@ -2791,6 +2810,20 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
           </Box>
         )
       })()}
+
+      {/* AI debug — scrollable viewer (see iOS sibling). */}
+      {step === 'ai-analysis-result-scroll' && aiAnalysisText && (
+        <FullscreenAiViewer
+          title="AI analysis"
+          subtitle={`${aiAnalysisText.split('\n').length} lines — scrollable because the analysis is taller than your terminal`}
+          lines={aiAnalysisText.split('\n')}
+          terminalRows={terminalRows}
+          onExit={() => {
+            setAiViewedFull(true)
+            setStep('ai-analysis-result')
+          }}
+        />
+      )}
 
       {step === 'error' && error && retryStep && (
         <Box flexDirection="column" marginTop={1}>

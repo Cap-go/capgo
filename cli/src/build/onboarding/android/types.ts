@@ -59,6 +59,7 @@ export type AndroidOnboardingStep
     | 'ai-analysis-prompt'
     | 'ai-analysis-running'
     | 'ai-analysis-result'
+    | 'ai-analysis-result-scroll'
     | 'build-complete'
     | 'error'
 
@@ -228,6 +229,7 @@ export const ANDROID_STEP_PROGRESS: Record<AndroidOnboardingStep, number> = {
   'requesting-build': 95,
   'ai-analysis-prompt': 96,
   'ai-analysis-running': 98,
+  'ai-analysis-result-scroll': 98,
   'ai-analysis-result': 99,
   'build-complete': 100,
   'error': 0,
@@ -289,6 +291,7 @@ export function getAndroidPhaseLabel(step: AndroidOnboardingStep): string {
     case 'ai-analysis-prompt':
     case 'ai-analysis-running':
     case 'ai-analysis-result':
+    case 'ai-analysis-result-scroll':
       return 'AI debug'
     case 'build-complete':
       return 'Complete'

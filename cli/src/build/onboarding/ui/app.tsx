@@ -23,6 +23,7 @@ import { releaseCapturedLogs, runCapgoAiAnalysis } from '../../../ai/analyze.js'
 import { renderMarkdown } from '../../../ai/render-markdown.js'
 import { trackAiAnalysisChoice, trackAiAnalysisResult } from '../../../ai/telemetry.js'
 import { requestBuildInternal } from '../../request.js'
+import { isAiAnalysisTooTall } from '../ai-fit.js'
 
 // Upper bound on "I fixed it, retry build" attempts after an AI diagnosis.
 // Three total attempts (initial + two retries) caps the AI cost when a model
@@ -44,7 +45,7 @@ import {
 
   STEP_PROGRESS,
 } from '../types.js'
-import { Divider, ErrorLine, FilteredTextInput, Header, SpinnerLine, SuccessLine } from './components.js'
+import { Divider, ErrorLine, FilteredTextInput, FullscreenAiViewer, Header, SpinnerLine, SuccessLine } from './components.js'
 
 const OUTPUT_LINE_SPLIT_RE = /\r?\n/
 const CARRIAGE_RETURN_RE = /\r/g
@@ -176,6 +177,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
   // Get terminal height for build output sizing
   const { stdout } = useStdout()
   const terminalRows = stdout?.rows ?? 24
+  const terminalCols = stdout?.columns ?? 80
 
   // Refs to avoid stale closures in useEffect async handlers
   const p8ContentRef = useRef(p8Content)
@@ -276,10 +278,14 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
   // these two state strings depending on the PostAnalyzeResult kind.
   // `aiRetryCount` tracks how many "I fixed it, retry" attempts the user has
   // used so we can cap them at MAX_AI_RETRIES.
+  // `aiViewedFull` flips true once the user has dismissed the scrollable
+  // FullscreenAiViewer for the current analysis — prevents 'ai-analysis-result'
+  // from immediately re-routing back into the scroll step on every render.
   const [aiJobId, setAiJobId] = useState<string | null>(null)
   const [aiAnalysisText, setAiAnalysisText] = useState<string | null>(null)
   const [aiResultMessage, setAiResultMessage] = useState<string | null>(null)
   const [aiRetryCount, setAiRetryCount] = useState(0)
+  const [aiViewedFull, setAiViewedFull] = useState(false)
   const [ciSecretEntries, setCiSecretEntries] = useState<CiSecretEntry[]>([])
   const [ciSecretTargets, setCiSecretTargets] = useState<CiSecretTarget[]>([])
   const [ciSecretTarget, setCiSecretTarget] = useState<CiSecretTarget | null>(null)
@@ -1373,6 +1379,16 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
       })()
     }
 
+    // When entering 'ai-analysis-result' with text the user hasn't yet seen,
+    // estimate fit and route through the fullscreen scroll viewer if the
+    // analysis is taller than the available viewport. The check is
+    // deliberately conservative — see ai-fit.ts for the heuristic.
+    if (step === 'ai-analysis-result' && aiAnalysisText && !aiViewedFull) {
+      if (isAiAnalysisTooTall(aiAnalysisText, terminalRows, terminalCols)) {
+        setStep('ai-analysis-result-scroll')
+      }
+    }
+
     if (step === 'build-complete') {
       setBuildOutput([])
       // Best-effort cleanup of any leftover captured log file. Safe to call
@@ -1400,9 +1416,12 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
 
   const progress = STEP_PROGRESS[step] ?? 0
   const phaseLabel = getPhaseLabel(step)
-  const showProgress = step !== 'welcome' && step !== 'platform-select' && step !== 'adding-platform' && step !== 'no-platform' && step !== 'error' && step !== 'build-complete' && step !== 'requesting-build' && step !== 'ai-analysis-result'
-  const showHeader = step !== 'requesting-build' && step !== 'ai-analysis-result'
-  const showLog = step !== 'requesting-build' && step !== 'build-complete' && step !== 'ai-analysis-prompt' && step !== 'ai-analysis-running' && step !== 'ai-analysis-result'
+  // The scrollable AI viewer takes over the screen — hide outer chrome so it
+  // gets maximum vertical space.
+  const isAiResultScroll = step === 'ai-analysis-result-scroll'
+  const showProgress = step !== 'welcome' && step !== 'platform-select' && step !== 'adding-platform' && step !== 'no-platform' && step !== 'error' && step !== 'build-complete' && step !== 'requesting-build' && step !== 'ai-analysis-result' && !isAiResultScroll
+  const showHeader = step !== 'requesting-build' && step !== 'ai-analysis-result' && !isAiResultScroll
+  const showLog = step !== 'requesting-build' && step !== 'build-complete' && step !== 'ai-analysis-prompt' && step !== 'ai-analysis-running' && step !== 'ai-analysis-result' && !isAiResultScroll
   const recoveryAdvice = error
     ? getBuildOnboardingRecoveryAdvice(error, retryStep, pm.runner, appId)
     : null
@@ -2593,11 +2612,21 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
         const retryLabel = retriesLeft === 1
           ? '🔄  I fixed it, retry build (last retry)'
           : `🔄  I fixed it, retry build (${retriesLeft} retries left)`
+        // When the analysis was routed through the scroll viewer the user has
+        // already read it — repeating the body here would just push the picker
+        // off-screen on small terminals. Show a compact "Analysis reviewed"
+        // marker instead. `aiResultMessage` (used for too_big / error / etc.)
+        // is always short so it can render inline regardless.
         return (
           <Box flexDirection="column" marginTop={1}>
             <Text bold color="cyan">AI analysis</Text>
             <Newline />
-            {aiAnalysisText && <Text>{aiAnalysisText}</Text>}
+            {aiAnalysisText && !aiViewedFull && <Text>{aiAnalysisText}</Text>}
+            {aiAnalysisText && aiViewedFull && (
+              <Text dimColor>
+                📖  Analysis already shown above (scroll your terminal back to re-read it).
+              </Text>
+            )}
             {aiResultMessage && <Text>{aiResultMessage}</Text>}
             <Newline />
             <Text color="yellow">⚠ AI can make mistakes. Always verify the diagnosis against the full log before applying the suggested fix.</Text>
@@ -2636,10 +2665,13 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
                     // tied to a new builder_job_id.
                     void releaseCapturedLogs(aiJobId).catch(() => { /* best-effort */ })
                   }
-                  // Reset AI state so the next failure starts clean.
+                  // Reset AI state so the next failure starts clean. The fit
+                  // check (and possible scroll-viewer route) will re-evaluate
+                  // against the new analysis text.
                   setAiJobId(null)
                   setAiAnalysisText(null)
                   setAiResultMessage(null)
+                  setAiViewedFull(false)
                   setAiRetryCount(prev => prev + 1)
                   setStep('requesting-build')
                   return
@@ -2651,6 +2683,24 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
           </Box>
         )
       })()}
+
+      {/* AI debug — scrollable viewer for analyses too tall for the viewport.
+          The outer Header / progress bar are hidden during this step so the
+          viewer gets the full terminal height. On exit, we mark the analysis
+          as "viewed" and return to 'ai-analysis-result' (which now shows a
+          compact "Analysis above" indicator + the retry/skip picker). */}
+      {step === 'ai-analysis-result-scroll' && aiAnalysisText && (
+        <FullscreenAiViewer
+          title="AI analysis"
+          subtitle={`${aiAnalysisText.split('\n').length} lines — scrollable because the analysis is taller than your terminal`}
+          lines={aiAnalysisText.split('\n')}
+          terminalRows={terminalRows}
+          onExit={() => {
+            setAiViewedFull(true)
+            setStep('ai-analysis-result')
+          }}
+        />
+      )}
 
       {/* Error with retry */}
       {step === 'error' && error && (
