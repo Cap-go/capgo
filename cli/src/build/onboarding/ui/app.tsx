@@ -192,7 +192,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
    * .p8 → verifying-key chain completes. `null` means there's no pending action
    * (i.e. .p8 was the entry point for app_store, not a recovery side-trip).
    */
-  const [pendingRecoveryAction, setPendingRecoveryAction] = useState<'fetching-profile' | 'create-profile-only' | null>(null)
+  const [pendingRecoveryAction, setPendingRecoveryAction] = useState<'create-profile-only' | null>(null)
   /**
    * Records which step triggered the shared `duplicate-profile-prompt` so the
    * `deleting-duplicate-profiles` handler routes the retry correctly. Without
@@ -803,9 +803,9 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
           setAppleCertIdForChosen(certId)
           addLog(`✔ Apple recognizes this certificate (ASC id ${certId.slice(0, 8)}…)`)
 
-          // Auto-fetch profiles for this cert. Saves the user a click on
-          // "Rescan Apple API for profiles" in the recovery menu when
-          // Apple actually has a matching profile waiting.
+          // Auto-fetch profiles for this cert. Sends the user straight to
+          // import-pick-profile when Apple has a matching profile waiting,
+          // skipping the recovery menu entirely in the happy path.
           const profiles = await listProfilesForCert(token, certId)
           if (cancelled)
             return
@@ -967,103 +967,6 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
       })()
     }
 
-    if (step === 'import-fetching-profile') {
-      ;(async () => {
-        try {
-          if (!chosenIdentity)
-            throw new Error('Internal error: no identity chosen for profile fetch.')
-          const token = await getFreshToken()
-          const certId = await findCertIdBySha1(token, chosenIdentity.sha1)
-          if (cancelled)
-            return
-          if (!certId) {
-            // Don't dead-end the user at the support-bundle error screen
-            // when this fires. Route back to no-match-recovery with a
-            // yellow log so they can pick a different option (Open Portal,
-            // Back to identity selection, or Exit) without restarting.
-            // Note: this null-result is sometimes a false negative — see
-            // listDistributionCerts; the current filter only matches the
-            // legacy IOS_DISTRIBUTION type and excludes newer cross-platform
-            // DISTRIBUTION certs that show up as "Apple Distribution:" in
-            // Keychain. A follow-up commit broadens the filter.
-            addLog(
-              `⚠ Apple did not return a cert match for "${chosenIdentity.name}". `
-              + `Returning to recovery menu — try "Open Apple Developer Portal" to verify the cert exists, or pick a different identity.`,
-              'yellow',
-            )
-            setStep('import-no-match-recovery')
-            return
-          }
-          const profiles = await listProfilesForCert(token, certId)
-          if (cancelled)
-            return
-          if (profiles.length === 0) {
-            addLog('⚠ Apple has the cert but no profiles linked to it — try "Create new profile" instead.', 'yellow')
-            setStep('import-no-match-recovery')
-            return
-          }
-          // Synthesize DiscoveredProfile entries from the Apple-side data so
-          // they can be picked through the normal `import-pick-profile` UI.
-          // path is left empty; the export step reads profileBase64 directly.
-          const synthesized: DiscoveredProfile[] = profiles.map(p => ({
-            path: '',
-            uuid: p.id,
-            name: p.name,
-            applicationIdentifier: '',
-            bundleId: p.bundleIdentifier,
-            teamId: chosenIdentity.teamId,
-            expirationDate: p.expirationDate,
-            profileType: (p.profileType === 'IOS_APP_STORE' ? 'app_store' : p.profileType === 'IOS_APP_ADHOC' ? 'ad_hoc' : 'unknown') as DiscoveredProfile['profileType'],
-            certificateSha1s: [chosenIdentity.sha1],
-            // Embed the base64 so the export step can use it without reading from disk
-            profileBase64: p.profileContent,
-          } as DiscoveredProfile & { profileBase64: string }))
-          // Inject into the match list so import-pick-profile shows them
-          setImportMatches(prev => prev.map(m => m.identity.sha1 === chosenIdentity.sha1
-            ? { ...m, profiles: [...m.profiles, ...synthesized] }
-            : m,
-          ))
-          // Before routing to the picker, check whether any of the
-          // returned profiles match THIS app's bundle ID + distribution.
-          // If Apple returned profiles for other apps only, surface that
-          // explicitly — otherwise the user lands on the recovery screen
-          // saying "no profile matches this app" with no indication that
-          // we actually found profiles for *other* apps.
-          const usableHere = filterProfilesForApp(synthesized, appId, importDistribution)
-          if (usableHere.length === 0) {
-            const otherBundleIds = Array.from(new Set(synthesized.map(p => p.bundleId).filter(b => b && b !== appId)))
-            const otherDistribTypes = Array.from(new Set(synthesized.filter(p => p.bundleId === appId && p.profileType !== importDistribution).map(p => p.profileType)))
-            if (otherBundleIds.length > 0) {
-              addLog(
-                `⚠ Apple returned ${profiles.length} profile${profiles.length === 1 ? '' : 's'} for this cert but none target "${appId}". `
-                + `Bundle ID${otherBundleIds.length === 1 ? '' : 's'} found: ${otherBundleIds.join(', ')}. `
-                + `Use "Create a new App Store profile for this cert" to add one for "${appId}".`,
-                'yellow',
-              )
-            }
-            else if (otherDistribTypes.length > 0) {
-              addLog(
-                `⚠ Apple returned ${profiles.length} profile${profiles.length === 1 ? '' : 's'} for "${appId}" but with distribution type ${otherDistribTypes.join(', ')} (need ${importDistribution}). `
-                + `Use "Create a new App Store profile for this cert" to add the right one.`,
-                'yellow',
-              )
-            }
-            else {
-              addLog(`⚠ Apple returned ${profiles.length} profile${profiles.length === 1 ? '' : 's'} for this cert but none match this app.`, 'yellow')
-            }
-            setStep('import-no-match-recovery')
-            return
-          }
-          addLog(`✔ Apple returned ${usableHere.length} matching profile${usableHere.length === 1 ? '' : 's'} for "${appId}"`)
-          setStep('import-pick-profile')
-        }
-        catch (err) {
-          if (!cancelled)
-            handleError(err, 'import-fetching-profile')
-        }
-      })()
-    }
-
     if (step === 'import-create-profile-only') {
       ;(async () => {
         try {
@@ -1078,7 +981,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
           if (importDistribution === 'ad_hoc') {
             throw new Error(
               'Creating a new profile via Apple is not implemented for ad_hoc distribution yet. '
-              + 'Use "Fetch matching profile from Apple" or "Open Apple Developer Portal" instead.',
+              + 'Use "Use a .mobileprovision file from disk" or "Open Apple Developer Portal" instead.',
             )
           }
           const token = await getFreshToken()
@@ -1086,10 +989,12 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
           if (cancelled)
             return
           if (!certId) {
-            // Same handling as import-fetching-profile: route back to the
-            // recovery menu instead of dead-ending at the support bundle.
-            // See note above re: the legacy IOS_DISTRIBUTION-only filter
-            // producing false negatives for newer cross-platform certs.
+            // Route back to the recovery menu instead of dead-ending at the
+            // support bundle. The listDistributionCerts filter occasionally
+            // misses a cert legitimately on Apple (eager batch already
+            // succeeded — see the note in apple-api.ts) so the user can
+            // recover via "Open Apple Developer Portal" or a different
+            // identity rather than restarting.
             addLog(
               `⚠ Apple did not return a cert match for "${chosenIdentity.name}". `
               + `Can't create a profile without an Apple-side cert ID. Returning to recovery menu — try "Open Apple Developer Portal" or pick a different identity.`,
@@ -2069,14 +1974,14 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
                 // Belt-and-suspenders: the upstream matchIdentitiesToProfiles
                 // filter and Apple-fetched profile synthesizing should both
                 // guarantee `profile.certificateSha1s` contains
-                // `chosenIdentity.sha1`. But the rescan flow re-imports
-                // profiles the user might have hand-created in the portal —
-                // if they ticked the wrong cert in step 4 of the manual
-                // walkthrough, we'd otherwise save credentials that the
-                // build server can't actually sign with (private key from
-                // chosenIdentity but profile only trusts a different cert).
-                // Catch that here with a clear error rather than discovering
-                // it during a build hours later.
+                // `chosenIdentity.sha1`. But the file-picker recovery path
+                // imports a .mobileprovision the user might have hand-created
+                // in the portal — if they ticked the wrong cert in step 5 of
+                // the manual walkthrough, we'd otherwise save credentials
+                // that the build server can't actually sign with (private
+                // key from chosenIdentity but profile only trusts a different
+                // cert). Catch that here with a clear error rather than
+                // discovering it during a build hours later.
                 if (!profile.certificateSha1s.includes(chosenIdentity.sha1)) {
                   const shownSha1s = profile.certificateSha1s.map(s => `${s.slice(0, 8)}…`).join(', ') || '(none listed)'
                   handleError(
@@ -2151,10 +2056,6 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
         const certKnownOnApple = typeof appleCertIdForChosen === 'string'
         const checkSkipped = !certKnownOnApple
 
-        const rescanOption = certKnownOnApple
-          ? [{ label: `🔄  Rescan Apple API for profiles (use after creating one in the portal)`, value: 'fetch' }]
-          : [{ label: hasAscKey ? `🔄  Rescan Apple API for profiles (use after creating one in the portal)` : `🔄  Provide ASC API key, then rescan Apple API for profiles`, value: 'fetch' }]
-
         const createOption = canCreateProfile && certKnownOnApple
           ? [{ label: `✨  Create a new App Store profile for this cert via Apple`, value: 'create' }]
           : canCreateProfile
@@ -2208,15 +2109,22 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
                 //      one click, links to the existing cert.
                 //   2. Use a local .mobileprovision file — fastest path
                 //      when the user already has a profile they trust.
-                //   3. Open the Developer Portal — manual fallback for
-                //      cases where the API isn't sufficient.
-                //   4. Rescan Apple API — explicit re-fetch after the
-                //      user created/edited something in the portal.
-                //   5. Back to identity selection — from the picker the
+                //   3. Open the Developer Portal — manual fallback that
+                //      walks the user through creating a profile by hand
+                //      and routes them back into the file-picker path.
+                //   4. Back to identity selection — from the picker the
                 //      user can choose "Switch to Create new" if they
                 //      want to abandon import entirely. (Removed from
                 //      this menu since the cert-not-on-Apple branch
                 //      that justified it is now unreachable.)
+                //
+                // A previous version also offered "Rescan Apple API for
+                // profiles" here. It was removed because the portal
+                // walkthrough now always tells the user to come back via
+                // "📁 Use a .mobileprovision file from disk" — having two
+                // parallel recovery paths (API rescan vs. file picker)
+                // for the same outcome made the UX inconsistent with the
+                // instructions we just rendered.
                 ...createOption,
                 // "Provide .mobileprovision from disk" — for users who
                 // already have a profile file in a non-standard location
@@ -2225,7 +2133,6 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
                 // is available.
                 ...(canUseFilePicker() ? [{ label: `📁  Use a .mobileprovision file from disk`, value: 'provide-profile-path' }] : []),
                 { label: `🌐  Open Apple Developer Portal (browse / create profiles manually)`, value: 'browser' },
-                ...rescanOption,
                 { label: '↩️   Back to identity selection', value: 'back' },
               ]}
               onChange={async (value) => {
@@ -2250,13 +2157,12 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
                   setStep('import-pick-identity')
                   return
                 }
-                if (value === 'fetch' || value === 'create') {
-                  const action = value === 'fetch' ? 'fetching-profile' : 'create-profile-only'
+                if (value === 'create') {
                   if (hasAscKey) {
-                    setStep(`import-${action}` as OnboardingStep)
+                    setStep('import-create-profile-only')
                   }
                   else {
-                    setPendingRecoveryAction(action)
+                    setPendingRecoveryAction('create-profile-only')
                     setStep('api-key-instructions')
                   }
                 }
@@ -2454,7 +2360,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
                 }
                 if (value === 'open-anyway') {
                   open('https://developer.apple.com/account/resources/profiles/list')
-                  addLog('🌐 Opened Apple Developer Portal — come back and pick "🔄 Rescan Apple API" when the new profile is ready.', 'yellow')
+                  addLog('🌐 Opened Apple Developer Portal — once you have downloaded the .mobileprovision file, come back and pick "📁 Use a .mobileprovision file from disk".', 'yellow')
                   setStep('import-no-match-recovery')
                   return
                 }
@@ -2470,13 +2376,6 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
         <Box flexDirection="column" marginTop={1}>
           <SpinnerLine text="Opening file picker for your .mobileprovision file..." />
           <Text dimColor>If the dialog doesn't appear, check behind other windows or in the menu bar.</Text>
-        </Box>
-      )}
-
-      {/* Import: fetching profile from Apple by cert SHA1 */}
-      {step === 'import-fetching-profile' && (
-        <Box flexDirection="column" marginTop={1}>
-          <SpinnerLine text="Looking up your cert on Apple and listing its profiles..." />
         </Box>
       )}
 

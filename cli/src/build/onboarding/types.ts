@@ -20,7 +20,6 @@ export type OnboardingStep
     | 'import-no-match-recovery'
     | 'import-portal-explanation'
     | 'import-provide-profile-path'
-    | 'import-fetching-profile'
     | 'import-create-profile-only'
     | 'import-export-warning'
     | 'import-compiling-helper'
@@ -170,7 +169,6 @@ export const STEP_PROGRESS: Record<OnboardingStep, number> = {
   'import-no-match-recovery': 55,
   'import-portal-explanation': 56,
   'import-provide-profile-path': 58,
-  'import-fetching-profile': 60,
   'import-create-profile-only': 60,
   'import-export-warning': 70,
   'import-compiling-helper': 72,
@@ -232,8 +230,6 @@ export function getPhaseLabel(step: OnboardingStep): string {
       return 'Step 3 of 4 · Manual portal walkthrough'
     case 'import-provide-profile-path':
       return 'Step 3 of 4 · Provide .mobileprovision file'
-    case 'import-fetching-profile':
-      return 'Step 3 of 4 · Fetching profile from Apple'
     case 'import-create-profile-only':
       return 'Step 3 of 4 · Creating profile via Apple'
     case 'import-export-warning':
