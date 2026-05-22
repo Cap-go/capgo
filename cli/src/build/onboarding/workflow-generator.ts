@@ -101,7 +101,7 @@ export function generateWorkflow(opts: WorkflowGeneratorOpts): GeneratedWorkflow
   // Capgo cloud build request. The `${{ ... }}` syntax below is GitHub Actions
   // expression syntax, not a JS template literal — it must be emitted verbatim
   // into the YAML. eslint's `no-template-curly-in-string` doesn't understand
-  // that and would otherwise mis-flag every single line here.
+  // that and would otherwise flag every single line here incorrectly.
   lines.push('')
   lines.push('      - name: Capgo native build')
   lines.push('        run: |')
