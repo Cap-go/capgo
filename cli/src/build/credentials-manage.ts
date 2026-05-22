@@ -27,6 +27,7 @@ import {
   removeSavedCredentialKeys,
   updateSavedCredentials,
 } from './credentials'
+import { escapeDotenvValue, renderEnvFile } from './env-render'
 import { onboardingBuilderCommand } from './onboarding/command'
 import { canUseFilePicker, openSaveFilePicker } from './onboarding/file-picker'
 
@@ -1197,7 +1198,7 @@ async function exportToEnvFile(entry: AppEntry): Promise<boolean> {
     return false
   }
 
-  const content = renderEnvFile(entry, platform, creds)
+  const content = renderEnvFile({ appId: entry.appId, local: entry.local, platform, creds })
   await writeFile(target.path, content, { mode: 0o600 })
   // Node's writeFile mode option only applies when the file is newly created;
   // an overwrite leaves the existing permission bits untouched. Force 0o600
@@ -1235,7 +1236,7 @@ async function exportCombinedEnvFile(entry: AppEntry): Promise<boolean> {
       pLog.info('✗ Export cancelled.')
       return false
     }
-    const content = renderEnvFile(entry, platform, creds)
+    const content = renderEnvFile({ appId: entry.appId, local: entry.local, platform, creds })
     await writeFile(target.path, content, { mode: 0o600 })
     await chmod(target.path, 0o600)
     const fieldCount = Object.values(creds).filter(v => typeof v === 'string' && v.length > 0).length
@@ -1392,42 +1393,6 @@ async function resolveExportTarget(entry: AppEntry, label: 'ios' | 'android' | '
   return { path: resolved }
 }
 
-function renderEnvFile(entry: AppEntry, platform: 'ios' | 'android', creds: Partial<BuildCredentials>): string {
-  const lines: string[] = []
-  const generated = new Date().toISOString()
-  lines.push('# Capgo build credentials — CI/CD environment file')
-  lines.push(`# App: ${entry.appId}`)
-  lines.push(`# Platform: ${platform}`)
-  lines.push(`# Source: ${entry.local ? 'local' : 'global'} credentials store`)
-  lines.push(`# Generated: ${generated}`)
-  lines.push('#')
-  lines.push('# Paste these into your CI/CD provider as secrets, or source the file locally:')
-  lines.push('#   set -a; . ./this-file; set +a')
-  lines.push('#')
-  lines.push('# DO NOT commit this file. Add to .gitignore: .env.capgo.*')
-  lines.push('')
-
-  const provisioningMapRaw = creds.CAPGO_IOS_PROVISIONING_MAP
-  for (const [key, value] of Object.entries(creds)) {
-    if (typeof value !== 'string' || value.length === 0)
-      continue
-    if (key === 'CAPGO_IOS_PROVISIONING_MAP')
-      continue
-    lines.push(`${key}=${escapeDotenvValue(value)}`)
-  }
-
-  if (provisioningMapRaw) {
-    const base64 = Buffer.from(provisioningMapRaw, 'utf-8').toString('base64')
-    lines.push('')
-    lines.push('# Provisioning map — base64 form is preferred to avoid newline/quoting issues in CI.')
-    lines.push(`CAPGO_IOS_PROVISIONING_MAP_BASE64=${base64}`)
-    lines.push(`# CAPGO_IOS_PROVISIONING_MAP=${escapeDotenvValue(provisioningMapRaw)}`)
-  }
-
-  lines.push('')
-  return lines.join('\n')
-}
-
 function renderEnvFileCombined(
   entry: AppEntry,
   sections: Array<{ platform: 'ios' | 'android', creds: Partial<BuildCredentials> }>,
@@ -1477,18 +1442,6 @@ function renderEnvFileCombined(
 
   lines.push('')
   return lines.join('\n')
-}
-
-function escapeDotenvValue(value: string): string {
-  if (/^[\w./+=:-]+$/.test(value))
-    return value
-  const escaped = value
-    .replaceAll('\\', '\\\\')
-    .replaceAll('"', '\\"')
-    .replaceAll('$', '\\$')
-    .replaceAll('`', '\\`')
-    .replaceAll('\n', '\\n')
-  return `"${escaped}"`
 }
 
 async function deletePlatformInteractive(entry: AppEntry): Promise<boolean> {

@@ -3,6 +3,7 @@
 import {
   createCiSecretEntries,
   detectCiSecretTargets,
+  getCiSecretRepoLabel,
   listExistingCiSecretKeys,
   uploadCiSecrets,
 } from '../src/build/onboarding/ci-secrets.ts'
@@ -81,6 +82,35 @@ await test('creates env entries and converts provisioning map to base64', () => 
     '{"com.example.app":{"profile":"abc","name":"main"}}',
   )
   assert(mapEntry.masked, 'Provisioning map base64 should be masked')
+})
+
+await test('omits CAPGO_TOKEN when no API key is provided', () => {
+  const entries = createCiSecretEntries({ BUILD_CERTIFICATE_BASE64: 'cert' })
+  const keys = entries.map(entry => entry.key)
+  assert(!keys.includes('CAPGO_TOKEN'), 'CAPGO_TOKEN should be absent without an API key')
+})
+
+await test('includes a masked CAPGO_TOKEN when an API key is provided', () => {
+  // The generated GitHub Actions workflow references ${{ secrets.CAPGO_TOKEN }}
+  // for --apikey, so the wizard must push it alongside build credentials.
+  const entries = createCiSecretEntries({ BUILD_CERTIFICATE_BASE64: 'cert' }, 'cap_test_apikey_xyz')
+  const tokenEntry = entries.find(entry => entry.key === 'CAPGO_TOKEN')
+  assert(tokenEntry !== undefined, 'CAPGO_TOKEN should be pushed when API key is provided')
+  assertEquals(tokenEntry.value, 'cap_test_apikey_xyz')
+  assert(tokenEntry.masked, 'CAPGO_TOKEN must be masked')
+})
+
+await test('treats an empty-string API key as "no token" (no entry)', () => {
+  const entries = createCiSecretEntries({ BUILD_CERTIFICATE_BASE64: 'cert' }, '')
+  assert(!entries.some(e => e.key === 'CAPGO_TOKEN'), 'Empty API key must not produce a CAPGO_TOKEN entry')
+})
+
+await test('trims the API key before creating CAPGO_TOKEN', () => {
+  const entries = createCiSecretEntries({ BUILD_CERTIFICATE_BASE64: 'cert' }, '  capgo_token_value  ')
+  const tokenEntry = entries.find(entry => entry.key === 'CAPGO_TOKEN')
+  assert(tokenEntry !== undefined, 'Trimmed API key should produce a CAPGO_TOKEN entry')
+  assertEquals(tokenEntry.value, 'capgo_token_value')
+  assert(tokenEntry.masked, 'CAPGO_TOKEN must stay masked')
 })
 
 await test('detects authenticated GitHub target from git remotes', () => {
@@ -220,6 +250,47 @@ await test('uploads GitLab variables using set/update and masks only secret keys
       input: 'release',
     },
   ])
+})
+
+const GITHUB_TARGET = { provider: 'github', label: 'GitHub Actions repository secrets', cli: 'gh' }
+const GITLAB_TARGET = { provider: 'gitlab', label: 'GitLab CI/CD variables', cli: 'glab' }
+
+await test('getCiSecretRepoLabel returns the gh-resolved nameWithOwner for GitHub', () => {
+  const runner = createRunner({
+    'gh repo view --json nameWithOwner -q .nameWithOwner': { status: 0, stdout: 'Cap-go/capgo\n', stderr: '' },
+  })
+  assertEquals(getCiSecretRepoLabel(GITHUB_TARGET, runner), 'Cap-go/capgo')
+})
+
+await test('getCiSecretRepoLabel returns null when gh repo view fails', () => {
+  // No matching handler → createRunner returns status: 1 by default
+  const runner = createRunner({})
+  assertEquals(getCiSecretRepoLabel(GITHUB_TARGET, runner), null)
+})
+
+await test('getCiSecretRepoLabel trims trailing whitespace from gh output', () => {
+  const runner = createRunner({
+    'gh repo view --json nameWithOwner -q .nameWithOwner': { status: 0, stdout: '   owner/repo   \n', stderr: '' },
+  })
+  assertEquals(getCiSecretRepoLabel(GITHUB_TARGET, runner), 'owner/repo')
+})
+
+await test('getCiSecretRepoLabel parses path_with_namespace from glab JSON output', () => {
+  const runner = createRunner({
+    'glab repo view -F json': {
+      status: 0,
+      stdout: JSON.stringify({ path_with_namespace: 'group/sub/project', name: 'project' }),
+      stderr: '',
+    },
+  })
+  assertEquals(getCiSecretRepoLabel(GITLAB_TARGET, runner), 'group/sub/project')
+})
+
+await test('getCiSecretRepoLabel returns null on glab JSON parse failure', () => {
+  const runner = createRunner({
+    'glab repo view -F json': { status: 0, stdout: 'not-valid-json', stderr: '' },
+  })
+  assertEquals(getCiSecretRepoLabel(GITLAB_TARGET, runner), null)
 })
 
 if (testsFailed > 0) {
