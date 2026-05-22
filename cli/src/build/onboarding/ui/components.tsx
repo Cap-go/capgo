@@ -219,10 +219,18 @@ export const FullscreenAiViewer: FC<{
   const visibleRowsUsed = totalRenderedRows(visibleLines, dims.cols)
   const padRows = Math.max(0, viewportRows - visibleRowsUsed)
 
+  // Suppress every scroll-related hint when the analysis fits the viewport
+  // outright. The conservative `isAiAnalysisTooTall` estimator in the parent
+  // sometimes routes us here even though `pickVisibleLines` ends up showing
+  // every logical line — telling the user to "↑/↓ to scroll" when scrolling
+  // is a no-op is just noise. The subtitle is also suppressed in that case
+  // because its only job is to advertise "this is scrollable".
+  const hasMoreToScroll = maxScrollOffset > 0
+
   return (
     <Box flexDirection="column">
       <Text bold color="cyan">{title}</Text>
-      {subtitle && <Text dimColor>{subtitle}</Text>}
+      {subtitle && hasMoreToScroll && <Text dimColor>{subtitle}</Text>}
       <Text color="cyan">{'─'.repeat(dividerWidth)}</Text>
       {visibleLines.map((line, index) => (
         <Text key={`ai-line-${scrollOffset + index}`}>{line}</Text>
@@ -232,12 +240,14 @@ export const FullscreenAiViewer: FC<{
       ))}
       <Text color="cyan">{'─'.repeat(dividerWidth)}</Text>
       <Text dimColor>
-        {`Showing ${firstVisibleLine}-${lastVisibleLine} of ${total} lines. ↑/↓ or PgUp/PgDn to scroll.`}
+        {hasMoreToScroll
+          ? `Showing ${firstVisibleLine}-${lastVisibleLine} of ${total} lines. ↑/↓ or PgUp/PgDn to scroll.`
+          : `Showing all ${total} lines.`}
       </Text>
       <Text color="yellow" bold>
-        {atBottom
-          ? 'Press Esc or Enter to continue to the retry/skip prompt.'
-          : 'Press Esc or Enter when done to continue.'}
+        {hasMoreToScroll && !atBottom
+          ? 'Press Esc or Enter when done to continue.'
+          : 'Press Esc or Enter to continue to the retry/skip prompt.'}
       </Text>
     </Box>
   )
