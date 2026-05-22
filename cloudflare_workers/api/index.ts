@@ -3,7 +3,6 @@ import { app as admin_credits } from '../../supabase/functions/_backend/private/
 import { app as admin_stats } from '../../supabase/functions/_backend/private/admin_stats.ts'
 import { app as channel_stats } from '../../supabase/functions/_backend/private/channel_stats.ts'
 import { app as config } from '../../supabase/functions/_backend/private/config.ts'
-import { app as builderTutorialVideo } from '../../supabase/functions/_backend/private/builder_tutorial_video.ts'
 import { app as configBuilder } from '../../supabase/functions/_backend/private/config_builder.ts'
 import { app as create_device } from '../../supabase/functions/_backend/private/create_device.ts'
 import { app as credits } from '../../supabase/functions/_backend/private/credits.ts'
@@ -104,7 +103,6 @@ appPrivate.route('/store_top', storeTop)
 appPrivate.route('/website_stats', publicStats)
 appPrivate.route('/config', config)
 appPrivate.route('/config/builder', configBuilder)
-appPrivate.route('/config/builder/tutorial-video', builderTutorialVideo)
 appPrivate.route('/accept_invitation', accept_invitation)
 appPrivate.route('/devices', devices_priv)
 appPrivate.route('/log_as', log_as)
