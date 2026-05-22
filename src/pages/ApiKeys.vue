@@ -22,6 +22,7 @@ import {
   sortApiKeyRows,
 } from '~/services/apikeys'
 import { formatLocalDate } from '~/services/date'
+import { checkPermissions } from '~/services/permissions'
 import { useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
 import { useDisplayStore } from '~/stores/display'
@@ -76,6 +77,7 @@ const expirationDate = ref<Date | null>(null)
 // RBAC creation state
 const selectedOrgRole = ref('org_member')
 const selectedOrgsForCreation = ref<string[]>([])
+const manageableOrgIds = ref(new Set<string>())
 const pendingAppBindings = ref<Record<string, string>>({})
 const showAppDropdown = ref(false)
 
@@ -90,6 +92,7 @@ const minExpirationDate = computed(() => {
 // Cache for organization and app names
 const orgCache = ref(new Map<string, string>())
 const appCache = ref(new Map<string, string>())
+const UUID_REGEX = /^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/i
 
 // Function to truncate strings (show first 5 and last 5 characters)
 function hideString(str: string | null) {
@@ -146,6 +149,23 @@ function getRolesByOrg(key: Database['public']['Tables']['apikeys']['Row']): { o
   }))
 }
 
+function getRbacAppBindingIds(key: Database['public']['Tables']['apikeys']['Row']): string[] {
+  return getBindingsForKey(key)
+    .filter(b => b.scope_type === 'app' && !!b.app_id)
+    .map(b => b.app_id!)
+}
+
+function getDisplayAppIds(key: Database['public']['Tables']['apikeys']['Row']): string[] {
+  const appIds = new Set<string>()
+  key.limited_to_apps?.forEach(appId => appIds.add(appId))
+  getRbacAppBindingIds(key).forEach(appId => appIds.add(appId))
+  return Array.from(appIds)
+}
+
+function getOrgNameById(orgId: string) {
+  return orgCache.value.get(orgId) || orgId
+}
+
 // Computed property to get unique organization IDs from all API keys
 const uniqueOrgIds = computed(() => {
   if (!keys.value)
@@ -176,6 +196,10 @@ const uniqueAppIds = computed(() => {
     if (key.limited_to_apps && key.limited_to_apps.length > 0) {
       key.limited_to_apps.forEach(appId => appIds.add(appId))
     }
+  })
+  allBindings.value.forEach((binding) => {
+    if (binding.scope_type === 'app' && binding.app_id)
+      appIds.add(binding.app_id)
   })
 
   return appIds
@@ -225,27 +249,60 @@ async function fetchOrgAndAppNames() {
     await Promise.all(orgPromises)
   }
 
-  // Fetch app names in parallel
+  // Fetch app names in parallel. `limited_to_apps` stores public app ids, while RBAC
+  // role_bindings.app_id stores apps.id UUIDs, so cache both keys.
   if (uncachedAppIds.length > 0) {
-    const appPromises = uncachedAppIds.map(async (appId) => {
-      try {
-        const { data, error } = await supabase
-          .from('apps')
-          .select('app_id, name')
-          .eq('app_id', appId)
-          .single()
+    const appUuidIds = uncachedAppIds.filter(appId => UUID_REGEX.test(appId))
+    const publicAppIds = uncachedAppIds.filter(appId => !UUID_REGEX.test(appId))
+    const appPromises: Promise<unknown>[] = []
 
-        if (error)
-          throw error
-        if (data && data.name)
-          appCache.value.set(appId, data.name)
-        return { id: appId, name: data?.name }
-      }
-      catch (err) {
-        console.error(`Error fetching app name for ${appId}:`, err)
-        return { id: appId, name: 'Unknown' }
-      }
-    })
+    if (publicAppIds.length > 0) {
+      appPromises.push((async () => {
+        try {
+          const { data, error } = await supabase
+            .from('apps')
+            .select('id, app_id, name')
+            .in('app_id', publicAppIds)
+
+          if (error)
+            throw error
+          const apps = data || []
+          apps.forEach((app) => {
+            const displayName = app.name || app.app_id
+            appCache.value.set(app.app_id, displayName)
+            if (app.id)
+              appCache.value.set(app.id, displayName)
+          })
+        }
+        catch (err) {
+          console.error('Error fetching app names by public app ids:', err)
+        }
+      })())
+    }
+
+    if (appUuidIds.length > 0) {
+      appPromises.push((async () => {
+        try {
+          const { data, error } = await supabase
+            .from('apps')
+            .select('id, app_id, name')
+            .in('id', appUuidIds)
+
+          if (error)
+            throw error
+          const apps = data || []
+          apps.forEach((app) => {
+            const displayName = app.name || app.app_id
+            appCache.value.set(app.app_id, displayName)
+            if (app.id)
+              appCache.value.set(app.id, displayName)
+          })
+        }
+        catch (err) {
+          console.error('Error fetching app names by RBAC app ids:', err)
+        }
+      })())
+    }
 
     await Promise.all(appPromises)
   }
@@ -372,7 +429,7 @@ columns.value = [
     key: 'limited_to_apps',
     label: t('apps'),
     displayFunction: (row: Database['public']['Tables']['apikeys']['Row']) => {
-      return formatApiKeyScope(row.limited_to_apps, appId => getAppName.value(appId))
+      return formatApiKeyScope(getDisplayAppIds(row), appId => getAppName.value(appId))
     },
   },
   {
@@ -524,6 +581,14 @@ async function loadAllApps() {
   }
 }
 
+async function loadManageableOrganizations() {
+  const checks = await Promise.all(organizationStore.organizations.map(async (org) => {
+    const canManage = await checkPermissions('org.update_user_roles', { orgId: org.gid })
+    return canManage ? org.gid : null
+  }))
+  manageableOrgIds.value = new Set(checks.filter((orgId): orgId is string => !!orgId))
+}
+
 async function createApiKey() {
   const isHashed = createAsHashed.value
 
@@ -606,7 +671,7 @@ async function createApiKey() {
 
     if (error || !data) {
       console.error('Error creating API key:', error)
-      toast.error(t('failed-to-create-api-key'))
+      toast.error(await getUserFacingErrorMessage(error, t('failed-to-create-api-key')))
       return false
     }
 
@@ -632,7 +697,7 @@ async function createApiKey() {
   }
   catch (error) {
     console.error('Error creating API key:', error)
-    toast.error(t('failed-to-create-api-key'))
+    toast.error(await getUserFacingErrorMessage(error, t('failed-to-create-api-key')))
     return false
   }
 }
@@ -653,11 +718,12 @@ async function addNewApiKey() {
   pendingAppBindings.value = {}
   showAppDropdown.value = false
 
-  // Select all orgs by default
-  selectedOrgsForCreation.value = organizationStore.organizations.map(org => org.gid)
+  await Promise.all([loadAllApps(), fetchRoles(), loadManageableOrganizations()])
 
-  // Load apps and roles
-  await Promise.all([loadAllApps(), fetchRoles()])
+  // Select all organizations that can receive RBAC bindings from this caller.
+  selectedOrgsForCreation.value = organizationStore.organizations
+    .map(org => org.gid)
+    .filter(orgId => manageableOrgIds.value.has(orgId))
 
   // Show creation modal
   await showAddNewKeyModal()
@@ -800,6 +866,9 @@ async function showAddNewKeyModal() {
 }
 
 function handleOrgSelection(orgId: string, checked: boolean) {
+  if (!manageableOrgIds.value.has(orgId))
+    return
+
   if (checked) {
     if (!selectedOrgsForCreation.value.includes(orgId)) {
       selectedOrgsForCreation.value.push(orgId)
@@ -832,6 +901,32 @@ function hasIncompleteAppBindings() {
 function getAppNameById(appId: string) {
   const app = availableApps.value.find(a => a.id === appId)
   return app ? (app.name || app.app_id) : appId
+}
+
+function getAppOrgNameById(appId: string) {
+  const app = availableApps.value.find(a => a.id === appId)
+  return app?.owner_org ? getOrgNameById(app.owner_org) : ''
+}
+
+async function getUserFacingErrorMessage(error: unknown, fallbackMessage: string) {
+  if (error && typeof error === 'object' && 'context' in error && error.context instanceof Response) {
+    try {
+      const payload = await error.context.clone().json() as { message?: string, error?: string, error_description?: string }
+      if (typeof payload.message === 'string' && payload.message)
+        return payload.message
+      if (typeof payload.error_description === 'string' && payload.error_description)
+        return payload.error_description
+      if (typeof payload.error === 'string' && payload.error)
+        return payload.error
+    }
+    catch {
+    }
+  }
+
+  if (error instanceof Error && error.message)
+    return error.message
+
+  return fallbackMessage
 }
 
 async function copyKey(apikey: Database['public']['Tables']['apikeys']['Row']) {
@@ -984,10 +1079,14 @@ getKeys()
                   type="checkbox"
                   class="border-gray-500 dark:border-gray-700 checkbox"
                   :checked="selectedOrgsForCreation.includes(org.gid)"
+                  :disabled="!manageableOrgIds.has(org.gid)"
                   @change="handleOrgSelection(org.gid, ($event.target as HTMLInputElement).checked)"
                 >
-                <label :for="`org-create-${org.gid}`" class="text-sm">
+                <label :for="`org-create-${org.gid}`" class="text-sm" :class="!manageableOrgIds.has(org.gid) ? 'text-slate-400' : ''">
                   {{ org.name }}
+                  <span v-if="!manageableOrgIds.has(org.gid)" class="text-xs text-slate-400">
+                    ({{ t('cannot-manage-org-api-keys') }})
+                  </span>
                 </label>
               </div>
             </div>
@@ -1067,6 +1166,9 @@ getKeys()
                       <div v-if="app.name" class="text-xs text-slate-500">
                         {{ app.app_id }}
                       </div>
+                      <div class="text-xs text-slate-500">
+                        {{ getOrgNameById(app.owner_org) }}
+                      </div>
                     </div>
                   </label>
                 </div>
@@ -1085,6 +1187,9 @@ getKeys()
               >
                 <span class="flex-1 text-sm font-medium truncate dark:text-white text-slate-800">
                   {{ getAppNameById(appId) }}
+                  <span v-if="getAppOrgNameById(appId)" class="block text-xs font-normal text-slate-500">
+                    {{ getAppOrgNameById(appId) }}
+                  </span>
                 </span>
                 <select
                   class="d-select d-select-sm d-select-bordered"

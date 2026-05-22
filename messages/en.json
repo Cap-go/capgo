@@ -560,6 +560,7 @@
   "cannot-invite-owner": "Cannot invite owner into organization",
   "cannot-load-app-settings": "Cannot load app settings",
   "cannot-load-channels": "Cannot load channels for this app.",
+  "cannot-manage-org-api-keys": "no permission",
   "cannot-remove-last-super-admin": "You cannot remove the last super admin.",
   "cannot-rescind-invitation": "Cannot rescind invitation, please look in the browser console and report this error to the <a href='https://support.capgo.app/' target='_blank' class='text-blue-500 underline hover:text-blue-600'>Capgo support team</a>",
   "cannot-rollback-to-current-version": "Cannot rollback to current bundle",
