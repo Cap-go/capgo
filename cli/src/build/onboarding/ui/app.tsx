@@ -2062,6 +2062,29 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
                   )
                   return
                 }
+                // Belt-and-suspenders: the upstream matchIdentitiesToProfiles
+                // filter and Apple-fetched profile synthesizing should both
+                // guarantee `profile.certificateSha1s` contains
+                // `chosenIdentity.sha1`. But the rescan flow re-imports
+                // profiles the user might have hand-created in the portal —
+                // if they ticked the wrong cert in step 4 of the manual
+                // walkthrough, we'd otherwise save credentials that the
+                // build server can't actually sign with (private key from
+                // chosenIdentity but profile only trusts a different cert).
+                // Catch that here with a clear error rather than discovering
+                // it during a build hours later.
+                if (!profile.certificateSha1s.includes(chosenIdentity.sha1)) {
+                  const shownSha1s = profile.certificateSha1s.map(s => `${s.slice(0, 8)}…`).join(', ') || '(none listed)'
+                  handleError(
+                    new Error(
+                      `Profile "${profile.name}" doesn't trust your chosen certificate "${chosenIdentity.name}". `
+                      + `The profile's allowed-certs list contains ${profile.certificateSha1s.length} entr${profile.certificateSha1s.length === 1 ? 'y' : 'ies'} (SHA1: ${shownSha1s}); your cert's SHA1 starts with ${chosenIdentity.sha1.slice(0, 8)}…. `
+                      + `Either pick a different profile, or re-create this profile in the Apple Developer Portal and tick the right cert at step 4.`,
+                    ),
+                    'import-pick-profile',
+                  )
+                  return
+                }
                 setChosenProfile(profile)
                 upsertLog('✔ Profile · ', `✔ Profile · ${profile.name}`)
                 setStep('import-export-warning')
