@@ -76,11 +76,19 @@ export async function onboardingBuilderCommand(options: OnboardingBuilderOptions
 
   // Detect app ID and platform directories from capacitor.config.ts
   let appId: string | undefined
+  // `iosBundleIdInitial` is the iOS-side default — the top-level
+  // `config.appId` (what `cap sync` writes into PRODUCT_BUNDLE_IDENTIFIER).
+  // This is distinct from `appId` above, which `getAppId` resolves to the
+  // CapacitorUpdater plugin override when present (e.g. a Capgo dev-tunnel
+  // suffix). The iOS onboarding flow uses these for different purposes —
+  // never collapse them — see the AppProps doc-block in ui/app.tsx.
+  let iosBundleIdInitial: string | undefined
   let iosDir = 'ios'
   let androidDir = 'android'
   try {
     const extConfig = await getConfig()
     appId = getAppId(undefined, extConfig?.config)
+    iosBundleIdInitial = extConfig?.config?.appId
     iosDir = getPlatformDirFromCapacitorConfig(extConfig?.config, 'ios')
     androidDir = getPlatformDirFromCapacitorConfig(extConfig?.config, 'android')
   }
@@ -92,6 +100,11 @@ export async function onboardingBuilderCommand(options: OnboardingBuilderOptions
     log.error('Could not detect app ID from capacitor.config.ts. Make sure you are in a Capacitor project directory.')
     process.exit(1)
   }
+  // If config.appId is missing (very rare — CapacitorConfig.appId is required
+  // for `cap sync` to produce a working iOS project), fall back to the
+  // resolved Capgo lookup key. Mismatch detection will still surface the
+  // pbxproj/plist values; the user can pick the right one from there.
+  const iosBundleIdForOnboarding = iosBundleIdInitial || appId
 
   const platform = await resolvePlatform(options, iosDir, androidDir)
 
@@ -111,7 +124,13 @@ export async function onboardingBuilderCommand(options: OnboardingBuilderOptions
 
   const progress = await loadProgress(appId)
   const { waitUntilExit } = render(
-    React.createElement(OnboardingApp, { appId, initialProgress: progress, iosDir, apikey: options.apikey }),
+    React.createElement(OnboardingApp, {
+      appId,
+      iosBundleIdInitial: iosBundleIdForOnboarding,
+      initialProgress: progress,
+      iosDir,
+      apikey: options.apikey,
+    }),
   )
   await waitUntilExit()
 }

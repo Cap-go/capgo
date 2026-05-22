@@ -43,7 +43,27 @@ const CARRIAGE_RETURN_RE = /\r/g
 interface LogEntry { text: string, color?: string }
 
 interface AppProps {
+  /**
+   * Capgo lookup key (used for progress files, saved credentials, and the
+   * Capgo SaaS build API). This is what `getAppId()` returns — which prefers
+   * `config.plugins.CapacitorUpdater.appId` over `config.appId` so dev-tunnel
+   * sandboxes can override the Capgo-side identifier without renaming the
+   * iOS bundle.
+   *
+   * Do NOT use this for Apple-side operations — see `iosBundleIdInitial`.
+   */
   appId: string
+  /**
+   * Default value for the iOS bundle ID used for Apple-side operations
+   * (cert lookup, profile filtering, ensureBundleId, createProfile, and the
+   * provisioning_map key). Sourced from `config.appId` directly because
+   * `cap sync` writes that into project.pbxproj's
+   * PRODUCT_BUNDLE_IDENTIFIER — not the plugin override.
+   *
+   * When `config.appId` is missing, command.ts falls back to `appId` so
+   * the prop is always a valid string.
+   */
+  iosBundleIdInitial: string
   initialProgress: OnboardingProgress | null
   /** Resolved iOS directory from capacitor.config (defaults to 'ios') */
   iosDir: string
@@ -88,7 +108,7 @@ async function runRunnerCommand(runner: string, args: string[]): Promise<{ succe
   })
 }
 
-const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey }) => {
+const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgress, iosDir, apikey }) => {
   const { exit } = useApp()
   const startStep = getResumeStep(initialProgress)
 
@@ -229,12 +249,18 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
 
   // ─── iOS bundle id detection + confirmation ───────────────────────────
   //
-  // capacitor.config.appId is the lookup key for everything Capgo-side
-  // (progress files, saved credentials, build API). For Apple-side ops
-  // (cert lookup, profile filtering, ensureBundleId, createProfile, and the
-  // provisioning_map key written into credentials.json) we use the iOS
-  // PRODUCT_BUNDLE_IDENTIFIER instead — they only line up when the user
-  // hasn't sandboxed their capacitor.config with a dev-tunnel suffix.
+  // The Capgo lookup key (`appId` prop, resolved by getAppId()) prefers
+  // config.plugins.CapacitorUpdater.appId — which is correct for tracking
+  // a dev-tunnel sandbox inside Capgo SaaS but is the wrong value for iOS
+  // signing. `cap sync` only ever writes `config.appId` (the top-level
+  // field) into project.pbxproj's PRODUCT_BUNDLE_IDENTIFIER, so that's the
+  // value Apple Dev Portal will know about.
+  //
+  // `iosBundleIdInitial` is wired in from command.ts as `config.appId`
+  // (falling back to the resolved `appId` only when config.appId is
+  // missing). We use it as the default for everything Apple-side; the
+  // resolved `appId` keeps owning the progress file key, the credentials
+  // store key, and the `capgo build request` command shown to the user.
   //
   // Detection is synchronous (small files, no network), so a single useMemo
   // captures the result for the lifetime of the component. The
@@ -242,15 +268,15 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
   // AND the user hasn't already chosen this session (tracked via
   // `appIdConfirmed`, persisted in progress as `iosBundleIdOverride`).
   const detectedIds = useMemo(
-    () => detectIosBundleIds({ cwd: process.cwd(), iosDir, capacitorAppId: appId }),
-    [iosDir, appId],
+    () => detectIosBundleIds({ cwd: process.cwd(), iosDir, capacitorAppId: iosBundleIdInitial }),
+    [iosDir, iosBundleIdInitial],
   )
   const [iosBundleId, setIosBundleId] = useState<string>(
-    initialProgress?.iosBundleIdOverride ?? appId,
+    initialProgress?.iosBundleIdOverride ?? iosBundleIdInitial,
   )
-  // Distinct from `iosBundleId !== appId` because the user is allowed to
-  // pick the capacitor value at the confirm step — we still want to suppress
-  // the question for the rest of the session in that case.
+  // Distinct from `iosBundleId !== iosBundleIdInitial` because the user is
+  // allowed to pick the capacitor value at the confirm step — we still want
+  // to suppress the question for the rest of the session in that case.
   const [appIdConfirmed, setAppIdConfirmed] = useState<boolean>(
     initialProgress?.iosBundleIdOverride !== undefined,
   )
@@ -1770,8 +1796,8 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
           }
           existing.iosBundleIdOverride = chosen
           await saveProgress(appId, existing)
-          if (chosen !== appId) {
-            addLog(`✔ Using "${chosen}" as the iOS bundle ID for Apple operations (capacitor.config.appId is "${appId}")`)
+          if (chosen !== iosBundleIdInitial) {
+            addLog(`✔ Using "${chosen}" as the iOS bundle ID for Apple operations (capacitor.config.appId is "${iosBundleIdInitial}")`)
           }
           else {
             addLog(`✔ Confirmed "${chosen}" as the iOS bundle ID`)
