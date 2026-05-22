@@ -79,6 +79,7 @@ const selectedOrgRole = ref('org_member')
 const selectedOrgsForCreation = ref<string[]>([])
 const manageableOrgIds = ref(new Set<string>())
 const pendingAppBindings = ref<Record<string, string>>({})
+const showOrgDropdown = ref(false)
 const showAppDropdown = ref(false)
 
 // Available apps for selection (populated when showing app dialog)
@@ -165,6 +166,13 @@ function getDisplayAppIds(key: Database['public']['Tables']['apikeys']['Row']): 
 function getOrgNameById(orgId: string) {
   return orgCache.value.get(orgId) || orgId
 }
+
+const selectedOrgNamesForCreation = computed(() => {
+  const orgById = new Map(organizationStore.organizations.map(org => [org.gid, org.name]))
+  return selectedOrgsForCreation.value
+    .map(orgId => orgById.get(orgId) || getOrgNameById(orgId))
+    .join(', ')
+})
 
 // Computed property to get unique organization IDs from all API keys
 const uniqueOrgIds = computed(() => {
@@ -716,6 +724,7 @@ async function addNewApiKey() {
   expirationDate.value = null
   selectedOrgRole.value = 'org_member'
   pendingAppBindings.value = {}
+  showOrgDropdown.value = false
   showAppDropdown.value = false
 
   await Promise.all([loadAllApps(), fetchRoles(), loadManageableOrganizations()])
@@ -848,7 +857,7 @@ async function showAddNewKeyModal() {
   dialogStore.openDialog({
     title: t('alert-add-new-key'),
     description: t('alert-generate-new-key'),
-    size: 'xl',
+    size: '3xl',
     buttons: [
       {
         text: t('button-cancel'),
@@ -864,6 +873,18 @@ async function showAddNewKeyModal() {
     ],
   })
   return dialogStore.onDialogDismiss()
+}
+
+function toggleOrgSelection(orgId: string) {
+  if (!manageableOrgIds.value.has(orgId))
+    return
+
+  if (selectedOrgsForCreation.value.includes(orgId)) {
+    selectedOrgsForCreation.value = selectedOrgsForCreation.value.filter(id => id !== orgId)
+    return
+  }
+
+  selectedOrgsForCreation.value = [...selectedOrgsForCreation.value, orgId]
 }
 
 function toggleApp(appId: string) {
@@ -1059,23 +1080,46 @@ getKeys()
             <h3 class="mb-2 text-sm font-semibold uppercase text-slate-500">
               {{ t('organizations') }}
             </h3>
-            <select
-              v-model="selectedOrgsForCreation"
-              multiple
-              class="w-full min-h-36 d-select d-select-bordered"
-            >
-              <option
-                v-for="org in organizationStore.organizations"
-                :key="org.gid"
-                :value="org.gid"
-                :disabled="!manageableOrgIds.has(org.gid)"
+            <div class="relative">
+              <button
+                type="button"
+                class="flex items-center justify-between w-full gap-3 px-3 py-2 text-sm text-left bg-white border rounded-lg border-slate-300 dark:bg-gray-800 dark:border-slate-600 focus:ring-2 focus:ring-primary-500 focus:outline-none"
+                @click="showOrgDropdown = !showOrgDropdown"
               >
-                {{ org.name }}{{ !manageableOrgIds.has(org.gid) ? ` (${t('cannot-manage-org-api-keys')})` : '' }}
-              </option>
-            </select>
-            <p class="mt-1 text-xs text-slate-500">
-              {{ t('select-multiple-organizations-help') }}
-            </p>
+                <span class="flex-1 truncate" :class="selectedOrgsForCreation.length ? 'text-slate-800 dark:text-white' : 'text-slate-500'">
+                  {{ selectedOrgNamesForCreation || t('select-organization') }}
+                </span>
+                <svg class="w-4 h-4 text-slate-500 shrink-0" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                  <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd" />
+                </svg>
+              </button>
+              <div v-if="showOrgDropdown" class="fixed inset-0 z-10" @click="showOrgDropdown = false" />
+              <div
+                v-if="showOrgDropdown"
+                class="absolute z-20 w-full mt-1 overflow-y-auto bg-white border rounded-lg shadow-lg top-full dark:bg-gray-800 border-slate-200 dark:border-slate-700 max-h-64"
+              >
+                <label
+                  v-for="org in organizationStore.organizations"
+                  :key="org.gid"
+                  class="flex items-center gap-3 px-4 py-2.5 transition-colors"
+                  :class="manageableOrgIds.has(org.gid) ? 'cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700' : 'cursor-not-allowed text-slate-400'"
+                >
+                  <input
+                    type="checkbox"
+                    class="d-checkbox d-checkbox-sm d-checkbox-primary"
+                    :checked="selectedOrgsForCreation.includes(org.gid)"
+                    :disabled="!manageableOrgIds.has(org.gid)"
+                    @change="toggleOrgSelection(org.gid)"
+                  >
+                  <span class="flex-1 text-sm truncate">
+                    {{ org.name }}
+                    <span v-if="!manageableOrgIds.has(org.gid)" class="text-xs text-slate-400">
+                      ({{ t('cannot-manage-org-api-keys') }})
+                    </span>
+                  </span>
+                </label>
+              </div>
+            </div>
           </div>
 
           <!-- Organization Role -->
