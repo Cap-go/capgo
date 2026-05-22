@@ -25,6 +25,9 @@ import { Box, Newline, Text, useApp, useInput, useStdout } from 'ink'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { createSupabaseClient, findSavedKey, findSavedKeySilent, getOrganizationId } from '../../../../utils.js'
 import { loadSavedCredentials, updateSavedCredentials } from '../../../credentials.js'
+import { releaseCapturedLogs, runCapgoAiAnalysis } from '../../../../ai/analyze.js'
+import { renderMarkdown } from '../../../../ai/render-markdown.js'
+import { trackAiAnalysisChoice, trackAiAnalysisResult } from '../../../../ai/telemetry.js'
 import { requestBuildInternal } from '../../../request.js'
 import type { CiSecretEntry, CiSecretSetupAdvice, CiSecretTarget } from '../../ci-secrets.js'
 import { createCiSecretEntries, detectCiSecretTargets, getCiSecretTargetLabel, listExistingCiSecretKeys, uploadCiSecrets } from '../../ci-secrets.js'
@@ -377,6 +380,11 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
   // Phase 6 — build output
   const [buildUrl, setBuildUrl] = useState('')
   const [buildOutput, setBuildOutput] = useState<string[]>([])
+  // ── AI-analysis sub-flow (see iOS sibling for full notes). Entered only when
+  // requestBuildInternal returns aiAnalysis.ready=true on a failed build.
+  const [aiJobId, setAiJobId] = useState<string | null>(null)
+  const [aiAnalysisText, setAiAnalysisText] = useState<string | null>(null)
+  const [aiResultMessage, setAiResultMessage] = useState<string | null>(null)
   const [ciSecretEntries, setCiSecretEntries] = useState<CiSecretEntry[]>([])
   const [ciSecretTargets, setCiSecretTargets] = useState<CiSecretTarget[]>([])
   const [ciSecretTarget, setCiSecretTarget] = useState<CiSecretTarget | null>(null)
@@ -1401,6 +1409,11 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
           const result = await requestBuildInternal(appId, {
             platform: 'android',
             apikey: capgoKey,
+            // The Ink TUI owns the terminal — @clack/prompts inside
+            // requestBuildInternal would corrupt rendering. Caller-handled mode
+            // surfaces the captured log path via result.aiAnalysis and lets us
+            // render the AI flow with Ink-native components.
+            aiAnalysisMode: 'caller-handled',
           }, true, buildLogger)
           if (cancelled)
             return
@@ -1418,6 +1431,13 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
           }
           else {
             setBuildOutput(prev => [...prev, `⚠ ${result.error || 'unknown error'}`])
+            // Offer AI-assisted diagnosis when logs were captured. The log file
+            // stays on disk until releaseCapturedLogs runs in 'build-complete'.
+            if (result.aiAnalysis?.ready && result.aiAnalysis.jobId) {
+              setAiJobId(result.aiAnalysis.jobId)
+              setStep('ai-analysis-prompt')
+              return
+            }
           }
           setStep('build-complete')
         }
@@ -1431,8 +1451,79 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
       })()
     }
 
+    // AI analysis — entered only when requestBuildInternal returned with
+    // aiAnalysis.ready=true. See iOS sibling for full notes.
+    if (step === 'ai-analysis-running' && aiJobId) {
+      ;(async () => {
+        await trackAiAnalysisChoice({
+          apikey: resolvedApiKeyRef.current ?? apikey ?? '',
+          orgId: resolvedOrgId ?? '',
+          appId,
+          platform: 'android',
+          jobId: aiJobId,
+          choice: 'capgo_ai',
+          triggeredBy: 'onboarding',
+        }).catch(() => { /* telemetry never breaks the wizard */ })
+
+        const result = await runCapgoAiAnalysis({
+          apiHost: 'https://api.capgo.app',
+          apikey: resolvedApiKeyRef.current ?? apikey ?? '',
+          jobId: aiJobId,
+          appId,
+        })
+
+        if (cancelled)
+          return
+
+        const resultTag: 'success' | 'already_analyzed' | 'too_big' | 'error'
+          = result.kind === 'ok'
+            ? 'success'
+            : result.kind === 'already_analyzed'
+              ? 'already_analyzed'
+              : result.kind === 'too_big'
+                ? 'too_big'
+                : 'error'
+
+        await trackAiAnalysisResult({
+          apikey: resolvedApiKeyRef.current ?? apikey ?? '',
+          orgId: resolvedOrgId ?? '',
+          appId,
+          platform: 'android',
+          jobId: aiJobId,
+          result: resultTag,
+          errorStatus: result.kind === 'error' ? result.status : undefined,
+        }).catch(() => { /* telemetry never breaks the wizard */ })
+
+        if (result.kind === 'ok') {
+          setAiAnalysisText(renderMarkdown(result.analysis, true))
+          setAiResultMessage(null)
+        }
+        else if (result.kind === 'already_analyzed') {
+          setAiAnalysisText(null)
+          setAiResultMessage('AI analysis was already requested for this build (only one per job).')
+        }
+        else if (result.kind === 'too_big') {
+          setAiAnalysisText(null)
+          setAiResultMessage('Build log is too large for Capgo AI (>10 MB). Try a local AI tool with the captured log.')
+        }
+        else {
+          setAiAnalysisText(null)
+          const detail = [
+            result.status ? `(status ${result.status})` : null,
+            result.message,
+          ].filter(Boolean).join(' ')
+          setAiResultMessage(`AI analysis failed${detail ? `: ${detail}` : ''}.`)
+        }
+        setStep('ai-analysis-result')
+      })()
+    }
+
     if (step === 'build-complete') {
       setBuildOutput([])
+      // Best-effort cleanup of any leftover captured log.
+      if (aiJobId) {
+        void releaseCapturedLogs(aiJobId).catch(() => { /* best-effort */ })
+      }
       const timer = setTimeout(() => {
         if (!cancelled)
           exit()
@@ -1457,9 +1548,9 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
 
   const progressPct = ANDROID_STEP_PROGRESS[step] ?? 0
   const phaseLabel = getAndroidPhaseLabel(step)
-  const showProgress = step !== 'welcome' && step !== 'error' && step !== 'build-complete' && step !== 'requesting-build'
-  const showHeader = step !== 'requesting-build'
-  const showLog = step !== 'requesting-build' && step !== 'build-complete'
+  const showProgress = step !== 'welcome' && step !== 'error' && step !== 'build-complete' && step !== 'requesting-build' && step !== 'ai-analysis-result'
+  const showHeader = step !== 'requesting-build' && step !== 'ai-analysis-result'
+  const showLog = step !== 'requesting-build' && step !== 'build-complete' && step !== 'ai-analysis-prompt' && step !== 'ai-analysis-running' && step !== 'ai-analysis-result'
 
   return (
     <Box flexDirection="column" padding={1}>
@@ -2587,6 +2678,69 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
               <Text>Track your build: <Text color="cyan" underline>{buildUrl}</Text></Text>
             </>
           )}
+        </Box>
+      )}
+
+      {/* AI debug — ask the user whether to send the captured log */}
+      {step === 'ai-analysis-prompt' && (
+        <Box flexDirection="column" marginTop={1}>
+          <ErrorLine text="Build failed." />
+          <Newline />
+          <Text>We can analyze the build log with Capgo AI (Kimi K2.5) and suggest a fix.</Text>
+          <Newline />
+          <Select
+            options={[
+              { label: '🤖  Debug with AI', value: 'debug' },
+              { label: '⏭   Skip', value: 'skip' },
+            ]}
+            onChange={async (value) => {
+              if (value === 'debug') {
+                setStep('ai-analysis-running')
+              }
+              else {
+                if (aiJobId) {
+                  await trackAiAnalysisChoice({
+                    apikey: resolvedApiKeyRef.current ?? apikey ?? '',
+                    orgId: resolvedOrgId ?? '',
+                    appId,
+                    platform: 'android',
+                    jobId: aiJobId,
+                    choice: 'skip',
+                    triggeredBy: 'onboarding',
+                  }).catch(() => { /* telemetry never breaks the wizard */ })
+                }
+                setStep('build-complete')
+              }
+            }}
+          />
+        </Box>
+      )}
+
+      {/* AI debug — spinner while the edge function is running */}
+      {step === 'ai-analysis-running' && (
+        <Box flexDirection="column" marginTop={1}>
+          <SpinnerLine text="Analyzing build log with Capgo AI (Kimi K2.5)..." />
+        </Box>
+      )}
+
+      {/* AI debug — render the diagnosis (or fallback message), then exit */}
+      {step === 'ai-analysis-result' && (
+        <Box flexDirection="column" marginTop={1}>
+          <Text bold color="cyan">AI analysis</Text>
+          <Newline />
+          {aiAnalysisText && <Text>{aiAnalysisText}</Text>}
+          {aiResultMessage && <Text>{aiResultMessage}</Text>}
+          <Newline />
+          <Text color="yellow">⚠ AI can make mistakes. Always verify the diagnosis against the full log before applying the suggested fix.</Text>
+          <Newline />
+          <Select
+            options={[
+              { label: '✔  Continue', value: 'continue' },
+            ]}
+            onChange={() => {
+              setStep('build-complete')
+            }}
+          />
         </Box>
       )}
 

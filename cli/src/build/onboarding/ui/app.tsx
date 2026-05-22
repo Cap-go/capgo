@@ -19,6 +19,9 @@ import { writeOnboardingSupportBundle } from '../../../onboarding-support.js'
 import { formatRunnerCommand, splitRunnerCommand } from '../../../runner-command.js'
 import { createSupabaseClient, findSavedKeySilent, getOrganizationId, getPMAndCommand } from '../../../utils.js'
 import { loadSavedCredentials, updateSavedCredentials } from '../../credentials.js'
+import { releaseCapturedLogs, runCapgoAiAnalysis } from '../../../ai/analyze.js'
+import { renderMarkdown } from '../../../ai/render-markdown.js'
+import { trackAiAnalysisChoice, trackAiAnalysisResult } from '../../../ai/telemetry.js'
 import { requestBuildInternal } from '../../request.js'
 import { CertificateLimitError, createCertificate, createProfile, deleteProfile, DuplicateProfileError, ensureBundleId, findCertIdBySha1, generateJwt, listProfilesForCert, revokeCertificate, verifyApiKey } from '../apple-api.js'
 import { createP12, DEFAULT_P12_PASSWORD, generateCsr } from '../csr.js'
@@ -261,6 +264,13 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
   const [buildUrl, setBuildUrl] = useState('')
   const [buildOutput, setBuildOutput] = useState<string[]>([])
   const [supportBundlePath, setSupportBundlePath] = useState<string | null>(null)
+  // ── AI-analysis sub-flow (entered only when the build fails and logs were
+  // captured). `aiJobId` is set when entering 'ai-analysis-prompt'; the running
+  // step reads it to call runCapgoAiAnalysis; the result step renders one of
+  // these two state strings depending on the PostAnalyzeResult kind.
+  const [aiJobId, setAiJobId] = useState<string | null>(null)
+  const [aiAnalysisText, setAiAnalysisText] = useState<string | null>(null)
+  const [aiResultMessage, setAiResultMessage] = useState<string | null>(null)
   const [ciSecretEntries, setCiSecretEntries] = useState<CiSecretEntry[]>([])
   const [ciSecretTargets, setCiSecretTargets] = useState<CiSecretTarget[]>([])
   const [ciSecretTarget, setCiSecretTarget] = useState<CiSecretTarget | null>(null)
@@ -1237,6 +1247,11 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
           const result = await requestBuildInternal(appId, {
             platform: 'ios',
             apikey: capgoKey,
+            // The Ink TUI owns the terminal — @clack/prompts inside
+            // requestBuildInternal would corrupt rendering. Caller-handled mode
+            // surfaces the captured log path via result.aiAnalysis and lets us
+            // render the AI flow with Ink-native components.
+            aiAnalysisMode: 'caller-handled',
           }, true, buildLogger) // silent=true, use our logger
           if (cancelled)
             return
@@ -1254,6 +1269,14 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
           }
           else {
             setBuildOutput(prev => [...prev, `⚠ ${result.error || 'unknown error'}`])
+            // If logs were captured we can offer AI-assisted diagnosis. The
+            // captured log file stays on disk until the user views the result
+            // (or skips); 'ai-analysis-result' calls releaseCapturedLogs on exit.
+            if (result.aiAnalysis?.ready && result.aiAnalysis.jobId) {
+              setAiJobId(result.aiAnalysis.jobId)
+              setStep('ai-analysis-prompt')
+              return
+            }
           }
           setStep('build-complete')
         }
@@ -1268,8 +1291,86 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
       })()
     }
 
+    // AI analysis — entered only when requestBuildInternal returned with
+    // aiAnalysis.ready=true. The captured log file is on disk; we call the
+    // edge function, then transition to 'ai-analysis-result' which renders the
+    // diagnosis (or a friendly fallback message) and waits for Enter.
+    if (step === 'ai-analysis-running' && aiJobId) {
+      ;(async () => {
+        // Fire the Choice telemetry here (not in 'ai-analysis-prompt'): we only
+        // know the user picked "Debug with AI" because we landed in `running`.
+        await trackAiAnalysisChoice({
+          apikey: resolvedApiKeyRef.current ?? apikey ?? '',
+          orgId: resolvedOrgId ?? '',
+          appId,
+          platform: 'ios',
+          jobId: aiJobId,
+          choice: 'capgo_ai',
+          triggeredBy: 'onboarding',
+        }).catch(() => { /* telemetry never breaks the wizard */ })
+
+        const result = await runCapgoAiAnalysis({
+          apiHost: 'https://api.capgo.app',
+          apikey: resolvedApiKeyRef.current ?? apikey ?? '',
+          jobId: aiJobId,
+          appId,
+        })
+
+        if (cancelled)
+          return
+
+        const resultTag: 'success' | 'already_analyzed' | 'too_big' | 'error'
+          = result.kind === 'ok'
+            ? 'success'
+            : result.kind === 'already_analyzed'
+              ? 'already_analyzed'
+              : result.kind === 'too_big'
+                ? 'too_big'
+                : 'error'
+
+        await trackAiAnalysisResult({
+          apikey: resolvedApiKeyRef.current ?? apikey ?? '',
+          orgId: resolvedOrgId ?? '',
+          appId,
+          platform: 'ios',
+          jobId: aiJobId,
+          result: resultTag,
+          errorStatus: result.kind === 'error' ? result.status : undefined,
+        }).catch(() => { /* telemetry never breaks the wizard */ })
+
+        if (result.kind === 'ok') {
+          // Render markdown to ANSI escapes; Ink <Text> passes them through.
+          // Fall back to raw text if a future Ink version stops doing so.
+          setAiAnalysisText(renderMarkdown(result.analysis, true))
+          setAiResultMessage(null)
+        }
+        else if (result.kind === 'already_analyzed') {
+          setAiAnalysisText(null)
+          setAiResultMessage('AI analysis was already requested for this build (only one per job).')
+        }
+        else if (result.kind === 'too_big') {
+          setAiAnalysisText(null)
+          setAiResultMessage('Build log is too large for Capgo AI (>10 MB). Try a local AI tool with the captured log.')
+        }
+        else {
+          setAiAnalysisText(null)
+          const detail = [
+            result.status ? `(status ${result.status})` : null,
+            result.message,
+          ].filter(Boolean).join(' ')
+          setAiResultMessage(`AI analysis failed${detail ? `: ${detail}` : ''}.`)
+        }
+        setStep('ai-analysis-result')
+      })()
+    }
+
     if (step === 'build-complete') {
       setBuildOutput([])
+      // Best-effort cleanup of any leftover captured log file. Safe to call
+      // even if we never entered the AI flow (operates only on jobs we know).
+      if (aiJobId) {
+        void releaseCapturedLogs(aiJobId).catch(() => { /* best-effort */ })
+      }
       // Exit immediately after rendering the final screen
       const timer = setTimeout(() => {
         if (!cancelled)
@@ -1290,9 +1391,9 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
 
   const progress = STEP_PROGRESS[step] ?? 0
   const phaseLabel = getPhaseLabel(step)
-  const showProgress = step !== 'welcome' && step !== 'platform-select' && step !== 'adding-platform' && step !== 'no-platform' && step !== 'error' && step !== 'build-complete' && step !== 'requesting-build'
-  const showHeader = step !== 'requesting-build'
-  const showLog = step !== 'requesting-build' && step !== 'build-complete'
+  const showProgress = step !== 'welcome' && step !== 'platform-select' && step !== 'adding-platform' && step !== 'no-platform' && step !== 'error' && step !== 'build-complete' && step !== 'requesting-build' && step !== 'ai-analysis-result'
+  const showHeader = step !== 'requesting-build' && step !== 'ai-analysis-result'
+  const showLog = step !== 'requesting-build' && step !== 'build-complete' && step !== 'ai-analysis-prompt' && step !== 'ai-analysis-running' && step !== 'ai-analysis-result'
   const recoveryAdvice = error
     ? getBuildOnboardingRecoveryAdvice(error, retryStep, pm.runner, appId)
     : null
@@ -2430,6 +2531,69 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
           </Box>
         )
       })()}
+
+      {/* AI debug — ask the user whether to send the captured log */}
+      {step === 'ai-analysis-prompt' && (
+        <Box flexDirection="column" marginTop={1}>
+          <ErrorLine text="Build failed." />
+          <Newline />
+          <Text>We can analyze the build log with Capgo AI (Kimi K2.5) and suggest a fix.</Text>
+          <Newline />
+          <Select
+            options={[
+              { label: '🤖  Debug with AI', value: 'debug' },
+              { label: '⏭   Skip', value: 'skip' },
+            ]}
+            onChange={async (value) => {
+              if (value === 'debug') {
+                setStep('ai-analysis-running')
+              }
+              else {
+                if (aiJobId) {
+                  await trackAiAnalysisChoice({
+                    apikey: resolvedApiKeyRef.current ?? apikey ?? '',
+                    orgId: resolvedOrgId ?? '',
+                    appId,
+                    platform: 'ios',
+                    jobId: aiJobId,
+                    choice: 'skip',
+                    triggeredBy: 'onboarding',
+                  }).catch(() => { /* telemetry never breaks the wizard */ })
+                }
+                setStep('build-complete')
+              }
+            }}
+          />
+        </Box>
+      )}
+
+      {/* AI debug — spinner while the edge function is running */}
+      {step === 'ai-analysis-running' && (
+        <Box flexDirection="column" marginTop={1}>
+          <SpinnerLine text="Analyzing build log with Capgo AI (Kimi K2.5)..." />
+        </Box>
+      )}
+
+      {/* AI debug — render the diagnosis (or fallback message), then exit */}
+      {step === 'ai-analysis-result' && (
+        <Box flexDirection="column" marginTop={1}>
+          <Text bold color="cyan">AI analysis</Text>
+          <Newline />
+          {aiAnalysisText && <Text>{aiAnalysisText}</Text>}
+          {aiResultMessage && <Text>{aiResultMessage}</Text>}
+          <Newline />
+          <Text color="yellow">⚠ AI can make mistakes. Always verify the diagnosis against the full log before applying the suggested fix.</Text>
+          <Newline />
+          <Select
+            options={[
+              { label: '✔  Continue', value: 'continue' },
+            ]}
+            onChange={() => {
+              setStep('build-complete')
+            }}
+          />
+        </Box>
+      )}
 
       {/* Error with retry */}
       {step === 'error' && error && (
