@@ -26,8 +26,26 @@ import { useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
 import { useDisplayStore } from '~/stores/display'
 import { useMainStore } from '~/stores/main'
-import { useOrganizationStore } from '~/stores/organization'
+import { getRbacRoleI18nKey, useOrganizationStore } from '~/stores/organization'
 import '@vuepic/vue-datepicker/dist/main.css'
+
+interface Role {
+  id: string
+  name: string
+  scope_type: string
+  description: string | null
+  priority_rank: number
+}
+
+interface RoleBindingRow {
+  id: string
+  principal_type: string
+  principal_id: string
+  scope_type: string
+  org_id: string | null
+  app_id: string | null
+  role_name: string
+}
 
 const { t } = useI18n()
 const isDark = useDark()
@@ -41,32 +59,33 @@ const keys = ref<Database['public']['Tables']['apikeys']['Row'][]>([])
 const organizationStore = useOrganizationStore()
 const columns: Ref<TableColumn[]> = ref<TableColumn[]>([])
 
+// RBAC data
+const roles = ref<Role[]>([])
+const allBindings = ref<RoleBindingRow[]>([])
+
 // State for change name dialog
 const newApiKeyName = ref('')
 
-// State for tracking app limitation checkbox
-const limitToAppCheckbox = ref(false)
-
-// State for tracking organization limitation checkbox
-const limitToOrgCheckbox = ref(false)
-
-// State for API key type selection
-const selectedKeyType = ref('')
+// State for hashed key creation
+const createAsHashed = ref(false)
 
 // State for expiration date
 const setExpirationCheckbox = ref(false)
 const expirationDate = ref<Date | null>(null)
 
+// RBAC creation state
+const selectedOrgRole = ref('org_member')
+const selectedOrgsForCreation = ref<string[]>([])
+const pendingAppBindings = ref<Record<string, string>>({})
+const showAppDropdown = ref(false)
+
+// Available apps for selection (populated when showing app dialog)
+const availableApps = ref<{ id: string, app_id: string, name: string | null, owner_org: string }[]>([])
+
 // Computed properties for expiration date limits
 const minExpirationDate = computed(() => {
   return dayjs().add(1, 'day').toDate()
 })
-
-// State for hashed key creation
-const createAsHashed = ref(false)
-
-// Available apps for selection (populated when showing app dialog)
-const availableApps = ref<Database['public']['Tables']['apps']['Row'][]>([])
 
 // Cache for organization and app names
 const orgCache = ref(new Map<string, string>())
@@ -86,6 +105,47 @@ function isHashedKey(key: Database['public']['Tables']['apikeys']['Row']) {
   return key.key === null && key.key_hash !== null
 }
 
+function getRoleDisplayName(roleName: string): string {
+  const normalized = roleName.replace(/^invite_/, '')
+  const i18nKey = getRbacRoleI18nKey(normalized)
+  return i18nKey ? t(i18nKey) : normalized.replaceAll('_', ' ')
+}
+
+// Get bindings for a specific key
+function getBindingsForKey(key: Database['public']['Tables']['apikeys']['Row']): RoleBindingRow[] {
+  return allBindings.value.filter(b => b.principal_id === key.rbac_id)
+}
+
+// Get the highest org role for a key (by priority_rank)
+function getHighestOrgRole(key: Database['public']['Tables']['apikeys']['Row']): string | null {
+  const keyBindings = getBindingsForKey(key)
+  const orgBindings = keyBindings.filter(b => b.scope_type === 'org')
+  if (orgBindings.length === 0)
+    return null
+
+  let highest: RoleBindingRow | null = null
+  let highestRank = -1
+  for (const binding of orgBindings) {
+    const role = roles.value.find(r => r.name === binding.role_name)
+    const rank = role?.priority_rank ?? 0
+    if (rank > highestRank) {
+      highestRank = rank
+      highest = binding
+    }
+  }
+  return highest?.role_name ?? null
+}
+
+// Get role details grouped by org for tooltip
+function getRolesByOrg(key: Database['public']['Tables']['apikeys']['Row']): { orgId: string, orgName: string, roleName: string }[] {
+  const keyBindings = getBindingsForKey(key).filter(b => b.scope_type === 'org' && b.org_id)
+  return keyBindings.map(b => ({
+    orgId: b.org_id!,
+    orgName: orgCache.value.get(b.org_id!) || b.org_id!,
+    roleName: getRoleDisplayName(b.role_name),
+  }))
+}
+
 // Computed property to get unique organization IDs from all API keys
 const uniqueOrgIds = computed(() => {
   if (!keys.value)
@@ -96,6 +156,11 @@ const uniqueOrgIds = computed(() => {
     if (key.limited_to_orgs && key.limited_to_orgs.length > 0) {
       key.limited_to_orgs.forEach(orgId => orgIds.add(orgId))
     }
+  })
+  // Also add org IDs from bindings
+  allBindings.value.forEach((b) => {
+    if (b.org_id)
+      orgIds.add(b.org_id)
   })
 
   return orgIds
@@ -204,33 +269,71 @@ const filteredAndSortedKeys = computed(() => {
   return columns.value.length ? sortApiKeyRows(result, columns.value) : result
 })
 
-// Computed property to filter apps based on selected organizations
+// Org role options for creation modal
+const unsupportedApiKeyOrgRoles = new Set(['org_billing_admin'])
+const orgRoles = computed(() => roles.value.filter(r => r.scope_type === 'org' && !unsupportedApiKeyOrgRoles.has(r.name)))
+const appRoles = computed(() => roles.value.filter(r => r.scope_type === 'app'))
+
+const orgRoleOptions = computed(() =>
+  orgRoles.value
+    .filter(r => r.name !== 'org_super_admin')
+    .map(r => ({ id: r.id, name: r.name, description: getRoleDisplayName(r.name) })),
+)
+
+const appRoleOptions = computed(() =>
+  appRoles.value.map(r => ({ id: r.id, name: r.name, description: getRoleDisplayName(r.name) })),
+)
+
+const rolesWithInheritedAppAccess = new Set(['org_admin', 'org_super_admin'])
+const showAppAccessInModal = computed(() =>
+  !!selectedOrgRole.value && !rolesWithInheritedAppAccess.has(selectedOrgRole.value),
+)
+
+// Filtered apps based on selected orgs for creation
 const filteredAppsForSelectedOrgs = computed(() => {
-  if (!availableApps.value || displayStore.selectedOrganizations.length === 0) {
+  if (!availableApps.value || selectedOrgsForCreation.value.length === 0)
     return []
-  }
-  return (availableApps.value as any).filter((app: Database['public']['Tables']['apps']['Row']) =>
-    displayStore.selectedOrganizations.includes(app.owner_org),
+  return availableApps.value.filter(app =>
+    selectedOrgsForCreation.value.includes(app.owner_org),
   )
 })
 
-function pruneSelectedApps() {
+// Prune app bindings when orgs change
+function pruneAppBindings() {
   const allowedAppIds = new Set(
-    filteredAppsForSelectedOrgs.value.map((app: Database['public']['Tables']['apps']['Row']) => app.app_id),
+    filteredAppsForSelectedOrgs.value.map(app => app.id),
   )
-
-  displayStore.selectedApps = (displayStore.selectedApps as any)
-    .filter((app: Database['public']['Tables']['apps']['Row']) => allowedAppIds.has(app.app_id))
+  const updated = { ...pendingAppBindings.value }
+  for (const appId of Object.keys(updated)) {
+    if (!allowedAppIds.has(appId))
+      delete updated[appId]
+  }
+  pendingAppBindings.value = updated
 }
+
+const selectedAppIds = computed(() => Object.keys(pendingAppBindings.value))
+
+const configuredAppIds = computed(() =>
+  Object.entries(pendingAppBindings.value)
+    .filter(([, roleName]) => !!roleName)
+    .map(([appId]) => appId),
+)
+
+// Get the app_id (string identifier) for limited_to_apps
+const configuredLimitedAppIds = computed(() => {
+  const appMap = new Map(availableApps.value.map(a => [a.id, a.app_id]))
+  return configuredAppIds.value
+    .map(id => appMap.get(id))
+    .filter((appId): appId is string => !!appId)
+})
 
 columns.value = [
   {
-    key: 'mode',
-    label: t('type'),
+    key: 'name',
+    label: t('name'),
+    head: true,
+    mobile: true,
     sortable: true,
-    displayFunction: (row: Database['public']['Tables']['apikeys']['Row']) => {
-      return row.mode ? row.mode.toUpperCase() : 'RBAC'
-    },
   },
   {
     key: 'key',
@@ -244,11 +347,33 @@ columns.value = [
     },
   },
   {
-    key: 'name',
-    label: t('name'),
-    head: true,
-    mobile: true,
-    sortable: true,
+    key: 'role',
+    label: t('role'),
+    sanitizeHtml: true,
+    displayFunction: (row: Database['public']['Tables']['apikeys']['Row']) => {
+      const highest = getHighestOrgRole(row)
+      if (!highest)
+        return '-'
+      const rolesByOrg = getRolesByOrg(row)
+      if (rolesByOrg.length <= 1)
+        return getRoleDisplayName(highest)
+      const tooltipText = rolesByOrg.map(e => `${e.orgName}: ${e.roleName}`).join('\n')
+      return `<span title="${tooltipText}" style="cursor: help; border-bottom: 1px dotted currentColor;">${getRoleDisplayName(highest)}</span>`
+    },
+  },
+  {
+    key: 'limited_to_orgs',
+    label: t('organizations'),
+    displayFunction: (row: Database['public']['Tables']['apikeys']['Row']) => {
+      return formatApiKeyScope(row.limited_to_orgs, orgId => getOrgName.value(orgId))
+    },
+  },
+  {
+    key: 'limited_to_apps',
+    label: t('apps'),
+    displayFunction: (row: Database['public']['Tables']['apikeys']['Row']) => {
+      return formatApiKeyScope(row.limited_to_apps, appId => getAppName.value(appId))
+    },
   },
   {
     key: 'created_at',
@@ -269,20 +394,6 @@ columns.value = [
       const expired = isApiKeyExpired(row.expires_at)
       const dateStr = formatLocalDate(row.expires_at)
       return expired ? `${dateStr} (${t('expired')})` : dateStr
-    },
-  },
-  {
-    key: 'limited_to_orgs',
-    label: t('organizations'),
-    displayFunction: (row: Database['public']['Tables']['apikeys']['Row']) => {
-      return formatApiKeyScope(row.limited_to_orgs, orgId => getOrgName.value(orgId))
-    },
-  },
-  {
-    key: 'limited_to_apps',
-    label: t('apps'),
-    displayFunction: (row: Database['public']['Tables']['apikeys']['Row']) => {
-      return formatApiKeyScope(row.limited_to_apps, appId => getAppName.value(appId))
     },
   },
   {
@@ -316,7 +427,6 @@ columns.value = [
 ]
 
 async function refreshData() {
-  // console.log('refreshData')
   try {
     currentPage.value = 1
     keys.value.length = 0
@@ -326,6 +436,7 @@ async function refreshData() {
     console.error(error)
   }
 }
+
 async function getKeys(retry = true): Promise<void> {
   isLoading.value = true
   const { data } = await supabase
@@ -334,7 +445,7 @@ async function getKeys(retry = true): Promise<void> {
     .eq('user_id', main.user?.id ?? '')
   if (data && data.length) {
     keys.value = data
-    // Fetch organization and app names after getting API keys
+    await Promise.all([fetchAllBindings(), fetchRoles()])
     await fetchOrgAndAppNames()
   }
   else if (retry && main.user?.id) {
@@ -342,6 +453,50 @@ async function getKeys(retry = true): Promise<void> {
   }
 
   isLoading.value = false
+}
+
+async function fetchRoles() {
+  const { data, error } = await supabase
+    .from('roles')
+    .select('id, name, scope_type, description, priority_rank')
+    .eq('is_assignable', true)
+    .in('scope_type', ['org', 'app'])
+    .order('priority_rank', { ascending: false })
+  if (error) {
+    console.error('Error fetching roles:', error)
+    return
+  }
+  roles.value = (data || []) as Role[]
+}
+
+async function fetchAllBindings() {
+  if (!keys.value || keys.value.length === 0)
+    return
+
+  const rbacIds = keys.value.map(k => k.rbac_id).filter(Boolean)
+  if (rbacIds.length === 0)
+    return
+
+  const { data, error } = await supabase
+    .from('role_bindings')
+    .select('id, principal_type, principal_id, scope_type, org_id, app_id, role_id, roles(name)')
+    .eq('principal_type', 'apikey')
+    .in('principal_id', rbacIds)
+
+  if (error) {
+    console.error('Error fetching role bindings:', error)
+    return
+  }
+
+  allBindings.value = ((data || []) as any[]).map(row => ({
+    id: row.id,
+    principal_type: row.principal_type,
+    principal_id: row.principal_id,
+    scope_type: row.scope_type,
+    org_id: row.org_id,
+    app_id: row.app_id,
+    role_name: row.roles?.name || '',
+  }))
 }
 
 async function loadAllApps() {
@@ -353,44 +508,38 @@ async function loadAllApps() {
     }
     const { data: apps, error } = await supabase
       .from('apps')
-      .select('*')
+      .select('id, app_id, name, owner_org')
       .in('owner_org', orgIds)
+      .order('name', { ascending: true })
     if (error) {
       console.error('Cannot load apps:', error)
       return
     }
-    availableApps.value = apps || []
+    availableApps.value = (apps || []).filter((app): app is { id: string, app_id: string, name: string | null, owner_org: string } =>
+      !!app.id && !!app.app_id,
+    )
   }
   catch (err) {
     console.error('Error loading apps:', err)
   }
 }
 
-async function createApiKey(keyType: 'read' | 'write' | 'all' | 'upload') {
-  // Get selections from the dialog
-  const limitToOrg = limitToOrgCheckbox.value
-  const limitToApp = limitToAppCheckbox.value
+async function createApiKey() {
   const isHashed = createAsHashed.value
 
-  if (limitToApp)
-    pruneSelectedApps()
-
-  let finalSelectedOrganizations: string[] = []
-  if (limitToOrg) {
-    finalSelectedOrganizations = [...displayStore.selectedOrganizations]
-    if (finalSelectedOrganizations.length === 0) {
-      toast.error(t('alert-no-org-selected'))
-      return false
-    }
+  if (selectedOrgsForCreation.value.length === 0) {
+    toast.error(t('alert-no-org-selected'))
+    return false
   }
 
-  let finalSelectedApps: Database['public']['Tables']['apps']['Row'][] = []
-  if (limitToApp) {
-    finalSelectedApps = Array.from(displayStore.selectedApps) as any
-    if (finalSelectedApps.length === 0) {
-      toast.error(t('alert-no-app-selected'))
-      return false
-    }
+  if (!selectedOrgRole.value) {
+    toast.error(t('select-at-least-one-role'))
+    return false
+  }
+
+  if (hasIncompleteAppBindings()) {
+    toast.error(t('select-role-for-each-app'))
+    return false
   }
 
   // Get expiration date if set
@@ -409,18 +558,49 @@ async function createApiKey(keyType: 'read' | 'write' | 'all' | 'upload') {
       return false
     }
 
+    // Build bindings array for all selected orgs
+    const bindings: Array<{
+      role_name: string
+      scope_type: 'org' | 'app'
+      org_id: string
+      app_id?: string
+    }> = []
+
+    for (const orgId of selectedOrgsForCreation.value) {
+      bindings.push({
+        role_name: selectedOrgRole.value,
+        scope_type: 'org',
+        org_id: orgId,
+      })
+    }
+
+    // Add app-level bindings
+    for (const [appId, roleName] of Object.entries(pendingAppBindings.value)) {
+      if (!roleName)
+        continue
+      // Find the app to get its owner_org
+      const app = availableApps.value.find(a => a.id === appId)
+      if (!app)
+        continue
+      bindings.push({
+        role_name: roleName,
+        scope_type: 'app',
+        org_id: app.owner_org,
+        app_id: appId,
+      })
+    }
+
     let plainKeyForDisplay: string | null = null
 
-    // Use the backend API to generate the key server-side
     const { data, error } = await supabase.functions.invoke('apikey', {
       method: 'POST',
       body: {
-        mode: keyType,
         name: newApiKeyName.value.trim(),
-        limited_to_orgs: finalSelectedOrganizations.length > 0 ? finalSelectedOrganizations : [],
-        limited_to_apps: finalSelectedApps.length > 0 ? finalSelectedApps.map(app => app.app_id) : [],
+        limited_to_orgs: selectedOrgsForCreation.value,
+        limited_to_apps: configuredLimitedAppIds.value,
         expires_at: expiresAt,
         hashed: isHashed,
+        bindings,
       },
     })
 
@@ -432,15 +612,14 @@ async function createApiKey(keyType: 'read' | 'write' | 'all' | 'upload') {
 
     const createdKey = data
     if (isHashed)
-      plainKeyForDisplay = typeof data.key === 'string' ? data.key : null // This is the one-time visible key
+      plainKeyForDisplay = typeof data.key === 'string' ? data.key : null
 
     // For hashed keys, clear the key field before adding to the list
-    // (the plainkey was only returned for one-time display)
     if (isHashed) {
       createdKey.key = null as any
     }
     keys.value?.push(createdKey)
-    // Fetch org and app names for the new key
+    await fetchAllBindings()
     await fetchOrgAndAppNames()
 
     // For hashed keys, show the key one time in a modal
@@ -465,20 +644,22 @@ async function showOneTimeKeyModal(plainKey: string) {
 }
 
 async function addNewApiKey() {
-  // Clear global state
-  displayStore.selectedOrganizations = []
-  displayStore.selectedApps = []
-  limitToOrgCheckbox.value = false
-  limitToAppCheckbox.value = false
-  createAsHashed.value = false
+  // Clear state
   newApiKeyName.value = ''
+  createAsHashed.value = false
   setExpirationCheckbox.value = false
   expirationDate.value = null
+  selectedOrgRole.value = 'org_member'
+  pendingAppBindings.value = {}
+  showAppDropdown.value = false
 
-  // Load all apps for selection
-  await loadAllApps()
+  // Select all orgs by default
+  selectedOrgsForCreation.value = organizationStore.organizations.map(org => org.gid)
 
-  // Show API key type selection modal with options
+  // Load apps and roles
+  await Promise.all([loadAllApps(), fetchRoles()])
+
+  // Show creation modal
   await showAddNewKeyModal()
 }
 
@@ -510,13 +691,8 @@ async function regenrateKey(apikey: Database['public']['Tables']['apikeys']['Row
     return
   }
 
-  // Extract the plaintext key for display before optionally clearing it.
-  // For hashed keys: this is the one-time visible key.
-  // For plain keys: we still show it to make regeneration explicit for the user.
   const plainKeyForDisplay = typeof data.key === 'string' ? data.key : undefined
 
-  // Clear the key field before caching to maintain the "hashed" state
-  // This ensures isHashedKey() returns true and the key cannot be copied
   if (wasHashed)
     data.key = null as any
 
@@ -524,7 +700,6 @@ async function regenrateKey(apikey: Database['public']['Tables']['apikeys']['Row
   if (idx !== -1)
     keys.value[idx] = data
 
-  // Show the new key one time
   if (plainKeyForDisplay)
     await showOneTimeKeyModal(plainKeyForDisplay)
 
@@ -604,9 +779,6 @@ async function changeName(key: Database['public']['Tables']['apikeys']['Row']) {
 }
 
 async function showAddNewKeyModal() {
-  // Reset selection state
-  selectedKeyType.value = ''
-
   dialogStore.openDialog({
     title: t('alert-add-new-key'),
     description: t('alert-generate-new-key'),
@@ -619,11 +791,7 @@ async function showAddNewKeyModal() {
         text: t('create'),
         role: 'primary',
         handler: () => {
-          if (!selectedKeyType.value) {
-            toast.error(t('please-select-key-type'))
-            return false
-          }
-          return createApiKey(selectedKeyType.value as 'read' | 'write' | 'all' | 'upload')
+          return createApiKey()
         },
       },
     ],
@@ -633,24 +801,37 @@ async function showAddNewKeyModal() {
 
 function handleOrgSelection(orgId: string, checked: boolean) {
   if (checked) {
-    if (!displayStore.selectedOrganizations.includes(orgId)) {
-      displayStore.selectedOrganizations.push(orgId)
+    if (!selectedOrgsForCreation.value.includes(orgId)) {
+      selectedOrgsForCreation.value.push(orgId)
     }
   }
   else {
-    displayStore.selectedOrganizations = displayStore.selectedOrganizations.filter(id => id !== orgId)
+    selectedOrgsForCreation.value = selectedOrgsForCreation.value.filter(id => id !== orgId)
   }
 }
 
-function handleAppSelection(app: Database['public']['Tables']['apps']['Row'], checked: boolean) {
-  if (checked) {
-    if (!(displayStore.selectedApps as any).find((a: Database['public']['Tables']['apps']['Row']) => a.app_id === app.app_id)) {
-      displayStore.selectedApps.push(app as any)
-    }
+function toggleApp(appId: string) {
+  if (appId in pendingAppBindings.value) {
+    const updated = { ...pendingAppBindings.value }
+    delete updated[appId]
+    pendingAppBindings.value = updated
   }
   else {
-    displayStore.selectedApps = (displayStore.selectedApps as any).filter((a: Database['public']['Tables']['apps']['Row']) => a.app_id !== app.app_id)
+    pendingAppBindings.value = { ...pendingAppBindings.value, [appId]: '' }
   }
+}
+
+function onAppRoleChange(appId: string, event: Event) {
+  pendingAppBindings.value = { ...pendingAppBindings.value, [appId]: (event.target as HTMLSelectElement).value }
+}
+
+function hasIncompleteAppBindings() {
+  return Object.values(pendingAppBindings.value).some(roleName => !roleName)
+}
+
+function getAppNameById(appId: string) {
+  const app = availableApps.value.find(a => a.id === appId)
+  return app ? (app.name || app.app_id) : appId
 }
 
 async function copyKey(apikey: Database['public']['Tables']['apikeys']['Row']) {
@@ -666,7 +847,6 @@ async function copyKey(apikey: Database['public']['Tables']['apikeys']['Row']) {
   }
   catch (err) {
     console.error('Failed to copy: ', err)
-    // Display a modal with the copied key
     dialogStore.openDialog({
       title: t('cannot-copy-key'),
       description: apikey.key!,
@@ -680,17 +860,17 @@ async function copyKey(apikey: Database['public']['Tables']['apikeys']['Row']) {
     await dialogStore.onDialogDismiss()
   }
 }
-// Watch for organization checkbox changes to reset app limitation
-watch(() => limitToOrgCheckbox.value, (newVal) => {
-  if (!newVal) {
-    // If org limitation is unchecked, reset app limitation
-    limitToAppCheckbox.value = false
-    displayStore.selectedApps = []
-  }
-})
 
-watch(filteredAppsForSelectedOrgs, () => {
-  pruneSelectedApps()
+// Watch for org selection changes to prune app bindings
+watch(selectedOrgsForCreation, () => {
+  pruneAppBindings()
+}, { deep: true })
+
+// Watch for org role changes - clear app bindings if role grants inherited access
+watch(selectedOrgRole, (newRole) => {
+  if (rolesWithInheritedAppAccess.has(newRole)) {
+    pendingAppBindings.value = {}
+  }
 })
 
 displayStore.NavTitle = t('api-keys')
@@ -772,62 +952,6 @@ getKeys()
             />
           </div>
 
-          <!-- API Key Type Selection -->
-          <div>
-            <div class="p-4 border rounded-lg dark:border-gray-600">
-              <div class="space-y-3">
-                <div class="form-control">
-                  <label class="justify-start gap-3 p-3 rounded-lg cursor-pointer hover:bg-gray-50 label dark:hover:bg-gray-800">
-                    <input
-                      v-model="selectedKeyType"
-                      type="radio"
-                      name="key-type"
-                      value="read"
-                      class="mr-2 radio radio-primary"
-                    >
-                    <span class="text-base label-text">{{ t('key-read') }}</span>
-                  </label>
-                </div>
-                <div class="form-control">
-                  <label class="justify-start gap-3 p-3 rounded-lg cursor-pointer hover:bg-gray-50 label dark:hover:bg-gray-800">
-                    <input
-                      v-model="selectedKeyType"
-                      type="radio"
-                      name="key-type"
-                      value="upload"
-                      class="mr-2 radio radio-primary"
-                    >
-                    <span class="text-base label-text">{{ t('key-upload') }}</span>
-                  </label>
-                </div>
-                <div class="form-control">
-                  <label class="justify-start gap-3 p-3 rounded-lg cursor-pointer hover:bg-gray-50 label dark:hover:bg-gray-800">
-                    <input
-                      v-model="selectedKeyType"
-                      type="radio"
-                      name="key-type"
-                      value="write"
-                      class="mr-2 radio radio-primary"
-                    >
-                    <span class="text-base label-text">{{ t('write-key') }}</span>
-                  </label>
-                </div>
-                <div class="form-control">
-                  <label class="justify-start gap-3 p-3 rounded-lg cursor-pointer hover:bg-gray-50 label dark:hover:bg-gray-800">
-                    <input
-                      v-model="selectedKeyType"
-                      type="radio"
-                      name="key-type"
-                      value="all"
-                      class="mr-2 radio radio-primary"
-                    >
-                    <span class="text-base label-text">{{ t('key-all') }}</span>
-                  </label>
-                </div>
-              </div>
-            </div>
-          </div>
-
           <!-- Create as Secure (Hashed) Key -->
           <div class="p-4 border border-blue-200 rounded-lg bg-blue-50 dark:bg-blue-900/20 dark:border-blue-700">
             <div class="flex items-start gap-3">
@@ -848,60 +972,139 @@ getKeys()
             </div>
           </div>
 
-          <!-- Limit to Organizations -->
-          <div class="flex items-center gap-2">
-            <input
-              id="limit-to-org"
-              v-model="limitToOrgCheckbox"
-              type="checkbox"
-              class="border-gray-500 dark:border-gray-700 checkbox"
-            >
-            <label for="limit-to-org" class="text-sm">
-              {{ t('limit-to-org') }}
-            </label>
-          </div>
-          <div v-if="limitToOrgCheckbox" class="pl-6">
+          <!-- Organizations Selection (all checked by default) -->
+          <div>
+            <h3 class="mb-2 text-sm font-semibold uppercase text-slate-500">
+              {{ t('organizations') }}
+            </h3>
             <div class="p-2 space-y-2 overflow-y-auto border rounded-lg max-h-32">
               <div v-for="org in organizationStore.organizations" :key="org.gid" class="flex items-center gap-2">
                 <input
-                  :id="`org-${org.gid}`"
-                  :value="org.gid"
+                  :id="`org-create-${org.gid}`"
                   type="checkbox"
                   class="border-gray-500 dark:border-gray-700 checkbox"
+                  :checked="selectedOrgsForCreation.includes(org.gid)"
                   @change="handleOrgSelection(org.gid, ($event.target as HTMLInputElement).checked)"
                 >
-                <label :for="`org-${org.gid}`" class="text-sm">
+                <label :for="`org-create-${org.gid}`" class="text-sm">
                   {{ org.name }}
                 </label>
               </div>
             </div>
           </div>
 
-          <!-- Limit to Apps (only show if orgs are selected) -->
-          <div v-if="limitToOrgCheckbox && displayStore.selectedOrganizations.length > 0" class="flex items-center gap-2">
-            <input
-              id="limit-to-app"
-              v-model="limitToAppCheckbox"
-              type="checkbox"
-              class="border-gray-500 dark:border-gray-700 checkbox"
-            >
-            <label for="limit-to-app" class="text-sm">
-              {{ t('limit-to-app') }}
-            </label>
-          </div>
-          <div v-if="limitToAppCheckbox && displayStore.selectedOrganizations.length > 0" class="pl-6">
-            <div class="p-2 space-y-2 overflow-y-auto border rounded-lg max-h-32">
-              <div v-for="app in filteredAppsForSelectedOrgs" :key="app.app_id" class="flex items-center gap-2">
+          <!-- Organization Role -->
+          <div>
+            <h3 class="mb-2 text-sm font-semibold uppercase text-slate-500">
+              {{ t('role') }}
+            </h3>
+            <p class="mb-3 text-sm text-slate-500">
+              {{ t('select-user-role') }}
+            </p>
+            <div class="space-y-2">
+              <label
+                v-for="role in orgRoleOptions"
+                :key="role.id"
+                class="flex items-center gap-3 cursor-pointer"
+              >
                 <input
-                  :id="`app-${app.app_id}`"
-                  :value="app"
-                  type="checkbox"
-                  class="border-gray-500 dark:border-gray-700 checkbox"
-                  @change="handleAppSelection(app, ($event.target as HTMLInputElement).checked)"
+                  v-model="selectedOrgRole"
+                  type="radio"
+                  class="d-radio d-radio-primary d-radio-sm"
+                  name="create-org-role"
+                  :value="role.name"
                 >
-                <label :for="`app-${app.app_id}`" class="text-sm">
-                  {{ app.name }}
-                </label>
+                <span class="text-sm font-medium dark:text-white text-slate-800">{{ role.description }}</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- App Access Control (only when role is not admin) -->
+          <div v-if="showAppAccessInModal && selectedOrgsForCreation.length > 0">
+            <h3 class="mb-2 text-sm font-semibold uppercase text-slate-500">
+              {{ t('app-access-control') }}
+            </h3>
+            <p class="mb-3 text-sm text-slate-500">
+              {{ t('app-access-member-only') }}
+            </p>
+
+            <!-- Add app dropdown -->
+            <div class="flex justify-end mb-4">
+              <div class="relative">
+                <button
+                  class="gap-2 d-btn d-btn-sm d-btn-outline"
+                  type="button"
+                  @click="showAppDropdown = !showAppDropdown"
+                >
+                  <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                    <path d="M10.75 4.75a.75.75 0 00-1.5 0v4.5h-4.5a.75.75 0 000 1.5h4.5v4.5a.75.75 0 001.5 0v-4.5h4.5a.75.75 0 000-1.5h-4.5v-4.5z" />
+                  </svg>
+                  {{ t('add-app') }}
+                </button>
+                <div v-if="showAppDropdown" class="fixed inset-0 z-10" @click="showAppDropdown = false" />
+                <div
+                  v-if="showAppDropdown"
+                  class="absolute right-0 top-full mt-1 z-20 bg-white dark:bg-gray-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg min-w-[240px] max-h-60 overflow-y-auto"
+                >
+                  <div v-if="filteredAppsForSelectedOrgs.length === 0" class="px-4 py-3 text-sm text-slate-500">
+                    {{ t('no-apps') }}
+                  </div>
+                  <label
+                    v-for="app in filteredAppsForSelectedOrgs"
+                    :key="app.id"
+                    class="flex items-center gap-3 px-4 py-2.5 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+                  >
+                    <input
+                      type="checkbox"
+                      class="d-checkbox d-checkbox-sm d-checkbox-primary"
+                      :checked="app.id in pendingAppBindings"
+                      @change="toggleApp(app.id)"
+                    >
+                    <div>
+                      <div class="text-sm font-medium dark:text-white text-slate-800">
+                        {{ app.name || app.app_id }}
+                      </div>
+                      <div v-if="app.name" class="text-xs text-slate-500">
+                        {{ app.app_id }}
+                      </div>
+                    </div>
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            <!-- Selected apps with role selection -->
+            <div v-if="selectedAppIds.length === 0" class="py-4 text-sm text-slate-500">
+              {{ t('app-access-none') }}
+            </div>
+            <div v-else class="overflow-hidden border rounded-lg border-slate-200 dark:border-slate-700">
+              <div
+                v-for="appId in selectedAppIds"
+                :key="appId"
+                class="flex items-center gap-4 px-4 py-2.5 border-b last:border-0 border-slate-100 dark:border-slate-700 hover:bg-slate-50/50 dark:hover:bg-slate-700/20"
+              >
+                <span class="flex-1 text-sm font-medium truncate dark:text-white text-slate-800">
+                  {{ getAppNameById(appId) }}
+                </span>
+                <select
+                  class="d-select d-select-sm d-select-bordered"
+                  :value="pendingAppBindings[appId] || ''"
+                  @change="onAppRoleChange(appId, $event)"
+                >
+                  <option value="">
+                    {{ t('select-role') }}
+                  </option>
+                  <option v-for="role in appRoleOptions" :key="role.id" :value="role.name">
+                    {{ role.description }}
+                  </option>
+                </select>
+                <button
+                  class="text-red-500 d-btn d-btn-xs d-btn-ghost shrink-0"
+                  type="button"
+                  @click="toggleApp(appId)"
+                >
+                  <IconTrash class="w-4 h-4" />
+                </button>
               </div>
             </div>
           </div>
@@ -967,57 +1170,6 @@ getKeys()
               length: t('name-length-error'),
             }"
           />
-        </div>
-      </Teleport>
-
-      <!-- Teleport Content for Organization Selection Modal -->
-      <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.title === t('alert-confirm-org-limit')" defer to="#dialog-v2-content">
-        <div class="space-y-4">
-          <div class="p-2 overflow-y-auto border rounded-lg max-h-64">
-            <div v-for="org in organizationStore.organizations" :key="org.gid" class="flex items-center gap-2 p-2">
-              <input
-                :id="`org-select-${org.gid}`"
-                :value="org.gid"
-                type="checkbox"
-                class="checkbox"
-                @change="handleOrgSelection(org.gid, ($event.target as HTMLInputElement).checked)"
-              >
-              <label :for="`org-select-${org.gid}`" class="text-sm">
-                {{ org.name }}
-              </label>
-            </div>
-          </div>
-          <div class="flex items-center gap-2 mt-4">
-            <input
-              id="limit-to-app-org"
-              v-model="limitToOrgCheckbox"
-              type="checkbox"
-              class="checkbox"
-            >
-            <label for="limit-to-app-org" class="text-sm">
-              {{ t('limit-to-app') }}
-            </label>
-          </div>
-        </div>
-      </Teleport>
-
-      <!-- Teleport Content for App Selection Modal -->
-      <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.title === t('alert-confirm-appid-limit')" defer to="#dialog-v2-content">
-        <div class="space-y-4">
-          <div class="p-2 overflow-y-auto border rounded-lg max-h-64">
-            <div v-for="app in availableApps" :key="app.app_id" class="flex items-center gap-2 p-2">
-              <input
-                :id="`app-${app.app_id}`"
-                :value="app"
-                type="checkbox"
-                class="checkbox"
-                @change="handleAppSelection(app as any, ($event.target as HTMLInputElement).checked)"
-              >
-              <label :for="`app-${app.app_id}`" class="text-sm">
-                {{ app.name }}
-              </label>
-            </div>
-          </div>
         </div>
       </Teleport>
     </div>
