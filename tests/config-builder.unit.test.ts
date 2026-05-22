@@ -194,51 +194,31 @@ describe('get /private/config/builder', () => {
     expect(body.tutorialVideo.sha1).toBe('abcdef0123456789abcdef0123456789abcdef01')
   })
 
-  it('tutorialVideo: rejects malformed SHA1 (wrong length / non-hex) — enabled:false', async () => {
-    // Cases that genuinely produce different bytes than the file's
-    // actual SHA1 — verifying these would fail at the CLI side every
-    // time, so the endpoint should refuse the misconfiguration up-front.
-    // Uses `getSkipping` because re-stubbing the same env var in the
-    // same test doesn't reliably override under Bun+vitest+Hono — see
-    // the bucket-missing test below. We restub SHA1 by wrapping each
-    // iteration in an unstub/re-stub cycle via a fresh request setup.
-    const malformed = [
-      'abcdef0123456789abcdef0123456789abcdef', // too short (38 chars)
-      'abcdef0123456789abcdef0123456789abcdef0123', // too long (42 chars)
-      'xyz0000000000000000000000000000000000000', // non-hex (g-z)
-    ]
-    for (const sha1 of malformed) {
-      vi.unstubAllEnvs()
-      // Re-apply the beforeEach blanks since unstub cleared them too.
-      vi.stubEnv('GOOGLE_OAUTH_CLIENT_ID', '')
-      vi.stubEnv('GOOGLE_OAUTH_CLIENT_SECRET', '')
-      vi.stubEnv('GOOGLE_OAUTH_SCOPES', '')
-      vi.stubEnv('BUILDER_TUTORIAL_VIDEO_R2_BUCKET', '')
-      vi.stubEnv('BUILDER_TUTORIAL_VIDEO_R2_PATH', '')
-      vi.stubEnv('BUILDER_TUTORIAL_VIDEO_R2_ACCOUNT_ID', '')
-      vi.stubEnv('BUILDER_TUTORIAL_VIDEO_R2_ACCESS_KEY', '')
-      vi.stubEnv('BUILDER_TUTORIAL_VIDEO_R2_SECRET_KEY', '')
-      vi.stubEnv('BUILDER_TUTORIAL_VIDEO_SHA1', '')
-      vi.stubEnv('BUILDER_TUTORIAL_VIDEO_YOUTUBE_URL', '')
-      const response = await get({ ...VALID_VIDEO_ENV, BUILDER_TUTORIAL_VIDEO_SHA1: sha1 })
-      expect(response.status).toBe(200)
-      const body = await response.json() as { tutorialVideo: { enabled: boolean } }
-      expect(body.tutorialVideo, `expected enabled:false for malformed SHA1 "${sha1}"`).toEqual({ enabled: false })
-    }
+  // Cases that genuinely produce different bytes than the file's actual
+  // SHA1 — verifying these would fail at the CLI side every time, so
+  // the endpoint should refuse the misconfiguration up-front. Driven
+  // by `it.each` so each malformed value runs in its own test()
+  // lifecycle with a fresh beforeEach — that's important because
+  // `vi.stubEnv` doesn't reliably re-override a key already stubbed
+  // to a non-empty value within the same test (Bun+vitest+Hono adapter
+  // quirk; see the bucket-missing test below). NOT `it.concurrent.each`:
+  // `vi.stubEnv` mutates process.env, which is process-global, so
+  // concurrent iterations would race on the same keys.
+  it.each([
+    'abcdef0123456789abcdef0123456789abcdef', // too short (38 chars)
+    'abcdef0123456789abcdef0123456789abcdef0123', // too long (42 chars)
+    'xyz0000000000000000000000000000000000000', // non-hex (g-z)
+  ])('tutorialVideo: rejects malformed SHA1 %s — enabled:false', async (sha1) => {
+    const response = await get({ ...VALID_VIDEO_ENV, BUILDER_TUTORIAL_VIDEO_SHA1: sha1 })
+    expect(response.status).toBe(200)
+    const body = await response.json() as { tutorialVideo: { enabled: boolean } }
+    expect(body.tutorialVideo).toEqual({ enabled: false })
   })
 
   it('tutorialVideo: rejects unparsable youtubeFallback — enabled:false', async () => {
-    vi.unstubAllEnvs()
-    vi.stubEnv('GOOGLE_OAUTH_CLIENT_ID', '')
-    vi.stubEnv('GOOGLE_OAUTH_CLIENT_SECRET', '')
-    vi.stubEnv('GOOGLE_OAUTH_SCOPES', '')
-    vi.stubEnv('BUILDER_TUTORIAL_VIDEO_R2_BUCKET', '')
-    vi.stubEnv('BUILDER_TUTORIAL_VIDEO_R2_PATH', '')
-    vi.stubEnv('BUILDER_TUTORIAL_VIDEO_R2_ACCOUNT_ID', '')
-    vi.stubEnv('BUILDER_TUTORIAL_VIDEO_R2_ACCESS_KEY', '')
-    vi.stubEnv('BUILDER_TUTORIAL_VIDEO_R2_SECRET_KEY', '')
-    vi.stubEnv('BUILDER_TUTORIAL_VIDEO_SHA1', '')
-    vi.stubEnv('BUILDER_TUTORIAL_VIDEO_YOUTUBE_URL', '')
+    // beforeEach already left every video env at ''; transitioning a
+    // single key from '' to a value via get() is the same pattern as
+    // the VALID_VIDEO_ENV test, so no manual unstub/restub needed.
     const response = await get({ ...VALID_VIDEO_ENV, BUILDER_TUTORIAL_VIDEO_YOUTUBE_URL: 'not a url' })
     expect(response.status).toBe(200)
     const body = await response.json() as { tutorialVideo: { enabled: boolean } }
