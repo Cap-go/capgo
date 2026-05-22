@@ -121,12 +121,6 @@ export interface SecretRow {
  * line-by-line dump entirely and show a short "matches — no diff" banner —
  * dumping 70 lines of `[eq]` content would only add noise.
  */
-export interface DiffViewerProps {
-  title: string
-  subtitle?: string
-  lines: DiffLine[]
-}
-
 function getDiffCounts(lines: DiffLine[]): { addCount: number, delCount: number, total: number } {
   return {
     addCount: lines.filter(l => l.kind === 'add').length,
@@ -254,76 +248,6 @@ export const FullscreenDiffViewer: FC<{
         {`Showing ${firstVisibleLine}-${lastVisibleLine} of ${total} lines. Use ↑/↓ or k/j to scroll.`}
       </Text>
       <Text color="yellow" bold>Press Escape to exit diff viewer</Text>
-    </Box>
-  )
-}
-
-export const DiffViewer: FC<DiffViewerProps> = ({ title, subtitle, lines }) => {
-  const total = lines.length
-  const allEqual = total > 0 && lines.every(l => l.kind === 'eq')
-  const addCount = lines.filter(l => l.kind === 'add').length
-  const delCount = lines.filter(l => l.kind === 'del').length
-
-  // When the proposed file matches disk byte-for-byte, don't bother streaming
-  // every line — render a compact dynamic banner instead.
-  if (allEqual) {
-    return (
-      <Box flexDirection="column" marginTop={1}>
-        <Text bold color="cyan">{title}</Text>
-        {subtitle && <Text dimColor>{subtitle}</Text>}
-        <Box marginTop={1}>
-          <Text color="green" bold>
-            ✓ File on disk already matches the proposed content —
-            {' '}
-            {total}
-            {' '}
-            identical line
-            {total === 1 ? '' : 's'}
-            , no diff to show.
-          </Text>
-        </Box>
-      </Box>
-    )
-  }
-
-  return (
-    <Box flexDirection="column" marginTop={1}>
-      <Text bold color="cyan">{title}</Text>
-      {subtitle && <Text dimColor>{subtitle}</Text>}
-      <Text color="cyan">{'─'.repeat(60)}</Text>
-      <Text dimColor>
-        {'Summary:  '}
-        <Text color="green">{`+${addCount} added`}</Text>
-        {'   '}
-        <Text color="red">{`-${delCount} removed`}</Text>
-      </Text>
-      {lines.map((line, index) => {
-        const lineNumber = String(index + 1).padStart(4, ' ')
-        if (line.kind === 'add') {
-          return (
-            <Text key={`line-${index}`} color="green">
-              {`${lineNumber} + `}
-              {line.text}
-            </Text>
-          )
-        }
-        if (line.kind === 'del') {
-          return (
-            <Text key={`line-${index}`} color="red">
-              {`${lineNumber} - `}
-              {line.text}
-            </Text>
-          )
-        }
-        return (
-          <Text key={`line-${index}`} dimColor>
-            {`${lineNumber}   `}
-            {line.text}
-          </Text>
-        )
-      })}
-      <Text color="cyan">{'─'.repeat(60)}</Text>
-      <Text dimColor>{`End of proposed diff (${total} line${total === 1 ? '' : 's'} total). Scroll your terminal up to review.`}</Text>
     </Box>
   )
 }
