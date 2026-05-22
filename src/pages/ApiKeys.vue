@@ -93,6 +93,7 @@ const minExpirationDate = computed(() => {
 // Cache for organization and app names
 const orgCache = ref(new Map<string, string>())
 const appCache = ref(new Map<string, string>())
+const appCanonicalIdCache = ref(new Map<string, string>())
 const UUID_REGEX = /^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/i
 
 // Function to truncate strings (show first 5 and last 5 characters)
@@ -120,16 +121,15 @@ function getBindingsForKey(key: Database['public']['Tables']['apikeys']['Row']):
   return allBindings.value.filter(b => b.principal_id === key.rbac_id)
 }
 
-// Get the highest org role for a key (by priority_rank)
-function getHighestOrgRole(key: Database['public']['Tables']['apikeys']['Row']): string | null {
+// Get the highest role for a key (by priority_rank)
+function getHighestRole(key: Database['public']['Tables']['apikeys']['Row']): string | null {
   const keyBindings = getBindingsForKey(key)
-  const orgBindings = keyBindings.filter(b => b.scope_type === 'org')
-  if (orgBindings.length === 0)
+  if (keyBindings.length === 0)
     return null
 
   let highest: RoleBindingRow | null = null
   let highestRank = -1
-  for (const binding of orgBindings) {
+  for (const binding of keyBindings) {
     const role = roles.value.find(r => r.name === binding.role_name)
     const rank = role?.priority_rank ?? 0
     if (rank > highestRank) {
@@ -140,27 +140,36 @@ function getHighestOrgRole(key: Database['public']['Tables']['apikeys']['Row']):
   return highest?.role_name ?? null
 }
 
-// Get role details grouped by org for tooltip
-function getRolesByOrg(key: Database['public']['Tables']['apikeys']['Row']): { orgId: string, orgName: string, roleName: string }[] {
-  const keyBindings = getBindingsForKey(key).filter(b => b.scope_type === 'org' && b.org_id)
-  return keyBindings.map(b => ({
-    orgId: b.org_id!,
-    orgName: orgCache.value.get(b.org_id!) || b.org_id!,
-    roleName: getRoleDisplayName(b.role_name),
-  }))
-}
-
 function getRbacAppBindingIds(key: Database['public']['Tables']['apikeys']['Row']): string[] {
   return getBindingsForKey(key)
     .filter(b => b.scope_type === 'app' && !!b.app_id)
     .map(b => b.app_id!)
 }
 
+function getDisplayOrgIds(key: Database['public']['Tables']['apikeys']['Row']): string[] {
+  const orgIds = new Set<string>()
+  key.limited_to_orgs?.forEach(orgId => orgIds.add(orgId))
+  getBindingsForKey(key)
+    .filter(b => b.scope_type === 'org' && !!b.org_id)
+    .forEach(b => orgIds.add(b.org_id!))
+  return Array.from(orgIds)
+}
+
+function coversAllOrganizations(orgIds: string[]): boolean {
+  const allOrgIds = organizationStore.organizations.map(org => org.gid)
+  return allOrgIds.length > 0 && allOrgIds.every(orgId => orgIds.includes(orgId))
+}
+
 function getDisplayAppIds(key: Database['public']['Tables']['apikeys']['Row']): string[] {
-  const appIds = new Set<string>()
-  key.limited_to_apps?.forEach(appId => appIds.add(appId))
-  getRbacAppBindingIds(key).forEach(appId => appIds.add(appId))
-  return Array.from(appIds)
+  const appIds = [...(key.limited_to_apps || []), ...getRbacAppBindingIds(key)]
+  const canonicalAppIds = new Set<string>()
+  appIds.forEach(appId => canonicalAppIds.add(appCanonicalIdCache.value.get(appId) || appId))
+  return Array.from(canonicalAppIds)
+}
+
+function formatDisplayApps(key: Database['public']['Tables']['apikeys']['Row']) {
+  const appNames = new Set(getDisplayAppIds(key).map(appId => appCache.value.get(appId) || 'Unknown'))
+  return Array.from(appNames).join(', ')
 }
 
 function getOrgNameById(orgId: string) {
@@ -218,11 +227,6 @@ const getOrgName = computed(() => {
   return (orgId: string) => orgCache.value.get(orgId) || 'Unknown'
 })
 
-// Helper computed property to get app name by ID
-const getAppName = computed(() => {
-  return (appId: string) => appCache.value.get(appId) || 'Unknown'
-})
-
 // Function to fetch organization and app names in parallel
 async function fetchOrgAndAppNames() {
   if (!keys.value)
@@ -278,8 +282,11 @@ async function fetchOrgAndAppNames() {
           apps.forEach((app) => {
             const displayName = app.name || app.app_id
             appCache.value.set(app.app_id, displayName)
+            appCanonicalIdCache.value.set(app.app_id, app.app_id)
             if (app.id)
               appCache.value.set(app.id, displayName)
+            if (app.id)
+              appCanonicalIdCache.value.set(app.id, app.app_id)
           })
         }
         catch (err) {
@@ -302,8 +309,11 @@ async function fetchOrgAndAppNames() {
           apps.forEach((app) => {
             const displayName = app.name || app.app_id
             appCache.value.set(app.app_id, displayName)
+            appCanonicalIdCache.value.set(app.app_id, app.app_id)
             if (app.id)
               appCache.value.set(app.id, displayName)
+            if (app.id)
+              appCanonicalIdCache.value.set(app.id, app.app_id)
           })
         }
         catch (err) {
@@ -414,30 +424,28 @@ columns.value = [
   {
     key: 'role',
     label: t('role'),
-    sanitizeHtml: true,
     displayFunction: (row: Database['public']['Tables']['apikeys']['Row']) => {
-      const highest = getHighestOrgRole(row)
+      const highest = getHighestRole(row)
       if (!highest)
         return '-'
-      const rolesByOrg = getRolesByOrg(row)
-      if (rolesByOrg.length <= 1)
-        return getRoleDisplayName(highest)
-      const tooltipText = rolesByOrg.map(e => `${e.orgName}: ${e.roleName}`).join('\n')
-      return `<span title="${tooltipText}" style="cursor: help; border-bottom: 1px dotted currentColor;">${getRoleDisplayName(highest)}</span>`
+      return getRoleDisplayName(highest)
     },
   },
   {
     key: 'limited_to_orgs',
     label: t('organizations'),
     displayFunction: (row: Database['public']['Tables']['apikeys']['Row']) => {
-      return formatApiKeyScope(row.limited_to_orgs, orgId => getOrgName.value(orgId))
+      const orgIds = getDisplayOrgIds(row)
+      if (coversAllOrganizations(orgIds))
+        return '*'
+      return formatApiKeyScope(orgIds, orgId => getOrgName.value(orgId))
     },
   },
   {
     key: 'limited_to_apps',
     label: t('apps'),
     displayFunction: (row: Database['public']['Tables']['apikeys']['Row']) => {
-      return formatApiKeyScope(getDisplayAppIds(row), appId => getAppName.value(appId))
+      return formatDisplayApps(row)
     },
   },
   {
@@ -583,6 +591,13 @@ async function loadAllApps() {
     availableApps.value = (apps || []).filter((app): app is { id: string, app_id: string, name: string | null, owner_org: string } =>
       !!app.id && !!app.app_id,
     )
+    availableApps.value.forEach((app) => {
+      const displayName = app.name || app.app_id
+      appCache.value.set(app.app_id, displayName)
+      appCache.value.set(app.id, displayName)
+      appCanonicalIdCache.value.set(app.app_id, app.app_id)
+      appCanonicalIdCache.value.set(app.id, app.app_id)
+    })
   }
   catch (err) {
     console.error('Error loading apps:', err)
