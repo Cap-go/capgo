@@ -808,8 +808,6 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
             return
           }
 
-          if (cancelled)
-            return
           setSaValidationResult(result)
           trackAction('android_sa_validation_result', {
             result: 'failure',

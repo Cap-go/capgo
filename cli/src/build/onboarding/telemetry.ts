@@ -67,15 +67,15 @@ export async function trackBuilderOnboardingStep(input: TrackBuilderOnboardingSt
 }
 
 export async function trackBuilderOnboardingAction(input: TrackBuilderOnboardingActionInput): Promise<void> {
-  const tags: Record<string, string> = {
-    step: input.step,
-    platform: input.platform,
-    app_id: input.appId,
-    action: input.action,
-  }
+  const tags: Record<string, string> = {}
 
   for (const [key, value] of Object.entries(input.tags ?? {}))
     tags[key] = String(value)
+
+  tags.step = input.step
+  tags.platform = input.platform
+  tags.app_id = input.appId
+  tags.action = input.action
 
   try {
     await sendEvent(input.apikey, {

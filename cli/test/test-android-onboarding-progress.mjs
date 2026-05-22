@@ -2,6 +2,7 @@
 /**
  * Focused resume-routing tests for Android onboarding progress.
  */
+import process from 'node:process'
 
 console.log('🧪 Testing Android onboarding progress routing...\n')
 
@@ -24,7 +25,10 @@ async function test(name, fn) {
   }
 }
 
-function assertEquals(a, b, msg) { if (a !== b) throw new Error(msg || `Expected ${b}, got ${a}`) }
+function assertEquals(a, b, msg) {
+  if (a !== b)
+    throw new Error(msg || `Expected ${b}, got ${a}`)
+}
 
 function keystoreReadyProgress(overrides = {}) {
   return {

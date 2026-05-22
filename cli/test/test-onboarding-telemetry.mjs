@@ -27,8 +27,12 @@ try {
     step: 'service-account-method-select',
     tags: {
       accepted: true,
+      action: 'caller_action',
+      app_id: 'caller_app',
       attempt: 1,
       method: 'existing',
+      platform: 'ios',
+      step: 'caller-step',
     },
   })
 
