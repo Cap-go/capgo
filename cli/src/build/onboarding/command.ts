@@ -65,29 +65,6 @@ async function resolvePlatform(
   return choice
 }
 
-// ANSI escape codes for the terminal's alternative screen buffer. Running
-// the wizard in alt-screen mode means each Ink frame fully replaces the
-// previous one (no scrollback accumulation), which kills the duplicate-
-// Header artifact at step transitions and lets us conditionally hide the
-// Header on steps that need the full terminal height (`requesting-build`
-// and the scrollable AI viewer).
-//
-// Trade-off: when the wizard exits, the terminal restores to whatever was
-// on screen before — the wizard's output is gone. That's the same behavior
-// as `vim`/`htop`/`less`, and it's the expected UX for a TUI wizard. We
-// print a one-line completion summary AFTER exiting alt screen so the
-// user sees something concrete in their terminal flow.
-const ENTER_ALT_SCREEN = '\x1B[?1049h\x1B[H' // enter buffer + cursor home
-const EXIT_ALT_SCREEN = '\x1B[?1049l'
-
-function enterAltScreen(): void {
-  process.stdout.write(ENTER_ALT_SCREEN)
-}
-
-function exitAltScreen(): void {
-  process.stdout.write(EXIT_ALT_SCREEN)
-}
-
 export async function onboardingBuilderCommand(options: OnboardingBuilderOptions = {}): Promise<void> {
   // Ink requires an interactive terminal — fail fast in CI/pipes
   if (!process.stdin.isTTY || !process.stdout.isTTY) {
@@ -118,61 +95,23 @@ export async function onboardingBuilderCommand(options: OnboardingBuilderOptions
 
   const platform = await resolvePlatform(options, iosDir, androidDir)
 
-  // Defensive cleanup: if the process exits abnormally (uncaught exception,
-  // SIGINT before Ink's own handler fires, etc.) we must restore the user's
-  // normal terminal buffer — otherwise they're stranded in alt-screen mode
-  // with no visible scrollback. Register handlers BEFORE entering alt screen
-  // so any failure between here and the explicit exit still recovers.
-  let altScreenActive = true
-  const cleanupAltScreen = (): void => {
-    if (!altScreenActive)
-      return
-    altScreenActive = false
-    exitAltScreen()
-  }
-  process.once('exit', cleanupAltScreen)
-  process.once('SIGINT', cleanupAltScreen)
-  process.once('SIGTERM', cleanupAltScreen)
-  process.once('uncaughtException', (err) => {
-    cleanupAltScreen()
-    // Re-throw on next tick so Node's default uncaughtException handling
-    // (print stack + exit non-zero) still fires after we've restored the
-    // terminal.
-    setImmediate(() => {
-      throw err
-    })
-  })
-
-  enterAltScreen()
-  try {
-    if (platform === 'android') {
-      const androidProgress = await loadAndroidProgress(appId)
-      const { waitUntilExit } = render(
-        React.createElement(AndroidOnboardingApp, {
-          appId,
-          initialProgress: androidProgress,
-          androidDir,
-          apikey: options.apikey,
-        }),
-      )
-      await waitUntilExit()
-    }
-    else {
-      const progress = await loadProgress(appId)
-      const { waitUntilExit } = render(
-        React.createElement(OnboardingApp, { appId, initialProgress: progress, iosDir, apikey: options.apikey }),
-      )
-      await waitUntilExit()
-    }
-  }
-  finally {
-    cleanupAltScreen()
+  if (platform === 'android') {
+    const androidProgress = await loadAndroidProgress(appId)
+    const { waitUntilExit } = render(
+      React.createElement(AndroidOnboardingApp, {
+        appId,
+        initialProgress: androidProgress,
+        androidDir,
+        apikey: options.apikey,
+      }),
+    )
+    await waitUntilExit()
+    return
   }
 
-  // Brief summary in the user's normal terminal flow so they have a visible
-  // record that onboarding finished (alt-screen restoration wiped the
-  // wizard's last frame). Written through process.stdout to bypass the
-  // project-wide no-console lint rule — this is a one-shot UX message,
-  // not application logging.
-  process.stdout.write(`\n✔ Capgo onboarding complete for ${appId} (${platform}).\n`)
+  const progress = await loadProgress(appId)
+  const { waitUntilExit } = render(
+    React.createElement(OnboardingApp, { appId, initialProgress: progress, iosDir, apikey: options.apikey }),
+  )
+  await waitUntilExit()
 }

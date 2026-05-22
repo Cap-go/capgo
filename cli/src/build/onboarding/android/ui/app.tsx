@@ -20,7 +20,7 @@ import { homedir } from 'node:os'
 import { join, resolve as resolvePath } from 'node:path'
 import process from 'node:process'
 import { Alert, ProgressBar, Select } from '@inkjs/ui'
-import { Box, Newline, Text, useApp, useInput, useStdout } from 'ink'
+import { Box, Newline, Static, Text, useApp, useInput, useStdout } from 'ink'
 // src/build/onboarding/android/ui/app.tsx
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { createSupabaseClient, findSavedKey, findSavedKeySilent, getOrganizationId } from '../../../../utils.js'
@@ -125,6 +125,10 @@ function emptyProgress(appId: string): AndroidOnboardingProgress {
     completedSteps: {},
   }
 }
+
+// Static items passed to Ink's `<Static>` to render the Header exactly once.
+// See iOS sibling for the rationale.
+const STATIC_HEADER_ITEMS: string[] = ['header']
 
 const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir, apikey }) => {
   const { exit } = useApp()
@@ -1567,22 +1571,24 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
 
   const progressPct = ANDROID_STEP_PROGRESS[step] ?? 0
   const phaseLabel = getAndroidPhaseLabel(step)
-  // See iOS sibling: the wizard runs in the terminal's alternative screen
-  // buffer so each Ink frame fully replaces the previous — no scrollback
-  // accumulation, no duplicate Header artifact. `showHeader` can be a plain
-  // step conditional that hides on the steps which need max screen
-  // (`requesting-build` and the scrollable AI viewer).
+  // See iOS sibling: Header is rendered exactly once via `<Static>` below
+  // so a single persistent banner sits above every step (including the AI
+  // sub-flow), with no duplicate-Header artifact when steps transition.
   const isAiResultScroll = step === 'ai-analysis-result-scroll'
   const isAiStep = step === 'ai-analysis-prompt' || step === 'ai-analysis-running' || step === 'ai-analysis-result' || isAiResultScroll
   const showProgress = step !== 'welcome' && step !== 'error' && step !== 'build-complete' && step !== 'requesting-build' && step !== 'ai-analysis-result' && !isAiResultScroll
-  const showHeader = step !== 'requesting-build' && !isAiResultScroll
   const showLog = step !== 'requesting-build' && step !== 'build-complete' && !isAiStep
 
   return (
-    <Box flexDirection="column" padding={1}>
-      {showHeader && <Header />}
-
-      {showProgress && (
+    <>
+      {/* Render the Header exactly once via Ink's `<Static>` — see iOS
+          sibling. The dynamic area below changes step-by-step but the
+          banner stays put. */}
+      <Static items={STATIC_HEADER_ITEMS}>
+        {item => <Header key={item} />}
+      </Static>
+      <Box flexDirection="column" padding={1}>
+        {showProgress && (
         <Box flexDirection="column" marginTop={1}>
           <Text bold color="cyan">{phaseLabel}</Text>
           <Box marginTop={1}>
@@ -2855,7 +2861,8 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
           />
         </Box>
       )}
-    </Box>
+      </Box>
+    </>
   )
 }
 
