@@ -1108,6 +1108,12 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
             repoLabel = await getCiSecretRepoLabelAsync(ciSecretTarget)
             if (cancelled)
               return
+            if (!repoLabel) {
+              setCiSecretRepoLabel(null)
+              setCiSecretError('Could not resolve the GitHub repository. Run `gh repo view` from this directory, then try again.')
+              setStep('ci-secrets-failed')
+              return
+            }
             setCiSecretRepoLabel(repoLabel)
           }
           // Phase 2: list existing secrets.
@@ -2612,9 +2618,6 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
           const existingSet = new Set(ciSecretExistingKeys)
           const newCount = ciSecretEntries.filter(entry => !existingSet.has(entry.key)).length
           const replaceCount = ciSecretEntries.length - newCount
-          const repoLine = ciSecretRepoLabel
-            ? ciSecretRepoLabel
-            : '(could not resolve repository — gh repo view failed)'
           return (
             <Box flexDirection="column" marginTop={1}>
               <Text bold color="yellow">⚠  Confirm before pushing secrets</Text>
@@ -2622,7 +2625,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
               <Text>
                 Repository:
                 {' '}
-                <Text bold color="cyan">{repoLine}</Text>
+                <Text bold color="cyan">{ciSecretRepoLabel}</Text>
               </Text>
               <Text dimColor>(resolved via `gh repo view` from this directory)</Text>
               <Newline />
@@ -2653,9 +2656,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
             <Select
               options={[
                 {
-                  label: ciSecretRepoLabel
-                    ? `✅  Yes, push to ${ciSecretRepoLabel}`
-                    : `✅  Yes, push (repo unresolved — uses gh's current context)`,
+                  label: `✅  Yes, push to ${ciSecretRepoLabel}`,
                   value: 'confirm',
                 },
                 { label: '❌  Cancel — don\'t push anything', value: 'cancel' },

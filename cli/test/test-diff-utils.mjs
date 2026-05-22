@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import process from 'node:process'
 import { diffLines } from '../src/build/onboarding/diff-utils.ts'
 
 console.log('🧪 Testing diff-utils...\n')
@@ -19,11 +20,6 @@ async function test(name, fn) {
     console.error(`   Error: ${error.message}`)
     testsFailed++
   }
-}
-
-function assert(condition, message) {
-  if (!condition)
-    throw new Error(message || 'Assertion failed')
 }
 
 function assertDeepEquals(actual, expected, message) {

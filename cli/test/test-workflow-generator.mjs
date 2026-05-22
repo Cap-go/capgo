@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import process from 'node:process'
 import { generateWorkflow, WORKFLOW_PATH } from '../src/build/onboarding/workflow-generator.ts'
 
 console.log('🧪 Testing GitHub Actions workflow generator...\n')
@@ -19,11 +20,6 @@ async function test(name, fn) {
     console.error(`   Error: ${error.message}`)
     testsFailed++
   }
-}
-
-function assert(condition, message) {
-  if (!condition)
-    throw new Error(message || 'Assertion failed')
 }
 
 function assertEquals(actual, expected, message) {

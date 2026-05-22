@@ -2,8 +2,8 @@ import type { FC } from 'react'
 import { Box, Text, useInput } from 'ink'
 import Spinner from 'ink-spinner'
 // src/build/onboarding/ui/components.tsx
-import React, { useEffect, useState } from 'react'
 import type { DiffLine } from '../diff-utils.js'
+import React, { useEffect, useState } from 'react'
 
 export const Divider: FC<{ width?: number }> = ({ width = 60 }) => (
   <Text dimColor>{'─'.repeat(width)}</Text>
