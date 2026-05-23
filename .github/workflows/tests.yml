@@ -189,6 +189,8 @@ jobs:
         run: bash scripts/setup-bun.sh
       - name: Validate migration timestamps
         if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: bash scripts/check-supabase-migration-order.sh
       - name: Check for typos
         uses: crate-ci/typos@v1 # v1.45.1

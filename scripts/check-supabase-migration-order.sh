@@ -46,6 +46,19 @@ resolve_target_branch() {
   echo 'main'
 }
 
+fetch_target_branch() {
+  local branch="$1"
+  local refspec="+refs/heads/${branch}:refs/remotes/origin/${branch}"
+
+  if [[ -n "${GITHUB_TOKEN:-}" ]]; then
+    git -c "http.https://github.com/.extraheader=AUTHORIZATION: bearer ${GITHUB_TOKEN}" \
+      fetch --no-tags origin "${refspec}"
+    return
+  fi
+
+  git fetch --no-tags origin "${refspec}"
+}
+
 target_branch="$(resolve_target_branch)"
 base_ref="origin/${target_branch}"
 tmp_dir="$(mktemp -d)"
@@ -55,7 +68,7 @@ added_timestamps_file="${tmp_dir}/added_timestamps.tsv"
 trap 'rm -rf "${tmp_dir}"' EXIT
 
 echo "Checking Supabase migrations against ${base_ref}"
-git fetch --no-tags origin "${target_branch}"
+fetch_target_branch "${target_branch}"
 
 : > "${base_timestamps_file}"
 while IFS= read -r file; do
