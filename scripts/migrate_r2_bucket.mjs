@@ -41,7 +41,6 @@ const __dirname = dirname(fileURLToPath(import.meta.url))
 const ROOT_DIR = resolve(__dirname, '..')
 const FILES_WRANGLER_CONFIG = resolve(ROOT_DIR, 'cloudflare_workers/files/wrangler.jsonc')
 const MAX_DB_BATCH_SIZE = 1000
-const COPY_OBJECT_LIMIT_BYTES = 5 * 1024 * 1024 * 1024
 const DEFAULT_MULTIPART_PART_SIZE = 512 * 1024 * 1024
 const DEFAULT_ROW_CONCURRENCY = 64
 const DEFAULT_PROJECT_REF = 'xvwzpoazmxkqosrdewyv'
@@ -193,7 +192,6 @@ function loadEnvFiles(envPaths) {
   return loaded
 }
 
-const targetEnv = loadEnvFiles(targetEnvPaths)
 const runtimeEnv = loadEnvFiles(['../.env', ...targetEnvPaths])
 for (const [key, value] of Object.entries(runtimeEnv))
   process.env[key] = value
@@ -647,7 +645,7 @@ async function mapWithConcurrency(items, concurrency, fn) {
   const runners = Array.from({ length: Math.min(concurrency, items.length) }, async () => {
     while (nextIndex < items.length) {
       const index = nextIndex++
-      results[index] = await fn(items[index], index)
+      results[index] = await fn(items[index])
     }
   })
   await Promise.all(runners)
