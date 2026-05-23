@@ -62,9 +62,7 @@ export const ALLOWED_HEADERS = HEADERS.join(', ')
 export const ALLOWED_METHODS = REQUEST_METHODS.join(', ')
 export const EXPOSED_HEADERS = HEADERS.join(', ')
 
-export type AppScopedAttachmentPath
-  = | { kind: 'scoped', app_id: string, owner_org: string }
-  | { kind: 'invalid_scoped' }
+export type AppScopedAttachmentPath = | { kind: 'scoped', app_id: string, owner_org: string } | { kind: 'invalid_scoped' }
 
 export function encodeR2KeyForUploadLocation(r2Key: string): string {
   return r2Key.split('/').map(segment => encodeURIComponent(segment)).join('/')
