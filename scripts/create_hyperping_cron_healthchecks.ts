@@ -15,8 +15,7 @@
  */
 import { mkdir, writeFile } from 'node:fs/promises'
 import process from 'node:process'
-import { createClient } from '@supabase/supabase-js'
-import { asyncPool, DEFAULT_ENV_FILE, getArgValue, getRequiredEnv, getSupabaseServiceRoleKey, loadEnv, parsePositiveInteger } from './admin_stripe_backfill_utils.ts'
+import { asyncPool, createSupabaseServiceClient, DEFAULT_ENV_FILE, getArgValue, loadEnv, parsePositiveInteger } from './admin_stripe_backfill_utils.ts'
 
 const DEFAULT_API_BASE_URL = 'https://api.hyperping.io'
 const DEFAULT_CONCURRENCY = 3
@@ -88,14 +87,6 @@ interface BackfillFailure {
   stage: 'build' | 'hyperping' | 'supabase'
 }
 
-function createSupabaseServiceClient(env: Record<string, string | undefined>) {
-  return createClient(
-    getRequiredEnv(env, 'SUPABASE_URL'),
-    getSupabaseServiceRoleKey(env),
-    { auth: { autoRefreshToken: false, persistSession: false, detectSessionInUrl: false } },
-  )
-}
-
 function parsePeriodType(value: string | null, label: string, fallback: PeriodType) {
   if (value === null)
     return fallback
@@ -114,9 +105,9 @@ function getRequiredArg(value: string | null, label: string) {
 }
 
 function requirePositiveNumber(value: number | null | undefined, label: string): number {
-  if (!Number.isInteger(value) || !value || value < 1)
+  if (!Number.isInteger(value) || (value as number) < 1)
     throw new Error(`${label} must be a positive integer`)
-  return value
+  return value as number
 }
 
 function requireInteger(value: number | null | undefined, label: string): number {
@@ -269,11 +260,12 @@ async function fetchCronTasks(
     if (!data?.length)
       break
 
-    rows.push(...data as CronTaskRow[])
+    const cronTaskRows = data as unknown as CronTaskRow[]
+    rows.push(...cronTaskRows)
 
     if (options.name || data.length < PAGE_SIZE)
       break
-    lastSeenId = data.at(-1)?.id ?? lastSeenId
+    lastSeenId = cronTaskRows.at(-1)?.id ?? lastSeenId
   }
 
   return rows
@@ -387,7 +379,7 @@ async function updateCronTaskHealthcheckUrl(
     .update({
       healthcheck_url: healthcheckUrl,
       updated_at: new Date().toISOString(),
-    })
+    } as never)
     .eq('id', cronTaskId)
 
   if (error)
