@@ -570,7 +570,7 @@ export async function getRemoteDependencies(appId: string, channel: string) {
   if (error) {
     throw new Error(error.message)
   }
-  return convertNativePackages((remoteNativePackages.version.native_packages as any) ?? [])
+  return convertNativePackages(((remoteNativePackages.version as any)?.native_packages as any) ?? [])
 }
 
 interface Compatibility {

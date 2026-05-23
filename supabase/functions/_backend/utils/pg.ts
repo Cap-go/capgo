@@ -1,5 +1,5 @@
 import type { Context } from 'hono'
-import { and, eq, or, sql } from 'drizzle-orm'
+import { and, eq, isNotNull, isNull, or, sql } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/node-postgres'
 import { alias } from 'drizzle-orm/pg-core'
 import { getRuntimeKey } from 'hono/adapter'
@@ -133,10 +133,9 @@ function toReplicationLagSeconds(value: unknown): number | null {
 async function queryReplicaLag(c: Context, pool: Pool): Promise<ReplicationLagStatus> {
   try {
     const query = `
-      SELECT EXTRACT(EPOCH FROM (now() - last_msg_receipt_time)) AS lag_seconds
+      SELECT MAX(EXTRACT(EPOCH FROM (now() - last_msg_receipt_time))) AS lag_seconds
       FROM pg_stat_subscription
-      WHERE subname LIKE 'planetscale_subscription_%'
-      LIMIT 1
+      WHERE last_msg_receipt_time IS NOT NULL
     `
 
     const result = await pool.query(query)
@@ -446,12 +445,12 @@ function getSchemaUpdatesAlias(includeMetadata = false) {
   const { versionAlias, channelDevicesAlias, channelAlias } = getAlias()
 
   const versionSelect: any = {
-    id: sql<number>`${versionAlias.id}`.as('vid'),
-    name: sql<string>`${versionAlias.name}`.as('vname'),
+    id: sql<number | null>`${versionAlias.id}`.as('vid'),
+    name: sql<string>`CASE WHEN ${channelAlias.version} IS NULL THEN 'builtin' ELSE ${versionAlias.name} END`.as('vname'),
     checksum: sql<string | null>`${versionAlias.checksum}`.as('vchecksum'),
     session_key: sql<string | null>`${versionAlias.session_key}`.as('vsession_key'),
     key_id: sql<string | null>`${versionAlias.key_id}`.as('vkey_id'),
-    storage_provider: sql<string>`${versionAlias.storage_provider}`.as('vstorage_provider'),
+    storage_provider: sql<string>`COALESCE(${versionAlias.storage_provider}, 'r2')`.as('vstorage_provider'),
     external_url: sql<string | null>`${versionAlias.external_url}`.as('vexternal_url'),
     min_update_version: sql<string | null>`${versionAlias.min_update_version}`.as('vminUpdateVersion'),
     r2_path: sql`${versionAlias.r2_path}`.mapWith(versionAlias.r2_path).as('vr2_path'),
@@ -523,12 +522,16 @@ export function requestInfosChannelDevicePostgres(
     .select(selectShape)
     .from(channelDevicesAlias)
     .innerJoin(channelAlias, eq(channelDevicesAlias.channel_id, channelAlias.id))
-    .innerJoin(versionAlias, activeChannelVersionJoin(channelAlias.version, versionAlias))
+    .leftJoin(versionAlias, activeChannelVersionJoin(channelAlias.version, versionAlias))
 
   const channelDevice = (includeManifest
     ? baseQuery.leftJoin(schema.manifest, eq(schema.manifest.app_version_id, versionAlias.id))
     : baseQuery)
-    .where(and(eq(channelDevicesAlias.device_id, device_id), eq(channelDevicesAlias.app_id, app_id)))
+    .where(and(
+      eq(channelDevicesAlias.device_id, device_id),
+      eq(channelDevicesAlias.app_id, app_id),
+      or(isNull(channelAlias.version), isNotNull(versionAlias.id)),
+    ))
     .groupBy(channelDevicesAlias.device_id, channelDevicesAlias.app_id, channelAlias.id, versionAlias.id)
     .limit(1)
   cloudlog({ requestId: c.get('requestId'), message: 'channelDevice Query:', channelDeviceQuery: channelDevice.toSQL() })
@@ -556,12 +559,12 @@ export function requestInfosChannelPostgres(
   const baseQuery = drizzleClient
     .select(selectShape)
     .from(channelAlias)
-    .innerJoin(versionAlias, activeChannelVersionJoin(channelAlias.version, versionAlias))
+    .leftJoin(versionAlias, activeChannelVersionJoin(channelAlias.version, versionAlias))
 
   const channelQuery = (includeManifest
     ? baseQuery.leftJoin(schema.manifest, eq(schema.manifest.app_version_id, versionAlias.id))
     : baseQuery)
-    .where(
+    .where(and(
       !defaultChannel
         ? and(
             eq(channelAlias.public, true),
@@ -577,7 +580,8 @@ export function requestInfosChannelPostgres(
               eq(channelAlias.allow_device_self_set, true),
             ),
           ),
-    )
+      or(isNull(channelAlias.version), isNotNull(versionAlias.id)),
+    ))
     .groupBy(channelAlias.id, versionAlias.id)
     .limit(1)
   cloudlog({ requestId: c.get('requestId'), message: 'channel Query:', channelQuery: channelQuery.toSQL() })
@@ -713,27 +717,6 @@ export async function getAppVersionPostgres(
   catch (e: unknown) {
     logPgError(c, 'getAppVersionPostgres', e)
     return null
-  }
-}
-
-export async function ensurePlaceholderVersions(c: Context, appId: string) {
-  let pgClient: ReturnType<typeof getPgClient> | undefined
-  try {
-    pgClient = getPgClient(c)
-    await pgClient.query(
-      `INSERT INTO public.app_versions (name, app_id, storage_provider)
-       VALUES ('builtin', $1, 'r2'), ('unknown', $1, 'r2')
-       ON CONFLICT (name, app_id) DO NOTHING`,
-      [appId],
-    )
-  }
-  catch (e: unknown) {
-    logPgError(c, 'ensurePlaceholderVersions', e)
-  }
-  finally {
-    if (pgClient) {
-      await closeClient(c, pgClient)
-    }
   }
 }
 
@@ -1413,6 +1396,32 @@ export interface AdminEmailTypeBreakdown {
   }>
 }
 
+interface AdminUtcDateRange {
+  startDay: Date
+  seriesEndDay: Date
+  endExclusive: Date
+}
+
+function getAdminUtcDateRange(start_date: string, end_date: string): AdminUtcDateRange {
+  const startTimestamp = new Date(start_date)
+  const endTimestamp = new Date(end_date)
+  const startDay = new Date(Date.UTC(startTimestamp.getUTCFullYear(), startTimestamp.getUTCMonth(), startTimestamp.getUTCDate()))
+  const endDay = new Date(Date.UTC(endTimestamp.getUTCFullYear(), endTimestamp.getUTCMonth(), endTimestamp.getUTCDate()))
+  const endIsExactUtcDayBoundary = endTimestamp.getTime() === endDay.getTime()
+  const seriesEndDay = new Date(endDay)
+
+  if (endIsExactUtcDayBoundary)
+    seriesEndDay.setUTCDate(seriesEndDay.getUTCDate() - 1)
+
+  return {
+    startDay,
+    seriesEndDay,
+    endExclusive: endIsExactUtcDayBoundary
+      ? endTimestamp
+      : new Date(endDay.getTime() + 24 * 60 * 60 * 1000),
+  }
+}
+
 export async function getAdminEmailTypeBreakdown(
   c: Context,
   start_date: string,
@@ -1431,17 +1440,7 @@ export async function getAdminEmailTypeBreakdown(
   try {
     const pgClient = getPgClient(c, true)
     const drizzleClient = getDrizzleClient(pgClient)
-    const startTimestamp = new Date(start_date)
-    const endTimestamp = new Date(end_date)
-    const startDay = new Date(Date.UTC(startTimestamp.getUTCFullYear(), startTimestamp.getUTCMonth(), startTimestamp.getUTCDate()))
-    const endDay = new Date(Date.UTC(endTimestamp.getUTCFullYear(), endTimestamp.getUTCMonth(), endTimestamp.getUTCDate()))
-    const endIsExactUtcDayBoundary = endTimestamp.getTime() === endDay.getTime()
-    const seriesEndDay = new Date(endDay)
-    if (endIsExactUtcDayBoundary)
-      seriesEndDay.setUTCDate(seriesEndDay.getUTCDate() - 1)
-    const endExclusive = endIsExactUtcDayBoundary
-      ? endTimestamp
-      : new Date(endDay.getTime() + 24 * 60 * 60 * 1000)
+    const { startDay, seriesEndDay, endExclusive } = getAdminUtcDateRange(start_date, end_date)
 
     const personalDomainsSql = sql.join(PERSONAL_EMAIL_DOMAINS.map(domain => sql`${domain}`), sql`, `)
     const disposableDomainsSql = sql.join(DISPOSABLE_EMAIL_DOMAINS.map(domain => sql`${domain}`), sql`, `)
@@ -1761,6 +1760,10 @@ export interface AdminOrganizationInsightRow {
   billing_type: 'monthly' | 'yearly' | null
   upload_count: number
   build_count: number
+  failed_update_count: number
+  install_count: number
+  update_attempt_count: number
+  needs_attention: boolean
   fail_rate: number
   mau: number
   members_count: number
@@ -1785,6 +1788,10 @@ interface AdminOrganizationInsightsFilters {
   paid_only?: boolean
   search?: string
 }
+
+const ADMIN_ORG_ATTENTION_FAIL_RATE_PERCENT = 20
+const ADMIN_ORG_ATTENTION_MIN_FAILED_UPDATES = 2
+const ADMIN_ORG_ATTENTION_MIN_UPDATE_ATTEMPTS = 10
 
 /**
  * Fetches admin organization rows with selected-period usage rollups.
@@ -1834,7 +1841,7 @@ export async function getAdminOrganizationInsights(
       : sql``
 
     const dataQuery = sql`
-      WITH filtered_orgs AS (
+      WITH filtered_orgs_all AS (
         SELECT
           o.id AS org_id,
           o.name AS org_name,
@@ -1851,7 +1858,64 @@ export async function getAdminOrganizationInsights(
           ${billingFilter}
           ${paidFilter}
           ${searchFilter}
-        ORDER BY o.created_at DESC NULLS LAST, o.id
+      ),
+      version_usage_totals AS (
+        SELECT
+          a.owner_org AS org_id,
+          COALESCE(SUM(COALESCE(dv.fail, 0)), 0)::bigint AS failed_update_count,
+          COALESCE(SUM(COALESCE(dv.install, 0)), 0)::bigint AS install_count
+        FROM filtered_orgs_all filtered
+        INNER JOIN apps a ON a.owner_org = filtered.org_id
+        INNER JOIN daily_version dv ON dv.app_id = a.app_id
+        WHERE dv.date >= ${startDateOnly}::date
+          AND dv.date <= ${endDateOnly}::date
+        GROUP BY a.owner_org
+      ),
+      version_usage_rank AS (
+        SELECT
+          vut.org_id,
+          vut.failed_update_count,
+          vut.install_count,
+          (vut.install_count + vut.failed_update_count)::bigint AS update_attempt_count,
+          CASE
+            WHEN vut.install_count + vut.failed_update_count > 0
+              THEN (vut.failed_update_count::float / (vut.install_count + vut.failed_update_count)::float) * 100
+            ELSE 0
+          END::float AS fail_rate
+        FROM version_usage_totals vut
+      ),
+      filtered_orgs_scored AS (
+        SELECT
+          filtered.org_id,
+          filtered.org_name,
+          filtered.management_email,
+          filtered.registered_at,
+          filtered.paid_at,
+          filtered.plan_name,
+          filtered.billing_type,
+          COALESCE(vur.failed_update_count, 0)::bigint AS failed_update_count,
+          COALESCE(vur.install_count, 0)::bigint AS install_count,
+          COALESCE(vur.update_attempt_count, 0)::bigint AS update_attempt_count,
+          COALESCE(vur.fail_rate, 0)::float AS fail_rate,
+          (
+            COALESCE(vur.fail_rate, 0) >= ${ADMIN_ORG_ATTENTION_FAIL_RATE_PERCENT}
+            AND COALESCE(vur.failed_update_count, 0) >= ${ADMIN_ORG_ATTENTION_MIN_FAILED_UPDATES}
+            AND COALESCE(vur.update_attempt_count, 0) >= ${ADMIN_ORG_ATTENTION_MIN_UPDATE_ATTEMPTS}
+          )::boolean AS needs_attention
+        FROM filtered_orgs_all filtered
+        LEFT JOIN version_usage_rank vur ON vur.org_id = filtered.org_id
+      ),
+      filtered_orgs AS (
+        SELECT *
+        FROM filtered_orgs_scored
+        ORDER BY
+          needs_attention DESC,
+          CASE
+            WHEN needs_attention THEN fail_rate
+            ELSE NULL
+          END DESC,
+          registered_at DESC NULLS LAST,
+          org_id
         LIMIT ${safeLimit}
         OFFSET ${safeOffset}
       ),
@@ -1881,18 +1945,6 @@ export async function getAdminOrganizationInsights(
         INNER JOIN daily_mau dm ON dm.app_id = a.app_id
         WHERE dm.date >= ${startDateOnly}::date
           AND dm.date <= ${endDateOnly}::date
-        GROUP BY a.owner_org
-      ),
-      version_usage_by_org AS (
-        SELECT
-          a.owner_org AS org_id,
-          COALESCE(SUM(COALESCE(dv.fail, 0)), 0)::bigint AS fails,
-          COALESCE(SUM(COALESCE(dv.install, 0)), 0)::bigint AS installs
-        FROM filtered_orgs filtered
-        INNER JOIN apps a ON a.owner_org = filtered.org_id
-        INNER JOIN daily_version dv ON dv.app_id = a.app_id
-        WHERE dv.date >= ${startDateOnly}::date
-          AND dv.date <= ${endDateOnly}::date
         GROUP BY a.owner_org
       ),
       build_usage_by_org AS (
@@ -1935,11 +1987,11 @@ export async function getAdminOrganizationInsights(
         filtered.billing_type,
         COALESCE(buo.upload_count, 0)::int AS upload_count,
         COALESCE(bu.build_count, 0)::bigint AS build_count,
-        CASE
-          WHEN COALESCE(vu.installs, 0) + COALESCE(vu.fails, 0) > 0
-            THEN (COALESCE(vu.fails, 0)::float / (COALESCE(vu.installs, 0) + COALESCE(vu.fails, 0))::float) * 100
-          ELSE 0
-        END::float AS fail_rate,
+        filtered.failed_update_count,
+        filtered.install_count,
+        filtered.update_attempt_count,
+        filtered.needs_attention,
+        filtered.fail_rate,
         COALESCE(mau.mau, 0)::bigint AS mau,
         COALESCE(members.members_count, 0)::int AS members_count,
         COALESCE(apps.apps_count, 0)::int AS apps_count,
@@ -1951,11 +2003,17 @@ export async function getAdminOrganizationInsights(
       LEFT JOIN apps_by_org apps ON apps.org_id = filtered.org_id
       LEFT JOIN members_by_org members ON members.org_id = filtered.org_id
       LEFT JOIN mau_by_org mau ON mau.org_id = filtered.org_id
-      LEFT JOIN version_usage_by_org vu ON vu.org_id = filtered.org_id
       LEFT JOIN build_usage_by_org bu ON bu.org_id = filtered.org_id
       LEFT JOIN bundle_uploads_by_org buo ON buo.org_id = filtered.org_id
       LEFT JOIN last_builds_by_org lb ON lb.org_id = filtered.org_id
-      ORDER BY filtered.registered_at DESC NULLS LAST, filtered.org_id
+      ORDER BY
+        filtered.needs_attention DESC,
+        CASE
+          WHEN filtered.needs_attention THEN filtered.fail_rate
+          ELSE NULL
+        END DESC,
+        filtered.registered_at DESC NULLS LAST,
+        filtered.org_id
     `
 
     const countQuery = sql`
@@ -1991,6 +2049,10 @@ export async function getAdminOrganizationInsights(
       billing_type: row.billing_type ?? null,
       upload_count: Number(row.upload_count) || 0,
       build_count: Number(row.build_count) || 0,
+      failed_update_count: Number(row.failed_update_count) || 0,
+      install_count: Number(row.install_count) || 0,
+      update_attempt_count: Number(row.update_attempt_count) || 0,
+      needs_attention: row.needs_attention === true,
       fail_rate: Number(row.fail_rate) || 0,
       mau: Number(row.mau) || 0,
       members_count: Number(row.members_count) || 0,
@@ -2162,7 +2224,7 @@ export async function getAdminTrialOrganizations(
 ): Promise<AdminTrialOrganizationsResult> {
   try {
     // The admin dashboard needs plans.name, and plans is not replicated to
-    // PlanetScale read replicas.
+    // read replicas.
     const pgClient = getPgClient(c)
     const drizzleClient = getDrizzleClient(pgClient)
 
@@ -2241,6 +2303,129 @@ export async function getAdminTrialOrganizations(
   catch (e: unknown) {
     logPgError(c, 'getAdminTrialOrganizations', e)
     return { organizations: [], total: 0 }
+  }
+}
+
+export interface AdminTrialPlanBreakdown {
+  totals: Array<{
+    plan_name: string
+    total: number
+  }>
+  trend: Array<{
+    date: string
+    total: number
+    plans: Record<string, number>
+  }>
+}
+
+function createAdminTrialPlanTrendDay(date: string): AdminTrialPlanBreakdown['trend'][number] {
+  return { date, total: 0, plans: {} }
+}
+
+export async function getAdminTrialPlanBreakdown(
+  c: Context,
+  start_date: string,
+  end_date: string,
+): Promise<AdminTrialPlanBreakdown> {
+  const emptyResult: AdminTrialPlanBreakdown = {
+    totals: [],
+    trend: [],
+  }
+
+  let pgClient: ReturnType<typeof getPgClient> | undefined
+  try {
+    // The admin dashboard needs plans.name, and plans is not available on every read replica.
+    pgClient = getPgClient(c)
+    const drizzleClient = getDrizzleClient(pgClient)
+    const { startDay, seriesEndDay, endExclusive } = getAdminUtcDateRange(start_date, end_date)
+
+    const query = sql`
+      WITH date_series AS (
+        SELECT generate_series(
+          ${startDay.toISOString()}::timestamptz::date,
+          ${seriesEndDay.toISOString()}::timestamptz::date,
+          interval '1 day'
+        )::date AS date
+      ),
+      daily_trials AS (
+        SELECT
+          (o.created_at AT TIME ZONE 'UTC')::date AS date,
+          COALESCE(NULLIF(BTRIM(p.name), ''), 'Unknown') AS plan_name,
+          COUNT(DISTINCT o.id)::int AS trials
+        FROM orgs o
+        INNER JOIN stripe_info si ON si.customer_id = o.customer_id
+        LEFT JOIN plans p ON p.stripe_id = si.product_id
+        WHERE o.created_at >= ${startDay.toISOString()}::timestamptz
+          AND o.created_at < ${endExclusive.toISOString()}::timestamptz
+          AND si.trial_at IS NOT NULL
+        GROUP BY (o.created_at AT TIME ZONE 'UTC')::date, COALESCE(NULLIF(BTRIM(p.name), ''), 'Unknown')
+      ),
+      plan_names AS (
+        SELECT BTRIM(name) AS plan_name
+        FROM plans
+        WHERE BTRIM(name) != ''
+        UNION
+        SELECT plan_name
+        FROM daily_trials
+      ),
+      filled AS (
+        SELECT
+          ds.date,
+          plan_name_set.plan_name,
+          COALESCE(dt.trials, 0)::int AS trials
+        FROM date_series ds
+        CROSS JOIN plan_names plan_name_set
+        LEFT JOIN daily_trials dt ON dt.date = ds.date AND dt.plan_name = plan_name_set.plan_name
+      )
+      SELECT
+        date,
+        plan_name,
+        trials
+      FROM filled
+      ORDER BY date ASC, plan_name ASC
+    `
+
+    const result = await drizzleClient.execute(query)
+    const totalsByPlan = new Map<string, number>()
+    const trendByDate = new Map<string, { date: string, total: number, plans: Record<string, number> }>()
+
+    for (const row of result.rows as any[]) {
+      const date = row.date instanceof Date ? row.date.toISOString().split('T')[0] : String(row.date)
+      const planName = String(row.plan_name || 'Unknown')
+      const trials = Number(row.trials) || 0
+      const day = trendByDate.get(date) ?? createAdminTrialPlanTrendDay(date)
+
+      day.plans[planName] = trials
+      day.total += trials
+      trendByDate.set(date, day)
+      totalsByPlan.set(planName, (totalsByPlan.get(planName) ?? 0) + trials)
+    }
+
+    const totals = Array.from(totalsByPlan.entries())
+      .map(([plan_name, total]) => ({ plan_name, total }))
+      .sort((a, b) => b.total - a.total || a.plan_name.localeCompare(b.plan_name))
+
+    const trend = Array.from(trendByDate.values())
+
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'getAdminTrialPlanBreakdown result',
+      resultCount: trend.length,
+      planCount: totals.length,
+    })
+
+    return {
+      totals,
+      trend,
+    }
+  }
+  catch (e: unknown) {
+    logPgError(c, 'getAdminTrialPlanBreakdown', e)
+    return emptyResult
+  }
+  finally {
+    if (pgClient)
+      await closeClient(c, pgClient)
   }
 }
 

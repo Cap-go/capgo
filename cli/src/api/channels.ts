@@ -2,7 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '../types/supabase.types'
 import { confirm as confirmC, intro, log, outro, spinner } from '@clack/prompts'
 import { Table } from '@sauber/table'
-import { formatError, getOrganizationId } from '../utils'
+import { formatError } from '../utils'
 
 interface CheckVersionOptions {
   silent?: boolean
@@ -66,14 +66,9 @@ export async function checkVersionNotUsedInChannel(
     const s = silent ? null : spinner()
     s?.start(`Unlinking channel ${channel.name}`)
 
-    const unknownVersion = await findUnknownVersion(supabase, appid, { silent })
-    if (!unknownVersion) {
-      s?.stop(`Cannot find unknown version for ${appid}`)
-      throw new Error(`Cannot find unknown version for ${appid}`)
-    }
     const { error: errorChannelUpdate } = await supabase
       .from('channels')
-      .update({ version: unknownVersion.id })
+      .update({ version: null })
       .eq('id', channel.id)
 
     if (errorChannelUpdate) {
@@ -86,66 +81,6 @@ export async function checkVersionNotUsedInChannel(
 
   if (!silent)
     outro(`Version unlinked from ${channelFound.length} channel${channelFound.length > 1 ? 's' : ''}`)
-}
-
-interface FindUnknownOptions {
-  silent?: boolean
-}
-
-export async function findUnknownVersion(
-  supabase: SupabaseClient<Database>,
-  appId: string,
-  options: FindUnknownOptions = {},
-) {
-  const { silent = false } = options
-
-  // Try to find existing unknown version
-  const { data, error: findError } = await supabase
-    .from('app_versions')
-    .select('id')
-    .eq('app_id', appId)
-    .eq('name', 'unknown')
-    .maybeSingle()
-
-  if (findError) {
-    if (!silent)
-      log.error(`Cannot find unknown version for ${appId}: ${formatError(findError)}`)
-    throw new Error(`Cannot find unknown version for app ${appId}: ${formatError(findError)}`)
-  }
-
-  if (data) {
-    return data
-  }
-
-  // Not found - create or reuse the synthetic placeholder version safely.
-  try {
-    const orgId = await getOrganizationId(supabase, appId)
-    const { data: newVersion, error: createError } = await supabase
-      .from('app_versions')
-      .upsert({
-        owner_org: orgId,
-        deleted: true,
-        name: 'unknown',
-        app_id: appId,
-      })
-      .select('id')
-      .eq('app_id', appId)
-      .eq('name', 'unknown')
-      .single()
-
-    if (createError) {
-      if (!silent)
-        log.error(`Cannot create unknown version for ${appId}: ${formatError(createError)}`)
-      throw new Error(`Cannot find or create unknown version for app ${appId}: ${formatError(createError)}`)
-    }
-
-    return newVersion
-  }
-  catch (createErr) {
-    if (!silent)
-      log.error(`Cannot create unknown version for ${appId}: ${formatError(createErr)}`)
-    throw new Error(`Cannot retrieve or create unknown version for app ${appId}: ${formatError(createErr)}`)
-  }
 }
 
 export function createChannel(

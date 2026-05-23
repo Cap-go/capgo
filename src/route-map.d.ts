@@ -352,6 +352,13 @@ declare module 'vue-router/auto-routes' {
       Record<never, never>,
       | never
     >,
+    '/onboarding/invitation': RouteRecordInfo<
+      '/onboarding/invitation',
+      '/onboarding/invitation',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
     '/onboarding/organization': RouteRecordInfo<
       '/onboarding/organization',
       '/onboarding/organization',
@@ -813,6 +820,12 @@ declare module 'vue-router/auto-routes' {
     'src/pages/login.vue': {
       routes:
         | '/login'
+      views:
+        | never
+    }
+    'src/pages/onboarding/invitation.vue': {
+      routes:
+        | '/onboarding/invitation'
       views:
         | never
     }

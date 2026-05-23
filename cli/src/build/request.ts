@@ -26,6 +26,7 @@
  * - Use `build credentials clear` to remove saved credentials
  */
 
+import type { PostAnalyzeResult } from '../ai/analyze'
 import type { BuildCredentials, BuildOptionsPayload, BuildRequestOptions, BuildRequestResult } from '../schemas/build'
 import { Buffer } from 'node:buffer'
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
@@ -33,17 +34,33 @@ import { mkdir, readFile as readFileAsync, rm, stat, writeFile } from 'node:fs/p
 import { tmpdir } from 'node:os'
 import { basename, join, resolve } from 'node:path'
 import process, { chdir, cwd, exit } from 'node:process'
-import { isCancel as clackIsCancel, log as clackLog, select as clackSelect, spinner as spinnerC } from '@clack/prompts'
+import { isCancel as clackIsCancel, log as clackLog, select as clackSelect, confirm, select, spinner as spinnerC } from '@clack/prompts'
 import AdmZip from 'adm-zip'
 import { WebSocket as PartySocket } from 'partysocket'
 import * as tus from 'tus-js-client'
 import WS from 'ws' // TODO: remove when min version nodejs 22 is bump, should do it in july 2026 as it become deprecated
 import pack from '../../package.json'
+import {
+  decideAnalyzeBehavior,
+  isLogTooBig,
+  postAnalyzeRequest,
+  writeLocalAiFile,
+} from '../ai/analyze'
+import {
+  appendCapturedLine,
+  registerCleanupHandlers,
+  shouldCaptureLogs,
+  startCaptureForJob,
+} from '../ai/log-capture'
+import { renderMarkdown } from '../ai/render-markdown'
+import { trackAiAnalysisChoice, trackAiAnalysisResult } from '../ai/telemetry'
 import { assertCliPermission, canPromptInteractively, createSupabaseClient, findSavedKey, getConfig, getOrganizationId, sendEvent } from '../utils'
-import { mergeCredentials, MIN_OUTPUT_RETENTION_SECONDS, parseOptionalBoolean, parseOutputRetentionSeconds } from './credentials'
+import { mergeCredentials, MIN_OUTPUT_RETENTION_SECONDS, parseInAppUpdatePriority, parseOptionalBoolean, parseOutputRetentionSeconds } from './credentials'
 import { buildProvisioningMap } from './credentials-command'
+import { writeBuildOutputRecord } from './output-record'
 import { getPlatformDirFromCapacitorConfig } from './platform-paths'
 import { handleCustomMsg } from './qr.js'
+import { trackBuilderUpload } from './telemetry.js'
 
 /**
  * Callback interface for build logging.
@@ -1244,7 +1261,23 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
   // Track build time
   const buildStartTime = Date.now()
   const verbose = options.verbose ?? false
-  const log = logger || createDefaultLogger(silent)
+  const baseLogger = logger || createDefaultLogger(silent)
+
+  // Capture the artifact download URL from the qr_download_link custom message so
+  // we can persist it (and a derived QR PNG) when --output-record is set. We wrap
+  // the logger rather than duplicating dispatch logic so the existing print
+  // behaviour stays intact.
+  let capturedOutputUrl: string | null = null
+  const log: BuildLogger = options.outputRecord
+    ? {
+        ...baseLogger,
+        customMsg: async (kind, data) => {
+          if (kind === 'qr_download_link' && typeof data.url === 'string')
+            capturedOutputUrl = data.url
+          await baseLogger.customMsg(kind, data)
+        },
+      }
+    : baseLogger
 
   try {
     options.apikey = options.apikey || findSavedKey(silent)
@@ -1335,6 +1368,9 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
     }
     if (options.playConfigJson)
       cliCredentials.PLAY_CONFIG_JSON = options.playConfigJson
+    if (options.inAppUpdatePriority !== undefined) {
+      cliCredentials.PLAY_STORE_IN_APP_UPDATE_PRIORITY = String(parseInAppUpdatePriority(options.inAppUpdatePriority as number | string))
+    }
     if (options.outputUpload !== undefined) {
       cliCredentials.BUILD_OUTPUT_UPLOAD_ENABLED = parseOptionalBoolean(options.outputUpload) ? 'true' : 'false'
     }
@@ -1590,6 +1626,33 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
       log.info(`Upload expires: ${buildRequest.upload_expires_at}`)
     }
 
+    // --- /tmp log capture setup ---
+    // Capture when interactive (so the on-failure menu has logs to send) OR when
+    // --ai-analytics is set in CI (so auto-upload has logs to send). Without the
+    // flag-OR, the CI auto_upload branch from decideAnalyzeBehavior would never
+    // have a log file to read.
+    const captureEnabled = shouldCaptureLogs() || options.aiAnalytics === true
+    let capturedJobId: string | null = null
+    let keepPromptFile = false // mutable so local-AI flow can set it true
+
+    if (captureEnabled && buildRequest.job_id) {
+      capturedJobId = buildRequest.job_id
+      await startCaptureForJob(buildRequest.job_id)
+      registerCleanupHandlers(buildRequest.job_id, () => keepPromptFile)
+    }
+
+    // Wrap the logger so every buildLog line is also captured to /tmp
+    const captureWrappedLogger: BuildLogger = {
+      ...log,
+      buildLog: (msg: string) => {
+        log.buildLog(msg)
+        if (captureEnabled && capturedJobId) {
+          void appendCapturedLine(capturedJobId, msg)
+        }
+      },
+    }
+    // --- end Task 19 ---
+
     // Send analytics event for build request
     await sendEvent(options.apikey, {
       channel: 'native-builder',
@@ -1635,6 +1698,19 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
       // Upload using TUS protocol
       log.uploadProgress(0)
 
+      const uploadStartedAt = Date.now()
+      const buildModeForTelemetry = options.buildMode || 'release'
+      void trackBuilderUpload({
+        apikey: options.apikey,
+        appId,
+        orgId,
+        platform,
+        buildMode: buildModeForTelemetry,
+        jobId: buildRequest.job_id,
+        sizeBytes: zipStats.size,
+        phase: 'started',
+      })
+
       await new Promise<void>((resolve, reject) => {
         const upload = new tus.Upload(zipBuffer as any, {
           endpoint: buildRequest.upload_url,
@@ -1664,7 +1740,19 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
             }
           },
           // Callback for errors which cannot be fixed using retries
-          onError(error) {
+          async onError(error) {
+            await trackBuilderUpload({
+              apikey: options.apikey,
+              appId,
+              orgId,
+              platform,
+              buildMode: buildModeForTelemetry,
+              jobId: buildRequest.job_id,
+              sizeBytes: zipStats.size,
+              phase: 'failed',
+              durationSeconds: (Date.now() - uploadStartedAt) / 1000,
+              error,
+            })
             log.error(`Upload error: ${error.message}`)
             if (error instanceof tus.DetailedError) {
               const body = error.originalResponse?.getBody()
@@ -1699,6 +1787,17 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
           },
           // Callback for once the upload is completed
           onSuccess() {
+            void trackBuilderUpload({
+              apikey: options.apikey,
+              appId,
+              orgId,
+              platform,
+              buildMode: buildModeForTelemetry,
+              jobId: buildRequest.job_id,
+              sizeBytes: zipStats.size,
+              phase: 'succeeded',
+              durationSeconds: (Date.now() - uploadStartedAt) / 1000,
+            })
             log.uploadProgress(100)
             if (verbose) {
               log.success('TUS upload completed successfully')
@@ -1817,7 +1916,11 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
           () => {
             showStatusChecks = true
           },
-          silent && !logger ? undefined : log,
+          // Force pass a logger whenever --output-record is set so the customMsg
+          // wrapper that captures the artifact URL fires even in silent mode
+          // without a user-supplied logger. Use captureWrappedLogger so AI log
+          // capture still flows through.
+          silent && !logger && !options.outputRecord ? undefined : captureWrappedLogger,
         )
       }
       finally {
@@ -1846,6 +1949,212 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
       }
       else {
         log.warn(`Build finished with status: ${finalStatus}`)
+      }
+
+      // On success, write the optional build-output record (added by main).
+      if (options.outputRecord && finalStatus === 'succeeded') {
+        try {
+          const record = await writeBuildOutputRecord(
+            options.outputRecord,
+            {
+              jobId: buildRequest.job_id,
+              appId,
+              platform,
+              buildMode: (options.buildMode ?? 'release') as 'debug' | 'release',
+              status: finalStatus,
+              outputUrl: capturedOutputUrl,
+            },
+            (msg: string) => log.warn(msg),
+          )
+          log.success(`Build output record written to ${options.outputRecord}`)
+          if (!record.outputUrl)
+            log.info('ℹ️  Record contains no download URL — pass --output-upload to publish one.')
+          if (record.qrCodePngPath)
+            log.info(`ℹ️  QR code PNG written to ${record.qrCodePngPath}`)
+        }
+        catch (error) {
+          log.warn(`Failed to write build output record to ${options.outputRecord}: ${error instanceof Error ? error.message : String(error)}`)
+        }
+      }
+
+      // On failure, offer the AI analysis flow (interactive menu or auto-upload).
+      if (finalStatus === 'failed' && captureEnabled && capturedJobId) {
+        const behavior = decideAnalyzeBehavior({
+          isTTY: process.stdout.isTTY === true,
+          aiAnalyticsFlag: options.aiAnalytics === true,
+        })
+
+        const AI_WARNING = '⚠ AI can make mistakes. Always verify the diagnosis against the full log before applying the suggested fix.'
+
+        // Closed-enum mapper for PostAnalyzeResult.kind → telemetry result tag.
+        // Never include the analysis text itself in telemetry.
+        const mapPostAnalyzeResultKind = (kind: PostAnalyzeResult['kind']): 'success' | 'already_analyzed' | 'too_big' | 'error' => {
+          if (kind === 'ok')
+            return 'success'
+          if (kind === 'already_analyzed')
+            return 'already_analyzed'
+          if (kind === 'too_big')
+            return 'too_big'
+          return 'error'
+        }
+
+        const runCapgoAi = async (choice: 'capgo_ai' | 'auto_upload', triggeredBy: 'menu' | 'ci_flag'): Promise<void> => {
+          await trackAiAnalysisChoice({
+            apikey: options.apikey,
+            orgId,
+            appId,
+            platform,
+            jobId: capturedJobId!,
+            choice,
+            triggeredBy,
+          })
+
+          const logsPath = `${process.env.CAPGO_AI_LOG_BASE_DIR || '/tmp/capgo-builds'}/${capturedJobId}.log`
+          let logs = ''
+          try {
+            const { readFile } = await import('node:fs/promises')
+            logs = await readFile(logsPath, 'utf8')
+          }
+          catch (err) {
+            // Don't crash the CLI on a missing/unreadable log file, but DO tell
+            // the user why we're bailing — otherwise the auto_upload path
+            // silently no-ops and it looks like nothing happened.
+            const msg = err instanceof Error ? err.message : String(err)
+            process.stderr.write(`AI analysis skipped: could not read captured log at ${logsPath}: ${msg}\n`)
+            return
+          }
+
+          // Spinner only when interactive — in CI it'd just dump noise.
+          const isInteractive = process.stdout.isTTY === true
+          const stream = isInteractive ? process.stdout : process.stderr
+          const aiSpinner = isInteractive ? spinnerC() : null
+          // @clack/prompts spinner appends its own animated dots — don't add an
+          // ellipsis here or the user sees "…..." (6 dots: our 1-char ellipsis
+          // plus the spinner's cycling 3-dot animation).
+          aiSpinner?.start('Analyzing build log with Capgo AI (Kimi K2.5)')
+
+          let result: PostAnalyzeResult
+          try {
+            result = await postAnalyzeRequest({
+              apiHost: host,
+              apikey: options.apikey,
+              jobId: capturedJobId!,
+              appId,
+              logs,
+            })
+          }
+          finally {
+            aiSpinner?.stop('Capgo AI finished')
+          }
+
+          // Telemetry — closed-enum result only, never the analysis text.
+          const resultTag = mapPostAnalyzeResultKind(result.kind)
+          await trackAiAnalysisResult({
+            apikey: options.apikey,
+            orgId,
+            appId,
+            platform,
+            jobId: capturedJobId!,
+            result: resultTag,
+            errorStatus: result.kind === 'error' ? result.status : undefined,
+          })
+
+          if (result.kind === 'ok') {
+            stream.write(`\n--- AI analysis ---\n${renderMarkdown(result.analysis, isInteractive)}\n\n${AI_WARNING}\n`)
+          }
+          else if (result.kind === 'already_analyzed') {
+            stream.write('\nAI analysis already requested for this job (only one per job).\n')
+          }
+          else if (result.kind === 'too_big') {
+            stream.write('\nLog too big for AI analysis.\n')
+          }
+          else {
+            stream.write(`\nAI analysis failed${result.status ? ` (${result.status})` : ''}${result.message ? `: ${result.message}` : ''}.\n`)
+          }
+        }
+
+        const runLocalAi = async (): Promise<void> => {
+          await trackAiAnalysisChoice({
+            apikey: options.apikey,
+            orgId,
+            appId,
+            platform,
+            jobId: capturedJobId!,
+            choice: 'local_ai',
+            triggeredBy: 'menu',
+          })
+          const promptPath = await writeLocalAiFile(capturedJobId!)
+          keepPromptFile = true
+          process.stdout.write(`\nSaved prompt to ${promptPath}\nPoint your local AI (Claude, Codex, aider, etc.) at this file.\n${AI_WARNING}\n`)
+        }
+
+        const emitSkipChoice = async (): Promise<void> => {
+          await trackAiAnalysisChoice({
+            apikey: options.apikey,
+            orgId,
+            appId,
+            platform,
+            jobId: capturedJobId!,
+            choice: 'skip',
+            triggeredBy: (behavior === 'auto_upload' || behavior === 'skip') ? 'ci_flag' : 'menu',
+          })
+        }
+
+        async function showMenu(): Promise<void> {
+          if (await isLogTooBig(capturedJobId!)) {
+            process.stdout.write('Log too big for AI analysis (>10 MB). Offering local AI instead.\n')
+            await runLocalAi()
+            return
+          }
+          const choice = await select({
+            message: 'Choose AI analysis',
+            options: [
+              { value: 'capgo', label: 'Capgo AI (Kimi K2.5)' },
+              { value: 'local', label: 'Local AI (write prompt to file)' },
+              { value: 'skip', label: 'Skip' },
+            ],
+          })
+          if (choice === 'capgo')
+            await runCapgoAi('capgo_ai', 'menu')
+          else if (choice === 'local')
+            await runLocalAi()
+          else
+            await emitSkipChoice()
+        }
+
+        try {
+          if (behavior === 'skip') {
+            await emitSkipChoice()
+          }
+          else if (behavior === 'auto_upload') {
+            if (await isLogTooBig(capturedJobId)) {
+              process.stderr.write('Log too big for AI analysis (>10 MB), skipping\n')
+              await emitSkipChoice()
+            }
+            else {
+              await runCapgoAi('auto_upload', 'ci_flag')
+            }
+          }
+          else {
+            // interactive: show_menu or ask_then_menu
+            if (behavior === 'ask_then_menu') {
+              const wants = await confirm({ message: 'Build failed. Run AI analysis?' })
+              if (!wants || typeof wants === 'symbol') {
+                // user cancelled or declined — skip
+                await emitSkipChoice()
+              }
+              else {
+                await showMenu()
+              }
+            }
+            else {
+              await showMenu()
+            }
+          }
+        }
+        catch (err) {
+          process.stderr.write(`AI analysis flow errored: ${err instanceof Error ? err.message : String(err)}\n`)
+        }
       }
 
       // Calculate build time (in seconds with 2 decimal places, matching upload behavior)

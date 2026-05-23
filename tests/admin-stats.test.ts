@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { BASE_URL, fetchWithRetry, getAuthHeadersForCredentials, getSupabaseClient, PRODUCT_ID, TEST_EMAIL, USER_ADMIN_EMAIL, USER_ID } from './test-utils.ts'
+import { BASE_URL, fetchWithRetry, getAuthHeadersForCredentials, getEndpointUrl, getSupabaseClient, PRODUCT_ID, TEST_EMAIL, USER_ADMIN_EMAIL, USER_ID } from './test-utils.ts'
 
 const DAY_IN_MS = 24 * 60 * 60 * 1000
 const NOW = Date.now()
@@ -18,6 +18,10 @@ const INSIGHTS_END = '2026-04-30T23:59:59.000Z'
 const INSIGHTS_UPLOAD_AT = '2026-04-10T10:00:00.000Z'
 const INSIGHTS_LAST_BUILD_AT = '2026-04-11T12:00:00.000Z'
 const INSIGHTS_BUILD_ID = `admin-stats-build-${TRIAL_ORG_ID.slice(0, 8)}`
+const ATTENTION_SORT_HEALTHY_ORG_ID = randomUUID()
+const ATTENTION_SORT_HEALTHY_CUSTOMER_ID = `cus_admin_stats_attention_sort_${ATTENTION_SORT_HEALTHY_ORG_ID.slice(0, 8)}`
+const ATTENTION_SORT_TOKEN = `attention-sort-${TRIAL_ORG_ID.slice(0, 8)}`
+const ATTENTION_SORT_HEALTHY_ORG_CREATED_AT = new Date(NOW + DAY_IN_MS).toISOString()
 
 const CANCELLED_YEARLY_ORG_ID = randomUUID()
 const CANCELLED_YEARLY_CUSTOMER_ID = `cus_admin_stats_cancelled_yearly_${CANCELLED_YEARLY_ORG_ID.slice(0, 8)}`
@@ -167,6 +171,17 @@ beforeAll(async () => {
       subscription_anchor_end: '2026-05-01T00:00:00.000Z',
     },
     {
+      customer_id: ATTENTION_SORT_HEALTHY_CUSTOMER_ID,
+      status: 'created',
+      product_id: soloPlan.stripe_id,
+      price_id: soloPlan.price_m_id,
+      trial_at: TRIAL_END_DATE,
+      is_good_plan: false,
+      plan_usage: 2,
+      subscription_anchor_start: '2026-04-01T00:00:00.000Z',
+      subscription_anchor_end: '2026-05-01T00:00:00.000Z',
+    },
+    {
       customer_id: CANCELLED_YEARLY_CUSTOMER_ID,
       status: 'canceled',
       product_id: soloPlan.stripe_id,
@@ -240,11 +255,19 @@ beforeAll(async () => {
   const { error: orgError } = await supabase.from('orgs').insert([
     {
       id: TRIAL_ORG_ID,
-      name: `Admin Stats Trial ${TRIAL_ORG_ID.slice(0, 8)}`,
+      name: `Admin Stats Trial ${ATTENTION_SORT_TOKEN}`,
       created_by: USER_ID,
       management_email: TEST_EMAIL,
       customer_id: TRIAL_CUSTOMER_ID,
       created_at: TRIAL_ORG_CREATED_AT,
+    },
+    {
+      id: ATTENTION_SORT_HEALTHY_ORG_ID,
+      name: `Admin Stats Healthy ${ATTENTION_SORT_TOKEN}`,
+      created_by: USER_ID,
+      management_email: TEST_EMAIL,
+      customer_id: ATTENTION_SORT_HEALTHY_CUSTOMER_ID,
+      created_at: ATTENTION_SORT_HEALTHY_ORG_CREATED_AT,
     },
     {
       id: CANCELLED_YEARLY_ORG_ID,
@@ -450,8 +473,8 @@ afterAll(async () => {
   await supabase.from('channels').delete().in('app_id', [ONBOARDING_APP_ID, ONBOARDING_LATE_SUBSCRIPTION_APP_ID])
   await supabase.from('app_versions').delete().in('app_id', [TRIAL_APP_ID, ONBOARDING_APP_ID, ONBOARDING_LATE_SUBSCRIPTION_APP_ID])
   await supabase.from('apps').delete().in('app_id', [TRIAL_APP_ID, ONBOARDING_APP_ID, ONBOARDING_LATE_SUBSCRIPTION_APP_ID])
-  await supabase.from('orgs').delete().in('id', [TRIAL_ORG_ID, CANCELLED_YEARLY_ORG_ID, CANCELLED_MONTHLY_ORG_ID, ONBOARDING_ORG_ID, ONBOARDING_NO_BUNDLE_ORG_ID, ONBOARDING_LATE_SUBSCRIPTION_ORG_ID])
-  await supabase.from('stripe_info').delete().in('customer_id', [TRIAL_CUSTOMER_ID, CANCELLED_YEARLY_CUSTOMER_ID, CANCELLED_MONTHLY_CUSTOMER_ID, ONBOARDING_CUSTOMER_ID, ONBOARDING_NO_BUNDLE_CUSTOMER_ID, ONBOARDING_LATE_SUBSCRIPTION_CUSTOMER_ID])
+  await supabase.from('orgs').delete().in('id', [TRIAL_ORG_ID, ATTENTION_SORT_HEALTHY_ORG_ID, CANCELLED_YEARLY_ORG_ID, CANCELLED_MONTHLY_ORG_ID, ONBOARDING_ORG_ID, ONBOARDING_NO_BUNDLE_ORG_ID, ONBOARDING_LATE_SUBSCRIPTION_ORG_ID])
+  await supabase.from('stripe_info').delete().in('customer_id', [TRIAL_CUSTOMER_ID, ATTENTION_SORT_HEALTHY_CUSTOMER_ID, CANCELLED_YEARLY_CUSTOMER_ID, CANCELLED_MONTHLY_CUSTOMER_ID, ONBOARDING_CUSTOMER_ID, ONBOARDING_NO_BUNDLE_CUSTOMER_ID, ONBOARDING_LATE_SUBSCRIPTION_CUSTOMER_ID])
 }, 90000)
 
 describe('/private/admin_stats', () => {
@@ -551,6 +574,10 @@ describe('/private/admin_stats', () => {
           billing_type: 'monthly' | 'yearly' | null
           upload_count: number
           build_count: number
+          failed_update_count: number
+          install_count: number
+          update_attempt_count: number
+          needs_attention: boolean
           fail_rate: number
           mau: number
           members_count: number
@@ -569,6 +596,10 @@ describe('/private/admin_stats', () => {
     expect(organization?.billing_type).toBe('monthly')
     expect(organization?.upload_count).toBe(1)
     expect(organization?.build_count).toBe(1)
+    expect(organization?.failed_update_count).toBe(2)
+    expect(organization?.install_count).toBe(8)
+    expect(organization?.update_attempt_count).toBe(10)
+    expect(organization?.needs_attention).toBe(true)
     expect(organization?.fail_rate).toBe(20)
     expect(organization?.mau).toBe(7)
     expect(organization?.members_count).toBe(1)
@@ -602,6 +633,44 @@ describe('/private/admin_stats', () => {
     expect(paidOnlyPayload.success).toBe(true)
     expect(paidOnlyPayload.data.organizations).toEqual([])
     expect(paidOnlyPayload.data.total).toBe(0)
+  })
+
+  it.concurrent('prioritizes organizations needing attention before pagination', async () => {
+    if (!soloPlan)
+      throw new Error('Expected Solo plan to be loaded')
+
+    const response = await fetchWithRetry(getEndpointUrl('/private/admin_stats'), {
+      method: 'POST',
+      headers: adminHeaders,
+      body: JSON.stringify({
+        metric_category: 'organization_insights',
+        start_date: INSIGHTS_START,
+        end_date: INSIGHTS_END,
+        plan_name: soloPlan.name,
+        billing_type: 'monthly',
+        search: ATTENTION_SORT_TOKEN,
+        limit: 1,
+        offset: 0,
+      }),
+    })
+
+    expect(response.status).toBe(200)
+    const payload = await response.json() as {
+      success: boolean
+      data: {
+        organizations: Array<{
+          org_id: string
+          needs_attention: boolean
+        }>
+        total: number
+      }
+    }
+
+    expect(payload.success).toBe(true)
+    expect(payload.data.total).toBe(2)
+    expect(payload.data.organizations).toHaveLength(1)
+    expect(payload.data.organizations[0]?.org_id).toBe(TRIAL_ORG_ID)
+    expect(payload.data.organizations[0]?.needs_attention).toBe(true)
   })
 
   it.concurrent('returns cancellation billing metadata and subscription-or-signup dates', async () => {
@@ -687,5 +756,37 @@ describe('/private/admin_stats', () => {
       new_orgs: 3,
       orgs_subscribed: 1,
     })
+  })
+
+  it.concurrent('returns daily new trial organizations grouped by plan', async () => {
+    const response = await fetchWithRetry(getEndpointUrl('/private/admin_stats'), {
+      method: 'POST',
+      headers: adminHeaders,
+      body: JSON.stringify({
+        metric_category: 'trial_plan_breakdown',
+        start_date: '2026-02-01T00:00:00.000Z',
+        end_date: '2026-02-02T00:00:00.000Z',
+      }),
+    })
+
+    expect(response.status).toBe(200)
+    const payload = await response.json() as {
+      success: boolean
+      data: {
+        totals: Array<{ plan_name: string, total: number }>
+        trend: Array<{
+          date: string
+          total: number
+          plans: Record<string, number>
+        }>
+      }
+    }
+
+    expect(payload.success).toBe(true)
+    expect(payload.data.trend).toHaveLength(1)
+    expect(payload.data.trend[0]?.date).toBe('2026-02-01')
+    expect(payload.data.trend[0]?.total).toBe(3)
+    expect(payload.data.trend[0]?.plans[soloPlan?.name ?? 'Solo']).toBe(3)
+    expect(payload.data.totals.find(plan => plan.plan_name === (soloPlan?.name ?? 'Solo'))?.total).toBe(3)
   })
 })

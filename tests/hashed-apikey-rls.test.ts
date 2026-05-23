@@ -841,7 +841,7 @@ describe('get_identity_org_allowed() with hashed API keys', () => {
   afterAll(async () => {
     await deleteApiKey(hashedKey.id)
     await deleteApiKey(otherOrgKey.id)
-  })
+  }, 60000)
 
   it('returns user_id for hashed API key with matching org', async () => {
     const rows = await execWithCapgkey(
@@ -1231,37 +1231,38 @@ describe('webhook and webhook_delivery rls with api-key org bindings', () => {
     await deleteApiKey(authorizedKey.id)
   })
 
-  it('uses API key org binding when auth context is also present for webhook reads', async () => {
-    const webhookRows = await execWithRoleClaims(
-      'SELECT id FROM public.webhooks WHERE id = $1',
-      {
-        role: 'authenticated',
-        claims: {
-          sub: USER_ID_RLS,
+  it('denies direct webhook reads even when API key scope matches', async () => {
+    await expect(
+      execWithRoleClaims(
+        'SELECT id FROM public.webhooks WHERE id = $1',
+        {
           role: 'authenticated',
-          aud: 'authenticated',
+          claims: {
+            sub: USER_ID_RLS,
+            role: 'authenticated',
+            aud: 'authenticated',
+          },
+          headers: { capgkey: authorizedKey.key },
+          params: [webhookId],
         },
-        headers: { capgkey: unauthorizedKey.key },
-        params: [webhookId],
-      },
-    ).then(result => result.rows)
+      ),
+    ).rejects.toMatchObject({ code: '42501' })
 
-    const deliveryRows = await execWithRoleClaims(
-      'SELECT id FROM public.webhook_deliveries WHERE id = $1',
-      {
-        role: 'authenticated',
-        claims: {
-          sub: USER_ID_RLS,
+    await expect(
+      execWithRoleClaims(
+        'SELECT id FROM public.webhook_deliveries WHERE id = $1',
+        {
           role: 'authenticated',
-          aud: 'authenticated',
+          claims: {
+            sub: USER_ID_RLS,
+            role: 'authenticated',
+            aud: 'authenticated',
+          },
+          headers: { capgkey: authorizedKey.key },
+          params: [deliveryId],
         },
-        headers: { capgkey: unauthorizedKey.key },
-        params: [deliveryId],
-      },
-    ).then(result => result.rows)
-
-    expect(webhookRows).toEqual([])
-    expect(deliveryRows).toEqual([])
+      ),
+    ).rejects.toMatchObject({ code: '42501' })
   })
 
   it('prevents webhook_delivery org_id changes when update payload org_id is unauthorized', async () => {

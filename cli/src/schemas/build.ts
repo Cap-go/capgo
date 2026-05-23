@@ -21,6 +21,9 @@ export const buildCredentialsSchema = z.object({
   KEYSTORE_KEY_PASSWORD: z.string().optional(),
   KEYSTORE_STORE_PASSWORD: z.string().optional(),
   PLAY_CONFIG_JSON: z.string().optional(),
+  // Stored as a string-encoded integer in the 0–5 range; the CLI flag (inAppUpdatePriority)
+  // enforces the numeric range, this field holds the env-var-style serialized form.
+  PLAY_STORE_IN_APP_UPDATE_PRIORITY: z.string().optional(),
 }).catchall(z.string().optional())
 
 export type BuildCredentials = z.infer<typeof buildCredentialsSchema>
@@ -54,12 +57,15 @@ export const buildRequestOptionsSchema = optionsBaseSchema.extend({
   keystoreStorePassword: z.string().optional(),
   playConfigJson: z.string().optional(),
   androidFlavor: z.string().trim().min(1).optional(),
+  inAppUpdatePriority: z.coerce.number().int().min(0).max(5).optional(),
   // Output control
   outputUpload: z.boolean().optional(),
   outputRetention: z.string().optional(),
+  outputRecord: z.string().optional(),
   skipBuildNumberBump: z.boolean().optional(),
   playstoreUpload: z.boolean().optional(),
   verbose: z.boolean().optional(),
+  aiAnalytics: z.boolean().optional(),
 })
 
 export type BuildRequestOptions = z.infer<typeof buildRequestOptionsSchema>

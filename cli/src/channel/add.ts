@@ -1,7 +1,7 @@
 import type { ChannelAddOptions } from '../schemas/channel'
 import { intro, log, outro } from '@clack/prompts'
 import { check2FAComplianceForApp, checkAppExistsAndHasPermissionOrgErr } from '../api/app'
-import { createChannel, findUnknownVersion } from '../api/channels'
+import { createChannel } from '../api/channels'
 import {
   createSupabaseClient,
   findSavedKey,
@@ -42,20 +42,13 @@ export async function addChannelInternal(channelId: string, appId: string, optio
   if (!silent)
     log.info(`Creating channel ${appId}#${channelId} to Capgo`)
 
-  const data = await findUnknownVersion(supabase, appId, { silent })
-  if (!data) {
-    if (!silent)
-      log.error('Cannot find default version for channel creation, please contact Capgo support 🤨')
-    throw new Error('Cannot find default version for channel creation')
-  }
-
   const orgId = await getOrganizationId(supabase, appId)
   const userId = await resolveUserIdFromApiKey(supabase, options.apikey)
 
   const res = await createChannel(supabase, {
     name: channelId,
     app_id: appId,
-    version: data.id,
+    version: null,
     created_by: userId,
     owner_org: orgId,
     allow_device_self_set: options.selfAssign ?? false,

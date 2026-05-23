@@ -145,14 +145,16 @@ function formatAction(elem: Element): string {
 
 // Initialize action filters from URL query parameter
 function initializeActionFilters(): void {
-  const actionParam = route.query.action
-  if (actionParam && typeof actionParam === 'string') {
-    // Find the filter key for this action
-    const filterKey = actionToFilter[actionParam]
+  const actionParams = [route.query.action]
+    .flat()
+    .filter((action): action is string => typeof action === 'string')
+
+  actionParams.forEach((action) => {
+    const filterKey = actionToFilter[action]
     if (filterKey && actionFilters.value[filterKey] !== undefined) {
       actionFilters.value[filterKey] = true
     }
-  }
+  })
 }
 
 // Compute active actions based on filters

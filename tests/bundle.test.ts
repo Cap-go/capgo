@@ -207,17 +207,7 @@ describe('[PUT] /bundle operations - Set bundle to channel', () => {
     const version = await createAppVersions('1.0.0-test-channel', APPNAME)
     versionId = version.id
 
-    // Get the unknown version for this app
     const supabase = getSupabaseClient()
-    const { data: unknownVersion } = await supabase
-      .from('app_versions')
-      .select('id')
-      .eq('app_id', APPNAME)
-      .eq('name', 'unknown')
-      .single()
-    if (!unknownVersion) {
-      throw new Error('Failed to find unknown version')
-    }
 
     // Create a test channel using proper seeded values
     const { data: channel, error } = await supabase
@@ -225,7 +215,7 @@ describe('[PUT] /bundle operations - Set bundle to channel', () => {
       .insert({
         name: 'test-channel',
         app_id: APPNAME,
-        version: unknownVersion.id, // Use app's unknown version
+        version: null,
         created_by: '6aa76066-55ef-4238-ade6-0b32334a4097', // test@capgo.app user from seed
         owner_org: '046a36ac-e03c-4590-9257-bd6c9dba9ee8', // Demo org from seed
       })

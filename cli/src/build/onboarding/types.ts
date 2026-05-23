@@ -8,6 +8,20 @@ export type OnboardingStep
     | 'adding-platform'
     | 'credentials-exist'
     | 'backing-up'
+    // ── Setup-method fork (macOS only) ──
+    | 'setup-method-select'
+    // ── Import-existing sub-flow (macOS only) ──
+    | 'import-scanning'
+    | 'import-distribution-mode'
+    | 'import-pick-identity'
+    | 'import-pick-profile'
+    | 'import-no-match-recovery'
+    | 'import-fetching-profile'
+    | 'import-create-profile-only'
+    | 'import-export-warning'
+    | 'import-compiling-helper'
+    | 'import-exporting'
+    // ── Existing create-new sub-flow (and ASC API key step reused by import for app_store) ──
     | 'api-key-instructions'
     | 'p8-method-select'
     | 'input-p8-path'
@@ -21,11 +35,46 @@ export type OnboardingStep
     | 'duplicate-profile-prompt'
     | 'deleting-duplicate-profiles'
     | 'saving-credentials'
+    | 'detecting-ci-secrets'
+    | 'ci-secrets-setup'
+    | 'ci-secrets-target-select'
+    | 'ask-ci-secrets'
+    | 'checking-ci-secrets'
+    | 'confirm-ci-secret-overwrite'
+    | 'uploading-ci-secrets'
+    | 'ci-secrets-failed'
+    // GitHub Actions workflow + .env export sub-flow (post-secrets-upload)
+    | 'ask-github-actions-setup'
+    | 'confirm-secrets-push'
+    | 'ask-export-env'
+    | 'exporting-env'
+    | 'confirm-env-export-overwrite'
+    | 'overwrite-and-export-env'
+    | 'pick-package-manager'
+    | 'pick-build-script'
+    | 'pick-build-script-custom'
+    | 'preview-workflow-file'
+    | 'view-workflow-diff'
+    | 'writing-workflow-file'
     | 'ask-build'
     | 'requesting-build'
     | 'build-complete'
     | 'no-platform'
     | 'error'
+
+export type OnboardingErrorCategory
+  = | 'apple_api_unauthorized'
+    | 'apple_api_rate_limited'
+    | 'cert_limit_reached'
+    | 'profile_creation_failed'
+    | 'p8_invalid'
+    // Import-existing flow (keychain / provisioning profile imports)
+    | 'keychain_no_identities'
+    | 'keychain_export_failed'
+    | 'keychain_helper_compile_failed'
+    | 'profile_no_match'
+    | 'profile_read_failed'
+    | 'unknown'
 
 export interface ApiKeyData {
   keyId: string
@@ -54,6 +103,28 @@ export interface OnboardingProgress {
   /** Partial input — saved incrementally so resume works mid-flow */
   keyId?: string
   issuerId?: string
+  /**
+   * Records which fork the user picked at `setup-method-select`. Crucial for
+   * resume — without this, a partial import-flow run would resume at
+   * `creating-certificate` (the create-new path) and immediately hit the
+   * Apple cert-limit error.
+   *
+   * Absent on legacy progress files (created before this field existed) →
+   * resume defaults to `create-new` for backward compatibility.
+   */
+  setupMethod?: 'create-new' | 'import-existing'
+  /**
+   * Records the distribution mode picked at `import-distribution-mode`.
+   *
+   * Persisted (not derived from .p8 presence) because ad_hoc users can
+   * legitimately enter a one-shot .p8 during no-match recovery, which would
+   * otherwise make .p8-presence-implies-app_store an incorrect heuristic. On
+   * resume the UI hydrates `importDistribution` from this field so the
+   * `verifying-key` branch and `doSaveCredentials` route correctly.
+   *
+   * Only meaningful when `setupMethod === 'import-existing'`.
+   */
+  importDistribution?: 'app_store' | 'ad_hoc'
   completedSteps: {
     apiKeyVerified?: ApiKeyData
     certificateCreated?: CertificateData
@@ -70,6 +141,19 @@ export const STEP_PROGRESS: Record<OnboardingStep, number> = {
   'adding-platform': 0,
   'credentials-exist': 0,
   'backing-up': 0,
+  // Import-existing sub-flow (re-ordered: distribution-mode first)
+  'setup-method-select': 5,
+  'import-scanning': 10,
+  'import-distribution-mode': 15,
+  'import-pick-identity': 40,
+  'import-pick-profile': 55,
+  'import-no-match-recovery': 55,
+  'import-fetching-profile': 60,
+  'import-create-profile-only': 60,
+  'import-export-warning': 70,
+  'import-compiling-helper': 72,
+  'import-exporting': 75,
+  // Create-new sub-flow
   'api-key-instructions': 5,
   'p8-method-select': 8,
   'input-p8-path': 10,
@@ -83,6 +167,27 @@ export const STEP_PROGRESS: Record<OnboardingStep, number> = {
   'duplicate-profile-prompt': 65,
   'deleting-duplicate-profiles': 68,
   'saving-credentials': 80,
+  'detecting-ci-secrets': 82,
+  'ci-secrets-setup': 82,
+  'ci-secrets-target-select': 82,
+  'ask-ci-secrets': 82,
+  'checking-ci-secrets': 83,
+  'confirm-ci-secret-overwrite': 83,
+  'uploading-ci-secrets': 84,
+  'ci-secrets-failed': 84,
+  // GitHub Actions + .env export branch — all post-build, mid-90s progress
+  'ask-github-actions-setup': 82,
+  'confirm-secrets-push': 83,
+  'ask-export-env': 95,
+  'exporting-env': 96,
+  'confirm-env-export-overwrite': 96,
+  'overwrite-and-export-env': 96,
+  'pick-package-manager': 95,
+  'pick-build-script': 96,
+  'pick-build-script-custom': 96,
+  'preview-workflow-file': 97,
+  'view-workflow-diff': 97,
+  'writing-workflow-file': 98,
   'ask-build': 85,
   'requesting-build': 90,
   'build-complete': 100,
@@ -98,6 +203,26 @@ export function getPhaseLabel(step: OnboardingStep): string {
     case 'credentials-exist':
     case 'backing-up':
       return ''
+    case 'setup-method-select':
+      return 'Setup method'
+    case 'import-scanning':
+      return 'Step 1 of 4 · Scanning your Mac'
+    case 'import-distribution-mode':
+      return 'Step 1 of 4 · Distribution mode'
+    case 'import-pick-identity':
+      return 'Step 2 of 4 · Choose certificate'
+    case 'import-pick-profile':
+      return 'Step 3 of 4 · Choose provisioning profile'
+    case 'import-no-match-recovery':
+      return 'Step 3 of 4 · No matching profile — recover'
+    case 'import-fetching-profile':
+      return 'Step 3 of 4 · Fetching profile from Apple'
+    case 'import-create-profile-only':
+      return 'Step 3 of 4 · Creating profile via Apple'
+    case 'import-export-warning':
+    case 'import-compiling-helper':
+    case 'import-exporting':
+      return 'Step 4 of 4 · Export from Keychain'
     case 'api-key-instructions':
     case 'p8-method-select':
     case 'input-p8-path':
@@ -114,6 +239,26 @@ export function getPhaseLabel(step: OnboardingStep): string {
     case 'deleting-duplicate-profiles':
       return 'Step 3 of 4 · Provisioning Profile'
     case 'saving-credentials':
+    case 'detecting-ci-secrets':
+    case 'ci-secrets-setup':
+    case 'ci-secrets-target-select':
+    case 'ask-ci-secrets':
+    case 'ask-github-actions-setup':
+    case 'confirm-secrets-push':
+    case 'checking-ci-secrets':
+    case 'confirm-ci-secret-overwrite':
+    case 'uploading-ci-secrets':
+    case 'ci-secrets-failed':
+    case 'ask-export-env':
+    case 'exporting-env':
+    case 'confirm-env-export-overwrite':
+    case 'overwrite-and-export-env':
+    case 'pick-package-manager':
+    case 'pick-build-script':
+    case 'pick-build-script-custom':
+    case 'preview-workflow-file':
+    case 'view-workflow-diff':
+    case 'writing-workflow-file':
     case 'ask-build':
     case 'requesting-build':
       return 'Step 4 of 4 · Save & Build'

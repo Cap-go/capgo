@@ -220,26 +220,14 @@ const checksumInfo = computed(() => {
   return getChecksumInfo(version.value?.checksum)
 })
 
-async function getUnknownBundleId() {
-  if (!version.value)
-    return
-  const { data } = await supabase
-    .from('app_versions')
-    .select()
-    .eq('app_id', version.value.app_id)
-    .eq('name', 'unknown')
-    .single()
-  return data?.id
-}
-
 // add check compatibility here
-async function setChannel(channel: Database['public']['Tables']['channels']['Row'], id: number) {
+async function setChannel(channel: Database['public']['Tables']['channels']['Row'], id: number | null) {
   if (!canPromoteChannel(channel.id)) {
     toast.error(t('no-permission'))
     return Promise.reject(new Error('No permission'))
   }
 
-  if (!id || typeof id !== 'number') {
+  if (id !== null && typeof id !== 'number') {
     console.error('Invalid version ID:', id)
     toast.error(t('error-invalid-version'))
     return Promise.reject(new Error('Invalid version ID'))
@@ -256,6 +244,7 @@ async function setChannel(channel: Database['public']['Tables']['channels']['Row
       version: id,
     })
     .eq('id', channel.id)
+    .throwOnError()
 }
 
 async function ASChannelChooser() {
@@ -398,10 +387,7 @@ async function handleChannelAction(action: 'set' | 'open' | 'unlink') {
   }
   else if (action === 'unlink') {
     try {
-      const id = await getUnknownBundleId()
-      if (!id)
-        return
-      await setChannel(channel.value, id)
+      await setChannel(channel.value, null)
       await getChannels()
       toast.success(t('channels-unlinked-successfully'))
       toast.info(t('cloud-replication-delay'))
@@ -702,33 +688,14 @@ async function didCancel(name: string, askForMethod = true): Promise<boolean | '
   return method
 }
 
-async function unlinkChannels(appId: string, unlink: { id: number, name: string }[]) {
+async function unlinkChannels(_appId: string, unlink: { id: number, name: string }[]) {
   // Unlink channels if confirmed
   if (unlink.length === 0) {
     return
   }
-  const { data: unknownVersion, error: unknownError } = await supabase
-    .from('app_versions')
-    .select('id')
-    .eq('app_id', appId)
-    .eq('name', 'unknown')
-    .single()
-
-  if (unknownError || !unknownVersion) {
-    toast.error(t('cannot-find-unknown-version'))
-    console.error('Cannot find unknown version:', unknownError)
-    return Promise.reject(new Error('Cannot find unknown version'))
-  }
-
-  if (!unknownVersion.id || typeof unknownVersion.id !== 'number') {
-    toast.error(t('error-invalid-version'))
-    console.error('Invalid unknown version ID:', unknownVersion)
-    return Promise.reject(new Error('Invalid unknown version ID'))
-  }
-
   const { error: updateError } = await supabase
     .from('channels')
-    .update({ version: unknownVersion.id })
+    .update({ version: null })
     .in('id', unlink.map(c => c.id))
 
   if (updateError) {
@@ -774,7 +741,7 @@ async function deleteBundle() {
       dialogStore.openDialog({
         title: t('want-to-unlink'),
         description: t('channel-bundle-linked', {
-          channels: channelFound.map((ch: any) => `${ch.name} (${ch.version.name})`).join(', '),
+          channels: channelFound.map((ch: any) => `${ch.name} (${ch.version?.name ?? t('channel-builtin')})`).join(', '),
         }),
         buttons: [
           {

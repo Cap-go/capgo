@@ -216,6 +216,15 @@ jobs:
           version: 2.84.2
       - name: Show Supabase CLI version
         run: supabase --version
+      - name: Install PostgreSQL 17 client
+        run: |
+          if command -v pg_dump-17 >/dev/null 2>&1 && command -v pg_restore-17 >/dev/null 2>&1 && command -v psql-17 >/dev/null 2>&1; then
+            exit 0
+          fi
+          sudo apt-get update
+          sudo apt-get install -y ca-certificates postgresql-common
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get install -y postgresql-client-17
       - name: Link Supabase templates
         run: ln -sfn supabase/templates templates
       - name: Stop leftover Supabase containers
@@ -224,6 +233,13 @@ jobs:
         run: supabase start -x imgproxy,studio,mailpit,realtime,postgres-meta,supavisor,studio,logflare,vector,realtime
       - name: Reset Supabase DB
         run: supabase db reset
+      - name: Check read-replica schema snapshot
+        env:
+          MAIN_SUPABASE_DB_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
+          PSQL_BIN: /usr/lib/postgresql/17/bin/psql
+          PG_DUMP_BIN: /usr/lib/postgresql/17/bin/pg_dump
+          PG_RESTORE_BIN: /usr/lib/postgresql/17/bin/pg_restore
+        run: bun run readreplicate:check-schema
       - name: Run Supabase Test DB
         run: supabase test db
       - name: Lint SQL
@@ -358,7 +374,7 @@ jobs:
         name: Start Playwright frontend
         env:
           BACKGROUND_SERVICE_NAME: Playwright frontend
-          BACKGROUND_RUN_COMMAND: CAPTCHA_KEY='' bun run serve:worktree
+          BACKGROUND_RUN_COMMAND: bun run supabase:with-env -- bun scripts/playwright-frontend-preview.ts
           BACKGROUND_WAIT_ON: |
             http-get://localhost:5173
           BACKGROUND_LOG_PATH: ${{ runner.temp }}/playwright-frontend.log

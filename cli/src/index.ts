@@ -11,6 +11,7 @@ import { setApp } from './app/set'
 import { setSetting } from './app/setting'
 import { clearCredentialsCommand, listCredentialsCommand, migrateCredentialsCommand, saveCredentialsCommand, updateCredentialsCommand } from './build/credentials-command'
 import { manageCredentialsCommand } from './build/credentials-manage'
+import { lastOutputCommand } from './build/last-output-command'
 import { checkBuildNeeded } from './build/needed'
 import { onboardingBuilderCommand } from './build/onboarding/command'
 import { requestBuildCommand } from './build/request'
@@ -756,7 +757,13 @@ const build = program
 📋 BEFORE BUILDING:
    Save your credentials first:
    npx @capgo/cli build credentials save --appId <your-app-id> --platform ios
-   npx @capgo/cli build credentials save --appId <your-app-id> --platform android`)
+   npx @capgo/cli build credentials save --appId <your-app-id> --platform android
+
+📤 CAPTURE THE OUTPUT URL FROM CI:
+   Pass --output-record to persist the download URL + QR code, then read it
+   back with \`build last-output\`:
+   npx @capgo/cli build request <appId> --platform android --output-upload --output-record /tmp/build.json
+   URL=$(npx @capgo/cli build last-output --path /tmp/build.json --field outputUrl)`)
 
 build
   .command('needed [appId]')
@@ -819,16 +826,36 @@ Example: npx @capgo/cli@latest build request com.example.app --platform ios --pa
   .option('--keystore-store-password <password>', 'Android: Keystore store password')
   .option('--play-config-json <json>', 'Android: Base64-encoded Google Play service account JSON')
   .option('--android-flavor <flavor>', 'Android: Product flavor to build (e.g. production). Required if your project has multiple flavors.')
+  .option('--in-app-update-priority <priority>', 'Android: Google Play in-app update priority for this release (integer 0–5; higher = more urgent). See https://developer.android.com/guide/playcore/in-app-updates. Precedence: CLI > env > saved credentials')
   .option('--no-playstore-upload', 'Skip Play Store upload for this build (nulls out saved play config). Requires --output-upload.')
   .option('--output-upload', 'Override output upload behavior for this build only (enable). Precedence: CLI > env > saved credentials')
   .option('--no-output-upload', 'Override output upload behavior for this build only (disable). Precedence: CLI > env > saved credentials')
   .option('--output-retention <duration>', 'Override output link TTL for this build only (1h to 7d). Examples: 1h, 6h, 2d. Precedence: CLI > env > saved credentials')
+  .option('--output-record <path>', 'After a successful build, write a JSON record (jobId, status, outputUrl, qrCodeAscii, qrCodePngPath, finishedAt) to <path>. A PNG QR code is also written next to it as <path>.qr.png. Read fields back with `build last-output`.')
   .option('--skip-build-number-bump', 'Skip automatic build number/version code incrementing. Uses whatever version is already in the project files.')
   .option('--no-skip-build-number-bump', 'Override saved credentials to re-enable automatic build number incrementing for this build only.')
+  .option('--ai-analytics', 'On build failure, send logs to Capgo AI for diagnosis. In interactive terminals this skips the upfront confirmation; in CI this auto-uploads and prints the analysis to stderr.')
   .option('-a, --apikey <apikey>', optionDescriptions.apikey)
   .option('--supa-host <supaHost>', optionDescriptions.supaHost)
   .option('--supa-anon <supaAnon>', optionDescriptions.supaAnon)
   .option('--verbose', optionDescriptions.verbose)
+
+build
+  .command('last-output')
+  .description(`Read the build output record written by a previous \`build request --output-record\`.
+
+Prints the full JSON by default, a single field with --field, or the ASCII QR
+code with --qr. Useful in CI to grab the download URL or QR for posting back
+to a PR or issue.
+
+Examples:
+  npx @capgo/cli build last-output --path /tmp/build.json
+  npx @capgo/cli build last-output --path /tmp/build.json --field outputUrl
+  npx @capgo/cli build last-output --path /tmp/build.json --qr`)
+  .action(lastOutputCommand)
+  .option('--path <path>', 'Path to the JSON record written by --output-record (required)')
+  .option('--field <field>', 'Print a single field (one of: jobId, appId, platform, buildMode, status, outputUrl, qrCodeAscii, qrCodePngPath, finishedAt, schemaVersion)')
+  .option('--qr', 'Print the rendered ASCII QR code (shortcut for --field qrCodeAscii)')
 
 const buildCredentials = build
   .command('credentials')
@@ -903,6 +930,7 @@ Local storage (per-project):
   .option('--keystore-store-password <password>', 'Android: Keystore store password')
   .option('--play-config <path>', 'Android: Path to Play Store service account JSON')
   .option('--android-flavor <flavor>', 'Android: Product flavor to build (e.g. production). Required if your project has multiple flavors.')
+  .option('--in-app-update-priority <priority>', 'Android: Google Play in-app update priority for future releases (integer 0–5; higher = more urgent). Omit to leave Play’s existing value untouched.')
   // Storage option
   .option('--local', 'Save to .capgo-credentials.json in project root instead of global ~/.capgo-credentials/')
   .option('--output-upload', 'Upload build outputs (IPA/APK/AAB) to Capgo storage and print download links')
@@ -971,6 +999,7 @@ Examples:
   .option('--keystore-store-password <password>', 'Keystore store password')
   .option('--play-config <path>', 'Path to Google Play service account JSON')
   .option('--android-flavor <flavor>', 'Android: Product flavor to build (e.g. production). Required if your project has multiple flavors.')
+  .option('--in-app-update-priority <priority>', 'Android: Google Play in-app update priority for future releases (integer 0–5; higher = more urgent).')
   .option('--output-upload', 'Upload build outputs (IPA/APK/AAB) to Capgo storage and print download links')
   .option('--no-output-upload', 'Do not upload build outputs (IPA/APK/AAB) to Capgo storage')
   .option('--output-retention <duration>', 'Output link TTL: 1h to 7d. Examples: 1h, 6h, 2d')

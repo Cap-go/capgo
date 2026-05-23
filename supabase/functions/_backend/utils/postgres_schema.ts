@@ -74,7 +74,7 @@ export const channels = pgTable('channels', {
   created_at: timestamp('created_at').notNull(),
   name: varchar('name').notNull(),
   app_id: varchar('app_id').notNull().references(() => apps.name),
-  version: bigint('version', { mode: 'number' }).notNull().references(() => app_versions.id),
+  version: bigint('version', { mode: 'number' }).references(() => app_versions.id, { onDelete: 'set null' }),
   created_by: uuid('created_by').notNull(),
   updated_at: timestamp('updated_at').defaultNow().notNull(),
   public: boolean('public').notNull().default(false),

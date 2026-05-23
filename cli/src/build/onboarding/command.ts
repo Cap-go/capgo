@@ -94,24 +94,34 @@ export async function onboardingBuilderCommand(options: OnboardingBuilderOptions
   }
 
   const platform = await resolvePlatform(options, iosDir, androidDir)
+  const realTerminalRows = process.stdout.rows ?? 24
 
   if (platform === 'android') {
     const androidProgress = await loadAndroidProgress(appId)
-    const { waitUntilExit } = render(
+    const inkApp = render(
       React.createElement(AndroidOnboardingApp, {
         appId,
         initialProgress: androidProgress,
         androidDir,
         apikey: options.apikey,
+        terminalRows: realTerminalRows,
       }),
     )
+    const { waitUntilExit } = inkApp
     await waitUntilExit()
     return
   }
 
   const progress = await loadProgress(appId)
-  const { waitUntilExit } = render(
-    React.createElement(OnboardingApp, { appId, initialProgress: progress, iosDir, apikey: options.apikey }),
+  const inkApp = render(
+    React.createElement(OnboardingApp, {
+      appId,
+      initialProgress: progress,
+      iosDir,
+      apikey: options.apikey,
+      terminalRows: realTerminalRows,
+    }),
   )
+  const { waitUntilExit } = inkApp
   await waitUntilExit()
 }

@@ -74,6 +74,7 @@ Follow the documentation here: https://capacitorjs.com/docs/getting-started/
   - [Needed](#build-needed)
   - [Init](#build-init)
   - [Request](#build-request)
+  - [Last-output](#build-last-output)
   - [Credentials](#build-credentials)
     - [Save](#build-credentials-save)
     - [List](#build-credentials-list)
@@ -1157,6 +1158,11 @@ npx @capgo/cli@latest organisation delete
    Save your credentials first:
    npx @capgo/cli build credentials save --appId <your-app-id> --platform ios
    npx @capgo/cli build credentials save --appId <your-app-id> --platform android
+📤 CAPTURE THE OUTPUT URL FROM CI:
+   Pass --output-record to persist the download URL + QR code, then read it
+   back with `build last-output`:
+   npx @capgo/cli build request <appId> --platform android --output-upload --output-record /tmp/build.json
+   URL=$(npx @capgo/cli build last-output --path /tmp/build.json --field outputUrl)
 
 ### <a id="build-needed"></a> 🔹 **Needed**
 
@@ -1247,16 +1253,42 @@ npx @capgo/cli@latest build request com.example.app --platform ios --path .
 | **--keystore-store-password** | <code>string</code> | Android: Keystore store password |
 | **--play-config-json** | <code>string</code> | Android: Base64-encoded Google Play service account JSON |
 | **--android-flavor** | <code>string</code> | Android: Product flavor to build (e.g. production). Required if your project has multiple flavors. |
+| **--in-app-update-priority** | <code>string</code> | Android: Google Play in-app update priority for this release (integer 0–5; higher = more urgent). See https://developer.android.com/guide/playcore/in-app-updates. Precedence: CLI > env > saved credentials |
 | **--no-playstore-upload** | <code>boolean</code> | Skip Play Store upload for this build (nulls out saved play config). Requires --output-upload. |
 | **--output-upload** | <code>boolean</code> | Override output upload behavior for this build only (enable). Precedence: CLI > env > saved credentials |
 | **--no-output-upload** | <code>boolean</code> | Override output upload behavior for this build only (disable). Precedence: CLI > env > saved credentials |
 | **--output-retention** | <code>string</code> | Override output link TTL for this build only (1h to 7d). Examples: 1h, 6h, 2d. Precedence: CLI > env > saved credentials |
+| **--output-record** | <code>string</code> | After a successful build, write a JSON record (jobId, status, outputUrl, qrCodeAscii, qrCodePngPath, finishedAt) to <path>. A PNG QR code is also written next to it as <path>.qr.png. Read fields back with `build last-output`. |
 | **--skip-build-number-bump** | <code>boolean</code> | Skip automatic build number/version code incrementing. Uses whatever version is already in the project files. |
 | **--no-skip-build-number-bump** | <code>boolean</code> | Override saved credentials to re-enable automatic build number incrementing for this build only. |
+| **--ai-analytics** | <code>boolean</code> | On build failure, send logs to Capgo AI for diagnosis. In interactive terminals this skips the upfront confirmation; in CI this auto-uploads and prints the analysis to stderr. |
 | **-a** | <code>string</code> | API key to link to your account |
 | **--supa-host** | <code>string</code> | Custom Supabase host URL (for self-hosting or Capgo development) |
 | **--supa-anon** | <code>string</code> | Custom Supabase anon key (for self-hosting) |
 | **--verbose** | <code>boolean</code> | Enable verbose output with detailed logging |
+
+### <a id="build-last-output"></a> 🔹 **Last-output**
+
+```bash
+npx @capgo/cli@latest build last-output
+```
+
+Read the build output record written by a previous `build request --output-record`.
+Prints the full JSON by default, a single field with --field, or the ASCII QR
+code with --qr. Useful in CI to grab the download URL or QR for posting back
+to a PR or issue.
+Examples:
+  npx @capgo/cli build last-output --path /tmp/build.json
+  npx @capgo/cli build last-output --path /tmp/build.json --field outputUrl
+  npx @capgo/cli build last-output --path /tmp/build.json --qr
+
+**Options:**
+
+| Param          | Type          | Description          |
+| -------------- | ------------- | -------------------- |
+| **--path** | <code>string</code> | Path to the JSON record written by --output-record (required) |
+| **--field** | <code>string</code> | Print a single field (one of: jobId, appId, platform, buildMode, status, outputUrl, qrCodeAscii, qrCodePngPath, finishedAt, schemaVersion) |
+| **--qr** | <code>boolean</code> | Print the rendered ASCII QR code (shortcut for --field qrCodeAscii) |
 
 ### <a id="build-credentials"></a> 🔹 **Credentials**
 
@@ -1331,6 +1363,7 @@ iOS Example:
 | **--keystore-store-password** | <code>string</code> | Android: Keystore store password |
 | **--play-config** | <code>string</code> | Android: Path to Play Store service account JSON |
 | **--android-flavor** | <code>string</code> | Android: Product flavor to build (e.g. production). Required if your project has multiple flavors. |
+| **--in-app-update-priority** | <code>string</code> | Android: Google Play in-app update priority for future releases (integer 0–5; higher = more urgent). Omit to leave Play’s existing value untouched. |
 | **--local** | <code>boolean</code> | Save to .capgo-credentials.json in project root instead of global ~/.capgo-credentials/ |
 | **--output-upload** | <code>boolean</code> | Upload build outputs (IPA/APK/AAB) to Capgo storage and print download links |
 | **--no-output-upload** | <code>boolean</code> | Do not upload build outputs (IPA/APK/AAB) to Capgo storage |
@@ -1414,6 +1447,7 @@ Examples:
 | **--keystore-store-password** | <code>string</code> | Keystore store password |
 | **--play-config** | <code>string</code> | Path to Google Play service account JSON |
 | **--android-flavor** | <code>string</code> | Android: Product flavor to build (e.g. production). Required if your project has multiple flavors. |
+| **--in-app-update-priority** | <code>string</code> | Android: Google Play in-app update priority for future releases (integer 0–5; higher = more urgent). |
 | **--output-upload** | <code>boolean</code> | Upload build outputs (IPA/APK/AAB) to Capgo storage and print download links |
 | **--no-output-upload** | <code>boolean</code> | Do not upload build outputs (IPA/APK/AAB) to Capgo storage |
 | **--output-retention** | <code>string</code> | Output link TTL: 1h to 7d. Examples: 1h, 6h, 2d |

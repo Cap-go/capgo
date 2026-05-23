@@ -3,7 +3,7 @@ import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { RetryableResult } from '../utils/retry.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import { Hono } from 'hono/tiny'
-import { BRES, middlewareAPISecret, simpleError, triggerValidator } from '../utils/hono.ts'
+import { BRES, middlewareAPISecret, quickError, simpleError, triggerValidator } from '../utils/hono.ts'
 import { cloudlog, cloudlogErr } from '../utils/logging.ts'
 import { isRetryablePostgrestResult, retryWithBackoff } from '../utils/retry.ts'
 import { s3 } from '../utils/s3.ts'
@@ -14,8 +14,24 @@ const SIZE_RETRY_DELAY_MS = 500
 const MANIFEST_UPDATE_RETRY_ATTEMPTS = 3
 const MANIFEST_UPDATE_RETRY_DELAY_MS = 300
 
-async function getManifestSizeWithRetry(c: Context, s3Path: string): Promise<{ size: number, lastError?: unknown }> {
-  const { result, lastError } = await retryWithBackoff(
+interface QueueLogMetadata {
+  queueName: string | null
+  queueMsgId: string | null
+  queueReadCount: string | null
+  cfId: string | null
+}
+
+function getQueueLogMetadata(c: Context): QueueLogMetadata {
+  return {
+    queueName: c.req.header('x-capgo-queue-name') ?? null,
+    queueMsgId: c.req.header('x-capgo-queue-msg-id') ?? null,
+    queueReadCount: c.req.header('x-capgo-queue-read-count') ?? null,
+    cfId: c.req.header('x-capgo-cf-id') ?? null,
+  }
+}
+
+async function getManifestSizeWithRetry(c: Context, s3Path: string): Promise<{ size: number, lastError?: unknown, attempts: number }> {
+  const { result, lastError, attempts } = await retryWithBackoff(
     () => s3.getSize(c, s3Path),
     {
       attempts: SIZE_RETRY_ATTEMPTS,
@@ -24,7 +40,11 @@ async function getManifestSizeWithRetry(c: Context, s3Path: string): Promise<{ s
     },
   )
 
-  return { size: typeof result === 'number' ? result : 0, lastError }
+  return { attempts, size: typeof result === 'number' ? result : 0, lastError }
+}
+
+function shouldRetryManifestSizeLookup(size: number, currentFileSize: number | null | undefined): boolean {
+  return size <= 0 && !(currentFileSize && currentFileSize > 0)
 }
 
 async function runManifestUpdateWithRetry(
@@ -66,22 +86,23 @@ async function runManifestUpdateWithRetry(
   }
 }
 
-async function updateManifestSize(c: Context, record: Database['public']['Tables']['manifest']['Row']) {
+export async function updateManifestSize(c: Context, record: Database['public']['Tables']['manifest']['Row'], queue = getQueueLogMetadata(c)) {
   if (!record.s3_path) {
-    cloudlog({ requestId: c.get('requestId'), message: 'No s3 path', id: record.id })
+    cloudlog({ requestId: c.get('requestId'), message: 'No s3 path', id: record.id, app_version_id: record.app_version_id, file_name: record.file_name, queue })
     throw simpleError('no_s3_path', 'No s3 path', { record })
   }
 
-  const { size, lastError } = await getManifestSizeWithRetry(c, record.s3_path)
+  const { size, lastError, attempts } = await getManifestSizeWithRetry(c, record.s3_path)
   if (lastError) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'getSize failed after retries', id: record.id, s3_path: record.s3_path, error: lastError })
+    cloudlogErr({ requestId: c.get('requestId'), message: 'getSize failed after retries', id: record.id, app_version_id: record.app_version_id, file_name: record.file_name, s3_path: record.s3_path, attempts, queue, error: lastError })
   }
-  if (size === 0) {
-    if (record.file_size && record.file_size > 0) {
-      cloudlog({ requestId: c.get('requestId'), message: 'getSize returned 0, keeping existing file_size', id: record.id, s3_path: record.s3_path, file_size: record.file_size })
-      return c.json(BRES)
-    }
-    cloudlog({ requestId: c.get('requestId'), message: 'getSize returned 0 after retries, skipping update', id: record.id, s3_path: record.s3_path })
+  if (shouldRetryManifestSizeLookup(size, record.file_size)) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'getSize returned 0 after retries', id: record.id, app_version_id: record.app_version_id, file_name: record.file_name, s3_path: record.s3_path, attempts, queue })
+    // Return non-2xx so queue_consumer keeps the message and applies its 5-read retry budget.
+    throw quickError(503, 'manifest_size_not_found', 'Manifest file size metadata was not found', { attempts, file_name: record.file_name, id: record.id, queue, s3_path: record.s3_path }, lastError, { alert: false })
+  }
+  if (size <= 0) {
+    cloudlog({ requestId: c.get('requestId'), message: 'getSize returned 0, keeping existing file_size', id: record.id, app_version_id: record.app_version_id, file_name: record.file_name, s3_path: record.s3_path, file_size: record.file_size, attempts, queue })
     return c.json(BRES)
   }
 
@@ -90,9 +111,10 @@ async function updateManifestSize(c: Context, record: Database['public']['Tables
       .from('manifest')
       .update({ file_size: size })
       .eq('id', record.id))
+    cloudlog({ requestId: c.get('requestId'), message: 'manifest file_size updated', id: record.id, app_version_id: record.app_version_id, file_name: record.file_name, s3_path: record.s3_path, size, attempts, queue })
   }
   catch (updateError) {
-    cloudlog({ requestId: c.get('requestId'), message: 'error update manifest size', error: updateError })
+    cloudlog({ requestId: c.get('requestId'), message: 'error update manifest size', id: record.id, app_version_id: record.app_version_id, file_name: record.file_name, s3_path: record.s3_path, size, attempts, queue, error: updateError })
     throw simpleError('manifest_update_failed', 'Failed to update manifest file_size', { record, updateError })
   }
 
@@ -116,4 +138,5 @@ app.post('/', middlewareAPISecret, triggerValidator('manifest', 'INSERT'), (c) =
 export const onManifestCreateTestUtils = {
   isRetryablePostgrestResult,
   runManifestUpdateWithRetry,
+  shouldRetryManifestSizeLookup,
 }
