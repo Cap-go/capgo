@@ -22,6 +22,8 @@ function getInvalidCode(c: Context) {
   return c.req.method === 'GET' || c.req.method === 'DELETE' ? 'invalid_query_parameters' : 'invalid_json_body'
 }
 
+const commonSemverRegex = /^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)$/
+
 export function makeDevice(devBody: AppInfos | DeviceLink | AppStats, allowCustomID = true): DeviceWithoutCreatedAt {
   const normalizedCustomId = normalizeCustomId(devBody.custom_id)
   const customId = allowCustomID ? normalizedCustomId : undefined
@@ -54,7 +56,7 @@ export function parsePluginBody<T extends AppInfos | DeviceLink | AppStats>(c: C
     throw simpleError('missing_app_id', 'Cannot find app_id', { body })
   }
   // Only validate version_build if it's provided (not required for GET /channel_self)
-  if (body.version_build) {
+  if (body.version_build && !commonSemverRegex.test(body.version_build)) {
     const coerce = tryParse(fixSemver(body.version_build))
     if (!coerce) {
       throw simpleError('semver_error', `Native version: ${body.version_build} doesn't follow semver convention, please check https://capgo.app/semver_tester/ to learn more about semver usage in Capgo`, { version_build: body.version_build })
