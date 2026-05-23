@@ -1,7 +1,17 @@
 import { HTTPException } from 'hono/http-exception'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { __queueConsumerTestUtils__, MAX_QUEUE_READS, messagesArraySchema } from '../supabase/functions/_backend/triggers/queue_consumer.ts'
 import { parseSchema } from '../supabase/functions/_backend/utils/ark_validation.ts'
+
+function createHealthcheckDb(queueLength: number) {
+  return {
+    db: {
+      query: vi.fn(async <T = Record<string, unknown>>(): Promise<{ rows: T[] }> => ({
+        rows: [{ queue_length: String(queueLength) } as T],
+      })),
+    },
+  }
+}
 
 describe('queue_consumer legacy message compatibility', () => {
   it.concurrent('uses the payload envelope when it is present', () => {
@@ -202,5 +212,104 @@ describe('queue_consumer legacy message compatibility', () => {
     expect(details.errorMessage).toBe('Manifest file size metadata was not found')
     expect(details.bodyPreview).toContain('"id":123')
     expect(details.bodyPreview).toContain('"queueName":"on_manifest_create"')
+  })
+
+  it.concurrent('calls the healthcheck URL when the worker succeeds and the queue is empty', async () => {
+    const { db } = createHealthcheckDb(0)
+    const fetchImpl = vi.fn(async () => new Response(null, { status: 200 })) as unknown as typeof fetch
+
+    const reported = await __queueConsumerTestUtils__.maybePingCronHealthcheck(
+      db as never,
+      'cron_email',
+      {
+        archivedCount: 0,
+        failedCount: 0,
+        processedCount: 1,
+        readSucceeded: true,
+        skippedCount: 0,
+        success: true,
+        successCount: 1,
+      },
+      'https://example.com/healthcheck',
+      fetchImpl,
+    )
+
+    expect(reported).toBe(true)
+    expect(fetchImpl).toHaveBeenCalledTimes(1)
+    expect(fetchImpl).toHaveBeenCalledWith('https://example.com/healthcheck', expect.objectContaining({
+      method: 'GET',
+    }))
+  })
+
+  it.concurrent('does not call the healthcheck URL when queue work remains', async () => {
+    const { db } = createHealthcheckDb(2)
+    const fetchImpl = vi.fn(async () => new Response(null, { status: 200 })) as unknown as typeof fetch
+
+    const reported = await __queueConsumerTestUtils__.maybePingCronHealthcheck(
+      db as never,
+      'cron_email',
+      {
+        archivedCount: 0,
+        failedCount: 0,
+        processedCount: 1,
+        readSucceeded: true,
+        skippedCount: 0,
+        success: true,
+        successCount: 1,
+      },
+      'https://example.com/healthcheck',
+      fetchImpl,
+    )
+
+    expect(reported).toBe(false)
+    expect(fetchImpl).not.toHaveBeenCalled()
+  })
+
+  it.concurrent('returns false when the healthcheck URL responds with an error', async () => {
+    const { db } = createHealthcheckDb(0)
+    const fetchImpl = vi.fn(async () => new Response(null, { status: 500 })) as unknown as typeof fetch
+
+    const reported = await __queueConsumerTestUtils__.maybePingCronHealthcheck(
+      db as never,
+      'cron_email',
+      {
+        archivedCount: 0,
+        failedCount: 0,
+        processedCount: 1,
+        readSucceeded: true,
+        skippedCount: 0,
+        success: true,
+        successCount: 1,
+      },
+      'https://example.com/healthcheck',
+      fetchImpl,
+    )
+
+    expect(reported).toBe(false)
+    expect(fetchImpl).toHaveBeenCalledTimes(1)
+  })
+
+  it.concurrent('does not call the healthcheck URL when the worker failed', async () => {
+    const { db } = createHealthcheckDb(0)
+    const fetchImpl = vi.fn(async () => new Response(null, { status: 200 })) as unknown as typeof fetch
+
+    const reported = await __queueConsumerTestUtils__.maybePingCronHealthcheck(
+      db as never,
+      'cron_email',
+      {
+        archivedCount: 0,
+        failedCount: 1,
+        processedCount: 1,
+        readSucceeded: true,
+        skippedCount: 0,
+        success: false,
+        successCount: 0,
+      },
+      'https://example.com/healthcheck',
+      fetchImpl,
+    )
+
+    expect(reported).toBe(false)
+    expect(fetchImpl).not.toHaveBeenCalled()
   })
 })
