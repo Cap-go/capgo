@@ -96,6 +96,7 @@
     "stripe:backfill-ltv-metrics": "bun scripts/backfill_ltv_metrics.ts",
     "stripe:backfill-revenue-trends": "bun scripts/fix_stripe_admin_revenue_dashboard_metrics.ts",
     "stripe:backfill-admin-revenue-dashboard": "bun scripts/fix_stripe_admin_revenue_dashboard_metrics.ts",
+    "admin:migrate-r2-bucket": "bun scripts/migrate_r2_bucket.mjs",
     "stripe:export-six-month-org-emails": "bun scripts/export_stripe_six_month_org_emails.ts",
     "stripe:sync-org-names": "bun scripts/sync_stripe_org_names.ts",
     "lint": "eslint \"src/**/*.{vue,ts,js}\"",

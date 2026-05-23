@@ -10,6 +10,7 @@ import { simpleError } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
 import { backgroundTask, isValidAppId } from '../utils/utils.ts'
+import { getAttachmentDownloadBuckets } from './buckets.ts'
 import { DEFAULT_RETRY_PARAMS, RetryBucket } from './retry.ts'
 // Cache settings
 const PREVIEW_AUTH_CACHE_PATH = '/.preview-auth'
@@ -307,8 +308,8 @@ export async function handlePreviewRequest(c: Context<MiddlewareKeyVariables>): 
     throw simpleError('preview_not_supported', 'Preview is not supported on Supabase Edge Functions. This feature requires Cloudflare Workers with R2 bucket access.')
   }
 
-  const bucket = c.env.ATTACHMENT_BUCKET
-  if (!bucket) {
+  const buckets = getAttachmentDownloadBuckets(c.env)
+  if (buckets.length === 0) {
     cloudlog({ requestId: c.get('requestId'), message: 'preview bucket is null' })
     throw simpleError('bucket_not_configured', 'Storage bucket not configured')
   }
@@ -351,7 +352,13 @@ export async function handlePreviewRequest(c: Context<MiddlewareKeyVariables>): 
   }
 
   try {
-    const object = await new RetryBucket(bucket, DEFAULT_RETRY_PARAMS).get(manifestEntry.s3_path)
+    let object: R2ObjectBody | null = null
+    for (const bucket of buckets) {
+      object = await new RetryBucket(bucket, DEFAULT_RETRY_PARAMS).get(manifestEntry.s3_path)
+      if (object)
+        break
+    }
+
     if (!object) {
       cloudlog({ requestId: c.get('requestId'), message: 'file not found in R2', s3_path: manifestEntry.s3_path })
       throw simpleError('file_not_found', 'File not found in storage', { filePath })

@@ -17,6 +17,7 @@ import { Hono } from 'hono/tiny'
 import { quickError } from '../utils/hono.ts'
 import { cloudlog, cloudlogErr } from '../utils/logging.ts'
 import { onError } from '../utils/on_error.ts'
+import { getAttachmentUploadBucket } from './buckets.ts'
 import { noopDigester, sha256Digester } from './digest.ts'
 import { parseChecksum, parseUploadMetadata } from './parse.ts'
 import {
@@ -84,6 +85,7 @@ function optionsHandler(c: Context) {
 
 interface Env {
   ATTACHMENT_BUCKET: R2Bucket
+  ATTACHMENT_UPLOAD_BUCKET?: R2Bucket
 }
 
 export class UploadHandler extends DurableObject {
@@ -97,7 +99,9 @@ export class UploadHandler extends DurableObject {
 
   constructor(ctx: ConstructorParameters<typeof DurableObject>[0], env: Env) {
     super(ctx, env)
-    const bucket = env.ATTACHMENT_BUCKET
+    const bucket = getAttachmentUploadBucket(env)
+    if (!bucket)
+      throw new Error('Attachment upload bucket binding is not configured')
     this.parts = []
     this.requestGate = new AsyncLock()
     this.retryBucket = new RetryBucket(bucket, DEFAULT_RETRY_PARAMS)
