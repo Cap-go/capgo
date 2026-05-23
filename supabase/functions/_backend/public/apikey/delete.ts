@@ -36,16 +36,30 @@ app.delete('/:id', middlewareV2(['all']), async (c) => {
   // Use supabaseWithAuth which handles both JWT and API key authentication
   const supabase = supabaseWithAuth(c, auth)
 
-  const { data: apikey, error: apikeyError } = await supabase.from('apikeys').select('*').or(`key.eq.${id},id.eq.${id}`).eq('user_id', auth.userId).single()
+  const baseQuery = supabase
+    .from('apikeys')
+    .select('*')
+    .eq('user_id', auth.userId)
+
+  const apikeyQuery = /^\d+$/.test(id)
+    ? baseQuery.eq('id', Number(id))
+    : baseQuery.eq('key', id)
+
+  const { data: apikey, error: apikeyError } = await apikeyQuery.single()
   if (!apikey || apikeyError) {
     throw quickError(404, 'api_key_not_found', 'API key not found', { supabaseError: apikeyError })
   }
 
-  const { error } = await supabase
+  const deleteBaseQuery = supabase
     .from('apikeys')
     .delete()
-    .or(`key.eq.${id},id.eq.${id}`)
     .eq('user_id', auth.userId)
+
+  const deleteQuery = /^\d+$/.test(id)
+    ? deleteBaseQuery.eq('id', Number(id))
+    : deleteBaseQuery.eq('key', id)
+
+  const { error } = await deleteQuery
 
   if (error) {
     throw quickError(500, 'failed_to_delete_apikey', 'Failed to delete API key', { supabaseError: error })

@@ -1,14 +1,21 @@
 BEGIN;
 
-SELECT plan(18);
+SELECT plan(22);
 
 SELECT tests.authenticate_as_service_role();
 SELECT tests.create_supabase_user('apikey_v2_scope_owner', 'apikey_v2_scope_owner@test.local');
+SELECT tests.create_supabase_user('apikey_v2_scope_upload_user', 'apikey_v2_scope_upload_user@test.local');
 
 INSERT INTO public.users (id, email, created_at, updated_at)
 VALUES (
   tests.get_supabase_uid('apikey_v2_scope_owner'),
   'apikey_v2_scope_owner@test.local',
+  NOW(),
+  NOW()
+),
+(
+  tests.get_supabase_uid('apikey_v2_scope_upload_user'),
+  'apikey_v2_scope_upload_user@test.local',
   NOW(),
   NOW()
 )
@@ -116,6 +123,83 @@ SELECT tests.create_v2_apikey(
   public.rbac_role_app_reader()
 );
 
+SELECT tests.create_v2_apikey(
+  56004,
+  tests.get_supabase_uid('apikey_v2_scope_owner'),
+  'apikey-v2-scope-upload-key',
+  'apikey-v2-scope-upload-key',
+  '71000000-0000-4000-8000-000000000056'::uuid,
+  public.rbac_role_org_member(),
+  'com.test.apikeyv2scope.target',
+  public.rbac_role_app_uploader()
+);
+
+INSERT INTO public.role_bindings (
+  principal_type,
+  principal_id,
+  role_id,
+  scope_type,
+  org_id,
+  granted_by,
+  reason,
+  is_direct
+)
+SELECT
+  public.rbac_principal_user(),
+  tests.get_supabase_uid('apikey_v2_scope_upload_user'),
+  roles.id,
+  public.rbac_scope_org(),
+  '71000000-0000-4000-8000-000000000056'::uuid,
+  tests.get_supabase_uid('apikey_v2_scope_owner'),
+  'pgTAP upload-only user org membership',
+  true
+FROM public.roles
+WHERE roles.name = public.rbac_role_org_member()
+ON CONFLICT DO NOTHING;
+
+INSERT INTO public.role_bindings (
+  principal_type,
+  principal_id,
+  role_id,
+  scope_type,
+  org_id,
+  app_id,
+  granted_by,
+  reason,
+  is_direct
+)
+SELECT
+  public.rbac_principal_user(),
+  tests.get_supabase_uid('apikey_v2_scope_upload_user'),
+  roles.id,
+  public.rbac_scope_app(),
+  '71000000-0000-4000-8000-000000000056'::uuid,
+  apps.id,
+  tests.get_supabase_uid('apikey_v2_scope_owner'),
+  'pgTAP upload-only user app binding',
+  true
+FROM public.roles
+JOIN public.apps ON apps.app_id = 'com.test.apikeyv2scope.target'
+WHERE roles.name = public.rbac_role_app_uploader()
+ON CONFLICT DO NOTHING;
+
+INSERT INTO public.app_versions (
+  id,
+  app_id,
+  name,
+  owner_org,
+  comment
+)
+VALUES (
+  5600401,
+  'com.test.apikeyv2scope.target',
+  '1.0.0-apikey-v2-scope',
+  '71000000-0000-4000-8000-000000000056'::uuid,
+  'initial'
+)
+ON CONFLICT (id) DO UPDATE
+SET comment = EXCLUDED.comment;
+
 SELECT ok(
   public.rbac_check_permission_direct(
     public.rbac_perm_app_read(),
@@ -198,6 +282,57 @@ SELECT ok(
     'apikey-v2-scope-both-key'
   ),
   'combined org/app limits do not grant listed apps outside the allowed org'
+);
+
+SELECT ok(
+  public.check_min_rights(
+    'upload'::public.user_min_right,
+    tests.get_supabase_uid('apikey_v2_scope_upload_user'),
+    '71000000-0000-4000-8000-000000000056'::uuid,
+    'com.test.apikeyv2scope.target',
+    NULL::bigint
+  ),
+  'JWT upload-only fixture has upload permission'
+);
+
+SELECT ok(
+  NOT public.check_min_rights(
+    'write'::public.user_min_right,
+    tests.get_supabase_uid('apikey_v2_scope_upload_user'),
+    '71000000-0000-4000-8000-000000000056'::uuid,
+    'com.test.apikeyv2scope.target',
+    NULL::bigint
+  ),
+  'JWT upload-only fixture does not have write permission'
+);
+
+SELECT tests.authenticate_as('apikey_v2_scope_upload_user');
+
+WITH updated_rows AS (
+  UPDATE public.app_versions
+  SET comment = 'blocked-jwt-upload-only'
+  WHERE id = 5600401
+  RETURNING 1
+)
+SELECT is(
+  (SELECT count(*)::int FROM updated_rows),
+  0,
+  'authenticated upload-only user cannot update app_versions through write-only JWT path'
+);
+
+SELECT tests.clear_authentication();
+SELECT set_config('request.headers', '{"capgkey":"apikey-v2-scope-upload-key"}', true);
+
+WITH updated_rows AS (
+  UPDATE public.app_versions
+  SET comment = 'allowed-apikey-upload'
+  WHERE id = 5600401
+  RETURNING 1
+)
+SELECT is(
+  (SELECT count(*)::int FROM updated_rows),
+  1,
+  'upload-scoped API key can update app_versions through old upload path'
 );
 
 SELECT tests.clear_authentication();

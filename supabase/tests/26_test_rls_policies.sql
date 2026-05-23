@@ -3,7 +3,7 @@
 BEGIN;
 
 -- Plan the number of tests
-SELECT plan(43);
+SELECT plan(44);
 
 -- Test app_versions policies
 SELECT
@@ -14,8 +14,7 @@ SELECT
             'Allow all for auth (super_admin+)',
             'Allow for auth, api keys (read+)',
             'Allow insert for api keys (write,all,upload) (upload+)',
-            'Allow update for auth (write+)',
-            'Allow update for api keys (write,all,upload) (upload+)',
+            'Allow update for auth and api keys',
             'Prevent non 2FA access'
         ],
         'app_versions should have correct policies'
@@ -99,6 +98,30 @@ SELECT
         ),
         1::bigint,
         'channel_permission_overrides should expose only one permissive SELECT path for authenticated'
+    );
+
+SELECT
+    is(
+        (
+            SELECT count(*)
+            FROM (
+                SELECT
+                    schemaname,
+                    tablename,
+                    cmd
+                FROM pg_policies
+                WHERE
+                    schemaname = 'public'
+                    AND permissive = 'PERMISSIVE'
+                GROUP BY
+                    schemaname,
+                    tablename,
+                    cmd
+                HAVING count(*) > 1
+            ) duplicate_public_policies
+        ),
+        0::bigint,
+        'public RLS should not have duplicate permissive policies for the same table operation'
     );
 
 -- Test orgs policies

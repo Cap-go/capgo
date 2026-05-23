@@ -58,11 +58,16 @@ app.get('/:id', middlewareV2(['all']), async (c) => {
 
   // Use supabaseWithAuth which handles both JWT and API key authentication
   const supabase = supabaseWithAuth(c, auth)
-  const { data: fetchedApikey, error } = await supabase
+  const baseQuery = supabase
     .from('apikeys')
     .select('*')
-    .or(`key.eq.${id},id.eq.${id}`)
     .eq('user_id', auth.userId)
+
+  const apikeyQuery = /^\d+$/.test(id)
+    ? baseQuery.eq('id', Number(id))
+    : baseQuery.eq('key', id)
+
+  const { data: fetchedApikey, error } = await apikeyQuery
     .single()
   if (error) {
     throw quickError(404, 'failed_to_get_apikey', 'Failed to get API key', { supabaseError: error })

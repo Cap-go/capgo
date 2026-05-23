@@ -1072,57 +1072,6 @@ getKeys()
           />
         </div>
       </Teleport>
-
-      <!-- Teleport Content for Organization Selection Modal -->
-      <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.title === t('alert-confirm-org-limit')" defer to="#dialog-v2-content">
-        <div class="space-y-4">
-          <div class="p-2 overflow-y-auto border rounded-lg max-h-64">
-            <div v-for="org in organizationStore.organizations" :key="org.gid" class="flex items-center gap-2 p-2">
-              <input
-                :id="`org-select-${org.gid}`"
-                :value="org.gid"
-                type="checkbox"
-                class="checkbox"
-                @change="handleOrgSelection(org.gid, ($event.target as HTMLInputElement).checked)"
-              >
-              <label :for="`org-select-${org.gid}`" class="text-sm">
-                {{ org.name }}
-              </label>
-            </div>
-          </div>
-          <div class="flex items-center gap-2 mt-4">
-            <input
-              id="limit-to-app-org"
-              v-model="limitToOrgCheckbox"
-              type="checkbox"
-              class="checkbox"
-            >
-            <label for="limit-to-app-org" class="text-sm">
-              {{ t('limit-to-app') }}
-            </label>
-          </div>
-        </div>
-      </Teleport>
-
-      <!-- Teleport Content for App Selection Modal -->
-      <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.title === t('alert-confirm-appid-limit')" defer to="#dialog-v2-content">
-        <div class="space-y-4">
-          <div class="p-2 overflow-y-auto border rounded-lg max-h-64">
-            <div v-for="app in availableApps" :key="app.app_id" class="flex items-center gap-2 p-2">
-              <input
-                :id="`app-${app.app_id}`"
-                :value="app"
-                type="checkbox"
-                class="checkbox"
-                @change="handleAppSelection(app as any, ($event.target as HTMLInputElement).checked)"
-              >
-              <label :for="`app-${app.app_id}`" class="text-sm">
-                {{ app.name }}
-              </label>
-            </div>
-          </div>
-        </div>
-      </Teleport>
     </div>
   </div>
 </template>

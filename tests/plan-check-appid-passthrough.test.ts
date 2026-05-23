@@ -150,7 +150,7 @@ describe.skipIf(USE_CLOUDFLARE_WORKERS)('plan-check appid passthrough (RBAC bind
 
     // 5. RBAC-managed API key with org read compatibility and upload access
     //    only for the primary app. This mirrors the V2 key shape after the
-    //    legacy limited_to_apps columns have been removed.
+    //    old scope columns have been removed.
     const apikeyRow = await createDirectApiKeyWithBindings({
       userId: ownerUserId,
       key: randomUUID(),

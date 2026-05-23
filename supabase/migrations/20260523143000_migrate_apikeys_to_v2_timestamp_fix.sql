@@ -2521,6 +2521,68 @@ USING (
   )
 );
 
+DROP POLICY IF EXISTS "Allow update for auth (write+)" ON "public"."app_versions";
+DROP POLICY IF EXISTS "Allow update for api keys (write,all,upload) (upload+)" ON "public"."app_versions";
+DROP POLICY IF EXISTS "Allow update for auth and api keys" ON "public"."app_versions";
+CREATE POLICY "Allow update for auth and api keys"
+ON "public"."app_versions"
+FOR UPDATE
+TO "authenticated", "anon"
+USING (
+  EXISTS (
+    SELECT 1
+    FROM (SELECT auth.uid() AS uid, public.get_apikey_header() AS apikey) AS identity
+    WHERE (
+        identity.uid IS NOT NULL
+        AND public.check_min_rights(
+          'write'::public.user_min_right,
+          identity.uid,
+          owner_org,
+          app_id,
+          NULL::bigint
+        )
+      )
+      OR (
+        identity.uid IS NULL
+        AND identity.apikey IS NOT NULL
+        AND public.check_min_rights(
+          'upload'::public.user_min_right,
+          NULL::uuid,
+          owner_org,
+          app_id,
+          NULL::bigint
+        )
+      )
+  )
+)
+WITH CHECK (
+  EXISTS (
+    SELECT 1
+    FROM (SELECT auth.uid() AS uid, public.get_apikey_header() AS apikey) AS identity
+    WHERE (
+        identity.uid IS NOT NULL
+        AND public.check_min_rights(
+          'write'::public.user_min_right,
+          identity.uid,
+          owner_org,
+          app_id,
+          NULL::bigint
+        )
+      )
+      OR (
+        identity.uid IS NULL
+        AND identity.apikey IS NOT NULL
+        AND public.check_min_rights(
+          'upload'::public.user_min_right,
+          NULL::uuid,
+          owner_org,
+          app_id,
+          NULL::bigint
+        )
+      )
+  )
+);
+
 DROP POLICY IF EXISTS "Allow insert for auth (write+)" ON "public"."channel_devices";
 CREATE POLICY "Allow insert for auth (write+)" ON "public"."channel_devices"
 FOR INSERT
