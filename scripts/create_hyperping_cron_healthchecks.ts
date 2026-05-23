@@ -13,6 +13,7 @@
  *   --include-disabled
  *   --missing-only
  */
+import type { Database } from '../supabase/functions/_backend/utils/supabase.types.ts'
 import { mkdir, writeFile } from 'node:fs/promises'
 import process from 'node:process'
 import { asyncPool, createSupabaseServiceClient, DEFAULT_ENV_FILE, getArgValue, loadEnv, parsePositiveInteger } from './admin_stripe_backfill_utils.ts'
@@ -27,24 +28,26 @@ const PAGE_SIZE = 1000
 
 type PeriodType = 'seconds' | 'minutes' | 'hours' | 'days'
 
-interface CronTaskRow {
-  id: number
-  name: string
-  description: string | null
-  task_type: string
-  target: string
-  batch_size: number | null
-  second_interval: number | null
-  minute_interval: number | null
-  hour_interval: number | null
-  run_at_hour: number | null
-  run_at_minute: number | null
-  run_at_second: number | null
-  run_on_dow: number | null
-  run_on_day: number | null
-  enabled: boolean
-  healthcheck_url: string | null
-}
+type CronTaskRow = Pick<
+  Database['public']['Tables']['cron_tasks']['Row'],
+  | 'id'
+  | 'name'
+  | 'description'
+  | 'task_type'
+  | 'target'
+  | 'batch_size'
+  | 'second_interval'
+  | 'minute_interval'
+  | 'hour_interval'
+  | 'run_at_hour'
+  | 'run_at_minute'
+  | 'run_at_second'
+  | 'run_on_dow'
+  | 'run_on_day'
+  | 'enabled'
+  | 'healthcheck_url'
+>
+type CronTaskUpdate = Database['public']['Tables']['cron_tasks']['Update']
 
 interface HyperpingHealthcheckPayload {
   name: string
@@ -260,12 +263,11 @@ async function fetchCronTasks(
     if (!data?.length)
       break
 
-    const cronTaskRows = data as unknown as CronTaskRow[]
-    rows.push(...cronTaskRows)
+    rows.push(...data)
 
     if (options.name || data.length < PAGE_SIZE)
       break
-    lastSeenId = cronTaskRows.at(-1)?.id ?? lastSeenId
+    lastSeenId = data.at(-1)?.id ?? lastSeenId
   }
 
   return rows
@@ -374,12 +376,13 @@ async function updateCronTaskHealthcheckUrl(
   cronTaskId: number,
   healthcheckUrl: string,
 ) {
+  const update: CronTaskUpdate = {
+    healthcheck_url: healthcheckUrl,
+    updated_at: new Date().toISOString(),
+  }
   const { error } = await supabase
     .from('cron_tasks')
-    .update({
-      healthcheck_url: healthcheckUrl,
-      updated_at: new Date().toISOString(),
-    } as never)
+    .update(update)
     .eq('id', cronTaskId)
 
   if (error)
