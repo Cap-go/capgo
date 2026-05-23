@@ -50,13 +50,18 @@ fetch_target_branch() {
   local branch="$1"
   local refspec="+refs/heads/${branch}:refs/remotes/origin/${branch}"
 
+  if git fetch --no-tags origin "${refspec}"; then
+    return
+  fi
+
   if [[ -n "${GITHUB_TOKEN:-}" ]]; then
-    git -c "http.https://github.com/.extraheader=AUTHORIZATION: bearer ${GITHUB_TOKEN}" \
+    git -c "http.https://github.com/.extraheader=" \
+      -c "http.https://github.com/.extraheader=AUTHORIZATION: bearer ${GITHUB_TOKEN}" \
       fetch --no-tags origin "${refspec}"
     return
   fi
 
-  git fetch --no-tags origin "${refspec}"
+  return 1
 }
 
 target_branch="$(resolve_target_branch)"
