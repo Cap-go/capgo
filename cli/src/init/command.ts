@@ -209,10 +209,9 @@ export function getInitUpdaterPluginConfig(appId: string, directInstall: boolean
   return {
     version: initNativeBundleVersion,
     appId,
-    autoUpdate: true,
+    autoUpdate: directInstall ? 'always' : 'atBackground',
     ...(directInstall
       ? {
-          directUpdate: 'always',
           autoSplashscreen: true,
         }
       : {}),

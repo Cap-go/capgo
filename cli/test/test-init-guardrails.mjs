@@ -14,6 +14,7 @@ import {
   isOnlyAllowedInitAutoTestChange,
   revertInitAutoTestChangeContent,
 } from '../src/init/command.ts'
+import { usesAlwaysDirectUpdate } from '../src/updaterConfig.ts'
 
 let failures = 0
 
@@ -83,16 +84,25 @@ t('init updater config always starts from native version 0.0.0', () => {
   assert.deepEqual(getInitUpdaterPluginConfig('com.example.app', false), {
     version: '0.0.0',
     appId: 'com.example.app',
-    autoUpdate: true,
+    autoUpdate: 'atBackground',
   })
 
   assert.deepEqual(getInitUpdaterPluginConfig('com.example.app', true), {
     version: '0.0.0',
     appId: 'com.example.app',
-    autoUpdate: true,
-    directUpdate: 'always',
+    autoUpdate: 'always',
     autoSplashscreen: true,
   })
+})
+
+t('instant update detection supports new autoUpdate modes and legacy directUpdate', () => {
+  assert.equal(usesAlwaysDirectUpdate({ autoUpdate: 'always' }), true)
+  assert.equal(usesAlwaysDirectUpdate({ autoUpdate: 'atBackground', directUpdate: 'always' }), false)
+  assert.equal(usesAlwaysDirectUpdate({ autoUpdate: 'onlyDownload', directUpdate: true }), false)
+  assert.equal(usesAlwaysDirectUpdate({ autoUpdate: false, directUpdate: true }), false)
+  assert.equal(usesAlwaysDirectUpdate({ autoUpdate: true, directUpdate: true }), true)
+  assert.equal(usesAlwaysDirectUpdate({ directUpdate: 'always' }), true)
+  assert.equal(usesAlwaysDirectUpdate({ directUpdate: 'onLaunch' }), false)
 })
 
 t('guided ota version suggestions stay on major zero when native baseline is pinned', () => {
