@@ -43,6 +43,7 @@ const FILES_WRANGLER_CONFIG = resolve(ROOT_DIR, 'cloudflare_workers/files/wrangl
 const MAX_DB_BATCH_SIZE = 1000
 const COPY_OBJECT_LIMIT_BYTES = 5 * 1024 * 1024 * 1024
 const DEFAULT_MULTIPART_PART_SIZE = 512 * 1024 * 1024
+const DEFAULT_ROW_CONCURRENCY = 64
 const DEFAULT_PROJECT_REF = 'xvwzpoazmxkqosrdewyv'
 const PERCENT_ENCODED_OCTET_RE = /%[0-9a-f]{2}/i
 
@@ -138,6 +139,7 @@ Core options:
   --max-records <n>             Debug cap across copied/verified rows.
   --skip-existing               Skip keys already present in target with the expected DB size.
   --verify-after-copy           HEAD target after every copied object.
+  --row-concurrency <n>         Parallel object work per DB worker. Defaults to 64, capped by --batch-size.
   --reset-state                 Ignore previous cursor state for this source/target pair.
   --part-size <bytes>           Multipart copy part size. Defaults to 512 MiB.
   --multipart-concurrency <n>   Parallel part copies for a single >5GiB object. Defaults to 16.
@@ -166,7 +168,8 @@ const verifyAfterCopy = hasFlag('--verify-after-copy')
 const resetState = hasFlag('--reset-state')
 const multipartPartSize = getNumberArg('--part-size', DEFAULT_MULTIPART_PART_SIZE)
 const multipartConcurrency = getNumberArg('--multipart-concurrency', 16)
-const maxSockets = getNumberArg('--max-sockets', (workers * batchSize) + (multipartConcurrency * workers) + 64)
+const rowConcurrency = Math.min(getNumberArg('--row-concurrency', Math.min(DEFAULT_ROW_CONCURRENCY, batchSize)), batchSize)
+const maxSockets = getNumberArg('--max-sockets', (workers * rowConcurrency) + (multipartConcurrency * workers) + 64)
 const projectRef = getArgValue('--project-ref') ?? DEFAULT_PROJECT_REF
 
 if (requestedBatchSize > MAX_DB_BATCH_SIZE)
@@ -273,7 +276,7 @@ const pool = databaseUrl
   ? new pg.Pool({
       connectionString: databaseUrl,
       max: Math.max(4, Math.min(workers + 4, 40)),
-      ssl: target === 'prod' ? { rejectUnauthorized: false } : undefined,
+      ssl: target === 'prod' ? { rejectUnauthorized: true } : undefined,
     })
   : null
 
@@ -834,33 +837,36 @@ async function verifyRow(row) {
 }
 
 async function processRows(rows, mode) {
-  const failures = (await Promise.all(rows.map(row => mode === 'verify' ? verifyRow(row) : copyRow(row)))).filter(Boolean)
+  const failures = (await mapWithConcurrency(rows, rowConcurrency, row => mode === 'verify' ? verifyRow(row) : copyRow(row))).filter(Boolean)
   appendFailedRows(failures)
   report.batches += 1
   logProgress()
 }
 
-async function runKindWorkers(kind, state) {
+async function runKindWorkers(kind, state, options) {
+  const { limitRecords = true, mode, persistState = true } = options
   const workerStates = state.workers[kind] ?? []
   const pageQuery = buildPageQuery(kind)
 
   await Promise.all(workerStates.map(async (workerState) => {
     while (!workerState.done) {
-      if (recordsLeft !== null && recordsLeft <= 0)
+      if (limitRecords && recordsLeft !== null && recordsLeft <= 0)
         return
 
-      const result = await queryWithRetry(pageQuery, [workerState.cursor, workerState.endId, batchSize], `${kind} page worker ${workerState.index}`)
-      const rows = takeRowsWithinLimit(result.rows)
+      const result = await queryWithRetry(pageQuery, [workerState.cursor, workerState.endId, batchSize], `${kind} ${mode} page worker ${workerState.index}`)
+      const rows = limitRecords ? takeRowsWithinLimit(result.rows) : result.rows
       if (rows.length === 0) {
         workerState.done = true
-        await saveState(state)
+        if (persistState)
+          await saveState(state)
         return
       }
 
-      await processRows(rows, phase === 'verify' ? 'verify' : 'copy')
+      await processRows(rows, mode)
       workerState.cursor = Number(rows.at(-1).id)
       workerState.done = rows.length < batchSize || workerState.cursor >= workerState.endId
-      await saveState(state)
+      if (persistState)
+        await saveState(state)
     }
   }))
 }
@@ -914,12 +920,13 @@ async function runCopyOrVerify() {
 
   console.log(`${apply ? 'Applying' : 'Dry-run'} ${phase} from ${sourceBucket} to ${targetBucket}`)
   console.log(`Database: ${describeDatabaseUrl(databaseUrl)}`)
-  console.log(`Workers: ${workers}, batch size: ${batchSize}, max sockets: ${maxSockets}`)
+  console.log(`Workers: ${workers}, batch size: ${batchSize}, row concurrency: ${rowConcurrency}, max sockets: ${maxSockets}`)
   console.log(`State: ${statePath}`)
   console.log(`Failed CSV: ${failedCsvPath}`)
 
-  await runKindWorkers('versions', state)
-  await runKindWorkers('manifest', state)
+  const mode = phase === 'verify' ? 'verify' : 'copy'
+  await runKindWorkers('versions', state, { mode })
+  await runKindWorkers('manifest', state, { mode })
   logProgress(true)
 }
 
@@ -1041,7 +1048,8 @@ function runCommand(command, args, label) {
 
 function deployFilesWorker(stage) {
   const tempConfig = buildTempWranglerConfig(stage)
-  runCommand('bunx', ['wrangler', 'deploy', '--config', tempConfig, '--env=prod', '--minify'], `files worker ${stage} bucket switch`)
+  const envArgs = target === 'prod' ? ['--env=prod'] : []
+  runCommand('bunx', ['wrangler', 'deploy', '--config', tempConfig, ...envArgs, '--minify'], `files worker ${stage} bucket switch`)
 }
 
 function deploySupabaseSecrets(stage) {
@@ -1095,23 +1103,7 @@ async function runVerifyAfterAll() {
 }
 
 async function runKindWorkersWithMode(kind, state, mode) {
-  const workerStates = state.workers[kind] ?? []
-  const pageQuery = buildPageQuery(kind)
-
-  await Promise.all(workerStates.map(async (workerState) => {
-    while (!workerState.done) {
-      const result = await queryWithRetry(pageQuery, [workerState.cursor, workerState.endId, batchSize], `${kind} ${mode} page worker ${workerState.index}`)
-      const rows = result.rows
-      if (rows.length === 0) {
-        workerState.done = true
-        return
-      }
-
-      await processRows(rows, mode)
-      workerState.cursor = Number(rows.at(-1).id)
-      workerState.done = rows.length < batchSize || workerState.cursor >= workerState.endId
-    }
-  }))
+  await runKindWorkers(kind, state, { limitRecords: false, mode, persistState: false })
 }
 
 try {

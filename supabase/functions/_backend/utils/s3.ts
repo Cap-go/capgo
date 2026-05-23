@@ -59,7 +59,13 @@ function resolveStorageEndpoint(c: Context): string {
 }
 
 function getOptionalEnv(c: Context, key: string): string | null {
-  const value = getEnv(c, key).trim()
+  let value = ''
+  try {
+    value = getEnv(c, key).trim()
+  }
+  catch {
+    return null
+  }
   return value || null
 }
 
@@ -245,7 +251,7 @@ async function headObjectSize(c: Context, client: ReturnType<typeof initS3>, buc
   return {
     bucket,
     contentLength,
-    exists: response.status === 200 && contentLength > 0,
+    exists: response.status === 200,
     fileId,
     status: response.status,
   }
