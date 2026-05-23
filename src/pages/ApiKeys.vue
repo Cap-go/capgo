@@ -172,6 +172,18 @@ function formatDisplayApps(key: Database['public']['Tables']['apikeys']['Row']) 
   return Array.from(appNames).join(', ')
 }
 
+function cacheAppNames(apps: { id: string | null, app_id: string, name: string | null }[]) {
+  apps.forEach((app) => {
+    const displayName = app.name || app.app_id
+    appCache.value.set(app.app_id, displayName)
+    appCanonicalIdCache.value.set(app.app_id, app.app_id)
+    if (!app.id)
+      return
+    appCache.value.set(app.id, displayName)
+    appCanonicalIdCache.value.set(app.id, app.app_id)
+  })
+}
+
 function getOrgNameById(orgId: string) {
   return orgCache.value.get(orgId) || orgId
 }
@@ -278,16 +290,7 @@ async function fetchOrgAndAppNames() {
 
           if (error)
             throw error
-          const apps = data || []
-          apps.forEach((app) => {
-            const displayName = app.name || app.app_id
-            appCache.value.set(app.app_id, displayName)
-            appCanonicalIdCache.value.set(app.app_id, app.app_id)
-            if (app.id)
-              appCache.value.set(app.id, displayName)
-            if (app.id)
-              appCanonicalIdCache.value.set(app.id, app.app_id)
-          })
+          cacheAppNames(data || [])
         }
         catch (err) {
           console.error('Error fetching app names by public app ids:', err)
@@ -305,16 +308,7 @@ async function fetchOrgAndAppNames() {
 
           if (error)
             throw error
-          const apps = data || []
-          apps.forEach((app) => {
-            const displayName = app.name || app.app_id
-            appCache.value.set(app.app_id, displayName)
-            appCanonicalIdCache.value.set(app.app_id, app.app_id)
-            if (app.id)
-              appCache.value.set(app.id, displayName)
-            if (app.id)
-              appCanonicalIdCache.value.set(app.id, app.app_id)
-          })
+          cacheAppNames(data || [])
         }
         catch (err) {
           console.error('Error fetching app names by RBAC app ids:', err)
@@ -591,13 +585,7 @@ async function loadAllApps() {
     availableApps.value = (apps || []).filter((app): app is { id: string, app_id: string, name: string | null, owner_org: string } =>
       !!app.id && !!app.app_id,
     )
-    availableApps.value.forEach((app) => {
-      const displayName = app.name || app.app_id
-      appCache.value.set(app.app_id, displayName)
-      appCache.value.set(app.id, displayName)
-      appCanonicalIdCache.value.set(app.app_id, app.app_id)
-      appCanonicalIdCache.value.set(app.id, app.app_id)
-    })
+    cacheAppNames(availableApps.value)
   }
   catch (err) {
     console.error('Error loading apps:', err)
@@ -1099,6 +1087,7 @@ getKeys()
               <button
                 type="button"
                 class="flex items-center justify-between w-full gap-3 px-3 py-2 text-sm text-left bg-white border rounded-lg border-slate-300 dark:bg-gray-800 dark:border-slate-600 focus:ring-2 focus:ring-primary-500 focus:outline-none"
+                :aria-expanded="showOrgDropdown"
                 @click="showOrgDropdown = !showOrgDropdown"
               >
                 <span class="flex-1 truncate" :class="selectedOrgsForCreation.length ? 'text-slate-800 dark:text-white' : 'text-slate-500'">
