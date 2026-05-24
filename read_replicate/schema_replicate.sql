@@ -792,6 +792,13 @@ CREATE INDEX idx_app_versions_retention_cleanup ON public.app_versions USING btr
 
 
 --
+-- Name: idx_apps_owner_org_app_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_apps_owner_org_app_id ON public.apps USING btree (owner_org, app_id);
+
+
+--
 -- Name: idx_channels_app_id_name; Type: INDEX; Schema: public; Owner: -
 --
 
