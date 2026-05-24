@@ -20,6 +20,10 @@ jobs:
     permissions:
       contents: read
     steps:
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24.x
       - name: Checkout
         uses: actions/checkout@v6
       - name: Setup bun
@@ -48,8 +52,14 @@ jobs:
         run: bun install
       - name: Install Supabase CLI
         uses: supabase/setup-cli@v2.0.0
+        # Pinned to 2.98.2 because Supabase CLI v2.99.0 (2026-05-18) ships
+        # release assets with version in the filename (supabase_2.99.0_linux_amd64.tar.gz)
+        # while setup-cli@v2.0.0 hardcodes the unversioned name
+        # (supabase_linux_amd64.tar.gz) for any version >= 1.28.0, causing 404.
+        # Revert to `latest` once setup-cli ships a fix or Supabase restores
+        # the unversioned assets. Tracking: https://github.com/supabase/setup-cli
         with:
-          version: latest
+          version: 2.98.2
       - name: Show Supabase CLI version
         run: supabase --version
       - name: Prepare Supabase
@@ -140,6 +150,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
       - name: Setup bun
         uses: oven-sh/setup-bun@v2
         with:
@@ -166,6 +179,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
       - name: Setup bun
         uses: oven-sh/setup-bun@v2
         with:
@@ -192,6 +208,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
       - name: Setup bun
         uses: oven-sh/setup-bun@v2
         with:
@@ -251,6 +270,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
       - name: Setup bun
         uses: oven-sh/setup-bun@v2
         with:

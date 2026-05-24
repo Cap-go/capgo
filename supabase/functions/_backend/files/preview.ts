@@ -160,11 +160,12 @@ async function getChannelPreviewVersionId(c: Context<MiddlewareKeyVariables>, ap
     throw simpleError('channel_not_found', 'Channel not found', { channelId })
   }
 
-  if (!Number.isSafeInteger(channel.version) || channel.version <= 0) {
+  const versionId = channel.version
+  if (!Number.isSafeInteger(versionId) || versionId === null || versionId <= 0) {
     throw simpleError('bundle_not_found', 'Bundle not found', { channelId })
   }
 
-  return channel.version
+  return versionId
 }
 
 // Export the handler directly for use in the main app

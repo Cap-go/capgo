@@ -404,6 +404,16 @@ Promise.all([buildCLI, buildSDK]).then(async (results) => {
   writeFileSync('meta.json', JSON.stringify(metafile))
 
   copyFileSync('package.json', 'dist/package.json')
+
+  // Ship the macOS keychain-export Swift helper alongside the bundle. The
+  // CLI compiles it on first use into an OS temp folder via `swiftc`. Source
+  // is shipped (not a precompiled binary) to keep the npm tarball Linux/Win-
+  // safe and to skip code-signing infrastructure for now.
+  copyFileSync(
+    'src/build/onboarding/keychain-export.swift',
+    'dist/keychain-export.swift',
+  )
+
   console.warn('✅ Built CLI and SDK successfully')
 }).catch((err) => {
   console.error('Build failed:', err)

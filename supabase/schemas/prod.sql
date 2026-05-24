@@ -2584,7 +2584,7 @@ CREATE OR REPLACE FUNCTION "public"."cleanup_old_audit_logs"() RETURNS "void"
     AS $$
 BEGIN
   DELETE FROM "public"."audit_logs"
-  WHERE created_at < NOW() - INTERVAL '90 days';
+  WHERE created_at < pg_catalog.now() - INTERVAL '90 days';
 END;
 $$;
 
@@ -2652,9 +2652,15 @@ CREATE OR REPLACE FUNCTION "public"."cleanup_onboarding_app_data_on_complete"() 
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
     AS $$
+DECLARE
+  v_preserve_setting text;
+  v_preserve_app_version_id bigint;
 BEGIN
   IF OLD.need_onboarding IS TRUE AND NEW.need_onboarding IS FALSE THEN
-    PERFORM public.clear_onboarding_app_data(NEW.id);
+    v_preserve_setting := current_setting('capgo.onboarding_preserve_app_version_id', true);
+    v_preserve_app_version_id := NULLIF(v_preserve_setting, '')::bigint;
+
+    PERFORM public.clear_onboarding_app_data(NEW.id, v_preserve_app_version_id);
   END IF;
 
   RETURN NEW;
@@ -2722,9 +2728,25 @@ CREATE OR REPLACE FUNCTION "public"."clear_onboarding_app_data"("p_app_uuid" "uu
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
     AS $$
+BEGIN
+  PERFORM public.clear_onboarding_app_data(p_app_uuid, NULL::bigint);
+END;
+$$;
+
+
+ALTER FUNCTION "public"."clear_onboarding_app_data"("p_app_uuid" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."clear_onboarding_app_data"("p_app_uuid" "uuid", "p_preserve_app_version_id" bigint) RETURNS "void"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
 DECLARE
   v_app_id text;
   v_owner_org uuid;
+  v_last_version text;
+  v_manifest_bundle_count bigint := 0;
+  v_channel_device_count bigint := 0;
 BEGIN
   SELECT app_id, owner_org
   INTO v_app_id, v_owner_org
@@ -2736,19 +2758,40 @@ BEGIN
   END IF;
 
   DELETE FROM public.channel_devices
-  WHERE app_id = v_app_id;
+  WHERE app_id = v_app_id
+    AND (
+      p_preserve_app_version_id IS NULL
+      OR NOT EXISTS (
+        SELECT 1
+        FROM public.channels
+        WHERE channels.id = channel_devices.channel_id
+          AND channels.version = p_preserve_app_version_id
+      )
+    );
 
   DELETE FROM public.deploy_history
-  WHERE app_id = v_app_id;
+  WHERE app_id = v_app_id
+    AND (
+      p_preserve_app_version_id IS NULL
+      OR version_id IS DISTINCT FROM p_preserve_app_version_id
+    );
 
   DELETE FROM public.channels
-  WHERE app_id = v_app_id;
+  WHERE app_id = v_app_id
+    AND (
+      p_preserve_app_version_id IS NULL
+      OR version IS DISTINCT FROM p_preserve_app_version_id
+    );
 
   DELETE FROM public.devices
   WHERE app_id = v_app_id;
 
   DELETE FROM public.app_versions_meta
-  WHERE app_id = v_app_id;
+  WHERE app_id = v_app_id
+    AND (
+      p_preserve_app_version_id IS NULL
+      OR id IS DISTINCT FROM p_preserve_app_version_id
+    );
 
   DELETE FROM public.daily_version
   WHERE app_id = v_app_id;
@@ -2770,7 +2813,11 @@ BEGIN
 
   DELETE FROM public.app_versions
   WHERE app_id = v_app_id
-    AND name NOT IN ('builtin', 'unknown');
+    AND name NOT IN ('builtin', 'unknown')
+    AND (
+      p_preserve_app_version_id IS NULL
+      OR id IS DISTINCT FROM p_preserve_app_version_id
+    );
 
   INSERT INTO public.app_versions (
     owner_org,
@@ -2794,11 +2841,28 @@ BEGIN
     comment = NULL,
     updated_at = now();
 
+  IF p_preserve_app_version_id IS NOT NULL THEN
+    SELECT name, CASE WHEN manifest_count > 0 THEN 1 ELSE 0 END
+    INTO v_last_version, v_manifest_bundle_count
+    FROM public.app_versions
+    WHERE id = p_preserve_app_version_id
+      AND app_id = v_app_id
+      AND deleted IS FALSE;
+
+    SELECT COUNT(*)::bigint
+    INTO v_channel_device_count
+    FROM public.channel_devices
+    INNER JOIN public.channels
+      ON channels.id = channel_devices.channel_id
+    WHERE channel_devices.app_id = v_app_id
+      AND channels.version = p_preserve_app_version_id;
+  END IF;
+
   UPDATE public.apps
   SET
-    channel_device_count = 0,
-    manifest_bundle_count = 0,
-    last_version = NULL
+    channel_device_count = v_channel_device_count,
+    manifest_bundle_count = v_manifest_bundle_count,
+    last_version = v_last_version
   WHERE id = p_app_uuid;
 
   IF v_owner_org IS NOT NULL THEN
@@ -2809,7 +2873,7 @@ END;
 $$;
 
 
-ALTER FUNCTION "public"."clear_onboarding_app_data"("p_app_uuid" "uuid") OWNER TO "postgres";
+ALTER FUNCTION "public"."clear_onboarding_app_data"("p_app_uuid" "uuid", "p_preserve_app_version_id" bigint) OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."cli_check_permission"("apikey" "text" DEFAULT NULL::"text", "permission_key" "text" DEFAULT NULL::"text", "org_id" "uuid" DEFAULT NULL::"uuid", "app_id" "text" DEFAULT NULL::"text", "channel_id" bigint DEFAULT NULL::bigint) RETURNS boolean
@@ -2859,6 +2923,55 @@ ALTER FUNCTION "public"."cli_check_permission"("apikey" "text", "permission_key"
 
 COMMENT ON FUNCTION "public"."cli_check_permission"("apikey" "text", "permission_key" "text", "org_id" "uuid", "app_id" "text", "channel_id" bigint) IS 'CLI permission wrapper bound to the request capgkey header. The apikey argument is retained for CLI compatibility and must match the header when provided.';
 
+
+
+CREATE OR REPLACE FUNCTION "public"."complete_onboarding_after_first_upload"() RETURNS "trigger"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+DECLARE
+  v_app_uuid uuid;
+BEGIN
+  IF NEW.name IN ('builtin', 'unknown') THEN
+    RETURN NEW;
+  END IF;
+
+  IF COALESCE(NEW.deleted, false) IS TRUE THEN
+    RETURN NEW;
+  END IF;
+
+  IF NOT (
+    (NEW.storage_provider = 'external' AND NULLIF(BTRIM(COALESCE(NEW.external_url, '')), '') IS NOT NULL)
+    OR (NEW.storage_provider <> 'r2-direct' AND NULLIF(BTRIM(COALESCE(NEW.r2_path, '')), '') IS NOT NULL)
+  ) THEN
+    RETURN NEW;
+  END IF;
+
+  SELECT id
+  INTO v_app_uuid
+  FROM public.apps
+  WHERE app_id = NEW.app_id
+    AND owner_org = NEW.owner_org
+    AND need_onboarding IS TRUE
+  LIMIT 1;
+
+  IF v_app_uuid IS NULL THEN
+    RETURN NEW;
+  END IF;
+
+  PERFORM set_config('capgo.onboarding_preserve_app_version_id', NEW.id::text, true);
+
+  UPDATE public.apps
+  SET need_onboarding = false
+  WHERE id = v_app_uuid
+    AND need_onboarding IS TRUE;
+
+  RETURN NEW;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."complete_onboarding_after_first_upload"() OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."convert_bytes_to_gb"("bytes_value" double precision) RETURNS double precision
@@ -3517,30 +3630,41 @@ CREATE OR REPLACE FUNCTION "public"."delete_old_deleted_versions"() RETURNS "voi
 DECLARE
   deleted_count bigint;
 BEGIN
-    -- Delete versions that are:
-    -- 1. Have deleted_at set (soft deleted)
-    -- 2. Soft-deleted more than 1 year ago
-    -- 3. NOT builtin or unknown (these are special placeholder versions)
-    -- 4. NOT currently linked to any channel (safety check)
-    DELETE FROM "public"."app_versions"
-    WHERE deleted_at IS NOT NULL
-      AND deleted_at < NOW() - INTERVAL '3 months'
-      AND name NOT IN ('builtin', 'unknown')
-      AND NOT EXISTS (
-        SELECT 1 FROM "public"."channels"
-        WHERE channels.version = app_versions.id
-      );
+  DELETE FROM "public"."app_versions"
+  WHERE "app_versions"."deleted" = true
+    AND "app_versions"."deleted_at" IS NOT NULL
+    AND "app_versions"."deleted_at" <= pg_catalog.now() - INTERVAL '90 days'
+    AND "app_versions"."name" NOT IN ('builtin', 'unknown')
+    AND "app_versions"."manifest_count" = 0
+    AND (
+      "app_versions"."r2_path" IS NULL
+      OR EXISTS (
+        SELECT 1
+        FROM "public"."app_versions_meta"
+        WHERE "app_versions_meta"."id" = "app_versions"."id"
+          AND "app_versions_meta"."size" = 0
+      )
+    )
+    AND NOT EXISTS (
+      SELECT 1
+      FROM "public"."channels"
+      WHERE "channels"."version" = "app_versions"."id"
+    );
 
-    GET DIAGNOSTICS deleted_count = ROW_COUNT;
+  GET DIAGNOSTICS deleted_count = ROW_COUNT;
 
-    IF deleted_count > 0 THEN
-      RAISE NOTICE 'delete_old_deleted_versions: permanently deleted % app versions', deleted_count;
-    END IF;
+  IF deleted_count > 0 THEN
+    RAISE NOTICE 'delete_old_deleted_versions: permanently deleted % app versions', deleted_count;
+  END IF;
 END;
 $$;
 
 
 ALTER FUNCTION "public"."delete_old_deleted_versions"() OWNER TO "postgres";
+
+
+COMMENT ON FUNCTION "public"."delete_old_deleted_versions"() IS 'Permanently deletes app_versions that have been soft-deleted for at least 90 days after storage cleanup is reflected in app_versions_meta and app_versions.manifest_count.';
+
 
 
 CREATE OR REPLACE FUNCTION "public"."delete_org_member_role"("p_org_id" "uuid", "p_user_id" "uuid") RETURNS "text"
@@ -6322,18 +6446,69 @@ CREATE OR REPLACE FUNCTION "public"."get_organization_cli_warnings"("orgid" "uui
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
     AS $$
-DECLARE messages jsonb[] := ARRAY[]::jsonb[]; has_read_access boolean;
+DECLARE
+    messages jsonb[] := ARRAY[]::jsonb[];
+    request_apikey text;
+    api_key public.apikeys%ROWTYPE;
+    fallback_app_id text;
+    has_org_read boolean;
 BEGIN
-  PERFORM cli_version;
-  SELECT public.check_min_rights('read'::public.user_min_right, public.get_identity_apikey_only('{write,all,upload,read}'::public.key_mode[]), orgid, NULL::varchar, NULL::bigint) INTO has_read_access;
-  IF NOT has_read_access THEN
-    messages := array_append(messages, jsonb_build_object('message','API key does not have read access to this organization','fatal',true));
+    PERFORM cli_version;
+
+    has_org_read := public.cli_check_permission(
+        permission_key := public.rbac_perm_org_read(),
+        org_id := orgid
+    );
+
+    IF NOT has_org_read THEN
+        SELECT public.get_apikey_header() INTO request_apikey;
+
+        IF request_apikey IS NOT NULL AND request_apikey <> '' THEN
+            SELECT * INTO api_key
+            FROM public.find_apikey_by_value(request_apikey)
+            LIMIT 1;
+
+            IF api_key.id IS NOT NULL
+                AND COALESCE(array_length(api_key.limited_to_apps, 1), 0) > 0
+            THEN
+                SELECT public.apps.app_id INTO fallback_app_id
+                FROM public.apps
+                WHERE public.apps.owner_org = orgid
+                    AND public.apps.app_id = ANY(api_key.limited_to_apps)
+                ORDER BY public.apps.app_id
+                LIMIT 1;
+
+                IF fallback_app_id IS NOT NULL THEN
+                    has_org_read := public.cli_check_permission(
+                        permission_key := public.rbac_perm_org_read(),
+                        org_id := orgid,
+                        app_id := fallback_app_id
+                    );
+                END IF;
+            END IF;
+        END IF;
+    END IF;
+
+    IF NOT has_org_read THEN
+        messages := array_append(messages, jsonb_build_object(
+            'message', 'API key does not have read access to this organization',
+            'fatal', true
+        ));
+        RETURN messages;
+    END IF;
+
+    IF (
+        public.is_paying_and_good_plan_org_action(orgid, ARRAY['mau']::public.action_type[]) = true
+        AND public.is_paying_and_good_plan_org_action(orgid, ARRAY['bandwidth']::public.action_type[]) = true
+        AND public.is_paying_and_good_plan_org_action(orgid, ARRAY['storage']::public.action_type[]) = false
+    ) THEN
+        messages := array_append(messages, jsonb_build_object(
+            'message', 'You have exceeded your storage limit.\nUpload will fail, but you can still download your data.\nMAU and bandwidth limits are not exceeded.\nIn order to upload your plan, please upgrade your plan here: https://console.capgo.app/settings/plans.',
+            'fatal', true
+        ));
+    END IF;
+
     RETURN messages;
-  END IF;
-  IF (public.is_paying_and_good_plan_org_action(orgid, ARRAY['mau']::public.action_type[]) = true AND public.is_paying_and_good_plan_org_action(orgid, ARRAY['bandwidth']::public.action_type[]) = true AND public.is_paying_and_good_plan_org_action(orgid, ARRAY['storage']::public.action_type[]) = false) THEN
-    messages := array_append(messages, jsonb_build_object('message','You have exceeded your storage limit.\nUpload will fail, but you can still download your data.\nMAU and bandwidth limits are not exceeded.\nIn order to upload your plan, please upgrade your plan here: https://console.capgo.app/settings/plans.','fatal',true));
-  END IF;
-  RETURN messages;
 END;
 $$;
 
@@ -7720,7 +7895,8 @@ CREATE TABLE IF NOT EXISTS "public"."app_versions" (
     "key_id" character varying(20),
     "cli_version" character varying,
     "deleted_at" timestamp with time zone
-);
+)
+WITH ("autovacuum_vacuum_scale_factor"='0.05', "autovacuum_analyze_scale_factor"='0.02');
 
 ALTER TABLE ONLY "public"."app_versions" REPLICA IDENTITY FULL;
 
@@ -12614,6 +12790,27 @@ $$;
 ALTER FUNCTION "public"."read_version_usage"("p_app_id" character varying, "p_period_start" timestamp without time zone, "p_period_end" timestamp without time zone) OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."reassign_webhook_created_by_before_user_delete"() RETURNS "trigger"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+BEGIN
+  -- Preserve org-owned webhooks when a non-owner creator deletes their account.
+  UPDATE "public"."webhooks" AS "webhook"
+  SET "created_by" = "orgs"."created_by"
+  FROM "public"."orgs" AS "orgs"
+  WHERE "webhook"."org_id" = "orgs"."id"
+    AND "webhook"."created_by" = OLD."id"
+    AND "orgs"."created_by" <> OLD."id";
+
+  RETURN OLD;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."reassign_webhook_created_by_before_user_delete"() OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."record_build_time"("p_org_id" "uuid", "p_user_id" "uuid", "p_build_id" character varying, "p_platform" character varying, "p_build_time_unit" bigint, "p_app_id" character varying) RETURNS "uuid"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -13885,6 +14082,45 @@ $$;
 
 
 ALTER FUNCTION "public"."set_deleted_at_on_soft_delete"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."set_webhook_created_by"() RETURNS "trigger"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+DECLARE
+  "creator_id" uuid;
+BEGIN
+  IF (SELECT "public"."get_apikey_header"()) IS NOT NULL THEN
+    "creator_id" := "public"."get_identity_org_allowed_apikey_only"(
+      '{all,write,upload}'::"public"."key_mode"[],
+      NEW."org_id"
+    );
+  ELSE
+    "creator_id" := "auth"."uid"();
+  END IF;
+
+  IF "creator_id" IS NOT NULL THEN
+    NEW."created_by" := "creator_id";
+  ELSIF NEW."created_by" IS NULL THEN
+    SELECT "orgs"."created_by"
+    INTO "creator_id"
+    FROM "public"."orgs" AS "orgs"
+    WHERE "orgs"."id" = NEW."org_id";
+
+    NEW."created_by" := "creator_id";
+  END IF;
+
+  IF NEW."created_by" IS NULL THEN
+    RAISE EXCEPTION 'webhooks.created_by cannot be null';
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."set_webhook_created_by"() OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."strip_html"("input" "text") RETURNS "text"
@@ -15647,7 +15883,8 @@ CREATE TABLE IF NOT EXISTS "public"."build_requests" (
     "upload_expires_at" timestamp with time zone NOT NULL,
     "last_error" "text",
     "runner_wait_seconds" bigint DEFAULT 0 NOT NULL,
-    CONSTRAINT "build_requests_platform_check" CHECK ((("platform")::"text" = ANY ((ARRAY['ios'::character varying, 'android'::character varying])::"text"[])))
+    "ai_analyzed" boolean DEFAULT false NOT NULL,
+    CONSTRAINT "build_requests_platform_check" CHECK ((("platform")::"text" = ANY (ARRAY[('ios'::character varying)::"text", ('android'::character varying)::"text"])))
 );
 
 
@@ -15655,6 +15892,10 @@ ALTER TABLE "public"."build_requests" OWNER TO "postgres";
 
 
 COMMENT ON COLUMN "public"."build_requests"."runner_wait_seconds" IS 'Self-hosted runner wait time reported by builder, in seconds. Informational only; not used for billing.';
+
+
+
+COMMENT ON COLUMN "public"."build_requests"."ai_analyzed" IS 'Set true after a successful AI analysis of this failed build. Enforces one-analysis-per-job for cost control.';
 
 
 
@@ -15878,7 +16119,8 @@ CREATE TABLE IF NOT EXISTS "public"."daily_bandwidth" (
     "app_id" character varying(255) NOT NULL,
     "date" "date" NOT NULL,
     "bandwidth" bigint NOT NULL
-);
+)
+WITH ("autovacuum_vacuum_scale_factor"='0.05', "autovacuum_analyze_scale_factor"='0.02');
 
 
 ALTER TABLE "public"."daily_bandwidth" OWNER TO "postgres";
@@ -15918,7 +16160,8 @@ CREATE TABLE IF NOT EXISTS "public"."daily_mau" (
     "app_id" character varying(255) NOT NULL,
     "date" "date" NOT NULL,
     "mau" bigint NOT NULL
-);
+)
+WITH ("autovacuum_vacuum_scale_factor"='0.05', "autovacuum_analyze_scale_factor"='0.02');
 
 
 ALTER TABLE "public"."daily_mau" OWNER TO "postgres";
@@ -16025,7 +16268,8 @@ CREATE TABLE IF NOT EXISTS "public"."daily_storage" (
     "app_id" character varying(255) NOT NULL,
     "date" "date" NOT NULL,
     "storage" bigint NOT NULL
-);
+)
+WITH ("autovacuum_vacuum_scale_factor"='0.05', "autovacuum_analyze_scale_factor"='0.02');
 
 
 ALTER TABLE "public"."daily_storage" OWNER TO "postgres";
@@ -16056,7 +16300,8 @@ CREATE TABLE IF NOT EXISTS "public"."daily_version" (
     "install" bigint,
     "uninstall" bigint,
     "version_name" character varying(255) NOT NULL
-);
+)
+WITH ("autovacuum_vacuum_scale_factor"='0.05', "autovacuum_analyze_scale_factor"='0.02');
 
 
 ALTER TABLE "public"."daily_version" OWNER TO "postgres";
@@ -16273,7 +16518,10 @@ CREATE TABLE IF NOT EXISTS "public"."global_stats" (
     "plan_maker_conversion_rate" double precision DEFAULT 0 NOT NULL,
     "plan_team_conversion_rate" double precision DEFAULT 0 NOT NULL,
     "plan_enterprise_conversion_rate" double precision DEFAULT 0 NOT NULL,
-    "plan_total_conversion_rate" double precision DEFAULT 0 NOT NULL
+    "plan_total_conversion_rate" double precision DEFAULT 0 NOT NULL,
+    "average_ltv" double precision DEFAULT 0 NOT NULL,
+    "shortest_ltv" double precision DEFAULT 0 NOT NULL,
+    "longest_ltv" double precision DEFAULT 0 NOT NULL
 );
 
 
@@ -16473,6 +16721,18 @@ COMMENT ON COLUMN "public"."global_stats"."plan_enterprise_conversion_rate" IS '
 
 
 COMMENT ON COLUMN "public"."global_stats"."plan_total_conversion_rate" IS 'Percentage of organizations converted to any paid plan ((plan_solo + plan_maker + plan_team + plan_enterprise) / orgs * 100)';
+
+
+
+COMMENT ON COLUMN "public"."global_stats"."average_ltv" IS 'Average estimated customer LTV in dollars for the daily snapshot.';
+
+
+
+COMMENT ON COLUMN "public"."global_stats"."shortest_ltv" IS 'Lowest estimated customer LTV in dollars for the daily snapshot.';
+
+
+
+COMMENT ON COLUMN "public"."global_stats"."longest_ltv" IS 'Highest estimated customer LTV in dollars for the daily snapshot.';
 
 
 
@@ -17384,7 +17644,7 @@ CREATE TABLE IF NOT EXISTS "public"."webhooks" (
     "events" "text"[] NOT NULL,
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
-    "created_by" "uuid"
+    "created_by" "uuid" NOT NULL
 );
 
 
@@ -17760,11 +18020,6 @@ ALTER TABLE ONLY "public"."orgs"
 
 
 
-ALTER TABLE ONLY "public"."channel_devices"
-    ADD CONSTRAINT "unique_device_app" UNIQUE ("device_id", "app_id");
-
-
-
 ALTER TABLE ONLY "public"."channels"
     ADD CONSTRAINT "unique_name_app_id" UNIQUE ("name", "app_id");
 
@@ -17843,6 +18098,10 @@ CREATE INDEX "app_versions_cli_version_idx" ON "public"."app_versions" USING "bt
 
 
 CREATE INDEX "app_versions_meta_app_id_idx" ON "public"."app_versions_meta" USING "btree" ("app_id");
+
+
+
+CREATE INDEX "app_versions_r2_path_idx" ON "public"."app_versions" USING "btree" ("r2_path");
 
 
 
@@ -18150,10 +18409,6 @@ CREATE INDEX "idx_manifest_app_version_id" ON "public"."manifest" USING "btree" 
 
 
 
-CREATE INDEX "idx_manifest_file_name_hash_version" ON "public"."manifest" USING "btree" ("file_name", "file_hash", "app_version_id");
-
-
-
 CREATE INDEX "idx_orgs_customer_id" ON "public"."orgs" USING "btree" ("customer_id");
 
 
@@ -18394,6 +18649,10 @@ CREATE OR REPLACE TRIGGER "cleanup_onboarding_app_data_on_complete" AFTER UPDATE
 
 
 
+CREATE OR REPLACE TRIGGER "complete_onboarding_after_first_upload" AFTER INSERT OR UPDATE OF "deleted", "external_url", "r2_path", "storage_provider", "name", "app_id", "owner_org" ON "public"."app_versions" FOR EACH ROW WHEN (((("new"."name")::"text" <> ALL ((ARRAY['builtin'::character varying, 'unknown'::character varying])::"text"[])) AND (COALESCE("new"."deleted", false) IS FALSE) AND ((("new"."storage_provider" = 'external'::"text") AND (NULLIF("btrim"((COALESCE("new"."external_url", ''::character varying))::"text"), ''::"text") IS NOT NULL)) OR (("new"."storage_provider" <> 'r2-direct'::"text") AND (NULLIF("btrim"((COALESCE("new"."r2_path", ''::character varying))::"text"), ''::"text") IS NOT NULL))))) EXECUTE FUNCTION "public"."complete_onboarding_after_first_upload"();
+
+
+
 CREATE OR REPLACE TRIGGER "credit_usage_alert_on_transactions" AFTER INSERT ON "public"."usage_credit_transactions" FOR EACH ROW EXECUTE FUNCTION "public"."enqueue_credit_usage_alert"();
 
 
@@ -18594,6 +18853,10 @@ CREATE OR REPLACE TRIGGER "prevent_last_super_admin_update" BEFORE UPDATE OF "ro
 
 
 
+CREATE OR REPLACE TRIGGER "reassign_webhook_created_by_before_user_delete" BEFORE DELETE ON "public"."users" FOR EACH ROW EXECUTE FUNCTION "public"."reassign_webhook_created_by_before_user_delete"();
+
+
+
 CREATE OR REPLACE TRIGGER "record_deployment_history_trigger" AFTER UPDATE OF "version" ON "public"."channels" FOR EACH ROW EXECUTE FUNCTION "public"."record_deployment_history"();
 
 
@@ -18607,6 +18870,10 @@ CREATE OR REPLACE TRIGGER "sanitize_orgs_text_fields" BEFORE INSERT OR UPDATE ON
 
 
 CREATE OR REPLACE TRIGGER "set_deleted_at_trigger" BEFORE UPDATE ON "public"."app_versions" FOR EACH ROW EXECUTE FUNCTION "public"."set_deleted_at_on_soft_delete"();
+
+
+
+CREATE OR REPLACE TRIGGER "set_webhook_created_by" BEFORE INSERT ON "public"."webhooks" FOR EACH ROW EXECUTE FUNCTION "public"."set_webhook_created_by"();
 
 
 
@@ -18998,7 +19265,7 @@ ALTER TABLE ONLY "public"."webhook_deliveries"
 
 
 ALTER TABLE ONLY "public"."webhooks"
-    ADD CONSTRAINT "webhooks_created_by_fkey" FOREIGN KEY ("created_by") REFERENCES "public"."users"("id") ON DELETE SET NULL;
+    ADD CONSTRAINT "webhooks_created_by_fkey" FOREIGN KEY ("created_by") REFERENCES "public"."users"("id") ON DELETE CASCADE;
 
 
 
@@ -19922,6 +20189,12 @@ ALTER TABLE "public"."webhook_deliveries" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."webhooks" ENABLE ROW LEVEL SECURITY;
 
 
+CREATE PUBLICATION "capgo_google_eu_2_pub" WITH (publish = 'insert, update, delete, truncate');
+
+
+ALTER PUBLICATION "capgo_google_eu_2_pub" OWNER TO "postgres";
+
+
 CREATE PUBLICATION "planetscale_replicate" WITH (publish = 'insert, update, delete, truncate');
 
 
@@ -19937,7 +20210,15 @@ ALTER PUBLICATION "supabase_realtime" OWNER TO "postgres";
 
 
 
+ALTER PUBLICATION "capgo_google_eu_2_pub" ADD TABLE ONLY "public"."app_versions";
+
+
+
 ALTER PUBLICATION "planetscale_replicate" ADD TABLE ONLY "public"."app_versions";
+
+
+
+ALTER PUBLICATION "capgo_google_eu_2_pub" ADD TABLE ONLY "public"."apps";
 
 
 
@@ -19945,7 +20226,15 @@ ALTER PUBLICATION "planetscale_replicate" ADD TABLE ONLY "public"."apps";
 
 
 
+ALTER PUBLICATION "capgo_google_eu_2_pub" ADD TABLE ONLY "public"."channel_devices";
+
+
+
 ALTER PUBLICATION "planetscale_replicate" ADD TABLE ONLY "public"."channel_devices";
+
+
+
+ALTER PUBLICATION "capgo_google_eu_2_pub" ADD TABLE ONLY "public"."channels";
 
 
 
@@ -19953,7 +20242,15 @@ ALTER PUBLICATION "planetscale_replicate" ADD TABLE ONLY "public"."channels";
 
 
 
+ALTER PUBLICATION "capgo_google_eu_2_pub" ADD TABLE ONLY "public"."manifest";
+
+
+
 ALTER PUBLICATION "planetscale_replicate" ADD TABLE ONLY "public"."manifest";
+
+
+
+ALTER PUBLICATION "capgo_google_eu_2_pub" ADD TABLE ONLY "public"."notifications";
 
 
 
@@ -19961,11 +20258,23 @@ ALTER PUBLICATION "planetscale_replicate" ADD TABLE ONLY "public"."notifications
 
 
 
+ALTER PUBLICATION "capgo_google_eu_2_pub" ADD TABLE ONLY "public"."org_users";
+
+
+
 ALTER PUBLICATION "planetscale_replicate" ADD TABLE ONLY "public"."org_users";
 
 
 
+ALTER PUBLICATION "capgo_google_eu_2_pub" ADD TABLE ONLY "public"."orgs";
+
+
+
 ALTER PUBLICATION "planetscale_replicate" ADD TABLE ONLY "public"."orgs";
+
+
+
+ALTER PUBLICATION "capgo_google_eu_2_pub" ADD TABLE ONLY "public"."stripe_info";
 
 
 
@@ -20471,6 +20780,7 @@ REVOKE ALL ON FUNCTION "public"."cleanup_job_run_details_7days"() FROM PUBLIC;
 
 
 REVOKE ALL ON FUNCTION "public"."cleanup_old_audit_logs"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."cleanup_old_audit_logs"() TO "service_role";
 
 
 
@@ -20504,10 +20814,20 @@ GRANT ALL ON FUNCTION "public"."clear_onboarding_app_data"("p_app_uuid" "uuid") 
 
 
 
+REVOKE ALL ON FUNCTION "public"."clear_onboarding_app_data"("p_app_uuid" "uuid", "p_preserve_app_version_id" bigint) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."clear_onboarding_app_data"("p_app_uuid" "uuid", "p_preserve_app_version_id" bigint) TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."cli_check_permission"("apikey" "text", "permission_key" "text", "org_id" "uuid", "app_id" "text", "channel_id" bigint) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."cli_check_permission"("apikey" "text", "permission_key" "text", "org_id" "uuid", "app_id" "text", "channel_id" bigint) TO "service_role";
 GRANT ALL ON FUNCTION "public"."cli_check_permission"("apikey" "text", "permission_key" "text", "org_id" "uuid", "app_id" "text", "channel_id" bigint) TO "anon";
 GRANT ALL ON FUNCTION "public"."cli_check_permission"("apikey" "text", "permission_key" "text", "org_id" "uuid", "app_id" "text", "channel_id" bigint) TO "authenticated";
+
+
+
+REVOKE ALL ON FUNCTION "public"."complete_onboarding_after_first_upload"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."complete_onboarding_after_first_upload"() TO "service_role";
 
 
 
@@ -20930,6 +21250,7 @@ GRANT ALL ON FUNCTION "public"."get_org_user_access_rbac"("p_user_id" "uuid", "p
 
 
 
+REVOKE ALL ON FUNCTION "public"."get_organization_cli_warnings"("orgid" "uuid", "cli_version" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."get_organization_cli_warnings"("orgid" "uuid", "cli_version" "text") TO "anon";
 GRANT ALL ON FUNCTION "public"."get_organization_cli_warnings"("orgid" "uuid", "cli_version" "text") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."get_organization_cli_warnings"("orgid" "uuid", "cli_version" "text") TO "service_role";
@@ -22068,6 +22389,11 @@ GRANT ALL ON FUNCTION "public"."read_version_usage"("p_app_id" character varying
 
 
 
+REVOKE ALL ON FUNCTION "public"."reassign_webhook_created_by_before_user_delete"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."reassign_webhook_created_by_before_user_delete"() TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."record_build_time"("p_org_id" "uuid", "p_user_id" "uuid", "p_build_id" character varying, "p_platform" character varying, "p_build_time_unit" bigint, "p_app_id" character varying) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."record_build_time"("p_org_id" "uuid", "p_user_id" "uuid", "p_build_id" character varying, "p_platform" character varying, "p_build_time_unit" bigint, "p_app_id" character varying) TO "service_role";
 
@@ -22215,6 +22541,11 @@ GRANT ALL ON FUNCTION "public"."set_build_time_exceeded_by_org"("org_id" "uuid",
 GRANT ALL ON FUNCTION "public"."set_deleted_at_on_soft_delete"() TO "anon";
 GRANT ALL ON FUNCTION "public"."set_deleted_at_on_soft_delete"() TO "authenticated";
 GRANT ALL ON FUNCTION "public"."set_deleted_at_on_soft_delete"() TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."set_webhook_created_by"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."set_webhook_created_by"() TO "service_role";
 
 
 

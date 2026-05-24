@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.1"
+    PostgrestVersion: "14.5"
   }
   public: {
     Tables: {
@@ -480,6 +480,7 @@ export type Database = {
       }
       build_requests: {
         Row: {
+          ai_analyzed: boolean
           app_id: string
           build_config: Json | null
           build_mode: string
@@ -499,6 +500,7 @@ export type Database = {
           upload_url: string
         }
         Insert: {
+          ai_analyzed?: boolean
           app_id: string
           build_config?: Json | null
           build_mode?: string
@@ -518,6 +520,7 @@ export type Database = {
           upload_url: string
         }
         Update: {
+          ai_analyzed?: boolean
           app_id?: string
           build_config?: Json | null
           build_mode?: string
@@ -715,7 +718,7 @@ export type Database = {
           public: boolean
           rbac_id: string
           updated_at: string
-          version: number
+          version: number | null
         }
         Insert: {
           allow_dev?: boolean
@@ -737,7 +740,7 @@ export type Database = {
           public?: boolean
           rbac_id?: string
           updated_at?: string
-          version: number
+          version?: number | null
         }
         Update: {
           allow_dev?: boolean
@@ -759,7 +762,7 @@ export type Database = {
           public?: boolean
           rbac_id?: string
           updated_at?: string
-          version?: number
+          version?: number | null
         }
         Relationships: [
           {
@@ -1231,6 +1234,7 @@ export type Database = {
         Row: {
           apps: number
           apps_active: number | null
+          average_ltv: number
           build_avg_seconds_day_android: number
           build_avg_seconds_day_ios: number
           build_count_day_android: number
@@ -1263,6 +1267,7 @@ export type Database = {
           devices_last_month_android: number | null
           devices_last_month_ios: number | null
           live_updates_active_paying_clients_60d: number
+          longest_ltv: number
           mrr: number
           need_upgrade: number | null
           new_paying_orgs: number
@@ -1298,6 +1303,7 @@ export type Database = {
           revenue_maker: number
           revenue_solo: number
           revenue_team: number
+          shortest_ltv: number
           stars: number
           success_rate: number | null
           total_revenue: number
@@ -1312,6 +1318,7 @@ export type Database = {
         Insert: {
           apps: number
           apps_active?: number | null
+          average_ltv?: number
           build_avg_seconds_day_android?: number
           build_avg_seconds_day_ios?: number
           build_count_day_android?: number
@@ -1344,6 +1351,7 @@ export type Database = {
           devices_last_month_android?: number | null
           devices_last_month_ios?: number | null
           live_updates_active_paying_clients_60d?: number
+          longest_ltv?: number
           mrr?: number
           need_upgrade?: number | null
           new_paying_orgs?: number
@@ -1379,6 +1387,7 @@ export type Database = {
           revenue_maker?: number
           revenue_solo?: number
           revenue_team?: number
+          shortest_ltv?: number
           stars: number
           success_rate?: number | null
           total_revenue?: number
@@ -1393,6 +1402,7 @@ export type Database = {
         Update: {
           apps?: number
           apps_active?: number | null
+          average_ltv?: number
           build_avg_seconds_day_android?: number
           build_avg_seconds_day_ios?: number
           build_count_day_android?: number
@@ -1425,6 +1435,7 @@ export type Database = {
           devices_last_month_android?: number | null
           devices_last_month_ios?: number | null
           live_updates_active_paying_clients_60d?: number
+          longest_ltv?: number
           mrr?: number
           need_upgrade?: number | null
           new_paying_orgs?: number
@@ -1460,6 +1471,7 @@ export type Database = {
           revenue_maker?: number
           revenue_solo?: number
           revenue_team?: number
+          shortest_ltv?: number
           stars?: number
           success_rate?: number | null
           total_revenue?: number
@@ -2764,6 +2776,7 @@ export type Database = {
           audit_log_id: number | null
           completed_at: string | null
           created_at: string
+          delivery_version: string
           duration_ms: number | null
           event_type: string
           id: string
@@ -2782,6 +2795,7 @@ export type Database = {
           audit_log_id?: number | null
           completed_at?: string | null
           created_at?: string
+          delivery_version?: string
           duration_ms?: number | null
           event_type: string
           id?: string
@@ -2800,6 +2814,7 @@ export type Database = {
           audit_log_id?: number | null
           completed_at?: string | null
           created_at?: string
+          delivery_version?: string
           duration_ms?: number | null
           event_type?: string
           id?: string
@@ -2833,7 +2848,8 @@ export type Database = {
       webhooks: {
         Row: {
           created_at: string
-          created_by: string | null
+          created_by: string
+          delivery_version: string
           enabled: boolean
           events: string[]
           id: string
@@ -2845,7 +2861,8 @@ export type Database = {
         }
         Insert: {
           created_at?: string
-          created_by?: string | null
+          created_by: string
+          delivery_version?: string
           enabled?: boolean
           events: string[]
           id?: string
@@ -2857,7 +2874,8 @@ export type Database = {
         }
         Update: {
           created_at?: string
-          created_by?: string | null
+          created_by?: string
+          delivery_version?: string
           enabled?: boolean
           events?: string[]
           id?: string
@@ -3066,7 +3084,7 @@ export type Database = {
       }
       check_revert_to_builtin_version: {
         Args: { appid: string }
-        Returns: number
+        Returns: number | null
       }
       cleanup_expired_apikeys: { Args: never; Returns: undefined }
       cleanup_expired_demo_apps: { Args: never; Returns: undefined }
@@ -3077,10 +3095,12 @@ export type Database = {
       cleanup_queue_messages: { Args: never; Returns: undefined }
       cleanup_tmp_users: { Args: never; Returns: undefined }
       cleanup_webhook_deliveries: { Args: never; Returns: undefined }
-      clear_onboarding_app_data: {
-        Args: { p_app_uuid: string }
-        Returns: undefined
-      }
+      clear_onboarding_app_data:
+        | { Args: { p_app_uuid: string }; Returns: undefined }
+        | {
+            Args: { p_app_uuid: string; p_preserve_app_version_id: number }
+            Returns: undefined
+          }
       cli_check_permission: {
         Args: {
           apikey?: string

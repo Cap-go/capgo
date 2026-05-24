@@ -6,7 +6,7 @@ import { literalUnion, safeParseSchema } from '../utils/ark_validation.ts'
 import { getAdminAppsTrend, getAdminBandwidthTrend, getAdminBundlesTrend, getAdminDistributionMetrics, getAdminFailureMetrics, getAdminMauTrend, getAdminOrgMetrics, getAdminPlatformOverview, getAdminStorageTrend, getAdminSuccessRate, getAdminSuccessRateTrend, getAdminUploadMetrics } from '../utils/cloudflare.ts'
 import { middlewareAuth, parseBody, simpleError, useCors } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
-import { getAdminCancelledOrganizations, getAdminCustomerCountryBreakdown, getAdminDeploymentsTrend, getAdminEmailTypeBreakdown, getAdminGlobalStatsTrend, getAdminOnboardingFunnel, getAdminPluginBreakdown, getAdminTrialOrganizations } from '../utils/pg.ts'
+import { getAdminCancelledOrganizations, getAdminCustomerCountryBreakdown, getAdminDeploymentsTrend, getAdminEmailTypeBreakdown, getAdminGlobalStatsTrend, getAdminOnboardingFunnel, getAdminOrganizationInsights, getAdminPluginBreakdown, getAdminTrialOrganizations, getAdminTrialPlanBreakdown } from '../utils/pg.ts'
 import { getCancellationDetails } from '../utils/stripe.ts'
 import { supabaseClient as useSupabaseClient } from '../utils/supabase.ts'
 
@@ -32,10 +32,12 @@ const metricCategories = [
   'global_stats_trend',
   'plugin_breakdown',
   'trial_organizations',
+  'trial_plan_breakdown',
   'onboarding_funnel',
   'cancelled_users',
   'email_type_breakdown',
   'customer_country_breakdown',
+  'organization_insights',
 ] as const
 
 const isoUtcDatetimeSchema = type('string').narrow((value, ctx) => {
@@ -77,6 +79,10 @@ export const adminStatsBodySchema = type({
   'end_date': isoUtcDatetimeSchema,
   'app_id?': 'string > 0',
   'org_id?': 'string > 0',
+  'plan_name?': 'string <= 128',
+  'billing_type?': literalUnion(['monthly', 'yearly']),
+  'paid_only?': 'boolean',
+  'search?': 'string <= 128',
   'limit?': limitSchema,
   'offset?': offsetSchema,
 })
@@ -87,6 +93,10 @@ interface AdminStatsBody {
   end_date: string
   app_id?: string
   org_id?: string
+  plan_name?: string
+  billing_type?: 'monthly' | 'yearly'
+  paid_only?: boolean
+  search?: string
   limit?: number
   offset?: number
 }
@@ -158,7 +168,7 @@ app.post('/', middlewareAuth, async (c) => {
     throw simpleError('not_admin', 'Not admin - only admin users can access platform statistics')
   }
 
-  const { metric_category, start_date, end_date, app_id, org_id, limit, offset } = parsedBodyResult.data
+  const { metric_category, start_date, end_date, app_id, org_id, plan_name, billing_type, paid_only, search, limit, offset } = parsedBodyResult.data
 
   cloudlog({
     requestId: c.get('requestId'),
@@ -238,6 +248,10 @@ app.post('/', middlewareAuth, async (c) => {
         result = await getAdminTrialOrganizations(c, limit || 20, offset || 0)
         break
 
+      case 'trial_plan_breakdown':
+        result = await getAdminTrialPlanBreakdown(c, start_date, end_date)
+        break
+
       case 'cancelled_users': {
         const canceledOrgs = await getAdminCancelledOrganizations(c, start_date, end_date, limit || 20, offset || 0)
         const detailsCache = new Map<string, CancellationDetails | null>()
@@ -282,6 +296,17 @@ app.post('/', middlewareAuth, async (c) => {
 
       case 'customer_country_breakdown':
         result = await getAdminCustomerCountryBreakdown(c, start_date, end_date)
+        break
+
+      case 'organization_insights':
+        result = await getAdminOrganizationInsights(c, start_date, end_date, {
+          limit: limit || 50,
+          offset: offset || 0,
+          plan_name,
+          billing_type,
+          paid_only,
+          search,
+        })
         break
 
       default:

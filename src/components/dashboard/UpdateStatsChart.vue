@@ -59,11 +59,27 @@ const cycleEnd = computed(() => {
 
 const DAY_IN_MS = 1000 * 60 * 60 * 24
 
-// Map action display names back to action filter keys for navigation
-const actionToFilterKey: Record<string, string> = {
-  requested: 'get',
-  install: 'set',
-  fail: 'set_fail',
+const UPDATE_FAILURE_ACTIONS = [
+  'set_fail',
+  'update_fail',
+  'download_fail',
+  'windows_path_fail',
+  'canonical_path_fail',
+  'directory_path_fail',
+  'unzip_fail',
+  'low_mem_fail',
+  'download_manifest_file_fail',
+  'download_manifest_checksum_fail',
+  'download_manifest_brotli_fail',
+  'decrypt_fail',
+  'checksum_fail',
+] as const
+
+// Map chart buckets back to the log actions they aggregate.
+const actionToLogActions: Record<string, readonly string[]> = {
+  requested: ['get'],
+  install: ['set'],
+  fail: UPDATE_FAILURE_ACTIONS,
 }
 
 // Click handler for tooltip items - navigates to logs page filtered by action type and date
@@ -81,11 +97,11 @@ const tooltipClickHandler = computed<TooltipClickHandler | undefined>(() => {
     onAppClick: (actionKey: string, clickContext?: { date: Date, dataIndex: number }) => {
       // Navigate to logs page with action filter and date range
       // The actionKey here is the internal key like 'requested', 'install', 'fail'
-      const filterAction = actionToFilterKey[actionKey] || actionKey
+      const filterActions = actionToLogActions[actionKey] ?? [actionKey]
       const params = new URLSearchParams()
-      params.set('action', filterAction)
+      filterActions.forEach(action => params.append('action', action))
 
-      // Add date range if provided (start of day to end of day)
+      // Add date range if provided (selected day)
       if (clickContext?.date) {
         const startOfDay = dayjs(clickContext.date).startOf('day')
         const endOfDay = dayjs(clickContext.date).endOf('day')

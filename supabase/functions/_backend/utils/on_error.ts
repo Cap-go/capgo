@@ -119,6 +119,16 @@ export function onError(functionName: string) {
         && typeof e.cause === 'object'
         && (e.cause as { suppressDiscordAlert?: unknown }).suppressDiscordAlert === true
       if (e.status === 429) {
+        // Set rate-limit headers from moreInfo when available, but DO NOT
+        // overwrite the response body. Several distinct conditions reach this
+        // branch — `too_many_requests` from simpleRateLimit (IP failed-auth,
+        // API-key flood), `native_build_concurrency_limit_exceeded` from
+        // reserveNativeBuildSlot, and others — and collapsing them to a
+        // generic "You are being rate limited" string strips the actual
+        // errorCode/message/moreInfo (activeBuilds, limit, planName, reason,
+        // …) that callers need to react correctly. Fall through to
+        // `return c.json(res, e.status)` below so the thrower's real error
+        // payload is preserved.
         const rateLimitResetAt = typeof res.moreInfo?.rateLimitResetAt === 'number' ? res.moreInfo.rateLimitResetAt : undefined
         let retryAfterSeconds = typeof res.moreInfo?.retryAfterSeconds === 'number' ? res.moreInfo.retryAfterSeconds : undefined
         if (typeof rateLimitResetAt === 'number' && Number.isFinite(rateLimitResetAt) && !(typeof retryAfterSeconds === 'number' && Number.isFinite(retryAfterSeconds))) {
@@ -130,7 +140,6 @@ export function onError(functionName: string) {
         if (typeof retryAfterSeconds === 'number' && Number.isFinite(retryAfterSeconds)) {
           c.header('Retry-After', String(Math.max(0, Math.floor(retryAfterSeconds))))
         }
-        return c.json({ error: 'too_many_requests', message: 'You are being rate limited' }, e.status)
       }
       if (e.status >= 500 && !suppressDiscordAlert) {
         await backgroundTask(c, sendDiscordAlert500(c, functionName, body, e))

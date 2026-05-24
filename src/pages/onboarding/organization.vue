@@ -585,8 +585,8 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <section class="min-h-full overflow-y-auto bg-slate-50 px-4 py-6 text-slate-950 sm:px-6 sm:py-10 lg:px-8 dark:bg-slate-950 dark:text-slate-50">
-    <div class="mx-auto flex w-full max-w-6xl flex-col gap-6">
+  <section class="h-full min-h-0 overflow-y-auto bg-slate-50 px-4 py-4 text-slate-950 sm:px-5 sm:py-6 lg:px-6 dark:bg-slate-950 dark:text-slate-50">
+    <div class="mx-auto flex w-full max-w-5xl flex-col gap-4">
       <InviteTeammateModal ref="inviteModalRef" @success="onInviteSuccess" />
       <input
         ref="logoInput"
@@ -621,27 +621,27 @@ onUnmounted(() => {
         </button>
       </div>
 
-      <div class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start">
-        <div class="space-y-6">
+      <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start">
+        <div class="space-y-4">
           <div>
-            <div class="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1 text-sm font-semibold text-slate-700 shadow-sm dark:border-white/15 dark:bg-slate-900/95 dark:text-slate-200 dark:shadow-lg dark:shadow-black/20">
-              <IconSparkles class="h-4 w-4" />
+            <div class="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 shadow-sm dark:border-white/15 dark:bg-slate-900/95 dark:text-slate-200 dark:shadow-lg dark:shadow-black/20">
+              <IconSparkles class="h-3.5 w-3.5" />
               {{ onboardingBadge }}
             </div>
-            <h1 class="mt-4 max-w-3xl text-3xl font-semibold text-slate-950 sm:text-4xl dark:text-white">
+            <h1 class="mt-3 max-w-3xl text-2xl font-semibold text-slate-950 sm:text-3xl dark:text-white">
               {{ onboardingTitle }}
             </h1>
-            <p class="mt-3 max-w-2xl text-base leading-7 text-slate-600 dark:text-slate-300">
+            <p class="mt-2 max-w-2xl text-base leading-6 text-slate-600 sm:text-sm dark:text-slate-300">
               {{ onboardingSubtitle }}
             </p>
           </div>
 
-          <div class="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm dark:border-white/15 dark:bg-slate-900/95 dark:shadow-2xl dark:shadow-black/30">
+          <div class="rounded-2xl border border-slate-200 bg-white p-2 shadow-sm dark:border-white/15 dark:bg-slate-900/95 dark:shadow-2xl dark:shadow-black/30">
             <div class="grid gap-2 sm:grid-cols-3">
               <div
                 v-for="(entry, index) in onboardingSteps"
                 :key="entry.id"
-                class="flex min-h-16 items-center gap-3 rounded-xl border px-3 py-2 transition"
+                class="flex min-h-12 items-center gap-2 rounded-xl border px-2.5 py-1.5 transition"
                 :aria-current="isStepActive(entry.id) ? 'step' : undefined"
                 :class="[
                   isStepActive(entry.id) ? 'border-primary-500/30 bg-slate-100 text-slate-950 ring-1 ring-primary-500/10 dark:border-primary-500/60 dark:bg-primary-500/25 dark:text-white dark:ring-primary-500/20' : '',
@@ -650,32 +650,32 @@ onUnmounted(() => {
                 ]"
               >
                 <span
-                  class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-semibold"
+                  class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold"
                   :class="isStepDone(entry.id) ? 'bg-emerald-500 text-white' : isStepActive(entry.id) ? 'bg-primary-500 text-white' : 'bg-slate-200 text-slate-600 dark:bg-slate-800 dark:text-slate-300'"
                 >
-                  <IconCheck v-if="isStepDone(entry.id)" class="h-4 w-4" />
+                  <IconCheck v-if="isStepDone(entry.id)" class="h-3.5 w-3.5" />
                   <span v-else>{{ index + 1 }}</span>
                 </span>
                 <span class="min-w-0">
-                  <span class="block truncate text-sm font-semibold">{{ entry.label }}</span>
+                  <span class="block truncate text-xs font-semibold sm:text-sm">{{ entry.label }}</span>
                   <span class="mt-0.5 block text-xs opacity-75">
                     {{ t('organization-onboarding-progress-count', { current: index + 1, total: onboardingSteps.length }) }}
                   </span>
                 </span>
               </div>
             </div>
-            <div class="mt-3 h-1.5 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-950" aria-hidden="true">
+            <div class="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-950" aria-hidden="true">
               <div class="h-full rounded-full bg-primary-500 transition-all duration-300" :style="{ width: stepProgress }" />
             </div>
           </div>
 
-          <div v-if="step === 'details'" class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6 dark:border-white/15 dark:bg-slate-900/95 dark:shadow-2xl dark:shadow-black/30">
-            <div class="space-y-6">
+          <div v-if="step === 'details'" class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-white/15 dark:bg-slate-900/95 dark:shadow-2xl dark:shadow-black/30">
+            <div class="space-y-4">
               <div>
                 <p class="text-sm font-semibold text-primary-500 dark:text-slate-300">
                   {{ t('organization-onboarding-step-details') }}
                 </p>
-                <h2 class="mt-2 text-2xl font-semibold text-slate-950 dark:text-white">
+                <h2 class="mt-1.5 text-xl font-semibold text-slate-950 dark:text-white">
                   {{ t('organization-onboarding-question') }}
                 </h2>
               </div>
@@ -683,12 +683,12 @@ onUnmounted(() => {
               <div class="grid gap-3 sm:grid-cols-2">
                 <button
                   type="button"
-                  class="group flex min-h-32 items-start gap-4 rounded-2xl border p-4 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-900"
+                  class="group flex min-h-24 items-start gap-3 rounded-xl border p-3 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-900"
                   :class="whiteCardToggleButtonClass(mode === 'website')"
                   data-test="onboarding-mode-website"
                   @click="mode = 'website'"
                 >
-                  <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary-500 text-white">
+                  <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary-500 text-white">
                     <IconGlobe class="h-5 w-5" />
                   </span>
                   <span class="min-w-0 flex-1">
@@ -701,12 +701,12 @@ onUnmounted(() => {
                 </button>
                 <button
                   type="button"
-                  class="group flex min-h-32 items-start gap-4 rounded-2xl border p-4 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-900"
+                  class="group flex min-h-24 items-start gap-3 rounded-xl border p-3 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-900"
                   :class="whiteCardToggleButtonClass(mode === 'name')"
                   data-test="onboarding-mode-name"
                   @click="mode = 'name'"
                 >
-                  <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-slate-900 text-white dark:bg-white dark:text-slate-950">
+                  <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-900 text-white dark:bg-white dark:text-slate-950">
                     <IconPencil class="h-5 w-5" />
                   </span>
                   <span class="min-w-0 flex-1">
@@ -719,7 +719,7 @@ onUnmounted(() => {
                 </button>
               </div>
 
-              <div v-if="mode === 'website'" class="space-y-4 border-t border-slate-200 pt-6 dark:border-white/15">
+              <div v-if="mode === 'website'" class="space-y-3 border-t border-slate-200 pt-4 dark:border-white/15">
                 <div>
                   <label for="onboarding-website-input" class="text-sm font-medium text-slate-800 dark:text-slate-200">
                     {{ t('organization-onboarding-website-label') }}
@@ -731,11 +731,11 @@ onUnmounted(() => {
                       type="url"
                       placeholder="https://capgo.app"
                       data-test="onboarding-website"
-                      class="min-h-12 w-full rounded-xl border border-slate-300 bg-white px-4 text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/10 dark:border-white/20 dark:bg-slate-950/90 dark:text-white dark:placeholder:text-slate-500 dark:focus:border-primary-500 dark:focus:ring-primary-500/30"
+                      class="min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-base text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/10 sm:text-sm dark:border-white/20 dark:bg-slate-950/90 dark:text-white dark:placeholder:text-slate-500 dark:focus:border-primary-500 dark:focus:ring-primary-500/30"
                     >
                     <button
                       type="button"
-                      class="d-btn min-h-12 shrink-0"
+                      class="d-btn min-h-11 shrink-0"
                       :class="whiteCardSecondaryButtonClass()"
                       data-test="onboarding-import-website"
                       :disabled="isLoadingWebsitePreview || !websiteInput.trim()"
@@ -759,7 +759,7 @@ onUnmounted(() => {
               </div>
 
               <template v-if="canShowOrgDetails">
-                <div class="border-t border-slate-200 pt-6 dark:border-white/15">
+                <div class="border-t border-slate-200 pt-4 dark:border-white/15">
                   <label for="onboarding-org-name-input" class="text-sm font-medium text-slate-800 dark:text-slate-200">
                     {{ t('organization-name') }}
                   </label>
@@ -769,7 +769,7 @@ onUnmounted(() => {
                     type="text"
                     :placeholder="t('organization-name')"
                     data-test="onboarding-org-name"
-                    class="mt-2 min-h-12 w-full rounded-xl border border-slate-300 bg-white px-4 text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/10 dark:border-white/20 dark:bg-slate-950/90 dark:text-white dark:placeholder:text-slate-500 dark:focus:border-primary-500 dark:focus:ring-primary-500/30"
+                    class="mt-2 min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-base text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/10 sm:text-sm dark:border-white/20 dark:bg-slate-950/90 dark:text-white dark:placeholder:text-slate-500 dark:focus:border-primary-500 dark:focus:ring-primary-500/30"
                   >
                   <p v-if="mode === 'website'" class="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400">
                     {{ importedLogoUrl
@@ -778,7 +778,7 @@ onUnmounted(() => {
                   </p>
                 </div>
 
-                <div class="border-t border-slate-200 pt-6 dark:border-white/15">
+                <div class="border-t border-slate-200 pt-4 dark:border-white/15">
                   <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div class="min-w-0">
                       <p id="estimated-users-label" class="flex items-center gap-2 text-sm font-medium text-slate-800 dark:text-slate-200">
@@ -790,7 +790,7 @@ onUnmounted(() => {
                       </p>
                     </div>
                     <div
-                      class="shrink-0 rounded-xl border px-3 py-2 text-left sm:text-right"
+                      class="shrink-0 rounded-xl border px-3 py-1.5 text-left sm:text-right"
                       :class="selectedUserCountStop ? 'border-primary-500/20 bg-slate-100 text-slate-900 dark:border-primary-500/60 dark:bg-primary-500/25 dark:text-slate-100' : 'border-slate-200 bg-slate-50 text-slate-500 dark:border-white/15 dark:bg-slate-950/90 dark:text-slate-400'"
                     >
                       <div class="text-xs font-medium uppercase">
@@ -806,7 +806,7 @@ onUnmounted(() => {
 
                   <div
                     id="estimated-users"
-                    class="mt-4 grid gap-3 sm:grid-cols-2"
+                    class="mt-3 grid gap-2 sm:grid-cols-2"
                     role="radiogroup"
                     aria-labelledby="estimated-users-label"
                     aria-describedby="estimated-users-help"
@@ -828,7 +828,7 @@ onUnmounted(() => {
                         @change="selectUserCountStop(index)"
                       >
                       <span
-                        class="flex min-h-20 items-center justify-between gap-3 rounded-xl border p-4 text-left transition peer-focus-visible:outline-none peer-focus-visible:ring-2 peer-focus-visible:ring-primary-500 peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-white dark:peer-focus-visible:ring-offset-slate-900"
+                        class="flex min-h-16 items-center justify-between gap-3 rounded-xl border p-3 text-left transition peer-focus-visible:outline-none peer-focus-visible:ring-2 peer-focus-visible:ring-primary-500 peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-white dark:peer-focus-visible:ring-offset-slate-900"
                         :class="isUserCountStopSelected(index)
                           ? 'border-primary-500 bg-slate-100 text-slate-950 ring-2 ring-primary-500/15 dark:border-primary-500/80 dark:bg-primary-500/25 dark:text-white dark:ring-primary-500/30'
                           : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50 dark:border-white/15 dark:bg-slate-950/90 dark:text-slate-200 dark:hover:border-white/30 dark:hover:bg-slate-900'"
@@ -853,13 +853,13 @@ onUnmounted(() => {
                   </div>
                 </div>
 
-                <div class="flex flex-col-reverse gap-3 border-t border-slate-200 pt-6 sm:flex-row sm:justify-between dark:border-white/15">
-                  <button type="button" class="d-btn min-h-12" :class="whiteCardSecondaryButtonClass()" @click="goBack">
+                <div class="flex flex-col-reverse gap-3 border-t border-slate-200 pt-4 sm:flex-row sm:justify-between dark:border-white/15">
+                  <button type="button" class="d-btn min-h-11" :class="whiteCardSecondaryButtonClass()" @click="goBack">
                     {{ t('cancel') }}
                   </button>
                   <button
                     type="button"
-                    class="d-btn min-h-12"
+                    class="d-btn min-h-11"
                     :class="whiteCardPrimaryButtonClass()"
                     data-test="onboarding-create-org"
                     :disabled="!canCreateOrganization"
@@ -880,16 +880,16 @@ onUnmounted(() => {
             </div>
           </div>
 
-          <div v-else-if="step === 'logo'" class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6 dark:border-white/15 dark:bg-slate-900/95 dark:shadow-2xl dark:shadow-black/30">
-            <div class="space-y-5">
+          <div v-else-if="step === 'logo'" class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-white/15 dark:bg-slate-900/95 dark:shadow-2xl dark:shadow-black/30">
+            <div class="space-y-4">
               <div>
-                <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-primary-500 text-white">
+                <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-500 text-white">
                   <IconImage class="h-5 w-5" />
                 </div>
-                <p class="mt-4 text-sm font-semibold text-primary-500 dark:text-slate-300">
+                <p class="mt-3 text-sm font-semibold text-primary-500 dark:text-slate-300">
                   {{ t('organization-onboarding-step-logo') }}
                 </p>
-                <h2 class="mt-2 text-2xl font-semibold text-slate-950 dark:text-white">
+                <h2 class="mt-1.5 text-xl font-semibold text-slate-950 dark:text-white">
                   {{ t('organization-onboarding-logo-title') }}
                 </h2>
                 <p class="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">
@@ -897,8 +897,8 @@ onUnmounted(() => {
                 </p>
               </div>
 
-              <div class="flex flex-col gap-5 rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-5 sm:flex-row sm:items-center dark:border-white/20 dark:bg-slate-950/90">
-                <div class="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-slate-900 text-2xl font-semibold text-white dark:bg-slate-800">
+              <div class="flex flex-col gap-4 rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4 sm:flex-row sm:items-center dark:border-white/20 dark:bg-slate-950/90">
+                <div class="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-slate-900 text-xl font-semibold text-white dark:bg-slate-800">
                   <img
                     v-if="currentOrganization?.gid === activeOrgId && currentOrganization?.logo"
                     :src="currentOrganization.logo"
@@ -920,18 +920,18 @@ onUnmounted(() => {
                   <div class="mt-1 text-sm leading-6 text-slate-500 dark:text-slate-400">
                     {{ t('organization-onboarding-logo-helper') }}
                   </div>
-                  <button type="button" class="d-btn mt-4 min-h-11" :class="whiteCardSecondaryButtonClass()" data-test="onboarding-upload-logo" :disabled="isUploadingLogo" @click="openLogoPicker">
+                  <button type="button" class="d-btn mt-3 min-h-10" :class="whiteCardSecondaryButtonClass()" data-test="onboarding-upload-logo" :disabled="isUploadingLogo" @click="openLogoPicker">
                     <IconUpload class="h-4 w-4" />
                     {{ t('organization-onboarding-upload-logo') }}
                   </button>
                 </div>
               </div>
 
-              <div class="flex flex-wrap gap-3">
+              <div class="flex flex-wrap gap-2">
                 <button
                   v-if="importedLogoUrl"
                   type="button"
-                  class="d-btn min-h-12"
+                  class="d-btn min-h-11"
                   :class="whiteCardPrimaryButtonClass()"
                   data-test="onboarding-use-imported-logo"
                   :disabled="isUploadingLogo"
@@ -942,7 +942,7 @@ onUnmounted(() => {
                 </button>
                 <button
                   type="button"
-                  class="d-btn min-h-12"
+                  class="d-btn min-h-11"
                   :class="hasSavedLogo ? whiteCardPrimaryButtonClass() : whiteCardSecondaryButtonClass()"
                   data-test="onboarding-logo-action"
                   :disabled="isUploadingLogo"
@@ -958,16 +958,16 @@ onUnmounted(() => {
             </div>
           </div>
 
-          <div v-else class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6 dark:border-white/15 dark:bg-slate-900/95 dark:shadow-2xl dark:shadow-black/30">
-            <div class="space-y-5">
+          <div v-else class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-white/15 dark:bg-slate-900/95 dark:shadow-2xl dark:shadow-black/30">
+            <div class="space-y-4">
               <div>
-                <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-primary-500 text-white">
+                <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-500 text-white">
                   <IconUserPlus class="h-5 w-5" />
                 </div>
-                <p class="mt-4 text-sm font-semibold text-primary-500 dark:text-slate-300">
+                <p class="mt-3 text-sm font-semibold text-primary-500 dark:text-slate-300">
                   {{ t('organization-onboarding-step-invite') }}
                 </p>
-                <h2 class="mt-2 text-2xl font-semibold text-slate-950 dark:text-white">
+                <h2 class="mt-1.5 text-xl font-semibold text-slate-950 dark:text-white">
                   {{ t('organization-onboarding-invite-title') }}
                 </h2>
                 <p class="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">
@@ -975,7 +975,7 @@ onUnmounted(() => {
                 </p>
               </div>
 
-              <div class="rounded-2xl border border-slate-200 bg-slate-50 p-5 dark:border-white/15 dark:bg-slate-950/90">
+              <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-white/15 dark:bg-slate-950/90">
                 <div class="flex items-start gap-4">
                   <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-slate-900 text-white dark:bg-slate-800">
                     <IconBuilding class="h-5 w-5" />
@@ -1013,12 +1013,12 @@ onUnmounted(() => {
                 </ul>
               </div>
 
-              <div class="flex flex-wrap gap-3">
-                <button type="button" class="d-btn min-h-12" :class="whiteCardPrimaryButtonClass()" data-test="onboarding-invite-users" @click="openInviteModal">
+              <div class="flex flex-wrap gap-2">
+                <button type="button" class="d-btn min-h-11" :class="whiteCardPrimaryButtonClass()" data-test="onboarding-invite-users" @click="openInviteModal">
                   <IconUserPlus class="h-4 w-4" />
                   {{ t('organization-onboarding-open-invite') }}
                 </button>
-                <button type="button" class="d-btn min-h-12" :class="whiteCardSecondaryButtonClass()" data-test="onboarding-finish" @click="finishOnboarding">
+                <button type="button" class="d-btn min-h-11" :class="whiteCardSecondaryButtonClass()" data-test="onboarding-finish" @click="finishOnboarding">
                   {{ t('organization-onboarding-create-app') }}
                   <IconArrowRight class="h-4 w-4" />
                 </button>
@@ -1027,9 +1027,9 @@ onUnmounted(() => {
           </div>
         </div>
 
-        <aside class="rounded-2xl border border-slate-900 bg-slate-950 p-5 text-white shadow-xl lg:sticky lg:top-8 dark:border-white/15 dark:bg-slate-900/95 dark:shadow-2xl dark:shadow-black/30">
+        <aside class="rounded-2xl border border-slate-900 bg-slate-950 p-4 text-white shadow-xl lg:sticky lg:top-6 dark:border-white/15 dark:bg-slate-900/95 dark:shadow-2xl dark:shadow-black/30">
           <div class="flex items-center gap-4">
-            <div class="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-slate-800 text-2xl font-semibold">
+            <div class="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-slate-800 text-xl font-semibold">
               <img
                 v-if="importedLogoUrl || selectedLogoPreview || (currentOrganization?.gid === activeOrgId && currentOrganization?.logo)"
                 :src="(currentOrganization?.gid === activeOrgId ? currentOrganization.logo : '') || selectedLogoPreview || importedLogoUrl"
@@ -1052,8 +1052,8 @@ onUnmounted(() => {
             </div>
           </div>
 
-          <div class="mt-6 grid gap-3 text-sm">
-            <div class="rounded-xl border border-white/10 bg-white/5 p-4">
+          <div class="mt-4 grid gap-2 text-sm">
+            <div class="rounded-xl border border-white/10 bg-white/5 p-3">
               <div class="text-xs font-medium uppercase text-slate-500">
                 {{ t('organization-onboarding-selected-path') }}
               </div>
@@ -1065,7 +1065,7 @@ onUnmounted(() => {
                     : t('organization-onboarding-no-choice') }}
               </div>
             </div>
-            <div class="rounded-xl border border-white/10 bg-white/5 p-4">
+            <div class="rounded-xl border border-white/10 bg-white/5 p-3">
               <div class="text-xs font-medium uppercase text-slate-500">
                 {{ t('organization-onboarding-starting-plan') }}
               </div>
@@ -1077,11 +1077,11 @@ onUnmounted(() => {
             </div>
           </div>
 
-          <div v-if="step === 'details'" class="mt-6 border-t border-white/10 pt-6">
+          <div v-if="step === 'details'" class="mt-4 border-t border-white/10 pt-4">
             <p class="text-xs font-medium uppercase text-slate-500">
               {{ t('organization-onboarding-next-steps') }}
             </p>
-            <ul class="mt-4 space-y-3 text-sm leading-6 text-slate-300">
+            <ul class="mt-3 space-y-2 text-sm leading-6 text-slate-300">
               <li class="flex gap-3">
                 <IconCheck class="mt-1 h-4 w-4 shrink-0 text-emerald-400" />
                 {{ mode === 'website' && importedLogoUrl
@@ -1103,7 +1103,7 @@ onUnmounted(() => {
             </ul>
           </div>
 
-          <div v-else-if="step === 'logo'" class="mt-6 border-t border-white/10 pt-6">
+          <div v-else-if="step === 'logo'" class="mt-4 border-t border-white/10 pt-4">
             <p class="text-xs font-medium uppercase text-slate-500">
               {{ t('organization-onboarding-import-preview') }}
             </p>
@@ -1127,7 +1127,7 @@ onUnmounted(() => {
               </div>
             </div>
 
-            <ul class="mt-5 space-y-3 text-sm leading-6 text-slate-300">
+            <ul class="mt-4 space-y-2 text-sm leading-6 text-slate-300">
               <li class="flex gap-3">
                 <IconCheck class="mt-1 h-4 w-4 shrink-0 text-emerald-400" />
                 {{ t('organization-onboarding-logo-tip-upload') }}
@@ -1139,11 +1139,11 @@ onUnmounted(() => {
             </ul>
           </div>
 
-          <div v-else class="mt-6 border-t border-white/10 pt-6">
+          <div v-else class="mt-4 border-t border-white/10 pt-4">
             <p class="text-xs font-medium uppercase text-slate-500">
               {{ t('organization-onboarding-what-next') }}
             </p>
-            <ul class="mt-4 space-y-3 text-sm leading-6 text-slate-300">
+            <ul class="mt-3 space-y-2 text-sm leading-6 text-slate-300">
               <li class="flex gap-3">
                 <IconCheck class="mt-1 h-4 w-4 shrink-0 text-emerald-400" />
                 {{ t('organization-onboarding-after-invite-1') }}

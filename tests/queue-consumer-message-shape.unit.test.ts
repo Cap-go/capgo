@@ -1,6 +1,17 @@
-import { describe, expect, it } from 'vitest'
+import { HTTPException } from 'hono/http-exception'
+import { describe, expect, it, vi } from 'vitest'
 import { __queueConsumerTestUtils__, MAX_QUEUE_READS, messagesArraySchema } from '../supabase/functions/_backend/triggers/queue_consumer.ts'
 import { parseSchema } from '../supabase/functions/_backend/utils/ark_validation.ts'
+
+function createHealthcheckDb(queueLength: number) {
+  return {
+    db: {
+      query: vi.fn(async <T = Record<string, unknown>>(): Promise<{ rows: T[] }> => ({
+        rows: [{ queue_length: String(queueLength) } as T],
+      })),
+    },
+  }
+}
 
 describe('queue_consumer legacy message compatibility', () => {
   it.concurrent('uses the payload envelope when it is present', () => {
@@ -73,6 +84,29 @@ describe('queue_consumer legacy message compatibility', () => {
     ])).toEqual([])
   })
 
+  it.concurrent('keeps manifest size lookup failures retrying until the queue budget is exhausted', () => {
+    expect(__queueConsumerTestUtils__.getActionableQueueFailures([
+      {
+        cf_id: 'cf-manifest',
+        error_code: 'manifest_size_not_found',
+        function_name: 'on_manifest_create',
+        function_type: 'supabase',
+        msg_id: 10,
+        payload_size: 10,
+        read_count: MAX_QUEUE_READS - 1,
+        status: 503,
+        status_text: 'Service Unavailable',
+      },
+    ])).toEqual([])
+  })
+
+  it.concurrent('caps manifest queue batches and concurrency to avoid storage bursts', () => {
+    expect(__queueConsumerTestUtils__.getQueueBatchSize('on_manifest_create', 950)).toBe(100)
+    expect(__queueConsumerTestUtils__.getQueueBatchSize('cron_email', 950)).toBe(950)
+    expect(__queueConsumerTestUtils__.getQueueHttpConcurrency('on_manifest_create')).toBe(10)
+    expect(__queueConsumerTestUtils__.getQueueHttpConcurrency('cron_email')).toBe(25)
+  })
+
   it.concurrent('alerts Discord after retry budget is exhausted', () => {
     const failure = {
       cf_id: 'cf-1',
@@ -138,5 +172,144 @@ describe('queue_consumer legacy message compatibility', () => {
       errorCode: null,
       errorMessage: 'builder unavailable',
     })
+  })
+
+  it.concurrent('turns queue transport failures into retryable per-message responses', async () => {
+    const response = __queueConsumerTestUtils__.queueFailureResponse('queue_message_failed', 'fetch failed', {
+      cfId: 'cf-transport',
+      msgId: 12,
+      queueName: 'on_manifest_create',
+      targetUrl: 'direct:on_manifest_create',
+    })
+
+    const details = await __queueConsumerTestUtils__.extractErrorDetails(response)
+
+    expect(response.status).toBe(599)
+    expect(details.errorCode).toBe('queue_message_failed')
+    expect(details.errorMessage).toBe('fetch failed')
+    expect(details.bodyPreview).toContain('"queueName":"on_manifest_create"')
+    expect(details.bodyPreview).toContain('"targetUrl":"direct:on_manifest_create"')
+  })
+
+  it.concurrent('preserves direct handler HTTP error details for queue retries', async () => {
+    const response = __queueConsumerTestUtils__.httpExceptionToQueueResponse(new HTTPException(503, {
+      message: 'Manifest file size metadata was not found',
+      cause: {
+        error: 'manifest_size_not_found',
+        message: 'Manifest file size metadata was not found',
+        moreInfo: {
+          id: 123,
+          queue: { queueName: 'on_manifest_create' },
+        },
+      },
+    }))
+
+    expect(response).not.toBeNull()
+    const details = await __queueConsumerTestUtils__.extractErrorDetails(response!)
+
+    expect(response!.status).toBe(503)
+    expect(details.errorCode).toBe('manifest_size_not_found')
+    expect(details.errorMessage).toBe('Manifest file size metadata was not found')
+    expect(details.bodyPreview).toContain('"id":123')
+    expect(details.bodyPreview).toContain('"queueName":"on_manifest_create"')
+  })
+
+  it.concurrent('calls the healthcheck URL when the worker succeeds and the queue is empty', async () => {
+    const { db } = createHealthcheckDb(0)
+    const fetchImpl = vi.fn(async () => new Response(null, { status: 200 })) as unknown as typeof fetch
+
+    const reported = await __queueConsumerTestUtils__.maybePingCronHealthcheck(
+      db as never,
+      'cron_email',
+      {
+        archivedCount: 0,
+        failedCount: 0,
+        processedCount: 1,
+        readSucceeded: true,
+        skippedCount: 0,
+        success: true,
+        successCount: 1,
+      },
+      'https://example.com/healthcheck',
+      fetchImpl,
+    )
+
+    expect(reported).toBe(true)
+    expect(fetchImpl).toHaveBeenCalledTimes(1)
+    expect(fetchImpl).toHaveBeenCalledWith('https://example.com/healthcheck', expect.objectContaining({
+      method: 'GET',
+    }))
+  })
+
+  it.concurrent('does not call the healthcheck URL when queue work remains', async () => {
+    const { db } = createHealthcheckDb(2)
+    const fetchImpl = vi.fn(async () => new Response(null, { status: 200 })) as unknown as typeof fetch
+
+    const reported = await __queueConsumerTestUtils__.maybePingCronHealthcheck(
+      db as never,
+      'cron_email',
+      {
+        archivedCount: 0,
+        failedCount: 0,
+        processedCount: 1,
+        readSucceeded: true,
+        skippedCount: 0,
+        success: true,
+        successCount: 1,
+      },
+      'https://example.com/healthcheck',
+      fetchImpl,
+    )
+
+    expect(reported).toBe(false)
+    expect(fetchImpl).not.toHaveBeenCalled()
+  })
+
+  it.concurrent('returns false when the healthcheck URL responds with an error', async () => {
+    const { db } = createHealthcheckDb(0)
+    const fetchImpl = vi.fn(async () => new Response(null, { status: 500 })) as unknown as typeof fetch
+
+    const reported = await __queueConsumerTestUtils__.maybePingCronHealthcheck(
+      db as never,
+      'cron_email',
+      {
+        archivedCount: 0,
+        failedCount: 0,
+        processedCount: 1,
+        readSucceeded: true,
+        skippedCount: 0,
+        success: true,
+        successCount: 1,
+      },
+      'https://example.com/healthcheck',
+      fetchImpl,
+    )
+
+    expect(reported).toBe(false)
+    expect(fetchImpl).toHaveBeenCalledTimes(1)
+  })
+
+  it.concurrent('does not call the healthcheck URL when the worker failed', async () => {
+    const { db } = createHealthcheckDb(0)
+    const fetchImpl = vi.fn(async () => new Response(null, { status: 200 })) as unknown as typeof fetch
+
+    const reported = await __queueConsumerTestUtils__.maybePingCronHealthcheck(
+      db as never,
+      'cron_email',
+      {
+        archivedCount: 0,
+        failedCount: 1,
+        processedCount: 1,
+        readSucceeded: true,
+        skippedCount: 0,
+        success: false,
+        successCount: 0,
+      },
+      'https://example.com/healthcheck',
+      fetchImpl,
+    )
+
+    expect(reported).toBe(false)
+    expect(fetchImpl).not.toHaveBeenCalled()
   })
 })

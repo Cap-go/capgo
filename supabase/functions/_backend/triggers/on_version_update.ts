@@ -5,12 +5,12 @@ import { eq } from 'drizzle-orm'
 import { Hono } from 'hono/tiny'
 import { BRES, middlewareAPISecret, simpleError, triggerValidator } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
+import { normalizeLegacyEncodedManifestFileName } from '../utils/manifest_encoding.ts'
 import { closeClient, getDrizzleClient, getPgClient } from '../utils/pg.ts'
 import { manifest } from '../utils/postgres_schema.ts'
 import { getPath, s3 } from '../utils/s3.ts'
 import { createStatsMeta } from '../utils/stats.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
-import { backgroundTask } from '../utils/utils.ts'
 
 /**
  * Resolves `owner_org` for an app version row.
@@ -99,7 +99,7 @@ async function handleManifest(c: Context, record: Database['public']['Tables']['
       .filter(entry => entry.file_name && entry.file_hash && entry.s3_path)
       .map(entry => ({
         app_version_id: record.id,
-        file_name: entry.file_name!,
+        file_name: normalizeLegacyEncodedManifestFileName(entry.file_name, entry.s3_path)!,
         file_hash: entry.file_hash!,
         s3_path: entry.s3_path!,
         file_size: 0,
@@ -193,7 +193,7 @@ async function updateIt(c: Context, record: Database['public']['Tables']['app_ve
 }
 
 /**
- * Deletes manifest rows and orphaned S3 assets for a removed app version.
+ * Deletes manifest rows and moves orphaned S3 assets to the R2 trash prefix.
  */
 async function deleteManifest(c: Context, record: Database['public']['Tables']['app_versions']['Row']) {
   // Delete manifest entries - first get them to delete from S3
@@ -209,11 +209,11 @@ async function deleteManifest(c: Context, record: Database['public']['Tables']['
     if (manifestEntries && manifestEntries.length > 0) {
       const manifestCount = manifestEntries.length
 
-      // Delete each file from S3
-      const promisesDeleteS3 = []
+      // Move each unreferenced file to the R2 trash prefix.
+      const promisesMoveToTrash = []
       for (const entry of manifestEntries) {
         if (entry.s3_path) {
-          promisesDeleteS3.push(
+          promisesMoveToTrash.push(
             // First delete the manifest row from database
             supabaseAdmin(c)
               .from('manifest')
@@ -228,9 +228,11 @@ async function deleteManifest(c: Context, record: Database['public']['Tables']['
                 // This avoids race condition where concurrent deletes both skip S3 cleanup
                 return supabaseAdmin(c)
                   .from('manifest')
-                  .select('*', { count: 'exact', head: true })
-                  .eq('file_name', entry.file_name)
+                  .select('id')
                   .eq('file_hash', entry.file_hash)
+                  .eq('file_name', entry.file_name)
+                  .limit(1)
+                  .maybeSingle()
               })
               .then((v) => {
                 if (!v)
@@ -239,19 +241,23 @@ async function deleteManifest(c: Context, record: Database['public']['Tables']['
                   cloudlog({ requestId: c.get('requestId'), message: 'error checking manifest references', error: v.error })
                   return // Don't delete S3 if we can't confirm no other references
                 }
-                const count = v.count ?? 0
-                if (count) {
+                if (v.data) {
                   // Other versions still use this file, S3 cleanup not needed
                   return
                 }
-                // No other versions use this file, delete from S3
-                cloudlog({ requestId: c.get('requestId'), message: 'deleted manifest file from S3', s3_path: entry.s3_path })
-                return s3.deleteObject(c, entry.s3_path)
+                // No other versions use this file, move it to the R2 trash prefix.
+                cloudlog({ requestId: c.get('requestId'), message: 'moving manifest file to R2 trash', s3_path: entry.s3_path })
+                return s3.moveObjectToTrash(c, entry.s3_path)
+                  .then((moved) => {
+                    if (!moved) {
+                      throw simpleError('cannot_move_manifest_s3_to_trash', 'Cannot move S3 object for deleted manifest file to trash', { id: entry.id, s3_path: entry.s3_path })
+                    }
+                  })
               }),
           )
         }
       }
-      await backgroundTask(c, Promise.all(promisesDeleteS3))
+      await Promise.all(promisesMoveToTrash)
 
       // After deleting manifest entries, update manifest_count and decrement manifest_bundle_count
       const updatePgClient = getPgClient(c, false)
@@ -281,7 +287,7 @@ async function deleteManifest(c: Context, record: Database['public']['Tables']['
     }
   }
   catch (error) {
-    cloudlog({ requestId: c.get('requestId'), message: 'error fetch manifest entries', error })
+    cloudlog({ requestId: c.get('requestId'), message: 'error deleting manifest entries', error })
   }
   finally {
     await closeClient(c, pgClient)
@@ -292,17 +298,17 @@ export async function deleteIt(c: Context, record: Database['public']['Tables'][
   cloudlog({ requestId: c.get('requestId'), message: 'Delete', r2_path: record.r2_path })
 
   if (record.r2_path) {
-    let deleted = false
+    let moved = false
     try {
-      deleted = await s3.deleteObject(c, record.r2_path)
+      moved = await s3.moveObjectToTrash(c, record.r2_path)
     }
     catch (error) {
-      cloudlog({ requestId: c.get('requestId'), message: 'Cannot delete s3 (v2)', error })
-      throw simpleError('cannot_delete_s3', 'Cannot delete S3 object for deleted version', { id: record.id, r2_path: record.r2_path }, error)
+      cloudlog({ requestId: c.get('requestId'), message: 'Cannot move s3 to trash (v2)', error })
+      throw simpleError('cannot_move_s3_to_trash', 'Cannot move S3 object for deleted version to trash', { id: record.id, r2_path: record.r2_path }, error)
     }
 
-    if (!deleted) {
-      throw simpleError('cannot_delete_s3', 'Cannot delete S3 object for deleted version', { id: record.id, r2_path: record.r2_path })
+    if (!moved) {
+      throw simpleError('cannot_move_s3_to_trash', 'Cannot move S3 object for deleted version to trash', { id: record.id, r2_path: record.r2_path })
     }
   }
   else {

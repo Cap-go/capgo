@@ -10,7 +10,6 @@ import { toast } from 'vue-sonner'
 import IconCopy from '~icons/heroicons/clipboard-document-check'
 import IconCode from '~icons/heroicons/code-bracket'
 import Settings from '~icons/heroicons/cog-8-tooth'
-import IconEye from '~icons/heroicons/eye'
 import IconInformation from '~icons/heroicons/information-circle'
 import IconSearch from '~icons/ic/round-search?raw'
 import IconAlertCircle from '~icons/lucide/alert-circle'
@@ -20,7 +19,7 @@ import IconDown from '~icons/material-symbols/keyboard-arrow-down-rounded'
 import { formatDate, formatLocalDate } from '~/services/date'
 import { checkPermissions } from '~/services/permissions'
 import { checkCompatibilityNativePackages, defaultApiHost, isCompatible, useSupabase } from '~/services/supabase'
-import { isInternalVersionName } from '~/services/versions'
+import { isInternalVersionName, withBuiltinChannelVersion } from '~/services/versions'
 import { useAppDetailStore } from '~/stores/appDetail'
 import { useDialogV2Store } from '~/stores/dialogv2'
 import { useDisplayStore } from '~/stores/display'
@@ -80,15 +79,9 @@ onClickOutside(autoUpdateDropdown, () => closeAutoUpdateDropdown())
 function openBundle() {
   if (!channel.value || channel.value.version.storage_provider === 'revert_to_builtin')
     return
-  if (channel.value.version.name === 'unknown')
+  if (isInternalVersionName(channel.value.version.name))
     return
   router.push(`/app/${route.params.app}/bundle/${channel.value.version.id}`)
-}
-
-function openPreview() {
-  if (!channel.value)
-    return
-  router.push(`/app/${route.params.app}/channel/${id.value}/preview`)
 }
 
 async function getChannel(force = false) {
@@ -97,7 +90,7 @@ async function getChannel(force = false) {
 
   // Check if we already have this channel in the store
   if (!force && appDetailStore.currentChannelId === id.value && appDetailStore.currentChannel) {
-    channel.value = appDetailStore.currentChannel as any
+    channel.value = withBuiltinChannelVersion(appDetailStore.currentChannel as any) as any
     if (channel.value?.name)
       displayStore.setChannelName(String(channel.value.id), channel.value.name)
     displayStore.NavTitle = channel.value?.name ?? t('channel')
@@ -143,7 +136,7 @@ async function getChannel(force = false) {
       return
     }
 
-    channel.value = data as unknown as Database['public']['Tables']['channels']['Row'] & Channel
+    channel.value = withBuiltinChannelVersion(data as any) as unknown as Database['public']['Tables']['channels']['Row'] & Channel
 
     // Store in appDetailStore
     appDetailStore.setChannel(id.value, channel.value)
@@ -171,7 +164,7 @@ async function saveChannelChange<K extends EditableChannelKey>(key: K, val: Chan
     return false
 
   // Validate version ID if updating version field
-  if (key === 'version' && (val === undefined || val === null || typeof val !== 'number')) {
+  if (key === 'version' && (val === undefined || (val !== null && typeof val !== 'number'))) {
     console.error('Invalid version ID:', val)
     toast.error(t('error-invalid-version'))
     return false
@@ -267,28 +260,6 @@ async function handleVersionLink(appVersion: Database['public']['Tables']['app_v
   toast.success(t('linked-bundle'))
 }
 
-async function getUnknownVersion(): Promise<number> {
-  if (!channel.value)
-    return 0
-  try {
-    const { data, error } = await supabase
-      .from('app_versions')
-      .select('id, app_id, name')
-      .eq('app_id', channel.value.version.app_id)
-      .eq('name', 'unknown')
-      .single()
-    if (error) {
-      console.error('no unknown version', error)
-      return 0
-    }
-    return data.id
-  }
-  catch (error) {
-    console.error(error)
-  }
-  return 0
-}
-
 async function handleUnlink() {
   if (!channel.value || !main.auth)
     return
@@ -307,10 +278,7 @@ async function handleUnlink() {
         text: t('continue'),
         role: 'primary',
         handler: async () => {
-          const id = await getUnknownVersion()
-          if (!id)
-            return
-          saveChannelChange('version', id)
+          await saveChannelChange('version', null)
         },
       },
     ],
@@ -335,22 +303,7 @@ async function handleRevert() {
         text: t('confirm'),
         role: 'primary',
         handler: async () => {
-          const { data: revertVersionId, error } = await supabase
-            .rpc('check_revert_to_builtin_version', { appid: packageId.value })
-
-          if (error) {
-            console.error('lazy load revertVersionId fail', error)
-            toast.error(t('error-revert-to-builtin'))
-            return
-          }
-
-          if (!revertVersionId || typeof revertVersionId !== 'number') {
-            console.error('Invalid revert version ID:', revertVersionId)
-            toast.error(t('error-invalid-version'))
-            return
-          }
-
-          await saveChannelChange('version', revertVersionId)
+          await saveChannelChange('version', null)
         },
       },
     ],
@@ -672,15 +625,6 @@ async function copyCurlCommand() {
             <InfoRow :label="t('bundle-number')" :is-link="channel && !isInternalVersionName((channel.version.name))">
               <div class="flex items-center gap-2">
                 <span class="cursor-pointer" @click="openBundle()">{{ channel.version.name }}</span>
-                <button
-                  v-if="channel"
-                  class="border border-gray-200 dark:border-gray-700 d-btn d-btn-ghost d-btn-square d-btn-sm"
-                  :title="t('preview')"
-                  :aria-label="t('preview')"
-                  @click="openPreview()"
-                >
-                  <IconEye class="w-4 h-4 text-gray-500 dark:text-gray-400" />
-                </button>
                 <button
                   v-if="channel"
                   class="p-1 transition-colors border border-gray-200 rounded-md dark:border-gray-700 hover:bg-gray-50 hover:border-gray-300 dark:hover:border-gray-600 dark:hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:border-gray-200 dark:disabled:hover:border-gray-700"

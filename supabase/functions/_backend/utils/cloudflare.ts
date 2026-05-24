@@ -47,15 +47,15 @@ export type Bindings = {
   NOTIFICATION_QUEUE?: Queue
   DB_STOREAPPS: D1Database
   HYPERDRIVE_CAPGO_DIRECT_EU: Hyperdrive // Add Hyperdrive binding
-  HYPERDRIVE_CAPGO_PS_NA: Hyperdrive
-  HYPERDRIVE_CAPGO_PS_EU: Hyperdrive
-  HYPERDRIVE_CAPGO_PS_SA: Hyperdrive
-  HYPERDRIVE_CAPGO_PS_OC: Hyperdrive
-  HYPERDRIVE_CAPGO_PS_AS_JAPAN: Hyperdrive
-  HYPERDRIVE_CAPGO_PS_AS_INDIA: Hyperdrive
-  HYPERDRIVE_CAPGO_GG_ME: Hyperdrive
-  HYPERDRIVE_CAPGO_GG_AF: Hyperdrive
-  HYPERDRIVE_CAPGO_GG_HK: Hyperdrive
+  HYPERDRIVE_CAPGO_READ_NA: Hyperdrive
+  HYPERDRIVE_CAPGO_READ_EU: Hyperdrive
+  HYPERDRIVE_CAPGO_READ_SA: Hyperdrive
+  HYPERDRIVE_CAPGO_READ_OC: Hyperdrive
+  HYPERDRIVE_CAPGO_READ_AS_JAPAN: Hyperdrive
+  HYPERDRIVE_CAPGO_READ_AS_INDIA: Hyperdrive
+  HYPERDRIVE_CAPGO_READ_ME: Hyperdrive
+  HYPERDRIVE_CAPGO_READ_AF: Hyperdrive
+  HYPERDRIVE_CAPGO_READ_HK: Hyperdrive
   ATTACHMENT_UPLOAD_HANDLER: DurableObjectNamespace
   ATTACHMENT_BUCKET: R2Bucket
   AI?: AiBinding
@@ -253,7 +253,6 @@ export async function trackDevicesCF(c: Context, device: DeviceWithoutCreatedAt)
     const cachedDevice = trackDeviceCache.available
       ? await trackDeviceCache.matchJson<DeviceCachePayload>(trackDeviceCacheRequest)
       : null
-    // TODO: re-enable caching after 10 december, to let the new DB get populated
     if (cachedDevice && !hasComparableDeviceChanged(cachedDevice, device)) {
       cloudlog({
         requestId: c.get('requestId'),
@@ -963,7 +962,6 @@ export async function countUpdatesFromStoreAppsCF(c: Context): Promise<number> {
 }
 
 export async function countUpdatesFromLogsCF(c: Context): Promise<number> {
-  // TODO: This will be a problem in 3 months where the old logs will be deleted automatically by Cloudflare starting 22/08/2024
   const query = `SELECT SUM(_sample_interval) AS count FROM app_log WHERE blob2 = 'get'`
 
   cloudlog({ requestId: c.get('requestId'), message: 'countUpdatesFromLogsCF query', query })
@@ -978,7 +976,6 @@ export async function countUpdatesFromLogsCF(c: Context): Promise<number> {
 }
 
 export async function countUpdatesFromLogsExternalCF(c: Context): Promise<number> {
-  // TODO: This will be a problem in 3 months where the old logs will be deleted automatically by Cloudflare starting 22/08/2024
   const query = `SELECT SUM(_sample_interval) AS count FROM app_log_external WHERE blob2 = 'get'`
 
   cloudlog({ requestId: c.get('requestId'), message: 'countUpdatesFromLogsExternalCF query', query })

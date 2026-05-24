@@ -47,7 +47,6 @@ export const NO_TRANSFORM_CACHE_CONTROL = 'no-transform'
 
 // how long an unfinished upload lives in ms
 export const UPLOAD_EXPIRATION_MS = 1 * 24 * 60 * 60 * 1000 // 1 day
-// TODO: make sure partial unfinished uploads are cleaned up automatically in r2 after 1 day
 
 // how much we'll buffer in memory, must be greater than or equal to R2's min part size
 // https://developers.cloudflare.com/r2/objects/multipart-objects/#limitations
@@ -63,8 +62,72 @@ export const ALLOWED_HEADERS = HEADERS.join(', ')
 export const ALLOWED_METHODS = REQUEST_METHODS.join(', ')
 export const EXPOSED_HEADERS = HEADERS.join(', ')
 
+export type AppScopedAttachmentPath = | { kind: 'scoped', app_id: string, owner_org: string } | { kind: 'invalid_scoped' }
+
 export function encodeR2KeyForUploadLocation(r2Key: string): string {
   return r2Key.split('/').map(segment => encodeURIComponent(segment)).join('/')
+}
+
+export function getAttachmentReadCandidateKeys(decodedKey: string, rawRouteKey: string | null | undefined): string[] {
+  const candidates = [decodedKey]
+  if (rawRouteKey && rawRouteKey !== decodedKey) {
+    candidates.push(rawRouteKey)
+
+    const encodedRawRouteKey = encodeR2KeyForUploadLocation(rawRouteKey)
+    if (encodedRawRouteKey !== rawRouteKey && encodedRawRouteKey !== decodedKey)
+      candidates.push(encodedRawRouteKey)
+  }
+
+  return [...new Set(candidates)]
+}
+
+export function parseAppScopedAttachmentPath(fileId: unknown): AppScopedAttachmentPath | null {
+  if (typeof fileId !== 'string') {
+    return null
+  }
+
+  const [orgs, owner_org, apps, app_id, ...suffix] = fileId.split('/')
+  if (orgs !== 'orgs') {
+    return null
+  }
+
+  if (!owner_org || apps !== 'apps' || !app_id || suffix.length === 0 || suffix.some(part => part.length === 0)) {
+    return { kind: 'invalid_scoped' }
+  }
+
+  return { kind: 'scoped', app_id, owner_org }
+}
+
+function hasSameReadableAppScope(decodedKey: string, rawRouteKey: string): boolean {
+  const decodedScope = parseAppScopedAttachmentPath(decodedKey)
+  const rawScope = parseAppScopedAttachmentPath(rawRouteKey)
+
+  if (decodedScope?.kind !== 'scoped' || rawScope?.kind !== 'scoped')
+    return false
+
+  return decodedScope.owner_org === rawScope.owner_org && decodedScope.app_id === rawScope.app_id
+}
+
+export function getSafeAttachmentReadCandidateKeys(decodedKey: string, rawRouteKey: string | null): string[] {
+  const candidateKeys = getAttachmentReadCandidateKeys(decodedKey, rawRouteKey)
+  if (candidateKeys.length === 1 || !rawRouteKey || hasSameReadableAppScope(decodedKey, rawRouteKey))
+    return candidateKeys
+
+  return [decodedKey]
+}
+
+export interface AttachmentHeadReader<T> {
+  head: (key: string) => Promise<T | null>
+}
+
+export async function headFirstExistingAttachmentCandidate<T>(reader: AttachmentHeadReader<T>, candidateKeys: string[]): Promise<T | null> {
+  for (const candidateKey of candidateKeys) {
+    const objectInfo = await reader.head(candidateKey)
+    if (objectInfo != null)
+      return objectInfo
+  }
+
+  return null
 }
 
 export function withNoTransformCacheControl(cacheControl: string | null | undefined): string {

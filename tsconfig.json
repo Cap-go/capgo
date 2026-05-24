@@ -51,6 +51,10 @@
     "benches",
     "vite.config.mts",
     "temp_cli_test",
-    "tests/device_comparison.test.ts"
+    "tests/device_comparison.test.ts",
+    "tests/ai-analysis-telemetry.unit.test.ts",
+    "tests/builder-onboarding-telemetry.unit.test.ts",
+    "tests/builder-upload-telemetry.unit.test.ts",
+    "tests/onboarding-error-categories.unit.test.ts"
   ]
 }

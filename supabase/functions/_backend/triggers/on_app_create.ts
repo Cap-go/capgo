@@ -147,28 +147,6 @@ app.post('/', middlewareAPISecret, triggerValidator('apps', 'INSERT'), async (c)
 
   // Purge on-prem cache for this app to clear any stale responses
   await backgroundTask(c, purgeOnPremCache(c, record.app_id))
-  const { error: dbVersionError } = await supabase
-    .from('app_versions')
-    .upsert([
-      {
-        owner_org: ownerOrg,
-        deleted: true,
-        name: 'unknown',
-        app_id: record.app_id,
-      },
-      {
-        owner_org: ownerOrg,
-        deleted: true,
-        name: 'builtin',
-        app_id: record.app_id,
-      },
-    ], { onConflict: 'name,app_id', ignoreDuplicates: true })
-    .select()
-
-  if (dbVersionError) {
-    cloudlog({ requestId: c.get('requestId'), message: 'Error creating default versions', dbVersionError })
-  }
-
   // Skip onboarding emails for demo apps
   if (!isDemo && !isPendingOnboarding) {
     await backgroundTask(c, createIfNotExistStoreInfo(c, {

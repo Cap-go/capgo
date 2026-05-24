@@ -165,14 +165,21 @@ function convertToUnixPath(windowsPath: string): string {
   return normalizedPath.split(win32.sep).join(posix.sep)
 }
 
-// Properly encode path segments while preserving slashes
 function encodePathSegments(path: string): string {
-  const result = path.split('/').map(segment => encodeURIComponent(segment)).join('/')
-  // if has space print it
-  if (path.includes(' ')) {
-    log.warn(`File "${path}" contains spaces in its name.`)
+  return path.split('/').map(segment => encodeURIComponent(segment)).join('/')
+}
+
+export function buildPartialUploadPath(orgId: string, appId: string, fileHash: string, filePathUnix: string, encryptionOptions?: { ivSessionKey: string }) {
+  // Keep the storage prefix short while preserving the full hash in manifest verification.
+  const filenameHash = createHash('sha256').update(fileHash).digest('hex')
+  const filePathUnixSafe = encodePathSegments(filePathUnix)
+
+  if (encryptionOptions) {
+    const ivSessionKeyHex = Buffer.from(encryptionOptions.ivSessionKey).toString('hex')
+    return `orgs/${orgId}/apps/${appId}/delta/${ivSessionKeyHex}/${filenameHash}_${filePathUnixSafe}`
   }
-  return result
+
+  return `orgs/${orgId}/apps/${appId}/delta/${filenameHash}_${filePathUnixSafe}`
 }
 
 interface PartialEncryptionOptions {
@@ -264,23 +271,7 @@ export async function uploadPartial(
         brFilesCount++
       }
 
-      const filePathUnixSafe = encodePathSegments(uploadPathUnix)
-      // Use SHA256 of file.hash for filename to keep it short (64 chars)
-      // The full hash (encrypted or not) is preserved in the manifest's file_hash field for plugin verification
-      const filenameHash = createHash('sha256').update(file.hash).digest('hex')
-
-      // Include hex-encoded ivSessionKey in the path for encrypted files
-      // This ensures files encrypted with different session keys/IVs have different paths
-      // and allows caching of files encrypted with the same session key/IV
-      let filename: string
-      if (encryptionOptions) {
-        // Convert ivSessionKey to hex for use in path (URL-safe)
-        const ivSessionKeyHex = Buffer.from(encryptionOptions.ivSessionKey).toString('hex')
-        filename = `orgs/${orgId}/apps/${appId}/delta/${ivSessionKeyHex}/${filenameHash}_${filePathUnixSafe}`
-      }
-      else {
-        filename = `orgs/${orgId}/apps/${appId}/delta/${filenameHash}_${filePathUnixSafe}`
-      }
+      const filename = buildPartialUploadPath(orgId, appId, file.hash, uploadPathUnix, encryptionOptions)
 
       // Check if file already exists on server
       // Skip reuse when encryption is enabled because the session key changes per upload
@@ -288,7 +279,7 @@ export async function uploadPartial(
       if (!encryptionOptions && await fileExists(localConfig, filename)) {
         uploadedFiles++
         return Promise.resolve({
-          file_name: filePathUnixSafe,
+          file_name: uploadPathUnix,
           s3_path: filename,
           file_hash: file.hash,
         })
@@ -339,7 +330,7 @@ export async function uploadPartial(
           onSuccess() {
             uploadedFiles++
             resolve({
-              file_name: filePathUnixSafe,
+              file_name: uploadPathUnix,
               s3_path: filename,
               file_hash: file.hash,
             })

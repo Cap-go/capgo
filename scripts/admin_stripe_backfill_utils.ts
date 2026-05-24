@@ -75,7 +75,7 @@ export function createStripeClient(secretKey: string, apiBaseUrl?: string) {
 
   type StripeApiVersion = NonNullable<ConstructorParameters<typeof Stripe>[1]>['apiVersion']
   return new Stripe(secretKey, {
-    apiVersion: '2026-03-25.dahlia' as StripeApiVersion,
+    apiVersion: '2026-04-22.dahlia' as StripeApiVersion,
     httpClient: Stripe.createFetchHttpClient(),
     ...hostConfig,
   })

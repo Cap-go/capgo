@@ -65,6 +65,13 @@ declare module 'vue-router/auto-routes' {
       Record<never, never>,
       | never
     >,
+    '/admin/dashboard/organizations': RouteRecordInfo<
+      '/admin/dashboard/organizations',
+      '/admin/dashboard/organizations',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
     '/admin/dashboard/plugins': RouteRecordInfo<
       '/admin/dashboard/plugins',
       '/admin/dashboard/plugins',
@@ -352,6 +359,13 @@ declare module 'vue-router/auto-routes' {
       Record<never, never>,
       | never
     >,
+    '/onboarding/invitation': RouteRecordInfo<
+      '/onboarding/invitation',
+      '/onboarding/invitation',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
     '/onboarding/organization': RouteRecordInfo<
       '/onboarding/organization',
       '/onboarding/organization',
@@ -567,6 +581,12 @@ declare module 'vue-router/auto-routes' {
     'src/pages/admin/dashboard/debug.vue': {
       routes:
         | '/admin/dashboard/debug'
+      views:
+        | never
+    }
+    'src/pages/admin/dashboard/organizations.vue': {
+      routes:
+        | '/admin/dashboard/organizations'
       views:
         | never
     }
@@ -813,6 +833,12 @@ declare module 'vue-router/auto-routes' {
     'src/pages/login.vue': {
       routes:
         | '/login'
+      views:
+        | never
+    }
+    'src/pages/onboarding/invitation.vue': {
+      routes:
+        | '/onboarding/invitation'
       views:
         | never
     }

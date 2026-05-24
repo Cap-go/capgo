@@ -74,6 +74,17 @@ interface BuildLogger {
 
 ## Core build request
 
+### `build needed [appId]`
+
+- Example: `npx @capgo/cli@latest build needed com.example.app --channel production --verbose`
+- Prints `yes` or `no` and exits with code `1` only when local native dependency metadata requires a new native build.
+- If `--channel` is omitted, it uses `plugins.CapacitorUpdater.defaultChannel` from local config, then the public default channel in Capgo Cloud.
+- Key options:
+  - `-c, --channel <channel>`
+  - `--verbose`
+  - `--package-json <packageJson>`
+  - `--node-modules <nodeModules>`
+
 ### `build request [appId]`
 
 - Example: `npx @capgo/cli@latest build request com.example.app --platform ios --path .`
@@ -114,6 +125,7 @@ interface BuildLogger {
 - `--keystore-store-password <password>`
 - `--play-config-json <json>`
 - `--android-flavor <flavor>`
+- `--in-app-update-priority <0-5>`: Google Play in-app update priority (higher = more urgent)
 
 #### Output behavior options
 

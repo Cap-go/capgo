@@ -1,7 +1,7 @@
 name: Run tests
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event_name == 'workflow_call' && github.sha || github.ref }}
+  group: ${{ github.workflow }}-${{ github.event_name == 'workflow_call' && github.sha || github.event_name == 'pull_request' && github.event.pull_request.number || github.ref_name || github.ref }}
   cancel-in-progress: true
 
 on:
@@ -40,6 +40,10 @@ jobs:
       run_capgo: ${{ steps.set.outputs.capgo }}
       run_cli: ${{ steps.set.outputs.cli }}
     steps:
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24.x
       - name: Checkout repository
         if: github.event_name != 'workflow_call'
         uses: actions/checkout@v6 # v6
@@ -145,6 +149,10 @@ jobs:
     permissions:
       contents: read
     steps:
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24.x
       - name: Checkout repository
         uses: actions/checkout@v6 # v6
       - name: Setup bun
@@ -173,6 +181,10 @@ jobs:
         uses: actions/checkout@v6 # v6
         with:
           fetch-depth: 2
+      - name: Setup Node.js
+        uses: actions/setup-node@v6 # v6
+        with:
+          node-version: 24.x
       - name: Setup bun
         run: bash scripts/setup-bun.sh
       - name: Validate migration timestamps
@@ -204,12 +216,30 @@ jobs:
           version: 2.84.2
       - name: Show Supabase CLI version
         run: supabase --version
+      - name: Install PostgreSQL 17 client
+        run: |
+          if command -v pg_dump-17 >/dev/null 2>&1 && command -v pg_restore-17 >/dev/null 2>&1 && command -v psql-17 >/dev/null 2>&1; then
+            exit 0
+          fi
+          sudo apt-get update
+          sudo apt-get install -y ca-certificates postgresql-common
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get install -y postgresql-client-17
       - name: Link Supabase templates
         run: ln -sfn supabase/templates templates
+      - name: Stop leftover Supabase containers
+        run: supabase stop --no-backup || true
       - name: Run Supabase Start
         run: supabase start -x imgproxy,studio,mailpit,realtime,postgres-meta,supavisor,studio,logflare,vector,realtime
       - name: Reset Supabase DB
         run: supabase db reset
+      - name: Check read-replica schema snapshot
+        env:
+          MAIN_SUPABASE_DB_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
+          PSQL_BIN: /usr/lib/postgresql/17/bin/psql
+          PG_DUMP_BIN: /usr/lib/postgresql/17/bin/pg_dump
+          PG_RESTORE_BIN: /usr/lib/postgresql/17/bin/pg_restore
+        run: bun run readreplicate:check-schema
       - name: Run Supabase Test DB
         run: supabase test db
       - name: Lint SQL
@@ -289,6 +319,10 @@ jobs:
     permissions:
       contents: read
     steps:
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24.x
       - name: Cache Deno dependencies
         uses: actions/cache@v5 # v5
         with:
@@ -344,7 +378,7 @@ jobs:
         name: Start Playwright frontend
         env:
           BACKGROUND_SERVICE_NAME: Playwright frontend
-          BACKGROUND_RUN_COMMAND: CAPTCHA_KEY='' bun run serve:worktree
+          BACKGROUND_RUN_COMMAND: bun run supabase:with-env -- bun scripts/playwright-frontend-preview.ts
           BACKGROUND_WAIT_ON: |
             http-get://localhost:5173
           BACKGROUND_LOG_PATH: ${{ runner.temp }}/playwright-frontend.log
@@ -408,7 +442,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        node-version: ['20', '21', '22', '23', '24', '25']
+        node-version: [24]
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6 # v6
@@ -417,7 +451,7 @@ jobs:
       - name: Setup Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v6 # v6
         with:
-          node-version: ${{ matrix.node-version }}
+          node-version: 24.x
       - name: Display Node.js version
         run: node --version
       - name: Install dependencies
@@ -436,6 +470,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24.x
       - name: Checkout repository
         uses: actions/checkout@v6 # v6
       - name: Check spelling with typos
@@ -451,6 +489,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24.x
       - name: Checkout repository
         uses: actions/checkout@v6 # v6
       - name: Setup bun
@@ -483,6 +525,10 @@ jobs:
       matrix:
         os: [windows-2025, windows-2022]
     steps:
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24.x
       - name: Checkout repository
         uses: actions/checkout@v6 # v6
       - name: Setup bun
@@ -513,6 +559,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24.x
       - name: Checkout repository
         uses: actions/checkout@v6 # v6
       - name: Download build-linux.zip artifact
@@ -592,6 +642,10 @@ jobs:
     runs-on: macos-latest
     timeout-minutes: 30
     steps:
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24.x
       - name: Checkout repository
         uses: actions/checkout@v6 # v6
       - name: Download build-linux.zip artifact
@@ -627,6 +681,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24.x
       - name: Final check
         run: echo "All POSIX path checks completed successfully"
 
@@ -644,7 +702,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v6 # v6
         with:
-          node-version: 24
+          node-version: 24.x
       - name: Setup pnpm
         uses: pnpm/action-setup@v4 # v4
         with:
@@ -676,6 +734,10 @@ jobs:
       contents: read
       actions: write
     steps:
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24.x
       - name: Cache Deno dependencies
         uses: actions/cache@v5 # v5
         with:
@@ -695,6 +757,8 @@ jobs:
           version: 2.84.2
       - name: Link Supabase templates
         run: ln -sfn supabase/templates templates
+      - name: Stop leftover Supabase containers
+        run: supabase stop --no-backup || true
       - name: Run Supabase Start
         run: supabase start -x imgproxy,studio,mailpit,realtime,postgres-meta,supavisor,studio,logflare,vector,realtime
       - name: Reset Supabase DB
@@ -718,7 +782,7 @@ jobs:
           tail -n 200 "${{ steps.bootstrap_cli_edge_server.outputs.log_path }}" || true
           echo "::endgroup::"
       - name: Upload CLI background service logs
-        if: failure()
+        if: failure() && steps.bootstrap_cli_edge_server.outputs.log_path != ''
         uses: actions/upload-artifact@v6 # v6
         with:
           name: cli-background-service-logs
