@@ -164,6 +164,7 @@
         "@types/dompurify": "3.2.0",
         "@types/pg": "^8.20.0",
         "@types/semver": "^7.7.1",
+        "@typescript/native-preview": "7.0.0-dev.20260524.1",
         "@vitejs/plugin-vue": "6.0.6",
         "@vitest/coverage-v8": "^4.1.6",
         "@vitest/ui": "^4.1.6",
@@ -202,7 +203,7 @@
     },
     "cli": {
       "name": "@capgo/cli",
-      "version": "7.108.3",
+      "version": "7.111.2",
       "bin": {
         "capgo": "dist/index.js",
       },
@@ -235,6 +236,7 @@
         "@types/react": "^18.3.28",
         "@types/tmp": "^0.2.6",
         "@types/ws": "^8.18.1",
+        "@typescript/native-preview": "7.0.0-dev.20260524.1",
         "@vercel/ncc": "^0.38.4",
         "adm-zip": "^0.5.16",
         "ci-info": "^4.3.1",
@@ -1376,6 +1378,22 @@
     "@typescript-eslint/utils": ["@typescript-eslint/utils@8.59.1", "", { "dependencies": { "@eslint-community/eslint-utils": "^4.9.1", "@typescript-eslint/scope-manager": "8.59.1", "@typescript-eslint/types": "8.59.1", "@typescript-eslint/typescript-estree": "8.59.1" }, "peerDependencies": { "eslint": "^8.57.0 || ^9.0.0 || ^10.0.0", "typescript": ">=4.8.4 <6.1.0" } }, "sha512-3pIeoXhCeYH9FSCBI8P3iNwJlGuzPlYKkTlen2O9T1DSeeg8UG8jstq6BLk+Mda0qup7mgk4z4XL4OzRaxZ8LA=="],
 
     "@typescript-eslint/visitor-keys": ["@typescript-eslint/visitor-keys@8.59.1", "", { "dependencies": { "@typescript-eslint/types": "8.59.1", "eslint-visitor-keys": "^5.0.0" } }, "sha512-LdDNl6C5iJExcM0Yh0PwAIBb9PrSiCsWamF/JyEZawm3kFDnRoaq3LGE4bpyRao/fWeGKKyw7icx0YxrLFC5Cg=="],
+
+    "@typescript/native-preview": ["@typescript/native-preview@7.0.0-dev.20260524.1", "", { "optionalDependencies": { "@typescript/native-preview-darwin-arm64": "7.0.0-dev.20260524.1", "@typescript/native-preview-darwin-x64": "7.0.0-dev.20260524.1", "@typescript/native-preview-linux-arm": "7.0.0-dev.20260524.1", "@typescript/native-preview-linux-arm64": "7.0.0-dev.20260524.1", "@typescript/native-preview-linux-x64": "7.0.0-dev.20260524.1", "@typescript/native-preview-win32-arm64": "7.0.0-dev.20260524.1", "@typescript/native-preview-win32-x64": "7.0.0-dev.20260524.1" }, "bin": { "tsgo": "bin/tsgo.js" } }, "sha512-L4YviXl4FVYt4V9vkUKRCZW1DcsUbLRaKC4gxsYmBJQqB262mtUo8eqjKqElgZNIpKwYEAAYsBDrVmNhy6ze2w=="],
+
+    "@typescript/native-preview-darwin-arm64": ["@typescript/native-preview-darwin-arm64@7.0.0-dev.20260524.1", "", { "os": "darwin", "cpu": "arm64" }, "sha512-dIaYmijy9/tdrxHTxlnfwzP+AC6iAycUYGChOowLR3bVSbKhz4DUJZGMaodzGCtBEWSRUwx0MK1Sa1zBpFbM5g=="],
+
+    "@typescript/native-preview-darwin-x64": ["@typescript/native-preview-darwin-x64@7.0.0-dev.20260524.1", "", { "os": "darwin", "cpu": "x64" }, "sha512-HjfPFOSQCymn5Iu07xoySqfK5lwXthEWN1vltO5SDaFYVRasK6P3DBRe4QL0AiSGr8tRfA3x7BdRPjPVu94Epg=="],
+
+    "@typescript/native-preview-linux-arm": ["@typescript/native-preview-linux-arm@7.0.0-dev.20260524.1", "", { "os": "linux", "cpu": "arm" }, "sha512-gXzD1BNpPUSAv12a9UvxLTX/+WdoC34skLw6hDLk1kv3VYbd5LecQzEIb7u+WHCsNuXVXffk79+BZP7IQNS1aw=="],
+
+    "@typescript/native-preview-linux-arm64": ["@typescript/native-preview-linux-arm64@7.0.0-dev.20260524.1", "", { "os": "linux", "cpu": "arm64" }, "sha512-dH+zYjBs2ajcIRMmb8YkapY7TXzU/yX6HITrXhuoDov+mun7nCNfiRRmRBeqbGxl5JM8mUugBl/yyyhFWjIWdQ=="],
+
+    "@typescript/native-preview-linux-x64": ["@typescript/native-preview-linux-x64@7.0.0-dev.20260524.1", "", { "os": "linux", "cpu": "x64" }, "sha512-Fr0A8RPBMXco9IIXel598hC25LE1A5wpB33mBhwimlIQe58MMCAeW+wDHXsmLmF2NiFVT1vr1tjMGmEMMdYdsg=="],
+
+    "@typescript/native-preview-win32-arm64": ["@typescript/native-preview-win32-arm64@7.0.0-dev.20260524.1", "", { "os": "win32", "cpu": "arm64" }, "sha512-AhFD6bct2RWeZxONLEvaKPlu+c+/TNejj7ntztHWREaq+lrjz8Qg3tXryah2K66EEmYY0TooapfWUWXWe8i+VQ=="],
+
+    "@typescript/native-preview-win32-x64": ["@typescript/native-preview-win32-x64@7.0.0-dev.20260524.1", "", { "os": "win32", "cpu": "x64" }, "sha512-3VE5kBH2y7vYpj83X9iqGbNR8gwnlQlTjzLKJBzuyfTJPZ9R/vM4txvpuTDRJo18JGzEq4FUjKg7yqpf9ajb2g=="],
 
     "@vercel/ncc": ["@vercel/ncc@0.38.4", "", { "bin": { "ncc": "dist/ncc/cli.js" } }, "sha512-8LwjnlP39s08C08J5NstzriPvW1SP8Zfpp1BvC2sI35kPeZnHfxVkCwu4/+Wodgnd60UtT1n8K8zw+Mp7J9JmQ=="],
 
