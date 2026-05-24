@@ -201,10 +201,15 @@ async function requestToken(): Promise<CapgoNotificationToken> {
       await Promise.allSettled([registrationHandle?.remove(), errorHandle?.remove()].filter((promise): promise is Promise<void> => Boolean(promise)))
     }
     const settleAfterCleanup = (callback: () => void) => {
-      cleanup()
-        .catch(() => undefined)
-        .then(callback)
-        .catch(() => undefined)
+      void (async () => {
+        try {
+          await cleanup()
+        }
+        catch {
+          // Cleanup is best effort before settling the token request.
+        }
+        callback()
+      })()
     }
     const fail = (error: unknown) => {
       if (resolved)
@@ -270,6 +275,9 @@ function eventFromNotification(notification?: CapgoPushNotificationSchema): Capg
   return {
     campaignId: getStringData(data, 'capgoCampaignId', 'capgo_campaign_id') || undefined,
     notificationId: getStringData(data, 'capgoNotificationId', 'capgo_notification_id') || notification?.id,
+    recipientKey: getStringData(data, 'capgoRecipientKey', 'capgo_recipient_key') || undefined,
+    deviceKey: getStringData(data, 'capgoDeviceKey', 'capgo_device_key') || undefined,
+    eventProof: getStringData(data, 'capgoEventProof', 'capgo_event_proof') || undefined,
   }
 }
 
@@ -391,15 +399,15 @@ async function registerToken(options: CapgoNotificationRegisterOptions, token: C
   return registration
 }
 
-async function trackEvent(event: 'received' | 'opened' | 'background_started' | 'background_finished' | 'failed', input?: CapgoNotificationEvent) {
+async function trackEvent(event: 'received' | 'opened' | 'background_started' | 'background_finished', input?: CapgoNotificationEvent) {
   const appId = input?.appId || state.config?.appId || state.lastRegistration?.appId
   if (!appId)
     return
   const registration = hydrateStoredRegistration(appId)
   const recipientKey = input?.recipientKey || registration?.recipientKey
   const deviceKey = input?.deviceKey || registration?.deviceKey
-  const eventProof = input?.eventProof || registration?.eventProof
-  if (!recipientKey || !deviceKey || !eventProof)
+  const eventProof = input?.eventProof
+  if (!recipientKey || !deviceKey || !eventProof || !input?.campaignId || !input.notificationId)
     return
   const platform = assertNativePlatform()
   await postJson(getServerUrl(), '/notifications/events', {
@@ -414,7 +422,6 @@ async function trackEvent(event: 'received' | 'opened' | 'background_started' | 
     platform: input?.platform || platform,
     campaignId: input?.campaignId,
     notificationId: input?.notificationId,
-    error: input?.error,
     badge: input?.badge ?? state.badge,
   })
 }
@@ -436,7 +443,7 @@ async function maybeRunUpdateCheck(notification?: CapgoPushNotificationSchema) {
   const baseEvent = eventFromNotification(notification)
   await trackEvent('background_started', baseEvent)
   const result = await CapgoNotifications.runUpdateCheck(updateOptionsFromNotification(notification))
-  await trackEvent(result.status === 'failed' ? 'failed' : 'background_finished', {
+  await trackEvent('background_finished', {
     ...baseEvent,
     error: result.error,
   })
@@ -467,18 +474,20 @@ async function ensureBridgeListeners() {
         notifyListeners(state.listeners.registrationChanged, token)
       }))
       handles.push(await NativeCapgoNotifications.addListener('notificationReceived', (notification) => {
-        void trackEvent('received', eventFromNotification(notification))
-        void maybeRunUpdateCheck(notification)
+        void Promise.allSettled([
+          trackEvent('received', eventFromNotification(notification)),
+          maybeRunUpdateCheck(notification),
+        ])
         notifyListeners(state.listeners.notificationReceived, notification)
       }))
       handles.push(await NativeCapgoNotifications.addListener('notificationOpened', (event) => {
-        void trackEvent('opened', eventFromNotification(event.notification))
+        void trackEvent('opened', eventFromNotification(event.notification)).catch(() => undefined)
         notifyListeners(state.listeners.notificationOpened, event)
       }))
       handles.push(await NativeCapgoNotifications.addListener('backgroundNotification', (notification) => {
         if (!isUpdateCheckNotification(notification))
-          void trackEvent('background_started', eventFromNotification(notification))
-        void maybeRunUpdateCheck(notification)
+          void trackEvent('background_started', eventFromNotification(notification)).catch(() => undefined)
+        void maybeRunUpdateCheck(notification).catch(() => undefined)
         let finished = false
         const finish = async () => {
           if (finished)

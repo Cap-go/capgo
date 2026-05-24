@@ -18,6 +18,8 @@ import {
   tombstoneNotificationRegistrationCF,
   trackNotificationEventCF,
   trackNotificationRegistrationCF,
+  normalizeNotificationTag,
+  verifyNotificationDeliveryEventProof,
   verifyNotificationEventProof,
   verifyNotificationIdentityProof,
 } from '../../utils/nativeNotifications.ts'
@@ -40,6 +42,15 @@ const NOTIFICATION_EVENTS = new Set<NativeNotificationEvent>([
   'permission_changed',
   'background_started',
   'background_finished',
+])
+const CLIENT_NOTIFICATION_DELIVERY_EVENTS = new Set<NativeNotificationEvent>([
+  'received',
+  'opened',
+  'background_started',
+  'background_finished',
+])
+const CLIENT_NOTIFICATION_DEVICE_EVENTS = new Set<NativeNotificationEvent>([
+  'permission_changed',
 ])
 const NOTIFICATION_PLATFORMS = new Set<NativeNotificationPlatform>(['ios', 'android'])
 const NOTIFICATION_PROVIDERS = new Set<NativeNotificationProvider>(['fcm', 'apns'])
@@ -315,8 +326,12 @@ async function resolveTargetPlan(c: Context<MiddlewareKeyVariables>, body: SendB
     return { target: { recipientKey: target.recipientKey }, buckets: [getNotificationBucket(target.recipientKey)], limit }
   if (target.deviceKey)
     return { target: { deviceKey: target.deviceKey }, buckets: getAllNotificationBuckets(), limit }
-  if (target.tag)
-    return { target: { tag: target.tag }, buckets: getAllNotificationBuckets(), limit }
+  if (target.tag) {
+    const tag = normalizeNotificationTag(target.tag)
+    if (!tag)
+      throw simpleError('invalid_notification_tag', 'Invalid notification tag')
+    return { target: { tag }, buckets: getAllNotificationBuckets(), limit }
+  }
   if (target.broadcast)
     return { target: { broadcast: true }, buckets: getAllNotificationBuckets(), limit }
   throw simpleError('missing_notification_target', 'Missing notification target')
@@ -463,6 +478,8 @@ app.post('/events', async (c) => {
     return limitedResponse
   if (!NOTIFICATION_EVENTS.has(body.event))
     throw simpleError('invalid_notification_event', 'Invalid notification event')
+  if (!CLIENT_NOTIFICATION_DELIVERY_EVENTS.has(body.event) && !CLIENT_NOTIFICATION_DEVICE_EVENTS.has(body.event))
+    throw simpleError('invalid_notification_client_event', 'Notification event is not accepted from clients')
   if (body.provider && !NOTIFICATION_PROVIDERS.has(body.provider))
     throw simpleError('invalid_provider', 'Invalid notification provider')
   if (body.platform && !NOTIFICATION_PLATFORMS.has(body.platform))
@@ -470,18 +487,29 @@ app.post('/events', async (c) => {
   const recipientKey = assertString(body.recipientKey, 'recipientKey', 128)
   const deviceKey = assertString(body.deviceKey, 'deviceKey', 128)
   const eventProof = assertString(body.eventProof, 'eventProof', 256)
-  if (!(await verifyNotificationEventProof(c, appId, recipientKey, deviceKey, eventProof)))
+  const campaignId = typeof body.campaignId === 'string' ? body.campaignId.trim() : ''
+  const notificationId = typeof body.notificationId === 'string' ? body.notificationId.trim() : ''
+  const validProof = CLIENT_NOTIFICATION_DELIVERY_EVENTS.has(body.event)
+    ? campaignId && notificationId && await verifyNotificationDeliveryEventProof(c, {
+        appId,
+        recipientKey,
+        deviceKey,
+        campaignId,
+        notificationId,
+        proof: eventProof,
+      })
+    : await verifyNotificationEventProof(c, appId, recipientKey, deviceKey, eventProof)
+  if (!validProof)
     throw quickError(401, 'invalid_notification_event_proof', 'Invalid notification event proof', { appId })
   await trackNotificationEventCF(c, {
     appId,
     event: body.event,
-    campaignId: body.campaignId,
-    notificationId: body.notificationId,
+    campaignId,
+    notificationId,
     recipientKey,
     deviceKey,
     provider: body.provider,
     platform: body.platform,
-    error: body.error,
     badge: body.badge,
   })
   return c.json(BRES)

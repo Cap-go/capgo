@@ -14,6 +14,7 @@ const MAX_TAG_LENGTH = 64
 const MAX_ATTRIBUTES_BLOB_LENGTH = 2048
 const IDENTITY_PROOF_PREFIX = 'identity-proof:v1'
 const EVENT_PROOF_PREFIX = 'event-proof:v1'
+const DELIVERY_EVENT_PROOF_PREFIX = 'delivery-event-proof:v1'
 
 const textEncoder = new TextEncoder()
 
@@ -212,12 +213,16 @@ function trimText(value: string | undefined, maxLength: number): string {
   return typeof value === 'string' ? value.trim().slice(0, maxLength) : ''
 }
 
+export function normalizeNotificationTag(tag: string | undefined): string {
+  return typeof tag === 'string' ? tag.trim().toLowerCase().replace(/[^a-z0-9_.:-]/g, '_').slice(0, MAX_TAG_LENGTH) : ''
+}
+
 function normalizeTags(tags: string[] | undefined): string {
   if (!Array.isArray(tags))
     return ''
   const normalized = [...new Set(tags
     .filter(tag => typeof tag === 'string')
-    .map(tag => tag.trim().toLowerCase().replace(/[^a-z0-9_.:-]/g, '_').slice(0, MAX_TAG_LENGTH))
+    .map(tag => normalizeNotificationTag(tag))
     .filter(Boolean))]
     .slice(0, MAX_TAGS)
   return normalized.length ? `|${normalized.join('|')}|` : ''
@@ -298,6 +303,37 @@ export async function createNotificationEventProof(c: Context, appId: string, re
 
 export async function verifyNotificationEventProof(c: Context, appId: string, recipientKey: string, deviceKey: string, proof: string): Promise<boolean> {
   return secureCompare(proof, await createNotificationEventProof(c, appId, recipientKey, deviceKey))
+}
+
+export async function createNotificationDeliveryEventProofFromSecret(secret: string, params: {
+  appId: string
+  recipientKey: string
+  deviceKey: string
+  campaignId: string
+  notificationId: string
+}): Promise<string> {
+  return hmacHex(secret, `${DELIVERY_EVENT_PROOF_PREFIX}:${params.appId}:${params.recipientKey}:${params.deviceKey}:${params.campaignId}:${params.notificationId}`)
+}
+
+export async function createNotificationDeliveryEventProof(c: Context, params: {
+  appId: string
+  recipientKey: string
+  deviceKey: string
+  campaignId: string
+  notificationId: string
+}): Promise<string> {
+  return createNotificationDeliveryEventProofFromSecret(getNotificationHashSecret(c), params)
+}
+
+export async function verifyNotificationDeliveryEventProof(c: Context, params: {
+  appId: string
+  recipientKey: string
+  deviceKey: string
+  campaignId: string
+  notificationId: string
+  proof: string
+}): Promise<boolean> {
+  return secureCompare(params.proof, await createNotificationDeliveryEventProof(c, params))
 }
 
 export async function encryptNotificationToken(c: Context, token: string): Promise<string> {
@@ -412,8 +448,9 @@ export function buildNotificationRegistryLookupQuery(params: {
     outerConditions.push(`recipient_key = '${escapeSqlString(params.recipientKey)}'`)
   if (params.deviceKey)
     outerConditions.push(`device_key = '${escapeSqlString(params.deviceKey)}'`)
-  if (params.tag)
-    outerConditions.push(`position('|${escapeSqlString(params.tag.toLowerCase())}|' IN tags) > 0`)
+  const tag = normalizeNotificationTag(params.tag)
+  if (tag)
+    outerConditions.push(`position('|${escapeSqlString(tag)}|' IN tags) > 0`)
 
   const limit = normalizeAnalyticsLimit(params.limit, 1000)
   return `SELECT *

@@ -2,6 +2,7 @@ import { afterAll, describe, expect, it, vi } from 'vitest'
 import {
   buildNotificationRegistryLookupQuery,
   buildNotificationStatsQuery,
+  createNotificationDeliveryEventProof,
   createNotificationEventProof,
   createNotificationIdentityProof,
   enqueueNativeNotificationFanout,
@@ -9,6 +10,8 @@ import {
   getNotificationBucket,
   getNotificationEventIndex,
   getNotificationIndex,
+  normalizeNotificationTag,
+  verifyNotificationDeliveryEventProof,
   verifyNotificationEventProof,
   verifyNotificationIdentityProof,
 } from '../supabase/functions/_backend/utils/nativeNotifications'
@@ -143,6 +146,18 @@ describe('native notification AE registry', () => {
     expect(query).toContain("device_key = 'device-key'")
   })
 
+  it.concurrent('uses registration tag normalization for registry lookup filters', () => {
+    const query = buildNotificationRegistryLookupQuery({
+      dataset: 'notification_registry',
+      appId: 'com.demo.app',
+      tag: 'Beta Users',
+      now: new Date('2026-05-06T00:00:00Z'),
+    })
+
+    expect(normalizeNotificationTag('Beta Users')).toBe('beta_users')
+    expect(query).toContain("position('|beta_users|' IN tags) > 0")
+  })
+
   it.concurrent('builds notification event stats from AE only', () => {
     const query = buildNotificationStatsQuery({
       dataset: 'notification_events',
@@ -181,11 +196,34 @@ describe('native notification AE registry', () => {
       const context = {} as any
       const identityProof = await createNotificationIdentityProof(context, 'com.demo.app', 'user-1')
       const eventProof = await createNotificationEventProof(context, 'com.demo.app', 'recipient-key', 'device-key')
+      const deliveryProof = await createNotificationDeliveryEventProof(context, {
+        appId: 'com.demo.app',
+        recipientKey: 'recipient-key',
+        deviceKey: 'device-key',
+        campaignId: 'campaign-1',
+        notificationId: 'notification-1',
+      })
 
       expect(await verifyNotificationIdentityProof(context, 'com.demo.app', 'user-1', identityProof)).toBe(true)
       expect(await verifyNotificationIdentityProof(context, 'com.demo.app', 'user-2', identityProof)).toBe(false)
       expect(await verifyNotificationEventProof(context, 'com.demo.app', 'recipient-key', 'device-key', eventProof)).toBe(true)
       expect(await verifyNotificationEventProof(context, 'com.demo.app', 'recipient-key', 'other-device', eventProof)).toBe(false)
+      expect(await verifyNotificationDeliveryEventProof(context, {
+        appId: 'com.demo.app',
+        recipientKey: 'recipient-key',
+        deviceKey: 'device-key',
+        campaignId: 'campaign-1',
+        notificationId: 'notification-1',
+        proof: deliveryProof,
+      })).toBe(true)
+      expect(await verifyNotificationDeliveryEventProof(context, {
+        appId: 'com.demo.app',
+        recipientKey: 'recipient-key',
+        deviceKey: 'device-key',
+        campaignId: 'campaign-2',
+        notificationId: 'notification-1',
+        proof: deliveryProof,
+      })).toBe(false)
     }
     finally {
       vi.unstubAllEnvs()
@@ -281,6 +319,9 @@ describe('native notification queue sender', () => {
     const requests = requestsFor(token)
     expect(requests[0].message.notification).toBeUndefined()
     expect(requests[0].message.data.capgoAction).toBe('update_check')
+    expect(requests[0].message.data.capgoCampaignId).toBe('campaign-update')
+    expect(requests[0].message.data.capgoNotificationId).toEqual(expect.any(String))
+    expect(requests[0].message.data.capgoEventProof).toEqual(expect.any(String))
     expect(requests[0].message.data.capgoUpdateInstallMode).toBe('next')
     expect(requests[0].message.android.priority).toBe('high')
     expect(requests[0].message.apns.payload.aps['content-available']).toBe(1)

@@ -35,6 +35,8 @@ Or let the Capgo CLI patch the app entrypoint:
 npx @capgo/cli@latest notifications setup
 ```
 
+On Android, keep app backup and data-extraction policy in the host app manifest. The plugin manifest only declares the FCM service.
+
 ## Usage
 
 ```ts

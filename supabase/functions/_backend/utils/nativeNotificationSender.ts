@@ -5,7 +5,7 @@ import type {
   NativeNotificationQueueMessage,
   NativeNotificationRegistryRow,
 } from './nativeNotifications.ts'
-import { buildNotificationRegistryLookupQuery, getAllNotificationBuckets, getNotificationBucket, getNotificationEventIndex, getNotificationIndex } from './nativeNotifications.ts'
+import { buildNotificationRegistryLookupQuery, createNotificationDeliveryEventProofFromSecret, getAllNotificationBuckets, getNotificationBucket, getNotificationEventIndex, getNotificationIndex } from './nativeNotifications.ts'
 
 type NotificationEnv = Record<string, unknown>
 const MAX_NOTIFICATION_RETRY_ATTEMPTS = 3
@@ -198,6 +198,38 @@ function normalizeData(value: unknown): Record<string, string> {
   if (!value || typeof value !== 'object' || Array.isArray(value))
     return {}
   return Object.fromEntries(Object.entries(value as Record<string, unknown>).map(([key, dataValue]) => [key, typeof dataValue === 'string' ? dataValue : JSON.stringify(dataValue)]))
+}
+
+function getNotificationHashSecret(env: NotificationEnv): string {
+  const secret = readEnv(env, 'NOTIFICATIONS_HMAC_SECRET') || readEnv(env, 'API_SECRET')
+  if (!secret)
+    throw new Error('Missing notification HMAC secret')
+  return secret
+}
+
+async function withDeliveryMetadata(env: NotificationEnv, message: NativeNotificationQueueMessage, device: NativeNotificationRegistryRow, notificationId: string): Promise<NativeNotificationQueueMessage> {
+  const campaignId = message.campaignId
+  const eventProof = await createNotificationDeliveryEventProofFromSecret(getNotificationHashSecret(env), {
+    appId: message.appId,
+    recipientKey: device.recipient_key,
+    deviceKey: device.device_key,
+    campaignId,
+    notificationId,
+  })
+  return {
+    ...message,
+    payload: {
+      ...message.payload,
+      data: {
+        ...(message.payload.data && typeof message.payload.data === 'object' && !Array.isArray(message.payload.data) ? message.payload.data : {}),
+        capgoCampaignId: campaignId,
+        capgoNotificationId: notificationId,
+        capgoRecipientKey: device.recipient_key,
+        capgoDeviceKey: device.device_key,
+        capgoEventProof: eventProof,
+      },
+    },
+  }
 }
 
 function buildCollapseId(message: NativeNotificationQueueMessage): string {
@@ -528,15 +560,16 @@ function tombstoneDevice(env: NotificationEnv, appId: string, device: NativeNoti
   })
 }
 
-async function sendToDevice(env: NotificationEnv, message: NativeNotificationQueueMessage, device: NativeNotificationRegistryRow, cache: SendCredentialCache): Promise<SendOutcome> {
+async function sendToDevice(env: NotificationEnv, message: NativeNotificationQueueMessage, device: NativeNotificationRegistryRow, notificationId: string, cache: SendCredentialCache): Promise<SendOutcome> {
   const providerConfig = getProviderConfig(message, device.provider)
   if (!providerConfig)
     return { ok: false, transient: false, error: `Missing configured provider for ${device.provider}` }
+  const deliveryMessage = await withDeliveryMetadata(env, message, device, notificationId)
   const token = await decryptToken(env, device.encrypted_token)
   if (device.provider === 'fcm')
-    return sendFcm(env, providerConfig, token, message, cache)
+    return sendFcm(env, providerConfig, token, deliveryMessage, cache)
   if (device.provider === 'apns')
-    return sendApns(env, providerConfig, token, message, cache)
+    return sendApns(env, providerConfig, token, deliveryMessage, cache)
   return { ok: false, transient: false, error: `Unsupported provider ${device.provider}` }
 }
 
@@ -564,8 +597,8 @@ function writeSuccessfulSend(env: NotificationEnv, message: NativeNotificationQu
   writeNotificationEvent(env, { appId: message.appId, campaignId: message.campaignId, event: 'provider_accepted', notificationId: outcome.notificationId, device, badge: message.badge })
 }
 
-function writeFailedSend(env: NotificationEnv, message: NativeNotificationQueueMessage, device: NativeNotificationRegistryRow, error?: string) {
-  writeNotificationEvent(env, { appId: message.appId, campaignId: message.campaignId, event: 'failed', device, error, badge: message.badge })
+function writeFailedSend(env: NotificationEnv, message: NativeNotificationQueueMessage, device: NativeNotificationRegistryRow, error?: string, notificationId?: string) {
+  writeNotificationEvent(env, { appId: message.appId, campaignId: message.campaignId, event: 'failed', notificationId, device, error, badge: message.badge })
 }
 
 function shouldRetryOutcome(env: NotificationEnv, message: NativeNotificationQueueMessage, device: NativeNotificationRegistryRow, outcome: SendOutcome, shouldRetry: boolean): boolean {
@@ -574,7 +607,7 @@ function shouldRetryOutcome(env: NotificationEnv, message: NativeNotificationQue
     return false
   }
 
-  writeFailedSend(env, message, device, outcome.error)
+  writeFailedSend(env, message, device, outcome.error, outcome.notificationId)
   if (outcome.invalidToken)
     tombstoneDevice(env, message.appId, device)
   return shouldRetry && outcome.transient
@@ -588,15 +621,17 @@ export async function processNativeNotificationQueueMessage(message: NativeNotif
   const credentialCache = createSendCredentialCache()
 
   for (const device of devices) {
+    const notificationId = crypto.randomUUID()
     if (shouldWriteQueuedEvents)
-      writeNotificationEvent(env, { appId: message.appId, campaignId: message.campaignId, event: 'queued', device, badge: message.badge })
+      writeNotificationEvent(env, { appId: message.appId, campaignId: message.campaignId, event: 'queued', notificationId, device, badge: message.badge })
     try {
-      const outcome = await sendToDevice(env, message, device, credentialCache)
+      const outcome = await sendToDevice(env, message, device, notificationId, credentialCache)
+      outcome.notificationId = notificationId
       if (shouldRetryOutcome(env, message, device, outcome, shouldRetry))
         retryDevices.push(device)
     }
     catch (error) {
-      writeFailedSend(env, message, device, error instanceof Error ? error.message : 'notification send failed')
+      writeFailedSend(env, message, device, error instanceof Error ? error.message : 'notification send failed', notificationId)
       if (shouldRetry && shouldRetryThrownError(error))
         retryDevices.push(device)
     }
