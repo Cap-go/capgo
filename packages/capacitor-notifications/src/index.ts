@@ -43,6 +43,11 @@ interface UpdaterPlugin {
   set: (options: { id: string }) => Promise<unknown>
 }
 
+interface StoredNotificationRegistration extends CapgoNotificationRegistration {
+  appId: string
+  externalId: string
+}
+
 interface ListenerState {
   notificationReceived: Set<(notification: CapgoPushNotificationSchema) => void>
   notificationOpened: Set<(event: CapgoNotificationOpenedEvent) => void>
@@ -62,7 +67,7 @@ interface RuntimeState {
   installId?: string
   bridgeListenersReady: boolean
   bridgeListenersPromise?: Promise<void>
-  lastRegistration?: CapgoNotificationRegistration
+  lastRegistration?: StoredNotificationRegistration
   handledUpdateNotifications: Set<string>
   listeners: ListenerState
   updater: Required<Pick<CapgoUpdaterIntegrationOptions, 'enabled'>> & {
@@ -110,6 +115,57 @@ function getAppId(options?: { appId?: string }) {
   if (!appId)
     throw new Error('Capgo notification appId is required')
   return appId
+}
+
+function registrationStorageKey(appId: string) {
+  return `capgo.notifications.registration.v1.${appId}`
+}
+
+function getLocalStorage(): Storage | undefined {
+  try {
+    return typeof globalThis.localStorage === 'undefined' ? undefined : globalThis.localStorage
+  }
+  catch {
+    return undefined
+  }
+}
+
+function readStoredRegistration(appId: string): StoredNotificationRegistration | undefined {
+  const storage = getLocalStorage()
+  if (!storage)
+    return undefined
+  try {
+    const parsed = JSON.parse(storage.getItem(registrationStorageKey(appId)) || 'null') as Partial<StoredNotificationRegistration> | null
+    if (!parsed || parsed.appId !== appId || !parsed.externalId || !parsed.recipientKey || !parsed.deviceKey || !parsed.eventProof)
+      return undefined
+    return parsed as StoredNotificationRegistration
+  }
+  catch {
+    return undefined
+  }
+}
+
+function writeStoredRegistration(registration: StoredNotificationRegistration) {
+  const storage = getLocalStorage()
+  if (!storage)
+    return
+  try {
+    storage.setItem(registrationStorageKey(registration.appId), JSON.stringify(registration))
+  }
+  catch {
+    // Best effort cache for cold-start notification event tracking.
+  }
+}
+
+function hydrateStoredRegistration(appId?: string): StoredNotificationRegistration | undefined {
+  if (!appId)
+    return state.lastRegistration
+  if (state.lastRegistration?.appId === appId)
+    return state.lastRegistration
+  const storedRegistration = readStoredRegistration(appId)
+  if (storedRegistration)
+    state.lastRegistration = storedRegistration
+  return storedRegistration
 }
 
 async function getInstallId() {
@@ -290,6 +346,14 @@ async function registerToken(options: CapgoNotificationRegisterOptions, token: C
   const identityProof = options.identityProof || state.identityProof
   if (!identityProof)
     throw new Error('Capgo notification identityProof is required')
+  const previousRegistration = hydrateStoredRegistration(appId)
+  const previousIdentity = previousRegistration && previousRegistration.externalId !== options.externalId
+    ? {
+        previousRecipientKey: previousRegistration.recipientKey,
+        previousDeviceKey: previousRegistration.deviceKey,
+        previousEventProof: previousRegistration.eventProof,
+      }
+    : {}
 
   const response = await postJson(serverUrl, '/notifications/register', {
     appId,
@@ -309,6 +373,7 @@ async function registerToken(options: CapgoNotificationRegisterOptions, token: C
     badge: state.badge,
     active: true,
     consent: options.consent ?? state.consent,
+    ...previousIdentity,
   })
 
   const registration: CapgoNotificationRegistration = {
@@ -321,13 +386,20 @@ async function registerToken(options: CapgoNotificationRegisterOptions, token: C
     permission,
     eventProof: String(response.eventProof),
   }
-  state.lastRegistration = registration
+  state.lastRegistration = { ...registration, appId, externalId: options.externalId }
+  writeStoredRegistration(state.lastRegistration)
   return registration
 }
 
 async function trackEvent(event: 'received' | 'opened' | 'background_started' | 'background_finished' | 'failed', input?: CapgoNotificationEvent) {
-  const appId = input?.appId || state.config?.appId
+  const appId = input?.appId || state.config?.appId || state.lastRegistration?.appId
   if (!appId)
+    return
+  const registration = hydrateStoredRegistration(appId)
+  const recipientKey = input?.recipientKey || registration?.recipientKey
+  const deviceKey = input?.deviceKey || registration?.deviceKey
+  const eventProof = input?.eventProof || registration?.eventProof
+  if (!recipientKey || !deviceKey || !eventProof)
     return
   const platform = assertNativePlatform()
   await postJson(getServerUrl(), '/notifications/events', {
@@ -335,9 +407,9 @@ async function trackEvent(event: 'received' | 'opened' | 'background_started' | 
     event,
     nativeInstallId: input?.nativeInstallId || await getInstallId(),
     externalId: input?.externalId || state.externalId,
-    recipientKey: input?.recipientKey || state.lastRegistration?.recipientKey,
-    deviceKey: input?.deviceKey || state.lastRegistration?.deviceKey,
-    eventProof: input?.eventProof || state.lastRegistration?.eventProof,
+    recipientKey,
+    deviceKey,
+    eventProof,
     provider: input?.provider || getProvider(platform),
     platform: input?.platform || platform,
     campaignId: input?.campaignId,
@@ -442,6 +514,7 @@ export const CapgoNotifications: CapgoNotificationsPlugin = {
     state.updater.enabled = config.autoUpdater !== false
     state.updater.installMode = config.updateInstallMode || 'next'
     state.updater.channel = config.updateChannel
+    hydrateStoredRegistration(config.appId)
     await ensureBridgeListeners()
     if (Capacitor.getPlatform() === 'android')
       await NativeCapgoNotifications.createDefaultChannel().catch(() => undefined)
@@ -466,6 +539,8 @@ export const CapgoNotifications: CapgoNotificationsPlugin = {
   },
 
   async setExternalId(externalId, identityProof) {
+    if (externalId !== state.externalId && !identityProof)
+      throw new Error('Capgo notification identityProof is required when externalId changes')
     state.externalId = externalId
     state.identityProof = identityProof ?? state.identityProof
     if (state.token)

@@ -9,7 +9,7 @@ async function createReadApiKey(page: Page, keyName: string) {
   await dialog.getByText('Read', { exact: true }).click()
   await expect(dialog.locator('input[name="key-type"][value="read"]')).toBeChecked()
   await page.getByRole('button', { name: 'Create' }).click()
-  await expect(page.locator('[data-test="toast"]')).toContainText('Added new API key successfully')
+  await expect(page.getByText('Added new API key successfully', { exact: true })).toBeVisible()
 }
 
 test.describe('API Key Management', () => {
@@ -25,7 +25,7 @@ test.describe('API Key Management', () => {
 
     await createReadApiKey(page, keyName)
 
-    await expect(page.locator('tr', { hasText: keyName })).toHaveCount(1)
+    await expect(page.getByText(keyName, { exact: true })).toBeVisible()
   })
 
   test('should delete API key', async ({ page }) => {
@@ -33,14 +33,14 @@ test.describe('API Key Management', () => {
 
     await createReadApiKey(page, keyName)
 
-    const keyRow = page.locator('tr', { hasText: keyName })
-    await expect(keyRow).toHaveCount(1)
+    const keyCell = page.getByText(keyName, { exact: true })
+    await expect(keyCell).toBeVisible()
+    const keyRow = keyCell.locator('xpath=ancestor::tr[1]')
 
     await keyRow.locator('[data-test^="delete-key-"]').click()
     await page.getByRole('button', { name: 'Delete' }).click()
 
-    const toast = page.locator('[data-test="toast"]')
-    await expect(toast).toContainText('API key has been successfully deleted')
-    await expect(page.locator('tr', { hasText: keyName })).toHaveCount(0)
+    await expect(page.getByText('API key has been successfully deleted', { exact: true })).toBeVisible()
+    await expect(page.getByText(keyName, { exact: true })).toHaveCount(0)
   })
 })

@@ -20,6 +20,15 @@ npm install @capgo/capacitor-notifications @capgo/capacitor-updater
 npx cap sync
 ```
 
+For iOS silent/background notifications, forward remote notifications from `ios/App/App/AppDelegate.swift`:
+
+```swift
+func application(_ application: UIApplication, didReceiveRemoteNotification userInfo: [AnyHashable: Any], fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void) {
+    NotificationCenter.default.post(name: Notification.Name("CapgoNotificationsRemoteNotification"), object: userInfo)
+    completionHandler(.newData)
+}
+```
+
 Or let the Capgo CLI patch the app entrypoint:
 
 ```bash

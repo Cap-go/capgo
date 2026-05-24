@@ -1,6 +1,6 @@
 import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../../utils/hono.ts'
-import type { NativeNotificationEvent, NativeNotificationPlatform, NativeNotificationProvider, NativeNotificationProviderConfig, NativeNotificationRegisterInput, NativeNotificationRegistryRow } from '../../utils/nativeNotifications.ts'
+import type { NativeNotificationEvent, NativeNotificationPlatform, NativeNotificationProvider, NativeNotificationProviderConfig, NativeNotificationRegisterInput, NativeNotificationRegistryRow, NativeNotificationTarget } from '../../utils/nativeNotifications.ts'
 import type { Permission } from '../../utils/rbac.ts'
 import { sql } from 'drizzle-orm'
 import { BRES, createHono, parseBody, quickError, simpleError, simpleRateLimit, useCors } from '../../utils/hono.ts'
@@ -8,11 +8,14 @@ import { middlewareV2 } from '../../utils/hono_middleware.ts'
 import {
   createNotificationEventProof,
   createNotificationIdentityProof,
+  deriveNativeNotificationIdentity,
   deriveRecipientKey,
-  enqueueNativeNotification,
+  enqueueNativeNotificationFanout,
   getAllNotificationBuckets,
+  getNotificationBucket,
   readNotificationRegistrationsCF,
   readNotificationStatsCF,
+  tombstoneNotificationRegistrationCF,
   trackNotificationEventCF,
   trackNotificationRegistrationCF,
   verifyNotificationEventProof,
@@ -61,6 +64,9 @@ interface RegisterBody {
   active?: boolean
   consent?: boolean
   identityProof: string
+  previousRecipientKey?: string
+  previousDeviceKey?: string
+  previousEventProof?: string
 }
 
 interface EventBody {
@@ -154,6 +160,12 @@ interface CampaignRecordRow {
   id: string
 }
 
+interface NotificationTargetPlan {
+  target: NativeNotificationTarget
+  buckets: string[]
+  limit?: number
+}
+
 function assertString(value: unknown, field: string, maxLength: number): string {
   if (typeof value !== 'string')
     throw simpleError('invalid_body', 'Invalid body', { field })
@@ -236,6 +248,28 @@ async function getAppOwnerOrg(c: Context<MiddlewareKeyVariables>, appId: string)
   }
 }
 
+function normalizeSecretRefSegment(value: string): string {
+  const normalized = value.toUpperCase().replace(/[^A-Z0-9]+/g, '_').replace(/^_+|_+$/g, '')
+  return (normalized || 'APP').slice(0, 96)
+}
+
+function expectedProviderSecretRef(appId: string, provider: NativeNotificationProvider) {
+  return `NOTIFICATIONS_${normalizeSecretRefSegment(appId)}_${provider.toUpperCase()}`
+}
+
+function resolveProviderSecretRef(appId: string, provider: NativeNotificationProvider, status: string, value: string | null | undefined) {
+  const expected = expectedProviderSecretRef(appId, provider)
+  const requested = typeof value === 'string' ? value.trim() : ''
+  if (requested && requested !== expected) {
+    throw simpleError('invalid_notification_secret_ref', 'Invalid notification provider secret reference', {
+      appId,
+      provider,
+      expectedSecretRef: expected,
+    })
+  }
+  return status === 'configured' ? expected : requested || null
+}
+
 function publicDevice(row: NativeNotificationRegistryRow) {
   return {
     deviceKey: row.device_key,
@@ -254,24 +288,6 @@ function publicDevice(row: NativeNotificationRegistryRow) {
   }
 }
 
-async function trackQueuedNotificationEvents(c: Context<MiddlewareKeyVariables>, params: {
-  appId: string
-  campaignId: string
-  devices: NativeNotificationRegistryRow[]
-  badge?: number
-}) {
-  await Promise.all(params.devices.map(device => trackNotificationEventCF(c, {
-    appId: params.appId,
-    campaignId: params.campaignId,
-    event: 'queued',
-    recipientKey: device.recipient_key,
-    deviceKey: device.device_key,
-    provider: device.provider,
-    platform: device.platform,
-    badge: params.badge,
-  })))
-}
-
 function publicNotificationSettings(row: Record<string, unknown> | undefined, appId: string) {
   return {
     appId,
@@ -281,21 +297,28 @@ function publicNotificationSettings(row: Record<string, unknown> | undefined, ap
   }
 }
 
-async function resolveTargetDevices(c: Context<MiddlewareKeyVariables>, body: SendBody | BadgeBody) {
+function normalizeTargetLimit(value: unknown): number | undefined {
+  if (value === undefined || value === null)
+    return undefined
+  const limit = Number(value)
+  return Number.isFinite(limit) && limit > 0 ? Math.trunc(limit) : undefined
+}
+
+async function resolveTargetPlan(c: Context<MiddlewareKeyVariables>, body: SendBody | BadgeBody | UpdateCheckBody): Promise<NotificationTargetPlan> {
   const target = body.target ?? {}
-  const limit = 'limit' in body ? body.limit : undefined
+  const limit = 'limit' in body ? normalizeTargetLimit(body.limit) : undefined
   if (target.externalId) {
     const recipientKey = await deriveRecipientKey(c, body.appId, target.externalId)
-    return readNotificationRegistrationsCF(c, { appId: body.appId, recipientKey, limit })
+    return { target: { recipientKey }, buckets: [getNotificationBucket(recipientKey)], limit }
   }
   if (target.recipientKey)
-    return readNotificationRegistrationsCF(c, { appId: body.appId, recipientKey: target.recipientKey, limit })
+    return { target: { recipientKey: target.recipientKey }, buckets: [getNotificationBucket(target.recipientKey)], limit }
   if (target.deviceKey)
-    return readNotificationRegistrationsCF(c, { appId: body.appId, deviceKey: target.deviceKey, buckets: getAllNotificationBuckets(), limit })
+    return { target: { deviceKey: target.deviceKey }, buckets: getAllNotificationBuckets(), limit }
   if (target.tag)
-    return readNotificationRegistrationsCF(c, { appId: body.appId, tag: target.tag, buckets: getAllNotificationBuckets(), limit })
+    return { target: { tag: target.tag }, buckets: getAllNotificationBuckets(), limit }
   if (target.broadcast)
-    return readNotificationRegistrationsCF(c, { appId: body.appId, buckets: getAllNotificationBuckets(), limit })
+    return { target: { broadcast: true }, buckets: getAllNotificationBuckets(), limit }
   throw simpleError('missing_notification_target', 'Missing notification target')
 }
 
@@ -390,6 +413,24 @@ app.post('/register', async (c) => {
     throw simpleError('invalid_provider', 'Invalid notification provider')
   if (!NOTIFICATION_PLATFORMS.has(body.platform))
     throw simpleError('invalid_platform', 'Invalid notification platform')
+  const previousRecipientKey = typeof body.previousRecipientKey === 'string' ? body.previousRecipientKey.trim() : ''
+  const previousDeviceKey = typeof body.previousDeviceKey === 'string' ? body.previousDeviceKey.trim() : ''
+  const previousEventProof = typeof body.previousEventProof === 'string' ? body.previousEventProof.trim() : ''
+  if (previousRecipientKey && previousDeviceKey && previousEventProof && !(await verifyNotificationEventProof(c, appId, previousRecipientKey, previousDeviceKey, previousEventProof)))
+    throw quickError(401, 'invalid_previous_notification_event_proof', 'Invalid previous notification event proof', { appId })
+
+  const nextIdentity = await deriveNativeNotificationIdentity(c, appId, externalId, nativeInstallId)
+  if (previousRecipientKey && previousDeviceKey && previousEventProof && (previousRecipientKey !== nextIdentity.recipientKey || previousDeviceKey !== nextIdentity.deviceKey)) {
+    tombstoneNotificationRegistrationCF(c, {
+      appId,
+      recipientKey: previousRecipientKey,
+      deviceKey: previousDeviceKey,
+      provider: body.provider,
+      platform: body.platform,
+      badge: body.badge,
+      permission: body.permission,
+    })
+  }
 
   const identity = await trackNotificationRegistrationCF(c, {
     ...body,
@@ -483,15 +524,23 @@ app.post('/badge', middlewareV2(['write', 'all']), async (c) => {
   const badge = Math.max(0, Math.trunc(Number(body.badge)))
   if (!Number.isFinite(badge))
     throw simpleError('invalid_badge', 'Invalid badge')
-  const devices = await resolveTargetDevices(c, { ...body, appId, badge })
+  const plan = await resolveTargetPlan(c, { ...body, appId, badge })
   const providerConfigs = await getNotificationProviderConfigs(c, appId)
   if (!providerConfigs.length)
     throw simpleError('missing_notification_provider', 'Missing configured notification provider')
   const campaignId = body.campaignId || crypto.randomUUID()
-  const queued = await enqueueNativeNotification(c, { kind: 'badge', appId, campaignId, payload: {}, devices, badge, providerConfigs })
-  if (queued)
-    await trackQueuedNotificationEvents(c, { appId, campaignId, devices, badge })
-  return c.json({ ...BRES, campaignId, queued, targeted: devices.length })
+  const queued = await enqueueNativeNotificationFanout(c, {
+    kind: 'badge',
+    appId,
+    campaignId,
+    payload: {},
+    target: plan.target,
+    buckets: plan.buckets,
+    limit: plan.limit,
+    badge,
+    providerConfigs,
+  }, plan.buckets)
+  return c.json({ ...BRES, campaignId, queued, queuedBuckets: plan.buckets.length, targeted: null })
 })
 
 app.post('/update-check', middlewareV2(['write', 'all']), async (c) => {
@@ -504,7 +553,7 @@ app.post('/update-check', middlewareV2(['write', 'all']), async (c) => {
   const installMode = body.installMode || settings.pushUpdateInstallMode
   const channel = body.channel ?? settings.pushUpdateChannel
   const target = body.target ?? { broadcast: true }
-  const devices = await resolveTargetDevices(c, { appId, target, limit: body.limit })
+  const plan = await resolveTargetPlan(c, { appId, target, limit: body.limit })
   const providerConfigs = await getNotificationProviderConfigs(c, appId)
   if (!providerConfigs.length)
     throw simpleError('missing_notification_provider', 'Missing configured notification provider')
@@ -533,10 +582,17 @@ app.post('/update-check', middlewareV2(['write', 'all']), async (c) => {
       ...(channel ? { capgoUpdateChannel: channel } : {}),
     },
   }
-  const queued = await enqueueNativeNotification(c, { kind: 'update_check', appId, campaignId, payload, devices, providerConfigs })
-  if (queued)
-    await trackQueuedNotificationEvents(c, { appId, campaignId, devices })
-  return c.json({ ...BRES, campaignId, queued, targeted: devices.length })
+  const queued = await enqueueNativeNotificationFanout(c, {
+    kind: 'update_check',
+    appId,
+    campaignId,
+    payload,
+    target: plan.target,
+    buckets: plan.buckets,
+    limit: plan.limit,
+    providerConfigs,
+  }, plan.buckets)
+  return c.json({ ...BRES, campaignId, queued, queuedBuckets: plan.buckets.length, targeted: null })
 })
 
 app.post('/send', middlewareV2(['write', 'all']), async (c) => {
@@ -545,14 +601,21 @@ app.post('/send', middlewareV2(['write', 'all']), async (c) => {
   await assertAppPermission(c, 'app.manage_devices', appId)
   const campaignId = body.campaignId || crypto.randomUUID()
   const payload = assertOptionalRecord(body.payload, 'payload')
-  const devices = await resolveTargetDevices(c, { ...body, appId })
+  const plan = await resolveTargetPlan(c, { ...body, appId })
   const providerConfigs = await getNotificationProviderConfigs(c, appId)
   if (!providerConfigs.length)
     throw simpleError('missing_notification_provider', 'Missing configured notification provider')
-  const queued = await enqueueNativeNotification(c, { kind: 'send', appId, campaignId, payload, devices, providerConfigs })
-  if (queued)
-    await trackQueuedNotificationEvents(c, { appId, campaignId, devices })
-  return c.json({ ...BRES, campaignId, queued, targeted: devices.length })
+  const queued = await enqueueNativeNotificationFanout(c, {
+    kind: 'send',
+    appId,
+    campaignId,
+    payload,
+    target: plan.target,
+    buckets: plan.buckets,
+    limit: plan.limit,
+    providerConfigs,
+  }, plan.buckets)
+  return c.json({ ...BRES, campaignId, queued, queuedBuckets: plan.buckets.length, targeted: null })
 })
 
 app.get('/campaigns', middlewareV2(['read', 'write', 'all']), async (c) => {
@@ -621,7 +684,7 @@ app.put('/providers', middlewareV2(['write', 'all']), async (c) => {
   const status = body.status && ['draft', 'configured', 'disabled', 'error'].includes(body.status) ? body.status : 'draft'
   const ownerOrg = await getAppOwnerOrg(c, appId)
   const config = assertOptionalRecord(body.config, 'config')
-  const secretRef = body.secretRef ?? null
+  const secretRef = resolveProviderSecretRef(appId, body.provider, status, body.secretRef)
   const auth = c.get('auth')
   let pgClient: ReturnType<typeof getPgClient> | undefined
   try {

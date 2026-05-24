@@ -5,10 +5,11 @@ import type {
   NativeNotificationQueueMessage,
   NativeNotificationRegistryRow,
 } from './nativeNotifications.ts'
-import { getNotificationBucket, getNotificationEventIndex, getNotificationIndex } from './nativeNotifications.ts'
+import { buildNotificationRegistryLookupQuery, getAllNotificationBuckets, getNotificationBucket, getNotificationEventIndex, getNotificationIndex } from './nativeNotifications.ts'
 
 type NotificationEnv = Record<string, unknown>
 const MAX_NOTIFICATION_RETRY_ATTEMPTS = 3
+const DEFAULT_NOTIFICATION_REGISTRY_DATASET = 'notification_registry'
 
 interface SendOutcome {
   ok: boolean
@@ -16,6 +17,16 @@ interface SendOutcome {
   invalidToken?: boolean
   notificationId?: string
   error?: string
+}
+
+interface SendCredentialCache {
+  fcmAccessTokens: Map<string, Promise<string>>
+  apnsJwtTokens: Map<string, Promise<string>>
+}
+
+interface AnalyticsApiResponse {
+  data: Array<Record<string, unknown>>
+  meta?: Array<{ name: string, type: string }>
 }
 
 const textEncoder = new TextEncoder()
@@ -109,8 +120,78 @@ function parseSecretValue(env: NotificationEnv, secretRef: string | null | undef
   }
 }
 
+function createSendCredentialCache(): SendCredentialCache {
+  return {
+    fcmAccessTokens: new Map(),
+    apnsJwtTokens: new Map(),
+  }
+}
+
 function getProviderConfig(message: NativeNotificationQueueMessage, provider: NativeNotificationProvider): NativeNotificationProviderConfig | null {
   return message.providerConfigs?.find(config => config.provider === provider && config.status === 'configured') ?? null
+}
+
+function safeDatasetName(name: string, fallback: string): string {
+  return /^\w+$/.test(name) ? name : fallback
+}
+
+function getRegistryDataset(env: NotificationEnv): string {
+  return safeDatasetName(readEnv(env, 'NOTIFICATION_REGISTRY_DATASET') || DEFAULT_NOTIFICATION_REGISTRY_DATASET, DEFAULT_NOTIFICATION_REGISTRY_DATASET)
+}
+
+function convertAnalyticsRows<T>(apiResponse: AnalyticsApiResponse): T[] {
+  const meta = apiResponse.meta ?? []
+  return apiResponse.data.map((row) => {
+    const convertedRow: Record<string, unknown> = {}
+    for (const column of meta) {
+      const value = row[column.name]
+      if (column.type === 'UInt64' && typeof value === 'string')
+        convertedRow[column.name] = Number(value)
+      else
+        convertedRow[column.name] = value
+    }
+    return { ...row, ...convertedRow } as T
+  })
+}
+
+async function runAnalyticsQuery<T>(env: NotificationEnv, query: string): Promise<T[]> {
+  const token = readEnv(env, 'CF_ANALYTICS_TOKEN')
+  const accountId = readEnv(env, 'CF_ACCOUNT_ANALYTICS_ID')
+  if (!token || !accountId)
+    return []
+
+  const response = await fetch(`https://api.cloudflare.com/client/v4/accounts/${accountId}/analytics_engine/sql`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'text/plain; charset=utf-8',
+      'Accept-Encoding': 'gzip, zlib, deflate, zstd, br',
+      'User-Agent': 'Capgo/1.0',
+    },
+    body: query,
+  })
+  if (!response.ok)
+    throw new Error('Unable to read notification registry')
+  return convertAnalyticsRows<T>(await response.json() as AnalyticsApiResponse)
+}
+
+async function resolveMessageDevices(env: NotificationEnv, message: NativeNotificationQueueMessage): Promise<NativeNotificationRegistryRow[]> {
+  if (Array.isArray(message.devices))
+    return message.devices
+  const target = message.target
+  if (!target)
+    return []
+
+  const query = buildNotificationRegistryLookupQuery({
+    dataset: getRegistryDataset(env),
+    appId: message.appId,
+    buckets: message.buckets?.length ? message.buckets : getAllNotificationBuckets(),
+    recipientKey: target.recipientKey,
+    deviceKey: target.deviceKey,
+    tag: target.tag,
+    limit: message.limit,
+  })
+  return runAnalyticsQuery<NativeNotificationRegistryRow>(env, query)
 }
 
 function normalizeData(value: unknown): Record<string, string> {
@@ -150,10 +231,10 @@ async function signEcJwt(header: Record<string, unknown>, claims: Record<string,
   return `${unsigned}.${toBase64Url(new Uint8Array(signature))}`
 }
 
-async function getFcmAccessToken(env: NotificationEnv, providerConfig: NativeNotificationProviderConfig): Promise<string> {
+async function loadFcmAccessToken(env: NotificationEnv, providerConfig: NativeNotificationProviderConfig): Promise<string> {
   const secretValue = parseSecretValue(env, providerConfig.secretRef)
   const secretObject = secretValue && typeof secretValue === 'object' ? secretValue as Record<string, unknown> : {}
-  const directAccessToken = readEnv(env, 'FCM_ACCESS_TOKEN') || getString(secretObject.access_token)
+  const directAccessToken = getString(secretObject.access_token)
   if (directAccessToken)
     return directAccessToken
   const privateKey = getString(secretObject.private_key) || getString(secretValue)
@@ -182,6 +263,16 @@ async function getFcmAccessToken(env: NotificationEnv, providerConfig: NativeNot
   if (!response.ok || !json.access_token)
     throw new Error(json.error || 'Unable to get FCM access token')
   return json.access_token
+}
+
+async function getFcmAccessToken(env: NotificationEnv, providerConfig: NativeNotificationProviderConfig, cache: SendCredentialCache): Promise<string> {
+  const cacheKey = `fcm:${providerConfig.secretRef ?? ''}:${getString(providerConfig.config.serviceAccountEmail)}`
+  let tokenPromise = cache.fcmAccessTokens.get(cacheKey)
+  if (!tokenPromise) {
+    tokenPromise = loadFcmAccessToken(env, providerConfig)
+    cache.fcmAccessTokens.set(cacheKey, tokenPromise)
+  }
+  return tokenPromise
 }
 
 function buildFcmBody(token: string, message: NativeNotificationQueueMessage) {
@@ -271,14 +362,14 @@ function isInvalidFcmToken(json: FcmSendError): boolean {
   )
 }
 
-async function sendFcm(env: NotificationEnv, providerConfig: NativeNotificationProviderConfig, token: string, message: NativeNotificationQueueMessage): Promise<SendOutcome> {
+async function sendFcm(env: NotificationEnv, providerConfig: NativeNotificationProviderConfig, token: string, message: NativeNotificationQueueMessage, cache: SendCredentialCache): Promise<SendOutcome> {
   const secretValue = parseSecretValue(env, providerConfig.secretRef)
   const secretObject = secretValue && typeof secretValue === 'object' ? secretValue as Record<string, unknown> : {}
   const projectId = getString(providerConfig.config.projectId) || getString(secretObject.project_id)
   if (!projectId)
     return { ok: false, transient: false, error: 'Missing FCM project id' }
 
-  const accessToken = await getFcmAccessToken(env, providerConfig)
+  const accessToken = await getFcmAccessToken(env, providerConfig, cache)
   const response = await fetch(`https://fcm.googleapis.com/v1/projects/${encodeURIComponent(projectId)}/messages:send`, {
     method: 'POST',
     headers: {
@@ -300,12 +391,18 @@ async function sendFcm(env: NotificationEnv, providerConfig: NativeNotificationP
   }
 }
 
-async function buildApnsJwt(providerConfig: NativeNotificationProviderConfig, privateKey: string): Promise<string> {
+async function buildApnsJwt(providerConfig: NativeNotificationProviderConfig, privateKey: string, cache: SendCredentialCache): Promise<string> {
   const teamId = getString(providerConfig.config.teamId)
   const keyId = getString(providerConfig.config.keyId)
   if (!teamId || !keyId)
     throw new Error('Missing APNs team id or key id')
-  return signEcJwt({ alg: 'ES256', kid: keyId }, { iss: teamId, iat: Math.floor(Date.now() / 1000) }, privateKey)
+  const cacheKey = `apns:${providerConfig.secretRef ?? ''}:${teamId}:${keyId}`
+  let jwtPromise = cache.apnsJwtTokens.get(cacheKey)
+  if (!jwtPromise) {
+    jwtPromise = signEcJwt({ alg: 'ES256', kid: keyId }, { iss: teamId, iat: Math.floor(Date.now() / 1000) }, privateKey)
+    cache.apnsJwtTokens.set(cacheKey, jwtPromise)
+  }
+  return jwtPromise
 }
 
 function buildApnsPayload(message: NativeNotificationQueueMessage) {
@@ -340,7 +437,7 @@ function buildApnsPayload(message: NativeNotificationQueueMessage) {
   }
 }
 
-async function sendApns(env: NotificationEnv, providerConfig: NativeNotificationProviderConfig, token: string, message: NativeNotificationQueueMessage): Promise<SendOutcome> {
+async function sendApns(env: NotificationEnv, providerConfig: NativeNotificationProviderConfig, token: string, message: NativeNotificationQueueMessage, cache: SendCredentialCache): Promise<SendOutcome> {
   const secretValue = parseSecretValue(env, providerConfig.secretRef)
   const secretObject = secretValue && typeof secretValue === 'object' ? secretValue as Record<string, unknown> : {}
   const privateKey = getString(secretObject.private_key) || getString(secretValue)
@@ -355,7 +452,7 @@ async function sendApns(env: NotificationEnv, providerConfig: NativeNotification
   const response = await fetch(`${host}/3/device/${encodeURIComponent(token)}`, {
     method: 'POST',
     headers: {
-      'Authorization': `bearer ${await buildApnsJwt(providerConfig, privateKey)}`,
+      'Authorization': `bearer ${await buildApnsJwt(providerConfig, privateKey, cache)}`,
       'Content-Type': 'application/json',
       'apns-topic': bundleId,
       'apns-push-type': background ? 'background' : 'alert',
@@ -431,15 +528,15 @@ function tombstoneDevice(env: NotificationEnv, appId: string, device: NativeNoti
   })
 }
 
-async function sendToDevice(env: NotificationEnv, message: NativeNotificationQueueMessage, device: NativeNotificationRegistryRow): Promise<SendOutcome> {
+async function sendToDevice(env: NotificationEnv, message: NativeNotificationQueueMessage, device: NativeNotificationRegistryRow, cache: SendCredentialCache): Promise<SendOutcome> {
   const providerConfig = getProviderConfig(message, device.provider)
   if (!providerConfig)
     return { ok: false, transient: false, error: `Missing configured provider for ${device.provider}` }
   const token = await decryptToken(env, device.encrypted_token)
   if (device.provider === 'fcm')
-    return sendFcm(env, providerConfig, token, message)
+    return sendFcm(env, providerConfig, token, message, cache)
   if (device.provider === 'apns')
-    return sendApns(env, providerConfig, token, message)
+    return sendApns(env, providerConfig, token, message, cache)
   return { ok: false, transient: false, error: `Unsupported provider ${device.provider}` }
 }
 
@@ -486,10 +583,15 @@ function shouldRetryOutcome(env: NotificationEnv, message: NativeNotificationQue
 export async function processNativeNotificationQueueMessage(message: NativeNotificationQueueMessage, env: NotificationEnv): Promise<NativeNotificationRegistryRow[]> {
   const retryDevices: NativeNotificationRegistryRow[] = []
   const shouldRetry = canRetry(message)
+  const devices = await resolveMessageDevices(env, message)
+  const shouldWriteQueuedEvents = !Array.isArray(message.devices)
+  const credentialCache = createSendCredentialCache()
 
-  for (const device of message.devices) {
+  for (const device of devices) {
+    if (shouldWriteQueuedEvents)
+      writeNotificationEvent(env, { appId: message.appId, campaignId: message.campaignId, event: 'queued', device, badge: message.badge })
     try {
-      const outcome = await sendToDevice(env, message, device)
+      const outcome = await sendToDevice(env, message, device, credentialCache)
       if (shouldRetryOutcome(env, message, device, outcome, shouldRetry))
         retryDevices.push(device)
     }

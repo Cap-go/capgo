@@ -439,7 +439,7 @@ async function createApiKey(keyType: 'read' | 'write' | 'all' | 'upload') {
     if (isHashed) {
       createdKey.key = null as any
     }
-    keys.value?.push(createdKey)
+    keys.value = [createdKey, ...keys.value]
     // Fetch org and app names for the new key
     await fetchOrgAndAppNames()
 

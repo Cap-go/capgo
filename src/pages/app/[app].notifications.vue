@@ -102,6 +102,10 @@ const totalEvents = computed(() => stats.value.reduce((total, item) => total + N
 const configuredProviders = computed(() => providers.value.filter(provider => provider.status === 'configured').length)
 const latestCampaigns = computed(() => campaigns.value.slice(0, 6))
 const hasStats = computed(() => stats.value.length > 0)
+const expectedProviderSecretRef = computed(() => {
+  const normalizedAppId = id.value.toUpperCase().replace(/[^A-Z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 96) || 'APP'
+  return `NOTIFICATIONS_${normalizedAppId}_${providerForm.value.provider.toUpperCase()}`
+})
 let activeRefreshId = 0
 
 async function authHeaders() {
@@ -237,7 +241,7 @@ async function saveProvider() {
         appId: id.value,
         provider: providerForm.value.provider,
         status: providerForm.value.status,
-        secretRef: providerForm.value.secretRef || null,
+        secretRef: providerForm.value.secretRef.trim() || (providerForm.value.status === 'configured' ? expectedProviderSecretRef.value : null),
         config: parseJson(providerForm.value.config, {}),
       }),
     })
@@ -515,7 +519,7 @@ watch(() => {
                     </label>
                     <label class="space-y-1 sm:col-span-2 2xl:col-span-2">
                       <span class="text-sm font-medium text-slate-700 dark:text-slate-200">{{ t('notification-provider-secret-ref') }}</span>
-                      <input v-model="providerForm.secretRef" class="w-full min-h-11 d-input d-input-bordered" :placeholder="t('notification-provider-secret-ref-placeholder')">
+                      <input v-model="providerForm.secretRef" class="w-full min-h-11 d-input d-input-bordered" :placeholder="expectedProviderSecretRef">
                     </label>
                   </div>
                   <label class="block space-y-1">

@@ -13,6 +13,10 @@ enum CapgoNotificationsPermissions: String {
     case granted
 }
 
+extension Notification.Name {
+    static let capgoNotificationsRemoteNotification = Notification.Name("CapgoNotificationsRemoteNotification")
+}
+
 @objc(CapgoNotificationsPlugin)
 public class CapgoNotificationsPlugin: CAPPlugin, CAPBridgedPlugin {
     public let identifier = "CapgoNotificationsPlugin"
@@ -51,6 +55,11 @@ public class CapgoNotificationsPlugin: CAPPlugin, CAPBridgedPlugin {
         NotificationCenter.default.addObserver(self,
                                                selector: #selector(self.didFailToRegisterForRemoteNotificationsWithError(notification:)),
                                                name: .capacitorDidFailToRegisterForRemoteNotifications,
+                                               object: nil)
+
+        NotificationCenter.default.addObserver(self,
+                                               selector: #selector(self.didReceiveRemoteNotification(notification:)),
+                                               name: .capgoNotificationsRemoteNotification,
                                                object: nil)
     }
 
@@ -203,6 +212,11 @@ public class CapgoNotificationsPlugin: CAPPlugin, CAPBridgedPlugin {
     @objc public func didFailToRegisterForRemoteNotificationsWithError(notification: NSNotification) {
         guard let error = notification.object as? Error else { return }
         notifyListeners("registrationError", data: ["error": error.localizedDescription], retainUntilConsumed: true)
+    }
+
+    @objc public func didReceiveRemoteNotification(notification: NSNotification) {
+        guard let userInfo = notification.object as? [AnyHashable: Any] else { return }
+        self.notificationDelegateHandler.handleRemoteNotification(userInfo)
     }
 
     private func setBadgeCount(_ count: Int, completion: @escaping (Error?) -> Void) {

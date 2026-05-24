@@ -4,6 +4,7 @@ import {
   buildNotificationStatsQuery,
   createNotificationEventProof,
   createNotificationIdentityProof,
+  enqueueNativeNotificationFanout,
   getAllNotificationBuckets,
   getNotificationBucket,
   getNotificationEventIndex,
@@ -54,8 +55,22 @@ function fcmDevice(encryptedToken: string) {
 }
 
 const fetchRequests = new Map<string, any[]>()
+const analyticsRowsByApp = new Map<string, any[]>()
 const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (_url, init) => {
-  const requestBody = JSON.parse(String(init?.body || '{}'))
+  const url = String(_url)
+  if (url.includes('/analytics_engine/sql')) {
+    const query = String(init?.body || '')
+    const appId = query.match(/index1 IN \('([^']+):[0-9a-f]{2}'/)?.[1] ?? ''
+    return new Response(JSON.stringify({ data: analyticsRowsByApp.get(appId) ?? [] }), { status: 200 })
+  }
+
+  let requestBody: any = {}
+  try {
+    requestBody = JSON.parse(String(init?.body || '{}'))
+  }
+  catch {
+    requestBody = {}
+  }
   const token = typeof requestBody?.message?.token === 'string' ? requestBody.message.token : ''
   if (token) {
     const requests = fetchRequests.get(token) ?? []
@@ -176,8 +191,71 @@ describe('native notification AE registry', () => {
       vi.unstubAllEnvs()
     }
   })
+
+  it.concurrent('keeps limited fanout in one queue job so the limit stays global', async () => {
+    const messages: any[] = []
+    const queued = await enqueueNativeNotificationFanout({
+      env: {
+        NOTIFICATION_QUEUE: {
+          send: (message: any) => {
+            messages.push(message)
+            return Promise.resolve()
+          },
+        },
+      },
+    } as any, {
+      kind: 'send',
+      appId: 'com.demo.app',
+      campaignId: 'campaign-limit',
+      payload: {},
+      target: { broadcast: true },
+      limit: 1,
+    }, ['00', '01'])
+
+    expect(queued).toBe(true)
+    expect(messages).toHaveLength(1)
+    expect(messages[0].buckets).toEqual(['00', '01'])
+    expect(messages[0].devices).toBeUndefined()
+  })
 })
 describe('native notification queue sender', () => {
+  it.concurrent('resolves bucket fanout devices from AE inside the worker', async () => {
+    const token = 'push-token-ae'
+    const encryptedToken = await encryptToken('secret', token)
+    const device = {
+      ...fcmDevice(encryptedToken),
+      recipient_key: 'bb-recipient',
+    }
+    analyticsRowsByApp.set('com.demo.ae', [device])
+    const events: any[] = []
+
+    const retryDevices = await processNativeNotificationQueueMessage({
+      kind: 'send',
+      appId: 'com.demo.ae',
+      campaignId: 'campaign-ae',
+      payload: { title: 'Hello', body: 'AE' },
+      target: { recipientKey: 'bb-recipient' },
+      buckets: ['bb'],
+      providerConfigs: [{
+        provider: 'fcm',
+        status: 'configured',
+        secretRef: 'FCM_SECRET',
+        config: { projectId: 'demo-project' },
+      }],
+    }, {
+      API_SECRET: 'secret',
+      CF_ANALYTICS_TOKEN: 'cf-token',
+      CF_ACCOUNT_ANALYTICS_ID: 'cf-account',
+      FCM_SECRET: JSON.stringify({ access_token: 'token', project_id: 'demo-project' }),
+      NOTIFICATION_EVENTS: { writeDataPoint: (point: any) => events.push(point) },
+    })
+
+    expect(retryDevices).toHaveLength(0)
+    expect(requestsFor(token)).toHaveLength(1)
+    expect(events.some(point => point.blobs[0] === 'queued')).toBe(true)
+    expect(events.some(point => point.blobs[0] === 'sent')).toBe(true)
+  })
+
   it.concurrent('builds silent update-check payloads for Capgo updater', async () => {
     const token = 'push-token-update'
     const encryptedToken = await encryptToken('secret', token)

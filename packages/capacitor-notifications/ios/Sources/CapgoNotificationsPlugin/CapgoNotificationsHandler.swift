@@ -66,6 +66,15 @@ public class CapgoNotificationsHandler: NSObject, NotificationHandlerProtocol {
         self.plugin?.notifyListeners("notificationOpened", data: data, retainUntilConsumed: true)
     }
 
+    public func handleRemoteNotification(_ userInfo: [AnyHashable: Any]) {
+        let notificationData = makeRemoteNotificationJSObject(userInfo)
+        self.plugin?.notifyListeners("notificationReceived", data: notificationData, retainUntilConsumed: true)
+
+        if isCapgoBackgroundPayload(userInfo) {
+            self.plugin?.notifyListeners("backgroundNotification", data: notificationData, retainUntilConsumed: true)
+        }
+    }
+
     func makeNotificationRequestJSObject(_ request: UNNotificationRequest) -> JSObject {
         return [
             "id": request.identifier,
@@ -74,6 +83,19 @@ public class CapgoNotificationsHandler: NSObject, NotificationHandlerProtocol {
             "badge": request.content.badge ?? 0,
             "body": request.content.body,
             "data": JSTypes.coerceDictionaryToJSObject(request.content.userInfo) ?? [:]
+        ]
+    }
+
+    private func makeRemoteNotificationJSObject(_ userInfo: [AnyHashable: Any]) -> JSObject {
+        let aps = userInfo["aps"] as? [String: Any]
+        let alert = aps?["alert"] as? [String: Any]
+        return [
+            "id": (userInfo["gcm.message_id"] as? String) ?? (userInfo["google.message_id"] as? String) ?? (userInfo["message_id"] as? String) ?? UUID().uuidString,
+            "title": alert?["title"] as? String ?? "",
+            "subtitle": alert?["subtitle"] as? String ?? "",
+            "badge": aps?["badge"] as? Int ?? 0,
+            "body": alert?["body"] as? String ?? "",
+            "data": JSTypes.coerceDictionaryToJSObject(userInfo) ?? [:]
         ]
     }
 

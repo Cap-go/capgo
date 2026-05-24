@@ -113,7 +113,10 @@ export interface NativeNotificationQueueMessage {
   appId: string
   campaignId: string
   payload: Record<string, unknown>
-  devices: NativeNotificationRegistryRow[]
+  target?: NativeNotificationTarget
+  buckets?: string[]
+  devices?: NativeNotificationRegistryRow[]
+  limit?: number
   badge?: number
   providerConfigs?: NativeNotificationProviderConfig[]
   attempt?: number
@@ -350,6 +353,43 @@ export async function trackNotificationRegistrationCF(c: Context<MiddlewareKeyVa
   return identity
 }
 
+export function tombstoneNotificationRegistrationCF(c: Context<MiddlewareKeyVariables>, params: {
+  appId: string
+  recipientKey: string
+  deviceKey: string
+  provider?: NativeNotificationProvider
+  platform?: NativeNotificationPlatform
+  badge?: number
+  permission?: NativeNotificationPermission
+}) {
+  if (!c.env.NOTIFICATION_REGISTRY)
+    return
+
+  c.env.NOTIFICATION_REGISTRY.writeDataPoint({
+    blobs: [
+      params.deviceKey,
+      params.recipientKey,
+      '',
+      '',
+      params.provider ?? '',
+      params.platform ?? '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+    ],
+    doubles: [
+      0,
+      Math.max(0, Math.trunc(params.badge ?? 0)),
+      permissionToNumber(params.permission),
+      0,
+    ],
+    indexes: [getNotificationIndex(params.appId, getNotificationBucket(params.recipientKey))],
+  })
+}
+
 export function buildNotificationRegistryLookupQuery(params: {
   dataset: string
   appId: string
@@ -525,5 +565,28 @@ export async function enqueueNativeNotification(c: Context<MiddlewareKeyVariable
   if (!queue?.send)
     return false
   await queue.send(message)
+  return true
+}
+
+export async function enqueueNativeNotificationFanout(c: Context<MiddlewareKeyVariables>, message: NativeNotificationQueueMessage, buckets: string[]) {
+  const queue = c.env.NOTIFICATION_QUEUE as { send?: (body: NativeNotificationQueueMessage) => Promise<void> } | undefined
+  if (!queue?.send)
+    return false
+  const send = queue.send.bind(queue)
+
+  if (message.limit) {
+    await send({
+      ...message,
+      buckets,
+      devices: undefined,
+    })
+    return true
+  }
+
+  await Promise.all(buckets.map(bucket => send({
+    ...message,
+    buckets: [bucket],
+    devices: undefined,
+  })))
   return true
 }
