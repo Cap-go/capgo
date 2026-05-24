@@ -794,6 +794,7 @@ export type Database = {
           created_at: string
           description: string | null
           enabled: boolean
+          healthcheck_url: string | null
           hour_interval: number | null
           id: number
           minute_interval: number | null
@@ -814,6 +815,7 @@ export type Database = {
           created_at?: string
           description?: string | null
           enabled?: boolean
+          healthcheck_url?: string | null
           hour_interval?: number | null
           id?: number
           minute_interval?: number | null
@@ -834,6 +836,7 @@ export type Database = {
           created_at?: string
           description?: string | null
           enabled?: boolean
+          healthcheck_url?: string | null
           hour_interval?: number | null
           id?: number
           minute_interval?: number | null
