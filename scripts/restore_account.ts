@@ -25,7 +25,6 @@ interface ApiKey {
   key: string | null
   updated_at: string
   name: string
-  rbac_id?: string | null
   expires_at: string | null
   key_hash: string | null
 }
@@ -116,7 +115,6 @@ async function main() {
             user_id: apikey.user_id,
             key: apikey.key,
             name: apikey.name,
-            rbac_id: apikey.rbac_id ?? undefined,
             key_hash: apikey.key_hash,
             expires_at: apikey.expires_at,
           })
@@ -125,7 +123,7 @@ async function main() {
           console.error(`  Error restoring API key "${apikey.name}":`, insertError)
         }
         else {
-          console.log(`  Restored API key: "${apikey.name}"`)
+          console.log(`  Restored API key: "${apikey.name}" (RBAC bindings must be reassigned)`)
         }
       }
     }

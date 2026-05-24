@@ -1251,6 +1251,13 @@ BEGIN
     WHERE r.name = public.rbac_role_org_member()
     ON CONFLICT DO NOTHING;
 
+    -- apikey_org_reader: compatibility org metadata read without org-wide app access
+    INSERT INTO public.role_permissions (role_id, permission_id)
+    SELECT r.id, p.id FROM public.roles r
+    JOIN public.permissions p ON p.key = public.rbac_perm_org_read()
+    WHERE r.name = public.rbac_role_apikey_org_reader()
+    ON CONFLICT DO NOTHING;
+
     -- app_admin: full app control
     INSERT INTO public.role_permissions (role_id, permission_id)
     SELECT r.id, p.id FROM public.roles r

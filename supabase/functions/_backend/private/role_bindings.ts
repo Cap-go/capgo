@@ -40,6 +40,7 @@ type RouteValidationResult<T> = { ok: true, data: T } | { ok: false, response: R
 type RoleBindingRecord = typeof schema.role_bindings.$inferSelect
 type RoleRecord = typeof schema.roles.$inferSelect
 const INVALID_APIKEY_ACCESS_ERROR = 'Invalid API key or access'
+const APIKEY_ORG_READER_ROLE = 'apikey_org_reader'
 
 export const app = createHono('', version)
 
@@ -413,6 +414,7 @@ export interface CreateBindingParams {
   app_id?: string | null
   channel_id?: string | number | null
   reason?: string
+  allowSystemRole?: boolean
 }
 
 export type CreateBindingResult = {
@@ -440,6 +442,7 @@ export async function createRoleBindingForPrincipal(
     app_id,
     channel_id,
     reason,
+    allowSystemRole = false,
   } = params
 
   // 1. Resolve role by name
@@ -453,7 +456,11 @@ export async function createRoleBindingForPrincipal(
     return { ok: false, status: 404, error: 'Role not found' }
   }
 
-  if (!role.is_assignable) {
+  const canUseSystemRole = allowSystemRole
+    && principal_type === 'apikey'
+    && role_name === APIKEY_ORG_READER_ROLE
+
+  if (!role.is_assignable && !canUseSystemRole) {
     return { ok: false, status: 403, error: 'Role is not assignable' }
   }
 

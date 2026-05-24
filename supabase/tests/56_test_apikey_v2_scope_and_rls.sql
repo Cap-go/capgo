@@ -1,6 +1,6 @@
 BEGIN;
 
-SELECT plan(22);
+SELECT plan(30);
 
 SELECT tests.authenticate_as_service_role();
 SELECT tests.create_supabase_user('apikey_v2_scope_owner', 'apikey_v2_scope_owner@test.local');
@@ -98,7 +98,7 @@ SELECT tests.create_v2_apikey(
   'apikey-v2-scope-app-key',
   'apikey-v2-scope-app-key',
   '71000000-0000-4000-8000-000000000056'::uuid,
-  public.rbac_role_org_member(),
+  public.rbac_role_apikey_org_reader(),
   'com.test.apikeyv2scope.target',
   public.rbac_role_app_reader()
 );
@@ -118,7 +118,7 @@ SELECT tests.create_v2_apikey(
   'apikey-v2-scope-both-key',
   'apikey-v2-scope-both-key',
   '71000000-0000-4000-8000-000000000056'::uuid,
-  public.rbac_role_org_member(),
+  public.rbac_role_apikey_org_reader(),
   'com.test.apikeyv2scope.target',
   public.rbac_role_app_reader()
 );
@@ -129,9 +129,20 @@ SELECT tests.create_v2_apikey(
   'apikey-v2-scope-upload-key',
   'apikey-v2-scope-upload-key',
   '71000000-0000-4000-8000-000000000056'::uuid,
-  public.rbac_role_org_member(),
+  public.rbac_role_apikey_org_reader(),
   'com.test.apikeyv2scope.target',
   public.rbac_role_app_uploader()
+);
+
+SELECT tests.create_v2_apikey(
+  56005,
+  tests.get_supabase_uid('apikey_v2_scope_owner'),
+  'apikey-v2-scope-all-app-key',
+  'apikey-v2-scope-all-app-key',
+  '71000000-0000-4000-8000-000000000056'::uuid,
+  public.rbac_role_apikey_org_reader(),
+  'com.test.apikeyv2scope.target',
+  public.rbac_role_app_admin()
 );
 
 INSERT INTO public.role_bindings (
@@ -200,6 +211,55 @@ VALUES (
 ON CONFLICT (id) DO UPDATE
 SET comment = EXCLUDED.comment;
 
+INSERT INTO public.channels (
+  id,
+  created_at,
+  name,
+  app_id,
+  version,
+  updated_at,
+  public,
+  disable_auto_update_under_native,
+  disable_auto_update,
+  ios,
+  android,
+  electron,
+  allow_device_self_set,
+  allow_emulator,
+  allow_device,
+  allow_dev,
+  allow_prod,
+  owner_org,
+  created_by
+)
+VALUES (
+  5600401,
+  NOW(),
+  'apikey-v2-scope-channel',
+  'com.test.apikeyv2scope.target',
+  5600401,
+  NOW(),
+  true,
+  true,
+  'major'::public.disable_update,
+  true,
+  true,
+  true,
+  true,
+  true,
+  true,
+  true,
+  true,
+  '71000000-0000-4000-8000-000000000056'::uuid,
+  tests.get_supabase_uid('apikey_v2_scope_owner')
+)
+ON CONFLICT (id) DO UPDATE
+SET
+  app_id = EXCLUDED.app_id,
+  version = EXCLUDED.version,
+  owner_org = EXCLUDED.owner_org,
+  created_by = EXCLUDED.created_by;
+
 SELECT ok(
   public.rbac_check_permission_direct(
     public.rbac_perm_app_read(),
@@ -222,6 +282,62 @@ SELECT ok(
     'apikey-v2-scope-app-key'
   ),
   'app-limited legacy migration shape does not grant sibling apps'
+);
+
+SELECT ok(
+  public.rbac_check_permission_direct(
+    public.rbac_perm_org_read(),
+    NULL::uuid,
+    '71000000-0000-4000-8000-000000000056',
+    NULL::varchar,
+    NULL::bigint,
+    'apikey-v2-scope-app-key'
+  ),
+  'app-limited legacy migration shape keeps org.read compatibility'
+);
+
+SELECT is(
+  (
+    SELECT count(*)::int
+    FROM public.apikeys ak
+    JOIN public.role_bindings rb
+      ON rb.principal_type = public.rbac_principal_apikey()
+      AND rb.principal_id = ak.rbac_id
+    JOIN public.roles r ON r.id = rb.role_id
+    WHERE ak.key = 'apikey-v2-scope-app-key'
+      AND rb.scope_type = public.rbac_scope_org()
+      AND r.name = public.rbac_role_apikey_org_reader()
+  ),
+  1,
+  'app-limited legacy migration shape uses the API-key org reader compatibility role'
+);
+
+SELECT is(
+  (
+    SELECT count(*)::int
+    FROM public.apikeys ak
+    JOIN public.role_bindings rb
+      ON rb.principal_type = public.rbac_principal_apikey()
+      AND rb.principal_id = ak.rbac_id
+    JOIN public.roles r ON r.id = rb.role_id
+    WHERE ak.key = 'apikey-v2-scope-app-key'
+      AND rb.scope_type = public.rbac_scope_org()
+      AND r.name = public.rbac_role_org_member()
+  ),
+  0,
+  'app-limited legacy migration shape does not use org_member compatibility binding'
+);
+
+SELECT ok(
+  NOT EXISTS (
+    SELECT 1
+    FROM public.roles r
+    JOIN public.role_permissions rp ON rp.role_id = r.id
+    JOIN public.permissions p ON p.id = rp.permission_id
+    WHERE r.name = public.rbac_role_apikey_org_reader()
+      AND p.key = public.rbac_perm_app_read()
+  ),
+  'API-key org reader role does not grant app.read at org scope'
 );
 
 SELECT ok(
@@ -282,6 +398,42 @@ SELECT ok(
     'apikey-v2-scope-both-key'
   ),
   'combined org/app limits do not grant listed apps outside the allowed org'
+);
+
+SELECT ok(
+  public.rbac_check_permission_direct(
+    public.rbac_perm_app_update_user_roles(),
+    NULL::uuid,
+    '71000000-0000-4000-8000-000000000056',
+    'com.test.apikeyv2scope.target',
+    NULL::bigint,
+    'apikey-v2-scope-all-app-key'
+  ),
+  'all-mode app-limited legacy key gets app admin on the selected app'
+);
+
+SELECT ok(
+  NOT public.rbac_check_permission_direct(
+    public.rbac_perm_app_update_user_roles(),
+    NULL::uuid,
+    '71000000-0000-4000-8000-000000000056',
+    'com.test.apikeyv2scope.sibling',
+    NULL::bigint,
+    'apikey-v2-scope-all-app-key'
+  ),
+  'all-mode app-limited legacy key does not get app admin on sibling apps'
+);
+
+SELECT ok(
+  NOT public.rbac_check_permission_direct(
+    public.rbac_perm_org_update_user_roles(),
+    NULL::uuid,
+    '71000000-0000-4000-8000-000000000056',
+    NULL::varchar,
+    NULL::bigint,
+    'apikey-v2-scope-all-app-key'
+  ),
+  'all-mode app-limited legacy key does not become an org admin'
 );
 
 SELECT ok(
@@ -361,6 +513,39 @@ SELECT is(
   'read app-scoped API key cannot update owner user rows through RLS'
 );
 
+SELECT tests.clear_authentication();
+SELECT set_config('request.headers', '{"capgkey":"apikey-v2-scope-all-app-key"}', true);
+
+DO $$
+DECLARE
+  captured_sqlstate text;
+BEGIN
+  BEGIN
+    INSERT INTO public.channel_devices (
+      channel_id,
+      app_id,
+      device_id,
+      owner_org
+    )
+    VALUES (
+      5600401,
+      'com.test.apikeyv2scope.target',
+      'apikey-v2-scope-channel-device',
+      '71000000-0000-4000-8000-000000000056'::uuid
+    );
+  EXCEPTION WHEN OTHERS THEN
+    captured_sqlstate := SQLSTATE;
+  END;
+
+  PERFORM set_config('tests.channel_devices_apikey_insert_sqlstate', COALESCE(captured_sqlstate, 'success'), true);
+END $$;
+
+SELECT is(
+  current_setting('tests.channel_devices_apikey_insert_sqlstate', true),
+  '42501',
+  'API keys cannot directly insert channel_devices through JWT-only RLS'
+);
+
 SELECT is(
   (
     SELECT prorettype::regtype::text
@@ -430,6 +615,8 @@ SELECT is(
   'jsonb[]',
   'legacy get_organization_cli_warnings(uuid, text) keeps jsonb[] return shape'
 );
+
+SELECT set_config('request.headers', '{"capgkey":"apikey-v2-scope-app-key"}', true);
 
 SELECT ok(
   public.cli_check_permission(

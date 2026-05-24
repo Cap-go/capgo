@@ -486,12 +486,12 @@ SELECT
         'get_organization_cli_warnings test - returns single warning for invalid API key'
     );
 
--- Test 2b: RBAC v2 path — apikey with org_member binding gets org.read.
+-- Test 2b: RBAC v2 path — apikey with an org binding gets org.read.
 -- Owned by the legacy fixture user (super_admin of the test org). In this
 -- codebase's RBAC v2 model the apikey binding mirrors the user's right (see
 -- supabase/functions/_backend/public/apikey/post.ts where the apikey creation
--- flow auto-inserts org_member bindings to "carry" org.read alongside any
--- app-level bindings). The fix this test guards proves the V2 path still
+-- flow auto-inserts an org-read compatibility binding alongside app-level
+-- bindings). The fix this test guards proves the V2 path still
 -- resolves correctly through cli_check_permission after V1 mode is removed.
 SELECT tests.clear_authentication();
 SELECT tests.authenticate_as_service_role();

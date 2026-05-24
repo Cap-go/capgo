@@ -100,6 +100,9 @@ async function handlePut(c: Context<MiddlewareKeyVariables>, idParam?: string) {
   if (!existingApikey) {
     throw quickError(404, 'api_key_not_found_or_access_denied', 'API key not found or access denied', { requestId })
   }
+  if (!existingApikey.rbac_id) {
+    throw quickError(409, 'apikey_missing_rbac_bindings', 'API key is missing RBAC bindings and cannot be updated', { requestId, apikeyId: existingApikey.id })
+  }
 
   // Validate expiration against org policies (only if expiration or scopes are changing)
   if (expires_at !== undefined) {

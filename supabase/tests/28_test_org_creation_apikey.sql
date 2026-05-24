@@ -38,14 +38,13 @@ BEGIN
     captured_sqlstate := SQLSTATE;
   END;
 
-  IF captured_sqlstate IS DISTINCT FROM '42501' THEN
-    RAISE EXCEPTION 'Expected API key org insert to fail with 42501, got %', COALESCE(captured_sqlstate, 'success');
-  END IF;
+  PERFORM set_config('tests.org_creation_apikey_sqlstate', COALESCE(captured_sqlstate, 'success'), true);
 END $$;
 
 SELECT
-    ok(
-        true,
+    is(
+        current_setting('tests.org_creation_apikey_sqlstate', true),
+        '42501',
         'API key insert is rejected for JWT-only org creation'
     );
 
@@ -76,7 +75,18 @@ EXCEPTION
     RAISE EXCEPTION 'Authenticated insert failed: %', SQLERRM;
 END $$;
 
-SELECT ok(true, 'Authenticated user insert succeeded');
+SELECT tests.authenticate_as_service_role();
+
+SELECT
+    ok(
+        EXISTS (
+            SELECT 1
+            FROM public.orgs
+            WHERE created_by = '6aa76066-55ef-4238-ade6-0b32334a4097'::uuid
+              AND name = 'SQL JWT Org'
+        ),
+        'Authenticated user insert succeeded'
+    );
 
 -- Finish
 SELECT *

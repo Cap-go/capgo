@@ -43,6 +43,42 @@ GRANT EXECUTE ON FUNCTION public.rbac_is_enabled_for_org(uuid) TO "service_role"
 
 COMMENT ON FUNCTION public.rbac_is_enabled_for_org(uuid) IS 'Compatibility helper retained for old callers. RBAC is always enabled.';
 
+CREATE OR REPLACE FUNCTION public.rbac_role_apikey_org_reader() RETURNS text
+LANGUAGE sql
+IMMUTABLE
+PARALLEL SAFE
+SET search_path = ''
+AS $$ SELECT 'apikey_org_reader'::text $$;
+
+ALTER FUNCTION public.rbac_role_apikey_org_reader() OWNER TO "postgres";
+REVOKE ALL ON FUNCTION public.rbac_role_apikey_org_reader() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.rbac_role_apikey_org_reader() TO "anon";
+GRANT EXECUTE ON FUNCTION public.rbac_role_apikey_org_reader() TO "authenticated";
+GRANT EXECUTE ON FUNCTION public.rbac_role_apikey_org_reader() TO "service_role";
+
+INSERT INTO public.roles (name, scope_type, description, priority_rank, is_assignable, created_by)
+VALUES (
+  public.rbac_role_apikey_org_reader(),
+  public.rbac_scope_org(),
+  'API key compatibility role: org metadata read only',
+  10,
+  false,
+  NULL
+)
+ON CONFLICT (name) DO UPDATE
+SET
+  scope_type = EXCLUDED.scope_type,
+  description = EXCLUDED.description,
+  priority_rank = EXCLUDED.priority_rank,
+  is_assignable = EXCLUDED.is_assignable;
+
+INSERT INTO public.role_permissions (role_id, permission_id)
+SELECT r.id, p.id
+FROM public.roles r
+JOIN public.permissions p ON p.key = public.rbac_perm_org_read()
+WHERE r.name = public.rbac_role_apikey_org_reader()
+ON CONFLICT DO NOTHING;
+
 CREATE TEMP TABLE _apikey_v2_current_orgs ON COMMIT DROP AS
 SELECT DISTINCT source.user_id, source.org_id
 FROM (
@@ -150,7 +186,7 @@ FROM (
     keys.user_id,
     keys.rbac_id,
     apps.owner_org AS org_id,
-    public.rbac_role_org_member() AS role_name
+    public.rbac_role_apikey_org_reader() AS role_name
   FROM _apikey_v2_seed keys
   JOIN _apikey_v2_target_apps apps ON apps.key_id = keys.id
   WHERE keys.has_app_limit
@@ -2586,14 +2622,11 @@ WITH CHECK (
 DROP POLICY IF EXISTS "Allow insert for auth (write+)" ON "public"."channel_devices";
 CREATE POLICY "Allow insert for auth (write+)" ON "public"."channel_devices"
 FOR INSERT
-TO "authenticated", "anon"
+TO "authenticated"
 WITH CHECK (
   public.check_min_rights(
     'write'::public.user_min_right,
-    CASE
-      WHEN (SELECT public.get_apikey_header()) IS NOT NULL THEN NULL::uuid
-      ELSE (SELECT auth.uid())
-    END,
+    (SELECT auth.uid()),
     owner_org,
     app_id,
     NULL::bigint
