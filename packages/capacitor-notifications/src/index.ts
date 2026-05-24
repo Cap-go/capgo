@@ -123,7 +123,7 @@ function registrationStorageKey(appId: string) {
 
 function getLocalStorage(): Storage | undefined {
   try {
-    return typeof globalThis.localStorage === 'undefined' ? undefined : globalThis.localStorage
+    return globalThis.localStorage === undefined ? undefined : globalThis.localStorage
   }
   catch {
     return undefined
@@ -136,7 +136,7 @@ function readStoredRegistration(appId: string): StoredNotificationRegistration |
     return undefined
   try {
     const parsed = JSON.parse(storage.getItem(registrationStorageKey(appId)) || 'null') as Partial<StoredNotificationRegistration> | null
-    if (!parsed || parsed.appId !== appId || !parsed.externalId || !parsed.recipientKey || !parsed.deviceKey || !parsed.eventProof)
+    if (parsed?.appId !== appId || !parsed.externalId || !parsed.recipientKey || !parsed.deviceKey || !parsed.eventProof)
       return undefined
     return parsed as StoredNotificationRegistration
   }
@@ -187,6 +187,14 @@ async function getPermissionState(): Promise<CapgoNotificationPermission> {
   return 'unknown'
 }
 
+function toError(error: unknown) {
+  return error instanceof Error ? error : new Error(String(error))
+}
+
+async function removeListenerHandles(handles: Array<PluginListenerHandle | undefined>) {
+  await Promise.allSettled(handles.map(handle => handle?.remove()).filter((promise): promise is Promise<void> => Boolean(promise)))
+}
+
 async function requestToken(): Promise<CapgoNotificationToken> {
   const permission = await NativeCapgoNotifications.requestPermissions()
   if (permission.receive !== 'granted')
@@ -197,36 +205,32 @@ async function requestToken(): Promise<CapgoNotificationToken> {
     let registrationHandle: PluginListenerHandle | undefined
     let errorHandle: PluginListenerHandle | undefined
 
-    const cleanup = async () => {
-      await Promise.allSettled([registrationHandle?.remove(), errorHandle?.remove()].filter((promise): promise is Promise<void> => Boolean(promise)))
+    const cleanup = () => removeListenerHandles([registrationHandle, errorHandle])
+    const succeed = async (token: CapgoNotificationToken) => {
+      await cleanup()
+      resolve(token)
     }
-    const settleAfterCleanup = (callback: () => void) => {
-      void (async () => {
-        try {
-          await cleanup()
-        }
-        catch {
-          // Cleanup is best effort before settling the token request.
-        }
-        callback()
-      })()
+    const rejectWithCleanup = async (error: unknown) => {
+      await cleanup()
+      reject(toError(error))
+    }
+    const complete = (token: CapgoNotificationToken) => {
+      if (resolved)
+        return
+      resolved = true
+      state.token = token
+      void succeed(token)
     }
     const fail = (error: unknown) => {
       if (resolved)
         return
       resolved = true
-      settleAfterCleanup(() => reject(error instanceof Error ? error : new Error(String(error))))
+      void rejectWithCleanup(error)
     }
 
     void (async () => {
       try {
-        registrationHandle = await NativeCapgoNotifications.addListener('registration', (token) => {
-          if (resolved)
-            return
-          resolved = true
-          state.token = token
-          settleAfterCleanup(() => resolve(token))
-        })
+        registrationHandle = await NativeCapgoNotifications.addListener('registration', complete)
         errorHandle = await NativeCapgoNotifications.addListener('registrationError', (error) => {
           fail(new Error(error.error))
         })
@@ -297,7 +301,7 @@ function isUpdateCheckNotification(notification?: CapgoPushNotificationSchema) {
 }
 
 function notifyListeners<T>(listeners: Set<(event: T) => void>, event: T) {
-  for (const listener of [...listeners]) {
+  for (const listener of listeners) {
     try {
       listener(event)
     }
@@ -449,6 +453,11 @@ async function maybeRunUpdateCheck(notification?: CapgoPushNotificationSchema) {
   })
 }
 
+async function addBridgeHandle(handles: PluginListenerHandle[], listenerHandle: Promise<PluginListenerHandle>) {
+  const handle = await listenerHandle
+  handles.push(handle)
+}
+
 async function ensureBridgeListeners() {
   if (state.bridgeListenersReady)
     return
@@ -458,7 +467,7 @@ async function ensureBridgeListeners() {
   state.bridgeListenersPromise = (async () => {
     const handles: PluginListenerHandle[] = []
     try {
-      handles.push(await NativeCapgoNotifications.addListener('registration', (token) => {
+      await addBridgeHandle(handles, NativeCapgoNotifications.addListener('registration', (token) => {
         state.token = token
         if (state.externalId) {
           void registerToken({
@@ -473,18 +482,18 @@ async function ensureBridgeListeners() {
         }
         notifyListeners(state.listeners.registrationChanged, token)
       }))
-      handles.push(await NativeCapgoNotifications.addListener('notificationReceived', (notification) => {
+      await addBridgeHandle(handles, NativeCapgoNotifications.addListener('notificationReceived', (notification) => {
         void Promise.allSettled([
           trackEvent('received', eventFromNotification(notification)),
           maybeRunUpdateCheck(notification),
         ])
         notifyListeners(state.listeners.notificationReceived, notification)
       }))
-      handles.push(await NativeCapgoNotifications.addListener('notificationOpened', (event) => {
+      await addBridgeHandle(handles, NativeCapgoNotifications.addListener('notificationOpened', (event) => {
         void trackEvent('opened', eventFromNotification(event.notification)).catch(() => undefined)
         notifyListeners(state.listeners.notificationOpened, event)
       }))
-      handles.push(await NativeCapgoNotifications.addListener('backgroundNotification', (notification) => {
+      await addBridgeHandle(handles, NativeCapgoNotifications.addListener('backgroundNotification', (notification) => {
         if (!isUpdateCheckNotification(notification))
           void trackEvent('background_started', eventFromNotification(notification)).catch(() => undefined)
         void maybeRunUpdateCheck(notification).catch(() => undefined)
