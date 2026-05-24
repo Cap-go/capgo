@@ -1,4 +1,4 @@
-import { afterAll, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   buildNotificationRegistryLookupQuery,
   buildNotificationStatsQuery,
@@ -59,51 +59,50 @@ function fcmDevice(encryptedToken: string) {
 
 const fetchRequests = new Map<string, any[]>()
 const analyticsRowsByApp = new Map<string, any[]>()
-const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (_url, init) => {
-  const url = String(_url)
-  if (url.includes('/analytics_engine/sql')) {
-    const query = String(init?.body || '')
-    const appId = query.match(/index1 IN \('([^']+):[0-9a-f]{2}'/)?.[1] ?? ''
-    return new Response(JSON.stringify({ data: analyticsRowsByApp.get(appId) ?? [] }), { status: 200 })
-  }
 
-  let requestBody: any = {}
-  try {
-    requestBody = JSON.parse(String(init?.body || '{}'))
-  }
-  catch {
-    requestBody = {}
-  }
-  const token = typeof requestBody?.message?.token === 'string' ? requestBody.message.token : ''
-  if (token) {
-    const requests = fetchRequests.get(token) ?? []
-    requests.push(requestBody)
-    fetchRequests.set(token, requests)
-  }
+function installFetchMock() {
+  vi.spyOn(globalThis, 'fetch').mockImplementation(async (_url, init) => {
+    const url = String(_url)
+    if (url.includes('/analytics_engine/sql')) {
+      const query = String(init?.body || '')
+      const appId = query.match(/index1 IN \('([^']+):[0-9a-f]{2}'/)?.[1] ?? ''
+      return new Response(JSON.stringify({ data: analyticsRowsByApp.get(appId) ?? [] }), { status: 200 })
+    }
 
-  if (token === 'push-token-invalid')
-    return new Response(JSON.stringify({ error: { status: 'UNREGISTERED', message: 'Token is gone' } }), { status: 404 })
-  if (token === 'push-token-invalid-payload') {
-    return new Response(JSON.stringify({
-      error: {
-        status: 'INVALID_ARGUMENT',
-        message: 'Invalid payload',
-        details: [{
-          '@type': 'type.googleapis.com/google.rpc.BadRequest',
-          fieldViolations: [{ field: 'message.notification.title' }],
-        }],
-      },
-    }), { status: 400 })
-  }
-  if (token === 'push-token-transient')
-    return new Response(JSON.stringify({ error: { status: 'UNAVAILABLE', message: 'Try later' } }), { status: 503 })
+    let requestBody: any = {}
+    try {
+      requestBody = JSON.parse(String(init?.body || '{}'))
+    }
+    catch {
+      requestBody = {}
+    }
+    const token = typeof requestBody?.message?.token === 'string' ? requestBody.message.token : ''
+    if (token) {
+      const requests = fetchRequests.get(token) ?? []
+      requests.push(requestBody)
+      fetchRequests.set(token, requests)
+    }
 
-  return new Response(JSON.stringify({ name: 'projects/demo/messages/1' }), { status: 200 })
-})
+    if (token === 'push-token-invalid')
+      return new Response(JSON.stringify({ error: { status: 'UNREGISTERED', message: 'Token is gone' } }), { status: 404 })
+    if (token === 'push-token-invalid-payload') {
+      return new Response(JSON.stringify({
+        error: {
+          status: 'INVALID_ARGUMENT',
+          message: 'Invalid payload',
+          details: [{
+            '@type': 'type.googleapis.com/google.rpc.BadRequest',
+            fieldViolations: [{ field: 'message.notification.title' }],
+          }],
+        },
+      }), { status: 400 })
+    }
+    if (token === 'push-token-transient')
+      return new Response(JSON.stringify({ error: { status: 'UNAVAILABLE', message: 'Try later' } }), { status: 503 })
 
-afterAll(() => {
-  fetchMock.mockRestore()
-})
+    return new Response(JSON.stringify({ name: 'projects/demo/messages/1' }), { status: 200 })
+  })
+}
 
 function requestsFor(token: string) {
   return fetchRequests.get(token) ?? []
@@ -257,7 +256,19 @@ describe('native notification AE registry', () => {
   })
 })
 describe('native notification queue sender', () => {
-  it.concurrent('resolves bucket fanout devices from AE inside the worker', async () => {
+  beforeEach(() => {
+    fetchRequests.clear()
+    analyticsRowsByApp.clear()
+    installFetchMock()
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+    fetchRequests.clear()
+    analyticsRowsByApp.clear()
+  })
+
+  it('resolves bucket fanout devices from AE inside the worker', async () => {
     const token = 'push-token-ae'
     const encryptedToken = await encryptToken('secret', token)
     const device = {
@@ -294,7 +305,7 @@ describe('native notification queue sender', () => {
     expect(events.some(point => point.blobs[0] === 'sent')).toBe(true)
   })
 
-  it.concurrent('builds silent update-check payloads for Capgo updater', async () => {
+  it('builds silent update-check payloads for Capgo updater', async () => {
     const token = 'push-token-update'
     const encryptedToken = await encryptToken('secret', token)
     const retryDevices = await processNativeNotificationQueueMessage({
@@ -327,7 +338,7 @@ describe('native notification queue sender', () => {
     expect(requests[0].message.apns.payload.aps['content-available']).toBe(1)
   })
 
-  it.concurrent('tombstones invalid FCM tokens in AE without a DB write', async () => {
+  it('tombstones invalid FCM tokens in AE without a DB write', async () => {
     const events: any[] = []
     const registry: any[] = []
 
@@ -358,7 +369,7 @@ describe('native notification queue sender', () => {
     expect(registry[0].indexes[0]).toBe('com.demo.app:aa')
   })
 
-  it.concurrent('does not tombstone non-token FCM invalid argument errors', async () => {
+  it('does not tombstone non-token FCM invalid argument errors', async () => {
     const registry: any[] = []
 
     const encryptedToken = await encryptToken('secret', 'push-token-invalid-payload')
@@ -385,7 +396,7 @@ describe('native notification queue sender', () => {
     expect(registry).toHaveLength(0)
   })
 
-  it.concurrent('does not retry permanent or exhausted notification send failures', async () => {
+  it('does not retry permanent or exhausted notification send failures', async () => {
     const encryptedToken = await encryptToken('wrong-secret', 'push-token-permanent')
     const permanentRetryDevices = await processNativeNotificationQueueMessage({
       kind: 'send',
