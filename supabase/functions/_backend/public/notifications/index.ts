@@ -260,8 +260,25 @@ async function getAppOwnerOrg(c: Context<MiddlewareKeyVariables>, appId: string)
 }
 
 function normalizeSecretRefSegment(value: string): string {
-  const normalized = value.toUpperCase().replace(/[^A-Z0-9]+/g, '_').replace(/^_+|_+$/g, '')
-  return (normalized || 'APP').slice(0, 96)
+  let normalized = ''
+  let needsSeparator = false
+  for (const char of value.toUpperCase()) {
+    const code = char.charCodeAt(0)
+    const isAlpha = code >= 65 && code <= 90
+    const isDigit = code >= 48 && code <= 57
+    if (isAlpha || isDigit) {
+      if (needsSeparator && normalized)
+        normalized += '_'
+      normalized += char
+      needsSeparator = false
+      if (normalized.length >= 96)
+        break
+    }
+    else if (normalized) {
+      needsSeparator = true
+    }
+  }
+  return normalized || 'APP'
 }
 
 function expectedProviderSecretRef(appId: string, provider: NativeNotificationProvider) {

@@ -123,7 +123,7 @@ function registrationStorageKey(appId: string) {
 
 function getLocalStorage(): Storage | undefined {
   try {
-    return globalThis.localStorage === undefined ? undefined : globalThis.localStorage
+    return globalThis.localStorage ?? undefined
   }
   catch {
     return undefined

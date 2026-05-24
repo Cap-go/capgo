@@ -98,12 +98,34 @@ const sendTitle = ref('')
 const sendBody = ref('')
 const pushUpdateChannel = ref('')
 
+function normalizeSecretRefSegment(value: string): string {
+  let normalized = ''
+  let needsSeparator = false
+  for (const char of value.toUpperCase()) {
+    const code = char.charCodeAt(0)
+    const isAlpha = code >= 65 && code <= 90
+    const isDigit = code >= 48 && code <= 57
+    if (isAlpha || isDigit) {
+      if (needsSeparator && normalized)
+        normalized += '_'
+      normalized += char
+      needsSeparator = false
+      if (normalized.length >= 96)
+        break
+    }
+    else if (normalized) {
+      needsSeparator = true
+    }
+  }
+  return normalized || 'APP'
+}
+
 const totalEvents = computed(() => stats.value.reduce((total, item) => total + Number(item.count || 0), 0))
 const configuredProviders = computed(() => providers.value.filter(provider => provider.status === 'configured').length)
 const latestCampaigns = computed(() => campaigns.value.slice(0, 6))
 const hasStats = computed(() => stats.value.length > 0)
 const expectedProviderSecretRef = computed(() => {
-  const normalizedAppId = id.value.toUpperCase().replace(/[^A-Z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 96) || 'APP'
+  const normalizedAppId = normalizeSecretRefSegment(id.value)
   return `NOTIFICATIONS_${normalizedAppId}_${providerForm.value.provider.toUpperCase()}`
 })
 let activeRefreshId = 0
