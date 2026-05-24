@@ -1,0 +1,23 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "oxc", "vue"],
+  "categories": {
+    "correctness": "error"
+  },
+  "ignorePatterns": [
+    "dist/**",
+    "scripts/**",
+    "public/**",
+    "supabase/functions/_script/**",
+    "**/supabase.types*",
+    "supabase/functions/_backend/scripts/**",
+    "CHANGELOG.md",
+    "src/services/posthog.ts",
+    "cli/dist/**",
+    "cli/test/**",
+    "cli/src/types/supabase.types.ts"
+  ],
+  "rules": {
+    "no-debugger": "off"
+  }
+}
