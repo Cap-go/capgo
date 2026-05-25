@@ -282,7 +282,7 @@ npx @capgo/cli@latest bundle upload com.example.app --path ./dist --channel prod
 | **--partial-only** | <code>boolean</code> | [DEPRECATED] Use --delta-only instead. Upload only incremental updates, skip full bundle |
 | **--delta** | <code>boolean</code> | Upload delta updates (only changed files) for instant, super-fast updates instead of big zip downloads |
 | **--delta-only** | <code>boolean</code> | Upload only delta updates without full bundle for maximum speed (useful for large apps) |
-| **--no-delta** | <code>boolean</code> | Disable delta updates even if Direct Update is enabled |
+| **--no-delta** | <code>boolean</code> | Disable delta updates even if instant updates are enabled |
 | **--encrypted-checksum** | <code>string</code> | An encrypted checksum (signature). Used only when uploading an external bundle. |
 | **--auto-set-bundle** | <code>boolean</code> | Set the bundle in capacitor.config.json |
 | **--dry-upload** | <code>boolean</code> | Dry upload the bundle process: add the row in database without uploading files or updating channels (Used by Capgo for internal testing) |
