@@ -35,6 +35,8 @@ interface DemoManifestEntry {
   file_size: number
 }
 
+const DEMO_CAPGO_UPDATER_VERSION = '8.47.3'
+
 /**
  * Generate demo native packages (Capacitor plugins)
  * @param versionName - Version name to base the package versions on
@@ -43,23 +45,23 @@ interface DemoManifestEntry {
 function getDemoNativePackages(versionName: string): DemoNativePackage[] {
   // Base packages that evolve with app versions
   const basePackages: DemoNativePackage[] = [
-    { name: '@capacitor/core', version: '6.0.0' },
-    { name: '@capacitor/app', version: '6.0.0' },
-    { name: '@capacitor/haptics', version: '6.0.0' },
-    { name: '@capacitor/keyboard', version: '6.0.0' },
-    { name: '@capacitor/status-bar', version: '6.0.0' },
-    { name: '@capgo/capacitor-updater', version: '6.0.0' },
+    { name: '@capacitor/core', version: '8.3.4' },
+    { name: '@capacitor/app', version: '8.1.0' },
+    { name: '@capacitor/haptics', version: '8.0.2' },
+    { name: '@capacitor/keyboard', version: '8.0.3' },
+    { name: '@capacitor/status-bar', version: '8.0.2' },
+    { name: '@capgo/capacitor-updater', version: DEMO_CAPGO_UPDATER_VERSION },
   ]
 
   // Add more plugins in later versions
   if (versionName >= '1.1.0') {
-    basePackages.push({ name: '@capacitor/push-notifications', version: '6.0.0' })
-    basePackages.push({ name: '@capacitor/local-notifications', version: '6.0.0' })
+    basePackages.push({ name: '@capacitor/push-notifications', version: '8.1.1' })
+    basePackages.push({ name: '@capacitor/local-notifications', version: '8.2.0' })
   }
 
   if (versionName >= '1.2.0') {
-    basePackages.push({ name: '@capacitor/camera', version: '6.0.0' })
-    basePackages.push({ name: '@capacitor/filesystem', version: '6.0.0' })
+    basePackages.push({ name: '@capacitor/camera', version: '8.2.0' })
+    basePackages.push({ name: '@capacitor/filesystem', version: '8.1.2' })
   }
 
   return basePackages
@@ -987,7 +989,7 @@ export async function createDemoApp(c: Context<MiddlewareKeyVariables>, body: Cr
       deviceRows.push({
         device_id: deviceId,
         platform,
-        plugin_version: '6.0.0',
+        plugin_version: DEMO_CAPGO_UPDATER_VERSION,
         version_name: '1.1.1',
         version_build: '1',
         os_version: platform === 'ios' ? '17.0' : '14',
