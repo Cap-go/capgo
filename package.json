@@ -196,7 +196,6 @@
     "@capacitor/toast": "^8.0.1",
     "@capgo/camera-preview": "^8.3.8",
     "@capgo/capacitor-accelerometer": "^8.0.30",
-    "@capgo/capacitor-admob": "^8.1.5",
     "@capgo/capacitor-android-age-signals": "^8.1.12",
     "@capgo/capacitor-android-inline-install": "^8.0.7",
     "@capgo/capacitor-android-kiosk": "^8.2.2",

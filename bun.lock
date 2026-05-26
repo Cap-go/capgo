@@ -34,7 +34,6 @@
         "@capacitor/toast": "^8.0.1",
         "@capgo/camera-preview": "^8.3.8",
         "@capgo/capacitor-accelerometer": "^8.0.30",
-        "@capgo/capacitor-admob": "^8.1.5",
         "@capgo/capacitor-android-age-signals": "^8.1.12",
         "@capgo/capacitor-android-inline-install": "^8.0.7",
         "@capgo/capacitor-android-kiosk": "^8.2.2",
@@ -466,8 +465,6 @@
     "@capgo/camera-preview": ["@capgo/camera-preview@8.4.0", "", { "peerDependencies": { "@capacitor/core": ">=8.0.0" } }, "sha512-yKebVLTNLz7soD8bprhe2IqqtfY309w1Je0Jb/zVjCjlsXnSxc0tMqIkXVN1Qh/gmef0/BVruN1uEehscxAAIA=="],
 
     "@capgo/capacitor-accelerometer": ["@capgo/capacitor-accelerometer@8.0.30", "", { "peerDependencies": { "@capacitor/core": ">=8.0.0" } }, "sha512-w9woRF/t+RKPpxqD6ELyJhD3Z5wC2gDwfdhQ/CPkgWghOMT0jak5dk0JQdSGh7HZggfFgdUI5pTzepJSOdyErg=="],
-
-    "@capgo/capacitor-admob": ["@capgo/capacitor-admob@8.1.5", "", { "peerDependencies": { "@capacitor/core": ">=8.0.0" } }, "sha512-NuRfHXOvym8mcWkRN2o5Co6sGV3y3i4+jiRMMLkfXDtEB5UpyWnUoTGC+8GV0M/cv+XAzbGbpHNTkj5ME38tSw=="],
 
     "@capgo/capacitor-android-age-signals": ["@capgo/capacitor-android-age-signals@8.1.12", "", { "peerDependencies": { "@capacitor/core": ">=8.0.0" } }, "sha512-TSUcLXJ4UEbTVU204EuVjHUTukIkglHrdy9zTYAVOE8OSmcyGOwH0MqgH9ZuLgFxvHBbjP2uLS9/80xv9Ft/IA=="],
 

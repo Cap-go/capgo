@@ -34,7 +34,6 @@ dependencies {
     implementation project(':capacitor-toast')
     implementation project(':capgo-camera-preview')
     implementation project(':capgo-capacitor-accelerometer')
-    implementation project(':capgo-capacitor-admob')
     implementation project(':capgo-capacitor-android-age-signals')
     implementation project(':capgo-capacitor-android-inline-install')
     implementation project(':capgo-capacitor-android-kiosk')

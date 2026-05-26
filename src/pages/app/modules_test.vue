@@ -30,7 +30,6 @@ const lastResults = ref<Record<string, string>>({})
 const pluginTests: PluginTest[] = [
   { packageName: '@capgo/camera-preview', pluginName: 'CameraPreview', method: 'getPluginVersion', label: 'camera-preview' },
   { packageName: '@capgo/capacitor-accelerometer', pluginName: 'CapacitorAccelerometer', method: 'getPluginVersion', label: 'capacitor-accelerometer' },
-  { packageName: '@capgo/capacitor-admob', pluginName: 'AdMobPlus', method: 'getPluginVersion', label: 'capacitor-admob' },
   { packageName: '@capgo/capacitor-android-age-signals', pluginName: 'AgeSignals', method: 'getPluginVersion', label: 'capacitor-android-age-signals' },
   { packageName: '@capgo/capacitor-android-inline-install', pluginName: 'AndroidInlineInstall', method: 'getPluginVersion', label: 'capacitor-android-inline-install' },
   { packageName: '@capgo/capacitor-android-kiosk', pluginName: 'CapacitorAndroidKiosk', method: 'getPluginVersion', label: 'capacitor-android-kiosk' },

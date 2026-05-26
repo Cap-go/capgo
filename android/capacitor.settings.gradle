@@ -77,9 +77,6 @@ project(':capgo-camera-preview').projectDir = new File('../node_modules/@capgo/c
 include ':capgo-capacitor-accelerometer'
 project(':capgo-capacitor-accelerometer').projectDir = new File('../node_modules/@capgo/capacitor-accelerometer/android')
 
-include ':capgo-capacitor-admob'
-project(':capgo-capacitor-admob').projectDir = new File('../node_modules/@capgo/capacitor-admob/android')
-
 include ':capgo-capacitor-android-age-signals'
 project(':capgo-capacitor-android-age-signals').projectDir = new File('../node_modules/@capgo/capacitor-android-age-signals/android')
 
