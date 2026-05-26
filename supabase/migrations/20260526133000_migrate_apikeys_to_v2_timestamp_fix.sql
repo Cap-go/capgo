@@ -1330,7 +1330,44 @@ $$;
 ALTER FUNCTION "public"."get_user_org_ids"() OWNER TO "postgres";
 COMMENT ON FUNCTION "public"."get_user_org_ids"() IS 'Org id list for authenticated users or RBAC-scoped API keys.';
 
-CREATE OR REPLACE FUNCTION "public"."get_orgs_v6"() RETURNS TABLE("gid" "uuid", "created_by" "uuid", "logo" "text", "name" "text", "role" character varying, "paying" boolean, "trial_left" integer, "can_use_more" boolean, "is_canceled" boolean, "app_count" bigint, "subscription_start" timestamp with time zone, "subscription_end" timestamp with time zone, "management_email" "text", "is_yearly" boolean, "stats_updated_at" timestamp without time zone, "next_stats_update_at" timestamp with time zone, "credit_available" numeric, "credit_total" numeric, "credit_next_expiration" timestamp with time zone, "require_apikey_expiration" boolean, "max_apikey_expiration_days" integer)
+DROP FUNCTION IF EXISTS "public"."get_orgs_v6"();
+DROP FUNCTION IF EXISTS "public"."get_orgs_v6"("userid" "uuid");
+
+CREATE OR REPLACE FUNCTION "public"."get_orgs_v6"("userid" "uuid") RETURNS TABLE("gid" "uuid", "created_by" "uuid", "logo" "text", "name" "text", "role" character varying, "paying" boolean, "trial_left" integer, "can_use_more" boolean, "is_canceled" boolean, "app_count" bigint, "subscription_start" timestamp with time zone, "subscription_end" timestamp with time zone, "management_email" "text", "is_yearly" boolean, "use_new_rbac" boolean)
+LANGUAGE "plpgsql" SECURITY DEFINER
+SET search_path = ''
+AS $$
+BEGIN
+  RETURN QUERY
+  SELECT
+    orgs.gid,
+    orgs.created_by,
+    orgs.logo,
+    orgs.name,
+    orgs.role,
+    orgs.paying,
+    orgs.trial_left,
+    orgs.can_use_more,
+    orgs.is_canceled,
+    orgs.app_count,
+    orgs.subscription_start,
+    orgs.subscription_end,
+    orgs.management_email,
+    orgs.is_yearly,
+    orgs.use_new_rbac
+  FROM public.get_orgs_v7(userid) orgs;
+END;
+$$;
+
+ALTER FUNCTION "public"."get_orgs_v6"("userid" "uuid") OWNER TO "postgres";
+REVOKE ALL ON FUNCTION "public"."get_orgs_v6"("userid" "uuid") FROM PUBLIC;
+REVOKE ALL ON FUNCTION "public"."get_orgs_v6"("userid" "uuid") FROM "anon";
+REVOKE ALL ON FUNCTION "public"."get_orgs_v6"("userid" "uuid") FROM "authenticated";
+GRANT EXECUTE ON FUNCTION "public"."get_orgs_v6"("userid" "uuid") TO "postgres";
+GRANT EXECUTE ON FUNCTION "public"."get_orgs_v6"("userid" "uuid") TO "service_role";
+COMMENT ON FUNCTION "public"."get_orgs_v6"("userid" "uuid") IS 'Legacy V6 organization shape for service-role compatibility. Authorization is backed by RBAC via get_orgs_v7.';
+
+CREATE OR REPLACE FUNCTION "public"."get_orgs_v6"() RETURNS TABLE("gid" "uuid", "created_by" "uuid", "logo" "text", "name" "text", "role" character varying, "paying" boolean, "trial_left" integer, "can_use_more" boolean, "is_canceled" boolean, "app_count" bigint, "subscription_start" timestamp with time zone, "subscription_end" timestamp with time zone, "management_email" "text", "is_yearly" boolean, "use_new_rbac" boolean)
 LANGUAGE "plpgsql" SECURITY DEFINER
 SET search_path = ''
 AS $$
@@ -1358,13 +1395,32 @@ BEGIN
   END IF;
 
   RETURN QUERY
-  SELECT orgs.*
-  FROM public.get_orgs_v6(v_user_id) orgs
+  SELECT
+    orgs.gid,
+    orgs.created_by,
+    orgs.logo,
+    orgs.name,
+    orgs.role,
+    orgs.paying,
+    orgs.trial_left,
+    orgs.can_use_more,
+    orgs.is_canceled,
+    orgs.app_count,
+    orgs.subscription_start,
+    orgs.subscription_end,
+    orgs.management_email,
+    orgs.is_yearly,
+    orgs.use_new_rbac
+  FROM public.get_orgs_v7(v_user_id) orgs
   JOIN public.get_user_org_ids() allowed_orgs ON allowed_orgs.org_id = orgs.gid;
 END;
 $$;
 
 ALTER FUNCTION "public"."get_orgs_v6"() OWNER TO "postgres";
+GRANT ALL ON FUNCTION "public"."get_orgs_v6"() TO "anon";
+GRANT ALL ON FUNCTION "public"."get_orgs_v6"() TO "authenticated";
+GRANT ALL ON FUNCTION "public"."get_orgs_v6"() TO "service_role";
+COMMENT ON FUNCTION "public"."get_orgs_v6"() IS 'Legacy V6 organization shape for old CLI compatibility. Authorization is backed by RBAC.';
 
 CREATE OR REPLACE FUNCTION "public"."get_orgs_v7"("userid" "uuid") RETURNS TABLE("gid" "uuid", "created_by" "uuid", "created_at" timestamp with time zone, "logo" "text", "website" "text", "name" "text", "role" character varying, "paying" boolean, "trial_left" integer, "can_use_more" boolean, "is_canceled" boolean, "app_count" bigint, "subscription_start" timestamp with time zone, "subscription_end" timestamp with time zone, "management_email" "text", "is_yearly" boolean, "stats_updated_at" timestamp without time zone, "stats_refresh_requested_at" timestamp without time zone, "next_stats_update_at" timestamp with time zone, "credit_available" numeric, "credit_total" numeric, "credit_next_expiration" timestamp with time zone, "enforcing_2fa" boolean, "2fa_has_access" boolean, "enforce_hashed_api_keys" boolean, "password_policy_config" "jsonb", "password_has_access" boolean, "require_apikey_expiration" boolean, "max_apikey_expiration_days" integer, "enforce_encrypted_bundles" boolean, "required_encryption_key" character varying, "use_new_rbac" boolean)
 LANGUAGE "plpgsql" SECURITY DEFINER

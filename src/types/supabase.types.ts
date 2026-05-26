@@ -3596,24 +3596,18 @@ export type Database = {
               app_count: number
               can_use_more: boolean
               created_by: string
-              credit_available: number
-              credit_next_expiration: string
-              credit_total: number
               gid: string
               is_canceled: boolean
               is_yearly: boolean
               logo: string
               management_email: string
-              max_apikey_expiration_days: number
               name: string
-              next_stats_update_at: string
               paying: boolean
-              require_apikey_expiration: boolean
               role: string
-              stats_updated_at: string
               subscription_end: string
               subscription_start: string
               trial_left: number
+              use_new_rbac: boolean
             }[]
           }
         | {
@@ -3622,24 +3616,18 @@ export type Database = {
               app_count: number
               can_use_more: boolean
               created_by: string
-              credit_available: number
-              credit_next_expiration: string
-              credit_total: number
               gid: string
               is_canceled: boolean
               is_yearly: boolean
               logo: string
               management_email: string
-              max_apikey_expiration_days: number
               name: string
-              next_stats_update_at: string
               paying: boolean
-              require_apikey_expiration: boolean
               role: string
-              stats_updated_at: string
               subscription_end: string
               subscription_start: string
               trial_left: number
+              use_new_rbac: boolean
             }[]
           }
       get_orgs_v7:

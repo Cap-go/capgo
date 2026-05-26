@@ -8,6 +8,7 @@ import { parseSchema, safeParseSchema } from '../supabase/functions/_backend/uti
 import {
   BASE_URL,
   createDirectApiKeyWithBindings,
+  executeSQL,
   getAuthHeaders,
   getAuthHeadersForCredentials,
   getSupabaseClient,
@@ -1652,6 +1653,52 @@ describe('[PUT] /organization - enforce_hashed_api_keys setting', () => {
 
     // Reset
     await getSupabaseClient().from('orgs').update({ enforce_hashed_api_keys: false, website: previousWebsite }).eq('id', enforceOrgId)
+  })
+
+  it.concurrent('get_orgs_v6 keeps the old CLI return shape', async () => {
+    const expectedColumns = [
+      'gid',
+      'created_by',
+      'logo',
+      'name',
+      'role',
+      'paying',
+      'trial_left',
+      'can_use_more',
+      'is_canceled',
+      'app_count',
+      'subscription_start',
+      'subscription_end',
+      'management_email',
+      'is_yearly',
+      'use_new_rbac',
+    ]
+
+    const rows = await executeSQL(`
+      SELECT overload, array_agg(arg_name ORDER BY ordinality) AS columns
+      FROM (
+        SELECT 'no_args' AS overload, args.arg_name, args.ordinality
+        FROM pg_proc proc
+        JOIN LATERAL unnest(proc.proallargtypes, proc.proargmodes, proc.proargnames)
+          WITH ORDINALITY AS args(type_oid, arg_mode, arg_name, ordinality) ON true
+        WHERE proc.oid = 'public.get_orgs_v6()'::regprocedure
+          AND args.arg_mode = 't'
+        UNION ALL
+        SELECT 'user_id' AS overload, args.arg_name, args.ordinality
+        FROM pg_proc proc
+        JOIN LATERAL unnest(proc.proallargtypes, proc.proargmodes, proc.proargnames)
+          WITH ORDINALITY AS args(type_oid, arg_mode, arg_name, ordinality) ON true
+        WHERE proc.oid = 'public.get_orgs_v6(uuid)'::regprocedure
+          AND args.arg_mode = 't'
+      ) output_args
+      GROUP BY overload
+      ORDER BY overload
+    `)
+
+    expect(rows).toHaveLength(2)
+    expect(rows.map((row: { overload: string }) => row.overload)).toEqual(['no_args', 'user_id'])
+    for (const row of rows)
+      expect(row.columns).toEqual(expectedColumns)
   })
 
   it.concurrent('rejects public RPC access to get_orgs_v7(userid)', async () => {
