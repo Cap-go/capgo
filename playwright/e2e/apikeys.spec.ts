@@ -1,14 +1,16 @@
 import type { Page } from '@playwright/test'
 import { expect, test } from '../support/commands'
 
-async function createReadApiKey(page: Page, keyName: string) {
+test.use({ screenshot: 'off', trace: 'off', video: 'off' })
+
+async function createRbacApiKey(page: Page, keyName: string) {
   await page.click('[data-test="create-key"]')
-  await page.locator('#dialog-v2-content input[type="text"]').fill(keyName)
-  await page.locator('#dialog-v2-content label').filter({ hasText: 'Read' }).click()
-  await page.locator('#dialog-v2-content label').filter({ hasText: 'Limit the API key to selected organizations?' }).click()
-  await page.locator('#dialog-v2-content label').filter({ hasText: 'Demo org' }).click()
+  const dialog = page.locator('#dialog-v2-content')
+  await expect(dialog.locator('input[name="key-type"]')).toHaveCount(0)
+  await dialog.locator('input[type="text"]').fill(keyName)
   await page.getByRole('button', { name: 'Create' }).click()
-  await expect(page.locator('[data-test="toast"]')).toContainText('Added new API key successfully')
+  await expect(page.getByText('Added new API key successfully').first()).toBeVisible()
+  await expect(page.locator('tr', { hasText: keyName })).toHaveCount(1)
 }
 
 test.describe('API Key Management', () => {
@@ -22,15 +24,13 @@ test.describe('API Key Management', () => {
   test('should create new API key', async ({ page }) => {
     const keyName = `Playwright Read ${Date.now()}`
 
-    await createReadApiKey(page, keyName)
-
-    await expect(page.locator('tr', { hasText: keyName })).toHaveCount(1)
+    await createRbacApiKey(page, keyName)
   })
 
   test('should delete API key', async ({ page }) => {
     const keyName = `Playwright Delete ${Date.now()}`
 
-    await createReadApiKey(page, keyName)
+    await createRbacApiKey(page, keyName)
 
     const keyRow = page.locator('tr', { hasText: keyName })
     await expect(keyRow).toHaveCount(1)

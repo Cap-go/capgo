@@ -21,10 +21,12 @@ function normalizeRel(rel?: string, target?: string) {
 }
 
 const sizeClasses = {
-  sm: 'max-w-sm',
-  md: 'max-w-md',
-  lg: 'max-w-lg',
-  xl: 'max-w-xl',
+  'sm': 'max-w-sm',
+  'md': 'max-w-md',
+  'lg': 'max-w-lg',
+  'xl': 'max-w-xl',
+  '2xl': 'max-w-2xl',
+  '3xl': 'max-w-3xl',
 }
 
 function getButtonClasses(button: DialogV2Button) {
