@@ -638,13 +638,6 @@ CREATE INDEX finx_channel_devices_channel_id ON public.channel_devices USING btr
 
 
 --
--- Name: finx_channel_devices_owner_org; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX finx_channel_devices_owner_org ON public.channel_devices USING btree (owner_org);
-
-
---
 -- Name: finx_channels_app_id; Type: INDEX; Schema: public; Owner: -
 --
 
