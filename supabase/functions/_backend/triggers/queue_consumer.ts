@@ -794,6 +794,27 @@ async function pingCronHealthcheck(
   }
 }
 
+function trimTrailingSlashes(value: string): string {
+  let end = value.length
+  while (end > 0 && value[end - 1] === '/')
+    end--
+  return value.slice(0, end)
+}
+
+function getCronHealthcheckStartUrl(healthcheckUrl: string): string {
+  return `${trimTrailingSlashes(healthcheckUrl)}/start`
+}
+
+async function maybePingCronHealthcheckStart(
+  healthcheckUrl: string | null,
+  fetchImpl: typeof fetch = fetch,
+): Promise<boolean> {
+  if (!healthcheckUrl)
+    return false
+
+  return pingCronHealthcheck(getCronHealthcheckStartUrl(healthcheckUrl), fetchImpl)
+}
+
 async function maybePingCronHealthcheck(
   db: ReturnType<typeof getPgClient>,
   queueName: string,
@@ -913,7 +934,7 @@ app.post('/sync', async (c) => {
   const body = await parseBody<{ queue_name: string, batch_size?: number, healthcheck_url?: string | null }>(c)
   const queueName = body?.queue_name
   const batchSize = body?.batch_size
-  const healthcheckUrl = typeof body?.healthcheck_url === 'string' ? body.healthcheck_url : null
+  const healthcheckUrl = typeof body?.healthcheck_url === 'string' && body.healthcheck_url.trim() ? body.healthcheck_url.trim() : null
 
   if (!queueName || typeof queueName !== 'string') {
     throw simpleError('missing_or_invalid_queue_name', 'Missing or invalid queue_name in body', { body })
@@ -943,6 +964,8 @@ app.post('/sync', async (c) => {
     let db: ReturnType<typeof getPgClient> | null = null
     try {
       db = getPgClient(c)
+      if (healthcheckUrl !== null)
+        await maybePingCronHealthcheckStart(healthcheckUrl)
       const result = await processQueue(c, db, queueName, finalBatchSize)
       await maybePingCronHealthcheck(db, queueName, result, healthcheckUrl)
       cloudlog({
@@ -967,10 +990,12 @@ export const __queueConsumerTestUtils__ = {
   extractErrorDetails,
   extractMessageBody,
   getActionableQueueFailures,
+  getCronHealthcheckStartUrl,
   getQueueBatchSize,
   getQueueHttpConcurrency,
   httpExceptionToQueueResponse,
   maybePingCronHealthcheck,
+  maybePingCronHealthcheckStart,
   queueFailureResponse,
   resolveFunctionUrl,
   sanitizeDiscordResponseBody,
