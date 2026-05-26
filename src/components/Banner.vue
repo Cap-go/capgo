@@ -68,7 +68,7 @@ const bannerText = computed(() => {
     return null
   const org = organizationStore.currentOrganization
   if (!org)
-    return
+    return null
 
   // Don't show billing banner when user lacks 2FA or password access - data is unreliable
   if (lacksSecurityAccess.value)
@@ -107,7 +107,7 @@ const bannerColor = computed(() => {
 
   const org = organizationStore.currentOrganization
   if (!org)
-    return
+    return ''
 
   if (organizationStore.currentOrganizationFailed)
     return warning

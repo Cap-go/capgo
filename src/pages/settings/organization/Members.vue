@@ -316,7 +316,7 @@ const isAppAccessSelectionValid = computed(() => {
 
 const membersOptions = computed(() => {
   if (!searchUserForAdminDelegation.value) {
-    return
+    return undefined
   }
 
   const searchLower = searchUserForAdminDelegation.value.toLowerCase()

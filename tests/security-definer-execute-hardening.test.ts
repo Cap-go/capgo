@@ -31,6 +31,8 @@ const SERVICE_ONLY_PROCS = [
   'public.noupdate()',
   'public.prevent_last_super_admin_binding_delete()',
   'public.prevent_last_super_admin_binding_update()',
+  'public.process_all_cron_tasks()',
+  'public.process_queue_with_healthcheck(text[], integer, text)',
   'public.reassign_webhook_created_by_before_user_delete()',
   'public.resync_org_user_role_bindings(uuid, uuid)',
   'public.sanitize_apps_text_fields()',

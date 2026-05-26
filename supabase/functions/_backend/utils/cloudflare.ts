@@ -249,7 +249,6 @@ export async function trackDevicesCF(c: Context, device: DeviceWithoutCreatedAt)
     const cachedDevice = trackDeviceCache.available
       ? await trackDeviceCache.matchJson<DeviceCachePayload>(trackDeviceCacheRequest)
       : null
-    // TODO: re-enable caching after 10 december, to let the new DB get populated
     if (cachedDevice && !hasComparableDeviceChanged(cachedDevice, device)) {
       cloudlog({
         requestId: c.get('requestId'),
@@ -959,7 +958,6 @@ export async function countUpdatesFromStoreAppsCF(c: Context): Promise<number> {
 }
 
 export async function countUpdatesFromLogsCF(c: Context): Promise<number> {
-  // TODO: This will be a problem in 3 months where the old logs will be deleted automatically by Cloudflare starting 22/08/2024
   const query = `SELECT SUM(_sample_interval) AS count FROM app_log WHERE blob2 = 'get'`
 
   cloudlog({ requestId: c.get('requestId'), message: 'countUpdatesFromLogsCF query', query })
@@ -974,7 +972,6 @@ export async function countUpdatesFromLogsCF(c: Context): Promise<number> {
 }
 
 export async function countUpdatesFromLogsExternalCF(c: Context): Promise<number> {
-  // TODO: This will be a problem in 3 months where the old logs will be deleted automatically by Cloudflare starting 22/08/2024
   const query = `SELECT SUM(_sample_interval) AS count FROM app_log_external WHERE blob2 = 'get'`
 
   cloudlog({ requestId: c.get('requestId'), message: 'countUpdatesFromLogsExternalCF query', query })

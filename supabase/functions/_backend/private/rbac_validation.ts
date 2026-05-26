@@ -11,7 +11,7 @@ type ValidationIssues = readonly ValidationIssue[]
 const ROLE_SCOPE_TYPE_SCHEMA = type('"org" | "app" | "channel"')
 const PRINCIPAL_TYPE_SCHEMA = type('"user" | "group" | "apikey"')
 const NON_EMPTY_STRING_SCHEMA = type('string > 0')
-const JSON_CONTENT_TYPE_REGEX = /^application\/(?:[a-z-.]+\+)?json(?:;\s*[a-zA-Z0-9\-]+=[^;]+)*$/
+const JSON_CONTENT_TYPE_REGEX = /^application\/(?:[a-z-.]+\+)?json(?:;\s*[a-zA-Z0-9-]+=[^;]+)*$/
 
 interface StandardSchema<T> {
   '~standard': {

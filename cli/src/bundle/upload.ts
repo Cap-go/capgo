@@ -20,6 +20,7 @@ import { getChecksum } from '../checksum'
 import { getRepoStarStatus, isRepoStarredInSession, starRepository } from '../github'
 import { confirmWithRememberedChoice } from '../promptPreferences'
 import { showReplicationProgress } from '../replicationProgress'
+import { usesAlwaysDirectUpdate } from '../updaterConfig'
 import { baseKeyV2, BROTLI_MIN_UPDATER_VERSION_V5, BROTLI_MIN_UPDATER_VERSION_V6, BROTLI_MIN_UPDATER_VERSION_V7, canPromptInteractively, checkChecksum, checkCompatibilityCloud, checkPlanValidUpload, checkRemoteCliMessages, createSupabaseClient, deletedFailedVersion, findRoot, findSavedKey, formatError, getAppId, getBundleVersion, getCompatibilityDetails, getConfig, getInstalledVersion, getLocalConfig, getLocalDependencies, getOrganizationId, getPMAndCommand, getRemoteFileConfig, hasCliPermission, hasOrganizationPerm, isCompatible, isDeprecatedPluginVersion, OrganizationPerm, regexSemver, resolveUserIdFromApiKey, sendEvent, updateConfigUpdater, updateOrCreateChannel, updateOrCreateVersion, UPLOAD_TIMEOUT, uploadTUS, uploadUrl, zipFile } from '../utils'
 import { getVersionSuggestions, interactiveVersionBump } from '../versionHelpers'
 import { checkIndexPosition, searchInDirectory } from './check'
@@ -749,21 +750,21 @@ export async function uploadBundleInternal(preAppid: string, options: OptionsUpl
   if (options.verbose)
     log.info(`[Verbose] Capacitor config loaded successfully`)
 
-  // Check if directUpdate is enabled and auto-enable delta updates
-  const directUpdateEnabled = extConfig?.config?.plugins?.CapacitorUpdater?.directUpdate === 'always'
+  // Check if instant updates are enabled and auto-enable delta updates.
+  const instantUpdateEnabled = usesAlwaysDirectUpdate(extConfig?.config?.plugins?.CapacitorUpdater)
   const interactive = canPromptInteractively({ silent })
-  if (directUpdateEnabled && options.delta === undefined) {
+  if (instantUpdateEnabled && options.delta === undefined) {
     if (interactive) {
-      log.info('💡 Direct Update (instant updates) is enabled in your config')
+      log.info('💡 Instant updates are enabled in your config')
       log.info('   Delta updates send only changed files instead of the full bundle')
       const enableDelta = await pConfirm({
-        message: 'Enable delta updates for this upload? (Recommended with Direct Update)',
+        message: 'Enable delta updates for this upload? (Recommended with instant updates)',
         initialValue: true,
       })
       if (!pIsCancel(enableDelta) && enableDelta) {
         options.delta = true
         if (options.verbose)
-          log.info(`[Verbose] Delta updates auto-enabled due to Direct Update configuration`)
+          log.info(`[Verbose] Delta updates auto-enabled due to instant update configuration`)
       }
     }
     else if (!silent) {
@@ -771,7 +772,7 @@ export async function uploadBundleInternal(preAppid: string, options: OptionsUpl
       if (options.delta !== false) {
         options.delta = true
         if (options.verbose)
-          log.info(`[Verbose] Delta updates auto-enabled in CI/CD mode due to Direct Update configuration`)
+          log.info(`[Verbose] Delta updates auto-enabled in CI/CD mode due to instant update configuration`)
       }
     }
   }
