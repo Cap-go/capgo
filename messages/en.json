@@ -1675,6 +1675,7 @@
   "revert-to-builtin": "Revert to builtin",
   "revert-to-builtin-confirm": "Are you sure that you want to revert to builtin version? While the channel is reverted, capgo will not distribute updates thru it.",
   "role": "Role",
+  "role-per-org": "Role per organization",
   "role-app-admin": "App Admin",
   "role-app-developer": "App Developer",
   "role-app-reader": "App Reader",
