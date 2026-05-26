@@ -457,6 +457,7 @@ async function resolveApiKey(
   key: string,
   rights: Database['public']['Enums']['key_mode'][],
   usePostgres: boolean,
+  readOnly = true,
 ) {
   if (!usePostgres) {
     return checkKey(c, key, supabaseAdmin(c), rights)
@@ -464,7 +465,7 @@ async function resolveApiKey(
 
   let pgClient: ReturnType<typeof getPgClient> | null = null
   try {
-    pgClient = getPgClient(c, true)
+    pgClient = getPgClient(c, readOnly)
     const drizzleClient = getDrizzleClient(pgClient)
     return await checkKeyPg(c, key, rights, drizzleClient)
   }
@@ -481,6 +482,7 @@ async function resolveSubkey(
   rights: Database['public']['Enums']['key_mode'][],
   usePostgres: boolean,
   expectedUserId?: string,
+  readOnly = true,
 ) {
   if (!usePostgres) {
     return checkKeyById(c, subkeyId, supabaseAdmin(c), rights, expectedUserId)
@@ -488,7 +490,7 @@ async function resolveSubkey(
 
   let subkeyPgClient: ReturnType<typeof getPgClient> | null = null
   try {
-    subkeyPgClient = getPgClient(c, true)
+    subkeyPgClient = getPgClient(c, readOnly)
     const drizzleClient = getDrizzleClient(subkeyPgClient)
     return await checkKeyByIdPg(c, subkeyId, rights, drizzleClient, expectedUserId)
   }
@@ -613,8 +615,9 @@ export function middlewareV2(rights: Database['public']['Enums']['key_mode'][]) 
  *
  * @param rights - Required key modes for the route.
  * @param usePostgres - When true, performs key lookups via Postgres instead of Supabase client.
+ * @param readOnly - When using Postgres, choose replica-safe read-only connections by default; latency-sensitive write flows can force primary auth.
  */
-export function middlewareKey(rights: Database['public']['Enums']['key_mode'][], usePostgres = false) {
+export function middlewareKey(rights: Database['public']['Enums']['key_mode'][], usePostgres = false, readOnly = true) {
   const subMiddlewareKey = honoFactory.createMiddleware(async (c, next) => {
     // Check if IP is rate limited due to failed auth attempts
     const ipRateLimited = await isIPRateLimited(c)
@@ -642,7 +645,7 @@ export function middlewareKey(rights: Database['public']['Enums']['key_mode'][],
       return quickError(401, 'no_key_provided', 'No key provided')
     }
 
-    const apikey = await resolveApiKey(c, key, rights, usePostgres)
+    const apikey = await resolveApiKey(c, key, rights, usePostgres, readOnly)
 
     if (!apikey) {
       cloudlog({ requestId: c.get('requestId'), message: 'Invalid apikey', keyPrefix: maskSecret(key), method: c.req.method, url: c.req.url })
@@ -664,7 +667,7 @@ export function middlewareKey(rights: Database['public']['Enums']['key_mode'][],
     setApiKeyAuthContext(c, apikey, key)
 
     if (subkey_id !== null) {
-      const subkey = await resolveSubkey(c, subkey_id, rights, usePostgres, apikey.user_id)
+      const subkey = await resolveSubkey(c, subkey_id, rights, usePostgres, apikey.user_id, readOnly)
 
       if (!subkey) {
         cloudlog({ requestId: c.get('requestId'), message: 'Invalid subkey', subkey_id })
