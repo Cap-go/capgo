@@ -118,6 +118,21 @@
           "binding": "ATTACHMENT_BUCKET",
           "bucket_name": "capgo",
           "preview_bucket_name": "capgo"
+        },
+        {
+          "binding": "ATTACHMENT_UPLOAD_BUCKET",
+          "bucket_name": "capgo",
+          "preview_bucket_name": "capgo"
+        },
+        {
+          "binding": "ATTACHMENT_DOWNLOAD_BUCKET",
+          "bucket_name": "capgo",
+          "preview_bucket_name": "capgo"
+        },
+        {
+          "binding": "ATTACHMENT_FALLBACK_BUCKET",
+          "bucket_name": "capgo",
+          "preview_bucket_name": "capgo"
         }
       ],
       "analytics_engine_datasets": [
@@ -176,6 +191,21 @@
           "binding": "ATTACHMENT_BUCKET",
           "bucket_name": "capgo",
           "preview_bucket_name": "capgo"
+        },
+        {
+          "binding": "ATTACHMENT_UPLOAD_BUCKET",
+          "bucket_name": "capgo",
+          "preview_bucket_name": "capgo"
+        },
+        {
+          "binding": "ATTACHMENT_DOWNLOAD_BUCKET",
+          "bucket_name": "capgo",
+          "preview_bucket_name": "capgo"
+        },
+        {
+          "binding": "ATTACHMENT_FALLBACK_BUCKET",
+          "bucket_name": "capgo",
+          "preview_bucket_name": "capgo"
         }
       ],
       "analytics_engine_datasets": [
@@ -228,6 +258,21 @@
           "binding": "ATTACHMENT_BUCKET",
           "bucket_name": "capgo-alpha",
           "preview_bucket_name": "capgo-alpha"
+        },
+        {
+          "binding": "ATTACHMENT_UPLOAD_BUCKET",
+          "bucket_name": "capgo-alpha",
+          "preview_bucket_name": "capgo-alpha"
+        },
+        {
+          "binding": "ATTACHMENT_DOWNLOAD_BUCKET",
+          "bucket_name": "capgo-alpha",
+          "preview_bucket_name": "capgo-alpha"
+        },
+        {
+          "binding": "ATTACHMENT_FALLBACK_BUCKET",
+          "bucket_name": "capgo-alpha",
+          "preview_bucket_name": "capgo-alpha"
         }
       ],
       "analytics_engine_datasets": [
@@ -258,6 +303,21 @@
       "r2_buckets": [
         {
           "binding": "ATTACHMENT_BUCKET",
+          "bucket_name": "capgo-local",
+          "preview_bucket_name": "capgo-local"
+        },
+        {
+          "binding": "ATTACHMENT_UPLOAD_BUCKET",
+          "bucket_name": "capgo-local",
+          "preview_bucket_name": "capgo-local"
+        },
+        {
+          "binding": "ATTACHMENT_DOWNLOAD_BUCKET",
+          "bucket_name": "capgo-local",
+          "preview_bucket_name": "capgo-local"
+        },
+        {
+          "binding": "ATTACHMENT_FALLBACK_BUCKET",
           "bucket_name": "capgo-local",
           "preview_bucket_name": "capgo-local"
         }

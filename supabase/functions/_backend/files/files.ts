@@ -17,6 +17,7 @@ import { checkPermissionPg } from '../utils/rbac.ts'
 import { createStatsBandwidth } from '../utils/stats.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
 import { backgroundTask } from '../utils/utils.ts'
+import { getAttachmentDownloadBuckets, getAttachmentUploadBucket } from './buckets.ts'
 import { app as files_config } from './files_config.ts'
 import { parseUploadMetadata } from './parse.ts'
 import { DEFAULT_RETRY_PARAMS, RetryBucket } from './retry.ts'
@@ -279,6 +280,19 @@ function withAttachmentResponseHeaders(response: Response, fileId: string): Resp
   })
 }
 
+async function headFirstExistingAttachmentCandidateInBuckets<T>(
+  readers: Array<{ head: (key: string) => Promise<T | null> }>,
+  candidateKeys: string[],
+): Promise<T | null> {
+  for (const reader of readers) {
+    const objectInfo = await headFirstExistingAttachmentCandidate(reader, candidateKeys)
+    if (objectInfo != null)
+      return objectInfo
+  }
+
+  return null
+}
+
 function getTransferredBytesFromResponse(response: Response): number | null {
   const contentRange = response.headers.get('content-range')
   if (contentRange) {
@@ -386,12 +400,14 @@ async function getHandler(c: Context): Promise<Response> {
     return getSupabaseStorageResponse(c, fileId)
   }
 
-  const bucket: R2Bucket = c.env.ATTACHMENT_BUCKET
+  const buckets = getAttachmentDownloadBuckets(c.env)
 
-  if (bucket == null) {
+  if (buckets.length === 0) {
     cloudlog({ requestId: c.get('requestId'), message: 'getHandler files bucket is null' })
     return c.json({ error: 'not_found', message: 'Not found' }, 404)
   }
+  const retryBuckets = buckets.map(bucket => new RetryBucket(bucket, DEFAULT_RETRY_PARAMS))
+  const uploadBucket = getAttachmentUploadBucket(c.env) ?? buckets[0]
 
   // Support for deno cache or CF cache do not remove this
   // @ts-expect-error-next-line
@@ -408,8 +424,7 @@ async function getHandler(c: Context): Promise<Response> {
     // Best-effort restore: if file is cached but missing in R2, write it back.
     await backgroundTask(c, async () => {
       try {
-        const retryBucket = new RetryBucket(bucket, DEFAULT_RETRY_PARAMS)
-        const existingObject = await headFirstExistingAttachmentCandidate(retryBucket, candidateKeys)
+        const existingObject = await headFirstExistingAttachmentCandidateInBuckets(retryBuckets, candidateKeys)
         if (existingObject != null)
           return
 
@@ -417,7 +432,7 @@ async function getHandler(c: Context): Promise<Response> {
         const data = await cached.arrayBuffer()
         const contentType = cached.headers.get('content-type') || undefined
         const httpMetadata = buildFileHttpMetadata(contentType, cached.headers.get('cache-control'))
-        await bucket.put(fileId, data, { httpMetadata })
+        await uploadBucket.put(fileId, data, { httpMetadata })
         cloudlog({ requestId: c.get('requestId'), message: 'Restored cached file to R2', fileId })
         await sendDiscordAlert(c, {
           content: `🛠️ Restored cached file to R2\nFile: ${fileId}\nRequest ID: ${c.get('requestId') ?? 'unknown'}`,
@@ -434,8 +449,7 @@ async function getHandler(c: Context): Promise<Response> {
   if (rangeHeaderFromRequest) {
     cloudlog({ requestId: c.get('requestId'), message: 'getHandler files range request', range: rangeHeaderFromRequest })
     try {
-      const retryBucket = new RetryBucket(bucket, DEFAULT_RETRY_PARAMS)
-      const objectInfo = await headFirstExistingAttachmentCandidate(retryBucket, candidateKeys)
+      const objectInfo = await headFirstExistingAttachmentCandidateInBuckets(retryBuckets, candidateKeys)
       if (objectInfo != null) {
         const fileSize = objectInfo.size
         const rangeMatch = rangeHeaderFromRequest.match(/bytes=(\d+)-(\d*)/)
@@ -456,10 +470,14 @@ async function getHandler(c: Context): Promise<Response> {
 
   let object: R2ObjectBody | null = null
   try {
-    for (const candidateKey of candidateKeys) {
-      object = await new RetryBucket(bucket, DEFAULT_RETRY_PARAMS).get(candidateKey, {
-        range: c.req.raw.headers,
-      })
+    for (const retryBucket of retryBuckets) {
+      for (const candidateKey of candidateKeys) {
+        object = await retryBucket.get(candidateKey, {
+          range: c.req.raw.headers,
+        })
+        if (object != null)
+          break
+      }
       if (object != null)
         break
     }

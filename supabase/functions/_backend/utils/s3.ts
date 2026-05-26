@@ -58,18 +58,54 @@ function resolveStorageEndpoint(c: Context): string {
   }
 }
 
-function initS3(c: Context) {
+function getOptionalEnv(c: Context, key: string): string | null {
+  let value = ''
+  try {
+    value = getEnv(c, key).trim()
+  }
+  catch {
+    return null
+  }
+  return value || null
+}
+
+function uniqueBucketNames(bucketNames: Array<string | null | undefined>): string[] {
+  return [...new Set(bucketNames.filter((bucketName): bucketName is string => Boolean(bucketName)))]
+}
+
+function getUploadBucketName(c: Context): string {
+  return getOptionalEnv(c, 'S3_UPLOAD_BUCKET') ?? getEnv(c, 'S3_BUCKET')
+}
+
+function getDownloadBucketNames(c: Context): string[] {
+  return uniqueBucketNames([
+    getOptionalEnv(c, 'S3_DOWNLOAD_BUCKET') ?? getOptionalEnv(c, 'S3_BUCKET'),
+    getOptionalEnv(c, 'S3_UPLOAD_BUCKET'),
+    getOptionalEnv(c, 'S3_FALLBACK_BUCKET'),
+    getOptionalEnv(c, 'S3_BUCKET'),
+  ])
+}
+
+function getMutationBucketNames(c: Context): string[] {
+  return uniqueBucketNames([
+    getOptionalEnv(c, 'S3_UPLOAD_BUCKET'),
+    getOptionalEnv(c, 'S3_DOWNLOAD_BUCKET'),
+    getOptionalEnv(c, 'S3_FALLBACK_BUCKET'),
+    getOptionalEnv(c, 'S3_BUCKET'),
+  ])
+}
+
+function initS3(c: Context, bucketName = getEnv(c, 'S3_BUCKET')) {
   const access_key_id = getEnv(c, 'S3_ACCESS_KEY_ID')
   const access_key_secret = getEnv(c, 'S3_SECRET_ACCESS_KEY')
   const storageRegion = getEnv(c, 'S3_REGION') || 'us-east-1'
-  const bucket = getEnv(c, 'S3_BUCKET')
   const client = new S3Client({
     endPoint: resolveStorageEndpoint(c),
     accessKey: access_key_id,
     pathStyle: true,
     secretKey: access_key_secret,
     region: storageRegion,
-    bucket,
+    bucket: bucketName,
   })
   return client
 }
@@ -108,7 +144,8 @@ export async function getPath(
 }
 
 async function getUploadUrl(c: Context, fileId: string, expirySeconds = 1200) {
-  const client = initS3(c)
+  const bucket = getUploadBucketName(c)
+  const client = initS3(c, bucket)
   const url = await client.getPresignedUrl('PUT', fileId, {
     expirySeconds,
     parameters: {
@@ -116,16 +153,29 @@ async function getUploadUrl(c: Context, fileId: string, expirySeconds = 1200) {
       'x-id': 'PutObject',
     },
   })
+  cloudlog({ requestId: c.get('requestId'), message: 'created upload URL', fileId, bucket })
   return url
 }
 
 async function deleteObject(c: Context, fileId: string) {
-  const client = initS3(c)
-  const url = await client.getPresignedUrl('DELETE', fileId)
-  const response = await fetch(url, {
-    method: 'DELETE',
-  })
-  return response.status >= 200 && response.status < 300
+  const bucketNames = getMutationBucketNames(c)
+  const results = await Promise.all(bucketNames.map(async (bucket) => {
+    const client = initS3(c, bucket)
+    const url = await client.getPresignedUrl('DELETE', fileId)
+    const response = await fetch(url, {
+      method: 'DELETE',
+    })
+    return { bucket, ok: (response.status >= 200 && response.status < 300) || response.status === 404, status: response.status }
+  }))
+
+  const failed = results.filter(result => !result.ok)
+  if (failed.length > 0) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'delete R2 object failed in at least one bucket', fileId, failed })
+    return false
+  }
+
+  cloudlog({ requestId: c.get('requestId'), message: 'deleted R2 object from configured buckets', fileId, buckets: bucketNames })
+  return true
 }
 
 function isMissingObjectError(error: unknown): boolean {
@@ -140,46 +190,95 @@ async function moveObjectToTrash(c: Context, fileId: string) {
   if (fileId.startsWith(R2_TRASH_PREFIX))
     return true
 
-  const client = initS3(c)
   const trashPath = getTrashPath(fileId)
-  try {
-    await client.copyObject({ sourceKey: fileId }, trashPath)
-    await client.deleteObject(fileId)
-    cloudlog({ requestId: c.get('requestId'), message: 'moved R2 object to trash', fileId, trashPath })
-    return true
-  }
-  catch (error) {
-    if (isMissingObjectError(error)) {
-      cloudlog({ requestId: c.get('requestId'), message: 'R2 object already missing before trash move', fileId, error: serializeStorageError(error) })
-      return true
-    }
+  let failed = false
+  let attempted = false
 
-    cloudlogErr({ requestId: c.get('requestId'), message: 'move R2 object to trash failed', fileId, trashPath, error: serializeStorageError(error) })
-    return false
+  for (const bucket of getMutationBucketNames(c)) {
+    const client = initS3(c, bucket)
+    try {
+      attempted = true
+      await client.copyObject({ sourceKey: fileId }, trashPath)
+      await client.deleteObject(fileId)
+      cloudlog({ requestId: c.get('requestId'), message: 'moved R2 object to trash', fileId, trashPath, bucket })
+    }
+    catch (error) {
+      if (isMissingObjectError(error)) {
+        cloudlog({ requestId: c.get('requestId'), message: 'R2 object already missing before trash move', fileId, bucket, error: serializeStorageError(error) })
+        continue
+      }
+
+      failed = true
+      cloudlogErr({ requestId: c.get('requestId'), message: 'move R2 object to trash failed', fileId, trashPath, bucket, error: serializeStorageError(error) })
+    }
   }
+
+  return attempted && !failed
 }
 
 async function deleteObjectsWithPrefix(c: Context, prefix: string): Promise<number> {
-  const client = initS3(c)
   let deletedCount = 0
+  for (const bucket of getMutationBucketNames(c)) {
+    const client = initS3(c, bucket)
 
-  for await (const object of client.listObjects({ prefix })) {
-    try {
-      await client.deleteObject(object.key)
-      deletedCount += 1
-    }
-    catch (error) {
-      cloudlog({
-        requestId: c.get('requestId'),
-        message: 'deleteObjectsWithPrefix item failed',
-        prefix,
-        key: object.key,
-        error,
-      })
+    for await (const object of client.listObjects({ prefix })) {
+      try {
+        await client.deleteObject(object.key)
+        deletedCount += 1
+      }
+      catch (error) {
+        cloudlog({
+          requestId: c.get('requestId'),
+          message: 'deleteObjectsWithPrefix item failed',
+          prefix,
+          key: object.key,
+          bucket,
+          error,
+        })
+      }
     }
   }
 
   return deletedCount
+}
+
+async function headObjectSize(c: Context, client: ReturnType<typeof initS3>, bucket: string, fileId: string) {
+  const url = await client.getPresignedUrl('HEAD', fileId)
+  const response = await fetch(url, {
+    method: 'HEAD',
+  })
+  const contentLength = Number.parseInt(response.headers.get('content-length') || '0')
+  return {
+    bucket,
+    contentLength,
+    exists: response.status === 200,
+    fileId,
+    status: response.status,
+  }
+}
+
+async function findExistingObject(c: Context, fileId: string) {
+  const candidateKeys = getManifestStorageCandidateKeys(fileId)
+  const bucketNames = getDownloadBucketNames(c)
+  let lastHead: Awaited<ReturnType<typeof headObjectSize>> | null = null
+
+  for (const bucket of bucketNames) {
+    const client = initS3(c, bucket)
+    for (const candidateKey of candidateKeys) {
+      try {
+        const head = await headObjectSize(c, client, bucket, candidateKey)
+        lastHead = head
+        if (head.exists)
+          return { bucket, client, key: candidateKey, size: head.contentLength }
+      }
+      catch (error) {
+        cloudlogErr({ requestId: c.get('requestId'), message: 'findExistingObject head failed', fileId, candidateKey, bucket, error: serializeStorageError(error) })
+      }
+    }
+  }
+
+  cloudlog({ requestId: c.get('requestId'), message: 'findExistingObject found no object', fileId, candidateKeys, bucketNames, lastHead })
+  return null
 }
 
 async function checkIfExist(c: Context, fileId: string | null) {
@@ -187,13 +286,7 @@ async function checkIfExist(c: Context, fileId: string | null) {
     return false
   }
   try {
-    const client = initS3(c)
-    const url = await client.getPresignedUrl('HEAD', fileId)
-    const response = await fetch(url, {
-      method: 'HEAD',
-    })
-    const contentLength = Number.parseInt(response.headers.get('content-length') || '0')
-    return response.status === 200 && contentLength > 0
+    return (await findExistingObject(c, fileId)) !== null
   }
   catch {
     // cloudlog({ requestId: c.get('requestId'), message: 'checkIfExist', fileId, error  })
@@ -202,14 +295,18 @@ async function checkIfExist(c: Context, fileId: string | null) {
 }
 
 async function getSignedUrl(c: Context, fileId: string, expirySeconds: number) {
-  const client = initS3(c)
-  const url = await client.getPresignedUrl('GET', fileId, {
+  const existing = await findExistingObject(c, fileId)
+  const bucket = existing?.bucket ?? getDownloadBucketNames(c)[0] ?? getEnv(c, 'S3_BUCKET')
+  const key = existing?.key ?? fileId
+  const client = existing?.client ?? initS3(c, bucket)
+  const url = await client.getPresignedUrl('GET', key, {
     expirySeconds,
     parameters: {
       'X-Amz-Content-Sha256': 'UNSIGNED-PAYLOAD',
       'x-id': 'PutObject',
     },
   })
+  cloudlog({ requestId: c.get('requestId'), message: 'created signed download URL', fileId, key, bucket, foundExisting: Boolean(existing) })
   return url
 }
 
@@ -246,6 +343,7 @@ function serializeStorageError(error: unknown) {
 async function getSizeFromRangeFallback(
   c: Context,
   client: ReturnType<typeof initS3>,
+  bucket: string,
   fileId: string,
   reason: 'head_error' | 'missing_head_size',
 ): Promise<number> {
@@ -274,6 +372,7 @@ async function getSizeFromRangeFallback(
         statusText: res.statusText,
         contentRange,
         contentLength,
+        bucket,
         size: 0,
       })
       return 0
@@ -295,6 +394,7 @@ async function getSizeFromRangeFallback(
       statusText: res.statusText,
       contentRange,
       contentLength,
+      bucket,
       size,
     })
     return size
@@ -306,14 +406,14 @@ async function getSizeFromRangeFallback(
       fileId,
       reason,
       error: serializeStorageError(fallbackError),
-      bucket: getEnv(c, 'S3_BUCKET'),
+      bucket,
       endpoint: getEnv(c, 'S3_ENDPOINT'),
     })
     return 0
   }
 }
 
-async function getSizeForKey(c: Context, client: ReturnType<typeof initS3>, fileId: string) {
+async function getSizeForKey(c: Context, client: ReturnType<typeof initS3>, bucket: string, fileId: string) {
   let size = 0
   let headError: unknown
   let usedFallback = false
@@ -329,7 +429,7 @@ async function getSizeForKey(c: Context, client: ReturnType<typeof initS3>, file
       fileId,
       headSize: size,
       headRawSize: file.size,
-      bucket: getEnv(c, 'S3_BUCKET'),
+      bucket,
       endpoint: getEnv(c, 'S3_ENDPOINT'),
     })
   }
@@ -340,21 +440,21 @@ async function getSizeForKey(c: Context, client: ReturnType<typeof initS3>, file
       message: 'getSize head failed',
       fileId,
       error: serializeStorageError(error),
-      bucket: getEnv(c, 'S3_BUCKET'),
+      bucket,
       endpoint: getEnv(c, 'S3_ENDPOINT'),
     })
   }
 
   if (!size) {
     usedFallback = true
-    size = await getSizeFromRangeFallback(c, client, fileId, headError ? 'head_error' : 'missing_head_size')
+    size = await getSizeFromRangeFallback(c, client, bucket, fileId, headError ? 'head_error' : 'missing_head_size')
   }
 
   cloudlog({
     requestId: c.get('requestId'),
     message: 'getSize final',
     fileId,
-    bucket: getEnv(c, 'S3_BUCKET'),
+    bucket,
     endpoint: getEnv(c, 'S3_ENDPOINT'),
     finalSize: size,
     usedFallback,
@@ -363,57 +463,65 @@ async function getSizeForKey(c: Context, client: ReturnType<typeof initS3>, file
 }
 
 async function getSize(c: Context, fileId: string) {
-  const client = initS3(c)
   const candidateKeys = getManifestStorageCandidateKeys(fileId)
+  const bucketNames = getDownloadBucketNames(c)
 
-  for (const candidateKey of candidateKeys) {
-    const size = await getSizeForKey(c, client, candidateKey)
-    if (size > 0) {
-      if (candidateKey !== fileId) {
-        cloudlog({
-          requestId: c.get('requestId'),
-          message: 'getSize recovered from manifest storage candidate',
-          fileId,
-          candidateKey,
-          candidateKeys,
-          size,
-        })
+  for (const bucket of bucketNames) {
+    const client = initS3(c, bucket)
+    for (const candidateKey of candidateKeys) {
+      const size = await getSizeForKey(c, client, bucket, candidateKey)
+      if (size > 0) {
+        if (candidateKey !== fileId || bucket !== bucketNames[0]) {
+          cloudlog({
+            requestId: c.get('requestId'),
+            message: 'getSize recovered from storage candidate',
+            fileId,
+            candidateKey,
+            candidateKeys,
+            bucket,
+            bucketNames,
+            size,
+          })
+        }
+        return size
       }
-      return size
     }
   }
 
-  if (candidateKeys.length > 1) {
-    cloudlogErr({
-      requestId: c.get('requestId'),
-      message: 'getSize failed all manifest storage candidates',
-      fileId,
-      candidateKeys,
-      bucket: getEnv(c, 'S3_BUCKET'),
-      endpoint: getEnv(c, 'S3_ENDPOINT'),
-    })
-  }
+  cloudlogErr({
+    requestId: c.get('requestId'),
+    message: 'getSize failed all storage candidates',
+    fileId,
+    candidateKeys,
+    bucketNames,
+    endpoint: getEnv(c, 'S3_ENDPOINT'),
+  })
 
   return 0
 }
 
 async function getObject(c: Context, fileId: string): Promise<Response | null> {
-  const client = initS3(c)
-  try {
-    const url = await client.getPresignedUrl('GET', fileId, {
-      expirySeconds: 60,
-    })
-    const response = await fetch(url)
-    if (!response.ok) {
-      cloudlog({ requestId: c.get('requestId'), message: 'getObject failed', fileId, status: response.status })
-      return null
+  const candidateKeys = getManifestStorageCandidateKeys(fileId)
+  for (const bucket of getDownloadBucketNames(c)) {
+    const client = initS3(c, bucket)
+    for (const candidateKey of candidateKeys) {
+      try {
+        const url = await client.getPresignedUrl('GET', candidateKey, {
+          expirySeconds: 60,
+        })
+        const response = await fetch(url)
+        if (!response.ok) {
+          cloudlog({ requestId: c.get('requestId'), message: 'getObject failed', fileId, candidateKey, bucket, status: response.status })
+          continue
+        }
+        return response
+      }
+      catch (error) {
+        cloudlog({ requestId: c.get('requestId'), message: 'getObject error', fileId, candidateKey, bucket, error })
+      }
     }
-    return response
   }
-  catch (error) {
-    cloudlog({ requestId: c.get('requestId'), message: 'getObject error', fileId, error })
-    return null
-  }
+  return null
 }
 
 export const s3 = {
