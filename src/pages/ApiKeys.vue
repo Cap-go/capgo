@@ -122,6 +122,7 @@ function getBindingsForKey(key: Database['public']['Tables']['apikeys']['Row']):
 // Get the highest role for a key (by priority_rank)
 function getHighestRole(key: Database['public']['Tables']['apikeys']['Row']): string | null {
   const keyBindings = getBindingsForKey(key)
+    .filter(binding => binding.scope_type === 'org')
   if (keyBindings.length === 0)
     return null
 
@@ -146,9 +147,10 @@ function getRbacAppBindingIds(key: Database['public']['Tables']['apikeys']['Row'
 
 function getDisplayOrgIds(key: Database['public']['Tables']['apikeys']['Row']): string[] {
   const orgIds = new Set<string>()
-  getBindingsForKey(key)
-    .filter(b => b.scope_type === 'org' && !!b.org_id)
-    .forEach(b => orgIds.add(b.org_id!))
+  getBindingsForKey(key).forEach((binding) => {
+    if (binding.org_id)
+      orgIds.add(binding.org_id)
+  })
   return Array.from(orgIds)
 }
 
@@ -162,8 +164,7 @@ function getDisplayAppIds(key: Database['public']['Tables']['apikeys']['Row']): 
 }
 
 function formatDisplayApps(key: Database['public']['Tables']['apikeys']['Row']) {
-  const appNames = new Set(getDisplayAppIds(key).map(appId => appCache.value.get(appId) || 'Unknown'))
-  return Array.from(appNames).join(', ')
+  return getDisplayAppIds(key).map(appId => appCache.value.get(appId) || 'Unknown').join(', ')
 }
 
 function cacheAppNames(apps: { id: string | null, app_id: string, name: string | null }[]) {
@@ -294,9 +295,40 @@ const unsupportedApiKeyOrgRoles = new Set(['org_billing_admin'])
 const orgRoles = computed(() => roles.value.filter(r => r.scope_type === 'org' && !unsupportedApiKeyOrgRoles.has(r.name)))
 const appRoles = computed(() => roles.value.filter(r => r.scope_type === 'app'))
 
+const legacyOrgRoleAliases: Record<string, string> = {
+  owner: 'org_super_admin',
+  super_admin: 'org_super_admin',
+  admin: 'org_admin',
+  write: 'org_member',
+  upload: 'org_member',
+  read: 'org_member',
+}
+
+function normalizeOrgRoleName(roleName: string) {
+  const normalized = roleName.replace(/^invite_/, '')
+  return legacyOrgRoleAliases[normalized] ?? normalized
+}
+
+function getRolePriority(roleName?: string | null) {
+  if (!roleName)
+    return 0
+  return roles.value.find(r => r.name === normalizeOrgRoleName(roleName))?.priority_rank ?? 0
+}
+
+const callerOrgPriorityByOrgId = computed(() => new Map(
+  organizationStore.organizations.map(org => [org.gid, getRolePriority(org.role)]),
+))
+
+const selectedOrgMinimumPriority = computed(() => {
+  const selectedManageableOrgIds = selectedOrgsForCreation.value.filter(orgId => manageableOrgIds.value.has(orgId))
+  if (selectedManageableOrgIds.length === 0)
+    return 0
+  return Math.min(...selectedManageableOrgIds.map(orgId => callerOrgPriorityByOrgId.value.get(orgId) ?? 0))
+})
+
 const orgRoleOptions = computed(() =>
   orgRoles.value
-    .filter(r => r.name !== 'org_super_admin')
+    .filter(r => r.name !== 'org_super_admin' && r.priority_rank <= selectedOrgMinimumPriority.value)
     .map(r => ({ id: r.id, name: r.name, description: getRoleDisplayName(r.name) })),
 )
 
@@ -329,6 +361,13 @@ function pruneAppBindings() {
       delete updated[appId]
   }
   pendingAppBindings.value = updated
+}
+
+function ensureSelectedOrgRoleAllowed() {
+  if (orgRoleOptions.value.some(role => role.name === selectedOrgRole.value))
+    return
+
+  selectedOrgRole.value = orgRoleOptions.value.find(role => role.name === 'org_member')?.name ?? orgRoleOptions.value[0]?.name ?? ''
 }
 
 const selectedAppIds = computed(() => Object.keys(pendingAppBindings.value))
@@ -682,6 +721,7 @@ async function addNewApiKey() {
   selectedOrgsForCreation.value = organizationStore.organizations
     .map(org => org.gid)
     .filter(orgId => manageableOrgIds.value.has(orgId))
+  ensureSelectedOrgRoleAllowed()
 
   // Show creation modal
   await showAddNewKeyModal()
@@ -916,7 +956,12 @@ async function copyKey(apikey: Database['public']['Tables']['apikeys']['Row']) {
 // Watch for org selection changes to prune app bindings
 watch(selectedOrgsForCreation, () => {
   pruneAppBindings()
+  ensureSelectedOrgRoleAllowed()
 }, { deep: true })
+
+watch(orgRoleOptions, () => {
+  ensureSelectedOrgRoleAllowed()
+})
 
 // Watch for org role changes - clear app bindings if role grants inherited access
 watch(selectedOrgRole, (newRole) => {
@@ -1032,6 +1077,7 @@ getKeys()
             <div class="relative">
               <button
                 type="button"
+                data-test="create-key-org-dropdown"
                 class="flex items-center justify-between w-full gap-3 px-3 py-2 text-sm text-left bg-white border rounded-lg border-slate-300 dark:bg-gray-800 dark:border-slate-600 focus:ring-2 focus:ring-primary-500 focus:outline-none"
                 :aria-expanded="showOrgDropdown"
                 @click="showOrgDropdown = !showOrgDropdown"
@@ -1056,6 +1102,8 @@ getKeys()
                 >
                   <input
                     type="checkbox"
+                    data-test="create-key-org-checkbox"
+                    :data-org-id="org.gid"
                     class="d-checkbox d-checkbox-sm d-checkbox-primary"
                     :checked="selectedOrgsForCreation.includes(org.gid)"
                     :disabled="!manageableOrgIds.has(org.gid)"
@@ -1089,6 +1137,7 @@ getKeys()
                 <input
                   v-model="selectedOrgRole"
                   type="radio"
+                  :data-test="`create-key-org-role-${role.name}`"
                   class="d-radio d-radio-primary d-radio-sm"
                   name="create-org-role"
                   :value="role.name"
@@ -1111,6 +1160,7 @@ getKeys()
             <div class="flex justify-end mb-4">
               <div class="relative">
                 <button
+                  data-test="create-key-add-app"
                   class="gap-2 d-btn d-btn-sm d-btn-outline"
                   type="button"
                   @click="showAppDropdown = !showAppDropdown"
@@ -1135,6 +1185,8 @@ getKeys()
                   >
                     <input
                       type="checkbox"
+                      data-test="create-key-app-checkbox"
+                      :data-app-id="app.id"
                       class="d-checkbox d-checkbox-sm d-checkbox-primary"
                       :checked="app.id in pendingAppBindings"
                       @change="toggleApp(app.id)"
@@ -1163,6 +1215,7 @@ getKeys()
               <div
                 v-for="appId in selectedAppIds"
                 :key="appId"
+                data-test="create-key-selected-app"
                 class="flex items-center gap-4 px-4 py-2.5 border-b last:border-0 border-slate-100 dark:border-slate-700 hover:bg-slate-50/50 dark:hover:bg-slate-700/20"
               >
                 <span class="flex-1 text-sm font-medium truncate dark:text-white text-slate-800">
@@ -1172,6 +1225,7 @@ getKeys()
                   </span>
                 </span>
                 <select
+                  data-test="create-key-app-role-select"
                   class="d-select d-select-sm d-select-bordered"
                   :value="pendingAppBindings[appId] || ''"
                   @change="onAppRoleChange(appId, $event)"
