@@ -92,8 +92,8 @@ const downloadHost = computed(() => {
 })
 
 onMounted(async () => {
-  displayStore.NavTitle = 'Scan update'
-  displayStore.defaultBack = '/apps'
+  displayStore.NavTitle = 'Test preview'
+  displayStore.defaultBack = '/login'
 
   const previewLink = Array.isArray(route.query.preview) ? route.query.preview[0] : route.query.preview
   if (previewLink) {
@@ -305,198 +305,143 @@ async function goBack() {
     return
   }
 
-  await router.push('/apps')
+  await router.push('/login')
 }
 </script>
 
 <template>
-  <main class="min-h-dvh overflow-y-auto bg-slate-950 text-white">
-    <div class="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(56,189,248,0.2),_transparent_36%),radial-gradient(circle_at_bottom_right,_rgba(59,130,246,0.18),_transparent_34%)]" />
-    <div class="relative mx-auto flex min-h-dvh w-full max-w-md flex-col px-4 pb-8 pt-6 sm:px-6">
-      <header class="rounded-[28px] border border-white/10 bg-white/[0.06] p-3 shadow-[0_18px_60px_rgba(15,23,42,0.32)] backdrop-blur">
-        <div class="flex items-start justify-between gap-3">
-          <button
-            class="inline-flex h-12 w-12 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.08] text-white transition-colors duration-200 hover:border-sky-300/40 hover:bg-white/[0.12]"
-            aria-label="Go back"
-            @click="goBack"
-          >
-            <IconArrowLeft class="h-5 w-5" />
-          </button>
-          <div class="flex-1 pt-1 text-center">
-            <p class="text-xs font-semibold uppercase tracking-[0.28em] text-sky-200/70">
-              Release delivery
-            </p>
-            <h1 class="mt-2 text-2xl font-semibold tracking-tight text-white">
-              Test a preview
-            </h1>
-            <p class="mt-2 text-sm leading-6 text-slate-300">
-              Scan a Capgo preview QR code, then the app will fetch and apply the matching bundle.
-            </p>
-          </div>
-          <span class="rounded-full border border-sky-300/25 bg-sky-400/10 px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.22em] text-sky-100">
-            {{ scannerStatusLabel }}
-          </span>
+  <main class="min-h-dvh overflow-y-auto bg-slate-950 pb-[calc(6rem+env(safe-area-inset-bottom))] text-white">
+    <div class="mx-auto flex min-h-dvh w-full max-w-md flex-col px-4 pb-4 pt-[max(1rem,env(safe-area-inset-top))]">
+      <header class="flex items-center gap-3">
+        <button
+          class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-white transition-colors hover:bg-white/10"
+          aria-label="Go back"
+          @click="goBack"
+        >
+          <IconArrowLeft class="h-5 w-5" />
+        </button>
+        <div class="min-w-0 flex-1">
+          <p class="text-sm font-medium text-cyan-200">
+            Preview test
+          </p>
+          <h1 class="text-2xl font-semibold text-white">
+            Scan QR code
+          </h1>
         </div>
+        <span class="rounded-full border border-emerald-300/30 bg-emerald-400/10 px-3 py-1.5 text-xs font-semibold text-emerald-100">
+          {{ scannerStatusLabel }}
+        </span>
       </header>
 
-      <section class="relative mt-5 overflow-hidden rounded-[32px] border border-white/10 bg-slate-900/80 p-5 shadow-[0_26px_90px_rgba(2,6,23,0.58)] backdrop-blur">
-        <div class="absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-sky-300/45 to-transparent" />
-        <div class="flex items-center justify-between gap-3">
+      <section class="mt-4 rounded-2xl border border-white/10 bg-white/[0.06] p-4">
+        <div class="flex items-start gap-3">
+          <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-cyan-300 text-slate-950">
+            <IconQrCode class="h-5 w-5" />
+          </span>
           <div>
-            <p class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
-              Scanner surface
-            </p>
-            <h2 class="mt-2 text-lg font-semibold text-white">
+            <h2 class="text-lg font-semibold text-white">
               {{ scannerTitle }}
             </h2>
-          </div>
-          <div class="rounded-2xl border border-white/10 bg-white/5 p-3 text-sky-200">
-            <IconQrCode class="h-6 w-6" />
-          </div>
-        </div>
-
-        <div class="relative mt-5 overflow-hidden rounded-[28px] border border-sky-300/[0.12] bg-[radial-gradient(circle_at_top,_rgba(56,189,248,0.14),_rgba(15,23,42,0.92)_56%)] p-4">
-          <div
-            class="relative mx-auto aspect-square w-full max-w-[18rem] overflow-hidden rounded-[26px] border border-dashed border-sky-200/35 bg-slate-950/80"
-            :class="isScanning ? 'shadow-[0_0_0_1px_rgba(125,211,252,0.16),0_24px_50px_rgba(8,47,73,0.5)]' : 'shadow-[0_24px_50px_rgba(2,6,23,0.32)]'"
-          >
-            <div class="absolute inset-5 rounded-[22px] border border-white/[0.08] bg-[linear-gradient(180deg,rgba(15,23,42,0.2),rgba(15,23,42,0.78))]" />
-            <div
-              v-if="isScanning"
-              class="scanner-sweep absolute left-7 right-7 top-16 h-px bg-gradient-to-r from-transparent via-cyan-300 to-transparent shadow-[0_0_18px_rgba(103,232,249,0.95)]"
-            />
-            <div class="absolute left-4 top-4 h-12 w-12 rounded-tl-[18px] border-l-4 border-t-4 border-sky-300" />
-            <div class="absolute right-4 top-4 h-12 w-12 rounded-tr-[18px] border-r-4 border-t-4 border-sky-300" />
-            <div class="absolute bottom-4 left-4 h-12 w-12 rounded-bl-[18px] border-b-4 border-l-4 border-sky-300" />
-            <div class="absolute bottom-4 right-4 h-12 w-12 rounded-br-[18px] border-b-4 border-r-4 border-sky-300" />
-            <div class="absolute inset-x-9 bottom-9 rounded-2xl border border-white/[0.08] bg-slate-950/[0.76] px-4 py-3 text-center text-xs font-medium leading-5 text-slate-300 backdrop-blur">
-              {{ isScanning ? 'Center the QR code and hold steady.' : 'Read the steps, then tap scan when you are ready.' }}
-            </div>
-          </div>
-
-          <div v-if="!isLoading" class="mt-5">
-            <button
-              v-if="isNativePlatform"
-              class="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-sky-400 via-cyan-300 to-blue-500 px-4 py-3 text-sm font-semibold text-slate-950 transition-transform duration-200 hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
-              :disabled="isScanning"
-              @click="retryScanning"
-            >
-              <IconQrCode class="h-5 w-5" />
-              {{ isScanning ? 'Camera open' : 'Scan QR code' }}
-            </button>
-            <p
-              v-if="statusMessage"
-              class="mt-3 rounded-2xl border border-sky-300/20 bg-sky-400/10 px-4 py-3 text-sm leading-6 text-sky-100"
-              aria-live="polite"
-            >
-              {{ statusMessage }}
+            <p class="mt-1 text-sm leading-6 text-slate-300">
+              Open the preview on your desktop, tap scan, then keep the app open until it reloads.
             </p>
-          </div>
-
-          <div v-if="isLoading" class="mt-5 rounded-[24px] border border-sky-300/20 bg-sky-400/[0.08] p-4" aria-live="polite">
-            <div class="flex items-start gap-3">
-              <div class="rounded-2xl bg-sky-400/[0.12] p-3 text-sky-200">
-                <IconDownload class="h-6 w-6 animate-bounce" />
-              </div>
-              <div class="flex-1">
-                <div class="flex items-center justify-between gap-3">
-                  <h3 class="text-base font-semibold text-white">
-                    Downloading and applying update
-                  </h3>
-                  <span class="text-sm font-semibold text-sky-100">
-                    {{ progressPercentage }}%
-                  </span>
-                </div>
-                <p class="mt-2 text-sm leading-6 text-slate-300">
-                  The bundle is being downloaded now. Keep this screen open until the app reloads.
-                </p>
-                <div class="mt-4 h-2 overflow-hidden rounded-full bg-slate-800/90">
-                  <div
-                    class="h-full rounded-full bg-gradient-to-r from-sky-400 via-cyan-300 to-blue-400 transition-all duration-300 ease-out"
-                    :style="{ width: `${downloadProgress}%` }"
-                  />
-                </div>
-                <p v-if="downloadHost" class="mt-3 text-xs font-medium uppercase tracking-[0.22em] text-sky-100/70">
-                  Source: {{ downloadHost }}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div v-else class="mt-5 grid gap-3 sm:grid-cols-2">
-            <div class="rounded-[24px] border border-white/[0.08] bg-white/5 p-4">
-              <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
-                Scanner mode
-              </p>
-              <p class="mt-2 text-sm leading-6 text-slate-200">
-                {{ isNativePlatform ? 'The camera opens only after you tap scan.' : 'This environment cannot open the device camera, so manual entry is enabled instead.' }}
-              </p>
-            </div>
-            <div class="rounded-[24px] border border-white/[0.08] bg-white/5 p-4">
-              <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
-                Install behavior
-              </p>
-              <p class="mt-2 text-sm leading-6 text-slate-200">
-                {{ isNativePlatform
-                  ? 'Preview QR codes resolve to a downloadable bundle before install.'
-                  : 'Applying an update still requires the native app.' }}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div class="mt-5 rounded-[28px] border border-white/10 bg-white/5 p-4">
-          <div class="flex items-center gap-3">
-            <div class="rounded-2xl border border-white/10 bg-white/[0.08] p-3 text-sky-200">
-              <IconLink class="h-5 w-5" />
-            </div>
-            <div>
-              <p class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
-                Paste link
-              </p>
-              <h3 class="mt-1 text-base font-semibold text-white">
-                Paste a preview link or bundle URL
-              </h3>
-            </div>
-          </div>
-
-          <p v-if="errorMessage" class="mt-4 rounded-2xl border border-amber-300/20 bg-amber-400/10 px-4 py-3 text-sm leading-6 text-amber-100" aria-live="polite">
-            {{ errorMessage }}
-          </p>
-
-          <label class="mt-4 block text-sm font-medium text-slate-200" for="manual-url">
-            Update URL
-          </label>
-          <input
-            id="manual-url"
-            v-model="manualUrl"
-            type="url"
-            inputmode="url"
-            placeholder="https://updates.example.com/channel/latest"
-            class="mt-2 w-full rounded-2xl border border-white/10 bg-slate-950/80 px-4 py-3 text-sm text-white outline-hidden transition-colors duration-200 placeholder:text-slate-500 focus:border-sky-300/60"
-          >
-
-          <div class="mt-4 flex flex-col gap-3 sm:flex-row">
-            <button
-              class="inline-flex min-h-12 flex-1 items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-sky-400 via-cyan-300 to-blue-500 px-4 py-3 text-sm font-semibold text-slate-950 transition-transform duration-200 hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50"
-              :disabled="!canSubmitManualUrl"
-              @click="submitManualUrl"
-            >
-              <IconDownload class="h-5 w-5" />
-              {{ manualActionLabel }}
-            </button>
-            <button
-              v-if="isNativePlatform"
-              class="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-white transition-colors duration-200 hover:border-sky-300/40 hover:bg-white/10"
-              :disabled="isLoading"
-              @click="retryScanning"
-            >
-              <IconArrowPath class="h-5 w-5" />
-              Scan QR code
-            </button>
           </div>
         </div>
       </section>
+
+      <section class="mt-4 rounded-2xl border border-white/10 bg-slate-900 p-4">
+        <div
+          class="relative mx-auto aspect-square w-full max-w-[13.5rem] overflow-hidden rounded-2xl border border-cyan-200/25 bg-slate-950"
+          :class="isScanning ? 'ring-2 ring-cyan-300/60' : ''"
+        >
+          <div
+            v-if="isScanning"
+            class="scanner-sweep absolute left-7 right-7 top-14 h-px bg-cyan-300 shadow-[0_0_18px_rgba(103,232,249,0.95)]"
+          />
+          <div class="absolute left-4 top-4 h-10 w-10 rounded-tl-xl border-l-4 border-t-4 border-cyan-300" />
+          <div class="absolute right-4 top-4 h-10 w-10 rounded-tr-xl border-r-4 border-t-4 border-cyan-300" />
+          <div class="absolute bottom-4 left-4 h-10 w-10 rounded-bl-xl border-b-4 border-l-4 border-cyan-300" />
+          <div class="absolute bottom-4 right-4 h-10 w-10 rounded-br-xl border-b-4 border-r-4 border-cyan-300" />
+          <div class="absolute inset-x-5 bottom-5 rounded-xl bg-slate-900/90 px-3 py-2 text-center text-xs font-medium leading-5 text-slate-200">
+            {{ isScanning ? 'Center the QR code and hold steady.' : 'The camera opens only after you tap scan.' }}
+          </div>
+        </div>
+
+        <div v-if="isLoading" class="mt-4" aria-live="polite">
+          <div class="flex items-center justify-between gap-3">
+            <span class="inline-flex items-center gap-2 text-sm font-semibold text-white">
+              <IconDownload class="h-5 w-5 animate-bounce text-cyan-200" />
+              Applying preview
+            </span>
+            <span class="text-sm font-semibold text-cyan-100">
+              {{ progressPercentage }}%
+            </span>
+          </div>
+          <div class="mt-3 h-2 overflow-hidden rounded-full bg-slate-800">
+            <div
+              class="h-full rounded-full bg-cyan-300 transition-all duration-300 ease-out"
+              :style="{ width: `${downloadProgress}%` }"
+            />
+          </div>
+          <p v-if="downloadHost" class="mt-3 text-xs text-slate-400">
+            Source: {{ downloadHost }}
+          </p>
+        </div>
+
+        <p v-if="statusMessage && !isLoading" class="mt-4 rounded-xl border border-cyan-300/20 bg-cyan-300/10 px-3 py-2 text-sm leading-6 text-cyan-100" aria-live="polite">
+          {{ statusMessage }}
+        </p>
+        <p v-if="errorMessage" class="mt-4 rounded-xl border border-amber-300/25 bg-amber-300/10 px-3 py-2 text-sm leading-6 text-amber-100" aria-live="polite">
+          {{ errorMessage }}
+        </p>
+      </section>
+
+      <details class="mt-4 rounded-2xl border border-white/10 bg-white/[0.06] p-4">
+        <summary class="flex cursor-pointer list-none items-center gap-3 text-sm font-semibold text-white">
+          <IconLink class="h-5 w-5 text-cyan-200" />
+          Paste a preview link
+        </summary>
+
+        <label class="mt-4 block text-sm font-medium text-slate-200" for="manual-url">
+          Preview link or bundle URL
+        </label>
+        <input
+          id="manual-url"
+          v-model="manualUrl"
+          type="url"
+          inputmode="url"
+          placeholder="capgo://preview/..."
+          class="mt-2 w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-3 text-sm text-white outline-hidden transition-colors placeholder:text-slate-500 focus:border-cyan-300/70"
+        >
+
+        <button
+          class="mt-3 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-cyan-300 px-4 py-2 text-sm font-semibold text-slate-950 transition-colors hover:bg-cyan-200 disabled:cursor-not-allowed disabled:opacity-50"
+          :disabled="!canSubmitManualUrl"
+          @click="submitManualUrl"
+        >
+          <IconDownload class="h-5 w-5" />
+          {{ manualActionLabel }}
+        </button>
+      </details>
+
+      <div class="fixed inset-x-0 bottom-0 z-20 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-5">
+        <div class="pointer-events-none absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-slate-950 via-slate-950/95 to-transparent" />
+        <div class="relative mx-auto max-w-md">
+          <button
+            v-if="isNativePlatform"
+            class="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-cyan-300 px-4 py-3 text-sm font-semibold text-slate-950 transition-colors hover:bg-cyan-200 disabled:cursor-not-allowed disabled:opacity-60"
+            :disabled="isScanning || isLoading"
+            @click="retryScanning"
+          >
+            <IconArrowPath v-if="errorMessage || statusMessage" class="h-5 w-5" />
+            <IconQrCode v-else class="h-5 w-5" />
+            {{ isScanning ? 'Camera open' : errorMessage || statusMessage ? 'Scan again' : 'Scan QR code' }}
+          </button>
+          <p v-else class="rounded-xl border border-white/10 bg-slate-900 px-3 py-3 text-center text-sm leading-6 text-slate-300">
+            Paste a preview link below to test from this browser.
+          </p>
+        </div>
+      </div>
     </div>
   </main>
 </template>
