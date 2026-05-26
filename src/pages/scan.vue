@@ -16,7 +16,6 @@ import IconArrowLeft from '~icons/heroicons/arrow-left-20-solid'
 import IconArrowPath from '~icons/heroicons/arrow-path-20-solid'
 import IconLink from '~icons/heroicons/link-20-solid'
 import IconQrCode from '~icons/heroicons/qr-code-20-solid'
-import IconShieldCheck from '~icons/heroicons/shield-check-20-solid'
 import { buildChannelPreviewLatestOptions, parseChannelPreviewDeepLink } from '~/services/previewLinks'
 import { useDisplayStore } from '~/stores/display'
 
@@ -31,47 +30,62 @@ const downloadProgress = ref(0)
 const scannedUrl = ref('')
 const errorMessage = ref('')
 const manualUrl = ref('')
+const statusMessage = ref('')
 
 let downloadListener: Awaited<ReturnType<typeof CapacitorUpdater.addListener>> | null = null
 
-function isValidUrl(value: string) {
-  if (!value)
-    return false
-
-  if (typeof URL.canParse === 'function')
-    return URL.canParse(value)
-
+function parseSafeUrl(value: string) {
   try {
-    const parsedUrl = new URL(value)
-    return !!parsedUrl.href
+    return new URL(value.trim())
   }
   catch {
-    return false
+    return null
   }
 }
 
-const isFallbackMode = computed(() => !isNativePlatform || !!errorMessage.value)
+function isHttpUrl(value: string) {
+  if (!value)
+    return false
+
+  const parsedUrl = parseSafeUrl(value)
+  return parsedUrl?.protocol === 'https:' || parsedUrl?.protocol === 'http:'
+}
+
 const progressPercentage = computed(() => Math.round(downloadProgress.value))
+const trimmedManualUrl = computed(() => manualUrl.value.trim())
+const manualPreviewLink = computed(() => parseChannelPreviewDeepLink(trimmedManualUrl.value))
 const normalizedManualUrl = computed(() => {
-  const value = manualUrl.value.trim()
+  const value = trimmedManualUrl.value
   if (!value)
     return ''
 
-  return /^https?:\/\//i.test(value) ? value : `https://${value}`
+  if (manualPreviewLink.value)
+    return value
+
+  return /^[a-z][a-z\d+.-]*:/i.test(value) ? value : `https://${value}`
 })
-const canSubmitManualUrl = computed(() => !isLoading.value && isValidUrl(normalizedManualUrl.value))
-const manualActionLabel = computed(() => (isNativePlatform ? 'Download update' : 'Open update URL'))
+const canSubmitManualUrl = computed(() => !isLoading.value && (!!manualPreviewLink.value || isHttpUrl(normalizedManualUrl.value)))
+const manualActionLabel = computed(() => {
+  if (manualPreviewLink.value)
+    return 'Start preview'
+  return isNativePlatform ? 'Download update' : 'Open update URL'
+})
 const scannerStatusLabel = computed(() => {
   if (isLoading.value)
     return 'Applying update'
   if (isScanning.value)
     return 'Camera active'
-  if (isFallbackMode.value)
-    return 'Manual fallback'
   return 'Ready'
 })
+const scannerTitle = computed(() => {
+  if (isLoading.value)
+    return 'Applying preview'
+  if (isScanning.value)
+    return 'Camera active'
+  return 'Ready to scan'
+})
 const downloadHost = computed(() => {
-  if (!scannedUrl.value || !isValidUrl(scannedUrl.value))
+  if (!scannedUrl.value || !isHttpUrl(scannedUrl.value))
     return ''
 
   return new URL(scannedUrl.value).host
@@ -87,12 +101,8 @@ onMounted(async () => {
     return
   }
 
-  if (isNativePlatform) {
-    await startScanner()
-    return
-  }
-
-  errorMessage.value = 'Live camera scanning is available in the iOS and Android app. Paste an update URL below to open it from this environment.'
+  if (!isNativePlatform)
+    statusMessage.value = 'Live camera scanning is available in the iOS and Android app. Paste a preview link or bundle URL below.'
 })
 
 onUnmounted(async () => {
@@ -111,6 +121,7 @@ async function startScanner() {
   try {
     isScanning.value = true
     errorMessage.value = ''
+    statusMessage.value = ''
     scannedUrl.value = ''
     manualUrl.value = ''
 
@@ -130,33 +141,35 @@ async function startScanner() {
       return
     }
 
-    errorMessage.value = 'No QR code was detected. Try again or paste the update URL manually.'
+    statusMessage.value = 'No QR code was detected. Tap scan when you are ready to try again.'
   }
   catch (error) {
     console.error('Failed to scan:', error)
-    errorMessage.value = 'The camera could not start. Check camera permissions, then try again or paste the update URL manually.'
+    errorMessage.value = 'The camera could not start. Check camera permissions, then tap scan again or paste the link manually.'
     isScanning.value = false
   }
 }
 
 async function handleBarcodeScan(scannedValue: string) {
-  const previewLink = parseChannelPreviewDeepLink(scannedValue)
+  const value = scannedValue.trim()
+  const previewLink = parseChannelPreviewDeepLink(value)
   if (previewLink) {
-    scannedUrl.value = scannedValue
+    scannedUrl.value = value
     manualUrl.value = ''
     await startChannelPreview(previewLink)
     return
   }
 
-  if (!isValidUrl(scannedValue)) {
-    errorMessage.value = 'The scanned QR code does not contain a valid update URL.'
-    toast.error('Scanned QR code is not a valid URL')
+  if (!isHttpUrl(value)) {
+    errorMessage.value = 'This QR code is not a Capgo preview link or an HTTPS bundle URL.'
+    manualUrl.value = value
+    toast.error('Scanned QR code is not a supported preview link')
     return
   }
 
-  scannedUrl.value = scannedValue
-  manualUrl.value = scannedValue
-  await downloadUpdate(scannedValue)
+  scannedUrl.value = value
+  manualUrl.value = value
+  await downloadUpdate(value)
 }
 
 async function startPreviewSession(appId?: string) {
@@ -176,7 +189,7 @@ async function startChannelPreview(previewLink: ReturnType<typeof parseChannelPr
       downloadProgress.value = state.percent || 0
     })
 
-    toast.success(`Switching to channel: ${previewLink.channelName}`)
+    toast.success('Starting preview')
 
     const latest = await CapacitorUpdater.getLatest(buildChannelPreviewLatestOptions(previewLink))
     if (!latest.url)
@@ -208,6 +221,18 @@ async function startChannelPreview(previewLink: ReturnType<typeof parseChannelPr
 }
 
 async function downloadUpdate(updateUrl: string) {
+  const previewLink = parseChannelPreviewDeepLink(updateUrl)
+  if (previewLink) {
+    await startChannelPreview(previewLink)
+    return
+  }
+
+  if (!isHttpUrl(updateUrl)) {
+    errorMessage.value = 'This is not a downloadable bundle URL. Use a Capgo preview QR code or an HTTPS bundle URL.'
+    toast.error('Unsupported update URL')
+    return
+  }
+
   try {
     isLoading.value = true
     downloadProgress.value = 0
@@ -243,12 +268,18 @@ async function downloadUpdate(updateUrl: string) {
 
 async function submitManualUrl() {
   if (!canSubmitManualUrl.value) {
-    toast.error('Enter a valid update URL')
+    toast.error('Enter a valid preview link or update URL')
     return
   }
 
   errorMessage.value = ''
+  statusMessage.value = ''
   scannedUrl.value = normalizedManualUrl.value
+
+  if (manualPreviewLink.value) {
+    await startChannelPreview(manualPreviewLink.value)
+    return
+  }
 
   if (!isNativePlatform) {
     toast.success(`Opening ${new URL(normalizedManualUrl.value).host}`)
@@ -261,6 +292,7 @@ async function submitManualUrl() {
 
 async function retryScanning() {
   errorMessage.value = ''
+  statusMessage.value = ''
   scannedUrl.value = ''
   manualUrl.value = ''
   downloadProgress.value = 0
@@ -278,9 +310,9 @@ async function goBack() {
 </script>
 
 <template>
-  <main class="min-h-screen overflow-hidden bg-slate-950 text-white">
+  <main class="min-h-dvh overflow-y-auto bg-slate-950 text-white">
     <div class="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(56,189,248,0.2),_transparent_36%),radial-gradient(circle_at_bottom_right,_rgba(59,130,246,0.18),_transparent_34%)]" />
-    <div class="relative mx-auto flex min-h-screen w-full max-w-md flex-col px-4 pb-8 pt-6 sm:px-6">
+    <div class="relative mx-auto flex min-h-dvh w-full max-w-md flex-col px-4 pb-8 pt-6 sm:px-6">
       <header class="rounded-[28px] border border-white/10 bg-white/[0.06] p-3 shadow-[0_18px_60px_rgba(15,23,42,0.32)] backdrop-blur">
         <div class="flex items-start justify-between gap-3">
           <button
@@ -295,10 +327,10 @@ async function goBack() {
               Release delivery
             </p>
             <h1 class="mt-2 text-2xl font-semibold tracking-tight text-white">
-              Scan an update QR code
+              Test a preview
             </h1>
             <p class="mt-2 text-sm leading-6 text-slate-300">
-              Load a live update bundle without leaving the app, then follow the install progress in one place.
+              Scan a Capgo preview QR code, then the app will fetch and apply the matching bundle.
             </p>
           </div>
           <span class="rounded-full border border-sky-300/25 bg-sky-400/10 px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.22em] text-sky-100">
@@ -315,7 +347,7 @@ async function goBack() {
               Scanner surface
             </p>
             <h2 class="mt-2 text-lg font-semibold text-white">
-              {{ isFallbackMode ? 'Paste the update link instead' : 'Align the QR code inside the frame' }}
+              {{ scannerTitle }}
             </h2>
           </div>
           <div class="rounded-2xl border border-white/10 bg-white/5 p-3 text-sky-200">
@@ -338,8 +370,27 @@ async function goBack() {
             <div class="absolute bottom-4 left-4 h-12 w-12 rounded-bl-[18px] border-b-4 border-l-4 border-sky-300" />
             <div class="absolute bottom-4 right-4 h-12 w-12 rounded-br-[18px] border-b-4 border-r-4 border-sky-300" />
             <div class="absolute inset-x-9 bottom-9 rounded-2xl border border-white/[0.08] bg-slate-950/[0.76] px-4 py-3 text-center text-xs font-medium leading-5 text-slate-300 backdrop-blur">
-              {{ isScanning ? 'Center the QR code and hold steady for a moment.' : 'Use the camera in the mobile app, or paste a full update URL below.' }}
+              {{ isScanning ? 'Center the QR code and hold steady.' : 'Read the steps, then tap scan when you are ready.' }}
             </div>
+          </div>
+
+          <div v-if="!isLoading" class="mt-5">
+            <button
+              v-if="isNativePlatform"
+              class="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-sky-400 via-cyan-300 to-blue-500 px-4 py-3 text-sm font-semibold text-slate-950 transition-transform duration-200 hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
+              :disabled="isScanning"
+              @click="retryScanning"
+            >
+              <IconQrCode class="h-5 w-5" />
+              {{ isScanning ? 'Camera open' : 'Scan QR code' }}
+            </button>
+            <p
+              v-if="statusMessage"
+              class="mt-3 rounded-2xl border border-sky-300/20 bg-sky-400/10 px-4 py-3 text-sm leading-6 text-sky-100"
+              aria-live="polite"
+            >
+              {{ statusMessage }}
+            </p>
           </div>
 
           <div v-if="isLoading" class="mt-5 rounded-[24px] border border-sky-300/20 bg-sky-400/[0.08] p-4" aria-live="polite">
@@ -378,7 +429,7 @@ async function goBack() {
                 Scanner mode
               </p>
               <p class="mt-2 text-sm leading-6 text-slate-200">
-                {{ isNativePlatform ? 'Use the camera to capture a signed update URL from another screen or device.' : 'This environment cannot open the device camera, so manual entry is enabled instead.' }}
+                {{ isNativePlatform ? 'The camera opens only after you tap scan.' : 'This environment cannot open the device camera, so manual entry is enabled instead.' }}
               </p>
             </div>
             <div class="rounded-[24px] border border-white/[0.08] bg-white/5 p-4">
@@ -387,8 +438,8 @@ async function goBack() {
               </p>
               <p class="mt-2 text-sm leading-6 text-slate-200">
                 {{ isNativePlatform
-                  ? 'The app downloads the bundle, switches to the new version, and reloads automatically when the update is ready.'
-                  : 'This page can open the bundle URL in the browser, but applying the update still requires the native app.' }}
+                  ? 'Preview QR codes resolve to a downloadable bundle before install.'
+                  : 'Applying an update still requires the native app.' }}
               </p>
             </div>
           </div>
@@ -401,10 +452,10 @@ async function goBack() {
             </div>
             <div>
               <p class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
-                Manual fallback
+                Paste link
               </p>
               <h3 class="mt-1 text-base font-semibold text-white">
-                Paste a full bundle URL
+                Paste a preview link or bundle URL
               </h3>
             </div>
           </div>
@@ -441,44 +492,10 @@ async function goBack() {
               @click="retryScanning"
             >
               <IconArrowPath class="h-5 w-5" />
-              Retry camera scan
+              Scan QR code
             </button>
           </div>
         </div>
-      </section>
-
-      <section class="mt-5 grid gap-3 sm:grid-cols-2">
-        <article class="rounded-[24px] border border-white/[0.08] bg-white/5 p-4">
-          <div class="flex items-center gap-3">
-            <div class="rounded-2xl border border-white/10 bg-white/[0.08] p-3 text-sky-200">
-              <IconQrCode class="h-5 w-5" />
-            </div>
-            <div>
-              <p class="text-sm font-semibold text-white">
-                Best scan results
-              </p>
-              <p class="mt-1 text-sm leading-6 text-slate-300">
-                Use a bright screen, avoid motion blur, and keep the full QR code inside the frame.
-              </p>
-            </div>
-          </div>
-        </article>
-
-        <article class="rounded-[24px] border border-white/[0.08] bg-white/5 p-4">
-          <div class="flex items-center gap-3">
-            <div class="rounded-2xl border border-white/10 bg-white/[0.08] p-3 text-emerald-200">
-              <IconShieldCheck class="h-5 w-5" />
-            </div>
-            <div>
-              <p class="text-sm font-semibold text-white">
-                Safer rollout check
-              </p>
-              <p class="mt-1 text-sm leading-6 text-slate-300">
-                Verify the source before installing. Only use bundle URLs from your trusted release workflow.
-              </p>
-            </div>
-          </div>
-        </article>
       </section>
     </div>
   </main>

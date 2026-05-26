@@ -135,7 +135,7 @@ function openExternal() {
 </script>
 
 <template>
-  <div class="relative w-full h-full p-4 md:p-8">
+  <div class="relative min-h-[calc(100dvh-8rem)] w-full overflow-y-auto px-3 py-4 md:px-6 md:py-6">
     <!-- Open in external button -->
     <button
       class="absolute z-10 p-2 transition-colors bg-white rounded-lg shadow-lg top-4 right-4 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700"
@@ -147,9 +147,9 @@ function openExternal() {
     </button>
 
     <!-- Main content container -->
-    <div class="flex items-center justify-center h-full gap-8">
+    <div class="grid min-h-full items-start gap-5 lg:grid-cols-[minmax(0,1fr)_16rem]">
       <!-- Device frame -->
-      <div class="flex flex-col items-center">
+      <div class="flex min-w-0 flex-col items-center">
         <!-- Device selector -->
         <div class="flex items-center gap-2 mb-4">
           <button
@@ -176,11 +176,11 @@ function openExternal() {
 
         <!-- Phone frame -->
         <div
-          class="relative p-3 bg-gray-900 shadow-2xl"
+          class="relative max-w-full p-3 bg-gray-900 shadow-2xl"
           :class="currentDevice.frameClass"
           :style="{
             width: `${currentDevice.width + 24}px`,
-            height: `${Math.min(currentDevice.height + 24, 700)}px`,
+            height: `min(${Math.min(currentDevice.height + 24, 700)}px, calc(100dvh - 13rem))`,
           }"
         >
           <!-- Notch (for iPhone) -->
@@ -212,12 +212,12 @@ function openExternal() {
       <!-- QR Code section (desktop only) -->
       <div
         v-if="!isMobile && qrCodeDataUrl"
-        class="flex flex-col items-center p-6 bg-white shadow-lg dark:bg-gray-800 rounded-xl"
+        class="sticky top-4 flex w-full flex-col items-center rounded-xl bg-white p-5 shadow-lg dark:bg-gray-800"
       >
         <img
           :src="qrCodeDataUrl"
           alt="QR Code to preview on phone"
-          class="mb-3 w-36 h-36"
+          class="mb-3 h-44 w-44"
         >
         <p class="text-sm text-center text-gray-600 dark:text-gray-400 max-w-40">
           {{ t('scan-qr-to-preview') }}

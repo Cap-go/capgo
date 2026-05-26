@@ -46,4 +46,19 @@ describe('channel preview deep links', () => {
       preview: true,
     })
   })
+
+  it.concurrent('parses scanned native preview links robustly', () => {
+    expect(parseChannelPreviewDeepLink(' capgo://preview/channel?appId=app.capgo.capacitor.navigation&channel=production&channelId=36706 ')).toEqual({
+      type: 'channel',
+      appId: 'app.capgo.capacitor.navigation',
+      channelId: 36706,
+      channelName: 'production',
+    })
+    expect(parseChannelPreviewDeepLink('capgo:/preview/channel?appId=app.capgo.capacitor.navigation&channel=production&channelId=36706')).toEqual({
+      type: 'channel',
+      appId: 'app.capgo.capacitor.navigation',
+      channelId: 36706,
+      channelName: 'production',
+    })
+  })
 })

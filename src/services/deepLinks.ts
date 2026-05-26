@@ -19,10 +19,14 @@ function isCapgoConsoleHost(hostname: string) {
 }
 
 function handleDeepLink(router: Router, rawUrl: string) {
-  if (!URL.canParse(rawUrl))
+  let url: URL
+  try {
+    url = new URL(rawUrl.trim())
+  }
+  catch {
     return
+  }
 
-  const url = new URL(rawUrl)
   if (parseChannelPreviewDeepLink(rawUrl)) {
     routePreviewLink(router, rawUrl)
     return

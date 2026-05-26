@@ -10,7 +10,7 @@ const CHANNEL_PREVIEW_SCHEME_URL = 'capgo://preview/channel'
 
 function parseUrl(value: string): URL | null {
   try {
-    return new URL(value)
+    return new URL(value.trim())
   }
   catch {
     return null

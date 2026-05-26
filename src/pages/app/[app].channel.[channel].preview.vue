@@ -204,7 +204,7 @@ watchEffect(async () => {
       </p>
     </div>
 
-    <div v-else-if="previewState === 'ready'" class="w-full h-full">
+    <div v-else-if="previewState === 'ready'" class="h-full min-h-0 w-full overflow-y-auto">
       <BundlePreviewFrame
         :app-id="packageId"
         :channel-id="id"
