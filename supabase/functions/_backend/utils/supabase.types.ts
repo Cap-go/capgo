@@ -1635,6 +1635,51 @@ export type Database = {
           },
         ]
       }
+      onboarding_demo_data: {
+        Row: {
+          app_id: string
+          created_at: string
+          id: string
+          owner_org: string
+          relation_name: string
+          row_key: string
+          seed_id: string
+        }
+        Insert: {
+          app_id: string
+          created_at?: string
+          id?: string
+          owner_org: string
+          relation_name: string
+          row_key: string
+          seed_id: string
+        }
+        Update: {
+          app_id?: string
+          created_at?: string
+          id?: string
+          owner_org?: string
+          relation_name?: string
+          row_key?: string
+          seed_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "onboarding_demo_data_app_id_fkey"
+            columns: ["app_id"]
+            isOneToOne: false
+            referencedRelation: "apps"
+            referencedColumns: ["app_id"]
+          },
+          {
+            foreignKeyName: "onboarding_demo_data_owner_org_fkey"
+            columns: ["owner_org"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       org_metrics_cache: {
         Row: {
           bandwidth: number
@@ -3087,7 +3132,11 @@ export type Database = {
       }
       check_revert_to_builtin_version: {
         Args: { appid: string }
-        Returns: number | null
+        Returns: number
+      }
+      claim_legacy_onboarding_demo_data: {
+        Args: { p_app_uuid: string }
+        Returns: undefined
       }
       cleanup_expired_apikeys: { Args: never; Returns: undefined }
       cleanup_expired_demo_apps: { Args: never; Returns: undefined }
@@ -3924,13 +3973,22 @@ export type Database = {
         Returns: boolean
       }
       is_allowed_action_org: { Args: { orgid: string }; Returns: boolean }
-      is_allowed_action_org_action: {
-        Args: {
-          actions: Database["public"]["Enums"]["action_type"][]
-          orgid: string
-        }
-        Returns: boolean
-      }
+      is_allowed_action_org_action:
+        | {
+            Args: {
+              actions: Database["public"]["Enums"]["action_type"][]
+              orgid: string
+            }
+            Returns: boolean
+          }
+        | {
+            Args: {
+              actions: Database["public"]["Enums"]["action_type"][]
+              appid: string
+              orgid: string
+            }
+            Returns: boolean
+          }
       is_allowed_capgkey:
         | {
             Args: {
@@ -3978,13 +4036,22 @@ export type Database = {
       is_onboarding_needed_org: { Args: { orgid: string }; Returns: boolean }
       is_org_yearly: { Args: { orgid: string }; Returns: boolean }
       is_paying_and_good_plan_org: { Args: { orgid: string }; Returns: boolean }
-      is_paying_and_good_plan_org_action: {
-        Args: {
-          actions: Database["public"]["Enums"]["action_type"][]
-          orgid: string
-        }
-        Returns: boolean
-      }
+      is_paying_and_good_plan_org_action:
+        | {
+            Args: {
+              actions: Database["public"]["Enums"]["action_type"][]
+              orgid: string
+            }
+            Returns: boolean
+          }
+        | {
+            Args: {
+              actions: Database["public"]["Enums"]["action_type"][]
+              appid: string
+              orgid: string
+            }
+            Returns: boolean
+          }
       is_paying_org: { Args: { orgid: string }; Returns: boolean }
       is_platform_admin:
         | { Args: never; Returns: boolean }
@@ -4048,6 +4115,14 @@ export type Database = {
             Args: { batch_size?: number; queue_names: string[] }
             Returns: undefined
           }
+      process_queue_with_healthcheck: {
+        Args: {
+          batch_size: number
+          healthcheck_url: string
+          queue_names: string[]
+        }
+        Returns: undefined
+      }
       process_stats_email_monthly: { Args: never; Returns: undefined }
       process_stats_email_weekly: { Args: never; Returns: undefined }
       process_subscribed_orgs: { Args: never; Returns: undefined }
@@ -4329,6 +4404,10 @@ export type Database = {
         Args: { p_user_id: string }
         Returns: string
       }
+      refresh_app_rollups_after_demo_reset: {
+        Args: { p_app_id: string; p_app_uuid: string; p_owner_org: string }
+        Returns: undefined
+      }
       refresh_orgs_has_usage_credits: { Args: never; Returns: undefined }
       regenerate_hashed_apikey: {
         Args: { p_apikey_id: number }
@@ -4424,6 +4503,10 @@ export type Database = {
         Args: { email: string; org_id: string }
         Returns: string
       }
+      reset_onboarding_demo_app_data: {
+        Args: { p_app_uuid: string }
+        Returns: undefined
+      }
       restore_deleted_account: { Args: never; Returns: undefined }
       resync_org_user_role_bindings: {
         Args: { p_org_id: string; p_user_id: string }
@@ -4492,6 +4575,16 @@ export type Database = {
         }[]
       }
       total_bundle_storage_bytes: { Args: never; Returns: number }
+      track_onboarding_demo_data: {
+        Args: {
+          p_app_id: string
+          p_owner_org: string
+          p_relation_name: string
+          p_row_keys: string[]
+          p_seed_id: string
+        }
+        Returns: undefined
+      }
       transfer_app: {
         Args: { p_app_id: string; p_new_org_id: string }
         Returns: undefined
