@@ -6,6 +6,22 @@ import {
 } from '../src/services/previewLinks.ts'
 
 describe('channel preview deep links', () => {
+  it.concurrent('generates compact capgo channel preview links by default', () => {
+    const previewUrl = buildChannelPreviewDeepLink({
+      appId: 'com.example.other-user-app',
+      channelId: 42,
+      channelName: 'preview',
+    })
+
+    expect(previewUrl).toBe('capgo://preview/channel?appId=com.example.other-user-app&channel=preview&channelId=42')
+    expect(parseChannelPreviewDeepLink(previewUrl)).toEqual({
+      type: 'channel',
+      appId: 'com.example.other-user-app',
+      channelId: 42,
+      channelName: 'preview',
+    })
+  })
+
   it.concurrent('requests updater preview mode for generated channel preview links', () => {
     const previewUrl = buildChannelPreviewDeepLink({
       appId: 'com.example.other-user-app',

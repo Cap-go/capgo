@@ -6,6 +6,16 @@ export interface ChannelPreviewLink {
 }
 
 const CHANNEL_PREVIEW_PATH = '/preview/channel'
+const CHANNEL_PREVIEW_SCHEME_URL = 'capgo://preview/channel'
+
+function parseUrl(value: string): URL | null {
+  try {
+    return new URL(value)
+  }
+  catch {
+    return null
+  }
+}
 
 function getPreviewPath(url: URL) {
   if (url.protocol !== 'capgo:')
@@ -21,7 +31,9 @@ export function buildChannelPreviewDeepLink(options: {
   channelName: string
   origin?: string
 }) {
-  const url = new URL(CHANNEL_PREVIEW_PATH, options.origin ?? window.location.origin)
+  const url = options.origin
+    ? new URL(CHANNEL_PREVIEW_PATH, options.origin)
+    : new URL(CHANNEL_PREVIEW_SCHEME_URL)
   url.searchParams.set('appId', options.appId)
   url.searchParams.set('channel', options.channelName)
   if (typeof options.channelId === 'number')
@@ -30,10 +42,10 @@ export function buildChannelPreviewDeepLink(options: {
 }
 
 export function parseChannelPreviewDeepLink(value: string): ChannelPreviewLink | null {
-  if (!URL.canParse(value))
+  const url = parseUrl(value)
+  if (!url)
     return null
 
-  const url = new URL(value)
   if (getPreviewPath(url) !== CHANNEL_PREVIEW_PATH)
     return null
 

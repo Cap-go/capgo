@@ -1,6 +1,11 @@
 <script setup lang="ts">
 import type { DownloadEvent } from '@capgo/capacitor-updater'
-import { CapacitorBarcodeScanner } from '@capacitor/barcode-scanner'
+import {
+  CapacitorBarcodeScanner,
+  CapacitorBarcodeScannerCameraDirection,
+  CapacitorBarcodeScannerScanOrientation,
+  CapacitorBarcodeScannerTypeHint,
+} from '@capacitor/barcode-scanner'
 import { Capacitor } from '@capacitor/core'
 import { CapacitorUpdater } from '@capgo/capacitor-updater'
 import { computed, onMounted, onUnmounted, ref } from 'vue'
@@ -110,7 +115,12 @@ async function startScanner() {
     manualUrl.value = ''
 
     const result = await CapacitorBarcodeScanner.scanBarcode({
-      hint: 0,
+      hint: CapacitorBarcodeScannerTypeHint.QR_CODE,
+      scanInstructions: 'Scan the preview QR code',
+      scanButton: false,
+      scanText: '',
+      cameraDirection: CapacitorBarcodeScannerCameraDirection.BACK,
+      scanOrientation: CapacitorBarcodeScannerScanOrientation.ADAPTIVE,
     })
 
     isScanning.value = false
@@ -186,7 +196,10 @@ async function startChannelPreview(previewLink: ReturnType<typeof parseChannelPr
   }
   catch (error) {
     console.error('Failed to start channel preview:', error)
-    toast.error(`Failed to start preview: ${error}`)
+    const message = error instanceof Error ? error.message : String(error)
+    errorMessage.value = `Failed to start preview: ${message}`
+    manualUrl.value = scannedUrl.value
+    toast.error(errorMessage.value)
   }
   finally {
     isLoading.value = false
