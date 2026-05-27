@@ -14,6 +14,13 @@ extract_timestamp() {
   fi
 }
 
+is_allowed_modified_migration() {
+  local file="$1"
+  local allowed_migrations=",${ALLOW_MODIFIED_SUPABASE_MIGRATIONS:-},"
+
+  [[ "$allowed_migrations" == *,"$file",* ]]
+}
+
 resolve_target_branch() {
   if [[ -n "${GITHUB_BASE_REF:-}" ]]; then
     echo "${GITHUB_BASE_REF}"
@@ -89,13 +96,28 @@ status=0
 
 modified_files="$(git diff --name-only --diff-filter=MR "${base_ref}...HEAD" -- 'supabase/migrations/*.sql')"
 if [[ -n "$modified_files" ]]; then
-  echo '❌ Existing Supabase migrations were modified in this change.'
-  echo '  Create a new migration instead of editing committed migration files.'
+  disallowed_modified_files=''
+
   while IFS= read -r file; do
     [[ -z "$file" ]] && continue
-    echo "  - $file"
+
+    if is_allowed_modified_migration "$file"; then
+      echo "⚠️  Allowing modified Supabase migration for this hotfix: $file"
+      continue
+    fi
+
+    disallowed_modified_files+="${file}"$'\n'
   done <<< "$modified_files"
-  status=1
+
+  if [[ -n "$disallowed_modified_files" ]]; then
+    echo '❌ Existing Supabase migrations were modified in this change.'
+    echo '  Create a new migration instead of editing committed migration files.'
+    while IFS= read -r file; do
+      [[ -z "$file" ]] && continue
+      echo "  - $file"
+    done <<< "$disallowed_modified_files"
+    status=1
+  fi
 fi
 
 deleted_files="$(git diff --name-only --diff-filter=D "${base_ref}...HEAD" -- 'supabase/migrations/*.sql')"
