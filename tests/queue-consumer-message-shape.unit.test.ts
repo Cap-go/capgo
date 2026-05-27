@@ -3,16 +3,6 @@ import { describe, expect, it, vi } from 'vitest'
 import { __queueConsumerTestUtils__, MAX_QUEUE_READS, messagesArraySchema } from '../supabase/functions/_backend/triggers/queue_consumer.ts'
 import { parseSchema } from '../supabase/functions/_backend/utils/ark_validation.ts'
 
-function createHealthcheckDb(queueLength: number) {
-  return {
-    db: {
-      query: vi.fn(async <T = Record<string, unknown>>(): Promise<{ rows: T[] }> => ({
-        rows: [{ queue_length: String(queueLength) } as T],
-      })),
-    },
-  }
-}
-
 describe('queue_consumer legacy message compatibility', () => {
   it.concurrent('uses the payload envelope when it is present', () => {
     const [message] = parseSchema(messagesArraySchema, [
@@ -214,14 +204,12 @@ describe('queue_consumer legacy message compatibility', () => {
     expect(details.bodyPreview).toContain('"queueName":"on_manifest_create"')
   })
 
-  it.concurrent('calls the healthcheck URL when the worker succeeds and the queue is empty', async () => {
-    const { db } = createHealthcheckDb(0)
+  it.concurrent('calls the healthcheck URL when the worker succeeds', async () => {
     const fetchImpl = vi.fn(async () => new Response(null, { status: 200 })) as unknown as typeof fetch
 
     const reported = await __queueConsumerTestUtils__.maybePingCronHealthcheck(
-      db as never,
-      'cron_email',
       {
+        actionableFailureCount: 0,
         archivedCount: 0,
         failedCount: 0,
         processedCount: 1,
@@ -257,14 +245,12 @@ describe('queue_consumer legacy message compatibility', () => {
     }))
   })
 
-  it.concurrent('does not call the healthcheck URL when queue work remains', async () => {
-    const { db } = createHealthcheckDb(2)
+  it.concurrent('calls the healthcheck URL when successful queue work remains', async () => {
     const fetchImpl = vi.fn(async () => new Response(null, { status: 200 })) as unknown as typeof fetch
 
     const reported = await __queueConsumerTestUtils__.maybePingCronHealthcheck(
-      db as never,
-      'cron_email',
       {
+        actionableFailureCount: 0,
         archivedCount: 0,
         failedCount: 0,
         processedCount: 1,
@@ -277,18 +263,16 @@ describe('queue_consumer legacy message compatibility', () => {
       fetchImpl,
     )
 
-    expect(reported).toBe(false)
-    expect(fetchImpl).not.toHaveBeenCalled()
+    expect(reported).toBe(true)
+    expect(fetchImpl).toHaveBeenCalledTimes(1)
   })
 
   it.concurrent('returns false when the healthcheck URL responds with an error', async () => {
-    const { db } = createHealthcheckDb(0)
     const fetchImpl = vi.fn(async () => new Response(null, { status: 500 })) as unknown as typeof fetch
 
     const reported = await __queueConsumerTestUtils__.maybePingCronHealthcheck(
-      db as never,
-      'cron_email',
       {
+        actionableFailureCount: 0,
         archivedCount: 0,
         failedCount: 0,
         processedCount: 1,
@@ -305,14 +289,34 @@ describe('queue_consumer legacy message compatibility', () => {
     expect(fetchImpl).toHaveBeenCalledTimes(1)
   })
 
-  it.concurrent('does not call the healthcheck URL when the worker failed', async () => {
-    const { db } = createHealthcheckDb(0)
+  it.concurrent('calls the healthcheck URL for retryable message failures', async () => {
     const fetchImpl = vi.fn(async () => new Response(null, { status: 200 })) as unknown as typeof fetch
 
     const reported = await __queueConsumerTestUtils__.maybePingCronHealthcheck(
-      db as never,
-      'cron_email',
       {
+        actionableFailureCount: 0,
+        archivedCount: 0,
+        failedCount: 1,
+        processedCount: 1,
+        readSucceeded: true,
+        skippedCount: 0,
+        success: false,
+        successCount: 0,
+      },
+      'https://example.com/healthcheck',
+      fetchImpl,
+    )
+
+    expect(reported).toBe(true)
+    expect(fetchImpl).toHaveBeenCalledTimes(1)
+  })
+
+  it.concurrent('does not call the healthcheck URL when the worker had actionable failures', async () => {
+    const fetchImpl = vi.fn(async () => new Response(null, { status: 200 })) as unknown as typeof fetch
+
+    const reported = await __queueConsumerTestUtils__.maybePingCronHealthcheck(
+      {
+        actionableFailureCount: 1,
         archivedCount: 0,
         failedCount: 1,
         processedCount: 1,
