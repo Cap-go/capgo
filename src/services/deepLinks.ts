@@ -1,7 +1,7 @@
 import type { Router } from 'vue-router'
 import { App as CapacitorApp } from '@capacitor/app'
 import { Capacitor } from '@capacitor/core'
-import { parseChannelPreviewDeepLink } from '~/services/previewLinks'
+import { parsePreviewDeepLink } from '~/services/previewLinks'
 
 function routePreviewLink(router: Router, url: string) {
   router.push({
@@ -27,7 +27,7 @@ function handleDeepLink(router: Router, rawUrl: string) {
     return
   }
 
-  if (parseChannelPreviewDeepLink(rawUrl)) {
+  if (parsePreviewDeepLink(rawUrl)) {
     routePreviewLink(router, rawUrl)
     return
   }

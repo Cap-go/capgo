@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import type { DownloadEvent } from '@capgo/capacitor-updater'
+import type { DownloadEvent, DownloadOptions } from '@capgo/capacitor-updater'
+import type { PreviewDeepLink } from '~/services/previewLinks'
 import {
   CapacitorBarcodeScanner,
   CapacitorBarcodeScannerCameraDirection,
@@ -16,7 +17,7 @@ import IconArrowLeft from '~icons/heroicons/arrow-left-20-solid'
 import IconArrowPath from '~icons/heroicons/arrow-path-20-solid'
 import IconLink from '~icons/heroicons/link-20-solid'
 import IconQrCode from '~icons/heroicons/qr-code-20-solid'
-import { buildChannelPreviewLatestOptions, parseChannelPreviewDeepLink } from '~/services/previewLinks'
+import { buildChannelPreviewLatestOptions, parsePreviewDeepLink } from '~/services/previewLinks'
 import { useDisplayStore } from '~/stores/display'
 
 const route = useRoute()
@@ -33,6 +34,14 @@ const manualUrl = ref('')
 const statusMessage = ref('')
 
 let downloadListener: Awaited<ReturnType<typeof CapacitorUpdater.addListener>> | null = null
+
+interface PreviewPayload {
+  version?: string
+  url?: string
+  checksum?: string | null
+  sessionKey?: string | null
+  manifest?: DownloadOptions['manifest']
+}
 
 function parseSafeUrl(value: string) {
   try {
@@ -51,9 +60,24 @@ function isHttpUrl(value: string) {
   return parsedUrl?.protocol === 'https:' || parsedUrl?.protocol === 'http:'
 }
 
+function isPreviewHost(hostname: string) {
+  return /^[^.]+\.preview(?:\.[^.]+)?\.(?:capgo\.app|usecapgo\.com)$/.test(hostname)
+}
+
+function previewPayloadUrlFromUrl(value: string) {
+  const parsedUrl = parseSafeUrl(value)
+  if (!parsedUrl || (parsedUrl.protocol !== 'https:' && parsedUrl.protocol !== 'http:'))
+    return ''
+
+  if (!isPreviewHost(parsedUrl.hostname))
+    return ''
+
+  return new URL('/.capgo/preview.json', parsedUrl.origin).toString()
+}
+
 const progressPercentage = computed(() => Math.round(downloadProgress.value))
 const trimmedManualUrl = computed(() => manualUrl.value.trim())
-const manualPreviewLink = computed(() => parseChannelPreviewDeepLink(trimmedManualUrl.value))
+const manualPreviewLink = computed(() => parsePreviewDeepLink(trimmedManualUrl.value))
 const normalizedManualUrl = computed(() => {
   const value = trimmedManualUrl.value
   if (!value)
@@ -64,9 +88,10 @@ const normalizedManualUrl = computed(() => {
 
   return /^[a-z][a-z\d+.-]*:/i.test(value) ? value : `https://${value}`
 })
-const canSubmitManualUrl = computed(() => !isLoading.value && (!!manualPreviewLink.value || isHttpUrl(normalizedManualUrl.value)))
+const manualPreviewPayloadUrl = computed(() => previewPayloadUrlFromUrl(normalizedManualUrl.value))
+const canSubmitManualUrl = computed(() => !isLoading.value && (!!manualPreviewLink.value || !!manualPreviewPayloadUrl.value || isHttpUrl(normalizedManualUrl.value)))
 const manualActionLabel = computed(() => {
-  if (manualPreviewLink.value)
+  if (manualPreviewLink.value || manualPreviewPayloadUrl.value)
     return 'Start preview'
   return isNativePlatform ? 'Download update' : 'Open update URL'
 })
@@ -152,11 +177,19 @@ async function startScanner() {
 
 async function handleBarcodeScan(scannedValue: string) {
   const value = scannedValue.trim()
-  const previewLink = parseChannelPreviewDeepLink(value)
+  const previewLink = parsePreviewDeepLink(value)
   if (previewLink) {
     scannedUrl.value = value
     manualUrl.value = ''
-    await startChannelPreview(previewLink)
+    await startPreviewLink(previewLink)
+    return
+  }
+
+  const previewPayloadUrl = previewPayloadUrlFromUrl(value)
+  if (previewPayloadUrl) {
+    scannedUrl.value = value
+    manualUrl.value = value
+    await startPreviewPayload(previewPayloadUrl)
     return
   }
 
@@ -172,14 +205,100 @@ async function handleBarcodeScan(scannedValue: string) {
   await downloadUpdate(value)
 }
 
-async function startPreviewSession(appId?: string) {
-  await CapacitorUpdater.startPreviewSession({ appId })
+async function startPreviewSession() {
+  await CapacitorUpdater.startPreviewSession()
 }
 
-async function startChannelPreview(previewLink: ReturnType<typeof parseChannelPreviewDeepLink>) {
-  if (!previewLink)
-    return
+async function previewPayloadFromResponse(response: Response): Promise<PreviewPayload> {
+  const text = await response.text()
+  let payload: unknown
+  try {
+    payload = JSON.parse(text)
+  }
+  catch {
+    throw new Error(text || `Preview payload request failed with HTTP ${response.status}`)
+  }
 
+  if (!response.ok) {
+    const message = typeof payload === 'object' && payload && 'message' in payload
+      ? String((payload as { message?: unknown }).message)
+      : `Preview payload request failed with HTTP ${response.status}`
+    throw new Error(message)
+  }
+
+  if (!payload || typeof payload !== 'object')
+    throw new Error('Preview payload is invalid')
+
+  return payload as PreviewPayload
+}
+
+async function fetchPreviewPayload(payloadUrl: string) {
+  const response = await fetch(payloadUrl, {
+    headers: { Accept: 'application/json' },
+  })
+  const payload = await previewPayloadFromResponse(response)
+  if (!payload.version)
+    throw new Error('Preview payload is missing a version')
+  if (!payload.url && !payload.manifest?.length)
+    throw new Error('Preview payload is missing download information')
+  return payload
+}
+
+function downloadOptionsFromPreviewPayload(payload: PreviewPayload): DownloadOptions {
+  if (!payload.version)
+    throw new Error('Preview payload is missing a version')
+
+  return {
+    checksum: payload.checksum ?? undefined,
+    manifest: payload.manifest,
+    sessionKey: payload.sessionKey ?? undefined,
+    url: payload.url || 'https://404.capgo.app/no.zip',
+    version: payload.version,
+  }
+}
+
+async function startPreviewPayload(payloadUrl: string) {
+  try {
+    isLoading.value = true
+    downloadProgress.value = 0
+
+    await removeDownloadListener()
+    downloadListener = await CapacitorUpdater.addListener('download', (state: DownloadEvent) => {
+      downloadProgress.value = state.percent || 0
+    })
+
+    toast.success('Starting preview')
+
+    const payload = await fetchPreviewPayload(payloadUrl)
+    const bundle = await CapacitorUpdater.download(downloadOptionsFromPreviewPayload(payload))
+
+    await startPreviewSession()
+    await CapacitorUpdater.set(bundle)
+  }
+  catch (error) {
+    console.error('Failed to start preview:', error)
+    const message = error instanceof Error ? error.message : String(error)
+    errorMessage.value = `Failed to start preview: ${message}`
+    manualUrl.value = scannedUrl.value
+    toast.error(errorMessage.value)
+  }
+  finally {
+    isLoading.value = false
+    await removeDownloadListener()
+  }
+}
+
+async function startPreviewLink(previewLink: PreviewDeepLink) {
+  if (previewLink.payloadUrl) {
+    await startPreviewPayload(previewLink.payloadUrl)
+    return
+  }
+
+  if (previewLink.type === 'channel')
+    await startChannelPreview(previewLink)
+}
+
+async function startChannelPreview(previewLink: Extract<PreviewDeepLink, { type: 'channel' }>) {
   try {
     isLoading.value = true
     downloadProgress.value = 0
@@ -195,8 +314,6 @@ async function startChannelPreview(previewLink: ReturnType<typeof parseChannelPr
     if (!latest.url)
       throw new Error(latest.message || latest.error || 'No preview update is available for this channel')
 
-    await startPreviewSession(previewLink.appId)
-
     const bundle = await CapacitorUpdater.download({
       checksum: latest.checksum,
       manifest: latest.manifest,
@@ -205,6 +322,7 @@ async function startChannelPreview(previewLink: ReturnType<typeof parseChannelPr
       version: latest.version,
     })
 
+    await startPreviewSession()
     await CapacitorUpdater.set(bundle)
   }
   catch (error) {
@@ -221,9 +339,15 @@ async function startChannelPreview(previewLink: ReturnType<typeof parseChannelPr
 }
 
 async function downloadUpdate(updateUrl: string) {
-  const previewLink = parseChannelPreviewDeepLink(updateUrl)
+  const previewLink = parsePreviewDeepLink(updateUrl)
   if (previewLink) {
-    await startChannelPreview(previewLink)
+    await startPreviewLink(previewLink)
+    return
+  }
+
+  const previewPayloadUrl = previewPayloadUrlFromUrl(updateUrl)
+  if (previewPayloadUrl) {
+    await startPreviewPayload(previewPayloadUrl)
     return
   }
 
@@ -251,6 +375,7 @@ async function downloadUpdate(updateUrl: string) {
 
     toast.success('Download completed. Applying update...')
 
+    await startPreviewSession()
     await CapacitorUpdater.set(bundle)
 
     toast.success('Update applied. The app will reload automatically.')
@@ -277,7 +402,12 @@ async function submitManualUrl() {
   scannedUrl.value = normalizedManualUrl.value
 
   if (manualPreviewLink.value) {
-    await startChannelPreview(manualPreviewLink.value)
+    await startPreviewLink(manualPreviewLink.value)
+    return
+  }
+
+  if (manualPreviewPayloadUrl.value) {
+    await startPreviewPayload(manualPreviewPayloadUrl.value)
     return
   }
 

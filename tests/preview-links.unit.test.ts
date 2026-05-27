@@ -1,28 +1,32 @@
 import { describe, expect, it } from 'vitest'
 import {
+  buildBundlePreviewDeepLink,
   buildChannelPreviewDeepLink,
   buildChannelPreviewLatestOptions,
   parseChannelPreviewDeepLink,
+  parsePreviewDeepLink,
 } from '../src/services/previewLinks.ts'
 
 describe('channel preview deep links', () => {
-  it.concurrent('generates compact capgo channel preview links by default', () => {
+  it.concurrent('generates payload-backed capgo channel preview links', () => {
     const previewUrl = buildChannelPreviewDeepLink({
       appId: 'com.example.other-user-app',
       channelId: 42,
       channelName: 'preview',
+      payloadUrl: 'https://c42-com_u2eexample.preview.capgo.app/.capgo/preview.json',
     })
 
-    expect(previewUrl).toBe('capgo://preview/channel?appId=com.example.other-user-app&channel=preview&channelId=42')
+    expect(previewUrl).toBe('capgo://preview/channel?appId=com.example.other-user-app&channel=preview&channelId=42&url=https%3A%2F%2Fc42-com_u2eexample.preview.capgo.app%2F.capgo%2Fpreview.json')
     expect(parseChannelPreviewDeepLink(previewUrl)).toEqual({
       type: 'channel',
       appId: 'com.example.other-user-app',
       channelId: 42,
       channelName: 'preview',
+      payloadUrl: 'https://c42-com_u2eexample.preview.capgo.app/.capgo/preview.json',
     })
   })
 
-  it.concurrent('requests updater preview mode for generated channel preview links', () => {
+  it.concurrent('keeps legacy channel links usable as updater payload fallback', () => {
     const previewUrl = buildChannelPreviewDeepLink({
       appId: 'com.example.other-user-app',
       channelId: 42,
@@ -39,6 +43,7 @@ describe('channel preview deep links', () => {
       appId: 'com.example.other-user-app',
       channelId: 42,
       channelName: 'preview',
+      payloadUrl: undefined,
     })
     expect(buildChannelPreviewLatestOptions(previewLink)).toEqual({
       appId: 'com.example.other-user-app',
@@ -53,12 +58,29 @@ describe('channel preview deep links', () => {
       appId: 'app.capgo.capacitor.navigation',
       channelId: 36706,
       channelName: 'production',
+      payloadUrl: undefined,
     })
     expect(parseChannelPreviewDeepLink('capgo:/preview/channel?appId=app.capgo.capacitor.navigation&channel=production&channelId=36706')).toEqual({
       type: 'channel',
       appId: 'app.capgo.capacitor.navigation',
       channelId: 36706,
       channelName: 'production',
+      payloadUrl: undefined,
+    })
+  })
+
+  it.concurrent('generates bundle preview deep links with a payload URL', () => {
+    const previewUrl = buildBundlePreviewDeepLink({
+      appId: 'com.example.other-user-app',
+      payloadUrl: 'https://42-com_u2eexample.preview.capgo.app/.capgo/preview.json',
+      versionId: 42,
+    })
+
+    expect(parsePreviewDeepLink(previewUrl)).toEqual({
+      type: 'bundle',
+      appId: 'com.example.other-user-app',
+      payloadUrl: 'https://42-com_u2eexample.preview.capgo.app/.capgo/preview.json',
+      versionId: 42,
     })
   })
 })

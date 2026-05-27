@@ -4,7 +4,7 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import IconExternalLink from '~icons/lucide/external-link'
 import IconSmartphone from '~icons/lucide/smartphone'
-import { buildChannelPreviewDeepLink } from '~/services/previewLinks'
+import { buildBundlePreviewDeepLink, buildChannelPreviewDeepLink } from '~/services/previewLinks'
 import { buildChannelPreviewSubdomain, buildPreviewSubdomain } from '../../shared/preview-subdomain.ts'
 
 const props = defineProps<{
@@ -88,16 +88,31 @@ const previewUrl = computed<string | null>(() => {
   }
 })
 
+const previewPayloadUrl = computed<string | null>(() => {
+  if (!previewUrl.value)
+    return null
+
+  return new URL('/.capgo/preview.json', previewUrl.value).toString()
+})
+
 const qrCodeUrl = computed<string | null>(() => {
+  if (!previewPayloadUrl.value)
+    return null
+
   if (typeof props.channelId === 'number' && props.channelName) {
     return buildChannelPreviewDeepLink({
       appId: props.appId,
       channelId: props.channelId,
       channelName: props.channelName,
+      payloadUrl: previewPayloadUrl.value,
     })
   }
 
-  return previewUrl.value
+  return buildBundlePreviewDeepLink({
+    appId: props.appId,
+    versionId: props.versionId,
+    payloadUrl: previewPayloadUrl.value,
+  })
 })
 
 function svgToDataUrl(svg: string): string {
