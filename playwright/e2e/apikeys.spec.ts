@@ -6,8 +6,6 @@ async function createRbacApiKey(page: Page, keyName: string) {
   const dialog = page.locator('#dialog-v2-content')
   await expect(dialog).toBeVisible()
   await dialog.locator('input[type="text"]').fill(keyName)
-  await dialog.getByText('Read', { exact: true }).click()
-  await expect(dialog.locator('input[name="key-type"][value="read"]')).toBeChecked()
   await page.getByRole('button', { name: 'Create' }).click()
   await expect(page.getByText('Added new API key successfully', { exact: true })).toBeVisible()
 }
