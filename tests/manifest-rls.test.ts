@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import {
-  APIKEY_TEST2_ALL,
   APIKEY_TEST_ALL,
+  createDirectApiKeyWithBindings,
   fetchWithRetry,
   getAuthHeaders,
   getAuthHeadersForCredentials,
@@ -26,10 +26,13 @@ const READ_ONLY_ORG_ID = randomUUID()
 const READ_ONLY_STRIPE_CUSTOMER_ID = `cus_manifest_rls_${id.replaceAll('-', '')}`
 const READ_ONLY_VISIBLE_FILE = 'read-only-visible.js'
 const OTHER_USER_EMAIL = 'test2@capgo.app'
+const otherOrgOnlyApiKeyInput = randomUUID()
 
 let authHeadersUser1: Record<string, string>
 let authHeadersUser2: Record<string, string>
 let authHeadersNonMember: Record<string, string>
+let otherOrgOnlyApiKey: string
+let otherOrgOnlyApiKeyId: number | null = null
 let ownVersionId: number
 let otherVersionId: number
 let readOnlyVersionId: number
@@ -190,6 +193,20 @@ beforeAll(async () => {
 
   readOnlyVersionId = readOnlyVersion.id
 
+  const apiKey = await createDirectApiKeyWithBindings({
+    userId: USER_ID_2,
+    key: otherOrgOnlyApiKeyInput,
+    name: `manifest-other-org-${id}`,
+    orgId: ORG_ID_2,
+    roleName: 'org_super_admin',
+    appId: APP_OTHER,
+    appRoleName: 'app_admin',
+  })
+  if (!apiKey.key)
+    throw new Error('Failed to create manifest API key')
+  otherOrgOnlyApiKey = apiKey.key
+  otherOrgOnlyApiKeyId = apiKey.id
+
   await supabase.from('org_users').insert({
     org_id: READ_ONLY_ORG_ID,
     user_id: USER_ID_NONMEMBER,
@@ -222,6 +239,14 @@ beforeAll(async () => {
 }, 120000)
 
 afterAll(async () => {
+  if (otherOrgOnlyApiKeyId !== null) {
+    await getSupabaseClient()
+      .from('apikeys')
+      .delete()
+      .eq('id', otherOrgOnlyApiKeyId)
+      .throwOnError()
+  }
+
   await getSupabaseClient()
     .from('org_users')
     .delete()
@@ -282,7 +307,7 @@ describe('manifest RLS', () => {
   it.concurrent('prevents an API key from reading another org\'s manifest entries', async () => {
     const { response, data } = await fetchManifestRows({
       ...restApiKeyHeaders,
-      capgkey: APIKEY_TEST2_ALL,
+      capgkey: otherOrgOnlyApiKey,
     }, ownVersionId)
 
     expect(response.status).toBe(200)

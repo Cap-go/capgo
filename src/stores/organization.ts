@@ -599,7 +599,7 @@ export const useOrganizationStore = defineStore('organization', () => {
     if (!role)
       return false
 
-    if (org?.use_new_rbac && requiredRoles.length > 0) {
+    if (requiredRoles.length > 0) {
       if (requiredRoles.some(required => matchesRbacRole(role, required)))
         return true
     }

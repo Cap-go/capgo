@@ -3,7 +3,7 @@ import type { AuthInfo, MiddlewareKeyVariables } from '../../utils/hono.ts'
 import type { Database } from '../../utils/supabase.types.ts'
 import { type } from 'arktype'
 import { safeParseSchema } from '../../utils/ark_validation.ts'
-import { simpleError } from '../../utils/hono.ts'
+import { quickError, simpleError } from '../../utils/hono.ts'
 import { supabaseAdmin, supabaseWithAuth } from '../../utils/supabase.ts'
 import { normalizeWebsiteUrl } from './website.ts'
 
@@ -83,6 +83,9 @@ export async function post(
   const auth = c.get('auth') as AuthInfo | undefined
   if (!auth?.userId) {
     throw simpleError('not_authorized', 'Not authorized')
+  }
+  if (auth.authType === 'apikey') {
+    throw quickError(401, 'invalid_apikey', 'API keys cannot create organizations')
   }
 
   const supabase = supabaseWithAuth(c, auth)

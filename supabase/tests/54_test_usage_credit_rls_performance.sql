@@ -19,25 +19,25 @@ SELECT
 SELECT
   ok(
     position(
-      'public.rbac_principal_apikey()' IN pg_get_functiondef('public.usage_credit_readable_org_ids()'::regprocedure)
+      'rbac_check_permission_direct' IN pg_get_functiondef('public.usage_credit_readable_org_ids()'::regprocedure)
     ) > 0,
-    'usage_credit_readable_org_ids includes API-key RBAC candidates for mixed auth'
+    'usage_credit_readable_org_ids verifies API-key RBAC permission with direct checks'
   );
 
 SELECT
   ok(
     position(
-      'NOT candidate_orgs.needs_api_key_scope' IN pg_get_functiondef('public.usage_credit_readable_org_ids()'::regprocedure)
+      'v_api_key.id IS NOT NULL' IN pg_get_functiondef('public.usage_credit_readable_org_ids()'::regprocedure)
     ) > 0,
-    'usage_credit_readable_org_ids does not apply API-key org scope to plain user candidates'
+    'usage_credit_readable_org_ids separates API-key and plain user authorization'
   );
 
 SELECT
   ok(
     position(
-      'v_check_user_id := v_api_key.user_id' IN pg_get_functiondef('public.usage_credit_readable_org_ids()'::regprocedure)
+      'v_user_id := v_api_key.user_id' IN pg_get_functiondef('public.usage_credit_readable_org_ids()'::regprocedure)
     ) > 0,
-    'usage_credit_readable_org_ids passes RBAC-only API key owner through exact permission checks'
+    'usage_credit_readable_org_ids passes the API key owner through exact permission checks'
   );
 
 SELECT
@@ -215,16 +215,12 @@ VALUES (
 )
 ON CONFLICT (id) DO NOTHING;
 
-INSERT INTO public.apikeys (id, user_id, key, mode, name, limited_to_orgs)
-VALUES (
+SELECT tests.create_v2_apikey(
   54054,
   '70000000-0000-4000-8000-000000005401',
   'usage-credit-rbac-only-key',
-  NULL,
-  'usage-credit-rbac-only-key',
-  ARRAY['70000000-0000-4000-8000-000000000054'::uuid]
-)
-ON CONFLICT (id) DO NOTHING;
+  'usage-credit-rbac-only-key'
+);
 
 INSERT INTO public.role_bindings (
   principal_type,

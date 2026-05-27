@@ -88,21 +88,16 @@ app.post('/', middlewareAuth, async (c) => {
       return c.json({ allowed: true })
     }
 
-    // SSO is enforced - check if user is super_admin (break-glass bypass)
-    const { data: roleData, error: roleError } = await (supabase.from as any)('org_users')
-      .select('user_right')
-      .eq('org_id', orgId)
-      .eq('user_id', userId)
-      .single()
+    // SSO is enforced - check RBAC super-admin-only permission for break-glass bypass
+    const { data: isSuperAdmin, error: roleError } = await (supabase.rpc as any)('rbac_check_permission', {
+      p_permission_key: 'org.update_billing',
+      p_org_id: orgId,
+    })
 
-    if (roleError && roleError.code !== 'PGRST116') {
-      // PGRST116 = no rows found (user not in org), which is expected
+    if (roleError) {
       cloudlog({ requestId, context: 'check_enforcement - role query error', error: roleError.message, orgId, userId })
       return quickError(500, 'query_error', 'Failed to check user role')
     }
-
-    // Check if user has super_admin right (break-glass: super admins bypass SSO enforcement)
-    const isSuperAdmin = roleData?.user_right === 'super_admin'
 
     if (isSuperAdmin) {
       cloudlog({ requestId, context: 'check_enforcement - super admin bypass', email, orgId })

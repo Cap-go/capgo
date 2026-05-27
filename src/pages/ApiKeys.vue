@@ -93,8 +93,6 @@ const minExpirationDate = computed(() => {
 // Cache for organization and app names
 const orgCache = ref(new Map<string, string>())
 const appCache = ref(new Map<string, string>())
-const appCanonicalIdCache = ref(new Map<string, string>())
-const UUID_REGEX = /^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/i
 
 // Function to truncate strings (show first 5 and last 5 characters)
 function hideString(str: string | null) {
@@ -124,6 +122,7 @@ function getBindingsForKey(key: Database['public']['Tables']['apikeys']['Row']):
 // Get the highest role for a key (by priority_rank)
 function getHighestRole(key: Database['public']['Tables']['apikeys']['Row']): string | null {
   const keyBindings = getBindingsForKey(key)
+    .filter(binding => binding.scope_type === 'org')
   if (keyBindings.length === 0)
     return null
 
@@ -148,10 +147,10 @@ function getRbacAppBindingIds(key: Database['public']['Tables']['apikeys']['Row'
 
 function getDisplayOrgIds(key: Database['public']['Tables']['apikeys']['Row']): string[] {
   const orgIds = new Set<string>()
-  key.limited_to_orgs?.forEach(orgId => orgIds.add(orgId))
-  getBindingsForKey(key)
-    .filter(b => b.scope_type === 'org' && !!b.org_id)
-    .forEach(b => orgIds.add(b.org_id!))
+  getBindingsForKey(key).forEach((binding) => {
+    if (binding.org_id)
+      orgIds.add(binding.org_id)
+  })
   return Array.from(orgIds)
 }
 
@@ -161,26 +160,20 @@ function coversAllOrganizations(orgIds: string[]): boolean {
 }
 
 function getDisplayAppIds(key: Database['public']['Tables']['apikeys']['Row']): string[] {
-  const appIds = [...(key.limited_to_apps || []), ...getRbacAppBindingIds(key)]
-  const canonicalAppIds = new Set<string>()
-  appIds.forEach(appId => canonicalAppIds.add(appCanonicalIdCache.value.get(appId) || appId))
-  return Array.from(canonicalAppIds)
+  return getRbacAppBindingIds(key)
 }
 
 function formatDisplayApps(key: Database['public']['Tables']['apikeys']['Row']) {
-  const appNames = new Set(getDisplayAppIds(key).map(appId => appCache.value.get(appId) || 'Unknown'))
-  return Array.from(appNames).join(', ')
+  return getDisplayAppIds(key).map(appId => appCache.value.get(appId) || 'Unknown').join(', ')
 }
 
 function cacheAppNames(apps: { id: string | null, app_id: string, name: string | null }[]) {
   apps.forEach((app) => {
     const displayName = app.name || app.app_id
     appCache.value.set(app.app_id, displayName)
-    appCanonicalIdCache.value.set(app.app_id, app.app_id)
     if (!app.id)
       return
     appCache.value.set(app.id, displayName)
-    appCanonicalIdCache.value.set(app.id, app.app_id)
   })
 }
 
@@ -201,12 +194,6 @@ const uniqueOrgIds = computed(() => {
     return new Set<string>()
 
   const orgIds = new Set<string>()
-  keys.value.forEach((key) => {
-    if (key.limited_to_orgs && key.limited_to_orgs.length > 0) {
-      key.limited_to_orgs.forEach(orgId => orgIds.add(orgId))
-    }
-  })
-  // Also add org IDs from bindings
   allBindings.value.forEach((b) => {
     if (b.org_id)
       orgIds.add(b.org_id)
@@ -221,11 +208,6 @@ const uniqueAppIds = computed(() => {
     return new Set<string>()
 
   const appIds = new Set<string>()
-  keys.value.forEach((key) => {
-    if (key.limited_to_apps && key.limited_to_apps.length > 0) {
-      key.limited_to_apps.forEach(appId => appIds.add(appId))
-    }
-  })
   allBindings.value.forEach((binding) => {
     if (binding.scope_type === 'app' && binding.app_id)
       appIds.add(binding.app_id)
@@ -273,50 +255,20 @@ async function fetchOrgAndAppNames() {
     await Promise.all(orgPromises)
   }
 
-  // Fetch app names in parallel. `limited_to_apps` stores public app ids, while RBAC
-  // role_bindings.app_id stores apps.id UUIDs, so cache both keys.
   if (uncachedAppIds.length > 0) {
-    const appUuidIds = uncachedAppIds.filter(appId => UUID_REGEX.test(appId))
-    const publicAppIds = uncachedAppIds.filter(appId => !UUID_REGEX.test(appId))
-    const appPromises: Promise<unknown>[] = []
+    try {
+      const { data, error } = await supabase
+        .from('apps')
+        .select('id, app_id, name')
+        .in('id', uncachedAppIds)
 
-    if (publicAppIds.length > 0) {
-      appPromises.push((async () => {
-        try {
-          const { data, error } = await supabase
-            .from('apps')
-            .select('id, app_id, name')
-            .in('app_id', publicAppIds)
-
-          if (error)
-            throw error
-          cacheAppNames(data || [])
-        }
-        catch (err) {
-          console.error('Error fetching app names by public app ids:', err)
-        }
-      })())
+      if (error)
+        throw error
+      cacheAppNames(data || [])
     }
-
-    if (appUuidIds.length > 0) {
-      appPromises.push((async () => {
-        try {
-          const { data, error } = await supabase
-            .from('apps')
-            .select('id, app_id, name')
-            .in('id', appUuidIds)
-
-          if (error)
-            throw error
-          cacheAppNames(data || [])
-        }
-        catch (err) {
-          console.error('Error fetching app names by RBAC app ids:', err)
-        }
-      })())
+    catch (err) {
+      console.error('Error fetching app names by RBAC app ids:', err)
     }
-
-    await Promise.all(appPromises)
   }
 }
 
@@ -343,9 +295,40 @@ const unsupportedApiKeyOrgRoles = new Set(['org_billing_admin'])
 const orgRoles = computed(() => roles.value.filter(r => r.scope_type === 'org' && !unsupportedApiKeyOrgRoles.has(r.name)))
 const appRoles = computed(() => roles.value.filter(r => r.scope_type === 'app'))
 
+const legacyOrgRoleAliases: Record<string, string> = {
+  owner: 'org_super_admin',
+  super_admin: 'org_super_admin',
+  admin: 'org_admin',
+  write: 'org_member',
+  upload: 'org_member',
+  read: 'org_member',
+}
+
+function normalizeOrgRoleName(roleName: string) {
+  const normalized = roleName.replace(/^invite_/, '')
+  return legacyOrgRoleAliases[normalized] ?? normalized
+}
+
+function getRolePriority(roleName?: string | null) {
+  if (!roleName)
+    return 0
+  return roles.value.find(r => r.name === normalizeOrgRoleName(roleName))?.priority_rank ?? 0
+}
+
+const callerOrgPriorityByOrgId = computed(() => new Map(
+  organizationStore.organizations.map(org => [org.gid, getRolePriority(org.role)]),
+))
+
+const selectedOrgMinimumPriority = computed(() => {
+  const selectedManageableOrgIds = selectedOrgsForCreation.value.filter(orgId => manageableOrgIds.value.has(orgId))
+  if (selectedManageableOrgIds.length === 0)
+    return 0
+  return Math.min(...selectedManageableOrgIds.map(orgId => callerOrgPriorityByOrgId.value.get(orgId) ?? 0))
+})
+
 const orgRoleOptions = computed(() =>
   orgRoles.value
-    .filter(r => r.name !== 'org_super_admin')
+    .filter(r => r.name !== 'org_super_admin' && r.priority_rank <= selectedOrgMinimumPriority.value)
     .map(r => ({ id: r.id, name: r.name, description: getRoleDisplayName(r.name) })),
 )
 
@@ -380,21 +363,14 @@ function pruneAppBindings() {
   pendingAppBindings.value = updated
 }
 
+function ensureSelectedOrgRoleAllowed() {
+  if (orgRoleOptions.value.some(role => role.name === selectedOrgRole.value))
+    return
+
+  selectedOrgRole.value = orgRoleOptions.value.find(role => role.name === 'org_member')?.name ?? orgRoleOptions.value[0]?.name ?? ''
+}
+
 const selectedAppIds = computed(() => Object.keys(pendingAppBindings.value))
-
-const configuredAppIds = computed(() =>
-  Object.entries(pendingAppBindings.value)
-    .filter(([, roleName]) => !!roleName)
-    .map(([appId]) => appId),
-)
-
-// Get the app_id (string identifier) for limited_to_apps
-const configuredLimitedAppIds = computed(() => {
-  const appMap = new Map(availableApps.value.map(a => [a.id, a.app_id]))
-  return configuredAppIds.value
-    .map(id => appMap.get(id))
-    .filter((appId): appId is string => !!appId)
-})
 
 columns.value = [
   {
@@ -426,7 +402,7 @@ columns.value = [
     },
   },
   {
-    key: 'limited_to_orgs',
+    key: 'org_scope',
     label: t('organizations'),
     displayFunction: (row: Database['public']['Tables']['apikeys']['Row']) => {
       const orgIds = getDisplayOrgIds(row)
@@ -436,7 +412,7 @@ columns.value = [
     },
   },
   {
-    key: 'limited_to_apps',
+    key: 'app_scope',
     label: t('apps'),
     displayFunction: (row: Database['public']['Tables']['apikeys']['Row']) => {
       return formatDisplayApps(row)
@@ -510,10 +486,16 @@ async function getKeys(retry = true): Promise<void> {
     .from('apikeys')
     .select()
     .eq('user_id', main.user?.id ?? '')
-  if (data && data.length) {
+    .order('created_at', { ascending: false })
+  if (data) {
     keys.value = data
-    await Promise.all([fetchAllBindings(), fetchRoles()])
-    await fetchOrgAndAppNames()
+    if (data.length > 0) {
+      await Promise.all([fetchAllBindings(), fetchRoles()])
+      await fetchOrgAndAppNames()
+    }
+    else {
+      allBindings.value = []
+    }
   }
   else if (retry && main.user?.id) {
     return getKeys(false)
@@ -537,12 +519,16 @@ async function fetchRoles() {
 }
 
 async function fetchAllBindings() {
-  if (!keys.value || keys.value.length === 0)
+  if (!keys.value || keys.value.length === 0) {
+    allBindings.value = []
     return
+  }
 
   const rbacIds = keys.value.map(k => k.rbac_id).filter(Boolean)
-  if (rbacIds.length === 0)
+  if (rbacIds.length === 0) {
+    allBindings.value = []
     return
+  }
 
   const { data, error } = await supabase
     .from('role_bindings')
@@ -552,6 +538,7 @@ async function fetchAllBindings() {
 
   if (error) {
     console.error('Error fetching role bindings:', error)
+    allBindings.value = []
     return
   }
 
@@ -672,8 +659,6 @@ async function createApiKey() {
       method: 'POST',
       body: {
         name: newApiKeyName.value.trim(),
-        limited_to_orgs: selectedOrgsForCreation.value,
-        limited_to_apps: configuredLimitedAppIds.value,
         expires_at: expiresAt,
         hashed: isHashed,
         bindings,
@@ -694,7 +679,7 @@ async function createApiKey() {
     if (isHashed) {
       createdKey.key = null as any
     }
-    keys.value = [createdKey, ...keys.value]
+    keys.value?.unshift(createdKey)
     await fetchAllBindings()
     await fetchOrgAndAppNames()
 
@@ -736,6 +721,7 @@ async function addNewApiKey() {
   selectedOrgsForCreation.value = organizationStore.organizations
     .map(org => org.gid)
     .filter(orgId => manageableOrgIds.value.has(orgId))
+  ensureSelectedOrgRoleAllowed()
 
   // Show creation modal
   await showAddNewKeyModal()
@@ -970,7 +956,12 @@ async function copyKey(apikey: Database['public']['Tables']['apikeys']['Row']) {
 // Watch for org selection changes to prune app bindings
 watch(selectedOrgsForCreation, () => {
   pruneAppBindings()
+  ensureSelectedOrgRoleAllowed()
 }, { deep: true })
+
+watch(orgRoleOptions, () => {
+  ensureSelectedOrgRoleAllowed()
+})
 
 // Watch for org role changes - clear app bindings if role grants inherited access
 watch(selectedOrgRole, (newRole) => {
@@ -1086,6 +1077,7 @@ getKeys()
             <div class="relative">
               <button
                 type="button"
+                data-test="create-key-org-dropdown"
                 class="flex items-center justify-between w-full gap-3 px-3 py-2 text-sm text-left bg-white border rounded-lg border-slate-300 dark:bg-gray-800 dark:border-slate-600 focus:ring-2 focus:ring-primary-500 focus:outline-none"
                 :aria-expanded="showOrgDropdown"
                 @click="showOrgDropdown = !showOrgDropdown"
@@ -1110,6 +1102,8 @@ getKeys()
                 >
                   <input
                     type="checkbox"
+                    data-test="create-key-org-checkbox"
+                    :data-org-id="org.gid"
                     class="d-checkbox d-checkbox-sm d-checkbox-primary"
                     :checked="selectedOrgsForCreation.includes(org.gid)"
                     :disabled="!manageableOrgIds.has(org.gid)"
@@ -1143,6 +1137,7 @@ getKeys()
                 <input
                   v-model="selectedOrgRole"
                   type="radio"
+                  :data-test="`create-key-org-role-${role.name}`"
                   class="d-radio d-radio-primary d-radio-sm"
                   name="create-org-role"
                   :value="role.name"
@@ -1165,6 +1160,7 @@ getKeys()
             <div class="flex justify-end mb-4">
               <div class="relative">
                 <button
+                  data-test="create-key-add-app"
                   class="gap-2 d-btn d-btn-sm d-btn-outline"
                   type="button"
                   @click="showAppDropdown = !showAppDropdown"
@@ -1189,6 +1185,8 @@ getKeys()
                   >
                     <input
                       type="checkbox"
+                      data-test="create-key-app-checkbox"
+                      :data-app-id="app.id"
                       class="d-checkbox d-checkbox-sm d-checkbox-primary"
                       :checked="app.id in pendingAppBindings"
                       @change="toggleApp(app.id)"
@@ -1217,6 +1215,7 @@ getKeys()
               <div
                 v-for="appId in selectedAppIds"
                 :key="appId"
+                data-test="create-key-selected-app"
                 class="flex items-center gap-4 px-4 py-2.5 border-b last:border-0 border-slate-100 dark:border-slate-700 hover:bg-slate-50/50 dark:hover:bg-slate-700/20"
               >
                 <span class="flex-1 text-sm font-medium truncate dark:text-white text-slate-800">
@@ -1226,6 +1225,7 @@ getKeys()
                   </span>
                 </span>
                 <select
+                  data-test="create-key-app-role-select"
                   class="d-select d-select-sm d-select-bordered"
                   :value="pendingAppBindings[appId] || ''"
                   @change="onAppRoleChange(appId, $event)"

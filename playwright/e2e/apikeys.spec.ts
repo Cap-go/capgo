@@ -1,13 +1,23 @@
 import type { Page } from '@playwright/test'
 import { expect, test } from '../support/commands'
 
-async function createRbacApiKey(page: Page, keyName: string) {
+test.use({ screenshot: 'off', trace: 'off', video: 'off' })
+
+async function openCreateKeyDialog(page: Page) {
   await page.click('[data-test="create-key"]')
   const dialog = page.locator('#dialog-v2-content')
-  await expect(dialog).toBeVisible()
+  await expect(dialog.locator('input[name="key-type"]')).toHaveCount(0)
+  await expect(dialog.locator('[data-test="create-key-org-role-org_member"]')).toBeChecked()
+  return dialog
+}
+
+async function createRbacApiKey(page: Page, keyName: string) {
+  const dialog = await openCreateKeyDialog(page)
   await dialog.locator('input[type="text"]').fill(keyName)
   await page.getByRole('button', { name: 'Create' }).click()
-  await expect(page.getByText('Added new API key successfully', { exact: true })).toBeVisible()
+  await expect(page.getByText('Added new API key successfully').first()).toBeVisible()
+  await expect(page.locator('tr', { hasText: keyName })).toHaveCount(1)
+  await expect(page.locator('tr', { hasText: keyName })).toContainText('Member')
 }
 
 test.describe('API Key Management', () => {
@@ -22,8 +32,41 @@ test.describe('API Key Management', () => {
     const keyName = `Playwright Read ${Date.now()}`
 
     await createRbacApiKey(page, keyName)
+  })
 
-    await expect(page.getByText(keyName, { exact: true })).toBeVisible()
+  test('should select all manageable organizations by default with member role', async ({ page }) => {
+    const dialog = await openCreateKeyDialog(page)
+
+    await dialog.locator('[data-test="create-key-org-dropdown"]').click()
+    const orgCheckboxes = dialog.locator('[data-test="create-key-org-checkbox"]:not(:disabled)')
+    await expect(orgCheckboxes.first()).toBeVisible()
+
+    const orgCount = await orgCheckboxes.count()
+    expect(orgCount).toBeGreaterThan(0)
+    for (let index = 0; index < orgCount; index++) {
+      await expect(orgCheckboxes.nth(index)).toBeChecked()
+    }
+
+    await page.mouse.click(5, 5)
+    await page.getByRole('button', { name: 'Cancel' }).click()
+  })
+
+  test('should configure app-level role bindings in the create dialog', async ({ page }) => {
+    const dialog = await openCreateKeyDialog(page)
+
+    await dialog.locator('[data-test="create-key-add-app"]').click()
+    const appCheckboxes = dialog.locator('[data-test="create-key-app-checkbox"]')
+    await expect(appCheckboxes.first()).toBeVisible()
+    await appCheckboxes.first().check()
+
+    const selectedApp = dialog.locator('[data-test="create-key-selected-app"]').first()
+    await expect(selectedApp).toBeVisible()
+    const roleSelect = selectedApp.locator('[data-test="create-key-app-role-select"]')
+    await roleSelect.selectOption('app_reader')
+    await expect(roleSelect).toHaveValue('app_reader')
+
+    await page.mouse.click(5, 5)
+    await page.getByRole('button', { name: 'Cancel' }).click()
   })
 
   test('should delete API key', async ({ page }) => {

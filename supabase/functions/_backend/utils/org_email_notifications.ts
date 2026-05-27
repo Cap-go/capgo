@@ -1,6 +1,6 @@
 import type { Context } from 'hono'
 import { parseCronExpression } from 'cron-schedule'
-import { and, eq, inArray, isNull } from 'drizzle-orm'
+import { and, eq, inArray } from 'drizzle-orm'
 import { isBentoConfigured, trackBentoEvent } from './bento.ts'
 import { CacheHelper } from './cache.ts'
 import { cloudlog } from './logging.ts'
@@ -165,7 +165,7 @@ function isOrgPreferenceEnabled(org: OrgWithPreferences, preferenceKey: EmailPre
 }
 
 /**
- * Get all admin/super_admin members of an organization who have the specified email preference enabled.
+ * Get all RBAC admin/super_admin members of an organization who have the specified email preference enabled.
  * Returns array of emails that should receive the notification.
  */
 async function getEligibleOrgMemberEmails(
@@ -180,29 +180,6 @@ async function getEligibleOrgMemberEmails(
   const userIds = new Set<string>()
 
   try {
-    let legacyMembers: { user_id: string | null }[] = []
-    try {
-      legacyMembers = await drizzle
-        .select({ user_id: schema.org_users.user_id })
-        .from(schema.org_users)
-        .where(
-          and(
-            eq(schema.org_users.org_id, orgId),
-            inArray(schema.org_users.user_right, ['admin', 'super_admin']),
-            isNull(schema.org_users.app_id),
-          ),
-        )
-    }
-    catch (error) {
-      resolutionFailed = true
-      cloudlog({ requestId: c.get('requestId'), message: 'getEligibleOrgMemberEmails legacy error', orgId, error })
-    }
-
-    for (const member of legacyMembers ?? []) {
-      if (member.user_id)
-        userIds.add(member.user_id)
-    }
-
     let rbacUserBindings: { principal_id: string | null, expires_at: Date | null }[] = []
     try {
       rbacUserBindings = await drizzle

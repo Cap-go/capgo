@@ -185,8 +185,9 @@ async function getVersionId(appId: string, version: string) {
 
 type ApiKeyRow = Pick<
   Database['public']['Tables']['apikeys']['Row'],
-  'expires_at' | 'id' | 'key' | 'key_hash' | 'limited_to_apps' | 'limited_to_orgs' | 'mode' | 'user_id'
+  'expires_at' | 'id' | 'key' | 'key_hash' | 'rbac_id' | 'user_id'
 >
+type ApiKeyPermissionMode = 'all' | 'read' | 'upload' | 'write'
 
 interface NativePackage {
   name: string
@@ -223,49 +224,80 @@ async function getApiKeyRecord(apikey: string) {
   return row
 }
 
-function hasModeAccess(mode: Database['public']['Enums']['key_mode'], allowedModes: Database['public']['Enums']['key_mode'][]) {
-  return mode === 'all' || allowedModes.includes(mode)
+const permissionKeysByMode: Record<ApiKeyPermissionMode, string[]> = {
+  read: ['app.read'],
+  upload: ['app.upload_bundle'],
+  write: ['app.manage_devices'],
+  all: ['app.update_user_roles'],
+}
+
+function permissionKeysForModes(allowedModes: ApiKeyPermissionMode[]) {
+  return Array.from(new Set(allowedModes.flatMap(mode => permissionKeysByMode[mode])))
+}
+
+async function apiKeyHasAnyAppPermission(
+  apikey: string,
+  apiKey: ApiKeyRow,
+  app: { app_id: string, owner_org: string | null },
+  allowedModes: ApiKeyPermissionMode[],
+) {
+  if (!app.owner_org)
+    return false
+
+  for (const permissionKey of permissionKeysForModes(allowedModes)) {
+    const { data, error } = await getSupabaseClient().rpc('rbac_check_permission_direct' as any, {
+      p_permission_key: permissionKey,
+      p_user_id: apiKey.user_id,
+      p_org_id: app.owner_org,
+      p_app_id: app.app_id,
+      p_channel_id: null,
+      p_apikey: apikey,
+    })
+
+    if (!error && data === true)
+      return true
+  }
+
+  return false
 }
 
 async function getAuthorizedApp(
   apikey: string,
   appId: string,
-  allowedModes: Database['public']['Enums']['key_mode'][],
+  allowedModes: ApiKeyPermissionMode[],
 ) {
   const apiKey = await getApiKeyRecord(apikey)
-  if (!apiKey || !apiKey.mode || !hasModeAccess(apiKey.mode, allowedModes))
+  if (!apiKey)
     return { error: 'Invalid API key or insufficient permissions.' as const }
 
   const app = await getAppRecord(appId)
   if (!app)
     return { error: `App ${appId} does not exist` as const }
 
-  if (apiKey.limited_to_orgs?.length && (!app.owner_org || !apiKey.limited_to_orgs.includes(app.owner_org)))
-    return { error: 'Invalid API key or insufficient permissions.' as const }
-
-  if (apiKey.limited_to_apps?.length && !apiKey.limited_to_apps.includes(appId))
+  if (!(await apiKeyHasAnyAppPermission(apikey, apiKey, app, allowedModes)))
     return { error: 'Invalid API key or insufficient permissions.' as const }
 
   return { apiKey, app } as const
 }
 
-async function getAppsForApiKey(apikey: string, allowedModes: Database['public']['Enums']['key_mode'][]) {
+async function getAppsForApiKey(apikey: string, allowedModes: ApiKeyPermissionMode[]) {
   const apiKey = await getApiKeyRecord(apikey)
-  if (!apiKey || !apiKey.mode || !hasModeAccess(apiKey.mode, allowedModes))
+  if (!apiKey)
     return { error: 'Invalid API key or insufficient permissions.' as const }
 
   const { data, error } = await getSupabaseClient()
     .from('apps')
     .select('app_id, created_at, icon_url, name, owner_org, user_id')
-    .eq('user_id', apiKey.user_id)
     .order('created_at', { ascending: true })
 
   if (error)
     return { error: error.message }
 
-  const filteredApps = (data ?? [])
-    .filter(app => !apiKey.limited_to_orgs?.length || (app.owner_org != null && apiKey.limited_to_orgs.includes(app.owner_org)))
-    .filter(app => !apiKey.limited_to_apps?.length || apiKey.limited_to_apps.includes(app.app_id))
+  const filteredApps = []
+  for (const app of data ?? []) {
+    if (await apiKeyHasAnyAppPermission(apikey, apiKey, app, allowedModes))
+      filteredApps.push(app)
+  }
 
   return {
     apiKey,

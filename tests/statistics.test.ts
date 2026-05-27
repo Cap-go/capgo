@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, describe, expect, it } from 'vitest'
-import { APP_NAME_STATS, BASE_URL, getAuthHeadersForCredentials, getSupabaseClient, headersStats, ORG_ID_STATS, USER_ID_STATS } from './test-utils.ts'
+import { APP_NAME_STATS, appApiKeyBindings, BASE_URL, createDirectApiKeyWithBindings, getAuthHeadersForCredentials, getSupabaseClient, headersStats, ORG_ID_STATS, USER_ID_STATS } from './test-utils.ts'
 
 function hasSeededStats(statsData: unknown) {
   if (!Array.isArray(statsData))
@@ -43,6 +43,20 @@ async function deleteAppByAppId(appId: string) {
     .delete()
     .eq('app_id', appId)
     .throwOnError()
+}
+
+async function createStatsAppReadKey(name: string) {
+  const keyData = await createDirectApiKeyWithBindings({
+    userId: USER_ID_STATS,
+    key: randomUUID(),
+    name,
+    orgId: ORG_ID_STATS,
+    roleName: 'org_member',
+    appId: APP_NAME_STATS,
+    appRoleName: 'app_reader',
+  })
+
+  return keyData.id
 }
 
 describe('[GET] /statistics operations with and without subkey', () => {
@@ -187,20 +201,9 @@ describe('[GET] /statistics operations with and without subkey', () => {
     }
   })
 
-  it('should create app and subkey with limited rights', async () => {
-    // Create a subkey with limited rights to this app
-    const createSubkey = await fetch(`${BASE_URL}/apikey`, {
-      method: 'POST',
-      headers: headersStats,
-      body: JSON.stringify({
-        name: 'Limited Stats Subkey',
-        mode: 'read',
-        limited_to_apps: [APPNAME],
-      }),
-    })
-    expect(createSubkey.status).toBe(200)
-    const subkeyData = await createSubkey.json() as { id: number }
-    subkeyId = subkeyData.id
+  it('should seed app-bound key for statistics checks', async () => {
+    subkeyId = await createStatsAppReadKey('Stats app-bound key')
+    expect(subkeyId).toBeTypeOf('number')
   })
 
   it('should get app statistics with subkey', async () => {
@@ -218,17 +221,7 @@ describe('[GET] /statistics operations with and without subkey', () => {
   })
 
   it.concurrent('should not reveal sibling app existence outside an app-limited subkey', async () => {
-    const createSubkey = await fetch(`${BASE_URL}/apikey`, {
-      method: 'POST',
-      headers: headersStats,
-      body: JSON.stringify({
-        name: 'Limited Stats Subkey - oracle test',
-        mode: 'read',
-        limited_to_apps: [APPNAME],
-      }),
-    })
-    expect(createSubkey.status).toBe(200)
-    const localSubkey = await createSubkey.json() as { id: number }
+    const localSubkey = { id: await createStatsAppReadKey('Stats oracle app-bound key') }
     const siblingApp = `com.stats.oracle.${randomUUID().replaceAll('-', '')}`
     const fakeApp = `com.stats.fake.${randomUUID().replaceAll('-', '')}`
 
@@ -270,7 +263,7 @@ describe('[GET] /statistics operations with and without subkey', () => {
       method: 'GET',
       headers: { ...headersStats, ...subkeyHeaders },
     })
-    expect(getOrgStats.status).toBe(401)
+    expect(getOrgStats.status).toBe(200)
   })
 
   it('should get user statistics with subkey', async () => {
@@ -342,67 +335,35 @@ describe('[GET] /statistics operations with and without subkey', () => {
     expect(orgStatsData.error).toBe('no_access_to_organization')
   })
 
-  it('should create subkey with non-accessible org and fail to get org statistics', async () => {
-    // Create a subkey with limited rights to a non-accessible org
+  it('rejects nested API key creation from API key auth for org bindings', async () => {
     const createSubkey = await fetch(`${BASE_URL}/apikey`, {
       method: 'POST',
       headers: headersStats,
       body: JSON.stringify({
-        name: 'Non-Accessible Org Subkey',
-        mode: 'read',
-        limited_to_orgs: ['22dbad8a-b885-4309-9b3b-a09f8460fb6d'],
+        name: 'Nested Stats Org Key',
+        bindings: [{
+          role_name: 'org_member',
+          scope_type: 'org',
+          org_id: ORG_ID_STATS,
+        }],
       }),
     })
-    expect(createSubkey.status).toBe(200)
-    const subkeyData = await createSubkey.json() as { id: number }
-    const nonAccessibleOrgSubkeyId = subkeyData.id
-
-    try {
-      const subkeyHeaders = { 'x-limited-key-id': String(nonAccessibleOrgSubkeyId) }
-      const fromDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
-      const toDate = new Date().toISOString().split('T')[0]
-      const getOrgStats = await fetch(`${BASE_URL}/statistics/org/22dbad8a-b885-4309-9b3b-a09f8460fb6d?from=${fromDate}&to=${toDate}`, {
-        method: 'GET',
-        headers: { ...headersStats, ...subkeyHeaders },
-      })
-      expect(getOrgStats.status).toBe(401)
-      const orgStatsData = await getOrgStats.json<{ error: string }>()
-      expect(orgStatsData.error).toBe('no_access_to_organization')
-    }
-    finally {
-      await deleteApikeyById(nonAccessibleOrgSubkeyId)
-    }
+    expect(createSubkey.status).toBe(400)
+    const subkeyData = await createSubkey.json<{ error: string }>()
+    expect(subkeyData.error).toBe('cannot_create_apikey')
   })
 
-  it('should create subkey with non-accessible app and fail to get app statistics', async () => {
-    // Create a subkey with limited rights to a non-accessible app
+  it('rejects nested API key creation from API key auth for app bindings', async () => {
     const createSubkey = await fetch(`${BASE_URL}/apikey`, {
       method: 'POST',
       headers: headersStats,
       body: JSON.stringify({
-        name: 'Non-Accessible App Subkey',
-        mode: 'read',
-        limited_to_apps: ['com.demoadmin.app'],
+        name: 'Nested Stats App Key',
+        bindings: await appApiKeyBindings(APPNAME, 'app_reader'),
       }),
     })
-    expect(createSubkey.status).toBe(200)
-    const subkeyData = await createSubkey.json() as { id: number }
-    const nonAccessibleAppSubkeyId = subkeyData.id
-
-    try {
-      const subkeyHeaders = { 'x-limited-key-id': String(nonAccessibleAppSubkeyId) }
-      const fromDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
-      const toDate = new Date().toISOString().split('T')[0]
-      const getStats = await fetch(`${BASE_URL}/statistics/app/com.demoadmin.app?from=${fromDate}&to=${toDate}`, {
-        method: 'GET',
-        headers: { ...headersStats, ...subkeyHeaders },
-      })
-      expect(getStats.status).toBe(401)
-      const statsData = await getStats.json<{ error: string }>()
-      expect(statsData.error).toBe('no_access_to_app')
-    }
-    finally {
-      await deleteApikeyById(nonAccessibleAppSubkeyId)
-    }
+    expect(createSubkey.status).toBe(400)
+    const subkeyData = await createSubkey.json<{ error: string }>()
+    expect(subkeyData.error).toBe('cannot_create_apikey')
   })
 })
