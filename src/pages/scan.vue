@@ -1,15 +1,12 @@
 <script setup lang="ts">
+import type { PluginListenerHandle } from '@capacitor/core'
+import type { BarcodeScanErrorEvent, BarcodeScannedEvent } from '@capgo/camera-preview'
 import type { DownloadEvent, DownloadOptions } from '@capgo/capacitor-updater'
 import type { PreviewDeepLink } from '~/services/previewLinks'
-import {
-  CapacitorBarcodeScanner,
-  CapacitorBarcodeScannerCameraDirection,
-  CapacitorBarcodeScannerScanOrientation,
-  CapacitorBarcodeScannerTypeHint,
-} from '@capacitor/barcode-scanner'
 import { Capacitor } from '@capacitor/core'
+import { CameraPreview } from '@capgo/camera-preview'
 import { CapacitorUpdater } from '@capgo/capacitor-updater'
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import IconDownload from '~icons/heroicons/arrow-down-tray-20-solid'
@@ -32,8 +29,13 @@ const scannedUrl = ref('')
 const errorMessage = ref('')
 const manualUrl = ref('')
 const statusMessage = ref('')
+const scannerFrameRef = ref<HTMLElement | null>(null)
 
 let downloadListener: Awaited<ReturnType<typeof CapacitorUpdater.addListener>> | null = null
+let barcodeScannedListener: PluginListenerHandle | null = null
+let barcodeScanErrorListener: PluginListenerHandle | null = null
+let cameraPreviewStarted = false
+let isHandlingBarcode = false
 
 interface PreviewPayload {
   appId?: string
@@ -132,6 +134,7 @@ onMounted(async () => {
 })
 
 onUnmounted(async () => {
+  await stopScanner(true)
   await removeDownloadListener()
 })
 
@@ -143,36 +146,121 @@ async function removeDownloadListener() {
   downloadListener = null
 }
 
+async function removeScannerListeners() {
+  await barcodeScannedListener?.remove()
+  await barcodeScanErrorListener?.remove()
+  barcodeScannedListener = null
+  barcodeScanErrorListener = null
+}
+
+function setCameraPreviewActive(active: boolean) {
+  document.documentElement.classList.toggle('camera-preview-active', active)
+  document.body.classList.toggle('camera-preview-active', active)
+}
+
+function getScannerFrame() {
+  const frame = scannerFrameRef.value
+  if (!frame)
+    throw new Error('Scanner frame is not ready')
+
+  const rect = frame.getBoundingClientRect()
+  if (rect.width < 1 || rect.height < 1)
+    throw new Error('Scanner frame is not visible')
+
+  return {
+    height: Math.round(rect.height),
+    width: Math.round(rect.width),
+    x: Math.round(rect.left),
+    y: Math.round(rect.top),
+  }
+}
+
+async function stopScanner(force = false) {
+  if (!cameraPreviewStarted && !force) {
+    isScanning.value = false
+    isHandlingBarcode = false
+    setCameraPreviewActive(false)
+    await removeScannerListeners()
+    return
+  }
+
+  try {
+    await CameraPreview.stopBarcodeScanner()
+  }
+  catch (error) {
+    console.warn('Failed to stop barcode scanner:', error)
+  }
+
+  try {
+    await CameraPreview.stop({ force: true })
+  }
+  catch (error) {
+    console.warn('Failed to stop camera preview:', error)
+  }
+
+  cameraPreviewStarted = false
+  isScanning.value = false
+  isHandlingBarcode = false
+  setCameraPreviewActive(false)
+  await removeScannerListeners()
+}
+
 async function startScanner() {
+  if (!isNativePlatform) {
+    statusMessage.value = 'Live camera scanning is available in the iOS and Android app. Paste a preview link or bundle URL below.'
+    return
+  }
+
+  if (isScanning.value || isLoading.value)
+    return
+
   try {
     isScanning.value = true
+    isHandlingBarcode = false
     errorMessage.value = ''
     statusMessage.value = ''
     scannedUrl.value = ''
     manualUrl.value = ''
 
-    const result = await CapacitorBarcodeScanner.scanBarcode({
-      hint: CapacitorBarcodeScannerTypeHint.QR_CODE,
-      scanInstructions: 'Scan the preview QR code',
-      scanButton: false,
-      scanText: '',
-      cameraDirection: CapacitorBarcodeScannerCameraDirection.BACK,
-      scanOrientation: CapacitorBarcodeScannerScanOrientation.ADAPTIVE,
+    await nextTick()
+    const frame = getScannerFrame()
+
+    await removeScannerListeners()
+    barcodeScannedListener = await CameraPreview.addListener('barcodeScanned', async ({ barcodes }: BarcodeScannedEvent) => {
+      if (isHandlingBarcode)
+        return
+
+      const barcode = barcodes.find(result => result.value)
+      if (!barcode)
+        return
+
+      isHandlingBarcode = true
+      await stopScanner()
+      await handleBarcodeScan(barcode.value)
+    })
+    barcodeScanErrorListener = await CameraPreview.addListener('barcodeScanError', ({ message }: BarcodeScanErrorEvent) => {
+      console.warn('Barcode scan error:', message)
     })
 
-    isScanning.value = false
-
-    if (result.ScanResult) {
-      await handleBarcodeScan(result.ScanResult)
-      return
-    }
-
-    statusMessage.value = 'No QR code was detected. Tap scan when you are ready to try again.'
+    cameraPreviewStarted = true
+    setCameraPreviewActive(true)
+    await CameraPreview.start({
+      ...frame,
+      aspectMode: 'cover',
+      barcodeScanner: {
+        detectionInterval: 350,
+        formats: ['qr_code'],
+      },
+      disableAudio: true,
+      force: true,
+      position: 'rear',
+      toBack: true,
+    })
   }
   catch (error) {
     console.error('Failed to scan:', error)
     errorMessage.value = 'The camera could not start. Check camera permissions, then tap scan again or paste the link manually.'
-    isScanning.value = false
+    await stopScanner(true)
   }
 }
 
@@ -402,6 +490,9 @@ async function submitManualUrl() {
   statusMessage.value = ''
   scannedUrl.value = normalizedManualUrl.value
 
+  if (isScanning.value || cameraPreviewStarted)
+    await stopScanner(true)
+
   if (manualPreviewLink.value) {
     await startPreviewLink(manualPreviewLink.value)
     return
@@ -427,6 +518,7 @@ async function retryScanning() {
   scannedUrl.value = ''
   manualUrl.value = ''
   downloadProgress.value = 0
+  await stopScanner(true)
   await startScanner()
 }
 
@@ -441,7 +533,10 @@ async function goBack() {
 </script>
 
 <template>
-  <main class="min-h-dvh overflow-y-auto bg-slate-950 pb-[calc(6rem+env(safe-area-inset-bottom))] text-white">
+  <main
+    class="min-h-dvh overflow-y-auto pb-[calc(6rem+env(safe-area-inset-bottom))] text-white"
+    :class="isScanning ? 'bg-transparent' : 'bg-slate-950'"
+  >
     <div class="mx-auto flex min-h-dvh w-full max-w-md flex-col px-4 pb-4 pt-[max(1rem,env(safe-area-inset-top))]">
       <header class="flex items-center gap-3">
         <button
@@ -480,10 +575,14 @@ async function goBack() {
         </div>
       </section>
 
-      <section class="mt-4 rounded-2xl border border-white/10 bg-slate-900 p-4">
+      <section
+        class="mt-4 rounded-2xl border border-white/10 p-4"
+        :class="isScanning ? 'bg-slate-950/45' : 'bg-slate-900'"
+      >
         <div
-          class="relative mx-auto aspect-square w-full max-w-[13.5rem] overflow-hidden rounded-2xl border border-cyan-200/25 bg-slate-950"
-          :class="isScanning ? 'ring-2 ring-cyan-300/60' : ''"
+          ref="scannerFrameRef"
+          class="relative mx-auto aspect-square w-full max-w-[13.5rem] overflow-hidden rounded-2xl border border-cyan-200/25"
+          :class="isScanning ? 'bg-transparent ring-2 ring-cyan-300/60' : 'bg-slate-950'"
         >
           <div
             v-if="isScanning"
@@ -592,6 +691,14 @@ async function goBack() {
     transform: translateY(9.5rem);
     opacity: 1;
   }
+}
+</style>
+
+<style>
+html.camera-preview-active,
+body.camera-preview-active,
+body.camera-preview-active #app {
+  background: transparent !important;
 }
 </style>
 
