@@ -241,6 +241,22 @@ describe('queue_consumer legacy message compatibility', () => {
     }))
   })
 
+  it.concurrent('calls the healthcheck start URL when requested', async () => {
+    const fetchImpl = vi.fn(async () => new Response(null, { status: 200 })) as unknown as typeof fetch
+
+    const reported = await __queueConsumerTestUtils__.maybePingCronHealthcheckStart(
+      'https://example.com/healthcheck/',
+      fetchImpl,
+    )
+
+    expect(reported).toBe(true)
+    expect(__queueConsumerTestUtils__.getCronHealthcheckStartUrl('https://example.com/healthcheck/')).toBe('https://example.com/healthcheck/start')
+    expect(fetchImpl).toHaveBeenCalledTimes(1)
+    expect(fetchImpl).toHaveBeenCalledWith('https://example.com/healthcheck/start', expect.objectContaining({
+      method: 'GET',
+    }))
+  })
+
   it.concurrent('does not call the healthcheck URL when queue work remains', async () => {
     const { db } = createHealthcheckDb(2)
     const fetchImpl = vi.fn(async () => new Response(null, { status: 200 })) as unknown as typeof fetch

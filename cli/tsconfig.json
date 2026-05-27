@@ -4,12 +4,11 @@
     "lib": [
       "es2023"
     ],
-    "baseUrl": "src",
     "module": "ESNext",
     "moduleResolution": "Bundler",
     "paths": {
       "*": [
-        "types/*"
+        "./src/types/*"
       ]
     },
     "resolveJsonModule": true,

@@ -12,10 +12,16 @@
  *   --limit=10
  *   --include-disabled
  *   --missing-only
+ *
+ * Grace period:
+ *   --grace-period-value and --grace-period-type set the maximum grace period.
+ *   Each healthcheck is capped as tightly as Hyperping's minute-level grace
+ *   selector allows.
  */
 import type { Database } from '../supabase/functions/_backend/utils/supabase.types.ts'
 import { mkdir, writeFile } from 'node:fs/promises'
 import process from 'node:process'
+import { pathToFileURL } from 'node:url'
 import { asyncPool, createSupabaseServiceClient, DEFAULT_ENV_FILE, getArgValue, loadEnv, parsePositiveInteger } from './admin_stripe_backfill_utils.ts'
 
 const DEFAULT_API_BASE_URL = 'https://api.hyperping.io'
@@ -78,6 +84,7 @@ interface HyperpingMutationResponse {
 }
 
 interface Candidate {
+  grace: string
   row: CronTaskRow
   payload: HyperpingHealthcheckPayload
   schedule: string
@@ -119,6 +126,72 @@ function requireInteger(value: number | null | undefined, label: string): number
   return value as number
 }
 
+function getPeriodSeconds(value: number, type: PeriodType) {
+  switch (type) {
+    case 'seconds':
+      return value
+    case 'minutes':
+      return value * 60
+    case 'hours':
+      return value * 60 * 60
+    case 'days':
+      return value * 24 * 60 * 60
+  }
+}
+
+function getPeriodParts(seconds: number): { value: number, type: PeriodType } {
+  if (seconds >= 24 * 60 * 60 && seconds % (24 * 60 * 60) === 0) {
+    return {
+      value: seconds / (24 * 60 * 60),
+      type: 'days',
+    }
+  }
+  if (seconds >= 60 * 60 && seconds % (60 * 60) === 0) {
+    return {
+      value: seconds / (60 * 60),
+      type: 'hours',
+    }
+  }
+  if (seconds >= 60 && seconds % 60 === 0) {
+    return {
+      value: seconds / 60,
+      type: 'minutes',
+    }
+  }
+  return {
+    value: seconds,
+    type: 'seconds',
+  }
+}
+
+function getGracePeriodParts(cadenceSeconds: number, maxGracePeriodSeconds: number) {
+  const cappedGraceSeconds = Math.min(maxGracePeriodSeconds, cadenceSeconds - 1)
+  return getPeriodParts(Math.max(60, Math.floor(cappedGraceSeconds / 60) * 60))
+}
+
+function getScheduledCadenceSeconds(row: CronTaskRow) {
+  if (row.second_interval !== null)
+    return requirePositiveNumber(row.second_interval, 'second_interval')
+  if (row.minute_interval !== null)
+    return requirePositiveNumber(row.minute_interval, 'minute_interval') * 60
+  if (row.hour_interval !== null)
+    return requirePositiveNumber(row.hour_interval, 'hour_interval') * 60 * 60
+  if (row.run_at_minute !== null && row.run_at_hour === null)
+    return 60 * 60
+  if (row.run_on_day !== null)
+    return 28 * 24 * 60 * 60
+  if (row.run_on_dow !== null)
+    return 7 * 24 * 60 * 60
+  if (row.run_at_hour !== null)
+    return 24 * 60 * 60
+
+  throw new Error('No supported cron schedule fields found')
+}
+
+function formatPeriod(value: number, type: PeriodType) {
+  return `${value} ${type}`
+}
+
 function trimTrailingSlash(value: string) {
   return value.replace(/\/+$/, '')
 }
@@ -155,30 +228,35 @@ function getHourlyCronExpression(row: CronTaskRow) {
   return `${minute} * * * *`
 }
 
-function buildHealthcheckPayload(row: CronTaskRow, gracePeriodValue: number, gracePeriodType: PeriodType, timezone: string): Candidate {
+export function buildHealthcheckPayload(row: CronTaskRow, maxGracePeriodSeconds: number, timezone: string): Candidate {
+  const cadenceSeconds = getScheduledCadenceSeconds(row)
+  const gracePeriod = getGracePeriodParts(cadenceSeconds, maxGracePeriodSeconds)
   const payload: HyperpingHealthcheckPayload = {
     name: getHealthcheckName(row),
     description: getHealthcheckDescription(row),
-    grace_period_value: gracePeriodValue,
-    grace_period_type: gracePeriodType,
+    grace_period_value: gracePeriod.value,
+    grace_period_type: gracePeriod.type,
   }
+  const grace = formatPeriod(gracePeriod.value, gracePeriod.type)
 
   if (row.second_interval !== null) {
-    requirePositiveNumber(row.second_interval, 'second_interval')
+    const periodValue = requirePositiveNumber(row.second_interval, 'second_interval')
     return {
+      grace,
       row,
       payload: {
         ...payload,
-        period_value: 1,
-        period_type: 'minutes',
+        period_value: periodValue,
+        period_type: 'seconds',
       },
-      schedule: 'every 1 minute',
+      schedule: `every ${periodValue} seconds`,
     }
   }
 
   if (row.minute_interval !== null) {
     const periodValue = requirePositiveNumber(row.minute_interval, 'minute_interval')
     return {
+      grace,
       row,
       payload: {
         ...payload,
@@ -192,6 +270,7 @@ function buildHealthcheckPayload(row: CronTaskRow, gracePeriodValue: number, gra
   if (row.hour_interval !== null) {
     const periodValue = requirePositiveNumber(row.hour_interval, 'hour_interval')
     return {
+      grace,
       row,
       payload: {
         ...payload,
@@ -205,6 +284,7 @@ function buildHealthcheckPayload(row: CronTaskRow, gracePeriodValue: number, gra
   if (row.run_at_hour !== null) {
     const cron = getCronExpression(row)
     return {
+      grace,
       row,
       payload: {
         ...payload,
@@ -218,6 +298,7 @@ function buildHealthcheckPayload(row: CronTaskRow, gracePeriodValue: number, gra
   if (row.run_at_minute !== null) {
     const cron = getHourlyCronExpression(row)
     return {
+      grace,
       row,
       payload: {
         ...payload,
@@ -398,7 +479,7 @@ async function writeFailures(failures: BackfillFailure[]) {
   console.log(`Failure details written to ${FAILURE_OUTPUT}`)
 }
 
-async function main(args = process.argv.slice(2), runtimeEnv: Record<string, string | undefined> = process.env) {
+export async function main(args = process.argv.slice(2), runtimeEnv: Record<string, string | undefined> = process.env) {
   const apply = args.includes('--apply')
   const enabledOnly = !args.includes('--include-disabled')
   const missingOnly = args.includes('--missing-only')
@@ -416,6 +497,7 @@ async function main(args = process.argv.slice(2), runtimeEnv: Record<string, str
 
   const gracePeriodValue = parsePositiveInteger(getArgValue(args, '--grace-period-value') ?? env.HYPERPING_GRACE_PERIOD_VALUE ?? null, '--grace-period-value', DEFAULT_GRACE_PERIOD_VALUE)
   const gracePeriodType = parsePeriodType(getArgValue(args, '--grace-period-type') ?? env.HYPERPING_GRACE_PERIOD_TYPE ?? null, '--grace-period-type', DEFAULT_GRACE_PERIOD_TYPE)
+  const maxGracePeriodSeconds = getPeriodSeconds(gracePeriodValue, gracePeriodType)
   const timezone = getArgValue(args, '--timezone') ?? env.HYPERPING_TIMEZONE?.trim() ?? DEFAULT_TIMEZONE
 
   const supabase = createSupabaseServiceClient(env)
@@ -430,7 +512,7 @@ async function main(args = process.argv.slice(2), runtimeEnv: Record<string, str
   const candidates: Candidate[] = []
   for (const row of limitedRows) {
     try {
-      candidates.push(buildHealthcheckPayload(row, gracePeriodValue, gracePeriodType, timezone))
+      candidates.push(buildHealthcheckPayload(row, maxGracePeriodSeconds, timezone))
     }
     catch (error) {
       failures.push({
@@ -452,7 +534,7 @@ async function main(args = process.argv.slice(2), runtimeEnv: Record<string, str
     console.log('Dry run only. Pass --apply to create Hyperping healthchecks and update cron_tasks.')
 
   for (const candidate of candidates)
-    console.log(`${candidate.row.id} ${candidate.row.name}: ${candidate.schedule}`)
+    console.log(`${candidate.row.id} ${candidate.row.name}: ${candidate.schedule}, grace ${candidate.grace}`)
 
   const apiKey = getRequiredArg(getArgValue(args, '--hyperping-api-key'), '--hyperping-api-key')
   const apiBaseUrl = env.HYPERPING_API_BASE_URL?.trim() || DEFAULT_API_BASE_URL
@@ -525,7 +607,9 @@ async function main(args = process.argv.slice(2), runtimeEnv: Record<string, str
   }
 }
 
-main().catch((error) => {
-  console.error(error)
-  process.exitCode = 1
-})
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main().catch((error) => {
+    console.error(error)
+    process.exitCode = 1
+  })
+}
