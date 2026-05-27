@@ -1,6 +1,5 @@
 import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
-import type { Database } from '../utils/supabase.types.ts'
 import { sValidator } from '@hono/standard-validator'
 import { and, eq, sql } from 'drizzle-orm'
 import { createHono, useCors } from '../utils/hono.ts'
@@ -41,6 +40,7 @@ type RouteValidationResult<T> = { ok: true, data: T } | { ok: false, response: R
 type RoleBindingRecord = typeof schema.role_bindings.$inferSelect
 type RoleRecord = typeof schema.roles.$inferSelect
 const INVALID_APIKEY_ACCESS_ERROR = 'Invalid API key or access'
+const APIKEY_ORG_READER_ROLE = 'apikey_org_reader'
 
 export const app = createHono('', version)
 
@@ -53,13 +53,11 @@ async function requireAuthAndGuardLimitedKeys(c: Context<MiddlewareKeyVariables>
     return c.json({ error: 'Unauthorized' }, 401)
   }
 
-  // Prevent limited-scope API keys from managing role bindings
+  // API keys must not manage role bindings. V2 API-key permissions are scoped
+  // by these bindings, so allowing keys to mutate them would let a key widen
+  // its own access or mint another broad key.
   if (auth.authType === 'apikey') {
-    const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row'] | undefined
-    const hasLimitedScope = (apikey?.limited_to_orgs?.length ?? 0) > 0 || (apikey?.limited_to_apps?.length ?? 0) > 0
-    if (hasLimitedScope) {
-      return c.json({ error: 'Limited-scope API keys cannot manage role bindings' }, 403)
-    }
+    return c.json({ error: 'API keys cannot manage role bindings' }, 403)
   }
 
   await next()
@@ -169,19 +167,24 @@ async function validateUserPrincipalAccess(
   principalId: string,
   orgId: string,
 ): Promise<ValidationResult<null>> {
-  const activeMembership = await drizzle
-    .select({ user_right: schema.org_users.user_right })
-    .from(schema.org_users)
+  const targetRbacAccess = await drizzle
+    .select({ id: schema.role_bindings.id })
+    .from(schema.role_bindings)
+    .innerJoin(schema.roles, and(
+      eq(schema.role_bindings.role_id, schema.roles.id),
+      eq(schema.role_bindings.scope_type, schema.roles.scope_type),
+    ))
     .where(
       and(
-        eq(schema.org_users.user_id, principalId),
-        eq(schema.org_users.org_id, orgId),
-        sql`(${schema.org_users.user_right} IS NULL OR ${schema.org_users.user_right}::text NOT LIKE 'invite_%')`,
+        eq(schema.role_bindings.principal_type, 'user'),
+        eq(schema.role_bindings.principal_id, principalId),
+        eq(schema.role_bindings.org_id, orgId),
+        sql`(${schema.role_bindings.expires_at} IS NULL OR ${schema.role_bindings.expires_at} > now())`,
       ),
     )
     .limit(1)
 
-  if (activeMembership.length) {
+  if (targetRbacAccess.length) {
     return { ok: true, data: null }
   }
 
@@ -201,28 +204,7 @@ async function validateUserPrincipalAccess(
     return { ok: false, status: 400, error: 'User has not accepted the org invitation yet' }
   }
 
-  const targetRbacAccess = await drizzle
-    .select({ id: schema.role_bindings.id })
-    .from(schema.role_bindings)
-    .innerJoin(schema.roles, and(
-      eq(schema.role_bindings.role_id, schema.roles.id),
-      eq(schema.role_bindings.scope_type, schema.roles.scope_type),
-    ))
-    .where(
-      and(
-        eq(schema.role_bindings.principal_type, 'user'),
-        eq(schema.role_bindings.principal_id, principalId),
-        eq(schema.role_bindings.org_id, orgId),
-        sql`(${schema.role_bindings.expires_at} IS NULL OR ${schema.role_bindings.expires_at} > now())`,
-      ),
-    )
-    .limit(1)
-
-  if (!targetRbacAccess.length) {
-    return { ok: false, status: 400, error: 'User is not a member of this org' }
-  }
-
-  return { ok: true, data: null }
+  return { ok: false, status: 400, error: 'User is not a member of this org' }
 }
 
 async function validateGroupPrincipalAccess(
@@ -256,7 +238,6 @@ async function validateApiKeyPrincipalAccess(
   const [apiKey] = await drizzle
     .select({
       user_id: schema.apikeys.user_id,
-      limited_to_orgs: schema.apikeys.limited_to_orgs,
     })
     .from(schema.apikeys)
     .where(eq(schema.apikeys.rbac_id, principalId))
@@ -271,34 +252,23 @@ async function validateApiKeyPrincipalAccess(
     return { ok: false, status: 400, error: INVALID_APIKEY_ACCESS_ERROR }
   }
 
-  if (apiKey.limited_to_orgs?.length && !apiKey.limited_to_orgs.includes(orgId)) {
-    cloudlogErr({
-      message: 'validatePrincipalAccess: apiKey limited_to_orgs scope excludes target org',
-      principalId,
-      orgId,
-      apiKeyUserId: apiKey.user_id,
-    })
-    return { ok: false, status: 400, error: INVALID_APIKEY_ACCESS_ERROR }
-  }
-
-  // Mirror the user-principal checks: only accept active (non-invite) memberships
-  const [activeMembership] = await drizzle
-    .select({ id: schema.org_users.id })
-    .from(schema.org_users)
+  const [ownerRbacAccess] = await drizzle
+    .select({ id: schema.role_bindings.id })
+    .from(schema.role_bindings)
     .where(
       and(
-        eq(schema.org_users.user_id, apiKey.user_id),
-        eq(schema.org_users.org_id, orgId),
-        sql`(${schema.org_users.user_right} IS NULL OR ${schema.org_users.user_right}::text NOT LIKE 'invite_%')`,
+        eq(schema.role_bindings.principal_type, 'user'),
+        eq(schema.role_bindings.principal_id, apiKey.user_id),
+        eq(schema.role_bindings.org_id, orgId),
+        sql`(${schema.role_bindings.expires_at} IS NULL OR ${schema.role_bindings.expires_at} > now())`,
       ),
     )
     .limit(1)
 
-  if (activeMembership) {
+  if (ownerRbacAccess) {
     return { ok: true, data: null }
   }
 
-  // Check if the owner has a pending invite (same as user-principal validation)
   const [pendingInvite] = await drizzle
     .select({ id: schema.org_users.id })
     .from(schema.org_users)
@@ -322,35 +292,12 @@ async function validateApiKeyPrincipalAccess(
   }
 
   cloudlogErr({
-    message: 'validatePrincipalAccess: apiKey owner legacy membership not found',
+    message: 'validatePrincipalAccess: apiKey owner RBAC access not found',
     principalId,
     orgId,
     apiKeyUserId: apiKey.user_id,
   })
-
-  const [ownerRbacAccess] = await drizzle
-    .select({ id: schema.role_bindings.id })
-    .from(schema.role_bindings)
-    .where(
-      and(
-        eq(schema.role_bindings.principal_type, 'user'),
-        eq(schema.role_bindings.principal_id, apiKey.user_id),
-        eq(schema.role_bindings.org_id, orgId),
-      ),
-    )
-    .limit(1)
-
-  if (!ownerRbacAccess) {
-    cloudlogErr({
-      message: 'validatePrincipalAccess: apiKey owner RBAC access not found',
-      principalId,
-      orgId,
-      apiKeyUserId: apiKey.user_id,
-    })
-    return { ok: false, status: 400, error: INVALID_APIKEY_ACCESS_ERROR }
-  }
-
-  return { ok: true, data: null }
+  return { ok: false, status: 400, error: INVALID_APIKEY_ACCESS_ERROR }
 }
 
 export async function validatePrincipalAccess(
@@ -394,15 +341,6 @@ async function loadManagedBinding(
   }
 
   return { ok: true, data: binding }
-}
-
-// Maps legacy org_users.user_right values to their equivalent RBAC role names.
-// Only admin-level rights are mapped because lower rights (write/upload/read)
-// cannot pass the checkPermission('org.update_user_roles') gate that precedes
-// every anti-escalation check.
-const LEGACY_RIGHT_TO_ROLE_NAME: Record<string, string> = {
-  super_admin: 'org_super_admin',
-  admin: 'org_admin',
 }
 
 async function loadAssignableRoleForBinding(
@@ -463,42 +401,7 @@ async function getCallerMaxPriorityRank(
     )
     .limit(1)
 
-  let maxRank = result[0]?.max_rank ?? 0
-
-  // For JWT callers, also consider legacy org_users.user_right so that admins
-  // who passed checkPermission via check_min_rights (legacy path) are not
-  // blocked by the anti-escalation check when they have no RBAC bindings yet.
-  if (authType === 'jwt') {
-    const [membership] = await drizzle
-      .select({ user_right: schema.org_users.user_right })
-      .from(schema.org_users)
-      .where(
-        and(
-          eq(schema.org_users.user_id, principalId),
-          eq(schema.org_users.org_id, orgId),
-          sql`${schema.org_users.user_right}::text NOT LIKE 'invite_%'`,
-        ),
-      )
-      .limit(1)
-
-    const mappedRoleName = membership?.user_right
-      ? LEGACY_RIGHT_TO_ROLE_NAME[membership.user_right]
-      : undefined
-
-    if (mappedRoleName) {
-      const [role] = await drizzle
-        .select({ priority_rank: schema.roles.priority_rank })
-        .from(schema.roles)
-        .where(eq(schema.roles.name, mappedRoleName))
-        .limit(1)
-
-      if (role && role.priority_rank > maxRank) {
-        maxRank = role.priority_rank
-      }
-    }
-  }
-
-  return maxRank
+  return result[0]?.max_rank ?? 0
 }
 
 // Reusable binding creation logic - used by both the POST route and apikey/post.ts
@@ -511,6 +414,7 @@ export interface CreateBindingParams {
   app_id?: string | null
   channel_id?: string | number | null
   reason?: string
+  allowSystemRole?: boolean
 }
 
 export type CreateBindingResult = {
@@ -538,6 +442,7 @@ export async function createRoleBindingForPrincipal(
     app_id,
     channel_id,
     reason,
+    allowSystemRole = false,
   } = params
 
   // 1. Resolve role by name
@@ -551,7 +456,11 @@ export async function createRoleBindingForPrincipal(
     return { ok: false, status: 404, error: 'Role not found' }
   }
 
-  if (!role.is_assignable) {
+  const canUseSystemRole = allowSystemRole
+    && principal_type === 'apikey'
+    && role_name === APIKEY_ORG_READER_ROLE
+
+  if (!role.is_assignable && !canUseSystemRole) {
     return { ok: false, status: 403, error: 'Role is not assignable' }
   }
 

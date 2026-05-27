@@ -19,7 +19,6 @@ declare module 'vue' {
     AdminOnlyModal: typeof import('./components/AdminOnlyModal.vue')['default']
     AdminStatsCard: typeof import('./components/admin/AdminStatsCard.vue')['default']
     AdminTrendChart: typeof import('./components/admin/AdminTrendChart.vue')['default']
-    ApiKeyRbacManager: typeof import('./components/organization/ApiKeyRbacManager.vue')['default']
     AppAccess: typeof import('./components/dashboard/AppAccess.vue')['default']
     AppNotFoundModal: typeof import('./components/AppNotFoundModal.vue')['default']
     AppOnboardingFlow: typeof import('./components/dashboard/AppOnboardingFlow.vue')['default']

@@ -30,7 +30,7 @@ beforeAll(async () => {
     management_email: TEST_EMAIL,
     created_by: USER_ID,
     customer_id: customerId,
-    use_new_rbac: false, // Explicitly legacy — preserves legacy check_min_rights coverage
+    use_new_rbac: false, // Compatibility flag is ignored; permissions are RBAC-backed.
   })
   if (error)
     throw error
@@ -642,7 +642,7 @@ describe('password Policy Enforcement Integration', () => {
       is_good_plan: true,
     })
 
-    // Create org with password policy enabled (legacy mode — preserves legacy check_min_rights coverage)
+    // Create org with password policy enabled while the compatibility flag is false.
     await getSupabaseClient().from('orgs').insert({
       id: orgWithPolicyId,
       name: orgWithPolicyName,
@@ -674,8 +674,8 @@ describe('password Policy Enforcement Integration', () => {
     await getSupabaseClient().from('stripe_info').delete().eq('customer_id', orgWithPolicyCustomerId)
   })
 
-  it('check_min_rights respects password policy (legacy mode)', async () => {
-    // Directly test the check_min_rights function via RPC in legacy mode
+  it('check_min_rights respects password policy with compatibility flag disabled', async () => {
+    // Directly test the compatibility check_min_rights function via RPC
     const { data, error } = await getSupabaseClient().rpc('check_min_rights', {
       min_right: 'read',
       user_id: USER_ID,

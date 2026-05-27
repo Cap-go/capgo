@@ -82,7 +82,7 @@ const groupId = computed(() => (route.params as { id: string }).id)
 const isCreateMode = computed(() => groupId.value === 'new')
 
 const canShow = computed(() =>
-  !!currentOrganization.value?.use_new_rbac && !!currentOrganization.value?.gid,
+  !!currentOrganization.value?.gid,
 )
 
 const isPermissionLoading = ref(false)

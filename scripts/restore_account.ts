@@ -22,12 +22,9 @@ interface ApiKey {
   id: number
   created_at: string
   user_id: string
-  key: string
-  mode: 'all' | 'upload' | 'read' | 'write'
+  key: string | null
   updated_at: string
   name: string
-  limited_to_orgs: string[]
-  limited_to_apps: string[]
   expires_at: string | null
   key_hash: string | null
 }
@@ -90,12 +87,21 @@ async function main() {
       console.log(`  Found ${apikeys.length} API key(s) to restore`)
 
       for (const apikey of apikeys) {
-        // Check if this apikey already exists (by key value)
-        const { data: existingKey } = await supabase
+        if (!apikey.key && !apikey.key_hash) {
+          console.log(`  Skipping API key "${apikey.name}" - no key value or hash to restore`)
+          continue
+        }
+
+        // Check if this apikey already exists by visible key or hash.
+        let existingKeyQuery = supabase
           .from('apikeys')
           .select('id')
-          .eq('key', apikey.key)
-          .single()
+
+        existingKeyQuery = apikey.key
+          ? existingKeyQuery.eq('key', apikey.key)
+          : existingKeyQuery.eq('key_hash', apikey.key_hash)
+
+        const { data: existingKey } = await existingKeyQuery.single()
 
         if (existingKey) {
           console.log(`  Skipping API key "${apikey.name}" - already exists`)
@@ -108,10 +114,8 @@ async function main() {
           .insert({
             user_id: apikey.user_id,
             key: apikey.key,
-            mode: apikey.mode,
             name: apikey.name,
-            limited_to_orgs: apikey.limited_to_orgs || [],
-            limited_to_apps: apikey.limited_to_apps || [],
+            key_hash: apikey.key_hash,
             expires_at: apikey.expires_at,
           })
 
@@ -119,7 +123,7 @@ async function main() {
           console.error(`  Error restoring API key "${apikey.name}":`, insertError)
         }
         else {
-          console.log(`  Restored API key: "${apikey.name}"`)
+          console.log(`  Restored API key: "${apikey.name}" (RBAC bindings must be reassigned)`)
         }
       }
     }

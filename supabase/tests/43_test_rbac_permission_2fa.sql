@@ -84,13 +84,13 @@ BEGIN
 END $$;
 
 -- Create an API key for the non-2FA user (for apikey-based permission checks)
-INSERT INTO public.apikeys (id, user_id, key, mode, name)
-VALUES (
+SELECT tests.create_v2_apikey(
     9101,
     tests.get_supabase_uid('test_rbac_no2fa_user'),
     'test-rbac-no2fa-key',
-    'all'::public.key_mode,
-    'Test RBAC No 2FA Key'
+    'Test RBAC No 2FA Key',
+    current_setting('test.rbac_org_with_2fa')::uuid,
+    public.rbac_role_org_admin()
 );
 
 -- Enable RBAC for the test orgs

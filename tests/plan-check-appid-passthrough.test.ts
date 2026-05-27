@@ -1,26 +1,17 @@
 // Regression test for the "Plan upgrade required for upload" RBAC bug.
 //
-// Background: is_allowed_action_org_action(orgid, actions) internally calls
-// check_min_rights with app_id = NULL. For an RBAC-managed API key with
-// limited_to_apps set (typical for capgo CLI uploads bound to one app), the
-// app-scope restriction in rbac_check_permission_direct denies the call
-// because the key is restricted to apps but the caller passed no app context.
-// The CLI then surfaces this as "Plan upgrade required for upload" even when
-// the plan is healthy.
-//
-// The migration in 20260518071442_plan_check_passthrough_appid.sql adds a
-// 3-arg overload that threads appid into check_min_rights. This test
-// exercises all three paths via PostgREST so we catch any regression in:
-//   1. The bug repro (2-arg call denies for limited_to_apps keys).
-//   2. The fix (3-arg call with matching appid allows).
-//   3. The safety invariant (3-arg call with non-matching appid still denies).
+// Background: old CLI versions call is_allowed_action_org_action(orgid, actions)
+// without an appid. Newer callers can pass appid so the plan check can enforce
+// app-scoped RBAC bindings when it has the app context. This keeps the old
+// two-argument function shape compatible while proving the three-argument
+// overload does not widen an app-scoped API key to sibling apps.
 
 import type { Database } from '../src/types/supabase.types'
 import { randomUUID } from 'node:crypto'
 import { env } from 'node:process'
 import { createClient } from '@supabase/supabase-js'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { getSupabaseClient, normalizeLocalhostUrl, SUPABASE_ANON_KEY } from './test-utils.ts'
+import { createDirectApiKeyWithBindings, getSupabaseClient, normalizeLocalhostUrl, SUPABASE_ANON_KEY } from './test-utils.ts'
 
 const SUPABASE_URL = normalizeLocalhostUrl(env.SUPABASE_URL) ?? ''
 const USE_CLOUDFLARE_WORKERS = env.USE_CLOUDFLARE_WORKERS === 'true'
@@ -60,7 +51,7 @@ function createCapgkeyClient(apikey: string) {
   })
 }
 
-describe.skipIf(USE_CLOUDFLARE_WORKERS)('plan-check appid passthrough (RBAC + limited_to_apps)', () => {
+describe.skipIf(USE_CLOUDFLARE_WORKERS)('plan-check appid passthrough (RBAC bindings)', () => {
   beforeAll(async () => {
     // 1. User. public.users has a FK to auth.users, so we provision via
     //    auth admin first. The CLI authenticates by capgkey header, not by
@@ -104,8 +95,7 @@ describe.skipIf(USE_CLOUDFLARE_WORKERS)('plan-check appid passthrough (RBAC + li
       throw stripeError
 
     // 3. Org with use_new_rbac = true so check_min_rights routes through
-    //    rbac_check_permission_direct (the function that has the
-    //    limited_to_apps gate).
+    //    rbac_check_permission_direct.
     const { data: orgRow, error: orgError } = await serviceRoleSupabase
       .from('orgs')
       .insert({
@@ -122,8 +112,8 @@ describe.skipIf(USE_CLOUDFLARE_WORKERS)('plan-check appid passthrough (RBAC + li
     orgId = orgRow.id
 
     // 4. Two apps in the same org - one the key is allowed for, one it isn't.
-    //    Same-org apps prove the rejection comes from limited_to_apps, not from
-    //    the cross-org check in check_min_rights.
+    //    Same-org apps prove the rejection comes from app RBAC bindings, not
+    //    from the cross-org check in check_min_rights.
     const { data: primaryAppRow, error: primaryAppError } = await serviceRoleSupabase
       .from('apps')
       .insert({
@@ -158,79 +148,24 @@ describe.skipIf(USE_CLOUDFLARE_WORKERS)('plan-check appid passthrough (RBAC + li
       throw new Error('Expected other app insert to return an id')
     otherAppUuid = otherAppRow.id
 
-    // 5. RBAC-managed API key: mode = NULL, limited_to_apps = [PRIMARY_APP_ID],
-    //    distinct rbac_id used as the role-binding principal. The
-    //    apikeys_force_server_key trigger overrides whatever we pass in
-    //    for `key` and replaces it with a server-generated UUID, so we
-    //    must read the actual key back from the INSERT ... RETURNING
-    //    result (the AFTER trigger that strips the plain key for hashed
-    //    keys is DEFERRABLE INITIALLY DEFERRED and runs at commit, so
-    //    the RETURNING clause still sees the plaintext).
-    const rbacId = randomUUID()
-    const { data: apikeyRow, error: apikeyError } = await serviceRoleSupabase
-      .from('apikeys')
-      .insert({
-        user_id: ownerUserId,
-        key: randomUUID(),
-        mode: null,
-        name: `plan-check-rbac-${SUITE_ID}`,
-        limited_to_apps: [PRIMARY_APP_ID],
-        limited_to_orgs: [orgId],
-        rbac_id: rbacId,
-      })
-      .select('id, rbac_id, key')
-      .single()
-    if (apikeyError)
-      throw apikeyError
+    // 5. RBAC-managed API key with org read compatibility and upload access
+    //    only for the primary app. This mirrors the V2 key shape after the
+    //    old scope columns have been removed.
+    const apikeyRow = await createDirectApiKeyWithBindings({
+      userId: ownerUserId,
+      key: randomUUID(),
+      name: `plan-check-rbac-${SUITE_ID}`,
+      orgId,
+      roleName: 'org_member',
+      appId: PRIMARY_APP_ID,
+      appRoleName: 'app_uploader',
+    })
     if (!apikeyRow.rbac_id)
       throw new Error('Expected apikey insert to return rbac_id')
     if (!apikeyRow.key)
       throw new Error('Expected plaintext key in apikey insert RETURNING row')
     apiKeyRow = { id: apikeyRow.id, rbac_id: apikeyRow.rbac_id }
     apiKeyPlain = apikeyRow.key
-
-    // 6. Role bindings: org_member at org scope gives org.read,
-    //    app_uploader at app scope gives app.read / app.upload_bundle.
-    //    Mirrors what /apikey POST creates for a CLI-issued RBAC key.
-    const { data: orgRoleRow, error: orgRoleError } = await serviceRoleSupabase
-      .from('roles')
-      .select('id')
-      .eq('name', 'org_member')
-      .single()
-    if (orgRoleError)
-      throw orgRoleError
-
-    const { data: appRoleRow, error: appRoleError } = await serviceRoleSupabase
-      .from('roles')
-      .select('id')
-      .eq('name', 'app_uploader')
-      .single()
-    if (appRoleError)
-      throw appRoleError
-
-    const { error: bindingError } = await serviceRoleSupabase.from('role_bindings').insert([
-      {
-        principal_type: 'apikey',
-        principal_id: apiKeyRow.rbac_id,
-        role_id: orgRoleRow.id,
-        scope_type: 'org',
-        org_id: orgId,
-        granted_by: ownerUserId,
-        is_direct: true,
-      },
-      {
-        principal_type: 'apikey',
-        principal_id: apiKeyRow.rbac_id,
-        role_id: appRoleRow.id,
-        scope_type: 'app',
-        org_id: orgId,
-        app_id: primaryAppUuid,
-        granted_by: ownerUserId,
-        is_direct: true,
-      },
-    ])
-    if (bindingError)
-      throw bindingError
   })
 
   afterAll(async () => {
@@ -251,20 +186,17 @@ describe.skipIf(USE_CLOUDFLARE_WORKERS)('plan-check appid passthrough (RBAC + li
     }
   })
 
-  it('denies the 2-arg call (regression of the original bug)', async () => {
+  it('allows the 2-arg call for old CLI compatibility', async () => {
     const client = createCapgkeyClient(apiKeyPlain)
     const { data, error } = await client.rpc('is_allowed_action_org_action', {
       orgid: orgId,
       actions: ['storage'],
     })
     expect(error).toBeNull()
-    // Limited_to_apps key + null app context => RBAC app-scope restriction
-    // denies. Before the fix, the CLI's checkPlanValidUpload always called
-    // this 2-arg variant and tripped this path.
-    expect(data).toBe(false)
+    expect(data).toBe(true)
   })
 
-  it('allows the 3-arg call when appid matches limited_to_apps (the fix)', async () => {
+  it('allows the 3-arg call when appid matches an app binding', async () => {
     const client = createCapgkeyClient(apiKeyPlain)
     const args = {
       orgid: orgId,
@@ -276,7 +208,7 @@ describe.skipIf(USE_CLOUDFLARE_WORKERS)('plan-check appid passthrough (RBAC + li
     expect(data).toBe(true)
   })
 
-  it('still denies the 3-arg call when appid does not match limited_to_apps (safety invariant)', async () => {
+  it('still denies the 3-arg call when appid does not match an app binding', async () => {
     const client = createCapgkeyClient(apiKeyPlain)
     const args = {
       orgid: orgId,
@@ -285,9 +217,9 @@ describe.skipIf(USE_CLOUDFLARE_WORKERS)('plan-check appid passthrough (RBAC + li
     } as never
     const { data, error } = await client.rpc('is_allowed_action_org_action', args)
     expect(error).toBeNull()
-    // Key is limited_to_apps = [PRIMARY_APP_ID], so an upload-plan check for
-    // OTHER_APP_ID must still be rejected even though both apps are in the
-    // same org.
+    // The API key only has an app binding for PRIMARY_APP_ID, so an upload-plan
+    // check for OTHER_APP_ID must still be rejected even though both apps are
+    // in the same org.
     expect(data).toBe(false)
   })
 })

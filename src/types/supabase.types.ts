@@ -12,6 +12,31 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
       apikeys: {
@@ -21,9 +46,6 @@ export type Database = {
           id: number
           key: string | null
           key_hash: string | null
-          limited_to_apps: string[] | null
-          limited_to_orgs: string[] | null
-          mode: Database["public"]["Enums"]["key_mode"] | null
           name: string
           rbac_id: string
           updated_at: string | null
@@ -35,9 +57,6 @@ export type Database = {
           id?: number
           key?: string | null
           key_hash?: string | null
-          limited_to_apps?: string[] | null
-          limited_to_orgs?: string[] | null
-          mode?: Database["public"]["Enums"]["key_mode"] | null
           name: string
           rbac_id?: string
           updated_at?: string | null
@@ -49,9 +68,6 @@ export type Database = {
           id?: number
           key?: string | null
           key_hash?: string | null
-          limited_to_apps?: string[] | null
-          limited_to_orgs?: string[] | null
-          mode?: Database["public"]["Enums"]["key_mode"] | null
           name?: string
           rbac_id?: string
           updated_at?: string | null
@@ -468,13 +484,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "apps"
             referencedColumns: ["app_id"]
-          },
-          {
-            foreignKeyName: "build_logs_org_id_fkey"
-            columns: ["org_id"]
-            isOneToOne: false
-            referencedRelation: "orgs"
-            referencedColumns: ["id"]
           },
         ]
       }
@@ -1281,7 +1290,7 @@ export type Database = {
           paying: number | null
           paying_monthly: number | null
           paying_yearly: number | null
-          plan_enterprise: number | null
+          plan_enterprise: number
           plan_enterprise_conversion_rate: number
           plan_enterprise_monthly: number
           plan_enterprise_yearly: number
@@ -1365,7 +1374,7 @@ export type Database = {
           paying?: number | null
           paying_monthly?: number | null
           paying_yearly?: number | null
-          plan_enterprise?: number | null
+          plan_enterprise?: number
           plan_enterprise_conversion_rate?: number
           plan_enterprise_monthly?: number
           plan_enterprise_yearly?: number
@@ -1449,7 +1458,7 @@ export type Database = {
           paying?: number | null
           paying_monthly?: number | null
           paying_yearly?: number | null
-          plan_enterprise?: number | null
+          plan_enterprise?: number
           plan_enterprise_conversion_rate?: number
           plan_enterprise_monthly?: number
           plan_enterprise_yearly?: number
@@ -2994,6 +3003,13 @@ export type Database = {
     }
     Functions: {
       accept_invitation_to_org: { Args: { org_id: string }; Returns: string }
+      apikey_permission_for_keymode: {
+        Args: {
+          keymode: Database["public"]["Enums"]["key_mode"][]
+          scope_type: string
+        }
+        Returns: string
+      }
       app_versions_readable_app_ids: { Args: never; Returns: string[] }
       apply_usage_overage: {
         Args: {
@@ -3189,65 +3205,6 @@ export type Database = {
           wrong_key_count: number
         }[]
       }
-      create_hashed_apikey: {
-        Args: {
-          p_expires_at?: string
-          p_limited_to_apps?: string[]
-          p_limited_to_orgs?: string[]
-          p_mode?: Database["public"]["Enums"]["key_mode"]
-          p_name?: string
-        }
-        Returns: {
-          created_at: string | null
-          expires_at: string | null
-          id: number
-          key: string | null
-          key_hash: string | null
-          limited_to_apps: string[] | null
-          limited_to_orgs: string[] | null
-          mode: Database["public"]["Enums"]["key_mode"] | null
-          name: string
-          rbac_id: string
-          updated_at: string | null
-          user_id: string
-        }
-        SetofOptions: {
-          from: "*"
-          to: "apikeys"
-          isOneToOne: true
-          isSetofReturn: false
-        }
-      }
-      create_hashed_apikey_for_user: {
-        Args: {
-          p_expires_at?: string
-          p_limited_to_apps?: string[]
-          p_limited_to_orgs?: string[]
-          p_mode?: Database["public"]["Enums"]["key_mode"]
-          p_name?: string
-          p_user_id: string
-        }
-        Returns: {
-          created_at: string | null
-          expires_at: string | null
-          id: number
-          key: string | null
-          key_hash: string | null
-          limited_to_apps: string[] | null
-          limited_to_orgs: string[] | null
-          mode: Database["public"]["Enums"]["key_mode"] | null
-          name: string
-          rbac_id: string
-          updated_at: string | null
-          user_id: string
-        }
-        SetofOptions: {
-          from: "*"
-          to: "apikeys"
-          isOneToOne: true
-          isSetofReturn: false
-        }
-      }
       current_request_role: { Args: never; Returns: string }
       delete_accounts_marked_for_deletion: {
         Args: never
@@ -3288,9 +3245,6 @@ export type Database = {
           id: number
           key: string | null
           key_hash: string | null
-          limited_to_apps: string[] | null
-          limited_to_orgs: string[] | null
-          mode: Database["public"]["Enums"]["key_mode"] | null
           name: string
           rbac_id: string
           updated_at: string | null
@@ -3545,9 +3499,6 @@ export type Database = {
           created_at: string
           expires_at: string
           id: number
-          limited_to_apps: string[]
-          limited_to_orgs: string[]
-          mode: Database["public"]["Enums"]["key_mode"]
           name: string
           owner_email: string
           rbac_id: string
@@ -4058,7 +4009,7 @@ export type Database = {
         | { Args: { userid: string }; Returns: boolean }
       is_rbac_enabled_globally: { Args: never; Returns: boolean }
       is_recent_email_otp_verified: {
-        Args: { user_id: string }
+        Args: { p_user_id: string }
         Returns: boolean
       }
       is_storage_exceeded_by_org: { Args: { org_id: string }; Returns: boolean }
@@ -4417,9 +4368,6 @@ export type Database = {
           id: number
           key: string | null
           key_hash: string | null
-          limited_to_apps: string[] | null
-          limited_to_orgs: string[] | null
-          mode: Database["public"]["Enums"]["key_mode"] | null
           name: string
           rbac_id: string
           updated_at: string | null
@@ -4440,9 +4388,6 @@ export type Database = {
           id: number
           key: string | null
           key_hash: string | null
-          limited_to_apps: string[] | null
-          limited_to_orgs: string[] | null
-          mode: Database["public"]["Enums"]["key_mode"] | null
           name: string
           rbac_id: string
           updated_at: string | null
@@ -4503,6 +4448,25 @@ export type Database = {
         Args: { email: string; org_id: string }
         Returns: string
       }
+      reset_and_seed_app_data: {
+        Args: {
+          p_admin_user_id?: string
+          p_app_id: string
+          p_org_id?: string
+          p_plan_product_id?: string
+          p_stripe_customer_id?: string
+          p_user_id?: string
+        }
+        Returns: undefined
+      }
+      reset_and_seed_app_stats_data: {
+        Args: { p_app_id: string }
+        Returns: undefined
+      }
+      reset_and_seed_data: { Args: never; Returns: undefined }
+      reset_and_seed_stats_data: { Args: never; Returns: undefined }
+      reset_app_data: { Args: { p_app_id: string }; Returns: undefined }
+      reset_app_stats_data: { Args: { p_app_id: string }; Returns: undefined }
       reset_onboarding_demo_app_data: {
         Args: { p_app_uuid: string }
         Returns: undefined
@@ -4687,7 +4651,9 @@ export type Database = {
         | "disableAutoUpdateMetadata"
         | "disableAutoUpdateUnderNative"
         | "disableDevBuild"
+        | "disableProdBuild"
         | "disableEmulator"
+        | "disableDevice"
         | "cannotGetBundle"
         | "checksum_fail"
         | "NoChannelOrOverride"
@@ -4708,8 +4674,6 @@ export type Database = {
         | "download_manifest_brotli_fail"
         | "backend_refusal"
         | "download_0"
-        | "disableProdBuild"
-        | "disableDevice"
         | "disablePlatformElectron"
         | "customIdBlocked"
         | "app_crash"
@@ -4900,6 +4864,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {
       action_type: ["mau", "storage", "bandwidth", "build_time"],
@@ -4956,7 +4923,9 @@ export const Constants = {
         "disableAutoUpdateMetadata",
         "disableAutoUpdateUnderNative",
         "disableDevBuild",
+        "disableProdBuild",
         "disableEmulator",
+        "disableDevice",
         "cannotGetBundle",
         "checksum_fail",
         "NoChannelOrOverride",
@@ -4977,8 +4946,6 @@ export const Constants = {
         "download_manifest_brotli_fail",
         "backend_refusal",
         "download_0",
-        "disableProdBuild",
-        "disableDevice",
         "disablePlatformElectron",
         "customIdBlocked",
         "app_crash",

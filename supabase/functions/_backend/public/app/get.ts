@@ -18,9 +18,6 @@ export async function get(c: Context<MiddlewareKeyVariables>, appId: string, api
   if (!(await checkPermission(c, 'app.read', { appId }))) {
     throw quickError(401, 'cannot_access_app', 'You can\'t access this app', { app_id: appId })
   }
-  if (apikey.limited_to_apps && apikey.limited_to_apps.length > 0 && !apikey.limited_to_apps.includes(appId)) {
-    throw quickError(401, 'cannot_access_app', 'You can\'t access this app', { app_id: appId })
-  }
 
   const { data, error: dbError } = await supabaseApikey(c, apikey.key)
     .from('apps')
@@ -66,17 +63,8 @@ export async function getAll(c: Context, apikey: Database['public']['Tables']['a
 
     query = query.eq('owner_org', orgId)
   }
-  // If the user has limited access to specific apps, filter by those
-  else if (apikey.limited_to_apps && apikey.limited_to_apps.length > 0) {
-    query = query.in('app_id', apikey.limited_to_apps)
-  }
-  // If the user has limited access to specific orgs, filter by those
-  else if (apikey.limited_to_orgs && apikey.limited_to_orgs.length > 0) {
-    query = query.in('owner_org', apikey.limited_to_orgs)
-  }
-  // Otherwise, get all organizations the user is a member of and filter by those
   else {
-    // Get list of orgs the user is a member of via RPC (avoids direct org_users select).
+    // Get list of orgs this key can read via RPC (avoids direct org_users select).
     const { data: userOrgs, error: orgsError } = await supabaseApikey(c, apikey.key)
       .rpc('get_orgs_v6')
 

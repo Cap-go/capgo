@@ -67,34 +67,42 @@ BEGIN
     PERFORM set_config('test.org_without_2fa_direct', org_without_2fa_enforcement_id::text, false);
 
     -- Create API key for test_2fa_user_org (use high IDs to avoid conflicts)
-    INSERT INTO public.apikeys (id, user_id, key, mode, name)
-    VALUES (
+    PERFORM tests.create_v2_apikey(
         9003,
         test_2fa_user_id,
         'test-2fa-apikey-for-org',
-        'all'::public.key_mode,
-        'Test 2FA API Key Org'
+        'Test 2FA API Key Org',
+        org_with_2fa_enforcement_id,
+        public.rbac_role_org_super_admin()
     );
 
     -- Create API key for test_no_2fa_user_org
-    INSERT INTO public.apikeys (id, user_id, key, mode, name)
-    VALUES (
+    PERFORM tests.create_v2_apikey(
         9004,
         test_no_2fa_user_id,
         'test-no2fa-apikey-for-org',
-        'all'::public.key_mode,
-        'Test No 2FA API Key Org'
+        'Test No 2FA API Key Org',
+        org_with_2fa_enforcement_id,
+        public.rbac_role_org_super_admin()
     );
 
-    -- Create org-limited API key for test_2fa_user_org (limited to org_without_2fa_enforcement only)
-    INSERT INTO public.apikeys (id, user_id, key, mode, name, limited_to_orgs)
-    VALUES (
+    PERFORM tests.create_v2_apikey(
+        9004,
+        test_no_2fa_user_id,
+        'test-no2fa-apikey-for-org',
+        'Test No 2FA API Key Org',
+        org_without_2fa_enforcement_id,
+        public.rbac_role_org_super_admin()
+    );
+
+    -- Create org-bound API key for test_2fa_user_org (bound to org_without_2fa_enforcement only)
+    PERFORM tests.create_v2_apikey(
         9005,
         test_2fa_user_id,
         'test-2fa-apikey-org-limited',
-        'all'::public.key_mode,
         'Test 2FA API Key Org Limited',
-        ARRAY[org_without_2fa_enforcement_id]
+        org_without_2fa_enforcement_id,
+        public.rbac_role_org_super_admin()
     );
 END $$;
 

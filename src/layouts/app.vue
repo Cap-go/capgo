@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import type { Tab } from '~/components/comp_def'
-import type { Organization } from '~/stores/organization'
-import { computed, ref, watchEffect } from 'vue'
+import { computed, watchEffect } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import PaymentRequiredModal from '~/components/PaymentRequiredModal.vue'
 import Tabs from '~/components/Tabs.vue'
@@ -21,26 +20,12 @@ const appId = computed(() => {
   return match ? match[1] : ''
 })
 
-// Get organization for the current app (not currentOrganization which may be wrong in app context)
-const appOrganization = ref<Organization | null>(null)
-
 watchEffect(async () => {
-  if (appId.value) {
+  if (appId.value)
     await organizationStore.awaitInitialLoad()
-    appOrganization.value = organizationStore.getOrgByAppId(appId.value) ?? null
-  }
 })
 
-// Compute tabs dynamically based on RBAC settings
-const appTabs = computed<Tab[]>(() => {
-  const useNewRbac = appOrganization.value?.use_new_rbac
-
-  if (useNewRbac) {
-    return baseAppTabs
-  }
-
-  return baseAppTabs.filter(t => t.label !== 'access')
-})
+const appTabs = computed<Tab[]>(() => baseAppTabs)
 
 // Check if org payment has failed - only show info tab in this case
 const isOrgUnpaid = computed(() => {

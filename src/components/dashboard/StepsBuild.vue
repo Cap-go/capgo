@@ -13,7 +13,7 @@ import IconSettings from '~icons/lucide/settings-2'
 import IconTerminal from '~icons/lucide/terminal-square'
 import IconAndroid from '~icons/mdi/android'
 import IconApple from '~icons/mdi/apple'
-import { createDefaultApiKey } from '~/services/apikeys'
+import { createDefaultApiKey, findUsablePlainApiKey } from '~/services/apikeys'
 import { pushEvent } from '~/services/posthog'
 import { getLocalConfig, isLocal, useSupabase } from '~/services/supabase'
 import { sendEvent } from '~/services/tracking'
@@ -222,35 +222,30 @@ async function addNewApiKey() {
 
   if (!userId) {
     console.log('Not logged in, cannot regenerate API key')
-    return
+    return null
   }
-  const { error } = await createDefaultApiKey(supabase, t('api-key'))
+  const { data, error } = await createDefaultApiKey(supabase, t('api-key'), {
+    orgId: organizationStore.currentOrganization?.gid,
+    appId: props.appId,
+  })
 
   if (error)
     throw error
+
+  return typeof data?.key === 'string' ? data.key : null
 }
 
 async function getKey(retry = true): Promise<void> {
   isLoading.value = true
   if (!main?.user?.id)
     return
-  const { data, error } = await supabase
-    .from('apikeys')
-    .select()
-    .eq('user_id', main?.user?.id)
-    .eq('mode', 'all')
-    .order('created_at', { ascending: true })
-    .limit(1)
 
-  if (typeof data !== 'undefined' && data !== null && !error) {
-    if (data.length === 0) {
-      await addNewApiKey()
-      return getKey(false)
-    }
-    apiKey.value = data[0].key ?? '[APIKEY]'
+  const existingKey = await findUsablePlainApiKey(supabase, main.user.id, organizationStore.currentOrganization?.gid, props.appId)
+  if (existingKey) {
+    apiKey.value = existingKey
   }
-  else if (retry && main?.user?.id) {
-    return getKey(false)
+  else if (retry) {
+    apiKey.value = await addNewApiKey() ?? '[APIKEY]'
   }
 
   isLoading.value = false

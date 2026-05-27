@@ -43,27 +43,23 @@ SELECT
 FROM public.roles r
 WHERE r.name = public.rbac_role_org_admin();
 
-INSERT INTO public.apikeys (id, user_id, key, mode, name, limited_to_orgs)
-VALUES (
+SELECT tests.create_v2_apikey(
   45148,
   tests.get_supabase_uid('rbac_apikey_mismatch_key_owner'),
   'rbac-apikey-mismatch-key',
-  'all'::public.key_mode,
   'rbac-apikey-mismatch-key',
-  ARRAY['70000000-0000-4000-8000-000000000048'::uuid]
-)
-ON CONFLICT (id) DO NOTHING;
+  '70000000-0000-4000-8000-000000000048'::uuid,
+  public.rbac_role_org_admin()
+);
 
-INSERT INTO public.apikeys (id, user_id, key, mode, name, limited_to_orgs)
-VALUES (
+SELECT tests.create_v2_apikey(
   45149,
   tests.get_supabase_uid('rbac_apikey_mismatch_actor'),
   'rbac-apikey-mismatch-actor-key',
-  'all'::public.key_mode,
   'rbac-apikey-mismatch-actor-key',
-  ARRAY['70000000-0000-4000-8000-000000000048'::uuid]
-)
-ON CONFLICT (id) DO NOTHING;
+  '70000000-0000-4000-8000-000000000048'::uuid,
+  public.rbac_role_org_admin()
+);
 
 SELECT ok(
   NOT public.rbac_check_permission_direct(

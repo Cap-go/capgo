@@ -178,11 +178,8 @@ export const apikeys = pgTable('apikeys', {
   user_id: uuid('user_id').notNull(),
   key: varchar('key'),
   key_hash: varchar('key_hash'),
-  mode: keyModePgEnum('mode').notNull(),
   updated_at: timestamp('updated_at').defaultNow(),
   name: varchar('name').notNull(),
-  limited_to_orgs: uuid('limited_to_orgs').array(),
-  limited_to_apps: varchar('limited_to_apps').array(),
   expires_at: timestamp('expires_at', { withTimezone: true }),
   rbac_id: uuid('rbac_id').notNull(),
 })
