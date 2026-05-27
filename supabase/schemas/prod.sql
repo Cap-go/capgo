@@ -2479,22 +2479,347 @@ CREATE OR REPLACE FUNCTION "public"."check_revert_to_builtin_version"("appid" ch
     SET "search_path" TO ''
     AS $$
 BEGIN
-    DECLARE
-        version_id INTEGER;
-    BEGIN
-        SELECT id INTO version_id FROM public.app_versions WHERE name = 'builtin' AND app_id = appid;
-        IF NOT FOUND THEN
-            INSERT INTO public.app_versions(name, app_id, storage_provider)
-            VALUES ('builtin', appid, 'r2')
-            RETURNING id INTO version_id;
-        END IF;
-        RETURN version_id;
-    END;
+  PERFORM appid;
+  RETURN NULL::integer;
 END;
 $$;
 
 
 ALTER FUNCTION "public"."check_revert_to_builtin_version"("appid" character varying) OWNER TO "postgres";
+
+
+COMMENT ON FUNCTION "public"."check_revert_to_builtin_version"("appid" character varying) IS 'Legacy RPC kept for older clients. Native/builtin channel targets are represented by channels.version = NULL and this function must not recreate app_versions rows.';
+
+
+
+CREATE OR REPLACE FUNCTION "public"."claim_legacy_onboarding_demo_data"("p_app_uuid" "uuid") RETURNS "void"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+DECLARE
+  v_app_id text;
+  v_owner_org uuid;
+  v_can_claim_full_seed boolean := false;
+BEGIN
+  SELECT "app_id", "owner_org"
+  INTO v_app_id, v_owner_org
+  FROM "public"."apps"
+  WHERE "id" = p_app_uuid
+    AND "need_onboarding" IS TRUE;
+
+  IF v_app_id IS NULL THEN
+    RETURN;
+  END IF;
+
+  -- Legacy demo rows created before this provenance table had no durable owner
+  -- marker. Only claim rows with hard demo storage/build markers. Names alone
+  -- are not enough because customers can create normal 1.0.0/production rows.
+  INSERT INTO "public"."onboarding_demo_data" (
+    "app_id",
+    "owner_org",
+    "relation_name",
+    "row_key",
+    "seed_id"
+  )
+  SELECT
+    v_app_id,
+    v_owner_org,
+    'manifest',
+    m."id"::text,
+    p_app_uuid
+  FROM "public"."manifest" m
+  INNER JOIN "public"."app_versions" av
+    ON av."id" = m."app_version_id"
+  WHERE av."app_id" = v_app_id
+    AND m."s3_path" LIKE ('demo/' || v_app_id || '/%')
+  ON CONFLICT ("app_id", "relation_name", "row_key") DO UPDATE
+  SET
+    "owner_org" = EXCLUDED."owner_org",
+    "seed_id" = EXCLUDED."seed_id",
+    "created_at" = "now"();
+
+  INSERT INTO "public"."onboarding_demo_data" (
+    "app_id",
+    "owner_org",
+    "relation_name",
+    "row_key",
+    "seed_id"
+  )
+  SELECT
+    v_app_id,
+    v_owner_org,
+    'build_requests',
+    br."id"::text,
+    p_app_uuid
+  FROM "public"."build_requests" br
+  WHERE br."app_id" = v_app_id
+    AND br."upload_session_key" LIKE 'demo-session-%'
+    AND br."upload_path" LIKE ('builds/' || v_app_id || '/%')
+    AND br."upload_url" LIKE ('https://demo-builds.example.com/' || v_app_id || '/%')
+    AND COALESCE(br."build_config"->>'bundleId', '') = v_app_id
+    AND (
+      br."builder_job_id" LIKE 'demo-job-%'
+      OR br."builder_job_id" IS NULL
+    )
+  ON CONFLICT ("app_id", "relation_name", "row_key") DO UPDATE
+  SET
+    "owner_org" = EXCLUDED."owner_org",
+    "seed_id" = EXCLUDED."seed_id",
+    "created_at" = "now"();
+
+  SELECT
+    EXISTS (
+      SELECT 1
+      FROM "public"."manifest" m
+      INNER JOIN "public"."app_versions" av
+        ON av."id" = m."app_version_id"
+      WHERE av."app_id" = v_app_id
+        AND m."s3_path" LIKE ('demo/' || v_app_id || '/%')
+    )
+    AND EXISTS (
+      SELECT 1
+      FROM "public"."build_requests" br
+      WHERE br."app_id" = v_app_id
+        AND br."upload_session_key" LIKE 'demo-session-%'
+        AND br."upload_url" LIKE ('https://demo-builds.example.com/' || v_app_id || '/%')
+    )
+    AND NOT EXISTS (
+      SELECT 1
+      FROM "public"."app_versions" av
+      WHERE av."app_id" = v_app_id
+        AND av."name" NOT IN ('unknown', 'builtin', '1.0.0', '1.0.1', '1.1.0', '1.1.1', '1.2.0')
+    )
+    AND NOT EXISTS (
+      SELECT 1
+      FROM "public"."manifest" m
+      INNER JOIN "public"."app_versions" av
+        ON av."id" = m."app_version_id"
+      WHERE av."app_id" = v_app_id
+        AND m."s3_path" NOT LIKE ('demo/' || v_app_id || '/%')
+    )
+    AND NOT EXISTS (
+      SELECT 1
+      FROM "public"."channels" c
+      INNER JOIN "public"."app_versions" av
+        ON av."id" = c."version"
+      WHERE c."app_id" = v_app_id
+        AND NOT (
+          c."disable_auto_update_under_native" IS TRUE
+          AND c."disable_auto_update" = 'major'::"public"."disable_update"
+          AND c."ios" IS TRUE
+          AND c."android" IS TRUE
+          AND c."electron" IS TRUE
+          AND c."allow_emulator" IS TRUE
+          AND c."allow_device" IS TRUE
+          AND c."allow_prod" IS TRUE
+          AND (
+            (
+              c."name" = 'production'
+              AND c."public" IS TRUE
+              AND c."allow_device_self_set" IS FALSE
+              AND c."allow_dev" IS FALSE
+              AND av."name" = '1.1.1'
+            )
+            OR (
+              c."name" = 'development'
+              AND c."public" IS FALSE
+              AND c."allow_device_self_set" IS FALSE
+              AND c."allow_dev" IS TRUE
+              AND av."name" = '1.2.0'
+            )
+            OR (
+              c."name" = 'pr-123'
+              AND c."public" IS FALSE
+              AND c."allow_device_self_set" IS TRUE
+              AND c."allow_dev" IS TRUE
+              AND av."name" = '1.2.0'
+            )
+          )
+        )
+    )
+    AND NOT EXISTS (
+      SELECT 1
+      FROM "public"."channel_devices" cd
+      WHERE cd."app_id" = v_app_id
+    )
+    AND NOT EXISTS (
+      SELECT 1
+      FROM "public"."devices" d
+      WHERE d."app_id" = v_app_id
+        AND NOT (
+          d."plugin_version" = '6.0.0'
+          AND d."version_name" = '1.1.1'
+          AND COALESCE(d."version_build", '') = '1'
+          AND d."platform" IN ('ios'::"public"."platform_os", 'android'::"public"."platform_os")
+          AND COALESCE(d."os_version", '') IN ('17.0', '14')
+          AND COALESCE(d."is_prod", false) IS TRUE
+          AND COALESCE(d."is_emulator", true) IS FALSE
+        )
+    )
+    AND NOT EXISTS (
+      SELECT 1
+      FROM "public"."build_requests" br
+      WHERE br."app_id" = v_app_id
+        AND NOT (
+          br."upload_session_key" LIKE 'demo-session-%'
+          AND br."upload_path" LIKE ('builds/' || v_app_id || '/%')
+          AND br."upload_url" LIKE ('https://demo-builds.example.com/' || v_app_id || '/%')
+          AND COALESCE(br."build_config"->>'bundleId', '') = v_app_id
+          AND (
+            br."builder_job_id" LIKE 'demo-job-%'
+            OR br."builder_job_id" IS NULL
+          )
+        )
+    )
+    AND NOT EXISTS (
+      WITH expected_deploys AS (
+        SELECT *
+        FROM (VALUES
+          ('production'::text, '1.0.0'::text),
+          ('development'::text, '1.0.1'::text),
+          ('production'::text, '1.0.1'::text),
+          ('development'::text, '1.1.0'::text),
+          ('production'::text, '1.1.0'::text),
+          ('development'::text, '1.1.1'::text),
+          ('production'::text, '1.1.1'::text),
+          ('pr-123'::text, '1.2.0'::text),
+          ('development'::text, '1.2.0'::text)
+        ) AS expected("channel_name", "version_name")
+      )
+      SELECT 1
+      FROM "public"."deploy_history" dh
+      INNER JOIN "public"."channels" c
+        ON c."id" = dh."channel_id"
+      INNER JOIN "public"."app_versions" av
+        ON av."id" = dh."version_id"
+      WHERE dh."app_id" = v_app_id
+        AND NOT EXISTS (
+          SELECT 1
+          FROM expected_deploys expected
+          WHERE expected."channel_name" = c."name"
+            AND expected."version_name" = av."name"
+        )
+    )
+  INTO v_can_claim_full_seed;
+
+  IF NOT v_can_claim_full_seed THEN
+    RETURN;
+  END IF;
+
+  INSERT INTO "public"."onboarding_demo_data" (
+    "app_id",
+    "owner_org",
+    "relation_name",
+    "row_key",
+    "seed_id"
+  )
+  SELECT
+    v_app_id,
+    v_owner_org,
+    'app_versions',
+    av."id"::text,
+    p_app_uuid
+  FROM "public"."app_versions" av
+  WHERE av."app_id" = v_app_id
+    AND av."name" IN ('1.0.0', '1.0.1', '1.1.0', '1.1.1', '1.2.0')
+  ON CONFLICT ("app_id", "relation_name", "row_key") DO UPDATE
+  SET
+    "owner_org" = EXCLUDED."owner_org",
+    "seed_id" = EXCLUDED."seed_id",
+    "created_at" = "now"();
+
+  INSERT INTO "public"."onboarding_demo_data" (
+    "app_id",
+    "owner_org",
+    "relation_name",
+    "row_key",
+    "seed_id"
+  )
+  SELECT
+    v_app_id,
+    v_owner_org,
+    'app_versions_meta',
+    avm."id"::text,
+    p_app_uuid
+  FROM "public"."app_versions_meta" avm
+  INNER JOIN "public"."app_versions" av
+    ON av."id" = avm."id"
+  WHERE av."app_id" = v_app_id
+    AND av."name" IN ('1.0.0', '1.0.1', '1.1.0', '1.1.1', '1.2.0')
+  ON CONFLICT ("app_id", "relation_name", "row_key") DO UPDATE
+  SET
+    "owner_org" = EXCLUDED."owner_org",
+    "seed_id" = EXCLUDED."seed_id",
+    "created_at" = "now"();
+
+  INSERT INTO "public"."onboarding_demo_data" (
+    "app_id",
+    "owner_org",
+    "relation_name",
+    "row_key",
+    "seed_id"
+  )
+  SELECT
+    v_app_id,
+    v_owner_org,
+    'channels',
+    c."id"::text,
+    p_app_uuid
+  FROM "public"."channels" c
+  WHERE c."app_id" = v_app_id
+    AND c."name" IN ('production', 'development', 'pr-123')
+  ON CONFLICT ("app_id", "relation_name", "row_key") DO UPDATE
+  SET
+    "owner_org" = EXCLUDED."owner_org",
+    "seed_id" = EXCLUDED."seed_id",
+    "created_at" = "now"();
+
+  INSERT INTO "public"."onboarding_demo_data" (
+    "app_id",
+    "owner_org",
+    "relation_name",
+    "row_key",
+    "seed_id"
+  )
+  SELECT
+    v_app_id,
+    v_owner_org,
+    'deploy_history',
+    dh."id"::text,
+    p_app_uuid
+  FROM "public"."deploy_history" dh
+  WHERE dh."app_id" = v_app_id
+  ON CONFLICT ("app_id", "relation_name", "row_key") DO UPDATE
+  SET
+    "owner_org" = EXCLUDED."owner_org",
+    "seed_id" = EXCLUDED."seed_id",
+    "created_at" = "now"();
+
+  INSERT INTO "public"."onboarding_demo_data" (
+    "app_id",
+    "owner_org",
+    "relation_name",
+    "row_key",
+    "seed_id"
+  )
+  SELECT
+    v_app_id,
+    v_owner_org,
+    'devices',
+    d."id"::text,
+    p_app_uuid
+  FROM "public"."devices" d
+  WHERE d."app_id" = v_app_id
+  ON CONFLICT ("app_id", "relation_name", "row_key") DO UPDATE
+  SET
+    "owner_org" = EXCLUDED."owner_org",
+    "seed_id" = EXCLUDED."seed_id",
+    "created_at" = "now"();
+END;
+$$;
+
+
+ALTER FUNCTION "public"."claim_legacy_onboarding_demo_data"("p_app_uuid" "uuid") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."cleanup_expired_apikeys"() RETURNS "void"
@@ -2729,7 +3054,7 @@ CREATE OR REPLACE FUNCTION "public"."clear_onboarding_app_data"("p_app_uuid" "uu
     SET "search_path" TO ''
     AS $$
 BEGIN
-  PERFORM public.clear_onboarding_app_data(p_app_uuid, NULL::bigint);
+  PERFORM "public"."reset_onboarding_demo_app_data"(p_app_uuid);
 END;
 $$;
 
@@ -2741,134 +3066,12 @@ CREATE OR REPLACE FUNCTION "public"."clear_onboarding_app_data"("p_app_uuid" "uu
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
     AS $$
-DECLARE
-  v_app_id text;
-  v_owner_org uuid;
-  v_last_version text;
-  v_manifest_bundle_count bigint := 0;
-  v_channel_device_count bigint := 0;
 BEGIN
-  SELECT app_id, owner_org
-  INTO v_app_id, v_owner_org
-  FROM public.apps
-  WHERE id = p_app_uuid;
-
-  IF v_app_id IS NULL THEN
-    RETURN;
-  END IF;
-
-  DELETE FROM public.channel_devices
-  WHERE app_id = v_app_id
-    AND (
-      p_preserve_app_version_id IS NULL
-      OR NOT EXISTS (
-        SELECT 1
-        FROM public.channels
-        WHERE channels.id = channel_devices.channel_id
-          AND channels.version = p_preserve_app_version_id
-      )
-    );
-
-  DELETE FROM public.deploy_history
-  WHERE app_id = v_app_id
-    AND (
-      p_preserve_app_version_id IS NULL
-      OR version_id IS DISTINCT FROM p_preserve_app_version_id
-    );
-
-  DELETE FROM public.channels
-  WHERE app_id = v_app_id
-    AND (
-      p_preserve_app_version_id IS NULL
-      OR version IS DISTINCT FROM p_preserve_app_version_id
-    );
-
-  DELETE FROM public.devices
-  WHERE app_id = v_app_id;
-
-  DELETE FROM public.app_versions_meta
-  WHERE app_id = v_app_id
-    AND (
-      p_preserve_app_version_id IS NULL
-      OR id IS DISTINCT FROM p_preserve_app_version_id
-    );
-
-  DELETE FROM public.daily_version
-  WHERE app_id = v_app_id;
-
-  DELETE FROM public.daily_bandwidth
-  WHERE app_id = v_app_id;
-
-  DELETE FROM public.daily_storage
-  WHERE app_id = v_app_id;
-
-  DELETE FROM public.daily_mau
-  WHERE app_id = v_app_id;
-
-  DELETE FROM public.daily_build_time
-  WHERE app_id = v_app_id;
-
-  DELETE FROM public.build_requests
-  WHERE app_id = v_app_id;
-
-  DELETE FROM public.app_versions
-  WHERE app_id = v_app_id
-    AND name NOT IN ('builtin', 'unknown')
-    AND (
-      p_preserve_app_version_id IS NULL
-      OR id IS DISTINCT FROM p_preserve_app_version_id
-    );
-
-  INSERT INTO public.app_versions (
-    owner_org,
-    deleted,
-    name,
-    app_id,
-    created_at
-  )
-  VALUES
-    (v_owner_org, true, 'builtin', v_app_id, now()),
-    (v_owner_org, true, 'unknown', v_app_id, now())
-  ON CONFLICT (name, app_id) DO UPDATE
-  SET
-    owner_org = EXCLUDED.owner_org,
-    deleted = true,
-    deleted_at = NULL,
-    checksum = NULL,
-    session_key = NULL,
-    r2_path = NULL,
-    link = NULL,
-    comment = NULL,
-    updated_at = now();
-
-  IF p_preserve_app_version_id IS NOT NULL THEN
-    SELECT name, CASE WHEN manifest_count > 0 THEN 1 ELSE 0 END
-    INTO v_last_version, v_manifest_bundle_count
-    FROM public.app_versions
-    WHERE id = p_preserve_app_version_id
-      AND app_id = v_app_id
-      AND deleted IS FALSE;
-
-    SELECT COUNT(*)::bigint
-    INTO v_channel_device_count
-    FROM public.channel_devices
-    INNER JOIN public.channels
-      ON channels.id = channel_devices.channel_id
-    WHERE channel_devices.app_id = v_app_id
-      AND channels.version = p_preserve_app_version_id;
-  END IF;
-
-  UPDATE public.apps
-  SET
-    channel_device_count = v_channel_device_count,
-    manifest_bundle_count = v_manifest_bundle_count,
-    last_version = v_last_version
-  WHERE id = p_app_uuid;
-
-  IF v_owner_org IS NOT NULL THEN
-    DELETE FROM public.app_metrics_cache
-    WHERE org_id = v_owner_org;
-  END IF;
+  -- This legacy helper used to delete broad app data. Keep the name for older
+  -- callers, but make it provenance-based so completing/resetting onboarding
+  -- can never wipe untracked production rows.
+  PERFORM p_preserve_app_version_id;
+  PERFORM "public"."reset_onboarding_demo_app_data"(p_app_uuid);
 END;
 $$;
 
@@ -2923,55 +3126,6 @@ ALTER FUNCTION "public"."cli_check_permission"("apikey" "text", "permission_key"
 
 COMMENT ON FUNCTION "public"."cli_check_permission"("apikey" "text", "permission_key" "text", "org_id" "uuid", "app_id" "text", "channel_id" bigint) IS 'CLI permission wrapper bound to the request capgkey header. The apikey argument is retained for CLI compatibility and must match the header when provided.';
 
-
-
-CREATE OR REPLACE FUNCTION "public"."complete_onboarding_after_first_upload"() RETURNS "trigger"
-    LANGUAGE "plpgsql" SECURITY DEFINER
-    SET "search_path" TO ''
-    AS $$
-DECLARE
-  v_app_uuid uuid;
-BEGIN
-  IF NEW.name IN ('builtin', 'unknown') THEN
-    RETURN NEW;
-  END IF;
-
-  IF COALESCE(NEW.deleted, false) IS TRUE THEN
-    RETURN NEW;
-  END IF;
-
-  IF NOT (
-    (NEW.storage_provider = 'external' AND NULLIF(BTRIM(COALESCE(NEW.external_url, '')), '') IS NOT NULL)
-    OR (NEW.storage_provider <> 'r2-direct' AND NULLIF(BTRIM(COALESCE(NEW.r2_path, '')), '') IS NOT NULL)
-  ) THEN
-    RETURN NEW;
-  END IF;
-
-  SELECT id
-  INTO v_app_uuid
-  FROM public.apps
-  WHERE app_id = NEW.app_id
-    AND owner_org = NEW.owner_org
-    AND need_onboarding IS TRUE
-  LIMIT 1;
-
-  IF v_app_uuid IS NULL THEN
-    RETURN NEW;
-  END IF;
-
-  PERFORM set_config('capgo.onboarding_preserve_app_version_id', NEW.id::text, true);
-
-  UPDATE public.apps
-  SET need_onboarding = false
-  WHERE id = v_app_uuid
-    AND need_onboarding IS TRUE;
-
-  RETURN NEW;
-END;
-$$;
-
-
-ALTER FUNCTION "public"."complete_onboarding_after_first_upload"() OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."convert_bytes_to_gb"("bytes_value" double precision) RETURNS double precision
@@ -8452,6 +8606,19 @@ $$;
 ALTER FUNCTION "public"."is_allowed_action_org_action"("orgid" "uuid", "actions" "public"."action_type"[]) OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."is_allowed_action_org_action"("orgid" "uuid", "actions" "public"."action_type"[], "appid" character varying) RETURNS boolean
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+BEGIN
+    RETURN public.is_paying_and_good_plan_org_action(orgid, actions, appid);
+END;
+$$;
+
+
+ALTER FUNCTION "public"."is_allowed_action_org_action"("orgid" "uuid", "actions" "public"."action_type"[], "appid" character varying) OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."is_allowed_capgkey"("apikey" "text", "keymode" "public"."key_mode"[]) RETURNS boolean
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -9083,6 +9250,64 @@ $$;
 
 
 ALTER FUNCTION "public"."is_paying_and_good_plan_org_action"("orgid" "uuid", "actions" "public"."action_type"[]) OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."is_paying_and_good_plan_org_action"("orgid" "uuid", "actions" "public"."action_type"[], "appid" character varying) RETURNS boolean
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+DECLARE
+  caller_role text;
+  org_customer_id text;
+  result boolean;
+  has_credits boolean;
+BEGIN
+  SELECT current_setting('role', true) INTO caller_role;
+
+  IF COALESCE(caller_role, '') NOT IN ('service_role', 'postgres', 'supabase_admin') THEN
+    IF NOT (public.check_min_rights(
+      'read'::public.user_min_right,
+      (SELECT public.get_identity_org_allowed('{read,upload,write,all}'::public.key_mode[], is_paying_and_good_plan_org_action.orgid)),
+      is_paying_and_good_plan_org_action.orgid,
+      is_paying_and_good_plan_org_action.appid,
+      NULL::bigint
+    )) THEN
+      RETURN false;
+    END IF;
+  END IF;
+
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.usage_credit_balances ucb
+    WHERE ucb.org_id = orgid
+      AND COALESCE(ucb.available_credits, 0) > 0
+  ) INTO has_credits;
+
+  IF has_credits THEN
+    RETURN true;
+  END IF;
+
+  SELECT o.customer_id INTO org_customer_id
+  FROM public.orgs o
+  WHERE o.id = orgid;
+
+  SELECT (si.trial_at > now()) OR (si.status = 'succeeded' AND NOT (
+      (si.mau_exceeded AND 'mau' = ANY(actions))
+      OR (si.storage_exceeded AND 'storage' = ANY(actions))
+      OR (si.bandwidth_exceeded AND 'bandwidth' = ANY(actions))
+      OR (si.build_time_exceeded AND 'build_time' = ANY(actions))
+    ))
+  INTO result
+  FROM public.stripe_info si
+  WHERE si.customer_id = org_customer_id
+  LIMIT 1;
+
+  RETURN COALESCE(result, false);
+END;
+$$;
+
+
+ALTER FUNCTION "public"."is_paying_and_good_plan_org_action"("orgid" "uuid", "actions" "public"."action_type"[], "appid" character varying) OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."is_paying_org"("orgid" "uuid") RETURNS boolean
@@ -9778,11 +10003,11 @@ BEGIN
   -- Wrap everything in a block so we can ensure the lock is released
   BEGIN
     -- Get current time components in UTC
-    current_hour := EXTRACT(HOUR FROM now());
-    current_minute := EXTRACT(MINUTE FROM now());
-    current_second := EXTRACT(SECOND FROM now());
-    current_dow := EXTRACT(DOW FROM now());
-    current_day := EXTRACT(DAY FROM now());
+    current_hour := EXTRACT(HOUR FROM NOW());
+    current_minute := EXTRACT(MINUTE FROM NOW());
+    current_second := EXTRACT(SECOND FROM NOW());
+    current_dow := EXTRACT(DOW FROM NOW());
+    current_day := EXTRACT(DAY FROM NOW());
 
     -- Loop through all enabled tasks
     FOR task IN SELECT * FROM public.cron_tasks WHERE enabled = true LOOP
@@ -9841,7 +10066,13 @@ BEGIN
               SELECT array_agg(value::text) INTO queue_names
               FROM jsonb_array_elements_text(task.target::jsonb);
 
-              IF task.batch_size IS NOT NULL THEN
+              IF task.healthcheck_url IS NOT NULL THEN
+                PERFORM public.process_queue_with_healthcheck(
+                  COALESCE(queue_names, ARRAY[]::text[]),
+                  COALESCE(task.batch_size, 950),
+                  task.healthcheck_url
+                );
+              ELSIF task.batch_size IS NOT NULL THEN
                 PERFORM public.process_function_queue(queue_names, task.batch_size);
               ELSE
                 PERFORM public.process_function_queue(queue_names);
@@ -9868,7 +10099,9 @@ $$;
 ALTER FUNCTION "public"."process_all_cron_tasks"() OWNER TO "postgres";
 
 
-COMMENT ON FUNCTION "public"."process_all_cron_tasks"() IS 'Consolidated cron task processor that runs every 10 seconds. Uses advisory lock (ID=1) to prevent concurrent execution - if a previous run is still executing, the new invocation will skip.';
+COMMENT ON FUNCTION "public"."process_all_cron_tasks"() IS 'Consolidated cron task processor that runs every 10 seconds. Uses advisory
+lock (ID=1) to prevent concurrent execution - if a previous run is still
+executing, the new invocation will skip.';
 
 
 
@@ -10360,6 +10593,64 @@ $$;
 
 
 ALTER FUNCTION "public"."process_function_queue"("queue_name" "text", "batch_size" integer) OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."process_queue_with_healthcheck"("queue_names" "text"[], "batch_size" integer, "healthcheck_url" "text") RETURNS "void"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+DECLARE
+  calls_needed int;
+  headers jsonb;
+  queue_name text;
+  queue_size bigint;
+  url text;
+BEGIN
+  IF batch_size IS NULL OR batch_size <= 0 THEN
+    RAISE EXCEPTION 'batch_size must be positive';
+  END IF;
+
+  headers := pg_catalog.jsonb_build_object(
+    'Content-Type', 'application/json',
+    'apisecret', public.get_apikey()
+  );
+  url := public.get_db_url() || '/functions/v1/triggers/queue_consumer/sync';
+
+  FOREACH queue_name IN ARRAY queue_names LOOP
+    BEGIN
+      EXECUTE pg_catalog.format('SELECT count(*) FROM pgmq.%I', 'q_' || queue_name)
+      INTO queue_size;
+
+      IF queue_size > 0 THEN
+        calls_needed := LEAST(
+          pg_catalog.ceil(queue_size / batch_size::double precision)::int,
+          10
+        );
+      ELSE
+        calls_needed := 1;
+      END IF;
+
+      FOR i IN 1..calls_needed LOOP
+        PERFORM net.http_post(
+          url := url,
+          headers := headers,
+          body := pg_catalog.jsonb_strip_nulls(pg_catalog.jsonb_build_object(
+            'queue_name', queue_name,
+            'batch_size', batch_size,
+            'healthcheck_url', healthcheck_url
+          )),
+          timeout_milliseconds := 8000
+        );
+      END LOOP;
+    EXCEPTION WHEN OTHERS THEN
+      RAISE WARNING 'process_queue_with_healthcheck failed for queue "%": %', queue_name, SQLERRM;
+    END;
+  END LOOP;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."process_queue_with_healthcheck"("queue_names" "text"[], "batch_size" integer, "healthcheck_url" "text") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."process_stats_email_monthly"() RETURNS "void"
@@ -12904,26 +13195,26 @@ CREATE OR REPLACE FUNCTION "public"."record_deployment_history"() RETURNS "trigg
     SET "search_path" TO ''
     AS $$
 BEGIN
-    -- If version is changing, record the deployment
-    IF OLD.version <> NEW.version THEN
-        -- Insert new record
-        INSERT INTO public.deploy_history (
-            channel_id, 
-            app_id, 
-            version_id, 
-            owner_org,
-            created_by
-        )
-        VALUES (
-            NEW.id,
-            NEW.app_id,
-            NEW.version,
-            NEW.owner_org,
-            coalesce(public.get_identity()::uuid, NEW.created_by)
-        );
-    END IF;
-    
-    RETURN NEW;
+  -- Native/builtin channel targets are stored as NULL and cannot be represented
+  -- in deploy_history.version_id. Record only concrete bundle deployments.
+  IF OLD.version IS DISTINCT FROM NEW.version AND NEW.version IS NOT NULL THEN
+    INSERT INTO public.deploy_history (
+      channel_id,
+      app_id,
+      version_id,
+      owner_org,
+      created_by
+    )
+    VALUES (
+      NEW.id,
+      NEW.app_id,
+      NEW.version,
+      NEW.owner_org,
+      COALESCE(public.get_identity()::uuid, NEW.created_by)
+    );
+  END IF;
+
+  RETURN NEW;
 END;
 $$;
 
@@ -12954,6 +13245,53 @@ $$;
 
 
 ALTER FUNCTION "public"."record_email_otp_verified"("p_user_id" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."refresh_app_rollups_after_demo_reset"("p_app_uuid" "uuid", "p_app_id" "text", "p_owner_org" "uuid") RETURNS "void"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+DECLARE
+  v_last_version text;
+  v_manifest_bundle_count bigint := 0;
+  v_channel_device_count bigint := 0;
+BEGIN
+  SELECT "name"
+  INTO v_last_version
+  FROM "public"."app_versions"
+  WHERE "app_id" = p_app_id
+    AND "deleted" IS FALSE
+  ORDER BY "created_at" DESC, "id" DESC
+  LIMIT 1;
+
+  SELECT COUNT(*)::bigint
+  INTO v_manifest_bundle_count
+  FROM "public"."app_versions"
+  WHERE "app_id" = p_app_id
+    AND "deleted" IS FALSE
+    AND COALESCE("manifest_count", 0) > 0;
+
+  SELECT COUNT(*)::bigint
+  INTO v_channel_device_count
+  FROM "public"."channel_devices"
+  WHERE "app_id" = p_app_id;
+
+  UPDATE "public"."apps"
+  SET
+    "last_version" = v_last_version,
+    "manifest_bundle_count" = v_manifest_bundle_count,
+    "channel_device_count" = v_channel_device_count
+  WHERE "id" = p_app_uuid;
+
+  IF p_owner_org IS NOT NULL THEN
+    DELETE FROM "public"."app_metrics_cache"
+    WHERE "org_id" = p_owner_org;
+  END IF;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."refresh_app_rollups_after_demo_reset"("p_app_uuid" "uuid", "p_app_id" "text", "p_owner_org" "uuid") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."refresh_orgs_has_usage_credits"() RETURNS "void"
@@ -13567,6 +13905,335 @@ $$;
 
 
 ALTER FUNCTION "public"."rescind_invitation"("email" "text", "org_id" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."reset_onboarding_demo_app_data"("p_app_uuid" "uuid") RETURNS "void"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+DECLARE
+  v_app_id text;
+  v_owner_org uuid;
+BEGIN
+  SELECT "app_id", "owner_org"
+  INTO v_app_id, v_owner_org
+  FROM "public"."apps"
+  WHERE "id" = p_app_uuid;
+
+  IF v_app_id IS NULL THEN
+    RETURN;
+  END IF;
+
+  PERFORM "public"."claim_legacy_onboarding_demo_data"(p_app_uuid);
+
+  -- unknown/builtin are system placeholders maintained by app creation. They
+  -- are allowed in demo-shaped legacy apps, but must never be demo-owned rows.
+  DELETE FROM "public"."onboarding_demo_data" odd
+  USING "public"."app_versions" av
+  WHERE odd."app_id" = v_app_id
+    AND odd."relation_name" IN ('app_versions', 'app_versions_meta')
+    AND odd."row_key" = av."id"::text
+    AND av."app_id" = v_app_id
+    AND av."name" IN ('unknown', 'builtin');
+
+  -- Refuse to delete tracked parents when any untracked child row points at
+  -- them. Without these guards, ON DELETE CASCADE could remove real data that
+  -- a user attached to a demo-created version or channel.
+  IF EXISTS (
+    WITH tracked_versions AS (
+      SELECT "row_key"::bigint AS "id"
+      FROM "public"."onboarding_demo_data"
+      WHERE "app_id" = v_app_id
+        AND "relation_name" = 'app_versions'
+    )
+    SELECT 1
+    FROM "public"."channels" c
+    INNER JOIN tracked_versions tv ON tv."id" = c."version"
+    WHERE NOT EXISTS (
+      SELECT 1
+      FROM "public"."onboarding_demo_data" odd
+      WHERE odd."app_id" = v_app_id
+        AND odd."relation_name" = 'channels'
+        AND odd."row_key" = c."id"::text
+    )
+  ) THEN
+    RAISE EXCEPTION 'reset_onboarding_demo_app_data: refusing to cascade from demo versions into untracked channels for app %', v_app_id;
+  END IF;
+
+  IF EXISTS (
+    WITH tracked_versions AS (
+      SELECT "row_key"::bigint AS "id"
+      FROM "public"."onboarding_demo_data"
+      WHERE "app_id" = v_app_id
+        AND "relation_name" = 'app_versions'
+    )
+    SELECT 1
+    FROM "public"."deploy_history" dh
+    INNER JOIN tracked_versions tv ON tv."id" = dh."version_id"
+    WHERE NOT EXISTS (
+      SELECT 1
+      FROM "public"."onboarding_demo_data" odd
+      WHERE odd."app_id" = v_app_id
+        AND odd."relation_name" = 'deploy_history'
+        AND odd."row_key" = dh."id"::text
+    )
+  ) THEN
+    RAISE EXCEPTION 'reset_onboarding_demo_app_data: refusing to cascade from demo versions into untracked deploy history for app %', v_app_id;
+  END IF;
+
+  IF EXISTS (
+    WITH tracked_versions AS (
+      SELECT "row_key"::bigint AS "id"
+      FROM "public"."onboarding_demo_data"
+      WHERE "app_id" = v_app_id
+        AND "relation_name" = 'app_versions'
+    )
+    SELECT 1
+    FROM "public"."manifest" m
+    INNER JOIN tracked_versions tv ON tv."id" = m."app_version_id"
+    WHERE NOT EXISTS (
+      SELECT 1
+      FROM "public"."onboarding_demo_data" odd
+      WHERE odd."app_id" = v_app_id
+        AND odd."relation_name" = 'manifest'
+        AND odd."row_key" = m."id"::text
+    )
+  ) THEN
+    RAISE EXCEPTION 'reset_onboarding_demo_app_data: refusing to cascade from demo versions into untracked manifest rows for app %', v_app_id;
+  END IF;
+
+  IF EXISTS (
+    WITH tracked_versions AS (
+      SELECT "row_key"::bigint AS "id"
+      FROM "public"."onboarding_demo_data"
+      WHERE "app_id" = v_app_id
+        AND "relation_name" = 'app_versions'
+    )
+    SELECT 1
+    FROM "public"."app_versions_meta" avm
+    INNER JOIN tracked_versions tv ON tv."id" = avm."id"
+    WHERE NOT EXISTS (
+      SELECT 1
+      FROM "public"."onboarding_demo_data" odd
+      WHERE odd."app_id" = v_app_id
+        AND odd."relation_name" = 'app_versions_meta'
+        AND odd."row_key" = avm."id"::text
+    )
+  ) THEN
+    RAISE EXCEPTION 'reset_onboarding_demo_app_data: refusing to cascade from demo versions into untracked version metadata for app %', v_app_id;
+  END IF;
+
+  IF EXISTS (
+    WITH tracked_versions AS (
+      SELECT "row_key"::bigint AS "id"
+      FROM "public"."onboarding_demo_data"
+      WHERE "app_id" = v_app_id
+        AND "relation_name" = 'app_versions'
+    )
+    SELECT 1
+    FROM "public"."permissions" p
+    INNER JOIN tracked_versions tv ON tv."id" = p."bundle_id"
+  ) OR EXISTS (
+    WITH tracked_versions AS (
+      SELECT "row_key"::bigint AS "id"
+      FROM "public"."onboarding_demo_data"
+      WHERE "app_id" = v_app_id
+        AND "relation_name" = 'app_versions'
+    )
+    SELECT 1
+    FROM "public"."role_bindings" rb
+    INNER JOIN tracked_versions tv ON tv."id" = rb."bundle_id"
+  ) THEN
+    RAISE EXCEPTION 'reset_onboarding_demo_app_data: refusing to cascade from demo versions into RBAC rows for app %', v_app_id;
+  END IF;
+
+  IF EXISTS (
+    WITH tracked_versions AS (
+      SELECT "row_key"::bigint AS "id"
+      FROM "public"."onboarding_demo_data"
+      WHERE "app_id" = v_app_id
+        AND "relation_name" = 'app_versions'
+    )
+    SELECT 1
+    FROM "public"."version_meta" vm
+    INNER JOIN tracked_versions tv ON tv."id" = vm."version_id"
+    WHERE vm."app_id" = v_app_id
+  ) THEN
+    RAISE EXCEPTION 'reset_onboarding_demo_app_data: refusing to delete demo versions with non-nullable version metrics for app %', v_app_id;
+  END IF;
+
+  IF EXISTS (
+    WITH tracked_channels AS (
+      SELECT "row_key"::bigint AS "id"
+      FROM "public"."onboarding_demo_data"
+      WHERE "app_id" = v_app_id
+        AND "relation_name" = 'channels'
+    )
+    SELECT 1
+    FROM "public"."deploy_history" dh
+    INNER JOIN tracked_channels tc ON tc."id" = dh."channel_id"
+    WHERE NOT EXISTS (
+      SELECT 1
+      FROM "public"."onboarding_demo_data" odd
+      WHERE odd."app_id" = v_app_id
+        AND odd."relation_name" = 'deploy_history'
+        AND odd."row_key" = dh."id"::text
+    )
+  ) THEN
+    RAISE EXCEPTION 'reset_onboarding_demo_app_data: refusing to cascade from demo channels into untracked deploy history for app %', v_app_id;
+  END IF;
+
+  IF EXISTS (
+    WITH tracked_channels AS (
+      SELECT "row_key"::bigint AS "id"
+      FROM "public"."onboarding_demo_data"
+      WHERE "app_id" = v_app_id
+        AND "relation_name" = 'channels'
+    )
+    SELECT 1
+    FROM "public"."channel_devices" cd
+    INNER JOIN tracked_channels tc ON tc."id" = cd."channel_id"
+    WHERE NOT EXISTS (
+      SELECT 1
+      FROM "public"."onboarding_demo_data" odd
+      WHERE odd."app_id" = v_app_id
+        AND odd."relation_name" = 'channel_devices'
+        AND odd."row_key" = cd."id"::text
+    )
+  ) THEN
+    RAISE EXCEPTION 'reset_onboarding_demo_app_data: refusing to delete demo channels with untracked channel devices for app %', v_app_id;
+  END IF;
+
+  IF EXISTS (
+    WITH tracked_channels AS (
+      SELECT c."id", c."rbac_id"
+      FROM "public"."channels" c
+      INNER JOIN "public"."onboarding_demo_data" odd
+        ON odd."app_id" = v_app_id
+        AND odd."relation_name" = 'channels'
+        AND odd."row_key" = c."id"::text
+    )
+    SELECT 1
+    FROM "public"."channel_permission_overrides" cpo
+    INNER JOIN tracked_channels tc ON tc."id" = cpo."channel_id"
+  ) OR EXISTS (
+    WITH tracked_channels AS (
+      SELECT c."id", c."rbac_id"
+      FROM "public"."channels" c
+      INNER JOIN "public"."onboarding_demo_data" odd
+        ON odd."app_id" = v_app_id
+        AND odd."relation_name" = 'channels'
+        AND odd."row_key" = c."id"::text
+    )
+    SELECT 1
+    FROM "public"."org_users" ou
+    INNER JOIN tracked_channels tc ON tc."id" = ou."channel_id"
+  ) OR EXISTS (
+    WITH tracked_channels AS (
+      SELECT c."id", c."rbac_id"
+      FROM "public"."channels" c
+      INNER JOIN "public"."onboarding_demo_data" odd
+        ON odd."app_id" = v_app_id
+        AND odd."relation_name" = 'channels'
+        AND odd."row_key" = c."id"::text
+    )
+    SELECT 1
+    FROM "public"."role_bindings" rb
+    INNER JOIN tracked_channels tc ON tc."rbac_id" = rb."channel_id"
+  ) THEN
+    RAISE EXCEPTION 'reset_onboarding_demo_app_data: refusing to cascade from demo channels into access-control rows for app %', v_app_id;
+  END IF;
+
+  DELETE FROM "public"."channel_devices" cd
+  USING "public"."onboarding_demo_data" odd
+  WHERE odd."app_id" = v_app_id
+    AND odd."relation_name" = 'channel_devices'
+    AND odd."row_key" = cd."id"::text;
+
+  DELETE FROM "public"."deploy_history" dh
+  USING "public"."onboarding_demo_data" odd
+  WHERE odd."app_id" = v_app_id
+    AND odd."relation_name" = 'deploy_history'
+    AND odd."row_key" = dh."id"::text;
+
+  DELETE FROM "public"."manifest" m
+  USING "public"."onboarding_demo_data" odd
+  WHERE odd."app_id" = v_app_id
+    AND odd."relation_name" = 'manifest'
+    AND odd."row_key" = m."id"::text;
+
+  DELETE FROM "public"."build_requests" br
+  USING "public"."onboarding_demo_data" odd
+  WHERE odd."app_id" = v_app_id
+    AND odd."relation_name" = 'build_requests'
+    AND odd."row_key" = br."id"::text;
+
+  DELETE FROM "public"."devices" d
+  USING "public"."onboarding_demo_data" odd
+  WHERE odd."app_id" = v_app_id
+    AND odd."relation_name" = 'devices'
+    AND odd."row_key" = d."id"::text;
+
+  DELETE FROM "public"."channels" c
+  USING "public"."onboarding_demo_data" odd
+  WHERE odd."app_id" = v_app_id
+    AND odd."relation_name" = 'channels'
+    AND odd."row_key" = c."id"::text;
+
+  DELETE FROM "public"."app_versions_meta" avm
+  USING "public"."onboarding_demo_data" odd
+  WHERE odd."app_id" = v_app_id
+    AND odd."relation_name" = 'app_versions_meta'
+    AND odd."row_key" = avm."id"::text;
+
+  UPDATE "public"."devices" d
+  SET "version" = NULL
+  WHERE d."app_id" = v_app_id
+    AND EXISTS (
+      SELECT 1
+      FROM "public"."onboarding_demo_data" odd
+      WHERE odd."app_id" = v_app_id
+        AND odd."relation_name" = 'app_versions'
+        AND odd."row_key" = d."version"::text
+    );
+
+  UPDATE "public"."daily_version" dv
+  SET "version_id" = NULL
+  WHERE dv."app_id" = v_app_id
+    AND EXISTS (
+      SELECT 1
+      FROM "public"."onboarding_demo_data" odd
+      WHERE odd."app_id" = v_app_id
+        AND odd."relation_name" = 'app_versions'
+        AND odd."row_key" = dv."version_id"::text
+    );
+
+  UPDATE "public"."version_usage" vu
+  SET "version_id" = NULL
+  WHERE vu."app_id" = v_app_id
+    AND EXISTS (
+      SELECT 1
+      FROM "public"."onboarding_demo_data" odd
+      WHERE odd."app_id" = v_app_id
+        AND odd."relation_name" = 'app_versions'
+        AND odd."row_key" = vu."version_id"::text
+    );
+
+  DELETE FROM "public"."app_versions" av
+  USING "public"."onboarding_demo_data" odd
+  WHERE odd."app_id" = v_app_id
+    AND odd."relation_name" = 'app_versions'
+    AND odd."row_key" = av."id"::text;
+
+  DELETE FROM "public"."onboarding_demo_data"
+  WHERE "app_id" = v_app_id;
+
+  PERFORM "public"."refresh_app_rollups_after_demo_reset"(p_app_uuid, v_app_id, v_owner_org);
+END;
+$$;
+
+
+ALTER FUNCTION "public"."reset_onboarding_demo_app_data"("p_app_uuid" "uuid") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."restore_deleted_account"() RETURNS "void"
@@ -14721,6 +15388,66 @@ ALTER FUNCTION "public"."total_bundle_storage_bytes"() OWNER TO "postgres";
 
 COMMENT ON FUNCTION "public"."total_bundle_storage_bytes"() IS 'Returns active bundle storage in bytes including bundle sizes (app_versions_meta.size) and manifest file sizes for non-deleted app versions.';
 
+
+
+CREATE OR REPLACE FUNCTION "public"."track_onboarding_demo_data"("p_app_id" "text", "p_owner_org" "uuid", "p_relation_name" "text", "p_row_keys" "text"[], "p_seed_id" "uuid") RETURNS "void"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+BEGIN
+  IF p_app_id IS NULL OR btrim(p_app_id) = '' THEN
+    RAISE EXCEPTION 'track_onboarding_demo_data: app_id is required';
+  END IF;
+
+  IF p_owner_org IS NULL THEN
+    RAISE EXCEPTION 'track_onboarding_demo_data: owner_org is required';
+  END IF;
+
+  IF p_seed_id IS NULL THEN
+    RAISE EXCEPTION 'track_onboarding_demo_data: seed_id is required';
+  END IF;
+
+  IF p_relation_name IS NULL OR NOT (
+    p_relation_name = ANY (ARRAY[
+      'app_versions'::text,
+      'app_versions_meta'::text,
+      'manifest'::text,
+      'channels'::text,
+      'channel_devices'::text,
+      'deploy_history'::text,
+      'devices'::text,
+      'build_requests'::text
+    ])
+  ) THEN
+    RAISE EXCEPTION 'track_onboarding_demo_data: unsupported relation %', p_relation_name;
+  END IF;
+
+  INSERT INTO "public"."onboarding_demo_data" (
+    "app_id",
+    "owner_org",
+    "relation_name",
+    "row_key",
+    "seed_id"
+  )
+  SELECT
+    p_app_id,
+    p_owner_org,
+    p_relation_name,
+    key_value,
+    p_seed_id
+  FROM "unnest"(p_row_keys) AS keys("key_value")
+  WHERE "key_value" IS NOT NULL
+    AND "btrim"("key_value") <> ''
+  ON CONFLICT ("app_id", "relation_name", "row_key") DO UPDATE
+  SET
+    "owner_org" = EXCLUDED."owner_org",
+    "seed_id" = EXCLUDED."seed_id",
+    "created_at" = "now"();
+END;
+$$;
+
+
+ALTER FUNCTION "public"."track_onboarding_demo_data"("p_app_id" "text", "p_owner_org" "uuid", "p_relation_name" "text", "p_row_keys" "text"[], "p_seed_id" "uuid") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."transfer_app"("p_app_id" character varying, "p_new_org_id" "uuid") RETURNS "void"
@@ -15999,7 +16726,7 @@ CREATE TABLE IF NOT EXISTS "public"."channels" (
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "name" character varying NOT NULL,
     "app_id" character varying NOT NULL,
-    "version" bigint NOT NULL,
+    "version" bigint,
     "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "public" boolean DEFAULT false NOT NULL,
     "disable_auto_update_under_native" boolean DEFAULT true NOT NULL,
@@ -16091,7 +16818,8 @@ CREATE TABLE IF NOT EXISTS "public"."cron_tasks" (
     "run_on_day" integer,
     "enabled" boolean DEFAULT true NOT NULL,
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
-    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL
+    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "healthcheck_url" "text"
 );
 
 
@@ -16813,6 +17541,29 @@ CREATE TABLE IF NOT EXISTS "public"."notifications" (
 
 
 ALTER TABLE "public"."notifications" OWNER TO "postgres";
+
+
+CREATE TABLE IF NOT EXISTS "public"."onboarding_demo_data" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "app_id" character varying NOT NULL,
+    "owner_org" "uuid" NOT NULL,
+    "relation_name" "text" NOT NULL,
+    "row_key" "text" NOT NULL,
+    "seed_id" "uuid" NOT NULL,
+    CONSTRAINT "onboarding_demo_data_relation_name_check" CHECK (("relation_name" = ANY (ARRAY['app_versions'::"text", 'app_versions_meta'::"text", 'manifest'::"text", 'channels'::"text", 'channel_devices'::"text", 'deploy_history'::"text", 'devices'::"text", 'build_requests'::"text"])))
+);
+
+
+ALTER TABLE "public"."onboarding_demo_data" OWNER TO "postgres";
+
+
+COMMENT ON TABLE "public"."onboarding_demo_data" IS 'Tracks rows created by onboarding demo seeding so demo resets can delete only demo-owned data.';
+
+
+
+COMMENT ON COLUMN "public"."onboarding_demo_data"."row_key" IS 'Primary-row identifier as text. Only exact rows created or confidently fingerprinted by onboarding demo seeding are tracked.';
+
 
 
 CREATE TABLE IF NOT EXISTS "public"."org_users" (
@@ -17623,15 +18374,21 @@ CREATE TABLE IF NOT EXISTS "public"."webhook_deliveries" (
     "response_body" "text",
     "response_headers" "jsonb",
     "attempt_count" integer DEFAULT 0 NOT NULL,
-    "max_attempts" integer DEFAULT 3 NOT NULL,
+    "max_attempts" integer DEFAULT 10 NOT NULL,
     "next_retry_at" timestamp with time zone,
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "completed_at" timestamp with time zone,
-    "duration_ms" integer
+    "duration_ms" integer,
+    "delivery_version" "text" DEFAULT 'legacy'::"text" NOT NULL,
+    CONSTRAINT "webhook_deliveries_delivery_version_check" CHECK (("delivery_version" ~ '^(legacy|standard)$'::"text"))
 );
 
 
 ALTER TABLE "public"."webhook_deliveries" OWNER TO "postgres";
+
+
+COMMENT ON COLUMN "public"."webhook_deliveries"."delivery_version" IS 'Delivery format version used for this webhook attempt.';
+
 
 
 CREATE TABLE IF NOT EXISTS "public"."webhooks" (
@@ -17639,19 +18396,25 @@ CREATE TABLE IF NOT EXISTS "public"."webhooks" (
     "org_id" "uuid" NOT NULL,
     "name" "text" NOT NULL,
     "url" "text" NOT NULL,
-    "secret" "text" DEFAULT ('whsec_'::"text" || "replace"(("gen_random_uuid"())::"text", '-'::"text", ''::"text")) NOT NULL,
+    "secret" "text" DEFAULT ('whsec_'::"text" || "encode"("extensions"."gen_random_bytes"(32), 'base64'::"text")) NOT NULL,
     "enabled" boolean DEFAULT true NOT NULL,
     "events" "text"[] NOT NULL,
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
-    "created_by" "uuid" NOT NULL
+    "created_by" "uuid" NOT NULL,
+    "delivery_version" "text" DEFAULT 'legacy'::"text" NOT NULL,
+    CONSTRAINT "webhooks_delivery_version_check" CHECK (("delivery_version" ~ '^(legacy|standard)$'::"text"))
 );
 
 
 ALTER TABLE "public"."webhooks" OWNER TO "postgres";
 
 
-COMMENT ON COLUMN "public"."webhooks"."secret" IS 'Secret key for HMAC-SHA256 signature verification. Format: whsec_{32-char-hex}';
+COMMENT ON COLUMN "public"."webhooks"."secret" IS 'Standard Webhooks HMAC-SHA256 secret in whsec_ base64 format.';
+
+
+
+COMMENT ON COLUMN "public"."webhooks"."delivery_version" IS 'Webhook delivery format version. legacy preserves existing Capgo payloads; standard uses Standard Webhooks payload and headers.';
 
 
 
@@ -17912,6 +18675,11 @@ ALTER TABLE ONLY "public"."manifest"
 
 ALTER TABLE ONLY "public"."notifications"
     ADD CONSTRAINT "notifications_pkey" PRIMARY KEY ("owner_org", "event", "uniq_id");
+
+
+
+ALTER TABLE ONLY "public"."onboarding_demo_data"
+    ADD CONSTRAINT "onboarding_demo_data_pkey" PRIMARY KEY ("id");
 
 
 
@@ -18182,10 +18950,6 @@ CREATE INDEX "finx_apps_user_id" ON "public"."apps" USING "btree" ("user_id");
 
 
 CREATE INDEX "finx_channel_devices_channel_id" ON "public"."channel_devices" USING "btree" ("channel_id");
-
-
-
-CREATE INDEX "finx_channel_devices_owner_org" ON "public"."channel_devices" USING "btree" ("owner_org");
 
 
 
@@ -18501,6 +19265,14 @@ CREATE INDEX "notifications_uniq_id_idx" ON "public"."notifications" USING "btre
 
 
 
+CREATE UNIQUE INDEX "onboarding_demo_data_app_relation_row_key_idx" ON "public"."onboarding_demo_data" USING "btree" ("app_id", "relation_name", "row_key");
+
+
+
+CREATE INDEX "onboarding_demo_data_seed_id_idx" ON "public"."onboarding_demo_data" USING "btree" ("seed_id");
+
+
+
 CREATE INDEX "org_users_app_id_idx" ON "public"."org_users" USING "btree" ("app_id");
 
 
@@ -18646,10 +19418,6 @@ CREATE OR REPLACE TRIGGER "check_privileges" BEFORE INSERT OR UPDATE OF "user_id
 
 
 CREATE OR REPLACE TRIGGER "cleanup_onboarding_app_data_on_complete" AFTER UPDATE OF "need_onboarding" ON "public"."apps" FOR EACH ROW WHEN ((("old"."need_onboarding" IS TRUE) AND ("new"."need_onboarding" IS FALSE))) EXECUTE FUNCTION "public"."cleanup_onboarding_app_data_on_complete"();
-
-
-
-CREATE OR REPLACE TRIGGER "complete_onboarding_after_first_upload" AFTER INSERT OR UPDATE OF "deleted", "external_url", "r2_path", "storage_provider", "name", "app_id", "owner_org" ON "public"."app_versions" FOR EACH ROW WHEN (((("new"."name")::"text" <> ALL ((ARRAY['builtin'::character varying, 'unknown'::character varying])::"text"[])) AND (COALESCE("new"."deleted", false) IS FALSE) AND ((("new"."storage_provider" = 'external'::"text") AND (NULLIF("btrim"((COALESCE("new"."external_url", ''::character varying))::"text"), ''::"text") IS NOT NULL)) OR (("new"."storage_provider" <> 'r2-direct'::"text") AND (NULLIF("btrim"((COALESCE("new"."r2_path", ''::character varying))::"text"), ''::"text") IS NOT NULL))))) EXECUTE FUNCTION "public"."complete_onboarding_after_first_upload"();
 
 
 
@@ -19010,7 +19778,7 @@ ALTER TABLE ONLY "public"."channels"
 
 
 ALTER TABLE ONLY "public"."channels"
-    ADD CONSTRAINT "channels_version_fkey" FOREIGN KEY ("version") REFERENCES "public"."app_versions"("id") ON DELETE CASCADE;
+    ADD CONSTRAINT "channels_version_fkey" FOREIGN KEY ("version") REFERENCES "public"."app_versions"("id") ON DELETE SET NULL;
 
 
 
@@ -19056,6 +19824,16 @@ ALTER TABLE ONLY "public"."groups"
 
 ALTER TABLE ONLY "public"."manifest"
     ADD CONSTRAINT "manifest_app_version_id_fkey" FOREIGN KEY ("app_version_id") REFERENCES "public"."app_versions"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."onboarding_demo_data"
+    ADD CONSTRAINT "onboarding_demo_data_app_id_fkey" FOREIGN KEY ("app_id") REFERENCES "public"."apps"("app_id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."onboarding_demo_data"
+    ADD CONSTRAINT "onboarding_demo_data_owner_org_fkey" FOREIGN KEY ("owner_org") REFERENCES "public"."orgs"("id") ON DELETE CASCADE;
 
 
 
@@ -19278,58 +20056,6 @@ CREATE POLICY " allow anon to select" ON "public"."global_stats" FOR SELECT TO "
 
 
 
-CREATE POLICY "Allow admin to delete webhooks" ON "public"."webhooks" FOR DELETE TO "anon", "authenticated" USING ("public"."check_min_rights"('admin'::"public"."user_min_right",
-CASE
-    WHEN (( SELECT "public"."get_apikey_header"() AS "get_apikey_header") IS NOT NULL) THEN "public"."get_identity_org_allowed_apikey_only"('{all,write,upload}'::"public"."key_mode"[], "org_id")
-    ELSE ( SELECT "auth"."uid"() AS "uid")
-END, "org_id", NULL::character varying, NULL::bigint));
-
-
-
-CREATE POLICY "Allow admin to insert webhook_deliveries" ON "public"."webhook_deliveries" FOR INSERT TO "anon", "authenticated" WITH CHECK ("public"."check_min_rights"('admin'::"public"."user_min_right",
-CASE
-    WHEN (( SELECT "public"."get_apikey_header"() AS "get_apikey_header") IS NOT NULL) THEN "public"."get_identity_org_allowed_apikey_only"('{all,write,upload}'::"public"."key_mode"[], "org_id")
-    ELSE ( SELECT "auth"."uid"() AS "uid")
-END, "org_id", NULL::character varying, NULL::bigint));
-
-
-
-CREATE POLICY "Allow admin to insert webhooks" ON "public"."webhooks" FOR INSERT TO "anon", "authenticated" WITH CHECK ("public"."check_min_rights"('admin'::"public"."user_min_right",
-CASE
-    WHEN (( SELECT "public"."get_apikey_header"() AS "get_apikey_header") IS NOT NULL) THEN "public"."get_identity_org_allowed_apikey_only"('{all,write,upload}'::"public"."key_mode"[], "org_id")
-    ELSE ( SELECT "auth"."uid"() AS "uid")
-END, "org_id", NULL::character varying, NULL::bigint));
-
-
-
-CREATE POLICY "Allow admin to select webhooks" ON "public"."webhooks" FOR SELECT TO "anon", "authenticated" USING ("public"."check_min_rights"('admin'::"public"."user_min_right",
-CASE
-    WHEN (( SELECT "public"."get_apikey_header"() AS "get_apikey_header") IS NOT NULL) THEN "public"."get_identity_org_allowed_apikey_only"('{all,write,upload}'::"public"."key_mode"[], "org_id")
-    ELSE ( SELECT "auth"."uid"() AS "uid")
-END, "org_id", NULL::character varying, NULL::bigint));
-
-
-
-CREATE POLICY "Allow admin to update webhook_deliveries" ON "public"."webhook_deliveries" FOR UPDATE TO "anon", "authenticated" USING ("public"."check_min_rights"('admin'::"public"."user_min_right",
-CASE
-    WHEN (( SELECT "public"."get_apikey_header"() AS "get_apikey_header") IS NOT NULL) THEN "public"."get_identity_org_allowed_apikey_only"('{all,write,upload}'::"public"."key_mode"[], "org_id")
-    ELSE ( SELECT "auth"."uid"() AS "uid")
-END, "org_id", NULL::character varying, NULL::bigint));
-
-
-
-CREATE POLICY "Allow admin to update webhooks" ON "public"."webhooks" FOR UPDATE TO "anon", "authenticated" USING ("public"."check_min_rights"('admin'::"public"."user_min_right",
-CASE
-    WHEN (( SELECT "public"."get_apikey_header"() AS "get_apikey_header") IS NOT NULL) THEN "public"."get_identity_org_allowed_apikey_only"('{all,write,upload}'::"public"."key_mode"[], "org_id")
-    ELSE ( SELECT "auth"."uid"() AS "uid")
-END, "org_id", NULL::character varying, NULL::bigint)) WITH CHECK ("public"."check_min_rights"('admin'::"public"."user_min_right",
-CASE
-    WHEN (( SELECT "public"."get_apikey_header"() AS "get_apikey_header") IS NOT NULL) THEN "public"."get_identity_org_allowed_apikey_only"('{all,write,upload}'::"public"."key_mode"[], "org_id")
-    ELSE ( SELECT "auth"."uid"() AS "uid")
-END, "org_id", NULL::character varying, NULL::bigint));
-
-
-
 CREATE POLICY "Allow all for auth (super_admin+)" ON "public"."app_versions" FOR DELETE TO "authenticated" USING ("public"."check_min_rights"('super_admin'::"public"."user_min_right", "public"."get_identity"(), "owner_org", "app_id", NULL::bigint));
 
 
@@ -19451,14 +20177,6 @@ CREATE POLICY "Allow org members to select usage_credit_transactions" ON "public
 
 
 CREATE POLICY "Allow org members to select usage_overage_events" ON "public"."usage_overage_events" FOR SELECT TO "anon", "authenticated" USING (("org_id" = ANY (COALESCE(( SELECT "public"."usage_credit_readable_org_ids"() AS "usage_credit_readable_org_ids"), '{}'::"uuid"[]))));
-
-
-
-CREATE POLICY "Allow org members to select webhook_deliveries" ON "public"."webhook_deliveries" FOR SELECT TO "anon", "authenticated" USING ("public"."check_min_rights"('read'::"public"."user_min_right",
-CASE
-    WHEN (( SELECT "public"."get_apikey_header"() AS "get_apikey_header") IS NOT NULL) THEN "public"."get_identity_org_allowed_apikey_only"('{read,write,upload,all}'::"public"."key_mode"[], "org_id")
-    ELSE ( SELECT "auth"."uid"() AS "uid")
-END, "org_id", NULL::character varying, NULL::bigint));
 
 
 
@@ -19679,6 +20397,10 @@ CREATE POLICY "Deny update for org members" ON "public"."usage_credit_transactio
 
 
 CREATE POLICY "Deny update for org members" ON "public"."usage_overage_events" AS RESTRICTIVE FOR UPDATE TO "anon", "authenticated" USING (false) WITH CHECK (false);
+
+
+
+CREATE POLICY "Deny user access to onboarding demo data" ON "public"."onboarding_demo_data" AS RESTRICTIVE TO "anon", "authenticated" USING (false) WITH CHECK (false);
 
 
 
@@ -19903,6 +20625,38 @@ CREATE POLICY "deny_all_access" ON "public"."deleted_apps" USING (false) WITH CH
 
 
 
+CREATE POLICY "deny_direct_delete_on_webhook_deliveries" ON "public"."webhook_deliveries" AS RESTRICTIVE FOR DELETE TO "anon", "authenticated" USING (false);
+
+
+
+CREATE POLICY "deny_direct_delete_on_webhooks" ON "public"."webhooks" AS RESTRICTIVE FOR DELETE TO "anon", "authenticated" USING (false);
+
+
+
+CREATE POLICY "deny_direct_insert_on_webhook_deliveries" ON "public"."webhook_deliveries" AS RESTRICTIVE FOR INSERT TO "anon", "authenticated" WITH CHECK (false);
+
+
+
+CREATE POLICY "deny_direct_insert_on_webhooks" ON "public"."webhooks" AS RESTRICTIVE FOR INSERT TO "anon", "authenticated" WITH CHECK (false);
+
+
+
+CREATE POLICY "deny_direct_select_on_webhook_deliveries" ON "public"."webhook_deliveries" AS RESTRICTIVE FOR SELECT TO "anon", "authenticated" USING (false);
+
+
+
+CREATE POLICY "deny_direct_select_on_webhooks" ON "public"."webhooks" AS RESTRICTIVE FOR SELECT TO "anon", "authenticated" USING (false);
+
+
+
+CREATE POLICY "deny_direct_update_on_webhook_deliveries" ON "public"."webhook_deliveries" AS RESTRICTIVE FOR UPDATE TO "anon", "authenticated" USING (false) WITH CHECK (false);
+
+
+
+CREATE POLICY "deny_direct_update_on_webhooks" ON "public"."webhooks" AS RESTRICTIVE FOR UPDATE TO "anon", "authenticated" USING (false) WITH CHECK (false);
+
+
+
 ALTER TABLE "public"."deploy_history" ENABLE ROW LEVEL SECURITY;
 
 
@@ -19984,6 +20738,9 @@ ALTER TABLE "public"."manifest" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."notifications" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."onboarding_demo_data" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."org_metrics_cache" ENABLE ROW LEVEL SECURITY;
@@ -20255,6 +21012,10 @@ ALTER PUBLICATION "capgo_google_eu_2_pub" ADD TABLE ONLY "public"."notifications
 
 
 ALTER PUBLICATION "planetscale_replicate" ADD TABLE ONLY "public"."notifications";
+
+
+
+ALTER PUBLICATION "capgo_google_eu_2_pub" ADD TABLE ONLY "public"."onboarding_demo_data";
 
 
 
@@ -20756,9 +21517,15 @@ REVOKE ALL ON FUNCTION "public"."check_org_user_privileges"() FROM PUBLIC;
 
 
 
+REVOKE ALL ON FUNCTION "public"."check_revert_to_builtin_version"("appid" character varying) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."check_revert_to_builtin_version"("appid" character varying) TO "anon";
 GRANT ALL ON FUNCTION "public"."check_revert_to_builtin_version"("appid" character varying) TO "authenticated";
 GRANT ALL ON FUNCTION "public"."check_revert_to_builtin_version"("appid" character varying) TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."claim_legacy_onboarding_demo_data"("p_app_uuid" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."claim_legacy_onboarding_demo_data"("p_app_uuid" "uuid") TO "service_role";
 
 
 
@@ -20823,11 +21590,6 @@ REVOKE ALL ON FUNCTION "public"."cli_check_permission"("apikey" "text", "permiss
 GRANT ALL ON FUNCTION "public"."cli_check_permission"("apikey" "text", "permission_key" "text", "org_id" "uuid", "app_id" "text", "channel_id" bigint) TO "service_role";
 GRANT ALL ON FUNCTION "public"."cli_check_permission"("apikey" "text", "permission_key" "text", "org_id" "uuid", "app_id" "text", "channel_id" bigint) TO "anon";
 GRANT ALL ON FUNCTION "public"."cli_check_permission"("apikey" "text", "permission_key" "text", "org_id" "uuid", "app_id" "text", "channel_id" bigint) TO "authenticated";
-
-
-
-REVOKE ALL ON FUNCTION "public"."complete_onboarding_after_first_upload"() FROM PUBLIC;
-GRANT ALL ON FUNCTION "public"."complete_onboarding_after_first_upload"() TO "service_role";
 
 
 
@@ -21493,6 +22255,13 @@ GRANT ALL ON FUNCTION "public"."is_allowed_action_org_action"("orgid" "uuid", "a
 
 
 
+REVOKE ALL ON FUNCTION "public"."is_allowed_action_org_action"("orgid" "uuid", "actions" "public"."action_type"[], "appid" character varying) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."is_allowed_action_org_action"("orgid" "uuid", "actions" "public"."action_type"[], "appid" character varying) TO "service_role";
+GRANT ALL ON FUNCTION "public"."is_allowed_action_org_action"("orgid" "uuid", "actions" "public"."action_type"[], "appid" character varying) TO "anon";
+GRANT ALL ON FUNCTION "public"."is_allowed_action_org_action"("orgid" "uuid", "actions" "public"."action_type"[], "appid" character varying) TO "authenticated";
+
+
+
 GRANT ALL ON FUNCTION "public"."is_allowed_capgkey"("apikey" "text", "keymode" "public"."key_mode"[]) TO "anon";
 GRANT ALL ON FUNCTION "public"."is_allowed_capgkey"("apikey" "text", "keymode" "public"."key_mode"[]) TO "authenticated";
 GRANT ALL ON FUNCTION "public"."is_allowed_capgkey"("apikey" "text", "keymode" "public"."key_mode"[]) TO "service_role";
@@ -21625,6 +22394,12 @@ GRANT ALL ON FUNCTION "public"."is_paying_and_good_plan_org_action"("orgid" "uui
 
 
 
+REVOKE ALL ON FUNCTION "public"."is_paying_and_good_plan_org_action"("orgid" "uuid", "actions" "public"."action_type"[], "appid" character varying) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."is_paying_and_good_plan_org_action"("orgid" "uuid", "actions" "public"."action_type"[], "appid" character varying) TO "service_role";
+GRANT ALL ON FUNCTION "public"."is_paying_and_good_plan_org_action"("orgid" "uuid", "actions" "public"."action_type"[], "appid" character varying) TO "authenticated";
+
+
+
 REVOKE ALL ON FUNCTION "public"."is_paying_org"("orgid" "uuid") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."is_paying_org"("orgid" "uuid") TO "service_role";
 GRANT ALL ON FUNCTION "public"."is_paying_org"("orgid" "uuid") TO "authenticated";
@@ -21740,6 +22515,7 @@ REVOKE ALL ON FUNCTION "public"."process_admin_stats"() FROM PUBLIC;
 
 
 REVOKE ALL ON FUNCTION "public"."process_all_cron_tasks"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."process_all_cron_tasks"() TO "service_role";
 
 
 
@@ -21786,6 +22562,11 @@ REVOKE ALL ON FUNCTION "public"."process_function_queue"("queue_names" "text"[],
 
 
 REVOKE ALL ON FUNCTION "public"."process_function_queue"("queue_name" "text", "batch_size" integer) FROM PUBLIC;
+
+
+
+REVOKE ALL ON FUNCTION "public"."process_queue_with_healthcheck"("queue_names" "text"[], "batch_size" integer, "healthcheck_url" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."process_queue_with_healthcheck"("queue_names" "text"[], "batch_size" integer, "healthcheck_url" "text") TO "service_role";
 
 
 
@@ -22408,6 +23189,11 @@ GRANT ALL ON FUNCTION "public"."record_email_otp_verified"("p_user_id" "uuid") T
 
 
 
+REVOKE ALL ON FUNCTION "public"."refresh_app_rollups_after_demo_reset"("p_app_uuid" "uuid", "p_app_id" "text", "p_owner_org" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."refresh_app_rollups_after_demo_reset"("p_app_uuid" "uuid", "p_app_id" "text", "p_owner_org" "uuid") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."refresh_orgs_has_usage_credits"() FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."refresh_orgs_has_usage_credits"() TO "service_role";
 
@@ -22481,6 +23267,11 @@ GRANT ALL ON FUNCTION "public"."request_read_key_modes"() TO "service_role";
 REVOKE ALL ON FUNCTION "public"."rescind_invitation"("email" "text", "org_id" "uuid") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."rescind_invitation"("email" "text", "org_id" "uuid") TO "service_role";
 GRANT ALL ON FUNCTION "public"."rescind_invitation"("email" "text", "org_id" "uuid") TO "authenticated";
+
+
+
+REVOKE ALL ON FUNCTION "public"."reset_onboarding_demo_app_data"("p_app_uuid" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."reset_onboarding_demo_app_data"("p_app_uuid" "uuid") TO "service_role";
 
 
 
@@ -22582,6 +23373,11 @@ GRANT ALL ON FUNCTION "public"."top_up_usage_credits"("p_org_id" "uuid", "p_amou
 
 REVOKE ALL ON FUNCTION "public"."total_bundle_storage_bytes"() FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."total_bundle_storage_bytes"() TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."track_onboarding_demo_data"("p_app_id" "text", "p_owner_org" "uuid", "p_relation_name" "text", "p_row_keys" "text"[], "p_seed_id" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."track_onboarding_demo_data"("p_app_id" "text", "p_owner_org" "uuid", "p_relation_name" "text", "p_row_keys" "text"[], "p_seed_id" "uuid") TO "service_role";
 
 
 
@@ -22971,6 +23767,10 @@ GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public".
 
 
 
+GRANT ALL ON TABLE "public"."onboarding_demo_data" TO "service_role";
+
+
+
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."org_users" TO "anon";
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."org_users" TO "authenticated";
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."org_users" TO "service_role";
@@ -23179,14 +23979,10 @@ GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public".
 
 
 
-GRANT ALL ON TABLE "public"."webhook_deliveries" TO "anon";
-GRANT ALL ON TABLE "public"."webhook_deliveries" TO "authenticated";
 GRANT ALL ON TABLE "public"."webhook_deliveries" TO "service_role";
 
 
 
-GRANT ALL ON TABLE "public"."webhooks" TO "anon";
-GRANT ALL ON TABLE "public"."webhooks" TO "authenticated";
 GRANT ALL ON TABLE "public"."webhooks" TO "service_role";
 
 

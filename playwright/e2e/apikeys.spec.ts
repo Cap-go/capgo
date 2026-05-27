@@ -1,7 +1,7 @@
 import type { Page } from '@playwright/test'
 import { expect, test } from '../support/commands'
 
-async function createReadApiKey(page: Page, keyName: string) {
+async function createRbacApiKey(page: Page, keyName: string) {
   await page.click('[data-test="create-key"]')
   const dialog = page.locator('#dialog-v2-content')
   await expect(dialog).toBeVisible()
@@ -23,7 +23,7 @@ test.describe('API Key Management', () => {
   test('should create new API key', async ({ page }) => {
     const keyName = `Playwright Read ${Date.now()}`
 
-    await createReadApiKey(page, keyName)
+    await createRbacApiKey(page, keyName)
 
     await expect(page.getByText(keyName, { exact: true })).toBeVisible()
   })
@@ -31,7 +31,7 @@ test.describe('API Key Management', () => {
   test('should delete API key', async ({ page }) => {
     const keyName = `Playwright Delete ${Date.now()}`
 
-    await createReadApiKey(page, keyName)
+    await createRbacApiKey(page, keyName)
 
     const keyCell = page.getByText(keyName, { exact: true })
     await expect(keyCell).toBeVisible()
