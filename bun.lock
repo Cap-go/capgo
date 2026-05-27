@@ -205,7 +205,7 @@
     },
     "cli": {
       "name": "@capgo/cli",
-      "version": "7.111.2",
+      "version": "7.111.4",
       "bin": {
         "capgo": "dist/index.js",
       },
@@ -269,7 +269,11 @@
       },
       "peerDependencies": {
         "@capacitor/core": "^8.0.0",
+        "@capgo/capacitor-updater": "^8.0.0",
       },
+      "optionalPeers": [
+        "@capgo/capacitor-updater",
+      ],
     },
   },
   "trustedDependencies": [

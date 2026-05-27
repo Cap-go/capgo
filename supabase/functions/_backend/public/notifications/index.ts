@@ -13,12 +13,13 @@ import {
   enqueueNativeNotificationFanout,
   getAllNotificationBuckets,
   getNotificationBucket,
+  normalizeNotificationTag,
   readNotificationRegistrationsCF,
   readNotificationStatsCF,
+  shouldTrackNotificationPermissionChanged,
   tombstoneNotificationRegistrationCF,
   trackNotificationEventCF,
   trackNotificationRegistrationCF,
-  normalizeNotificationTag,
   verifyNotificationDeliveryEventProof,
   verifyNotificationEventProof,
   verifyNotificationIdentityProof,
@@ -75,6 +76,7 @@ interface RegisterBody {
   active?: boolean
   consent?: boolean
   identityProof: string
+  previousPermission?: NativeNotificationRegisterInput['permission']
   previousRecipientKey?: string
   previousDeviceKey?: string
   previousEventProof?: string
@@ -298,6 +300,28 @@ function resolveProviderSecretRef(appId: string, provider: NativeNotificationPro
   return status === 'configured' ? expected : requested || null
 }
 
+function optionalConfigString(config: Record<string, unknown>, key: string): string {
+  const value = config[key]
+  return typeof value === 'string' ? value.trim() : ''
+}
+
+function assertProviderConfigReady(provider: NativeNotificationProvider, status: string, config: Record<string, unknown>, secretRef: string | null) {
+  if (status !== 'configured')
+    return
+
+  if (!secretRef)
+    throw simpleError('missing_notification_secret_ref', 'Missing notification provider secret reference', { provider })
+
+  if (provider === 'fcm' && !optionalConfigString(config, 'projectId'))
+    throw simpleError('missing_notification_provider_project_id', 'Missing FCM project id', { provider })
+
+  if (provider === 'apns') {
+    const missing = ['teamId', 'keyId', 'bundleId'].filter(key => !optionalConfigString(config, key))
+    if (missing.length)
+      throw simpleError('missing_notification_provider_apns_config', 'Missing APNs provider config', { provider, missing })
+  }
+}
+
 function publicDevice(row: NativeNotificationRegistryRow) {
   return {
     deviceKey: row.device_key,
@@ -472,15 +496,17 @@ app.post('/register', async (c) => {
     pushToken,
   })
 
-  await trackNotificationEventCF(c, {
-    appId,
-    event: 'permission_changed',
-    recipientKey: identity.recipientKey,
-    deviceKey: identity.deviceKey,
-    provider: body.provider,
-    platform: body.platform,
-    badge: body.badge,
-  })
+  if (shouldTrackNotificationPermissionChanged(body.previousPermission, body.permission)) {
+    await trackNotificationEventCF(c, {
+      appId,
+      event: 'permission_changed',
+      recipientKey: identity.recipientKey,
+      deviceKey: identity.deviceKey,
+      provider: body.provider,
+      platform: body.platform,
+      badge: body.badge,
+    })
+  }
 
   const eventProof = await createNotificationEventProof(c, appId, identity.recipientKey, identity.deviceKey)
 
@@ -730,6 +756,7 @@ app.put('/providers', middlewareV2(['write', 'all']), async (c) => {
   const ownerOrg = await getAppOwnerOrg(c, appId)
   const config = assertOptionalRecord(body.config, 'config')
   const secretRef = resolveProviderSecretRef(appId, body.provider, status, body.secretRef)
+  assertProviderConfigReady(body.provider, status, config, secretRef)
   const auth = c.get('auth')
   let pgClient: ReturnType<typeof getPgClient> | undefined
   try {

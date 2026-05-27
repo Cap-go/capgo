@@ -2,17 +2,19 @@ import { describe, expect, it } from 'vitest'
 import { getReleaseRangeBase, matchesComponent, resolveReleaseScope } from '../scripts/release-scope.ts'
 
 describe('release scope matching', () => {
-  it.concurrent('treats shared release infrastructure as affecting both components', () => {
+  it.concurrent('treats shared release infrastructure as affecting all components', () => {
     const files = [
       '.github/workflows/tests.yml',
       '.github/workflows/bump_version.yml',
       '.github/scripts/start-background-service.sh',
       'scripts/setup-bun.sh',
       'scripts/release-scope.ts',
+      'scripts/sync-notifications-package-version.ts',
     ]
 
     expect(matchesComponent('capgo', files)).toBe(true)
     expect(matchesComponent('cli', files)).toBe(true)
+    expect(matchesComponent('notifications', files)).toBe(true)
   })
 
   it.concurrent('treats capgo deploy workflow changes as capgo-only releases', () => {
@@ -27,13 +29,27 @@ describe('release scope matching', () => {
 
     expect(matchesComponent('capgo', files)).toBe(false)
     expect(matchesComponent('cli', files)).toBe(true)
+    expect(matchesComponent('notifications', files)).toBe(false)
+  })
+
+  it.concurrent('treats notifications package changes as notifications-only releases', () => {
+    const files = [
+      'packages/capacitor-notifications/src/index.ts',
+      '.github/workflows/publish_notifications.yml',
+    ]
+
+    expect(matchesComponent('capgo', files)).toBe(false)
+    expect(matchesComponent('cli', files)).toBe(false)
+    expect(matchesComponent('notifications', files)).toBe(true)
   })
 
   it.concurrent('keeps runtime code scoped to the matching component', () => {
     expect(matchesComponent('capgo', ['src/pages/index.vue'])).toBe(true)
     expect(matchesComponent('cli', ['src/pages/index.vue'])).toBe(false)
+    expect(matchesComponent('notifications', ['src/pages/index.vue'])).toBe(false)
     expect(matchesComponent('capgo', ['cli/src/index.ts'])).toBe(false)
     expect(matchesComponent('cli', ['cli/src/index.ts'])).toBe(true)
+    expect(matchesComponent('notifications', ['cli/src/index.ts'])).toBe(false)
   })
 
   it.concurrent('does not release on unrelated changes', () => {
@@ -41,6 +57,7 @@ describe('release scope matching', () => {
 
     expect(matchesComponent('capgo', files)).toBe(false)
     expect(matchesComponent('cli', files)).toBe(false)
+    expect(matchesComponent('notifications', files)).toBe(false)
   })
 
   it.concurrent('uses the latest component tag instead of only the pushed range', () => {

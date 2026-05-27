@@ -11,6 +11,7 @@ import {
   getNotificationEventIndex,
   getNotificationIndex,
   normalizeNotificationTag,
+  shouldTrackNotificationPermissionChanged,
   verifyNotificationDeliveryEventProof,
   verifyNotificationEventProof,
   verifyNotificationIdentityProof,
@@ -170,6 +171,13 @@ describe('native notification AE registry', () => {
     expect(query).toContain("index1 = 'com.demo.app:campaign-1'")
     expect(query).toContain("blob2 = 'campaign-1'")
     expect(query).toContain('GROUP BY blob1')
+  })
+
+  it.concurrent('tracks permission_changed only when permission state changes or old plugins omit previous state', () => {
+    expect(shouldTrackNotificationPermissionChanged(undefined, 'granted')).toBe(true)
+    expect(shouldTrackNotificationPermissionChanged('prompt', 'granted')).toBe(true)
+    expect(shouldTrackNotificationPermissionChanged('granted', 'granted')).toBe(false)
+    expect(shouldTrackNotificationPermissionChanged('denied', 'denied')).toBe(false)
   })
 
   it.concurrent('normalizes notification event indexes consistently for long IDs', () => {

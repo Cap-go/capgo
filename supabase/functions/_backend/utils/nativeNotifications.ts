@@ -209,6 +209,10 @@ function permissionToNumber(permission: NativeNotificationPermission | undefined
   }
 }
 
+export function shouldTrackNotificationPermissionChanged(previous: NativeNotificationPermission | undefined, next: NativeNotificationPermission | undefined): boolean {
+  return !previous || previous !== next
+}
+
 function trimText(value: string | undefined, maxLength: number): string {
   return typeof value === 'string' ? value.trim().slice(0, maxLength) : ''
 }

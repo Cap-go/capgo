@@ -9,6 +9,7 @@ import { writeFileAtomic } from '../utils/safeWrites'
 
 const notificationPackages = [
   '@capgo/capacitor-notifications',
+  '@capgo/capacitor-updater',
 ]
 
 interface NotificationSetupOptions {

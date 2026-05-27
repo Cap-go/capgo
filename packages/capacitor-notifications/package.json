@@ -23,7 +23,13 @@
     "prepublishOnly": "bun run typecheck && bun run build"
   },
   "peerDependencies": {
-    "@capacitor/core": "^8.0.0"
+    "@capacitor/core": "^8.0.0",
+    "@capgo/capacitor-updater": "^8.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@capgo/capacitor-updater": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@capacitor/android": "^8.0.0",

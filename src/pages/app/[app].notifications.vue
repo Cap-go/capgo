@@ -84,7 +84,7 @@ const providerForm = ref({
   provider: 'fcm',
   status: 'draft',
   secretRef: '',
-  config: '{\n  "projectId": ""\n}',
+  config: '{\n  "projectId": "",\n  "serviceAccountEmail": ""\n}',
 })
 const campaignForm = ref({
   name: '',
@@ -127,6 +127,12 @@ const hasStats = computed(() => stats.value.length > 0)
 const expectedProviderSecretRef = computed(() => {
   const normalizedAppId = normalizeSecretRefSegment(id.value)
   return `NOTIFICATIONS_${normalizedAppId}_${providerForm.value.provider.toUpperCase()}`
+})
+const providerConfigPlaceholder = computed(() => {
+  if (providerForm.value.provider === 'apns') {
+    return '{\n  "teamId": "",\n  "keyId": "",\n  "bundleId": "",\n  "environment": "production"\n}'
+  }
+  return '{\n  "projectId": "",\n  "serviceAccountEmail": ""\n}'
 })
 let activeRefreshId = 0
 
@@ -422,6 +428,10 @@ watch(() => {
     displayStore.defaultBack = '/apps'
   }
 }, { immediate: true })
+
+watch(() => providerForm.value.provider, () => {
+  providerForm.value.config = providerConfigPlaceholder.value
+})
 </script>
 
 <template>
@@ -542,11 +552,13 @@ watch(() => {
                     <label class="space-y-1 sm:col-span-2 2xl:col-span-2">
                       <span class="text-sm font-medium text-slate-700 dark:text-slate-200">{{ t('notification-provider-secret-ref') }}</span>
                       <input v-model="providerForm.secretRef" class="w-full min-h-11 d-input d-input-bordered" :placeholder="expectedProviderSecretRef">
+                      <span class="block text-xs leading-5 text-slate-500 dark:text-slate-400">{{ t('notification-provider-secret-ref-help') }}</span>
                     </label>
                   </div>
                   <label class="block space-y-1">
                     <span class="text-sm font-medium text-slate-700 dark:text-slate-200">{{ t('notification-provider-config-json') }}</span>
-                    <textarea v-model="providerForm.config" class="w-full font-mono text-sm d-textarea d-textarea-bordered min-h-36" :placeholder="t('notification-provider-config-json')" />
+                    <textarea v-model="providerForm.config" class="w-full font-mono text-sm d-textarea d-textarea-bordered min-h-36" :placeholder="providerConfigPlaceholder" />
+                    <span class="block text-xs leading-5 text-slate-500 dark:text-slate-400">{{ t('notification-provider-config-help') }}</span>
                   </label>
                 </div>
 

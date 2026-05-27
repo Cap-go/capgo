@@ -18,12 +18,12 @@ import type {
   CapgoUpdateCheckResult,
   CapgoUpdaterIntegrationOptions,
 } from './definitions'
+import { PLUGIN_VERSION } from './version'
 
 export * from './definitions'
 
 const NativeCapgoNotifications = registerPlugin<CapgoNotificationsNativePlugin>('CapgoNotifications')
 const DEFAULT_SERVER_URL = 'https://api.capgo.app'
-const PLUGIN_VERSION = '0.0.1-private.0'
 
 interface UpdaterTriggerResult {
   status?: string
@@ -385,6 +385,7 @@ async function registerToken(options: CapgoNotificationRegisterOptions, token: C
     badge: state.badge,
     active: true,
     consent: options.consent ?? state.consent,
+    previousPermission: previousRegistration?.permission,
     ...previousIdentity,
   })
 
