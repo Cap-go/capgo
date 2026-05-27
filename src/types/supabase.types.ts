@@ -21,9 +21,6 @@ export type Database = {
           id: number
           key: string | null
           key_hash: string | null
-          limited_to_apps: string[] | null
-          limited_to_orgs: string[] | null
-          mode: Database["public"]["Enums"]["key_mode"] | null
           name: string
           rbac_id: string
           updated_at: string | null
@@ -35,9 +32,6 @@ export type Database = {
           id?: number
           key?: string | null
           key_hash?: string | null
-          limited_to_apps?: string[] | null
-          limited_to_orgs?: string[] | null
-          mode?: Database["public"]["Enums"]["key_mode"] | null
           name: string
           rbac_id?: string
           updated_at?: string | null
@@ -49,9 +43,6 @@ export type Database = {
           id?: number
           key?: string | null
           key_hash?: string | null
-          limited_to_apps?: string[] | null
-          limited_to_orgs?: string[] | null
-          mode?: Database["public"]["Enums"]["key_mode"] | null
           name?: string
           rbac_id?: string
           updated_at?: string | null
@@ -2994,6 +2985,13 @@ export type Database = {
     }
     Functions: {
       accept_invitation_to_org: { Args: { org_id: string }; Returns: string }
+      apikey_permission_for_keymode: {
+        Args: {
+          keymode: Database["public"]["Enums"]["key_mode"][]
+          scope_type: string
+        }
+        Returns: string
+      }
       app_versions_readable_app_ids: { Args: never; Returns: string[] }
       apply_usage_overage: {
         Args: {
@@ -3189,65 +3187,6 @@ export type Database = {
           wrong_key_count: number
         }[]
       }
-      create_hashed_apikey: {
-        Args: {
-          p_expires_at?: string
-          p_limited_to_apps?: string[]
-          p_limited_to_orgs?: string[]
-          p_mode?: Database["public"]["Enums"]["key_mode"]
-          p_name?: string
-        }
-        Returns: {
-          created_at: string | null
-          expires_at: string | null
-          id: number
-          key: string | null
-          key_hash: string | null
-          limited_to_apps: string[] | null
-          limited_to_orgs: string[] | null
-          mode: Database["public"]["Enums"]["key_mode"] | null
-          name: string
-          rbac_id: string
-          updated_at: string | null
-          user_id: string
-        }
-        SetofOptions: {
-          from: "*"
-          to: "apikeys"
-          isOneToOne: true
-          isSetofReturn: false
-        }
-      }
-      create_hashed_apikey_for_user: {
-        Args: {
-          p_expires_at?: string
-          p_limited_to_apps?: string[]
-          p_limited_to_orgs?: string[]
-          p_mode?: Database["public"]["Enums"]["key_mode"]
-          p_name?: string
-          p_user_id: string
-        }
-        Returns: {
-          created_at: string | null
-          expires_at: string | null
-          id: number
-          key: string | null
-          key_hash: string | null
-          limited_to_apps: string[] | null
-          limited_to_orgs: string[] | null
-          mode: Database["public"]["Enums"]["key_mode"] | null
-          name: string
-          rbac_id: string
-          updated_at: string | null
-          user_id: string
-        }
-        SetofOptions: {
-          from: "*"
-          to: "apikeys"
-          isOneToOne: true
-          isSetofReturn: false
-        }
-      }
       current_request_role: { Args: never; Returns: string }
       delete_accounts_marked_for_deletion: {
         Args: never
@@ -3288,9 +3227,6 @@ export type Database = {
           id: number
           key: string | null
           key_hash: string | null
-          limited_to_apps: string[] | null
-          limited_to_orgs: string[] | null
-          mode: Database["public"]["Enums"]["key_mode"] | null
           name: string
           rbac_id: string
           updated_at: string | null
@@ -3545,9 +3481,6 @@ export type Database = {
           created_at: string
           expires_at: string
           id: number
-          limited_to_apps: string[]
-          limited_to_orgs: string[]
-          mode: Database["public"]["Enums"]["key_mode"]
           name: string
           owner_email: string
           rbac_id: string
@@ -4219,6 +4152,10 @@ export type Database = {
         Args: { p_granted_by?: string; p_org_id: string }
         Returns: Json
       }
+      rbac_org_role_for_legacy_right: {
+        Args: { legacy_right: Database["public"]["Enums"]["user_min_right"] }
+        Returns: string
+      }
       rbac_perm_app_build_native: { Args: never; Returns: string }
       rbac_perm_app_create_channel: { Args: never; Returns: string }
       rbac_perm_app_delete: { Args: never; Returns: string }
@@ -4325,6 +4262,7 @@ export type Database = {
         Args: never
         Returns: Database["public"]["Enums"]["user_min_right"]
       }
+      rbac_role_apikey_org_reader: { Args: never; Returns: string }
       rbac_role_app_admin: { Args: never; Returns: string }
       rbac_role_app_developer: { Args: never; Returns: string }
       rbac_role_app_reader: { Args: never; Returns: string }
@@ -4417,9 +4355,6 @@ export type Database = {
           id: number
           key: string | null
           key_hash: string | null
-          limited_to_apps: string[] | null
-          limited_to_orgs: string[] | null
-          mode: Database["public"]["Enums"]["key_mode"] | null
           name: string
           rbac_id: string
           updated_at: string | null
@@ -4440,9 +4375,6 @@ export type Database = {
           id: number
           key: string | null
           key_hash: string | null
-          limited_to_apps: string[] | null
-          limited_to_orgs: string[] | null
-          mode: Database["public"]["Enums"]["key_mode"] | null
           name: string
           rbac_id: string
           updated_at: string | null
