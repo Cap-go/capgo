@@ -189,8 +189,6 @@ jobs:
         run: bash scripts/setup-bun.sh
       - name: Validate migration timestamps
         if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
-        env:
-          ALLOW_MODIFIED_SUPABASE_MIGRATIONS: ${{ github.head_ref == 'codex/fix-apikey-migration-deadlock' && 'supabase/migrations/20260526133000_migrate_apikeys_to_v2_timestamp_fix.sql' || '' }}
         run: bash scripts/check-supabase-migration-order.sh
       - name: Check for typos
         uses: crate-ci/typos@v1 # v1.45.1
