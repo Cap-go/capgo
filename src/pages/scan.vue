@@ -36,6 +36,7 @@ const statusMessage = ref('')
 let downloadListener: Awaited<ReturnType<typeof CapacitorUpdater.addListener>> | null = null
 
 interface PreviewPayload {
+  appId?: string
   version?: string
   url?: string
   checksum?: string | null
@@ -205,8 +206,8 @@ async function handleBarcodeScan(scannedValue: string) {
   await downloadUpdate(value)
 }
 
-async function startPreviewSession() {
-  await CapacitorUpdater.startPreviewSession()
+async function startPreviewSession(appId?: string) {
+  await CapacitorUpdater.startPreviewSession(appId ? { appId } : undefined)
 }
 
 async function previewPayloadFromResponse(response: Response): Promise<PreviewPayload> {
@@ -257,7 +258,7 @@ function downloadOptionsFromPreviewPayload(payload: PreviewPayload): DownloadOpt
   }
 }
 
-async function startPreviewPayload(payloadUrl: string) {
+async function startPreviewPayload(payloadUrl: string, appId?: string) {
   try {
     isLoading.value = true
     downloadProgress.value = 0
@@ -272,7 +273,7 @@ async function startPreviewPayload(payloadUrl: string) {
     const payload = await fetchPreviewPayload(payloadUrl)
     const bundle = await CapacitorUpdater.download(downloadOptionsFromPreviewPayload(payload))
 
-    await startPreviewSession()
+    await startPreviewSession(payload.appId || appId)
     await CapacitorUpdater.set(bundle)
   }
   catch (error) {
@@ -290,7 +291,7 @@ async function startPreviewPayload(payloadUrl: string) {
 
 async function startPreviewLink(previewLink: PreviewDeepLink) {
   if (previewLink.payloadUrl) {
-    await startPreviewPayload(previewLink.payloadUrl)
+    await startPreviewPayload(previewLink.payloadUrl, previewLink.appId)
     return
   }
 
@@ -322,7 +323,7 @@ async function startChannelPreview(previewLink: Extract<PreviewDeepLink, { type:
       version: latest.version,
     })
 
-    await startPreviewSession()
+    await startPreviewSession(previewLink.appId)
     await CapacitorUpdater.set(bundle)
   }
   catch (error) {

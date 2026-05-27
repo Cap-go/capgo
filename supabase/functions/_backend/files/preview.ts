@@ -214,6 +214,7 @@ async function getPreviewPayload(c: Context<MiddlewareKeyVariables>, appId: stri
   }
 
   return new Response(JSON.stringify({
+    appId,
     checksum: bundle.checksum ?? undefined,
     comment: bundle.comment ?? undefined,
     link: bundle.link ?? undefined,
