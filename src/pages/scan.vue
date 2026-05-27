@@ -158,6 +158,12 @@ function setCameraPreviewActive(active: boolean) {
   document.body.classList.toggle('camera-preview-active', active)
 }
 
+function waitForPaint() {
+  return new Promise<void>((resolve) => {
+    requestAnimationFrame(() => resolve())
+  })
+}
+
 function getScannerFrame() {
   const frame = scannerFrameRef.value
   if (!frame)
@@ -244,6 +250,8 @@ async function startScanner() {
 
     cameraPreviewStarted = true
     setCameraPreviewActive(true)
+    await waitForPaint()
+
     await CameraPreview.start({
       ...frame,
       aspectMode: 'cover',
@@ -534,7 +542,7 @@ async function goBack() {
 
 <template>
   <main
-    class="min-h-dvh overflow-y-auto pb-[calc(6rem+env(safe-area-inset-bottom))] text-white"
+    class="camera-preview-page min-h-dvh overflow-y-auto pb-[calc(6rem+env(safe-area-inset-bottom))] text-white"
     :class="isScanning ? 'bg-transparent' : 'bg-slate-950'"
   >
     <div class="mx-auto flex min-h-dvh w-full max-w-md flex-col px-4 pb-4 pt-[max(1rem,env(safe-area-inset-top))]">
@@ -577,7 +585,7 @@ async function goBack() {
 
       <section
         class="mt-4 rounded-2xl border border-white/10 p-4"
-        :class="isScanning ? 'bg-slate-950/45' : 'bg-slate-900'"
+        :class="isScanning ? 'bg-transparent' : 'bg-slate-900'"
       >
         <div
           ref="scannerFrameRef"
@@ -697,8 +705,11 @@ async function goBack() {
 <style>
 html.camera-preview-active,
 body.camera-preview-active,
-body.camera-preview-active #app {
+body.camera-preview-active #app,
+body.camera-preview-active #app > .app-shell,
+body.camera-preview-active .camera-preview-page {
   background: transparent !important;
+  background-color: transparent !important;
 }
 </style>
 
