@@ -1,5 +1,61 @@
 -- Move every existing API key to RBAC-backed bindings and remove the old key scope columns.
 
+CREATE OR REPLACE FUNCTION pg_temp.exec_ddl_with_retry(p_sql text, p_attempts integer DEFAULT 20)
+RETURNS void
+LANGUAGE plpgsql
+SET search_path = ''
+AS $$
+DECLARE
+  v_attempt integer := 0;
+BEGIN
+  LOOP
+    v_attempt := v_attempt + 1;
+    PERFORM pg_catalog.set_config('lock_timeout', '5s', true);
+
+    BEGIN
+      EXECUTE p_sql;
+      PERFORM pg_catalog.set_config('lock_timeout', '0', true);
+      RETURN;
+    EXCEPTION
+      WHEN deadlock_detected OR lock_not_available THEN
+        PERFORM pg_catalog.set_config('lock_timeout', '0', true);
+
+        IF v_attempt >= p_attempts THEN
+          RAISE;
+        END IF;
+
+        RAISE NOTICE 'Retrying migration DDL after lock conflict on attempt %', v_attempt;
+        PERFORM pg_catalog.pg_sleep(pg_catalog.least(0.25 * v_attempt, 3.0));
+    END;
+  END LOOP;
+END;
+$$;
+
+SELECT pg_temp.exec_ddl_with_retry($lock$
+  LOCK TABLE
+    "public"."apikeys",
+    "public"."apps",
+    "public"."app_versions",
+    "public"."channel_devices",
+    "public"."daily_bandwidth",
+    "public"."daily_mau",
+    "public"."daily_storage",
+    "public"."daily_version",
+    "public"."group_members",
+    "public"."groups",
+    "public"."org_users",
+    "public"."orgs",
+    "public"."permissions",
+    "public"."role_bindings",
+    "public"."role_permissions",
+    "public"."roles",
+    "public"."stats",
+    "public"."users",
+    "public"."webhook_deliveries",
+    "public"."webhooks"
+  IN ACCESS EXCLUSIVE MODE
+$lock$);
+
 DO $$
 DECLARE
   v_org_id uuid;
