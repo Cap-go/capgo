@@ -430,6 +430,10 @@ END;
 $$;
 
 ALTER FUNCTION "public"."get_identity"("keymode" "public"."key_mode"[]) OWNER TO "postgres";
+REVOKE ALL ON FUNCTION "public"."get_identity"("public"."key_mode"[]) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION "public"."get_identity"("public"."key_mode"[]) TO "anon";
+GRANT EXECUTE ON FUNCTION "public"."get_identity"("public"."key_mode"[]) TO "authenticated";
+GRANT EXECUTE ON FUNCTION "public"."get_identity"("public"."key_mode"[]) TO "service_role";
 
 CREATE OR REPLACE FUNCTION "public"."get_identity_apikey_only"("keymode" "public"."key_mode"[]) RETURNS "uuid"
 LANGUAGE "plpgsql" SECURITY DEFINER
@@ -516,6 +520,10 @@ END;
 $$;
 
 ALTER FUNCTION "public"."get_identity_org_allowed"("keymode" "public"."key_mode"[], "org_id" "uuid") OWNER TO "postgres";
+REVOKE ALL ON FUNCTION "public"."get_identity_org_allowed"("public"."key_mode"[], "uuid") FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION "public"."get_identity_org_allowed"("public"."key_mode"[], "uuid") TO "anon";
+GRANT EXECUTE ON FUNCTION "public"."get_identity_org_allowed"("public"."key_mode"[], "uuid") TO "authenticated";
+GRANT EXECUTE ON FUNCTION "public"."get_identity_org_allowed"("public"."key_mode"[], "uuid") TO "service_role";
 
 CREATE OR REPLACE FUNCTION "public"."get_identity_org_allowed_apikey_only"("keymode" "public"."key_mode"[], "org_id" "uuid") RETURNS "uuid"
 LANGUAGE "plpgsql" SECURITY DEFINER
@@ -584,6 +592,10 @@ END;
 $$;
 
 ALTER FUNCTION "public"."get_identity_org_appid"("keymode" "public"."key_mode"[], "org_id" "uuid", "app_id" character varying) OWNER TO "postgres";
+REVOKE ALL ON FUNCTION "public"."get_identity_org_appid"("public"."key_mode"[], "uuid", character varying) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION "public"."get_identity_org_appid"("public"."key_mode"[], "uuid", character varying) TO "anon";
+GRANT EXECUTE ON FUNCTION "public"."get_identity_org_appid"("public"."key_mode"[], "uuid", character varying) TO "authenticated";
+GRANT EXECUTE ON FUNCTION "public"."get_identity_org_appid"("public"."key_mode"[], "uuid", character varying) TO "service_role";
 
 CREATE OR REPLACE FUNCTION "public"."is_allowed_capgkey"("apikey" "text", "keymode" "public"."key_mode"[]) RETURNS boolean
 LANGUAGE "plpgsql" SECURITY DEFINER
@@ -639,6 +651,10 @@ END;
 $$;
 
 ALTER FUNCTION "public"."is_allowed_capgkey"("apikey" "text", "keymode" "public"."key_mode"[]) OWNER TO "postgres";
+REVOKE ALL ON FUNCTION "public"."is_allowed_capgkey"("text", "public"."key_mode"[]) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION "public"."is_allowed_capgkey"("text", "public"."key_mode"[]) TO "anon";
+GRANT EXECUTE ON FUNCTION "public"."is_allowed_capgkey"("text", "public"."key_mode"[]) TO "authenticated";
+GRANT EXECUTE ON FUNCTION "public"."is_allowed_capgkey"("text", "public"."key_mode"[]) TO "service_role";
 
 CREATE OR REPLACE FUNCTION "public"."is_allowed_capgkey"("apikey" "text", "keymode" "public"."key_mode"[], "app_id" character varying) RETURNS boolean
 LANGUAGE "plpgsql" SECURITY DEFINER
@@ -669,6 +685,10 @@ END;
 $$;
 
 ALTER FUNCTION "public"."is_allowed_capgkey"("apikey" "text", "keymode" "public"."key_mode"[], "app_id" character varying) OWNER TO "postgres";
+REVOKE ALL ON FUNCTION "public"."is_allowed_capgkey"("text", "public"."key_mode"[], character varying) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION "public"."is_allowed_capgkey"("text", "public"."key_mode"[], character varying) TO "anon";
+GRANT EXECUTE ON FUNCTION "public"."is_allowed_capgkey"("text", "public"."key_mode"[], character varying) TO "authenticated";
+GRANT EXECUTE ON FUNCTION "public"."is_allowed_capgkey"("text", "public"."key_mode"[], character varying) TO "service_role";
 
 CREATE OR REPLACE FUNCTION "capgo_private"."matches_app_storage_apikey_owner"("folder_user_id" "text", "target_app_id" character varying, "keymode" "public"."key_mode"[]) RETURNS boolean
 LANGUAGE "plpgsql" SECURITY DEFINER
@@ -750,6 +770,10 @@ END;
 $$;
 
 ALTER FUNCTION "public"."has_app_right_apikey"("appid" character varying, "right" "public"."user_min_right", "userid" "uuid", "apikey" "text") OWNER TO "postgres";
+REVOKE ALL ON FUNCTION "public"."has_app_right_apikey"(character varying, "public"."user_min_right", "uuid", "text") FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION "public"."has_app_right_apikey"(character varying, "public"."user_min_right", "uuid", "text") TO "anon";
+GRANT EXECUTE ON FUNCTION "public"."has_app_right_apikey"(character varying, "public"."user_min_right", "uuid", "text") TO "authenticated";
+GRANT EXECUTE ON FUNCTION "public"."has_app_right_apikey"(character varying, "public"."user_min_right", "uuid", "text") TO "service_role";
 
 CREATE OR REPLACE FUNCTION "public"."rbac_check_permission_direct"(
   "p_permission_key" "text",
