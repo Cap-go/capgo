@@ -1,8 +1,6 @@
 import type { CapacitorConfig } from '@capacitor/cli'
 import pkg from './package.json'
 
-const enableSelfUpdates = process.env.CAPGO_APP_AUTO_UPDATE === 'true' || process.env.CI === 'true'
-
 const config: CapacitorConfig = {
   appId: 'ee.forgr.capacitor_go',
   appName: 'Capgo',
@@ -22,7 +20,7 @@ const config: CapacitorConfig = {
     CapacitorUpdater: {
       shakeMenu: true,
       allowPreview: true,
-      autoUpdate: enableSelfUpdates ? 'atInstall' : 'off',
+      autoUpdate: 'atInstall',
       autoSplashscreen: true,
       version: pkg.version,
     },
