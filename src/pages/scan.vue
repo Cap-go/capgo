@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import type { PluginListenerHandle } from '@capacitor/core'
+import type { HttpResponse, PluginListenerHandle } from '@capacitor/core'
 import type { BarcodeScanErrorEvent, BarcodeScannedEvent } from '@capgo/camera-preview'
 import type { DownloadEvent, DownloadOptions } from '@capgo/capacitor-updater'
 import type { PreviewDeepLink } from '~/services/previewLinks'
-import { Capacitor } from '@capacitor/core'
+import { Capacitor, CapacitorHttp } from '@capacitor/core'
 import { CameraPreview } from '@capgo/camera-preview'
 import { CapacitorUpdater } from '@capgo/capacitor-updater'
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
@@ -381,35 +381,83 @@ async function startPreviewSession(appId?: string) {
   debugLog('preview session started', { appId })
 }
 
-async function previewPayloadFromResponse(response: Response): Promise<PreviewPayload> {
-  const text = await response.text()
-  let payload: unknown
+function parsePreviewPayloadBody(data: unknown, status: number) {
+  if (typeof data !== 'string')
+    return data
+
   try {
-    payload = JSON.parse(text)
+    return JSON.parse(data)
   }
   catch {
-    throw new Error(text || `Preview payload request failed with HTTP ${response.status}`)
+    throw new Error(data || `Preview payload request failed with HTTP ${status}`)
   }
+}
 
-  if (!response.ok) {
-    const message = typeof payload === 'object' && payload && 'message' in payload
-      ? String((payload as { message?: unknown }).message)
-      : `Preview payload request failed with HTTP ${response.status}`
-    throw new Error(message)
-  }
+function previewPayloadErrorMessage(payload: unknown, status: number) {
+  return typeof payload === 'object' && payload && 'message' in payload
+    ? String((payload as { message?: unknown }).message)
+    : `Preview payload request failed with HTTP ${status}`
+}
 
+function validatePreviewPayload(payload: unknown) {
   if (!payload || typeof payload !== 'object')
     throw new Error('Preview payload is invalid')
 
   return payload as PreviewPayload
 }
 
-async function fetchPreviewPayload(payloadUrl: string) {
-  debugLog('fetching preview payload', payloadUrl)
+async function previewPayloadFromResponse(response: Response): Promise<PreviewPayload> {
+  const payload = parsePreviewPayloadBody(await response.text(), response.status)
+
+  if (!response.ok)
+    throw new Error(previewPayloadErrorMessage(payload, response.status))
+
+  return validatePreviewPayload(payload)
+}
+
+function previewPayloadFromHttpResponse(response: HttpResponse): PreviewPayload {
+  const payload = parsePreviewPayloadBody(response.data, response.status)
+
+  if (response.status < 200 || response.status >= 300)
+    throw new Error(previewPayloadErrorMessage(payload, response.status))
+
+  return validatePreviewPayload(payload)
+}
+
+async function fetchPreviewPayloadWithNativeHttp(payloadUrl: string) {
+  const response = await CapacitorHttp.get({
+    headers: { Accept: 'application/json' },
+    responseType: 'text',
+    url: payloadUrl,
+  })
+  debugLog('native preview payload response received', {
+    dataType: typeof response.data,
+    status: response.status,
+    url: response.url,
+  })
+  return previewPayloadFromHttpResponse(response)
+}
+
+async function fetchPreviewPayloadWithBrowserFetch(payloadUrl: string) {
   const response = await fetch(payloadUrl, {
     headers: { Accept: 'application/json' },
   })
-  const payload = await previewPayloadFromResponse(response)
+  debugLog('browser preview payload response received', {
+    ok: response.ok,
+    status: response.status,
+    url: response.url,
+  })
+  return previewPayloadFromResponse(response)
+}
+
+async function fetchPreviewPayload(payloadUrl: string) {
+  debugLog('fetching preview payload', {
+    payloadUrl,
+    transport: isNativePlatform ? 'native-http' : 'fetch',
+  })
+  const payload = isNativePlatform
+    ? await fetchPreviewPayloadWithNativeHttp(payloadUrl)
+    : await fetchPreviewPayloadWithBrowserFetch(payloadUrl)
   if (!payload.version)
     throw new Error('Preview payload is missing a version')
   if (!payload.url && !payload.manifest?.length)
