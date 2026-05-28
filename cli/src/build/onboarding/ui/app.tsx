@@ -45,7 +45,7 @@ import {
 
   STEP_PROGRESS,
 } from '../types.js'
-import { Divider, ErrorLine, FilteredTextInput, FullscreenAiViewer, Header, MIN_TERMINAL_ROWS, SpinnerLine, SuccessLine, TerminalTooSmall } from './components.js'
+import { Divider, ErrorLine, FilteredTextInput, FullscreenAiViewer, Header, HEADER_BOX_MIN_ROWS, MIN_TERMINAL_ROWS, SpinnerLine, SuccessLine, TerminalTooSmall } from './components.js'
 
 const OUTPUT_LINE_SPLIT_RE = /\r?\n/
 const CARRIAGE_RETURN_RE = /\r/g
@@ -1459,7 +1459,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
 
   return (
     <Box flexDirection="column" padding={1}>
-      {showHeader && <Header />}
+      {showHeader && <Header compact={terminalRows < HEADER_BOX_MIN_ROWS} />}
         {/* Progress bar */}
       {showProgress && (
         <Box flexDirection="column" marginTop={1}>

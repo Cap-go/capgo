@@ -15,7 +15,13 @@ export const Divider: FC<{ width?: number }> = ({ width = 60 }) => (
 // scrollable, so below this floor we show a resize prompt instead of a
 // clipped, partly-unreachable step. The wizard is resize-reactive, so it
 // snaps back to the real content the moment the window is tall enough.
-export const MIN_TERMINAL_ROWS = 14
+export const MIN_TERMINAL_ROWS = 16
+
+// At/above this height the Header renders as the full double-bordered box
+// (~5 rows). Below it (but still ≥ MIN_TERMINAL_ROWS) the box would eat too
+// large a fraction of the viewport, so the Header collapses to a single
+// borderless line that keeps the branding without the vertical cost.
+export const HEADER_BOX_MIN_ROWS = 20
 
 // Shown in place of the step content when the terminal is shorter than
 // MIN_TERMINAL_ROWS. Kept to TWO rows with no padding: in the alt buffer the
@@ -106,19 +112,31 @@ export const FilteredTextInput: FC<{
   )
 }
 
-export const Header: FC = () => (
-  <Box
-    borderStyle="double"
-    borderColor="cyan"
-    paddingX={4}
-    paddingY={1}
-    alignSelf="center"
-  >
-    <Text bold color="cyan">
-      🚀  Capgo Cloud Build · Onboarding
-    </Text>
-  </Box>
-)
+// `compact` collapses the banner to a single borderless line. Callers pass
+// it when the terminal is too short (< HEADER_BOX_MIN_ROWS) to spend ~5 rows
+// on the bordered box — the branding stays, the vertical cost drops to 1 row.
+export const Header: FC<{ compact?: boolean }> = ({ compact = false }) => {
+  if (compact) {
+    return (
+      <Text bold color="cyan">
+        🚀  Capgo Cloud Build · Onboarding
+      </Text>
+    )
+  }
+  return (
+    <Box
+      borderStyle="double"
+      borderColor="cyan"
+      paddingX={4}
+      paddingY={1}
+      alignSelf="center"
+    >
+      <Text bold color="cyan">
+        🚀  Capgo Cloud Build · Onboarding
+      </Text>
+    </Box>
+  )
+}
 
 /**
  * Scrollable, fullscreen viewer for the AI build-analysis markdown when it

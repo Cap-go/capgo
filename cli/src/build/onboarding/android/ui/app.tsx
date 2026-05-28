@@ -41,7 +41,7 @@ import { createCiSecretEntries, detectCiSecretTargets, getCiSecretTargetLabel, l
 import { mapAndroidOnboardingError, mapSaValidationKindToCategory } from '../../error-categories.js'
 import { canUseFilePicker, openKeystorePicker, openServiceAccountJsonPicker } from '../../file-picker.js'
 import { trackBuilderOnboardingStep } from '../../telemetry.js'
-import { Divider, ErrorLine, FilteredTextInput, FullscreenAiViewer, Header, MIN_TERMINAL_ROWS, SpinnerLine, SuccessLine, TerminalTooSmall } from '../../ui/components.js'
+import { Divider, ErrorLine, FilteredTextInput, FullscreenAiViewer, Header, HEADER_BOX_MIN_ROWS, MIN_TERMINAL_ROWS, SpinnerLine, SuccessLine, TerminalTooSmall } from '../../ui/components.js'
 import { findAndroidApplicationIds } from '../gradle-parser.js'
 import { validateServiceAccountJson } from '../service-account-validation.js'
 import {
@@ -1601,7 +1601,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
 
   return (
     <Box flexDirection="column" padding={1}>
-      {showHeader && <Header />}
+      {showHeader && <Header compact={terminalRows < HEADER_BOX_MIN_ROWS} />}
       {showProgress && (
         <Box flexDirection="column" marginTop={1}>
           <Text bold color="cyan">{phaseLabel}</Text>
