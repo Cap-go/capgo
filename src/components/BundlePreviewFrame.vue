@@ -97,15 +97,17 @@ const qrCodeUrl = computed<string | null>(() => {
       appId: props.appId,
       channelId: props.channelId,
       channelName: props.channelName,
-      payloadUrl: previewUrl.value,
     })
   }
 
-  return buildBundlePreviewDeepLink({
-    appId: props.appId,
-    versionId: props.versionId,
-    payloadUrl: previewUrl.value,
-  })
+  if (typeof props.versionId === 'number') {
+    return buildBundlePreviewDeepLink({
+      appId: props.appId,
+      versionId: props.versionId,
+    })
+  }
+
+  return previewUrl.value
 })
 
 function svgToDataUrl(svg: string): string {

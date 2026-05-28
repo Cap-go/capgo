@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { HttpResponse, PluginListenerHandle } from '@capacitor/core'
-import type { BarcodeScanErrorEvent, BarcodeScannedEvent } from '@capgo/camera-preview'
+import type { BarcodeScanErrorEvent, BarcodeScannedEvent, BarcodeScannerOptions } from '@capgo/camera-preview'
 import type { DownloadEvent, DownloadOptions, StartPreviewSessionOptions } from '@capgo/capacitor-updater'
 import type { PreviewDeepLink } from '~/services/previewLinks'
 import { Clipboard } from '@capacitor/clipboard'
@@ -18,7 +18,7 @@ import IconLink from '~icons/heroicons/link-20-solid'
 import IconQrCode from '~icons/heroicons/qr-code-20-solid'
 import { buildChannelPreviewLatestOptions, parsePreviewDeepLink } from '~/services/previewLinks'
 import { useDisplayStore } from '~/stores/display'
-import { buildChannelPreviewSubdomain, parsePreviewHostname } from '../../shared/preview-subdomain.ts'
+import { buildChannelPreviewSubdomain, buildPreviewSubdomain, parsePreviewHostname } from '../../shared/preview-subdomain.ts'
 
 const route = useRoute()
 const router = useRouter()
@@ -184,6 +184,19 @@ function previewRootUrlFromChannelLink(previewLink: Extract<PreviewDeepLink, { t
 
   try {
     const subdomain = buildChannelPreviewSubdomain(previewLink.appId, previewLink.channelId)
+    return `https://${subdomain}.preview.capgo.app/`
+  }
+  catch {
+    return ''
+  }
+}
+
+function previewRootUrlFromBundleLink(previewLink: Extract<PreviewDeepLink, { type: 'bundle' }>) {
+  if (!previewLink.appId || typeof previewLink.versionId !== 'number')
+    return ''
+
+  try {
+    const subdomain = buildPreviewSubdomain(previewLink.appId, previewLink.versionId)
     return `https://${subdomain}.preview.capgo.app/`
   }
   catch {
@@ -534,11 +547,42 @@ function startBarcodeWatchdog(startResult: unknown) {
     }
 
     debugLog('barcode scanner still waiting for QR', {
-      isScanning: isScanning.value,
+      diagnostics: getScannerDiagnostics(),
       previewSize,
       startResult,
     })
   }, 2500)
+}
+
+function getScannerDiagnostics() {
+  const rect = scannerFrameRef.value?.getBoundingClientRect()
+  const visualViewport = window.visualViewport
+
+  return {
+    cameraPreviewStarted,
+    devicePixelRatio: window.devicePixelRatio,
+    documentVisibility: document.visibilityState,
+    frame: rect
+      ? {
+          height: Math.round(rect.height),
+          width: Math.round(rect.width),
+          x: Math.round(rect.left),
+          y: Math.round(rect.top),
+        }
+      : null,
+    innerHeight: window.innerHeight,
+    innerWidth: window.innerWidth,
+    isHandlingBarcode,
+    isScanning: isScanning.value,
+    scrollY: Math.round(window.scrollY),
+    visualViewport: visualViewport
+      ? {
+          height: Math.round(visualViewport.height),
+          offsetTop: Math.round(visualViewport.offsetTop),
+          width: Math.round(visualViewport.width),
+        }
+      : null,
+  }
 }
 
 function setCameraPreviewActive(active: boolean) {
@@ -675,10 +719,14 @@ async function startScanner() {
       position: 'rear',
       toBack: true,
     })
-    debugLog('camera preview started', startResult)
+    debugLog('camera preview started', {
+      diagnostics: getScannerDiagnostics(),
+      startResult,
+    })
 
-    debugLog('starting native barcode scanner', { detectionInterval: 250, formats: 'all' })
-    await CameraPreview.startBarcodeScanner({ detectionInterval: 250 })
+    const barcodeScannerOptions: BarcodeScannerOptions = { detectionInterval: 200, formats: ['qr_code'] }
+    debugLog('starting native barcode scanner', barcodeScannerOptions)
+    await CameraPreview.startBarcodeScanner(barcodeScannerOptions)
     debugLog('native barcode scanner started')
     startBarcodeWatchdog(startResult)
   }
@@ -968,6 +1016,15 @@ async function startPreviewLink(previewLink: PreviewDeepLink) {
     }
   }
 
+  if (previewLink.type === 'bundle') {
+    const previewRootUrl = previewRootUrlFromBundleLink(previewLink)
+    if (previewRootUrl) {
+      debugLog('bundle preview link converted to preview host', { previewRootUrl })
+      await startPreviewPayload(previewRootUrl, previewLink.appId)
+      return
+    }
+  }
+
   if (previewLink.type === 'channel')
     await startChannelPreview(previewLink)
 }
@@ -1138,153 +1195,148 @@ async function goBack() {
 
 <template>
   <main
-    class="camera-preview-page min-h-dvh overflow-y-auto pb-[calc(6rem+env(safe-area-inset-bottom))] text-white"
+    class="camera-preview-page fixed inset-0 h-dvh overflow-hidden text-white"
     :class="isScanning ? 'bg-transparent' : 'bg-slate-950'"
   >
-    <div class="mx-auto flex min-h-dvh w-full max-w-md flex-col px-4 pb-4 pt-[max(1rem,env(safe-area-inset-top))]">
-      <header class="flex items-center gap-3">
+    <div v-if="!isScanning" class="absolute inset-0 bg-slate-950" />
+
+    <div class="relative z-10 mx-auto flex h-dvh w-full max-w-md flex-col px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-[max(0.75rem,env(safe-area-inset-top))]">
+      <header class="flex shrink-0 items-center gap-3">
         <button
-          class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-white transition-colors hover:bg-white/10"
+          class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-white/10 bg-slate-950/70 text-white shadow-lg shadow-black/20 backdrop-blur transition-colors hover:bg-slate-900"
           aria-label="Go back"
           @click="goBack"
         >
           <IconArrowLeft class="h-5 w-5" />
         </button>
         <div class="min-w-0 flex-1">
-          <p class="text-sm font-medium text-cyan-200">
+          <p class="text-xs font-semibold uppercase tracking-wide text-cyan-200">
             Preview test
           </p>
-          <h1 class="text-2xl font-semibold text-white">
-            Scan QR code
+          <h1 class="truncate text-xl font-semibold text-white">
+            Scan QR
           </h1>
         </div>
-        <span class="rounded-full border border-emerald-300/30 bg-emerald-400/10 px-3 py-1.5 text-xs font-semibold text-emerald-100">
+        <span class="shrink-0 rounded-full border border-emerald-300/30 bg-slate-950/70 px-3 py-1.5 text-xs font-semibold text-emerald-100 shadow-lg shadow-black/20 backdrop-blur">
           {{ scannerStatusLabel }}
         </span>
       </header>
 
-      <section class="mt-4 rounded-2xl border border-white/10 bg-white/[0.06] p-4">
-        <div class="flex items-start gap-3">
-          <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-cyan-300 text-slate-950">
+      <section class="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 py-3">
+        <div class="inline-flex max-w-full items-center gap-2 rounded-full border border-white/10 bg-slate-950/70 px-3 py-2 text-sm font-semibold text-white shadow-lg shadow-black/20 backdrop-blur">
+          <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-cyan-300 text-slate-950">
             <IconQrCode class="h-5 w-5" />
           </span>
-          <div>
-            <h2 class="text-lg font-semibold text-white">
-              {{ scannerTitle }}
-            </h2>
-            <p class="mt-1 text-sm leading-6 text-slate-300">
-              Open the preview on your desktop, tap scan, then keep the app open until it reloads.
-            </p>
-          </div>
+          <span class="truncate">{{ scannerTitle }}</span>
         </div>
-      </section>
 
-      <section
-        class="mt-4 rounded-2xl border border-white/10 p-4"
-        :class="isScanning ? 'bg-transparent' : 'bg-slate-900'"
-      >
         <div
           ref="scannerFrameRef"
-          class="relative mx-auto aspect-square w-full max-w-[13.5rem] overflow-hidden rounded-2xl border border-cyan-200/25"
-          :class="isScanning ? 'bg-transparent ring-2 ring-cyan-300/60' : 'bg-slate-950'"
+          class="scan-camera-frame relative mx-auto aspect-[3/4] shrink-0 overflow-hidden rounded-[2rem] border border-cyan-200/30 shadow-2xl shadow-black/40"
+          :class="isScanning ? 'bg-transparent ring-2 ring-cyan-300/70' : 'bg-slate-950 ring-1 ring-white/10'"
+          style="width: min(74vw, 17rem, 34dvh);"
         >
+          <div v-if="!isScanning" class="absolute inset-0 bg-slate-950" />
           <div
             v-if="isScanning"
-            class="scanner-sweep absolute left-7 right-7 top-14 h-px bg-cyan-300 shadow-[0_0_18px_rgba(103,232,249,0.95)]"
+            class="scanner-sweep absolute left-8 right-8 top-10 h-px bg-cyan-300 shadow-[0_0_18px_rgba(103,232,249,0.95)]"
           />
-          <div class="absolute left-4 top-4 h-10 w-10 rounded-tl-xl border-l-4 border-t-4 border-cyan-300" />
-          <div class="absolute right-4 top-4 h-10 w-10 rounded-tr-xl border-r-4 border-t-4 border-cyan-300" />
-          <div class="absolute bottom-4 left-4 h-10 w-10 rounded-bl-xl border-b-4 border-l-4 border-cyan-300" />
-          <div class="absolute bottom-4 right-4 h-10 w-10 rounded-br-xl border-b-4 border-r-4 border-cyan-300" />
-          <div class="absolute inset-x-5 bottom-5 rounded-xl bg-slate-900/90 px-3 py-2 text-center text-xs font-medium leading-5 text-slate-200">
-            {{ isScanning ? 'Center the QR code and hold steady.' : 'The camera opens only after you tap scan.' }}
-          </div>
+          <div class="absolute left-4 top-4 h-12 w-12 rounded-tl-2xl border-l-4 border-t-4 border-cyan-300" />
+          <div class="absolute right-4 top-4 h-12 w-12 rounded-tr-2xl border-r-4 border-t-4 border-cyan-300" />
+          <div class="absolute bottom-4 left-4 h-12 w-12 rounded-bl-2xl border-b-4 border-l-4 border-cyan-300" />
+          <div class="absolute bottom-4 right-4 h-12 w-12 rounded-br-2xl border-b-4 border-r-4 border-cyan-300" />
         </div>
 
-        <div v-if="isLoading" class="mt-4" aria-live="polite">
-          <div class="flex items-center justify-between gap-3">
-            <span class="inline-flex items-center gap-2 text-sm font-semibold text-white">
-              <IconDownload class="h-5 w-5 animate-bounce text-cyan-200" />
-              Applying preview
-            </span>
-            <span class="text-sm font-semibold text-cyan-100">
-              {{ progressPercentage }}%
-            </span>
+        <div class="min-h-[4.25rem] w-full max-w-sm">
+          <div v-if="isLoading" class="rounded-2xl border border-white/10 bg-slate-950/80 px-3 py-3 shadow-lg shadow-black/20 backdrop-blur" aria-live="polite">
+            <div class="flex items-center justify-between gap-3">
+              <span class="inline-flex items-center gap-2 text-sm font-semibold text-white">
+                <IconDownload class="h-5 w-5 animate-bounce text-cyan-200" />
+                Applying preview
+              </span>
+              <span class="text-sm font-semibold text-cyan-100">
+                {{ progressPercentage }}%
+              </span>
+            </div>
+            <div class="mt-3 h-2 overflow-hidden rounded-full bg-slate-800">
+              <div
+                class="h-full rounded-full bg-cyan-300 transition-all duration-300 ease-out"
+                :style="{ width: `${downloadProgress}%` }"
+              />
+            </div>
+            <p v-if="downloadHost" class="mt-2 truncate text-xs text-slate-400">
+              Source: {{ downloadHost }}
+            </p>
           </div>
-          <div class="mt-3 h-2 overflow-hidden rounded-full bg-slate-800">
-            <div
-              class="h-full rounded-full bg-cyan-300 transition-all duration-300 ease-out"
-              :style="{ width: `${downloadProgress}%` }"
-            />
-          </div>
-          <p v-if="downloadHost" class="mt-3 text-xs text-slate-400">
-            Source: {{ downloadHost }}
+
+          <p v-else-if="statusMessage" class="rounded-2xl border border-cyan-300/20 bg-slate-950/80 px-3 py-3 text-sm leading-6 text-cyan-100 shadow-lg shadow-black/20 backdrop-blur" aria-live="polite">
+            {{ statusMessage }}
+          </p>
+          <p v-else-if="!errorMessage" class="rounded-2xl border border-white/10 bg-slate-950/70 px-3 py-3 text-center text-sm font-semibold leading-6 text-slate-100 shadow-lg shadow-black/20 backdrop-blur" aria-live="polite">
+            {{ isScanning ? 'Hold QR in frame' : 'Camera opens when you scan' }}
+          </p>
+          <p v-if="errorMessage" class="mt-2 rounded-2xl border border-amber-300/25 bg-slate-950/80 px-3 py-3 text-sm leading-6 text-amber-100 shadow-lg shadow-black/20 backdrop-blur" aria-live="polite">
+            {{ errorMessage }}
           </p>
         </div>
-
-        <p v-if="statusMessage && !isLoading" class="mt-4 rounded-xl border border-cyan-300/20 bg-cyan-300/10 px-3 py-2 text-sm leading-6 text-cyan-100" aria-live="polite">
-          {{ statusMessage }}
-        </p>
-        <p v-if="errorMessage" class="mt-4 rounded-xl border border-amber-300/25 bg-amber-300/10 px-3 py-2 text-sm leading-6 text-amber-100" aria-live="polite">
-          {{ errorMessage }}
-        </p>
-
-        <details v-if="debugMessages.length" class="mt-4 rounded-xl border border-white/10 bg-slate-950/80 px-3 py-2 text-xs text-slate-300" open>
-          <summary class="cursor-pointer select-none font-semibold text-slate-100">
-            Debug
-          </summary>
-          <div class="mt-2 flex items-center justify-between gap-3">
-            <span class="min-w-0 text-[11px] font-medium text-slate-400">
-              {{ debugMessages.length }} entries
-            </span>
-            <button
-              type="button"
-              class="inline-flex h-8 shrink-0 items-center justify-center gap-1.5 rounded-lg border border-cyan-300/25 bg-cyan-300/10 px-2.5 text-[11px] font-semibold text-cyan-100 transition-colors hover:bg-cyan-300/20"
-              @click="copyDebugLogs"
-            >
-              <IconClipboard class="h-4 w-4" />
-              Copy logs
-            </button>
-          </div>
-          <ol class="mt-2 max-h-36 space-y-1 overflow-y-auto font-mono leading-5">
-            <li v-for="message in debugMessages" :key="message">
-              {{ message }}
-            </li>
-          </ol>
-        </details>
       </section>
 
-      <details class="mt-4 rounded-2xl border border-white/10 bg-white/[0.06] p-4">
-        <summary class="flex cursor-pointer list-none items-center gap-3 text-sm font-semibold text-white">
-          <IconLink class="h-5 w-5 text-cyan-200" />
-          Paste a preview link
-        </summary>
+      <section class="shrink-0">
+        <div class="mx-auto max-w-md space-y-2">
+          <div class="max-h-[20dvh] space-y-2 overflow-y-auto pr-1">
+            <details class="rounded-2xl border border-white/10 bg-slate-950/80 p-3 shadow-lg shadow-black/20 backdrop-blur">
+              <summary class="flex cursor-pointer list-none items-center gap-3 text-sm font-semibold text-white">
+                <IconLink class="h-5 w-5 text-cyan-200" />
+                Paste preview link
+              </summary>
 
-        <label class="mt-4 block text-sm font-medium text-slate-200" for="manual-url">
-          Preview link or bundle URL
-        </label>
-        <input
-          id="manual-url"
-          v-model="manualUrl"
-          type="url"
-          inputmode="url"
-          placeholder="capgo://preview/..."
-          class="mt-2 w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-3 text-sm text-white outline-hidden transition-colors placeholder:text-slate-500 focus:border-cyan-300/70"
-        >
+              <label class="mt-3 block text-sm font-medium text-slate-200" for="manual-url">
+                Preview link or bundle URL
+              </label>
+              <input
+                id="manual-url"
+                v-model="manualUrl"
+                type="url"
+                inputmode="url"
+                placeholder="https://preview.capgo.app/..."
+                class="mt-2 w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-3 text-sm text-white outline-hidden transition-colors placeholder:text-slate-500 focus:border-cyan-300/70"
+              >
 
-        <button
-          class="mt-3 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-cyan-300 px-4 py-2 text-sm font-semibold text-slate-950 transition-colors hover:bg-cyan-200 disabled:cursor-not-allowed disabled:opacity-50"
-          :disabled="!canSubmitManualUrl"
-          @click="submitManualUrl"
-        >
-          <IconDownload class="h-5 w-5" />
-          {{ manualActionLabel }}
-        </button>
-      </details>
+              <button
+                class="mt-3 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-cyan-300 px-4 py-2 text-sm font-semibold text-slate-950 transition-colors hover:bg-cyan-200 disabled:cursor-not-allowed disabled:opacity-50"
+                :disabled="!canSubmitManualUrl"
+                @click="submitManualUrl"
+              >
+                <IconDownload class="h-5 w-5" />
+                {{ manualActionLabel }}
+              </button>
+            </details>
 
-      <div class="fixed inset-x-0 bottom-0 z-20 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-5">
-        <div class="pointer-events-none absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-slate-950 via-slate-950/95 to-transparent" />
-        <div class="relative mx-auto max-w-md">
+            <details v-if="debugMessages.length" class="rounded-2xl border border-white/10 bg-slate-950/80 px-3 py-2 text-xs text-slate-300 shadow-lg shadow-black/20 backdrop-blur" open>
+              <summary class="cursor-pointer select-none font-semibold text-slate-100">
+                Debug
+              </summary>
+              <div class="mt-2 flex items-center justify-between gap-3">
+                <span class="min-w-0 text-[11px] font-medium text-slate-400">
+                  {{ debugMessages.length }} entries
+                </span>
+                <button
+                  type="button"
+                  class="inline-flex h-8 shrink-0 items-center justify-center gap-1.5 rounded-lg border border-cyan-300/25 bg-cyan-300/10 px-2.5 text-[11px] font-semibold text-cyan-100 transition-colors hover:bg-cyan-300/20"
+                  @click="copyDebugLogs"
+                >
+                  <IconClipboard class="h-4 w-4" />
+                  Copy logs
+                </button>
+              </div>
+              <ol class="mt-2 max-h-36 space-y-1 overflow-y-auto font-mono leading-5">
+                <li v-for="message in debugMessages" :key="message">
+                  {{ message }}
+                </li>
+              </ol>
+            </details>
+          </div>
+
           <button
             v-if="isNativePlatform"
             class="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-cyan-300 px-4 py-3 text-sm font-semibold text-slate-950 transition-colors hover:bg-cyan-200 disabled:cursor-not-allowed disabled:opacity-60"
@@ -1299,12 +1351,17 @@ async function goBack() {
             Paste a preview link below to test from this browser.
           </p>
         </div>
-      </div>
+      </section>
     </div>
   </main>
 </template>
 
 <style scoped>
+.camera-preview-page {
+  overscroll-behavior: none;
+  touch-action: manipulation;
+}
+
 .scanner-sweep {
   animation: scanner-sweep 2.2s ease-in-out infinite;
 }
@@ -1316,7 +1373,7 @@ async function goBack() {
     opacity: 0.4;
   }
   50% {
-    transform: translateY(9.5rem);
+    transform: translateY(16rem);
     opacity: 1;
   }
 }
@@ -1327,7 +1384,8 @@ html.camera-preview-active,
 body.camera-preview-active,
 body.camera-preview-active #app,
 body.camera-preview-active #app > .app-shell,
-body.camera-preview-active .camera-preview-page {
+body.camera-preview-active .camera-preview-page,
+body.camera-preview-active .scan-camera-frame {
   background: transparent !important;
   background-color: transparent !important;
 }

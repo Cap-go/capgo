@@ -10,7 +10,7 @@ export interface BundlePreviewLink {
   type: 'bundle'
   appId?: string
   versionId?: number
-  payloadUrl: string
+  payloadUrl?: string
 }
 
 export type PreviewDeepLink = ChannelPreviewLink | BundlePreviewLink
@@ -69,13 +69,14 @@ export function buildChannelPreviewDeepLink(options: {
 export function buildBundlePreviewDeepLink(options: {
   appId?: string
   versionId?: number
-  payloadUrl: string
+  payloadUrl?: string
   origin?: string
 }) {
   const url = options.origin
     ? new URL(BUNDLE_PREVIEW_PATH, options.origin)
     : new URL(BUNDLE_PREVIEW_SCHEME_URL)
-  url.searchParams.set('url', options.payloadUrl)
+  if (options.payloadUrl)
+    url.searchParams.set('url', options.payloadUrl)
   if (options.appId)
     url.searchParams.set('appId', options.appId)
   if (typeof options.versionId === 'number')
@@ -94,16 +95,18 @@ export function parsePreviewDeepLink(value: string): PreviewDeepLink | null {
 
   const payloadUrl = getHttpUrlParam(url, 'url', 'payloadUrl')
   if (previewPath === BUNDLE_PREVIEW_PATH) {
-    if (!payloadUrl)
-      return null
-
     const versionIdValue = url.searchParams.get('versionId') ?? url.searchParams.get('bundleId')
     const versionId = versionIdValue ? Number(versionIdValue) : Number.NaN
+    const parsedVersionId = Number.isFinite(versionId) ? versionId : undefined
+    const appId = url.searchParams.get('appId') ?? url.searchParams.get('app') ?? undefined
+    if (!payloadUrl && (!appId || typeof parsedVersionId !== 'number'))
+      return null
+
     return {
       type: 'bundle',
-      appId: url.searchParams.get('appId') ?? url.searchParams.get('app') ?? undefined,
-      versionId: Number.isFinite(versionId) ? versionId : undefined,
+      appId,
       payloadUrl,
+      versionId: parsedVersionId,
     }
   }
 

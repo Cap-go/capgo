@@ -52,6 +52,23 @@ describe('channel preview deep links', () => {
     })
   })
 
+  it.concurrent('generates compact channel preview deep links for QR codes', () => {
+    const previewUrl = buildChannelPreviewDeepLink({
+      appId: 'com.example.other-user-app',
+      channelId: 42,
+      channelName: 'preview',
+    })
+
+    expect(previewUrl).toBe('capgo://preview/channel?appId=com.example.other-user-app&channel=preview&channelId=42')
+    expect(parseChannelPreviewDeepLink(previewUrl)).toEqual({
+      type: 'channel',
+      appId: 'com.example.other-user-app',
+      channelId: 42,
+      channelName: 'preview',
+      payloadUrl: undefined,
+    })
+  })
+
   it.concurrent('parses scanned native preview links robustly', () => {
     expect(parseChannelPreviewDeepLink(' capgo://preview/channel?appId=app.capgo.capacitor.navigation&channel=production&channelId=36706 ')).toEqual({
       type: 'channel',
@@ -80,6 +97,21 @@ describe('channel preview deep links', () => {
       type: 'bundle',
       appId: 'com.example.other-user-app',
       payloadUrl: 'https://42-com_u2eexample.preview.capgo.app/.capgo/preview.json',
+      versionId: 42,
+    })
+  })
+
+  it.concurrent('generates compact bundle preview deep links for QR codes', () => {
+    const previewUrl = buildBundlePreviewDeepLink({
+      appId: 'com.example.other-user-app',
+      versionId: 42,
+    })
+
+    expect(previewUrl).toBe('capgo://preview/bundle?appId=com.example.other-user-app&versionId=42')
+    expect(parsePreviewDeepLink(previewUrl)).toEqual({
+      type: 'bundle',
+      appId: 'com.example.other-user-app',
+      payloadUrl: undefined,
       versionId: 42,
     })
   })
