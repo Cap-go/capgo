@@ -33,21 +33,27 @@
         "@capacitor/toast": "^8.0.1",
         "@capgo/camera-preview": "8.4.0",
         "@capgo/capacitor-accelerometer": "^8.0.30",
+        "@capgo/capacitor-age-range": "^8.1.6",
         "@capgo/capacitor-android-age-signals": "^8.1.12",
         "@capgo/capacitor-android-inline-install": "^8.0.7",
         "@capgo/capacitor-android-kiosk": "^8.2.2",
         "@capgo/capacitor-android-sms-retriever": "^8.0.2",
         "@capgo/capacitor-android-usagestatsmanager": "^8.0.26",
+        "@capgo/capacitor-app-attest": "^8.1.10",
+        "@capgo/capacitor-app-tracking-transparency": "^8.1.8",
         "@capgo/capacitor-appinsights": "^8.0.33",
         "@capgo/capacitor-appsflyer": "^8.1.4",
         "@capgo/capacitor-audio-recorder": "^8.2.1",
         "@capgo/capacitor-audio-session": "^8.0.38",
         "@capgo/capacitor-autofill-save-password": "^8.0.28",
+        "@capgo/capacitor-background-task": "^8.1.0",
         "@capgo/capacitor-barometer": "^8.0.12",
         "@capgo/capacitor-brightness": "^8.0.11",
+        "@capgo/capacitor-calendar": "^8.0.1",
         "@capgo/capacitor-compass": "^8.1.13",
         "@capgo/capacitor-crisp": "^8.0.31",
         "@capgo/capacitor-data-storage-sqlite": "^8.0.34",
+        "@capgo/capacitor-date-picker": "^8.0.2",
         "@capgo/capacitor-document-scanner": "^8.3.29",
         "@capgo/capacitor-downloader": "^8.1.24",
         "@capgo/capacitor-file": "^8.0.12",
@@ -73,13 +79,17 @@
         "@capgo/capacitor-mute": "^8.0.30",
         "@capgo/capacitor-mux-player": "^8.0.11",
         "@capgo/capacitor-native-audio": "^8.4.3",
+        "@capgo/capacitor-native-biometric": "^8.4.5",
         "@capgo/capacitor-native-market": "^8.0.29",
         "@capgo/capacitor-native-navigation": "^8.0.21",
         "@capgo/capacitor-nativegeocoder": "^8.0.33",
         "@capgo/capacitor-navigation-bar": "^8.1.8",
+        "@capgo/capacitor-nfc": "^8.0.28",
         "@capgo/capacitor-pdf-generator": "^8.0.30",
+        "@capgo/capacitor-pedometer": "^8.0.32",
         "@capgo/capacitor-persistent-account": "^8.0.29",
         "@capgo/capacitor-photo-library": "^8.0.13",
+        "@capgo/capacitor-pretty-toast": "^8.1.5",
         "@capgo/capacitor-printer": "^8.0.14",
         "@capgo/capacitor-privacy-screen": "^8.2.2",
         "@capgo/capacitor-proximity": "^8.1.2",
@@ -91,6 +101,7 @@
         "@capgo/capacitor-shake": "^8.0.30",
         "@capgo/capacitor-sheets": "^8.0.8",
         "@capgo/capacitor-sim": "^8.0.26",
+        "@capgo/capacitor-speech-recognition": "^8.1.3",
         "@capgo/capacitor-speech-synthesis": "^8.0.15",
         "@capgo/capacitor-textinteraction": "^8.0.25",
         "@capgo/capacitor-transitions": "^8.1.6",
@@ -463,6 +474,8 @@
 
     "@capgo/capacitor-accelerometer": ["@capgo/capacitor-accelerometer@8.0.30", "", { "peerDependencies": { "@capacitor/core": ">=8.0.0" } }, "sha512-w9woRF/t+RKPpxqD6ELyJhD3Z5wC2gDwfdhQ/CPkgWghOMT0jak5dk0JQdSGh7HZggfFgdUI5pTzepJSOdyErg=="],
 
+    "@capgo/capacitor-age-range": ["@capgo/capacitor-age-range@8.1.6", "", { "peerDependencies": { "@capacitor/core": ">=8.0.0" } }, "sha512-HlC7LDOaTb1aEep5UGVNY05gxzgHHdBNupnlDf/lZlFjPb+Cl9TJXxWZus3UzjPuIeNZYaT4peFH0BvpGQguQA=="],
+
     "@capgo/capacitor-android-age-signals": ["@capgo/capacitor-android-age-signals@8.1.12", "", { "peerDependencies": { "@capacitor/core": ">=8.0.0" } }, "sha512-TSUcLXJ4UEbTVU204EuVjHUTukIkglHrdy9zTYAVOE8OSmcyGOwH0MqgH9ZuLgFxvHBbjP2uLS9/80xv9Ft/IA=="],
 
     "@capgo/capacitor-android-inline-install": ["@capgo/capacitor-android-inline-install@8.0.7", "", { "peerDependencies": { "@capacitor/core": ">=8.0.0" } }, "sha512-KUegWCup3HYGZX3I/MhjveBxRy6Nzz13ZpADCHOnlUMqn9oINlk4Ktt66jbH073hqaN0zMIW01wFm3QAzZ0g+w=="],
@@ -472,6 +485,10 @@
     "@capgo/capacitor-android-sms-retriever": ["@capgo/capacitor-android-sms-retriever@8.0.2", "", { "peerDependencies": { "@capacitor/core": ">=8.0.0" } }, "sha512-zapHd90AjZfmUMq0RmpWly1ohX7ZcxYpKhQrHkC2ycJ2Vps/w+PaqAh38qXwRNfVIxaTSLHTyumdejLxF5VSOw=="],
 
     "@capgo/capacitor-android-usagestatsmanager": ["@capgo/capacitor-android-usagestatsmanager@8.0.26", "", { "peerDependencies": { "@capacitor/core": ">=8.0.0" } }, "sha512-/MlxdMYnnDw6NkZpDVmJx8deiwQFRvBPVRGVg31wJEVQADvp4J7zeHeOT7Ekj206SWR0USbx6VDNSuIMd/2tVg=="],
+
+    "@capgo/capacitor-app-attest": ["@capgo/capacitor-app-attest@8.1.10", "", { "peerDependencies": { "@capacitor/core": "^8.0.0" } }, "sha512-Jf7crpRsNbocg0OHuT2pK5mqLOsvOPfIkATymnHUqE9RCro3iIe/Yxe5XHCGJZnI2FnsrJVUI7a2+di5slW/2A=="],
+
+    "@capgo/capacitor-app-tracking-transparency": ["@capgo/capacitor-app-tracking-transparency@8.1.8", "", { "peerDependencies": { "@capacitor/core": ">=8.0.0" } }, "sha512-XHuJAOWFLCheYEEaQz4e85T9fOXX2tZ/x6PJnh6h9+tQR3HTTrcrJCzZxNRiEgD5vvQMxkzDrcZBrUOiV5oeDQ=="],
 
     "@capgo/capacitor-appinsights": ["@capgo/capacitor-appinsights@8.0.33", "", { "peerDependencies": { "@capacitor/core": ">=8.0.0" } }, "sha512-dsmrO7fryFgl96Ncmd56585eCa1B6AzETZHI5Gn9yWNNw4fStWJixWD0Z3Tgy1ufBUAgLtvfhYyuqedVCFqZHg=="],
 
@@ -483,15 +500,21 @@
 
     "@capgo/capacitor-autofill-save-password": ["@capgo/capacitor-autofill-save-password@8.0.28", "", { "peerDependencies": { "@capacitor/core": ">=8.0.0" } }, "sha512-43Ss8nYm2P4Sjz88V7cQDlDfrbU5faqSxWFzMdD1nOlzEYRglUwMNdt/5TBlF15ns15b4CvPRWEW9HdJ0/Z1WQ=="],
 
+    "@capgo/capacitor-background-task": ["@capgo/capacitor-background-task@8.1.0", "", { "peerDependencies": { "@capacitor/core": ">=8.0.0" } }, "sha512-cQ9n1iDzvf+Xn/avJFGVfx5hQXqCgIjWEZSJCojIHkeePgZV9DHy/VQ/hi5BqDLu4ohMD3opwIKtP3hT4Sx72g=="],
+
     "@capgo/capacitor-barometer": ["@capgo/capacitor-barometer@8.0.12", "", { "peerDependencies": { "@capacitor/core": ">=8.0.0" } }, "sha512-mXgqpxF0qGWOJMFvPDMX8nXYomxFad7Qr1Q4NR/eHQqKxxEg+1Iv9F3yBnn82pSsRnNoxu48aQ7tOjfIVDS2QA=="],
 
     "@capgo/capacitor-brightness": ["@capgo/capacitor-brightness@8.0.11", "", { "peerDependencies": { "@capacitor/core": ">=8.0.0" } }, "sha512-VMeUrDi+kokHbz+R99H3dsVUh0Xv+iacwduHC3e9vWJMPGbkouGOhuHpX9P6EcRr8rCQhdqoA0E0oHjWGAZBTQ=="],
+
+    "@capgo/capacitor-calendar": ["@capgo/capacitor-calendar@8.0.1", "", { "peerDependencies": { "@capacitor/core": ">=8.0.0" } }, "sha512-1YQAofRUgoLqENzYs5I+Moenr6Mu2z3SudWV8dmqKqGIPEIldjWNFFPFB+PwC/nsqAHpjlDi11bacbbHdypjcg=="],
 
     "@capgo/capacitor-compass": ["@capgo/capacitor-compass@8.1.13", "", { "peerDependencies": { "@capacitor/core": ">=8.0.0" } }, "sha512-45lEpFeycAvF0MHiSSloiVuUIqjkwJhNySdRsNTaAHI+ZZlRyLBh2HrgZaNAPDM6V06jXBkbjwIsQ2hXp06uMw=="],
 
     "@capgo/capacitor-crisp": ["@capgo/capacitor-crisp@8.0.31", "", { "peerDependencies": { "@capacitor/core": ">=8.0.0" } }, "sha512-kHny74uiFAAFG+94B51IAxThY9K0qgTD5gmJnDEzCsccJCBfJdc4uclao9kLkmkd1HplO3bQU6QjdDHqfPEHkg=="],
 
     "@capgo/capacitor-data-storage-sqlite": ["@capgo/capacitor-data-storage-sqlite@8.0.34", "", { "dependencies": { "localforage": "^1.10.0" }, "peerDependencies": { "@capacitor/core": ">=8.0.0" } }, "sha512-nlGqCLLb1zlVsltcxkTdKYoUVMiwWxgZKxqXjBAcnFH2VqVUoZ/+Kd0Lbd25D8wLncBx4JwmCSzf5qd2v8mdeQ=="],
+
+    "@capgo/capacitor-date-picker": ["@capgo/capacitor-date-picker@8.0.2", "", { "peerDependencies": { "@capacitor/core": ">=8.0.0" } }, "sha512-+XZDXKOlU2EpB6pPHeOxf8Cf1nLL+YhIHh/BQkY0uIcQCYCVIcTELxUboqesP9Jo+gQd72QCp3GY6nI/H2rAYQ=="],
 
     "@capgo/capacitor-document-scanner": ["@capgo/capacitor-document-scanner@8.3.29", "", { "peerDependencies": { "@capacitor/core": ">=8.0.0" } }, "sha512-hmLsIbaiw+nWiYx6Yl2ktJyCfZaiy3c6Rjvu8Ype+hxUmmgiY2POCZYkPT3BEP7XWcoEDpI4OVQqHgveSys6wQ=="],
 
@@ -543,6 +566,8 @@
 
     "@capgo/capacitor-native-audio": ["@capgo/capacitor-native-audio@8.4.3", "", { "peerDependencies": { "@capacitor/core": ">=8.0.0" } }, "sha512-9SUFNvHNqHtae2f8hdbtGoKrMSBTVtAj45lrSg8ziJpKPmaEFLixMyn9eTvodlD/DEAiiopPfgR66Jb0WzLt6A=="],
 
+    "@capgo/capacitor-native-biometric": ["@capgo/capacitor-native-biometric@8.4.5", "", { "peerDependencies": { "@capacitor/core": ">=8.0.0" } }, "sha512-wTIdngpibWLKr8GdUTyRBQ5xIDFsb6XzZlZ4qtF19hciZHkG49YL36rwNTmkN8XqSqGp59sogDDgtD0MNkgiWA=="],
+
     "@capgo/capacitor-native-market": ["@capgo/capacitor-native-market@8.0.29", "", { "peerDependencies": { "@capacitor/core": ">=8.0.0" } }, "sha512-b+6d/sxKUEtfXpKLN4e3floNozUb0Yjli00erJeuTd/4MyqW/pVBVEwUS+Precg5sm6ECNXfgKUSIRSO5ALlKg=="],
 
     "@capgo/capacitor-native-navigation": ["@capgo/capacitor-native-navigation@8.0.21", "", { "peerDependencies": { "@capacitor/core": ">=8.0.0" } }, "sha512-pKJoHfn1eD1VP7sJe0qbmM6JKCNexWNxUTY+4tqkT4tUvwAozzE+IVS64M+7rL9bLWP2i5jreqKIVFwmT2n03A=="],
@@ -551,11 +576,17 @@
 
     "@capgo/capacitor-navigation-bar": ["@capgo/capacitor-navigation-bar@8.1.8", "", { "peerDependencies": { "@capacitor/core": ">=8.0.0" } }, "sha512-cy5dQmGQw0faU67A1B8Gq32Kl7ISXbSjtNpjI4bknXIHvqVNY1mr5aGCebEqDMWIdIZayXy2fRQeEYQmymRsOg=="],
 
+    "@capgo/capacitor-nfc": ["@capgo/capacitor-nfc@8.0.28", "", { "peerDependencies": { "@capacitor/core": ">=8.0.0" } }, "sha512-sNzbaCQ8TZxPTFuxg9ASTBjMBKu3x3Yb8a/VdtUta2sAYRDOjs2YY5NuSACaaUoKPGYKtWajrv68TMdpIQNBLg=="],
+
     "@capgo/capacitor-pdf-generator": ["@capgo/capacitor-pdf-generator@8.0.30", "", { "peerDependencies": { "@capacitor/core": ">=8.0.0" } }, "sha512-fdcJX4VnN1wEUIHReZ/t5eD2BJJD/aTAA+OWWUvQKTsRhYl0krWNCoqV1OVUM7bd1COaWwSapOi1sxqu2pKGCg=="],
+
+    "@capgo/capacitor-pedometer": ["@capgo/capacitor-pedometer@8.0.32", "", { "peerDependencies": { "@capacitor/core": ">=8.0.0" } }, "sha512-0Ckzx+7tJf74D/Z5K0QEaSd9mCvz+HvMtz088BvEUfbf9LFfRF3GdS529Ei6wFVZ63lcrrWEiXx2n9JBbXgTdw=="],
 
     "@capgo/capacitor-persistent-account": ["@capgo/capacitor-persistent-account@8.0.29", "", { "peerDependencies": { "@capacitor/core": ">=8.0.0" } }, "sha512-LUO75hllgWlbIMHvoY8ViSg2gq2/M2Pb1IIpIGiedc+hsRo5Bxr8gycna91Tn4dJSXawv5ypO0sbAz//lGe7Iw=="],
 
     "@capgo/capacitor-photo-library": ["@capgo/capacitor-photo-library@8.0.13", "", { "peerDependencies": { "@capacitor/core": ">=8.0.0" } }, "sha512-s/HyNatiAId+veLH5Jt1vTr49/fj8QXW6CM877LxrJO1E3FGj8e+Si4jPHLcPn9zrR9HmZmrHieDKixb8MQCNA=="],
+
+    "@capgo/capacitor-pretty-toast": ["@capgo/capacitor-pretty-toast@8.1.5", "", { "peerDependencies": { "@capacitor/core": ">=8.0.0" } }, "sha512-jd25SHMCBFqbON3EryyA9vHPrlknqXRDfBujR7b7Q5HtN897moZes4YSzYa4aKnFBOd6wwjCA6joiB/1zkwGtg=="],
 
     "@capgo/capacitor-printer": ["@capgo/capacitor-printer@8.0.14", "", { "peerDependencies": { "@capacitor/core": ">=8.0.0" } }, "sha512-jIt8niXBndTYQE8enqW8SAALy+7ku0yHfSAJdB1G4apCd9O1cZF3mwsyiNmMGvKLaIo6Qf/9bjs/Vzo4PxKbMg=="],
 
@@ -578,6 +609,8 @@
     "@capgo/capacitor-sheets": ["@capgo/capacitor-sheets@8.0.8", "", { "optionalDependencies": { "@rolldown/binding-wasm32-wasi": "1.0.2" }, "peerDependencies": { "@angular/core": ">=17.0.0", "react": ">=18.0.0", "react-dom": ">=18.0.0", "solid-js": ">=1.0.0", "svelte": ">=4.0.0", "vue": ">=3.0.0" }, "optionalPeers": ["@angular/core", "react", "react-dom", "solid-js", "svelte", "vue"] }, "sha512-kije3w8vfmmFwyOz0wJiRnqhmBmads+jPI8qfu3L7rR+ih1gV2R6DzsarQZ3M/IHBGITu+yCHvBC9VV4uY4i/Q=="],
 
     "@capgo/capacitor-sim": ["@capgo/capacitor-sim@8.0.26", "", { "peerDependencies": { "@capacitor/core": ">=8.0.0" } }, "sha512-S3umJle3WAz1KGzYowC+f2cf19qlqukB46lObZj/vArSR2YoZ31k3EfFGaDxLRJG9SsERhJsB362wOcqSSN6Tw=="],
+
+    "@capgo/capacitor-speech-recognition": ["@capgo/capacitor-speech-recognition@8.1.3", "", { "peerDependencies": { "@capacitor/core": ">=8.0.0" } }, "sha512-LRQXdZDpbuqN8TMCvCsBEoaX3F+6AWddWdhMFxIXquorqV39biq765N+pe5XtaKsdNtF3J7ugFo7dbGFhs31Gg=="],
 
     "@capgo/capacitor-speech-synthesis": ["@capgo/capacitor-speech-synthesis@8.0.15", "", { "peerDependencies": { "@capacitor/core": ">=8.0.0" } }, "sha512-f+FL/Zyxjemj+80eUNM9QOIkKH2RUUevYEhKe2L1yM483+b+wpmjYfYeDdqXXaKAMAPOXiv2mf6iVyfgZBEYOA=="],
 
