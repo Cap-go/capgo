@@ -79,6 +79,7 @@ interface ProcessedQueueMessage extends Message {
 }
 
 interface QueueProcessResult {
+  actionableFailureCount: number
   archivedCount: number
   failedCount: number
   processedCount: number
@@ -422,6 +423,7 @@ async function processQueue(c: Context, db: ReturnType<typeof getPgClient>, queu
       queueName,
     })
     return {
+      actionableFailureCount: 0,
       archivedCount: 0,
       failedCount: 0,
       processedCount: 0,
@@ -462,6 +464,7 @@ async function processQueue(c: Context, db: ReturnType<typeof getPgClient>, queu
 
   // Process messages that are still within the retry budget.
   const results = await mapWithConcurrency(messagesToProcess, processConcurrency, async message => processQueueMessage(c, queueName, message))
+  let actionableFailureCount = 0
 
   // Update all messages with their CF IDs
   const cfIdUpdates = results.map(result => ({
@@ -517,6 +520,7 @@ async function processQueue(c: Context, db: ReturnType<typeof getPgClient>, queu
     }))
 
     const actionableFailures = getActionableQueueFailures(failureDetails)
+    actionableFailureCount = actionableFailures.length
 
     const groupedByFunction = actionableFailures.reduce((acc, detail) => {
       const key = detail.function_name
@@ -610,6 +614,7 @@ async function processQueue(c: Context, db: ReturnType<typeof getPgClient>, queu
   }
 
   return {
+    actionableFailureCount,
     archivedCount: messagesToSkip.length,
     failedCount: messagesFailed.length,
     processedCount: messagesToProcess.length,
@@ -816,29 +821,14 @@ async function maybePingCronHealthcheckStart(
 }
 
 async function maybePingCronHealthcheck(
-  db: ReturnType<typeof getPgClient>,
-  queueName: string,
   processResult: QueueProcessResult,
   healthcheckUrl: string | null,
   fetchImpl: typeof fetch = fetch,
 ): Promise<boolean> {
-  if (!healthcheckUrl || !processResult.success)
+  if (!healthcheckUrl || !processResult.readSucceeded || processResult.skippedCount > 0 || processResult.actionableFailureCount > 0)
     return false
 
-  try {
-    const metrics = await db.query<{ queue_length: string }>(
-      'SELECT queue_length::text FROM pgmq.metrics($1)',
-      [queueName],
-    )
-    const queueLength = Number(metrics.rows[0]?.queue_length ?? 0)
-    if (queueLength !== 0)
-      return false
-
-    return pingCronHealthcheck(healthcheckUrl, fetchImpl)
-  }
-  catch {
-    return false
-  }
+  return pingCronHealthcheck(healthcheckUrl, fetchImpl)
 }
 
 // Helper function to delete multiple messages from the queue in a single batch
@@ -967,7 +957,7 @@ app.post('/sync', async (c) => {
       if (healthcheckUrl !== null)
         await maybePingCronHealthcheckStart(healthcheckUrl)
       const result = await processQueue(c, db, queueName, finalBatchSize)
-      await maybePingCronHealthcheck(db, queueName, result, healthcheckUrl)
+      await maybePingCronHealthcheck(result, healthcheckUrl)
       cloudlog({
         requestId: c.get('requestId'),
         message: result.success

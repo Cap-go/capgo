@@ -1740,6 +1740,7 @@
   "search-by-version": "Search by version",
   "search-channels": "Search channel",
   "search-groups": "Search groups",
+  "search-scope-items": "Search scopes",
   "search-members": "Search members",
   "search-organizations": "Search organizations",
   "search-role-bindings": "Search by user, group or role...",
