@@ -46,7 +46,7 @@ import {
 
   STEP_PROGRESS,
 } from '../types.js'
-import { BOX_HEADER_ROWS, Divider, ErrorLine, FilteredTextInput, FullscreenAiViewer, Header, MIN_TERMINAL_ROWS, SpinnerLine, SuccessLine, TerminalTooSmall, WIZARD_PADDING_ROWS } from './components.js'
+import { BOX_HEADER_ROWS, COMPACT_HEADER_ROWS, Divider, ErrorLine, FilteredTextInput, FullscreenAiViewer, Header, SpinnerLine, SuccessLine, TerminalTooSmall, WIZARD_PADDING_ROWS } from './components.js'
 
 const OUTPUT_LINE_SPLIT_RE = /\r?\n/
 const CARRIAGE_RETURN_RE = /\r/g
@@ -197,29 +197,44 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
   const terminalRows = termSize.rows
   const terminalCols = termSize.cols
 
-  // Measured height of the wizard body (everything below the Header). Used to
-  // decide — from the LIVE rendered height, not a hardcoded row threshold —
-  // whether the bordered Header box fits or must collapse to its one-line
-  // form. `measureElement` only reports after a render, so on the very first
-  // frame `bodyHeight` is null and we optimistically render the box; if it
-  // doesn't fit, the next frame corrects to compact (one-frame flash, only on
-  // small terminals).
+  // Measured height of the wizard body (everything below the Header). Drives
+  // every fit decision from the LIVE rendered height — no hardcoded row
+  // thresholds. The measurement is tagged with the step it was taken for, so
+  // a stale measurement from a previous (taller) step can never wedge a new
+  // (shorter) step into the too-small state: when the step changes the tagged
+  // measurement no longer matches and `bodyHeight` falls back to null until
+  // the new body is measured. `measureElement` only reports after a render,
+  // so on the first frame of a step `bodyHeight` is null and we optimistically
+  // render the box header; the next frame corrects if it doesn't fit
+  // (one-frame flash, only on small terminals).
   const bodyRef = useRef<DOMElement | null>(null)
-  const [bodyHeight, setBodyHeight] = useState<number | null>(null)
+  const [measuredBody, setMeasuredBody] = useState<{ step: OnboardingStep, height: number } | null>(null)
   useEffect(() => {
     if (!bodyRef.current)
       return
     const { height } = measureElement(bodyRef.current)
-    if (height > 0)
-      setBodyHeight(prev => (prev === height ? prev : height))
+    if (height > 0) {
+      setMeasuredBody(prev => (prev && prev.step === step && prev.height === height ? prev : { step, height }))
+    }
   })
-  // Collapse to the one-line header whenever the bordered box wouldn't fit
-  // alongside the measured body. When even the compact line doesn't fit, the
-  // MIN_TERMINAL_ROWS floor is the backstop — but compact is still strictly
-  // better than an overflowing box, so we always prefer it once the box is
-  // ruled out.
+  const bodyHeight = measuredBody && measuredBody.step === step ? measuredBody.height : null
+
+  // Three-way fit decision, all derived from the measured body vs the live
+  // terminal height:
+  //   - box header fits        → bordered box
+  //   - only one-line fits     → compact header (headerCompact)
+  //   - not even one-line fits → resize prompt (tooSmall)
+  // Before measurement (bodyHeight === null) we only force the resize prompt
+  // when the terminal can't even hold the one-line header + padding + a single
+  // content row; otherwise we render optimistically and let the measurement
+  // settle the decision.
+  const compactHeaderTotal = COMPACT_HEADER_ROWS + WIZARD_PADDING_ROWS
   const headerCompact = bodyHeight != null
     && (bodyHeight + BOX_HEADER_ROWS + WIZARD_PADDING_ROWS > terminalRows)
+  const tooSmall = bodyHeight != null
+    ? (bodyHeight + compactHeaderTotal > terminalRows)
+    : (terminalRows < compactHeaderTotal + 1)
+  const neededRows = (bodyHeight != null ? bodyHeight : 1) + compactHeaderTotal
 
   // Refs to avoid stale closures in useEffect async handlers
   const p8ContentRef = useRef(p8Content)
@@ -1476,15 +1491,16 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
     ? getBuildOnboardingRecoveryAdvice(error, retryStep, pm.runner, appId)
     : null
 
-  // Floor guard: below MIN_TERMINAL_ROWS an interactive step would clip in the
-  // alt buffer with no way to scroll/reach the top. Show a resize prompt
-  // instead. Resize-reactive, so the real wizard returns when the window grows.
-  // The `minHeight` fills the viewport so Ink takes its full clear-screen
-  // render path (see the main return below for why).
-  if (terminalRows < MIN_TERMINAL_ROWS)
+  // Floor guard: when even the one-line header + this step's content won't
+  // fit (measured), an interactive step would clip in the alt buffer with no
+  // way to scroll/reach the top. Show a resize prompt instead. Resize-reactive,
+  // so the real wizard returns when the window grows. The `minHeight` fills
+  // the viewport so Ink takes its full clear-screen render path (see the main
+  // return below for why).
+  if (tooSmall)
     return (
       <Box flexDirection="column" minHeight={terminalRows}>
-        <TerminalTooSmall rows={terminalRows} />
+        <TerminalTooSmall rows={terminalRows} neededRows={neededRows} />
       </Box>
     )
 

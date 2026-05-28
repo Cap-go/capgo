@@ -9,35 +9,28 @@ export const Divider: FC<{ width?: number }> = ({ width = 60 }) => (
   <Text dimColor>{'─'.repeat(width)}</Text>
 )
 
-// Absolute floor below which the wizard shows a resize prompt instead of a
-// clipped, partly-unreachable interactive step. The wizard runs in the
-// alternative screen buffer (no scrollback) and interactive steps can't be
-// made scrollable, so there's a hard minimum. This stays a fixed number (not
-// measured) on purpose: the too-small check has to run BEFORE the body
-// renders, so there's nothing to measure yet.
-export const MIN_TERMINAL_ROWS = 16
-
-// Rendered row cost of each Header variant, used by the wizards to decide —
-// from a live `measureElement` of the step body — whether the bordered box
-// fits or the Header must collapse to its one-line form. Rather than a
-// hardcoded height threshold, the wizard compares
-// `bodyHeight + BOX_HEADER_ROWS + WIZARD_PADDING_ROWS` against the live
-// terminal height.
+// Rendered row cost of each Header variant + the wizard's outer padding.
+// The wizards use these against a live `measureElement` of the step body to
+// decide — with no hardcoded height threshold — whether (a) the bordered box
+// fits, (b) only the one-line header fits, or (c) not even the one-line
+// header + content fits, in which case the resize prompt is shown.
 //   box = double border (2) + paddingY (2) + text (1)
 export const BOX_HEADER_ROWS = 5
 export const COMPACT_HEADER_ROWS = 1
 // The outer wizard <Box> uses padding={1} → one row top + one row bottom.
 export const WIZARD_PADDING_ROWS = 2
 
-// Shown in place of the step content when the terminal is shorter than
-// MIN_TERMINAL_ROWS. Kept to TWO rows with no padding: in the alt buffer the
-// TOP of overflowing content is what gets clipped, so the fewer rows this
-// occupies the more likely the user sees the actionable instruction even on
-// a very short terminal.
-export const TerminalTooSmall: FC<{ rows: number }> = ({ rows }) => (
+// Shown in place of the step content when even the one-line header + the
+// step's content won't fit the current viewport. Kept to TWO rows with no
+// padding: in the alt buffer the TOP of overflowing content is what gets
+// clipped, so the fewer rows this occupies the more likely the user sees the
+// actionable instruction even on a very short terminal. `neededRows` is the
+// measured target height (body + one-line header + padding) so the message
+// can tell the user concretely how tall to make the window.
+export const TerminalTooSmall: FC<{ rows: number, neededRows: number }> = ({ rows, neededRows }) => (
   <Box flexDirection="column">
     <Text color="yellow" bold>{`⚠  Terminal too small (${rows} row${rows === 1 ? '' : 's'})`}</Text>
-    <Text>{`Resize taller — at least ${MIN_TERMINAL_ROWS} rows — to continue onboarding.`}</Text>
+    <Text>{`Resize taller — at least ${neededRows} rows — to continue onboarding.`}</Text>
   </Box>
 )
 

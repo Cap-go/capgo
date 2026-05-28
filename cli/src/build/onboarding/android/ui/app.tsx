@@ -42,7 +42,7 @@ import { createCiSecretEntries, detectCiSecretTargets, getCiSecretTargetLabel, l
 import { mapAndroidOnboardingError, mapSaValidationKindToCategory } from '../../error-categories.js'
 import { canUseFilePicker, openKeystorePicker, openServiceAccountJsonPicker } from '../../file-picker.js'
 import { trackBuilderOnboardingStep } from '../../telemetry.js'
-import { BOX_HEADER_ROWS, Divider, ErrorLine, FilteredTextInput, FullscreenAiViewer, Header, MIN_TERMINAL_ROWS, SpinnerLine, SuccessLine, TerminalTooSmall, WIZARD_PADDING_ROWS } from '../../ui/components.js'
+import { BOX_HEADER_ROWS, COMPACT_HEADER_ROWS, Divider, ErrorLine, FilteredTextInput, FullscreenAiViewer, Header, SpinnerLine, SuccessLine, TerminalTooSmall, WIZARD_PADDING_ROWS } from '../../ui/components.js'
 import { findAndroidApplicationIds } from '../gradle-parser.js'
 import { validateServiceAccountJson } from '../service-account-validation.js'
 import {
@@ -424,18 +424,27 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
   const terminalRows = termSize.rows
   const terminalCols = termSize.cols
 
-  // Measured body height → adaptive box-vs-compact Header. See iOS sibling.
+  // Measured body height → adaptive box/compact/too-small. See iOS sibling
+  // for the full rationale (step-tagged measurement avoids cross-step
+  // deadlock; decisions derived from live height, no hardcoded floor).
   const bodyRef = useRef<DOMElement | null>(null)
-  const [bodyHeight, setBodyHeight] = useState<number | null>(null)
+  const [measuredBody, setMeasuredBody] = useState<{ step: AndroidOnboardingStep, height: number } | null>(null)
   useEffect(() => {
     if (!bodyRef.current)
       return
     const { height } = measureElement(bodyRef.current)
-    if (height > 0)
-      setBodyHeight(prev => (prev === height ? prev : height))
+    if (height > 0) {
+      setMeasuredBody(prev => (prev && prev.step === step && prev.height === height ? prev : { step, height }))
+    }
   })
+  const bodyHeight = measuredBody && measuredBody.step === step ? measuredBody.height : null
+  const compactHeaderTotal = COMPACT_HEADER_ROWS + WIZARD_PADDING_ROWS
   const headerCompact = bodyHeight != null
     && (bodyHeight + BOX_HEADER_ROWS + WIZARD_PADDING_ROWS > terminalRows)
+  const tooSmall = bodyHeight != null
+    ? (bodyHeight + compactHeaderTotal > terminalRows)
+    : (terminalRows < compactHeaderTotal + 1)
+  const neededRows = (bodyHeight != null ? bodyHeight : 1) + compactHeaderTotal
 
   const addLog = useCallback((text: string, color = 'green') => {
     setLogLines(prev => [...prev, { text, color }])
@@ -1608,12 +1617,13 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
   const showProgress = step !== 'welcome' && step !== 'error' && step !== 'build-complete' && step !== 'requesting-build' && step !== 'ai-analysis-result' && !isAiResultScroll
   const showLog = step !== 'requesting-build' && step !== 'build-complete' && !isAiStep
 
-  // Floor guard — see iOS sibling. Below MIN_TERMINAL_ROWS, show a resize
-  // prompt instead of a clipped interactive step. Resize-reactive.
-  if (terminalRows < MIN_TERMINAL_ROWS)
+  // Floor guard — see iOS sibling. When even the one-line header + content
+  // won't fit (measured), show a resize prompt instead of a clipped step.
+  // Resize-reactive.
+  if (tooSmall)
     return (
       <Box flexDirection="column" minHeight={terminalRows}>
-        <TerminalTooSmall rows={terminalRows} />
+        <TerminalTooSmall rows={terminalRows} neededRows={neededRows} />
       </Box>
     )
 
