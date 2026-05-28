@@ -9,6 +9,26 @@ export const Divider: FC<{ width?: number }> = ({ width = 60 }) => (
   <Text dimColor>{'─'.repeat(width)}</Text>
 )
 
+// Minimum terminal height the wizard needs to render an interactive step
+// without clipping. The wizard runs in the alternative screen buffer (no
+// scrollback), and interactive steps (Select / TextInput) can't be made
+// scrollable, so below this floor we show a resize prompt instead of a
+// clipped, partly-unreachable step. The wizard is resize-reactive, so it
+// snaps back to the real content the moment the window is tall enough.
+export const MIN_TERMINAL_ROWS = 14
+
+// Shown in place of the step content when the terminal is shorter than
+// MIN_TERMINAL_ROWS. Kept to TWO rows with no padding: in the alt buffer the
+// TOP of overflowing content is what gets clipped, so the fewer rows this
+// occupies the more likely the user sees the actionable instruction even on
+// a very short terminal.
+export const TerminalTooSmall: FC<{ rows: number }> = ({ rows }) => (
+  <Box flexDirection="column">
+    <Text color="yellow" bold>{`⚠  Terminal too small (${rows} row${rows === 1 ? '' : 's'})`}</Text>
+    <Text>{`Resize taller — at least ${MIN_TERMINAL_ROWS} rows — to continue onboarding.`}</Text>
+  </Box>
+)
+
 export const SpinnerLine: FC<{ text: string }> = ({ text }) => (
   <Box>
     <Box marginRight={1}>

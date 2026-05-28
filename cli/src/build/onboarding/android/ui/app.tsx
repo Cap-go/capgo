@@ -41,7 +41,7 @@ import { createCiSecretEntries, detectCiSecretTargets, getCiSecretTargetLabel, l
 import { mapAndroidOnboardingError, mapSaValidationKindToCategory } from '../../error-categories.js'
 import { canUseFilePicker, openKeystorePicker, openServiceAccountJsonPicker } from '../../file-picker.js'
 import { trackBuilderOnboardingStep } from '../../telemetry.js'
-import { Divider, ErrorLine, FilteredTextInput, FullscreenAiViewer, Header, SpinnerLine, SuccessLine } from '../../ui/components.js'
+import { Divider, ErrorLine, FilteredTextInput, FullscreenAiViewer, Header, MIN_TERMINAL_ROWS, SpinnerLine, SuccessLine, TerminalTooSmall } from '../../ui/components.js'
 import { findAndroidApplicationIds } from '../gradle-parser.js'
 import { validateServiceAccountJson } from '../service-account-validation.js'
 import {
@@ -1593,6 +1593,11 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
   const showHeader = step !== 'requesting-build' && !isAiResultScroll
   const showProgress = step !== 'welcome' && step !== 'error' && step !== 'build-complete' && step !== 'requesting-build' && step !== 'ai-analysis-result' && !isAiResultScroll
   const showLog = step !== 'requesting-build' && step !== 'build-complete' && !isAiStep
+
+  // Floor guard — see iOS sibling. Below MIN_TERMINAL_ROWS, show a resize
+  // prompt instead of a clipped interactive step. Resize-reactive.
+  if (terminalRows < MIN_TERMINAL_ROWS)
+    return <TerminalTooSmall rows={terminalRows} />
 
   return (
     <Box flexDirection="column" padding={1}>

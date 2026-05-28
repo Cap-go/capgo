@@ -45,7 +45,7 @@ import {
 
   STEP_PROGRESS,
 } from '../types.js'
-import { Divider, ErrorLine, FilteredTextInput, FullscreenAiViewer, Header, SpinnerLine, SuccessLine } from './components.js'
+import { Divider, ErrorLine, FilteredTextInput, FullscreenAiViewer, Header, MIN_TERMINAL_ROWS, SpinnerLine, SuccessLine, TerminalTooSmall } from './components.js'
 
 const OUTPUT_LINE_SPLIT_RE = /\r?\n/
 const CARRIAGE_RETURN_RE = /\r/g
@@ -1450,6 +1450,12 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
   const recoveryAdvice = error
     ? getBuildOnboardingRecoveryAdvice(error, retryStep, pm.runner, appId)
     : null
+
+  // Floor guard: below MIN_TERMINAL_ROWS an interactive step would clip in the
+  // alt buffer with no way to scroll/reach the top. Show a resize prompt
+  // instead. Resize-reactive, so the real wizard returns when the window grows.
+  if (terminalRows < MIN_TERMINAL_ROWS)
+    return <TerminalTooSmall rows={terminalRows} />
 
   return (
     <Box flexDirection="column" padding={1}>
