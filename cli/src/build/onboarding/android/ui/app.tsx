@@ -2349,6 +2349,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
 
       {step === 'ci-secrets-setup' && (
         <CiSecretsSetupStep
+          dense={dense}
           advice={ciSecretSetupAdvice}
           onChoose={(choice) => {
             setStep(choice === 'retry' ? 'detecting-ci-secrets' : 'build-complete')
@@ -2358,6 +2359,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
 
       {step === 'ci-secrets-target-select' && (
         <CiSecretsTargetSelectStep
+          dense={dense}
           options={[
             ...ciSecretTargets.map(target => ({
               label: target.provider === 'github' ? 'GitHub Actions repository secrets' : 'GitLab CI/CD variables',
@@ -2379,6 +2381,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
 
       {step === 'ask-ci-secrets' && (
         <AskCiSecretsStep
+          dense={dense}
           entryCount={ciSecretEntries.length}
           targetLabel={getCiSecretTargetLabel(ciSecretTarget)}
           cli={ciSecretTarget?.cli || 'CLI'}
@@ -2394,6 +2397,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
 
       {step === 'confirm-ci-secret-overwrite' && (
         <ConfirmCiSecretOverwriteStep
+          dense={dense}
           existingKeys={ciSecretExistingKeys}
           onChoose={(choice) => {
             setStep(choice === 'replace' ? 'uploading-ci-secrets' : 'build-complete')
@@ -2407,6 +2411,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
 
       {step === 'ci-secrets-failed' && (
         <CiSecretsFailedStep
+          dense={dense}
           error={ciSecretError}
           onChoose={(choice) => {
             setStep(choice === 'retry' ? (ciSecretTarget ? 'checking-ci-secrets' : 'detecting-ci-secrets') : 'build-complete')
@@ -2416,6 +2421,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
 
       {step === 'ask-build' && (
         <AskBuildStep
+          dense={dense}
           onChoose={(choice) => {
             if (choice === 'yes')
               setStep('requesting-build')

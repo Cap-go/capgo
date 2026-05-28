@@ -8,19 +8,24 @@
 // `useStdout` / `measureElement`. `useInput` inside the shared FilteredTextInput
 // widget is fine — that's a leaf control, not layout measurement.
 //
-// The frame-fit contract (see ui/components.tsx + test/helpers/frame-fit.mjs)
-// requires every step body to render within BODY_BUDGET_ROWS (13) rows at the
-// reference widths (80 and 60 cols). Copy here is deliberately terse and the
-// original decorative <Newline/>s are dropped so the bodies stay lean at 60
-// columns where text wraps hardest — but the interactive control and its key
-// instruction always stay on screen. The list-bearing steps (CI setup advice,
-// overwrite confirmation) cap how many entries they show and add a
-// "… +N more" hint so a long list can never blow the budget; pickers cap
-// `visibleOptionCount` for the same reason.
+// Adaptive spacing — each body renders its COMFORTABLE form by default (the
+// original design: decorative <Newline/> blank-line spacing + full multi-line
+// copy + un-capped advice/key lists). The 16-row frame contract (see
+// ui/components.tsx + test/helpers/frame-fit.mjs) is a FLOOR we must survive on
+// short terminals, not a cap on every terminal: when the parent measures that
+// the comfortable body can't fit the viewport it flips the sticky `dense`
+// signal and threads `dense={true}` here, collapsing each body to the terse,
+// budget-fitting form (blank lines dropped, the per-provider setup advice
+// reduced to the first entry + a "… +N more" hint, the overwrite key list
+// tailed to the last few + a "… +N more" hint, and the target picker capped via
+// Select's `visibleOptionCount` with a "+N more" hint). `dense` defaults to
+// `false` so a component rendered without the prop (e.g. a test asserting the
+// comfortable form) gets the original look. All props/handlers/behaviour are
+// identical across both modes.
 import type { FC } from 'react'
 import type { CiSecretSetupAdvice, CiSecretTarget } from '../../ci-secrets.js'
 import { Select } from '@inkjs/ui'
-import { Box, Text } from 'ink'
+import { Box, Newline, Text } from 'ink'
 import React from 'react'
 import { ErrorLine, SpinnerLine, SuccessLine } from '../components.js'
 
@@ -31,14 +36,17 @@ export interface SelectOption {
   value: string
 }
 
-// Capped visible rows for the scrollable picker steps. Kept low so the bold
-// header + Select window always fit the 13-row budget even at 60 cols.
+// Capped visible rows for the scrollable picker steps in DENSE mode. Kept low
+// so the bold header + Select window + "+N more" hint always fit the 13-row
+// budget even at 60 cols. In the comfortable form the picker is un-capped (the
+// parent only renders that form after measuring it fits the viewport).
 const LIST_VISIBLE_COUNT = 4
 
 // How many list entries the non-picker list steps (setup advice, overwrite
-// confirmation) render before collapsing the rest into a "… +N more" line.
-// Showing the LAST few keeps the most recently relevant entries visible while
-// the bold header + interactive control stay on screen.
+// confirmation) render in DENSE mode before collapsing the rest into a
+// "… +N more" line. Showing the LAST few keeps the most recently relevant
+// entries visible while the bold header + interactive control stay on screen.
+// The comfortable form renders the whole list.
 const SETUP_ADVICE_VISIBLE = 1
 const OVERWRITE_KEYS_VISIBLE = 3
 
@@ -57,20 +65,49 @@ export const DetectingCiSecretsStep: FC = () => (
 // ── ci-secrets-setup ──────────────────────────────────────────────────────────
 // `advice` is one entry per git-hosting provider that needs its CLI installed
 // or authenticated; each carries a wrapping message + one or more shell
-// commands. The original rendered every entry with a blank line above and
-// below plus the label, message and each command — which blew the budget once
-// there were 2 providers (or one provider with the 2-line "not installed"
-// advice). We render only the first entry in full (the user fixes one platform
-// at a time) and collapse the rest to a "… +N more" hint; the decorative
-// <Newline/>s are dropped. The Select + its retry/skip instruction always stay
-// visible.
+// commands. Comfortable: the original rendered every entry with the label,
+// message and each command, separated by `marginBottom={1}` blank lines, with a
+// <Newline/> after the heading and a <Newline/> before the Select (the original
+// look — rendered only after the parent measured it fits). Dense: the
+// decorative blank lines are dropped and only the first entry is rendered in
+// full (the user fixes one platform at a time) with the rest collapsed to a
+// "… +N more" hint, so two providers (or one with the 2-line "not installed"
+// advice) can't blow the budget. The Select + its retry/skip context always
+// stay on screen.
 
 export interface CiSecretsSetupStepProps {
   advice: CiSecretSetupAdvice[]
   onChoose: (choice: 'retry' | 'skip') => void
+  dense?: boolean
 }
 
-export const CiSecretsSetupStep: FC<CiSecretsSetupStepProps> = ({ advice, onChoose }) => {
+export const CiSecretsSetupStep: FC<CiSecretsSetupStepProps> = ({ advice, onChoose, dense = false }) => {
+  if (!dense) {
+    return (
+      <Box flexDirection="column" marginTop={1}>
+        <Text bold>Set up your git hosting CLI to upload env vars</Text>
+        <Newline />
+        {advice.map(entry => (
+          <Box key={entry.target.provider} flexDirection="column" marginBottom={1}>
+            <Text>{entry.target.label}</Text>
+            <Text dimColor>{entry.message}</Text>
+            {entry.commands.map(command => (
+              <Text key={`${entry.target.provider}-${command}`} color="cyan">{command}</Text>
+            ))}
+          </Box>
+        ))}
+        <Text dimColor>Run this in another terminal, then come back here.</Text>
+        <Newline />
+        <Select
+          options={[
+            { label: 'I installed and logged in, check again', value: 'retry' },
+            { label: 'Skip upload', value: 'skip' },
+          ]}
+          onChange={value => onChoose(value as 'retry' | 'skip')}
+        />
+      </Box>
+    )
+  }
   const shown = advice.slice(0, SETUP_ADVICE_VISIBLE)
   const hidden = Math.max(0, advice.length - SETUP_ADVICE_VISIBLE)
   return (
@@ -102,15 +139,28 @@ export const CiSecretsSetupStep: FC<CiSecretsSetupStepProps> = ({ advice, onChoo
 
 // ── ci-secrets-target-select ──────────────────────────────────────────────────
 // The parent builds the option list (one row per detected target + a "Skip"
-// row) and owns the route handler. Visibility is capped so it can never blow
-// the budget, though in practice there are at most two providers + skip.
+// row) and owns the route handler. Comfortable: the original bold heading + a
+// <Newline/> + the un-capped Select (in practice there are at most two
+// providers + skip). Dense: the blank line is dropped and visibility is capped
+// via Select's `visibleOptionCount` with a "+N more" hint so it can never blow
+// the budget.
 
 export interface CiSecretsTargetSelectStepProps {
   options: SelectOption[]
   onChange: (value: string) => void
+  dense?: boolean
 }
 
-export const CiSecretsTargetSelectStep: FC<CiSecretsTargetSelectStepProps> = ({ options, onChange }) => {
+export const CiSecretsTargetSelectStep: FC<CiSecretsTargetSelectStepProps> = ({ options, onChange, dense = false }) => {
+  if (!dense) {
+    return (
+      <Box flexDirection="column" marginTop={1}>
+        <Text bold>Where should Capgo upload the build env vars?</Text>
+        <Newline />
+        <Select options={options} onChange={onChange} />
+      </Box>
+    )
+  }
   const hidden = Math.max(0, options.length - LIST_VISIBLE_COUNT)
   return (
     <Box flexDirection="column" marginTop={1}>
@@ -130,24 +180,33 @@ export const CiSecretsTargetSelectStep: FC<CiSecretsTargetSelectStepProps> = ({ 
 // ── ask-ci-secrets ────────────────────────────────────────────────────────────
 // `entryCount` is the number of build env vars about to be uploaded;
 // `targetLabel` is the human label of the chosen target; `cli` is the CLI the
-// upload will shell out to (gh/glab) shown in the confirm option. The original
-// had a blank line after the success line and before the Select; both
-// <Newline/>s are dropped so the prompt + control fit at 60 cols.
+// upload will shell out to (gh/glab) shown in the confirm option. Comfortable:
+// the original success line + a <Newline/> + the bold "Upload N build env vars
+// to <target>?" prompt + the dim "Capgo will check…" reassurance + a <Newline/>
+// + the Select. Dense: both <Newline/>s are dropped and the reassurance copy
+// trimmed so the prompt + control fit at 60 cols.
 
 export interface AskCiSecretsStepProps {
   entryCount: number
   targetLabel: string
   cli: string
   onChoose: (choice: 'yes' | 'no') => void
+  dense?: boolean
 }
 
-export const AskCiSecretsStep: FC<AskCiSecretsStepProps> = ({ entryCount, targetLabel, cli, onChoose }) => (
+export const AskCiSecretsStep: FC<AskCiSecretsStepProps> = ({ entryCount, targetLabel, cli, onChoose, dense = false }) => (
   <Box flexDirection="column" marginTop={1}>
     <SuccessLine text="Android credentials saved" />
+    {!dense && <Newline />}
     <Text bold>
       {`Upload ${entryCount} build env var${entryCount === 1 ? '' : 's'} to ${targetLabel}?`}
     </Text>
-    <Text dimColor>Capgo checks for existing names first and asks before replacing anything.</Text>
+    <Text dimColor>
+      {dense
+        ? 'Capgo checks for existing names first and asks before replacing anything.'
+        : 'Capgo will check for existing names first and ask before replacing anything.'}
+    </Text>
+    {!dense && <Newline />}
     <Select
       options={[
         { label: `Upload with ${cli}`, value: 'yes' },
@@ -170,18 +229,40 @@ export const CheckingCiSecretsStep: FC<CheckingCiSecretsStepProps> = ({ targetLa
 
 // ── confirm-ci-secret-overwrite ───────────────────────────────────────────────
 // `existingKeys` are the env-var names already present on the target that the
-// upload would replace. The original listed every key indented under the
-// heading with a blank line before the Select; a realistic 6+-key list blew the
-// budget. We show the last few keys + a "… +N more" line and drop the
-// <Newline/>, keeping the heading, the list and the replace/skip control on
-// screen.
+// upload would replace. Comfortable: the original listed every key indented
+// under the heading (in a `marginTop={1}` box) with a <Newline/> before the
+// Select (the original look — rendered only after the parent measured it fits).
+// Dense: the box's top margin and the <Newline/> are dropped and only the last
+// few keys are shown with a "… +N more" line above them, so a realistic 6+-key
+// list can't push the heading, list or replace/skip control off-screen.
 
 export interface ConfirmCiSecretOverwriteStepProps {
   existingKeys: string[]
   onChoose: (choice: 'replace' | 'skip') => void
+  dense?: boolean
 }
 
-export const ConfirmCiSecretOverwriteStep: FC<ConfirmCiSecretOverwriteStepProps> = ({ existingKeys, onChoose }) => {
+export const ConfirmCiSecretOverwriteStep: FC<ConfirmCiSecretOverwriteStepProps> = ({ existingKeys, onChoose, dense = false }) => {
+  if (!dense) {
+    return (
+      <Box flexDirection="column" marginTop={1}>
+        <Text bold color="yellow">These env vars already exist and will be replaced:</Text>
+        <Box flexDirection="column" marginTop={1} marginLeft={2}>
+          {existingKeys.map(key => (
+            <Text key={key}>{`• ${key}`}</Text>
+          ))}
+        </Box>
+        <Newline />
+        <Select
+          options={[
+            { label: 'Replace existing env vars', value: 'replace' },
+            { label: 'Skip upload', value: 'skip' },
+          ]}
+          onChange={value => onChoose(value as 'replace' | 'skip')}
+        />
+      </Box>
+    )
+  }
   const shown = existingKeys.slice(-OVERWRITE_KEYS_VISIBLE)
   const hidden = Math.max(0, existingKeys.length - OVERWRITE_KEYS_VISIBLE)
   return (
@@ -217,22 +298,25 @@ export const UploadingCiSecretsStep: FC<UploadingCiSecretsStepProps> = ({ target
 )
 
 // ── ci-secrets-failed (error) ─────────────────────────────────────────────────
-// `error` is the upload failure detail and can be long (CLI stderr). The
-// original wrapped the error + a reassurance line with blank lines around both
-// plus the Select, which overflowed at 60 cols once the error wrapped. The
-// reassurance is compressed to one dim line and the <Newline/>s are dropped; a
-// long error can still wrap a couple of rows without pushing the retry/continue
-// control off-screen.
+// `error` is the upload failure detail and can be long (CLI stderr).
+// Comfortable: the original error line + a <Newline/> + the dim reassurance +
+// a <Newline/> + the Select (the original look — rendered only after the parent
+// measured it fits). Dense: both <Newline/>s are dropped so a long error can
+// still wrap a couple of rows without pushing the retry/continue control
+// off-screen.
 
 export interface CiSecretsFailedStepProps {
   error: string | null
   onChoose: (choice: 'retry' | 'continue') => void
+  dense?: boolean
 }
 
-export const CiSecretsFailedStep: FC<CiSecretsFailedStepProps> = ({ error, onChoose }) => (
+export const CiSecretsFailedStep: FC<CiSecretsFailedStepProps> = ({ error, onChoose, dense = false }) => (
   <Box flexDirection="column" marginTop={1}>
     <ErrorLine text={error || 'Could not upload env vars.'} />
+    {!dense && <Newline />}
     <Text dimColor>You can continue; credentials are already saved locally.</Text>
+    {!dense && <Newline />}
     <Select
       options={[
         { label: 'Try upload again', value: 'retry' },
@@ -244,18 +328,22 @@ export const CiSecretsFailedStep: FC<CiSecretsFailedStepProps> = ({ error, onCho
 )
 
 // ── ask-build ─────────────────────────────────────────────────────────────────
-// Final prompt of the Android flow. The original had blank lines around the
-// "Request a build now?" prompt; both <Newline/>s are dropped so the success
-// line, prompt and yes/no control fit comfortably.
+// Final prompt of the Android flow. Comfortable: the original success line + a
+// <Newline/> + the bold "Request a build now?" prompt + a <Newline/> + the
+// yes/no Select. Dense: both <Newline/>s are dropped so the success line,
+// prompt and control fit within budget.
 
 export interface AskBuildStepProps {
   onChoose: (choice: 'yes' | 'no') => void
+  dense?: boolean
 }
 
-export const AskBuildStep: FC<AskBuildStepProps> = ({ onChoose }) => (
+export const AskBuildStep: FC<AskBuildStepProps> = ({ onChoose, dense = false }) => (
   <Box flexDirection="column" marginTop={1}>
     <SuccessLine text="Android credentials saved" />
+    {!dense && <Newline />}
     <Text bold>Request a build now?</Text>
+    {!dense && <Newline />}
     <Select
       options={[
         { label: '🚀  Yes, request a build', value: 'yes' },
