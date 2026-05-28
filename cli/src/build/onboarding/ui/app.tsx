@@ -10,9 +10,9 @@ import { copyFile, readFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import process from 'node:process'
-import { ProgressBar, Select } from '@inkjs/ui'
+import { ProgressBar } from '@inkjs/ui'
 import type { DOMElement } from 'ink'
-import { Box, measureElement, Newline, Text, useApp, useInput, useStdout } from 'ink'
+import { Box, measureElement, Text, useApp, useInput, useStdout } from 'ink'
 import open from 'open'
 // src/build/onboarding/ui/app.tsx
 import React, { useCallback, useEffect, useRef, useState } from 'react'
@@ -46,7 +46,7 @@ import {
 
   STEP_PROGRESS,
 } from '../types.js'
-import { AiResultBanner, BOX_HEADER_ROWS, COMPACT_HEADER_ROWS, Divider, ErrorLine, FilteredTextInput, FullscreenAiViewer, Header, SpinnerLine, SuccessLine, TerminalTooSmall, WIZARD_PADDING_ROWS } from './components.js'
+import { BOX_HEADER_ROWS, COMPACT_HEADER_ROWS, Divider, FilteredTextInput, FullscreenAiViewer, Header, SpinnerLine, TerminalTooSmall, WIZARD_PADDING_ROWS } from './components.js'
 import type { AiResultKind } from './components.js'
 import {
   ApiKeyInstructionsStep,
@@ -89,6 +89,17 @@ import {
   ImportPickProfileStep,
   ImportScanningStep,
 } from './steps/ios-import.js'
+import {
+  AddingPlatformStep,
+  AiAnalysisPromptStep,
+  AiAnalysisRunningStep,
+  AiAnalysisResultStep,
+  BuildCompleteStep,
+  ErrorStep,
+  NoPlatformStep,
+  PlatformSelectStep,
+  WelcomeStep,
+} from './steps/ios-shared.js'
 
 const OUTPUT_LINE_SPLIT_RE = /\r?\n/
 const CARRIAGE_RETURN_RE = /\r/g
@@ -1590,99 +1601,73 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
       )}
 
       {/* Welcome */}
-      {step === 'welcome' && (
-        <Box marginTop={1} justifyContent="center">
-          <SpinnerLine text="Detecting project..." />
-        </Box>
-      )}
+      {step === 'welcome' && <WelcomeStep />}
 
       {/* Platform select */}
       {step === 'platform-select' && (
-        <Box flexDirection="column" marginTop={1}>
-          <SuccessLine text="Detected Capacitor project" detail={appId} />
-          <Newline />
-          <Text bold>Which platform do you want to set up?</Text>
-          <Newline />
-          <Select
-            options={[
-              { label: '🍎  iOS', value: 'ios' },
-              { label: '🤖  Android', value: 'android' },
-            ]}
-            onChange={async (value) => {
-              if (value === 'android') {
-                // The Android flow lives in a separate Ink app — this iOS app
-                // can't host it inline. Exit cleanly and tell the user to
-                // re-run with --platform android.
-                addLog('Re-run with `npx @capgo/cli@latest build init --platform android` to set up Android.', 'cyan')
-                exitOnboarding()
-                return
-              }
-              // Check for existing credentials before proceeding
-              const existing = await loadSavedCredentials(appId)
-              if (existing?.ios) {
-                setStep('credentials-exist')
-              }
-              else if (isMacOS()) {
-                // macOS users see the fork: import existing or create new
-                setStep('setup-method-select')
-              }
-              else {
-                // Non-macOS hosts can only create new (importing requires Keychain)
-                setStep('api-key-instructions')
-              }
-            }}
-          />
-        </Box>
+        <PlatformSelectStep
+          appId={appId}
+          onChange={async (value) => {
+            if (value === 'android') {
+              // The Android flow lives in a separate Ink app — this iOS app
+              // can't host it inline. Exit cleanly and tell the user to
+              // re-run with --platform android.
+              addLog('Re-run with `npx @capgo/cli@latest build init --platform android` to set up Android.', 'cyan')
+              exitOnboarding()
+              return
+            }
+            // Check for existing credentials before proceeding
+            const existing = await loadSavedCredentials(appId)
+            if (existing?.ios) {
+              setStep('credentials-exist')
+            }
+            else if (isMacOS()) {
+              // macOS users see the fork: import existing or create new
+              setStep('setup-method-select')
+            }
+            else {
+              // Non-macOS hosts can only create new (importing requires Keychain)
+              setStep('api-key-instructions')
+            }
+          }}
+        />
       )}
 
       {/* No platform directory */}
       {step === 'no-platform' && (
-        <Box flexDirection="column" marginTop={1}>
-          <ErrorLine text={`No ${iosDir}/ directory found.`} />
-          <Newline />
-          <Text>This onboarding flow needs a generated native iOS project before credentials can be created.</Text>
-          <Newline />
-          <Text dimColor>{`Suggested commands: ${addIosCommand} && ${syncIosCommand}`}</Text>
-          <Newline />
-          <Select
-            options={[
-              { label: `🛠  Run ${addIosCommand} now`, value: 'run' },
-              { label: '🔄  I already fixed it, re-check', value: 'recheck' },
-              { label: '✖  Exit onboarding', value: 'exit' },
-            ]}
-            onChange={(value) => {
-              if (value === 'run') {
-                setStep('adding-platform')
-              }
-              else if (value === 'recheck') {
-                if (existsSync(join(process.cwd(), iosDir))) {
-                  addLog(`✔ Found ${iosDir}/ — resuming onboarding.`)
-                  ;(async () => {
-                    const existing = await loadSavedCredentials(appId)
-                    if (existing?.ios)
-                      setStep('credentials-exist')
-                    else
-                      setStep('api-key-instructions')
-                  })()
-                }
-                else {
-                  addLog(`⚠ ${iosDir}/ is still missing. Try ${addIosCommand} or ${doctorCommand}.`, 'yellow')
-                }
+        <NoPlatformStep
+          iosDir={iosDir}
+          addIosCommand={addIosCommand}
+          syncIosCommand={syncIosCommand}
+          onChange={(value) => {
+            if (value === 'run') {
+              setStep('adding-platform')
+            }
+            else if (value === 'recheck') {
+              if (existsSync(join(process.cwd(), iosDir))) {
+                addLog(`✔ Found ${iosDir}/ — resuming onboarding.`)
+                ;(async () => {
+                  const existing = await loadSavedCredentials(appId)
+                  if (existing?.ios)
+                    setStep('credentials-exist')
+                  else
+                    setStep('api-key-instructions')
+                })()
               }
               else {
-                addLog(`Exiting. Run \`${buildInitCommand}\` after the native iOS folder exists.`, 'yellow')
-                exitOnboarding()
+                addLog(`⚠ ${iosDir}/ is still missing. Try ${addIosCommand} or ${doctorCommand}.`, 'yellow')
               }
-            }}
-          />
-        </Box>
+            }
+            else {
+              addLog(`Exiting. Run \`${buildInitCommand}\` after the native iOS folder exists.`, 'yellow')
+              exitOnboarding()
+            }
+          }}
+        />
       )}
 
       {step === 'adding-platform' && (
-        <Box flexDirection="column" marginTop={1}>
-          <SpinnerLine text={`Running ${addIosCommand}...`} />
-          <Text dimColor>{`If this still fails, try ${doctorCommand} and keep the support bundle path from the error screen.`}</Text>
-        </Box>
+        <AddingPlatformStep addIosCommand={addIosCommand} doctorCommand={doctorCommand} />
       )}
 
       {/* Existing credentials warning */}
@@ -2272,127 +2257,79 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
 
       {/* AI debug — ask the user whether to send the captured log */}
       {step === 'ai-analysis-prompt' && (
-        <Box flexDirection="column" marginTop={1}>
-          <ErrorLine text="Build failed." />
-          <Newline />
-          <Text>We can analyze the build log with Capgo AI (Kimi K2.5) and suggest a fix.</Text>
-          <Newline />
-          <Select
-            options={[
-              { label: '🤖  Debug with AI', value: 'debug' },
-              { label: '⏭   Skip', value: 'skip' },
-            ]}
-            onChange={async (value) => {
-              if (value === 'debug') {
-                setStep('ai-analysis-running')
+        <AiAnalysisPromptStep
+          onChange={async (value) => {
+            if (value === 'debug') {
+              setStep('ai-analysis-running')
+            }
+            else {
+              if (aiJobId) {
+                await trackAiAnalysisChoice({
+                  apikey: resolvedApiKeyRef.current ?? apikey ?? '',
+                  orgId: resolvedOrgId ?? '',
+                  appId,
+                  platform: 'ios',
+                  jobId: aiJobId,
+                  choice: 'skip',
+                  triggeredBy: 'onboarding',
+                }).catch(() => { /* telemetry never breaks the wizard */ })
               }
-              else {
-                if (aiJobId) {
-                  await trackAiAnalysisChoice({
-                    apikey: resolvedApiKeyRef.current ?? apikey ?? '',
-                    orgId: resolvedOrgId ?? '',
-                    appId,
-                    platform: 'ios',
-                    jobId: aiJobId,
-                    choice: 'skip',
-                    triggeredBy: 'onboarding',
-                  }).catch(() => { /* telemetry never breaks the wizard */ })
-                }
-                setStep('build-complete')
-              }
-            }}
-          />
-        </Box>
+              setStep('build-complete')
+            }
+          }}
+        />
       )}
 
       {/* AI debug — spinner while the edge function is running */}
-      {step === 'ai-analysis-running' && (
-        <Box flexDirection="column" marginTop={1}>
-          <SpinnerLine text="Analyzing build log with Capgo AI (Kimi K2.5)..." />
-        </Box>
-      )}
+      {step === 'ai-analysis-running' && <AiAnalysisRunningStep />}
 
       {/* AI debug — render the diagnosis (or fallback message), then offer
           retry-or-skip. Retry transitions back to 'requesting-build' so the
           user can rebuild after applying the AI's fix in another terminal,
           without re-running the credential wizard. Capped at MAX_AI_RETRIES. */}
-      {step === 'ai-analysis-result' && (() => {
-        const retriesLeft = MAX_AI_RETRIES - aiRetryCount
-        const canRetry = retriesLeft > 0
-        const retryLabel = retriesLeft === 1
-          ? '🔄  I fixed it, retry build (last retry)'
-          : `🔄  I fixed it, retry build (${retriesLeft} retries left)`
-        // When the analysis was routed through the scroll viewer the user has
-        // already read it — repeating the body here would just push the picker
-        // off-screen on small terminals. Show a compact "Analysis reviewed"
-        // marker instead. `aiResult` (the too_big / error / already_analyzed
-        // outcome) is always short so its banner can render inline regardless.
-        return (
-          <Box flexDirection="column" marginTop={1}>
-            <Text bold color="cyan">AI analysis</Text>
-            <Newline />
-            {aiAnalysisText && !aiViewedFull && <Text>{aiAnalysisText}</Text>}
-            {aiAnalysisText && aiViewedFull && (
-              <Text dimColor>
-                📖  Analysis already shown above (scroll your terminal back to re-read it).
-              </Text>
-            )}
-            {aiResult && <AiResultBanner kind={aiResult.kind} message={aiResult.message} />}
-            <Newline />
-            <Text color="yellow">⚠ AI can make mistakes. Always verify the diagnosis against the full log before applying the suggested fix.</Text>
-            <Newline />
-            {!canRetry && (
-              <>
-                <Text dimColor>You've used all {MAX_AI_RETRIES} retries. Exit and re-run the wizard if you need another attempt.</Text>
-                <Newline />
-              </>
-            )}
-            <Select
-              options={canRetry
-                ? [
-                    { label: retryLabel, value: 'retry' },
-                    { label: '⏭   Continue (skip retry)', value: 'skip' },
-                  ]
-                : [
-                    { label: '✔  Continue', value: 'continue' },
-                  ]}
-              onChange={async (value) => {
-                if (value === 'retry') {
-                  // Track the retry intent before we tear down the AI state so
-                  // the choice event carries the per-attempt context.
-                  if (aiJobId) {
-                    await trackAiAnalysisChoice({
-                      apikey: resolvedApiKeyRef.current ?? apikey ?? '',
-                      orgId: resolvedOrgId ?? '',
-                      appId,
-                      platform: 'ios',
-                      jobId: aiJobId,
-                      choice: 'retry',
-                      triggeredBy: 'onboarding',
-                    }).catch(() => { /* telemetry never breaks the wizard */ })
-                    // Free the captured log for the previous attempt; the next
-                    // attempt's `requestBuildInternal` will create a new file
-                    // tied to a new builder_job_id.
-                    void releaseCapturedLogs(aiJobId).catch(() => { /* best-effort */ })
-                  }
-                  // Reset AI state so the next failure starts clean. The fit
-                  // check (and possible scroll-viewer route) will re-evaluate
-                  // against the new analysis text.
-                  setAiJobId(null)
-                  setAiAnalysisText(null)
-                  setAiResult(null)
-                  setAiViewedFull(false)
-                  setAiRetryCount(prev => prev + 1)
-                  setStep('requesting-build')
-                  return
-                }
-                // 'skip' (with retries available) or 'continue' (none left).
-                setStep('build-complete')
-              }}
-            />
-          </Box>
-        )
-      })()}
+      {step === 'ai-analysis-result' && (
+        <AiAnalysisResultStep
+          analysisText={aiAnalysisText}
+          viewedFull={aiViewedFull}
+          result={aiResult}
+          canRetry={MAX_AI_RETRIES - aiRetryCount > 0}
+          retriesLeft={MAX_AI_RETRIES - aiRetryCount}
+          maxRetries={MAX_AI_RETRIES}
+          onChange={async (value) => {
+            if (value === 'retry') {
+              // Track the retry intent before we tear down the AI state so
+              // the choice event carries the per-attempt context.
+              if (aiJobId) {
+                await trackAiAnalysisChoice({
+                  apikey: resolvedApiKeyRef.current ?? apikey ?? '',
+                  orgId: resolvedOrgId ?? '',
+                  appId,
+                  platform: 'ios',
+                  jobId: aiJobId,
+                  choice: 'retry',
+                  triggeredBy: 'onboarding',
+                }).catch(() => { /* telemetry never breaks the wizard */ })
+                // Free the captured log for the previous attempt; the next
+                // attempt's `requestBuildInternal` will create a new file
+                // tied to a new builder_job_id.
+                void releaseCapturedLogs(aiJobId).catch(() => { /* best-effort */ })
+              }
+              // Reset AI state so the next failure starts clean. The fit
+              // check (and possible scroll-viewer route) will re-evaluate
+              // against the new analysis text.
+              setAiJobId(null)
+              setAiAnalysisText(null)
+              setAiResult(null)
+              setAiViewedFull(false)
+              setAiRetryCount(prev => prev + 1)
+              setStep('requesting-build')
+              return
+            }
+            // 'skip' (with retries available) or 'continue' (none left).
+            setStep('build-complete')
+          }}
+        />
+      )}
 
       {/* AI debug — scrollable viewer for analyses too tall for the viewport.
           The outer Header / progress bar are hidden during this step so the
@@ -2414,149 +2351,59 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
 
       {/* Error with retry */}
       {step === 'error' && error && (
-        <Box flexDirection="column" marginTop={1}>
-          <ErrorLine text={error} />
-          <Newline />
-          {recoveryAdvice && (
-            <>
-              <Text bold>Recovery plan</Text>
-              <Box flexDirection="column" marginTop={1} marginLeft={2}>
-                {recoveryAdvice.summary.map(line => (
-                  <Text key={`recovery-summary-${line}`}>{`• ${line}`}</Text>
-                ))}
-              </Box>
-              {recoveryAdvice.commands.length > 0 && (
-                <>
-                  <Newline />
-                  <Text bold>Helpful commands</Text>
-                  <Box flexDirection="column" marginTop={1} marginLeft={2}>
-                    {recoveryAdvice.commands.map(command => (
-                      <Text key={`recovery-command-${command}`} dimColor>{command}</Text>
-                    ))}
-                  </Box>
-                </>
-              )}
-              {recoveryAdvice.docs.length > 0 && (
-                <>
-                  <Newline />
-                  <Text bold>Docs</Text>
-                  <Box flexDirection="column" marginTop={1} marginLeft={2}>
-                    {recoveryAdvice.docs.map(doc => (
-                      <Text key={`recovery-doc-${doc}`} color="cyan">{doc}</Text>
-                    ))}
-                  </Box>
-                </>
-              )}
-            </>
-          )}
-          {supportBundlePath && (
-            <>
-              <Newline />
-              <Text bold>Support bundle</Text>
-              <Text dimColor>{supportBundlePath}</Text>
-            </>
-          )}
-          <Newline />
-          {retryStep && (
-            <>
-              <Text bold>What do you want to do?</Text>
-              <Newline />
-              <Select
-                options={[
-                  { label: '🔄  Try again', value: 'retry' },
-                  { label: '↩️   Restart onboarding', value: 'restart' },
-                  { label: '❌  Exit', value: 'exit' },
-                ]}
-                onChange={async (value) => {
-                  if (value === 'retry') {
-                    setError(null)
-                    errorCategoryRef.current = undefined
-                    pickerOpenedRef.current = false
-                    setStep(retryStep)
-                  }
-                  else if (value === 'restart') {
-                    // Wipe persisted progress so the next run starts truly fresh.
-                    // Without this, getResumeStep would skip the user back to
-                    // wherever they were — re-triggering the same broken state.
-                    await deleteProgress(appId).catch(() => { /* best-effort */ })
-                    // Also reset all in-memory import-flow state so a previously-
-                    // chosen identity/profile/distribution doesn't leak across.
-                    setImportMode(false)
-                    setImportMatches([])
-                    setImportProfiles([])
-                    setChosenIdentity(null)
-                    setChosenProfile(null)
-                    setImportDistribution(null)
-                    setImportedP12Password('')
-                    setPendingRecoveryAction(null)
-                    setCertData(null)
-                    setProfileData(null)
-                    setError(null)
-                    errorCategoryRef.current = undefined
-                    setRetryCount(0)
-                    pickerOpenedRef.current = false
-                    setSupportBundlePath(null)
-                    addLog('↩️  Onboarding reset — starting fresh', 'yellow')
-                    setStep('welcome')
-                  }
-                  else {
-                    setError(`Run \`${buildInitCommand}\` to resume.`)
-                    exitOnboarding()
-                  }
-                }}
-              />
-            </>
-          )}
-        </Box>
+        <ErrorStep
+          error={error}
+          recoveryAdvice={recoveryAdvice}
+          supportBundlePath={supportBundlePath}
+          showRetry={!!retryStep}
+          onChange={async (value) => {
+            if (value === 'retry') {
+              setError(null)
+              errorCategoryRef.current = undefined
+              pickerOpenedRef.current = false
+              if (retryStep)
+                setStep(retryStep)
+            }
+            else if (value === 'restart') {
+              // Wipe persisted progress so the next run starts truly fresh.
+              // Without this, getResumeStep would skip the user back to
+              // wherever they were — re-triggering the same broken state.
+              await deleteProgress(appId).catch(() => { /* best-effort */ })
+              // Also reset all in-memory import-flow state so a previously-
+              // chosen identity/profile/distribution doesn't leak across.
+              setImportMode(false)
+              setImportMatches([])
+              setImportProfiles([])
+              setChosenIdentity(null)
+              setChosenProfile(null)
+              setImportDistribution(null)
+              setImportedP12Password('')
+              setPendingRecoveryAction(null)
+              setCertData(null)
+              setProfileData(null)
+              setError(null)
+              errorCategoryRef.current = undefined
+              setRetryCount(0)
+              pickerOpenedRef.current = false
+              setSupportBundlePath(null)
+              addLog('↩️  Onboarding reset — starting fresh', 'yellow')
+              setStep('welcome')
+            }
+            else {
+              setError(`Run \`${buildInitCommand}\` to resume.`)
+              exitOnboarding()
+            }
+          }}
+        />
       )}
 
       {/* Done */}
       {step === 'build-complete' && (
-        <Box flexDirection="column" marginTop={1}>
-          <Newline />
-          <Box
-            borderStyle="round"
-            borderColor="green"
-            paddingX={3}
-            paddingY={1}
-            flexDirection="column"
-            alignItems="center"
-          >
-            <Text bold color="green">
-              🎉  You're all set!
-            </Text>
-            <Newline />
-            {buildUrl
-              ? (
-                  <>
-                    <Text>Your iOS app is building in the cloud.</Text>
-                    <Text>
-                      Track it at
-                      {' '}
-                      <Text color="cyan" underline>{buildUrl}</Text>
-                    </Text>
-                  </>
-                )
-              : (
-                  <Text>Your iOS credentials are saved and ready to use.</Text>
-                )}
-            <Newline />
-            {ciSecretUploadSummary && (
-              <>
-                <Text>{ciSecretUploadSummary}.</Text>
-                <Newline />
-              </>
-            )}
-            <Text dimColor>
-              Run
-              {' '}
-              <Text bold color="white">{buildRequestCommand}</Text>
-              {' '}
-              anytime to start a build.
-            </Text>
-          </Box>
-          <Newline />
-        </Box>
+        <BuildCompleteStep
+          buildUrl={buildUrl}
+          ciSecretUploadSummary={ciSecretUploadSummary}
+          buildRequestCommand={buildRequestCommand}
+        />
       )}
       </Box>
     </Box>
