@@ -168,8 +168,8 @@ function previewHostTargetFromUrl(value: string): PreviewHostTarget | null {
   }
 }
 
-function previewPayloadUrlFromUrl(value: string) {
-  return previewHostTargetFromUrl(value)?.payloadUrl ?? ''
+function previewStartUrlFromUrl(value: string) {
+  return previewHostTargetFromUrl(value)?.rootUrl ?? ''
 }
 
 function previewRootUrlFromChannelLink(previewLink: Extract<PreviewDeepLink, { type: 'channel' }>) {
@@ -427,10 +427,10 @@ const normalizedManualUrl = computed(() => {
 
   return /^[a-z][a-z\d+.-]*:/i.test(value) ? value : `https://${value}`
 })
-const manualPreviewPayloadUrl = computed(() => previewPayloadUrlFromUrl(normalizedManualUrl.value))
-const canSubmitManualUrl = computed(() => !isLoading.value && (!!manualPreviewLink.value || !!manualPreviewPayloadUrl.value || isHttpUrl(normalizedManualUrl.value)))
+const manualPreviewStartUrl = computed(() => previewStartUrlFromUrl(normalizedManualUrl.value))
+const canSubmitManualUrl = computed(() => !isLoading.value && (!!manualPreviewLink.value || !!manualPreviewStartUrl.value || isHttpUrl(normalizedManualUrl.value)))
 const manualActionLabel = computed(() => {
-  if (manualPreviewLink.value || manualPreviewPayloadUrl.value)
+  if (manualPreviewLink.value || manualPreviewStartUrl.value)
     return 'Start preview'
   return isNativePlatform ? 'Download update' : 'Open update URL'
 })
@@ -655,12 +655,12 @@ async function handleBarcodeScan(scannedValue: string) {
     return
   }
 
-  const previewPayloadUrl = previewPayloadUrlFromUrl(value)
-  if (previewPayloadUrl) {
-    debugLog('scan parsed as preview payload host', { previewPayloadUrl, value })
+  const previewStartUrl = previewStartUrlFromUrl(value)
+  if (previewStartUrl) {
+    debugLog('scan parsed as preview host', { previewStartUrl, value })
     scannedUrl.value = value
     manualUrl.value = value
-    await startPreviewPayload(previewPayloadUrl)
+    await startPreviewPayload(previewStartUrl)
     return
   }
 
@@ -819,11 +819,25 @@ function downloadOptionsFromPreviewPayload(payload: PreviewPayload): DownloadOpt
 }
 
 async function fetchPreviewPayloadWithHostFallback(payloadUrl: string, appId?: string) {
+  const target = previewHostTargetFromUrl(payloadUrl)
+  if (target) {
+    const parsedUrl = parseSafeUrl(payloadUrl)
+    if (parsedUrl?.pathname !== PREVIEW_PAYLOAD_PATH) {
+      debugLog('using preview host directly', {
+        appId: appId || target.appId,
+        rootUrl: target.rootUrl,
+      })
+      return buildPreviewPayloadFromHost({
+        ...target,
+        appId: appId || target.appId,
+      })
+    }
+  }
+
   try {
     return await fetchPreviewPayload(payloadUrl)
   }
   catch (error) {
-    const target = previewHostTargetFromUrl(payloadUrl)
     if (!target)
       throw error
 
@@ -881,7 +895,7 @@ async function startPreviewLink(previewLink: PreviewDeepLink) {
     const previewRootUrl = previewRootUrlFromChannelLink(previewLink)
     if (previewRootUrl) {
       debugLog('channel preview link converted to preview host', { previewRootUrl })
-      await startPreviewPayload(previewPayloadUrlFromUrl(previewRootUrl), previewLink.appId)
+      await startPreviewPayload(previewRootUrl, previewLink.appId)
       return
     }
   }
@@ -949,9 +963,9 @@ async function downloadUpdate(updateUrl: string) {
     return
   }
 
-  const previewPayloadUrl = previewPayloadUrlFromUrl(updateUrl)
-  if (previewPayloadUrl) {
-    await startPreviewPayload(previewPayloadUrl)
+  const previewStartUrl = previewStartUrlFromUrl(updateUrl)
+  if (previewStartUrl) {
+    await startPreviewPayload(previewStartUrl)
     return
   }
 
@@ -1019,8 +1033,8 @@ async function submitManualUrl() {
     return
   }
 
-  if (manualPreviewPayloadUrl.value) {
-    await startPreviewPayload(manualPreviewPayloadUrl.value)
+  if (manualPreviewStartUrl.value) {
+    await startPreviewPayload(manualPreviewStartUrl.value)
     return
   }
 

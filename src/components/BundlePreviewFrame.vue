@@ -88,15 +88,8 @@ const previewUrl = computed<string | null>(() => {
   }
 })
 
-const previewPayloadUrl = computed<string | null>(() => {
-  if (!previewUrl.value)
-    return null
-
-  return new URL('/.capgo/preview.json', previewUrl.value).toString()
-})
-
 const qrCodeUrl = computed<string | null>(() => {
-  if (!previewPayloadUrl.value)
+  if (!previewUrl.value)
     return null
 
   if (typeof props.channelId === 'number' && props.channelName) {
@@ -104,14 +97,14 @@ const qrCodeUrl = computed<string | null>(() => {
       appId: props.appId,
       channelId: props.channelId,
       channelName: props.channelName,
-      payloadUrl: previewPayloadUrl.value,
+      payloadUrl: previewUrl.value,
     })
   }
 
   return buildBundlePreviewDeepLink({
     appId: props.appId,
     versionId: props.versionId,
-    payloadUrl: previewPayloadUrl.value,
+    payloadUrl: previewUrl.value,
   })
 })
 
