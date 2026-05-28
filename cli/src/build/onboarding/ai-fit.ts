@@ -13,10 +13,16 @@
  * top of the screen).
  */
 
-// Conservative chrome reserve: outer Header + AI title + safety warning +
-// the retry/skip Select with up to 2 options + blank lines/margins.
-// Sized for the worst case so a small terminal still feels safe.
-export const AI_RESULT_CHROME_ROWS = 20
+// Rows the inline ai-analysis-result frame spends on chrome AROUND the
+// analysis text: compact Header + outer padding + "AI analysis" title + the
+// "AI can make mistakes" caution + the retry/skip Select. We route to the
+// fullscreen scroll viewer only when the analysis won't fit inline even after
+// the frame collapses to its dense (compact) form — so the inline path shows
+// the WHOLE analysis whenever the terminal has room. 20 was far too
+// conservative: it scrolled even on tall terminals where everything fit. The
+// dense + too-small safety net catches anything that still overflows once
+// rendered inline, so a tight reserve here is safe.
+export const AI_RESULT_CHROME_ROWS = 10
 
 // ESC sequence used by `renderMarkdown` and `kleur`/`chalk` to color text.
 // The escape byte (0x1B) lives in a private-use region so the regex below

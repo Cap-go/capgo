@@ -33,9 +33,13 @@ function test(name, fn) {
   }
 }
 
-test('AI_RESULT_CHROME_ROWS is conservative (≥ 15)', () => {
-  if (AI_RESULT_CHROME_ROWS < 15)
-    throw new Error(`chrome reserve too small: ${AI_RESULT_CHROME_ROWS}`)
+test('AI_RESULT_CHROME_ROWS matches the inline result-frame chrome (~10)', () => {
+  // Must cover the inline chrome (Header + padding + title + caution + Select)
+  // so we don't route inline when it would overflow, but NOT be so large that
+  // analyses scroll on terminals where they'd fit (the old value of 20 did
+  // exactly that — see git history). 6–14 is the sane band.
+  if (AI_RESULT_CHROME_ROWS < 6 || AI_RESULT_CHROME_ROWS > 14)
+    throw new Error(`chrome reserve out of range: ${AI_RESULT_CHROME_ROWS}`)
 })
 
 test('stripAnsi removes SGR escape codes', () => {
@@ -91,12 +95,20 @@ test('isAiAnalysisTooTall: many lines on a small terminal → true (overflows)',
     throw new Error('50 lines on 24-row terminal should NOT fit')
 })
 
-test('isAiAnalysisTooTall: borderline case errs on the side of scroll (conservative)', () => {
-  // 20 rows of text, 24-row terminal, 20-row chrome reserve → 4 rows budget.
-  // 20 > 4, must return true.
+test('isAiAnalysisTooTall: analysis taller than the inline budget → scroll', () => {
+  // 20 rows of text, 24-row terminal, ~10-row chrome reserve → ~14 rows budget.
+  // 20 > 14, must return true (route to the scroll viewer).
   const txt = Array.from({ length: 20 }, (_, i) => `line ${i}`).join('\n')
   if (isAiAnalysisTooTall(txt, 24, 80) !== true)
-    throw new Error('borderline should err toward true')
+    throw new Error('a 20-line analysis must not render inline on a 24-row terminal')
+})
+
+test('isAiAnalysisTooTall: analysis that fits inline is NOT scrolled', () => {
+  // 13 lines on a 26-row terminal: 13 + ~10 chrome = 23 ≤ 26 → render inline,
+  // do NOT route to the scroll viewer. (The old reserve of 20 scrolled this.)
+  const txt = Array.from({ length: 13 }, (_, i) => `line ${i}`).join('\n')
+  if (isAiAnalysisTooTall(txt, 26, 80) !== false)
+    throw new Error('a 13-line analysis on a 26-row terminal should render inline')
 })
 
 test('isAiAnalysisTooTall: very tall terminal accepts moderate analyses', () => {
