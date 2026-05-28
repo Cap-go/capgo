@@ -44,6 +44,23 @@ import { canUseFilePicker, openKeystorePicker, openServiceAccountJsonPicker } fr
 import { trackBuilderOnboardingStep } from '../../telemetry.js'
 import { AiResultBanner, BOX_HEADER_ROWS, COMPACT_HEADER_ROWS, Divider, ErrorLine, FilteredTextInput, FullscreenAiViewer, Header, SpinnerLine, SuccessLine, TerminalTooSmall, WIZARD_PADDING_ROWS } from '../../ui/components.js'
 import type { AiResultKind } from '../../ui/components.js'
+import {
+  KeystoreExistingAliasSelectStep,
+  KeystoreExistingAliasStep,
+  KeystoreExistingDetectingAliasStep,
+  KeystoreExistingKeyPasswordStep,
+  KeystoreExistingPathStep,
+  KeystoreExistingPickerStep,
+  KeystoreExistingStorePasswordStep,
+  KeystoreExplainerStep,
+  KeystoreGeneratingStep,
+  KeystoreMethodSelectStep,
+  KeystoreNewAliasStep,
+  KeystoreNewCommonNameStep,
+  KeystoreNewKeyPasswordStep,
+  KeystoreNewPasswordMethodStep,
+  KeystoreNewStorePasswordStep,
+} from '../../ui/steps/android-keystore.js'
 import { findAndroidApplicationIds } from '../gradle-parser.js'
 import { validateServiceAccountJson } from '../service-account-validation.js'
 import {
@@ -1703,336 +1720,211 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
       {/* ── Phase 1 — Keystore ── */}
 
       {step === 'keystore-method-select' && (
-        <Box flexDirection="column" marginTop={1}>
-          <Alert variant="info">
-            Android apps must be signed by a keystore. Google Play requires the same keystore for every update, forever.
-          </Alert>
-          <Newline />
-          <Text bold>Do you already have a keystore?</Text>
-          <Newline />
-          <Select
-            options={[
-              { label: '✅  Yes, I have one', value: 'existing' },
-              { label: '🆕  No, create one for me', value: 'generate' },
-              { label: 'ℹ️   What is a keystore?', value: 'learn' },
-            ]}
-            onChange={(value) => {
-              if (value === 'learn') {
-                setStep('keystore-explainer')
-              }
-              else if (value === 'existing') {
-                setKeystoreMethod('existing')
-                persistAndStep((p) => ({ ...p, keystoreMethod: 'existing' }), 'keystore-existing-path')
-              }
-              else {
-                setKeystoreMethod('generate')
-                persistAndStep((p) => ({ ...p, keystoreMethod: 'generate' }), 'keystore-new-alias')
-              }
-            }}
-          />
-        </Box>
+        <KeystoreMethodSelectStep
+          onChoose={(choice) => {
+            if (choice === 'learn') {
+              setStep('keystore-explainer')
+            }
+            else if (choice === 'existing') {
+              setKeystoreMethod('existing')
+              persistAndStep((p) => ({ ...p, keystoreMethod: 'existing' }), 'keystore-existing-path')
+            }
+            else {
+              setKeystoreMethod('generate')
+              persistAndStep((p) => ({ ...p, keystoreMethod: 'generate' }), 'keystore-new-alias')
+            }
+          }}
+        />
       )}
 
       {step === 'keystore-explainer' && (
-        <Box flexDirection="column" marginTop={1}>
-          <Alert variant="info">
-            A keystore is a file that holds a cryptographic key used to sign your Android app.
-          </Alert>
-          <Newline />
-          <Box flexDirection="column" marginLeft={2}>
-            <Text>• Google Play uses the key to verify that every update really came from you.</Text>
-            <Text>• You must use the <Text bold>same</Text> keystore for every release of this app.</Text>
-            <Text>• If you lose it, you lose the ability to publish updates.</Text>
-            <Text>• If you&apos;ve never published this app before, let us create one for you.</Text>
-          </Box>
-          <Newline />
-          <Select options={[{ label: '← Back', value: 'back' }]} onChange={() => setStep('keystore-method-select')} />
-        </Box>
+        <KeystoreExplainerStep onBack={() => setStep('keystore-method-select')} />
       )}
 
       {step === 'keystore-existing-path' && (
-        <Box flexDirection="column" marginTop={1}>
-          <Text bold>Existing keystore (.jks, .keystore, or .p12)</Text>
-          <Newline />
-          {canUseFilePicker() && keystorePathMode === 'choose'
-            ? (
-                <>
-                  <Text>How do you want to provide it?</Text>
-                  <Newline />
-                  <Select
-                    options={[
-                      { label: '📂  Open file picker', value: 'picker' },
-                      { label: '📝  Type the path', value: 'manual' },
-                    ]}
-                    onChange={(value) => {
-                      if (value === 'picker')
-                        setStep('keystore-existing-picker')
-                      else
-                        setKeystorePathMode('manual')
-                    }}
-                  />
-                </>
-              )
-            : (
-                <>
-                  <Text dimColor>Tip: drag a file into this window to paste its path.</Text>
-                  <Newline />
-                  <FilteredTextInput
-                    placeholder="/path/to/release.jks"
-                    filter=""
-                    onSubmit={(val) => {
-                      const cleaned = cleanPath(val)
-                      if (!cleaned)
-                        return
-                      const abs = resolvePath(cleaned)
-                      if (!existsSync(abs)) {
-                        setError(`File not found: ${abs}`)
-                        setRetryStep('keystore-existing-path')
-                        setStep('error')
-                        return
-                      }
-                      setKeystoreExistingPath(abs)
-                      addLog(`✔ Keystore selected · ${abs}`)
-                      persistAndStep((p) => ({ ...p, keystoreExistingPath: abs }), 'keystore-existing-store-password')
-                    }}
-                  />
-                </>
-              )}
-        </Box>
+        <KeystoreExistingPathStep
+          showChooser={canUseFilePicker() && keystorePathMode === 'choose'}
+          onChoosePicker={() => setStep('keystore-existing-picker')}
+          onChooseManual={() => setKeystorePathMode('manual')}
+          onSubmitPath={(val) => {
+            const cleaned = cleanPath(val)
+            if (!cleaned)
+              return
+            const abs = resolvePath(cleaned)
+            if (!existsSync(abs)) {
+              setError(`File not found: ${abs}`)
+              setRetryStep('keystore-existing-path')
+              setStep('error')
+              return
+            }
+            setKeystoreExistingPath(abs)
+            addLog(`✔ Keystore selected · ${abs}`)
+            persistAndStep((p) => ({ ...p, keystoreExistingPath: abs }), 'keystore-existing-store-password')
+          }}
+        />
       )}
 
-      {step === 'keystore-existing-picker' && (
-        <Box marginTop={1}><SpinnerLine text="Waiting for file selection..." /></Box>
-      )}
+      {step === 'keystore-existing-picker' && <KeystoreExistingPickerStep />}
 
       {step === 'keystore-existing-store-password' && (
-        <Box flexDirection="column" marginTop={1}>
-          <Text bold>Store password:</Text>
-          <Text dimColor>We'll use this to unlock the keystore and auto-detect the alias.</Text>
-          <Newline />
-          <FilteredTextInput
-            placeholder="(hidden)"
-            filter=""
-            mask
-            onSubmit={(val) => {
-              if (!val) {
-                setError('Store password cannot be empty')
-                setRetryStep('keystore-existing-store-password')
-                setStep('error')
-                return
-              }
-              setKeystoreStorePassword(val)
-              addLog('✔ Store password set')
-              persistAndStep((p) => ({ ...p, keystoreStorePassword: val }), 'keystore-existing-detecting-alias')
-            }}
-          />
-        </Box>
+        <KeystoreExistingStorePasswordStep
+          onSubmit={(val) => {
+            if (!val) {
+              setError('Store password cannot be empty')
+              setRetryStep('keystore-existing-store-password')
+              setStep('error')
+              return
+            }
+            setKeystoreStorePassword(val)
+            addLog('✔ Store password set')
+            persistAndStep((p) => ({ ...p, keystoreStorePassword: val }), 'keystore-existing-detecting-alias')
+          }}
+        />
       )}
 
-      {step === 'keystore-existing-detecting-alias' && (
-        <Box marginTop={1}><SpinnerLine text="Unlocking keystore and reading aliases..." /></Box>
-      )}
+      {step === 'keystore-existing-detecting-alias' && <KeystoreExistingDetectingAliasStep />}
 
       {step === 'keystore-existing-alias-select' && (
-        <Box flexDirection="column" marginTop={1}>
-          <Text bold>Multiple aliases in the keystore. Which one do you use for this app?</Text>
-          <Newline />
-          <Select
-            options={detectedAliases.map(a => ({ label: a, value: a }))}
-            onChange={(value) => {
-              setKeystoreAlias(value)
-              addLog(`✔ Alias selected · ${value}`)
-              persistAndStep((p) => ({ ...p, keystoreAlias: value }), 'keystore-existing-key-password')
-            }}
-          />
-        </Box>
+        <KeystoreExistingAliasSelectStep
+          aliases={detectedAliases}
+          onSelect={(value) => {
+            setKeystoreAlias(value)
+            addLog(`✔ Alias selected · ${value}`)
+            persistAndStep((p) => ({ ...p, keystoreAlias: value }), 'keystore-existing-key-password')
+          }}
+        />
       )}
 
       {step === 'keystore-existing-alias' && (
-        <Box flexDirection="column" marginTop={1}>
-          <Text bold>Key alias:</Text>
-          <Text dimColor>We couldn't auto-detect it — please enter it manually.</Text>
-          <Newline />
-          <FilteredTextInput
-            placeholder="release"
-            filter=""
-            onSubmit={(val) => {
-              const alias = val.trim() || RELEASE_ALIAS_DEFAULT
-              setKeystoreAlias(alias)
-              addLog(`✔ Key alias · ${alias}`)
-              persistAndStep((p) => ({ ...p, keystoreAlias: alias }), 'keystore-existing-key-password')
-            }}
-          />
-        </Box>
+        <KeystoreExistingAliasStep
+          onSubmit={(val) => {
+            const alias = val.trim() || RELEASE_ALIAS_DEFAULT
+            setKeystoreAlias(alias)
+            addLog(`✔ Key alias · ${alias}`)
+            persistAndStep((p) => ({ ...p, keystoreAlias: alias }), 'keystore-existing-key-password')
+          }}
+        />
       )}
 
-      {step === 'keystore-existing-key-password' && keyPasswordProbe !== 'prompt' && (
-        <Box marginTop={1}>
-          <SpinnerLine text="Checking if the key uses the same password as the store..." />
-        </Box>
-      )}
-
-      {step === 'keystore-existing-key-password' && keyPasswordProbe === 'prompt' && (
-        <Box flexDirection="column" marginTop={1}>
-          <Text bold>Key password (press Enter to use the same as store password):</Text>
-          <Newline />
-          <FilteredTextInput
-            placeholder="(hidden — same as store)"
-            filter=""
-            mask
-            onSubmit={(val) => {
-              const keyPw = val || keystoreStorePassword
-              setKeystoreKeyPassword(keyPw)
-              addLog('✔ Key password set')
-              ;(async () => {
-                try {
-                  const bytes = await readFile(keystoreExistingPath)
-                  const base64 = bytes.toString('base64')
-                  const ready: KeystoreReady = {
-                    keystorePath: keystoreExistingPath,
-                    alias: keystoreAlias || RELEASE_ALIAS_DEFAULT,
-                    isGenerated: false,
-                  }
-                  setKeystoreBase64(base64)
-                  setKeystoreReady(ready)
-                  await persist((p) => ({
-                    ...p,
-                    keystoreKeyPassword: keyPw,
-                    _keystoreBase64: base64,
-                    completedSteps: { ...p.completedSteps, keystoreReady: ready },
-                  }))
-                  addLog(`✔ Keystore loaded — ${keystoreExistingPath}`)
-                  // Smart-route: same pattern as the auto-probe branch above.
-                  // If the user has any OAuth-side progress (legacy resume or
-                  // mid-flow), pick up where they left off; otherwise drop
-                  // them on the new fork.
-                  const fresh = await loadAndroidProgress(appId)
-                  const hasAnyOAuthProgress = !!(
-                    fresh?.completedSteps.googleSignInComplete
-                    || fresh?.completedSteps.playAccountChosen
-                    || fresh?.completedSteps.gcpProjectChosen
-                    || fresh?.completedSteps.androidPackageChosen
-                    || fresh?._oauthRefreshToken
-                  )
-                  if (hasAnyOAuthProgress || fresh?.serviceAccountMethod !== undefined)
-                    setStep(fresh ? getAndroidResumeStep(fresh) : 'service-account-method-select')
-                  else
-                    setStep('service-account-method-select')
+      {step === 'keystore-existing-key-password' && (
+        <KeystoreExistingKeyPasswordStep
+          mode={keyPasswordProbe === 'prompt' ? 'prompt' : 'probing'}
+          onSubmit={(val) => {
+            const keyPw = val || keystoreStorePassword
+            setKeystoreKeyPassword(keyPw)
+            addLog('✔ Key password set')
+            ;(async () => {
+              try {
+                const bytes = await readFile(keystoreExistingPath)
+                const base64 = bytes.toString('base64')
+                const ready: KeystoreReady = {
+                  keystorePath: keystoreExistingPath,
+                  alias: keystoreAlias || RELEASE_ALIAS_DEFAULT,
+                  isGenerated: false,
                 }
-                catch (err) {
-                  handleError(err, 'keystore-existing-path')
-                }
-              })()
-            }}
-          />
-        </Box>
+                setKeystoreBase64(base64)
+                setKeystoreReady(ready)
+                await persist((p) => ({
+                  ...p,
+                  keystoreKeyPassword: keyPw,
+                  _keystoreBase64: base64,
+                  completedSteps: { ...p.completedSteps, keystoreReady: ready },
+                }))
+                addLog(`✔ Keystore loaded — ${keystoreExistingPath}`)
+                // Smart-route: same pattern as the auto-probe branch above.
+                // If the user has any OAuth-side progress (legacy resume or
+                // mid-flow), pick up where they left off; otherwise drop
+                // them on the new fork.
+                const fresh = await loadAndroidProgress(appId)
+                const hasAnyOAuthProgress = !!(
+                  fresh?.completedSteps.googleSignInComplete
+                  || fresh?.completedSteps.playAccountChosen
+                  || fresh?.completedSteps.gcpProjectChosen
+                  || fresh?.completedSteps.androidPackageChosen
+                  || fresh?._oauthRefreshToken
+                )
+                if (hasAnyOAuthProgress || fresh?.serviceAccountMethod !== undefined)
+                  setStep(fresh ? getAndroidResumeStep(fresh) : 'service-account-method-select')
+                else
+                  setStep('service-account-method-select')
+              }
+              catch (err) {
+                handleError(err, 'keystore-existing-path')
+              }
+            })()
+          }}
+        />
       )}
 
       {step === 'keystore-new-alias' && (
-        <Box flexDirection="column" marginTop={1}>
-          <Text bold>Key alias (press Enter for "release"):</Text>
-          <Newline />
-          <FilteredTextInput
-            placeholder="release"
-            filter=""
-            onSubmit={(val) => {
-              const alias = val.trim() || RELEASE_ALIAS_DEFAULT
-              setKeystoreAlias(alias)
-              addLog(`✔ Key alias · ${alias}`)
-              persistAndStep((p) => ({ ...p, keystoreAlias: alias }), 'keystore-new-password-method')
-            }}
-          />
-        </Box>
+        <KeystoreNewAliasStep
+          onSubmit={(val) => {
+            const alias = val.trim() || RELEASE_ALIAS_DEFAULT
+            setKeystoreAlias(alias)
+            addLog(`✔ Key alias · ${alias}`)
+            persistAndStep((p) => ({ ...p, keystoreAlias: alias }), 'keystore-new-password-method')
+          }}
+        />
       )}
 
       {step === 'keystore-new-password-method' && (
-        <Box flexDirection="column" marginTop={1}>
-          <Text bold>How would you like to set the keystore password?</Text>
-          <Newline />
-          <Select
-            options={[
-              { label: '🔐  Generate a strong random password (recommended)', value: 'random' },
-              { label: '✍️   I\'ll set my own', value: 'manual' },
-            ]}
-            onChange={(value) => {
-              if (value === 'random') {
-                const pw = generateRandomPassword()
-                setKeystoreStorePassword(pw)
-                setKeystoreKeyPassword(pw)
-                setRandomPasswordGenerated(true)
-                addLog('✔ Store + key passwords generated')
-                persistAndStep((p) => ({ ...p, keystoreStorePassword: pw, keystoreKeyPassword: pw }), 'keystore-new-cn')
-              }
-              else {
-                setStep('keystore-new-store-password')
-              }
-            }}
-          />
-        </Box>
+        <KeystoreNewPasswordMethodStep
+          onChoose={(choice) => {
+            if (choice === 'random') {
+              const pw = generateRandomPassword()
+              setKeystoreStorePassword(pw)
+              setKeystoreKeyPassword(pw)
+              setRandomPasswordGenerated(true)
+              addLog('✔ Store + key passwords generated')
+              persistAndStep((p) => ({ ...p, keystoreStorePassword: pw, keystoreKeyPassword: pw }), 'keystore-new-cn')
+            }
+            else {
+              setStep('keystore-new-store-password')
+            }
+          }}
+        />
       )}
 
       {step === 'keystore-new-store-password' && (
-        <Box flexDirection="column" marginTop={1}>
-          <Text bold>Store password:</Text>
-          <Newline />
-          <FilteredTextInput
-            placeholder="(hidden, minimum 6 characters)"
-            filter=""
-            mask
-            onSubmit={(val) => {
-              if (val.length < 6) {
-                setError('Password must be at least 6 characters')
-                setRetryStep('keystore-new-store-password')
-                setStep('error')
-                return
-              }
-              setKeystoreStorePassword(val)
-              addLog('✔ Store password set')
-              persistAndStep((p) => ({ ...p, keystoreStorePassword: val }), 'keystore-new-key-password')
-            }}
-          />
-        </Box>
+        <KeystoreNewStorePasswordStep
+          onSubmit={(val) => {
+            if (val.length < 6) {
+              setError('Password must be at least 6 characters')
+              setRetryStep('keystore-new-store-password')
+              setStep('error')
+              return
+            }
+            setKeystoreStorePassword(val)
+            addLog('✔ Store password set')
+            persistAndStep((p) => ({ ...p, keystoreStorePassword: val }), 'keystore-new-key-password')
+          }}
+        />
       )}
 
       {step === 'keystore-new-key-password' && (
-        <Box flexDirection="column" marginTop={1}>
-          <Text bold>Key password (press Enter to match store password):</Text>
-          <Newline />
-          <FilteredTextInput
-            placeholder="(hidden — same as store)"
-            filter=""
-            mask
-            onSubmit={(val) => {
-              const keyPw = val || keystoreStorePassword
-              setKeystoreKeyPassword(keyPw)
-              addLog('✔ Key password set')
-              persistAndStep((p) => ({ ...p, keystoreKeyPassword: keyPw }), 'keystore-new-cn')
-            }}
-          />
-        </Box>
+        <KeystoreNewKeyPasswordStep
+          onSubmit={(val) => {
+            const keyPw = val || keystoreStorePassword
+            setKeystoreKeyPassword(keyPw)
+            addLog('✔ Key password set')
+            persistAndStep((p) => ({ ...p, keystoreKeyPassword: keyPw }), 'keystore-new-cn')
+          }}
+        />
       )}
 
       {step === 'keystore-new-cn' && (
-        <Box flexDirection="column" marginTop={1}>
-          <Text bold>Common Name for the certificate (press Enter to use app ID):</Text>
-          <Text dimColor>Google Play doesn&apos;t display this — default is safe.</Text>
-          <Newline />
-          <FilteredTextInput
-            placeholder={appId}
-            filter=""
-            onSubmit={(val) => {
-              const cn = val.trim() || appId
-              setKeystoreCommonName(cn)
-              addLog(`✔ Common name · ${cn}`)
-              persistAndStep((p) => ({ ...p, keystoreCommonName: cn }), 'keystore-generating')
-            }}
-          />
-        </Box>
+        <KeystoreNewCommonNameStep
+          appId={appId}
+          onSubmit={(val) => {
+            const cn = val.trim() || appId
+            setKeystoreCommonName(cn)
+            addLog(`✔ Common name · ${cn}`)
+            persistAndStep((p) => ({ ...p, keystoreCommonName: cn }), 'keystore-generating')
+          }}
+        />
       )}
 
-      {step === 'keystore-generating' && (
-        <Box marginTop={1}><SpinnerLine text="Generating 2048-bit RSA keystore..." /></Box>
-      )}
+      {step === 'keystore-generating' && <KeystoreGeneratingStep />}
 
       {/* ── Phase 2 — Service account method fork ── */}
 
