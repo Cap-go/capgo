@@ -7,7 +7,7 @@ import { supabaseAdmin } from './supabase.ts'
 import { getEnv, isStripeConfigured } from './utils.ts'
 
 const ISO_COUNTRY_CODE_REGEX = /^[A-Z]{2}$/
-const TRAILING_SLASHES_REGEX = /\/+$/
+const TRAILING_SLASHES_REGEX = /\/+$/g
 
 // Checks if SUPABASE_URL points to a local instance
 function isLocalSupabase(c: Context): boolean {
@@ -747,7 +747,7 @@ export async function createCustomer(c: Context, email: string, userId: string, 
   if (!isStripeConfigured(c)) {
     cloudlog({ requestId: c.get('requestId'), message: 'createCustomer no stripe key', email, userId, name })
     // create a fake customer id like stripe one and random id
-    const randomId = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15)
+    const randomId = crypto.randomUUID().replaceAll('-', '').slice(0, 24)
     return { id: `cus_${randomId}`, email, name, metadata }
   }
   const customer = await getStripe(c).customers.create({
