@@ -19,7 +19,7 @@ import { copyFile, readFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { join, resolve as resolvePath } from 'node:path'
 import process from 'node:process'
-import { Alert, ProgressBar, Select } from '@inkjs/ui'
+import { ProgressBar, Select } from '@inkjs/ui'
 import type { DOMElement } from 'ink'
 import { Box, measureElement, Newline, Text, useApp, useInput, useStdout } from 'ink'
 // src/build/onboarding/android/ui/app.tsx
@@ -61,6 +61,23 @@ import {
   KeystoreNewPasswordMethodStep,
   KeystoreNewStorePasswordStep,
 } from '../../ui/steps/android-keystore.js'
+import {
+  AndroidPackageSelectStep,
+  GcpProjectCreateNameStep,
+  GcpProjectsLoadingStep,
+  GcpProjectsSelectStep,
+  GcpSetupRunningStep,
+  GoogleSignInLearnMoreStep,
+  GoogleSignInRunningStep,
+  GoogleSignInStep,
+  PlayDeveloperIdActionsStep,
+  PlayDeveloperIdInputStep,
+  SaJsonExistingPathStep,
+  SaJsonExistingPickerStep,
+  SaJsonValidatingStep,
+  SaJsonValidationFailedStep,
+  ServiceAccountMethodSelectStep,
+} from '../../ui/steps/android-sa-gcp.js'
 import { findAndroidApplicationIds } from '../gradle-parser.js'
 import { validateServiceAccountJson } from '../service-account-validation.js'
 import {
@@ -1929,545 +1946,362 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
       {/* ── Phase 2 — Service account method fork ── */}
 
       {step === 'service-account-method-select' && (
-        <Box flexDirection="column" marginTop={1}>
-          <Alert variant="info">
-            Capgo needs a Google Play service account JSON to upload AABs on your behalf. You can bring your own or let Capgo set one up via Google sign-in.
-          </Alert>
-          <Newline />
-          <Text bold>Do you already have a service account JSON?</Text>
-          <Newline />
-          <Select
-            options={[
-              { label: '🔐  No, set one up for me via Google', value: 'generate' },
-              { label: '✅  Yes, I have my service account JSON file', value: 'existing' },
-            ]}
-            onChange={(value) => {
-              if (selectFiredRef.current)
-                return
-              selectFiredRef.current = true
-              const method: 'existing' | 'generate' = value === 'existing' ? 'existing' : 'generate'
-              setServiceAccountMethod(method)
-              if (method === 'existing') {
-                // Import path needs the package name first so validation can
-                // probe edits.insert(packageName). The package-select step is
-                // shared with the OAuth path and routes back here based on
-                // serviceAccountMethod.
-                persistAndStep(
-                  (p) => ({ ...p, serviceAccountMethod: 'existing' }),
-                  'android-package-select',
-                )
-              }
-              else {
-                persistAndStep(
-                  (p) => ({ ...p, serviceAccountMethod: 'generate' }),
-                  'google-sign-in',
-                )
-              }
-            }}
-          />
-        </Box>
+        <ServiceAccountMethodSelectStep
+          onChoose={(method) => {
+            if (selectFiredRef.current)
+              return
+            selectFiredRef.current = true
+            setServiceAccountMethod(method)
+            if (method === 'existing') {
+              // Import path needs the package name first so validation can
+              // probe edits.insert(packageName). The package-select step is
+              // shared with the OAuth path and routes back here based on
+              // serviceAccountMethod.
+              persistAndStep(
+                (p) => ({ ...p, serviceAccountMethod: 'existing' }),
+                'android-package-select',
+              )
+            }
+            else {
+              persistAndStep(
+                (p) => ({ ...p, serviceAccountMethod: 'generate' }),
+                'google-sign-in',
+              )
+            }
+          }}
+        />
       )}
 
       {/* ── Phase 2a — Import existing service account JSON ── */}
 
       {step === 'sa-json-existing-path' && (
-        <Box flexDirection="column" marginTop={1}>
-          <Text bold>Existing service account JSON (.json)</Text>
-          <Newline />
-          {canUseFilePicker() && saJsonPathMode === 'choose'
-            ? (
-                <>
-                  <Text>How do you want to provide it?</Text>
-                  <Newline />
-                  <Select
-                    options={[
-                      { label: '📂  Open file picker', value: 'picker' },
-                      { label: '📝  Type the path', value: 'manual' },
-                    ]}
-                    onChange={(value) => {
-                      // 'manual' just flips the sub-mode (Select unmounts) and
-                      // is safe from the re-fire bug. 'picker' triggers a step
-                      // transition that takes time — guard against re-fires
-                      // before commit.
-                      if (value === 'picker') {
-                        if (selectFiredRef.current)
-                          return
-                        selectFiredRef.current = true
-                        setStep('sa-json-existing-picker')
-                      }
-                      else {
-                        setSaJsonPathMode('manual')
-                      }
-                    }}
-                  />
-                </>
-              )
-            : (
-                <>
-                  <Text dimColor>Tip: drag a file into this window to paste its path.</Text>
-                  <Newline />
-                  <FilteredTextInput
-                    placeholder="/path/to/service-account.json"
-                    filter=""
-                    onSubmit={(val) => {
-                      const cleaned = cleanPath(val)
-                      if (!cleaned)
-                        return
-                      const abs = resolvePath(cleaned)
-                      if (!existsSync(abs)) {
-                        setError(`File not found: ${abs}`)
-                        setRetryStep('sa-json-existing-path')
-                        setStep('error')
-                        return
-                      }
-                      setServiceAccountJsonPath(abs)
-                      addLog(`✔ Service account JSON · ${abs}`)
-                      persistAndStep(
-                        (p) => ({ ...p, serviceAccountJsonPath: abs }),
-                        'sa-json-validating',
-                      )
-                    }}
-                  />
-                </>
-              )}
-        </Box>
+        <SaJsonExistingPathStep
+          showChooser={canUseFilePicker() && saJsonPathMode === 'choose'}
+          onChoosePicker={() => {
+            // The picker triggers a step transition that takes time — guard
+            // against the @inkjs/ui re-fire bug before commit.
+            if (selectFiredRef.current)
+              return
+            selectFiredRef.current = true
+            setStep('sa-json-existing-picker')
+          }}
+          onChooseManual={() => {
+            // 'manual' just flips the sub-mode (Select unmounts) and is safe
+            // from the re-fire bug.
+            setSaJsonPathMode('manual')
+          }}
+          onSubmitPath={(val) => {
+            const cleaned = cleanPath(val)
+            if (!cleaned)
+              return
+            const abs = resolvePath(cleaned)
+            if (!existsSync(abs)) {
+              setError(`File not found: ${abs}`)
+              setRetryStep('sa-json-existing-path')
+              setStep('error')
+              return
+            }
+            setServiceAccountJsonPath(abs)
+            addLog(`✔ Service account JSON · ${abs}`)
+            persistAndStep(
+              (p) => ({ ...p, serviceAccountJsonPath: abs }),
+              'sa-json-validating',
+            )
+          }}
+        />
       )}
 
-      {step === 'sa-json-existing-picker' && (
-        <Box marginTop={1}><SpinnerLine text="Opening file picker..." /></Box>
-      )}
+      {step === 'sa-json-existing-picker' && <SaJsonExistingPickerStep />}
 
-      {step === 'sa-json-validating' && (
-        <Box marginTop={1}>
-          <SpinnerLine text="Validating service account against Google Play..." />
-        </Box>
-      )}
+      {step === 'sa-json-validating' && <SaJsonValidatingStep />}
 
       {step === 'sa-json-validation-failed' && saValidationResult && !saValidationResult.ok && (
-        <Box flexDirection="column" marginTop={1}>
-          <Alert variant="warning">
-            Service account validation failed.
-          </Alert>
-          <Newline />
-          <Box flexDirection="column" marginLeft={2}>
-            <Text color="red">{saValidationResult.message}</Text>
-          </Box>
-          <Newline />
-          <Text bold>What would you like to do?</Text>
-          <Newline />
-          <Select
-            options={[
-              { label: '🔄  Try a different service account file', value: 'retry' },
-              { label: '💾  Save credentials anyway (skip validation)', value: 'save-anyway' },
-              { label: '🆕  Set up a new service account via Google', value: 'oauth' },
-            ]}
-            onChange={(value) => {
-              if (selectFiredRef.current)
-                return
-              selectFiredRef.current = true
-              // Defense-in-depth: the validation failure's errorCategory has
-              // already been emitted on the `sa-json-validation-failed` step
-              // event. Clearing the ref before leaving this step ensures any
-              // subsequent error (e.g. disk failure at `saving-credentials`,
-              // a failed re-validation, or an OAuth issue downstream) gets
-              // its own freshly-mapped category instead of inheriting the
-              // stale SA validation one. `handleError` overwrites this ref
-              // before transitioning to `'error'`, so today this is
-              // belt-and-suspenders — but it makes the ref's invariant
-              // ("most recent unresolved error context") true at every
-              // sa-json-validation-failed exit point.
-              errorCategoryRef.current = undefined
-              if (value === 'retry') {
-                // Clear the saved path so the picker chooser shows fresh.
-                setServiceAccountJsonPath('')
-                setSaValidationResult(null)
-                setSaJsonPathMode('choose')
-                persistAndStep(
-                  (p) => ({ ...p, serviceAccountJsonPath: undefined }),
-                  'sa-json-existing-path',
-                )
-                return
-              }
-              if (value === 'save-anyway') {
-                ;(async () => {
-                  try {
-                    if (!serviceAccountJsonPath)
-                      throw new Error('No service account JSON path on record.')
-                    const bytes = await readFile(serviceAccountJsonPath)
-                    const base64 = bytes.toString('base64')
-                    setServiceAccountKeyBase64(base64)
-                    await persist((p) => ({
-                      ...p,
-                      _serviceAccountKeyBase64: base64,
-                      serviceAccountValidationSkipped: true,
-                    }))
-                    addLog('⚠ Saved service account without validation — builds may fail if the SA isn\'t invited to your Play Console app.', 'yellow')
-                    setStep('saving-credentials')
-                  }
-                  catch (err) {
-                    handleError(err, 'sa-json-existing-path')
-                  }
-                })()
-                return
-              }
-              // oauth — fall back to the OAuth provisioning path.
-              setServiceAccountMethod('generate')
+        <SaJsonValidationFailedStep
+          message={saValidationResult.message}
+          onChoose={(value) => {
+            if (selectFiredRef.current)
+              return
+            selectFiredRef.current = true
+            // Defense-in-depth: the validation failure's errorCategory has
+            // already been emitted on the `sa-json-validation-failed` step
+            // event. Clearing the ref before leaving this step ensures any
+            // subsequent error (e.g. disk failure at `saving-credentials`,
+            // a failed re-validation, or an OAuth issue downstream) gets
+            // its own freshly-mapped category instead of inheriting the
+            // stale SA validation one. `handleError` overwrites this ref
+            // before transitioning to `'error'`, so today this is
+            // belt-and-suspenders — but it makes the ref's invariant
+            // ("most recent unresolved error context") true at every
+            // sa-json-validation-failed exit point.
+            errorCategoryRef.current = undefined
+            if (value === 'retry') {
+              // Clear the saved path so the picker chooser shows fresh.
+              setServiceAccountJsonPath('')
               setSaValidationResult(null)
+              setSaJsonPathMode('choose')
               persistAndStep(
-                (p) => ({ ...p, serviceAccountMethod: 'generate' }),
-                'google-sign-in',
+                (p) => ({ ...p, serviceAccountJsonPath: undefined }),
+                'sa-json-existing-path',
               )
-            }}
-          />
-        </Box>
+              return
+            }
+            if (value === 'save-anyway') {
+              ;(async () => {
+                try {
+                  if (!serviceAccountJsonPath)
+                    throw new Error('No service account JSON path on record.')
+                  const bytes = await readFile(serviceAccountJsonPath)
+                  const base64 = bytes.toString('base64')
+                  setServiceAccountKeyBase64(base64)
+                  await persist((p) => ({
+                    ...p,
+                    _serviceAccountKeyBase64: base64,
+                    serviceAccountValidationSkipped: true,
+                  }))
+                  addLog('⚠ Saved service account without validation — builds may fail if the SA isn\'t invited to your Play Console app.', 'yellow')
+                  setStep('saving-credentials')
+                }
+                catch (err) {
+                  handleError(err, 'sa-json-existing-path')
+                }
+              })()
+              return
+            }
+            // oauth — fall back to the OAuth provisioning path.
+            setServiceAccountMethod('generate')
+            setSaValidationResult(null)
+            persistAndStep(
+              (p) => ({ ...p, serviceAccountMethod: 'generate' }),
+              'google-sign-in',
+            )
+          }}
+        />
       )}
 
       {/* ── Phase 2b — Google sign-in ── */}
 
       {step === 'google-sign-in' && !showOAuthLearnMore && (
-        <Box flexDirection="column" marginTop={1}>
-          <Alert variant="info">
-            Sign in with Google so Capgo can set up Play Store publishing on your account — your tokens never reach Capgo's servers.
-          </Alert>
-          <Newline />
-          <Text>We'll open Google's consent screen. The two access requests are:</Text>
-          <Box flexDirection="column" marginLeft={2} marginTop={1}>
-            <Text>• <Text bold>Google Cloud access</Text> — to create a service account in a project you pick</Text>
-            <Text>• <Text bold>Google Play Developer access</Text> — to invite that service account to your Play Console with release-only permissions</Text>
-          </Box>
-          <Newline />
-          <Select
-            options={[
-              { label: '🔐  Continue to Google sign-in', value: 'go' },
-              { label: 'ℹ️   Learn why the onboarding via Google is secure', value: 'learn' },
-              { label: '✖  Exit (I\'ll do it later)', value: 'exit' },
-            ]}
-            onChange={(value) => {
-              if (value === 'go')
-                setStep('google-sign-in-running')
-              else if (value === 'learn')
-                setShowOAuthLearnMore(true)
-              else
-                exitOnboarding('Run `capgo build init --platform android` again when ready.')
-            }}
-          />
-        </Box>
+        <GoogleSignInStep
+          onChoose={(value) => {
+            if (value === 'go')
+              setStep('google-sign-in-running')
+            else if (value === 'learn')
+              setShowOAuthLearnMore(true)
+            else
+              exitOnboarding('Run `capgo build init --platform android` again when ready.')
+          }}
+        />
       )}
 
       {step === 'google-sign-in' && showOAuthLearnMore && (
-        <Box flexDirection="column" marginTop={1}>
-          <Alert variant="info">
-            What Capgo can and can't do with the access you're about to grant.
-          </Alert>
-          <Newline />
-          <Box flexDirection="column" marginLeft={2}>
-            <Text bold>Can Capgo touch other GCP projects on my account?</Text>
-            <Text>The scope allows it, but this CLI only calls APIs against the project you'll pick on the next screen. It creates one service account named <Text color="cyan">capgo-native-build</Text> in that one project and stops.</Text>
-            <Newline />
-            <Text bold>Will Capgo upload anything to Play Store without me knowing?</Text>
-            <Text>No. The flow invites one service account into one app (the package you confirm) with release-only permissions. Future builds use that service account, not your OAuth tokens.</Text>
-            <Newline />
-            <Text bold>Can Capgo employees access my Google account?</Text>
-            <Text>No. The refresh token never leaves your machine. Capgo's servers only serve the OAuth client ID — they never see your tokens. When provisioning finishes, the CLI asks Google to revoke that token, so even your local copy stops working.</Text>
-            <Newline />
-            <Text bold>What if I change my mind later?</Text>
-            <Text>Revoke anytime at <Text color="cyan">myaccount.google.com/permissions</Text>, or just delete the service account in Google Cloud. Neither needs Capgo's involvement.</Text>
-            <Newline />
-            <Text dimColor>Capgo passed Google's OAuth verification on 2026-05-02 for these scopes. Source code: github.com/Cap-go/capgo</Text>
-          </Box>
-          <Newline />
-          <Select
-            options={[
-              { label: '← Back to sign-in', value: 'back' },
-            ]}
-            onChange={() => setShowOAuthLearnMore(false)}
-          />
-        </Box>
+        <GoogleSignInLearnMoreStep onBack={() => setShowOAuthLearnMore(false)} />
       )}
 
       {step === 'google-sign-in-running' && (
-        <Box flexDirection="column" marginTop={1}>
-          <SpinnerLine text="Waiting for Google sign-in..." />
-          {oauthStatusMessages.length > 0 && (
-            <Box flexDirection="column" marginTop={1} marginLeft={2}>
-              {oauthStatusMessages.map((msg, i) => (<Text key={i} dimColor>{msg}</Text>))}
-            </Box>
-          )}
-        </Box>
+        <GoogleSignInRunningStep statusMessages={oauthStatusMessages} />
       )}
 
       {/* ── Phase 3 — Play Developer account ID ── */}
 
       {step === 'play-developer-id-input' && playDevIdMode === 'actions' && (
-        <Box flexDirection="column" marginTop={1}>
-          <Alert variant="info">
-            We need your Google Play Console Developer account ID.
-          </Alert>
-          <Newline />
-          <Text>Every Google Play Developer account (the one you paid the $25 one-time fee for) has a unique numeric ID. We invite Capgo&apos;s service account into that specific account, which is how builds get uploaded to Play.</Text>
-          <Newline />
-          <Text>You&apos;ll find the ID in the Play Console URL after signing in:</Text>
-          <Box marginLeft={2} marginTop={1}>
-            <Text dimColor>{PLAY_DEVELOPERS_URL}</Text>
-            <Text bold color="cyan">1234567890123456789</Text>
-            <Text dimColor>/…</Text>
-          </Box>
-          <Newline />
-          <Text dimColor>The digits after <Text color="cyan">/developers/</Text> are what we need. Copy them, or copy the whole URL — we&apos;ll parse it.</Text>
-          <Newline />
-          <Select
-            options={[
-              { label: '🌐  Open Play Console in my browser', value: 'open' },
-              { label: '🎬  Watch a quick video tutorial', value: 'tutorial' },
-              { label: '📝  I have my developer ID — let me paste it', value: 'manual' },
-            ]}
-            onChange={async (value) => {
-              if (value === 'open') {
-                try {
-                  await open(PLAY_DEVELOPERS_URL)
-                  addLog('🌐 Opened Play Console in your browser', 'cyan')
-                }
-                catch {
-                  // Headless / WSL / SSH session — `open` has no display to
-                  // hand off to. Don't pretend it worked.
-                  addLog(`⚠ Couldn't auto-open the browser. Visit ${PLAY_DEVELOPERS_URL} manually.`, 'yellow')
-                }
-                setPlayDevIdMode('input')
+        <PlayDeveloperIdActionsStep
+          playDeveloperUrl={PLAY_DEVELOPERS_URL}
+          onChoose={async (value) => {
+            if (value === 'open') {
+              try {
+                await open(PLAY_DEVELOPERS_URL)
+                addLog('🌐 Opened Play Console in your browser', 'cyan')
               }
-              else if (value === 'tutorial') {
-                try {
-                  await open(PLAY_DEV_ID_TUTORIAL_URL)
-                  addLog('🎬 Opened video tutorial in your browser', 'cyan')
-                }
-                catch {
-                  addLog(`⚠ Couldn't auto-open the browser. Visit ${PLAY_DEV_ID_TUTORIAL_URL} manually.`, 'yellow')
-                }
-                // Stay on the actions screen so the user can still choose
-                // "Open Play Console" or "I have my developer ID" after
-                // watching.
+              catch {
+                // Headless / WSL / SSH session — `open` has no display to
+                // hand off to. Don't pretend it worked.
+                addLog(`⚠ Couldn't auto-open the browser. Visit ${PLAY_DEVELOPERS_URL} manually.`, 'yellow')
               }
-              else {
-                setPlayDevIdMode('input')
+              setPlayDevIdMode('input')
+            }
+            else if (value === 'tutorial') {
+              try {
+                await open(PLAY_DEV_ID_TUTORIAL_URL)
+                addLog('🎬 Opened video tutorial in your browser', 'cyan')
               }
-            }}
-          />
-        </Box>
+              catch {
+                addLog(`⚠ Couldn't auto-open the browser. Visit ${PLAY_DEV_ID_TUTORIAL_URL} manually.`, 'yellow')
+              }
+              // Stay on the actions screen so the user can still choose
+              // "Open Play Console" or "I have my developer ID" after
+              // watching.
+            }
+            else {
+              setPlayDevIdMode('input')
+            }
+          }}
+        />
       )}
 
       {step === 'play-developer-id-input' && playDevIdMode === 'input' && (
-        <Box flexDirection="column" marginTop={1}>
-          <Text bold>Paste the Play Console URL, or just the developer ID:</Text>
-          <Text dimColor>Either the whole address bar value or the 16–20 digit number works.</Text>
-          <Newline />
-          <FilteredTextInput
-            placeholder="https://play.google.com/console/u/0/developers/…"
-            filter=""
-            onSubmit={(val) => {
-              const id = extractDeveloperId(val)
-              if (!id) {
-                setError('Could not extract a developer ID. Paste the full Play Console URL or just the numeric ID.')
-                setRetryStep('play-developer-id-input')
-                setStep('error')
-                return
-              }
-              const choice: PlayDeveloperAccountChoice = { developerId: id }
-              setPlayAccountChoice(choice)
-              addLog(`✔ Play Developer account — ${id}`)
-              persistAndStep(
-                (p) => ({
-                  ...p,
-                  completedSteps: { ...p.completedSteps, playAccountChosen: choice },
-                }),
-                'gcp-projects-loading',
-              )
-            }}
-          />
-        </Box>
+        <PlayDeveloperIdInputStep
+          onSubmit={(val) => {
+            const id = extractDeveloperId(val)
+            if (!id) {
+              setError('Could not extract a developer ID. Paste the full Play Console URL or just the numeric ID.')
+              setRetryStep('play-developer-id-input')
+              setStep('error')
+              return
+            }
+            const choice: PlayDeveloperAccountChoice = { developerId: id }
+            setPlayAccountChoice(choice)
+            addLog(`✔ Play Developer account — ${id}`)
+            persistAndStep(
+              (p) => ({
+                ...p,
+                completedSteps: { ...p.completedSteps, playAccountChosen: choice },
+              }),
+              'gcp-projects-loading',
+            )
+          }}
+        />
       )}
 
       {/* ── Phase 4 — GCP project ── */}
 
-      {step === 'gcp-projects-loading' && (
-        <Box marginTop={1}><SpinnerLine text="Loading your Google Cloud projects..." /></Box>
-      )}
+      {step === 'gcp-projects-loading' && <GcpProjectsLoadingStep />}
 
       {step === 'gcp-projects-select' && (
-        <Box flexDirection="column" marginTop={1}>
-          <Text bold>Which Google Cloud project should host the service account?</Text>
-          <Text dimColor>We'll create a `capgo-native-build` service account in the chosen project.</Text>
-          <Newline />
-          <Select
-            options={[
-              { label: '🆕  Create a new project', value: '__new__' },
-              ...gcpProjects.map(p => ({
-                label: `${p.name} (${p.projectId})`,
-                value: p.projectId,
-              })),
-            ]}
-            onChange={(value) => {
-              if (value === '__new__') {
-                const defaultName = sanitizeGcpProjectDisplayName(`Capgo Native Build ${appId}`)
-                setNewProjectDisplayName(defaultName)
-                setStep('gcp-project-create-name')
-                return
-              }
-              const chosen = gcpProjects.find(p => p.projectId === value)
-              if (!chosen)
-                return
-              const choice: GcpProjectChoice = {
-                projectId: chosen.projectId,
-                projectNumber: chosen.projectNumber,
-                displayName: chosen.name,
-                createdByOnboarding: false,
-              }
-              setGcpProjectChoice(choice)
-              addLog(`✔ GCP project — ${chosen.name}`)
-              persistAndStep(
-                (p) => ({
-                  ...p,
-                  completedSteps: { ...p.completedSteps, gcpProjectChosen: choice },
-                }),
-                'android-package-select',
-              )
-            }}
-          />
-        </Box>
+        <GcpProjectsSelectStep
+          options={[
+            { label: '🆕  Create a new project', value: '__new__' },
+            ...gcpProjects.map(p => ({
+              label: `${p.name} (${p.projectId})`,
+              value: p.projectId,
+            })),
+          ]}
+          onChange={(value) => {
+            if (value === '__new__') {
+              const defaultName = sanitizeGcpProjectDisplayName(`Capgo Native Build ${appId}`)
+              setNewProjectDisplayName(defaultName)
+              setStep('gcp-project-create-name')
+              return
+            }
+            const chosen = gcpProjects.find(p => p.projectId === value)
+            if (!chosen)
+              return
+            const choice: GcpProjectChoice = {
+              projectId: chosen.projectId,
+              projectNumber: chosen.projectNumber,
+              displayName: chosen.name,
+              createdByOnboarding: false,
+            }
+            setGcpProjectChoice(choice)
+            addLog(`✔ GCP project — ${chosen.name}`)
+            persistAndStep(
+              (p) => ({
+                ...p,
+                completedSteps: { ...p.completedSteps, gcpProjectChosen: choice },
+              }),
+              'android-package-select',
+            )
+          }}
+        />
       )}
 
       {step === 'gcp-project-create-name' && (
-        <Box flexDirection="column" marginTop={1}>
-          <Text bold>Name for the new Google Cloud project:</Text>
-          <Text dimColor>≤30 chars. The project ID will be auto-generated from your app ID plus a random suffix.</Text>
-          <Newline />
-          <FilteredTextInput
-            placeholder={newProjectDisplayName || sanitizeGcpProjectDisplayName(`Capgo ${appId}`)}
-            filter=""
-            onSubmit={(val) => {
-              const displayName = sanitizeGcpProjectDisplayName(
-                val.trim() || newProjectDisplayName || `Capgo ${appId}`,
-              )
-              const projectId = generateProjectId(appId)
-              const choice: GcpProjectChoice = {
-                projectId,
-                displayName,
-                createdByOnboarding: true,
-              }
-              setGcpProjectChoice(choice)
-              setNewProjectDisplayName(displayName)
-              addLog(`✔ GCP project (new) — ${displayName} / ${projectId}`)
-              persistAndStep(
-                (p) => ({
-                  ...p,
-                  pendingNewProjectId: projectId,
-                  pendingNewProjectDisplayName: displayName,
-                  completedSteps: { ...p.completedSteps, gcpProjectChosen: choice },
-                }),
-                'android-package-select',
-              )
-            }}
-          />
-        </Box>
+        <GcpProjectCreateNameStep
+          defaultDisplayName={newProjectDisplayName || sanitizeGcpProjectDisplayName(`Capgo ${appId}`)}
+          onSubmit={(val) => {
+            const displayName = sanitizeGcpProjectDisplayName(
+              val.trim() || newProjectDisplayName || `Capgo ${appId}`,
+            )
+            const projectId = generateProjectId(appId)
+            const choice: GcpProjectChoice = {
+              projectId,
+              displayName,
+              createdByOnboarding: true,
+            }
+            setGcpProjectChoice(choice)
+            setNewProjectDisplayName(displayName)
+            addLog(`✔ GCP project (new) — ${displayName} / ${projectId}`)
+            persistAndStep(
+              (p) => ({
+                ...p,
+                pendingNewProjectId: projectId,
+                pendingNewProjectDisplayName: displayName,
+                completedSteps: { ...p.completedSteps, gcpProjectChosen: choice },
+              }),
+              'android-package-select',
+            )
+          }}
+        />
       )}
 
       {step === 'android-package-select' && (
-        <Box flexDirection="column" marginTop={1}>
-          <Alert variant="info">
-            Which Android package (applicationId) should Capgo have release access to?
-          </Alert>
-          <Newline />
-          <Text>This is the package name the Play Console uses — it must match the <Text bold>applicationId</Text> in <Text color="cyan">{androidDir}/app/build.gradle</Text>, not the Capacitor JS-level appId (those can differ when plugins like CapacitorUpdater override the base ID).</Text>
-          <Newline />
-          {detectedPackageIds.length > 0 && packageSelectMode === 'choose'
-            ? (
-                <>
-                  <Text bold>Found these in your Gradle config. Pick one, or enter a different package:</Text>
-                  <Newline />
-                  <Select
-                    options={[
-                      ...detectedPackageIds.map(id => ({
-                        label: `📦  ${id}`,
-                        value: id,
-                      })),
-                      { label: '✍️   Type a different package name', value: '__manual__' },
-                    ]}
-                    onChange={(value) => {
-                      // Mode-switch path unmounts the <Select> synchronously,
-                      // so the @inkjs/ui re-fire bug can't replay it. The
-                      // package-pick path goes through async persistAndStep,
-                      // which keeps the <Select> mounted long enough for the
-                      // bug to spam — gate it with the per-step guard.
-                      if (value === '__manual__') {
-                        setPackageSelectMode('manual')
-                        return
-                      }
-                      if (selectFiredRef.current)
-                        return
-                      selectFiredRef.current = true
-                      const choice: AndroidPackageChoice = {
-                        packageName: value,
-                        source: 'gradle',
-                      }
-                      setAndroidPackageChoice(choice)
-                      addLog(`✔ Android package — ${value}`)
-                      const nextStep: AndroidOnboardingStep
-                        = serviceAccountMethod === 'existing' ? 'sa-json-existing-path' : 'gcp-setup-running'
-                      persistAndStep(
-                        (p) => ({
-                          ...p,
-                          completedSteps: { ...p.completedSteps, androidPackageChosen: choice },
-                        }),
-                        nextStep,
-                      )
-                    }}
-                  />
-                </>
-              )
-            : (
-                <>
-                  <Text bold>Android package name:</Text>
-                  <Newline />
-                  <FilteredTextInput
-                    placeholder="com.example.app"
-                    filter=""
-                    onSubmit={(val) => {
-                      const name = val.trim()
-                      if (!/^[a-z][\w]*(?:\.[a-z][\w]*)+$/i.test(name)) {
-                        setError(`"${name}" doesn't look like a valid Android package name (e.g. com.example.app).`)
-                        setRetryStep('android-package-select')
-                        setStep('error')
-                        return
-                      }
-                      const choice: AndroidPackageChoice = {
-                        packageName: name,
-                        source: detectedPackageIds.includes(name) ? 'gradle' : 'user-input',
-                      }
-                      setAndroidPackageChoice(choice)
-                      addLog(`✔ Android package — ${name}`)
-                      const nextStep: AndroidOnboardingStep
-                        = serviceAccountMethod === 'existing' ? 'sa-json-existing-path' : 'gcp-setup-running'
-                      persistAndStep(
-                        (p) => ({
-                          ...p,
-                          completedSteps: { ...p.completedSteps, androidPackageChosen: choice },
-                        }),
-                        nextStep,
-                      )
-                    }}
-                  />
-                </>
-              )}
-        </Box>
+        <AndroidPackageSelectStep
+          showChooser={detectedPackageIds.length > 0 && packageSelectMode === 'choose'}
+          detectedCount={detectedPackageIds.length}
+          detectedOptions={[
+            ...detectedPackageIds.map(id => ({
+              label: `📦  ${id}`,
+              value: id,
+            })),
+            { label: '✍️   Type a different package name', value: '__manual__' },
+          ]}
+          onChooseDetected={(value) => {
+            // Mode-switch path unmounts the <Select> synchronously, so the
+            // @inkjs/ui re-fire bug can't replay it. The package-pick path
+            // goes through async persistAndStep, which keeps the <Select>
+            // mounted long enough for the bug to spam — gate it with the
+            // per-step guard.
+            if (value === '__manual__') {
+              setPackageSelectMode('manual')
+              return
+            }
+            if (selectFiredRef.current)
+              return
+            selectFiredRef.current = true
+            const choice: AndroidPackageChoice = {
+              packageName: value,
+              source: 'gradle',
+            }
+            setAndroidPackageChoice(choice)
+            addLog(`✔ Android package — ${value}`)
+            const nextStep: AndroidOnboardingStep
+              = serviceAccountMethod === 'existing' ? 'sa-json-existing-path' : 'gcp-setup-running'
+            persistAndStep(
+              (p) => ({
+                ...p,
+                completedSteps: { ...p.completedSteps, androidPackageChosen: choice },
+              }),
+              nextStep,
+            )
+          }}
+          onSubmitManual={(val) => {
+            const name = val.trim()
+            if (!/^[a-z][\w]*(?:\.[a-z][\w]*)+$/i.test(name)) {
+              setError(`"${name}" doesn't look like a valid Android package name (e.g. com.example.app).`)
+              setRetryStep('android-package-select')
+              setStep('error')
+              return
+            }
+            const choice: AndroidPackageChoice = {
+              packageName: name,
+              source: detectedPackageIds.includes(name) ? 'gradle' : 'user-input',
+            }
+            setAndroidPackageChoice(choice)
+            addLog(`✔ Android package — ${name}`)
+            const nextStep: AndroidOnboardingStep
+              = serviceAccountMethod === 'existing' ? 'sa-json-existing-path' : 'gcp-setup-running'
+            persistAndStep(
+              (p) => ({
+                ...p,
+                completedSteps: { ...p.completedSteps, androidPackageChosen: choice },
+              }),
+              nextStep,
+            )
+          }}
+        />
       )}
 
       {step === 'gcp-setup-running' && (
-        <Box flexDirection="column" marginTop={1}>
-          <SpinnerLine text="Provisioning Google Cloud + Play Console..." />
-          {setupStatus.length > 0 && (
-            <Box flexDirection="column" marginTop={1} marginLeft={2}>
-              {setupStatus.map((msg, i) => (<Text key={i} dimColor>{msg}</Text>))}
-            </Box>
-          )}
-        </Box>
+        <GcpSetupRunningStep statusMessages={setupStatus} />
       )}
 
       {/* ── Phase 6 ── */}
