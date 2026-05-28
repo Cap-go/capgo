@@ -547,7 +547,6 @@ export function requestInfosChannelPostgres(
   drizzleClient: ReturnType<typeof getDrizzleClient>,
   includeManifest: boolean,
   includeMetadata = false,
-  preview = false,
 ) {
   const { versionSelect, channelAlias, channelSelect, manifestSelect, versionAlias } = getSchemaUpdatesAlias(includeMetadata)
   const platformQuery = platform === 'android' ? channelAlias.android : platform === 'electron' ? channelAlias.electron : channelAlias.ios
@@ -572,11 +571,6 @@ export function requestInfosChannelPostgres(
             eq(channelAlias.app_id, app_id),
             eq(platformQuery, true),
           )
-        : preview
-          ? and(
-              eq(channelAlias.app_id, app_id),
-              eq(channelAlias.name, defaultChannel),
-            )
         : and(
             eq(channelAlias.app_id, app_id),
             eq(channelAlias.name, defaultChannel),
@@ -606,9 +600,8 @@ export function requestInfosPostgres(
   channelDeviceCount?: number | null,
   manifestBundleCount?: number | null,
   includeMetadata = false,
-  preview = false,
 ) {
-  const shouldQueryChannelOverride = !preview && (channelDeviceCount === undefined || channelDeviceCount === null ? true : channelDeviceCount > 0)
+  const shouldQueryChannelOverride = channelDeviceCount === undefined || channelDeviceCount === null ? true : channelDeviceCount > 0
   const shouldFetchManifest = manifestBundleCount === undefined || manifestBundleCount === null ? true : manifestBundleCount > 0
 
   const channelDevice = shouldQueryChannelOverride
@@ -618,7 +611,7 @@ export function requestInfosPostgres(
           cloudlog({ requestId: c.get('requestId'), message: 'Skipping channel device override query' })
           return null
         })
-  const channel = requestInfosChannelPostgres(c, platform, app_id, defaultChannel, drizzleClient, shouldFetchManifest, includeMetadata, preview)
+  const channel = requestInfosChannelPostgres(c, platform, app_id, defaultChannel, drizzleClient, shouldFetchManifest, includeMetadata)
 
   return Promise.all([channelDevice, channel])
     .then(([channelOverride, channelData]) => ({ channelData, channelOverride }))
@@ -636,7 +629,6 @@ export interface AppOwnerPostgresResult {
   manifest_bundle_count: number
   expose_metadata: boolean
   allow_device_custom_id: boolean
-  allow_preview: boolean
 }
 
 export async function getAppOwnerPostgres(
@@ -659,7 +651,6 @@ export async function getAppOwnerPostgres(
         manifest_bundle_count: schema.apps.manifest_bundle_count,
         expose_metadata: schema.apps.expose_metadata,
         allow_device_custom_id: schema.apps.allow_device_custom_id,
-        allow_preview: schema.apps.allow_preview,
         orgs: {
           created_by: orgAlias.created_by,
           id: orgAlias.id,

@@ -579,7 +579,6 @@ export interface BaseTestData {
   is_emulator: boolean
   is_prod: boolean
   defaultChannel?: string
-  preview?: boolean
 }
 
 export function makeBaseData(appId: string): BaseTestData {

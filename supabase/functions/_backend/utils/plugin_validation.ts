@@ -76,18 +76,6 @@ function validateRequiredBoolean(input: UnknownRecord, key: string, issues: Vali
   return value
 }
 
-function validateOptionalBoolean(input: UnknownRecord, key: string, issues: ValidationIssue[]): boolean | undefined {
-  const value = input[key]
-  if (value === undefined) {
-    return undefined
-  }
-  if (typeof value !== 'boolean') {
-    issues.push(fieldIssue(key, `${key} must be a boolean`))
-    return undefined
-  }
-  return value
-}
-
 function validateOptionalString(input: UnknownRecord, key: string, issues: ValidationIssue[]): string | undefined {
   const value = input[key]
   if (value === undefined) {
@@ -296,7 +284,6 @@ export const updateRequestSchema = createPluginSchema<AppInfos>((input, issues) 
   validateRequiredPluginVersion(input, issues)
   validateOptionalString(input, 'defaultChannel', issues)
   validateOptionalStringMaxLength(input, 'key_id', 20, issues)
-  validateOptionalBoolean(input, 'preview', issues)
 })
 
 export const statsRequestSchema = createPluginSchema<AppStats>((input, issues) => {

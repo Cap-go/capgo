@@ -20,7 +20,6 @@ export interface AppInfos {
   device_id: string
   defaultChannel: string
   key_id?: string
-  preview?: boolean
 }
 
 export interface AppStats extends AppInfos {
