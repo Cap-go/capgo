@@ -46,7 +46,7 @@ import {
 
   STEP_PROGRESS,
 } from '../types.js'
-import { BOX_HEADER_ROWS, COMPACT_HEADER_ROWS, Divider, FilteredTextInput, FullscreenAiViewer, Header, SpinnerLine, TerminalTooSmall, WIZARD_PADDING_ROWS } from './components.js'
+import { BOX_HEADER_ROWS, COMPACT_HEADER_ROWS, Divider, FullscreenAiViewer, Header, SpinnerLine, TerminalTooSmall, WIZARD_PADDING_ROWS } from './components.js'
 import type { AiResultKind } from './components.js'
 import {
   ApiKeyInstructionsStep,
