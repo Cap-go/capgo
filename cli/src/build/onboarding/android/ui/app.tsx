@@ -403,9 +403,25 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
   const [ciSecretError, setCiSecretError] = useState<string | null>(null)
   const [ciSecretUploadSummary, setCiSecretUploadSummary] = useState<string | null>(null)
 
+  // Terminal dimensions in state so the wizard re-renders on resize (see iOS
+  // sibling — needed for the AI fit check to re-route inline → scroll viewer
+  // when the user shrinks the terminal).
   const { stdout } = useStdout()
-  const terminalRows = stdout?.rows ?? 24
-  const terminalCols = stdout?.columns ?? 80
+  const [termSize, setTermSize] = useState<{ rows: number, cols: number }>({
+    rows: stdout?.rows ?? 24,
+    cols: stdout?.columns ?? 80,
+  })
+  useEffect(() => {
+    if (!stdout)
+      return
+    const handler = (): void => setTermSize({ rows: stdout.rows ?? 24, cols: stdout.columns ?? 80 })
+    stdout.on('resize', handler)
+    return () => {
+      stdout.off('resize', handler)
+    }
+  }, [stdout])
+  const terminalRows = termSize.rows
+  const terminalCols = termSize.cols
 
   const addLog = useCallback((text: string, color = 'green') => {
     setLogLines(prev => [...prev, { text, color }])
@@ -1529,14 +1545,6 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
       })()
     }
 
-    // See iOS sibling: route through fullscreen scroll viewer when the
-    // analysis is taller than the available viewport.
-    if (step === 'ai-analysis-result' && aiAnalysisText && !aiViewedFull) {
-      if (isAiAnalysisTooTall(aiAnalysisText, terminalRows, terminalCols)) {
-        setStep('ai-analysis-result-scroll')
-      }
-    }
-
     if (step === 'build-complete') {
       setBuildOutput([])
       // Best-effort cleanup of any leftover captured log.
@@ -1564,6 +1572,16 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
       validationCleanupRef.current = null
     }
   }, [step])
+
+  // Re-evaluate AI-analysis fit on step entry AND on terminal resize, routing
+  // inline → scroll viewer when it no longer fits. See iOS sibling for why
+  // this needs its own resize-dependent effect.
+  useEffect(() => {
+    if (step !== 'ai-analysis-result' || !aiAnalysisText || aiViewedFull)
+      return
+    if (isAiAnalysisTooTall(aiAnalysisText, terminalRows, terminalCols))
+      setStep('ai-analysis-result-scroll')
+  }, [step, aiAnalysisText, aiViewedFull, terminalRows, terminalCols])
 
   const progressPct = ANDROID_STEP_PROGRESS[step] ?? 0
   const phaseLabel = getAndroidPhaseLabel(step)

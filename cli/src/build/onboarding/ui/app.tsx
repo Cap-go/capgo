@@ -174,10 +174,27 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
   const [keyId, setKeyId] = useState(initialProgress?.completedSteps.apiKeyVerified?.keyId || initialProgress?.keyId || '')
   const [issuerId, setIssuerId] = useState(initialProgress?.completedSteps.apiKeyVerified?.issuerId || initialProgress?.issuerId || '')
 
-  // Get terminal height for build output sizing
+  // Terminal dimensions, tracked in state so the wizard RE-RENDERS on resize.
+  // This matters for the AI-analysis fit check: if the analysis fit inline
+  // when the terminal was large and the user then shrinks it, we must
+  // re-evaluate and route into the scrollable viewer — otherwise the
+  // overflowing content is clipped by the alt buffer with no way to scroll.
   const { stdout } = useStdout()
-  const terminalRows = stdout?.rows ?? 24
-  const terminalCols = stdout?.columns ?? 80
+  const [termSize, setTermSize] = useState<{ rows: number, cols: number }>({
+    rows: stdout?.rows ?? 24,
+    cols: stdout?.columns ?? 80,
+  })
+  useEffect(() => {
+    if (!stdout)
+      return
+    const handler = (): void => setTermSize({ rows: stdout.rows ?? 24, cols: stdout.columns ?? 80 })
+    stdout.on('resize', handler)
+    return () => {
+      stdout.off('resize', handler)
+    }
+  }, [stdout])
+  const terminalRows = termSize.rows
+  const terminalCols = termSize.cols
 
   // Refs to avoid stale closures in useEffect async handlers
   const p8ContentRef = useRef(p8Content)
@@ -1379,16 +1396,6 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
       })()
     }
 
-    // When entering 'ai-analysis-result' with text the user hasn't yet seen,
-    // estimate fit and route through the fullscreen scroll viewer if the
-    // analysis is taller than the available viewport. The check is
-    // deliberately conservative — see ai-fit.ts for the heuristic.
-    if (step === 'ai-analysis-result' && aiAnalysisText && !aiViewedFull) {
-      if (isAiAnalysisTooTall(aiAnalysisText, terminalRows, terminalCols)) {
-        setStep('ai-analysis-result-scroll')
-      }
-    }
-
     if (step === 'build-complete') {
       setBuildOutput([])
       // Best-effort cleanup of any leftover captured log file. Safe to call
@@ -1411,6 +1418,20 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
       cancelled = true
     }
   }, [step])
+
+  // Route the AI analysis into the scrollable fullscreen viewer when it's
+  // taller than the current viewport. This lives in its OWN effect (not the
+  // [step] effect above) and depends on the live terminal dimensions, so it
+  // re-evaluates when the user RESIZES the terminal — not just on step entry.
+  // Without the resize dependency, an analysis that fit inline on a large
+  // terminal would stay inline and overflow (un-scrollably, in the alt
+  // buffer) after the user shrinks the window.
+  useEffect(() => {
+    if (step !== 'ai-analysis-result' || !aiAnalysisText || aiViewedFull)
+      return
+    if (isAiAnalysisTooTall(aiAnalysisText, terminalRows, terminalCols))
+      setStep('ai-analysis-result-scroll')
+  }, [step, aiAnalysisText, aiViewedFull, terminalRows, terminalCols])
 
   // ── Render ──
 
