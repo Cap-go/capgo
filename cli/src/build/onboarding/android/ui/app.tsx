@@ -20,7 +20,8 @@ import { homedir } from 'node:os'
 import { join, resolve as resolvePath } from 'node:path'
 import process from 'node:process'
 import { Alert, ProgressBar, Select } from '@inkjs/ui'
-import { Box, Newline, Text, useApp, useInput, useStdout } from 'ink'
+import type { DOMElement } from 'ink'
+import { Box, measureElement, Newline, Text, useApp, useInput, useStdout } from 'ink'
 // src/build/onboarding/android/ui/app.tsx
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { createSupabaseClient, findSavedKey, findSavedKeySilent, getOrganizationId } from '../../../../utils.js'
@@ -41,7 +42,7 @@ import { createCiSecretEntries, detectCiSecretTargets, getCiSecretTargetLabel, l
 import { mapAndroidOnboardingError, mapSaValidationKindToCategory } from '../../error-categories.js'
 import { canUseFilePicker, openKeystorePicker, openServiceAccountJsonPicker } from '../../file-picker.js'
 import { trackBuilderOnboardingStep } from '../../telemetry.js'
-import { Divider, ErrorLine, FilteredTextInput, FullscreenAiViewer, Header, HEADER_BOX_MIN_ROWS, MIN_TERMINAL_ROWS, SpinnerLine, SuccessLine, TerminalTooSmall } from '../../ui/components.js'
+import { BOX_HEADER_ROWS, Divider, ErrorLine, FilteredTextInput, FullscreenAiViewer, Header, MIN_TERMINAL_ROWS, SpinnerLine, SuccessLine, TerminalTooSmall, WIZARD_PADDING_ROWS } from '../../ui/components.js'
 import { findAndroidApplicationIds } from '../gradle-parser.js'
 import { validateServiceAccountJson } from '../service-account-validation.js'
 import {
@@ -422,6 +423,19 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
   }, [stdout])
   const terminalRows = termSize.rows
   const terminalCols = termSize.cols
+
+  // Measured body height → adaptive box-vs-compact Header. See iOS sibling.
+  const bodyRef = useRef<DOMElement | null>(null)
+  const [bodyHeight, setBodyHeight] = useState<number | null>(null)
+  useEffect(() => {
+    if (!bodyRef.current)
+      return
+    const { height } = measureElement(bodyRef.current)
+    if (height > 0)
+      setBodyHeight(prev => (prev === height ? prev : height))
+  })
+  const headerCompact = bodyHeight != null
+    && (bodyHeight + BOX_HEADER_ROWS + WIZARD_PADDING_ROWS > terminalRows)
 
   const addLog = useCallback((text: string, color = 'green') => {
     setLogLines(prev => [...prev, { text, color }])
@@ -1601,7 +1615,9 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
 
   return (
     <Box flexDirection="column" padding={1}>
-      {showHeader && <Header compact={terminalRows < HEADER_BOX_MIN_ROWS} />}
+      {showHeader && <Header compact={headerCompact} />}
+      {/* Body measured via `bodyRef` to drive the Header box-vs-compact choice. */}
+      <Box flexDirection="column" ref={bodyRef}>
       {showProgress && (
         <Box flexDirection="column" marginTop={1}>
           <Text bold color="cyan">{phaseLabel}</Text>
@@ -2875,6 +2891,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
           />
         </Box>
       )}
+      </Box>
     </Box>
   )
 }

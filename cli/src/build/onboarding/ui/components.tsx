@@ -9,19 +9,25 @@ export const Divider: FC<{ width?: number }> = ({ width = 60 }) => (
   <Text dimColor>{'─'.repeat(width)}</Text>
 )
 
-// Minimum terminal height the wizard needs to render an interactive step
-// without clipping. The wizard runs in the alternative screen buffer (no
-// scrollback), and interactive steps (Select / TextInput) can't be made
-// scrollable, so below this floor we show a resize prompt instead of a
-// clipped, partly-unreachable step. The wizard is resize-reactive, so it
-// snaps back to the real content the moment the window is tall enough.
+// Absolute floor below which the wizard shows a resize prompt instead of a
+// clipped, partly-unreachable interactive step. The wizard runs in the
+// alternative screen buffer (no scrollback) and interactive steps can't be
+// made scrollable, so there's a hard minimum. This stays a fixed number (not
+// measured) on purpose: the too-small check has to run BEFORE the body
+// renders, so there's nothing to measure yet.
 export const MIN_TERMINAL_ROWS = 16
 
-// At/above this height the Header renders as the full double-bordered box
-// (~5 rows). Below it (but still ≥ MIN_TERMINAL_ROWS) the box would eat too
-// large a fraction of the viewport, so the Header collapses to a single
-// borderless line that keeps the branding without the vertical cost.
-export const HEADER_BOX_MIN_ROWS = 20
+// Rendered row cost of each Header variant, used by the wizards to decide —
+// from a live `measureElement` of the step body — whether the bordered box
+// fits or the Header must collapse to its one-line form. Rather than a
+// hardcoded height threshold, the wizard compares
+// `bodyHeight + BOX_HEADER_ROWS + WIZARD_PADDING_ROWS` against the live
+// terminal height.
+//   box = double border (2) + paddingY (2) + text (1)
+export const BOX_HEADER_ROWS = 5
+export const COMPACT_HEADER_ROWS = 1
+// The outer wizard <Box> uses padding={1} → one row top + one row bottom.
+export const WIZARD_PADDING_ROWS = 2
 
 // Shown in place of the step content when the terminal is shorter than
 // MIN_TERMINAL_ROWS. Kept to TWO rows with no padding: in the alt buffer the

@@ -11,7 +11,8 @@ import { homedir } from 'node:os'
 import { join } from 'node:path'
 import process from 'node:process'
 import { Alert, ProgressBar, Select } from '@inkjs/ui'
-import { Box, Newline, Text, useApp, useInput, useStdout } from 'ink'
+import type { DOMElement } from 'ink'
+import { Box, measureElement, Newline, Text, useApp, useInput, useStdout } from 'ink'
 import open from 'open'
 // src/build/onboarding/ui/app.tsx
 import React, { useCallback, useEffect, useRef, useState } from 'react'
@@ -45,7 +46,7 @@ import {
 
   STEP_PROGRESS,
 } from '../types.js'
-import { Divider, ErrorLine, FilteredTextInput, FullscreenAiViewer, Header, HEADER_BOX_MIN_ROWS, MIN_TERMINAL_ROWS, SpinnerLine, SuccessLine, TerminalTooSmall } from './components.js'
+import { BOX_HEADER_ROWS, Divider, ErrorLine, FilteredTextInput, FullscreenAiViewer, Header, MIN_TERMINAL_ROWS, SpinnerLine, SuccessLine, TerminalTooSmall, WIZARD_PADDING_ROWS } from './components.js'
 
 const OUTPUT_LINE_SPLIT_RE = /\r?\n/
 const CARRIAGE_RETURN_RE = /\r/g
@@ -195,6 +196,30 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
   }, [stdout])
   const terminalRows = termSize.rows
   const terminalCols = termSize.cols
+
+  // Measured height of the wizard body (everything below the Header). Used to
+  // decide — from the LIVE rendered height, not a hardcoded row threshold —
+  // whether the bordered Header box fits or must collapse to its one-line
+  // form. `measureElement` only reports after a render, so on the very first
+  // frame `bodyHeight` is null and we optimistically render the box; if it
+  // doesn't fit, the next frame corrects to compact (one-frame flash, only on
+  // small terminals).
+  const bodyRef = useRef<DOMElement | null>(null)
+  const [bodyHeight, setBodyHeight] = useState<number | null>(null)
+  useEffect(() => {
+    if (!bodyRef.current)
+      return
+    const { height } = measureElement(bodyRef.current)
+    if (height > 0)
+      setBodyHeight(prev => (prev === height ? prev : height))
+  })
+  // Collapse to the one-line header whenever the bordered box wouldn't fit
+  // alongside the measured body. When even the compact line doesn't fit, the
+  // MIN_TERMINAL_ROWS floor is the backstop — but compact is still strictly
+  // better than an overflowing box, so we always prefer it once the box is
+  // ruled out.
+  const headerCompact = bodyHeight != null
+    && (bodyHeight + BOX_HEADER_ROWS + WIZARD_PADDING_ROWS > terminalRows)
 
   // Refs to avoid stale closures in useEffect async handlers
   const p8ContentRef = useRef(p8Content)
@@ -1437,11 +1462,11 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
 
   const progress = STEP_PROGRESS[step] ?? 0
   const phaseLabel = getPhaseLabel(step)
-  // Header is rendered as a normal conditional. Visible on every interactive
-  // step including the AI sub-flow; hidden on `requesting-build` (build
-  // output needs the full viewport) and on the scrollable AI viewer (same
-  // reason). The Header itself is now a compact two-row banner so even when
-  // visible it only costs a couple of rows.
+  // Header is a normal conditional: visible on every interactive step
+  // including the AI sub-flow; hidden on `requesting-build` and the scrollable
+  // AI viewer (those want the full viewport). Whether it renders as the
+  // bordered box or the one-line form is decided by `headerCompact` above,
+  // from the measured body height vs the live terminal height.
   const isAiResultScroll = step === 'ai-analysis-result-scroll'
   const isAiStep = step === 'ai-analysis-prompt' || step === 'ai-analysis-running' || step === 'ai-analysis-result' || isAiResultScroll
   const showHeader = step !== 'requesting-build' && !isAiResultScroll
@@ -1459,7 +1484,10 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
 
   return (
     <Box flexDirection="column" padding={1}>
-      {showHeader && <Header compact={terminalRows < HEADER_BOX_MIN_ROWS} />}
+      {showHeader && <Header compact={headerCompact} />}
+      {/* Body: everything below the Header. Measured via `bodyRef` to drive
+          the box-vs-compact Header decision above. */}
+      <Box flexDirection="column" ref={bodyRef}>
         {/* Progress bar */}
       {showProgress && (
         <Box flexDirection="column" marginTop={1}>
@@ -2878,6 +2906,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
           <Newline />
         </Box>
       )}
+      </Box>
     </Box>
   )
 }
