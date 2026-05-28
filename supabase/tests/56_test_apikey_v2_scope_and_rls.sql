@@ -1,6 +1,6 @@
 BEGIN;
 
-SELECT plan(34);
+SELECT plan(39);
 
 SELECT tests.authenticate_as_service_role();
 SELECT tests.create_supabase_user('apikey_v2_scope_owner', 'apikey_v2_scope_owner@test.local');
@@ -472,6 +472,60 @@ SELECT ok(
     in pg_get_functiondef('public.app_versions_readable_app_ids()'::regprocedure)
   ) = 0,
   'app_versions readable app helper does not use per-app RBAC checks'
+);
+
+SELECT ok(
+  position(
+    'rbac_check_permission_direct'
+    in pg_get_functiondef('public.app_versions_has_app_permission(public.user_min_right,uuid,character varying,uuid,text)'::regprocedure)
+  ) = 0,
+  'app_versions targeted permission helper does not call generic per-app RBAC checks'
+);
+
+SELECT ok(
+  position(
+    'app_versions_readable_app_ids'
+    in (
+      SELECT pg_get_expr(polqual, polrelid)
+      FROM pg_policy
+      WHERE polrelid = 'public.app_versions'::regclass
+        AND polname = 'Allow for auth, api keys (read+)'
+    )
+  ) = 0,
+  'app_versions select policy does not materialize every readable app during targeted writes'
+);
+
+SELECT ok(
+  public.app_versions_has_app_permission(
+    'upload'::public.user_min_right,
+    '71000000-0000-4000-8000-000000000056'::uuid,
+    'com.test.apikeyv2scope.target',
+    NULL::uuid,
+    'apikey-v2-scope-upload-key'
+  ),
+  'targeted app_versions permission helper allows upload API key on its app'
+);
+
+SELECT ok(
+  NOT public.app_versions_has_app_permission(
+    'upload'::public.user_min_right,
+    '71000000-0000-4000-8000-000000000056'::uuid,
+    'com.test.apikeyv2scope.sibling',
+    NULL::uuid,
+    'apikey-v2-scope-upload-key'
+  ),
+  'targeted app_versions permission helper keeps upload API key app-scoped'
+);
+
+SELECT is(
+  (
+    SELECT count(*)::int
+    FROM public.app_versions
+    WHERE app_id = 'com.test.apikeyv2scope.target'
+      AND name = '1.0.0-apikey-v2-scope'
+  ),
+  1,
+  'app-scoped API key can still select its app_versions row through RLS'
 );
 
 SELECT tests.clear_authentication();
