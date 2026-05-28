@@ -827,6 +827,13 @@ CREATE INDEX idx_manifest_file_hash ON public.manifest USING btree (file_hash);
 
 
 --
+-- Name: idx_manifest_file_name; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_manifest_file_name ON public.manifest USING btree (file_name);
+
+
+--
 -- Name: idx_orgs_customer_id; Type: INDEX; Schema: public; Owner: -
 --
 
