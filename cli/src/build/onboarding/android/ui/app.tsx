@@ -1611,10 +1611,17 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
   // Floor guard — see iOS sibling. Below MIN_TERMINAL_ROWS, show a resize
   // prompt instead of a clipped interactive step. Resize-reactive.
   if (terminalRows < MIN_TERMINAL_ROWS)
-    return <TerminalTooSmall rows={terminalRows} />
+    return (
+      <Box flexDirection="column" minHeight={terminalRows}>
+        <TerminalTooSmall rows={terminalRows} />
+      </Box>
+    )
 
+  // `minHeight={terminalRows}` fills the viewport so Ink always uses its full
+  // clear-screen redraw path, which avoids stale rows lingering after the
+  // terminal shrinks. See iOS sibling for the full explanation.
   return (
-    <Box flexDirection="column" padding={1}>
+    <Box flexDirection="column" minHeight={terminalRows} padding={1}>
       {showHeader && <Header compact={headerCompact} />}
       {/* Body measured via `bodyRef` to drive the Header box-vs-compact choice. */}
       <Box flexDirection="column" ref={bodyRef}>

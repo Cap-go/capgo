@@ -1479,11 +1479,24 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
   // Floor guard: below MIN_TERMINAL_ROWS an interactive step would clip in the
   // alt buffer with no way to scroll/reach the top. Show a resize prompt
   // instead. Resize-reactive, so the real wizard returns when the window grows.
+  // The `minHeight` fills the viewport so Ink takes its full clear-screen
+  // render path (see the main return below for why).
   if (terminalRows < MIN_TERMINAL_ROWS)
-    return <TerminalTooSmall rows={terminalRows} />
+    return (
+      <Box flexDirection="column" minHeight={terminalRows}>
+        <TerminalTooSmall rows={terminalRows} />
+      </Box>
+    )
 
+  // `minHeight={terminalRows}` makes the root fill the whole viewport. Ink
+  // only does a full clear-the-screen redraw when the frame height is ≥ the
+  // terminal height; for shorter frames it uses an incremental cursor-up
+  // redraw whose line math breaks after the terminal SHRINKS, leaving stale
+  // rows from the previous (taller) frame on screen. Filling the viewport
+  // forces the full-clear path on every frame, so resizing down never leaves
+  // ghost content behind.
   return (
-    <Box flexDirection="column" padding={1}>
+    <Box flexDirection="column" minHeight={terminalRows} padding={1}>
       {showHeader && <Header compact={headerCompact} />}
       {/* Body: everything below the Header. Measured via `bodyRef` to drive
           the box-vs-compact Header decision above. */}
