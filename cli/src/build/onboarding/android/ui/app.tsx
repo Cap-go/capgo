@@ -21,7 +21,7 @@ import { join, resolve as resolvePath } from 'node:path'
 import process from 'node:process'
 import { ProgressBar, Select } from '@inkjs/ui'
 import type { DOMElement } from 'ink'
-import { Box, measureElement, Newline, Text, useApp, useInput, useStdout } from 'ink'
+import { Box, measureElement, Text, useApp, useInput, useStdout } from 'ink'
 // src/build/onboarding/android/ui/app.tsx
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { createSupabaseClient, findSavedKey, findSavedKeySilent, getOrganizationId } from '../../../../utils.js'
@@ -42,7 +42,7 @@ import { createCiSecretEntries, detectCiSecretTargets, getCiSecretTargetLabel, l
 import { mapAndroidOnboardingError, mapSaValidationKindToCategory } from '../../error-categories.js'
 import { canUseFilePicker, openKeystorePicker, openServiceAccountJsonPicker } from '../../file-picker.js'
 import { trackBuilderOnboardingStep } from '../../telemetry.js'
-import { AiResultBanner, BOX_HEADER_ROWS, COMPACT_HEADER_ROWS, Divider, ErrorLine, FilteredTextInput, FullscreenAiViewer, Header, SpinnerLine, SuccessLine, TerminalTooSmall, WIZARD_PADDING_ROWS } from '../../ui/components.js'
+import { BOX_HEADER_ROWS, COMPACT_HEADER_ROWS, Divider, FullscreenAiViewer, Header, TerminalTooSmall, WIZARD_PADDING_ROWS } from '../../ui/components.js'
 import type { AiResultKind } from '../../ui/components.js'
 import {
   KeystoreExistingAliasSelectStep,
@@ -90,6 +90,17 @@ import {
   SavingCredentialsStep,
   UploadingCiSecretsStep,
 } from '../../ui/steps/android-ci.js'
+import {
+  AiAnalysisPromptStep,
+  AiAnalysisResultStep,
+  AiAnalysisRunningStep,
+  BackingUpStep,
+  BuildCompleteStep,
+  CredentialsExistStep,
+  ErrorStep,
+  NoPlatformStep,
+  WelcomeStep,
+} from '../../ui/steps/android-shared.js'
 import { findAndroidApplicationIds } from '../gradle-parser.js'
 import { validateServiceAccountJson } from '../service-account-validation.js'
 import {
@@ -1707,44 +1718,23 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
         </Box>
       )}
 
-      {step === 'welcome' && (
-        <Box marginTop={1} justifyContent="center">
-          <SpinnerLine text="Detecting Android project..." />
-        </Box>
-      )}
+      {step === 'welcome' && <WelcomeStep />}
 
-      {step === 'no-platform' && (
-        <Box flexDirection="column" marginTop={1}>
-          <ErrorLine text={`No ${androidDir}/ directory found.`} />
-          <Newline />
-          <Text>Run <Text bold color="white">npx cap add android</Text> first, then re-run onboarding.</Text>
-        </Box>
-      )}
+      {step === 'no-platform' && <NoPlatformStep androidDir={androidDir} />}
 
       {step === 'credentials-exist' && (
-        <Box flexDirection="column" marginTop={1}>
-          <Text bold color="yellow">⚠ Android credentials already exist for {appId}</Text>
-          <Newline />
-          <Text>Onboarding will create new credentials, replacing the existing ones.</Text>
-          <Newline />
-          <Select
-            options={[
-              { label: '📦  Start fresh (backup existing credentials first)', value: 'backup' },
-              { label: '✖  Exit onboarding', value: 'exit' },
-            ]}
-            onChange={(value) => {
-              if (value === 'backup')
-                setStep('backing-up')
-              else
-                exitOnboarding('Exiting onboarding.')
-            }}
-          />
-        </Box>
+        <CredentialsExistStep
+          appId={appId}
+          onChoose={(choice) => {
+            if (choice === 'backup')
+              setStep('backing-up')
+            else
+              exitOnboarding('Exiting onboarding.')
+          }}
+        />
       )}
 
-      {step === 'backing-up' && (
-        <Box marginTop={1}><SpinnerLine text="Backing up existing credentials..." /></Box>
-      )}
+      {step === 'backing-up' && <BackingUpStep />}
 
       {/* ── Phase 1 — Keystore ── */}
 
@@ -2411,132 +2401,71 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
       )}
 
       {step === 'build-complete' && (
-        <Box flexDirection="column" marginTop={1}>
-          <SuccessLine text="Onboarding complete" />
-          {ciSecretUploadSummary && (
-            <>
-              <Newline />
-              <Text>{ciSecretUploadSummary}.</Text>
-            </>
-          )}
-          {buildUrl && (
-            <>
-              <Newline />
-              <Text>Track your build: <Text color="cyan" underline>{buildUrl}</Text></Text>
-            </>
-          )}
-        </Box>
+        <BuildCompleteStep uploadSummary={ciSecretUploadSummary} buildUrl={buildUrl} />
       )}
 
       {/* AI debug — ask the user whether to send the captured log */}
       {step === 'ai-analysis-prompt' && (
-        <Box flexDirection="column" marginTop={1}>
-          <ErrorLine text="Build failed." />
-          <Newline />
-          <Text>We can analyze the build log with Capgo AI (Kimi K2.5) and suggest a fix.</Text>
-          <Newline />
-          <Select
-            options={[
-              { label: '🤖  Debug with AI', value: 'debug' },
-              { label: '⏭   Skip', value: 'skip' },
-            ]}
-            onChange={async (value) => {
-              if (value === 'debug') {
-                setStep('ai-analysis-running')
+        <AiAnalysisPromptStep
+          onChoose={async (choice) => {
+            if (choice === 'debug') {
+              setStep('ai-analysis-running')
+            }
+            else {
+              if (aiJobId) {
+                await trackAiAnalysisChoice({
+                  apikey: resolvedApiKeyRef.current ?? apikey ?? '',
+                  orgId: resolvedOrgId ?? '',
+                  appId,
+                  platform: 'android',
+                  jobId: aiJobId,
+                  choice: 'skip',
+                  triggeredBy: 'onboarding',
+                }).catch(() => { /* telemetry never breaks the wizard */ })
               }
-              else {
-                if (aiJobId) {
-                  await trackAiAnalysisChoice({
-                    apikey: resolvedApiKeyRef.current ?? apikey ?? '',
-                    orgId: resolvedOrgId ?? '',
-                    appId,
-                    platform: 'android',
-                    jobId: aiJobId,
-                    choice: 'skip',
-                    triggeredBy: 'onboarding',
-                  }).catch(() => { /* telemetry never breaks the wizard */ })
-                }
-                setStep('build-complete')
-              }
-            }}
-          />
-        </Box>
+              setStep('build-complete')
+            }
+          }}
+        />
       )}
 
       {/* AI debug — spinner while the edge function is running */}
-      {step === 'ai-analysis-running' && (
-        <Box flexDirection="column" marginTop={1}>
-          <SpinnerLine text="Analyzing build log with Capgo AI (Kimi K2.5)..." />
-        </Box>
-      )}
+      {step === 'ai-analysis-running' && <AiAnalysisRunningStep />}
 
       {/* AI debug — render the diagnosis (or fallback message), then offer
           retry-or-skip. Retry transitions back to 'requesting-build' so the
           user can rebuild after applying the AI's fix in another terminal,
           without re-running the credential wizard. Capped at MAX_AI_RETRIES. */}
-      {step === 'ai-analysis-result' && (() => {
-        const retriesLeft = MAX_AI_RETRIES - aiRetryCount
-        const canRetry = retriesLeft > 0
-        const retryLabel = retriesLeft === 1
-          ? '🔄  I fixed it, retry build (last retry)'
-          : `🔄  I fixed it, retry build (${retriesLeft} retries left)`
-        return (
-          <Box flexDirection="column" marginTop={1}>
-            <Text bold color="cyan">AI analysis</Text>
-            <Newline />
-            {aiAnalysisText && !aiViewedFull && <Text>{aiAnalysisText}</Text>}
-            {aiAnalysisText && aiViewedFull && (
-              <Text dimColor>
-                📖  Analysis already shown above (scroll your terminal back to re-read it).
-              </Text>
-            )}
-            {aiResult && <AiResultBanner kind={aiResult.kind} message={aiResult.message} />}
-            <Newline />
-            <Text color="yellow">⚠ AI can make mistakes. Always verify the diagnosis against the full log before applying the suggested fix.</Text>
-            <Newline />
-            {!canRetry && (
-              <>
-                <Text dimColor>You've used all {MAX_AI_RETRIES} retries. Exit and re-run the wizard if you need another attempt.</Text>
-                <Newline />
-              </>
-            )}
-            <Select
-              options={canRetry
-                ? [
-                    { label: retryLabel, value: 'retry' },
-                    { label: '⏭   Continue (skip retry)', value: 'skip' },
-                  ]
-                : [
-                    { label: '✔  Continue', value: 'continue' },
-                  ]}
-              onChange={async (value) => {
-                if (value === 'retry') {
-                  if (aiJobId) {
-                    await trackAiAnalysisChoice({
-                      apikey: resolvedApiKeyRef.current ?? apikey ?? '',
-                      orgId: resolvedOrgId ?? '',
-                      appId,
-                      platform: 'android',
-                      jobId: aiJobId,
-                      choice: 'retry',
-                      triggeredBy: 'onboarding',
-                    }).catch(() => { /* telemetry never breaks the wizard */ })
-                    void releaseCapturedLogs(aiJobId).catch(() => { /* best-effort */ })
-                  }
-                  setAiJobId(null)
-                  setAiAnalysisText(null)
-                  setAiResult(null)
-                  setAiViewedFull(false)
-                  setAiRetryCount(prev => prev + 1)
-                  setStep('requesting-build')
-                  return
-                }
-                setStep('build-complete')
-              }}
-            />
-          </Box>
-        )
-      })()}
+      {step === 'ai-analysis-result' && (
+        <AiAnalysisResultStep
+          analysisText={aiAnalysisText}
+          viewedFull={aiViewedFull}
+          result={aiResult}
+          retryCount={aiRetryCount}
+          maxRetries={MAX_AI_RETRIES}
+          onRetry={async () => {
+            if (aiJobId) {
+              await trackAiAnalysisChoice({
+                apikey: resolvedApiKeyRef.current ?? apikey ?? '',
+                orgId: resolvedOrgId ?? '',
+                appId,
+                platform: 'android',
+                jobId: aiJobId,
+                choice: 'retry',
+                triggeredBy: 'onboarding',
+              }).catch(() => { /* telemetry never breaks the wizard */ })
+              void releaseCapturedLogs(aiJobId).catch(() => { /* best-effort */ })
+            }
+            setAiJobId(null)
+            setAiAnalysisText(null)
+            setAiResult(null)
+            setAiViewedFull(false)
+            setAiRetryCount(prev => prev + 1)
+            setStep('requesting-build')
+          }}
+          onSkipOrContinue={() => setStep('build-complete')}
+        />
+      )}
 
       {/* AI debug — scrollable viewer (see iOS sibling). */}
       {step === 'ai-analysis-result-scroll' && aiAnalysisText && (
@@ -2553,28 +2482,21 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
       )}
 
       {step === 'error' && error && retryStep && (
-        <Box flexDirection="column" marginTop={1}>
-          <ErrorLine text={error} />
-          <Newline />
-          <Select
-            options={[
-              { label: '↻  Retry', value: 'retry' },
-              { label: '✖  Exit', value: 'exit' },
-            ]}
-            onChange={(value) => {
-              if (value === 'retry') {
-                setError(null)
-                errorCategoryRef.current = undefined
-                const target = retryStep
-                setRetryStep(null)
-                setStep(target)
-              }
-              else {
-                exitOnboarding('Run `capgo build init --platform android` to resume.')
-              }
-            }}
-          />
-        </Box>
+        <ErrorStep
+          message={error}
+          onChoose={(choice) => {
+            if (choice === 'retry') {
+              setError(null)
+              errorCategoryRef.current = undefined
+              const target = retryStep
+              setRetryStep(null)
+              setStep(target)
+            }
+            else {
+              exitOnboarding('Run `capgo build init --platform android` to resume.')
+            }
+          }}
+        />
       )}
       </Box>
     </Box>
