@@ -66,6 +66,34 @@ export const ErrorLine: FC<{ text: string }> = ({ text }) => (
   </Box>
 )
 
+// Non-success outcomes of a Capgo AI analysis request. `error` is a genuine
+// failure (network/backend); `already_analyzed` and `too_big` are blocking
+// "can't proceed" states the backend reports deliberately.
+export type AiResultKind = 'already_analyzed' | 'too_big' | 'error'
+
+// Renders a non-success AI-analysis outcome as a bordered, coloured banner so
+// the user reads it as a distinct blocking state instead of mistaking it for
+// part of the neutral analysis text. Previously these messages rendered as a
+// plain <Text> line and blended in — users couldn't tell the request had been
+// rejected. `error` is shown red (✖); `already_analyzed` / `too_big` are
+// shown yellow (⚠) since they're expected, non-crash outcomes.
+export const AiResultBanner: FC<{ kind: AiResultKind, message: string }> = ({ kind, message }) => {
+  const isError = kind === 'error'
+  const color = isError ? 'red' : 'yellow'
+  const icon = isError ? '✖' : '⚠'
+  const label = kind === 'error'
+    ? 'Analysis failed'
+    : kind === 'too_big'
+      ? 'Build log too large'
+      : 'Already analyzed'
+  return (
+    <Box flexDirection="column" borderStyle="round" borderColor={color} paddingX={1}>
+      <Text color={color} bold>{`${icon}  ${label}`}</Text>
+      <Text color={color}>{message}</Text>
+    </Box>
+  )
+}
+
 /**
  * Custom TextInput that filters out specific characters (e.g. '=').
  * @inkjs/ui's TextInput is uncontrolled and can't filter keystrokes,

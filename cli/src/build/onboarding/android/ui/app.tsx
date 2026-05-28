@@ -42,7 +42,8 @@ import { createCiSecretEntries, detectCiSecretTargets, getCiSecretTargetLabel, l
 import { mapAndroidOnboardingError, mapSaValidationKindToCategory } from '../../error-categories.js'
 import { canUseFilePicker, openKeystorePicker, openServiceAccountJsonPicker } from '../../file-picker.js'
 import { trackBuilderOnboardingStep } from '../../telemetry.js'
-import { BOX_HEADER_ROWS, COMPACT_HEADER_ROWS, Divider, ErrorLine, FilteredTextInput, FullscreenAiViewer, Header, SpinnerLine, SuccessLine, TerminalTooSmall, WIZARD_PADDING_ROWS } from '../../ui/components.js'
+import { AiResultBanner, BOX_HEADER_ROWS, COMPACT_HEADER_ROWS, Divider, ErrorLine, FilteredTextInput, FullscreenAiViewer, Header, SpinnerLine, SuccessLine, TerminalTooSmall, WIZARD_PADDING_ROWS } from '../../ui/components.js'
+import type { AiResultKind } from '../../ui/components.js'
 import { findAndroidApplicationIds } from '../gradle-parser.js'
 import { validateServiceAccountJson } from '../service-account-validation.js'
 import {
@@ -392,7 +393,9 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
   // requestBuildInternal returns aiAnalysis.ready=true on a failed build.
   const [aiJobId, setAiJobId] = useState<string | null>(null)
   const [aiAnalysisText, setAiAnalysisText] = useState<string | null>(null)
-  const [aiResultMessage, setAiResultMessage] = useState<string | null>(null)
+  // See iOS sibling — non-success outcome banner, mutually exclusive with
+  // `aiAnalysisText`. One object so kind + message can't drift.
+  const [aiResult, setAiResult] = useState<{ kind: AiResultKind, message: string } | null>(null)
   const [aiRetryCount, setAiRetryCount] = useState(0)
   // See iOS sibling for full notes on aiViewedFull.
   const [aiViewedFull, setAiViewedFull] = useState(false)
@@ -1546,15 +1549,15 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
 
         if (result.kind === 'ok') {
           setAiAnalysisText(renderMarkdown(result.analysis, true))
-          setAiResultMessage(null)
+          setAiResult(null)
         }
         else if (result.kind === 'already_analyzed') {
           setAiAnalysisText(null)
-          setAiResultMessage('AI analysis was already requested for this build (only one per job).')
+          setAiResult({ kind: 'already_analyzed', message: 'AI analysis was already requested for this build (only one per job).' })
         }
         else if (result.kind === 'too_big') {
           setAiAnalysisText(null)
-          setAiResultMessage('Build log is too large for Capgo AI (>10 MB). Try a local AI tool with the captured log.')
+          setAiResult({ kind: 'too_big', message: 'Build log is too large for Capgo AI (>10 MB). Try a local AI tool with the captured log.' })
         }
         else {
           setAiAnalysisText(null)
@@ -1562,7 +1565,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
             result.status ? `(status ${result.status})` : null,
             result.message,
           ].filter(Boolean).join(' ')
-          setAiResultMessage(`AI analysis failed${detail ? `: ${detail}` : ''}.`)
+          setAiResult({ kind: 'error', message: `AI analysis failed${detail ? `: ${detail}` : ''}.` })
         }
         setStep('ai-analysis-result')
       })()
@@ -2822,7 +2825,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
                 📖  Analysis already shown above (scroll your terminal back to re-read it).
               </Text>
             )}
-            {aiResultMessage && <Text>{aiResultMessage}</Text>}
+            {aiResult && <AiResultBanner kind={aiResult.kind} message={aiResult.message} />}
             <Newline />
             <Text color="yellow">⚠ AI can make mistakes. Always verify the diagnosis against the full log before applying the suggested fix.</Text>
             <Newline />
@@ -2857,7 +2860,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
                   }
                   setAiJobId(null)
                   setAiAnalysisText(null)
-                  setAiResultMessage(null)
+                  setAiResult(null)
                   setAiViewedFull(false)
                   setAiRetryCount(prev => prev + 1)
                   setStep('requesting-build')

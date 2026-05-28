@@ -46,7 +46,8 @@ import {
 
   STEP_PROGRESS,
 } from '../types.js'
-import { BOX_HEADER_ROWS, COMPACT_HEADER_ROWS, Divider, ErrorLine, FilteredTextInput, FullscreenAiViewer, Header, SpinnerLine, SuccessLine, TerminalTooSmall, WIZARD_PADDING_ROWS } from './components.js'
+import { AiResultBanner, BOX_HEADER_ROWS, COMPACT_HEADER_ROWS, Divider, ErrorLine, FilteredTextInput, FullscreenAiViewer, Header, SpinnerLine, SuccessLine, TerminalTooSmall, WIZARD_PADDING_ROWS } from './components.js'
+import type { AiResultKind } from './components.js'
 
 const OUTPUT_LINE_SPLIT_RE = /\r?\n/
 const CARRIAGE_RETURN_RE = /\r/g
@@ -340,7 +341,12 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
   // from immediately re-routing back into the scroll step on every render.
   const [aiJobId, setAiJobId] = useState<string | null>(null)
   const [aiAnalysisText, setAiAnalysisText] = useState<string | null>(null)
-  const [aiResultMessage, setAiResultMessage] = useState<string | null>(null)
+  // Non-success outcome (already_analyzed / too_big / error) rendered as a
+  // prominent coloured banner. Mutually exclusive with `aiAnalysisText` — a
+  // successful analysis sets the text and clears this; every other outcome
+  // clears the text and sets this. Kept as one object so kind + message can
+  // never drift out of sync.
+  const [aiResult, setAiResult] = useState<{ kind: AiResultKind, message: string } | null>(null)
   const [aiRetryCount, setAiRetryCount] = useState(0)
   const [aiViewedFull, setAiViewedFull] = useState(false)
   const [ciSecretEntries, setCiSecretEntries] = useState<CiSecretEntry[]>([])
@@ -1414,15 +1420,15 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
           // Render markdown to ANSI escapes; Ink <Text> passes them through.
           // Fall back to raw text if a future Ink version stops doing so.
           setAiAnalysisText(renderMarkdown(result.analysis, true))
-          setAiResultMessage(null)
+          setAiResult(null)
         }
         else if (result.kind === 'already_analyzed') {
           setAiAnalysisText(null)
-          setAiResultMessage('AI analysis was already requested for this build (only one per job).')
+          setAiResult({ kind: 'already_analyzed', message: 'AI analysis was already requested for this build (only one per job).' })
         }
         else if (result.kind === 'too_big') {
           setAiAnalysisText(null)
-          setAiResultMessage('Build log is too large for Capgo AI (>10 MB). Try a local AI tool with the captured log.')
+          setAiResult({ kind: 'too_big', message: 'Build log is too large for Capgo AI (>10 MB). Try a local AI tool with the captured log.' })
         }
         else {
           setAiAnalysisText(null)
@@ -1430,7 +1436,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
             result.status ? `(status ${result.status})` : null,
             result.message,
           ].filter(Boolean).join(' ')
-          setAiResultMessage(`AI analysis failed${detail ? `: ${detail}` : ''}.`)
+          setAiResult({ kind: 'error', message: `AI analysis failed${detail ? `: ${detail}` : ''}.` })
         }
         setStep('ai-analysis-result')
       })()
@@ -2702,8 +2708,8 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
         // When the analysis was routed through the scroll viewer the user has
         // already read it — repeating the body here would just push the picker
         // off-screen on small terminals. Show a compact "Analysis reviewed"
-        // marker instead. `aiResultMessage` (used for too_big / error / etc.)
-        // is always short so it can render inline regardless.
+        // marker instead. `aiResult` (the too_big / error / already_analyzed
+        // outcome) is always short so its banner can render inline regardless.
         return (
           <Box flexDirection="column" marginTop={1}>
             <Text bold color="cyan">AI analysis</Text>
@@ -2714,7 +2720,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
                 📖  Analysis already shown above (scroll your terminal back to re-read it).
               </Text>
             )}
-            {aiResultMessage && <Text>{aiResultMessage}</Text>}
+            {aiResult && <AiResultBanner kind={aiResult.kind} message={aiResult.message} />}
             <Newline />
             <Text color="yellow">⚠ AI can make mistakes. Always verify the diagnosis against the full log before applying the suggested fix.</Text>
             <Newline />
@@ -2757,7 +2763,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
                   // against the new analysis text.
                   setAiJobId(null)
                   setAiAnalysisText(null)
-                  setAiResultMessage(null)
+                  setAiResult(null)
                   setAiViewedFull(false)
                   setAiRetryCount(prev => prev + 1)
                   setStep('requesting-build')
