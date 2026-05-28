@@ -268,14 +268,17 @@ function isTextPreviewAsset(fileName: string, contentType: string) {
 
 function normalizePreviewAssetUrl(rawValue: string, baseUrl: string, rootUrl: string) {
   const value = rawValue.trim()
-  if (!value || value.startsWith('#') || value.startsWith('data:') || value.startsWith('blob:') || value.startsWith('javascript:') || value.startsWith('mailto:') || value.startsWith('tel:'))
+  if (!value || value.startsWith('#'))
     return ''
 
   try {
+    const base = new URL(baseUrl)
     const url = value.startsWith('//')
-      ? new URL(`${new URL(baseUrl).protocol}${value}`)
+      ? new URL(`${base.protocol}${value}`)
       : new URL(value, baseUrl)
     const root = new URL(rootUrl)
+    if (url.protocol !== 'https:' && url.protocol !== 'http:')
+      return ''
     if (url.origin !== root.origin)
       return ''
     if (url.pathname === PREVIEW_PAYLOAD_PATH)
