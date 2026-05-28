@@ -105,14 +105,19 @@ export function totalRenderedRows(lines: string[], terminalCols: number): number
 }
 
 /**
- * Pick the slice of `lines` starting at `scrollOffset` that fits within
- * `viewportRows` *rendered* rows on a terminal `terminalCols` wide. Returns
- * fewer lines than would otherwise be sliced when individual lines wrap.
+ * Pick the slice of `lines` starting at `scrollOffset` that PACKS the
+ * `viewportRows` rendered rows of a terminal `terminalCols` wide.
+ *
+ * Packs lines until the cumulative wrapped row count reaches or exceeds
+ * `viewportRows`, INCLUDING the line that crosses the boundary. That last line
+ * may render past the viewport; the viewer clips it with `overflow: hidden` so
+ * the visible area is always FULL of text when more lines remain. (Stopping
+ * before the boundary line — the old behaviour — left the unused rows as an
+ * empty gap when a long line couldn't fully fit.)
  *
  * Always returns at least one line if the input is non-empty and the
  * `scrollOffset` is in-range — even if that line wraps to more rows than the
- * viewport. The user can still scroll past it; without this floor the viewer
- * would render an empty body on hostile inputs.
+ * viewport.
  */
 export function pickVisibleLines(
   lines: string[],
@@ -125,11 +130,8 @@ export function pickVisibleLines(
   const result: string[] = []
   let rowsUsed = 0
   for (let i = scrollOffset; i < lines.length; i++) {
-    const rows = renderedRowsForLine(lines[i], terminalCols)
-    if (result.length > 0 && rowsUsed + rows > viewportRows)
-      break
     result.push(lines[i])
-    rowsUsed += rows
+    rowsUsed += renderedRowsForLine(lines[i], terminalCols)
     if (rowsUsed >= viewportRows)
       break
   }

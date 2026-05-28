@@ -319,10 +319,17 @@ export const FullscreenAiViewer: FC<{
       <Text bold color="cyan">{title}</Text>
       {subtitle && hasMoreToScroll && <Text dimColor>{subtitle}</Text>}
       <Text color="cyan">{'─'.repeat(dividerWidth)}</Text>
-      {visibleLines.map((line, index) => (
-        <Text key={`ai-line-${scrollOffset + index}`}>{line}</Text>
-      ))}
-      <Box flexGrow={1} />
+      {/* Fixed-height, clipped content area. `pickVisibleLines` packs it full
+          (including a line that crosses the bottom), so when more lines remain
+          the viewport is full of text — no empty gap — and the overflowing
+          last line is clipped here rather than pushing the footer off-screen.
+          A fixed `height` (not flexGrow, which has no max and so won't clip)
+          is what makes overflow:hidden actually trim the excess. */}
+      <Box flexDirection="column" height={viewportRows} overflow="hidden">
+        {visibleLines.map((line, index) => (
+          <Text key={`ai-line-${scrollOffset + index}`}>{line}</Text>
+        ))}
+      </Box>
       <Text color="cyan">{'─'.repeat(dividerWidth)}</Text>
       <Text dimColor>
         {hasMoreToScroll

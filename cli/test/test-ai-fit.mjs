@@ -157,6 +157,17 @@ test('pickVisibleLines: stops early when wrapped lines would overflow', () => {
     throw new Error(`expected 2 lines, got ${out.length}`)
 })
 
+test('pickVisibleLines: PACKS the viewport, including the line that crosses the bottom', () => {
+  // a(1) + b(1) leaves 1 row of slack in a 3-row viewport; the next line wraps
+  // to 4 rows. The OLD logic stopped at [a,b] and left a 1-row gap; now we
+  // include the long line (the viewer clips it via overflow:hidden) so the
+  // viewport is packed full of text. Regression guard for the empty-gap bug.
+  const lines = ['a', 'b', 'x'.repeat(80)] // x*80 = 4 rows at 20 cols
+  const out = pickVisibleLines(lines, 0, 3, 20)
+  if (out.length !== 3)
+    throw new Error(`expected the overflowing line to be included (3), got ${out.length}`)
+})
+
 test('pickVisibleLines: floor at one line even if it overflows by itself', () => {
   // 200-char line wraps to 10 rows on 20-col terminal, viewport is 5 rows.
   // We still include the line so the viewer isn't blank.
