@@ -1,9 +1,9 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import {
-  BASE_URL,
   executeSQL,
   fetchWithRetry,
+  getEndpointUrl,
   PRODUCT_ID,
   resetAndSeedAppData,
   resetAppData,
@@ -40,7 +40,7 @@ describe('credit-only billing', () => {
     await executeSQL('DELETE FROM public.stripe_info WHERE customer_id = $1', [stripeCustomerId])
   })
 
-  it('consumes credits for a former subscriber even when usage is under the old plan limit', async () => {
+  it.concurrent('consumes credits for a former subscriber even when usage is under the old plan limit', async () => {
     await executeSQL('DELETE FROM public.usage_credit_consumptions WHERE org_id = $1', [orgId])
     await executeSQL('DELETE FROM public.usage_overage_events WHERE org_id = $1', [orgId])
     await executeSQL('DELETE FROM public.usage_credit_transactions WHERE org_id = $1', [orgId])
@@ -82,7 +82,7 @@ describe('credit-only billing', () => {
       VALUES ($1, 100, 0, NOW() + interval '30 days', 'manual', 'former subscriber credit mode regression')
     `, [orgId])
 
-    const response = await fetchWithRetry(`${BASE_URL}/triggers/cron_stat_org`, {
+    const response = await fetchWithRetry(getEndpointUrl('/triggers/cron_stat_org'), {
       method: 'POST',
       headers,
       body: JSON.stringify({ orgId, customerId: stripeCustomerId }),
