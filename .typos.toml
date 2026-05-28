@@ -33,7 +33,8 @@ extend-exclude = [
   "supabase/.branches/",
   "supabase/.temp/",
   "supabase/schemas/prod.sql",
-  # Existing committed migration filename cannot be renamed without breaking migration guards.
+  # Keep this committed migration filename stable even though it contains
+  # "indexs"; the migration timestamp is already part of history.
   "supabase/migrations/20260528113224_missing_indexs.sql",
 
   # Assets and data files
