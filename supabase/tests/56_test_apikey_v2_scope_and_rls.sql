@@ -1,6 +1,6 @@
 BEGIN;
 
-SELECT plan(30);
+SELECT plan(34);
 
 SELECT tests.authenticate_as_service_role();
 SELECT tests.create_supabase_user('apikey_v2_scope_owner', 'apikey_v2_scope_owner@test.local');
@@ -435,6 +435,47 @@ SELECT ok(
   ),
   'all-mode app-limited legacy key does not become an org admin'
 );
+
+SELECT tests.clear_authentication();
+SELECT set_config('request.headers', '{"capgkey":"apikey-v2-scope-app-key"}', true);
+
+SELECT is(
+  ARRAY(SELECT unnest(public.app_versions_readable_app_ids()) ORDER BY 1),
+  ARRAY['com.test.apikeyv2scope.target']::character varying[],
+  'app_versions readable app helper only returns app-scoped API key apps'
+);
+
+SELECT tests.clear_authentication();
+SELECT set_config('request.headers', '{"capgkey":"apikey-v2-scope-org-key"}', true);
+
+SELECT is(
+  ARRAY(SELECT unnest(public.app_versions_readable_app_ids()) ORDER BY 1),
+  ARRAY[
+    'com.test.apikeyv2scope.sibling',
+    'com.test.apikeyv2scope.target'
+  ]::character varying[],
+  'app_versions readable app helper expands org-scoped API key bindings set-wise'
+);
+
+SELECT tests.clear_authentication();
+SELECT set_config('request.headers', '{"capgkey":"apikey-v2-scope-all-app-key"}', true);
+
+SELECT is(
+  ARRAY(SELECT unnest(public.app_versions_readable_app_ids()) ORDER BY 1),
+  ARRAY['com.test.apikeyv2scope.target']::character varying[],
+  'app_versions readable app helper keeps app-admin API keys app-scoped'
+);
+
+SELECT ok(
+  position(
+    'rbac_check_permission_direct'
+    in pg_get_functiondef('public.app_versions_readable_app_ids()'::regprocedure)
+  ) = 0,
+  'app_versions readable app helper does not use per-app RBAC checks'
+);
+
+SELECT tests.clear_authentication();
+SELECT set_config('request.headers', '{}', true);
 
 SELECT ok(
   public.check_min_rights(
