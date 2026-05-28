@@ -42,8 +42,9 @@ import { createCiSecretEntries, detectCiSecretTargets, getCiSecretTargetLabel, l
 import { mapAndroidOnboardingError, mapSaValidationKindToCategory } from '../../error-categories.js'
 import { canUseFilePicker, openKeystorePicker, openServiceAccountJsonPicker } from '../../file-picker.js'
 import { trackBuilderOnboardingStep } from '../../telemetry.js'
-import { BOX_HEADER_ROWS, COMPACT_HEADER_ROWS, Divider, FullscreenAiViewer, Header, TerminalTooSmall, WIZARD_PADDING_ROWS } from '../../ui/components.js'
+import { BOX_HEADER_ROWS, Divider, FullscreenAiViewer, Header, TerminalTooSmall, WIZARD_PADDING_ROWS } from '../../ui/components.js'
 import type { AiResultKind } from '../../ui/components.js'
+import { COMPACT_HEADER_TOTAL_ROWS, isFrameTooSmall, shouldCollapseToDense } from '../../ui/frame-fit.js'
 import {
   KeystoreExistingAliasSelectStep,
   KeystoreExistingAliasStep,
@@ -488,7 +489,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
   // for the full rationale (step-tagged measurement avoids cross-step
   // deadlock; decisions derived from live height, no hardcoded floor).
   const bodyRef = useRef<DOMElement | null>(null)
-  const [measuredBody, setMeasuredBody] = useState<{ step: AndroidOnboardingStep, height: number } | null>(null)
+  const [measuredBody, setMeasuredBody] = useState<{ step: AndroidOnboardingStep, dense: boolean, height: number } | null>(null)
   // Adaptive spacing — see iOS sibling for the full rationale. Step bodies
   // render their comfortable form by default and collapse to the compact,
   // budget-fitting form only when the viewport can't fit it. `denseOverride` is
@@ -501,19 +502,19 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
       return
     const { height } = measureElement(bodyRef.current)
     if (height > 0) {
-      setMeasuredBody(prev => (prev && prev.step === step && prev.height === height ? prev : { step, height }))
-      if (!dense && height + COMPACT_HEADER_ROWS + WIZARD_PADDING_ROWS > terminalRows)
+      // Tag the measurement with its density (see iOS sibling): a stale
+      // wrong-density height would wedge the wizard on the resize prompt.
+      setMeasuredBody(prev => (prev && prev.step === step && prev.dense === dense && prev.height === height ? prev : { step, dense, height }))
+      if (!dense && shouldCollapseToDense({ bodyRows: height, terminalRows }))
         setDenseOverride({ step, rows: terminalRows })
     }
   })
-  const bodyHeight = measuredBody && measuredBody.step === step ? measuredBody.height : null
-  const compactHeaderTotal = COMPACT_HEADER_ROWS + WIZARD_PADDING_ROWS
+  const bodyHeight = measuredBody && measuredBody.step === step && measuredBody.dense === dense ? measuredBody.height : null
   const headerCompact = bodyHeight != null
     && (bodyHeight + BOX_HEADER_ROWS + WIZARD_PADDING_ROWS > terminalRows)
-  const tooSmall = bodyHeight != null
-    ? (bodyHeight + compactHeaderTotal > terminalRows)
-    : (terminalRows < compactHeaderTotal + 1)
-  const neededRows = (bodyHeight != null ? bodyHeight : 1) + compactHeaderTotal
+  // Only block when even the dense form can't fit (see frame-fit.ts).
+  const tooSmall = isFrameTooSmall({ bodyRows: bodyHeight, dense, terminalRows })
+  const neededRows = (bodyHeight != null ? bodyHeight : 1) + COMPACT_HEADER_TOTAL_ROWS
 
   const addLog = useCallback((text: string, color = 'green') => {
     setLogLines(prev => [...prev, { text, color }])

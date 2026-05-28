@@ -46,8 +46,9 @@ import {
 
   STEP_PROGRESS,
 } from '../types.js'
-import { BOX_HEADER_ROWS, COMPACT_HEADER_ROWS, Divider, FullscreenAiViewer, Header, SpinnerLine, TerminalTooSmall, WIZARD_PADDING_ROWS } from './components.js'
+import { BOX_HEADER_ROWS, Divider, FullscreenAiViewer, Header, SpinnerLine, TerminalTooSmall, WIZARD_PADDING_ROWS } from './components.js'
 import type { AiResultKind } from './components.js'
+import { COMPACT_HEADER_TOTAL_ROWS, isFrameTooSmall, shouldCollapseToDense } from './frame-fit.js'
 import {
   ApiKeyInstructionsStep,
   BackingUpStep,
@@ -261,7 +262,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
   // render the box header; the next frame corrects if it doesn't fit
   // (one-frame flash, only on small terminals).
   const bodyRef = useRef<DOMElement | null>(null)
-  const [measuredBody, setMeasuredBody] = useState<{ step: OnboardingStep, height: number } | null>(null)
+  const [measuredBody, setMeasuredBody] = useState<{ step: OnboardingStep, dense: boolean, height: number } | null>(null)
   // Adaptive spacing. Step bodies render their comfortable form (matching the
   // original design — boxes, blank lines between elements) by DEFAULT and
   // collapse to their compact, budget-fitting form only when the live viewport
@@ -277,30 +278,32 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
       return
     const { height } = measureElement(bodyRef.current)
     if (height > 0) {
-      setMeasuredBody(prev => (prev && prev.step === step && prev.height === height ? prev : { step, height }))
+      // Tag the measurement with the density it was taken at. A measurement
+      // from the OTHER density is stale: using the comfortable height while in
+      // dense mode would wrongly judge the frame too-small and unmount the body
+      // before the dense form can be measured → deadlock. Tagging makes
+      // `bodyHeight` fall back to null right after a flip so we render the new
+      // density once and re-measure it.
+      setMeasuredBody(prev => (prev && prev.step === step && prev.dense === dense && prev.height === height ? prev : { step, dense, height }))
       // Comfortable body overflows even with the one-line header → collapse it.
-      if (!dense && height + COMPACT_HEADER_ROWS + WIZARD_PADDING_ROWS > terminalRows)
+      if (!dense && shouldCollapseToDense({ bodyRows: height, terminalRows }))
         setDenseOverride({ step, rows: terminalRows })
     }
   })
-  const bodyHeight = measuredBody && measuredBody.step === step ? measuredBody.height : null
+  const bodyHeight = measuredBody && measuredBody.step === step && measuredBody.dense === dense ? measuredBody.height : null
 
-  // Three-way fit decision, all derived from the measured body vs the live
-  // terminal height:
-  //   - box header fits        → bordered box
-  //   - only one-line fits     → compact header (headerCompact)
-  //   - not even one-line fits → resize prompt (tooSmall)
-  // Before measurement (bodyHeight === null) we only force the resize prompt
-  // when the terminal can't even hold the one-line header + padding + a single
-  // content row; otherwise we render optimistically and let the measurement
-  // settle the decision.
-  const compactHeaderTotal = COMPACT_HEADER_ROWS + WIZARD_PADDING_ROWS
+  // Fit decision, derived from the measured body vs the live terminal height:
+  //   - box header fits                  → bordered box
+  //   - only one-line header fits        → compact header (headerCompact)
+  //   - comfortable overflows            → collapse to dense (NOT too-small)
+  //   - even the dense form won't fit    → resize prompt (tooSmall)
+  // `tooSmall` (see frame-fit.ts) only blocks when we're already dense — while
+  // a denser fallback remains it returns false so we collapse instead of
+  // wedging on the resize prompt.
   const headerCompact = bodyHeight != null
     && (bodyHeight + BOX_HEADER_ROWS + WIZARD_PADDING_ROWS > terminalRows)
-  const tooSmall = bodyHeight != null
-    ? (bodyHeight + compactHeaderTotal > terminalRows)
-    : (terminalRows < compactHeaderTotal + 1)
-  const neededRows = (bodyHeight != null ? bodyHeight : 1) + compactHeaderTotal
+  const tooSmall = isFrameTooSmall({ bodyRows: bodyHeight, dense, terminalRows })
+  const neededRows = (bodyHeight != null ? bodyHeight : 1) + COMPACT_HEADER_TOTAL_ROWS
 
   // Refs to avoid stale closures in useEffect async handlers
   const p8ContentRef = useRef(p8Content)
