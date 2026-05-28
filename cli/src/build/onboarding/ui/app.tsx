@@ -10,7 +10,7 @@ import { copyFile, readFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import process from 'node:process'
-import { Alert, ProgressBar, Select } from '@inkjs/ui'
+import { ProgressBar, Select } from '@inkjs/ui'
 import type { DOMElement } from 'ink'
 import { Box, measureElement, Newline, Text, useApp, useInput, useStdout } from 'ink'
 import open from 'open'
@@ -66,6 +66,18 @@ import {
   SetupMethodSelectStep,
   VerifyingKeyStep,
 } from './steps/ios-credentials.js'
+import {
+  ImportCompilingHelperStep,
+  ImportCreateProfileOnlyStep,
+  ImportDistributionModeStep,
+  ImportExportingStep,
+  ImportExportWarningStep,
+  ImportFetchingProfileStep,
+  ImportNoMatchRecoveryStep,
+  ImportPickIdentityStep,
+  ImportPickProfileStep,
+  ImportScanningStep,
+} from './steps/ios-import.js'
 
 const OUTPUT_LINE_SPLIT_RE = /\r?\n/
 const CARRIAGE_RETURN_RE = /\r/g
@@ -1711,135 +1723,102 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
       )}
 
       {/* Import: scanning */}
-      {step === 'import-scanning' && (
-        <Box flexDirection="column" marginTop={1}>
-          <SpinnerLine text="Scanning Keychain and provisioning profiles..." />
-          <Text dimColor>This is read-only — no Keychain password prompt yet.</Text>
-        </Box>
-      )}
+      {step === 'import-scanning' && <ImportScanningStep />}
 
       {/* Import: distribution mode (now FIRST visible step in import flow) */}
       {step === 'import-distribution-mode' && (
-        <Box flexDirection="column" marginTop={1}>
-          <Text bold>How will Capgo distribute your build?</Text>
-          <Newline />
-          <Text dimColor>
-            • App Store: builds upload to TestFlight automatically (requires an App Store Connect API key)
-          </Text>
-          <Text dimColor>
-            • Ad-hoc: builds are signed and either downloaded from Capgo or installed via QR. No ASC key needed.
-          </Text>
-          <Newline />
-          <Select
-            options={[
-              { label: '🛫  App Store / TestFlight', value: 'app_store' },
-              { label: '📦  Ad-hoc (no TestFlight upload)', value: 'ad_hoc' },
-              { label: '↩️   Cancel and use Create new instead', value: '__cancel__' },
-            ]}
-            onChange={async (value) => {
-              if (value === '__cancel__') {
-                setImportMode(false)
-                // Clear the persisted import-distribution and setupMethod since
-                // the user is bailing to the create-new path.
-                const existing = await loadProgress(appId)
-                if (existing) {
-                  existing.setupMethod = 'create-new'
-                  delete existing.importDistribution
-                  await saveProgress(appId, existing)
-                }
-                setStep('api-key-instructions')
-                return
+        <ImportDistributionModeStep
+          onChange={async (value) => {
+            if (value === '__cancel__') {
+              setImportMode(false)
+              // Clear the persisted import-distribution and setupMethod since
+              // the user is bailing to the create-new path.
+              const existing = await loadProgress(appId)
+              if (existing) {
+                existing.setupMethod = 'create-new'
+                delete existing.importDistribution
+                await saveProgress(appId, existing)
               }
-              const mode = value as 'app_store' | 'ad_hoc'
-              setImportDistribution(mode)
-              // Persist so a CLI restart at any later step (incl. verifying-key
-              // or saving-credentials) knows we're in app_store vs ad_hoc.
-              // Codex caught a bug where without this, resumed sessions
-              // re-entered the create-new path via the stale `importMode=false`
-              // default — fixed here by hydrating both fields on mount.
-              const existing = await loadProgress(appId) || {
-                platform: 'ios' as const,
-                appId,
-                startedAt: new Date().toISOString(),
-                completedSteps: {},
-              }
-              existing.setupMethod = 'import-existing'
-              existing.importDistribution = mode
-              await saveProgress(appId, existing)
-              addLog(`✔ Distribution · ${mode}`)
-              if (mode === 'app_store') {
-                // Need .p8 for TestFlight upload AND for any profile auto-recovery.
-                // After verifying-key the import-mode branch routes back to import-pick-identity.
-                // Skip the .p8 input chain entirely if the key was already
-                // verified on a previous attempt (resume) — otherwise we
-                // re-ask "How do you want to provide the .p8 file?" even
-                // though APPLE_KEY_CONTENT is already known. Use the same
-                // routing decision as the post-scan entry point.
-                setStep(getImportEntryStep(existing))
-              }
-              else {
-                // ad_hoc skips .p8; can opt into it later from no-match recovery.
-                setStep('import-pick-identity')
-              }
-            }}
-          />
-        </Box>
+              setStep('api-key-instructions')
+              return
+            }
+            const mode = value as 'app_store' | 'ad_hoc'
+            setImportDistribution(mode)
+            // Persist so a CLI restart at any later step (incl. verifying-key
+            // or saving-credentials) knows we're in app_store vs ad_hoc.
+            // Codex caught a bug where without this, resumed sessions
+            // re-entered the create-new path via the stale `importMode=false`
+            // default — fixed here by hydrating both fields on mount.
+            const existing = await loadProgress(appId) || {
+              platform: 'ios' as const,
+              appId,
+              startedAt: new Date().toISOString(),
+              completedSteps: {},
+            }
+            existing.setupMethod = 'import-existing'
+            existing.importDistribution = mode
+            await saveProgress(appId, existing)
+            addLog(`✔ Distribution · ${mode}`)
+            if (mode === 'app_store') {
+              // Need .p8 for TestFlight upload AND for any profile auto-recovery.
+              // After verifying-key the import-mode branch routes back to import-pick-identity.
+              // Skip the .p8 input chain entirely if the key was already
+              // verified on a previous attempt (resume) — otherwise we
+              // re-ask "How do you want to provide the .p8 file?" even
+              // though APPLE_KEY_CONTENT is already known. Use the same
+              // routing decision as the post-scan entry point.
+              setStep(getImportEntryStep(existing))
+            }
+            else {
+              // ad_hoc skips .p8; can opt into it later from no-match recovery.
+              setStep('import-pick-identity')
+            }
+          }}
+        />
       )}
 
       {/* Import: pick identity */}
       {step === 'import-pick-identity' && (
-        <Box flexDirection="column" marginTop={1}>
-          <Text bold>
-            Found
-            {' '}
-            {importMatches.length}
-            {' '}
-            distribution identity
-            {importMatches.length === 1 ? '' : 'ies'}
-            {' '}
-            in your Keychain. Pick one:
-          </Text>
-          <Newline />
-          <Select
-            options={[
-              ...importMatches.map((m) => {
-                const matchCount = m.profiles.length
-                const label = matchCount > 0
-                  ? `🔑  ${m.identity.name} · ${matchCount} matching profile${matchCount === 1 ? '' : 's'}`
-                  : `🔑  ${m.identity.name} · ⚠ no matching profiles on this Mac (recovery available)`
-                return { label, value: m.identity.sha1 }
-              }),
-              { label: '↩️   Cancel and use Create new instead', value: '__cancel__' },
-            ]}
-            onChange={async (value) => {
-              if (value === '__cancel__') {
-                setImportMode(false)
-                // Persist the switch so a CLI restart doesn't resume into
-                // the import flow the user just abandoned. Mirrors the same
-                // pattern in import-distribution-mode's cancel path.
-                const existing = await loadProgress(appId)
-                if (existing) {
-                  existing.setupMethod = 'create-new'
-                  delete existing.importDistribution
-                  await saveProgress(appId, existing)
-                }
-                setStep('api-key-instructions')
-                return
+        <ImportPickIdentityStep
+          identityCount={importMatches.length}
+          options={[
+            ...importMatches.map((m) => {
+              const matchCount = m.profiles.length
+              const label = matchCount > 0
+                ? `🔑  ${m.identity.name} · ${matchCount} matching profile${matchCount === 1 ? '' : 's'}`
+                : `🔑  ${m.identity.name} · ⚠ no matching profiles on this Mac (recovery available)`
+              return { label, value: m.identity.sha1 }
+            }),
+            { label: '↩️   Cancel and use Create new instead', value: '__cancel__' },
+          ]}
+          onChange={async (value) => {
+            if (value === '__cancel__') {
+              setImportMode(false)
+              // Persist the switch so a CLI restart doesn't resume into
+              // the import flow the user just abandoned. Mirrors the same
+              // pattern in import-distribution-mode's cancel path.
+              const existing = await loadProgress(appId)
+              if (existing) {
+                existing.setupMethod = 'create-new'
+                delete existing.importDistribution
+                await saveProgress(appId, existing)
               }
-              const match = importMatches.find(m => m.identity.sha1 === value)
-              if (!match)
-                return
-              setChosenIdentity(match.identity)
-              addLog(`✔ Identity · ${match.identity.name}`)
-              if (match.profiles.length === 0) {
-                // No local match — offer recovery instead of dead-ending
-                setStep('import-no-match-recovery')
-                return
-              }
-              setStep('import-pick-profile')
-            }}
-          />
-        </Box>
+              setStep('api-key-instructions')
+              return
+            }
+            const match = importMatches.find(m => m.identity.sha1 === value)
+            if (!match)
+              return
+            setChosenIdentity(match.identity)
+            addLog(`✔ Identity · ${match.identity.name}`)
+            if (match.profiles.length === 0) {
+              // No local match — offer recovery instead of dead-ending
+              setStep('import-no-match-recovery')
+              return
+            }
+            setStep('import-pick-profile')
+          }}
+        />
       )}
 
       {/* Import: pick profile */}
@@ -1858,71 +1837,52 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
         )
         const droppedCount = allMatchedProfiles.length - matchedProfiles.length
         return (
-          <Box flexDirection="column" marginTop={1}>
-            <Text bold>
-              Pick a provisioning profile (
-              {matchedProfiles.length}
-              {' '}
-              matching this app's bundle ID
-              {importDistribution ? ` and ${importDistribution} distribution` : ''}
-              ):
-            </Text>
-            {droppedCount > 0 && (
-              <Text dimColor>
-                (
-                {droppedCount}
-                {' '}
-                other profile
-                {droppedCount === 1 ? '' : 's'}
-                {' '}
-                hidden — wrong bundle ID or distribution mode)
-              </Text>
-            )}
-            <Newline />
-            <Select
-              options={[
-                ...matchedProfiles.map(p => ({
-                  label: `📜  ${p.name} · bundle ${p.bundleId} · ${p.profileType} · expires ${p.expirationDate.split('T')[0]}`,
-                  // Key by UUID, NOT path. Disk-discovered profiles have a
-                  // unique path, but Apple-fetched profiles (from the D
-                  // no-match-recovery path) are synthesized with path=''.
-                  // UUID is unique for both kinds: disk profiles use the
-                  // mobileprovision UUID, synthesized ones use Apple's
-                  // profile resource ID.
-                  value: p.uuid,
-                })),
-                { label: '↩️   Back to identity selection', value: '__back__' },
-              ]}
-              onChange={(value) => {
-                if (value === '__back__') {
-                  setStep('import-pick-identity')
-                  return
-                }
-                const profile = matchedProfiles.find(p => p.uuid === value)
-                if (!profile)
-                  return
-                // Defense in depth: verify bundleId + profileType match before
-                // committing. The filter above should make this unreachable,
-                // but if the filter regresses, we'd rather hard-fail than
-                // silently save bad creds.
-                if (profile.bundleId !== appId
-                  || (importDistribution && profile.profileType !== importDistribution)) {
-                  handleError(
-                    new Error(
-                      `Profile "${profile.name}" doesn't match this app: `
-                      + `bundle ${profile.bundleId} (expected ${appId}), `
-                      + `type ${profile.profileType} (expected ${importDistribution ?? 'any'}).`,
-                    ),
-                    'import-pick-profile',
-                  )
-                  return
-                }
-                setChosenProfile(profile)
-                addLog(`✔ Profile · ${profile.name}`)
-                setStep('import-export-warning')
-              }}
-            />
-          </Box>
+          <ImportPickProfileStep
+            matchedCount={matchedProfiles.length}
+            droppedCount={droppedCount}
+            distribution={importDistribution}
+            options={[
+              ...matchedProfiles.map(p => ({
+                label: `📜  ${p.name} · bundle ${p.bundleId} · ${p.profileType} · expires ${p.expirationDate.split('T')[0]}`,
+                // Key by UUID, NOT path. Disk-discovered profiles have a
+                // unique path, but Apple-fetched profiles (from the D
+                // no-match-recovery path) are synthesized with path=''.
+                // UUID is unique for both kinds: disk profiles use the
+                // mobileprovision UUID, synthesized ones use Apple's
+                // profile resource ID.
+                value: p.uuid,
+              })),
+              { label: '↩️   Back to identity selection', value: '__back__' },
+            ]}
+            onChange={(value) => {
+              if (value === '__back__') {
+                setStep('import-pick-identity')
+                return
+              }
+              const profile = matchedProfiles.find(p => p.uuid === value)
+              if (!profile)
+                return
+              // Defense in depth: verify bundleId + profileType match before
+              // committing. The filter above should make this unreachable,
+              // but if the filter regresses, we'd rather hard-fail than
+              // silently save bad creds.
+              if (profile.bundleId !== appId
+                || (importDistribution && profile.profileType !== importDistribution)) {
+                handleError(
+                  new Error(
+                    `Profile "${profile.name}" doesn't match this app: `
+                    + `bundle ${profile.bundleId} (expected ${appId}), `
+                    + `type ${profile.profileType} (expected ${importDistribution ?? 'any'}).`,
+                  ),
+                  'import-pick-profile',
+                )
+                return
+              }
+              setChosenProfile(profile)
+              addLog(`✔ Profile · ${profile.name}`)
+              setStep('import-export-warning')
+            }}
+          />
         )
       })()}
 
@@ -1938,178 +1898,93 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
         // CAPGO_IOS_DISTRIBUTION='ad_hoc'. Browser + Fetch still work.
         const canCreateProfile = importDistribution !== 'ad_hoc'
         return (
-          <Box flexDirection="column" marginTop={1}>
-            <Alert variant="warning">
-              No provisioning profile on this Mac is linked to "
-              {chosenIdentity.name}
-              ".
-            </Alert>
-            <Newline />
-            <Text dimColor>
-              The cert is in your Keychain but the matching profile isn't on disk. Pick a recovery path:
-            </Text>
-            <Newline />
-            <Select
-              options={[
-                {
-                  label: `🌐  Open Apple Developer Portal (download manually, then re-scan)`,
-                  value: 'browser',
-                },
-                {
-                  label: hasAscKey
-                    ? `🔍  Fetch matching profile from Apple now`
-                    : `🔍  Provide ASC API key, then fetch profile from Apple`,
-                  value: 'fetch',
-                },
-                ...(canCreateProfile
-                  ? [{
-                      label: hasAscKey
-                        ? `✨  Create a new App Store profile for this cert via Apple`
-                        : `✨  Provide ASC API key, then create a new App Store profile for this cert`,
-                      value: 'create',
-                    }]
-                  : []),
-                { label: '↩️   Back to identity selection', value: 'back' },
-              ]}
-              onChange={(value) => {
-                if (value === 'browser') {
-                  open('https://developer.apple.com/account/resources/profiles/list')
-                  addLog('✔ Opened Apple Developer Portal — re-running scan in 5s', 'yellow')
-                  setTimeout(() => {
-                    if (!exitRequestedRef.current)
-                      setStep('import-scanning')
-                  }, 5000)
-                  return
+          <ImportNoMatchRecoveryStep
+            identityName={chosenIdentity.name}
+            options={[
+              {
+                label: `🌐  Open Apple Developer Portal (download manually, then re-scan)`,
+                value: 'browser',
+              },
+              {
+                label: hasAscKey
+                  ? `🔍  Fetch matching profile from Apple now`
+                  : `🔍  Provide ASC API key, then fetch profile from Apple`,
+                value: 'fetch',
+              },
+              ...(canCreateProfile
+                ? [{
+                    label: hasAscKey
+                      ? `✨  Create a new App Store profile for this cert via Apple`
+                      : `✨  Provide ASC API key, then create a new App Store profile for this cert`,
+                    value: 'create',
+                  }]
+                : []),
+              { label: '↩️   Back to identity selection', value: 'back' },
+            ]}
+            onChange={(value) => {
+              if (value === 'browser') {
+                open('https://developer.apple.com/account/resources/profiles/list')
+                addLog('✔ Opened Apple Developer Portal — re-running scan in 5s', 'yellow')
+                setTimeout(() => {
+                  if (!exitRequestedRef.current)
+                    setStep('import-scanning')
+                }, 5000)
+                return
+              }
+              if (value === 'back') {
+                setStep('import-pick-identity')
+                return
+              }
+              if (value === 'fetch' || value === 'create') {
+                const action = value === 'fetch' ? 'fetching-profile' : 'create-profile-only'
+                if (hasAscKey) {
+                  setStep(`import-${action}` as OnboardingStep)
                 }
-                if (value === 'back') {
-                  setStep('import-pick-identity')
-                  return
+                else {
+                  setPendingRecoveryAction(action)
+                  setStep('api-key-instructions')
                 }
-                if (value === 'fetch' || value === 'create') {
-                  const action = value === 'fetch' ? 'fetching-profile' : 'create-profile-only'
-                  if (hasAscKey) {
-                    setStep(`import-${action}` as OnboardingStep)
-                  }
-                  else {
-                    setPendingRecoveryAction(action)
-                    setStep('api-key-instructions')
-                  }
-                }
-              }}
-            />
-          </Box>
+              }
+            }}
+          />
         )
       })()}
 
       {/* Import: fetching profile from Apple by cert SHA1 */}
-      {step === 'import-fetching-profile' && (
-        <Box flexDirection="column" marginTop={1}>
-          <SpinnerLine text="Looking up your cert on Apple and listing its profiles..." />
-        </Box>
-      )}
+      {step === 'import-fetching-profile' && <ImportFetchingProfileStep />}
 
       {/* Import: D2 — creating a new profile via Apple for the existing cert */}
-      {step === 'import-create-profile-only' && (
-        <Box flexDirection="column" marginTop={1}>
-          <SpinnerLine text="Creating a new App Store profile via Apple for your existing certificate..." />
-          <Text dimColor>
-            (Skipping cert creation — using the cert already in your Keychain.)
-          </Text>
-        </Box>
-      )}
+      {step === 'import-create-profile-only' && <ImportCreateProfileOnlyStep />}
 
       {/* Import: export warning (heads-up before the one Keychain dialog) */}
       {step === 'import-export-warning' && chosenIdentity && (
-        <Box flexDirection="column" marginTop={1}>
-          <Alert variant="warning">
-            macOS will now ask permission to access your private key.
-          </Alert>
-          <Newline />
-          <Box flexDirection="column" marginLeft={2}>
-            <Text>
-              <Text bold color="white">1.</Text>
-              {' '}
-              A Keychain dialog will pop up asking
-              {' '}
-              <Text bold>"security wants to use your confidential information"</Text>
-            </Text>
-            <Text>
-              <Text bold color="white">2.</Text>
-              {' '}
-              Click
-              {' '}
-              <Text bold color="green">"Always Allow"</Text>
-              {' '}
-              so it doesn't ask again on retry
-            </Text>
-            <Text>
-              <Text bold color="white">3.</Text>
-              {' '}
-              That's the only prompt — the export is otherwise non-interactive
-            </Text>
-          </Box>
-          <Newline />
-          <Select
-            options={[
-              { label: `🔓  Export "${chosenIdentity.name}" now`, value: 'go' },
-              { label: '↩️   Back', value: 'back' },
-              { label: '✖  Exit onboarding', value: 'exit' },
-            ]}
-            onChange={(value) => {
-              if (value === 'go') {
-                // First run on this CLI version: compile the Swift helper
-                // explicitly so the user sees what's happening, instead of
-                // staring at the "look for the macOS dialog" spinner while
-                // we silently do a 2-3s swiftc invocation. Cache hit skips
-                // straight to export.
-                setStep(isHelperCached() ? 'import-exporting' : 'import-compiling-helper')
-              }
-              else if (value === 'back') {
-                // Back goes to profile selection (distribution mode is now upstream of this step)
-                setStep('import-pick-profile')
-              }
-              else {
-                exitOnboarding('Exiting. Re-run `build init` whenever you\'re ready.')
-              }
-            }}
-          />
-        </Box>
+        <ImportExportWarningStep
+          identityName={chosenIdentity.name}
+          onChange={(value) => {
+            if (value === 'go') {
+              // First run on this CLI version: compile the Swift helper
+              // explicitly so the user sees what's happening, instead of
+              // staring at the "look for the macOS dialog" spinner while
+              // we silently do a 2-3s swiftc invocation. Cache hit skips
+              // straight to export.
+              setStep(isHelperCached() ? 'import-exporting' : 'import-compiling-helper')
+            }
+            else if (value === 'back') {
+              // Back goes to profile selection (distribution mode is now upstream of this step)
+              setStep('import-pick-profile')
+            }
+            else {
+              exitOnboarding('Exiting. Re-run `build init` whenever you\'re ready.')
+            }
+          }}
+        />
       )}
 
       {/* Import: compiling helper (one-time per CLI version) */}
-      {step === 'import-compiling-helper' && (
-        <Box flexDirection="column" marginTop={1}>
-          <SpinnerLine text="Compiling keychain-export helper (one-time, ~2-3s)..." />
-          <Newline />
-          <Box flexDirection="column" marginLeft={2}>
-            <Text dimColor>
-              We ship a small Swift program (~350 lines) that wraps Apple's
-              Security framework. It compiles via
-              {' '}
-              <Text bold>swiftc</Text>
-              {' '}
-              into your OS temp folder.
-            </Text>
-            <Text dimColor>
-              The result is cached for this CLI version — future runs of
-              {' '}
-              <Text bold>build init</Text>
-              {' '}
-              skip this step.
-            </Text>
-          </Box>
-        </Box>
-      )}
+      {step === 'import-compiling-helper' && <ImportCompilingHelperStep />}
 
       {/* Import: exporting (the one Keychain prompt happens here) */}
-      {step === 'import-exporting' && (
-        <Box flexDirection="column" marginTop={1}>
-          <SpinnerLine text="Exporting from Keychain — check for the macOS dialog..." />
-          <Text dimColor>
-            If you don't see a dialog, look behind other windows or check the menu bar.
-          </Text>
-        </Box>
-      )}
+      {step === 'import-exporting' && <ImportExportingStep />}
 
       {/* API key instructions + .p8 input */}
       {step === 'api-key-instructions' && (
