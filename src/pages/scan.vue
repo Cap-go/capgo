@@ -275,6 +275,8 @@ function normalizePreviewAssetUrl(rawValue: string, baseUrl: string, rootUrl: st
   const value = rawValue.trim()
   if (!value || value.startsWith('#'))
     return ''
+  if (value.includes('${') || value.includes('%24%7B') || value.includes('%24%7b'))
+    return ''
 
   try {
     const base = new URL(baseUrl)
