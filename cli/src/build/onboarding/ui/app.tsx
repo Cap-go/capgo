@@ -1578,6 +1578,25 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
       </Box>
     )
 
+  // The fullscreen AI viewer is a takeover: render it as an EARLY RETURN so it
+  // owns the whole terminal and bypasses the body-measurement / dense /
+  // too-small logic above. (If it rendered inside the measured body, its
+  // full-height body would trip `shouldCollapseToDense`/`tooSmall` and get
+  // replaced by the resize prompt.) It fills the screen itself via minHeight.
+  if (isAiResultScroll && aiAnalysisText)
+    return (
+      <FullscreenAiViewer
+        title="AI analysis"
+        subtitle={`${aiAnalysisText.split('\n').length} lines — scrollable because the analysis is taller than your terminal`}
+        lines={aiAnalysisText.split('\n')}
+        terminalRows={terminalRows}
+        onExit={() => {
+          setAiViewedFull(true)
+          setStep('ai-analysis-result')
+        }}
+      />
+    )
+
   // `minHeight={terminalRows}` makes the root fill the whole viewport. Ink
   // only does a full clear-the-screen redraw when the frame height is ≥ the
   // terminal height; for shorter frames it uses an incremental cursor-up
@@ -2369,23 +2388,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
         />
       )}
 
-      {/* AI debug — scrollable viewer for analyses too tall for the viewport.
-          The outer Header / progress bar are hidden during this step so the
-          viewer gets the full terminal height. On exit, we mark the analysis
-          as "viewed" and return to 'ai-analysis-result' (which now shows a
-          compact "Analysis above" indicator + the retry/skip picker). */}
-      {step === 'ai-analysis-result-scroll' && aiAnalysisText && (
-        <FullscreenAiViewer
-          title="AI analysis"
-          subtitle={`${aiAnalysisText.split('\n').length} lines — scrollable because the analysis is taller than your terminal`}
-          lines={aiAnalysisText.split('\n')}
-          terminalRows={terminalRows}
-          onExit={() => {
-            setAiViewedFull(true)
-            setStep('ai-analysis-result')
-          }}
-        />
-      )}
+      {/* (ai-analysis-result-scroll renders as a fullscreen early return above.) */}
 
       {/* Error with retry */}
       {step === 'error' && error && (

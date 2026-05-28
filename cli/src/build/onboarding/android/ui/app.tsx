@@ -1697,6 +1697,23 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
       </Box>
     )
 
+  // Fullscreen AI viewer is a takeover — early return so it owns the whole
+  // terminal and bypasses the body-measurement / dense / too-small logic (see
+  // iOS sibling). It fills the screen itself via minHeight.
+  if (isAiResultScroll && aiAnalysisText)
+    return (
+      <FullscreenAiViewer
+        title="AI analysis"
+        subtitle={`${aiAnalysisText.split('\n').length} lines — scrollable because the analysis is taller than your terminal`}
+        lines={aiAnalysisText.split('\n')}
+        terminalRows={terminalRows}
+        onExit={() => {
+          setAiViewedFull(true)
+          setStep('ai-analysis-result')
+        }}
+      />
+    )
+
   // `minHeight={terminalRows}` fills the viewport so Ink always uses its full
   // clear-screen redraw path, which avoids stale rows lingering after the
   // terminal shrinks. See iOS sibling for the full explanation.
@@ -2507,19 +2524,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
         />
       )}
 
-      {/* AI debug — scrollable viewer (see iOS sibling). */}
-      {step === 'ai-analysis-result-scroll' && aiAnalysisText && (
-        <FullscreenAiViewer
-          title="AI analysis"
-          subtitle={`${aiAnalysisText.split('\n').length} lines — scrollable because the analysis is taller than your terminal`}
-          lines={aiAnalysisText.split('\n')}
-          terminalRows={terminalRows}
-          onExit={() => {
-            setAiViewedFull(true)
-            setStep('ai-analysis-result')
-          }}
-        />
-      )}
+      {/* (ai-analysis-result-scroll renders as a fullscreen early return above.) */}
 
       {step === 'error' && error && retryStep && (
         <ErrorStep

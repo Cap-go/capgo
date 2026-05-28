@@ -3,7 +3,7 @@ import { Box, Text, useInput, useStdout } from 'ink'
 import Spinner from 'ink-spinner'
 // src/build/onboarding/ui/components.tsx
 import React, { useEffect, useState } from 'react'
-import { computeMaxScrollOffset, pickVisibleLines, totalRenderedRows } from '../ai-fit.js'
+import { computeMaxScrollOffset, pickVisibleLines } from '../ai-fit.js'
 
 export const Divider: FC<{ width?: number }> = ({ width = 60 }) => (
   <Text dimColor>{'─'.repeat(width)}</Text>
@@ -238,12 +238,15 @@ export const FullscreenAiViewer: FC<{
     }
   }, [stdout])
 
-  // Reserve 10 rows for the viewer's own chrome: title + optional subtitle +
-  // two dividers + position line + exit hint + a margin to absorb chrome
-  // lines that themselves wrap on narrow terminals. The parent wizard has
-  // already hidden its outer Header for this step so the viewer owns the
-  // whole screen.
-  const VIEWER_CHROME_ROWS = 10
+  // The viewer is a fullscreen takeover: the parent renders it as an early
+  // return that fills the whole terminal (no outer Header, no wizard padding),
+  // so its available height is the full terminal. Its own chrome is exactly 6
+  // rows — title + optional subtitle + two dividers + position line + exit hint
+  // — and the rest is the scrollable viewport. (Previously this reserved 10 to
+  // stay short enough not to trip the parent's body-measurement; now the early
+  // return bypasses that, so we reserve only the real chrome and a flex spacer
+  // fills any remainder — no dead space, and more lines visible per screen.)
+  const VIEWER_CHROME_ROWS = 6
   const viewportRows = Math.max(1, dims.rows - VIEWER_CHROME_ROWS)
   const total = lines.length
   // Wrap-aware bound: maximum offset that still places the last logical line
@@ -299,14 +302,6 @@ export const FullscreenAiViewer: FC<{
   // wrap on narrow terminals (which would silently eat a viewport row).
   const dividerWidth = Math.max(10, Math.min(60, dims.cols - 1))
 
-  // Pad the content area with empty rows so the viewer's total frame height
-  // is CONSTANT across scroll positions. Without this, scrolling can change
-  // the frame height by ±1 row when lines with different wrap counts move in
-  // and out of view — Ink then writes the new (taller) frame BELOW the old
-  // one and the user perceives "scrolling just added an extra line".
-  const visibleRowsUsed = totalRenderedRows(visibleLines, dims.cols)
-  const padRows = Math.max(0, viewportRows - visibleRowsUsed)
-
   // Suppress every scroll-related hint when the analysis fits the viewport
   // outright. The conservative `isAiAnalysisTooTall` estimator in the parent
   // sometimes routes us here even though `pickVisibleLines` ends up showing
@@ -316,16 +311,18 @@ export const FullscreenAiViewer: FC<{
   const hasMoreToScroll = maxScrollOffset > 0
 
   return (
-    <Box flexDirection="column">
+    // minHeight fills the whole terminal and the flexGrow spacer below pushes
+    // the bottom divider + hints to the very bottom — so the frame height is
+    // constant across scroll positions AND there's no dead space, regardless
+    // of how many lines are currently visible.
+    <Box flexDirection="column" minHeight={dims.rows}>
       <Text bold color="cyan">{title}</Text>
       {subtitle && hasMoreToScroll && <Text dimColor>{subtitle}</Text>}
       <Text color="cyan">{'─'.repeat(dividerWidth)}</Text>
       {visibleLines.map((line, index) => (
         <Text key={`ai-line-${scrollOffset + index}`}>{line}</Text>
       ))}
-      {Array.from({ length: padRows }).map((_, i) => (
-        <Text key={`ai-pad-${i}`}>{' '}</Text>
-      ))}
+      <Box flexGrow={1} />
       <Text color="cyan">{'─'.repeat(dividerWidth)}</Text>
       <Text dimColor>
         {hasMoreToScroll
