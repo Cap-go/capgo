@@ -9,7 +9,7 @@ import { addTagBento, trackBentoEvent } from '../utils/bento.ts'
 import { getFallbackCreditProductId } from '../utils/credits.ts'
 import { BRES, quickError, simpleError } from '../utils/hono.ts'
 import { middlewareStripeWebhook } from '../utils/hono_middleware_stripe.ts'
-import { cloudlog } from '../utils/logging.ts'
+import { cloudlog, cloudlogErr } from '../utils/logging.ts'
 import { closeClient, getDrizzleClient, getPgClient } from '../utils/pg.ts'
 import * as schema from '../utils/postgres_schema.ts'
 import { groupIdentifyPosthog } from '../utils/posthog.ts'
@@ -983,6 +983,21 @@ async function getOrg(c: Context, stripeData: StripeData) {
   return org
 }
 
+async function orgHasActiveUsageCredits(c: Context, orgId: string): Promise<boolean> {
+  const { data, error } = await supabaseAdmin(c)
+    .from('orgs')
+    .select('has_usage_credits')
+    .eq('id', orgId)
+    .maybeSingle()
+
+  if (error) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'orgHasActiveUsageCredits error', orgId, error })
+    return false
+  }
+
+  return data?.has_usage_credits === true
+}
+
 async function cancelingOrFinished(
   c: Context,
   stripeEvent: Stripe.Event,
@@ -1076,7 +1091,12 @@ app.post('/', middlewareStripeWebhook(), async (c) => {
       return createdOrUpdatedResponse
   }
   else if (stripeData.data.status === 'failed') {
-    await trackBentoEvent(c, org.management_email, {}, 'org:failed_payment')
+    if (await orgHasActiveUsageCredits(c, org.id)) {
+      cloudlog({ requestId: c.get('requestId'), message: 'Skipping failed payment email because org has active usage credits', orgId: org.id })
+    }
+    else {
+      await trackBentoEvent(c, org.management_email, {}, 'org:failed_payment')
+    }
     // Update the database with failed status
     await updateStripeInfo(c, stripeData)
   }
