@@ -1,8 +1,11 @@
 <script setup lang="ts">
+import { Capacitor } from '@capacitor/core'
 import { toSvg } from 'better-qr'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useRouter } from 'vue-router'
 import IconExternalLink from '~icons/lucide/external-link'
+import IconPlay from '~icons/lucide/play'
 import IconSmartphone from '~icons/lucide/smartphone'
 import { buildBundlePreviewDeepLink, buildChannelPreviewDeepLink } from '~/services/previewLinks'
 import { buildChannelPreviewSubdomain, buildPreviewSubdomain } from '../../shared/preview-subdomain.ts'
@@ -15,6 +18,8 @@ const props = defineProps<{
 }>()
 
 const { t } = useI18n()
+const router = useRouter()
+const isNativePlatform = Capacitor.isNativePlatform()
 
 // Device configurations
 const devices = {
@@ -116,7 +121,7 @@ function svgToDataUrl(svg: string): string {
 
 // Generate QR code linking to the preview URL
 function generateQRCode() {
-  if (!qrCodeUrl.value) {
+  if (isNativePlatform || !qrCodeUrl.value) {
     qrCodeDataUrl.value = ''
     return
   }
@@ -142,10 +147,34 @@ function openExternal() {
     return
   window.open(previewUrl.value, '_blank')
 }
+
+async function startNativePreview() {
+  if (!qrCodeUrl.value)
+    return
+
+  await router.push({
+    path: '/scan',
+    query: { preview: qrCodeUrl.value },
+  })
+}
 </script>
 
 <template>
-  <div class="relative min-h-[calc(100dvh-8rem)] w-full overflow-y-auto px-3 py-4 md:px-6 md:py-6">
+  <div
+    v-if="isNativePlatform"
+    class="flex min-h-[calc(100dvh-8rem)] w-full items-center justify-center px-4 py-6"
+  >
+    <button
+      class="inline-flex min-h-12 w-full max-w-xs items-center justify-center gap-2 rounded-xl bg-blue-500 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-500/20 transition-colors hover:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-60"
+      :disabled="!qrCodeUrl"
+      @click="startNativePreview"
+    >
+      <IconPlay class="h-5 w-5" />
+      {{ t('start-preview') }}
+    </button>
+  </div>
+
+  <div v-else class="relative min-h-[calc(100dvh-8rem)] w-full overflow-y-auto px-3 py-4 md:px-6 md:py-6">
     <!-- Open in external button -->
     <button
       class="absolute z-10 p-2 transition-colors bg-white rounded-lg shadow-lg top-4 right-4 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700"

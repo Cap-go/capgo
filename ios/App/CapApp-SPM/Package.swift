@@ -101,11 +101,11 @@ let package = Package(
         .package(name: "CapgoCapacitorYoutubePlayer", path: "../../../node_modules/@capgo/capacitor-youtube-player"),
         .package(name: "CapgoCapacitorZebraDatawedge", path: "../../../node_modules/@capgo/capacitor-zebra-datawedge"),
         .package(name: "CapgoCapacitorZip", path: "../../../node_modules/@capgo/capacitor-zip"),
-        .package(name: "CapgoInappbrowser", path: "../../../node_modules/@capgo/inappbrowser"),
-        .package(name: "CapgoNativeAudio", path: "../../../node_modules/@capgo/native-audio"),
-        .package(name: "CapgoNativeMarket", path: "../../../node_modules/@capgo/native-market"),
-        .package(name: "CapgoNativegeocoder", path: "../../../node_modules/@capgo/nativegeocoder"),
-        .package(name: "CapgoRicoh360", path: "../../../node_modules/@capgo/ricoh360"),
+        .package(name: "CapgoCapacitorInappbrowser", path: "../../../node_modules/@capgo/capacitor-inappbrowser"),
+        .package(name: "CapgoCapacitorNativeAudio", path: "../../../node_modules/@capgo/capacitor-native-audio"),
+        .package(name: "CapgoCapacitorNativeMarket", path: "../../../node_modules/@capgo/capacitor-native-market"),
+        .package(name: "CapgoCapacitorNativegeocoder", path: "../../../node_modules/@capgo/capacitor-nativegeocoder"),
+        .package(name: "CapgoCapacitorRicoh360", path: "../../../node_modules/@capgo/capacitor-ricoh360"),
         .package(name: "RevenuecatPurchasesCapacitor", path: "../../../node_modules/@revenuecat/purchases-capacitor")
     ],
     targets: [
@@ -203,11 +203,11 @@ let package = Package(
                 .product(name: "CapgoCapacitorYoutubePlayer", package: "CapgoCapacitorYoutubePlayer"),
                 .product(name: "CapgoCapacitorZebraDatawedge", package: "CapgoCapacitorZebraDatawedge"),
                 .product(name: "CapgoCapacitorZip", package: "CapgoCapacitorZip"),
-                .product(name: "CapgoInappbrowser", package: "CapgoInappbrowser"),
-                .product(name: "CapgoNativeAudio", package: "CapgoNativeAudio"),
-                .product(name: "CapgoNativeMarket", package: "CapgoNativeMarket"),
-                .product(name: "CapgoNativegeocoder", package: "CapgoNativegeocoder"),
-                .product(name: "CapgoRicoh360", package: "CapgoRicoh360"),
+                .product(name: "CapgoCapacitorInappbrowser", package: "CapgoCapacitorInappbrowser"),
+                .product(name: "CapgoCapacitorNativeAudio", package: "CapgoCapacitorNativeAudio"),
+                .product(name: "CapgoCapacitorNativeMarket", package: "CapgoCapacitorNativeMarket"),
+                .product(name: "CapgoCapacitorNativegeocoder", package: "CapgoCapacitorNativegeocoder"),
+                .product(name: "CapgoCapacitorRicoh360", package: "CapgoCapacitorRicoh360"),
                 .product(name: "RevenuecatPurchasesCapacitor", package: "RevenuecatPurchasesCapacitor")
             ]
         )

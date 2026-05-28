@@ -97,11 +97,11 @@ dependencies {
     implementation project(':capgo-capacitor-youtube-player')
     implementation project(':capgo-capacitor-zebra-datawedge')
     implementation project(':capgo-capacitor-zip')
-    implementation project(':capgo-inappbrowser')
-    implementation project(':capgo-native-audio')
-    implementation project(':capgo-native-market')
-    implementation project(':capgo-nativegeocoder')
-    implementation project(':capgo-ricoh360')
+    implementation project(':capgo-capacitor-inappbrowser')
+    implementation project(':capgo-capacitor-native-audio')
+    implementation project(':capgo-capacitor-native-market')
+    implementation project(':capgo-capacitor-nativegeocoder')
+    implementation project(':capgo-capacitor-ricoh360')
     implementation project(':revenuecat-purchases-capacitor')
 
 }

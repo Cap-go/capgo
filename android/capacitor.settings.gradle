@@ -266,20 +266,20 @@ project(':capgo-capacitor-zebra-datawedge').projectDir = new File('../node_modul
 include ':capgo-capacitor-zip'
 project(':capgo-capacitor-zip').projectDir = new File('../node_modules/@capgo/capacitor-zip/android')
 
-include ':capgo-inappbrowser'
-project(':capgo-inappbrowser').projectDir = new File('../node_modules/@capgo/inappbrowser/android')
+include ':capgo-capacitor-inappbrowser'
+project(':capgo-capacitor-inappbrowser').projectDir = new File('../node_modules/@capgo/capacitor-inappbrowser/android')
 
-include ':capgo-native-audio'
-project(':capgo-native-audio').projectDir = new File('../node_modules/@capgo/native-audio/android')
+include ':capgo-capacitor-native-audio'
+project(':capgo-capacitor-native-audio').projectDir = new File('../node_modules/@capgo/capacitor-native-audio/android')
 
-include ':capgo-native-market'
-project(':capgo-native-market').projectDir = new File('../node_modules/@capgo/native-market/android')
+include ':capgo-capacitor-native-market'
+project(':capgo-capacitor-native-market').projectDir = new File('../node_modules/@capgo/capacitor-native-market/android')
 
-include ':capgo-nativegeocoder'
-project(':capgo-nativegeocoder').projectDir = new File('../node_modules/@capgo/nativegeocoder/android')
+include ':capgo-capacitor-nativegeocoder'
+project(':capgo-capacitor-nativegeocoder').projectDir = new File('../node_modules/@capgo/capacitor-nativegeocoder/android')
 
-include ':capgo-ricoh360'
-project(':capgo-ricoh360').projectDir = new File('../node_modules/@capgo/ricoh360/android')
+include ':capgo-capacitor-ricoh360'
+project(':capgo-capacitor-ricoh360').projectDir = new File('../node_modules/@capgo/capacitor-ricoh360/android')
 
 include ':revenuecat-purchases-capacitor'
 project(':revenuecat-purchases-capacitor').projectDir = new File('../node_modules/@revenuecat/purchases-capacitor/android')

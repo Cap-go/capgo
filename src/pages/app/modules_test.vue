@@ -95,11 +95,11 @@ const pluginTests: PluginTest[] = [
   { packageName: '@capgo/capacitor-youtube-player', pluginName: 'YoutubePlayer', method: 'getPluginVersion', label: 'capacitor-youtube-player' },
   { packageName: '@capgo/capacitor-zebra-datawedge', pluginName: 'ZebraDataWedge', method: 'getPluginVersion', label: 'capacitor-zebra-datawedge' },
   { packageName: '@capgo/capacitor-zip', pluginName: 'CapacitorZip', method: 'getPluginVersion', label: 'capacitor-zip' },
-  { packageName: '@capgo/inappbrowser', pluginName: 'InAppBrowser', method: 'getPluginVersion', label: 'inappbrowser' },
-  { packageName: '@capgo/native-audio', pluginName: 'NativeAudio', method: 'getPluginVersion', label: 'native-audio' },
-  { packageName: '@capgo/native-market', pluginName: 'NativeMarket', method: 'getPluginVersion', label: 'native-market' },
-  { packageName: '@capgo/nativegeocoder', pluginName: 'NativeGeocoder', method: 'getPluginVersion', label: 'nativegeocoder' },
-  { packageName: '@capgo/ricoh360', pluginName: 'Ricoh360Camera', method: 'getPluginVersion', label: 'ricoh360' },
+  { packageName: '@capgo/capacitor-inappbrowser', pluginName: 'InAppBrowser', method: 'getPluginVersion', label: 'capacitor-inappbrowser' },
+  { packageName: '@capgo/capacitor-native-audio', pluginName: 'NativeAudio', method: 'getPluginVersion', label: 'capacitor-native-audio' },
+  { packageName: '@capgo/capacitor-native-market', pluginName: 'NativeMarket', method: 'getPluginVersion', label: 'capacitor-native-market' },
+  { packageName: '@capgo/capacitor-nativegeocoder', pluginName: 'NativeGeocoder', method: 'getPluginVersion', label: 'capacitor-nativegeocoder' },
+  { packageName: '@capgo/capacitor-ricoh360', pluginName: 'Ricoh360Camera', method: 'getPluginVersion', label: 'capacitor-ricoh360' },
   { packageName: '@revenuecat/purchases-capacitor', pluginName: 'Purchases', method: 'isConfigured', label: 'purchases-capacitor' },
 ]
 
