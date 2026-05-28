@@ -5,7 +5,7 @@ import { FormKit } from '@formkit/vue'
 import { VueDatePicker } from '@vuepic/vue-datepicker'
 import { useDark } from '@vueuse/core'
 import dayjs from 'dayjs'
-import { computed, ref, watch } from 'vue'
+import { computed, h, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import IconArrowPath from '~icons/heroicons/arrow-path'
@@ -13,10 +13,10 @@ import IconCalendar from '~icons/heroicons/calendar'
 import IconClipboard from '~icons/heroicons/clipboard-document'
 import IconPencil from '~icons/heroicons/pencil'
 import IconTrash from '~icons/heroicons/trash'
+import IconXMark from '~icons/heroicons/x-mark'
 import {
   confirmApiKeyDeletion,
   confirmApiKeyRegeneration,
-  formatApiKeyScope,
   isApiKeyExpired,
   showApiKeySecretModal,
   sortApiKeyRows,
@@ -48,6 +48,21 @@ interface RoleBindingRow {
   role_name: string
 }
 
+interface ScopeBadgeItem {
+  id: string
+  label: string
+  filterId?: string | null
+  type?: 'org' | 'app'
+}
+
+interface ScopePickerState {
+  title: string
+  items: ScopeBadgeItem[]
+  x: number
+  y: number
+  width: number
+}
+
 const { t } = useI18n()
 const isDark = useDark()
 const dialogStore = useDialogV2Store()
@@ -55,9 +70,16 @@ const displayStore = useDisplayStore()
 const main = useMainStore()
 const currentPage = ref(1)
 const isLoading = ref(false)
+const scopeFilters = ref<Record<string, boolean>>({})
+const hasUserChangedScopeFilters = ref(false)
+const hasInitialScopeFilterInUrl = new URLSearchParams(window.location.search).has('filter')
+const defaultScopeFilterKey = ref<string | null>(null)
+const scopePicker = ref<ScopePickerState | null>(null)
+const scopePickerQuery = ref('')
 const supabase = useSupabase()
 const keys = ref<Database['public']['Tables']['apikeys']['Row'][]>([])
 const organizationStore = useOrganizationStore()
+const currentOrganizationId = computed(() => organizationStore.currentOrganization?.gid ?? null)
 const columns: Ref<TableColumn[]> = ref<TableColumn[]>([])
 
 // RBAC data
@@ -93,6 +115,7 @@ const minExpirationDate = computed(() => {
 // Cache for organization and app names
 const orgCache = ref(new Map<string, string>())
 const appCache = ref(new Map<string, string>())
+const organizationNameById = computed(() => new Map(organizationStore.organizations.map(org => [org.gid, org.name])))
 
 // Function to truncate strings (show first 5 and last 5 characters)
 function hideString(str: string | null) {
@@ -163,8 +186,208 @@ function getDisplayAppIds(key: Database['public']['Tables']['apikeys']['Row']): 
   return getRbacAppBindingIds(key)
 }
 
+function getDisplayOrgItems(key: Database['public']['Tables']['apikeys']['Row']): ScopeBadgeItem[] {
+  const orgIds = getDisplayOrgIds(key)
+  if (coversAllOrganizations(orgIds)) {
+    return [{ id: 'all', label: t('key-all'), filterId: null, type: 'org' }]
+  }
+  return orgIds.map(orgId => ({
+    id: orgId,
+    label: orgCache.value.get(orgId) || t('unknown'),
+    filterId: orgId,
+    type: 'org',
+  }))
+}
+
+function getDisplayOrgNames(key: Database['public']['Tables']['apikeys']['Row']): string[] {
+  return getDisplayOrgItems(key).map(item => item.label)
+}
+
+function getDisplayAppItems(key: Database['public']['Tables']['apikeys']['Row']): ScopeBadgeItem[] {
+  return getDisplayAppIds(key).map(appId => ({
+    id: appId,
+    label: appCache.value.get(appId) || t('unknown'),
+    filterId: appId,
+    type: 'app',
+  }))
+}
+
+function getDisplayAppNames(key: Database['public']['Tables']['apikeys']['Row']): string[] {
+  return getDisplayAppItems(key).map(item => item.label)
+}
+
 function formatDisplayApps(key: Database['public']['Tables']['apikeys']['Row']) {
-  return getDisplayAppIds(key).map(appId => appCache.value.get(appId) || 'Unknown').join(', ')
+  return getDisplayAppNames(key).join(', ')
+}
+
+function formatDisplayOrganizations(key: Database['public']['Tables']['apikeys']['Row']) {
+  return getDisplayOrgNames(key).join(', ')
+}
+
+function capitalizeLabel(label: string) {
+  return label.charAt(0).toUpperCase() + label.slice(1)
+}
+
+function makeScopeFilterKey(type: 'org' | 'app', id: string) {
+  return `${type}:${id}`
+}
+
+function parseScopeFilterKey(key: string) {
+  const [type, id] = key.split(':')
+  if ((type !== 'org' && type !== 'app') || !id)
+    return null
+  return { type, id } as const
+}
+
+function clearScopeFilters(markUserChange = true) {
+  if (markUserChange)
+    hasUserChangedScopeFilters.value = true
+
+  scopeFilters.value = Object.fromEntries(
+    Object.keys(scopeFilters.value).map(key => [key, false]),
+  )
+  currentPage.value = 1
+}
+
+function setSingleScopeFilter(type: 'org' | 'app', id: string | null, markUserChange = true) {
+  if (markUserChange)
+    hasUserChangedScopeFilters.value = true
+
+  if (id === null) {
+    clearScopeFilters(markUserChange)
+    return
+  }
+
+  const selectedKey = makeScopeFilterKey(type, id)
+  const filterKeys = Array.from(new Set([...Object.keys(scopeFilters.value), selectedKey]))
+  scopeFilters.value = Object.fromEntries(
+    filterKeys.map(key => [key, key === selectedKey]),
+  )
+  currentPage.value = 1
+}
+
+function updateScopeFilters(filters: Record<string, boolean>) {
+  hasUserChangedScopeFilters.value = true
+  scopeFilters.value = filters
+  currentPage.value = 1
+}
+
+function isFilterableScopeItem(item: ScopeBadgeItem): item is ScopeBadgeItem & { type: 'org' | 'app', filterId: string | null } {
+  return !!item.type && Object.hasOwn(item, 'filterId')
+}
+
+function isScopeItemActive(item: ScopeBadgeItem) {
+  if (!isFilterableScopeItem(item))
+    return false
+  if (item.filterId === null)
+    return !Object.values(scopeFilters.value).some(Boolean)
+  return !!scopeFilters.value[makeScopeFilterKey(item.type, item.filterId)]
+}
+
+function closeScopePicker() {
+  scopePicker.value = null
+  scopePickerQuery.value = ''
+}
+
+function selectScopeItem(item: ScopeBadgeItem) {
+  if (!isFilterableScopeItem(item))
+    return
+
+  setSingleScopeFilter(item.type, item.filterId)
+  closeScopePicker()
+}
+
+function openScopePicker(event: MouseEvent, label: string, items: ScopeBadgeItem[]) {
+  const trigger = event.currentTarget as HTMLElement
+  const rect = trigger.getBoundingClientRect()
+  const width = Math.min(340, window.innerWidth - 32)
+  const estimatedHeight = Math.min(384, 76 + items.length * 44)
+  const x = Math.min(Math.max(16, rect.left), window.innerWidth - width - 16)
+  const belowY = rect.bottom + 8
+  const y = belowY + estimatedHeight <= window.innerHeight
+    ? belowY
+    : Math.max(16, rect.top - estimatedHeight - 8)
+
+  scopePicker.value = {
+    title: `${capitalizeLabel(label)} (${items.length})`,
+    items,
+    x,
+    y,
+    width,
+  }
+  scopePickerQuery.value = ''
+}
+
+const filteredScopePickerItems = computed(() => {
+  if (!scopePicker.value)
+    return []
+
+  const query = scopePickerQuery.value.trim().toLowerCase()
+  if (!query)
+    return scopePicker.value.items
+
+  return scopePicker.value.items.filter(item => item.label.toLowerCase().includes(query))
+})
+
+function renderScopeBadges(items: ScopeBadgeItem[], visibleCount: number, overflowLabel: string) {
+  const cleanItems = items.filter(item => item.label)
+  if (cleanItems.length === 0) {
+    return h('span', {
+      class: 'text-slate-400 dark:text-slate-500',
+    }, '-')
+  }
+
+  const visibleItems = cleanItems.slice(0, visibleCount)
+  const hiddenItems = cleanItems.slice(visibleCount)
+  const fullLabel = cleanItems.map(item => item.label).join(', ')
+
+  return h('div', {
+    'class': 'flex min-w-0 max-w-full items-center gap-1.5 overflow-hidden',
+    'title': fullLabel,
+    'aria-label': fullLabel,
+  }, [
+    ...visibleItems.map((item) => {
+      const isFilterable = isFilterableScopeItem(item)
+      const isActive = isScopeItemActive(item)
+      const chipClass = [
+        'min-w-0 max-w-[9rem] truncate rounded-md border px-2 py-0.5 text-xs font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:ring-offset-1 dark:focus:ring-offset-slate-800',
+        isActive
+          ? 'border-cyan-300 bg-cyan-50 text-cyan-700 dark:border-cyan-500/40 dark:bg-cyan-500/15 dark:text-cyan-200'
+          : 'border-slate-200 bg-slate-100 text-slate-700 dark:border-slate-600 dark:bg-slate-700/60 dark:text-slate-200',
+        isFilterable ? 'cursor-pointer hover:border-cyan-300 hover:text-cyan-700 dark:hover:border-cyan-500/40 dark:hover:text-cyan-200' : '',
+      ].join(' ')
+
+      if (!isFilterable) {
+        return h('span', {
+          class: chipClass,
+          title: item.label,
+        }, item.label)
+      }
+
+      return h('button', {
+        type: 'button',
+        class: chipClass,
+        title: item.label,
+        onClick: (event: MouseEvent) => {
+          event.stopPropagation()
+          selectScopeItem(item)
+        },
+      }, item.label)
+    }),
+    hiddenItems.length > 0
+      ? h('button', {
+          'type': 'button',
+          'class': 'shrink-0 rounded-md border border-cyan-200 bg-cyan-50 px-2 py-0.5 text-xs font-semibold text-cyan-700 dark:border-cyan-500/30 dark:bg-cyan-500/10 dark:text-cyan-200',
+          'title': hiddenItems.map(item => item.label).join(', '),
+          'aria-label': `${hiddenItems.length} ${overflowLabel}`,
+          'aria-haspopup': 'dialog',
+          'onClick': (event: MouseEvent) => {
+            event.stopPropagation()
+            openScopePicker(event, overflowLabel, cleanItems)
+          },
+        }, `+${hiddenItems.length}`)
+      : null,
+  ])
 }
 
 function cacheAppNames(apps: { id: string | null, app_id: string, name: string | null }[]) {
@@ -178,7 +401,7 @@ function cacheAppNames(apps: { id: string | null, app_id: string, name: string |
 }
 
 function getOrgNameById(orgId: string) {
-  return orgCache.value.get(orgId) || orgId
+  return orgCache.value.get(orgId) || organizationNameById.value.get(orgId) || orgId
 }
 
 const selectedOrgNamesForCreation = computed(() => {
@@ -194,6 +417,9 @@ const uniqueOrgIds = computed(() => {
     return new Set<string>()
 
   const orgIds = new Set<string>()
+  if (currentOrganizationId.value)
+    orgIds.add(currentOrganizationId.value)
+
   allBindings.value.forEach((b) => {
     if (b.org_id)
       orgIds.add(b.org_id)
@@ -216,10 +442,74 @@ const uniqueAppIds = computed(() => {
   return appIds
 })
 
-// Helper computed property to get organization name by ID
-const getOrgName = computed(() => {
-  return (orgId: string) => orgCache.value.get(orgId) || 'Unknown'
-})
+const orgFilterOptions = computed(() => Array.from(uniqueOrgIds.value)
+  .map(orgId => ({
+    id: orgId,
+    name: orgCache.value.get(orgId) || getOrgNameById(orgId),
+  }))
+  .sort((a, b) => a.name.localeCompare(b.name)))
+
+const appFilterOptions = computed(() => Array.from(uniqueAppIds.value)
+  .map(appId => ({
+    id: appId,
+    name: appCache.value.get(appId) || t('unknown'),
+  }))
+  .sort((a, b) => a.name.localeCompare(b.name)))
+
+const scopeFilterLabels = computed(() => ({
+  ...Object.fromEntries(orgFilterOptions.value.map(org => [
+    makeScopeFilterKey('org', org.id),
+    `${capitalizeLabel(t('organizations'))}: ${org.name}`,
+  ])),
+  ...Object.fromEntries(appFilterOptions.value.map(app => [
+    makeScopeFilterKey('app', app.id),
+    `${capitalizeLabel(t('apps'))}: ${app.name}`,
+  ])),
+}))
+
+function syncScopeFilters() {
+  const labels = scopeFilterLabels.value
+  const nextFilters = Object.fromEntries(
+    Object.keys(labels).map(key => [key, scopeFilters.value[key] ?? false]),
+  )
+
+  if (JSON.stringify(nextFilters) !== JSON.stringify(scopeFilters.value))
+    scopeFilters.value = nextFilters
+}
+
+function applyCurrentOrganizationDefaultFilter() {
+  if (hasInitialScopeFilterInUrl || hasUserChangedScopeFilters.value)
+    return
+
+  const orgId = currentOrganizationId.value
+  if (!orgId)
+    return
+
+  const filterKey = makeScopeFilterKey('org', orgId)
+  if (!(filterKey in scopeFilterLabels.value))
+    return
+
+  const activeFilterKeys = Object.entries(scopeFilters.value)
+    .filter(([, enabled]) => enabled)
+    .map(([key]) => key)
+  if (
+    activeFilterKeys.length > 0
+    && (activeFilterKeys.length > 1 || activeFilterKeys[0] !== defaultScopeFilterKey.value)
+  ) {
+    return
+  }
+
+  setSingleScopeFilter('org', orgId, false)
+  defaultScopeFilterKey.value = filterKey
+}
+
+function selectedScopeFilterIds(type: 'org' | 'app') {
+  return Object.entries(scopeFilters.value)
+    .filter(([, enabled]) => enabled)
+    .map(([key]) => parseScopeFilterKey(key))
+    .filter((parsed): parsed is { type: 'org' | 'app', id: string } => parsed?.type === type)
+    .map(parsed => parsed.id)
+}
 
 // Function to fetch organization and app names in parallel
 async function fetchOrgAndAppNames() {
@@ -277,12 +567,31 @@ const searchQuery = ref('')
 const filteredAndSortedKeys = computed(() => {
   let result = keys.value ?? []
 
+  const orgFilterIds = selectedScopeFilterIds('org')
+  if (orgFilterIds.length > 0) {
+    result = result.filter((key) => {
+      const orgIds = getDisplayOrgIds(key)
+      return orgFilterIds.some(orgId => orgIds.includes(orgId))
+    })
+  }
+
+  const appFilterIds = selectedScopeFilterIds('app')
+  if (appFilterIds.length > 0) {
+    result = result.filter((key) => {
+      const appIds = getDisplayAppIds(key)
+      return appFilterIds.some(appId => appIds.includes(appId))
+    })
+  }
+
   // Filter first
   if (searchQuery.value) {
     const query = searchQuery.value.toLowerCase()
     result = result.filter(key =>
       key.name?.toLowerCase().includes(query)
-      || key.key?.toLowerCase().includes(query),
+      || key.key?.toLowerCase().includes(query)
+      || getRoleDisplayName(getHighestRole(key) || '').toLowerCase().includes(query)
+      || formatDisplayOrganizations(key).toLowerCase().includes(query)
+      || formatDisplayApps(key).toLowerCase().includes(query),
     )
   }
 
@@ -404,18 +713,17 @@ columns.value = [
   {
     key: 'org_scope',
     label: t('organizations'),
-    displayFunction: (row: Database['public']['Tables']['apikeys']['Row']) => {
-      const orgIds = getDisplayOrgIds(row)
-      if (coversAllOrganizations(orgIds))
-        return '*'
-      return formatApiKeyScope(orgIds, orgId => getOrgName.value(orgId))
+    class: 'w-[16rem] max-w-[16rem]',
+    renderFunction: (row: Database['public']['Tables']['apikeys']['Row']) => {
+      return renderScopeBadges(getDisplayOrgItems(row), 2, t('organizations'))
     },
   },
   {
     key: 'app_scope',
     label: t('apps'),
-    displayFunction: (row: Database['public']['Tables']['apikeys']['Row']) => {
-      return formatDisplayApps(row)
+    class: 'w-[22rem] max-w-[22rem]',
+    renderFunction: (row: Database['public']['Tables']['apikeys']['Row']) => {
+      return renderScopeBadges(getDisplayAppItems(row), 3, t('apps'))
     },
   },
   {
@@ -954,6 +1262,11 @@ async function copyKey(apikey: Database['public']['Tables']['apikeys']['Row']) {
 }
 
 // Watch for org selection changes to prune app bindings
+watch([scopeFilterLabels, currentOrganizationId], () => {
+  syncScopeFilters()
+  applyCurrentOrganizationDefaultFilter()
+}, { immediate: true })
+
 watch(selectedOrgsForCreation, () => {
   pruneAppBindings()
   ensureSelectedOrgRoleAllowed()
@@ -988,11 +1301,15 @@ getKeys()
               :auto-reload="false"
               :columns="columns"
               :element-list="filteredAndSortedKeys"
+              :filter-labels="scopeFilterLabels"
+              :filters="scopeFilters"
+              filter-text="scope"
               :is-loading="isLoading"
               :total="filteredAndSortedKeys.length"
               :search-placeholder="t('search-api-keys')"
               :search="searchQuery"
               @add="addNewApiKey"
+              @update:filters="updateScopeFilters"
               @update:search="searchQuery = $event"
               @reload="getKeys()"
               @reset="refreshData()"
@@ -1031,6 +1348,61 @@ getKeys()
           </div>
         </div>
       </div>
+
+      <Teleport to="body">
+        <div
+          v-if="scopePicker"
+          class="fixed inset-0 z-40"
+          @click="closeScopePicker"
+        />
+        <div
+          v-if="scopePicker"
+          class="fixed z-50 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-800"
+          :style="{ left: `${scopePicker.x}px`, top: `${scopePicker.y}px`, width: `${scopePicker.width}px` }"
+          role="dialog"
+          :aria-label="scopePicker.title"
+        >
+          <div class="flex items-center justify-between gap-3 border-b border-slate-200 px-3 py-2 dark:border-slate-700">
+            <h2 class="min-w-0 truncate text-sm font-semibold text-slate-800 dark:text-slate-100">
+              {{ scopePicker.title }}
+            </h2>
+            <button
+              type="button"
+              class="flex size-8 shrink-0 items-center justify-center rounded-md text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-800 focus:ring-2 focus:ring-cyan-500 focus:outline-none dark:text-slate-300 dark:hover:bg-slate-700 dark:hover:text-white"
+              :aria-label="t('close')"
+              @click="closeScopePicker"
+            >
+              <IconXMark class="size-4" />
+            </button>
+          </div>
+          <div v-if="scopePicker.items.length > 8" class="border-b border-slate-200 p-2 dark:border-slate-700">
+            <input
+              v-model="scopePickerQuery"
+              type="search"
+              class="min-h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-800 focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/30 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
+              :placeholder="t('search-scope-items')"
+            >
+          </div>
+          <ul class="max-h-80 overflow-y-auto p-2">
+            <li v-for="item in filteredScopePickerItems" :key="`${item.type ?? 'item'}-${item.id}`">
+              <button
+                type="button"
+                class="flex min-h-11 w-full items-center rounded-md px-3 py-2 text-left text-sm text-slate-700 transition-colors hover:bg-cyan-50 hover:text-cyan-700 focus:ring-2 focus:ring-cyan-500 focus:outline-none dark:text-slate-200 dark:hover:bg-cyan-500/10 dark:hover:text-cyan-200"
+                :class="isScopeItemActive(item) ? 'bg-cyan-50 text-cyan-700 dark:bg-cyan-500/10 dark:text-cyan-200' : ''"
+                @click="selectScopeItem(item)"
+              >
+                <span class="min-w-0 flex-1 truncate">{{ item.label }}</span>
+              </button>
+            </li>
+          </ul>
+          <div
+            v-if="filteredScopePickerItems.length === 0"
+            class="px-4 py-6 text-center text-sm text-slate-500 dark:text-slate-400"
+          >
+            {{ t('no_elements_found') }}
+          </div>
+        </div>
+      </Teleport>
 
       <!-- Teleport Content for Add New Key Modal -->
       <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.title === t('alert-add-new-key')" defer to="#dialog-v2-content">
