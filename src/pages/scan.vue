@@ -40,6 +40,7 @@ let barcodeScannedListener: PluginListenerHandle | null = null
 let barcodeScanErrorListener: PluginListenerHandle | null = null
 let cameraPreviewStarted = false
 let isHandlingBarcode = false
+let barcodeWatchdogTimer: ReturnType<typeof setTimeout> | null = null
 
 interface PreviewPayload {
   appId?: string
@@ -508,6 +509,38 @@ async function removeScannerListeners() {
   barcodeScanErrorListener = null
 }
 
+function clearBarcodeWatchdog() {
+  if (!barcodeWatchdogTimer)
+    return
+
+  clearTimeout(barcodeWatchdogTimer)
+  barcodeWatchdogTimer = null
+}
+
+function startBarcodeWatchdog(startResult: unknown) {
+  clearBarcodeWatchdog()
+  barcodeWatchdogTimer = setTimeout(async () => {
+    barcodeWatchdogTimer = null
+
+    if (!isScanning.value || isHandlingBarcode)
+      return
+
+    let previewSize: unknown
+    try {
+      previewSize = await CameraPreview.getPreviewSize()
+    }
+    catch (error) {
+      previewSize = formatDebugData(error)
+    }
+
+    debugLog('barcode scanner still waiting for QR', {
+      isScanning: isScanning.value,
+      previewSize,
+      startResult,
+    })
+  }, 2500)
+}
+
 function setCameraPreviewActive(active: boolean) {
   document.documentElement.classList.toggle('camera-preview-active', active)
   document.body.classList.toggle('camera-preview-active', active)
@@ -538,6 +571,7 @@ function getScannerFrame() {
 
 async function stopScanner(force = false) {
   debugLog('stopScanner called', { cameraPreviewStarted, force, isScanning: isScanning.value })
+  clearBarcodeWatchdog()
 
   if (!cameraPreviewStarted && !force) {
     isScanning.value = false
@@ -599,6 +633,7 @@ async function startScanner() {
 
     await removeScannerListeners()
     barcodeScannedListener = await CameraPreview.addListener('barcodeScanned', async ({ barcodes }: BarcodeScannedEvent) => {
+      clearBarcodeWatchdog()
       debugLog('barcodeScanned event received', {
         count: barcodes.length,
         values: barcodes.map(barcode => ({
@@ -635,16 +670,17 @@ async function startScanner() {
     const startResult = await CameraPreview.start({
       ...frame,
       aspectMode: 'cover',
-      barcodeScanner: {
-        detectionInterval: 350,
-        formats: ['qr_code'],
-      },
       disableAudio: true,
       force: true,
       position: 'rear',
       toBack: true,
     })
     debugLog('camera preview started', startResult)
+
+    debugLog('starting native barcode scanner', { detectionInterval: 250, formats: 'all' })
+    await CameraPreview.startBarcodeScanner({ detectionInterval: 250 })
+    debugLog('native barcode scanner started')
+    startBarcodeWatchdog(startResult)
   }
   catch (error) {
     debugWarn('failed to start scanner', error)
