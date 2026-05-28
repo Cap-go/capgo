@@ -108,7 +108,6 @@ beforeAll(async () => {
     created_by: USER_ID,
     customer_id: customerId,
     // This suite keeps the classic org membership path enabled while API keys use V2 bindings.
-    use_new_rbac: false,
   })
   if (error)
     throw error

@@ -32,25 +32,15 @@ VALUES
 )
 ON CONFLICT (id) DO NOTHING;
 
-INSERT INTO public.orgs (id, created_by, name, management_email, use_new_rbac)
+INSERT INTO public.orgs (id, created_by, name, management_email)
 VALUES
 (
     '55555555-5555-4555-8555-555555555555',
     tests.get_supabase_uid('shared_public_image_owner'),
     'Shared Public Images Org',
-    'shared-public-owner@test.local',
-    false
+    'shared-public-owner@test.local'
 )
 ON CONFLICT (id) DO NOTHING;
-
-INSERT INTO public.org_users (user_id, org_id, user_right)
-VALUES
-(
-    tests.get_supabase_uid('shared_public_image_owner'),
-    '55555555-5555-4555-8555-555555555555',
-    'admin'::public.user_min_right
-)
-ON CONFLICT DO NOTHING;
 
 INSERT INTO public.apps (app_id, icon_url, user_id, name, owner_org)
 VALUES

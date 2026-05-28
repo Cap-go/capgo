@@ -190,7 +190,6 @@ BEGIN
 
     UPDATE public.orgs
     SET
-        use_new_rbac = true,
         password_policy_config = v_policy
     WHERE id = '046a36ac-e03c-4590-9257-bd6c9dba9ee8'::uuid;
 

@@ -25,7 +25,6 @@ async function setupTestOrg() {
     created_by: USER_ID,
     name: TEST_ORG_NAME,
     management_email: TEST_ORG_EMAIL,
-    use_new_rbac: true,
   })
   if (orgError)
     throw orgError

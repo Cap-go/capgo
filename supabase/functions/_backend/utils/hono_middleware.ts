@@ -69,51 +69,34 @@ async function resolveOrgIdForRbac(c: Context, options?: RbacContextOptions) {
 
 async function setRbacContextForOrg(c: Context, orgId: string) {
   c.set('resolvedOrgId', orgId)
-  let pgClient
-  try {
-    pgClient = getPgClient(c, true)
-    const drizzleClient = getDrizzleClient(pgClient)
-    const result = await drizzleClient.execute(
-      sql`SELECT public.rbac_is_enabled_for_org(${orgId}::uuid) as enabled`,
-    )
-    const enabled = (result.rows[0] as any)?.enabled === true
-    c.set('rbacEnabled', enabled)
+  c.set('rbacEnabled', true)
 
-    cloudlog({
-      requestId: c.get('requestId'),
-      message: 'middlewareRbacContext: resolved',
-      orgId,
-      rbacEnabled: enabled,
-    })
-  }
-  catch (e) {
-    logPgError(c, 'middlewareRbacContext:checkRbacEnabled', e)
-    c.set('rbacEnabled', false)
-  }
-  finally {
-    if (pgClient) {
-      await closeClient(c, pgClient)
-    }
-  }
-}
-
-function setRbacContextLegacy(c: Context) {
-  c.set('rbacEnabled', false)
   cloudlog({
     requestId: c.get('requestId'),
-    message: 'middlewareRbacContext: no orgId resolved, defaulting to legacy',
+    message: 'middlewareRbacContext: resolved',
+    orgId,
+    rbacEnabled: true,
+  })
+}
+
+function setRbacContextWithoutOrg(c: Context) {
+  c.set('rbacEnabled', true)
+  cloudlog({
+    requestId: c.get('requestId'),
+    message: 'middlewareRbacContext: no orgId resolved',
+    rbacEnabled: true,
   })
 }
 
 /**
- * Middleware that resolves and caches the RBAC feature flag for the current org.
+ * Middleware that resolves and caches the RBAC context for the current org.
  * Should be used after authentication middleware and when orgId is known.
  *
  * Usage:
  *   app.use('/app/*', middlewareV2(['all']), middlewareRbacContext())
  *
  * After this middleware runs:
- *   - c.get('rbacEnabled') - boolean indicating if RBAC is enabled for the org
+ *   - c.get('rbacEnabled') - true; RBAC is the only authorization system
  *   - c.get('resolvedOrgId') - the resolved org ID (if provided)
  */
 export function middlewareRbacContext(options?: RbacContextOptions) {
@@ -123,7 +106,7 @@ export function middlewareRbacContext(options?: RbacContextOptions) {
       await setRbacContextForOrg(c, orgId)
     }
     else {
-      setRbacContextLegacy(c)
+      setRbacContextWithoutOrg(c)
     }
 
     await next()

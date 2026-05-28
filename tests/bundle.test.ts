@@ -395,7 +395,6 @@ describe('[PUT] /bundle RBAC channel overrides', () => {
       name: `Bundle RBAC Org ${id}`,
       management_email: `bundle-rbac-${id}@capgo.app`,
       created_by: USER_ID,
-      use_new_rbac: true,
     })
     if (orgError)
       throw orgError

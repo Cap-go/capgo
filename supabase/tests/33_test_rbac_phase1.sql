@@ -62,13 +62,12 @@ WITH seed_data AS (
         'rbac-test-key-phase1'::text AS api_key_value
 )
 
-INSERT INTO public.orgs (id, created_by, name, management_email, use_new_rbac)
+INSERT INTO public.orgs (id, created_by, name, management_email)
 SELECT
     org_legacy,
     admin_user,
-    'Legacy Org (RBAC off)',
-    'legacy-rbac@example.com',
-    false
+    'Legacy Org (RBAC always on)',
+    'legacy-rbac@example.com'
 FROM seed_data
 ON CONFLICT (id) DO NOTHING;
 
@@ -78,13 +77,12 @@ WITH seed_data AS (
         '22222222-2222-4222-8222-222222222222'::uuid AS org_rbac
 )
 
-INSERT INTO public.orgs (id, created_by, name, management_email, use_new_rbac)
+INSERT INTO public.orgs (id, created_by, name, management_email)
 SELECT
     org_rbac,
     admin_user,
     'RBAC Org',
-    'rbac-enabled@example.com',
-    true
+    'rbac-enabled@example.com'
 FROM seed_data
 ON CONFLICT (id) DO NOTHING;
 
@@ -420,9 +418,7 @@ SELECT
 SELECT tests.authenticate_as_service_role();
 SELECT set_config('request.headers', '{}', true);
 
--- 6) The old RBAC flag is now compatibility-only; RBAC grants remain authoritative
-UPDATE public.orgs SET use_new_rbac = false
-WHERE id = '22222222-2222-4222-8222-222222222222';
+-- 6) RBAC grants remain authoritative without the old rollout flag
 
 SELECT
     ok(
@@ -434,11 +430,8 @@ SELECT
             null::bigint,
             null::varchar
         ),
-        'RBAC compatibility flag does not disable role bindings'
+        'RBAC remains authoritative without the old rollout flag'
     );
-
-UPDATE public.orgs SET use_new_rbac = true
-WHERE id = '22222222-2222-4222-8222-222222222222';
 
 SELECT
     is(

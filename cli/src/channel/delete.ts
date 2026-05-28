@@ -1,16 +1,16 @@
 import type { ChannelDeleteOptions } from '../schemas/channel'
 import { intro, log, outro } from '@clack/prompts'
-import { check2FAComplianceForApp, checkAppExists } from '../api/app'
+import { check2FAComplianceForApp, checkAppExistsAndHasPermissionOrgErr } from '../api/app'
 import { delChannel, delChannelDevices, findBundleIdByChannelName, findChannel } from '../api/channels'
 import { deleteAppVersion } from '../api/versions'
 import {
-  assertCliPermission,
   createSupabaseClient,
   findSavedKey,
   formatError,
   getAppId,
   getConfig,
   getOrganizationId,
+  OrganizationPerm,
   resolveUserIdFromApiKey,
   sendEvent,
 } from '../utils'
@@ -39,11 +39,17 @@ export async function deleteChannelInternal(channelId: string, appId: string, op
   await check2FAComplianceForApp(supabase, appId, silent)
   const userId = await resolveUserIdFromApiKey(supabase, options.apikey)
 
-  if (!(await checkAppExists(supabase, appId))) {
-    const msg = `App ${appId} does not exist`
-    if (!silent)
-      log.error(msg)
-    throw new Error(msg)
+  await checkAppExistsAndHasPermissionOrgErr(supabase, options.apikey, appId, OrganizationPerm.admin, silent, true)
+
+  if (options.deleteBundle && !silent)
+    log.info(`Deleting bundle ${appId}#${channelId} from Capgo`)
+
+  if (options.deleteBundle) {
+    const bundle = await findBundleIdByChannelName(supabase, appId, channelId)
+    if (bundle?.name && !silent)
+      log.info(`Deleting bundle ${bundle.name} from Capgo`)
+    if (bundle?.name)
+      await deleteAppVersion(supabase, appId, bundle.name)
   }
 
   const { data: channel, error: channelError } = await findChannel(supabase, appId, channelId)
@@ -58,22 +64,6 @@ export async function deleteChannelInternal(channelId: string, appId: string, op
     }
 
     throw new Error(`Channel ${channelId} not found`)
-  }
-
-  await assertCliPermission(supabase, options.apikey, 'channel.delete', { appId, channelId: channel.id }, {
-    message: `Insufficient permissions to delete channel ${channelId} for app ${appId}`,
-    silent,
-  })
-
-  if (options.deleteBundle && !silent)
-    log.info(`Deleting bundle ${appId}#${channelId} from Capgo`)
-
-  if (options.deleteBundle) {
-    const bundle = await findBundleIdByChannelName(supabase, appId, channelId)
-    if (bundle?.name && !silent)
-      log.info(`Deleting bundle ${bundle.name} from Capgo`)
-    if (bundle?.name)
-      await deleteAppVersion(supabase, appId, bundle.name)
   }
 
   const { error: delDevicesError } = await delChannelDevices(supabase, appId, channel.id)

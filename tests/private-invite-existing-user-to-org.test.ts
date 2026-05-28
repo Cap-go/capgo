@@ -46,7 +46,6 @@ async function createInviteTestFixture(options?: {
     management_email: orgEmail,
     created_by: USER_ID,
     customer_id: customerId,
-    use_new_rbac: false,
   })
   if (orgError)
     throw orgError

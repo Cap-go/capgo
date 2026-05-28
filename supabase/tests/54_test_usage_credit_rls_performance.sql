@@ -202,7 +202,6 @@ INSERT INTO public.orgs (
   created_by,
   name,
   management_email,
-  use_new_rbac,
   enforcing_2fa
 )
 VALUES (
@@ -210,7 +209,6 @@ VALUES (
   '70000000-0000-4000-8000-000000005401',
   'Usage Credit RBAC API key org',
   'usage-credit-rbac-key@test.local',
-  true,
   true
 )
 ON CONFLICT (id) DO NOTHING;

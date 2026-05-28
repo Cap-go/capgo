@@ -19,13 +19,12 @@ VALUES
   (tests.get_supabase_uid('get_org_apikeys_app_bound_owner'), 'get_org_apikeys_app_bound_owner@test.local', NOW(), NOW())
 ON CONFLICT (id) DO NOTHING;
 
-INSERT INTO public.orgs (id, created_by, name, management_email, use_new_rbac)
+INSERT INTO public.orgs (id, created_by, name, management_email)
 VALUES (
   '70000000-0000-4000-8000-000000000047',
   tests.get_supabase_uid('get_org_apikeys_admin'),
   'Get org apikeys permission org',
-  'get-org-apikeys@test.local',
-  true
+  'get-org-apikeys@test.local'
 )
 ON CONFLICT (id) DO NOTHING;
 

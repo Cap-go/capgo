@@ -159,13 +159,12 @@ SELECT tests.clear_authentication();
 -- Test 6: Regular authenticated user cannot call the function (private function)
 SELECT tests.authenticate_as('test_2fa_user_reject');
 SELECT
-    throws_ok(
-        format(
-            'SELECT reject_access_due_to_2fa(''%s'', ''%s'')',
-            current_setting('test.org_with_2fa_reject')::uuid,
-            tests.get_supabase_uid('test_2fa_user_reject')
+    ok(
+        NOT has_function_privilege(
+            'authenticated',
+            'public.reject_access_due_to_2fa(uuid,uuid)',
+            'EXECUTE'
         ),
-        'permission denied for function reject_access_due_to_2fa',
         'reject_access_due_to_2fa test - regular authenticated user cannot call function'
     );
 SELECT tests.clear_authentication();
@@ -173,13 +172,12 @@ SELECT tests.clear_authentication();
 -- Test 7: User without 2FA cannot call the function (private function)
 SELECT tests.authenticate_as('test_no_2fa_user_reject');
 SELECT
-    throws_ok(
-        format(
-            'SELECT reject_access_due_to_2fa(''%s'', ''%s'')',
-            current_setting('test.org_with_2fa_reject')::uuid,
-            tests.get_supabase_uid('test_no_2fa_user_reject')
+    ok(
+        NOT has_function_privilege(
+            'authenticated',
+            'public.reject_access_due_to_2fa(uuid,uuid)',
+            'EXECUTE'
         ),
-        'permission denied for function reject_access_due_to_2fa',
         'reject_access_due_to_2fa test - user without 2FA cannot call function'
     );
 SELECT tests.clear_authentication();
@@ -187,13 +185,12 @@ SELECT tests.clear_authentication();
 -- Test 8: Anonymous user cannot call the function (private function)
 SELECT tests.clear_authentication();
 SELECT
-    throws_ok(
-        format(
-            'SELECT reject_access_due_to_2fa(''%s'', ''%s'')',
-            current_setting('test.org_with_2fa_reject')::uuid,
-            tests.get_supabase_uid('test_2fa_user_reject')
+    ok(
+        NOT has_function_privilege(
+            'anon',
+            'public.reject_access_due_to_2fa(uuid,uuid)',
+            'EXECUTE'
         ),
-        'permission denied for function reject_access_due_to_2fa',
         'reject_access_due_to_2fa test - anonymous user cannot call function'
     );
 

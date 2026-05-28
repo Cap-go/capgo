@@ -52,15 +52,11 @@ BEGIN
 
     -- Add members to org WITH 2FA enforcement
     INSERT INTO public.org_users (org_id, user_id, user_right)
-    VALUES 
-        (org_with_2fa_enforcement_id, test_2fa_user_id, 'admin'::public.user_min_right),
-        (org_with_2fa_enforcement_id, test_no_2fa_user_id, 'read'::public.user_min_right);
+    VALUES (org_with_2fa_enforcement_id, test_no_2fa_user_id, 'read'::public.user_min_right);
 
     -- Add members to org WITHOUT 2FA enforcement
     INSERT INTO public.org_users (org_id, user_id, user_right)
-    VALUES 
-        (org_without_2fa_enforcement_id, test_2fa_user_id, 'admin'::public.user_min_right),
-        (org_without_2fa_enforcement_id, test_no_2fa_user_id, 'read'::public.user_min_right);
+    VALUES (org_without_2fa_enforcement_id, test_no_2fa_user_id, 'read'::public.user_min_right);
 
     -- Create app in org WITH 2FA enforcement
     INSERT INTO public.apps (app_id, owner_org, name, icon_url)

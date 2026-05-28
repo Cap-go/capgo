@@ -13,10 +13,10 @@ VALUES
   (tests.get_supabase_uid('org_create_app_writer'), 'org_create_app_writer@test.local', NOW(), NOW())
 ON CONFLICT (id) DO NOTHING;
 
-INSERT INTO public.orgs (id, created_by, name, management_email, use_new_rbac)
+INSERT INTO public.orgs (id, created_by, name, management_email)
 VALUES
-  ('70000000-0000-4000-8000-000000000001', tests.get_supabase_uid('org_create_app_admin'), 'Org Create App RBAC', 'org-create-app-rbac@test.local', true),
-  ('70000000-0000-4000-8000-000000000002', tests.get_supabase_uid('org_create_app_admin'), 'Org Create App Legacy', 'org-create-app-legacy@test.local', false)
+  ('70000000-0000-4000-8000-000000000001', tests.get_supabase_uid('org_create_app_admin'), 'Org Create App RBAC', 'org-create-app-rbac@test.local'),
+  ('70000000-0000-4000-8000-000000000002', tests.get_supabase_uid('org_create_app_admin'), 'Org Create App Legacy', 'org-create-app-legacy@test.local')
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO public.org_users (user_id, org_id, user_right)
@@ -119,7 +119,7 @@ SELECT ok(
     NULL::bigint,
     NULL::text
   ),
-  'RBAC compatibility flag still honors org_member create-app permission'
+  'RBAC always-on mode honors org_member create-app permission'
 );
 
 SELECT ok(
