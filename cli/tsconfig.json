@@ -4,7 +4,7 @@
     "lib": [
       "es2023"
     ],
-    "ignoreDeprecations": "6.0",
+    "ignoreDeprecations": "5.0",
     "baseUrl": "src",
     "module": "ESNext",
     "moduleResolution": "Bundler",
