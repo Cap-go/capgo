@@ -1741,6 +1741,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
       {/* Import: distribution mode (now FIRST visible step in import flow) */}
       {step === 'import-distribution-mode' && (
         <ImportDistributionModeStep
+          dense={dense}
           onChange={async (value) => {
             if (value === '__cancel__') {
               setImportMode(false)
@@ -1794,6 +1795,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
       {step === 'import-pick-identity' && (
         <ImportPickIdentityStep
           identityCount={importMatches.length}
+          dense={dense}
           options={[
             ...importMatches.map((m) => {
               const matchCount = m.profiles.length
@@ -1854,6 +1856,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
             matchedCount={matchedProfiles.length}
             droppedCount={droppedCount}
             distribution={importDistribution}
+            dense={dense}
             options={[
               ...matchedProfiles.map(p => ({
                 label: `📜  ${p.name} · bundle ${p.bundleId} · ${p.profileType} · expires ${p.expirationDate.split('T')[0]}`,
@@ -1913,6 +1916,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
         return (
           <ImportNoMatchRecoveryStep
             identityName={chosenIdentity.name}
+            dense={dense}
             options={[
               {
                 label: `🌐  Open Apple Developer Portal (download manually, then re-scan)`,
@@ -1973,6 +1977,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
       {step === 'import-export-warning' && chosenIdentity && (
         <ImportExportWarningStep
           identityName={chosenIdentity.name}
+          dense={dense}
           onChange={(value) => {
             if (value === 'go') {
               // First run on this CLI version: compile the Swift helper
@@ -1994,7 +1999,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
       )}
 
       {/* Import: compiling helper (one-time per CLI version) */}
-      {step === 'import-compiling-helper' && <ImportCompilingHelperStep />}
+      {step === 'import-compiling-helper' && <ImportCompilingHelperStep dense={dense} />}
 
       {/* Import: exporting (the one Keychain prompt happens here) */}
       {step === 'import-exporting' && <ImportExportingStep />}

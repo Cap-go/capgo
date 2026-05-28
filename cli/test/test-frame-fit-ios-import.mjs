@@ -2,10 +2,16 @@
 // Frame-fit tests for the iOS "import existing credentials" sub-flow step
 // components (src/build/onboarding/ui/steps/ios-import.tsx). Renders each step
 // body × each meaningful state variant through the shared harness and asserts
-// it fits the 16-row contract's body budget (13 rows) at every reference width
-// (80 + 60 cols). The list/picker steps are exercised at realistic worst cases
-// (10+ rows, long names) since their `Select` is what most threatens the budget.
-// Shape copied from test-frame-fit-ios-credentials.mjs (the batch exemplar).
+// its DENSE form fits the 16-row contract's body budget (13 rows) at every
+// reference width (80 + 60 cols). The dense form is the budget-fitting fallback
+// the parent flips on when the comfortable (default) form can't fit — so EVERY
+// assertion here passes `dense: true`. The comfortable form is intentionally NOT
+// budget-asserted (it only renders when the parent measured that it fits). The
+// list/picker steps are exercised at realistic worst cases (10+ rows, long
+// names) since their `Select` is what most threatens the budget. Spinner-only
+// steps with no `dense` branch (identical in both forms) are asserted without
+// the prop. Shape copied from test-frame-fit-ios-credentials.mjs (the batch
+// exemplar).
 import React from 'react'
 import {
   ImportCompilingHelperStep,
@@ -85,13 +91,13 @@ function makeRecoveryOptions({ withCreate = true } = {}) {
   ]
 }
 
-// ── Static spinner steps (each must trivially fit, but assert anyway so a
-//    future copy change can't silently blow the budget). ────────────────────
+// ── Static spinner steps (no `dense` branch — identical in both forms). Each
+//    must trivially fit, but assert anyway so a future copy change can't
+//    silently blow the budget. ────────────────────────────────────────────────
 const spinnerSteps = [
   ['import-scanning', h(ImportScanningStep)],
   ['import-fetching-profile', h(ImportFetchingProfileStep)],
   ['import-create-profile-only', h(ImportCreateProfileOnlyStep)],
-  ['import-compiling-helper', h(ImportCompilingHelperStep)],
   ['import-exporting', h(ImportExportingStep)],
 ]
 for (const [label, el] of spinnerSteps) {
@@ -100,105 +106,117 @@ for (const [label, el] of spinnerSteps) {
   })
 }
 
-// ── import-distribution-mode ──────────────────────────────────────────────────
-test(`import-distribution-mode fits ${BODY_BUDGET_ROWS}-row budget`, () => {
-  assertFitsBudget(h(ImportDistributionModeStep, { onChange: noop }), 'import-distribution-mode')
+// ── import-compiling-helper — dense form (the comfortable form's two wrapping
+//    paragraphs intentionally exceed the budget). ─────────────────────────────
+test(`import-compiling-helper (dense) fits ${BODY_BUDGET_ROWS}-row budget`, () => {
+  assertFitsBudget(h(ImportCompilingHelperStep, { dense: true }), 'import-compiling-helper')
 })
 
-// ── import-pick-identity — realistic & worst-case identity counts ─────────────
-test('import-pick-identity [1 identity] fits budget', () => {
+// ── import-distribution-mode ──────────────────────────────────────────────────
+test(`import-distribution-mode (dense) fits ${BODY_BUDGET_ROWS}-row budget`, () => {
+  assertFitsBudget(h(ImportDistributionModeStep, { dense: true, onChange: noop }), 'import-distribution-mode')
+})
+
+// ── import-pick-identity — realistic & worst-case identity counts (dense) ─────
+test('import-pick-identity [1 identity, dense] fits budget', () => {
   assertFitsBudget(
-    h(ImportPickIdentityStep, { identityCount: 1, options: makeIdentityOptions(1), onChange: noop }),
+    h(ImportPickIdentityStep, { identityCount: 1, options: makeIdentityOptions(1), dense: true, onChange: noop }),
     'import-pick-identity-1',
   )
 })
-test('import-pick-identity [12 identities, long names] fits budget', () => {
+test('import-pick-identity [12 identities, long names, dense] fits budget', () => {
   assertFitsBudget(
-    h(ImportPickIdentityStep, { identityCount: 12, options: makeIdentityOptions(12), onChange: noop }),
+    h(ImportPickIdentityStep, { identityCount: 12, options: makeIdentityOptions(12), dense: true, onChange: noop }),
     'import-pick-identity-12',
   )
 })
-test('import-pick-identity [12 identities, all no-match long labels] fits budget', () => {
+test('import-pick-identity [12 identities, all no-match long labels, dense] fits budget', () => {
   assertFitsBudget(
     h(ImportPickIdentityStep, {
       identityCount: 12,
       options: makeIdentityOptions(12, { noMatch: true }),
+      dense: true,
       onChange: noop,
     }),
     'import-pick-identity-12-nomatch',
   )
 })
 
-// ── import-pick-profile — small, worst-case, and with dropped hint ────────────
-test('import-pick-profile [2 profiles, no dropped] fits budget', () => {
+// ── import-pick-profile — small, worst-case, and with dropped hint (dense) ────
+test('import-pick-profile [2 profiles, no dropped, dense] fits budget', () => {
   assertFitsBudget(
     h(ImportPickProfileStep, {
       matchedCount: 2,
       droppedCount: 0,
       distribution: 'app_store',
       options: makeProfileOptions(2),
+      dense: true,
       onChange: noop,
     }),
     'import-pick-profile-2',
   )
 })
-test('import-pick-profile [12 profiles + dropped hint, ad_hoc] fits budget', () => {
+test('import-pick-profile [12 profiles + dropped hint, ad_hoc, dense] fits budget', () => {
   assertFitsBudget(
     h(ImportPickProfileStep, {
       matchedCount: 12,
       droppedCount: 7,
       distribution: 'ad_hoc',
       options: makeProfileOptions(12),
+      dense: true,
       onChange: noop,
     }),
     'import-pick-profile-12',
   )
 })
-test('import-pick-profile [no distribution known] fits budget', () => {
+test('import-pick-profile [no distribution known, dense] fits budget', () => {
   assertFitsBudget(
     h(ImportPickProfileStep, {
       matchedCount: 1,
       droppedCount: 0,
       distribution: null,
       options: makeProfileOptions(1),
+      dense: true,
       onChange: noop,
     }),
     'import-pick-profile-null-dist',
   )
 })
 
-// ── import-no-match-recovery — long identity name + all option variants ───────
-test('import-no-match-recovery [4 options, long labels] fits budget', () => {
+// ── import-no-match-recovery — long identity name + all option variants (dense)
+test('import-no-match-recovery [4 options, long labels, dense] fits budget', () => {
   assertFitsBudget(
     h(ImportNoMatchRecoveryStep, {
       identityName: LONG_IDENTITY,
       options: makeRecoveryOptions({ withCreate: true }),
+      dense: true,
       onChange: noop,
     }),
     'import-no-match-recovery-create',
   )
 })
-test('import-no-match-recovery [ad_hoc: no create option] fits budget', () => {
+test('import-no-match-recovery [ad_hoc: no create option, dense] fits budget', () => {
   assertFitsBudget(
     h(ImportNoMatchRecoveryStep, {
       identityName: LONG_IDENTITY,
       options: makeRecoveryOptions({ withCreate: false }),
+      dense: true,
       onChange: noop,
     }),
     'import-no-match-recovery-no-create',
   )
 })
 
-// ── import-export-warning — short and long identity names ─────────────────────
-test('import-export-warning [short identity] fits budget', () => {
+// ── import-export-warning — short and long identity names (dense) ─────────────
+test('import-export-warning [short identity, dense] fits budget', () => {
   assertFitsBudget(
-    h(ImportExportWarningStep, { identityName: 'Apple Distribution: X (Y)', onChange: noop }),
+    h(ImportExportWarningStep, { identityName: 'Apple Distribution: X (Y)', dense: true, onChange: noop }),
     'import-export-warning-short',
   )
 })
-test('import-export-warning [long identity] fits budget', () => {
+test('import-export-warning [long identity, dense] fits budget', () => {
   assertFitsBudget(
-    h(ImportExportWarningStep, { identityName: LONG_IDENTITY, onChange: noop }),
+    h(ImportExportWarningStep, { identityName: LONG_IDENTITY, dense: true, onChange: noop }),
     'import-export-warning-long',
   )
 })
