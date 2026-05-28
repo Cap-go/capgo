@@ -30,6 +30,7 @@ const errorMessage = ref('')
 const manualUrl = ref('')
 const statusMessage = ref('')
 const scannerFrameRef = ref<HTMLElement | null>(null)
+const debugMessages = ref<string[]>([])
 
 let downloadListener: Awaited<ReturnType<typeof CapacitorUpdater.addListener>> | null = null
 let barcodeScannedListener: PluginListenerHandle | null = null
@@ -44,6 +45,38 @@ interface PreviewPayload {
   checksum?: string | null
   sessionKey?: string | null
   manifest?: DownloadOptions['manifest']
+}
+
+function formatDebugData(data: unknown) {
+  try {
+    if (data instanceof Error)
+      return data.stack || data.message
+
+    const serialized = typeof data === 'string' ? data : JSON.stringify(data)
+    return serialized.length > 280 ? `${serialized.slice(0, 280)}...` : serialized
+  }
+  catch {
+    return String(data)
+  }
+}
+
+function debugLog(message: string, data?: unknown) {
+  const line = data === undefined ? message : `${message}: ${formatDebugData(data)}`
+  debugMessages.value = [`${new Date().toISOString().slice(11, 19)} ${line}`, ...debugMessages.value].slice(0, 16)
+
+  if (data === undefined)
+    console.log('[PreviewScan]', message)
+  else
+    console.log('[PreviewScan]', message, data)
+}
+
+function debugWarn(message: string, data?: unknown) {
+  debugLog(message, data)
+
+  if (data === undefined)
+    console.warn('[PreviewScan]', message)
+  else
+    console.warn('[PreviewScan]', message, data)
 }
 
 function parseSafeUrl(value: string) {
@@ -122,18 +155,23 @@ const downloadHost = computed(() => {
 onMounted(async () => {
   displayStore.NavTitle = 'Test preview'
   displayStore.defaultBack = '/login'
+  debugLog('scan page mounted', { isNativePlatform, previewQuery: route.query.preview })
 
   const previewLink = Array.isArray(route.query.preview) ? route.query.preview[0] : route.query.preview
   if (previewLink) {
+    debugLog('handling preview query parameter', previewLink)
     await handleBarcodeScan(previewLink)
     return
   }
 
-  if (!isNativePlatform)
+  if (!isNativePlatform) {
+    debugLog('native scanner unavailable on web platform')
     statusMessage.value = 'Live camera scanning is available in the iOS and Android app. Paste a preview link or bundle URL below.'
+  }
 })
 
 onUnmounted(async () => {
+  debugLog('scan page unmounting')
   await stopScanner(true)
   await removeDownloadListener()
 })
@@ -142,11 +180,15 @@ async function removeDownloadListener() {
   if (!downloadListener)
     return
 
+  debugLog('removing download listener')
   await downloadListener.remove()
   downloadListener = null
 }
 
 async function removeScannerListeners() {
+  if (barcodeScannedListener || barcodeScanErrorListener)
+    debugLog('removing barcode listeners')
+
   await barcodeScannedListener?.remove()
   await barcodeScanErrorListener?.remove()
   barcodeScannedListener = null
@@ -182,26 +224,31 @@ function getScannerFrame() {
 }
 
 async function stopScanner(force = false) {
+  debugLog('stopScanner called', { cameraPreviewStarted, force, isScanning: isScanning.value })
+
   if (!cameraPreviewStarted && !force) {
     isScanning.value = false
     isHandlingBarcode = false
     setCameraPreviewActive(false)
     await removeScannerListeners()
+    debugLog('scanner stopped without native stop')
     return
   }
 
   try {
     await CameraPreview.stopBarcodeScanner()
+    debugLog('native barcode scanner stopped')
   }
   catch (error) {
-    console.warn('Failed to stop barcode scanner:', error)
+    debugWarn('failed to stop barcode scanner', error)
   }
 
   try {
     await CameraPreview.stop({ force: true })
+    debugLog('camera preview stopped')
   }
   catch (error) {
-    console.warn('Failed to stop camera preview:', error)
+    debugWarn('failed to stop camera preview', error)
   }
 
   cameraPreviewStarted = false
@@ -209,18 +256,23 @@ async function stopScanner(force = false) {
   isHandlingBarcode = false
   setCameraPreviewActive(false)
   await removeScannerListeners()
+  debugLog('scanner state cleared')
 }
 
 async function startScanner() {
   if (!isNativePlatform) {
+    debugLog('startScanner ignored on web platform')
     statusMessage.value = 'Live camera scanning is available in the iOS and Android app. Paste a preview link or bundle URL below.'
     return
   }
 
-  if (isScanning.value || isLoading.value)
+  if (isScanning.value || isLoading.value) {
+    debugLog('startScanner ignored because scanner is busy', { isScanning: isScanning.value, isLoading: isLoading.value })
     return
+  }
 
   try {
+    debugLog('starting scanner')
     isScanning.value = true
     isHandlingBarcode = false
     errorMessage.value = ''
@@ -230,29 +282,44 @@ async function startScanner() {
 
     await nextTick()
     const frame = getScannerFrame()
+    debugLog('scanner frame measured', frame)
 
     await removeScannerListeners()
     barcodeScannedListener = await CameraPreview.addListener('barcodeScanned', async ({ barcodes }: BarcodeScannedEvent) => {
+      debugLog('barcodeScanned event received', {
+        count: barcodes.length,
+        values: barcodes.map(barcode => ({
+          displayValue: barcode.displayValue,
+          format: barcode.format,
+          value: barcode.value,
+        })),
+      })
+
       if (isHandlingBarcode)
         return
 
       const barcode = barcodes.find(result => result.value)
-      if (!barcode)
+      if (!barcode) {
+        debugLog('barcode event did not contain a value')
         return
+      }
 
       isHandlingBarcode = true
+      debugLog('handling scanned barcode', { format: barcode.format, value: barcode.value })
       await stopScanner()
       await handleBarcodeScan(barcode.value)
     })
     barcodeScanErrorListener = await CameraPreview.addListener('barcodeScanError', ({ message }: BarcodeScanErrorEvent) => {
-      console.warn('Barcode scan error:', message)
+      debugWarn('barcode scan error event', message)
     })
+    debugLog('barcode listeners attached')
 
     cameraPreviewStarted = true
     setCameraPreviewActive(true)
+    debugLog('camera preview transparency enabled')
     await waitForPaint()
 
-    await CameraPreview.start({
+    const startResult = await CameraPreview.start({
       ...frame,
       aspectMode: 'cover',
       barcodeScanner: {
@@ -264,9 +331,10 @@ async function startScanner() {
       position: 'rear',
       toBack: true,
     })
+    debugLog('camera preview started', startResult)
   }
   catch (error) {
-    console.error('Failed to scan:', error)
+    debugWarn('failed to start scanner', error)
     errorMessage.value = 'The camera could not start. Check camera permissions, then tap scan again or paste the link manually.'
     await stopScanner(true)
   }
@@ -274,8 +342,10 @@ async function startScanner() {
 
 async function handleBarcodeScan(scannedValue: string) {
   const value = scannedValue.trim()
+  debugLog('handleBarcodeScan called', value)
   const previewLink = parsePreviewDeepLink(value)
   if (previewLink) {
+    debugLog('scan parsed as preview deep link', previewLink)
     scannedUrl.value = value
     manualUrl.value = ''
     await startPreviewLink(previewLink)
@@ -284,6 +354,7 @@ async function handleBarcodeScan(scannedValue: string) {
 
   const previewPayloadUrl = previewPayloadUrlFromUrl(value)
   if (previewPayloadUrl) {
+    debugLog('scan parsed as preview payload host', { previewPayloadUrl, value })
     scannedUrl.value = value
     manualUrl.value = value
     await startPreviewPayload(previewPayloadUrl)
@@ -291,6 +362,7 @@ async function handleBarcodeScan(scannedValue: string) {
   }
 
   if (!isHttpUrl(value)) {
+    debugWarn('scan value is unsupported', value)
     errorMessage.value = 'This QR code is not a Capgo preview link or an HTTPS bundle URL.'
     manualUrl.value = value
     toast.error('Scanned QR code is not a supported preview link')
@@ -299,11 +371,14 @@ async function handleBarcodeScan(scannedValue: string) {
 
   scannedUrl.value = value
   manualUrl.value = value
+  debugLog('scan parsed as direct HTTP update URL', value)
   await downloadUpdate(value)
 }
 
 async function startPreviewSession(appId?: string) {
+  debugLog('starting preview session', { appId })
   await CapacitorUpdater.startPreviewSession(appId ? { appId } : undefined)
+  debugLog('preview session started', { appId })
 }
 
 async function previewPayloadFromResponse(response: Response): Promise<PreviewPayload> {
@@ -330,6 +405,7 @@ async function previewPayloadFromResponse(response: Response): Promise<PreviewPa
 }
 
 async function fetchPreviewPayload(payloadUrl: string) {
+  debugLog('fetching preview payload', payloadUrl)
   const response = await fetch(payloadUrl, {
     headers: { Accept: 'application/json' },
   })
@@ -338,6 +414,12 @@ async function fetchPreviewPayload(payloadUrl: string) {
     throw new Error('Preview payload is missing a version')
   if (!payload.url && !payload.manifest?.length)
     throw new Error('Preview payload is missing download information')
+  debugLog('preview payload received', {
+    appId: payload.appId,
+    hasManifest: !!payload.manifest?.length,
+    hasUrl: !!payload.url,
+    version: payload.version,
+  })
   return payload
 }
 
@@ -356,24 +438,28 @@ function downloadOptionsFromPreviewPayload(payload: PreviewPayload): DownloadOpt
 
 async function startPreviewPayload(payloadUrl: string, appId?: string) {
   try {
+    debugLog('starting preview payload flow', { appId, payloadUrl })
     isLoading.value = true
     downloadProgress.value = 0
 
     await removeDownloadListener()
     downloadListener = await CapacitorUpdater.addListener('download', (state: DownloadEvent) => {
       downloadProgress.value = state.percent || 0
+      debugLog('download progress', { percent: state.percent })
     })
 
     toast.success('Starting preview')
 
     const payload = await fetchPreviewPayload(payloadUrl)
     const bundle = await CapacitorUpdater.download(downloadOptionsFromPreviewPayload(payload))
+    debugLog('preview payload downloaded', bundle)
 
     await startPreviewSession(payload.appId || appId)
     await CapacitorUpdater.set(bundle)
+    debugLog('preview payload applied', bundle)
   }
   catch (error) {
-    console.error('Failed to start preview:', error)
+    debugWarn('failed to start preview payload flow', error)
     const message = error instanceof Error ? error.message : String(error)
     errorMessage.value = `Failed to start preview: ${message}`
     manualUrl.value = scannedUrl.value
@@ -386,6 +472,7 @@ async function startPreviewPayload(payloadUrl: string, appId?: string) {
 }
 
 async function startPreviewLink(previewLink: PreviewDeepLink) {
+  debugLog('starting preview link', previewLink)
   if (previewLink.payloadUrl) {
     await startPreviewPayload(previewLink.payloadUrl, previewLink.appId)
     return
@@ -397,17 +484,26 @@ async function startPreviewLink(previewLink: PreviewDeepLink) {
 
 async function startChannelPreview(previewLink: Extract<PreviewDeepLink, { type: 'channel' }>) {
   try {
+    debugLog('starting channel preview flow', previewLink)
     isLoading.value = true
     downloadProgress.value = 0
 
     await removeDownloadListener()
     downloadListener = await CapacitorUpdater.addListener('download', (state: DownloadEvent) => {
       downloadProgress.value = state.percent || 0
+      debugLog('download progress', { percent: state.percent })
     })
 
     toast.success('Starting preview')
 
     const latest = await CapacitorUpdater.getLatest(buildChannelPreviewLatestOptions(previewLink))
+    debugLog('latest preview response received', {
+      error: latest.error,
+      hasManifest: !!latest.manifest?.length,
+      hasUrl: !!latest.url,
+      message: latest.message,
+      version: latest.version,
+    })
     if (!latest.url)
       throw new Error(latest.message || latest.error || 'No preview update is available for this channel')
 
@@ -418,12 +514,14 @@ async function startChannelPreview(previewLink: Extract<PreviewDeepLink, { type:
       url: latest.url,
       version: latest.version,
     })
+    debugLog('channel preview downloaded', bundle)
 
     await startPreviewSession(previewLink.appId)
     await CapacitorUpdater.set(bundle)
+    debugLog('channel preview applied', bundle)
   }
   catch (error) {
-    console.error('Failed to start channel preview:', error)
+    debugWarn('failed to start channel preview flow', error)
     const message = error instanceof Error ? error.message : String(error)
     errorMessage.value = `Failed to start preview: ${message}`
     manualUrl.value = scannedUrl.value
@@ -436,6 +534,7 @@ async function startChannelPreview(previewLink: Extract<PreviewDeepLink, { type:
 }
 
 async function downloadUpdate(updateUrl: string) {
+  debugLog('downloadUpdate called', updateUrl)
   const previewLink = parsePreviewDeepLink(updateUrl)
   if (previewLink) {
     await startPreviewLink(previewLink)
@@ -449,18 +548,21 @@ async function downloadUpdate(updateUrl: string) {
   }
 
   if (!isHttpUrl(updateUrl)) {
+    debugWarn('downloadUpdate rejected unsupported URL', updateUrl)
     errorMessage.value = 'This is not a downloadable bundle URL. Use a Capgo preview QR code or an HTTPS bundle URL.'
     toast.error('Unsupported update URL')
     return
   }
 
   try {
+    debugLog('starting direct download flow', updateUrl)
     isLoading.value = true
     downloadProgress.value = 0
 
     await removeDownloadListener()
     downloadListener = await CapacitorUpdater.addListener('download', (state: DownloadEvent) => {
       downloadProgress.value = state.percent || 0
+      debugLog('download progress', { percent: state.percent })
     })
 
     toast.success(`Starting download from ${new URL(updateUrl).host}`)
@@ -469,16 +571,18 @@ async function downloadUpdate(updateUrl: string) {
       url: updateUrl,
       version: `scan-${Date.now()}`,
     })
+    debugLog('direct update downloaded', bundle)
 
     toast.success('Download completed. Applying update...')
 
     await startPreviewSession()
     await CapacitorUpdater.set(bundle)
+    debugLog('direct update applied', bundle)
 
     toast.success('Update applied. The app will reload automatically.')
   }
   catch (error) {
-    console.error('Failed to download/apply update:', error)
+    debugWarn('failed to download/apply update', error)
     const message = error instanceof Error ? error.message : String(error)
     toast.error(`Failed to apply update: ${message}`)
   }
@@ -489,6 +593,7 @@ async function downloadUpdate(updateUrl: string) {
 }
 
 async function submitManualUrl() {
+  debugLog('submitManualUrl called', normalizedManualUrl.value)
   if (!canSubmitManualUrl.value) {
     toast.error('Enter a valid preview link or update URL')
     return
@@ -521,6 +626,7 @@ async function submitManualUrl() {
 }
 
 async function retryScanning() {
+  debugLog('retryScanning called')
   errorMessage.value = ''
   statusMessage.value = ''
   scannedUrl.value = ''
@@ -632,6 +738,17 @@ async function goBack() {
         <p v-if="errorMessage" class="mt-4 rounded-xl border border-amber-300/25 bg-amber-300/10 px-3 py-2 text-sm leading-6 text-amber-100" aria-live="polite">
           {{ errorMessage }}
         </p>
+
+        <details v-if="debugMessages.length" class="mt-4 rounded-xl border border-white/10 bg-slate-950/80 px-3 py-2 text-xs text-slate-300" open>
+          <summary class="cursor-pointer select-none font-semibold text-slate-100">
+            Debug
+          </summary>
+          <ol class="mt-2 max-h-36 space-y-1 overflow-y-auto font-mono leading-5">
+            <li v-for="message in debugMessages" :key="message">
+              {{ message }}
+            </li>
+          </ol>
+        </details>
       </section>
 
       <details class="mt-4 rounded-2xl border border-white/10 bg-white/[0.06] p-4">
