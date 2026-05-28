@@ -179,17 +179,6 @@ export function isApiKeyExpired(expiresAt: string | null): boolean {
   return new Date(expiresAt) < new Date()
 }
 
-export function formatApiKeyScope(
-  items: string[] | null | undefined,
-  formatItem: (item: string) => string,
-  emptyValue = '',
-): string {
-  if (!items || items.length === 0)
-    return emptyValue
-
-  return items.map(formatItem).join(', ')
-}
-
 export function sortApiKeyRows<T extends ApiKeyListRow>(
   rows: T[],
   columns: TableColumn[],
