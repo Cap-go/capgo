@@ -1689,6 +1689,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
       {step === 'credentials-exist' && (
         <CredentialsExistStep
           appId={appId}
+          dense={dense}
           onChange={(value) => {
             if (value === 'backup') {
               setStep('backing-up')
@@ -1707,6 +1708,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
       {/* Setup-method fork (macOS only) */}
       {step === 'setup-method-select' && (
         <SetupMethodSelectStep
+          dense={dense}
           onChange={async (value) => {
             // Persist the fork choice to progress so resume after CLI close
             // routes to the right path. Without this, an interrupted import
@@ -2001,6 +2003,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
       {step === 'api-key-instructions' && (
         <ApiKeyInstructionsStep
           canUseFilePicker={canUseFilePicker()}
+          dense={dense}
           onMethodChange={(value) => {
             if (value === 'picker') {
               setStep('p8-method-select')
@@ -2059,6 +2062,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
       {step === 'input-key-id' && (
         <InputKeyIdStep
           keyId={keyId}
+          dense={dense}
           onSubmit={(value) => {
             // `value || keyId` reuses the detected key ID when the user just
             // presses Enter; the trim+guard rejects an empty submission in the
@@ -2077,6 +2081,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
       {/* Issuer ID */}
       {step === 'input-issuer-id' && (
         <InputIssuerIdStep
+          dense={dense}
           onSubmit={(value) => {
             const cleaned = value.trim()
             if (!cleaned)
@@ -2099,6 +2104,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
       {step === 'cert-limit-prompt' && (
         <CertLimitPromptStep
           existingCount={existingCerts.length}
+          dense={dense}
           options={[
             ...existingCerts.map((c) => {
               const ourCertId = certData?.certificateId || initialProgress?.completedSteps.certificateCreated?.certificateId
@@ -2128,12 +2134,13 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
       {step === 'revoking-certificate' && <RevokingCertificateStep />}
 
       {/* Creating profile */}
-      {step === 'creating-profile' && <CreatingProfileStep appId={appId} />}
+      {step === 'creating-profile' && <CreatingProfileStep appId={appId} dense={dense} />}
 
       {/* Duplicate profile prompt */}
       {step === 'duplicate-profile-prompt' && (
         <DuplicateProfilePromptStep
           duplicateCount={duplicateProfiles.length}
+          dense={dense}
           onChange={(value) => {
             if (value === 'delete') {
               setStep('deleting-duplicate-profiles')

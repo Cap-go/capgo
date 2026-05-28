@@ -1,8 +1,13 @@
 #!/usr/bin/env node
 // Frame-fit tests for the iOS credential sub-flow step components
 // (src/build/onboarding/ui/steps/ios-credentials.tsx). Renders each step body
-// × each meaningful state variant through the shared harness and asserts it
-// fits the 16-row contract's body budget at every reference width (80 + 60).
+// × each meaningful state variant through the shared harness and asserts its
+// DENSE form fits the 16-row contract's body budget at every reference width
+// (80 + 60). The dense form is the budget-fitting fallback the parent flips on
+// when the comfortable (default) form can't fit — so EVERY assertion here
+// passes `dense: true`. The comfortable form is intentionally NOT
+// budget-asserted (it only renders when the parent measured that it fits).
+// Spinner-only steps take no `dense` prop (identical in both forms).
 // Shape copied from test-frame-fit-ai.mjs (the batch exemplar).
 import React from 'react'
 import {
@@ -63,28 +68,28 @@ for (const [label, el] of spinnerSteps) {
 }
 
 // ── credentials-exist ────────────────────────────────────────────────────────
-test('credentials-exist (short appId) fits budget', () => {
-  assertFitsBudget(h(CredentialsExistStep, { appId: 'com.app', onChange: noop }), 'credentials-exist-short')
+test('credentials-exist (short appId, dense) fits budget', () => {
+  assertFitsBudget(h(CredentialsExistStep, { appId: 'com.app', dense: true, onChange: noop }), 'credentials-exist-short')
 })
-test('credentials-exist (long appId) fits budget', () => {
-  assertFitsBudget(h(CredentialsExistStep, { appId: LONG_APP_ID, onChange: noop }), 'credentials-exist-long')
+test('credentials-exist (long appId, dense) fits budget', () => {
+  assertFitsBudget(h(CredentialsExistStep, { appId: LONG_APP_ID, dense: true, onChange: noop }), 'credentials-exist-long')
 })
 
 // ── setup-method-select ──────────────────────────────────────────────────────
-test('setup-method-select fits budget', () => {
-  assertFitsBudget(h(SetupMethodSelectStep, { onChange: noop }), 'setup-method-select')
+test('setup-method-select (dense) fits budget', () => {
+  assertFitsBudget(h(SetupMethodSelectStep, { dense: true, onChange: noop }), 'setup-method-select')
 })
 
 // ── api-key-instructions (both control variants) ─────────────────────────────
-test('api-key-instructions (file picker available) fits budget', () => {
+test('api-key-instructions (file picker available, dense) fits budget', () => {
   assertFitsBudget(
-    h(ApiKeyInstructionsStep, { canUseFilePicker: true, onMethodChange: noop, onPathSubmit: noop }),
+    h(ApiKeyInstructionsStep, { canUseFilePicker: true, dense: true, onMethodChange: noop, onPathSubmit: noop }),
     'api-key-instructions-picker',
   )
 })
-test('api-key-instructions (no file picker → text input) fits budget', () => {
+test('api-key-instructions (no file picker → text input, dense) fits budget', () => {
   assertFitsBudget(
-    h(ApiKeyInstructionsStep, { canUseFilePicker: false, onMethodChange: noop, onPathSubmit: noop }),
+    h(ApiKeyInstructionsStep, { canUseFilePicker: false, dense: true, onMethodChange: noop, onPathSubmit: noop }),
     'api-key-instructions-manual',
   )
 })
@@ -95,16 +100,16 @@ test('input-p8-path fits budget', () => {
 })
 
 // ── input-key-id (detected vs not detected) ──────────────────────────────────
-test('input-key-id (detected from filename) fits budget', () => {
-  assertFitsBudget(h(InputKeyIdStep, { keyId: 'ABC123DEF', onSubmit: noop }), 'input-key-id-detected')
+test('input-key-id (detected from filename, dense) fits budget', () => {
+  assertFitsBudget(h(InputKeyIdStep, { keyId: 'ABC123DEF', dense: true, onSubmit: noop }), 'input-key-id-detected')
 })
-test('input-key-id (empty — manual entry) fits budget', () => {
-  assertFitsBudget(h(InputKeyIdStep, { keyId: '', onSubmit: noop }), 'input-key-id-empty')
+test('input-key-id (empty — manual entry, dense) fits budget', () => {
+  assertFitsBudget(h(InputKeyIdStep, { keyId: '', dense: true, onSubmit: noop }), 'input-key-id-empty')
 })
 
 // ── input-issuer-id ──────────────────────────────────────────────────────────
-test('input-issuer-id fits budget', () => {
-  assertFitsBudget(h(InputIssuerIdStep, { onSubmit: noop }), 'input-issuer-id')
+test('input-issuer-id (dense) fits budget', () => {
+  assertFitsBudget(h(InputIssuerIdStep, { dense: true, onSubmit: noop }), 'input-issuer-id')
 })
 
 // ── cert-limit-prompt ─────────────────────────────────────────────────────────
@@ -122,27 +127,27 @@ function makeCertOptions(count, ours = false) {
   opts.push({ label: '✖  Exit onboarding', value: '__exit__' })
   return opts
 }
-test('cert-limit-prompt (3 certs, worst case) fits budget', () => {
+test('cert-limit-prompt (3 certs, worst case, dense) fits budget', () => {
   assertFitsBudget(
-    h(CertLimitPromptStep, { existingCount: 3, options: makeCertOptions(3, true), onChange: noop }),
+    h(CertLimitPromptStep, { existingCount: 3, options: makeCertOptions(3, true), dense: true, onChange: noop }),
     'cert-limit-prompt-3',
   )
 })
-test('cert-limit-prompt (1 cert) fits budget', () => {
+test('cert-limit-prompt (1 cert, dense) fits budget', () => {
   assertFitsBudget(
-    h(CertLimitPromptStep, { existingCount: 1, options: makeCertOptions(1), onChange: noop }),
+    h(CertLimitPromptStep, { existingCount: 1, options: makeCertOptions(1), dense: true, onChange: noop }),
     'cert-limit-prompt-1',
   )
 })
 
 // ── creating-profile ──────────────────────────────────────────────────────────
-test('creating-profile (long appId) fits budget', () => {
-  assertFitsBudget(h(CreatingProfileStep, { appId: LONG_APP_ID }), 'creating-profile')
+test('creating-profile (long appId, dense) fits budget', () => {
+  assertFitsBudget(h(CreatingProfileStep, { appId: LONG_APP_ID, dense: true }), 'creating-profile')
 })
 
 // ── duplicate-profile-prompt ─────────────────────────────────────────────────
-test('duplicate-profile-prompt fits budget', () => {
-  assertFitsBudget(h(DuplicateProfilePromptStep, { duplicateCount: 4, onChange: noop }), 'duplicate-profile-prompt')
+test('duplicate-profile-prompt (dense) fits budget', () => {
+  assertFitsBudget(h(DuplicateProfilePromptStep, { duplicateCount: 4, dense: true, onChange: noop }), 'duplicate-profile-prompt')
 })
 
 // ── deleting-duplicate-profiles ──────────────────────────────────────────────
