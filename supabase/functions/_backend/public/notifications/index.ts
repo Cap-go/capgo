@@ -356,7 +356,7 @@ function assertProviderConfigReady(provider: NativeNotificationProvider, status:
   if (provider === 'apns') {
     const missing = ['teamId', 'keyId', 'bundleId'].filter(key => !optionalConfigString(config, key))
     if (missing.length)
-      throw simpleError('missing_notification_provider_apns_config', 'Missing iOS push config', { missing })
+      throw simpleError('missing_notification_provider_ios_config', 'Missing iOS push config', { missing })
   }
 }
 
