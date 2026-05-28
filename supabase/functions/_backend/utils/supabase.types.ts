@@ -2992,6 +2992,16 @@ export type Database = {
         }
         Returns: string
       }
+      app_versions_has_app_permission: {
+        Args: {
+          p_apikey: string
+          p_app_id: string
+          p_min_right: Database["public"]["Enums"]["user_min_right"]
+          p_owner_org: string
+          p_user_id: string
+        }
+        Returns: boolean
+      }
       app_versions_readable_app_ids: { Args: never; Returns: string[] }
       apply_usage_overage: {
         Args: {
