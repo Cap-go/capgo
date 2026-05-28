@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { HttpResponse, PluginListenerHandle } from '@capacitor/core'
 import type { BarcodeScanErrorEvent, BarcodeScannedEvent } from '@capgo/camera-preview'
-import type { DownloadEvent, DownloadOptions } from '@capgo/capacitor-updater'
+import type { DownloadEvent, DownloadOptions, StartPreviewSessionOptions } from '@capgo/capacitor-updater'
 import type { PreviewDeepLink } from '~/services/previewLinks'
 import { Clipboard } from '@capacitor/clipboard'
 import { Capacitor, CapacitorHttp } from '@capacitor/core'
@@ -63,6 +63,11 @@ interface PreviewFetchResult {
   contentType: string
   status: number
   url: string
+}
+
+interface PreviewPayloadFetchResult {
+  payload: PreviewPayload
+  sessionPayloadUrl?: string
 }
 
 const PREVIEW_ASSET_LIMIT = 500
@@ -681,10 +686,25 @@ async function handleBarcodeScan(scannedValue: string) {
   await downloadUpdate(value)
 }
 
-async function startPreviewSession(appId?: string) {
-  debugLog('starting preview session', { appId })
-  await CapacitorUpdater.startPreviewSession(appId ? { appId } : undefined)
-  debugLog('preview session started', { appId })
+async function startPreviewSession(appId?: string, payloadUrl?: string) {
+  const options: StartPreviewSessionOptions = {}
+  if (appId)
+    options.appId = appId
+  if (payloadUrl)
+    options.payloadUrl = payloadUrl
+
+  const hasOptions = Object.keys(options).length > 0
+  debugLog('starting preview session', {
+    appId: options.appId,
+    hasPayloadUrl: !!options.payloadUrl,
+    payloadUrl: options.payloadUrl,
+  })
+  await CapacitorUpdater.startPreviewSession(hasOptions ? options : undefined)
+  debugLog('preview session started', {
+    appId: options.appId,
+    hasPayloadUrl: !!options.payloadUrl,
+    payloadUrl: options.payloadUrl,
+  })
 }
 
 function parsePreviewPayloadBody(data: unknown, status: number) {
@@ -821,7 +841,7 @@ function downloadOptionsFromPreviewPayload(payload: PreviewPayload): DownloadOpt
   }
 }
 
-async function fetchPreviewPayloadWithHostFallback(payloadUrl: string, appId?: string) {
+async function fetchPreviewPayloadWithHostFallback(payloadUrl: string, appId?: string): Promise<PreviewPayloadFetchResult> {
   const target = previewHostTargetFromUrl(payloadUrl)
   if (target) {
     const parsedUrl = parseSafeUrl(payloadUrl)
@@ -830,25 +850,32 @@ async function fetchPreviewPayloadWithHostFallback(payloadUrl: string, appId?: s
         appId: appId || target.appId,
         rootUrl: target.rootUrl,
       })
-      return buildPreviewPayloadFromHost({
-        ...target,
-        appId: appId || target.appId,
-      })
+      return {
+        payload: await buildPreviewPayloadFromHost({
+          ...target,
+          appId: appId || target.appId,
+        }),
+      }
     }
   }
 
   try {
-    return await fetchPreviewPayload(payloadUrl)
+    return {
+      payload: await fetchPreviewPayload(payloadUrl),
+      sessionPayloadUrl: payloadUrl,
+    }
   }
   catch (error) {
     if (!target)
       throw error
 
     debugWarn('preview payload endpoint unavailable, falling back to host crawl', error)
-    return buildPreviewPayloadFromHost({
-      ...target,
-      appId: appId || target.appId,
-    })
+    return {
+      payload: await buildPreviewPayloadFromHost({
+        ...target,
+        appId: appId || target.appId,
+      }),
+    }
   }
 }
 
@@ -866,11 +893,11 @@ async function startPreviewPayload(payloadUrl: string, appId?: string) {
 
     toast.success('Starting preview')
 
-    const payload = await fetchPreviewPayloadWithHostFallback(payloadUrl, appId)
+    const { payload, sessionPayloadUrl } = await fetchPreviewPayloadWithHostFallback(payloadUrl, appId)
     const bundle = await CapacitorUpdater.download(downloadOptionsFromPreviewPayload(payload))
     debugLog('preview payload downloaded', bundle)
 
-    await startPreviewSession(payload.appId || appId)
+    await startPreviewSession(payload.appId || appId, sessionPayloadUrl)
     await CapacitorUpdater.set(bundle)
     debugLog('preview payload applied', bundle)
   }
