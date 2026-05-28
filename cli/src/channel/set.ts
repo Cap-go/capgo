@@ -3,8 +3,9 @@ import type { Database } from '../types/supabase.types'
 import type { Compatibility } from '../utils'
 import { intro, log, outro } from '@clack/prompts'
 import { Table } from '@sauber/table'
-import { check2FAComplianceForApp, checkAppExistsAndHasPermissionOrgErr } from '../api/app'
+import { check2FAComplianceForApp, checkAppExists } from '../api/app'
 import {
+  assertCliPermission,
   checkCompatibilityNativePackages,
   checkPlanValid,
   createSupabaseClient,
@@ -15,7 +16,6 @@ import {
   getConfig,
   getOrganizationId,
   isCompatible,
-  OrganizationPerm,
   resolveUserIdFromApiKey,
   sendEvent,
   updateOrCreateChannel,
@@ -80,7 +80,13 @@ export async function setChannelInternal(channel: string, appId: string, options
   await check2FAComplianceForApp(supabase, appId, silent)
   const userId = await resolveUserIdFromApiKey(supabase, options.apikey)
 
-  await checkAppExistsAndHasPermissionOrgErr(supabase, options.apikey, appId, OrganizationPerm.admin, silent, true)
+  if (!(await checkAppExists(supabase, appId))) {
+    const msg = `App ${appId} does not exist`
+    if (!silent)
+      log.error(msg)
+    throw new Error(msg)
+  }
+
   const orgId = await getOrganizationId(supabase, appId)
 
   const {
@@ -147,9 +153,9 @@ export async function setChannelInternal(channel: string, appId: string, options
     version: undefined as any,
   }
 
-  const { error: channelError } = await supabase
+  const { data: existingChannel, error: channelError } = await supabase
     .from('channels')
-    .select()
+    .select('id')
     .eq('app_id', appId)
     .eq('name', channel)
     .single()
@@ -159,6 +165,11 @@ export async function setChannelInternal(channel: string, appId: string, options
       log.error(`Cannot find channel ${channel}`)
     throw new Error(`Cannot find channel ${channel}`)
   }
+
+  await assertCliPermission(supabase, options.apikey, 'channel.update_settings', { appId, channelId: existingChannel.id }, {
+    message: `Insufficient permissions to update channel ${channel} for app ${appId}`,
+    silent,
+  })
 
   const resolvedBundleVersion = latest
     ? (extConfig?.config?.plugins?.CapacitorUpdater?.version || getBundleVersion('', options.packageJson))
@@ -209,6 +220,11 @@ export async function setChannelInternal(channel: string, appId: string, options
       }
     }
 
+    await assertCliPermission(supabase, options.apikey, 'channel.promote_bundle', { appId, channelId: existingChannel.id }, {
+      message: `Insufficient permissions to set a bundle on channel ${channel} for app ${appId}`,
+      silent,
+    })
+
     if (!silent)
       log.info(`Set ${appId} channel: ${channel} to @${resolvedBundleVersion}`)
 
@@ -252,6 +268,11 @@ export async function setChannelInternal(channel: string, appId: string, options
         throw new Error(`Latest remote bundle is not compatible with ${channel} channel`)
       }
     }
+
+    await assertCliPermission(supabase, options.apikey, 'channel.promote_bundle', { appId, channelId: existingChannel.id }, {
+      message: `Insufficient permissions to set a bundle on channel ${channel} for app ${appId}`,
+      silent,
+    })
 
     if (!silent)
       log.info(`Set ${appId} channel: ${channel} to @${data.name}`)

@@ -29,10 +29,6 @@ export async function deleteChannel(c: Context<MiddlewareKeyVariables>, body: Ch
   if (!isValidAppId(body.app_id)) {
     throw simpleError('invalid_app_id', 'App ID must be a reverse domain string', { app_id: body.app_id })
   }
-  // Auth context is already set by middlewareKey
-  if (!(await checkPermission(c, 'channel.delete', { appId: body.app_id }))) {
-    throw simpleError('cannot_access_app', 'You can\'t access this app', { app_id: body.app_id })
-  }
   if (!body.channel) {
     throw simpleError('missing_channel_name', 'You must provide a channel name')
   }
@@ -46,6 +42,10 @@ export async function deleteChannel(c: Context<MiddlewareKeyVariables>, body: Ch
     .single()
   if (dbError || !dataChannel) {
     throw simpleError('cannot_find_channel', 'Cannot find channel', { supabaseError: dbError })
+  }
+  // Auth context is already set by middlewareKey.
+  if (!(await checkPermission(c, 'channel.delete', { appId: body.app_id, channelId: dataChannel.id }))) {
+    throw simpleError('cannot_access_app', 'You can\'t access this app', { app_id: body.app_id, channel: body.channel })
   }
   await supabaseApikey(c, apikey.key)
     .from('channels')
