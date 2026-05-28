@@ -327,7 +327,13 @@ export const FullscreenAiViewer: FC<{
           is what makes overflow:hidden actually trim the excess. */}
       <Box flexDirection="column" height={viewportRows} overflow="hidden">
         {visibleLines.map((line, index) => (
-          <Text key={`ai-line-${scrollOffset + index}`}>{line}</Text>
+          // Render empty lines as a single space so they occupy ONE row —
+          // matching renderedRowsForLine's floor of 1. Ink collapses an empty
+          // <Text> to zero rows, but pickVisibleLines counts each blank as 1;
+          // that mismatch made the packer stop early and the fixed-height box
+          // pad the shortfall as blank rows at the bottom (the "gap"), while
+          // excluding real content below. Keeping blanks 1 row aligns the two.
+          <Text key={`ai-line-${scrollOffset + index}`}>{line === '' ? ' ' : line}</Text>
         ))}
       </Box>
       <Text color="cyan">{'─'.repeat(dividerWidth)}</Text>
