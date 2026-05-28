@@ -13,22 +13,37 @@ import type { AiResultKind } from '../components.js'
 // render and forward callbacks. They never touch `useStdout` /
 // `measureElement`.
 //
+// Adaptive spacing. Each step renders its COMFORTABLE form (the original
+// design — bordered boxes, blank-line spacing between elements, full copy) by
+// DEFAULT and collapses to a COMPACT form only when the parent passes
+// `dense=true`. The parent (ui/app.tsx) measures the comfortable body against
+// the live viewport and flips `dense` on only when the comfortable version
+// can't fit — so a roomy terminal breathes while a 16-row terminal still
+// survives. Mirrors the AiResultBanner (ui/components.tsx) adaptive pattern,
+// which these step bodies thread `dense` straight through to.
+//
 // The frame-fit contract (see ui/components.tsx + test/helpers/frame-fit.mjs)
-// requires every step body to render within BODY_BUDGET_ROWS (13) rows at the
-// reference widths (80 + 60). The two budget offenders here are:
+// requires every step body's DENSE form to render within BODY_BUDGET_ROWS (13)
+// rows at the reference widths (80 + 60) — that's the form which must survive
+// the 16-row floor. The comfortable form may legitimately exceed the budget
+// (it only renders when the parent measured that it fits). The two budget
+// offenders in dense mode are:
 //   • error — renders variable-length recovery advice (the recovery helper can
 //     match several branches at once, so summary/commands/docs all grow). The
-//     error string is clamped, the advice lists are capped to a couple of rows
-//     each with a "… +N more" line, docs is dropped (the actionable bits are
-//     summary + commands + the Select), and the decorative blank lines are
-//     removed so the "what failed" line + recovery action stay on screen.
+//     dense form clamps the error string, caps the advice lists to a couple of
+//     rows each with a "… +N more" line, drops docs (the actionable bits are
+//     summary + commands + the Select), and drops the decorative blank lines so
+//     the "what failed" line + recovery action stay on screen. The comfortable
+//     form restores the full "Recovery plan / Helpful commands / Docs / Support
+//     bundle" headings, the uncapped lists, and the blank-line spacing.
 //   • ai-analysis-result — the success analysis text rendered inline here is
 //     always SHORT (long analyses are routed to the fullscreen scroll step by
-//     the parent BEFORE this frame); the verbose caution + "retries used"
-//     notice are kept terse and the decorative blank lines dropped.
-// Verified in test-frame-fit-ios-shared.mjs.
+//     the parent BEFORE this frame); the dense form keeps the caution +
+//     "retries used" notice terse and drops the blank lines. The comfortable
+//     form restores the full caution copy + blank-line spacing.
+// Verified in test-frame-fit-ios-shared.mjs (dense form asserted ≤ 13).
 import { Select } from '@inkjs/ui'
-import { Box, Text } from 'ink'
+import { Box, Newline, Text } from 'ink'
 import React from 'react'
 import { AiResultBanner, ErrorLine, SpinnerLine, SuccessLine } from '../components.js'
 
@@ -91,11 +106,12 @@ export const WelcomeStep: FC = () => (
 // (iOS → credential flow; Android → exit-with-instructions).
 export interface PlatformSelectStepProps {
   appId: string
+  dense?: boolean
   onChange: (value: string) => void | Promise<void>
 }
 
-export const PlatformSelectStep: FC<PlatformSelectStepProps> = ({ appId, onChange }) => (
-  <Box flexDirection="column" marginTop={1}>
+export const PlatformSelectStep: FC<PlatformSelectStepProps> = ({ appId, dense = false, onChange }) => (
+  <Box flexDirection="column" marginTop={1} gap={dense ? 0 : 1}>
     <SuccessLine text="Detected Capacitor project" detail={appId} />
     <Text bold>Which platform do you want to set up?</Text>
     <Select
@@ -116,14 +132,19 @@ export interface NoPlatformStepProps {
   iosDir: string
   addIosCommand: string
   syncIosCommand: string
+  dense?: boolean
   onChange: (value: string) => void
 }
 
-export const NoPlatformStep: FC<NoPlatformStepProps> = ({ iosDir, addIosCommand, syncIosCommand, onChange }) => (
-  <Box flexDirection="column" marginTop={1}>
+export const NoPlatformStep: FC<NoPlatformStepProps> = ({ iosDir, addIosCommand, syncIosCommand, dense = false, onChange }) => (
+  <Box flexDirection="column" marginTop={1} gap={dense ? 0 : 1}>
     <ErrorLine text={`No ${iosDir}/ directory found.`} />
-    <Text>Onboarding needs a generated native iOS project before creating credentials.</Text>
-    <Text dimColor>{`Suggested: ${addIosCommand} && ${syncIosCommand}`}</Text>
+    <Text>
+      {dense
+        ? 'Onboarding needs a generated native iOS project before creating credentials.'
+        : 'This onboarding flow needs a generated native iOS project before credentials can be created.'}
+    </Text>
+    <Text dimColor>{dense ? `Suggested: ${addIosCommand} && ${syncIosCommand}` : `Suggested commands: ${addIosCommand} && ${syncIosCommand}`}</Text>
     <Select
       options={[
         { label: `🛠  Run ${addIosCommand} now`, value: 'run' },
@@ -140,12 +161,17 @@ export const NoPlatformStep: FC<NoPlatformStepProps> = ({ iosDir, addIosCommand,
 export interface AddingPlatformStepProps {
   addIosCommand: string
   doctorCommand: string
+  dense?: boolean
 }
 
-export const AddingPlatformStep: FC<AddingPlatformStepProps> = ({ addIosCommand, doctorCommand }) => (
+export const AddingPlatformStep: FC<AddingPlatformStepProps> = ({ addIosCommand, doctorCommand, dense = false }) => (
   <Box flexDirection="column" marginTop={1}>
     <SpinnerLine text={`Running ${addIosCommand}...`} />
-    <Text dimColor>{`If this fails, try ${doctorCommand} and keep the support bundle path from the error screen.`}</Text>
+    <Text dimColor>
+      {dense
+        ? `If this fails, try ${doctorCommand} and keep the support bundle path from the error screen.`
+        : `If this still fails, try ${doctorCommand} and keep the support bundle path from the error screen.`}
+    </Text>
   </Box>
 )
 
@@ -153,11 +179,12 @@ export const AddingPlatformStep: FC<AddingPlatformStepProps> = ({ addIosCommand,
 // Build failed; offer an AI diagnosis. The parent routes debug →
 // ai-analysis-running, skip → build-complete (and fires the 'skip' telemetry).
 export interface AiAnalysisPromptStepProps {
+  dense?: boolean
   onChange: (value: string) => void | Promise<void>
 }
 
-export const AiAnalysisPromptStep: FC<AiAnalysisPromptStepProps> = ({ onChange }) => (
-  <Box flexDirection="column" marginTop={1}>
+export const AiAnalysisPromptStep: FC<AiAnalysisPromptStepProps> = ({ dense = false, onChange }) => (
+  <Box flexDirection="column" marginTop={1} gap={dense ? 0 : 1}>
     <ErrorLine text="Build failed." />
     <Text>We can analyze the build log with Capgo AI (Kimi K2.5) and suggest a fix.</Text>
     <Select
@@ -202,6 +229,7 @@ export interface AiAnalysisResultStepProps {
   canRetry: boolean
   retriesLeft: number
   maxRetries: number
+  dense?: boolean
   onChange: (value: string) => void | Promise<void>
 }
 
@@ -212,6 +240,7 @@ export const AiAnalysisResultStep: FC<AiAnalysisResultStepProps> = ({
   canRetry,
   retriesLeft,
   maxRetries,
+  dense = false,
   onChange,
 }) => {
   const retryLabel = retriesLeft === 1
@@ -220,15 +249,29 @@ export const AiAnalysisResultStep: FC<AiAnalysisResultStepProps> = ({
   return (
     <Box flexDirection="column" marginTop={1}>
       <Text bold color="cyan">AI analysis</Text>
+      {!dense && <Newline />}
       {analysisText && !viewedFull && <Text>{analysisText}</Text>}
       {analysisText && viewedFull && (
         <Text dimColor>📖  Analysis already shown above (scroll your terminal back to re-read it).</Text>
       )}
-      {result && <AiResultBanner kind={result.kind} message={result.message} />}
-      <Text color="yellow">⚠ AI can make mistakes. Verify the diagnosis against the full log before applying the fix.</Text>
+      {result && <AiResultBanner kind={result.kind} message={result.message} dense={dense} />}
+      {!dense && <Newline />}
+      <Text color="yellow">
+        {dense
+          ? '⚠ AI can make mistakes. Verify the diagnosis against the full log before applying the fix.'
+          : '⚠ AI can make mistakes. Always verify the diagnosis against the full log before applying the suggested fix.'}
+      </Text>
       {!canRetry && (
-        <Text dimColor>{`You've used all ${maxRetries} retries. Exit and re-run the wizard for another attempt.`}</Text>
+        <>
+          {!dense && <Newline />}
+          <Text dimColor>
+            {dense
+              ? `You've used all ${maxRetries} retries. Exit and re-run the wizard for another attempt.`
+              : `You've used all ${maxRetries} retries. Exit and re-run the wizard if you need another attempt.`}
+          </Text>
+        </>
       )}
+      {!dense && <Newline />}
       <Select
         options={canRetry
           ? [
@@ -245,26 +288,96 @@ export const AiAnalysisResultStep: FC<AiAnalysisResultStepProps> = ({
 }
 
 // ── error ───────────────────────────────────────────────────────────────────────
-// The main fit risk: recovery advice is variable-length (recovery.ts can match
-// several branches for one composite error, growing summary/commands/docs). We
-// keep a clamped one-line "what failed" + the single most relevant recovery
-// summary line + the first helpful command (each with a "… +N more" count) +
-// the recovery Select, all with the original decorative blank lines dropped.
-// `docs` is intentionally not rendered (the Select + commands are the
-// actionable parts; docs URLs are long and would wrap past the budget). The
-// support-bundle path is rendered whole (it's the artifact the user must copy);
-// it may wrap to 2 rows, which the budget accounts for. `showRetry` gates the
-// Select (the parent only sets a retryStep on recoverable errors); the parent
-// owns retry/restart/exit.
+// Recovery advice is variable-length (recovery.ts can match several branches for
+// one composite error, growing summary/commands/docs).
+//
+// Comfortable form (default): the original full layout — "Recovery plan",
+// "Helpful commands" and "Docs" headings, each over its uncapped list; the
+// full (unclamped) error; the "Support bundle" heading + path; and the "What do
+// you want to do?" Select, all with blank-line spacing. The parent only renders
+// this when it measured that it fits.
+//
+// Dense form: the budget-fitting fallback — a clamped one-line "what failed",
+// the single most relevant recovery summary line + the first helpful command
+// (each with a "… +N more" count), docs dropped (the Select + commands are the
+// actionable parts; docs URLs are long and would wrap past the budget), the
+// support-bundle path rendered whole (the artifact the user must copy; it may
+// wrap to 2 rows, which the budget accounts for), no headings, no blank lines.
+//
+// `showRetry` gates the Select (the parent only sets a retryStep on recoverable
+// errors); the parent owns retry/restart/exit.
 export interface ErrorStepProps {
   error: string
   recoveryAdvice: BuildOnboardingRecoveryAdvice | null
   supportBundlePath: string | null
   showRetry: boolean
+  dense?: boolean
   onChange: (value: string) => void | Promise<void>
 }
 
-export const ErrorStep: FC<ErrorStepProps> = ({ error, recoveryAdvice, supportBundlePath, showRetry, onChange }) => {
+const RETRY_OPTIONS = [
+  { label: '🔄  Try again', value: 'retry' },
+  { label: '↩️   Restart onboarding', value: 'restart' },
+  { label: '❌  Exit', value: 'exit' },
+]
+
+export const ErrorStep: FC<ErrorStepProps> = ({ error, recoveryAdvice, supportBundlePath, showRetry, dense = false, onChange }) => {
+  if (!dense) {
+    return (
+      <Box flexDirection="column" marginTop={1}>
+        <ErrorLine text={error} />
+        <Newline />
+        {recoveryAdvice && (
+          <>
+            <Text bold>Recovery plan</Text>
+            <Box flexDirection="column" marginTop={1} marginLeft={2}>
+              {recoveryAdvice.summary.map(line => (
+                <Text key={`recovery-summary-${line}`}>{`• ${line}`}</Text>
+              ))}
+            </Box>
+            {recoveryAdvice.commands.length > 0 && (
+              <>
+                <Newline />
+                <Text bold>Helpful commands</Text>
+                <Box flexDirection="column" marginTop={1} marginLeft={2}>
+                  {recoveryAdvice.commands.map(command => (
+                    <Text key={`recovery-command-${command}`} dimColor>{command}</Text>
+                  ))}
+                </Box>
+              </>
+            )}
+            {recoveryAdvice.docs.length > 0 && (
+              <>
+                <Newline />
+                <Text bold>Docs</Text>
+                <Box flexDirection="column" marginTop={1} marginLeft={2}>
+                  {recoveryAdvice.docs.map(doc => (
+                    <Text key={`recovery-doc-${doc}`} color="cyan">{doc}</Text>
+                  ))}
+                </Box>
+              </>
+            )}
+          </>
+        )}
+        {supportBundlePath && (
+          <>
+            <Newline />
+            <Text bold>Support bundle</Text>
+            <Text dimColor>{supportBundlePath}</Text>
+          </>
+        )}
+        <Newline />
+        {showRetry && (
+          <>
+            <Text bold>What do you want to do?</Text>
+            <Newline />
+            <Select options={RETRY_OPTIONS} onChange={onChange} />
+          </>
+        )}
+      </Box>
+    )
+  }
+
   const summary = recoveryAdvice?.summary ?? []
   const commands = recoveryAdvice?.commands ?? []
   const hiddenSummary = Math.max(0, summary.length - RECOVERY_VISIBLE_SUMMARY)
@@ -294,14 +407,7 @@ export const ErrorStep: FC<ErrorStepProps> = ({ error, recoveryAdvice, supportBu
         <Text dimColor>{`Support bundle: ${supportBundlePath}`}</Text>
       )}
       {showRetry && (
-        <Select
-          options={[
-            { label: '🔄  Try again', value: 'retry' },
-            { label: '↩️   Restart onboarding', value: 'restart' },
-            { label: '❌  Exit', value: 'exit' },
-          ]}
-          onChange={onChange}
-        />
+        <Select options={RETRY_OPTIONS} onChange={onChange} />
       )}
     </Box>
   )
@@ -311,45 +417,83 @@ export const ErrorStep: FC<ErrorStepProps> = ({ error, recoveryAdvice, supportBu
 // Final success screen. `buildUrl` (when a build was kicked off) and
 // `ciSecretUploadSummary` (when env vars were uploaded) are optional details.
 // `buildRequestCommand` is shown as the "run anytime" hint. The bordered box is
-// kept (this is a terminal frame, not an interactive step that risks clipping).
+// kept in BOTH forms (this is a terminal frame, not an interactive step that
+// risks clipping). The comfortable form (default) restores the original
+// `paddingY={1}` inside the box plus the blank-line spacing around and inside
+// it; the dense form drops that vertical padding/spacing to fit the floor.
 export interface BuildCompleteStepProps {
   buildUrl: string
   ciSecretUploadSummary: string | null
   buildRequestCommand: string
+  dense?: boolean
 }
 
-export const BuildCompleteStep: FC<BuildCompleteStepProps> = ({ buildUrl, ciSecretUploadSummary, buildRequestCommand }) => (
-  <Box flexDirection="column" marginTop={1}>
-    <Box
-      borderStyle="round"
-      borderColor="green"
-      paddingX={3}
-      flexDirection="column"
-      alignItems="center"
-    >
-      <Text bold color="green">🎉  You're all set!</Text>
-      {buildUrl
-        ? (
+export const BuildCompleteStep: FC<BuildCompleteStepProps> = ({ buildUrl, ciSecretUploadSummary, buildRequestCommand, dense = false }) => {
+  const detail = buildUrl
+    ? (
+        <>
+          <Text>Your iOS app is building in the cloud.</Text>
+          <Text>
+            Track it at
+            {' '}
+            <Text color="cyan" underline>{buildUrl}</Text>
+          </Text>
+        </>
+      )
+    : (
+        <Text>Your iOS credentials are saved and ready to use.</Text>
+      )
+  const runHint = (
+    <Text dimColor>
+      Run
+      {' '}
+      <Text bold color="white">{buildRequestCommand}</Text>
+      {' '}
+      anytime to start a build.
+    </Text>
+  )
+  if (!dense) {
+    return (
+      <Box flexDirection="column" marginTop={1}>
+        <Newline />
+        <Box
+          borderStyle="round"
+          borderColor="green"
+          paddingX={3}
+          paddingY={1}
+          flexDirection="column"
+          alignItems="center"
+        >
+          <Text bold color="green">🎉  You're all set!</Text>
+          <Newline />
+          {detail}
+          <Newline />
+          {ciSecretUploadSummary && (
             <>
-              <Text>Your iOS app is building in the cloud.</Text>
-              <Text>
-                Track it at
-                {' '}
-                <Text color="cyan" underline>{buildUrl}</Text>
-              </Text>
+              <Text>{`${ciSecretUploadSummary}.`}</Text>
+              <Newline />
             </>
-          )
-        : (
-            <Text>Your iOS credentials are saved and ready to use.</Text>
           )}
-      {ciSecretUploadSummary && <Text>{`${ciSecretUploadSummary}.`}</Text>}
-      <Text dimColor>
-        Run
-        {' '}
-        <Text bold color="white">{buildRequestCommand}</Text>
-        {' '}
-        anytime to start a build.
-      </Text>
+          {runHint}
+        </Box>
+        <Newline />
+      </Box>
+    )
+  }
+  return (
+    <Box flexDirection="column" marginTop={1}>
+      <Box
+        borderStyle="round"
+        borderColor="green"
+        paddingX={3}
+        flexDirection="column"
+        alignItems="center"
+      >
+        <Text bold color="green">🎉  You're all set!</Text>
+        {detail}
+        {ciSecretUploadSummary && <Text>{`${ciSecretUploadSummary}.`}</Text>}
+        {runHint}
+      </Box>
     </Box>
-  </Box>
-)
+  )
+}

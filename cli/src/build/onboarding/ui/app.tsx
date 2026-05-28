@@ -1620,6 +1620,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
       {step === 'platform-select' && (
         <PlatformSelectStep
           appId={appId}
+          dense={dense}
           onChange={async (value) => {
             if (value === 'android') {
               // The Android flow lives in a separate Ink app — this iOS app
@@ -1652,6 +1653,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
           iosDir={iosDir}
           addIosCommand={addIosCommand}
           syncIosCommand={syncIosCommand}
+          dense={dense}
           onChange={(value) => {
             if (value === 'run') {
               setStep('adding-platform')
@@ -1680,7 +1682,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
       )}
 
       {step === 'adding-platform' && (
-        <AddingPlatformStep addIosCommand={addIosCommand} doctorCommand={doctorCommand} />
+        <AddingPlatformStep addIosCommand={addIosCommand} doctorCommand={doctorCommand} dense={dense} />
       )}
 
       {/* Existing credentials warning */}
@@ -2271,6 +2273,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
       {/* AI debug — ask the user whether to send the captured log */}
       {step === 'ai-analysis-prompt' && (
         <AiAnalysisPromptStep
+          dense={dense}
           onChange={async (value) => {
             if (value === 'debug') {
               setStep('ai-analysis-running')
@@ -2308,6 +2311,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
           canRetry={MAX_AI_RETRIES - aiRetryCount > 0}
           retriesLeft={MAX_AI_RETRIES - aiRetryCount}
           maxRetries={MAX_AI_RETRIES}
+          dense={dense}
           onChange={async (value) => {
             if (value === 'retry') {
               // Track the retry intent before we tear down the AI state so
@@ -2369,6 +2373,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
           recoveryAdvice={recoveryAdvice}
           supportBundlePath={supportBundlePath}
           showRetry={!!retryStep}
+          dense={dense}
           onChange={async (value) => {
             if (value === 'retry') {
               setError(null)
@@ -2416,6 +2421,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
           buildUrl={buildUrl}
           ciSecretUploadSummary={ciSecretUploadSummary}
           buildRequestCommand={buildRequestCommand}
+          dense={dense}
         />
       )}
       </Box>

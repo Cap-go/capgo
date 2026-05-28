@@ -5,6 +5,13 @@
 // the 16-row contract's body budget (13 rows) at every reference width
 // (80 + 60). Shape copied from test-frame-fit-ios-ci.mjs (the batch exemplar).
 //
+// These steps are ADAPTIVE: they render a comfortable form by default and a
+// compact form when `dense=true`. The DENSE form is the one that must survive
+// the 16-row floor (the parent only renders the comfortable form after
+// measuring that it fits), so every assertion below passes `dense: true`. The
+// comfortable form may legitimately exceed the budget and is intentionally NOT
+// asserted against it.
+//
 // The budget offenders get realistic worst cases:
 //   • error — a composite backend error string with the recovery helper
 //     matching MANY branches (so summary + commands overflow before capping)
@@ -64,29 +71,29 @@ test(`ai-analysis-running fits ${BODY_BUDGET_ROWS}-row body budget`, () => {
 })
 
 // ── platform-select ─────────────────────────────────────────────────────────
-test(`platform-select [long appId] fits ${BODY_BUDGET_ROWS}-row budget`, () => {
-  assertFitsBudget(h(PlatformSelectStep, { appId: LONG_APP_ID, onChange: noop }), 'platform-select')
+test(`platform-select [dense, long appId] fits ${BODY_BUDGET_ROWS}-row budget`, () => {
+  assertFitsBudget(h(PlatformSelectStep, { appId: LONG_APP_ID, dense: true, onChange: noop }), 'platform-select')
 })
 
 // ── no-platform ─────────────────────────────────────────────────────────────
-test(`no-platform [long commands] fits ${BODY_BUDGET_ROWS}-row budget`, () => {
+test(`no-platform [dense, long commands] fits ${BODY_BUDGET_ROWS}-row budget`, () => {
   assertFitsBudget(
-    h(NoPlatformStep, { iosDir: 'ios', addIosCommand: ADD_IOS, syncIosCommand: SYNC_IOS, onChange: noop }),
+    h(NoPlatformStep, { iosDir: 'ios', addIosCommand: ADD_IOS, syncIosCommand: SYNC_IOS, dense: true, onChange: noop }),
     'no-platform',
   )
 })
 
 // ── adding-platform ─────────────────────────────────────────────────────────
-test(`adding-platform [long commands] fits ${BODY_BUDGET_ROWS}-row budget`, () => {
+test(`adding-platform [dense, long commands] fits ${BODY_BUDGET_ROWS}-row budget`, () => {
   assertFitsBudget(
-    h(AddingPlatformStep, { addIosCommand: ADD_IOS, doctorCommand: DOCTOR }),
+    h(AddingPlatformStep, { addIosCommand: ADD_IOS, doctorCommand: DOCTOR, dense: true }),
     'adding-platform',
   )
 })
 
 // ── ai-analysis-prompt ──────────────────────────────────────────────────────
-test(`ai-analysis-prompt fits ${BODY_BUDGET_ROWS}-row budget`, () => {
-  assertFitsBudget(h(AiAnalysisPromptStep, { onChange: noop }), 'ai-analysis-prompt')
+test(`ai-analysis-prompt [dense] fits ${BODY_BUDGET_ROWS}-row budget`, () => {
+  assertFitsBudget(h(AiAnalysisPromptStep, { dense: true, onChange: noop }), 'ai-analysis-prompt')
 })
 
 // ── ai-analysis-result — every display variant × retry shape ─────────────────
@@ -94,7 +101,7 @@ test(`ai-analysis-prompt fits ${BODY_BUDGET_ROWS}-row budget`, () => {
 // routed to the scroll step by the parent before this frame).
 const SHORT_ANALYSIS = 'The build failed because CODE_SIGN_IDENTITY is unset. Add it to your build settings and retry.'
 
-test(`ai-analysis-result [short success, retries left] fits ${BODY_BUDGET_ROWS}-row budget`, () => {
+test(`ai-analysis-result [dense, short success, retries left] fits ${BODY_BUDGET_ROWS}-row budget`, () => {
   assertFitsBudget(
     h(AiAnalysisResultStep, {
       analysisText: SHORT_ANALYSIS,
@@ -103,12 +110,13 @@ test(`ai-analysis-result [short success, retries left] fits ${BODY_BUDGET_ROWS}-
       canRetry: true,
       retriesLeft: 2,
       maxRetries: 2,
+      dense: true,
       onChange: noop,
     }),
     'ai-analysis-result-short-2left',
   )
 })
-test(`ai-analysis-result [short success, 1 retry left — last-retry label] fits ${BODY_BUDGET_ROWS}-row budget`, () => {
+test(`ai-analysis-result [dense, short success, 1 retry left — last-retry label] fits ${BODY_BUDGET_ROWS}-row budget`, () => {
   assertFitsBudget(
     h(AiAnalysisResultStep, {
       analysisText: SHORT_ANALYSIS,
@@ -117,12 +125,13 @@ test(`ai-analysis-result [short success, 1 retry left — last-retry label] fits
       canRetry: true,
       retriesLeft: 1,
       maxRetries: 2,
+      dense: true,
       onChange: noop,
     }),
     'ai-analysis-result-short-1left',
   )
 })
-test(`ai-analysis-result [success, viewedFull marker] fits ${BODY_BUDGET_ROWS}-row budget`, () => {
+test(`ai-analysis-result [dense, success, viewedFull marker] fits ${BODY_BUDGET_ROWS}-row budget`, () => {
   assertFitsBudget(
     h(AiAnalysisResultStep, {
       analysisText: SHORT_ANALYSIS,
@@ -131,12 +140,13 @@ test(`ai-analysis-result [success, viewedFull marker] fits ${BODY_BUDGET_ROWS}-r
       canRetry: true,
       retriesLeft: 2,
       maxRetries: 2,
+      dense: true,
       onChange: noop,
     }),
     'ai-analysis-result-viewedFull',
   )
 })
-test(`ai-analysis-result [retries exhausted — Continue only] fits ${BODY_BUDGET_ROWS}-row budget`, () => {
+test(`ai-analysis-result [dense, retries exhausted — Continue only] fits ${BODY_BUDGET_ROWS}-row budget`, () => {
   assertFitsBudget(
     h(AiAnalysisResultStep, {
       analysisText: SHORT_ANALYSIS,
@@ -145,6 +155,7 @@ test(`ai-analysis-result [retries exhausted — Continue only] fits ${BODY_BUDGE
       canRetry: false,
       retriesLeft: 0,
       maxRetries: 2,
+      dense: true,
       onChange: noop,
     }),
     'ai-analysis-result-exhausted',
@@ -157,7 +168,7 @@ const TOO_BIG_MSG = 'The build log is too large to analyze automatically. Trim i
 const ALREADY_MSG = 'This build log was already analyzed in a previous run — re-run the build to get a fresh diagnosis.'
 const ERROR_MSG = 'The analysis service is temporarily unavailable. Please try again in a few minutes.'
 
-test(`ai-analysis-result [already_analyzed banner, retries left] fits ${BODY_BUDGET_ROWS}-row budget`, () => {
+test(`ai-analysis-result [dense, already_analyzed banner, retries left] fits ${BODY_BUDGET_ROWS}-row budget`, () => {
   assertFitsBudget(
     h(AiAnalysisResultStep, {
       analysisText: null,
@@ -166,12 +177,13 @@ test(`ai-analysis-result [already_analyzed banner, retries left] fits ${BODY_BUD
       canRetry: true,
       retriesLeft: 2,
       maxRetries: 2,
+      dense: true,
       onChange: noop,
     }),
     'ai-analysis-result-already',
   )
 })
-test(`ai-analysis-result [too_big banner, retries exhausted] fits ${BODY_BUDGET_ROWS}-row budget`, () => {
+test(`ai-analysis-result [dense, too_big banner, retries exhausted] fits ${BODY_BUDGET_ROWS}-row budget`, () => {
   assertFitsBudget(
     h(AiAnalysisResultStep, {
       analysisText: null,
@@ -180,12 +192,13 @@ test(`ai-analysis-result [too_big banner, retries exhausted] fits ${BODY_BUDGET_
       canRetry: false,
       retriesLeft: 0,
       maxRetries: 2,
+      dense: true,
       onChange: noop,
     }),
     'ai-analysis-result-toobig-exhausted',
   )
 })
-test(`ai-analysis-result [error banner, retries left] fits ${BODY_BUDGET_ROWS}-row budget`, () => {
+test(`ai-analysis-result [dense, error banner, retries left] fits ${BODY_BUDGET_ROWS}-row budget`, () => {
   assertFitsBudget(
     h(AiAnalysisResultStep, {
       analysisText: null,
@@ -194,6 +207,7 @@ test(`ai-analysis-result [error banner, retries left] fits ${BODY_BUDGET_ROWS}-r
       canRetry: true,
       retriesLeft: 2,
       maxRetries: 2,
+      dense: true,
       onChange: noop,
     }),
     'ai-analysis-result-error',
@@ -237,31 +251,33 @@ const LONG_ERROR = 'API key verification failed: HTTP 403 Forbidden — the App 
 
 const LONG_SUPPORT_BUNDLE = '/Users/developer/Library/Application Support/capgo/onboarding-support-bundles/ios-com.acme.enterprise.internal.mobile.companion.app-2026-05-28T12-00-00.zip'
 
-test(`error [short error, no advice, no retry] fits ${BODY_BUDGET_ROWS}-row budget`, () => {
+test(`error [dense, short error, no advice, no retry] fits ${BODY_BUDGET_ROWS}-row budget`, () => {
   assertFitsBudget(
     h(ErrorStep, {
       error: 'Run `pnpm dlx @capgo/cli@latest build init` to resume.',
       recoveryAdvice: null,
       supportBundlePath: null,
       showRetry: false,
+      dense: true,
       onChange: noop,
     }),
     'error-minimal',
   )
 })
-test(`error [worst-case composite advice + long error + support bundle + retry] fits ${BODY_BUDGET_ROWS}-row budget`, () => {
+test(`error [dense, worst-case composite advice + long error + support bundle + retry] fits ${BODY_BUDGET_ROWS}-row budget`, () => {
   assertFitsBudget(
     h(ErrorStep, {
       error: LONG_ERROR,
       recoveryAdvice: WORST_CASE_ADVICE,
       supportBundlePath: LONG_SUPPORT_BUNDLE,
       showRetry: true,
+      dense: true,
       onChange: noop,
     }),
     'error-worst-case',
   )
 })
-test(`error [advice present, retry, no support bundle] fits ${BODY_BUDGET_ROWS}-row budget`, () => {
+test(`error [dense, advice present, retry, no support bundle] fits ${BODY_BUDGET_ROWS}-row budget`, () => {
   assertFitsBudget(
     h(ErrorStep, {
       error: 'The onboarding flow hit an unexpected error.',
@@ -275,6 +291,7 @@ test(`error [advice present, retry, no support bundle] fits ${BODY_BUDGET_ROWS}-
       },
       supportBundlePath: null,
       showRetry: true,
+      dense: true,
       onChange: noop,
     }),
     'error-typical',
@@ -282,22 +299,24 @@ test(`error [advice present, retry, no support bundle] fits ${BODY_BUDGET_ROWS}-
 })
 
 // ── build-complete — with build URL + CI upload summary, and the minimal form ─
-test(`build-complete [build URL + CI summary] fits ${BODY_BUDGET_ROWS}-row budget`, () => {
+test(`build-complete [dense, build URL + CI summary] fits ${BODY_BUDGET_ROWS}-row budget`, () => {
   assertFitsBudget(
     h(BuildCompleteStep, {
       buildUrl: 'https://capgo.app/app/p/com.acme.enterprise.internal.mobile.companion.app/builds/abc123',
       ciSecretUploadSummary: 'Uploaded 12 build env vars to GitLab CI/CD variables',
       buildRequestCommand: BUILD_REQUEST,
+      dense: true,
     }),
     'build-complete-full',
   )
 })
-test(`build-complete [no build, no CI summary] fits ${BODY_BUDGET_ROWS}-row budget`, () => {
+test(`build-complete [dense, no build, no CI summary] fits ${BODY_BUDGET_ROWS}-row budget`, () => {
   assertFitsBudget(
     h(BuildCompleteStep, {
       buildUrl: '',
       ciSecretUploadSummary: null,
       buildRequestCommand: BUILD_REQUEST,
+      dense: true,
     }),
     'build-complete-minimal',
   )
