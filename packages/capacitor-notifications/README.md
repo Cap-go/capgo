@@ -4,7 +4,7 @@ First-party Capgo native notification plugin for Capacitor apps.
 
 It handles:
 
-- APNs and FCM token registration with Capgo
+- iOS and Android push token registration with Capgo
 - Foreground notification receive events
 - Notification open tracking
 - Badge count reads and writes
@@ -35,7 +35,7 @@ Or let the Capgo CLI patch the app entrypoint:
 npx @capgo/cli@latest notifications setup
 ```
 
-On Android, keep app backup and data-extraction policy in the host app manifest. The plugin manifest only declares the FCM service.
+On Android, keep app backup and data-extraction policy in the host app manifest. The plugin manifest only declares the Android push messaging service.
 
 ## Usage
 

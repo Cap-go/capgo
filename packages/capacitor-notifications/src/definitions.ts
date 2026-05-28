@@ -2,7 +2,6 @@ import type { PermissionState, PluginListenerHandle } from '@capacitor/core'
 
 export type CapgoNotificationPermission = 'unknown' | 'prompt' | 'granted' | 'denied'
 export type CapgoNotificationPlatform = 'ios' | 'android'
-export type CapgoNotificationProvider = 'fcm' | 'apns'
 export type CapgoNotificationInstallMode = 'next' | 'set'
 export type CapgoNotificationImportance = 1 | 2 | 3 | 4 | 5
 export type CapgoNotificationVisibility = -1 | 0 | 1
@@ -31,7 +30,6 @@ export interface CapgoNotificationRegistration {
   deviceKey: string
   bucket: string
   token: string
-  provider: CapgoNotificationProvider
   platform: CapgoNotificationPlatform
   permission: CapgoNotificationPermission
   eventProof: string
@@ -46,7 +44,6 @@ export interface CapgoNotificationEvent {
   recipientKey?: string
   deviceKey?: string
   eventProof?: string
-  provider?: CapgoNotificationProvider
   platform?: CapgoNotificationPlatform
   error?: string
   badge?: number

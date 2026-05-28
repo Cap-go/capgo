@@ -2063,7 +2063,7 @@
   "notification-device-results": "Devices found",
   "notification-active-providers": "Configured platforms",
   "notification-no-providers": "No platform credentials configured",
-  "notification-provider-secret-ref-placeholder": "NOTIFICATIONS_FCM_SERVICE_ACCOUNT",
+  "notification-provider-secret-ref-placeholder": "NOTIFICATIONS_COM_EXAMPLE_APP_ANDROID",
   "notification-platform": "Platform",
   "notification-platform-android": "Android push",
   "notification-platform-ios": "iOS push",

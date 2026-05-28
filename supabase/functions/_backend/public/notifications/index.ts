@@ -63,7 +63,7 @@ interface RegisterBody {
   externalId: string
   nativeInstallId: string
   pushToken: string
-  provider: NativeNotificationProvider
+  provider?: NativeNotificationProvider
   platform: NativeNotificationPlatform
   locale?: string
   timezone?: string
@@ -115,7 +115,8 @@ interface CampaignBody {
 
 interface ProviderBody {
   appId: string
-  provider: NativeNotificationProvider
+  provider?: NativeNotificationProvider
+  platform?: NativeNotificationPlatform
   status?: string
   config?: Record<string, unknown>
   secretRef?: string | null
@@ -284,16 +285,53 @@ function normalizeSecretRefSegment(value: string): string {
 }
 
 function expectedProviderSecretRef(appId: string, provider: NativeNotificationProvider) {
-  return `NOTIFICATIONS_${normalizeSecretRefSegment(appId)}_${provider.toUpperCase()}`
+  return `NOTIFICATIONS_${normalizeSecretRefSegment(appId)}_${provider === 'apns' ? 'IOS' : 'ANDROID'}`
+}
+
+function providerForPlatform(platform: NativeNotificationPlatform): NativeNotificationProvider {
+  return platform === 'ios' ? 'apns' : 'fcm'
+}
+
+function platformForProvider(provider: NativeNotificationProvider): NativeNotificationPlatform {
+  return provider === 'apns' ? 'ios' : 'android'
+}
+
+function resolveNotificationProvider(platform: NativeNotificationPlatform, provider?: NativeNotificationProvider): NativeNotificationProvider {
+  const expectedProvider = providerForPlatform(platform)
+  if (!provider)
+    return expectedProvider
+  if (!NOTIFICATION_PROVIDERS.has(provider) || provider !== expectedProvider)
+    throw simpleError('invalid_platform', 'Invalid notification platform')
+  return provider
+}
+
+function resolveNotificationEventProvider(body: EventBody): NativeNotificationProvider | undefined {
+  if (body.platform)
+    return resolveNotificationProvider(body.platform, body.provider)
+  if (!body.provider)
+    return undefined
+  if (!NOTIFICATION_PROVIDERS.has(body.provider))
+    throw simpleError('invalid_platform', 'Invalid notification platform')
+  return body.provider
+}
+
+function resolveProviderConfigProvider(body: ProviderBody): NativeNotificationProvider {
+  if (body.platform) {
+    if (!NOTIFICATION_PLATFORMS.has(body.platform))
+      throw simpleError('invalid_platform', 'Invalid notification platform')
+    return resolveNotificationProvider(body.platform, body.provider)
+  }
+  if (body.provider && NOTIFICATION_PROVIDERS.has(body.provider))
+    return body.provider
+  throw simpleError('invalid_platform', 'Invalid notification platform')
 }
 
 function resolveProviderSecretRef(appId: string, provider: NativeNotificationProvider, status: string, value: string | null | undefined) {
   const expected = expectedProviderSecretRef(appId, provider)
   const requested = typeof value === 'string' ? value.trim() : ''
   if (requested && requested !== expected) {
-    throw simpleError('invalid_notification_secret_ref', 'Invalid notification provider secret reference', {
+    throw simpleError('invalid_notification_secret_ref', 'Invalid notification platform secret reference', {
       appId,
-      provider,
       expectedSecretRef: expected,
     })
   }
@@ -310,15 +348,15 @@ function assertProviderConfigReady(provider: NativeNotificationProvider, status:
     return
 
   if (!secretRef)
-    throw simpleError('missing_notification_secret_ref', 'Missing notification provider secret reference', { provider })
+    throw simpleError('missing_notification_secret_ref', 'Missing notification platform secret reference')
 
   if (provider === 'fcm' && !optionalConfigString(config, 'projectId'))
-    throw simpleError('missing_notification_provider_project_id', 'Missing FCM project id', { provider })
+    throw simpleError('missing_notification_provider_project_id', 'Missing Android push project id')
 
   if (provider === 'apns') {
     const missing = ['teamId', 'keyId', 'bundleId'].filter(key => !optionalConfigString(config, key))
     if (missing.length)
-      throw simpleError('missing_notification_provider_apns_config', 'Missing APNs provider config', { provider, missing })
+      throw simpleError('missing_notification_provider_apns_config', 'Missing iOS push config', { missing })
   }
 }
 
@@ -326,7 +364,6 @@ function publicDevice(row: NativeNotificationRegistryRow) {
   return {
     deviceKey: row.device_key,
     recipientKey: row.recipient_key,
-    provider: row.provider,
     platform: row.platform,
     locale: row.locale,
     timezone: row.timezone,
@@ -337,6 +374,21 @@ function publicDevice(row: NativeNotificationRegistryRow) {
     badge: row.badge,
     permission: row.permission,
     updatedAt: row.updated_at,
+  }
+}
+
+function publicProviderConfig(row: Record<string, unknown>) {
+  const provider = row.provider as NativeNotificationProvider
+  return {
+    id: row.id,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+    owner_org: row.owner_org,
+    app_id: row.app_id,
+    platform: platformForProvider(provider),
+    status: row.status,
+    config: row.config,
+    secret_ref: row.secret_ref,
   }
 }
 
@@ -465,10 +517,9 @@ app.post('/register', async (c) => {
   const identityProof = assertString(body.identityProof, 'identityProof', 256)
   if (!(await verifyNotificationIdentityProof(c, appId, externalId, identityProof)))
     throw quickError(401, 'invalid_notification_identity_proof', 'Invalid notification identity proof', { appId })
-  if (!NOTIFICATION_PROVIDERS.has(body.provider))
-    throw simpleError('invalid_provider', 'Invalid notification provider')
   if (!NOTIFICATION_PLATFORMS.has(body.platform))
     throw simpleError('invalid_platform', 'Invalid notification platform')
+  const provider = resolveNotificationProvider(body.platform, body.provider)
   const previousRecipientKey = typeof body.previousRecipientKey === 'string' ? body.previousRecipientKey.trim() : ''
   const previousDeviceKey = typeof body.previousDeviceKey === 'string' ? body.previousDeviceKey.trim() : ''
   const previousEventProof = typeof body.previousEventProof === 'string' ? body.previousEventProof.trim() : ''
@@ -481,7 +532,7 @@ app.post('/register', async (c) => {
       appId,
       recipientKey: previousRecipientKey,
       deviceKey: previousDeviceKey,
-      provider: body.provider,
+      provider,
       platform: body.platform,
       badge: body.badge,
       permission: body.permission,
@@ -494,6 +545,7 @@ app.post('/register', async (c) => {
     externalId,
     nativeInstallId,
     pushToken,
+    provider,
   })
 
   if (shouldTrackNotificationPermissionChanged(body.previousPermission, body.permission)) {
@@ -502,7 +554,7 @@ app.post('/register', async (c) => {
       event: 'permission_changed',
       recipientKey: identity.recipientKey,
       deviceKey: identity.deviceKey,
-      provider: body.provider,
+      provider,
       platform: body.platform,
       badge: body.badge,
     })
@@ -523,10 +575,9 @@ app.post('/events', async (c) => {
     throw simpleError('invalid_notification_event', 'Invalid notification event')
   if (!CLIENT_NOTIFICATION_DELIVERY_EVENTS.has(body.event) && !CLIENT_NOTIFICATION_DEVICE_EVENTS.has(body.event))
     throw simpleError('invalid_notification_client_event', 'Notification event is not accepted from clients')
-  if (body.provider && !NOTIFICATION_PROVIDERS.has(body.provider))
-    throw simpleError('invalid_provider', 'Invalid notification provider')
   if (body.platform && !NOTIFICATION_PLATFORMS.has(body.platform))
     throw simpleError('invalid_platform', 'Invalid notification platform')
+  const provider = resolveNotificationEventProvider(body)
   const recipientKey = assertString(body.recipientKey, 'recipientKey', 128)
   const deviceKey = assertString(body.deviceKey, 'deviceKey', 128)
   const eventProof = assertString(body.eventProof, 'eventProof', 256)
@@ -551,7 +602,7 @@ app.post('/events', async (c) => {
     notificationId,
     recipientKey,
     deviceKey,
-    provider: body.provider,
+    provider,
     platform: body.platform,
     badge: body.badge,
   })
@@ -598,7 +649,7 @@ app.post('/badge', middlewareV2(['write', 'all']), async (c) => {
   const plan = await resolveTargetPlan(c, { ...body, appId, badge })
   const providerConfigs = await getNotificationProviderConfigs(c, appId)
   if (!providerConfigs.length)
-    throw simpleError('missing_notification_provider', 'Missing configured notification provider')
+    throw simpleError('missing_notification_provider', 'Missing configured notification platform credentials')
   const campaignId = body.campaignId || crypto.randomUUID()
   const queued = await enqueueNativeNotificationFanout(c, {
     kind: 'badge',
@@ -627,7 +678,7 @@ app.post('/update-check', middlewareV2(['write', 'all']), async (c) => {
   const plan = await resolveTargetPlan(c, { appId, target, limit: body.limit })
   const providerConfigs = await getNotificationProviderConfigs(c, appId)
   if (!providerConfigs.length)
-    throw simpleError('missing_notification_provider', 'Missing configured notification provider')
+    throw simpleError('missing_notification_provider', 'Missing configured notification platform credentials')
   let campaignId = body.campaignId
   if (!campaignId) {
     const campaignRecord = await createCampaignRecord(c, {
@@ -675,7 +726,7 @@ app.post('/send', middlewareV2(['write', 'all']), async (c) => {
   const plan = await resolveTargetPlan(c, { ...body, appId })
   const providerConfigs = await getNotificationProviderConfigs(c, appId)
   if (!providerConfigs.length)
-    throw simpleError('missing_notification_provider', 'Missing configured notification provider')
+    throw simpleError('missing_notification_provider', 'Missing configured notification platform credentials')
   const queued = await enqueueNativeNotificationFanout(c, {
     kind: 'send',
     appId,
@@ -738,7 +789,7 @@ app.get('/providers', middlewareV2(['read', 'write', 'all']), async (c) => {
       WHERE app_id = ${appId}
       ORDER BY provider ASC
     `)
-    return c.json({ data: result.rows })
+    return c.json({ data: result.rows.map(row => publicProviderConfig(row as Record<string, unknown>)) })
   }
   finally {
     if (pgClient)
@@ -750,13 +801,12 @@ app.put('/providers', middlewareV2(['write', 'all']), async (c) => {
   const body = await parseBody<ProviderBody>(c)
   const appId = assertString(body.appId, 'appId', 128)
   await assertAppPermission(c, 'app.update_settings', appId)
-  if (!NOTIFICATION_PROVIDERS.has(body.provider))
-    throw simpleError('invalid_provider', 'Invalid notification provider')
+  const provider = resolveProviderConfigProvider(body)
   const status = body.status && ['draft', 'configured', 'disabled', 'error'].includes(body.status) ? body.status : 'draft'
   const ownerOrg = await getAppOwnerOrg(c, appId)
   const config = assertOptionalRecord(body.config, 'config')
-  const secretRef = resolveProviderSecretRef(appId, body.provider, status, body.secretRef)
-  assertProviderConfigReady(body.provider, status, config, secretRef)
+  const secretRef = resolveProviderSecretRef(appId, provider, status, body.secretRef)
+  assertProviderConfigReady(provider, status, config, secretRef)
   const auth = c.get('auth')
   let pgClient: ReturnType<typeof getPgClient> | undefined
   try {
@@ -764,12 +814,12 @@ app.put('/providers', middlewareV2(['write', 'all']), async (c) => {
     const drizzleClient = getDrizzleClient(pgClient)
     const result = await drizzleClient.execute(sql`
       INSERT INTO public.notification_provider_configs (owner_org, app_id, provider, status, config, secret_ref, created_by)
-      VALUES (${ownerOrg}::uuid, ${appId}, ${body.provider}, ${status}, ${JSON.stringify(config)}::jsonb, ${secretRef}, ${auth?.userId ?? null}::uuid)
+      VALUES (${ownerOrg}::uuid, ${appId}, ${provider}, ${status}, ${JSON.stringify(config)}::jsonb, ${secretRef}, ${auth?.userId ?? null}::uuid)
       ON CONFLICT (app_id, provider)
       DO UPDATE SET updated_at = now(), status = EXCLUDED.status, config = EXCLUDED.config, secret_ref = EXCLUDED.secret_ref
       RETURNING id, created_at, updated_at, owner_org::text, app_id, provider, status, config, secret_ref
     `)
-    return c.json(result.rows[0])
+    return c.json(publicProviderConfig(result.rows[0] as Record<string, unknown>))
   }
   finally {
     if (pgClient)

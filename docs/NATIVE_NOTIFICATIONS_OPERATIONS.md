@@ -1,7 +1,7 @@
 # Native notifications operations
 
 Native notifications use Cloudflare Analytics Engine for active device state and
-events. Capgo Postgres stores only provider config, app settings, and campaign
+events. Capgo Postgres stores only platform credential config, app settings, and campaign
 metadata.
 
 ## Cloudflare queues
@@ -23,12 +23,12 @@ bun scripts/ensure-native-notification-queues.ts prod
 The script creates the primary queue and dead-letter queue names referenced by
 `cloudflare_workers/api/wrangler.jsonc`.
 
-## Provider secrets
+## Platform secrets
 
-The dashboard stores only provider metadata and the expected secret reference.
-The private FCM/APNs credential must be present in the API worker environment
-under the exact name shown in the app Notifications tab before a provider is
+The dashboard stores only platform metadata and the expected secret reference.
+The private Android or iOS push credential must be present in the API worker environment
+under the exact name shown in the app Notifications tab before a platform is
 marked configured.
 
-Configured FCM providers require `projectId` in provider config. Configured APNs
-providers require `teamId`, `keyId`, and `bundleId`.
+Configured Android push credentials require `projectId` in platform config. Configured iOS
+push credentials require `teamId`, `keyId`, and `bundleId`.

@@ -126,7 +126,7 @@ export async function setupNotifications(appIdArg: string | undefined, options: 
       runSync()
 
     log.info('Import setupCapgoNotifications(...) after your user is known, and pass your stable customer external ID.')
-    log.info('Then configure FCM/APNs in the Capgo app Notifications tab before sending production notifications.')
+    log.info('Then configure Android and iOS push credentials in the Capgo app Notifications tab before sending production notifications.')
     outro('Notifications setup done')
   }
   catch (error) {

@@ -7,7 +7,6 @@ import type {
   CapgoNotificationOpenedEvent,
   CapgoNotificationPermission,
   CapgoNotificationPlatform,
-  CapgoNotificationProvider,
   CapgoNotificationRegisterOptions,
   CapgoNotificationRegistration,
   CapgoNotificationToken,
@@ -100,10 +99,6 @@ function assertNativePlatform(): CapgoNotificationPlatform {
   if (platform === 'ios' || platform === 'android')
     return platform
   throw new Error('Capgo notifications are only available on iOS and Android')
-}
-
-function getProvider(platform: CapgoNotificationPlatform): CapgoNotificationProvider {
-  return platform === 'ios' ? 'apns' : 'fcm'
 }
 
 function getServerUrl(options?: { serverUrl?: string }) {
@@ -372,7 +367,6 @@ async function registerToken(options: CapgoNotificationRegisterOptions, token: C
     externalId: options.externalId,
     nativeInstallId,
     pushToken: token.value,
-    provider: getProvider(platform),
     platform,
     locale: navigator.language || '',
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || '',
@@ -394,7 +388,6 @@ async function registerToken(options: CapgoNotificationRegisterOptions, token: C
     deviceKey: String(response.deviceKey),
     bucket: String(response.bucket),
     token: token.value,
-    provider: getProvider(platform),
     platform,
     permission,
     eventProof: String(response.eventProof),
@@ -423,7 +416,6 @@ async function trackEvent(event: 'received' | 'opened' | 'background_started' | 
     recipientKey,
     deviceKey,
     eventProof,
-    provider: input?.provider || getProvider(platform),
     platform: input?.platform || platform,
     campaignId: input?.campaignId,
     notificationId: input?.notificationId,

@@ -1044,7 +1044,7 @@ program
   .command('setup [appId]')
   .description(`Install the Capgo notifications plugin, add Capacitor config, create a helper file, and run Capacitor sync.
 
-Before sending production notifications, configure FCM/APNs credentials in the Capgo app Notifications tab.
+Before sending production notifications, configure Android and iOS push credentials in the Capgo app Notifications tab.
 
 Example: npx @capgo/cli@latest notifications setup com.example.app`)
   .action(setupNotifications)

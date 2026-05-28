@@ -272,7 +272,7 @@ async function loadFcmAccessToken(env: NotificationEnv, providerConfig: NativeNo
   const privateKey = getString(secretObject.private_key) || getString(secretValue)
   const clientEmail = getString(secretObject.client_email) || getString(providerConfig.config.serviceAccountEmail)
   if (!privateKey || !clientEmail)
-    throw new Error('Missing FCM service account secret')
+    throw new Error('Missing Android push service account secret')
 
   const now = Math.floor(Date.now() / 1000)
   const assertion = await signRsaJwt({ alg: 'RS256', typ: 'JWT' }, {
@@ -293,7 +293,7 @@ async function loadFcmAccessToken(env: NotificationEnv, providerConfig: NativeNo
   })
   const json = await response.json() as { access_token?: string, error?: string }
   if (!response.ok || !json.access_token)
-    throw new Error(json.error || 'Unable to get FCM access token')
+    throw new Error('Unable to get Android push access token')
   return json.access_token
 }
 
@@ -399,7 +399,7 @@ async function sendFcm(env: NotificationEnv, providerConfig: NativeNotificationP
   const secretObject = secretValue && typeof secretValue === 'object' ? secretValue as Record<string, unknown> : {}
   const projectId = getString(providerConfig.config.projectId) || getString(secretObject.project_id)
   if (!projectId)
-    return { ok: false, transient: false, error: 'Missing FCM project id' }
+    return { ok: false, transient: false, error: 'Missing Android push project id' }
 
   const accessToken = await getFcmAccessToken(env, providerConfig, cache)
   const response = await fetch(`https://fcm.googleapis.com/v1/projects/${encodeURIComponent(projectId)}/messages:send`, {
@@ -415,11 +415,12 @@ async function sendFcm(env: NotificationEnv, providerConfig: NativeNotificationP
     return { ok: true, transient: false, notificationId: json.name }
 
   const status = json.error?.status ?? ''
+  const invalidToken = isInvalidFcmToken(json)
   return {
     ok: false,
     transient: response.status === 429 || response.status >= 500,
-    invalidToken: isInvalidFcmToken(json),
-    error: json.error?.message || status || 'FCM rejected notification',
+    invalidToken,
+    error: invalidToken ? 'Invalid Android push token' : status || 'Android push rejected notification',
   }
 }
 
@@ -427,7 +428,7 @@ async function buildApnsJwt(providerConfig: NativeNotificationProviderConfig, pr
   const teamId = getString(providerConfig.config.teamId)
   const keyId = getString(providerConfig.config.keyId)
   if (!teamId || !keyId)
-    throw new Error('Missing APNs team id or key id')
+    throw new Error('Missing iOS push team id or key id')
   const cacheKey = `apns:${providerConfig.secretRef ?? ''}:${teamId}:${keyId}`
   let jwtPromise = cache.apnsJwtTokens.get(cacheKey)
   if (!jwtPromise) {
@@ -475,7 +476,7 @@ async function sendApns(env: NotificationEnv, providerConfig: NativeNotification
   const privateKey = getString(secretObject.private_key) || getString(secretValue)
   const bundleId = getString(providerConfig.config.bundleId)
   if (!privateKey || !bundleId)
-    return { ok: false, transient: false, error: 'Missing APNs key or bundle id' }
+    return { ok: false, transient: false, error: 'Missing iOS push key or bundle id' }
 
   const background = getBoolean(message.payload.background) || getBoolean(message.payload.silent) || message.payload.kind === 'background' || message.kind === 'update_check'
   const host = getBoolean(providerConfig.config.sandbox) || providerConfig.config.environment === 'sandbox'
@@ -498,7 +499,7 @@ async function sendApns(env: NotificationEnv, providerConfig: NativeNotification
     return { ok: true, transient: false, notificationId: response.headers.get('apns-id') ?? undefined }
 
   const json = await response.json().catch(() => ({})) as { reason?: string }
-  const reason = json.reason ?? 'APNs rejected notification'
+  const reason = json.reason ?? 'iOS push rejected notification'
   return {
     ok: false,
     transient: response.status === 429 || response.status >= 500,
@@ -587,8 +588,8 @@ function shouldRetryThrownError(error: unknown): boolean {
   return ![
     'Invalid notification token ciphertext',
     'Missing notification token secret',
-    'Missing FCM service account secret',
-    'Missing APNs team id or key id',
+    'Missing Android push service account secret',
+    'Missing iOS push team id or key id',
   ].some(permanentError => message.includes(permanentError))
 }
 

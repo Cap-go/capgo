@@ -124,8 +124,7 @@ public class CapgoNotificationsPlugin extends Plugin {
             .getToken()
             .addOnCompleteListener((task) -> {
                 if (!task.isSuccessful()) {
-                    Exception exception = task.getException();
-                    sendError(exception == null ? "Unable to register for FCM" : exception.getLocalizedMessage());
+                    sendError("Unable to register Android push token");
                     return;
                 }
                 sendToken(task.getResult());
