@@ -4,8 +4,17 @@
 // build-complete / error / ai-analysis-prompt / ai-analysis-running /
 // ai-analysis-result). Renders each step component × each meaningful state
 // variant via the shared harness and asserts it fits the 16-row contract's
-// body budget (13 rows) at every reference width (80 and 60 cols). Shape copied
-// from test-frame-fit-ai.mjs (the batch exemplar) + test-frame-fit-android-*.
+// body budget (13 rows) at every reference width (80 and 60 cols).
+//
+// Adaptive spacing: each body renders its COMFORTABLE form by default (boxed
+// banners + blank-line spacing + full copy) and collapses to a terse,
+// budget-fitting DENSE form when the parent passes `dense`. The 13-row budget
+// is the floor we must survive on short terminals — it bounds the DENSE form
+// only. The comfortable form is allowed to exceed it (the parent renders it
+// only after measuring that it fits the viewport), so EVERY assertion below
+// passes `dense: true` and asserts the dense form against the budget. The
+// prop-less spinner steps (welcome / backing-up / ai-analysis-running) have no
+// spacing to collapse, so they render identically in both modes.
 import React from 'react'
 import {
   AiAnalysisPromptStep,
@@ -38,106 +47,111 @@ const h = React.createElement
 const noop = () => {}
 
 // ── welcome (spinner) ─────────────────────────────────────────────────────────
-test(`welcome fits ${BODY_BUDGET_ROWS}-row budget`, () => {
-  assertFitsBudget(h(WelcomeStep), 'welcome')
+test(`welcome [dense] fits ${BODY_BUDGET_ROWS}-row budget`, () => {
+  assertFitsBudget(h(WelcomeStep), 'welcome-dense')
 })
 
 // ── no-platform — short and long native-dir names ─────────────────────────────
-test(`no-platform [short dir] fits ${BODY_BUDGET_ROWS}-row budget`, () => {
-  assertFitsBudget(h(NoPlatformStep, { androidDir: 'android' }), 'no-platform-short')
+test(`no-platform [dense, short dir] fits ${BODY_BUDGET_ROWS}-row budget`, () => {
+  assertFitsBudget(h(NoPlatformStep, { androidDir: 'android', dense: true }), 'no-platform-dense-short')
 })
-test(`no-platform [long dir] fits ${BODY_BUDGET_ROWS}-row budget`, () => {
+test(`no-platform [dense, long dir] fits ${BODY_BUDGET_ROWS}-row budget`, () => {
   assertFitsBudget(
-    h(NoPlatformStep, { androidDir: 'apps/mobile/platforms/android-native' }),
-    'no-platform-long',
+    h(NoPlatformStep, { androidDir: 'apps/mobile/platforms/android-native', dense: true }),
+    'no-platform-dense-long',
   )
 })
 
 // ── credentials-exist — short and long appId (heading width) ──────────────────
-test(`credentials-exist [short appId] fits ${BODY_BUDGET_ROWS}-row budget`, () => {
+test(`credentials-exist [dense, short appId] fits ${BODY_BUDGET_ROWS}-row budget`, () => {
   assertFitsBudget(
-    h(CredentialsExistStep, { appId: 'com.x.y', onChoose: noop }),
-    'credentials-exist-short',
+    h(CredentialsExistStep, { appId: 'com.x.y', onChoose: noop, dense: true }),
+    'credentials-exist-dense-short',
   )
 })
-test(`credentials-exist [long appId] fits ${BODY_BUDGET_ROWS}-row budget`, () => {
+test(`credentials-exist [dense, long appId] fits ${BODY_BUDGET_ROWS}-row budget`, () => {
   assertFitsBudget(
     h(CredentialsExistStep, {
       appId: 'com.companyname.product.flavor.staging.internal.example',
       onChoose: noop,
+      dense: true,
     }),
-    'credentials-exist-long',
+    'credentials-exist-dense-long',
   )
 })
 
 // ── backing-up (spinner) ──────────────────────────────────────────────────────
-test(`backing-up fits ${BODY_BUDGET_ROWS}-row budget`, () => {
-  assertFitsBudget(h(BackingUpStep), 'backing-up')
+test(`backing-up [dense] fits ${BODY_BUDGET_ROWS}-row budget`, () => {
+  assertFitsBudget(h(BackingUpStep), 'backing-up-dense')
 })
 
 // ── build-complete — every combination of the two optional follow-up lines ────
-test(`build-complete [bare] fits ${BODY_BUDGET_ROWS}-row budget`, () => {
+test(`build-complete [dense, bare] fits ${BODY_BUDGET_ROWS}-row budget`, () => {
   assertFitsBudget(
-    h(BuildCompleteStep, { uploadSummary: null, buildUrl: '' }),
-    'build-complete-bare',
+    h(BuildCompleteStep, { uploadSummary: null, buildUrl: '', dense: true }),
+    'build-complete-dense-bare',
   )
 })
-test(`build-complete [url only] fits ${BODY_BUDGET_ROWS}-row budget`, () => {
+test(`build-complete [dense, url only] fits ${BODY_BUDGET_ROWS}-row budget`, () => {
   assertFitsBudget(
-    h(BuildCompleteStep, { uploadSummary: null, buildUrl: 'https://capgo.app/app/com.example.app/builds' }),
-    'build-complete-url',
+    h(BuildCompleteStep, { uploadSummary: null, buildUrl: 'https://capgo.app/app/com.example.app/builds', dense: true }),
+    'build-complete-dense-url',
   )
 })
-test(`build-complete [summary + url] fits ${BODY_BUDGET_ROWS}-row budget`, () => {
+test(`build-complete [dense, summary + url] fits ${BODY_BUDGET_ROWS}-row budget`, () => {
   assertFitsBudget(
     h(BuildCompleteStep, {
       uploadSummary: 'Uploaded 5 env vars to GitHub Actions',
       buildUrl: 'https://capgo.app/app/com.example.app/builds',
+      dense: true,
     }),
-    'build-complete-summary-url',
+    'build-complete-dense-summary-url',
   )
 })
-test(`build-complete [long summary] fits ${BODY_BUDGET_ROWS}-row budget`, () => {
+test(`build-complete [dense, long summary] fits ${BODY_BUDGET_ROWS}-row budget`, () => {
   assertFitsBudget(
     h(BuildCompleteStep, {
       uploadSummary: 'Uploaded 12 build environment variables to the GitHub Actions repository secrets store',
       buildUrl: 'https://capgo.app/app/com.example.app/builds',
+      dense: true,
     }),
-    'build-complete-long-summary',
+    'build-complete-dense-long-summary',
   )
 })
 
 // ── error — short and very long (wrapped stderr) failure messages ─────────────
-test(`error [short] fits ${BODY_BUDGET_ROWS}-row budget`, () => {
+// Dense mode truncates the message to a single line so even a multi-hundred-char
+// stderr keeps the retry/exit control on screen.
+test(`error [dense, short] fits ${BODY_BUDGET_ROWS}-row budget`, () => {
   assertFitsBudget(
-    h(ErrorStep, { message: 'Store password was rejected by the keystore. Try again.', onChoose: noop }),
-    'error-short',
+    h(ErrorStep, { message: 'Store password was rejected by the keystore. Try again.', onChoose: noop, dense: true }),
+    'error-dense-short',
   )
 })
-test(`error [long stderr] fits ${BODY_BUDGET_ROWS}-row budget`, () => {
+test(`error [dense, long stderr] fits ${BODY_BUDGET_ROWS}-row budget`, () => {
   const longMessage
     = 'Failed to provision Google Cloud resources: the Android Publisher API '
       + 'returned 403 PERMISSION_DENIED — the signed-in account lacks the '
       + 'serviceusage.services.enable permission on project capgo-native-build-9f3a2c, '
       + 'and the linked billing account is suspended. Re-run after enabling billing '
       + 'and granting the Service Usage Admin role, then try the build again from the top.'
-  assertFitsBudget(h(ErrorStep, { message: longMessage, onChoose: noop }), 'error-long')
+  assertFitsBudget(h(ErrorStep, { message: longMessage, onChoose: noop, dense: true }), 'error-dense-long')
 })
 
 // ── ai-analysis-prompt ────────────────────────────────────────────────────────
-test(`ai-analysis-prompt fits ${BODY_BUDGET_ROWS}-row budget`, () => {
-  assertFitsBudget(h(AiAnalysisPromptStep, { onChoose: noop }), 'ai-analysis-prompt')
+test(`ai-analysis-prompt [dense] fits ${BODY_BUDGET_ROWS}-row budget`, () => {
+  assertFitsBudget(h(AiAnalysisPromptStep, { onChoose: noop, dense: true }), 'ai-analysis-prompt-dense')
 })
 
 // ── ai-analysis-running (spinner) ─────────────────────────────────────────────
-test(`ai-analysis-running fits ${BODY_BUDGET_ROWS}-row budget`, () => {
-  assertFitsBudget(h(AiAnalysisRunningStep), 'ai-analysis-running')
+test(`ai-analysis-running [dense] fits ${BODY_BUDGET_ROWS}-row budget`, () => {
+  assertFitsBudget(h(AiAnalysisRunningStep), 'ai-analysis-running-dense')
 })
 
-// ── ai-analysis-result — every content variant × retry affordance ─────────────
+// ── ai-analysis-result — every content variant × retry affordance (DENSE) ─────
 // Short inline success text (long analyses route to the scroll step, so the
 // inline branch only ever sees short text). Retries available.
-test(`ai-analysis-result [short success, retries left] fits ${BODY_BUDGET_ROWS}-row budget`, () => {
+test(`ai-analysis-result [dense, short success, retries left] fits ${BODY_BUDGET_ROWS}-row budget`, () => {
   assertFitsBudget(
     h(AiAnalysisResultStep, {
       analysisText: 'Gradle could not find the keystore at the configured path. Verify ANDROID_KEYSTORE_FILE.',
@@ -147,12 +161,13 @@ test(`ai-analysis-result [short success, retries left] fits ${BODY_BUDGET_ROWS}-
       maxRetries: 2,
       onRetry: noop,
       onSkipOrContinue: noop,
+      dense: true,
     }),
-    'ai-result-short-success',
+    'ai-result-dense-short-success',
   )
 })
 // aiViewedFull marker (the long-analysis case: user dismissed the scroll viewer).
-test(`ai-analysis-result [viewedFull marker] fits ${BODY_BUDGET_ROWS}-row budget`, () => {
+test(`ai-analysis-result [dense, viewedFull marker] fits ${BODY_BUDGET_ROWS}-row budget`, () => {
   assertFitsBudget(
     h(AiAnalysisResultStep, {
       analysisText: 'a'.repeat(4000),
@@ -162,12 +177,13 @@ test(`ai-analysis-result [viewedFull marker] fits ${BODY_BUDGET_ROWS}-row budget
       maxRetries: 2,
       onRetry: noop,
       onSkipOrContinue: noop,
+      dense: true,
     }),
-    'ai-result-viewed-full',
+    'ai-result-dense-viewed-full',
   )
 })
-// Non-success banner: error.
-test(`ai-analysis-result [error banner] fits ${BODY_BUDGET_ROWS}-row budget`, () => {
+// Non-success banner: error. In dense mode the banner is boxless.
+test(`ai-analysis-result [dense, error banner] fits ${BODY_BUDGET_ROWS}-row budget`, () => {
   assertFitsBudget(
     h(AiAnalysisResultStep, {
       analysisText: null,
@@ -177,12 +193,13 @@ test(`ai-analysis-result [error banner] fits ${BODY_BUDGET_ROWS}-row budget`, ()
       maxRetries: 2,
       onRetry: noop,
       onSkipOrContinue: noop,
+      dense: true,
     }),
-    'ai-result-error',
+    'ai-result-dense-error',
   )
 })
 // Non-success banner: already_analyzed.
-test(`ai-analysis-result [already_analyzed banner] fits ${BODY_BUDGET_ROWS}-row budget`, () => {
+test(`ai-analysis-result [dense, already_analyzed banner] fits ${BODY_BUDGET_ROWS}-row budget`, () => {
   assertFitsBudget(
     h(AiAnalysisResultStep, {
       analysisText: null,
@@ -195,12 +212,13 @@ test(`ai-analysis-result [already_analyzed banner] fits ${BODY_BUDGET_ROWS}-row 
       maxRetries: 2,
       onRetry: noop,
       onSkipOrContinue: noop,
+      dense: true,
     }),
-    'ai-result-already-analyzed',
+    'ai-result-dense-already-analyzed',
   )
 })
 // Non-success banner: too_big.
-test(`ai-analysis-result [too_big banner] fits ${BODY_BUDGET_ROWS}-row budget`, () => {
+test(`ai-analysis-result [dense, too_big banner] fits ${BODY_BUDGET_ROWS}-row budget`, () => {
   assertFitsBudget(
     h(AiAnalysisResultStep, {
       analysisText: null,
@@ -213,12 +231,13 @@ test(`ai-analysis-result [too_big banner] fits ${BODY_BUDGET_ROWS}-row budget`, 
       maxRetries: 2,
       onRetry: noop,
       onSkipOrContinue: noop,
+      dense: true,
     }),
-    'ai-result-too-big',
+    'ai-result-dense-too-big',
   )
 })
 // Retries exhausted — the single-line "used all N retries" note + Continue.
-test(`ai-analysis-result [retries exhausted, banner] fits ${BODY_BUDGET_ROWS}-row budget`, () => {
+test(`ai-analysis-result [dense, retries exhausted, banner] fits ${BODY_BUDGET_ROWS}-row budget`, () => {
   assertFitsBudget(
     h(AiAnalysisResultStep, {
       analysisText: null,
@@ -228,12 +247,13 @@ test(`ai-analysis-result [retries exhausted, banner] fits ${BODY_BUDGET_ROWS}-ro
       maxRetries: 2,
       onRetry: noop,
       onSkipOrContinue: noop,
+      dense: true,
     }),
-    'ai-result-exhausted',
+    'ai-result-dense-exhausted',
   )
 })
 // Last-retry label variant (retriesLeft === 1).
-test(`ai-analysis-result [last retry label] fits ${BODY_BUDGET_ROWS}-row budget`, () => {
+test(`ai-analysis-result [dense, last retry label] fits ${BODY_BUDGET_ROWS}-row budget`, () => {
   assertFitsBudget(
     h(AiAnalysisResultStep, {
       analysisText: 'Short inline diagnosis.',
@@ -243,12 +263,13 @@ test(`ai-analysis-result [last retry label] fits ${BODY_BUDGET_ROWS}-row budget`
       maxRetries: 2,
       onRetry: noop,
       onSkipOrContinue: noop,
+      dense: true,
     }),
-    'ai-result-last-retry',
+    'ai-result-dense-last-retry',
   )
 })
 // viewedFull marker WITH retries exhausted (both terse lines present at once).
-test(`ai-analysis-result [viewedFull + exhausted] fits ${BODY_BUDGET_ROWS}-row budget`, () => {
+test(`ai-analysis-result [dense, viewedFull + exhausted] fits ${BODY_BUDGET_ROWS}-row budget`, () => {
   assertFitsBudget(
     h(AiAnalysisResultStep, {
       analysisText: 'b'.repeat(2000),
@@ -258,8 +279,9 @@ test(`ai-analysis-result [viewedFull + exhausted] fits ${BODY_BUDGET_ROWS}-row b
       maxRetries: 2,
       onRetry: noop,
       onSkipOrContinue: noop,
+      dense: true,
     }),
-    'ai-result-viewed-full-exhausted',
+    'ai-result-dense-viewed-full-exhausted',
   )
 })
 

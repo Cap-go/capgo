@@ -10,28 +10,34 @@
 // never touch `useStdout` / `measureElement`. `useInput` inside a leaf control
 // is fine — that's not layout measurement.
 //
-// The frame-fit contract (see ui/components.tsx + test/helpers/frame-fit.mjs)
-// requires every step body to render within BODY_BUDGET_ROWS (13) rows at the
-// reference widths (80 and 60 cols). Copy here is deliberately terse and the
-// original decorative <Newline/>s are dropped so the bodies stay lean at 60
-// columns where text wraps hardest — but the interactive control and its key
-// instruction always stay on screen. The two variable-length frames cap their
-// growth: `error` truncates a long failure message to a single line, and
-// `ai-analysis-result` only ever renders SHORT analysis text inline (long
-// analyses are routed to the fullscreen scroll viewer by the parent before
-// this frame is shown) and collapses the "retries exhausted" hint to one line.
+// Adaptive spacing — each body renders its COMFORTABLE form by default (the
+// original design: bordered banners where applicable + decorative <Newline/>
+// blank-line spacing + full copy). The 16-row frame contract is a FLOOR we must
+// survive on short terminals, not a cap on every terminal: when the parent
+// measures that the comfortable body can't fit the viewport it flips the sticky
+// `dense` signal and threads `dense={true}` here, collapsing each body to the
+// terse, budget-fitting form (blank lines dropped, copy trimmed, banners
+// boxless via AiResultBanner's own `dense` pass-through). The two
+// variable-length frames also cap their growth in dense mode: `error`
+// truncates a long failure message to a single line and `ai-analysis-result`
+// renders SHORT analysis text inline (long analyses are routed to the
+// fullscreen scroll viewer by the parent before this frame is shown) and
+// collapses the "retries exhausted" hint to one line. `dense` defaults to
+// `false` so a component rendered without the prop (e.g. a test asserting the
+// comfortable form) gets the original look.
 import type { FC } from 'react'
 import type { AiResultKind } from '../components.js'
 import { Select } from '@inkjs/ui'
-import { Box, Text } from 'ink'
+import { Box, Newline, Text } from 'ink'
 import React from 'react'
 import { AiResultBanner, ErrorLine, SpinnerLine, SuccessLine } from '../components.js'
 
 // Longest a single failure message may be before we hard-truncate it with an
-// ellipsis. A raw backend / CLI stderr can be hundreds of characters and would
-// wrap several rows at 60 cols, pushing the retry/exit control off the 13-row
-// budget. One line of failure context + the recovery control is enough here;
-// the parent already logs the full message to the scrollback above.
+// ellipsis in the DENSE form. A raw backend / CLI stderr can be hundreds of
+// characters and would wrap several rows at 60 cols, pushing the retry/exit
+// control off the 13-row budget. One line of failure context + the recovery
+// control is enough in dense mode; the parent already logs the full message to
+// the scrollback above, and the comfortable form prints the message in full.
 const MAX_ERROR_CHARS = 110
 
 function truncate(text: string, max: number): string {
@@ -42,6 +48,7 @@ function truncate(text: string, max: number): string {
 }
 
 // ── welcome (spinner) ─────────────────────────────────────────────────────────
+// Single spinner line — identical comfortable / dense (no spacing to collapse).
 
 export const WelcomeStep: FC = () => (
   <Box marginTop={1} justifyContent="center">
@@ -51,16 +58,19 @@ export const WelcomeStep: FC = () => (
 
 // ── no-platform ───────────────────────────────────────────────────────────────
 // `androidDir` is the (configurable) native dir we looked for, e.g. "android".
-// The original separated the error line from the instruction with a <Newline/>;
-// dropped here so the two lines sit together and the frame stays at 2 rows.
+// Comfortable: a <Newline/> separates the error line from the recovery
+// instruction (3 rows). Dense: the blank line is dropped so the two lines sit
+// together (2 rows).
 
 export interface NoPlatformStepProps {
   androidDir: string
+  dense?: boolean
 }
 
-export const NoPlatformStep: FC<NoPlatformStepProps> = ({ androidDir }) => (
+export const NoPlatformStep: FC<NoPlatformStepProps> = ({ androidDir, dense = false }) => (
   <Box flexDirection="column" marginTop={1}>
     <ErrorLine text={`No ${androidDir}/ directory found.`} />
+    {!dense && <Newline />}
     <Text>
       Run
       {' '}
@@ -72,19 +82,22 @@ export const NoPlatformStep: FC<NoPlatformStepProps> = ({ androidDir }) => (
 )
 
 // ── credentials-exist ─────────────────────────────────────────────────────────
-// `appId` is the Capgo app whose credentials already exist. The original padded
-// the warning, the explanation and the Select with three <Newline/>s; dropped
-// so the prompt + choices fit comfortably at 60 cols.
+// `appId` is the Capgo app whose credentials already exist. Comfortable: the
+// warning, the explanation and the Select are each separated by a <Newline/>.
+// Dense: the blank lines are dropped so the prompt + choices fit at 60 cols.
 
 export interface CredentialsExistStepProps {
   appId: string
   onChoose: (choice: 'backup' | 'exit') => void
+  dense?: boolean
 }
 
-export const CredentialsExistStep: FC<CredentialsExistStepProps> = ({ appId, onChoose }) => (
+export const CredentialsExistStep: FC<CredentialsExistStepProps> = ({ appId, onChoose, dense = false }) => (
   <Box flexDirection="column" marginTop={1}>
     <Text bold color="yellow">{`⚠ Android credentials already exist for ${appId}`}</Text>
+    {!dense && <Newline />}
     <Text>Onboarding will create new credentials, replacing the existing ones.</Text>
+    {!dense && <Newline />}
     <Select
       options={[
         { label: '📦  Start fresh (backup existing credentials first)', value: 'backup' },
@@ -96,6 +109,7 @@ export const CredentialsExistStep: FC<CredentialsExistStepProps> = ({ appId, onC
 )
 
 // ── backing-up (spinner) ──────────────────────────────────────────────────────
+// Single spinner line — identical comfortable / dense.
 
 export const BackingUpStep: FC = () => (
   <Box marginTop={1}><SpinnerLine text="Backing up existing credentials..." /></Box>
@@ -103,45 +117,56 @@ export const BackingUpStep: FC = () => (
 
 // ── build-complete ────────────────────────────────────────────────────────────
 // Terminal frame of the flow. `uploadSummary` (CI-secret push result) and
-// `buildUrl` are both optional. The original wrapped each in a <Newline/> +
-// fragment; dropped so the success line + the (at most two) follow-up lines
-// stay within budget.
+// `buildUrl` are both optional. Comfortable: each follow-up line is preceded by
+// a <Newline/> (the original padded both). Dense: the blank lines are dropped so
+// the success line + the (at most two) follow-up lines stay within budget.
 
 export interface BuildCompleteStepProps {
   uploadSummary: string | null
   buildUrl: string
+  dense?: boolean
 }
 
-export const BuildCompleteStep: FC<BuildCompleteStepProps> = ({ uploadSummary, buildUrl }) => (
+export const BuildCompleteStep: FC<BuildCompleteStepProps> = ({ uploadSummary, buildUrl, dense = false }) => (
   <Box flexDirection="column" marginTop={1}>
     <SuccessLine text="Onboarding complete" />
-    {uploadSummary && <Text>{`${uploadSummary}.`}</Text>}
+    {uploadSummary && (
+      <>
+        {!dense && <Newline />}
+        <Text>{`${uploadSummary}.`}</Text>
+      </>
+    )}
     {buildUrl && (
-      <Text>
-        Track your build:
-        {' '}
-        <Text color="cyan" underline>{buildUrl}</Text>
-      </Text>
+      <>
+        {!dense && <Newline />}
+        <Text>
+          Track your build:
+          {' '}
+          <Text color="cyan" underline>{buildUrl}</Text>
+        </Text>
+      </>
     )}
   </Box>
 )
 
 // ── error ─────────────────────────────────────────────────────────────────────
 // `message` is the failure detail and can be arbitrarily long (wrapped backend
-// / CLI stderr). The original rendered the full message + a <Newline/> + the
-// retry/exit Select, so a long message wrapped past the budget and clipped the
-// control. We truncate the message to a single line (the parent logs the full
-// text to the scrollback) and drop the <Newline/>; the recovery control always
-// stays on screen.
+// / CLI stderr). Comfortable: the FULL message + a <Newline/> + the retry/exit
+// Select (the original look — renders only when the parent measured it fits).
+// Dense: the message is truncated to a single line (the parent logs the full
+// text to the scrollback) and the blank line dropped, so the recovery control
+// always stays on screen within the 13-row budget.
 
 export interface ErrorStepProps {
   message: string
   onChoose: (choice: 'retry' | 'exit') => void
+  dense?: boolean
 }
 
-export const ErrorStep: FC<ErrorStepProps> = ({ message, onChoose }) => (
+export const ErrorStep: FC<ErrorStepProps> = ({ message, onChoose, dense = false }) => (
   <Box flexDirection="column" marginTop={1}>
-    <ErrorLine text={truncate(message, MAX_ERROR_CHARS)} />
+    <ErrorLine text={dense ? truncate(message, MAX_ERROR_CHARS) : message} />
+    {!dense && <Newline />}
     <Select
       options={[
         { label: '↻  Retry', value: 'retry' },
@@ -153,19 +178,22 @@ export const ErrorStep: FC<ErrorStepProps> = ({ message, onChoose }) => (
 )
 
 // ── ai-analysis-prompt ────────────────────────────────────────────────────────
-// Offered when a build fails and Capgo captured a log to analyze. The original
-// padded the failure line, the offer and the Select with <Newline/>s; dropped
-// so the offer + debug/skip control fit at 60 cols. All telemetry on the choice
-// stays in the parent's onChange handler.
+// Offered when a build fails and Capgo captured a log to analyze. Comfortable:
+// the failure line, the offer and the Select are each separated by a <Newline/>.
+// Dense: the blank lines are dropped so the offer + debug/skip control fit at 60
+// cols. All telemetry on the choice stays in the parent's onChoose handler.
 
 export interface AiAnalysisPromptStepProps {
   onChoose: (choice: 'debug' | 'skip') => void
+  dense?: boolean
 }
 
-export const AiAnalysisPromptStep: FC<AiAnalysisPromptStepProps> = ({ onChoose }) => (
+export const AiAnalysisPromptStep: FC<AiAnalysisPromptStepProps> = ({ onChoose, dense = false }) => (
   <Box flexDirection="column" marginTop={1}>
     <ErrorLine text="Build failed." />
+    {!dense && <Newline />}
     <Text>We can analyze the build log with Capgo AI (Kimi K2.5) and suggest a fix.</Text>
+    {!dense && <Newline />}
     <Select
       options={[
         { label: '🤖  Debug with AI', value: 'debug' },
@@ -177,6 +205,7 @@ export const AiAnalysisPromptStep: FC<AiAnalysisPromptStepProps> = ({ onChoose }
 )
 
 // ── ai-analysis-running (spinner) ─────────────────────────────────────────────
+// Single spinner line — identical comfortable / dense.
 
 export const AiAnalysisRunningStep: FC = () => (
   <Box flexDirection="column" marginTop={1}>
@@ -193,15 +222,17 @@ export const AiAnalysisRunningStep: FC = () => (
 //   • `viewedFull` — once the user has dismissed the scroll viewer, the long
 //     text already scrolled past in the terminal, so we show a one-line "shown
 //     above" marker instead of re-printing it.
-//   • `result` (non-success) — a compact AiResultBanner (already ≤ 3 rows).
+//   • `result` (non-success) — an AiResultBanner. Comfortable: bordered box;
+//     dense: boxless (we thread `dense` straight through to it).
 //
 // `retryCount` + `maxRetries` derive the retry affordance; the parent keeps the
 // counter and ALL telemetry (trackAiAnalysisChoice) + state-reset in its
 // onChange handlers. We expose two handlers: `onRetry` ("I fixed it, rebuild")
-// and `onSkipOrContinue` (skip retry / continue). The original padded every
-// element with <Newline/>s and printed a two-line "retries exhausted" note,
-// which overflowed at 60 cols; the blank lines are dropped and the exhausted
-// note is a single dim line so the Select always stays visible.
+// and `onSkipOrContinue` (skip retry / continue). Comfortable: every element is
+// padded with <Newline/>s and the "retries exhausted" note is the original
+// two-line copy; dense: the blank lines are dropped, the caution copy is
+// shortened, and the exhausted note collapses to a single dim line so the
+// Select always stays visible.
 
 export interface AiAnalysisResultStepProps {
   /** Pre-rendered (markdown→ANSI) analysis text, or null on a non-success result. */
@@ -215,6 +246,7 @@ export interface AiAnalysisResultStepProps {
   maxRetries: number
   onRetry: () => void
   onSkipOrContinue: () => void
+  dense?: boolean
 }
 
 export const AiAnalysisResultStep: FC<AiAnalysisResultStepProps> = ({
@@ -225,6 +257,7 @@ export const AiAnalysisResultStep: FC<AiAnalysisResultStepProps> = ({
   maxRetries,
   onRetry,
   onSkipOrContinue,
+  dense = false,
 }) => {
   const retriesLeft = maxRetries - retryCount
   const canRetry = retriesLeft > 0
@@ -234,14 +267,28 @@ export const AiAnalysisResultStep: FC<AiAnalysisResultStepProps> = ({
   return (
     <Box flexDirection="column" marginTop={1}>
       <Text bold color="cyan">AI analysis</Text>
+      {!dense && <Newline />}
       {analysisText && !viewedFull && <Text>{analysisText}</Text>}
       {analysisText && viewedFull && (
         <Text dimColor>📖  Analysis already shown above (scroll your terminal back to re-read it).</Text>
       )}
-      {result && <AiResultBanner kind={result.kind} message={result.message} />}
-      <Text color="yellow">⚠ AI can make mistakes. Verify against the full log before applying the fix.</Text>
+      {result && <AiResultBanner kind={result.kind} message={result.message} dense={dense} />}
+      {!dense && <Newline />}
+      <Text color="yellow">
+        {dense
+          ? '⚠ AI can make mistakes. Verify against the full log before applying the fix.'
+          : '⚠ AI can make mistakes. Always verify the diagnosis against the full log before applying the suggested fix.'}
+      </Text>
+      {!dense && <Newline />}
       {!canRetry && (
-        <Text dimColor>{`You've used all ${maxRetries} retries. Exit and re-run the wizard for another attempt.`}</Text>
+        <>
+          <Text dimColor>
+            {dense
+              ? `You've used all ${maxRetries} retries. Exit and re-run the wizard for another attempt.`
+              : `You've used all ${maxRetries} retries. Exit and re-run the wizard if you need another attempt.`}
+          </Text>
+          {!dense && <Newline />}
+        </>
       )}
       <Select
         options={canRetry

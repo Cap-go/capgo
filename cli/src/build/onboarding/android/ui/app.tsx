@@ -1729,11 +1729,12 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
 
       {step === 'welcome' && <WelcomeStep />}
 
-      {step === 'no-platform' && <NoPlatformStep androidDir={androidDir} />}
+      {step === 'no-platform' && <NoPlatformStep androidDir={androidDir} dense={dense} />}
 
       {step === 'credentials-exist' && (
         <CredentialsExistStep
           appId={appId}
+          dense={dense}
           onChoose={(choice) => {
             if (choice === 'backup')
               setStep('backing-up')
@@ -2410,12 +2411,13 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
       )}
 
       {step === 'build-complete' && (
-        <BuildCompleteStep uploadSummary={ciSecretUploadSummary} buildUrl={buildUrl} />
+        <BuildCompleteStep uploadSummary={ciSecretUploadSummary} buildUrl={buildUrl} dense={dense} />
       )}
 
       {/* AI debug — ask the user whether to send the captured log */}
       {step === 'ai-analysis-prompt' && (
         <AiAnalysisPromptStep
+          dense={dense}
           onChoose={async (choice) => {
             if (choice === 'debug') {
               setStep('ai-analysis-running')
@@ -2452,6 +2454,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
           result={aiResult}
           retryCount={aiRetryCount}
           maxRetries={MAX_AI_RETRIES}
+          dense={dense}
           onRetry={async () => {
             if (aiJobId) {
               await trackAiAnalysisChoice({
@@ -2493,6 +2496,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
       {step === 'error' && error && retryStep && (
         <ErrorStep
           message={error}
+          dense={dense}
           onChoose={(choice) => {
             if (choice === 'retry') {
               setError(null)
