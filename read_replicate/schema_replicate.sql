@@ -869,6 +869,20 @@ CREATE INDEX idx_stripe_info_trial ON public.stripe_info USING btree (trial_at) 
 
 
 --
+-- Name: manifest_file_hash_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX manifest_file_hash_idx ON public.manifest USING btree (file_hash);
+
+
+--
+-- Name: manifest_file_name_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX manifest_file_name_idx ON public.manifest USING btree (file_name);
+
+
+--
 -- Name: notifications_uniq_id_idx; Type: INDEX; Schema: public; Owner: -
 --
 
