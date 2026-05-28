@@ -48,6 +48,24 @@ import {
 } from '../types.js'
 import { AiResultBanner, BOX_HEADER_ROWS, COMPACT_HEADER_ROWS, Divider, ErrorLine, FilteredTextInput, FullscreenAiViewer, Header, SpinnerLine, SuccessLine, TerminalTooSmall, WIZARD_PADDING_ROWS } from './components.js'
 import type { AiResultKind } from './components.js'
+import {
+  ApiKeyInstructionsStep,
+  BackingUpStep,
+  CertLimitPromptStep,
+  CreatingCertificateStep,
+  CreatingProfileStep,
+  CredentialsExistStep,
+  DeletingDuplicateProfilesStep,
+  DuplicateProfilePromptStep,
+  InputIssuerIdStep,
+  InputKeyIdStep,
+  InputP8PathStep,
+  P8MethodSelectStep,
+  RevokingCertificateStep,
+  SavingCredentialsStep,
+  SetupMethodSelectStep,
+  VerifyingKeyStep,
+} from './steps/ios-credentials.js'
 
 const OUTPUT_LINE_SPLIT_RE = /\r?\n/
 const CARRIAGE_RETURN_RE = /\r/g
@@ -1646,81 +1664,50 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
 
       {/* Existing credentials warning */}
       {step === 'credentials-exist' && (
-        <Box flexDirection="column" marginTop={1}>
-          <Text bold color="yellow">
-            ⚠ iOS credentials already exist for
-            {appId}
-          </Text>
-          <Newline />
-          <Text>Onboarding will create new certificates and profiles, replacing your existing credentials.</Text>
-          <Newline />
-          <Select
-            options={[
-              { label: '📦  Start fresh (backup existing credentials first)', value: 'backup' },
-              { label: '✖  Exit onboarding', value: 'exit' },
-            ]}
-            onChange={(value) => {
-              if (value === 'backup') {
-                setStep('backing-up')
-              }
-              else {
-                addLog('Exiting onboarding.', 'yellow')
-                exitOnboarding()
-              }
-            }}
-          />
-        </Box>
+        <CredentialsExistStep
+          appId={appId}
+          onChange={(value) => {
+            if (value === 'backup') {
+              setStep('backing-up')
+            }
+            else {
+              addLog('Exiting onboarding.', 'yellow')
+              exitOnboarding()
+            }
+          }}
+        />
       )}
 
       {/* Backing up credentials */}
-      {step === 'backing-up' && (
-        <Box flexDirection="column" marginTop={1}>
-          <SpinnerLine text="Backing up existing credentials..." />
-        </Box>
-      )}
+      {step === 'backing-up' && <BackingUpStep />}
 
       {/* Setup-method fork (macOS only) */}
       {step === 'setup-method-select' && (
-        <Box flexDirection="column" marginTop={1}>
-          <Alert variant="info">
-            How do you want to set up iOS credentials?
-          </Alert>
-          <Newline />
-          <Select
-            options={[
-              { label: '🆕  Create new via App Store Connect API', value: 'create' },
-              { label: '📥  Import existing from this Mac (Keychain + Xcode profiles)', value: 'import' },
-            ]}
-            onChange={async (value) => {
-              // Persist the fork choice to progress so resume after CLI close
-              // routes to the right path. Without this, an interrupted import
-              // run resumes into the create-new path's `creating-certificate`
-              // step and triggers the cert-limit error.
-              const existing = await loadProgress(appId) || {
-                platform: 'ios' as const,
-                appId,
-                startedAt: new Date().toISOString(),
-                completedSteps: {},
-              }
-              existing.setupMethod = value === 'import' ? 'import-existing' : 'create-new'
-              await saveProgress(appId, existing)
+        <SetupMethodSelectStep
+          onChange={async (value) => {
+            // Persist the fork choice to progress so resume after CLI close
+            // routes to the right path. Without this, an interrupted import
+            // run resumes into the create-new path's `creating-certificate`
+            // step and triggers the cert-limit error.
+            const existing = await loadProgress(appId) || {
+              platform: 'ios' as const,
+              appId,
+              startedAt: new Date().toISOString(),
+              completedSteps: {},
+            }
+            existing.setupMethod = value === 'import' ? 'import-existing' : 'create-new'
+            await saveProgress(appId, existing)
 
-              if (value === 'import') {
-                setImportMode(true)
-                setStep('import-scanning')
-              }
-              else {
-                setImportMode(false)
-                setStep('api-key-instructions')
-              }
-            }}
-          />
-          <Newline />
-          <Text dimColor>
-            Tip: Importing reuses the certificate Xcode already installed,
-            so it doesn't count against Apple's 3-cert limit.
-          </Text>
-        </Box>
+            if (value === 'import') {
+              setImportMode(true)
+              setStep('import-scanning')
+            }
+            else {
+              setImportMode(false)
+              setStep('api-key-instructions')
+            }
+          }}
+        />
       )}
 
       {/* Import: scanning */}
@@ -2126,335 +2113,160 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
 
       {/* API key instructions + .p8 input */}
       {step === 'api-key-instructions' && (
-        <Box flexDirection="column" marginTop={1}>
-          <Alert variant="info">
-            We need an App Store Connect API key to manage certificates and profiles for you.
-          </Alert>
-          <Newline />
-          <Box flexDirection="column" marginLeft={2}>
-            <Text>
-              <Text bold color="white">1.</Text>
-              {' '}
-              Go to
-              {' '}
-              <Text color="cyan" underline>appstoreconnect.apple.com/access/integrations/api</Text>
-            </Text>
-            <Text>
-              <Text bold color="white">2.</Text>
-              {' '}
-              Click
-              {' '}
-              <Text bold>"Generate API Key"</Text>
-            </Text>
-            <Text>
-              <Text bold color="white">3.</Text>
-              {' '}
-              Name it
-              {' '}
-              <Text color="yellow">"Capgo Builder"</Text>
-              {' '}
-              · Access:
-              {' '}
-              <Text bold color="green">"Admin"</Text>
-            </Text>
-            <Text>
-              <Text bold color="white">4.</Text>
-              {' '}
-              Download the
-              {' '}
-              <Text bold>.p8</Text>
-              {' '}
-              file
-            </Text>
-          </Box>
-          <Newline />
-          <Box>
-            <Text dimColor>Press </Text>
-            <Text bold color="white">Ctrl+O</Text>
-            <Text dimColor> to open App Store Connect in your browser</Text>
-          </Box>
-          <Newline />
-          <Divider />
-          <Newline />
-          {canUseFilePicker() && (
-            <>
-              <Text bold>How do you want to provide the .p8 file?</Text>
-              <Newline />
-              <Select
-                options={[
-                  { label: '📂  Open file picker', value: 'picker' },
-                  { label: '📝  Type the path', value: 'manual' },
-                ]}
-                onChange={(value) => {
-                  if (value === 'picker') {
-                    setStep('p8-method-select')
-                  }
-                  else {
-                    setStep('input-p8-path')
-                  }
-                }}
-              />
-            </>
-          )}
-          {!canUseFilePicker() && (
-            <>
-              <Text bold>Path to your .p8 file:</Text>
-              <Box marginTop={1}>
-                <FilteredTextInput
-                  placeholder="~/Downloads/AuthKey_XXXXXXXXXX.p8"
-                  onSubmit={async (value) => {
-                    const filePath = value.replace(/^~/, process.env.HOME || '')
-                    try {
-                      const content = await readFile(filePath, 'utf-8')
-                      setP8Path(filePath)
-                      setP8Content(content)
-                      const extracted = extractKeyIdFromPath(filePath)
-                      if (extracted)
-                        setKeyId(extracted)
-                      addLog(`✔ Key file found · ${filePath}`)
-                      void savePartialProgress({ p8Path: filePath })
-                      setStep('input-key-id')
-                    }
-                    catch {
-                      handleError(new Error(`File not found: ${filePath}`), 'api-key-instructions')
-                    }
-                  }}
-                />
-              </Box>
-            </>
-          )}
-        </Box>
+        <ApiKeyInstructionsStep
+          canUseFilePicker={canUseFilePicker()}
+          onMethodChange={(value) => {
+            if (value === 'picker') {
+              setStep('p8-method-select')
+            }
+            else {
+              setStep('input-p8-path')
+            }
+          }}
+          onPathSubmit={async (value) => {
+            const filePath = value.replace(/^~/, process.env.HOME || '')
+            try {
+              const content = await readFile(filePath, 'utf-8')
+              setP8Path(filePath)
+              setP8Content(content)
+              const extracted = extractKeyIdFromPath(filePath)
+              if (extracted)
+                setKeyId(extracted)
+              addLog(`✔ Key file found · ${filePath}`)
+              void savePartialProgress({ p8Path: filePath })
+              setStep('input-key-id')
+            }
+            catch {
+              handleError(new Error(`File not found: ${filePath}`), 'api-key-instructions')
+            }
+          }}
+        />
       )}
 
       {/* File picker opening */}
-      {step === 'p8-method-select' && (
-        <Box flexDirection="column" marginTop={1}>
-          <SpinnerLine text="Opening file picker..." />
-        </Box>
-      )}
+      {step === 'p8-method-select' && <P8MethodSelectStep />}
 
       {/* Manual .p8 path input */}
       {step === 'input-p8-path' && (
-        <Box flexDirection="column" marginTop={1}>
-          <Text bold>Path to your .p8 file:</Text>
-          <Box marginTop={1}>
-            <FilteredTextInput
-              placeholder="~/Downloads/AuthKey_XXXXXXXXXX.p8"
-              onSubmit={async (value) => {
-                const filePath = value.replace(/^~/, process.env.HOME || '')
-                try {
-                  const content = await readFile(filePath, 'utf-8')
-                  setP8Path(filePath)
-                  setP8Content(content)
-                  const extracted = extractKeyIdFromPath(filePath)
-                  if (extracted)
-                    setKeyId(extracted)
-                  addLog(`✔ Key file found · ${filePath}`)
-                  void savePartialProgress({ p8Path: filePath })
-                  setStep('input-key-id')
-                }
-                catch {
-                  handleError(new Error(`File not found: ${value}`), 'input-p8-path')
-                }
-              }}
-            />
-          </Box>
-        </Box>
+        <InputP8PathStep
+          onSubmit={async (value) => {
+            const filePath = value.replace(/^~/, process.env.HOME || '')
+            try {
+              const content = await readFile(filePath, 'utf-8')
+              setP8Path(filePath)
+              setP8Content(content)
+              const extracted = extractKeyIdFromPath(filePath)
+              if (extracted)
+                setKeyId(extracted)
+              addLog(`✔ Key file found · ${filePath}`)
+              void savePartialProgress({ p8Path: filePath })
+              setStep('input-key-id')
+            }
+            catch {
+              handleError(new Error(`File not found: ${value}`), 'input-p8-path')
+            }
+          }}
+        />
       )}
 
       {/* Key ID */}
       {step === 'input-key-id' && (
-        <Box flexDirection="column" marginTop={1}>
-          {keyId
-            ? (
-                <>
-                  <Text bold>
-                    Key ID
-                    {' '}
-                    <Text dimColor>(detected from filename)</Text>
-                    :
-                  </Text>
-                  <Box marginTop={1}>
-                    <Text color="green">✔ </Text>
-                    <Text>{keyId}</Text>
-                    <Text dimColor> — press Enter to confirm, or type a different one</Text>
-                  </Box>
-                  <Box marginTop={1}>
-                    <FilteredTextInput
-                      placeholder={keyId}
-                      onSubmit={(value) => {
-                        const finalKeyId = (value || keyId).trim()
-                        setKeyId(finalKeyId)
-                        addLog(`✔ Key ID · ${finalKeyId}`)
-                        void savePartialProgress({ keyId: finalKeyId })
-                        setStep('input-issuer-id')
-                      }}
-                    />
-                  </Box>
-                </>
-              )
-            : (
-                <>
-                  <Text bold>
-                    Key ID
-                    {' '}
-                    <Text dimColor>(shown next to the key name in App Store Connect)</Text>
-                    :
-                  </Text>
-                  <Box marginTop={1}>
-                    <FilteredTextInput
-                      placeholder="ABC123DEF"
-                      onSubmit={(value) => {
-                        const cleaned = value.trim()
-                        if (!cleaned)
-                          return
-                        setKeyId(cleaned)
-                        addLog(`✔ Key ID · ${cleaned}`)
-                        void savePartialProgress({ keyId: cleaned })
-                        setStep('input-issuer-id')
-                      }}
-                    />
-                  </Box>
-                </>
-              )}
-        </Box>
+        <InputKeyIdStep
+          keyId={keyId}
+          onSubmit={(value) => {
+            // `value || keyId` reuses the detected key ID when the user just
+            // presses Enter; the trim+guard rejects an empty submission in the
+            // no-detection case (keyId='' makes the fallback a no-op).
+            const finalKeyId = (value || keyId).trim()
+            if (!finalKeyId)
+              return
+            setKeyId(finalKeyId)
+            addLog(`✔ Key ID · ${finalKeyId}`)
+            void savePartialProgress({ keyId: finalKeyId })
+            setStep('input-issuer-id')
+          }}
+        />
       )}
 
       {/* Issuer ID */}
       {step === 'input-issuer-id' && (
-        <Box flexDirection="column" marginTop={1}>
-          <Text bold>
-            Issuer ID
-            {' '}
-            <Text dimColor>(UUID at the very top of the API keys page, above the key list)</Text>
-            :
-          </Text>
-          <Newline />
-          <Box>
-            <Text dimColor>Press </Text>
-            <Text bold color="white">Ctrl+O</Text>
-            <Text dimColor> to open App Store Connect in your browser</Text>
-          </Box>
-          <Box marginTop={1}>
-            <FilteredTextInput
-              placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-              onSubmit={(value) => {
-                const cleaned = value.trim()
-                if (!cleaned)
-                  return
-                setIssuerId(cleaned)
-                addLog(`✔ Issuer ID · ${cleaned}`)
-                void savePartialProgress({ issuerId: cleaned })
-                setStep('verifying-key')
-              }}
-            />
-          </Box>
-        </Box>
+        <InputIssuerIdStep
+          onSubmit={(value) => {
+            const cleaned = value.trim()
+            if (!cleaned)
+              return
+            setIssuerId(cleaned)
+            addLog(`✔ Issuer ID · ${cleaned}`)
+            void savePartialProgress({ issuerId: cleaned })
+            setStep('verifying-key')
+          }}
+        />
       )}
 
       {/* Verifying */}
-      {step === 'verifying-key' && (
-        <Box flexDirection="column" marginTop={1}>
-          <SpinnerLine text="Verifying API key with Apple..." />
-        </Box>
-      )}
+      {step === 'verifying-key' && <VerifyingKeyStep />}
 
       {/* Creating certificate */}
-      {step === 'creating-certificate' && (
-        <Box flexDirection="column" marginTop={1}>
-          <SpinnerLine text="Generating signing key and CSR..." />
-          <SpinnerLine text="Creating iOS distribution certificate..." />
-        </Box>
-      )}
+      {step === 'creating-certificate' && <CreatingCertificateStep />}
 
       {/* Certificate limit — ask which to revoke */}
       {step === 'cert-limit-prompt' && (
-        <Box flexDirection="column" marginTop={1}>
-          <ErrorLine text={`iOS distribution certificate limit reached (${existingCerts.length} existing).`} />
-          <Newline />
-          <Text bold>Select a certificate to revoke:</Text>
-          <Newline />
-          <Select
-            options={[
-              ...existingCerts.map((c) => {
-                const ourCertId = certData?.certificateId || initialProgress?.completedSteps.certificateCreated?.certificateId
-                const isOurs = ourCertId === c.id
-                const creator = isOurs ? ' · 🔧 Created by Capgo' : ''
-                return {
-                  label: `🗑️   ${c.name} · expires ${c.expirationDate.split('T')[0]}${creator}`,
-                  value: c.id,
-                }
-              }),
-              { label: '✖  Exit onboarding', value: '__exit__' },
-            ]}
-            onChange={(value) => {
-              if (value === '__exit__') {
-                addLog(`Exiting. Revoke a certificate manually in App Store Connect, then resume with ${buildInitCommand}.`, 'yellow')
-                exitOnboarding()
+        <CertLimitPromptStep
+          existingCount={existingCerts.length}
+          options={[
+            ...existingCerts.map((c) => {
+              const ourCertId = certData?.certificateId || initialProgress?.completedSteps.certificateCreated?.certificateId
+              const isOurs = ourCertId === c.id
+              const creator = isOurs ? ' · 🔧 Created by Capgo' : ''
+              return {
+                label: `🗑️   ${c.name} · expires ${c.expirationDate.split('T')[0]}${creator}`,
+                value: c.id,
               }
-              else {
-                setCertToRevoke(value)
-                setStep('revoking-certificate')
-              }
-            }}
-          />
-        </Box>
+            }),
+            { label: '✖  Exit onboarding', value: '__exit__' },
+          ]}
+          onChange={(value) => {
+            if (value === '__exit__') {
+              addLog(`Exiting. Revoke a certificate manually in App Store Connect, then resume with ${buildInitCommand}.`, 'yellow')
+              exitOnboarding()
+            }
+            else {
+              setCertToRevoke(value)
+              setStep('revoking-certificate')
+            }
+          }}
+        />
       )}
 
       {/* Revoking certificate */}
-      {step === 'revoking-certificate' && (
-        <Box flexDirection="column" marginTop={1}>
-          <SpinnerLine text="Revoking old certificate..." />
-        </Box>
-      )}
+      {step === 'revoking-certificate' && <RevokingCertificateStep />}
 
       {/* Creating profile */}
-      {step === 'creating-profile' && (
-        <Box flexDirection="column" marginTop={1}>
-          <SuccessLine text="Bundle ID" detail={appId} />
-          <Newline />
-          <SpinnerLine text="Creating App Store provisioning profile..." />
-        </Box>
-      )}
+      {step === 'creating-profile' && <CreatingProfileStep appId={appId} />}
 
       {/* Duplicate profile prompt */}
       {step === 'duplicate-profile-prompt' && (
-        <Box flexDirection="column" marginTop={1}>
-          <ErrorLine text={`Found ${duplicateProfiles.length} existing Capgo profile(s) for this app.`} />
-          <Newline />
-          <Text bold>Delete old profiles and create a new one?</Text>
-          <Newline />
-          <Select
-            options={[
-              { label: '✔  Yes, delete old profiles and recreate', value: 'delete' },
-              { label: '✖  No, exit onboarding', value: 'exit' },
-            ]}
-            onChange={(value) => {
-              if (value === 'delete') {
-                setStep('deleting-duplicate-profiles')
-              }
-              else {
-                addLog(`Exiting. Delete the duplicate profiles in App Store Connect, then resume with ${buildInitCommand}.`, 'yellow')
-                exitOnboarding()
-              }
-            }}
-          />
-        </Box>
+        <DuplicateProfilePromptStep
+          duplicateCount={duplicateProfiles.length}
+          onChange={(value) => {
+            if (value === 'delete') {
+              setStep('deleting-duplicate-profiles')
+            }
+            else {
+              addLog(`Exiting. Delete the duplicate profiles in App Store Connect, then resume with ${buildInitCommand}.`, 'yellow')
+              exitOnboarding()
+            }
+          }}
+        />
       )}
 
       {/* Deleting duplicate profiles */}
       {step === 'deleting-duplicate-profiles' && (
-        <Box flexDirection="column" marginTop={1}>
-          <SpinnerLine text={`Deleting ${duplicateProfiles.length} old profile(s)...`} />
-        </Box>
+        <DeletingDuplicateProfilesStep duplicateCount={duplicateProfiles.length} />
       )}
 
       {/* Saving credentials */}
-      {step === 'saving-credentials' && (
-        <Box flexDirection="column" marginTop={1}>
-          <SpinnerLine text="Saving credentials..." />
-        </Box>
-      )}
+      {step === 'saving-credentials' && <SavingCredentialsStep />}
 
       {step === 'detecting-ci-secrets' && (
         <Box flexDirection="column" marginTop={1}>
