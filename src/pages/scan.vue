@@ -18,7 +18,7 @@ import IconLink from '~icons/heroicons/link-20-solid'
 import IconQrCode from '~icons/heroicons/qr-code-20-solid'
 import { buildChannelPreviewLatestOptions, parsePreviewDeepLink } from '~/services/previewLinks'
 import { useDisplayStore } from '~/stores/display'
-import { parsePreviewHostname } from '../../shared/preview-subdomain.ts'
+import { buildChannelPreviewSubdomain, parsePreviewHostname } from '../../shared/preview-subdomain.ts'
 
 const route = useRoute()
 const router = useRouter()
@@ -170,6 +170,19 @@ function previewHostTargetFromUrl(value: string): PreviewHostTarget | null {
 
 function previewPayloadUrlFromUrl(value: string) {
   return previewHostTargetFromUrl(value)?.payloadUrl ?? ''
+}
+
+function previewRootUrlFromChannelLink(previewLink: Extract<PreviewDeepLink, { type: 'channel' }>) {
+  if (typeof previewLink.channelId !== 'number')
+    return ''
+
+  try {
+    const subdomain = buildChannelPreviewSubdomain(previewLink.appId, previewLink.channelId)
+    return `https://${subdomain}.preview.capgo.app/`
+  }
+  catch {
+    return ''
+  }
 }
 
 function base64ToBytes(value: string) {
@@ -862,6 +875,15 @@ async function startPreviewLink(previewLink: PreviewDeepLink) {
   if (previewLink.payloadUrl) {
     await startPreviewPayload(previewLink.payloadUrl, previewLink.appId)
     return
+  }
+
+  if (previewLink.type === 'channel') {
+    const previewRootUrl = previewRootUrlFromChannelLink(previewLink)
+    if (previewRootUrl) {
+      debugLog('channel preview link converted to preview host', { previewRootUrl })
+      await startPreviewPayload(previewPayloadUrlFromUrl(previewRootUrl), previewLink.appId)
+      return
+    }
   }
 
   if (previewLink.type === 'channel')
