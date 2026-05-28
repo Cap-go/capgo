@@ -1750,6 +1750,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
 
       {step === 'keystore-method-select' && (
         <KeystoreMethodSelectStep
+          dense={dense}
           onChoose={(choice) => {
             if (choice === 'learn') {
               setStep('keystore-explainer')
@@ -1767,11 +1768,12 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
       )}
 
       {step === 'keystore-explainer' && (
-        <KeystoreExplainerStep onBack={() => setStep('keystore-method-select')} />
+        <KeystoreExplainerStep dense={dense} onBack={() => setStep('keystore-method-select')} />
       )}
 
       {step === 'keystore-existing-path' && (
         <KeystoreExistingPathStep
+          dense={dense}
           showChooser={canUseFilePicker() && keystorePathMode === 'choose'}
           onChoosePicker={() => setStep('keystore-existing-picker')}
           onChooseManual={() => setKeystorePathMode('manual')}
@@ -1797,6 +1799,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
 
       {step === 'keystore-existing-store-password' && (
         <KeystoreExistingStorePasswordStep
+          dense={dense}
           onSubmit={(val) => {
             if (!val) {
               setError('Store password cannot be empty')
@@ -1815,6 +1818,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
 
       {step === 'keystore-existing-alias-select' && (
         <KeystoreExistingAliasSelectStep
+          dense={dense}
           aliases={detectedAliases}
           onSelect={(value) => {
             setKeystoreAlias(value)
@@ -1826,6 +1830,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
 
       {step === 'keystore-existing-alias' && (
         <KeystoreExistingAliasStep
+          dense={dense}
           onSubmit={(val) => {
             const alias = val.trim() || RELEASE_ALIAS_DEFAULT
             setKeystoreAlias(alias)
@@ -1837,6 +1842,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
 
       {step === 'keystore-existing-key-password' && (
         <KeystoreExistingKeyPasswordStep
+          dense={dense}
           mode={keyPasswordProbe === 'prompt' ? 'prompt' : 'probing'}
           onSubmit={(val) => {
             const keyPw = val || keystoreStorePassword
@@ -1887,6 +1893,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
 
       {step === 'keystore-new-alias' && (
         <KeystoreNewAliasStep
+          dense={dense}
           onSubmit={(val) => {
             const alias = val.trim() || RELEASE_ALIAS_DEFAULT
             setKeystoreAlias(alias)
@@ -1898,6 +1905,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
 
       {step === 'keystore-new-password-method' && (
         <KeystoreNewPasswordMethodStep
+          dense={dense}
           onChoose={(choice) => {
             if (choice === 'random') {
               const pw = generateRandomPassword()
@@ -1916,6 +1924,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
 
       {step === 'keystore-new-store-password' && (
         <KeystoreNewStorePasswordStep
+          dense={dense}
           onSubmit={(val) => {
             if (val.length < 6) {
               setError('Password must be at least 6 characters')
@@ -1932,6 +1941,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
 
       {step === 'keystore-new-key-password' && (
         <KeystoreNewKeyPasswordStep
+          dense={dense}
           onSubmit={(val) => {
             const keyPw = val || keystoreStorePassword
             setKeystoreKeyPassword(keyPw)
@@ -1943,6 +1953,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
 
       {step === 'keystore-new-cn' && (
         <KeystoreNewCommonNameStep
+          dense={dense}
           appId={appId}
           onSubmit={(val) => {
             const cn = val.trim() || appId
