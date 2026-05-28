@@ -1723,46 +1723,51 @@ BEGIN
     RETURN true;
   END IF;
 
-  WITH scoped_orgs AS (
-    SELECT public.role_bindings.org_id
-    FROM public.role_bindings
-    WHERE apikey_row.rbac_id IS NOT NULL
-      AND public.role_bindings.principal_type = public.rbac_principal_apikey()
-      AND public.role_bindings.principal_id = apikey_row.rbac_id
-      AND public.role_bindings.scope_type = public.rbac_scope_org()
-      AND public.role_bindings.org_id IS NOT NULL
-      AND (public.role_bindings.expires_at IS NULL OR public.role_bindings.expires_at > now())
+  IF apikey_row.rbac_id IS NULL THEN
+    RETURN true;
+  END IF;
 
-    UNION
-
-    SELECT public.apps.owner_org
-    FROM public.role_bindings
-    JOIN public.apps ON public.apps.id = public.role_bindings.app_id
-    WHERE apikey_row.rbac_id IS NOT NULL
-      AND public.role_bindings.principal_type = public.rbac_principal_apikey()
-      AND public.role_bindings.principal_id = apikey_row.rbac_id
-      AND public.role_bindings.scope_type = public.rbac_scope_app()
-      AND public.role_bindings.app_id IS NOT NULL
-      AND (public.role_bindings.expires_at IS NULL OR public.role_bindings.expires_at > now())
-
-    UNION
-
-    SELECT public.apps.owner_org
-    FROM public.role_bindings
-    JOIN public.channels ON public.channels.rbac_id = public.role_bindings.channel_id
-    JOIN public.apps ON public.apps.app_id = public.channels.app_id
-    WHERE apikey_row.rbac_id IS NOT NULL
-      AND public.role_bindings.principal_type = public.rbac_principal_apikey()
-      AND public.role_bindings.principal_id = apikey_row.rbac_id
-      AND public.role_bindings.scope_type = public.rbac_scope_channel()
-      AND public.role_bindings.channel_id IS NOT NULL
-      AND (public.role_bindings.expires_at IS NULL OR public.role_bindings.expires_at > now())
+  WITH enforced_orgs AS (
+    SELECT public.orgs.id
+    FROM public.orgs
+    WHERE public.orgs.enforce_hashed_api_keys = true
   )
   SELECT EXISTS (
     SELECT 1
-    FROM scoped_orgs
-    JOIN public.orgs ON public.orgs.id = scoped_orgs.org_id
-    WHERE public.orgs.enforce_hashed_api_keys = true
+    FROM enforced_orgs
+    WHERE EXISTS (
+        SELECT 1
+        FROM public.role_bindings rb
+        WHERE rb.principal_type = public.rbac_principal_apikey()
+          AND rb.principal_id = apikey_row.rbac_id
+          AND rb.scope_type = public.rbac_scope_org()
+          AND rb.org_id = enforced_orgs.id
+          AND (rb.expires_at IS NULL OR rb.expires_at > now())
+      )
+      OR EXISTS (
+        SELECT 1
+        FROM public.role_bindings rb
+        JOIN public.apps apps
+          ON apps.id = rb.app_id
+          AND apps.owner_org = enforced_orgs.id
+        WHERE rb.principal_type = public.rbac_principal_apikey()
+          AND rb.principal_id = apikey_row.rbac_id
+          AND rb.scope_type = public.rbac_scope_app()
+          AND rb.app_id IS NOT NULL
+          AND (rb.expires_at IS NULL OR rb.expires_at > now())
+      )
+      OR EXISTS (
+        SELECT 1
+        FROM public.role_bindings rb
+        JOIN public.channels channels
+          ON channels.rbac_id = rb.channel_id
+          AND channels.owner_org = enforced_orgs.id
+        WHERE rb.principal_type = public.rbac_principal_apikey()
+          AND rb.principal_id = apikey_row.rbac_id
+          AND rb.scope_type = public.rbac_scope_channel()
+          AND rb.channel_id IS NOT NULL
+          AND (rb.expires_at IS NULL OR rb.expires_at > now())
+      )
   )
   INTO scoped_enforced_org_exists;
 
@@ -1780,6 +1785,10 @@ $$;
 
 
 ALTER FUNCTION "public"."check_apikey_hashed_key_enforcement"("apikey_row" "public"."apikeys") OWNER TO "postgres";
+
+
+COMMENT ON FUNCTION "public"."check_apikey_hashed_key_enforcement"("apikey_row" "public"."apikeys") IS 'Rejects plaintext API keys when any scoped org requires hashed API keys. The lookup starts from enforcing orgs and indexed RBAC bindings so broad API keys do not scan every app binding on each permission check.';
+
 
 
 CREATE OR REPLACE FUNCTION "public"."check_domain_sso"("p_domain" "text") RETURNS TABLE("has_sso" boolean, "provider_id" "text", "org_id" "uuid")
@@ -18564,6 +18573,14 @@ CREATE INDEX "idx_version_usage_version_name" ON "public"."version_usage" USING 
 
 
 
+CREATE INDEX "manifest_file_hash_idx" ON "public"."manifest" USING "btree" ("file_hash");
+
+
+
+CREATE INDEX "manifest_file_name_idx" ON "public"."manifest" USING "btree" ("file_name");
+
+
+
 CREATE INDEX "notifications_uniq_id_idx" ON "public"."notifications" USING "btree" ("uniq_id");
 
 
@@ -18577,6 +18594,10 @@ CREATE INDEX "onboarding_demo_data_seed_id_idx" ON "public"."onboarding_demo_dat
 
 
 CREATE INDEX "org_users_app_id_idx" ON "public"."org_users" USING "btree" ("app_id");
+
+
+
+CREATE INDEX "orgs_enforce_hashed_api_keys_true_idx" ON "public"."orgs" USING "btree" ("id") WHERE ("enforce_hashed_api_keys" = true);
 
 
 
