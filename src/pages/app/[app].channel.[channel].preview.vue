@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { Database } from '~/types/supabase.types'
+import { Capacitor } from '@capacitor/core'
 import { ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
@@ -23,6 +24,7 @@ const id = ref<number>(0)
 const loading = ref(true)
 const channel = ref<Database['public']['Tables']['channels']['Row'] & ChannelPreview>()
 const app = ref<Database['public']['Tables']['apps']['Row']>()
+const isNativePlatform = Capacitor.isNativePlatform()
 
 type PreviewState = 'loading' | 'no-app' | 'no-manifest' | 'preview-disabled' | 'encrypted' | 'ready'
 const previewState = ref<PreviewState>('loading')
@@ -104,6 +106,11 @@ function determinePreviewState() {
 
   if (!app.value.allow_preview) {
     previewState.value = 'preview-disabled'
+    return
+  }
+
+  if (isNativePlatform) {
+    previewState.value = channel.value.version ? 'ready' : 'no-manifest'
     return
   }
 
