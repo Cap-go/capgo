@@ -201,39 +201,9 @@ export function createCustomTooltip(context: TooltipContext, isAccumulated: bool
   if (tooltip.body) {
     const dataPoints = tooltip.dataPoints || []
 
-    // Calculate the formatted date title from the data index
     const dataIndex = dataPoints[0]?.dataIndex ?? 0
-    // Use the actual label from the chart for the tooltip title
-    // This ensures alignment between what's shown on the X-axis and the tooltip
-    const chartLabels = chart.data?.labels || []
-    const labelAtIndex = chartLabels[dataIndex]
-    let formattedTitle: string
-    // Declare tooltipDate at higher scope so it's accessible for click handler
-    let tooltipDate: Date
-
-    if (labelAtIndex !== undefined && dateStartOrUseBillingPeriod instanceof Date) {
-      // Create date using the day number from the label and the month/year from billing start
-      tooltipDate = new Date(dateStartOrUseBillingPeriod)
-      const dayNumber = typeof labelAtIndex === 'number' ? labelAtIndex : Number.parseInt(String(labelAtIndex), 10)
-      if (!Number.isNaN(dayNumber)) {
-        // Handle month transitions - if label day is less than billing start day, it's next month
-        const billingStartDay = dateStartOrUseBillingPeriod.getDate()
-        if (dayNumber < billingStartDay) {
-          // Next month
-          tooltipDate.setMonth(tooltipDate.getMonth() + 1)
-        }
-        tooltipDate.setDate(dayNumber)
-        formattedTitle = formatDateForTooltip(tooltipDate)
-      }
-      else {
-        formattedTitle = String(labelAtIndex)
-      }
-    }
-    else {
-      // Fallback to original calculation
-      tooltipDate = getDateFromIndex(dataIndex, dateStartOrUseBillingPeriod)
-      formattedTitle = formatDateForTooltip(tooltipDate)
-    }
+    const tooltipDate = getDateFromIndex(dataIndex, dateStartOrUseBillingPeriod)
+    const formattedTitle = formatDateForTooltip(tooltipDate)
 
     // Create an array of items with their values, colors, and labels
     const items: ProcessedTooltipItem[] = dataPoints.map((dataPoint, index) => {

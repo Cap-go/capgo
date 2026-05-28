@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import type { Database } from '~/types/supabase.types'
-import dayjs from 'dayjs'
 import { storeToRefs } from 'pinia'
 import colors from 'tailwindcss/colors'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
@@ -24,7 +23,7 @@ import {
   requestOrgChartRefresh,
   shouldAutoRequestChartRefresh,
 } from '~/services/dashboardRefresh'
-import { formatUtcDateTimeAsLocal } from '~/services/date'
+import { formatLocalDate, formatLocalDateTime, formatUtcDateTimeAsLocal } from '~/services/date'
 import { DEMO_APP_NAMES, generateDemoBandwidthData, generateDemoMauData, generateDemoStorageData } from '~/services/demoChartData'
 import { getPlans, useSupabase } from '~/services/supabase'
 import { useDashboardAppsStore } from '~/stores/dashboardApps'
@@ -158,11 +157,11 @@ const { dashboard } = storeToRefs(main)
 
 const subscriptionAnchorStart = computed(() => {
   const start = effectiveOrganization.value?.subscription_start
-  return start ? dayjs(start).format('YYYY/MM/D') : t('unknown')
+  return start ? formatLocalDate(start) || t('unknown') : t('unknown')
 })
 const subscriptionAnchorEnd = computed(() => {
   const end = effectiveOrganization.value?.subscription_end
-  return end ? dayjs(end).format('YYYY/MM/D') : t('unknown')
+  return end ? formatLocalDate(end) || t('unknown') : t('unknown')
 })
 const lastRunDisplay = computed(() => {
   const source = scopeStatsUpdatedAt.value
@@ -170,7 +169,7 @@ const lastRunDisplay = computed(() => {
 })
 const nextRunDisplay = computed(() => {
   const source = effectiveOrganization.value?.next_stats_update_at
-  return source ? dayjs(source).format('MMMM D, YYYY HH:mm') : t('unknown')
+  return source ? formatLocalDateTime(source) || t('unknown') : t('unknown')
 })
 
 // Confirmation logic for cumulative mode in 30-day view
