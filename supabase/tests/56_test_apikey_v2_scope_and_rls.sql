@@ -1,6 +1,6 @@
 BEGIN;
 
-SELECT plan(41);
+SELECT plan(43);
 
 SELECT tests.authenticate_as_service_role();
 SELECT tests.create_supabase_user('apikey_v2_scope_owner', 'apikey_v2_scope_owner@test.local');
@@ -491,6 +491,86 @@ SELECT is(
   'app_versions readable app helper keeps app-admin API keys app-scoped'
 );
 
+SELECT tests.authenticate_as_service_role();
+SELECT set_config('request.headers', '{}', true);
+
+INSERT INTO public.apps (app_id, icon_url, user_id, name, last_version, owner_org)
+SELECT
+  'com.test.apikeyv2scope.perf.' || gs::text,
+  '',
+  tests.get_supabase_uid('apikey_v2_scope_owner'),
+  'API key V2 perf app ' || gs::text,
+  '1.0.0-apikey-v2-perf',
+  '71000000-0000-4000-8000-000000000056'::uuid
+FROM generate_series(1, 75) gs
+ON CONFLICT (app_id) DO NOTHING;
+
+INSERT INTO public.app_versions (
+  app_id,
+  name,
+  owner_org,
+  storage_provider,
+  comment
+)
+SELECT
+  'com.test.apikeyv2scope.perf.' || gs::text,
+  '1.0.0-apikey-v2-perf',
+  '71000000-0000-4000-8000-000000000056'::uuid,
+  'r2-direct',
+  'perf seed'
+FROM generate_series(1, 75) gs
+ON CONFLICT (name, app_id) DO UPDATE
+SET
+  storage_provider = EXCLUDED.storage_provider,
+  r2_path = NULL,
+  comment = EXCLUDED.comment;
+
+INSERT INTO public.role_bindings (
+  principal_type,
+  principal_id,
+  role_id,
+  scope_type,
+  org_id,
+  app_id,
+  granted_by,
+  reason,
+  is_direct
+)
+SELECT
+  public.rbac_principal_apikey(),
+  apikeys.rbac_id,
+  roles.id,
+  public.rbac_scope_app(),
+  apps.owner_org,
+  apps.id,
+  tests.get_supabase_uid('apikey_v2_scope_owner'),
+  'pgTAP broad app-scoped API key performance regression',
+  true
+FROM public.apikeys
+JOIN public.roles ON roles.name = public.rbac_role_app_admin()
+JOIN public.apps ON apps.app_id LIKE 'com.test.apikeyv2scope.perf.%'
+WHERE apikeys.key = 'apikey-v2-scope-all-app-key'
+ON CONFLICT DO NOTHING;
+
+SELECT tests.clear_authentication();
+SELECT set_config('request.headers', '{"capgkey":"apikey-v2-scope-all-app-key"}', true);
+SELECT set_config('request.method', 'PATCH', true);
+
+WITH updated_rows AS (
+  UPDATE public.app_versions
+  SET r2_path = 'orgs/71000000-0000-4000-8000-000000000056/apps/com.test.apikeyv2scope.perf.1/1.0.0-apikey-v2-perf.zip'
+  WHERE app_id = 'com.test.apikeyv2scope.perf.1'
+    AND name = '1.0.0-apikey-v2-perf'
+  RETURNING 1
+)
+SELECT is(
+  (SELECT count(*)::int FROM updated_rows),
+  1,
+  'broad app-scoped API key can finish the indexed app_versions upload update'
+);
+
+SELECT set_config('request.method', '', true);
+
 SELECT ok(
   position(
     'rbac_check_permission_direct'
@@ -505,6 +585,14 @@ SELECT ok(
     in pg_get_functiondef('public.app_versions_has_app_permission(public.user_min_right,uuid,character varying,uuid,text)'::regprocedure)
   ) = 0,
   'app_versions targeted permission helper does not call generic per-app RBAC checks'
+);
+
+SELECT ok(
+  position(
+    'enforced_orgs'
+    in pg_get_functiondef('public.check_apikey_hashed_key_enforcement(public.apikeys)'::regprocedure)
+  ) > 0,
+  'API key hashed-key enforcement starts from enforcing orgs instead of every scoped app binding'
 );
 
 SELECT ok(
