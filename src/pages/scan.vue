@@ -18,6 +18,7 @@ import IconLink from '~icons/heroicons/link-20-solid'
 import IconQrCode from '~icons/heroicons/qr-code-20-solid'
 import { buildChannelPreviewLatestOptions, parsePreviewDeepLink } from '~/services/previewLinks'
 import { useDisplayStore } from '~/stores/display'
+import { parsePreviewHostname } from '../../shared/preview-subdomain.ts'
 
 const route = useRoute()
 const router = useRouter()
@@ -48,6 +49,37 @@ interface PreviewPayload {
   sessionKey?: string | null
   manifest?: DownloadOptions['manifest']
 }
+
+interface PreviewHostTarget {
+  appId: string
+  channelId?: number
+  payloadUrl: string
+  rootUrl: string
+  versionId?: number
+}
+
+interface PreviewFetchResult {
+  bytes: Uint8Array
+  contentType: string
+  status: number
+  url: string
+}
+
+const PREVIEW_ASSET_LIMIT = 500
+const PREVIEW_PAYLOAD_PATH = '/.capgo/preview.json'
+const PREVIEW_DOWNLOAD_PLACEHOLDER_URL = 'https://404.capgo.app/no.zip'
+const TEXT_ASSET_EXTENSIONS = new Set([
+  'css',
+  'html',
+  'htm',
+  'js',
+  'json',
+  'mjs',
+  'svg',
+  'txt',
+  'webmanifest',
+  'xml',
+])
 
 function formatDebugData(data: unknown) {
   try {
@@ -120,19 +152,253 @@ function isHttpUrl(value: string) {
   return parsedUrl?.protocol === 'https:' || parsedUrl?.protocol === 'http:'
 }
 
-function isPreviewHost(hostname: string) {
-  return /^[^.]+\.preview(?:\.[^.]+)?\.(?:capgo\.app|usecapgo\.com)$/.test(hostname)
+function previewHostTargetFromUrl(value: string): PreviewHostTarget | null {
+  const parsedUrl = parseSafeUrl(value)
+  if (!parsedUrl || (parsedUrl.protocol !== 'https:' && parsedUrl.protocol !== 'http:'))
+    return null
+
+  const parsedHost = parsePreviewHostname(parsedUrl.hostname)
+  if (!parsedHost)
+    return null
+
+  return {
+    ...parsedHost,
+    payloadUrl: new URL(PREVIEW_PAYLOAD_PATH, parsedUrl.origin).toString(),
+    rootUrl: new URL('/', parsedUrl.origin).toString(),
+  }
 }
 
 function previewPayloadUrlFromUrl(value: string) {
-  const parsedUrl = parseSafeUrl(value)
-  if (!parsedUrl || (parsedUrl.protocol !== 'https:' && parsedUrl.protocol !== 'http:'))
+  return previewHostTargetFromUrl(value)?.payloadUrl ?? ''
+}
+
+function base64ToBytes(value: string) {
+  const binary = atob(value.replace(/\s/g, ''))
+  const bytes = new Uint8Array(binary.length)
+  for (let index = 0; index < binary.length; index += 1)
+    bytes[index] = binary.charCodeAt(index)
+  return bytes
+}
+
+async function responseDataToBytes(data: unknown) {
+  if (data instanceof Uint8Array)
+    return data
+  if (data instanceof ArrayBuffer)
+    return new Uint8Array(data)
+  if (ArrayBuffer.isView(data))
+    return new Uint8Array(data.buffer, data.byteOffset, data.byteLength)
+  if (data instanceof Blob)
+    return new Uint8Array(await data.arrayBuffer())
+  if (typeof data === 'string')
+    return base64ToBytes(data)
+
+  throw new Error('Preview asset response is not binary data')
+}
+
+function responseHeader(headers: Record<string, string> | Headers, name: string) {
+  if (headers instanceof Headers)
+    return headers.get(name) ?? ''
+
+  const lowerName = name.toLowerCase()
+  const entry = Object.entries(headers).find(([key]) => key.toLowerCase() === lowerName)
+  return entry?.[1] ?? ''
+}
+
+async function fetchPreviewBytes(url: string): Promise<PreviewFetchResult> {
+  if (isNativePlatform) {
+    const response = await CapacitorHttp.get({
+      headers: { Accept: '*/*' },
+      responseType: 'arraybuffer',
+      url,
+    })
+    const bytes = response.status >= 200 && response.status < 300
+      ? await responseDataToBytes(response.data)
+      : new Uint8Array()
+    return {
+      bytes,
+      contentType: responseHeader(response.headers, 'content-type'),
+      status: response.status,
+      url: response.url || url,
+    }
+  }
+
+  const response = await fetch(url, { headers: { Accept: '*/*' } })
+  return {
+    bytes: response.ok ? new Uint8Array(await response.arrayBuffer()) : new Uint8Array(),
+    contentType: response.headers.get('content-type') ?? '',
+    status: response.status,
+    url: response.url,
+  }
+}
+
+async function sha256Hex(bytes: Uint8Array) {
+  if (!crypto.subtle)
+    throw new Error('SHA-256 is not available in this WebView')
+
+  const buffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer
+  const digest = await crypto.subtle.digest('SHA-256', buffer)
+  return Array.from(new Uint8Array(digest))
+    .map(byte => byte.toString(16).padStart(2, '0'))
+    .join('')
+}
+
+function isTextPreviewAsset(fileName: string, contentType: string) {
+  const cleanContentType = contentType.split(';')[0]?.trim().toLowerCase() ?? ''
+  if (cleanContentType.startsWith('text/'))
+    return true
+  if (cleanContentType.includes('javascript') || cleanContentType.includes('json') || cleanContentType.includes('xml') || cleanContentType.includes('svg'))
+    return true
+
+  const extension = fileName.split('.').pop()?.toLowerCase() ?? ''
+  return TEXT_ASSET_EXTENSIONS.has(extension)
+}
+
+function normalizePreviewAssetUrl(rawValue: string, baseUrl: string, rootUrl: string) {
+  const value = rawValue.trim()
+  if (!value || value.startsWith('#') || value.startsWith('data:') || value.startsWith('blob:') || value.startsWith('javascript:') || value.startsWith('mailto:') || value.startsWith('tel:'))
     return ''
 
-  if (!isPreviewHost(parsedUrl.hostname))
+  try {
+    const url = value.startsWith('//')
+      ? new URL(`${new URL(baseUrl).protocol}${value}`)
+      : new URL(value, baseUrl)
+    const root = new URL(rootUrl)
+    if (url.origin !== root.origin)
+      return ''
+    if (url.pathname === PREVIEW_PAYLOAD_PATH)
+      return ''
+
+    url.hash = ''
+    return url.toString()
+  }
+  catch {
+    return ''
+  }
+}
+
+function previewFileNameFromUrl(value: string, rootUrl: string) {
+  const url = new URL(value)
+  const root = new URL(rootUrl)
+  if (url.origin !== root.origin)
     return ''
 
-  return new URL('/.capgo/preview.json', parsedUrl.origin).toString()
+  if (url.pathname === '/' || url.pathname === '')
+    return 'index.html'
+
+  const fileName = decodeURIComponent(url.pathname).replace(/^\/+/, '')
+  if (!fileName || fileName.endsWith('/'))
+    return ''
+
+  return fileName
+}
+
+function previewDownloadUrlForFile(fileName: string, rootUrl: string) {
+  if (fileName === 'index.html')
+    return new URL('/index.html', rootUrl).toString()
+  return new URL(`/${fileName}`, rootUrl).toString()
+}
+
+function extractPreviewAssetUrls(text: string, baseUrl: string, rootUrl: string) {
+  const urls = new Set<string>()
+  const add = (rawValue: string) => {
+    const normalized = normalizePreviewAssetUrl(rawValue, baseUrl, rootUrl)
+    if (normalized)
+      urls.add(normalized)
+  }
+
+  for (const match of text.matchAll(/\b(?:href|src|poster|data-href|data-src)\s*=\s*["']([^"']+)["']/gi))
+    add(match[1])
+
+  for (const match of text.matchAll(/url\(([^)]{1,2048})\)/gi))
+    add(match[1].trim().replace(/^['"]|['"]$/g, ''))
+
+  for (const match of text.matchAll(/\b(?:from|import)\s*(?:\(\s*)?["']([^"']+)["']/gi))
+    add(match[1])
+
+  for (const match of text.matchAll(/["'`]((?:\/|\.\.?\/)?(?:assets|fonts|images|img|static)\/[^"'`)\s?#]+(?:\?[^"'`)\s#]+)?)/gi))
+    add(match[1])
+
+  return [...urls]
+}
+
+function previewVersionFromHostTarget(target: PreviewHostTarget) {
+  if (typeof target.versionId === 'number')
+    return `preview-${target.versionId}`
+  if (typeof target.channelId === 'number')
+    return `preview-channel-${target.channelId}-${Date.now()}`
+  return `preview-${Date.now()}`
+}
+
+async function buildPreviewPayloadFromHost(target: PreviewHostTarget): Promise<PreviewPayload> {
+  const firstUrl = previewDownloadUrlForFile('index.html', target.rootUrl)
+  const queuedUrls = new Set([firstUrl])
+  const queue = [firstUrl]
+  const manifest: NonNullable<DownloadOptions['manifest']> = []
+  const collectedFiles = new Set<string>()
+
+  debugLog('building preview payload from host', {
+    appId: target.appId,
+    channelId: target.channelId,
+    rootUrl: target.rootUrl,
+    versionId: target.versionId,
+  })
+
+  while (queue.length) {
+    if (manifest.length >= PREVIEW_ASSET_LIMIT)
+      throw new Error(`Preview has more than ${PREVIEW_ASSET_LIMIT} linked files`)
+
+    const assetUrl = queue.shift() as string
+    const fileName = previewFileNameFromUrl(assetUrl, target.rootUrl)
+    if (!fileName || collectedFiles.has(fileName))
+      continue
+
+    const downloadUrl = previewDownloadUrlForFile(fileName, target.rootUrl)
+    statusMessage.value = `Preparing preview files (${manifest.length + 1})`
+    const response = await fetchPreviewBytes(downloadUrl)
+    if (response.status < 200 || response.status >= 300)
+      throw new Error(`Failed to fetch preview file ${fileName}: HTTP ${response.status}`)
+
+    const fileHash = await sha256Hex(response.bytes)
+    manifest.push({
+      download_url: downloadUrl,
+      file_hash: fileHash,
+      file_name: fileName,
+    })
+    collectedFiles.add(fileName)
+    debugLog('preview file prepared', {
+      bytes: response.bytes.byteLength,
+      contentType: response.contentType,
+      fileName,
+    })
+
+    if (!isTextPreviewAsset(fileName, response.contentType))
+      continue
+
+    const text = new TextDecoder().decode(response.bytes)
+    for (const discoveredUrl of extractPreviewAssetUrls(text, downloadUrl, target.rootUrl)) {
+      const discoveredFileName = previewFileNameFromUrl(discoveredUrl, target.rootUrl)
+      if (discoveredFileName && !collectedFiles.has(discoveredFileName) && !queuedUrls.has(discoveredUrl)) {
+        queuedUrls.add(discoveredUrl)
+        queue.push(discoveredUrl)
+      }
+    }
+  }
+
+  if (!collectedFiles.has('index.html'))
+    throw new Error('Preview did not expose an index.html file')
+
+  const version = previewVersionFromHostTarget(target)
+  debugLog('preview host payload built', {
+    files: manifest.length,
+    version,
+  })
+
+  return {
+    appId: target.appId,
+    manifest,
+    url: PREVIEW_DOWNLOAD_PLACEHOLDER_URL,
+    version,
+  }
 }
 
 const progressPercentage = computed(() => Math.round(downloadProgress.value))
@@ -534,8 +800,25 @@ function downloadOptionsFromPreviewPayload(payload: PreviewPayload): DownloadOpt
     checksum: payload.checksum ?? undefined,
     manifest: payload.manifest,
     sessionKey: payload.sessionKey ?? undefined,
-    url: payload.url || 'https://404.capgo.app/no.zip',
+    url: payload.url || PREVIEW_DOWNLOAD_PLACEHOLDER_URL,
     version: payload.version,
+  }
+}
+
+async function fetchPreviewPayloadWithHostFallback(payloadUrl: string, appId?: string) {
+  try {
+    return await fetchPreviewPayload(payloadUrl)
+  }
+  catch (error) {
+    const target = previewHostTargetFromUrl(payloadUrl)
+    if (!target)
+      throw error
+
+    debugWarn('preview payload endpoint unavailable, falling back to host crawl', error)
+    return buildPreviewPayloadFromHost({
+      ...target,
+      appId: appId || target.appId,
+    })
   }
 }
 
@@ -553,7 +836,7 @@ async function startPreviewPayload(payloadUrl: string, appId?: string) {
 
     toast.success('Starting preview')
 
-    const payload = await fetchPreviewPayload(payloadUrl)
+    const payload = await fetchPreviewPayloadWithHostFallback(payloadUrl, appId)
     const bundle = await CapacitorUpdater.download(downloadOptionsFromPreviewPayload(payload))
     debugLog('preview payload downloaded', bundle)
 

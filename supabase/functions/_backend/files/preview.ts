@@ -14,12 +14,6 @@ import { DEFAULT_RETRY_PARAMS, RetryBucket } from './retry.ts'
 // Cache settings
 const PREVIEW_AUTH_CACHE_PATH = '/.preview-auth'
 const PREVIEW_AUTH_CACHE_TTL_SECONDS = 60
-const PREVIEW_PAYLOAD_PATH = '.capgo/preview.json'
-const PREVIEW_PAYLOAD_HEADERS = {
-  'Access-Control-Allow-Origin': '*',
-  'Cache-Control': 'no-store',
-  'Content-Type': 'application/json; charset=utf-8',
-}
 
 interface PreviewAuthCache {
   actualAppId: string
@@ -174,64 +168,6 @@ async function getChannelPreviewVersionId(c: Context<MiddlewareKeyVariables>, ap
   return versionId
 }
 
-function encodePreviewPath(fileName: string) {
-  return fileName
-    .replace(/^\/+/, '')
-    .split('/')
-    .map(part => encodeURIComponent(part))
-    .join('/')
-}
-
-function buildPreviewFileUrl(c: Context<MiddlewareKeyVariables>, fileName: string) {
-  const url = new URL(c.req.url)
-  url.pathname = `/${encodePreviewPath(fileName)}`
-  url.search = ''
-  url.hash = ''
-  return url.toString()
-}
-
-async function getPreviewPayload(c: Context<MiddlewareKeyVariables>, appId: string, versionId: number): Promise<Response> {
-  const supabase = supabaseAdmin(c)
-  const { data: bundle, error: bundleError } = await supabase
-    .from('app_versions')
-    .select('id, name, checksum, external_url, session_key, link, comment')
-    .eq('app_id', appId)
-    .eq('id', versionId)
-    .single()
-
-  if (bundleError || !bundle) {
-    throw simpleError('bundle_not_found', 'Bundle not found', { versionId })
-  }
-
-  const { data: manifestEntries, error: manifestError } = await supabase
-    .from('manifest')
-    .select('file_name, file_hash')
-    .eq('app_version_id', versionId)
-    .order('id', { ascending: true })
-
-  if (manifestError || !manifestEntries?.length) {
-    throw simpleError('no_manifest', 'Bundle has no manifest and cannot be previewed')
-  }
-
-  return new Response(JSON.stringify({
-    appId,
-    checksum: bundle.checksum ?? undefined,
-    comment: bundle.comment ?? undefined,
-    link: bundle.link ?? undefined,
-    manifest: manifestEntries.map(entry => ({
-      download_url: buildPreviewFileUrl(c, entry.file_name),
-      file_hash: entry.file_hash,
-      file_name: entry.file_name,
-    })),
-    sessionKey: bundle.session_key ?? undefined,
-    url: bundle.external_url || 'https://404.capgo.app/no.zip',
-    version: bundle.name,
-  }), {
-    headers: PREVIEW_PAYLOAD_HEADERS,
-    status: 200,
-  })
-}
-
 // Export the handler directly for use in the main app
 // This preserves the context (requestId, env bindings, etc.) from the parent app
 export async function handlePreviewRequest(c: Context<MiddlewareKeyVariables>): Promise<Response> {
@@ -375,10 +311,6 @@ export async function handlePreviewRequest(c: Context<MiddlewareKeyVariables>): 
   if (!bucket) {
     cloudlog({ requestId: c.get('requestId'), message: 'preview bucket is null' })
     throw simpleError('bucket_not_configured', 'Storage bucket not configured')
-  }
-
-  if (filePath === PREVIEW_PAYLOAD_PATH) {
-    return getPreviewPayload(c, actualAppId, previewVersionId)
   }
 
   // Look up file in manifest using a single query with OR conditions for all possible paths
