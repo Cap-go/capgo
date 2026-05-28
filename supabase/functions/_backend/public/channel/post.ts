@@ -4,7 +4,7 @@ import type { Database } from '../../utils/supabase.types.ts'
 import { BRES, simpleError } from '../../utils/hono.ts'
 import { cloudlogErr } from '../../utils/logging.ts'
 import { checkPermission } from '../../utils/rbac.ts'
-import { supabaseApikey, updateOrCreateChannel } from '../../utils/supabase.ts'
+import { supabaseAdmin, supabaseApikey, updateOrCreateChannel } from '../../utils/supabase.ts'
 import { isInternalVersionName, isValidAppId } from '../../utils/utils.ts'
 
 interface ChannelSet {
@@ -148,8 +148,23 @@ export async function post(c: Context<MiddlewareKeyVariables>, body: ChannelSet,
   if (!isValidAppId(body.app_id)) {
     throw simpleError('invalid_app_id', 'App ID must be a reverse domain string', { app_id: body.app_id })
   }
-  // Auth context is already set by middlewareKey
-  if (!(await checkPermission(c, 'app.create_channel', { appId: body.app_id }))) {
+  const { data: existingChannel } = await supabaseAdmin(c)
+    .from('channels')
+    .select('id, version')
+    .eq('app_id', body.app_id)
+    .eq('name', body.channel)
+    .maybeSingle()
+
+  if (existingChannel) {
+    const canUpdateChannel = await checkPermission(c, 'channel.update_settings', { appId: body.app_id, channelId: existingChannel.id })
+    if (!canUpdateChannel) {
+      throw simpleError('cannot_access_app', 'You can\'t access this app', { app_id: body.app_id, channel: body.channel })
+    }
+    if ((body.version !== undefined || existingChannel.version !== null) && !(await checkPermission(c, 'channel.promote_bundle', { appId: body.app_id, channelId: existingChannel.id }))) {
+      throw simpleError('cannot_access_app', 'You can\'t access this app', { app_id: body.app_id, channel: body.channel })
+    }
+  }
+  else if (!(await checkPermission(c, 'app.create_channel', { appId: body.app_id }))) {
     throw simpleError('cannot_access_app', 'You can\'t access this app', { app_id: body.app_id })
   }
   const { data: org, error } = await supabaseApikey(c, apikey.key).from('apps').select('owner_org').eq('app_id', body.app_id).single()

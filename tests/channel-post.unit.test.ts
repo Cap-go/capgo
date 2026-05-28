@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const updateOrCreateChannel = vi.fn()
 const checkPermission = vi.fn()
+const supabaseAdmin = vi.fn()
 const supabaseApikey = vi.fn()
 const isValidAppId = vi.fn()
 
@@ -23,6 +24,7 @@ vi.mock('../supabase/functions/_backend/utils/rbac.ts', () => ({
 }))
 
 vi.mock('../supabase/functions/_backend/utils/supabase.ts', () => ({
+  supabaseAdmin,
   supabaseApikey,
   updateOrCreateChannel,
 }))
@@ -83,11 +85,34 @@ function buildSupabaseChain(body: { existingChannelId?: number | null, existingC
   }
 }
 
+function buildAdminChain(body: { existingChannelId?: number | null } = {}) {
+  return {
+    from(table: string) {
+      if (table === 'channels') {
+        return {
+          select: () => ({
+            eq() {
+              return this
+            },
+            maybeSingle: async () => ({
+              data: body.existingChannelId == null ? null : { id: body.existingChannelId },
+              error: null,
+            }),
+          }),
+        }
+      }
+
+      throw new Error(`Unexpected admin table: ${table}`)
+    },
+  }
+}
+
 describe('public channel post', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     checkPermission.mockResolvedValue(true)
     isValidAppId.mockReturnValue(true)
+    supabaseAdmin.mockImplementation(() => buildAdminChain())
     supabaseApikey.mockImplementation(() => buildSupabaseChain({}))
     updateOrCreateChannel.mockResolvedValue({ error: null })
   })

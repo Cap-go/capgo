@@ -1,15 +1,15 @@
 import type { ChannelAddOptions } from '../schemas/channel'
 import { intro, log, outro } from '@clack/prompts'
-import { check2FAComplianceForApp, checkAppExistsAndHasPermissionOrgErr } from '../api/app'
+import { check2FAComplianceForApp, checkAppExists } from '../api/app'
 import { createChannel } from '../api/channels'
 import {
+  assertCliPermission,
   createSupabaseClient,
   findSavedKey,
   formatError,
   getAppId,
   getConfig,
   getOrganizationId,
-  OrganizationPerm,
   resolveUserIdFromApiKey,
   sendEvent,
 } from '../utils'
@@ -36,18 +36,22 @@ export async function addChannelInternal(channelId: string, appId: string, optio
 
   const supabase = await createSupabaseClient(options.apikey, options.supaHost, options.supaAnon, silent)
   await check2FAComplianceForApp(supabase, appId, silent)
-  await resolveUserIdFromApiKey(supabase, options.apikey)
-  // Creating a channel needs app_admin tier (app.create_channel / the INSERT RLS's app.update_settings),
-  // which get_org_perm_for_apikey reports as perm_write; org_super_admin's app.delete is NOT required.
-  // Gating on admin here was a false-negative that blocked org_admin/app_admin keys. The channels
-  // INSERT RLS remains authoritative, so a non-admin key is still rejected at the DB.
-  await checkAppExistsAndHasPermissionOrgErr(supabase, options.apikey, appId, OrganizationPerm.write, silent, true)
+  const userId = await resolveUserIdFromApiKey(supabase, options.apikey)
+  if (!(await checkAppExists(supabase, appId))) {
+    const msg = `App ${appId} does not exist`
+    if (!silent)
+      log.error(msg)
+    throw new Error(msg)
+  }
+  await assertCliPermission(supabase, options.apikey, 'app.create_channel', { appId }, {
+    message: `Insufficient permissions to create channel for app ${appId}`,
+    silent,
+  })
 
   if (!silent)
     log.info(`Creating channel ${appId}#${channelId} to Capgo`)
 
   const orgId = await getOrganizationId(supabase, appId)
-  const userId = await resolveUserIdFromApiKey(supabase, options.apikey)
 
   const res = await createChannel(supabase, {
     name: channelId,
@@ -69,8 +73,7 @@ export async function addChannelInternal(channelId: string, appId: string, optio
     channel: 'channel',
     event: 'Create channel',
     icon: '✅',
-    org_id: orgId,
-    tracking_version: 2,
+    user_id: orgId,
     tags: {
       'app-id': appId,
       'channel': channelId,
