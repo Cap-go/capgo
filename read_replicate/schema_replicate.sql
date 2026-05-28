@@ -890,6 +890,13 @@ CREATE INDEX org_users_app_id_idx ON public.org_users USING btree (app_id);
 
 
 --
+-- Name: orgs_enforce_hashed_api_keys_true_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX orgs_enforce_hashed_api_keys_true_idx ON public.orgs USING btree (id) WHERE (enforce_hashed_api_keys = true);
+
+
+--
 -- Name: orgs_updated_at_id_idx; Type: INDEX; Schema: public; Owner: -
 --
 
