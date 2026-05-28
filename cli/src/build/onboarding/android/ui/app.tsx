@@ -1970,6 +1970,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
 
       {step === 'service-account-method-select' && (
         <ServiceAccountMethodSelectStep
+          dense={dense}
           onChoose={(method) => {
             if (selectFiredRef.current)
               return
@@ -1999,6 +2000,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
 
       {step === 'sa-json-existing-path' && (
         <SaJsonExistingPathStep
+          dense={dense}
           showChooser={canUseFilePicker() && saJsonPathMode === 'choose'}
           onChoosePicker={() => {
             // The picker triggers a step transition that takes time — guard
@@ -2040,6 +2042,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
 
       {step === 'sa-json-validation-failed' && saValidationResult && !saValidationResult.ok && (
         <SaJsonValidationFailedStep
+          dense={dense}
           message={saValidationResult.message}
           onChoose={(value) => {
             if (selectFiredRef.current)
@@ -2105,6 +2108,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
 
       {step === 'google-sign-in' && !showOAuthLearnMore && (
         <GoogleSignInStep
+          dense={dense}
           onChoose={(value) => {
             if (value === 'go')
               setStep('google-sign-in-running')
@@ -2117,17 +2121,18 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
       )}
 
       {step === 'google-sign-in' && showOAuthLearnMore && (
-        <GoogleSignInLearnMoreStep onBack={() => setShowOAuthLearnMore(false)} />
+        <GoogleSignInLearnMoreStep dense={dense} onBack={() => setShowOAuthLearnMore(false)} />
       )}
 
       {step === 'google-sign-in-running' && (
-        <GoogleSignInRunningStep statusMessages={oauthStatusMessages} />
+        <GoogleSignInRunningStep dense={dense} statusMessages={oauthStatusMessages} />
       )}
 
       {/* ── Phase 3 — Play Developer account ID ── */}
 
       {step === 'play-developer-id-input' && playDevIdMode === 'actions' && (
         <PlayDeveloperIdActionsStep
+          dense={dense}
           playDeveloperUrl={PLAY_DEVELOPERS_URL}
           onChoose={async (value) => {
             if (value === 'open') {
@@ -2163,6 +2168,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
 
       {step === 'play-developer-id-input' && playDevIdMode === 'input' && (
         <PlayDeveloperIdInputStep
+          dense={dense}
           onSubmit={(val) => {
             const id = extractDeveloperId(val)
             if (!id) {
@@ -2191,6 +2197,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
 
       {step === 'gcp-projects-select' && (
         <GcpProjectsSelectStep
+          dense={dense}
           options={[
             { label: '🆕  Create a new project', value: '__new__' },
             ...gcpProjects.map(p => ({
@@ -2229,6 +2236,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
 
       {step === 'gcp-project-create-name' && (
         <GcpProjectCreateNameStep
+          dense={dense}
           defaultDisplayName={newProjectDisplayName || sanitizeGcpProjectDisplayName(`Capgo ${appId}`)}
           onSubmit={(val) => {
             const displayName = sanitizeGcpProjectDisplayName(
@@ -2258,6 +2266,8 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
 
       {step === 'android-package-select' && (
         <AndroidPackageSelectStep
+          dense={dense}
+          androidDir={androidDir}
           showChooser={detectedPackageIds.length > 0 && packageSelectMode === 'choose'}
           detectedCount={detectedPackageIds.length}
           detectedOptions={[
@@ -2324,7 +2334,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
       )}
 
       {step === 'gcp-setup-running' && (
-        <GcpSetupRunningStep statusMessages={setupStatus} />
+        <GcpSetupRunningStep dense={dense} statusMessages={setupStatus} />
       )}
 
       {/* ── Phase 6 ── */}

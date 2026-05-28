@@ -9,17 +9,23 @@
 // `useStdout` / `measureElement`. `useInput` inside the shared FilteredTextInput
 // widget is fine — that's a leaf control, not layout measurement.
 //
-// The frame-fit contract (see ui/components.tsx + test/helpers/frame-fit.mjs)
-// requires every step body to render within BODY_BUDGET_ROWS (13) rows at the
-// reference widths (80 and 60 cols). Copy here is deliberately terse and
-// decorative blank lines are dropped so the bodies stay lean at 60 columns
-// where text wraps hardest — but the interactive control and its key
-// instruction always stay on screen. List steps cap visibility via Select's
-// `visibleOptionCount` and add a "+N more (↑/↓)" hint so a long list can never
-// blow the budget.
+// Adaptive spacing — each body renders its COMFORTABLE form by default (the
+// original design: bordered Alert banners where applicable + decorative
+// <Newline/> blank-line spacing + full multi-line copy + un-capped lists). The
+// 16-row frame contract (see ui/components.tsx + test/helpers/frame-fit.mjs) is
+// a FLOOR we must survive on short terminals, not a cap on every terminal: when
+// the parent measures that the comfortable body can't fit the viewport it flips
+// the sticky `dense` signal and threads `dense={true}` here, collapsing each
+// body to the terse, budget-fitting form (blank lines dropped, banners reduced
+// to single-line copy, the full project/package lists capped via Select's
+// `visibleOptionCount` with a "+N more" hint, and the variable-length live
+// status streams tailed to the last few lines). `dense` defaults to `false` so
+// a component rendered without the prop (e.g. a test asserting the comfortable
+// form) gets the original look. All props/handlers/behaviour are identical
+// across both modes.
 import type { FC } from 'react'
 import { Alert, Select } from '@inkjs/ui'
-import { Box, Text } from 'ink'
+import { Box, Newline, Text } from 'ink'
 import React from 'react'
 import { FilteredTextInput, SpinnerLine } from '../components.js'
 
@@ -30,10 +36,17 @@ export interface SelectOption {
   value: string
 }
 
-// Capped visible rows for the scrollable list steps. Kept low so the bold
-// header + Select window + "+N more" hint always fit the 13-row budget even at
-// 60 cols where the explanatory copy above wraps.
+// Capped visible rows for the scrollable list steps in DENSE mode. Kept low so
+// the bold header + Select window + "+N more" hint always fit the 13-row budget
+// even at 60 cols where the explanatory copy above wraps. In the comfortable
+// form the lists are un-capped (the parent only renders that form after
+// measuring it fits the viewport).
 const LIST_VISIBLE_COUNT = 4
+
+// How many trailing lines of a live status stream to show in DENSE mode. The
+// comfortable form prints the whole stream; the dense form tails it so a long
+// stream can never push the spinner / frame past budget.
+const STATUS_TAIL = 4
 
 // ── service-account-method-select ────────────────────────────────────────────
 
@@ -41,14 +54,22 @@ export type ServiceAccountMethodChoice = 'existing' | 'generate'
 
 export interface ServiceAccountMethodSelectStepProps {
   onChoose: (choice: ServiceAccountMethodChoice) => void
+  dense?: boolean
 }
 
-export const ServiceAccountMethodSelectStep: FC<ServiceAccountMethodSelectStepProps> = ({ onChoose }) => (
+// Comfortable: the info Alert (full copy), a <Newline/>, the bold question,
+// another <Newline/>, then the Select. Dense: the blank lines are dropped and
+// the Alert copy trimmed so the prompt + two choices stay within budget.
+export const ServiceAccountMethodSelectStep: FC<ServiceAccountMethodSelectStepProps> = ({ onChoose, dense = false }) => (
   <Box flexDirection="column" marginTop={1}>
     <Alert variant="info">
-      Capgo needs a Google Play service account JSON to upload AABs. Bring your own, or let Capgo set one up via Google.
+      {dense
+        ? 'Capgo needs a Google Play service account JSON to upload AABs. Bring your own, or let Capgo set one up via Google.'
+        : 'Capgo needs a Google Play service account JSON to upload AABs on your behalf. You can bring your own or let Capgo set one up via Google sign-in.'}
     </Alert>
+    {!dense && <Newline />}
     <Text bold>Do you already have a service account JSON?</Text>
+    {!dense && <Newline />}
     <Select
       options={[
         { label: '🔐  No, set one up for me via Google', value: 'generate' },
@@ -70,20 +91,28 @@ export interface SaJsonExistingPathStepProps {
   onChoosePicker: () => void
   onChooseManual: () => void
   onSubmitPath: (value: string) => void
+  dense?: boolean
 }
 
+// Comfortable: the bold title + a <Newline/>, then either the chooser prompt +
+// a <Newline/> + the Select, or the drag-and-drop tip + a <Newline/> + the path
+// input. Dense: the blank lines are dropped so the title + prompt + control sit
+// together within budget.
 export const SaJsonExistingPathStep: FC<SaJsonExistingPathStepProps> = ({
   showChooser,
   onChoosePicker,
   onChooseManual,
   onSubmitPath,
+  dense = false,
 }) => (
   <Box flexDirection="column" marginTop={1}>
     <Text bold>Existing service account JSON (.json)</Text>
+    {!dense && <Newline />}
     {showChooser
       ? (
           <>
             <Text>How do you want to provide it?</Text>
+            {!dense && <Newline />}
             <Select
               options={[
                 { label: '📂  Open file picker', value: 'picker' },
@@ -101,6 +130,7 @@ export const SaJsonExistingPathStep: FC<SaJsonExistingPathStepProps> = ({
       : (
           <>
             <Text dimColor>Tip: drag a file into this window to paste its path.</Text>
+            {!dense && <Newline />}
             <FilteredTextInput
               placeholder="/path/to/service-account.json"
               filter=""
@@ -112,12 +142,14 @@ export const SaJsonExistingPathStep: FC<SaJsonExistingPathStepProps> = ({
 )
 
 // ── sa-json-existing-picker (spinner) ─────────────────────────────────────────
+// Single spinner line — identical comfortable / dense (no spacing to collapse).
 
 export const SaJsonExistingPickerStep: FC = () => (
   <Box marginTop={1}><SpinnerLine text="Opening file picker..." /></Box>
 )
 
 // ── sa-json-validating (spinner) ──────────────────────────────────────────────
+// Single spinner line — identical comfortable / dense.
 
 export const SaJsonValidatingStep: FC = () => (
   <Box marginTop={1}>
@@ -127,32 +159,58 @@ export const SaJsonValidatingStep: FC = () => (
 
 // ── sa-json-validation-failed ─────────────────────────────────────────────────
 // `message` is the backend/validation failure detail (can be long — e.g. a
-// no-app-access explanation). The original Alert + indented message + bold +
-// several <Newline/>s + Select(3) overflowed at 60 cols, so the blank lines are
-// dropped: the failure is conveyed by a single red ✖ line above the choices,
-// and the Select keeps its window capped so a long message can't push the
-// control off-screen.
+// no-app-access explanation). Comfortable: the original warning Alert + the
+// indented full message + a <Newline/> + the bold "What would you like to do?"
+// prompt + a <Newline/> + the un-capped Select(3) (the original look — rendered
+// only after the parent measured it fits). Dense: the Alert / blank lines are
+// dropped — the failure is conveyed by a single red ✖-style line above the
+// choices — and the Select keeps its window capped so a long message can't push
+// the control off-screen.
 
 export interface SaJsonValidationFailedStepProps {
   message: string
   onChoose: (choice: 'retry' | 'save-anyway' | 'oauth') => void
+  dense?: boolean
 }
 
-export const SaJsonValidationFailedStep: FC<SaJsonValidationFailedStepProps> = ({ message, onChoose }) => (
-  <Box flexDirection="column" marginTop={1}>
-    <Text color="yellow" bold>⚠  Service account validation failed</Text>
-    <Text color="red">{message}</Text>
-    <Select
-      visibleOptionCount={3}
-      options={[
-        { label: '🔄  Try a different service account file', value: 'retry' },
-        { label: '💾  Save credentials anyway (skip validation)', value: 'save-anyway' },
-        { label: '🆕  Set up a new service account via Google', value: 'oauth' },
-      ]}
-      onChange={value => onChoose(value as 'retry' | 'save-anyway' | 'oauth')}
-    />
-  </Box>
-)
+export const SaJsonValidationFailedStep: FC<SaJsonValidationFailedStepProps> = ({ message, onChoose, dense = false }) => {
+  const options = [
+    { label: '🔄  Try a different service account file', value: 'retry' },
+    { label: '💾  Save credentials anyway (skip validation)', value: 'save-anyway' },
+    { label: '🆕  Set up a new service account via Google', value: 'oauth' },
+  ]
+  if (!dense) {
+    return (
+      <Box flexDirection="column" marginTop={1}>
+        <Alert variant="warning">
+          Service account validation failed.
+        </Alert>
+        <Newline />
+        <Box flexDirection="column" marginLeft={2}>
+          <Text color="red">{message}</Text>
+        </Box>
+        <Newline />
+        <Text bold>What would you like to do?</Text>
+        <Newline />
+        <Select
+          options={options}
+          onChange={value => onChoose(value as 'retry' | 'save-anyway' | 'oauth')}
+        />
+      </Box>
+    )
+  }
+  return (
+    <Box flexDirection="column" marginTop={1}>
+      <Text color="yellow" bold>⚠  Service account validation failed</Text>
+      <Text color="red">{message}</Text>
+      <Select
+        visibleOptionCount={3}
+        options={options}
+        onChange={value => onChoose(value as 'retry' | 'save-anyway' | 'oauth')}
+      />
+    </Box>
+  )
+}
 
 // ── google-sign-in (pre-consent) ──────────────────────────────────────────────
 
@@ -160,85 +218,169 @@ export type GoogleSignInChoice = 'go' | 'learn' | 'exit'
 
 export interface GoogleSignInStepProps {
   onChoose: (choice: GoogleSignInChoice) => void
+  dense?: boolean
 }
 
-// Condensed from the original Alert + intro line + two wrapping bullets +
-// blank lines + Select(3), which blew the budget at 60 cols. The two access
-// scopes are folded into terse single-line bullets and the decorative
-// <Newline/>s are dropped; the Select and its scope context stay visible.
-export const GoogleSignInStep: FC<GoogleSignInStepProps> = ({ onChoose }) => (
-  <Box flexDirection="column" marginTop={1}>
-    <Text bold color="cyan">Sign in with Google to set up Play publishing.</Text>
-    <Text dimColor>Tokens stay on your machine — Capgo&apos;s servers never see them.</Text>
-    <Text>
-      •
-      {' '}
-      <Text bold>Cloud</Text>
-      : create a service account in a project you pick.
-    </Text>
-    <Text>
-      •
-      {' '}
-      <Text bold>Play</Text>
-      : invite it with release-only access.
-    </Text>
-    <Select
-      options={[
-        { label: '🔐  Continue to Google sign-in', value: 'go' },
-        { label: 'ℹ️   Why is this secure?', value: 'learn' },
-        { label: '✖  Exit (I\'ll do it later)', value: 'exit' },
-      ]}
-      onChange={value => onChoose(value as GoogleSignInChoice)}
-    />
-  </Box>
-)
+// Comfortable: the original info Alert (full copy) + a <Newline/> + the intro
+// line + two indented wrapping bullets (full scope descriptions) in a
+// marginLeft box + a <Newline/> + the Select(3). Dense: the Alert / box /
+// blank lines are dropped, the two access scopes are folded into terse
+// single-line bullets, and a reassurance line replaces the Alert so the Select
+// and its scope context stay within budget at 60 cols.
+export const GoogleSignInStep: FC<GoogleSignInStepProps> = ({ onChoose, dense = false }) => {
+  if (dense) {
+    return (
+      <Box flexDirection="column" marginTop={1}>
+        <Text bold color="cyan">Sign in with Google to set up Play publishing.</Text>
+        <Text dimColor>Tokens stay on your machine — Capgo&apos;s servers never see them.</Text>
+        <Text>
+          •
+          {' '}
+          <Text bold>Cloud</Text>
+          : create a service account in a project you pick.
+        </Text>
+        <Text>
+          •
+          {' '}
+          <Text bold>Play</Text>
+          : invite it with release-only access.
+        </Text>
+        <Select
+          options={[
+            { label: '🔐  Continue to Google sign-in', value: 'go' },
+            { label: 'ℹ️   Why is this secure?', value: 'learn' },
+            { label: '✖  Exit (I\'ll do it later)', value: 'exit' },
+          ]}
+          onChange={value => onChoose(value as GoogleSignInChoice)}
+        />
+      </Box>
+    )
+  }
+  return (
+    <Box flexDirection="column" marginTop={1}>
+      <Alert variant="info">
+        Sign in with Google so Capgo can set up Play Store publishing on your account — your tokens never reach Capgo&apos;s servers.
+      </Alert>
+      <Newline />
+      <Text>We&apos;ll open Google&apos;s consent screen. The two access requests are:</Text>
+      <Box flexDirection="column" marginLeft={2} marginTop={1}>
+        <Text>
+          •
+          {' '}
+          <Text bold>Google Cloud access</Text>
+          {' '}
+          — to create a service account in a project you pick
+        </Text>
+        <Text>
+          •
+          {' '}
+          <Text bold>Google Play Developer access</Text>
+          {' '}
+          — to invite that service account to your Play Console with release-only permissions
+        </Text>
+      </Box>
+      <Newline />
+      <Select
+        options={[
+          { label: '🔐  Continue to Google sign-in', value: 'go' },
+          { label: 'ℹ️   Learn why the onboarding via Google is secure', value: 'learn' },
+          { label: '✖  Exit (I\'ll do it later)', value: 'exit' },
+        ]}
+        onChange={value => onChoose(value as GoogleSignInChoice)}
+      />
+    </Box>
+  )
+}
 
 // ── google-sign-in (learn-more) ───────────────────────────────────────────────
-// The original long-form Q&A (4 question/answer pairs, each a wrapping
-// paragraph + blank lines) was far over budget. Condensed to four terse
-// single-line reassurances so the whole trust explainer + the Back control fit;
-// the deep detail lives in the docs/source, which the last line points to.
 
 export interface GoogleSignInLearnMoreStepProps {
   onBack: () => void
+  dense?: boolean
 }
 
-export const GoogleSignInLearnMoreStep: FC<GoogleSignInLearnMoreStepProps> = ({ onBack }) => (
-  <Box flexDirection="column" marginTop={1}>
-    <Text bold color="cyan">What Capgo can and can&apos;t do:</Text>
-    <Text>• Touches only the one project you pick — one SA, then stops.</Text>
-    <Text>• Invites that SA into one app with release-only access.</Text>
-    <Text>• Refresh token never leaves your machine; it&apos;s revoked after.</Text>
-    <Text>
-      • Revoke anytime at
-      {' '}
-      <Text color="cyan">myaccount.google.com/permissions</Text>
-      .
-    </Text>
-    <Text dimColor>Google-verified 2026-05-02 · source: github.com/Cap-go/capgo</Text>
-    <Select options={[{ label: '← Back to sign-in', value: 'back' }]} onChange={onBack} />
-  </Box>
-)
+// Comfortable: the original long-form trust explainer — an info Alert + an
+// indented box of four bold question / wrapping-answer pairs separated by
+// <Newline/>s + a dim provenance line + a <Newline/> + the Back control. Dense:
+// the whole Q&A is condensed to four terse single-line reassurances (the deep
+// detail lives in the docs/source the last line points to) so the explainer +
+// the Back control fit within budget.
+export const GoogleSignInLearnMoreStep: FC<GoogleSignInLearnMoreStepProps> = ({ onBack, dense = false }) => {
+  if (dense) {
+    return (
+      <Box flexDirection="column" marginTop={1}>
+        <Text bold color="cyan">What Capgo can and can&apos;t do:</Text>
+        <Text>• Touches only the one project you pick — one SA, then stops.</Text>
+        <Text>• Invites that SA into one app with release-only access.</Text>
+        <Text>• Refresh token never leaves your machine; it&apos;s revoked after.</Text>
+        <Text>
+          • Revoke anytime at
+          {' '}
+          <Text color="cyan">myaccount.google.com/permissions</Text>
+          .
+        </Text>
+        <Text dimColor>Google-verified 2026-05-02 · source: github.com/Cap-go/capgo</Text>
+        <Select options={[{ label: '← Back to sign-in', value: 'back' }]} onChange={onBack} />
+      </Box>
+    )
+  }
+  return (
+    <Box flexDirection="column" marginTop={1}>
+      <Alert variant="info">
+        What Capgo can and can&apos;t do with the access you&apos;re about to grant.
+      </Alert>
+      <Newline />
+      <Box flexDirection="column" marginLeft={2}>
+        <Text bold>Can Capgo touch other GCP projects on my account?</Text>
+        <Text>
+          The scope allows it, but this CLI only calls APIs against the project you&apos;ll pick on the next screen. It creates one service account named
+          {' '}
+          <Text color="cyan">capgo-native-build</Text>
+          {' '}
+          in that one project and stops.
+        </Text>
+        <Newline />
+        <Text bold>Will Capgo upload anything to Play Store without me knowing?</Text>
+        <Text>No. The flow invites one service account into one app (the package you confirm) with release-only permissions. Future builds use that service account, not your OAuth tokens.</Text>
+        <Newline />
+        <Text bold>Can Capgo employees access my Google account?</Text>
+        <Text>No. The refresh token never leaves your machine. Capgo&apos;s servers only serve the OAuth client ID — they never see your tokens. When provisioning finishes, the CLI asks Google to revoke that token, so even your local copy stops working.</Text>
+        <Newline />
+        <Text bold>What if I change my mind later?</Text>
+        <Text>
+          Revoke anytime at
+          {' '}
+          <Text color="cyan">myaccount.google.com/permissions</Text>
+          , or just delete the service account in Google Cloud. Neither needs Capgo&apos;s involvement.
+        </Text>
+        <Newline />
+        <Text dimColor>Capgo passed Google&apos;s OAuth verification on 2026-05-02 for these scopes. Source code: github.com/Cap-go/capgo</Text>
+      </Box>
+      <Newline />
+      <Select options={[{ label: '← Back to sign-in', value: 'back' }]} onChange={onBack} />
+    </Box>
+  )
+}
 
 // ── google-sign-in-running (spinner + optional status stream) ─────────────────
 // `statusMessages` is a live stream of OAuth progress lines. The spinner stays
-// pinned at the top; only the last few status lines are shown so a long stream
-// can't push past the budget.
-
-const OAUTH_STATUS_TAIL = 4
+// pinned at the top. Comfortable: the full stream is rendered (the original
+// look). Dense: only the last few status lines are shown so a long stream can't
+// push past the budget.
 
 export interface GoogleSignInRunningStepProps {
   statusMessages: string[]
+  dense?: boolean
 }
 
-export const GoogleSignInRunningStep: FC<GoogleSignInRunningStepProps> = ({ statusMessages }) => {
-  const tail = statusMessages.slice(-OAUTH_STATUS_TAIL)
+export const GoogleSignInRunningStep: FC<GoogleSignInRunningStepProps> = ({ statusMessages, dense = false }) => {
+  const lines = dense ? statusMessages.slice(-STATUS_TAIL) : statusMessages
   return (
     <Box flexDirection="column" marginTop={1}>
       <SpinnerLine text="Waiting for Google sign-in..." />
-      {tail.length > 0 && (
+      {lines.length > 0 && (
         <Box flexDirection="column" marginTop={1} marginLeft={2}>
-          {tail.map((msg, i) => (<Text key={`oauth-status-${i}`} dimColor>{msg}</Text>))}
+          {lines.map((msg, i) => (<Text key={`oauth-status-${i}`} dimColor>{msg}</Text>))}
         </Box>
       )}
     </Box>
@@ -246,49 +388,92 @@ export const GoogleSignInRunningStep: FC<GoogleSignInRunningStepProps> = ({ stat
 }
 
 // ── play-developer-id-input (actions) ─────────────────────────────────────────
-// `playDeveloperUrl` is the Play Console URL prefix shown as the example. The
-// original Alert + several explainer paragraphs + the URL example + Select(3)
-// overflowed badly; the explanation is compressed to two terse lines that still
-// tell the user what the ID is and where to find it.
+// `playDeveloperUrl` is the Play Console URL prefix shown as the example.
 
 export type PlayDevIdActionChoice = 'open' | 'tutorial' | 'manual'
 
 export interface PlayDeveloperIdActionsStepProps {
   playDeveloperUrl: string
   onChoose: (choice: PlayDevIdActionChoice) => void
+  dense?: boolean
 }
 
-export const PlayDeveloperIdActionsStep: FC<PlayDeveloperIdActionsStepProps> = ({ playDeveloperUrl, onChoose }) => (
-  <Box flexDirection="column" marginTop={1}>
-    <Text bold color="cyan">We need your Play Console Developer account ID.</Text>
-    <Text dimColor>The numeric ID we invite the service account into so builds can publish.</Text>
-    <Text>
-      Find it in the Play Console URL:
-      {' '}
-      <Text dimColor>{playDeveloperUrl}</Text>
-      <Text bold color="cyan">1234567890123456789</Text>
-    </Text>
-    <Select
-      options={[
-        { label: '🌐  Open Play Console in my browser', value: 'open' },
-        { label: '🎬  Watch a quick video tutorial', value: 'tutorial' },
-        { label: '📝  I have my developer ID — let me paste it', value: 'manual' },
-      ]}
-      onChange={value => onChoose(value as PlayDevIdActionChoice)}
-    />
-  </Box>
-)
+// Comfortable: the original info Alert + a <Newline/> + the "every Play
+// Developer account has a unique ID" explainer + a <Newline/> + the
+// "find it in the URL" line + the indented URL example (prefix + bold ID +
+// "/…") + a <Newline/> + the dim "copy the digits / whole URL" hint + a
+// <Newline/> + the Select(3). Dense: the explanation is compressed to two terse
+// lines that still tell the user what the ID is and where to find it, the blank
+// lines are dropped, and the URL example is folded into one line.
+export const PlayDeveloperIdActionsStep: FC<PlayDeveloperIdActionsStepProps> = ({ playDeveloperUrl, onChoose, dense = false }) => {
+  const options = [
+    { label: '🌐  Open Play Console in my browser', value: 'open' },
+    { label: '🎬  Watch a quick video tutorial', value: 'tutorial' },
+    { label: '📝  I have my developer ID — let me paste it', value: 'manual' },
+  ]
+  if (dense) {
+    return (
+      <Box flexDirection="column" marginTop={1}>
+        <Text bold color="cyan">We need your Play Console Developer account ID.</Text>
+        <Text dimColor>The numeric ID we invite the service account into so builds can publish.</Text>
+        <Text>
+          Find it in the Play Console URL:
+          {' '}
+          <Text dimColor>{playDeveloperUrl}</Text>
+          <Text bold color="cyan">1234567890123456789</Text>
+        </Text>
+        <Select
+          options={options}
+          onChange={value => onChoose(value as PlayDevIdActionChoice)}
+        />
+      </Box>
+    )
+  }
+  return (
+    <Box flexDirection="column" marginTop={1}>
+      <Alert variant="info">
+        We need your Google Play Console Developer account ID.
+      </Alert>
+      <Newline />
+      <Text>Every Google Play Developer account (the one you paid the $25 one-time fee for) has a unique numeric ID. We invite Capgo&apos;s service account into that specific account, which is how builds get uploaded to Play.</Text>
+      <Newline />
+      <Text>You&apos;ll find the ID in the Play Console URL after signing in:</Text>
+      <Box marginLeft={2} marginTop={1}>
+        <Text dimColor>{playDeveloperUrl}</Text>
+        <Text bold color="cyan">1234567890123456789</Text>
+        <Text dimColor>/…</Text>
+      </Box>
+      <Newline />
+      <Text>
+        The digits after
+        {' '}
+        <Text color="cyan">/developers/</Text>
+        {' '}
+        are what we need. Copy them, or copy the whole URL — we&apos;ll parse it.
+      </Text>
+      <Newline />
+      <Select
+        options={options}
+        onChange={value => onChoose(value as PlayDevIdActionChoice)}
+      />
+    </Box>
+  )
+}
 
 // ── play-developer-id-input (input) ───────────────────────────────────────────
 
 export interface PlayDeveloperIdInputStepProps {
   onSubmit: (value: string) => void
+  dense?: boolean
 }
 
-export const PlayDeveloperIdInputStep: FC<PlayDeveloperIdInputStepProps> = ({ onSubmit }) => (
+// Comfortable: bold label + the dim helper line + a <Newline/> + the input (the
+// original look). Dense: the blank line is dropped.
+export const PlayDeveloperIdInputStep: FC<PlayDeveloperIdInputStepProps> = ({ onSubmit, dense = false }) => (
   <Box flexDirection="column" marginTop={1}>
     <Text bold>Paste the Play Console URL, or just the developer ID:</Text>
-    <Text dimColor>Either the whole address-bar value or the 16–20 digit number works.</Text>
+    <Text dimColor>Either the whole address bar value or the 16–20 digit number works.</Text>
+    {!dense && <Newline />}
     <FilteredTextInput
       placeholder="https://play.google.com/console/u/0/developers/…"
       filter=""
@@ -298,6 +483,7 @@ export const PlayDeveloperIdInputStep: FC<PlayDeveloperIdInputStepProps> = ({ on
 )
 
 // ── gcp-projects-loading (spinner) ────────────────────────────────────────────
+// Single spinner line — identical comfortable / dense.
 
 export const GcpProjectsLoadingStep: FC = () => (
   <Box marginTop={1}><SpinnerLine text="Loading your Google Cloud projects..." /></Box>
@@ -305,16 +491,30 @@ export const GcpProjectsLoadingStep: FC = () => (
 
 // ── gcp-projects-select ───────────────────────────────────────────────────────
 // The parent builds the option list (a "Create a new project" row prepended to
-// one row per existing GCP project) and owns the route handler. Visibility is
-// capped so a user with many projects can't blow the budget; a "+N more" hint
-// signals the list scrolls.
+// one row per existing GCP project) and owns the route handler. Comfortable:
+// the original bold heading + the dim helper line + a <Newline/> + the un-capped
+// Select (the original showed every project — the parent only renders this form
+// after measuring it fits). Dense: the blank line is dropped and visibility is
+// capped via Select's `visibleOptionCount` with a "+N more" hint so a user with
+// many projects can't blow the budget.
 
 export interface GcpProjectsSelectStepProps {
   options: SelectOption[]
   onChange: (value: string) => void
+  dense?: boolean
 }
 
-export const GcpProjectsSelectStep: FC<GcpProjectsSelectStepProps> = ({ options, onChange }) => {
+export const GcpProjectsSelectStep: FC<GcpProjectsSelectStepProps> = ({ options, onChange, dense = false }) => {
+  if (!dense) {
+    return (
+      <Box flexDirection="column" marginTop={1}>
+        <Text bold>Which Google Cloud project should host the service account?</Text>
+        <Text dimColor>We&apos;ll create a `capgo-native-build` service account in the chosen project.</Text>
+        <Newline />
+        <Select options={options} onChange={onChange} />
+      </Box>
+    )
+  }
   const hidden = Math.max(0, options.length - LIST_VISIBLE_COUNT)
   return (
     <Box flexDirection="column" marginTop={1}>
@@ -338,12 +538,21 @@ export interface GcpProjectCreateNameStepProps {
   /** Placeholder shown for the default project display name. */
   defaultDisplayName: string
   onSubmit: (value: string) => void
+  dense?: boolean
 }
 
-export const GcpProjectCreateNameStep: FC<GcpProjectCreateNameStepProps> = ({ defaultDisplayName, onSubmit }) => (
+// Comfortable: bold label + the dim constraint line + a <Newline/> + the input
+// (the original look). Dense: the blank line is dropped and the constraint copy
+// trimmed.
+export const GcpProjectCreateNameStep: FC<GcpProjectCreateNameStepProps> = ({ defaultDisplayName, onSubmit, dense = false }) => (
   <Box flexDirection="column" marginTop={1}>
     <Text bold>Name for the new Google Cloud project:</Text>
-    <Text dimColor>≤30 chars. The project ID is auto-generated from your app ID + a random suffix.</Text>
+    <Text dimColor>
+      {dense
+        ? '≤30 chars. The project ID is auto-generated from your app ID + a random suffix.'
+        : '≤30 chars. The project ID will be auto-generated from your app ID plus a random suffix.'}
+    </Text>
+    {!dense && <Newline />}
     <FilteredTextInput
       placeholder={defaultDisplayName}
       filter=""
@@ -354,28 +563,77 @@ export const GcpProjectCreateNameStep: FC<GcpProjectCreateNameStepProps> = ({ de
 
 // ── android-package-select ────────────────────────────────────────────────────
 // `showChooser` is true when Gradle-detected package IDs exist AND the user
-// hasn't switched to manual entry; it renders the detected-list fork (capped +
-// "+N more" hint). Otherwise the manual package-name input is shown. The
-// detected options (one row per id + a "type a different name" row) are built
-// by the parent. Copy is compressed: the original verbose applicationId-vs-JS-
-// appId paragraph wrapped to many rows at 60 cols and pushed the list off the
-// budget.
+// hasn't switched to manual entry; it renders the detected-list fork. Otherwise
+// the manual package-name input is shown. The detected options (one row per id +
+// a "type a different name" row) are built by the parent.
 
 export interface AndroidPackageSelectStepProps {
   showChooser: boolean
   detectedOptions: SelectOption[]
   detectedCount: number
+  /** The configured native dir (e.g. "android") — used in the comfortable copy. */
+  androidDir: string
   onChooseDetected: (value: string) => void
   onSubmitManual: (value: string) => void
+  dense?: boolean
 }
 
+// Comfortable: the original info Alert + a <Newline/> + the full
+// applicationId-vs-JS-appId paragraph (naming the build.gradle path) + a
+// <Newline/> + either the bold "Found these…" line + a <Newline/> + the
+// un-capped Select, or the bold "Android package name:" label + a <Newline/> +
+// the input. Dense: the Alert / box / blank lines are dropped, the copy is
+// compressed to a terse header + a one-line "must match applicationId" hint, and
+// the detected list is capped via `visibleOptionCount` + a "+N more" hint.
 export const AndroidPackageSelectStep: FC<AndroidPackageSelectStepProps> = ({
   showChooser,
   detectedOptions,
   detectedCount,
+  androidDir,
   onChooseDetected,
   onSubmitManual,
+  dense = false,
 }) => {
+  if (!dense) {
+    return (
+      <Box flexDirection="column" marginTop={1}>
+        <Alert variant="info">
+          Which Android package (applicationId) should Capgo have release access to?
+        </Alert>
+        <Newline />
+        <Text>
+          This is the package name the Play Console uses — it must match the
+          {' '}
+          <Text bold>applicationId</Text>
+          {' '}
+          in
+          {' '}
+          <Text color="cyan">{`${androidDir}/app/build.gradle`}</Text>
+          , not the Capacitor JS-level appId (those can differ when plugins like CapacitorUpdater override the base ID).
+        </Text>
+        <Newline />
+        {showChooser
+          ? (
+              <>
+                <Text bold>Found these in your Gradle config. Pick one, or enter a different package:</Text>
+                <Newline />
+                <Select options={detectedOptions} onChange={onChooseDetected} />
+              </>
+            )
+          : (
+              <>
+                <Text bold>Android package name:</Text>
+                <Newline />
+                <FilteredTextInput
+                  placeholder="com.example.app"
+                  filter=""
+                  onSubmit={onSubmitManual}
+                />
+              </>
+            )}
+      </Box>
+    )
+  }
   const hidden = Math.max(0, detectedOptions.length - LIST_VISIBLE_COUNT)
   return (
     <Box flexDirection="column" marginTop={1}>
@@ -418,23 +676,24 @@ export const AndroidPackageSelectStep: FC<AndroidPackageSelectStepProps> = ({
 }
 
 // ── gcp-setup-running (spinner + optional status stream) ──────────────────────
-// `statusMessages` is the live provisioning progress stream. Only the last few
-// lines are shown so a long stream can't push the spinner / frame past budget.
-
-const SETUP_STATUS_TAIL = 4
+// `statusMessages` is the live provisioning progress stream. The spinner stays
+// pinned at the top. Comfortable: the full stream is rendered (the original
+// look). Dense: only the last few lines are shown so a long stream can't push
+// the spinner / frame past budget.
 
 export interface GcpSetupRunningStepProps {
   statusMessages: string[]
+  dense?: boolean
 }
 
-export const GcpSetupRunningStep: FC<GcpSetupRunningStepProps> = ({ statusMessages }) => {
-  const tail = statusMessages.slice(-SETUP_STATUS_TAIL)
+export const GcpSetupRunningStep: FC<GcpSetupRunningStepProps> = ({ statusMessages, dense = false }) => {
+  const lines = dense ? statusMessages.slice(-STATUS_TAIL) : statusMessages
   return (
     <Box flexDirection="column" marginTop={1}>
       <SpinnerLine text="Provisioning Google Cloud + Play Console..." />
-      {tail.length > 0 && (
+      {lines.length > 0 && (
         <Box flexDirection="column" marginTop={1} marginLeft={2}>
-          {tail.map((msg, i) => (<Text key={`setup-status-${i}`} dimColor>{msg}</Text>))}
+          {lines.map((msg, i) => (<Text key={`setup-status-${i}`} dimColor>{msg}</Text>))}
         </Box>
       )}
     </Box>
