@@ -134,6 +134,15 @@ const providerConfigPlaceholder = computed(() => {
   }
   return '{\n  "projectId": "",\n  "serviceAccountEmail": ""\n}'
 })
+
+function notificationPlatformLabel(provider: string) {
+  if (provider === 'fcm')
+    return t('notification-platform-android')
+  if (provider === 'apns')
+    return t('notification-platform-ios')
+  return provider.toUpperCase()
+}
+
 let activeRefreshId = 0
 
 async function authHeaders() {
@@ -525,13 +534,13 @@ watch(() => providerForm.value.provider, () => {
                 <div class="space-y-4">
                   <div class="grid gap-3 sm:grid-cols-2 2xl:grid-cols-4">
                     <label class="space-y-1">
-                      <span class="text-sm font-medium text-slate-700 dark:text-slate-200">{{ t('provider') }}</span>
+                      <span class="text-sm font-medium text-slate-700 dark:text-slate-200">{{ t('notification-platform') }}</span>
                       <select v-model="providerForm.provider" class="w-full min-h-11 d-select d-select-bordered">
                         <option value="fcm">
-                          FCM
+                          {{ t('notification-platform-android') }}
                         </option>
                         <option value="apns">
-                          APNs
+                          {{ t('notification-platform-ios') }}
                         </option>
                       </select>
                     </label>
@@ -569,7 +578,7 @@ watch(() => providerForm.value.provider, () => {
                   <div v-if="providers.length" class="divide-y divide-slate-200 dark:divide-slate-700">
                     <div v-for="provider in providers" :key="provider.id" class="p-3">
                       <div class="flex items-center justify-between gap-3">
-                        <span class="font-medium uppercase text-slate-950 dark:text-white">{{ provider.provider }}</span>
+                        <span class="font-medium text-slate-950 dark:text-white">{{ notificationPlatformLabel(provider.provider) }}</span>
                         <span class="inline-flex items-center px-2 py-1 text-xs font-medium border rounded-full" :class="statusClass(provider.status)">
                           {{ provider.status }}
                         </span>
@@ -768,7 +777,7 @@ watch(() => providerForm.value.provider, () => {
                       <td class="font-mono text-xs">
                         {{ shortKey(device.deviceKey) }}
                       </td>
-                      <td>{{ device.platform }} / {{ device.provider }}</td>
+                      <td>{{ device.platform }} / {{ notificationPlatformLabel(device.provider) }}</td>
                       <td>{{ device.badge }}</td>
                     </tr>
                     <tr v-if="!devices.length">
