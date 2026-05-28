@@ -346,6 +346,113 @@ describe('rbac permission system', () => {
         expect(result.rows[0].settings_allowed).toBe(false)
       })
 
+      it('should map app-scoped channel RBAC permissions to legacy CLI permissions', async () => {
+        const developerKey = `rbac-channel-developer-${randomUUID()}`
+        const adminKey = `rbac-channel-admin-${randomUUID()}`
+
+        const developerKeyResult = await query(`
+          INSERT INTO public.apikeys (user_id, key, name)
+          VALUES ($1::uuid, $2, $3)
+          RETURNING rbac_id
+        `, [USER_ID, developerKey, 'RBAC channel developer key'])
+
+        const adminKeyResult = await query(`
+          INSERT INTO public.apikeys (user_id, key, name)
+          VALUES ($1::uuid, $2, $3)
+          RETURNING rbac_id
+        `, [USER_ID, adminKey, 'RBAC channel admin key'])
+
+        await query(`
+          INSERT INTO public.role_bindings (
+            principal_type,
+            principal_id,
+            role_id,
+            scope_type,
+            org_id,
+            app_id,
+            granted_by,
+            is_direct
+          )
+          SELECT
+            public.rbac_principal_apikey(),
+            $1::uuid,
+            roles.id,
+            public.rbac_scope_app(),
+            $2::uuid,
+            apps.id,
+            $3::uuid,
+            true
+          FROM public.roles
+          CROSS JOIN public.apps
+          WHERE roles.name = public.rbac_role_app_developer()
+            AND apps.app_id = $4
+          LIMIT 1
+        `, [developerKeyResult.rows[0].rbac_id, ORG_ID, USER_ID, TEST_APP_ID])
+
+        await query(`
+          INSERT INTO public.role_bindings (
+            principal_type,
+            principal_id,
+            role_id,
+            scope_type,
+            org_id,
+            app_id,
+            granted_by,
+            is_direct
+          )
+          SELECT
+            public.rbac_principal_apikey(),
+            $1::uuid,
+            roles.id,
+            public.rbac_scope_app(),
+            $2::uuid,
+            apps.id,
+            $3::uuid,
+            true
+          FROM public.roles
+          CROSS JOIN public.apps
+          WHERE roles.name = public.rbac_role_app_admin()
+            AND apps.app_id = $4
+          LIMIT 1
+        `, [adminKeyResult.rows[0].rbac_id, ORG_ID, USER_ID, TEST_APP_ID])
+
+        const result = await query(`
+          SELECT
+            public.get_org_perm_for_apikey($1, $3) AS developer_perm,
+            public.rbac_check_permission_direct(
+              public.rbac_perm_app_create_channel(),
+              $4::uuid,
+              $5::uuid,
+              $3,
+              NULL::bigint,
+              $1
+            ) AS developer_can_create_channel,
+            public.rbac_check_permission_direct(
+              public.rbac_perm_channel_delete(),
+              $4::uuid,
+              $5::uuid,
+              $3,
+              NULL::bigint,
+              $1
+            ) AS developer_can_delete_channel,
+            public.get_org_perm_for_apikey($2, $3) AS admin_perm,
+            public.rbac_check_permission_direct(
+              public.rbac_perm_channel_delete(),
+              $4::uuid,
+              $5::uuid,
+              $3,
+              NULL::bigint,
+              $2
+            ) AS admin_can_delete_channel
+        `, [developerKey, adminKey, TEST_APP_ID, USER_ID, ORG_ID])
+
+        expect(result.rows[0].developer_perm).toBe('perm_write')
+        expect(result.rows[0].developer_can_create_channel).toBe(true)
+        expect(result.rows[0].developer_can_delete_channel).toBe(false)
+        expect(result.rows[0].admin_perm).toBe('perm_admin')
+        expect(result.rows[0].admin_can_delete_channel).toBe(true)
+      })
+
       it('should ignore role bindings whose role scope does not match the binding scope', async () => {
         const fakeUserId = '11111111-1111-4111-8111-111111111111'
 

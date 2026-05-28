@@ -153,10 +153,19 @@ export function getEndpointUrl(path: string): string {
 
   return isPluginEndpoint ? `${CLOUDFLARE_PLUGIN_URL}${path}` : `${CLOUDFLARE_API_URL}${path}`
 }
-export const APIKEY_TEST_ORG_SUPER_ADMIN = 'ae6e7458-c46d-4c00-aa3b-153b0b8520ea'
-export const APIKEY_TEST_APP_UPLOADER = 'c591b04e-cf29-4945-b9a0-776d0672061b'
-export const APIKEY_TEST2_ORG_SUPER_ADMIN = 'ac4d9a98-ec25-4af8-933c-2aae4aa52b85' // Dedicated for statistics
+export const APIKEY_TEST_ALL = 'ae6e7458-c46d-4c00-aa3b-153b0b8520ea' // all key
+export const APIKEY_TEST_UPLOAD = 'c591b04e-cf29-4945-b9a0-776d0672061b' // upload key
+export const APIKEY_TEST2_ALL = 'ac4d9a98-ec25-4af8-933c-2aae4aa52b85' // test2 all key (dedicated for statistics)
 export const APIKEY_TEST_HASHED = 'test-hashed-apikey-for-auth-test' // hashed key (plain value, stored as SHA-256 hash in DB)
+export const APIKEY_TEST_ORG_SUPER_ADMIN = APIKEY_TEST_ALL
+export const APIKEY_TEST_APP_UPLOADER = APIKEY_TEST_UPLOAD
+export const APIKEY_TEST2_ORG_SUPER_ADMIN = APIKEY_TEST2_ALL
+export const USER_ID_APIKEY_MANAGEMENT = 'd0f1a2b3-c4d5-4e6f-8a90-b1c2d3e4f506'
+export const USER_EMAIL_APIKEY_MANAGEMENT = 'apikey-management@capgo.app'
+export const ORG_ID_APIKEY_MANAGEMENT = 'f1a2b3c4-d5e6-4f70-8a9b-0c1d2e3f4a50'
+export const APIKEY_MANAGEMENT_ORG_SUPER_ADMIN = 'c9d0e1f2-a3b4-4c5d-8e6f-7a8b9c0d1e25'
+export const APIKEY_MANAGEMENT_APIKEY_MANAGER = 'd1e2f3a4-b5c6-4d7e-8f90-a1b2c3d4e5f6'
+export const APIKEY_MANAGEMENT_APIKEY_MANAGER_ID = 113
 export const ORG_ID = '046a36ac-e03c-4590-9257-bd6c9dba9ee8'
 export const STRIPE_INFO_CUSTOMER_ID = 'cus_Q38uE91NP8Ufqc' // Customer ID for ORG_ID
 export const NON_OWNER_ORG_ID = 'a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d'
@@ -169,12 +178,6 @@ export const USER_ID_EMAIL_PREFS = '9f1a2b3c-4d5e-4f60-8a7b-1c2d3e4f5061'
 export const USER_EMAIL_EMAIL_PREFS = 'emailprefs@capgo.app'
 export const USER_ID_APIKEY_EXPIRATION = 'af1a2b3c-4d5e-4f60-8a7b-1c2d3e4f5062'
 export const USER_EMAIL_APIKEY_EXPIRATION = 'apikey-expiration@capgo.app'
-export const USER_ID_APIKEY_MANAGEMENT = 'd0f1a2b3-c4d5-4e6f-8a90-b1c2d3e4f506'
-export const USER_EMAIL_APIKEY_MANAGEMENT = 'apikey-management@capgo.app'
-export const ORG_ID_APIKEY_MANAGEMENT = 'f1a2b3c4-d5e6-4f70-8a9b-0c1d2e3f4a50'
-export const APIKEY_MANAGEMENT_ORG_SUPER_ADMIN = 'c9d0e1f2-a3b4-4c5d-8e6f-7a8b9c0d1e25'
-export const APIKEY_MANAGEMENT_APIKEY_MANAGER = 'd1e2f3a4-b5c6-4d7e-8f90-a1b2c3d4e5f6'
-export const APIKEY_MANAGEMENT_APIKEY_MANAGER_ID = 113
 export const USER_ID_DELETE_USER_STALE = 'b7a1d9f4-7b8f-4e3c-8f2b-1a2b3c4d5e6f'
 export const USER_EMAIL_DELETE_USER_STALE = 'delete-user-stale@capgo.app'
 export const USER_ID_DELETE_USER_FRESH = 'c8b2e0f5-8c90-4f4d-9f3c-2b3c4d5e6f70'
@@ -239,7 +242,7 @@ export const APP_NAME = 'com.demo'
 export const NON_ACCESS_APP_NAME = 'com.demoadmin.app'
 export const headers = {
   'Content-Type': 'application/json',
-  'Authorization': APIKEY_TEST_ORG_SUPER_ADMIN,
+  'Authorization': APIKEY_TEST_ALL,
 }
 
 interface ApiKeyBinding {
@@ -514,7 +517,7 @@ export const headersInternal = {
  * Useful for tests that may fail due to edge function cold starts or connection issues.
  */
 export async function fetchWithRetry(
-  url: RequestInfo | URL,
+  url: string,
   options?: RequestInit,
   maxRetries = 3,
   delayMs = 500,

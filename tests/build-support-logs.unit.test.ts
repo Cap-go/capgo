@@ -1,14 +1,19 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { mockSupabaseAdmin } = vi.hoisted(() => ({
+const { checkPermissionMock, mockSupabaseAdmin } = vi.hoisted(() => ({
+  checkPermissionMock: vi.fn(),
   mockSupabaseAdmin: vi.fn(),
+}))
+
+vi.mock('../supabase/functions/_backend/utils/rbac.ts', () => ({
+  checkPermission: checkPermissionMock,
 }))
 
 vi.mock('../supabase/functions/_backend/utils/supabase.ts', () => ({
   supabaseAdmin: mockSupabaseAdmin,
 }))
 
-import { uploadSupportLogs } from '../supabase/functions/_backend/public/build/support_logs.ts'
+const { uploadSupportLogs } = await import('../supabase/functions/_backend/public/build/support_logs.ts')
 
 const apikey = { user_id: 'user-1' } as any
 
@@ -52,6 +57,8 @@ function mockAdminRows(rows: { user?: unknown, buildRequest?: unknown }) {
 
 beforeEach(() => {
   vi.restoreAllMocks()
+  checkPermissionMock.mockReset()
+  checkPermissionMock.mockResolvedValue(true)
   mockSupabaseAdmin.mockReset()
   vi.stubEnv('BUILDER_URL', 'https://builder.test')
   vi.stubEnv('BUILDER_API_KEY', 'builder-key')
