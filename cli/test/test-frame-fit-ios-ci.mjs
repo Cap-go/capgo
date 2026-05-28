@@ -3,12 +3,20 @@
 // (src/build/onboarding/ui/steps/ios-ci.tsx). Renders each step body × each
 // meaningful state variant through the shared harness and asserts it fits the
 // 16-row contract's body budget (13 rows) at every reference width (80 + 60).
-// Shape copied from test-frame-fit-ios-credentials.mjs (the batch exemplar).
+// Shape copied from test-frame-fit-ios-import.mjs (the batch exemplar).
+//
+// The DENSE form is the budget-fitting fallback (the form that must survive the
+// 16-row floor on short terminals), so every interactive assertion here passes
+// `dense: true`. The comfortable form is intentionally NOT budget-asserted: it
+// restores the original blank-line spacing / full advice + key lists and only
+// renders when the parent measured that it fits the live viewport.
 //
 // The list-bearing / error steps get realistic worst cases: the setup step with
 // BOTH providers needing install (the longest, wrapping command lines), the
 // overwrite confirmation listing the full ~12-key credential set, and the
-// failed step with a long multi-line backend error.
+// failed step with a long multi-line backend error. Pure spinner steps
+// (detecting / checking / uploading) have no `dense` branch and are asserted
+// without the prop.
 import React from 'react'
 import {
   AskBuildStep,
@@ -82,21 +90,21 @@ test(`uploading-ci-secrets fits ${BODY_BUDGET_ROWS}-row body budget`, () => {
 })
 
 // ── ci-secrets-setup — single + both providers, worst-case (not-installed) ────
-test(`ci-secrets-setup [1 provider, not-authed] fits ${BODY_BUDGET_ROWS}-row budget`, () => {
+test(`ci-secrets-setup [1 provider, not-authed, dense] fits ${BODY_BUDGET_ROWS}-row budget`, () => {
   assertFitsBudget(
-    h(CiSecretsSetupStep, { advice: [GH_ADVICE_NOT_AUTHED], onChange: noop }),
+    h(CiSecretsSetupStep, { advice: [GH_ADVICE_NOT_AUTHED], dense: true, onChange: noop }),
     'ci-secrets-setup-1',
   )
 })
-test(`ci-secrets-setup [both providers, not-installed — worst case] fits ${BODY_BUDGET_ROWS}-row budget`, () => {
+test(`ci-secrets-setup [both providers, not-installed — worst case, dense] fits ${BODY_BUDGET_ROWS}-row budget`, () => {
   assertFitsBudget(
-    h(CiSecretsSetupStep, { advice: [GH_ADVICE_NOT_INSTALLED, GL_ADVICE_NOT_INSTALLED], onChange: noop }),
+    h(CiSecretsSetupStep, { advice: [GH_ADVICE_NOT_INSTALLED, GL_ADVICE_NOT_INSTALLED], dense: true, onChange: noop }),
     'ci-secrets-setup-both',
   )
 })
 
 // ── ci-secrets-target-select — both real targets + skip ───────────────────────
-test(`ci-secrets-target-select [both targets] fits ${BODY_BUDGET_ROWS}-row budget`, () => {
+test(`ci-secrets-target-select [both targets, dense] fits ${BODY_BUDGET_ROWS}-row budget`, () => {
   assertFitsBudget(
     h(CiSecretsTargetSelectStep, {
       options: [
@@ -104,6 +112,7 @@ test(`ci-secrets-target-select [both targets] fits ${BODY_BUDGET_ROWS}-row budge
         { label: GITLAB_LABEL, value: 'gitlab' },
         { label: 'Skip', value: 'skip' },
       ],
+      dense: true,
       onChange: noop,
     }),
     'ci-secrets-target-select',
@@ -111,15 +120,15 @@ test(`ci-secrets-target-select [both targets] fits ${BODY_BUDGET_ROWS}-row budge
 })
 
 // ── ask-ci-secrets — singular + plural counts, long label ─────────────────────
-test(`ask-ci-secrets [1 var] fits ${BODY_BUDGET_ROWS}-row budget`, () => {
+test(`ask-ci-secrets [1 var, dense] fits ${BODY_BUDGET_ROWS}-row budget`, () => {
   assertFitsBudget(
-    h(AskCiSecretsStep, { entryCount: 1, target: GITHUB_TARGET, targetLabel: GITHUB_LABEL, onChange: noop }),
+    h(AskCiSecretsStep, { entryCount: 1, target: GITHUB_TARGET, targetLabel: GITHUB_LABEL, dense: true, onChange: noop }),
     'ask-ci-secrets-1',
   )
 })
-test(`ask-ci-secrets [12 vars, long label] fits ${BODY_BUDGET_ROWS}-row budget`, () => {
+test(`ask-ci-secrets [12 vars, long label, dense] fits ${BODY_BUDGET_ROWS}-row budget`, () => {
   assertFitsBudget(
-    h(AskCiSecretsStep, { entryCount: 12, target: GITLAB_TARGET, targetLabel: GITLAB_LABEL, onChange: noop }),
+    h(AskCiSecretsStep, { entryCount: 12, target: GITLAB_TARGET, targetLabel: GITLAB_LABEL, dense: true, onChange: noop }),
     'ask-ci-secrets-12',
   )
 })
@@ -139,34 +148,34 @@ const ALL_CREDENTIAL_KEYS = [
   'APP_STORE_CONNECT_ISSUER_ID',
   'TEAM_ID',
 ]
-test(`confirm-ci-secret-overwrite [2 keys] fits ${BODY_BUDGET_ROWS}-row budget`, () => {
+test(`confirm-ci-secret-overwrite [2 keys, dense] fits ${BODY_BUDGET_ROWS}-row budget`, () => {
   assertFitsBudget(
-    h(ConfirmCiSecretOverwriteStep, { existingKeys: ['P12_PASSWORD', 'TEAM_ID'], onChange: noop }),
+    h(ConfirmCiSecretOverwriteStep, { existingKeys: ['P12_PASSWORD', 'TEAM_ID'], dense: true, onChange: noop }),
     'confirm-ci-secret-overwrite-2',
   )
 })
-test(`confirm-ci-secret-overwrite [12 keys — worst case] fits ${BODY_BUDGET_ROWS}-row budget`, () => {
+test(`confirm-ci-secret-overwrite [12 keys — worst case, dense] fits ${BODY_BUDGET_ROWS}-row budget`, () => {
   assertFitsBudget(
-    h(ConfirmCiSecretOverwriteStep, { existingKeys: ALL_CREDENTIAL_KEYS, onChange: noop }),
+    h(ConfirmCiSecretOverwriteStep, { existingKeys: ALL_CREDENTIAL_KEYS, dense: true, onChange: noop }),
     'confirm-ci-secret-overwrite-12',
   )
 })
 
 // ── ci-secrets-failed — null/short error + long multi-line backend error ──────
-test(`ci-secrets-failed [no error] fits ${BODY_BUDGET_ROWS}-row budget`, () => {
-  assertFitsBudget(h(CiSecretsFailedStep, { error: null, onChange: noop }), 'ci-secrets-failed-null')
+test(`ci-secrets-failed [no error, dense] fits ${BODY_BUDGET_ROWS}-row budget`, () => {
+  assertFitsBudget(h(CiSecretsFailedStep, { error: null, dense: true, onChange: noop }), 'ci-secrets-failed-null')
 })
-test(`ci-secrets-failed [long multi-line error — worst case] fits ${BODY_BUDGET_ROWS}-row budget`, () => {
+test(`ci-secrets-failed [long multi-line error — worst case, dense] fits ${BODY_BUDGET_ROWS}-row budget`, () => {
   const longError = 'gh secret set failed: HTTP 403: Resource not accessible by integration '
     + '(https://api.github.com/repos/acme/app/actions/secrets/P12_PASSWORD)\n'
     + 'Ensure the gh CLI is authenticated with a token that has the "repo" and '
     + '"admin:repo_hook" scopes, then run `gh auth refresh -s admin:repo_hook` and retry.'
-  assertFitsBudget(h(CiSecretsFailedStep, { error: longError, onChange: noop }), 'ci-secrets-failed-long')
+  assertFitsBudget(h(CiSecretsFailedStep, { error: longError, dense: true, onChange: noop }), 'ci-secrets-failed-long')
 })
 
 // ── ask-build ─────────────────────────────────────────────────────────────────
-test(`ask-build fits ${BODY_BUDGET_ROWS}-row budget`, () => {
-  assertFitsBudget(h(AskBuildStep, { onChange: noop }), 'ask-build')
+test(`ask-build [dense] fits ${BODY_BUDGET_ROWS}-row budget`, () => {
+  assertFitsBudget(h(AskBuildStep, { dense: true, onChange: noop }), 'ask-build')
 })
 
 console.log(`\n${passed} passed, ${failed} failed`)

@@ -2171,6 +2171,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
       {step === 'ci-secrets-setup' && (
         <CiSecretsSetupStep
           advice={ciSecretSetupAdvice}
+          dense={dense}
           onChange={(value) => {
             setStep(value === 'retry' ? 'detecting-ci-secrets' : 'build-complete')
           }}
@@ -2186,6 +2187,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
             })),
             { label: 'Skip', value: 'skip' },
           ]}
+          dense={dense}
           onChange={(value) => {
             if (value === 'skip') {
               setStep('build-complete')
@@ -2203,6 +2205,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
           entryCount={ciSecretEntries.length}
           target={ciSecretTarget}
           targetLabel={getCiSecretTargetLabel(ciSecretTarget)}
+          dense={dense}
           onChange={(value) => {
             setStep(value === 'yes' ? 'checking-ci-secrets' : 'build-complete')
           }}
@@ -2216,6 +2219,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
       {step === 'confirm-ci-secret-overwrite' && (
         <ConfirmCiSecretOverwriteStep
           existingKeys={ciSecretExistingKeys}
+          dense={dense}
           onChange={(value) => {
             setStep(value === 'replace' ? 'uploading-ci-secrets' : 'build-complete')
           }}
@@ -2229,6 +2233,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
       {step === 'ci-secrets-failed' && (
         <CiSecretsFailedStep
           error={ciSecretError}
+          dense={dense}
           onChange={(value) => {
             setStep(value === 'retry' ? (ciSecretTarget ? 'checking-ci-secrets' : 'detecting-ci-secrets') : 'build-complete')
           }}
@@ -2238,6 +2243,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
       {/* Ask to build */}
       {step === 'ask-build' && (
         <AskBuildStep
+          dense={dense}
           onChange={(value) => {
             if (value === 'yes') {
               setStep('requesting-build')
