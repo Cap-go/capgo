@@ -785,6 +785,13 @@ CREATE INDEX idx_app_versions_retention_cleanup ON public.app_versions USING btr
 
 
 --
+-- Name: idx_apps_default_upload_channel; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_apps_default_upload_channel ON public.apps USING btree (default_upload_channel);
+
+
+--
 -- Name: idx_channels_app_id_name; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -824,6 +831,13 @@ CREATE INDEX idx_manifest_app_version_id ON public.manifest USING btree (app_ver
 --
 
 CREATE INDEX idx_manifest_file_hash ON public.manifest USING btree (file_hash);
+
+
+--
+-- Name: idx_manifest_file_name; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_manifest_file_name ON public.manifest USING btree (file_name);
 
 
 --
