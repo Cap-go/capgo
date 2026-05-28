@@ -93,8 +93,7 @@ describe.skipIf(USE_CLOUDFLARE_WORKERS)('plan-check appid passthrough (RBAC bind
     })
     if (stripeError)
       throw stripeError
-
-    // 3. Org with use_new_rbac = true so check_min_rights routes through
+    // 3. RBAC is always enabled so check_min_rights routes through
     //    rbac_check_permission_direct.
     const { data: orgRow, error: orgError } = await serviceRoleSupabase
       .from('orgs')
@@ -103,7 +102,6 @@ describe.skipIf(USE_CLOUDFLARE_WORKERS)('plan-check appid passthrough (RBAC bind
         name: `Plan Check Test Org ${SUITE_ID}`,
         management_email: OWNER_EMAIL,
         customer_id: CUSTOMER_ID,
-        use_new_rbac: true,
       })
       .select('id')
       .single()

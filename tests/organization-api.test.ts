@@ -57,19 +57,9 @@ beforeAll(async () => {
     created_by: USER_ID,
     customer_id: customerId,
     website,
-    use_new_rbac: false, // Compatibility flag is ignored; permissions are RBAC-backed.
   })
   if (error)
     throw error
-
-  // Add the test user as super_admin to the org so they can access it via API
-  const { error: orgUserError } = await getSupabaseClient().from('org_users').insert({
-    org_id: ORG_ID,
-    user_id: USER_ID,
-    user_right: 'super_admin',
-  })
-  if (orgUserError)
-    throw orgUserError
 
   const createdKey = await createDirectApiKeyWithBindings({
     userId: USER_ID,
@@ -93,7 +83,6 @@ afterAll(async () => {
   if (organizationApiKeyId) {
     await getSupabaseClient().from('apikeys').delete().eq('id', organizationApiKeyId)
   }
-  await getSupabaseClient().from('org_users').delete().eq('org_id', ORG_ID)
   await getSupabaseClient().from('orgs').delete().eq('id', ORG_ID)
   await getSupabaseClient().from('stripe_info').delete().eq('customer_id', customerId)
 })
@@ -127,16 +116,8 @@ describe('read-only API keys cannot access destructive organization routes', () 
       created_by: USER_ID,
       customer_id: readOnlyCustomerId,
       require_apikey_expiration: false,
-      use_new_rbac: false, // Compatibility flag is ignored; permissions are RBAC-backed.
     })
     expect(orgError).toBeNull()
-
-    const { error: orgUserError } = await getSupabaseClient().from('org_users').insert({
-      org_id: readOnlyOrgId,
-      user_id: USER_ID,
-      user_right: 'super_admin',
-    })
-    expect(orgUserError).toBeNull()
 
     const createdKey = await createDirectApiKeyWithBindings({
       userId: USER_ID,
@@ -159,7 +140,6 @@ describe('read-only API keys cannot access destructive organization routes', () 
     if (readOnlyKeyId) {
       await getSupabaseClient().from('apikeys').delete().eq('id', readOnlyKeyId)
     }
-    await getSupabaseClient().from('org_users').delete().eq('org_id', readOnlyOrgId)
     await getSupabaseClient().from('orgs').delete().eq('id', readOnlyOrgId)
     await getSupabaseClient().from('stripe_info').delete().eq('customer_id', readOnlyCustomerId)
   })
@@ -322,7 +302,6 @@ describe('scoped write API keys cannot cross organization boundaries', () => {
       name: `Scoped allowed ${randomUUID()}`,
       management_email: TEST_EMAIL,
       created_by: USER_ID,
-      use_new_rbac: true,
     })
     expect(allowedOrgError).toBeNull()
 
@@ -332,7 +311,6 @@ describe('scoped write API keys cannot cross organization boundaries', () => {
       management_email: TEST_EMAIL,
       created_by: USER_ID,
       customer_id: targetCustomerId,
-      use_new_rbac: true,
     })
     expect(targetOrgError).toBeNull()
 
@@ -371,10 +349,6 @@ describe('scoped write API keys cannot cross organization boundaries', () => {
     }
 
     await getSupabaseClient().storage.from('images').remove([imagePath])
-    await getSupabaseClient().from('role_bindings').delete().eq('org_id', allowedOrgId)
-    await getSupabaseClient().from('role_bindings').delete().eq('org_id', targetOrgId)
-    await getSupabaseClient().from('org_users').delete().eq('org_id', allowedOrgId)
-    await getSupabaseClient().from('org_users').delete().eq('org_id', targetOrgId)
     await getSupabaseClient().from('orgs').delete().eq('id', allowedOrgId)
     await getSupabaseClient().from('orgs').delete().eq('id', targetOrgId)
     await getSupabaseClient().from('stripe_info').delete().eq('customer_id', targetCustomerId)
@@ -527,7 +501,6 @@ describe('x-limited-key-id subkeys enforce organization scope on middlewareKey r
         management_email: TEST_EMAIL,
         created_by: USER_ID,
         customer_id: scopedCustomerId,
-        use_new_rbac: false,
       },
       {
         id: blockedOrgId,
@@ -535,16 +508,9 @@ describe('x-limited-key-id subkeys enforce organization scope on middlewareKey r
         management_email: TEST_EMAIL,
         created_by: USER_ID,
         customer_id: blockedCustomerId,
-        use_new_rbac: false,
       },
     ])
     expect(orgError).toBeNull()
-
-    const { error: orgUsersError } = await supabase.from('org_users').insert([
-      { org_id: scopedOrgId, user_id: USER_ID, user_right: 'super_admin' },
-      { org_id: blockedOrgId, user_id: USER_ID, user_right: 'super_admin' },
-    ])
-    expect(orgUsersError).toBeNull()
 
     const parentKeyData = await createDirectApiKeyWithBindings({
       userId: USER_ID,
@@ -1359,8 +1325,6 @@ describe('[POST] /organization', () => {
       expect(data).toBeTruthy()
       expect(data?.name).toBe(name)
       expect(data?.website).toBe('https://capgo.app/')
-      // New orgs should default to RBAC enabled
-      expect(data?.use_new_rbac).toBe(true)
     }
     finally {
       await getSupabaseClient().from('orgs').delete().eq('id', safe.data.id)
@@ -1465,18 +1429,9 @@ describe('[PUT] /organization', () => {
       management_email: TEST_EMAIL,
       created_by: USER_ID,
       website: 'https://base.example/',
-      use_new_rbac: false,
     })
     if (createError)
       throw createError
-    const { error: orgUserError } = await getSupabaseClient().from('org_users').insert({
-      org_id: orgId,
-      user_id: USER_ID,
-      user_right: 'super_admin',
-    })
-    if (orgUserError)
-      throw orgUserError
-
     try {
       const response = await fetch(`${BASE_URL}/organization`, {
         headers: authHeaders,
@@ -1851,22 +1806,13 @@ describe('[PUT] /organization - enforce_hashed_api_keys setting', () => {
       created_by: USER_ID_2,
       customer_id: enforceCustomerId,
       website: enforceWebsite,
-      use_new_rbac: false,
     })
     expect(orgError).toBeNull()
-
-    const { error: orgUserError } = await getSupabaseClient().from('org_users').insert({
-      org_id: enforceOrgId,
-      user_id: USER_ID_2,
-      user_right: 'super_admin',
-    })
-    expect(orgUserError).toBeNull()
 
     user2AuthHeaders = await getAuthHeadersForCredentials('test2@capgo.app', USER_PASSWORD)
   })
 
   afterAll(async () => {
-    await getSupabaseClient().from('org_users').delete().eq('org_id', enforceOrgId)
     await getSupabaseClient().from('orgs').delete().eq('id', enforceOrgId)
     await getSupabaseClient().from('stripe_info').delete().eq('customer_id', enforceCustomerId)
   })
@@ -2041,7 +1987,7 @@ describe('[PUT] /organization - enforce_hashed_api_keys setting', () => {
 })
 
 // ─── RBAC mode coverage ──────────────────────────────────────────────────────
-// New orgs default to use_new_rbac = true. The suite below runs the same key
+// RBAC is always enabled. The suite below runs the same key
 // member operations against an explicitly RBAC-enabled org so that the RBAC
 // permission path (role_bindings) is exercised alongside the legacy tests above.
 
@@ -2059,7 +2005,6 @@ describe('rbac mode - organization member operations', () => {
       name: nameRbac,
       management_email: TEST_EMAIL,
       created_by: USER_ID,
-      use_new_rbac: true, // Explicitly RBAC — tests the RBAC permission path
     })
     if (error)
       throw error

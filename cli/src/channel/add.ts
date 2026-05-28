@@ -1,15 +1,15 @@
 import type { ChannelAddOptions } from '../schemas/channel'
 import { intro, log, outro } from '@clack/prompts'
-import { check2FAComplianceForApp, checkAppExists } from '../api/app'
+import { check2FAComplianceForApp, checkAppExistsAndHasPermissionOrgErr } from '../api/app'
 import { createChannel } from '../api/channels'
 import {
-  assertCliPermission,
   createSupabaseClient,
   findSavedKey,
   formatError,
   getAppId,
   getConfig,
   getOrganizationId,
+  OrganizationPerm,
   resolveUserIdFromApiKey,
   sendEvent,
 } from '../utils'
@@ -36,22 +36,14 @@ export async function addChannelInternal(channelId: string, appId: string, optio
 
   const supabase = await createSupabaseClient(options.apikey, options.supaHost, options.supaAnon, silent)
   await check2FAComplianceForApp(supabase, appId, silent)
-  const userId = await resolveUserIdFromApiKey(supabase, options.apikey)
-  if (!(await checkAppExists(supabase, appId))) {
-    const msg = `App ${appId} does not exist`
-    if (!silent)
-      log.error(msg)
-    throw new Error(msg)
-  }
-  await assertCliPermission(supabase, options.apikey, 'app.create_channel', { appId }, {
-    message: `Insufficient permissions to create channel for app ${appId}`,
-    silent,
-  })
+  await resolveUserIdFromApiKey(supabase, options.apikey)
+  await checkAppExistsAndHasPermissionOrgErr(supabase, options.apikey, appId, OrganizationPerm.admin, silent, true)
 
   if (!silent)
     log.info(`Creating channel ${appId}#${channelId} to Capgo`)
 
   const orgId = await getOrganizationId(supabase, appId)
+  const userId = await resolveUserIdFromApiKey(supabase, options.apikey)
 
   const res = await createChannel(supabase, {
     name: channelId,

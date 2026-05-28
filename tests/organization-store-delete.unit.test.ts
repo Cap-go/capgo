@@ -100,7 +100,6 @@ describe('organization store deleteOrganization', () => {
     store.getAllOrgs().set(orgId, {
       gid: orgId,
       role: 'org_super_admin',
-      use_new_rbac: true,
     } as any)
 
     const result = await store.deleteOrganization(orgId)
@@ -118,7 +117,6 @@ describe('organization store deleteOrganization', () => {
     store.getAllOrgs().set(orgId, {
       gid: orgId,
       role: 'org_admin',
-      use_new_rbac: true,
     } as any)
 
     const result = await store.deleteOrganization(orgId)

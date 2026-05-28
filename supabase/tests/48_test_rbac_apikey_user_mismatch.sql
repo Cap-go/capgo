@@ -13,13 +13,12 @@ VALUES
   (tests.get_supabase_uid('rbac_apikey_mismatch_key_owner'), 'rbac_apikey_mismatch_key_owner@test.local', NOW(), NOW())
 ON CONFLICT (id) DO NOTHING;
 
-INSERT INTO public.orgs (id, created_by, name, management_email, use_new_rbac)
+INSERT INTO public.orgs (id, created_by, name, management_email)
 VALUES (
   '70000000-0000-4000-8000-000000000048',
   tests.get_supabase_uid('rbac_apikey_mismatch_admin'),
   'RBAC API key mismatch org',
-  'rbac-apikey-mismatch@test.local',
-  true
+  'rbac-apikey-mismatch@test.local'
 )
 ON CONFLICT (id) DO NOTHING;
 

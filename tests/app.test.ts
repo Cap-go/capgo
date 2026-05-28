@@ -423,7 +423,6 @@ describe('[POST] /app operations with non-owner user', () => {
         management_email: `no-access-${safeId}@capgo.test`,
         created_by: USER_ID_2,
         customer_id: noAccessCustomerId,
-        use_new_rbac: false,
       },
       {
         id: adminAccessOrgId,
@@ -431,7 +430,6 @@ describe('[POST] /app operations with non-owner user', () => {
         management_email: `admin-access-${safeId}@capgo.test`,
         created_by: USER_ID_2,
         customer_id: adminAccessCustomerId,
-        use_new_rbac: false,
       },
     ])
     if (orgError)

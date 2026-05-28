@@ -46,26 +46,24 @@ BEGIN
     -- Define password policy config
     policy_config := '{"enabled": true, "min_length": 10, "require_uppercase": true, "require_number": true, "require_special": true}'::jsonb;
 
-    -- Create org WITH password policy enforcement while the compatibility flag is false.
-    INSERT INTO public.orgs (id, created_by, name, management_email, password_policy_config, use_new_rbac)
+    -- Create org WITH password policy enforcement.
+    INSERT INTO public.orgs (id, created_by, name, management_email, password_policy_config)
     VALUES (
         org_with_pwd_policy_id,
         test_admin_id,
         'Pwd Policy Org',
         'pwd@org.com',
-        policy_config,
-        false
+        policy_config
     );
 
-    -- Create org WITHOUT password policy enforcement while the compatibility flag is false.
-    INSERT INTO public.orgs (id, created_by, name, management_email, password_policy_config, use_new_rbac)
+    -- Create org WITHOUT password policy enforcement.
+    INSERT INTO public.orgs (id, created_by, name, management_email, password_policy_config)
     VALUES (
         org_without_pwd_policy_id,
         test_admin_id,
         'No Pwd Policy Org',
         'nopwd@org.com',
-        NULL,
-        false
+        NULL
     );
 
     -- Add members to org WITH password policy
@@ -269,15 +267,13 @@ BEGIN
     test_admin_id := tests.get_supabase_uid('test_admin');
     noncompliant_user_id := tests.get_supabase_uid('test_pwd_noncompliant_user');
 
-    -- use_new_rbac = false verifies the compatibility flag does not disable RBAC checks.
-    INSERT INTO public.orgs (id, created_by, name, management_email, password_policy_config, use_new_rbac)
+    INSERT INTO public.orgs (id, created_by, name, management_email, password_policy_config)
     VALUES (
         org_disabled_policy_id,
         test_admin_id,
         'Disabled Policy Org',
         'disabled@org.com',
-        '{"enabled": false, "min_length": 10}'::jsonb,
-        false
+        '{"enabled": false, "min_length": 10}'::jsonb
     );
 
     INSERT INTO public.org_users (org_id, user_id, user_right)

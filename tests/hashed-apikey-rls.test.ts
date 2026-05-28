@@ -377,8 +377,8 @@ async function createEnforcedRbacOnlyOrgForUser(userId: string): Promise<string>
   const orgId = randomUUID()
   try {
     await client.query(
-      `INSERT INTO public.orgs (id, created_by, name, management_email, enforce_hashed_api_keys, use_new_rbac)
-       VALUES ($1, $2, $3, $4, true, true)`,
+      `INSERT INTO public.orgs (id, created_by, name, management_email, enforce_hashed_api_keys)
+       VALUES ($1, $2, $3, $4, true)`,
       [orgId, USER_ID_2, `rbac-only-org-${orgId}`, `rbac-only-${orgId}@capgo.test`],
     )
     await client.query(
@@ -425,8 +425,8 @@ async function createEnforcedApikeyPrincipalOrgForKey(apikeyId: number): Promise
   const orgId = randomUUID()
   try {
     await client.query(
-      `INSERT INTO public.orgs (id, created_by, name, management_email, enforce_hashed_api_keys, use_new_rbac)
-       VALUES ($1, $2, $3, $4, true, true)`,
+      `INSERT INTO public.orgs (id, created_by, name, management_email, enforce_hashed_api_keys)
+       VALUES ($1, $2, $3, $4, true)`,
       [orgId, USER_ID_2, `apikey-rbac-org-${orgId}`, `apikey-rbac-${orgId}@capgo.test`],
     )
     await client.query(
@@ -473,8 +473,8 @@ async function createStandaloneOrg(enforceHashedApiKeys = true): Promise<string>
   const orgId = randomUUID()
   try {
     await client.query(
-      `INSERT INTO public.orgs (id, created_by, name, management_email, enforce_hashed_api_keys, use_new_rbac)
-       VALUES ($1, $2, $3, $4, $5, true)`,
+      `INSERT INTO public.orgs (id, created_by, name, management_email, enforce_hashed_api_keys)
+       VALUES ($1, $2, $3, $4, $5)`,
       [orgId, USER_ID_2, `standalone-org-${orgId}`, `standalone-${orgId}@capgo.test`, enforceHashedApiKeys],
     )
     return orgId

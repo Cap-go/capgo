@@ -36,7 +36,6 @@ async function createRoleBindingFixture(): Promise<RoleBindingFixture> {
     created_by: USER_ID,
     name: `Role Binding Attacker Org ${id}`,
     management_email: `role-binding-attacker-${id}@capgo.app`,
-    use_new_rbac: true,
   })
   if (attackerOrgError)
     throw attackerOrgError
@@ -46,7 +45,6 @@ async function createRoleBindingFixture(): Promise<RoleBindingFixture> {
     created_by: USER_ID_2,
     name: `Role Binding Victim Org ${id}`,
     management_email: `role-binding-victim-${id}@capgo.app`,
-    use_new_rbac: true,
   })
   if (victimOrgError)
     throw victimOrgError
@@ -628,7 +626,6 @@ describe.skipIf(USE_CLOUDFLARE)('/private/role_bindings', () => {
         created_by: USER_ID,
         name: `Role Binding Delete Org ${id}`,
         management_email: `role-binding-delete-${id}@capgo.app`,
-        use_new_rbac: true,
       })
       expect(orgError).toBeNull()
 
@@ -871,7 +868,6 @@ describe.skipIf(USE_CLOUDFLARE)('[PATCH] /private/role_bindings/:binding_id', ()
         created_by: USER_ID_2,
         name: `Role Binding Rank Org ${id}`,
         management_email: `role-binding-rank-${id}@capgo.app`,
-        use_new_rbac: true,
       })
       if (orgError)
         throw orgError
@@ -930,7 +926,6 @@ describe.skipIf(USE_CLOUDFLARE)('[PATCH] /private/role_bindings/:binding_id', ()
         created_by: USER_ID_2,
         name: `Last Super Admin API Org ${id}`,
         management_email: `last-super-admin-api-${id}@capgo.app`,
-        use_new_rbac: true,
       })
       if (orgError)
         throw orgError
@@ -976,8 +971,8 @@ describe('private role bindings helpers', () => {
     const managementEmail = `role-binding-${id}@capgo.app`
 
     await query(`
-      INSERT INTO public.orgs (id, name, management_email, created_by, use_new_rbac)
-      VALUES ($1::uuid, $2, $3, $4::uuid, true)
+      INSERT INTO public.orgs (id, name, management_email, created_by)
+      VALUES ($1::uuid, $2, $3, $4::uuid)
     `, [orgId, `Role Binding Test Org ${id}`, managementEmail, USER_ID])
 
     await query(`
@@ -1040,8 +1035,8 @@ describe('private role bindings helpers', () => {
     const drizzle = getDrizzleClient(client as any)
 
     await query(`
-      INSERT INTO public.orgs (id, name, management_email, created_by, use_new_rbac)
-      VALUES ($1::uuid, $2, $3, $4::uuid, true)
+      INSERT INTO public.orgs (id, name, management_email, created_by)
+      VALUES ($1::uuid, $2, $3, $4::uuid)
     `, [orgId, `Role Binding Invite Overflow Org ${id}`, `role-binding-invite-overflow-${id}@capgo.app`, USER_ID])
 
     for (let index = 0; index < 10; index += 1) {
@@ -1067,8 +1062,8 @@ describe('private role bindings helpers', () => {
     const drizzle = getDrizzleClient(client as any)
 
     await query(`
-      INSERT INTO public.orgs (id, name, management_email, created_by, use_new_rbac)
-      VALUES ($1::uuid, $2, $3, $4::uuid, true)
+      INSERT INTO public.orgs (id, name, management_email, created_by)
+      VALUES ($1::uuid, $2, $3, $4::uuid)
     `, [orgId, `Role Binding Membership Org ${id}`, `role-binding-membership-${id}@capgo.app`, USER_ID])
 
     await query(`
@@ -1108,8 +1103,8 @@ describe('private role bindings helpers', () => {
     const drizzle = getDrizzleClient(client as any)
 
     await query(`
-      INSERT INTO public.orgs (id, name, management_email, created_by, use_new_rbac)
-      VALUES ($1::uuid, $2, $3, $4::uuid, true)
+      INSERT INTO public.orgs (id, name, management_email, created_by)
+      VALUES ($1::uuid, $2, $3, $4::uuid)
     `, [orgId, `Expired Role Binding Org ${id}`, `expired-role-binding-${id}@capgo.app`, USER_ID])
 
     await query(`
@@ -1163,8 +1158,8 @@ describe('private role bindings helpers', () => {
     const orgId = randomUUID()
 
     await query(`
-      INSERT INTO public.orgs (id, name, management_email, created_by, use_new_rbac)
-      VALUES ($1::uuid, $2, $3, $4::uuid, true)
+      INSERT INTO public.orgs (id, name, management_email, created_by)
+      VALUES ($1::uuid, $2, $3, $4::uuid)
     `, [orgId, `Last Super Admin Demotion Org ${id}`, `last-super-admin-demotion-${id}@capgo.app`, USER_ID])
 
     const bindingResult = await query(`
