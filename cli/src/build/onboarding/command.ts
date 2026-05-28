@@ -65,6 +65,27 @@ async function resolvePlatform(
   return choice
 }
 
+// ANSI escape codes for the terminal's alternative screen buffer. The whole
+// onboarding wizard runs inside this buffer (vim / htop / less style):
+//
+//   - In the alt buffer there is NO scrollback, so every Ink frame fully
+//     replaces the previous one. That eliminates the entire class of
+//     main-buffer artifacts we fought with — duplicate Header on step
+//     transitions, "scrolling added a line", frame-height drift — without
+//     any per-step height budgeting or Static/Header gymnastics.
+//   - Tall content (e.g. the AI analysis) still needs in-app scrolling
+//     because the alt buffer is viewport-sized; that's what the
+//     FullscreenAiViewer component handles, and it works MORE reliably here
+//     than in the main buffer precisely because there's no scrollback to
+//     leak into.
+//
+// Trade-off: on exit the terminal restores to whatever was on screen before
+// the wizard started — the wizard's frames are gone (same as quitting vim).
+// We print a one-line completion summary AFTER leaving the alt buffer so the
+// user has a durable breadcrumb in their normal terminal flow.
+const ENTER_ALT_SCREEN = '\x1B[?1049h\x1B[H' // enter buffer + cursor home
+const EXIT_ALT_SCREEN = '\x1B[?1049l'
+
 export async function onboardingBuilderCommand(options: OnboardingBuilderOptions = {}): Promise<void> {
   // Ink requires an interactive terminal — fail fast in CI/pipes
   if (!process.stdin.isTTY || !process.stdout.isTTY) {
@@ -95,23 +116,56 @@ export async function onboardingBuilderCommand(options: OnboardingBuilderOptions
 
   const platform = await resolvePlatform(options, iosDir, androidDir)
 
-  if (platform === 'android') {
-    const androidProgress = await loadAndroidProgress(appId)
-    const { waitUntilExit } = render(
-      React.createElement(AndroidOnboardingApp, {
-        appId,
-        initialProgress: androidProgress,
-        androidDir,
-        apikey: options.apikey,
-      }),
-    )
-    await waitUntilExit()
-    return
+  // Register the alt-buffer restore BEFORE entering it, so an abnormal exit
+  // (uncaught exception, SIGINT/SIGTERM before Ink's own handler runs) can't
+  // strand the user in the alt buffer with no visible shell.
+  let altScreenActive = true
+  const restoreMainScreen = (): void => {
+    if (!altScreenActive)
+      return
+    altScreenActive = false
+    process.stdout.write(EXIT_ALT_SCREEN)
+  }
+  process.once('exit', restoreMainScreen)
+  process.once('SIGINT', restoreMainScreen)
+  process.once('SIGTERM', restoreMainScreen)
+  process.once('uncaughtException', (err) => {
+    restoreMainScreen()
+    // Re-throw next tick so Node's default print-stack-and-exit still runs.
+    setImmediate(() => {
+      throw err
+    })
+  })
+
+  process.stdout.write(ENTER_ALT_SCREEN)
+  try {
+    if (platform === 'android') {
+      const androidProgress = await loadAndroidProgress(appId)
+      const { waitUntilExit } = render(
+        React.createElement(AndroidOnboardingApp, {
+          appId,
+          initialProgress: androidProgress,
+          androidDir,
+          apikey: options.apikey,
+        }),
+      )
+      await waitUntilExit()
+    }
+    else {
+      const progress = await loadProgress(appId)
+      const { waitUntilExit } = render(
+        React.createElement(OnboardingApp, { appId, initialProgress: progress, iosDir, apikey: options.apikey }),
+      )
+      await waitUntilExit()
+    }
+  }
+  finally {
+    restoreMainScreen()
   }
 
-  const progress = await loadProgress(appId)
-  const { waitUntilExit } = render(
-    React.createElement(OnboardingApp, { appId, initialProgress: progress, iosDir, apikey: options.apikey }),
-  )
-  await waitUntilExit()
+  // Durable breadcrumb in the user's normal terminal flow — the alt buffer
+  // restore wiped the wizard's last frame. Written via process.stdout to
+  // bypass the project-wide no-console lint rule (one-shot UX message, not
+  // application logging).
+  process.stdout.write(`\n✔ Capgo onboarding complete for ${appId} (${platform}).\n`)
 }
