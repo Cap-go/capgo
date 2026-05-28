@@ -5,6 +5,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
+import VueTurnstile from 'vue-turnstile'
 import iconEmail from '~icons/oui/email?raw'
 import { authGhostButtonClass, authInsetCardClass, authPanelClass, authPrimaryButtonClass } from '~/components/auth/pageStyles'
 import { getRecentEmailOtpVerification, sendEmailOtpVerification, verifyEmailOtp } from '~/services/emailOtp'
@@ -20,8 +21,11 @@ const main = useMainStore()
 const isLoading = ref(false)
 const isLoadingMain = ref(false)
 const otpSending = ref(false)
+const otpCaptchaToken = ref('')
+const otpCaptchaRef = ref<InstanceType<typeof VueTurnstile> | null>(null)
 const otpVerificationCode = ref('')
 const otpVerificationLoading = ref(false)
+const captchaKey = ref(import.meta.env.VITE_CAPTCHA_KEY)
 const currentUserId = ref('')
 const currentUserEmail = ref('')
 const emailVerificationBlockingReason = computed(() => route.query.reason === 'email_not_verified')
@@ -70,12 +74,19 @@ async function sendOtpCode() {
   if (!currentUserEmail.value || otpSending.value)
     return
 
+  if (captchaKey.value && !otpCaptchaToken.value) {
+    toast.error(t('captcha-required'))
+    return
+  }
+
   otpSending.value = true
-  const { error } = await sendEmailOtpVerification(supabase, currentUserEmail.value)
+  const { error } = await sendEmailOtpVerification(supabase, currentUserEmail.value, otpCaptchaToken.value)
   otpSending.value = false
+  otpCaptchaToken.value = ''
+  otpCaptchaRef.value?.reset()
 
   if (error) {
-    toast.error(t('verification-failed'))
+    toast.error(error.message.toLowerCase().includes('captcha') ? t('captcha-fail') : t('verification-failed'))
     console.error('Cannot send email OTP', error)
     return
   }
@@ -144,6 +155,18 @@ onMounted(async () => {
           <p class="text-xs leading-5">
             {{ t('email-otp-code-required') }}
           </p>
+        </div>
+
+        <div v-if="captchaKey" class="space-y-2">
+          <p class="text-sm font-medium text-slate-700 dark:text-slate-100">
+            {{ t('captcha') }}
+          </p>
+          <VueTurnstile
+            ref="otpCaptchaRef"
+            v-model="otpCaptchaToken"
+            size="flexible"
+            :site-key="captchaKey"
+          />
         </div>
 
         <button
