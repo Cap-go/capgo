@@ -78,6 +78,18 @@ import {
   SaJsonValidationFailedStep,
   ServiceAccountMethodSelectStep,
 } from '../../ui/steps/android-sa-gcp.js'
+import {
+  AskBuildStep,
+  AskCiSecretsStep,
+  CheckingCiSecretsStep,
+  CiSecretsFailedStep,
+  CiSecretsSetupStep,
+  CiSecretsTargetSelectStep,
+  ConfirmCiSecretOverwriteStep,
+  DetectingCiSecretsStep,
+  SavingCredentialsStep,
+  UploadingCiSecretsStep,
+} from '../../ui/steps/android-ci.js'
 import { findAndroidApplicationIds } from '../gradle-parser.js'
 import { validateServiceAccountJson } from '../service-account-validation.js'
 import {
@@ -2307,162 +2319,89 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
       {/* ── Phase 6 ── */}
 
       {step === 'saving-credentials' && (
-        <Box marginTop={1}><SpinnerLine text="Saving credentials..." /></Box>
+        <SavingCredentialsStep />
       )}
 
       {step === 'detecting-ci-secrets' && (
-        <Box marginTop={1}><SpinnerLine text="Checking git hosting..." /></Box>
+        <DetectingCiSecretsStep />
       )}
 
       {step === 'ci-secrets-setup' && (
-        <Box flexDirection="column" marginTop={1}>
-          <Text bold>Set up your git hosting CLI to upload env vars</Text>
-          <Newline />
-          {ciSecretSetupAdvice.map(advice => (
-            <Box key={advice.target.provider} flexDirection="column" marginBottom={1}>
-              <Text>{advice.target.label}</Text>
-              <Text dimColor>{advice.message}</Text>
-              {advice.commands.map(command => (
-                <Text key={`${advice.target.provider}-${command}`} color="cyan">{command}</Text>
-              ))}
-            </Box>
-          ))}
-          <Text dimColor>Run this in another terminal, then come back here.</Text>
-          <Newline />
-          <Select
-            options={[
-              { label: 'I installed and logged in, check again', value: 'retry' },
-              { label: 'Skip upload', value: 'skip' },
-            ]}
-            onChange={(value) => {
-              setStep(value === 'retry' ? 'detecting-ci-secrets' : 'build-complete')
-            }}
-          />
-        </Box>
+        <CiSecretsSetupStep
+          advice={ciSecretSetupAdvice}
+          onChoose={(choice) => {
+            setStep(choice === 'retry' ? 'detecting-ci-secrets' : 'build-complete')
+          }}
+        />
       )}
 
       {step === 'ci-secrets-target-select' && (
-        <Box flexDirection="column" marginTop={1}>
-          <Text bold>Where should Capgo upload the build env vars?</Text>
-          <Newline />
-          <Select
-            options={[
-              ...ciSecretTargets.map(target => ({
-                label: target.provider === 'github' ? 'GitHub Actions repository secrets' : 'GitLab CI/CD variables',
-                value: target.provider,
-              })),
-              { label: 'Skip', value: 'skip' },
-            ]}
-            onChange={(value) => {
-              if (value === 'skip') {
-                setStep('build-complete')
-                return
-              }
-              const target = ciSecretTargets.find(candidate => candidate.provider === value) || null
-              setCiSecretTarget(target)
-              setStep(target ? 'ask-ci-secrets' : 'build-complete')
-            }}
-          />
-        </Box>
+        <CiSecretsTargetSelectStep
+          options={[
+            ...ciSecretTargets.map(target => ({
+              label: target.provider === 'github' ? 'GitHub Actions repository secrets' : 'GitLab CI/CD variables',
+              value: target.provider,
+            })),
+            { label: 'Skip', value: 'skip' },
+          ]}
+          onChange={(value) => {
+            if (value === 'skip') {
+              setStep('build-complete')
+              return
+            }
+            const target = ciSecretTargets.find(candidate => candidate.provider === value) || null
+            setCiSecretTarget(target)
+            setStep(target ? 'ask-ci-secrets' : 'build-complete')
+          }}
+        />
       )}
 
       {step === 'ask-ci-secrets' && (
-        <Box flexDirection="column" marginTop={1}>
-          <SuccessLine text="Android credentials saved" />
-          <Newline />
-          <Text bold>
-            Upload
-            {' '}
-            {ciSecretEntries.length}
-            {' '}
-            build env var
-            {ciSecretEntries.length === 1 ? '' : 's'}
-            {' '}
-            to
-            {' '}
-            {getCiSecretTargetLabel(ciSecretTarget)}
-            ?
-          </Text>
-          <Text dimColor>Capgo will check for existing names first and ask before replacing anything.</Text>
-          <Newline />
-          <Select
-            options={[
-              { label: `Upload with ${ciSecretTarget?.cli || 'CLI'}`, value: 'yes' },
-              { label: 'Skip', value: 'no' },
-            ]}
-            onChange={(value) => {
-              setStep(value === 'yes' ? 'checking-ci-secrets' : 'build-complete')
-            }}
-          />
-        </Box>
+        <AskCiSecretsStep
+          entryCount={ciSecretEntries.length}
+          targetLabel={getCiSecretTargetLabel(ciSecretTarget)}
+          cli={ciSecretTarget?.cli || 'CLI'}
+          onChoose={(choice) => {
+            setStep(choice === 'yes' ? 'checking-ci-secrets' : 'build-complete')
+          }}
+        />
       )}
 
       {step === 'checking-ci-secrets' && (
-        <Box marginTop={1}><SpinnerLine text={`Checking existing env vars in ${getCiSecretTargetLabel(ciSecretTarget)}...`} /></Box>
+        <CheckingCiSecretsStep targetLabel={getCiSecretTargetLabel(ciSecretTarget)} />
       )}
 
       {step === 'confirm-ci-secret-overwrite' && (
-        <Box flexDirection="column" marginTop={1}>
-          <Text bold color="yellow">These env vars already exist and will be replaced:</Text>
-          <Box flexDirection="column" marginTop={1} marginLeft={2}>
-            {ciSecretExistingKeys.map(key => (
-              <Text key={key}>{`• ${key}`}</Text>
-            ))}
-          </Box>
-          <Newline />
-          <Select
-            options={[
-              { label: 'Replace existing env vars', value: 'replace' },
-              { label: 'Skip upload', value: 'skip' },
-            ]}
-            onChange={(value) => {
-              setStep(value === 'replace' ? 'uploading-ci-secrets' : 'build-complete')
-            }}
-          />
-        </Box>
+        <ConfirmCiSecretOverwriteStep
+          existingKeys={ciSecretExistingKeys}
+          onChoose={(choice) => {
+            setStep(choice === 'replace' ? 'uploading-ci-secrets' : 'build-complete')
+          }}
+        />
       )}
 
       {step === 'uploading-ci-secrets' && (
-        <Box marginTop={1}><SpinnerLine text={`Uploading env vars to ${getCiSecretTargetLabel(ciSecretTarget)}...`} /></Box>
+        <UploadingCiSecretsStep targetLabel={getCiSecretTargetLabel(ciSecretTarget)} />
       )}
 
       {step === 'ci-secrets-failed' && (
-        <Box flexDirection="column" marginTop={1}>
-          <ErrorLine text={ciSecretError || 'Could not upload env vars.'} />
-          <Newline />
-          <Text dimColor>You can continue; credentials are already saved locally.</Text>
-          <Newline />
-          <Select
-            options={[
-              { label: 'Try upload again', value: 'retry' },
-              { label: 'Continue without upload', value: 'continue' },
-            ]}
-            onChange={(value) => {
-              setStep(value === 'retry' ? (ciSecretTarget ? 'checking-ci-secrets' : 'detecting-ci-secrets') : 'build-complete')
-            }}
-          />
-        </Box>
+        <CiSecretsFailedStep
+          error={ciSecretError}
+          onChoose={(choice) => {
+            setStep(choice === 'retry' ? (ciSecretTarget ? 'checking-ci-secrets' : 'detecting-ci-secrets') : 'build-complete')
+          }}
+        />
       )}
 
       {step === 'ask-build' && (
-        <Box flexDirection="column" marginTop={1}>
-          <SuccessLine text="Android credentials saved" />
-          <Newline />
-          <Text bold>Request a build now?</Text>
-          <Newline />
-          <Select
-            options={[
-              { label: '🚀  Yes, request a build', value: 'yes' },
-              { label: '⏭   Not now', value: 'no' },
-            ]}
-            onChange={(value) => {
-              if (value === 'yes')
-                setStep('requesting-build')
-              else
-                setStep('build-complete')
-            }}
-          />
-        </Box>
+        <AskBuildStep
+          onChoose={(choice) => {
+            if (choice === 'yes')
+              setStep('requesting-build')
+            else
+              setStep('build-complete')
+          }}
+        />
       )}
 
       {step === 'requesting-build' && (
