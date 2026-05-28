@@ -3,6 +3,7 @@ import type { HttpResponse, PluginListenerHandle } from '@capacitor/core'
 import type { BarcodeScanErrorEvent, BarcodeScannedEvent } from '@capgo/camera-preview'
 import type { DownloadEvent, DownloadOptions } from '@capgo/capacitor-updater'
 import type { PreviewDeepLink } from '~/services/previewLinks'
+import { Clipboard } from '@capacitor/clipboard'
 import { Capacitor, CapacitorHttp } from '@capacitor/core'
 import { CameraPreview } from '@capgo/camera-preview'
 import { CapacitorUpdater } from '@capgo/capacitor-updater'
@@ -12,6 +13,7 @@ import { toast } from 'vue-sonner'
 import IconDownload from '~icons/heroicons/arrow-down-tray-20-solid'
 import IconArrowLeft from '~icons/heroicons/arrow-left-20-solid'
 import IconArrowPath from '~icons/heroicons/arrow-path-20-solid'
+import IconClipboard from '~icons/heroicons/clipboard-document-20-solid'
 import IconLink from '~icons/heroicons/link-20-solid'
 import IconQrCode from '~icons/heroicons/qr-code-20-solid'
 import { buildChannelPreviewLatestOptions, parsePreviewDeepLink } from '~/services/previewLinks'
@@ -50,10 +52,10 @@ interface PreviewPayload {
 function formatDebugData(data: unknown) {
   try {
     if (data instanceof Error)
-      return data.stack || data.message
+      return data.message || data.stack || String(data)
 
     const serialized = typeof data === 'string' ? data : JSON.stringify(data)
-    return serialized.length > 280 ? `${serialized.slice(0, 280)}...` : serialized
+    return serialized.length > 1200 ? `${serialized.slice(0, 1200)}...` : serialized
   }
   catch {
     return String(data)
@@ -62,7 +64,7 @@ function formatDebugData(data: unknown) {
 
 function debugLog(message: string, data?: unknown) {
   const line = data === undefined ? message : `${message}: ${formatDebugData(data)}`
-  debugMessages.value = [`${new Date().toISOString().slice(11, 19)} ${line}`, ...debugMessages.value].slice(0, 16)
+  debugMessages.value = [`${new Date().toISOString().slice(11, 19)} ${line}`, ...debugMessages.value].slice(0, 80)
 
   if (data === undefined)
     console.log('[PreviewScan]', message)
@@ -77,6 +79,28 @@ function debugWarn(message: string, data?: unknown) {
     console.warn('[PreviewScan]', message)
   else
     console.warn('[PreviewScan]', message, data)
+}
+
+async function copyDebugLogs() {
+  if (!debugMessages.value.length)
+    return
+
+  const logs = debugMessages.value.slice().reverse().join('\n')
+  try {
+    await Clipboard.write({ string: logs })
+    toast.success('Debug logs copied')
+  }
+  catch (error) {
+    debugWarn('failed to copy debug logs with native clipboard', error)
+    try {
+      await navigator.clipboard.writeText(logs)
+      toast.success('Debug logs copied')
+    }
+    catch (clipboardError) {
+      debugWarn('failed to copy debug logs with browser clipboard', clipboardError)
+      toast.error('Failed to copy debug logs')
+    }
+  }
 }
 
 function parseSafeUrl(value: string) {
@@ -393,10 +417,35 @@ function parsePreviewPayloadBody(data: unknown, status: number) {
   }
 }
 
+function stringFromPayloadValue(value: unknown) {
+  if (value === undefined || value === null)
+    return ''
+
+  if (typeof value === 'string')
+    return value
+
+  if (typeof value === 'number' || typeof value === 'boolean')
+    return String(value)
+
+  try {
+    return JSON.stringify(value)
+  }
+  catch {
+    return String(value)
+  }
+}
+
 function previewPayloadErrorMessage(payload: unknown, status: number) {
-  return typeof payload === 'object' && payload && 'message' in payload
-    ? String((payload as { message?: unknown }).message)
-    : `Preview payload request failed with HTTP ${status}`
+  if (typeof payload === 'object' && payload) {
+    const payloadRecord = payload as Record<string, unknown>
+    for (const key of ['message', 'error', 'details', 'detail']) {
+      const message = stringFromPayloadValue(payloadRecord[key])
+      if (message)
+        return message
+    }
+  }
+
+  return `Preview payload request failed with HTTP ${status}`
 }
 
 function validatePreviewPayload(payload: unknown) {
@@ -407,7 +456,12 @@ function validatePreviewPayload(payload: unknown) {
 }
 
 async function previewPayloadFromResponse(response: Response): Promise<PreviewPayload> {
-  const payload = parsePreviewPayloadBody(await response.text(), response.status)
+  const text = await response.text()
+  debugLog('browser preview payload body received', {
+    body: text,
+    status: response.status,
+  })
+  const payload = parsePreviewPayloadBody(text, response.status)
 
   if (!response.ok)
     throw new Error(previewPayloadErrorMessage(payload, response.status))
@@ -431,6 +485,7 @@ async function fetchPreviewPayloadWithNativeHttp(payloadUrl: string) {
     url: payloadUrl,
   })
   debugLog('native preview payload response received', {
+    body: response.data,
     dataType: typeof response.data,
     status: response.status,
     url: response.url,
@@ -791,6 +846,19 @@ async function goBack() {
           <summary class="cursor-pointer select-none font-semibold text-slate-100">
             Debug
           </summary>
+          <div class="mt-2 flex items-center justify-between gap-3">
+            <span class="min-w-0 text-[11px] font-medium text-slate-400">
+              {{ debugMessages.length }} entries
+            </span>
+            <button
+              type="button"
+              class="inline-flex h-8 shrink-0 items-center justify-center gap-1.5 rounded-lg border border-cyan-300/25 bg-cyan-300/10 px-2.5 text-[11px] font-semibold text-cyan-100 transition-colors hover:bg-cyan-300/20"
+              @click="copyDebugLogs"
+            >
+              <IconClipboard class="h-4 w-4" />
+              Copy logs
+            </button>
+          </div>
           <ol class="mt-2 max-h-36 space-y-1 overflow-y-auto font-mono leading-5">
             <li v-for="message in debugMessages" :key="message">
               {{ message }}
