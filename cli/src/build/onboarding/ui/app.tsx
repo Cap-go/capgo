@@ -262,12 +262,25 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
   // (one-frame flash, only on small terminals).
   const bodyRef = useRef<DOMElement | null>(null)
   const [measuredBody, setMeasuredBody] = useState<{ step: OnboardingStep, height: number } | null>(null)
+  // Adaptive spacing. Step bodies render their comfortable form (matching the
+  // original design — boxes, blank lines between elements) by DEFAULT and
+  // collapse to their compact, budget-fitting form only when the live viewport
+  // can't fit the comfortable version — so a roomy terminal breathes while a
+  // 16-row terminal still survives. `denseOverride` is keyed by (step, rows) so
+  // the decision is sticky and cannot oscillate: we flip to dense at most once
+  // per step+size and re-evaluate (defaulting back to comfortable) only when the
+  // step or terminal height changes. Passed to every step body as `dense`.
+  const [denseOverride, setDenseOverride] = useState<{ step: OnboardingStep, rows: number } | null>(null)
+  const dense = denseOverride != null && denseOverride.step === step && denseOverride.rows === terminalRows
   useEffect(() => {
     if (!bodyRef.current)
       return
     const { height } = measureElement(bodyRef.current)
     if (height > 0) {
       setMeasuredBody(prev => (prev && prev.step === step && prev.height === height ? prev : { step, height }))
+      // Comfortable body overflows even with the one-line header → collapse it.
+      if (!dense && height + COMPACT_HEADER_ROWS + WIZARD_PADDING_ROWS > terminalRows)
+        setDenseOverride({ step, rows: terminalRows })
     }
   })
   const bodyHeight = measuredBody && measuredBody.step === step ? measuredBody.height : null

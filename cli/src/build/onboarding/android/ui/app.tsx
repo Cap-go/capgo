@@ -489,12 +489,21 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
   // deadlock; decisions derived from live height, no hardcoded floor).
   const bodyRef = useRef<DOMElement | null>(null)
   const [measuredBody, setMeasuredBody] = useState<{ step: AndroidOnboardingStep, height: number } | null>(null)
+  // Adaptive spacing — see iOS sibling for the full rationale. Step bodies
+  // render their comfortable form by default and collapse to the compact,
+  // budget-fitting form only when the viewport can't fit it. `denseOverride` is
+  // keyed by (step, rows) so the decision is sticky and cannot oscillate.
+  // Passed to every step body as `dense`.
+  const [denseOverride, setDenseOverride] = useState<{ step: AndroidOnboardingStep, rows: number } | null>(null)
+  const dense = denseOverride != null && denseOverride.step === step && denseOverride.rows === terminalRows
   useEffect(() => {
     if (!bodyRef.current)
       return
     const { height } = measureElement(bodyRef.current)
     if (height > 0) {
       setMeasuredBody(prev => (prev && prev.step === step && prev.height === height ? prev : { step, height }))
+      if (!dense && height + COMPACT_HEADER_ROWS + WIZARD_PADDING_ROWS > terminalRows)
+        setDenseOverride({ step, rows: terminalRows })
     }
   })
   const bodyHeight = measuredBody && measuredBody.step === step ? measuredBody.height : null

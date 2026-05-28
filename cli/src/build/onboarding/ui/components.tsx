@@ -81,16 +81,18 @@ export const ErrorLine: FC<{ text: string }> = ({ text }) => (
 // "can't proceed" states the backend reports deliberately.
 export type AiResultKind = 'already_analyzed' | 'too_big' | 'error'
 
-// Renders a non-success AI-analysis outcome as a compact, coloured two-line
-// banner (bold severity heading + detail) so the user reads it as a distinct
-// blocking state instead of mistaking it for part of the neutral analysis
-// text. Previously these messages rendered as a plain <Text> line and blended
-// in — users couldn't tell the request had been rejected. A bordered box was
-// tried but cost ~3 extra rows and pushed the already-tall AI-result frame
-// past the 16-row fit contract; colour + bold + icon make it prominent at a
-// 2-row cost instead. `error` is red (✖); `already_analyzed` / `too_big` are
-// yellow (⚠) since they're expected, non-crash outcomes.
-export const AiResultBanner: FC<{ kind: AiResultKind, message: string }> = ({ kind, message }) => {
+// Renders a non-success AI-analysis outcome as a prominent, coloured banner so
+// the user reads it as a distinct blocking state instead of mistaking it for
+// part of the neutral analysis text (these used to render as a plain <Text>
+// line and blended in — users couldn't tell the request had been rejected).
+// `error` is red (✖); `already_analyzed` / `too_big` are yellow (⚠) since
+// they're expected, non-crash outcomes.
+//
+// Adaptive: the comfortable form (default) is a bordered box — the original,
+// most-prominent design. The `dense` form drops the box (saving ~2 rows) for
+// terminals too short to fit the boxed version within the 16-row contract; the
+// parent sets `dense` only when the measured comfortable frame won't fit.
+export const AiResultBanner: FC<{ kind: AiResultKind, message: string, dense?: boolean }> = ({ kind, message, dense = false }) => {
   const isError = kind === 'error'
   const color = isError ? 'red' : 'yellow'
   const icon = isError ? '✖' : '⚠'
@@ -99,10 +101,18 @@ export const AiResultBanner: FC<{ kind: AiResultKind, message: string }> = ({ ki
     : kind === 'too_big'
       ? 'Build log too large'
       : 'Already analyzed'
-  return (
-    <Box flexDirection="column">
+  const inner = (
+    <>
       <Text color={color} bold>{`${icon}  ${label}`}</Text>
       <Text color={color}>{message}</Text>
+    </>
+  )
+  if (dense) {
+    return <Box flexDirection="column">{inner}</Box>
+  }
+  return (
+    <Box flexDirection="column" borderStyle="round" borderColor={color} paddingX={1}>
+      {inner}
     </Box>
   )
 }

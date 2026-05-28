@@ -36,19 +36,27 @@ for (const [kind, message] of bannerVariants) {
   })
 }
 
-// Regression guard: the banner used to be a bordered box (4 rows at 80 cols),
-// which pushed the already-tall AI-result frame past the contract. The compact
-// form must stay at ≤ 3 rows.
-test('AiResultBanner is compact (≤ 3 rows at 80 cols)', () => {
+// The banner is adaptive: the comfortable default is a bordered box (the
+// prominent original design) and the `dense` form drops the box for terminals
+// too short to fit it. The dense (compact) form is the one that must survive
+// the 16-row floor, so it must stay ≤ 3 rows (icon line + message, no border).
+test('AiResultBanner dense form is compact (≤ 3 rows at 80 cols)', () => {
   const rows = frameRows(
     h(AiResultBanner, {
       kind: 'already_analyzed',
       message: 'AI analysis was already requested for this build (only one per job).',
+      dense: true,
     }),
     80,
   )
   if (rows > 3)
-    throw new Error(`expected ≤ 3 rows, got ${rows} (is the bordered box back?)`)
+    throw new Error(`expected ≤ 3 rows, got ${rows}`)
+})
+
+// The comfortable default (boxed) must still fit the body budget so it can be
+// shown on any terminal that has room.
+test('AiResultBanner boxed default fits the body budget', () => {
+  assertFitsBudget(h(AiResultBanner, { kind: 'already_analyzed', message: 'AI analysis was already requested for this build (only one per job).' }), 'ai-banner-boxed')
 })
 
 console.log(`\n${passed} passed, ${failed} failed`)
