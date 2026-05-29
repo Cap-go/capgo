@@ -11,7 +11,7 @@ import type { PlatformPickerLayout } from './frame-fit.js'
 //     or short terminals. The layout is chosen by the shell via
 //     `pickPlatformLayout` so this component stays pure (props in → JSX out).
 import { Select } from '@inkjs/ui'
-import { Box, Newline, Text, useInput } from 'ink'
+import { Box, Text, useInput } from 'ink'
 import React, { useState } from 'react'
 
 // Pure mapping from a keypress to a picker action (extracted so the
@@ -92,16 +92,20 @@ export const PlatformPicker: FC<PlatformPickerProps> = ({ layout, onSelect }) =>
     )
   }
 
+  // `alignItems="center"` centers the heading, the cards row, and the legend
+  // horizontally within the full terminal width (the shell renders this in a
+  // full-width column). marginTop spaces the rows (vs <Newline/>, which doesn't
+  // play well with centered cross-axis layout).
   return (
-    <Box flexDirection="column" marginTop={1}>
+    <Box flexDirection="column" alignItems="center" marginTop={1}>
       <Text bold>Which platform do you want to set up?</Text>
-      <Newline />
-      <Box flexDirection="row" gap={3}>
+      <Box flexDirection="row" gap={3} marginTop={1}>
         <PlatformCard emoji="🍎" name="iOS" hint="Apple App Store" selected={selected === 'ios'} />
         <PlatformCard emoji="🤖" name="Android" hint="Google Play" selected={selected === 'android'} />
       </Box>
-      <Newline />
-      <Text dimColor>←  →  choose   ·   Enter  confirm</Text>
+      <Box marginTop={1}>
+        <Text dimColor>←  →  choose   ·   Enter  confirm</Text>
+      </Box>
     </Box>
   )
 }
