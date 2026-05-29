@@ -5,6 +5,7 @@ export type CliErrorCategory
     | 'forbidden'
     | 'not_found'
     | 'payload_too_large'
+    | 'rate_limited'
     | 'validation_error'
     | 'server_error'
     | 'commander'
@@ -60,5 +61,29 @@ export function categorizeCliError(error: unknown): CliErrorCategory {
   if (/invalid|must be|required|not allowed|malformed|validation/.test(message))
     return 'validation_error'
 
+  return 'unknown'
+}
+
+/**
+ * Maps a non-2xx HTTP status to the same closed enum, for Supabase responses
+ * where we have a status code but no thrown Error. Never leaks response bodies.
+ */
+export function categorizeHttpStatus(status: number): CliErrorCategory {
+  if (status === 401)
+    return 'unauthorized'
+  if (status === 403)
+    return 'forbidden'
+  if (status === 404)
+    return 'not_found'
+  if (status === 408 || status === 504)
+    return 'timeout'
+  if (status === 413)
+    return 'payload_too_large'
+  if (status === 429)
+    return 'rate_limited'
+  if (status === 400 || status === 422)
+    return 'validation_error'
+  if (status >= 500)
+    return 'server_error'
   return 'unknown'
 }
