@@ -221,43 +221,63 @@ export interface GoogleSignInStepProps {
   dense?: boolean
 }
 
-// Matches the version on main (the onboarding's canonical copy). There is
-// intentionally NO dense/short variant: on a terminal too short to fit it the
-// wizard's resize prompt is the fallback (as for the other over-budget steps).
-// `dense` is accepted for parity with the other step components but ignored.
-export const GoogleSignInStep: FC<GoogleSignInStepProps> = ({ onChoose }) => {
+// main's copy, with a responsive LAYOUT (the words never change between forms):
+//   • comfortable (room to spare) — main's exact look: boxed info Alert + blank-
+//     line spacing around the scope bullets.
+//   • dense (tight) — the SAME text with the box and blank lines stripped (a
+//     plain "ℹ …" line, bullets flush, no <Newline/>s), which is all it takes to
+//     fit the 16-row frame — no rewording.
+// Shared constants below guarantee the wording is identical in both forms.
+const SIGN_IN_TRUST = 'Sign in with Google so Capgo can set up Play Store publishing on your account — your tokens never reach Capgo\'s servers.'
+const SIGN_IN_INTRO = 'We\'ll open Google\'s consent screen. The two access requests are:'
+
+export const GoogleSignInStep: FC<GoogleSignInStepProps> = ({ onChoose, dense = false }) => {
+  const bullets = (
+    <Box flexDirection="column" marginLeft={2} marginTop={dense ? 0 : 1}>
+      <Text>
+        •
+        {' '}
+        <Text bold>Google Cloud access</Text>
+        {' '}
+        — to create a service account in a project you pick
+      </Text>
+      <Text>
+        •
+        {' '}
+        <Text bold>Google Play Developer access</Text>
+        {' '}
+        — to invite that service account to your Play Console with release-only permissions
+      </Text>
+    </Box>
+  )
+  const select = (
+    <Select
+      options={[
+        { label: '🔐  Continue to Google sign-in', value: 'go' },
+        { label: 'ℹ️   Learn why the onboarding via Google is secure', value: 'learn' },
+        { label: '✖  Exit (I\'ll do it later)', value: 'exit' },
+      ]}
+      onChange={value => onChoose(value as GoogleSignInChoice)}
+    />
+  )
+  if (dense) {
+    return (
+      <Box flexDirection="column" marginTop={1}>
+        <Text>{`ℹ ${SIGN_IN_TRUST}`}</Text>
+        <Text>{SIGN_IN_INTRO}</Text>
+        {bullets}
+        {select}
+      </Box>
+    )
+  }
   return (
     <Box flexDirection="column" marginTop={1}>
-      <Alert variant="info">
-        Sign in with Google so Capgo can set up Play Store publishing on your account — your tokens never reach Capgo&apos;s servers.
-      </Alert>
+      <Alert variant="info">{SIGN_IN_TRUST}</Alert>
       <Newline />
-      <Text>We&apos;ll open Google&apos;s consent screen. The two access requests are:</Text>
-      <Box flexDirection="column" marginLeft={2} marginTop={1}>
-        <Text>
-          •
-          {' '}
-          <Text bold>Google Cloud access</Text>
-          {' '}
-          — to create a service account in a project you pick
-        </Text>
-        <Text>
-          •
-          {' '}
-          <Text bold>Google Play Developer access</Text>
-          {' '}
-          — to invite that service account to your Play Console with release-only permissions
-        </Text>
-      </Box>
+      <Text>{SIGN_IN_INTRO}</Text>
+      {bullets}
       <Newline />
-      <Select
-        options={[
-          { label: '🔐  Continue to Google sign-in', value: 'go' },
-          { label: 'ℹ️   Learn why the onboarding via Google is secure', value: 'learn' },
-          { label: '✖  Exit (I\'ll do it later)', value: 'exit' },
-        ]}
-        onChange={value => onChoose(value as GoogleSignInChoice)}
-      />
+      {select}
     </Box>
   )
 }

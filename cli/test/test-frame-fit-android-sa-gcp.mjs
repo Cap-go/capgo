@@ -24,6 +24,7 @@ import {
   GcpSetupRunningStep,
   GoogleSignInLearnMoreStep,
   GoogleSignInRunningStep,
+  GoogleSignInStep,
   PlayDeveloperIdActionsStep,
   PlayDeveloperIdInputStep,
   SaJsonExistingPathStep,
@@ -115,10 +116,12 @@ test(`sa-json-validation-failed [dense, long msg] fits ${BODY_BUDGET_ROWS}-row b
 })
 
 // ── google-sign-in — pre-consent instructions ────────────────────────────────
-// No frame-fit test: this step matches the copy on main, which is a single
-// version with no dense/compact form and is intentionally taller than the
-// budget. On a terminal too short to fit it the wizard falls back to the resize
-// prompt (the floor), same as on main.
+// Same copy as main; the dense form just strips the box + blank-line spacing
+// (no rewording) and must fit the budget. The comfortable form keeps main's
+// boxed look and is shown only when the terminal has room.
+test(`google-sign-in [dense] fits ${BODY_BUDGET_ROWS}-row budget`, () => {
+  assertFitsBudget(h(GoogleSignInStep, { onChoose: noop, dense: true }), 'google-sign-in-dense')
+})
 
 // ── google-sign-in — learn-more (the historical worst offender) ───────────────
 test(`google-sign-in [dense, learn-more] fits ${BODY_BUDGET_ROWS}-row budget`, () => {
