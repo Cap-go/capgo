@@ -57,6 +57,63 @@ try {
   assert.equal(recorded[1].ok, false)
   assert.equal(recorded[1].status, 0)
 
+  // --- Task 3: full `Supabase Call` event via the wired real recorder ---
+  const { flushAnalytics, trackCommandInvoked } = await import('../src/analytics/track.ts')
+  const originalToken = process.env.CAPGO_TOKEN
+  const originalDisable = process.env.CAPGO_DISABLE_TELEMETRY
+  const originalDisablePosthog = process.env.CAPGO_DISABLE_POSTHOG
+  delete process.env.CAPGO_DISABLE_TELEMETRY
+  delete process.env.CAPGO_DISABLE_POSTHOG
+  process.env.CAPGO_TOKEN = 'perf-key'
+
+  const stubPerf = () => {
+    const reqs = []
+    globalThis.fetch = async (url, init) => {
+      reqs.push({ url: String(url), init })
+      if (String(url).includes('/rest/v1/'))
+        return new Response('{}', { status: 200 })
+      if (String(url).endsWith('/private/config'))
+        return new Response('', { status: 500 })
+      return new Response('{}', { status: 200 })
+    }
+    return reqs
+  }
+  const findPerfEvent = reqs => reqs.find(r => r.url.endsWith('/private/events') && JSON.parse(r.init.body).event === 'Supabase Call')
+
+  // success path → ok:true, operation, channel cli-perf, command_path
+  trackCommandInvoked('bundle upload', { flags: [], positional_arg_count: 0 })
+  let reqs = stubPerf()
+  const tf3 = createTimedFetch()
+  await withSupabaseSource('apps.list', () => tf3('https://db.co/rest/v1/apps?select=*', { method: 'GET' }))
+  await flushAnalytics()
+  let ev = JSON.parse(findPerfEvent(reqs).init.body)
+  assert.equal(ev.event, 'Supabase Call')
+  assert.equal(ev.channel, 'cli-perf')
+  assert.equal(ev.tags.operation, 'GET apps')
+  assert.equal(ev.tags.ok, true)
+  assert.equal(ev.tags.source, 'apps.list')
+  assert.equal(ev.tags.command_path, 'bundle upload')
+  assert.equal(ev.tags.error_category, undefined, 'no error_category on success')
+
+  // HTTP failure path → ok:false, error_category from status (504 => timeout)
+  reqs = []
+  globalThis.fetch = async (url, init) => {
+    reqs.push({ url: String(url), init })
+    if (String(url).includes('/rest/v1/'))
+      return new Response('', { status: 504 })
+    return new Response('{}', { status: 200 })
+  }
+  await tf3('https://db.co/rest/v1/rpc/get_user_id', { method: 'POST' })
+  await flushAnalytics()
+  ev = JSON.parse(findPerfEvent(reqs).init.body)
+  assert.equal(ev.tags.ok, false)
+  assert.equal(ev.tags.operation, 'rpc:get_user_id')
+  assert.equal(ev.tags.error_category, 'timeout')
+
+  process.env.CAPGO_TOKEN = originalToken
+  if (originalDisable !== undefined) process.env.CAPGO_DISABLE_TELEMETRY = originalDisable
+  if (originalDisablePosthog !== undefined) process.env.CAPGO_DISABLE_POSTHOG = originalDisablePosthog
+
   console.log('✅ supabase-perf tests passed')
 }
 finally {

@@ -5,6 +5,9 @@ import pack from '../../package.json'
 import { isTruthyEnvValue } from '../posthog'
 import { findSavedKeySilent, getAppId, getConfig, sendEvent } from '../utils'
 import { resolveOwnerOrgId } from './org-resolver'
+import { categorizeCliError, categorizeHttpStatus } from './error-category'
+import { deriveSupabaseOperation, setSupabaseCallRecorder, SLOW_THRESHOLD_MS, withSupabaseSource } from './supabase-perf'
+import type { SupabaseCallInfo } from './supabase-perf'
 
 type InvocationSource = 'cli' | 'mcp'
 
@@ -177,6 +180,13 @@ export function trackEvent(input: TrackEventInput): Promise<void> {
 const CLI_USAGE_CHANNEL = 'cli-usage'
 
 let commandStartedAt = 0
+// The active command path ('bundle upload', or 'mcp:<tool>'), read by perf
+// events. One command per CLI process, so a module-level value is sufficient.
+let currentCommandPath = ''
+
+export function setCurrentCommandPath(path: string): void {
+  currentCommandPath = path
+}
 
 export interface CommandContext {
   flags: string[]
@@ -205,6 +215,7 @@ export function extractCommandContext(command: CommanderLike): CommandContext {
 
 export function trackCommandInvoked(commandPath: string, ctx: CommandContext): void {
   commandStartedAt = Date.now()
+  currentCommandPath = commandPath
   void trackEvent({
     channel: CLI_USAGE_CHANNEL,
     event: 'CLI Command Invoked',
@@ -256,6 +267,7 @@ type AnyAsyncFn = (...args: any[]) => Promise<any>
 export function withMcpToolTracking<H extends AnyAsyncFn>(toolName: string, handler: H): H {
   const wrapped = async (...args: Parameters<H>) => {
     const start = Date.now()
+    currentCommandPath = `mcp:${toolName}`
     let success = true
     try {
       const result = await handler(...args)
@@ -294,3 +306,36 @@ export function trackMcpServerStarted(hasApikey: boolean): void {
     },
   })
 }
+
+// --- Supabase performance events ---
+const CLI_PERF_CHANNEL = 'cli-perf'
+
+/**
+ * Turns a raw timed-fetch observation into a fire-and-forget `Supabase Call`
+ * event. Injected into supabase-perf so that module stays a leaf (no cycle).
+ */
+function recordSupabaseCall(info: SupabaseCallInfo): void {
+  const tags: Record<string, string | number | boolean> = {
+    operation: deriveSupabaseOperation(info.url, info.method),
+    method: info.method,
+    status_code: info.status,
+    duration_ms: info.durationMs,
+    ok: info.ok,
+    slow: info.durationMs > SLOW_THRESHOLD_MS,
+  }
+  if (info.source)
+    tags.source = info.source
+  if (currentCommandPath)
+    tags.command_path = currentCommandPath
+  if (!info.ok) {
+    tags.error_category = info.error !== undefined
+      ? categorizeCliError(info.error)
+      : categorizeHttpStatus(info.status)
+  }
+  void trackEvent({ channel: CLI_PERF_CHANNEL, event: 'Supabase Call', icon: '⏱️', tags })
+}
+
+setSupabaseCallRecorder(recordSupabaseCall)
+
+// Re-export so call sites can `import { withSupabaseSource } from '../analytics/track'`.
+export { withSupabaseSource }
