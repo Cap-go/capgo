@@ -30,6 +30,7 @@ const SLIDE_COUNT = 5
 const cur = ref(0)
 const launched = ref(false)
 let animating = false
+let buildTimer: ReturnType<typeof setTimeout> | null = null
 
 const deckEl = ref<HTMLElement | null>(null)
 const termPlatform = ref<'ios' | 'android'>('ios')
@@ -352,7 +353,10 @@ function startBuild() {
     return
   }
   launched.value = true
-  setTimeout(() => {
+  if (buildTimer)
+    clearTimeout(buildTimer)
+  buildTimer = setTimeout(() => {
+    buildTimer = null
     close()
     router.push(dest)
   }, 1000)
@@ -370,6 +374,10 @@ function onKey(e: KeyboardEvent) {
 }
 
 function close() {
+  if (buildTimer) {
+    clearTimeout(buildTimer)
+    buildTimer = null
+  }
   emit('close')
 }
 
@@ -382,6 +390,8 @@ function initDeck() {
   cur.value = 0
   clearLaunch()
   enter(0)
+  // record the first slide impression (navigation only fires for slides 2+)
+  track('builder_promo_slide_viewed', { slide: 1 })
 }
 
 watch(() => props.open, async (open) => {
@@ -399,6 +409,8 @@ watch(() => props.open, async (open) => {
 })
 
 onUnmounted(() => {
+  if (buildTimer)
+    clearTimeout(buildTimer)
   document.body.style.overflow = ''
   window.removeEventListener('keydown', onKey)
 })

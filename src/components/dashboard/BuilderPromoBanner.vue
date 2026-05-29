@@ -26,6 +26,8 @@ const open = ref(false)
 // hidden until we confirm the app has no builds (avoids a flash for ineligible apps)
 const eligible = ref(false)
 let shownTracked = false
+// guards against out-of-order async results when appId changes quickly
+let reqToken = 0
 
 function track(event: string) {
   pushEvent(event, config.supaHost, {})
@@ -38,6 +40,7 @@ function openModal() {
 
 // Only eligible when the current app has zero native builds.
 async function checkEligibility() {
+  const token = ++reqToken
   eligible.value = false
   const appId = props.appId
   if (!appId)
@@ -55,6 +58,9 @@ async function checkEligibility() {
       .select('id', { count: 'exact', head: true })
       .eq('owner_org', orgId)
       .eq('app_id', appId)
+    // ignore a stale response superseded by a newer appId check
+    if (token !== reqToken)
+      return
     if (error || (count ?? 0) > 0)
       return
     eligible.value = true
@@ -86,6 +92,7 @@ watch(
       tabindex="0"
       @click="openModal"
       @keydown.enter="openModal"
+      @keydown.space.prevent="openModal"
     >
       <!-- Left: native-builds switch + message (mirrors DeploymentBanner layout) -->
       <div class="flex items-center gap-3">
