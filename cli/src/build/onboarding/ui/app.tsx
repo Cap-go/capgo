@@ -1653,6 +1653,13 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
   return (
     <Box flexDirection="column" minHeight={terminalRows} padding={1}>
       {showHeader && <Header compact={headerCompact} />}
+      {/* Banner stays pinned to the top; this flex spacer pushes the rest (log +
+          step body) to the bottom of the viewport. On a tight terminal it
+          collapses to zero (content fills the height), so the frame-fit contract
+          is unaffected; on a tall terminal it absorbs the extra rows, and since
+          both the banner (top) and the content (bottom) are anchored, neither
+          jumps as the step's content height changes between steps. */}
+      <Box flexGrow={1} />
       {/* Completed-steps log — rendered OUTSIDE the measured body so its growth
           can't inflate the dense / fit decision. Capped (see logMaxRows) to the
           rows the current step leaves; CompletedStepsLog drops its leading gap

@@ -1754,6 +1754,10 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
   return (
     <Box flexDirection="column" minHeight={terminalRows} padding={1}>
       {showHeader && <Header compact={headerCompact} />}
+      {/* Banner pinned top; this flex spacer pushes the rest (log + body) to the
+          bottom. Collapses to zero on a tight terminal (frame-fit unaffected);
+          absorbs extra rows on a tall one. See iOS sibling. */}
+      <Box flexGrow={1} />
       {/* Completed-steps log — OUTSIDE the measured body, capped to the rows the
           current step leaves (see logMaxRows + iOS sibling); CompletedStepsLog
           drops its leading gap when it collapses to one line. */}
