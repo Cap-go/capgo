@@ -2032,7 +2032,7 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
           // @clack/prompts spinner appends its own animated dots — don't add an
           // ellipsis here or the user sees "…..." (6 dots: our 1-char ellipsis
           // plus the spinner's cycling 3-dot animation).
-          aiSpinner?.start('Analyzing build log with Capgo AI (Kimi K2.5)')
+          aiSpinner?.start('Analyzing build log with Capgo AI')
 
           let result: PostAnalyzeResult
           try {
@@ -2110,7 +2110,7 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
           const choice = await select({
             message: 'Choose AI analysis',
             options: [
-              { value: 'capgo', label: 'Capgo AI (Kimi K2.5)' },
+              { value: 'capgo', label: 'Capgo AI' },
               { value: 'local', label: 'Local AI (write prompt to file)' },
               { value: 'skip', label: 'Skip' },
             ],
