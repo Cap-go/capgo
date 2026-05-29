@@ -3,7 +3,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod'
 import pack from '../../package.json'
-import { setInvocationSource, trackMcpServerStarted, withMcpToolTracking } from '../analytics/track'
+import { enableSupabaseInstrumentation, setInvocationSource, trackMcpServerStarted, withMcpToolTracking } from '../analytics/track'
 import { addAppOptionsSchema, cleanupOptionsSchema, getStatsOptionsSchema, requestBuildOptionsSchema, starAllRepositoriesOptionsSchema, starRepoOptionsSchema, updateAppOptionsSchema, updateChannelOptionsSchema, uploadOptionsSchema } from '../schemas/sdk'
 import { CapgoSDK } from '../sdk'
 import { findSavedKey } from '../utils'
@@ -37,6 +37,7 @@ export async function startMcpServer(): Promise<void> {
   })
 
   setInvocationSource('mcp')
+  enableSupabaseInstrumentation()
 
   // Auto-track every tool invocation without touching each registration.
   const originalTool = server.tool.bind(server)

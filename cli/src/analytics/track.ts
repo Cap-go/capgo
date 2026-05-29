@@ -339,3 +339,4 @@ setSupabaseCallRecorder(recordSupabaseCall)
 
 // Re-export so call sites can `import { withSupabaseSource } from '../analytics/track'`.
 export { withSupabaseSource }
+export { enableSupabaseInstrumentation } from './supabase-perf'
