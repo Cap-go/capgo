@@ -221,73 +221,43 @@ export interface GoogleSignInStepProps {
   dense?: boolean
 }
 
-// Responsive explanation, both forms leading with the WHY (never the
-// service-account mechanism):
-//   • comfortable (room to spare) — the fuller version: an info Alert + the
-//     "two approvals" framing + a per-scope breakdown of why each is safe + the
-//     trust line. Shown whenever it fits the terminal.
-//   • dense (tight) — the same why condensed to fit BODY_BUDGET_ROWS at the
-//     reference widths, in smooth prose (not the old terse fallback).
-const GOOGLE_SIGN_IN_OPTIONS = [
-  { label: '🔐  Continue to Google sign-in', value: 'go' as const },
-  { label: 'ℹ️   Why is this secure?', value: 'learn' as const },
-  { label: '✖  Exit (I\'ll do it later)', value: 'exit' as const },
-]
-
-export const GoogleSignInStep: FC<GoogleSignInStepProps> = ({ onChoose, dense = false }) => {
-  const select = (
-    <Select options={GOOGLE_SIGN_IN_OPTIONS} onChange={value => onChoose(value as GoogleSignInChoice)} />
-  )
-  if (dense) {
-    return (
-      <Box flexDirection="column" marginTop={1}>
-        <Text>Capgo uploads your signed app to Google Play for you on each cloud build. Google only allows that through a service account — this one-time sign-in creates one for you, instead of a manual setup across two Google consoles.</Text>
-        <Text>
-          •
-          {' '}
-          <Text bold>Cloud access</Text>
-          {' '}
-          looks broad, but it&apos;s used once to create that one account, then never again.
-        </Text>
-        <Text>
-          •
-          {' '}
-          <Text bold>Play access</Text>
-          {' '}
-          is release-only — this one app, nothing else.
-        </Text>
-        <Text dimColor>• Your Google sign-in token never leaves your machine; it&apos;s revoked once setup finishes.</Text>
-        {select}
-      </Box>
-    )
-  }
+// Matches the version on main (the onboarding's canonical copy). There is
+// intentionally NO dense/short variant: on a terminal too short to fit it the
+// wizard's resize prompt is the fallback (as for the other over-budget steps).
+// `dense` is accepted for parity with the other step components but ignored.
+export const GoogleSignInStep: FC<GoogleSignInStepProps> = ({ onChoose }) => {
   return (
     <Box flexDirection="column" marginTop={1}>
       <Alert variant="info">
-        On every Android cloud build, Capgo uploads your signed app to Google Play for you. Google only allows that through a service account — normally a fiddly manual setup across the Google Cloud and Play consoles. This one-time sign-in does it for you, scoped to release-only access.
+        Sign in with Google so Capgo can set up Play Store publishing on your account — your tokens never reach Capgo&apos;s servers.
       </Alert>
       <Newline />
-      <Text>Google&apos;s consent screen will ask you to approve two things:</Text>
+      <Text>We&apos;ll open Google&apos;s consent screen. The two access requests are:</Text>
       <Box flexDirection="column" marginLeft={2} marginTop={1}>
         <Text>
           •
           {' '}
-          <Text bold>Create the publishing account</Text>
+          <Text bold>Google Cloud access</Text>
           {' '}
-          in a Google Cloud project you pick. Google labels this access broadly, but Capgo only creates that one account — it never touches anything else in your Cloud.
+          — to create a service account in a project you pick
         </Text>
         <Text>
           •
           {' '}
-          <Text bold>Give it release access</Text>
+          <Text bold>Google Play Developer access</Text>
           {' '}
-          to this one app in your Play Console, and nothing more.
+          — to invite that service account to your Play Console with release-only permissions
         </Text>
       </Box>
       <Newline />
-      <Text dimColor>Your Google sign-in token stays on your machine and is revoked once setup finishes.</Text>
-      <Newline />
-      {select}
+      <Select
+        options={[
+          { label: '🔐  Continue to Google sign-in', value: 'go' },
+          { label: 'ℹ️   Learn why the onboarding via Google is secure', value: 'learn' },
+          { label: '✖  Exit (I\'ll do it later)', value: 'exit' },
+        ]}
+        onChange={value => onChoose(value as GoogleSignInChoice)}
+      />
     </Box>
   )
 }
