@@ -189,14 +189,17 @@ consistency, except where noted. Animations are scoped CSS.
 
 ### Slide 5 — Soft close (rocket launch)
 - **Left:** an inline **flat Noto rocket SVG** (yellow flame paths removed,
-  engine bell kept), ~30% larger than default, centered. A CSS blue exhaust
-  (flame + smoke) renders **behind** the rocket (lower z-index) so the fins
-  overlap it for realism; at idle the flame + smoke emerge from the engine bell
-  between the fins, angled down-left along the rocket's axis (not vertical). On
-  CTA click it plays a ~0.7s launch: the jet swings further down-left
-  (down-left, opposite travel), the rocket flies to the top-right corner with
-  the trail behind it, and a smoke blast lingers at the pad — then it navigates
-  to the Builds flow. Honor `prefers-reduced-motion` with a static rocket.
+  engine bell kept), ~30% larger than default, centered. A CSS exhaust renders
+  **behind** the rocket (lower z-index) so the fins overlap it for realism: a
+  warm flame (white→orange→red gradient, chosen so it stays visible on the blue
+  panel rather than blending) plus neutral smoke puffs. At idle the flame +
+  smoke emerge from the engine bell between the fins, angled down-left along the
+  rocket's axis (not vertical). On CTA click it plays a ~0.7s launch: the flame
+  elongates smoothly (~0.55s ease-in, matching the rocket's acceleration), the
+  jet swings further down-left (opposite travel), the rocket flies to the
+  top-right corner with the trail behind it, and a smoke blast lingers at the
+  pad — then it navigates to the Builds flow. Honor `prefers-reduced-motion`
+  with a static rocket.
 - **Right:** **"Everything's in place."** Lead (fixed first sentence): "Builds,
   signing, and delivery are handled for you. **{closing line}**"
   - **Closing line — A/B test (5 variants):**
