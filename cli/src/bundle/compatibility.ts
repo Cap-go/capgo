@@ -2,6 +2,7 @@ import type { BundleCompatibilityOptions } from '../schemas/bundle'
 import type { Compatibility } from '../utils'
 import { intro, log } from '@clack/prompts'
 import { Table } from '@sauber/table'
+import { trackEvent } from '../analytics/track'
 import { check2FAComplianceForApp, checkAppExistsAndHasPermissionOrgErr } from '../api/app'
 import {
   checkCompatibilityCloud,
@@ -81,6 +82,16 @@ export async function checkCompatibilityInternal(
   )
 
   const hasIncompatible = compatibility.finalCompatibility.some(entry => !isCompatible(entry))
+
+  void trackEvent({
+    channel: 'bundle',
+    event: 'Bundle Compatibility Checked',
+    icon: '🧪',
+    tags: {
+      result: hasIncompatible ? 'incompatible' : 'compatible',
+      missing_deps_count: compatibility.finalCompatibility.filter(entry => !isCompatible(entry)).length,
+    },
+  })
 
   if (!silent) {
     const table = new Table()

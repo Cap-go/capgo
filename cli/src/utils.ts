@@ -575,11 +575,11 @@ interface CapgoConfig {
   hostFilesApi: string
   hostApi: string
 }
-export async function getRemoteConfig(silent = false) {
+export async function getRemoteConfig(silent = false, signal?: AbortSignal) {
   // call host + /api/get_config and parse the result as json using fetch
   const localConfig = await getLocalConfig(silent)
   try {
-    const response = await fetch(`${localConfig.hostApi}/private/config`)
+    const response = await fetch(`${localConfig.hostApi}/private/config`, signal ? { signal } : {})
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`)
     }
@@ -1428,19 +1428,24 @@ export async function updateOrCreateChannel(supabase: SupabaseClient<Database>, 
     .single()
 }
 
-export async function sendEvent(capgkey: string, payload: TrackOptions & { notifyConsole?: boolean }, verbose?: boolean): Promise<void> {
+export async function sendEvent(capgkey: string, payload: TrackOptions & { notifyConsole?: boolean }, verbose?: boolean, signal?: AbortSignal): Promise<void> {
   try {
     if (verbose) {
       log.info(`Get remove config: for ${payload.event}`)
     }
     // Always fetch remote config silently — sendEvent is telemetry and must
     // not bypass an Ink-controlled stdout (e.g. during `capgo init`).
-    const config = await getRemoteConfig(true)
+    const config = await getRemoteConfig(true, signal)
     if (verbose) {
       log.info(`Sending LogSnag event: ${JSON.stringify(payload)}`)
     }
     const controller = new AbortController()
     const timeoutId = setTimeout(() => controller.abort(), 10000) // 10 seconds timeout
+    // Combine the internal timeout with any caller-supplied signal (e.g. the
+    // analytics flush) so in-flight telemetry can be released promptly.
+    const eventSignal = signal
+      ? (typeof AbortSignal.any === 'function' ? AbortSignal.any([controller.signal, signal]) : signal)
+      : controller.signal
 
     try {
       const fetchResponse = await fetch(`${config.hostApi}/private/events`, {
@@ -1450,7 +1455,7 @@ export async function sendEvent(capgkey: string, payload: TrackOptions & { notif
           'Content-Type': 'application/json',
           'capgkey': capgkey,
         },
-        signal: controller.signal,
+        signal: eventSignal,
       })
 
       clearTimeout(timeoutId)

@@ -4,6 +4,7 @@ import { existsSync, writeFileSync } from 'node:fs'
 import { cwd } from 'node:process'
 import { intro, log, outro, spinner } from '@clack/prompts'
 import { parse } from '@std/semver'
+import { trackEvent } from '../analytics/track'
 import { checkAlerts } from '../api/update'
 import { getChecksum } from '../checksum'
 import {
@@ -168,6 +169,8 @@ export async function zipBundleInternal(appId: string, options: BundleZipOptions
 
     if (saveSpinner)
       saveSpinner.stop(`Saved to ${filename}`)
+
+    void trackEvent({ channel: 'bundle', event: 'Bundle Zipped', icon: '🗜️', tags: { zip_size_bytes: zipped.byteLength } })
 
     if (shouldShowPrompts)
       outro('Done ✅')
