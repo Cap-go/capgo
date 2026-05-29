@@ -4,6 +4,7 @@ import { Option, program } from 'commander'
 import pack from '../package.json'
 import { categorizeCliError } from './analytics/error-category'
 import { extractCommandContext, flushAnalytics, trackCommandFailed, trackCommandInvoked, trackCommandSucceeded } from './analytics/track'
+import { enableSupabaseInstrumentation } from './analytics/supabase-perf'
 import { addApp } from './app/add'
 import { debugApp } from './app/debug'
 import { deleteApp } from './app/delete'
@@ -64,6 +65,10 @@ program
   .name(pack.name)
   .description(`📦 Manage packages and bundle versions in Capgo Cloud`)
   .version(pack.version, '-v, --version', `output the current version`)
+
+// Turn on client-side Supabase perf tracking for the CLI. (Off by default so
+// the SDK bundle, which transitively imports createSupabaseClient, stays clean.)
+enableSupabaseInstrumentation()
 
 let currentCommandPath = 'unknown'
 

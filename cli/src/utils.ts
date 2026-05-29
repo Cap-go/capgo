@@ -27,6 +27,7 @@ import { getChecksum } from './checksum'
 import { loadConfig, writeConfig } from './config'
 import { nativePackageSchema } from './schemas/common'
 import { formatApiErrorForCli, parseSecurityPolicyError } from './utils/security_policy_errors'
+import { createTimedFetch, isSupabaseInstrumentationEnabled } from './analytics/supabase-perf'
 
 export const baseKey = '.capgo_key'
 export const baseKeyV2 = '.capgo_key_v2'
@@ -639,7 +640,7 @@ function normalizeSupabaseHost(host: string): string {
   return `${parsed.origin}${normalizedPath}`
 }
 
-export async function createSupabaseClient(apikey: string, supaHost?: string, supaKey?: string, silent = false) {
+export async function createSupabaseClient(apikey: string, supaHost?: string, supaKey?: string, silent = false, instrument = true) {
   const config = await getRemoteConfig(silent)
   if (supaHost && supaKey) {
     if (!silent)
@@ -662,6 +663,7 @@ export async function createSupabaseClient(apikey: string, supaHost?: string, su
       headers: {
         capgkey: apikey,
       },
+      ...(isSupabaseInstrumentationEnabled() && instrument ? { fetch: createTimedFetch() } : {}),
     },
   })
 }

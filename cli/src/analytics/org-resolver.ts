@@ -21,7 +21,7 @@ export function resolveOwnerOrgId(apikey: string, appId: string, deps: OrgResolv
   const create = deps.createClient ?? createSupabaseClient
   const promise = (async () => {
     try {
-      const supabase = await create(apikey, undefined, undefined, true)
+      const supabase = await create(apikey, undefined, undefined, true, false)
       let query = supabase
         .from('apps')
         .select('owner_org')

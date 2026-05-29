@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from 'node:async_hooks'
 import { platform } from 'node:os'
 import { arch, env, version as nodeVersion } from 'node:process'
 import { isCI, name as ciName } from 'ci-info'
@@ -5,6 +6,9 @@ import pack from '../../package.json'
 import { isTruthyEnvValue } from '../posthog'
 import { findSavedKeySilent, getAppId, getConfig, sendEvent } from '../utils'
 import { resolveOwnerOrgId } from './org-resolver'
+import { categorizeCliError, categorizeHttpStatus } from './error-category'
+import { deriveSupabaseOperation, setSupabaseCallRecorder, SLOW_THRESHOLD_MS, withSupabaseSource } from './supabase-perf'
+import type { SupabaseCallInfo } from './supabase-perf'
 
 type InvocationSource = 'cli' | 'mcp'
 
@@ -177,6 +181,14 @@ export function trackEvent(input: TrackEventInput): Promise<void> {
 const CLI_USAGE_CHANNEL = 'cli-usage'
 
 let commandStartedAt = 0
+// The active command path ('bundle upload', or 'mcp:<tool>'), read by perf
+// events. One command per CLI process, so a module-level value is sufficient.
+let currentCommandPath = ''
+
+// MCP tools can run concurrently, so a module-level path would race between
+// overlapping handlers. The CLI runs one command per process (module-level is
+// safe there); MCP scopes its path per-invocation via this async-local store.
+const mcpCommandPathStore = new AsyncLocalStorage<string>()
 
 export interface CommandContext {
   flags: string[]
@@ -205,6 +217,7 @@ export function extractCommandContext(command: CommanderLike): CommandContext {
 
 export function trackCommandInvoked(commandPath: string, ctx: CommandContext): void {
   commandStartedAt = Date.now()
+  currentCommandPath = commandPath
   void trackEvent({
     channel: CLI_USAGE_CHANNEL,
     event: 'CLI Command Invoked',
@@ -254,7 +267,7 @@ type AnyAsyncFn = (...args: any[]) => Promise<any>
  * name, success flag, and duration. Re-throws so behavior is unchanged.
  */
 export function withMcpToolTracking<H extends AnyAsyncFn>(toolName: string, handler: H): H {
-  const wrapped = async (...args: Parameters<H>) => {
+  const wrapped = (...args: Parameters<H>) => mcpCommandPathStore.run(`mcp:${toolName}`, async () => {
     const start = Date.now()
     let success = true
     try {
@@ -279,7 +292,7 @@ export function withMcpToolTracking<H extends AnyAsyncFn>(toolName: string, hand
         },
       })
     }
-  }
+  })
   return wrapped as H
 }
 
@@ -294,3 +307,42 @@ export function trackMcpServerStarted(hasApikey: boolean): void {
     },
   })
 }
+
+// --- Supabase performance events ---
+const CLI_PERF_CHANNEL = 'cli-perf'
+
+/**
+ * Turns a raw timed-fetch observation into a fire-and-forget `Supabase Call`
+ * event. Injected into supabase-perf so that module stays a leaf (no cycle).
+ */
+function recordSupabaseCall(info: SupabaseCallInfo): void {
+  // MCP tool calls scope their path via the async-local store; the CLI uses the
+  // module-level value set in trackCommandInvoked.
+  const commandPath = mcpCommandPathStore.getStore() ?? currentCommandPath
+  const tags: Record<string, string | number | boolean> = {
+    operation: deriveSupabaseOperation(info.url, info.method),
+    method: info.method,
+    status_code: info.status,
+    duration_ms: info.durationMs,
+    ok: info.ok,
+    slow: info.durationMs > SLOW_THRESHOLD_MS,
+  }
+  if (info.source)
+    tags.source = info.source
+  if (commandPath)
+    tags.command_path = commandPath
+  if (!info.ok) {
+    tags.error_category = info.error !== undefined
+      ? categorizeCliError(info.error)
+      : categorizeHttpStatus(info.status)
+  }
+  // Use the key from the Supabase request itself so events fire even when the
+  // key came from --apikey (not env / a saved file); trackEvent still falls back.
+  void trackEvent({ apikey: info.apikey, channel: CLI_PERF_CHANNEL, event: 'Supabase Call', icon: '⏱️', tags })
+}
+
+setSupabaseCallRecorder(recordSupabaseCall)
+
+// Re-export so call sites can `import { withSupabaseSource } from '../analytics/track'`.
+export { withSupabaseSource }
+export { enableSupabaseInstrumentation } from './supabase-perf'

@@ -3,7 +3,7 @@ import type { OptionsBase } from '../schemas/base'
 import type { Database } from '../types/supabase.types'
 import { intro, log, outro } from '@clack/prompts'
 import { Table } from '@sauber/table'
-import { trackEvent } from '../analytics/track'
+import { trackEvent, withSupabaseSource } from '../analytics/track'
 import { checkAlerts } from '../api/update'
 import { createSupabaseClient, findSavedKey, getHumanDate, resolveUserIdFromApiKey } from '../utils'
 
@@ -20,10 +20,10 @@ function displayApps(data: Database['public']['Tables']['apps']['Row'][]) {
 }
 
 async function getActiveApps(supabase: SupabaseClient<Database>, silent: boolean) {
-  const { data, error } = await supabase
+  const { data, error } = await withSupabaseSource('apps.list', () => supabase
     .from('apps')
     .select()
-    .order('created_at', { ascending: false })
+    .order('created_at', { ascending: false }))
 
   if (error) {
     if (!silent)
