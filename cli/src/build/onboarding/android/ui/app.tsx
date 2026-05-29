@@ -30,7 +30,7 @@ import { releaseCapturedLogs, runCapgoAiAnalysis } from '../../../../ai/analyze.
 import { renderMarkdown } from '../../../../ai/render-markdown.js'
 import { trackAiAnalysisChoice, trackAiAnalysisResult } from '../../../../ai/telemetry.js'
 import { requestBuildInternal } from '../../../request.js'
-import { isAiAnalysisTooTall } from '../../ai-fit.js'
+import { resolveAiResultRoute } from '../../ai-fit.js'
 
 // Upper bound on "I fixed it, retry build" attempts after an AI diagnosis.
 // Three total attempts (initial + two retries) caps the AI cost when a model
@@ -1666,14 +1666,21 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
     }
   }, [step])
 
-  // Re-evaluate AI-analysis fit on step entry AND on terminal resize, routing
-  // inline → scroll viewer when it no longer fits. See iOS sibling for why
-  // this needs its own resize-dependent effect.
+  // Route between the inline render and the scroll viewer based on the live
+  // terminal size, BIDIRECTIONALLY (shrink → scroll, grow back → inline). See
+  // iOS sibling + resolveAiResultRoute for the full rationale.
   useEffect(() => {
-    if (step !== 'ai-analysis-result' || !aiAnalysisText || aiViewedFull)
+    if (step !== 'ai-analysis-result' && step !== 'ai-analysis-result-scroll')
       return
-    if (isAiAnalysisTooTall(aiAnalysisText, terminalRows, terminalCols))
-      setStep('ai-analysis-result-scroll')
+    const next = resolveAiResultRoute({
+      current: step,
+      text: aiAnalysisText,
+      viewedFull: aiViewedFull,
+      terminalRows,
+      terminalCols,
+    })
+    if (next)
+      setStep(next)
   }, [step, aiAnalysisText, aiViewedFull, terminalRows, terminalCols])
 
   const progressPct = ANDROID_STEP_PROGRESS[step] ?? 0

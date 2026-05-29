@@ -24,7 +24,7 @@ import { releaseCapturedLogs, runCapgoAiAnalysis } from '../../../ai/analyze.js'
 import { renderMarkdown } from '../../../ai/render-markdown.js'
 import { trackAiAnalysisChoice, trackAiAnalysisResult } from '../../../ai/telemetry.js'
 import { requestBuildInternal } from '../../request.js'
-import { isAiAnalysisTooTall } from '../ai-fit.js'
+import { resolveAiResultRoute } from '../ai-fit.js'
 
 // Upper bound on "I fixed it, retry build" attempts after an AI diagnosis.
 // Three total attempts (initial + two retries) caps the AI cost when a model
@@ -1533,18 +1533,26 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
     }
   }, [step])
 
-  // Route the AI analysis into the scrollable fullscreen viewer when it's
-  // taller than the current viewport. This lives in its OWN effect (not the
-  // [step] effect above) and depends on the live terminal dimensions, so it
-  // re-evaluates when the user RESIZES the terminal — not just on step entry.
-  // Without the resize dependency, an analysis that fit inline on a large
-  // terminal would stay inline and overflow (un-scrollably, in the alt
-  // buffer) after the user shrinks the window.
+  // Route between the inline AI-result render and the scrollable fullscreen
+  // viewer based on the LIVE terminal size — BIDIRECTIONALLY. Depends on the
+  // terminal dimensions so it re-evaluates on resize: shrinking past the inline
+  // budget opens the viewer, and growing back so it fits again returns to the
+  // inline render. (Previously this was one-way — once the viewer opened it
+  // never went back, leaving the user stuck in the scroll view with empty
+  // space after enlarging the window.) `resolveAiResultRoute` is the single
+  // source of truth, driven by one predicate so it can't oscillate.
   useEffect(() => {
-    if (step !== 'ai-analysis-result' || !aiAnalysisText || aiViewedFull)
+    if (step !== 'ai-analysis-result' && step !== 'ai-analysis-result-scroll')
       return
-    if (isAiAnalysisTooTall(aiAnalysisText, terminalRows, terminalCols))
-      setStep('ai-analysis-result-scroll')
+    const next = resolveAiResultRoute({
+      current: step,
+      text: aiAnalysisText,
+      viewedFull: aiViewedFull,
+      terminalRows,
+      terminalCols,
+    })
+    if (next)
+      setStep(next)
   }, [step, aiAnalysisText, aiViewedFull, terminalRows, terminalCols])
 
   // ── Render ──

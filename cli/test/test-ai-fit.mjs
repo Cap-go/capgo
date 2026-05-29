@@ -16,6 +16,7 @@ import {
   estimateRenderedRows,
   isAiAnalysisTooTall,
   pickVisibleLines,
+  resolveAiResultRoute,
   stripAnsi,
 } from '../src/build/onboarding/ai-fit.ts'
 
@@ -217,6 +218,69 @@ test('computeMaxScrollOffset: long wrapping tail line counts for wrap', () => {
   const got = computeMaxScrollOffset(lines, 5, 20)
   if (got !== 7)
     throw new Error(`expected 7, got ${got}`)
+})
+
+// ── resolveAiResultRoute (bidirectional inline ⇄ scroll routing) ─────────────
+
+// A short analysis that comfortably fits inline on any reasonable terminal.
+const shortText = ['Likely cause', 'Missing profile.', '', 'Fix', 'Add it.'].join('\n')
+// A tall analysis that overflows the inline budget on a small terminal.
+const tallText = Array.from({ length: 40 }, (_, i) => `line ${i}`).join('\n')
+
+test('resolveAiResultRoute: inline + too tall → scroll (terminal shrank)', () => {
+  const next = resolveAiResultRoute({ current: 'ai-analysis-result', text: tallText, viewedFull: false, terminalRows: 20, terminalCols: 80 })
+  if (next !== 'ai-analysis-result-scroll')
+    throw new Error(`expected scroll, got ${next}`)
+})
+
+// THE REGRESSION: in the scroll viewer, growing the terminal so it fits again
+// must route BACK to the inline render. The old one-way logic returned null
+// here and the user was stuck in the viewer.
+test('resolveAiResultRoute: scroll + now fits → inline (terminal grew back)', () => {
+  const next = resolveAiResultRoute({ current: 'ai-analysis-result-scroll', text: shortText, viewedFull: false, terminalRows: 60, terminalCols: 120 })
+  if (next !== 'ai-analysis-result')
+    throw new Error(`expected inline, got ${next}`)
+})
+
+test('resolveAiResultRoute: scroll + still too tall → stay (null)', () => {
+  const next = resolveAiResultRoute({ current: 'ai-analysis-result-scroll', text: tallText, viewedFull: false, terminalRows: 16, terminalCols: 80 })
+  if (next !== null)
+    throw new Error(`expected null (stay in scroll), got ${next}`)
+})
+
+test('resolveAiResultRoute: inline + fits → stay (null)', () => {
+  const next = resolveAiResultRoute({ current: 'ai-analysis-result', text: shortText, viewedFull: false, terminalRows: 40, terminalCols: 80 })
+  if (next !== null)
+    throw new Error(`expected null (stay inline), got ${next}`)
+})
+
+test('resolveAiResultRoute: viewedFull pins inline even when too tall', () => {
+  // User dismissed the viewer; a later shrink must NOT shove them back in.
+  const next = resolveAiResultRoute({ current: 'ai-analysis-result', text: tallText, viewedFull: true, terminalRows: 16, terminalCols: 80 })
+  if (next !== null)
+    throw new Error(`expected null (viewedFull pins inline), got ${next}`)
+})
+
+test('resolveAiResultRoute: null text → null (no routing)', () => {
+  const next = resolveAiResultRoute({ current: 'ai-analysis-result-scroll', text: null, viewedFull: false, terminalRows: 60, terminalCols: 120 })
+  if (next !== null)
+    throw new Error(`expected null, got ${next}`)
+})
+
+// Stability: routing settles in one hop at any size — re-running from the
+// returned step yields null (no oscillation). Sweep representative sizes.
+test('resolveAiResultRoute: settles in one hop (no oscillation) across sizes', () => {
+  for (const text of [shortText, tallText]) {
+    for (const rows of [12, 16, 20, 30, 50]) {
+      for (const start of ['ai-analysis-result', 'ai-analysis-result-scroll']) {
+        const next = resolveAiResultRoute({ current: start, text, viewedFull: false, terminalRows: rows, terminalCols: 80 })
+        const settled = next ?? start
+        const again = resolveAiResultRoute({ current: settled, text, viewedFull: false, terminalRows: rows, terminalCols: 80 })
+        if (again !== null)
+          throw new Error(`oscillation: start=${start} rows=${rows} → ${settled} → ${again}`)
+      }
+    }
+  }
 })
 
 console.log(`\n${passed} passed, ${failed} failed`)

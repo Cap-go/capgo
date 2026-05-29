@@ -79,6 +79,50 @@ export function isAiAnalysisTooTall(
   return estimated > availableRows
 }
 
+// The two AI-analysis-result steps. Both wizards (iOS + Android) use these same
+// literal step names, so the routing decision below is platform-agnostic.
+export type AiResultStep = 'ai-analysis-result' | 'ai-analysis-result-scroll'
+
+/**
+ * Decide which AI-result step should be active for the CURRENT terminal size.
+ *
+ * Routing is BIDIRECTIONAL and driven by the single `isAiAnalysisTooTall`
+ * predicate, so it settles deterministically at any size — at a given size
+ * exactly one outcome is stable, so it can't oscillate:
+ *   - inline + now too tall (terminal shrank)  → scroll
+ *   - scroll + now fits      (terminal grew)    → inline   ← the missing case
+ *
+ * Before, only the inline→scroll direction existed: once the viewer opened
+ * (e.g. after shrinking), growing the terminal never returned to the inline
+ * render — the user was stuck in the scroll viewer showing "all N lines" with
+ * empty space.
+ *
+ * `viewedFull` (the user manually dismissed the viewer with Esc/Enter) pins the
+ * inline step so a later resize can't shove a dismissed analysis back into the
+ * viewer. It only gates the inline→scroll direction; leaving the viewer when it
+ * fits is always allowed.
+ *
+ * @returns the step to switch to, or `null` when the current step is already
+ *   correct (so the caller can skip a no-op `setStep`).
+ */
+export function resolveAiResultRoute(params: {
+  current: AiResultStep
+  text: string | null
+  viewedFull: boolean
+  terminalRows: number
+  terminalCols: number
+}): AiResultStep | null {
+  const { current, text, viewedFull, terminalRows, terminalCols } = params
+  if (!text)
+    return null
+  const tooTall = isAiAnalysisTooTall(text, terminalRows, terminalCols)
+  if (current === 'ai-analysis-result' && tooTall && !viewedFull)
+    return 'ai-analysis-result-scroll'
+  if (current === 'ai-analysis-result-scroll' && !tooTall)
+    return 'ai-analysis-result'
+  return null
+}
+
 /**
  * Wrap-aware rendered-row count for a single logical line.
  * Treats blank/empty lines as one row (Ink still occupies a row for them).
