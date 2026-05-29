@@ -1935,7 +1935,7 @@ async function addAppStep(organization: Organization, apikey: string, appId: str
       const s = pSpinner()
       s.start(`Running: ${pm.runner} @capgo/cli@latest app add ${currentAppId}`)
       try {
-        await addAppInternal(currentAppId, options, organization, true)
+        await addAppInternal(currentAppId, options, organization, true, 'onboarding')
         await saveAppIdToCapacitorConfig(currentAppId)
       }
       catch (innerError) {

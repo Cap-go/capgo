@@ -3,6 +3,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod'
 import pack from '../../package.json'
+import { setInvocationSource, trackMcpServerStarted, withMcpToolTracking } from '../analytics/track'
 import { addAppOptionsSchema, cleanupOptionsSchema, getStatsOptionsSchema, requestBuildOptionsSchema, starAllRepositoriesOptionsSchema, starRepoOptionsSchema, updateAppOptionsSchema, updateChannelOptionsSchema, uploadOptionsSchema } from '../schemas/sdk'
 import { CapgoSDK } from '../sdk'
 import { findSavedKey } from '../utils'
@@ -34,6 +35,17 @@ export async function startMcpServer(): Promise<void> {
     name: 'capgo',
     version: pack.version,
   })
+
+  setInvocationSource('mcp')
+
+  // Auto-track every tool invocation without touching each registration.
+  const originalTool = server.tool.bind(server)
+  ;(server as unknown as { tool: (...args: any[]) => unknown }).tool = (...args: any[]) => {
+    const handlerIndex = args.length - 1
+    if (typeof args[handlerIndex] === 'function')
+      args[handlerIndex] = withMcpToolTracking(String(args[0]), args[handlerIndex])
+    return (originalTool as (...a: any[]) => unknown)(...args)
+  }
 
   // Initialize SDK - will use saved API key or require it per-call
   let savedApiKey: string | undefined
@@ -594,4 +606,5 @@ export async function startMcpServer(): Promise<void> {
   // Start the server with stdio transport
   const transport = new StdioServerTransport()
   await server.connect(transport)
+  trackMcpServerStarted(Boolean(savedApiKey))
 }
