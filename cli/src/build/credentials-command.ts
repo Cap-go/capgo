@@ -607,7 +607,7 @@ export async function listCredentialsCommand(options?: { appId?: string, local?:
     log.info('\n🔒 These credentials are stored locally on your machine only.')
     log.info('   When building, they are sent to Capgo but NEVER stored there.\n')
 
-    void trackEvent({ channel: 'credentials', event: 'Credentials Listed', icon: '📋', tags: { credentials_count: allAppIds.length } })
+    void trackEvent({ channel: 'credentials', event: 'Credentials Listed', icon: '📋', tags: { credentials_count: appsToShow.length } })
   }
   catch (error) {
     log.error(`Failed to list credentials: ${error instanceof Error ? error.message : String(error)}`)

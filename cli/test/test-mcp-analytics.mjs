@@ -6,6 +6,7 @@ console.log('🧪 Testing MCP tool tracking...\n')
 
 const originalFetch = globalThis.fetch
 const originalDisable = process.env.CAPGO_DISABLE_TELEMETRY
+const originalDisablePosthog = process.env.CAPGO_DISABLE_POSTHOG
 const originalToken = process.env.CAPGO_TOKEN
 
 function stubFetch() {
@@ -22,6 +23,7 @@ const findEvent = requests => requests.find(r => r.url.endsWith('/private/events
 
 try {
   delete process.env.CAPGO_DISABLE_TELEMETRY
+  delete process.env.CAPGO_DISABLE_POSTHOG
   process.env.CAPGO_TOKEN = 'mcp-key'
   setInvocationSource('mcp')
 
@@ -63,6 +65,9 @@ finally {
   if (originalDisable === undefined)
     delete process.env.CAPGO_DISABLE_TELEMETRY
   else process.env.CAPGO_DISABLE_TELEMETRY = originalDisable
+  if (originalDisablePosthog === undefined)
+    delete process.env.CAPGO_DISABLE_POSTHOG
+  else process.env.CAPGO_DISABLE_POSTHOG = originalDisablePosthog
   if (originalToken === undefined)
     delete process.env.CAPGO_TOKEN
   else process.env.CAPGO_TOKEN = originalToken

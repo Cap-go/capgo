@@ -17,6 +17,18 @@ const fresh = computeDoctorAnalyticsTags(
   { '@capgo/capacitor-updater': '6.2.0' },
 )
 assert.equal(fresh.is_outdated, false)
+assert.equal(fresh.dependency_count, 1)
 assert.equal(fresh.outdated_count, 0)
+
+// edge cases
+const empty = computeDoctorAnalyticsTags({}, {})
+assert.equal(empty.is_outdated, false)
+assert.equal(empty.dependency_count, 0)
+assert.equal(empty.outdated_count, 0)
+
+const allOutdated = computeDoctorAnalyticsTags({ a: '1.0.0', b: '2.0.0' }, { a: '1.1.0', b: '2.1.0' })
+assert.equal(allOutdated.is_outdated, true)
+assert.equal(allOutdated.dependency_count, 2)
+assert.equal(allOutdated.outdated_count, 2)
 
 console.log('✅ doctor analytics tags tests passed')

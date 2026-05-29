@@ -11,8 +11,8 @@ export function starRepositoryCommand(repository?: string) {
   }
   else {
     log.success(`🙏 Thanks for starring ${fullRepo} 🎉`)
+    void trackEvent({ channel: 'cli-usage', event: 'Repo Starred', icon: '⭐', tags: { repo_count: 1 } })
   }
-  void trackEvent({ channel: 'cli-usage', event: 'Repo Starred', icon: '⭐', tags: { repo_count: 1 } })
 }
 
 interface StarAllCommandOptions {
@@ -123,7 +123,8 @@ export async function starAllRepositoriesCommand(repositories: string[], options
     const starredCount = result.filter(entry => entry.status === 'starred').length
     const alreadyStarredCount = result.filter(entry => entry.status === 'already_starred').length
     const failedCount = result.filter(entry => entry.status === 'failed').length
-    void trackEvent({ channel: 'cli-usage', event: 'Repo Starred', icon: '⭐', tags: { repo_count: starredCount } })
+    if (starredCount > 0)
+      void trackEvent({ channel: 'cli-usage', event: 'Repo Starred', icon: '⭐', tags: { repo_count: starredCount } })
     const completionMessage = !hasResult
       ? 'No repositories were processed.'
       : `Completed ${result.length} repository(s): ${starredCount} starred, ${alreadyStarredCount} already starred, ${failedCount} failed.`

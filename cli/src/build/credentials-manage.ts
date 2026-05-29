@@ -492,10 +492,10 @@ export async function manageCredentialsCommand(options: ManageCredentialsOptions
       }
     }
 
-    if (!handedOffToOnboarding)
+    if (!handedOffToOnboarding) {
       pOutro('Done.')
-
-    void trackEvent({ channel: 'credentials', event: 'Credentials Managed', icon: '🗂️', tags: {} })
+      void trackEvent({ channel: 'credentials', event: 'Credentials Managed', icon: '🗂️', tags: {} })
+    }
   }
   catch (error) {
     pCancel(`Failed: ${error instanceof Error ? error.message : String(error)}`)

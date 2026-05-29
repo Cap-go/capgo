@@ -6,6 +6,7 @@ console.log('🧪 Testing analytics track.ts...\n')
 
 const originalFetch = globalThis.fetch
 const originalDisable = process.env.CAPGO_DISABLE_TELEMETRY
+const originalDisablePosthog = process.env.CAPGO_DISABLE_POSTHOG
 const originalToken = process.env.CAPGO_TOKEN
 
 function stubFetch() {
@@ -34,6 +35,7 @@ try {
 
   // 2. v2 actor-scoped payload (explicit org + app => no context lookup)
   delete process.env.CAPGO_DISABLE_TELEMETRY
+  delete process.env.CAPGO_DISABLE_POSTHOG
   let requests = stubFetch()
   await trackEvent({ apikey: 'capgo-key', channel: 'cli-usage', event: 'Test Event', orgId: 'org-1', appId: 'com.example.app', tags: { foo: 'bar', count: 3, flag: true } })
   await flushAnalytics()
@@ -128,6 +130,9 @@ finally {
   if (originalDisable === undefined)
     delete process.env.CAPGO_DISABLE_TELEMETRY
   else process.env.CAPGO_DISABLE_TELEMETRY = originalDisable
+  if (originalDisablePosthog === undefined)
+    delete process.env.CAPGO_DISABLE_POSTHOG
+  else process.env.CAPGO_DISABLE_POSTHOG = originalDisablePosthog
   if (originalToken === undefined)
     delete process.env.CAPGO_TOKEN
   else process.env.CAPGO_TOKEN = originalToken

@@ -1104,42 +1104,47 @@ program.configureOutput({
   },
 })
 
-program.parseAsync().then(async () => {
-  await flushAnalytics()
-}).catch(async (error: unknown) => {
-  if (typeof error === 'object' && error !== null && 'code' in error) {
-    const commanderError = error as { code: string, exitCode?: number, message?: string }
-    // These are normal Commander.js exits (help, version, etc.) - exit silently
-    if (commanderError.code === 'commander.version' || commanderError.code === 'commander.helpDisplayed') {
-      exit(0)
-    }
-    const capturePromise = shouldCapturePosthogException(error)
-      ? capturePosthogException({
-          error,
-          functionName: currentCommandPath,
-          kind: 'unhandled_error',
-          status: commanderError.exitCode ?? 1,
-        })
-      : Promise.resolve(false)
-    // For actual errors, show just the message without the full stack trace
-    if (commanderError.message) {
-      log.error(commanderError.message)
-    }
-    const exitCode = commanderError.exitCode ?? 1
-    if (shouldCapturePosthogException(error))
-      trackCommandFailed(currentCommandPath, { errorCategory: categorizeCliError(error), exitCode })
-    await Promise.all([capturePromise, flushAnalytics()])
-    exit(exitCode)
+void (async () => {
+  try {
+    await program.parseAsync()
+    await flushAnalytics()
   }
-  const capturePromise = capturePosthogException({
-    error,
-    functionName: currentCommandPath,
-    kind: 'unhandled_error',
-    status: 1,
-  })
-  // For non-Commander errors, show full error details
-  log.error(`Error: ${formatError(error)}`)
-  trackCommandFailed(currentCommandPath, { errorCategory: categorizeCliError(error), exitCode: 1 })
-  await Promise.all([capturePromise, flushAnalytics()])
-  exit(1)
-})
+  catch (error: unknown) {
+    if (typeof error === 'object' && error !== null && 'code' in error) {
+      const commanderError = error as { code: string, exitCode?: number, message?: string }
+      // These are normal Commander.js exits (help, version, etc.) - exit silently
+      if (commanderError.code === 'commander.version' || commanderError.code === 'commander.helpDisplayed') {
+        await flushAnalytics()
+        exit(0)
+      }
+      const capturePromise = shouldCapturePosthogException(error)
+        ? capturePosthogException({
+            error,
+            functionName: currentCommandPath,
+            kind: 'unhandled_error',
+            status: commanderError.exitCode ?? 1,
+          })
+        : Promise.resolve(false)
+      // For actual errors, show just the message without the full stack trace
+      if (commanderError.message) {
+        log.error(commanderError.message)
+      }
+      const exitCode = commanderError.exitCode ?? 1
+      if (shouldCapturePosthogException(error))
+        trackCommandFailed(currentCommandPath, { errorCategory: categorizeCliError(error), exitCode })
+      await Promise.all([capturePromise, flushAnalytics()])
+      exit(exitCode)
+    }
+    const capturePromise = capturePosthogException({
+      error,
+      functionName: currentCommandPath,
+      kind: 'unhandled_error',
+      status: 1,
+    })
+    // For non-Commander errors, show full error details
+    log.error(`Error: ${formatError(error)}`)
+    trackCommandFailed(currentCommandPath, { errorCategory: categorizeCliError(error), exitCode: 1 })
+    await Promise.all([capturePromise, flushAnalytics()])
+    exit(1)
+  }
+})()

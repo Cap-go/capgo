@@ -79,12 +79,14 @@ export async function flushAnalytics(timeoutMs = 2000): Promise<void> {
 }
 
 // --- best-effort app + owner-org context from the local Capacitor config ---
-let cachedContext: Promise<{ appId?: string, orgId?: string }> | undefined
+// Keyed by apikey so events for different accounts never reuse another's org.
+const cachedContextByApiKey = new Map<string, Promise<{ appId?: string, orgId?: string }>>()
 
 export function resolveTrackingContext(apikey: string, signal?: AbortSignal): Promise<{ appId?: string, orgId?: string }> {
-  if (cachedContext)
-    return cachedContext
-  cachedContext = (async () => {
+  const cached = cachedContextByApiKey.get(apikey)
+  if (cached)
+    return cached
+  const promise = (async () => {
     try {
       const extConfig = await getConfig(true).catch(() => undefined)
       const appId = getAppId('', extConfig?.config) || undefined
@@ -97,7 +99,8 @@ export function resolveTrackingContext(apikey: string, signal?: AbortSignal): Pr
       return {}
     }
   })()
-  return cachedContext
+  cachedContextByApiKey.set(apikey, promise)
+  return promise
 }
 
 export interface TrackEventInput {
