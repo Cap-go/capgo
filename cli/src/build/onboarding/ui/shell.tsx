@@ -53,7 +53,10 @@ async function loadReady(platform: Platform, appId: string): Promise<ReadyApp> {
 // direct read is already current. Holding the size in state instead lags by one
 // frame (the resize re-render runs with the stale state until setState flushes),
 // which shows up as a 1-row "jump then correct" on the bottom-pinned legend.
-function useTerminalSize(): { cols: number, rows: number } {
+//
+// Exported so the resize harness in test/test-frame-fit-resize.mjs drives the
+// REAL hook (not a copy) through a simulated resize.
+export function useTerminalSize(): { cols: number, rows: number } {
   const { stdout } = useStdout()
   const [, forceRerender] = useState(0)
   useEffect(() => {

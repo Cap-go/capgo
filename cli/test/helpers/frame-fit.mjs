@@ -82,6 +82,56 @@ export function frameRows(element, columns = 80) {
   return text === '' ? 0 : text.split('\n').length
 }
 
+// Settle pending microtasks + macrotask turns so React/Ink commit any scheduled
+// re-render (incl. passive useEffect effects) and flush its frame to the stub
+// before we inspect frames. React's passive effects flush on a later turn than
+// the commit, so we pump several turns + a timer.
+async function flush() {
+  for (let i = 0; i < 5; i++)
+    await new Promise(resolve => setImmediate(resolve))
+  await new Promise(resolve => setTimeout(resolve, 20))
+}
+
+/**
+ * Render an element, then simulate a terminal resize and return the full frame
+ * sequence split at the resize boundary. A "resize" is exactly what a real TTY
+ * does: mutate stdout.columns/rows, then emit 'resize' — ink (and any
+ * useStdout-based hook) listen for that event. `debug: true` makes ink write
+ * every render synchronously to the stub, so `frames` holds the whole sequence
+ * (no render throttling), which is what lets us see a transient stale frame.
+ *
+ * @param {import('react').ReactElement} element
+ * @param {{ from: { cols: number, rows: number }, to: { cols: number, rows: number } }} opts
+ * @returns {Promise<{ before: string[], after: string[] }>} frames emitted
+ *   before vs. after the resize event
+ */
+export async function renderResizeFrames(element, { from, to }) {
+  const stdout = makeStdout(from.cols)
+  stdout.rows = from.rows
+  const stderr = makeStdout(from.cols)
+  const stdin = makeStdin()
+  const instance = inkRender(element, {
+    stdout,
+    stderr,
+    stdin,
+    debug: true,
+    exitOnCtrlC: false,
+    patchConsole: false,
+  })
+  await flush()
+  const splitAt = stdout.frames.length
+  // Simulate the resize: new dimensions are live BEFORE the event fires (Node
+  // updates stdout.columns/rows, then emits), mirroring a real terminal.
+  stdout.columns = to.cols
+  stdout.rows = to.rows
+  stdout.emit('resize')
+  await flush()
+  const before = stdout.frames.slice(0, splitAt)
+  const after = stdout.frames.slice(splitAt)
+  instance.unmount()
+  return { before, after }
+}
+
 /**
  * Assert a step body fits the budget at every reference width. Throws a
  * detailed error (label, width, rows, budget, rendered frame) on the first
