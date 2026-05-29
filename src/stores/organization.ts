@@ -5,6 +5,7 @@ import { defineStore } from 'pinia'
 import { computed, ref, watch } from 'vue'
 import { createSignedImageUrl, getImmediateImageUrl, resolveImagePath } from '~/services/storage'
 import { stripeEnabled, useSupabase } from '~/services/supabase'
+import { clearWebsitePaidUserCookie, syncWebsitePaidUserCookieFromOrganizations } from '~/services/websiteAuthCookie'
 import { createDeferredPromise } from '../utils/promise'
 import { useDashboardAppsStore } from './dashboardApps'
 import { useDisplayStore } from './display'
@@ -461,6 +462,7 @@ export const useOrganizationStore = defineStore('organization', () => {
       const listener = supabase.auth.onAuthStateChange((event: any) => {
         if (event === 'SIGNED_OUT') {
           listener.data.subscription.unsubscribe()
+          clearWebsitePaidUserCookie()
           // Remove all from orgs
           _organizations.value = new Map()
           _organizationsByAppId.value = new Map()
@@ -479,6 +481,7 @@ export const useOrganizationStore = defineStore('organization', () => {
 
     if (error) {
       console.error('Cannot get orgs!', error)
+      clearWebsitePaidUserCookie()
       throw error
     }
 
@@ -495,6 +498,7 @@ export const useOrganizationStore = defineStore('organization', () => {
       } as Organization & { id: number }
     })
 
+    syncWebsitePaidUserCookieFromOrganizations(mappedData)
     _organizations.value = new Map(mappedData.map(item => [item.gid, item as Organization]))
     loadOrganizationLogos(mappedData, logoLoadRun)
 
