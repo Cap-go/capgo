@@ -1,6 +1,7 @@
 import type { PlatformChoice } from '../init/command'
 import { exit, stdin, stdout } from 'node:process'
 import { cancel as clackCancel, isCancel as clackIsCancel, log as clackLog, select as clackSelect } from '@clack/prompts'
+import { trackEvent } from '../analytics/track'
 import { normalizeRunDevicePlatform, resolveRunDeviceCommand, runPackageRunnerSync } from '../init/command'
 import { cancel as pCancel, log as pLog, outro as pOutro, spinner as pSpinner } from '../init/prompts'
 import { setInitScreen } from '../init/runtime'
@@ -137,6 +138,8 @@ export async function testRunDeviceCommand(platformName?: string, options: RunDe
   try {
     const pm = getPMAndCommand()
     const platformNameChoice = await selectRunDevicePlatform(platformName, interactive)
+
+    void trackEvent({ channel: 'cli-usage', event: 'Run On Device', icon: '📱', tags: { platform: platformNameChoice } })
 
     if (!interactive) {
       const runCommand = getNonInteractiveRunDeviceCommand(pm, platformNameChoice)

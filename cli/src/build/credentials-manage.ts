@@ -17,6 +17,7 @@ import {
   text as pText,
 } from '../init/prompts'
 import { clearInitLogs, setInitScreen, stopInitInkSession } from '../init/runtime'
+import { trackEvent } from '../analytics/track'
 import { getAppId, getConfig } from '../utils'
 import {
   clearSavedCredentials,
@@ -493,6 +494,8 @@ export async function manageCredentialsCommand(options: ManageCredentialsOptions
 
     if (!handedOffToOnboarding)
       pOutro('Done.')
+
+    void trackEvent({ channel: 'credentials', event: 'Credentials Managed', icon: '🗂️', tags: {} })
   }
   catch (error) {
     pCancel(`Failed: ${error instanceof Error ? error.message : String(error)}`)
