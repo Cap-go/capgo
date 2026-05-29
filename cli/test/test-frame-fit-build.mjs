@@ -12,7 +12,7 @@
 // never exceeds the terminal height (so it can never report "too small"), the
 // newest line is always shown (tail), and the status bar shows the line count.
 import React from 'react'
-import { FullscreenBuildOutput } from '../src/build/onboarding/ui/components.tsx'
+import { buildScrollAction, FullscreenBuildOutput } from '../src/build/onboarding/ui/components.tsx'
 import { renderFrameText } from './helpers/frame-fit.mjs'
 
 let passed = 0
@@ -64,6 +64,57 @@ test('short log fits and still shows content + status bar', () => {
   assert(height <= 24, `short-log frame is ${height} rows, exceeds 24`)
   assert(frame.includes('✔ Build job created'), 'short-log content should show')
   assert(/\(2 lines\)/.test(frame), 'line count should be 2')
+})
+
+// ── buildScrollAction: scroll/follow transitions (less +F style) ─────────────
+// Pure logic, so we test it directly rather than simulating keypresses through
+// the harness (which can't reliably surface input timing). maxScrollOffset=20,
+// viewportRows=10 throughout.
+const S = (scrollOffset, maxScrollOffset = 20, viewportRows = 10) => ({ scrollOffset, maxScrollOffset, viewportRows })
+
+test('scroll: ↑ from the bottom pauses follow and moves up one line', () => {
+  const r = buildScrollAction('', { upArrow: true }, S(20))
+  assert(r && r.scrollOffset === 19 && r.follow === false, `got ${JSON.stringify(r)}`)
+})
+
+test('scroll: ↓ back to the bottom resumes follow', () => {
+  const r = buildScrollAction('', { downArrow: true }, S(19))
+  assert(r && r.scrollOffset === 20 && r.follow === true, `got ${JSON.stringify(r)}`)
+})
+
+test('scroll: ↓ while still above the bottom stays paused', () => {
+  const r = buildScrollAction('', { downArrow: true }, S(10))
+  assert(r && r.scrollOffset === 11 && r.follow === false, `got ${JSON.stringify(r)}`)
+})
+
+test('scroll: G follows from the bottom; g jumps to the top (paused)', () => {
+  const g = buildScrollAction('G', {}, S(0))
+  assert(g && g.scrollOffset === 20 && g.follow === true, `G: ${JSON.stringify(g)}`)
+  const top = buildScrollAction('g', {}, S(20))
+  assert(top && top.scrollOffset === 0 && top.follow === false, `g: ${JSON.stringify(top)}`)
+})
+
+test('scroll: PgUp/PgDn move a viewport and clamp at the edges', () => {
+  const up = buildScrollAction('', { pageUp: true }, S(5))
+  assert(up && up.scrollOffset === 0 && up.follow === false, `PgUp clamps to 0: ${JSON.stringify(up)}`)
+  const down = buildScrollAction('', { pageDown: true }, S(15))
+  assert(down && down.scrollOffset === 20 && down.follow === true, `PgDn clamps to bottom + follows: ${JSON.stringify(down)}`)
+})
+
+test('scroll: ↑ at the top stays at 0 (paused)', () => {
+  const r = buildScrollAction('', { upArrow: true }, S(0))
+  assert(r && r.scrollOffset === 0 && r.follow === false, `got ${JSON.stringify(r)}`)
+})
+
+test('scroll: j/k/space aliases work (vim + space-page)', () => {
+  assert(buildScrollAction('k', {}, S(20)).scrollOffset === 19, 'k = up')
+  assert(buildScrollAction('j', {}, S(10)).scrollOffset === 11, 'j = down')
+  assert(buildScrollAction(' ', {}, S(0)).scrollOffset === 10, 'space = page down')
+})
+
+test('scroll: unhandled keys are a no-op (null)', () => {
+  assert(buildScrollAction('x', {}, S(10)) === null, 'random key should be a no-op')
+  assert(buildScrollAction('', { return: true }, S(10)) === null, 'enter is not a scroll key')
 })
 
 console.log(`\n${passed} passed, ${failed} failed`)

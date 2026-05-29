@@ -351,18 +351,51 @@ export const FullscreenAiViewer: FC<{
   )
 }
 
+// Pure keypress → scroll/follow transition for the streaming build viewer
+// (extracted so the scroll logic is unit-testable without rendering, like
+// platformKeyAction). Returns the next { scrollOffset, follow } or null for an
+// unhandled key. Scrolling down to the bottom (re)enables follow; any upward
+// move pauses it; G jumps to the bottom and follows, g jumps to the top.
+export interface BuildScrollState { scrollOffset: number, follow: boolean }
+export function buildScrollAction(
+  input: string,
+  key: { upArrow?: boolean, downArrow?: boolean, pageUp?: boolean, pageDown?: boolean },
+  state: { scrollOffset: number, maxScrollOffset: number, viewportRows: number },
+): BuildScrollState | null {
+  const { scrollOffset, maxScrollOffset, viewportRows } = state
+  if (key.downArrow || input === 'j') {
+    const next = Math.min(scrollOffset + 1, maxScrollOffset)
+    return { scrollOffset: next, follow: next >= maxScrollOffset }
+  }
+  if (key.upArrow || input === 'k')
+    return { scrollOffset: Math.max(scrollOffset - 1, 0), follow: false }
+  if (key.pageDown || input === 'd' || input === ' ') {
+    const next = Math.min(scrollOffset + viewportRows, maxScrollOffset)
+    return { scrollOffset: next, follow: next >= maxScrollOffset }
+  }
+  if (key.pageUp || input === 'u')
+    return { scrollOffset: Math.max(scrollOffset - viewportRows, 0), follow: false }
+  if (input === 'g')
+    return { scrollOffset: 0, follow: false }
+  if (input === 'G')
+    return { scrollOffset: maxScrollOffset, follow: true }
+  return null
+}
+
 // Streaming build-output viewer — a fullscreen takeover (like FullscreenAiViewer)
 // the parent renders as an EARLY RETURN so it owns the whole terminal and
 // BYPASSES the wizard's body-measurement / dense / too-small logic. The
 // `requesting-build` step's output grows unbounded; rendered inside the measured
 // body it inflated bodyHeight and tripped the "terminal too small" gate. Here it
-// can't: the output auto-tails inside a fixed-height viewport that always fits
-// the live screen, exactly as the AI analysis viewer paginates tall content.
+// can't: the output lives in a fixed-height viewport that always fits the live
+// screen, exactly as the AI analysis viewer paginates tall content.
 //
-// Auto-tail (not manual scroll): the build streams, so we always show the most
-// recent screenful, bottom-aligned just above the status bar — like `tail -f`.
-// Chrome is two rows (a divider + the "Building… (N lines)" status); the rest is
-// the clipped tail viewport, which resizes with the terminal.
+// Follow mode (like `less +F`): by default the viewport tails the stream,
+// sticking to the bottom as new lines arrive. Scrolling up (↑/k, PgUp/u) PAUSES
+// the tail so earlier output can be read; scrolling back to the bottom (↓/G)
+// resumes following. Chrome is two rows (a divider + a status line with the
+// spinner, line count, and a follow/scroll hint); the rest is the clipped
+// viewport, which resizes with the terminal.
 export const FullscreenBuildOutput: FC<{
   title: string
   lines: string[]
@@ -383,19 +416,45 @@ export const FullscreenBuildOutput: FC<{
     }
   }, [stdout])
 
-  const CHROME_ROWS = 2 // bottom divider + "Building…" status line
+  const CHROME_ROWS = 2 // bottom divider + status line
   const viewportRows = Math.max(1, dims.rows - CHROME_ROWS)
-  // Always show the last screenful (wrap-aware), since output streams in.
-  const tailOffset = computeMaxScrollOffset(lines, viewportRows, dims.cols)
-  const visibleLines = pickVisibleLines(lines, tailOffset, viewportRows, dims.cols)
+  const maxScrollOffset = computeMaxScrollOffset(lines, viewportRows, dims.cols)
+
+  // Follow (tail) the stream by default; pause when the user scrolls up.
+  const [follow, setFollow] = useState(true)
+  const [scrollOffset, setScrollOffset] = useState(maxScrollOffset)
+
+  // While following, stay pinned to the (growing) bottom as lines stream in;
+  // otherwise just clamp so a resize-larger can't strand us past the end.
+  useEffect(() => {
+    setScrollOffset(prev => (follow ? maxScrollOffset : Math.min(prev, maxScrollOffset)))
+  }, [follow, maxScrollOffset])
+
+  useInput((input, key) => {
+    const action = buildScrollAction(input, key, { scrollOffset, maxScrollOffset, viewportRows })
+    if (!action)
+      return
+    setScrollOffset(action.scrollOffset)
+    setFollow(action.follow)
+  })
+
+  const visibleLines = pickVisibleLines(lines, scrollOffset, viewportRows, dims.cols)
   const dividerWidth = Math.max(10, Math.min(60, dims.cols - 1))
+  const atBottom = scrollOffset >= maxScrollOffset
+  const hint = maxScrollOffset === 0
+    ? ''
+    : atBottom
+      ? '  ·  ↑ scroll back'
+      : '  ·  paused — ↓/G to resume'
 
   return (
     <Box flexDirection="column" minHeight={dims.rows}>
-      {/* Fixed-height clipped tail, bottom-aligned so the newest lines sit just
-          above the status bar (and any single over-long wrapped line is clipped
-          at the top rather than pushing the footer off-screen). */}
-      <Box flexDirection="column" height={viewportRows} justifyContent="flex-end" overflow="hidden">
+      {/* Fixed-height clipped viewport. At the bottom (following) the lines are
+          bottom-aligned — newest just above the status bar, like a terminal
+          tail; scrolled up they read top-down from the scroll position. Either
+          way a single over-long wrapped line is clipped rather than pushing the
+          footer off-screen. */}
+      <Box flexDirection="column" height={viewportRows} justifyContent={atBottom ? 'flex-end' : 'flex-start'} overflow="hidden">
         {visibleLines.map((line, index) => {
           const isSuccess = line.startsWith('✔')
           const isError = line.startsWith('✖') || line.startsWith('❌')
@@ -403,7 +462,7 @@ export const FullscreenBuildOutput: FC<{
           const isBold = line.startsWith('✔ Build') || line.startsWith('✔ Created') || line.startsWith('Uploading:')
           const color = isSuccess ? 'green' : isError ? 'red' : isWarn ? 'yellow' : undefined
           return (
-            <Text key={`build-${tailOffset + index}`} color={color} bold={isBold} dimColor={!color && !isBold}>
+            <Text key={`build-${scrollOffset + index}`} color={color} bold={isBold} dimColor={!color && !isBold}>
               {line === '' ? ' ' : line}
             </Text>
           )
@@ -412,7 +471,7 @@ export const FullscreenBuildOutput: FC<{
       <Text color="cyan">{'─'.repeat(dividerWidth)}</Text>
       <Box>
         <SpinnerLine text={title} />
-        <Text dimColor>{` (${lines.length} lines)`}</Text>
+        <Text dimColor wrap="truncate-end">{` (${lines.length} lines)${hint}`}</Text>
       </Box>
     </Box>
   )
