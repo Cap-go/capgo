@@ -20,6 +20,13 @@ export const app = honoFactory.createApp()
 app.use('*', useCors)
 app.use('*', middlewareV2(['all', 'read']))
 
+function accumulateNumbers(values: number[]): number[] {
+  return values.reduce<number[]>((result, value) => {
+    result.push(value + (result.at(-1) ?? 0))
+    return result
+  }, [])
+}
+
 function parseQueryDate(query: Record<string, string>, key: 'from' | 'to', issues: ValidationIssue[]): Date | undefined {
   const value = query[key]
   if (typeof value !== 'string') {
@@ -524,19 +531,13 @@ async function getNormalStats(c: Context, appId: string | null, ownerOrg: string
 
   // Accumulate data if requested (default behavior for backward compatibility)
   if (noAccumulate === false) {
-    // eslint-disable-next-line style/max-statements-per-line
-    storage = (storage as number[]).reduce((p, c) => { if (p.length > 0) { c += p[p.length - 1] } p.push(c); return p }, [] as number[])
-    // eslint-disable-next-line style/max-statements-per-line
-    storageByteHours = (storageByteHours as number[]).reduce((p, c) => { if (p.length > 0) { c += p[p.length - 1] } p.push(c); return p }, [] as number[])
-    // eslint-disable-next-line style/max-statements-per-line
-    mau = (mau as number[]).reduce((p, c) => { if (p.length > 0) { c += p[p.length - 1] } p.push(c); return p }, [] as number[])
-    // eslint-disable-next-line style/max-statements-per-line
-    bandwidth = (bandwidth as number[]).reduce((p, c) => { if (p.length > 0) { c += p[p.length - 1] } p.push(c); return p }, [] as number[])
-    // eslint-disable-next-line style/max-statements-per-line
-    buildTime = (buildTime as number[]).reduce((p, c) => { if (p.length > 0) { c += p[p.length - 1] } p.push(c); return p }, [] as number[])
+    storage = accumulateNumbers(storage)
+    storageByteHours = accumulateNumbers(storageByteHours)
+    mau = accumulateNumbers(mau)
+    bandwidth = accumulateNumbers(bandwidth)
+    buildTime = accumulateNumbers(buildTime)
     if (isDashboard) {
-      // eslint-disable-next-line style/max-statements-per-line
-      gets = (gets as number[]).reduce((p, c) => { if (p.length > 0) { c += p[p.length - 1] } p.push(c); return p }, [] as number[])
+      gets = accumulateNumbers(gets)
     }
   }
   const baseDay = dayjs(from).utc()
@@ -609,49 +610,13 @@ async function getNormalStats(c: Context, appId: string | null, ownerOrg: string
 
       // Accumulate data if requested (default behavior for backward compatibility)
       if (noAccumulate === false) {
-        appStorage = (appStorage as number[]).reduce((p, c) => {
-          if (p.length > 0) {
-            c += p[p.length - 1]
-          }
-          p.push(c)
-          return p
-        }, [] as number[])
-        appStorageByteHours = (appStorageByteHours as number[]).reduce((p, c) => {
-          if (p.length > 0) {
-            c += p[p.length - 1]
-          }
-          p.push(c)
-          return p
-        }, [] as number[])
-        appMau = (appMau as number[]).reduce((p, c) => {
-          if (p.length > 0) {
-            c += p[p.length - 1]
-          }
-          p.push(c)
-          return p
-        }, [] as number[])
-        appBandwidth = (appBandwidth as number[]).reduce((p, c) => {
-          if (p.length > 0) {
-            c += p[p.length - 1]
-          }
-          p.push(c)
-          return p
-        }, [] as number[])
-        appBuildTime = (appBuildTime as number[]).reduce((p, c) => {
-          if (p.length > 0) {
-            c += p[p.length - 1]
-          }
-          p.push(c)
-          return p
-        }, [] as number[])
+        appStorage = accumulateNumbers(appStorage)
+        appStorageByteHours = accumulateNumbers(appStorageByteHours)
+        appMau = accumulateNumbers(appMau)
+        appBandwidth = accumulateNumbers(appBandwidth)
+        appBuildTime = accumulateNumbers(appBuildTime)
         if (isDashboard) {
-          appGets = (appGets as number[]).reduce((p, c) => {
-            if (p.length > 0) {
-              c += p[p.length - 1]
-            }
-            p.push(c)
-            return p
-          }, [] as number[])
+          appGets = accumulateNumbers(appGets)
         }
       }
 

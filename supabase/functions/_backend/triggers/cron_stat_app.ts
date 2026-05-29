@@ -53,6 +53,12 @@ interface VersionMetaStorageRow {
   size: number
 }
 
+interface StorageVersionLifetime {
+  addedAt?: number
+  removedAt?: number
+  size?: number
+}
+
 interface StorageHourlyRow {
   app_id: string
   owner_org: string
@@ -74,6 +80,14 @@ interface StorageHourlyCalculationResult {
   skippedMissingAddition: number
   skippedInvalidInterval: number
   error?: string
+}
+
+type StorageIntervalSkipReason = 'missingAddition' | 'invalidInterval' | 'outsideCycle'
+
+interface StorageInterval {
+  start: number
+  end: number
+  size: number
 }
 
 const HOUR_MS = 60 * 60 * 1000
@@ -107,6 +121,88 @@ function getStorageDailyDeleteRange(cycleStart: string, cycleEnd: string) {
   }
 }
 
+function emptyStorageHourlyCalculationResult(): StorageHourlyCalculationResult {
+  return {
+    rows: [],
+    skippedMissingAddition: 0,
+    skippedInvalidInterval: 0,
+  }
+}
+
+function assertStorageCycleWithinLimit(cycleStartMs: number, cycleEndMs: number) {
+  const cycleHours = Math.ceil((cycleEndMs - cycleStartMs) / HOUR_MS)
+  if (cycleHours > MAX_STORAGE_CYCLE_HOURS)
+    throw new Error(`Billing cycle is too large for hourly storage calculation: ${cycleHours} hours`)
+}
+
+function applyStorageEvent(current: StorageVersionLifetime, event: VersionMetaStorageRow, timestamp: number) {
+  if (event.size > 0) {
+    if (current.addedAt === undefined || timestamp < current.addedAt) {
+      current.addedAt = timestamp
+      current.size = event.size
+    }
+    return
+  }
+
+  if (event.size < 0 && (current.removedAt === undefined || timestamp < current.removedAt))
+    current.removedAt = timestamp
+}
+
+function collectStorageVersionLifetimes(events: VersionMetaStorageRow[]) {
+  const versions = new Map<number, StorageVersionLifetime>()
+  for (const event of events) {
+    const timestamp = parseTimestampMs(event.timestamp)
+    const current = versions.get(event.version_id) ?? {}
+    applyStorageEvent(current, event, timestamp)
+    versions.set(event.version_id, current)
+  }
+  return versions
+}
+
+function getStorageInterval(
+  version: StorageVersionLifetime,
+  cycleStartMs: number,
+  calculationEndMs: number,
+  cycleEndMs: number,
+): StorageInterval | { skipReason: StorageIntervalSkipReason } {
+  if (version.addedAt === undefined || version.size === undefined || version.size <= 0)
+    return { skipReason: 'missingAddition' }
+
+  const start = Math.max(version.addedAt, cycleStartMs)
+  const end = Math.min(version.removedAt ?? calculationEndMs, calculationEndMs, cycleEndMs)
+  if (end <= cycleStartMs || start >= calculationEndMs)
+    return { skipReason: 'outsideCycle' }
+  if (end <= start)
+    return { skipReason: 'invalidInterval' }
+
+  return { start, end, size: version.size }
+}
+
+function addStorageIntervalToDailyBuckets(dailyBuckets: Map<number, number>, interval: StorageInterval) {
+  for (let bucketStart = floorToDay(interval.start); bucketStart < interval.end; bucketStart += DAY_MS) {
+    const overlapStart = Math.max(bucketStart, interval.start)
+    const overlapEnd = Math.min(bucketStart + DAY_MS, interval.end)
+    if (overlapEnd <= overlapStart)
+      continue
+
+    const byteHours = interval.size * ((overlapEnd - overlapStart) / HOUR_MS)
+    dailyBuckets.set(bucketStart, (dailyBuckets.get(bucketStart) ?? 0) + byteHours)
+  }
+}
+
+function buildStorageHourlyRows(dailyBuckets: Map<number, number>, options: StorageHourlyCalculationOptions) {
+  const now = new Date().toISOString()
+  return Array.from(dailyBuckets.entries())
+    .sort(([a], [b]) => a - b)
+    .map(([dateMs, storageByteHours]) => ({
+      app_id: options.appId,
+      owner_org: options.ownerOrg,
+      date: formatUtcDay(dateMs),
+      storage_byte_hours: storageByteHours,
+      updated_at: now,
+    }))
+}
+
 export function calculateStorageHourlyRows(
   events: VersionMetaStorageRow[],
   options: StorageHourlyCalculationOptions,
@@ -116,79 +212,30 @@ export function calculateStorageHourlyRows(
   const currentHourMs = options.currentHour ? parseTimestampMs(options.currentHour) : Date.now()
   const calculationEndMs = Math.min(cycleEndMs, currentHourMs)
 
-  if (calculationEndMs <= cycleStartMs) {
-    return {
-      rows: [],
-      skippedMissingAddition: 0,
-      skippedInvalidInterval: 0,
-    }
-  }
+  if (calculationEndMs <= cycleStartMs)
+    return emptyStorageHourlyCalculationResult()
 
-  const cycleHours = Math.ceil((cycleEndMs - cycleStartMs) / HOUR_MS)
-  if (cycleHours > MAX_STORAGE_CYCLE_HOURS) {
-    throw new Error(`Billing cycle is too large for hourly storage calculation: ${cycleHours} hours`)
-  }
-
-  const versions = new Map<number, { addedAt?: number, removedAt?: number, size?: number }>()
-  for (const event of events) {
-    const timestamp = parseTimestampMs(event.timestamp)
-    const current = versions.get(event.version_id) ?? {}
-    if (event.size > 0) {
-      if (current.addedAt === undefined || timestamp < current.addedAt) {
-        current.addedAt = timestamp
-        current.size = event.size
-      }
-    }
-    else if (event.size < 0) {
-      if (current.removedAt === undefined || timestamp < current.removedAt)
-        current.removedAt = timestamp
-    }
-    versions.set(event.version_id, current)
-  }
-
+  assertStorageCycleWithinLimit(cycleStartMs, cycleEndMs)
+  const versions = collectStorageVersionLifetimes(events)
   const dailyBuckets = new Map<number, number>()
   let skippedMissingAddition = 0
   let skippedInvalidInterval = 0
 
   for (const version of versions.values()) {
-    if (version.addedAt === undefined || version.size === undefined || version.size <= 0) {
-      skippedMissingAddition++
+    const interval = getStorageInterval(version, cycleStartMs, calculationEndMs, cycleEndMs)
+    if ('skipReason' in interval) {
+      if (interval.skipReason === 'missingAddition')
+        skippedMissingAddition++
+      else if (interval.skipReason === 'invalidInterval')
+        skippedInvalidInterval++
       continue
     }
 
-    const intervalStart = Math.max(version.addedAt, cycleStartMs)
-    const intervalEnd = Math.min(version.removedAt ?? calculationEndMs, calculationEndMs, cycleEndMs)
-    if (intervalEnd <= cycleStartMs || intervalStart >= calculationEndMs)
-      continue
-    if (intervalEnd <= intervalStart) {
-      skippedInvalidInterval++
-      continue
-    }
-
-    for (let bucketStart = floorToDay(intervalStart); bucketStart < intervalEnd; bucketStart += DAY_MS) {
-      const overlapStart = Math.max(bucketStart, intervalStart, cycleStartMs)
-      const overlapEnd = Math.min(bucketStart + DAY_MS, intervalEnd)
-      if (overlapEnd <= overlapStart)
-        continue
-
-      const byteHours = version.size * ((overlapEnd - overlapStart) / HOUR_MS)
-      dailyBuckets.set(bucketStart, (dailyBuckets.get(bucketStart) ?? 0) + byteHours)
-    }
+    addStorageIntervalToDailyBuckets(dailyBuckets, interval)
   }
 
-  const now = new Date().toISOString()
-  const rows = Array.from(dailyBuckets.entries())
-    .sort(([a], [b]) => a - b)
-    .map(([dateMs, storageByteHours]) => ({
-      app_id: options.appId,
-      owner_org: options.ownerOrg,
-      date: formatUtcDay(dateMs),
-      storage_byte_hours: storageByteHours,
-      updated_at: now,
-    }))
-
   return {
-    rows,
+    rows: buildStorageHourlyRows(dailyBuckets, options),
     skippedMissingAddition,
     skippedInvalidInterval,
   }
