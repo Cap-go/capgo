@@ -309,6 +309,7 @@ function go(to: number, dir: number) {
     b.classList.add('show')
     gsap.set(b, { zIndex: 2, autoAlpha: 1, xPercent: 0 })
     cur.value = to
+    track('builder_promo_slide_viewed', { slide: to + 1 })
     enter(to)
     return
   }

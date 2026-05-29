@@ -77,6 +77,8 @@ async function checkEligibility() {
 watch(
   () => props.appId,
   () => {
+    // reset the per-session impression latch so each new app re-emits "shown"
+    shownTracked = false
     checkEligibility()
   },
   { immediate: true },
