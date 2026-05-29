@@ -221,38 +221,73 @@ export interface GoogleSignInStepProps {
   dense?: boolean
 }
 
-// One explanation, sized to fit the 16-row frame (≤ BODY_BUDGET_ROWS at the
-// reference widths) so the full "why" always shows — no terse dense fallback.
-// `dense` is accepted (the caller passes it) but ignored: the copy is concise
-// enough that there's nothing to collapse. Leads with the why, then folds the
-// two consent scopes into scannable bullets that explain why each is safe.
-export const GoogleSignInStep: FC<GoogleSignInStepProps> = ({ onChoose }) => {
+// Responsive explanation, both forms leading with the WHY (never the
+// service-account mechanism):
+//   • comfortable (room to spare) — the fuller version: an info Alert + the
+//     "two approvals" framing + a per-scope breakdown of why each is safe + the
+//     trust line. Shown whenever it fits the terminal.
+//   • dense (tight) — the same why condensed to fit BODY_BUDGET_ROWS at the
+//     reference widths, in smooth prose (not the old terse fallback).
+const GOOGLE_SIGN_IN_OPTIONS = [
+  { label: '🔐  Continue to Google sign-in', value: 'go' as const },
+  { label: 'ℹ️   Why is this secure?', value: 'learn' as const },
+  { label: '✖  Exit (I\'ll do it later)', value: 'exit' as const },
+]
+
+export const GoogleSignInStep: FC<GoogleSignInStepProps> = ({ onChoose, dense = false }) => {
+  const select = (
+    <Select options={GOOGLE_SIGN_IN_OPTIONS} onChange={value => onChoose(value as GoogleSignInChoice)} />
+  )
+  if (dense) {
+    return (
+      <Box flexDirection="column" marginTop={1}>
+        <Text>Capgo uploads your signed app to Google Play for you on each cloud build. Google only allows that through a service account — this one-time sign-in creates one for you, instead of a manual setup across two Google consoles.</Text>
+        <Text>
+          •
+          {' '}
+          <Text bold>Cloud access</Text>
+          {' '}
+          looks broad, but it&apos;s used once to create that one account, then never again.
+        </Text>
+        <Text>
+          •
+          {' '}
+          <Text bold>Play access</Text>
+          {' '}
+          is release-only — this one app, nothing else.
+        </Text>
+        <Text dimColor>• Your Google sign-in token never leaves your machine; it&apos;s revoked once setup finishes.</Text>
+        {select}
+      </Box>
+    )
+  }
   return (
     <Box flexDirection="column" marginTop={1}>
-      <Text>Capgo uploads your signed app to Google Play for you on each cloud build. Google only allows that through a service account — this one-time sign-in creates one for you, instead of a manual setup across two Google consoles.</Text>
-      <Text>
-        •
-        {' '}
-        <Text bold>Cloud access</Text>
-        {' '}
-        looks broad, but it&apos;s used once to create that one account, then never again.
-      </Text>
-      <Text>
-        •
-        {' '}
-        <Text bold>Play access</Text>
-        {' '}
-        is release-only — this one app, nothing else.
-      </Text>
-      <Text dimColor>• Your Google sign-in token never leaves your machine; it&apos;s revoked once setup finishes.</Text>
-      <Select
-        options={[
-          { label: '🔐  Continue to Google sign-in', value: 'go' },
-          { label: 'ℹ️   Why is this secure?', value: 'learn' },
-          { label: '✖  Exit (I\'ll do it later)', value: 'exit' },
-        ]}
-        onChange={value => onChoose(value as GoogleSignInChoice)}
-      />
+      <Alert variant="info">
+        On every Android cloud build, Capgo uploads your signed app to Google Play for you. Google only allows that through a service account — normally a fiddly manual setup across the Google Cloud and Play consoles. This one-time sign-in does it for you, scoped to release-only access.
+      </Alert>
+      <Newline />
+      <Text>Google&apos;s consent screen will ask you to approve two things:</Text>
+      <Box flexDirection="column" marginLeft={2} marginTop={1}>
+        <Text>
+          •
+          {' '}
+          <Text bold>Create the publishing account</Text>
+          {' '}
+          in a Google Cloud project you pick. Google labels this access broadly, but Capgo only creates that one account — it never touches anything else in your Cloud.
+        </Text>
+        <Text>
+          •
+          {' '}
+          <Text bold>Give it release access</Text>
+          {' '}
+          to this one app in your Play Console, and nothing more.
+        </Text>
+      </Box>
+      <Newline />
+      <Text dimColor>Your Google sign-in token stays on your machine and is revoked once setup finishes.</Text>
+      <Newline />
+      {select}
     </Box>
   )
 }

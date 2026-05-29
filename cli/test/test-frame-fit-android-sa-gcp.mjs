@@ -116,10 +116,10 @@ test(`sa-json-validation-failed [dense, long msg] fits ${BODY_BUDGET_ROWS}-row b
 })
 
 // ── google-sign-in — pre-consent instructions ────────────────────────────────
-// One version, no dense fallback: the full "why" must always fit the frame, so
-// it's asserted against the body budget directly.
-test(`google-sign-in fits ${BODY_BUDGET_ROWS}-row budget (single version)`, () => {
-  assertFitsBudget(h(GoogleSignInStep, { onChoose: noop }), 'google-sign-in')
+// The dense (tight-terminal) form must fit the budget; the comfortable form is
+// the fuller explanation, shown only when the terminal has room for it.
+test(`google-sign-in [dense] fits ${BODY_BUDGET_ROWS}-row budget`, () => {
+  assertFitsBudget(h(GoogleSignInStep, { onChoose: noop, dense: true }), 'google-sign-in-dense')
 })
 
 // ── google-sign-in — learn-more (the historical worst offender) ───────────────
