@@ -191,8 +191,9 @@ consistency, except where noted. Animations are scoped CSS.
 - **Left:** an inline **flat Noto rocket SVG** (yellow flame paths removed,
   engine bell kept), ~30% larger than default, centered. A CSS blue exhaust
   (flame + smoke) renders **behind** the rocket (lower z-index) so the fins
-  overlap it for realism; at idle it emerges from the engine bell between the
-  fins (~22°). On CTA click it plays a ~0.7s launch: the jet swings to ~45°
+  overlap it for realism; at idle the flame + smoke emerge from the engine bell
+  between the fins, angled down-left along the rocket's axis (not vertical). On
+  CTA click it plays a ~0.7s launch: the jet swings further down-left
   (down-left, opposite travel), the rocket flies to the top-right corner with
   the trail behind it, and a smoke blast lingers at the pad — then it navigates
   to the Builds flow. Honor `prefers-reduced-motion` with a static rocket.
