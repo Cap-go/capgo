@@ -2,6 +2,8 @@ import { exit } from 'node:process'
 import { log } from '@clack/prompts'
 import { Option, program } from 'commander'
 import pack from '../package.json'
+import { categorizeCliError } from './analytics/error-category'
+import { extractCommandContext, flushAnalytics, trackCommandFailed, trackCommandInvoked, trackCommandSucceeded } from './analytics/track'
 import { addApp } from './app/add'
 import { debugApp } from './app/debug'
 import { deleteApp } from './app/delete'
@@ -67,6 +69,11 @@ let currentCommandPath = 'unknown'
 
 program.hook('preAction', (_thisCommand, actionCommand) => {
   currentCommandPath = getCommandPath(actionCommand)
+  trackCommandInvoked(currentCommandPath, extractCommandContext(actionCommand))
+})
+
+program.hook('postAction', (_thisCommand, actionCommand) => {
+  trackCommandSucceeded(getCommandPath(actionCommand))
 })
 
 program
@@ -1097,7 +1104,9 @@ program.configureOutput({
   },
 })
 
-program.parseAsync().catch(async (error: unknown) => {
+program.parseAsync().then(async () => {
+  await flushAnalytics()
+}).catch(async (error: unknown) => {
   if (typeof error === 'object' && error !== null && 'code' in error) {
     const commanderError = error as { code: string, exitCode?: number, message?: string }
     // These are normal Commander.js exits (help, version, etc.) - exit silently
@@ -1116,8 +1125,10 @@ program.parseAsync().catch(async (error: unknown) => {
     if (commanderError.message) {
       log.error(commanderError.message)
     }
-    await capturePromise
     const exitCode = commanderError.exitCode ?? 1
+    if (shouldCapturePosthogException(error))
+      trackCommandFailed(currentCommandPath, { errorCategory: categorizeCliError(error), exitCode })
+    await Promise.all([capturePromise, flushAnalytics()])
     exit(exitCode)
   }
   const capturePromise = capturePosthogException({
@@ -1128,6 +1139,7 @@ program.parseAsync().catch(async (error: unknown) => {
   })
   // For non-Commander errors, show full error details
   log.error(`Error: ${formatError(error)}`)
-  await capturePromise
+  trackCommandFailed(currentCommandPath, { errorCategory: categorizeCliError(error), exitCode: 1 })
+  await Promise.all([capturePromise, flushAnalytics()])
   exit(1)
 })
