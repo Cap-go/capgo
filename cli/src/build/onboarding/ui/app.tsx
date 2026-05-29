@@ -46,9 +46,9 @@ import {
 
   STEP_PROGRESS,
 } from '../types.js'
-import { BOX_HEADER_ROWS, Divider, FullscreenAiViewer, Header, SpinnerLine, TerminalTooSmall, WIZARD_PADDING_ROWS } from './components.js'
+import { BOX_HEADER_ROWS, COMPACT_HEADER_ROWS, Divider, FullscreenAiViewer, Header, SpinnerLine, TerminalTooSmall, WIZARD_PADDING_ROWS } from './components.js'
 import type { AiResultKind } from './components.js'
-import { COMPACT_HEADER_TOTAL_ROWS, isFrameTooSmall, shouldCollapseToDense } from './frame-fit.js'
+import { capLogRows, COMPACT_HEADER_TOTAL_ROWS, isFrameTooSmall, shouldCollapseToDense } from './frame-fit.js'
 import {
   ApiKeyInstructionsStep,
   BackingUpStep,
@@ -315,6 +315,19 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
   const bodyHeight = dense ? heights.dense : heights.comfortable
   const tooSmall = isFrameTooSmall({ bodyRows: bodyHeight, dense, terminalRows })
   const neededRows = (bodyHeight != null ? bodyHeight : 1) + COMPACT_HEADER_TOTAL_ROWS
+
+  // Rows available for the completed-steps log. The log renders OUTSIDE the
+  // measured body (so its growth never inflates the dense/fit decision) and
+  // fills only what the current step leaves: terminal minus header, padding,
+  // the measured step body, and the log's own top margin. capLogRows then packs
+  // the most recent entries and summarizes the rest — so a long history never
+  // pushes the current step off-screen or trips the resize prompt. Before the
+  // body is measured (bodyHeight null) we show all entries and let the next
+  // frame settle (same one-frame entry behaviour as the fit decision).
+  const logHeaderRows = headerCompact ? COMPACT_HEADER_ROWS : BOX_HEADER_ROWS
+  const logMaxRows = bodyHeight != null
+    ? Math.max(0, terminalRows - logHeaderRows - WIZARD_PADDING_ROWS - bodyHeight - 1)
+    : Number.POSITIVE_INFINITY
 
   // Refs to avoid stale closures in useEffect async handlers
   const p8ContentRef = useRef(p8Content)
@@ -1626,8 +1639,29 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
   return (
     <Box flexDirection="column" minHeight={terminalRows} padding={1}>
       {showHeader && <Header compact={headerCompact} />}
-      {/* Body: everything below the Header. Measured via `bodyRef` to drive
-          the box-vs-compact Header decision above. */}
+      {/* Completed-steps log — rendered OUTSIDE the measured body so its growth
+          can't inflate the dense / fit decision. Capped (see logMaxRows) to the
+          rows the current step leaves: most-recent entries newest-last, with a
+          one-line summary for the rest. */}
+      {showLog && log.length > 0 && (() => {
+        const { hidden, visible } = capLogRows(log, logMaxRows, terminalCols)
+        if (hidden === 0 && visible.length === 0)
+          return null
+        return (
+          <Box flexDirection="column" marginTop={1}>
+            {hidden > 0 && (
+              <Text dimColor>{`…and ${hidden} earlier step${hidden === 1 ? '' : 's'} done (resize taller to see all)`}</Text>
+            )}
+            {visible.map((entry, i) => (
+              <Text key={i} color={entry.color as any}>{entry.text}</Text>
+            ))}
+          </Box>
+        )
+      })()}
+      {/* Body: the current step (+ its progress bar). Measured via `bodyRef` to
+          drive the dense / box-vs-compact-header / too-small decisions. The log
+          above is excluded so the body height stays independent of how many
+          steps have completed. */}
       <Box flexDirection="column" ref={bodyRef}>
         {/* Progress bar */}
       {showProgress && (
@@ -1642,15 +1676,6 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
             </Text>
           </Box>
           <Divider />
-        </Box>
-      )}
-
-      {/* Completed steps log */}
-      {showLog && log.length > 0 && (
-        <Box flexDirection="column" marginTop={1}>
-          {log.map((entry, i) => (
-            <Text key={i} color={entry.color as any}>{entry.text}</Text>
-          ))}
         </Box>
       )}
 

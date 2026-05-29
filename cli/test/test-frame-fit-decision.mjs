@@ -12,6 +12,7 @@
 //   • a stale (wrong-density) measurement must not trigger too-small;
 //   • only block when even the dense form can't fit.
 import {
+  capLogRows,
   COMPACT_HEADER_TOTAL_ROWS,
   isFrameTooSmall,
   shouldCollapseToDense,
@@ -78,6 +79,52 @@ test('comfortable body that fits neither blocks nor collapses', () => {
 test('truly tiny terminal blocks pre-measure', () => {
   assert(isFrameTooSmall({ bodyRows: null, dense: false, terminalRows: 3 }) === true)
   assert(isFrameTooSmall({ bodyRows: null, dense: false, terminalRows: 4 }) === false)
+})
+
+// ── capLogRows (completed-steps log capping) ─────────────────────────────────
+// The log grows on every completed step; left unbounded it pushes the current
+// step off-screen / trips the resize prompt. capLogRows packs the most-recent
+// entries into the available rows and summarizes the rest.
+const mk = (...texts) => texts.map(t => ({ text: t, color: 'green' }))
+
+test('capLogRows: everything fits → no summary, all shown in order', () => {
+  const log = mk('a', 'b', 'c')
+  const { hidden, visible } = capLogRows(log, 10, 80)
+  assert(hidden === 0, `expected 0 hidden, got ${hidden}`)
+  assert(visible.map(e => e.text).join('') === 'abc', 'order/content preserved')
+})
+
+test('capLogRows: overflow → most-recent kept, rest summarized (1 row reserved)', () => {
+  const log = mk('s1', 's2', 's3', 's4', 's5', 's6', 's7', 's8')
+  // budget 5 rows → reserve 1 for summary → 4 most-recent entries (s5..s8).
+  const { hidden, visible } = capLogRows(log, 5, 80)
+  assert(visible.map(e => e.text).join(',') === 's5,s6,s7,s8', `got ${visible.map(e => e.text)}`)
+  assert(hidden === 4, `expected 4 hidden, got ${hidden}`)
+})
+
+test('capLogRows: wrap-aware — a long line counts as multiple rows', () => {
+  // A 100-char path wraps to 3 rows at 40 cols; with a 5-row budget and a 1-row
+  // entry after it, only the short tail + summary fit (the long one is hidden).
+  const longPath = 'x'.repeat(100)
+  const log = mk('a', 'b', longPath, 'tail')
+  const { visible } = capLogRows(log, 5, 40)
+  // budget 4 (1 reserved): 'tail'(1) + longPath(3) = 4 → both fit; 'a','b' hidden.
+  assert(visible.some(e => e.text === 'tail'), 'tail visible')
+  assert(visible.some(e => e.text === longPath), 'long line visible (fits the budget)')
+  assert(!visible.some(e => e.text === 'a'), 'oldest hidden')
+})
+
+test('capLogRows: zero budget hides everything', () => {
+  const { hidden, visible } = capLogRows(mk('a', 'b'), 0, 80)
+  assert(visible.length === 0 && hidden === 2, 'all hidden when no rows')
+})
+
+test('capLogRows: always keeps at least the newest when truncating', () => {
+  // budget 1 → reserve 1 for summary → 0 fit, but the loop keeps the first one.
+  const { visible, hidden } = capLogRows(mk('a', 'b', 'c'), 1, 80)
+  assert(visible.length >= 1, 'keeps at least one recent entry')
+  assert(visible[visible.length - 1].text === 'c', 'and it is the newest')
+  assert(hidden === 3 - visible.length, 'hidden accounts for the rest')
 })
 
 console.log(`\n${passed} passed, ${failed} failed`)

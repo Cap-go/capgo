@@ -42,9 +42,9 @@ import { createCiSecretEntries, detectCiSecretTargets, getCiSecretTargetLabel, l
 import { mapAndroidOnboardingError, mapSaValidationKindToCategory } from '../../error-categories.js'
 import { canUseFilePicker, openKeystorePicker, openServiceAccountJsonPicker } from '../../file-picker.js'
 import { trackBuilderOnboardingStep } from '../../telemetry.js'
-import { BOX_HEADER_ROWS, Divider, FullscreenAiViewer, Header, TerminalTooSmall, WIZARD_PADDING_ROWS } from '../../ui/components.js'
+import { BOX_HEADER_ROWS, COMPACT_HEADER_ROWS, Divider, FullscreenAiViewer, Header, TerminalTooSmall, WIZARD_PADDING_ROWS } from '../../ui/components.js'
 import type { AiResultKind } from '../../ui/components.js'
-import { COMPACT_HEADER_TOTAL_ROWS, isFrameTooSmall, shouldCollapseToDense } from '../../ui/frame-fit.js'
+import { capLogRows, COMPACT_HEADER_TOTAL_ROWS, isFrameTooSmall, shouldCollapseToDense } from '../../ui/frame-fit.js'
 import {
   KeystoreExistingAliasSelectStep,
   KeystoreExistingAliasStep,
@@ -523,6 +523,14 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
   const bodyHeight = dense ? heights.dense : heights.comfortable
   const tooSmall = isFrameTooSmall({ bodyRows: bodyHeight, dense, terminalRows })
   const neededRows = (bodyHeight != null ? bodyHeight : 1) + COMPACT_HEADER_TOTAL_ROWS
+
+  // Rows for the completed-steps log (rendered OUTSIDE the measured body so its
+  // growth never inflates the dense/fit decision). It fills what the current
+  // step leaves; capLogRows packs recent entries + a summary. See iOS sibling.
+  const logHeaderRows = headerCompact ? COMPACT_HEADER_ROWS : BOX_HEADER_ROWS
+  const logMaxRows = bodyHeight != null
+    ? Math.max(0, terminalRows - logHeaderRows - WIZARD_PADDING_ROWS - bodyHeight - 1)
+    : Number.POSITIVE_INFINITY
 
   const addLog = useCallback((text: string, color = 'green') => {
     setLogLines(prev => [...prev, { text, color }])
@@ -1735,7 +1743,26 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
   return (
     <Box flexDirection="column" minHeight={terminalRows} padding={1}>
       {showHeader && <Header compact={headerCompact} />}
-      {/* Body measured via `bodyRef` to drive the Header box-vs-compact choice. */}
+      {/* Completed-steps log — OUTSIDE the measured body, capped to the rows the
+          current step leaves (see logMaxRows + iOS sibling) so it never pushes
+          the step off-screen. */}
+      {showLog && logLines.length > 0 && (() => {
+        const { hidden, visible } = capLogRows(logLines, logMaxRows, terminalCols)
+        if (hidden === 0 && visible.length === 0)
+          return null
+        return (
+          <Box flexDirection="column" marginTop={1}>
+            {hidden > 0 && (
+              <Text dimColor>{`…and ${hidden} earlier step${hidden === 1 ? '' : 's'} done (resize taller to see all)`}</Text>
+            )}
+            {visible.map((entry, i) => (
+              <Text key={i} color={entry.color as any}>{entry.text}</Text>
+            ))}
+          </Box>
+        )
+      })()}
+      {/* Body: the current step (+ progress). Measured via `bodyRef`; the log
+          above is excluded so the height is independent of completed-step count. */}
       <Box flexDirection="column" ref={bodyRef}>
       {showProgress && (
         <Box flexDirection="column" marginTop={1}>
@@ -1749,14 +1776,6 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
             </Text>
           </Box>
           <Divider />
-        </Box>
-      )}
-
-      {showLog && logLines.length > 0 && (
-        <Box flexDirection="column" marginTop={1}>
-          {logLines.map((entry, i) => (
-            <Text key={i} color={entry.color as any}>{entry.text}</Text>
-          ))}
         </Box>
       )}
 

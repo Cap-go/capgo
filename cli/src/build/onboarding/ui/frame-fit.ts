@@ -58,3 +58,45 @@ export const PLATFORM_CARDS_MIN_ROWS = 16
 export function pickPlatformLayout(cols: number, rows: number): PlatformPickerLayout {
   return cols >= PLATFORM_CARDS_MIN_COLS && rows >= PLATFORM_CARDS_MIN_ROWS ? 'cards' : 'list'
 }
+
+// ── Completed-steps log capping ──────────────────────────────────────────────
+// The "✔ step done" log grows on every completed step, so left unbounded it
+// eventually pushes the current step off-screen (or trips the resize prompt)
+// even on a normal terminal. The log is rendered OUTSIDE the measured step body
+// and capped here to whatever rows are left over, newest-first, with a one-line
+// summary for the rest — so the current step always wins the space and the log
+// never causes a too-small. Wrap-aware: a long line (e.g. a key-file path)
+// counts as the rows it occupies, not one.
+export interface CappedLog<T> {
+  hidden: number
+  visible: T[]
+}
+
+export function capLogRows<T extends { text: string }>(entries: T[], maxRows: number, cols: number): CappedLog<T> {
+  const width = Math.max(1, Math.floor(cols))
+  const rowsFor = (text: string): number => Math.max(1, Math.ceil(text.length / width))
+  if (maxRows <= 0)
+    return { hidden: entries.length, visible: [] }
+
+  let total = 0
+  for (const e of entries)
+    total += rowsFor(e.text)
+  if (total <= maxRows)
+    return { hidden: 0, visible: entries }
+
+  // Doesn't all fit: reserve one row for the summary line, then pack the most
+  // recent entries that fit the remaining budget.
+  const budget = Math.max(0, maxRows - 1)
+  const visible: T[] = []
+  let used = 0
+  for (let i = entries.length - 1; i >= 0; i--) {
+    const r = rowsFor(entries[i].text)
+    if (visible.length > 0 && used + r > budget)
+      break
+    visible.unshift(entries[i])
+    used += r
+    if (used >= budget)
+      break
+  }
+  return { hidden: entries.length - visible.length, visible }
+}
