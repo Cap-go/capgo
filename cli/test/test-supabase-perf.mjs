@@ -9,6 +9,9 @@ import {
   SLOW_THRESHOLD_MS,
   withSupabaseSource,
 } from '../src/analytics/supabase-perf.ts'
+import { createSupabaseClient } from '../src/utils.ts'
+import { resolveOwnerOrgId } from '../src/analytics/org-resolver.ts'
+import { enableSupabaseInstrumentation } from '../src/analytics/supabase-perf.ts'
 
 console.log('🧪 Testing supabase-perf...\n')
 
@@ -113,6 +116,60 @@ try {
   process.env.CAPGO_TOKEN = originalToken
   if (originalDisable !== undefined) process.env.CAPGO_DISABLE_TELEMETRY = originalDisable
   if (originalDisablePosthog !== undefined) process.env.CAPGO_DISABLE_POSTHOG = originalDisablePosthog
+
+  // --- Task 4: createSupabaseClient gate + recursion guard ---
+  process.env.CAPGO_TOKEN = 'perf-key'
+  delete process.env.CAPGO_DISABLE_TELEMETRY
+  delete process.env.CAPGO_DISABLE_POSTHOG
+
+  const stubClient = () => {
+    const reqs = []
+    globalThis.fetch = async (url, init) => {
+      reqs.push({ url: String(url), init })
+      if (String(url).endsWith('/private/config'))
+        return new Response(JSON.stringify({ supaHost: 'https://db.co', supaKey: 'anon' }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+      if (String(url).includes('/rest/v1/'))
+        return new Response('[]', { status: 200, headers: { 'Content-Type': 'application/json' } })
+      return new Response('{}', { status: 200 })
+    }
+    return reqs
+  }
+  const findPerf = reqs => reqs.find(r => r.url.endsWith('/private/events') && JSON.parse(r.init.body).event === 'Supabase Call')
+
+  // disabled (default): no timed fetch attached → no Supabase Call event
+  let creqs = stubClient()
+  let sb = await createSupabaseClient('perf-key', 'https://db.co', 'anon')
+  await sb.from('demo').select('*')
+  await flushAnalytics()
+  assert.equal(findPerf(creqs), undefined, 'disabled => no perf event')
+
+  // enabled: timed fetch attached → Supabase Call event with operation
+  enableSupabaseInstrumentation()
+  creqs = stubClient()
+  sb = await createSupabaseClient('perf-key', 'https://db.co', 'anon')
+  await sb.from('demo').select('*')
+  await flushAnalytics()
+  const cev = findPerf(creqs)
+  assert.ok(cev, 'enabled => perf event')
+  assert.equal(JSON.parse(cev.init.body).tags.operation, 'GET demo')
+
+  // recursion guard: org-resolver must build an UNinstrumented client
+  let capturedInstrument
+  const chain = {
+    from: () => chain,
+    select: () => chain,
+    eq: () => chain,
+    abortSignal: () => chain,
+    maybeSingle: async () => ({ data: { owner_org: 'org-x' } }),
+  }
+  const orgId = await resolveOwnerOrgId('recursion-key', 'com.recursion.test', {
+    createClient: async (_apikey, _host, _key, _silent, instrument) => {
+      capturedInstrument = instrument
+      return chain
+    },
+  })
+  assert.equal(orgId, 'org-x')
+  assert.equal(capturedInstrument, false, 'org-resolver must create an uninstrumented client')
 
   console.log('✅ supabase-perf tests passed')
 }
