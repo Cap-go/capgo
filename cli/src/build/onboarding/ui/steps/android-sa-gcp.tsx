@@ -278,7 +278,7 @@ export const GoogleSignInStep: FC<GoogleSignInStepProps> = ({ onChoose, dense = 
   if (dense) {
     return (
       <Box flexDirection="column" marginTop={1}>
-        <Text>{`ℹ ${SIGN_IN_TRUST}`}</Text>
+        <Text color="blueBright">{`ℹ ${SIGN_IN_TRUST}`}</Text>
         <Box flexDirection="column" marginTop={spaced ? 1 : 0}>
           <Text>{SIGN_IN_INTRO}</Text>
           <Box flexDirection="column" marginLeft={2}>
