@@ -110,17 +110,19 @@ function headerPlusLog(entries, maxRows) {
   return renderFrameText(h(Box, { flexDirection: 'column' }, h(Header, { compact: true }), h(CompletedStepsLog, { entries, maxRows })), 80).split('\n')
 }
 
-test('single line (maxRows=1, the regression): NO leading gap — lone step sits under the header', () => {
+test('single row (maxRows=1) + overflow: summary is ALWAYS shown (never hidden), no leading gap', () => {
   const entries = [
     ...Array.from({ length: 6 }, (_, i) => ({ text: `✔ step ${i + 1}`, color: 'green' })),
     { text: '✔ Distribution certificate created — Expires 2027-05-29', color: 'green' },
   ]
   const lines = headerPlusLog(entries, 1)
   const headerIdx = lines.findIndex(l => /Capgo Cloud Build/.test(l))
-  const certIdx = lines.findIndex(l => /Distribution certificate created/.test(l))
-  assert(headerIdx >= 0 && certIdx >= 0, 'header/cert line missing')
-  assert(certIdx === headerIdx + 1, `orphan blank: lone log line should sit directly under the header (header=${headerIdx}, cert=${certIdx})`)
-  assert(!lines.some(l => /earlier steps done/.test(l)), 'summary should not show when only one line fits')
+  // At a one-row budget the summary wins the row (shown alone) — never hidden.
+  const summaryIdx = lines.findIndex(l => /\d+ steps done \(resize taller to see all\)/.test(l))
+  assert(headerIdx >= 0, 'header missing')
+  assert(summaryIdx >= 0, 'summary MUST show even at a one-row budget — we never hide that more steps exist')
+  assert(summaryIdx === headerIdx + 1, `single line should sit directly under the header, no gap (header=${headerIdx}, summary=${summaryIdx})`)
+  assert(!lines.some(l => /Distribution certificate created/.test(l)), 'at one row, the summary takes the row — no concrete step line')
 })
 
 test('summary block (maxRows=2): KEEPS the leading gap', () => {

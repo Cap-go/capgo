@@ -83,8 +83,9 @@ test('truly tiny terminal blocks pre-measure', () => {
 
 // ── capLogRows (completed-steps log capping) ─────────────────────────────────
 // Each entry is one row (the renderer truncates long lines). capLogRows keeps
-// the most-recent entries that fit; a summary stands in for hidden steps only
-// when it condenses ≥ 2 of them.
+// the most-recent entries that fit; when they overflow, a summary line is
+// MANDATORY (we never hide that more completed steps exist) and always condenses
+// ≥ 2 of them. At a one-row budget the summary wins the row, shown alone.
 const mk = (...texts) => texts.map(t => ({ text: t, color: 'green' }))
 
 test('capLogRows: everything fits → no summary, all shown in order', () => {
@@ -112,12 +113,13 @@ test('capLogRows: when summary shows, it always covers ≥ 2 steps', () => {
   }
 })
 
-test('capLogRows: one row to spare → show the newest step, not a summary', () => {
-  // budget 1, 3 entries: rather than "…and N earlier" with zero steps shown,
-  // show the single newest step (no summary).
+test('capLogRows: one row + overflow → the summary wins the row (never hide "more steps")', () => {
+  // budget 1, 3 entries: the "…and N" summary is mandatory. It takes the only
+  // row (shown alone, covering all 3) rather than a single newest step that
+  // would silently hide that two more completed steps exist.
   const { hidden, visible } = capLogRows(mk('a', 'b', 'c'), 1)
-  assert(hidden === 0, `expected no summary at budget 1, got hidden=${hidden}`)
-  assert(visible.length === 1 && visible[0].text === 'c', 'shows the newest step')
+  assert(visible.length === 0, `expected the summary to take the only row, got ${visible.length} step(s)`)
+  assert(hidden === 3, `expected all 3 summarized, got hidden=${hidden}`)
 })
 
 test('capLogRows: zero budget shows nothing (no room, not even a summary)', () => {

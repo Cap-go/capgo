@@ -19,26 +19,31 @@ export interface LogEntry {
 }
 
 // Capped to `maxRows` (see capLogRows): the most recent entries newest-last,
-// with a one-line "…and N earlier steps done" summary when older steps don't
-// fit.
+// with a summary line that stands in for older steps that don't fit. That
+// summary is NEVER hidden when steps overflow — even at a one-row budget it
+// wins the row (shown alone), because hiding "there are more completed steps"
+// is worse than not showing the single newest line.
 //
 // The top-margin gap separates the block from the header — but ONLY when the
-// block is substantial (a summary line, or two or more entries). When the cap
-// collapses it to a single ambient line, that gap would be orphaned: it sits
-// where the summary used to be and reads as a dropped line. So in the
-// single-line case we drop the gap and the lone completed-step line sits
-// directly under the header.
+// block renders two or more lines. When it collapses to a single line (a lone
+// step, or a lone summary), the gap would be orphaned, so it's dropped and the
+// line sits directly under the header.
 export const CompletedStepsLog: FC<{ entries: LogEntry[], maxRows: number }> = ({ entries, maxRows }) => {
   if (maxRows < 1 || entries.length === 0)
     return null
   const { hidden, visible } = capLogRows(entries, maxRows)
   if (hidden === 0 && visible.length === 0)
     return null
-  const spaced = hidden > 0 || visible.length > 1
+  // "…and N earlier steps done" when concrete steps are shown below it; when the
+  // budget is so tight only the summary fits, it stands alone as "N steps done".
+  const summary = visible.length > 0
+    ? `…and ${hidden} earlier steps done (resize taller to see all)`
+    : `${hidden} steps done (resize taller to see all)`
+  const renderedLines = (hidden > 0 ? 1 : 0) + visible.length
   return (
-    <Box flexDirection="column" marginTop={spaced ? 1 : 0}>
+    <Box flexDirection="column" marginTop={renderedLines > 1 ? 1 : 0}>
       {hidden > 0 && (
-        <Text dimColor wrap="truncate-end">{`…and ${hidden} earlier steps done (resize taller to see all)`}</Text>
+        <Text dimColor wrap="truncate-end">{summary}</Text>
       )}
       {visible.map((entry, i) => (
         <Text key={i} color={entry.color} wrap="truncate-middle">{entry.text}</Text>

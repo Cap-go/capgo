@@ -81,22 +81,21 @@ export interface CappedLog<T> {
 
 // Pick the most-recent entries that fit `maxRows`. Each entry occupies EXACTLY
 // ONE row (the caller truncates long lines like file paths), so this is a plain
-// row count. A one-line summary stands in for hidden steps, but only when it
-// actually condenses ≥ 2 of them — with a single step to hide, or only one row
-// to spare, we show the step itself rather than a pointless "…and 1 earlier
-// step done" placeholder.
+// row count.
+//
+// When the entries overflow `maxRows`, the summary line ("…and N earlier steps
+// done") is MANDATORY — we never hide the fact that more completed steps exist.
+// It takes one row; the remaining rows show the most-recent entries (newest-
+// last). With `maxRows === 1` the summary is therefore the only line (no
+// concrete step shown) rather than a step that silently drops the "there's more"
+// indicator. `hidden` is always ≥ 2 in the overflow case (entries.length >
+// maxRows ⇒ length − (maxRows − 1) ≥ 2), so we never render a summary for a
+// single hidden step ("…and 1 earlier step done").
 export function capLogRows<T>(entries: T[], maxRows: number): CappedLog<T> {
   if (maxRows <= 0)
     return { hidden: 0, visible: [] }
   if (entries.length <= maxRows)
     return { hidden: 0, visible: entries }
-  // Overflow. A summary line + ≥1 entry needs ≥2 rows; with only one row to
-  // spare, show the single newest step instead of an all-hiding summary.
-  if (maxRows < 2)
-    return { hidden: 0, visible: entries.slice(entries.length - maxRows) }
-  // Reserve one row for the summary; show the most-recent entries in the rest.
-  // entries.length > maxRows here, so hidden = length − (maxRows − 1) ≥ 2: the
-  // summary always represents at least two steps.
   const visibleCount = maxRows - 1
   return { hidden: entries.length - visibleCount, visible: entries.slice(entries.length - visibleCount) }
 }
