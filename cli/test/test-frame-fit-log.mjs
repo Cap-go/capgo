@@ -12,9 +12,10 @@
 //      overflows it. That difference is the bug → fix.
 import { Box, Text } from 'ink'
 import React from 'react'
+import { CompletedStepsLog } from '../src/build/onboarding/ui/completed-steps-log.tsx'
 import { COMPACT_HEADER_ROWS, Header, WIZARD_PADDING_ROWS } from '../src/build/onboarding/ui/components.tsx'
 import { capLogRows, logBudgetRows } from '../src/build/onboarding/ui/frame-fit.ts'
-import { frameRows } from './helpers/frame-fit.mjs'
+import { frameRows, renderFrameText } from './helpers/frame-fit.mjs'
 
 let passed = 0
 let failed = 0
@@ -95,6 +96,48 @@ test('UNCAPPED long log overflows — proving the cap is what prevents too-small
   const rows = 19
   const uncapped = frameRows(frame(longLog, rows, 80, 6), 80)
   assert(uncapped > rows, `expected the uncapped 30-entry log to overflow ${rows} rows, got ${uncapped}`)
+})
+
+// ── 3. CompletedStepsLog: the separator gap follows the block, not the budget ─
+// The bug: when the cap collapses the log to a single line (the summary line
+// dropped to save a row), the block's top-margin blank STAYED — an orphaned gap
+// under the header where the summary used to be. The gap must exist only when
+// the block is substantial (summary present, or 2+ entries), and vanish in the
+// single-line case so the lone completed-step line sits directly under header.
+// We render header + log (no padding) so line 0 is the header and the gap, if
+// any, is the blank line immediately below it.
+function headerPlusLog(entries, maxRows) {
+  return renderFrameText(h(Box, { flexDirection: 'column' }, h(Header, { compact: true }), h(CompletedStepsLog, { entries, maxRows })), 80).split('\n')
+}
+
+test('single line (maxRows=1, the regression): NO leading gap — lone step sits under the header', () => {
+  const entries = [
+    ...Array.from({ length: 6 }, (_, i) => ({ text: `✔ step ${i + 1}`, color: 'green' })),
+    { text: '✔ Distribution certificate created — Expires 2027-05-29', color: 'green' },
+  ]
+  const lines = headerPlusLog(entries, 1)
+  const headerIdx = lines.findIndex(l => /Capgo Cloud Build/.test(l))
+  const certIdx = lines.findIndex(l => /Distribution certificate created/.test(l))
+  assert(headerIdx >= 0 && certIdx >= 0, 'header/cert line missing')
+  assert(certIdx === headerIdx + 1, `orphan blank: lone log line should sit directly under the header (header=${headerIdx}, cert=${certIdx})`)
+  assert(!lines.some(l => /earlier steps done/.test(l)), 'summary should not show when only one line fits')
+})
+
+test('summary block (maxRows=2): KEEPS the leading gap', () => {
+  const entries = Array.from({ length: 7 }, (_, i) => ({ text: `✔ step ${i + 1}`, color: 'green' }))
+  const lines = headerPlusLog(entries, 2)
+  const headerIdx = lines.findIndex(l => /Capgo Cloud Build/.test(l))
+  const summaryIdx = lines.findIndex(l => /earlier steps done/.test(l))
+  assert(headerIdx >= 0 && summaryIdx >= 0, 'header/summary missing')
+  assert(summaryIdx === headerIdx + 2, `summary block should keep a blank gap under the header (header=${headerIdx}, summary=${summaryIdx})`)
+})
+
+test('multiple entries, no summary (all fit): KEEP the leading gap', () => {
+  const lines = headerPlusLog([{ text: '✔ alpha' }, { text: '✔ bravo' }], 5)
+  const headerIdx = lines.findIndex(l => /Capgo Cloud Build/.test(l))
+  const firstIdx = lines.findIndex(l => /✔ alpha/.test(l))
+  assert(headerIdx >= 0 && firstIdx >= 0, 'header/entry missing')
+  assert(firstIdx === headerIdx + 2, `a 2-entry block should keep a blank gap under the header (header=${headerIdx}, first=${firstIdx})`)
 })
 
 console.log(`\n${passed} passed, ${failed} failed`)

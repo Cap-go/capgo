@@ -46,9 +46,10 @@ import {
 
   STEP_PROGRESS,
 } from '../types.js'
+import { CompletedStepsLog } from './completed-steps-log.js'
 import { BOX_HEADER_ROWS, COMPACT_HEADER_ROWS, Divider, FullscreenAiViewer, Header, SpinnerLine, TerminalTooSmall, WIZARD_PADDING_ROWS } from './components.js'
 import type { AiResultKind } from './components.js'
-import { capLogRows, COMPACT_HEADER_TOTAL_ROWS, isFrameTooSmall, logBudgetRows, shouldCollapseToDense } from './frame-fit.js'
+import { COMPACT_HEADER_TOTAL_ROWS, isFrameTooSmall, logBudgetRows, shouldCollapseToDense } from './frame-fit.js'
 import {
   ApiKeyInstructionsStep,
   BackingUpStep,
@@ -1645,23 +1646,9 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
       {showHeader && <Header compact={headerCompact} />}
       {/* Completed-steps log — rendered OUTSIDE the measured body so its growth
           can't inflate the dense / fit decision. Capped (see logMaxRows) to the
-          rows the current step leaves: most-recent entries newest-last, with a
-          one-line summary for the rest. */}
-      {showLog && log.length > 0 && logMaxRows >= 1 && (() => {
-        const { hidden, visible } = capLogRows(log, logMaxRows)
-        if (hidden === 0 && visible.length === 0)
-          return null
-        return (
-          <Box flexDirection="column" marginTop={1}>
-            {hidden > 0 && (
-              <Text dimColor wrap="truncate-end">{`…and ${hidden} earlier steps done (resize taller to see all)`}</Text>
-            )}
-            {visible.map((entry, i) => (
-              <Text key={i} color={entry.color as any} wrap="truncate-middle">{entry.text}</Text>
-            ))}
-          </Box>
-        )
-      })()}
+          rows the current step leaves; CompletedStepsLog drops its leading gap
+          when it collapses to a single line so no orphaned blank survives. */}
+      {showLog && <CompletedStepsLog entries={log} maxRows={logMaxRows} />}
       {/* Body: the current step (+ its progress bar). Measured via `bodyRef` to
           drive the dense / box-vs-compact-header / too-small decisions. The log
           above is excluded so the body height stays independent of how many

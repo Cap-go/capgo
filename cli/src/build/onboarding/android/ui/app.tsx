@@ -42,9 +42,10 @@ import { createCiSecretEntries, detectCiSecretTargets, getCiSecretTargetLabel, l
 import { mapAndroidOnboardingError, mapSaValidationKindToCategory } from '../../error-categories.js'
 import { canUseFilePicker, openKeystorePicker, openServiceAccountJsonPicker } from '../../file-picker.js'
 import { trackBuilderOnboardingStep } from '../../telemetry.js'
+import { CompletedStepsLog } from '../../ui/completed-steps-log.js'
 import { BOX_HEADER_ROWS, COMPACT_HEADER_ROWS, Divider, FullscreenAiViewer, Header, TerminalTooSmall, WIZARD_PADDING_ROWS } from '../../ui/components.js'
 import type { AiResultKind } from '../../ui/components.js'
-import { capLogRows, COMPACT_HEADER_TOTAL_ROWS, isFrameTooSmall, logBudgetRows, shouldCollapseToDense } from '../../ui/frame-fit.js'
+import { COMPACT_HEADER_TOTAL_ROWS, isFrameTooSmall, logBudgetRows, shouldCollapseToDense } from '../../ui/frame-fit.js'
 import {
   KeystoreExistingAliasSelectStep,
   KeystoreExistingAliasStep,
@@ -1748,23 +1749,9 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
     <Box flexDirection="column" minHeight={terminalRows} padding={1}>
       {showHeader && <Header compact={headerCompact} />}
       {/* Completed-steps log — OUTSIDE the measured body, capped to the rows the
-          current step leaves (see logMaxRows + iOS sibling) so it never pushes
-          the step off-screen. */}
-      {showLog && logLines.length > 0 && logMaxRows >= 1 && (() => {
-        const { hidden, visible } = capLogRows(logLines, logMaxRows)
-        if (hidden === 0 && visible.length === 0)
-          return null
-        return (
-          <Box flexDirection="column" marginTop={1}>
-            {hidden > 0 && (
-              <Text dimColor wrap="truncate-end">{`…and ${hidden} earlier steps done (resize taller to see all)`}</Text>
-            )}
-            {visible.map((entry, i) => (
-              <Text key={i} color={entry.color as any} wrap="truncate-middle">{entry.text}</Text>
-            ))}
-          </Box>
-        )
-      })()}
+          current step leaves (see logMaxRows + iOS sibling); CompletedStepsLog
+          drops its leading gap when it collapses to one line. */}
+      {showLog && <CompletedStepsLog entries={logLines} maxRows={logMaxRows} />}
       {/* Body: the current step (+ progress). Measured via `bodyRef`; the log
           above is excluded so the height is independent of completed-step count. */}
       <Box flexDirection="column" ref={bodyRef}>
