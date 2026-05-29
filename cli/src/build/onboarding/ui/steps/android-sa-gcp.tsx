@@ -232,19 +232,10 @@ export const GoogleSignInStep: FC<GoogleSignInStepProps> = ({ onChoose, dense = 
     return (
       <Box flexDirection="column" marginTop={1}>
         <Text bold color="cyan">Sign in with Google to set up Play publishing.</Text>
-        <Text dimColor>Tokens stay on your machine — Capgo&apos;s servers never see them.</Text>
-        <Text>
-          •
-          {' '}
-          <Text bold>Cloud</Text>
-          : create a service account in a project you pick.
-        </Text>
-        <Text>
-          •
-          {' '}
-          <Text bold>Play</Text>
-          : invite it with release-only access.
-        </Text>
+        <Text>So Capgo can upload your signed app to Google Play for you on each build.</Text>
+        <Text>• Cloud access looks broad — used once to create one account, then stops.</Text>
+        <Text>• Play access is release-only — this app only, nothing else.</Text>
+        <Text dimColor>Your Google sign-in token stays on your machine, revoked after setup.</Text>
         <Select
           options={[
             { label: '🔐  Continue to Google sign-in', value: 'go' },
@@ -259,31 +250,33 @@ export const GoogleSignInStep: FC<GoogleSignInStepProps> = ({ onChoose, dense = 
   return (
     <Box flexDirection="column" marginTop={1}>
       <Alert variant="info">
-        Sign in with Google so Capgo can set up Play Store publishing on your account — your tokens never reach Capgo&apos;s servers.
+        On every Android cloud build, Capgo uploads your signed app to Google Play for you. Google only allows that through a Play service account — normally a fiddly manual setup across the Google Cloud and Play consoles. This one-time sign-in does it for you, scoped to release-only access.
       </Alert>
       <Newline />
-      <Text>We&apos;ll open Google&apos;s consent screen. The two access requests are:</Text>
+      <Text>Google&apos;s consent screen will ask you to approve two things:</Text>
       <Box flexDirection="column" marginLeft={2} marginTop={1}>
         <Text>
           •
           {' '}
-          <Text bold>Google Cloud access</Text>
+          <Text bold>Create the publishing account</Text>
           {' '}
-          — to create a service account in a project you pick
+          in a Google Cloud project you pick. Google labels this access broadly, but Capgo only creates that one account — it never touches anything else in your Cloud.
         </Text>
         <Text>
           •
           {' '}
-          <Text bold>Google Play Developer access</Text>
+          <Text bold>Give it release access</Text>
           {' '}
-          — to invite that service account to your Play Console with release-only permissions
+          to this one app in your Play Console, and nothing more.
         </Text>
       </Box>
+      <Newline />
+      <Text dimColor>Your Google sign-in token stays on your machine and is revoked once setup finishes.</Text>
       <Newline />
       <Select
         options={[
           { label: '🔐  Continue to Google sign-in', value: 'go' },
-          { label: 'ℹ️   Learn why the onboarding via Google is secure', value: 'learn' },
+          { label: 'ℹ️   Why is this secure?', value: 'learn' },
           { label: '✖  Exit (I\'ll do it later)', value: 'exit' },
         ]}
         onChange={value => onChoose(value as GoogleSignInChoice)}
