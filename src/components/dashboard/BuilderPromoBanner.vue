@@ -40,10 +40,16 @@ function openModal() {
 async function checkEligibility() {
   eligible.value = false
   const appId = props.appId
-  const orgId = organizationStore.currentOrganization?.gid
-  if (!appId || !orgId)
+  if (!appId)
     return
   try {
+    // currentOrganization is unreliable on app-based URLs (the app may belong
+    // to an org other than the selected one), so resolve the app's owning org
+    // explicitly — otherwise we'd count builds against the wrong org.
+    await organizationStore.awaitInitialLoad()
+    const orgId = organizationStore.getOrgByAppId(appId)?.gid
+    if (!orgId)
+      return
     const { count, error } = await supabase
       .from('build_requests')
       .select('id', { count: 'exact', head: true })
@@ -63,7 +69,7 @@ async function checkEligibility() {
 }
 
 watch(
-  [() => props.appId, () => organizationStore.currentOrganization],
+  () => props.appId,
   () => {
     checkEligibility()
   },

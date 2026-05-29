@@ -70,4 +70,5 @@ extend-exclude = [
 capgo = "capgo"
 forgr = "forgr"
 supabase = "supabase"
+ALS = "ALS" # AsyncLocalStorage abbreviation (used in CLI perf-tracking spec)
 # Add more project-specific terms as needed
