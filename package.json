@@ -15,6 +15,7 @@
     "readreplicate:status": "bash read_replicate/replicate_status.sh",
     "readreplicate:check-schema": "bash scripts/check-read-replica-schema.sh",
     "supabase:reset-postgres-config": "bash scripts/reset_supabase_postgres_config_defaults.sh",
+    "supabase:allow-cloudflare": "bash scripts/update_supabase_network_restrictions.sh",
     "cloudsql:allow-cloudflare": "bash scripts/update_cloudsql_authorized_networks.sh",
     "supabase:start": "bun scripts/supabase-worktree.ts start",
     "supabase:stop": "bun scripts/supabase-worktree.ts stop",
