@@ -8,10 +8,15 @@ import type { Platform } from '../types.js'
 // platform's existing app INLINE in the same Ink tree — no second render, no
 // alt-screen flash.
 //
-//   • platform unknown → the responsive PlatformPicker (cards / list), framed
-//     with the same Header + full-height Box as the rest of the wizard.
+//   • platform unknown → the responsive PlatformPicker (cards / list).
 //   • platform chosen  → load that platform's progress, then mount
-//     <OnboardingApp/> or <AndroidOnboardingApp/> (each owns its own framing).
+//     <OnboardingApp/> or <AndroidOnboardingApp/>.
+//
+// Every shell frame (picker, the brief progress-load, and each app) is a
+// FULL-HEIGHT framed box with the same Header, so transitions only change the
+// body — never collapse the screen to a stray 1-line frame (which read as a
+// flash when selecting a platform). The apps render their own identical
+// full-height frame, so picker → loading → app is seamless.
 //
 // `command.ts` passes `initialPlatform` (from --platform or the single existing
 // native dir) to skip the picker, and `onResolvePlatform` so it can print the
@@ -30,8 +35,48 @@ import { PlatformPicker } from './platform-picker.js'
 type IosProgress = Awaited<ReturnType<typeof loadProgress>>
 type AndroidProgress = Awaited<ReturnType<typeof loadAndroidProgress>>
 
-// Loads iOS progress then mounts the iOS app. The brief spinner only shows
-// during the (fast) disk read.
+// Live terminal size, tracked through resize. Shared by the picker frame and
+// the loading frame so both fill the viewport (and reflow on resize).
+function useTerminalSize(): { cols: number, rows: number } {
+  const { stdout } = useStdout()
+  const [size, setSize] = useState<{ cols: number, rows: number }>({
+    cols: stdout?.columns ?? 80,
+    rows: stdout?.rows ?? 24,
+  })
+  useEffect(() => {
+    if (!stdout)
+      return
+    const onResize = (): void => setSize({ cols: stdout.columns ?? 80, rows: stdout.rows ?? 24 })
+    stdout.on('resize', onResize)
+    return () => {
+      stdout.off('resize', onResize)
+    }
+  }, [stdout])
+  return size
+}
+
+// The full-height framed shell box (header + body), shared by the picker and
+// the loading frame so the screen never collapses between them.
+const ShellFrame: FC<{ cols: number, rows: number, children: React.ReactNode }> = ({ cols, rows, children }) => (
+  <Box flexDirection="column" minHeight={rows} padding={1}>
+    <Header compact={pickPlatformLayout(cols, rows) === 'list'} />
+    {children}
+  </Box>
+)
+
+// Brief framed loading state shown while a platform's progress loads from disk.
+const LoadingScreen: FC = () => {
+  const { cols, rows } = useTerminalSize()
+  return (
+    <ShellFrame cols={cols} rows={rows}>
+      <Box marginTop={1}>
+        <SpinnerLine text="Loading…" />
+      </Box>
+    </ShellFrame>
+  )
+}
+
+// Loads iOS progress (framed spinner during the read) then mounts the iOS app.
 const IosApp: FC<{ appId: string, iosDir: string, apikey?: string }> = ({ appId, iosDir, apikey }) => {
   const [loaded, setLoaded] = useState<{ progress: IosProgress } | null>(null)
   useEffect(() => {
@@ -45,7 +90,7 @@ const IosApp: FC<{ appId: string, iosDir: string, apikey?: string }> = ({ appId,
     }
   }, [appId])
   if (!loaded)
-    return <SpinnerLine text="Loading…" />
+    return <LoadingScreen />
   return <OnboardingApp appId={appId} initialProgress={loaded.progress} iosDir={iosDir} apikey={apikey} />
 }
 
@@ -62,7 +107,7 @@ const AndroidApp: FC<{ appId: string, androidDir: string, apikey?: string }> = (
     }
   }, [appId])
   if (!loaded)
-    return <SpinnerLine text="Loading…" />
+    return <LoadingScreen />
   return <AndroidOnboardingApp appId={appId} initialProgress={loaded.progress} androidDir={androidDir} apikey={apikey} />
 }
 
@@ -79,40 +124,22 @@ export interface OnboardingShellProps {
 
 const OnboardingShell: FC<OnboardingShellProps> = ({ appId, iosDir, androidDir, apikey, initialPlatform, onResolvePlatform }) => {
   const [platform, setPlatform] = useState<Platform | null>(initialPlatform ?? null)
+  const { cols, rows } = useTerminalSize()
 
   useEffect(() => {
     if (platform)
       onResolvePlatform?.(platform)
   }, [platform, onResolvePlatform])
 
-  // Live terminal size: drives the picker's cards↔list layout and lets the
-  // picker frame fill the viewport (minHeight) for a ghost-free redraw on resize.
-  const { stdout } = useStdout()
-  const [size, setSize] = useState<{ cols: number, rows: number }>({
-    cols: stdout?.columns ?? 80,
-    rows: stdout?.rows ?? 24,
-  })
-  useEffect(() => {
-    if (!stdout)
-      return
-    const onResize = (): void => setSize({ cols: stdout.columns ?? 80, rows: stdout.rows ?? 24 })
-    stdout.on('resize', onResize)
-    return () => {
-      stdout.off('resize', onResize)
-    }
-  }, [stdout])
-
   if (platform === 'android')
     return <AndroidApp appId={appId} androidDir={androidDir} apikey={apikey} />
   if (platform === 'ios')
     return <IosApp appId={appId} iosDir={iosDir} apikey={apikey} />
 
-  const layout = pickPlatformLayout(size.cols, size.rows)
   return (
-    <Box flexDirection="column" minHeight={size.rows} padding={1}>
-      <Header compact={layout === 'list'} />
-      <PlatformPicker layout={layout} onSelect={setPlatform} />
-    </Box>
+    <ShellFrame cols={cols} rows={rows}>
+      <PlatformPicker layout={pickPlatformLayout(cols, rows)} onSelect={setPlatform} />
+    </ShellFrame>
   )
 }
 
