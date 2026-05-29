@@ -3,9 +3,22 @@ import { AsyncLocalStorage } from 'node:async_hooks'
 // --- explicit call-site labels, async-safe across awaits and Promise.all ---
 const sourceStore = new AsyncLocalStorage<string>()
 
-/** Tags every Supabase call made inside `fn` with `source`. */
-export function withSupabaseSource<T>(source: string, fn: () => T): T {
-  return sourceStore.run(source, fn)
+/**
+ * Tags every Supabase call made inside `fn` with `source`.
+ *
+ * The Supabase JS query builder is a lazy thenable: it does not call `fetch`
+ * until `.then()` is invoked (i.e. when the caller `await`s it). If we only
+ * call `run(source, fn)` and return the builder, `.then()` fires *outside* the
+ * AsyncLocalStorage context and `getSupabaseSource()` returns `undefined`.
+ *
+ * To fix this, we wrap the result in `Promise.resolve()` inside the `run()`
+ * callback. This schedules the microtask (which calls `.then()` on the builder)
+ * while still inside the async context, so the source label propagates through
+ * to the actual fetch. For plain Promises and non-thenable values the behaviour
+ * is unchanged.
+ */
+export function withSupabaseSource<T>(source: string, fn: () => T): Promise<Awaited<T>> {
+  return sourceStore.run(source, () => Promise.resolve(fn())) as Promise<Awaited<T>>
 }
 
 export function getSupabaseSource(): string | undefined {

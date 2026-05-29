@@ -171,6 +171,22 @@ try {
   assert.equal(orgId, 'org-x')
   assert.equal(capturedInstrument, false, 'org-resolver must create an uninstrumented client')
 
+  // --- Task 6: source label flows into the event ---
+  process.env.CAPGO_TOKEN = 'perf-key'
+  let lreqs = stubClient()
+  enableSupabaseInstrumentation()
+  const lsb = await createSupabaseClient('perf-key', 'https://db.co', 'anon')
+  await withSupabaseSource('apps.list', () => lsb
+    .from('apps')
+    .select()
+    .order('created_at', { ascending: false }))
+  await flushAnalytics()
+  const lev = findPerf(lreqs)
+  assert.ok(lev, 'labeled query emits a perf event')
+  const ltags = JSON.parse(lev.init.body).tags
+  assert.equal(ltags.source, 'apps.list')
+  assert.equal(ltags.operation, 'GET apps')
+
   console.log('✅ supabase-perf tests passed')
 }
 finally {
