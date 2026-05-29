@@ -57,6 +57,20 @@ export function setSupabaseCallRecorder(fn: SupabaseCallRecorder): void {
   recorder = fn
 }
 
+/**
+ * Invokes the recorder defensively. A throwing recorder must never change the
+ * wrapped request's returned response or rethrown error (the "never altered"
+ * contract), so any error here is swallowed.
+ */
+function safeRecord(info: SupabaseCallInfo): void {
+  try {
+    recorder?.(info)
+  }
+  catch {
+    // Telemetry must never alter the wrapped request's outcome.
+  }
+}
+
 /** A Supabase call slower than this is flagged `slow` regardless of status. */
 export const SLOW_THRESHOLD_MS = 5000
 
@@ -119,11 +133,11 @@ export function createTimedFetch(): typeof fetch {
     const start = Date.now()
     try {
       const response = await globalThis.fetch(input, init)
-      recorder?.({ url, method, status: response.status, ok: response.ok, durationMs: Date.now() - start, source, apikey })
+      safeRecord({ url, method, status: response.status, ok: response.ok, durationMs: Date.now() - start, source, apikey })
       return response
     }
     catch (error) {
-      recorder?.({ url, method, status: 0, ok: false, durationMs: Date.now() - start, source, apikey, error })
+      safeRecord({ url, method, status: 0, ok: false, durationMs: Date.now() - start, source, apikey, error })
       throw error
     }
   }

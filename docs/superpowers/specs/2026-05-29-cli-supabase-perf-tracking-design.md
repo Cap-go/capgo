@@ -93,7 +93,7 @@ A timed Supabase call fires `trackEvent`, which resolves org context via `resolv
 
 To avoid a `utils → track → utils` cycle, `supabase-perf.ts` is a **leaf** module that depends only on `node:async_hooks` and `error-category.ts`. The event builder is injected, not imported:
 
-```
+```text
 supabase-perf.ts   (leaf: AsyncLocalStorage, timing, operation parsing, enable flag, recorder hook)
    ↑ imports                    ↑ imports (createTimedFetch, isSupabaseInstrumentationEnabled)
 track.ts ───────────────────► utils.ts (createSupabaseClient)
@@ -114,6 +114,7 @@ index.ts / mcp/server.ts ─ on startup: enableSupabaseInstrumentation()
 **Dispatch:** `void trackEvent(...)` — fire-and-forget, flushed at exit, abortable. Inherits v2 actor-scoping (`tracking_version: 2`, backend-derived `user_id`, best-effort `org_id`) and the global props (`cli_version`, `os_platform`, `os_arch`, `is_ci`, `is_tty`, `invocation_source`) from `trackEvent`.
 
 **Tags:**
+
 ```ts
 {
   operation: 'rpc:get_user_id' | 'GET apps' | 'POST app_versions' | ...,  // see §Operation derivation

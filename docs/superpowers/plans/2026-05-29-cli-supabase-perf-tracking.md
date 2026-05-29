@@ -334,7 +334,7 @@ In `cli/package.json`, add a script next to the other `test:analytics*` scripts:
 "test:supabase-perf": "bun test/test-supabase-perf.mjs",
 ```
 
-Then add ` && bun run test:supabase-perf` to the long `"test"` script, immediately after `bun run test:analytics-org-resolver`.
+Then add `&& bun run test:supabase-perf` to the long `"test"` script, immediately after `bun run test:analytics-org-resolver`.
 
 - [ ] **Step 6: Commit**
 
@@ -745,9 +745,11 @@ import { enableSupabaseInstrumentation, setInvocationSource, trackMcpServerStart
 ```
 
 > This requires `track.ts` to re-export `enableSupabaseInstrumentation`. Add to the end of `cli/src/analytics/track.ts` (next to the existing `export { withSupabaseSource }`):
+>
 > ```ts
 > export { enableSupabaseInstrumentation } from './supabase-perf'
 > ```
+>
 
 In `cli/src/mcp/server.ts`, find the line `setInvocationSource('mcp')` (line 39) and add the enable call right after it:
 
