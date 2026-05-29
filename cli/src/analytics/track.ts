@@ -184,10 +184,6 @@ let commandStartedAt = 0
 // events. One command per CLI process, so a module-level value is sufficient.
 let currentCommandPath = ''
 
-export function setCurrentCommandPath(path: string): void {
-  currentCommandPath = path
-}
-
 export interface CommandContext {
   flags: string[]
   positional_arg_count: number
