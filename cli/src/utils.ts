@@ -1304,7 +1304,8 @@ export async function uploadTUS(apikey: string, data: Buffer, orgId: string, app
       channel: 'app',
       event: 'App TUS upload',
       icon: '⏫',
-      user_id: orgId,
+      org_id: orgId,
+      tracking_version: 2,
       tags: {
         'app-id': appId,
       },
@@ -1348,7 +1349,8 @@ export async function uploadTUS(apikey: string, data: Buffer, orgId: string, app
           channel: 'app',
           event: 'App TUS done',
           icon: '⏫',
-          user_id: orgId,
+          org_id: orgId,
+          tracking_version: 2,
           tags: {
             'app-id': appId,
           },
