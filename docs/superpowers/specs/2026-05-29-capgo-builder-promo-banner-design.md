@@ -60,7 +60,8 @@ premise holds across tiers.
 **Non-Goals**
 - No acquisition/marketing-site work; this is in-console only.
 - No changes to Builder itself (backend build pipeline, CLI, Builds tab).
-- No new animation dependency (GSAP was considered and rejected — see §8).
+- GSAP is added as a new dependency for the presentation's motion (see §8); no
+  other new runtime deps.
 - The presentation never asks the user to run a command inside the modal; the
   only action is the final CTA, which navigates into the existing Builds flow.
 
@@ -232,14 +233,35 @@ Each event carries the assigned variant keys for attribution.
 
 ## 8. Animation Approach
 
-House style only — **no animation library** (the console ships none; GSAP was
-considered and rejected to avoid a new dependency). Use scoped CSS `@keyframes`
-+ Vue `<Transition>` keyed on slide index, matching `DemoOnboardingModal.vue` and
-`TrialBanner.vue`. Techniques used: toggle flip + ripple, `clip-path: circle()`
-iris reveal, draw-on checkmark (`stroke-dashoffset`), rotating dashed ring,
-rocket launch via `transform: translate()` + `requestAnimationFrame`-free CSS
-keyframes. Respect `prefers-reduced-motion` (fall back to instant slide changes
-and a static rocket).
+**GSAP** drives the presentation's motion (added as an npm dependency:
+`npm i gsap`, imported in the modal component — no CDN/SRI). The console ships
+no animation library today, so this is a new, intentional dependency chosen for
+the richer, sequenced "attention-grabbing" motion the deck needs. Idle ambient
+loops (phone float, glow breathe, shield ring spin, switch ripple, rocket
+flame flicker) stay as lightweight scoped CSS `@keyframes`; GSAP handles
+*orchestrated* motion.
+
+Key orchestration rules (validated in the prototype):
+
+- **Transitions are crossfade + slight x-drift**, not a full block-slide. The
+  outgoing slide fades out (~0.24s), then the incoming slide fades in (~0.4s)
+  **and its content staggers in afterward** — so content never animates
+  mid-transition (this was a real bug in the CSS-only version).
+- **Per-slide entrance** runs once the slide lands: right-column items stagger
+  (`gsap.from`, `y:14`, `stagger:.07`, `power3.out`); slide-2 checklist + drawn
+  checkmark (`strokeDashoffset` 327→0); slide-3 phones pop (`back.out(1.5)`,
+  staggered) then pills/caption; slide-4 shield scales in (`back.out`);
+  slide-5 rocket scales in.
+- **Always `clearProps`** transform/opacity after GSAP entrances so the CSS
+  ambient loops (float/bob) resume — verified the phone/rocket transforms are
+  cleared post-entrance.
+- **Slide 1 switch**: knob flip ~0.22s; advance to slide 2 only *after* it
+  settles (~360ms) so the flip and the transition never overlap.
+- **Rocket launch** (slide 5 CTA): the launch itself can stay CSS keyframes
+  (translate + flame elongation) or be a GSAP timeline; either way the jet
+  swings down-left and the flame ramps over ~0.55s.
+- **`prefers-reduced-motion`**: skip all GSAP entrances/transitions (instant
+  slide swap), freeze the rocket, no flip animation.
 
 ## 9. Dismissal
 
@@ -283,10 +305,13 @@ is low-risk.
 - `supabase/functions/_backend/private/builder_promo.ts` (new endpoint) + route wiring
 - `messages/en.json` (new `builder-promo-*` keys, incl. all variants)
 - PostHog experiment + event wiring via existing analytics service
+- `gsap` added to `package.json` dependencies (imported in the modal component)
 - `playwright/e2e/builder-promo.spec.ts` (new)
 
 Visual reference mockups (HTML, not shipped) live under
-`.superpowers/brainstorm/.../content/` (slide1–slide5, final rocket = `slide5-rocket-v3.html`).
+`.superpowers/brainstorm/.../content/` — the end-to-end deck (GSAP) is
+`slides-only.html`; individual slides are `slide1`–`slide5` (final rocket =
+`slide5-rocket-v3.html`).
 
 ## 13. Open Questions
 
