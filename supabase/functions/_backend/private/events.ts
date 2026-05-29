@@ -180,13 +180,18 @@ app.post('/', middlewareV2(['read', 'write', 'all', 'upload']), async (c) => {
 
   const supabase = supabaseWithAuth(c, c.get('auth')!)
 
+  // Resolve the org from the verified org id (v2) or the legacy user_id-as-org
+  // value (v1). Under tracking v2, trackedBody.user_id is the authenticated
+  // *user*, so it must not be used to look up the organization.
+  const onboardingOrgId = verifiedOrgId
+    ?? (typeof trackedBody.user_id === 'string' ? trackedBody.user_id : undefined)
   let onboardingBentoEvent: BentoTrackingPayload | undefined
-  if (trackedBody.user_id && appId && trackedBody.event === 'onboarding-step-done') {
+  if (onboardingOrgId && appId && trackedBody.event === 'onboarding-step-done') {
     onboardingBentoEvent = await Promise.all([
       supabase
         .from('orgs')
         .select('*')
-        .eq('id', trackedBody.user_id)
+        .eq('id', onboardingOrgId)
         .single(),
       supabase
         .from('apps')

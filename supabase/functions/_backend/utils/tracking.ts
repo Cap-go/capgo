@@ -80,7 +80,10 @@ async function executeBentoTracking(c: Context, payload: SendEventToTrackingPayl
     return
   }
 
-  const orgId = payload.user_id
+  // Under tracking v2 the org lives in the PostHog `organization` group, not in
+  // user_id (which is now the authenticated actor). Fall back to user_id for
+  // legacy v1 payloads where user_id still carried the org id.
+  const orgId = payload.groups?.organization ?? payload.user_id
   if (!orgId || typeof orgId !== 'string') {
     cloudlogErr({
       requestId: c.get('requestId'),
