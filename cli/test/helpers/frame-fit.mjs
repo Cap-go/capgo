@@ -20,10 +20,12 @@ export { BODY_BUDGET_ROWS, MAX_FRAME_ROWS }
 // resize-prompt is the safety net (we do not guarantee narrower).
 export const REFERENCE_WIDTHS = [80, 60]
 
-function makeStdout(columns) {
+function makeStdout(columns, rows = 200) {
   const s = new EventEmitter()
   s.columns = columns
-  s.rows = 200 // tall, so ink never paginates; we measure the natural height
+  // Default very tall so ink never paginates and we measure natural height.
+  // Pass a real height to test viewport components that fill the terminal.
+  s.rows = rows
   s.frames = []
   s.lastFrame = null
   s.write = (frame) => {
@@ -48,13 +50,17 @@ function makeStdin() {
 
 /**
  * Render an Ink element at a given width and return the plain frame text.
+ * Pass `rows` for components that fill the terminal via minHeight/viewport math
+ * (e.g. the fullscreen viewers); leave it default for natural-height step body
+ * measurement.
  * @param {import('react').ReactElement} element
  * @param {number} columns
+ * @param {number} [rows]
  * @returns {string}
  */
-export function renderFrameText(element, columns = 80) {
-  const stdout = makeStdout(columns)
-  const stderr = makeStdout(columns)
+export function renderFrameText(element, columns = 80, rows = 200) {
+  const stdout = makeStdout(columns, rows)
+  const stderr = makeStdout(columns, rows)
   const stdin = makeStdin()
   const instance = inkRender(element, {
     stdout,
@@ -72,13 +78,14 @@ export function renderFrameText(element, columns = 80) {
 }
 
 /**
- * Rendered row count of an element at a given width.
+ * Rendered row count of an element at a given width (and optional height).
  * @param {import('react').ReactElement} element
  * @param {number} columns
+ * @param {number} [rows]
  * @returns {number}
  */
-export function frameRows(element, columns = 80) {
-  const text = renderFrameText(element, columns)
+export function frameRows(element, columns = 80, rows = 200) {
+  const text = renderFrameText(element, columns, rows)
   return text === '' ? 0 : text.split('\n').length
 }
 

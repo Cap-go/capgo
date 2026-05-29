@@ -350,3 +350,70 @@ export const FullscreenAiViewer: FC<{
     </Box>
   )
 }
+
+// Streaming build-output viewer — a fullscreen takeover (like FullscreenAiViewer)
+// the parent renders as an EARLY RETURN so it owns the whole terminal and
+// BYPASSES the wizard's body-measurement / dense / too-small logic. The
+// `requesting-build` step's output grows unbounded; rendered inside the measured
+// body it inflated bodyHeight and tripped the "terminal too small" gate. Here it
+// can't: the output auto-tails inside a fixed-height viewport that always fits
+// the live screen, exactly as the AI analysis viewer paginates tall content.
+//
+// Auto-tail (not manual scroll): the build streams, so we always show the most
+// recent screenful, bottom-aligned just above the status bar — like `tail -f`.
+// Chrome is two rows (a divider + the "Building… (N lines)" status); the rest is
+// the clipped tail viewport, which resizes with the terminal.
+export const FullscreenBuildOutput: FC<{
+  title: string
+  lines: string[]
+  terminalRows: number
+}> = ({ title, lines, terminalRows }) => {
+  const { stdout } = useStdout()
+  const [dims, setDims] = useState<{ rows: number, cols: number }>({
+    rows: stdout?.rows ?? terminalRows,
+    cols: stdout?.columns ?? 80,
+  })
+  useEffect(() => {
+    if (!stdout)
+      return
+    const handler = (): void => setDims({ rows: stdout.rows ?? 24, cols: stdout.columns ?? 80 })
+    stdout.on('resize', handler)
+    return () => {
+      stdout.off('resize', handler)
+    }
+  }, [stdout])
+
+  const CHROME_ROWS = 2 // bottom divider + "Building…" status line
+  const viewportRows = Math.max(1, dims.rows - CHROME_ROWS)
+  // Always show the last screenful (wrap-aware), since output streams in.
+  const tailOffset = computeMaxScrollOffset(lines, viewportRows, dims.cols)
+  const visibleLines = pickVisibleLines(lines, tailOffset, viewportRows, dims.cols)
+  const dividerWidth = Math.max(10, Math.min(60, dims.cols - 1))
+
+  return (
+    <Box flexDirection="column" minHeight={dims.rows}>
+      {/* Fixed-height clipped tail, bottom-aligned so the newest lines sit just
+          above the status bar (and any single over-long wrapped line is clipped
+          at the top rather than pushing the footer off-screen). */}
+      <Box flexDirection="column" height={viewportRows} justifyContent="flex-end" overflow="hidden">
+        {visibleLines.map((line, index) => {
+          const isSuccess = line.startsWith('✔')
+          const isError = line.startsWith('✖') || line.startsWith('❌')
+          const isWarn = line.startsWith('⚠')
+          const isBold = line.startsWith('✔ Build') || line.startsWith('✔ Created') || line.startsWith('Uploading:')
+          const color = isSuccess ? 'green' : isError ? 'red' : isWarn ? 'yellow' : undefined
+          return (
+            <Text key={`build-${tailOffset + index}`} color={color} bold={isBold} dimColor={!color && !isBold}>
+              {line === '' ? ' ' : line}
+            </Text>
+          )
+        })}
+      </Box>
+      <Text color="cyan">{'─'.repeat(dividerWidth)}</Text>
+      <Box>
+        <SpinnerLine text={title} />
+        <Text dimColor>{` (${lines.length} lines)`}</Text>
+      </Box>
+    </Box>
+  )
+}

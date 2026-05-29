@@ -43,7 +43,7 @@ import { mapAndroidOnboardingError, mapSaValidationKindToCategory } from '../../
 import { canUseFilePicker, openKeystorePicker, openServiceAccountJsonPicker } from '../../file-picker.js'
 import { trackBuilderOnboardingStep } from '../../telemetry.js'
 import { CompletedStepsLog } from '../../ui/completed-steps-log.js'
-import { BOX_HEADER_ROWS, COMPACT_HEADER_ROWS, Divider, FullscreenAiViewer, Header, TerminalTooSmall, WIZARD_PADDING_ROWS } from '../../ui/components.js'
+import { BOX_HEADER_ROWS, COMPACT_HEADER_ROWS, Divider, FullscreenAiViewer, FullscreenBuildOutput, Header, TerminalTooSmall, WIZARD_PADDING_ROWS } from '../../ui/components.js'
 import type { AiResultKind } from '../../ui/components.js'
 import { COMPACT_HEADER_TOTAL_ROWS, isFrameTooSmall, logBudgetRows, shouldCollapseToDense } from '../../ui/frame-fit.js'
 import {
@@ -1715,6 +1715,12 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
   const showProgress = step !== 'welcome' && step !== 'error' && step !== 'build-complete' && step !== 'requesting-build' && step !== 'ai-analysis-result' && !isAiResultScroll
   const showLog = step !== 'requesting-build' && step !== 'build-complete' && !isAiStep
 
+  // Streaming build output is a fullscreen takeover — see iOS sibling. As an
+  // early return (before the `tooSmall` guard) it auto-tails inside a viewport
+  // that always fits, so the unbounded output never trips "terminal too small".
+  if (step === 'requesting-build')
+    return <FullscreenBuildOutput title="Building..." lines={buildOutput} terminalRows={terminalRows} />
+
   // Floor guard — see iOS sibling. When even the one-line header + content
   // won't fit (measured), show a resize prompt instead of a clipped step.
   // Resize-reactive.
@@ -2474,11 +2480,8 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
         />
       )}
 
-      {step === 'requesting-build' && (
-        <Box flexDirection="column" marginTop={1}>
-          {buildOutput.slice(-Math.max(terminalRows - 6, 5)).map((line, i) => (<Text key={i}>{line}</Text>))}
-        </Box>
-      )}
+      {/* Requesting build: handled by the FullscreenBuildOutput early return
+          above — nothing renders here in the measured body. */}
 
       {step === 'build-complete' && (
         <BuildCompleteStep uploadSummary={ciSecretUploadSummary} buildUrl={buildUrl} dense={dense} />

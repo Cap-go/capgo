@@ -47,7 +47,7 @@ import {
   STEP_PROGRESS,
 } from '../types.js'
 import { CompletedStepsLog } from './completed-steps-log.js'
-import { BOX_HEADER_ROWS, COMPACT_HEADER_ROWS, Divider, FullscreenAiViewer, Header, SpinnerLine, TerminalTooSmall, WIZARD_PADDING_ROWS } from './components.js'
+import { BOX_HEADER_ROWS, COMPACT_HEADER_ROWS, Divider, FullscreenAiViewer, FullscreenBuildOutput, Header, TerminalTooSmall, WIZARD_PADDING_ROWS } from './components.js'
 import type { AiResultKind } from './components.js'
 import { COMPACT_HEADER_TOTAL_ROWS, isFrameTooSmall, logBudgetRows, shouldCollapseToDense } from './frame-fit.js'
 import {
@@ -1602,6 +1602,15 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
     ? getBuildOnboardingRecoveryAdvice(error, retryStep, pm.runner, appId)
     : null
 
+  // The streaming build output is a fullscreen takeover too — same reasoning as
+  // the AI viewer below. Rendered inside the measured body, its unbounded growth
+  // inflated bodyHeight and tripped `tooSmall`, replacing a live build with a
+  // resize prompt on a perfectly usable terminal. As an early return it
+  // auto-tails inside a viewport that always fits, so the build phase never
+  // reports "terminal too small". (Must precede the `tooSmall` guard.)
+  if (step === 'requesting-build')
+    return <FullscreenBuildOutput title="Building..." lines={buildOutput} terminalRows={terminalRows} />
+
   // Floor guard: when even the one-line header + this step's content won't
   // fit (measured), an interactive step would clip in the alt buffer with no
   // way to scroll/reach the top. Show a resize prompt instead. Resize-reactive,
@@ -2312,38 +2321,9 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
         />
       )}
 
-      {/* Requesting build — live output fills terminal, spinner at bottom */}
-      {step === 'requesting-build' && (() => {
-        // 3 lines overhead: 1 divider + 1 spinner + 1 padding
-        const visibleLines = Math.max(5, terminalRows - 3)
-        return (
-          <Box flexDirection="column" marginTop={1}>
-            {buildOutput.slice(-visibleLines).map((line, i) => {
-              const isSuccess = line.startsWith('✔')
-              const isError = line.startsWith('✖') || line.startsWith('❌')
-              const isWarn = line.startsWith('⚠')
-              const isBold = line.startsWith('✔ Build') || line.startsWith('✔ Created') || line.startsWith('Uploading:')
-              const color = isSuccess ? 'green' : isError ? 'red' : isWarn ? 'yellow' : undefined
-              return (
-                <Text key={i} color={color} dimColor={!color && !isBold} bold={isBold}>
-                  {line}
-                </Text>
-              )
-            })}
-            <Divider />
-            <Box>
-              <SpinnerLine text="Building..." />
-              <Text dimColor>
-                {' '}
-                (
-                {buildOutput.length}
-                {' '}
-                lines)
-              </Text>
-            </Box>
-          </Box>
-        )
-      })()}
+      {/* Requesting build: handled by the FullscreenBuildOutput early return
+          above (fullscreen takeover, bypasses the too-small gate) — nothing
+          renders here in the measured body. */}
 
       {/* AI debug — ask the user whether to send the captured log */}
       {step === 'ai-analysis-prompt' && (
