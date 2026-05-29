@@ -1130,8 +1130,9 @@ void (async () => {
         log.error(commanderError.message)
       }
       const exitCode = commanderError.exitCode ?? 1
-      if (shouldCapturePosthogException(error))
-        trackCommandFailed(currentCommandPath, { errorCategory: categorizeCliError(error), exitCode })
+      // Track the failure for usage analytics regardless of exception-capture
+      // policy (commander usage errors are real failures, categorized 'commander').
+      trackCommandFailed(currentCommandPath, { errorCategory: categorizeCliError(error), exitCode })
       await Promise.all([capturePromise, flushAnalytics()])
       exit(exitCode)
     }
