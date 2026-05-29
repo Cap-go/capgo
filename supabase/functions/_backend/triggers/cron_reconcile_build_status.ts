@@ -274,6 +274,7 @@ app.post('/', middlewareAPISecret, async (c) => {
             platform: build.platform,
             build_mode: build.build_mode,
             owner_org: build.owner_org,
+            requested_by: build.requested_by,
           },
         })
       }

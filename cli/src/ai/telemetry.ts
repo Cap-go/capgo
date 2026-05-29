@@ -37,7 +37,8 @@ export async function trackAiAnalysisChoice(input: TrackAiAnalysisChoiceInput): 
       channel: 'build-lifecycle',
       icon: '🤖',
       notify: false,
-      user_id: input.orgId,
+      org_id: input.orgId,
+      tracking_version: 2,
       tags: {
         app_id: input.appId,
         platform: input.platform,
@@ -76,7 +77,8 @@ export async function trackAiAnalysisResult(input: TrackAiAnalysisResultInput): 
       channel: 'build-lifecycle',
       icon: '🤖',
       notify: false,
-      user_id: input.orgId,
+      org_id: input.orgId,
+      tracking_version: 2,
       tags,
     })
   }
