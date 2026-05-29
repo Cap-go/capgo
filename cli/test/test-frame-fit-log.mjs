@@ -42,16 +42,17 @@ test('logBudgetRows: budget + chrome + body + margin never exceeds the terminal'
 })
 
 // ── 2. composition: long log fits; uncapped log would overflow ───────────────
-// Mirror the wizard frame shape: <Box minHeight padding><Header/>{log}{body}</Box>.
-function frame(logEntries, rows, cols, bodyHeight) {
+// Mirror the wizard frame shape AND its one-row-per-entry truncation:
+//   <Box minHeight padding><Header/>{log (truncate-middle lines)}{body}</Box>.
+function frame(logEntries, rows, bodyHeight) {
   const body = h(Box, { flexDirection: 'column' }, ...Array.from({ length: bodyHeight }, (_, i) => h(Text, { key: i }, `step line ${i + 1}`)))
   const logBox = logEntries.length > 0
-    ? h(Box, { flexDirection: 'column', marginTop: 1 }, ...logEntries.map((e, i) => h(Text, { key: i }, e.text)))
+    ? h(Box, { flexDirection: 'column', marginTop: 1 }, ...logEntries.map((e, i) => h(Text, { key: i, wrap: 'truncate-middle' }, e.text)))
     : null
   return h(Box, { flexDirection: 'column', minHeight: rows, padding: 1 }, h(Header, { compact: true }), logBox, body)
 }
 
-// 30 completed steps, one a long key-file path (wraps) — the real scenario.
+// 30 completed steps, one a long key-file path — the real scenario.
 const longLog = [
   ...Array.from({ length: 28 }, (_, i) => ({ text: `✔ step ${i + 1} done`, color: 'green' })),
   { text: '✔ Key file selected · /Users/me/dev/app/tutorial/capgo-tutorial/AuthKey_66FGQZB566.p8', color: 'green' },
@@ -62,10 +63,9 @@ for (const rows of [16, 19, 24]) {
   test(`capped log fits a ${rows}-row terminal (was: too small)`, () => {
     const bodyHeight = 6
     const budget = logBudgetRows(rows, COMPACT_HEADER_ROWS, bodyHeight)
-    const { visible } = capLogRows(longLog, budget, 80)
-    // Build the capped log: summary line + visible entries.
+    const { visible } = capLogRows(longLog, budget)
     const cappedEntries = [{ text: '…and N earlier steps done (resize taller to see all)', color: 'gray' }, ...visible]
-    const capped = frameRows(frame(cappedEntries, rows, 80, bodyHeight), 80)
+    const capped = frameRows(frame(cappedEntries, rows, bodyHeight), 80)
     assert(capped <= rows, `capped frame is ${capped} rows, exceeds ${rows}`)
   })
 }

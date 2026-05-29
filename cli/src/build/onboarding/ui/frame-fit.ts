@@ -61,18 +61,15 @@ export function pickPlatformLayout(cols: number, rows: number): PlatformPickerLa
 
 // ── Completed-steps log capping ──────────────────────────────────────────────
 // The "✔ step done" log grows on every completed step, so left unbounded it
-// eventually pushes the current step off-screen (or trips the resize prompt)
-// even on a normal terminal. The log is rendered OUTSIDE the measured step body
-// and capped here to whatever rows are left over, newest-first, with a one-line
-// summary for the rest — so the current step always wins the space and the log
-// never causes a too-small. Wrap-aware: a long line (e.g. a key-file path)
-// counts as the rows it occupies, not one.
-// Rows available for the completed-steps log, which renders OUTSIDE the
-// measured step body: the terminal minus the header, the wizard padding, the
-// measured step body, and the log block's own top margin (1). Clamped at 0.
-// By construction `logBudgetRows + headerRows + WIZARD_PADDING_ROWS + bodyHeight
-// + 1 ≤ terminalRows`, so a log capped to this budget can never push the frame
-// past the terminal — i.e. the log can't cause a "too small".
+// eventually pushes the current step off-screen (or trips the resize prompt).
+// The log is rendered OUTSIDE the measured step body and capped here to the
+// rows it's allowed.
+
+// Rows available for the log: the terminal minus the header, the wizard
+// padding, the measured step body, and the log block's own top margin (1).
+// Clamped at 0. By construction `logBudgetRows + headerRows + WIZARD_PADDING_ROWS
+// + bodyHeight + 1 ≤ terminalRows`, so a log capped to this budget can never
+// push the frame past the terminal — i.e. the log can't cause a "too small".
 export function logBudgetRows(terminalRows: number, headerRows: number, bodyHeight: number): number {
   return Math.max(0, terminalRows - headerRows - WIZARD_PADDING_ROWS - bodyHeight - 1)
 }
@@ -82,31 +79,24 @@ export interface CappedLog<T> {
   visible: T[]
 }
 
-export function capLogRows<T extends { text: string }>(entries: T[], maxRows: number, cols: number): CappedLog<T> {
-  const width = Math.max(1, Math.floor(cols))
-  const rowsFor = (text: string): number => Math.max(1, Math.ceil(text.length / width))
+// Pick the most-recent entries that fit `maxRows`. Each entry occupies EXACTLY
+// ONE row (the caller truncates long lines like file paths), so this is a plain
+// row count. A one-line summary stands in for hidden steps, but only when it
+// actually condenses ≥ 2 of them — with a single step to hide, or only one row
+// to spare, we show the step itself rather than a pointless "…and 1 earlier
+// step done" placeholder.
+export function capLogRows<T>(entries: T[], maxRows: number): CappedLog<T> {
   if (maxRows <= 0)
-    return { hidden: entries.length, visible: [] }
-
-  let total = 0
-  for (const e of entries)
-    total += rowsFor(e.text)
-  if (total <= maxRows)
+    return { hidden: 0, visible: [] }
+  if (entries.length <= maxRows)
     return { hidden: 0, visible: entries }
-
-  // Doesn't all fit: reserve one row for the summary line, then pack the most
-  // recent entries that fit the remaining budget.
-  const budget = Math.max(0, maxRows - 1)
-  const visible: T[] = []
-  let used = 0
-  for (let i = entries.length - 1; i >= 0; i--) {
-    const r = rowsFor(entries[i].text)
-    if (visible.length > 0 && used + r > budget)
-      break
-    visible.unshift(entries[i])
-    used += r
-    if (used >= budget)
-      break
-  }
-  return { hidden: entries.length - visible.length, visible }
+  // Overflow. A summary line + ≥1 entry needs ≥2 rows; with only one row to
+  // spare, show the single newest step instead of an all-hiding summary.
+  if (maxRows < 2)
+    return { hidden: 0, visible: entries.slice(entries.length - maxRows) }
+  // Reserve one row for the summary; show the most-recent entries in the rest.
+  // entries.length > maxRows here, so hidden = length − (maxRows − 1) ≥ 2: the
+  // summary always represents at least two steps.
+  const visibleCount = maxRows - 1
+  return { hidden: entries.length - visibleCount, visible: entries.slice(entries.length - visibleCount) }
 }

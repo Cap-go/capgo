@@ -1643,17 +1643,17 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
           can't inflate the dense / fit decision. Capped (see logMaxRows) to the
           rows the current step leaves: most-recent entries newest-last, with a
           one-line summary for the rest. */}
-      {showLog && log.length > 0 && (() => {
-        const { hidden, visible } = capLogRows(log, logMaxRows, terminalCols)
+      {showLog && log.length > 0 && logMaxRows >= 1 && (() => {
+        const { hidden, visible } = capLogRows(log, logMaxRows)
         if (hidden === 0 && visible.length === 0)
           return null
         return (
           <Box flexDirection="column" marginTop={1}>
             {hidden > 0 && (
-              <Text dimColor>{`…and ${hidden} earlier step${hidden === 1 ? '' : 's'} done (resize taller to see all)`}</Text>
+              <Text dimColor wrap="truncate-end">{`…and ${hidden} earlier steps done (resize taller to see all)`}</Text>
             )}
             {visible.map((entry, i) => (
-              <Text key={i} color={entry.color as any}>{entry.text}</Text>
+              <Text key={i} color={entry.color as any} wrap="truncate-middle">{entry.text}</Text>
             ))}
           </Box>
         )

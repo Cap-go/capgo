@@ -1746,17 +1746,17 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
       {/* Completed-steps log — OUTSIDE the measured body, capped to the rows the
           current step leaves (see logMaxRows + iOS sibling) so it never pushes
           the step off-screen. */}
-      {showLog && logLines.length > 0 && (() => {
-        const { hidden, visible } = capLogRows(logLines, logMaxRows, terminalCols)
+      {showLog && logLines.length > 0 && logMaxRows >= 1 && (() => {
+        const { hidden, visible } = capLogRows(logLines, logMaxRows)
         if (hidden === 0 && visible.length === 0)
           return null
         return (
           <Box flexDirection="column" marginTop={1}>
             {hidden > 0 && (
-              <Text dimColor>{`…and ${hidden} earlier step${hidden === 1 ? '' : 's'} done (resize taller to see all)`}</Text>
+              <Text dimColor wrap="truncate-end">{`…and ${hidden} earlier steps done (resize taller to see all)`}</Text>
             )}
             {visible.map((entry, i) => (
-              <Text key={i} color={entry.color as any}>{entry.text}</Text>
+              <Text key={i} color={entry.color as any} wrap="truncate-middle">{entry.text}</Text>
             ))}
           </Box>
         )
