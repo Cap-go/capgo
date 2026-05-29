@@ -262,46 +262,57 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
   // render the box header; the next frame corrects if it doesn't fit
   // (one-frame flash, only on small terminals).
   const bodyRef = useRef<DOMElement | null>(null)
-  const [measuredBody, setMeasuredBody] = useState<{ step: OnboardingStep, dense: boolean, height: number } | null>(null)
-  // Adaptive spacing. Step bodies render their comfortable form (matching the
-  // original design — boxes, blank lines between elements) by DEFAULT and
-  // collapse to their compact, budget-fitting form only when the live viewport
-  // can't fit the comfortable version — so a roomy terminal breathes while a
-  // 16-row terminal still survives. `denseOverride` is keyed by (step, rows) so
-  // the decision is sticky and cannot oscillate: we flip to dense at most once
-  // per step+size and re-evaluate (defaulting back to comfortable) only when the
-  // step or terminal height changes. Passed to every step body as `dense`.
-  const [denseOverride, setDenseOverride] = useState<{ step: OnboardingStep, rows: number } | null>(null)
-  const dense = denseOverride != null && denseOverride.step === step && denseOverride.rows === terminalRows
+  // Body heights cached per (step, cols). A body's height in ROWS depends on
+  // the step, its content, and the terminal WIDTH (wrapping) — but NOT on the
+  // terminal HEIGHT. So once a step's comfortable height is measured at the
+  // current width, a VERTICAL resize reuses it and the dense / header /
+  // too-small decisions are made SYNCHRONOUSLY on the first frame. That kills
+  // the measure-then-correct "flash" that used to fire on every resize: the
+  // old code keyed `dense` off the live row count, so each resize reset to
+  // comfortable, rendered (often overflowing), measured, then flipped back to
+  // dense — a visible round-trip per resize tick. We cache the comfortable and
+  // dense forms separately (each has its own height).
+  const [bodyHeights, setBodyHeights] = useState<{ key: string, comfortable: number | null, dense: number | null }>(
+    { key: '', comfortable: null, dense: null },
+  )
+  const fitKey = `${step}|${terminalCols}`
+  const heights = bodyHeights.key === fitKey ? bodyHeights : { key: fitKey, comfortable: null, dense: null }
+
+  // Collapse to the dense (compact-spacing) form only when the comfortable body
+  // can't fit even with the one-line header. Derived synchronously from the
+  // cached comfortable height; null (first frame of a step, or just after a
+  // width change) renders comfortable so we can measure it.
+  const dense = heights.comfortable != null
+    && shouldCollapseToDense({ bodyRows: heights.comfortable, terminalRows })
+
+  // Measure whichever form is on screen and cache it (only when missing or
+  // changed — so this settles and doesn't re-render in a loop).
   useEffect(() => {
     if (!bodyRef.current)
       return
     const { height } = measureElement(bodyRef.current)
-    if (height > 0) {
-      // Tag the measurement with the density it was taken at. A measurement
-      // from the OTHER density is stale: using the comfortable height while in
-      // dense mode would wrongly judge the frame too-small and unmount the body
-      // before the dense form can be measured → deadlock. Tagging makes
-      // `bodyHeight` fall back to null right after a flip so we render the new
-      // density once and re-measure it.
-      setMeasuredBody(prev => (prev && prev.step === step && prev.dense === dense && prev.height === height ? prev : { step, dense, height }))
-      // Comfortable body overflows even with the one-line header → collapse it.
-      if (!dense && shouldCollapseToDense({ bodyRows: height, terminalRows }))
-        setDenseOverride({ step, rows: terminalRows })
-    }
+    if (height <= 0)
+      return
+    const form = dense ? 'dense' : 'comfortable'
+    setBodyHeights((prev) => {
+      const base = prev.key === fitKey ? prev : { key: fitKey, comfortable: null, dense: null }
+      if (base[form] === height)
+        return prev
+      return { ...base, [form]: height }
+    })
   })
-  const bodyHeight = measuredBody && measuredBody.step === step && measuredBody.dense === dense ? measuredBody.height : null
 
-  // Fit decision, derived from the measured body vs the live terminal height:
-  //   - box header fits                  → bordered box
-  //   - only one-line header fits        → compact header (headerCompact)
-  //   - comfortable overflows            → collapse to dense (NOT too-small)
-  //   - even the dense form won't fit    → resize prompt (tooSmall)
-  // `tooSmall` (see frame-fit.ts) only blocks when we're already dense — while
-  // a denser fallback remains it returns false so we collapse instead of
-  // wedging on the resize prompt.
-  const headerCompact = bodyHeight != null
-    && (bodyHeight + BOX_HEADER_ROWS + WIZARD_PADDING_ROWS > terminalRows)
+  // Header degrades box → one-line from the COMFORTABLE height (the upper
+  // bound), so the choice is synchronous and never overflows. When dense is
+  // active the comfortable body already didn't fit the one-line header, so this
+  // is always true then — dense always pairs with the one-line header.
+  const headerCompact = heights.comfortable != null
+    && (heights.comfortable + BOX_HEADER_ROWS + WIZARD_PADDING_ROWS > terminalRows)
+  // The on-screen form's height drives the resize-prompt check. `tooSmall`
+  // (see frame-fit.ts) only blocks when we're already dense AND the dense form
+  // still overflows — null dense height (just flipped, not yet measured) is
+  // optimistic, never a false positive.
+  const bodyHeight = dense ? heights.dense : heights.comfortable
   const tooSmall = isFrameTooSmall({ bodyRows: bodyHeight, dense, terminalRows })
   const neededRows = (bodyHeight != null ? bodyHeight : 1) + COMPACT_HEADER_TOTAL_ROWS
 
