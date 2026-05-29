@@ -1,6 +1,7 @@
 import type { DiffLine } from './diff-utils.js'
 import type { BuildScriptChoice, PackageManager } from './workflow-generator.js'
-import { createSupabaseClient, findSavedKeySilent, sendEvent } from '../../utils.js'
+import { resolveOwnerOrgId } from '../../analytics/org-resolver.js'
+import { findSavedKeySilent, sendEvent } from '../../utils.js'
 
 export type BuildOnboardingWorkflowEvent
   = | 'workflow-preview-prepared'
@@ -37,8 +38,6 @@ const WORKFLOW_EVENT_NAMES: Record<BuildOnboardingWorkflowEvent, string> = {
   'workflow-file-written': 'Build onboarding workflow file written',
 }
 
-const orgIdCache = new Map<string, Promise<string | undefined>>()
-
 export function getWorkflowDiffTelemetry(lines: DiffLine[], isNew: boolean): WorkflowDiffTelemetry {
   const diffAdded = lines.filter(line => line.kind === 'add').length
   const diffRemoved = lines.filter(line => line.kind === 'del').length
@@ -63,7 +62,7 @@ async function trackBuildOnboardingWorkflowEventAsync(options: TrackBuildOnboard
   if (!apikey)
     return
 
-  const orgId = await resolveOrganizationId(apikey, options.appId)
+  const orgId = await resolveOwnerOrgId(apikey, options.appId)
   const tags: Record<string, string | number | boolean> = {
     'app-id': options.appId,
     'platform': options.platform,
@@ -84,34 +83,9 @@ async function trackBuildOnboardingWorkflowEventAsync(options: TrackBuildOnboard
     channel: 'native-builder',
     event: WORKFLOW_EVENT_NAMES[options.event],
     icon: '🧭',
-    user_id: orgId,
+    org_id: orgId,
+    tracking_version: 2,
     tags,
     notify: false,
   })
-}
-
-async function resolveOrganizationId(apikey: string, appId: string): Promise<string | undefined> {
-  const cacheKey = `${apikey}:${appId}`
-  const cached = orgIdCache.get(cacheKey)
-  if (cached)
-    return cached
-
-  const promise = (async () => {
-    try {
-      const supabase = await createSupabaseClient(apikey, undefined, undefined, true)
-      const { data } = await supabase
-        .from('apps')
-        .select('owner_org')
-        .eq('app_id', appId)
-        .maybeSingle()
-
-      return data?.owner_org
-    }
-    catch {
-      return undefined
-    }
-  })()
-
-  orgIdCache.set(cacheKey, promise)
-  return promise
 }

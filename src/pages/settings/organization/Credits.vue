@@ -16,6 +16,7 @@ import ScaleIcon from '~icons/heroicons/scale'
 import UserGroupIcon from '~icons/heroicons/user-group'
 import AdminOnlyModal from '~/components/AdminOnlyModal.vue'
 import { creditPricingMetricOrder, formatCreditPricingPrice, formatCreditPricingTierLabel } from '~/services/creditPricing'
+import { formatLocalDate } from '~/services/date'
 import { completeCreditTopUp, startCreditTopUp } from '~/services/stripe'
 import { getCreditPricingSteps, useSupabase } from '~/services/supabase'
 import { useDisplayStore } from '~/stores/display'
@@ -107,7 +108,7 @@ const creditUsagePercent = computed(() => {
 })
 const creditNextExpiration = computed(() => {
   const expiresAt = currentOrganization.value?.credit_next_expiration
-  return expiresAt ? dayjs(expiresAt).format('MMMM D, YYYY') : null
+  return expiresAt ? formatLocalDate(expiresAt) || null : null
 })
 const hasCreditSummary = computed(() => creditTotal.value > 0 || creditAvailable.value > 0)
 
@@ -261,7 +262,7 @@ const dailyTransactions = computed<DailyLedgerRow[]>(() => {
   const groups = new Map<string, DailyLedgerRow>()
   for (const tx of transactions.value) {
     const dateKey = dayjs(tx.occurred_at).format('YYYY-MM-DD')
-    const dateLabel = dayjs(tx.occurred_at).format('MMM D, YYYY')
+    const dateLabel = formatLocalDate(tx.occurred_at) || dateKey
     const existing = groups.get(dateKey)
     if (!existing) {
       const initial: DailyLedgerRow = {

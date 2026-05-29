@@ -3,6 +3,7 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { cwd } from 'node:process'
 import { intro, log, outro } from '@clack/prompts'
 import { parse } from '@std/semver'
+import { trackEvent } from '../analytics/track'
 import { decryptChecksum, decryptChecksumV3, decryptSource } from '../api/crypto'
 import { checkAlerts } from '../api/update'
 import { getChecksum } from '../checksum'
@@ -115,6 +116,8 @@ export async function decryptZipInternal(
       if (!silent)
         log.info('Checksum matches')
     }
+
+    void trackEvent({ channel: 'bundle', event: 'Bundle Decrypted', icon: '🔓', tags: {} })
 
     if (!silent)
       outro('✅ done')

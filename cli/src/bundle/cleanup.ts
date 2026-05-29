@@ -10,6 +10,7 @@ import {
   lessThan,
   parse,
 } from '@std/semver'
+import { trackEvent } from '../analytics/track'
 import { check2FAComplianceForApp, checkAppExistsAndHasPermissionOrgErr } from '../api/app'
 import { checkAlerts } from '../api/update'
 import { deleteSpecificVersion, displayBundles, getActiveAppVersions, getChannelsVersion } from '../api/versions'
@@ -153,6 +154,8 @@ export async function cleanupBundleInternal(appId: string, options: BundleCleanu
     log.success('You have confirmed removal, removing versions now')
 
   await removeVersions(toRemove, supabase, appId, silent)
+
+  void trackEvent({ channel: 'bundle', event: 'Bundles Cleaned', icon: '🧹', tags: { kept_count: kept, deleted_count: toRemove.length } })
 
   if (!silent)
     outro('Done ✅')

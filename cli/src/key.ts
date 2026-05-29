@@ -1,5 +1,6 @@
 import { existsSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs'
 import { intro, log, outro, confirm as pConfirm } from '@clack/prompts'
+import { trackEvent } from './analytics/track'
 import { createRSA } from './api/crypto'
 import { checkAlerts } from './api/update'
 import { writeConfigUpdater } from './config'
@@ -66,6 +67,7 @@ export async function saveKeyInternal(options: SaveOptions, silent = false) {
 
     updaterConfig.publicKey = publicKey
     await writeConfigUpdater(extConfig)
+    void trackEvent({ channel: 'key', event: 'Key Saved', icon: '💾', tags: {} })
   }
 
   if (!silent) {
@@ -115,6 +117,7 @@ export async function deleteOldPrivateKeyInternal(options: Options, silent = fal
       log.success(`Old private key deleted from ${extConfig.path} file`)
       outro('Done ✅')
     }
+    void trackEvent({ channel: 'key', event: 'Old Key Deleted', icon: '🧹', tags: {} })
     return true
   }
 
@@ -172,6 +175,8 @@ export async function createKeyInternal(options: Options, silent = false) {
     updaterConfig.publicKey = publicKey
     await writeConfigUpdater(extConfig)
   }
+
+  void trackEvent({ channel: 'key', event: 'Encryption Keys Generated', icon: '🔑', tags: {} })
 
   if (!silent) {
     log.success('Your RSA key has been generated')

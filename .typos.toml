@@ -33,6 +33,9 @@ extend-exclude = [
   "supabase/.branches/",
   "supabase/.temp/",
   "supabase/schemas/prod.sql",
+  # Keep this committed migration filename stable even though it contains
+  # "indexs"; the migration timestamp is already part of history.
+  "supabase/migrations/20260528113224_missing_indexs.sql",
 
   # Assets and data files
   "*.json",

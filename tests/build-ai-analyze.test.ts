@@ -120,7 +120,7 @@ describe('aiAnalyzeBuild', () => {
     expect(results).toHaveLength(1)
     const [, payload] = results[0]
     expect(payload.tags.result).toBe('unauthorized')
-    expect(payload.user_id).toBeUndefined()
+    expect(payload.user_id).toBe(apikey.user_id)
     expect(payload.groups).toBeUndefined()
   })
 
@@ -136,7 +136,7 @@ describe('aiAnalyzeBuild', () => {
     expect(results).toHaveLength(1)
     const [, payload] = results[0]
     expect(payload.tags.result).toBe('unauthorized')
-    expect(payload.user_id).toBeUndefined()
+    expect(payload.user_id).toBe(apikey.user_id)
     expect(payload.groups).toBeUndefined()
   })
 
@@ -152,8 +152,9 @@ describe('aiAnalyzeBuild', () => {
     const results = trackingCallsByEvent('AI Build Analysis Result')
     expect(results).toHaveLength(1)
     expect(results[0][1].tags.result).toBe('invalid_state')
-    expect(results[0][1].user_id).toBe(orgId)
+    expect(results[0][1].user_id).toBe(apikey.user_id)
     expect(results[0][1].groups).toEqual({ organization: orgId })
+    expect(results[0][1].tags.org_id).toBe(orgId)
   })
 
   it('throws already_analyzed when ai_analyzed is true; fires Result(already_analyzed) only (no Requested)', async () => {
@@ -270,6 +271,7 @@ describe('aiAnalyzeBuild', () => {
     const results = trackingCallsByEvent('AI Build Analysis Result')
     expect(results).toHaveLength(1)
     expect(results[0][1].tags.result).toBe('config_error')
-    expect(results[0][1].user_id).toBe(orgId)
+    expect(results[0][1].user_id).toBe(apikey.user_id)
+    expect(results[0][1].tags.org_id).toBe(orgId)
   })
 })

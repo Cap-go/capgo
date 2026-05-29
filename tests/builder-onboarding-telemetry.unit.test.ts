@@ -31,7 +31,8 @@ describe('trackBuilderOnboardingStep', () => {
       channel: 'builder-onboarding',
       icon: '🧭',
       notify: false,
-      user_id: 'org-uuid-1',
+      org_id: 'org-uuid-1',
+      tracking_version: 2,
       tags: {
         step: 'api-key-instructions',
         platform: 'ios',

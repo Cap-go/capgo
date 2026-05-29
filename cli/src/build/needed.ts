@@ -6,6 +6,7 @@ import process, { env, stdout } from 'node:process'
 import { log } from '@clack/prompts'
 import { Table } from '@sauber/table'
 import { difference, parse } from '@std/semver'
+import { trackEvent } from '../analytics/track'
 import { check2FAComplianceForApp, checkAppExistsAndHasPermissionOrgErr } from '../api/app'
 import {
   checkCompatibilityCloud,
@@ -316,6 +317,7 @@ export async function checkBuildNeeded(
 
     stdout.write(`${output}\n`)
     process.exitCode = getBuildNeededExitCode(result.required)
+    void trackEvent({ channel: 'cli-usage', event: 'Build Needed Checked', icon: '🧭', tags: { build_needed: result.required } })
   }
   catch (error) {
     log.error(`Error checking build requirement ${formatError(error)}`)

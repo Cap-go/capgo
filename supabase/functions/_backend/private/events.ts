@@ -5,6 +5,7 @@ import type { BentoTrackingPayload } from '../utils/tracking.ts'
 import { Hono } from 'hono/tiny'
 import { BRES, parseBody, quickError, simpleError, useCors } from '../utils/hono.ts'
 import { middlewareV2 } from '../utils/hono_middleware.ts'
+import { cloudlog } from '../utils/logging.ts'
 import { checkPermission } from '../utils/rbac.ts'
 import { broadcastCLIEvent } from '../utils/realtime_broadcast.ts'
 import { hasOrgRight, hasOrgRightApikey, supabaseWithAuth } from '../utils/supabase.ts'
@@ -24,14 +25,61 @@ interface ResolvedTrackingId {
   orgId?: string
 }
 
+interface TrackEventBody extends TrackOptions {
+  notifyConsole?: boolean
+  org_id?: string
+  tracking_version?: number | string
+}
+
+function isTrackingV2(version: unknown) {
+  return version === 2 || version === '2'
+}
+
 async function resolveTrackingUserId(
   c: Context<MiddlewareKeyVariables>,
   requestedUserId: string | undefined,
+  requestedOrgId: string | undefined,
   appId: string | undefined,
+  trackingV2 = false,
   notifyConsole = false,
 ): Promise<ResolvedTrackingId> {
   const forbiddenError = notifyConsole ? 'Forbidden' : 'no_permission'
   const authUserId = c.get('auth')?.userId ?? ''
+
+  if (trackingV2) {
+    if (!requestedOrgId) {
+      cloudlog({
+        requestId: c.get('requestId'),
+        message: 'tracking v2 event missing org_id; sending actor-scoped event without organization group',
+      })
+      return { trackingUserId: authUserId }
+    }
+
+    if (appId) {
+      if (!(await checkPermission(c, 'app.read', { appId }))) {
+        throw quickError(403, forbiddenError, 'You cannot send events for this organization')
+      }
+
+      const supabase = supabaseWithAuth(c, c.get('auth')!)
+      const { data: app, error } = await supabase
+        .from('apps')
+        .select('owner_org')
+        .eq('app_id', appId)
+        .single()
+
+      if (error || !app || app.owner_org !== requestedOrgId) {
+        throw quickError(403, forbiddenError, 'You cannot send events for this organization')
+      }
+
+      return { trackingUserId: authUserId, orgId: requestedOrgId }
+    }
+
+    if (await checkPermission(c, 'org.read', { orgId: requestedOrgId })) {
+      return { trackingUserId: authUserId, orgId: requestedOrgId }
+    }
+
+    throw quickError(403, forbiddenError, 'You cannot send events for this organization')
+  }
 
   if (!requestedUserId || requestedUserId === authUserId) {
     return { trackingUserId: authUserId }
@@ -77,13 +125,19 @@ function canAccessRequestedOrg(c: Context<MiddlewareKeyVariables>, orgId: string
 }
 
 app.post('/', middlewareV2(['read', 'write', 'all', 'upload']), async (c) => {
-  const body = await parseBody<TrackOptions & { notifyConsole?: boolean }>(c)
-  const { notifyConsole = false, ...trackOptions } = body
-  const requestedOrgId = body.notifyConsole && typeof body.user_id === 'string' && body.user_id.length > 0
-    ? body.user_id
-    : undefined
+  const body = await parseBody<TrackEventBody>(c)
+  const { notifyConsole = false, org_id: _orgId, tracking_version: _trackingVersion, ...trackOptions } = body
+  const trackingV2 = isTrackingV2(body.tracking_version)
+  const requestedOrgId = trackingV2 && typeof body.org_id === 'string' && body.org_id.length > 0
+    ? body.org_id
+    : body.notifyConsole && typeof body.user_id === 'string' && body.user_id.length > 0
+      ? body.user_id
+      : undefined
 
-  if (requestedOrgId && !(await canAccessRequestedOrg(c, requestedOrgId)))
+  // Legacy notifyConsole still sends the target org in `user_id`, so keep this
+  // preflight scoped to notifyConsole. Non-notify v2 events validate `org_id`
+  // inside resolveTrackingUserId(), where app ownership and org access diverge.
+  if (body.notifyConsole && requestedOrgId && !(await canAccessRequestedOrg(c, requestedOrgId)))
     throw quickError(403, 'Forbidden', 'You cannot send events for this organization')
 
   const requestedUserId = typeof body.user_id === 'string' ? body.user_id : undefined
@@ -92,8 +146,15 @@ app.post('/', middlewareV2(['read', 'write', 'all', 'upload']), async (c) => {
     : typeof body.tags?.app_id === 'string'
       ? body.tags.app_id
       : undefined
-  const { trackingUserId, orgId: verifiedOrgId } = await resolveTrackingUserId(c, requestedUserId, appId, Boolean(body.notifyConsole))
-  const trackedBody = requestedUserId ? { ...trackOptions, user_id: trackingUserId } : trackOptions
+  const { trackingUserId, orgId: verifiedOrgId } = await resolveTrackingUserId(c, requestedUserId, requestedOrgId, appId, trackingV2, Boolean(body.notifyConsole))
+  const trackedTags = trackingV2 && verifiedOrgId
+    ? { ...(trackOptions.tags || {}), org_id: verifiedOrgId }
+    : trackOptions.tags
+  const trackedBody = trackingV2
+    ? { ...trackOptions, user_id: trackingUserId, tags: trackedTags }
+    : requestedUserId
+      ? { ...trackOptions, user_id: trackingUserId }
+      : trackOptions
 
   // notifyConsole: broadcast to Supabase Realtime only, skip all tracking
   if (notifyConsole) {
@@ -119,13 +180,19 @@ app.post('/', middlewareV2(['read', 'write', 'all', 'upload']), async (c) => {
 
   const supabase = supabaseWithAuth(c, c.get('auth')!)
 
+  // Resolve the org from the verified org id (v2) or the legacy user_id-as-org
+  // value (v1 only). Under tracking v2, trackedBody.user_id is the authenticated
+  // *user*, so it must never be used to look up the organization — a v2 event
+  // without an org_id simply skips the Bento notification.
+  const onboardingOrgId = verifiedOrgId
+    ?? (!trackingV2 && typeof trackedBody.user_id === 'string' ? trackedBody.user_id : undefined)
   let onboardingBentoEvent: BentoTrackingPayload | undefined
-  if (trackedBody.user_id && appId && trackedBody.event === 'onboarding-step-done') {
+  if (onboardingOrgId && appId && trackedBody.event === 'onboarding-step-done') {
     onboardingBentoEvent = await Promise.all([
       supabase
         .from('orgs')
         .select('*')
-        .eq('id', trackedBody.user_id)
+        .eq('id', onboardingOrgId)
         .single(),
       supabase
         .from('apps')
