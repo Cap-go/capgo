@@ -282,8 +282,12 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
   // can't fit even with the one-line header. Derived synchronously from the
   // cached comfortable height; null (first frame of a step, or just after a
   // width change) renders comfortable so we can measure it.
+  // Reserve room for the completed-steps log (its top margin + one summary row)
+  // so a tall step collapses to dense rather than evicting the log entirely —
+  // the "✔ N steps done" reassurance is never hidden completely.
+  const logReserve = log.length > 0 ? 2 : 0
   const dense = heights.comfortable != null
-    && shouldCollapseToDense({ bodyRows: heights.comfortable, terminalRows })
+    && shouldCollapseToDense({ bodyRows: heights.comfortable, terminalRows: terminalRows - logReserve })
 
   // Measure whichever form is on screen and cache it (only when missing or
   // changed — so this settles and doesn't re-render in a loop).
@@ -307,13 +311,13 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
   // active the comfortable body already didn't fit the one-line header, so this
   // is always true then — dense always pairs with the one-line header.
   const headerCompact = heights.comfortable != null
-    && (heights.comfortable + BOX_HEADER_ROWS + WIZARD_PADDING_ROWS > terminalRows)
+    && (heights.comfortable + BOX_HEADER_ROWS + WIZARD_PADDING_ROWS + logReserve > terminalRows)
   // The on-screen form's height drives the resize-prompt check. `tooSmall`
   // (see frame-fit.ts) only blocks when we're already dense AND the dense form
   // still overflows — null dense height (just flipped, not yet measured) is
   // optimistic, never a false positive.
   const bodyHeight = dense ? heights.dense : heights.comfortable
-  const tooSmall = isFrameTooSmall({ bodyRows: bodyHeight, dense, terminalRows })
+  const tooSmall = isFrameTooSmall({ bodyRows: bodyHeight, dense, terminalRows: terminalRows - logReserve })
   const neededRows = (bodyHeight != null ? bodyHeight : 1) + COMPACT_HEADER_TOTAL_ROWS
 
   // Rows available for the completed-steps log. The log renders OUTSIDE the

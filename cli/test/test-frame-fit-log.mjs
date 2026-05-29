@@ -25,6 +25,10 @@ function test(name, fn) {
 function assert(cond, msg) { if (!cond) throw new Error(msg) }
 const h = React.createElement
 
+// The wizard reserves this many rows for the log (its top margin + one summary
+// row) in the dense/too-small decision, so the step is never sized to evict it.
+const LOG_RESERVE = 2
+
 // ── 1. budget invariant ──────────────────────────────────────────────────────
 test('logBudgetRows: budget + chrome + body + margin never exceeds the terminal', () => {
   for (const rows of [12, 16, 19, 24, 40]) {
@@ -37,6 +41,23 @@ test('logBudgetRows: budget + chrome + body + margin never exceeds the terminal'
         if (budget > 0)
           assert(totalWhenLogPresent <= rows, `overflow: rows=${rows} header=${headerRows} body=${bodyHeight} budget=${budget} total=${totalWhenLogPresent}`)
       }
+    }
+  }
+})
+
+// ── 1b. the reserve guarantees the log summary always has a row ──────────────
+// When the step body is sized so the reserve fits (body ≤ terminal − header −
+// padding − LOG_RESERVE, which the wizard's dense decision enforces), the log
+// budget is ≥ 1 — i.e. the completed-steps summary is never hidden entirely
+// just because the current step is tall (the regression the user hit).
+test('reserve guarantees a log row whenever the step leaves room for it', () => {
+  for (const rows of [16, 19, 24, 40]) {
+    for (const headerRows of [COMPACT_HEADER_ROWS, 5]) {
+      const maxBody = rows - headerRows - WIZARD_PADDING_ROWS - LOG_RESERVE
+      if (maxBody < 0)
+        continue
+      const budget = logBudgetRows(rows, headerRows, maxBody)
+      assert(budget >= 1, `reserve failed: rows=${rows} header=${headerRows} maxBody=${maxBody} budget=${budget}`)
     }
   }
 })
