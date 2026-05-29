@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import {
   createTimedFetch,
   deriveSupabaseOperation,
+  enableSupabaseInstrumentation,
   getSupabaseSource,
   isSupabaseInstrumentationEnabled,
   setSupabaseCallRecorder,
@@ -11,7 +12,6 @@ import {
 } from '../src/analytics/supabase-perf.ts'
 import { createSupabaseClient } from '../src/utils.ts'
 import { resolveOwnerOrgId } from '../src/analytics/org-resolver.ts'
-import { enableSupabaseInstrumentation } from '../src/analytics/supabase-perf.ts'
 
 console.log('🧪 Testing supabase-perf...\n')
 
@@ -118,6 +118,9 @@ try {
   if (originalDisablePosthog !== undefined) process.env.CAPGO_DISABLE_POSTHOG = originalDisablePosthog
 
   // --- Task 4: createSupabaseClient gate + recursion guard ---
+  // NOTE: this 'disabled' assertion depends on instrumentation still being OFF
+  // here. enableSupabaseInstrumentation() (called just below, and never reset in
+  // finally) is process-wide — do not insert an enabling test before this block.
   process.env.CAPGO_TOKEN = 'perf-key'
   delete process.env.CAPGO_DISABLE_TELEMETRY
   delete process.env.CAPGO_DISABLE_POSTHOG
