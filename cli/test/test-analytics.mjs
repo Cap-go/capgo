@@ -104,6 +104,23 @@ try {
   assert.equal(body.tags.error_category, 'network_error')
   assert.equal(body.tags.exit_code, 1)
 
+  // 7. flush aborts in-flight telemetry so the CLI process can exit promptly
+  //    (offline/firewalled users must not hang on a stuck telemetry socket).
+  let capturedSignal
+  globalThis.fetch = async (url, init) => {
+    if (String(url).endsWith('/private/config'))
+      return new Response('', { status: 500 })
+    capturedSignal = init?.signal
+    return new Promise((_resolve, reject) => {
+      init?.signal?.addEventListener('abort', () => reject(new Error('aborted')))
+    })
+  }
+  const hung = trackEvent({ apikey: 'flush-key', channel: 'cli-usage', event: 'Hang', orgId: 'o', appId: 'a' })
+  await flushAnalytics(50)
+  assert.ok(capturedSignal, 'in-flight telemetry fetch received an abort signal')
+  assert.equal(capturedSignal.aborted, true, 'flush aborts in-flight telemetry past its window')
+  await hung.catch(() => {})
+
   console.log('✅ analytics track.ts tests passed')
 }
 finally {

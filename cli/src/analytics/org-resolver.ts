@@ -12,7 +12,7 @@ export interface OrgResolverDeps {
  * per `(apikey, appId)`. Returns undefined on any error — never throws.
  * Extracted so the analytics layer and onboarding analytics share one path.
  */
-export function resolveOwnerOrgId(apikey: string, appId: string, deps: OrgResolverDeps = {}): Promise<string | undefined> {
+export function resolveOwnerOrgId(apikey: string, appId: string, deps: OrgResolverDeps = {}, signal?: AbortSignal): Promise<string | undefined> {
   const cacheKey = `${apikey}:${appId}`
   const cached = ownerOrgCache.get(cacheKey)
   if (cached)
@@ -22,11 +22,13 @@ export function resolveOwnerOrgId(apikey: string, appId: string, deps: OrgResolv
   const promise = (async () => {
     try {
       const supabase = await create(apikey, undefined, undefined, true)
-      const { data } = await supabase
+      let query = supabase
         .from('apps')
         .select('owner_org')
         .eq('app_id', appId)
-        .maybeSingle()
+      if (signal)
+        query = query.abortSignal(signal)
+      const { data } = await query.maybeSingle()
       return data?.owner_org ?? undefined
     }
     catch {

@@ -50,6 +50,7 @@ export function getGlobalAnalyticsProps(): GlobalAnalyticsProps {
 
 // --- flush registry: keep in-flight telemetry alive until the process drains ---
 const pending = new Set<Promise<unknown>>()
+const pendingControllers = new Set<AbortController>()
 
 function registerPending(promise: Promise<unknown>): void {
   pending.add(promise)
@@ -59,16 +60,28 @@ function registerPending(promise: Promise<unknown>): void {
 export async function flushAnalytics(timeoutMs = 2000): Promise<void> {
   if (pending.size === 0)
     return
+  let timer: ReturnType<typeof setTimeout> | undefined
   await Promise.race([
     Promise.allSettled([...pending]),
-    new Promise(resolve => setTimeout(resolve, timeoutMs)),
+    new Promise<void>((resolve) => {
+      timer = setTimeout(resolve, timeoutMs)
+      // Don't let the flush timer itself keep the process alive.
+      timer.unref?.()
+    }),
   ])
+  if (timer)
+    clearTimeout(timer)
+  // Abort any still-in-flight telemetry so its sockets/timers can't keep the
+  // CLI process alive past the flush window (offline / firewalled users).
+  for (const controller of pendingControllers)
+    controller.abort()
+  pendingControllers.clear()
 }
 
 // --- best-effort app + owner-org context from the local Capacitor config ---
 let cachedContext: Promise<{ appId?: string, orgId?: string }> | undefined
 
-export function resolveTrackingContext(apikey: string): Promise<{ appId?: string, orgId?: string }> {
+export function resolveTrackingContext(apikey: string, signal?: AbortSignal): Promise<{ appId?: string, orgId?: string }> {
   if (cachedContext)
     return cachedContext
   cachedContext = (async () => {
@@ -77,7 +90,7 @@ export function resolveTrackingContext(apikey: string): Promise<{ appId?: string
       const appId = getAppId('', extConfig?.config) || undefined
       if (!appId)
         return {}
-      const orgId = await resolveOwnerOrgId(apikey, appId)
+      const orgId = await resolveOwnerOrgId(apikey, appId, {}, signal)
       return { appId, orgId }
     }
     catch {
@@ -116,12 +129,15 @@ export function trackEvent(input: TrackEventInput): Promise<void> {
   if (!apikey)
     return Promise.resolve()
 
+  const controller = new AbortController()
+  pendingControllers.add(controller)
+
   const work = (async () => {
     try {
       let appId = input.appId
       let orgId = input.orgId
       if (appId === undefined && orgId === undefined) {
-        const ctx = await resolveTrackingContext(apikey)
+        const ctx = await resolveTrackingContext(apikey, controller.signal)
         appId = ctx.appId
         orgId = ctx.orgId
       }
@@ -140,10 +156,13 @@ export function trackEvent(input: TrackEventInput): Promise<void> {
         tracking_version: 2,
         ...(orgId ? { org_id: orgId } : {}),
         tags,
-      }).catch(() => {})
+      }, false, controller.signal).catch(() => {})
     }
     catch {
       // telemetry must never break a command
+    }
+    finally {
+      pendingControllers.delete(controller)
     }
   })()
 
