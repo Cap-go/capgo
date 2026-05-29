@@ -117,10 +117,12 @@ test(`sa-json-validation-failed [dense, long msg] fits ${BODY_BUDGET_ROWS}-row b
 
 // ── google-sign-in — pre-consent instructions ────────────────────────────────
 // Same copy as main; the dense form just strips the box + blank-line spacing
-// (no rewording) and must fit the budget. The comfortable form keeps main's
-// boxed look and is shown only when the terminal has room.
-test(`google-sign-in [dense] fits ${BODY_BUDGET_ROWS}-row budget`, () => {
-  assertFitsBudget(h(GoogleSignInStep, { onChoose: noop, dense: true }), 'google-sign-in-dense')
+// (no rewording). It progressively re-adds two blank-line gaps when the terminal
+// is wide enough (≥ 64 cols) that the body + 2 rows still fits the budget, and
+// stays fully-compact below that. Test both sides of the 64-col breakpoint: at
+// 60 the compact form fits, at 64 and 80 the spaced form fits.
+test(`google-sign-in [dense] fits ${BODY_BUDGET_ROWS}-row budget (compact <64, spaced ≥64)`, () => {
+  assertFitsBudget(h(GoogleSignInStep, { onChoose: noop, dense: true }), 'google-sign-in-dense', { widths: [60, 64, 80] })
 })
 
 // ── google-sign-in — learn-more (the historical worst offender) ───────────────

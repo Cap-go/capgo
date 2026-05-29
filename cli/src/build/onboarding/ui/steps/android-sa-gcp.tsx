@@ -25,7 +25,7 @@
 // across both modes.
 import type { FC } from 'react'
 import { Alert, Select } from '@inkjs/ui'
-import { Box, Newline, Text } from 'ink'
+import { Box, Newline, Text, useStdout } from 'ink'
 import React from 'react'
 import { FilteredTextInput, SpinnerLine } from '../components.js'
 
@@ -230,10 +230,16 @@ export interface GoogleSignInStepProps {
 // Shared constants below guarantee the wording is identical in both forms.
 const SIGN_IN_TRUST = 'Sign in with Google so Capgo can set up Play Store publishing on your account — your tokens never reach Capgo\'s servers.'
 const SIGN_IN_INTRO = 'We\'ll open Google\'s consent screen. The two access requests are:'
+// At/above this width the dense form wraps to ≤ 11 rows, so its two blank-line
+// gaps (after the trust line, before the actions) still fit the 13-row body
+// budget. Narrower than this, the text wraps taller and the gaps are dropped
+// (fully-compact). Measured against the copy above; the frame-fit test guards it.
+const SIGN_IN_DENSE_SPACED_MIN_COLS = 64
 
-export const GoogleSignInStep: FC<GoogleSignInStepProps> = ({ onChoose, dense = false }) => {
-  const bullets = (
-    <Box flexDirection="column" marginLeft={2} marginTop={dense ? 0 : 1}>
+// The two consent scopes — shared so the wording is identical in every form.
+function SignInBullets() {
+  return (
+    <>
       <Text>
         •
         {' '}
@@ -248,8 +254,17 @@ export const GoogleSignInStep: FC<GoogleSignInStepProps> = ({ onChoose, dense = 
         {' '}
         — to invite that service account to your Play Console with release-only permissions
       </Text>
-    </Box>
+    </>
   )
+}
+
+export const GoogleSignInStep: FC<GoogleSignInStepProps> = ({ onChoose, dense = false }) => {
+  const { stdout } = useStdout()
+  // Progressive degradation in the dense form: re-add the two blank-line gaps
+  // (after the trust line, before the actions) when the terminal is wide enough
+  // that the dense body + 2 rows still fits the budget; otherwise stay fully
+  // compact. The words are identical in every form — only the spacing changes.
+  const spaced = dense && (stdout?.columns ?? 80) >= SIGN_IN_DENSE_SPACED_MIN_COLS
   const select = (
     <Select
       options={[
@@ -264,9 +279,13 @@ export const GoogleSignInStep: FC<GoogleSignInStepProps> = ({ onChoose, dense = 
     return (
       <Box flexDirection="column" marginTop={1}>
         <Text>{`ℹ ${SIGN_IN_TRUST}`}</Text>
-        <Text>{SIGN_IN_INTRO}</Text>
-        {bullets}
-        {select}
+        <Box flexDirection="column" marginTop={spaced ? 1 : 0}>
+          <Text>{SIGN_IN_INTRO}</Text>
+          <Box flexDirection="column" marginLeft={2}>
+            <SignInBullets />
+          </Box>
+        </Box>
+        <Box marginTop={spaced ? 1 : 0}>{select}</Box>
       </Box>
     )
   }
@@ -275,7 +294,9 @@ export const GoogleSignInStep: FC<GoogleSignInStepProps> = ({ onChoose, dense = 
       <Alert variant="info">{SIGN_IN_TRUST}</Alert>
       <Newline />
       <Text>{SIGN_IN_INTRO}</Text>
-      {bullets}
+      <Box flexDirection="column" marginLeft={2} marginTop={1}>
+        <SignInBullets />
+      </Box>
       <Newline />
       {select}
     </Box>
