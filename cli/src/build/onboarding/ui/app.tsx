@@ -48,7 +48,7 @@ import {
 } from '../types.js'
 import { BOX_HEADER_ROWS, COMPACT_HEADER_ROWS, Divider, FullscreenAiViewer, Header, SpinnerLine, TerminalTooSmall, WIZARD_PADDING_ROWS } from './components.js'
 import type { AiResultKind } from './components.js'
-import { capLogRows, COMPACT_HEADER_TOTAL_ROWS, isFrameTooSmall, shouldCollapseToDense } from './frame-fit.js'
+import { capLogRows, COMPACT_HEADER_TOTAL_ROWS, isFrameTooSmall, logBudgetRows, shouldCollapseToDense } from './frame-fit.js'
 import {
   ApiKeyInstructionsStep,
   BackingUpStep,
@@ -326,7 +326,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
   // frame settle (same one-frame entry behaviour as the fit decision).
   const logHeaderRows = headerCompact ? COMPACT_HEADER_ROWS : BOX_HEADER_ROWS
   const logMaxRows = bodyHeight != null
-    ? Math.max(0, terminalRows - logHeaderRows - WIZARD_PADDING_ROWS - bodyHeight - 1)
+    ? logBudgetRows(terminalRows, logHeaderRows, bodyHeight)
     : Number.POSITIVE_INFINITY
 
   // Refs to avoid stale closures in useEffect async handlers

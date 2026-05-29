@@ -44,7 +44,7 @@ import { canUseFilePicker, openKeystorePicker, openServiceAccountJsonPicker } fr
 import { trackBuilderOnboardingStep } from '../../telemetry.js'
 import { BOX_HEADER_ROWS, COMPACT_HEADER_ROWS, Divider, FullscreenAiViewer, Header, TerminalTooSmall, WIZARD_PADDING_ROWS } from '../../ui/components.js'
 import type { AiResultKind } from '../../ui/components.js'
-import { capLogRows, COMPACT_HEADER_TOTAL_ROWS, isFrameTooSmall, shouldCollapseToDense } from '../../ui/frame-fit.js'
+import { capLogRows, COMPACT_HEADER_TOTAL_ROWS, isFrameTooSmall, logBudgetRows, shouldCollapseToDense } from '../../ui/frame-fit.js'
 import {
   KeystoreExistingAliasSelectStep,
   KeystoreExistingAliasStep,
@@ -529,7 +529,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
   // step leaves; capLogRows packs recent entries + a summary. See iOS sibling.
   const logHeaderRows = headerCompact ? COMPACT_HEADER_ROWS : BOX_HEADER_ROWS
   const logMaxRows = bodyHeight != null
-    ? Math.max(0, terminalRows - logHeaderRows - WIZARD_PADDING_ROWS - bodyHeight - 1)
+    ? logBudgetRows(terminalRows, logHeaderRows, bodyHeight)
     : Number.POSITIVE_INFINITY
 
   const addLog = useCallback((text: string, color = 'green') => {

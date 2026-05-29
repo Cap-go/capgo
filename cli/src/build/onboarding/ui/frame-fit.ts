@@ -67,6 +67,16 @@ export function pickPlatformLayout(cols: number, rows: number): PlatformPickerLa
 // summary for the rest — so the current step always wins the space and the log
 // never causes a too-small. Wrap-aware: a long line (e.g. a key-file path)
 // counts as the rows it occupies, not one.
+// Rows available for the completed-steps log, which renders OUTSIDE the
+// measured step body: the terminal minus the header, the wizard padding, the
+// measured step body, and the log block's own top margin (1). Clamped at 0.
+// By construction `logBudgetRows + headerRows + WIZARD_PADDING_ROWS + bodyHeight
+// + 1 ≤ terminalRows`, so a log capped to this budget can never push the frame
+// past the terminal — i.e. the log can't cause a "too small".
+export function logBudgetRows(terminalRows: number, headerRows: number, bodyHeight: number): number {
+  return Math.max(0, terminalRows - headerRows - WIZARD_PADDING_ROWS - bodyHeight - 1)
+}
+
 export interface CappedLog<T> {
   hidden: number
   visible: T[]
