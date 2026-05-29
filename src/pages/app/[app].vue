@@ -199,6 +199,10 @@ watchEffect(async () => {
           </div>
           <DeploymentBanner v-if="!appNotFound" :app-id="id" @deployed="refreshData" />
           <ReleaseBanner v-if="!appNotFound" :app-id="id" />
+
+          <!-- Capgo Builder promo banner (only for apps with no native build yet) -->
+          <BuilderPromoBanner :app-id="id" />
+
           <Usage
             v-if="!lacksSecurityAccess"
             ref="usageComponent"
