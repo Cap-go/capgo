@@ -38,3 +38,20 @@ export function isFrameTooSmall({ bodyRows, dense, terminalRows }: FrameFitInput
 export function shouldCollapseToDense({ bodyRows, terminalRows }: { bodyRows: number, terminalRows: number }): boolean {
   return bodyRows + COMPACT_HEADER_TOTAL_ROWS > terminalRows
 }
+
+// ── Platform picker layout ───────────────────────────────────────────────────
+// The platform picker renders two bordered "cards" side-by-side when there's
+// room, else the same vertical Select used elsewhere. Cards need horizontal
+// room for two boxes + gap AND vertical room to fit within the frame budget.
+export type PlatformPickerLayout = 'cards' | 'list'
+
+// Two cards (~19 cols each: "Apple App Store" + paddingX(2) + border) + a 3-col
+// gap ≈ 41; round up for safety. Below this, stack them as the vertical list.
+export const PLATFORM_CARDS_MIN_COLS = 44
+// Cards body ≈ heading + blank + 4-row card + blank + hint ≈ 8 rows; plus the
+// header + padding. Below this height, the vertical list is more compact.
+export const PLATFORM_CARDS_MIN_ROWS = 14
+
+export function pickPlatformLayout(cols: number, rows: number): PlatformPickerLayout {
+  return cols >= PLATFORM_CARDS_MIN_COLS && rows >= PLATFORM_CARDS_MIN_ROWS ? 'cards' : 'list'
+}
