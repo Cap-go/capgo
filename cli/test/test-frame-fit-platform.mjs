@@ -2,6 +2,7 @@
 // Frame-fit + content tests for the in-wizard PlatformPicker. The picker frame
 // (header + body + padding) must fit the 16-row contract in BOTH layouts, and
 // both platform options must be present in each.
+import { Box } from 'ink'
 import React from 'react'
 import { PlatformPicker } from '../src/build/onboarding/ui/platform-picker.tsx'
 import { assertFitsBudget, BODY_BUDGET_ROWS, renderFrameText } from './helpers/frame-fit.mjs'
@@ -45,6 +46,25 @@ test('cards layout shows store hints + key legend', () => {
     throw new Error('missing "Google Play" hint')
   if (!/Enter/.test(text))
     throw new Error('missing key legend')
+})
+
+// In a full-height frame the legend is pinned to the BOTTOM (a flex spacer
+// separates it from the cards), not stacked directly under them.
+test('cards layout pins the key legend to the bottom of the frame', () => {
+  const rows = 24
+  const frame = h(Box, { flexDirection: 'column', minHeight: rows, padding: 1 }, h(PlatformPicker, { layout: 'cards', onSelect: noop }))
+  const lines = renderFrameText(frame, 80).split('\n')
+  const legendIdx = lines.findIndex(l => /choose .* Enter/.test(l))
+  const cardsIdx = lines.findIndex(l => /Apple App Store/.test(l))
+  if (legendIdx < 0)
+    throw new Error('legend not found')
+  if (cardsIdx < 0)
+    throw new Error('cards not found')
+  // Legend is well below the cards (spacer in between), near the bottom.
+  if (legendIdx - cardsIdx < 3)
+    throw new Error(`legend (row ${legendIdx}) not separated from cards (row ${cardsIdx}) — expected a spacer`)
+  if (legendIdx < rows - 4)
+    throw new Error(`legend at row ${legendIdx} is not near the bottom of the ${rows}-row frame`)
 })
 
 console.log(`\n${passed} passed, ${failed} failed`)
