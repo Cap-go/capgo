@@ -499,12 +499,13 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
   const fitKey = `${step}|${terminalCols}`
   const heights = bodyHeights.key === fitKey ? bodyHeights : { key: fitKey, comfortable: null, dense: null }
 
-  // Reserve room for the completed-steps log (its top margin + one summary
-  // row) so a tall step collapses to dense rather than evicting the log
-  // entirely — the "✔ N steps done" reassurance is never hidden completely.
-  const logReserve = logLines.length > 0 ? 2 : 0
+  // The step body (its explanation + controls) takes PRIORITY over the
+  // completed-steps log: fit decisions use the FULL terminal, no rows reserved
+  // for the log, which gets only the leftover rows (logMaxRows, → 0 when the
+  // body needs the space). When space is tight the "why" of the current step
+  // matters far more than a recap of completed steps. See iOS sibling.
   const dense = heights.comfortable != null
-    && shouldCollapseToDense({ bodyRows: heights.comfortable, terminalRows: terminalRows - logReserve })
+    && shouldCollapseToDense({ bodyRows: heights.comfortable, terminalRows })
 
   useEffect(() => {
     if (!bodyRef.current)
@@ -522,11 +523,11 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
   })
 
   const headerCompact = heights.comfortable != null
-    && (heights.comfortable + BOX_HEADER_ROWS + WIZARD_PADDING_ROWS + logReserve > terminalRows)
+    && (heights.comfortable + BOX_HEADER_ROWS + WIZARD_PADDING_ROWS > terminalRows)
   // Only block when even the dense form can't fit (see frame-fit.ts); null dense
   // height (just flipped, not yet measured) is optimistic, not a false positive.
   const bodyHeight = dense ? heights.dense : heights.comfortable
-  const tooSmall = isFrameTooSmall({ bodyRows: bodyHeight, dense, terminalRows: terminalRows - logReserve })
+  const tooSmall = isFrameTooSmall({ bodyRows: bodyHeight, dense, terminalRows })
   const neededRows = (bodyHeight != null ? bodyHeight : 1) + COMPACT_HEADER_TOTAL_ROWS
 
   // Rows for the completed-steps log (rendered OUTSIDE the measured body so its

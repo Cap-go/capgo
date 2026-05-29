@@ -283,12 +283,15 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
   // can't fit even with the one-line header. Derived synchronously from the
   // cached comfortable height; null (first frame of a step, or just after a
   // width change) renders comfortable so we can measure it.
-  // Reserve room for the completed-steps log (its top margin + one summary row)
-  // so a tall step collapses to dense rather than evicting the log entirely —
-  // the "✔ N steps done" reassurance is never hidden completely.
-  const logReserve = log.length > 0 ? 2 : 0
+  // The step body (its explanation + controls) takes PRIORITY over the
+  // completed-steps log: fit decisions are made against the FULL terminal, with
+  // no rows reserved for the log. So a tall comfortable body stays comfortable
+  // as long as IT fits, and the log gets only the rows left over (see
+  // logMaxRows — it drops to zero when the body needs the space). Rationale:
+  // when space is tight, the "why" of the current step matters far more than a
+  // recap of already-completed steps.
   const dense = heights.comfortable != null
-    && shouldCollapseToDense({ bodyRows: heights.comfortable, terminalRows: terminalRows - logReserve })
+    && shouldCollapseToDense({ bodyRows: heights.comfortable, terminalRows })
 
   // Measure whichever form is on screen and cache it (only when missing or
   // changed — so this settles and doesn't re-render in a loop).
@@ -312,13 +315,13 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
   // active the comfortable body already didn't fit the one-line header, so this
   // is always true then — dense always pairs with the one-line header.
   const headerCompact = heights.comfortable != null
-    && (heights.comfortable + BOX_HEADER_ROWS + WIZARD_PADDING_ROWS + logReserve > terminalRows)
+    && (heights.comfortable + BOX_HEADER_ROWS + WIZARD_PADDING_ROWS > terminalRows)
   // The on-screen form's height drives the resize-prompt check. `tooSmall`
   // (see frame-fit.ts) only blocks when we're already dense AND the dense form
   // still overflows — null dense height (just flipped, not yet measured) is
   // optimistic, never a false positive.
   const bodyHeight = dense ? heights.dense : heights.comfortable
-  const tooSmall = isFrameTooSmall({ bodyRows: bodyHeight, dense, terminalRows: terminalRows - logReserve })
+  const tooSmall = isFrameTooSmall({ bodyRows: bodyHeight, dense, terminalRows })
   const neededRows = (bodyHeight != null ? bodyHeight : 1) + COMPACT_HEADER_TOTAL_ROWS
 
   // Rows available for the completed-steps log. The log renders OUTSIDE the
