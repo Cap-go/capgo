@@ -31,7 +31,7 @@ import {
   PlatformSelectStep,
   WelcomeStep,
 } from '../src/build/onboarding/ui/steps/ios-shared.tsx'
-import { assertFitsBudget, BODY_BUDGET_ROWS } from './helpers/frame-fit.mjs'
+import { assertFitsBudget, BODY_BUDGET_ROWS, renderFrameText } from './helpers/frame-fit.mjs'
 
 let passed = 0
 let failed = 0
@@ -105,7 +105,7 @@ test(`ai-analysis-result [dense, short success, retries left] fits ${BODY_BUDGET
   assertFitsBudget(
     h(AiAnalysisResultStep, {
       analysisText: SHORT_ANALYSIS,
-      viewedFull: false,
+      collapsed: false,
       result: null,
       canRetry: true,
       retriesLeft: 2,
@@ -120,7 +120,7 @@ test(`ai-analysis-result [dense, short success, 1 retry left — last-retry labe
   assertFitsBudget(
     h(AiAnalysisResultStep, {
       analysisText: SHORT_ANALYSIS,
-      viewedFull: false,
+      collapsed: false,
       result: null,
       canRetry: true,
       retriesLeft: 1,
@@ -135,7 +135,7 @@ test(`ai-analysis-result [dense, success, viewedFull marker] fits ${BODY_BUDGET_
   assertFitsBudget(
     h(AiAnalysisResultStep, {
       analysisText: SHORT_ANALYSIS,
-      viewedFull: true,
+      collapsed: true,
       result: null,
       canRetry: true,
       retriesLeft: 2,
@@ -150,7 +150,7 @@ test(`ai-analysis-result [dense, retries exhausted — Continue only] fits ${BOD
   assertFitsBudget(
     h(AiAnalysisResultStep, {
       analysisText: SHORT_ANALYSIS,
-      viewedFull: false,
+      collapsed: false,
       result: null,
       canRetry: false,
       retriesLeft: 0,
@@ -172,7 +172,7 @@ test(`ai-analysis-result [dense, already_analyzed banner, retries left] fits ${B
   assertFitsBudget(
     h(AiAnalysisResultStep, {
       analysisText: null,
-      viewedFull: false,
+      collapsed: false,
       result: { kind: 'already_analyzed', message: ALREADY_MSG },
       canRetry: true,
       retriesLeft: 2,
@@ -187,7 +187,7 @@ test(`ai-analysis-result [dense, too_big banner, retries exhausted] fits ${BODY_
   assertFitsBudget(
     h(AiAnalysisResultStep, {
       analysisText: null,
-      viewedFull: false,
+      collapsed: false,
       result: { kind: 'too_big', message: TOO_BIG_MSG },
       canRetry: false,
       retriesLeft: 0,
@@ -202,7 +202,7 @@ test(`ai-analysis-result [dense, error banner, retries left] fits ${BODY_BUDGET_
   assertFitsBudget(
     h(AiAnalysisResultStep, {
       analysisText: null,
-      viewedFull: false,
+      collapsed: false,
       result: { kind: 'error', message: ERROR_MSG },
       canRetry: true,
       retriesLeft: 2,
@@ -320,6 +320,31 @@ test(`build-complete [dense, no build, no CI summary] fits ${BODY_BUDGET_ROWS}-r
     }),
     'build-complete-minimal',
   )
+})
+
+// ── content: the collapsed marker must not lie about scrollback ──────────────
+// The wizard runs in the alt-screen buffer (no scrollback), so the old
+// "scroll your terminal back to re-read it" marker was a dead instruction.
+// When collapsed, the analysis must be re-readable via a "Re-read" option, and
+// the marker must not tell the user to scroll the terminal.
+test('collapsed AI result: no "scroll back" lie + offers a Re-read option', () => {
+  const text = renderFrameText(
+    h(AiAnalysisResultStep, {
+      analysisText: SHORT_ANALYSIS,
+      collapsed: true,
+      result: null,
+      canRetry: true,
+      retriesLeft: 2,
+      maxRetries: 2,
+      dense: false,
+      onChange: noop,
+    }),
+    80,
+  )
+  if (/scroll your terminal back/i.test(text))
+    throw new Error('marker still tells the user to scroll the terminal back (impossible in the alt buffer)')
+  if (!/Re-read/i.test(text))
+    throw new Error('collapsed state must offer a "Re-read analysis" option')
 })
 
 console.log(`\n${passed} passed, ${failed} failed`)

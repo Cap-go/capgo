@@ -30,7 +30,7 @@ import { releaseCapturedLogs, runCapgoAiAnalysis } from '../../../../ai/analyze.
 import { renderMarkdown } from '../../../../ai/render-markdown.js'
 import { trackAiAnalysisChoice, trackAiAnalysisResult } from '../../../../ai/telemetry.js'
 import { requestBuildInternal } from '../../../request.js'
-import { resolveAiResultRoute } from '../../ai-fit.js'
+import { isAiAnalysisTooTall, resolveAiResultRoute } from '../../ai-fit.js'
 
 // Upper bound on "I fixed it, retry build" attempts after an AI diagnosis.
 // Three total attempts (initial + two retries) caps the AI cost when a model
@@ -2502,11 +2502,13 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
       {step === 'ai-analysis-result' && (
         <AiAnalysisResultStep
           analysisText={aiAnalysisText}
-          viewedFull={aiViewedFull}
+          // See iOS sibling: marker only when dismissed AND still too tall.
+          collapsed={aiViewedFull && !!aiAnalysisText && isAiAnalysisTooTall(aiAnalysisText, terminalRows, terminalCols)}
           result={aiResult}
           retryCount={aiRetryCount}
           maxRetries={MAX_AI_RETRIES}
           dense={dense}
+          onReread={() => setStep('ai-analysis-result-scroll')}
           onRetry={async () => {
             if (aiJobId) {
               await trackAiAnalysisChoice({

@@ -219,9 +219,12 @@ export const AiAnalysisRunningStep: FC = () => (
 //   • `analysisText` (success) — rendered inline ONLY when short; the parent
 //     routes long analyses to the fullscreen scroll viewer BEFORE this frame is
 //     shown, so the inline branch never blows the budget.
-//   • `viewedFull` — once the user has dismissed the scroll viewer, the long
-//     text already scrolled past in the terminal, so we show a one-line "shown
-//     above" marker instead of re-printing it.
+//   • `collapsed` — when the analysis is too tall to show inline alongside the
+//     picker it lives in the fullscreen scroll viewer, and here we show a
+//     one-line "reviewed" marker plus a "Re-read analysis" option that re-opens
+//     the viewer (the alt-screen buffer has no scrollback — "scroll up" is
+//     impossible). The parent computes collapsed = (viewer dismissed) AND
+//     (still too tall), so growing the terminal reveals the full text again.
 //   • `result` (non-success) — an AiResultBanner. Comfortable: bordered box;
 //     dense: boxless (we thread `dense` straight through to it).
 //
@@ -237,8 +240,12 @@ export const AiAnalysisRunningStep: FC = () => (
 export interface AiAnalysisResultStepProps {
   /** Pre-rendered (markdown→ANSI) analysis text, or null on a non-success result. */
   analysisText: string | null
-  /** True once the user dismissed the fullscreen scroll viewer for this text. */
-  viewedFull: boolean
+  /**
+   * True when the analysis is too tall to show inline alongside the picker, so
+   * it lives in the scroll viewer and is replaced here by a compact marker + a
+   * "Re-read analysis" option. False ⇒ render the full text inline.
+   */
+  collapsed: boolean
   /** Non-success outcome banner (error / already_analyzed / too_big), else null. */
   result: { kind: AiResultKind, message: string } | null
   /** Retries already consumed; with `maxRetries` decides whether retry is offered. */
@@ -246,17 +253,20 @@ export interface AiAnalysisResultStepProps {
   maxRetries: number
   onRetry: () => void
   onSkipOrContinue: () => void
+  /** Re-open the fullscreen scroll viewer to re-read the analysis. */
+  onReread: () => void
   dense?: boolean
 }
 
 export const AiAnalysisResultStep: FC<AiAnalysisResultStepProps> = ({
   analysisText,
-  viewedFull,
+  collapsed,
   result,
   retryCount,
   maxRetries,
   onRetry,
   onSkipOrContinue,
+  onReread,
   dense = false,
 }) => {
   const retriesLeft = maxRetries - retryCount
@@ -268,9 +278,9 @@ export const AiAnalysisResultStep: FC<AiAnalysisResultStepProps> = ({
     <Box flexDirection="column" marginTop={1}>
       <Text bold color="cyan">AI analysis</Text>
       {!dense && <Newline />}
-      {analysisText && !viewedFull && <Text>{analysisText}</Text>}
-      {analysisText && viewedFull && (
-        <Text dimColor>📖  Analysis already shown above (scroll your terminal back to re-read it).</Text>
+      {analysisText && !collapsed && <Text>{analysisText}</Text>}
+      {analysisText && collapsed && (
+        <Text dimColor>📖  Analysis reviewed — pick an option below, or re-read it.</Text>
       )}
       {result && <AiResultBanner kind={result.kind} message={result.message} dense={dense} />}
       {!dense && <Newline />}
@@ -291,17 +301,24 @@ export const AiAnalysisResultStep: FC<AiAnalysisResultStepProps> = ({
         </>
       )}
       <Select
-        options={canRetry
-          ? [
-              { label: retryLabel, value: 'retry' },
-              { label: '⏭   Continue (skip retry)', value: 'skip' },
-            ]
-          : [
-              { label: '✔  Continue', value: 'continue' },
-            ]}
+        options={[
+          ...(canRetry
+            ? [
+                { label: retryLabel, value: 'retry' },
+                { label: '⏭   Continue (skip retry)', value: 'skip' },
+              ]
+            : [
+                { label: '✔  Continue', value: 'continue' },
+              ]),
+          // Only when the analysis is in the scroll viewer (collapsed); inline
+          // there's nothing to re-read.
+          ...(collapsed ? [{ label: '📖  Re-read analysis', value: 'reread' }] : []),
+        ]}
         onChange={(value) => {
           if (value === 'retry')
             onRetry()
+          else if (value === 'reread')
+            onReread()
           else
             onSkipOrContinue()
         }}

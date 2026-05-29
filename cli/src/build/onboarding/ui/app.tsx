@@ -24,7 +24,7 @@ import { releaseCapturedLogs, runCapgoAiAnalysis } from '../../../ai/analyze.js'
 import { renderMarkdown } from '../../../ai/render-markdown.js'
 import { trackAiAnalysisChoice, trackAiAnalysisResult } from '../../../ai/telemetry.js'
 import { requestBuildInternal } from '../../request.js'
-import { resolveAiResultRoute } from '../ai-fit.js'
+import { isAiAnalysisTooTall, resolveAiResultRoute } from '../ai-fit.js'
 
 // Upper bound on "I fixed it, retry build" attempts after an AI diagnosis.
 // Three total attempts (initial + two retries) caps the AI cost when a model
@@ -2354,13 +2354,22 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
       {step === 'ai-analysis-result' && (
         <AiAnalysisResultStep
           analysisText={aiAnalysisText}
-          viewedFull={aiViewedFull}
+          // Collapse to the compact marker + "Re-read" option only when the
+          // user has dismissed the viewer AND the analysis is still too tall to
+          // show inline. If the terminal is now big enough, show the full text.
+          collapsed={aiViewedFull && !!aiAnalysisText && isAiAnalysisTooTall(aiAnalysisText, terminalRows, terminalCols)}
           result={aiResult}
           canRetry={MAX_AI_RETRIES - aiRetryCount > 0}
           retriesLeft={MAX_AI_RETRIES - aiRetryCount}
           maxRetries={MAX_AI_RETRIES}
           dense={dense}
           onChange={async (value) => {
+            if (value === 'reread') {
+              // Re-open the fullscreen scroll viewer (alt buffer has no
+              // scrollback, so this is the only way to re-read).
+              setStep('ai-analysis-result-scroll')
+              return
+            }
             if (value === 'retry') {
               // Track the retry intent before we tear down the AI state so
               // the choice event carries the per-attempt context.

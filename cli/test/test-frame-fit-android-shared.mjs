@@ -155,7 +155,7 @@ test(`ai-analysis-result [dense, short success, retries left] fits ${BODY_BUDGET
   assertFitsBudget(
     h(AiAnalysisResultStep, {
       analysisText: 'Gradle could not find the keystore at the configured path. Verify ANDROID_KEYSTORE_FILE.',
-      viewedFull: false,
+      collapsed: false,
       result: null,
       retryCount: 0,
       maxRetries: 2,
@@ -171,7 +171,7 @@ test(`ai-analysis-result [dense, viewedFull marker] fits ${BODY_BUDGET_ROWS}-row
   assertFitsBudget(
     h(AiAnalysisResultStep, {
       analysisText: 'a'.repeat(4000),
-      viewedFull: true,
+      collapsed: true,
       result: null,
       retryCount: 0,
       maxRetries: 2,
@@ -187,7 +187,7 @@ test(`ai-analysis-result [dense, error banner] fits ${BODY_BUDGET_ROWS}-row budg
   assertFitsBudget(
     h(AiAnalysisResultStep, {
       analysisText: null,
-      viewedFull: false,
+      collapsed: false,
       result: { kind: 'error', message: 'AI analysis failed: (status 500) internal error.' },
       retryCount: 0,
       maxRetries: 2,
@@ -203,7 +203,7 @@ test(`ai-analysis-result [dense, already_analyzed banner] fits ${BODY_BUDGET_ROW
   assertFitsBudget(
     h(AiAnalysisResultStep, {
       analysisText: null,
-      viewedFull: false,
+      collapsed: false,
       result: {
         kind: 'already_analyzed',
         message: 'AI analysis was already requested for this build (only one per job).',
@@ -222,7 +222,7 @@ test(`ai-analysis-result [dense, too_big banner] fits ${BODY_BUDGET_ROWS}-row bu
   assertFitsBudget(
     h(AiAnalysisResultStep, {
       analysisText: null,
-      viewedFull: false,
+      collapsed: false,
       result: {
         kind: 'too_big',
         message: 'Build log is too large for Capgo AI (>10 MB). Try a local AI tool with the captured log.',
@@ -241,7 +241,7 @@ test(`ai-analysis-result [dense, retries exhausted, banner] fits ${BODY_BUDGET_R
   assertFitsBudget(
     h(AiAnalysisResultStep, {
       analysisText: null,
-      viewedFull: false,
+      collapsed: false,
       result: { kind: 'error', message: 'AI analysis failed: (status 503) service unavailable.' },
       retryCount: 2,
       maxRetries: 2,
@@ -257,7 +257,7 @@ test(`ai-analysis-result [dense, last retry label] fits ${BODY_BUDGET_ROWS}-row 
   assertFitsBudget(
     h(AiAnalysisResultStep, {
       analysisText: 'Short inline diagnosis.',
-      viewedFull: false,
+      collapsed: false,
       result: null,
       retryCount: 1,
       maxRetries: 2,
@@ -273,7 +273,7 @@ test(`ai-analysis-result [dense, viewedFull + exhausted] fits ${BODY_BUDGET_ROWS
   assertFitsBudget(
     h(AiAnalysisResultStep, {
       analysisText: 'b'.repeat(2000),
-      viewedFull: true,
+      collapsed: true,
       result: null,
       retryCount: 2,
       maxRetries: 2,
