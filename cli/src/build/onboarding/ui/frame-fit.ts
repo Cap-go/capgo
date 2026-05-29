@@ -48,9 +48,12 @@ export type PlatformPickerLayout = 'cards' | 'list'
 // Two cards (~19 cols each: "Apple App Store" + paddingX(2) + border) + a 3-col
 // gap ≈ 41; round up for safety. Below this, stack them as the vertical list.
 export const PLATFORM_CARDS_MIN_COLS = 44
-// Cards body ≈ heading + blank + 4-row card + blank + hint ≈ 8 rows; plus the
-// header + padding. Below this height, the vertical list is more compact.
-export const PLATFORM_CARDS_MIN_ROWS = 14
+// The cards layout uses the BOXED header (5 rows), so the full frame —
+// boxed header + wizard padding + heading + cards + legend — measures ~15
+// rows. Require the whole 16-row contract before showing cards; otherwise the
+// alt buffer would clip the top (the banner) instead of falling back. Below
+// this, the compact list (boxless header, ~6 rows total) is used.
+export const PLATFORM_CARDS_MIN_ROWS = 16
 
 export function pickPlatformLayout(cols: number, rows: number): PlatformPickerLayout {
   return cols >= PLATFORM_CARDS_MIN_COLS && rows >= PLATFORM_CARDS_MIN_ROWS ? 'cards' : 'list'
