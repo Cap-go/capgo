@@ -66,6 +66,17 @@ test('short log fits and still shows content + status bar', () => {
   assert(/\(2 lines\)/.test(frame), 'line count should be 2')
 })
 
+// Default state is following: the status shows the "scroll back" hint, never
+// "paused". (The streaming-transient flicker — where a lagging scrollOffset
+// briefly read as scrolled-up — can't be reproduced in this synchronous harness,
+// same as the resize bounce; deriving the hint from `follow` fixes it by
+// construction. This guards against re-deriving it from a scrollOffset compare.)
+test('default render follows — shows the following hint, never "paused"', () => {
+  const frame = render(longLog, 24)
+  assert(/scroll back/.test(frame), 'should show the following hint by default')
+  assert(!/paused/.test(frame), 'must never show the paused hint while following')
+})
+
 // ── buildScrollAction: scroll/follow transitions (less +F style) ─────────────
 // Pure logic, so we test it directly rather than simulating keypresses through
 // the harness (which can't reliably surface input timing). maxScrollOffset=20,

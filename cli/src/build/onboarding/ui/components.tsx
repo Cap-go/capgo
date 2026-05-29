@@ -420,30 +420,30 @@ export const FullscreenBuildOutput: FC<{
   const viewportRows = Math.max(1, dims.rows - CHROME_ROWS)
   const maxScrollOffset = computeMaxScrollOffset(lines, viewportRows, dims.cols)
 
-  // Follow (tail) the stream by default; pause when the user scrolls up.
+  // `follow` is the SINGLE source of truth for the tail state — never a
+  // comparison of scrollOffset vs maxScrollOffset. When following, the offset is
+  // DERIVED as the live maxScrollOffset every render (no chasing useEffect), so a
+  // newly streamed line can't open a one-frame window where a lagging scrollOffset
+  // reads as "scrolled up" and flashes the paused hint / flips the alignment.
+  // `pausedOffset` only matters while paused (clamped so a resize-larger can't
+  // strand us past the end).
   const [follow, setFollow] = useState(true)
-  const [scrollOffset, setScrollOffset] = useState(maxScrollOffset)
-
-  // While following, stay pinned to the (growing) bottom as lines stream in;
-  // otherwise just clamp so a resize-larger can't strand us past the end.
-  useEffect(() => {
-    setScrollOffset(prev => (follow ? maxScrollOffset : Math.min(prev, maxScrollOffset)))
-  }, [follow, maxScrollOffset])
+  const [pausedOffset, setPausedOffset] = useState(0)
+  const scrollOffset = follow ? maxScrollOffset : Math.min(pausedOffset, maxScrollOffset)
 
   useInput((input, key) => {
     const action = buildScrollAction(input, key, { scrollOffset, maxScrollOffset, viewportRows })
     if (!action)
       return
-    setScrollOffset(action.scrollOffset)
     setFollow(action.follow)
+    setPausedOffset(action.scrollOffset)
   })
 
   const visibleLines = pickVisibleLines(lines, scrollOffset, viewportRows, dims.cols)
   const dividerWidth = Math.max(10, Math.min(60, dims.cols - 1))
-  const atBottom = scrollOffset >= maxScrollOffset
   const hint = maxScrollOffset === 0
     ? ''
-    : atBottom
+    : follow
       ? '  ·  ↑ scroll back'
       : '  ·  paused — ↓/G to resume'
 
@@ -454,7 +454,7 @@ export const FullscreenBuildOutput: FC<{
           tail; scrolled up they read top-down from the scroll position. Either
           way a single over-long wrapped line is clipped rather than pushing the
           footer off-screen. */}
-      <Box flexDirection="column" height={viewportRows} justifyContent={atBottom ? 'flex-end' : 'flex-start'} overflow="hidden">
+      <Box flexDirection="column" height={viewportRows} justifyContent={follow ? 'flex-end' : 'flex-start'} overflow="hidden">
         {visibleLines.map((line, index) => {
           const isSuccess = line.startsWith('✔')
           const isError = line.startsWith('✖') || line.startsWith('❌')
