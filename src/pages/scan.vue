@@ -253,18 +253,35 @@ async function removeDownloadListener() {
     return
 
   debugLog('removing download listener')
-  await downloadListener.remove()
+  const listener = downloadListener
   downloadListener = null
+  try {
+    await listener.remove()
+  }
+  catch (error) {
+    debugWarn('failed to remove download listener', error)
+  }
 }
 
 async function removeScannerListeners() {
   if (barcodeScannedListener || barcodeScanErrorListener)
     debugLog('removing barcode listeners')
 
-  await barcodeScannedListener?.remove()
-  await barcodeScanErrorListener?.remove()
+  const listeners = [
+    barcodeScannedListener,
+    barcodeScanErrorListener,
+  ].filter((listener): listener is PluginListenerHandle => !!listener)
   barcodeScannedListener = null
   barcodeScanErrorListener = null
+
+  await Promise.all(listeners.map(async (listener) => {
+    try {
+      await listener.remove()
+    }
+    catch (error) {
+      debugWarn('failed to remove barcode listener', error)
+    }
+  }))
 }
 
 function clearBarcodeWatchdog() {
@@ -358,15 +375,17 @@ function getScannerFrame() {
   }
 }
 
-async function stopScanner(force = false) {
-  debugLog('stopScanner called', { cameraPreviewStarted, force, isScanning: isScanning.value })
+async function stopScanner(force = false, options: { keepHandlingBarcode?: boolean } = {}) {
+  const keepHandlingBarcode = options.keepHandlingBarcode ?? false
+  debugLog('stopScanner called', { cameraPreviewStarted, force, isScanning: isScanning.value, keepHandlingBarcode })
   clearBarcodeWatchdog()
 
   if (!cameraPreviewStarted && !force) {
     isScanning.value = false
-    isHandlingBarcode = false
     setCameraPreviewActive(false)
     await removeScannerListeners()
+    if (!keepHandlingBarcode)
+      isHandlingBarcode = false
     debugLog('scanner stopped without native stop')
     return
   }
@@ -389,9 +408,10 @@ async function stopScanner(force = false) {
 
   cameraPreviewStarted = false
   isScanning.value = false
-  isHandlingBarcode = false
   setCameraPreviewActive(false)
   await removeScannerListeners()
+  if (!keepHandlingBarcode)
+    isHandlingBarcode = false
   debugLog('scanner state cleared')
 }
 
@@ -415,6 +435,7 @@ async function startScanner() {
     statusMessage.value = ''
     scannedUrl.value = ''
     manualUrl.value = ''
+    window.scrollTo(0, 0)
 
     await nextTick()
     const frame = getScannerFrame()
@@ -443,8 +464,19 @@ async function startScanner() {
 
       isHandlingBarcode = true
       debugLog('handling scanned barcode', { format: barcode.format, value: barcode.value })
-      await stopScanner()
-      await handleBarcodeScan(barcode.value)
+      try {
+        await stopScanner(false, { keepHandlingBarcode: true })
+        await handleBarcodeScan(barcode.value)
+      }
+      catch (error) {
+        debugWarn('failed to handle scanned barcode', error)
+        const message = error instanceof Error ? error.message : String(error)
+        errorMessage.value = `Failed to handle scanned QR code: ${message}`
+        toast.error(errorMessage.value)
+      }
+      finally {
+        isHandlingBarcode = false
+      }
     })
     barcodeScanErrorListener = await CameraPreview.addListener('barcodeScanError', ({ message }: BarcodeScanErrorEvent) => {
       debugWarn('barcode scan error event', message)
@@ -1137,6 +1169,11 @@ body.camera-preview-active .camera-preview-page,
 body.camera-preview-active .scan-camera-frame {
   background: transparent !important;
   background-color: transparent !important;
+}
+
+html.camera-preview-active,
+body.camera-preview-active {
+  overflow: hidden !important;
 }
 </style>
 

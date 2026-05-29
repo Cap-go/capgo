@@ -52,6 +52,25 @@ describe('channel preview deep links', () => {
     })
   })
 
+  it.concurrent('only parses web preview routes from trusted Capgo or local hosts', () => {
+    expect(parseChannelPreviewDeepLink('https://web.capgo.app/preview/channel?appId=com.example.other-user-app&channel=preview&channelId=42')).toEqual({
+      type: 'channel',
+      appId: 'com.example.other-user-app',
+      channelId: 42,
+      channelName: 'preview',
+      payloadUrl: undefined,
+    })
+    expect(parseChannelPreviewDeepLink('http://localhost:5173/preview/channel?appId=com.example.other-user-app&channel=preview&channelId=42')).toEqual({
+      type: 'channel',
+      appId: 'com.example.other-user-app',
+      channelId: 42,
+      channelName: 'preview',
+      payloadUrl: undefined,
+    })
+    expect(parseChannelPreviewDeepLink('https://evil.example/preview/channel?appId=com.example.other-user-app&channel=preview&channelId=42')).toBeNull()
+    expect(parseChannelPreviewDeepLink('http://web.capgo.app/preview/channel?appId=com.example.other-user-app&channel=preview&channelId=42')).toBeNull()
+  })
+
   it.concurrent('generates compact channel preview deep links for QR codes', () => {
     const previewUrl = buildChannelPreviewDeepLink({
       appId: 'com.example.other-user-app',
@@ -114,5 +133,11 @@ describe('channel preview deep links', () => {
       payloadUrl: undefined,
       versionId: 42,
     })
+  })
+
+  it.concurrent('rejects malformed bundle preview identifiers', () => {
+    expect(parsePreviewDeepLink('capgo://preview/bundle?appId=com.example.other-user-app&versionId=1.5')).toBeNull()
+    expect(parsePreviewDeepLink('capgo://preview/bundle?appId=com.example.other-user-app&versionId=-1')).toBeNull()
+    expect(parsePreviewDeepLink(`capgo://preview/bundle?appId=com.example.other-user-app&versionId=${Number.MAX_SAFE_INTEGER + 1}`)).toBeNull()
   })
 })

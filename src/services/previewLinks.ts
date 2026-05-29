@@ -19,6 +19,7 @@ const CHANNEL_PREVIEW_PATH = '/preview/channel'
 const BUNDLE_PREVIEW_PATH = '/preview/bundle'
 const CHANNEL_PREVIEW_SCHEME_URL = 'capgo://preview/channel'
 const BUNDLE_PREVIEW_SCHEME_URL = 'capgo://preview/bundle'
+const LOCAL_PREVIEW_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]'])
 
 function parseUrl(value: string): URL | null {
   try {
@@ -29,6 +30,27 @@ function parseUrl(value: string): URL | null {
   }
 }
 
+function isAllowedWebPreviewHost(hostname: string) {
+  const normalizedHostname = hostname.toLowerCase()
+  return LOCAL_PREVIEW_HOSTS.has(normalizedHostname)
+    || normalizedHostname === 'web.capgo.app'
+    || normalizedHostname === 'console.capgo.app'
+    || /^console\.(?:dev|preprod|staging)\.capgo\.app$/.test(normalizedHostname)
+}
+
+function isPreviewLinkOriginAllowed(url: URL) {
+  if (url.protocol === 'capgo:')
+    return true
+
+  if (url.protocol === 'https:')
+    return isAllowedWebPreviewHost(url.hostname)
+
+  if (url.protocol === 'http:')
+    return LOCAL_PREVIEW_HOSTS.has(url.hostname.toLowerCase())
+
+  return false
+}
+
 function getPreviewPath(url: URL) {
   if (url.protocol !== 'capgo:')
     return url.pathname
@@ -37,9 +59,30 @@ function getPreviewPath(url: URL) {
   return hostPath.replace(/\/+/g, '/')
 }
 
+function getTrimmedParam(url: URL, ...names: string[]) {
+  for (const name of names) {
+    const value = url.searchParams.get(name)?.trim()
+    if (value)
+      return value
+  }
+  return undefined
+}
+
+function parseSafeIntegerParam(url: URL, names: string[], options: { min: number }) {
+  const value = getTrimmedParam(url, ...names)
+  if (!value || !/^\d+$/.test(value))
+    return undefined
+
+  const parsed = Number.parseInt(value, 10)
+  if (!Number.isSafeInteger(parsed) || parsed < options.min)
+    return undefined
+
+  return parsed
+}
+
 function getHttpUrlParam(url: URL, ...names: string[]) {
   for (const name of names) {
-    const value = url.searchParams.get(name)
+    const value = url.searchParams.get(name)?.trim()
     const parsed = value ? parseUrl(value) : null
     if (parsed && (parsed.protocol === 'https:' || parsed.protocol === 'http:'))
       return parsed.toString()
@@ -89,16 +132,17 @@ export function parsePreviewDeepLink(value: string): PreviewDeepLink | null {
   if (!url)
     return null
 
+  if (!isPreviewLinkOriginAllowed(url))
+    return null
+
   const previewPath = getPreviewPath(url)
   if (previewPath !== CHANNEL_PREVIEW_PATH && previewPath !== BUNDLE_PREVIEW_PATH)
     return null
 
   const payloadUrl = getHttpUrlParam(url, 'url', 'payloadUrl')
   if (previewPath === BUNDLE_PREVIEW_PATH) {
-    const versionIdValue = url.searchParams.get('versionId') ?? url.searchParams.get('bundleId')
-    const versionId = versionIdValue ? Number(versionIdValue) : Number.NaN
-    const parsedVersionId = Number.isFinite(versionId) ? versionId : undefined
-    const appId = url.searchParams.get('appId') ?? url.searchParams.get('app') ?? undefined
+    const parsedVersionId = parseSafeIntegerParam(url, ['versionId', 'bundleId'], { min: 0 })
+    const appId = getTrimmedParam(url, 'appId', 'app')
     if (!payloadUrl && (!appId || typeof parsedVersionId !== 'number'))
       return null
 
@@ -110,10 +154,9 @@ export function parsePreviewDeepLink(value: string): PreviewDeepLink | null {
     }
   }
 
-  const appId = url.searchParams.get('appId') ?? url.searchParams.get('app')
-  const channelName = url.searchParams.get('channel') ?? url.searchParams.get('channelName')
-  const channelIdValue = url.searchParams.get('channelId')
-  const channelId = channelIdValue ? Number(channelIdValue) : Number.NaN
+  const appId = getTrimmedParam(url, 'appId', 'app')
+  const channelName = getTrimmedParam(url, 'channel', 'channelName')
+  const channelId = parseSafeIntegerParam(url, ['channelId'], { min: 1 })
 
   if (!appId || !channelName)
     return null
@@ -121,7 +164,7 @@ export function parsePreviewDeepLink(value: string): PreviewDeepLink | null {
   return {
     type: 'channel',
     appId,
-    channelId: Number.isFinite(channelId) ? channelId : undefined,
+    channelId,
     channelName,
     payloadUrl,
   }

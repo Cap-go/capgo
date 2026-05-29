@@ -4,14 +4,18 @@ import { Capacitor } from '@capacitor/core'
 import { parsePreviewDeepLink } from '~/services/previewLinks'
 
 function routePreviewLink(router: Router, url: string) {
-  router.push({
+  void router.push({
     path: '/scan',
     query: { preview: url },
+  }).catch((error: unknown) => {
+    console.warn('Failed to route preview deep link', error)
   })
 }
 
 function routeWebLink(router: Router, url: URL) {
-  router.push(`${url.pathname}${url.search}${url.hash}`)
+  void router.push(`${url.pathname}${url.search}${url.hash}`).catch((error: unknown) => {
+    console.warn('Failed to route web deep link', error)
+  })
 }
 
 function isCapgoConsoleHost(hostname: string) {
