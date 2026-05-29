@@ -382,6 +382,16 @@ export function buildScrollAction(
   return null
 }
 
+// Compact elapsed-time label for the build timer: "42s" under a minute,
+// "1m 05s" above (seconds zero-padded so the width is stable). Negative inputs
+// clamp to 0s.
+export function formatElapsed(ms: number): string {
+  const totalSec = Math.max(0, Math.floor(ms / 1000))
+  const minutes = Math.floor(totalSec / 60)
+  const seconds = totalSec % 60
+  return minutes > 0 ? `${minutes}m ${String(seconds).padStart(2, '0')}s` : `${seconds}s`
+}
+
 // Streaming build-output viewer — a fullscreen takeover (like FullscreenAiViewer)
 // the parent renders as an EARLY RETURN so it owns the whole terminal and
 // BYPASSES the wizard's body-measurement / dense / too-small logic. The
@@ -415,6 +425,17 @@ export const FullscreenBuildOutput: FC<{
       stdout.off('resize', handler)
     }
   }, [stdout])
+
+  // Live elapsed-time clock so the user sees how long the build has been
+  // running. Counts from mount (the start of the requesting-build phase) and
+  // resets if the step remounts on a retry. Ticks independently of follow/scroll.
+  const [startedAt] = useState(() => Date.now())
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(id)
+  }, [])
+  const elapsed = formatElapsed(now - startedAt)
 
   const CHROME_ROWS = 2 // bottom divider + status line
   const viewportRows = Math.max(1, dims.rows - CHROME_ROWS)
@@ -471,7 +492,7 @@ export const FullscreenBuildOutput: FC<{
       <Text color="cyan">{'─'.repeat(dividerWidth)}</Text>
       <Box>
         <SpinnerLine text={title} />
-        <Text dimColor wrap="truncate-end">{` (${lines.length} lines)${hint}`}</Text>
+        <Text dimColor wrap="truncate-end">{`  ·  ${elapsed}  (${lines.length} lines)${hint}`}</Text>
       </Box>
     </Box>
   )

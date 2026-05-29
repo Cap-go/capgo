@@ -12,7 +12,7 @@
 // never exceeds the terminal height (so it can never report "too small"), the
 // newest line is always shown (tail), and the status bar shows the line count.
 import React from 'react'
-import { buildScrollAction, FullscreenBuildOutput } from '../src/build/onboarding/ui/components.tsx'
+import { buildScrollAction, formatElapsed, FullscreenBuildOutput } from '../src/build/onboarding/ui/components.tsx'
 import { renderFrameText } from './helpers/frame-fit.mjs'
 
 let passed = 0
@@ -50,11 +50,14 @@ test('auto-tails: newest line shown, far-earlier lines clipped', () => {
   assert(!frame.includes('build log line 10'), 'far-earlier lines should be clipped, not shown')
 })
 
-// 3. Status bar shows the spinner label + the running line count.
-test('status bar shows "Building..." and the line count', () => {
+// 3. Status bar shows the spinner label + the running line count + a timer.
+test('status bar shows "Building...", the line count, and a live elapsed timer', () => {
   const frame = render(longLog, 24)
   assert(/Building/.test(frame), 'missing "Building" status')
   assert(/\(400 lines\)/.test(frame), 'missing/incorrect line count in status')
+  // At mount the timer reads ~0s; only the timer matches "<digits>s" (the line
+  // count is "400 lines", no digit+s).
+  assert(/\b\d+s\b/.test(frame), 'missing elapsed-time clock in status')
 })
 
 // 4. A short log also fits and keeps the status bar.
@@ -126,6 +129,18 @@ test('scroll: j/k/space aliases work (vim + space-page)', () => {
 test('scroll: unhandled keys are a no-op (null)', () => {
   assert(buildScrollAction('x', {}, S(10)) === null, 'random key should be a no-op')
   assert(buildScrollAction('', { return: true }, S(10)) === null, 'enter is not a scroll key')
+})
+
+// ── formatElapsed (build timer label) ────────────────────────────────────────
+test('formatElapsed: seconds under a minute, m + padded-seconds above, clamps <0', () => {
+  assert(formatElapsed(0) === '0s', `0 → ${formatElapsed(0)}`)
+  assert(formatElapsed(999) === '0s', `999ms → ${formatElapsed(999)}`)
+  assert(formatElapsed(1000) === '1s', `1000ms → ${formatElapsed(1000)}`)
+  assert(formatElapsed(59_000) === '59s', `59s → ${formatElapsed(59_000)}`)
+  assert(formatElapsed(60_000) === '1m 00s', `60s → ${formatElapsed(60_000)}`)
+  assert(formatElapsed(83_000) === '1m 23s', `83s → ${formatElapsed(83_000)}`)
+  assert(formatElapsed(3_599_000) === '59m 59s', `3599s → ${formatElapsed(3_599_000)}`)
+  assert(formatElapsed(-500) === '0s', `negative clamps → ${formatElapsed(-500)}`)
 })
 
 console.log(`\n${passed} passed, ${failed} failed`)
