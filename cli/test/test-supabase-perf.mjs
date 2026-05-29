@@ -190,6 +190,41 @@ try {
   assert.equal(ltags.source, 'apps.list')
   assert.equal(ltags.operation, 'GET apps')
 
+  // --- Codex P2: perf telemetry uses the key from the request's capgkey header ---
+  // (so events fire for --apikey usage, not just env / saved-file keys)
+  process.env.CAPGO_TOKEN = 'env-fallback-key'
+  const hreqs = []
+  globalThis.fetch = async (url, init) => {
+    hreqs.push({ url: String(url), init })
+    return new Response('{}', { status: 200 })
+  }
+  const tfHeader = createTimedFetch()
+  await tfHeader('https://db.co/rest/v1/apps?select=*', { method: 'GET', headers: { capgkey: 'header-key' } })
+  await flushAnalytics()
+  const headerEvent = hreqs.find(r => r.url.endsWith('/private/events') && JSON.parse(r.init.body).event === 'Supabase Call')
+  assert.ok(headerEvent, 'perf event fires using the key from the request header')
+  assert.equal(headerEvent.init.headers.capgkey, 'header-key', 'perf telemetry uses the capgkey from the Supabase request, not the env fallback')
+
+  // --- Codex P2: MCP command_path is per-invocation (no cross-talk between overlapping tools) ---
+  const { withMcpToolTracking } = await import('../src/analytics/track.ts')
+  process.env.CAPGO_TOKEN = 'perf-key'
+  const mreqs = []
+  globalThis.fetch = async (url, init) => {
+    mreqs.push({ url: String(url), init })
+    return new Response('{}', { status: 200 })
+  }
+  const tickMs = () => new Promise(r => setTimeout(r, 5))
+  const tfMcp = createTimedFetch()
+  const handlerA = withMcpToolTracking('tool_a', async () => { await tickMs(); await tfMcp('https://db.co/rest/v1/apps', { method: 'GET' }) })
+  const handlerB = withMcpToolTracking('tool_b', async () => { await tfMcp('https://db.co/rest/v1/channels', { method: 'GET' }) })
+  await Promise.all([handlerA({}), handlerB({})])
+  await flushAnalytics()
+  const mcpPerf = mreqs
+    .filter(r => r.url.endsWith('/private/events') && JSON.parse(r.init.body).event === 'Supabase Call')
+    .map(r => JSON.parse(r.init.body).tags)
+  assert.equal(mcpPerf.find(t => t.operation === 'GET apps').command_path, 'mcp:tool_a', 'tool_a Supabase call attributed to tool_a despite interleaving')
+  assert.equal(mcpPerf.find(t => t.operation === 'GET channels').command_path, 'mcp:tool_b', 'tool_b Supabase call attributed to tool_b')
+
   console.log('✅ supabase-perf tests passed')
 }
 finally {

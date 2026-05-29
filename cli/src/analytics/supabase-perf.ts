@@ -45,6 +45,7 @@ export interface SupabaseCallInfo {
   ok: boolean
   durationMs: number
   source?: string
+  apikey?: string
   error?: unknown
 }
 
@@ -85,6 +86,24 @@ export function deriveSupabaseOperation(url: string, method: string): string {
 }
 
 /**
+ * Reads the Capgo API key from a Supabase request's `capgkey` header (set by
+ * createSupabaseClient). Lets perf telemetry attribute the call to the exact
+ * key used — even when it came from `--apikey` rather than env / a saved file,
+ * a case where the global `trackEvent` key-lookup would otherwise find nothing.
+ */
+function extractCapgkey(init: Parameters<typeof fetch>[1]): string | undefined {
+  const headers = init?.headers
+  if (!headers)
+    return undefined
+  const getter = (headers as { get?: (name: string) => string | null }).get
+  if (typeof getter === 'function')
+    return getter.call(headers, 'capgkey') ?? undefined
+  if (Array.isArray(headers))
+    return headers.find(([key]) => key.toLowerCase() === 'capgkey')?.[1]
+  return (headers as Record<string, string>).capgkey
+}
+
+/**
  * A `fetch` wrapper for supabase-js's `global.fetch`. Times the real request
  * (which runs regardless), captures the active source label, and hands the
  * result to the injected recorder. Returns the real Response / rethrows the
@@ -96,14 +115,15 @@ export function createTimedFetch(): typeof fetch {
     const method = (init?.method ?? 'GET').toUpperCase()
     const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
     const source = getSupabaseSource()
+    const apikey = extractCapgkey(init)
     const start = Date.now()
     try {
       const response = await globalThis.fetch(input, init)
-      recorder?.({ url, method, status: response.status, ok: response.ok, durationMs: Date.now() - start, source })
+      recorder?.({ url, method, status: response.status, ok: response.ok, durationMs: Date.now() - start, source, apikey })
       return response
     }
     catch (error) {
-      recorder?.({ url, method, status: 0, ok: false, durationMs: Date.now() - start, source, error })
+      recorder?.({ url, method, status: 0, ok: false, durationMs: Date.now() - start, source, apikey, error })
       throw error
     }
   }

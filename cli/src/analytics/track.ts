@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from 'node:async_hooks'
 import { platform } from 'node:os'
 import { arch, env, version as nodeVersion } from 'node:process'
 import { isCI, name as ciName } from 'ci-info'
@@ -184,6 +185,11 @@ let commandStartedAt = 0
 // events. One command per CLI process, so a module-level value is sufficient.
 let currentCommandPath = ''
 
+// MCP tools can run concurrently, so a module-level path would race between
+// overlapping handlers. The CLI runs one command per process (module-level is
+// safe there); MCP scopes its path per-invocation via this async-local store.
+const mcpCommandPathStore = new AsyncLocalStorage<string>()
+
 export interface CommandContext {
   flags: string[]
   positional_arg_count: number
@@ -261,9 +267,8 @@ type AnyAsyncFn = (...args: any[]) => Promise<any>
  * name, success flag, and duration. Re-throws so behavior is unchanged.
  */
 export function withMcpToolTracking<H extends AnyAsyncFn>(toolName: string, handler: H): H {
-  const wrapped = async (...args: Parameters<H>) => {
+  const wrapped = (...args: Parameters<H>) => mcpCommandPathStore.run(`mcp:${toolName}`, async () => {
     const start = Date.now()
-    currentCommandPath = `mcp:${toolName}`
     let success = true
     try {
       const result = await handler(...args)
@@ -287,7 +292,7 @@ export function withMcpToolTracking<H extends AnyAsyncFn>(toolName: string, hand
         },
       })
     }
-  }
+  })
   return wrapped as H
 }
 
@@ -311,6 +316,9 @@ const CLI_PERF_CHANNEL = 'cli-perf'
  * event. Injected into supabase-perf so that module stays a leaf (no cycle).
  */
 function recordSupabaseCall(info: SupabaseCallInfo): void {
+  // MCP tool calls scope their path via the async-local store; the CLI uses the
+  // module-level value set in trackCommandInvoked.
+  const commandPath = mcpCommandPathStore.getStore() ?? currentCommandPath
   const tags: Record<string, string | number | boolean> = {
     operation: deriveSupabaseOperation(info.url, info.method),
     method: info.method,
@@ -321,14 +329,16 @@ function recordSupabaseCall(info: SupabaseCallInfo): void {
   }
   if (info.source)
     tags.source = info.source
-  if (currentCommandPath)
-    tags.command_path = currentCommandPath
+  if (commandPath)
+    tags.command_path = commandPath
   if (!info.ok) {
     tags.error_category = info.error !== undefined
       ? categorizeCliError(info.error)
       : categorizeHttpStatus(info.status)
   }
-  void trackEvent({ channel: CLI_PERF_CHANNEL, event: 'Supabase Call', icon: '⏱️', tags })
+  // Use the key from the Supabase request itself so events fire even when the
+  // key came from --apikey (not env / a saved file); trackEvent still falls back.
+  void trackEvent({ apikey: info.apikey, channel: CLI_PERF_CHANNEL, event: 'Supabase Call', icon: '⏱️', tags })
 }
 
 setSupabaseCallRecorder(recordSupabaseCall)
