@@ -46,22 +46,26 @@ async function loadReady(platform: Platform, appId: string): Promise<ReadyApp> {
 
 // Live terminal size, tracked through resize — drives the picker's cards↔list
 // layout and the full-height frame.
+//
+// We read `stdout.rows/columns` DIRECTLY each render (not from state) and only
+// use the resize listener to force a re-render. When the terminal resizes, Node
+// updates stdout.rows/columns and Ink re-renders the tree — at which point the
+// direct read is already current. Holding the size in state instead lags by one
+// frame (the resize re-render runs with the stale state until setState flushes),
+// which shows up as a 1-row "jump then correct" on the bottom-pinned legend.
 function useTerminalSize(): { cols: number, rows: number } {
   const { stdout } = useStdout()
-  const [size, setSize] = useState<{ cols: number, rows: number }>({
-    cols: stdout?.columns ?? 80,
-    rows: stdout?.rows ?? 24,
-  })
+  const [, forceRerender] = useState(0)
   useEffect(() => {
     if (!stdout)
       return
-    const onResize = (): void => setSize({ cols: stdout.columns ?? 80, rows: stdout.rows ?? 24 })
+    const onResize = (): void => forceRerender(n => n + 1)
     stdout.on('resize', onResize)
     return () => {
       stdout.off('resize', onResize)
     }
   }, [stdout])
-  return size
+  return { cols: stdout?.columns ?? 80, rows: stdout?.rows ?? 24 }
 }
 
 export interface OnboardingShellProps {
