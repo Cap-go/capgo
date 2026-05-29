@@ -102,7 +102,7 @@ describe('[POST] /private/events operations', () => {
     expect(data.status).toBe('ok')
   })
 
-  it('tracks v2 onboarding-step-done events (resolves org from verified org, not user_id)', async () => {
+  it.concurrent('tracks v2 onboarding-step-done events (resolves org from verified org, not user_id)', async () => {
     const response = await fetch(`${BASE_URL}/private/events`, {
       method: 'POST',
       headers: {
