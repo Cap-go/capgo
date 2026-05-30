@@ -146,3 +146,35 @@ export async function checkCompatibility(appId: string, options: BundleCompatibi
     throw error
   }
 }
+
+export type UploadCompatibilityResult = 'compatible' | 'incompatible' | 'skipped'
+
+export interface UploadCompatibilitySummary {
+  result: UploadCompatibilityResult
+  incompatibleCount: number
+  reasons: string[]
+}
+
+/**
+ * Summarize an upload's compatibility outcome for analytics.
+ *
+ * `finalCompatibility` is `undefined` when the comparison did not run (new
+ * channel / no remote native metadata / `--ignore-metadata-check`), which is
+ * reported as `skipped` so the funnel never silently counts a skip as
+ * `compatible`.
+ */
+export function summarizeUploadCompatibility(
+  finalCompatibility: Compatibility[] | undefined,
+): UploadCompatibilitySummary {
+  if (!finalCompatibility)
+    return { result: 'skipped', incompatibleCount: 0, reasons: [] }
+
+  const incompatible = finalCompatibility.filter(entry => !isCompatible(entry))
+  const reasons = [...new Set(incompatible.flatMap(entry => getCompatibilityDetails(entry).reasons))]
+
+  return {
+    result: incompatible.length > 0 ? 'incompatible' : 'compatible',
+    incompatibleCount: incompatible.length,
+    reasons,
+  }
+}

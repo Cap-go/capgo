@@ -13,6 +13,7 @@ import { Table } from '@sauber/table'
 import { greaterOrEqual, parse } from '@std/semver'
 // Native fetch is available in Node.js >= 18
 import pack from '../../package.json'
+import { trackEvent } from '../analytics/track'
 import { check2FAComplianceForApp, checkAppExistsAndHasPermissionOrgErr } from '../api/app'
 import { calcKeyId, encryptChecksum, encryptChecksumV3, encryptSource, generateSessionKey } from '../api/crypto'
 import { checkAlerts } from '../api/update'
@@ -24,6 +25,7 @@ import { usesAlwaysDirectUpdate } from '../updaterConfig'
 import { baseKeyV2, BROTLI_MIN_UPDATER_VERSION_V5, BROTLI_MIN_UPDATER_VERSION_V6, BROTLI_MIN_UPDATER_VERSION_V7, canPromptInteractively, checkChecksum, checkCompatibilityCloud, checkPlanValidUpload, checkRemoteCliMessages, createSupabaseClient, deletedFailedVersion, findRoot, findSavedKey, formatError, getAppId, getBundleVersion, getCompatibilityDetails, getConfig, getInstalledVersion, getLocalConfig, getLocalDependencies, getOrganizationId, getPMAndCommand, getRemoteFileConfig, hasCliPermission, hasOrganizationPerm, isCompatible, isDeprecatedPluginVersion, OrganizationPerm, regexSemver, resolveUserIdFromApiKey, sendEvent, updateConfigUpdater, updateOrCreateChannel, updateOrCreateVersion, UPLOAD_TIMEOUT, uploadTUS, uploadUrl, zipFile } from '../utils'
 import { getVersionSuggestions, interactiveVersionBump } from '../versionHelpers'
 import { checkIndexPosition, searchInDirectory } from './check'
+import { summarizeUploadCompatibility } from './compatibility'
 import { prepareBundlePartialFiles, uploadPartial } from './partial'
 
 type SupabaseType = Awaited<ReturnType<typeof createSupabaseClient>>
@@ -130,7 +132,7 @@ function checkNotifyAppReady(options: OptionsUpload, path: string) {
   }
 }
 
-async function verifyCompatibility(supabase: SupabaseType, pm: pmType, options: OptionsUpload, channel: string, appid: string, bundle: string) {
+async function verifyCompatibility(supabase: SupabaseType, pm: pmType, options: OptionsUpload, channel: string, appid: string, bundle: string, orgId: string) {
   // Check compatibility here
   const ignoreMetadataCheck = options.ignoreMetadataCheck
   const autoMinUpdateVersion = options.autoMinUpdateVersion
@@ -149,7 +151,7 @@ async function verifyCompatibility(supabase: SupabaseType, pm: pmType, options: 
   const updateMetadataRequired = !!channelData && channelData.disable_auto_update === 'version_number'
 
   let localDependencies: Awaited<ReturnType<typeof getLocalDependencies>> | undefined
-  let finalCompatibility: Awaited<ReturnType<typeof checkCompatibilityCloud>>['finalCompatibility']
+  let finalCompatibility: Awaited<ReturnType<typeof checkCompatibilityCloud>>['finalCompatibility'] | undefined
 
   // We only check compatibility IF the channel exists
   if (!channelError && channelData && channelData.version && (channelData.version as any).native_packages && !ignoreMetadataCheck) {
@@ -203,6 +205,26 @@ async function verifyCompatibility(supabase: SupabaseType, pm: pmType, options: 
       log.info(`Auto set min-update-version to ${minUpdateVersion}`)
     }
   }
+
+  const compatibilitySkipReason = finalCompatibility
+    ? undefined
+    : (ignoreMetadataCheck ? 'ignore_metadata_check' : 'no_remote_metadata')
+  const compatibilitySummary = summarizeUploadCompatibility(finalCompatibility)
+  void trackEvent({
+    channel: 'bundle',
+    event: 'Bundle Upload Compatibility Checked',
+    icon: '🧪',
+    apikey: options.apikey,
+    appId: appid,
+    orgId,
+    tags: {
+      result: compatibilitySummary.result,
+      incompatible_count: compatibilitySummary.incompatibleCount,
+      channel,
+      ...(compatibilitySummary.reasons.length > 0 ? { reasons: compatibilitySummary.reasons.join(',') } : {}),
+      ...(compatibilitySkipReason ? { skip_reason: compatibilitySkipReason } : {}),
+    },
+  })
 
   if (updateMetadataRequired && !minUpdateVersion && !ignoreMetadataCheck) {
     uploadFail('You need to provide a min-update-version to upload a bundle to this channel')
@@ -860,7 +882,7 @@ export async function uploadBundleInternal(preAppid: string, options: OptionsUpl
   if (options.verbose)
     log.info(`[Verbose] Checking compatibility with channel ${channel}...`)
 
-  const { nativePackages, minUpdateVersion } = await verifyCompatibility(supabase, pm, options, channel, appid, bundle)
+  const { nativePackages, minUpdateVersion } = await verifyCompatibility(supabase, pm, options, channel, appid, bundle, orgId)
   if (options.verbose) {
     log.info(`[Verbose] Compatibility check completed:`)
     log.info(`  - Native packages: ${nativePackages ? nativePackages.length : 0}`)
