@@ -180,8 +180,9 @@ compatible-vs-incompatible graphs (previously only fed by the standalone command
 ## Decisions (resolved)
 
 - Accept → skip upload; the CLI entry point launches the relevant build flow.
-- A single yes/no with the reason folded in; declining (or cancelling) just continues
-  the upload — no second prompt, no snooze.
+- Two messages in interactive mode: a context line, then a short yes/no prompt
+  carrying a clickable "Learn what Capgo Builder is" link; declining (or cancelling)
+  just continues the upload — no second prompt, no snooze.
 - Warning copy: low-fear (native changes ship via an app-store build, not OTA).
 - Architecture: CLI-only, PostHog for tracking, local credential check.
 - `CAPGO_NO_BUILDER_PROMPT` suppresses everything (prompt + CI ad).
