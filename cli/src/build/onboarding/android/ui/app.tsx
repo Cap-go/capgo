@@ -44,6 +44,7 @@ import { canUseFilePicker, openKeystorePicker, openServiceAccountJsonPicker } fr
 import { trackBuilderOnboardingStep } from '../../telemetry.js'
 import { CompletedStepsLog } from '../../ui/completed-steps-log.js'
 import { ANDROID_MIN_ROWS, terminalFitsOnboarding } from '../../min-terminal-size.js'
+import { sanitizeBuildLogLines } from '../../build-log.js'
 import { TerminalTooSmallPrompt } from '../../ui/min-size-gate.js'
 import { BOX_HEADER_ROWS, Divider, FullscreenAiViewer, FullscreenBuildOutput, Header } from '../../ui/components.js'
 import type { AiResultKind } from '../../ui/components.js'
@@ -1526,7 +1527,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
             error: (msg: string) => setBuildOutput(prev => [...prev, `✖ ${msg}`]),
             warn: (msg: string) => setBuildOutput(prev => [...prev, `⚠ ${msg}`]),
             success: (msg: string) => setBuildOutput(prev => [...prev, `✔ ${msg}`]),
-            buildLog: (msg: string) => setBuildOutput(prev => [...prev, msg]),
+            buildLog: (msg: string) => setBuildOutput(prev => [...prev, ...sanitizeBuildLogLines(msg)]),
             uploadProgress: (percent: number) => {
               setBuildOutput((prev) => {
                 const idx = prev.findIndex(l => l.startsWith('Uploading:'))
