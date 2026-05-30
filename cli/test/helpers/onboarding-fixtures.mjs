@@ -46,7 +46,7 @@ export function staticStepFixtures() {
     f('sa-json-validation-failed', h(sa.SaJsonValidationFailedStep, { message: LONG_ERR, onChoose: noop, ...C })),
     f('play-developer-id-actions', h(sa.PlayDeveloperIdActionsStep, { onChoose: noop, ...C })),
     f('play-developer-id-input', h(sa.PlayDeveloperIdInputStep, { onSubmit: noop, ...C })),
-    f('gcp-projects-select', h(sa.GcpProjectsSelectStep, { projects: Array.from({ length: 8 }, (_, i) => ({ projectId: `proj-${i}`, name: `Project ${i}` })), onSelect: noop, ...C })),
+    f('gcp-projects-select', h(sa.GcpProjectsSelectStep, { options: [{ label: '➕  Create a new project', value: 'new' }, ...Array.from({ length: 8 }, (_, i) => ({ label: `Project ${i} (project-id-${i})`, value: `proj-${i}` }))], onChange: noop, ...C })),
     f('gcp-project-create-name', h(sa.GcpProjectCreateNameStep, { onSubmit: noop, ...C })),
     f('android-package-select', h(sa.AndroidPackageSelectStep, { packages: ['com.x.y', 'com.a.b'], onSelect: noop, ...C })),
     // ── android-keystore ────────────────────────────────────────────────────
@@ -80,7 +80,10 @@ export function staticStepFixtures() {
     f('build-complete', h(ash.BuildCompleteStep, { uploadSummary: null, buildUrl: 'https://capgo.app/app/com.example.app/builds', ...C }), false),
     f('error', h(ash.ErrorStep, { message: LONG_ERR, onChoose: noop, ...C })),
     // ── ci ──────────────────────────────────────────────────────────────────
-    f('ci-secrets-setup', h(aci.CiSecretsSetupStep, { advice: [{ target: 'github', label: 'GitHub', authed: false, installed: true }, { target: 'gitlab', label: 'GitLab', authed: false, installed: false }], onChoose: noop, ...C })),
+    f('ci-secrets-setup', h(aci.CiSecretsSetupStep, { advice: [
+      { target: { provider: 'github', label: 'GitHub Actions repository secrets', cli: 'gh' }, reason: 'not-installed', message: 'GitHub CLI (gh) is not installed or not authenticated.', commands: ['Install GitHub CLI: https://cli.github.com/', 'gh auth login'] },
+      { target: { provider: 'gitlab', label: 'GitLab CI/CD variables', cli: 'glab' }, reason: 'not-installed', message: 'GitLab CLI (glab) is not installed or not authenticated.', commands: ['Install GitLab CLI: https://gitlab.com/gitlab-org/cli#installation', 'glab auth login'] },
+    ], onChoose: noop, ...C })),
     f('ci-secrets-target-select', h(aci.CiSecretsTargetSelectStep, { options: opt(8), onChange: noop, ...C })),
     f('ask-ci-secrets', h(aci.AskCiSecretsStep, { entryCount: 12, targetLabel: 'GitLab CI/CD', cli: 'glab', onChoose: noop, ...C })),
   ]
