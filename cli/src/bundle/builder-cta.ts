@@ -66,6 +66,16 @@ export interface MaybePromptBuilderCtaParams {
  * `continue` so the upload is never blocked by the CTA.
  */
 export async function maybePromptBuilderCta(params: MaybePromptBuilderCtaParams): Promise<BuilderCtaAction> {
+  try {
+    return await runBuilderCta(params)
+  }
+  catch {
+    // A CTA failure (filesystem, prompt, telemetry) must never block the upload.
+    return 'continue'
+  }
+}
+
+async function runBuilderCta(params: MaybePromptBuilderCtaParams): Promise<BuilderCtaAction> {
   const now = params.now ?? new Date()
   const envDisabled = isTruthyEnvValue(env.CAPGO_NO_BUILDER_PROMPT)
   const hasCredentials = (await loadSavedCredentials(params.appId)) !== null

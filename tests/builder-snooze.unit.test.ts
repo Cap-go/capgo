@@ -1,41 +1,64 @@
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { isBuilderPromptSnoozed, snoozeBuilderPrompt } from '../cli/src/bundle/builder-snooze.ts'
 
-let dir: string
-let statePath: string
 const now = new Date('2026-05-30T00:00:00.000Z')
+const DAY = 86_400_000
 
-beforeEach(() => {
-  dir = mkdtempSync(join(tmpdir(), 'capgo-snooze-'))
-  statePath = join(dir, 'builder-prompt.json')
-})
-afterEach(() => rmSync(dir, { recursive: true, force: true }))
+// Each test gets its own isolated temp dir so the cases run concurrently without
+// sharing mutable state (the snooze helpers take an injectable path).
+function makeTempDir(): string {
+  return mkdtempSync(join(tmpdir(), 'capgo-snooze-'))
+}
 
 describe('builder snooze', () => {
-  it('reports not snoozed when no state file exists', async () => {
-    expect(await isBuilderPromptSnoozed('com.app', now, join(dir, 'missing.json'))).toBe(false)
+  it.concurrent('reports not snoozed when no state file exists', async () => {
+    const dir = makeTempDir()
+    try {
+      expect(await isBuilderPromptSnoozed('com.app', now, join(dir, 'missing.json'))).toBe(false)
+    }
+    finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
   })
 
-  it('honors a snooze within the window and expires it after', async () => {
-    await snoozeBuilderPrompt('com.app', 3, now, statePath)
-    const twoDaysLater = new Date(now.getTime() + 2 * 86400_000)
-    const fourDaysLater = new Date(now.getTime() + 4 * 86400_000)
-    expect(await isBuilderPromptSnoozed('com.app', twoDaysLater, statePath)).toBe(true)
-    expect(await isBuilderPromptSnoozed('com.app', fourDaysLater, statePath)).toBe(false)
+  it.concurrent('honors a snooze within the window and expires it after', async () => {
+    const dir = makeTempDir()
+    const path = join(dir, 'builder-prompt.json')
+    try {
+      await snoozeBuilderPrompt('com.app', 3, now, path)
+      expect(await isBuilderPromptSnoozed('com.app', new Date(now.getTime() + 2 * DAY), path)).toBe(true)
+      expect(await isBuilderPromptSnoozed('com.app', new Date(now.getTime() + 4 * DAY), path)).toBe(false)
+    }
+    finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
   })
 
-  it('is per-app (snoozing one app does not snooze another)', async () => {
-    await snoozeBuilderPrompt('com.app.a', 3, now, statePath)
-    expect(await isBuilderPromptSnoozed('com.app.a', now, statePath)).toBe(true)
-    expect(await isBuilderPromptSnoozed('com.app.b', now, statePath)).toBe(false)
+  it.concurrent('is per-app (snoozing one app does not snooze another)', async () => {
+    const dir = makeTempDir()
+    const path = join(dir, 'builder-prompt.json')
+    try {
+      await snoozeBuilderPrompt('com.app.a', 3, now, path)
+      expect(await isBuilderPromptSnoozed('com.app.a', now, path)).toBe(true)
+      expect(await isBuilderPromptSnoozed('com.app.b', now, path)).toBe(false)
+    }
+    finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
   })
 
-  it('treats a corrupt state file as not snoozed', async () => {
-    const p = join(dir, 'corrupt.json')
-    writeFileSync(p, '{ not json')
-    expect(await isBuilderPromptSnoozed('com.app', now, p)).toBe(false)
+  it.concurrent('treats a corrupt state file as not snoozed', async () => {
+    const dir = makeTempDir()
+    const path = join(dir, 'corrupt.json')
+    try {
+      writeFileSync(path, '{ not json')
+      expect(await isBuilderPromptSnoozed('com.app', now, path)).toBe(false)
+    }
+    finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
   })
 })

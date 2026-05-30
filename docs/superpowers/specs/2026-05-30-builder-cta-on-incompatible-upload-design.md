@@ -148,22 +148,24 @@ compatible-vs-incompatible graphs (previously only fed by the standalone command
 ## Code shape (all client-side)
 
 - `cli/src/bundle/builder-cta.ts`
-  - `maybePromptBuilderCta(ctx): Promise<BuilderCtaAction>` where
-    `BuilderCtaAction = { kind: 'continue' } | { kind: 'launch-onboarding' } | { kind: 'launch-build' }`.
+  - `maybePromptBuilderCta(params): Promise<BuilderCtaAction>` where
+    `BuilderCtaAction = 'continue' | 'launch-onboarding' | 'launch-build'` (string union).
   - Owns: environment detection, credential branch, prompt copy, confirm + snooze,
-    and emitting the `Builder CTA *` events. Pure decision logic separated from I/O
-    where practical for testability.
-- `cli/src/build/credentials-state.ts` (or extend existing credentials module)
-  - `hasLocalCredentials(appId): boolean`.
-- `cli/src/utils/builder-snooze.ts`
-  - `isSnoozed(appId): boolean`, `snooze(appId, days): void`. Reads/writes
-    `~/.capgo/builder-prompt.json`.
+    and emitting the `Builder CTA *` events. `interactive` and `confirm` are injected
+    by the caller for testability; the pure `decideBuilderCtaSurface` does the gating.
+    The whole body is wrapped so it never throws (degrades to `continue`).
+- Credential detection: reuse `loadSavedCredentials(appId)` from
+  `cli/src/build/credentials.ts` (returns credentials | `null`); no new helper.
+- `cli/src/bundle/builder-snooze.ts`
+  - `isBuilderPromptSnoozed(appId, now, path?)`, `snoozeBuilderPrompt(appId, days, now, path?)`.
+    Reads/writes `~/.capgo-builder-prompt.json`.
 - `cli/src/bundle/upload.ts`
-  - After `verifyCompatibility`, if incompatible: emit
-    `Bundle Upload Compatibility Checked`; then call `maybePromptBuilderCta`.
-    On `launch-*`, invoke the relevant build command and return early; otherwise
-    continue. CI path prints the ad (still continues).
-- Reuse `isBuildNeeded`, `getCompatibilityDetails`, `getNativeDiffLabel` from
+  - After `verifyCompatibility`, if incompatible **and not silent**: call
+    `maybePromptBuilderCta`. On a launch action, skip the OTA upload and return a
+    `builderAction` in the result. The Ink-based launch runs in the CLI entry point
+    (`index.ts` → `cli/src/bundle/upload-command.ts`) so this SDK-shared module stays
+    free of `ink`. CI path prints the ad and continues.
+- Reuse `isBuildNeeded`, `getCompatibilityDetails` from
   `cli/src/build/needed.ts` and `isCompatible` from `cli/src/utils.ts`.
 
 ## Testing

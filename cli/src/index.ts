@@ -25,7 +25,7 @@ import { deleteBundle } from './bundle/delete'
 import { encryptZip } from './bundle/encrypt'
 import { listBundle } from './bundle/list'
 import { printReleaseType } from './bundle/releaseType'
-import { uploadBundle } from './bundle/upload'
+import { handleBundleUploadCommand } from './bundle/upload-command'
 import { zipBundle } from './bundle/zip'
 import { addChannel } from './channel/add'
 import { currentBundle } from './channel/currentBundle'
@@ -172,22 +172,7 @@ External option: Store only a URL link (useful for apps >200MB or privacy requir
 Capgo never inspects external content. Add encryption for trustless security.
 
 Example: npx @capgo/cli@latest bundle upload com.example.app --path ./dist --channel production`)
-  .action(async (...args: Parameters<typeof uploadBundle>): Promise<void> => {
-    const result = await uploadBundle(...args)
-    // When the bundle is incompatible and the user opted into Capgo Builder, the
-    // upload is skipped and we launch the (Ink-based) build flow here — keeping
-    // those heavy commands out of the upload module / programmatic SDK bundle.
-    if (result?.builderAction) {
-      const [appId, options] = args
-      if (result.builderAction === 'launch-onboarding')
-        await onboardingBuilderCommand({ apikey: options.apikey })
-      else
-        // NB: don't forward `options.path` — for `bundle upload` it's the web
-        // asset dir (webDir), but `build request` treats `path` as the Capacitor
-        // project root. Omitting it defaults to cwd() (the project root).
-        await requestBuildCommand(appId ?? '', { apikey: options.apikey, supaHost: options.supaHost, supaAnon: options.supaAnon })
-    }
-  })
+  .action(handleBundleUploadCommand)
   .option('-a, --apikey <apikey>', optionDescriptions.apikey)
   .option('-p, --path <path>', `Path of the folder to upload, if not provided it will use the webDir set in capacitor.config`)
   .option('-c, --channel <channel>', `Channel to link to`)
