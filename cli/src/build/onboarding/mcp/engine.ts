@@ -13,6 +13,7 @@ export interface PreflightFacts {
   authenticated: boolean
   appRegistered: boolean
   androidProgress: AndroidOnboardingProgress | null
+  iosProgress: OnboardingProgress | null
 }
 
 const ROADMAP: string[] = [
@@ -29,6 +30,9 @@ interface OnboardingInput {
   platform?: string
   serviceAccountJsonPath?: string
   runBuild?: boolean
+  keyId?: string
+  issuerId?: string
+  p8Path?: string
 }
 
 /** Decide the first/again step for a fresh or resumed session. Pure. */
@@ -141,17 +145,60 @@ function platformChosen(facts: PreflightFacts, platform: Platform): NextStepResu
   if (platform === 'android')
     return decideAndroid(facts)
 
-  return {
-    onboarding: 'capgo-builder',
-    phase: 'credentials',
-    state: 'ios-credentials-not-implemented',
-    platform,
-    progress: 10,
-    kind: 'info',
-    summary: `iOS selected for "${facts.appId}". The iOS credential setup flow lands in the next milestone.`,
-    context: { appId: facts.appId, appRegistered: facts.appRegistered },
-    rules: ONBOARDING_RULES,
+  return decideIos(facts)
+}
+
+/**
+ * iOS credential sub-flow decider (create-new). Pure — branches on the persisted
+ * OnboardingProgress. The user supplies an App Store Connect API key (.p8 + IDs);
+ * the finalize step verifies it and creates the certificate + provisioning profile.
+ */
+export function decideIos(facts: PreflightFacts): NextStepResult {
+  const p = facts.iosProgress
+  const done = p?.completedSteps ?? {}
+
+  if (!p?.keyId || !p?.issuerId || !p?.p8Path) {
+    return {
+      onboarding: 'capgo-builder',
+      phase: 'credentials',
+      state: 'ios-api-key',
+      platform: 'ios',
+      progress: 25,
+      kind: 'human_gate',
+      summary: `Set up iOS signing for "${facts.appId}". I need an App Store Connect API key.`,
+      human: {
+        instruction: 'In App Store Connect → Users and Access → Integrations → App Store Connect API, create a key with App Manager access and download the .p8 (you can only download it once). Then give me the Key ID, the Issuer ID, and the path to the .p8 file. The .p8 stays on your machine — do not paste its contents here.',
+      },
+      collect: [
+        { field: 'keyId', desc: 'the Key ID shown next to the key' },
+        { field: 'issuerId', desc: 'the Issuer ID at the top of the Keys page' },
+        { field: 'p8Path', desc: 'absolute path to the downloaded .p8 file' },
+      ],
+      next: {
+        tool: NEXT_STEP_TOOL,
+        with: { keyId: '<keyId>', issuerId: '<issuerId>', p8Path: '<path>' },
+        instruction: 'Collect all three from the user, then call next_step with keyId, issuerId, and p8Path.',
+        call: `${NEXT_STEP_TOOL}({ keyId: "ABC123", issuerId: "1a2b-...", p8Path: "/path/to/AuthKey.p8" })`,
+      },
+      rules: ONBOARDING_RULES,
+    }
   }
+
+  if (!done.profileCreated) {
+    return {
+      onboarding: 'capgo-builder',
+      phase: 'credentials',
+      state: 'ios-finalize',
+      platform: 'ios',
+      progress: 70,
+      kind: 'auto',
+      summary: 'Verifying your App Store Connect key, creating the distribution certificate + provisioning profile, and saving credentials…',
+      context: { appId: facts.appId },
+      rules: ONBOARDING_RULES,
+    }
+  }
+
+  return decideBuildPhase(facts, 'ios')
 }
 
 /**
@@ -280,6 +327,8 @@ export interface EngineDeps {
   setAndroidServiceAccountPath: (appId: string, path: string) => Promise<void>
   finalizeAndroidCredentials: (appId: string) => Promise<{ ok: true } | { ok: false, error: string }>
   requestFirstBuild: (appId: string, platform: Platform) => Promise<{ ok: true, jobId?: string, status?: string } | { ok: false, error: string }>
+  setIosApiKey: (appId: string, keyId: string, issuerId: string, p8Path: string) => Promise<void>
+  finalizeIosCredentials: (appId: string) => Promise<{ ok: true } | { ok: false, error: string }>
 }
 
 /** Gather preflight facts via the injected deps. */
@@ -288,12 +337,13 @@ export async function gatherFacts(deps: EngineDeps): Promise<PreflightFacts> {
   const authenticated = deps.hasSavedKey()
 
   if (!appId)
-    return { capacitorProject: false, appId: undefined, platformsDetected: [], authenticated, appRegistered: false, androidProgress: null }
+    return { capacitorProject: false, appId: undefined, platformsDetected: [], authenticated, appRegistered: false, androidProgress: null, iosProgress: null }
 
   const platformsDetected = await deps.detectPlatforms()
   const appRegistered = authenticated ? await deps.isAppRegistered(appId) : false
   const androidProgress = await deps.loadAndroidProgress(appId)
-  return { capacitorProject: true, appId, platformsDetected, authenticated, appRegistered, androidProgress }
+  const iosProgress = await deps.loadProgress(appId)
+  return { capacitorProject: true, appId, platformsDetected, authenticated, appRegistered, androidProgress, iosProgress }
 }
 
 const MAX_AUTO_STEPS = 8
@@ -372,6 +422,35 @@ async function executeAuto(
       rules: ONBOARDING_RULES,
     }
   }
+  if (result.state === 'ios-finalize' && facts.appId) {
+    const fin = await deps.finalizeIosCredentials(facts.appId)
+    if (fin.ok)
+      return null
+    return {
+      onboarding: 'capgo-builder',
+      phase: 'credentials',
+      state: 'ios-credentials-failed',
+      platform: 'ios',
+      progress: 25,
+      kind: 'human_gate',
+      summary: `iOS signing setup failed: ${fin.error}`,
+      human: {
+        instruction: 'This often means the API key lacks access, the .p8 moved, or Apple\'s certificate limit was hit. Provide corrected Key ID / Issuer ID / .p8 path, then continue.',
+      },
+      collect: [
+        { field: 'keyId', desc: 'the Key ID' },
+        { field: 'issuerId', desc: 'the Issuer ID' },
+        { field: 'p8Path', desc: 'absolute path to the .p8 file' },
+      ],
+      next: {
+        tool: NEXT_STEP_TOOL,
+        with: { keyId: '<keyId>', issuerId: '<issuerId>', p8Path: '<path>' },
+        instruction: 'Collect corrected values from the user, then call next_step with keyId, issuerId, p8Path.',
+        call: `${NEXT_STEP_TOOL}({ keyId: "ABC123", issuerId: "1a2b-...", p8Path: "/path/to/AuthKey.p8" })`,
+      },
+      rules: ONBOARDING_RULES,
+    }
+  }
   // Unknown auto step — surface it rather than silently looping.
   return result
 }
@@ -420,6 +499,11 @@ async function drive(deps: EngineDeps, input?: OnboardingInput): Promise<NextSte
     const inputAppId = await deps.getAppId()
     if (inputAppId)
       await deps.setAndroidServiceAccountPath(inputAppId, input.serviceAccountJsonPath)
+  }
+  if (input?.keyId && input?.issuerId && input?.p8Path) {
+    const inputAppId = await deps.getAppId()
+    if (inputAppId)
+      await deps.setIosApiKey(inputAppId, input.keyId, input.issuerId, input.p8Path)
   }
   for (let i = 0; i < MAX_AUTO_STEPS; i++) {
     const facts = await gatherFacts(deps)

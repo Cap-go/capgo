@@ -379,6 +379,90 @@ await test('runStart (android): generateAndroidKeystore runs exactly once', asyn
   eq(calls, 1)
 })
 
+// --- Plan 4: iOS credentials ---
+const { decideIos } = await import('../src/build/onboarding/mcp/engine.ts')
+
+function iosDeps(o = {}) {
+  let prog = null
+  return {
+    cwd: '/tmp/app',
+    hasSavedKey: () => true,
+    getAppId: async () => 'com.acme.app',
+    detectPlatforms: async () => ['ios'],
+    isAppRegistered: async () => true,
+    loadProgress: async () => prog,
+    loadAndroidProgress: async () => null,
+    registerApp: async () => ({ ok: true }),
+    requestFirstBuild: async () => ({ ok: true, jobId: 'job_ios', status: 'queued' }),
+    setIosApiKey: async (_id, keyId, issuerId, p8Path) => {
+      prog = { ...(prog || {}), keyId, issuerId, p8Path, completedSteps: { ...(prog?.completedSteps || {}) } }
+    },
+    finalizeIosCredentials: async () => {
+      prog = {
+        ...(prog || {}),
+        completedSteps: {
+          ...(prog?.completedSteps || {}),
+          apiKeyVerified: { keyId: 'ABC', issuerId: '1a2b' },
+          certificateCreated: { certificateId: 'C', expirationDate: 'x', teamId: 'T', p12Base64: 'p12' },
+          profileCreated: { profileId: 'P', profileName: 'Capgo', profileBase64: 'prof' },
+        },
+      }
+      return { ok: true }
+    },
+    ...o,
+  }
+}
+
+const iosFacts = (o = {}) => ({
+  capacitorProject: true,
+  appId: 'com.acme.app',
+  platformsDetected: ['ios'],
+  authenticated: true,
+  appRegistered: true,
+  androidProgress: null,
+  iosProgress: null,
+  ...o,
+})
+
+await test('decideIos: no API key → human_gate ios-api-key (collects 3 fields)', async () => {
+  const r = decideIos(iosFacts())
+  eq(r.kind, 'human_gate')
+  eq(r.state, 'ios-api-key')
+  eq(r.collect.length, 3)
+})
+
+await test('decideIos: API key present, not finalized → auto ios-finalize', async () => {
+  const r = decideIos(iosFacts({ iosProgress: { keyId: 'A', issuerId: 'B', p8Path: '/p.p8', completedSteps: {} } }))
+  eq(r.kind, 'auto')
+  eq(r.state, 'ios-finalize')
+})
+
+await test('decideIos: profile created → offers first build', async () => {
+  const r = decideIos(iosFacts({ iosProgress: { keyId: 'A', issuerId: 'B', p8Path: '/p.p8', completedSteps: { profileCreated: { profileId: 'P', profileName: 'n', profileBase64: 'b' } } } }))
+  eq(r.kind, 'choice')
+  eq(r.state, 'build-ready')
+})
+
+await test('ios: full flow → provide ASC key → finalize → offers build → runBuild', async () => {
+  const deps = iosDeps()
+  const r1 = await runStart(deps)
+  eq(r1.state, 'ios-api-key')
+  const r2 = await runAdvance(deps, { keyId: 'ABC', issuerId: '1a2b', p8Path: '/tmp/AuthKey.p8' })
+  eq(r2.kind, 'choice')
+  eq(r2.state, 'build-ready')
+  const r3 = await runAdvance(deps, { runBuild: true, platform: 'ios' })
+  eq(r3.kind, 'done')
+  eq(r3.state, 'build-requested')
+})
+
+await test('ios: finalize failure → human_gate to re-provide key', async () => {
+  const deps = iosDeps({ finalizeIosCredentials: async () => ({ ok: false, error: 'cert limit reached' }) })
+  await runStart(deps)
+  const r = await runAdvance(deps, { keyId: 'ABC', issuerId: '1a2b', p8Path: '/tmp/AuthKey.p8' })
+  eq(r.kind, 'human_gate')
+  eq(r.state, 'ios-credentials-failed')
+})
+
 console.log(`\n📊 Results: ${pass} passed, ${fail} failed`)
 if (fail > 0)
   process.exit(1)

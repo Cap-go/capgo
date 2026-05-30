@@ -13,7 +13,9 @@ import { getPlatformDirFromCapacitorConfig } from '../../platform-paths.js'
 import { generateKeystore, generateRandomPassword } from '../android/keystore.js'
 import { loadAndroidProgress, saveAndroidProgress } from '../android/progress.js'
 import { validateServiceAccountJson } from '../android/service-account-validation.js'
-import { loadProgress } from '../progress.js'
+import { createCertificate, createProfile, ensureBundleId, generateJwt, verifyApiKey } from '../apple-api.js'
+import { createP12, DEFAULT_P12_PASSWORD, generateCsr } from '../csr.js'
+import { loadProgress, saveProgress } from '../progress.js'
 import type { Platform } from './contract.js'
 import { renderResult } from './contract.js'
 import type { EngineDeps } from './engine.js'
@@ -139,6 +141,47 @@ function buildDeps(sdk: CapgoSDK): EngineDeps {
         return { ok: true as const, jobId: res.data?.jobId, status: res.data?.status }
       return { ok: false as const, error: res.error || 'Build request failed' }
     },
+    setIosApiKey: async (appId: string, keyId: string, issuerId: string, p8Path: string) => {
+      const base = (await loadProgress(appId)) ?? { platform: 'ios' as const, appId, startedAt: new Date().toISOString(), completedSteps: {} }
+      await saveProgress(appId, { ...base, platform: 'ios', appId, setupMethod: 'create-new', keyId, issuerId, p8Path })
+    },
+    finalizeIosCredentials: async (appId: string) => {
+      const prog = await loadProgress(appId)
+      if (!prog?.keyId || !prog?.issuerId || !prog?.p8Path)
+        return { ok: false as const, error: 'Missing App Store Connect API key details.' }
+      try {
+        const p8Content = await readFile(prog.p8Path, 'utf-8')
+        const token = generateJwt(prog.keyId, prog.issuerId, p8Content)
+        await verifyApiKey(token)
+        const { csrPem, privateKeyPem } = generateCsr()
+        const cert = await createCertificate(token, csrPem)
+        const { p12Base64 } = createP12(cert.certificateContent, privateKeyPem)
+        const { bundleIdResourceId } = await ensureBundleId(token, appId)
+        const profile = await createProfile(token, bundleIdResourceId, cert.certificateId, appId)
+        await updateSavedCredentials(appId, 'ios', {
+          BUILD_CERTIFICATE_BASE64: p12Base64,
+          P12_PASSWORD: DEFAULT_P12_PASSWORD,
+          APPLE_KEY_ID: prog.keyId,
+          APPLE_ISSUER_ID: prog.issuerId,
+          APPLE_KEY_CONTENT: Buffer.from(p8Content).toString('base64'),
+          APP_STORE_CONNECT_TEAM_ID: cert.teamId,
+          CAPGO_IOS_PROVISIONING_MAP: JSON.stringify({ [appId]: profile.profileContent }),
+        })
+        await saveProgress(appId, {
+          ...prog,
+          completedSteps: {
+            ...prog.completedSteps,
+            apiKeyVerified: { keyId: prog.keyId, issuerId: prog.issuerId },
+            certificateCreated: { certificateId: cert.certificateId, expirationDate: cert.expirationDate, teamId: cert.teamId, p12Base64 },
+            profileCreated: { profileId: profile.profileId, profileName: profile.profileName, profileBase64: profile.profileContent },
+          },
+        })
+        return { ok: true as const }
+      }
+      catch (err) {
+        return { ok: false as const, error: err instanceof Error ? err.message : String(err) }
+      }
+    },
   }
 }
 
@@ -166,9 +209,12 @@ export function registerOnboardingTools(server: McpLike, sdk: CapgoSDK, depsOver
       platform: z.enum(['ios', 'android']).optional().describe('Platform choice, when the previous step asked for it'),
       serviceAccountJsonPath: z.string().optional().describe('Path to your Google Play service-account JSON file, when the previous step asked for it'),
       runBuild: z.boolean().optional().describe('Set true (with platform) to trigger the first cloud build'),
+      keyId: z.string().optional().describe('App Store Connect Key ID (iOS), when asked'),
+      issuerId: z.string().optional().describe('App Store Connect Issuer ID (iOS), when asked'),
+      p8Path: z.string().optional().describe('Path to your App Store Connect .p8 key file (iOS), when asked'),
     },
-    async ({ platform, serviceAccountJsonPath, runBuild }: { platform?: Platform, serviceAccountJsonPath?: string, runBuild?: boolean }) => {
-      const result = await runAdvance(deps, { platform, serviceAccountJsonPath, runBuild })
+    async ({ platform, serviceAccountJsonPath, runBuild, keyId, issuerId, p8Path }: { platform?: Platform, serviceAccountJsonPath?: string, runBuild?: boolean, keyId?: string, issuerId?: string, p8Path?: string }) => {
+      const result = await runAdvance(deps, { platform, serviceAccountJsonPath, runBuild, keyId, issuerId, p8Path })
       return { content: [{ type: 'text' as const, text: renderResult(result) }] }
     },
   )
