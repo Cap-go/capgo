@@ -1,14 +1,18 @@
 // src/build/onboarding/mcp/onboarding-tools.ts
+import { Buffer } from 'node:buffer'
 import { existsSync } from 'node:fs'
+import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import process from 'node:process'
 import { z } from 'zod'
 import type { CapgoSDK } from '../../../sdk.js'
 import { isAppAlreadyExistsError } from '../../../init/app-conflict.js'
 import { findSavedKeySilent, getAppId, getConfig } from '../../../utils.js'
+import { updateSavedCredentials } from '../../credentials.js'
 import { getPlatformDirFromCapacitorConfig } from '../../platform-paths.js'
 import { generateKeystore, generateRandomPassword } from '../android/keystore.js'
 import { loadAndroidProgress, saveAndroidProgress } from '../android/progress.js'
+import { validateServiceAccountJson } from '../android/service-account-validation.js'
 import { loadProgress } from '../progress.js'
 import type { Platform } from './contract.js'
 import { renderResult } from './contract.js'
@@ -90,6 +94,45 @@ function buildDeps(sdk: CapgoSDK): EngineDeps {
         completedSteps: { ...base.completedSteps, keystoreReady: { keystorePath: '', alias, isGenerated: true } },
       })
     },
+    setAndroidServiceAccountPath: async (appId: string, path: string) => {
+      const base = (await loadAndroidProgress(appId)) ?? { platform: 'android' as const, appId, startedAt: new Date().toISOString(), completedSteps: {} }
+      await saveAndroidProgress(appId, {
+        ...base,
+        platform: 'android',
+        appId,
+        serviceAccountMethod: 'existing',
+        serviceAccountJsonPath: path,
+      })
+    },
+    finalizeAndroidCredentials: async (appId: string) => {
+      const prog = await loadAndroidProgress(appId)
+      if (!prog?.serviceAccountJsonPath)
+        return { ok: false as const, error: 'No service-account JSON path on file.' }
+      let jsonBytes: Buffer
+      try {
+        jsonBytes = await readFile(prog.serviceAccountJsonPath)
+      }
+      catch {
+        return { ok: false as const, error: `Could not read the service-account file at ${prog.serviceAccountJsonPath}.` }
+      }
+      const validation = await validateServiceAccountJson({ jsonBytes, packageName: appId })
+      if (!validation.ok)
+        return { ok: false as const, error: validation.message }
+      if (!prog._keystoreBase64 || !prog.keystoreAlias || !prog.keystoreStorePassword || !prog.keystoreKeyPassword)
+        return { ok: false as const, error: 'Keystore is missing — re-run keystore generation.' }
+      await updateSavedCredentials(appId, 'android', {
+        ANDROID_KEYSTORE_FILE: prog._keystoreBase64,
+        KEYSTORE_KEY_ALIAS: prog.keystoreAlias,
+        KEYSTORE_KEY_PASSWORD: prog.keystoreKeyPassword,
+        KEYSTORE_STORE_PASSWORD: prog.keystoreStorePassword,
+        PLAY_CONFIG_JSON: jsonBytes.toString('base64'),
+      })
+      await saveAndroidProgress(appId, {
+        ...prog,
+        completedSteps: { ...prog.completedSteps, serviceAccountProvisioned: { email: validation.serviceAccountEmail, projectId: validation.projectId } },
+      })
+      return { ok: true as const }
+    },
   }
 }
 
@@ -115,9 +158,10 @@ export function registerOnboardingTools(server: McpLike, sdk: CapgoSDK, depsOver
     'Advance the guided Capgo Builder onboarding by one step. Call ONLY as directed by the previous result\'s `next`. Pass the user\'s choice (e.g. platform) when the previous step asked for one.',
     {
       platform: z.enum(['ios', 'android']).optional().describe('Platform choice, when the previous step asked for it'),
+      serviceAccountJsonPath: z.string().optional().describe('Path to your Google Play service-account JSON file, when the previous step asked for it'),
     },
-    async ({ platform }: { platform?: Platform }) => {
-      const result = await runAdvance(deps, { platform })
+    async ({ platform, serviceAccountJsonPath }: { platform?: Platform, serviceAccountJsonPath?: string }) => {
+      const result = await runAdvance(deps, { platform, serviceAccountJsonPath })
       return { content: [{ type: 'text' as const, text: renderResult(result) }] }
     },
   )

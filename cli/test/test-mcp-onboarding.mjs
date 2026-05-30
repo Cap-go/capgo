@@ -272,6 +272,19 @@ function androidDeps(o = {}) {
         },
       }
     },
+    setAndroidServiceAccountPath: async (_id, path) => {
+      prog = { ...(prog || {}), serviceAccountJsonPath: path }
+    },
+    finalizeAndroidCredentials: async () => {
+      prog = {
+        ...(prog || {}),
+        completedSteps: {
+          ...(prog?.completedSteps || {}),
+          serviceAccountProvisioned: { serviceAccountEmail: 'sa@project.iam.gserviceaccount.com' },
+        },
+      }
+      return { ok: true }
+    },
     ...o,
   }
 }
@@ -293,17 +306,51 @@ await test('decideAndroid: no keystore yet → auto android-keystore', async () 
   eq(r.platform, 'android')
 })
 
-await test('decideAndroid: keystore ready → advances to next android milestone', async () => {
+await test('decideAndroid: keystore ready, no service account → human_gate for SA JSON', async () => {
   const r = decideAndroid(androidFacts({
     androidProgress: { completedSteps: { keystoreReady: { keystorePath: 'p', alias: 'release', isGenerated: true } } },
   }))
-  eq(r.state, 'android-credentials-next')
+  eq(r.kind, 'human_gate')
+  eq(r.state, 'android-service-account')
 })
 
-await test('runStart (android): keystore generated, then flow advances past it', async () => {
+await test('decideAndroid: SA path present, not provisioned → auto android-finalize', async () => {
+  const r = decideAndroid(androidFacts({
+    androidProgress: { serviceAccountJsonPath: '/tmp/sa.json', completedSteps: { keystoreReady: { keystorePath: 'p', alias: 'release', isGenerated: true } } },
+  }))
+  eq(r.kind, 'auto')
+  eq(r.state, 'android-finalize')
+})
+
+await test('decideAndroid: provisioned → done', async () => {
+  const r = decideAndroid(androidFacts({
+    androidProgress: { serviceAccountJsonPath: '/tmp/sa.json', completedSteps: { keystoreReady: { keystorePath: 'p', alias: 'release', isGenerated: true }, serviceAccountProvisioned: { serviceAccountEmail: 'x' } } },
+  }))
+  eq(r.kind, 'done')
+  eq(r.state, 'android-complete')
+})
+
+await test('runStart (android): keystore generated, then asks for the service-account JSON', async () => {
   const r = await runStart(androidDeps())
   eq(r.platform, 'android')
-  eq(r.state, 'android-credentials-next')
+  eq(r.kind, 'human_gate')
+  eq(r.state, 'android-service-account')
+})
+
+await test('android: full flow keystore → provide SA path → finalize → done', async () => {
+  const deps = androidDeps()
+  await runStart(deps)
+  const r = await runAdvance(deps, { serviceAccountJsonPath: '/tmp/sa.json' })
+  eq(r.kind, 'done')
+  eq(r.state, 'android-complete')
+})
+
+await test('android: invalid service account → human_gate to re-provide', async () => {
+  const deps = androidDeps({ finalizeAndroidCredentials: async () => ({ ok: false, error: 'no-app-access' }) })
+  await runStart(deps)
+  const r = await runAdvance(deps, { serviceAccountJsonPath: '/tmp/bad.json' })
+  eq(r.kind, 'human_gate')
+  eq(r.state, 'android-service-account-invalid')
 })
 
 await test('runStart (android): generateAndroidKeystore runs exactly once', async () => {

@@ -24,6 +24,12 @@ const ROADMAP: string[] = [
 
 const NEXT_STEP_TOOL = 'capgo_builder_onboarding_next_step'
 
+/** User input carried into the flow via next_step. */
+interface OnboardingInput {
+  platform?: string
+  serviceAccountJsonPath?: string
+}
+
 /** Decide the first/again step for a fresh or resumed session. Pure. */
 export function decideStart(facts: PreflightFacts, progress: OnboardingProgress | null): NextStepResult {
   if (!facts.capacitorProject || !facts.appId) {
@@ -170,15 +176,55 @@ export function decideAndroid(facts: PreflightFacts): NextStepResult {
     }
   }
 
-  // Plan 3 milestone boundary — remaining Android steps land next.
+  const p = facts.androidProgress
+
+  // Provision via an existing Google Play service account (no OAuth): the user
+  // supplies their service-account JSON; we validate it and save credentials.
+  if (!p?.serviceAccountJsonPath) {
+    return {
+      onboarding: 'capgo-builder',
+      phase: 'credentials',
+      state: 'android-service-account',
+      platform: 'android',
+      progress: 45,
+      kind: 'human_gate',
+      summary: `Keystore ready for "${facts.appId}". Now connect Google Play with a service-account key.`,
+      human: {
+        instruction: 'In Google Cloud Console, create (or reuse) a service account that has access to your Google Play app, and download its key as JSON. Then give me the path to that .json file. The file stays on your machine — do not paste its contents here.',
+      },
+      collect: [{ field: 'serviceAccountJsonPath', desc: 'absolute path to the Google Play service-account .json file' }],
+      next: {
+        tool: NEXT_STEP_TOOL,
+        with: { serviceAccountJsonPath: '<path>' },
+        instruction: 'Ask the user for the service-account .json file path, then call next_step with serviceAccountJsonPath.',
+        call: `${NEXT_STEP_TOOL}({ serviceAccountJsonPath: "/path/to/service-account.json" })`,
+      },
+      rules: ONBOARDING_RULES,
+    }
+  }
+
+  if (!done.serviceAccountProvisioned) {
+    return {
+      onboarding: 'capgo-builder',
+      phase: 'credentials',
+      state: 'android-finalize',
+      platform: 'android',
+      progress: 70,
+      kind: 'auto',
+      summary: 'Validating the service account and saving your Android build credentials…',
+      context: { appId: facts.appId },
+      rules: ONBOARDING_RULES,
+    }
+  }
+
   return {
     onboarding: 'capgo-builder',
-    phase: 'credentials',
-    state: 'android-credentials-next',
+    phase: 'done',
+    state: 'android-complete',
     platform: 'android',
-    progress: 30,
-    kind: 'info',
-    summary: `Keystore ready for "${facts.appId}". Remaining Android steps (Google sign-in, Play provisioning, save) land in the next milestone.`,
+    progress: 100,
+    kind: 'done',
+    summary: `Android credentials are ready for "${facts.appId}" — keystore + Play service account saved locally. You can run a cloud build next.`,
     context: { appId: facts.appId },
     rules: ONBOARDING_RULES,
   }
@@ -188,7 +234,7 @@ export function decideAndroid(facts: PreflightFacts): NextStepResult {
 export function decideAdvance(
   facts: PreflightFacts,
   progress: OnboardingProgress | null,
-  input?: { platform?: string },
+  input?: OnboardingInput,
 ): NextStepResult {
   if (input?.platform === 'ios' || input?.platform === 'android') {
     if (!facts.authenticated)
@@ -212,6 +258,8 @@ export interface EngineDeps {
   registerApp: (appId: string) => Promise<{ ok: true } | { ok: false, alreadyExists: boolean, error: string }>
   loadAndroidProgress: (appId: string) => Promise<AndroidOnboardingProgress | null>
   generateAndroidKeystore: (appId: string) => Promise<void>
+  setAndroidServiceAccountPath: (appId: string, path: string) => Promise<void>
+  finalizeAndroidCredentials: (appId: string) => Promise<{ ok: true } | { ok: false, error: string }>
 }
 
 /** Gather preflight facts via the injected deps. */
@@ -279,12 +327,43 @@ async function executeAuto(
     await deps.generateAndroidKeystore(facts.appId)
     return null
   }
+  if (result.state === 'android-finalize' && facts.appId) {
+    const fin = await deps.finalizeAndroidCredentials(facts.appId)
+    if (fin.ok)
+      return null
+    return {
+      onboarding: 'capgo-builder',
+      phase: 'credentials',
+      state: 'android-service-account-invalid',
+      platform: 'android',
+      progress: 45,
+      kind: 'human_gate',
+      summary: `That service-account JSON could not be validated: ${fin.error}`,
+      human: {
+        instruction: 'Provide the path to a valid Google Play service-account .json (with access to your app). The file stays on your machine — do not paste its contents here.',
+      },
+      collect: [{ field: 'serviceAccountJsonPath', desc: 'absolute path to a valid service-account .json file' }],
+      next: {
+        tool: NEXT_STEP_TOOL,
+        with: { serviceAccountJsonPath: '<path>' },
+        instruction: 'Ask the user for a corrected service-account .json path, then call next_step with serviceAccountJsonPath.',
+        call: `${NEXT_STEP_TOOL}({ serviceAccountJsonPath: "/path/to/service-account.json" })`,
+      },
+      rules: ONBOARDING_RULES,
+    }
+  }
   // Unknown auto step — surface it rather than silently looping.
   return result
 }
 
 /** Gather → decide → execute auto steps → repeat until a terminal directive. */
-async function drive(deps: EngineDeps, input?: { platform?: string }): Promise<NextStepResult> {
+async function drive(deps: EngineDeps, input?: OnboardingInput): Promise<NextStepResult> {
+  // Persist any provided inputs (side effects) before the decide loop.
+  if (input?.serviceAccountJsonPath) {
+    const inputAppId = await deps.getAppId()
+    if (inputAppId)
+      await deps.setAndroidServiceAccountPath(inputAppId, input.serviceAccountJsonPath)
+  }
   for (let i = 0; i < MAX_AUTO_STEPS; i++) {
     const facts = await gatherFacts(deps)
     const progress = facts.appId ? await deps.loadProgress(facts.appId) : null
@@ -312,6 +391,6 @@ export async function runStart(deps: EngineDeps): Promise<NextStepResult> {
 }
 
 /** Advance one step, carrying the user's choice/values. */
-export async function runAdvance(deps: EngineDeps, input?: { platform?: string }): Promise<NextStepResult> {
+export async function runAdvance(deps: EngineDeps, input?: OnboardingInput): Promise<NextStepResult> {
   return drive(deps, input)
 }
