@@ -66,6 +66,7 @@ export type EmailPreferenceKey
   = | 'usage_limit'
     | 'credit_usage'
     | 'onboarding'
+    | 'builder_onboarding'
     | 'weekly_stats'
     | 'monthly_stats'
     | 'billing_period_stats'
@@ -76,11 +77,13 @@ export type EmailPreferenceKey
     | 'channel_self_rejected'
     | 'daily_fail_ratio'
     | 'cli_realtime_feed'
+    | 'bundle_incompatible'
 
 export interface EmailPreferences {
   usage_limit?: boolean
   credit_usage?: boolean
   onboarding?: boolean
+  builder_onboarding?: boolean
   weekly_stats?: boolean
   monthly_stats?: boolean
   billing_period_stats?: boolean
@@ -91,6 +94,7 @@ export interface EmailPreferences {
   channel_self_rejected?: boolean
   daily_fail_ratio?: boolean
   cli_realtime_feed?: boolean
+  bundle_incompatible?: boolean
 }
 
 interface OrgWithPreferences {

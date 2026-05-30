@@ -14,6 +14,7 @@ const EMAIL_PREF_DISABLED_TAGS: Record<EmailPreferenceKey, string> = {
   usage_limit: 'usage_limit_disabled',
   credit_usage: 'credit_usage_disabled',
   onboarding: 'onboarding_disabled',
+  builder_onboarding: 'builder_onboarding_disabled',
   weekly_stats: 'weekly_stats_disabled',
   monthly_stats: 'monthly_stats_disabled',
   billing_period_stats: 'billing_period_stats_disabled',
@@ -24,6 +25,7 @@ const EMAIL_PREF_DISABLED_TAGS: Record<EmailPreferenceKey, string> = {
   channel_self_rejected: 'channel_self_rejected_disabled',
   daily_fail_ratio: 'daily_fail_ratio_disabled',
   cli_realtime_feed: 'cli_realtime_feed_disabled',
+  bundle_incompatible: 'bundle_incompatible_disabled',
 }
 
 const ALL_LEGACY_TAGS = [NOTIFICATION_TAG, NEWSLETTER_TAG]

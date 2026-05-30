@@ -3,6 +3,8 @@ import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { BentoTrackingPayload } from '../utils/tracking.ts'
 import { Hono } from 'hono/tiny'
+import { BUILDER_RECOVERY_MILESTONES, buildBuilderOnboardingBentoEvent } from '../utils/builder_onboarding_recovery.ts'
+import { BUNDLE_INCOMPATIBLE_EVENT, buildBundleCompatibilityBentoEvent } from '../utils/bundle_compatibility_recovery.ts'
 import { BRES, parseBody, quickError, simpleError, useCors } from '../utils/hono.ts'
 import { middlewareV2 } from '../utils/hono_middleware.ts'
 import { cloudlog } from '../utils/logging.ts'
@@ -33,6 +35,16 @@ interface TrackEventBody extends TrackOptions {
 
 function isTrackingV2(version: unknown) {
   return version === 2 || version === '2'
+}
+
+// Coerce a tag/DB value (string id, numeric/bigint id, or missing) into a
+// non-empty string id or undefined — keeps the Bento payload *_id fields clean.
+function toIdString(value: unknown): string | undefined {
+  if (typeof value === 'string')
+    return value.length > 0 ? value : undefined
+  if (typeof value === 'number' || typeof value === 'bigint')
+    return String(value)
+  return undefined
 }
 
 async function resolveTrackingUserId(
@@ -218,10 +230,96 @@ app.post('/', middlewareV2(['read', 'write', 'all', 'upload']), async (c) => {
     })
   }
 
+  // Builder native-build onboarding (capgo build init): emit start/finish signal
+  // events to Bento so a later automation can recover users who started but never
+  // finished. Mirrors the onboarding-step-done block above. Only the milestone
+  // steps trigger the org/app lookup.
+  const builderStep = typeof body.tags?.step === 'string' ? body.tags.step : undefined
+  const builderPlatform = typeof body.tags?.platform === 'string' ? body.tags.platform : undefined
+  let builderBentoEvent: BentoTrackingPayload | undefined
+  if (
+    onboardingOrgId && appId
+    && trackedBody.event === 'Builder Onboarding Step'
+    && builderStep && BUILDER_RECOVERY_MILESTONES.has(builderStep)
+  ) {
+    const [orgResult, appResult] = await Promise.all([
+      supabase.from('orgs').select('id, name').eq('id', onboardingOrgId).single(),
+      supabase.from('apps').select('name').eq('app_id', appId).single(),
+    ])
+    if (orgResult.error || appResult.error) {
+      // Best-effort recovery signal: never fail the wizard's request, and don't
+      // emit a Bento event with empty org/app names. Log and skip instead.
+      cloudlog({ requestId: c.get('requestId'), message: 'builder onboarding bento lookup failed; skipping signal', org: orgResult.error, app: appResult.error })
+    }
+    else {
+      builderBentoEvent = buildBuilderOnboardingBentoEvent({
+        event: trackedBody.event,
+        step: builderStep,
+        orgId: onboardingOrgId,
+        appId,
+        platform: builderPlatform,
+        orgName: orgResult.data?.name ?? undefined,
+        appName: appResult.data?.name ?? undefined,
+      })
+    }
+  }
+
+  // Bundle compatibility failure (capgo bundle upload / bundle compatibility):
+  // when the CLI reports an incompatible bundle, emit a Bento signal so a
+  // lifecycle automation can react. Mirrors the builder block above; resolves
+  // org/app names + the freshly created version id for the payload.
+  let bundleIncompatibleBentoEvent: BentoTrackingPayload | undefined
+  if (onboardingOrgId && appId && trackedBody.event === BUNDLE_INCOMPATIBLE_EVENT) {
+    const tags = trackedBody.tags ?? {}
+    const versionNewName = typeof tags.version_new_name === 'string' && tags.version_new_name.length > 0
+      ? tags.version_new_name
+      : undefined
+    const [orgResult, appResult] = await Promise.all([
+      supabase.from('orgs').select('id, name').eq('id', onboardingOrgId).single(),
+      supabase.from('apps').select('name').eq('app_id', appId).single(),
+    ])
+    if (orgResult.error || appResult.error) {
+      // Best-effort signal: never fail the CLI's request, and don't emit a Bento
+      // event with empty org/app context. Log and skip instead.
+      cloudlog({ requestId: c.get('requestId'), message: 'bundle incompatible bento lookup failed; skipping signal', org: orgResult.error, app: appResult.error })
+    }
+    else {
+      // The upload flow sends only version_new_name; resolve its id here (the
+      // version exists by the time this event is sent). The command flow uploads
+      // nothing, so versionNewName is absent and version_new_id stays empty.
+      let versionNewId: string | undefined
+      if (versionNewName) {
+        const { data: versionNewData } = await supabase
+          .from('app_versions')
+          .select('id')
+          .eq('app_id', appId)
+          .eq('name', versionNewName)
+          .maybeSingle()
+        versionNewId = toIdString(versionNewData?.id)
+      }
+      const versionOldId = toIdString(tags.version_old_id)
+      bundleIncompatibleBentoEvent = buildBundleCompatibilityBentoEvent({
+        event: trackedBody.event,
+        orgId: onboardingOrgId,
+        appId,
+        channel: typeof tags.channel === 'string' ? tags.channel : undefined,
+        source: typeof tags.source === 'string' ? tags.source : undefined,
+        versionNewId,
+        versionNewName,
+        versionOldId,
+        versionOldName: typeof tags.version_old_name === 'string' ? tags.version_old_name : undefined,
+        orgName: orgResult.data?.name ?? undefined,
+        appName: appResult.data?.name ?? undefined,
+      })
+    }
+  }
+
+  // Exactly one of these is ever set (distinct event names); `??` picks the active one.
+  const bentoEvent = onboardingBentoEvent ?? builderBentoEvent ?? bundleIncompatibleBentoEvent
   await sendEventToTracking(c, {
     ...trackedBody,
-    bento: onboardingBentoEvent,
-    sentToBento: Boolean(onboardingBentoEvent),
+    bento: bentoEvent,
+    sentToBento: Boolean(bentoEvent),
     groups: verifiedOrgId ? { organization: verifiedOrgId } : undefined,
   })
 

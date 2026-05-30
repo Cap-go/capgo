@@ -140,6 +140,7 @@ export const users = pgTable('users', {
     usage_limit: true,
     credit_usage: true,
     onboarding: true,
+    builder_onboarding: true,
     weekly_stats: true,
     monthly_stats: true,
     deploy_stats_24h: true,
