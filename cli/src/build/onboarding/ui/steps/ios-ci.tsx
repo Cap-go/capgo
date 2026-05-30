@@ -62,29 +62,6 @@ export interface SelectOption {
 // mirroring the Android keystore flow.
 const TARGET_VISIBLE_COUNT = 3
 
-// How many already-exist keys to render in the dense overwrite confirmation
-// before collapsing the remainder into a "… +N more" line. iOS + Android
-// credentials can produce ~10 env vars, which would blow the 13-row budget if
-// listed in full at 60 cols. Showing the last few + a count keeps the
-// interactive control visible while still telling the user how many will be
-// replaced. The comfortable form lists every key.
-const OVERWRITE_VISIBLE_KEYS = 3
-
-// Upper bound on the rendered length of a backend error string in the dense
-// form. A long `gh`/`glab` failure (stderr + stdout joined) can wrap to many
-// rows at 60 cols and shove the retry/continue picker off screen; clamping
-// keeps it to ~2 wrapped rows. The full error is only ever surfaced here, so the
-// clamp is purely cosmetic — the user still gets the actionable retry control.
-// The comfortable form renders the full error.
-const ERROR_MAX_CHARS = 110
-
-function clampError(message: string): string {
-  const collapsed = message.replace(/\s+/g, ' ').trim()
-  if (collapsed.length <= ERROR_MAX_CHARS)
-    return collapsed
-  return `${collapsed.slice(0, ERROR_MAX_CHARS - 1)}…`
-}
-
 // ── detecting-ci-secrets ──────────────────────────────────────────────────────
 export const DetectingCiSecretsStep: FC = () => (
   <Box flexDirection="column" marginTop={1}>
@@ -119,38 +96,21 @@ export const CiSecretsSetupStep: FC<CiSecretsSetupStepProps> = ({ advice, dense 
       onChange={onChange}
     />
   )
-  if (!dense) {
-    return (
-      <Box flexDirection="column" marginTop={1}>
-        <Text bold>Set up your git hosting CLI to upload env vars</Text>
-        <Newline />
-        {advice.map(entry => (
-          <Box key={entry.target.provider} flexDirection="column" marginBottom={1}>
-            <Text>{entry.target.label}</Text>
-            <Text dimColor>{entry.message}</Text>
-            {entry.commands.map(command => (
-              <Text key={`${entry.target.provider}-${command}`} color="cyan">{command}</Text>
-            ))}
-          </Box>
-        ))}
-        <Text dimColor>Run this in another terminal, then come back here.</Text>
-        <Newline />
-        {select}
-      </Box>
-    )
-  }
   return (
     <Box flexDirection="column" marginTop={1}>
       <Text bold>Set up your git hosting CLI to upload env vars</Text>
+      <Newline />
       {advice.map(entry => (
-        <Box key={entry.target.provider} flexDirection="column">
+        <Box key={entry.target.provider} flexDirection="column" marginBottom={1}>
           <Text>{entry.target.label}</Text>
+          <Text dimColor>{entry.message}</Text>
           {entry.commands.map(command => (
             <Text key={`${entry.target.provider}-${command}`} color="cyan">{command}</Text>
           ))}
         </Box>
       ))}
       <Text dimColor>Run this in another terminal, then come back here.</Text>
+      <Newline />
       {select}
     </Box>
   )
@@ -253,31 +213,15 @@ const OVERWRITE_OPTIONS = [
 ]
 
 export const ConfirmCiSecretOverwriteStep: FC<ConfirmCiSecretOverwriteStepProps> = ({ existingKeys, dense = false, onChange }) => {
-  if (!dense) {
-    return (
-      <Box flexDirection="column" marginTop={1}>
-        <Text bold color="yellow">These env vars already exist and will be replaced:</Text>
-        <Box flexDirection="column" marginTop={1} marginLeft={2}>
-          {existingKeys.map(key => (
-            <Text key={key}>{`• ${key}`}</Text>
-          ))}
-        </Box>
-        <Newline />
-        <Select options={OVERWRITE_OPTIONS} onChange={onChange} />
-      </Box>
-    )
-  }
-  const hidden = Math.max(0, existingKeys.length - OVERWRITE_VISIBLE_KEYS)
-  const visibleKeys = existingKeys.slice(existingKeys.length - OVERWRITE_VISIBLE_KEYS)
   return (
     <Box flexDirection="column" marginTop={1}>
       <Text bold color="yellow">These env vars already exist and will be replaced:</Text>
-      <Box flexDirection="column" marginLeft={2}>
-        {hidden > 0 && <Text dimColor>{`… +${hidden} more`}</Text>}
-        {visibleKeys.map(key => (
+      <Box flexDirection="column" marginTop={1} marginLeft={2}>
+        {existingKeys.map(key => (
           <Text key={key}>{`• ${key}`}</Text>
         ))}
       </Box>
+      <Newline />
       <Select options={OVERWRITE_OPTIONS} onChange={onChange} />
     </Box>
   )
@@ -315,21 +259,12 @@ const FAILED_OPTIONS = [
 ]
 
 export const CiSecretsFailedStep: FC<CiSecretsFailedStepProps> = ({ error, dense = false, onChange }) => {
-  if (!dense) {
-    return (
-      <Box flexDirection="column" marginTop={1}>
-        <ErrorLine text={error || 'Could not upload env vars.'} />
-        <Newline />
-        <Text dimColor>You can continue; credentials are already saved locally.</Text>
-        <Newline />
-        <Select options={FAILED_OPTIONS} onChange={onChange} />
-      </Box>
-    )
-  }
   return (
     <Box flexDirection="column" marginTop={1}>
-      <ErrorLine text={clampError(error || 'Could not upload env vars.')} />
+      <ErrorLine text={error || 'Could not upload env vars.'} />
+      <Newline />
       <Text dimColor>You can continue; credentials are already saved locally.</Text>
+      <Newline />
       <Select options={FAILED_OPTIONS} onChange={onChange} />
     </Box>
   )
