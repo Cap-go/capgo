@@ -66,6 +66,7 @@ export type EmailPreferenceKey
   = | 'usage_limit'
     | 'credit_usage'
     | 'onboarding'
+    | 'builder_onboarding'
     | 'weekly_stats'
     | 'monthly_stats'
     | 'billing_period_stats'
@@ -81,6 +82,7 @@ export interface EmailPreferences {
   usage_limit?: boolean
   credit_usage?: boolean
   onboarding?: boolean
+  builder_onboarding?: boolean
   weekly_stats?: boolean
   monthly_stats?: boolean
   billing_period_stats?: boolean
