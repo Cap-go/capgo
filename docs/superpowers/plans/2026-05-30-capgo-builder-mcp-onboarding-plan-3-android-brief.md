@@ -2,6 +2,11 @@
 
 > **Status: DESIGN BRIEF, not yet a full TDD plan.** Before executing, run `superpowers:writing-plans` to expand this into bite-sized TDD tasks (like Plans 1 & 2). This brief front-loads the survey + design decisions so that expansion is fast and the executor has zero ambiguity. **Recommended: do this in a fresh session** — Plan 3 is multi-module and benefits from clean context.
 
+## Progress (2026-05-30)
+
+- ✅ **Keystore step implemented & committed.** `decideAndroid` + the `android-keystore` `auto` step in the engine; real wiring in `buildDeps` (`generateKeystore` + `generateRandomPassword`, persisted via `saveAndroidProgress`). Verified: build (`tsc`) + 29 unit tests + MCP integration smoke all green.
+- ⬜ **Remaining (next session):** Google sign-in (blocking OAuth via `runOAuthFlow` + the confirm-signal design in decision #3), GCP provisioning, Play developer-id `human_gate` + invite, service-account validation, save credentials → `done`.
+
 **Goal:** Drive the **Android** credential flow through the onboarding engine — keystore → Google sign-in → GCP service account → Play invite → validate → save — reaching saved Android build credentials, reusing the existing `cli/src/build/onboarding/android/*` modules.
 
 **Key finding from the survey:** the Android core logic is **already headless** — nothing in `android/*.ts` (outside `android/ui/`) imports `ink`/`react`/`@clack`. So Plan 3 *reuses* these modules directly; no extraction/refactor needed.
