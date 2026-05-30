@@ -36,20 +36,6 @@ export interface SelectOption {
   value: string
 }
 
-// Capped visible rows for the scrollable picker steps in DENSE mode. Kept low
-// so the bold header + Select window + "+N more" hint always fit the 13-row
-// budget even at 60 cols. In the comfortable form the picker is un-capped (the
-// parent only renders that form after measuring it fits the viewport).
-const LIST_VISIBLE_COUNT = 4
-
-// How many list entries the non-picker list steps (setup advice, overwrite
-// confirmation) render in DENSE mode before collapsing the rest into a
-// "… +N more" line. Showing the LAST few keeps the most recently relevant
-// entries visible while the bold header + interactive control stay on screen.
-// The comfortable form renders the whole list.
-const SETUP_ADVICE_VISIBLE = 1
-const OVERWRITE_KEYS_VISIBLE = 3
-
 // ── saving-credentials (spinner) ──────────────────────────────────────────────
 
 export const SavingCredentialsStep: FC = () => (
@@ -82,39 +68,12 @@ export interface CiSecretsSetupStepProps {
 }
 
 export const CiSecretsSetupStep: FC<CiSecretsSetupStepProps> = ({ advice, onChoose, dense = false }) => {
-  if (!dense) {
-    return (
-      <Box flexDirection="column" marginTop={1}>
-        <Text bold>Set up your git hosting CLI to upload env vars</Text>
-        <Newline />
-        {advice.map(entry => (
-          <Box key={entry.target.provider} flexDirection="column" marginBottom={1}>
-            <Text>{entry.target.label}</Text>
-            <Text dimColor>{entry.message}</Text>
-            {entry.commands.map(command => (
-              <Text key={`${entry.target.provider}-${command}`} color="cyan">{command}</Text>
-            ))}
-          </Box>
-        ))}
-        <Text dimColor>Run this in another terminal, then come back here.</Text>
-        <Newline />
-        <Select
-          options={[
-            { label: 'I installed and logged in, check again', value: 'retry' },
-            { label: 'Skip upload', value: 'skip' },
-          ]}
-          onChange={value => onChoose(value as 'retry' | 'skip')}
-        />
-      </Box>
-    )
-  }
-  const shown = advice.slice(0, SETUP_ADVICE_VISIBLE)
-  const hidden = Math.max(0, advice.length - SETUP_ADVICE_VISIBLE)
   return (
     <Box flexDirection="column" marginTop={1}>
       <Text bold>Set up your git hosting CLI to upload env vars</Text>
-      {shown.map(entry => (
-        <Box key={entry.target.provider} flexDirection="column">
+      <Newline />
+      {advice.map(entry => (
+        <Box key={entry.target.provider} flexDirection="column" marginBottom={1}>
           <Text>{entry.target.label}</Text>
           <Text dimColor>{entry.message}</Text>
           {entry.commands.map(command => (
@@ -122,10 +81,8 @@ export const CiSecretsSetupStep: FC<CiSecretsSetupStepProps> = ({ advice, onChoo
           ))}
         </Box>
       ))}
-      {hidden > 0 && (
-        <Text dimColor>{`… +${hidden} more platform${hidden === 1 ? '' : 's'} to set up`}</Text>
-      )}
-      <Text dimColor>Run this in another terminal, then come back.</Text>
+      <Text dimColor>Run this in another terminal, then come back here.</Text>
+      <Newline />
       <Select
         options={[
           { label: 'I installed and logged in, check again', value: 'retry' },
@@ -152,27 +109,11 @@ export interface CiSecretsTargetSelectStepProps {
 }
 
 export const CiSecretsTargetSelectStep: FC<CiSecretsTargetSelectStepProps> = ({ options, onChange, dense = false }) => {
-  if (!dense) {
-    return (
-      <Box flexDirection="column" marginTop={1}>
-        <Text bold>Where should Capgo upload the build env vars?</Text>
-        <Newline />
-        <Select options={options} onChange={onChange} />
-      </Box>
-    )
-  }
-  const hidden = Math.max(0, options.length - LIST_VISIBLE_COUNT)
   return (
     <Box flexDirection="column" marginTop={1}>
       <Text bold>Where should Capgo upload the build env vars?</Text>
-      <Select
-        visibleOptionCount={LIST_VISIBLE_COUNT}
-        options={options}
-        onChange={onChange}
-      />
-      {hidden > 0 && (
-        <Text dimColor>{`… +${hidden} more (↑/↓ to scroll)`}</Text>
-      )}
+      <Newline />
+      <Select options={options} onChange={onChange} />
     </Box>
   )
 }
@@ -243,39 +184,15 @@ export interface ConfirmCiSecretOverwriteStepProps {
 }
 
 export const ConfirmCiSecretOverwriteStep: FC<ConfirmCiSecretOverwriteStepProps> = ({ existingKeys, onChoose, dense = false }) => {
-  if (!dense) {
-    return (
-      <Box flexDirection="column" marginTop={1}>
-        <Text bold color="yellow">These env vars already exist and will be replaced:</Text>
-        <Box flexDirection="column" marginTop={1} marginLeft={2}>
-          {existingKeys.map(key => (
-            <Text key={key}>{`• ${key}`}</Text>
-          ))}
-        </Box>
-        <Newline />
-        <Select
-          options={[
-            { label: 'Replace existing env vars', value: 'replace' },
-            { label: 'Skip upload', value: 'skip' },
-          ]}
-          onChange={value => onChoose(value as 'replace' | 'skip')}
-        />
-      </Box>
-    )
-  }
-  const shown = existingKeys.slice(-OVERWRITE_KEYS_VISIBLE)
-  const hidden = Math.max(0, existingKeys.length - OVERWRITE_KEYS_VISIBLE)
   return (
     <Box flexDirection="column" marginTop={1}>
       <Text bold color="yellow">These env vars already exist and will be replaced:</Text>
-      <Box flexDirection="column" marginLeft={2}>
-        {hidden > 0 && (
-          <Text dimColor>{`… +${hidden} more`}</Text>
-        )}
-        {shown.map(key => (
+      <Box flexDirection="column" marginTop={1} marginLeft={2}>
+        {existingKeys.map(key => (
           <Text key={key}>{`• ${key}`}</Text>
         ))}
       </Box>
+      <Newline />
       <Select
         options={[
           { label: 'Replace existing env vars', value: 'replace' },
