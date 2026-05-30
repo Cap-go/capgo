@@ -82,12 +82,8 @@ function evaluateReasons(
   if (!versionsIntersect(candidate.version, baseline.version))
     reasons.push('version_mismatch')
 
-  const iosChanged = Boolean(
-    candidate.ios_checksum && baseline.ios_checksum && candidate.ios_checksum !== baseline.ios_checksum,
-  )
-  const androidChanged = Boolean(
-    candidate.android_checksum && baseline.android_checksum && candidate.android_checksum !== baseline.android_checksum,
-  )
+  const iosChanged = candidate.ios_checksum != null && baseline.ios_checksum != null && candidate.ios_checksum !== baseline.ios_checksum
+  const androidChanged = candidate.android_checksum != null && baseline.android_checksum != null && candidate.android_checksum !== baseline.android_checksum
 
   if (iosChanged && androidChanged)
     reasons.push('both_platforms_changed')
