@@ -47,6 +47,8 @@ import {
   STEP_PROGRESS,
 } from '../types.js'
 import { CompletedStepsLog } from './completed-steps-log.js'
+import { terminalFitsOnboarding } from '../min-terminal-size.js'
+import { TerminalTooSmallPrompt } from './min-size-gate.js'
 import { BOX_HEADER_ROWS, COMPACT_HEADER_ROWS, Divider, FullscreenAiViewer, FullscreenBuildOutput, Header, TerminalTooSmall, WIZARD_PADDING_ROWS } from './components.js'
 import type { AiResultKind } from './components.js'
 import { COMPACT_HEADER_TOTAL_ROWS, isFrameTooSmall, logBudgetRows, shouldCollapseToDense } from './frame-fit.js'
@@ -1611,18 +1613,19 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
   if (step === 'requesting-build')
     return <FullscreenBuildOutput title="Building..." lines={buildOutput} terminalRows={terminalRows} />
 
-  // Floor guard: when even the one-line header + this step's content won't
-  // fit (measured), an interactive step would clip in the alt buffer with no
-  // way to scroll/reach the top. Show a resize prompt instead. Resize-reactive,
-  // so the real wizard returns when the window grows. The `minHeight` fills
-  // the viewport so Ink takes its full clear-screen render path (see the main
-  // return below for why).
-  if (tooSmall)
-    return (
-      <Box flexDirection="column" minHeight={terminalRows}>
-        <TerminalTooSmall rows={terminalRows} neededRows={neededRows} />
-      </Box>
-    )
+  // Size gate (resize-reactive): below the enforced floor, render the resize
+  // prompt from THIS mounted component so all in-progress state (current step,
+  // entered values) is preserved — a shrink shows the prompt, a re-grow shows
+  // the exact same step. It's an early return after all hooks (rules of hooks
+  // hold). Crucially this does NOT unmount the app: gating at the shell instead
+  // would tear the app down on resize and fire its exit/teardown effects (the
+  // "onboarding complete" flash + quit). The startup gate guarantees the floor
+  // before mount; this keeps it guaranteed across mid-flow resizes.
+  if (!terminalFitsOnboarding(terminalCols, terminalRows))
+    return <TerminalTooSmallPrompt cols={terminalCols} rows={terminalRows} />
+
+  // (The wizard never clips on a too-small terminal: the gate above replaces it
+  // with the resize prompt instead.)
 
   // The fullscreen AI viewer is a takeover: render it as an EARLY RETURN so it
   // owns the whole terminal and bypasses the body-measurement / dense /
