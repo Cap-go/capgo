@@ -34,7 +34,7 @@ export const MinSizeGate: FC<MinSizeGateProps> = ({ cols, rows, children }) => {
     <Box flexDirection="column" minHeight={rows} padding={1}>
       <Text bold color="cyan">🚀  Capgo Cloud Build · Onboarding</Text>
       <Box marginTop={1} flexDirection="column">
-        <Text color="yellow" bold>{`⚠  Your terminal is a bit small (${cols}×${rows}).`}</Text>
+        <Text color="yellow" bold>{`⚠  Terminal too small (${cols}×${rows}).`}</Text>
         <Text>{`Onboarding needs at least ${MIN_COLS}×${MIN_ROWS} (columns × rows) so every step fits without resizing partway through.`}</Text>
         <Box marginTop={1} flexDirection="column">
           {needWider && <Text>{`• Widen to at least ${MIN_COLS} columns (currently ${cols}).`}</Text>}
