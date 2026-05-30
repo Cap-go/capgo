@@ -74,6 +74,10 @@ function resetSearchState() {
 function selectCompareVersion(option: VersionRow | null) {
   resetSearchState()
   emit('update:modelValue', option)
+  // The DaisyUI dropdown is CSS-only (opens on :focus-within), so blur the
+  // active element to close it after a selection.
+  if (typeof document !== 'undefined' && document.activeElement instanceof HTMLElement)
+    document.activeElement.blur()
 }
 
 // The manifest tab compares per-file manifest entries (manifest_count), while the
