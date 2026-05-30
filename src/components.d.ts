@@ -30,7 +30,6 @@ declare module 'vue' {
     BlurBg: typeof import('./components/BlurBg.vue')['default']
     BuilderPresentationModal: typeof import('./components/dashboard/BuilderPresentationModal.vue')['default']
     BuilderPromoBanner: typeof import('./components/dashboard/BuilderPromoBanner.vue')['default']
-    BuilderPromotionModal: typeof import('./components/BuilderPromotionModal.vue')['default']
     BuildTable: typeof import('./components/tables/BuildTable.vue')['default']
     BundleCompareSelect: typeof import('./components/bundle/BundleCompareSelect.vue')['default']
     BundlePreviewFrame: typeof import('./components/BundlePreviewFrame.vue')['default']
