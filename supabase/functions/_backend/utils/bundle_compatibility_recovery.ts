@@ -53,15 +53,15 @@ export function buildBundleCompatibilityBentoEvent(input: BundleCompatibilityBen
   const versionOldName = input.versionOldName ?? ''
 
   return {
-    // Mirrors the onboarding/builder signals: '* * * * *' lets the notifications
-    // table + uniqId dedupe the signal without hard-blocking it.
-    cron: '* * * * *',
     event: 'bundle_incompatible',
     // Dedicated key — independent from other bundle/OTA email preferences.
     preferenceKey: 'bundle_incompatible',
-    // One signal per app+channel+new-version (falls back to the old version for
-    // the command flow, which uploads no new bundle), so repeated upload/check
-    // attempts of the same version collapse to a single notification.
+    // Permanent per app+channel+version claim (no reopening cron window): repeated
+    // incompatible uploads / `bundle compatibility` checks of the SAME version must
+    // not re-email org admins. A genuinely new version has a different uniqId and
+    // notifies on its own; the old version is the fallback for the command flow
+    // (which uploads no new bundle).
+    once: true,
     uniqId: `bundle_incompatible:${input.appId}:${channel}:${versionNewName || versionOldName}`,
     data: {
       org_id: input.orgId,

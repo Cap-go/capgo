@@ -25,7 +25,10 @@ describe('buildBundleCompatibilityBentoEvent', () => {
     expect(r).toBeDefined()
     expect(r!.event).toBe('bundle_incompatible')
     expect(r!.preferenceKey).toBe('bundle_incompatible')
-    expect(r!.cron).toBe('* * * * *')
+    // Permanent per-version dedupe (no reopening cron window), so retries of the
+    // same incompatible version don't re-email org admins.
+    expect(r!.once).toBe(true)
+    expect(r!.cron).toBeUndefined()
     // uniqId keys off the new version for uploads.
     expect(r!.uniqId).toBe('bundle_incompatible:com.demo.app:production:1.0.1')
     expect(r!.data).toMatchObject({
