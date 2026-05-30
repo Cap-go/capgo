@@ -198,6 +198,7 @@ watchEffect(async () => {
                   v-model="selectedCompareVersion"
                   :app-id="packageId"
                   :current-version-id="id"
+                  compare-mode="dependencies"
                   :label="t('dependencies-compare-label')"
                   :none-label="t('dependencies-compare-none')"
                   :latest-label="t('dependencies-compare-latest')"
