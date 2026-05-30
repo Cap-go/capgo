@@ -23,7 +23,9 @@ import * as ish from '../../src/build/onboarding/ui/steps/ios-shared.tsx'
 
 const h = React.createElement
 const noop = () => {}
-const C = { dense: false }
+// The form we ship: dense is becoming the only form (the comfortable variant is
+// being dropped). Measure the floor for dense everywhere.
+const C = { dense: true }
 
 const LONG_APP_ID = 'com.acme.enterprise.internal.mobile.companion.app'
 const LONG_ERR = 'The service account is valid but has no access to this app in the Play Console. Invite capgo-native-build@your-project.iam.gserviceaccount.com under Users and permissions, grant release access, then retry. (HTTP 403 from androidpublisher.edits.insert)'
