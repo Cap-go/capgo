@@ -33,6 +33,62 @@ await test('renderResult leads with a directive and embeds the JSON', async () =
   ok(text.includes('- ios'), 'should list options')
 })
 
+const { decideStart, decideAdvance } = await import('../src/build/onboarding/mcp/engine.ts')
+
+const facts = (o = {}) => ({
+  capacitorProject: true,
+  appId: 'com.acme.app',
+  platformsDetected: ['ios', 'android'],
+  authenticated: true,
+  appRegistered: true,
+  ...o,
+})
+
+await test('decideStart: not a Capacitor project → error', async () => {
+  const r = decideStart(facts({ capacitorProject: false, appId: undefined }), null)
+  eq(r.kind, 'error')
+  eq(r.phase, 'preflight')
+})
+
+await test('decideStart: not authenticated → login human_gate, no chat paste', async () => {
+  const r = decideStart(facts({ authenticated: false }), null)
+  eq(r.kind, 'human_gate')
+  eq(r.state, 'login-required')
+  ok(/cli login/i.test(r.human.instruction), 'should mention the login command')
+  ok(/not paste/i.test(r.human.instruction), 'should warn against pasting into chat')
+})
+
+await test('decideStart: both platforms → choice with two options', async () => {
+  const r = decideStart(facts(), null)
+  eq(r.kind, 'choice')
+  eq(r.state, 'platform-select')
+  eq(r.options.length, 2)
+  ok(r.roadmap.length >= 3, 'first decision should carry the roadmap')
+})
+
+await test('decideStart: single platform → auto-selects and enters credentials phase', async () => {
+  const r = decideStart(facts({ platformsDetected: ['android'] }), null)
+  eq(r.platform, 'android')
+  eq(r.phase, 'credentials')
+})
+
+await test('decideStart: no native folder → human_gate cap add', async () => {
+  const r = decideStart(facts({ platformsDetected: [] }), null)
+  eq(r.kind, 'human_gate')
+  eq(r.state, 'no-platform')
+})
+
+await test('decideAdvance: platform choice records it and enters credentials', async () => {
+  const r = decideAdvance(facts(), null, { platform: 'ios' })
+  eq(r.platform, 'ios')
+  eq(r.phase, 'credentials')
+})
+
+await test('decideAdvance: platform choice while unauthenticated bounces to login', async () => {
+  const r = decideAdvance(facts({ authenticated: false }), null, { platform: 'ios' })
+  eq(r.state, 'login-required')
+})
+
 console.log(`\n📊 Results: ${pass} passed, ${fail} failed`)
 if (fail > 0)
   process.exit(1)
