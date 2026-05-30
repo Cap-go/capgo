@@ -190,6 +190,42 @@ await test('decideAdvance: platform chosen but app not registered → routes bac
   eq(r.state, 'registering-app')
 })
 
+function appPhaseDeps(o = {}) {
+  let registered = false
+  return {
+    cwd: '/tmp/app',
+    hasSavedKey: () => true,
+    getAppId: async () => 'com.acme.app',
+    detectPlatforms: async () => ['ios', 'android'],
+    isAppRegistered: async () => registered,
+    loadProgress: async () => null,
+    registerApp: async () => { registered = true; return { ok: true } },
+    ...o,
+  }
+}
+
+await test('runStart: unregistered app → executor registers it → ends at platform-select', async () => {
+  const r = await runStart(appPhaseDeps())
+  eq(r.state, 'platform-select')
+})
+
+await test('runStart: register-app side effect runs exactly once', async () => {
+  let calls = 0
+  let registered = false
+  const deps = appPhaseDeps()
+  deps.isAppRegistered = async () => registered
+  deps.registerApp = async () => { calls++; registered = true; return { ok: true } }
+  await runStart(deps)
+  eq(calls, 1)
+})
+
+await test('drive loop guards against a non-progressing auto step', async () => {
+  const deps = appPhaseDeps({ isAppRegistered: async () => false, registerApp: async () => ({ ok: true }) })
+  const r = await runStart(deps)
+  eq(r.kind, 'error')
+  eq(r.state, 'auto-loop-guard')
+})
+
 console.log(`\n📊 Results: ${pass} passed, ${fail} failed`)
 if (fail > 0)
   process.exit(1)

@@ -1,6 +1,7 @@
 // src/build/onboarding/mcp/engine.ts
 import type { OnboardingProgress } from '../types.js'
 import type { NextStepResult, Platform } from './contract.js'
+import { buildAppIdConflictSuggestions } from '../../../init/app-conflict.js'
 import { ONBOARDING_RULES } from './contract.js'
 
 /** Facts gathered during preflight; the pure deciders branch only on these. */
@@ -166,6 +167,7 @@ export interface EngineDeps {
   detectPlatforms: () => Promise<Platform[]>
   isAppRegistered: (appId: string) => Promise<boolean>
   loadProgress: (appId: string) => Promise<OnboardingProgress | null>
+  registerApp: (appId: string) => Promise<{ ok: true } | { ok: false, alreadyExists: boolean, error: string }>
 }
 
 /** Gather preflight facts via the injected deps. */
@@ -181,16 +183,86 @@ export async function gatherFacts(deps: EngineDeps): Promise<PreflightFacts> {
   return { capacitorProject: true, appId, platformsDetected, authenticated, appRegistered }
 }
 
-/** Orient/resume. Gathers facts + progress, then runs the pure start decider. */
-export async function runStart(deps: EngineDeps): Promise<NextStepResult> {
-  const facts = await gatherFacts(deps)
-  const progress = facts.appId ? await deps.loadProgress(facts.appId) : null
-  return decideStart(facts, progress)
+const MAX_AUTO_STEPS = 8
+
+function appConflictResult(appId: string): NextStepResult {
+  return {
+    onboarding: 'capgo-builder',
+    phase: 'app',
+    state: 'app-id-conflict',
+    progress: 8,
+    kind: 'human_gate',
+    summary: `The app id "${appId}" already exists and is not in your account. You'll need a different app id.`,
+    human: {
+      instruction: `Choose a different app id (it must match your capacitor.config). Suggestions: ${buildAppIdConflictSuggestions(appId).slice(0, 4).join(', ')}. Update capacitor.config, then continue. (Automatic rename lands in a later milestone.)`,
+    },
+    next: {
+      tool: 'capgo_builder_onboarding_next_step',
+      instruction: 'After the user updates their app id in capacitor.config, call next_step (no arguments).',
+      call: 'capgo_builder_onboarding_next_step({})',
+    },
+    rules: ONBOARDING_RULES,
+  }
 }
 
-/** Advance one step. */
+/**
+ * Perform an executable auto step's side effect. Returns a terminal directive
+ * to stop on, or null to signal "executed; re-decide".
+ */
+async function executeAuto(
+  result: NextStepResult,
+  facts: PreflightFacts,
+  deps: EngineDeps,
+): Promise<NextStepResult | null> {
+  if (result.state === 'registering-app' && facts.appId) {
+    const reg = await deps.registerApp(facts.appId)
+    if (reg.ok)
+      return null
+    if (reg.alreadyExists)
+      return appConflictResult(facts.appId)
+    return {
+      onboarding: 'capgo-builder',
+      phase: 'app',
+      state: 'register-app-failed',
+      progress: 8,
+      kind: 'error',
+      summary: `Could not register "${facts.appId}" in Capgo: ${reg.error}`,
+      rules: ONBOARDING_RULES,
+    }
+  }
+  // Unknown auto step — surface it rather than silently looping.
+  return result
+}
+
+/** Gather → decide → execute auto steps → repeat until a terminal directive. */
+async function drive(deps: EngineDeps, input?: { platform?: string }): Promise<NextStepResult> {
+  for (let i = 0; i < MAX_AUTO_STEPS; i++) {
+    const facts = await gatherFacts(deps)
+    const progress = facts.appId ? await deps.loadProgress(facts.appId) : null
+    const result = decideAdvance(facts, progress, input)
+    if (result.kind !== 'auto')
+      return result
+    const afterExec = await executeAuto(result, facts, deps)
+    if (afterExec !== null)
+      return afterExec
+  }
+  return {
+    onboarding: 'capgo-builder',
+    phase: 'preflight',
+    state: 'auto-loop-guard',
+    progress: 0,
+    kind: 'error',
+    summary: 'Onboarding stalled (too many automatic steps without progress). Please retry or run `capgo doctor`.',
+    rules: ONBOARDING_RULES,
+  }
+}
+
+/** Orient/resume — runs the drive loop with no input. */
+export async function runStart(deps: EngineDeps): Promise<NextStepResult> {
+  return drive(deps, undefined)
+}
+
+/** Advance one step, carrying the user's choice/values. */
 export async function runAdvance(deps: EngineDeps, input?: { platform?: string }): Promise<NextStepResult> {
-  const facts = await gatherFacts(deps)
-  const progress = facts.appId ? await deps.loadProgress(facts.appId) : null
-  return decideAdvance(facts, progress, input)
+  return drive(deps, input)
 }
