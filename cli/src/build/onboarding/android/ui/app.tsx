@@ -43,6 +43,8 @@ import { mapAndroidOnboardingError, mapSaValidationKindToCategory } from '../../
 import { canUseFilePicker, openKeystorePicker, openServiceAccountJsonPicker } from '../../file-picker.js'
 import { trackBuilderOnboardingStep } from '../../telemetry.js'
 import { CompletedStepsLog } from '../../ui/completed-steps-log.js'
+import { terminalFitsOnboarding } from '../../min-terminal-size.js'
+import { TerminalTooSmallPrompt } from '../../ui/min-size-gate.js'
 import { BOX_HEADER_ROWS, Divider, FullscreenAiViewer, FullscreenBuildOutput, Header } from '../../ui/components.js'
 import type { AiResultKind } from '../../ui/components.js'
 import { logBudgetRows } from '../../ui/frame-fit.js'
@@ -1708,6 +1710,14 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
   // Streaming build output is a fullscreen takeover — see iOS sibling. As an
   // early return (before the `tooSmall` guard) it auto-tails inside a viewport
   // that always fits, so the unbounded output never trips "terminal too small".
+  // Size gate (resize-reactive): below the floor, render the resize prompt from
+  // THIS mounted component so all in-progress state (current step, entered
+  // values, build output) is preserved — a shrink shows the prompt, a re-grow
+  // shows the exact same step. Kept as an early return after all hooks so the
+  // rules of hooks hold. The wizard never clips, and never exits, on resize.
+  if (!terminalFitsOnboarding(terminalCols, terminalRows))
+    return <TerminalTooSmallPrompt cols={terminalCols} rows={terminalRows} />
+
   if (step === 'requesting-build')
     return <FullscreenBuildOutput title="Building..." lines={buildOutput} terminalRows={terminalRows} />
 
