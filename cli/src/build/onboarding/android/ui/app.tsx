@@ -43,9 +43,9 @@ import { mapAndroidOnboardingError, mapSaValidationKindToCategory } from '../../
 import { canUseFilePicker, openKeystorePicker, openServiceAccountJsonPicker } from '../../file-picker.js'
 import { trackBuilderOnboardingStep } from '../../telemetry.js'
 import { CompletedStepsLog } from '../../ui/completed-steps-log.js'
-import { BOX_HEADER_ROWS, COMPACT_HEADER_ROWS, Divider, FullscreenAiViewer, FullscreenBuildOutput, Header, TerminalTooSmall, WIZARD_PADDING_ROWS } from '../../ui/components.js'
+import { BOX_HEADER_ROWS, Divider, FullscreenAiViewer, FullscreenBuildOutput, Header } from '../../ui/components.js'
 import type { AiResultKind } from '../../ui/components.js'
-import { COMPACT_HEADER_TOTAL_ROWS, isFrameTooSmall, logBudgetRows, shouldCollapseToDense } from '../../ui/frame-fit.js'
+import { logBudgetRows } from '../../ui/frame-fit.js'
 import {
   KeystoreExistingAliasSelectStep,
   KeystoreExistingAliasStep,
@@ -493,46 +493,36 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
   // the first frame, instead of the old reset→measure→flip round-trip per
   // resize tick. See iOS sibling for the full rationale.
   const bodyRef = useRef<DOMElement | null>(null)
-  const [bodyHeights, setBodyHeights] = useState<{ key: string, comfortable: number | null, dense: number | null }>(
-    { key: '', comfortable: null, dense: null },
+  const [bodyHeights, setBodyHeights] = useState<{ key: string, comfortable: number | null }>(
+    { key: '', comfortable: null },
   )
   const fitKey = `${step}|${terminalCols}`
-  const heights = bodyHeights.key === fitKey ? bodyHeights : { key: fitKey, comfortable: null, dense: null }
+  const heights = bodyHeights.key === fitKey ? bodyHeights : { key: fitKey, comfortable: null }
 
   // Always render the comfortable form. The startup size gate (MinSizeGate)
   // guarantees the terminal is large enough, so the adaptive dense fallback is
-  // unreachable — forcing it false removes the fragile measure→decide coupling
-  // and the degraded small-terminal UX. (The dense branches in the step
-  // components + the measure machinery are now dead code, cleaned up next.)
-  const dense = false
-
+  // unreachable. The dense branches in the step components are now dead, and the
+  // measure machinery below only feeds the completed-steps log budget.
   useEffect(() => {
     if (!bodyRef.current)
       return
     const { height } = measureElement(bodyRef.current)
     if (height <= 0)
       return
-    const form = dense ? 'dense' : 'comfortable'
     setBodyHeights((prev) => {
-      const base = prev.key === fitKey ? prev : { key: fitKey, comfortable: null, dense: null }
-      if (base[form] === height)
+      if (prev.key === fitKey && prev.comfortable === height)
         return prev
-      return { ...base, [form]: height }
+      return { key: fitKey, comfortable: height }
     })
   })
 
-  const headerCompact = heights.comfortable != null
-    && (heights.comfortable + BOX_HEADER_ROWS + WIZARD_PADDING_ROWS > terminalRows)
-  // Only block when even the dense form can't fit (see frame-fit.ts); null dense
-  // height (just flipped, not yet measured) is optimistic, not a false positive.
-  const bodyHeight = dense ? heights.dense : heights.comfortable
-  const tooSmall = isFrameTooSmall({ bodyRows: bodyHeight, dense, terminalRows })
-  const neededRows = (bodyHeight != null ? bodyHeight : 1) + COMPACT_HEADER_TOTAL_ROWS
+  const bodyHeight = heights.comfortable
 
   // Rows for the completed-steps log (rendered OUTSIDE the measured body so its
-  // growth never inflates the dense/fit decision). It fills what the current
-  // step leaves; capLogRows packs recent entries + a summary. See iOS sibling.
-  const logHeaderRows = headerCompact ? COMPACT_HEADER_ROWS : BOX_HEADER_ROWS
+  // growth never inflates the fit decision). It fills what the current step
+  // leaves; capLogRows packs recent entries + a summary. See iOS sibling. The
+  // header is always boxed (the size gate guarantees room).
+  const logHeaderRows = BOX_HEADER_ROWS
   const logMaxRows = bodyHeight != null
     ? logBudgetRows(terminalRows, logHeaderRows, bodyHeight)
     : Number.POSITIVE_INFINITY
@@ -1721,15 +1711,9 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
   if (step === 'requesting-build')
     return <FullscreenBuildOutput title="Building..." lines={buildOutput} terminalRows={terminalRows} />
 
-  // Floor guard — see iOS sibling. When even the one-line header + content
-  // won't fit (measured), show a resize prompt instead of a clipped step.
-  // Resize-reactive.
-  if (tooSmall)
-    return (
-      <Box flexDirection="column" minHeight={terminalRows}>
-        <TerminalTooSmall rows={terminalRows} neededRows={neededRows} />
-      </Box>
-    )
+  // (No in-app "terminal too small" guard: the startup MinSizeGate in the shell
+  // guarantees the terminal is large enough before the wizard mounts, so a
+  // mid-flow too-small state can't occur.)
 
   // Fullscreen AI viewer is a takeover — early return so it owns the whole
   // terminal and bypasses the body-measurement / dense / too-small logic (see
@@ -1753,7 +1737,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
   // terminal shrinks. See iOS sibling for the full explanation.
   return (
     <Box flexDirection="column" minHeight={terminalRows} padding={1}>
-      {showHeader && <Header compact={headerCompact} />}
+      {showHeader && <Header />}
       {/* Banner pinned top; this flex spacer pushes the rest (log + body) to the
           bottom. Collapses to zero on a tight terminal (frame-fit unaffected);
           absorbs extra rows on a tall one. See iOS sibling. */}
@@ -1782,12 +1766,12 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
 
       {step === 'welcome' && <WelcomeStep />}
 
-      {step === 'no-platform' && <NoPlatformStep androidDir={androidDir} dense={dense} />}
+      {step === 'no-platform' && <NoPlatformStep androidDir={androidDir} dense={false} />}
 
       {step === 'credentials-exist' && (
         <CredentialsExistStep
           appId={appId}
-          dense={dense}
+          dense={false}
           onChoose={(choice) => {
             if (choice === 'backup')
               setStep('backing-up')
@@ -1803,7 +1787,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
 
       {step === 'keystore-method-select' && (
         <KeystoreMethodSelectStep
-          dense={dense}
+          dense={false}
           onChoose={(choice) => {
             if (choice === 'learn') {
               setStep('keystore-explainer')
@@ -1821,12 +1805,12 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
       )}
 
       {step === 'keystore-explainer' && (
-        <KeystoreExplainerStep dense={dense} onBack={() => setStep('keystore-method-select')} />
+        <KeystoreExplainerStep dense={false} onBack={() => setStep('keystore-method-select')} />
       )}
 
       {step === 'keystore-existing-path' && (
         <KeystoreExistingPathStep
-          dense={dense}
+          dense={false}
           showChooser={canUseFilePicker() && keystorePathMode === 'choose'}
           onChoosePicker={() => setStep('keystore-existing-picker')}
           onChooseManual={() => setKeystorePathMode('manual')}
@@ -1852,7 +1836,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
 
       {step === 'keystore-existing-store-password' && (
         <KeystoreExistingStorePasswordStep
-          dense={dense}
+          dense={false}
           onSubmit={(val) => {
             if (!val) {
               setError('Store password cannot be empty')
@@ -1871,7 +1855,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
 
       {step === 'keystore-existing-alias-select' && (
         <KeystoreExistingAliasSelectStep
-          dense={dense}
+          dense={false}
           aliases={detectedAliases}
           onSelect={(value) => {
             setKeystoreAlias(value)
@@ -1883,7 +1867,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
 
       {step === 'keystore-existing-alias' && (
         <KeystoreExistingAliasStep
-          dense={dense}
+          dense={false}
           onSubmit={(val) => {
             const alias = val.trim() || RELEASE_ALIAS_DEFAULT
             setKeystoreAlias(alias)
@@ -1895,7 +1879,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
 
       {step === 'keystore-existing-key-password' && (
         <KeystoreExistingKeyPasswordStep
-          dense={dense}
+          dense={false}
           mode={keyPasswordProbe === 'prompt' ? 'prompt' : 'probing'}
           onSubmit={(val) => {
             const keyPw = val || keystoreStorePassword
@@ -1946,7 +1930,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
 
       {step === 'keystore-new-alias' && (
         <KeystoreNewAliasStep
-          dense={dense}
+          dense={false}
           onSubmit={(val) => {
             const alias = val.trim() || RELEASE_ALIAS_DEFAULT
             setKeystoreAlias(alias)
@@ -1958,7 +1942,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
 
       {step === 'keystore-new-password-method' && (
         <KeystoreNewPasswordMethodStep
-          dense={dense}
+          dense={false}
           onChoose={(choice) => {
             if (choice === 'random') {
               const pw = generateRandomPassword()
@@ -1977,7 +1961,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
 
       {step === 'keystore-new-store-password' && (
         <KeystoreNewStorePasswordStep
-          dense={dense}
+          dense={false}
           onSubmit={(val) => {
             if (val.length < 6) {
               setError('Password must be at least 6 characters')
@@ -1994,7 +1978,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
 
       {step === 'keystore-new-key-password' && (
         <KeystoreNewKeyPasswordStep
-          dense={dense}
+          dense={false}
           onSubmit={(val) => {
             const keyPw = val || keystoreStorePassword
             setKeystoreKeyPassword(keyPw)
@@ -2006,7 +1990,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
 
       {step === 'keystore-new-cn' && (
         <KeystoreNewCommonNameStep
-          dense={dense}
+          dense={false}
           appId={appId}
           onSubmit={(val) => {
             const cn = val.trim() || appId
@@ -2023,7 +2007,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
 
       {step === 'service-account-method-select' && (
         <ServiceAccountMethodSelectStep
-          dense={dense}
+          dense={false}
           onChoose={(method) => {
             if (selectFiredRef.current)
               return
@@ -2053,7 +2037,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
 
       {step === 'sa-json-existing-path' && (
         <SaJsonExistingPathStep
-          dense={dense}
+          dense={false}
           showChooser={canUseFilePicker() && saJsonPathMode === 'choose'}
           onChoosePicker={() => {
             // The picker triggers a step transition that takes time — guard
@@ -2095,7 +2079,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
 
       {step === 'sa-json-validation-failed' && saValidationResult && !saValidationResult.ok && (
         <SaJsonValidationFailedStep
-          dense={dense}
+          dense={false}
           message={saValidationResult.message}
           onChoose={(value) => {
             if (selectFiredRef.current)
@@ -2161,7 +2145,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
 
       {step === 'google-sign-in' && !showOAuthLearnMore && (
         <GoogleSignInStep
-          dense={dense}
+          dense={false}
           onChoose={(value) => {
             if (value === 'go')
               setStep('google-sign-in-running')
@@ -2174,18 +2158,18 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
       )}
 
       {step === 'google-sign-in' && showOAuthLearnMore && (
-        <GoogleSignInLearnMoreStep dense={dense} onBack={() => setShowOAuthLearnMore(false)} />
+        <GoogleSignInLearnMoreStep dense={false} onBack={() => setShowOAuthLearnMore(false)} />
       )}
 
       {step === 'google-sign-in-running' && (
-        <GoogleSignInRunningStep dense={dense} statusMessages={oauthStatusMessages} />
+        <GoogleSignInRunningStep dense={false} statusMessages={oauthStatusMessages} />
       )}
 
       {/* ── Phase 3 — Play Developer account ID ── */}
 
       {step === 'play-developer-id-input' && playDevIdMode === 'actions' && (
         <PlayDeveloperIdActionsStep
-          dense={dense}
+          dense={false}
           playDeveloperUrl={PLAY_DEVELOPERS_URL}
           onChoose={async (value) => {
             if (value === 'open') {
@@ -2221,7 +2205,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
 
       {step === 'play-developer-id-input' && playDevIdMode === 'input' && (
         <PlayDeveloperIdInputStep
-          dense={dense}
+          dense={false}
           onSubmit={(val) => {
             const id = extractDeveloperId(val)
             if (!id) {
@@ -2250,7 +2234,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
 
       {step === 'gcp-projects-select' && (
         <GcpProjectsSelectStep
-          dense={dense}
+          dense={false}
           options={[
             { label: '🆕  Create a new project', value: '__new__' },
             ...gcpProjects.map(p => ({
@@ -2289,7 +2273,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
 
       {step === 'gcp-project-create-name' && (
         <GcpProjectCreateNameStep
-          dense={dense}
+          dense={false}
           defaultDisplayName={newProjectDisplayName || sanitizeGcpProjectDisplayName(`Capgo ${appId}`)}
           onSubmit={(val) => {
             const displayName = sanitizeGcpProjectDisplayName(
@@ -2319,7 +2303,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
 
       {step === 'android-package-select' && (
         <AndroidPackageSelectStep
-          dense={dense}
+          dense={false}
           androidDir={androidDir}
           showChooser={detectedPackageIds.length > 0 && packageSelectMode === 'choose'}
           detectedCount={detectedPackageIds.length}
@@ -2387,7 +2371,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
       )}
 
       {step === 'gcp-setup-running' && (
-        <GcpSetupRunningStep dense={dense} statusMessages={setupStatus} />
+        <GcpSetupRunningStep dense={false} statusMessages={setupStatus} />
       )}
 
       {/* ── Phase 6 ── */}
@@ -2402,7 +2386,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
 
       {step === 'ci-secrets-setup' && (
         <CiSecretsSetupStep
-          dense={dense}
+          dense={false}
           advice={ciSecretSetupAdvice}
           onChoose={(choice) => {
             setStep(choice === 'retry' ? 'detecting-ci-secrets' : 'build-complete')
@@ -2412,7 +2396,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
 
       {step === 'ci-secrets-target-select' && (
         <CiSecretsTargetSelectStep
-          dense={dense}
+          dense={false}
           options={[
             ...ciSecretTargets.map(target => ({
               label: target.provider === 'github' ? 'GitHub Actions repository secrets' : 'GitLab CI/CD variables',
@@ -2434,7 +2418,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
 
       {step === 'ask-ci-secrets' && (
         <AskCiSecretsStep
-          dense={dense}
+          dense={false}
           entryCount={ciSecretEntries.length}
           targetLabel={getCiSecretTargetLabel(ciSecretTarget)}
           cli={ciSecretTarget?.cli || 'CLI'}
@@ -2450,7 +2434,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
 
       {step === 'confirm-ci-secret-overwrite' && (
         <ConfirmCiSecretOverwriteStep
-          dense={dense}
+          dense={false}
           existingKeys={ciSecretExistingKeys}
           onChoose={(choice) => {
             setStep(choice === 'replace' ? 'uploading-ci-secrets' : 'build-complete')
@@ -2464,7 +2448,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
 
       {step === 'ci-secrets-failed' && (
         <CiSecretsFailedStep
-          dense={dense}
+          dense={false}
           error={ciSecretError}
           onChoose={(choice) => {
             setStep(choice === 'retry' ? (ciSecretTarget ? 'checking-ci-secrets' : 'detecting-ci-secrets') : 'build-complete')
@@ -2474,7 +2458,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
 
       {step === 'ask-build' && (
         <AskBuildStep
-          dense={dense}
+          dense={false}
           onChoose={(choice) => {
             if (choice === 'yes')
               setStep('requesting-build')
@@ -2488,13 +2472,13 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
           above — nothing renders here in the measured body. */}
 
       {step === 'build-complete' && (
-        <BuildCompleteStep uploadSummary={ciSecretUploadSummary} buildUrl={buildUrl} dense={dense} />
+        <BuildCompleteStep uploadSummary={ciSecretUploadSummary} buildUrl={buildUrl} dense={false} />
       )}
 
       {/* AI debug — ask the user whether to send the captured log */}
       {step === 'ai-analysis-prompt' && (
         <AiAnalysisPromptStep
-          dense={dense}
+          dense={false}
           onChoose={async (choice) => {
             if (choice === 'debug') {
               setStep('ai-analysis-running')
@@ -2532,7 +2516,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
           result={aiResult}
           retryCount={aiRetryCount}
           maxRetries={MAX_AI_RETRIES}
-          dense={dense}
+          dense={false}
           onReread={() => setStep('ai-analysis-result-scroll')}
           onRetry={async () => {
             if (aiJobId) {
@@ -2563,7 +2547,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
       {step === 'error' && error && retryStep && (
         <ErrorStep
           message={error}
-          dense={dense}
+          dense={false}
           onChoose={(choice) => {
             if (choice === 'retry') {
               setError(null)
