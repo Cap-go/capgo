@@ -73,19 +73,19 @@ function check(name, cond) {
   }
 }
 
-// Below the floor (small terminal): the gate must show the resize prompt and
-// must NOT show the platform picker.
+// The platform picker is NOT size-gated — the user must always be able to choose
+// their platform first; the 80×49 floor is enforced by each app AFTER a platform
+// is picked. So the picker shows (and no resize prompt appears) at BOTH a small
+// and an ample terminal.
 {
   const out = await renderShellAt(50, 20)
-  check('shell below floor shows the resize prompt', /too small/i.test(out))
-  check('shell below floor hides the platform picker', !/want to set up/i.test(out))
+  check('picker shows on a small terminal (not gated)', /want to set up|iOS|Android/i.test(out))
+  check('no resize prompt on the small-terminal picker path', !/too small/i.test(out))
 }
-
-// Ample size: the gate must let the picker through.
 {
   const out = await renderShellAt(100, 50)
-  check('shell at ample size shows the platform picker', /want to set up|iOS|Android/i.test(out))
-  check('shell at ample size hides the resize prompt', !/too small/i.test(out))
+  check('picker shows on an ample terminal', /want to set up|iOS|Android/i.test(out))
+  check('no resize prompt on the ample picker path', !/too small/i.test(out))
 }
 
 console.log(`\n${passed} passed, ${failed} failed`)

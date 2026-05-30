@@ -26,7 +26,6 @@ import { loadProgress } from '../progress.js'
 import OnboardingApp from './app.js'
 import { Header } from './components.js'
 import { pickPlatformLayout } from './frame-fit.js'
-import { MinSizeGate } from './min-size-gate.js'
 import { PlatformPicker } from './platform-picker.js'
 
 // Progress shapes derived from the loaders so we don't re-import the type names.
@@ -112,17 +111,16 @@ const OnboardingShell: FC<OnboardingShellProps> = ({ appId, iosDir, androidDir, 
   if (ready?.kind === 'android')
     return <AndroidOnboardingApp appId={appId} initialProgress={ready.progress} androidDir={androidDir} apikey={apikey} />
 
-  // Not ready yet (pre-platform picker / brief load). This branch has no
-  // in-progress state, so the MinSizeGate wrapper is safe here: below the floor
-  // it shows the resize prompt, at/above it shows the picker. Resize-reactive
-  // via cols/rows from useTerminalSize.
+  // Not ready yet: the platform picker (or a brief framed load). The picker is
+  // NOT size-gated — it's small and adapts cards↔list to the terminal, so the
+  // user can always choose their platform first. The 80×49 floor is about the
+  // STEP content, which each app self-gates after a platform is chosen. (Gating
+  // the picker would force a resize before the user could even pick — backwards.)
   return (
-    <MinSizeGate cols={cols} rows={rows}>
-      <Box flexDirection="column" minHeight={rows} padding={1}>
-        <Header />
-        {!initialPlatform && <PlatformPicker layout={pickPlatformLayout(cols, rows)} onSelect={choose} />}
-      </Box>
-    </MinSizeGate>
+    <Box flexDirection="column" minHeight={rows} padding={1}>
+      <Header />
+      {!initialPlatform && <PlatformPicker layout={pickPlatformLayout(cols, rows)} onSelect={choose} />}
+    </Box>
   )
 }
 
