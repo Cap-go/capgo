@@ -147,7 +147,7 @@ export function comparePackages(
 
   return comparisons.sort((a, b) => {
     const byStatus = STATUS_ORDER[a.status] - STATUS_ORDER[b.status]
-    return byStatus !== 0 ? byStatus : a.name.localeCompare(b.name)
+    return byStatus === 0 ? a.name.localeCompare(b.name) : byStatus
   })
 }
 

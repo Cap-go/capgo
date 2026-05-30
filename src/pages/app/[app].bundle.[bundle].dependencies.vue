@@ -186,7 +186,8 @@ function replaceCompareParam(value: number | null) {
     query.compare = desired
   else
     delete query.compare
-  void router.replace({ path: route.path, query })
+  // Ignore redundant-navigation rejections from vue-router.
+  router.replace({ path: route.path, query }).catch(() => {})
 }
 
 // Pre-select a baseline from ?compare=<versionId> on load. Reads route.query
@@ -201,11 +202,17 @@ async function restoreCompareFromQuery() {
     replaceCompareParam(null)
     return
   }
+  // Match the picker's eligibility: a deep link must not resolve a deleted
+  // bundle or one without native packages (which the picker excludes), else the
+  // baseline load would coerce missing packages to [] and report every
+  // dependency as newly added/incompatible. Scrub the param if it doesn't match.
   const { data, error } = await supabase
     .from('app_versions')
     .select('id, name, created_at, manifest_count, app_id')
     .eq('app_id', packageId.value)
     .eq('id', compareId)
+    .eq('deleted', false)
+    .not('native_packages', 'is', null)
     .maybeSingle()
   if (error || !data) {
     replaceCompareParam(null)
