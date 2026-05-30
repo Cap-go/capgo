@@ -503,7 +503,16 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
   const [duplicateProfileOrigin, setDuplicateProfileOrigin] = useState<'creating-profile' | 'import-create-profile-only'>('creating-profile')
 
   const addLog = useCallback((text: string, color = 'green') => {
-    setLog(prev => [...prev, { text, color }])
+    setLog((prev) => {
+      // Drop a consecutive duplicate: completed-step breadcrumbs are idempotent,
+      // so the same line twice in a row is always spam, never information. Guards
+      // against the log filling with repeats if a hydration replay / re-render
+      // fires it more than once. (Mirrors the Android sibling.)
+      const last = prev[prev.length - 1]
+      if (last && last.text === text && last.color === color)
+        return prev
+      return [...prev, { text, color }]
+    })
   }, [])
 
   const pm = getPMAndCommand()

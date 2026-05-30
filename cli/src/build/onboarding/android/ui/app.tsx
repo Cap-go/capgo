@@ -530,7 +530,17 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
     : Number.POSITIVE_INFINITY
 
   const addLog = useCallback((text: string, color = 'green') => {
-    setLogLines(prev => [...prev, { text, color }])
+    setLogLines((prev) => {
+      // Drop a consecutive duplicate: completed-step breadcrumbs are idempotent
+      // ("✔ GCP project — X" means the same thing however many times the
+      // hydration replay or a re-render fires it), so the same line twice in a
+      // row is always spam, never information. Guards against the log filling
+      // with repeats if an effect re-runs.
+      const last = prev[prev.length - 1]
+      if (last && last.text === text && last.color === color)
+        return prev
+      return [...prev, { text, color }]
+    })
   }, [])
 
   const addSetupStatus = useCallback((text: string) => {
