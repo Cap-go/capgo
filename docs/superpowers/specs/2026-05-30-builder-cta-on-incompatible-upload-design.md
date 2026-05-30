@@ -51,7 +51,7 @@ Interactivity is determined by the existing `canPromptInteractively()` helper
 
 Print a single warning + ad block, **no prompt**, then continue the upload unchanged:
 
-```
+```text
 ⚠️  This update changes native code, so it needs a native build to reach users
     on current app-store binaries.
     → Set up Capgo Builder:  npx @capgo/cli build onboarding        (no credentials yet)
@@ -67,27 +67,31 @@ Shown **once per invocation**. Branch on local credentials.
 
 **No credentials → onboarding CTA**
 
-```
+```text
 This update includes native changes, which ship via an app-store build rather than OTA.
 Set up Capgo Builder now? (Y/n)
 ```
 
-- **Yes** → skip the OTA upload, launch `build onboarding` inline, return early.
+- **Yes** → skip the OTA upload and return a `launch-onboarding` action; the CLI
+  entry point launches `build onboarding`.
 - **No** → confirmation step:
-  ```
+
+  ```text
   Heads up: this update includes native changes, which ship via an app-store build rather than OTA.
   Skip the Builder for now? (y/N)
   ```
+
   - **Yes (sure)** → snooze 3 days (this app), then continue the OTA upload.
   - **No (not sure)** → continue the OTA upload, **no snooze** (CTA may appear again next time).
 
 **Has credentials → build CTA**
 
-```
+```text
 This update needs a native build. Run one now with Capgo Builder? (Y/n)
 ```
 
-- **Yes** → skip the OTA upload, launch `build request` inline, return early.
+- **Yes** → skip the OTA upload and return a `launch-build` action; the CLI entry
+  point launches `build request`.
 - **No** → same confirmation + snooze flow as above.
 
 > Warning copy (option 4, "minimal heads-up") is intentionally low-fear and accurate:
@@ -97,17 +101,14 @@ This update needs a native build. Run one now with Capgo Builder? (Y/n)
 
 ## Credential detection (local)
 
-"Has credentials" = `~/.capgo/credentials.json` contains an entry for the current
-`appId` (and, where relevant, platform). This is the same file `build request`
-already reads (see `cli/src/build/request.ts`). A small helper
-`hasLocalCredentials(appId)` encapsulates this; reuse the existing credentials
-loader rather than re-parsing.
-
-No server-side credential or usage lookup (explicitly out of scope).
+"Has credentials" = `loadSavedCredentials(appId)` (from `cli/src/build/credentials.ts`)
+returns a non-`null` entry for the current `appId`. Credentials live under
+`~/.capgo-credentials/` — the same store `build request` reads. No new helper and
+no server-side lookup (explicitly out of scope).
 
 ## Snooze
 
-- File: `~/.capgo/builder-prompt.json`.
+- File: `~/.capgo-builder-prompt.json`.
 - Shape: `{ [appId]: { snoozedUntil: <ISO8601> } }` (per-app, per-machine).
 - Set **only** on a confirmed decline ("sure") → `snoozedUntil = now + 3 days`.
 - On each upload, the CTA is suppressed while `now < snoozedUntil` for that app.
