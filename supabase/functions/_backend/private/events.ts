@@ -37,6 +37,16 @@ function isTrackingV2(version: unknown) {
   return version === 2 || version === '2'
 }
 
+// Coerce a tag/DB value (string id, numeric/bigint id, or missing) into a
+// non-empty string id or undefined — keeps the Bento payload *_id fields clean.
+function toIdString(value: unknown): string | undefined {
+  if (typeof value === 'string')
+    return value.length > 0 ? value : undefined
+  if (typeof value === 'number' || typeof value === 'bigint')
+    return String(value)
+  return undefined
+}
+
 async function resolveTrackingUserId(
   c: Context<MiddlewareKeyVariables>,
   requestedUserId: string | undefined,
@@ -285,13 +295,9 @@ app.post('/', middlewareV2(['read', 'write', 'all', 'upload']), async (c) => {
           .eq('app_id', appId)
           .eq('name', versionNewName)
           .maybeSingle()
-        versionNewId = versionNewData?.id != null ? String(versionNewData.id) : undefined
+        versionNewId = toIdString(versionNewData?.id)
       }
-      const versionOldId = typeof tags.version_old_id === 'string'
-        ? tags.version_old_id
-        : typeof tags.version_old_id === 'number'
-          ? String(tags.version_old_id)
-          : undefined
+      const versionOldId = toIdString(tags.version_old_id)
       bundleIncompatibleBentoEvent = buildBundleCompatibilityBentoEvent({
         event: trackedBody.event,
         orgId: onboardingOrgId,
