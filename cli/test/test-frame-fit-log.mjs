@@ -13,7 +13,7 @@
 import { Box, Text } from 'ink'
 import React from 'react'
 import { CompletedStepsLog } from '../src/build/onboarding/ui/completed-steps-log.tsx'
-import { COMPACT_HEADER_ROWS, Header, WIZARD_PADDING_ROWS } from '../src/build/onboarding/ui/components.tsx'
+import { COMPACT_HEADER_ROWS, WIZARD_PADDING_ROWS } from '../src/build/onboarding/ui/components.tsx'
 import { capLogRows, logBudgetRows } from '../src/build/onboarding/ui/frame-fit.ts'
 import { frameRows, renderFrameText } from './helpers/frame-fit.mjs'
 
@@ -25,6 +25,14 @@ function test(name, fn) {
 }
 function assert(cond, msg) { if (!cond) throw new Error(msg) }
 const h = React.createElement
+
+// A 1-row header stand-in. This test's subject is the log-capping math (its
+// budgets use COMPACT_HEADER_ROWS = 1), NOT the banner — so it uses a 1-row
+// placeholder rather than the real Header, which is now always the 5-row boxed
+// form (the dynamic compact variant was removed once the startup size gate
+// guaranteed the rows for the boxed banner). Includes "Capgo Cloud Build" so the
+// header-row findIndex in the gap tests still locates it.
+const HeaderStub = () => h(Text, null, '🚀  Capgo Cloud Build · Onboarding')
 
 // The wizard reserves this many rows for the log (its top margin + one summary
 // row) in the dense/too-small decision, so the step is never sized to evict it.
@@ -107,7 +115,7 @@ test('UNCAPPED long log overflows — proving the cap is what prevents too-small
 // We render header + log (no padding) so line 0 is the header and the gap, if
 // any, is the blank line immediately below it.
 function headerPlusLog(entries, maxRows) {
-  return renderFrameText(h(Box, { flexDirection: 'column' }, h(Header, { compact: true }), h(CompletedStepsLog, { entries, maxRows })), 80).split('\n')
+  return renderFrameText(h(Box, { flexDirection: 'column' }, h(HeaderStub, null), h(CompletedStepsLog, { entries, maxRows })), 80).split('\n')
 }
 
 test('single row (maxRows=1) + overflow: summary is ALWAYS shown (never hidden), no leading gap', () => {
