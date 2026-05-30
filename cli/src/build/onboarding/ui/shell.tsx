@@ -26,6 +26,7 @@ import { loadProgress } from '../progress.js'
 import OnboardingApp from './app.js'
 import { Header } from './components.js'
 import { pickPlatformLayout } from './frame-fit.js'
+import { MinSizeGate } from './min-size-gate.js'
 import { PlatformPicker } from './platform-picker.js'
 
 // Progress shapes derived from the loaders so we don't re-import the type names.
