@@ -102,7 +102,9 @@
     "test:ai-onboarding-mode": "bun test/test-ai-onboarding-mode.mjs",
     "test:ai-fit": "bun test/test-ai-fit.mjs",
     "test:platform-layout": "bun test/test-platform-layout.mjs",
-    "test:frame-fit": "bun test/run-frame-fit.mjs"
+    "test:frame-fit": "bun test/run-frame-fit.mjs",
+    "test:onboarding-min-size": "bun test/test-onboarding-min-size.mjs",
+    "test:min-size-gate": "bun test/test-min-size-gate.mjs"
   },
   "dependencies": {
     "@inkjs/ui": "^2.0.0",
