@@ -5,9 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Capgo Builder · MCP-conducted onboarding — design</title>
 <script>document.documentElement.classList.remove('no-js');document.documentElement.classList.add('js');</script>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
   :root{
     --bg:#07100d; --bg2:#0a1612; --panel:#0c1a16; --panel2:#102420;
@@ -345,7 +342,7 @@
         <div class="channel"></div>
         <div class="ico">Primitive · Prompt</div>
         <h3 style="margin-top:8px"><code>onboard_capgo_builder</code></h3>
-        <p style="font-size:14.5px">A <b>user-invoked</b> slash command (e.g. <code>/mcp__capgo__onboard_capgo_builder</code>). Injects a short <b>operating manual</b> into the chat: the AI's role, the rules of engagement, and "call <code>…_status</code> first."</p>
+        <p style="font-size:14.5px">A <b>user-invoked</b> slash command (e.g. <code>/mcp__capgo__onboard_capgo_builder</code>). Injects a short <b>operating manual</b> into the chat: the AI's role, the rules of engagement, and "call <code>start_capgo_builder_onboarding</code> first."</p>
         <div class="role"><b>Replaces:</b> a skill's front-matter + "how to behave" preamble. The kickoff, not the content.</div>
         <span class="tag prop" style="margin-top:14px">proposed</span>
       </div>
@@ -370,7 +367,7 @@
     <div class="grid g2 reveal" style="margin-top:18px">
       <div class="card">
         <h3>Two doors into the room</h3>
-        <p style="font-size:14.5px">An MCP prompt is <strong>user-initiated</strong> — the AI can't trigger it on its own. So we add a second entrance: when the user says "help me set up native builds," the AI can call <code>capgo_builder_onboarding_status</code> directly. Same flow, whichever door they use.</p>
+        <p style="font-size:14.5px">An MCP prompt is <strong>user-initiated</strong> — the AI can't trigger it on its own. So we add a second entrance: when the user says "help me set up native builds," the AI can call <code>start_capgo_builder_onboarding</code> directly. Same flow, whichever door they use.</p>
       </div>
       <div class="card">
         <h3>The spine vs. the hands</h3>
@@ -411,7 +408,7 @@
 
     <p class="reveal" style="margin-top:30px">Concretely, every <code>advance</code> call returns the same shape. The <code>kind</code> tells the AI how to behave; <code>next</code> tells it the literal next move:</p>
     <div class="schema reveal">
-<span class="c">// result of capgo_builder_onboarding_advance — written FOR the model</span>
+<span class="c">// result of capgo_builder_onboarding_next_step — written FOR the model</span>
 {
   <span class="k">"state"</span>: <span class="s">"creating-profile"</span>,        <span class="c">// current OnboardingStep (reused vocabulary)</span>
   <span class="k">"phase"</span>: <span class="s">"credentials"</span>,            <span class="c">// platform-agnostic phase</span>
@@ -422,7 +419,7 @@
   <span class="k">"humanAction"</span>: <span class="s">"Open App Store Connect → Users and Access → Integrations → create a key with App Manager role. Download the .p8 (you can only download it once)."</span>,
   <span class="k">"resourceUri"</span>: <span class="s">"capgo://builder/ios/asc-api-key-guide"</span>,
   <span class="k">"collect"</span>: [ <span class="s">"keyId"</span>, <span class="s">"issuerId"</span>, <span class="s">"p8Path"</span> ], <span class="c">// what to bring back</span>
-  <span class="k">"verifyWith"</span>: <span class="s">"capgo_builder_onboarding_advance"</span>,    <span class="c">// re-enter with the collected values</span>
+  <span class="k">"verifyWith"</span>: <span class="s">"capgo_builder_onboarding_next_step"</span>,    <span class="c">// re-enter with the collected values</span>
   <span class="k">"next"</span>: <span class="s">"Tell the user the humanAction verbatim, wait, then call advance with keyId/issuerId/p8Path."</span>
 }
     </div>
@@ -449,8 +446,8 @@
     <h3 class="reveal" style="margin-top:46px;font-size:18px;color:var(--soft)">Phase 2 · Credentials — the fork</h3>
     <div class="tabs reveal">
       <div class="tabbar" role="tablist">
-        <button role="tab" aria-selected="true" data-tab="ios">🍎 &nbsp;iOS</button>
-        <button role="tab" aria-selected="false" data-tab="android">🤖 &nbsp;Android</button>
+        <button type="button" role="tab" aria-selected="true" data-tab="ios">🍎 &nbsp;iOS</button>
+        <button type="button" role="tab" aria-selected="false" data-tab="android">🤖 &nbsp;Android</button>
       </div>
 
       <div class="tabpane" data-pane="ios" data-active="true">
@@ -488,7 +485,7 @@
       <div class="head"><span class="lights"><i></i><i></i><i></i></span> capgo · onboarding session</div>
       <div class="body">
         <div class="row a-user"><div class="actor">USER</div><div class="msg">"Help me ship my iOS app through Capgo's cloud builder."</div></div>
-        <div class="row a-ai"><div class="actor">AI</div><div class="msg">Invokes the prompt → reads the operating manual → calls <span class="mono">capgo_builder_onboarding_status</span></div></div>
+        <div class="row a-ai"><div class="actor">AI</div><div class="msg">Invokes the prompt → reads the operating manual → calls <span class="mono">start_capgo_builder_onboarding</span></div></div>
         <div class="row a-mcp"><div class="actor">MCP</div><div class="msg"><em>Preflight OK</em>: Capacitor project found, app id <span class="mono">com.acme.app</span>, API key present, build needed. App not yet registered. <span class="pill auto">auto-next</span> <span class="mono">→ call advance</span></div></div>
         <div class="row a-ai"><div class="actor">AI</div><div class="msg">Calls <span class="mono">advance</span></div></div>
         <div class="row a-mcp"><div class="actor">MCP</div><div class="msg">Created app in Capgo Cloud. Platform = iOS. <span class="pill choice">choice</span> "Create new signing assets, or import what's already in your Keychain?"</div></div>

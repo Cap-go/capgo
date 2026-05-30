@@ -4,10 +4,11 @@ import { existsSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import process from 'node:process'
-import { z } from 'zod'
 import type { CapgoSDK } from '../../../sdk.js'
+import type { OnboardingNextStepInput } from '../../../schemas/onboarding.js'
 import { isAppAlreadyExistsError } from '../../../init/app-conflict.js'
-import { findSavedKeySilent, getAppId, getConfig } from '../../../utils.js'
+import { onboardingNextStepSchema } from '../../../schemas/onboarding.js'
+import { findSavedKeySilent, formatError, getAppId, getConfig } from '../../../utils.js'
 import { updateSavedCredentials } from '../../credentials.js'
 import { getPlatformDirFromCapacitorConfig } from '../../platform-paths.js'
 import { generateKeystore, generateRandomPassword } from '../android/keystore.js'
@@ -179,7 +180,7 @@ function buildDeps(sdk: CapgoSDK): EngineDeps {
         return { ok: true as const }
       }
       catch (err) {
-        return { ok: false as const, error: err instanceof Error ? err.message : String(err) }
+        return { ok: false as const, error: formatError(err) }
       }
     },
   }
@@ -205,16 +206,9 @@ export function registerOnboardingTools(server: McpLike, sdk: CapgoSDK, depsOver
   server.tool(
     'capgo_builder_onboarding_next_step',
     'Advance the guided Capgo Builder onboarding by one step. Call ONLY as directed by the previous result\'s `next`. Pass the user\'s choice (e.g. platform) when the previous step asked for one.',
-    {
-      platform: z.enum(['ios', 'android']).optional().describe('Platform choice, when the previous step asked for it'),
-      serviceAccountJsonPath: z.string().optional().describe('Path to your Google Play service-account JSON file, when the previous step asked for it'),
-      runBuild: z.boolean().optional().describe('Set true (with platform) to trigger the first cloud build'),
-      keyId: z.string().optional().describe('App Store Connect Key ID (iOS), when asked'),
-      issuerId: z.string().optional().describe('App Store Connect Issuer ID (iOS), when asked'),
-      p8Path: z.string().optional().describe('Path to your App Store Connect .p8 key file (iOS), when asked'),
-    },
-    async ({ platform, serviceAccountJsonPath, runBuild, keyId, issuerId, p8Path }: { platform?: Platform, serviceAccountJsonPath?: string, runBuild?: boolean, keyId?: string, issuerId?: string, p8Path?: string }) => {
-      const result = await runAdvance(deps, { platform, serviceAccountJsonPath, runBuild, keyId, issuerId, p8Path })
+    onboardingNextStepSchema.shape,
+    async (args: OnboardingNextStepInput) => {
+      const result = await runAdvance(deps, args)
       return { content: [{ type: 'text' as const, text: renderResult(result) }] }
     },
   )

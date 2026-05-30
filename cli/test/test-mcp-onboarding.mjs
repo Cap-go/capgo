@@ -463,6 +463,39 @@ await test('ios: finalize failure → human_gate to re-provide key', async () =>
   eq(r.state, 'ios-credentials-failed')
 })
 
+// --- CI review follow-ups: skip-build + both-platform resume ---
+await test('android: skip build → onboarding completes (build-skipped)', async () => {
+  const deps = androidDeps()
+  await runStart(deps)
+  await runAdvance(deps, { serviceAccountJsonPath: '/tmp/sa.json' })
+  const r = await runAdvance(deps, { runBuild: false, platform: 'android' })
+  eq(r.kind, 'done')
+  eq(r.state, 'build-skipped')
+})
+
+await test('both platforms: credential submission without platform resumes in-flight platform (no loop to select)', async () => {
+  let prog = { completedSteps: { keystoreReady: { keystorePath: 'p', alias: 'release', isGenerated: true } } }
+  const deps = {
+    cwd: '/tmp/app',
+    hasSavedKey: () => true,
+    getAppId: async () => 'com.acme.app',
+    detectPlatforms: async () => ['ios', 'android'],
+    isAppRegistered: async () => true,
+    loadProgress: async () => null,
+    loadAndroidProgress: async () => prog,
+    registerApp: async () => ({ ok: true }),
+    generateAndroidKeystore: async () => {},
+    setAndroidServiceAccountPath: async (_id, p) => { prog = { ...prog, serviceAccountJsonPath: p } },
+    finalizeAndroidCredentials: async () => { prog = { ...prog, completedSteps: { ...prog.completedSteps, serviceAccountProvisioned: { email: 'x', projectId: 'p' } } }; return { ok: true } },
+    requestFirstBuild: async () => ({ ok: true, jobId: 'j', status: 'queued' }),
+    setIosApiKey: async () => {},
+    finalizeIosCredentials: async () => ({ ok: true }),
+  }
+  const r = await runAdvance(deps, { serviceAccountJsonPath: '/tmp/sa.json' })
+  ok(r.state !== 'platform-select', 'must not bounce back to platform selection')
+  ok(r.kind === 'done' || r.state === 'build-ready', `should reach finalize/build, got ${r.state}`)
+})
+
 console.log(`\n📊 Results: ${pass} passed, ${fail} failed`)
 if (fail > 0)
   process.exit(1)

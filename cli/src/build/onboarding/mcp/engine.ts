@@ -85,7 +85,26 @@ export function decideStart(facts: PreflightFacts, progress: OnboardingProgress 
     }
   }
 
+  // Resume an in-flight platform credential flow so credential-submission calls
+  // that omit `platform` aren't bounced back to platform selection.
+  const active = activePlatform(facts)
+  if (active === 'android')
+    return decideAndroid(facts)
+  if (active === 'ios')
+    return decideIos(facts)
+
   return decidePlatform(facts, progress)
+}
+
+/** Which platform's credential flow is already in progress (if any). */
+function activePlatform(facts: PreflightFacts): Platform | null {
+  const a = facts.androidProgress
+  if (a && (Boolean(a.completedSteps?.keystoreReady) || Boolean(a.serviceAccountJsonPath)))
+    return 'android'
+  const i = facts.iosProgress
+  if (i && (Boolean(i.keyId) || Boolean(i.p8Path) || Boolean(i.completedSteps?.apiKeyVerified)))
+    return 'ios'
+  return null
 }
 
 function decidePlatform(facts: PreflightFacts, _progress: OnboardingProgress | null): NextStepResult {
@@ -289,7 +308,7 @@ function decideBuildPhase(facts: PreflightFacts, platform: Platform): NextStepRe
     next: {
       tool: NEXT_STEP_TOOL,
       with: { runBuild: true, platform },
-      instruction: `Ask the user. To build now, call next_step with runBuild:true and platform:"${platform}". If they skip, onboarding is complete.`,
+      instruction: `Ask the user. To build now: next_step({ runBuild: true, platform: "${platform}" }). To skip (onboarding still completes): next_step({ runBuild: false, platform: "${platform}" }).`,
       call: `${NEXT_STEP_TOOL}({ runBuild: true, platform: "${platform}" })`,
     },
     rules: ONBOARDING_RULES,
@@ -305,6 +324,8 @@ export function decideAdvance(
   if (input?.platform === 'ios' || input?.platform === 'android') {
     if (!facts.authenticated)
       return decideStart(facts, progress)
+    if (!facts.platformsDetected.includes(input.platform))
+      return decideStart(facts, progress) // ignore a platform the project doesn't have
     if (!facts.appRegistered)
       return decideStart(facts, progress) // register the app before credentials
     return platformChosen(facts, input.platform)
@@ -493,6 +514,23 @@ async function drive(deps: EngineDeps, input?: OnboardingInput): Promise<NextSte
     const buildPlatform = input.platform === 'ios' || input.platform === 'android' ? input.platform : undefined
     if (buildAppId && buildPlatform)
       return buildResult(buildAppId, buildPlatform, await deps.requestFirstBuild(buildAppId, buildPlatform))
+  }
+  // Explicit "skip the first build" → onboarding is complete.
+  if (input?.runBuild === false) {
+    const skipAppId = await deps.getAppId()
+    const skipPlatform = input.platform === 'ios' || input.platform === 'android' ? input.platform : undefined
+    if (skipAppId && skipPlatform) {
+      return {
+        onboarding: 'capgo-builder',
+        phase: 'done',
+        state: 'build-skipped',
+        platform: skipPlatform,
+        progress: 100,
+        kind: 'done',
+        summary: `Credentials for "${skipAppId}" (${skipPlatform}) are saved. You can start your first cloud build anytime.`,
+        rules: ONBOARDING_RULES,
+      }
+    }
   }
   // Persist any provided inputs (side effects) before the decide loop.
   if (input?.serviceAccountJsonPath) {

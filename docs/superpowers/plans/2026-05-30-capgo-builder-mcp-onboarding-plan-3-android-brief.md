@@ -9,7 +9,7 @@
 - ❌ **OAuth / GCP-generate / Play-invite-via-API — dropped for v1** (explicit decision: no OAuth). The "generate a service account via Google sign-in" path can be added later; `oauth-google`/`gcp-api`/`play-api` remain available and headless.
 - ➡️ **Next:** Plan 4 (iOS credentials) and Plan 5 (build → first build). With Android creds saved, `capgo_request_build` can produce a real Android build.
 
-**Goal:** Drive the **Android** credential flow through the onboarding engine — keystore → Google sign-in → GCP service account → Play invite → validate → save — reaching saved Android build credentials, reusing the existing `cli/src/build/onboarding/android/*` modules.
+**Goal:** Drive the **Android** credential flow through the onboarding engine — keystore → provide a Google Play service-account JSON → validate → save — reaching saved Android build credentials, reusing the existing `cli/src/build/onboarding/android/*` modules. (The OAuth "generate a service account via Google sign-in" path is intentionally out of scope for v1; see Progress above.)
 
 **Key finding from the survey:** the Android core logic is **already headless** — nothing in `android/*.ts` (outside `android/ui/`) imports `ink`/`react`/`@clack`. So Plan 3 *reuses* these modules directly; no extraction/refactor needed.
 
@@ -45,7 +45,7 @@
 
 4. **GCP provisioning = `auto` chain** using the OAuth access token: `generateProjectId(appId)` → `createProject`/`enableService` (poll with `pollOperation`) → `ensureServiceAccount` → `createServiceAccountKey` (this yields the service-account JSON used as the Play config). All coalesced by the drive loop.
 
-5. **Play developer id = `human_gate`.** The user pastes/【provides their Play developer id (non-secret identifier → fine for chat); parse with `extractDeveloperId`. Then `inviteServiceAccount` (`auto`).
+5. **Play developer id = `human_gate`.** The user provides their Play developer id (non-secret identifier → fine for chat); parse with `extractDeveloperId`. Then `inviteServiceAccount` (`auto`).
 
 6. **Validate + save = `auto`.** `validateServiceAccountJson` then `updateSavedCredentials` with the android `BuildCredentials` (keystore base64/alias/passwords + play config JSON). End state `kind: done` for the credentials phase → hands to the Build phase (Plan 5).
 

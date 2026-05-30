@@ -5,9 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Capgo Builder onboarding · the end-user journey</title>
 <script>document.documentElement.classList.remove('no-js');document.documentElement.classList.add('js');</script>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Albert+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
   :root{
     --paper:#f4efe4; --paper2:#fffdf7; --card:#fbf7ee; --sink:# efe8d8;
@@ -286,8 +283,8 @@
 
     <div class="tabs reveal">
       <div class="tabbar" role="tablist">
-        <button role="tab" aria-selected="true" data-tab="ios">🍎 &nbsp;iOS — the full ride</button>
-        <button role="tab" aria-selected="false" data-tab="android">🤖 &nbsp;Android — the smoother one</button>
+        <button type="button" role="tab" aria-selected="true" data-tab="ios">🍎 &nbsp;iOS — the full ride</button>
+        <button type="button" role="tab" aria-selected="false" data-tab="android">🤖 &nbsp;Android — the smoother one</button>
       </div>
 
       <!-- iOS -->
@@ -393,7 +390,7 @@
     <h2 class="reveal">The bumps — and how they feel</h2>
     <p class="lead reveal">A guided flow is only as good as its recovery. Each of these is handled as a calm, single next step — never a dead end.</p>
     <div class="rec reveal">
-      <div class="rcard"><div class="sit">no account yet</div><h3>You're not logged in</h3><p>The very first thing the AI hits.</p><div class="fix"><b>What you see:</b> "Let's connect Capgo first — here's the link to grab an API key, paste it here." Then it continues automatically.</div></div>
+      <div class="rcard"><div class="sit">no account yet</div><h3>You're not logged in</h3><p>The very first thing the AI hits.</p><div class="fix"><b>What you see:</b> "Let's connect Capgo first — grab an API key from the dashboard and run <code>npx @capgo/cli login</code> in your terminal (it's stored locally, never pasted in chat)." Then it continues automatically.</div></div>
       <div class="rcard"><div class="sit">conflict</div><h3>The app already exists</h3><p>You (or a teammate) already created it in Capgo.</p><div class="fix"><b>What you see:</b> "I found an existing <code>com.acme.app</code> — reuse it, or recreate it fresh?" A one-tap decision; it syncs the right id and moves on.</div></div>
       <div class="rcard"><div class="sit">missing platform</div><h3>No iOS / Android folder</h3><p>You haven't added the native platform yet.</p><div class="fix"><b>What you see:</b> "Your project has no <code>ios/</code> folder yet — want me to run <code>cap add ios</code> for you?" Yes → it adds it and carries on.</div></div>
       <div class="rcard"><div class="sit">apple limit</div><h3>Certificate limit reached</h3><p>Apple caps you at 2 distribution certificates.</p><div class="fix"><b>What you see:</b> a list of your certs with dates/usage and "revoke the unused one?" You choose; it never deletes without asking.</div></div>

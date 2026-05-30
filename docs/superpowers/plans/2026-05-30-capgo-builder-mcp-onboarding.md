@@ -109,7 +109,7 @@ Then add the script to `cli/package.json`. Insert after the `"test:apple-api-imp
 
 And append to the end of the aggregate `"test"` script value (just before the closing quote):
 
-```
+```text
  && bun run test:mcp-onboarding
 ```
 
