@@ -68,15 +68,17 @@ Shown **once per invocation** as a single yes/no that states *why* up front. Bra
 on local credentials. Declining (or cancelling) just continues the OTA upload —
 there is no follow-up prompt.
 
-Each prompt also renders a clickable **"Learn what Capgo Builder is"** hyperlink
-(OSC 8) that opens <https://capgo.app/native-build/> in the browser without
-dismissing the prompt.
+Shown as **two messages**: first a context line, then a short yes/no prompt that
+carries a clickable **"Learn what Capgo Builder is"** hyperlink (OSC 8) opening
+<https://capgo.app/native-build/> in the browser without dismissing the prompt.
 
 **No credentials → onboarding CTA**
 
 ```text
-This update includes native changes. An app store update may be required for these changes to take effect. Capgo Builder can help you build and publish the required native update. Would you like to configure Capgo Builder now? (Y/n)
-Learn what Capgo Builder is  (→ https://capgo.app/native-build/)
+ℹ  This update includes native changes. An app store update may be required for these changes to take effect. Capgo Builder can help you build and publish the required native update.
+
+◆  Would you like to configure Capgo Builder now? (Y/n)
+│  Learn what Capgo Builder is  (→ https://capgo.app/native-build/)
 ```
 
 - **Yes** → skip the OTA upload and return a `launch-onboarding` action; the CLI
@@ -86,8 +88,10 @@ Learn what Capgo Builder is  (→ https://capgo.app/native-build/)
 **Has credentials → build CTA**
 
 ```text
-This update includes native changes. An app store update may be required for these changes to take effect. Capgo Builder can help you build and publish the required native update. Start a native build with Capgo Builder now? (Y/n)
-Learn what Capgo Builder is  (→ https://capgo.app/native-build/)
+ℹ  This update includes native changes. An app store update may be required for these changes to take effect. Capgo Builder can help you build and publish the required native update.
+
+◆  Start a native build with Capgo Builder now? (Y/n)
+│  Learn what Capgo Builder is  (→ https://capgo.app/native-build/)
 ```
 
 - **Yes** → skip the OTA upload and return a `launch-build` action; the CLI entry

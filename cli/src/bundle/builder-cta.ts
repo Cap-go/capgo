@@ -113,15 +113,17 @@ async function runBuilderCta(params: MaybePromptBuilderCtaParams): Promise<Build
     return 'continue'
   }
 
-  // Single question: state why up front, then offer the relevant Builder flow.
-  // The "learn" line is a clickable hyperlink that opens in the browser without
-  // dismissing this prompt.
+  // Message 1: the context, printed above the prompt so the question stays short.
+  log.info(REASON)
+
+  // Message 2: the short yes/no question, plus a clickable "learn more" hyperlink
+  // that opens in the browser without dismissing this prompt.
   const confirm = params.confirm ?? pConfirm
   const question = mode === 'build'
     ? 'Start a native build with Capgo Builder now?'
     : 'Would you like to configure Capgo Builder now?'
   const accepted = await confirm({
-    message: `${REASON} ${question}\n${terminalLink('Learn what Capgo Builder is', LEARN_URL)}`,
+    message: `${question}\n${terminalLink('Learn what Capgo Builder is', LEARN_URL)}`,
     initialValue: true,
   })
   if (pIsCancel(accepted))
