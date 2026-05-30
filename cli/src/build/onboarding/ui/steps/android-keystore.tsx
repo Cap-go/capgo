@@ -70,23 +70,6 @@ export interface KeystoreExplainerStepProps {
 // bullets so every line stays un-wrapped within the 13-row budget at 60 cols
 // (the original wrapping bullets blew the budget there).
 export const KeystoreExplainerStep: FC<KeystoreExplainerStepProps> = ({ onBack, dense = false }) => {
-  if (dense) {
-    return (
-      <Box flexDirection="column" marginTop={1}>
-        <Text bold color="cyan">A keystore is the signing key for your Android app.</Text>
-        <Text>• Google Play uses it to verify each update came from you.</Text>
-        <Text>
-          • Use the
-          {' '}
-          <Text bold>same</Text>
-          {' '}
-          keystore for every release — lose it and you can&apos;t publish.
-        </Text>
-        <Text>• Never published before? Let us create one for you.</Text>
-        <Select options={[{ label: '← Back', value: 'back' }]} onChange={onBack} />
-      </Box>
-    )
-  }
   return (
     <Box flexDirection="column" marginTop={1}>
       <Alert variant="info">
@@ -207,44 +190,17 @@ export interface KeystoreExistingAliasSelectStepProps {
   dense?: boolean
 }
 
-// `Select` only ever renders `visibleOptionCount` rows (it scrolls the rest),
-// so a long alias list can't blow the row budget. In DENSE mode we cap
-// visibility low and add a "+N more" hint so the user knows the list scrolls,
-// keeping the interactive control and instruction always on screen.
-const ALIAS_VISIBLE_COUNT = 4
-
-// Comfortable: the original full heading + a <Newline/> + an UN-capped Select
-// (the original showed every alias — the parent only renders this form after
-// measuring it fits the viewport). Dense: a terser heading, the blank line
-// dropped, the Select capped to ALIAS_VISIBLE_COUNT rows with a "+N more" hint
-// so even a long alias list stays within the 13-row budget.
+// The original full heading + a <Newline/> + an UN-capped Select (shows every
+// alias — the parent only renders this after measuring it fits the viewport).
 export const KeystoreExistingAliasSelectStep: FC<KeystoreExistingAliasSelectStepProps> = ({ aliases, onSelect, dense = false }) => {
-  if (!dense) {
-    return (
-      <Box flexDirection="column" marginTop={1}>
-        <Text bold>Multiple aliases in the keystore. Which one do you use for this app?</Text>
-        <Newline />
-        <Select
-          options={aliases.map(a => ({ label: a, value: a }))}
-          onChange={onSelect}
-        />
-      </Box>
-    )
-  }
-  const hidden = Math.max(0, aliases.length - ALIAS_VISIBLE_COUNT)
   return (
     <Box flexDirection="column" marginTop={1}>
-      <Text bold>Multiple aliases found. Which one does this app use?</Text>
+      <Text bold>Multiple aliases in the keystore. Which one do you use for this app?</Text>
+      <Newline />
       <Select
-        visibleOptionCount={ALIAS_VISIBLE_COUNT}
         options={aliases.map(a => ({ label: a, value: a }))}
         onChange={onSelect}
       />
-      {hidden > 0 && (
-        <Text dimColor>
-          {`… +${hidden} more (↑/↓ to scroll)`}
-        </Text>
-      )}
     </Box>
   )
 }
