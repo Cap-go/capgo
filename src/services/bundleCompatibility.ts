@@ -17,13 +17,13 @@ export interface NativePackage {
  * shared vocabulary but never emitted here: removing native code is OTA-safe, so
  * a removed package is reported as compatible (matching the CLI).
  */
-export type IncompatibilityReason =
-  | 'new_plugin'
-  | 'removed_plugin'
-  | 'version_mismatch'
-  | 'ios_code_changed'
-  | 'android_code_changed'
-  | 'both_platforms_changed'
+export type IncompatibilityReason
+  = | 'new_plugin'
+    | 'removed_plugin'
+    | 'version_mismatch'
+    | 'ios_code_changed'
+    | 'android_code_changed'
+    | 'both_platforms_changed'
 
 export type PackageStatus = 'added' | 'removed' | 'changed' | 'unchanged'
 
