@@ -48,19 +48,16 @@ Interactivity is determined by the existing `canPromptInteractively()` helper
 
 ### Non-interactive / CI
 
-Print a single warning + ad block, **no prompt**, then continue the upload unchanged:
+Print a single `log.warn` line, **no prompt**, then continue the upload unchanged.
+The action clause matches the local credential state (onboarding vs build), not both:
 
 ```text
-This update includes native changes. An app store update may be required for these
-changes to take effect. Capgo Builder can help you build and publish the required
-native update.
-    → Set up Capgo Builder:  npx @capgo/cli build onboarding        (no credentials yet)
-    → Or run a native build: npx @capgo/cli build request --platform <ios|android>   (credentials found)
-    Learn what Capgo Builder is: https://capgo.app/native-build/
-    Docs: https://capgo.app/docs/cli/cloud-build/
-```
+# no credentials yet
+This update includes native changes. An app store update may be required for these changes to take effect. Capgo Builder can help you build and publish the required native update. To set up Capgo Builder (npx @capgo/cli build onboarding) — learn more: https://capgo.app/native-build/ · docs: https://capgo.app/docs/cli/cloud-build/
 
-Show the line that matches the local credential state (onboarding vs build), not both.
+# credentials found
+… To run a native build (npx @capgo/cli build request --platform <ios|android>) — learn more: https://capgo.app/native-build/ · docs: https://capgo.app/docs/cli/cloud-build/
+```
 
 ### Interactive (TTY)
 

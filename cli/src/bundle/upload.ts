@@ -17,6 +17,7 @@ import { trackEvent } from '../analytics/track'
 import { check2FAComplianceForApp, checkAppExistsAndHasPermissionOrgErr } from '../api/app'
 import { calcKeyId, encryptChecksum, encryptChecksumV3, encryptSource, generateSessionKey } from '../api/crypto'
 import { checkAlerts } from '../api/update'
+import { loadSavedCredentials } from '../build/credentials'
 import { getChecksum } from '../checksum'
 import { getRepoStarStatus, isRepoStarredInSession, starRepository } from '../github'
 import { confirmWithRememberedChoice } from '../promptPreferences'
@@ -896,7 +897,8 @@ export async function uploadBundleInternal(preAppid: string, options: OptionsUpl
   // entirely for the programmatic SDK path (silent), which must not prompt,
   // print, or emit CTA telemetry.
   if (incompatible && !silent) {
-    const builderAction = await maybePromptBuilderCta({ incompatible, interactive, appId: appid, orgId, apikey, incompatibleCount })
+    const hasCredentials = (await loadSavedCredentials(appid)) !== null
+    const builderAction = await maybePromptBuilderCta({ incompatible, interactive, hasCredentials, appId: appid, orgId, apikey, incompatibleCount })
     if (builderAction !== 'continue') {
       // Skip the OTA upload and hand the launch back to the CLI entry point, which
       // runs the Ink-based build commands. Doing it here would pull `ink` into the

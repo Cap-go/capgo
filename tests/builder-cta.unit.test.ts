@@ -1,24 +1,21 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
-vi.mock('../cli/src/build/credentials.ts', () => ({ loadSavedCredentials: vi.fn() }))
+// trackEvent is fire-and-forget (void) and never asserted, so a shared module
+// mock is safe under concurrent execution. Everything else (confirm,
+// hasCredentials) is passed per-test, so there is no shared mutable state.
 vi.mock('../cli/src/analytics/track.ts', () => ({ trackEvent: vi.fn() }))
 
-// eslint-disable-next-line import/first -- vi.mock is hoisted above these imports
-import { loadSavedCredentials } from '../cli/src/build/credentials.ts'
+// eslint-disable-next-line import/first -- vi.mock is hoisted above this import
 import { decideBuilderCtaSurface, maybePromptBuilderCta } from '../cli/src/bundle/builder-cta.ts'
 
-const mockLoadCreds = vi.mocked(loadSavedCredentials)
-// The confirm prompt is injected (not module-mocked) so we never hit real clack I/O.
-const mockConfirm = vi.fn()
-
-const params = {
+const baseParams = {
   incompatible: true,
   interactive: true,
+  hasCredentials: false,
   appId: 'com.app',
   orgId: 'org1',
   apikey: 'k',
   incompatibleCount: 2,
-  confirm: mockConfirm,
 }
 
 describe('decideBuilderCtaSurface', () => {
@@ -41,40 +38,36 @@ describe('decideBuilderCtaSurface', () => {
 })
 
 describe('maybePromptBuilderCta', () => {
-  beforeEach(() => {
-    vi.resetAllMocks()
-    mockLoadCreds.mockResolvedValue(null)
+  it.concurrent('returns continue when compatible', async () => {
+    const confirm = vi.fn()
+    expect(await maybePromptBuilderCta({ ...baseParams, incompatible: false, confirm })).toBe('continue')
+    expect(confirm).not.toHaveBeenCalled()
   })
 
-  it('returns continue when compatible', async () => {
-    expect(await maybePromptBuilderCta({ ...params, incompatible: false })).toBe('continue')
-    expect(mockConfirm).not.toHaveBeenCalled()
-  })
-
-  it('launches onboarding on accept (no credentials) with a single prompt + learn link', async () => {
-    mockConfirm.mockResolvedValueOnce(true)
-    expect(await maybePromptBuilderCta(params)).toBe('launch-onboarding')
-    expect(mockConfirm).toHaveBeenCalledTimes(1)
-    const msg = mockConfirm.mock.calls[0][0].message as string
+  it.concurrent('launches onboarding on accept (no credentials) with a single prompt + learn link', async () => {
+    const confirm = vi.fn().mockResolvedValue(true)
+    expect(await maybePromptBuilderCta({ ...baseParams, hasCredentials: false, confirm })).toBe('launch-onboarding')
+    expect(confirm).toHaveBeenCalledTimes(1)
+    const msg = confirm.mock.calls[0][0].message as string
     expect(msg).toContain('Would you like to configure Capgo Builder now?')
     expect(msg).toContain('https://capgo.app/native-build/')
   })
 
-  it('launches build on accept (credentials present) with the build question', async () => {
-    mockLoadCreds.mockResolvedValue({ ios: {} } as never)
-    mockConfirm.mockResolvedValueOnce(true)
-    expect(await maybePromptBuilderCta(params)).toBe('launch-build')
-    expect(mockConfirm.mock.calls[0][0].message as string).toContain('Start a native build with Capgo Builder now?')
+  it.concurrent('launches build on accept (credentials present) with the build question', async () => {
+    const confirm = vi.fn().mockResolvedValue(true)
+    expect(await maybePromptBuilderCta({ ...baseParams, hasCredentials: true, confirm })).toBe('launch-build')
+    expect(confirm.mock.calls[0][0].message as string).toContain('Start a native build with Capgo Builder now?')
   })
 
-  it('continues on decline without a second prompt', async () => {
-    mockConfirm.mockResolvedValueOnce(false)
-    expect(await maybePromptBuilderCta(params)).toBe('continue')
-    expect(mockConfirm).toHaveBeenCalledTimes(1)
+  it.concurrent('continues on decline without a second prompt', async () => {
+    const confirm = vi.fn().mockResolvedValue(false)
+    expect(await maybePromptBuilderCta({ ...baseParams, confirm })).toBe('continue')
+    expect(confirm).toHaveBeenCalledTimes(1)
   })
 
-  it('shows the CI ad and continues when non-interactive', async () => {
-    expect(await maybePromptBuilderCta({ ...params, interactive: false })).toBe('continue')
-    expect(mockConfirm).not.toHaveBeenCalled()
+  it.concurrent('shows the CI ad and continues when non-interactive', async () => {
+    const confirm = vi.fn()
+    expect(await maybePromptBuilderCta({ ...baseParams, interactive: false, confirm })).toBe('continue')
+    expect(confirm).not.toHaveBeenCalled()
   })
 })

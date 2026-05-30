@@ -1,7 +1,6 @@
 import { env } from 'node:process'
 import { confirm as pConfirm, isCancel as pIsCancel, log } from '@clack/prompts'
 import { trackEvent } from '../analytics/track'
-import { loadSavedCredentials } from '../build/credentials'
 import { isTruthyEnvValue } from '../posthog'
 
 export type BuilderCtaSurface = 'skip' | 'ci-ad' | 'prompt-onboarding' | 'prompt-build'
@@ -32,7 +31,7 @@ export function decideBuilderCtaSurface(ctx: BuilderCtaContext): BuilderCtaSurfa
 const DOCS_URL = 'https://capgo.app/docs/cli/cloud-build/'
 const LEARN_URL = 'https://capgo.app/native-build/'
 
-// Why a native build is needed — folded into the single prompt and the CI ad.
+// Why a native build is needed — folded into the prompt and the CI ad.
 const REASON = 'This update includes native changes. An app store update may be required for these changes to take effect. Capgo Builder can help you build and publish the required native update.'
 
 /**
@@ -47,12 +46,10 @@ function terminalLink(text: string, url: string): string {
 }
 
 export function printBuilderCiAd(hasCredentials: boolean): void {
-  log.warn(REASON)
-  log.info(hasCredentials
-    ? '→ Run a native build:  npx @capgo/cli build request --platform <ios|android>'
-    : '→ Set up Capgo Builder: npx @capgo/cli build onboarding')
-  log.info(`  Learn what Capgo Builder is: ${LEARN_URL}`)
-  log.info(`  Docs: ${DOCS_URL}`)
+  const action = hasCredentials
+    ? 'run a native build (npx @capgo/cli build request --platform <ios|android>)'
+    : 'set up Capgo Builder (npx @capgo/cli build onboarding)'
+  log.warn(`${REASON} To ${action} — learn more: ${LEARN_URL} · docs: ${DOCS_URL}`)
 }
 
 /** Confirm-prompt seam (`@clack/prompts` `confirm` satisfies it); injectable for tests. */
@@ -61,6 +58,8 @@ export type BuilderConfirm = (opts: { message: string, initialValue?: boolean })
 export interface MaybePromptBuilderCtaParams {
   incompatible: boolean
   interactive: boolean
+  /** Whether the app already has saved build credentials (resolved by the caller). */
+  hasCredentials: boolean
   appId: string
   orgId: string
   apikey: string
@@ -79,14 +78,14 @@ export async function maybePromptBuilderCta(params: MaybePromptBuilderCtaParams)
     return await runBuilderCta(params)
   }
   catch {
-    // A CTA failure (filesystem, prompt, telemetry) must never block the upload.
+    // A CTA failure (prompt, telemetry) must never block the upload.
     return 'continue'
   }
 }
 
 async function runBuilderCta(params: MaybePromptBuilderCtaParams): Promise<BuilderCtaAction> {
   const envDisabled = isTruthyEnvValue(env.CAPGO_NO_BUILDER_PROMPT)
-  const hasCredentials = (await loadSavedCredentials(params.appId)) !== null
+  const { hasCredentials } = params
 
   const surface = decideBuilderCtaSurface({
     incompatible: params.incompatible,
