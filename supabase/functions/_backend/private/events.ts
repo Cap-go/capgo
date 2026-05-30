@@ -235,17 +235,25 @@ app.post('/', middlewareV2(['read', 'write', 'all', 'upload']), async (c) => {
       supabase.from('orgs').select('id, name').eq('id', onboardingOrgId).single(),
       supabase.from('apps').select('name').eq('app_id', appId).single(),
     ])
-    builderBentoEvent = buildBuilderOnboardingBentoEvent({
-      event: trackedBody.event,
-      step: builderStep,
-      orgId: onboardingOrgId,
-      appId,
-      platform: builderPlatform,
-      orgName: orgResult.data?.name ?? undefined,
-      appName: appResult.data?.name ?? undefined,
-    })
+    if (orgResult.error || appResult.error) {
+      // Best-effort recovery signal: never fail the wizard's request, and don't
+      // emit a Bento event with empty org/app names. Log and skip instead.
+      cloudlog({ requestId: c.get('requestId'), message: 'builder onboarding bento lookup failed; skipping signal', org: orgResult.error, app: appResult.error })
+    }
+    else {
+      builderBentoEvent = buildBuilderOnboardingBentoEvent({
+        event: trackedBody.event,
+        step: builderStep,
+        orgId: onboardingOrgId,
+        appId,
+        platform: builderPlatform,
+        orgName: orgResult.data?.name ?? undefined,
+        appName: appResult.data?.name ?? undefined,
+      })
+    }
   }
 
+  // Exactly one of these is ever set (distinct event names); `??` picks the active one.
   const bentoEvent = onboardingBentoEvent ?? builderBentoEvent
   await sendEventToTracking(c, {
     ...trackedBody,
