@@ -55,45 +55,6 @@ export interface SelectOption {
   value: string
 }
 
-// How many recovery summary / command lines to render before collapsing the
-// rest into a "… +N more" line. The recovery helper (recovery.ts) pushes ~2
-// lines per matched branch and a composite error string matches several
-// branches at once, so an uncapped list blows the 13-row budget at 60 cols
-// (each summary line itself wraps to 2-3 rows). Showing ONE summary line + ONE
-// command + a "… +N more" count keeps the actionable bits — the "what failed"
-// error, the support-bundle path, and the recovery Select — on screen even in
-// the composite worst case. The summary's first line is the most relevant
-// (recovery.ts orders the matched branch's headline first).
-const RECOVERY_VISIBLE_SUMMARY = 1
-const RECOVERY_VISIBLE_COMMANDS = 1
-
-// Upper bound on the rendered length of the error string. Onboarding errors are
-// usually short, but an Apple/Capgo backend error (or a profile-mismatch
-// message) can wrap to many rows at 60 cols and shove the recovery Select off
-// screen; clamping keeps it to ~2 wrapped rows at 60 cols. The full error is
-// also written to the support bundle, so the clamp is purely cosmetic.
-const ERROR_MAX_CHARS = 110
-
-// The single visible summary line is clamped to ONE rendered row (the recovery
-// summary lines from recovery.ts run ~100 chars and would wrap to 2 rows at 60
-// cols). Clamped to the narrow reference width minus the 2-col `marginLeft`
-// indent + the "• " bullet so it never wraps even at 60 cols. Commands are
-// already short and the support-bundle path is left whole (it's the actionable
-// artifact the user must copy — it may wrap to 2 rows, which the budget
-// accounts for).
-const SUMMARY_LINE_MAX_CHARS = 54
-
-function collapse(message: string): string {
-  return message.replace(/\s+/g, ' ').trim()
-}
-
-function clamp(message: string, max: number): string {
-  const collapsed = collapse(message)
-  if (collapsed.length <= max)
-    return collapsed
-  return `${collapsed.slice(0, max - 1)}…`
-}
-
 // ── welcome ─────────────────────────────────────────────────────────────────
 export const WelcomeStep: FC = () => (
   <Box marginTop={1} justifyContent="center">
@@ -335,92 +296,56 @@ const RETRY_OPTIONS = [
 ]
 
 export const ErrorStep: FC<ErrorStepProps> = ({ error, recoveryAdvice, supportBundlePath, showRetry, dense = false, onChange }) => {
-  if (!dense) {
-    return (
-      <Box flexDirection="column" marginTop={1}>
-        <ErrorLine text={error} />
-        <Newline />
-        {recoveryAdvice && (
-          <>
-            <Text bold>Recovery plan</Text>
-            <Box flexDirection="column" marginTop={1} marginLeft={2}>
-              {recoveryAdvice.summary.map(line => (
-                <Text key={`recovery-summary-${line}`}>{`• ${line}`}</Text>
-              ))}
-            </Box>
-            {recoveryAdvice.commands.length > 0 && (
-              <>
-                <Newline />
-                <Text bold>Helpful commands</Text>
-                <Box flexDirection="column" marginTop={1} marginLeft={2}>
-                  {recoveryAdvice.commands.map(command => (
-                    <Text key={`recovery-command-${command}`} dimColor>{command}</Text>
-                  ))}
-                </Box>
-              </>
-            )}
-            {recoveryAdvice.docs.length > 0 && (
-              <>
-                <Newline />
-                <Text bold>Docs</Text>
-                <Box flexDirection="column" marginTop={1} marginLeft={2}>
-                  {recoveryAdvice.docs.map(doc => (
-                    <Text key={`recovery-doc-${doc}`} color="cyan">{doc}</Text>
-                  ))}
-                </Box>
-              </>
-            )}
-          </>
-        )}
-        {supportBundlePath && (
-          <>
-            <Newline />
-            <Text bold>Support bundle</Text>
-            <Text dimColor>{supportBundlePath}</Text>
-          </>
-        )}
-        <Newline />
-        {showRetry && (
-          <>
-            <Text bold>What do you want to do?</Text>
-            <Newline />
-            <Select options={RETRY_OPTIONS} onChange={onChange} />
-          </>
-        )}
-      </Box>
-    )
-  }
-
-  const summary = recoveryAdvice?.summary ?? []
-  const commands = recoveryAdvice?.commands ?? []
-  const hiddenSummary = Math.max(0, summary.length - RECOVERY_VISIBLE_SUMMARY)
-  const visibleSummary = summary.slice(0, RECOVERY_VISIBLE_SUMMARY)
-  const hiddenCommands = Math.max(0, commands.length - RECOVERY_VISIBLE_COMMANDS)
-  const visibleCommands = commands.slice(0, RECOVERY_VISIBLE_COMMANDS)
   return (
     <Box flexDirection="column" marginTop={1}>
-      <ErrorLine text={clamp(error, ERROR_MAX_CHARS)} />
-      {visibleSummary.length > 0 && (
-        <Box flexDirection="column" marginLeft={2}>
-          {visibleSummary.map(line => (
-            <Text key={`recovery-summary-${line}`}>{`• ${clamp(line, SUMMARY_LINE_MAX_CHARS)}`}</Text>
-          ))}
-          {hiddenSummary > 0 && <Text dimColor>{`… +${hiddenSummary} more`}</Text>}
-        </Box>
-      )}
-      {visibleCommands.length > 0 && (
-        <Box flexDirection="column" marginLeft={2}>
-          {visibleCommands.map(command => (
-            <Text key={`recovery-command-${command}`} dimColor>{collapse(command)}</Text>
-          ))}
-          {hiddenCommands > 0 && <Text dimColor>{`… +${hiddenCommands} more`}</Text>}
-        </Box>
+      <ErrorLine text={error} />
+      <Newline />
+      {recoveryAdvice && (
+        <>
+          <Text bold>Recovery plan</Text>
+          <Box flexDirection="column" marginTop={1} marginLeft={2}>
+            {recoveryAdvice.summary.map(line => (
+              <Text key={`recovery-summary-${line}`}>{`• ${line}`}</Text>
+            ))}
+          </Box>
+          {recoveryAdvice.commands.length > 0 && (
+            <>
+              <Newline />
+              <Text bold>Helpful commands</Text>
+              <Box flexDirection="column" marginTop={1} marginLeft={2}>
+                {recoveryAdvice.commands.map(command => (
+                  <Text key={`recovery-command-${command}`} dimColor>{command}</Text>
+                ))}
+              </Box>
+            </>
+          )}
+          {recoveryAdvice.docs.length > 0 && (
+            <>
+              <Newline />
+              <Text bold>Docs</Text>
+              <Box flexDirection="column" marginTop={1} marginLeft={2}>
+                {recoveryAdvice.docs.map(doc => (
+                  <Text key={`recovery-doc-${doc}`} color="cyan">{doc}</Text>
+                ))}
+              </Box>
+            </>
+          )}
+        </>
       )}
       {supportBundlePath && (
-        <Text dimColor>{`Support bundle: ${supportBundlePath}`}</Text>
+        <>
+          <Newline />
+          <Text bold>Support bundle</Text>
+          <Text dimColor>{supportBundlePath}</Text>
+        </>
       )}
+      <Newline />
       {showRetry && (
-        <Select options={RETRY_OPTIONS} onChange={onChange} />
+        <>
+          <Text bold>What do you want to do?</Text>
+          <Newline />
+          <Select options={RETRY_OPTIONS} onChange={onChange} />
+        </>
       )}
     </Box>
   )
@@ -465,48 +390,30 @@ export const BuildCompleteStep: FC<BuildCompleteStepProps> = ({ buildUrl, ciSecr
       anytime to start a build.
     </Text>
   )
-  if (!dense) {
-    return (
-      <Box flexDirection="column" marginTop={1}>
-        <Newline />
-        <Box
-          borderStyle="round"
-          borderColor="green"
-          paddingX={3}
-          paddingY={1}
-          flexDirection="column"
-          alignItems="center"
-        >
-          <Text bold color="green">🎉  You're all set!</Text>
-          <Newline />
-          {detail}
-          <Newline />
-          {ciSecretUploadSummary && (
-            <>
-              <Text>{`${ciSecretUploadSummary}.`}</Text>
-              <Newline />
-            </>
-          )}
-          {runHint}
-        </Box>
-        <Newline />
-      </Box>
-    )
-  }
   return (
     <Box flexDirection="column" marginTop={1}>
+      <Newline />
       <Box
         borderStyle="round"
         borderColor="green"
         paddingX={3}
+        paddingY={1}
         flexDirection="column"
         alignItems="center"
       >
         <Text bold color="green">🎉  You're all set!</Text>
+        <Newline />
         {detail}
-        {ciSecretUploadSummary && <Text>{`${ciSecretUploadSummary}.`}</Text>}
+        <Newline />
+        {ciSecretUploadSummary && (
+          <>
+            <Text>{`${ciSecretUploadSummary}.`}</Text>
+            <Newline />
+          </>
+        )}
         {runHint}
       </Box>
+      <Newline />
     </Box>
   )
 }
