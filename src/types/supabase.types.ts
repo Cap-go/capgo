@@ -997,6 +997,48 @@ export type Database = {
         }
         Relationships: []
       }
+      daily_storage_hourly: {
+        Row: {
+          app_id: string
+          created_at: string
+          date: string
+          owner_org: string
+          storage_byte_hours: number
+          updated_at: string
+        }
+        Insert: {
+          app_id: string
+          created_at?: string
+          date: string
+          owner_org: string
+          storage_byte_hours?: number
+          updated_at?: string
+        }
+        Update: {
+          app_id?: string
+          created_at?: string
+          date?: string
+          owner_org?: string
+          storage_byte_hours?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "daily_storage_hourly_app_id_fkey"
+            columns: ["app_id"]
+            isOneToOne: false
+            referencedRelation: "apps"
+            referencedColumns: ["app_id"]
+          },
+          {
+            foreignKeyName: "daily_storage_hourly_owner_org_fkey"
+            columns: ["owner_org"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       daily_version: {
         Row: {
           app_id: string

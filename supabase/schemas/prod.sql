@@ -16315,6 +16315,27 @@ WITH ("autovacuum_vacuum_scale_factor"='0.05', "autovacuum_analyze_scale_factor"
 ALTER TABLE "public"."daily_storage" OWNER TO "postgres";
 
 
+CREATE TABLE IF NOT EXISTS "public"."daily_storage_hourly" (
+    "app_id" character varying(255) NOT NULL,
+    "owner_org" "uuid" NOT NULL,
+    "date" "date" NOT NULL,
+    "storage_byte_hours" double precision DEFAULT 0 NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL
+);
+
+
+ALTER TABLE "public"."daily_storage_hourly" OWNER TO "postgres";
+
+
+COMMENT ON TABLE "public"."daily_storage_hourly" IS 'Shadow daily storage-hour usage, recorded as byte-hours. This is intentionally not used for billing until storage-hour billing is explicitly enabled.';
+
+
+
+COMMENT ON COLUMN "public"."daily_storage_hourly"."storage_byte_hours" IS 'Byte-hour contribution for this UTC day.';
+
+
+
 CREATE SEQUENCE IF NOT EXISTS "public"."daily_storage_id_seq"
     AS integer
     START WITH 1
@@ -17635,7 +17656,7 @@ CREATE TABLE IF NOT EXISTS "public"."users" (
     "enable_notifications" boolean DEFAULT true NOT NULL,
     "opt_for_newsletters" boolean DEFAULT true NOT NULL,
     "ban_time" timestamp with time zone,
-    "email_preferences" "jsonb" DEFAULT '{"onboarding": true, "usage_limit": true, "credit_usage": true, "device_error": true, "weekly_stats": true, "monthly_stats": true, "bundle_created": true, "bundle_deployed": true, "deploy_stats_24h": true, "cli_realtime_feed": true, "billing_period_stats": true, "channel_self_rejected": true}'::"jsonb" NOT NULL,
+    "email_preferences" "jsonb" DEFAULT '{"onboarding": true, "usage_limit": true, "credit_usage": true, "device_error": true, "weekly_stats": true, "monthly_stats": true, "bundle_created": true, "bundle_deployed": true, "deploy_stats_24h": true, "cli_realtime_feed": true, "builder_onboarding": true, "billing_period_stats": true, "channel_self_rejected": true}'::"jsonb" NOT NULL,
     "created_via_invite" boolean DEFAULT false NOT NULL
 );
 
@@ -17643,7 +17664,7 @@ CREATE TABLE IF NOT EXISTS "public"."users" (
 ALTER TABLE "public"."users" OWNER TO "postgres";
 
 
-COMMENT ON COLUMN "public"."users"."email_preferences" IS 'Per-user email notification preferences. Keys: usage_limit, credit_usage, onboarding, weekly_stats, monthly_stats, billing_period_stats, deploy_stats_24h, bundle_created, bundle_deployed, device_error, channel_self_rejected, cli_realtime_feed. Values are booleans.';
+COMMENT ON COLUMN "public"."users"."email_preferences" IS 'Per-user email notification preferences. Keys: usage_limit, credit_usage, onboarding, builder_onboarding, weekly_stats, monthly_stats, billing_period_stats, deploy_stats_24h, bundle_created, bundle_deployed, device_error, channel_self_rejected, cli_realtime_feed. Values are booleans.';
 
 
 
@@ -17912,6 +17933,11 @@ ALTER TABLE ONLY "public"."daily_mau"
 
 ALTER TABLE ONLY "public"."daily_revenue_metrics"
     ADD CONSTRAINT "daily_revenue_metrics_pkey" PRIMARY KEY ("date_id", "customer_id");
+
+
+
+ALTER TABLE ONLY "public"."daily_storage_hourly"
+    ADD CONSTRAINT "daily_storage_hourly_pkey" PRIMARY KEY ("app_id", "date");
 
 
 
@@ -18353,6 +18379,10 @@ CREATE INDEX "idx_app_versions_retention_cleanup" ON "public"."app_versions" USI
 
 
 
+CREATE INDEX "idx_apps_default_upload_channel" ON "public"."apps" USING "btree" ("default_upload_channel");
+
+
+
 CREATE INDEX "idx_audit_logs_created_at" ON "public"."audit_logs" USING "btree" ("created_at" DESC);
 
 
@@ -18366,6 +18396,10 @@ CREATE INDEX "idx_audit_logs_org_created" ON "public"."audit_logs" USING "btree"
 
 
 CREATE INDEX "idx_audit_logs_org_id" ON "public"."audit_logs" USING "btree" ("org_id");
+
+
+
+CREATE INDEX "idx_audit_logs_record_id" ON "public"."audit_logs" USING "btree" ("record_id");
 
 
 
@@ -18441,6 +18475,14 @@ CREATE INDEX "idx_daily_mau_app_id_date" ON "public"."daily_mau" USING "btree" (
 
 
 
+CREATE INDEX "idx_daily_storage_hourly_date" ON "public"."daily_storage_hourly" USING "btree" ("date");
+
+
+
+CREATE INDEX "idx_daily_storage_hourly_owner_org_date" ON "public"."daily_storage_hourly" USING "btree" ("owner_org", "date");
+
+
+
 CREATE INDEX "idx_daily_version_app_id" ON "public"."daily_version" USING "btree" ("app_id");
 
 
@@ -18482,6 +18524,14 @@ CREATE INDEX "idx_id_app_id_app_versions_meta" ON "public"."app_versions_meta" U
 
 
 CREATE INDEX "idx_manifest_app_version_id" ON "public"."manifest" USING "btree" ("app_version_id");
+
+
+
+CREATE INDEX "idx_manifest_file_hash" ON "public"."manifest" USING "btree" ("file_hash");
+
+
+
+CREATE INDEX "idx_manifest_file_name" ON "public"."manifest" USING "btree" ("file_name");
 
 
 
@@ -18545,6 +18595,10 @@ CREATE INDEX "idx_usage_credit_transactions_grant" ON "public"."usage_credit_tra
 
 
 
+CREATE INDEX "idx_usage_credit_transactions_org_id" ON "public"."usage_credit_transactions" USING "btree" ("org_id");
+
+
+
 CREATE INDEX "idx_usage_credit_transactions_org_time" ON "public"."usage_credit_transactions" USING "btree" ("org_id", "occurred_at" DESC);
 
 
@@ -18557,6 +18611,10 @@ CREATE INDEX "idx_usage_overage_events_metric" ON "public"."usage_overage_events
 
 
 
+CREATE INDEX "idx_usage_overage_events_org_id" ON "public"."usage_overage_events" USING "btree" ("org_id");
+
+
+
 CREATE INDEX "idx_usage_overage_events_org_time" ON "public"."usage_overage_events" USING "btree" ("org_id", "created_at" DESC);
 
 
@@ -18566,6 +18624,10 @@ CREATE INDEX "idx_user_password_compliance_user_org" ON "public"."user_password_
 
 
 CREATE INDEX "idx_users_email_preferences" ON "public"."users" USING "gin" ("email_preferences");
+
+
+
+CREATE INDEX "idx_version_meta_app_id_timestamp" ON "public"."version_meta" USING "btree" ("app_id", "timestamp");
 
 
 
@@ -19119,6 +19181,16 @@ ALTER TABLE ONLY "public"."daily_build_time"
 
 
 
+ALTER TABLE ONLY "public"."daily_storage_hourly"
+    ADD CONSTRAINT "daily_storage_hourly_app_id_fkey" FOREIGN KEY ("app_id") REFERENCES "public"."apps"("app_id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."daily_storage_hourly"
+    ADD CONSTRAINT "daily_storage_hourly_owner_org_fkey" FOREIGN KEY ("owner_org") REFERENCES "public"."orgs"("id") ON DELETE CASCADE;
+
+
+
 ALTER TABLE ONLY "public"."deploy_history"
     ADD CONSTRAINT "deploy_history_app_id_fkey" FOREIGN KEY ("app_id") REFERENCES "public"."apps"("app_id") ON DELETE CASCADE;
 
@@ -19651,6 +19723,10 @@ CREATE POLICY "Allow read for auth (read+)" ON "public"."daily_storage" FOR SELE
 
 
 
+CREATE POLICY "Allow read for auth (read+)" ON "public"."daily_storage_hourly" FOR SELECT TO "anon", "authenticated" USING ("public"."check_min_rights"('read'::"public"."user_min_right", "public"."get_identity_org_appid"('{read,upload,write,all}'::"public"."key_mode"[], "owner_org", "app_id"), "owner_org", "app_id", NULL::bigint));
+
+
+
 CREATE POLICY "Allow read for auth (read+)" ON "public"."daily_version" FOR SELECT TO "anon", "authenticated" USING ((EXISTS ( SELECT 1
    FROM "public"."apps"
   WHERE ((("apps"."app_id")::"text" = ("daily_version"."app_id")::"text") AND "public"."check_min_rights"('read'::"public"."user_min_right",
@@ -19801,6 +19877,10 @@ CREATE POLICY "Deny delete for org members" ON "public"."usage_overage_events" A
 
 
 
+CREATE POLICY "Deny delete on daily_storage_hourly" ON "public"."daily_storage_hourly" AS RESTRICTIVE FOR DELETE TO "anon", "authenticated" USING (false);
+
+
+
 CREATE POLICY "Deny delete on deploy history" ON "public"."deploy_history" FOR DELETE USING (false);
 
 
@@ -19821,6 +19901,10 @@ CREATE POLICY "Deny insert for org members" ON "public"."usage_overage_events" A
 
 
 
+CREATE POLICY "Deny insert on daily_storage_hourly" ON "public"."daily_storage_hourly" AS RESTRICTIVE FOR INSERT TO "anon", "authenticated" WITH CHECK (false);
+
+
+
 CREATE POLICY "Deny update for org members" ON "public"."usage_credit_consumptions" AS RESTRICTIVE FOR UPDATE TO "anon", "authenticated" USING (false) WITH CHECK (false);
 
 
@@ -19834,6 +19918,10 @@ CREATE POLICY "Deny update for org members" ON "public"."usage_credit_transactio
 
 
 CREATE POLICY "Deny update for org members" ON "public"."usage_overage_events" AS RESTRICTIVE FOR UPDATE TO "anon", "authenticated" USING (false) WITH CHECK (false);
+
+
+
+CREATE POLICY "Deny update on daily_storage_hourly" ON "public"."daily_storage_hourly" AS RESTRICTIVE FOR UPDATE TO "anon", "authenticated" USING (false) WITH CHECK (false);
 
 
 
@@ -20047,6 +20135,9 @@ ALTER TABLE "public"."daily_revenue_metrics" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."daily_storage" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."daily_storage_hourly" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."daily_version" ENABLE ROW LEVEL SECURITY;
@@ -23134,6 +23225,12 @@ GRANT ALL ON TABLE "public"."daily_revenue_metrics" TO "service_role";
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."daily_storage" TO "anon";
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."daily_storage" TO "authenticated";
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."daily_storage" TO "service_role";
+
+
+
+GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."daily_storage_hourly" TO "anon";
+GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."daily_storage_hourly" TO "authenticated";
+GRANT ALL ON TABLE "public"."daily_storage_hourly" TO "service_role";
 
 
 
