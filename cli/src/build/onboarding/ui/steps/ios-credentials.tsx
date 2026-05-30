@@ -167,97 +167,57 @@ export const ApiKeyInstructionsStep: FC<ApiKeyInstructionsStepProps> = ({
           </Box>
         </>
       )
-  if (!dense) {
-    return (
-      <Box flexDirection="column" marginTop={1}>
-        <Alert variant="info">
-          We need an App Store Connect API key to manage certificates and profiles for you.
-        </Alert>
-        <Newline />
-        <Box flexDirection="column" marginLeft={2}>
-          <Text>
-            <Text bold color="white">1.</Text>
-            {' '}
-            Go to
-            {' '}
-            <Text color="cyan" underline>appstoreconnect.apple.com/access/integrations/api</Text>
-          </Text>
-          <Text>
-            <Text bold color="white">2.</Text>
-            {' '}
-            Click
-            {' '}
-            <Text bold>"Generate API Key"</Text>
-          </Text>
-          <Text>
-            <Text bold color="white">3.</Text>
-            {' '}
-            Name it
-            {' '}
-            <Text color="yellow">"Capgo Builder"</Text>
-            {' '}
-            · Access:
-            {' '}
-            <Text bold color="green">"Admin"</Text>
-          </Text>
-          <Text>
-            <Text bold color="white">4.</Text>
-            {' '}
-            Download the
-            {' '}
-            <Text bold>.p8</Text>
-            {' '}
-            file
-          </Text>
-        </Box>
-        <Newline />
-        <Box>
-          <Text dimColor>Press </Text>
-          <Text bold color="white">Ctrl+O</Text>
-          <Text dimColor> to open App Store Connect in your browser</Text>
-        </Box>
-        <Newline />
-        <Divider />
-        <Newline />
-        {control}
-      </Box>
-    )
-  }
   return (
     <Box flexDirection="column" marginTop={1}>
       <Alert variant="info">
-        Capgo needs an App Store Connect API key to manage certs and profiles.
+        We need an App Store Connect API key to manage certificates and profiles for you.
       </Alert>
+      <Newline />
       <Box flexDirection="column" marginLeft={2}>
         <Text>
           <Text bold color="white">1.</Text>
           {' '}
-          Open
+          Go to
           {' '}
           <Text color="cyan" underline>appstoreconnect.apple.com/access/integrations/api</Text>
         </Text>
         <Text>
           <Text bold color="white">2.</Text>
           {' '}
-          <Text bold>Generate API Key</Text>
-          {' · name '}
-          <Text color="yellow">"Capgo Builder"</Text>
-          {' · Access '}
-          <Text bold color="green">Admin</Text>
+          Click
+          {' '}
+          <Text bold>"Generate API Key"</Text>
         </Text>
         <Text>
           <Text bold color="white">3.</Text>
+          {' '}
+          Name it
+          {' '}
+          <Text color="yellow">"Capgo Builder"</Text>
+          {' '}
+          · Access:
+          {' '}
+          <Text bold color="green">"Admin"</Text>
+        </Text>
+        <Text>
+          <Text bold color="white">4.</Text>
           {' '}
           Download the
           {' '}
           <Text bold>.p8</Text>
           {' '}
-          file ·
-          {' '}
-          <Text dimColor>Ctrl+O opens it in your browser</Text>
+          file
         </Text>
       </Box>
+      <Newline />
+      <Box>
+        <Text dimColor>Press </Text>
+        <Text bold color="white">Ctrl+O</Text>
+        <Text dimColor> to open App Store Connect in your browser</Text>
+      </Box>
+      <Newline />
       <Divider />
+      <Newline />
       {control}
     </Box>
   )
