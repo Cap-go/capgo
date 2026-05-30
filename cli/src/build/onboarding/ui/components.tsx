@@ -437,7 +437,18 @@ export const FullscreenBuildOutput: FC<{
 
   const CHROME_ROWS = 2 // bottom divider + status line
   const viewportRows = Math.max(1, dims.rows - CHROME_ROWS)
-  const maxScrollOffset = computeMaxScrollOffset(lines, viewportRows, dims.cols)
+  // Each log line renders as exactly ONE row (truncated to the terminal width in
+  // the viewport below), so the viewport is a plain 1:1 slice — NOT the
+  // wrap-aware packing the AI viewer needs. We deliberately do not wrap: an
+  // un-truncated line — e.g. a multi-KB base64 provisioning/key blob streamed in
+  // the build env — wraps to dozens of rows, which (a) lets one line dominate or
+  // overflow the viewport, and (b) desyncs Ink's per-line row accounting from
+  // what the terminal actually draws, leaving stale "dead space" rows that don't
+  // repaint on stream/scroll/resize. One row per line keeps the frame exactly
+  // dims.rows tall so Ink always takes its full clear-screen redraw path. A
+  // tail-follow build log is read vertically, not horizontally, so truncating
+  // over-long lines is the right model (the full log is also captured to disk).
+  const maxScrollOffset = Math.max(0, lines.length - viewportRows)
 
   // `follow` is the SINGLE source of truth for the tail state — never a
   // comparison of scrollOffset vs maxScrollOffset. When following, the offset is
@@ -458,7 +469,7 @@ export const FullscreenBuildOutput: FC<{
     setPausedOffset(action.scrollOffset)
   })
 
-  const visibleLines = pickVisibleLines(lines, scrollOffset, viewportRows, dims.cols)
+  const visibleLines = lines.slice(scrollOffset, scrollOffset + viewportRows)
   const dividerWidth = Math.max(10, Math.min(60, dims.cols - 1))
   const hint = maxScrollOffset === 0
     ? ''
@@ -481,7 +492,7 @@ export const FullscreenBuildOutput: FC<{
           const isBold = line.startsWith('✔ Build') || line.startsWith('✔ Created') || line.startsWith('Uploading:')
           const color = isSuccess ? 'green' : isError ? 'red' : isWarn ? 'yellow' : undefined
           return (
-            <Text key={`build-${scrollOffset + index}`} color={color} bold={isBold} dimColor={!color && !isBold}>
+            <Text key={`build-${scrollOffset + index}`} color={color} bold={isBold} dimColor={!color && !isBold} wrap="truncate-end">
               {line === '' ? ' ' : line}
             </Text>
           )
