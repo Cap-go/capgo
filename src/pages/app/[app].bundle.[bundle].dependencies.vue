@@ -87,7 +87,9 @@ const compareStatusMessage = computed(() => {
   const compareName = selectedCompareVersion.value?.name ?? t('unknown')
   if (baselinePackages.value.length === 0)
     return t('dependencies-status-compare-empty', { bundle: compareName })
-  return t('dependencies-status-compatibility', { bundle: compareName })
+  // In comparison mode the verdict banner already names the baseline bundle, so
+  // a separate "comparing against ..." line would be redundant.
+  return ''
 })
 
 // Reason → human label, mirroring the CLI's getCompatibilityDetails messages.

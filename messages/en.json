@@ -909,7 +909,6 @@
   "dependencies-status-added": "Added",
   "dependencies-status-changed": "Changed",
   "dependencies-status-compare-empty": "We could not find any dependencies for {bundle}.",
-  "dependencies-status-compatibility": "Comparing this bundle against {bundle}.",
   "dependencies-status-full": "Showing all dependencies for this bundle.",
   "dependencies-status-removed": "Removed",
   "dependencies-status-unchanged": "Unchanged",
