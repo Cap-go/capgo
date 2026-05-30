@@ -36,7 +36,6 @@ The CTA is evaluated only when **all** hold:
 1. Command is `bundle upload`.
 2. Compatibility ran and the verdict is **incompatible** (`isBuildNeeded(...) === true`).
    - If `--ignore-metadata-check` was passed, no compatibility check runs, so no CTA.
-3. `CAPGO_NO_BUILDER_PROMPT` is not truthy.
 
 Compatible uploads are completely unchanged. The compatibility verdict itself remains
 **non-fatal** (this feature does not block uploads).
@@ -102,13 +101,12 @@ returns a non-`null` entry for the current `appId`. Credentials live under
 `~/.capgo-credentials/` — the same store `build request` reads. No new helper and
 no server-side lookup (explicitly out of scope).
 
-## Opt-out
+## No opt-out / snooze
 
-- `CAPGO_NO_BUILDER_PROMPT=1` suppresses the CTA entirely (both the interactive
-  prompt and the CI ad).
-
-There is **no snooze / "don't ask again" state**. A declined prompt simply continues
-the upload, and the CTA may appear again on the next incompatible upload.
+There is **no opt-out, snooze, or "don't ask again" state**. A declined prompt simply
+continues the upload, and the CTA may appear again on the next incompatible upload.
+Non-interactive / CI runs get a single `log.warn` ad line (never a prompt), so there is
+nothing to suppress there either.
 
 ## Accept → skip upload
 
@@ -185,6 +183,5 @@ compatible-vs-incompatible graphs (previously only fed by the standalone command
   just continues the upload — no second prompt, no snooze.
 - Warning copy: low-fear (native changes ship via an app-store build, not OTA).
 - Architecture: CLI-only, PostHog for tracking, local credential check.
-- `CAPGO_NO_BUILDER_PROMPT` suppresses everything (prompt + CI ad).
 - `build request` is launched without `--path` (it resolves the project root and
   prompts for platform); the launch lives in the CLI entry point, not `upload.ts`.

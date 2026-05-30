@@ -19,12 +19,9 @@ const baseParams = {
 }
 
 describe('decideBuilderCtaSurface', () => {
-  const base = { incompatible: true, interactive: true, envDisabled: false, hasCredentials: false }
+  const base = { incompatible: true, interactive: true, hasCredentials: false }
   it.concurrent('skips when compatible', () => {
     expect(decideBuilderCtaSurface({ ...base, incompatible: false })).toBe('skip')
-  })
-  it.concurrent('skips when disabled via env (even on CI)', () => {
-    expect(decideBuilderCtaSurface({ ...base, envDisabled: true, interactive: false })).toBe('skip')
   })
   it.concurrent('shows the CI ad when non-interactive', () => {
     expect(decideBuilderCtaSurface({ ...base, interactive: false })).toBe('ci-ad')

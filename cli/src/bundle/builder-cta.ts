@@ -1,7 +1,5 @@
-import { env } from 'node:process'
 import { confirm as pConfirm, isCancel as pIsCancel, log } from '@clack/prompts'
 import { trackEvent } from '../analytics/track'
-import { isTruthyEnvValue } from '../posthog'
 
 export type BuilderCtaSurface = 'skip' | 'ci-ad' | 'prompt-onboarding' | 'prompt-build'
 export type BuilderCtaAction = 'continue' | 'launch-onboarding' | 'launch-build'
@@ -9,19 +7,18 @@ export type BuilderCtaAction = 'continue' | 'launch-onboarding' | 'launch-build'
 export interface BuilderCtaContext {
   incompatible: boolean
   interactive: boolean
-  envDisabled: boolean
   hasCredentials: boolean
 }
 
 /**
  * Pure decision: which Builder CTA surface (if any) to show for this upload.
- * - `skip`: do nothing (compatible or disabled via env).
+ * - `skip`: do nothing (compatible bundle).
  * - `ci-ad`: non-interactive — print a one-off ad, never prompt.
  * - `prompt-onboarding` / `prompt-build`: interactive prompt, branched on
  *   whether the app already has build credentials.
  */
 export function decideBuilderCtaSurface(ctx: BuilderCtaContext): BuilderCtaSurface {
-  if (!ctx.incompatible || ctx.envDisabled)
+  if (!ctx.incompatible)
     return 'skip'
   if (!ctx.interactive)
     return 'ci-ad'
@@ -84,13 +81,11 @@ export async function maybePromptBuilderCta(params: MaybePromptBuilderCtaParams)
 }
 
 async function runBuilderCta(params: MaybePromptBuilderCtaParams): Promise<BuilderCtaAction> {
-  const envDisabled = isTruthyEnvValue(env.CAPGO_NO_BUILDER_PROMPT)
   const { hasCredentials } = params
 
   const surface = decideBuilderCtaSurface({
     incompatible: params.incompatible,
     interactive: params.interactive,
-    envDisabled,
     hasCredentials,
   })
   if (surface === 'skip')
