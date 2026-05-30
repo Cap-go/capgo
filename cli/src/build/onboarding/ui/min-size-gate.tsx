@@ -28,12 +28,22 @@ import { MIN_COLS, MIN_ROWS, terminalFitsOnboarding } from '../min-terminal-size
 export interface TerminalTooSmallPromptProps {
   cols: number
   rows: number
+  /** Minimum columns this screen needs. Defaults to the full onboarding floor;
+   *  the platform picker passes its smaller PICKER_MIN_COLS. */
+  minCols?: number
+  /** Minimum rows this screen needs. Defaults to the full onboarding floor; the
+   *  platform picker passes its smaller PICKER_MIN_ROWS. So the prompt always
+   *  states the floor of the screen that's actually too small (e.g. "11 rows" on
+   *  the picker, not the wizard's 49). */
+  minRows?: number
 }
 
 // The "terminal too small" resize prompt. minHeight fills the viewport so Ink
 // uses its full clear-screen path (no stale rows from a previous frame on
-// resize), and it names whichever dimension is short.
-export const TerminalTooSmallPrompt: FC<TerminalTooSmallPromptProps> = ({ cols, rows }) => {
+// resize), and it names whichever dimension is short — against the floor of the
+// CALLING screen (minCols/minRows), so the numbers always match what the user is
+// looking at.
+export const TerminalTooSmallPrompt: FC<TerminalTooSmallPromptProps> = ({ cols, rows, minCols = MIN_COLS, minRows = MIN_ROWS }) => {
   // Keep a stdin reader alive while the prompt is shown. This is load-bearing:
   // on the picker path the ONLY useInput lives in PlatformPicker, so swapping it
   // for this prompt would leave Ink with zero input subscribers — under
@@ -45,17 +55,17 @@ export const TerminalTooSmallPrompt: FC<TerminalTooSmallPromptProps> = ({ cols, 
     if (key.ctrl && input === 'c')
       process.kill(process.pid, 'SIGINT')
   })
-  const needWider = cols < MIN_COLS
-  const needTaller = rows < MIN_ROWS
+  const needWider = cols < minCols
+  const needTaller = rows < minRows
   return (
     <Box flexDirection="column" minHeight={rows} padding={1}>
       <Text bold color="cyan">🚀  Capgo Cloud Build · Onboarding</Text>
       <Box marginTop={1} flexDirection="column">
         <Text color="yellow" bold>{`⚠  Terminal too small (${cols}×${rows}).`}</Text>
-        <Text>{`Onboarding needs at least ${MIN_COLS}×${MIN_ROWS} (columns × rows) so every step fits without resizing partway through.`}</Text>
+        <Text>{`This screen needs at least ${minCols}×${minRows} (columns × rows).`}</Text>
         <Box marginTop={1} flexDirection="column">
-          {needWider && <Text>{`• Widen to at least ${MIN_COLS} columns (currently ${cols}).`}</Text>}
-          {needTaller && <Text>{`• Make it taller — at least ${MIN_ROWS} rows (currently ${rows}).`}</Text>}
+          {needWider && <Text>{`• Widen to at least ${minCols} columns (currently ${cols}).`}</Text>}
+          {needTaller && <Text>{`• Make it taller — at least ${minRows} rows (currently ${rows}).`}</Text>}
         </Box>
         <Box marginTop={1}>
           <Text dimColor>Resize this window and onboarding will continue automatically — no need to restart.</Text>

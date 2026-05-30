@@ -24,7 +24,7 @@ import { loadAndroidProgress } from '../android/progress.js'
 import AndroidOnboardingApp from '../android/ui/app.js'
 import { loadProgress } from '../progress.js'
 import OnboardingApp from './app.js'
-import { terminalFitsPicker } from '../min-terminal-size.js'
+import { PICKER_MIN_COLS, PICKER_MIN_ROWS, terminalFitsPicker } from '../min-terminal-size.js'
 import { Header } from './components.js'
 import { pickPlatformLayout } from './frame-fit.js'
 import { TerminalTooSmallPrompt } from './min-size-gate.js'
@@ -123,7 +123,7 @@ const OnboardingShell: FC<OnboardingShellProps> = ({ appId, iosDir, androidDir, 
   // (44×11), well below the step floor, so the middle band still shows the
   // picker. Resize-reactive via cols/rows from useTerminalSize.
   if (!terminalFitsPicker(cols, rows))
-    return <TerminalTooSmallPrompt cols={cols} rows={rows} />
+    return <TerminalTooSmallPrompt cols={cols} rows={rows} minCols={PICKER_MIN_COLS} minRows={PICKER_MIN_ROWS} />
 
   return (
     <Box flexDirection="column" minHeight={rows} padding={1}>

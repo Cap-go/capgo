@@ -86,6 +86,11 @@ function check(name, cond) {
   const out = await renderShellAt(30, 8)
   check('below the banner floor shows the resize prompt', /too small/i.test(out))
   check('below the banner floor hides the picker', !/want to set up/i.test(out))
+  // The prompt must name the PICKER floor (11 rows), not the step floor (49) —
+  // saying "at least 49 rows" on the platform-picker screen is nonsense. Collapse
+  // whitespace first so a line wrap at narrow width can't split "11 rows".
+  const flat = out.replace(/\s+/g, ' ')
+  check('picker prompt names the picker row floor (11), not the step floor (49)', /at least 11 rows/.test(flat) && !/\b49\b/.test(flat))
 }
 
 // Middle band (above banner floor, below the 80×49 step floor): picker shows.
