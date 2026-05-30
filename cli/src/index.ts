@@ -173,7 +173,17 @@ Capgo never inspects external content. Add encryption for trustless security.
 
 Example: npx @capgo/cli@latest bundle upload com.example.app --path ./dist --channel production`)
   .action(async (...args: Parameters<typeof uploadBundle>): Promise<void> => {
-    await uploadBundle(...args)
+    const result = await uploadBundle(...args)
+    // When the bundle is incompatible and the user opted into Capgo Builder, the
+    // upload is skipped and we launch the (Ink-based) build flow here — keeping
+    // those heavy commands out of the upload module / programmatic SDK bundle.
+    if (result?.builderAction) {
+      const [appId, options] = args
+      if (result.builderAction === 'launch-onboarding')
+        await onboardingBuilderCommand({ apikey: options.apikey })
+      else
+        await requestBuildCommand(appId ?? '', { apikey: options.apikey, supaHost: options.supaHost, supaAnon: options.supaAnon, path: options.path })
+    }
   })
   .option('-a, --apikey <apikey>', optionDescriptions.apikey)
   .option('-p, --path <path>', `Path of the folder to upload, if not provided it will use the webDir set in capacitor.config`)
