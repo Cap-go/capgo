@@ -11,25 +11,51 @@
 // These numbers are not guessed — they are produced by the VT size-search
 // harness (test/find-min-onboarding-size.mjs), which renders EVERY static step
 // in its comfortable form (worst-case content) plus the completed-steps log,
-// through a real terminal emulator (@xterm/headless), and reports the tallest:
+// through a real terminal emulator (@xterm/headless), and reports the tallest
+// PER PLATFORM:
 //
-//   width 80 → 49 rows   (tallest: google-sign-in-learn-more)
+//   iOS     width 80 → 38 rows   (tallest: api-key-instructions)
+//   Android width 80 → 49 rows   (tallest: google-sign-in-learn-more, the GCP explainer)
+//
+// The two wizards differ: iOS signs with an App Store Connect API key + certs
+// (it has no Google/GCP step), so its tallest static step is shorter than
+// Android's GCP service-account explainer. A single shared floor would force iOS
+// users to have 11 rows they never need — so the floor is PER PLATFORM.
 //
 // Width is fixed at 80 (the classic default) so the row floor is deterministic;
-// narrower terminals wrap text taller (53 @ 60 cols), which would raise the row
-// requirement. The matching test (test/test-onboarding-min-size.mjs) re-runs the
-// harness and FAILS if any static step grows past MIN_ROWS at MIN_COLS, so this
-// number can never silently drift from reality.
+// narrower terminals wrap text taller, which would raise the row requirement.
+// The matching test (test/test-onboarding-min-size.mjs) re-runs the harness and
+// FAILS if any static step grows past ITS platform's floor at MIN_COLS, so these
+// numbers can never silently drift from reality.
 //
-// Dynamic content (the completed-steps log, AI analysis, the build log) is NOT
-// part of this floor beyond the log's minimal cut form: those scroll or cut, so
-// they never force a resize.
+// Dynamic / unbounded content is NOT part of this floor — it scrolls or cuts, so
+// it never forces a resize: the completed-steps log (cuts to a summary line), the
+// AI analysis + build log (fullscreen scroll viewers), and the iOS error screen
+// (its recovery advice is unbounded — 42–54 rows — so it routes through the same
+// scroll viewer as the AI analysis rather than dictating a 54-row floor).
 export const MIN_COLS = 80
-export const MIN_ROWS = 49
 
-/** True when the given terminal size can run onboarding without a mid-flow resize. */
-export function terminalFitsOnboarding(cols: number, rows: number): boolean {
-  return cols >= MIN_COLS && rows >= MIN_ROWS
+// Per-platform row floors at MIN_COLS. See the harness output above.
+export const IOS_MIN_ROWS = 38
+export const ANDROID_MIN_ROWS = 49
+
+// Conservative default for platform-agnostic callers (the generic MinSizeGate /
+// TerminalTooSmallPrompt default): the LARGER floor, so a gate with no platform
+// context never under-reserves.
+export const MIN_ROWS = ANDROID_MIN_ROWS
+
+/** The full-onboarding row floor for a given platform. */
+export function onboardingMinRows(platform: 'ios' | 'android'): number {
+  return platform === 'ios' ? IOS_MIN_ROWS : ANDROID_MIN_ROWS
+}
+
+/**
+ * True when the given terminal size can run a platform's onboarding without a
+ * mid-flow resize. `platform` defaults to the conservative 'android' (larger)
+ * floor for platform-agnostic callers.
+ */
+export function terminalFitsOnboarding(cols: number, rows: number, platform: 'ios' | 'android' = 'android'): boolean {
+  return cols >= MIN_COLS && rows >= onboardingMinRows(platform)
 }
 
 // A much smaller floor for the PLATFORM PICKER specifically. The picker is shown

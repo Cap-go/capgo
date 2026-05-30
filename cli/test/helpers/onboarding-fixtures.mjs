@@ -3,15 +3,25 @@
 // worst cases lifted from the existing frame-fit tests (longest ids/messages,
 // most options) so the measured floor is a true upper bound.
 //
-// DYNAMIC steps are intentionally EXCLUDED — they scroll or cut, so they don't
-// constrain the static floor:
+// Each entry is TAGGED with its platform ('ios' | 'android'), because the floor
+// is now PER PLATFORM (see min-terminal-size.ts): iOS steps must fit IOS_MIN_ROWS
+// (38), Android steps must fit ANDROID_MIN_ROWS (49). The tag is by source module
+// — ios-* → 'ios', android-* → 'android' — which is exact: each app renders ONLY
+// its own platform's modules (verified: ui/app.tsx imports ios-*; android/ui/app
+// imports android-*), with no cross-platform component sharing.
+//
+// DYNAMIC / UNBOUNDED steps are intentionally EXCLUDED — they scroll or cut, so
+// they don't constrain the static floor:
 //   • ai-analysis-prompt / -running / -result  (AI content scrolls)
 //   • requesting-build (build log scrolls/tails)
 //   • the completed-steps log (cuts to a summary line)
+//   • the iOS error screen (ish.ErrorStep) — its recovery advice is unbounded
+//     (42–54 rows), so it routes through the same fullscreen scroll viewer as
+//     the AI analysis; only its COMPACT form renders inline, and that's ~20 rows.
 //
-// Each entry: { label, el, withProgress }. withProgress=false for the takeover /
-// pre-flow frames that hide the progress bar (welcome, no-platform,
-// build-complete).
+// Each entry: { label, el, withProgress, platform }. withProgress=false for the
+// takeover / pre-flow frames that hide the progress bar (welcome, no-platform,
+// build-complete, adding-platform).
 import React from 'react'
 import * as ks from '../../src/build/onboarding/ui/steps/android-keystore.tsx'
 import * as sa from '../../src/build/onboarding/ui/steps/android-sa-gcp.tsx'
@@ -20,6 +30,7 @@ import * as aci from '../../src/build/onboarding/ui/steps/android-ci.tsx'
 import * as cred from '../../src/build/onboarding/ui/steps/ios-credentials.tsx'
 import * as imp from '../../src/build/onboarding/ui/steps/ios-import.tsx'
 import * as ish from '../../src/build/onboarding/ui/steps/ios-shared.tsx'
+import * as cic from '../../src/build/onboarding/ui/steps/ios-ci.tsx'
 
 const h = React.createElement
 const noop = () => {}
@@ -33,9 +44,21 @@ const LONG_ERR = 'The service account is valid but has no access to this app in 
 const ALIASES = ['release', 'upload', 'androiddebugkey', 'mykeyalias', 'prod', 'staging']
 const opt = n => Array.from({ length: n }, (_, i) => ({ label: `Option ${i + 1}`, value: `${i}` }))
 
-/** @returns {{ label: string, el: import('react').ReactElement, withProgress: boolean }[]} */
+// CI-secrets worst-case props (shared shape across android-ci + ios-ci; both
+// render the same per-provider advice list).
+const CI_ADVICE = [
+  { target: { provider: 'github', label: 'GitHub Actions repository secrets', cli: 'gh' }, reason: 'not-installed', message: 'GitHub CLI (gh) is not installed or not authenticated.', commands: ['Install GitHub CLI: https://cli.github.com/', 'gh auth login'] },
+  { target: { provider: 'gitlab', label: 'GitLab CI/CD variables', cli: 'glab' }, reason: 'not-installed', message: 'GitLab CLI (glab) is not installed or not authenticated.', commands: ['Install GitLab CLI: https://gitlab.com/gitlab-org/cli#installation', 'glab auth login'] },
+]
+const CI_TARGET = { provider: 'gitlab', label: 'GitLab CI/CD variables', cli: 'glab' }
+const CI_KEYS = Array.from({ length: 12 }, (_, i) => `CAPGO_SECRET_ENV_VAR_NUMBER_${i}`)
+
+/** @returns {{ label: string, el: import('react').ReactElement, withProgress: boolean, platform: 'ios' | 'android' }[]} */
 export function staticStepFixtures() {
-  const f = (label, el, withProgress = true) => ({ label, el, withProgress })
+  // f → Android-platform fixture; fi → iOS-platform fixture. Tag is by source
+  // module, asserted against that platform's floor in test-onboarding-min-size.
+  const f = (label, el, withProgress = true) => ({ label, el, withProgress, platform: 'android' })
+  const fi = (label, el, withProgress = true) => ({ label, el, withProgress, platform: 'ios' })
   return [
     // ── android-sa-gcp ──────────────────────────────────────────────────────
     f('google-sign-in', h(sa.GoogleSignInStep, { onChoose: noop, ...C })),
@@ -62,28 +85,39 @@ export function staticStepFixtures() {
     f('keystore-new-key-password', h(ks.KeystoreNewKeyPasswordStep, { onSubmit: noop, ...C })),
     f('keystore-new-common-name', h(ks.KeystoreNewCommonNameStep, { appId: LONG_APP_ID, onSubmit: noop, ...C })),
     // ── ios-credentials ─────────────────────────────────────────────────────
-    f('credentials-exist', h(cred.CredentialsExistStep, { appId: LONG_APP_ID, onChange: noop, ...C })),
-    f('setup-method-select', h(cred.SetupMethodSelectStep, { onChange: noop, ...C })),
-    f('api-key-instructions', h(cred.ApiKeyInstructionsStep, { canUseFilePicker: true, onMethodChange: noop, onPathSubmit: noop, ...C })),
-    f('input-key-id', h(cred.InputKeyIdStep, { keyId: '', onSubmit: noop, ...C })),
-    f('input-issuer-id', h(cred.InputIssuerIdStep, { onSubmit: noop, ...C })),
-    f('cert-limit-prompt', h(cred.CertLimitPromptStep, { existingCount: 3, options: opt(2), onChange: noop, ...C })),
-    f('duplicate-profile-prompt', h(cred.DuplicateProfilePromptStep, { duplicateCount: 4, onChange: noop, ...C })),
+    fi('credentials-exist', h(cred.CredentialsExistStep, { appId: LONG_APP_ID, onChange: noop, ...C })),
+    fi('setup-method-select', h(cred.SetupMethodSelectStep, { onChange: noop, ...C })),
+    fi('api-key-instructions', h(cred.ApiKeyInstructionsStep, { canUseFilePicker: true, onMethodChange: noop, onPathSubmit: noop, ...C })),
+    fi('input-key-id', h(cred.InputKeyIdStep, { keyId: '', onSubmit: noop, ...C })),
+    fi('input-issuer-id', h(cred.InputIssuerIdStep, { onSubmit: noop, ...C })),
+    fi('cert-limit-prompt', h(cred.CertLimitPromptStep, { existingCount: 3, options: opt(2), onChange: noop, ...C })),
+    fi('duplicate-profile-prompt', h(cred.DuplicateProfilePromptStep, { duplicateCount: 4, onChange: noop, ...C })),
     // ── ios-import ──────────────────────────────────────────────────────────
-    f('import-distribution-mode', h(imp.ImportDistributionModeStep, { onChange: noop, ...C })),
-    f('import-pick-identity', h(imp.ImportPickIdentityStep, { identityCount: 12, options: opt(12), onChange: noop, ...C })),
-    f('import-export-warning', h(imp.ImportExportWarningStep, { identityName: 'Apple Distribution: Acme Enterprise Inc (ABCDE12345)', onChange: noop, ...C })),
-    // ── shared (with + without progress) ────────────────────────────────────
-    f('welcome', h(ish.WelcomeStep), false),
+    fi('import-distribution-mode', h(imp.ImportDistributionModeStep, { onChange: noop, ...C })),
+    fi('import-pick-identity', h(imp.ImportPickIdentityStep, { identityCount: 12, options: opt(12), onChange: noop, ...C })),
+    fi('import-export-warning', h(imp.ImportExportWarningStep, { identityName: 'Apple Distribution: Acme Enterprise Inc (ABCDE12345)', onChange: noop, ...C })),
+    // ── ios-ci (iOS CI-secrets sub-flow — previously UNMEASURED) ─────────────
+    fi('ios-ci-secrets-setup', h(cic.CiSecretsSetupStep, { advice: CI_ADVICE, onChange: noop, ...C })),
+    fi('ios-ci-secrets-target-select', h(cic.CiSecretsTargetSelectStep, { options: opt(3), onChange: noop, ...C })),
+    fi('ios-ask-ci-secrets', h(cic.AskCiSecretsStep, { entryCount: 12, target: CI_TARGET, targetLabel: 'GitLab CI/CD', onChange: noop, ...C })),
+    fi('ios-confirm-ci-secret-overwrite', h(cic.ConfirmCiSecretOverwriteStep, { existingKeys: CI_KEYS, onChange: noop, ...C })),
+    fi('ios-ci-secrets-failed', h(cic.CiSecretsFailedStep, { error: LONG_ERR, onChange: noop, ...C })),
+    fi('ios-ask-build', h(cic.AskBuildStep, { onChange: noop, ...C })),
+    // ── ios-shared (takeover / pre-flow frames — previously UNMEASURED) ──────
+    // NOTE: ish.ErrorStep is deliberately NOT here — it's unbounded and scrolls
+    // (see header). Only its compact form renders inline, and that's ~20 rows.
+    fi('ios-no-platform', h(ish.NoPlatformStep, { iosDir: 'apps/mobile/platforms/ios-native', addIosCommand: 'npx cap add ios', syncIosCommand: 'npx cap sync ios', onChange: noop, ...C }), false),
+    fi('ios-build-complete', h(ish.BuildCompleteStep, { buildUrl: `https://capgo.app/app/${LONG_APP_ID}/builds`, ciSecretUploadSummary: 'Uploaded 12 secrets to GitHub Actions repository secrets', buildRequestCommand: `npx @capgo/cli build --app ${LONG_APP_ID}`, ...C }), false),
+    fi('ios-platform-select', h(ish.PlatformSelectStep, { appId: LONG_APP_ID, onChange: noop, ...C })),
+    fi('ios-adding-platform', h(ish.AddingPlatformStep, { addIosCommand: 'npx cap add ios', doctorCommand: 'npx @capgo/cli doctor', ...C }), false),
+    // ── shared (rendered by the Android app) ─────────────────────────────────
+    fi('welcome', h(ish.WelcomeStep), false),
     f('no-platform', h(ash.NoPlatformStep, { androidDir: 'apps/mobile/platforms/android-native', ...C }), false),
     f('credentials-exist-choose', h(ash.CredentialsExistStep, { appId: 'com.x.y', onChoose: noop, ...C })),
     f('build-complete', h(ash.BuildCompleteStep, { uploadSummary: null, buildUrl: 'https://capgo.app/app/com.example.app/builds', ...C }), false),
     f('error', h(ash.ErrorStep, { message: LONG_ERR, onChoose: noop, ...C })),
     // ── ci ──────────────────────────────────────────────────────────────────
-    f('ci-secrets-setup', h(aci.CiSecretsSetupStep, { advice: [
-      { target: { provider: 'github', label: 'GitHub Actions repository secrets', cli: 'gh' }, reason: 'not-installed', message: 'GitHub CLI (gh) is not installed or not authenticated.', commands: ['Install GitHub CLI: https://cli.github.com/', 'gh auth login'] },
-      { target: { provider: 'gitlab', label: 'GitLab CI/CD variables', cli: 'glab' }, reason: 'not-installed', message: 'GitLab CLI (glab) is not installed or not authenticated.', commands: ['Install GitLab CLI: https://gitlab.com/gitlab-org/cli#installation', 'glab auth login'] },
-    ], onChoose: noop, ...C })),
+    f('ci-secrets-setup', h(aci.CiSecretsSetupStep, { advice: CI_ADVICE, onChoose: noop, ...C })),
     f('ci-secrets-target-select', h(aci.CiSecretsTargetSelectStep, { options: opt(8), onChange: noop, ...C })),
     f('ask-ci-secrets', h(aci.AskCiSecretsStep, { entryCount: 12, targetLabel: 'GitLab CI/CD', cli: 'glab', onChoose: noop, ...C })),
   ]

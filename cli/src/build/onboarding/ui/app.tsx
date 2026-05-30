@@ -47,7 +47,7 @@ import {
   STEP_PROGRESS,
 } from '../types.js'
 import { CompletedStepsLog } from './completed-steps-log.js'
-import { terminalFitsOnboarding } from '../min-terminal-size.js'
+import { IOS_MIN_ROWS, terminalFitsOnboarding } from '../min-terminal-size.js'
 import { TerminalTooSmallPrompt } from './min-size-gate.js'
 import { BOX_HEADER_ROWS, COMPACT_HEADER_ROWS, Divider, FullscreenAiViewer, FullscreenBuildOutput, Header, TerminalTooSmall, WIZARD_PADDING_ROWS } from './components.js'
 import type { AiResultKind } from './components.js'
@@ -100,6 +100,8 @@ import {
   AiAnalysisResultStep,
   BuildCompleteStep,
   ErrorStep,
+  estimateErrorBodyRows,
+  formatErrorViewerLines,
   NoPlatformStep,
   PlatformSelectStep,
   WelcomeStep,
@@ -448,6 +450,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
   const [aiResult, setAiResult] = useState<{ kind: AiResultKind, message: string } | null>(null)
   const [aiRetryCount, setAiRetryCount] = useState(0)
   const [aiViewedFull, setAiViewedFull] = useState(false)
+  const [errorViewedFull, setErrorViewedFull] = useState(false)
   const [ciSecretEntries, setCiSecretEntries] = useState<CiSecretEntry[]>([])
   const [ciSecretTargets, setCiSecretTargets] = useState<CiSecretTarget[]>([])
   const [ciSecretTarget, setCiSecretTarget] = useState<CiSecretTarget | null>(null)
@@ -1595,6 +1598,14 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
       setStep(next)
   }, [step, aiAnalysisText, aiViewedFull, terminalRows, terminalCols])
 
+  // Reset the error-viewer "dismissed" pin whenever we leave the error step, so
+  // a NEW error re-opens the scrollable viewer. While on the error step it
+  // persists, so dismissing the viewer keeps the compact form across resizes.
+  useEffect(() => {
+    if (step !== 'error')
+      setErrorViewedFull(false)
+  }, [step])
+
   // ── Render ──
 
   const progress = STEP_PROGRESS[step] ?? 0
@@ -1612,6 +1623,23 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
   const recoveryAdvice = error
     ? getBuildOnboardingRecoveryAdvice(error, retryStep, pm.runner, appId)
     : null
+  // The iOS error screen's recovery advice is unbounded (42–54 rows). Like the
+  // AI analysis + build log, it routes through the scrollable FullscreenAiViewer
+  // when it's taller than the viewport, so the Try again / Restart / Exit actions
+  // (rendered by the compact ErrorStep after the viewer is dismissed) are never
+  // pushed off-screen. The decision uses a STRUCTURAL estimate of the comfortable
+  // ErrorStep body (NOT measureElement — measuring the rendered body would
+  // feedback-loop: the collapsed body measures short → "fits" → renders full →
+  // measures tall → collapses again, forever). ERROR_FRAME_CHROME_ROWS is the
+  // fixed header + log + padding reserve, calibrated against the VT harness at
+  // ~15 rows for the boxed header; the compact-header case is shorter, so this
+  // errs toward scroll — never toward a clip. `errorViewedFull` pins the compact
+  // inline form once the user dismisses the viewer (mirrors aiViewedFull).
+  const ERROR_FRAME_CHROME_ROWS = 15
+  const errorViewerLines = error ? formatErrorViewerLines(error, recoveryAdvice, supportBundlePath) : []
+  const errorTooTall = step === 'error' && !!error
+    && estimateErrorBodyRows(error, recoveryAdvice, supportBundlePath, terminalCols, !!retryStep) + ERROR_FRAME_CHROME_ROWS > terminalRows
+  const isErrorScroll = errorTooTall && !errorViewedFull
 
   // The streaming build output is a fullscreen takeover too — same reasoning as
   // the AI viewer below. Rendered inside the measured body, its unbounded growth
@@ -1630,8 +1658,8 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
   // would tear the app down on resize and fire its exit/teardown effects (the
   // "onboarding complete" flash + quit). The startup gate guarantees the floor
   // before mount; this keeps it guaranteed across mid-flow resizes.
-  if (!terminalFitsOnboarding(terminalCols, terminalRows))
-    return <TerminalTooSmallPrompt cols={terminalCols} rows={terminalRows} />
+  if (!terminalFitsOnboarding(terminalCols, terminalRows, 'ios'))
+    return <TerminalTooSmallPrompt cols={terminalCols} rows={terminalRows} minRows={IOS_MIN_ROWS} />
 
   // (The wizard never clips on a too-small terminal: the gate above replaces it
   // with the resize prompt instead.)
@@ -1652,6 +1680,22 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
           setAiViewedFull(true)
           setStep('ai-analysis-result')
         }}
+      />
+    )
+
+  // The iOS error screen is a fullscreen scroll takeover when its recovery
+  // advice is taller than the viewport — same treatment as the AI viewer above,
+  // so the Try again / Restart / Exit actions (in the compact ErrorStep shown
+  // after dismiss) are never pushed off-screen. Placed after the size gate like
+  // the AI viewer: below the floor the resize prompt wins.
+  if (isErrorScroll && error)
+    return (
+      <FullscreenAiViewer
+        title="Build error"
+        subtitle={`${errorViewerLines.length} lines — scrollable because the error details are taller than your terminal`}
+        lines={errorViewerLines}
+        terminalRows={terminalRows}
+        onExit={() => setErrorViewedFull(true)}
       />
     )
 
@@ -2441,6 +2485,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
           supportBundlePath={supportBundlePath}
           showRetry={!!retryStep}
           dense={dense}
+          collapsed={errorTooTall && errorViewedFull}
           onChange={async (value) => {
             if (value === 'retry') {
               setError(null)

@@ -43,7 +43,7 @@ import { mapAndroidOnboardingError, mapSaValidationKindToCategory } from '../../
 import { canUseFilePicker, openKeystorePicker, openServiceAccountJsonPicker } from '../../file-picker.js'
 import { trackBuilderOnboardingStep } from '../../telemetry.js'
 import { CompletedStepsLog } from '../../ui/completed-steps-log.js'
-import { terminalFitsOnboarding } from '../../min-terminal-size.js'
+import { ANDROID_MIN_ROWS, terminalFitsOnboarding } from '../../min-terminal-size.js'
 import { TerminalTooSmallPrompt } from '../../ui/min-size-gate.js'
 import { BOX_HEADER_ROWS, Divider, FullscreenAiViewer, FullscreenBuildOutput, Header } from '../../ui/components.js'
 import type { AiResultKind } from '../../ui/components.js'
@@ -1725,8 +1725,8 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
   // values, build output) is preserved — a shrink shows the prompt, a re-grow
   // shows the exact same step. Kept as an early return after all hooks so the
   // rules of hooks hold. The wizard never clips, and never exits, on resize.
-  if (!terminalFitsOnboarding(terminalCols, terminalRows))
-    return <TerminalTooSmallPrompt cols={terminalCols} rows={terminalRows} />
+  if (!terminalFitsOnboarding(terminalCols, terminalRows, 'android'))
+    return <TerminalTooSmallPrompt cols={terminalCols} rows={terminalRows} minRows={ANDROID_MIN_ROWS} />
 
   if (step === 'requesting-build')
     return <FullscreenBuildOutput title="Building..." lines={buildOutput} terminalRows={terminalRows} />

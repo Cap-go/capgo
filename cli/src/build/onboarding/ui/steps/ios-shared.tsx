@@ -286,6 +286,11 @@ export interface ErrorStepProps {
   supportBundlePath: string | null
   showRetry: boolean
   dense?: boolean
+  /** When true, the full error + recovery advice was already shown in the
+   *  scrollable viewer (it was taller than the viewport), so render only the
+   *  error headline + the action prompt here — keeping Try again / Restart /
+   *  Exit reachable no matter how long the advice was. */
+  collapsed?: boolean
   onChange: (value: string) => void | Promise<void>
 }
 
@@ -295,7 +300,114 @@ const RETRY_OPTIONS = [
   { label: '❌  Exit', value: 'exit' },
 ]
 
-export const ErrorStep: FC<ErrorStepProps> = ({ error, recoveryAdvice, supportBundlePath, showRetry, dense = false, onChange }) => {
+// Flatten an error + its recovery advice into plain text lines for the
+// scrollable FullscreenAiViewer. The recovery advice is UNBOUNDED — a stacked
+// failure produces 6+ summary lines (50+ rows) — so when the screen is taller
+// than the viewport the parent shows these lines in the same scroll viewer as
+// the AI analysis (rather than clipping the actions off the bottom), then
+// renders the compact ErrorStep once dismissed. Mirrors the inline ErrorStep
+// layout; the action prompt is intentionally omitted (it lives in the compact
+// step that follows).
+export function formatErrorViewerLines(
+  error: string,
+  recoveryAdvice: BuildOnboardingRecoveryAdvice | null,
+  supportBundlePath: string | null,
+): string[] {
+  const lines: string[] = [`✖  ${error}`, '']
+  if (recoveryAdvice) {
+    lines.push('Recovery plan', '')
+    for (const item of recoveryAdvice.summary)
+      lines.push(`  • ${item}`)
+    if (recoveryAdvice.commands.length > 0) {
+      lines.push('', 'Helpful commands', '')
+      for (const command of recoveryAdvice.commands)
+        lines.push(`  ${command}`)
+    }
+    if (recoveryAdvice.docs.length > 0) {
+      lines.push('', 'Docs', '')
+      for (const doc of recoveryAdvice.docs)
+        lines.push(`  ${doc}`)
+    }
+  }
+  if (supportBundlePath)
+    lines.push('', 'Support bundle', supportBundlePath)
+  return lines
+}
+
+function wrapRows(text: string, cols: number): number {
+  return Math.max(1, Math.ceil(text.length / Math.max(1, cols)))
+}
+
+/**
+ * Estimate the rendered row height of the COMFORTABLE ErrorStep body (marginTop
+ * + error line + recovery advice + action prompt), independent of whether the
+ * collapsed or full form actually renders. The parent uses this to decide
+ * whether to route the error through the scroll viewer.
+ *
+ * Why a structural estimate and not `measureElement`: measuring the rendered
+ * body would FEEDBACK-LOOP — a collapsed body measures short → "fits" → render
+ * full → measures tall → collapse → measures short → … This estimate depends
+ * only on the advice shape + width, so the decision is stable at any size.
+ *
+ * Calibrated against the VT harness: the body estimate lands within ~1 row of
+ * the real render across every recovery-advice shape, and the surrounding frame
+ * chrome (boxed header + completed-steps log + padding) is a fixed ~15 rows the
+ * caller reserves on top.
+ */
+export function estimateErrorBodyRows(
+  error: string,
+  recoveryAdvice: BuildOnboardingRecoveryAdvice | null,
+  supportBundlePath: string | null,
+  cols: number,
+  showRetry: boolean,
+): number {
+  let rows = 1 // outer marginTop
+  rows += wrapRows(`✖  ${error}`, cols) // ErrorLine (wraps)
+  rows += 1 // Newline after the error
+  if (recoveryAdvice) {
+    rows += 2 // "Recovery plan" heading + its box marginTop
+    for (const item of recoveryAdvice.summary)
+      rows += wrapRows(`• ${item}`, cols - 2) // marginLeft 2
+    if (recoveryAdvice.commands.length > 0) {
+      rows += 3 // Newline + "Helpful commands" + marginTop
+      for (const command of recoveryAdvice.commands)
+        rows += wrapRows(command, cols - 2)
+    }
+    if (recoveryAdvice.docs.length > 0) {
+      rows += 3 // Newline + "Docs" + marginTop
+      for (const doc of recoveryAdvice.docs)
+        rows += wrapRows(doc, cols - 2)
+    }
+  }
+  if (supportBundlePath)
+    rows += 2 + wrapRows(supportBundlePath, cols) // Newline + "Support bundle" + path
+  rows += 1 // Newline before the action prompt
+  if (showRetry)
+    rows += 5 // "What do you want to do?" + Newline + Select (3 options)
+  return rows
+}
+
+export const ErrorStep: FC<ErrorStepProps> = ({ error, recoveryAdvice, supportBundlePath, showRetry, dense = false, collapsed = false, onChange }) => {
+  // Collapsed form: the full error + recovery advice was too tall for the
+  // viewport, so the parent already showed it in the scrollable viewer. Render
+  // only the error headline + the action prompt, so Try again / Restart / Exit
+  // are always reachable. (recoveryAdvice / supportBundlePath were shown in the
+  // viewer, so they're intentionally not repeated here.)
+  if (collapsed) {
+    return (
+      <Box flexDirection="column" marginTop={1}>
+        <ErrorLine text={error} />
+        {showRetry && (
+          <>
+            <Newline />
+            <Text bold>What do you want to do?</Text>
+            <Newline />
+            <Select options={RETRY_OPTIONS} onChange={onChange} />
+          </>
+        )}
+      </Box>
+    )
+  }
   return (
     <Box flexDirection="column" marginTop={1}>
       <ErrorLine text={error} />
