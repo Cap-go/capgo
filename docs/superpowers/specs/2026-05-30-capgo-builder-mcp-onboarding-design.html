@@ -1,0 +1,628 @@
+<!doctype html>
+<html lang="en" class="no-js">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Capgo Builder · MCP-conducted onboarding — design</title>
+<script>document.documentElement.classList.remove('no-js');document.documentElement.classList.add('js');</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#07100d; --bg2:#0a1612; --panel:#0c1a16; --panel2:#102420;
+    --line:rgba(52,211,153,.14); --line2:rgba(52,211,153,.28);
+    --ink:#e2f4ed; --soft:#9bbcb0; --faint:#6b887e;
+    --green:#34d399; --green-hi:#67ffc9; --amber:#f6b65a; --sky:#5cc8ff;
+    --violet:#bda4ff; --red:#ff7a7a;
+    --display:'Bricolage Grotesque',ui-sans-serif,system-ui,sans-serif;
+    --body:'Hanken Grotesk',ui-sans-serif,system-ui,sans-serif;
+    --mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
+    --maxw:1120px;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    margin:0;background:var(--bg);color:var(--ink);font-family:var(--body);
+    font-size:17px;line-height:1.62;-webkit-font-smoothing:antialiased;overflow-x:hidden;
+  }
+  /* blueprint backdrop */
+  body::before{
+    content:"";position:fixed;inset:0;z-index:-2;
+    background:
+      radial-gradient(1100px 720px at 78% -8%, rgba(52,211,153,.16), transparent 60%),
+      radial-gradient(900px 600px at 4% 18%, rgba(92,200,255,.07), transparent 55%),
+      linear-gradient(180deg,#081310,#06100d 60%,#050c0a);
+  }
+  body::after{
+    content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;opacity:.5;
+    background-image:
+      linear-gradient(rgba(52,211,153,.05) 1px,transparent 1px),
+      linear-gradient(90deg,rgba(52,211,153,.05) 1px,transparent 1px);
+    background-size:46px 46px;
+    -webkit-mask-image:radial-gradient(circle at 50% 30%,#000,transparent 92%);
+            mask-image:radial-gradient(circle at 50% 30%,#000,transparent 92%);
+  }
+  a{color:inherit}
+  ::selection{background:rgba(103,255,201,.28);color:#fff}
+
+  /* ---- top nav ---- */
+  header.top{
+    position:sticky;top:0;z-index:50;backdrop-filter:blur(10px);
+    background:linear-gradient(180deg,rgba(7,16,13,.92),rgba(7,16,13,.66));
+    border-bottom:1px solid var(--line);
+  }
+  .top .wrap{max-width:var(--maxw);margin:0 auto;padding:13px 26px;display:flex;align-items:center;gap:22px}
+  .brand{display:flex;align-items:center;gap:11px;font-family:var(--mono);font-size:13px;letter-spacing:.14em;text-transform:uppercase;color:var(--green-hi)}
+  .brand .dot{width:11px;height:11px;border-radius:50%;background:var(--green);box-shadow:0 0 14px var(--green);animation:pulse 2.6s ease-in-out infinite}
+  @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.55;transform:scale(.82)}}
+  nav.secnav{margin-left:auto;display:flex;gap:4px;flex-wrap:wrap}
+  nav.secnav a{font-family:var(--mono);font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);text-decoration:none;padding:6px 10px;border-radius:7px;transition:.18s}
+  nav.secnav a:hover{color:var(--ink);background:rgba(52,211,153,.08)}
+  nav.secnav a.active{color:var(--green-hi);background:rgba(52,211,153,.1)}
+  @media(max-width:880px){nav.secnav{display:none}}
+
+  main{max-width:var(--maxw);margin:0 auto;padding:0 26px}
+  section{padding:84px 0;border-bottom:1px solid var(--line)}
+  section:last-of-type{border-bottom:0}
+
+  .kicker{font-family:var(--mono);font-size:12px;letter-spacing:.26em;text-transform:uppercase;color:var(--green);margin:0 0 18px;display:flex;align-items:center;gap:12px}
+  .kicker::before{content:"";width:30px;height:1px;background:var(--green);opacity:.7}
+  h1,h2,h3{font-family:var(--display);font-weight:800;letter-spacing:-.02em;line-height:1.04;margin:0}
+  h2{font-size:clamp(30px,4.4vw,50px)}
+  h3{font-size:22px;font-weight:700;letter-spacing:-.01em}
+  p{margin:16px 0;color:var(--soft)}
+  p strong,li strong{color:var(--ink);font-weight:600}
+  .lead{font-size:20px;color:var(--ink);max-width:62ch}
+  code{font-family:var(--mono);font-size:.86em;background:rgba(52,211,153,.1);border:1px solid var(--line);padding:.08em .42em;border-radius:5px;color:var(--green-hi);white-space:nowrap}
+  .muted{color:var(--faint)}
+
+  /* ---- hero ---- */
+  .hero{padding:96px 0 80px}
+  .hero h1{font-size:clamp(42px,7.4vw,92px);max-width:16ch}
+  .hero h1 .em{background:linear-gradient(120deg,var(--green-hi),var(--sky));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .hero .lead{margin-top:30px;font-size:clamp(18px,2.3vw,23px);max-width:54ch}
+  .hero .meta{margin-top:34px;display:flex;gap:26px;flex-wrap:wrap;font-family:var(--mono);font-size:12.5px;color:var(--faint);letter-spacing:.04em}
+  .hero .meta b{color:var(--green-hi);font-weight:500}
+
+  /* reveal */
+  .js .reveal{opacity:0;transform:translateY(22px);transition:opacity .7s cubic-bezier(.2,.7,.2,1),transform .7s cubic-bezier(.2,.7,.2,1)}
+  .js .reveal.in{opacity:1;transform:none}
+
+  /* ---- generic panels ---- */
+  .grid{display:grid;gap:18px}
+  .g2{grid-template-columns:repeat(2,1fr)}
+  .g3{grid-template-columns:repeat(3,1fr)}
+  @media(max-width:820px){.g2,.g3{grid-template-columns:1fr}}
+  .card{background:linear-gradient(180deg,var(--panel2),var(--panel));border:1px solid var(--line);border-radius:16px;padding:24px}
+  .card h3{margin-bottom:6px}
+  .tag{font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;padding:3px 9px;border-radius:999px;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+  .tag.exists{color:#7fe9c0;background:rgba(52,211,153,.1);border:1px solid var(--line2)}
+  .tag.prop{color:var(--sky);background:rgba(92,200,255,.1);border:1px solid rgba(92,200,255,.3)}
+  .tag.reuse{color:var(--violet);background:rgba(189,164,255,.1);border:1px solid rgba(189,164,255,.3)}
+
+  /* contrast panels (current state) */
+  .vs{display:grid;grid-template-columns:1fr 56px 1fr;align-items:stretch;gap:0;margin-top:14px}
+  @media(max-width:820px){.vs{grid-template-columns:1fr}.vs .mid{display:none}}
+  .vs .col{background:linear-gradient(180deg,var(--panel2),var(--panel));border:1px solid var(--line);border-radius:16px;padding:26px}
+  .vs .mid{display:flex;align-items:center;justify-content:center;font-family:var(--mono);color:var(--faint);font-size:13px}
+  .vs h3{font-size:18px;margin-bottom:4px}
+  .vs .sub{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);margin-bottom:16px}
+  .vs ul{margin:0;padding-left:18px}
+  .vs li{margin:9px 0;color:var(--soft);font-size:15px}
+  .vs .bad{color:var(--amber)}
+
+  /* primitive cards */
+  .prim{position:relative;overflow:hidden}
+  .prim .ico{font-family:var(--mono);font-size:12px;letter-spacing:.1em;color:var(--faint);text-transform:uppercase}
+  .prim .role{margin-top:14px;padding-top:14px;border-top:1px dashed var(--line2);font-size:14.5px}
+  .prim .role b{color:var(--green-hi)}
+  .prim .channel{position:absolute;right:-30px;top:-30px;width:120px;height:120px;border-radius:50%;filter:blur(36px);opacity:.5}
+  .prim.p1 .channel{background:var(--violet)} .prim.p2 .channel{background:var(--green)} .prim.p3 .channel{background:var(--sky)}
+
+  /* contract cards (AUTO / HUMAN_GATE / CHOICE) */
+  .kind{border-radius:16px;padding:24px;border:1px solid;position:relative;overflow:hidden;background:var(--panel)}
+  .kind .lbl{font-family:var(--mono);font-size:12px;letter-spacing:.16em;text-transform:uppercase;font-weight:700}
+  .kind h3{margin:10px 0 8px;font-size:20px}
+  .kind p{font-size:14.5px;margin:8px 0}
+  .kind .who{font-family:var(--mono);font-size:11.5px;margin-top:16px;padding-top:14px;border-top:1px dashed currentColor;opacity:.85}
+  .kind.auto{border-color:rgba(52,211,153,.4)} .kind.auto .lbl,.kind.auto h3{color:var(--green-hi)}
+  .kind.gate{border-color:rgba(246,182,90,.45)} .kind.gate .lbl,.kind.gate h3{color:var(--amber)}
+  .kind.choice{border-color:rgba(92,200,255,.45)} .kind.choice .lbl,.kind.choice h3{color:var(--sky)}
+  .kind .bar{position:absolute;left:0;top:0;bottom:0;width:4px}
+  .kind.auto .bar{background:var(--green)} .kind.gate .bar{background:var(--amber)} .kind.choice .bar{background:var(--sky)}
+
+  /* schema block */
+  .schema{font-family:var(--mono);font-size:13.5px;line-height:1.7;background:#060d0b;border:1px solid var(--line);border-radius:14px;padding:22px 24px;overflow-x:auto;color:var(--soft)}
+  .schema .k{color:var(--green-hi)} .schema .s{color:var(--amber)} .schema .c{color:var(--faint);font-style:italic} .schema .t{color:var(--sky)}
+
+  /* phase pipeline */
+  .pipe{display:grid;grid-template-columns:repeat(5,1fr);gap:0;margin-top:24px;position:relative}
+  @media(max-width:900px){.pipe{grid-template-columns:1fr}}
+  .ph{position:relative;padding:22px 18px;border:1px solid var(--line);background:linear-gradient(180deg,var(--panel2),var(--panel))}
+  .pipe>.ph:first-child{border-radius:16px 0 0 16px}
+  .pipe>.ph:last-child{border-radius:0 16px 16px 0}
+  @media(max-width:900px){.pipe>.ph{border-radius:14px!important;margin-bottom:10px}}
+  .ph .n{font-family:var(--mono);font-size:11px;color:var(--faint);letter-spacing:.1em}
+  .ph h3{font-size:16px;margin:8px 0 6px}
+  .ph p{font-size:12.5px;margin:0;color:var(--faint);line-height:1.5}
+  .ph .arrow{position:absolute;right:-9px;top:50%;transform:translateY(-50%);z-index:3;color:var(--green);font-size:18px;background:var(--bg);border-radius:50%;width:18px;height:18px;display:grid;place-items:center}
+  @media(max-width:900px){.ph .arrow{display:none}}
+  .ph.fork{border-color:var(--line2);box-shadow:0 0 0 1px rgba(52,211,153,.06) inset}
+  .ph .badge{display:inline-block;margin-top:10px;font-family:var(--mono);font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;padding:2px 7px;border-radius:999px;border:1px solid var(--line2);color:var(--soft)}
+
+  /* fork tabs */
+  .tabs{margin-top:20px;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:var(--panel)}
+  .tabbar{display:flex;border-bottom:1px solid var(--line);background:#081411}
+  .tabbar button{flex:0 0 auto;font-family:var(--mono);font-size:13px;letter-spacing:.05em;color:var(--faint);background:none;border:0;padding:14px 22px;cursor:pointer;border-bottom:2px solid transparent;transition:.18s}
+  .tabbar button:hover{color:var(--ink)}
+  .tabbar button[aria-selected=true]{color:var(--green-hi);border-bottom-color:var(--green)}
+  .tabpane{padding:22px 24px;display:none}
+  .tabpane[data-active=true]{display:block;animation:fade .4s ease}
+  @keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1}}
+  .steps{list-style:none;margin:0;padding:0;counter-reset:s}
+  .steps li{display:flex;gap:14px;align-items:flex-start;padding:11px 0;border-bottom:1px dashed var(--line)}
+  .steps li:last-child{border-bottom:0}
+  .steps .kb{flex:0 0 auto;margin-top:3px;font-family:var(--mono);font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;padding:3px 8px;border-radius:6px;min-width:96px;text-align:center}
+  .kb.auto{color:var(--green-hi);background:rgba(52,211,153,.12);border:1px solid var(--line2)}
+  .kb.gate{color:var(--amber);background:rgba(246,182,90,.12);border:1px solid rgba(246,182,90,.3)}
+  .kb.choice{color:var(--sky);background:rgba(92,200,255,.12);border:1px solid rgba(92,200,255,.3)}
+  .steps .txt{font-size:14.5px;color:var(--soft)}
+  .steps .txt b{color:var(--ink)} .steps .txt .st{font-family:var(--mono);font-size:12px;color:var(--faint)}
+
+  /* transcript / conducted run */
+  .log{margin-top:22px;border:1px solid var(--line);border-radius:16px;background:#060e0b;overflow:hidden}
+  .log .head{display:flex;align-items:center;gap:8px;padding:12px 18px;border-bottom:1px solid var(--line);font-family:var(--mono);font-size:12px;color:var(--faint)}
+  .log .head .lights{display:flex;gap:6px;margin-right:8px}
+  .log .head .lights i{width:10px;height:10px;border-radius:50%;display:block}
+  .log .head .lights i:nth-child(1){background:#ff5f57}.log .head .lights i:nth-child(2){background:#febc2e}.log .head .lights i:nth-child(3){background:#28c840}
+  .log .body{padding:8px 0}
+  .row{display:grid;grid-template-columns:120px 1fr;gap:16px;padding:11px 20px;align-items:start;border-left:3px solid transparent}
+  .row+.row{border-top:1px dashed var(--line)}
+  .row .actor{font-family:var(--mono);font-size:11px;letter-spacing:.04em;padding-top:2px}
+  .row .msg{font-size:14.5px;color:var(--soft)}
+  .row .msg .mono{font-family:var(--mono);font-size:12.5px;color:var(--green-hi)}
+  .row .msg em{color:var(--ink);font-style:normal;font-weight:600}
+  .a-user .actor{color:var(--ink)} .a-user{border-left-color:rgba(226,244,237,.3)}
+  .a-ai .actor{color:var(--violet)} .a-ai{border-left-color:rgba(189,164,255,.4)}
+  .a-mcp .actor{color:var(--green-hi)} .a-mcp{border-left-color:var(--green)}
+  .a-ext .actor{color:var(--amber)} .a-ext{border-left-color:var(--amber)}
+  .pill{font-family:var(--mono);font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;padding:1px 7px;border-radius:5px;margin-left:8px}
+  .pill.auto{color:var(--green-hi);background:rgba(52,211,153,.14)}
+  .pill.gate{color:var(--amber);background:rgba(246,182,90,.14)}
+  .pill.choice{color:var(--sky);background:rgba(92,200,255,.14)}
+
+  /* mapping table (where structure comes from) */
+  .map{margin-top:22px;display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+  @media(max-width:820px){.map{grid-template-columns:1fr}}
+  .map .cell{border:1px solid var(--line);border-radius:14px;padding:20px;background:var(--panel)}
+  .map .from{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--faint)}
+  .map .skillrole{margin:8px 0 2px;font-family:var(--display);font-weight:700;font-size:18px;color:var(--ink)}
+  .map .via{margin-top:12px;font-size:14px;color:var(--soft)}
+  .map .via b{color:var(--green-hi)}
+
+  /* alternatives */
+  .alt{margin-top:18px;display:flex;flex-direction:column;gap:12px}
+  .altrow{display:grid;grid-template-columns:160px 1fr;gap:18px;border:1px solid var(--line);border-radius:14px;padding:18px 20px;background:var(--panel)}
+  @media(max-width:720px){.altrow{grid-template-columns:1fr}}
+  .altrow .verdict{font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;display:flex;align-items:flex-start;gap:8px}
+  .verdict .v{padding:3px 9px;border-radius:999px;height:fit-content}
+  .v.rej{color:var(--red);background:rgba(255,122,122,.12);border:1px solid rgba(255,122,122,.3)}
+  .v.sup{color:var(--violet);background:rgba(189,164,255,.12);border:1px solid rgba(189,164,255,.3)}
+  .v.win{color:var(--green-hi);background:rgba(52,211,153,.14);border:1px solid var(--line2)}
+  .altrow .what{font-weight:600;color:var(--ink);font-size:15px}
+  .altrow .why{font-size:14px;color:var(--soft);margin-top:5px}
+
+  /* open decisions */
+  .dec{margin-top:18px;display:grid;gap:12px}
+  .decrow{display:flex;gap:14px;align-items:flex-start;border:1px solid var(--line);border-radius:12px;padding:16px 18px;background:var(--panel)}
+  .decrow .q{flex:0 0 auto;font-family:var(--mono);color:var(--green);font-size:14px;margin-top:1px}
+  .decrow .d b{color:var(--ink)} .decrow .d{font-size:14.5px;color:var(--soft)}
+
+  .callout{margin-top:22px;border:1px solid var(--line2);border-left:4px solid var(--green);border-radius:12px;background:rgba(52,211,153,.05);padding:20px 24px}
+  .callout .t{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--green);margin-bottom:8px}
+  .callout p{margin:6px 0;color:var(--ink)}
+
+  footer{padding:60px 26px 90px;text-align:center;color:var(--faint);font-family:var(--mono);font-size:12.5px;letter-spacing:.05em}
+  footer .big{font-family:var(--display);font-size:22px;font-weight:700;color:var(--soft);letter-spacing:-.01em;margin-bottom:10px}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap">
+    <div class="brand"><span class="dot"></span> Capgo&nbsp;·&nbsp;MCP onboarding</div>
+    <nav class="secnav">
+      <a href="#problem">Problem</a>
+      <a href="#idea">Core idea</a>
+      <a href="#primitives">Primitives</a>
+      <a href="#contract">Contract</a>
+      <a href="#machine">State machine</a>
+      <a href="#run">A run</a>
+      <a href="#noskill">No skill</a>
+      <a href="#alts">Alternatives</a>
+      <a href="#decisions">Decisions</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+
+  <!-- HERO -->
+  <section class="hero" id="top">
+    <p class="kicker reveal">Design note · not an implementation plan</p>
+    <h1 class="reveal">Onboarding that the&nbsp;<span class="em">MCP itself</span> conducts.</h1>
+    <p class="lead reveal">
+      The goal: a developer asks their AI agent for help setting up Capgo Builder, and the
+      <strong>Capgo MCP server drives the entire flow</strong> — automating what it can, handing the
+      human precise instructions for what it can't, and verifying every step — all the way to a first
+      successful native cloud build. No skill ships. The structure lives in the server.
+    </p>
+    <div class="meta reveal">
+      <span>SCOPE&nbsp;·&nbsp;<b>zero → first build</b></span>
+      <span>PLATFORMS&nbsp;·&nbsp;<b>iOS + Android (agnostic core)</b></span>
+      <span>CONSTRAINT&nbsp;·&nbsp;<b>no skill — MCP carries the guidance</b></span>
+    </div>
+  </section>
+
+  <!-- PROBLEM / CURRENT STATE -->
+  <section id="problem">
+    <p class="kicker reveal">01 · Where we start</p>
+    <h2 class="reveal">Two systems that don't fit together yet</h2>
+    <p class="lead reveal">Today the CLI has both halves of the puzzle — but they were built for different operators. Neither is shaped for an AI to conduct a guided flow.</p>
+
+    <div class="vs reveal">
+      <div class="col">
+        <span class="tag exists">● exists today</span>
+        <h3 style="margin-top:14px">The MCP server</h3>
+        <div class="sub">cli/src/mcp/server.ts</div>
+        <ul>
+          <li><b>~20 flat tools</b>, each a thin wrapper over <code>CapgoSDK</code> — <code>capgo_add_app</code>, <code>capgo_request_build</code>, <code>capgo_doctor</code>, <code>capgo_probe</code>…</li>
+          <li class="bad">Only the <b>tool</b> primitive — <b>no prompts, no resources</b>.</li>
+          <li class="bad"><b>Stateless.</b> No notion of "where am I in a flow" or "what's next".</li>
+          <li class="bad">No ordering. The AI must already know the recipe — so it improvises and drifts.</li>
+        </ul>
+      </div>
+      <div class="mid">≠</div>
+      <div class="col">
+        <span class="tag exists">● exists today</span>
+        <h3 style="margin-top:14px">The Builder onboarding wizard</h3>
+        <div class="sub">cli/src/build/onboarding/ · ~20k LOC</div>
+        <ul>
+          <li>A rich <b>Ink TUI</b> with a <b>~50-state machine</b> (<code>OnboardingStep</code>) and a persisted, <b>resumable <code>OnboardingProgress</code></b>.</li>
+          <li>Knows every branch: iOS create-new vs import, Android keystore + Google OAuth + Play invite.</li>
+          <li class="bad">Deeply <b>human-interactive</b>: Apple portal, macOS keychain export, OAuth consent, file pickers.</li>
+          <li class="bad"><b>Refuses non-TTY.</b> "<span style="font-family:var(--mono);font-size:12px">build init requires an interactive terminal</span>" — unusable by an agent.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="callout reveal">
+      <div class="t">The tension</div>
+      <p>An MCP-driven onboarding <strong>cannot reuse the wizard</strong> — that's the wrong execution model (a blocking TUI that owns the terminal). But it <strong>can reuse the wizard's brain</strong>: the step graph, the branch logic, the resumable progress file, and the SDK calls underneath. We keep the model, throw away the UI, and put an <strong>AI in the conductor's chair</strong>.</p>
+    </div>
+  </section>
+
+  <!-- CORE IDEA -->
+  <section id="idea">
+    <p class="kicker reveal">02 · The core idea</p>
+    <h2 class="reveal">The server is the brain. The&nbsp;AI is the conductor. The human is the hands.</h2>
+    <p class="lead reveal">Invert the usual MCP relationship. Instead of the AI deciding which tool to call next, <strong>the server decides</strong> and tells the AI exactly what to do — one step at a time, every turn.</p>
+
+    <div class="grid g3 reveal" style="margin-top:26px">
+      <div class="card">
+        <span class="tag" style="color:var(--green-hi);background:rgba(52,211,153,.1);border:1px solid var(--line2)">MCP server</span>
+        <h3 style="margin-top:14px">The brain 🧠</h3>
+        <p style="font-size:14.5px">Owns the state machine and the progress file. Performs automatable work. Decides the single next action. Validates that human steps actually happened before advancing.</p>
+      </div>
+      <div class="card">
+        <span class="tag prop">AI agent</span>
+        <h3 style="margin-top:14px">The conductor 🎼</h3>
+        <p style="font-size:14.5px">A thin executor. Reads each tool result, does what the <code>next</code> field says: run the next tool, or relay a human instruction and wait, or surface a choice. Never invents the sequence.</p>
+      </div>
+      <div class="card">
+        <span class="tag reuse">human</span>
+        <h3 style="margin-top:14px">The hands 🤲</h3>
+        <p style="font-size:14.5px">Does only what software can't: logs into Apple, approves OAuth, types a keychain password, plugs in a device — then hands the resulting values back to the AI.</p>
+      </div>
+    </div>
+
+    <div class="callout reveal">
+      <div class="t">First principles · why this is the only shape that works</div>
+      <p>An MCP server can influence the model through exactly four channels: <strong>tool/prompt/resource descriptions</strong> (static, sent once at connect), <strong>prompt content</strong> (on user invoke), <strong>resource contents</strong> (on read), and <strong>tool results</strong> (dynamic, every single call).</p>
+      <p>Only <strong>tool results are dynamic and per-turn</strong> — so a structured flow <em>must</em> steer primarily through what tools return. That single fact is the whole design: every tool result ends with an explicit, machine-followable <code>next</code> instruction. The flow can't drift, because the model is re-told the correct next step on every turn.</p>
+    </div>
+  </section>
+
+  <!-- PRIMITIVES -->
+  <section id="primitives">
+    <p class="kicker reveal">03 · Mapping the three MCP primitives</p>
+    <h2 class="reveal">Each primitive does the job it's actually good at</h2>
+    <p class="lead reveal">Prompts open the door. Tools do the work and steer. Resources hold the long human instructions. Together they replace what a skill file would have carried.</p>
+
+    <div class="grid g3 reveal" style="margin-top:26px">
+      <div class="card prim p1">
+        <div class="channel"></div>
+        <div class="ico">Primitive · Prompt</div>
+        <h3 style="margin-top:8px"><code>onboard_capgo_builder</code></h3>
+        <p style="font-size:14.5px">A <b>user-invoked</b> slash command (e.g. <code>/mcp__capgo__onboard_capgo_builder</code>). Injects a short <b>operating manual</b> into the chat: the AI's role, the rules of engagement, and "call <code>…_status</code> first."</p>
+        <div class="role"><b>Replaces:</b> a skill's front-matter + "how to behave" preamble. The kickoff, not the content.</div>
+        <span class="tag prop" style="margin-top:14px">proposed</span>
+      </div>
+      <div class="card prim p2">
+        <div class="channel"></div>
+        <div class="ico">Primitive · Tools</div>
+        <h3 style="margin-top:8px">A <code>status</code> + <code>advance</code> spine</h3>
+        <p style="font-size:14.5px">Two driver tools wrap the existing granular tools. Their <b>results carry the steering</b> — every response says what happened and what's next.</p>
+        <div class="role"><b>Replaces:</b> the step-by-step procedure of a skill — but enforced by the server, not trusted to the model.</div>
+        <span class="tag prop" style="margin-top:14px">proposed spine · reuses existing tools</span>
+      </div>
+      <div class="card prim p3">
+        <div class="channel"></div>
+        <div class="ico">Primitive · Resources</div>
+        <h3 style="margin-top:8px"><code>capgo://builder/…</code> guides</h3>
+        <p style="font-size:14.5px">Versioned docs for human-only steps — "create an App Store Connect API key", OAuth walk-throughs, troubleshooting. The <code>advance</code> result points the AI at a URI; the AI reads and relays.</p>
+        <div class="role"><b>Replaces:</b> a skill's reference files — keeps long text out of tool results (cheaper tokens, easy to version).</div>
+        <span class="tag prop" style="margin-top:14px">proposed · supporting role</span>
+      </div>
+    </div>
+
+    <div class="grid g2 reveal" style="margin-top:18px">
+      <div class="card">
+        <h3>Two doors into the room</h3>
+        <p style="font-size:14.5px">An MCP prompt is <strong>user-initiated</strong> — the AI can't trigger it on its own. So we add a second entrance: when the user says "help me set up native builds," the AI can call <code>capgo_builder_onboarding_status</code> directly. Same flow, whichever door they use.</p>
+      </div>
+      <div class="card">
+        <h3>The spine vs. the hands</h3>
+        <p style="font-size:14.5px">Don't force everything through one mega-tool (impossible schemas, no pausing for humans) and don't expose only granular tools (no spine → drift). The <code>status</code>/<code>advance</code> spine gives <strong>structure</strong>; the granular tools (many already exist) give <strong>precision and reuse</strong>.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- CONTRACT -->
+  <section id="contract">
+    <p class="kicker reveal">04 · The heart of it</p>
+    <h2 class="reveal">Every step is one of three kinds</h2>
+    <p class="lead reveal">This is what makes it "structured." The AI never improvises — it only ever handles one of three result kinds. The server's job is to classify each step correctly and tell the AI which kind it's looking at.</p>
+
+    <div class="grid g3 reveal" style="margin-top:26px">
+      <div class="kind auto"><span class="bar"></span>
+        <div class="lbl">kind: auto</div>
+        <h3>The MCP just did it</h3>
+        <p>Server performed the work itself via the SDK — created the app, generated the Android keystore, saved credentials, requested the build.</p>
+        <p>Result reports what changed and points at the next step.</p>
+        <div class="who">AI → just reads & continues. Human untouched.</div>
+      </div>
+      <div class="kind gate"><span class="bar"></span>
+        <div class="lbl">kind: human_gate</div>
+        <h3>Only a person can do this</h3>
+        <p>Apple portal API key, Google OAuth consent, macOS keychain password, plug in a device. Software can't.</p>
+        <p>Result carries a <b>copy-paste instruction</b>, the <b>values to bring back</b>, a <b>resource URI</b>, and the <b>verify tool</b> to call after.</p>
+        <div class="who">AI → relays to human, waits, collects, then calls verify. Server checks before advancing.</div>
+      </div>
+      <div class="kind choice"><span class="bar"></span>
+        <div class="lbl">kind: choice</div>
+        <h3>A branch the user owns</h3>
+        <p>Create-new vs import-existing certificate. App Store vs ad-hoc distribution. Reuse an existing app or recreate it.</p>
+        <p>Result lists the options with consequences. The AI asks; the user picks.</p>
+        <div class="who">AI → presents options, calls advance with the chosen branch.</div>
+      </div>
+    </div>
+
+    <p class="reveal" style="margin-top:30px">Concretely, every <code>advance</code> call returns the same shape. The <code>kind</code> tells the AI how to behave; <code>next</code> tells it the literal next move:</p>
+    <div class="schema reveal">
+<span class="c">// result of capgo_builder_onboarding_advance — written FOR the model</span>
+{
+  <span class="k">"state"</span>: <span class="s">"creating-profile"</span>,        <span class="c">// current OnboardingStep (reused vocabulary)</span>
+  <span class="k">"phase"</span>: <span class="s">"credentials"</span>,            <span class="c">// platform-agnostic phase</span>
+  <span class="k">"platform"</span>: <span class="s">"ios"</span>,
+  <span class="k">"progress"</span>: <span class="t">65</span>,                     <span class="c">// 0–100, from STEP_PROGRESS</span>
+  <span class="k">"kind"</span>: <span class="s">"human_gate"</span>,             <span class="c">// auto | human_gate | choice | done | error</span>
+  <span class="k">"summary"</span>: <span class="s">"Distribution certificate is ready. Now we need your App Store Connect API key."</span>,
+  <span class="k">"humanAction"</span>: <span class="s">"Open App Store Connect → Users and Access → Integrations → create a key with App Manager role. Download the .p8 (you can only download it once)."</span>,
+  <span class="k">"resourceUri"</span>: <span class="s">"capgo://builder/ios/asc-api-key-guide"</span>,
+  <span class="k">"collect"</span>: [ <span class="s">"keyId"</span>, <span class="s">"issuerId"</span>, <span class="s">"p8Path"</span> ], <span class="c">// what to bring back</span>
+  <span class="k">"verifyWith"</span>: <span class="s">"capgo_builder_onboarding_advance"</span>,    <span class="c">// re-enter with the collected values</span>
+  <span class="k">"next"</span>: <span class="s">"Tell the user the humanAction verbatim, wait, then call advance with keyId/issuerId/p8Path."</span>
+}
+    </div>
+    <div class="callout reveal">
+      <div class="t">Trust, but verify</div>
+      <p>The server <strong>never advances on the AI's word</strong> that a human step is done. After a <code>human_gate</code>, the next <code>advance</code> call actually <em>uses</em> the supplied values — verifies the .p8 against Apple, confirms the OAuth token works, checks the keychain export produced a real .p12. If verification fails, it returns <code>kind: human_gate</code> again with a sharper instruction. The flow is self-correcting.</p>
+    </div>
+  </section>
+
+  <!-- STATE MACHINE -->
+  <section id="machine">
+    <p class="kicker reveal">05 · The state machine</p>
+    <h2 class="reveal">A platform-agnostic spine with a platform-specific middle</h2>
+    <p class="lead reveal">Four of the five phases are identical for iOS and Android. Only <b>Credentials</b> forks. That fork is exactly where the existing wizard's branch logic and <code>OnboardingStep</code> states get reused.</p>
+
+    <div class="pipe reveal">
+      <div class="ph"><div class="n">PHASE 0</div><h3>Preflight</h3><p>Capacitor project? app id? API key present? Is a native build even needed (<code>build&nbsp;needed</code> / <code>probe</code>)?</p><span class="badge">mostly auto · 1 gate: login</span><span class="arrow">›</span></div>
+      <div class="ph"><div class="n">PHASE 1</div><h3>App</h3><p>Ensure the app exists in Capgo Cloud; reuse-or-create on conflict.</p><span class="badge">auto · 1 choice</span><span class="arrow">›</span></div>
+      <div class="ph fork"><div class="n">PHASE 2 · forks</div><h3>Credentials</h3><p>The hard part. iOS and Android diverge here — see below.</p><span class="badge">auto + gates + choices</span><span class="arrow">›</span></div>
+      <div class="ph"><div class="n">PHASE 3</div><h3>Build</h3><p>Save creds, then <code>capgo_request_build</code>; poll; surface output URL + QR.</p><span class="badge">auto</span><span class="arrow">›</span></div>
+      <div class="ph"><div class="n">PHASE 4</div><h3>Done</h3><p>Confirm the build, summarize, suggest CI wiring as the next journey.</p><span class="badge">auto</span></div>
+    </div>
+
+    <h3 class="reveal" style="margin-top:46px;font-size:18px;color:var(--soft)">Phase 2 · Credentials — the fork</h3>
+    <div class="tabs reveal">
+      <div class="tabbar" role="tablist">
+        <button role="tab" aria-selected="true" data-tab="ios">🍎 &nbsp;iOS</button>
+        <button role="tab" aria-selected="false" data-tab="android">🤖 &nbsp;Android</button>
+      </div>
+
+      <div class="tabpane" data-pane="ios" data-active="true">
+        <ul class="steps">
+          <li><span class="kb choice">choice</span><span class="txt"><b>Setup method</b> — create-new (automated via App Store Connect API) or import-existing (read from your Keychain). <span class="st">setup-method-select</span></span></li>
+          <li><span class="kb gate">human_gate</span><span class="txt"><b>App Store Connect API key</b> — created in Apple's portal, .p8 downloaded once. <span class="st">api-key-instructions → input-p8-path</span></span></li>
+          <li><span class="kb auto">auto</span><span class="txt"><b>Verify the key</b> against Apple; <b>create distribution certificate</b>. <span class="st">verifying-key → creating-certificate</span></span></li>
+          <li><span class="kb gate">human_gate</span><span class="txt"><b>Cert limit?</b> If Apple's 2-cert limit is hit, the human chooses one to revoke. <span class="st">cert-limit-prompt → revoking-certificate</span></span></li>
+          <li><span class="kb auto">auto</span><span class="txt"><b>Create provisioning profile</b> (handle duplicates automatically). <span class="st">creating-profile</span></span></li>
+          <li><span class="kb gate">human_gate</span><span class="txt"><b>Import path (macOS-only):</b> Keychain export needs the user's password + a compiled helper. <span class="st">import-export-warning → import-exporting</span></span></li>
+          <li><span class="kb auto">auto</span><span class="txt"><b>Save credentials</b> locally (never uploaded to Capgo). <span class="st">saving-credentials</span></span></li>
+        </ul>
+      </div>
+
+      <div class="tabpane" data-pane="android" data-active="false">
+        <ul class="steps">
+          <li><span class="kb auto">auto</span><span class="txt"><b>Generate keystore</b> — fully automatable, no human needed. <span class="st">keystore</span></span></li>
+          <li><span class="kb gate">human_gate</span><span class="txt"><b>Google OAuth consent</b> — the one hard gate: browser sign-in to authorize provisioning. <span class="st">oauth-google</span></span></li>
+          <li><span class="kb auto">auto</span><span class="txt"><b>Provision GCP service account</b> + validate, after consent. <span class="st">service-account-validation</span></span></li>
+          <li><span class="kb auto">auto</span><span class="txt"><b>Play Console invite</b> / API wiring. <span class="st">play-api</span></span></li>
+          <li><span class="kb auto">auto</span><span class="txt"><b>Save credentials</b> locally (never uploaded to Capgo). <span class="st">saving-credentials</span></span></li>
+        </ul>
+      </div>
+    </div>
+    <p class="muted reveal" style="font-size:13.5px;margin-top:14px"><span style="font-family:var(--mono)">Note:</span> the <code>OnboardingStep</code> names above are the real states from <code>cli/src/build/onboarding/types.ts</code>. The MCP doesn't re-derive the graph — it drives the <em>same</em> states, headlessly.</p>
+  </section>
+
+  <!-- A RUN -->
+  <section id="run">
+    <p class="kicker reveal">06 · A conducted run</p>
+    <h2 class="reveal">What it looks like turn-by-turn</h2>
+    <p class="lead reveal">An iOS slice. Watch how control bounces: the server decides, the AI relays, the human acts, the server verifies. Notice the AI never picks the next step itself.</p>
+
+    <div class="log reveal">
+      <div class="head"><span class="lights"><i></i><i></i><i></i></span> capgo · onboarding session</div>
+      <div class="body">
+        <div class="row a-user"><div class="actor">USER</div><div class="msg">"Help me ship my iOS app through Capgo's cloud builder."</div></div>
+        <div class="row a-ai"><div class="actor">AI</div><div class="msg">Invokes the prompt → reads the operating manual → calls <span class="mono">capgo_builder_onboarding_status</span></div></div>
+        <div class="row a-mcp"><div class="actor">MCP</div><div class="msg"><em>Preflight OK</em>: Capacitor project found, app id <span class="mono">com.acme.app</span>, API key present, build needed. App not yet registered. <span class="pill auto">auto-next</span> <span class="mono">→ call advance</span></div></div>
+        <div class="row a-ai"><div class="actor">AI</div><div class="msg">Calls <span class="mono">advance</span></div></div>
+        <div class="row a-mcp"><div class="actor">MCP</div><div class="msg">Created app in Capgo Cloud. Platform = iOS. <span class="pill choice">choice</span> "Create new signing assets, or import what's already in your Keychain?"</div></div>
+        <div class="row a-ai"><div class="actor">AI</div><div class="msg">Asks the user. User: <em>"create new."</em> Calls <span class="mono">advance({ setupMethod: "create-new" })</span></div></div>
+        <div class="row a-mcp"><div class="actor">MCP</div><div class="msg"><span class="pill gate">human_gate</span> "Create an App Store Connect API key (App Manager role), download the .p8." → <span class="mono">resource: capgo://builder/ios/asc-api-key-guide</span> · collect <span class="mono">keyId, issuerId, p8Path</span></div></div>
+        <div class="row a-ai"><div class="actor">AI</div><div class="msg">Reads the resource, relays the steps, and <em>waits</em>.</div></div>
+        <div class="row a-ext"><div class="actor">APPLE</div><div class="msg">Human signs in to App Store Connect, creates the key, downloads <span class="mono">AuthKey_XXXX.p8</span>.</div></div>
+        <div class="row a-user"><div class="actor">USER</div><div class="msg">"Done — key id ABC123, issuer 9a8b…, saved to ~/Downloads/AuthKey.p8"</div></div>
+        <div class="row a-ai"><div class="actor">AI</div><div class="msg">Calls <span class="mono">advance({ keyId, issuerId, p8Path })</span></div></div>
+        <div class="row a-mcp"><div class="actor">MCP</div><div class="msg">Verified the key with Apple ✓ · created distribution certificate ✓ · created provisioning profile ✓ · saved credentials locally ✓ <span class="pill auto">auto</span> <span class="mono">→ advance</span></div></div>
+        <div class="row a-ai"><div class="actor">AI</div><div class="msg">Calls <span class="mono">advance</span></div></div>
+        <div class="row a-mcp"><div class="actor">MCP</div><div class="msg">Requested native build via <span class="mono">capgo_request_build</span>… polling. <span class="pill auto">auto</span></div></div>
+        <div class="row a-mcp"><div class="actor">MCP</div><div class="msg"><em>kind: done</em> — Build succeeded. Output URL + QR ready. "Next journey: wire this into CI so every push builds automatically."</div></div>
+        <div class="row a-ai"><div class="actor">AI</div><div class="msg">Reports success to the user with the download link and the CI suggestion.</div></div>
+      </div>
+    </div>
+    <p class="muted reveal" style="font-size:13.5px;margin-top:14px">A fresh AI session mid-flow? It just calls <code>status</code> — the persisted <code>OnboardingProgress</code> re-hydrates everything and the run resumes exactly where it left off.</p>
+  </section>
+
+  <!-- NO SKILL -->
+  <section id="noskill">
+    <p class="kicker reveal">07 · Honoring the constraint</p>
+    <h2 class="reveal">Why this needs no skill</h2>
+    <p class="lead reveal">A skill is a bundle of "how to behave" + "the procedure" + "reference material." Each of those has a natural home in an MCP primitive — so the skill's job gets done without shipping one.</p>
+
+    <div class="map reveal">
+      <div class="cell">
+        <div class="from">A skill would give…</div>
+        <div class="skillrole">Behavior / persona</div>
+        <div class="via"><b>→ MCP prompt</b><br>The <code>onboard_capgo_builder</code> prompt injects the role and rules of engagement on demand.</div>
+      </div>
+      <div class="cell">
+        <div class="from">A skill would give…</div>
+        <div class="skillrole">The procedure</div>
+        <div class="via"><b>→ tool results</b><br>The <code>status</code>/<code>advance</code> spine emits the next step every turn — <em>enforced</em> by the server, not trusted to the model.</div>
+      </div>
+      <div class="cell">
+        <div class="from">A skill would give…</div>
+        <div class="skillrole">Reference material</div>
+        <div class="via"><b>→ MCP resources</b><br>Long human instructions and troubleshooting live at <code>capgo://builder/…</code>, versioned with the CLI.</div>
+      </div>
+    </div>
+
+    <div class="grid g2 reveal" style="margin-top:24px">
+      <div class="card">
+        <h3>Stronger than a skill, actually</h3>
+        <p style="font-size:14.5px">A skill is advisory — the model can ignore it. Here the <strong>server owns the state</strong>, so the flow can't drift: ignore the <code>next</code> field and the following <code>status</code>/<code>advance</code> call simply re-asserts the correct step. And it <strong>survives a cold context</strong> — no skill text needs to be resident.</p>
+      </div>
+      <div class="card">
+        <h3>It ships with the CLI</h3>
+        <p style="font-size:14.5px">The guidance versions in lockstep with the code that executes it — when a step changes, the instruction that describes it changes in the same commit. No separate skill artifact to keep in sync, install, or discover.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ALTERNATIVES -->
+  <section id="alts">
+    <p class="kicker reveal">08 · Alternatives I weighed</p>
+    <h2 class="reveal">Why not the simpler options</h2>
+    <div class="alt reveal">
+      <div class="altrow">
+        <div class="verdict"><span class="v rej">rejected</span></div>
+        <div><div class="what">A. Just document the tools well, let the AI sequence them</div><div class="why">No enforced order across a ~50-state branchy flow → the model drifts, skips verification, and can't resume. "Good descriptions" is not a state machine.</div></div>
+      </div>
+      <div class="altrow">
+        <div class="verdict"><span class="v rej">rejected</span></div>
+        <div><div class="what">B. One mega "do the whole onboarding" tool</div><div class="why">Impossible: MCP tools are request/response. A single call can't pause for the user to do OAuth in a browser and resume. Human gates <em>require</em> returning control to the conversation.</div></div>
+      </div>
+      <div class="altrow">
+        <div class="verdict"><span class="v sup">supporting</span></div>
+        <div><div class="what">C. Ship the playbook as a resource the AI reads</div><div class="why">On its own this is just an inlined skill — the AI still drives and drifts, with no state and no automation. Kept in a <em>supporting</em> role for the long human-step docs only.</div></div>
+      </div>
+      <div class="altrow">
+        <div class="verdict"><span class="v win">chosen</span></div>
+        <div><div class="what">D. Prompt entry + stateful <code>status</code>/<code>advance</code> spine + verify gates + resources</div><div class="why">Server-owned state machine; AI as conductor; humans gated and verified. Structured, resumable, drift-proof, no skill. Reuses the wizard's graph and the existing SDK tools.</div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- DECISIONS -->
+  <section id="decisions">
+    <p class="kicker reveal">09 · Open decisions before any code</p>
+    <h2 class="reveal">What you'd want to pin down next</h2>
+    <p class="lead reveal">These are the genuine forks — none block the architecture above, but each shapes the first slice.</p>
+    <div class="dec reveal">
+      <div class="decrow"><div class="q">Q1</div><div class="d"><b>Shared core vs. duplicated logic.</b> Extract the wizard's branch/step logic into a headless engine both the Ink UI and the MCP drive? (Best, more refactor.) Or have the MCP re-implement the sequence against the SDK? (Faster, risks drift between the two onboarding paths.)</div></div>
+      <div class="decrow"><div class="q">Q2</div><div class="d"><b>How granular is <code>advance</code>?</b> One <code>advance</code> that internally runs all consecutive auto-steps until the next gate (fewer round-trips, snappier)? Or one tool call per state (more observable, more chatty)? I lean: auto-coalesce until the next human gate or choice.</div></div>
+      <div class="decrow"><div class="q">Q3</div><div class="d"><b>Where do human values land?</b> Through <code>advance</code> arguments (simple, but secrets pass through the model's context) or written to disk by the human and only referenced by path (the .p8 path pattern the wizard already uses — safer for secrets)? Probably path-by-reference for anything sensitive.</div></div>
+      <div class="decrow"><div class="q">Q4</div><div class="d"><b>iOS import path on non-macOS / no-Keychain.</b> The Keychain-export branch can't run for an agent on Linux. Does the MCP hard-gate to "create-new" off macOS, or surface import as unavailable? Affects the choice step's options.</div></div>
+      <div class="decrow"><div class="q">Q5</div><div class="d"><b>Auth bootstrap <span style="color:var(--green-hi)">— DECIDED</span>.</b> "No key yet" is the first human_gate. <b>v1:</b> the AI directs the user to grab their key and run <code>capgo login</code> in the terminal — the key lands in the local store, <b>never in the chat</b> (so no secret leak and no "Claude warns about the pasted key" friction). <b>Future polish:</b> one-click browser device-auth (needs a Capgo backend endpoint) — deferred as non-trivial, and cleanly swappable later since login is an isolated front gate that touches nothing downstream.</div></div>
+      <div class="decrow"><div class="q">Q6</div><div class="d"><b>CI wiring.</b> Confirmed out of scope for v1 (the run ends at first build), but the <code>done</code> state should advertise it as the next journey so it's a natural follow-on.</div></div>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <div class="big">Server decides · AI conducts · Human acts · Server verifies</div>
+  Design exploration for an MCP-conducted Capgo Builder onboarding · grounded in <span style="color:var(--green-hi)">cli/src/mcp/server.ts</span> &amp; <span style="color:var(--green-hi)">cli/src/build/onboarding/</span>
+</footer>
+
+<script>
+  // active-section nav
+  (function(){
+    var links = [].slice.call(document.querySelectorAll('nav.secnav a'));
+    var map = {};
+    links.forEach(function(a){ var id=a.getAttribute('href').slice(1); var el=document.getElementById(id); if(el) map[id]=a; });
+    var io = new IntersectionObserver(function(es){
+      es.forEach(function(e){
+        if(e.isIntersecting){ links.forEach(function(l){l.classList.remove('active')}); var a=map[e.target.id]; if(a)a.classList.add('active'); }
+      });
+    },{rootMargin:'-45% 0px -50% 0px'});
+    Object.keys(map).forEach(function(id){ io.observe(document.getElementById(id)); });
+  })();
+
+  // reveal on scroll
+  (function(){
+    var els=[].slice.call(document.querySelectorAll('.reveal'));
+    var io=new IntersectionObserver(function(es){
+      es.forEach(function(e){ if(e.isIntersecting){ e.target.classList.add('in'); io.unobserve(e.target); } });
+    },{rootMargin:'0px 0px -8% 0px',threshold:.08});
+    els.forEach(function(el,i){ el.style.transitionDelay=Math.min(i%6*60,300)+'ms'; io.observe(el); });
+  })();
+
+  // fork tabs
+  (function(){
+    var bar=document.querySelector('.tabbar'); if(!bar) return;
+    bar.addEventListener('click',function(e){
+      var b=e.target.closest('button[data-tab]'); if(!b) return;
+      var t=b.getAttribute('data-tab');
+      [].slice.call(bar.querySelectorAll('button')).forEach(function(x){x.setAttribute('aria-selected', x===b?'true':'false')});
+      [].slice.call(document.querySelectorAll('.tabpane')).forEach(function(p){p.setAttribute('data-active', p.getAttribute('data-pane')===t?'true':'false')});
+    });
+  })();
+</script>
+</body>
+</html>

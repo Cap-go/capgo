@@ -1,0 +1,482 @@
+<!doctype html>
+<html lang="en" class="no-js">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Capgo Builder onboarding · the end-user journey</title>
+<script>document.documentElement.classList.remove('no-js');document.documentElement.classList.add('js');</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Albert+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#f4efe4; --paper2:#fffdf7; --card:#fbf7ee; --sink:# efe8d8;
+    --ink:#1b251f; --ink2:#475349; --faint:#8c978c;
+    --green:#0f9d63; --green-deep:#0a6e46; --green-soft:#e4f3ea;
+    --coral:#df5a36; --coral-soft:#fbe7df;
+    --amber:#c98a1e; --amber-soft:#f7ecd4;
+    --sky:#2b6f9e; --sky-soft:#e1eef6;
+    --line:rgba(27,37,31,.13); --line2:rgba(27,37,31,.26);
+    --display:'Fraunces',Georgia,serif;
+    --body:'Albert Sans',ui-sans-serif,system-ui,sans-serif;
+    --mono:'IBM Plex Mono',ui-monospace,Menlo,monospace;
+    --maxw:1060px;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--body);font-size:17px;line-height:1.62;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+  body::before{content:"";position:fixed;inset:0;z-index:-2;background:
+    radial-gradient(900px 600px at 88% -6%,rgba(15,157,99,.10),transparent 60%),
+    radial-gradient(700px 520px at 2% 10%,rgba(223,90,54,.06),transparent 55%),var(--paper);}
+  body::after{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;opacity:.4;mix-blend-mode:multiply;
+    background-image:radial-gradient(rgba(27,37,31,.05) 1px,transparent 1.4px);background-size:22px 22px;
+    -webkit-mask-image:radial-gradient(circle at 50% 20%,#000,transparent 95%);mask-image:radial-gradient(circle at 50% 20%,#000,transparent 95%)}
+  ::selection{background:rgba(15,157,99,.22)}
+  a{color:var(--green-deep);text-underline-offset:3px}
+
+  header.top{position:sticky;top:0;z-index:40;backdrop-filter:blur(8px);background:linear-gradient(180deg,rgba(244,239,228,.94),rgba(244,239,228,.7));border-bottom:1px solid var(--line)}
+  .top .wrap{max-width:var(--maxw);margin:0 auto;padding:13px 26px;display:flex;align-items:center;gap:20px}
+  .brand{display:flex;align-items:center;gap:10px;font-family:var(--mono);font-size:12.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--green-deep)}
+  .brand .dot{width:10px;height:10px;border-radius:50%;background:var(--green);box-shadow:0 0 0 4px var(--green-soft)}
+  nav.secnav{margin-left:auto;display:flex;gap:2px;flex-wrap:wrap}
+  nav.secnav a{font-family:var(--mono);font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--faint);text-decoration:none;padding:6px 9px;border-radius:7px;transition:.15s}
+  nav.secnav a:hover,nav.secnav a.active{color:var(--green-deep);background:var(--green-soft)}
+  @media(max-width:880px){nav.secnav{display:none}}
+
+  main{max-width:var(--maxw);margin:0 auto;padding:0 26px}
+  section{padding:78px 0;border-bottom:1px solid var(--line)}
+  section:last-of-type{border-bottom:0}
+  .kicker{font-family:var(--mono);font-size:12px;letter-spacing:.22em;text-transform:uppercase;color:var(--coral);margin:0 0 16px;display:flex;align-items:center;gap:11px}
+  .kicker::before{content:"";width:26px;height:1px;background:var(--coral)}
+  h1,h2,h3{font-family:var(--display);font-weight:600;line-height:1.05;margin:0;letter-spacing:-.01em}
+  h1{font-size:clamp(40px,6.6vw,80px);font-weight:600}
+  h2{font-size:clamp(28px,4.2vw,46px)}
+  h3{font-size:21px;font-weight:600}
+  p{margin:15px 0;color:var(--ink2)}
+  .lead{font-size:20px;color:var(--ink);max-width:60ch}
+  strong{color:var(--ink);font-weight:600}
+  code{font-family:var(--mono);font-size:.85em;background:var(--green-soft);padding:.08em .4em;border-radius:5px;color:var(--green-deep);white-space:nowrap}
+  .muted{color:var(--faint)}
+
+  .js .reveal{opacity:0;transform:translateY(20px);transition:opacity .7s cubic-bezier(.2,.7,.2,1),transform .7s cubic-bezier(.2,.7,.2,1)}
+  .js .reveal.in{opacity:1;transform:none}
+
+  /* hero */
+  .hero{padding:90px 0 70px}
+  .hero h1{max-width:15ch}
+  .hero h1 em{font-style:italic;color:var(--green-deep)}
+  .hero .lead{margin-top:26px;max-width:52ch}
+  .stats{margin-top:40px;display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+  @media(max-width:760px){.stats{grid-template-columns:repeat(2,1fr)}}
+  .stat{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px 20px}
+  .stat .v{font-family:var(--display);font-size:30px;font-weight:600;color:var(--green-deep);line-height:1}
+  .stat .l{font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);margin-top:9px}
+
+  .note{margin-top:30px;font-family:var(--mono);font-size:12.5px;color:var(--faint);border-left:2px solid var(--line2);padding:4px 0 4px 16px;max-width:62ch}
+
+  /* before-you-begin grid */
+  .grid{display:grid;gap:16px}
+  .g2{grid-template-columns:1fr 1fr}.g3{grid-template-columns:repeat(3,1fr)}
+  @media(max-width:800px){.g2,.g3{grid-template-columns:1fr}}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:24px}
+  .card h3{margin-bottom:8px}
+  .card p{font-size:15px;margin:6px 0}
+  .card ul{margin:8px 0 0;padding-left:18px}.card li{margin:7px 0;font-size:15px;color:var(--ink2)}
+
+  /* glance stepper */
+  .glance{margin-top:24px;display:grid;grid-template-columns:repeat(5,1fr);gap:0}
+  @media(max-width:880px){.glance{grid-template-columns:1fr;gap:10px}}
+  .gstep{position:relative;padding:22px 16px;background:var(--card);border:1px solid var(--line)}
+  .glance>.gstep:first-child{border-radius:16px 0 0 16px}.glance>.gstep:last-child{border-radius:0 16px 16px 0}
+  @media(max-width:880px){.glance>.gstep{border-radius:14px!important}}
+  .gstep .num{font-family:var(--mono);font-size:11px;color:var(--faint);letter-spacing:.08em}
+  .gstep h3{font-size:16px;margin:7px 0 6px}
+  .gstep p{font-size:12.5px;margin:0;color:var(--faint);line-height:1.5}
+  .gstep .turn{display:inline-block;margin-top:11px;font-family:var(--mono);font-size:9.5px;letter-spacing:.06em;text-transform:uppercase;padding:3px 8px;border-radius:999px}
+  .turn.you{background:var(--coral-soft);color:var(--coral)}
+  .turn.auto{background:var(--green-soft);color:var(--green-deep)}
+  .gstep .arr{position:absolute;right:-8px;top:50%;transform:translateY(-50%);z-index:3;background:var(--paper);color:var(--green);width:16px;height:16px;border-radius:50%;display:grid;place-items:center;font-size:13px}
+  @media(max-width:880px){.gstep .arr{display:none}}
+
+  .legend{margin-top:18px;display:flex;gap:18px;flex-wrap:wrap;font-family:var(--mono);font-size:12px;color:var(--ink2)}
+  .legend span{display:inline-flex;align-items:center;gap:7px}
+  .swatch{width:13px;height:13px;border-radius:4px;display:inline-block}
+  .sw-green{background:var(--green)}.sw-coral{background:var(--coral)}.sw-sky{background:var(--sky)}
+
+  /* principles */
+  .princ{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:22px}
+  @media(max-width:800px){.princ{grid-template-columns:1fr}}
+  .princ .p{border:1px solid var(--line);border-radius:14px;padding:18px 20px;background:var(--paper2)}
+  .princ .p b{font-family:var(--display);font-size:17px;color:var(--ink);display:block;margin-bottom:4px}
+  .princ .p span{font-size:14px;color:var(--ink2)}
+
+  /* tabs */
+  .tabs{margin-top:24px}
+  .tabbar{display:flex;gap:8px;margin-bottom:18px}
+  .tabbar button{font-family:var(--mono);font-size:13px;letter-spacing:.04em;color:var(--ink2);background:var(--card);border:1px solid var(--line);padding:11px 20px;border-radius:999px;cursor:pointer;transition:.16s}
+  .tabbar button:hover{border-color:var(--line2)}
+  .tabbar button[aria-selected=true]{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+  .tabpane{display:none}.tabpane[data-active=true]{display:block;animation:fade .4s ease}
+  @keyframes fade{from{opacity:0;transform:translateY(8px)}to{opacity:1}}
+  .plathead{display:flex;align-items:baseline;gap:14px;margin-bottom:6px}
+  .plathead .big{font-family:var(--display);font-size:26px;font-weight:600}
+  .plathead .meta{font-family:var(--mono);font-size:12px;color:var(--coral)}
+
+  /* chat storyboard */
+  .thread{border:1px solid var(--line);border-radius:18px;background:var(--paper2);overflow:hidden;margin-top:14px}
+  .thread .bar{display:flex;align-items:center;gap:7px;padding:12px 18px;border-bottom:1px solid var(--line);font-family:var(--mono);font-size:11.5px;color:var(--faint);background:var(--card)}
+  .thread .bar i{width:9px;height:9px;border-radius:50%;display:block}
+  .thread .bar i:nth-child(1){background:#e8643c}.thread .bar i:nth-child(2){background:#d9a441}.thread .bar i:nth-child(3){background:#0f9d63}
+  .thread .bar span{margin-left:6px}
+  .stream{padding:20px}
+  .turnrow{display:flex;flex-direction:column;gap:5px;margin:14px 0}
+  .who{font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint)}
+  .bubble{border-radius:14px;padding:13px 17px;font-size:15px;max-width:80%;line-height:1.55}
+  .bubble.user{align-self:flex-end;background:var(--ink);color:#f3efe4;border-bottom-right-radius:5px}
+  .bubble.user .who{color:rgba(243,239,228,.55)}
+  .bubble.ai{align-self:flex-start;background:var(--card);border:1px solid var(--line);border-bottom-left-radius:5px}
+  .bubble.ai b{color:var(--green-deep)}
+  .bubble ul{margin:8px 0 2px;padding-left:18px}.bubble li{margin:4px 0}
+  .turnrow.r{align-items:flex-end}.turnrow.l{align-items:flex-start}
+
+  .aside{margin:12px 0;border-radius:12px;padding:12px 16px;font-size:13.5px;display:flex;gap:11px;align-items:flex-start}
+  .aside .ic{flex:0 0 auto;font-size:15px;margin-top:1px}
+  .aside.bts{background:var(--green-soft);color:var(--green-deep);font-family:var(--mono);font-size:12px;border:1px dashed rgba(15,157,99,.4)}
+  .aside.offline{background:var(--coral-soft);color:#9c3a1e;border:1px solid rgba(223,90,54,.3)}
+  .aside.offline b{color:var(--coral)}
+  .aside.decide{background:var(--sky-soft);color:#1d4f72;border:1px solid rgba(43,111,158,.3)}
+  .aside .lab{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;display:block;margin-bottom:3px;opacity:.8}
+
+  /* recovery cards */
+  .rec{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:20px}
+  @media(max-width:800px){.rec{grid-template-columns:1fr}}
+  .rcard{border:1px solid var(--line);border-radius:14px;padding:20px;background:var(--paper2);border-top:3px solid var(--amber)}
+  .rcard .sit{font-family:var(--mono);font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:var(--amber);margin-bottom:6px}
+  .rcard h3{font-size:17px;margin-bottom:6px}
+  .rcard p{font-size:14px;margin:6px 0}
+  .rcard .fix{margin-top:10px;font-size:14px;color:var(--ink);border-top:1px dashed var(--line);padding-top:10px}
+  .rcard .fix b{color:var(--green-deep)}
+
+  /* ledger */
+  .ledger{margin-top:20px;display:grid;grid-template-columns:1fr 1fr;gap:0;border:1px solid var(--line);border-radius:16px;overflow:hidden}
+  @media(max-width:760px){.ledger{grid-template-columns:1fr}}
+  .ledger .side{padding:26px}
+  .ledger .you{background:var(--coral-soft)}
+  .ledger .cap{background:var(--green-soft);border-left:1px solid var(--line)}
+  @media(max-width:760px){.ledger .cap{border-left:0;border-top:1px solid var(--line)}}
+  .ledger h3{font-size:18px;margin-bottom:4px}
+  .ledger .you h3{color:#9c3a1e}.ledger .cap h3{color:var(--green-deep)}
+  .ledger .sub{font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;opacity:.7;margin-bottom:14px}
+  .ledger ul{margin:0;padding-left:18px}.ledger li{margin:9px 0;font-size:14.5px;color:var(--ink2)}
+
+  /* payoff */
+  .payoff{margin-top:22px;border:1px solid var(--line2);border-radius:18px;padding:30px;background:linear-gradient(180deg,var(--paper2),var(--card))}
+  .payoff .row{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:8px}
+  @media(max-width:760px){.payoff .row{grid-template-columns:1fr 1fr}}
+  .payoff .item .e{font-size:24px}
+  .payoff .item b{display:block;font-family:var(--display);font-size:17px;margin:8px 0 2px}
+  .payoff .item span{font-size:13.5px;color:var(--ink2)}
+  .next{margin-top:24px;padding-top:20px;border-top:1px dashed var(--line);font-size:15px}
+  .next b{color:var(--green-deep)}
+
+  footer{padding:54px 26px 80px;text-align:center;color:var(--faint);font-family:var(--mono);font-size:12px;letter-spacing:.04em}
+  footer .big{font-family:var(--display);font-size:22px;color:var(--ink2);margin-bottom:10px;font-style:italic}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap">
+    <div class="brand"><span class="dot"></span> Capgo Builder · the journey</div>
+    <nav class="secnav">
+      <a href="#promise">Promise</a>
+      <a href="#begin">Before</a>
+      <a href="#glance">At a glance</a>
+      <a href="#walk">Walkthrough</a>
+      <a href="#sideways">Recovery</a>
+      <a href="#ledger">Your job</a>
+      <a href="#payoff">Payoff</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+
+  <!-- HERO -->
+  <section class="hero" id="promise">
+    <p class="kicker reveal">The proposed end-user experience</p>
+    <h1 class="reveal">You ask. It <em>conducts</em>. You ship.</h1>
+    <p class="lead reveal">
+      A developer tells their AI assistant "set up native builds for my app," and the Capgo MCP walks
+      them — one calm step at a time — from a plain Capacitor project to a <strong>signed iOS or Android
+      build running in the cloud</strong>. The AI does everything it can itself, and only ever asks the
+      person to do the few things software can't: sign into Apple or Google, make a couple of decisions.
+    </p>
+    <div class="stats reveal">
+      <div class="stat"><div class="v">~10–15<span style="font-size:15px"> min</span></div><div class="l">start to first build</div></div>
+      <div class="stat"><div class="v">1–2</div><div class="l">times you leave the chat</div></div>
+      <div class="stat"><div class="v">2</div><div class="l">tools the AI uses</div></div>
+      <div class="stat"><div class="v">∞</div><div class="l">resume after stopping</div></div>
+    </div>
+    <p class="note reveal">This document describes the <strong>intended experience</strong>. The wording is illustrative, but every step maps to something the CLI already does today in its interactive wizard — here it's re-shaped so an AI can conduct it. "Behind the scenes" notes show the underlying tool calls from the architecture design.</p>
+  </section>
+
+  <!-- BEFORE YOU BEGIN -->
+  <section id="begin">
+    <p class="kicker reveal">01 · Before you begin</p>
+    <h2 class="reveal">What you need, and how it starts</h2>
+    <div class="grid g2 reveal" style="margin-top:24px">
+      <div class="card">
+        <h3>What you bring</h3>
+        <ul>
+          <li>A <strong>Capacitor app</strong> on your machine (the AI auto-detects the app id from <code>capacitor.config</code>).</li>
+          <li>A <strong>Capgo account</strong> — or the AI will hand you the link to make one and grab an API key.</li>
+          <li>For iOS: an <strong>Apple Developer account</strong>. For Android: a <strong>Google Play developer account</strong>.</li>
+          <li>The Capgo MCP connected to your AI client (Claude, Cursor, etc.).</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>How you kick it off</h3>
+        <p>Either way lands in the same place:</p>
+        <ul>
+          <li><strong>Just say it:</strong> "Help me set up Capgo native builds for iOS." The AI recognizes the intent and starts.</li>
+          <li><strong>Or run the command:</strong> <code>/mcp__capgo__onboard_capgo_builder</code> — a discoverable slash command that tells the AI to begin.</li>
+        </ul>
+        <p class="muted" style="font-size:13.5px">You never need to memorize tool names or flags. You talk; the AI drives.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- AT A GLANCE -->
+  <section id="glance">
+    <p class="kicker reveal">02 · The shape of it</p>
+    <h2 class="reveal">Five phases — and you're only needed in two of them</h2>
+    <p class="lead reveal">Most of the journey is the AI working quietly. The colored markers show when it's <em>your</em> turn versus when Capgo handles it for you.</p>
+
+    <div class="glance reveal">
+      <div class="gstep"><div class="num">PHASE 0</div><h3>Check</h3><p>Finds your project, your account, your platform. Confirms a build is even needed.</p><span class="turn auto">automatic</span><span class="arr">›</span></div>
+      <div class="gstep"><div class="num">PHASE 1</div><h3>Register</h3><p>Makes sure your app exists in Capgo Cloud.</p><span class="turn auto">automatic</span><span class="arr">›</span></div>
+      <div class="gstep"><div class="num">PHASE 2</div><h3>Sign</h3><p>The real work: iOS certificates &amp; profiles, or Android keystore &amp; Play access.</p><span class="turn you">your turn ×1</span><span class="arr">›</span></div>
+      <div class="gstep"><div class="num">PHASE 3</div><h3>Build</h3><p>Sends your app to the cloud, watches it compile, hands you the result.</p><span class="turn auto">automatic</span><span class="arr">›</span></div>
+      <div class="gstep"><div class="num">PHASE 4</div><h3>Ship</h3><p>Download link + QR, credentials saved, one-command rebuilds from now on.</p><span class="turn auto">automatic</span></div>
+    </div>
+
+    <div class="legend reveal">
+      <span><i class="swatch sw-green"></i> Capgo / AI handles it</span>
+      <span><i class="swatch sw-coral"></i> Your turn — leave the chat briefly</span>
+      <span><i class="swatch sw-sky"></i> A quick decision only you can make</span>
+    </div>
+
+    <h3 class="reveal" style="margin-top:42px">The feel we're aiming for</h3>
+    <div class="princ reveal">
+      <div class="p"><b>One thing at a time</b><span>You're never handed a 12-item checklist. Exactly one ask per turn.</span></div>
+      <div class="p"><b>Plain language</b><span>No flags, no JSON, no tool names. "Paste your key here," "tap approve."</span></div>
+      <div class="p"><b>Never lose progress</b><span>Stop anytime. Say "continue" tomorrow and it resumes exactly where you left off.</span></div>
+      <div class="p"><b>Verify, don't assume</b><span>It checks your key really works with Apple before moving on — no false "done."</span></div>
+      <div class="p"><b>Your secrets stay yours</b><span>Credentials live on your machine; used during the build, never stored on Capgo's servers.</span></div>
+      <div class="p"><b>An escape hatch always</b><span>Stuck? It surfaces a diagnosis, a manual command, and a "tell me when ready" pause.</span></div>
+    </div>
+  </section>
+
+  <!-- WALKTHROUGH -->
+  <section id="walk">
+    <p class="kicker reveal">03 · The full walkthrough</p>
+    <h2 class="reveal">What it actually looks like, message by message</h2>
+    <p class="lead reveal">A realistic transcript for each platform — including the bumps. Dark bubbles are you; light bubbles are the AI; green notes are what's happening behind the scenes; coral notes are when you step away.</p>
+
+    <div class="tabs reveal">
+      <div class="tabbar" role="tablist">
+        <button role="tab" aria-selected="true" data-tab="ios">🍎 &nbsp;iOS — the full ride</button>
+        <button role="tab" aria-selected="false" data-tab="android">🤖 &nbsp;Android — the smoother one</button>
+      </div>
+
+      <!-- iOS -->
+      <div class="tabpane" data-pane="ios" data-active="true">
+        <div class="plathead"><span class="big">iOS</span><span class="meta">~12 min · 1 trip to Apple · 2 quick decisions</span></div>
+        <div class="thread">
+          <div class="bar"><i></i><i></i><i></i><span>your AI assistant · Capgo connected</span></div>
+          <div class="stream">
+
+            <div class="turnrow r"><div class="bubble user"><div class="who">You</div>I want to ship my app to the App Store using Capgo's cloud builder.</div></div>
+
+            <div class="aside bts"><span class="ic">⚙︎</span><div><span class="lab">behind the scenes</span>AI calls <code>start_capgo_builder_onboarding</code> → preflight runs: Capacitor project ✓, app id <code>com.acme.app</code> ✓, native <code>ios/</code> folder ✓, build needed ✓ — but no API key saved yet.</div></div>
+
+            <div class="turnrow l"><div class="bubble ai"><div class="who">AI</div>Great — I found your app <b>com.acme.app</b> and the iOS project. Here's the plan:
+              <ul><li>1 · Connect your Capgo account</li><li>2 · Register the app</li><li>3 · Set up iOS signing</li><li>4 · Run your first cloud build</li></ul>
+              This takes about 10–15 minutes and you'll pop into Apple's site once. First — I need to connect to Capgo.</div></div>
+
+            <div class="aside offline"><span class="ic">↗</span><div><span class="lab">your turn</span><b>Log in to Capgo.</b> The AI points you to <em>app.capgo.io → Account → API keys</em>, then asks you to run <code>npx @capgo/cli login</code> in your terminal so the key is stored locally — <b>never pasted into the chat.</b></div></div>
+
+            <div class="turnrow r"><div class="bubble user"><div class="who">You</div>Logged in.</div></div>
+
+            <div class="aside bts"><span class="ic">⚙︎</span><div><span class="lab">behind the scenes</span>The MCP reads the key from the local store (not the conversation), verifies it → <code>next_step</code> registers the app (it wasn't in Capgo yet).</div></div>
+
+            <div class="aside decide"><span class="ic">⚑</span><div><span class="lab">v1 decision</span>This terminal-login step is deliberate friction for v1. A one-click <b>browser device-auth</b> (no terminal, nothing pasted) is the planned polish — deferred because it needs a Capgo backend endpoint, and cleanly swappable later since login is an isolated front gate.</div></div>
+
+            <div class="turnrow l"><div class="bubble ai"><div class="who">AI</div>Connected ✓ and I've registered <b>com.acme.app</b> in Capgo ✓. Now iOS signing. Two ways to do this:</div></div>
+
+            <div class="aside decide"><span class="ic">◆</span><div><span class="lab">your decision</span><b>Create fresh signing assets</b> (I do it via Apple's API — recommended), or <b>import what's already in your Mac's Keychain</b>. Which would you like?</div></div>
+
+            <div class="turnrow r"><div class="bubble user"><div class="who">You</div>Create fresh.</div></div>
+
+            <div class="turnrow l"><div class="bubble ai"><div class="who">AI</div>Perfect. I need an <b>App Store Connect API key</b> from you — it lets me create your certificate and profile automatically. Step by step:
+              <ul><li>Open <b>App Store Connect → Users and Access → Integrations</b></li><li>Under <b>App Store Connect API</b>, click <b>+</b></li><li>Name it "Capgo", role <b>App Manager</b>, Generate</li><li><b>Download the .p8</b> — you can only download it once!</li></ul>
+              Then tell me the <b>Key ID</b>, the <b>Issuer ID</b>, and where you saved the <b>.p8</b>.</div></div>
+
+            <div class="aside offline"><span class="ic">↗</span><div><span class="lab">your turn · ~3 min</span><b>Go to Apple.</b> Create the key, download <code>AuthKey_ABC123.p8</code>. (The AI also offers a detailed guide it pulls from a Capgo resource if you want screenshots.)</div></div>
+
+            <div class="turnrow r"><div class="bubble user"><div class="who">You</div>Done. Key ID ABC123, Issuer 1a2b-3c4d…, saved to ~/Downloads/AuthKey_ABC123.p8</div></div>
+
+            <div class="aside bts"><span class="ic">⚙︎</span><div><span class="lab">behind the scenes</span><code>next_step</code> verifies the key against Apple, then creates the distribution certificate — Apple replies "certificate limit reached."</div></div>
+
+            <div class="turnrow l"><div class="bubble ai"><div class="who">AI</div>Verified your key ✓. One snag: Apple only allows <b>2 distribution certificates</b> and you're at the limit.</div></div>
+
+            <div class="aside decide"><span class="ic">◆</span><div><span class="lab">your decision</span>I can revoke the oldest one — <b>"iPhone Distribution, created Jan 2023, unused"</b> — to make room, or you can tell me which to keep. Revoke the old one?</div></div>
+
+            <div class="turnrow r"><div class="bubble user"><div class="who">You</div>Yes, revoke it.</div></div>
+
+            <div class="aside bts"><span class="ic">⚙︎</span><div><span class="lab">behind the scenes</span>Revoked ✓ · certificate created ✓ · provisioning profile created ✓ · credentials saved locally ✓ — several auto-steps in one turn, each verified.</div></div>
+
+            <div class="turnrow l"><div class="bubble ai"><div class="who">AI</div>Done — certificate created, provisioning profile created, and your credentials saved locally. <b>A note:</b> these never go to Capgo's servers; they're used during the build and deleted right after. Ready to run your first build?</div></div>
+
+            <div class="turnrow r"><div class="bubble user"><div class="who">You</div>Yes!</div></div>
+
+            <div class="aside bts"><span class="ic">⚙︎</span><div><span class="lab">behind the scenes</span><code>next_step</code> → <code>capgo_request_build</code> (platform ios), then polls the build status until it finishes.</div></div>
+
+            <div class="turnrow l"><div class="bubble ai"><div class="who">AI</div>Build requested ✓ — compiling in the cloud now. This usually takes a few minutes; I'll watch it… <br><br>🎉 <b>Build succeeded!</b> Here's your <b>download link</b> and a <b>QR code</b> to install on a device — and it's been sent toward App Store Connect.</div></div>
+
+            <div class="turnrow l"><div class="bubble ai"><div class="who">AI</div>You're fully set up. Next time just say <b>"ship a new iOS build"</b> and I'll do it in one step. Want me to wire this into GitHub Actions so every push builds automatically?</div></div>
+
+          </div>
+        </div>
+      </div>
+
+      <!-- Android -->
+      <div class="tabpane" data-pane="android" data-active="false">
+        <div class="plathead"><span class="big">Android</span><span class="meta">~8 min · 1 Google sign-in · 0 keys to paste</span></div>
+        <div class="thread">
+          <div class="bar"><i></i><i></i><i></i><span>your AI assistant · Capgo connected</span></div>
+          <div class="stream">
+
+            <div class="turnrow r"><div class="bubble user"><div class="who">You</div>Set up Android cloud builds for com.acme.app.</div></div>
+
+            <div class="aside bts"><span class="ic">⚙︎</span><div><span class="lab">behind the scenes</span><code>start_capgo_builder_onboarding</code> → preflight: project ✓, account connected ✓, <code>android/</code> folder ✓, app already registered ✓. Jumps straight to signing.</div></div>
+
+            <div class="turnrow l"><div class="bubble ai"><div class="who">AI</div>You're already connected and registered, so we go straight to Android signing. Heads up: you'll sign into Google once in your browser. First, I'll generate your signing keystore — this is fully automatic.</div></div>
+
+            <div class="aside bts"><span class="ic">⚙︎</span><div><span class="lab">behind the scenes</span><code>next_step</code> generates the keystore and stores it safely on disk. No human needed.</div></div>
+
+            <div class="turnrow l"><div class="bubble ai"><div class="who">AI</div>Keystore generated and stored safely on your machine ✓. Now I need to connect your Google account so Capgo can publish to Google Play.</div></div>
+
+            <div class="aside offline"><span class="ic">↗</span><div><span class="lab">your turn · ~1 min</span><b>Sign in with Google.</b> The tool opens your browser to the consent screen → you approve → it detects the approval automatically via a local callback and continues. Nothing to copy or paste.</div></div>
+
+            <div class="turnrow r"><div class="bubble user"><div class="who">You</div>Approved.</div></div>
+
+            <div class="aside bts"><span class="ic">⚙︎</span><div><span class="lab">behind the scenes</span><code>next_step</code> verifies the OAuth token, provisions a Google Cloud service account, grants Play access, and validates it — all automatic, all verified.</div></div>
+
+            <div class="turnrow l"><div class="bubble ai"><div class="who">AI</div>Connected ✓. I've provisioned a Google Cloud service account and granted it Play access ✓, and saved your credentials locally (never uploaded to Capgo) ✓. Want to run your first build?</div></div>
+
+            <div class="turnrow r"><div class="bubble user"><div class="who">You</div>Go for it.</div></div>
+
+            <div class="turnrow l"><div class="bubble ai"><div class="who">AI</div>Building in the cloud… <br><br>🎉 <b>Build succeeded!</b> Here's your <b>APK/AAB download link</b> and a <b>QR code</b>, and it's been pushed toward the Play Console. Say <b>"ship a new Android build"</b> anytime to do this in one step.</div></div>
+
+          </div>
+        </div>
+        <p class="muted reveal" style="font-size:13.5px;margin-top:14px">Notice the contrast: Android needs you <strong>once</strong> (the Google sign-in) and you paste <strong>nothing</strong>. iOS needs the Apple portal trip because Apple has no equivalent hands-off path.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- SIDEWAYS -->
+  <section id="sideways">
+    <p class="kicker reveal">04 · When things go sideways</p>
+    <h2 class="reveal">The bumps — and how they feel</h2>
+    <p class="lead reveal">A guided flow is only as good as its recovery. Each of these is handled as a calm, single next step — never a dead end.</p>
+    <div class="rec reveal">
+      <div class="rcard"><div class="sit">no account yet</div><h3>You're not logged in</h3><p>The very first thing the AI hits.</p><div class="fix"><b>What you see:</b> "Let's connect Capgo first — here's the link to grab an API key, paste it here." Then it continues automatically.</div></div>
+      <div class="rcard"><div class="sit">conflict</div><h3>The app already exists</h3><p>You (or a teammate) already created it in Capgo.</p><div class="fix"><b>What you see:</b> "I found an existing <code>com.acme.app</code> — reuse it, or recreate it fresh?" A one-tap decision; it syncs the right id and moves on.</div></div>
+      <div class="rcard"><div class="sit">missing platform</div><h3>No iOS / Android folder</h3><p>You haven't added the native platform yet.</p><div class="fix"><b>What you see:</b> "Your project has no <code>ios/</code> folder yet — want me to run <code>cap add ios</code> for you?" Yes → it adds it and carries on.</div></div>
+      <div class="rcard"><div class="sit">apple limit</div><h3>Certificate limit reached</h3><p>Apple caps you at 2 distribution certificates.</p><div class="fix"><b>What you see:</b> a list of your certs with dates/usage and "revoke the unused one?" You choose; it never deletes without asking.</div></div>
+      <div class="rcard"><div class="sit">build failed</div><h3>The cloud build errored</h3><p>A compile or signing error came back.</p><div class="fix"><b>What you see:</b> the actual error in plain terms, the likely cause, a suggested fix, and "want me to retry?" — never a silent failure or a fake success.</div></div>
+      <div class="rcard"><div class="sit">interrupted</div><h3>You closed the chat halfway</h3><p>Life happened during the Apple step.</p><div class="fix"><b>What you see (later):</b> say "continue Capgo setup" and it picks up <b>exactly where you left off</b> — your progress was saved to disk after every step.</div></div>
+    </div>
+  </section>
+
+  <!-- LEDGER -->
+  <section id="ledger">
+    <p class="kicker reveal">05 · The honest ledger</p>
+    <h2 class="reveal">Your job vs. Capgo's job</h2>
+    <p class="lead reveal">Set expectations plainly: here is the complete list of what a human has to do — everything else is handled.</p>
+    <div class="ledger reveal">
+      <div class="side you">
+        <h3>Your job</h3>
+        <div class="sub">the few things software can't do</div>
+        <ul>
+          <li>Paste a Capgo API key — <b>once</b> (or skip if already logged in).</li>
+          <li><b>iOS:</b> create an App Store Connect API key in Apple's portal and bring back 3 values.</li>
+          <li><b>Android:</b> approve one Google sign-in in your browser.</li>
+          <li>Make 1–2 quick decisions (create-new vs import; revoke an old cert).</li>
+          <li>Say "go" to start the build. That's it.</li>
+        </ul>
+      </div>
+      <div class="side cap">
+        <h3>Capgo + AI's job</h3>
+        <div class="sub">everything else, verified each step</div>
+        <ul>
+          <li>Detect your project, app id, platform, and whether a build is needed.</li>
+          <li>Register the app; resolve any naming conflict.</li>
+          <li><b>iOS:</b> verify the key, create/rotate certificates, create the provisioning profile.</li>
+          <li><b>Android:</b> generate the keystore, provision GCP + Play, validate access.</li>
+          <li>Save credentials securely, request the build, watch it, hand you the link + QR.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- PAYOFF -->
+  <section id="payoff">
+    <p class="kicker reveal">06 · What you walk away with</p>
+    <h2 class="reveal">The payoff</h2>
+    <div class="payoff reveal">
+      <div class="row">
+        <div class="item"><div class="e">📦</div><b>A real build</b><span>A signed iOS or Android binary, compiled in the cloud.</span></div>
+        <div class="item"><div class="e">🔗</div><b>Link + QR</b><span>Download it, or scan to install on a device on the spot.</span></div>
+        <div class="item"><div class="e">🔐</div><b>Saved credentials</b><span>On your machine, ready for next time — never on Capgo's servers.</span></div>
+        <div class="item"><div class="e">⚡</div><b>One-line rebuilds</b><span>"Ship a new build" now does it in a single step.</span></div>
+      </div>
+      <div class="next">
+        <b>And the natural next journey:</b> the AI offers to wire this into <strong>GitHub Actions</strong> so every push builds and ships automatically — a separate guided flow you can take whenever you're ready. (Out of scope for the first run, deliberately — we end on the win.)
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <div class="big">You ask. It conducts. You ship.</div>
+  Proposed end-user journey for AI-conducted Capgo Builder onboarding · companion to the architecture design note
+</footer>
+
+<script>
+  (function(){
+    var links=[].slice.call(document.querySelectorAll('nav.secnav a')),map={};
+    links.forEach(function(a){var id=a.getAttribute('href').slice(1),el=document.getElementById(id);if(el)map[id]=a;});
+    var io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){links.forEach(function(l){l.classList.remove('active')});var a=map[e.target.id];if(a)a.classList.add('active');}});},{rootMargin:'-45% 0px -50% 0px'});
+    Object.keys(map).forEach(function(id){io.observe(document.getElementById(id));});
+  })();
+  (function(){
+    var els=[].slice.call(document.querySelectorAll('.reveal'));
+    var io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target);}});},{rootMargin:'0px 0px -8% 0px',threshold:.08});
+    els.forEach(function(el,i){el.style.transitionDelay=Math.min(i%5*55,260)+'ms';io.observe(el);});
+  })();
+  (function(){
+    var bar=document.querySelector('.tabbar');if(!bar)return;
+    bar.addEventListener('click',function(e){
+      var b=e.target.closest('button[data-tab]');if(!b)return;var t=b.getAttribute('data-tab');
+      [].slice.call(bar.querySelectorAll('button')).forEach(function(x){x.setAttribute('aria-selected',x===b?'true':'false')});
+      [].slice.call(document.querySelectorAll('.tabpane')).forEach(function(p){p.setAttribute('data-active',p.getAttribute('data-pane')===t?'true':'false')});
+    });
+  })();
+</script>
+</body>
+</html>
