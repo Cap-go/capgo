@@ -24,6 +24,16 @@ describe('comparePackages', () => {
     expect(a.baselineVersion).toBe('1.0.0')
   })
 
+  it.concurrent('stays unchanged when version and both checksums match', () => {
+    const result = comparePackages(
+      [pkg('a', '1.0.0', { ios_checksum: 'i', android_checksum: 'd' })],
+      [pkg('a', '1.0.0', { ios_checksum: 'i', android_checksum: 'd' })],
+    )
+    const a = byName('a', result)
+    expect(a.status).toBe('unchanged')
+    expect(a.compatible).toBe(true)
+  })
+
   it.concurrent('marks a newly added package as added + incompatible (new_plugin)', () => {
     const result = comparePackages([pkg('a', '1.0.0')], [])
     const a = byName('a', result)
@@ -64,8 +74,9 @@ describe('comparePackages', () => {
       [pkg('a', '1.0.0', { ios_checksum: 'old' })],
     )
     const a = byName('a', result)
-    // Same version string => status unchanged, but native code differs => incompatible.
-    expect(a.status).toBe('unchanged')
+    // Same version string but native code differs => status must be 'changed'
+    // (not 'unchanged') so it stays consistent with the incompatible verdict.
+    expect(a.status).toBe('changed')
     expect(a.compatible).toBe(false)
     expect(a.reasons).toEqual(['ios_code_changed'])
   })
@@ -76,6 +87,7 @@ describe('comparePackages', () => {
       [pkg('a', '1.0.0', { android_checksum: 'old' })],
     )
     const a = byName('a', result)
+    expect(a.status).toBe('changed')
     expect(a.compatible).toBe(false)
     expect(a.reasons).toEqual(['android_code_changed'])
   })

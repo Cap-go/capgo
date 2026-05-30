@@ -98,12 +98,17 @@ function evaluateReasons(
 function statusFor(
   candidate: NativePackage | undefined,
   baseline: NativePackage | undefined,
+  reasons: readonly IncompatibilityReason[],
 ): PackageStatus {
   if (candidate && !baseline)
     return 'added'
   if (!candidate && baseline)
     return 'removed'
-  if (candidate && baseline && candidate.version !== baseline.version)
+  // Present in both: "changed" covers a version difference OR a native-code
+  // (checksum) change. Deriving from `reasons` keeps status consistent with the
+  // compatibility verdict — a same-version bundle whose native code changed must
+  // not render as "unchanged" while the verdict flags it as incompatible.
+  if (candidate && baseline && (candidate.version !== baseline.version || reasons.length > 0))
     return 'changed'
   return 'unchanged'
 }
@@ -135,7 +140,7 @@ export function comparePackages(
       name,
       candidateVersion: candidate?.version,
       baselineVersion: baseline?.version,
-      status: statusFor(candidate, baseline),
+      status: statusFor(candidate, baseline, reasons),
       compatible: reasons.length === 0,
       reasons,
     }
