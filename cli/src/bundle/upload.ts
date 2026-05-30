@@ -17,6 +17,7 @@ import { trackEvent } from '../analytics/track'
 import { check2FAComplianceForApp, checkAppExistsAndHasPermissionOrgErr } from '../api/app'
 import { calcKeyId, encryptChecksum, encryptChecksumV3, encryptSource, generateSessionKey } from '../api/crypto'
 import { checkAlerts } from '../api/update'
+import { loadSavedCredentials } from '../build/credentials'
 import { getChecksum } from '../checksum'
 import { getRepoStarStatus, isRepoStarredInSession, starRepository } from '../github'
 import { confirmWithRememberedChoice } from '../promptPreferences'
@@ -24,6 +25,7 @@ import { showReplicationProgress } from '../replicationProgress'
 import { usesAlwaysDirectUpdate } from '../updaterConfig'
 import { baseKeyV2, BROTLI_MIN_UPDATER_VERSION_V5, BROTLI_MIN_UPDATER_VERSION_V6, BROTLI_MIN_UPDATER_VERSION_V7, canPromptInteractively, checkChecksum, checkCompatibilityCloud, checkPlanValidUpload, checkRemoteCliMessages, createSupabaseClient, deletedFailedVersion, findRoot, findSavedKey, formatError, getAppId, getBundleVersion, getCompatibilityDetails, getConfig, getInstalledVersion, getLocalConfig, getLocalDependencies, getOrganizationId, getPMAndCommand, getRemoteFileConfig, hasCliPermission, hasOrganizationPerm, isCompatible, isDeprecatedPluginVersion, OrganizationPerm, regexSemver, resolveUserIdFromApiKey, sendEvent, updateConfigUpdater, updateOrCreateChannel, updateOrCreateVersion, UPLOAD_TIMEOUT, uploadTUS, uploadUrl, zipFile } from '../utils'
 import { getVersionSuggestions, interactiveVersionBump } from '../versionHelpers'
+import { maybePromptBuilderCta } from './builder-cta'
 import { checkIndexPosition, searchInDirectory } from './check'
 import { summarizeUploadCompatibility } from './compatibility'
 import { prepareBundlePartialFiles, uploadPartial } from './partial'
@@ -259,6 +261,7 @@ async function verifyCompatibility(supabase: SupabaseType, pm: pmType, options: 
   return {
     nativePackages,
     minUpdateVersion,
+    incompatibleCount: compatibilitySummary.incompatibleCount,
     compatibility: {
       result: compatibilitySummary.result,
       versionOldId: oldVersion?.id != null ? String(oldVersion.id) : undefined,
@@ -895,7 +898,33 @@ export async function uploadBundleInternal(preAppid: string, options: OptionsUpl
   if (options.verbose)
     log.info(`[Verbose] Checking compatibility with channel ${channel}...`)
 
-  const { nativePackages, minUpdateVersion, compatibility } = await verifyCompatibility(supabase, pm, options, channel, appid, bundle, orgId)
+  const { nativePackages, minUpdateVersion, incompatibleCount, compatibility } = await verifyCompatibility(supabase, pm, options, channel, appid, bundle, orgId)
+  const incompatible = compatibility.result === 'incompatible'
+
+  // Incompatible bundle => a native build is required. Offer Capgo Builder:
+  // onboarding if the app has no build credentials, otherwise a native build.
+  // Accepting skips this OTA upload (a native build supersedes it). Skipped
+  // entirely for the programmatic SDK path (silent), which must not prompt,
+  // print, or emit CTA telemetry.
+  if (incompatible && !silent) {
+    const hasCredentials = (await loadSavedCredentials(appid)) !== null
+    const builderAction = await maybePromptBuilderCta({ incompatible, interactive, hasCredentials, appId: appid, orgId, apikey, incompatibleCount })
+    if (builderAction !== 'continue') {
+      // Skip the OTA upload and hand the launch back to the CLI entry point, which
+      // runs the Ink-based build commands. Doing it here would pull `ink` into the
+      // programmatic SDK bundle (which also imports this module).
+      return {
+        success: true,
+        skipped: true,
+        reason: 'NATIVE_BUILD',
+        builderAction,
+        bundle,
+        checksum: null,
+        encryptionMethod,
+        storageProvider: defaultStorageProvider,
+      }
+    }
+  }
   if (options.verbose) {
     log.info(`[Verbose] Compatibility check completed:`)
     log.info(`  - Native packages: ${nativePackages ? nativePackages.length : 0}`)

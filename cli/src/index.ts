@@ -25,7 +25,7 @@ import { deleteBundle } from './bundle/delete'
 import { encryptZip } from './bundle/encrypt'
 import { listBundle } from './bundle/list'
 import { printReleaseType } from './bundle/releaseType'
-import { uploadBundle } from './bundle/upload'
+import { handleBundleUploadCommand } from './bundle/upload-command'
 import { zipBundle } from './bundle/zip'
 import { addChannel } from './channel/add'
 import { currentBundle } from './channel/currentBundle'
@@ -172,9 +172,7 @@ External option: Store only a URL link (useful for apps >200MB or privacy requir
 Capgo never inspects external content. Add encryption for trustless security.
 
 Example: npx @capgo/cli@latest bundle upload com.example.app --path ./dist --channel production`)
-  .action(async (...args: Parameters<typeof uploadBundle>): Promise<void> => {
-    await uploadBundle(...args)
-  })
+  .action(handleBundleUploadCommand)
   .option('-a, --apikey <apikey>', optionDescriptions.apikey)
   .option('-p, --path <path>', `Path of the folder to upload, if not provided it will use the webDir set in capacitor.config`)
   .option('-c, --channel <channel>', `Channel to link to`)
