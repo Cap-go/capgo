@@ -1337,7 +1337,7 @@
   "notifications-billing-period-stats": "Billing period statistics",
   "notifications-billing-period-stats-desc": "Receive usage statistics on your billing anniversary date with plan upgrade recommendations",
   "notifications-builder-onboarding": "Native build setup emails",
-  "notifications-builder-onboarding-desc": "Get a reminder with tips if you start setting up native cloud builds (capgo build init) but don't finish",
+  "notifications-builder-onboarding-desc": "Get a reminder with tips if you start setting up native cloud builds (npx @capgo/cli@latest build init) but don't finish",
   "notifications-bundle-created": "New bundle uploads",
   "notifications-bundle-created-desc": "Receive emails when a new bundle is uploaded to your app",
   "notifications-bundle-deployed": "Bundle deployments",
