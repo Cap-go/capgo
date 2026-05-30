@@ -219,27 +219,20 @@ export type GoogleSignInChoice = 'go' | 'learn' | 'exit'
 export interface GoogleSignInStepProps {
   onChoose: (choice: GoogleSignInChoice) => void
   dense?: boolean
-  /** Dense form only: when true, re-add the blank-line gaps (the parent sets
-   *  this when there's vertical room — see SIGN_IN_GAP_ROWS). */
-  spaced?: boolean
 }
 
-// main's copy, with a responsive LAYOUT (the words never change between forms):
-//   • comfortable (room to spare) — main's exact look: boxed info Alert + blank-
-//     line spacing around the scope bullets.
-//   • dense (tight) — the SAME text with the box and blank lines stripped (a
-//     plain "ℹ …" line, bullets flush, no <Newline/>s), which is all it takes to
-//     fit the 16-row frame — no rewording.
-// Shared constants below guarantee the wording is identical in both forms.
+// Two forms, SAME WORDS (shared constants below) — only the layout differs:
+//   • comfortable (room to spare) — main's exact look: boxed info Alert +
+//     blank-line spacing around the scope bullets.
+//   • dense (tight) — the same text with the box and blank lines stripped: a
+//     plain "ℹ …" line, bullets flush, no <Newline/>s.
+// It's a strict binary (dense or comfortable) — there is NO in-between "spaced
+// dense" tier. That tier depended on the parent measuring leftover rows and
+// feeding a flag back, which kept tripping the too-small guard; it's gone.
 const SIGN_IN_TRUST = 'Sign in with Google so Capgo can set up Play Store publishing on your account — your tokens never reach Capgo\'s servers.'
 const SIGN_IN_INTRO = 'We\'ll open Google\'s consent screen. The two access requests are:'
-// Blank rows the dense form adds when `spaced`: one before the trust line, one
-// after it, one before the actions. The PARENT decides whether to set `spaced`
-// (it's the only one that knows the rows left after the progress bar + log), so
-// it needs to know how many rows the gaps cost — hence this is exported.
-export const SIGN_IN_GAP_ROWS = 3
 
-// The two consent scopes — shared so the wording is identical in every form.
+// The two consent scopes — shared so the wording is identical in both forms.
 function SignInBullets() {
   return (
     <>
@@ -261,7 +254,7 @@ function SignInBullets() {
   )
 }
 
-export const GoogleSignInStep: FC<GoogleSignInStepProps> = ({ onChoose, dense = false, spaced = false }) => {
+export const GoogleSignInStep: FC<GoogleSignInStepProps> = ({ onChoose, dense = false }) => {
   const select = (
     <Select
       options={[
@@ -273,19 +266,14 @@ export const GoogleSignInStep: FC<GoogleSignInStepProps> = ({ onChoose, dense = 
     />
   )
   if (dense) {
-    // Gaps (gated on `spaced`): before the trust line, after it, before the
-    // actions — SIGN_IN_GAP_ROWS rows total. When not spaced, everything is
-    // flush so the step survives a short terminal.
     return (
-      <Box flexDirection="column" marginTop={spaced ? 1 : 0}>
+      <Box flexDirection="column" marginTop={1}>
         <Text color="blueBright">{`ℹ ${SIGN_IN_TRUST}`}</Text>
-        <Box flexDirection="column" marginTop={spaced ? 1 : 0}>
-          <Text>{SIGN_IN_INTRO}</Text>
-          <Box flexDirection="column" marginLeft={2}>
-            <SignInBullets />
-          </Box>
+        <Text>{SIGN_IN_INTRO}</Text>
+        <Box flexDirection="column" marginLeft={2}>
+          <SignInBullets />
         </Box>
-        <Box marginTop={spaced ? 1 : 0}>{select}</Box>
+        {select}
       </Box>
     )
   }

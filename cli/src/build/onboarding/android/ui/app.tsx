@@ -45,7 +45,7 @@ import { trackBuilderOnboardingStep } from '../../telemetry.js'
 import { CompletedStepsLog } from '../../ui/completed-steps-log.js'
 import { BOX_HEADER_ROWS, COMPACT_HEADER_ROWS, Divider, FullscreenAiViewer, FullscreenBuildOutput, Header, TerminalTooSmall, WIZARD_PADDING_ROWS } from '../../ui/components.js'
 import type { AiResultKind } from '../../ui/components.js'
-import { COMPACT_HEADER_TOTAL_ROWS, extraSpacingFits, isFrameTooSmall, logBudgetRows, shouldCollapseToDense } from '../../ui/frame-fit.js'
+import { COMPACT_HEADER_TOTAL_ROWS, isFrameTooSmall, logBudgetRows, shouldCollapseToDense } from '../../ui/frame-fit.js'
 import {
   KeystoreExistingAliasSelectStep,
   KeystoreExistingAliasStep,
@@ -72,7 +72,6 @@ import {
   GoogleSignInLearnMoreStep,
   GoogleSignInRunningStep,
   GoogleSignInStep,
-  SIGN_IN_GAP_ROWS,
   PlayDeveloperIdActionsStep,
   PlayDeveloperIdInputStep,
   SaJsonExistingPathStep,
@@ -508,12 +507,6 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
   const dense = heights.comfortable != null
     && shouldCollapseToDense({ bodyRows: heights.comfortable, terminalRows })
 
-  // Google sign-in dense form: re-add its blank-line gaps only when the terminal
-  // genuinely has the rows for them. The step itself can't decide — it sits below
-  // the progress bar + completed-steps log and can't see its remaining rows; only
-  // here do we have the measured body height AND the terminal height.
-  const [signInDenseSpaced, setSignInDenseSpaced] = useState(false)
-
   useEffect(() => {
     if (!bodyRef.current)
       return
@@ -534,27 +527,8 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
   // Only block when even the dense form can't fit (see frame-fit.ts); null dense
   // height (just flipped, not yet measured) is optimistic, not a false positive.
   const bodyHeight = dense ? heights.dense : heights.comfortable
-  // The measured dense height includes the sign-in gaps when they're showing, so
-  // normalize to the COMPACT body (subtract them back out) for ALL fit math
-  // below. Otherwise enabling the gaps would inflate bodyHeight, trip "too
-  // small" / a higher neededRows, and we'd never fall back to compact — the bug
-  // where a 17-row terminal that fits the compact step still said "need 18".
-  const bodyHeightCompact = bodyHeight != null && signInDenseSpaced
-    ? bodyHeight - SIGN_IN_GAP_ROWS
-    : bodyHeight
-  const tooSmall = isFrameTooSmall({ bodyRows: bodyHeightCompact, dense, terminalRows })
-  const neededRows = (bodyHeightCompact != null ? bodyHeightCompact : 1) + COMPACT_HEADER_TOTAL_ROWS
-
-  // Show the sign-in gaps iff they fit ON TOP of the compact body. Keyed off the
-  // normalized compact height, so the decision is monotonic (turning the gaps on
-  // can't change the input and oscillate).
-  useEffect(() => {
-    const onSignIn = step === 'google-sign-in' && !showOAuthLearnMore && dense
-    const wantsSpaced = onSignIn && bodyHeightCompact != null
-      && extraSpacingFits({ compactBodyRows: bodyHeightCompact, extraRows: SIGN_IN_GAP_ROWS, terminalRows })
-    if (wantsSpaced !== signInDenseSpaced)
-      setSignInDenseSpaced(wantsSpaced)
-  }, [step, showOAuthLearnMore, dense, bodyHeightCompact, terminalRows, signInDenseSpaced])
+  const tooSmall = isFrameTooSmall({ bodyRows: bodyHeight, dense, terminalRows })
+  const neededRows = (bodyHeight != null ? bodyHeight : 1) + COMPACT_HEADER_TOTAL_ROWS
 
   // Rows for the completed-steps log (rendered OUTSIDE the measured body so its
   // growth never inflates the dense/fit decision). It fills what the current
@@ -2189,7 +2163,6 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
       {step === 'google-sign-in' && !showOAuthLearnMore && (
         <GoogleSignInStep
           dense={dense}
-          spaced={signInDenseSpaced}
           onChoose={(value) => {
             if (value === 'go')
               setStep('google-sign-in-running')

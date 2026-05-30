@@ -14,7 +14,6 @@
 import {
   capLogRows,
   COMPACT_HEADER_TOTAL_ROWS,
-  extraSpacingFits,
   isFrameTooSmall,
   shouldCollapseToDense,
 } from '../src/build/onboarding/ui/frame-fit.ts'
@@ -126,38 +125,6 @@ test('capLogRows: one row + overflow → the summary wins the row (never hide "m
 test('capLogRows: zero budget shows nothing (no room, not even a summary)', () => {
   const { hidden, visible } = capLogRows(mk('a', 'b'), 0)
   assert(visible.length === 0 && hidden === 0, 'nothing rendered when no rows')
-})
-
-// ── extraSpacingFits (optional spacing, e.g. the Google sign-in gaps) ─────────
-// The contract that the app's spacing decision relies on, and the invariant the
-// earlier columns-based version got WRONG (it ignored height, so spacing could
-// turn on and then trip "terminal too small"). Keyed off the COMPACT body.
-test('extraSpacingFits: true only when compact body + extra + header fits the terminal', () => {
-  // compact body 12, header/padding 3 → compact frame 15. +3 extra = 18.
-  assert(extraSpacingFits({ compactBodyRows: 12, extraRows: 3, terminalRows: 18 }), 'exactly fits at 18')
-  assert(!extraSpacingFits({ compactBodyRows: 12, extraRows: 3, terminalRows: 17 }), 'must NOT fit at 17 (the reported bug)')
-  assert(extraSpacingFits({ compactBodyRows: 12, extraRows: 3, terminalRows: 40 }), 'plenty of room')
-})
-
-test('extraSpacingFits: zero extra rows is just the compact-frame fit check', () => {
-  // With extra=0 it reduces to "does the compact frame fit" — never stricter.
-  for (const body of [5, 10, 13, 20]) {
-    for (const rows of [10, 16, 24]) {
-      const fits = extraSpacingFits({ compactBodyRows: body, extraRows: 0, terminalRows: rows })
-      assert(fits === (body + COMPACT_HEADER_TOTAL_ROWS <= rows), `mismatch body=${body} rows=${rows}`)
-    }
-  }
-})
-
-test('extraSpacingFits: whenever it says yes, the too-small check on the COMPACT body says no', () => {
-  // The key safety property: we never enable spacing on a terminal that would
-  // then report "too small". If the gaps fit, the compact body certainly fits.
-  for (let body = 1; body <= 20; body++) {
-    for (let rows = 4; rows <= 30; rows++) {
-      if (extraSpacingFits({ compactBodyRows: body, extraRows: 3, terminalRows: rows }))
-        assert(!isFrameTooSmall({ bodyRows: body, dense: true, terminalRows: rows }), `spacing fit but compact too-small: body=${body} rows=${rows}`)
-    }
-  }
 })
 
 console.log(`\n${passed} passed, ${failed} failed`)

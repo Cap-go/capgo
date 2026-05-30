@@ -39,16 +39,6 @@ export function shouldCollapseToDense({ bodyRows, terminalRows }: { bodyRows: nu
   return bodyRows + COMPACT_HEADER_TOTAL_ROWS > terminalRows
 }
 
-// Whether `extraRows` of OPTIONAL spacing (e.g. the Google sign-in blank-line
-// gaps) fit on top of the COMPACT body within the frame. `compactBodyRows` must
-// be the body height WITHOUT the optional spacing (the minimum), so the answer
-// is monotonic — turning the spacing on can't change the input and flip the
-// decision. The full spaced frame is compact body + extra + compact header +
-// padding; it must not exceed the terminal.
-export function extraSpacingFits({ compactBodyRows, extraRows, terminalRows }: { compactBodyRows: number, extraRows: number, terminalRows: number }): boolean {
-  return compactBodyRows + extraRows + COMPACT_HEADER_TOTAL_ROWS <= terminalRows
-}
-
 // ── Platform picker layout ───────────────────────────────────────────────────
 // The platform picker renders two bordered "cards" side-by-side when there's
 // room, else the same vertical Select used elsewhere. Cards need horizontal
