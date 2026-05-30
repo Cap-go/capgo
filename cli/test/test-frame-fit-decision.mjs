@@ -14,6 +14,7 @@
 import {
   capLogRows,
   COMPACT_HEADER_TOTAL_ROWS,
+  extraSpacingFits,
   isFrameTooSmall,
   shouldCollapseToDense,
 } from '../src/build/onboarding/ui/frame-fit.ts'
