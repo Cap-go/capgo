@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { Database } from '~/types/supabase.types'
 import type { IncompatibilityReason, NativePackage, PackageComparison, PackageStatus } from '~/services/bundleCompatibility'
-import { computed, ref, watch, watchEffect } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import IconExternalLink from '~icons/heroicons/arrow-top-right-on-square'
@@ -242,25 +242,37 @@ watch(compareVersionId, async (value) => {
   tableLoading.value = false
 })
 
-watchEffect(async () => {
-  if (route.path.includes('/bundle/') && route.path.includes('/dependencies')) {
-    const params = route.params as { app?: string, bundle?: string }
-    loading.value = true
-    packageId.value = params.app as string
-    id.value = Number(params.bundle as string)
-    baselinePackagesCache.value = {}
-    resetCompareSelection()
-    await getVersion()
-    // After the first await this effect no longer tracks reactive reads, so
-    // reading the ?compare param here cannot cause the init effect to re-run.
-    if (version.value)
-      await restoreCompareFromQuery()
-    loading.value = false
-    if (!version.value?.name)
-      displayStore.NavTitle = t('bundle')
-    displayStore.defaultBack = `/app/${params.app}/bundles`
-  }
+// Init key derived ONLY from the path params (app + bundle). Watching this
+// instead of route.params/route.path means a query-only navigation — e.g. the
+// ?compare write below — never retriggers page init (which would reset the
+// selection and cause a flash/loop).
+const bundleRouteKey = computed(() => {
+  if (!route.path.includes('/bundle/') || !route.path.includes('/dependencies'))
+    return null
+  const params = route.params as { app?: string, bundle?: string }
+  if (!params.app || !params.bundle)
+    return null
+  return `${params.app}::${params.bundle}`
 })
+
+watch(bundleRouteKey, async (key) => {
+  if (!key)
+    return
+  const [app, bundle] = key.split('::')
+  loading.value = true
+  packageId.value = app
+  id.value = Number(bundle)
+  baselinePackagesCache.value = {}
+  resetCompareSelection()
+  await getVersion()
+  // Pre-select from ?compare only after the version loads.
+  if (version.value)
+    await restoreCompareFromQuery()
+  loading.value = false
+  if (!version.value?.name)
+    displayStore.NavTitle = t('bundle')
+  displayStore.defaultBack = `/app/${app}/bundles`
+}, { immediate: true })
 </script>
 
 <template>
