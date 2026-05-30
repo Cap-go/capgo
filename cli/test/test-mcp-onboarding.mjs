@@ -226,6 +226,27 @@ await test('drive loop guards against a non-progressing auto step', async () => 
   eq(r.state, 'auto-loop-guard')
 })
 
+await test('drive loop: app id taken by another account → human_gate conflict with suggestions', async () => {
+  const deps = appPhaseDeps({
+    isAppRegistered: async () => false,
+    registerApp: async () => ({ ok: false, alreadyExists: true, error: 'already exists' }),
+  })
+  const r = await runStart(deps)
+  eq(r.kind, 'human_gate')
+  eq(r.state, 'app-id-conflict')
+  ok(/com\.acme\.app/.test(r.human.instruction), 'should suggest alternates based on the id')
+})
+
+await test('drive loop: registration hard-fails → error result', async () => {
+  const deps = appPhaseDeps({
+    isAppRegistered: async () => false,
+    registerApp: async () => ({ ok: false, alreadyExists: false, error: 'network down' }),
+  })
+  const r = await runStart(deps)
+  eq(r.kind, 'error')
+  eq(r.state, 'register-app-failed')
+})
+
 console.log(`\n📊 Results: ${pass} passed, ${fail} failed`)
 if (fail > 0)
   process.exit(1)
