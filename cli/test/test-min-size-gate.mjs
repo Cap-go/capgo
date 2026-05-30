@@ -57,16 +57,21 @@ check('exactly the floor renders the wizard', gateAt(MIN_COLS, MIN_ROWS).include
 // 4. ample size → renders wizard
 check('ample size renders the wizard', gateAt(MIN_COLS + 20, MIN_ROWS + 10).includes(SENTINEL))
 
-// 5. the resize prompt itself fits the small terminal it's shown on (real grid)
+// 5. the resize prompt itself fits the small terminal it's shown on (real grid):
+//    it must not clip (natural height ≤ rows) and the warning must be visible.
+//    (We check the warning line, not the wrapping resize sentence, because at
+//    50 cols that sentence wraps and no single grid line contains a fixed
+//    phrase — clipping is the real property to assert here.)
 {
   const cols = 50
   const rows = 20
   const frame = renderInkFrame(h(MinSizeGate, { cols, rows, children: child }), cols)
+  const naturalRows = frame.split('\n').length
   const grid = await frameToGrid(frame, { cols, rows })
   const visible = grid.filter(l => l.length > 0)
   check(
     'the resize prompt fits the small terminal it is shown on',
-    visible.some(l => /too small/i.test(l)) && visible.some(l => /continue automatically/i.test(l)),
+    naturalRows <= rows && visible.some(l => /too small/i.test(l)) && visible.some(l => /Resize this window/i.test(l)),
   )
 }
 
