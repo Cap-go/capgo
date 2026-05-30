@@ -283,15 +283,12 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
   // can't fit even with the one-line header. Derived synchronously from the
   // cached comfortable height; null (first frame of a step, or just after a
   // width change) renders comfortable so we can measure it.
-  // The step body (its explanation + controls) takes PRIORITY over the
-  // completed-steps log: fit decisions are made against the FULL terminal, with
-  // no rows reserved for the log. So a tall comfortable body stays comfortable
-  // as long as IT fits, and the log gets only the rows left over (see
-  // logMaxRows — it drops to zero when the body needs the space). Rationale:
-  // when space is tight, the "why" of the current step matters far more than a
-  // recap of already-completed steps.
-  const dense = heights.comfortable != null
-    && shouldCollapseToDense({ bodyRows: heights.comfortable, terminalRows })
+  // Always render the comfortable form. The startup size gate (MinSizeGate)
+  // guarantees the terminal is large enough, so the adaptive dense fallback is
+  // unreachable — forcing it false removes the fragile measure→decide coupling
+  // and the degraded small-terminal UX. (The dense branches in the step
+  // components + the measure machinery are now dead code, cleaned up next.)
+  const dense = false
 
   // Measure whichever form is on screen and cache it (only when missing or
   // changed — so this settles and doesn't re-render in a loop).
