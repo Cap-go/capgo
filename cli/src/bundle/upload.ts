@@ -132,7 +132,7 @@ function checkNotifyAppReady(options: OptionsUpload, path: string) {
   }
 }
 
-async function verifyCompatibility(supabase: SupabaseType, pm: pmType, options: OptionsUpload, channel: string, appid: string, bundle: string) {
+async function verifyCompatibility(supabase: SupabaseType, pm: pmType, options: OptionsUpload, channel: string, appid: string, bundle: string, orgId: string) {
   // Check compatibility here
   const ignoreMetadataCheck = options.ignoreMetadataCheck
   const autoMinUpdateVersion = options.autoMinUpdateVersion
@@ -216,6 +216,7 @@ async function verifyCompatibility(supabase: SupabaseType, pm: pmType, options: 
     icon: '🧪',
     apikey: options.apikey,
     appId: appid,
+    orgId,
     tags: {
       result: compatibilitySummary.result,
       incompatible_count: compatibilitySummary.incompatibleCount,
@@ -881,7 +882,7 @@ export async function uploadBundleInternal(preAppid: string, options: OptionsUpl
   if (options.verbose)
     log.info(`[Verbose] Checking compatibility with channel ${channel}...`)
 
-  const { nativePackages, minUpdateVersion } = await verifyCompatibility(supabase, pm, options, channel, appid, bundle)
+  const { nativePackages, minUpdateVersion } = await verifyCompatibility(supabase, pm, options, channel, appid, bundle, orgId)
   if (options.verbose) {
     log.info(`[Verbose] Compatibility check completed:`)
     log.info(`  - Native packages: ${nativePackages ? nativePackages.length : 0}`)

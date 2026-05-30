@@ -36,7 +36,7 @@ const iosCodeChanged: Compatibility = {
 }
 
 describe('summarizeUploadCompatibility', () => {
-  it('reports skipped when the comparison did not run (undefined)', () => {
+  it.concurrent('reports skipped when the comparison did not run (undefined)', () => {
     expect(summarizeUploadCompatibility(undefined)).toEqual({
       result: 'skipped',
       incompatibleCount: 0,
@@ -44,7 +44,7 @@ describe('summarizeUploadCompatibility', () => {
     })
   })
 
-  it('reports compatible for an empty package set (check ran, no native deps)', () => {
+  it.concurrent('reports compatible for an empty package set (check ran, no native deps)', () => {
     expect(summarizeUploadCompatibility([])).toEqual({
       result: 'compatible',
       incompatibleCount: 0,
@@ -52,7 +52,7 @@ describe('summarizeUploadCompatibility', () => {
     })
   })
 
-  it('treats matching versions and remote-only removals as compatible', () => {
+  it.concurrent('treats matching versions and remote-only removals as compatible', () => {
     expect(summarizeUploadCompatibility([compatibleSameVersion, removedRemoteOnly])).toEqual({
       result: 'compatible',
       incompatibleCount: 0,
@@ -60,7 +60,7 @@ describe('summarizeUploadCompatibility', () => {
     })
   })
 
-  it('flags a newly added native plugin as incompatible', () => {
+  it.concurrent('flags a newly added native plugin as incompatible', () => {
     expect(summarizeUploadCompatibility([compatibleSameVersion, newPlugin])).toEqual({
       result: 'incompatible',
       incompatibleCount: 1,
@@ -68,7 +68,7 @@ describe('summarizeUploadCompatibility', () => {
     })
   })
 
-  it('aggregates distinct reasons across incompatible packages', () => {
+  it.concurrent('aggregates distinct reasons across incompatible packages', () => {
     const summary = summarizeUploadCompatibility([
       compatibleSameVersion,
       versionMismatch,
@@ -79,7 +79,7 @@ describe('summarizeUploadCompatibility', () => {
     expect([...summary.reasons].sort()).toEqual(['ios_code_changed', 'version_mismatch'])
   })
 
-  it('de-duplicates repeated reasons', () => {
+  it.concurrent('de-duplicates repeated reasons', () => {
     const summary = summarizeUploadCompatibility([
       versionMismatch,
       { ...versionMismatch, name: 'version-mismatch-2' },
