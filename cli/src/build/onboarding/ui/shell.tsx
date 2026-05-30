@@ -101,20 +101,34 @@ const OnboardingShell: FC<OnboardingShellProps> = ({ appId, iosDir, androidDir, 
       choose(initialPlatform)
   }, [initialPlatform, choose])
 
+  // The wizard content (chosen app, or the picker while loading). Computed (not
+  // early-returned) so the MinSizeGate below wraps EVERY path uniformly.
+  let inner: React.ReactNode
   if (ready?.kind === 'ios')
-    return <OnboardingApp appId={appId} initialProgress={ready.progress} iosDir={iosDir} apikey={apikey} />
-  if (ready?.kind === 'android')
-    return <AndroidOnboardingApp appId={appId} initialProgress={ready.progress} androidDir={androidDir} apikey={apikey} />
+    inner = <OnboardingApp appId={appId} initialProgress={ready.progress} iosDir={iosDir} apikey={apikey} />
+  else if (ready?.kind === 'android')
+    inner = <AndroidOnboardingApp appId={appId} initialProgress={ready.progress} androidDir={androidDir} apikey={apikey} />
+  else
+    // Not ready yet. Full-height framed box (same shape as the apps + a stable
+    // Header) so nothing collapses. On the picker path: show the picker (it stays
+    // up during its own load). When the platform is pre-resolved: just the header
+    // for the brief startup load — no "Loading…" that flashes in and out.
+    inner = (
+      <Box flexDirection="column" minHeight={rows} padding={1}>
+        <Header />
+        {!initialPlatform && <PlatformPicker layout={pickPlatformLayout(cols, rows)} onSelect={choose} />}
+      </Box>
+    )
 
-  // Not ready yet. Full-height framed box (same shape as the apps + a stable
-  // Header) so nothing collapses. On the picker path: show the picker (it stays
-  // up during its own load). When the platform is pre-resolved: just the header
-  // for the brief startup load — no "Loading…" that flashes in and out.
+  // Startup AND resize-reactive size gate: below the floor it shows a resize
+  // prompt instead of the wizard, at/above it renders the wizard. cols/rows come
+  // from useTerminalSize (re-renders on resize), so SHRINKING the terminal
+  // mid-flow swaps the wizard for the prompt — onboarding content can never be
+  // clipped. This is the ONLY place onboarding asks the user to resize.
   return (
-    <Box flexDirection="column" minHeight={rows} padding={1}>
-      <Header compact={pickPlatformLayout(cols, rows) === 'list'} />
-      {!initialPlatform && <PlatformPicker layout={pickPlatformLayout(cols, rows)} onSelect={choose} />}
-    </Box>
+    <MinSizeGate cols={cols} rows={rows}>
+      {inner}
+    </MinSizeGate>
   )
 }
 
