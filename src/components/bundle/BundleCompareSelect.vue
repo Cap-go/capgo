@@ -232,15 +232,17 @@ async function searchCompareVersions(term: string) {
 
   const requestId = ++compareSearchRequestId.value
   compareSearchLoading.value = true
-  const baseQuery = buildCompareBaseQuery()
-    .neq('id', props.currentVersionId)
 
+  // Each chain must start from its own builder: the Supabase query builder is
+  // mutable and returns `this`, so reusing one instance across concurrent
+  // chains would leak filters between the requests.
   const numericId = Number(term)
   let data: VersionRow[] | null = null
   let error: unknown = null
 
   if (Number.isNaN(numericId)) {
-    const response = await baseQuery
+    const response = await buildCompareBaseQuery()
+      .neq('id', props.currentVersionId)
       .ilike('name', `%${term}%`)
       .order('created_at', { ascending: false })
       .limit(5)
@@ -253,11 +255,13 @@ async function searchCompareVersions(term: string) {
   }
   else {
     const [nameResponse, idResponse] = await Promise.all([
-      baseQuery
+      buildCompareBaseQuery()
+        .neq('id', props.currentVersionId)
         .ilike('name', `%${term}%`)
         .order('created_at', { ascending: false })
         .limit(5),
-      baseQuery
+      buildCompareBaseQuery()
+        .neq('id', props.currentVersionId)
         .eq('id', numericId)
         .order('created_at', { ascending: false })
         .limit(5),
