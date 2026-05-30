@@ -36,13 +36,6 @@ export interface SelectOption {
   value: string
 }
 
-// Capped visible rows for the scrollable list steps in DENSE mode. Kept low so
-// the bold header + Select window + "+N more" hint always fit the 13-row budget
-// even at 60 cols where the explanatory copy above wraps. In the comfortable
-// form the lists are un-capped (the parent only renders that form after
-// measuring it fits the viewport).
-const LIST_VISIBLE_COUNT = 4
-
 // How many trailing lines of a live status stream to show in DENSE mode. The
 // comfortable form prints the whole stream; the dense form tails it so a long
 // stream can never push the spinner / frame past budget.
@@ -179,32 +172,19 @@ export const SaJsonValidationFailedStep: FC<SaJsonValidationFailedStepProps> = (
     { label: '💾  Save credentials anyway (skip validation)', value: 'save-anyway' },
     { label: '🆕  Set up a new service account via Google', value: 'oauth' },
   ]
-  if (!dense) {
-    return (
-      <Box flexDirection="column" marginTop={1}>
-        <Alert variant="warning">
-          Service account validation failed.
-        </Alert>
-        <Newline />
-        <Box flexDirection="column" marginLeft={2}>
-          <Text color="red">{message}</Text>
-        </Box>
-        <Newline />
-        <Text bold>What would you like to do?</Text>
-        <Newline />
-        <Select
-          options={options}
-          onChange={value => onChoose(value as 'retry' | 'save-anyway' | 'oauth')}
-        />
-      </Box>
-    )
-  }
   return (
     <Box flexDirection="column" marginTop={1}>
-      <Text color="yellow" bold>⚠  Service account validation failed</Text>
-      <Text color="red">{message}</Text>
+      <Alert variant="warning">
+        Service account validation failed.
+      </Alert>
+      <Newline />
+      <Box flexDirection="column" marginLeft={2}>
+        <Text color="red">{message}</Text>
+      </Box>
+      <Newline />
+      <Text bold>What would you like to do?</Text>
+      <Newline />
       <Select
-        visibleOptionCount={3}
         options={options}
         onChange={value => onChoose(value as 'retry' | 'save-anyway' | 'oauth')}
       />
@@ -265,18 +245,6 @@ export const GoogleSignInStep: FC<GoogleSignInStepProps> = ({ onChoose, dense = 
       onChange={value => onChoose(value as GoogleSignInChoice)}
     />
   )
-  if (dense) {
-    return (
-      <Box flexDirection="column" marginTop={1}>
-        <Text color="blueBright">{`ℹ ${SIGN_IN_TRUST}`}</Text>
-        <Text>{SIGN_IN_INTRO}</Text>
-        <Box flexDirection="column" marginLeft={2}>
-          <SignInBullets />
-        </Box>
-        {select}
-      </Box>
-    )
-  }
   return (
     <Box flexDirection="column" marginTop={1}>
       <Alert variant="info">{SIGN_IN_TRUST}</Alert>
@@ -305,24 +273,6 @@ export interface GoogleSignInLearnMoreStepProps {
 // detail lives in the docs/source the last line points to) so the explainer +
 // the Back control fit within budget.
 export const GoogleSignInLearnMoreStep: FC<GoogleSignInLearnMoreStepProps> = ({ onBack, dense = false }) => {
-  if (dense) {
-    return (
-      <Box flexDirection="column" marginTop={1}>
-        <Text bold color="cyan">What Capgo can and can&apos;t do:</Text>
-        <Text>• Touches only the one project you pick — one SA, then stops.</Text>
-        <Text>• Invites that SA into one app with release-only access.</Text>
-        <Text>• Refresh token never leaves your machine; it&apos;s revoked after.</Text>
-        <Text>
-          • Revoke anytime at
-          {' '}
-          <Text color="cyan">myaccount.google.com/permissions</Text>
-          .
-        </Text>
-        <Text dimColor>Google-verified 2026-05-02 · source: github.com/Cap-go/capgo</Text>
-        <Select options={[{ label: '← Back to sign-in', value: 'back' }]} onChange={onBack} />
-      </Box>
-    )
-  }
   return (
     <Box flexDirection="column" marginTop={1}>
       <Alert variant="info">
@@ -410,24 +360,6 @@ export const PlayDeveloperIdActionsStep: FC<PlayDeveloperIdActionsStepProps> = (
     { label: '🎬  Watch a quick video tutorial', value: 'tutorial' },
     { label: '📝  I have my developer ID — let me paste it', value: 'manual' },
   ]
-  if (dense) {
-    return (
-      <Box flexDirection="column" marginTop={1}>
-        <Text bold color="cyan">We need your Play Console Developer account ID.</Text>
-        <Text dimColor>The numeric ID we invite the service account into so builds can publish.</Text>
-        <Text>
-          Find it in the Play Console URL:
-          {' '}
-          <Text dimColor>{playDeveloperUrl}</Text>
-          <Text bold color="cyan">1234567890123456789</Text>
-        </Text>
-        <Select
-          options={options}
-          onChange={value => onChoose(value as PlayDevIdActionChoice)}
-        />
-      </Box>
-    )
-  }
   return (
     <Box flexDirection="column" marginTop={1}>
       <Alert variant="info">
@@ -504,29 +436,12 @@ export interface GcpProjectsSelectStepProps {
 }
 
 export const GcpProjectsSelectStep: FC<GcpProjectsSelectStepProps> = ({ options, onChange, dense = false }) => {
-  if (!dense) {
-    return (
-      <Box flexDirection="column" marginTop={1}>
-        <Text bold>Which Google Cloud project should host the service account?</Text>
-        <Text dimColor>We&apos;ll create a `capgo-native-build` service account in the chosen project.</Text>
-        <Newline />
-        <Select options={options} onChange={onChange} />
-      </Box>
-    )
-  }
-  const hidden = Math.max(0, options.length - LIST_VISIBLE_COUNT)
   return (
     <Box flexDirection="column" marginTop={1}>
       <Text bold>Which Google Cloud project should host the service account?</Text>
-      <Text dimColor>We&apos;ll create a `capgo-native-build` service account in it.</Text>
-      <Select
-        visibleOptionCount={LIST_VISIBLE_COUNT}
-        options={options}
-        onChange={onChange}
-      />
-      {hidden > 0 && (
-        <Text dimColor>{`… +${hidden} more (↑/↓ to scroll)`}</Text>
-      )}
+      <Text dimColor>We&apos;ll create a `capgo-native-build` service account in the chosen project.</Text>
+      <Newline />
+      <Select options={options} onChange={onChange} />
     </Box>
   )
 }
@@ -593,76 +508,35 @@ export const AndroidPackageSelectStep: FC<AndroidPackageSelectStepProps> = ({
   onSubmitManual,
   dense = false,
 }) => {
-  if (!dense) {
-    return (
-      <Box flexDirection="column" marginTop={1}>
-        <Alert variant="info">
-          Which Android package (applicationId) should Capgo have release access to?
-        </Alert>
-        <Newline />
-        <Text>
-          This is the package name the Play Console uses — it must match the
-          {' '}
-          <Text bold>applicationId</Text>
-          {' '}
-          in
-          {' '}
-          <Text color="cyan">{`${androidDir}/app/build.gradle`}</Text>
-          , not the Capacitor JS-level appId (those can differ when plugins like CapacitorUpdater override the base ID).
-        </Text>
-        <Newline />
-        {showChooser
-          ? (
-              <>
-                <Text bold>Found these in your Gradle config. Pick one, or enter a different package:</Text>
-                <Newline />
-                <Select options={detectedOptions} onChange={onChooseDetected} />
-              </>
-            )
-          : (
-              <>
-                <Text bold>Android package name:</Text>
-                <Newline />
-                <FilteredTextInput
-                  placeholder="com.example.app"
-                  filter=""
-                  onSubmit={onSubmitManual}
-                />
-              </>
-            )}
-      </Box>
-    )
-  }
-  const hidden = Math.max(0, detectedOptions.length - LIST_VISIBLE_COUNT)
   return (
     <Box flexDirection="column" marginTop={1}>
-      <Text bold color="cyan">Which Android package should Capgo release?</Text>
-      <Text dimColor>
-        Must match the
+      <Alert variant="info">
+        Which Android package (applicationId) should Capgo have release access to?
+      </Alert>
+      <Newline />
+      <Text>
+        This is the package name the Play Console uses — it must match the
         {' '}
         <Text bold>applicationId</Text>
         {' '}
-        in app/build.gradle (not the JS appId).
+        in
+        {' '}
+        <Text color="cyan">{`${androidDir}/app/build.gradle`}</Text>
+        , not the Capacitor JS-level appId (those can differ when plugins like CapacitorUpdater override the base ID).
       </Text>
+      <Newline />
       {showChooser
         ? (
             <>
-              <Text>
-                {`Found ${detectedCount} in Gradle. Pick one, or type a different package:`}
-              </Text>
-              <Select
-                visibleOptionCount={LIST_VISIBLE_COUNT}
-                options={detectedOptions}
-                onChange={onChooseDetected}
-              />
-              {hidden > 0 && (
-                <Text dimColor>{`… +${hidden} more (↑/↓ to scroll)`}</Text>
-              )}
+              <Text bold>Found these in your Gradle config. Pick one, or enter a different package:</Text>
+              <Newline />
+              <Select options={detectedOptions} onChange={onChooseDetected} />
             </>
           )
         : (
             <>
               <Text bold>Android package name:</Text>
+              <Newline />
               <FilteredTextInput
                 placeholder="com.example.app"
                 filter=""
