@@ -20,7 +20,8 @@ import type { FC, ReactNode } from 'react'
 //
 // Both are resize-reactive: callers pass cols/rows from useTerminalSize, which
 // re-renders on every resize event.
-import { Box, Text } from 'ink'
+import process from 'node:process'
+import { Box, Text, useInput } from 'ink'
 import React from 'react'
 import { MIN_COLS, MIN_ROWS, terminalFitsOnboarding } from '../min-terminal-size.js'
 
@@ -33,6 +34,17 @@ export interface TerminalTooSmallPromptProps {
 // uses its full clear-screen path (no stale rows from a previous frame on
 // resize), and it names whichever dimension is short.
 export const TerminalTooSmallPrompt: FC<TerminalTooSmallPromptProps> = ({ cols, rows }) => {
+  // Keep a stdin reader alive while the prompt is shown. This is load-bearing:
+  // on the picker path the ONLY useInput lives in PlatformPicker, so swapping it
+  // for this prompt would leave Ink with zero input subscribers — under
+  // alternateScreen + a real TTY that lets waitUntilExit() resolve and the whole
+  // wizard exits ("✔ onboarding complete" + quit) the instant you shrink past
+  // the floor. Registering a useInput here keeps Ink reading input, so the
+  // prompt just sits there until the user resizes back. Ctrl+C still quits.
+  useInput((input, key) => {
+    if (key.ctrl && input === 'c')
+      process.kill(process.pid, 'SIGINT')
+  })
   const needWider = cols < MIN_COLS
   const needTaller = rows < MIN_ROWS
   return (
