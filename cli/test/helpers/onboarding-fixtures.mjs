@@ -23,9 +23,10 @@ import * as ish from '../../src/build/onboarding/ui/steps/ios-shared.tsx'
 
 const h = React.createElement
 const noop = () => {}
-// The form we ship: dense is becoming the only form (the comfortable variant is
-// being dropped). Measure the floor for dense everywhere.
-const C = { dense: true }
+// The form we ship after dropping the `dense` flag: the COMFORTABLE form (full
+// decorations — Alert boxes, spacing). The harness measures THIS so the enforced
+// minimum guarantees the real, fully-decorated step fits.
+const C = { dense: false }
 
 const LONG_APP_ID = 'com.acme.enterprise.internal.mobile.companion.app'
 const LONG_ERR = 'The service account is valid but has no access to this app in the Play Console. Invite capgo-native-build@your-project.iam.gserviceaccount.com under Users and permissions, grant release access, then retry. (HTTP 403 from androidpublisher.edits.insert)'
