@@ -10,6 +10,11 @@
 
 **Spec:** `docs/superpowers/specs/2026-05-30-builder-cta-on-incompatible-upload-design.md`
 
+> **Update (post-review):** The 3-day snooze (Task 1) and the second "are you sure?"
+> confirmation were dropped. The shipped flow is a **single yes/no** with the reason
+> folded into the question and **no snooze**. The spec reflects the current design; the
+> tasks below are kept as the original plan of record.
+
 ---
 
 ## File Structure

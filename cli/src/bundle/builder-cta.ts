@@ -3,7 +3,6 @@ import { confirm as pConfirm, isCancel as pIsCancel, log } from '@clack/prompts'
 import { trackEvent } from '../analytics/track'
 import { loadSavedCredentials } from '../build/credentials'
 import { isTruthyEnvValue } from '../posthog'
-import { isBuilderPromptSnoozed, snoozeBuilderPrompt } from './builder-snooze'
 
 export type BuilderCtaSurface = 'skip' | 'ci-ad' | 'prompt-onboarding' | 'prompt-build'
 export type BuilderCtaAction = 'continue' | 'launch-onboarding' | 'launch-build'
@@ -12,13 +11,12 @@ export interface BuilderCtaContext {
   incompatible: boolean
   interactive: boolean
   envDisabled: boolean
-  snoozed: boolean
   hasCredentials: boolean
 }
 
 /**
  * Pure decision: which Builder CTA surface (if any) to show for this upload.
- * - `skip`: do nothing (compatible, disabled, or snoozed).
+ * - `skip`: do nothing (compatible or disabled via env).
  * - `ci-ad`: non-interactive — print a one-off ad, never prompt.
  * - `prompt-onboarding` / `prompt-build`: interactive prompt, branched on
  *   whether the app already has build credentials.
@@ -28,16 +26,16 @@ export function decideBuilderCtaSurface(ctx: BuilderCtaContext): BuilderCtaSurfa
     return 'skip'
   if (!ctx.interactive)
     return 'ci-ad'
-  if (ctx.snoozed)
-    return 'skip'
   return ctx.hasCredentials ? 'prompt-build' : 'prompt-onboarding'
 }
 
 const DOCS_URL = 'https://capgo.app/docs/cli/cloud-build/'
-const SNOOZE_DAYS = 3
+
+// Why a native build is needed — folded into the single prompt and the CI ad.
+const REASON = 'This update includes native changes, which ship via an app-store build rather than OTA.'
 
 export function printBuilderCiAd(hasCredentials: boolean): void {
-  log.warn('This update changes native code, so it needs a native build to reach users on current app-store binaries.')
+  log.warn(REASON)
   log.info(hasCredentials
     ? '→ Run a native build:  npx @capgo/cli build request --platform <ios|android>'
     : '→ Set up Capgo Builder: npx @capgo/cli build onboarding')
@@ -54,8 +52,6 @@ export interface MaybePromptBuilderCtaParams {
   orgId: string
   apikey: string
   incompatibleCount: number
-  /** Injectable for tests; defaults to the current time. */
-  now?: Date
   /** Injectable for tests; defaults to the `@clack/prompts` confirm prompt. */
   confirm?: BuilderConfirm
 }
@@ -76,16 +72,13 @@ export async function maybePromptBuilderCta(params: MaybePromptBuilderCtaParams)
 }
 
 async function runBuilderCta(params: MaybePromptBuilderCtaParams): Promise<BuilderCtaAction> {
-  const now = params.now ?? new Date()
   const envDisabled = isTruthyEnvValue(env.CAPGO_NO_BUILDER_PROMPT)
   const hasCredentials = (await loadSavedCredentials(params.appId)) !== null
-  const snoozed = await isBuilderPromptSnoozed(params.appId, now)
 
   const surface = decideBuilderCtaSurface({
     incompatible: params.incompatible,
     interactive: params.interactive,
     envDisabled,
-    snoozed,
     hasCredentials,
   })
   if (surface === 'skip')
@@ -107,11 +100,12 @@ async function runBuilderCta(params: MaybePromptBuilderCtaParams): Promise<Build
     return 'continue'
   }
 
+  // Single question: explain why, then offer the relevant Builder flow.
   const confirm = params.confirm ?? pConfirm
   const accepted = await confirm({
     message: mode === 'build'
-      ? 'This update needs a native build. Run one now with Capgo Builder?'
-      : 'This update includes native changes. Set up Capgo Builder now?',
+      ? `${REASON} Run a native build now with Capgo Builder?`
+      : `${REASON} Set up Capgo Builder now?`,
     initialValue: true,
   })
   if (pIsCancel(accepted))
@@ -122,16 +116,7 @@ async function runBuilderCta(params: MaybePromptBuilderCtaParams): Promise<Build
     return mode === 'build' ? 'launch-build' : 'launch-onboarding'
   }
 
-  // Declined → confirm with the low-fear warning (spec option 4).
-  const stillSkip = await confirm({
-    message: 'Heads up: this update includes native changes, which ship via an app-store build rather than OTA. Skip the Builder for now?',
-    initialValue: false,
-  })
-  const sure = !pIsCancel(stillSkip) && stillSkip === true
-  void trackEvent({ channel: 'bundle', event: 'Builder CTA Declined', icon: '🚫', apikey: params.apikey, appId: params.appId, orgId: params.orgId, tags: { mode, sure } })
-  if (sure) {
-    await snoozeBuilderPrompt(params.appId, SNOOZE_DAYS, now)
-    void trackEvent({ channel: 'bundle', event: 'Builder CTA Snoozed', icon: '😴', apikey: params.apikey, appId: params.appId, orgId: params.orgId, tags: { mode, days: SNOOZE_DAYS } })
-  }
+  // Declined → just continue the OTA upload (no follow-up prompt).
+  void trackEvent({ channel: 'bundle', event: 'Builder CTA Declined', icon: '🚫', apikey: params.apikey, appId: params.appId, orgId: params.orgId, tags: { mode } })
   return 'continue'
 }

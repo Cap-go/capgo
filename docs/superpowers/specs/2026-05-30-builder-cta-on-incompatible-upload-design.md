@@ -36,8 +36,7 @@ The CTA is evaluated only when **all** hold:
 1. Command is `bundle upload`.
 2. Compatibility ran and the verdict is **incompatible** (`isBuildNeeded(...) === true`).
    - If `--ignore-metadata-check` was passed, no compatibility check runs, so no CTA.
-3. Not currently snoozed (see Snooze).
-4. `CAPGO_NO_BUILDER_PROMPT` is not truthy.
+3. `CAPGO_NO_BUILDER_PROMPT` is not truthy.
 
 Compatible uploads are completely unchanged. The compatibility verdict itself remains
 **non-fatal** (this feature does not block uploads).
@@ -63,41 +62,33 @@ Show the line that matches the local credential state (onboarding vs build), not
 
 ### Interactive (TTY)
 
-Shown **once per invocation**. Branch on local credentials.
+Shown **once per invocation** as a single yes/no that states *why* up front. Branch
+on local credentials. Declining (or cancelling) just continues the OTA upload —
+there is no follow-up prompt.
 
 **No credentials → onboarding CTA**
 
 ```text
-This update includes native changes, which ship via an app-store build rather than OTA.
-Set up Capgo Builder now? (Y/n)
+This update includes native changes, which ship via an app-store build rather than OTA. Set up Capgo Builder now? (Y/n)
 ```
 
 - **Yes** → skip the OTA upload and return a `launch-onboarding` action; the CLI
   entry point launches `build onboarding`.
-- **No** → confirmation step:
-
-  ```text
-  Heads up: this update includes native changes, which ship via an app-store build rather than OTA.
-  Skip the Builder for now? (y/N)
-  ```
-
-  - **Yes (sure)** → snooze 3 days (this app), then continue the OTA upload.
-  - **No (not sure)** → continue the OTA upload, **no snooze** (CTA may appear again next time).
+- **No / cancel** → continue the OTA upload.
 
 **Has credentials → build CTA**
 
 ```text
-This update needs a native build. Run one now with Capgo Builder? (Y/n)
+This update includes native changes, which ship via an app-store build rather than OTA. Run a native build now with Capgo Builder? (Y/n)
 ```
 
 - **Yes** → skip the OTA upload and return a `launch-build` action; the CLI entry
   point launches `build request`.
-- **No** → same confirmation + snooze flow as above.
+- **No / cancel** → continue the OTA upload.
 
-> Warning copy (option 4, "minimal heads-up") is intentionally low-fear and accurate:
-> the OTA update still applies to users whose binary matches; Capgo's
-> `min_update_version` gating is what protects older binaries. We do **not** claim
-> "this update won't apply to users."
+> The wording is deliberately low-fear and accurate: the OTA update still applies
+> to users whose binary matches; Capgo's `min_update_version` gating is what
+> protects older binaries. We do **not** claim "this update won't apply to users."
 
 ## Credential detection (local)
 
@@ -106,26 +97,24 @@ returns a non-`null` entry for the current `appId`. Credentials live under
 `~/.capgo-credentials/` — the same store `build request` reads. No new helper and
 no server-side lookup (explicitly out of scope).
 
-## Snooze
+## Opt-out
 
-- File: `~/.capgo-builder-prompt.json`.
-- Shape: `{ [appId]: { snoozedUntil: <ISO8601> } }` (per-app, per-machine).
-- Set **only** on a confirmed decline ("sure") → `snoozedUntil = now + 3 days`.
-- On each upload, the CTA is suppressed while `now < snoozedUntil` for that app.
-- Corrupt/missing file is treated as "not snoozed" (never throws).
-- `CAPGO_NO_BUILDER_PROMPT=1` always suppresses the prompt (CI ad still allowed, or
-  also suppressed — see Open decisions; default: suppresses everything).
+- `CAPGO_NO_BUILDER_PROMPT=1` suppresses the CTA entirely (both the interactive
+  prompt and the CI ad).
+
+There is **no snooze / "don't ask again" state**. A declined prompt simply continues
+the upload, and the CTA may appear again on the next incompatible upload.
 
 ## Accept → skip upload
 
 Because accepting means the user is switching to a native build, the in-progress OTA
 upload is abandoned before any zip/upload work:
 
-- `verifyCompatibility` already runs early in `upload.ts`, before the bundle is zipped.
+- `verifyCompatibility` runs early in `upload.ts`, before the bundle is zipped.
 - The CTA is evaluated right after the incompatibility is known.
-- On `launch-onboarding` / `launch-build`, the upload function invokes
-  `onboardingBuilderCommand` / `requestBuildCommand` and returns early — no zip,
-  no upload.
+- On `launch-onboarding` / `launch-build`, `uploadBundleInternal` returns early with a
+  `builderAction` in its result (no zip, no upload); the CLI entry point then launches
+  the Ink-based build command.
 
 ## Tracking (PostHog via existing `trackEvent`)
 
@@ -138,8 +127,7 @@ node_version, os, is_ci, app_id, org group) automatically.
 | `Bundle Upload Compatibility Checked` | `result` (compatible/incompatible), `incompatible_count`, `reasons` |
 | `Builder CTA Shown` | `surface` (ci/interactive), `mode` (onboarding/build), `incompatible_count` |
 | `Builder CTA Accepted` | `mode` |
-| `Builder CTA Declined` | `mode`, `sure` (bool) |
-| `Builder CTA Snoozed` | `mode`, `days` (3) |
+| `Builder CTA Declined` | `mode` |
 
 This yields a funnel: incompatible upload → CTA shown → accepted → onboarding/build,
 joinable with the existing **Capgo Builder Tracking** dashboard. The
@@ -151,15 +139,12 @@ compatible-vs-incompatible graphs (previously only fed by the standalone command
 - `cli/src/bundle/builder-cta.ts`
   - `maybePromptBuilderCta(params): Promise<BuilderCtaAction>` where
     `BuilderCtaAction = 'continue' | 'launch-onboarding' | 'launch-build'` (string union).
-  - Owns: environment detection, credential branch, prompt copy, confirm + snooze,
+  - Owns: environment detection, credential branch, prompt copy, the single confirm,
     and emitting the `Builder CTA *` events. `interactive` and `confirm` are injected
     by the caller for testability; the pure `decideBuilderCtaSurface` does the gating.
     The whole body is wrapped so it never throws (degrades to `continue`).
 - Credential detection: reuse `loadSavedCredentials(appId)` from
   `cli/src/build/credentials.ts` (returns credentials | `null`); no new helper.
-- `cli/src/bundle/builder-snooze.ts`
-  - `isBuilderPromptSnoozed(appId, now, path?)`, `snoozeBuilderPrompt(appId, days, now, path?)`.
-    Reads/writes `~/.capgo-builder-prompt.json`.
 - `cli/src/bundle/upload.ts`
   - After `verifyCompatibility`, if incompatible **and not silent**: call
     `maybePromptBuilderCta`. On a launch action, skip the OTA upload and return a
@@ -172,11 +157,10 @@ compatible-vs-incompatible graphs (previously only fed by the standalone command
 ## Testing
 
 - Unit tests (target ≥80% on new modules):
-  - `maybePromptBuilderCta` decision matrix: {interactive, CI} × {creds, no-creds} ×
-    {accept, decline-sure, decline-unsure} × {snoozed, not snoozed} → expected action
-    + expected events. Prompt I/O mocked.
-  - Snooze util: set/honor/expire, corrupt file tolerance, per-app isolation.
-  - `hasLocalCredentials`: present/absent/malformed credentials file.
+  - `decideBuilderCtaSurface` matrix: {interactive, CI} × {creds, no-creds} ×
+    {compatible, env-disabled} → expected surface.
+  - `maybePromptBuilderCta`: accept → launch action; decline/cancel → continue (single
+    prompt, asserted); CI → ad + continue. Confirm injected; credentials + tracking mocked.
 - Ensure no regression for compatible uploads and `--ignore-metadata-check`
   (no CTA, no new event other than the compat-checked event when applicable).
 
@@ -186,19 +170,15 @@ compatible-vs-incompatible graphs (previously only fed by the standalone command
   build-usage lookup.
 - CTA only in `bundle upload` (not `bundle compatibility` or `build needed`).
 - No change to compatibility being non-fatal.
-- No persistence beyond the snooze file.
+- No snooze / persistent prompt state.
 
 ## Decisions (resolved)
 
-- Accept → skip upload and launch the relevant build flow inline.
-- Snooze scope: **per-app**, per-machine, 3 days, set only on confirmed decline.
-- "Not sure" at the confirm step → continue upload, do not snooze (re-ask next time).
-- Warning copy: option 4 (minimal heads-up).
+- Accept → skip upload; the CLI entry point launches the relevant build flow.
+- A single yes/no with the reason folded in; declining (or cancelling) just continues
+  the upload — no second prompt, no snooze.
+- Warning copy: low-fear (native changes ship via an app-store build, not OTA).
 - Architecture: CLI-only, PostHog for tracking, local credential check.
-
-## Open decisions (minor, can finalize in plan)
-
-- Does `CAPGO_NO_BUILDER_PROMPT` also suppress the CI ad, or only the interactive
-  prompt? Default assumption: suppresses everything.
-- Exact `build request` invocation when launched inline (platform selection / prompt)
-  — confirm against `requestBuildCommand`'s current interactive behavior.
+- `CAPGO_NO_BUILDER_PROMPT` suppresses everything (prompt + CI ad).
+- `build request` is launched without `--path` (it resolves the project root and
+  prompts for platform); the launch lives in the CLI entry point, not `upload.ts`.
