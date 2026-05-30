@@ -25,7 +25,7 @@
 // across both modes.
 import type { FC } from 'react'
 import { Alert, Select } from '@inkjs/ui'
-import { Box, Newline, Text, useStdout } from 'ink'
+import { Box, Newline, Text } from 'ink'
 import React from 'react'
 import { FilteredTextInput, SpinnerLine } from '../components.js'
 
@@ -219,6 +219,9 @@ export type GoogleSignInChoice = 'go' | 'learn' | 'exit'
 export interface GoogleSignInStepProps {
   onChoose: (choice: GoogleSignInChoice) => void
   dense?: boolean
+  /** Dense form only: when true, re-add the blank-line gaps (the parent sets
+   *  this when there's vertical room — see SIGN_IN_GAP_ROWS). */
+  spaced?: boolean
 }
 
 // main's copy, with a responsive LAYOUT (the words never change between forms):
@@ -230,11 +233,11 @@ export interface GoogleSignInStepProps {
 // Shared constants below guarantee the wording is identical in both forms.
 const SIGN_IN_TRUST = 'Sign in with Google so Capgo can set up Play Store publishing on your account — your tokens never reach Capgo\'s servers.'
 const SIGN_IN_INTRO = 'We\'ll open Google\'s consent screen. The two access requests are:'
-// At/above this width the dense form wraps to ≤ 11 rows, so its two blank-line
-// gaps (after the trust line, before the actions) still fit the 13-row body
-// budget. Narrower than this, the text wraps taller and the gaps are dropped
-// (fully-compact). Measured against the copy above; the frame-fit test guards it.
-const SIGN_IN_DENSE_SPACED_MIN_COLS = 64
+// Blank rows the dense form adds when `spaced`: one before the trust line, one
+// after it, one before the actions. The PARENT decides whether to set `spaced`
+// (it's the only one that knows the rows left after the progress bar + log), so
+// it needs to know how many rows the gaps cost — hence this is exported.
+export const SIGN_IN_GAP_ROWS = 3
 
 // The two consent scopes — shared so the wording is identical in every form.
 function SignInBullets() {
@@ -258,13 +261,7 @@ function SignInBullets() {
   )
 }
 
-export const GoogleSignInStep: FC<GoogleSignInStepProps> = ({ onChoose, dense = false }) => {
-  const { stdout } = useStdout()
-  // Progressive degradation in the dense form: re-add the two blank-line gaps
-  // (after the trust line, before the actions) when the terminal is wide enough
-  // that the dense body + 2 rows still fits the budget; otherwise stay fully
-  // compact. The words are identical in every form — only the spacing changes.
-  const spaced = dense && (stdout?.columns ?? 80) >= SIGN_IN_DENSE_SPACED_MIN_COLS
+export const GoogleSignInStep: FC<GoogleSignInStepProps> = ({ onChoose, dense = false, spaced = false }) => {
   const select = (
     <Select
       options={[
@@ -276,8 +273,11 @@ export const GoogleSignInStep: FC<GoogleSignInStepProps> = ({ onChoose, dense = 
     />
   )
   if (dense) {
+    // Gaps (gated on `spaced`): before the trust line, after it, before the
+    // actions — SIGN_IN_GAP_ROWS rows total. When not spaced, everything is
+    // flush so the step survives a short terminal.
     return (
-      <Box flexDirection="column" marginTop={1}>
+      <Box flexDirection="column" marginTop={spaced ? 1 : 0}>
         <Text color="blueBright">{`ℹ ${SIGN_IN_TRUST}`}</Text>
         <Box flexDirection="column" marginTop={spaced ? 1 : 0}>
           <Text>{SIGN_IN_INTRO}</Text>

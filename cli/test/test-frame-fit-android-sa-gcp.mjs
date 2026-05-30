@@ -26,6 +26,7 @@ import {
   GoogleSignInRunningStep,
   GoogleSignInStep,
   PlayDeveloperIdActionsStep,
+  SIGN_IN_GAP_ROWS,
   PlayDeveloperIdInputStep,
   SaJsonExistingPathStep,
   SaJsonExistingPickerStep,
@@ -116,13 +117,18 @@ test(`sa-json-validation-failed [dense, long msg] fits ${BODY_BUDGET_ROWS}-row b
 })
 
 // ── google-sign-in — pre-consent instructions ────────────────────────────────
-// Same copy as main; the dense form just strips the box + blank-line spacing
-// (no rewording). It progressively re-adds two blank-line gaps when the terminal
-// is wide enough (≥ 64 cols) that the body + 2 rows still fits the budget, and
-// stays fully-compact below that. Test both sides of the 64-col breakpoint: at
-// 60 the compact form fits, at 64 and 80 the spaced form fits.
-test(`google-sign-in [dense] fits ${BODY_BUDGET_ROWS}-row budget (compact <64, spaced ≥64)`, () => {
-  assertFitsBudget(h(GoogleSignInStep, { onChoose: noop, dense: true }), 'google-sign-in-dense', { widths: [60, 64, 80] })
+// The compact dense form (gaps off) is what shows when vertical space is tight,
+// so it must fit the budget. The parent re-adds the gaps (via `spaced`) only when
+// the terminal has the rows — a height decision the step can't make itself.
+test(`google-sign-in [dense, compact] fits ${BODY_BUDGET_ROWS}-row budget`, () => {
+  assertFitsBudget(h(GoogleSignInStep, { onChoose: noop, dense: true }), 'google-sign-in-dense')
+})
+// `spaced` adds exactly SIGN_IN_GAP_ROWS blank rows (and nothing else changes),
+// so the parent's "does it fit" math (compact body + SIGN_IN_GAP_ROWS) is sound.
+test('google-sign-in [dense] spaced adds exactly SIGN_IN_GAP_ROWS rows', () => {
+  const compact = frameRows(h(GoogleSignInStep, { onChoose: noop, dense: true }), 80)
+  const spaced = frameRows(h(GoogleSignInStep, { onChoose: noop, dense: true, spaced: true }), 80)
+  assert(spaced - compact === SIGN_IN_GAP_ROWS, `spaced adds ${spaced - compact} rows, expected ${SIGN_IN_GAP_ROWS}`)
 })
 
 // ── google-sign-in — learn-more (the historical worst offender) ───────────────

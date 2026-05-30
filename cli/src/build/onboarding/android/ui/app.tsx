@@ -72,6 +72,7 @@ import {
   GoogleSignInLearnMoreStep,
   GoogleSignInRunningStep,
   GoogleSignInStep,
+  SIGN_IN_GAP_ROWS,
   PlayDeveloperIdActionsStep,
   PlayDeveloperIdInputStep,
   SaJsonExistingPathStep,
@@ -507,6 +508,12 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
   const dense = heights.comfortable != null
     && shouldCollapseToDense({ bodyRows: heights.comfortable, terminalRows })
 
+  // Google sign-in dense form: re-add its blank-line gaps only when the terminal
+  // genuinely has the rows for them. The step itself can't decide — it sits below
+  // the progress bar + completed-steps log and can't see its remaining rows; only
+  // here do we have the measured body height AND the terminal height.
+  const [signInDenseSpaced, setSignInDenseSpaced] = useState(false)
+
   useEffect(() => {
     if (!bodyRef.current)
       return
@@ -529,6 +536,18 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
   const bodyHeight = dense ? heights.dense : heights.comfortable
   const tooSmall = isFrameTooSmall({ bodyRows: bodyHeight, dense, terminalRows })
   const neededRows = (bodyHeight != null ? bodyHeight : 1) + COMPACT_HEADER_TOTAL_ROWS
+
+  // Show the sign-in gaps iff they fit. Derive the COMPACT body (strip the gaps
+  // if currently spaced) so toggling them can't change the input and oscillate;
+  // the condition then reduces to a single stable comparison either way.
+  useEffect(() => {
+    const onSignIn = step === 'google-sign-in' && !showOAuthLearnMore && dense
+    const compactBody = bodyHeight != null ? bodyHeight - (signInDenseSpaced ? SIGN_IN_GAP_ROWS : 0) : null
+    const wantsSpaced = onSignIn && compactBody != null
+      && terminalRows - compactBody - COMPACT_HEADER_TOTAL_ROWS >= SIGN_IN_GAP_ROWS
+    if (wantsSpaced !== signInDenseSpaced)
+      setSignInDenseSpaced(wantsSpaced)
+  }, [step, showOAuthLearnMore, dense, bodyHeight, terminalRows, signInDenseSpaced])
 
   // Rows for the completed-steps log (rendered OUTSIDE the measured body so its
   // growth never inflates the dense/fit decision). It fills what the current
@@ -2163,6 +2182,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
       {step === 'google-sign-in' && !showOAuthLearnMore && (
         <GoogleSignInStep
           dense={dense}
+          spaced={signInDenseSpaced}
           onChoose={(value) => {
             if (value === 'go')
               setStep('google-sign-in-running')
