@@ -82,12 +82,15 @@ function selectCompareVersion(option: VersionRow | null) {
 
 // The manifest tab compares per-file manifest entries (manifest_count), while the
 // dependencies tab compares native_packages. Only offer bundles that actually carry
-// the data the current tab diffs on, so gate the candidate list per mode.
+// the data the current tab diffs on, so gate the candidate list per mode. Deleted
+// bundles are excluded — their storage may be gone (and is purged after 90 days),
+// so they are not meaningful comparison targets.
 function buildCompareBaseQuery() {
   const query = supabase
     .from('app_versions')
     .select('id, name, created_at, manifest_count, app_id')
     .eq('app_id', props.appId)
+    .eq('deleted', false)
   return props.compareMode === 'dependencies'
     ? query.not('native_packages', 'is', null)
     : query.gt('manifest_count', 0)
