@@ -24,8 +24,10 @@ import { loadAndroidProgress } from '../android/progress.js'
 import AndroidOnboardingApp from '../android/ui/app.js'
 import { loadProgress } from '../progress.js'
 import OnboardingApp from './app.js'
+import { terminalFitsPicker } from '../min-terminal-size.js'
 import { Header } from './components.js'
 import { pickPlatformLayout } from './frame-fit.js'
+import { TerminalTooSmallPrompt } from './min-size-gate.js'
 import { PlatformPicker } from './platform-picker.js'
 
 // Progress shapes derived from the loaders so we don't re-import the type names.
@@ -112,10 +114,17 @@ const OnboardingShell: FC<OnboardingShellProps> = ({ appId, iosDir, androidDir, 
     return <AndroidOnboardingApp appId={appId} initialProgress={ready.progress} androidDir={androidDir} apikey={apikey} />
 
   // Not ready yet: the platform picker (or a brief framed load). The picker is
-  // NOT size-gated — it's small and adapts cards↔list to the terminal, so the
-  // user can always choose their platform first. The 80×49 floor is about the
-  // STEP content, which each app self-gates after a platform is chosen. (Gating
-  // the picker would force a resize before the user could even pick — backwards.)
+  // NOT gated to the full 80×49 onboarding floor — it's small and adapts
+  // cards↔list, so the user can always choose their platform first (the step
+  // floor is enforced afterward by each app). BUT if the terminal is so small
+  // the boxed banner can't even render, the picker screen is broken and
+  // onboarding can't run anyway — so show the resize prompt instead of silently
+  // clipping the banner. terminalFitsPicker is the tiny banner-fits floor
+  // (44×11), well below the step floor, so the middle band still shows the
+  // picker. Resize-reactive via cols/rows from useTerminalSize.
+  if (!terminalFitsPicker(cols, rows))
+    return <TerminalTooSmallPrompt cols={cols} rows={rows} />
+
   return (
     <Box flexDirection="column" minHeight={rows} padding={1}>
       <Header />

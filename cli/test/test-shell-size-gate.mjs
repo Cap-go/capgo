@@ -73,15 +73,29 @@ function check(name, cond) {
   }
 }
 
-// The platform picker is NOT size-gated — the user must always be able to choose
-// their platform first; the 80×49 floor is enforced by each app AFTER a platform
-// is picked. So the picker shows (and no resize prompt appears) at BOTH a small
-// and an ample terminal.
+// The picker is gated only to the tiny banner-fits floor (44×11), NOT the full
+// 80×49 onboarding floor. Three bands:
+//   • below the banner floor → resize prompt (banner can't render, picker broken)
+//   • banner floor .. step floor (the middle band) → picker shows (pick first)
+//   • ample → picker shows
+// This keeps "choose platform first" working while still informing the user when
+// the terminal is too small to render the banner at all.
+
+// Below the banner floor (44×11): resize prompt, no picker.
 {
-  const out = await renderShellAt(50, 20)
-  check('picker shows on a small terminal (not gated)', /want to set up|iOS|Android/i.test(out))
-  check('no resize prompt on the small-terminal picker path', !/too small/i.test(out))
+  const out = await renderShellAt(30, 8)
+  check('below the banner floor shows the resize prompt', /too small/i.test(out))
+  check('below the banner floor hides the picker', !/want to set up/i.test(out))
 }
+
+// Middle band (above banner floor, below the 80×49 step floor): picker shows.
+{
+  const out = await renderShellAt(60, 20)
+  check('middle-band terminal shows the picker (choose first)', /want to set up|iOS|Android/i.test(out))
+  check('no resize prompt in the middle band', !/too small/i.test(out))
+}
+
+// Ample: picker shows.
 {
   const out = await renderShellAt(100, 50)
   check('picker shows on an ample terminal', /want to set up|iOS|Android/i.test(out))

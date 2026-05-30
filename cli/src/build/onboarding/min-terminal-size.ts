@@ -31,3 +31,18 @@ export const MIN_ROWS = 49
 export function terminalFitsOnboarding(cols: number, rows: number): boolean {
   return cols >= MIN_COLS && rows >= MIN_ROWS
 }
+
+// A much smaller floor for the PLATFORM PICKER specifically. The picker is shown
+// before a platform is chosen and isn't gated to the full onboarding floor — the
+// user must be able to pick first (the step floor is enforced afterward). But if
+// the terminal is so small the boxed banner can't even render, the picker screen
+// is broken and onboarding can't run anyway, so we show the resize prompt
+// instead of a clipped banner. Measured via the VT harness: the boxed banner is
+// 44 cols wide, and banner + the list-form picker is 11 rows.
+export const PICKER_MIN_COLS = 44
+export const PICKER_MIN_ROWS = 11
+
+/** True when the terminal can render the platform picker (banner + picker). */
+export function terminalFitsPicker(cols: number, rows: number): boolean {
+  return cols >= PICKER_MIN_COLS && rows >= PICKER_MIN_ROWS
+}
