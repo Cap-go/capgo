@@ -499,13 +499,12 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
   const fitKey = `${step}|${terminalCols}`
   const heights = bodyHeights.key === fitKey ? bodyHeights : { key: fitKey, comfortable: null, dense: null }
 
-  // The step body (its explanation + controls) takes PRIORITY over the
-  // completed-steps log: fit decisions use the FULL terminal, no rows reserved
-  // for the log, which gets only the leftover rows (logMaxRows, → 0 when the
-  // body needs the space). When space is tight the "why" of the current step
-  // matters far more than a recap of completed steps. See iOS sibling.
-  const dense = heights.comfortable != null
-    && shouldCollapseToDense({ bodyRows: heights.comfortable, terminalRows })
+  // Always render the comfortable form. The startup size gate (MinSizeGate)
+  // guarantees the terminal is large enough, so the adaptive dense fallback is
+  // unreachable — forcing it false removes the fragile measure→decide coupling
+  // and the degraded small-terminal UX. (The dense branches in the step
+  // components + the measure machinery are now dead code, cleaned up next.)
+  const dense = false
 
   useEffect(() => {
     if (!bodyRef.current)
