@@ -214,27 +214,21 @@ export const FullscreenAiViewer: FC<{
   // forcing the user to scroll their terminal emulator to see content the
   // viewer should have paginated.
   const { stdout } = useStdout()
-  const initialRows = stdout?.rows ?? terminalRows
-  const initialCols = stdout?.columns ?? 80
-  const [dims, setDims] = useState<{ rows: number, cols: number }>({
-    rows: initialRows,
-    cols: initialCols,
-  })
-
+  // Read the live size DIRECTLY each render + force a re-render on resize (same
+  // reasoning as FullscreenBuildOutput / the shell's useTerminalSize): holding it
+  // in state lags one frame, so a resize briefly renders at the old size and
+  // leaves ghost rows on a shrink.
+  const [, forceResize] = useState(0)
   useEffect(() => {
     if (!stdout)
       return
-    const handler = (): void => {
-      setDims({
-        rows: stdout.rows ?? 24,
-        cols: stdout.columns ?? 80,
-      })
-    }
-    stdout.on('resize', handler)
+    const onResize = (): void => forceResize(n => n + 1)
+    stdout.on('resize', onResize)
     return () => {
-      stdout.off('resize', handler)
+      stdout.off('resize', onResize)
     }
   }, [stdout])
+  const dims = { rows: stdout?.rows ?? terminalRows, cols: stdout?.columns ?? 80 }
 
   // The viewer is a fullscreen takeover: the parent renders it as an early
   // return that fills the whole terminal (no outer Header, no wizard padding),
@@ -410,19 +404,25 @@ export const FullscreenBuildOutput: FC<{
   terminalRows: number
 }> = ({ title, lines, terminalRows }) => {
   const { stdout } = useStdout()
-  const [dims, setDims] = useState<{ rows: number, cols: number }>({
-    rows: stdout?.rows ?? terminalRows,
-    cols: stdout?.columns ?? 80,
-  })
+  // Read the live terminal size DIRECTLY each render — Node updates
+  // stdout.rows/columns BEFORE emitting 'resize' and Ink re-renders on resize, so
+  // a direct read is already current. The listener only forces a re-render.
+  // Holding the size in state (setDims on resize) lags one frame: the resize
+  // re-render runs with the STALE size, so minHeight is briefly the OLD height —
+  // and on a shrink that over-tall frame overflows the smaller terminal, leaving
+  // ghost rows until the next frame corrects (the "resize shifts things around"
+  // glitch). Same pattern as the shell's useTerminalSize.
+  const [, forceResize] = useState(0)
   useEffect(() => {
     if (!stdout)
       return
-    const handler = (): void => setDims({ rows: stdout.rows ?? 24, cols: stdout.columns ?? 80 })
-    stdout.on('resize', handler)
+    const onResize = (): void => forceResize(n => n + 1)
+    stdout.on('resize', onResize)
     return () => {
-      stdout.off('resize', handler)
+      stdout.off('resize', onResize)
     }
   }, [stdout])
+  const dims = { rows: stdout?.rows ?? terminalRows, cols: stdout?.columns ?? 80 }
 
   // Live elapsed-time clock so the user sees how long the build has been
   // running. Counts from mount (the start of the requesting-build phase) and
