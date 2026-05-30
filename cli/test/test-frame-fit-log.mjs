@@ -71,7 +71,7 @@ function frame(logEntries, rows, bodyHeight) {
   const logBox = logEntries.length > 0
     ? h(Box, { flexDirection: 'column', marginTop: 1 }, ...logEntries.map((e, i) => h(Text, { key: i, wrap: 'truncate-middle' }, e.text)))
     : null
-  return h(Box, { flexDirection: 'column', minHeight: rows, padding: 1 }, h(Header, { compact: true }), logBox, body)
+  return h(Box, { flexDirection: 'column', minHeight: rows, padding: 1 }, h(HeaderStub, null), logBox, body)
 }
 
 // 30 completed steps, one a long key-file path — the real scenario.
