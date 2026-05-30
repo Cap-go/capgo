@@ -24,10 +24,12 @@ const props = withDefaults(defineProps<{
   noResultsLabel: string
   disabled?: boolean
   showSpinner?: boolean
+  compareMode?: 'manifest' | 'dependencies'
 }>(), {
   modelValue: null,
   disabled: false,
   showSpinner: false,
+  compareMode: 'manifest',
 })
 
 const emit = defineEmits<{
@@ -74,17 +76,26 @@ function selectCompareVersion(option: VersionRow | null) {
   emit('update:modelValue', option)
 }
 
+// The manifest tab compares per-file manifest entries (manifest_count), while the
+// dependencies tab compares native_packages. Only offer bundles that actually carry
+// the data the current tab diffs on, so gate the candidate list per mode.
+function buildCompareBaseQuery() {
+  const query = supabase
+    .from('app_versions')
+    .select('id, name, created_at, manifest_count, app_id')
+    .eq('app_id', props.appId)
+  return props.compareMode === 'dependencies'
+    ? query.not('native_packages', 'is', null)
+    : query.gt('manifest_count', 0)
+}
+
 async function loadLatestCompareVersions() {
   if (!props.appId || !props.currentVersionId) {
     latestCompareVersions.value = []
     return
   }
   const requestId = ++latestCompareRequestId.value
-  const { data, error } = await supabase
-    .from('app_versions')
-    .select('id, name, created_at, manifest_count, app_id')
-    .eq('app_id', props.appId)
-    .gt('manifest_count', 0)
+  const { data, error } = await buildCompareBaseQuery()
     .neq('id', props.currentVersionId)
     .order('created_at', { ascending: false })
     .limit(5)
@@ -191,11 +202,7 @@ async function loadPreferredCompareVersions() {
     return
 
   const uniqueIds = [...new Set(preferredHistory.map(entry => entry.versionId))]
-  const { data: versions, error } = await supabase
-    .from('app_versions')
-    .select('id, name, created_at, manifest_count, app_id')
-    .eq('app_id', props.appId)
-    .gt('manifest_count', 0)
+  const { data: versions, error } = await buildCompareBaseQuery()
     .in('id', uniqueIds)
 
   if (requestId !== preferredCompareRequestId)
@@ -225,11 +232,7 @@ async function searchCompareVersions(term: string) {
 
   const requestId = ++compareSearchRequestId.value
   compareSearchLoading.value = true
-  const baseQuery = supabase
-    .from('app_versions')
-    .select('id, name, created_at, manifest_count, app_id')
-    .eq('app_id', props.appId)
-    .gt('manifest_count', 0)
+  const baseQuery = buildCompareBaseQuery()
     .neq('id', props.currentVersionId)
 
   const numericId = Number(term)
