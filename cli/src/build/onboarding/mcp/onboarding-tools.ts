@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import process from 'node:process'
 import { z } from 'zod'
 import type { CapgoSDK } from '../../../sdk.js'
+import { isAppAlreadyExistsError } from '../../../init/app-conflict.js'
 import { findSavedKeySilent, getAppId, getConfig } from '../../../utils.js'
 import { getPlatformDirFromCapacitorConfig } from '../../platform-paths.js'
 import { loadProgress } from '../progress.js'
@@ -60,6 +61,13 @@ function buildDeps(sdk: CapgoSDK): EngineDeps {
       return res.data.some((a: { app_id?: string, appId?: string }) => a.app_id === appId || a.appId === appId)
     },
     loadProgress: (appId: string) => loadProgress(appId),
+    registerApp: async (appId: string) => {
+      const res = await sdk.addApp({ appId })
+      if (res.success)
+        return { ok: true as const }
+      const error = res.error || 'Failed to register app'
+      return { ok: false as const, alreadyExists: isAppAlreadyExistsError(error), error }
+    },
   }
 }
 
