@@ -4,13 +4,13 @@ import { BUILDER_RECOVERY_MILESTONES, buildBuilderOnboardingBentoEvent } from '.
 const base = { orgId: 'org-1', appId: 'com.demo.app', platform: 'ios', orgName: 'Demo Org', appName: 'Demo' }
 
 describe('buildBuilderOnboardingBentoEvent', () => {
-  it('exposes the milestone steps that trigger a fetch', () => {
+  it.concurrent('exposes the milestone steps that trigger a fetch', () => {
     expect(BUILDER_RECOVERY_MILESTONES.has('welcome')).toBe(true)
     expect(BUILDER_RECOVERY_MILESTONES.has('build-complete')).toBe(true)
     expect(BUILDER_RECOVERY_MILESTONES.has('verifying-key')).toBe(false)
   })
 
-  it('returns a started payload on the welcome step', () => {
+  it.concurrent('returns a started payload on the welcome step', () => {
     const r = buildBuilderOnboardingBentoEvent({ event: 'Builder Onboarding Step', step: 'welcome', ...base })
     expect(r).toBeDefined()
     expect(r!.event).toBe('builder_onboarding_started')
@@ -22,26 +22,26 @@ describe('buildBuilderOnboardingBentoEvent', () => {
     })
   })
 
-  it('returns a completed payload on build-complete', () => {
+  it.concurrent('returns a completed payload on build-complete', () => {
     const r = buildBuilderOnboardingBentoEvent({ event: 'Builder Onboarding Step', step: 'build-complete', ...base })
     expect(r!.event).toBe('builder_onboarding_completed')
     expect(r!.uniqId).toBe('builder_onboarding_completed:com.demo.app:ios')
   })
 
-  it('returns undefined for non-milestone steps', () => {
+  it.concurrent('returns undefined for non-milestone steps', () => {
     expect(buildBuilderOnboardingBentoEvent({ event: 'Builder Onboarding Step', step: 'verifying-key', ...base })).toBeUndefined()
   })
 
-  it('returns undefined for other event names', () => {
+  it.concurrent('returns undefined for other event names', () => {
     expect(buildBuilderOnboardingBentoEvent({ event: 'onboarding-step-done', step: 'welcome', ...base })).toBeUndefined()
   })
 
-  it('returns undefined when org or app id is missing', () => {
+  it.concurrent('returns undefined when org or app id is missing', () => {
     expect(buildBuilderOnboardingBentoEvent({ ...base, event: 'Builder Onboarding Step', step: 'welcome', orgId: undefined })).toBeUndefined()
     expect(buildBuilderOnboardingBentoEvent({ ...base, event: 'Builder Onboarding Step', step: 'welcome', appId: undefined })).toBeUndefined()
   })
 
-  it('defaults platform to "unknown" when absent', () => {
+  it.concurrent('defaults platform to "unknown" when absent', () => {
     const r = buildBuilderOnboardingBentoEvent({ ...base, event: 'Builder Onboarding Step', step: 'welcome', platform: undefined })
     expect(r!.uniqId).toBe('builder_onboarding_started:com.demo.app:unknown')
     expect(r!.data.platform).toBe('unknown')

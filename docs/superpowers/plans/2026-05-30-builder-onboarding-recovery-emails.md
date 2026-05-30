@@ -33,7 +33,7 @@
 
 ## Data flow (recap)
 
-```
+```text
 capgo build init ──POST /private/events (event:"Builder Onboarding Step",
                    tracking_version:2, org_id, tags:{step,platform,app_id})
    │
@@ -387,15 +387,22 @@ The current tail of the route handler (lines ~187–226) ends with the `onboardi
       supabase.from('orgs').select('id, name').eq('id', onboardingOrgId).single(),
       supabase.from('apps').select('name').eq('app_id', appId).single(),
     ])
-    builderBentoEvent = buildBuilderOnboardingBentoEvent({
-      event: trackedBody.event,
-      step: builderStep,
-      orgId: onboardingOrgId,
-      appId,
-      platform: builderPlatform,
-      orgName: orgResult.data?.name ?? undefined,
-      appName: appResult.data?.name ?? undefined,
-    })
+    if (orgResult.error || appResult.error) {
+      // Best-effort recovery signal: never fail the wizard's request, and don't
+      // emit a Bento event with empty org/app names. Log and skip instead.
+      cloudlog({ requestId: c.get('requestId'), message: 'builder onboarding bento lookup failed; skipping signal', org: orgResult.error, app: appResult.error })
+    }
+    else {
+      builderBentoEvent = buildBuilderOnboardingBentoEvent({
+        event: trackedBody.event,
+        step: builderStep,
+        orgId: onboardingOrgId,
+        appId,
+        platform: builderPlatform,
+        orgName: orgResult.data?.name ?? undefined,
+        appName: appResult.data?.name ?? undefined,
+      })
+    }
   }
 
   const bentoEvent = onboardingBentoEvent ?? builderBentoEvent
@@ -411,7 +418,7 @@ The current tail of the route handler (lines ~187–226) ends with the `onboardi
 
 Notes:
 - `onboarding-step-done` and `Builder Onboarding Step` are different event names, so only one of the two payloads is ever set — `??` just picks the active one.
-- Builder uses narrow `select`s and tolerates a missing org/app name (the helper defaults to `''`), so a name-lookup miss never throws.
+- Builder uses narrow `select`s and checks for lookup errors: if either fails it logs and skips emitting (best-effort signal — never throws); on success the helper defaults any missing name to `''`.
 - The lookup only runs on the two milestone steps (the `BUILDER_RECOVERY_MILESTONES` guard), so non-milestone steps add no DB cost.
 
 - [ ] **Step 3: Typecheck**
