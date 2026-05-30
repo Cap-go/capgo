@@ -1,4 +1,5 @@
 // src/build/onboarding/mcp/engine.ts
+import type { AndroidOnboardingProgress } from '../android/types.js'
 import type { OnboardingProgress } from '../types.js'
 import type { NextStepResult, Platform } from './contract.js'
 import { buildAppIdConflictSuggestions } from '../../../init/app-conflict.js'
@@ -11,6 +12,7 @@ export interface PreflightFacts {
   platformsDetected: Platform[]
   authenticated: boolean
   appRegistered: boolean
+  androidProgress: AndroidOnboardingProgress | null
 }
 
 const ROADMAP: string[] = [
@@ -125,19 +127,59 @@ function decidePlatform(facts: PreflightFacts, _progress: OnboardingProgress | n
 }
 
 /**
- * Plan 1 stops at the START of the credentials phase. The real per-platform
- * credential flow lands in Plans 3 (Android) and 4 (iOS).
+ * Route to the per-platform credential sub-flow. Android lands in this plan;
+ * iOS credential setup lands in Plan 4.
  */
 function platformChosen(facts: PreflightFacts, platform: Platform): NextStepResult {
+  if (platform === 'android')
+    return decideAndroid(facts)
+
   return {
     onboarding: 'capgo-builder',
     phase: 'credentials',
-    state: 'credentials-not-implemented',
+    state: 'ios-credentials-not-implemented',
     platform,
     progress: 10,
     kind: 'info',
-    summary: `Platform "${platform}" selected for "${facts.appId}". The credential setup flow lands in the next milestone.`,
+    summary: `iOS selected for "${facts.appId}". The iOS credential setup flow lands in the next milestone.`,
     context: { appId: facts.appId, appRegistered: facts.appRegistered },
+    rules: ONBOARDING_RULES,
+  }
+}
+
+/**
+ * Android credential sub-flow decider. Pure — branches on the persisted
+ * AndroidOnboardingProgress (reused from the existing wizard). This plan
+ * implements the keystore step; later steps (Google sign-in, GCP service
+ * account, Play invite, validate, save) extend this switch.
+ */
+export function decideAndroid(facts: PreflightFacts): NextStepResult {
+  const done = facts.androidProgress?.completedSteps ?? {}
+
+  if (!done.keystoreReady) {
+    return {
+      onboarding: 'capgo-builder',
+      phase: 'credentials',
+      state: 'android-keystore',
+      platform: 'android',
+      progress: 20,
+      kind: 'auto',
+      summary: `Generating an Android signing keystore for "${facts.appId}" (stored locally, never uploaded to Capgo)…`,
+      context: { appId: facts.appId },
+      rules: ONBOARDING_RULES,
+    }
+  }
+
+  // Plan 3 milestone boundary — remaining Android steps land next.
+  return {
+    onboarding: 'capgo-builder',
+    phase: 'credentials',
+    state: 'android-credentials-next',
+    platform: 'android',
+    progress: 30,
+    kind: 'info',
+    summary: `Keystore ready for "${facts.appId}". Remaining Android steps (Google sign-in, Play provisioning, save) land in the next milestone.`,
+    context: { appId: facts.appId },
     rules: ONBOARDING_RULES,
   }
 }
@@ -168,6 +210,8 @@ export interface EngineDeps {
   isAppRegistered: (appId: string) => Promise<boolean>
   loadProgress: (appId: string) => Promise<OnboardingProgress | null>
   registerApp: (appId: string) => Promise<{ ok: true } | { ok: false, alreadyExists: boolean, error: string }>
+  loadAndroidProgress: (appId: string) => Promise<AndroidOnboardingProgress | null>
+  generateAndroidKeystore: (appId: string) => Promise<void>
 }
 
 /** Gather preflight facts via the injected deps. */
@@ -176,11 +220,12 @@ export async function gatherFacts(deps: EngineDeps): Promise<PreflightFacts> {
   const authenticated = deps.hasSavedKey()
 
   if (!appId)
-    return { capacitorProject: false, appId: undefined, platformsDetected: [], authenticated, appRegistered: false }
+    return { capacitorProject: false, appId: undefined, platformsDetected: [], authenticated, appRegistered: false, androidProgress: null }
 
   const platformsDetected = await deps.detectPlatforms()
   const appRegistered = authenticated ? await deps.isAppRegistered(appId) : false
-  return { capacitorProject: true, appId, platformsDetected, authenticated, appRegistered }
+  const androidProgress = await deps.loadAndroidProgress(appId)
+  return { capacitorProject: true, appId, platformsDetected, authenticated, appRegistered, androidProgress }
 }
 
 const MAX_AUTO_STEPS = 8
@@ -229,6 +274,10 @@ async function executeAuto(
       summary: `Could not register "${facts.appId}" in Capgo: ${reg.error}`,
       rules: ONBOARDING_RULES,
     }
+  }
+  if (result.state === 'android-keystore' && facts.appId) {
+    await deps.generateAndroidKeystore(facts.appId)
+    return null
   }
   // Unknown auto step — surface it rather than silently looping.
   return result

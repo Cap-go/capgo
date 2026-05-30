@@ -7,6 +7,8 @@ import type { CapgoSDK } from '../../../sdk.js'
 import { isAppAlreadyExistsError } from '../../../init/app-conflict.js'
 import { findSavedKeySilent, getAppId, getConfig } from '../../../utils.js'
 import { getPlatformDirFromCapacitorConfig } from '../../platform-paths.js'
+import { generateKeystore, generateRandomPassword } from '../android/keystore.js'
+import { loadAndroidProgress, saveAndroidProgress } from '../android/progress.js'
 import { loadProgress } from '../progress.js'
 import type { Platform } from './contract.js'
 import { renderResult } from './contract.js'
@@ -67,6 +69,26 @@ function buildDeps(sdk: CapgoSDK): EngineDeps {
         return { ok: true as const }
       const error = res.error || 'Failed to register app'
       return { ok: false as const, alreadyExists: isAppAlreadyExistsError(error), error }
+    },
+    loadAndroidProgress: (appId: string) => loadAndroidProgress(appId),
+    generateAndroidKeystore: async (appId: string) => {
+      const storePassword = generateRandomPassword()
+      const keyPassword = generateRandomPassword()
+      const alias = 'release'
+      const ks = generateKeystore({ alias, storePassword, keyPassword, dname: { commonName: appId } })
+      const base = (await loadAndroidProgress(appId)) ?? { platform: 'android' as const, appId, startedAt: new Date().toISOString(), completedSteps: {} }
+      await saveAndroidProgress(appId, {
+        ...base,
+        platform: 'android',
+        appId,
+        keystoreMethod: 'generate',
+        keystoreAlias: alias,
+        keystoreStorePassword: storePassword,
+        keystoreKeyPassword: keyPassword,
+        keystoreCommonName: appId,
+        _keystoreBase64: ks.p12Base64,
+        completedSteps: { ...base.completedSteps, keystoreReady: { keystorePath: '', alias, isGenerated: true } },
+      })
     },
   }
 }

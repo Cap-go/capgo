@@ -98,6 +98,7 @@ const fakeDeps = (o = {}) => ({
   detectPlatforms: async () => ['ios'],
   isAppRegistered: async () => true,
   loadProgress: async () => null,
+  loadAndroidProgress: async () => null,
   ...o,
 })
 
@@ -137,8 +138,8 @@ await test('runStart: single platform via deps → enters credentials phase', as
 })
 
 await test('runAdvance: passes platform input through to the decider', async () => {
-  const r = await runAdvance(fakeDeps({ detectPlatforms: async () => ['ios', 'android'] }), { platform: 'android' })
-  eq(r.platform, 'android')
+  const r = await runAdvance(fakeDeps({ detectPlatforms: async () => ['ios', 'android'] }), { platform: 'ios' })
+  eq(r.platform, 'ios')
 })
 
 const { registerOnboardingTools } = await import('../src/build/onboarding/mcp/onboarding-tools.ts')
@@ -169,8 +170,8 @@ await test('registerOnboardingTools: start handler returns rendered text content
 await test('registerOnboardingTools: next_step handler forwards platform input', async () => {
   const server = fakeServer()
   registerOnboardingTools(server, null, fakeDeps({ detectPlatforms: async () => ['ios', 'android'] }))
-  const res = await server.tools.capgo_builder_onboarding_next_step.handler({ platform: 'android' })
-  ok(res.content[0].text.includes('"platform": "android"'), 'forwards the chosen platform')
+  const res = await server.tools.capgo_builder_onboarding_next_step.handler({ platform: 'ios' })
+  ok(res.content[0].text.includes('"platform": "ios"'), 'forwards the chosen platform')
 })
 
 await test('decideStart: authenticated but app not registered → auto registering-app', async () => {
@@ -199,6 +200,7 @@ function appPhaseDeps(o = {}) {
     detectPlatforms: async () => ['ios', 'android'],
     isAppRegistered: async () => registered,
     loadProgress: async () => null,
+    loadAndroidProgress: async () => null,
     registerApp: async () => { registered = true; return { ok: true } },
     ...o,
   }
@@ -245,6 +247,72 @@ await test('drive loop: registration hard-fails → error result', async () => {
   const r = await runStart(deps)
   eq(r.kind, 'error')
   eq(r.state, 'register-app-failed')
+})
+
+// --- Plan 3: Android credentials ---
+const { decideAndroid } = await import('../src/build/onboarding/mcp/engine.ts')
+
+function androidDeps(o = {}) {
+  let prog = null
+  return {
+    cwd: '/tmp/app',
+    hasSavedKey: () => true,
+    getAppId: async () => 'com.acme.app',
+    detectPlatforms: async () => ['android'],
+    isAppRegistered: async () => true,
+    loadProgress: async () => null,
+    registerApp: async () => ({ ok: true }),
+    loadAndroidProgress: async () => prog,
+    generateAndroidKeystore: async () => {
+      prog = {
+        ...(prog || {}),
+        completedSteps: {
+          ...(prog?.completedSteps || {}),
+          keystoreReady: { keystorePath: 'android/app/release.p12', alias: 'release', isGenerated: true },
+        },
+      }
+    },
+    ...o,
+  }
+}
+
+const androidFacts = (o = {}) => ({
+  capacitorProject: true,
+  appId: 'com.acme.app',
+  platformsDetected: ['android'],
+  authenticated: true,
+  appRegistered: true,
+  androidProgress: null,
+  ...o,
+})
+
+await test('decideAndroid: no keystore yet → auto android-keystore', async () => {
+  const r = decideAndroid(androidFacts())
+  eq(r.kind, 'auto')
+  eq(r.state, 'android-keystore')
+  eq(r.platform, 'android')
+})
+
+await test('decideAndroid: keystore ready → advances to next android milestone', async () => {
+  const r = decideAndroid(androidFacts({
+    androidProgress: { completedSteps: { keystoreReady: { keystorePath: 'p', alias: 'release', isGenerated: true } } },
+  }))
+  eq(r.state, 'android-credentials-next')
+})
+
+await test('runStart (android): keystore generated, then flow advances past it', async () => {
+  const r = await runStart(androidDeps())
+  eq(r.platform, 'android')
+  eq(r.state, 'android-credentials-next')
+})
+
+await test('runStart (android): generateAndroidKeystore runs exactly once', async () => {
+  let calls = 0
+  const deps = androidDeps()
+  const orig = deps.generateAndroidKeystore
+  deps.generateAndroidKeystore = async (id) => { calls++; return orig(id) }
+  await runStart(deps)
+  eq(calls, 1)
 })
 
 console.log(`\n📊 Results: ${pass} passed, ${fail} failed`)
