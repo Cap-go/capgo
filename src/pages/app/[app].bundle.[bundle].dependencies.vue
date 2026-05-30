@@ -172,8 +172,51 @@ function resetCompareSelection() {
   tableLoading.value = false
 }
 
+// Reflect the selected baseline in the URL (?compare=<versionId>) so a
+// comparison is shareable / deep-linkable. Uses replace so each dropdown change
+// does not pollute browser history, and skips no-op writes.
+function replaceCompareParam(value: number | null) {
+  const current = route.query.compare
+  const currentStr = (Array.isArray(current) ? current[0] : current) ?? undefined
+  const desired = value ? String(value) : undefined
+  if (currentStr === desired)
+    return
+  const query = { ...route.query }
+  if (desired)
+    query.compare = desired
+  else
+    delete query.compare
+  void router.replace({ path: route.path, query })
+}
+
+// Pre-select a baseline from ?compare=<versionId> on load. Reads route.query
+// imperatively (never inside a tracked scope) so it cannot retrigger init.
+async function restoreCompareFromQuery() {
+  const raw = route.query.compare
+  if (raw == null)
+    return
+  const compareId = Number(Array.isArray(raw) ? raw[0] : raw)
+  // Ignore a missing/self/invalid id and scrub it from the URL.
+  if (!compareId || Number.isNaN(compareId) || compareId === id.value) {
+    replaceCompareParam(null)
+    return
+  }
+  const { data, error } = await supabase
+    .from('app_versions')
+    .select('id, name, created_at, manifest_count, app_id')
+    .eq('app_id', packageId.value)
+    .eq('id', compareId)
+    .maybeSingle()
+  if (error || !data) {
+    replaceCompareParam(null)
+    return
+  }
+  selectedCompareVersion.value = data
+}
+
 watch(compareVersionId, async (value) => {
   const requestId = ++compareRequestId.value
+  replaceCompareParam(value)
   if (!value) {
     baselinePackages.value = []
     tableLoading.value = false
@@ -208,6 +251,10 @@ watchEffect(async () => {
     baselinePackagesCache.value = {}
     resetCompareSelection()
     await getVersion()
+    // After the first await this effect no longer tracks reactive reads, so
+    // reading the ?compare param here cannot cause the init effect to re-run.
+    if (version.value)
+      await restoreCompareFromQuery()
     loading.value = false
     if (!version.value?.name)
       displayStore.NavTitle = t('bundle')
