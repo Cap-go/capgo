@@ -222,30 +222,17 @@ export interface ImportNoMatchRecoveryStepProps {
 // LIST_VISIBLE_COUNT visible rows with a "… +N more" hint so the (wrapping)
 // recovery options stay within budget at 60 cols.
 export const ImportNoMatchRecoveryStep: FC<ImportNoMatchRecoveryStepProps> = ({ identityName, options, dense = false, onChange }) => {
-  const hidden = Math.max(0, options.length - LIST_VISIBLE_COUNT)
-  if (!dense) {
-    return (
-      <Box flexDirection="column" marginTop={1}>
-        <Alert variant="warning">
-          {`No provisioning profile on this Mac is linked to "${identityName}".`}
-        </Alert>
-        <Newline />
-        <Text dimColor>
-          The cert is in your Keychain but the matching profile isn't on disk. Pick a recovery path:
-        </Text>
-        <Newline />
-        <Select options={options} onChange={onChange} />
-      </Box>
-    )
-  }
   return (
     <Box flexDirection="column" marginTop={1}>
-      <Text bold color="yellow">{`⚠  No profile on this Mac is linked to "${identityName}".`}</Text>
-      <Text dimColor>Cert is in your Keychain, profile isn't on disk. Pick a recovery path:</Text>
-      <Select visibleOptionCount={LIST_VISIBLE_COUNT} options={options} onChange={onChange} />
-      {hidden > 0 && (
-        <Text dimColor>{`… +${hidden} more (↑/↓ to scroll)`}</Text>
-      )}
+      <Alert variant="warning">
+        {`No provisioning profile on this Mac is linked to "${identityName}".`}
+      </Alert>
+      <Newline />
+      <Text dimColor>
+        The cert is in your Keychain but the matching profile isn't on disk. Pick a recovery path:
+      </Text>
+      <Newline />
+      <Select options={options} onChange={onChange} />
     </Box>
   )
 }
@@ -294,49 +281,19 @@ export const ImportExportWarningStep: FC<ImportExportWarningStepProps> = ({ iden
       onChange={onChange}
     />
   )
-  if (!dense) {
-    return (
-      <Box flexDirection="column" marginTop={1}>
-        <Alert variant="warning">
-          macOS will now ask permission to access your private key.
-        </Alert>
-        <Newline />
-        <Box flexDirection="column" marginLeft={2}>
-          <Text>
-            <Text bold color="white">1.</Text>
-            {' '}
-            A Keychain dialog will pop up asking
-            {' '}
-            <Text bold>"security wants to use your confidential information"</Text>
-          </Text>
-          <Text>
-            <Text bold color="white">2.</Text>
-            {' '}
-            Click
-            {' '}
-            <Text bold color="green">"Always Allow"</Text>
-            {' '}
-            so it doesn't ask again on retry
-          </Text>
-          <Text>
-            <Text bold color="white">3.</Text>
-            {' '}
-            That's the only prompt — the export is otherwise non-interactive
-          </Text>
-        </Box>
-        <Newline />
-        {select}
-      </Box>
-    )
-  }
   return (
     <Box flexDirection="column" marginTop={1}>
-      <Alert variant="warning">macOS will now ask permission to access your private key.</Alert>
+      <Alert variant="warning">
+        macOS will now ask permission to access your private key.
+      </Alert>
+      <Newline />
       <Box flexDirection="column" marginLeft={2}>
         <Text>
           <Text bold color="white">1.</Text>
           {' '}
-          A Keychain dialog will pop up.
+          A Keychain dialog will pop up asking
+          {' '}
+          <Text bold>"security wants to use your confidential information"</Text>
         </Text>
         <Text>
           <Text bold color="white">2.</Text>
@@ -345,14 +302,15 @@ export const ImportExportWarningStep: FC<ImportExportWarningStepProps> = ({ iden
           {' '}
           <Text bold color="green">"Always Allow"</Text>
           {' '}
-          so it doesn't re-ask on retry.
+          so it doesn't ask again on retry
         </Text>
         <Text>
           <Text bold color="white">3.</Text>
           {' '}
-          That's the only prompt — export is otherwise non-interactive.
+          That's the only prompt — the export is otherwise non-interactive
         </Text>
       </Box>
+      <Newline />
       {select}
     </Box>
   )
@@ -372,43 +330,26 @@ export interface ImportCompilingHelperStepProps {
 }
 
 export const ImportCompilingHelperStep: FC<ImportCompilingHelperStepProps> = ({ dense = false }) => {
-  if (!dense) {
-    return (
-      <Box flexDirection="column" marginTop={1}>
-        <SpinnerLine text="Compiling keychain-export helper (one-time, ~2-3s)..." />
-        <Newline />
-        <Box flexDirection="column" marginLeft={2}>
-          <Text dimColor>
-            We ship a small Swift program (~350 lines) that wraps Apple's
-            Security framework. It compiles via
-            {' '}
-            <Text bold>swiftc</Text>
-            {' '}
-            into your OS temp folder.
-          </Text>
-          <Text dimColor>
-            The result is cached for this CLI version — future runs of
-            {' '}
-            <Text bold>build init</Text>
-            {' '}
-            skip this step.
-          </Text>
-        </Box>
-      </Box>
-    )
-  }
   return (
     <Box flexDirection="column" marginTop={1}>
       <SpinnerLine text="Compiling keychain-export helper (one-time, ~2-3s)..." />
+      <Newline />
       <Box flexDirection="column" marginLeft={2}>
         <Text dimColor>
-          A small Swift program wraps Apple's Security framework — compiled with
+          We ship a small Swift program (~350 lines) that wraps Apple's
+          Security framework. It compiles via
           {' '}
           <Text bold>swiftc</Text>
           {' '}
-          into your temp folder.
+          into your OS temp folder.
         </Text>
-        <Text dimColor>Cached for this CLI version — future runs skip this step.</Text>
+        <Text dimColor>
+          The result is cached for this CLI version — future runs of
+          {' '}
+          <Text bold>build init</Text>
+          {' '}
+          skip this step.
+        </Text>
       </Box>
     </Box>
   )
