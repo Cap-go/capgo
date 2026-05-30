@@ -51,16 +51,20 @@ describe('maybePromptBuilderCta', () => {
     expect(mockConfirm).not.toHaveBeenCalled()
   })
 
-  it('launches onboarding on accept (no credentials) with a single prompt', async () => {
+  it('launches onboarding on accept (no credentials) with a single prompt + learn link', async () => {
     mockConfirm.mockResolvedValueOnce(true)
     expect(await maybePromptBuilderCta(params)).toBe('launch-onboarding')
     expect(mockConfirm).toHaveBeenCalledTimes(1)
+    const msg = mockConfirm.mock.calls[0][0].message as string
+    expect(msg).toContain('Would you like to configure Capgo Builder now?')
+    expect(msg).toContain('https://capgo.app/native-build/')
   })
 
-  it('launches build on accept (credentials present)', async () => {
+  it('launches build on accept (credentials present) with the build question', async () => {
     mockLoadCreds.mockResolvedValue({ ios: {} } as never)
     mockConfirm.mockResolvedValueOnce(true)
     expect(await maybePromptBuilderCta(params)).toBe('launch-build')
+    expect(mockConfirm.mock.calls[0][0].message as string).toContain('Start a native build with Capgo Builder now?')
   })
 
   it('continues on decline without a second prompt', async () => {

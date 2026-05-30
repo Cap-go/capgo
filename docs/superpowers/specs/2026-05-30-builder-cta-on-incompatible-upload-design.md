@@ -51,10 +51,12 @@ Interactivity is determined by the existing `canPromptInteractively()` helper
 Print a single warning + ad block, **no prompt**, then continue the upload unchanged:
 
 ```text
-⚠️  This update changes native code, so it needs a native build to reach users
-    on current app-store binaries.
+This update includes native changes. An app store update may be required for these
+changes to take effect. Capgo Builder can help you build and publish the required
+native update.
     → Set up Capgo Builder:  npx @capgo/cli build onboarding        (no credentials yet)
     → Or run a native build: npx @capgo/cli build request --platform <ios|android>   (credentials found)
+    Learn what Capgo Builder is: https://capgo.app/native-build/
     Docs: https://capgo.app/docs/cli/cloud-build/
 ```
 
@@ -66,10 +68,15 @@ Shown **once per invocation** as a single yes/no that states *why* up front. Bra
 on local credentials. Declining (or cancelling) just continues the OTA upload —
 there is no follow-up prompt.
 
+Each prompt also renders a clickable **"Learn what Capgo Builder is"** hyperlink
+(OSC 8) that opens <https://capgo.app/native-build/> in the browser without
+dismissing the prompt.
+
 **No credentials → onboarding CTA**
 
 ```text
-This update includes native changes, which ship via an app-store build rather than OTA. Set up Capgo Builder now? (Y/n)
+This update includes native changes. An app store update may be required for these changes to take effect. Capgo Builder can help you build and publish the required native update. Would you like to configure Capgo Builder now? (Y/n)
+Learn what Capgo Builder is  (→ https://capgo.app/native-build/)
 ```
 
 - **Yes** → skip the OTA upload and return a `launch-onboarding` action; the CLI
@@ -79,16 +86,13 @@ This update includes native changes, which ship via an app-store build rather th
 **Has credentials → build CTA**
 
 ```text
-This update includes native changes, which ship via an app-store build rather than OTA. Run a native build now with Capgo Builder? (Y/n)
+This update includes native changes. An app store update may be required for these changes to take effect. Capgo Builder can help you build and publish the required native update. Start a native build with Capgo Builder now? (Y/n)
+Learn what Capgo Builder is  (→ https://capgo.app/native-build/)
 ```
 
 - **Yes** → skip the OTA upload and return a `launch-build` action; the CLI entry
   point launches `build request`.
 - **No / cancel** → continue the OTA upload.
-
-> The wording is deliberately low-fear and accurate: the OTA update still applies
-> to users whose binary matches; Capgo's `min_update_version` gating is what
-> protects older binaries. We do **not** claim "this update won't apply to users."
 
 ## Credential detection (local)
 

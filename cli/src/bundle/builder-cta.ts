@@ -30,15 +30,28 @@ export function decideBuilderCtaSurface(ctx: BuilderCtaContext): BuilderCtaSurfa
 }
 
 const DOCS_URL = 'https://capgo.app/docs/cli/cloud-build/'
+const LEARN_URL = 'https://capgo.app/native-build/'
 
 // Why a native build is needed — folded into the single prompt and the CI ad.
-const REASON = 'This update includes native changes, which ship via an app-store build rather than OTA.'
+const REASON = 'This update includes native changes. An app store update may be required for these changes to take effect. Capgo Builder can help you build and publish the required native update.'
+
+/**
+ * Render a clickable terminal hyperlink (OSC 8). Clicking it opens the URL in the
+ * browser **without dismissing the active prompt**. Terminals that don't support
+ * OSC 8 just render `text`.
+ */
+function terminalLink(text: string, url: string): string {
+  const ESC = String.fromCharCode(27) // \x1B
+  const BEL = String.fromCharCode(7) // \x07
+  return `${ESC}]8;;${url}${BEL}${text}${ESC}]8;;${BEL}`
+}
 
 export function printBuilderCiAd(hasCredentials: boolean): void {
   log.warn(REASON)
   log.info(hasCredentials
     ? '→ Run a native build:  npx @capgo/cli build request --platform <ios|android>'
     : '→ Set up Capgo Builder: npx @capgo/cli build onboarding')
+  log.info(`  Learn what Capgo Builder is: ${LEARN_URL}`)
   log.info(`  Docs: ${DOCS_URL}`)
 }
 
@@ -100,12 +113,15 @@ async function runBuilderCta(params: MaybePromptBuilderCtaParams): Promise<Build
     return 'continue'
   }
 
-  // Single question: explain why, then offer the relevant Builder flow.
+  // Single question: state why up front, then offer the relevant Builder flow.
+  // The "learn" line is a clickable hyperlink that opens in the browser without
+  // dismissing this prompt.
   const confirm = params.confirm ?? pConfirm
+  const question = mode === 'build'
+    ? 'Start a native build with Capgo Builder now?'
+    : 'Would you like to configure Capgo Builder now?'
   const accepted = await confirm({
-    message: mode === 'build'
-      ? `${REASON} Run a native build now with Capgo Builder?`
-      : `${REASON} Set up Capgo Builder now?`,
+    message: `${REASON} ${question}\n${terminalLink('Learn what Capgo Builder is', LEARN_URL)}`,
     initialValue: true,
   })
   if (pIsCancel(accepted))
