@@ -3,6 +3,7 @@ import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { BentoTrackingPayload } from '../utils/tracking.ts'
 import { Hono } from 'hono/tiny'
+import { BUILDER_RECOVERY_MILESTONES, buildBuilderOnboardingBentoEvent } from '../utils/builder_onboarding_recovery.ts'
 import { BRES, parseBody, quickError, simpleError, useCors } from '../utils/hono.ts'
 import { middlewareV2 } from '../utils/hono_middleware.ts'
 import { cloudlog } from '../utils/logging.ts'
@@ -218,10 +219,46 @@ app.post('/', middlewareV2(['read', 'write', 'all', 'upload']), async (c) => {
     })
   }
 
+  // Builder native-build onboarding (capgo build init): emit start/finish signal
+  // events to Bento so a later automation can recover users who started but never
+  // finished. Mirrors the onboarding-step-done block above. Only the milestone
+  // steps trigger the org/app lookup.
+  const builderStep = typeof body.tags?.step === 'string' ? body.tags.step : undefined
+  const builderPlatform = typeof body.tags?.platform === 'string' ? body.tags.platform : undefined
+  let builderBentoEvent: BentoTrackingPayload | undefined
+  if (
+    onboardingOrgId && appId
+    && trackedBody.event === 'Builder Onboarding Step'
+    && builderStep && BUILDER_RECOVERY_MILESTONES.has(builderStep)
+  ) {
+    const [orgResult, appResult] = await Promise.all([
+      supabase.from('orgs').select('id, name').eq('id', onboardingOrgId).single(),
+      supabase.from('apps').select('name').eq('app_id', appId).single(),
+    ])
+    if (orgResult.error || appResult.error) {
+      // Best-effort recovery signal: never fail the wizard's request, and don't
+      // emit a Bento event with empty org/app names. Log and skip instead.
+      cloudlog({ requestId: c.get('requestId'), message: 'builder onboarding bento lookup failed; skipping signal', org: orgResult.error, app: appResult.error })
+    }
+    else {
+      builderBentoEvent = buildBuilderOnboardingBentoEvent({
+        event: trackedBody.event,
+        step: builderStep,
+        orgId: onboardingOrgId,
+        appId,
+        platform: builderPlatform,
+        orgName: orgResult.data?.name ?? undefined,
+        appName: appResult.data?.name ?? undefined,
+      })
+    }
+  }
+
+  // Exactly one of these is ever set (distinct event names); `??` picks the active one.
+  const bentoEvent = onboardingBentoEvent ?? builderBentoEvent
   await sendEventToTracking(c, {
     ...trackedBody,
-    bento: onboardingBentoEvent,
-    sentToBento: Boolean(onboardingBentoEvent),
+    bento: bentoEvent,
+    sentToBento: Boolean(bentoEvent),
     groups: verifiedOrgId ? { organization: verifiedOrgId } : undefined,
   })
 
