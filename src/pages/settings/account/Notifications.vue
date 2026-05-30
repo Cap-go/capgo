@@ -20,6 +20,7 @@ interface EmailPreferences {
   usage_limit?: boolean
   credit_usage?: boolean
   onboarding?: boolean
+  builder_onboarding?: boolean
   weekly_stats?: boolean
   monthly_stats?: boolean
   billing_period_stats?: boolean
@@ -245,6 +246,12 @@ async function toggleEmailPref(key: EmailPreferenceKey) {
               <Toggle
                 :value="getEmailPref('onboarding')"
                 @change="toggleEmailPref('onboarding')"
+              />
+            </InfoRow>
+            <InfoRow :label="t('notifications-builder-onboarding')" :editable="false" :value="t('notifications-builder-onboarding-desc')">
+              <Toggle
+                :value="getEmailPref('builder_onboarding')"
+                @change="toggleEmailPref('builder_onboarding')"
               />
             </InfoRow>
           </dl>
