@@ -133,6 +133,12 @@ function buildDeps(sdk: CapgoSDK): EngineDeps {
       })
       return { ok: true as const }
     },
+    requestFirstBuild: async (appId: string, platform: Platform) => {
+      const res = await sdk.requestBuild({ appId, platform, path: cwd })
+      if (res.success)
+        return { ok: true as const, jobId: res.data?.jobId, status: res.data?.status }
+      return { ok: false as const, error: res.error || 'Build request failed' }
+    },
   }
 }
 
@@ -159,9 +165,10 @@ export function registerOnboardingTools(server: McpLike, sdk: CapgoSDK, depsOver
     {
       platform: z.enum(['ios', 'android']).optional().describe('Platform choice, when the previous step asked for it'),
       serviceAccountJsonPath: z.string().optional().describe('Path to your Google Play service-account JSON file, when the previous step asked for it'),
+      runBuild: z.boolean().optional().describe('Set true (with platform) to trigger the first cloud build'),
     },
-    async ({ platform, serviceAccountJsonPath }: { platform?: Platform, serviceAccountJsonPath?: string }) => {
-      const result = await runAdvance(deps, { platform, serviceAccountJsonPath })
+    async ({ platform, serviceAccountJsonPath, runBuild }: { platform?: Platform, serviceAccountJsonPath?: string, runBuild?: boolean }) => {
+      const result = await runAdvance(deps, { platform, serviceAccountJsonPath, runBuild })
       return { content: [{ type: 'text' as const, text: renderResult(result) }] }
     },
   )

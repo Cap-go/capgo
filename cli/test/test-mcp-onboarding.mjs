@@ -285,6 +285,7 @@ function androidDeps(o = {}) {
       }
       return { ok: true }
     },
+    requestFirstBuild: async () => ({ ok: true, jobId: 'job_123', status: 'queued' }),
     ...o,
   }
 }
@@ -322,12 +323,12 @@ await test('decideAndroid: SA path present, not provisioned → auto android-fin
   eq(r.state, 'android-finalize')
 })
 
-await test('decideAndroid: provisioned → done', async () => {
+await test('decideAndroid: provisioned → offers first build', async () => {
   const r = decideAndroid(androidFacts({
-    androidProgress: { serviceAccountJsonPath: '/tmp/sa.json', completedSteps: { keystoreReady: { keystorePath: 'p', alias: 'release', isGenerated: true }, serviceAccountProvisioned: { serviceAccountEmail: 'x' } } },
+    androidProgress: { serviceAccountJsonPath: '/tmp/sa.json', completedSteps: { keystoreReady: { keystorePath: 'p', alias: 'release', isGenerated: true }, serviceAccountProvisioned: { email: 'x', projectId: 'p' } } },
   }))
-  eq(r.kind, 'done')
-  eq(r.state, 'android-complete')
+  eq(r.kind, 'choice')
+  eq(r.state, 'build-ready')
 })
 
 await test('runStart (android): keystore generated, then asks for the service-account JSON', async () => {
@@ -337,12 +338,28 @@ await test('runStart (android): keystore generated, then asks for the service-ac
   eq(r.state, 'android-service-account')
 })
 
-await test('android: full flow keystore → provide SA path → finalize → done', async () => {
+await test('android: full flow keystore → SA path → finalize → offers first build', async () => {
   const deps = androidDeps()
   await runStart(deps)
   const r = await runAdvance(deps, { serviceAccountJsonPath: '/tmp/sa.json' })
+  eq(r.kind, 'choice')
+  eq(r.state, 'build-ready')
+})
+
+await test('android: runBuild triggers the first cloud build → done', async () => {
+  const deps = androidDeps()
+  await runStart(deps)
+  await runAdvance(deps, { serviceAccountJsonPath: '/tmp/sa.json' })
+  const r = await runAdvance(deps, { runBuild: true, platform: 'android' })
   eq(r.kind, 'done')
-  eq(r.state, 'android-complete')
+  eq(r.state, 'build-requested')
+})
+
+await test('build request failure → error build-failed', async () => {
+  const deps = androidDeps({ requestFirstBuild: async () => ({ ok: false, error: 'no credentials' }) })
+  const r = await runAdvance(deps, { runBuild: true, platform: 'android' })
+  eq(r.kind, 'error')
+  eq(r.state, 'build-failed')
 })
 
 await test('android: invalid service account → human_gate to re-provide', async () => {

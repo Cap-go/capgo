@@ -28,6 +28,7 @@ const NEXT_STEP_TOOL = 'capgo_builder_onboarding_next_step'
 interface OnboardingInput {
   platform?: string
   serviceAccountJsonPath?: string
+  runBuild?: boolean
 }
 
 /** Decide the first/again step for a fresh or resumed session. Pure. */
@@ -217,15 +218,33 @@ export function decideAndroid(facts: PreflightFacts): NextStepResult {
     }
   }
 
+  return decideBuildPhase(facts, 'android')
+}
+
+/**
+ * Shared build phase — once a platform's credentials are saved, offer to run
+ * the first cloud build. The trigger happens via next_step({ runBuild }) (handled
+ * in `drive`); this step just presents the choice.
+ */
+function decideBuildPhase(facts: PreflightFacts, platform: Platform): NextStepResult {
   return {
     onboarding: 'capgo-builder',
-    phase: 'done',
-    state: 'android-complete',
-    platform: 'android',
-    progress: 100,
-    kind: 'done',
-    summary: `Android credentials are ready for "${facts.appId}" — keystore + Play service account saved locally. You can run a cloud build next.`,
-    context: { appId: facts.appId },
+    phase: 'build',
+    state: 'build-ready',
+    platform,
+    progress: 90,
+    kind: 'choice',
+    summary: `Credentials for "${facts.appId}" (${platform}) are saved. Run your first cloud build now?`,
+    options: [
+      { value: 'build', label: 'Run the first build now' },
+      { value: 'skip', label: 'Skip — I will build later' },
+    ],
+    next: {
+      tool: NEXT_STEP_TOOL,
+      with: { runBuild: true, platform },
+      instruction: `Ask the user. To build now, call next_step with runBuild:true and platform:"${platform}". If they skip, onboarding is complete.`,
+      call: `${NEXT_STEP_TOOL}({ runBuild: true, platform: "${platform}" })`,
+    },
     rules: ONBOARDING_RULES,
   }
 }
@@ -260,6 +279,7 @@ export interface EngineDeps {
   generateAndroidKeystore: (appId: string) => Promise<void>
   setAndroidServiceAccountPath: (appId: string, path: string) => Promise<void>
   finalizeAndroidCredentials: (appId: string) => Promise<{ ok: true } | { ok: false, error: string }>
+  requestFirstBuild: (appId: string, platform: Platform) => Promise<{ ok: true, jobId?: string, status?: string } | { ok: false, error: string }>
 }
 
 /** Gather preflight facts via the injected deps. */
@@ -357,7 +377,44 @@ async function executeAuto(
 }
 
 /** Gather → decide → execute auto steps → repeat until a terminal directive. */
+function buildResult(
+  appId: string,
+  platform: Platform,
+  res: { ok: true, jobId?: string, status?: string } | { ok: false, error: string },
+): NextStepResult {
+  if (res.ok) {
+    return {
+      onboarding: 'capgo-builder',
+      phase: 'done',
+      state: 'build-requested',
+      platform,
+      progress: 100,
+      kind: 'done',
+      summary: `First cloud build requested for "${appId}" (${platform}) — compiling in the cloud (job ${res.jobId ?? 'pending'}, status: ${res.status ?? 'queued'}). Onboarding complete! 🎉`,
+      context: { appId, platform, jobId: res.jobId, status: res.status },
+      rules: ONBOARDING_RULES,
+    }
+  }
+  return {
+    onboarding: 'capgo-builder',
+    phase: 'build',
+    state: 'build-failed',
+    platform,
+    progress: 90,
+    kind: 'error',
+    summary: `Could not start the build: ${res.error}`,
+    rules: ONBOARDING_RULES,
+  }
+}
+
 async function drive(deps: EngineDeps, input?: OnboardingInput): Promise<NextStepResult> {
+  // Build trigger is a terminal action (not a persisted step).
+  if (input?.runBuild) {
+    const buildAppId = await deps.getAppId()
+    const buildPlatform = input.platform === 'ios' || input.platform === 'android' ? input.platform : undefined
+    if (buildAppId && buildPlatform)
+      return buildResult(buildAppId, buildPlatform, await deps.requestFirstBuild(buildAppId, buildPlatform))
+  }
   // Persist any provided inputs (side effects) before the decide loop.
   if (input?.serviceAccountJsonPath) {
     const inputAppId = await deps.getAppId()
