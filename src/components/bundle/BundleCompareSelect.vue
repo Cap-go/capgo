@@ -171,7 +171,12 @@ async function loadPreferredCompareVersions() {
   if (channelIds.size === 0)
     return
 
-  const preferredHistory: Array<{ versionId: number, deployedAt: string | null }> = []
+  // Fetch several recent prior deployments per channel (not just one): if the
+  // most recent points to a now-deleted bundle, the deleted filter below would
+  // otherwise leave the channel with no baseline. Keeping a small lookback lets
+  // us fall back to the next older non-deleted deployment instead.
+  const PREFERRED_LOOKBACK = 20
+  const candidatesByChannel: Array<Array<{ versionId: number, deployedAt: string | null }>> = []
   for (const channelId of channelIds) {
     const cutoff = deployedAtByChannel.get(channelId)
     let query = supabase
@@ -186,7 +191,7 @@ async function loadPreferredCompareVersions() {
 
     const { data, error } = await query
       .order('created_at', { ascending: false })
-      .limit(1)
+      .limit(PREFERRED_LOOKBACK)
 
     if (requestId !== preferredCompareRequestId)
       return
@@ -196,19 +201,18 @@ async function loadPreferredCompareVersions() {
       continue
     }
 
-    const entry = (data ?? [])[0] as DeployHistoryRow | undefined
-    if (!entry)
-      continue
-    preferredHistory.push({
+    const candidates = ((data ?? []) as DeployHistoryRow[]).map(entry => ({
       versionId: entry.version_id,
       deployedAt: entry.created_at ?? entry.deployed_at ?? null,
-    })
+    }))
+    if (candidates.length)
+      candidatesByChannel.push(candidates)
   }
 
-  if (!preferredHistory.length)
+  if (!candidatesByChannel.length)
     return
 
-  const uniqueIds = [...new Set(preferredHistory.map(entry => entry.versionId))]
+  const uniqueIds = [...new Set(candidatesByChannel.flat().map(entry => entry.versionId))]
   const { data: versions, error } = await buildCompareBaseQuery()
     .in('id', uniqueIds)
 
@@ -221,11 +225,20 @@ async function loadPreferredCompareVersions() {
   }
 
   const versionMap = new Map((versions ?? []).map(version => [version.id, version]))
-  const sorted = preferredHistory
-    .filter(entry => versionMap.has(entry.versionId))
+  // Per channel, keep the most recent deployment whose bundle survived the
+  // deleted filter (candidates are already ordered newest-first).
+  const seen = new Set<number>()
+  preferredCompareVersions.value = candidatesByChannel
+    .map(candidates => candidates.find(entry => versionMap.has(entry.versionId)))
+    .filter((entry): entry is { versionId: number, deployedAt: string | null } => Boolean(entry))
     .sort((a, b) => (b.deployedAt ?? '').localeCompare(a.deployedAt ?? ''))
-
-  preferredCompareVersions.value = sorted
+    .filter((entry) => {
+      // Dedupe: the same bundle can be the surviving pick for multiple channels.
+      if (seen.has(entry.versionId))
+        return false
+      seen.add(entry.versionId)
+      return true
+    })
     .map(entry => versionMap.get(entry.versionId))
     .filter((version): version is VersionRow => Boolean(version))
 }
