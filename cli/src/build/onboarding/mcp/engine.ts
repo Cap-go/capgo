@@ -57,6 +57,20 @@ export function decideStart(facts: PreflightFacts, progress: OnboardingProgress 
     }
   }
 
+  // App phase: ensure the app is registered in Capgo Cloud before signing.
+  if (!facts.appRegistered) {
+    return {
+      onboarding: 'capgo-builder',
+      phase: 'app',
+      state: 'registering-app',
+      progress: 8,
+      kind: 'auto',
+      summary: `Registering "${facts.appId}" in Capgo Cloud…`,
+      context: { appId: facts.appId },
+      rules: ONBOARDING_RULES,
+    }
+  }
+
   return decidePlatform(facts, progress)
 }
 
@@ -136,6 +150,8 @@ export function decideAdvance(
   if (input?.platform === 'ios' || input?.platform === 'android') {
     if (!facts.authenticated)
       return decideStart(facts, progress)
+    if (!facts.appRegistered)
+      return decideStart(facts, progress) // register the app before credentials
     return platformChosen(facts, input.platform)
   }
   // No explicit input → re-orient (idempotent): re-run the start decision.

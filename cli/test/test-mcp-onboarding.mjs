@@ -173,6 +173,23 @@ await test('registerOnboardingTools: next_step handler forwards platform input',
   ok(res.content[0].text.includes('"platform": "android"'), 'forwards the chosen platform')
 })
 
+await test('decideStart: authenticated but app not registered → auto registering-app', async () => {
+  const r = decideStart(facts({ appRegistered: false }), null)
+  eq(r.kind, 'auto')
+  eq(r.phase, 'app')
+  eq(r.state, 'registering-app')
+})
+
+await test('decideStart: app registered → proceeds to platform decision', async () => {
+  const r = decideStart(facts({ appRegistered: true }), null)
+  ok(r.state === 'platform-select' || r.phase === 'credentials', 'should be past the app phase')
+})
+
+await test('decideAdvance: platform chosen but app not registered → routes back to register first', async () => {
+  const r = decideAdvance(facts({ appRegistered: false }), null, { platform: 'ios' })
+  eq(r.state, 'registering-app')
+})
+
 console.log(`\n📊 Results: ${pass} passed, ${fail} failed`)
 if (fail > 0)
   process.exit(1)
