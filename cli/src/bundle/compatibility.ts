@@ -142,20 +142,26 @@ export async function checkCompatibilityInternal(
         supabase.from('apps').select('owner_org').eq('app_id', resolvedAppId).maybeSingle(),
       ])
       const oldVersion = (channelResult.data?.version ?? undefined) as unknown as { id?: number | string, name?: string } | undefined
-      void trackEvent({
-        channel: 'bundle',
-        event: 'Bundle Incompatible',
-        icon: '🚫',
-        apikey: enrichedOptions.apikey,
-        appId: resolvedAppId,
-        orgId: appResult.data?.owner_org ?? undefined,
-        tags: {
-          source: 'command',
-          channel,
-          ...(oldVersion?.id != null ? { version_old_id: String(oldVersion.id) } : {}),
-          ...(oldVersion?.name ? { version_old_name: oldVersion.name } : {}),
-        },
-      })
+      // The command re-queries the channel separately, so version_old can come
+      // back unresolved (race with a channel repoint, or a transient failure).
+      // version_old is required for this signal — skip the event entirely rather
+      // than emit one missing the version it is about.
+      if (oldVersion?.id != null) {
+        void trackEvent({
+          channel: 'bundle',
+          event: 'Bundle Incompatible',
+          icon: '🚫',
+          apikey: enrichedOptions.apikey,
+          appId: resolvedAppId,
+          orgId: appResult.data?.owner_org ?? undefined,
+          tags: {
+            source: 'command',
+            channel,
+            version_old_id: String(oldVersion.id),
+            ...(oldVersion.name ? { version_old_name: oldVersion.name } : {}),
+          },
+        })
+      }
     }
     catch {
       // telemetry must never break a command
