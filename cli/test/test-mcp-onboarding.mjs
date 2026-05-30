@@ -141,6 +141,38 @@ await test('runAdvance: passes platform input through to the decider', async () 
   eq(r.platform, 'android')
 })
 
+const { registerOnboardingTools } = await import('../src/build/onboarding/mcp/onboarding-tools.ts')
+
+function fakeServer() {
+  const tools = {}
+  return {
+    tools,
+    tool(name, _desc, _schema, handler) { tools[name] = { handler } },
+  }
+}
+
+await test('registerOnboardingTools: registers the two-tool spine', async () => {
+  const server = fakeServer()
+  registerOnboardingTools(server, /* sdk */ null, fakeDeps())
+  ok(server.tools.start_capgo_builder_onboarding, 'start tool registered')
+  ok(server.tools.capgo_builder_onboarding_next_step, 'next_step tool registered')
+})
+
+await test('registerOnboardingTools: start handler returns rendered text content', async () => {
+  const server = fakeServer()
+  registerOnboardingTools(server, null, fakeDeps())
+  const res = await server.tools.start_capgo_builder_onboarding.handler({})
+  ok(Array.isArray(res.content) && res.content[0].type === 'text', 'returns MCP text content')
+  ok(res.content[0].text.includes('Capgo Builder onboarding'), 'renders the result')
+})
+
+await test('registerOnboardingTools: next_step handler forwards platform input', async () => {
+  const server = fakeServer()
+  registerOnboardingTools(server, null, fakeDeps({ detectPlatforms: async () => ['ios', 'android'] }))
+  const res = await server.tools.capgo_builder_onboarding_next_step.handler({ platform: 'android' })
+  ok(res.content[0].text.includes('"platform": "android"'), 'forwards the chosen platform')
+})
+
 console.log(`\n📊 Results: ${pass} passed, ${fail} failed`)
 if (fail > 0)
   process.exit(1)
