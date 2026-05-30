@@ -4,8 +4,10 @@
 
 ## Progress (2026-05-30)
 
-- ✅ **Keystore step implemented & committed.** `decideAndroid` + the `android-keystore` `auto` step in the engine; real wiring in `buildDeps` (`generateKeystore` + `generateRandomPassword`, persisted via `saveAndroidProgress`). Verified: build (`tsc`) + 29 unit tests + MCP integration smoke all green.
-- ⬜ **Remaining (next session):** Google sign-in (blocking OAuth via `runOAuthFlow` + the confirm-signal design in decision #3), GCP provisioning, Play developer-id `human_gate` + invite, service-account validation, save credentials → `done`.
+- ✅ **Keystore step** — `decideAndroid` + `android-keystore` `auto` step; wiring reuses `generateKeystore` + `generateRandomPassword`. Committed.
+- ✅ **Provisioning (existing service account — NO OAuth)** — per the scope decision to drop OAuth, the Android flow is: keystore → **provide service-account JSON** (`human_gate`, by **file path** — never pasted) → **validate** (`validateServiceAccountJson`) + **save** (`updateSavedCredentials` with keystore base64 + `PLAY_CONFIG_JSON`) → `done`. Invalid JSON re-prompts via `android-service-account-invalid`. Verified: build (`tsc`) + 33 unit tests + MCP smoke green. **Android credentials now reach a buildable state.**
+- ❌ **OAuth / GCP-generate / Play-invite-via-API — dropped for v1** (explicit decision: no OAuth). The "generate a service account via Google sign-in" path can be added later; `oauth-google`/`gcp-api`/`play-api` remain available and headless.
+- ➡️ **Next:** Plan 4 (iOS credentials) and Plan 5 (build → first build). With Android creds saved, `capgo_request_build` can produce a real Android build.
 
 **Goal:** Drive the **Android** credential flow through the onboarding engine — keystore → Google sign-in → GCP service account → Play invite → validate → save — reaching saved Android build credentials, reusing the existing `cli/src/build/onboarding/android/*` modules.
 
