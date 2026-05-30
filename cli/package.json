@@ -134,6 +134,7 @@
     "@types/tmp": "^0.2.6",
     "@types/ws": "^8.18.1",
     "@vercel/ncc": "^0.38.4",
+    "@xterm/headless": "^6.0.0",
     "adm-zip": "^0.5.16",
     "ci-info": "^4.3.1",
     "commander": "^14.0.2",

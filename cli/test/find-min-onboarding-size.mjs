@@ -64,5 +64,13 @@ if (errors.length)
 writeFileSync('/tmp/onboarding-size-report.txt', `${lines.join('\n')}\n`)
 
 console.log(`fixtures=${fixtures.length} errors=${errors.length} report=/tmp/onboarding-size-report.txt`)
+
+// One compact line per width with the top-6 tallest steps inline — so the floor
+// breakdown survives shells that truncate multi-line output.
+for (const cols of WIDTHS) {
+  const top = report.filter(r => r.cols === cols).sort((a, b) => b.rows - a.rows).slice(0, 6)
+    .map(r => `${r.label}:${r.rows}`).join(' ')
+  console.log(`TOP@${cols} ${top}`)
+}
 clearTimeout(watchdog)
 process.exit(errors.length ? 1 : 0)
