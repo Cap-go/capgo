@@ -129,6 +129,32 @@ export async function checkCompatibilityInternal(
     }
   }
 
+  // Surface incompatible results from the explicit `capgo bundle compatibility`
+  // command to Bento via the backend. The silent internal callers (sdk.ts,
+  // releaseType.ts) are intentionally excluded. The command uploads nothing, so
+  // only the channel's current (old) version is reported — version_new is empty.
+  if (hasIncompatible && !silent) {
+    const [channelResult, appResult] = await Promise.all([
+      supabase.from('channels').select('version ( id, name )').eq('name', channel).eq('app_id', resolvedAppId).maybeSingle(),
+      supabase.from('apps').select('owner_org').eq('app_id', resolvedAppId).maybeSingle(),
+    ])
+    const oldVersion = (channelResult.data?.version ?? undefined) as unknown as { id?: number | string, name?: string } | undefined
+    void trackEvent({
+      channel: 'bundle',
+      event: 'Bundle Incompatible',
+      icon: '🚫',
+      apikey: enrichedOptions.apikey,
+      appId: resolvedAppId,
+      orgId: appResult.data?.owner_org ?? undefined,
+      tags: {
+        source: 'command',
+        channel,
+        ...(oldVersion?.id != null ? { version_old_id: String(oldVersion.id) } : {}),
+        ...(oldVersion?.name ? { version_old_name: oldVersion.name } : {}),
+      },
+    })
+  }
+
   return {
     finalCompatibility: compatibility.finalCompatibility,
     hasIncompatible,

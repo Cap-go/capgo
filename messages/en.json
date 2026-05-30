@@ -1340,6 +1340,8 @@
   "notifications-bundle-created-desc": "Receive emails when a new bundle is uploaded to your app",
   "notifications-bundle-deployed": "Bundle deployments",
   "notifications-bundle-deployed-desc": "Receive emails when a bundle is deployed to a production channel",
+  "notifications-bundle-incompatible": "Incompatible bundles",
+  "notifications-bundle-incompatible-desc": "Receive emails when an uploaded bundle is incompatible with the channel's native packages and may need a native app store update",
   "notifications-channel-self-rejected": "Channel self-assignment rejected",
   "notifications-channel-self-rejected-desc": "Receive emails when devices are rejected from self-assigning to channels",
   "notifications-cli-realtime-feed": "CLI activity notifications",

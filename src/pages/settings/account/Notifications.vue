@@ -28,6 +28,7 @@ interface EmailPreferences {
   bundle_deployed?: boolean
   device_error?: boolean
   channel_self_rejected?: boolean
+  bundle_incompatible?: boolean
   cli_realtime_feed?: boolean
 }
 
@@ -219,6 +220,12 @@ async function toggleEmailPref(key: EmailPreferenceKey) {
               <Toggle
                 :value="getEmailPref('channel_self_rejected')"
                 @change="toggleEmailPref('channel_self_rejected')"
+              />
+            </InfoRow>
+            <InfoRow :label="t('notifications-bundle-incompatible')" :editable="false" :value="t('notifications-bundle-incompatible-desc')">
+              <Toggle
+                :value="getEmailPref('bundle_incompatible')"
+                @change="toggleEmailPref('bundle_incompatible')"
               />
             </InfoRow>
           </dl>
