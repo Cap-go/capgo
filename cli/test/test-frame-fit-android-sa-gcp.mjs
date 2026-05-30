@@ -34,7 +34,7 @@ import {
   SaJsonValidationFailedStep,
   ServiceAccountMethodSelectStep,
 } from '../src/build/onboarding/ui/steps/android-sa-gcp.tsx'
-import { assertFitsBudget, BODY_BUDGET_ROWS } from './helpers/frame-fit.mjs'
+import { assertFitsBudget, BODY_BUDGET_ROWS, frameRows } from './helpers/frame-fit.mjs'
 
 let passed = 0
 let failed = 0
@@ -128,7 +128,8 @@ test(`google-sign-in [dense, compact] fits ${BODY_BUDGET_ROWS}-row budget`, () =
 test('google-sign-in [dense] spaced adds exactly SIGN_IN_GAP_ROWS rows', () => {
   const compact = frameRows(h(GoogleSignInStep, { onChoose: noop, dense: true }), 80)
   const spaced = frameRows(h(GoogleSignInStep, { onChoose: noop, dense: true, spaced: true }), 80)
-  assert(spaced - compact === SIGN_IN_GAP_ROWS, `spaced adds ${spaced - compact} rows, expected ${SIGN_IN_GAP_ROWS}`)
+  if (spaced - compact !== SIGN_IN_GAP_ROWS)
+    throw new Error(`spaced adds ${spaced - compact} rows, expected ${SIGN_IN_GAP_ROWS}`)
 })
 
 // ── google-sign-in — learn-more (the historical worst offender) ───────────────
