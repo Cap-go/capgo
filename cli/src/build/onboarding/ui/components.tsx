@@ -165,14 +165,12 @@ export const FilteredTextInput: FC<{
 // `compact` collapses the banner to a single borderless line. Callers pass
 // it when the terminal is too short (< HEADER_BOX_MIN_ROWS) to spend ~5 rows
 // on the bordered box — the branding stays, the vertical cost drops to 1 row.
-export const Header: FC<{ compact?: boolean }> = ({ compact = false }) => {
-  if (compact) {
-    return (
-      <Text bold color="cyan">
-        🚀  Capgo Cloud Build · Onboarding
-      </Text>
-    )
-  }
+// The banner is ALWAYS the full boxed form now. The startup size gate
+// (min-size-gate.tsx) guarantees enough rows for it, so there's no reason to
+// degrade to the one-line variant on short terminals. `compact` is accepted but
+// ignored so existing call sites keep compiling; the prop + its arguments are
+// removed in the dense-cleanup follow-up.
+export const Header: FC<{ compact?: boolean }> = () => {
   return (
     <Box
       borderStyle="double"
