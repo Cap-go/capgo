@@ -182,7 +182,10 @@ Example: npx @capgo/cli@latest bundle upload com.example.app --path ./dist --cha
       if (result.builderAction === 'launch-onboarding')
         await onboardingBuilderCommand({ apikey: options.apikey })
       else
-        await requestBuildCommand(appId ?? '', { apikey: options.apikey, supaHost: options.supaHost, supaAnon: options.supaAnon, path: options.path })
+        // NB: don't forward `options.path` — for `bundle upload` it's the web
+        // asset dir (webDir), but `build request` treats `path` as the Capacitor
+        // project root. Omitting it defaults to cwd() (the project root).
+        await requestBuildCommand(appId ?? '', { apikey: options.apikey, supaHost: options.supaHost, supaAnon: options.supaAnon })
     }
   })
   .option('-a, --apikey <apikey>', optionDescriptions.apikey)
