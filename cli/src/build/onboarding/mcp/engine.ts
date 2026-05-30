@@ -141,3 +141,40 @@ export function decideAdvance(
   // No explicit input → re-orient (idempotent): re-run the start decision.
   return decideStart(facts, progress)
 }
+
+/** IO surface the orchestrators depend on. Injected so the flow is testable headlessly. */
+export interface EngineDeps {
+  cwd: string
+  hasSavedKey: () => boolean
+  getAppId: () => Promise<string | undefined>
+  detectPlatforms: () => Promise<Platform[]>
+  isAppRegistered: (appId: string) => Promise<boolean>
+  loadProgress: (appId: string) => Promise<OnboardingProgress | null>
+}
+
+/** Gather preflight facts via the injected deps. */
+export async function gatherFacts(deps: EngineDeps): Promise<PreflightFacts> {
+  const appId = await deps.getAppId()
+  const authenticated = deps.hasSavedKey()
+
+  if (!appId)
+    return { capacitorProject: false, appId: undefined, platformsDetected: [], authenticated, appRegistered: false }
+
+  const platformsDetected = await deps.detectPlatforms()
+  const appRegistered = authenticated ? await deps.isAppRegistered(appId) : false
+  return { capacitorProject: true, appId, platformsDetected, authenticated, appRegistered }
+}
+
+/** Orient/resume. Gathers facts + progress, then runs the pure start decider. */
+export async function runStart(deps: EngineDeps): Promise<NextStepResult> {
+  const facts = await gatherFacts(deps)
+  const progress = facts.appId ? await deps.loadProgress(facts.appId) : null
+  return decideStart(facts, progress)
+}
+
+/** Advance one step. */
+export async function runAdvance(deps: EngineDeps, input?: { platform?: string }): Promise<NextStepResult> {
+  const facts = await gatherFacts(deps)
+  const progress = facts.appId ? await deps.loadProgress(facts.appId) : null
+  return decideAdvance(facts, progress, input)
+}

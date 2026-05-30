@@ -89,6 +89,58 @@ await test('decideAdvance: platform choice while unauthenticated bounces to logi
   eq(r.state, 'login-required')
 })
 
+const { gatherFacts, runStart, runAdvance } = await import('../src/build/onboarding/mcp/engine.ts')
+
+const fakeDeps = (o = {}) => ({
+  cwd: '/tmp/app',
+  hasSavedKey: () => true,
+  getAppId: async () => 'com.acme.app',
+  detectPlatforms: async () => ['ios'],
+  isAppRegistered: async () => true,
+  loadProgress: async () => null,
+  ...o,
+})
+
+await test('gatherFacts: maps injected deps into facts', async () => {
+  const f = await gatherFacts(fakeDeps())
+  eq(f.capacitorProject, true)
+  eq(f.appId, 'com.acme.app')
+  eq(f.authenticated, true)
+  eq(f.platformsDetected.length, 1)
+  eq(f.appRegistered, true)
+})
+
+await test('gatherFacts: no appId → not a capacitor project, skips app check', async () => {
+  let appChecked = false
+  const f = await gatherFacts(fakeDeps({
+    getAppId: async () => undefined,
+    isAppRegistered: async () => { appChecked = true; return true },
+  }))
+  eq(f.capacitorProject, false)
+  eq(appChecked, false, 'must not call isAppRegistered without an appId')
+})
+
+await test('gatherFacts: unauthenticated skips the registered-app check', async () => {
+  let appChecked = false
+  const f = await gatherFacts(fakeDeps({
+    hasSavedKey: () => false,
+    isAppRegistered: async () => { appChecked = true; return true },
+  }))
+  eq(f.authenticated, false)
+  eq(appChecked, false, 'must not call the API when unauthenticated')
+})
+
+await test('runStart: single platform via deps → enters credentials phase', async () => {
+  const r = await runStart(fakeDeps())
+  eq(r.platform, 'ios')
+  eq(r.phase, 'credentials')
+})
+
+await test('runAdvance: passes platform input through to the decider', async () => {
+  const r = await runAdvance(fakeDeps({ detectPlatforms: async () => ['ios', 'android'] }), { platform: 'android' })
+  eq(r.platform, 'android')
+})
+
 console.log(`\n📊 Results: ${pass} passed, ${fail} failed`)
 if (fail > 0)
   process.exit(1)
