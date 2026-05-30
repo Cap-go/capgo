@@ -140,13 +140,18 @@ async function verifyCompatibility(supabase: SupabaseType, pm: pmType, options: 
 
   const { data: channelData, error: channelError } = await supabase
     .from('channels')
-    .select('disable_auto_update, version ( min_update_version, native_packages )')
+    .select('disable_auto_update, version ( id, name, min_update_version, native_packages )')
     .eq('name', channel)
     .eq('app_id', appid)
     .maybeSingle()
 
   if (channelError)
     uploadFail(`Cannot load channel ${channel} for compatibility checks ${formatError(channelError)}`)
+
+  // The version currently live on the channel — what the new bundle is compared
+  // against. Captured here (before the channel is repointed at the new bundle)
+  // so the incompatible-bundle Bento signal can report the prior version.
+  const oldVersion = (channelData?.version ?? undefined) as unknown as { id?: number | string, name?: string } | undefined
 
   const updateMetadataRequired = !!channelData && channelData.disable_auto_update === 'version_number'
 
@@ -251,7 +256,15 @@ async function verifyCompatibility(supabase: SupabaseType, pm: pmType, options: 
       }))
     : undefined
 
-  return { nativePackages, minUpdateVersion }
+  return {
+    nativePackages,
+    minUpdateVersion,
+    compatibility: {
+      result: compatibilitySummary.result,
+      versionOldId: oldVersion?.id != null ? String(oldVersion.id) : undefined,
+      versionOldName: oldVersion?.name,
+    },
+  }
 }
 
 async function checkVersionExists(supabase: SupabaseType, appid: string, bundle: string, versionExistsOk = false, interactive = false): Promise<boolean | string> {
@@ -882,7 +895,7 @@ export async function uploadBundleInternal(preAppid: string, options: OptionsUpl
   if (options.verbose)
     log.info(`[Verbose] Checking compatibility with channel ${channel}...`)
 
-  const { nativePackages, minUpdateVersion } = await verifyCompatibility(supabase, pm, options, channel, appid, bundle, orgId)
+  const { nativePackages, minUpdateVersion, compatibility } = await verifyCompatibility(supabase, pm, options, channel, appid, bundle, orgId)
   if (options.verbose) {
     log.info(`[Verbose] Compatibility check completed:`)
     log.info(`  - Native packages: ${nativePackages ? nativePackages.length : 0}`)
@@ -1309,6 +1322,28 @@ export async function uploadBundleInternal(preAppid: string, options: OptionsUpl
     notify: false,
     notifyConsole: true,
   }).catch(() => {})
+
+  // Surface incompatible uploads to Bento via the backend (it resolves
+  // version_new_id + org/app names and gates delivery via the
+  // bundle_incompatible preference). Fires only once the version exists and the
+  // channel has been set, and only when the bundle was actually incompatible.
+  if (compatibility?.result === 'incompatible') {
+    void trackEvent({
+      channel: 'bundle',
+      event: 'Bundle Incompatible',
+      icon: '🚫',
+      apikey,
+      appId: appid,
+      orgId,
+      tags: {
+        source: 'upload',
+        channel,
+        version_new_name: bundle,
+        ...(compatibility.versionOldId ? { version_old_id: compatibility.versionOldId } : {}),
+        ...(compatibility.versionOldName ? { version_old_name: compatibility.versionOldName } : {}),
+      },
+    })
+  }
 
   const result: UploadBundleResult = {
     success: true,

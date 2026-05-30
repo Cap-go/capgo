@@ -3,15 +3,22 @@ import type { Context } from 'hono'
 import type { PostHogGroups } from './posthog.ts'
 import { cloudlogErr, serializeError } from './logging.ts'
 import { logsnag } from './logsnag.ts'
-import { sendNotifToOrgMembers } from './org_email_notifications.ts'
+import { sendNotifToOrgMembers, sendNotifToOrgMembersOnce } from './org_email_notifications.ts'
 import { getDrizzleClient, getPgClient } from './pg.ts'
 import { trackPosthogEvent } from './posthog.ts'
 import { backgroundTask } from './utils.ts'
 
 export interface BentoTrackingPayload {
-  cron: string
+  /** Cron window for the throttle/dedupe. Used only when `once` is not set. */
+  cron?: string
   data: Record<string, unknown>
   event: string
+  /**
+   * Send at most ONE notification ever per (event, org, uniqId) via a permanent
+   * claim instead of a reopening cron window. Use for per-entity alerts that must
+   * not re-fire on retries (e.g. an incompatible bundle version). Ignores `cron`.
+   */
+  once?: boolean
   preferenceKey: import('./org_email_notifications.ts').EmailPreferenceKey
   uniqId: string
 }
@@ -97,16 +104,31 @@ async function executeBentoTracking(c: Context, payload: SendEventToTrackingPayl
   await runTrackedCall(c, 'bento', async () => {
     const pgClient = getPgClient(c, true)
     try {
-      await sendNotifToOrgMembers(
-        c,
-        bento.event,
-        bento.preferenceKey,
-        bento.data,
-        orgId,
-        bento.uniqId,
-        bento.cron,
-        getDrizzleClient(pgClient),
-      )
+      if (bento.once) {
+        // Permanent per-(event, org, uniqId) claim: per-entity alerts (e.g. an
+        // incompatible bundle version) must not re-email org admins on retries.
+        await sendNotifToOrgMembersOnce(
+          c,
+          bento.event,
+          bento.preferenceKey,
+          bento.data,
+          orgId,
+          bento.uniqId,
+          getDrizzleClient(pgClient),
+        )
+      }
+      else {
+        await sendNotifToOrgMembers(
+          c,
+          bento.event,
+          bento.preferenceKey,
+          bento.data,
+          orgId,
+          bento.uniqId,
+          bento.cron ?? '* * * * *',
+          getDrizzleClient(pgClient),
+        )
+      }
     }
     finally {
       await pgClient.end()
