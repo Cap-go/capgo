@@ -2064,26 +2064,16 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
   const showLog = step !== 'requesting-build' && step !== 'build-complete' && !isAiStep && !tallStep
 
   // Streaming build output is a fullscreen takeover — see iOS sibling. As an
-  // early return (before the `tooSmall` guard) it auto-tails inside a viewport
-  // that always fits, so the unbounded output never trips "terminal too small".
-  // Size gate (resize-reactive): below the floor, render the resize prompt from
-  // THIS mounted component so all in-progress state (current step, entered
-  // values, build output) is preserved — a shrink shows the prompt, a re-grow
-  // shows the exact same step. Kept as an early return after all hooks so the
-  // rules of hooks hold. The wizard never clips, and never exits, on resize.
-  if (!terminalFitsOnboarding(terminalCols, terminalRows, 'android'))
-    return <TerminalTooSmallPrompt cols={terminalCols} rows={terminalRows} minRows={ANDROID_MIN_ROWS} />
-
+  // early return BEFORE the size gate it auto-tails inside a viewport that always
+  // fits, so the unbounded output never trips "terminal too small": shrinking the
+  // window mid-build keeps the live log on screen instead of hiding it behind the
+  // resize prompt. (Matches the iOS app's ordering.)
   if (step === 'requesting-build')
     return <FullscreenBuildOutput title="Building..." lines={buildOutput} terminalRows={terminalRows} />
 
-  // (No in-app "terminal too small" guard: the startup MinSizeGate in the shell
-  // guarantees the terminal is large enough before the wizard mounts, so a
-  // mid-flow too-small state can't occur.)
-
-  // Fullscreen AI viewer is a takeover — early return so it owns the whole
-  // terminal and bypasses the body-measurement / dense / too-small logic (see
-  // iOS sibling). It fills the screen itself via minHeight.
+  // Fullscreen AI viewer is a takeover too — early return BEFORE the gate so it
+  // owns the whole terminal (it paginates to the live size itself) and a mid-view
+  // shrink can't replace the scrollable analysis with the resize prompt.
   if (isAiResultScroll && aiAnalysisText)
     return (
       <FullscreenAiViewer
@@ -2097,6 +2087,14 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
         }}
       />
     )
+
+  // Size gate (resize-reactive): below the enforced floor, render the resize
+  // prompt from THIS mounted component so all in-progress state is preserved — a
+  // shrink shows the prompt, a re-grow shows the exact same step. Placed AFTER the
+  // fullscreen build/AI takeovers above (which own the whole screen and must not
+  // be hidden by the prompt) but before the normal step body. Matches iOS.
+  if (!terminalFitsOnboarding(terminalCols, terminalRows, 'android'))
+    return <TerminalTooSmallPrompt cols={terminalCols} rows={terminalRows} minRows={ANDROID_MIN_ROWS} />
 
   // `minHeight={terminalRows}` fills the viewport so Ink always uses its full
   // clear-screen redraw path, which avoids stale rows lingering after the

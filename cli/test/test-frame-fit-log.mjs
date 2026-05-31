@@ -102,7 +102,7 @@ for (const rows of [16, 19, 24]) {
 
 test('UNCAPPED long log overflows — proving the cap is what prevents too-small', () => {
   const rows = 19
-  const uncapped = frameRows(frame(longLog, rows, 80, 6), 80)
+  const uncapped = frameRows(frame(longLog, rows, 6), 80)
   assert(uncapped > rows, `expected the uncapped 30-entry log to overflow ${rows} rows, got ${uncapped}`)
 })
 
