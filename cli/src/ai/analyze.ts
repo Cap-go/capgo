@@ -1,5 +1,5 @@
 import { readFile, stat, writeFile } from 'node:fs/promises'
-import { getAiPromptPath, getLogCapturePath } from './log-capture'
+import { cleanupCapturedJobFiles, getAiPromptPath, getLogCapturePath } from './log-capture'
 import { SYSTEM_PROMPT } from './prompt'
 
 export type AnalyzeBehavior = 'show_menu' | 'ask_then_menu' | 'auto_upload' | 'skip'
@@ -99,4 +99,44 @@ export async function isLogTooBig(jobId: string): Promise<boolean> {
   catch {
     return false
   }
+}
+
+export interface RunCapgoAiAnalysisInput {
+  apiHost: string
+  apikey: string
+  jobId: string
+  appId: string
+}
+
+// Reads the captured log file for a failed job, then sends it to the Capgo AI
+// edge function. Used by callers (e.g. the Ink onboarding TUI) that can't show
+// the interactive clack menu in `requestBuildInternal`.
+export async function runCapgoAiAnalysis(input: RunCapgoAiAnalysisInput): Promise<PostAnalyzeResult> {
+  // Check the byte limit before the read so a multi-MB log file doesn't get
+  // pulled into memory just to be rejected.
+  if (await isLogTooBig(input.jobId))
+    return { kind: 'too_big' }
+
+  let logs: string
+  try {
+    logs = await readFile(getLogCapturePath(input.jobId), 'utf8')
+  }
+  catch (err) {
+    return { kind: 'error', message: err instanceof Error ? err.message : 'log_unavailable' }
+  }
+
+  return postAnalyzeRequest({
+    apiHost: input.apiHost,
+    apikey: input.apikey,
+    jobId: input.jobId,
+    appId: input.appId,
+    logs,
+  })
+}
+
+// Best-effort cleanup of captured artifacts for a job. Callers in caller-handled
+// mode use this once the user has either viewed the analysis or chosen to skip,
+// since `requestBuildInternal` leaves the log file in place for them.
+export async function releaseCapturedLogs(jobId: string): Promise<void> {
+  await cleanupCapturedJobFiles(jobId, { keepAiPromptFile: false })
 }

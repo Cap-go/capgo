@@ -10,8 +10,9 @@ import { copyFile, readFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { join, resolve } from 'node:path'
 import process from 'node:process'
-import { Alert, ProgressBar, Select } from '@inkjs/ui'
-import { Box, Newline, Text, useApp, useInput } from 'ink'
+import { ProgressBar, Select } from '@inkjs/ui'
+import type { DOMElement } from 'ink'
+import { Box, measureElement, Newline, Text, useApp, useInput, useStdout } from 'ink'
 import open from 'open'
 // src/build/onboarding/ui/app.tsx
 import React, { useCallback, useEffect, useRef, useState } from 'react'
@@ -19,7 +20,17 @@ import { writeOnboardingSupportBundle } from '../../../onboarding-support.js'
 import { formatRunnerCommand, splitRunnerCommand } from '../../../runner-command.js'
 import { createSupabaseClient, findBuildCommandForProjectType, findProjectType, findSavedKeySilent, getOrganizationId, getPackageScripts, getPMAndCommand } from '../../../utils.js'
 import { loadSavedCredentials, updateSavedCredentials } from '../../credentials.js'
+import { releaseCapturedLogs, runCapgoAiAnalysis } from '../../../ai/analyze.js'
+import { renderMarkdown } from '../../../ai/render-markdown.js'
+import { trackAiAnalysisChoice, trackAiAnalysisResult } from '../../../ai/telemetry.js'
 import { requestBuildInternal } from '../../request.js'
+import { isAiAnalysisTooTall, resolveAiResultRoute } from '../ai-fit.js'
+
+// Upper bound on "I fixed it, retry build" attempts after an AI diagnosis.
+// Three total attempts (initial + two retries) caps the AI cost when a model
+// suggestion doesn't actually fix the failure mode while still giving the user
+// a couple of in-wizard chances to iterate.
+const MAX_AI_RETRIES = 2
 import { CertificateLimitError, createCertificate, createProfile, deleteProfile, DuplicateProfileError, ensureBundleId, findCertIdBySha1, generateJwt, listProfilesForCert, revokeCertificate, verifyApiKey } from '../apple-api.js'
 import { createP12, DEFAULT_P12_PASSWORD, generateCsr } from '../csr.js'
 import { mapIosOnboardingError } from '../error-categories.js'
@@ -39,13 +50,71 @@ import {
 
   STEP_PROGRESS,
 } from '../types.js'
-import { DiffSummary, Divider, ErrorLine, FilteredTextInput, FullscreenDiffViewer, Header, SecretsTable, SpinnerLine, SuccessLine } from './components.js'
+import { CompletedStepsLog } from './completed-steps-log.js'
+import { IOS_MIN_ROWS, terminalFitsOnboarding } from '../min-terminal-size.js'
+import { sanitizeBuildLogLines } from '../build-log.js'
+import { TerminalTooSmallPrompt } from './min-size-gate.js'
+import { BOX_HEADER_ROWS, COMPACT_HEADER_ROWS, DiffSummary, Divider, FilteredTextInput, FullscreenAiViewer, FullscreenBuildOutput, FullscreenDiffViewer, Header, SecretsTable, SpinnerLine, SuccessLine, TerminalTooSmall, WIZARD_PADDING_ROWS } from './components.js'
+import type { AiResultKind } from './components.js'
+import { COMPACT_HEADER_TOTAL_ROWS, isFrameTooSmall, logBudgetRows, shouldCollapseToDense } from './frame-fit.js'
 import { diffLines } from '../diff-utils.js'
 import type { DiffLine } from '../diff-utils.js'
 import { generateWorkflow, WORKFLOW_PATH as WORKFLOW_GEN_PATH } from '../workflow-generator.js'
 import { getWorkflowDiffTelemetry, trackBuildOnboardingWorkflowEvent } from '../analytics.js'
 import type { BuildOnboardingWorkflowDecision, BuildOnboardingWorkflowEvent, WorkflowDiffTelemetry } from '../analytics.js'
 import { buildScriptPickerOptions, normalizePackageManager } from '../workflow-ui-helpers.js'
+import {
+  ApiKeyInstructionsStep,
+  BackingUpStep,
+  CertLimitPromptStep,
+  CreatingCertificateStep,
+  CreatingProfileStep,
+  CredentialsExistStep,
+  DeletingDuplicateProfilesStep,
+  DuplicateProfilePromptStep,
+  InputIssuerIdStep,
+  InputKeyIdStep,
+  InputP8PathStep,
+  P8MethodSelectStep,
+  RevokingCertificateStep,
+  SavingCredentialsStep,
+  SetupMethodSelectStep,
+  VerifyingKeyStep,
+} from './steps/ios-credentials.js'
+import {
+  AskBuildStep,
+  AskCiSecretsStep,
+  CiSecretsFailedStep,
+  CiSecretsSetupStep,
+  CiSecretsTargetSelectStep,
+  ConfirmCiSecretOverwriteStep,
+  DetectingCiSecretsStep,
+} from './steps/ios-ci.js'
+import {
+  ImportCompilingHelperStep,
+  ImportCreateProfileOnlyStep,
+  ImportDistributionModeStep,
+  ImportExportingStep,
+  ImportExportWarningStep,
+  ImportFetchingProfileStep,
+  ImportNoMatchRecoveryStep,
+  ImportPickIdentityStep,
+  ImportPickProfileStep,
+  ImportScanningStep,
+} from './steps/ios-import.js'
+import {
+  AddingPlatformStep,
+  AiAnalysisPromptStep,
+  AiAnalysisRunningStep,
+  AiAnalysisResultStep,
+  BuildCompleteStep,
+  ErrorStep,
+  estimateErrorBodyRows,
+  formatErrorViewerLines,
+  NoPlatformStep,
+  PlatformSelectStep,
+  WelcomeStep,
+} from './steps/ios-shared.js'
 
 const OUTPUT_LINE_SPLIT_RE = /\r?\n/
 const CARRIAGE_RETURN_RE = /\r/g
@@ -59,7 +128,6 @@ interface AppProps {
   iosDir: string
   /** Optional Capgo API key passed via -a/--apikey flag; takes precedence over saved key */
   apikey?: string
-  terminalRows?: number
 }
 
 async function runRunnerCommand(runner: string, args: string[]): Promise<{ success: boolean, output: string[] }> {
@@ -99,7 +167,7 @@ async function runRunnerCommand(runner: string, args: string[]): Promise<{ succe
   })
 }
 
-const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey, terminalRows = 24 }) => {
+const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey }) => {
   const { exit } = useApp()
   const startStep = getResumeStep(initialProgress)
 
@@ -175,7 +243,110 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey, t
   const [keyId, setKeyId] = useState(initialProgress?.completedSteps.apiKeyVerified?.keyId || initialProgress?.keyId || '')
   const [issuerId, setIssuerId] = useState(initialProgress?.completedSteps.apiKeyVerified?.issuerId || initialProgress?.issuerId || '')
 
-  // Get terminal height for build output sizing
+  // Terminal dimensions, tracked in state so the wizard RE-RENDERS on resize.
+  // This matters for the AI-analysis fit check: if the analysis fit inline
+  // when the terminal was large and the user then shrinks it, we must
+  // re-evaluate and route into the scrollable viewer — otherwise the
+  // overflowing content is clipped by the alt buffer with no way to scroll.
+  const { stdout } = useStdout()
+  const [termSize, setTermSize] = useState<{ rows: number, cols: number }>({
+    rows: stdout?.rows ?? 24,
+    cols: stdout?.columns ?? 80,
+  })
+  useEffect(() => {
+    if (!stdout)
+      return
+    const handler = (): void => setTermSize({ rows: stdout.rows ?? 24, cols: stdout.columns ?? 80 })
+    stdout.on('resize', handler)
+    return () => {
+      stdout.off('resize', handler)
+    }
+  }, [stdout])
+  const terminalRows = termSize.rows
+  const terminalCols = termSize.cols
+
+  // Measured height of the wizard body (everything below the Header). Drives
+  // every fit decision from the LIVE rendered height — no hardcoded row
+  // thresholds. The measurement is tagged with the step it was taken for, so
+  // a stale measurement from a previous (taller) step can never wedge a new
+  // (shorter) step into the too-small state: when the step changes the tagged
+  // measurement no longer matches and `bodyHeight` falls back to null until
+  // the new body is measured. `measureElement` only reports after a render,
+  // so on the first frame of a step `bodyHeight` is null and we optimistically
+  // render the box header; the next frame corrects if it doesn't fit
+  // (one-frame flash, only on small terminals).
+  const bodyRef = useRef<DOMElement | null>(null)
+  // Body heights cached per (step, cols). A body's height in ROWS depends on
+  // the step, its content, and the terminal WIDTH (wrapping) — but NOT on the
+  // terminal HEIGHT. So once a step's comfortable height is measured at the
+  // current width, a VERTICAL resize reuses it and the dense / header /
+  // too-small decisions are made SYNCHRONOUSLY on the first frame. That kills
+  // the measure-then-correct "flash" that used to fire on every resize: the
+  // old code keyed `dense` off the live row count, so each resize reset to
+  // comfortable, rendered (often overflowing), measured, then flipped back to
+  // dense — a visible round-trip per resize tick. We cache the comfortable and
+  // dense forms separately (each has its own height).
+  const [bodyHeights, setBodyHeights] = useState<{ key: string, comfortable: number | null, dense: number | null }>(
+    { key: '', comfortable: null, dense: null },
+  )
+  const fitKey = `${step}|${terminalCols}`
+  const heights = bodyHeights.key === fitKey ? bodyHeights : { key: fitKey, comfortable: null, dense: null }
+
+  // Collapse to the dense (compact-spacing) form only when the comfortable body
+  // can't fit even with the one-line header. Derived synchronously from the
+  // cached comfortable height; null (first frame of a step, or just after a
+  // width change) renders comfortable so we can measure it.
+  // Always render the comfortable form. The startup size gate (MinSizeGate)
+  // guarantees the terminal is large enough, so the adaptive dense fallback is
+  // unreachable — forcing it false removes the fragile measure→decide coupling
+  // and the degraded small-terminal UX. (The dense branches in the step
+  // components + the measure machinery are now dead code, cleaned up next.)
+  const dense = false
+
+  // Measure whichever form is on screen and cache it (only when missing or
+  // changed — so this settles and doesn't re-render in a loop).
+  useEffect(() => {
+    if (!bodyRef.current)
+      return
+    const { height } = measureElement(bodyRef.current)
+    if (height <= 0)
+      return
+    const form = dense ? 'dense' : 'comfortable'
+    setBodyHeights((prev) => {
+      const base = prev.key === fitKey ? prev : { key: fitKey, comfortable: null, dense: null }
+      if (base[form] === height)
+        return prev
+      return { ...base, [form]: height }
+    })
+  })
+
+  // Header degrades box → one-line from the COMFORTABLE height (the upper
+  // bound), so the choice is synchronous and never overflows. When dense is
+  // active the comfortable body already didn't fit the one-line header, so this
+  // is always true then — dense always pairs with the one-line header.
+  const headerCompact = heights.comfortable != null
+    && (heights.comfortable + BOX_HEADER_ROWS + WIZARD_PADDING_ROWS > terminalRows)
+  // The on-screen form's height drives the resize-prompt check. `tooSmall`
+  // (see frame-fit.ts) only blocks when we're already dense AND the dense form
+  // still overflows — null dense height (just flipped, not yet measured) is
+  // optimistic, never a false positive.
+  const bodyHeight = dense ? heights.dense : heights.comfortable
+  const tooSmall = isFrameTooSmall({ bodyRows: bodyHeight, dense, terminalRows })
+  const neededRows = (bodyHeight != null ? bodyHeight : 1) + COMPACT_HEADER_TOTAL_ROWS
+
+  // Rows available for the completed-steps log. The log renders OUTSIDE the
+  // measured body (so its growth never inflates the dense/fit decision) and
+  // fills only what the current step leaves: terminal minus header, padding,
+  // the measured step body, and the log's own top margin. capLogRows then packs
+  // the most recent entries and summarizes the rest — so a long history never
+  // pushes the current step off-screen or trips the resize prompt. Before the
+  // body is measured (bodyHeight null) we show all entries and let the next
+  // frame settle (same one-frame entry behaviour as the fit decision).
+  const logHeaderRows = headerCompact ? COMPACT_HEADER_ROWS : BOX_HEADER_ROWS
+  const logMaxRows = bodyHeight != null
+    ? logBudgetRows(terminalRows, logHeaderRows, bodyHeight)
+    : Number.POSITIVE_INFINITY
+
   // Refs to avoid stale closures in useEffect async handlers
   const p8ContentRef = useRef(p8Content)
   const p8PathRef = useRef(p8Path)
@@ -269,6 +440,26 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey, t
   const [buildUrl, setBuildUrl] = useState('')
   const [buildOutput, setBuildOutput] = useState<string[]>([])
   const [supportBundlePath, setSupportBundlePath] = useState<string | null>(null)
+  // ── AI-analysis sub-flow (entered only when the build fails and logs were
+  // captured). `aiJobId` is set when entering 'ai-analysis-prompt'; the running
+  // step reads it to call runCapgoAiAnalysis; the result step renders one of
+  // these two state strings depending on the PostAnalyzeResult kind.
+  // `aiRetryCount` tracks how many "I fixed it, retry" attempts the user has
+  // used so we can cap them at MAX_AI_RETRIES.
+  // `aiViewedFull` flips true once the user has dismissed the scrollable
+  // FullscreenAiViewer for the current analysis — prevents 'ai-analysis-result'
+  // from immediately re-routing back into the scroll step on every render.
+  const [aiJobId, setAiJobId] = useState<string | null>(null)
+  const [aiAnalysisText, setAiAnalysisText] = useState<string | null>(null)
+  // Non-success outcome (already_analyzed / too_big / error) rendered as a
+  // prominent coloured banner. Mutually exclusive with `aiAnalysisText` — a
+  // successful analysis sets the text and clears this; every other outcome
+  // clears the text and sets this. Kept as one object so kind + message can
+  // never drift out of sync.
+  const [aiResult, setAiResult] = useState<{ kind: AiResultKind, message: string } | null>(null)
+  const [aiRetryCount, setAiRetryCount] = useState(0)
+  const [aiViewedFull, setAiViewedFull] = useState(false)
+  const [errorViewedFull, setErrorViewedFull] = useState(false)
   const [ciSecretEntries, setCiSecretEntries] = useState<CiSecretEntry[]>([])
   const [ciSecretTargets, setCiSecretTargets] = useState<CiSecretTarget[]>([])
   const [ciSecretTarget, setCiSecretTarget] = useState<CiSecretTarget | null>(null)
@@ -362,7 +553,16 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey, t
   const [duplicateProfileOrigin, setDuplicateProfileOrigin] = useState<'creating-profile' | 'import-create-profile-only'>('creating-profile')
 
   const addLog = useCallback((text: string, color = 'green') => {
-    setLog(prev => [...prev, { text, color }])
+    setLog((prev) => {
+      // Drop a consecutive duplicate: completed-step breadcrumbs are idempotent,
+      // so the same line twice in a row is always spam, never information. Guards
+      // against the log filling with repeats if a hydration replay / re-render
+      // fires it more than once. (Mirrors the Android sibling.)
+      const last = prev[prev.length - 1]
+      if (last && last.text === text && last.color === color)
+        return prev
+      return [...prev, { text, color }]
+    })
   }, [])
 
   const pm = getPMAndCommand()
@@ -1509,7 +1709,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey, t
             error: (msg: string) => setBuildOutput(prev => [...prev, `✖ ${msg}`]),
             warn: (msg: string) => setBuildOutput(prev => [...prev, `⚠ ${msg}`]),
             success: (msg: string) => setBuildOutput(prev => [...prev, `✔ ${msg}`]),
-            buildLog: (msg: string) => setBuildOutput(prev => [...prev, msg]),
+            buildLog: (msg: string) => setBuildOutput(prev => [...prev, ...sanitizeBuildLogLines(msg)]),
             uploadProgress: (percent: number) => {
               setBuildOutput((prev) => {
                 const uploadLineIdx = prev.findIndex(l => l.startsWith('Uploading:'))
@@ -1536,6 +1736,11 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey, t
           const result = await requestBuildInternal(appId, {
             platform: 'ios',
             apikey: capgoKey,
+            // The Ink TUI owns the terminal — @clack/prompts inside
+            // requestBuildInternal would corrupt rendering. Caller-handled mode
+            // surfaces the captured log path via result.aiAnalysis and lets us
+            // render the AI flow with Ink-native components.
+            aiAnalysisMode: 'caller-handled',
           }, true, buildLogger) // silent=true, use our logger
           if (cancelled)
             return
@@ -1553,6 +1758,14 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey, t
           }
           else {
             setBuildOutput(prev => [...prev, `⚠ ${result.error || 'unknown error'}`])
+            // If logs were captured we can offer AI-assisted diagnosis. The
+            // captured log file stays on disk until the user views the result
+            // (or skips); 'ai-analysis-result' calls releaseCapturedLogs on exit.
+            if (result.aiAnalysis?.ready && result.aiAnalysis.jobId) {
+              setAiJobId(result.aiAnalysis.jobId)
+              setStep('ai-analysis-prompt')
+              return
+            }
           }
           setStep('build-complete')
         }
@@ -1567,8 +1780,86 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey, t
       })()
     }
 
+    // AI analysis — entered only when requestBuildInternal returned with
+    // aiAnalysis.ready=true. The captured log file is on disk; we call the
+    // edge function, then transition to 'ai-analysis-result' which renders the
+    // diagnosis (or a friendly fallback message) and waits for Enter.
+    if (step === 'ai-analysis-running' && aiJobId) {
+      ;(async () => {
+        // Fire the Choice telemetry here (not in 'ai-analysis-prompt'): we only
+        // know the user picked "Debug with AI" because we landed in `running`.
+        await trackAiAnalysisChoice({
+          apikey: resolvedApiKeyRef.current ?? apikey ?? '',
+          orgId: resolvedOrgId ?? '',
+          appId,
+          platform: 'ios',
+          jobId: aiJobId,
+          choice: 'capgo_ai',
+          triggeredBy: 'onboarding',
+        }).catch(() => { /* telemetry never breaks the wizard */ })
+
+        const result = await runCapgoAiAnalysis({
+          apiHost: 'https://api.capgo.app',
+          apikey: resolvedApiKeyRef.current ?? apikey ?? '',
+          jobId: aiJobId,
+          appId,
+        })
+
+        if (cancelled)
+          return
+
+        const resultTag: 'success' | 'already_analyzed' | 'too_big' | 'error'
+          = result.kind === 'ok'
+            ? 'success'
+            : result.kind === 'already_analyzed'
+              ? 'already_analyzed'
+              : result.kind === 'too_big'
+                ? 'too_big'
+                : 'error'
+
+        await trackAiAnalysisResult({
+          apikey: resolvedApiKeyRef.current ?? apikey ?? '',
+          orgId: resolvedOrgId ?? '',
+          appId,
+          platform: 'ios',
+          jobId: aiJobId,
+          result: resultTag,
+          errorStatus: result.kind === 'error' ? result.status : undefined,
+        }).catch(() => { /* telemetry never breaks the wizard */ })
+
+        if (result.kind === 'ok') {
+          // Render markdown to ANSI escapes; Ink <Text> passes them through.
+          // Fall back to raw text if a future Ink version stops doing so.
+          setAiAnalysisText(renderMarkdown(result.analysis, true))
+          setAiResult(null)
+        }
+        else if (result.kind === 'already_analyzed') {
+          setAiAnalysisText(null)
+          setAiResult({ kind: 'already_analyzed', message: 'AI analysis was already requested for this build (only one per job).' })
+        }
+        else if (result.kind === 'too_big') {
+          setAiAnalysisText(null)
+          setAiResult({ kind: 'too_big', message: 'Build log is too large for Capgo AI (>10 MB). Try a local AI tool with the captured log.' })
+        }
+        else {
+          setAiAnalysisText(null)
+          const detail = [
+            result.status ? `(status ${result.status})` : null,
+            result.message,
+          ].filter(Boolean).join(' ')
+          setAiResult({ kind: 'error', message: `AI analysis failed${detail ? `: ${detail}` : ''}.` })
+        }
+        setStep('ai-analysis-result')
+      })()
+    }
+
     if (step === 'build-complete') {
       setBuildOutput([])
+      // Best-effort cleanup of any leftover captured log file. Safe to call
+      // even if we never entered the AI flow (operates only on jobs we know).
+      if (aiJobId) {
+        void releaseCapturedLogs(aiJobId).catch(() => { /* best-effort */ })
+      }
       // Exit immediately after rendering the final screen
       const timer = setTimeout(() => {
         if (!cancelled)
@@ -1585,21 +1876,53 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey, t
     }
   }, [step])
 
+  // Route between the inline AI-result render and the scrollable fullscreen
+  // viewer based on the LIVE terminal size — BIDIRECTIONALLY. Depends on the
+  // terminal dimensions so it re-evaluates on resize: shrinking past the inline
+  // budget opens the viewer, and growing back so it fits again returns to the
+  // inline render. (Previously this was one-way — once the viewer opened it
+  // never went back, leaving the user stuck in the scroll view with empty
+  // space after enlarging the window.) `resolveAiResultRoute` is the single
+  // source of truth, driven by one predicate so it can't oscillate.
+  useEffect(() => {
+    if (step !== 'ai-analysis-result' && step !== 'ai-analysis-result-scroll')
+      return
+    const next = resolveAiResultRoute({
+      current: step,
+      text: aiAnalysisText,
+      viewedFull: aiViewedFull,
+      terminalRows,
+      terminalCols,
+    })
+    if (next)
+      setStep(next)
+  }, [step, aiAnalysisText, aiViewedFull, terminalRows, terminalCols])
+
+  // Reset the error-viewer "dismissed" pin whenever we leave the error step, so
+  // a NEW error re-opens the scrollable viewer. While on the error step it
+  // persists, so dismissing the viewer keeps the compact form across resizes.
+  useEffect(() => {
+    if (step !== 'error')
+      setErrorViewedFull(false)
+  }, [step])
+
   // ── Render ──
 
   const progress = STEP_PROGRESS[step] ?? 0
   const phaseLabel = getPhaseLabel(step)
-  // Tall fullscreen-style steps. Their content overflows the wizard chrome on
-  // smaller terminals and Ink can leak the previous frame above the new one
-  // on transition. Hide chrome so each tall step renders cleanly.
-  // The whole post-build GHA flow runs WITHOUT Progress + Logs so transitions
-  // don't flash chrome in and out and leftover content from a previous tall
-  // step doesn't bleed into the next short step's live area. The Header
-  // ("🚀 Capgo Cloud Build · Onboarding") stays visible for branding /
-  // orientation — only `requesting-build` (which streams live build output
-  // and needs the full terminal) hides the Header.
-  const tallStep = step === 'requesting-build'
-    || step === 'detecting-ci-secrets'
+  // Header is a normal conditional: visible on every interactive step
+  // including the AI sub-flow; hidden on `requesting-build`, the scrollable
+  // AI viewer, and the fullscreen workflow diff (those want the full
+  // viewport). Whether it renders as the bordered box or the one-line form is
+  // decided by `headerCompact` above, from the measured body height vs the
+  // live terminal height.
+  const isAiResultScroll = step === 'ai-analysis-result-scroll'
+  const isAiStep = step === 'ai-analysis-prompt' || step === 'ai-analysis-running' || step === 'ai-analysis-result' || isAiResultScroll
+  // Tall fullscreen-style steps from the post-build GitHub Actions / .env
+  // export flow. They run WITHOUT Progress + Logs so transitions don't flash
+  // chrome in and out and leftover content from a previous tall step doesn't
+  // bleed into the next short step's live area.
+  const tallStep = step === 'detecting-ci-secrets'
     || step === 'checking-ci-secrets'
     || step === 'ask-github-actions-setup'
     || step === 'confirm-secrets-push'
@@ -1619,19 +1942,116 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey, t
     || step === 'overwrite-and-export-env'
     || step === 'ci-secrets-failed'
     || step === 'confirm-ci-secret-overwrite'
-  const showProgress = step !== 'welcome' && step !== 'platform-select' && step !== 'adding-platform' && step !== 'no-platform' && step !== 'error' && step !== 'build-complete' && !tallStep
-  // Header stays on every tall step except `requesting-build` (which streams
-  // multi-line build output and would otherwise fight for vertical space).
-  const showHeader = step !== 'requesting-build' && step !== 'view-workflow-diff'
-  const showLog = step !== 'build-complete' && !tallStep
+  const showHeader = step !== 'requesting-build' && step !== 'view-workflow-diff' && !isAiResultScroll
+  const showProgress = step !== 'welcome' && step !== 'platform-select' && step !== 'adding-platform' && step !== 'no-platform' && step !== 'error' && step !== 'build-complete' && step !== 'requesting-build' && step !== 'ai-analysis-result' && !isAiResultScroll && !tallStep
+  const showLog = step !== 'requesting-build' && step !== 'build-complete' && !isAiStep && !tallStep
   const recoveryAdvice = error
     ? getBuildOnboardingRecoveryAdvice(error, retryStep, pm.runner, appId)
     : null
-  return (
-    <Box flexDirection="column" padding={1}>
-      {showHeader && <Header />}
+  // The iOS error screen's recovery advice is unbounded (42–54 rows). Like the
+  // AI analysis + build log, it routes through the scrollable FullscreenAiViewer
+  // when it's taller than the viewport, so the Try again / Restart / Exit actions
+  // (rendered by the compact ErrorStep after the viewer is dismissed) are never
+  // pushed off-screen. The decision uses a STRUCTURAL estimate of the comfortable
+  // ErrorStep body (NOT measureElement — measuring the rendered body would
+  // feedback-loop: the collapsed body measures short → "fits" → renders full →
+  // measures tall → collapses again, forever). ERROR_FRAME_CHROME_ROWS is the
+  // fixed header + log + padding reserve, calibrated against the VT harness at
+  // ~15 rows for the boxed header; the compact-header case is shorter, so this
+  // errs toward scroll — never toward a clip. `errorViewedFull` pins the compact
+  // inline form once the user dismisses the viewer (mirrors aiViewedFull).
+  const ERROR_FRAME_CHROME_ROWS = 15
+  const errorViewerLines = error ? formatErrorViewerLines(error, recoveryAdvice, supportBundlePath) : []
+  const errorTooTall = step === 'error' && !!error
+    && estimateErrorBodyRows(error, recoveryAdvice, supportBundlePath, terminalCols, !!retryStep) + ERROR_FRAME_CHROME_ROWS > terminalRows
+  const isErrorScroll = errorTooTall && !errorViewedFull
 
-      {/* Progress bar */}
+  // The streaming build output is a fullscreen takeover too — same reasoning as
+  // the AI viewer below. Rendered inside the measured body, its unbounded growth
+  // inflated bodyHeight and tripped `tooSmall`, replacing a live build with a
+  // resize prompt on a perfectly usable terminal. As an early return it
+  // auto-tails inside a viewport that always fits, so the build phase never
+  // reports "terminal too small". (Must precede the `tooSmall` guard.)
+  if (step === 'requesting-build')
+    return <FullscreenBuildOutput title="Building..." lines={buildOutput} terminalRows={terminalRows} />
+
+  // Size gate (resize-reactive): below the enforced floor, render the resize
+  // prompt from THIS mounted component so all in-progress state (current step,
+  // entered values) is preserved — a shrink shows the prompt, a re-grow shows
+  // the exact same step. It's an early return after all hooks (rules of hooks
+  // hold). Crucially this does NOT unmount the app: gating at the shell instead
+  // would tear the app down on resize and fire its exit/teardown effects (the
+  // "onboarding complete" flash + quit). The startup gate guarantees the floor
+  // before mount; this keeps it guaranteed across mid-flow resizes.
+  if (!terminalFitsOnboarding(terminalCols, terminalRows, 'ios'))
+    return <TerminalTooSmallPrompt cols={terminalCols} rows={terminalRows} minRows={IOS_MIN_ROWS} />
+
+  // (The wizard never clips on a too-small terminal: the gate above replaces it
+  // with the resize prompt instead.)
+
+  // The fullscreen AI viewer is a takeover: render it as an EARLY RETURN so it
+  // owns the whole terminal and bypasses the body-measurement / dense /
+  // too-small logic above. (If it rendered inside the measured body, its
+  // full-height body would trip `shouldCollapseToDense`/`tooSmall` and get
+  // replaced by the resize prompt.) It fills the screen itself via minHeight.
+  if (isAiResultScroll && aiAnalysisText)
+    return (
+      <FullscreenAiViewer
+        title="AI analysis"
+        subtitle={`${aiAnalysisText.split('\n').length} lines — scrollable because the analysis is taller than your terminal`}
+        lines={aiAnalysisText.split('\n')}
+        terminalRows={terminalRows}
+        onExit={() => {
+          setAiViewedFull(true)
+          setStep('ai-analysis-result')
+        }}
+      />
+    )
+
+  // The iOS error screen is a fullscreen scroll takeover when its recovery
+  // advice is taller than the viewport — same treatment as the AI viewer above,
+  // so the Try again / Restart / Exit actions (in the compact ErrorStep shown
+  // after dismiss) are never pushed off-screen. Placed after the size gate like
+  // the AI viewer: below the floor the resize prompt wins.
+  if (isErrorScroll && error)
+    return (
+      <FullscreenAiViewer
+        title="Build error"
+        subtitle={`${errorViewerLines.length} lines — scrollable because the error details are taller than your terminal`}
+        lines={errorViewerLines}
+        terminalRows={terminalRows}
+        onExit={() => setErrorViewedFull(true)}
+      />
+    )
+
+  // `minHeight={terminalRows}` makes the root fill the whole viewport. Ink
+  // only does a full clear-the-screen redraw when the frame height is ≥ the
+  // terminal height; for shorter frames it uses an incremental cursor-up
+  // redraw whose line math breaks after the terminal SHRINKS, leaving stale
+  // rows from the previous (taller) frame on screen. Filling the viewport
+  // forces the full-clear path on every frame, so resizing down never leaves
+  // ghost content behind.
+  return (
+    <Box flexDirection="column" minHeight={terminalRows} padding={1}>
+      {showHeader && <Header compact={headerCompact} />}
+      {/* Banner stays pinned to the top; this flex spacer pushes the rest (log +
+          step body) to the bottom of the viewport. On a tight terminal it
+          collapses to zero (content fills the height), so the frame-fit contract
+          is unaffected; on a tall terminal it absorbs the extra rows, and since
+          both the banner (top) and the content (bottom) are anchored, neither
+          jumps as the step's content height changes between steps. */}
+      <Box flexGrow={1} />
+      {/* Completed-steps log — rendered OUTSIDE the measured body so its growth
+          can't inflate the dense / fit decision. Capped (see logMaxRows) to the
+          rows the current step leaves; CompletedStepsLog drops its leading gap
+          when it collapses to a single line so no orphaned blank survives. */}
+      {showLog && <CompletedStepsLog entries={log} maxRows={logMaxRows} />}
+      {/* Body: the current step (+ its progress bar). Measured via `bodyRef` to
+          drive the dense / box-vs-compact-header / too-small decisions. The log
+          above is excluded so the body height stays independent of how many
+          steps have completed. */}
+      <Box flexDirection="column" ref={bodyRef}>
+        {/* Progress bar */}
       {showProgress && (
         <Box flexDirection="column" marginTop={1}>
           <Text bold color="cyan">{phaseLabel}</Text>
@@ -1647,320 +2067,227 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey, t
         </Box>
       )}
 
-      {/* Completed steps log */}
-      {showLog && log.length > 0 && (
-        <Box flexDirection="column" marginTop={1}>
-          {log.map((entry, i) => (
-            <Text key={i} color={entry.color as any}>{entry.text}</Text>
-          ))}
-        </Box>
-      )}
-
       {/* Welcome */}
-      {step === 'welcome' && (
-        <Box marginTop={1} justifyContent="center">
-          <SpinnerLine text="Detecting project..." />
-        </Box>
-      )}
+      {step === 'welcome' && <WelcomeStep />}
 
       {/* Platform select */}
       {step === 'platform-select' && (
-        <Box flexDirection="column" marginTop={1}>
-          <SuccessLine text="Detected Capacitor project" detail={appId} />
-          <Newline />
-          <Text bold>Which platform do you want to set up?</Text>
-          <Newline />
-          <Select
-            options={[
-              { label: '🍎  iOS', value: 'ios' },
-              { label: '🤖  Android', value: 'android' },
-            ]}
-            onChange={async (value) => {
-              if (value === 'android') {
-                // The Android flow lives in a separate Ink app — this iOS app
-                // can't host it inline. Exit cleanly and tell the user to
-                // re-run with --platform android.
-                addLog('Re-run with `npx @capgo/cli@latest build init --platform android` to set up Android.', 'cyan')
-                exitOnboarding()
-                return
-              }
-              // Check for existing credentials before proceeding
-              const existing = await loadSavedCredentials(appId)
-              if (existing?.ios) {
-                setStep('credentials-exist')
-              }
-              else if (isMacOS()) {
-                // macOS users see the fork: import existing or create new
-                setStep('setup-method-select')
-              }
-              else {
-                // Non-macOS hosts can only create new (importing requires Keychain)
-                setStep('api-key-instructions')
-              }
-            }}
-          />
-        </Box>
+        <PlatformSelectStep
+          appId={appId}
+          dense={dense}
+          onChange={async (value) => {
+            if (value === 'android') {
+              // The Android flow lives in a separate Ink app — this iOS app
+              // can't host it inline. Exit cleanly and tell the user to
+              // re-run with --platform android.
+              addLog('Re-run with `npx @capgo/cli@latest build init --platform android` to set up Android.', 'cyan')
+              exitOnboarding()
+              return
+            }
+            // Check for existing credentials before proceeding
+            const existing = await loadSavedCredentials(appId)
+            if (existing?.ios) {
+              setStep('credentials-exist')
+            }
+            else if (isMacOS()) {
+              // macOS users see the fork: import existing or create new
+              setStep('setup-method-select')
+            }
+            else {
+              // Non-macOS hosts can only create new (importing requires Keychain)
+              setStep('api-key-instructions')
+            }
+          }}
+        />
       )}
 
       {/* No platform directory */}
       {step === 'no-platform' && (
-        <Box flexDirection="column" marginTop={1}>
-          <ErrorLine text={`No ${iosDir}/ directory found.`} />
-          <Newline />
-          <Text>This onboarding flow needs a generated native iOS project before credentials can be created.</Text>
-          <Newline />
-          <Text dimColor>{`Suggested commands: ${addIosCommand} && ${syncIosCommand}`}</Text>
-          <Newline />
-          <Select
-            options={[
-              { label: `🛠  Run ${addIosCommand} now`, value: 'run' },
-              { label: '🔄  I already fixed it, re-check', value: 'recheck' },
-              { label: '✖  Exit onboarding', value: 'exit' },
-            ]}
-            onChange={(value) => {
-              if (value === 'run') {
-                setStep('adding-platform')
-              }
-              else if (value === 'recheck') {
-                if (existsSync(join(process.cwd(), iosDir))) {
-                  addLog(`✔ Found ${iosDir}/ — resuming onboarding.`)
-                  ;(async () => {
-                    const existing = await loadSavedCredentials(appId)
-                    if (existing?.ios)
-                      setStep('credentials-exist')
-                    else
-                      setStep('api-key-instructions')
-                  })()
-                }
-                else {
-                  addLog(`⚠ ${iosDir}/ is still missing. Try ${addIosCommand} or ${doctorCommand}.`, 'yellow')
-                }
+        <NoPlatformStep
+          iosDir={iosDir}
+          addIosCommand={addIosCommand}
+          syncIosCommand={syncIosCommand}
+          dense={dense}
+          onChange={(value) => {
+            if (value === 'run') {
+              setStep('adding-platform')
+            }
+            else if (value === 'recheck') {
+              if (existsSync(join(process.cwd(), iosDir))) {
+                addLog(`✔ Found ${iosDir}/ — resuming onboarding.`)
+                ;(async () => {
+                  const existing = await loadSavedCredentials(appId)
+                  if (existing?.ios)
+                    setStep('credentials-exist')
+                  else
+                    setStep('api-key-instructions')
+                })()
               }
               else {
-                addLog(`Exiting. Run \`${buildInitCommand}\` after the native iOS folder exists.`, 'yellow')
-                exitOnboarding()
+                addLog(`⚠ ${iosDir}/ is still missing. Try ${addIosCommand} or ${doctorCommand}.`, 'yellow')
               }
-            }}
-          />
-        </Box>
+            }
+            else {
+              addLog(`Exiting. Run \`${buildInitCommand}\` after the native iOS folder exists.`, 'yellow')
+              exitOnboarding()
+            }
+          }}
+        />
       )}
 
       {step === 'adding-platform' && (
-        <Box flexDirection="column" marginTop={1}>
-          <SpinnerLine text={`Running ${addIosCommand}...`} />
-          <Text dimColor>{`If this still fails, try ${doctorCommand} and keep the support bundle path from the error screen.`}</Text>
-        </Box>
+        <AddingPlatformStep addIosCommand={addIosCommand} doctorCommand={doctorCommand} dense={dense} />
       )}
 
       {/* Existing credentials warning */}
       {step === 'credentials-exist' && (
-        <Box flexDirection="column" marginTop={1}>
-          <Text bold color="yellow">
-            ⚠ iOS credentials already exist for
-            {appId}
-          </Text>
-          <Newline />
-          <Text>Onboarding will create new certificates and profiles, replacing your existing credentials.</Text>
-          <Newline />
-          <Select
-            options={[
-              { label: '📦  Start fresh (backup existing credentials first)', value: 'backup' },
-              { label: '✖  Exit onboarding', value: 'exit' },
-            ]}
-            onChange={(value) => {
-              if (value === 'backup') {
-                setStep('backing-up')
-              }
-              else {
-                addLog('Exiting onboarding.', 'yellow')
-                exitOnboarding()
-              }
-            }}
-          />
-        </Box>
+        <CredentialsExistStep
+          appId={appId}
+          dense={dense}
+          onChange={(value) => {
+            if (value === 'backup') {
+              setStep('backing-up')
+            }
+            else {
+              addLog('Exiting onboarding.', 'yellow')
+              exitOnboarding()
+            }
+          }}
+        />
       )}
 
       {/* Backing up credentials */}
-      {step === 'backing-up' && (
-        <Box flexDirection="column" marginTop={1}>
-          <SpinnerLine text="Backing up existing credentials..." />
-        </Box>
-      )}
+      {step === 'backing-up' && <BackingUpStep />}
 
       {/* Setup-method fork (macOS only) */}
       {step === 'setup-method-select' && (
-        <Box flexDirection="column" marginTop={1}>
-          <Alert variant="info">
-            How do you want to set up iOS credentials?
-          </Alert>
-          <Newline />
-          <Select
-            options={[
-              { label: '🆕  Create new via App Store Connect API', value: 'create' },
-              { label: '📥  Import existing from this Mac (Keychain + Xcode profiles)', value: 'import' },
-            ]}
-            onChange={async (value) => {
-              // Persist the fork choice to progress so resume after CLI close
-              // routes to the right path. Without this, an interrupted import
-              // run resumes into the create-new path's `creating-certificate`
-              // step and triggers the cert-limit error.
-              const existing = await loadProgress(appId) || {
-                platform: 'ios' as const,
-                appId,
-                startedAt: new Date().toISOString(),
-                completedSteps: {},
-              }
-              existing.setupMethod = value === 'import' ? 'import-existing' : 'create-new'
-              await saveProgress(appId, existing)
+        <SetupMethodSelectStep
+          dense={dense}
+          onChange={async (value) => {
+            // Persist the fork choice to progress so resume after CLI close
+            // routes to the right path. Without this, an interrupted import
+            // run resumes into the create-new path's `creating-certificate`
+            // step and triggers the cert-limit error.
+            const existing = await loadProgress(appId) || {
+              platform: 'ios' as const,
+              appId,
+              startedAt: new Date().toISOString(),
+              completedSteps: {},
+            }
+            existing.setupMethod = value === 'import' ? 'import-existing' : 'create-new'
+            await saveProgress(appId, existing)
 
-              if (value === 'import') {
-                setImportMode(true)
-                setStep('import-scanning')
-              }
-              else {
-                setImportMode(false)
-                setStep('api-key-instructions')
-              }
-            }}
-          />
-          <Newline />
-          <Text dimColor>
-            Tip: Importing reuses the certificate Xcode already installed,
-            so it doesn't count against Apple's 3-cert limit.
-          </Text>
-        </Box>
+            if (value === 'import') {
+              setImportMode(true)
+              setStep('import-scanning')
+            }
+            else {
+              setImportMode(false)
+              setStep('api-key-instructions')
+            }
+          }}
+        />
       )}
 
       {/* Import: scanning */}
-      {step === 'import-scanning' && (
-        <Box flexDirection="column" marginTop={1}>
-          <SpinnerLine text="Scanning Keychain and provisioning profiles..." />
-          <Text dimColor>This is read-only — no Keychain password prompt yet.</Text>
-        </Box>
-      )}
+      {step === 'import-scanning' && <ImportScanningStep />}
 
       {/* Import: distribution mode (now FIRST visible step in import flow) */}
       {step === 'import-distribution-mode' && (
-        <Box flexDirection="column" marginTop={1}>
-          <Text bold>How will Capgo distribute your build?</Text>
-          <Newline />
-          <Text dimColor>
-            • App Store: builds upload to TestFlight automatically (requires an App Store Connect API key)
-          </Text>
-          <Text dimColor>
-            • Ad-hoc: builds are signed and either downloaded from Capgo or installed via QR. No ASC key needed.
-          </Text>
-          <Newline />
-          <Select
-            options={[
-              { label: '🛫  App Store / TestFlight', value: 'app_store' },
-              { label: '📦  Ad-hoc (no TestFlight upload)', value: 'ad_hoc' },
-              { label: '↩️   Cancel and use Create new instead', value: '__cancel__' },
-            ]}
-            onChange={async (value) => {
-              if (value === '__cancel__') {
-                setImportMode(false)
-                // Clear the persisted import-distribution and setupMethod since
-                // the user is bailing to the create-new path.
-                const existing = await loadProgress(appId)
-                if (existing) {
-                  existing.setupMethod = 'create-new'
-                  delete existing.importDistribution
-                  await saveProgress(appId, existing)
-                }
-                setStep('api-key-instructions')
-                return
+        <ImportDistributionModeStep
+          dense={dense}
+          onChange={async (value) => {
+            if (value === '__cancel__') {
+              setImportMode(false)
+              // Clear the persisted import-distribution and setupMethod since
+              // the user is bailing to the create-new path.
+              const existing = await loadProgress(appId)
+              if (existing) {
+                existing.setupMethod = 'create-new'
+                delete existing.importDistribution
+                await saveProgress(appId, existing)
               }
-              const mode = value as 'app_store' | 'ad_hoc'
-              setImportDistribution(mode)
-              // Persist so a CLI restart at any later step (incl. verifying-key
-              // or saving-credentials) knows we're in app_store vs ad_hoc.
-              // Codex caught a bug where without this, resumed sessions
-              // re-entered the create-new path via the stale `importMode=false`
-              // default — fixed here by hydrating both fields on mount.
-              const existing = await loadProgress(appId) || {
-                platform: 'ios' as const,
-                appId,
-                startedAt: new Date().toISOString(),
-                completedSteps: {},
-              }
-              existing.setupMethod = 'import-existing'
-              existing.importDistribution = mode
-              await saveProgress(appId, existing)
-              addLog(`✔ Distribution · ${mode}`)
-              if (mode === 'app_store') {
-                // Need .p8 for TestFlight upload AND for any profile auto-recovery.
-                // After verifying-key the import-mode branch routes back to import-pick-identity.
-                // Skip the .p8 input chain entirely if the key was already
-                // verified on a previous attempt (resume) — otherwise we
-                // re-ask "How do you want to provide the .p8 file?" even
-                // though APPLE_KEY_CONTENT is already known. Use the same
-                // routing decision as the post-scan entry point.
-                setStep(getImportEntryStep(existing))
-              }
-              else {
-                // ad_hoc skips .p8; can opt into it later from no-match recovery.
-                setStep('import-pick-identity')
-              }
-            }}
-          />
-        </Box>
+              setStep('api-key-instructions')
+              return
+            }
+            const mode = value as 'app_store' | 'ad_hoc'
+            setImportDistribution(mode)
+            // Persist so a CLI restart at any later step (incl. verifying-key
+            // or saving-credentials) knows we're in app_store vs ad_hoc.
+            // Codex caught a bug where without this, resumed sessions
+            // re-entered the create-new path via the stale `importMode=false`
+            // default — fixed here by hydrating both fields on mount.
+            const existing = await loadProgress(appId) || {
+              platform: 'ios' as const,
+              appId,
+              startedAt: new Date().toISOString(),
+              completedSteps: {},
+            }
+            existing.setupMethod = 'import-existing'
+            existing.importDistribution = mode
+            await saveProgress(appId, existing)
+            addLog(`✔ Distribution · ${mode}`)
+            if (mode === 'app_store') {
+              // Need .p8 for TestFlight upload AND for any profile auto-recovery.
+              // After verifying-key the import-mode branch routes back to import-pick-identity.
+              // Skip the .p8 input chain entirely if the key was already
+              // verified on a previous attempt (resume) — otherwise we
+              // re-ask "How do you want to provide the .p8 file?" even
+              // though APPLE_KEY_CONTENT is already known. Use the same
+              // routing decision as the post-scan entry point.
+              setStep(getImportEntryStep(existing))
+            }
+            else {
+              // ad_hoc skips .p8; can opt into it later from no-match recovery.
+              setStep('import-pick-identity')
+            }
+          }}
+        />
       )}
 
       {/* Import: pick identity */}
       {step === 'import-pick-identity' && (
-        <Box flexDirection="column" marginTop={1}>
-          <Text bold>
-            Found
-            {' '}
-            {importMatches.length}
-            {' '}
-            distribution identity
-            {importMatches.length === 1 ? '' : 'ies'}
-            {' '}
-            in your Keychain. Pick one:
-          </Text>
-          <Newline />
-          <Select
-            options={[
-              ...importMatches.map((m) => {
-                const matchCount = m.profiles.length
-                const label = matchCount > 0
-                  ? `🔑  ${m.identity.name} · ${matchCount} matching profile${matchCount === 1 ? '' : 's'}`
-                  : `🔑  ${m.identity.name} · ⚠ no matching profiles on this Mac (recovery available)`
-                return { label, value: m.identity.sha1 }
-              }),
-              { label: '↩️   Cancel and use Create new instead', value: '__cancel__' },
-            ]}
-            onChange={async (value) => {
-              if (value === '__cancel__') {
-                setImportMode(false)
-                // Persist the switch so a CLI restart doesn't resume into
-                // the import flow the user just abandoned. Mirrors the same
-                // pattern in import-distribution-mode's cancel path.
-                const existing = await loadProgress(appId)
-                if (existing) {
-                  existing.setupMethod = 'create-new'
-                  delete existing.importDistribution
-                  await saveProgress(appId, existing)
-                }
-                setStep('api-key-instructions')
-                return
+        <ImportPickIdentityStep
+          identityCount={importMatches.length}
+          dense={dense}
+          options={[
+            ...importMatches.map((m) => {
+              const matchCount = m.profiles.length
+              const label = matchCount > 0
+                ? `🔑  ${m.identity.name} · ${matchCount} matching profile${matchCount === 1 ? '' : 's'}`
+                : `🔑  ${m.identity.name} · ⚠ no matching profiles on this Mac (recovery available)`
+              return { label, value: m.identity.sha1 }
+            }),
+            { label: '↩️   Cancel and use Create new instead', value: '__cancel__' },
+          ]}
+          onChange={async (value) => {
+            if (value === '__cancel__') {
+              setImportMode(false)
+              // Persist the switch so a CLI restart doesn't resume into
+              // the import flow the user just abandoned. Mirrors the same
+              // pattern in import-distribution-mode's cancel path.
+              const existing = await loadProgress(appId)
+              if (existing) {
+                existing.setupMethod = 'create-new'
+                delete existing.importDistribution
+                await saveProgress(appId, existing)
               }
-              const match = importMatches.find(m => m.identity.sha1 === value)
-              if (!match)
-                return
-              setChosenIdentity(match.identity)
-              addLog(`✔ Identity · ${match.identity.name}`)
-              if (match.profiles.length === 0) {
-                // No local match — offer recovery instead of dead-ending
-                setStep('import-no-match-recovery')
-                return
-              }
-              setStep('import-pick-profile')
-            }}
-          />
-        </Box>
+              setStep('api-key-instructions')
+              return
+            }
+            const match = importMatches.find(m => m.identity.sha1 === value)
+            if (!match)
+              return
+            setChosenIdentity(match.identity)
+            addLog(`✔ Identity · ${match.identity.name}`)
+            if (match.profiles.length === 0) {
+              // No local match — offer recovery instead of dead-ending
+              setStep('import-no-match-recovery')
+              return
+            }
+            setStep('import-pick-profile')
+          }}
+        />
       )}
 
       {/* Import: pick profile */}
@@ -1979,71 +2306,53 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey, t
         )
         const droppedCount = allMatchedProfiles.length - matchedProfiles.length
         return (
-          <Box flexDirection="column" marginTop={1}>
-            <Text bold>
-              Pick a provisioning profile (
-              {matchedProfiles.length}
-              {' '}
-              matching this app's bundle ID
-              {importDistribution ? ` and ${importDistribution} distribution` : ''}
-              ):
-            </Text>
-            {droppedCount > 0 && (
-              <Text dimColor>
-                (
-                {droppedCount}
-                {' '}
-                other profile
-                {droppedCount === 1 ? '' : 's'}
-                {' '}
-                hidden — wrong bundle ID or distribution mode)
-              </Text>
-            )}
-            <Newline />
-            <Select
-              options={[
-                ...matchedProfiles.map(p => ({
-                  label: `📜  ${p.name} · bundle ${p.bundleId} · ${p.profileType} · expires ${p.expirationDate.split('T')[0]}`,
-                  // Key by UUID, NOT path. Disk-discovered profiles have a
-                  // unique path, but Apple-fetched profiles (from the D
-                  // no-match-recovery path) are synthesized with path=''.
-                  // UUID is unique for both kinds: disk profiles use the
-                  // mobileprovision UUID, synthesized ones use Apple's
-                  // profile resource ID.
-                  value: p.uuid,
-                })),
-                { label: '↩️   Back to identity selection', value: '__back__' },
-              ]}
-              onChange={(value) => {
-                if (value === '__back__') {
-                  setStep('import-pick-identity')
-                  return
-                }
-                const profile = matchedProfiles.find(p => p.uuid === value)
-                if (!profile)
-                  return
-                // Defense in depth: verify bundleId + profileType match before
-                // committing. The filter above should make this unreachable,
-                // but if the filter regresses, we'd rather hard-fail than
-                // silently save bad creds.
-                if (profile.bundleId !== appId
-                  || (importDistribution && profile.profileType !== importDistribution)) {
-                  handleError(
-                    new Error(
-                      `Profile "${profile.name}" doesn't match this app: `
-                      + `bundle ${profile.bundleId} (expected ${appId}), `
-                      + `type ${profile.profileType} (expected ${importDistribution ?? 'any'}).`,
-                    ),
-                    'import-pick-profile',
-                  )
-                  return
-                }
-                setChosenProfile(profile)
-                addLog(`✔ Profile · ${profile.name}`)
-                setStep('import-export-warning')
-              }}
-            />
-          </Box>
+          <ImportPickProfileStep
+            matchedCount={matchedProfiles.length}
+            droppedCount={droppedCount}
+            distribution={importDistribution}
+            dense={dense}
+            options={[
+              ...matchedProfiles.map(p => ({
+                label: `📜  ${p.name} · bundle ${p.bundleId} · ${p.profileType} · expires ${p.expirationDate.split('T')[0]}`,
+                // Key by UUID, NOT path. Disk-discovered profiles have a
+                // unique path, but Apple-fetched profiles (from the D
+                // no-match-recovery path) are synthesized with path=''.
+                // UUID is unique for both kinds: disk profiles use the
+                // mobileprovision UUID, synthesized ones use Apple's
+                // profile resource ID.
+                value: p.uuid,
+              })),
+              { label: '↩️   Back to identity selection', value: '__back__' },
+            ]}
+            onChange={(value) => {
+              if (value === '__back__') {
+                setStep('import-pick-identity')
+                return
+              }
+              const profile = matchedProfiles.find(p => p.uuid === value)
+              if (!profile)
+                return
+              // Defense in depth: verify bundleId + profileType match before
+              // committing. The filter above should make this unreachable,
+              // but if the filter regresses, we'd rather hard-fail than
+              // silently save bad creds.
+              if (profile.bundleId !== appId
+                || (importDistribution && profile.profileType !== importDistribution)) {
+                handleError(
+                  new Error(
+                    `Profile "${profile.name}" doesn't match this app: `
+                    + `bundle ${profile.bundleId} (expected ${appId}), `
+                    + `type ${profile.profileType} (expected ${importDistribution ?? 'any'}).`,
+                  ),
+                  'import-pick-profile',
+                )
+                return
+              }
+              setChosenProfile(profile)
+              addLog(`✔ Profile · ${profile.name}`)
+              setStep('import-export-warning')
+            }}
+          />
         )
       })()}
 
@@ -2059,602 +2368,309 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey, t
         // CAPGO_IOS_DISTRIBUTION='ad_hoc'. Browser + Fetch still work.
         const canCreateProfile = importDistribution !== 'ad_hoc'
         return (
-          <Box flexDirection="column" marginTop={1}>
-            <Alert variant="warning">
-              No provisioning profile on this Mac is linked to "
-              {chosenIdentity.name}
-              ".
-            </Alert>
-            <Newline />
-            <Text dimColor>
-              The cert is in your Keychain but the matching profile isn't on disk. Pick a recovery path:
-            </Text>
-            <Newline />
-            <Select
-              options={[
-                {
-                  label: `🌐  Open Apple Developer Portal (download manually, then re-scan)`,
-                  value: 'browser',
-                },
-                {
-                  label: hasAscKey
-                    ? `🔍  Fetch matching profile from Apple now`
-                    : `🔍  Provide ASC API key, then fetch profile from Apple`,
-                  value: 'fetch',
-                },
-                ...(canCreateProfile
-                  ? [{
-                      label: hasAscKey
-                        ? `✨  Create a new App Store profile for this cert via Apple`
-                        : `✨  Provide ASC API key, then create a new App Store profile for this cert`,
-                      value: 'create',
-                    }]
-                  : []),
-                { label: '↩️   Back to identity selection', value: 'back' },
-              ]}
-              onChange={(value) => {
-                if (value === 'browser') {
-                  open('https://developer.apple.com/account/resources/profiles/list')
-                  addLog('✔ Opened Apple Developer Portal — re-running scan in 5s', 'yellow')
-                  setTimeout(() => {
-                    if (!exitRequestedRef.current)
-                      setStep('import-scanning')
-                  }, 5000)
-                  return
+          <ImportNoMatchRecoveryStep
+            identityName={chosenIdentity.name}
+            dense={dense}
+            options={[
+              {
+                label: `🌐  Open Apple Developer Portal (download manually, then re-scan)`,
+                value: 'browser',
+              },
+              {
+                label: hasAscKey
+                  ? `🔍  Fetch matching profile from Apple now`
+                  : `🔍  Provide ASC API key, then fetch profile from Apple`,
+                value: 'fetch',
+              },
+              ...(canCreateProfile
+                ? [{
+                    label: hasAscKey
+                      ? `✨  Create a new App Store profile for this cert via Apple`
+                      : `✨  Provide ASC API key, then create a new App Store profile for this cert`,
+                    value: 'create',
+                  }]
+                : []),
+              { label: '↩️   Back to identity selection', value: 'back' },
+            ]}
+            onChange={(value) => {
+              if (value === 'browser') {
+                open('https://developer.apple.com/account/resources/profiles/list')
+                addLog('✔ Opened Apple Developer Portal — re-running scan in 5s', 'yellow')
+                setTimeout(() => {
+                  if (!exitRequestedRef.current)
+                    setStep('import-scanning')
+                }, 5000)
+                return
+              }
+              if (value === 'back') {
+                setStep('import-pick-identity')
+                return
+              }
+              if (value === 'fetch' || value === 'create') {
+                const action = value === 'fetch' ? 'fetching-profile' : 'create-profile-only'
+                if (hasAscKey) {
+                  setStep(`import-${action}` as OnboardingStep)
                 }
-                if (value === 'back') {
-                  setStep('import-pick-identity')
-                  return
+                else {
+                  setPendingRecoveryAction(action)
+                  setStep('api-key-instructions')
                 }
-                if (value === 'fetch' || value === 'create') {
-                  const action = value === 'fetch' ? 'fetching-profile' : 'create-profile-only'
-                  if (hasAscKey) {
-                    setStep(`import-${action}` as OnboardingStep)
-                  }
-                  else {
-                    setPendingRecoveryAction(action)
-                    setStep('api-key-instructions')
-                  }
-                }
-              }}
-            />
-          </Box>
+              }
+            }}
+          />
         )
       })()}
 
       {/* Import: fetching profile from Apple by cert SHA1 */}
-      {step === 'import-fetching-profile' && (
-        <Box flexDirection="column" marginTop={1}>
-          <SpinnerLine text="Looking up your cert on Apple and listing its profiles..." />
-        </Box>
-      )}
+      {step === 'import-fetching-profile' && <ImportFetchingProfileStep />}
 
       {/* Import: D2 — creating a new profile via Apple for the existing cert */}
-      {step === 'import-create-profile-only' && (
-        <Box flexDirection="column" marginTop={1}>
-          <SpinnerLine text="Creating a new App Store profile via Apple for your existing certificate..." />
-          <Text dimColor>
-            (Skipping cert creation — using the cert already in your Keychain.)
-          </Text>
-        </Box>
-      )}
+      {step === 'import-create-profile-only' && <ImportCreateProfileOnlyStep />}
 
       {/* Import: export warning (heads-up before the one Keychain dialog) */}
       {step === 'import-export-warning' && chosenIdentity && (
-        <Box flexDirection="column" marginTop={1}>
-          <Alert variant="warning">
-            macOS will now ask permission to access your private key.
-          </Alert>
-          <Newline />
-          <Box flexDirection="column" marginLeft={2}>
-            <Text>
-              <Text bold color="white">1.</Text>
-              {' '}
-              A Keychain dialog will pop up asking
-              {' '}
-              <Text bold>"security wants to use your confidential information"</Text>
-            </Text>
-            <Text>
-              <Text bold color="white">2.</Text>
-              {' '}
-              Click
-              {' '}
-              <Text bold color="green">"Always Allow"</Text>
-              {' '}
-              so it doesn't ask again on retry
-            </Text>
-            <Text>
-              <Text bold color="white">3.</Text>
-              {' '}
-              That's the only prompt — the export is otherwise non-interactive
-            </Text>
-          </Box>
-          <Newline />
-          <Select
-            options={[
-              { label: `🔓  Export "${chosenIdentity.name}" now`, value: 'go' },
-              { label: '↩️   Back', value: 'back' },
-              { label: '✖  Exit onboarding', value: 'exit' },
-            ]}
-            onChange={(value) => {
-              if (value === 'go') {
-                // First run on this CLI version: compile the Swift helper
-                // explicitly so the user sees what's happening, instead of
-                // staring at the "look for the macOS dialog" spinner while
-                // we silently do a 2-3s swiftc invocation. Cache hit skips
-                // straight to export.
-                setStep(isHelperCached() ? 'import-exporting' : 'import-compiling-helper')
-              }
-              else if (value === 'back') {
-                // Back goes to profile selection (distribution mode is now upstream of this step)
-                setStep('import-pick-profile')
-              }
-              else {
-                exitOnboarding('Exiting. Re-run `build init` whenever you\'re ready.')
-              }
-            }}
-          />
-        </Box>
+        <ImportExportWarningStep
+          identityName={chosenIdentity.name}
+          dense={dense}
+          onChange={(value) => {
+            if (value === 'go') {
+              // First run on this CLI version: compile the Swift helper
+              // explicitly so the user sees what's happening, instead of
+              // staring at the "look for the macOS dialog" spinner while
+              // we silently do a 2-3s swiftc invocation. Cache hit skips
+              // straight to export.
+              setStep(isHelperCached() ? 'import-exporting' : 'import-compiling-helper')
+            }
+            else if (value === 'back') {
+              // Back goes to profile selection (distribution mode is now upstream of this step)
+              setStep('import-pick-profile')
+            }
+            else {
+              exitOnboarding('Exiting. Re-run `build init` whenever you\'re ready.')
+            }
+          }}
+        />
       )}
 
       {/* Import: compiling helper (one-time per CLI version) */}
-      {step === 'import-compiling-helper' && (
-        <Box flexDirection="column" marginTop={1}>
-          <SpinnerLine text="Compiling keychain-export helper (one-time, ~2-3s)..." />
-          <Newline />
-          <Box flexDirection="column" marginLeft={2}>
-            <Text dimColor>
-              We ship a small Swift program (~350 lines) that wraps Apple's
-              Security framework. It compiles via
-              {' '}
-              <Text bold>swiftc</Text>
-              {' '}
-              into your OS temp folder.
-            </Text>
-            <Text dimColor>
-              The result is cached for this CLI version — future runs of
-              {' '}
-              <Text bold>build init</Text>
-              {' '}
-              skip this step.
-            </Text>
-          </Box>
-        </Box>
-      )}
+      {step === 'import-compiling-helper' && <ImportCompilingHelperStep dense={dense} />}
 
       {/* Import: exporting (the one Keychain prompt happens here) */}
-      {step === 'import-exporting' && (
-        <Box flexDirection="column" marginTop={1}>
-          <SpinnerLine text="Exporting from Keychain — check for the macOS dialog..." />
-          <Text dimColor>
-            If you don't see a dialog, look behind other windows or check the menu bar.
-          </Text>
-        </Box>
-      )}
+      {step === 'import-exporting' && <ImportExportingStep />}
 
       {/* API key instructions + .p8 input */}
       {step === 'api-key-instructions' && (
-        <Box flexDirection="column" marginTop={1}>
-          <Alert variant="info">
-            We need an App Store Connect API key to manage certificates and profiles for you.
-          </Alert>
-          <Newline />
-          <Box flexDirection="column" marginLeft={2}>
-            <Text>
-              <Text bold color="white">1.</Text>
-              {' '}
-              Go to
-              {' '}
-              <Text color="cyan" underline>appstoreconnect.apple.com/access/integrations/api</Text>
-            </Text>
-            <Text>
-              <Text bold color="white">2.</Text>
-              {' '}
-              Click
-              {' '}
-              <Text bold>"Generate API Key"</Text>
-            </Text>
-            <Text>
-              <Text bold color="white">3.</Text>
-              {' '}
-              Name it
-              {' '}
-              <Text color="yellow">"Capgo Builder"</Text>
-              {' '}
-              · Access:
-              {' '}
-              <Text bold color="green">"Admin"</Text>
-            </Text>
-            <Text>
-              <Text bold color="white">4.</Text>
-              {' '}
-              Download the
-              {' '}
-              <Text bold>.p8</Text>
-              {' '}
-              file
-            </Text>
-          </Box>
-          <Newline />
-          <Box>
-            <Text dimColor>Press </Text>
-            <Text bold color="white">Ctrl+O</Text>
-            <Text dimColor> to open App Store Connect in your browser</Text>
-          </Box>
-          <Newline />
-          <Divider />
-          <Newline />
-          {canUseFilePicker() && (
-            <>
-              <Text bold>How do you want to provide the .p8 file?</Text>
-              <Newline />
-              <Select
-                options={[
-                  { label: '📂  Open file picker', value: 'picker' },
-                  { label: '📝  Type the path', value: 'manual' },
-                ]}
-                onChange={(value) => {
-                  if (value === 'picker') {
-                    setStep('p8-method-select')
-                  }
-                  else {
-                    setStep('input-p8-path')
-                  }
-                }}
-              />
-            </>
-          )}
-          {!canUseFilePicker() && (
-            <>
-              <Text bold>Path to your .p8 file:</Text>
-              <Box marginTop={1}>
-                <FilteredTextInput
-                  placeholder="~/Downloads/AuthKey_XXXXXXXXXX.p8"
-                  onSubmit={async (value) => {
-                    const filePath = value.replace(/^~/, process.env.HOME || '')
-                    try {
-                      const content = await readFile(filePath, 'utf-8')
-                      setP8Path(filePath)
-                      setP8Content(content)
-                      const extracted = extractKeyIdFromPath(filePath)
-                      if (extracted)
-                        setKeyId(extracted)
-                      addLog(`✔ Key file found · ${filePath}`)
-                      void savePartialProgress({ p8Path: filePath })
-                      setStep('input-key-id')
-                    }
-                    catch {
-                      handleError(new Error(`File not found: ${filePath}`), 'api-key-instructions')
-                    }
-                  }}
-                />
-              </Box>
-            </>
-          )}
-        </Box>
+        <ApiKeyInstructionsStep
+          canUseFilePicker={canUseFilePicker()}
+          dense={dense}
+          onMethodChange={(value) => {
+            if (value === 'picker') {
+              setStep('p8-method-select')
+            }
+            else {
+              setStep('input-p8-path')
+            }
+          }}
+          onPathSubmit={async (value) => {
+            const filePath = value.replace(/^~/, process.env.HOME || '')
+            try {
+              const content = await readFile(filePath, 'utf-8')
+              setP8Path(filePath)
+              setP8Content(content)
+              const extracted = extractKeyIdFromPath(filePath)
+              if (extracted)
+                setKeyId(extracted)
+              addLog(`✔ Key file found · ${filePath}`)
+              void savePartialProgress({ p8Path: filePath })
+              setStep('input-key-id')
+            }
+            catch {
+              handleError(new Error(`File not found: ${filePath}`), 'api-key-instructions')
+            }
+          }}
+        />
       )}
 
       {/* File picker opening */}
-      {step === 'p8-method-select' && (
-        <Box flexDirection="column" marginTop={1}>
-          <SpinnerLine text="Opening file picker..." />
-        </Box>
-      )}
+      {step === 'p8-method-select' && <P8MethodSelectStep />}
 
       {/* Manual .p8 path input */}
       {step === 'input-p8-path' && (
-        <Box flexDirection="column" marginTop={1}>
-          <Text bold>Path to your .p8 file:</Text>
-          <Box marginTop={1}>
-            <FilteredTextInput
-              placeholder="~/Downloads/AuthKey_XXXXXXXXXX.p8"
-              onSubmit={async (value) => {
-                const filePath = value.replace(/^~/, process.env.HOME || '')
-                try {
-                  const content = await readFile(filePath, 'utf-8')
-                  setP8Path(filePath)
-                  setP8Content(content)
-                  const extracted = extractKeyIdFromPath(filePath)
-                  if (extracted)
-                    setKeyId(extracted)
-                  addLog(`✔ Key file found · ${filePath}`)
-                  void savePartialProgress({ p8Path: filePath })
-                  setStep('input-key-id')
-                }
-                catch {
-                  handleError(new Error(`File not found: ${value}`), 'input-p8-path')
-                }
-              }}
-            />
-          </Box>
-        </Box>
+        <InputP8PathStep
+          onSubmit={async (value) => {
+            const filePath = value.replace(/^~/, process.env.HOME || '')
+            try {
+              const content = await readFile(filePath, 'utf-8')
+              setP8Path(filePath)
+              setP8Content(content)
+              const extracted = extractKeyIdFromPath(filePath)
+              if (extracted)
+                setKeyId(extracted)
+              addLog(`✔ Key file found · ${filePath}`)
+              void savePartialProgress({ p8Path: filePath })
+              setStep('input-key-id')
+            }
+            catch {
+              handleError(new Error(`File not found: ${value}`), 'input-p8-path')
+            }
+          }}
+        />
       )}
 
       {/* Key ID */}
       {step === 'input-key-id' && (
-        <Box flexDirection="column" marginTop={1}>
-          {keyId
-            ? (
-                <>
-                  <Text bold>
-                    Key ID
-                    {' '}
-                    <Text dimColor>(detected from filename)</Text>
-                    :
-                  </Text>
-                  <Box marginTop={1}>
-                    <Text color="green">✔ </Text>
-                    <Text>{keyId}</Text>
-                    <Text dimColor> — press Enter to confirm, or type a different one</Text>
-                  </Box>
-                  <Box marginTop={1}>
-                    <FilteredTextInput
-                      placeholder={keyId}
-                      onSubmit={(value) => {
-                        const finalKeyId = (value || keyId).trim()
-                        setKeyId(finalKeyId)
-                        addLog(`✔ Key ID · ${finalKeyId}`)
-                        void savePartialProgress({ keyId: finalKeyId })
-                        setStep('input-issuer-id')
-                      }}
-                    />
-                  </Box>
-                </>
-              )
-            : (
-                <>
-                  <Text bold>
-                    Key ID
-                    {' '}
-                    <Text dimColor>(shown next to the key name in App Store Connect)</Text>
-                    :
-                  </Text>
-                  <Box marginTop={1}>
-                    <FilteredTextInput
-                      placeholder="ABC123DEF"
-                      onSubmit={(value) => {
-                        const cleaned = value.trim()
-                        if (!cleaned)
-                          return
-                        setKeyId(cleaned)
-                        addLog(`✔ Key ID · ${cleaned}`)
-                        void savePartialProgress({ keyId: cleaned })
-                        setStep('input-issuer-id')
-                      }}
-                    />
-                  </Box>
-                </>
-              )}
-        </Box>
+        <InputKeyIdStep
+          keyId={keyId}
+          dense={dense}
+          onSubmit={(value) => {
+            // `value || keyId` reuses the detected key ID when the user just
+            // presses Enter; the trim+guard rejects an empty submission in the
+            // no-detection case (keyId='' makes the fallback a no-op).
+            const finalKeyId = (value || keyId).trim()
+            if (!finalKeyId)
+              return
+            setKeyId(finalKeyId)
+            addLog(`✔ Key ID · ${finalKeyId}`)
+            void savePartialProgress({ keyId: finalKeyId })
+            setStep('input-issuer-id')
+          }}
+        />
       )}
 
       {/* Issuer ID */}
       {step === 'input-issuer-id' && (
-        <Box flexDirection="column" marginTop={1}>
-          <Text bold>
-            Issuer ID
-            {' '}
-            <Text dimColor>(UUID at the very top of the API keys page, above the key list)</Text>
-            :
-          </Text>
-          <Newline />
-          <Box>
-            <Text dimColor>Press </Text>
-            <Text bold color="white">Ctrl+O</Text>
-            <Text dimColor> to open App Store Connect in your browser</Text>
-          </Box>
-          <Box marginTop={1}>
-            <FilteredTextInput
-              placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-              onSubmit={(value) => {
-                const cleaned = value.trim()
-                if (!cleaned)
-                  return
-                setIssuerId(cleaned)
-                addLog(`✔ Issuer ID · ${cleaned}`)
-                void savePartialProgress({ issuerId: cleaned })
-                setStep('verifying-key')
-              }}
-            />
-          </Box>
-        </Box>
+        <InputIssuerIdStep
+          dense={dense}
+          onSubmit={(value) => {
+            const cleaned = value.trim()
+            if (!cleaned)
+              return
+            setIssuerId(cleaned)
+            addLog(`✔ Issuer ID · ${cleaned}`)
+            void savePartialProgress({ issuerId: cleaned })
+            setStep('verifying-key')
+          }}
+        />
       )}
 
       {/* Verifying */}
-      {step === 'verifying-key' && (
-        <Box flexDirection="column" marginTop={1}>
-          <SpinnerLine text="Verifying API key with Apple..." />
-        </Box>
-      )}
+      {step === 'verifying-key' && <VerifyingKeyStep />}
 
       {/* Creating certificate */}
-      {step === 'creating-certificate' && (
-        <Box flexDirection="column" marginTop={1}>
-          <SpinnerLine text="Generating signing key and CSR..." />
-          <SpinnerLine text="Creating iOS distribution certificate..." />
-        </Box>
-      )}
+      {step === 'creating-certificate' && <CreatingCertificateStep />}
 
       {/* Certificate limit — ask which to revoke */}
       {step === 'cert-limit-prompt' && (
-        <Box flexDirection="column" marginTop={1}>
-          <ErrorLine text={`iOS distribution certificate limit reached (${existingCerts.length} existing).`} />
-          <Newline />
-          <Text bold>Select a certificate to revoke:</Text>
-          <Newline />
-          <Select
-            options={[
-              ...existingCerts.map((c) => {
-                const ourCertId = certData?.certificateId || initialProgress?.completedSteps.certificateCreated?.certificateId
-                const isOurs = ourCertId === c.id
-                const creator = isOurs ? ' · 🔧 Created by Capgo' : ''
-                return {
-                  label: `🗑️   ${c.name} · expires ${c.expirationDate.split('T')[0]}${creator}`,
-                  value: c.id,
-                }
-              }),
-              { label: '✖  Exit onboarding', value: '__exit__' },
-            ]}
-            onChange={(value) => {
-              if (value === '__exit__') {
-                addLog(`Exiting. Revoke a certificate manually in App Store Connect, then resume with ${buildInitCommand}.`, 'yellow')
-                exitOnboarding()
+        <CertLimitPromptStep
+          existingCount={existingCerts.length}
+          dense={dense}
+          options={[
+            ...existingCerts.map((c) => {
+              const ourCertId = certData?.certificateId || initialProgress?.completedSteps.certificateCreated?.certificateId
+              const isOurs = ourCertId === c.id
+              const creator = isOurs ? ' · 🔧 Created by Capgo' : ''
+              return {
+                label: `🗑️   ${c.name} · expires ${c.expirationDate.split('T')[0]}${creator}`,
+                value: c.id,
               }
-              else {
-                setCertToRevoke(value)
-                setStep('revoking-certificate')
-              }
-            }}
-          />
-        </Box>
+            }),
+            { label: '✖  Exit onboarding', value: '__exit__' },
+          ]}
+          onChange={(value) => {
+            if (value === '__exit__') {
+              addLog(`Exiting. Revoke a certificate manually in App Store Connect, then resume with ${buildInitCommand}.`, 'yellow')
+              exitOnboarding()
+            }
+            else {
+              setCertToRevoke(value)
+              setStep('revoking-certificate')
+            }
+          }}
+        />
       )}
 
       {/* Revoking certificate */}
-      {step === 'revoking-certificate' && (
-        <Box flexDirection="column" marginTop={1}>
-          <SpinnerLine text="Revoking old certificate..." />
-        </Box>
-      )}
+      {step === 'revoking-certificate' && <RevokingCertificateStep />}
 
       {/* Creating profile */}
-      {step === 'creating-profile' && (
-        <Box flexDirection="column" marginTop={1}>
-          <SuccessLine text="Bundle ID" detail={appId} />
-          <Newline />
-          <SpinnerLine text="Creating App Store provisioning profile..." />
-        </Box>
-      )}
+      {step === 'creating-profile' && <CreatingProfileStep appId={appId} dense={dense} />}
 
       {/* Duplicate profile prompt */}
       {step === 'duplicate-profile-prompt' && (
-        <Box flexDirection="column" marginTop={1}>
-          <ErrorLine text={`Found ${duplicateProfiles.length} existing Capgo profile(s) for this app.`} />
-          <Newline />
-          <Text bold>Delete old profiles and create a new one?</Text>
-          <Newline />
-          <Select
-            options={[
-              { label: '✔  Yes, delete old profiles and recreate', value: 'delete' },
-              { label: '✖  No, exit onboarding', value: 'exit' },
-            ]}
-            onChange={(value) => {
-              if (value === 'delete') {
-                setStep('deleting-duplicate-profiles')
-              }
-              else {
-                addLog(`Exiting. Delete the duplicate profiles in App Store Connect, then resume with ${buildInitCommand}.`, 'yellow')
-                exitOnboarding()
-              }
-            }}
-          />
-        </Box>
+        <DuplicateProfilePromptStep
+          duplicateCount={duplicateProfiles.length}
+          dense={dense}
+          onChange={(value) => {
+            if (value === 'delete') {
+              setStep('deleting-duplicate-profiles')
+            }
+            else {
+              addLog(`Exiting. Delete the duplicate profiles in App Store Connect, then resume with ${buildInitCommand}.`, 'yellow')
+              exitOnboarding()
+            }
+          }}
+        />
       )}
 
       {/* Deleting duplicate profiles */}
       {step === 'deleting-duplicate-profiles' && (
-        <Box flexDirection="column" marginTop={1}>
-          <SpinnerLine text={`Deleting ${duplicateProfiles.length} old profile(s)...`} />
-        </Box>
+        <DeletingDuplicateProfilesStep duplicateCount={duplicateProfiles.length} />
       )}
 
       {/* Saving credentials */}
-      {step === 'saving-credentials' && (
-        <Box flexDirection="column" marginTop={1}>
-          <SpinnerLine text="Saving credentials..." />
-        </Box>
-      )}
+      {step === 'saving-credentials' && <SavingCredentialsStep />}
 
-      {step === 'detecting-ci-secrets' && (
-        <Box flexDirection="column" marginTop={1}>
-          <SpinnerLine text="Checking git hosting..." />
-        </Box>
-      )}
+      {step === 'detecting-ci-secrets' && <DetectingCiSecretsStep />}
 
       {step === 'ci-secrets-setup' && (
-        <Box flexDirection="column" marginTop={1}>
-          <Text bold>Set up your git hosting CLI to upload env vars</Text>
-          <Newline />
-          {ciSecretSetupAdvice.map(advice => (
-            <Box key={advice.target.provider} flexDirection="column" marginBottom={1}>
-              <Text>{advice.target.label}</Text>
-              <Text dimColor>{advice.message}</Text>
-              {advice.commands.map(command => (
-                <Text key={`${advice.target.provider}-${command}`} color="cyan">{command}</Text>
-              ))}
-            </Box>
-          ))}
-          <Text dimColor>Run this in another terminal, then come back here.</Text>
-          <Newline />
-          <Select
-            options={[
-              { label: 'I installed and logged in, check again', value: 'retry' },
-              { label: 'Skip upload', value: 'skip' },
-            ]}
-            onChange={(value) => {
-              setStep(value === 'retry' ? 'detecting-ci-secrets' : 'build-complete')
-            }}
-          />
-        </Box>
+        <CiSecretsSetupStep
+          advice={ciSecretSetupAdvice}
+          dense={dense}
+          onChange={(value) => {
+            setStep(value === 'retry' ? 'detecting-ci-secrets' : 'build-complete')
+          }}
+        />
       )}
 
       {step === 'ci-secrets-target-select' && (
-        <Box flexDirection="column" marginTop={1}>
-          <Text bold>Where should Capgo upload the build env vars?</Text>
-          <Newline />
-          <Select
-            options={[
-              ...ciSecretTargets.map(target => ({
-                label: target.provider === 'github' ? 'GitHub Actions repository secrets' : 'GitLab CI/CD variables',
-                value: target.provider,
-              })),
-              { label: 'Skip', value: 'skip' },
-            ]}
-            onChange={(value) => {
-              if (value === 'skip') {
-                setStep('build-complete')
-                return
-              }
-              const target = ciSecretTargets.find(candidate => candidate.provider === value) || null
-              setCiSecretTarget(target)
-              if (!target) {
-                setStep('build-complete')
-                return
-              }
-              setStep(target.provider === 'github' ? 'ask-github-actions-setup' : 'ask-ci-secrets')
-            }}
-          />
-        </Box>
+        <CiSecretsTargetSelectStep
+          options={[
+            ...ciSecretTargets.map(target => ({
+              label: target.provider === 'github' ? 'GitHub Actions repository secrets' : 'GitLab CI/CD variables',
+              value: target.provider,
+            })),
+            { label: 'Skip', value: 'skip' },
+          ]}
+          dense={dense}
+          onChange={(value) => {
+            if (value === 'skip') {
+              setStep('build-complete')
+              return
+            }
+            const target = ciSecretTargets.find(candidate => candidate.provider === value) || null
+            setCiSecretTarget(target)
+            if (!target) {
+              setStep('build-complete')
+              return
+            }
+            // GitHub routes into the new 3-option GitHub Actions prompt
+            // (secrets + workflow / secrets-only / no); GitLab keeps the legacy
+            // 2-option ask-ci-secrets flow.
+            setStep(target.provider === 'github' ? 'ask-github-actions-setup' : 'ask-ci-secrets')
+          }}
+        />
       )}
 
       {step === 'ask-ci-secrets' && (
-        <Box flexDirection="column" marginTop={1}>
-          <SuccessLine text="Credentials saved" />
-          <Newline />
-          <Text bold>
-            Upload
-            {' '}
-            {ciSecretEntries.length}
-            {' '}
-            build env var
-            {ciSecretEntries.length === 1 ? '' : 's'}
-            {' '}
-            to
-            {' '}
-            {getCiSecretTargetLabel(ciSecretTarget)}
-            ?
-          </Text>
-          <Text dimColor>Capgo will check for existing names first and ask before replacing anything.</Text>
-          <Newline />
-          <Select
-            options={[
-              { label: `Upload with ${ciSecretTarget?.cli || 'CLI'}`, value: 'yes' },
-              { label: 'Skip', value: 'no' },
-            ]}
-            onChange={(value) => {
-              setStep(value === 'yes' ? 'checking-ci-secrets' : 'build-complete')
-            }}
-          />
-        </Box>
+        <AskCiSecretsStep
+          entryCount={ciSecretEntries.length}
+          target={ciSecretTarget}
+          targetLabel={getCiSecretTargetLabel(ciSecretTarget)}
+          dense={dense}
+          onChange={(value) => {
+            setStep(value === 'yes' ? 'checking-ci-secrets' : 'build-complete')
+          }}
+        />
       )}
 
       {step === 'ask-github-actions-setup' && (
@@ -2974,24 +2990,13 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey, t
       )}
 
       {step === 'confirm-ci-secret-overwrite' && (
-        <Box flexDirection="column" marginTop={1}>
-          <Text bold color="yellow">These env vars already exist and will be replaced:</Text>
-          <Box flexDirection="column" marginTop={1} marginLeft={2}>
-            {ciSecretExistingKeys.map(key => (
-              <Text key={key}>{`• ${key}`}</Text>
-            ))}
-          </Box>
-          <Newline />
-          <Select
-            options={[
-              { label: 'Replace existing env vars', value: 'replace' },
-              { label: 'Skip upload', value: 'skip' },
-            ]}
-            onChange={(value) => {
-              setStep(value === 'replace' ? 'uploading-ci-secrets' : 'build-complete')
-            }}
-          />
-        </Box>
+        <ConfirmCiSecretOverwriteStep
+          existingKeys={ciSecretExistingKeys}
+          dense={dense}
+          onChange={(value) => {
+            setStep(value === 'replace' ? 'uploading-ci-secrets' : 'build-complete')
+          }}
+        />
       )}
 
       {step === 'uploading-ci-secrets' && (
@@ -3005,274 +3010,186 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey, t
       )}
 
       {step === 'ci-secrets-failed' && (
-        <Box flexDirection="column" marginTop={1}>
-          <ErrorLine text={ciSecretError || 'Could not upload env vars.'} />
-          <Newline />
-          <Text dimColor>You can continue; credentials are already saved locally.</Text>
-          <Newline />
-          <Select
-            options={[
-              { label: 'Try upload again', value: 'retry' },
-              { label: 'Continue without upload', value: 'continue' },
-            ]}
-            onChange={(value) => {
-              setStep(value === 'retry' ? (ciSecretTarget ? 'checking-ci-secrets' : 'detecting-ci-secrets') : 'build-complete')
-            }}
-          />
-        </Box>
+        <CiSecretsFailedStep
+          error={ciSecretError}
+          dense={dense}
+          onChange={(value) => {
+            setStep(value === 'retry' ? (ciSecretTarget ? 'checking-ci-secrets' : 'detecting-ci-secrets') : 'build-complete')
+          }}
+        />
       )}
 
       {/* Ask to build */}
       {step === 'ask-build' && (
-        <Box flexDirection="column" marginTop={1}>
-          <SuccessLine text="Credentials saved" />
-          <Newline />
-          <Text bold>Start your first cloud build now?</Text>
-          <Newline />
-          <Select
-            options={[
-              { label: '🚀  Yes, build now', value: 'yes' },
-              { label: '⏭️   No, I\'ll build later', value: 'no' },
-            ]}
-            onChange={(value) => {
-              if (value === 'yes') {
-                setStep('requesting-build')
-              }
-              else {
-                setStep('build-complete')
-              }
-            }}
-          />
-        </Box>
+        <AskBuildStep
+          dense={dense}
+          onChange={(value) => {
+            if (value === 'yes') {
+              setStep('requesting-build')
+            }
+            else {
+              setStep('build-complete')
+            }
+          }}
+        />
       )}
 
-      {/* Requesting build — live output fills terminal, spinner at bottom */}
-      {step === 'requesting-build' && (() => {
-        // 3 lines overhead: 1 divider + 1 spinner + 1 padding
-        const visibleLines = Math.max(5, terminalRows - 3)
-        return (
-          <Box flexDirection="column" marginTop={1}>
-            {buildOutput.slice(-visibleLines).map((line, i) => {
-              const isSuccess = line.startsWith('✔')
-              const isError = line.startsWith('✖') || line.startsWith('❌')
-              const isWarn = line.startsWith('⚠')
-              const isBold = line.startsWith('✔ Build') || line.startsWith('✔ Created') || line.startsWith('Uploading:')
-              const color = isSuccess ? 'green' : isError ? 'red' : isWarn ? 'yellow' : undefined
-              return (
-                <Text key={i} color={color} dimColor={!color && !isBold} bold={isBold}>
-                  {line}
-                </Text>
-              )
-            })}
-            <Divider />
-            <Box>
-              <SpinnerLine text="Building..." />
-              <Text dimColor>
-                {' '}
-                (
-                {buildOutput.length}
-                {' '}
-                lines)
-              </Text>
-            </Box>
-          </Box>
-        )
-      })()}
+      {/* Requesting build: handled by the FullscreenBuildOutput early return
+          above (fullscreen takeover, bypasses the too-small gate) — nothing
+          renders here in the measured body. */}
+
+      {/* AI debug — ask the user whether to send the captured log */}
+      {step === 'ai-analysis-prompt' && (
+        <AiAnalysisPromptStep
+          dense={dense}
+          onChange={async (value) => {
+            if (value === 'debug') {
+              setStep('ai-analysis-running')
+            }
+            else {
+              if (aiJobId) {
+                await trackAiAnalysisChoice({
+                  apikey: resolvedApiKeyRef.current ?? apikey ?? '',
+                  orgId: resolvedOrgId ?? '',
+                  appId,
+                  platform: 'ios',
+                  jobId: aiJobId,
+                  choice: 'skip',
+                  triggeredBy: 'onboarding',
+                }).catch(() => { /* telemetry never breaks the wizard */ })
+              }
+              setStep('build-complete')
+            }
+          }}
+        />
+      )}
+
+      {/* AI debug — spinner while the edge function is running */}
+      {step === 'ai-analysis-running' && <AiAnalysisRunningStep />}
+
+      {/* AI debug — render the diagnosis (or fallback message), then offer
+          retry-or-skip. Retry transitions back to 'requesting-build' so the
+          user can rebuild after applying the AI's fix in another terminal,
+          without re-running the credential wizard. Capped at MAX_AI_RETRIES. */}
+      {step === 'ai-analysis-result' && (
+        <AiAnalysisResultStep
+          analysisText={aiAnalysisText}
+          // Collapse to the compact marker + "Re-read" option only when the
+          // user has dismissed the viewer AND the analysis is still too tall to
+          // show inline. If the terminal is now big enough, show the full text.
+          collapsed={aiViewedFull && !!aiAnalysisText && isAiAnalysisTooTall(aiAnalysisText, terminalRows, terminalCols)}
+          result={aiResult}
+          canRetry={MAX_AI_RETRIES - aiRetryCount > 0}
+          retriesLeft={MAX_AI_RETRIES - aiRetryCount}
+          maxRetries={MAX_AI_RETRIES}
+          dense={dense}
+          onChange={async (value) => {
+            if (value === 'reread') {
+              // Re-open the fullscreen scroll viewer (alt buffer has no
+              // scrollback, so this is the only way to re-read).
+              setStep('ai-analysis-result-scroll')
+              return
+            }
+            if (value === 'retry') {
+              // Track the retry intent before we tear down the AI state so
+              // the choice event carries the per-attempt context.
+              if (aiJobId) {
+                await trackAiAnalysisChoice({
+                  apikey: resolvedApiKeyRef.current ?? apikey ?? '',
+                  orgId: resolvedOrgId ?? '',
+                  appId,
+                  platform: 'ios',
+                  jobId: aiJobId,
+                  choice: 'retry',
+                  triggeredBy: 'onboarding',
+                }).catch(() => { /* telemetry never breaks the wizard */ })
+                // Free the captured log for the previous attempt; the next
+                // attempt's `requestBuildInternal` will create a new file
+                // tied to a new builder_job_id.
+                void releaseCapturedLogs(aiJobId).catch(() => { /* best-effort */ })
+              }
+              // Reset AI state so the next failure starts clean. The fit
+              // check (and possible scroll-viewer route) will re-evaluate
+              // against the new analysis text.
+              setAiJobId(null)
+              setAiAnalysisText(null)
+              setAiResult(null)
+              setAiViewedFull(false)
+              setAiRetryCount(prev => prev + 1)
+              setStep('requesting-build')
+              return
+            }
+            // 'skip' (with retries available) or 'continue' (none left).
+            setStep('build-complete')
+          }}
+        />
+      )}
+
+      {/* (ai-analysis-result-scroll renders as a fullscreen early return above.) */}
 
       {/* Error with retry */}
       {step === 'error' && error && (
-        <Box flexDirection="column" marginTop={1}>
-          <ErrorLine text={error} />
-          <Newline />
-          {recoveryAdvice && (
-            <>
-              <Text bold>Recovery plan</Text>
-              <Box flexDirection="column" marginTop={1} marginLeft={2}>
-                {recoveryAdvice.summary.map(line => (
-                  <Text key={`recovery-summary-${line}`}>{`• ${line}`}</Text>
-                ))}
-              </Box>
-              {recoveryAdvice.commands.length > 0 && (
-                <>
-                  <Newline />
-                  <Text bold>Helpful commands</Text>
-                  <Box flexDirection="column" marginTop={1} marginLeft={2}>
-                    {recoveryAdvice.commands.map(command => (
-                      <Text key={`recovery-command-${command}`} dimColor>{command}</Text>
-                    ))}
-                  </Box>
-                </>
-              )}
-              {recoveryAdvice.docs.length > 0 && (
-                <>
-                  <Newline />
-                  <Text bold>Docs</Text>
-                  <Box flexDirection="column" marginTop={1} marginLeft={2}>
-                    {recoveryAdvice.docs.map(doc => (
-                      <Text key={`recovery-doc-${doc}`} color="cyan">{doc}</Text>
-                    ))}
-                  </Box>
-                </>
-              )}
-            </>
-          )}
-          {supportBundlePath && (
-            <>
-              <Newline />
-              <Text bold>Support bundle</Text>
-              <Text dimColor>{supportBundlePath}</Text>
-            </>
-          )}
-          <Newline />
-          {retryStep && (
-            <>
-              <Text bold>What do you want to do?</Text>
-              <Newline />
-              <Select
-                options={[
-                  { label: '🔄  Try again', value: 'retry' },
-                  { label: '↩️   Restart onboarding', value: 'restart' },
-                  { label: '❌  Exit', value: 'exit' },
-                ]}
-                onChange={async (value) => {
-                  if (value === 'retry') {
-                    setError(null)
-                    errorCategoryRef.current = undefined
-                    pickerOpenedRef.current = false
-                    setStep(retryStep)
-                  }
-                  else if (value === 'restart') {
-                    // Wipe persisted progress so the next run starts truly fresh.
-                    // Without this, getResumeStep would skip the user back to
-                    // wherever they were — re-triggering the same broken state.
-                    await deleteProgress(appId).catch(() => { /* best-effort */ })
-                    // Also reset all in-memory import-flow state so a previously-
-                    // chosen identity/profile/distribution doesn't leak across.
-                    setImportMode(false)
-                    setImportMatches([])
-                    setImportProfiles([])
-                    setChosenIdentity(null)
-                    setChosenProfile(null)
-                    setImportDistribution(null)
-                    setImportedP12Password('')
-                    setPendingRecoveryAction(null)
-                    setCertData(null)
-                    setProfileData(null)
-                    setError(null)
-                    errorCategoryRef.current = undefined
-                    setRetryCount(0)
-                    pickerOpenedRef.current = false
-                    setSupportBundlePath(null)
-                    addLog('↩️  Onboarding reset — starting fresh', 'yellow')
-                    setStep('welcome')
-                  }
-                  else {
-                    setError(`Run \`${buildInitCommand}\` to resume.`)
-                    exitOnboarding()
-                  }
-                }}
-              />
-            </>
-          )}
-        </Box>
+        <ErrorStep
+          error={error}
+          recoveryAdvice={recoveryAdvice}
+          supportBundlePath={supportBundlePath}
+          showRetry={!!retryStep}
+          dense={dense}
+          collapsed={errorTooTall && errorViewedFull}
+          onChange={async (value) => {
+            if (value === 'retry') {
+              setError(null)
+              errorCategoryRef.current = undefined
+              pickerOpenedRef.current = false
+              if (retryStep)
+                setStep(retryStep)
+            }
+            else if (value === 'restart') {
+              // Wipe persisted progress so the next run starts truly fresh.
+              // Without this, getResumeStep would skip the user back to
+              // wherever they were — re-triggering the same broken state.
+              await deleteProgress(appId).catch(() => { /* best-effort */ })
+              // Also reset all in-memory import-flow state so a previously-
+              // chosen identity/profile/distribution doesn't leak across.
+              setImportMode(false)
+              setImportMatches([])
+              setImportProfiles([])
+              setChosenIdentity(null)
+              setChosenProfile(null)
+              setImportDistribution(null)
+              setImportedP12Password('')
+              setPendingRecoveryAction(null)
+              setCertData(null)
+              setProfileData(null)
+              setError(null)
+              errorCategoryRef.current = undefined
+              setRetryCount(0)
+              pickerOpenedRef.current = false
+              setSupportBundlePath(null)
+              addLog('↩️  Onboarding reset — starting fresh', 'yellow')
+              setStep('welcome')
+            }
+            else {
+              setError(`Run \`${buildInitCommand}\` to resume.`)
+              exitOnboarding()
+            }
+          }}
+        />
       )}
 
       {/* Done */}
       {step === 'build-complete' && (
-        <Box flexDirection="column" marginTop={1}>
-          <Newline />
-          <Box
-            borderStyle="round"
-            borderColor="green"
-            paddingX={3}
-            paddingY={1}
-            flexDirection="column"
-            alignItems="center"
-          >
-            <Text bold color="green">
-              🎉  You're all set!
-            </Text>
-            <Newline />
-            {buildUrl
-              ? (
-                  <>
-                    <Text>Your iOS app is building in the cloud.</Text>
-                    <Text>
-                      Track it at
-                      {' '}
-                      <Text color="cyan" underline>{buildUrl}</Text>
-                    </Text>
-                  </>
-                )
-              : (
-                  <Text>Your iOS credentials are saved and ready to use.</Text>
-                )}
-            <Newline />
-            {ciSecretUploadSummary && (
-              <>
-                <Text>{ciSecretUploadSummary}.</Text>
-                <Newline />
-              </>
-            )}
-            {workflowWrittenPath && (
-              <>
-                <Text color="green">
-                  ✔ Workflow file written:
-                  {' '}
-                  {workflowWrittenPath}
-                </Text>
-                <Text dimColor>
-                  Dispatch it from GitHub Actions to kick off a build, or run
-                  {' '}
-                  <Text bold>{buildRequestCommand}</Text>
-                  {' '}
-                  locally.
-                </Text>
-                <Newline />
-              </>
-            )}
-            {envExportPath && (
-              <>
-                <Text color="green">
-                  ✔ Credentials exported to:
-                  {' '}
-                  {envExportPath}
-                </Text>
-                <Text dimColor>
-                  When you're ready, push them with
-                  {' '}
-                  <Text bold>{`gh secret set -f ${envExportPath.split('/').slice(-1)[0]}`}</Text>
-                  {' '}
-                  (or your CI's equivalent). Add the file to
-                  {' '}
-                  <Text bold>.gitignore</Text>
-                  {' '}
-                  — never commit it.
-                </Text>
-                <Newline />
-              </>
-            )}
-            {envExportError && (
-              <>
-                <Text color="yellow">
-                  ⚠ Could not export .env:
-                  {' '}
-                  {envExportError}
-                </Text>
-                <Newline />
-              </>
-            )}
-            <Text dimColor>
-              Run
-              {' '}
-              <Text bold color="white">{buildRequestCommand}</Text>
-              {' '}
-              anytime to start a build.
-            </Text>
-          </Box>
-          <Newline />
-        </Box>
+        <BuildCompleteStep
+          buildUrl={buildUrl}
+          ciSecretUploadSummary={ciSecretUploadSummary}
+          buildRequestCommand={buildRequestCommand}
+          workflowWrittenPath={workflowWrittenPath}
+          envExportPath={envExportPath}
+          envExportError={envExportError}
+          dense={dense}
+        />
       )}
+      </Box>
     </Box>
   )
 }
