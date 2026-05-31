@@ -35,7 +35,8 @@ const MAX_AI_RETRIES = 2
 import { CertificateLimitError, createCertificate, createProfile, deleteProfile, DuplicateProfileError, ensureBundleId, findCertIdBySha1, generateJwt, revokeCertificate, verifyApiKey } from '../apple-api.js'
 import { createP12, DEFAULT_P12_PASSWORD, generateCsr } from '../csr.js'
 import { mapIosOnboardingError } from '../error-categories.js'
-import { canUseFilePicker, openFilePicker } from '../file-picker.js'
+import { canUseFilePicker, openFilePicker, openMobileprovisionPicker } from '../file-picker.js'
+import { parseMobileprovisionDetailed } from '../../mobileprovision-parser.js'
 import { exportP12FromKeychain, isHelperCached, isMacOS, listSigningIdentities, matchIdentitiesToProfiles, precompileSwiftHelper, scanProvisioningProfiles } from '../macos-signing.js'
 import { deleteProgress, extractKeyIdFromP8Path, getImportEntryStep, getResumeStep, loadProgress, saveProgress } from '../progress.js'
 import { getBuildOnboardingRecoveryAdvice } from '../recovery.js'
@@ -624,7 +625,12 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
    * .p8 → verifying-key chain completes. `null` means there's no pending action
    * (i.e. .p8 was the entry point for app_store, not a recovery side-trip).
    */
-  const [pendingRecoveryAction, setPendingRecoveryAction] = useState<'fetching-profile' | 'create-profile-only' | null>(null)
+  // The 'fetching-profile' variant was removed alongside the Rescan
+  // recovery option (commit 36a7c282) — the file picker covers that path.
+  const [pendingRecoveryAction, setPendingRecoveryAction] = useState<'create-profile-only' | null>(null)
+  // Guard against re-opening the native picker on every re-render. Reset
+  // whenever we leave the import-provide-profile-path step.
+  const mobileprovisionPickerOpenedRef = useRef(false)
   /**
    * Records which step triggered the shared `duplicate-profile-prompt` so the
    * `deleting-duplicate-profiles` handler routes the retry correctly. Without
@@ -1116,6 +1122,106 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
     // disk" workflow. Two parallel rescan paths confused users so we kept
     // only the file picker. (See commit 36a7c282 and the no-match recovery
     // menu's order comment.)
+
+    // ── import-provide-profile-path ──
+    // User picked "📁 Use a .mobileprovision file from disk" from the
+    // no-match recovery menu. Open the native picker, validate the file
+    // (bundle id + distribution + cert SHA1), and feed it into the
+    // import-pick-profile path as a freshly-synthesized DiscoveredProfile.
+    if (step === 'import-provide-profile-path') {
+      if (mobileprovisionPickerOpenedRef.current)
+        return
+      mobileprovisionPickerOpenedRef.current = true
+      ;(async () => {
+        try {
+          if (!chosenIdentity)
+            throw new Error('Internal error: no identity chosen for .mobileprovision import.')
+          const filePath = await openMobileprovisionPicker()
+          if (cancelled)
+            return
+          if (!filePath) {
+            // User cancelled the picker — bounce back to the recovery menu.
+            setStep('import-no-match-recovery')
+            return
+          }
+          // Parse + run our three invariant checks (bundle id, distribution,
+          // cert SHA1) before persisting anything. Errors route through
+          // handleError so the user gets the support-bundle screen with a
+          // clear "this file is wrong because X" message.
+          let detail
+          try {
+            detail = parseMobileprovisionDetailed(filePath)
+          }
+          catch (err) {
+            handleError(
+              new Error(`Couldn't parse "${filePath}": ${err instanceof Error ? err.message : String(err)}`),
+              'import-provide-profile-path',
+            )
+            return
+          }
+          if (detail.bundleId !== iosBundleId) {
+            handleError(
+              new Error(
+                `This .mobileprovision is for bundle ID "${detail.bundleId}" but the current app is "${iosBundleId}". `
+                + `Pick a profile that targets the right app, or use "Create a new App Store profile" in the recovery menu.`,
+              ),
+              'import-provide-profile-path',
+            )
+            return
+          }
+          // parseMobileprovisionDetailed already returns Capgo's distribution
+          // enum (app_store/ad_hoc/development/enterprise/unknown) — no need
+          // to remap from Apple's IOS_APP_* constants here.
+          if (importDistribution && detail.profileType !== importDistribution) {
+            handleError(
+              new Error(
+                `This .mobileprovision is a ${detail.profileType} profile but you picked ${importDistribution} distribution. `
+                + `Pick a profile that matches, or restart and pick the matching distribution mode.`,
+              ),
+              'import-provide-profile-path',
+            )
+            return
+          }
+          if (!detail.certificateSha1s.includes(chosenIdentity.sha1)) {
+            const shownSha1s = detail.certificateSha1s.map(s => `${s.slice(0, 8)}…`).join(', ') || '(none listed)'
+            handleError(
+              new Error(
+                `This .mobileprovision doesn't trust your chosen certificate "${chosenIdentity.name}". `
+                + `Allowed certs in the profile (SHA1): ${shownSha1s}; your cert starts with ${chosenIdentity.sha1.slice(0, 8)}…. `
+                + `Either pick a different cert at the identity step, or re-create this profile in the Apple Developer Portal and tick the right one.`,
+              ),
+              'import-provide-profile-path',
+            )
+            return
+          }
+          // All checks pass — synthesize a DiscoveredProfile and route
+          // straight to the picker. The on-disk `path` is preserved so
+          // import-exporting reads the profile bytes from it directly,
+          // exactly like a profile we found via scanProvisioningProfiles.
+          const synthesized: DiscoveredProfile = {
+            path: filePath,
+            uuid: detail.uuid,
+            name: detail.name,
+            applicationIdentifier: detail.applicationIdentifier,
+            bundleId: detail.bundleId,
+            teamId: chosenIdentity.teamId,
+            expirationDate: detail.expirationDate,
+            profileType: detail.profileType,
+            certificateSha1s: detail.certificateSha1s,
+          }
+          setImportMatches(prev => prev.map(m => m.identity.sha1 === chosenIdentity.sha1
+            ? { ...m, profiles: [...m.profiles, synthesized] }
+            : m,
+          ))
+          addLog(`✔ Loaded profile from file · ${detail.name}`)
+          setStep('import-pick-profile')
+        }
+        catch (err) {
+          if (!cancelled)
+            handleError(err, 'import-provide-profile-path')
+        }
+      })()
+    }
 
     if (step === 'import-create-profile-only') {
       ;(async () => {
@@ -2555,6 +2661,29 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
                 )
                 return
               }
+              // Belt-and-suspenders: the upstream matchIdentitiesToProfiles
+              // filter and Apple-fetched profile synthesizing should both
+              // guarantee `profile.certificateSha1s` contains
+              // `chosenIdentity.sha1`. But the file-picker recovery path
+              // imports a .mobileprovision the user might have hand-created
+              // in the portal — if they ticked the wrong cert in the cert
+              // list there, we'd otherwise save credentials that the build
+              // server can't actually sign with (private key from
+              // chosenIdentity but profile only trusts a different cert).
+              // Catch that here with a clear error rather than discovering
+              // it during a build hours later.
+              if (chosenIdentity && !profile.certificateSha1s.includes(chosenIdentity.sha1)) {
+                const shownSha1s = profile.certificateSha1s.map(s => `${s.slice(0, 8)}…`).join(', ') || '(none listed)'
+                handleError(
+                  new Error(
+                    `Profile "${profile.name}" doesn't trust your chosen certificate "${chosenIdentity.name}". `
+                    + `The profile's allowed-certs list contains ${profile.certificateSha1s.length} entr${profile.certificateSha1s.length === 1 ? 'y' : 'ies'} (SHA1: ${shownSha1s}); your cert's SHA1 starts with ${chosenIdentity.sha1.slice(0, 8)}…. `
+                    + `Either pick a different profile, or re-create this profile in the Apple Developer Portal and tick the right cert.`,
+                  ),
+                  'import-pick-profile',
+                )
+                return
+              }
               setChosenProfile(profile)
               addLog(`✔ Profile · ${profile.name}`)
               setStep('import-export-warning')
@@ -2579,16 +2708,21 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
             identityName={chosenIdentity.name}
             dense={dense}
             options={[
-              {
-                label: `🌐  Open Apple Developer Portal (download manually, then re-scan)`,
-                value: 'browser',
-              },
-              {
-                label: hasAscKey
-                  ? `🔍  Fetch matching profile from Apple now`
-                  : `🔍  Provide ASC API key, then fetch profile from Apple`,
-                value: 'fetch',
-              },
+              // Order optimized for most-likely-to-succeed first:
+              //   1. Create a fresh profile via Apple API — automatic
+              //   2. Use a local .mobileprovision file — fastest when you
+              //      already have one
+              //   3. Open the Developer Portal — manual fallback with a
+              //      guided walkthrough that funnels back to option 2
+              //   4. Back to identity selection
+              //
+              // The legacy "🔍 Fetch matching profile from Apple" / "🔄
+              // Rescan" option was dropped (commit 36a7c282): the auto-
+              // fetch built into the per-identity check already covers
+              // the "Apple has a profile" case, and the portal walkthrough
+              // routes the manual case through the file picker. Two
+              // parallel rescan paths made the UX inconsistent with the
+              // instructions we render in the walkthrough.
               ...(canCreateProfile
                 ? [{
                     label: hasAscKey
@@ -2597,34 +2731,159 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
                     value: 'create',
                   }]
                 : []),
+              ...(canUseFilePicker()
+                ? [{ label: `📁  Use a .mobileprovision file from disk`, value: 'provide-profile-path' }]
+                : []),
+              {
+                label: `🌐  Open Apple Developer Portal (browse / create profiles manually)`,
+                value: 'browser',
+              },
               { label: '↩️   Back to identity selection', value: 'back' },
             ]}
             onChange={(value) => {
               if (value === 'browser') {
-                open('https://developer.apple.com/account/resources/profiles/list')
-                addLog('✔ Opened Apple Developer Portal — re-running scan in 5s', 'yellow')
-                setTimeout(() => {
-                  if (!exitRequestedRef.current)
-                    setStep('import-scanning')
-                }, 5000)
+                // Don't immediately open the portal — manual cert/profile
+                // creation on developer.apple.com is genuinely tricky
+                // (right cert type, allowed-certs list on the profile,
+                // bundle ID + capabilities, push the .mobileprovision
+                // back into Xcode). Route to a step that explains the
+                // manual steps + steers the user toward the automatic
+                // "Create a new App Store profile via Apple" option
+                // when it's available (almost always the better pick).
+                setStep('import-portal-explanation')
+                return
+              }
+              if (value === 'provide-profile-path') {
+                mobileprovisionPickerOpenedRef.current = false
+                setStep('import-provide-profile-path')
                 return
               }
               if (value === 'back') {
                 setStep('import-pick-identity')
                 return
               }
-              if (value === 'fetch' || value === 'create') {
-                const action = value === 'fetch' ? 'fetching-profile' : 'create-profile-only'
-                if (hasAscKey) {
-                  setStep(`import-${action}` as OnboardingStep)
-                }
+              if (value === 'create') {
+                if (hasAscKey)
+                  setStep('import-create-profile-only')
                 else {
-                  setPendingRecoveryAction(action)
+                  setPendingRecoveryAction('create-profile-only')
                   setStep('api-key-instructions')
                 }
               }
             }}
           />
+        )
+      })()}
+
+      {/* Import: native picker for a .mobileprovision file on disk */}
+      {step === 'import-provide-profile-path' && (
+        <Box flexDirection="column" marginTop={1}>
+          <SpinnerLine text="Opening file picker for your .mobileprovision file..." />
+          <Text dimColor>{`If the dialog doesn't appear, check behind other windows or in the menu bar.`}</Text>
+        </Box>
+      )}
+
+      {/* Import: manual portal walkthrough — explains what to do on
+          developer.apple.com and steers toward the automatic "Create new"
+          path or the file-picker path. Routed to from the recovery menu's
+          "🌐 Open Apple Developer Portal" option. */}
+      {step === 'import-portal-explanation' && chosenIdentity && (() => {
+        const canAutoCreate = importDistribution !== 'ad_hoc'
+        return (
+          <Box flexDirection="column" marginTop={1}>
+            <Alert variant="info">
+              {canAutoCreate
+                ? 'You can do this manually in the Apple Developer Portal — but the automatic path is much easier.'
+                : `You can do this manually in the Apple Developer Portal. Here's what it involves.`}
+            </Alert>
+            <Newline />
+            <Text bold>{`What you'd need to do manually:`}</Text>
+            <Box flexDirection="column" marginLeft={2} marginTop={1}>
+              <Text>1. Sign in at developer.apple.com/account/resources/profiles/list.</Text>
+              <Text>
+                2. Select the correct team (top right) —
+                {' '}
+                <Text bold>{chosenIdentity.teamId}</Text>
+                {chosenIdentity.teamName ? ` (${chosenIdentity.teamName})` : ''}
+                .
+              </Text>
+              <Text>
+                3. Click
+                {' '}
+                <Text bold>+</Text>
+                {' '}
+                to create a new profile. Pick
+                {' '}
+                <Text bold>{importDistribution === 'ad_hoc' ? 'Ad Hoc' : 'App Store'}</Text>
+                {' '}
+                under
+                {' '}
+                <Text bold>Distribution</Text>
+                .
+              </Text>
+              <Text>
+                4. Pick the App ID matching
+                {' '}
+                <Text bold>{iosBundleId}</Text>
+                {`. Create it first if it doesn't exist.`}
+              </Text>
+              <Text>
+                5. In the "Certificates" step, tick the cert matching
+                {' '}
+                <Text bold>{chosenIdentity.name}</Text>
+                . If multiple are listed, pick carefully — we re-verify the cert SHA1 in the next step.
+              </Text>
+              <Text>
+                6. Name + Generate + Download. The .mobileprovision file lands in your Downloads folder.
+              </Text>
+              <Text>
+                7. Come back here and pick
+                {' '}
+                <Text bold>📁  Use a .mobileprovision file from disk</Text>
+                .
+              </Text>
+            </Box>
+            <Newline />
+            {canAutoCreate && (
+              <Box flexDirection="column">
+                <Text bold color="green">💡 Recommended: let Capgo do this automatically.</Text>
+                <Text dimColor>
+                  "✨ Create a new App Store profile for this cert via Apple" runs the same steps via the Apple API — same cert, same bundle ID, no portal navigation, no manual download.
+                </Text>
+                <Newline />
+              </Box>
+            )}
+            <Select
+              options={[
+                ...(canAutoCreate
+                  ? [{ label: '✨  Use "Create a new App Store profile" instead (recommended)', value: 'use-create' }]
+                  : []),
+                { label: '🌐  Open the portal anyway (advanced)', value: 'open-anyway' },
+                ...(canUseFilePicker()
+                  ? [{ label: '📁  I already have a .mobileprovision on disk — let me pick it', value: 'use-file' }]
+                  : []),
+                { label: '↩️   Back to recovery menu', value: 'back' },
+              ]}
+              onChange={(value) => {
+                if (value === 'use-create') {
+                  setStep('import-create-profile-only')
+                  return
+                }
+                if (value === 'use-file') {
+                  mobileprovisionPickerOpenedRef.current = false
+                  setStep('import-provide-profile-path')
+                  return
+                }
+                if (value === 'open-anyway') {
+                  open('https://developer.apple.com/account/resources/profiles/list')
+                  addLog('🌐 Opened Apple Developer Portal — once you have downloaded the .mobileprovision file, come back and pick "📁 Use a .mobileprovision file from disk".', 'yellow')
+                  setStep('import-no-match-recovery')
+                  return
+                }
+                setStep('import-no-match-recovery')
+              }}
+            />
+          </Box>
         )
       })()}
 
