@@ -209,18 +209,13 @@ export interface ImportNoMatchRecoveryStepProps {
   onChange: (value: string) => void
 }
 
-// Comfortable: the original layout — the warning inside an `Alert variant=
-// "warning"` box ("No provisioning profile on this Mac is linked to '{name}'."),
-// a <Newline/>, the full "The cert is in your Keychain but the matching profile
-// isn't on disk. Pick a recovery path:" line, another <Newline/>, then an
-// UN-capped Select listing every recovery option.
-//
-// Dense: the Alert box (whose border + padding wrap the unbounded identity name
-// to several rows) drops to a plain bold yellow warning line — same as the
-// Android keystore explainer's fix, so the long name costs only its wrapped text
-// — the dim line + blank lines shorten/drop, and the Select caps to
-// LIST_VISIBLE_COUNT visible rows with a "… +N more" hint so the (wrapping)
-// recovery options stay within budget at 60 cols.
+// Renders the full layout: the warning inside an `Alert variant="warning"` box
+// ("No provisioning profile on this Mac is linked to '{name}'."), a <Newline/>,
+// the full "The cert is in your Keychain but the matching profile isn't on disk.
+// Pick a recovery path:" line, another <Newline/>, then an UN-capped Select
+// listing every recovery option. (The old adaptive `dense` collapse was dropped
+// once the startup size gate began guaranteeing enough rows; `dense` is still on
+// the props for call-site compatibility but no longer alters the layout.)
 export const ImportNoMatchRecoveryStep: FC<ImportNoMatchRecoveryStepProps> = ({ identityName, options, onChange }) => {
   return (
     <Box flexDirection="column" marginTop={1}>
