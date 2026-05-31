@@ -559,6 +559,7 @@ export const BuildCompleteStep: FC<BuildCompleteStepProps> = ({ buildUrl, ciSecr
         {runHint}
       </Box>
       <Newline />
+      <Text dimColor>Press Enter to finish ›</Text>
     </Box>
   )
 }

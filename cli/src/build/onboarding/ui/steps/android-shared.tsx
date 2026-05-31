@@ -193,6 +193,8 @@ export const BuildCompleteStep: FC<BuildCompleteStepProps> = ({ uploadSummary, b
         </Text>
       </>
     )}
+    <Newline />
+    <Text dimColor>Press Enter to finish ›</Text>
   </Box>
 )
 

@@ -49,7 +49,7 @@ import { CompletedStepsLog } from '../../ui/completed-steps-log.js'
 import { ANDROID_MIN_ROWS, terminalFitsOnboarding } from '../../min-terminal-size.js'
 import { sanitizeBuildLogLines } from '../../build-log.js'
 import { TerminalTooSmallPrompt } from '../../ui/min-size-gate.js'
-import { BOX_HEADER_ROWS, DiffSummary, Divider, FilteredTextInput, FullscreenAiViewer, FullscreenBuildOutput, FullscreenDiffViewer, Header, SecretsTable, SpinnerLine, SuccessLine } from '../../ui/components.js'
+import { BOX_HEADER_ROWS, DiffSummary, Divider, FilteredTextInput, FullscreenAiViewer, FullscreenBuildOutput, FullscreenDiffViewer, Header, isBuildCompleteDismissKey, SecretsTable, SpinnerLine, SuccessLine } from '../../ui/components.js'
 import type { AiResultKind } from '../../ui/components.js'
 import { logBudgetRows } from '../../ui/frame-fit.js'
 import { writeWorkflowFile, WORKFLOW_PATH } from '../../workflow-writer.js'
@@ -669,6 +669,14 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
   useInput((input, key) => {
     if (key.ctrl && input === 'c')
       process.kill(process.pid, 'SIGINT')
+
+    // build-complete is the terminal success screen; it deliberately does not
+    // auto-exit (that would wipe the frame on the alt-screen before it can be
+    // read). Dismiss on Enter/Esc/q so it lasts until the user is ready.
+    if (step === 'build-complete' && isBuildCompleteDismissKey(input, key)) {
+      exit()
+      return
+    }
 
     // preview-workflow-file: Esc skips. Arrows/Enter go to the Select.
     if (step === 'preview-workflow-file' && key.escape) {
@@ -2007,13 +2015,12 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
       if (aiJobId) {
         void releaseCapturedLogs(aiJobId).catch(() => { /* best-effort */ })
       }
-      const timer = setTimeout(() => {
-        if (!cancelled)
-          exit()
-      }, 100)
+      // Do NOT auto-exit here. On the alt-screen, exit() restores the primary
+      // buffer and wipes this success frame instantly — the user never gets to
+      // read it. Stay rendered; a keypress (handled in useInput) exits, after
+      // which command.ts reprints the durable summary to the primary buffer.
       return () => {
         cancelled = true
-        clearTimeout(timer)
         validationCleanupRef.current?.()
         validationCleanupRef.current = null
       }
@@ -2102,6 +2109,28 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
         onExit={() => {
           setAiViewedFull(true)
           setStep('ai-analysis-result')
+        }}
+      />
+    )
+
+  // The workflow-file diff is a fullscreen takeover too (same reasoning as the
+  // AI/build viewers): rendered inside the wizard Box it inherited the header +
+  // padding (a large top gap) and a too-short viewport. As an early return it
+  // owns the whole terminal and fills it.
+  if (step === 'view-workflow-diff' && previewDiff.length > 0)
+    return (
+      <FullscreenDiffViewer
+        title={previewIsNew
+          ? `🆕  Proposed new file — ${previewExistingPath ?? WORKFLOW_PATH}`
+          : `✏️  Proposed changes — ${previewExistingPath ?? WORKFLOW_PATH}`}
+        subtitle={previewIsNew
+          ? 'Nothing exists on disk yet. Every line below is what would be written.'
+          : 'Proposed diff vs the file on disk. Lines marked - would be removed, lines marked + would be added.'}
+        lines={previewDiff}
+        terminalRows={terminalRows}
+        onExit={() => {
+          trackWorkflowEvent('workflow-diff-closed', { decision: 'close' })
+          setStep('preview-workflow-file')
         }}
       />
     )
@@ -3046,22 +3075,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
         <Box marginTop={1}><SpinnerLine text={`Preparing diff for ${WORKFLOW_PATH}…`} /></Box>
       )}
 
-      {step === 'view-workflow-diff' && previewDiff.length > 0 && (
-        <FullscreenDiffViewer
-          title={previewIsNew
-            ? `🆕  Proposed new file — ${previewExistingPath ?? WORKFLOW_PATH}`
-            : `✏️  Proposed changes — ${previewExistingPath ?? WORKFLOW_PATH}`}
-          subtitle={previewIsNew
-            ? 'Nothing exists on disk yet. Every line below is what would be written.'
-            : 'Proposed diff vs the file on disk. Lines marked - would be removed, lines marked + would be added.'}
-          lines={previewDiff}
-          terminalRows={terminalRows}
-          onExit={() => {
-            trackWorkflowEvent('workflow-diff-closed', { decision: 'close' })
-            setStep('preview-workflow-file')
-          }}
-        />
-      )}
+      {/* view-workflow-diff renders as a fullscreen early-return takeover above. */}
 
       {step === 'writing-workflow-file' && (
         <Box flexDirection="column" marginTop={1}>

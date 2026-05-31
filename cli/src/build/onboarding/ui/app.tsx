@@ -54,7 +54,7 @@ import { CompletedStepsLog } from './completed-steps-log.js'
 import { IOS_MIN_ROWS, terminalFitsOnboarding } from '../min-terminal-size.js'
 import { sanitizeBuildLogLines } from '../build-log.js'
 import { TerminalTooSmallPrompt } from './min-size-gate.js'
-import { BOX_HEADER_ROWS, COMPACT_HEADER_ROWS, DiffSummary, Divider, FilteredTextInput, FullscreenAiViewer, FullscreenBuildOutput, FullscreenDiffViewer, Header, SecretsTable, SpinnerLine, SuccessLine, WIZARD_PADDING_ROWS } from './components.js'
+import { BOX_HEADER_ROWS, COMPACT_HEADER_ROWS, DiffSummary, Divider, FilteredTextInput, FullscreenAiViewer, FullscreenBuildOutput, FullscreenDiffViewer, Header, isBuildCompleteDismissKey, SecretsTable, SpinnerLine, SuccessLine, WIZARD_PADDING_ROWS } from './components.js'
 import type { AiResultKind } from './components.js'
 import { logBudgetRows } from './frame-fit.js'
 import { diffLines } from '../diff-utils.js'
@@ -613,6 +613,14 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey, o
   useInput((input, key) => {
     if (key.ctrl && input === 'c') {
       process.kill(process.pid, 'SIGINT')
+      return
+    }
+
+    // build-complete is the terminal success screen; it deliberately does not
+    // auto-exit (that would wipe the frame on the alt-screen before it can be
+    // read). Dismiss on Enter/Esc/q so it lasts until the user is ready.
+    if (step === 'build-complete' && isBuildCompleteDismissKey(input, key)) {
+      exit()
       return
     }
 
@@ -1881,14 +1889,12 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey, o
       if (aiJobId) {
         void releaseCapturedLogs(aiJobId).catch(() => { /* best-effort */ })
       }
-      // Exit immediately after rendering the final screen
-      const timer = setTimeout(() => {
-        if (!cancelled)
-          exit()
-      }, 100)
+      // Do NOT auto-exit here. On the alt-screen, exit() restores the primary
+      // buffer and wipes this success frame instantly — the user never gets to
+      // read it. Stay rendered; a keypress (handled in useInput) exits, after
+      // which command.ts reprints the durable summary to the primary buffer.
       return () => {
         cancelled = true
-        clearTimeout(timer)
       }
     }
 
@@ -2040,6 +2046,28 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey, o
         lines={errorViewerLines}
         terminalRows={terminalRows}
         onExit={() => setErrorViewedFull(true)}
+      />
+    )
+
+  // The workflow-file diff is a fullscreen takeover too (same reasoning as the
+  // AI/build viewers): rendered inside the wizard Box it inherited the header +
+  // padding (a large top gap) and a too-short viewport. As an early return it
+  // owns the whole terminal and fills it.
+  if (step === 'view-workflow-diff' && previewDiff.length > 0)
+    return (
+      <FullscreenDiffViewer
+        title={previewIsNew
+          ? `🆕  Proposed new file — ${previewExistingPath ?? WORKFLOW_PATH}`
+          : `✏️  Proposed changes — ${previewExistingPath ?? WORKFLOW_PATH}`}
+        subtitle={previewIsNew
+          ? 'Nothing exists on disk yet. Every line below is what would be written.'
+          : 'Proposed diff vs the file on disk. Lines marked - would be removed, lines marked + would be added.'}
+        lines={previewDiff}
+        terminalRows={terminalRows}
+        onExit={() => {
+          trackWorkflowEvent('workflow-diff-closed', { decision: 'close' })
+          setStep('preview-workflow-file')
+        }}
       />
     )
 
@@ -2928,22 +2956,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey, o
         </Box>
       )}
 
-      {step === 'view-workflow-diff' && previewDiff.length > 0 && (
-        <FullscreenDiffViewer
-          title={previewIsNew
-            ? `🆕  Proposed new file — ${previewExistingPath ?? WORKFLOW_PATH}`
-            : `✏️  Proposed changes — ${previewExistingPath ?? WORKFLOW_PATH}`}
-          subtitle={previewIsNew
-            ? 'Nothing exists on disk yet. Every line below is what would be written.'
-            : 'Proposed diff vs the file on disk. Lines marked - would be removed, lines marked + would be added.'}
-          lines={previewDiff}
-          terminalRows={terminalRows}
-          onExit={() => {
-            trackWorkflowEvent('workflow-diff-closed', { decision: 'close' })
-            setStep('preview-workflow-file')
-          }}
-        />
-      )}
+      {/* view-workflow-diff renders as a fullscreen early-return takeover above. */}
 
       {step === 'writing-workflow-file' && (
         <Box flexDirection="column" marginTop={1}>

@@ -328,6 +328,18 @@ export const FullscreenAiViewer: FC<{
   )
 }
 
+// Pure predicate for the build-complete success screen. The wizard deliberately
+// does NOT auto-exit there (on the alt-screen, exit() wipes the final frame
+// instantly); instead it waits for the user to dismiss with Enter / Esc / q.
+// Extracted as a pure function so the exit behavior is unit-testable without
+// rendering the whole app (same rationale as buildScrollAction).
+export function isBuildCompleteDismissKey(
+  input: string,
+  key: { return?: boolean, escape?: boolean },
+): boolean {
+  return Boolean(key.return || key.escape || input === 'q')
+}
+
 // Pure keypress → scroll/follow transition for the streaming build viewer
 // (extracted so the scroll logic is unit-testable without rendering, like
 // platformKeyAction). Returns the next { scrollOffset, follow } or null for an
@@ -563,7 +575,27 @@ export const FullscreenDiffViewer: FC<{
   terminalRows: number
   onExit: () => void
 }> = ({ title, subtitle, lines, terminalRows, onExit }) => {
-  const viewportRows = Math.max(1, Math.min(lines.length || 1, terminalRows - 12))
+  // Read the live terminal size each render + re-render on resize (same as
+  // FullscreenAiViewer). The parent renders this as a fullscreen early-return
+  // takeover, so it owns the whole terminal: reserve only the real chrome
+  // (7 rows — title + subtitle + two dividers + summary + position + exit hint)
+  // and let the viewport fill the rest. Previously this reserved 12 AND rendered
+  // inside the wizard Box, so a big top gap + a short viewport wasted the screen.
+  const { stdout } = useStdout()
+  const [, forceResize] = useState(0)
+  useEffect(() => {
+    if (!stdout)
+      return
+    const onResize = (): void => forceResize(n => n + 1)
+    stdout.on('resize', onResize)
+    return () => {
+      stdout.off('resize', onResize)
+    }
+  }, [stdout])
+  const dims = { rows: stdout?.rows ?? terminalRows, cols: stdout?.columns ?? 80 }
+  const dividerWidth = Math.max(10, Math.min(60, dims.cols - 1))
+  const DIFF_CHROME_ROWS = 7
+  const viewportRows = Math.max(1, dims.rows - DIFF_CHROME_ROWS)
   const [scrollOffset, setScrollOffset] = useState(0)
   const { addCount, delCount, total } = getDiffCounts(lines)
   const maxScrollOffset = Math.max(0, lines.length - viewportRows)
@@ -573,7 +605,7 @@ export const FullscreenDiffViewer: FC<{
   }, [maxScrollOffset])
 
   useInput((input, key) => {
-    if (key.escape) {
+    if (key.escape || key.return) {
       onExit()
       return
     }
@@ -600,42 +632,47 @@ export const FullscreenDiffViewer: FC<{
   const lineNumberWidth = String(Math.max(total, 1)).length
 
   return (
-    <Box flexDirection="column">
-      <Text bold color="cyan">{title}</Text>
-      {subtitle && <Text dimColor>{subtitle}</Text>}
-      <Text color="cyan">{'─'.repeat(60)}</Text>
+    // minHeight fills the whole terminal; the fixed-height content box below
+    // clips overflow so the footer stays pinned at the bottom and the frame
+    // height is constant — no dead space regardless of scroll position.
+    <Box flexDirection="column" minHeight={dims.rows}>
+      <Text bold color="cyan" wrap="truncate-end">{title}</Text>
+      {subtitle && <Text dimColor wrap="truncate-end">{subtitle}</Text>}
+      <Text color="cyan">{'─'.repeat(dividerWidth)}</Text>
       <Text dimColor>
         {'Summary:  '}
         <Text color="green">{`+${addCount} added`}</Text>
         {'   '}
         <Text color="red">{`-${delCount} removed`}</Text>
       </Text>
-      {visibleLines.map((line, index) => {
-        const lineNumber = String(scrollOffset + index + 1).padStart(lineNumberWidth, ' ')
-        if (line.kind === 'add') {
+      <Box flexDirection="column" height={viewportRows} overflow="hidden">
+        {visibleLines.map((line, index) => {
+          const lineNumber = String(scrollOffset + index + 1).padStart(lineNumberWidth, ' ')
+          if (line.kind === 'add') {
+            return (
+              <Text key={`line-${scrollOffset + index}`} color="green" wrap="truncate-end">
+                {`${lineNumber} + `}
+                {line.text}
+              </Text>
+            )
+          }
+          if (line.kind === 'del') {
+            return (
+              <Text key={`line-${scrollOffset + index}`} color="red" wrap="truncate-end">
+                {`${lineNumber} - `}
+                {line.text}
+              </Text>
+            )
+          }
           return (
-            <Text key={`line-${scrollOffset + index}`} color="green">
-              {`${lineNumber} + `}
+            <Text key={`line-${scrollOffset + index}`} dimColor wrap="truncate-end">
+              {`${lineNumber}   `}
               {line.text}
             </Text>
           )
-        }
-        if (line.kind === 'del') {
-          return (
-            <Text key={`line-${scrollOffset + index}`} color="red">
-              {`${lineNumber} - `}
-              {line.text}
-            </Text>
-          )
-        }
-        return (
-          <Text key={`line-${scrollOffset + index}`} dimColor>
-            {`${lineNumber}   `}
-            {line.text}
-          </Text>
-        )
-      })}
-      <Text color="cyan">{'─'.repeat(60)}</Text>
+        })}
+      </Box>
+      <Text color="cyan">{'─'.repeat(dividerWidth)}</Text>
       <Text dimColor>
         {`Showing ${firstVisibleLine}-${lastVisibleLine} of ${total} lines. Use ↑/↓ or k/j to scroll.`}
       </Text>
