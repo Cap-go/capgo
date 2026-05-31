@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { getImportEntryStep, getResumeStep } from '../src/build/onboarding/progress.ts'
+import { extractKeyIdFromP8Path, getImportEntryStep, getResumeStep } from '../src/build/onboarding/progress.ts'
 
 function t(name, fn) {
   try {
@@ -134,4 +134,31 @@ t('getResumeStep still returns import-scanning for verified import flow', () => 
     completedSteps: { apiKeyVerified: { keyId: 'X', issuerId: 'Y' } },
   })
   assert.equal(getResumeStep(progress), 'import-scanning')
+})
+
+// ─── extractKeyIdFromP8Path — Key ID recovered from the .p8 filename ──────────
+// Regression: a session that picked the .p8 but quit before confirming the Key
+// ID step used to come back with an empty field (the "ABC123DEF" placeholder).
+// The Key ID is now re-derived from the saved p8Path filename on resume.
+
+t('extracts the Key ID from an AuthKey_<id>.p8 filename', () => {
+  assert.equal(extractKeyIdFromP8Path('/Users/me/AuthKey_66FGQZB566.p8'), '66FGQZB566')
+})
+
+t('extracts from the legacy ApiKey_ prefix too', () => {
+  assert.equal(extractKeyIdFromP8Path('~/Downloads/ApiKey_ABC123DEF.p8'), 'ABC123DEF')
+})
+
+t('matches the prefix case-insensitively', () => {
+  assert.equal(extractKeyIdFromP8Path('/x/authkey_9Z9ZZZ9Z9Z.p8'), '9Z9ZZZ9Z9Z')
+})
+
+t('returns empty for a renamed / non-matching filename', () => {
+  assert.equal(extractKeyIdFromP8Path('/Users/me/my-apple-key.p8'), '')
+  assert.equal(extractKeyIdFromP8Path('/Users/me/AuthKey_66FGQZB566.pem'), '')
+  assert.equal(extractKeyIdFromP8Path(''), '')
+})
+
+t('only matches the key id at the end of the path (not a mid-path token)', () => {
+  assert.equal(extractKeyIdFromP8Path('/AuthKey_NOPE/actual-file.p8'), '')
 })
