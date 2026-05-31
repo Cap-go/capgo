@@ -47,14 +47,6 @@ import { Box, Newline, Text } from 'ink'
 import React from 'react'
 import { AiResultBanner, ErrorLine, SpinnerLine, SuccessLine } from '../components.js'
 
-// A single Select option. Mirrors the shape @inkjs/ui's Select expects so the
-// parent can build option lists and pass them straight through. Matches the
-// other step files' SelectOption.
-export interface SelectOption {
-  label: string
-  value: string
-}
-
 // ── welcome ─────────────────────────────────────────────────────────────────
 export const WelcomeStep: FC = () => (
   <Box marginTop={1} justifyContent="center">

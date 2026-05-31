@@ -21,29 +21,13 @@ export const COMPACT_HEADER_ROWS = 1
 // The outer wizard <Box> uses padding={1} → one row top + one row bottom.
 export const WIZARD_PADDING_ROWS = 2
 
-// Frame-fit contract. Every rendered frame must fit within MAX_FRAME_ROWS
-// terminal rows so the wizard never surprises the user with a "terminal too
-// small" block after a step that fit. A frame = adaptive header + body +
-// padding; with the one-line compact header the body's row budget is the
-// constant below. Each step BODY component is unit-tested (see
-// test/helpers/frame-fit.mjs) to render within BODY_BUDGET_ROWS at the
+// Frame-fit contract. Every rendered frame must fit within the 16-row floor so
+// the wizard never surprises the user with a "terminal too small" block after a
+// step that fit. A frame = adaptive header + body + padding; with the one-line
+// compact header the body's row budget is 13 rows. Each step BODY component is
+// unit-tested (see test/helpers/frame-fit.mjs, which derives the budget from
+// COMPACT_HEADER_ROWS + WIZARD_PADDING_ROWS) to render within that budget at the
 // reference widths, so a too-tall step can never silently regress.
-export const MAX_FRAME_ROWS = 16
-export const BODY_BUDGET_ROWS = MAX_FRAME_ROWS - COMPACT_HEADER_ROWS - WIZARD_PADDING_ROWS // 13
-
-// Shown in place of the step content when even the one-line header + the
-// step's content won't fit the current viewport. Kept to TWO rows with no
-// padding: in the alt buffer the TOP of overflowing content is what gets
-// clipped, so the fewer rows this occupies the more likely the user sees the
-// actionable instruction even on a very short terminal. `neededRows` is the
-// measured target height (body + one-line header + padding) so the message
-// can tell the user concretely how tall to make the window.
-export const TerminalTooSmall: FC<{ rows: number, neededRows: number }> = ({ rows, neededRows }) => (
-  <Box flexDirection="column">
-    <Text color="yellow" bold>{`⚠  Terminal too small (${rows} row${rows === 1 ? '' : 's'})`}</Text>
-    <Text>{`Resize taller — at least ${neededRows} rows — to continue onboarding.`}</Text>
-  </Box>
-)
 
 export const SpinnerLine: FC<{ text: string }> = ({ text }) => (
   <Box>

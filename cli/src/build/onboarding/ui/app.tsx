@@ -1984,10 +1984,8 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
   // with the resize prompt instead.)
 
   // The fullscreen AI viewer is a takeover: render it as an EARLY RETURN so it
-  // owns the whole terminal and bypasses the body-measurement / dense /
-  // too-small logic above. (If it rendered inside the measured body, its
-  // full-height body would trip `shouldCollapseToDense`/`tooSmall` and get
-  // replaced by the resize prompt.) It fills the screen itself via minHeight.
+  // owns the whole terminal and bypasses the regular wizard frame above. It
+  // fills the screen itself via minHeight.
   if (isAiResultScroll && aiAnalysisText)
     return (
       <FullscreenAiViewer

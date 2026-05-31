@@ -41,8 +41,9 @@ export const ANDROID_MIN_ROWS = 49
 
 // Conservative default for platform-agnostic callers (the generic MinSizeGate /
 // TerminalTooSmallPrompt default): the LARGER floor, so a gate with no platform
-// context never under-reserves.
-export const MIN_ROWS = ANDROID_MIN_ROWS
+// context never under-reserves. Computed (not aliased to ANDROID_MIN_ROWS) so it
+// stays correct if the per-platform floors are ever reordered.
+export const MIN_ROWS = Math.max(IOS_MIN_ROWS, ANDROID_MIN_ROWS)
 
 /** The full-onboarding row floor for a given platform. */
 export function onboardingMinRows(platform: 'ios' | 'android'): number {

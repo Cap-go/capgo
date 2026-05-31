@@ -158,16 +158,6 @@ export const AskCiSecretsStep: FC<AskCiSecretsStepProps> = ({ entryCount, target
   </Box>
 )
 
-// ── checking-ci-secrets (spinner) ─────────────────────────────────────────────
-
-export interface CheckingCiSecretsStepProps {
-  targetLabel: string
-}
-
-export const CheckingCiSecretsStep: FC<CheckingCiSecretsStepProps> = ({ targetLabel }) => (
-  <Box marginTop={1}><SpinnerLine text={`Checking existing env vars in ${targetLabel}...`} /></Box>
-)
-
 // ── confirm-ci-secret-overwrite ───────────────────────────────────────────────
 // `existingKeys` are the env-var names already present on the target that the
 // upload would replace. Comfortable: the original listed every key indented
@@ -203,16 +193,6 @@ export const ConfirmCiSecretOverwriteStep: FC<ConfirmCiSecretOverwriteStepProps>
     </Box>
   )
 }
-
-// ── uploading-ci-secrets (spinner) ────────────────────────────────────────────
-
-export interface UploadingCiSecretsStepProps {
-  targetLabel: string
-}
-
-export const UploadingCiSecretsStep: FC<UploadingCiSecretsStepProps> = ({ targetLabel }) => (
-  <Box marginTop={1}><SpinnerLine text={`Uploading env vars to ${targetLabel}...`} /></Box>
-)
 
 // ── ci-secrets-failed (error) ─────────────────────────────────────────────────
 // `error` is the upload failure detail and can be long (CLI stderr).

@@ -8,12 +8,18 @@
 //
 // Contract: each STEP BODY must render within BODY_BUDGET_ROWS rows at every
 // REFERENCE_WIDTH, which guarantees the full frame (compact header + body +
-// padding) fits MAX_FRAME_ROWS. See components.tsx for the constants.
+// padding) fits MAX_FRAME_ROWS. The header/padding row costs live in
+// components.tsx; the frame budget is a test-only contract, so it's derived
+// here from those costs rather than exported from production.
 import { EventEmitter } from 'node:events'
 import { render as inkRender } from 'ink'
-import { BODY_BUDGET_ROWS, MAX_FRAME_ROWS } from '../../src/build/onboarding/ui/components.tsx'
+import { COMPACT_HEADER_ROWS, WIZARD_PADDING_ROWS } from '../../src/build/onboarding/ui/components.tsx'
 
-export { BODY_BUDGET_ROWS, MAX_FRAME_ROWS }
+// The 16-row frame floor and the body's share of it (frame minus the one-line
+// compact header + the wizard's outer padding = 13). Kept in the test harness
+// because only the per-component frame-fit tests consume them.
+export const MAX_FRAME_ROWS = 16
+export const BODY_BUDGET_ROWS = MAX_FRAME_ROWS - COMPACT_HEADER_ROWS - WIZARD_PADDING_ROWS // 13
 
 // Widths we guarantee the contract at. 80 = standard; 60 = a narrow case so
 // text wrapping can't sneak a violation past us. Below ~60 cols the runtime

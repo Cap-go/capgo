@@ -23,14 +23,14 @@
 // takeover / pre-flow frames that hide the progress bar (welcome, no-platform,
 // build-complete, adding-platform).
 import React from 'react'
+import * as androidCi from '../../src/build/onboarding/ui/steps/android-ci.tsx'
 import * as ks from '../../src/build/onboarding/ui/steps/android-keystore.tsx'
 import * as sa from '../../src/build/onboarding/ui/steps/android-sa-gcp.tsx'
 import * as ash from '../../src/build/onboarding/ui/steps/android-shared.tsx'
-import * as aci from '../../src/build/onboarding/ui/steps/android-ci.tsx'
+import * as cic from '../../src/build/onboarding/ui/steps/ios-ci.tsx'
 import * as cred from '../../src/build/onboarding/ui/steps/ios-credentials.tsx'
 import * as imp from '../../src/build/onboarding/ui/steps/ios-import.tsx'
 import * as ish from '../../src/build/onboarding/ui/steps/ios-shared.tsx'
-import * as cic from '../../src/build/onboarding/ui/steps/ios-ci.tsx'
 
 const h = React.createElement
 const noop = () => {}
@@ -117,8 +117,8 @@ export function staticStepFixtures() {
     f('build-complete', h(ash.BuildCompleteStep, { uploadSummary: null, buildUrl: 'https://capgo.app/app/com.example.app/builds', ...C }), false),
     f('error', h(ash.ErrorStep, { message: LONG_ERR, onChoose: noop, ...C })),
     // ── ci ──────────────────────────────────────────────────────────────────
-    f('ci-secrets-setup', h(aci.CiSecretsSetupStep, { advice: CI_ADVICE, onChoose: noop, ...C })),
-    f('ci-secrets-target-select', h(aci.CiSecretsTargetSelectStep, { options: opt(8), onChange: noop, ...C })),
-    f('ask-ci-secrets', h(aci.AskCiSecretsStep, { entryCount: 12, targetLabel: 'GitLab CI/CD', cli: 'glab', onChoose: noop, ...C })),
+    f('ci-secrets-setup', h(androidCi.CiSecretsSetupStep, { advice: CI_ADVICE, onChoose: noop, ...C })),
+    f('ci-secrets-target-select', h(androidCi.CiSecretsTargetSelectStep, { options: opt(8), onChange: noop, ...C })),
+    f('ask-ci-secrets', h(androidCi.AskCiSecretsStep, { entryCount: 12, targetLabel: 'GitLab CI/CD', cli: 'glab', onChoose: noop, ...C })),
   ]
 }
