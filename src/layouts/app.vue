@@ -170,8 +170,8 @@ function handleSecondaryTab(key: string) {
     />
     <main class="relative flex flex-1 w-full min-h-0 mt-0 overflow-hidden bg-blue-50 dark:bg-slate-800/40">
       <div
-        class="flex-1 w-full min-h-0 mx-auto overflow-y-auto"
-        :class="{ 'blur-sm pointer-events-none select-none': showPaymentOverlay }"
+        class="flex-1 w-full min-h-0 mx-auto"
+        :class="showPaymentOverlay ? 'overflow-hidden blur-sm pointer-events-none select-none' : 'overflow-y-auto'"
       >
         <RouterView class="w-full" />
       </div>

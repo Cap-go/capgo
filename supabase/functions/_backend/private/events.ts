@@ -269,7 +269,14 @@ app.post('/', middlewareV2(['read', 'write', 'all', 'upload']), async (c) => {
   // lifecycle automation can react. Mirrors the builder block above; resolves
   // org/app names + the freshly created version id for the payload.
   let bundleIncompatibleBentoEvent: BentoTrackingPayload | undefined
-  if (onboardingOrgId && appId && trackedBody.event === BUNDLE_INCOMPATIBLE_EVENT) {
+  // PostHog records every incompatible upload (tracking runs unconditionally
+  // below). Skip the org/app/version lookups + email unless the incompatible
+  // bundle actually went live — i.e. the upload overwrote the channel's version.
+  // (buildBundleCompatibilityBentoEvent re-checks channelOverwritten too, so the
+  // gate stays unit-tested even though we short-circuit the DB work here.)
+  const channelOverwritten = trackedBody.tags?.channel_overwritten === true
+    || trackedBody.tags?.channel_overwritten === 'true'
+  if (onboardingOrgId && appId && trackedBody.event === BUNDLE_INCOMPATIBLE_EVENT && channelOverwritten) {
     const tags = trackedBody.tags ?? {}
     const versionNewName = typeof tags.version_new_name === 'string' && tags.version_new_name.length > 0
       ? tags.version_new_name
@@ -302,6 +309,7 @@ app.post('/', middlewareV2(['read', 'write', 'all', 'upload']), async (c) => {
         event: trackedBody.event,
         orgId: onboardingOrgId,
         appId,
+        channelOverwritten,
         channel: typeof tags.channel === 'string' ? tags.channel : undefined,
         source: typeof tags.source === 'string' ? tags.source : undefined,
         versionNewId,

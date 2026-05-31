@@ -3592,6 +3592,45 @@ export type Database = {
         Args: { apikey: string; app_id: string }
         Returns: string
       }
+      get_org_apps_with_last_upload: {
+        Args: {
+          p_limit?: number
+          p_offset?: number
+          p_org_id: string
+          p_search?: string
+          p_sort_by?: string
+          p_sort_desc?: boolean
+        }
+        Returns: {
+          allow_device_custom_id: boolean
+          allow_preview: boolean
+          android_store_url: string | null
+          app_id: string
+          build_timeout_seconds: number
+          build_timeout_updated_at: string
+          channel_device_count: number
+          created_at: string | null
+          default_upload_channel: string
+          existing_app: boolean
+          expose_metadata: boolean
+          icon_url: string
+          id: string | null
+          ios_store_url: string | null
+          last_upload_at: string | null
+          last_version: string | null
+          manifest_bundle_count: number
+          name: string | null
+          need_onboarding: boolean
+          owner_org: string
+          retention: number
+          stats_refresh_requested_at: string | null
+          stats_updated_at: string | null
+          total_count: number
+          transfer_history: Json[] | null
+          updated_at: string | null
+          user_id: string | null
+        }[]
+      }
       get_org_perm_for_apikey_v2: {
         Args: { apikey: string; app_id: string }
         Returns: string

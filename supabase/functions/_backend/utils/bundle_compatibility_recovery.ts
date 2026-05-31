@@ -1,16 +1,14 @@
 import type { BentoTrackingPayload } from './tracking.ts'
 
 /**
- * The CLI emits a `Bundle Incompatible` tracking event whenever a bundle's
- * native dependencies don't match the version currently live on the target
- * channel. It fires from two flows:
- * - `bundle upload` (after the new version is created), and
- * - the standalone `capgo bundle compatibility` command.
- *
- * We turn that into a Bento signal event so a lifecycle automation can react
- * (e.g. nudge the org toward a native rebuild / Capgo Builder). Delivery and
- * email gating are handled by `sendNotifToOrgMembers` via the dedicated
- * `bundle_incompatible` preference key. Mirrors `buildBuilderOnboardingBentoEvent`.
+ * The CLI emits a `Bundle Incompatible` tracking event when a `bundle upload`'s
+ * native dependencies don't match the version currently live on the channel.
+ * PostHog records every such upload; this helper builds the Bento payload only
+ * when the incompatible bundle actually went live — i.e. the upload overwrote
+ * the channel's version (`channelOverwritten`) — so org admins are emailed only
+ * when it can affect users. Delivery + email gating run through
+ * `sendNotifToOrgMembers` via the dedicated `bundle_incompatible` preference key.
+ * Mirrors `buildBuilderOnboardingBentoEvent`.
  */
 export const BUNDLE_INCOMPATIBLE_EVENT = 'Bundle Incompatible'
 
@@ -19,17 +17,20 @@ export interface BundleCompatibilityBentoInput {
   event: string
   orgId: string | undefined
   appId: string | undefined
+  /**
+   * True only when the upload overwrote the channel's live version. The Bento
+   * email is built only in that case; PostHog still records every incompatible
+   * upload upstream.
+   */
+  channelOverwritten: boolean | undefined
   /** Channel the bundle was checked against. */
   channel: string | undefined
-  /** Which flow detected the incompatibility: 'upload' | 'command'. */
+  /** Which flow emitted the event (currently always 'upload'). */
   source: string | undefined
-  /**
-   * New bundle being uploaded. Empty for the standalone command, which uploads
-   * nothing — only the upload flow has a freshly created version.
-   */
+  /** The freshly uploaded bundle (its id is resolved server-side). */
   versionNewId: string | undefined
   versionNewName: string | undefined
-  /** Version currently live on the channel that the bundle was compared against. */
+  /** Version that was live on the channel before this upload. */
   versionOldId: string | undefined
   versionOldName: string | undefined
   orgName: string | undefined
@@ -46,6 +47,11 @@ export function buildBundleCompatibilityBentoEvent(input: BundleCompatibilityBen
     return undefined
   if (!input.orgId || !input.appId)
     return undefined
+  // Email gate: only build a payload when the incompatible bundle actually went
+  // live (the upload overwrote the channel's version). PostHog still records the
+  // event upstream regardless of this.
+  if (!input.channelOverwritten)
+    return undefined
 
   const source = input.source ?? 'unknown'
   const channel = input.channel ?? ''
@@ -57,10 +63,8 @@ export function buildBundleCompatibilityBentoEvent(input: BundleCompatibilityBen
     // Dedicated key — independent from other bundle/OTA email preferences.
     preferenceKey: 'bundle_incompatible',
     // Permanent per app+channel+version claim (no reopening cron window): repeated
-    // incompatible uploads / `bundle compatibility` checks of the SAME version must
-    // not re-email org admins. A genuinely new version has a different uniqId and
-    // notifies on its own; the old version is the fallback for the command flow
-    // (which uploads no new bundle).
+    // incompatible uploads of the SAME version must not re-email org admins. A
+    // genuinely new version has a different uniqId and notifies on its own.
     once: true,
     uniqId: `bundle_incompatible:${input.appId}:${channel}:${versionNewName || versionOldName}`,
     data: {
