@@ -227,7 +227,10 @@ async function verifyCompatibility(supabase: SupabaseType, pm: pmType, options: 
     tags: {
       result: compatibilitySummary.result,
       incompatible_count: compatibilitySummary.incompatibleCount,
+      // `channel` is overwritten by the event category ('bundle') in PostHog, so
+      // also send channel_name to keep the app channel queryable.
       channel,
+      channel_name: channel,
       ...(compatibilitySummary.reasons.length > 0 ? { reasons: compatibilitySummary.reasons.join(',') } : {}),
       ...(compatibilitySkipReason ? { skip_reason: compatibilitySkipReason } : {}),
     },
@@ -1367,7 +1370,10 @@ export async function uploadBundleInternal(preAppid: string, options: OptionsUpl
       orgId,
       tags: {
         source: 'upload',
+        // `channel` is overwritten by the event category ('bundle') in PostHog
+        // (the backend still reads tags.channel); channel_name keeps it queryable.
         channel,
+        channel_name: channel,
         channel_overwritten: channelVersionSet,
         version_new_name: bundle,
         ...(compatibility.versionOldId ? { version_old_id: compatibility.versionOldId } : {}),
