@@ -14,9 +14,14 @@ import type { FC, ReactNode } from 'react'
 //     in-progress step state and (via Ink teardown effects) could exit the whole
 //     wizard. Keeping it mounted means a shrink shows the prompt and a re-grow
 //     shows the exact same step, with no lost state and no exit.
-//   • MinSizeGate — a convenience wrapper (fits ? children : prompt) for callers
-//     with no precious state to preserve (e.g. the shell's pre-platform picker),
-//     where unmounting children on resize is harmless.
+//   • MinSizeGate — a convenience wrapper (fits ? children : prompt), gated on the
+//     full onboarding floor (terminalFitsOnboarding), for callers with no precious
+//     state to preserve where unmounting children on resize is harmless. NOTE: the
+//     shell does NOT use this for the platform picker — the picker has its own,
+//     much smaller floor and is gated directly with terminalFitsPicker +
+//     TerminalTooSmallPrompt(PICKER_MIN_*) in shell.tsx. MinSizeGate is currently
+//     unused by the picker path; it remains for any caller wanting the full-floor
+//     wrapper.
 //
 // Both are resize-reactive: callers pass cols/rows from useTerminalSize, which
 // re-renders on every resize event.

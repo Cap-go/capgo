@@ -458,11 +458,11 @@ export const ErrorStep: FC<ErrorStepProps> = ({ error, recoveryAdvice, supportBu
 // ── build-complete ──────────────────────────────────────────────────────────────
 // Final success screen. `buildUrl` (when a build was kicked off) and
 // `ciSecretUploadSummary` (when env vars were uploaded) are optional details.
-// `buildRequestCommand` is shown as the "run anytime" hint. The bordered box is
-// kept in BOTH forms (this is a terminal frame, not an interactive step that
-// risks clipping). The comfortable form (default) restores the original
-// `paddingY={1}` inside the box plus the blank-line spacing around and inside
-// it; the dense form drops that vertical padding/spacing to fit the floor.
+// `buildRequestCommand` is shown as the "run anytime" hint. Always renders the
+// comfortable form: the bordered box with `paddingY={1}` plus the blank-line
+// spacing around and inside it. (The startup size gate guarantees enough rows,
+// so the old adaptive `dense` collapse was dropped; the `dense` prop is accepted
+// for call-site compatibility but no longer alters the layout.)
 export interface BuildCompleteStepProps {
   buildUrl: string
   ciSecretUploadSummary: string | null

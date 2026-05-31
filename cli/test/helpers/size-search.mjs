@@ -8,8 +8,8 @@
 // The search is two independent 1-D searches because cols and rows affect fit
 // almost separably: cols drives text WRAPPING (narrower → taller frames), rows
 // is the vertical budget. We:
-//   1. Pick a generous rows budget, binary-search the minimal COLS at which no
-//      frame's natural width is mangled and wrapping stays bounded.
+//   1. Pick a generous rows budget, linearly scan upward for the minimal COLS at
+//      which no frame's natural width is mangled and wrapping stays bounded.
 //   2. At that cols, find the minimal ROWS = max over frames of naturalRows
 //      (the tallest frame's height) — that's the vertical floor.
 //   3. Verify the (cols, rows) pair passes all checks together.

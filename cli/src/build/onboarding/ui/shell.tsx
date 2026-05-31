@@ -18,7 +18,7 @@ import type { OnboardingResult, Platform } from '../types.js'
 //
 // `command.ts` passes `initialPlatform` to skip the picker, and
 // `onResolvePlatform` so it can print the post-exit completion breadcrumb.
-import { Box, useStdout } from 'ink'
+import { Box, Text, useApp, useStdout } from 'ink'
 import React, { useCallback, useEffect, useState } from 'react'
 import { loadAndroidProgress } from '../android/progress.js'
 import AndroidOnboardingApp from '../android/ui/app.js'
@@ -90,22 +90,51 @@ export interface OnboardingShellProps {
 }
 
 const OnboardingShell: FC<OnboardingShellProps> = ({ appId, iosDir, androidDir, apikey, initialPlatform, onResolvePlatform, onResult }) => {
+  const { exit } = useApp()
   const { cols, rows } = useTerminalSize()
   const [ready, setReady] = useState<ReadyApp | null>(null)
+  // Set when progress loading fails (e.g. corrupt saved-progress JSON). loadProgress
+  // throws for non-ENOENT errors, so without a rejection handler `choose` would
+  // leave an unhandled promise rejection and the picker stuck with no feedback.
+  const [loadError, setLoadError] = useState<string | null>(null)
 
   // Begin loading the chosen platform's progress; mount the app once it lands.
   // The picker stays on screen during the (few-ms) load, so there's no loading
   // frame on the picker path.
   const choose = useCallback((platform: Platform) => {
     onResolvePlatform?.(platform)
-    void loadReady(platform, appId).then(setReady)
-  }, [appId, onResolvePlatform])
+    void loadReady(platform, appId)
+      .then(setReady)
+      .catch((err: unknown) => {
+        // Surface the failure instead of hanging: show an error frame, report a
+        // cancelled outcome (so the caller doesn't claim success), and exit. The
+        // common cause is unreadable/corrupt saved progress on disk.
+        const message = err instanceof Error ? err.message : String(err)
+        setLoadError(message)
+        onResult?.({ outcome: 'cancelled' })
+        setTimeout(() => exit(), 50)
+      })
+  }, [appId, onResolvePlatform, onResult, exit])
 
   // Pre-resolved platform → load immediately (no picker shown).
   useEffect(() => {
     if (initialPlatform)
       choose(initialPlatform)
   }, [initialPlatform, choose])
+
+  // Progress load failed (corrupt/unreadable saved state) — show why and exit,
+  // rather than hanging on a frozen picker. The exit is scheduled in the .catch.
+  if (loadError) {
+    return (
+      <Box flexDirection="column" minHeight={rows} padding={1}>
+        <Text bold color="red">{`✖  Could not load onboarding progress for ${appId}.`}</Text>
+        <Text>{loadError}</Text>
+        <Box marginTop={1}>
+          <Text dimColor>Your saved progress file may be corrupt. Remove it and re-run `capgo build init`.</Text>
+        </Box>
+      </Box>
+    )
+  }
 
   // Render the chosen app DIRECTLY (no MinSizeGate wrapper). Each app self-gates
   // internally (renders the resize prompt from its own render when the terminal

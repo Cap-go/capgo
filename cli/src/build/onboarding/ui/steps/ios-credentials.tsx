@@ -122,13 +122,13 @@ export const SetupMethodSelectStep: FC<SetupMethodSelectStepProps> = ({ dense = 
 // (Select) or a direct path input (FilteredTextInput). The submit handler for
 // the no-picker path is owned by the parent. Telemetry/file-reads happen there.
 //
-// Comfortable: the info Alert, a <Newline/>, the FOUR numbered setup steps in a
-// marginLeft box, a <Newline/>, the "Press Ctrl+O" hint, a <Newline/>, a
-// Divider, another <Newline/>, then the control (with a <Newline/> before the
-// picker Select). Dense: the steps collapse to THREE terser lines (the Ctrl+O
-// hint folds into step 3), the standalone Ctrl+O line + blank lines drop, and
-// the Divider sits directly above the control so the instructions + control fit
-// the budget at 60 cols.
+// Renders the full comfortable form: the info Alert, a <Newline/>, the FOUR
+// numbered setup steps in a marginLeft box, a <Newline/>, the "Press Ctrl+O"
+// hint, a <Newline/>, a Divider, another <Newline/>, then the control (with a
+// <Newline/> before the picker Select). (The startup size gate guarantees the
+// terminal is tall enough, so the old adaptive `dense` collapse was dropped; the
+// `dense` prop is accepted for call-site compatibility but no longer alters the
+// layout — see the per-platform floor in min-terminal-size.ts.)
 export interface ApiKeyInstructionsStepProps {
   canUseFilePicker: boolean
   dense?: boolean
