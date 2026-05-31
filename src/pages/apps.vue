@@ -135,11 +135,11 @@ async function getMyApps() {
     totalApps.value = rows[0]?.total_count ?? 0
 
     apps.value = rows.map(app => ({
-      ...appWithImmediateIcon(app as unknown as AppRow),
+      ...appWithImmediateIcon(app),
       last_upload_at: app.last_upload_at ?? null,
     }))
     if (rows.length)
-      loadAppIcons(rows as unknown as AppRow[], currentRun)
+      loadAppIcons(rows, currentRun)
   }
   finally {
     isTableLoading.value = false
