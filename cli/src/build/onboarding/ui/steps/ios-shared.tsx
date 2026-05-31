@@ -139,7 +139,7 @@ export interface AiAnalysisPromptStepProps {
 export const AiAnalysisPromptStep: FC<AiAnalysisPromptStepProps> = ({ dense = false, onChange }) => (
   <Box flexDirection="column" marginTop={1} gap={dense ? 0 : 1}>
     <ErrorLine text="Build failed." />
-    <Text>We can analyze the build log with Capgo AI (Kimi K2.5) and suggest a fix.</Text>
+    <Text>We can analyze the build log with Capgo AI and suggest a fix.</Text>
     <Select
       options={[
         { label: '🤖  Debug with AI', value: 'debug' },
@@ -153,7 +153,7 @@ export const AiAnalysisPromptStep: FC<AiAnalysisPromptStepProps> = ({ dense = fa
 // ── ai-analysis-running ─────────────────────────────────────────────────────────
 export const AiAnalysisRunningStep: FC = () => (
   <Box flexDirection="column" marginTop={1}>
-    <SpinnerLine text="Analyzing build log with Capgo AI (Kimi K2.5)..." />
+    <SpinnerLine text="Analyzing build log with Capgo AI..." />
   </Box>
 )
 

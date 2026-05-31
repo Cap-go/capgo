@@ -239,7 +239,7 @@ export const AiAnalysisPromptStep: FC<AiAnalysisPromptStepProps> = ({ onChoose, 
   <Box flexDirection="column" marginTop={1}>
     <ErrorLine text="Build failed." />
     {!dense && <Newline />}
-    <Text>We can analyze the build log with Capgo AI (Kimi K2.5) and suggest a fix.</Text>
+    <Text>We can analyze the build log with Capgo AI and suggest a fix.</Text>
     {!dense && <Newline />}
     <Select
       options={[
@@ -256,7 +256,7 @@ export const AiAnalysisPromptStep: FC<AiAnalysisPromptStepProps> = ({ onChoose, 
 
 export const AiAnalysisRunningStep: FC = () => (
   <Box flexDirection="column" marginTop={1}>
-    <SpinnerLine text="Analyzing build log with Capgo AI (Kimi K2.5)..." />
+    <SpinnerLine text="Analyzing build log with Capgo AI..." />
   </Box>
 )
 
