@@ -10,12 +10,13 @@ import { copyFile, readFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { join, resolve } from 'node:path'
 import process from 'node:process'
-import { ProgressBar, Select } from '@inkjs/ui'
+import { Alert, ProgressBar, Select } from '@inkjs/ui'
 import type { DOMElement } from 'ink'
 import { Box, measureElement, Newline, Text, useApp, useInput, useStdout } from 'ink'
 import open from 'open'
 // src/build/onboarding/ui/app.tsx
-import React, { useCallback, useEffect, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { detectIosBundleIds } from '../bundle-id-detector.js'
 import { writeOnboardingSupportBundle } from '../../../onboarding-support.js'
 import { formatRunnerCommand, splitRunnerCommand } from '../../../runner-command.js'
 import { createSupabaseClient, findBuildCommandForProjectType, findProjectType, findSavedKeySilent, getOrganizationId, getPackageScripts, getPMAndCommand } from '../../../utils.js'
@@ -207,15 +208,49 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
   // setups where capacitor.config carries a suffixed appId; using the
   // resolved key for Apple ops causes "No profile targets X" errors.
   //
-  // Restored from progress when set (the user explicitly overrode in a
-  // previous run via the confirm-app-id step). The interactive override
-  // step itself is restored in a follow-up commit on top of this merge —
-  // for now we use the initial value (which is config.appId), which is
-  // the correct default and matches what users without a divergent
-  // capacitor.config see today.
-  const [iosBundleId, _setIosBundleId] = useState<string>(
-    initialProgress?.iosBundleIdOverride ?? iosBundleIdInitial,
+  // Trust the saved override only when it was confirmed for the SAME
+  // `config.appId` we're seeing this run. If the user renamed the app
+  // between CLI runs the previously-saved override is stale relative to
+  // the new files — fall back to `iosBundleIdInitial` so the mismatch
+  // detector can re-ask via the confirm-app-id step instead of silently
+  // using the old value.
+  const savedOverrideIsFresh = initialProgress?.iosBundleIdOverride !== undefined
+    && initialProgress.iosBundleIdContextAppId === iosBundleIdInitial
+  const [iosBundleId, setIosBundleId] = useState<string>(
+    savedOverrideIsFresh && initialProgress?.iosBundleIdOverride
+      ? initialProgress.iosBundleIdOverride
+      : iosBundleIdInitial,
   )
+  // Distinct from `iosBundleId !== iosBundleIdInitial` because the user is
+  // allowed to pick the capacitor value at the confirm step — we still want
+  // to suppress the question for the rest of the session in that case.
+  // Stale overrides (context drift between runs) don't count as confirmed.
+  const [appIdConfirmed, setAppIdConfirmed] = useState<boolean>(savedOverrideIsFresh)
+  // Where redirectIfMismatch wants to go after the user confirms.
+  const [pendingAppIdNext, setPendingAppIdNext] = useState<OnboardingStep | null>(null)
+  // Sub-mode for confirm-app-id: false = render the candidate Select;
+  // true = render a FilteredTextInput for a custom value.
+  const [confirmAppIdTyping, setConfirmAppIdTyping] = useState(false)
+  // Detection is synchronous (small files, no network); useMemo captures the
+  // result for the lifetime of the component. The confirm-app-id step
+  // renders only when `detectedIds.mismatch === true` AND the user hasn't
+  // already chosen this session.
+  const detectedIds = useMemo(
+    () => detectIosBundleIds({ cwd: process.cwd(), iosDir, capacitorAppId: iosBundleIdInitial }),
+    [iosDir, iosBundleIdInitial],
+  )
+  // Shared sites that fan out into Apple-side work (end of import-scanning,
+  // end of verifying-key) wrap their setStep call with this so the
+  // confirmation question gets injected at the right moment without
+  // duplicating the "is there a mismatch?" logic per call site.
+  const redirectIfMismatch = (target: OnboardingStep): OnboardingStep => {
+    if (appIdConfirmed)
+      return target
+    if (!detectedIds.mismatch)
+      return target
+    setPendingAppIdNext(target)
+    return 'confirm-app-id'
+  }
 
   // Telemetry: resolve org id once + emit per-step events
   const stepTimingRef = useRef<{ step: OnboardingStep | null, startedAt: number }>({
@@ -996,7 +1031,12 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
           // already saved in progress, jump past distribution-mode and the
           // .p8 input chain. See progress.ts → getImportEntryStep for the
           // full decision table and tests.
-          setStep(getImportEntryStep(await loadProgress(appId)))
+          //
+          // redirectIfMismatch then short-circuits to confirm-app-id when
+          // config.appId and project.pbxproj's PRODUCT_BUNDLE_IDENTIFIER
+          // disagree — surfaced AFTER p8 setup so the user has context
+          // before Apple-side filtering kicks in.
+          setStep(redirectIfMismatch(getImportEntryStep(await loadProgress(appId))))
         }
         catch (err) {
           if (!cancelled)
@@ -1236,7 +1276,12 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
             setStep(`import-${action}` as OnboardingStep)
           }
           else if (importMode) {
-            setStep('import-pick-identity')
+            // After p8 verification we're about to use the bundle id for
+            // Apple-side filtering; redirectIfMismatch routes through the
+            // confirm-app-id step when config.appId disagrees with
+            // pbxproj. Returns the same target step when there's no
+            // mismatch.
+            setStep(redirectIfMismatch('import-pick-identity'))
           }
           else {
             setStep('creating-certificate')
@@ -2238,6 +2283,121 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
 
       {/* Import: scanning */}
       {step === 'import-scanning' && <ImportScanningStep />}
+
+      {/* Confirm iOS bundle id when config.appId and project.pbxproj
+          disagree. Only reached via redirectIfMismatch — never shown on
+          fresh runs where everything lines up. */}
+      {step === 'confirm-app-id' && (() => {
+        const onChoose = async (chosen: string) => {
+          setIosBundleId(chosen)
+          setAppIdConfirmed(true)
+          setConfirmAppIdTyping(false)
+          // Persist + snapshot the current config.appId so the next CLI
+          // run can detect "user changed the app id since last time" and
+          // re-ask. Merge with whatever progress already exists.
+          const existing = await loadProgress(appId) || {
+            platform: 'ios' as const,
+            appId,
+            startedAt: new Date().toISOString(),
+            completedSteps: {},
+          }
+          existing.iosBundleIdOverride = chosen
+          existing.iosBundleIdContextAppId = iosBundleIdInitial
+          await saveProgress(appId, existing)
+          if (chosen !== iosBundleIdInitial)
+            addLog(`✔ Using "${chosen}" as the iOS bundle ID for Apple operations (capacitor.config.appId is "${iosBundleIdInitial}")`)
+          else
+            addLog(`✔ Confirmed "${chosen}" as the iOS bundle ID`)
+          setStep(pendingAppIdNext ?? 'import-pick-identity')
+          setPendingAppIdNext(null)
+        }
+
+        if (confirmAppIdTyping) {
+          return (
+            <Box flexDirection="column" marginTop={1}>
+              <Alert variant="info">
+                Type the iOS bundle ID to use for Apple operations.
+              </Alert>
+              <Newline />
+              <Text dimColor>
+                {`Press Enter when done. This is what we'll send to Apple's API for cert and profile lookups — it must match `}
+                <Text bold>PRODUCT_BUNDLE_IDENTIFIER</Text>
+                {' in your Xcode project (and the App ID on developer.apple.com).'}
+              </Text>
+              <Newline />
+              <FilteredTextInput
+                placeholder="e.g. com.example.myapp"
+                allowedPattern={/[\w.-]/}
+                maxLength={155}
+                initialValue={detectedIds.recommended.value}
+                onSubmit={(value) => {
+                  const trimmed = value.trim()
+                  if (!trimmed)
+                    return
+                  void onChoose(trimmed)
+                }}
+              />
+            </Box>
+          )
+        }
+
+        return (
+          <Box flexDirection="column" marginTop={1}>
+            <Alert variant="warning">
+              {`The iOS bundle ID in your Xcode project doesn't match capacitor.config.`}
+            </Alert>
+            <Newline />
+            <Text dimColor>
+              {`We use the iOS bundle ID for Apple Developer Portal operations (looking up certs, fetching/creating provisioning profiles). Picking the wrong one is the cause of "Apple returned X profiles but none target …" errors. capacitor.config.appId stays untouched — this only affects what we send to Apple.`}
+            </Text>
+            <Newline />
+            <Box flexDirection="column" marginLeft={2}>
+              {detectedIds.pbxproj && (
+                <Text>
+                  • Xcode (
+                  <Text bold>{detectedIds.pbxproj.label}</Text>
+                  ):
+                  {' '}
+                  <Text bold color="cyan">{detectedIds.pbxproj.value}</Text>
+                </Text>
+              )}
+              {detectedIds.plist && (
+                <Text>
+                  • Info.plist (CFBundleIdentifier):
+                  {' '}
+                  <Text bold color="cyan">{detectedIds.plist.value}</Text>
+                </Text>
+              )}
+              <Text>
+                • Capacitor (capacitor.config.appId):
+                {' '}
+                <Text bold color="cyan">{detectedIds.capacitor.value}</Text>
+              </Text>
+            </Box>
+            <Newline />
+            <Text>Which value should we use for Apple-side operations?</Text>
+            <Newline />
+            <Select
+              options={[
+                ...detectedIds.candidates.map((c, i) => ({
+                  label: i === 0
+                    ? `${c.value} — ${c.label} (recommended)`
+                    : `${c.value} — ${c.label}`,
+                  value: c.value,
+                })),
+                { label: '✏️   Type a custom bundle ID...', value: '__type__' },
+              ]}
+              onChange={(value) => {
+                if (value === '__type__') {
+                  setConfirmAppIdTyping(true)
+                  return
+                }
+                void onChoose(value)
+              }}
+            />
+          </Box>
+        )
+      })()}
 
       {/* Import: distribution mode (now FIRST visible step in import flow) */}
       {step === 'import-distribution-mode' && (
