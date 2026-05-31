@@ -1462,6 +1462,12 @@ export async function uploadBundleInternal(preAppid: string, options: OptionsUpl
   return result
 }
 
+/**
+ * Validate mutually-exclusive and dependent upload options, failing fast (via
+ * `uploadFail`) before any network call. Exported so the option-conflict guards
+ * (e.g. `--fail-on-incompatible` + `--ignore-metadata-check`) can be unit-tested
+ * directly.
+ */
 export function checkValidOptions(options: OptionsUpload) {
   const noKey = options.key === false
   const forceCrc32 = options.forceCrc32Checksum === true

@@ -94,32 +94,43 @@ leaves Capgo Cloud unchanged.
 All changes are within `cli/`.
 
 ### 1. Schema — `cli/src/schemas/bundle.ts`
+
 Add to `optionsUploadSchema` (near [line 31](../../../cli/src/schemas/bundle.ts)):
+
 ```ts
 failOnIncompatible: z.boolean().optional(),
 ```
+
 `OptionsUpload` is inferred from this schema, so the type updates automatically.
 
 ### 2. Flag registration — `cli/src/index.ts`
+
 On the `bundle upload` command (alongside `--ignore-metadata-check`,
 [line 202](../../../cli/src/index.ts)):
+
 ```ts
 .option('--fail-on-incompatible', `Fail the upload (exit non-zero) instead of uploading when the bundle is incompatible with the channel's current native packages. In an interactive terminal you can still choose a native build; declining fails. Cannot be combined with --ignore-metadata-check.`)
 ```
+
 Commander maps `--fail-on-incompatible` → `options.failOnIncompatible`.
 
 ### 3. Mutual-exclusion guard — `cli/src/bundle/upload.ts` `checkValidOptions`
+
 Add (near [line 1429](../../../cli/src/bundle/upload.ts)):
+
 ```ts
 if (options.failOnIncompatible && options.ignoreMetadataCheck) {
   uploadFail('You cannot use --fail-on-incompatible together with --ignore-metadata-check — the metadata check is exactly what --fail-on-incompatible enforces. Remove one of them.')
 }
 ```
+
 `checkValidOptions` runs first inside `uploadBundle` (before any network call).
 
 ### 4. The gate — `cli/src/bundle/upload.ts` (incompatible block, ~905–931)
+
 Introduce a dedicated error + helper so the failure is reliably distinguishable
 from other errors (see §5), then gate around the existing Builder CTA:
+
 ```ts
 const incompatible = compatibility.result === 'incompatible'
 
@@ -139,10 +150,12 @@ if (incompatible && !silent) {
     uploadFailIncompatible(channel, incompatibleCount)
 }
 ```
+
 Note: `interactive` is already computed in scope as
 `canPromptInteractively({ silent })`.
 
 ### 5. Distinct error type + no-retry — `cli/src/bundle/upload.ts`
+
 ```ts
 class IncompatibleBundleError extends Error {}
 
@@ -161,6 +174,7 @@ function uploadFailIncompatible(channel: string, incompatibleCount: number): nev
   throw new IncompatibleBundleError(message)
 }
 ```
+
 (The exact parameter wiring — passing `appid`/`orgId`/`apikey`/`interactive` vs.
 closing over them — is an implementation detail; the compatibility table itself
 is already printed by `verifyCompatibility`, so this adds only the verdict + fix.)
@@ -168,6 +182,7 @@ is already printed by `verifyCompatibility`, so this adds only the verdict + fix
 In `uploadBundle`'s catch ([line 1531](../../../cli/src/bundle/upload.ts)), skip the generic
 "retry the upload?" prompt for this error (retrying an incompatible bundle is
 pointless), mirroring the existing `isChecksumError` special-case:
+
 ```ts
 if (error instanceof IncompatibleBundleError)
   throw error
