@@ -313,7 +313,9 @@ app.post('/', middlewareV2(['read', 'write', 'all', 'upload']), async (c) => {
         outcome: skippedForMetadata ? 'skipped_metadata' : 'sent',
         update_strategy: updateStrategy ?? 'unknown',
         app_id: appId,
-        ...(incompatibleChannel ? { channel: incompatibleChannel } : {}),
+        // Use channel_name, not `channel`: trackPosthogEvent overwrites a `channel`
+        // tag with payload.channel ('bundle', the event category).
+        ...(incompatibleChannel ? { channel_name: incompatibleChannel } : {}),
       },
     }))
 
