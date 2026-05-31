@@ -2,6 +2,31 @@
 
 export type Platform = 'ios' | 'android'
 
+// The outcome a wizard app reports to the shell/command when Ink exits, so the
+// caller can print an accurate post-exit message instead of always claiming
+// success. The shell defaults to `cancelled`; an app flips it to `completed`
+// (with a durable summary) only when it actually reaches the build-complete
+// screen. This fixes the false "✔ onboarding complete" that printed on every
+// exit path (missing-platform, user-cancel, etc.).
+export interface OnboardingCompletionSummary {
+  /** The Capgo dashboard build URL, when a build was kicked off. */
+  buildUrl?: string
+  /** One-line CI-secret upload summary, when secrets were pushed. */
+  ciSecretUploadSummary?: string | null
+  /** Path to the generated GitHub Actions workflow file, when written. */
+  workflowFilePath?: string | null
+  /** Path to the exported .env file, when the user chose the env-export fallback. */
+  envExportPath?: string | null
+  /** The "run anytime" build-request command shown on the final screen. */
+  buildRequestCommand?: string
+}
+
+export interface OnboardingResult {
+  outcome: 'completed' | 'cancelled'
+  /** Present only when outcome === 'completed'. */
+  summary?: OnboardingCompletionSummary
+}
+
 export type OnboardingStep
   = | 'welcome'
     | 'platform-select'
@@ -58,6 +83,11 @@ export type OnboardingStep
     | 'writing-workflow-file'
     | 'ask-build'
     | 'requesting-build'
+    // AI debug — only entered when the build fails and logs were captured
+    | 'ai-analysis-prompt'
+    | 'ai-analysis-running'
+    | 'ai-analysis-result'
+    | 'ai-analysis-result-scroll'
     | 'build-complete'
     | 'no-platform'
     | 'error'
@@ -190,6 +220,10 @@ export const STEP_PROGRESS: Record<OnboardingStep, number> = {
   'writing-workflow-file': 98,
   'ask-build': 85,
   'requesting-build': 90,
+  'ai-analysis-prompt': 92,
+  'ai-analysis-running': 95,
+  'ai-analysis-result-scroll': 97,
+  'ai-analysis-result': 98,
   'build-complete': 100,
   'no-platform': 0,
   'error': 0,
@@ -262,6 +296,11 @@ export function getPhaseLabel(step: OnboardingStep): string {
     case 'ask-build':
     case 'requesting-build':
       return 'Step 4 of 4 · Save & Build'
+    case 'ai-analysis-prompt':
+    case 'ai-analysis-running':
+    case 'ai-analysis-result':
+    case 'ai-analysis-result-scroll':
+      return 'AI debug'
     case 'build-complete':
       return 'Complete'
     case 'no-platform':
