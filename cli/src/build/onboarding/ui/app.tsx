@@ -36,7 +36,7 @@ import { createP12, DEFAULT_P12_PASSWORD, generateCsr } from '../csr.js'
 import { mapIosOnboardingError } from '../error-categories.js'
 import { canUseFilePicker, openFilePicker } from '../file-picker.js'
 import { exportP12FromKeychain, isHelperCached, isMacOS, listSigningIdentities, matchIdentitiesToProfiles, precompileSwiftHelper, scanProvisioningProfiles } from '../macos-signing.js'
-import { deleteProgress, getImportEntryStep, getResumeStep, loadProgress, saveProgress } from '../progress.js'
+import { deleteProgress, extractKeyIdFromP8Path, getImportEntryStep, getResumeStep, loadProgress, saveProgress } from '../progress.js'
 import { getBuildOnboardingRecoveryAdvice } from '../recovery.js'
 import { createCiSecretEntries, detectCiSecretTargets, getCiSecretRepoLabelAsync, getCiSecretTargetLabel, listExistingCiSecretKeysAsync, uploadCiSecretsAsync } from '../ci-secrets.js'
 import type { CiSecretEntry, CiSecretSetupAdvice, CiSecretTarget } from '../ci-secrets.js'
@@ -244,7 +244,16 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey, o
   // Collected data — restore p8Path from progress if resuming
   const [p8Path, setP8Path] = useState(initialProgress?.p8Path || '')
   const [p8Content, _setP8Content] = useState('')
-  const [keyId, setKeyId] = useState(initialProgress?.completedSteps.apiKeyVerified?.keyId || initialProgress?.keyId || '')
+  // Resume order: verified key → explicitly saved keyId → re-derive from the saved
+  // .p8 filename. The last fallback fixes the case where a previous session picked
+  // the .p8 (saving only p8Path) and quit before confirming the Key ID step — the
+  // field used to come back empty (showing the placeholder) instead of the real id.
+  const [keyId, setKeyId] = useState(
+    initialProgress?.completedSteps.apiKeyVerified?.keyId
+    || initialProgress?.keyId
+    || extractKeyIdFromP8Path(initialProgress?.p8Path || '')
+    || '',
+  )
   const [issuerId, setIssuerId] = useState(initialProgress?.completedSteps.apiKeyVerified?.issuerId || initialProgress?.issuerId || '')
 
   // Terminal dimensions, tracked in state so the wizard RE-RENDERS on resize.
@@ -637,11 +646,9 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey, o
     await saveProgress(appId, existing)
   }, [appId])
 
-  // Extract Key ID from .p8 filename (e.g. "AuthKey_ABC123.p8" or "ApiKey_ABC123.p8")
-  function extractKeyIdFromPath(filePath: string): string {
-    const match = filePath.match(/(?:Auth|Api)Key_([A-Z0-9]+)\.p8$/i)
-    return match?.[1] || ''
-  }
+  // Extract Key ID from .p8 filename — delegates to the module-level helper so
+  // the resume initializer and the live-pick handlers share one implementation.
+  const extractKeyIdFromPath = extractKeyIdFromP8Path
 
   /**
    * Get a fresh JWT token, re-reading the .p8 file if needed.
@@ -1158,7 +1165,9 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey, o
             if (extracted)
               setKeyId(extracted)
             addLog(`✔ Key file selected · ${selected}`)
-            void savePartialProgress({ p8Path: selected })
+            // Persist the extracted keyId too — otherwise quitting before the
+            // Key ID step loses it and resume shows the empty placeholder.
+            void savePartialProgress({ p8Path: selected, keyId: extracted || undefined })
             setStep('input-key-id')
           }
           else {
@@ -2491,7 +2500,9 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey, o
               if (extracted)
                 setKeyId(extracted)
               addLog(`✔ Key file found · ${filePath}`)
-              void savePartialProgress({ p8Path: filePath })
+              // Persist the extracted keyId too, so a quit-before-confirm resume
+              // restores it instead of showing the empty placeholder.
+              void savePartialProgress({ p8Path: filePath, keyId: extracted || undefined })
               setStep('input-key-id')
             }
             catch {
@@ -2517,7 +2528,9 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey, o
               if (extracted)
                 setKeyId(extracted)
               addLog(`✔ Key file found · ${filePath}`)
-              void savePartialProgress({ p8Path: filePath })
+              // Persist the extracted keyId too, so a quit-before-confirm resume
+              // restores it instead of showing the empty placeholder.
+              void savePartialProgress({ p8Path: filePath, keyId: extracted || undefined })
               setStep('input-key-id')
             }
             catch {
