@@ -134,10 +134,11 @@ async function getMyApps() {
     const rows = data ?? []
     totalApps.value = rows[0]?.total_count ?? 0
 
-    apps.value = rows.map(app => ({
-      ...appWithImmediateIcon(app),
-      last_upload_at: app.last_upload_at ?? null,
-    }))
+    // appWithImmediateIcon spreads the whole RPC row, so last_upload_at is carried
+    // through as-is. Avoid re-building the object inline (e.g. { ...appWithImmediateIcon(app),
+    // last_upload_at } ) here: spreading into the AppRowWithIconState intersection makes
+    // vue-tsc hit TS2589 (excessively deep type instantiation).
+    apps.value = rows.map(appWithImmediateIcon)
     if (rows.length)
       loadAppIcons(rows, currentRun)
   }
