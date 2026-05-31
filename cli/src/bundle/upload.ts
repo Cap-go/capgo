@@ -714,7 +714,7 @@ async function setVersionInChannel(
   appid: string,
   localConfig: localConfigType,
   selfAssign?: boolean,
-) {
+): Promise<boolean> {
   const { data: versionId } = await supabase
     .rpc('get_app_versions', { apikey, name_version: bundle, appid })
     .single()
@@ -743,10 +743,11 @@ async function setVersionInChannel(
 
     if (displayBundleUrl)
       log.info(`Bundle url: ${bundleUrl}`)
+    return true
   }
-  else {
-    log.warn('The upload key is not allowed to set the version in the channel')
-  }
+
+  log.warn('The upload key is not allowed to set the version in the channel')
+  return false
 }
 
 export async function getDefaultUploadChannel(appId: string, supabase: SupabaseType, hostWeb: string) {
@@ -1305,10 +1306,11 @@ export async function uploadBundleInternal(preAppid: string, options: OptionsUpl
     log.warn('Cannot delete linked bundle on upload as a upload organization member')
   }
 
+  let channelVersionSet = false
   if (hasOrganizationPerm(permissions, OrganizationPerm.write)) {
     if (options.verbose)
       log.info(`[Verbose] Setting bundle ${bundle} to channel ${channel}...`)
-    await setVersionInChannel(supabase, apikey, !!options.bundleUrl, bundle, channel, userId, orgId, appid, localConfig, options.selfAssign)
+    channelVersionSet = await setVersionInChannel(supabase, apikey, !!options.bundleUrl, bundle, channel, userId, orgId, appid, localConfig, options.selfAssign)
     if (options.verbose)
       log.info(`[Verbose] Channel updated successfully`)
 
@@ -1352,10 +1354,9 @@ export async function uploadBundleInternal(preAppid: string, options: OptionsUpl
     notifyConsole: true,
   }).catch(() => {})
 
-  // Surface incompatible uploads to Bento via the backend (it resolves
-  // version_new_id + org/app names and gates delivery via the
-  // bundle_incompatible preference). Fires only once the version exists and the
-  // channel has been set, and only when the bundle was actually incompatible.
+  // Record every incompatible upload in PostHog (`Bundle Incompatible`). The
+  // channel_overwritten flag lets the backend gate the org-member email to
+  // uploads that actually went live (i.e. overwrote the channel's version).
   if (compatibility?.result === 'incompatible') {
     void trackEvent({
       channel: 'bundle',
@@ -1367,6 +1368,7 @@ export async function uploadBundleInternal(preAppid: string, options: OptionsUpl
       tags: {
         source: 'upload',
         channel,
+        channel_overwritten: channelVersionSet,
         version_new_name: bundle,
         ...(compatibility.versionOldId ? { version_old_id: compatibility.versionOldId } : {}),
         ...(compatibility.versionOldName ? { version_old_name: compatibility.versionOldName } : {}),
