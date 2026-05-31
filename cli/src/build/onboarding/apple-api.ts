@@ -312,7 +312,19 @@ export async function ensureBundleId(
     return { bundleIdResourceId: searchBody.data[0].id }
   }
 
-  // Register new
+  // Register new. Apple's `attributes.identifier` field accepts the
+  // reverse-DNS bundle id verbatim (dots, hyphens), but the human-readable
+  // `attributes.name` field rejects anything non-alphanumeric — including
+  // the dots that are mandatory in every real bundle id. The error reads:
+  //   'Capgo app.capgo.plugin.TutorialBuild1' is not a valid name for an
+  //   app id. Please choose a name containing only alphanumeric characters
+  //   and spaces. (ENTITY_ERROR.ATTRIBUTE.INVALID)
+  // So we sanitize by replacing every non-alphanumeric run with a single
+  // space and trimming. "app.capgo.plugin.TutorialBuild1" becomes
+  // "app capgo plugin TutorialBuild1" → final name "Capgo app capgo
+  // plugin TutorialBuild1", which Apple accepts. The identifier we send
+  // stays the original — the name is purely a portal display label.
+  const sanitizedName = identifier.replace(/[^a-zA-Z0-9]+/g, ' ').trim()
   const createBody = await ascFetch('/bundleIds', token, {
     method: 'POST',
     body: JSON.stringify({
@@ -320,7 +332,7 @@ export async function ensureBundleId(
         type: 'bundleIds',
         attributes: {
           identifier,
-          name: `Capgo ${identifier}`,
+          name: `Capgo ${sanitizedName}`,
           platform: 'IOS',
         },
       },
