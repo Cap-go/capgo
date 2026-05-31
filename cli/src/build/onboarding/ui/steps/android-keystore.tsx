@@ -69,7 +69,7 @@ export interface KeystoreExplainerStepProps {
 // Dense: the Alert/box/blank-lines are dropped in favour of terse single-line
 // bullets so every line stays un-wrapped within the 13-row budget at 60 cols
 // (the original wrapping bullets blew the budget there).
-export const KeystoreExplainerStep: FC<KeystoreExplainerStepProps> = ({ onBack, dense = false }) => {
+export const KeystoreExplainerStep: FC<KeystoreExplainerStepProps> = ({ onBack }) => {
   return (
     <Box flexDirection="column" marginTop={1}>
       <Alert variant="info">
@@ -192,7 +192,7 @@ export interface KeystoreExistingAliasSelectStepProps {
 
 // The original full heading + a <Newline/> + an UN-capped Select (shows every
 // alias — the parent only renders this after measuring it fits the viewport).
-export const KeystoreExistingAliasSelectStep: FC<KeystoreExistingAliasSelectStepProps> = ({ aliases, onSelect, dense = false }) => {
+export const KeystoreExistingAliasSelectStep: FC<KeystoreExistingAliasSelectStepProps> = ({ aliases, onSelect }) => {
   return (
     <Box flexDirection="column" marginTop={1}>
       <Text bold>Multiple aliases in the keystore. Which one do you use for this app?</Text>

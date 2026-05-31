@@ -23,7 +23,7 @@
 // comfortable form) gets the original look. All props/handlers/behaviour are
 // identical across both modes.
 import type { FC } from 'react'
-import type { CiSecretSetupAdvice, CiSecretTarget } from '../../ci-secrets.js'
+import type { CiSecretSetupAdvice } from '../../ci-secrets.js'
 import { Select } from '@inkjs/ui'
 import { Box, Newline, Text } from 'ink'
 import React from 'react'
@@ -67,7 +67,7 @@ export interface CiSecretsSetupStepProps {
   dense?: boolean
 }
 
-export const CiSecretsSetupStep: FC<CiSecretsSetupStepProps> = ({ advice, onChoose, dense = false }) => {
+export const CiSecretsSetupStep: FC<CiSecretsSetupStepProps> = ({ advice, onChoose }) => {
   return (
     <Box flexDirection="column" marginTop={1}>
       <Text bold>Set up your git hosting CLI to upload env vars</Text>
@@ -108,7 +108,7 @@ export interface CiSecretsTargetSelectStepProps {
   dense?: boolean
 }
 
-export const CiSecretsTargetSelectStep: FC<CiSecretsTargetSelectStepProps> = ({ options, onChange, dense = false }) => {
+export const CiSecretsTargetSelectStep: FC<CiSecretsTargetSelectStepProps> = ({ options, onChange }) => {
   return (
     <Box flexDirection="column" marginTop={1}>
       <Text bold>Where should Capgo upload the build env vars?</Text>
@@ -183,7 +183,7 @@ export interface ConfirmCiSecretOverwriteStepProps {
   dense?: boolean
 }
 
-export const ConfirmCiSecretOverwriteStep: FC<ConfirmCiSecretOverwriteStepProps> = ({ existingKeys, onChoose, dense = false }) => {
+export const ConfirmCiSecretOverwriteStep: FC<ConfirmCiSecretOverwriteStepProps> = ({ existingKeys, onChoose }) => {
   return (
     <Box flexDirection="column" marginTop={1}>
       <Text bold color="yellow">These env vars already exist and will be replaced:</Text>

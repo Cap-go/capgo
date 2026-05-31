@@ -221,7 +221,7 @@ export interface ImportNoMatchRecoveryStepProps {
 // — the dim line + blank lines shorten/drop, and the Select caps to
 // LIST_VISIBLE_COUNT visible rows with a "… +N more" hint so the (wrapping)
 // recovery options stay within budget at 60 cols.
-export const ImportNoMatchRecoveryStep: FC<ImportNoMatchRecoveryStepProps> = ({ identityName, options, dense = false, onChange }) => {
+export const ImportNoMatchRecoveryStep: FC<ImportNoMatchRecoveryStepProps> = ({ identityName, options, onChange }) => {
   return (
     <Box flexDirection="column" marginTop={1}>
       <Alert variant="warning">
@@ -270,7 +270,7 @@ export interface ImportExportWarningStepProps {
   onChange: (value: string) => void
 }
 
-export const ImportExportWarningStep: FC<ImportExportWarningStepProps> = ({ identityName, dense = false, onChange }) => {
+export const ImportExportWarningStep: FC<ImportExportWarningStepProps> = ({ identityName, onChange }) => {
   const select = (
     <Select
       options={[
@@ -329,7 +329,7 @@ export interface ImportCompilingHelperStepProps {
   dense?: boolean
 }
 
-export const ImportCompilingHelperStep: FC<ImportCompilingHelperStepProps> = ({ dense = false }) => {
+export const ImportCompilingHelperStep: FC<ImportCompilingHelperStepProps> = () => {
   return (
     <Box flexDirection="column" marginTop={1}>
       <SpinnerLine text="Compiling keychain-export helper (one-time, ~2-3s)..." />

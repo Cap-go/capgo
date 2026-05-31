@@ -387,7 +387,7 @@ export function estimateErrorBodyRows(
   return rows
 }
 
-export const ErrorStep: FC<ErrorStepProps> = ({ error, recoveryAdvice, supportBundlePath, showRetry, dense = false, collapsed = false, onChange }) => {
+export const ErrorStep: FC<ErrorStepProps> = ({ error, recoveryAdvice, supportBundlePath, showRetry, collapsed = false, onChange }) => {
   // Collapsed form: the full error + recovery advice was too tall for the
   // viewport, so the parent already showed it in the scrollable viewer. Render
   // only the error headline + the action prompt, so Try again / Restart / Exit
@@ -484,7 +484,7 @@ export interface BuildCompleteStepProps {
   dense?: boolean
 }
 
-export const BuildCompleteStep: FC<BuildCompleteStepProps> = ({ buildUrl, ciSecretUploadSummary, buildRequestCommand, workflowWrittenPath = null, envExportPath = null, envExportError = null, dense = false }) => {
+export const BuildCompleteStep: FC<BuildCompleteStepProps> = ({ buildUrl, ciSecretUploadSummary, buildRequestCommand, workflowWrittenPath = null, envExportPath = null, envExportError = null }) => {
   const detail = buildUrl
     ? (
         <>

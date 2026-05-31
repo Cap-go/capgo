@@ -86,7 +86,7 @@ export interface CiSecretsSetupStepProps {
   onChange: (value: string) => void
 }
 
-export const CiSecretsSetupStep: FC<CiSecretsSetupStepProps> = ({ advice, dense = false, onChange }) => {
+export const CiSecretsSetupStep: FC<CiSecretsSetupStepProps> = ({ advice, onChange }) => {
   const select = (
     <Select
       options={[
@@ -212,7 +212,7 @@ const OVERWRITE_OPTIONS = [
   { label: 'Skip upload', value: 'skip' },
 ]
 
-export const ConfirmCiSecretOverwriteStep: FC<ConfirmCiSecretOverwriteStepProps> = ({ existingKeys, dense = false, onChange }) => {
+export const ConfirmCiSecretOverwriteStep: FC<ConfirmCiSecretOverwriteStepProps> = ({ existingKeys, onChange }) => {
   return (
     <Box flexDirection="column" marginTop={1}>
       <Text bold color="yellow">These env vars already exist and will be replaced:</Text>
@@ -258,7 +258,7 @@ const FAILED_OPTIONS = [
   { label: 'Continue without upload', value: 'continue' },
 ]
 
-export const CiSecretsFailedStep: FC<CiSecretsFailedStepProps> = ({ error, dense = false, onChange }) => {
+export const CiSecretsFailedStep: FC<CiSecretsFailedStepProps> = ({ error, onChange }) => {
   return (
     <Box flexDirection="column" marginTop={1}>
       <ErrorLine text={error || 'Could not upload env vars.'} />

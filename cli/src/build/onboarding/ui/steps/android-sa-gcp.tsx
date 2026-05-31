@@ -166,7 +166,7 @@ export interface SaJsonValidationFailedStepProps {
   dense?: boolean
 }
 
-export const SaJsonValidationFailedStep: FC<SaJsonValidationFailedStepProps> = ({ message, onChoose, dense = false }) => {
+export const SaJsonValidationFailedStep: FC<SaJsonValidationFailedStepProps> = ({ message, onChoose }) => {
   const options = [
     { label: '🔄  Try a different service account file', value: 'retry' },
     { label: '💾  Save credentials anyway (skip validation)', value: 'save-anyway' },
@@ -234,7 +234,7 @@ function SignInBullets() {
   )
 }
 
-export const GoogleSignInStep: FC<GoogleSignInStepProps> = ({ onChoose, dense = false }) => {
+export const GoogleSignInStep: FC<GoogleSignInStepProps> = ({ onChoose }) => {
   const select = (
     <Select
       options={[
@@ -272,7 +272,7 @@ export interface GoogleSignInLearnMoreStepProps {
 // the whole Q&A is condensed to four terse single-line reassurances (the deep
 // detail lives in the docs/source the last line points to) so the explainer +
 // the Back control fit within budget.
-export const GoogleSignInLearnMoreStep: FC<GoogleSignInLearnMoreStepProps> = ({ onBack, dense = false }) => {
+export const GoogleSignInLearnMoreStep: FC<GoogleSignInLearnMoreStepProps> = ({ onBack }) => {
   return (
     <Box flexDirection="column" marginTop={1}>
       <Alert variant="info">
@@ -354,7 +354,7 @@ export interface PlayDeveloperIdActionsStepProps {
 // <Newline/> + the Select(3). Dense: the explanation is compressed to two terse
 // lines that still tell the user what the ID is and where to find it, the blank
 // lines are dropped, and the URL example is folded into one line.
-export const PlayDeveloperIdActionsStep: FC<PlayDeveloperIdActionsStepProps> = ({ playDeveloperUrl, onChoose, dense = false }) => {
+export const PlayDeveloperIdActionsStep: FC<PlayDeveloperIdActionsStepProps> = ({ playDeveloperUrl, onChoose }) => {
   const options = [
     { label: '🌐  Open Play Console in my browser', value: 'open' },
     { label: '🎬  Watch a quick video tutorial', value: 'tutorial' },
@@ -435,7 +435,7 @@ export interface GcpProjectsSelectStepProps {
   dense?: boolean
 }
 
-export const GcpProjectsSelectStep: FC<GcpProjectsSelectStepProps> = ({ options, onChange, dense = false }) => {
+export const GcpProjectsSelectStep: FC<GcpProjectsSelectStepProps> = ({ options, onChange }) => {
   return (
     <Box flexDirection="column" marginTop={1}>
       <Text bold>Which Google Cloud project should host the service account?</Text>
@@ -502,11 +502,9 @@ export interface AndroidPackageSelectStepProps {
 export const AndroidPackageSelectStep: FC<AndroidPackageSelectStepProps> = ({
   showChooser,
   detectedOptions,
-  detectedCount,
   androidDir,
   onChooseDetected,
   onSubmitManual,
-  dense = false,
 }) => {
   return (
     <Box flexDirection="column" marginTop={1}>

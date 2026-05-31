@@ -54,9 +54,9 @@ import { CompletedStepsLog } from './completed-steps-log.js'
 import { IOS_MIN_ROWS, terminalFitsOnboarding } from '../min-terminal-size.js'
 import { sanitizeBuildLogLines } from '../build-log.js'
 import { TerminalTooSmallPrompt } from './min-size-gate.js'
-import { BOX_HEADER_ROWS, COMPACT_HEADER_ROWS, DiffSummary, Divider, FilteredTextInput, FullscreenAiViewer, FullscreenBuildOutput, FullscreenDiffViewer, Header, SecretsTable, SpinnerLine, SuccessLine, TerminalTooSmall, WIZARD_PADDING_ROWS } from './components.js'
+import { BOX_HEADER_ROWS, COMPACT_HEADER_ROWS, DiffSummary, Divider, FilteredTextInput, FullscreenAiViewer, FullscreenBuildOutput, FullscreenDiffViewer, Header, SecretsTable, SpinnerLine, SuccessLine, WIZARD_PADDING_ROWS } from './components.js'
 import type { AiResultKind } from './components.js'
-import { COMPACT_HEADER_TOTAL_ROWS, isFrameTooSmall, logBudgetRows, shouldCollapseToDense } from './frame-fit.js'
+import { logBudgetRows } from './frame-fit.js'
 import { diffLines } from '../diff-utils.js'
 import type { DiffLine } from '../diff-utils.js'
 import { generateWorkflow, WORKFLOW_PATH as WORKFLOW_GEN_PATH } from '../workflow-generator.js'
@@ -326,13 +326,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
   // is always true then — dense always pairs with the one-line header.
   const headerCompact = heights.comfortable != null
     && (heights.comfortable + BOX_HEADER_ROWS + WIZARD_PADDING_ROWS > terminalRows)
-  // The on-screen form's height drives the resize-prompt check. `tooSmall`
-  // (see frame-fit.ts) only blocks when we're already dense AND the dense form
-  // still overflows — null dense height (just flipped, not yet measured) is
-  // optimistic, never a false positive.
   const bodyHeight = dense ? heights.dense : heights.comfortable
-  const tooSmall = isFrameTooSmall({ bodyRows: bodyHeight, dense, terminalRows })
-  const neededRows = (bodyHeight != null ? bodyHeight : 1) + COMPACT_HEADER_TOTAL_ROWS
 
   // Rows available for the completed-steps log. The log renders OUTSIDE the
   // measured body (so its growth never inflates the dense/fit decision) and
