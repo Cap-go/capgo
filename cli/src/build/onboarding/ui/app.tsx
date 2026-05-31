@@ -2835,7 +2835,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
           <Box flexDirection="column" marginTop={1}>
             {available.length > 0 && (
               <>
-                <Text bold color="green">{`✅  AVAILABLE (${available.length})`}</Text>
+                <Text bold color="green">{`✅  CERTIFICATE${available.length === 1 ? '' : 'S'} AVAILABLE (${available.length})`}</Text>
                 <Newline />
                 <Table
                   data={availableRows}
@@ -2854,7 +2854,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
             )}
             {available.length === 0 && (
               <Box flexDirection="column">
-                <Text bold color="red">{`✖  NO AVAILABLE CERTIFICATES`}</Text>
+                <Text bold color="red">{`✖  NO CERTIFICATES AVAILABLE`}</Text>
                 <Text dimColor>
                   All
                   {' '}
@@ -2870,7 +2870,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
             )}
             {unavailable.length > 0 && (
               <>
-                <Text bold color="red">{`✖  UNAVAILABLE (${unavailable.length})`}</Text>
+                <Text bold color="red">{`✖  CERTIFICATE${unavailable.length === 1 ? '' : 'S'} UNAVAILABLE (${unavailable.length})`}</Text>
                 <Newline />
                 <Table
                   data={unavailableRows}
