@@ -13,35 +13,22 @@ import type { AiResultKind } from '../components.js'
 // render and forward callbacks. They never touch `useStdout` /
 // `measureElement`.
 //
-// Adaptive spacing. Each step renders its COMFORTABLE form (the original
-// design — bordered boxes, blank-line spacing between elements, full copy) by
-// DEFAULT and collapses to a COMPACT form only when the parent passes
-// `dense=true`. The parent (ui/app.tsx) measures the comfortable body against
-// the live viewport and flips `dense` on only when the comfortable version
-// can't fit — so a roomy terminal breathes while a 16-row terminal still
-// survives. Mirrors the AiResultBanner (ui/components.tsx) adaptive pattern,
-// which these step bodies thread `dense` straight through to.
+// Spacing. Each step renders its COMFORTABLE form (bordered boxes, blank-line
+// spacing, full copy). The old adaptive `dense` collapse was dropped once the
+// startup size gate began guaranteeing a per-platform minimum height (see
+// min-terminal-size.ts), so a `dense` prop is still accepted on some steps for
+// call-site compatibility but no longer changes the layout.
 //
-// The frame-fit contract (see ui/components.tsx + test/helpers/frame-fit.mjs)
-// requires every step body's DENSE form to render within BODY_BUDGET_ROWS (13)
-// rows at the reference widths (80 + 60) — that's the form which must survive
-// the 16-row floor. The comfortable form may legitimately exceed the budget
-// (it only renders when the parent measured that it fits). The two budget
-// offenders in dense mode are:
-//   • error — renders variable-length recovery advice (the recovery helper can
-//     match several branches at once, so summary/commands/docs all grow). The
-//     dense form clamps the error string, caps the advice lists to a couple of
-//     rows each with a "… +N more" line, drops docs (the actionable bits are
-//     summary + commands + the Select), and drops the decorative blank lines so
-//     the "what failed" line + recovery action stay on screen. The comfortable
-//     form restores the full "Recovery plan / Helpful commands / Docs / Support
-//     bundle" headings, the uncapped lists, and the blank-line spacing.
-//   • ai-analysis-result — the success analysis text rendered inline here is
-//     always SHORT (long analyses are routed to the fullscreen scroll step by
-//     the parent BEFORE this frame); the dense form keeps the caution +
-//     "retries used" notice terse and drops the blank lines. The comfortable
-//     form restores the full caution copy + blank-line spacing.
-// Verified in test-frame-fit-ios-shared.mjs (dense form asserted ≤ 13).
+// The two steps whose content is UNBOUNDED don't rely on a dense form at all —
+// they hand off to a scrollable fullscreen takeover instead:
+//   • error — recovery advice is variable-length (recovery.ts can match several
+//     branches at once). When the full form is taller than the viewport the
+//     parent shows it in the FullscreenAiViewer, then renders ErrorStep in its
+//     `collapsed` form (error headline + the action Select only) so Try again /
+//     Restart / Exit stay reachable. (See the per-step note on ErrorStep below.)
+//   • ai-analysis-result — the inline success text is always SHORT here; long
+//     analyses are routed to the fullscreen scroll step by the parent BEFORE
+//     this frame renders.
 import { Select } from '@inkjs/ui'
 import { Box, Newline, Text } from 'ink'
 import React from 'react'
@@ -257,18 +244,18 @@ export const AiAnalysisResultStep: FC<AiAnalysisResultStepProps> = ({
 // Recovery advice is variable-length (recovery.ts can match several branches for
 // one composite error, growing summary/commands/docs).
 //
-// Comfortable form (default): the original full layout — "Recovery plan",
-// "Helpful commands" and "Docs" headings, each over its uncapped list; the
-// full (unclamped) error; the "Support bundle" heading + path; and the "What do
-// you want to do?" Select, all with blank-line spacing. The parent only renders
-// this when it measured that it fits.
+// Full form (default): the complete layout — "Recovery plan", "Helpful commands"
+// and "Docs" headings, each over its uncapped list; the full (unclamped) error;
+// the "Support bundle" heading + path; and the "What do you want to do?" Select,
+// all with blank-line spacing.
 //
-// Dense form: the budget-fitting fallback — a clamped one-line "what failed",
-// the single most relevant recovery summary line + the first helpful command
-// (each with a "… +N more" count), docs dropped (the Select + commands are the
-// actionable parts; docs URLs are long and would wrap past the budget), the
-// support-bundle path rendered whole (the artifact the user must copy; it may
-// wrap to 2 rows, which the budget accounts for), no headings, no blank lines.
+// Collapsed form (`collapsed`): when the parent measured the full form as taller
+// than the viewport, it first shows the error + advice in the scrollable
+// FullscreenAiViewer, then renders ONLY the error headline + the action Select
+// here — so Try again / Restart / Exit stay reachable no matter how long the
+// advice was. This `collapsed` route REPLACES the old adaptive `dense` collapse,
+// which was dropped along with the rest of the dense flag; `dense` is still
+// accepted for call-site compatibility but no longer alters the layout.
 //
 // `showRetry` gates the Select (the parent only sets a retryStep on recoverable
 // errors); the parent owns retry/restart/exit.
