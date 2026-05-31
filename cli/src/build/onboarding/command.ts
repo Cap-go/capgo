@@ -8,6 +8,7 @@ import React from 'react'
 import { getAppId, getConfig } from '../../utils.js'
 import { getPlatformDirFromCapacitorConfig } from '../platform-paths.js'
 import OnboardingShell from './ui/shell.js'
+import type { OnboardingResult } from './types.js'
 
 export interface OnboardingBuilderOptions {
   apikey?: string
@@ -107,6 +108,10 @@ export async function onboardingBuilderCommand(options: OnboardingBuilderOptions
   // else once the user picks). Capture it so the breadcrumb below — printed
   // after Ink restores the primary buffer — names the right platform.
   let resolvedPlatform: Platform | undefined = initialPlatform
+  // Default to 'cancelled': the wizard reports 'completed' (with a summary) ONLY
+  // when it reaches build-complete. Any other exit (missing platform, user
+  // cancel, error) leaves this untouched, so we never claim false success.
+  let result: OnboardingResult = { outcome: 'cancelled' }
   const { waitUntilExit } = render(
     React.createElement(OnboardingShell, {
       appId,
@@ -117,14 +122,40 @@ export async function onboardingBuilderCommand(options: OnboardingBuilderOptions
       onResolvePlatform: (platform: Platform) => {
         resolvedPlatform = platform
       },
+      onResult: (r: OnboardingResult) => {
+        result = r
+      },
     }),
     { alternateScreen: true },
   )
   await waitUntilExit()
 
-  // Durable breadcrumb in the user's normal terminal flow — the alt buffer
-  // restore wiped the wizard's last frame. Written via process.stdout to
-  // bypass the project-wide no-console lint rule (one-shot UX message, not
-  // application logging).
-  process.stdout.write(`\n✔ Capgo onboarding complete for ${appId}${resolvedPlatform ? ` (${resolvedPlatform})` : ''}.\n`)
+  // Durable post-exit output in the user's normal terminal flow — the alt buffer
+  // restore wiped the wizard's last frame, so anything the user needs to keep
+  // (build URL, generated file paths) must be reprinted here. Written via
+  // process.stdout to bypass the project-wide no-console lint rule (one-shot UX
+  // message, not application logging).
+  if (result.outcome === 'completed') {
+    const platformSuffix = resolvedPlatform ? ` (${resolvedPlatform})` : ''
+    process.stdout.write(`\n✔ Capgo onboarding complete for ${appId}${platformSuffix}.\n`)
+    const s = result.summary
+    if (s) {
+      if (s.buildUrl)
+        process.stdout.write(`  Build:    ${s.buildUrl}\n`)
+      if (s.workflowFilePath)
+        process.stdout.write(`  Workflow: ${s.workflowFilePath}\n`)
+      if (s.envExportPath)
+        process.stdout.write(`  Env file: ${s.envExportPath}\n`)
+      if (s.ciSecretUploadSummary)
+        process.stdout.write(`  Secrets:  ${s.ciSecretUploadSummary}\n`)
+      if (s.buildRequestCommand)
+        process.stdout.write(`  Run anytime: ${s.buildRequestCommand}\n`)
+    }
+  }
+  else {
+    // Cancelled / incomplete — do NOT claim success. The wizard already showed
+    // the user why it stopped (e.g. the "no native platform" screen); this is
+    // just a neutral closing line so the exit isn't silent.
+    process.stdout.write(`\nCapgo onboarding exited — setup not completed. Re-run \`capgo build init\` to continue.\n`)
+  }
 }

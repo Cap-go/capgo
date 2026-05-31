@@ -1,7 +1,7 @@
 import type { FC } from 'react'
 import type { BuildLogger } from '../../request.js'
 import type { DiscoveredProfile, IdentityProfileMatch, SigningIdentity } from '../macos-signing.js'
-import type { ApiKeyData, CertificateData, OnboardingErrorCategory, OnboardingProgress, OnboardingStep, ProfileData } from '../types.js'
+import type { ApiKeyData, CertificateData, OnboardingErrorCategory, OnboardingProgress, OnboardingResult, OnboardingStep, ProfileData } from '../types.js'
 import { handleCustomMsg } from '../../qr.js'
 import { spawn } from 'node:child_process'
 import { Buffer } from 'node:buffer'
@@ -128,6 +128,10 @@ interface AppProps {
   iosDir: string
   /** Optional Capgo API key passed via -a/--apikey flag; takes precedence over saved key */
   apikey?: string
+  /** Reports the wizard outcome to the shell when it reaches build-complete, so
+   *  the caller prints an accurate post-exit message + durable summary instead of
+   *  always claiming success. Never fires on cancel/missing-platform exits. */
+  onResult?: (result: OnboardingResult) => void
 }
 
 async function runRunnerCommand(runner: string, args: string[]): Promise<{ success: boolean, output: string[] }> {
@@ -167,7 +171,7 @@ async function runRunnerCommand(runner: string, args: string[]): Promise<{ succe
   })
 }
 
-const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey }) => {
+const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey, onResult }) => {
   const { exit } = useApp()
   const startStep = getResumeStep(initialProgress)
 
@@ -1849,6 +1853,20 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
 
     if (step === 'build-complete') {
       setBuildOutput([])
+      // Report a successful outcome + the durable summary to the shell/caller, so
+      // it can reprint the build URL + generated file paths to the PRIMARY buffer
+      // (the alt-screen final frame is wiped on exit). This is the ONLY place that
+      // fires 'completed'; every other exit stays 'cancelled' by default.
+      onResult?.({
+        outcome: 'completed',
+        summary: {
+          buildUrl: buildUrl || undefined,
+          ciSecretUploadSummary,
+          workflowFilePath: workflowWrittenPath,
+          envExportPath,
+          buildRequestCommand,
+        },
+      })
       // Best-effort cleanup of any leftover captured log file. Safe to call
       // even if we never entered the AI flow (operates only on jobs we know).
       if (aiJobId) {

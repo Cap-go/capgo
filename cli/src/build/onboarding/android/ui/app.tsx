@@ -13,6 +13,7 @@ import type {
   PlayInviteProvisioned,
   ServiceAccountProvisioned,
 } from '../types.js'
+import type { OnboardingResult } from '../../types.js'
 import { handleCustomMsg } from '../../../qr.js'
 import { existsSync, readFileSync } from 'node:fs'
 import { copyFile, readFile } from 'node:fs/promises'
@@ -163,6 +164,10 @@ interface AppProps {
   androidDir: string
   /** Optional Capgo API key passed via -a/--apikey flag; takes precedence over saved key. */
   apikey?: string
+  /** Reports the wizard outcome to the shell when it reaches build-complete, so
+   *  the caller prints an accurate post-exit message + durable summary instead of
+   *  always claiming success. Never fires on cancel/missing-platform exits. */
+  onResult?: (result: OnboardingResult) => void
 }
 
 const RELEASE_ALIAS_DEFAULT = 'release'
@@ -199,7 +204,7 @@ function emptyProgress(appId: string): AndroidOnboardingProgress {
   }
 }
 
-const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir, apikey }) => {
+const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir, apikey, onResult }) => {
   const { exit } = useApp()
   const startStep: AndroidOnboardingStep = getAndroidResumeStep(initialProgress)
 
@@ -1985,6 +1990,19 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
 
     if (step === 'build-complete') {
       setBuildOutput([])
+      // Report a successful outcome + durable summary to the shell/caller so it
+      // can reprint the build URL + generated file paths to the PRIMARY buffer
+      // (the alt-screen final frame is wiped on exit). ONLY place that fires
+      // 'completed'; every other exit stays 'cancelled' by default.
+      onResult?.({
+        outcome: 'completed',
+        summary: {
+          buildUrl: buildUrl || undefined,
+          ciSecretUploadSummary,
+          workflowFilePath: workflowWrittenPath,
+          envExportPath,
+        },
+      })
       // Best-effort cleanup of any leftover captured log.
       if (aiJobId) {
         void releaseCapturedLogs(aiJobId).catch(() => { /* best-effort */ })

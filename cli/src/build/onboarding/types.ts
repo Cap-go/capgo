@@ -2,6 +2,31 @@
 
 export type Platform = 'ios' | 'android'
 
+// The outcome a wizard app reports to the shell/command when Ink exits, so the
+// caller can print an accurate post-exit message instead of always claiming
+// success. The shell defaults to `cancelled`; an app flips it to `completed`
+// (with a durable summary) only when it actually reaches the build-complete
+// screen. This fixes the false "✔ onboarding complete" that printed on every
+// exit path (missing-platform, user-cancel, etc.).
+export interface OnboardingCompletionSummary {
+  /** The Capgo dashboard build URL, when a build was kicked off. */
+  buildUrl?: string
+  /** One-line CI-secret upload summary, when secrets were pushed. */
+  ciSecretUploadSummary?: string | null
+  /** Path to the generated GitHub Actions workflow file, when written. */
+  workflowFilePath?: string | null
+  /** Path to the exported .env file, when the user chose the env-export fallback. */
+  envExportPath?: string | null
+  /** The "run anytime" build-request command shown on the final screen. */
+  buildRequestCommand?: string
+}
+
+export interface OnboardingResult {
+  outcome: 'completed' | 'cancelled'
+  /** Present only when outcome === 'completed'. */
+  summary?: OnboardingCompletionSummary
+}
+
 export type OnboardingStep
   = | 'welcome'
     | 'platform-select'

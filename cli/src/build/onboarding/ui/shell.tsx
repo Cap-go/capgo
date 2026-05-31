@@ -1,5 +1,5 @@
 import type { FC } from 'react'
-import type { Platform } from '../types.js'
+import type { OnboardingResult, Platform } from '../types.js'
 // src/build/onboarding/ui/shell.tsx
 //
 // Top-level wizard shell, rendered ONCE inside the alt-screen buffer
@@ -82,9 +82,14 @@ export interface OnboardingShellProps {
   initialPlatform?: Platform
   /** Called once a platform is chosen so the caller can print the completion breadcrumb. */
   onResolvePlatform?: (platform: Platform) => void
+  /** Called by the mounted app when it reaches the build-complete screen, so the
+   *  caller prints the accurate post-exit message + durable summary. If the wizard
+   *  exits any other way (cancel / missing platform), this never fires and the
+   *  caller treats it as cancelled. */
+  onResult?: (result: OnboardingResult) => void
 }
 
-const OnboardingShell: FC<OnboardingShellProps> = ({ appId, iosDir, androidDir, apikey, initialPlatform, onResolvePlatform }) => {
+const OnboardingShell: FC<OnboardingShellProps> = ({ appId, iosDir, androidDir, apikey, initialPlatform, onResolvePlatform, onResult }) => {
   const { cols, rows } = useTerminalSize()
   const [ready, setReady] = useState<ReadyApp | null>(null)
 
@@ -109,9 +114,9 @@ const OnboardingShell: FC<OnboardingShellProps> = ({ appId, iosDir, androidDir, 
   // exiting the wizard. The app owns the size decision so a shrink→regrow keeps
   // the user exactly where they were.
   if (ready?.kind === 'ios')
-    return <OnboardingApp appId={appId} initialProgress={ready.progress} iosDir={iosDir} apikey={apikey} />
+    return <OnboardingApp appId={appId} initialProgress={ready.progress} iosDir={iosDir} apikey={apikey} onResult={onResult} />
   if (ready?.kind === 'android')
-    return <AndroidOnboardingApp appId={appId} initialProgress={ready.progress} androidDir={androidDir} apikey={apikey} />
+    return <AndroidOnboardingApp appId={appId} initialProgress={ready.progress} androidDir={androidDir} apikey={apikey} onResult={onResult} />
 
   // Not ready yet: the platform picker (or a brief framed load). The picker is
   // NOT gated to the full 80×49 onboarding floor — it's small and adapts
