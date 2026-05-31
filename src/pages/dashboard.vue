@@ -86,7 +86,10 @@ displayStore.defaultBack = '/apps'
 <template>
   <div>
     <div class="overflow-hidden pb-4 h-full">
-      <div class="relative overflow-y-auto px-4 pt-2 mx-auto mb-8 w-full h-full sm:px-6 md:pt-8 lg:px-8 max-w-9xl max-h-fit">
+      <div
+        class="relative px-4 pt-2 mx-auto mb-8 w-full h-full sm:px-6 md:pt-8 lg:px-8 max-w-9xl max-h-fit"
+        :class="shouldBlurContent ? 'overflow-hidden' : 'overflow-y-auto'"
+      >
         <!-- Only show FailedCard for security access issues (2FA/password) -->
         <FailedCard v-if="lacksSecurityAccess" />
 
