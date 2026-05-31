@@ -210,25 +210,14 @@ BEGIN
         validated_at = now(),
         updated_at = now();
 
-    INSERT INTO public.apikeys (
-        user_id,
-        key,
-        key_hash,
-        mode,
-        name,
-        limited_to_orgs,
-        limited_to_apps
-    )
-    VALUES (
+    v_apikey_rbac_id := tests.create_v2_apikey(
+        49049,
         '6aa76066-55ef-4238-ade6-0b32334a4097'::uuid,
         v_apikey,
-        NULL,
-        NULL,
         'RBAC v2 password policy RLS key',
-        ARRAY['046a36ac-e03c-4590-9257-bd6c9dba9ee8'::uuid],
-        ARRAY[]::character varying[]
-    )
-    RETURNING rbac_id INTO v_apikey_rbac_id;
+        NULL,
+        NULL
+    );
 
     INSERT INTO public.role_bindings (
         principal_type,
@@ -296,9 +285,9 @@ SELECT
 
 SELECT
     is(
-        to_regprocedure('public.get_accessible_apps_for_apikey_v2(text)'),
-        NULL::regprocedure,
-        'API-key app-list RPC is removed to avoid app enumeration'
+        to_regprocedure('public.get_accessible_apps_for_apikey_v2(text)') IS NOT NULL,
+        true,
+        'API-key app-list RPC exists for header-bound V2 API key statistics'
     );
 
 DO $$

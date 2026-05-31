@@ -65,7 +65,8 @@ export async function addChannelInternal(channelId: string, appId: string, optio
     channel: 'channel',
     event: 'Create channel',
     icon: '✅',
-    user_id: orgId,
+    org_id: orgId,
+    tracking_version: 2,
     tags: {
       'app-id': appId,
       'channel': channelId,

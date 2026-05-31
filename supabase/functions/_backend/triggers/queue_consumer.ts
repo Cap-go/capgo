@@ -18,6 +18,7 @@ const MANIFEST_QUEUE_BATCH_SIZE = 100
 const DEFAULT_QUEUE_HTTP_CONCURRENCY = 25
 const MANIFEST_QUEUE_HTTP_CONCURRENCY = 10
 const QUEUE_HTTP_TIMEOUT_MS = 15_000
+const HEALTHCHECK_HTTP_TIMEOUT_MS = 8_000
 export const MAX_QUEUE_READS = 5
 const DISCORD_IGNORED_ERROR_CODES = new Set(['version_not_found', 'no_channel'])
 
@@ -75,6 +76,17 @@ interface ProcessedQueueMessage extends Message {
   payloadSize: number
   durationMs: number
   targetUrl: string | null
+}
+
+interface QueueProcessResult {
+  actionableFailureCount: number
+  archivedCount: number
+  failedCount: number
+  processedCount: number
+  readSucceeded: boolean
+  skippedCount: number
+  success: boolean
+  successCount: number
 }
 
 function extractMessageBody(message: Message): Record<string, unknown> {
@@ -401,12 +413,25 @@ async function mapWithConcurrency<T, R>(
   return results
 }
 
-async function processQueue(c: Context, db: ReturnType<typeof getPgClient>, queueName: string, batchSize: number = DEFAULT_BATCH_SIZE) {
+async function processQueue(c: Context, db: ReturnType<typeof getPgClient>, queueName: string, batchSize: number = DEFAULT_BATCH_SIZE): Promise<QueueProcessResult> {
   const messages = await readQueue(c, db, queueName, batchSize)
 
-  if (!messages) {
-    cloudlog(`[${queueName}] No messages found in queue or an error occurred.`)
-    return
+  if (messages === null) {
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: `[${queueName}] Queue read failed.`,
+      queueName,
+    })
+    return {
+      actionableFailureCount: 0,
+      archivedCount: 0,
+      failedCount: 0,
+      processedCount: 0,
+      readSucceeded: false,
+      skippedCount: 0,
+      success: false,
+      successCount: 0,
+    }
   }
 
   const [messagesToProcess, messagesToSkip] = messages.reduce((acc, message) => {
@@ -439,6 +464,7 @@ async function processQueue(c: Context, db: ReturnType<typeof getPgClient>, queu
 
   // Process messages that are still within the retry budget.
   const results = await mapWithConcurrency(messagesToProcess, processConcurrency, async message => processQueueMessage(c, queueName, message))
+  let actionableFailureCount = 0
 
   // Update all messages with their CF IDs
   const cfIdUpdates = results.map(result => ({
@@ -494,6 +520,7 @@ async function processQueue(c: Context, db: ReturnType<typeof getPgClient>, queu
     }))
 
     const actionableFailures = getActionableQueueFailures(failureDetails)
+    actionableFailureCount = actionableFailures.length
 
     const groupedByFunction = actionableFailures.reduce((acc, detail) => {
       const key = detail.function_name
@@ -585,6 +612,17 @@ async function processQueue(c: Context, db: ReturnType<typeof getPgClient>, queu
   else {
     cloudlog({ requestId: c.get('requestId'), message: `[${queueName}] All messages were processed successfully.` })
   }
+
+  return {
+    actionableFailureCount,
+    archivedCount: messagesToSkip.length,
+    failedCount: messagesFailed.length,
+    processedCount: messagesToProcess.length,
+    readSucceeded: true,
+    skippedCount: messagesToSkip.length,
+    success: messagesToSkip.length === 0 && messagesFailed.length === 0,
+    successCount: successMessages.length,
+  }
 }
 
 async function extractErrorDetails(response: Response): Promise<{
@@ -643,7 +681,7 @@ async function extractErrorDetails(response: Response): Promise<{
 }
 
 // Reads messages from the queue and logs them
-async function readQueue(c: Context, db: ReturnType<typeof getPgClient>, queueName: string, batchSize: number = DEFAULT_BATCH_SIZE): Promise<Message[]> {
+async function readQueue(c: Context, db: ReturnType<typeof getPgClient>, queueName: string, batchSize: number = DEFAULT_BATCH_SIZE): Promise<Message[] | null> {
   const queueKey = 'readQueue'
   const startTime = Date.now()
   let messages: Message[] = []
@@ -684,7 +722,7 @@ async function readQueue(c: Context, db: ReturnType<typeof getPgClient>, queueNa
   finally {
     cloudlog({ requestId: c.get('requestId'), message: `[${queueKey}] Finished reading queue messages in ${Date.now() - startTime}ms.` })
   }
-  return messages
+  return null
 }
 
 // The main HTTP POST helper function
@@ -736,6 +774,61 @@ export async function http_post_helper(
   finally {
     clearTimeout(timeoutId)
   }
+}
+
+async function pingCronHealthcheck(
+  healthcheckUrl: string,
+  fetchImpl: typeof fetch,
+): Promise<boolean> {
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), HEALTHCHECK_HTTP_TIMEOUT_MS)
+
+  try {
+    const response = await fetchImpl(healthcheckUrl, {
+      method: 'GET',
+      signal: controller.signal,
+    })
+    await response.body?.cancel()
+    return response.ok
+  }
+  catch {
+    return false
+  }
+  finally {
+    clearTimeout(timeoutId)
+  }
+}
+
+function trimTrailingSlashes(value: string): string {
+  let end = value.length
+  while (end > 0 && value[end - 1] === '/')
+    end--
+  return value.slice(0, end)
+}
+
+function getCronHealthcheckStartUrl(healthcheckUrl: string): string {
+  return `${trimTrailingSlashes(healthcheckUrl)}/start`
+}
+
+async function maybePingCronHealthcheckStart(
+  healthcheckUrl: string | null,
+  fetchImpl: typeof fetch = fetch,
+): Promise<boolean> {
+  if (!healthcheckUrl)
+    return false
+
+  return pingCronHealthcheck(getCronHealthcheckStartUrl(healthcheckUrl), fetchImpl)
+}
+
+async function maybePingCronHealthcheck(
+  processResult: QueueProcessResult,
+  healthcheckUrl: string | null,
+  fetchImpl: typeof fetch = fetch,
+): Promise<boolean> {
+  if (!healthcheckUrl || !processResult.readSucceeded || processResult.skippedCount > 0 || processResult.actionableFailureCount > 0)
+    return false
+
+  return pingCronHealthcheck(healthcheckUrl, fetchImpl)
 }
 
 // Helper function to delete multiple messages from the queue in a single batch
@@ -828,9 +921,10 @@ app.post('/sync', async (c) => {
   cloudlog({ requestId: c.get('requestId'), message: `[Sync Request] Received trigger to process queue.` })
 
   // Require JSON body with queue_name and optional batch_size
-  const body = await parseBody<{ queue_name: string, batch_size?: number }>(c)
+  const body = await parseBody<{ queue_name: string, batch_size?: number, healthcheck_url?: string | null }>(c)
   const queueName = body?.queue_name
   const batchSize = body?.batch_size
+  const healthcheckUrl = typeof body?.healthcheck_url === 'string' && body.healthcheck_url.trim() ? body.healthcheck_url.trim() : null
 
   if (!queueName || typeof queueName !== 'string') {
     throw simpleError('missing_or_invalid_queue_name', 'Missing or invalid queue_name in body', { body })
@@ -860,8 +954,17 @@ app.post('/sync', async (c) => {
     let db: ReturnType<typeof getPgClient> | null = null
     try {
       db = getPgClient(c)
-      await processQueue(c, db, queueName, finalBatchSize)
-      cloudlog({ requestId: c.get('requestId'), message: `[Background Queue Sync] Background execution finished successfully.` })
+      if (healthcheckUrl !== null)
+        await maybePingCronHealthcheckStart(healthcheckUrl)
+      const result = await processQueue(c, db, queueName, finalBatchSize)
+      await maybePingCronHealthcheck(result, healthcheckUrl)
+      cloudlog({
+        requestId: c.get('requestId'),
+        message: result.success
+          ? `[Background Queue Sync] Background execution finished successfully.`
+          : `[Background Queue Sync] Background execution finished with queue failures.`,
+        result,
+      })
     }
     finally {
       if (db)
@@ -877,9 +980,12 @@ export const __queueConsumerTestUtils__ = {
   extractErrorDetails,
   extractMessageBody,
   getActionableQueueFailures,
+  getCronHealthcheckStartUrl,
   getQueueBatchSize,
   getQueueHttpConcurrency,
   httpExceptionToQueueResponse,
+  maybePingCronHealthcheck,
+  maybePingCronHealthcheckStart,
   queueFailureResponse,
   resolveFunctionUrl,
   sanitizeDiscordResponseBody,

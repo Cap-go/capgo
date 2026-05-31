@@ -349,7 +349,8 @@ export async function setChannelInternal(channel: string, appId: string, options
     channel: 'channel',
     event: 'Set channel',
     icon: '✅',
-    user_id: orgId,
+    org_id: orgId,
+    tracking_version: 2,
     tags: {
       'app-id': appId,
     },

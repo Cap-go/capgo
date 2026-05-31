@@ -2,6 +2,31 @@
 
 export type Platform = 'ios' | 'android'
 
+// The outcome a wizard app reports to the shell/command when Ink exits, so the
+// caller can print an accurate post-exit message instead of always claiming
+// success. The shell defaults to `cancelled`; an app flips it to `completed`
+// (with a durable summary) only when it actually reaches the build-complete
+// screen. This fixes the false "✔ onboarding complete" that printed on every
+// exit path (missing-platform, user-cancel, etc.).
+export interface OnboardingCompletionSummary {
+  /** The Capgo dashboard build URL, when a build was kicked off. */
+  buildUrl?: string
+  /** One-line CI-secret upload summary, when secrets were pushed. */
+  ciSecretUploadSummary?: string | null
+  /** Path to the generated GitHub Actions workflow file, when written. */
+  workflowFilePath?: string | null
+  /** Path to the exported .env file, when the user chose the env-export fallback. */
+  envExportPath?: string | null
+  /** The "run anytime" build-request command shown on the final screen. */
+  buildRequestCommand?: string
+}
+
+export interface OnboardingResult {
+  outcome: 'completed' | 'cancelled'
+  /** Present only when outcome === 'completed'. */
+  summary?: OnboardingCompletionSummary
+}
+
 export type OnboardingStep
   = | 'welcome'
     | 'platform-select'
@@ -49,11 +74,43 @@ export type OnboardingStep
     | 'confirm-ci-secret-overwrite'
     | 'uploading-ci-secrets'
     | 'ci-secrets-failed'
+    // GitHub Actions workflow + .env export sub-flow (post-secrets-upload)
+    | 'ask-github-actions-setup'
+    | 'confirm-secrets-push'
+    | 'ask-export-env'
+    | 'exporting-env'
+    | 'confirm-env-export-overwrite'
+    | 'overwrite-and-export-env'
+    | 'pick-package-manager'
+    | 'pick-build-script'
+    | 'pick-build-script-custom'
+    | 'preview-workflow-file'
+    | 'view-workflow-diff'
+    | 'writing-workflow-file'
     | 'ask-build'
     | 'requesting-build'
+    // AI debug — only entered when the build fails and logs were captured
+    | 'ai-analysis-prompt'
+    | 'ai-analysis-running'
+    | 'ai-analysis-result'
+    | 'ai-analysis-result-scroll'
     | 'build-complete'
     | 'no-platform'
     | 'error'
+
+export type OnboardingErrorCategory
+  = | 'apple_api_unauthorized'
+    | 'apple_api_rate_limited'
+    | 'cert_limit_reached'
+    | 'profile_creation_failed'
+    | 'p8_invalid'
+    // Import-existing flow (keychain / provisioning profile imports)
+    | 'keychain_no_identities'
+    | 'keychain_export_failed'
+    | 'keychain_helper_compile_failed'
+    | 'profile_no_match'
+    | 'profile_read_failed'
+    | 'unknown'
 
 export interface ApiKeyData {
   keyId: string
@@ -221,8 +278,25 @@ export const STEP_PROGRESS: Record<OnboardingStep, number> = {
   'confirm-ci-secret-overwrite': 83,
   'uploading-ci-secrets': 84,
   'ci-secrets-failed': 84,
+  // GitHub Actions + .env export branch — all post-build, mid-90s progress
+  'ask-github-actions-setup': 82,
+  'confirm-secrets-push': 83,
+  'ask-export-env': 95,
+  'exporting-env': 96,
+  'confirm-env-export-overwrite': 96,
+  'overwrite-and-export-env': 96,
+  'pick-package-manager': 95,
+  'pick-build-script': 96,
+  'pick-build-script-custom': 96,
+  'preview-workflow-file': 97,
+  'view-workflow-diff': 97,
+  'writing-workflow-file': 98,
   'ask-build': 85,
   'requesting-build': 90,
+  'ai-analysis-prompt': 92,
+  'ai-analysis-running': 95,
+  'ai-analysis-result-scroll': 97,
+  'ai-analysis-result': 98,
   'build-complete': 100,
   'no-platform': 0,
   'error': 0,
@@ -284,13 +358,30 @@ export function getPhaseLabel(step: OnboardingStep): string {
     case 'ci-secrets-setup':
     case 'ci-secrets-target-select':
     case 'ask-ci-secrets':
+    case 'ask-github-actions-setup':
+    case 'confirm-secrets-push':
     case 'checking-ci-secrets':
     case 'confirm-ci-secret-overwrite':
     case 'uploading-ci-secrets':
     case 'ci-secrets-failed':
+    case 'ask-export-env':
+    case 'exporting-env':
+    case 'confirm-env-export-overwrite':
+    case 'overwrite-and-export-env':
+    case 'pick-package-manager':
+    case 'pick-build-script':
+    case 'pick-build-script-custom':
+    case 'preview-workflow-file':
+    case 'view-workflow-diff':
+    case 'writing-workflow-file':
     case 'ask-build':
     case 'requesting-build':
       return 'Step 4 of 4 · Save & Build'
+    case 'ai-analysis-prompt':
+    case 'ai-analysis-running':
+    case 'ai-analysis-result':
+    case 'ai-analysis-result-scroll':
+      return 'AI debug'
     case 'build-complete':
       return 'Complete'
     case 'no-platform':

@@ -12,6 +12,7 @@ import {
   shouldApplyBuildTimeout,
   TERMINAL_BUILD_STATUSES,
 } from '../utils/build_timeout.ts'
+import { emitBuildTransitionEvent } from '../utils/build_tracking.ts'
 import { BRES, middlewareAPISecret } from '../utils/hono.ts'
 import { cloudlog, cloudlogErr } from '../utils/logging.ts'
 import { recordBuildTime, supabaseAdmin } from '../utils/supabase.ts'
@@ -68,7 +69,7 @@ app.post('/', middlewareAPISecret, async (c) => {
 
   const { data: staleBuilds, error: queryError } = await supabase
     .from('build_requests')
-    .select('id, builder_job_id, app_id, owner_org, requested_by, platform, status, created_at')
+    .select('id, builder_job_id, app_id, owner_org, requested_by, platform, build_mode, status, created_at')
     .not('status', 'in', `(${[...TERMINAL_BUILD_STATUSES].join(',')})`)
     .lt('updated_at', new Date(Date.now() - STALE_THRESHOLD_MINUTES * 60 * 1000).toISOString())
     .order('updated_at', { ascending: true })
@@ -209,7 +210,16 @@ app.post('/', middlewareAPISecret, async (c) => {
       if (timeoutApplied)
         timedOut++
 
-      const { error: updateError } = await supabase
+      const previousStatus = build.status
+
+      // Optimistic concurrency-control (CAS) guard: `.eq('status', previousStatus)`
+      // ensures only one writer wins when the cron races with a CLI/dashboard
+      // poller on the same row. The `.select('id')` lets us detect whether this
+      // writer actually advanced the row; if `updatedRows` is empty, another
+      // writer already moved the status and has emitted the transition — skip
+      // emission here. The cron's per-build loop is inside Promise.allSettled,
+      // so a lost race must NOT throw: we just skip the event and continue.
+      const { data: updatedRows, error: updateError } = await supabase
         .from('build_requests')
         .update({
           status: effectiveStatus,
@@ -218,10 +228,17 @@ app.post('/', middlewareAPISecret, async (c) => {
           updated_at: new Date().toISOString(),
         })
         .eq('id', build.id)
+        .eq('status', previousStatus)
+        .select('id')
 
       if (updateError)
         throw new Error(updateError.message)
 
+      const transitionApplied = !!updatedRows && updatedRows.length > 0
+
+      // recordBuildTime stays unconditional on terminal status: it's idempotent
+      // at the DB layer, and skipping it on the CAS-lost branch would let
+      // billing miss a build (worse than the rare duplicate).
       if (
         (isTerminalBuildStatus(effectiveStatus) || timeoutApplied)
         && builderJob.job.started_at
@@ -244,6 +261,25 @@ app.post('/', middlewareAPISecret, async (c) => {
           )
         }
       }
+
+      if (transitionApplied) {
+        await emitBuildTransitionEvent(c, {
+          previousStatus,
+          effectiveStatus,
+          timeoutApplied,
+          effectiveError,
+          effectiveBuildTimeSeconds,
+          build: {
+            app_id: build.app_id,
+            platform: build.platform,
+            build_mode: build.build_mode,
+            owner_org: build.owner_org,
+            requested_by: build.requested_by,
+          },
+        })
+      }
+      // else: another writer (start.ts/status.ts, or another cron tick) already
+      // advanced this row and emitted — skip to avoid double-firing.
     }),
   )
 

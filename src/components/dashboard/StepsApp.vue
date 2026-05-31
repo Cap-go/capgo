@@ -7,7 +7,7 @@ import IconCheck from '~icons/lucide/check'
 import IconChevronDown from '~icons/lucide/chevron-down'
 import IconLoader from '~icons/lucide/loader-2'
 import InviteTeammateModal from '~/components/dashboard/InviteTeammateModal.vue'
-import { createDefaultApiKey } from '~/services/apikeys'
+import { createDefaultApiKey, findUsablePlainApiKey } from '~/services/apikeys'
 import { pushEvent } from '~/services/posthog'
 import { getLocalConfig, isLocal, useSupabase } from '~/services/supabase'
 import { sendEvent } from '~/services/tracking'
@@ -84,14 +84,18 @@ function stepToName(stepNumber: number): string {
 
 function setLog() {
   if (props.onboarding && main.user?.id) {
-    sendEvent({
-      channel: 'onboarding-v2',
-      event: `onboarding-step-${stepToName(step.value)}`,
-      icon: '👶',
-      user_id: organizationStore.currentOrganization?.gid,
-      notify: false,
-    }).catch()
-    pushEvent(`user:onboarding-step-${stepToName(step.value)}`, config.supaHost)
+    const orgId = organizationStore.currentOrganization?.gid
+    if (orgId) {
+      sendEvent({
+        channel: 'onboarding-v2',
+        event: `onboarding-step-${stepToName(step.value)}`,
+        icon: '👶',
+        org_id: orgId,
+        tracking_version: 2,
+        notify: false,
+      }).catch()
+      pushEvent(`user:onboarding-step-${stepToName(step.value)}`, config.supaHost, { org_id: orgId })
+    }
   }
   if (step.value === 2) {
     console.log('Finished onboarding for app ID:', appId.value)
@@ -121,14 +125,18 @@ function goToNextStep(scrollTargetId?: string) {
 
 function openInviteDialog() {
   inviteModalRef.value?.openDialog()
-  sendEvent({
-    channel: 'onboarding-v2',
-    event: `onboarding-alternative-send-invite`,
-    icon: '👶',
-    user_id: organizationStore.currentOrganization?.gid,
-    notify: false,
-  }).catch()
-  pushEvent(`user:onboarding-alternative-send-invite`, config.supaHost)
+  const orgId = organizationStore.currentOrganization?.gid
+  if (orgId) {
+    sendEvent({
+      channel: 'onboarding-v2',
+      event: `onboarding-alternative-send-invite`,
+      icon: '👶',
+      org_id: orgId,
+      tracking_version: 2,
+      notify: false,
+    }).catch()
+    pushEvent(`user:onboarding-alternative-send-invite`, config.supaHost, { org_id: orgId })
+  }
 }
 
 function onInviteSuccess() {
@@ -153,10 +161,11 @@ async function createDemoApp() {
       channel: 'onboarding-v2',
       event: 'onboarding-create-demo-app',
       icon: '👶',
-      user_id: orgId,
+      org_id: orgId,
+      tracking_version: 2,
       notify: false,
     }).catch()
-    pushEvent('user:onboarding-create-demo-app', config.supaHost)
+    pushEvent('user:onboarding-create-demo-app', config.supaHost, { org_id: orgId })
 
     const { data, error } = await supabase.functions.invoke('app/demo', {
       method: 'POST',
@@ -230,33 +239,30 @@ async function addNewApiKey() {
 
   if (!userId) {
     console.log('Not logged in, cannot regenerate API key')
-    return
+    return null
   }
-  const { error } = await createDefaultApiKey(supabase, t('api-key'))
+  const { data, error } = await createDefaultApiKey(supabase, t('api-key'), {
+    orgId: organizationStore.currentOrganization?.gid,
+    appId: appId.value,
+  })
 
   if (error)
     throw error
+
+  return typeof data?.key === 'string' ? data.key : null
 }
 
 async function getKey(retry = true): Promise<void> {
   isLoading.value = true
   if (!main?.user?.id)
     return
-  const { data, error } = await supabase
-    .from('apikeys')
-    .select()
-    .eq('user_id', main?.user?.id)
-    .eq('mode', 'all')
 
-  if (typeof data !== 'undefined' && data !== null && !error) {
-    if (data.length === 0) {
-      await addNewApiKey()
-      return getKey(false)
-    }
-    apiKey.value = data[0]?.key ?? null
+  const existingKey = await findUsablePlainApiKey(supabase, main.user.id, organizationStore.currentOrganization?.gid, appId.value)
+  if (existingKey) {
+    apiKey.value = existingKey
   }
-  else if (retry && main?.user?.id) {
-    return getKey(false)
+  else if (retry) {
+    apiKey.value = await addNewApiKey()
   }
 
   isLoading.value = false

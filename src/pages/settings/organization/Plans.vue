@@ -369,13 +369,17 @@ watchEffect(async () => {
       }
 
       loadData(true)
-      sendEvent({
-        channel: 'usage',
-        event: 'User visit',
-        icon: '💳',
-        user_id: currentOrganization.value?.gid,
-        notify: false,
-      }).catch()
+      const orgId = currentOrganization.value?.gid
+      if (orgId) {
+        sendEvent({
+          channel: 'usage',
+          event: 'User visit',
+          icon: '💳',
+          org_id: orgId,
+          tracking_version: 2,
+          notify: false,
+        }).catch()
+      }
     }
   }
 })

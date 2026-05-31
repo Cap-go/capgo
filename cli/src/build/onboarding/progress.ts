@@ -184,3 +184,12 @@ export function getImportEntryStep(progress: OnboardingProgress | null): Onboard
     return 'input-key-id'
   return 'api-key-instructions'
 }
+
+// Apple names downloaded App Store Connect API keys "AuthKey_<KEYID>.p8" (older
+// portals used "ApiKey_"), so the Key ID is recoverable from the filename. Used
+// both to pre-fill the Key ID when a .p8 is picked and to re-derive it on resume
+// when a prior session saved the path but quit before confirming the Key ID step.
+// Returns '' when the filename doesn't match (e.g. a manually-renamed file).
+export function extractKeyIdFromP8Path(filePath: string): string {
+  return filePath.match(/(?:Auth|Api)Key_([A-Z0-9]+)\.p8$/i)?.[1] ?? ''
+}

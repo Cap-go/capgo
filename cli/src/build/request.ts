@@ -53,12 +53,14 @@ import {
   startCaptureForJob,
 } from '../ai/log-capture'
 import { renderMarkdown } from '../ai/render-markdown'
+import { trackAiAnalysisChoice, trackAiAnalysisResult } from '../ai/telemetry'
 import { assertCliPermission, canPromptInteractively, createSupabaseClient, findSavedKey, getConfig, getOrganizationId, sendEvent } from '../utils'
 import { mergeCredentials, MIN_OUTPUT_RETENTION_SECONDS, parseInAppUpdatePriority, parseOptionalBoolean, parseOutputRetentionSeconds } from './credentials'
 import { buildProvisioningMap } from './credentials-command'
 import { writeBuildOutputRecord } from './output-record'
 import { getPlatformDirFromCapacitorConfig } from './platform-paths'
 import { handleCustomMsg } from './qr.js'
+import { trackBuilderUpload } from './telemetry.js'
 
 /**
  * Callback interface for build logging.
@@ -1629,9 +1631,17 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
     // --ai-analytics is set in CI (so auto-upload has logs to send). Without the
     // flag-OR, the CI auto_upload branch from decideAnalyzeBehavior would never
     // have a log file to read.
-    const captureEnabled = shouldCaptureLogs() || options.aiAnalytics === true
+    const aiAnalysisMode: 'auto-prompt' | 'caller-handled' | 'skip' = options.aiAnalysisMode ?? 'auto-prompt'
+    // Capture when interactive, when the CI flag is set, OR when the caller asked
+    // to drive the AI flow themselves (e.g. Ink onboarding) so the captured log
+    // is available for runCapgoAiAnalysis.
+    const captureEnabled = (shouldCaptureLogs() || options.aiAnalytics === true || aiAnalysisMode === 'caller-handled')
+      && aiAnalysisMode !== 'skip'
     let capturedJobId: string | null = null
     let keepPromptFile = false // mutable so local-AI flow can set it true
+    // Populated only in caller-handled mode on a failed build. Returned to the
+    // caller so it can render its own AI prompt UI and later release the log.
+    let aiAnalysisInfo: BuildRequestResult['aiAnalysis']
 
     if (captureEnabled && buildRequest.job_id) {
       capturedJobId = buildRequest.job_id
@@ -1656,7 +1666,8 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
       channel: 'native-builder',
       event: 'Build requested',
       icon: '🏗️',
-      user_id: orgId,
+      org_id: orgId,
+      tracking_version: 2,
       tags: {
         'app-id': appId,
         'platform': platform,
@@ -1696,6 +1707,19 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
       // Upload using TUS protocol
       log.uploadProgress(0)
 
+      const uploadStartedAt = Date.now()
+      const buildModeForTelemetry = options.buildMode || 'release'
+      void trackBuilderUpload({
+        apikey: options.apikey,
+        appId,
+        orgId,
+        platform,
+        buildMode: buildModeForTelemetry,
+        jobId: buildRequest.job_id,
+        sizeBytes: zipStats.size,
+        phase: 'started',
+      })
+
       await new Promise<void>((resolve, reject) => {
         const upload = new tus.Upload(zipBuffer as any, {
           endpoint: buildRequest.upload_url,
@@ -1725,7 +1749,19 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
             }
           },
           // Callback for errors which cannot be fixed using retries
-          onError(error) {
+          async onError(error) {
+            await trackBuilderUpload({
+              apikey: options.apikey,
+              appId,
+              orgId,
+              platform,
+              buildMode: buildModeForTelemetry,
+              jobId: buildRequest.job_id,
+              sizeBytes: zipStats.size,
+              phase: 'failed',
+              durationSeconds: (Date.now() - uploadStartedAt) / 1000,
+              error,
+            })
             log.error(`Upload error: ${error.message}`)
             if (error instanceof tus.DetailedError) {
               const body = error.originalResponse?.getBody()
@@ -1760,6 +1796,17 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
           },
           // Callback for once the upload is completed
           onSuccess() {
+            void trackBuilderUpload({
+              apikey: options.apikey,
+              appId,
+              orgId,
+              platform,
+              buildMode: buildModeForTelemetry,
+              jobId: buildRequest.job_id,
+              sizeBytes: zipStats.size,
+              phase: 'succeeded',
+              durationSeconds: (Date.now() - uploadStartedAt) / 1000,
+            })
             log.uploadProgress(100)
             if (verbose) {
               log.success('TUS upload completed successfully')
@@ -1939,8 +1986,30 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
         }
       }
 
-      // On failure, offer the AI analysis flow (interactive menu or auto-upload).
-      if (finalStatus === 'failed' && captureEnabled && capturedJobId) {
+      // On failure, offer the AI analysis flow.
+      //
+      // - 'skip'           → no-op (caller wants nothing to do with AI here).
+      // - 'caller-handled' → leave the captured log on disk and surface it via
+      //                      `result.aiAnalysis` so the caller (e.g. the Ink
+      //                      onboarding wizard) can run `runCapgoAiAnalysis`
+      //                      and render its own UI without clack corrupting
+      //                      its terminal renderer.
+      // - 'auto-prompt'    → existing interactive / CI matrix via
+      //                      decideAnalyzeBehavior + clack prompts.
+      if (finalStatus === 'failed' && captureEnabled && capturedJobId && aiAnalysisMode === 'caller-handled') {
+        // Preserve the captured log until the caller calls
+        // releaseCapturedLogs(jobId) explicitly. Without this, the cleanup
+        // handlers registered above would remove it on process exit before
+        // the caller had a chance to read it.
+        keepPromptFile = true
+        const logsPath = `${process.env.CAPGO_AI_LOG_BASE_DIR || '/tmp/capgo-builds'}/${capturedJobId}.log`
+        aiAnalysisInfo = {
+          jobId: capturedJobId,
+          capturedLogPath: logsPath,
+          ready: true,
+        }
+      }
+      else if (finalStatus === 'failed' && captureEnabled && capturedJobId && aiAnalysisMode === 'auto-prompt') {
         const behavior = decideAnalyzeBehavior({
           isTTY: process.stdout.isTTY === true,
           aiAnalyticsFlag: options.aiAnalytics === true,
@@ -1948,7 +2017,29 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
 
         const AI_WARNING = '⚠ AI can make mistakes. Always verify the diagnosis against the full log before applying the suggested fix.'
 
-        const runCapgoAi = async (): Promise<void> => {
+        // Closed-enum mapper for PostAnalyzeResult.kind → telemetry result tag.
+        // Never include the analysis text itself in telemetry.
+        const mapPostAnalyzeResultKind = (kind: PostAnalyzeResult['kind']): 'success' | 'already_analyzed' | 'too_big' | 'error' => {
+          if (kind === 'ok')
+            return 'success'
+          if (kind === 'already_analyzed')
+            return 'already_analyzed'
+          if (kind === 'too_big')
+            return 'too_big'
+          return 'error'
+        }
+
+        const runCapgoAi = async (choice: 'capgo_ai' | 'auto_upload', triggeredBy: 'menu' | 'ci_flag'): Promise<void> => {
+          await trackAiAnalysisChoice({
+            apikey: options.apikey,
+            orgId,
+            appId,
+            platform,
+            jobId: capturedJobId!,
+            choice,
+            triggeredBy,
+          })
+
           const logsPath = `${process.env.CAPGO_AI_LOG_BASE_DIR || '/tmp/capgo-builds'}/${capturedJobId}.log`
           let logs = ''
           try {
@@ -1971,7 +2062,7 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
           // @clack/prompts spinner appends its own animated dots — don't add an
           // ellipsis here or the user sees "…..." (6 dots: our 1-char ellipsis
           // plus the spinner's cycling 3-dot animation).
-          aiSpinner?.start('Analyzing build log with Capgo AI (Kimi K2.5)')
+          aiSpinner?.start('Analyzing build log with Capgo AI')
 
           let result: PostAnalyzeResult
           try {
@@ -1986,6 +2077,18 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
           finally {
             aiSpinner?.stop('Capgo AI finished')
           }
+
+          // Telemetry — closed-enum result only, never the analysis text.
+          const resultTag = mapPostAnalyzeResultKind(result.kind)
+          await trackAiAnalysisResult({
+            apikey: options.apikey,
+            orgId,
+            appId,
+            platform,
+            jobId: capturedJobId!,
+            result: resultTag,
+            errorStatus: result.kind === 'error' ? result.status : undefined,
+          })
 
           if (result.kind === 'ok') {
             stream.write(`\n--- AI analysis ---\n${renderMarkdown(result.analysis, isInteractive)}\n\n${AI_WARNING}\n`)
@@ -2002,9 +2105,30 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
         }
 
         const runLocalAi = async (): Promise<void> => {
+          await trackAiAnalysisChoice({
+            apikey: options.apikey,
+            orgId,
+            appId,
+            platform,
+            jobId: capturedJobId!,
+            choice: 'local_ai',
+            triggeredBy: 'menu',
+          })
           const promptPath = await writeLocalAiFile(capturedJobId!)
           keepPromptFile = true
           process.stdout.write(`\nSaved prompt to ${promptPath}\nPoint your local AI (Claude, Codex, aider, etc.) at this file.\n${AI_WARNING}\n`)
+        }
+
+        const emitSkipChoice = async (): Promise<void> => {
+          await trackAiAnalysisChoice({
+            apikey: options.apikey,
+            orgId,
+            appId,
+            platform,
+            jobId: capturedJobId!,
+            choice: 'skip',
+            triggeredBy: (behavior === 'auto_upload' || behavior === 'skip') ? 'ci_flag' : 'menu',
+          })
         }
 
         async function showMenu(): Promise<void> {
@@ -2016,27 +2140,30 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
           const choice = await select({
             message: 'Choose AI analysis',
             options: [
-              { value: 'capgo', label: 'Capgo AI (Kimi K2.5)' },
+              { value: 'capgo', label: 'Capgo AI' },
               { value: 'local', label: 'Local AI (write prompt to file)' },
               { value: 'skip', label: 'Skip' },
             ],
           })
           if (choice === 'capgo')
-            await runCapgoAi()
+            await runCapgoAi('capgo_ai', 'menu')
           else if (choice === 'local')
             await runLocalAi()
+          else
+            await emitSkipChoice()
         }
 
         try {
           if (behavior === 'skip') {
-            // nothing
+            await emitSkipChoice()
           }
           else if (behavior === 'auto_upload') {
             if (await isLogTooBig(capturedJobId)) {
               process.stderr.write('Log too big for AI analysis (>10 MB), skipping\n')
+              await emitSkipChoice()
             }
             else {
-              await runCapgoAi()
+              await runCapgoAi('auto_upload', 'ci_flag')
             }
           }
           else {
@@ -2045,6 +2172,7 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
               const wants = await confirm({ message: 'Build failed. Run AI analysis?' })
               if (!wants || typeof wants === 'symbol') {
                 // user cancelled or declined — skip
+                await emitSkipChoice()
               }
               else {
                 await showMenu()
@@ -2068,7 +2196,8 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
         channel: 'native-builder',
         event: finalStatus === 'succeeded' ? 'Build succeeded' : 'Build failed',
         icon: finalStatus === 'succeeded' ? '✅' : '❌',
-        user_id: orgId,
+        org_id: orgId,
+        tracking_version: 2,
         tags: {
           'app-id': appId,
           'platform': platform,
@@ -2083,6 +2212,7 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
         jobId: buildRequest.job_id,
         uploadUrl: buildRequest.upload_url,
         status: finalStatus || startResult.status || buildRequest.status,
+        aiAnalysis: aiAnalysisInfo,
       }
     }
     finally {

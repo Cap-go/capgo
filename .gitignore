@@ -92,3 +92,5 @@ internal/AuthKey_8P7Y3V99PJ.p8
 internal/CICD.mobileprovision
 internal/Certificates.p12
 .opencode
+.superpowers/
+.playwright-mcp/

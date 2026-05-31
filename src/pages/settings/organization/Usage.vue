@@ -10,7 +10,7 @@ import { toast } from 'vue-sonner'
 import CreditsCta from '~/components/CreditsCta.vue'
 import Spinner from '~/components/Spinner.vue'
 import { bytesToGb } from '~/services/conversion'
-import { formatUtcDateTimeAsLocal } from '~/services/date'
+import { formatLocalDate, formatLocalDateTime, formatUtcDateTimeAsLocal } from '~/services/date'
 import { calculateCreditCost, getCurrentPlanNameOrg, getPlans, getPlanUsagePercent, getTotalStorage, getUsageCreditDeductions } from '~/services/supabase'
 import { sendEvent } from '~/services/tracking'
 import { useDialogV2Store } from '~/stores/dialogv2'
@@ -39,13 +39,17 @@ watchEffect(async () => {
       toast.success(t('usage-success'))
     }
     else if (main.user?.id) {
-      sendEvent({
-        channel: 'usage',
-        event: 'User visit',
-        icon: '💳',
-        user_id: currentOrganization.value?.gid,
-        notify: false,
-      }).catch()
+      const orgId = currentOrganization.value?.gid
+      if (orgId) {
+        sendEvent({
+          channel: 'usage',
+          event: 'User visit',
+          icon: '💳',
+          org_id: orgId,
+          tracking_version: 2,
+          notify: false,
+        }).catch()
+      }
     }
   }
 })
@@ -173,8 +177,8 @@ async function getUsage(orgId: string) {
     totalBuildTime,
     detailPlanUsage,
     cycle: {
-      subscription_anchor_start: dayjs(organizationStore.currentOrganization?.subscription_start).format('YYYY/MM/D'),
-      subscription_anchor_end: dayjs(organizationStore.currentOrganization?.subscription_end).format('YYYY/MM/D'),
+      subscription_anchor_start: formatLocalDate(organizationStore.currentOrganization?.subscription_start) || t('unknown'),
+      subscription_anchor_end: formatLocalDate(organizationStore.currentOrganization?.subscription_end) || t('unknown'),
     },
   }
 }
@@ -333,7 +337,7 @@ function nextRunDate() {
   if (!source)
     return `${t('next-run')}: ${t('unknown')}`
 
-  const nextRun = dayjs(source).format('MMMM D, YYYY HH:mm')
+  const nextRun = formatLocalDateTime(source) || t('unknown')
   return `${t('next-run')}: ${nextRun}`
 }
 </script>

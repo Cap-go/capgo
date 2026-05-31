@@ -4,7 +4,7 @@ export function encodeManifestPathSegments(path: string): string {
   return path.split('/').map(segment => encodeURIComponent(segment)).join('/')
 }
 
-function decodeManifestPathSegments(path: string): string | null {
+export function decodeManifestPathSegments(path: string): string | null {
   try {
     return path.split('/').map(segment => decodeURIComponent(segment)).join('/')
   }
@@ -35,4 +35,20 @@ export function normalizeLegacyEncodedManifestFileName(fileName: string | null |
     return fileName
 
   return decodedFileName
+}
+
+export function getManifestStorageCandidateKeys(s3Path: string): string[] {
+  const candidates = [s3Path]
+
+  if (PERCENT_ENCODED_OCTET_RE.test(s3Path)) {
+    const decodedPath = decodeManifestPathSegments(s3Path)
+    if (decodedPath && decodedPath !== s3Path)
+      candidates.push(decodedPath)
+
+    const encodedPath = encodeManifestPathSegments(s3Path)
+    if (encodedPath !== s3Path)
+      candidates.push(encodedPath)
+  }
+
+  return [...new Set(candidates)]
 }

@@ -387,20 +387,7 @@ app.post(
         .limit(1)
 
       if (!targetRbacAccess.length) {
-        const targetLegacyAccess = await drizzle
-          .select({ id: schema.org_users.id })
-          .from(schema.org_users)
-          .where(
-            and(
-              eq(schema.org_users.user_id, targetUserId),
-              eq(schema.org_users.org_id, group.org_id),
-            ),
-          )
-          .limit(1)
-
-        if (!targetLegacyAccess.length) {
-          return c.json({ error: 'User is not a member of this org' }, 400)
-        }
+        return c.json({ error: 'User is not a member of this org' }, 400)
       }
 
       // Add member (ON CONFLICT DO NOTHING for idempotency)

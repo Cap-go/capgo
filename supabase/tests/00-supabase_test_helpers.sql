@@ -445,12 +445,140 @@ BEGIN
 END
 $$ LANGUAGE plpgsql;
 
+/**
+    * ### tests.create_v2_apikey(...)
+    *
+    * Creates an API key row and optional RBAC role bindings for V2-only API key tests.
+ */
+CREATE OR REPLACE FUNCTION tests.create_v2_apikey(
+    p_id bigint,
+    p_user_id uuid,
+    p_key text,
+    p_name text,
+    p_org_id uuid DEFAULT NULL,
+    p_org_role text DEFAULT public.rbac_role_org_super_admin(),
+    p_app_app_id character varying DEFAULT NULL,
+    p_app_role text DEFAULT NULL,
+    p_expires_at timestamptz DEFAULT NULL,
+    p_key_hash text DEFAULT NULL
+)
+RETURNS uuid
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+    v_rbac_id uuid;
+    v_role_id uuid;
+    v_app_uuid uuid;
+    v_app_org_id uuid;
+BEGIN
+    IF p_key IS NULL AND p_key_hash IS NULL THEN
+        RAISE EXCEPTION 'tests.create_v2_apikey requires p_key or p_key_hash';
+    END IF;
+
+    INSERT INTO public.apikeys (id, user_id, key, key_hash, name, expires_at)
+    VALUES (p_id, p_user_id, p_key, p_key_hash, p_name, p_expires_at)
+    ON CONFLICT (id) DO UPDATE
+    SET
+        user_id = EXCLUDED.user_id,
+        key = COALESCE(EXCLUDED.key, public.apikeys.key),
+        key_hash = COALESCE(EXCLUDED.key_hash, public.apikeys.key_hash),
+        name = EXCLUDED.name,
+        expires_at = EXCLUDED.expires_at
+    RETURNING rbac_id INTO v_rbac_id;
+
+    IF p_org_id IS NOT NULL AND p_org_role IS NOT NULL THEN
+        SELECT id INTO v_role_id
+        FROM public.roles
+        WHERE name = p_org_role
+        LIMIT 1;
+
+        IF v_role_id IS NULL THEN
+            RAISE EXCEPTION 'Unknown org role: %', p_org_role;
+        END IF;
+
+        INSERT INTO public.role_bindings (
+            principal_type,
+            principal_id,
+            role_id,
+            scope_type,
+            org_id,
+            granted_by,
+            reason,
+            is_direct
+        )
+        VALUES (
+            public.rbac_principal_apikey(),
+            v_rbac_id,
+            v_role_id,
+            public.rbac_scope_org(),
+            p_org_id,
+            p_user_id,
+            'pgTAP V2 API key helper',
+            true
+        )
+        ON CONFLICT DO NOTHING;
+    END IF;
+
+    IF p_app_app_id IS NOT NULL THEN
+        IF p_app_role IS NULL THEN
+            RAISE EXCEPTION 'tests.create_v2_apikey requires p_app_role when p_app_app_id is set';
+        END IF;
+
+        SELECT id, owner_org
+        INTO v_app_uuid, v_app_org_id
+        FROM public.apps
+        WHERE app_id = p_app_app_id
+        LIMIT 1;
+
+        IF v_app_uuid IS NULL THEN
+            RAISE EXCEPTION 'Unknown app_id: %', p_app_app_id;
+        END IF;
+
+        SELECT id INTO v_role_id
+        FROM public.roles
+        WHERE name = p_app_role
+        LIMIT 1;
+
+        IF v_role_id IS NULL THEN
+            RAISE EXCEPTION 'Unknown app role: %', p_app_role;
+        END IF;
+
+        INSERT INTO public.role_bindings (
+            principal_type,
+            principal_id,
+            role_id,
+            scope_type,
+            org_id,
+            app_id,
+            granted_by,
+            reason,
+            is_direct
+        )
+        VALUES (
+            public.rbac_principal_apikey(),
+            v_rbac_id,
+            v_role_id,
+            public.rbac_scope_app(),
+            COALESCE(p_org_id, v_app_org_id),
+            v_app_uuid,
+            p_user_id,
+            'pgTAP V2 API key helper',
+            true
+        )
+        ON CONFLICT DO NOTHING;
+    END IF;
+
+    RETURN v_rbac_id;
+END;
+$$ LANGUAGE plpgsql;
+
 
 -- we have to run some tests to get this to pass as the first test file.
 -- investigating options to make this better.  Maybe a dedicated test harness
 -- but we dont' want these functions to always exist on the database.
 BEGIN;
-SELECT plan(7);
+SELECT plan(8);
 SELECT function_returns('tests', 'create_supabase_user', ARRAY['text', 'text', 'text', 'jsonb'], 'uuid');
 SELECT function_returns('tests', 'get_supabase_uid', ARRAY['text'], 'uuid');
 SELECT function_returns('tests', 'get_supabase_user', ARRAY['text'], 'json');
@@ -458,5 +586,6 @@ SELECT function_returns('tests', 'authenticate_as', ARRAY['text'], 'void');
 SELECT function_returns('tests', 'clear_authentication', ARRAY[null], 'void');
 SELECT function_returns('tests', 'rls_enabled', ARRAY['text', 'text'], 'text');
 SELECT function_returns('tests', 'rls_enabled', ARRAY['text'], 'text');
+SELECT function_returns('tests', 'create_v2_apikey', ARRAY['bigint', 'uuid', 'text', 'text', 'uuid', 'text', 'character varying', 'text', 'timestamp with time zone', 'text'], 'uuid');
 SELECT * FROM finish();
 ROLLBACK;

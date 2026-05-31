@@ -2,6 +2,7 @@ import type { BundleCompatibilityOptions } from '../schemas/bundle'
 import type { Compatibility } from '../utils'
 import { intro, log } from '@clack/prompts'
 import { Table } from '@sauber/table'
+import { trackEvent } from '../analytics/track'
 import { check2FAComplianceForApp, checkAppExistsAndHasPermissionOrgErr } from '../api/app'
 import {
   checkCompatibilityCloud,
@@ -82,6 +83,16 @@ export async function checkCompatibilityInternal(
 
   const hasIncompatible = compatibility.finalCompatibility.some(entry => !isCompatible(entry))
 
+  void trackEvent({
+    channel: 'bundle',
+    event: 'Bundle Compatibility Checked',
+    icon: '🧪',
+    tags: {
+      result: hasIncompatible ? 'incompatible' : 'compatible',
+      missing_deps_count: compatibility.finalCompatibility.filter(entry => !isCompatible(entry)).length,
+    },
+  })
+
   if (!silent) {
     const table = new Table()
     table.headers = ['Package', 'Local', 'Remote', 'Status', 'Details']
@@ -133,5 +144,37 @@ export async function checkCompatibility(appId: string, options: BundleCompatibi
   catch (error) {
     log.error(`Error checking compatibility ${formatError(error)}`)
     throw error
+  }
+}
+
+export type UploadCompatibilityResult = 'compatible' | 'incompatible' | 'skipped'
+
+export interface UploadCompatibilitySummary {
+  result: UploadCompatibilityResult
+  incompatibleCount: number
+  reasons: string[]
+}
+
+/**
+ * Summarize an upload's compatibility outcome for analytics.
+ *
+ * `finalCompatibility` is `undefined` when the comparison did not run (new
+ * channel / no remote native metadata / `--ignore-metadata-check`), which is
+ * reported as `skipped` so the funnel never silently counts a skip as
+ * `compatible`.
+ */
+export function summarizeUploadCompatibility(
+  finalCompatibility: Compatibility[] | undefined,
+): UploadCompatibilitySummary {
+  if (!finalCompatibility)
+    return { result: 'skipped', incompatibleCount: 0, reasons: [] }
+
+  const incompatible = finalCompatibility.filter(entry => !isCompatible(entry))
+  const reasons = [...new Set(incompatible.flatMap(entry => getCompatibilityDetails(entry).reasons))]
+
+  return {
+    result: incompatible.length > 0 ? 'incompatible' : 'compatible',
+    incompatibleCount: incompatible.length,
+    reasons,
   }
 }

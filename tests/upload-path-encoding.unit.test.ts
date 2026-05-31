@@ -16,6 +16,7 @@ describe('upload path encoding', () => {
     )).toEqual([
       'orgs/org-id/apps/app-id/delta/hash_sad_post_grey@2x.png',
       'orgs/org-id/apps/app-id/delta/hash_sad_post_grey%402x.png',
+      'orgs/org-id/apps/app-id/delta/hash_sad_post_grey%25402x.png',
     ])
   })
 
@@ -28,24 +29,26 @@ describe('upload path encoding', () => {
     expect(getSafeAttachmentReadCandidateKeys(decodedRouteKey, encodedStoragePath)).toEqual([
       decodedRouteKey,
       encodedStoragePath,
+      'orgs/org-id/apps/app-id/delta/hash_assets/suite-marketing/images/social-media/sad_post_grey%25402x.png',
     ])
   })
 
-  it.concurrent('heads legacy raw percent candidates when decoded object keys are missing', async () => {
+  it.concurrent('heads upload-location encoded candidates when decoded and raw percent object keys are missing', async () => {
     const checkedKeys: string[] = []
     const decodedRouteKey = 'orgs/org-id/apps/app-id/delta/hash_assets/suite-marketing/images/social-media/sad_post_grey@2x.png'
     const encodedStoragePath = 'orgs/org-id/apps/app-id/delta/hash_assets/suite-marketing/images/social-media/sad_post_grey%402x.png'
+    const uploadLocationEncodedStoragePath = 'orgs/org-id/apps/app-id/delta/hash_assets/suite-marketing/images/social-media/sad_post_grey%25402x.png'
     const legacyObjectInfo = { size: 42 }
 
     const objectInfo = await headFirstExistingAttachmentCandidate({
       async head(key: string) {
         checkedKeys.push(key)
-        return key === encodedStoragePath ? legacyObjectInfo : null
+        return key === uploadLocationEncodedStoragePath ? legacyObjectInfo : null
       },
     }, getSafeAttachmentReadCandidateKeys(decodedRouteKey, encodedStoragePath))
 
     expect(objectInfo).toBe(legacyObjectInfo)
-    expect(checkedKeys).toEqual([decodedRouteKey, encodedStoragePath])
+    expect(checkedKeys).toEqual([decodedRouteKey, encodedStoragePath, uploadLocationEncodedStoragePath])
   })
 
   it.concurrent('does not try raw percent route keys outside the authorized app scope', () => {

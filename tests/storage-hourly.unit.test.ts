@@ -1,0 +1,56 @@
+import { describe, expect, it } from 'vitest'
+import { calculateStorageHourlyRows } from '../supabase/functions/_backend/triggers/cron_stat_app.ts'
+
+const APP_ID = 'com.storage-hourly.test'
+const OWNER_ORG = '11111111-2222-4333-8444-555555555555'
+
+function calculate(events: Parameters<typeof calculateStorageHourlyRows>[0], currentHour: string) {
+  return calculateStorageHourlyRows(events, {
+    appId: APP_ID,
+    ownerOrg: OWNER_ORG,
+    cycleStart: '2026-01-01T00:00:00.000Z',
+    cycleEnd: '2026-02-01T00:00:00.000Z',
+    currentHour,
+  }).rows.map(row => ({
+    date: row.date,
+    storage_byte_hours: row.storage_byte_hours,
+  }))
+}
+
+describe('calculateStorageHourlyRows', () => {
+  it('records one byte-hour per active byte for full hours', () => {
+    expect(calculate([
+      { version_id: 1, size: 100, timestamp: '2026-01-01T00:00:00.000Z' },
+    ], '2026-01-01T03:00:00.000Z')).toEqual([
+      { date: '2026-01-01', storage_byte_hours: 300 },
+    ])
+  })
+
+  it('uses partial-hour precision for additions and removals', () => {
+    expect(calculate([
+      { version_id: 1, size: 120, timestamp: '2026-01-01T00:30:00.000Z' },
+      { version_id: 1, size: -120, timestamp: '2026-01-01T02:15:00.000Z' },
+    ], '2026-01-01T04:00:00.000Z')).toEqual([
+      { date: '2026-01-01', storage_byte_hours: 210 },
+    ])
+  })
+
+  it('clips versions that started before the billing cycle', () => {
+    expect(calculate([
+      { version_id: 1, size: 200, timestamp: '2025-12-31T23:00:00.000Z' },
+      { version_id: 1, size: -200, timestamp: '2026-01-01T01:30:00.000Z' },
+    ], '2026-01-01T03:00:00.000Z')).toEqual([
+      { date: '2026-01-01', storage_byte_hours: 300 },
+    ])
+  })
+
+  it('splits byte-hours across UTC days', () => {
+    expect(calculate([
+      { version_id: 1, size: 100, timestamp: '2026-01-01T23:30:00.000Z' },
+      { version_id: 1, size: -100, timestamp: '2026-01-02T01:15:00.000Z' },
+    ], '2026-01-02T03:00:00.000Z')).toEqual([
+      { date: '2026-01-01', storage_byte_hours: 50 },
+      { date: '2026-01-02', storage_byte_hours: 125 },
+    ])
+  })
+})

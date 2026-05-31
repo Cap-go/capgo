@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { BASE_URL, USER_ID_2, getSupabaseClient, resetAndSeedAppData, resetAppData } from './test-utils.ts'
+import { BASE_URL, createDirectApiKeyWithBindings, getSupabaseClient, resetAndSeedAppData, resetAppData, USER_ID_2 } from './test-utils.ts'
 
 describe('Build Endpoints Job/App Binding', () => {
   const id = randomUUID()
@@ -51,53 +51,31 @@ describe('Build Endpoints Job/App Binding', () => {
 
     buildRequestId = buildRequest.id
 
-    const { error: keyInsertError } = await supabase
-      .from('apikeys')
-      .insert([
-        {
-          user_id: userId,
-          key: null,
-          mode: 'read',
-          name: `test-build-job-scope-read-${id}`,
-          limited_to_orgs: [orgId],
-          limited_to_apps: [appA],
-        },
-        {
-          user_id: userId,
-          key: null,
-          mode: 'write',
-          name: `test-build-job-scope-write-${id}`,
-          limited_to_orgs: [orgId],
-          limited_to_apps: [appA],
-        },
-      ])
-      .select('id, key, mode')
-
-    if (keyInsertError) {
-      throw keyInsertError
-    }
-
-    // The DB forces server-side key generation; we must use the returned keys.
-    // See supabase/migrations/20260206120000_apikey_server_generation.sql
-    const { data: insertedKeys, error: keyFetchError } = await supabase
-      .from('apikeys')
-      .select('id, key, mode')
-      .eq('user_id', userId)
-      .in('name', [`test-build-job-scope-read-${id}`, `test-build-job-scope-write-${id}`])
-
-    if (keyFetchError || !insertedKeys?.length) {
-      throw keyFetchError ?? new Error('Failed to fetch generated API keys for build job scope test')
-    }
-
-    const readRow = insertedKeys.find(k => k.mode === 'read')
-    const writeRow = insertedKeys.find(k => k.mode === 'write')
+    const readRow = await createDirectApiKeyWithBindings({
+      userId,
+      key: randomUUID(),
+      name: `test-build-job-scope-read-${id}`,
+      orgId,
+      roleName: 'org_member',
+      appId: appA,
+      appRoleName: 'app_reader',
+    })
+    const writeRow = await createDirectApiKeyWithBindings({
+      userId,
+      key: randomUUID(),
+      name: `test-build-job-scope-write-${id}`,
+      orgId,
+      roleName: 'org_member',
+      appId: appA,
+      appRoleName: 'app_developer',
+    })
     if (!readRow?.key || !writeRow?.key) {
       throw new Error('Seeded API keys missing generated key values')
     }
 
     readKey = readRow.key
     writeKey = writeRow.key
-    apikeyIds = insertedKeys.map(k => k.id)
+    apikeyIds = [readRow.id, writeRow.id]
   })
 
   afterAll(async () => {

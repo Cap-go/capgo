@@ -2,6 +2,9 @@ import { exit } from 'node:process'
 import { log } from '@clack/prompts'
 import { Option, program } from 'commander'
 import pack from '../package.json'
+import { categorizeCliError } from './analytics/error-category'
+import { extractCommandContext, flushAnalytics, trackCommandFailed, trackCommandInvoked, trackCommandSucceeded } from './analytics/track'
+import { enableSupabaseInstrumentation } from './analytics/supabase-perf'
 import { addApp } from './app/add'
 import { debugApp } from './app/debug'
 import { deleteApp } from './app/delete'
@@ -22,7 +25,7 @@ import { deleteBundle } from './bundle/delete'
 import { encryptZip } from './bundle/encrypt'
 import { listBundle } from './bundle/list'
 import { printReleaseType } from './bundle/releaseType'
-import { uploadBundle } from './bundle/upload'
+import { handleBundleUploadCommand } from './bundle/upload-command'
 import { zipBundle } from './bundle/zip'
 import { addChannel } from './channel/add'
 import { currentBundle } from './channel/currentBundle'
@@ -63,10 +66,19 @@ program
   .description(`📦 Manage packages and bundle versions in Capgo Cloud`)
   .version(pack.version, '-v, --version', `output the current version`)
 
+// Turn on client-side Supabase perf tracking for the CLI. (Off by default so
+// the SDK bundle, which transitively imports createSupabaseClient, stays clean.)
+enableSupabaseInstrumentation()
+
 let currentCommandPath = 'unknown'
 
 program.hook('preAction', (_thisCommand, actionCommand) => {
   currentCommandPath = getCommandPath(actionCommand)
+  trackCommandInvoked(currentCommandPath, extractCommandContext(actionCommand))
+})
+
+program.hook('postAction', (_thisCommand, actionCommand) => {
+  trackCommandSucceeded(getCommandPath(actionCommand))
 })
 
 program
@@ -160,9 +172,7 @@ External option: Store only a URL link (useful for apps >200MB or privacy requir
 Capgo never inspects external content. Add encryption for trustless security.
 
 Example: npx @capgo/cli@latest bundle upload com.example.app --path ./dist --channel production`)
-  .action(async (...args: Parameters<typeof uploadBundle>): Promise<void> => {
-    await uploadBundle(...args)
-  })
+  .action(handleBundleUploadCommand)
   .option('-a, --apikey <apikey>', optionDescriptions.apikey)
   .option('-p, --path <path>', `Path of the folder to upload, if not provided it will use the webDir set in capacitor.config`)
   .option('-c, --channel <channel>', `Channel to link to`)
@@ -201,7 +211,7 @@ Example: npx @capgo/cli@latest bundle upload com.example.app --path ./dist --cha
   .option('--partial-only', `[DEPRECATED] Use --delta-only instead. Upload only incremental updates, skip full bundle`)
   .option('--delta', `Upload delta updates (only changed files) for instant, super-fast updates instead of big zip downloads`)
   .option('--delta-only', `Upload only delta updates without full bundle for maximum speed (useful for large apps)`)
-  .option('--no-delta', `Disable delta updates even if Direct Update is enabled`)
+  .option('--no-delta', `Disable delta updates even if instant updates are enabled`)
   .option('--encrypted-checksum <encryptedChecksum>', `An encrypted checksum (signature). Used only when uploading an external bundle.`)
   .option('--auto-set-bundle', `Set the bundle in capacitor.config.json`)
   .option('--dry-upload', `Dry upload the bundle process: add the row in database without uploading files or updating channels (Used by Capgo for internal testing)`)
@@ -1097,37 +1107,48 @@ program.configureOutput({
   },
 })
 
-program.parseAsync().catch(async (error: unknown) => {
-  if (typeof error === 'object' && error !== null && 'code' in error) {
-    const commanderError = error as { code: string, exitCode?: number, message?: string }
-    // These are normal Commander.js exits (help, version, etc.) - exit silently
-    if (commanderError.code === 'commander.version' || commanderError.code === 'commander.helpDisplayed') {
-      exit(0)
-    }
-    const capturePromise = shouldCapturePosthogException(error)
-      ? capturePosthogException({
-          error,
-          functionName: currentCommandPath,
-          kind: 'unhandled_error',
-          status: commanderError.exitCode ?? 1,
-        })
-      : Promise.resolve(false)
-    // For actual errors, show just the message without the full stack trace
-    if (commanderError.message) {
-      log.error(commanderError.message)
-    }
-    await capturePromise
-    const exitCode = commanderError.exitCode ?? 1
-    exit(exitCode)
+void (async () => {
+  try {
+    await program.parseAsync()
+    await flushAnalytics()
   }
-  const capturePromise = capturePosthogException({
-    error,
-    functionName: currentCommandPath,
-    kind: 'unhandled_error',
-    status: 1,
-  })
-  // For non-Commander errors, show full error details
-  log.error(`Error: ${formatError(error)}`)
-  await capturePromise
-  exit(1)
-})
+  catch (error: unknown) {
+    if (typeof error === 'object' && error !== null && 'code' in error) {
+      const commanderError = error as { code: string, exitCode?: number, message?: string }
+      // These are normal Commander.js exits (help, version, etc.) - exit silently
+      if (commanderError.code === 'commander.version' || commanderError.code === 'commander.helpDisplayed') {
+        await flushAnalytics()
+        exit(0)
+      }
+      const capturePromise = shouldCapturePosthogException(error)
+        ? capturePosthogException({
+            error,
+            functionName: currentCommandPath,
+            kind: 'unhandled_error',
+            status: commanderError.exitCode ?? 1,
+          })
+        : Promise.resolve(false)
+      // For actual errors, show just the message without the full stack trace
+      if (commanderError.message) {
+        log.error(commanderError.message)
+      }
+      const exitCode = commanderError.exitCode ?? 1
+      // Track the failure for usage analytics regardless of exception-capture
+      // policy (commander usage errors are real failures, categorized 'commander').
+      trackCommandFailed(currentCommandPath, { errorCategory: categorizeCliError(error), exitCode })
+      await Promise.all([capturePromise, flushAnalytics()])
+      exit(exitCode)
+    }
+    const capturePromise = capturePosthogException({
+      error,
+      functionName: currentCommandPath,
+      kind: 'unhandled_error',
+      status: 1,
+    })
+    // For non-Commander errors, show full error details
+    log.error(`Error: ${formatError(error)}`)
+    trackCommandFailed(currentCommandPath, { errorCategory: categorizeCliError(error), exitCode: 1 })
+    await Promise.all([capturePromise, flushAnalytics()])
+    exit(1)
+  }
+})()

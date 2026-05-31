@@ -23,7 +23,7 @@ interface CapturePosthogExceptionPayload {
   status?: number
 }
 
-function isTruthyEnvValue(value: string | undefined) {
+export function isTruthyEnvValue(value: string | undefined) {
   return value === '1' || value?.toLowerCase() === 'true' || value?.toLowerCase() === 'yes'
 }
 

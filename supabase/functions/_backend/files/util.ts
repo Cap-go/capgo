@@ -47,7 +47,6 @@ export const NO_TRANSFORM_CACHE_CONTROL = 'no-transform'
 
 // how long an unfinished upload lives in ms
 export const UPLOAD_EXPIRATION_MS = 1 * 24 * 60 * 60 * 1000 // 1 day
-// TODO: make sure partial unfinished uploads are cleaned up automatically in r2 after 1 day
 
 // how much we'll buffer in memory, must be greater than or equal to R2's min part size
 // https://developers.cloudflare.com/r2/objects/multipart-objects/#limitations
@@ -63,19 +62,23 @@ export const ALLOWED_HEADERS = HEADERS.join(', ')
 export const ALLOWED_METHODS = REQUEST_METHODS.join(', ')
 export const EXPOSED_HEADERS = HEADERS.join(', ')
 
-export type AppScopedAttachmentPath
-  = | { kind: 'scoped', app_id: string, owner_org: string }
-    | { kind: 'invalid_scoped' }
+export type AppScopedAttachmentPath = | { kind: 'scoped', app_id: string, owner_org: string } | { kind: 'invalid_scoped' }
 
 export function encodeR2KeyForUploadLocation(r2Key: string): string {
   return r2Key.split('/').map(segment => encodeURIComponent(segment)).join('/')
 }
 
 export function getAttachmentReadCandidateKeys(decodedKey: string, rawRouteKey: string | null | undefined): string[] {
-  if (rawRouteKey && rawRouteKey !== decodedKey)
-    return [decodedKey, rawRouteKey]
+  const candidates = [decodedKey]
+  if (rawRouteKey && rawRouteKey !== decodedKey) {
+    candidates.push(rawRouteKey)
 
-  return [decodedKey]
+    const encodedRawRouteKey = encodeR2KeyForUploadLocation(rawRouteKey)
+    if (encodedRawRouteKey !== rawRouteKey && encodedRawRouteKey !== decodedKey)
+      candidates.push(encodedRawRouteKey)
+  }
+
+  return [...new Set(candidates)]
 }
 
 export function parseAppScopedAttachmentPath(fileId: unknown): AppScopedAttachmentPath | null {

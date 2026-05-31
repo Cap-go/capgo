@@ -3,6 +3,7 @@ import type { Database } from '../../utils/supabase.types.ts'
 import { honoFactory, quickError, simpleError } from '../../utils/hono.ts'
 import { middlewareV2 } from '../../utils/hono_middleware.ts'
 import { supabaseWithAuth } from '../../utils/supabase.ts'
+import { apiKeyHasLimitedScope } from './scope.ts'
 
 const app = honoFactory.createApp()
 
@@ -18,9 +19,7 @@ app.get('/', middlewareV2(['all']), async (c) => {
   const auth = c.get('auth') as AuthInfo
   const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row'] | undefined
 
-  const callerHasLimitedScope = (apikey?.limited_to_orgs?.length ?? 0) > 0
-    || (apikey?.limited_to_apps?.length ?? 0) > 0
-  if (auth.authType === 'apikey' && callerHasLimitedScope) {
+  if (auth.authType === 'apikey' && await apiKeyHasLimitedScope(c, apikey)) {
     throw quickError(401, 'cannot_list_apikeys', 'You cannot do that as a limited API key', { apikeyId: apikey?.id })
   }
 
@@ -43,9 +42,7 @@ app.get('/:id', middlewareV2(['all']), async (c) => {
   const auth = c.get('auth') as AuthInfo
   const authApikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row'] | undefined
 
-  const callerHasLimitedScope = (authApikey?.limited_to_orgs?.length ?? 0) > 0
-    || (authApikey?.limited_to_apps?.length ?? 0) > 0
-  if (auth.authType === 'apikey' && callerHasLimitedScope) {
+  if (auth.authType === 'apikey' && await apiKeyHasLimitedScope(c, authApikey)) {
     throw quickError(401, 'cannot_get_apikey', 'You cannot do that as a limited API key', { apikeyId: authApikey?.id })
   }
 
@@ -61,11 +58,16 @@ app.get('/:id', middlewareV2(['all']), async (c) => {
 
   // Use supabaseWithAuth which handles both JWT and API key authentication
   const supabase = supabaseWithAuth(c, auth)
-  const { data: fetchedApikey, error } = await supabase
+  const baseQuery = supabase
     .from('apikeys')
     .select('*')
-    .or(`key.eq.${id},id.eq.${id}`)
     .eq('user_id', auth.userId)
+
+  const apikeyQuery = /^\d+$/.test(id)
+    ? baseQuery.eq('id', Number(id))
+    : baseQuery.eq('key', id)
+
+  const { data: fetchedApikey, error } = await apikeyQuery
     .single()
   if (error) {
     throw quickError(404, 'failed_to_get_apikey', 'Failed to get API key', { supabaseError: error })
