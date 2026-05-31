@@ -96,6 +96,28 @@ check('giant line is shown once, truncated', grid.some(r => r.startsWith('"CAPGO
 // The lines AFTER the giant line are still visible (weren't pushed off-screen).
 check('lines after the giant line remain visible', grid.some(r => r.includes(TAIL.trim())))
 
+// Regression: tab-indented fastlane lines must render intact. The viewer
+// truncates by char count; a literal tab (1 char, up to 8 cols) used to overflow
+// the width so the terminal clipped the last char ("* App" → "* Ap"). sanitize
+// now expands tabs, so the full text survives. Pipe a tabbed chunk through the
+// sanitizer (the real path) into the viewer and assert the tails are intact.
+{
+  const { sanitizeBuildLogLines } = await import('../src/build/onboarding/build-log.ts')
+  const tabbed = sanitizeBuildLogLines('Modified Targets:\n\t* App\n\t* Release\nStep: update_project_team')
+  const so = makeStdout(COLS, ROWS)
+  const inst2 = render(
+    React.createElement(FullscreenBuildOutput, { title: 'Building...', lines: tabbed, terminalRows: ROWS }),
+    { stdout: so, stderr: makeStdout(COLS, ROWS), stdin: makeStdin(), debug: true, exitOnCtrlC: false, patchConsole: false },
+  )
+  await new Promise(r => setTimeout(r, 80))
+  const f2 = (so.lastFrame ?? '').replace(/\n$/, '')
+  inst2.unmount()
+  const g2 = await frameToGrid(f2, { cols: COLS, rows: ROWS })
+  check('tab-indented line keeps its full text ("* App")', g2.some(r => r.includes('* App')))
+  check('tab-indented line keeps its full text ("* Release")', g2.some(r => r.includes('* Release')))
+  check('no literal tab reaches the rendered grid', !g2.join('').includes('\t'))
+}
+
 console.log(`\n${passed} passed, ${failed} failed`)
 clearTimeout(watchdog)
 process.exit(failed > 0 ? 1 : 0)

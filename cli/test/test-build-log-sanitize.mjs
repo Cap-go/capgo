@@ -73,8 +73,13 @@ const FUSED_RAW = `${ZIP}\rCruising 🚗` // one stored line: zip then in-place 
 check('ANSI SGR stripped', sanitizeBuildLogLines(`${ESC}[36mcolored${ESC}[0m`).join('|') === 'colored')
 check('CSI erase-line stripped', sanitizeBuildLogLines(`text${ESC}[K`)[0] === 'text')
 
-// 3. C0 control bytes stripped, tab kept
-check('BEL stripped, tab kept', sanitizeBuildLogLines('a\x07b\tc')[0] === 'ab\tc')
+// 3. C0 control bytes stripped; tabs EXPANDED to spaces (not kept) so the viewer's
+//    char-count truncation matches the terminal's rendered width — otherwise a tab
+//    (1 char, ~8 cols) overflows and the terminal eats the line's last char(s).
+check('BEL stripped', sanitizeBuildLogLines('a\x07bc')[0] === 'abc')
+check('leading tab → 8 spaces to the tab stop', sanitizeBuildLogLines('\t* App')[0] === '        * App')
+check('no literal tab survives', !sanitizeBuildLogLines('a\tb\tc')[0].includes('\t'))
+check('mid-line tab advances to next stop (not blind 8)', sanitizeBuildLogLines('ab\tc')[0] === 'ab      c') // col 2 → pad 6 → col 8
 
 // 4. line-break normalisation + blank handling
 check('CRLF splits', JSON.stringify(sanitizeBuildLogLines('a\r\nb')) === JSON.stringify(['a', 'b']))
