@@ -25,7 +25,7 @@ import { showReplicationProgress } from '../replicationProgress'
 import { usesAlwaysDirectUpdate } from '../updaterConfig'
 import { baseKeyV2, BROTLI_MIN_UPDATER_VERSION_V5, BROTLI_MIN_UPDATER_VERSION_V6, BROTLI_MIN_UPDATER_VERSION_V7, canPromptInteractively, checkChecksum, checkCompatibilityCloud, checkPlanValidUpload, checkRemoteCliMessages, createSupabaseClient, deletedFailedVersion, findRoot, findSavedKey, formatError, getAppId, getBundleVersion, getCompatibilityDetails, getConfig, getInstalledVersion, getLocalConfig, getLocalDependencies, getOrganizationId, getPMAndCommand, getRemoteFileConfig, hasCliPermission, hasOrganizationPerm, isCompatible, isDeprecatedPluginVersion, OrganizationPerm, regexSemver, resolveUserIdFromApiKey, sendEvent, updateConfigUpdater, updateOrCreateChannel, updateOrCreateVersion, UPLOAD_TIMEOUT, uploadTUS, uploadUrl, zipFile } from '../utils'
 import { getVersionSuggestions, interactiveVersionBump } from '../versionHelpers'
-import { maybePromptBuilderCta } from './builder-cta'
+import { maybePromptBuilderCta, shouldBlockIncompatibleUpload } from './builder-cta'
 import { checkIndexPosition, searchInDirectory } from './check'
 import { summarizeUploadCompatibility } from './compatibility'
 import { prepareBundlePartialFiles, uploadPartial } from './partial'
@@ -40,6 +40,14 @@ function uploadFail(message: string): never {
   log.error(message)
   throw new Error(message)
 }
+
+/**
+ * Thrown when `--fail-on-incompatible` aborts an upload because the bundle is
+ * incompatible with the channel's current native packages. A dedicated type lets
+ * `uploadBundle` skip the generic "retry the upload?" prompt — retrying an
+ * incompatible bundle is pointless.
+ */
+class IncompatibleBundleError extends Error {}
 
 async function persistVersionData(
   supabase: SupabaseType,
@@ -905,12 +913,36 @@ export async function uploadBundleInternal(preAppid: string, options: OptionsUpl
   const { nativePackages, minUpdateVersion, incompatibleCount, compatibility } = await verifyCompatibility(supabase, pm, options, channel, appid, bundle, orgId)
   const incompatible = compatibility.result === 'incompatible'
 
+  // `--fail-on-incompatible`: abort the upload (exit non-zero) instead of shipping
+  // an OTA update that cannot take effect without a native build. Emits a single
+  // fire-and-forget telemetry event, then throws a dedicated error so the retry
+  // prompt in `uploadBundle` is skipped. Closes over the upload context.
+  const uploadFailIncompatible = (): never => {
+    void trackEvent({
+      channel: 'bundle',
+      event: 'Bundle Upload Blocked',
+      icon: '⛔',
+      apikey: options.apikey,
+      appId: appid,
+      orgId,
+      tags: { reason: 'incompatible', channel, channel_name: channel, incompatible_count: incompatibleCount, interactive },
+    })
+    const message = `Upload aborted: bundle is incompatible with channel "${channel}" (${incompatibleCount} native package(s) changed). A native build / app-store update is required. Run a native build with Capgo Builder (https://capgo.app/docs/cli/cloud-build/), or remove --fail-on-incompatible to upload anyway.`
+    log.error(message)
+    throw new IncompatibleBundleError(message)
+  }
+
   // Incompatible bundle => a native build is required. Offer Capgo Builder:
   // onboarding if the app has no build credentials, otherwise a native build.
   // Accepting skips this OTA upload (a native build supersedes it). Skipped
   // entirely for the programmatic SDK path (silent), which must not prompt,
   // print, or emit CTA telemetry.
   if (incompatible && !silent) {
+    // CI / non-interactive with the flag: hard fail now, before the promotional
+    // Builder ad prints (there is no escape-hatch prompt to offer).
+    if (options.failOnIncompatible && !interactive)
+      uploadFailIncompatible()
+
     const hasCredentials = (await loadSavedCredentials(appid)) !== null
     const builderAction = await maybePromptBuilderCta({ incompatible, interactive, hasCredentials, appId: appid, orgId, apikey, incompatibleCount })
     if (builderAction !== 'continue') {
@@ -928,6 +960,10 @@ export async function uploadBundleInternal(preAppid: string, options: OptionsUpl
         storageProvider: defaultStorageProvider,
       }
     }
+
+    // Interactive and the user declined the native-build escape hatch.
+    if (shouldBlockIncompatibleUpload({ incompatible, failOnIncompatible: !!options.failOnIncompatible, interactive, builderAction }))
+      uploadFailIncompatible()
   }
   if (options.verbose) {
     log.info(`[Verbose] Compatibility check completed:`)
@@ -1426,7 +1462,13 @@ export async function uploadBundleInternal(preAppid: string, options: OptionsUpl
   return result
 }
 
-function checkValidOptions(options: OptionsUpload) {
+/**
+ * Validate mutually-exclusive and dependent upload options, failing fast (via
+ * `uploadFail`) before any network call. Exported so the option-conflict guards
+ * (e.g. `--fail-on-incompatible` + `--ignore-metadata-check`) can be unit-tested
+ * directly.
+ */
+export function checkValidOptions(options: OptionsUpload) {
   const noKey = options.key === false
   const forceCrc32 = options.forceCrc32Checksum === true
   const hasEncryptionKey = (options.keyV2 || options.keyDataV2 || existsSync(baseKeyV2))
@@ -1471,6 +1513,9 @@ function checkValidOptions(options: OptionsUpload) {
   }
   if (forceCrc32 && hasEncryptionKey && !noKey) {
     uploadFail('You cannot use --force-crc32-checksum when encryption is enabled. Remove the flag or disable encryption.')
+  }
+  if (options.failOnIncompatible && options.ignoreMetadataCheck) {
+    uploadFail('You cannot use --fail-on-incompatible together with --ignore-metadata-check — the metadata check is exactly what --fail-on-incompatible enforces. Remove one of them.')
   }
 }
 
@@ -1524,6 +1569,12 @@ export async function uploadBundle(appid: string, options: OptionsUpload) {
     else {
       log.error(`uploadBundle failed: ${simpleMessage}`)
     }
+
+    // An incompatible-bundle failure (`--fail-on-incompatible`) is intentional and
+    // not retryable — retrying the same bundle would just fail again. Re-throw
+    // before the generic retry prompt, mirroring the isChecksumError special-case.
+    if (error instanceof IncompatibleBundleError)
+      throw error
 
     // Check if this is a checksum error - offer specific retry option
     const isChecksumError = simpleMessage.includes('Cannot upload the same bundle content')
