@@ -1188,10 +1188,17 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
           const usableHere = filterProfilesForApp(synthesized, iosBundleId, importDistribution)
           if (usableHere.length === 0) {
             const otherBundleIds = Array.from(new Set(synthesized.map(p => p.bundleId).filter(b => b && b !== iosBundleId)))
-            if (otherBundleIds.length > 0)
-              addLog(`⚠ Apple returned ${profiles.length} profile${profiles.length === 1 ? '' : 's'} for this cert but none target "${iosBundleId}" (found: ${otherBundleIds.join(', ')}). Use "Create a new App Store profile" to add one.`, 'yellow')
-            else
+            if (otherBundleIds.length > 0) {
+              // Split into two log lines instead of one long "X (found: Y, Z)" line —
+              // when the bundle ids are long the opening paren slides off the terminal
+              // and the trailing ")" looks orphaned. The Profiles-returned-for line
+              // also stands alone better than nested parenthetical metadata.
+              addLog(`⚠ Apple returned ${profiles.length} profile${profiles.length === 1 ? '' : 's'} for this cert but none target "${iosBundleId}".`, 'yellow')
+              addLog(`  Apple linked them to: ${otherBundleIds.join(', ')}. Use "Create a new App Store profile" to add one for "${iosBundleId}".`, 'yellow')
+            }
+            else {
               addLog(`⚠ Apple returned ${profiles.length} profile${profiles.length === 1 ? '' : 's'} for this cert but none match this app.`, 'yellow')
+            }
             setStep('import-no-match-recovery')
             return
           }
