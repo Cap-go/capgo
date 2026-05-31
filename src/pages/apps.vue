@@ -18,7 +18,7 @@ const supabase = useSupabase()
 const { t } = useI18n()
 const displayStore = useDisplayStore()
 type AppRow = Database['public']['Tables']['apps']['Row']
-type AppRowWithIconState = AppRow & { icon_url_loading?: boolean }
+type AppRowWithIconState = AppRow & { icon_url_loading?: boolean, last_upload_at?: string | null }
 const apps = ref<AppRowWithIconState[]>([])
 const currentPage = ref(1)
 const pageSize = 10
@@ -83,6 +83,47 @@ function loadAppIcons(sourceApps: AppRow[], runId: number) {
   }
 }
 
+// Resolve the real "last upload" time for a page of apps. We use the created_at
+// of the bundle whose name matches each app's last_version, so the value stays
+// consistent with the adjacent "Last version" column. This relies on the
+// existing (app_id, name) index on app_versions and is bounded to the apps
+// currently shown, keeping it a fast, indexed lookup.
+async function fetchLastUploadMap(rows: AppRow[]): Promise<Map<string, string>> {
+  const lastVersionByApp = new Map<string, string>()
+  for (const app of rows) {
+    if (app.last_version)
+      lastVersionByApp.set(app.app_id, app.last_version)
+  }
+  if (lastVersionByApp.size === 0)
+    return new Map()
+
+  const appIds = [...lastVersionByApp.keys()]
+  const versionNames = [...new Set(lastVersionByApp.values())]
+
+  const { data, error } = await supabase
+    .from('app_versions')
+    .select('app_id, name, created_at')
+    .in('app_id', appIds)
+    .in('name', versionNames)
+
+  if (error) {
+    console.error('Cannot load last upload times', error)
+    return new Map()
+  }
+
+  const lastUploadByApp = new Map<string, string>()
+  for (const row of data ?? []) {
+    // Keep only the row matching the app's current last_version, and the most
+    // recent one when the same version name was uploaded more than once.
+    if (!row.created_at || lastVersionByApp.get(row.app_id) !== row.name)
+      continue
+    const existing = lastUploadByApp.get(row.app_id)
+    if (!existing || new Date(row.created_at).getTime() > new Date(existing).getTime())
+      lastUploadByApp.set(row.app_id, row.created_at)
+  }
+  return lastUploadByApp
+}
+
 async function getMyApps() {
   const currentRun = ++appIconLoadRun
   isTableLoading.value = true
@@ -135,9 +176,20 @@ async function getMyApps() {
       .range(offset, offset + pageSize - 1)
       .order('updated_at', { ascending: false })
 
-    apps.value = data?.map(appWithImmediateIcon) ?? []
-    if (data?.length)
-      loadAppIcons(data, currentRun)
+    const rows = data ?? []
+    // Resolve each app's real last bundle-upload time before rendering so the
+    // "Last upload" column reflects actual uploads, not apps.updated_at (which is
+    // also bumped by unrelated app edits and background/cron updates).
+    const lastUploadByApp = await fetchLastUploadMap(rows)
+    if (appIconLoadRun !== currentRun)
+      return
+
+    apps.value = rows.map(app => ({
+      ...appWithImmediateIcon(app),
+      last_upload_at: lastUploadByApp.get(app.app_id) ?? null,
+    }))
+    if (rows.length)
+      loadAppIcons(rows, currentRun)
   }
   finally {
     isTableLoading.value = false
