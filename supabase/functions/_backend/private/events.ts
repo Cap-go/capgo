@@ -8,11 +8,16 @@ import { BUNDLE_INCOMPATIBLE_EVENT, buildBundleCompatibilityBentoEvent } from '.
 import { BRES, parseBody, quickError, simpleError, useCors } from '../utils/hono.ts'
 import { middlewareV2 } from '../utils/hono_middleware.ts'
 import { cloudlog } from '../utils/logging.ts'
+import { trackPosthogEvent } from '../utils/posthog.ts'
 import { checkPermission } from '../utils/rbac.ts'
 import { broadcastCLIEvent } from '../utils/realtime_broadcast.ts'
 import { hasOrgRight, hasOrgRightApikey, supabaseWithAuth } from '../utils/supabase.ts'
 import { sendEventToTracking } from '../utils/tracking.ts'
 import { backgroundTask } from '../utils/utils.ts'
+
+// PostHog event recording whether the org-member incompatibility email was sent
+// or skipped (and why). Powers the weekly sent-vs-skipped breakdown.
+const BUNDLE_INCOMPATIBLE_EMAIL_EVENT = 'Bundle Incompatible Email'
 
 export const app = new Hono<MiddlewareKeyVariables>()
 
@@ -270,55 +275,90 @@ app.post('/', middlewareV2(['read', 'write', 'all', 'upload']), async (c) => {
   // org/app names + the freshly created version id for the payload.
   let bundleIncompatibleBentoEvent: BentoTrackingPayload | undefined
   // PostHog records every incompatible upload (tracking runs unconditionally
-  // below). Skip the org/app/version lookups + email unless the incompatible
-  // bundle actually went live — i.e. the upload overwrote the channel's version.
-  // (buildBundleCompatibilityBentoEvent re-checks channelOverwritten too, so the
-  // gate stays unit-tested even though we short-circuit the DB work here.)
+  // below). The org-member email is only relevant when the incompatible bundle
+  // actually went live — i.e. the upload overwrote the channel's version — AND the
+  // channel doesn't gate delivery itself. On the metadata (`version_number`)
+  // strategy, `min_update_version` keeps the bundle off incompatible devices, so
+  // there's no breakage to warn about — we skip the email there. Either outcome is
+  // recorded in PostHog (sent vs skipped_metadata) for the weekly breakdown.
   const channelOverwritten = trackedBody.tags?.channel_overwritten === true
     || trackedBody.tags?.channel_overwritten === 'true'
   if (onboardingOrgId && appId && trackedBody.event === BUNDLE_INCOMPATIBLE_EVENT && channelOverwritten) {
     const tags = trackedBody.tags ?? {}
-    const versionNewName = typeof tags.version_new_name === 'string' && tags.version_new_name.length > 0
-      ? tags.version_new_name
-      : undefined
-    const [orgResult, appResult] = await Promise.all([
-      supabase.from('orgs').select('id, name').eq('id', onboardingOrgId).single(),
-      supabase.from('apps').select('name').eq('app_id', appId).single(),
-    ])
-    if (orgResult.error || appResult.error) {
-      // Best-effort signal: never fail the CLI's request, and don't emit a Bento
-      // event with empty org/app context. Log and skip instead.
-      cloudlog({ requestId: c.get('requestId'), message: 'bundle incompatible bento lookup failed; skipping signal', org: orgResult.error, app: appResult.error })
+    const incompatibleChannel = typeof tags.channel === 'string' ? tags.channel : undefined
+
+    // Look up the channel's update strategy to decide whether the email is warranted.
+    let updateStrategy: string | null = null
+    if (incompatibleChannel) {
+      const { data: channelRow } = await supabase
+        .from('channels')
+        .select('disable_auto_update')
+        .eq('app_id', appId)
+        .eq('name', incompatibleChannel)
+        .maybeSingle()
+      updateStrategy = channelRow?.disable_auto_update ?? null
     }
-    else {
-      // The upload flow sends only version_new_name; resolve its id here (the
-      // version exists by the time this event is sent). The command flow uploads
-      // nothing, so versionNewName is absent and version_new_id stays empty.
-      let versionNewId: string | undefined
-      if (versionNewName) {
-        const { data: versionNewData } = await supabase
-          .from('app_versions')
-          .select('id')
-          .eq('app_id', appId)
-          .eq('name', versionNewName)
-          .maybeSingle()
-        versionNewId = toIdString(versionNewData?.id)
+    const skippedForMetadata = updateStrategy === 'version_number'
+
+    // Record the email decision in PostHog (sent vs skipped_metadata). Fire-and-
+    // forget; setPersonProperties:false so these transient decision tags don't get
+    // $set onto the acting user's person profile.
+    await backgroundTask(c, trackPosthogEvent(c, {
+      event: BUNDLE_INCOMPATIBLE_EMAIL_EVENT,
+      user_id: typeof trackedBody.user_id === 'string' ? trackedBody.user_id : undefined,
+      channel: 'bundle',
+      setPersonProperties: false,
+      groups: { organization: onboardingOrgId },
+      tags: {
+        outcome: skippedForMetadata ? 'skipped_metadata' : 'sent',
+        update_strategy: updateStrategy ?? 'unknown',
+        app_id: appId,
+        ...(incompatibleChannel ? { channel: incompatibleChannel } : {}),
+      },
+    }))
+
+    if (!skippedForMetadata) {
+      const versionNewName = typeof tags.version_new_name === 'string' && tags.version_new_name.length > 0
+        ? tags.version_new_name
+        : undefined
+      const [orgResult, appResult] = await Promise.all([
+        supabase.from('orgs').select('id, name').eq('id', onboardingOrgId).single(),
+        supabase.from('apps').select('name').eq('app_id', appId).single(),
+      ])
+      if (orgResult.error || appResult.error) {
+        // Best-effort signal: never fail the CLI's request, and don't emit a Bento
+        // event with empty org/app context. Log and skip instead.
+        cloudlog({ requestId: c.get('requestId'), message: 'bundle incompatible bento lookup failed; skipping signal', org: orgResult.error, app: appResult.error })
       }
-      const versionOldId = toIdString(tags.version_old_id)
-      bundleIncompatibleBentoEvent = buildBundleCompatibilityBentoEvent({
-        event: trackedBody.event,
-        orgId: onboardingOrgId,
-        appId,
-        channelOverwritten,
-        channel: typeof tags.channel === 'string' ? tags.channel : undefined,
-        source: typeof tags.source === 'string' ? tags.source : undefined,
-        versionNewId,
-        versionNewName,
-        versionOldId,
-        versionOldName: typeof tags.version_old_name === 'string' ? tags.version_old_name : undefined,
-        orgName: orgResult.data?.name ?? undefined,
-        appName: appResult.data?.name ?? undefined,
-      })
+      else {
+        // The upload flow sends only version_new_name; resolve its id here (the
+        // version exists by the time this event is sent).
+        let versionNewId: string | undefined
+        if (versionNewName) {
+          const { data: versionNewData } = await supabase
+            .from('app_versions')
+            .select('id')
+            .eq('app_id', appId)
+            .eq('name', versionNewName)
+            .maybeSingle()
+          versionNewId = toIdString(versionNewData?.id)
+        }
+        const versionOldId = toIdString(tags.version_old_id)
+        bundleIncompatibleBentoEvent = buildBundleCompatibilityBentoEvent({
+          event: trackedBody.event,
+          orgId: onboardingOrgId,
+          appId,
+          channelOverwritten,
+          channel: incompatibleChannel,
+          source: typeof tags.source === 'string' ? tags.source : undefined,
+          versionNewId,
+          versionNewName,
+          versionOldId,
+          versionOldName: typeof tags.version_old_name === 'string' ? tags.version_old_name : undefined,
+          orgName: orgResult.data?.name ?? undefined,
+          appName: appResult.data?.name ?? undefined,
+        })
+      }
     }
   }
 
