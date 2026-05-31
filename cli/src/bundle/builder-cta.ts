@@ -25,6 +25,32 @@ export function decideBuilderCtaSurface(ctx: BuilderCtaContext): BuilderCtaSurfa
   return ctx.hasCredentials ? 'prompt-build' : 'prompt-onboarding'
 }
 
+export interface ShouldBlockIncompatibleUploadContext {
+  incompatible: boolean
+  failOnIncompatible: boolean
+  interactive: boolean
+  /** The resolved Builder CTA action (`continue` in CI / when declined). */
+  builderAction: BuilderCtaAction
+}
+
+/**
+ * Pure decision: should an incompatible upload be blocked (abort + exit non-zero)
+ * instead of uploaded, given `--fail-on-incompatible`?
+ *
+ * - Only confirmed-incompatible bundles with the flag set are candidates.
+ * - Non-interactive (CI): block immediately.
+ * - Interactive: block only when the user declined the Capgo Builder native-build
+ *   escape hatch (`builderAction === 'continue'`). Accepting a native build
+ *   (`launch-build` / `launch-onboarding`) supersedes the OTA upload, so do not block.
+ */
+export function shouldBlockIncompatibleUpload(ctx: ShouldBlockIncompatibleUploadContext): boolean {
+  if (!ctx.incompatible || !ctx.failOnIncompatible)
+    return false
+  if (!ctx.interactive)
+    return true
+  return ctx.builderAction === 'continue'
+}
+
 const DOCS_URL = 'https://capgo.app/docs/cli/cloud-build/'
 const LEARN_URL = 'https://capgo.app/native-build/'
 
