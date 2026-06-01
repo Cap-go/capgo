@@ -1,7 +1,8 @@
+import { PassThrough, Writable } from 'node:stream'
 import { describe, expect, it, vi } from 'vitest'
 
 // trackEvent is fire-and-forget (void) and never asserted, so a shared module
-// mock is safe under concurrent execution. Everything else (confirm,
+// mock is safe under concurrent execution. Everything else (select, openUrl,
 // hasCredentials) is passed per-test, so there is no shared mutable state.
 vi.mock('../cli/src/analytics/track.ts', () => ({ trackEvent: vi.fn() }))
 
@@ -16,6 +17,49 @@ const baseParams = {
   orgId: 'org1',
   apikey: 'k',
   incompatibleCount: 2,
+}
+
+const learnUrl = 'https://capgo.app/native-build/'
+
+interface CliClackPrompts {
+  isCancel: (value: unknown) => boolean
+  log: {
+    warn: (message: string) => void
+  }
+  select: <Value>(opts: {
+    message: string
+    options: { value: Value, label: string }[]
+    signal: AbortSignal
+    input: PassThrough
+    output: Writable
+  }) => Promise<Value | symbol>
+}
+
+let cliClackPrompts: Promise<CliClackPrompts> | undefined
+
+function getCliClackPrompts(): Promise<CliClackPrompts> {
+  cliClackPrompts ??= import(new URL('../cli/node_modules/@clack/prompts', import.meta.url).href) as Promise<CliClackPrompts>
+  return cliClackPrompts
+}
+
+async function getClackCancelSymbol(): Promise<symbol> {
+  const { isCancel, select } = await getCliClackPrompts()
+  const input = new PassThrough()
+  const output = new Writable({
+    write(_chunk, _encoding, callback) {
+      callback()
+    },
+  })
+
+  const choice = await select({
+    message: 'Cancel fixture',
+    options: [{ value: 'yes', label: 'yes' }],
+    signal: AbortSignal.abort(),
+    input,
+    output,
+  })
+  expect(isCancel(choice)).toBe(true)
+  return choice as symbol
 }
 
 describe('decideBuilderCtaSurface', () => {
@@ -35,13 +79,13 @@ describe('decideBuilderCtaSurface', () => {
 })
 
 describe('maybePromptBuilderCta', () => {
-  it.concurrent('returns continue when compatible', async () => {
+  it('returns continue when compatible', async () => {
     const select = vi.fn()
     expect(await maybePromptBuilderCta({ ...baseParams, incompatible: false, select })).toBe('continue')
     expect(select).not.toHaveBeenCalled()
   })
 
-  it.concurrent('launches onboarding on yes (no credentials) with a selector and learn option', async () => {
+  it('launches onboarding on yes (no credentials) with a selector and learn option', async () => {
     const select = vi.fn().mockResolvedValue('yes')
     expect(await maybePromptBuilderCta({ ...baseParams, hasCredentials: false, select })).toBe('launch-onboarding')
     expect(select).toHaveBeenCalledTimes(1)
@@ -54,30 +98,68 @@ describe('maybePromptBuilderCta', () => {
     ])
   })
 
-  it.concurrent('launches build on accept (credentials present) with the build question', async () => {
+  it('launches build on accept (credentials present) with the build question', async () => {
     const select = vi.fn().mockResolvedValue('yes')
     expect(await maybePromptBuilderCta({ ...baseParams, hasCredentials: true, select })).toBe('launch-build')
     expect(select.mock.calls[0][0].message as string).toContain('Start a native build with Capgo Builder now?')
   })
 
-  it.concurrent('continues on no without a second prompt', async () => {
+  it('continues on no without a second prompt', async () => {
     const select = vi.fn().mockResolvedValue('no')
     expect(await maybePromptBuilderCta({ ...baseParams, select })).toBe('continue')
     expect(select).toHaveBeenCalledTimes(1)
   })
 
-  it.concurrent('opens the learn page and asks again', async () => {
+  it('continues when the selector is cancelled', async () => {
+    const cancelChoice = await getClackCancelSymbol()
+    const select = vi.fn().mockResolvedValue(cancelChoice)
+
+    expect(await maybePromptBuilderCta({ ...baseParams, select })).toBe('continue')
+    expect(select).toHaveBeenCalledTimes(1)
+  })
+
+  it('opens the learn page and asks again', async () => {
     const select = vi.fn()
       .mockResolvedValueOnce('learn')
       .mockResolvedValueOnce('no')
     const openUrl = vi.fn().mockResolvedValue(undefined)
 
     expect(await maybePromptBuilderCta({ ...baseParams, select, openUrl })).toBe('continue')
-    expect(openUrl).toHaveBeenCalledWith('https://capgo.app/native-build/')
+    expect(openUrl).toHaveBeenCalledWith(learnUrl)
     expect(select).toHaveBeenCalledTimes(2)
   })
 
-  it.concurrent('shows the CI ad and continues when non-interactive', async () => {
+  it('opens the learn page before launching a build on yes', async () => {
+    const select = vi.fn()
+      .mockResolvedValueOnce('learn')
+      .mockResolvedValueOnce('yes')
+    const openUrl = vi.fn().mockResolvedValue(undefined)
+
+    expect(await maybePromptBuilderCta({ ...baseParams, hasCredentials: true, select, openUrl })).toBe('launch-build')
+    expect(openUrl).toHaveBeenCalledWith(learnUrl)
+    expect(select).toHaveBeenCalledTimes(2)
+  })
+
+  it('warns and asks again when opening the learn page fails', async () => {
+    const select = vi.fn()
+      .mockResolvedValueOnce('learn')
+      .mockResolvedValueOnce('yes')
+    const openUrl = vi.fn().mockRejectedValue(new Error('browser unavailable'))
+    const { log } = await getCliClackPrompts()
+    const warn = vi.spyOn(log, 'warn').mockImplementation(() => {})
+
+    try {
+      expect(await maybePromptBuilderCta({ ...baseParams, select, openUrl })).toBe('launch-onboarding')
+      expect(openUrl).toHaveBeenCalledWith(learnUrl)
+      expect(warn).toHaveBeenCalledWith(`Could not open your browser automatically. Visit: ${learnUrl}`)
+      expect(select).toHaveBeenCalledTimes(2)
+    }
+    finally {
+      warn.mockRestore()
+    }
+  })
+
+  it('shows the CI ad and continues when non-interactive', async () => {
     const select = vi.fn()
     expect(await maybePromptBuilderCta({ ...baseParams, interactive: false, select })).toBe('continue')
     expect(select).not.toHaveBeenCalled()
