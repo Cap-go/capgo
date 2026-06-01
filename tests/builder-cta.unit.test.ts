@@ -92,9 +92,9 @@ describe('maybePromptBuilderCta', () => {
     const msg = select.mock.calls[0][0].message as string
     expect(msg).toContain('Would you like to configure Capgo Builder now?')
     expect(select.mock.calls[0][0].options).toEqual([
-      { value: 'yes', label: 'yes' },
-      { value: 'no', label: 'no' },
-      { value: 'learn', label: 'learn what Capgo Builder is' },
+      { value: 'yes', label: '✅ Yes' },
+      { value: 'no', label: '❌ No' },
+      { value: 'learn', label: '📖 Learn what Capgo Builder is' },
     ])
   })
 

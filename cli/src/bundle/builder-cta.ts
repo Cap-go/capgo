@@ -126,9 +126,9 @@ async function runBuilderCta(params: MaybePromptBuilderCtaParams): Promise<Build
       message: question,
       initialValue: 'yes',
       options: [
-        { value: 'yes', label: 'yes' },
-        { value: 'no', label: 'no' },
-        { value: 'learn', label: 'learn what Capgo Builder is' },
+        { value: 'yes', label: '✅ Yes' },
+        { value: 'no', label: '❌ No' },
+        { value: 'learn', label: '📖 Learn what Capgo Builder is' },
       ],
     })
 
