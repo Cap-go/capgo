@@ -110,11 +110,11 @@ describe('maybePromptBuilderCta', () => {
     expect(select).toHaveBeenCalledTimes(1)
   })
 
-  it('continues when the selector is cancelled', async () => {
+  it('aborts when the selector is cancelled', async () => {
     const cancelChoice = await getClackCancelSymbol()
     const select = vi.fn().mockResolvedValue(cancelChoice)
 
-    expect(await maybePromptBuilderCta({ ...baseParams, select })).toBe('continue')
+    expect(await maybePromptBuilderCta({ ...baseParams, select })).toBe('abort')
     expect(select).toHaveBeenCalledTimes(1)
   })
 

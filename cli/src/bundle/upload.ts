@@ -36,6 +36,8 @@ type localConfigType = Awaited<ReturnType<typeof getLocalConfig>>
 
 export type { UploadBundleResult }
 
+const UPLOAD_CANCELLED_BY_USER = 'Upload cancelled by user'
+
 function uploadFail(message: string): never {
   log.error(message)
   throw new Error(message)
@@ -909,6 +911,9 @@ export async function uploadBundleInternal(preAppid: string, options: OptionsUpl
   if (incompatible && !silent) {
     const hasCredentials = (await loadSavedCredentials(appid)) !== null
     const builderAction = await maybePromptBuilderCta({ incompatible, interactive, hasCredentials, appId: appid, orgId, apikey, incompatibleCount })
+    if (builderAction === 'abort')
+      throw new Error(UPLOAD_CANCELLED_BY_USER)
+
     if (builderAction !== 'continue') {
       // Skip the OTA upload and hand the launch back to the CLI entry point, which
       // runs the Ink-based build commands. Doing it here would pull `ink` into the
@@ -1513,6 +1518,9 @@ export async function uploadBundle(appid: string, options: OptionsUpload) {
     // Show simple message by default, full error details only with --verbose
     const simpleMessage = error instanceof Error ? error.message : String(error)
     const verboseMessage = formatError(error)
+
+    if (simpleMessage === UPLOAD_CANCELLED_BY_USER)
+      throw error instanceof Error ? error : new Error(String(error))
 
     if (options.verbose) {
       log.error(`uploadBundle failed:${verboseMessage}`)

@@ -3,7 +3,7 @@ import open from 'open'
 import { trackEvent } from '../analytics/track'
 
 export type BuilderCtaSurface = 'skip' | 'ci-ad' | 'prompt-onboarding' | 'prompt-build'
-export type BuilderCtaAction = 'continue' | 'launch-onboarding' | 'launch-build'
+export type BuilderCtaAction = 'continue' | 'abort' | 'launch-onboarding' | 'launch-build'
 
 export interface BuilderCtaContext {
   incompatible: boolean
@@ -133,7 +133,7 @@ async function runBuilderCta(params: MaybePromptBuilderCtaParams): Promise<Build
     })
 
     if (pIsCancel(choice))
-      return 'continue'
+      return 'abort'
 
     if (choice === 'learn') {
       void trackEvent({ channel: 'bundle', event: 'Builder CTA Learn Selected', icon: '📖', apikey: params.apikey, appId: params.appId, orgId: params.orgId, tags: { mode } })
