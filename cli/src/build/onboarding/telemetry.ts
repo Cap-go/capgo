@@ -10,6 +10,8 @@ export interface TrackBuilderOnboardingStepInput {
   platform: Platform
   step: OnboardingStep | AndroidOnboardingStep
   durationMs?: number
+  /** Step whose elapsed time is represented by durationMs. */
+  durationStep?: OnboardingStep | AndroidOnboardingStep
   /** Raw caught error — mapped via the platform's category mapper. Use this OR errorCategory, not both. */
   error?: unknown
   /** Pre-computed category. Takes precedence over `error` if both are present. */
@@ -38,8 +40,11 @@ export async function trackBuilderOnboardingStep(input: TrackBuilderOnboardingSt
     app_id: input.appId,
   }
 
-  if (typeof input.durationMs === 'number' && Number.isFinite(input.durationMs))
+  if (typeof input.durationMs === 'number' && Number.isFinite(input.durationMs)) {
     tags.duration_ms = String(Math.round(input.durationMs))
+    if (input.durationStep)
+      tags.duration_step = input.durationStep
+  }
 
   if (input.errorCategory !== undefined) {
     tags.error_category = input.errorCategory
