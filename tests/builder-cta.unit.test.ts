@@ -36,35 +36,50 @@ describe('decideBuilderCtaSurface', () => {
 
 describe('maybePromptBuilderCta', () => {
   it.concurrent('returns continue when compatible', async () => {
-    const confirm = vi.fn()
-    expect(await maybePromptBuilderCta({ ...baseParams, incompatible: false, confirm })).toBe('continue')
-    expect(confirm).not.toHaveBeenCalled()
+    const select = vi.fn()
+    expect(await maybePromptBuilderCta({ ...baseParams, incompatible: false, select })).toBe('continue')
+    expect(select).not.toHaveBeenCalled()
   })
 
-  it.concurrent('launches onboarding on accept (no credentials) with a single prompt + learn link', async () => {
-    const confirm = vi.fn().mockResolvedValue(true)
-    expect(await maybePromptBuilderCta({ ...baseParams, hasCredentials: false, confirm })).toBe('launch-onboarding')
-    expect(confirm).toHaveBeenCalledTimes(1)
-    const msg = confirm.mock.calls[0][0].message as string
+  it.concurrent('launches onboarding on yes (no credentials) with a selector and learn option', async () => {
+    const select = vi.fn().mockResolvedValue('yes')
+    expect(await maybePromptBuilderCta({ ...baseParams, hasCredentials: false, select })).toBe('launch-onboarding')
+    expect(select).toHaveBeenCalledTimes(1)
+    const msg = select.mock.calls[0][0].message as string
     expect(msg).toContain('Would you like to configure Capgo Builder now?')
-    expect(msg).toContain('https://capgo.app/native-build/')
+    expect(select.mock.calls[0][0].options).toEqual([
+      { value: 'yes', label: 'yes' },
+      { value: 'no', label: 'no' },
+      { value: 'learn', label: 'learn what Capgo Builder is' },
+    ])
   })
 
   it.concurrent('launches build on accept (credentials present) with the build question', async () => {
-    const confirm = vi.fn().mockResolvedValue(true)
-    expect(await maybePromptBuilderCta({ ...baseParams, hasCredentials: true, confirm })).toBe('launch-build')
-    expect(confirm.mock.calls[0][0].message as string).toContain('Start a native build with Capgo Builder now?')
+    const select = vi.fn().mockResolvedValue('yes')
+    expect(await maybePromptBuilderCta({ ...baseParams, hasCredentials: true, select })).toBe('launch-build')
+    expect(select.mock.calls[0][0].message as string).toContain('Start a native build with Capgo Builder now?')
   })
 
-  it.concurrent('continues on decline without a second prompt', async () => {
-    const confirm = vi.fn().mockResolvedValue(false)
-    expect(await maybePromptBuilderCta({ ...baseParams, confirm })).toBe('continue')
-    expect(confirm).toHaveBeenCalledTimes(1)
+  it.concurrent('continues on no without a second prompt', async () => {
+    const select = vi.fn().mockResolvedValue('no')
+    expect(await maybePromptBuilderCta({ ...baseParams, select })).toBe('continue')
+    expect(select).toHaveBeenCalledTimes(1)
+  })
+
+  it.concurrent('opens the learn page and asks again', async () => {
+    const select = vi.fn()
+      .mockResolvedValueOnce('learn')
+      .mockResolvedValueOnce('no')
+    const openUrl = vi.fn().mockResolvedValue(undefined)
+
+    expect(await maybePromptBuilderCta({ ...baseParams, select, openUrl })).toBe('continue')
+    expect(openUrl).toHaveBeenCalledWith('https://capgo.app/native-build/')
+    expect(select).toHaveBeenCalledTimes(2)
   })
 
   it.concurrent('shows the CI ad and continues when non-interactive', async () => {
-    const confirm = vi.fn()
-    expect(await maybePromptBuilderCta({ ...baseParams, interactive: false, confirm })).toBe('continue')
-    expect(confirm).not.toHaveBeenCalled()
+    const select = vi.fn()
+    expect(await maybePromptBuilderCta({ ...baseParams, interactive: false, select })).toBe('continue')
+    expect(select).not.toHaveBeenCalled()
   })
 })

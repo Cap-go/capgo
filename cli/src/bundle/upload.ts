@@ -9,7 +9,6 @@ import { existsSync, readFileSync } from 'node:fs'
 import { cwd } from 'node:process'
 import { S3Client } from '@bradenmacdonald/s3-lite-client'
 import { intro, log, outro, confirm as pConfirm, isCancel as pIsCancel, select as pSelect, spinner as spinnerC } from '@clack/prompts'
-import { Table } from '@sauber/table'
 import { greaterOrEqual, parse } from '@std/semver'
 // Native fetch is available in Node.js >= 18
 import pack from '../../package.json'
@@ -22,6 +21,7 @@ import { getChecksum } from '../checksum'
 import { getRepoStarStatus, isRepoStarredInSession, starRepository } from '../github'
 import { confirmWithRememberedChoice } from '../promptPreferences'
 import { showReplicationProgress } from '../replicationProgress'
+import { formatTable } from '../terminal-table'
 import { usesAlwaysDirectUpdate } from '../updaterConfig'
 import { baseKeyV2, BROTLI_MIN_UPDATER_VERSION_V5, BROTLI_MIN_UPDATER_VERSION_V6, BROTLI_MIN_UPDATER_VERSION_V7, canPromptInteractively, checkChecksum, checkCompatibilityCloud, checkPlanValidUpload, checkRemoteCliMessages, createSupabaseClient, deletedFailedVersion, findRoot, findSavedKey, formatError, getAppId, getBundleVersion, getCompatibilityDetails, getConfig, getInstalledVersion, getLocalConfig, getLocalDependencies, getOrganizationId, getPMAndCommand, getRemoteFileConfig, hasCliPermission, hasOrganizationPerm, isCompatible, isDeprecatedPluginVersion, OrganizationPerm, regexSemver, resolveUserIdFromApiKey, sendEvent, updateConfigUpdater, updateOrCreateChannel, updateOrCreateVersion, UPLOAD_TIMEOUT, uploadTUS, uploadUrl, zipFile } from '../utils'
 import { getVersionSuggestions, interactiveVersionBump } from '../versionHelpers'
@@ -55,25 +55,21 @@ async function persistVersionData(
  * Display a compatibility table for the given packages
  */
 function displayCompatibilityTable(packages: Compatibility[]) {
-  const table = new Table()
-  table.headers = ['Package', 'Local', 'Remote', 'Status', 'Details']
-  table.theme = Table.roundTheme
-  table.rows = []
-
-  for (const entry of packages) {
-    const { name, localVersion, remoteVersion } = entry
+  const rows = packages.map((entry) => {
     const details = getCompatibilityDetails(entry)
-    const statusSymbol = details.compatible ? '✅' : '❌'
-    table.rows.push([
-      name,
-      localVersion || '-',
-      remoteVersion || '-',
-      statusSymbol,
+    return [
+      entry.name,
+      entry.localVersion || '-',
+      entry.remoteVersion || '-',
+      details.compatible ? '✅' : '❌',
       details.message,
-    ])
-  }
+    ]
+  })
 
-  log.info(table.toString())
+  log.info(formatTable({
+    headers: ['Package', 'Local', 'Remote', 'Status', 'Details'],
+    rows,
+  }))
 }
 
 async function getBundle(config: CapacitorConfig, options: OptionsUpload) {
