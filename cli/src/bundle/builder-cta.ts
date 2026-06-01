@@ -137,7 +137,6 @@ async function runBuilderCta(params: MaybePromptBuilderCtaParams): Promise<Build
 
     if (choice === 'learn') {
       void trackEvent({ channel: 'bundle', event: 'Builder CTA Learn Selected', icon: '📖', apikey: params.apikey, appId: params.appId, orgId: params.orgId, tags: { mode } })
-      log.info(`Learn more: ${LEARN_URL}`)
       try {
         await openUrl(LEARN_URL)
       }
