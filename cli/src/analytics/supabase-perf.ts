@@ -75,10 +75,11 @@ function safeRecord(info: SupabaseCallInfo): void {
 export const SLOW_THRESHOLD_MS = 5000
 
 /**
- * Parses a Supabase REST/RPC URL into a low-cardinality operation label.
+ * Parses a Supabase REST/RPC/Functions URL into a low-cardinality operation label.
  * Query strings are discarded so filter values never leak and cardinality
  * stays bounded. `/rest/v1/rpc/get_user_id` => `rpc:get_user_id`;
- * `/rest/v1/apps?...` => `GET apps`.
+ * `/rest/v1/apps?...` => `GET apps`;
+ * `/functions/v1/files/upload_link` => `POST functions:files/upload_link`.
  */
 export function deriveSupabaseOperation(url: string, method: string): string {
   let pathname: string
@@ -88,6 +89,13 @@ export function deriveSupabaseOperation(url: string, method: string): string {
   catch {
     pathname = url.split('?')[0]
   }
+  const functionsMarker = '/functions/v1/'
+  const functionsIdx = pathname.indexOf(functionsMarker)
+  if (functionsIdx >= 0) {
+    const functionRoute = pathname.slice(functionsIdx + functionsMarker.length).replace(/^\/+|\/+$/g, '')
+    return functionRoute ? `${method} functions:${functionRoute}` : `${method} functions`
+  }
+
   const marker = '/rest/v1/'
   const idx = pathname.indexOf(marker)
   const after = idx >= 0 ? pathname.slice(idx + marker.length) : pathname.replace(/^\//, '')
