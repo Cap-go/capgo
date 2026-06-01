@@ -1,9 +1,9 @@
 import type { BundleCompatibilityOptions } from '../schemas/bundle'
 import type { Compatibility } from '../utils'
 import { intro, log } from '@clack/prompts'
-import { Table } from '@sauber/table'
 import { trackEvent } from '../analytics/track'
 import { check2FAComplianceForApp, checkAppExistsAndHasPermissionOrgErr } from '../api/app'
+import { formatTable } from '../terminal-table'
 import {
   checkCompatibilityCloud,
   createSupabaseClient,
@@ -94,29 +94,24 @@ export async function checkCompatibilityInternal(
   })
 
   if (!silent) {
-    const table = new Table()
-    table.headers = ['Package', 'Local', 'Remote', 'Status', 'Details']
-    table.theme = Table.roundTheme
-    table.rows = []
-
     const yesSymbol = enrichedOptions.text ? 'OK' : '✅'
     const noSymbol = enrichedOptions.text ? 'FAIL' : '❌'
-
-    for (const entry of compatibility.finalCompatibility) {
-      const { name, localVersion, remoteVersion } = entry
+    const rows = compatibility.finalCompatibility.map((entry) => {
       const details = getCompatibilityDetails(entry)
-      const statusSymbol = details.compatible ? yesSymbol : noSymbol
-      table.rows.push([
-        name,
-        localVersion || '-',
-        remoteVersion || '-',
-        statusSymbol,
+      return [
+        entry.name,
+        entry.localVersion || '-',
+        entry.remoteVersion || '-',
+        details.compatible ? yesSymbol : noSymbol,
         details.message,
-      ])
-    }
+      ]
+    })
 
     log.success('Compatibility Check Results')
-    log.info(table.toString())
+    log.info(formatTable({
+      headers: ['Package', 'Local', 'Remote', 'Status', 'Details'],
+      rows,
+    }))
 
     // Summary
     if (hasIncompatible) {

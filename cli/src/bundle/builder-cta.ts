@@ -1,8 +1,9 @@
-import { confirm as pConfirm, isCancel as pIsCancel, log } from '@clack/prompts'
+import { isCancel as pIsCancel, log, select as pSelect } from '@clack/prompts'
+import open from 'open'
 import { trackEvent } from '../analytics/track'
 
 export type BuilderCtaSurface = 'skip' | 'ci-ad' | 'prompt-onboarding' | 'prompt-build'
-export type BuilderCtaAction = 'continue' | 'launch-onboarding' | 'launch-build'
+export type BuilderCtaAction = 'continue' | 'abort' | 'launch-onboarding' | 'launch-build'
 
 export interface BuilderCtaContext {
   incompatible: boolean
@@ -57,17 +58,6 @@ const LEARN_URL = 'https://capgo.app/native-build/'
 // Why a native build is needed — folded into the prompt and the CI ad.
 const REASON = 'This update includes native changes. An app store update may be required for these changes to take effect. Capgo Builder can help you build and publish the required native update.'
 
-/**
- * Render a clickable terminal hyperlink (OSC 8). Clicking it opens the URL in the
- * browser **without dismissing the active prompt**. Terminals that don't support
- * OSC 8 just render `text`.
- */
-function terminalLink(text: string, url: string): string {
-  const ESC = String.fromCharCode(27) // \x1B
-  const BEL = String.fromCharCode(7) // \x07
-  return `${ESC}]8;;${url}${BEL}${text}${ESC}]8;;${BEL}`
-}
-
 export function printBuilderCiAd(hasCredentials: boolean): void {
   const action = hasCredentials
     ? 'run a native build (npx @capgo/cli build request --platform <ios|android>)'
@@ -75,8 +65,21 @@ export function printBuilderCiAd(hasCredentials: boolean): void {
   log.warn(`${REASON} To ${action} — learn more: ${LEARN_URL} · docs: ${DOCS_URL}`)
 }
 
-/** Confirm-prompt seam (`@clack/prompts` `confirm` satisfies it); injectable for tests. */
-export type BuilderConfirm = (opts: { message: string, initialValue?: boolean }) => Promise<boolean | symbol>
+export type BuilderCtaChoice = 'yes' | 'no' | 'learn'
+
+interface BuilderSelectOption {
+  value: BuilderCtaChoice
+  label: string
+}
+
+interface BuilderSelectOptions {
+  message: string
+  options: BuilderSelectOption[]
+  initialValue?: BuilderCtaChoice
+}
+
+/** Select-prompt seam (`@clack/prompts` `select` satisfies it); injectable for tests. */
+export type BuilderSelect = (opts: BuilderSelectOptions) => Promise<BuilderCtaChoice | symbol>
 
 export interface MaybePromptBuilderCtaParams {
   incompatible: boolean
@@ -87,8 +90,10 @@ export interface MaybePromptBuilderCtaParams {
   orgId: string
   apikey: string
   incompatibleCount: number
-  /** Injectable for tests; defaults to the `@clack/prompts` confirm prompt. */
-  confirm?: BuilderConfirm
+  /** Injectable for tests; defaults to the `@clack/prompts` select prompt. */
+  select?: BuilderSelect
+  /** Injectable for tests; defaults to opening the learn page in the browser. */
+  openUrl?: (url: string) => Promise<unknown>
 }
 
 /**
@@ -136,25 +141,44 @@ async function runBuilderCta(params: MaybePromptBuilderCtaParams): Promise<Build
   // Message 1: the context, printed above the prompt so the question stays short.
   log.info(REASON)
 
-  // Message 2: the short yes/no question, plus a clickable "learn more" hyperlink
-  // that opens in the browser without dismissing this prompt.
-  const confirm = params.confirm ?? pConfirm
+  const select = params.select ?? ((opts: BuilderSelectOptions) => pSelect<BuilderCtaChoice>(opts))
+  const openUrl = params.openUrl ?? open
   const question = mode === 'build'
     ? 'Start a native build with Capgo Builder now?'
     : 'Would you like to configure Capgo Builder now?'
-  const accepted = await confirm({
-    message: `${question}\n${terminalLink('Learn what Capgo Builder is', LEARN_URL)}`,
-    initialValue: true,
-  })
-  if (pIsCancel(accepted))
+
+  while (true) {
+    const choice = await select({
+      message: question,
+      initialValue: 'yes',
+      options: [
+        { value: 'yes', label: '✅ Yes' },
+        { value: 'no', label: '❌ No' },
+        { value: 'learn', label: '📖 Learn what Capgo Builder is' },
+      ],
+    })
+
+    if (pIsCancel(choice))
+      return 'abort'
+
+    if (choice === 'learn') {
+      void trackEvent({ channel: 'bundle', event: 'Builder CTA Learn Selected', icon: '📖', apikey: params.apikey, appId: params.appId, orgId: params.orgId, tags: { mode } })
+      try {
+        await openUrl(LEARN_URL)
+      }
+      catch {
+        log.warn(`Could not open your browser automatically. Visit: ${LEARN_URL}`)
+      }
+      continue
+    }
+
+    if (choice === 'yes') {
+      void trackEvent({ channel: 'bundle', event: 'Builder CTA Accepted', icon: '✅', apikey: params.apikey, appId: params.appId, orgId: params.orgId, tags: { mode } })
+      return mode === 'build' ? 'launch-build' : 'launch-onboarding'
+    }
+
+    // Declined → just continue the OTA upload (no follow-up prompt).
+    void trackEvent({ channel: 'bundle', event: 'Builder CTA Declined', icon: '🚫', apikey: params.apikey, appId: params.appId, orgId: params.orgId, tags: { mode } })
     return 'continue'
-
-  if (accepted === true) {
-    void trackEvent({ channel: 'bundle', event: 'Builder CTA Accepted', icon: '✅', apikey: params.apikey, appId: params.appId, orgId: params.orgId, tags: { mode } })
-    return mode === 'build' ? 'launch-build' : 'launch-onboarding'
   }
-
-  // Declined → just continue the OTA upload (no follow-up prompt).
-  void trackEvent({ channel: 'bundle', event: 'Builder CTA Declined', icon: '🚫', apikey: params.apikey, appId: params.appId, orgId: params.orgId, tags: { mode } })
-  return 'continue'
 }
