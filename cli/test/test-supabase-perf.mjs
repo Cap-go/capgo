@@ -22,6 +22,8 @@ try {
   assert.equal(deriveSupabaseOperation('https://db.co/rest/v1/rpc/get_user_id', 'POST'), 'rpc:get_user_id')
   assert.equal(deriveSupabaseOperation('https://db.co/rest/v1/apps?select=*&app_id=eq.com.x', 'GET'), 'GET apps')
   assert.equal(deriveSupabaseOperation('https://db.co/rest/v1/app_versions', 'POST'), 'POST app_versions')
+  assert.equal(deriveSupabaseOperation('https://db.co/functions/v1/files/upload_link', 'POST'), 'POST functions:files/upload_link')
+  assert.equal(deriveSupabaseOperation('https://db.co/functions/v1/private/delete_failed_version', 'DELETE'), 'DELETE functions:private/delete_failed_version')
   assert.equal(deriveSupabaseOperation('not a url', 'GET'), 'GET not a url')
 
   // 2. enable flag defaults off

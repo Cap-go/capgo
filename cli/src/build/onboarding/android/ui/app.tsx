@@ -225,6 +225,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
   const pendingTelemetryRef = useRef<Array<{
     step: AndroidOnboardingStep
     durationMs?: number
+    durationStep?: AndroidOnboardingStep
     errorCategory?: AndroidOnboardingErrorCategory
   }>>([])
   const pendingActionTelemetryRef = useRef<Array<{
@@ -321,7 +322,10 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
     const now = Date.now()
     // Initial step (previous.step === null) and same-step error re-entries have
     // no meaningful previous-step duration.
-    const durationMs = previous.step === null || previous.step === step
+    const durationStep = previous.step === null || previous.step === step
+      ? undefined
+      : previous.step
+    const durationMs = durationStep === undefined
       ? undefined
       : now - previous.startedAt
 
@@ -337,6 +341,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
     const eventPayload = {
       step,
       durationMs,
+      durationStep,
       errorCategory: carriesErrorCategory ? errorCategoryRef.current : undefined,
     }
 

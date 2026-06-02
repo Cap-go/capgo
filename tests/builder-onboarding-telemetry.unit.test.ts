@@ -21,6 +21,7 @@ describe('trackBuilderOnboardingStep', () => {
       appId: 'com.example.app',
       orgId: 'org-uuid-1',
       durationMs: 1234,
+      durationStep: 'welcome',
     })
 
     expect(sendEventMock).toHaveBeenCalledTimes(1)
@@ -38,6 +39,7 @@ describe('trackBuilderOnboardingStep', () => {
         platform: 'ios',
         app_id: 'com.example.app',
         duration_ms: '1234',
+        duration_step: 'welcome',
       },
     })
     expect(payload.tags.error_category).toBeUndefined()

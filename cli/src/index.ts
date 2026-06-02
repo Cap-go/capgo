@@ -3,8 +3,8 @@ import { log } from '@clack/prompts'
 import { Option, program } from 'commander'
 import pack from '../package.json'
 import { categorizeCliError } from './analytics/error-category'
-import { extractCommandContext, flushAnalytics, trackCommandFailed, trackCommandInvoked, trackCommandSucceeded } from './analytics/track'
 import { enableSupabaseInstrumentation } from './analytics/supabase-perf'
+import { extractCommandContext, flushAnalytics, trackCommandFailed, trackCommandInvoked, trackCommandSucceeded } from './analytics/track'
 import { addApp } from './app/add'
 import { debugApp } from './app/debug'
 import { deleteApp } from './app/delete'
@@ -200,6 +200,7 @@ Example: npx @capgo/cli@latest bundle upload com.example.app --path ./dist --cha
   )
   .option('--auto-min-update-version', `Set the min update version based on native packages`)
   .option('--ignore-metadata-check', `Ignores the metadata (node_modules) check when uploading`)
+  .option('--fail-on-incompatible', `Fail the upload (exit non-zero) instead of uploading when the bundle is incompatible with the channel's current native packages. In an interactive terminal you can still choose a native build; declining fails. Cannot be combined with --ignore-metadata-check.`)
   .option('--ignore-checksum-check', `Ignores the checksum check when uploading`)
   .option('--force-crc32-checksum', `Force CRC32 checksum for upload (override auto-detection)`)
   .option('--timeout <timeout>', `Timeout for the upload process in seconds`)
@@ -1122,11 +1123,11 @@ void (async () => {
       }
       const capturePromise = shouldCapturePosthogException(error)
         ? capturePosthogException({
-            error,
-            functionName: currentCommandPath,
-            kind: 'unhandled_error',
-            status: commanderError.exitCode ?? 1,
-          })
+          error,
+          functionName: currentCommandPath,
+          kind: 'unhandled_error',
+          status: commanderError.exitCode ?? 1,
+        })
         : Promise.resolve(false)
       // For actual errors, show just the message without the full stack trace
       if (commanderError.message) {

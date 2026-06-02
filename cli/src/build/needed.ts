@@ -4,10 +4,10 @@ import type { Compatibility } from '../schemas/common'
 import type { Database } from '../types/supabase.types'
 import process, { env, stdout } from 'node:process'
 import { log } from '@clack/prompts'
-import { Table } from '@sauber/table'
 import { difference, parse } from '@std/semver'
 import { trackEvent } from '../analytics/track'
 import { check2FAComplianceForApp, checkAppExistsAndHasPermissionOrgErr } from '../api/app'
+import { formatTable } from '../terminal-table'
 import {
   checkCompatibilityCloud,
   createSupabaseClient,
@@ -205,29 +205,27 @@ export function formatShortBuildNeeded(required: boolean): string {
 
 export function formatBuildNeededTable(finalCompatibility: Compatibility[], options: FormatOptions = {}): string {
   const color = options.color ?? shouldUseColor()
-  const table = new Table()
-  table.headers = ['Package', 'Current app', 'Local', 'Change', 'Native diff', 'Required']
-  table.theme = Table.roundTheme
-  table.rows = []
-
-  for (const entry of sortCompatibility(finalCompatibility)) {
+  const rows = sortCompatibility(finalCompatibility).map((entry) => {
     const change = getVersionChangeType(entry)
     const details = getCompatibilityDetails(entry)
     const required = !details.compatible
     const nativeDiff = getNativeDiffLabel(entry)
     const changeColor = colorForVersionChange(change)
 
-    table.rows.push([
+    return [
       entry.name,
       entry.remoteVersion || '-',
       entry.localVersion || '-',
       colorize(change, changeColor, color),
       nativeDiff === '-' ? nativeDiff : colorize(nativeDiff, 'red', color),
       required ? colorize('yes', 'red', color) : colorize('no', 'green', color),
-    ])
-  }
+    ]
+  })
 
-  return table.toString()
+  return formatTable({
+    headers: ['Package', 'Current app', 'Local', 'Change', 'Native diff', 'Required'],
+    rows,
+  })
 }
 
 export function formatVerboseBuildNeeded(

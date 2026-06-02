@@ -283,6 +283,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
   const pendingTelemetryRef = useRef<Array<{
     step: OnboardingStep
     durationMs?: number
+    durationStep?: OnboardingStep
     errorCategory?: OnboardingErrorCategory
   }>>([])
   const [resolvedOrgId, setResolvedOrgId] = useState<string | null>(null)
@@ -507,13 +508,17 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
     const now = Date.now()
     // Initial step (previous.step === null) and same-step error re-entries have
     // no meaningful previous-step duration.
-    const durationMs = previous.step === null || previous.step === step
+    const durationStep = previous.step === null || previous.step === step
+      ? undefined
+      : previous.step
+    const durationMs = durationStep === undefined
       ? undefined
       : now - previous.startedAt
 
     const eventPayload = {
       step,
       durationMs,
+      durationStep,
       errorCategory: step === 'error' ? errorCategoryRef.current : undefined,
     }
 
