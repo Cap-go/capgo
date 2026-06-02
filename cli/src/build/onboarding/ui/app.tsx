@@ -37,7 +37,7 @@ import { createP12, DEFAULT_P12_PASSWORD, generateCsr } from '../csr.js'
 import { mapIosOnboardingError } from '../error-categories.js'
 import { canUseFilePicker, openFilePicker, openMobileprovisionPicker } from '../file-picker.js'
 import { parseMobileprovisionDetailed } from '../../mobileprovision-parser.js'
-import { exportP12FromKeychain, filterProfilesForApp, isHelperCached, isMacOS, listSigningIdentities, matchIdentitiesToProfiles, precompileSwiftHelper, scanProvisioningProfiles } from '../macos-signing.js'
+import { bundleIdMatches, exportP12FromKeychain, filterProfilesForApp, isHelperCached, isMacOS, listSigningIdentities, matchIdentitiesToProfiles, precompileSwiftHelper, scanProvisioningProfiles } from '../macos-signing.js'
 import { deleteProgress, extractKeyIdFromP8Path, getImportEntryStep, getResumeStep, loadProgress, saveProgress } from '../progress.js'
 import { getBuildOnboardingRecoveryAdvice } from '../recovery.js'
 import { createCiSecretEntries, detectCiSecretTargets, getCiSecretRepoLabelAsync, getCiSecretTargetLabel, listExistingCiSecretKeysAsync, uploadCiSecretsAsync } from '../ci-secrets.js'
@@ -884,7 +884,16 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
     // build system looks up by PRODUCT_BUNDLE_IDENTIFIER at sign time — so
     // the Capgo lookup key would be wrong here whenever it diverges from
     // config.appId (e.g. dev-tunnel sandboxes).
-    const provisioningBundleId = importMode && chosenProfile?.bundleId ? chosenProfile.bundleId : iosBundleId
+    //
+    // Wildcard profiles (bundleId like `com.example.*` or bare `*`) are valid
+    // for many concrete app ids — but Xcode resolves the map by the concrete
+    // PRODUCT_BUNDLE_IDENTIFIER, so we substitute the resolved iosBundleId in
+    // that case. The chosenProfile?.bundleId branch is only reached on the
+    // importMode path; the create-new path already falls through to
+    // iosBundleId, so the wildcard substitution doesn't affect it.
+    const importedBundleId = chosenProfile?.bundleId
+    const isWildcardProfile = Boolean(importedBundleId && importedBundleId.includes('*'))
+    const provisioningBundleId = importMode && importedBundleId && !isWildcardProfile ? importedBundleId : iosBundleId
     const provisioningMap: Record<string, { profile: string, name: string }> = {
       [provisioningBundleId]: {
         profile: profileData!.profileBase64,
@@ -1340,11 +1349,11 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
             )
             return
           }
-          if (detail.bundleId !== iosBundleId) {
+          if (!bundleIdMatches(detail.bundleId, iosBundleId)) {
             handleError(
               new Error(
                 `This .mobileprovision is for bundle ID "${detail.bundleId}" but the current app is "${iosBundleId}". `
-                + `Pick a profile that targets the right app, or use "Create a new App Store profile" in the recovery menu.`,
+                + `Pick a profile that targets the right app (wildcard profiles like "com.example.*" are accepted), or use "Create a new App Store profile" in the recovery menu.`,
               ),
               'import-provide-profile-path',
             )
@@ -2932,10 +2941,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
         // or whose profileType !== importDistribution. `doSaveCredentials`
         // would then persist a mismatched provisioning_map / distribution
         // pair, producing unusable signing credentials.
-        const matchedProfiles = allMatchedProfiles.filter(p =>
-          p.bundleId === iosBundleId
-          && (!importDistribution || p.profileType === importDistribution),
-        )
+        const matchedProfiles = filterProfilesForApp(allMatchedProfiles, iosBundleId, importDistribution)
         const droppedCount = allMatchedProfiles.length - matchedProfiles.length
         return (
           <ImportPickProfileStep
@@ -2967,8 +2973,12 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
               // Defense in depth: verify bundleId + profileType match before
               // committing. The filter above should make this unreachable,
               // but if the filter regresses, we'd rather hard-fail than
-              // silently save bad creds.
-              if (profile.bundleId !== iosBundleId
+              // silently save bad creds. Wildcard bundle ids
+              // (`com.example.*`, bare `*`) are accepted via bundleIdMatches
+              // so this guard stays in sync with the picker's filter — a
+              // strict equality here would over-reject wildcards the filter
+              // intentionally accepted upstream.
+              if (!bundleIdMatches(profile.bundleId, iosBundleId)
                 || (importDistribution && profile.profileType !== importDistribution)) {
                 handleError(
                   new Error(
