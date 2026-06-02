@@ -29,6 +29,7 @@ export interface OnboardingResult {
 
 export type OnboardingStep
   = | 'welcome'
+    | 'resume-prompt'
     | 'platform-select'
     | 'adding-platform'
     | 'credentials-exist'
@@ -236,6 +237,7 @@ export interface OnboardingProgress {
 /** Maps each step to a progress percentage (0-100) */
 export const STEP_PROGRESS: Record<OnboardingStep, number> = {
   'welcome': 0,
+  'resume-prompt': 2,
   'platform-select': 0,
   'adding-platform': 0,
   'credentials-exist': 0,
@@ -310,6 +312,8 @@ export function getPhaseLabel(step: OnboardingStep): string {
     case 'credentials-exist':
     case 'backing-up':
       return ''
+    case 'resume-prompt':
+      return 'Resume or restart?'
     case 'setup-method-select':
       return 'Setup method'
     case 'confirm-app-id':

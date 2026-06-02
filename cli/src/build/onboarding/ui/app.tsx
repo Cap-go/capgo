@@ -194,7 +194,17 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
   const { exit } = useApp()
   const startStep = getResumeStep(initialProgress)
 
-  const [step, setStep] = useState<OnboardingStep>(startStep === 'welcome' ? 'welcome' : startStep)
+  // When there's saved progress AND the resume target isn't trivially 'welcome',
+  // land on the resume-prompt fork so the user can see what's saved and decide
+  // whether to continue or restart from scratch — instead of being silently
+  // teleported to the middle of the wizard with no chance to bail out cleanly.
+  // The trivial case (no progress, or resume target is welcome) keeps the
+  // existing zero-friction path.
+  const [step, setStep] = useState<OnboardingStep>(
+    initialProgress !== null && startStep !== 'welcome'
+      ? 'resume-prompt'
+      : startStep === 'welcome' ? 'welcome' : startStep,
+  )
 
   // ─── iOS bundle id ─────────────────────────────────────────────────────
   //
@@ -748,6 +758,54 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
       existing.issuerId = updates.issuerId
     await saveProgress(appId, existing)
   }, [appId])
+
+  /**
+   * Reset everything for a fresh-start onboarding pass. Called from:
+   *   • the ErrorStep restart handler (existing user-facing "Restart" option),
+   *   • the resume-prompt restart handler (new mount-time "start over" branch).
+   *
+   * Wipes the on-disk progress file AND every piece of in-memory state that
+   * could otherwise leak across into the next attempt (chosen identity/profile,
+   * import distribution, ASC key inputs' cert/profile outputs, the eager
+   * per-cert availability map, file-picker guards, error/retry plumbing, and
+   * the iOS bundle id confirmation gate). Does NOT addLog or setStep — the
+   * caller picks the user-facing message and the next step so each call site
+   * can phrase its breadcrumb differently.
+   */
+  const resetForFreshStart = useCallback(async () => {
+    await deleteProgress(appId).catch(() => { /* best-effort */ })
+    // Import-flow state
+    setImportMode(false)
+    setImportMatches([])
+    setImportProfiles([])
+    setChosenIdentity(null)
+    setChosenProfile(null)
+    setImportDistribution(null)
+    setImportedP12Password('')
+    setPendingRecoveryAction(null)
+    // Eager per-identity Apple-side availability cache. The previous restart
+    // handler missed this — after restart the picker would still see the prior
+    // run's per-cert reasons. Reset so the next batch validation starts clean.
+    setIdentityAvailability({})
+    // Credential outputs
+    setCertData(null)
+    setProfileData(null)
+    // Error / retry plumbing
+    setError(null)
+    errorCategoryRef.current = undefined
+    setRetryCount(0)
+    setSupportBundlePath(null)
+    // File-picker re-open guards
+    pickerOpenedRef.current = false
+    mobileprovisionPickerOpenedRef.current = false
+    // iOS bundle id confirmation gate — without this a restart from inside
+    // confirm-app-id would silently keep the previously chosen override in
+    // this session, so the user would never see the question again.
+    setIosBundleId(iosBundleIdInitial)
+    setAppIdConfirmed(false)
+    setPendingAppIdNext(null)
+    setConfirmAppIdTyping(false)
+  }, [appId, iosBundleIdInitial])
 
   // Extract Key ID from .p8 filename — delegates to the module-level helper so
   // the resume initializer and the live-pick handlers share one implementation.
@@ -2461,6 +2519,70 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
         </Box>
       )}
 
+      {/* Resume-or-restart prompt — only reachable when initialProgress is
+          non-null AND getResumeStep didn't resolve to 'welcome'. The initial
+          step useState above wires this branch. */}
+      {step === 'resume-prompt' && initialProgress && (() => {
+        const { startedAt, setupMethod, importDistribution: savedDist, completedSteps, iosBundleIdOverride } = initialProgress
+        // Defensive date parse: legacy / corrupted progress files can carry an
+        // unparseable startedAt — show the raw string with a dim suffix instead
+        // of crashing the wizard.
+        let whenLabel: string
+        try {
+          const d = new Date(startedAt)
+          if (Number.isNaN(d.getTime()))
+            throw new Error('NaN')
+          whenLabel = d.toLocaleString()
+        }
+        catch {
+          whenLabel = `${startedAt} (could not parse)`
+        }
+        const setupLabel = setupMethod === 'import-existing'
+          ? 'Import existing credentials'
+          : 'Create new via Apple'
+        const distLabel = savedDist === 'app_store'
+          ? 'App Store'
+          : savedDist === 'ad_hoc' ? 'Ad Hoc' : null
+        const keyVerified = Boolean(completedSteps.apiKeyVerified)
+        const certCreated = Boolean(completedSteps.certificateCreated)
+        const profileCreated = Boolean(completedSteps.profileCreated)
+        const showBundleOverride = Boolean(
+          iosBundleIdOverride && iosBundleIdOverride !== iosBundleIdInitial,
+        )
+        const resumeLabel = getPhaseLabel(startStep) || startStep
+        return (
+          <Box flexDirection="column" marginTop={1} gap={1}>
+            <Text bold color="cyan">{`↩️  Found in-progress onboarding for ${appId}`}</Text>
+            <Text>Pick up where you left off, or start over from the welcome step.</Text>
+            <Box flexDirection="column">
+              <Text>{`•  Started: ${whenLabel}`}</Text>
+              <Text>{`•  Setup method: ${setupLabel}`}</Text>
+              {distLabel && <Text>{`•  Distribution mode: ${distLabel}`}</Text>}
+              <Text>{`•  ASC API key verified: ${keyVerified ? `Yes (Key: ${completedSteps.apiKeyVerified!.keyId})` : 'No'}`}</Text>
+              <Text>{`•  Certificate created: ${certCreated ? `Yes (expires ${completedSteps.certificateCreated!.expirationDate})` : 'No'}`}</Text>
+              <Text>{`•  Profile created: ${profileCreated ? `Yes ("${completedSteps.profileCreated!.profileName}")` : 'No'}`}</Text>
+              {showBundleOverride && <Text>{`•  Confirmed iOS bundle id: ${iosBundleIdOverride}`}</Text>}
+              <Text dimColor>{`•  Resume target: ${resumeLabel}`}</Text>
+            </Box>
+            <Select
+              options={[
+                { label: '▶️  Continue from where I left off', value: 'continue' },
+                { label: '🔄  Restart onboarding (wipe saved progress)', value: 'restart' },
+              ]}
+              onChange={async (value) => {
+                if (value === 'continue') {
+                  setStep(startStep)
+                  return
+                }
+                await resetForFreshStart()
+                addLog('↩️  Restarted — fresh start', 'yellow')
+                setStep('welcome')
+              }}
+            />
+          </Box>
+        )
+      })()}
+
       {/* Welcome */}
       {step === 'welcome' && <WelcomeStep />}
 
@@ -3971,28 +4093,11 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
                 setStep(retryStep)
             }
             else if (value === 'restart') {
-              // Wipe persisted progress so the next run starts truly fresh.
-              // Without this, getResumeStep would skip the user back to
-              // wherever they were — re-triggering the same broken state.
-              await deleteProgress(appId).catch(() => { /* best-effort */ })
-              // Also reset all in-memory import-flow state so a previously-
-              // chosen identity/profile/distribution doesn't leak across.
-              setImportMode(false)
-              setImportMatches([])
-              setImportProfiles([])
-              setChosenIdentity(null)
-              setChosenProfile(null)
-              setImportDistribution(null)
-              setImportedP12Password('')
-              setPendingRecoveryAction(null)
-              setCertData(null)
-              setProfileData(null)
-              setError(null)
-              errorCategoryRef.current = undefined
-              setRetryCount(0)
-              pickerOpenedRef.current = false
-              mobileprovisionPickerOpenedRef.current = false
-              setSupportBundlePath(null)
+              // Centralised reset (also clears the per-identity Apple-side
+              // availability map + the iOS bundle id confirmation gate — both
+              // missing from the previous inline version). The log message
+              // stays error-recovery specific.
+              await resetForFreshStart()
               addLog('↩️  Onboarding reset — starting fresh', 'yellow')
               setStep('welcome')
             }
