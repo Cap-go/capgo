@@ -37,6 +37,7 @@ declare module 'vue' {
     BundleUploadsCard: typeof import('./components/dashboard/BundleUploadsCard.vue')['default']
     BundleUploadsChart: typeof import('./components/dashboard/BundleUploadsChart.vue')['default']
     ChannelHistoryTable: typeof import('./components/tables/ChannelHistoryTable.vue')['default']
+    ChannelPermissionOverridesPanel: typeof import('./components/permissions/ChannelPermissionOverridesPanel.vue')['default']
     ChannelTable: typeof import('./components/tables/ChannelTable.vue')['default']
     ChartCard: typeof import('./components/dashboard/ChartCard.vue')['default']
     CreditsCta: typeof import('./components/CreditsCta.vue')['default']
