@@ -3892,6 +3892,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
               setError(null)
               errorCategoryRef.current = undefined
               pickerOpenedRef.current = false
+              mobileprovisionPickerOpenedRef.current = false
               if (retryStep)
                 setStep(retryStep)
             }
@@ -3916,6 +3917,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
               errorCategoryRef.current = undefined
               setRetryCount(0)
               pickerOpenedRef.current = false
+              mobileprovisionPickerOpenedRef.current = false
               setSupportBundlePath(null)
               addLog('↩️  Onboarding reset — starting fresh', 'yellow')
               setStep('welcome')
