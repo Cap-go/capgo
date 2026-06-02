@@ -805,6 +805,11 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
     setAppIdConfirmed(false)
     setPendingAppIdNext(null)
     setConfirmAppIdTyping(false)
+    // After a Restart, if the user re-enters the import flow and picks
+    // Ad Hoc again, they should see the support hint fresh — otherwise
+    // the previous session's emission would mute a hint that's now
+    // newly relevant.
+    adHocHintShownRef.current = false
   }, [appId, iosBundleIdInitial])
 
   // Extract Key ID from .p8 filename — delegates to the module-level helper so
@@ -846,6 +851,23 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
     return generateJwt(keyIdRef.current, issuerIdRef.current, content)
   }
 
+  // Has the ad-hoc support hint been logged this session? Both the
+  // hydration replay (used when resuming a saved ad_hoc run via the
+  // Continue button) AND the distribution-mode onChange (used when the
+  // user picks Ad Hoc fresh) want to surface it — but addLog's dedupe
+  // only suppresses CONSECUTIVE duplicates, so an interleaved log line
+  // (e.g. `✔ Distribution · ad_hoc` between the two emissions) breaks
+  // the dedupe and the hint prints twice. A session-scoped ref handles
+  // both call sites uniformly.
+  const adHocHintShownRef = useRef(false)
+  const logAdHocSupportHint = useCallback(() => {
+    if (adHocHintShownRef.current)
+      return
+    adHocHintShownRef.current = true
+    addLog('ℹ️  Ad-hoc is more involved than App Store — you also need to register every device on Apple.', 'yellow')
+    addLog('   Want hands-on help? Email support@capgo.app and we\'ll walk you through it.', 'yellow')
+  }, [addLog])
+
   // Re-emit the breadcrumb entries the user "earned" before this session
   // — partial inputs (p8 path, key id, issuer id), completed steps
   // (apiKeyVerified, certificateCreated, profileCreated), and the
@@ -872,11 +894,9 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
       addLog(`✔ Distribution certificate created — Expires ${completedSteps.certificateCreated.expirationDate}`)
     if (completedSteps.profileCreated)
       addLog(`✔ Provisioning profile created — "${completedSteps.profileCreated.profileName}"`)
-    if (initialProgress.importDistribution === 'ad_hoc' && !completedSteps.profileCreated) {
-      addLog('ℹ️  Ad-hoc is more involved than App Store — you also need to register every device on Apple.', 'yellow')
-      addLog('   Want hands-on help? Email support@capgo.app and we\'ll walk you through it.', 'yellow')
-    }
-  }, [initialProgress, addLog])
+    if (initialProgress.importDistribution === 'ad_hoc' && !completedSteps.profileCreated)
+      logAdHocSupportHint()
+  }, [initialProgress, addLog, logAdHocSupportHint])
 
   // Mount-time hydration. Suppressed when the initial step is the
   // resume-prompt fork — that path defers hydration to the user's
@@ -2899,9 +2919,10 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
               // Surface the support hint up-front rather than waiting until
               // the user is mid-recovery in the portal-explanation step —
               // they've now committed to the harder path and deserve to
-              // know help is available before they hit a wall.
-              addLog('ℹ️  Ad-hoc is more involved than App Store — you also need to register every device on Apple.', 'yellow')
-              addLog('   Want hands-on help? Email support@capgo.app and we\'ll walk you through it.', 'yellow')
+              // know help is available before they hit a wall. The helper
+              // is idempotent across the session, so re-picking Ad Hoc
+              // after a back-navigation doesn't re-emit.
+              logAdHocSupportHint()
               setStep('import-pick-identity')
             }
           }}
