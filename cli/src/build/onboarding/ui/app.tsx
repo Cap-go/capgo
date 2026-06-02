@@ -846,40 +846,50 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
     return generateJwt(keyIdRef.current, issuerIdRef.current, content)
   }
 
-  // Populate log with already-completed steps from progress (including partial input)
-  useEffect(() => {
+  // Re-emit the breadcrumb entries the user "earned" before this session
+  // — partial inputs (p8 path, key id, issuer id), completed steps
+  // (apiKeyVerified, certificateCreated, profileCreated), and the
+  // ad-hoc-needs-help hint when applicable. Wrapped in a useCallback so
+  // both the mount-time path AND the resume-prompt "Continue" handler can
+  // call it. We DON'T want this firing while the user is still on the
+  // resume-prompt screen — the side log would fill with stale entries
+  // BEFORE the user has chosen Continue vs Restart, and picking Restart
+  // would leave those entries dangling next to a fresh wizard. addLog's
+  // consecutive-dedupe protects against accidental double calls.
+  const hydrateCompletedLog = useCallback(() => {
     if (!initialProgress)
       return
-    // Show partial input steps
-    if (initialProgress.p8Path) {
+    if (initialProgress.p8Path)
       addLog(`✔ Key file selected · ${initialProgress.p8Path}`)
-    }
-    if (initialProgress.keyId && !initialProgress.completedSteps.apiKeyVerified) {
+    if (initialProgress.keyId && !initialProgress.completedSteps.apiKeyVerified)
       addLog(`✔ Key ID · ${initialProgress.keyId}`)
-    }
-    if (initialProgress.issuerId && !initialProgress.completedSteps.apiKeyVerified) {
+    if (initialProgress.issuerId && !initialProgress.completedSteps.apiKeyVerified)
       addLog(`✔ Issuer ID · ${initialProgress.issuerId}`)
-    }
-    // Show fully completed steps
     const { completedSteps } = initialProgress
-    if (completedSteps.apiKeyVerified) {
+    if (completedSteps.apiKeyVerified)
       addLog(`✔ API Key verified — Key: ${completedSteps.apiKeyVerified.keyId}`)
-    }
-    if (completedSteps.certificateCreated) {
+    if (completedSteps.certificateCreated)
       addLog(`✔ Distribution certificate created — Expires ${completedSteps.certificateCreated.expirationDate}`)
-    }
-    if (completedSteps.profileCreated) {
+    if (completedSteps.profileCreated)
       addLog(`✔ Provisioning profile created — "${completedSteps.profileCreated.profileName}"`)
-    }
-    // Re-surface the ad-hoc support hint on resume so a user who quit
-    // after picking ad_hoc and comes back later still sees it. Suppress
-    // when the profile is already created (the heads-up is no longer
-    // useful at that point).
     if (initialProgress.importDistribution === 'ad_hoc' && !completedSteps.profileCreated) {
       addLog('ℹ️  Ad-hoc is more involved than App Store — you also need to register every device on Apple.', 'yellow')
       addLog('   Want hands-on help? Email support@capgo.app and we\'ll walk you through it.', 'yellow')
     }
-  }, []) // Only on mount
+  }, [initialProgress, addLog])
+
+  // Mount-time hydration. Suppressed when the initial step is the
+  // resume-prompt fork — that path defers hydration to the user's
+  // explicit Continue choice (see the resume-prompt onChange below).
+  // The trivial-progress paths (welcome / no progress) still hydrate
+  // here so any partial input the user had keeps its breadcrumb.
+  const skipMountHydrationRef = useRef(step === 'resume-prompt')
+  useEffect(() => {
+    if (skipMountHydrationRef.current)
+      return
+    hydrateCompletedLog()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const handleError = useCallback((err: unknown, failedStep: OnboardingStep) => {
     // If we need the .p8 file, redirect to the input step
@@ -2579,6 +2589,14 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
               ]}
               onChange={async (value) => {
                 if (value === 'continue') {
+                  // Now that the user has committed to picking up where
+                  // they left off, replay the breadcrumb log so they see
+                  // the in-progress state they're resuming into. Held
+                  // back at mount so the resume-prompt screen itself
+                  // wasn't surrounded by stale "Distribution · ad_hoc",
+                  // "Key file selected · …" entries while they were
+                  // still deciding.
+                  hydrateCompletedLog()
                   setStep(startStep)
                   return
                 }
