@@ -12,8 +12,10 @@ import IconArrowPath from '~icons/heroicons/arrow-path'
 import IconCalendar from '~icons/heroicons/calendar'
 import IconClipboard from '~icons/heroicons/clipboard-document'
 import IconPencil from '~icons/heroicons/pencil'
+import IconShield from '~icons/heroicons/shield-check'
 import IconTrash from '~icons/heroicons/trash'
 import IconXMark from '~icons/heroicons/x-mark'
+import ChannelPermissionOverridesPanel from '~/components/permissions/ChannelPermissionOverridesPanel.vue'
 import {
   confirmApiKeyDeletion,
   confirmApiKeyRegeneration,
@@ -40,7 +42,7 @@ interface Role {
 
 interface RoleBindingRow {
   id: string
-  principal_type: string
+  principal_type: 'apikey'
   principal_id: string
   scope_type: string
   org_id: string | null
@@ -68,6 +70,15 @@ interface ApiKeyBindingInput {
   scope_type: 'org' | 'app'
   org_id: string
   app_id?: string
+}
+
+interface ApiKeyAppAccessOption {
+  appUuid: string
+  publicAppId: string
+  appName: string
+  orgId: string
+  orgName: string
+  roleName: string
 }
 
 const { t } = useI18n()
@@ -113,6 +124,10 @@ const manageableOrgIds = ref(new Set<string>())
 const pendingAppBindings = ref<Record<string, string>>({})
 const showOrgDropdown = ref(false)
 const showAppDropdown = ref(false)
+const selectedApiKeyForChannelPermissions = ref<Database['public']['Tables']['apikeys']['Row'] | null>(null)
+const channelPermissionAppOptions = ref<ApiKeyAppAccessOption[]>([])
+const selectedChannelPermissionAppUuid = ref('')
+const channelPermissionAppsLoading = ref(false)
 
 // Available apps for selection (populated when showing app dialog)
 const availableApps = ref<{ id: string, app_id: string, name: string | null, owner_org: string }[]>([])
@@ -712,6 +727,9 @@ function getOrgRoleForBinding(orgId: string) {
 }
 
 const selectedAppIds = computed(() => Object.keys(pendingAppBindings.value))
+const selectedChannelPermissionApp = computed(() =>
+  channelPermissionAppOptions.value.find(app => app.appUuid === selectedChannelPermissionAppUuid.value),
+)
 
 columns.value = [
   {
@@ -788,6 +806,13 @@ columns.value = [
         icon: IconClipboard,
         title: t('copy'),
         onClick: (key: Database['public']['Tables']['apikeys']['Row']) => copyKey(key),
+      },
+      {
+        icon: IconShield,
+        title: t('channel-permissions-title'),
+        visible: (key: Database['public']['Tables']['apikeys']['Row']) => hasChannelPermissionApps(key),
+        onClick: (key: Database['public']['Tables']['apikeys']['Row']) => openApiKeyChannelPermissions(key),
+        testId: (key: Database['public']['Tables']['apikeys']['Row']) => `manage-key-channel-permissions-${key.id}`,
       },
       {
         icon: IconPencil,
@@ -885,7 +910,7 @@ async function fetchAllBindings() {
 
   allBindings.value = ((data || []) as any[]).map(row => ({
     id: row.id,
-    principal_type: row.principal_type,
+    principal_type: 'apikey',
     principal_id: row.principal_id,
     scope_type: row.scope_type,
     org_id: row.org_id,
@@ -1337,6 +1362,115 @@ function getAppNameById(appId: string) {
 function getAppOrgNameById(appId: string) {
   const app = availableApps.value.find(a => a.id === appId)
   return app?.owner_org ? getOrgNameById(app.owner_org) : ''
+}
+
+function getApiKeyAdminOrgIds(key: Database['public']['Tables']['apikeys']['Row']) {
+  return getBindingsForKey(key)
+    .filter(binding => binding.scope_type === 'org' && !!binding.org_id && rolesWithInheritedAppAccess.has(binding.role_name))
+    .map(binding => binding.org_id!)
+}
+
+function hasChannelPermissionApps(key: Database['public']['Tables']['apikeys']['Row']) {
+  if (!key.rbac_id)
+    return false
+
+  const bindings = getBindingsForKey(key)
+  return bindings.some(binding => binding.scope_type === 'app' && !!binding.app_id)
+    || bindings.some(binding => binding.scope_type === 'org' && !!binding.org_id && rolesWithInheritedAppAccess.has(binding.role_name))
+}
+
+async function loadApiKeyChannelPermissionApps(key: Database['public']['Tables']['apikeys']['Row']) {
+  channelPermissionAppsLoading.value = true
+  channelPermissionAppOptions.value = []
+  selectedChannelPermissionAppUuid.value = ''
+
+  try {
+    const bindings = getBindingsForKey(key)
+    const directAppRoleById = new Map<string, string>()
+    for (const binding of bindings) {
+      if (binding.scope_type === 'app' && binding.app_id && binding.role_name)
+        directAppRoleById.set(binding.app_id, binding.role_name)
+    }
+
+    const adminOrgIds = Array.from(new Set(getApiKeyAdminOrgIds(key)))
+    const appRows: { id: string, app_id: string, name: string | null, owner_org: string }[] = []
+
+    const directAppIds = Array.from(directAppRoleById.keys())
+    if (directAppIds.length > 0) {
+      const { data, error } = await supabase
+        .from('apps')
+        .select('id, app_id, name, owner_org')
+        .in('id', directAppIds)
+
+      if (error)
+        throw error
+      appRows.push(...((data || []) as { id: string, app_id: string, name: string | null, owner_org: string }[]))
+    }
+
+    if (adminOrgIds.length > 0) {
+      const { data, error } = await supabase
+        .from('apps')
+        .select('id, app_id, name, owner_org')
+        .in('owner_org', adminOrgIds)
+
+      if (error)
+        throw error
+      appRows.push(...((data || []) as { id: string, app_id: string, name: string | null, owner_org: string }[]))
+    }
+
+    const uniqueAppsById = new Map<string, { id: string, app_id: string, name: string | null, owner_org: string }>()
+    for (const app of appRows) {
+      if (app.id)
+        uniqueAppsById.set(app.id, app)
+    }
+
+    const options = Array.from(uniqueAppsById.values()).map((app): ApiKeyAppAccessOption => {
+      const displayName = app.name || app.app_id
+      return {
+        appUuid: app.id,
+        publicAppId: app.app_id,
+        appName: displayName,
+        orgId: app.owner_org,
+        orgName: getOrgNameById(app.owner_org),
+        roleName: directAppRoleById.get(app.id) ?? 'app_admin',
+      }
+    }).sort((a, b) => a.appName.localeCompare(b.appName))
+
+    cacheAppNames(Array.from(uniqueAppsById.values()))
+    channelPermissionAppOptions.value = options
+    selectedChannelPermissionAppUuid.value = options[0]?.appUuid ?? ''
+  }
+  catch (error) {
+    console.error('Error loading API key channel permission apps:', error)
+    toast.error(t('error-loading-channel-permissions'))
+  }
+  finally {
+    channelPermissionAppsLoading.value = false
+  }
+}
+
+async function openApiKeyChannelPermissions(key: Database['public']['Tables']['apikeys']['Row']) {
+  if (!key.rbac_id)
+    return
+
+  selectedApiKeyForChannelPermissions.value = key
+  channelPermissionAppOptions.value = []
+  selectedChannelPermissionAppUuid.value = ''
+
+  dialogStore.openDialog({
+    id: 'apikey-channel-permissions',
+    title: t('channel-permissions-title'),
+    description: t('channel-permissions-description'),
+    size: 'xl',
+    buttons: [
+      {
+        text: t('close'),
+        role: 'cancel',
+      },
+    ],
+  })
+
+  await loadApiKeyChannelPermissionApps(key)
 }
 
 async function getUserFacingErrorMessage(error: unknown, fallbackMessage: string) {
@@ -1797,6 +1931,46 @@ getKeys()
               </template>
             </VueDatePicker>
           </div>
+        </div>
+      </Teleport>
+
+      <!-- Teleport Content for API Key Channel Permissions -->
+      <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.id === 'apikey-channel-permissions'" defer to="#dialog-v2-content">
+        <div class="space-y-4">
+          <div v-if="channelPermissionAppsLoading" class="py-6 text-sm text-gray-500">
+            {{ t('loading') }}...
+          </div>
+          <div v-else-if="channelPermissionAppOptions.length === 0" class="py-6 text-sm text-gray-500">
+            {{ t('app-access-none') }}
+          </div>
+          <template v-else-if="selectedApiKeyForChannelPermissions?.rbac_id && selectedChannelPermissionApp">
+            <div>
+              <label class="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-200">
+                {{ t('app') }}
+              </label>
+              <select
+                v-model="selectedChannelPermissionAppUuid"
+                class="w-full d-select d-select-bordered"
+                data-test="apikey-channel-permissions-app-select"
+              >
+                <option
+                  v-for="app in channelPermissionAppOptions"
+                  :key="app.appUuid"
+                  :value="app.appUuid"
+                >
+                  {{ app.appName }} · {{ getRoleDisplayName(app.roleName) }} · {{ app.orgName }}
+                </option>
+              </select>
+            </div>
+
+            <ChannelPermissionOverridesPanel
+              :app-id="selectedChannelPermissionApp.publicAppId"
+              principal-type="apikey"
+              :principal-id="selectedApiKeyForChannelPermissions.rbac_id"
+              :principal-name="selectedApiKeyForChannelPermissions.name || hideString(selectedApiKeyForChannelPermissions.key)"
+              :role-name="selectedChannelPermissionApp.roleName"
+            />
+          </template>
         </div>
       </Teleport>
     </div>
