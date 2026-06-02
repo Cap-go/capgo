@@ -911,6 +911,16 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
   const hydrateCompletedLog = useCallback(() => {
     if (!initialProgress)
       return
+    // Distribution mode is the upstream-most import-flow field — surface it
+    // first so the resumed breadcrumb mirrors the order a user would see on
+    // a fresh run (Distribution → Key file → Key ID → Issuer ID → …).
+    // Without this the hydration replay was emitting the ad-hoc support hint
+    // (which is gated on importDistribution === 'ad_hoc') WITHOUT first
+    // emitting the "✔ Distribution · ad_hoc" line that explains why the
+    // hint exists — surprising the user with the support breadcrumb out
+    // of context.
+    if (initialProgress.importDistribution)
+      upsertLog('✔ Distribution · ', `✔ Distribution · ${initialProgress.importDistribution}`)
     if (initialProgress.p8Path)
       upsertLog('✔ Key file selected · ', `✔ Key file selected · ${initialProgress.p8Path}`)
     if (initialProgress.keyId && !initialProgress.completedSteps.apiKeyVerified)
