@@ -677,6 +677,36 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
     })
   }, [])
 
+  /**
+   * Field-update breadcrumb: write/replace a single log entry identified by a
+   * stable prefix, so navigating back and re-picking the same field doesn't
+   * stack duplicate lines. Unlike `addLog`'s consecutive-dedupe, this scans
+   * the WHOLE log for any entry starting with `prefix` — so even when other
+   * lines have been emitted between picks, only one "Distribution · …" /
+   * "Key ID · …" / "Issuer ID · …" entry survives.
+   *
+   * Pre-merge our PR shipped this for Key ID / Issuer ID edits; the rewrite
+   * dropped it. Restored here to fix the "Distribution · ad_hoc twice"
+   * report after the user back-navigates the import flow.
+   */
+  const upsertLog = useCallback((prefix: string, text: string, color = 'green') => {
+    setLog((prev) => {
+      const idx = prev.findIndex(e => e.text.startsWith(prefix))
+      if (idx >= 0) {
+        if (prev[idx].text === text && prev[idx].color === color)
+          return prev
+        const next = [...prev]
+        next[idx] = { text, color }
+        return next
+      }
+      // No existing entry — append, with the same consecutive-dedupe guard.
+      const last = prev[prev.length - 1]
+      if (last && last.text === text && last.color === color)
+        return prev
+      return [...prev, { text, color }]
+    })
+  }, [])
+
   const pm = getPMAndCommand()
   const addIosCommand = formatRunnerCommand(pm.runner, ['cap', 'add', 'ios'])
   const syncIosCommand = formatRunnerCommand(pm.runner, ['cap', 'sync', 'ios'])
@@ -882,11 +912,11 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
     if (!initialProgress)
       return
     if (initialProgress.p8Path)
-      addLog(`✔ Key file selected · ${initialProgress.p8Path}`)
+      upsertLog('✔ Key file selected · ', `✔ Key file selected · ${initialProgress.p8Path}`)
     if (initialProgress.keyId && !initialProgress.completedSteps.apiKeyVerified)
-      addLog(`✔ Key ID · ${initialProgress.keyId}`)
+      upsertLog('✔ Key ID · ', `✔ Key ID · ${initialProgress.keyId}`)
     if (initialProgress.issuerId && !initialProgress.completedSteps.apiKeyVerified)
-      addLog(`✔ Issuer ID · ${initialProgress.issuerId}`)
+      upsertLog('✔ Issuer ID · ', `✔ Issuer ID · ${initialProgress.issuerId}`)
     const { completedSteps } = initialProgress
     if (completedSteps.apiKeyVerified)
       addLog(`✔ API Key verified — Key: ${completedSteps.apiKeyVerified.keyId}`)
@@ -1604,7 +1634,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
             const extracted = extractKeyIdFromPath(selected)
             if (extracted)
               setKeyId(extracted)
-            addLog(`✔ Key file selected · ${selected}`)
+            upsertLog('✔ Key file selected · ', `✔ Key file selected · ${selected}`)
             // Persist the extracted keyId too — otherwise quitting before the
             // Key ID step loses it and resume shows the empty placeholder.
             void savePartialProgress({ p8Path: selected, keyId: extracted || undefined })
@@ -2903,7 +2933,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
             existing.setupMethod = 'import-existing'
             existing.importDistribution = mode
             await saveProgress(appId, existing)
-            addLog(`✔ Distribution · ${mode}`)
+            upsertLog('✔ Distribution · ', `✔ Distribution · ${mode}`)
             if (mode === 'app_store') {
               // Need .p8 for TestFlight upload AND for any profile auto-recovery.
               // After verifying-key the import-mode branch routes back to import-pick-identity.
@@ -3536,7 +3566,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
             if (!finalKeyId)
               return
             setKeyId(finalKeyId)
-            addLog(`✔ Key ID · ${finalKeyId}`)
+            upsertLog('✔ Key ID · ', `✔ Key ID · ${finalKeyId}`)
             void savePartialProgress({ keyId: finalKeyId })
             setStep('input-issuer-id')
           }}
@@ -3552,7 +3582,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
             if (!cleaned)
               return
             setIssuerId(cleaned)
-            addLog(`✔ Issuer ID · ${cleaned}`)
+            upsertLog('✔ Issuer ID · ', `✔ Issuer ID · ${cleaned}`)
             void savePartialProgress({ issuerId: cleaned })
             setStep('verifying-key')
           }}
