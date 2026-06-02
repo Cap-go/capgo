@@ -310,4 +310,55 @@ t('filterProfilesForApp returns empty for empty input', () => {
   assert.equal(filterProfilesForApp([], 'com.example.app', 'app_store').length, 0)
 })
 
+// ─── mapIosOnboardingError: import-provide-profile-path → profile_read_failed ──
+//
+// Regression coverage for ultrareview issue #3 — the PR removed the
+// 'import-fetching-profile' → 'profile_read_failed' branch but didn't add
+// one for the replacement step 'import-provide-profile-path', so the five
+// file-picker validation failure modes (parse + 3 invariant checks +
+// generic catch) all fell through to 'unknown' in PostHog telemetry.
+import { mapIosOnboardingError } from '../src/build/onboarding/error-categories.ts'
+
+t('mapIosOnboardingError: import-provide-profile-path maps to profile_read_failed', () => {
+  assert.equal(
+    mapIosOnboardingError(new Error('parseMobileprovisionDetailed failed'), 'import-provide-profile-path'),
+    'profile_read_failed',
+  )
+})
+
+t('mapIosOnboardingError: import-pick-profile still maps to profile_no_match', () => {
+  assert.equal(
+    mapIosOnboardingError(new Error('no match'), 'import-pick-profile'),
+    'profile_no_match',
+  )
+})
+
+t('mapIosOnboardingError: import-no-match-recovery still maps to profile_no_match', () => {
+  assert.equal(
+    mapIosOnboardingError(new Error('still no match'), 'import-no-match-recovery'),
+    'profile_no_match',
+  )
+})
+
+t('mapIosOnboardingError: import-scanning still maps to keychain_no_identities', () => {
+  assert.equal(
+    mapIosOnboardingError(new Error('no identities'), 'import-scanning'),
+    'keychain_no_identities',
+  )
+})
+
+t('mapIosOnboardingError: import-exporting still maps to keychain_export_failed', () => {
+  assert.equal(
+    mapIosOnboardingError(new Error('export failed'), 'import-exporting'),
+    'keychain_export_failed',
+  )
+})
+
+t('mapIosOnboardingError: unmapped step falls through to unknown', () => {
+  assert.equal(
+    mapIosOnboardingError(new Error('something else'), 'welcome'),
+    'unknown',
+  )
+})
+
 process.stdout.write('OK\n')

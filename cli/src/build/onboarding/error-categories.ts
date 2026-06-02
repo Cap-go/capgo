@@ -58,6 +58,8 @@ export function mapIosOnboardingError(
     return 'keychain_helper_compile_failed'
   if (failedStep === 'import-exporting')
     return 'keychain_export_failed'
+  if (failedStep === 'import-provide-profile-path')
+    return 'profile_read_failed'
   if (failedStep === 'import-pick-profile' || failedStep === 'import-no-match-recovery')
     return 'profile_no_match'
 
