@@ -331,19 +331,17 @@ async function handlePut(c: Context<MiddlewareKeyVariables>, idParam?: string) {
       rbac_id: existingApikey.rbac_id,
     }, currentBindingOrgIds, bindings, hasUpdates ? updateData : undefined)
 
-    if (hasUpdates) {
-      const { data: updatedData, error: fetchUpdatedError } = await supabase
-        .from('apikeys')
-        .select()
-        .eq('id', existingApikey.id)
-        .eq('user_id', auth.userId)
-        .single()
+    const { data: updatedData, error: fetchUpdatedError } = await supabase
+      .from('apikeys')
+      .select()
+      .eq('id', existingApikey.id)
+      .eq('user_id', auth.userId)
+      .single()
 
-      if (fetchUpdatedError || !updatedData) {
-        throw quickError(500, 'failed_to_update_apikey', 'Failed to load updated API key', { requestId, supabaseError: fetchUpdatedError })
-      }
-      updatedApikey = updatedData
+    if (fetchUpdatedError || !updatedData) {
+      throw quickError(500, 'failed_to_update_apikey', 'Failed to load updated API key', { requestId, supabaseError: fetchUpdatedError })
     }
+    updatedApikey = updatedData
   }
   else if (hasUpdates) {
     const { data: updatedData, error: updateError } = await supabase
