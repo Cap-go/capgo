@@ -15,6 +15,7 @@ import { apiKeyHasLimitedScope } from './scope.ts'
 
 const app = honoFactory.createApp()
 const APIKEY_ORG_READER_ROLE = 'apikey_org_reader'
+type ApiKeyUpdateData = Partial<Pick<Database['public']['Tables']['apikeys']['Update'], 'name' | 'expires_at'>>
 
 // Validate id format to prevent PostgREST filter injection
 // ID must be a valid UUID or numeric string
@@ -94,12 +95,26 @@ function enrichApiKeyBindings(bindings: BindingInput[]): Array<BindingInput & { 
   return enrichedBindings
 }
 
+function toDrizzleApiKeyUpdate(updateData: ApiKeyUpdateData): Partial<typeof schema.apikeys.$inferInsert> {
+  const drizzleUpdate: Partial<typeof schema.apikeys.$inferInsert> = {}
+
+  if (updateData.name !== undefined) {
+    drizzleUpdate.name = updateData.name
+  }
+  if (updateData.expires_at !== undefined) {
+    drizzleUpdate.expires_at = updateData.expires_at === null ? null : new Date(updateData.expires_at)
+  }
+
+  return drizzleUpdate
+}
+
 async function replaceApiKeyBindings(
   c: Context<MiddlewareKeyVariables>,
   auth: AuthInfo,
   apikey: { id: number, rbac_id: string },
   currentBindingOrgIds: string[],
   bindings: BindingInput[],
+  updateData?: ApiKeyUpdateData,
 ) {
   if (auth.authType !== 'jwt' || !auth.userId) {
     throw quickError(403, 'not_authorized', 'Only user sessions can update API key bindings', { requestId: c.get('requestId') })
@@ -123,6 +138,18 @@ async function replaceApiKeyBindings(
     const enrichedBindings = enrichApiKeyBindings(bindings)
 
     await drizzle.transaction(async (tx) => {
+      if (updateData && Object.keys(updateData).length > 0) {
+        const result = await tx
+          .update(schema.apikeys)
+          .set(toDrizzleApiKeyUpdate(updateData))
+          .where(sql`${schema.apikeys.id} = ${apikey.id} AND ${schema.apikeys.user_id} = ${auth.userId}::uuid`)
+          .returning({ id: schema.apikeys.id })
+
+        if (result.length === 0) {
+          throw quickError(500, 'failed_to_update_apikey', 'Failed to update API key', { requestId: c.get('requestId'), apikeyId: apikey.id })
+        }
+      }
+
       await tx
         .delete(schema.role_bindings)
         .where(sql`${schema.role_bindings.principal_type} = public.rbac_principal_apikey() AND ${schema.role_bindings.principal_id} = ${apikey.rbac_id}::uuid`)
@@ -220,7 +247,7 @@ async function handlePut(c: Context<MiddlewareKeyVariables>, idParam?: string) {
 
   // Build update data from only explicitly-provided fields.
   // Note: empty arrays are meaningful and should clear the list.
-  const updateData: Partial<Database['public']['Tables']['apikeys']['Update']> = {}
+  const updateData: ApiKeyUpdateData = {}
   if (name !== undefined) {
     updateData.name = name
   }
@@ -297,8 +324,28 @@ async function handlePut(c: Context<MiddlewareKeyVariables>, idParam?: string) {
 
   const isHashedKey = existingApikey.key_hash !== null
 
-  let updatedApikey = existingApikey
-  if (hasUpdates) {
+  let updatedApikey: Database['public']['Tables']['apikeys']['Row'] | typeof existingApikey = existingApikey
+  if (hasBindingUpdates) {
+    await replaceApiKeyBindings(c, auth, {
+      id: existingApikey.id,
+      rbac_id: existingApikey.rbac_id,
+    }, currentBindingOrgIds, bindings, hasUpdates ? updateData : undefined)
+
+    if (hasUpdates) {
+      const { data: updatedData, error: fetchUpdatedError } = await supabase
+        .from('apikeys')
+        .select()
+        .eq('id', existingApikey.id)
+        .eq('user_id', auth.userId)
+        .single()
+
+      if (fetchUpdatedError || !updatedData) {
+        throw quickError(500, 'failed_to_update_apikey', 'Failed to load updated API key', { requestId, supabaseError: fetchUpdatedError })
+      }
+      updatedApikey = updatedData
+    }
+  }
+  else if (hasUpdates) {
     const { data: updatedData, error: updateError } = await supabase
       .from('apikeys')
       .update(updateData)
@@ -311,13 +358,6 @@ async function handlePut(c: Context<MiddlewareKeyVariables>, idParam?: string) {
       throw quickError(500, 'failed_to_update_apikey', 'Failed to update API key', { requestId, supabaseError: updateError })
     }
     updatedApikey = updatedData
-  }
-
-  if (hasBindingUpdates) {
-    await replaceApiKeyBindings(c, auth, {
-      id: existingApikey.id,
-      rbac_id: existingApikey.rbac_id,
-    }, currentBindingOrgIds, bindings)
   }
 
   if (regenerate) {

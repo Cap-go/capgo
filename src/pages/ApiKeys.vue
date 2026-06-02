@@ -5,7 +5,7 @@ import { FormKit } from '@formkit/vue'
 import { VueDatePicker } from '@vuepic/vue-datepicker'
 import { useDark } from '@vueuse/core'
 import dayjs from 'dayjs'
-import { computed, h, ref, watch } from 'vue'
+import { computed, h, nextTick, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import IconArrowPath from '~icons/heroicons/arrow-path'
@@ -107,6 +107,8 @@ const expirationDate = ref<Date | null>(null)
 // RBAC creation state
 const selectedOrgRole = ref('org_member')
 const selectedOrgsForCreation = ref<string[]>([])
+const selectedOrgRolesById = ref<Record<string, string>>({})
+const isHydratingApiKeyEdit = ref(false)
 const manageableOrgIds = ref(new Set<string>())
 const pendingAppBindings = ref<Record<string, string>>({})
 const showOrgDropdown = ref(false)
@@ -689,6 +691,26 @@ function ensureSelectedOrgRoleAllowed() {
   selectedOrgRole.value = orgRoleOptions.value.find(role => role.name === 'org_member')?.name ?? orgRoleOptions.value[0]?.name ?? ''
 }
 
+function syncSelectedOrgRolesById(defaultRole = selectedOrgRole.value, forceRole = false) {
+  const selectedOrgIds = new Set(selectedOrgsForCreation.value)
+  const nextRoles: Record<string, string> = {}
+
+  for (const orgId of selectedOrgIds) {
+    nextRoles[orgId] = forceRole
+      ? defaultRole
+      : selectedOrgRolesById.value[orgId] || defaultRole
+  }
+
+  selectedOrgRolesById.value = nextRoles
+}
+
+function getOrgRoleForBinding(orgId: string) {
+  if (!isEditingApiKey.value)
+    return selectedOrgRole.value
+
+  return selectedOrgRolesById.value[orgId] || selectedOrgRole.value
+}
+
 const selectedAppIds = computed(() => Object.keys(pendingAppBindings.value))
 
 columns.value = [
@@ -998,7 +1020,7 @@ function buildApiKeyBindingsFromForm(): ApiKeyBindingInput[] {
 
   for (const orgId of selectedOrgsForCreation.value) {
     bindings.push({
-      role_name: selectedOrgRole.value,
+      role_name: getOrgRoleForBinding(orgId),
       scope_type: 'org',
       org_id: orgId,
     })
@@ -1029,6 +1051,7 @@ async function addNewApiKey() {
   setExpirationCheckbox.value = false
   expirationDate.value = null
   selectedOrgRole.value = 'org_member'
+  selectedOrgRolesById.value = {}
   pendingAppBindings.value = {}
   showOrgDropdown.value = false
   showAppDropdown.value = false
@@ -1046,40 +1069,57 @@ async function addNewApiKey() {
 }
 
 async function editApiKey(key: Database['public']['Tables']['apikeys']['Row']) {
-  editingApiKey.value = key
-  newApiKeyName.value = key.name || ''
-  createAsHashed.value = isHashedKey(key)
-  setExpirationCheckbox.value = !!key.expires_at
-  expirationDate.value = key.expires_at ? new Date(key.expires_at) : null
-  pendingAppBindings.value = {}
-  showOrgDropdown.value = false
-  showAppDropdown.value = false
+  isHydratingApiKeyEdit.value = true
 
-  await Promise.all([loadAllApps(), fetchRoles(), loadManageableOrganizations(), fetchAllBindings()])
+  try {
+    editingApiKey.value = key
+    newApiKeyName.value = key.name || ''
+    createAsHashed.value = isHashedKey(key)
+    setExpirationCheckbox.value = !!key.expires_at
+    expirationDate.value = key.expires_at ? new Date(key.expires_at) : null
+    selectedOrgRolesById.value = {}
+    pendingAppBindings.value = {}
+    showOrgDropdown.value = false
+    showAppDropdown.value = false
 
-  const keyBindings = getBindingsForKey(key)
-  const editableOrgBindings = keyBindings
-    .filter(binding => binding.scope_type === 'org' && !!binding.org_id && binding.role_name !== systemApiKeyOrgReaderRole)
-  const appBindingOrgIds = keyBindings
-    .filter(binding => binding.scope_type === 'app' && !!binding.app_id)
-    .map(binding => availableApps.value.find(app => app.id === binding.app_id)?.owner_org)
-    .filter((orgId): orgId is string => !!orgId)
+    await Promise.all([loadAllApps(), fetchRoles(), loadManageableOrganizations(), fetchAllBindings()])
 
-  selectedOrgsForCreation.value = Array.from(new Set([
-    ...editableOrgBindings.map(binding => binding.org_id!),
-    ...appBindingOrgIds,
-  ]))
+    const keyBindings = getBindingsForKey(key)
+    const editableOrgBindings = keyBindings
+      .filter(binding => binding.scope_type === 'org' && !!binding.org_id && binding.role_name !== systemApiKeyOrgReaderRole)
+    const appBindingOrgIds = keyBindings
+      .filter(binding => binding.scope_type === 'app' && !!binding.app_id)
+      .map(binding => availableApps.value.find(app => app.id === binding.app_id)?.owner_org)
+      .filter((orgId): orgId is string => !!orgId)
 
-  const firstOrgRole = editableOrgBindings[0]?.role_name
-  selectedOrgRole.value = firstOrgRole && orgRoleOptions.value.some(role => role.name === firstOrgRole)
-    ? firstOrgRole
-    : orgRoleOptions.value.find(role => role.name === 'org_member')?.name ?? orgRoleOptions.value[0]?.name ?? ''
+    selectedOrgsForCreation.value = Array.from(new Set([
+      ...editableOrgBindings.map(binding => binding.org_id!),
+      ...appBindingOrgIds,
+    ]))
 
-  pendingAppBindings.value = Object.fromEntries(
-    keyBindings
-      .filter(binding => binding.scope_type === 'app' && !!binding.app_id && !!binding.role_name)
-      .map(binding => [binding.app_id!, binding.role_name]),
-  )
+    selectedOrgRolesById.value = Object.fromEntries(
+      editableOrgBindings
+        .filter(binding => !!binding.org_id && !!binding.role_name)
+        .map(binding => [binding.org_id!, binding.role_name]),
+    )
+
+    const firstOrgRole = Object.values(selectedOrgRolesById.value)[0]
+    selectedOrgRole.value = firstOrgRole && orgRoleOptions.value.some(role => role.name === firstOrgRole)
+      ? firstOrgRole
+      : orgRoleOptions.value.find(role => role.name === 'org_member')?.name ?? orgRoleOptions.value[0]?.name ?? ''
+    syncSelectedOrgRolesById(selectedOrgRole.value)
+
+    pendingAppBindings.value = Object.fromEntries(
+      keyBindings
+        .filter(binding => binding.scope_type === 'app' && !!binding.app_id && !!binding.role_name)
+        .map(binding => [binding.app_id!, binding.role_name]),
+    )
+
+    await nextTick()
+  }
+  finally {
+    isHydratingApiKeyEdit.value = false
+  }
 
   await showEditKeyModal()
 }
@@ -1354,6 +1394,7 @@ watch([scopeFilterLabels, currentOrganizationId], () => {
 }, { immediate: true })
 
 watch(selectedOrgsForCreation, () => {
+  syncSelectedOrgRolesById()
   pruneAppBindings()
   ensureSelectedOrgRoleAllowed()
 }, { deep: true })
@@ -1364,6 +1405,12 @@ watch(orgRoleOptions, () => {
 
 // Watch for org role changes - clear app bindings if role grants inherited access
 watch(selectedOrgRole, (newRole) => {
+  if (isHydratingApiKeyEdit.value)
+    return
+
+  if (isEditingApiKey.value)
+    syncSelectedOrgRolesById(newRole, true)
+
   if (rolesWithInheritedAppAccess.has(newRole)) {
     pendingAppBindings.value = {}
   }
