@@ -3481,7 +3481,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
         const canCreateProfile = importDistribution !== 'ad_hoc'
         return (
           <ImportNoMatchRecoveryStep
-            reason={noMatchReason ?? 'apple-other'}
+            reason={noMatchReason ?? undefined}
             appId={iosBundleId}
             importDistribution={importDistribution}
             identityName={chosenIdentity.name}
