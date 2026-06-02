@@ -337,20 +337,41 @@ export async function listProfilesForCert(
   // `include=certificates,bundleId`, then filter client-side to those
   // whose `relationships.certificates.data[]` array includes our cert id.
   // Limit=200 is Apple's documented max for /profiles.
-  const body = await ascFetch(
-    `/profiles?include=certificates,bundleId&limit=200`,
-    token,
-  )
-  const included: any[] = body.included || []
+  //
+  // PAGINATION: the 200 cap is on the TEAM's total profile count (apps ×
+  // distribution types × extensions × dev machines), NOT on profiles
+  // matching our cert. Teams with 200+ active profiles would silently
+  // lose matches on page 2+ if we ignored `body.links.next`, causing
+  // import-checking-apple-cert to misroute to no-match-recovery and
+  // create-new to collide with an existing-but-paginated-away profile.
+  // We walk every page and accumulate before applying the client-side
+  // cert-id filter.
+  const allData: any[] = []
+  const allIncluded: any[] = []
+  let url: string = '/profiles?include=certificates,bundleId&limit=200'
+  while (url) {
+    const body = await ascFetch(url, token)
+    if (Array.isArray(body.data))
+      allData.push(...body.data)
+    if (Array.isArray(body.included))
+      allIncluded.push(...body.included)
+    const next: string | undefined = body.links?.next
+    // Apple returns `links.next` as a fully-qualified URL; ascFetch builds
+    // `${ASC_BASE_URL}${path}`, so strip the base prefix to avoid a
+    // double-prefixed URL on the follow-up request. If a future API
+    // version ever returns a path-relative next link, the startsWith
+    // guard preserves it as-is.
+    url = next ? (next.startsWith(ASC_BASE_URL) ? next.slice(ASC_BASE_URL.length) : next) : ''
+  }
   const bundleById = new Map<string, string>()
-  for (const item of included) {
+  for (const item of allIncluded) {
     if (item.type === 'bundleIds' && item.attributes?.identifier)
       bundleById.set(item.id, item.attributes.identifier)
   }
   // Client-side cert-id filter on `relationships.certificates.data[].id`.
   // Apple's included response includes the cert resources too, but we
   // only need the reference array to decide which profiles to keep.
-  const profiles = (body.data || []).filter((p: any) => {
+  const profiles = allData.filter((p: any) => {
     const certs: { id: string }[] = p.relationships?.certificates?.data ?? []
     return certs.some(c => c.id === certificateId)
   })

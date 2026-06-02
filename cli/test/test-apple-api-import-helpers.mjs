@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { Buffer } from 'node:buffer'
 import { createHash } from 'node:crypto'
-import { classifyCertAvailability, computeCertSha1 } from '../src/build/onboarding/apple-api.ts'
+import { classifyCertAvailability, computeCertSha1, listProfilesForCert } from '../src/build/onboarding/apple-api.ts'
 
 function t(name, fn) {
   try {
@@ -122,6 +122,142 @@ t('classifyCertAvailability tolerates malformed expiration date strings', () => 
   // Bad date should not crash; falls through to the lookup result.
   assert.equal(result.available, true)
   assert.equal(result.appleCertId, 'apple-id-xyz')
+})
+
+// ─── listProfilesForCert pagination ──────────────────────────────
+// Verifies the fix for ultrareview issue #4: the 200 cap on /profiles is
+// the team's total profile count, not matches for our cert, so the loop
+// must follow body.links.next instead of returning page 1 only.
+
+const ASC_BASE = 'https://api.appstoreconnect.apple.com/v1'
+
+function installFetchMock(pages) {
+  const calls = []
+  const original = globalThis.fetch
+  globalThis.fetch = async (input) => {
+    const url = typeof input === 'string' ? input : input.url
+    calls.push(url)
+    const page = pages.shift()
+    if (!page)
+      throw new Error(`Unexpected extra fetch: ${url}`)
+    return {
+      ok: true,
+      status: 200,
+      statusText: 'OK',
+      json: async () => page,
+    }
+  }
+  return {
+    calls,
+    restore: () => { globalThis.fetch = original },
+  }
+}
+
+function makeProfile(id, certId, bundleId = 'bid-1') {
+  return {
+    id,
+    type: 'profiles',
+    attributes: {
+      name: `profile-${id}`,
+      profileType: 'IOS_APP_STORE',
+      profileContent: '',
+      expirationDate: '2099-01-01T00:00:00.000Z',
+    },
+    relationships: {
+      certificates: { data: [{ type: 'certificates', id: certId }] },
+      bundleId: { data: { type: 'bundleIds', id: bundleId } },
+    },
+  }
+}
+
+async function tAsync(name, fn) {
+  try {
+    await fn()
+    process.stdout.write(`✓ ${name}\n`)
+  }
+  catch (e) {
+    process.stderr.write(`✗ ${name}\n`)
+    throw e
+  }
+}
+
+await tAsync('listProfilesForCert follows links.next and aggregates pages', async () => {
+  const pages = [
+    {
+      data: [makeProfile('p1', 'CERT_A'), makeProfile('p2', 'CERT_OTHER')],
+      included: [{ id: 'bid-1', type: 'bundleIds', attributes: { identifier: 'com.example.one' } }],
+      links: { next: `${ASC_BASE}/profiles?cursor=PAGE2&include=certificates,bundleId&limit=200` },
+    },
+    {
+      data: [makeProfile('p3', 'CERT_A'), makeProfile('p4', 'CERT_A')],
+      included: [{ id: 'bid-1', type: 'bundleIds', attributes: { identifier: 'com.example.one' } }],
+      links: { next: `${ASC_BASE}/profiles?cursor=PAGE3&include=certificates,bundleId&limit=200` },
+    },
+    {
+      data: [makeProfile('p5', 'CERT_OTHER')],
+      included: [],
+      links: {},
+    },
+  ]
+  const mock = installFetchMock(pages)
+  try {
+    const result = await listProfilesForCert('tok', 'CERT_A')
+    assert.equal(mock.calls.length, 3, 'should have walked all three pages')
+    assert.equal(mock.calls[0], `${ASC_BASE}/profiles?include=certificates,bundleId&limit=200`)
+    assert.equal(mock.calls[1], `${ASC_BASE}/profiles?cursor=PAGE2&include=certificates,bundleId&limit=200`)
+    assert.equal(mock.calls[2], `${ASC_BASE}/profiles?cursor=PAGE3&include=certificates,bundleId&limit=200`)
+    const ids = result.map(r => r.id).sort()
+    assert.deepEqual(ids, ['p1', 'p3', 'p4'])
+    for (const r of result)
+      assert.equal(r.bundleIdentifier, 'com.example.one')
+  }
+  finally {
+    mock.restore()
+  }
+})
+
+await tAsync('listProfilesForCert stops when links.next is absent', async () => {
+  const pages = [
+    {
+      data: [makeProfile('p1', 'CERT_A')],
+      included: [{ id: 'bid-1', type: 'bundleIds', attributes: { identifier: 'com.example.one' } }],
+      links: {},
+    },
+  ]
+  const mock = installFetchMock(pages)
+  try {
+    const result = await listProfilesForCert('tok', 'CERT_A')
+    assert.equal(mock.calls.length, 1)
+    assert.equal(result.length, 1)
+    assert.equal(result[0].id, 'p1')
+  }
+  finally {
+    mock.restore()
+  }
+})
+
+await tAsync('listProfilesForCert handles missing data/included arrays on a page', async () => {
+  const pages = [
+    {
+      links: { next: `${ASC_BASE}/profiles?cursor=PAGE2` },
+    },
+    {
+      data: [makeProfile('p2', 'CERT_A')],
+      included: [{ id: 'bid-1', type: 'bundleIds', attributes: { identifier: 'com.example.one' } }],
+      links: {},
+    },
+  ]
+  const mock = installFetchMock(pages)
+  try {
+    const result = await listProfilesForCert('tok', 'CERT_A')
+    assert.equal(mock.calls.length, 2)
+    assert.equal(result.length, 1)
+    assert.equal(result[0].id, 'p2')
+    assert.equal(result[0].bundleIdentifier, 'com.example.one')
+  }
+  finally {
+    mock.restore()
+  }
 })
 
 process.stdout.write('OK\n')
