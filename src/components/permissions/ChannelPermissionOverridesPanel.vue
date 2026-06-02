@@ -13,6 +13,12 @@ interface ChannelSummary {
   name: string
 }
 
+interface ChannelPermissionOverrideSummary {
+  channel_id: number
+  permission_key: ChannelPermissionKey
+  is_allowed: boolean
+}
+
 const props = withDefaults(defineProps<{
   appId: string
   principalType: PrincipalType
@@ -30,6 +36,7 @@ const channelOverrides = ref<Record<string, boolean>>({})
 const channelOverridesLoading = ref(false)
 const channelOverridesSearch = ref('')
 const channelOverridesSaving = ref<Record<string, boolean>>({})
+const loadRequestId = ref(0)
 const channels = ref<ChannelSummary[]>([])
 
 const channelPermissionOptions = computed(() => [
@@ -39,6 +46,16 @@ const channelPermissionOptions = computed(() => [
 ])
 
 const roleDefaultChannelPermissions: Record<string, Record<ChannelPermissionKey, boolean>> = {
+  org_super_admin: {
+    'channel.read': true,
+    'channel.read_history': true,
+    'channel.promote_bundle': true,
+  },
+  org_admin: {
+    'channel.read': true,
+    'channel.read_history': true,
+    'channel.promote_bundle': true,
+  },
   app_admin: {
     'channel.read': true,
     'channel.read_history': true,
@@ -112,9 +129,12 @@ function isSavingOverride(channelId: number, permission: ChannelPermissionKey) {
 }
 
 async function loadChannelPermissions() {
+  const currentRequestId = ++loadRequestId.value
+
   if (!props.appId || !props.principalId) {
     channels.value = []
     channelOverrides.value = {}
+    channelOverridesLoading.value = false
     return
   }
 
@@ -125,6 +145,9 @@ async function loadChannelPermissions() {
       .select('id, name')
       .eq('app_id', props.appId)
       .order('name', { ascending: true })
+
+    if (currentRequestId !== loadRequestId.value)
+      return
 
     if (channelError)
       throw channelError
@@ -138,17 +161,20 @@ async function loadChannelPermissions() {
 
     const channelIds = channels.value.map(channel => channel.id)
     const { data: overrides, error: overridesError } = await supabase
-      .from('channel_permission_overrides' as any)
+      .from('channel_permission_overrides')
       .select('channel_id, permission_key, is_allowed')
       .eq('principal_type', props.principalType)
       .eq('principal_id', props.principalId)
       .in('channel_id', channelIds)
 
+    if (currentRequestId !== loadRequestId.value)
+      return
+
     if (overridesError)
       throw overridesError
 
     const nextOverrides: Record<string, boolean> = {}
-    for (const override of (overrides as any[] || [])) {
+    for (const override of (overrides || []) as ChannelPermissionOverrideSummary[]) {
       const key = getOverrideKey(override.channel_id, override.permission_key)
       nextOverrides[key] = override.is_allowed
     }
@@ -159,7 +185,8 @@ async function loadChannelPermissions() {
     toast.error(t('error-loading-channel-permissions'))
   }
   finally {
-    channelOverridesLoading.value = false
+    if (currentRequestId === loadRequestId.value)
+      channelOverridesLoading.value = false
   }
 }
 
@@ -197,7 +224,7 @@ async function updateChannelPermission(channelId: number, permission: ChannelPer
   try {
     if (nextOverride === null) {
       const { error } = await supabase
-        .from('channel_permission_overrides' as any)
+        .from('channel_permission_overrides')
         .delete()
         .eq('principal_type', props.principalType)
         .eq('principal_id', props.principalId)
@@ -209,7 +236,7 @@ async function updateChannelPermission(channelId: number, permission: ChannelPer
     }
     else {
       const { error } = await supabase
-        .from('channel_permission_overrides' as any)
+        .from('channel_permission_overrides')
         .upsert({
           principal_type: props.principalType,
           principal_id: props.principalId,
@@ -240,7 +267,7 @@ watch(
     channelOverridesSearch.value = ''
     channelOverrides.value = {}
     channels.value = []
-    loadChannelPermissions()
+    void loadChannelPermissions()
   },
   { immediate: true },
 )

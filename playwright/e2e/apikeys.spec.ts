@@ -1,7 +1,9 @@
-import type { Page } from '@playwright/test'
+import type { Locator, Page } from '@playwright/test'
 import { expect, test } from '../support/commands'
 
 test.use({ screenshot: 'off', trace: 'off', video: 'off' })
+
+const DEMO_ORG_ID = '046a36ac-e03c-4590-9257-bd6c9dba9ee8'
 
 async function openCreateKeyDialog(page: Page) {
   await page.click('[data-test="create-key"]')
@@ -39,6 +41,61 @@ async function createDemoAppApiKey(page: Page, keyName: string) {
   await expect(page.getByText('Added new API key successfully').first()).toBeVisible()
   await expect(page.locator('tr', { hasText: keyName })).toHaveCount(1)
   return page.locator('tr', { hasText: keyName })
+}
+
+async function createInheritedOrgAdminApiKey(page: Page, keyName: string) {
+  const dialog = await openCreateKeyDialog(page)
+  await dialog.locator('input[type="text"]').fill(keyName)
+
+  await dialog.locator('[data-test="create-key-org-dropdown"]').click()
+  const orgCheckboxes = dialog.locator('[data-test="create-key-org-checkbox"]:not(:disabled)')
+  const orgCount = await orgCheckboxes.count()
+  for (let index = 0; index < orgCount; index++) {
+    const checkbox = orgCheckboxes.nth(index)
+    const orgId = await checkbox.getAttribute('data-org-id')
+    if (orgId === DEMO_ORG_ID) {
+      await checkbox.check()
+    }
+    else if (await checkbox.isChecked()) {
+      await checkbox.uncheck()
+    }
+  }
+  await page.mouse.click(5, 5)
+
+  const orgAdminRole = dialog.locator('[data-test="create-key-org-role-org_admin"]')
+  await orgAdminRole.click()
+  await expect(orgAdminRole).toBeChecked()
+
+  await page.getByRole('button', { name: 'Create' }).click()
+  await expect(page.getByText('Added new API key successfully').first()).toBeVisible()
+  await expect(page.locator('tr', { hasText: keyName })).toHaveCount(1)
+  return page.locator('tr', { hasText: keyName })
+}
+
+async function expectChannelPermissionOverridePersists(page: Page, keyRow: Locator, expectedAppText: string) {
+  await keyRow.locator('[data-test^="manage-key-channel-permissions-"]').click()
+  const panel = page.locator('[data-test="channel-permissions-panel"]')
+  await expect(panel).toBeVisible()
+
+  const appSelect = page.locator('[data-test="apikey-channel-permissions-app-select"]')
+  await expect(appSelect).toContainText(expectedAppText)
+
+  const promoteSelect = panel.locator('[data-test="channel-permission-select"][data-permission-key="channel.promote_bundle"]').first()
+  await expect(promoteSelect).toBeVisible()
+  const channelId = Number(await promoteSelect.getAttribute('data-channel-id'))
+  expect(channelId).toBeGreaterThan(0)
+
+  await promoteSelect.selectOption('deny')
+  await expect(promoteSelect).toHaveValue('deny')
+  await expect(promoteSelect).toBeEnabled()
+
+  await page.getByRole('button', { name: 'Close', exact: true }).click()
+  await keyRow.locator('[data-test^="manage-key-channel-permissions-"]').click()
+  const reopenedPromoteSelect = page
+    .locator(`[data-test="channel-permissions-panel"] [data-test="channel-permission-select"][data-permission-key="channel.promote_bundle"][data-channel-id="${channelId}"]`)
+    .first()
+  await expect(reopenedPromoteSelect).toHaveValue('deny')
+  await page.getByRole('button', { name: 'Close', exact: true }).click()
 }
 
 test.describe('API Key Management', () => {
@@ -94,29 +151,14 @@ test.describe('API Key Management', () => {
     const keyName = `Playwright Channel ${Date.now()}`
     const keyRow = await createDemoAppApiKey(page, keyName)
 
-    await keyRow.locator('[data-test^="manage-key-channel-permissions-"]').click()
-    const panel = page.locator('[data-test="channel-permissions-panel"]')
-    await expect(panel).toBeVisible()
+    await expectChannelPermissionOverridePersists(page, keyRow, 'Demo app')
+  })
 
-    const appSelect = page.locator('[data-test="apikey-channel-permissions-app-select"]')
-    await expect(appSelect).toContainText('Demo app')
+  test('should manage inherited org-admin channel permissions for API keys', async ({ page }) => {
+    const keyName = `Playwright Inherited Channel ${Date.now()}`
+    const keyRow = await createInheritedOrgAdminApiKey(page, keyName)
 
-    const promoteSelect = panel.locator('[data-test="channel-permission-select"][data-permission-key="channel.promote_bundle"]').first()
-    await expect(promoteSelect).toBeVisible()
-    const channelId = Number(await promoteSelect.getAttribute('data-channel-id'))
-    expect(channelId).toBeGreaterThan(0)
-
-    await promoteSelect.selectOption('deny')
-    await expect(promoteSelect).toHaveValue('deny')
-    await expect(promoteSelect).toBeEnabled()
-
-    await page.getByRole('button', { name: 'Close', exact: true }).click()
-    await keyRow.locator('[data-test^="manage-key-channel-permissions-"]').click()
-    const reopenedPromoteSelect = page
-      .locator(`[data-test="channel-permissions-panel"] [data-test="channel-permission-select"][data-permission-key="channel.promote_bundle"][data-channel-id="${channelId}"]`)
-      .first()
-    await expect(reopenedPromoteSelect).toHaveValue('deny')
-    await page.getByRole('button', { name: 'Close', exact: true }).click()
+    await expectChannelPermissionOverridePersists(page, keyRow, 'Demo app · App Admin')
   })
 
   test('should delete API key', async ({ page }) => {
