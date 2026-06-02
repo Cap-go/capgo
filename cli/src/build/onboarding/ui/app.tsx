@@ -3268,9 +3268,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
                   <Text>
                     {'Email '}
                     <Text bold color="cyan">support@capgo.app</Text>
-                    {' with your team id ('}
-                    <Text bold>{chosenIdentity.teamId}</Text>
-                    {`) and we'll walk you through ad-hoc setup including device registration.`}
+                    {` and we'll walk you through ad-hoc setup including device registration.`}
                   </Text>
                 </Box>
                 <Newline />
