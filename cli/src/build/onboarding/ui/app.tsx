@@ -871,6 +871,14 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
     if (completedSteps.profileCreated) {
       addLog(`✔ Provisioning profile created — "${completedSteps.profileCreated.profileName}"`)
     }
+    // Re-surface the ad-hoc support hint on resume so a user who quit
+    // after picking ad_hoc and comes back later still sees it. Suppress
+    // when the profile is already created (the heads-up is no longer
+    // useful at that point).
+    if (initialProgress.importDistribution === 'ad_hoc' && !completedSteps.profileCreated) {
+      addLog('ℹ️  Ad-hoc is more involved than App Store — you also need to register every device on Apple.', 'yellow')
+      addLog('   Want hands-on help? Email support@capgo.app and we\'ll walk you through it.', 'yellow')
+    }
   }, []) // Only on mount
 
   const handleError = useCallback((err: unknown, failedStep: OnboardingStep) => {
@@ -2870,6 +2878,12 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
             }
             else {
               // ad_hoc skips .p8; can opt into it later from no-match recovery.
+              // Surface the support hint up-front rather than waiting until
+              // the user is mid-recovery in the portal-explanation step —
+              // they've now committed to the harder path and deserve to
+              // know help is available before they hit a wall.
+              addLog('ℹ️  Ad-hoc is more involved than App Store — you also need to register every device on Apple.', 'yellow')
+              addLog('   Want hands-on help? Email support@capgo.app and we\'ll walk you through it.', 'yellow')
               setStep('import-pick-identity')
             }
           }}
@@ -3261,19 +3275,12 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
                 : `Ad-hoc distribution is genuinely fiddly (you also need to register every target device on Apple's side). Here's what's involved — and how to get help if you're stuck.`}
             </Alert>
             <Newline />
-            {!canAutoCreate && (
-              <>
-                <Box flexDirection="column" borderStyle="round" borderColor="cyan" paddingX={1}>
-                  <Text bold color="cyan">💬 Want help instead of doing this yourself?</Text>
-                  <Text>
-                    {'Email '}
-                    <Text bold color="cyan">support@capgo.app</Text>
-                    {` and we'll walk you through ad-hoc setup including device registration.`}
-                  </Text>
-                </Box>
-                <Newline />
-              </>
-            )}
+            {/* The ad_hoc "want help?" breadcrumb fires at the moment the
+                user picks Ad Hoc on the distribution-mode step (yellow log
+                entries), not here. Surfacing it on the recovery walkthrough
+                meant the user only saw the offer AFTER they'd already
+                started fumbling — too late. The log lines stay visible in
+                the side log throughout the rest of the wizard. */}
             <Text bold>{`What you'd need to do manually:`}</Text>
             <Box flexDirection="column" marginLeft={2} marginTop={1}>
               <Text>1. Sign in at developer.apple.com/account/resources/profiles/list.</Text>
