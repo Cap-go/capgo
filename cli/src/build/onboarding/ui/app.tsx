@@ -671,6 +671,17 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
   // changes, but we want fetches to fire exactly once per eager-batch pass.
   // Cleared by `resetForFreshStart` so a Restart can re-trigger cleanly.
   const prefetchTriggeredRef = useRef(false)
+  // Generation counter for in-flight prefetches. Captured per fetch closure
+  // at fire time; checked before any setState. Bumped by resetForFreshStart
+  // to invalidate prior in-flight work without setStating into a fresh
+  // wizard. We CANNOT reuse the step-useEffect's `cancelled` flag here —
+  // that flag is tripped the instant we `setStep('import-pick-identity')`
+  // because React runs the previous effect's cleanup BEFORE the next
+  // effect's body. Tying prefetch lifetime to the cleanup would mean every
+  // fetch resolves after the cleanup has already cancelled it, so the
+  // spinner would spin forever. The generation counter only changes on
+  // explicit resets, so prefetches outlive step transitions.
+  const prefetchGenerationRef = useRef(0)
   // Result of the per-identity Apple-side cert lookup for the currently
   // chosen identity. `undefined` = not yet checked; `null` = Apple has no
   // matching cert; `string` = Apple's resource id (reused downstream).
@@ -848,6 +859,11 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
     // UNAVAILABLE (no prefetch fires, no profiles injected).
     setProfilePrefetch({})
     prefetchTriggeredRef.current = false
+    // Bump the generation so any prefetch fetches still in flight from a
+    // pre-restart pass invalidate themselves before they hit setState —
+    // otherwise they'd write stale 'available'/'unavailable' entries into
+    // the freshly-emptied prefetch map AFTER the user has already restarted.
+    prefetchGenerationRef.current += 1
     // Credential outputs
     setCertData(null)
     setProfileData(null)
@@ -1318,6 +1334,11 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
           // Once flipped true it stays true until resetForFreshStart wipes it.
           if (!prefetchTriggeredRef.current) {
             prefetchTriggeredRef.current = true
+            // Snapshot the current generation so every in-flight fetch can
+            // self-invalidate on resetForFreshStart. Captured by reference
+            // semantics — the closures read prefetchGenerationRef.current
+            // when they resolve, not the closed-over value here.
+            const myGen = prefetchGenerationRef.current
             const toPrefetch = importMatches.filter(m => map[m.identity.sha1]?.available && map[m.identity.sha1]?.appleCertId)
             if (toPrefetch.length > 0) {
               const pendingSeed: Record<string, { kind: 'pending' }> = {}
@@ -1338,7 +1359,11 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
                       listProfilesForCert(token, certId),
                       new Promise<'__timeout__'>(resolve => setTimeout(() => resolve('__timeout__'), 7000)),
                     ])
-                    if (cancelled)
+                    // Check generation, NOT the step-tied `cancelled` —
+                    // setStep('import-pick-identity') below trips cancelled
+                    // before we ever resolve, so a `cancelled` check here
+                    // would discard every prefetch result and spin forever.
+                    if (prefetchGenerationRef.current !== myGen)
                       return
                     if (raced === '__timeout__') {
                       setProfilePrefetch(prev => ({ ...prev, [sha1]: { kind: 'timeout' } }))
@@ -1377,7 +1402,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
                     setProfilePrefetch(prev => ({ ...prev, [sha1]: { kind: 'available' } }))
                   }
                   catch {
-                    if (cancelled)
+                    if (prefetchGenerationRef.current !== myGen)
                       return
                     // Per-fetch error sandbox: any one cert's failure stays
                     // contained. The user can still click the row and the
