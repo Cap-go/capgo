@@ -3118,14 +3118,42 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
           "🌐 Open Apple Developer Portal" option. */}
       {step === 'import-portal-explanation' && chosenIdentity && (() => {
         const canAutoCreate = importDistribution !== 'ad_hoc'
+        // The walkthrough renders one of two flavours:
+        //  - app_store: the original "you CAN do this manually, but
+        //    here's an easier automatic option" framing, ending with a
+        //    Select that nudges toward the auto path.
+        //  - ad_hoc: an honest "this is complex, here's what's involved,
+        //    and you can email support if you want help" framing, with a
+        //    plain Open Portal option (no "anyway" — there's no
+        //    automatic alternative to contrast with), the file-picker
+        //    return path, and a Capgo-support breadcrumb. The manual
+        //    walkthrough below stops at step 7 (download + come back),
+        //    intentionally skipping the device-registration step that
+        //    ad_hoc profiles require — that step varies wildly by team
+        //    and is exactly the kind of thing support can help with.
         return (
           <Box flexDirection="column" marginTop={1}>
             <Alert variant="info">
               {canAutoCreate
                 ? 'You can do this manually in the Apple Developer Portal — but the automatic path is much easier.'
-                : `You can do this manually in the Apple Developer Portal. Here's what it involves.`}
+                : `Ad-hoc distribution is genuinely fiddly (you also need to register every target device on Apple's side). Here's what's involved — and how to get help if you're stuck.`}
             </Alert>
             <Newline />
+            {!canAutoCreate && (
+              <>
+                <Box flexDirection="column" borderStyle="round" borderColor="cyan" paddingX={1}>
+                  <Text bold color="cyan">💬 Want help instead of doing this yourself?</Text>
+                  <Text>
+                    {'Email '}
+                    <Text bold color="cyan">support@capgo.app</Text>
+                    {' with your team id ('}
+                    <Text bold>{chosenIdentity.teamId}</Text>
+                    {`) and we'll walk you through ad-hoc setup including device registration.`}
+                  </Text>
+                </Box>
+                <Newline />
+              </>
+            )}
             <Text bold>{`What you'd need to do manually:`}</Text>
             <Box flexDirection="column" marginLeft={2} marginTop={1}>
               <Text>1. Sign in at developer.apple.com/account/resources/profiles/list.</Text>
@@ -3162,11 +3190,22 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
                 <Text bold>{chosenIdentity.name}</Text>
                 . If multiple are listed, pick carefully — we re-verify the cert SHA1 in the next step.
               </Text>
+              {!canAutoCreate && (
+                <Text>
+                  6. In the "Devices" step, tick every device UDID that should be able to run this build. (This is the ad-hoc-specific step. Devices have to be registered under
+                  {' '}
+                  <Text color="cyan" underline>developer.apple.com/account/resources/devices/list</Text>
+                  {' '}
+                  first.)
+                </Text>
+              )}
               <Text>
-                6. Name + Generate + Download. The .mobileprovision file lands in your Downloads folder.
+                {canAutoCreate ? '6. ' : '7. '}
+                Name + Generate + Download. The .mobileprovision file lands in your Downloads folder.
               </Text>
               <Text>
-                7. Come back here and pick
+                {canAutoCreate ? '7. ' : '8. '}
+                Come back here and pick
                 {' '}
                 <Text bold>📁  Use a .mobileprovision file from disk</Text>
                 .
@@ -3187,7 +3226,12 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
                 ...(canAutoCreate
                   ? [{ label: '✨  Use "Create a new App Store profile" instead (recommended)', value: 'use-create' }]
                   : []),
-                { label: '🌐  Open the portal anyway (advanced)', value: 'open-anyway' },
+                {
+                  label: canAutoCreate
+                    ? '🌐  Open the portal anyway (advanced)'
+                    : '🌐  Open Apple Developer Portal',
+                  value: 'open-anyway',
+                },
                 ...(canUseFilePicker()
                   ? [{ label: '📁  I already have a .mobileprovision on disk — let me pick it', value: 'use-file' }]
                   : []),
