@@ -46,8 +46,14 @@ describe('mapIosOnboardingError', () => {
     expect(mapIosOnboardingError(new Error('wrong password'), 'import-exporting')).toBe('keychain_export_failed')
   })
 
-  it.concurrent('maps import-fetching-profile failures to profile_read_failed', () => {
-    expect(mapIosOnboardingError(new Error('fs error'), 'import-fetching-profile')).toBe('profile_read_failed')
+  it.concurrent('maps import-provide-profile-path failures to profile_read_failed', () => {
+    // The 'import-fetching-profile' step was removed (commit 36a7c282)
+    // alongside the Rescan recovery option; the .mobileprovision file
+    // picker step 'import-provide-profile-path' replaces it for the
+    // "read profile from disk" failure class — parse + 3 invariant
+    // checks (bundle id, distribution, cert SHA1) + the generic catch
+    // all surface here.
+    expect(mapIosOnboardingError(new Error('fs error'), 'import-provide-profile-path')).toBe('profile_read_failed')
   })
 
   it.concurrent('maps import-pick-profile and import-no-match-recovery to profile_no_match', () => {
