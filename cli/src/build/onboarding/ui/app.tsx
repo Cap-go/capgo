@@ -16,6 +16,11 @@ import { Box, measureElement, Newline, Text, useApp, useInput, useStdout } from 
 import open from 'open'
 // src/build/onboarding/ui/app.tsx
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+
+// Braille spinner frames for the per-row "Profile" cell during prefetch.
+// Module-scoped so the array reference is stable and never triggers
+// re-renders by accident.
+const SPINNER_FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'] as const
 import { detectIosBundleIds } from '../bundle-id-detector.js'
 import { writeOnboardingSupportBundle } from '../../../onboarding-support.js'
 import { formatRunnerCommand, splitRunnerCommand } from '../../../runner-command.js'
@@ -32,6 +37,7 @@ import { isAiAnalysisTooTall, resolveAiResultRoute } from '../ai-fit.js'
 // suggestion doesn't actually fix the failure mode while still giving the user
 // a couple of in-wizard chances to iterate.
 const MAX_AI_RETRIES = 2
+import type { AscProfileSummary } from '../apple-api.js'
 import { CertificateLimitError, classifyCertAvailability, computeCertSha1, createCertificate, createProfile, deleteProfile, DuplicateProfileError, ensureBundleId, findCertIdBySha1, generateJwt, listDistributionCerts, listProfilesForCert, revokeCertificate, verifyApiKey } from '../apple-api.js'
 import { createP12, DEFAULT_P12_PASSWORD, generateCsr } from '../csr.js'
 import { mapIosOnboardingError } from '../error-categories.js'
@@ -646,6 +652,25 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
   // verified API key. Empty map = no eager check performed (e.g. ad_hoc
   // users without .p8); the picker falls back to a single-list layout.
   const [identityAvailability, setIdentityAvailability] = useState<Record<string, EnrichedIdentityAvailability>>({})
+  // Per-identity Apple-side PROFILE prefetch state. Fires in parallel right
+  // after the eager batch cert validation completes — see the trigger at the
+  // tail of `import-validating-all-certs` below. Discriminated union (not
+  // `any`) so the cell-render branch narrows via `state.kind` without casts.
+  // The `available` variant carries no payload because the profiles get
+  // injected directly into `importMatches` (the existing `matchCount > 0`
+  // check then naturally renders the cell as green AVAILABLE — see the
+  // table-row builder near line ~3066).
+  const [profilePrefetch, setProfilePrefetch] = useState<Record<string, { kind: 'pending' | 'available' | 'unavailable' | 'timeout' | 'error' }>>({})
+  // Braille-spinner frame counter for the per-row "checking…" cell. Ticks
+  // only while at least one prefetch is still pending — gated by the
+  // dedicated useEffect below — so the interval is cleaned up the instant
+  // every cell has resolved.
+  const [spinnerFrame, setSpinnerFrame] = useState(0)
+  // Guard against the prefetch trigger re-firing on every re-render of the
+  // `import-validating-all-certs` effect. The effect re-runs on `step`
+  // changes, but we want fetches to fire exactly once per eager-batch pass.
+  // Cleared by `resetForFreshStart` so a Restart can re-trigger cleanly.
+  const prefetchTriggeredRef = useRef(false)
   // Result of the per-identity Apple-side cert lookup for the currently
   // chosen identity. `undefined` = not yet checked; `null` = Apple has no
   // matching cert; `string` = Apple's resource id (reused downstream).
@@ -817,6 +842,12 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
     // handler missed this — after restart the picker would still see the prior
     // run's per-cert reasons. Reset so the next batch validation starts clean.
     setIdentityAvailability({})
+    // Per-identity PROFILE prefetch state + its one-shot guard. Without the
+    // ref reset, a Restart followed by a re-enter would early-out of the
+    // prefetch trigger and leave every AVAILABLE row stuck rendering as
+    // UNAVAILABLE (no prefetch fires, no profiles injected).
+    setProfilePrefetch({})
+    prefetchTriggeredRef.current = false
     // Credential outputs
     setCertData(null)
     setProfileData(null)
@@ -1275,6 +1306,90 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
           }
           setIdentityAvailability(map)
           addLog(`✔ Apple validation complete — ${availableCount} available, ${results.length - availableCount} unavailable`)
+
+          // Profile prefetch trigger — fires in parallel for every identity
+          // whose batch validation yielded an Apple-side certId. Identities
+          // marked unavailable (no appleCertId) are not prefetched: they're
+          // already in the UNAVAILABLE table and clicking them re-routes via
+          // import-checking-apple-cert.
+          //
+          // The one-shot ref guards against this useEffect re-running on
+          // re-renders triggered by our own setImportMatches injections.
+          // Once flipped true it stays true until resetForFreshStart wipes it.
+          if (!prefetchTriggeredRef.current) {
+            prefetchTriggeredRef.current = true
+            const toPrefetch = importMatches.filter(m => map[m.identity.sha1]?.available && map[m.identity.sha1]?.appleCertId)
+            if (toPrefetch.length > 0) {
+              const pendingSeed: Record<string, { kind: 'pending' }> = {}
+              for (const m of toPrefetch)
+                pendingSeed[m.identity.sha1] = { kind: 'pending' }
+              setProfilePrefetch(prev => ({ ...prev, ...pendingSeed }))
+
+              // Fire each fetch independently — one slow / failing cert must
+              // not delay or poison the others. Token is captured from the
+              // outer scope (already fetched for the batch validation).
+              for (const m of toPrefetch) {
+                const sha1 = m.identity.sha1
+                const certId = map[sha1].appleCertId!
+                const teamId = m.identity.teamId
+                ;(async () => {
+                  try {
+                    const raced = await Promise.race<AscProfileSummary[] | '__timeout__'>([
+                      listProfilesForCert(token, certId),
+                      new Promise<'__timeout__'>(resolve => setTimeout(() => resolve('__timeout__'), 7000)),
+                    ])
+                    if (cancelled)
+                      return
+                    if (raced === '__timeout__') {
+                      setProfilePrefetch(prev => ({ ...prev, [sha1]: { kind: 'timeout' } }))
+                      return
+                    }
+                    // Map AscProfileSummary[] → DiscoveredProfile[] using the
+                    // SAME shape import-checking-apple-cert builds (see ~1328).
+                    const synthesized: DiscoveredProfile[] = raced.map(p => ({
+                      path: '',
+                      uuid: p.id,
+                      name: p.name,
+                      applicationIdentifier: '',
+                      bundleId: p.bundleIdentifier,
+                      teamId,
+                      expirationDate: p.expirationDate,
+                      profileType: (p.profileType === 'IOS_APP_STORE' ? 'app_store' : p.profileType === 'IOS_APP_ADHOC' ? 'ad_hoc' : 'unknown') as DiscoveredProfile['profileType'],
+                      certificateSha1s: [sha1],
+                      profileBase64: p.profileContent,
+                    } as DiscoveredProfile & { profileBase64: string }))
+                    const usableHere = filterProfilesForApp(synthesized, iosBundleId, importDistribution)
+                    if (usableHere.length === 0) {
+                      // Apple returned zero (or none usable for this app +
+                      // distribution). Cell renders UNAVAILABLE; clicking it
+                      // re-routes through import-checking-apple-cert so the
+                      // user still gets the rich "why" messaging there.
+                      setProfilePrefetch(prev => ({ ...prev, [sha1]: { kind: 'unavailable' } }))
+                      return
+                    }
+                    // Inject synthesized profiles into importMatches so the
+                    // existing matchCount > 0 check in the row builder lights
+                    // the cell green without needing a second branch.
+                    setImportMatches(prev => prev.map(mm => mm.identity.sha1 === sha1
+                      ? { ...mm, profiles: [...mm.profiles, ...synthesized] }
+                      : mm,
+                    ))
+                    setProfilePrefetch(prev => ({ ...prev, [sha1]: { kind: 'available' } }))
+                  }
+                  catch {
+                    if (cancelled)
+                      return
+                    // Per-fetch error sandbox: any one cert's failure stays
+                    // contained. The user can still click the row and the
+                    // existing import-checking-apple-cert handler will retry
+                    // with the cached cert id.
+                    setProfilePrefetch(prev => ({ ...prev, [sha1]: { kind: 'error' } }))
+                  }
+                })()
+              }
+            }
+          }
+
           setStep('import-pick-identity')
         }
         catch (err) {
@@ -2386,6 +2501,21 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
     }
   }, [step])
 
+  // Spinner-frame ticker for the in-flight profile prefetch cells. Runs only
+  // while at least one entry in profilePrefetch is `pending`; the cleanup
+  // function clears the interval the instant the last row resolves, AND on
+  // unmount. setSpinnerFrame uses a functional update so we don't need to
+  // re-establish the effect when the frame index changes.
+  useEffect(() => {
+    const anyPending = Object.values(profilePrefetch).some(p => p.kind === 'pending')
+    if (!anyPending)
+      return
+    const id = setInterval(() => {
+      setSpinnerFrame(prev => (prev + 1) % SPINNER_FRAMES.length)
+    }, 100)
+    return () => clearInterval(id)
+  }, [profilePrefetch])
+
   // Route between the inline AI-result render and the scrollable fullscreen
   // viewer based on the LIVE terminal size — BIDIRECTIONALLY. Depends on the
   // terminal dimensions so it re-evaluates on resize: shrinking past the inline
@@ -3065,15 +3195,33 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
 
         const availableRows = available.map((m, i) => {
           const matchCount = filterProfilesForApp(m.profiles, iosBundleId, importDistribution).length
+          // Cell value is a three-way state:
+          //   1. matchCount > 0 → 'AVAILABLE' (green). Catches BOTH the
+          //      on-disk-match case AND the prefetch-injected case (the
+          //      prefetch synthesises profiles into m.profiles, so this
+          //      branch lights up automatically — no separate prefetch
+          //      branch needed for the success path).
+          //   2. matchCount === 0 + prefetch pending → animated spinner.
+          //      Yellow cellColor (see Table below) signals "in flight,
+          //      click is still allowed" — the onPick handler routes
+          //      pending clicks the same way unavailable clicks go,
+          //      through import-checking-apple-cert.
+          //   3. matchCount === 0 + timeout/error/unavailable/no entry →
+          //      'UNAVAILABLE' (red). Click re-routes through
+          //      import-checking-apple-cert so the user gets a fresh fetch.
+          const prefetchState = profilePrefetch[m.identity.sha1]
+          let profileCell: string
+          if (matchCount > 0)
+            profileCell = 'AVAILABLE'
+          else if (prefetchState?.kind === 'pending')
+            profileCell = `${SPINNER_FRAMES[spinnerFrame % SPINNER_FRAMES.length]} checking…`
+          else
+            profileCell = 'UNAVAILABLE'
           return {
             '#': `${i + 1}`,
             'Name': `🔑 ${m.identity.name}`,
             'Team': m.identity.teamId,
-            // Binary readiness signal — green AVAILABLE when there's an
-            // on-disk profile matching this app, red UNAVAILABLE when the
-            // pick will land in the no-match recovery menu (still usable —
-            // file picker / Apple create available there).
-            'Profile': matchCount > 0 ? 'AVAILABLE' : 'UNAVAILABLE',
+            'Profile': profileCell,
           }
         })
         const unavailableRows = unavailable.map(m => ({
@@ -3097,6 +3245,12 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
                       return 'green'
                     if (val === 'UNAVAILABLE')
                       return 'red'
+                    // Spinner cell — every pending render is one of
+                    // SPINNER_FRAMES followed by ` checking…`. Endswith is
+                    // cheaper than scanning frame chars and tolerates the
+                    // frame index rolling over between renders.
+                    if (typeof val === 'string' && val.endsWith(' checking…'))
+                      return 'yellow'
                     return undefined
                   }}
                 />
