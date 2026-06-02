@@ -39,6 +39,18 @@ interface AppleApiError {
   detail: string
 }
 
+// Carries the HTTP status alongside the message so error-categories.ts can map
+// 401 → 'apple_api_unauthorized' and 429 → 'apple_api_rate_limited' instead of
+// falling through to 'unknown'.
+export class AppleApiHttpError extends Error {
+  readonly status: number
+  constructor(status: number, message: string) {
+    super(message)
+    this.name = 'AppleApiHttpError'
+    this.status = status
+  }
+}
+
 async function ascFetch(
   path: string,
   token: string,
@@ -60,9 +72,9 @@ async function ascFetch(
     const errors: AppleApiError[] = body?.errors || []
     const first = errors[0]
     if (first) {
-      throw new Error(`Apple API error (${res.status}): ${first.title} — ${first.detail} (${first.code})`)
+      throw new AppleApiHttpError(res.status, `Apple API error (${res.status}): ${first.title} — ${first.detail} (${first.code})`)
     }
-    throw new Error(`Apple API error: HTTP ${res.status} ${res.statusText}`)
+    throw new AppleApiHttpError(res.status, `Apple API error: HTTP ${res.status} ${res.statusText}`)
   }
 
   return body

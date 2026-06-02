@@ -350,7 +350,7 @@ export interface ImportExportWarningStepProps {
   onChange: (value: string) => void
 }
 
-export const ImportExportWarningStep: FC<ImportExportWarningStepProps> = ({ identityName, onChange }) => {
+export const ImportExportWarningStep: FC<ImportExportWarningStepProps> = ({ identityName, dense = false, onChange }) => {
   const select = (
     <Select
       options={[
@@ -366,31 +366,43 @@ export const ImportExportWarningStep: FC<ImportExportWarningStepProps> = ({ iden
       <Alert variant="warning">
         macOS will now ask permission to access your private key.
       </Alert>
-      <Newline />
+      {!dense && <Newline />}
       <Box flexDirection="column" marginLeft={2}>
-        <Text>
-          <Text bold color="white">1.</Text>
-          {' '}
-          A Keychain dialog will pop up asking
-          {' '}
-          <Text bold>"security wants to use your confidential information"</Text>
-        </Text>
-        <Text>
-          <Text bold color="white">2.</Text>
-          {' '}
-          Click
-          {' '}
-          <Text bold color="green">"Always Allow"</Text>
-          {' '}
-          so it doesn't ask again on retry
-        </Text>
-        <Text>
-          <Text bold color="white">3.</Text>
-          {' '}
-          That's the only prompt — the export is otherwise non-interactive
-        </Text>
+        {dense
+          ? (
+              <>
+                <Text dimColor>1. macOS will pop up a Keychain permission dialog.</Text>
+                <Text dimColor>2. Click "Always Allow" so retries don't re-prompt.</Text>
+                <Text dimColor>3. That's the only prompt — the rest is non-interactive.</Text>
+              </>
+            )
+          : (
+              <>
+                <Text>
+                  <Text bold color="white">1.</Text>
+                  {' '}
+                  A Keychain dialog will pop up asking
+                  {' '}
+                  <Text bold>"security wants to use your confidential information"</Text>
+                </Text>
+                <Text>
+                  <Text bold color="white">2.</Text>
+                  {' '}
+                  Click
+                  {' '}
+                  <Text bold color="green">"Always Allow"</Text>
+                  {' '}
+                  so it doesn't ask again on retry
+                </Text>
+                <Text>
+                  <Text bold color="white">3.</Text>
+                  {' '}
+                  That's the only prompt — the export is otherwise non-interactive
+                </Text>
+              </>
+            )}
       </Box>
-      <Newline />
+      {!dense && <Newline />}
       {select}
     </Box>
   )
@@ -409,28 +421,36 @@ export interface ImportCompilingHelperStepProps {
   dense?: boolean
 }
 
-export const ImportCompilingHelperStep: FC<ImportCompilingHelperStepProps> = () => {
+export const ImportCompilingHelperStep: FC<ImportCompilingHelperStepProps> = ({ dense = false }) => {
   return (
     <Box flexDirection="column" marginTop={1}>
       <SpinnerLine text="Compiling keychain-export helper (one-time, ~2-3s)..." />
-      <Newline />
-      <Box flexDirection="column" marginLeft={2}>
-        <Text dimColor>
-          We ship a small Swift program (~350 lines) that wraps Apple's
-          Security framework. It compiles via
-          {' '}
-          <Text bold>swiftc</Text>
-          {' '}
-          into your OS temp folder.
-        </Text>
-        <Text dimColor>
-          The result is cached for this CLI version — future runs of
-          {' '}
-          <Text bold>build init</Text>
-          {' '}
-          skip this step.
-        </Text>
-      </Box>
+      {!dense && <Newline />}
+      {dense
+        ? (
+            <Box marginLeft={2}>
+              <Text dimColor>Compiling a ~350-line Swift helper via swiftc; cached per CLI version.</Text>
+            </Box>
+          )
+        : (
+            <Box flexDirection="column" marginLeft={2}>
+              <Text dimColor>
+                We ship a small Swift program (~350 lines) that wraps Apple's
+                Security framework. It compiles via
+                {' '}
+                <Text bold>swiftc</Text>
+                {' '}
+                into your OS temp folder.
+              </Text>
+              <Text dimColor>
+                The result is cached for this CLI version — future runs of
+                {' '}
+                <Text bold>build init</Text>
+                {' '}
+                skip this step.
+              </Text>
+            </Box>
+          )}
     </Box>
   )
 }

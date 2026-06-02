@@ -202,5 +202,8 @@ export function getImportEntryStep(progress: OnboardingProgress | null): Onboard
 // when a prior session saved the path but quit before confirming the Key ID step.
 // Returns '' when the filename doesn't match (e.g. a manually-renamed file).
 export function extractKeyIdFromP8Path(filePath: string): string {
-  return filePath.match(/(?:Auth|Api)Key_([A-Z0-9]+)\.p8$/i)?.[1] ?? ''
+  // /i tolerates manually-renamed files, but the JWT `kid` claim is always
+  // upper-case (Apple registers keys that way). Normalize here so a renamed
+  // file like `authkey_abc123.p8` still produces a usable kid.
+  return filePath.match(/(?:Auth|Api)Key_([A-Z0-9]+)\.p8$/i)?.[1]?.toUpperCase() ?? ''
 }
