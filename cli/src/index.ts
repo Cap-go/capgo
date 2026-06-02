@@ -3,8 +3,8 @@ import { log } from '@clack/prompts'
 import { Option, program } from 'commander'
 import pack from '../package.json'
 import { categorizeCliError } from './analytics/error-category'
-import { extractCommandContext, flushAnalytics, trackCommandFailed, trackCommandInvoked, trackCommandSucceeded } from './analytics/track'
 import { enableSupabaseInstrumentation } from './analytics/supabase-perf'
+import { extractCommandContext, flushAnalytics, trackCommandFailed, trackCommandInvoked, trackCommandSucceeded } from './analytics/track'
 import { addApp } from './app/add'
 import { debugApp } from './app/debug'
 import { deleteApp } from './app/delete'
@@ -1123,11 +1123,11 @@ void (async () => {
       }
       const capturePromise = shouldCapturePosthogException(error)
         ? capturePosthogException({
-            error,
-            functionName: currentCommandPath,
-            kind: 'unhandled_error',
-            status: commanderError.exitCode ?? 1,
-          })
+          error,
+          functionName: currentCommandPath,
+          kind: 'unhandled_error',
+          status: commanderError.exitCode ?? 1,
+        })
         : Promise.resolve(false)
       // For actual errors, show just the message without the full stack trace
       if (commanderError.message) {
