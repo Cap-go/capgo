@@ -1,12 +1,20 @@
 import type { Context } from 'hono'
+import type { CreateBindingParams } from '../../private/role_bindings.ts'
 import type { AuthInfo, MiddlewareKeyVariables } from '../../utils/hono.ts'
 import type { Database } from '../../utils/supabase.types.ts'
+import { sql } from 'drizzle-orm'
+import { createRoleBindingForPrincipal } from '../../private/role_bindings.ts'
 import { honoFactory, parseBody, quickError, simpleError } from '../../utils/hono.ts'
 import { middlewareV2 } from '../../utils/hono_middleware.ts'
+import { cloudlog, cloudlogErr } from '../../utils/logging.ts'
+import { closeClient, getDrizzleClient, getPgClient } from '../../utils/pg.ts'
+import { checkPermission } from '../../utils/rbac.ts'
+import { schema } from '../../utils/postgres_schema.ts'
 import { supabaseAdmin, supabaseWithAuth, validateExpirationAgainstOrgPolicies, validateExpirationDate } from '../../utils/supabase.ts'
 import { apiKeyHasLimitedScope } from './scope.ts'
 
 const app = honoFactory.createApp()
+const APIKEY_ORG_READER_ROLE = 'apikey_org_reader'
 
 // Validate id format to prevent PostgREST filter injection
 // ID must be a valid UUID or numeric string
@@ -21,6 +29,165 @@ interface ApiKeyPut {
   name?: string
   expires_at?: string | null
   regenerate?: boolean
+  bindings?: BindingInput[]
+}
+
+interface BindingInput {
+  role_name: string
+  scope_type: 'org' | 'app' | 'channel'
+  org_id: string
+  app_id?: string | null
+  channel_id?: string | number | null
+  reason?: string
+}
+
+function parseBindingsForUpdate(body: ApiKeyPut, requestId: string): BindingInput[] | undefined {
+  if (body.bindings === undefined) {
+    return undefined
+  }
+
+  if (!Array.isArray(body.bindings)) {
+    throw simpleError('invalid_bindings', 'bindings must be an array', { requestId })
+  }
+
+  if (body.bindings.length === 0) {
+    throw simpleError('bindings_required', 'API key bindings are required', { requestId })
+  }
+
+  for (const binding of body.bindings) {
+    if (!binding || typeof binding !== 'object') {
+      throw simpleError('invalid_bindings', 'Each binding must be an object', { requestId })
+    }
+    if (typeof binding.role_name !== 'string' || !binding.role_name) {
+      throw simpleError('invalid_bindings', 'Each binding must have a role_name', { requestId })
+    }
+    if (!['org', 'app', 'channel'].includes(binding.scope_type)) {
+      throw simpleError('invalid_bindings', 'Each binding must have a valid scope_type (org, app, channel)', { requestId })
+    }
+    if (typeof binding.org_id !== 'string' || !binding.org_id) {
+      throw simpleError('invalid_bindings', 'Each binding must have an org_id', { requestId })
+    }
+  }
+
+  return body.bindings
+}
+
+function enrichApiKeyBindings(bindings: BindingInput[]): Array<BindingInput & { allowSystemRole?: boolean }> {
+  const enrichedBindings: Array<BindingInput & { allowSystemRole?: boolean }> = [...bindings]
+  const orgsWithOrgBinding = new Set(
+    bindings.filter(binding => binding.scope_type === 'org').map(binding => binding.org_id),
+  )
+
+  for (const binding of bindings) {
+    if (binding.scope_type === 'app' && !orgsWithOrgBinding.has(binding.org_id)) {
+      enrichedBindings.push({
+        role_name: APIKEY_ORG_READER_ROLE,
+        scope_type: 'org',
+        org_id: binding.org_id,
+        reason: 'API key app-scope org read compatibility',
+        allowSystemRole: true,
+      })
+      orgsWithOrgBinding.add(binding.org_id)
+    }
+  }
+
+  return enrichedBindings
+}
+
+async function replaceApiKeyBindings(
+  c: Context<MiddlewareKeyVariables>,
+  auth: AuthInfo,
+  apikey: { id: number, rbac_id: string },
+  currentBindingOrgIds: string[],
+  bindings: BindingInput[],
+) {
+  if (auth.authType !== 'jwt' || !auth.userId) {
+    throw quickError(403, 'not_authorized', 'Only user sessions can update API key bindings', { requestId: c.get('requestId') })
+  }
+
+  const affectedOrgIds = [...new Set([
+    ...currentBindingOrgIds,
+    ...bindings.map(binding => binding.org_id),
+  ])]
+
+  for (const orgId of affectedOrgIds) {
+    if (!(await checkPermission(c, 'org.update_user_roles', { orgId }))) {
+      throw quickError(403, 'forbidden_binding', `Forbidden - Admin rights required for org ${orgId}`, { requestId: c.get('requestId'), orgId })
+    }
+  }
+
+  let pgClient: ReturnType<typeof getPgClient> | undefined
+  try {
+    pgClient = getPgClient(c)
+    const drizzle = getDrizzleClient(pgClient)
+    const enrichedBindings = enrichApiKeyBindings(bindings)
+
+    await drizzle.transaction(async (tx) => {
+      await tx
+        .delete(schema.role_bindings)
+        .where(sql`${schema.role_bindings.principal_type} = public.rbac_principal_apikey() AND ${schema.role_bindings.principal_id} = ${apikey.rbac_id}::uuid`)
+
+      for (const binding of enrichedBindings) {
+        const bindingParams: CreateBindingParams = {
+          principal_type: 'apikey',
+          principal_id: apikey.rbac_id,
+          role_name: binding.role_name,
+          scope_type: binding.scope_type,
+          org_id: binding.org_id,
+          app_id: binding.app_id,
+          channel_id: binding.channel_id,
+          reason: binding.reason,
+          allowSystemRole: binding.allowSystemRole === true,
+        }
+
+        const result = await createRoleBindingForPrincipal(
+          tx as unknown as ReturnType<typeof getDrizzleClient>,
+          bindingParams,
+          auth.userId,
+          'jwt',
+          auth.userId,
+        )
+
+        if (!result.ok) {
+          cloudlogErr({
+            requestId: c.get('requestId'),
+            message: 'apikey_binding_update_failed',
+            apikeyId: apikey.id,
+            binding,
+            error: result.error,
+          })
+          throw quickError(result.status, 'binding_failed', result.error, { requestId: c.get('requestId'), apikeyId: apikey.id })
+        }
+      }
+    })
+
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'apikey_bindings_replaced',
+      apikeyId: apikey.id,
+      bindingsCount: enrichedBindings.length,
+    })
+  }
+  catch (error: any) {
+    if (error?.status) {
+      throw error
+    }
+    if (error?.code === '23505') {
+      throw quickError(409, 'duplicate_binding', 'API key already has a role in this family at this scope', { requestId: c.get('requestId'), apikeyId: apikey.id }, error)
+    }
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: 'apikey_bindings_replace_unexpected_error',
+      apikeyId: apikey.id,
+      error,
+    })
+    throw quickError(500, 'binding_update_failed', 'Failed to update role bindings for the API key', { requestId: c.get('requestId'), apikeyId: apikey.id }, error)
+  }
+  finally {
+    if (pgClient) {
+      await closeClient(c, pgClient)
+    }
+  }
 }
 
 async function handlePut(c: Context<MiddlewareKeyVariables>, idParam?: string) {
@@ -35,6 +202,8 @@ async function handlePut(c: Context<MiddlewareKeyVariables>, idParam?: string) {
 
   const body = await parseBody<ApiKeyPut>(c)
   const { id, name, expires_at, regenerate } = body
+  const bindings = parseBindingsForUpdate(body, requestId)
+  const hasBindingUpdates = bindings !== undefined
 
   const resolvedId = typeof idParam === 'string' && idParam.length > 0 ? idParam : (id !== undefined ? String(id) : '')
   if (!resolvedId) {
@@ -70,8 +239,8 @@ async function handlePut(c: Context<MiddlewareKeyVariables>, idParam?: string) {
     throw simpleError('regenerate_must_be_boolean', 'regenerate must be a boolean', { requestId })
   }
 
-  if (!hasUpdates && !regenerate) {
-    throw simpleError('no_valid_fields_provided_for_update', 'No valid fields provided for update. Provide name, expires_at, or regenerate.', { requestId })
+  if (!hasUpdates && !regenerate && !hasBindingUpdates) {
+    throw simpleError('no_valid_fields_provided_for_update', 'No valid fields provided for update. Provide name, expires_at, bindings, or regenerate.', { requestId })
   }
 
   // Use supabaseWithAuth which handles both JWT and API key authentication
@@ -105,7 +274,7 @@ async function handlePut(c: Context<MiddlewareKeyVariables>, idParam?: string) {
   }
 
   // Validate expiration against org policies (only if expiration or scopes are changing)
-  if (expires_at !== undefined) {
+  const currentBindingOrgIds = await (async () => {
     const { data: bindings, error: bindingError } = await policyLookupSupabase
       .from('role_bindings')
       .select('org_id')
@@ -116,8 +285,14 @@ async function handlePut(c: Context<MiddlewareKeyVariables>, idParam?: string) {
       throw quickError(500, 'failed_to_load_apikey_bindings', 'Failed to load API key bindings', { requestId, supabaseError: bindingError })
     }
 
-    const orgsToValidate = [...new Set((bindings || []).map(binding => binding.org_id).filter((orgId): orgId is string => !!orgId))]
-    await validateExpirationAgainstOrgPolicies(orgsToValidate, expires_at, supabase)
+    return [...new Set((bindings || []).map(binding => binding.org_id).filter((orgId): orgId is string => !!orgId))]
+  })()
+
+  if (expires_at !== undefined || hasBindingUpdates) {
+    const orgsToValidate = hasBindingUpdates
+      ? [...new Set(bindings.map(binding => binding.org_id))]
+      : currentBindingOrgIds
+    await validateExpirationAgainstOrgPolicies(orgsToValidate, expires_at !== undefined ? expires_at : existingApikey.expires_at, supabase)
   }
 
   const isHashedKey = existingApikey.key_hash !== null
@@ -136,6 +311,13 @@ async function handlePut(c: Context<MiddlewareKeyVariables>, idParam?: string) {
       throw quickError(500, 'failed_to_update_apikey', 'Failed to update API key', { requestId, supabaseError: updateError })
     }
     updatedApikey = updatedData
+  }
+
+  if (hasBindingUpdates) {
+    await replaceApiKeyBindings(c, auth, {
+      id: existingApikey.id,
+      rbac_id: existingApikey.rbac_id,
+    }, currentBindingOrgIds, bindings)
   }
 
   if (regenerate) {
