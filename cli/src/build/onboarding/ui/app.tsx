@@ -2600,7 +2600,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
               <Newline />
               <FilteredTextInput
                 placeholder="e.g. com.example.myapp"
-                allowedPattern={/[\w.-]/}
+                allowedPattern={/[A-Za-z0-9.-]/}
                 maxLength={155}
                 initialValue={detectedIds.recommended.value}
                 onSubmit={(value) => {
