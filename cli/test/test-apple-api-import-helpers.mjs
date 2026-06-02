@@ -260,4 +260,73 @@ await tAsync('listProfilesForCert handles missing data/included arrays on a page
   }
 })
 
+// ─── SHA1-indexed batch validation (mirrors app.tsx batch path) ──────
+// Verifies the fix for ultrareview issue #6: import-validating-all-certs
+// now does ONE listDistributionCerts({includeContent:true}) fetch and
+// indexes by SHA1 instead of N parallel findCertBySha1 calls. These tests
+// pin the contract that map indexing is a faithful drop-in for the old
+// fan-out — same lookup result for known SHA1s, undefined for unknowns,
+// and case-insensitive matching against Keychain's uppercase hex output.
+
+t('SHA1 map indexing finds a cert by its content hash', () => {
+  const derA = Buffer.from('cert-A-der-bytes')
+  const derB = Buffer.from('cert-B-der-bytes')
+  const certs = [
+    { id: 'id-A', name: 'A', certificateContent: derA.toString('base64') },
+    { id: 'id-B', name: 'B', certificateContent: derB.toString('base64') },
+  ]
+  const bySha1 = new Map()
+  for (const cert of certs) {
+    if (!cert.certificateContent)
+      continue
+    bySha1.set(computeCertSha1(cert.certificateContent), cert)
+  }
+  const sha1A = createHash('sha1').update(derA).digest('hex').toLowerCase()
+  const sha1B = createHash('sha1').update(derB).digest('hex').toLowerCase()
+  assert.equal(bySha1.get(sha1A)?.id, 'id-A')
+  assert.equal(bySha1.get(sha1B)?.id, 'id-B')
+})
+
+t('SHA1 map indexing returns undefined for an unknown identity', () => {
+  const der = Buffer.from('only-cert')
+  const bySha1 = new Map()
+  bySha1.set(computeCertSha1(der.toString('base64')), { id: 'id-only' })
+  // Identity whose SHA1 has no Apple-side match — the batch path treats this
+  // as cert=null and lets classifyCertAvailability render the 'not-visible'
+  // branch instead of throwing.
+  const stranger = createHash('sha1').update(Buffer.from('stranger')).digest('hex').toLowerCase()
+  assert.equal(bySha1.get(stranger), undefined)
+})
+
+t('SHA1 map lookup is case-insensitive when identities lowercase before lookup', () => {
+  const der = Buffer.from('mixed-case-cert')
+  const key = computeCertSha1(der.toString('base64'))
+  const bySha1 = new Map()
+  bySha1.set(key, { id: 'id-mixed' })
+  // macOS `security find-identity` returns uppercase hex; the batch path
+  // .toLowerCase()s before lookup to match computeCertSha1's lowercase output.
+  const fromKeychain = key.toUpperCase()
+  assert.equal(bySha1.get(fromKeychain.toLowerCase())?.id, 'id-mixed')
+})
+
+t('SHA1 map indexing skips certs missing certificateContent', () => {
+  // Defensive: listDistributionCerts({includeContent:true}) normally returns
+  // content for every cert, but Apple has been known to omit fields for
+  // certain cert types. The batch path's `if (!cert.certificateContent)
+  // continue` guard prevents a TypeError when hashing.
+  const der = Buffer.from('has-content')
+  const certs = [
+    { id: 'id-with', certificateContent: der.toString('base64') },
+    { id: 'id-without' }, // no certificateContent
+  ]
+  const bySha1 = new Map()
+  for (const cert of certs) {
+    if (!cert.certificateContent)
+      continue
+    bySha1.set(computeCertSha1(cert.certificateContent), cert)
+  }
+  assert.equal(bySha1.size, 1)
+  assert.equal(bySha1.get(computeCertSha1(der.toString('base64')))?.id, 'id-with')
+})
+
 process.stdout.write('OK\n')

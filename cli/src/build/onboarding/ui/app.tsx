@@ -32,7 +32,7 @@ import { isAiAnalysisTooTall, resolveAiResultRoute } from '../ai-fit.js'
 // suggestion doesn't actually fix the failure mode while still giving the user
 // a couple of in-wizard chances to iterate.
 const MAX_AI_RETRIES = 2
-import { CertificateLimitError, classifyCertAvailability, createCertificate, createProfile, deleteProfile, DuplicateProfileError, ensureBundleId, findCertBySha1, findCertIdBySha1, generateJwt, listProfilesForCert, revokeCertificate, verifyApiKey } from '../apple-api.js'
+import { CertificateLimitError, classifyCertAvailability, computeCertSha1, createCertificate, createProfile, deleteProfile, DuplicateProfileError, ensureBundleId, findCertIdBySha1, generateJwt, listDistributionCerts, listProfilesForCert, revokeCertificate, verifyApiKey } from '../apple-api.js'
 import { createP12, DEFAULT_P12_PASSWORD, generateCsr } from '../csr.js'
 import { mapIosOnboardingError } from '../error-categories.js'
 import { canUseFilePicker, openFilePicker, openMobileprovisionPicker } from '../file-picker.js'
@@ -1074,25 +1074,36 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
       ;(async () => {
         try {
           const token = await getFreshToken()
-          // Lookups in parallel — N typically 1-3, max ~10 even for big
-          // teams. Each lookup fails independently — a network blip on one
-          // identity shouldn't disqualify all certs.
+          // Single team-wide cert fetch + SHA1 index. Previously this was a
+          // Promise.all(findCertBySha1) fan-out: each lookup internally
+          // refetched the entire /certificates list, so N identities meant
+          // N identical downloads + N×M SHA1 hashes and N concurrent hits
+          // against Apple's rate limiter. Indexing once by SHA1 turns that
+          // into one download + M hashes + N O(1) map lookups.
           //
-          // Uses findCertBySha1 (not findCertIdBySha1) so we capture the
-          // full Apple-side record — name, expirationDate, serialNumber —
-          // which the manual-portal walkthrough surfaces as disambiguators
-          // when multiple distribution certs are listed for the same team.
-          const results = await Promise.all(importMatches.map(async (m) => {
-            try {
-              const cert = await findCertBySha1(token, m.identity.sha1)
-              return { sha1: m.identity.sha1, cert, error: null as unknown }
-            }
-            catch (err) {
-              return { sha1: m.identity.sha1, cert: null, error: err }
-            }
-          }))
+          // includeContent:true so we still get the cert DER needed to
+          // compute the SHA1 key; the AscDistributionCert record we store
+          // in the map is the same shape findCertBySha1 used to return —
+          // name, expirationDate, serialNumber — so the manual-portal
+          // walkthrough disambiguators remain available downstream.
+          //
+          // One try/catch around the single fetch: either the cert list
+          // lands or it doesn't. The previous per-identity error capture
+          // is now redundant because a single network blip uniformly
+          // affects all lookups in this batch.
+          const allCerts = await listDistributionCerts(token, { includeContent: true })
           if (cancelled)
             return
+          const bySha1 = new Map<string, typeof allCerts[number]>()
+          for (const cert of allCerts) {
+            if (!cert.certificateContent)
+              continue
+            bySha1.set(computeCertSha1(cert.certificateContent), cert)
+          }
+          const results = importMatches.map((m) => {
+            const cert = bySha1.get(m.identity.sha1.toLowerCase()) ?? null
+            return { sha1: m.identity.sha1, cert, error: null as unknown }
+          })
           const map: Record<string, EnrichedIdentityAvailability> = {}
           let availableCount = 0
           for (const r of results) {
@@ -1559,10 +1570,10 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
             // mismatch.
             //
             // Eager batch validation runs BEFORE the picker renders when
-            // there's at least one match — fans out findCertBySha1 across
-            // every identity so the picker can split them into Available /
-            // Unavailable tables with concrete reasons rather than a flat
-            // list with surprises on pick.
+            // there's at least one match — runs a single ASC cert fetch and
+            // indexes by SHA1 so the picker can split identities into
+            // Available / Unavailable tables with concrete reasons rather
+            // than a flat list with surprises on pick.
             setStep(redirectIfMismatch(importMatches.length > 0 ? 'import-validating-all-certs' : 'import-pick-identity'))
           }
           else {
