@@ -849,6 +849,24 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
     setImportDistribution(null)
     setImportedP12Password('')
     setPendingRecoveryAction(null)
+    // ASC API key inputs (state + their refs). Without this a Restart
+    // that follows a partial .p8 flow would carry the previous run's
+    // p8 path / Key ID / Issuer ID into the next pass. The state
+    // setters trigger the existing useEffect([state]) sync to the
+    // refs on the next render — but resetForFreshStart is called
+    // immediately before setStep('welcome') which fires the React
+    // render that triggers them. We also set the refs directly here
+    // so any sync code between this call and the next render (e.g.
+    // a subsequent setStep on an alternate restart path) sees clean
+    // values rather than stale.
+    setP8Path('')
+    setP8Content('')  // wrapper updates p8ContentRef too
+    setKeyId('')
+    setIssuerId('')
+    setTeamId('')
+    p8PathRef.current = ''
+    keyIdRef.current = ''
+    issuerIdRef.current = ''
     // Eager per-identity Apple-side availability cache. The previous restart
     // handler missed this — after restart the picker would still see the prior
     // run's per-cert reasons. Reset so the next batch validation starts clean.
@@ -1862,7 +1880,19 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
             setStep(redirectIfMismatch(importMatches.length > 0 ? 'import-validating-all-certs' : 'import-pick-identity'))
           }
           else {
-            setStep('creating-certificate')
+            // Create-new path: gate cert/profile creation on the iOS bundle
+            // id confirmation just like the import path two lines above.
+            // Without redirectIfMismatch here, a user whose project.pbxproj
+            // disagrees with config.appId would never see the confirm-app-id
+            // question on the create-new flow — and the downstream
+            // `creating-profile` would call `ensureBundleId(token, iosBundleId)`
+            // + `createProfile(token, …, iosBundleId)` with the un-confirmed
+            // default (= config.appId), registering a profile under the wrong
+            // bundle id on Apple's side. Certs themselves are team-wide so
+            // the gate placement at 'creating-certificate' is fine — when
+            // the user picks at confirm-app-id, the wizard resumes at this
+            // exact target step with the chosen iosBundleId in scope.
+            setStep(redirectIfMismatch('creating-certificate'))
           }
         }
         catch (err) {
