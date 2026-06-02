@@ -109,6 +109,7 @@ import {
   ImportPickProfileStep,
   ImportScanningStep,
 } from './steps/ios-import.js'
+import type { NoMatchReason } from './steps/ios-import.js'
 import {
   AddingPlatformStep,
   AiAnalysisPromptStep,
@@ -644,6 +645,17 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
   // The 'fetching-profile' variant was removed alongside the Rescan
   // recovery option (commit 36a7c282) — the file picker covers that path.
   const [pendingRecoveryAction, setPendingRecoveryAction] = useState<'create-profile-only' | null>(null)
+  // Why the wizard ended up at `import-no-match-recovery`. Set right before
+  // each setStep call that routes there so the step can render an Alert
+  // sentence that names the actual cause (Apple-no-cert, bundle mismatch,
+  // distribution mismatch, …) instead of the legacy "no profile on disk"
+  // wording that contradicted the yellow log line for the Apple-side
+  // routes. Back-nav into the recovery menu (file picker cancel, "open
+  // portal anyway", explainer back) intentionally does NOT overwrite this
+  // — the user is bouncing through, not changing the underlying cause.
+  // `null` falls back to the legacy wording so the back-compat default
+  // matches every untracked call site.
+  const [noMatchReason, setNoMatchReason] = useState<NoMatchReason | null>(null)
   // Guard against re-opening the native picker on every re-render. Reset
   // whenever we leave the import-provide-profile-path step.
   const mobileprovisionPickerOpenedRef = useRef(false)
@@ -900,6 +912,10 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
     setAppIdConfirmed(false)
     setPendingAppIdNext(null)
     setConfirmAppIdTyping(false)
+    // No-match recovery context — without this a restart would carry the
+    // previous run's reason into the next pass and surface the wrong
+    // bundle/distribution/profile-source wording in the recovery alert.
+    setNoMatchReason(null)
     // After a Restart, if the user re-enters the import flow and picks
     // Ad Hoc again, they should see the support hint fresh — otherwise
     // the previous session's emission would mute a hint that's now
@@ -1464,6 +1480,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
               'yellow',
             )
             setAppleCertIdForChosen(null)
+            setNoMatchReason('apple-no-cert-match')
             setStep('import-no-match-recovery')
             return
           }
@@ -1478,6 +1495,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
             return
           if (profiles.length === 0) {
             addLog('ℹ️  Apple has the cert but no profiles linked to it yet — use "Create a new App Store profile" to add one.', 'yellow')
+            setNoMatchReason('apple-no-profiles-linked')
             setStep('import-no-match-recovery')
             return
           }
@@ -1510,6 +1528,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
               // also stands alone better than nested parenthetical metadata.
               addLog(`⚠ Apple returned ${profiles.length} profile${profiles.length === 1 ? '' : 's'} for this cert but none target "${iosBundleId}".`, 'yellow')
               addLog(`  Apple linked them to: ${otherBundleIds.join(', ')}. Use "Create a new App Store profile" to add one for "${iosBundleId}".`, 'yellow')
+              setNoMatchReason('apple-bundle-mismatch')
             }
             else if (sameBundleWrongDist.length > 0) {
               // Bundle matches but distribution mode does not — surface the actual mismatch
@@ -1518,9 +1537,11 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
               const foundDist = Array.from(new Set(sameBundleWrongDist.map(p => p.profileType))).join(', ')
               addLog(`⚠ Apple has ${sameBundleWrongDist.length} profile${sameBundleWrongDist.length === 1 ? '' : 's'} for "${iosBundleId}" but none are ${importDistribution} (found: ${foundDist}).`, 'yellow')
               addLog(`  Re-run with the matching distribution, or use "Create a new App Store profile" to add one.`, 'yellow')
+              setNoMatchReason('apple-distribution-mismatch')
             }
             else {
               addLog(`⚠ Apple returned ${profiles.length} profile${profiles.length === 1 ? '' : 's'} for this cert but none match this app.`, 'yellow')
+              setNoMatchReason('apple-other')
             }
             setStep('import-no-match-recovery')
             return
@@ -3221,6 +3242,8 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
             return
           }
           const apiKeyAvailable = !!(p8ContentRef.current || (await loadProgress(appId))?.completedSteps?.apiKeyVerified)
+          if (!apiKeyAvailable)
+            setNoMatchReason('no-profile-on-disk')
           setStep(apiKeyAvailable ? 'import-checking-apple-cert' : 'import-no-match-recovery')
         }
 
@@ -3458,6 +3481,9 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
         const canCreateProfile = importDistribution !== 'ad_hoc'
         return (
           <ImportNoMatchRecoveryStep
+            reason={noMatchReason ?? 'apple-other'}
+            appId={iosBundleId}
+            importDistribution={importDistribution}
             identityName={chosenIdentity.name}
             dense={dense}
             options={[
