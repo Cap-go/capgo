@@ -640,7 +640,7 @@ describe('x-limited-key-id subkeys enforce organization scope on middlewareKey r
 })
 
 describe('API key organization creation', () => {
-  it('allows a key with org.create to create an organization and auto-binds that key', async () => {
+  it.concurrent('allows a key with org.create to create an organization and auto-binds that key', async () => {
     const createKeyValue = randomUUID()
     const createKey = await createDirectApiKeyWithBindings({
       userId: USER_ID,

@@ -132,6 +132,92 @@ async function ensureApiKeyCanCreateOrganization(c: Context<MiddlewareKeyVariabl
   }
 }
 
+async function insertOrgForApiKey(
+  c: Context<MiddlewareKeyVariables>,
+  auth: AuthInfo,
+  org: {
+    id: string
+    name: string
+    created_by: string
+    management_email: string
+    customer_id: string
+    website: string | null
+  },
+) {
+  const apikeyRbacId = auth.apikey?.rbac_id
+  if (!apikeyRbacId) {
+    throw quickError(401, 'invalid_apikey', 'Invalid apikey')
+  }
+
+  // API-key Supabase clients run as anon, so this checked endpoint owns the write path instead of reopening direct anon RLS inserts.
+  let pgClient
+  try {
+    pgClient = getPgClient(c)
+    await pgClient.query('BEGIN')
+
+    const roleResult = await pgClient.query<{ id: string }>(
+      'SELECT id FROM public.roles WHERE name = public.rbac_role_org_super_admin() AND scope_type = public.rbac_scope_org() LIMIT 1',
+    )
+    const orgSuperAdminRoleId = roleResult.rows[0]?.id
+    if (!orgSuperAdminRoleId) {
+      throw simpleError('cannot_create_org', 'Cannot create org', { error: 'missing_org_super_admin_role' })
+    }
+
+    await pgClient.query(
+      `INSERT INTO public.orgs (
+         id,
+         name,
+         created_by,
+         management_email,
+         customer_id,
+         website
+       )
+       VALUES ($1::uuid, $2::varchar, $3::uuid, $4::varchar, $5::varchar, $6::varchar)`,
+      [org.id, org.name, org.created_by, org.management_email, org.customer_id, org.website],
+    )
+
+    await pgClient.query(
+      `INSERT INTO public.role_bindings (
+         principal_type,
+         principal_id,
+         role_id,
+         scope_type,
+         org_id,
+         granted_by,
+         granted_at,
+         reason,
+         is_direct
+       )
+       VALUES (
+         public.rbac_principal_apikey(),
+         $1::uuid,
+         $2::uuid,
+         public.rbac_scope_org(),
+         $3::uuid,
+         $4::uuid,
+         now(),
+         'Auto-granted to API key on org creation',
+         true
+       )
+       ON CONFLICT DO NOTHING`,
+      [apikeyRbacId, orgSuperAdminRoleId, org.id, auth.userId],
+    )
+
+    await pgClient.query('COMMIT')
+  }
+  catch (error) {
+    if (pgClient) {
+      await pgClient.query('ROLLBACK')
+    }
+    throw error
+  }
+  finally {
+    if (pgClient) {
+      closeClient(c, pgClient)
+    }
+  }
+}
+
 export async function post(
   c: Context<MiddlewareKeyVariables>,
   bodyRaw: any,
@@ -152,7 +238,6 @@ export async function post(
 
   await ensureApiKeyCanCreateOrganization(c, auth)
   const ownerEmail = await getOwnerEmail(c, auth)
-  const supabase = supabaseWithAuth(c, auth)
   const orgId = crypto.randomUUID()
   const pendingCustomerId = await createPendingStripeInfo(c, orgId, estimatedMau)
   const newOrg = {
@@ -163,17 +248,28 @@ export async function post(
     customer_id: pendingCustomerId,
     website,
   }
-  const { error: errorOrg } = await supabase
-    .from('orgs')
-    .insert(newOrg)
 
-  if (errorOrg) {
+  try {
+    if (auth.authType === 'apikey') {
+      await insertOrgForApiKey(c, auth, newOrg)
+    }
+    else {
+      const { error: errorOrg } = await supabaseWithAuth(c, auth)
+        .from('orgs')
+        .insert(newOrg)
+
+      if (errorOrg) {
+        throw simpleError('cannot_create_org', 'Cannot create org', { error: errorOrg.message })
+      }
+    }
+  }
+  catch (error) {
     await supabaseAdmin(c)
       .from('stripe_info')
       .delete()
       .eq('customer_id', pendingCustomerId)
 
-    throw simpleError('cannot_create_org', 'Cannot create org', { error: errorOrg?.message })
+    throw error
   }
 
   return c.json({ id: orgId })

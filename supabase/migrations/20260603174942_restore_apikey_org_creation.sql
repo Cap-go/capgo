@@ -66,7 +66,7 @@ TO anon, authenticated
 USING (false);
 
 COMMENT ON TABLE public.apikey_global_permissions IS
-  'Global permissions for API keys where no org/app/channel target exists yet. Currently used to grandfather org creation for existing keys without granting it to future keys by default.';
+  'Global permissions for API keys where no org/app/channel target exists yet. Currently used to grandfather org creation for existing write-capable keys without granting it to future keys by default.';
 
 INSERT INTO public.apikey_global_permissions (
   apikey_rbac_id,
@@ -78,8 +78,25 @@ SELECT
   apikeys.rbac_id,
   public.rbac_perm_org_create(),
   apikeys.user_id,
-  'Backfilled for API keys that existed before org.create became explicit'
+  'Backfilled for write-capable API keys that existed before org.create became explicit'
 FROM public.apikeys
+WHERE EXISTS (
+  SELECT 1
+  FROM public.role_bindings
+  JOIN public.roles ON public.roles.id = public.role_bindings.role_id
+  WHERE public.role_bindings.principal_type = public.rbac_principal_apikey()
+    AND public.role_bindings.principal_id = apikeys.rbac_id
+    AND public.role_bindings.scope_type IN (
+      public.rbac_scope_org(),
+      public.rbac_scope_app()
+    )
+    AND public.roles.name IN (
+      public.rbac_role_org_super_admin(),
+      public.rbac_role_org_admin(),
+      public.rbac_role_app_admin(),
+      public.rbac_role_app_developer()
+    )
+)
 ON CONFLICT (apikey_rbac_id, permission_key) DO NOTHING;
 
 CREATE OR REPLACE FUNCTION public.apikey_has_global_permission(
@@ -269,7 +286,7 @@ DROP POLICY IF EXISTS "Allow insert org for user" ON public.orgs;
 CREATE POLICY "Allow insert org for user or apikey with org.create"
 ON public.orgs
 FOR INSERT
-TO anon, authenticated
+TO authenticated
 WITH CHECK (
   created_by = (SELECT public.get_identity_for_apikey_creation())
 );
