@@ -1847,6 +1847,7 @@ export type Database = {
           management_email: string
           max_apikey_expiration_days: number | null
           name: string
+          onboarding_intent: string
           password_policy_config: Json | null
           require_apikey_expiration: boolean
           required_encryption_key: string | null
@@ -1871,6 +1872,7 @@ export type Database = {
           management_email: string
           max_apikey_expiration_days?: number | null
           name: string
+          onboarding_intent?: string
           password_policy_config?: Json | null
           require_apikey_expiration?: boolean
           required_encryption_key?: string | null
@@ -1895,6 +1897,7 @@ export type Database = {
           management_email?: string
           max_apikey_expiration_days?: number | null
           name?: string
+          onboarding_intent?: string
           password_policy_config?: Json | null
           require_apikey_expiration?: boolean
           required_encryption_key?: string | null

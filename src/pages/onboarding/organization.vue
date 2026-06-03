@@ -80,24 +80,16 @@ const isAdditionalOrgFlow = ref(false)
 const estimatedUsersIndex = ref<number | null>(null)
 const config = getLocalConfig()
 
-// One-time, per-user onboarding intent. Stored in auth.users metadata
-// (no public.users column / migration) and mirrored to PostHog for segmentation.
+// Org-level onboarding intent: what the user wants to do with Capgo first.
+// Persisted on the new org (orgs.onboarding_intent) by the organization edge
+// function, and mirrored to PostHog for segmentation. Asked once per org.
 const selectedIntent = ref<string | null>(null)
-const intentJustAnswered = ref(false)
 const intentOptions = [
   { value: 'ota', icon: IconRefresh },
   { value: 'builder', icon: IconSmartphone },
   { value: 'both', icon: IconLayers },
   { value: 'exploring', icon: IconCompass },
 ] as const
-// Ask only when the user has never answered. Skips returning users and the
-// additional-org flow (their metadata is already set), so it shows once.
-const shouldAskIntent = computed(() => {
-  if (intentJustAnswered.value)
-    return false
-  const stored = main.auth?.user_metadata?.onboarding_intent
-  return typeof stored !== 'string' || stored.length === 0
-})
 
 const fallbackUserCountStops: UserCountStop[] = [
   { value: 2000, label: '2K', planName: 'Solo' },
@@ -150,24 +142,6 @@ const selectedUserCountStop = computed<UserCountStop | null>(() => {
   return userCountStops.value[Math.min(estimatedUsersIndex.value, userCountStops.value.length - 1)] ?? null
 })
 
-async function persistOnboardingIntent(intent: string) {
-  intentJustAnswered.value = true
-  try {
-    await supabase.auth.updateUser({ data: { onboarding_intent: intent } })
-  }
-  catch (error) {
-    console.error('Failed to persist onboarding intent', error)
-  }
-  try {
-    pushEvent('onboarding_intent_selected', config.supaHost, {
-      intent,
-      estimated_mau: selectedUserCountStop.value?.value ?? null,
-    })
-  }
-  catch (error) {
-    console.error('Failed to track onboarding intent', error)
-  }
-}
 const currentStepIndex = computed(() => onboardingSteps.findIndex(entry => entry.id === step.value) + 1)
 const stepProgress = computed(() => `${((currentStepIndex.value - 1) / Math.max(onboardingSteps.length - 1, 1)) * 100}%`)
 
@@ -415,7 +389,7 @@ async function createOrganization() {
     return
   }
 
-  if (shouldAskIntent.value && !selectedIntent.value) {
+  if (!selectedIntent.value) {
     toast.error(t('organization-onboarding-intent-required'))
     return
   }
@@ -434,6 +408,7 @@ async function createOrganization() {
         email: main.auth.email ?? '',
         estimatedMau: selectedUserCountStop.value.value,
         website: normalizedWebsite,
+        intent: selectedIntent.value,
       },
     })
 
@@ -448,8 +423,16 @@ async function createOrganization() {
     createdOrgId.value = data.id
     toast.success(t('org-created-successfully'))
 
-    if (shouldAskIntent.value && selectedIntent.value)
-      await persistOnboardingIntent(selectedIntent.value)
+    try {
+      pushEvent('onboarding_intent_selected', config.supaHost, {
+        intent: selectedIntent.value,
+        estimated_mau: selectedUserCountStop.value?.value ?? null,
+        org_id: data.id,
+      })
+    }
+    catch (error) {
+      console.error('Failed to track onboarding intent', error)
+    }
 
     try {
       await organizationStore.fetchOrganizations()
@@ -721,7 +704,7 @@ onUnmounted(() => {
             </div>
           </div>
 
-          <div v-if="step === 'details' && shouldAskIntent" class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-white/15 dark:bg-slate-900/95 dark:shadow-2xl dark:shadow-black/30">
+          <div v-if="step === 'details'" class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-white/15 dark:bg-slate-900/95 dark:shadow-2xl dark:shadow-black/30">
             <div class="space-y-4">
               <div>
                 <p class="text-sm font-semibold text-primary-500 dark:text-slate-300">
@@ -761,7 +744,7 @@ onUnmounted(() => {
             </div>
           </div>
 
-          <div v-if="step === 'details' && (!shouldAskIntent || !!selectedIntent)" class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-white/15 dark:bg-slate-900/95 dark:shadow-2xl dark:shadow-black/30">
+          <div v-if="step === 'details' && !!selectedIntent" class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-white/15 dark:bg-slate-900/95 dark:shadow-2xl dark:shadow-black/30">
             <div class="space-y-4">
               <div>
                 <p class="text-sm font-semibold text-primary-500 dark:text-slate-300">

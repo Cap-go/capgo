@@ -25,6 +25,7 @@ const bodySchema = type({
   'email?': 'string.email',
   'estimatedMau?': estimatedMauSchema,
   'website?': 'string',
+  'intent?': "'ota' | 'builder' | 'both' | 'exploring' | 'unknown'",
 })
 
 async function getInitialPlanForMau(c: Context<MiddlewareKeyVariables>, estimatedMau: number) {
@@ -102,6 +103,7 @@ export async function post(
     management_email: body.email ?? self.email ?? '',
     customer_id: pendingCustomerId,
     website,
+    onboarding_intent: body.intent ?? 'unknown',
   }
   const { error: errorOrg } = await supabase
     .from('orgs')
