@@ -52,6 +52,9 @@ function createWriteBuilder(error?: Error | null) {
     data: null,
     error: error ?? null,
     status: error ? 500 : 200,
+    delete: vi.fn().mockReturnThis(),
+    gte: vi.fn().mockReturnThis(),
+    lt: vi.fn().mockReturnThis(),
     upsert: vi.fn().mockReturnThis(),
     update: vi.fn().mockReturnThis(),
     eq: vi.fn().mockReturnThis(),
@@ -131,6 +134,9 @@ function createSupabaseStub(options?: {
   const pendingAppsQuery = vi.fn().mockResolvedValue({
     rows: [{ has_pending: hasPendingRefresh(pendingAppRows) }],
   })
+  const versionMetaQuery = vi.fn().mockResolvedValue({
+    rows: [],
+  })
   const orgSelectBuilder = createSingleBuilder({
     data: {
       customer_id: options?.customerId ?? 'cus_test',
@@ -143,6 +149,7 @@ function createSupabaseStub(options?: {
   const dailyBandwidthBuilder = createWriteBuilder()
   const dailyStorageBuilder = createWriteBuilder()
   const dailyVersionBuilder = createWriteBuilder()
+  const storageHourlyBuilder = createWriteBuilder()
   const cycleInfoBuilder = createRpcSingleBuilder({
     data: {
       subscription_anchor_start: '2026-04-01T00:00:00.000Z',
@@ -162,7 +169,11 @@ function createSupabaseStub(options?: {
     status: options?.queueStatus ?? (options?.queueError ? 500 : 200),
   })
   const pgClient = {
-    query: pendingAppsQuery,
+    query: vi.fn((sql: string, args?: unknown[]) => {
+      if (sql.includes('FROM public.version_meta'))
+        return versionMetaQuery(sql, args)
+      return pendingAppsQuery(sql, args)
+    }),
   }
   const orgBuilder = {
     select: vi.fn().mockReturnValue(orgSelectBuilder),
@@ -187,6 +198,8 @@ function createSupabaseStub(options?: {
           return dailyStorageBuilder
         case 'daily_version':
           return dailyVersionBuilder
+        case 'daily_storage_hourly':
+          return storageHourlyBuilder
         case 'orgs':
           return orgBuilder
         default:
@@ -221,6 +234,8 @@ function createSupabaseStub(options?: {
       orgUpdateBuilder,
       pendingAppsQuery,
       queueBuilder,
+      storageHourlyBuilder,
+      versionMetaQuery,
     },
   }
 }

@@ -18,7 +18,7 @@ const supabase = useSupabase()
 const { t } = useI18n()
 const displayStore = useDisplayStore()
 type AppRow = Database['public']['Tables']['apps']['Row']
-type AppRowWithIconState = AppRow & { icon_url_loading?: boolean }
+type AppRowWithIconState = AppRow & { icon_url_loading?: boolean, last_upload_at?: string | null }
 const apps = ref<AppRowWithIconState[]>([])
 const currentPage = ref(1)
 const pageSize = 10
@@ -107,37 +107,40 @@ async function getMyApps() {
 
     const offset = (currentPage.value - 1) * pageSize
 
-    // Build base query
-    let countQuery = supabase
-      .from('apps')
-      .select('*', { count: 'exact', head: true })
-      .eq('owner_org', currentGid)
+    // Fetch the page via an RPC that derives each app's real last-upload time
+    // (created_at of the bundle matching apps.last_version) and performs search,
+    // ordering, pagination and the total count in SQL. This keeps the page order
+    // consistent with the displayed "Last upload" sort, which apps.updated_at
+    // (bumped by unrelated edits and background/cron jobs) cannot guarantee.
+    const { data, error } = await supabase.rpc('get_org_apps_with_last_upload', {
+      p_org_id: currentGid,
+      p_search: searchQuery.value ? searchQuery.value.trim() : undefined,
+      p_sort_by: 'last_upload_at',
+      p_sort_desc: true,
+      p_limit: pageSize,
+      p_offset: offset,
+    })
 
-    let dataQuery = supabase
-      .from('apps')
-      .select()
-      .eq('owner_org', currentGid)
+    if (appIconLoadRun !== currentRun)
+      return
 
-    // Apply search filters if search query exists
-    if (searchQuery.value) {
-      const search = searchQuery.value.trim()
-      // Search by name (case-insensitive) or app_id (exact match)
-      countQuery = countQuery.or(`name.ilike.%${search}%,app_id.ilike.%${search}%`)
-      dataQuery = dataQuery.or(`name.ilike.%${search}%,app_id.ilike.%${search}%`)
+    if (error) {
+      console.error('Cannot fetch apps', error)
+      apps.value = []
+      totalApps.value = 0
+      return
     }
 
-    // Get total count with filters
-    const { count } = await countQuery
-    totalApps.value = count || 0
+    const rows = data ?? []
+    totalApps.value = rows[0]?.total_count ?? 0
 
-    // Get paginated data with filters
-    const { data } = await dataQuery
-      .range(offset, offset + pageSize - 1)
-      .order('updated_at', { ascending: false })
-
-    apps.value = data?.map(appWithImmediateIcon) ?? []
-    if (data?.length)
-      loadAppIcons(data, currentRun)
+    // appWithImmediateIcon spreads the whole RPC row, so last_upload_at is carried
+    // through as-is. Avoid re-building the object inline (e.g. { ...appWithImmediateIcon(app),
+    // last_upload_at } ) here: spreading into the AppRowWithIconState intersection makes
+    // vue-tsc hit TS2589 (excessively deep type instantiation).
+    apps.value = rows.map(appWithImmediateIcon)
+    if (rows.length)
+      loadAppIcons(rows, currentRun)
   }
   finally {
     isTableLoading.value = false

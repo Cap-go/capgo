@@ -5867,6 +5867,75 @@ $$;
 ALTER FUNCTION "public"."get_org_apikeys"("p_org_id" "uuid") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."get_org_apps_with_last_upload"("p_org_id" "uuid", "p_search" "text" DEFAULT NULL::"text", "p_sort_by" "text" DEFAULT 'last_upload_at'::"text", "p_sort_desc" boolean DEFAULT true, "p_limit" integer DEFAULT 10, "p_offset" integer DEFAULT 0) RETURNS TABLE("created_at" timestamp with time zone, "app_id" character varying, "icon_url" character varying, "user_id" "uuid", "name" character varying, "last_version" character varying, "updated_at" timestamp with time zone, "id" "uuid", "retention" bigint, "owner_org" "uuid", "default_upload_channel" character varying, "transfer_history" "jsonb"[], "channel_device_count" bigint, "manifest_bundle_count" bigint, "expose_metadata" boolean, "allow_preview" boolean, "allow_device_custom_id" boolean, "need_onboarding" boolean, "existing_app" boolean, "ios_store_url" "text", "android_store_url" "text", "stats_updated_at" timestamp without time zone, "stats_refresh_requested_at" timestamp without time zone, "build_timeout_seconds" bigint, "build_timeout_updated_at" timestamp with time zone, "last_upload_at" timestamp with time zone, "total_count" bigint)
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+DECLARE
+    v_limit integer := LEAST(GREATEST(COALESCE(p_limit, 10), 1), 100);
+    v_offset integer := GREATEST(COALESCE(p_offset, 0), 0);
+    v_search text := NULLIF(btrim(COALESCE(p_search, '')), '');
+    -- Whitelist sort keys to avoid dynamic-SQL injection via p_sort_by.
+    v_sort text := CASE
+        WHEN p_sort_by IN ('name', 'last_version', 'updated_at', 'created_at', 'last_upload_at')
+            THEN p_sort_by
+        ELSE 'last_upload_at'
+    END;
+    v_desc boolean := COALESCE(p_sort_desc, true);
+BEGIN
+    RETURN QUERY
+    WITH scoped AS (
+        SELECT
+            a.*,
+            lv.created_at AS last_upload_at
+        FROM public.apps a
+        LEFT JOIN LATERAL (
+            SELECT av.created_at
+            FROM public.app_versions av
+            WHERE av.app_id = a.app_id
+              AND av.name = a.last_version
+              AND av.deleted = false
+            ORDER BY av.created_at DESC
+            LIMIT 1
+        ) lv ON a.last_version IS NOT NULL
+        WHERE a.owner_org = p_org_id
+          AND (
+            v_search IS NULL
+            OR a.name ILIKE '%' || v_search || '%'
+            OR a.app_id ILIKE '%' || v_search || '%'
+          )
+    )
+    SELECT
+        s.*,
+        COUNT(*) OVER () AS total_count
+    FROM scoped s
+    ORDER BY
+        -- NULLS LAST in both directions so apps without uploads sort to the bottom.
+        CASE WHEN v_sort = 'last_upload_at' AND v_desc THEN s.last_upload_at END DESC NULLS LAST,
+        CASE WHEN v_sort = 'last_upload_at' AND NOT v_desc THEN s.last_upload_at END ASC NULLS LAST,
+        CASE WHEN v_sort = 'updated_at' AND v_desc THEN s.updated_at END DESC NULLS LAST,
+        CASE WHEN v_sort = 'updated_at' AND NOT v_desc THEN s.updated_at END ASC NULLS LAST,
+        CASE WHEN v_sort = 'created_at' AND v_desc THEN s.created_at END DESC NULLS LAST,
+        CASE WHEN v_sort = 'created_at' AND NOT v_desc THEN s.created_at END ASC NULLS LAST,
+        CASE WHEN v_sort = 'name' AND v_desc THEN s.name END DESC NULLS LAST,
+        CASE WHEN v_sort = 'name' AND NOT v_desc THEN s.name END ASC NULLS LAST,
+        CASE WHEN v_sort = 'last_version' AND v_desc THEN s.last_version END DESC NULLS LAST,
+        CASE WHEN v_sort = 'last_version' AND NOT v_desc THEN s.last_version END ASC NULLS LAST,
+        -- Stable tiebreaker so pagination is deterministic across pages.
+        s.app_id ASC
+    LIMIT v_limit
+    OFFSET v_offset;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."get_org_apps_with_last_upload"("p_org_id" "uuid", "p_search" "text", "p_sort_by" "text", "p_sort_desc" boolean, "p_limit" integer, "p_offset" integer) OWNER TO "postgres";
+
+
+COMMENT ON FUNCTION "public"."get_org_apps_with_last_upload"("p_org_id" "uuid", "p_search" "text", "p_sort_by" "text", "p_sort_desc" boolean, "p_limit" integer, "p_offset" integer) IS 'Paginated apps for one org with a derived last_upload_at (created_at of the bundle matching apps.last_version). Returns the full apps row plus last_upload_at and total_count. SECURITY INVOKER so RLS on apps/app_versions enforces visibility; p_org_id is an indexed narrowing filter on top of RLS. Search/sort/pagination/total_count are computed in SQL so page order matches the displayed last-upload sort.';
+
+
+
 CREATE OR REPLACE FUNCTION "public"."get_org_build_time_unit"("p_org_id" "uuid", "p_start_date" "date", "p_end_date" "date") RETURNS TABLE("total_build_time_unit" bigint, "total_builds" bigint)
     LANGUAGE "plpgsql" STABLE
     SET "search_path" TO ''
@@ -16315,6 +16384,27 @@ WITH ("autovacuum_vacuum_scale_factor"='0.05', "autovacuum_analyze_scale_factor"
 ALTER TABLE "public"."daily_storage" OWNER TO "postgres";
 
 
+CREATE TABLE IF NOT EXISTS "public"."daily_storage_hourly" (
+    "app_id" character varying(255) NOT NULL,
+    "owner_org" "uuid" NOT NULL,
+    "date" "date" NOT NULL,
+    "storage_byte_hours" double precision DEFAULT 0 NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL
+);
+
+
+ALTER TABLE "public"."daily_storage_hourly" OWNER TO "postgres";
+
+
+COMMENT ON TABLE "public"."daily_storage_hourly" IS 'Shadow daily storage-hour usage, recorded as byte-hours. This is intentionally not used for billing until storage-hour billing is explicitly enabled.';
+
+
+
+COMMENT ON COLUMN "public"."daily_storage_hourly"."storage_byte_hours" IS 'Byte-hour contribution for this UTC day.';
+
+
+
 CREATE SEQUENCE IF NOT EXISTS "public"."daily_storage_id_seq"
     AS integer
     START WITH 1
@@ -17635,7 +17725,7 @@ CREATE TABLE IF NOT EXISTS "public"."users" (
     "enable_notifications" boolean DEFAULT true NOT NULL,
     "opt_for_newsletters" boolean DEFAULT true NOT NULL,
     "ban_time" timestamp with time zone,
-    "email_preferences" "jsonb" DEFAULT '{"onboarding": true, "usage_limit": true, "credit_usage": true, "device_error": true, "weekly_stats": true, "monthly_stats": true, "bundle_created": true, "bundle_deployed": true, "deploy_stats_24h": true, "cli_realtime_feed": true, "billing_period_stats": true, "channel_self_rejected": true}'::"jsonb" NOT NULL,
+    "email_preferences" "jsonb" DEFAULT '{"onboarding": true, "usage_limit": true, "credit_usage": true, "device_error": true, "weekly_stats": true, "monthly_stats": true, "bundle_created": true, "bundle_deployed": true, "deploy_stats_24h": true, "cli_realtime_feed": true, "builder_onboarding": true, "bundle_incompatible": true, "billing_period_stats": true, "channel_self_rejected": true}'::"jsonb" NOT NULL,
     "created_via_invite" boolean DEFAULT false NOT NULL
 );
 
@@ -17643,7 +17733,7 @@ CREATE TABLE IF NOT EXISTS "public"."users" (
 ALTER TABLE "public"."users" OWNER TO "postgres";
 
 
-COMMENT ON COLUMN "public"."users"."email_preferences" IS 'Per-user email notification preferences. Keys: usage_limit, credit_usage, onboarding, weekly_stats, monthly_stats, billing_period_stats, deploy_stats_24h, bundle_created, bundle_deployed, device_error, channel_self_rejected, cli_realtime_feed. Values are booleans.';
+COMMENT ON COLUMN "public"."users"."email_preferences" IS 'Per-user email notification preferences. Keys: usage_limit, credit_usage, onboarding, builder_onboarding, weekly_stats, monthly_stats, billing_period_stats, deploy_stats_24h, bundle_created, bundle_deployed, device_error, channel_self_rejected, cli_realtime_feed, bundle_incompatible. Values are booleans.';
 
 
 
@@ -17912,6 +18002,11 @@ ALTER TABLE ONLY "public"."daily_mau"
 
 ALTER TABLE ONLY "public"."daily_revenue_metrics"
     ADD CONSTRAINT "daily_revenue_metrics_pkey" PRIMARY KEY ("date_id", "customer_id");
+
+
+
+ALTER TABLE ONLY "public"."daily_storage_hourly"
+    ADD CONSTRAINT "daily_storage_hourly_pkey" PRIMARY KEY ("app_id", "date");
 
 
 
@@ -18353,6 +18448,10 @@ CREATE INDEX "idx_app_versions_retention_cleanup" ON "public"."app_versions" USI
 
 
 
+CREATE INDEX "idx_apps_default_upload_channel" ON "public"."apps" USING "btree" ("default_upload_channel");
+
+
+
 CREATE INDEX "idx_audit_logs_created_at" ON "public"."audit_logs" USING "btree" ("created_at" DESC);
 
 
@@ -18366,6 +18465,10 @@ CREATE INDEX "idx_audit_logs_org_created" ON "public"."audit_logs" USING "btree"
 
 
 CREATE INDEX "idx_audit_logs_org_id" ON "public"."audit_logs" USING "btree" ("org_id");
+
+
+
+CREATE INDEX "idx_audit_logs_record_id" ON "public"."audit_logs" USING "btree" ("record_id");
 
 
 
@@ -18441,6 +18544,14 @@ CREATE INDEX "idx_daily_mau_app_id_date" ON "public"."daily_mau" USING "btree" (
 
 
 
+CREATE INDEX "idx_daily_storage_hourly_date" ON "public"."daily_storage_hourly" USING "btree" ("date");
+
+
+
+CREATE INDEX "idx_daily_storage_hourly_owner_org_date" ON "public"."daily_storage_hourly" USING "btree" ("owner_org", "date");
+
+
+
 CREATE INDEX "idx_daily_version_app_id" ON "public"."daily_version" USING "btree" ("app_id");
 
 
@@ -18482,6 +18593,14 @@ CREATE INDEX "idx_id_app_id_app_versions_meta" ON "public"."app_versions_meta" U
 
 
 CREATE INDEX "idx_manifest_app_version_id" ON "public"."manifest" USING "btree" ("app_version_id");
+
+
+
+CREATE INDEX "idx_manifest_file_hash" ON "public"."manifest" USING "btree" ("file_hash");
+
+
+
+CREATE INDEX "idx_manifest_file_name" ON "public"."manifest" USING "btree" ("file_name");
 
 
 
@@ -18545,6 +18664,10 @@ CREATE INDEX "idx_usage_credit_transactions_grant" ON "public"."usage_credit_tra
 
 
 
+CREATE INDEX "idx_usage_credit_transactions_org_id" ON "public"."usage_credit_transactions" USING "btree" ("org_id");
+
+
+
 CREATE INDEX "idx_usage_credit_transactions_org_time" ON "public"."usage_credit_transactions" USING "btree" ("org_id", "occurred_at" DESC);
 
 
@@ -18557,6 +18680,10 @@ CREATE INDEX "idx_usage_overage_events_metric" ON "public"."usage_overage_events
 
 
 
+CREATE INDEX "idx_usage_overage_events_org_id" ON "public"."usage_overage_events" USING "btree" ("org_id");
+
+
+
 CREATE INDEX "idx_usage_overage_events_org_time" ON "public"."usage_overage_events" USING "btree" ("org_id", "created_at" DESC);
 
 
@@ -18566,6 +18693,10 @@ CREATE INDEX "idx_user_password_compliance_user_org" ON "public"."user_password_
 
 
 CREATE INDEX "idx_users_email_preferences" ON "public"."users" USING "gin" ("email_preferences");
+
+
+
+CREATE INDEX "idx_version_meta_app_id_timestamp" ON "public"."version_meta" USING "btree" ("app_id", "timestamp");
 
 
 
@@ -19119,6 +19250,16 @@ ALTER TABLE ONLY "public"."daily_build_time"
 
 
 
+ALTER TABLE ONLY "public"."daily_storage_hourly"
+    ADD CONSTRAINT "daily_storage_hourly_app_id_fkey" FOREIGN KEY ("app_id") REFERENCES "public"."apps"("app_id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."daily_storage_hourly"
+    ADD CONSTRAINT "daily_storage_hourly_owner_org_fkey" FOREIGN KEY ("owner_org") REFERENCES "public"."orgs"("id") ON DELETE CASCADE;
+
+
+
 ALTER TABLE ONLY "public"."deploy_history"
     ADD CONSTRAINT "deploy_history_app_id_fkey" FOREIGN KEY ("app_id") REFERENCES "public"."apps"("app_id") ON DELETE CASCADE;
 
@@ -19651,6 +19792,10 @@ CREATE POLICY "Allow read for auth (read+)" ON "public"."daily_storage" FOR SELE
 
 
 
+CREATE POLICY "Allow read for auth (read+)" ON "public"."daily_storage_hourly" FOR SELECT TO "anon", "authenticated" USING ("public"."check_min_rights"('read'::"public"."user_min_right", "public"."get_identity_org_appid"('{read,upload,write,all}'::"public"."key_mode"[], "owner_org", "app_id"), "owner_org", "app_id", NULL::bigint));
+
+
+
 CREATE POLICY "Allow read for auth (read+)" ON "public"."daily_version" FOR SELECT TO "anon", "authenticated" USING ((EXISTS ( SELECT 1
    FROM "public"."apps"
   WHERE ((("apps"."app_id")::"text" = ("daily_version"."app_id")::"text") AND "public"."check_min_rights"('read'::"public"."user_min_right",
@@ -19801,6 +19946,10 @@ CREATE POLICY "Deny delete for org members" ON "public"."usage_overage_events" A
 
 
 
+CREATE POLICY "Deny delete on daily_storage_hourly" ON "public"."daily_storage_hourly" AS RESTRICTIVE FOR DELETE TO "anon", "authenticated" USING (false);
+
+
+
 CREATE POLICY "Deny delete on deploy history" ON "public"."deploy_history" FOR DELETE USING (false);
 
 
@@ -19821,6 +19970,10 @@ CREATE POLICY "Deny insert for org members" ON "public"."usage_overage_events" A
 
 
 
+CREATE POLICY "Deny insert on daily_storage_hourly" ON "public"."daily_storage_hourly" AS RESTRICTIVE FOR INSERT TO "anon", "authenticated" WITH CHECK (false);
+
+
+
 CREATE POLICY "Deny update for org members" ON "public"."usage_credit_consumptions" AS RESTRICTIVE FOR UPDATE TO "anon", "authenticated" USING (false) WITH CHECK (false);
 
 
@@ -19834,6 +19987,10 @@ CREATE POLICY "Deny update for org members" ON "public"."usage_credit_transactio
 
 
 CREATE POLICY "Deny update for org members" ON "public"."usage_overage_events" AS RESTRICTIVE FOR UPDATE TO "anon", "authenticated" USING (false) WITH CHECK (false);
+
+
+
+CREATE POLICY "Deny update on daily_storage_hourly" ON "public"."daily_storage_hourly" AS RESTRICTIVE FOR UPDATE TO "anon", "authenticated" USING (false) WITH CHECK (false);
 
 
 
@@ -20047,6 +20204,9 @@ ALTER TABLE "public"."daily_revenue_metrics" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."daily_storage" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."daily_storage_hourly" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."daily_version" ENABLE ROW LEVEL SECURITY;
@@ -21418,6 +21578,13 @@ GRANT ALL ON FUNCTION "public"."get_org_apikeys"("p_org_id" "uuid") TO "authenti
 
 
 
+REVOKE ALL ON FUNCTION "public"."get_org_apps_with_last_upload"("p_org_id" "uuid", "p_search" "text", "p_sort_by" "text", "p_sort_desc" boolean, "p_limit" integer, "p_offset" integer) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."get_org_apps_with_last_upload"("p_org_id" "uuid", "p_search" "text", "p_sort_by" "text", "p_sort_desc" boolean, "p_limit" integer, "p_offset" integer) TO "service_role";
+GRANT ALL ON FUNCTION "public"."get_org_apps_with_last_upload"("p_org_id" "uuid", "p_search" "text", "p_sort_by" "text", "p_sort_desc" boolean, "p_limit" integer, "p_offset" integer) TO "anon";
+GRANT ALL ON FUNCTION "public"."get_org_apps_with_last_upload"("p_org_id" "uuid", "p_search" "text", "p_sort_by" "text", "p_sort_desc" boolean, "p_limit" integer, "p_offset" integer) TO "authenticated";
+
+
+
 GRANT ALL ON FUNCTION "public"."get_org_build_time_unit"("p_org_id" "uuid", "p_start_date" "date", "p_end_date" "date") TO "anon";
 GRANT ALL ON FUNCTION "public"."get_org_build_time_unit"("p_org_id" "uuid", "p_start_date" "date", "p_end_date" "date") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."get_org_build_time_unit"("p_org_id" "uuid", "p_start_date" "date", "p_end_date" "date") TO "service_role";
@@ -21861,6 +22028,7 @@ GRANT ALL ON FUNCTION "public"."is_paying_and_good_plan_org_action"("orgid" "uui
 REVOKE ALL ON FUNCTION "public"."is_paying_org"("orgid" "uuid") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."is_paying_org"("orgid" "uuid") TO "service_role";
 GRANT ALL ON FUNCTION "public"."is_paying_org"("orgid" "uuid") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."is_paying_org"("orgid" "uuid") TO "anon";
 
 
 
@@ -21892,6 +22060,7 @@ GRANT ALL ON FUNCTION "public"."is_storage_exceeded_by_org"("org_id" "uuid") TO 
 REVOKE ALL ON FUNCTION "public"."is_trial_org"("orgid" "uuid") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."is_trial_org"("orgid" "uuid") TO "service_role";
 GRANT ALL ON FUNCTION "public"."is_trial_org"("orgid" "uuid") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."is_trial_org"("orgid" "uuid") TO "anon";
 
 
 
@@ -23134,6 +23303,12 @@ GRANT ALL ON TABLE "public"."daily_revenue_metrics" TO "service_role";
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."daily_storage" TO "anon";
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."daily_storage" TO "authenticated";
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."daily_storage" TO "service_role";
+
+
+
+GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."daily_storage_hourly" TO "anon";
+GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."daily_storage_hourly" TO "authenticated";
+GRANT ALL ON TABLE "public"."daily_storage_hourly" TO "service_role";
 
 
 

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { getImportEntryStep, getResumeStep } from '../src/build/onboarding/progress.ts'
+import { extractKeyIdFromP8Path, getImportEntryStep, getResumeStep } from '../src/build/onboarding/progress.ts'
 
 function t(name, fn) {
   try {
@@ -134,4 +134,95 @@ t('getResumeStep still returns import-scanning for verified import flow', () => 
     completedSteps: { apiKeyVerified: { keyId: 'X', issuerId: 'Y' } },
   })
   assert.equal(getResumeStep(progress), 'import-scanning')
+})
+
+// Regression: ad_hoc resume must not bounce back to setup-method-select
+// just because the user hasn't entered a .p8 (ad_hoc never asks for one).
+// Reported by the resume-prompt screen where the user picked Continue
+// after picking Import + Ad Hoc and got dropped on "How do you want to
+// set up iOS credentials?" — re-asking a fork they already chose.
+t('getResumeStep returns import-scanning for ad_hoc import without apiKey', () => {
+  const progress = makeProgress({
+    setupMethod: 'import-existing',
+    importDistribution: 'ad_hoc',
+  })
+  assert.equal(getResumeStep(progress), 'import-scanning')
+})
+
+// app_store + import + no .p8 yet should start the ASC API key flow, not
+// bounce the user back to the setup-method fork.
+t('getResumeStep returns api-key-instructions for app_store import with no inputs', () => {
+  const progress = makeProgress({
+    setupMethod: 'import-existing',
+    importDistribution: 'app_store',
+  })
+  assert.equal(getResumeStep(progress), 'api-key-instructions')
+})
+
+// User picked Import but quit before picking distribution mode — re-ask
+// just the distribution-mode question, not the upstream setup fork.
+t('getResumeStep returns import-distribution-mode when importDistribution is unset', () => {
+  const progress = makeProgress({
+    setupMethod: 'import-existing',
+  })
+  assert.equal(getResumeStep(progress), 'import-distribution-mode')
+})
+
+// Partial .p8 inputs (the original branches) keep working — these resume
+// at the furthest input step, regardless of distribution mode.
+t('getResumeStep resumes at verifying-key when import has full .p8 inputs', () => {
+  const progress = makeProgress({
+    setupMethod: 'import-existing',
+    importDistribution: 'app_store',
+    p8Path: '/tmp/AuthKey_ABC1234567.p8',
+    keyId: 'ABC1234567',
+    issuerId: '550e8400-e29b-41d4-a716-446655440000',
+  })
+  assert.equal(getResumeStep(progress), 'verifying-key')
+})
+
+t('getResumeStep resumes at input-issuer-id when import has .p8 + keyId only', () => {
+  const progress = makeProgress({
+    setupMethod: 'import-existing',
+    importDistribution: 'app_store',
+    p8Path: '/tmp/AuthKey_ABC1234567.p8',
+    keyId: 'ABC1234567',
+  })
+  assert.equal(getResumeStep(progress), 'input-issuer-id')
+})
+
+t('getResumeStep resumes at input-key-id when import has .p8 only', () => {
+  const progress = makeProgress({
+    setupMethod: 'import-existing',
+    importDistribution: 'app_store',
+    p8Path: '/tmp/AuthKey_ABC1234567.p8',
+  })
+  assert.equal(getResumeStep(progress), 'input-key-id')
+})
+
+// ─── extractKeyIdFromP8Path — Key ID recovered from the .p8 filename ──────────
+// Regression: a session that picked the .p8 but quit before confirming the Key
+// ID step used to come back with an empty field (the "ABC123DEF" placeholder).
+// The Key ID is now re-derived from the saved p8Path filename on resume.
+
+t('extracts the Key ID from an AuthKey_<id>.p8 filename', () => {
+  assert.equal(extractKeyIdFromP8Path('/Users/me/AuthKey_66FGQZB566.p8'), '66FGQZB566')
+})
+
+t('extracts from the legacy ApiKey_ prefix too', () => {
+  assert.equal(extractKeyIdFromP8Path('~/Downloads/ApiKey_ABC123DEF.p8'), 'ABC123DEF')
+})
+
+t('matches the prefix case-insensitively', () => {
+  assert.equal(extractKeyIdFromP8Path('/x/authkey_9Z9ZZZ9Z9Z.p8'), '9Z9ZZZ9Z9Z')
+})
+
+t('returns empty for a renamed / non-matching filename', () => {
+  assert.equal(extractKeyIdFromP8Path('/Users/me/my-apple-key.p8'), '')
+  assert.equal(extractKeyIdFromP8Path('/Users/me/AuthKey_66FGQZB566.pem'), '')
+  assert.equal(extractKeyIdFromP8Path(''), '')
+})
+
+t('only matches the key id at the end of the path (not a mid-path token)', () => {
+  assert.equal(extractKeyIdFromP8Path('/AuthKey_NOPE/actual-file.p8'), '')
 })

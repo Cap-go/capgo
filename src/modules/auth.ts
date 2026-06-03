@@ -7,6 +7,7 @@ import { isSsoUser, provisionSsoUser } from '~/services/ssoProvisioning'
 import { createSignedImageUrl, getImmediateImageUrl } from '~/services/storage'
 import { getLocalConfig, useSupabase } from '~/services/supabase'
 import { sendEvent } from '~/services/tracking'
+import { clearWebsitePaidUserCookie } from '~/services/websiteAuthCookie'
 import { useMainStore } from '~/stores/main'
 import { useOrganizationStore } from '~/stores/organization'
 import { hasPendingInviteSkip } from '~/utils/pendingInviteSkip'
@@ -408,6 +409,21 @@ async function guard(
 }
 
 export const install: UserModule = ({ router }) => {
+  const supabase = useSupabase()
+  supabase.auth.getSession()
+    .then(({ data }) => {
+      if (!data.session)
+        clearWebsitePaidUserCookie()
+    })
+    .catch(error => console.error('Failed to clear website paid user cookie', error))
+
+  if (typeof supabase.auth.onAuthStateChange === 'function') {
+    supabase.auth.onAuthStateChange((_event, session) => {
+      if (!session)
+        clearWebsitePaidUserCookie()
+    })
+  }
+
   router.beforeEach(async (to, from, next) => {
     if (to.meta.middleware) {
       await guard(next, to, from)

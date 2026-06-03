@@ -1,5 +1,6 @@
 import type { Options } from '../api/app'
 import { intro, log, outro } from '@clack/prompts'
+import { trackEvent } from '../analytics/track'
 import { createSupabaseClient, findSavedKey, formatError, resolveUserIdFromApiKey } from '../utils'
 
 export async function getUserIdInternal(options: Options, silent = false) {
@@ -24,6 +25,8 @@ export async function getUserIdInternal(options: Options, silent = false) {
       enrichedOptions.supaAnon,
     )
     const userId = await resolveUserIdFromApiKey(supabase, enrichedOptions.apikey)
+
+    void trackEvent({ channel: 'account', event: 'Account Id Viewed', icon: '🪪', tags: {} })
 
     if (!silent)
       outro(`Done ✅: ${userId}`)

@@ -2,21 +2,53 @@
 
 export type Platform = 'ios' | 'android'
 
+// The outcome a wizard app reports to the shell/command when Ink exits, so the
+// caller can print an accurate post-exit message instead of always claiming
+// success. The shell defaults to `cancelled`; an app flips it to `completed`
+// (with a durable summary) only when it actually reaches the build-complete
+// screen. This fixes the false "✔ onboarding complete" that printed on every
+// exit path (missing-platform, user-cancel, etc.).
+export interface OnboardingCompletionSummary {
+  /** The Capgo dashboard build URL, when a build was kicked off. */
+  buildUrl?: string
+  /** One-line CI-secret upload summary, when secrets were pushed. */
+  ciSecretUploadSummary?: string | null
+  /** Path to the generated GitHub Actions workflow file, when written. */
+  workflowFilePath?: string | null
+  /** Path to the exported .env file, when the user chose the env-export fallback. */
+  envExportPath?: string | null
+  /** The "run anytime" build-request command shown on the final screen. */
+  buildRequestCommand?: string
+}
+
+export interface OnboardingResult {
+  outcome: 'completed' | 'cancelled'
+  /** Present only when outcome === 'completed'. */
+  summary?: OnboardingCompletionSummary
+}
+
 export type OnboardingStep
   = | 'welcome'
+    | 'resume-prompt'
     | 'platform-select'
     | 'adding-platform'
     | 'credentials-exist'
     | 'backing-up'
     // ── Setup-method fork (macOS only) ──
     | 'setup-method-select'
+    // ── Apple-side bundle id confirmation (only shown when capacitor.config and
+    //    project.pbxproj disagree) ──
+    | 'confirm-app-id'
     // ── Import-existing sub-flow (macOS only) ──
     | 'import-scanning'
     | 'import-distribution-mode'
     | 'import-pick-identity'
     | 'import-pick-profile'
+    | 'import-validating-all-certs'
+    | 'import-checking-apple-cert'
     | 'import-no-match-recovery'
-    | 'import-fetching-profile'
+    | 'import-portal-explanation'
+    | 'import-provide-profile-path'
     | 'import-create-profile-only'
     | 'import-export-warning'
     | 'import-compiling-helper'
@@ -58,6 +90,11 @@ export type OnboardingStep
     | 'writing-workflow-file'
     | 'ask-build'
     | 'requesting-build'
+    // AI debug — only entered when the build fails and logs were captured
+    | 'ai-analysis-prompt'
+    | 'ai-analysis-running'
+    | 'ai-analysis-result'
+    | 'ai-analysis-result-scroll'
     | 'build-complete'
     | 'no-platform'
     | 'error'
@@ -79,6 +116,47 @@ export type OnboardingErrorCategory
 export interface ApiKeyData {
   keyId: string
   issuerId: string
+}
+
+/**
+ * Per-identity result of the eager Apple-side validation run. Populated by
+ * the `import-validating-all-certs` step useEffect, consumed by the two-
+ * table picker in `import-pick-identity`. Kept here (alongside the Step
+ * type) so the renderer and the validation logic share a single shape.
+ */
+export interface EnrichedIdentityAvailability {
+  /** True when Apple's API returned a SHA1 match for this identity. */
+  available: boolean
+  /**
+   * Stable reason code for unavailable identities. Drives the per-reason
+   * detail rendering in the unavailable table (e.g. notice about the
+   * Apple-managed signing constraint, or about private-key-missing).
+   */
+  reason?: 'expired' | 'managed' | 'not-visible' | 'check-failed' | 'no-private-key'
+  /** One-line summary shown in the Reason column of the unavailable table. */
+  reasonText?: string
+  /** When available — Apple-side cert resource id, reused downstream. */
+  appleCertId?: string
+  /**
+   * Apple-side cert name as returned by /v1/certificates. Useful when
+   * the local Keychain name differs from the portal name (e.g. multiple
+   * "iOS Distribution" certs in the same team — the portal column says
+   * exactly which one).
+   */
+  appleCertName?: string
+  /**
+   * ISO timestamp from Apple's expiration field. Shown in the manual-
+   * portal walkthrough so the user can tell which row to click when
+   * multiple certs are listed.
+   */
+  appleCertExpirationDate?: string
+  /**
+   * Full serial number from Apple. The portal shows it in the cert
+   * detail view; surfacing the last 8 chars here gives the user a
+   * concrete disambiguator without leaking the full 40-byte serial
+   * into the terminal.
+   */
+  appleCertSerialNumber?: string
 }
 
 export interface CertificateData {
@@ -125,6 +203,28 @@ export interface OnboardingProgress {
    * Only meaningful when `setupMethod === 'import-existing'`.
    */
   importDistribution?: 'app_store' | 'ad_hoc'
+  /**
+   * When set, the user explicitly confirmed an iOS bundle id different from
+   * `capacitor.config.appId`. Used for Apple-side operations (cert lookup,
+   * profile filtering, `ensureBundleId`, `createProfile`) and as the key in
+   * the provisioning_map. The progress-file key and Capgo SaaS API calls
+   * still use `appId` so existing build commands continue to find these
+   * credentials without forcing the user to edit `capacitor.config`.
+   *
+   * Persisted so the confirm-app-id step doesn't re-ask on resume — once
+   * confirmed, the override sticks unless the configuration context (see
+   * `iosBundleIdContextAppId`) changes between CLI runs.
+   */
+  iosBundleIdOverride?: string
+  /**
+   * Snapshot of `config.appId` at the time the user confirmed the
+   * `iosBundleIdOverride`. On the next run we compare this to the current
+   * `config.appId`; if it changed (user renamed the app, added/removed a
+   * dev-tunnel suffix, etc.) the saved override is stale and we re-ask
+   * via the confirm-app-id step. Without this we'd silently keep using a
+   * bundle id the user already moved on from.
+   */
+  iosBundleIdContextAppId?: string
   completedSteps: {
     apiKeyVerified?: ApiKeyData
     certificateCreated?: CertificateData
@@ -137,18 +237,23 @@ export interface OnboardingProgress {
 /** Maps each step to a progress percentage (0-100) */
 export const STEP_PROGRESS: Record<OnboardingStep, number> = {
   'welcome': 0,
+  'resume-prompt': 2,
   'platform-select': 0,
   'adding-platform': 0,
   'credentials-exist': 0,
   'backing-up': 0,
   // Import-existing sub-flow (re-ordered: distribution-mode first)
   'setup-method-select': 5,
+  'confirm-app-id': 12,
   'import-scanning': 10,
   'import-distribution-mode': 15,
   'import-pick-identity': 40,
   'import-pick-profile': 55,
+  'import-validating-all-certs': 38,
+  'import-checking-apple-cert': 50,
   'import-no-match-recovery': 55,
-  'import-fetching-profile': 60,
+  'import-portal-explanation': 56,
+  'import-provide-profile-path': 58,
   'import-create-profile-only': 60,
   'import-export-warning': 70,
   'import-compiling-helper': 72,
@@ -190,6 +295,10 @@ export const STEP_PROGRESS: Record<OnboardingStep, number> = {
   'writing-workflow-file': 98,
   'ask-build': 85,
   'requesting-build': 90,
+  'ai-analysis-prompt': 92,
+  'ai-analysis-running': 95,
+  'ai-analysis-result-scroll': 97,
+  'ai-analysis-result': 98,
   'build-complete': 100,
   'no-platform': 0,
   'error': 0,
@@ -203,20 +312,30 @@ export function getPhaseLabel(step: OnboardingStep): string {
     case 'credentials-exist':
     case 'backing-up':
       return ''
+    case 'resume-prompt':
+      return 'Resume or restart?'
     case 'setup-method-select':
       return 'Setup method'
+    case 'confirm-app-id':
+      return 'Confirm iOS bundle ID'
     case 'import-scanning':
       return 'Step 1 of 4 · Scanning your Mac'
     case 'import-distribution-mode':
       return 'Step 1 of 4 · Distribution mode'
     case 'import-pick-identity':
       return 'Step 2 of 4 · Choose certificate'
+    case 'import-validating-all-certs':
+      return 'Step 2 of 4 · Validating certificates with Apple'
     case 'import-pick-profile':
       return 'Step 3 of 4 · Choose provisioning profile'
+    case 'import-checking-apple-cert':
+      return 'Step 3 of 4 · Checking certificate on Apple'
     case 'import-no-match-recovery':
       return 'Step 3 of 4 · No matching profile — recover'
-    case 'import-fetching-profile':
-      return 'Step 3 of 4 · Fetching profile from Apple'
+    case 'import-portal-explanation':
+      return 'Step 3 of 4 · Manual portal walkthrough'
+    case 'import-provide-profile-path':
+      return 'Step 3 of 4 · Provide .mobileprovision file'
     case 'import-create-profile-only':
       return 'Step 3 of 4 · Creating profile via Apple'
     case 'import-export-warning':
@@ -262,6 +381,11 @@ export function getPhaseLabel(step: OnboardingStep): string {
     case 'ask-build':
     case 'requesting-build':
       return 'Step 4 of 4 · Save & Build'
+    case 'ai-analysis-prompt':
+    case 'ai-analysis-running':
+    case 'ai-analysis-result':
+    case 'ai-analysis-result-scroll':
+      return 'AI debug'
     case 'build-complete':
       return 'Complete'
     case 'no-platform':

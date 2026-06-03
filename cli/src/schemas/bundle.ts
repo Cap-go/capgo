@@ -29,6 +29,7 @@ export const optionsUploadSchema = optionsBaseSchema.extend({
   autoMinUpdateVersion: z.boolean().optional(),
   autoSetBundle: z.boolean().optional(),
   ignoreMetadataCheck: z.boolean().optional(),
+  failOnIncompatible: z.boolean().optional(),
   ignoreChecksumCheck: z.boolean().optional(),
   forceCrc32Checksum: z.boolean().optional(),
   timeout: z.number().optional(),
@@ -95,6 +96,7 @@ export const uploadBundleResultSchema = z.object({
   storageProvider: z.string().optional(),
   skipped: z.boolean().optional(),
   reason: z.string().optional(),
+  builderAction: z.enum(['launch-onboarding', 'launch-build']).optional(),
 })
 
 export type UploadBundleResult = z.infer<typeof uploadBundleResultSchema>

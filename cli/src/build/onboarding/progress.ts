@@ -98,20 +98,31 @@ export function getResumeStep(progress: OnboardingProgress | null): OnboardingSt
   // Issuer ID are reused so they don't have to re-enter those.
   if (setupMethod === 'import-existing') {
     if (!completedSteps.apiKeyVerified) {
-      // For app_store mode the .p8 chain hadn't completed yet — resume there.
-      // For ad_hoc mode this branch is normally unreachable (.p8 isn't asked
-      // until no-match recovery), so we fall through to import-scanning,
-      // which is the safe default.
+      // For app_store mode the .p8 chain hadn't completed yet — resume at
+      // the furthest partial input step.
       if (progress.issuerId && progress.keyId && progress.p8Path)
         return 'verifying-key'
       if (progress.keyId && progress.p8Path)
         return 'input-issuer-id'
       if (progress.p8Path)
         return 'input-key-id'
-      // Distribution mode is gone from progress, so re-ask: jump back to the
-      // setup-method fork. The user will pick "Import existing" again and
-      // re-enter the (cheap) distribution-mode question.
-      return 'setup-method-select'
+      // No .p8 inputs yet. Branch on the saved importDistribution rather
+      // than falling back to setup-method-select (which would make the
+      // user re-pick a fork they already chose). Mirrors what
+      // getImportEntryStep does after a successful scan, but at mount
+      // time — so a user who quit right after picking Import + ad_hoc
+      // lands on import-scanning instead of being asked "how do you want
+      // to set up iOS credentials?" again.
+      //
+      //   ad_hoc   → scan straight away (no .p8 needed for non-TestFlight)
+      //   app_store → start the .p8 input chain at api-key-instructions
+      //   undefined → user picked Import but never the distribution mode;
+      //               re-ask just that question, not the setup fork
+      if (progress.importDistribution === 'ad_hoc')
+        return 'import-scanning'
+      if (progress.importDistribution === 'app_store')
+        return 'api-key-instructions'
+      return 'import-distribution-mode'
     }
     // .p8 verified, but no cert/profile completed yet — resume at scanning.
     return 'import-scanning'
@@ -183,4 +194,16 @@ export function getImportEntryStep(progress: OnboardingProgress | null): Onboard
   if (progress.p8Path)
     return 'input-key-id'
   return 'api-key-instructions'
+}
+
+// Apple names downloaded App Store Connect API keys "AuthKey_<KEYID>.p8" (older
+// portals used "ApiKey_"), so the Key ID is recoverable from the filename. Used
+// both to pre-fill the Key ID when a .p8 is picked and to re-derive it on resume
+// when a prior session saved the path but quit before confirming the Key ID step.
+// Returns '' when the filename doesn't match (e.g. a manually-renamed file).
+export function extractKeyIdFromP8Path(filePath: string): string {
+  // /i tolerates manually-renamed files, but the JWT `kid` claim is always
+  // upper-case (Apple registers keys that way). Normalize here so a renamed
+  // file like `authkey_abc123.p8` still produces a usable kid.
+  return filePath.match(/(?:Auth|Api)Key_([A-Z0-9]+)\.p8$/i)?.[1]?.toUpperCase() ?? ''
 }

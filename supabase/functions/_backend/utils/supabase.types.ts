@@ -997,6 +997,48 @@ export type Database = {
         }
         Relationships: []
       }
+      daily_storage_hourly: {
+        Row: {
+          app_id: string
+          created_at: string
+          date: string
+          owner_org: string
+          storage_byte_hours: number
+          updated_at: string
+        }
+        Insert: {
+          app_id: string
+          created_at?: string
+          date: string
+          owner_org: string
+          storage_byte_hours?: number
+          updated_at?: string
+        }
+        Update: {
+          app_id?: string
+          created_at?: string
+          date?: string
+          owner_org?: string
+          storage_byte_hours?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "daily_storage_hourly_app_id_fkey"
+            columns: ["app_id"]
+            isOneToOne: false
+            referencedRelation: "apps"
+            referencedColumns: ["app_id"]
+          },
+          {
+            foreignKeyName: "daily_storage_hourly_owner_org_fkey"
+            columns: ["owner_org"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       daily_version: {
         Row: {
           app_id: string
@@ -3494,6 +3536,45 @@ export type Database = {
           name: string
           owner_email: string
           rbac_id: string
+          user_id: string
+        }[]
+      }
+      get_org_apps_with_last_upload: {
+        Args: {
+          p_limit?: number
+          p_offset?: number
+          p_org_id: string
+          p_search?: string
+          p_sort_by?: string
+          p_sort_desc?: boolean
+        }
+        Returns: {
+          allow_device_custom_id: boolean
+          allow_preview: boolean
+          android_store_url: string
+          app_id: string
+          build_timeout_seconds: number
+          build_timeout_updated_at: string
+          channel_device_count: number
+          created_at: string
+          default_upload_channel: string
+          existing_app: boolean
+          expose_metadata: boolean
+          icon_url: string
+          id: string
+          ios_store_url: string
+          last_upload_at: string
+          last_version: string
+          manifest_bundle_count: number
+          name: string
+          need_onboarding: boolean
+          owner_org: string
+          retention: number
+          stats_refresh_requested_at: string
+          stats_updated_at: string
+          total_count: number
+          transfer_history: Json[]
+          updated_at: string
           user_id: string
         }[]
       }

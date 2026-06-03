@@ -1631,9 +1631,17 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
     // --ai-analytics is set in CI (so auto-upload has logs to send). Without the
     // flag-OR, the CI auto_upload branch from decideAnalyzeBehavior would never
     // have a log file to read.
-    const captureEnabled = shouldCaptureLogs() || options.aiAnalytics === true
+    const aiAnalysisMode: 'auto-prompt' | 'caller-handled' | 'skip' = options.aiAnalysisMode ?? 'auto-prompt'
+    // Capture when interactive, when the CI flag is set, OR when the caller asked
+    // to drive the AI flow themselves (e.g. Ink onboarding) so the captured log
+    // is available for runCapgoAiAnalysis.
+    const captureEnabled = (shouldCaptureLogs() || options.aiAnalytics === true || aiAnalysisMode === 'caller-handled')
+      && aiAnalysisMode !== 'skip'
     let capturedJobId: string | null = null
     let keepPromptFile = false // mutable so local-AI flow can set it true
+    // Populated only in caller-handled mode on a failed build. Returned to the
+    // caller so it can render its own AI prompt UI and later release the log.
+    let aiAnalysisInfo: BuildRequestResult['aiAnalysis']
 
     if (captureEnabled && buildRequest.job_id) {
       capturedJobId = buildRequest.job_id
@@ -1658,7 +1666,8 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
       channel: 'native-builder',
       event: 'Build requested',
       icon: '🏗️',
-      user_id: orgId,
+      org_id: orgId,
+      tracking_version: 2,
       tags: {
         'app-id': appId,
         'platform': platform,
@@ -1977,8 +1986,30 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
         }
       }
 
-      // On failure, offer the AI analysis flow (interactive menu or auto-upload).
-      if (finalStatus === 'failed' && captureEnabled && capturedJobId) {
+      // On failure, offer the AI analysis flow.
+      //
+      // - 'skip'           → no-op (caller wants nothing to do with AI here).
+      // - 'caller-handled' → leave the captured log on disk and surface it via
+      //                      `result.aiAnalysis` so the caller (e.g. the Ink
+      //                      onboarding wizard) can run `runCapgoAiAnalysis`
+      //                      and render its own UI without clack corrupting
+      //                      its terminal renderer.
+      // - 'auto-prompt'    → existing interactive / CI matrix via
+      //                      decideAnalyzeBehavior + clack prompts.
+      if (finalStatus === 'failed' && captureEnabled && capturedJobId && aiAnalysisMode === 'caller-handled') {
+        // Preserve the captured log until the caller calls
+        // releaseCapturedLogs(jobId) explicitly. Without this, the cleanup
+        // handlers registered above would remove it on process exit before
+        // the caller had a chance to read it.
+        keepPromptFile = true
+        const logsPath = `${process.env.CAPGO_AI_LOG_BASE_DIR || '/tmp/capgo-builds'}/${capturedJobId}.log`
+        aiAnalysisInfo = {
+          jobId: capturedJobId,
+          capturedLogPath: logsPath,
+          ready: true,
+        }
+      }
+      else if (finalStatus === 'failed' && captureEnabled && capturedJobId && aiAnalysisMode === 'auto-prompt') {
         const behavior = decideAnalyzeBehavior({
           isTTY: process.stdout.isTTY === true,
           aiAnalyticsFlag: options.aiAnalytics === true,
@@ -2031,7 +2062,7 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
           // @clack/prompts spinner appends its own animated dots — don't add an
           // ellipsis here or the user sees "…..." (6 dots: our 1-char ellipsis
           // plus the spinner's cycling 3-dot animation).
-          aiSpinner?.start('Analyzing build log with Capgo AI (Kimi K2.5)')
+          aiSpinner?.start('Analyzing build log with Capgo AI')
 
           let result: PostAnalyzeResult
           try {
@@ -2109,7 +2140,7 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
           const choice = await select({
             message: 'Choose AI analysis',
             options: [
-              { value: 'capgo', label: 'Capgo AI (Kimi K2.5)' },
+              { value: 'capgo', label: 'Capgo AI' },
               { value: 'local', label: 'Local AI (write prompt to file)' },
               { value: 'skip', label: 'Skip' },
             ],
@@ -2165,7 +2196,8 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
         channel: 'native-builder',
         event: finalStatus === 'succeeded' ? 'Build succeeded' : 'Build failed',
         icon: finalStatus === 'succeeded' ? '✅' : '❌',
-        user_id: orgId,
+        org_id: orgId,
+        tracking_version: 2,
         tags: {
           'app-id': appId,
           'platform': platform,
@@ -2180,6 +2212,7 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
         jobId: buildRequest.job_id,
         uploadUrl: buildRequest.upload_url,
         status: finalStatus || startResult.status || buildRequest.status,
+        aiAnalysis: aiAnalysisInfo,
       }
     }
     finally {

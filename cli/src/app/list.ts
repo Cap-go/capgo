@@ -3,6 +3,7 @@ import type { OptionsBase } from '../schemas/base'
 import type { Database } from '../types/supabase.types'
 import { intro, log, outro } from '@clack/prompts'
 import { Table } from '@sauber/table'
+import { trackEvent, withSupabaseSource } from '../analytics/track'
 import { checkAlerts } from '../api/update'
 import { createSupabaseClient, findSavedKey, getHumanDate, resolveUserIdFromApiKey } from '../utils'
 
@@ -19,10 +20,10 @@ function displayApps(data: Database['public']['Tables']['apps']['Row'][]) {
 }
 
 async function getActiveApps(supabase: SupabaseClient<Database>, silent: boolean) {
-  const { data, error } = await supabase
+  const { data, error } = await withSupabaseSource('apps.list', () => supabase
     .from('apps')
     .select()
-    .order('created_at', { ascending: false })
+    .order('created_at', { ascending: false }))
 
   if (error) {
     if (!silent)
@@ -49,6 +50,8 @@ export async function listAppInternal(options: OptionsBase, silent = false) {
     log.info('Getting active bundle in Capgo')
 
   const allApps = await getActiveApps(supabase, silent)
+
+  void trackEvent({ channel: 'app', event: 'Apps Listed', icon: '📋', tags: { app_count: allApps.length } })
 
   if (!allApps.length) {
     if (!silent)

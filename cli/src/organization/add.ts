@@ -90,7 +90,8 @@ export async function addOrganizationInternal(options: OrganizationAddOptions, s
     channel: 'organization',
     event: 'Organization Created',
     icon: '🏢',
-    user_id: orgData.id,
+    org_id: orgData.id,
+    tracking_version: 2,
     tags: {
       'org-name': name,
     },

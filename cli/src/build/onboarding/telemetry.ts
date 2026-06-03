@@ -10,6 +10,8 @@ export interface TrackBuilderOnboardingStepInput {
   platform: Platform
   step: OnboardingStep | AndroidOnboardingStep
   durationMs?: number
+  /** Step whose elapsed time is represented by durationMs. */
+  durationStep?: OnboardingStep | AndroidOnboardingStep
   /** Raw caught error — mapped via the platform's category mapper. Use this OR errorCategory, not both. */
   error?: unknown
   /** Pre-computed category. Takes precedence over `error` if both are present. */
@@ -17,7 +19,11 @@ export interface TrackBuilderOnboardingStepInput {
 }
 
 export type BuilderOnboardingAction
-  = | 'android_sa_method_selected'
+  // Shared (both platforms): which branch the user picked on the resume-prompt
+  // fork — `continue` resumes saved progress, `restart` wipes it. Carries a
+  // `choice` tag with that value.
+  = | 'resume_prompt_decision'
+    | 'android_sa_method_selected'
     | 'android_sa_validation_recovery_selected'
     | 'android_sa_validation_result'
 
@@ -38,8 +44,11 @@ export async function trackBuilderOnboardingStep(input: TrackBuilderOnboardingSt
     app_id: input.appId,
   }
 
-  if (typeof input.durationMs === 'number' && Number.isFinite(input.durationMs))
+  if (typeof input.durationMs === 'number' && Number.isFinite(input.durationMs)) {
     tags.duration_ms = String(Math.round(input.durationMs))
+    if (input.durationStep)
+      tags.duration_step = input.durationStep
+  }
 
   if (input.errorCategory !== undefined) {
     tags.error_category = input.errorCategory
@@ -56,7 +65,8 @@ export async function trackBuilderOnboardingStep(input: TrackBuilderOnboardingSt
       channel: 'builder-onboarding',
       icon: '🧭',
       notify: false,
-      user_id: input.orgId,
+      org_id: input.orgId,
+      tracking_version: 2,
       tags,
     })
   }
@@ -83,7 +93,8 @@ export async function trackBuilderOnboardingAction(input: TrackBuilderOnboarding
       channel: 'builder-onboarding',
       icon: '🧭',
       notify: false,
-      user_id: input.orgId,
+      org_id: input.orgId,
+      tracking_version: 2,
       tags,
     })
   }

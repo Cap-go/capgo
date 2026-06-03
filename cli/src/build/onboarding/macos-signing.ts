@@ -251,6 +251,58 @@ export function matchIdentitiesToProfiles(
   }))
 }
 
+/**
+ * Compare a provisioning profile's bundle id against the app's concrete bundle
+ * id, honoring Apple's wildcard syntax. The mobileprovision parser leaves the
+ * asterisk in place after stripping the team-id prefix, so a wildcard profile
+ * arrives here as either the bare `*` (matches everything the team owns) or a
+ * suffix wildcard like `com.example.*` (matches `com.example.<anything>`).
+ *
+ * Exported so the file-picker validation in the Ink UI can reuse the same
+ * matching rule as `filterProfilesForApp` — otherwise a wildcard
+ * `.mobileprovision` picked manually would be hard-rejected even though the
+ * underlying profile is valid for the current app.
+ */
+export function bundleIdMatches(profileBundleId: string, appId: string): boolean {
+  if (profileBundleId === appId)
+    return true
+  if (profileBundleId === '*')
+    return true
+  if (profileBundleId.endsWith('.*')) {
+    const prefix = profileBundleId.slice(0, profileBundleId.length - 1)
+    return appId.startsWith(prefix)
+  }
+  return false
+}
+
+/**
+ * Filter profiles that are actually usable for a given Capacitor app + iOS
+ * distribution mode. Used by the import-existing flow to detect dead-end
+ * situations where an identity has profiles for a different app or the wrong
+ * distribution mode — in which case the no-match-recovery menu can offer
+ * "fetch / create via Apple" instead of dropping the user at an empty picker.
+ *
+ * `importDistribution` is null/undefined when the user hasn't picked yet —
+ * in that case any profileType is accepted.
+ *
+ * Bundle-id comparison goes through {@link bundleIdMatches} so wildcard
+ * profiles (the norm for ad_hoc/enterprise teams that share one profile
+ * across many apps) are accepted alongside literal-equality matches. Apple
+ * never issues wildcard `app_store` profiles in practice, so when the caller
+ * pins `importDistribution = 'app_store'` the conjunction naturally drops
+ * any ad_hoc/enterprise wildcards that happen to be installed.
+ */
+export function filterProfilesForApp(
+  profiles: readonly DiscoveredProfile[],
+  appId: string,
+  importDistribution: 'app_store' | 'ad_hoc' | null | undefined,
+): DiscoveredProfile[] {
+  return profiles.filter(p =>
+    bundleIdMatches(p.bundleId, appId)
+    && (!importDistribution || p.profileType === importDistribution),
+  )
+}
+
 // ─── P12 export ──────────────────────────────────────────────────────
 
 /**

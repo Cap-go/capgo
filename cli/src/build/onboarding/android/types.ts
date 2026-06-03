@@ -2,6 +2,7 @@
 
 export type AndroidOnboardingStep
   = | 'welcome'
+    | 'resume-prompt'
     | 'credentials-exist'
     | 'backing-up'
     | 'no-platform'
@@ -68,6 +69,11 @@ export type AndroidOnboardingStep
     | 'writing-workflow-file'
     | 'ask-build'
     | 'requesting-build'
+    // AI debug — only entered when the build fails and logs were captured
+    | 'ai-analysis-prompt'
+    | 'ai-analysis-running'
+    | 'ai-analysis-result'
+    | 'ai-analysis-result-scroll'
     | 'build-complete'
     | 'error'
 
@@ -188,6 +194,7 @@ export interface AndroidOnboardingProgress {
 
 export const ANDROID_STEP_PROGRESS: Record<AndroidOnboardingStep, number> = {
   'welcome': 0,
+  'resume-prompt': 2,
   'credentials-exist': 0,
   'backing-up': 0,
   'no-platform': 0,
@@ -254,6 +261,10 @@ export const ANDROID_STEP_PROGRESS: Record<AndroidOnboardingStep, number> = {
   'writing-workflow-file': 98,
   'ask-build': 90,
   'requesting-build': 95,
+  'ai-analysis-prompt': 96,
+  'ai-analysis-running': 98,
+  'ai-analysis-result-scroll': 98,
+  'ai-analysis-result': 99,
   'build-complete': 100,
   'error': 0,
 }
@@ -265,6 +276,8 @@ export function getAndroidPhaseLabel(step: AndroidOnboardingStep): string {
     case 'backing-up':
     case 'no-platform':
       return ''
+    case 'resume-prompt':
+      return 'Resume or restart?'
     case 'keystore-method-select':
     case 'keystore-explainer':
     case 'keystore-existing-path':
@@ -323,6 +336,11 @@ export function getAndroidPhaseLabel(step: AndroidOnboardingStep): string {
     case 'ask-build':
     case 'requesting-build':
       return 'Step 4 of 4 · Save & Build'
+    case 'ai-analysis-prompt':
+    case 'ai-analysis-running':
+    case 'ai-analysis-result':
+    case 'ai-analysis-result-scroll':
+      return 'AI debug'
     case 'build-complete':
       return 'Complete'
     case 'error':

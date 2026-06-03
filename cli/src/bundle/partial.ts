@@ -147,7 +147,8 @@ export async function prepareBundlePartialFiles(
     channel: 'partial-update',
     event: 'Generate manifest',
     icon: '📂',
-    user_id: orgId,
+    org_id: orgId,
+    tracking_version: 2,
     tags: {
       'app-id': appid,
     },
@@ -369,7 +370,8 @@ export async function uploadPartial(
       channel: 'app',
       event: `App Partial TUS done${brFilesCount > 0 ? ' with .br extension' : ''}`,
       icon: '⏫',
-      user_id: orgId,
+      org_id: orgId,
+      tracking_version: 2,
       tags: {
         'app-id': appId,
       },
@@ -379,7 +381,8 @@ export async function uploadPartial(
       channel: 'performance',
       event: 'Partial upload performance',
       icon: '🚄',
-      user_id: orgId,
+      org_id: orgId,
+      tracking_version: 2,
       tags: {
         'app-id': appId,
         'time': uploadTime,

@@ -13,19 +13,31 @@ import type {
   PlayInviteProvisioned,
   ServiceAccountProvisioned,
 } from '../types.js'
+import type { OnboardingResult } from '../../types.js'
 import { handleCustomMsg } from '../../../qr.js'
 import { existsSync, readFileSync } from 'node:fs'
 import { copyFile, readFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { join, resolve as resolvePath } from 'node:path'
 import process from 'node:process'
-import { Alert, ProgressBar, Select } from '@inkjs/ui'
-import { Box, Newline, Text, useApp, useInput } from 'ink'
+import { ProgressBar, Select } from '@inkjs/ui'
+import type { DOMElement } from 'ink'
+import { Box, measureElement, Newline, Text, useApp, useInput, useStdout } from 'ink'
 // src/build/onboarding/android/ui/app.tsx
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { createSupabaseClient, findBuildCommandForProjectType, findProjectType, findSavedKeySilent, getOrganizationId, getPackageScripts, getPMAndCommand } from '../../../../utils.js'
 import { loadSavedCredentials, updateSavedCredentials } from '../../../credentials.js'
+import { releaseCapturedLogs, runCapgoAiAnalysis } from '../../../../ai/analyze.js'
+import { renderMarkdown } from '../../../../ai/render-markdown.js'
+import { trackAiAnalysisChoice, trackAiAnalysisResult } from '../../../../ai/telemetry.js'
 import { requestBuildInternal } from '../../../request.js'
+import { isAiAnalysisTooTall, resolveAiResultRoute } from '../../ai-fit.js'
+
+// Upper bound on "I fixed it, retry build" attempts after an AI diagnosis.
+// Three total attempts (initial + two retries) caps the AI cost when a model
+// suggestion doesn't actually fix the failure mode while still giving the user
+// a couple of in-wizard chances to iterate.
+const MAX_AI_RETRIES = 2
 import { createCiSecretEntries, detectCiSecretTargets, getCiSecretRepoLabelAsync, getCiSecretTargetLabel, listExistingCiSecretKeysAsync, uploadCiSecretsAsync } from '../../ci-secrets.js'
 import type { CiSecretEntry, CiSecretSetupAdvice, CiSecretTarget } from '../../ci-secrets.js'
 import { mapAndroidOnboardingError, mapSaValidationKindToCategory } from '../../error-categories.js'
@@ -33,10 +45,71 @@ import { defaultExportPath, exportCredentialsToEnv } from '../../env-export.js'
 import { canUseFilePicker, openKeystorePicker, openServiceAccountJsonPicker } from '../../file-picker.js'
 import type { BuilderOnboardingAction } from '../../telemetry.js'
 import { trackBuilderOnboardingAction, trackBuilderOnboardingStep } from '../../telemetry.js'
-import { DiffSummary, Divider, ErrorLine, FilteredTextInput, FullscreenDiffViewer, Header, SecretsTable, SpinnerLine, SuccessLine } from '../../ui/components.js'
+import { CompletedStepsLog } from '../../ui/completed-steps-log.js'
+import { ANDROID_MIN_ROWS, terminalFitsOnboarding } from '../../min-terminal-size.js'
+import { sanitizeBuildLogLines } from '../../build-log.js'
+import { TerminalTooSmallPrompt } from '../../ui/min-size-gate.js'
+import { BOX_HEADER_ROWS, DiffSummary, Divider, FilteredTextInput, FullscreenAiViewer, FullscreenBuildOutput, FullscreenDiffViewer, Header, isBuildCompleteDismissKey, SecretsTable, SpinnerLine, SuccessLine } from '../../ui/components.js'
+import type { AiResultKind } from '../../ui/components.js'
+import { logBudgetRows } from '../../ui/frame-fit.js'
 import { writeWorkflowFile, WORKFLOW_PATH } from '../../workflow-writer.js'
 import type { BuildScriptChoice, PackageManager } from '../../workflow-generator.js'
 import type { BuildCredentials } from '../../../../schemas/build.js'
+import {
+  KeystoreExistingAliasSelectStep,
+  KeystoreExistingAliasStep,
+  KeystoreExistingDetectingAliasStep,
+  KeystoreExistingKeyPasswordStep,
+  KeystoreExistingPathStep,
+  KeystoreExistingPickerStep,
+  KeystoreExistingStorePasswordStep,
+  KeystoreExplainerStep,
+  KeystoreGeneratingStep,
+  KeystoreMethodSelectStep,
+  KeystoreNewAliasStep,
+  KeystoreNewCommonNameStep,
+  KeystoreNewKeyPasswordStep,
+  KeystoreNewPasswordMethodStep,
+  KeystoreNewStorePasswordStep,
+} from '../../ui/steps/android-keystore.js'
+import {
+  AndroidPackageSelectStep,
+  GcpProjectCreateNameStep,
+  GcpProjectsLoadingStep,
+  GcpProjectsSelectStep,
+  GcpSetupRunningStep,
+  GoogleSignInLearnMoreStep,
+  GoogleSignInRunningStep,
+  GoogleSignInStep,
+  PlayDeveloperIdActionsStep,
+  PlayDeveloperIdInputStep,
+  SaJsonExistingPathStep,
+  SaJsonExistingPickerStep,
+  SaJsonValidatingStep,
+  SaJsonValidationFailedStep,
+  ServiceAccountMethodSelectStep,
+} from '../../ui/steps/android-sa-gcp.js'
+import {
+  AskBuildStep,
+  AskCiSecretsStep,
+  CiSecretsFailedStep,
+  CiSecretsSetupStep,
+  CiSecretsTargetSelectStep,
+  ConfirmCiSecretOverwriteStep,
+  DetectingCiSecretsStep,
+  SavingCredentialsStep,
+} from '../../ui/steps/android-ci.js'
+import {
+  AiAnalysisPromptStep,
+  AiAnalysisResultStep,
+  AiAnalysisRunningStep,
+  BackingUpStep,
+  BuildCompleteStep,
+  CredentialsExistStep,
+  ErrorStep,
+  NoPlatformStep,
+  WelcomeStep,
+} from '../../ui/steps/android-shared.js'
 import { findAndroidApplicationIds } from '../gradle-parser.js'
 import { validateServiceAccountJson } from '../service-account-validation.js'
 import { diffLines } from '../../diff-utils.js'
@@ -91,7 +164,10 @@ interface AppProps {
   androidDir: string
   /** Optional Capgo API key passed via -a/--apikey flag; takes precedence over saved key. */
   apikey?: string
-  terminalRows?: number
+  /** Reports the wizard outcome to the shell when it reaches build-complete, so
+   *  the caller prints an accurate post-exit message + durable summary instead of
+   *  always claiming success. Never fires on cancel/missing-platform exits. */
+  onResult?: (result: OnboardingResult) => void
 }
 
 const RELEASE_ALIAS_DEFAULT = 'release'
@@ -128,12 +204,20 @@ function emptyProgress(appId: string): AndroidOnboardingProgress {
   }
 }
 
-const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir, apikey, terminalRows = 24 }) => {
+const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir, apikey, onResult }) => {
   const { exit } = useApp()
   const startStep: AndroidOnboardingStep = getAndroidResumeStep(initialProgress)
 
+  // When there's saved progress AND the resume target isn't trivially 'welcome',
+  // land on the resume-prompt fork so the user can see what's saved and decide
+  // whether to continue or restart from scratch — instead of being silently
+  // teleported to the middle of the wizard with no chance to bail out cleanly.
+  // The trivial case (no progress, or resume target is welcome) keeps the
+  // existing zero-friction path.
   const [step, setStep] = useState<AndroidOnboardingStep>(
-    startStep === 'welcome' ? 'welcome' : startStep,
+    initialProgress !== null && startStep !== 'welcome'
+      ? 'resume-prompt'
+      : startStep,
   )
 
   // Telemetry: resolve org id once + emit per-step events
@@ -149,6 +233,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
   const pendingTelemetryRef = useRef<Array<{
     step: AndroidOnboardingStep
     durationMs?: number
+    durationStep?: AndroidOnboardingStep
     errorCategory?: AndroidOnboardingErrorCategory
   }>>([])
   const pendingActionTelemetryRef = useRef<Array<{
@@ -245,7 +330,10 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
     const now = Date.now()
     // Initial step (previous.step === null) and same-step error re-entries have
     // no meaningful previous-step duration.
-    const durationMs = previous.step === null || previous.step === step
+    const durationStep = previous.step === null || previous.step === step
+      ? undefined
+      : previous.step
+    const durationMs = durationStep === undefined
       ? undefined
       : now - previous.startedAt
 
@@ -261,6 +349,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
     const eventPayload = {
       step,
       durationMs,
+      durationStep,
       errorCategory: carriesErrorCategory ? errorCategoryRef.current : undefined,
     }
 
@@ -432,6 +521,16 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
   // Phase 6 — build output
   const [buildUrl, setBuildUrl] = useState('')
   const [buildOutput, setBuildOutput] = useState<string[]>([])
+  // ── AI-analysis sub-flow (see iOS sibling for full notes). Entered only when
+  // requestBuildInternal returns aiAnalysis.ready=true on a failed build.
+  const [aiJobId, setAiJobId] = useState<string | null>(null)
+  const [aiAnalysisText, setAiAnalysisText] = useState<string | null>(null)
+  // See iOS sibling — non-success outcome banner, mutually exclusive with
+  // `aiAnalysisText`. One object so kind + message can't drift.
+  const [aiResult, setAiResult] = useState<{ kind: AiResultKind, message: string } | null>(null)
+  const [aiRetryCount, setAiRetryCount] = useState(0)
+  // See iOS sibling for full notes on aiViewedFull.
+  const [aiViewedFull, setAiViewedFull] = useState(false)
   const [ciSecretEntries, setCiSecretEntries] = useState<CiSecretEntry[]>([])
   const [ciSecretTargets, setCiSecretTargets] = useState<CiSecretTarget[]>([])
   const [ciSecretTarget, setCiSecretTarget] = useState<CiSecretTarget | null>(null)
@@ -457,6 +556,67 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
   const [previewTelemetry, setPreviewTelemetry] = useState<WorkflowDiffTelemetry | null>(null)
   const [ciSecretError, setCiSecretError] = useState<string | null>(null)
   const [ciSecretUploadSummary, setCiSecretUploadSummary] = useState<string | null>(null)
+
+  // Terminal dimensions in state so the wizard re-renders on resize (see iOS
+  // sibling — needed for the AI fit check to re-route inline → scroll viewer
+  // when the user shrinks the terminal).
+  const { stdout } = useStdout()
+  const [termSize, setTermSize] = useState<{ rows: number, cols: number }>({
+    rows: stdout?.rows ?? 24,
+    cols: stdout?.columns ?? 80,
+  })
+  useEffect(() => {
+    if (!stdout)
+      return
+    const handler = (): void => setTermSize({ rows: stdout.rows ?? 24, cols: stdout.columns ?? 80 })
+    stdout.on('resize', handler)
+    return () => {
+      stdout.off('resize', handler)
+    }
+  }, [stdout])
+  const terminalRows = termSize.rows
+  const terminalCols = termSize.cols
+
+  // Body heights cached per (step, cols) → adaptive box/compact/too-small,
+  // decided SYNCHRONOUSLY so a vertical resize doesn't flash. A body's row
+  // height depends on step/content/WIDTH, not terminal height; caching the
+  // comfortable height lets a height-resize reuse it and pick the right form on
+  // the first frame, instead of the old reset→measure→flip round-trip per
+  // resize tick. See iOS sibling for the full rationale.
+  const bodyRef = useRef<DOMElement | null>(null)
+  const [bodyHeights, setBodyHeights] = useState<{ key: string, comfortable: number | null }>(
+    { key: '', comfortable: null },
+  )
+  const fitKey = `${step}|${terminalCols}`
+  const heights = bodyHeights.key === fitKey ? bodyHeights : { key: fitKey, comfortable: null }
+
+  // Always render the comfortable form. The startup size gate (MinSizeGate)
+  // guarantees the terminal is large enough, so the adaptive dense fallback is
+  // unreachable. The dense branches in the step components are now dead, and the
+  // measure machinery below only feeds the completed-steps log budget.
+  useEffect(() => {
+    if (!bodyRef.current)
+      return
+    const { height } = measureElement(bodyRef.current)
+    if (height <= 0)
+      return
+    setBodyHeights((prev) => {
+      if (prev.key === fitKey && prev.comfortable === height)
+        return prev
+      return { key: fitKey, comfortable: height }
+    })
+  })
+
+  const bodyHeight = heights.comfortable
+
+  // Rows for the completed-steps log (rendered OUTSIDE the measured body so its
+  // growth never inflates the fit decision). It fills what the current step
+  // leaves; capLogRows packs recent entries + a summary. See iOS sibling. The
+  // header is always boxed (the size gate guarantees room).
+  const logHeaderRows = BOX_HEADER_ROWS
+  const logMaxRows = bodyHeight != null
+    ? logBudgetRows(terminalRows, logHeaderRows, bodyHeight)
+    : Number.POSITIVE_INFINITY
   // GitHub Actions workflow setup state. setupMode tracks the 3-way choice at
   // ask-github-actions-setup. After a successful secrets upload, with-workflow
   // continues into pick-build-script + writing-workflow-file; secrets-only
@@ -493,7 +653,17 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
   }
 
   const addLog = useCallback((text: string, color = 'green') => {
-    setLogLines(prev => [...prev, { text, color }])
+    setLogLines((prev) => {
+      // Drop a consecutive duplicate: completed-step breadcrumbs are idempotent
+      // ("✔ GCP project — X" means the same thing however many times the
+      // hydration replay or a re-render fires it), so the same line twice in a
+      // row is always spam, never information. Guards against the log filling
+      // with repeats if an effect re-runs.
+      const last = prev[prev.length - 1]
+      if (last && last.text === text && last.color === color)
+        return prev
+      return [...prev, { text, color }]
+    })
   }, [])
 
   const addSetupStatus = useCallback((text: string) => {
@@ -512,6 +682,14 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
   useInput((input, key) => {
     if (key.ctrl && input === 'c')
       process.kill(process.pid, 'SIGINT')
+
+    // build-complete is the terminal success screen; it deliberately does not
+    // auto-exit (that would wipe the frame on the alt-screen before it can be
+    // read). Dismiss on Enter/Esc/q so it lasts until the user is ready.
+    if (step === 'build-complete' && isBuildCompleteDismissKey(input, key)) {
+      exit()
+      return
+    }
 
     // preview-workflow-file: Esc skips. Arrows/Enter go to the Select.
     if (step === 'preview-workflow-file' && key.escape) {
@@ -573,7 +751,16 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
     [persist],
   )
 
-  useEffect(() => {
+  // Re-emit the breadcrumb entries the user "earned" before this session — the
+  // partial keystore inputs (path / alias / store + key password) and the
+  // completed-phase markers (sign-in, Play account, GCP project, package, SA).
+  // Wrapped in a useCallback so both the mount-time path AND the resume-prompt
+  // "Continue" handler can call it. We DON'T want this firing while the user is
+  // still on the resume-prompt screen — the side log would fill with stale
+  // entries BEFORE the user has chosen Continue vs Restart, and picking Restart
+  // would leave those entries dangling next to a fresh wizard. addLog's
+  // consecutive-dedupe protects against accidental double calls.
+  const hydrateCompletedLog = useCallback(() => {
     if (!initialProgress)
       return
     const { completedSteps } = initialProgress
@@ -632,7 +819,77 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
       addLog(`✔ Service account — ${completedSteps.serviceAccountProvisioned.email}`)
     if (completedSteps.playInviteProvisioned)
       addLog(`✔ Service account invited to Play Console`)
+  }, [initialProgress, addLog])
+
+  // Mount-time hydration. Suppressed when the initial step is the resume-prompt
+  // fork — that path defers hydration to the user's explicit Continue choice
+  // (see the resume-prompt onChange below). The trivial-progress paths
+  // (welcome / no progress) still hydrate here so any partial input the user
+  // had keeps its breadcrumb.
+  const skipMountHydrationRef = useRef(step === 'resume-prompt')
+  useEffect(() => {
+    if (skipMountHydrationRef.current)
+      return
+    hydrateCompletedLog()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  /**
+   * Reset everything for a fresh-start onboarding pass. Called from the
+   * resume-prompt restart handler (mount-time "start over" branch).
+   *
+   * Wipes the on-disk progress file AND every piece of in-memory state that
+   * could otherwise leak across into the next attempt (keystore inputs +
+   * outputs, the service-account fork choice and imported JSON path, OAuth
+   * tokens, the chosen Play account / GCP project / Android package, and the
+   * provisioning outputs). Does NOT addLog or setStep — the caller picks the
+   * user-facing message and the next step.
+   */
+  const resetForFreshStart = useCallback(async () => {
+    await deleteAndroidProgress(appId).catch(() => { /* best-effort */ })
+    // Phase 1 — keystore inputs + outputs
+    setKeystoreMethod(null)
+    setKeystorePathMode('choose')
+    setKeystoreExistingPath('')
+    setKeystoreAlias('')
+    setKeystoreStorePassword('')
+    setKeystoreKeyPassword('')
+    setKeystoreCommonName('')
+    setKeystoreReady(null)
+    setKeystoreBase64('')
+    setRandomPasswordGenerated(false)
+    setDetectedAliases([])
+    setKeyPasswordProbe(null)
+    keyPasswordProbeRef.current = false
+    // Phase 2 — service-account fork
+    setServiceAccountMethod(null)
+    setSaJsonPathMode('choose')
+    setServiceAccountJsonPath('')
+    setSaValidationResult(null)
+    // Phase 2b — Google sign-in / OAuth
+    setGoogleSignIn(null)
+    setAccessToken('')
+    setRefreshTokenState('')
+    setOauthClientId('')
+    setOauthStatusMessages([])
+    setShowOAuthLearnMore(false)
+    // Phase 3 — Play developer account
+    setPlayAccountChoice(null)
+    setPlayDevIdMode('actions')
+    // Phase 4 — GCP project
+    setGcpProjects([])
+    setGcpProjectChoice(null)
+    setNewProjectDisplayName('')
+    // Phase 4.5 — Android package
+    setAndroidPackageChoice(null)
+    setDetectedPackageIds([])
+    setPackageSelectMode('choose')
+    packageLoadedRef.current = false
+    // Phase 5 — provisioning outputs
+    setServiceAccountProvisioned(null)
+    setPlayInviteProvisioned(null)
+    setServiceAccountKeyBase64('')
+  }, [appId])
 
   const handleError = useCallback(
     (err: unknown, failedStep: AndroidOnboardingStep) => {
@@ -737,7 +994,15 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
           const existing = await loadSavedCredentials(appId)
           if (cancelled)
             return
-          if (existing?.android && !initialProgress)
+          // NB: do NOT gate this on `!initialProgress`. The welcome step is
+          // only reached via the trivial-welcome resume case or the
+          // resume-prompt Restart handler — never during an actual resume
+          // (that routes resume-prompt → startStep directly). Gating on the
+          // stale, still-non-null `initialProgress` prop would send a Restart
+          // straight to keystore-method-select and silently overwrite existing
+          // saved credentials without offering the backup flow. Mirror iOS
+          // (cli/src/build/onboarding/ui/app.tsx) and check creds only.
+          if (existing?.android)
             setStep('credentials-exist')
           else
             setStep('keystore-method-select')
@@ -1696,7 +1961,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
             error: (msg: string) => setBuildOutput(prev => [...prev, `✖ ${msg}`]),
             warn: (msg: string) => setBuildOutput(prev => [...prev, `⚠ ${msg}`]),
             success: (msg: string) => setBuildOutput(prev => [...prev, `✔ ${msg}`]),
-            buildLog: (msg: string) => setBuildOutput(prev => [...prev, msg]),
+            buildLog: (msg: string) => setBuildOutput(prev => [...prev, ...sanitizeBuildLogLines(msg)]),
             uploadProgress: (percent: number) => {
               setBuildOutput((prev) => {
                 const idx = prev.findIndex(l => l.startsWith('Uploading:'))
@@ -1722,6 +1987,11 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
           const result = await requestBuildInternal(appId, {
             platform: 'android',
             apikey: capgoKey,
+            // The Ink TUI owns the terminal — @clack/prompts inside
+            // requestBuildInternal would corrupt rendering. Caller-handled mode
+            // surfaces the captured log path via result.aiAnalysis and lets us
+            // render the AI flow with Ink-native components.
+            aiAnalysisMode: 'caller-handled',
           }, true, buildLogger)
           if (cancelled)
             return
@@ -1739,6 +2009,13 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
           }
           else {
             setBuildOutput(prev => [...prev, `⚠ ${result.error || 'unknown error'}`])
+            // Offer AI-assisted diagnosis when logs were captured. The log file
+            // stays on disk until releaseCapturedLogs runs in 'build-complete'.
+            if (result.aiAnalysis?.ready && result.aiAnalysis.jobId) {
+              setAiJobId(result.aiAnalysis.jobId)
+              setStep('ai-analysis-prompt')
+              return
+            }
           }
           setStep('build-complete')
         }
@@ -1752,15 +2029,98 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
       })()
     }
 
+    // AI analysis — entered only when requestBuildInternal returned with
+    // aiAnalysis.ready=true. See iOS sibling for full notes.
+    if (step === 'ai-analysis-running' && aiJobId) {
+      ;(async () => {
+        await trackAiAnalysisChoice({
+          apikey: resolvedApiKeyRef.current ?? apikey ?? '',
+          orgId: resolvedOrgId ?? '',
+          appId,
+          platform: 'android',
+          jobId: aiJobId,
+          choice: 'capgo_ai',
+          triggeredBy: 'onboarding',
+        }).catch(() => { /* telemetry never breaks the wizard */ })
+
+        const result = await runCapgoAiAnalysis({
+          apiHost: 'https://api.capgo.app',
+          apikey: resolvedApiKeyRef.current ?? apikey ?? '',
+          jobId: aiJobId,
+          appId,
+        })
+
+        if (cancelled)
+          return
+
+        const resultTag: 'success' | 'already_analyzed' | 'too_big' | 'error'
+          = result.kind === 'ok'
+            ? 'success'
+            : result.kind === 'already_analyzed'
+              ? 'already_analyzed'
+              : result.kind === 'too_big'
+                ? 'too_big'
+                : 'error'
+
+        await trackAiAnalysisResult({
+          apikey: resolvedApiKeyRef.current ?? apikey ?? '',
+          orgId: resolvedOrgId ?? '',
+          appId,
+          platform: 'android',
+          jobId: aiJobId,
+          result: resultTag,
+          errorStatus: result.kind === 'error' ? result.status : undefined,
+        }).catch(() => { /* telemetry never breaks the wizard */ })
+
+        if (result.kind === 'ok') {
+          setAiAnalysisText(renderMarkdown(result.analysis, true))
+          setAiResult(null)
+        }
+        else if (result.kind === 'already_analyzed') {
+          setAiAnalysisText(null)
+          setAiResult({ kind: 'already_analyzed', message: 'AI analysis was already requested for this build (only one per job).' })
+        }
+        else if (result.kind === 'too_big') {
+          setAiAnalysisText(null)
+          setAiResult({ kind: 'too_big', message: 'Build log is too large for Capgo AI (>10 MB). Try a local AI tool with the captured log.' })
+        }
+        else {
+          setAiAnalysisText(null)
+          const detail = [
+            result.status ? `(status ${result.status})` : null,
+            result.message,
+          ].filter(Boolean).join(' ')
+          setAiResult({ kind: 'error', message: `AI analysis failed${detail ? `: ${detail}` : ''}.` })
+        }
+        setStep('ai-analysis-result')
+      })()
+    }
+
     if (step === 'build-complete') {
       setBuildOutput([])
-      const timer = setTimeout(() => {
-        if (!cancelled)
-          exit()
-      }, 100)
+      // Report a successful outcome + durable summary to the shell/caller so it
+      // can reprint the build URL + generated file paths to the PRIMARY buffer
+      // (the alt-screen final frame is wiped on exit). ONLY place that fires
+      // 'completed'; every other exit stays 'cancelled' by default.
+      onResult?.({
+        outcome: 'completed',
+        summary: {
+          buildUrl: buildUrl || undefined,
+          ciSecretUploadSummary,
+          workflowFilePath: workflowWrittenPath,
+          envExportPath,
+        },
+      })
+      // Best-effort cleanup of any leftover captured log.
+      if (aiJobId) {
+        void releaseCapturedLogs(aiJobId).catch(() => { /* best-effort */ })
+      }
+      // Do NOT auto-exit here. On the alt-screen, exit() restores the primary
+      // buffer and wipes this success frame instantly — the user never gets to
+      // read it. Stay rendered; a keypress (handled in useInput) exits, after
+      // which command.ts reprints the durable summary to the primary buffer.
       return () => {
         cancelled = true
-        clearTimeout(timer)
         validationCleanupRef.current?.()
         validationCleanupRef.current = null
       }
@@ -1776,17 +2136,35 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
     }
   }, [step])
 
+  // Route between the inline render and the scroll viewer based on the live
+  // terminal size, BIDIRECTIONALLY (shrink → scroll, grow back → inline). See
+  // iOS sibling + resolveAiResultRoute for the full rationale.
+  useEffect(() => {
+    if (step !== 'ai-analysis-result' && step !== 'ai-analysis-result-scroll')
+      return
+    const next = resolveAiResultRoute({
+      current: step,
+      text: aiAnalysisText,
+      viewedFull: aiViewedFull,
+      terminalRows,
+      terminalCols,
+    })
+    if (next)
+      setStep(next)
+  }, [step, aiAnalysisText, aiViewedFull, terminalRows, terminalCols])
+
   const progressPct = ANDROID_STEP_PROGRESS[step] ?? 0
   const phaseLabel = getAndroidPhaseLabel(step)
-  // Steps that need fullscreen room: their content is taller than the wizard
-  // chrome would leave space for, and Ink can leak previous-frame content on
-  // transition when the previous frame overflowed. Hide chrome here so the
-  // tall content fits cleanly.
-  // GHA flow steps hide Progress + Logs to avoid chrome-in-chrome-out flashing
-  // between steps. Header stays visible across the whole flow (only
-  // `requesting-build` hides it, because that step streams live build output).
-  const tallStep = step === 'requesting-build'
-    || step === 'detecting-ci-secrets'
+  // See iOS sibling: conditional Header, visible on every interactive step
+  // including the AI sub-flow, hidden on `requesting-build`, the scrollable AI
+  // viewer, and the fullscreen workflow diff so those get the full terminal
+  // height.
+  const isAiResultScroll = step === 'ai-analysis-result-scroll'
+  const isAiStep = step === 'ai-analysis-prompt' || step === 'ai-analysis-running' || step === 'ai-analysis-result' || isAiResultScroll
+  // Tall fullscreen-style steps from the post-build GitHub Actions / .env
+  // export flow hide Progress + Logs to avoid chrome-in-chrome-out flashing
+  // between steps. Header stays visible across the whole flow.
+  const tallStep = step === 'detecting-ci-secrets'
     || step === 'checking-ci-secrets'
     || step === 'ask-github-actions-setup'
     || step === 'confirm-secrets-push'
@@ -1806,13 +2184,82 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
     || step === 'overwrite-and-export-env'
     || step === 'ci-secrets-failed'
     || step === 'confirm-ci-secret-overwrite'
-  const showProgress = step !== 'welcome' && step !== 'error' && step !== 'build-complete' && !tallStep
-  const showHeader = step !== 'requesting-build' && step !== 'view-workflow-diff'
-  const showLog = step !== 'build-complete' && !tallStep
-  return (
-    <Box flexDirection="column" padding={1}>
-      {showHeader && <Header />}
+  const showHeader = step !== 'requesting-build' && step !== 'view-workflow-diff' && !isAiResultScroll
+  const showProgress = step !== 'welcome' && step !== 'error' && step !== 'build-complete' && step !== 'requesting-build' && step !== 'ai-analysis-result' && !isAiResultScroll && !tallStep
+  const showLog = step !== 'requesting-build' && step !== 'build-complete' && !isAiStep && !tallStep
 
+  // Streaming build output is a fullscreen takeover — see iOS sibling. As an
+  // early return BEFORE the size gate it auto-tails inside a viewport that always
+  // fits, so the unbounded output never trips "terminal too small": shrinking the
+  // window mid-build keeps the live log on screen instead of hiding it behind the
+  // resize prompt. (Matches the iOS app's ordering.)
+  if (step === 'requesting-build')
+    return <FullscreenBuildOutput title="Building..." lines={buildOutput} terminalRows={terminalRows} />
+
+  // Fullscreen AI viewer is a takeover too — early return BEFORE the gate so it
+  // owns the whole terminal (it paginates to the live size itself) and a mid-view
+  // shrink can't replace the scrollable analysis with the resize prompt.
+  if (isAiResultScroll && aiAnalysisText)
+    return (
+      <FullscreenAiViewer
+        title="AI analysis"
+        subtitle={`${aiAnalysisText.split('\n').length} lines — scrollable because the analysis is taller than your terminal`}
+        lines={aiAnalysisText.split('\n')}
+        terminalRows={terminalRows}
+        onExit={() => {
+          setAiViewedFull(true)
+          setStep('ai-analysis-result')
+        }}
+      />
+    )
+
+  // The workflow-file diff is a fullscreen takeover too (same reasoning as the
+  // AI/build viewers): rendered inside the wizard Box it inherited the header +
+  // padding (a large top gap) and a too-short viewport. As an early return it
+  // owns the whole terminal and fills it.
+  if (step === 'view-workflow-diff' && previewDiff.length > 0)
+    return (
+      <FullscreenDiffViewer
+        title={previewIsNew
+          ? `🆕  Proposed new file — ${previewExistingPath ?? WORKFLOW_PATH}`
+          : `✏️  Proposed changes — ${previewExistingPath ?? WORKFLOW_PATH}`}
+        subtitle={previewIsNew
+          ? 'Nothing exists on disk yet. Every line below is what would be written.'
+          : 'Proposed diff vs the file on disk. Lines marked - would be removed, lines marked + would be added.'}
+        lines={previewDiff}
+        terminalRows={terminalRows}
+        onExit={() => {
+          trackWorkflowEvent('workflow-diff-closed', { decision: 'close' })
+          setStep('preview-workflow-file')
+        }}
+      />
+    )
+
+  // Size gate (resize-reactive): below the enforced floor, render the resize
+  // prompt from THIS mounted component so all in-progress state is preserved — a
+  // shrink shows the prompt, a re-grow shows the exact same step. Placed AFTER the
+  // fullscreen build/AI takeovers above (which own the whole screen and must not
+  // be hidden by the prompt) but before the normal step body. Matches iOS.
+  if (!terminalFitsOnboarding(terminalCols, terminalRows, 'android'))
+    return <TerminalTooSmallPrompt cols={terminalCols} rows={terminalRows} minRows={ANDROID_MIN_ROWS} />
+
+  // `minHeight={terminalRows}` fills the viewport so Ink always uses its full
+  // clear-screen redraw path, which avoids stale rows lingering after the
+  // terminal shrinks. See iOS sibling for the full explanation.
+  return (
+    <Box flexDirection="column" minHeight={terminalRows} padding={1}>
+      {showHeader && <Header />}
+      {/* Banner pinned top; this flex spacer pushes the rest (log + body) to the
+          bottom. Collapses to zero on a tight terminal (frame-fit unaffected);
+          absorbs extra rows on a tall one. See iOS sibling. */}
+      <Box flexGrow={1} />
+      {/* Completed-steps log — OUTSIDE the measured body, capped to the rows the
+          current step leaves (see logMaxRows + iOS sibling); CompletedStepsLog
+          drops its leading gap when it collapses to one line. */}
+      {showLog && <CompletedStepsLog entries={logLines} maxRows={logMaxRows} />}
+      {/* Body: the current step (+ progress). Measured via `bodyRef`; the log
+          above is excluded so the height is independent of completed-step count. */}
+      <Box flexDirection="column" ref={bodyRef}>
       {showProgress && (
         <Box flexDirection="column" marginTop={1}>
           <Text bold color="cyan">{phaseLabel}</Text>
@@ -1828,1025 +2275,777 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
         </Box>
       )}
 
-      {showLog && logLines.length > 0 && (
-        <Box flexDirection="column" marginTop={1}>
-          {logLines.map((entry, i) => (
-            <Text key={i} color={entry.color as any}>{entry.text}</Text>
-          ))}
-        </Box>
-      )}
+      {/* Resume-or-restart prompt — only reachable when initialProgress is
+          non-null AND getAndroidResumeStep didn't resolve to 'welcome'. The
+          initial step useState above wires this branch. */}
+      {step === 'resume-prompt' && initialProgress && (() => {
+        const { startedAt, keystoreMethod, serviceAccountMethod, completedSteps } = initialProgress
+        // Defensive date parse: legacy / corrupted progress files can carry an
+        // unparseable startedAt — show the raw string with a dim suffix instead
+        // of crashing the wizard.
+        let whenLabel: string
+        try {
+          const d = new Date(startedAt)
+          if (Number.isNaN(d.getTime()))
+            throw new Error('NaN')
+          whenLabel = d.toLocaleString()
+        }
+        catch {
+          whenLabel = `${startedAt} (could not parse)`
+        }
+        const keystoreLabel = keystoreMethod === 'existing'
+          ? 'Import existing keystore'
+          : keystoreMethod === 'generate' ? 'Generate new keystore' : 'Not chosen yet'
+        const saLabel = serviceAccountMethod === 'existing'
+          ? 'Import existing JSON'
+          : serviceAccountMethod === 'generate' ? 'Create via Google' : null
+        const keystoreReady = Boolean(completedSteps.keystoreReady)
+        const androidPackage = completedSteps.androidPackageChosen
+        // The service-account fork governs which downstream breadcrumbs make
+        // sense. On the import path the user never signs in with Google or
+        // picks a GCP project, so surfacing "Signed in with Google: No" there
+        // is misleading — only show the OAuth-path lines once the user is
+        // actually on (or has made progress along) that path. The import line
+        // likewise only shows on the import path. Before either is chosen we
+        // show neither, so a user who's about to auto-import isn't told they
+        // haven't done OAuth steps that don't apply to them.
+        const onImportPath = serviceAccountMethod === 'existing'
+        const onOAuthPath = serviceAccountMethod === 'generate' || hasAnyOAuthProgress(initialProgress)
+        const signedIn = completedSteps.googleSignInComplete
+        const playAccount = completedSteps.playAccountChosen
+        const gcpProject = completedSteps.gcpProjectChosen
+        const saProvisioned = completedSteps.serviceAccountProvisioned
+        const resumeLabel = getAndroidPhaseLabel(startStep) || startStep
+        return (
+          <Box flexDirection="column" marginTop={1} gap={1}>
+            <Text bold color="cyan">{`↩️  Found in-progress onboarding for ${appId}`}</Text>
+            <Text>Pick up where you left off, or start over from the welcome step.</Text>
+            <Box flexDirection="column">
+              <Text>{`•  Started: ${whenLabel}`}</Text>
+              <Text>{`•  Keystore method: ${keystoreLabel}`}</Text>
+              {saLabel && <Text>{`•  Service account method: ${saLabel}`}</Text>}
+              <Text>{`•  Keystore ready: ${keystoreReady ? `Yes (${completedSteps.keystoreReady!.keystorePath})` : 'No'}`}</Text>
+              {onImportPath && (
+                <Text>{`•  Service account JSON: ${initialProgress.serviceAccountJsonPath ? `selected (${initialProgress.serviceAccountJsonPath})` : 'not selected yet'}`}</Text>
+              )}
+              {onOAuthPath && (
+                <Text>{`•  Signed in with Google: ${signedIn ? `Yes (${signedIn.email})` : 'No'}`}</Text>
+              )}
+              {onOAuthPath && (
+                <Text>{`•  Play Developer account: ${playAccount ? `Yes (${playAccount.displayName || playAccount.developerId})` : 'No'}`}</Text>
+              )}
+              {onOAuthPath && (
+                <Text>{`•  GCP project: ${gcpProject ? `Yes (${gcpProject.displayName})` : 'No'}`}</Text>
+              )}
+              {(onImportPath || onOAuthPath) && (
+                <Text>{`•  Android package: ${androidPackage ? `Yes (${androidPackage.packageName})` : 'No'}`}</Text>
+              )}
+              {onOAuthPath && (
+                <Text>{`•  Service account provisioned: ${saProvisioned ? `Yes (${saProvisioned.email})` : 'No'}`}</Text>
+              )}
+              <Text dimColor>{`•  Resume target: ${resumeLabel}`}</Text>
+            </Box>
+            <Select
+              options={[
+                { label: '▶️  Continue from where I left off', value: 'continue' },
+                { label: '🔄  Restart onboarding (wipe saved progress)', value: 'restart' },
+              ]}
+              onChange={async (value) => {
+                // @inkjs/ui re-fire guard — see selectFiredRef JSDoc.
+                if (selectFiredRef.current)
+                  return
+                selectFiredRef.current = true
+                // Record which branch the user took. The funnel already shows
+                // the resume-prompt step + the next step (welcome on restart,
+                // the resume target on continue), but the explicit choice tag
+                // gives a clean continue-vs-restart split without inferring it.
+                trackAction('resume_prompt_decision', { choice: value })
+                if (value === 'continue') {
+                  // Now that the user has committed to picking up where they
+                  // left off, replay the breadcrumb log so they see the
+                  // in-progress state they're resuming into. Held back at
+                  // mount so the resume-prompt screen itself wasn't surrounded
+                  // by stale "✔ …" entries while they were still deciding.
+                  hydrateCompletedLog()
+                  setStep(startStep)
+                  return
+                }
+                await resetForFreshStart()
+                addLog('↩️  Restarted — fresh start', 'yellow')
+                setStep('welcome')
+              }}
+            />
+          </Box>
+        )
+      })()}
+      {step === 'welcome' && <WelcomeStep />}
 
-      {step === 'welcome' && (
-        <Box marginTop={1} justifyContent="center">
-          <SpinnerLine text="Detecting Android project..." />
-        </Box>
-      )}
-
-      {step === 'no-platform' && (
-        <Box flexDirection="column" marginTop={1}>
-          <ErrorLine text={`No ${androidDir}/ directory found.`} />
-          <Newline />
-          <Text>Run <Text bold color="white">npx cap add android</Text> first, then re-run onboarding.</Text>
-        </Box>
-      )}
+      {step === 'no-platform' && <NoPlatformStep androidDir={androidDir} dense={false} />}
 
       {step === 'credentials-exist' && (
-        <Box flexDirection="column" marginTop={1}>
-          <Text bold color="yellow">⚠ Android credentials already exist for {appId}</Text>
-          <Newline />
-          <Text>Onboarding will create new credentials, replacing the existing ones.</Text>
-          <Newline />
-          <Select
-            options={[
-              { label: '📦  Start fresh (backup existing credentials first)', value: 'backup' },
-              { label: '✖  Exit onboarding', value: 'exit' },
-            ]}
-            onChange={(value) => {
-              if (value === 'backup')
-                setStep('backing-up')
-              else
-                exitOnboarding('Exiting onboarding.')
-            }}
-          />
-        </Box>
+        <CredentialsExistStep
+          appId={appId}
+          dense={false}
+          onChoose={(choice) => {
+            if (choice === 'backup')
+              setStep('backing-up')
+            else
+              exitOnboarding('Exiting onboarding.')
+          }}
+        />
       )}
 
-      {step === 'backing-up' && (
-        <Box marginTop={1}><SpinnerLine text="Backing up existing credentials..." /></Box>
-      )}
+      {step === 'backing-up' && <BackingUpStep />}
 
       {/* ── Phase 1 — Keystore ── */}
 
       {step === 'keystore-method-select' && (
-        <Box flexDirection="column" marginTop={1}>
-          <Alert variant="info">
-            Android apps must be signed by a keystore. Google Play requires the same keystore for every update, forever.
-          </Alert>
-          <Newline />
-          <Text bold>Do you already have a keystore?</Text>
-          <Newline />
-          <Select
-            options={[
-              { label: '✅  Yes, I have one', value: 'existing' },
-              { label: '🆕  No, create one for me', value: 'generate' },
-              { label: 'ℹ️   What is a keystore?', value: 'learn' },
-            ]}
-            onChange={(value) => {
-              if (value === 'learn') {
-                setStep('keystore-explainer')
-              }
-              else if (value === 'existing') {
-                setKeystoreMethod('existing')
-                persistAndStep((p) => ({ ...p, keystoreMethod: 'existing' }), 'keystore-existing-path')
-              }
-              else {
-                setKeystoreMethod('generate')
-                persistAndStep((p) => ({ ...p, keystoreMethod: 'generate' }), 'keystore-new-alias')
-              }
-            }}
-          />
-        </Box>
+        <KeystoreMethodSelectStep
+          dense={false}
+          onChoose={(choice) => {
+            if (choice === 'learn') {
+              setStep('keystore-explainer')
+            }
+            else if (choice === 'existing') {
+              setKeystoreMethod('existing')
+              persistAndStep((p) => ({ ...p, keystoreMethod: 'existing' }), 'keystore-existing-path')
+            }
+            else {
+              setKeystoreMethod('generate')
+              persistAndStep((p) => ({ ...p, keystoreMethod: 'generate' }), 'keystore-new-alias')
+            }
+          }}
+        />
       )}
 
       {step === 'keystore-explainer' && (
-        <Box flexDirection="column" marginTop={1}>
-          <Alert variant="info">
-            A keystore is a file that holds a cryptographic key used to sign your Android app.
-          </Alert>
-          <Newline />
-          <Box flexDirection="column" marginLeft={2}>
-            <Text>• Google Play uses the key to verify that every update really came from you.</Text>
-            <Text>• You must use the <Text bold>same</Text> keystore for every release of this app.</Text>
-            <Text>• If you lose it, you lose the ability to publish updates.</Text>
-            <Text>• If you&apos;ve never published this app before, let us create one for you.</Text>
-          </Box>
-          <Newline />
-          <Select options={[{ label: '← Back', value: 'back' }]} onChange={() => setStep('keystore-method-select')} />
-        </Box>
+        <KeystoreExplainerStep dense={false} onBack={() => setStep('keystore-method-select')} />
       )}
 
       {step === 'keystore-existing-path' && (
-        <Box flexDirection="column" marginTop={1}>
-          <Text bold>Existing keystore (.jks, .keystore, or .p12)</Text>
-          <Newline />
-          {canUseFilePicker() && keystorePathMode === 'choose'
-            ? (
-                <>
-                  <Text>How do you want to provide it?</Text>
-                  <Newline />
-                  <Select
-                    options={[
-                      { label: '📂  Open file picker', value: 'picker' },
-                      { label: '📝  Type the path', value: 'manual' },
-                    ]}
-                    onChange={(value) => {
-                      if (value === 'picker')
-                        setStep('keystore-existing-picker')
-                      else
-                        setKeystorePathMode('manual')
-                    }}
-                  />
-                </>
-              )
-            : (
-                <>
-                  <Text dimColor>Tip: drag a file into this window to paste its path.</Text>
-                  <Newline />
-                  <FilteredTextInput
-                    placeholder="/path/to/release.jks"
-                    filter=""
-                    onSubmit={(val) => {
-                      const cleaned = cleanPath(val)
-                      if (!cleaned)
-                        return
-                      const abs = resolvePath(cleaned)
-                      if (!existsSync(abs)) {
-                        setError(`File not found: ${abs}`)
-                        setRetryStep('keystore-existing-path')
-                        setStep('error')
-                        return
-                      }
-                      setKeystoreExistingPath(abs)
-                      addLog(`✔ Keystore selected · ${abs}`)
-                      persistAndStep((p) => ({ ...p, keystoreExistingPath: abs }), 'keystore-existing-store-password')
-                    }}
-                  />
-                </>
-              )}
-        </Box>
+        <KeystoreExistingPathStep
+          dense={false}
+          showChooser={canUseFilePicker() && keystorePathMode === 'choose'}
+          onChoosePicker={() => setStep('keystore-existing-picker')}
+          onChooseManual={() => setKeystorePathMode('manual')}
+          onSubmitPath={(val) => {
+            const cleaned = cleanPath(val)
+            if (!cleaned)
+              return
+            const abs = resolvePath(cleaned)
+            if (!existsSync(abs)) {
+              setError(`File not found: ${abs}`)
+              setRetryStep('keystore-existing-path')
+              setStep('error')
+              return
+            }
+            setKeystoreExistingPath(abs)
+            addLog(`✔ Keystore selected · ${abs}`)
+            persistAndStep((p) => ({ ...p, keystoreExistingPath: abs }), 'keystore-existing-store-password')
+          }}
+        />
       )}
 
-      {step === 'keystore-existing-picker' && (
-        <Box marginTop={1}><SpinnerLine text="Waiting for file selection..." /></Box>
-      )}
+      {step === 'keystore-existing-picker' && <KeystoreExistingPickerStep />}
 
       {step === 'keystore-existing-store-password' && (
-        <Box flexDirection="column" marginTop={1}>
-          <Text bold>Store password:</Text>
-          <Text dimColor>We'll use this to unlock the keystore and auto-detect the alias.</Text>
-          <Newline />
-          <FilteredTextInput
-            placeholder="(hidden)"
-            filter=""
-            mask
-            onSubmit={(val) => {
-              if (!val) {
-                setError('Store password cannot be empty')
-                setRetryStep('keystore-existing-store-password')
-                setStep('error')
-                return
-              }
-              setKeystoreStorePassword(val)
-              addLog('✔ Store password set')
-              persistAndStep((p) => ({ ...p, keystoreStorePassword: val }), 'keystore-existing-detecting-alias')
-            }}
-          />
-        </Box>
+        <KeystoreExistingStorePasswordStep
+          dense={false}
+          onSubmit={(val) => {
+            if (!val) {
+              setError('Store password cannot be empty')
+              setRetryStep('keystore-existing-store-password')
+              setStep('error')
+              return
+            }
+            setKeystoreStorePassword(val)
+            addLog('✔ Store password set')
+            persistAndStep((p) => ({ ...p, keystoreStorePassword: val }), 'keystore-existing-detecting-alias')
+          }}
+        />
       )}
 
-      {step === 'keystore-existing-detecting-alias' && (
-        <Box marginTop={1}><SpinnerLine text="Unlocking keystore and reading aliases..." /></Box>
-      )}
+      {step === 'keystore-existing-detecting-alias' && <KeystoreExistingDetectingAliasStep />}
 
       {step === 'keystore-existing-alias-select' && (
-        <Box flexDirection="column" marginTop={1}>
-          <Text bold>Multiple aliases in the keystore. Which one do you use for this app?</Text>
-          <Newline />
-          <Select
-            options={detectedAliases.map(a => ({ label: a, value: a }))}
-            onChange={(value) => {
-              setKeystoreAlias(value)
-              addLog(`✔ Alias selected · ${value}`)
-              persistAndStep((p) => ({ ...p, keystoreAlias: value }), 'keystore-existing-key-password')
-            }}
-          />
-        </Box>
+        <KeystoreExistingAliasSelectStep
+          dense={false}
+          aliases={detectedAliases}
+          onSelect={(value) => {
+            setKeystoreAlias(value)
+            addLog(`✔ Alias selected · ${value}`)
+            persistAndStep((p) => ({ ...p, keystoreAlias: value }), 'keystore-existing-key-password')
+          }}
+        />
       )}
 
       {step === 'keystore-existing-alias' && (
-        <Box flexDirection="column" marginTop={1}>
-          <Text bold>Key alias:</Text>
-          <Text dimColor>We couldn't auto-detect it — please enter it manually.</Text>
-          <Newline />
-          <FilteredTextInput
-            placeholder="release"
-            filter=""
-            onSubmit={(val) => {
-              const alias = val.trim() || RELEASE_ALIAS_DEFAULT
-              setKeystoreAlias(alias)
-              addLog(`✔ Key alias · ${alias}`)
-              persistAndStep((p) => ({ ...p, keystoreAlias: alias }), 'keystore-existing-key-password')
-            }}
-          />
-        </Box>
+        <KeystoreExistingAliasStep
+          dense={false}
+          onSubmit={(val) => {
+            const alias = val.trim() || RELEASE_ALIAS_DEFAULT
+            setKeystoreAlias(alias)
+            addLog(`✔ Key alias · ${alias}`)
+            persistAndStep((p) => ({ ...p, keystoreAlias: alias }), 'keystore-existing-key-password')
+          }}
+        />
       )}
 
-      {step === 'keystore-existing-key-password' && keyPasswordProbe !== 'prompt' && (
-        <Box marginTop={1}>
-          <SpinnerLine text="Checking if the key uses the same password as the store..." />
-        </Box>
-      )}
-
-      {step === 'keystore-existing-key-password' && keyPasswordProbe === 'prompt' && (
-        <Box flexDirection="column" marginTop={1}>
-          <Text bold>Key password (press Enter to use the same as store password):</Text>
-          <Newline />
-          <FilteredTextInput
-            placeholder="(hidden — same as store)"
-            filter=""
-            mask
-            onSubmit={(val) => {
-              const keyPw = val || keystoreStorePassword
-              setKeystoreKeyPassword(keyPw)
-              addLog('✔ Key password set')
-              ;(async () => {
-                try {
-                  const bytes = await readFile(keystoreExistingPath)
-                  const base64 = bytes.toString('base64')
-                  const ready: KeystoreReady = {
-                    keystorePath: keystoreExistingPath,
-                    alias: keystoreAlias || RELEASE_ALIAS_DEFAULT,
-                    isGenerated: false,
-                  }
-                  setKeystoreBase64(base64)
-                  setKeystoreReady(ready)
-                  await persist((p) => ({
-                    ...p,
-                    keystoreKeyPassword: keyPw,
-                    _keystoreBase64: base64,
-                    serviceAccountForkSeen: true,
-                    completedSteps: { ...p.completedSteps, keystoreReady: ready },
-                  }))
-                  addLog(`✔ Keystore loaded — ${keystoreExistingPath}`)
-                  // Smart-route: same pattern as the auto-probe branch above.
-                  // If the user has any OAuth-side progress (legacy resume or
-                  // mid-flow), pick up where they left off; otherwise drop
-                  // them on the new fork.
-                  const fresh = await loadAndroidProgress(appId)
-                  const hasOAuthProgress = fresh ? hasAnyOAuthProgress(fresh) : false
-                  if (hasOAuthProgress || fresh?.serviceAccountMethod !== undefined)
-                    setStep(fresh ? getAndroidResumeStep(fresh) : 'service-account-method-select')
-                  else
-                    setStep('service-account-method-select')
+      {step === 'keystore-existing-key-password' && (
+        <KeystoreExistingKeyPasswordStep
+          dense={false}
+          mode={keyPasswordProbe === 'prompt' ? 'prompt' : 'probing'}
+          onSubmit={(val) => {
+            const keyPw = val || keystoreStorePassword
+            setKeystoreKeyPassword(keyPw)
+            addLog('✔ Key password set')
+            ;(async () => {
+              try {
+                const bytes = await readFile(keystoreExistingPath)
+                const base64 = bytes.toString('base64')
+                const ready: KeystoreReady = {
+                  keystorePath: keystoreExistingPath,
+                  alias: keystoreAlias || RELEASE_ALIAS_DEFAULT,
+                  isGenerated: false,
                 }
-                catch (err) {
-                  handleError(err, 'keystore-existing-path')
-                }
-              })()
-            }}
-          />
-        </Box>
+                setKeystoreBase64(base64)
+                setKeystoreReady(ready)
+                await persist((p) => ({
+                  ...p,
+                  keystoreKeyPassword: keyPw,
+                  _keystoreBase64: base64,
+                  serviceAccountForkSeen: true,
+                  completedSteps: { ...p.completedSteps, keystoreReady: ready },
+                }))
+                addLog(`✔ Keystore loaded — ${keystoreExistingPath}`)
+                // Smart-route: same pattern as the auto-probe branch above.
+                // If the user has any OAuth-side progress (legacy resume or
+                // mid-flow), pick up where they left off; otherwise drop
+                // them on the new fork.
+                const fresh = await loadAndroidProgress(appId)
+                const hasOAuthProgress = fresh ? hasAnyOAuthProgress(fresh) : false
+                if (hasOAuthProgress || fresh?.serviceAccountMethod !== undefined)
+                  setStep(fresh ? getAndroidResumeStep(fresh) : 'service-account-method-select')
+                else
+                  setStep('service-account-method-select')
+              }
+              catch (err) {
+                handleError(err, 'keystore-existing-path')
+              }
+            })()
+          }}
+        />
       )}
 
       {step === 'keystore-new-alias' && (
-        <Box flexDirection="column" marginTop={1}>
-          <Text bold>Key alias (press Enter for "release"):</Text>
-          <Newline />
-          <FilteredTextInput
-            placeholder="release"
-            filter=""
-            onSubmit={(val) => {
-              const alias = val.trim() || RELEASE_ALIAS_DEFAULT
-              setKeystoreAlias(alias)
-              addLog(`✔ Key alias · ${alias}`)
-              persistAndStep((p) => ({ ...p, keystoreAlias: alias }), 'keystore-new-password-method')
-            }}
-          />
-        </Box>
+        <KeystoreNewAliasStep
+          dense={false}
+          onSubmit={(val) => {
+            const alias = val.trim() || RELEASE_ALIAS_DEFAULT
+            setKeystoreAlias(alias)
+            addLog(`✔ Key alias · ${alias}`)
+            persistAndStep((p) => ({ ...p, keystoreAlias: alias }), 'keystore-new-password-method')
+          }}
+        />
       )}
 
       {step === 'keystore-new-password-method' && (
-        <Box flexDirection="column" marginTop={1}>
-          <Text bold>How would you like to set the keystore password?</Text>
-          <Newline />
-          <Select
-            options={[
-              { label: '🔐  Generate a strong random password (recommended)', value: 'random' },
-              { label: '✍️   I\'ll set my own', value: 'manual' },
-            ]}
-            onChange={(value) => {
-              if (value === 'random') {
-                const pw = generateRandomPassword()
-                setKeystoreStorePassword(pw)
-                setKeystoreKeyPassword(pw)
-                setRandomPasswordGenerated(true)
-                addLog('✔ Store + key passwords generated')
-                persistAndStep((p) => ({ ...p, keystoreStorePassword: pw, keystoreKeyPassword: pw }), 'keystore-new-cn')
-              }
-              else {
-                setStep('keystore-new-store-password')
-              }
-            }}
-          />
-        </Box>
+        <KeystoreNewPasswordMethodStep
+          dense={false}
+          onChoose={(choice) => {
+            if (choice === 'random') {
+              const pw = generateRandomPassword()
+              setKeystoreStorePassword(pw)
+              setKeystoreKeyPassword(pw)
+              setRandomPasswordGenerated(true)
+              addLog('✔ Store + key passwords generated')
+              persistAndStep((p) => ({ ...p, keystoreStorePassword: pw, keystoreKeyPassword: pw }), 'keystore-new-cn')
+            }
+            else {
+              setStep('keystore-new-store-password')
+            }
+          }}
+        />
       )}
 
       {step === 'keystore-new-store-password' && (
-        <Box flexDirection="column" marginTop={1}>
-          <Text bold>Store password:</Text>
-          <Newline />
-          <FilteredTextInput
-            placeholder="(hidden, minimum 6 characters)"
-            filter=""
-            mask
-            onSubmit={(val) => {
-              if (val.length < 6) {
-                setError('Password must be at least 6 characters')
-                setRetryStep('keystore-new-store-password')
-                setStep('error')
-                return
-              }
-              setKeystoreStorePassword(val)
-              addLog('✔ Store password set')
-              persistAndStep((p) => ({ ...p, keystoreStorePassword: val }), 'keystore-new-key-password')
-            }}
-          />
-        </Box>
+        <KeystoreNewStorePasswordStep
+          dense={false}
+          onSubmit={(val) => {
+            if (val.length < 6) {
+              setError('Password must be at least 6 characters')
+              setRetryStep('keystore-new-store-password')
+              setStep('error')
+              return
+            }
+            setKeystoreStorePassword(val)
+            addLog('✔ Store password set')
+            persistAndStep((p) => ({ ...p, keystoreStorePassword: val }), 'keystore-new-key-password')
+          }}
+        />
       )}
 
       {step === 'keystore-new-key-password' && (
-        <Box flexDirection="column" marginTop={1}>
-          <Text bold>Key password (press Enter to match store password):</Text>
-          <Newline />
-          <FilteredTextInput
-            placeholder="(hidden — same as store)"
-            filter=""
-            mask
-            onSubmit={(val) => {
-              const keyPw = val || keystoreStorePassword
-              setKeystoreKeyPassword(keyPw)
-              addLog('✔ Key password set')
-              persistAndStep((p) => ({ ...p, keystoreKeyPassword: keyPw }), 'keystore-new-cn')
-            }}
-          />
-        </Box>
+        <KeystoreNewKeyPasswordStep
+          dense={false}
+          onSubmit={(val) => {
+            const keyPw = val || keystoreStorePassword
+            setKeystoreKeyPassword(keyPw)
+            addLog('✔ Key password set')
+            persistAndStep((p) => ({ ...p, keystoreKeyPassword: keyPw }), 'keystore-new-cn')
+          }}
+        />
       )}
 
       {step === 'keystore-new-cn' && (
-        <Box flexDirection="column" marginTop={1}>
-          <Text bold>Common Name for the certificate (press Enter to use app ID):</Text>
-          <Text dimColor>Google Play doesn&apos;t display this — default is safe.</Text>
-          <Newline />
-          <FilteredTextInput
-            placeholder={appId}
-            filter=""
-            onSubmit={(val) => {
-              const cn = val.trim() || appId
-              setKeystoreCommonName(cn)
-              addLog(`✔ Common name · ${cn}`)
-              persistAndStep((p) => ({ ...p, keystoreCommonName: cn }), 'keystore-generating')
-            }}
-          />
-        </Box>
+        <KeystoreNewCommonNameStep
+          dense={false}
+          appId={appId}
+          onSubmit={(val) => {
+            const cn = val.trim() || appId
+            setKeystoreCommonName(cn)
+            addLog(`✔ Common name · ${cn}`)
+            persistAndStep((p) => ({ ...p, keystoreCommonName: cn }), 'keystore-generating')
+          }}
+        />
       )}
 
-      {step === 'keystore-generating' && (
-        <Box marginTop={1}><SpinnerLine text="Generating 2048-bit RSA keystore..." /></Box>
-      )}
+      {step === 'keystore-generating' && <KeystoreGeneratingStep />}
 
       {/* ── Phase 2 — Service account method fork ── */}
 
       {step === 'service-account-method-select' && (
-        <Box flexDirection="column" marginTop={1}>
-          <Alert variant="info">
-            Capgo needs a Google Play service account JSON to upload AABs on your behalf. You can bring your own or let Capgo set one up via Google sign-in.
-          </Alert>
-          <Newline />
-          <Text bold>Do you already have a service account JSON?</Text>
-          <Newline />
-          <Select
-            options={[
-              { label: '🔐  No, set one up for me via Google', value: 'generate' },
-              { label: '✅  Yes, I have my service account JSON file', value: 'existing' },
-            ]}
-            onChange={(value) => {
-              if (selectFiredRef.current)
-                return
-              selectFiredRef.current = true
-              const method: 'existing' | 'generate' = value === 'existing' ? 'existing' : 'generate'
-              setServiceAccountMethod(method)
-              trackAction('android_sa_method_selected', { method })
-              if (method === 'existing') {
-                // Import path needs the package name first so validation can
-                // probe edits.insert(packageName). The package-select step is
-                // shared with the OAuth path and routes back here based on
-                // serviceAccountMethod.
-                persistAndStep(
-                  (p) => ({ ...p, serviceAccountMethod: 'existing' }),
-                  'android-package-select',
-                )
-              }
-              else {
-                persistAndStep(
-                  (p) => ({ ...p, serviceAccountMethod: 'generate' }),
-                  'google-sign-in',
-                )
-              }
-            }}
-          />
-        </Box>
+        <ServiceAccountMethodSelectStep
+          dense={false}
+          onChoose={(method) => {
+            if (selectFiredRef.current)
+              return
+            selectFiredRef.current = true
+            setServiceAccountMethod(method)
+            trackAction('android_sa_method_selected', { method })
+            if (method === 'existing') {
+              // Import path needs the package name first so validation can
+              // probe edits.insert(packageName). The package-select step is
+              // shared with the OAuth path and routes back here based on
+              // serviceAccountMethod.
+              persistAndStep(
+                (p) => ({ ...p, serviceAccountMethod: 'existing' }),
+                'android-package-select',
+              )
+            }
+            else {
+              persistAndStep(
+                (p) => ({ ...p, serviceAccountMethod: 'generate' }),
+                'google-sign-in',
+              )
+            }
+          }}
+        />
       )}
 
       {/* ── Phase 2a — Import existing service account JSON ── */}
 
       {step === 'sa-json-existing-path' && (
-        <Box flexDirection="column" marginTop={1}>
-          <Text bold>Existing service account JSON (.json)</Text>
-          <Newline />
-          {canUseFilePicker() && saJsonPathMode === 'choose'
-            ? (
-                <>
-                  <Text>How do you want to provide it?</Text>
-                  <Newline />
-                  <Select
-                    options={[
-                      { label: '📂  Open file picker', value: 'picker' },
-                      { label: '📝  Type the path', value: 'manual' },
-                    ]}
-                    onChange={(value) => {
-                      // 'manual' just flips the sub-mode (Select unmounts) and
-                      // is safe from the re-fire bug. 'picker' triggers a step
-                      // transition that takes time — guard against re-fires
-                      // before commit.
-                      if (value === 'picker') {
-                        if (selectFiredRef.current)
-                          return
-                        selectFiredRef.current = true
-                        setStep('sa-json-existing-picker')
-                      }
-                      else {
-                        setSaJsonPathMode('manual')
-                      }
-                    }}
-                  />
-                </>
-              )
-            : (
-                <>
-                  <Text dimColor>Tip: drag a file into this window to paste its path.</Text>
-                  <Newline />
-                  <FilteredTextInput
-                    placeholder="/path/to/service-account.json"
-                    filter=""
-                    onSubmit={(val) => {
-                      const cleaned = cleanPath(val)
-                      if (!cleaned)
-                        return
-                      const abs = resolvePath(cleaned)
-                      if (!existsSync(abs)) {
-                        setError(`File not found: ${abs}`)
-                        setRetryStep('sa-json-existing-path')
-                        setStep('error')
-                        return
-                      }
-                      setServiceAccountJsonPath(abs)
-                      addLog(`✔ Service account JSON · ${abs}`)
-                      persistAndStep(
-                        (p) => ({ ...p, serviceAccountJsonPath: abs }),
-                        'sa-json-validating',
-                      )
-                    }}
-                  />
-                </>
-              )}
-        </Box>
+        <SaJsonExistingPathStep
+          dense={false}
+          showChooser={canUseFilePicker() && saJsonPathMode === 'choose'}
+          onChoosePicker={() => {
+            // The picker triggers a step transition that takes time — guard
+            // against the @inkjs/ui re-fire bug before commit.
+            if (selectFiredRef.current)
+              return
+            selectFiredRef.current = true
+            setStep('sa-json-existing-picker')
+          }}
+          onChooseManual={() => {
+            // 'manual' just flips the sub-mode (Select unmounts) and is safe
+            // from the re-fire bug.
+            setSaJsonPathMode('manual')
+          }}
+          onSubmitPath={(val) => {
+            const cleaned = cleanPath(val)
+            if (!cleaned)
+              return
+            const abs = resolvePath(cleaned)
+            if (!existsSync(abs)) {
+              setError(`File not found: ${abs}`)
+              setRetryStep('sa-json-existing-path')
+              setStep('error')
+              return
+            }
+            setServiceAccountJsonPath(abs)
+            addLog(`✔ Service account JSON · ${abs}`)
+            persistAndStep(
+              (p) => ({ ...p, serviceAccountJsonPath: abs }),
+              'sa-json-validating',
+            )
+          }}
+        />
       )}
 
-      {step === 'sa-json-existing-picker' && (
-        <Box marginTop={1}><SpinnerLine text="Opening file picker..." /></Box>
-      )}
+      {step === 'sa-json-existing-picker' && <SaJsonExistingPickerStep />}
 
-      {step === 'sa-json-validating' && (
-        <Box marginTop={1}>
-          <SpinnerLine text="Validating service account against Google Play..." />
-        </Box>
-      )}
+      {step === 'sa-json-validating' && <SaJsonValidatingStep />}
 
       {step === 'sa-json-validation-failed' && saValidationResult && !saValidationResult.ok && (
-        <Box flexDirection="column" marginTop={1}>
-          <Alert variant="warning">
-            Service account validation failed.
-          </Alert>
-          <Newline />
-          <Box flexDirection="column" marginLeft={2}>
-            <Text color="red">{saValidationResult.message}</Text>
-          </Box>
-          <Newline />
-          <Text bold>What would you like to do?</Text>
-          <Newline />
-          <Select
-            options={[
-              { label: '🔄  Try a different service account file', value: 'retry' },
-              { label: '💾  Save credentials anyway (skip validation)', value: 'save-anyway' },
-              { label: '🆕  Set up a new service account via Google', value: 'oauth' },
-            ]}
-            onChange={(value) => {
-              if (selectFiredRef.current)
-                return
-              selectFiredRef.current = true
-              // Defense-in-depth: the validation failure's errorCategory has
-              // already been emitted on the `sa-json-validation-failed` step
-              // event. Clearing the ref before leaving this step ensures any
-              // subsequent error (e.g. disk failure at `saving-credentials`,
-              // a failed re-validation, or an OAuth issue downstream) gets
-              // its own freshly-mapped category instead of inheriting the
-              // stale SA validation one. `handleError` overwrites this ref
-              // before transitioning to `'error'`, so today this is
-              // belt-and-suspenders — but it makes the ref's invariant
-              // ("most recent unresolved error context") true at every
-              // sa-json-validation-failed exit point.
-              errorCategoryRef.current = undefined
-              if (value === 'retry') {
-                trackAction('android_sa_validation_recovery_selected', { recovery_action: 'retry' })
-                // Clear the saved path so the picker chooser shows fresh.
-                setServiceAccountJsonPath('')
-                setSaValidationResult(null)
-                setSaJsonPathMode('choose')
-                persistAndStep(
-                  (p) => ({ ...p, serviceAccountJsonPath: undefined }),
-                  'sa-json-existing-path',
-                )
-                return
-              }
-              if (value === 'save-anyway') {
-                trackAction('android_sa_validation_recovery_selected', { recovery_action: 'save_anyway' })
-                ;(async () => {
-                  try {
-                    if (!serviceAccountJsonPath)
-                      throw new Error('No service account JSON path on record.')
-                    const bytes = await readFile(serviceAccountJsonPath)
-                    const base64 = bytes.toString('base64')
-                    setServiceAccountKeyBase64(base64)
-                    await persist((p) => ({
-                      ...p,
-                      _serviceAccountKeyBase64: base64,
-                      serviceAccountValidationSkipped: true,
-                    }))
-                    addLog('⚠ Saved service account without validation — builds may fail if the SA isn\'t invited to your Play Console app.', 'yellow')
-                    setStep('saving-credentials')
-                  }
-                  catch (err) {
-                    handleError(err, 'sa-json-existing-path')
-                  }
-                })()
-                return
-              }
-              // oauth — fall back to the OAuth provisioning path.
-              trackAction('android_sa_validation_recovery_selected', { recovery_action: 'fallback_oauth' })
-              setServiceAccountMethod('generate')
+        <SaJsonValidationFailedStep
+          dense={false}
+          message={saValidationResult.message}
+          onChoose={(value) => {
+            if (selectFiredRef.current)
+              return
+            selectFiredRef.current = true
+            // Defense-in-depth: the validation failure's errorCategory has
+            // already been emitted on the `sa-json-validation-failed` step
+            // event. Clearing the ref before leaving this step ensures any
+            // subsequent error (e.g. disk failure at `saving-credentials`,
+            // a failed re-validation, or an OAuth issue downstream) gets
+            // its own freshly-mapped category instead of inheriting the
+            // stale SA validation one. `handleError` overwrites this ref
+            // before transitioning to `'error'`, so today this is
+            // belt-and-suspenders — but it makes the ref's invariant
+            // ("most recent unresolved error context") true at every
+            // sa-json-validation-failed exit point.
+            errorCategoryRef.current = undefined
+            if (value === 'retry') {
+              trackAction('android_sa_validation_recovery_selected', { recovery_action: 'retry' })
+              // Clear the saved path so the picker chooser shows fresh.
+              setServiceAccountJsonPath('')
               setSaValidationResult(null)
+              setSaJsonPathMode('choose')
               persistAndStep(
-                (p) => ({ ...p, serviceAccountMethod: 'generate' }),
-                'google-sign-in',
+                (p) => ({ ...p, serviceAccountJsonPath: undefined }),
+                'sa-json-existing-path',
               )
-            }}
-          />
-        </Box>
+              return
+            }
+            if (value === 'save-anyway') {
+              trackAction('android_sa_validation_recovery_selected', { recovery_action: 'save_anyway' })
+              ;(async () => {
+                try {
+                  if (!serviceAccountJsonPath)
+                    throw new Error('No service account JSON path on record.')
+                  const bytes = await readFile(serviceAccountJsonPath)
+                  const base64 = bytes.toString('base64')
+                  setServiceAccountKeyBase64(base64)
+                  await persist((p) => ({
+                    ...p,
+                    _serviceAccountKeyBase64: base64,
+                    serviceAccountValidationSkipped: true,
+                  }))
+                  addLog('⚠ Saved service account without validation — builds may fail if the SA isn\'t invited to your Play Console app.', 'yellow')
+                  setStep('saving-credentials')
+                }
+                catch (err) {
+                  handleError(err, 'sa-json-existing-path')
+                }
+              })()
+              return
+            }
+            // oauth — fall back to the OAuth provisioning path.
+            trackAction('android_sa_validation_recovery_selected', { recovery_action: 'fallback_oauth' })
+            setServiceAccountMethod('generate')
+            setSaValidationResult(null)
+            persistAndStep(
+              (p) => ({ ...p, serviceAccountMethod: 'generate' }),
+              'google-sign-in',
+            )
+          }}
+        />
       )}
 
       {/* ── Phase 2b — Google sign-in ── */}
 
       {step === 'google-sign-in' && !showOAuthLearnMore && (
-        <Box flexDirection="column" marginTop={1}>
-          <Alert variant="info">
-            Sign in with Google so Capgo can set up Play Store publishing on your account — your tokens never reach Capgo's servers.
-          </Alert>
-          <Newline />
-          <Text>We'll open Google's consent screen. The two access requests are:</Text>
-          <Box flexDirection="column" marginLeft={2} marginTop={1}>
-            <Text>• <Text bold>Google Cloud access</Text> — to create a service account in a project you pick</Text>
-            <Text>• <Text bold>Google Play Developer access</Text> — to invite that service account to your Play Console with release-only permissions</Text>
-          </Box>
-          <Newline />
-          <Select
-            options={[
-              { label: '🔐  Continue to Google sign-in', value: 'go' },
-              { label: 'ℹ️   Learn why the onboarding via Google is secure', value: 'learn' },
-              { label: '✖  Exit (I\'ll do it later)', value: 'exit' },
-            ]}
-            onChange={(value) => {
-              if (value === 'go')
-                setStep('google-sign-in-running')
-              else if (value === 'learn')
-                setShowOAuthLearnMore(true)
-              else
-                exitOnboarding('Run `capgo build init --platform android` again when ready.')
-            }}
-          />
-        </Box>
+        <GoogleSignInStep
+          dense={false}
+          onChoose={(value) => {
+            if (value === 'go')
+              setStep('google-sign-in-running')
+            else if (value === 'learn')
+              setShowOAuthLearnMore(true)
+            else
+              exitOnboarding('Run `capgo build init --platform android` again when ready.')
+          }}
+        />
       )}
 
       {step === 'google-sign-in' && showOAuthLearnMore && (
-        <Box flexDirection="column" marginTop={1}>
-          <Alert variant="info">
-            What Capgo can and can't do with the access you're about to grant.
-          </Alert>
-          <Newline />
-          <Box flexDirection="column" marginLeft={2}>
-            <Text bold>Can Capgo touch other GCP projects on my account?</Text>
-            <Text>The scope allows it, but this CLI only calls APIs against the project you'll pick on the next screen. It creates one service account named <Text color="cyan">capgo-native-build</Text> in that one project and stops.</Text>
-            <Newline />
-            <Text bold>Will Capgo upload anything to Play Store without me knowing?</Text>
-            <Text>No. The flow invites one service account into one app (the package you confirm) with release-only permissions. Future builds use that service account, not your OAuth tokens.</Text>
-            <Newline />
-            <Text bold>Can Capgo employees access my Google account?</Text>
-            <Text>No. The refresh token never leaves your machine. Capgo's servers only serve the OAuth client ID — they never see your tokens. When provisioning finishes, the CLI asks Google to revoke that token, so even your local copy stops working.</Text>
-            <Newline />
-            <Text bold>What if I change my mind later?</Text>
-            <Text>Revoke anytime at <Text color="cyan">myaccount.google.com/permissions</Text>, or just delete the service account in Google Cloud. Neither needs Capgo's involvement.</Text>
-            <Newline />
-            <Text dimColor>Capgo passed Google's OAuth verification on 2026-05-02 for these scopes. Source code: github.com/Cap-go/capgo</Text>
-          </Box>
-          <Newline />
-          <Select
-            options={[
-              { label: '← Back to sign-in', value: 'back' },
-            ]}
-            onChange={() => setShowOAuthLearnMore(false)}
-          />
-        </Box>
+        <GoogleSignInLearnMoreStep dense={false} onBack={() => setShowOAuthLearnMore(false)} />
       )}
 
       {step === 'google-sign-in-running' && (
-        <Box flexDirection="column" marginTop={1}>
-          <SpinnerLine text="Waiting for Google sign-in..." />
-          {oauthStatusMessages.length > 0 && (
-            <Box flexDirection="column" marginTop={1} marginLeft={2}>
-              {oauthStatusMessages.map((msg, i) => (<Text key={i} dimColor>{msg}</Text>))}
-            </Box>
-          )}
-        </Box>
+        <GoogleSignInRunningStep dense={false} statusMessages={oauthStatusMessages} />
       )}
 
       {/* ── Phase 3 — Play Developer account ID ── */}
 
       {step === 'play-developer-id-input' && playDevIdMode === 'actions' && (
-        <Box flexDirection="column" marginTop={1}>
-          <Alert variant="info">
-            We need your Google Play Console Developer account ID.
-          </Alert>
-          <Newline />
-          <Text>Every Google Play Developer account (the one you paid the $25 one-time fee for) has a unique numeric ID. We invite Capgo&apos;s service account into that specific account, which is how builds get uploaded to Play.</Text>
-          <Newline />
-          <Text>You&apos;ll find the ID in the Play Console URL after signing in:</Text>
-          <Box marginLeft={2} marginTop={1}>
-            <Text dimColor>{PLAY_DEVELOPERS_URL}</Text>
-            <Text bold color="cyan">1234567890123456789</Text>
-            <Text dimColor>/…</Text>
-          </Box>
-          <Newline />
-          <Text dimColor>The digits after <Text color="cyan">/developers/</Text> are what we need. Copy them, or copy the whole URL — we&apos;ll parse it.</Text>
-          <Newline />
-          <Select
-            options={[
-              { label: '🌐  Open Play Console in my browser', value: 'open' },
-              { label: '🎬  Watch a quick video tutorial', value: 'tutorial' },
-              { label: '📝  I have my developer ID — let me paste it', value: 'manual' },
-            ]}
-            onChange={async (value) => {
-              if (value === 'open') {
-                try {
-                  await open(PLAY_DEVELOPERS_URL)
-                  addLog('🌐 Opened Play Console in your browser', 'cyan')
-                }
-                catch {
-                  // Headless / WSL / SSH session — `open` has no display to
-                  // hand off to. Don't pretend it worked.
-                  addLog(`⚠ Couldn't auto-open the browser. Visit ${PLAY_DEVELOPERS_URL} manually.`, 'yellow')
-                }
-                setPlayDevIdMode('input')
+        <PlayDeveloperIdActionsStep
+          dense={false}
+          playDeveloperUrl={PLAY_DEVELOPERS_URL}
+          onChoose={async (value) => {
+            if (value === 'open') {
+              try {
+                await open(PLAY_DEVELOPERS_URL)
+                addLog('🌐 Opened Play Console in your browser', 'cyan')
               }
-              else if (value === 'tutorial') {
-                try {
-                  await open(PLAY_DEV_ID_TUTORIAL_URL)
-                  addLog('🎬 Opened video tutorial in your browser', 'cyan')
-                }
-                catch {
-                  addLog(`⚠ Couldn't auto-open the browser. Visit ${PLAY_DEV_ID_TUTORIAL_URL} manually.`, 'yellow')
-                }
-                // Stay on the actions screen so the user can still choose
-                // "Open Play Console" or "I have my developer ID" after
-                // watching.
+              catch {
+                // Headless / WSL / SSH session — `open` has no display to
+                // hand off to. Don't pretend it worked.
+                addLog(`⚠ Couldn't auto-open the browser. Visit ${PLAY_DEVELOPERS_URL} manually.`, 'yellow')
               }
-              else {
-                setPlayDevIdMode('input')
+              setPlayDevIdMode('input')
+            }
+            else if (value === 'tutorial') {
+              try {
+                await open(PLAY_DEV_ID_TUTORIAL_URL)
+                addLog('🎬 Opened video tutorial in your browser', 'cyan')
               }
-            }}
-          />
-        </Box>
+              catch {
+                addLog(`⚠ Couldn't auto-open the browser. Visit ${PLAY_DEV_ID_TUTORIAL_URL} manually.`, 'yellow')
+              }
+              // Stay on the actions screen so the user can still choose
+              // "Open Play Console" or "I have my developer ID" after
+              // watching.
+            }
+            else {
+              setPlayDevIdMode('input')
+            }
+          }}
+        />
       )}
 
       {step === 'play-developer-id-input' && playDevIdMode === 'input' && (
-        <Box flexDirection="column" marginTop={1}>
-          <Text bold>Paste the Play Console URL, or just the developer ID:</Text>
-          <Text dimColor>Either the whole address bar value or the 16–20 digit number works.</Text>
-          <Newline />
-          <FilteredTextInput
-            placeholder="https://play.google.com/console/u/0/developers/…"
-            filter=""
-            onSubmit={(val) => {
-              const id = extractDeveloperId(val)
-              if (!id) {
-                setError('Could not extract a developer ID. Paste the full Play Console URL or just the numeric ID.')
-                setRetryStep('play-developer-id-input')
-                setStep('error')
-                return
-              }
-              const choice: PlayDeveloperAccountChoice = { developerId: id }
-              setPlayAccountChoice(choice)
-              addLog(`✔ Play Developer account — ${id}`)
-              persistAndStep(
-                (p) => ({
-                  ...p,
-                  completedSteps: { ...p.completedSteps, playAccountChosen: choice },
-                }),
-                'gcp-projects-loading',
-              )
-            }}
-          />
-        </Box>
+        <PlayDeveloperIdInputStep
+          dense={false}
+          onSubmit={(val) => {
+            const id = extractDeveloperId(val)
+            if (!id) {
+              setError('Could not extract a developer ID. Paste the full Play Console URL or just the numeric ID.')
+              setRetryStep('play-developer-id-input')
+              setStep('error')
+              return
+            }
+            const choice: PlayDeveloperAccountChoice = { developerId: id }
+            setPlayAccountChoice(choice)
+            addLog(`✔ Play Developer account — ${id}`)
+            persistAndStep(
+              (p) => ({
+                ...p,
+                completedSteps: { ...p.completedSteps, playAccountChosen: choice },
+              }),
+              'gcp-projects-loading',
+            )
+          }}
+        />
       )}
 
       {/* ── Phase 4 — GCP project ── */}
 
-      {step === 'gcp-projects-loading' && (
-        <Box marginTop={1}><SpinnerLine text="Loading your Google Cloud projects..." /></Box>
-      )}
+      {step === 'gcp-projects-loading' && <GcpProjectsLoadingStep />}
 
       {step === 'gcp-projects-select' && (
-        <Box flexDirection="column" marginTop={1}>
-          <Text bold>Which Google Cloud project should host the service account?</Text>
-          <Text dimColor>We'll create a `capgo-native-build` service account in the chosen project.</Text>
-          <Newline />
-          <Select
-            options={[
-              { label: '🆕  Create a new project', value: '__new__' },
-              ...gcpProjects.map(p => ({
-                label: `${p.name} (${p.projectId})`,
-                value: p.projectId,
-              })),
-            ]}
-            onChange={(value) => {
-              if (value === '__new__') {
-                const defaultName = sanitizeGcpProjectDisplayName(`Capgo Native Build ${appId}`)
-                setNewProjectDisplayName(defaultName)
-                setStep('gcp-project-create-name')
-                return
-              }
-              const chosen = gcpProjects.find(p => p.projectId === value)
-              if (!chosen)
-                return
-              const choice: GcpProjectChoice = {
-                projectId: chosen.projectId,
-                projectNumber: chosen.projectNumber,
-                displayName: chosen.name,
-                createdByOnboarding: false,
-              }
-              setGcpProjectChoice(choice)
-              addLog(`✔ GCP project — ${chosen.name}`)
-              persistAndStep(
-                (p) => ({
-                  ...p,
-                  completedSteps: { ...p.completedSteps, gcpProjectChosen: choice },
-                }),
-                'android-package-select',
-              )
-            }}
-          />
-        </Box>
+        <GcpProjectsSelectStep
+          dense={false}
+          options={[
+            { label: '🆕  Create a new project', value: '__new__' },
+            ...gcpProjects.map(p => ({
+              label: `${p.name} (${p.projectId})`,
+              value: p.projectId,
+            })),
+          ]}
+          onChange={(value) => {
+            if (value === '__new__') {
+              const defaultName = sanitizeGcpProjectDisplayName(`Capgo Native Build ${appId}`)
+              setNewProjectDisplayName(defaultName)
+              setStep('gcp-project-create-name')
+              return
+            }
+            const chosen = gcpProjects.find(p => p.projectId === value)
+            if (!chosen)
+              return
+            const choice: GcpProjectChoice = {
+              projectId: chosen.projectId,
+              projectNumber: chosen.projectNumber,
+              displayName: chosen.name,
+              createdByOnboarding: false,
+            }
+            setGcpProjectChoice(choice)
+            addLog(`✔ GCP project — ${chosen.name}`)
+            persistAndStep(
+              (p) => ({
+                ...p,
+                completedSteps: { ...p.completedSteps, gcpProjectChosen: choice },
+              }),
+              'android-package-select',
+            )
+          }}
+        />
       )}
 
       {step === 'gcp-project-create-name' && (
-        <Box flexDirection="column" marginTop={1}>
-          <Text bold>Name for the new Google Cloud project:</Text>
-          <Text dimColor>≤30 chars. The project ID will be auto-generated from your app ID plus a random suffix.</Text>
-          <Newline />
-          <FilteredTextInput
-            placeholder={newProjectDisplayName || sanitizeGcpProjectDisplayName(`Capgo ${appId}`)}
-            filter=""
-            onSubmit={(val) => {
-              const displayName = sanitizeGcpProjectDisplayName(
-                val.trim() || newProjectDisplayName || `Capgo ${appId}`,
-              )
-              const projectId = generateProjectId(appId)
-              const choice: GcpProjectChoice = {
-                projectId,
-                displayName,
-                createdByOnboarding: true,
-              }
-              setGcpProjectChoice(choice)
-              setNewProjectDisplayName(displayName)
-              addLog(`✔ GCP project (new) — ${displayName} / ${projectId}`)
-              persistAndStep(
-                (p) => ({
-                  ...p,
-                  pendingNewProjectId: projectId,
-                  pendingNewProjectDisplayName: displayName,
-                  completedSteps: { ...p.completedSteps, gcpProjectChosen: choice },
-                }),
-                'android-package-select',
-              )
-            }}
-          />
-        </Box>
+        <GcpProjectCreateNameStep
+          dense={false}
+          defaultDisplayName={newProjectDisplayName || sanitizeGcpProjectDisplayName(`Capgo ${appId}`)}
+          onSubmit={(val) => {
+            const displayName = sanitizeGcpProjectDisplayName(
+              val.trim() || newProjectDisplayName || `Capgo ${appId}`,
+            )
+            const projectId = generateProjectId(appId)
+            const choice: GcpProjectChoice = {
+              projectId,
+              displayName,
+              createdByOnboarding: true,
+            }
+            setGcpProjectChoice(choice)
+            setNewProjectDisplayName(displayName)
+            addLog(`✔ GCP project (new) — ${displayName} / ${projectId}`)
+            persistAndStep(
+              (p) => ({
+                ...p,
+                pendingNewProjectId: projectId,
+                pendingNewProjectDisplayName: displayName,
+                completedSteps: { ...p.completedSteps, gcpProjectChosen: choice },
+              }),
+              'android-package-select',
+            )
+          }}
+        />
       )}
 
       {step === 'android-package-select' && (
-        <Box flexDirection="column" marginTop={1}>
-          <Alert variant="info">
-            Which Android package (applicationId) should Capgo have release access to?
-          </Alert>
-          <Newline />
-          <Text>This is the package name the Play Console uses — it must match the <Text bold>applicationId</Text> in <Text color="cyan">{androidDir}/app/build.gradle</Text>, not the Capacitor JS-level appId (those can differ when plugins like CapacitorUpdater override the base ID).</Text>
-          <Newline />
-          {detectedPackageIds.length > 0 && packageSelectMode === 'choose'
-            ? (
-                <>
-                  <Text bold>Found these in your Gradle config. Pick one, or enter a different package:</Text>
-                  <Newline />
-                  <Select
-                    options={[
-                      ...detectedPackageIds.map(id => ({
-                        label: `📦  ${id}`,
-                        value: id,
-                      })),
-                      { label: '✍️   Type a different package name', value: '__manual__' },
-                    ]}
-                    onChange={(value) => {
-                      // Mode-switch path unmounts the <Select> synchronously,
-                      // so the @inkjs/ui re-fire bug can't replay it. The
-                      // package-pick path goes through async persistAndStep,
-                      // which keeps the <Select> mounted long enough for the
-                      // bug to spam — gate it with the per-step guard.
-                      if (value === '__manual__') {
-                        setPackageSelectMode('manual')
-                        return
-                      }
-                      if (selectFiredRef.current)
-                        return
-                      selectFiredRef.current = true
-                      const choice: AndroidPackageChoice = {
-                        packageName: value,
-                        source: 'gradle',
-                      }
-                      setAndroidPackageChoice(choice)
-                      addLog(`✔ Android package — ${value}`)
-                      const nextStep: AndroidOnboardingStep
-                        = serviceAccountMethod === 'existing' ? 'sa-json-existing-path' : 'gcp-setup-running'
-                      persistAndStep(
-                        (p) => ({
-                          ...p,
-                          completedSteps: { ...p.completedSteps, androidPackageChosen: choice },
-                        }),
-                        nextStep,
-                      )
-                    }}
-                  />
-                </>
-              )
-            : (
-                <>
-                  <Text bold>Android package name:</Text>
-                  <Newline />
-                  <FilteredTextInput
-                    placeholder="com.example.app"
-                    filter=""
-                    onSubmit={(val) => {
-                      const name = val.trim()
-                      if (!/^[a-z][\w]*(?:\.[a-z][\w]*)+$/i.test(name)) {
-                        setError(`"${name}" doesn't look like a valid Android package name (e.g. com.example.app).`)
-                        setRetryStep('android-package-select')
-                        setStep('error')
-                        return
-                      }
-                      const choice: AndroidPackageChoice = {
-                        packageName: name,
-                        source: detectedPackageIds.includes(name) ? 'gradle' : 'user-input',
-                      }
-                      setAndroidPackageChoice(choice)
-                      addLog(`✔ Android package — ${name}`)
-                      const nextStep: AndroidOnboardingStep
-                        = serviceAccountMethod === 'existing' ? 'sa-json-existing-path' : 'gcp-setup-running'
-                      persistAndStep(
-                        (p) => ({
-                          ...p,
-                          completedSteps: { ...p.completedSteps, androidPackageChosen: choice },
-                        }),
-                        nextStep,
-                      )
-                    }}
-                  />
-                </>
-              )}
-        </Box>
+        <AndroidPackageSelectStep
+          dense={false}
+          androidDir={androidDir}
+          showChooser={detectedPackageIds.length > 0 && packageSelectMode === 'choose'}
+          detectedCount={detectedPackageIds.length}
+          detectedOptions={[
+            ...detectedPackageIds.map(id => ({
+              label: `📦  ${id}`,
+              value: id,
+            })),
+            { label: '✍️   Type a different package name', value: '__manual__' },
+          ]}
+          onChooseDetected={(value) => {
+            // Mode-switch path unmounts the <Select> synchronously, so the
+            // @inkjs/ui re-fire bug can't replay it. The package-pick path
+            // goes through async persistAndStep, which keeps the <Select>
+            // mounted long enough for the bug to spam — gate it with the
+            // per-step guard.
+            if (value === '__manual__') {
+              setPackageSelectMode('manual')
+              return
+            }
+            if (selectFiredRef.current)
+              return
+            selectFiredRef.current = true
+            const choice: AndroidPackageChoice = {
+              packageName: value,
+              source: 'gradle',
+            }
+            setAndroidPackageChoice(choice)
+            addLog(`✔ Android package — ${value}`)
+            const nextStep: AndroidOnboardingStep
+              = serviceAccountMethod === 'existing' ? 'sa-json-existing-path' : 'gcp-setup-running'
+            persistAndStep(
+              (p) => ({
+                ...p,
+                completedSteps: { ...p.completedSteps, androidPackageChosen: choice },
+              }),
+              nextStep,
+            )
+          }}
+          onSubmitManual={(val) => {
+            const name = val.trim()
+            if (!/^[a-z][\w]*(?:\.[a-z][\w]*)+$/i.test(name)) {
+              setError(`"${name}" doesn't look like a valid Android package name (e.g. com.example.app).`)
+              setRetryStep('android-package-select')
+              setStep('error')
+              return
+            }
+            const choice: AndroidPackageChoice = {
+              packageName: name,
+              source: detectedPackageIds.includes(name) ? 'gradle' : 'user-input',
+            }
+            setAndroidPackageChoice(choice)
+            addLog(`✔ Android package — ${name}`)
+            const nextStep: AndroidOnboardingStep
+              = serviceAccountMethod === 'existing' ? 'sa-json-existing-path' : 'gcp-setup-running'
+            persistAndStep(
+              (p) => ({
+                ...p,
+                completedSteps: { ...p.completedSteps, androidPackageChosen: choice },
+              }),
+              nextStep,
+            )
+          }}
+        />
       )}
 
       {step === 'gcp-setup-running' && (
-        <Box flexDirection="column" marginTop={1}>
-          <SpinnerLine text="Provisioning Google Cloud + Play Console..." />
-          {setupStatus.length > 0 && (
-            <Box flexDirection="column" marginTop={1} marginLeft={2}>
-              {setupStatus.map((msg, i) => (<Text key={i} dimColor>{msg}</Text>))}
-            </Box>
-          )}
-        </Box>
+        <GcpSetupRunningStep dense={false} statusMessages={setupStatus} />
       )}
 
       {/* ── Phase 6 ── */}
 
       {step === 'saving-credentials' && (
-        <Box marginTop={1}><SpinnerLine text="Saving credentials..." /></Box>
+        <SavingCredentialsStep />
       )}
 
       {step === 'detecting-ci-secrets' && (
-        <Box marginTop={1}><SpinnerLine text="Checking git hosting..." /></Box>
+        <DetectingCiSecretsStep />
       )}
 
       {step === 'ci-secrets-setup' && (
-        <Box flexDirection="column" marginTop={1}>
-          <Text bold>Set up your git hosting CLI to upload env vars</Text>
-          <Newline />
-          {ciSecretSetupAdvice.map(advice => (
-            <Box key={advice.target.provider} flexDirection="column" marginBottom={1}>
-              <Text>{advice.target.label}</Text>
-              <Text dimColor>{advice.message}</Text>
-              {advice.commands.map(command => (
-                <Text key={`${advice.target.provider}-${command}`} color="cyan">{command}</Text>
-              ))}
-            </Box>
-          ))}
-          <Text dimColor>Run this in another terminal, then come back here.</Text>
-          <Newline />
-          <Select
-            options={[
-              { label: 'I installed and logged in, check again', value: 'retry' },
-              { label: 'Skip upload', value: 'skip' },
-            ]}
-            onChange={(value) => {
-              setStep(value === 'retry' ? 'detecting-ci-secrets' : 'build-complete')
-            }}
-          />
-        </Box>
+        <CiSecretsSetupStep
+          dense={false}
+          advice={ciSecretSetupAdvice}
+          onChoose={(choice) => {
+            setStep(choice === 'retry' ? 'detecting-ci-secrets' : 'build-complete')
+          }}
+        />
       )}
 
       {step === 'ci-secrets-target-select' && (
-        <Box flexDirection="column" marginTop={1}>
-          <Text bold>Where should Capgo upload the build env vars?</Text>
-          <Newline />
-          <Select
-            options={[
-              ...ciSecretTargets.map(target => ({
-                label: target.provider === 'github' ? 'GitHub Actions repository secrets' : 'GitLab CI/CD variables',
-                value: target.provider,
-              })),
-              { label: 'Skip', value: 'skip' },
-            ]}
-            onChange={(value) => {
-              if (value === 'skip') {
-                setStep('build-complete')
-                return
-              }
-              const target = ciSecretTargets.find(candidate => candidate.provider === value) || null
-              setCiSecretTarget(target)
-              if (!target) {
-                setStep('build-complete')
-                return
-              }
-              setStep(target.provider === 'github' ? 'ask-github-actions-setup' : 'ask-ci-secrets')
-            }}
-          />
-        </Box>
+        <CiSecretsTargetSelectStep
+          dense={false}
+          options={[
+            ...ciSecretTargets.map(target => ({
+              label: target.provider === 'github' ? 'GitHub Actions repository secrets' : 'GitLab CI/CD variables',
+              value: target.provider,
+            })),
+            { label: 'Skip', value: 'skip' },
+          ]}
+          onChange={(value) => {
+            if (value === 'skip') {
+              setStep('build-complete')
+              return
+            }
+            const target = ciSecretTargets.find(candidate => candidate.provider === value) || null
+            setCiSecretTarget(target)
+            if (!target) {
+              setStep('build-complete')
+              return
+            }
+            // GitHub routes into the new 3-option GitHub Actions prompt
+            // (secrets + workflow / secrets-only / no); GitLab keeps the legacy
+            // 2-option ask-ci-secrets flow.
+            setStep(target.provider === 'github' ? 'ask-github-actions-setup' : 'ask-ci-secrets')
+          }}
+        />
       )}
 
       {step === 'ask-ci-secrets' && (
-        <Box flexDirection="column" marginTop={1}>
-          <SuccessLine text="Android credentials saved" />
-          <Newline />
-          <Text bold>
-            Upload
-            {' '}
-            {ciSecretEntries.length}
-            {' '}
-            build env var
-            {ciSecretEntries.length === 1 ? '' : 's'}
-            {' '}
-            to
-            {' '}
-            {getCiSecretTargetLabel(ciSecretTarget)}
-            ?
-          </Text>
-          <Text dimColor>Capgo will check for existing names first and ask before replacing anything.</Text>
-          <Newline />
-          <Select
-            options={[
-              { label: `Upload with ${ciSecretTarget?.cli || 'CLI'}`, value: 'yes' },
-              { label: 'Skip', value: 'no' },
-            ]}
-            onChange={(value) => {
-              setStep(value === 'yes' ? 'checking-ci-secrets' : 'build-complete')
-            }}
-          />
-        </Box>
+        <AskCiSecretsStep
+          dense={false}
+          entryCount={ciSecretEntries.length}
+          targetLabel={getCiSecretTargetLabel(ciSecretTarget)}
+          cli={ciSecretTarget?.cli || 'CLI'}
+          onChoose={(choice) => {
+            setStep(choice === 'yes' ? 'checking-ci-secrets' : 'build-complete')
+          }}
+        />
       )}
 
       {step === 'ask-github-actions-setup' && (
@@ -3079,22 +3278,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
         <Box marginTop={1}><SpinnerLine text={`Preparing diff for ${WORKFLOW_PATH}…`} /></Box>
       )}
 
-      {step === 'view-workflow-diff' && previewDiff.length > 0 && (
-        <FullscreenDiffViewer
-          title={previewIsNew
-            ? `🆕  Proposed new file — ${previewExistingPath ?? WORKFLOW_PATH}`
-            : `✏️  Proposed changes — ${previewExistingPath ?? WORKFLOW_PATH}`}
-          subtitle={previewIsNew
-            ? 'Nothing exists on disk yet. Every line below is what would be written.'
-            : 'Proposed diff vs the file on disk. Lines marked - would be removed, lines marked + would be added.'}
-          lines={previewDiff}
-          terminalRows={terminalRows}
-          onExit={() => {
-            trackWorkflowEvent('workflow-diff-closed', { decision: 'close' })
-            setStep('preview-workflow-file')
-          }}
-        />
-      )}
+      {/* view-workflow-diff renders as a fullscreen early-return takeover above. */}
 
       {step === 'writing-workflow-file' && (
         <Box flexDirection="column" marginTop={1}>
@@ -3162,24 +3346,13 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
       )}
 
       {step === 'confirm-ci-secret-overwrite' && (
-        <Box flexDirection="column" marginTop={1}>
-          <Text bold color="yellow">These env vars already exist and will be replaced:</Text>
-          <Box flexDirection="column" marginTop={1} marginLeft={2}>
-            {ciSecretExistingKeys.map(key => (
-              <Text key={key}>{`• ${key}`}</Text>
-            ))}
-          </Box>
-          <Newline />
-          <Select
-            options={[
-              { label: 'Replace existing env vars', value: 'replace' },
-              { label: 'Skip upload', value: 'skip' },
-            ]}
-            onChange={(value) => {
-              setStep(value === 'replace' ? 'uploading-ci-secrets' : 'build-complete')
-            }}
-          />
-        </Box>
+        <ConfirmCiSecretOverwriteStep
+          dense={false}
+          existingKeys={ciSecretExistingKeys}
+          onChoose={(choice) => {
+            setStep(choice === 'replace' ? 'uploading-ci-secrets' : 'build-complete')
+          }}
+        />
       )}
 
       {step === 'uploading-ci-secrets' && (
@@ -3193,133 +3366,129 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
       )}
 
       {step === 'ci-secrets-failed' && (
-        <Box flexDirection="column" marginTop={1}>
-          <ErrorLine text={ciSecretError || 'Could not upload env vars.'} />
-          <Newline />
-          <Text dimColor>You can continue; credentials are already saved locally.</Text>
-          <Newline />
-          <Select
-            options={[
-              { label: 'Try upload again', value: 'retry' },
-              { label: 'Continue without upload', value: 'continue' },
-            ]}
-            onChange={(value) => {
-              setStep(value === 'retry' ? (ciSecretTarget ? 'checking-ci-secrets' : 'detecting-ci-secrets') : 'build-complete')
-            }}
-          />
-        </Box>
+        <CiSecretsFailedStep
+          dense={false}
+          error={ciSecretError}
+          onChoose={(choice) => {
+            setStep(choice === 'retry' ? (ciSecretTarget ? 'checking-ci-secrets' : 'detecting-ci-secrets') : 'build-complete')
+          }}
+        />
       )}
 
       {step === 'ask-build' && (
-        <Box flexDirection="column" marginTop={1}>
-          <SuccessLine text="Android credentials saved" />
-          <Newline />
-          <Text bold>Request a build now?</Text>
-          <Newline />
-          <Select
-            options={[
-              { label: '🚀  Yes, request a build', value: 'yes' },
-              { label: '⏭   Not now', value: 'no' },
-            ]}
-            onChange={(value) => {
-              if (value === 'yes')
-                setStep('requesting-build')
-              else
-                setStep('build-complete')
-            }}
-          />
-        </Box>
+        <AskBuildStep
+          dense={false}
+          onChoose={(choice) => {
+            if (choice === 'yes')
+              setStep('requesting-build')
+            else
+              setStep('build-complete')
+          }}
+        />
       )}
 
-      {step === 'requesting-build' && (
-        <Box flexDirection="column" marginTop={1}>
-          {buildOutput.slice(-Math.max(terminalRows - 6, 5)).map((line, i) => (<Text key={i}>{line}</Text>))}
-        </Box>
-      )}
+      {/* Requesting build: handled by the FullscreenBuildOutput early return
+          above — nothing renders here in the measured body. */}
 
       {step === 'build-complete' && (
-        <Box flexDirection="column" marginTop={1}>
-          <SuccessLine text="Onboarding complete" />
-          {ciSecretUploadSummary && (
-            <>
-              <Newline />
-              <Text>{ciSecretUploadSummary}.</Text>
-            </>
-          )}
-          {workflowWrittenPath && (
-            <>
-              <Newline />
-              <Text color="green">
-                ✔ Workflow file written:
-                {' '}
-                {workflowWrittenPath}
-              </Text>
-              <Text dimColor>Dispatch it from GitHub Actions to kick off an Android build.</Text>
-            </>
-          )}
-          {envExportPath && (
-            <>
-              <Newline />
-              <Text color="green">
-                ✔ Credentials exported to:
-                {' '}
-                {envExportPath}
-              </Text>
-              <Text dimColor>
-                When you're ready, push them with
-                {' '}
-                <Text bold>{`gh secret set -f ${envExportPath.split('/').slice(-1)[0]}`}</Text>
-                . Add the file to
-                {' '}
-                <Text bold>.gitignore</Text>
-                {' '}
-                — never commit it.
-              </Text>
-            </>
-          )}
-          {envExportError && (
-            <>
-              <Newline />
-              <Text color="yellow">
-                ⚠ Could not export .env:
-                {' '}
-                {envExportError}
-              </Text>
-            </>
-          )}
-          {buildUrl && (
-            <>
-              <Newline />
-              <Text>Track your build: <Text color="cyan" underline>{buildUrl}</Text></Text>
-            </>
-          )}
-        </Box>
+        <BuildCompleteStep
+          uploadSummary={ciSecretUploadSummary}
+          buildUrl={buildUrl}
+          workflowWrittenPath={workflowWrittenPath}
+          envExportPath={envExportPath}
+          envExportError={envExportError}
+          dense={false}
+        />
       )}
 
-      {step === 'error' && error && retryStep && (
-        <Box flexDirection="column" marginTop={1}>
-          <ErrorLine text={error} />
-          <Newline />
-          <Select
-            options={[
-              { label: '↻  Retry', value: 'retry' },
-              { label: '✖  Exit', value: 'exit' },
-            ]}
-            onChange={(value) => {
-              if (value === 'retry') {
-                setError(null)
-                errorCategoryRef.current = undefined
-                const target = retryStep
-                setRetryStep(null)
-                setStep(target)
+      {/* AI debug — ask the user whether to send the captured log */}
+      {step === 'ai-analysis-prompt' && (
+        <AiAnalysisPromptStep
+          dense={false}
+          onChoose={async (choice) => {
+            if (choice === 'debug') {
+              setStep('ai-analysis-running')
+            }
+            else {
+              if (aiJobId) {
+                await trackAiAnalysisChoice({
+                  apikey: resolvedApiKeyRef.current ?? apikey ?? '',
+                  orgId: resolvedOrgId ?? '',
+                  appId,
+                  platform: 'android',
+                  jobId: aiJobId,
+                  choice: 'skip',
+                  triggeredBy: 'onboarding',
+                }).catch(() => { /* telemetry never breaks the wizard */ })
               }
-              else {
-                exitOnboarding('Run `capgo build init --platform android` to resume.')
-              }
-            }}
-          />
-        </Box>
+              setStep('build-complete')
+            }
+          }}
+        />
       )}
+
+      {/* AI debug — spinner while the edge function is running */}
+      {step === 'ai-analysis-running' && <AiAnalysisRunningStep />}
+
+      {/* AI debug — render the diagnosis (or fallback message), then offer
+          retry-or-skip. Retry transitions back to 'requesting-build' so the
+          user can rebuild after applying the AI's fix in another terminal,
+          without re-running the credential wizard. Capped at MAX_AI_RETRIES. */}
+      {step === 'ai-analysis-result' && (
+        <AiAnalysisResultStep
+          analysisText={aiAnalysisText}
+          // See iOS sibling: marker only when dismissed AND still too tall.
+          collapsed={aiViewedFull && !!aiAnalysisText && isAiAnalysisTooTall(aiAnalysisText, terminalRows, terminalCols)}
+          result={aiResult}
+          retryCount={aiRetryCount}
+          maxRetries={MAX_AI_RETRIES}
+          dense={false}
+          onReread={() => setStep('ai-analysis-result-scroll')}
+          onRetry={async () => {
+            if (aiJobId) {
+              await trackAiAnalysisChoice({
+                apikey: resolvedApiKeyRef.current ?? apikey ?? '',
+                orgId: resolvedOrgId ?? '',
+                appId,
+                platform: 'android',
+                jobId: aiJobId,
+                choice: 'retry',
+                triggeredBy: 'onboarding',
+              }).catch(() => { /* telemetry never breaks the wizard */ })
+              void releaseCapturedLogs(aiJobId).catch(() => { /* best-effort */ })
+            }
+            setAiJobId(null)
+            setAiAnalysisText(null)
+            setAiResult(null)
+            setAiViewedFull(false)
+            setAiRetryCount(prev => prev + 1)
+            setStep('requesting-build')
+          }}
+          onSkipOrContinue={() => setStep('build-complete')}
+        />
+      )}
+
+      {/* (ai-analysis-result-scroll renders as a fullscreen early return above.) */}
+
+      {step === 'error' && error && retryStep && (
+        <ErrorStep
+          message={error}
+          dense={false}
+          onChoose={(choice) => {
+            if (choice === 'retry') {
+              setError(null)
+              errorCategoryRef.current = undefined
+              const target = retryStep
+              setRetryStep(null)
+              setStep(target)
+            }
+            else {
+              exitOnboarding('Run `capgo build init --platform android` to resume.')
+            }
+          }}
+        />
+      )}
+      </Box>
     </Box>
   )
 }

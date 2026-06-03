@@ -1,7 +1,7 @@
 import { sendEvent } from '../utils.js'
 
-export type AiAnalysisChoice = 'capgo_ai' | 'local_ai' | 'skip' | 'auto_upload'
-export type AiAnalysisTriggeredBy = 'menu' | 'ci_flag'
+export type AiAnalysisChoice = 'capgo_ai' | 'local_ai' | 'skip' | 'auto_upload' | 'retry'
+export type AiAnalysisTriggeredBy = 'menu' | 'ci_flag' | 'onboarding'
 export type AiAnalysisResult = 'success' | 'already_analyzed' | 'too_big' | 'error'
 
 export interface TrackAiAnalysisChoiceInput {
@@ -37,7 +37,8 @@ export async function trackAiAnalysisChoice(input: TrackAiAnalysisChoiceInput): 
       channel: 'build-lifecycle',
       icon: '🤖',
       notify: false,
-      user_id: input.orgId,
+      org_id: input.orgId,
+      tracking_version: 2,
       tags: {
         app_id: input.appId,
         platform: input.platform,
@@ -76,7 +77,8 @@ export async function trackAiAnalysisResult(input: TrackAiAnalysisResultInput): 
       channel: 'build-lifecycle',
       icon: '🤖',
       notify: false,
-      user_id: input.orgId,
+      org_id: input.orgId,
+      tracking_version: 2,
       tags,
     })
   }
