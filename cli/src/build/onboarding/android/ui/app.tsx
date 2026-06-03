@@ -119,11 +119,7 @@ import { getWorkflowDiffTelemetry, trackBuildOnboardingWorkflowEvent } from '../
 import type { BuildOnboardingWorkflowDecision, BuildOnboardingWorkflowEvent, WorkflowDiffTelemetry } from '../../analytics.js'
 import { buildScriptPickerOptions, normalizePackageManager } from '../../workflow-ui-helpers.js'
 import {
-  ANDROIDPUBLISHER_API,
   createServiceAccountKey,
-  DEFAULT_SERVICE_ACCOUNT_DESCRIPTION,
-  DEFAULT_SERVICE_ACCOUNT_DISPLAY_NAME,
-  DEFAULT_SERVICE_ACCOUNT_ID,
   enableService,
   ensureServiceAccount,
   generateProjectId,
@@ -135,7 +131,6 @@ import { generateKeystore, generateRandomPassword, listKeystoreAliases, tryUnloc
 import {
   fetchUserInfo,
   GOOGLE_OAUTH_SCOPES_ANDROIDPUBLISHER,
-  MissingScopesError,
   refreshAccessToken,
   revokeToken,
   runOAuthFlow,
@@ -147,14 +142,14 @@ import {
 } from '../oauth-config.js'
 import type { CapgoOAuthClientConfig } from '../oauth-config.js'
 import {
-  CAPGO_SA_APP_PERMISSIONS,
-  CAPGO_SA_DEVELOPER_PERMISSIONS,
   extractDeveloperId,
   inviteServiceAccount,
   PLAY_DEVELOPERS_URL,
 } from '../play-api.js'
 import { deleteAndroidProgress, getAndroidResumeStep, hasAnyOAuthProgress, loadAndroidProgress, saveAndroidProgress } from '../progress.js'
 import { ANDROID_STEP_PROGRESS, getAndroidPhaseLabel } from '../types.js'
+import type { AndroidEffectDeps } from '../flow.js'
+import { runAndroidEffect } from '../flow.js'
 
 interface LogEntry { text: string, color?: string }
 
@@ -171,6 +166,27 @@ interface AppProps {
 }
 
 const RELEASE_ALIAS_DEFAULT = 'release'
+
+// ─── ENGINE_AUTO_FAILED_STEP ──────────────────────────────────────────────────
+//
+// The engine-driven 'auto' steps routed through the shared `runAndroidEffect`
+// (Plan 3.2). The map's PRESENCE of a key marks the step as engine-routed; the
+// VALUE is the `failedStep` passed to `handleError` when the engine throws
+// (matching the failedStep each original per-step effect used). `undefined`
+// reproduces the original effect's best-effort no-catch behavior (the
+// android-package-select pre-load swallowed errors).
+//
+// Steps the engine does NOT yet implement (sa-json-validating, saving-credentials,
+// gcp-projects-loading, the CI / env / workflow / build tail) and the TUI-only
+// auto steps are intentionally absent — they keep their bespoke TUI effects.
+const ENGINE_AUTO_FAILED_STEP: { [K in AndroidOnboardingStep]?: AndroidOnboardingStep | undefined } = {
+  'backing-up': 'backing-up',
+  'keystore-existing-detecting-alias': 'keystore-existing-path',
+  'keystore-generating': 'keystore-generating',
+  'google-sign-in-running': 'google-sign-in',
+  'gcp-setup-running': 'gcp-setup-running',
+  'android-package-select': undefined,
+}
 
 /** OAuth scopes — superset of `androidpublisher` because we also need
  *  cloud-platform to create GCP projects, service accounts, and keys on the
@@ -441,7 +457,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
   const [keystoreAlias, setKeystoreAlias] = useState(initialProgress?.keystoreAlias || '')
   const [keystoreStorePassword, setKeystoreStorePassword] = useState(initialProgress?.keystoreStorePassword || '')
   const [keystoreKeyPassword, setKeystoreKeyPassword] = useState(initialProgress?.keystoreKeyPassword || '')
-  const [keystoreCommonName, setKeystoreCommonName] = useState(initialProgress?.keystoreCommonName || '')
+  const [, setKeystoreCommonName] = useState(initialProgress?.keystoreCommonName || '')
   const [keystoreReady, setKeystoreReady] = useState<KeystoreReady | null>(
     initialProgress?.completedSteps.keystoreReady || null,
   )
@@ -482,7 +498,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
   const [showOAuthLearnMore, setShowOAuthLearnMore] = useState(false)
 
   // Phase 3 — Play developer account (user pastes ID or URL)
-  const [playAccountChoice, setPlayAccountChoice] = useState<PlayDeveloperAccountChoice | null>(
+  const [, setPlayAccountChoice] = useState<PlayDeveloperAccountChoice | null>(
     initialProgress?.completedSteps.playAccountChosen || null,
   )
   /** Two-screen flow for the dev ID step: 'actions' shows a Select of what
@@ -491,7 +507,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
 
   // Phase 4 — GCP projects
   const [gcpProjects, setGcpProjects] = useState<GcpProject[]>([])
-  const [gcpProjectChoice, setGcpProjectChoice] = useState<GcpProjectChoice | null>(
+  const [, setGcpProjectChoice] = useState<GcpProjectChoice | null>(
     initialProgress?.completedSteps.gcpProjectChosen || null,
   )
   const [newProjectDisplayName, setNewProjectDisplayName] = useState<string>(
@@ -1034,26 +1050,6 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
       setTimeout(() => { if (!cancelled) exit() }, 2000)
     }
 
-    if (step === 'backing-up') {
-      ;(async () => {
-        const credPath = join(homedir(), '.capgo-credentials', 'credentials.json')
-        const date = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
-        const backupPath = join(homedir(), '.capgo-credentials', `credentials-${date}.copy.json`)
-        try {
-          await copyFile(credPath, backupPath)
-          if (cancelled)
-            return
-          addLog(`✔ Backup saved · ${backupPath}`)
-        }
-        catch {
-          if (cancelled)
-            return
-          addLog('⚠ Could not backup credentials (file may not exist yet)', 'yellow')
-        }
-        setStep('keystore-method-select')
-      })()
-    }
-
     if (step !== 'keystore-existing-picker')
       pickerOpenedRef.current = false
     if (step !== 'google-sign-in-running')
@@ -1185,47 +1181,6 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
       })()
     }
 
-    if (step === 'keystore-existing-detecting-alias') {
-      ;(async () => {
-        try {
-          const bytes = await readFile(keystoreExistingPath)
-          if (cancelled)
-            return
-          const listed = listKeystoreAliases(bytes, keystoreStorePassword)
-          if (cancelled)
-            return
-          if (listed.ok && listed.aliases.length === 1) {
-            const alias = listed.aliases[0]
-            setKeystoreAlias(alias)
-            await persist((p) => ({ ...p, keystoreAlias: alias }))
-            addLog(`✔ Detected alias · ${alias}`)
-            setStep('keystore-existing-key-password')
-            return
-          }
-          if (listed.ok && listed.aliases.length > 1) {
-            setDetectedAliases(listed.aliases)
-            setStep('keystore-existing-alias-select')
-            return
-          }
-          if (!listed.ok && listed.reason === 'wrong-password') {
-            setError('Store password was rejected by the keystore. Try again.')
-            setRetryStep('keystore-existing-store-password')
-            setStep('error')
-            return
-          }
-          if (!listed.ok && listed.reason === 'unsupported-format')
-            addLog('ℹ Couldn\'t auto-detect alias (JKS format or similar) — enter it manually.', 'yellow')
-          else if (listed.ok)
-            addLog('ℹ Couldn\'t auto-detect alias from the keystore — enter it manually.', 'yellow')
-          setStep('keystore-existing-alias')
-        }
-        catch (err) {
-          if (!cancelled)
-            handleError(err, 'keystore-existing-path')
-        }
-      })()
-    }
-
     // Reset the key-password probe whenever the user leaves the step.
     if (step !== 'keystore-existing-key-password') {
       keyPasswordProbeRef.current = false
@@ -1322,148 +1277,10 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
       })()
     }
 
-    if (step === 'keystore-generating') {
-      ;(async () => {
-        try {
-          const storePw = keystoreStorePassword
-          const keyPw = keystoreKeyPassword || storePw
-          const cn = keystoreCommonName || appId
-          const result = generateKeystore({
-            alias: keystoreAlias || RELEASE_ALIAS_DEFAULT,
-            storePassword: storePw,
-            keyPassword: keyPw,
-            dname: { commonName: cn, organizationName: 'Capgo' },
-          })
-          if (cancelled)
-            return
-          const defaultPath = `android/app/${result.alias}.p12`
-          const ready: KeystoreReady = {
-            keystorePath: defaultPath,
-            alias: result.alias,
-            isGenerated: true,
-          }
-          setKeystoreBase64(result.p12Base64)
-          setKeystoreReady(ready)
-          await persist((p) => ({
-            ...p,
-            keystoreMethod: 'generate',
-            keystoreAlias: result.alias,
-            keystoreStorePassword: storePw,
-            keystoreKeyPassword: keyPw,
-            keystoreCommonName: cn,
-            _keystoreBase64: result.p12Base64,
-            serviceAccountForkSeen: true,
-            completedSteps: { ...p.completedSteps, keystoreReady: ready },
-          }))
-          addLog(`✔ Keystore generated — alias: ${result.alias}, valid until ${result.notAfter.getFullYear()}`)
-          // Backup hint is emitted after `saving-credentials` succeeds, not
-          // here — at this point the password lives only in the in-memory
-          // state and the progress file, not in `credentials.json`.
-          setRetryCount(0)
-          // After keystore is freshly generated in THIS run, always land on
-          // the new method-select fork — we know there's no prior SA choice
-          // because we just finished the keystore phase. Resume mid-flow on
-          // a subsequent run goes through `getAndroidResumeStep`, which
-          // routes legacy progress (absent `serviceAccountMethod`) to the
-          // OAuth path for backward compatibility.
-          if (cancelled)
-            return
-          setStep('service-account-method-select')
-        }
-        catch (err) {
-          if (!cancelled)
-            handleError(err, 'keystore-generating')
-        }
-      })()
-    }
-
-    if (step === 'google-sign-in-running' && !oauthStartedRef.current) {
-      oauthStartedRef.current = true
-      ;(async () => {
-        try {
-          const cfg = await getCapgoConfig()
-          setOauthClientId(cfg.clientId)
-
-          setOauthStatusMessages([])
-          const tokens = await runOAuthFlow(
-            {
-              clientId: cfg.clientId,
-              clientSecret: cfg.clientSecret,
-              scopes: OAUTH_SCOPES_FOR_ONBOARDING,
-            },
-            {
-              onAuthUrl: (url) => {
-                if (cancelled)
-                  return
-                setOauthStatusMessages(prev => [...prev, `🌐 If the browser didn't open: ${url}`])
-              },
-              onStatus: (msg) => {
-                if (cancelled)
-                  return
-                setOauthStatusMessages(prev => [...prev, msg])
-              },
-            },
-          )
-          if (cancelled)
-            return
-          if (!tokens.refreshToken)
-            throw new Error('Google did not return a refresh token — try again.')
-
-          const info = await fetchUserInfo(tokens.accessToken)
-          if (cancelled)
-            return
-
-          const complete: GoogleSignInComplete = {
-            email: info.email,
-            googleSubject: info.sub,
-            scope: tokens.scope,
-          }
-          setAccessToken(tokens.accessToken)
-          setRefreshTokenState(tokens.refreshToken)
-          setGoogleSignIn(complete)
-          await persist((p) => ({
-            ...p,
-            _oauthRefreshToken: tokens.refreshToken,
-            completedSteps: { ...p.completedSteps, googleSignInComplete: complete },
-          }))
-          addLog(`✔ Signed in as ${info.email}`)
-          setRetryCount(0)
-          setStep('play-developer-id-input')
-        }
-        catch (err) {
-          if (cancelled)
-            return
-          // User deselected one or more scopes on the consent screen.
-          // Treat this as a recoverable input error: explain in the CLI
-          // which scopes were missing and route back to the pre-consent
-          // screen so the user can try again. Don't burn a retry strike.
-          if (err instanceof MissingScopesError) {
-            addLog('✖ Sign-in did not grant all required permissions.', 'red')
-            for (const scope of err.missing)
-              addLog(`  • Missing: ${scope}`, 'yellow')
-            addLog('Please retry sign-in and leave every requested permission checked.', 'yellow')
-            setStep('google-sign-in')
-            return
-          }
-          handleError(err, 'google-sign-in')
-        }
-      })()
-    }
-
     // Reset the dev-ID step's sub-screen whenever we leave and come back
     // (e.g. after a retry from the error screen).
     if (step !== 'play-developer-id-input' && playDevIdMode === 'input')
       setPlayDevIdMode('actions')
-
-    if (step === 'android-package-select' && !packageLoadedRef.current) {
-      packageLoadedRef.current = true
-      ;(async () => {
-        const gradleIds = await findAndroidApplicationIds(androidDir)
-        if (cancelled)
-          return
-        setDetectedPackageIds(gradleIds)
-      })()
-    }
 
     if (step === 'gcp-projects-loading') {
       ;(async () => {
@@ -1478,151 +1295,6 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
         catch (err) {
           if (!cancelled)
             handleError(err, 'gcp-projects-loading')
-        }
-      })()
-    }
-
-    if (step === 'gcp-setup-running' && !setupStartedRef.current) {
-      setupStartedRef.current = true
-      ;(async () => {
-        try {
-          setSetupStatus([])
-          const tok = await ensureAccessToken()
-          let projectChoice: GcpProjectChoice | null = gcpProjectChoice
-
-          // Step A: create project if the user chose "new"
-          if (projectChoice && projectChoice.createdByOnboarding && !projectChoice.projectNumber) {
-            addSetupStatus(`Creating GCP project ${projectChoice.projectId}...`)
-            const created = await gcpCreateProject(tok, projectChoice.projectId, projectChoice.displayName)
-            if (cancelled)
-              return
-            projectChoice = {
-              ...projectChoice,
-              projectNumber: created.projectNumber,
-            }
-            setGcpProjectChoice(projectChoice)
-            await persist((p) => ({
-              ...p,
-              completedSteps: { ...p.completedSteps, gcpProjectChosen: projectChoice! },
-            }))
-            addSetupStatus(`✔ Project created (number ${created.projectNumber})`)
-          }
-
-          if (!projectChoice)
-            throw new Error('No GCP project selected')
-
-          // Step B: enable Android Publisher API
-          addSetupStatus(`Enabling ${ANDROIDPUBLISHER_API}...`)
-          await enableService(tok, projectChoice.projectId, ANDROIDPUBLISHER_API)
-          if (cancelled)
-            return
-          addSetupStatus('✔ API enabled')
-
-          // Step C: create or find the capgo-native-build service account
-          addSetupStatus(`Ensuring service account "${DEFAULT_SERVICE_ACCOUNT_ID}"...`)
-          const { account: sa, created: saCreated } = await ensureServiceAccount({
-            accessToken: tok,
-            projectId: projectChoice.projectId,
-            accountId: DEFAULT_SERVICE_ACCOUNT_ID,
-            displayName: DEFAULT_SERVICE_ACCOUNT_DISPLAY_NAME,
-            description: DEFAULT_SERVICE_ACCOUNT_DESCRIPTION,
-          })
-          if (cancelled)
-            return
-          const saProv: ServiceAccountProvisioned = {
-            email: sa.email,
-            projectId: projectChoice.projectId,
-            uniqueId: sa.uniqueId,
-          }
-          setServiceAccountProvisioned(saProv)
-          addSetupStatus(saCreated ? `✔ Service account created — ${sa.email}` : `✔ Service account exists — ${sa.email}`)
-
-          // Step D: create a fresh JSON key for the SA
-          addSetupStatus('Creating service-account JSON key...')
-          const key = await createServiceAccountKey({
-            accessToken: tok,
-            projectId: projectChoice.projectId,
-            serviceAccountEmail: sa.email,
-          })
-          if (cancelled)
-            return
-          setServiceAccountKeyBase64(key.privateKeyDataBase64)
-          await persist((p) => ({
-            ...p,
-            _serviceAccountKeyBase64: key.privateKeyDataBase64,
-            completedSteps: { ...p.completedSteps, serviceAccountProvisioned: saProv },
-          }))
-          addSetupStatus('✔ Key created')
-
-          // Step E: invite the SA into the Play Developer account
-          if (!playAccountChoice)
-            throw new Error('No Play Developer account chosen')
-          addSetupStatus(`Inviting ${sa.email} to Play Console...`)
-          try {
-            if (!androidPackageChoice)
-              throw new Error('No Android package selected for the Play invite')
-            await inviteServiceAccount({
-              accessToken: tok,
-              developerId: playAccountChoice.developerId,
-              serviceAccountEmail: sa.email,
-              developerAccountPermissions: CAPGO_SA_DEVELOPER_PERMISSIONS,
-              grants: [{
-                packageName: androidPackageChoice.packageName,
-                permissions: CAPGO_SA_APP_PERMISSIONS,
-              }],
-            })
-          }
-          catch (err) {
-            const msg = err instanceof Error ? err.message : String(err)
-            // Treat "already exists" style failures as success — the SA is
-            // already a user on this developer account from a prior run.
-            if (!/already|exists|duplicate/i.test(msg))
-              throw err
-            addSetupStatus(`ℹ Service account was already invited — continuing`)
-          }
-          if (cancelled)
-            return
-          const invite: PlayInviteProvisioned = {
-            developerId: playAccountChoice.developerId,
-            serviceAccountEmail: sa.email,
-          }
-          setPlayInviteProvisioned(invite)
-          await persist((p) => ({
-            ...p,
-            completedSteps: { ...p.completedSteps, playInviteProvisioned: invite },
-          }))
-          addSetupStatus(`✔ Play Console invite confirmed`)
-
-          // Step F: ask Google to revoke our OAuth tokens now that
-          // provisioning has succeeded. From this point forward Capgo's build
-          // workers authenticate via the service account JSON key — the
-          // user's OAuth tokens are no longer needed. Revoking enforces the
-          // trust statement on the pre-consent screen ("your tokens never
-          // reach Capgo and we revoke them as soon as we're done"). Failure
-          // is non-fatal: the token expires within ~1 hour regardless.
-          if (refreshTokenState) {
-            addSetupStatus('Revoking OAuth token (we don\'t need it anymore)...')
-            try {
-              await revokeToken(refreshTokenState)
-              if (cancelled)
-                return
-              addSetupStatus('✔ OAuth token revoked')
-            }
-            catch (err) {
-              if (cancelled)
-                return
-              const msg = err instanceof Error ? err.message : String(err)
-              addSetupStatus(`⚠ Revoke request failed (${msg}) — token will expire on its own`)
-            }
-          }
-
-          addLog(`✔ Google Cloud + Play setup complete`)
-          setRetryCount(0)
-          setStep('saving-credentials')
-        }
-        catch (err) {
-          if (!cancelled)
-            handleError(err, 'gcp-setup-running')
         }
       })()
     }
@@ -2154,6 +1826,242 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
       validationCleanupRef.current?.()
       validationCleanupRef.current = null
     }
+  }, [step])
+
+  // ─── Engine-driven auto-effect driver (Plan 3.2) ────────────────────────────
+  // Route the android TUI's engine-driven 'auto' steps through the shared
+  // engine's `runAndroidEffect` instead of hand-rolled per-step useEffect bodies.
+  // `runAndroidEffect` already replicates the SAME automation these steps used to
+  // run inline (audit-verified). This driver wires the engine's deps to the
+  // TUI's existing helpers + log functions, applies the engine's transient and
+  // persisted progress back into the React render state, and re-emits the same
+  // step transition. Display logs are produced by the engine via
+  // deps.onLog/onStatus/onAuthUrl — wired to addLog/addSetupStatus/
+  // setOauthStatusMessages — so the side-log + spinner-status UX is byte-for-byte
+  // unchanged.
+  //
+  // TUI-only auto steps (welcome, resume-prompt, ai-analysis-*, the file
+  // pickers) keep their bespoke effects in the useEffect above and are NOT routed
+  // here. Steps the engine does not yet implement (sa-json-validating,
+  // saving-credentials, gcp-projects-loading, the CI / env / workflow / build
+  // tail) also keep their TUI effects — routing them would lose TUI-specific work
+  // (telemetry, CI-secret entry building, the full GcpProject shape) the engine
+  // result can't reproduce.
+  useEffect(() => {
+    // Steps whose automation runAndroidEffect implements AND whose engine result
+    // cleanly reproduces every observable TUI behavior (logs + render state).
+    const failedStep = ENGINE_AUTO_FAILED_STEP[step]
+    if (!(step in ENGINE_AUTO_FAILED_STEP))
+      return
+
+    // Per-step one-shot guards — mirror the originals (oauthStartedRef,
+    // setupStartedRef, packageLoadedRef). The other engine-driven steps had no
+    // guard: the step is entered once, so a stray re-render re-run is a no-op.
+    if (step === 'google-sign-in-running') {
+      if (oauthStartedRef.current)
+        return
+      oauthStartedRef.current = true
+    }
+    if (step === 'gcp-setup-running') {
+      if (setupStartedRef.current)
+        return
+      setupStartedRef.current = true
+    }
+    if (step === 'android-package-select') {
+      if (packageLoadedRef.current)
+        return
+      packageLoadedRef.current = true
+    }
+
+    let cancelled = false
+    // Abort wiring for cloud round-trips — mirrors the SA-validation cleanup
+    // pattern; aborts on step change / unmount / Ctrl+C.
+    const abort = new AbortController()
+
+    void (async () => {
+      // OAuth client-config prep for google-sign-in-running. The original effect
+      // fetched the config, mirrored the client id into render state, and reset
+      // the streaming status list before opening the browser.
+      let oauthCfg: CapgoOAuthClientConfig | null = null
+      if (step === 'google-sign-in-running') {
+        try {
+          oauthCfg = await getCapgoConfig()
+        }
+        catch (err) {
+          if (!cancelled)
+            handleError(err, 'google-sign-in')
+          return
+        }
+        if (cancelled)
+          return
+        setOauthClientId(oauthCfg.clientId)
+        setOauthStatusMessages([])
+      }
+      // gcp-setup-running resets its status stream before the engine streams in.
+      if (step === 'gcp-setup-running')
+        setSetupStatus([])
+
+      const deps: AndroidEffectDeps = {
+        // Keystore
+        generateKeystore,
+        listKeystoreAliases,
+        tryUnlockPrivateKey,
+        // Service-account validation
+        validateServiceAccountJson,
+        // Build-credentials persistence
+        updateSavedCredentials,
+        loadSavedCredentials,
+        // Onboarding-progress persistence
+        saveAndroidProgress,
+        loadAndroidProgress,
+        deleteAndroidProgress,
+        // File system
+        readFile,
+        copyFile,
+        // OAuth — driver pre-binds client config + scopes (config/scope policy
+        // stays in the driver, never reaches the core).
+        runOAuthFlow: callbacks => runOAuthFlow(
+          {
+            clientId: oauthCfg!.clientId,
+            clientSecret: oauthCfg!.clientSecret,
+            scopes: OAUTH_SCOPES_FOR_ONBOARDING,
+          },
+          callbacks,
+        ),
+        fetchUserInfo,
+        getAccessToken: ensureAccessToken,
+        revokeToken,
+        // GCP
+        listProjects,
+        createProject: gcpCreateProject,
+        enableService,
+        ensureServiceAccount,
+        createServiceAccountKey,
+        // Google Play (engine deps expect Promise<void>; play-api's
+        // inviteServiceAccount returns the invited user, which the original
+        // effect discarded — wrap to drop it so the types line up).
+        inviteServiceAccount: async (args) => {
+          await inviteServiceAccount(args)
+        },
+        // Android project detection — driver pre-binds androidDir.
+        findAndroidApplicationIds: () => findAndroidApplicationIds(androidDir),
+        // Streaming callbacks — wire the engine's status/log/auth-url streams to
+        // the exact TUI sinks the original effects used, so every breadcrumb +
+        // spinner-status line is reproduced identically.
+        onLog: (message, color) => {
+          if (!cancelled)
+            addLog(message, color)
+        },
+        onStatus: (message) => {
+          if (cancelled)
+            return
+          if (step === 'gcp-setup-running')
+            addSetupStatus(message)
+          else
+            setOauthStatusMessages(prev => [...prev, message])
+        },
+        onAuthUrl: (url) => {
+          if (!cancelled)
+            setOauthStatusMessages(prev => [...prev, `🌐 If the browser didn't open: ${url}`])
+        },
+        signal: abort.signal,
+      }
+
+      try {
+        // Run the engine against the freshest persisted progress. Plan 3.1 made
+        // disk progress the source of truth for in-session sequencing; the prior
+        // input steps persist their fields before these auto steps run, so the
+        // loaded progress carries the same values the original effects read from
+        // React state.
+        const current = (await loadAndroidProgress(appId)) ?? emptyProgress(appId)
+        if (cancelled)
+          return
+        const result = await runAndroidEffect(step, current, deps)
+        if (cancelled)
+          return
+
+        const t = result.transient
+        const np = result.progress
+
+        // ── Apply transient runtime data to render state ──────────────────────
+        if (t?.detectedPackageIds !== undefined)
+          setDetectedPackageIds(t.detectedPackageIds)
+        if (t?.detectedAliases !== undefined)
+          setDetectedAliases(t.detectedAliases)
+        if (t?.accessToken !== undefined)
+          setAccessToken(t.accessToken)
+
+        // ── Mirror engine-persisted progress into the render state that
+        // downstream TUI code (doSaveCredentials, renders) reads directly ──────
+        if (step === 'keystore-existing-detecting-alias') {
+          if (np.keystoreAlias)
+            setKeystoreAlias(np.keystoreAlias)
+        }
+        else if (step === 'keystore-generating') {
+          if (np._keystoreBase64)
+            setKeystoreBase64(np._keystoreBase64)
+          if (np.keystoreAlias)
+            setKeystoreAlias(np.keystoreAlias)
+          if (np.completedSteps.keystoreReady)
+            setKeystoreReady(np.completedSteps.keystoreReady)
+          setRetryCount(0)
+        }
+        else if (step === 'google-sign-in-running') {
+          if (np._oauthRefreshToken)
+            setRefreshTokenState(np._oauthRefreshToken)
+          if (np.completedSteps.googleSignInComplete)
+            setGoogleSignIn(np.completedSteps.googleSignInComplete)
+          setRetryCount(0)
+        }
+        else if (step === 'gcp-setup-running') {
+          if (np.completedSteps.gcpProjectChosen)
+            setGcpProjectChoice(np.completedSteps.gcpProjectChosen)
+          if (np.completedSteps.serviceAccountProvisioned)
+            setServiceAccountProvisioned(np.completedSteps.serviceAccountProvisioned)
+          if (np.completedSteps.playInviteProvisioned)
+            setPlayInviteProvisioned(np.completedSteps.playInviteProvisioned)
+          if (np._serviceAccountKeyBase64)
+            setServiceAccountKeyBase64(np._serviceAccountKeyBase64)
+          setRetryCount(0)
+        }
+
+        // ── keystore-existing-detecting-alias wrong-password ─────────────────
+        // Reproduce the original special error UX (setError + retryStep +
+        // 'error') WITHOUT calling handleError (so retryCount is NOT bumped),
+        // instead of advancing to the engine's `next`.
+        if (t?.wrongPassword) {
+          setError('Store password was rejected by the keystore. Try again.')
+          setRetryStep('keystore-existing-store-password')
+          setStep('error')
+          return
+        }
+
+        // ── Advance ──────────────────────────────────────────────────────────
+        // The engine returns an explicit `next` for these steps; fall back to
+        // the resume-derived step if it's ever absent. For android-package-select
+        // `next` is the same step (stay put after the pre-load), so only
+        // transition when it actually changes.
+        const nextStep = result.next ?? getAndroidResumeStep(np)
+        if (nextStep && nextStep !== step)
+          setStep(nextStep)
+      }
+      catch (err) {
+        if (cancelled)
+          return
+        // MissingScopesError on google-sign-in is handled INSIDE the engine
+        // (returns next: 'google-sign-in'); any other throw routes through the
+        // same retry/error UX the original effects used. android-package-select
+        // had no catch in the original (best-effort pre-load) — swallow there.
+        if (failedStep)
+          handleError(err, failedStep)
+      }
+    })()
+
+    return () => {
+      cancelled = true
+      abort.abort()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step])
 
   // Route between the inline render and the scroll viewer based on the live
