@@ -708,6 +708,18 @@ describe('API key organization creation', () => {
       const createdOrg = await getResponse.json() as { id: string, website: string | null }
       expect(createdOrg.id).toBe(createdOrgId)
       expect(createdOrg.website).toBe('https://created-by-apikey.example/')
+
+      const auditRows = await executeSQL(
+        `SELECT id
+         FROM public.audit_logs
+         WHERE table_name = 'orgs'
+           AND operation = 'INSERT'
+           AND org_id = $1::uuid
+           AND record_id = $1::text
+           AND user_id = $2::uuid`,
+        [createdOrgId, USER_ID],
+      )
+      expect(auditRows.length).toBe(1)
     }
     finally {
       if (createdOrgId) {

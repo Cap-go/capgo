@@ -148,12 +148,20 @@ async function insertOrgForApiKey(
   if (!apikeyRbacId) {
     throw quickError(401, 'invalid_apikey', 'Invalid apikey')
   }
+  const apikeyValue = c.get('capgkey') ?? auth.apikey?.key
+  if (!apikeyValue) {
+    throw quickError(401, 'invalid_apikey', 'Invalid apikey')
+  }
 
   // API-key Supabase clients run as anon, so this checked endpoint owns the write path instead of reopening direct anon RLS inserts.
   let pgClient
   try {
     pgClient = getPgClient(c)
     await pgClient.query('BEGIN')
+    await pgClient.query(
+      'SELECT set_config($1, $2, true)',
+      ['request.headers', JSON.stringify({ capgkey: apikeyValue })],
+    )
 
     const roleResult = await pgClient.query<{ id: string }>(
       'SELECT id FROM public.roles WHERE name = public.rbac_role_org_super_admin() AND scope_type = public.rbac_scope_org() LIMIT 1',
