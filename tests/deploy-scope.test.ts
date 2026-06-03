@@ -68,6 +68,16 @@ describe('deploy scope matching', () => {
     })
   })
 
+  it.concurrent('deploys API and files workers when the shared TUS file utility changes', () => {
+    expect(resolveDeployScopeFromFiles(['supabase/functions/_backend/files/util.ts'])).toEqual({
+      api: true,
+      files: true,
+      plugins: false,
+      supabase: true,
+      translation: false,
+    })
+  })
+
   it.concurrent('deploys package dependency changes to Cloudflare workers without forcing Supabase', () => {
     expect(resolveDeployScopeFromFiles(['package.json'])).toEqual({
       api: true,
@@ -85,7 +95,7 @@ describe('deploy scope matching', () => {
         'log -1 --format=%s capgo-12.0.0': 'chore(release): 12.0.0',
         'rev-parse capgo-12.0.0^': 'feature-head',
         'describe --tags --match capgo-[0-9]* --exclude capgo-*-alpha* --abbrev=0 feature-head': 'capgo-11.0.0',
-        'diff --name-only --diff-filter=ACMRT capgo-11.0.0..feature-head': 'src/pages/index.vue',
+        'diff --name-only --diff-filter=ACMRTD capgo-11.0.0..feature-head': 'src/pages/index.vue',
       }
 
       if (key in responses) {
@@ -110,7 +120,7 @@ describe('deploy scope matching', () => {
         'log -1 --format=%s capgo-12.0.0': 'chore(release): 12.0.0',
         'rev-parse capgo-12.0.0^': 'feature-head',
         'describe --tags --match capgo-[0-9]* --exclude capgo-*-alpha* --abbrev=0 feature-head': 'capgo-11.0.0',
-        'diff --name-only --diff-filter=ACMRT capgo-11.0.0..feature-head': 'supabase/functions/_backend/plugins/updates.ts',
+        'diff --name-only --diff-filter=ACMRTD capgo-11.0.0..feature-head': 'supabase/functions/_backend/plugins/updates.ts',
       }
 
       if (key in responses) {
@@ -141,7 +151,7 @@ describe('deploy scope matching', () => {
         'log -1 --format=%s capgo-12.0.0-alpha.1': 'chore(release): 12.0.0-alpha.1',
         'rev-parse capgo-12.0.0-alpha.1^': 'feature-head',
         'describe --tags --match capgo-[0-9]* --abbrev=0 feature-head': 'capgo-11.0.0-alpha.9',
-        'diff --name-only --diff-filter=ACMRT capgo-11.0.0-alpha.9..feature-head': 'cloudflare_workers/translation/index.ts',
+        'diff --name-only --diff-filter=ACMRTD capgo-11.0.0-alpha.9..feature-head': 'cloudflare_workers/translation/index.ts',
       }
 
       if (key in responses) {
@@ -190,6 +200,39 @@ describe('deploy scope matching', () => {
         plugins: true,
         supabase: true,
         translation: true,
+      },
+    })
+  })
+
+  it.concurrent.each([
+    ['supabase', 'supabase/config.toml'],
+    ['api', 'cloudflare_workers/api/index.ts'],
+    ['translation', 'cloudflare_workers/translation/index.ts'],
+    ['files', 'cloudflare_workers/files/index.ts'],
+    ['plugins', 'cloudflare_workers/plugin/index.ts'],
+  ] as const)('deploys %s when a matched file is deleted', (target, file) => {
+    const run = (args: string[]) => {
+      const key = args.join(' ')
+      const responses: Record<string, string> = {
+        'log -1 --format=%s HEAD': 'feat: delete deployed code',
+        'describe --tags --match capgo-[0-9]* --exclude capgo-*-alpha* --abbrev=0 HEAD': 'capgo-11.0.0',
+        'diff --name-only --diff-filter=ACMRTD capgo-11.0.0..HEAD': file,
+      }
+
+      if (key in responses) {
+        return responses[key]
+      }
+
+      throw new Error(`Unexpected git call: ${key}`)
+    }
+
+    expect(resolveDeployScopeFromGit('HEAD', run)).toEqual({
+      base: 'capgo-11.0.0',
+      files: [file],
+      head: 'HEAD',
+      scope: {
+        ...noBackendDeploys,
+        [target]: true,
       },
     })
   })

@@ -45,6 +45,7 @@ export const deployMatchers: Record<DeployTarget, RegExp[]> = {
     ...backendDependencyMatchers,
     ...backendUtilityMatchers,
     /^cloudflare_workers\/api\//,
+    /^supabase\/functions\/_backend\/files\/util\.ts$/,
     /^supabase\/functions\/_backend\/private\//,
     /^supabase\/functions\/_backend\/public\//,
     /^supabase\/functions\/_backend\/triggers\//,
@@ -176,7 +177,7 @@ export function getPreviousCapgoTag(head: string, includePrereleaseTags: boolean
 }
 
 function getChangedFiles(base: string, head: string, run: GitRunner = runGit): string[] {
-  const files = run(['diff', '--name-only', '--diff-filter=ACMRT', `${base}..${head}`])
+  const files = run(['diff', '--name-only', '--diff-filter=ACMRTD', `${base}..${head}`])
   return files ? files.split('\n').filter(Boolean) : []
 }
 

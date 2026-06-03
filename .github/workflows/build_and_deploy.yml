@@ -36,7 +36,9 @@ jobs:
           bun-version: latest
       - name: Resolve deploy scope
         id: scope
-        run: bun scripts/deploy-scope.ts "${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
+        env:
+          REF_NAME: ${{ github.ref_name }}
+        run: bun scripts/deploy-scope.ts "$REF_NAME" >> "$GITHUB_OUTPUT"
 
   # Tests already passed before tag was created, so just build and deploy
   supabase_deploy:
