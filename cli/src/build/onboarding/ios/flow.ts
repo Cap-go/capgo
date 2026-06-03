@@ -31,6 +31,8 @@
 // is IosNoMatchReason — the recovery-menu reason enum has no helper-module export.
 
 import type { Buffer } from 'node:buffer'
+import { homedir } from 'node:os'
+import { join } from 'node:path'
 import type { AscDistributionCert, AscProfileSummary } from '../apple-api.js'
 import type {
   ApiKeyData,
@@ -58,7 +60,9 @@ import type { WorkflowWriteOptions, WorkflowWriteResult } from '../workflow-writ
 // implemented once for both platforms.
 import type { TailEffectDeps, TailInput, TailStep, TailStepCtx, TailStepView, TailTransient } from '../tail/flow.js'
 import { applyTailInput, runTailEffect, tailViewForStep } from '../tail/flow.js'
+import { CertificateLimitError, DuplicateProfileError } from '../apple-api.js'
 import { DEFAULT_P12_PASSWORD } from '../csr.js'
+import { extractKeyIdFromP8Path } from '../progress.js'
 import { getIosResumeStep } from './progress.js'
 
 // ─── Local structural helper types ───────────────────────────────────────────
@@ -168,6 +172,13 @@ export interface IosStepCtx {
   // ── .p8 validation buffer (ephemeral during input-p8-path) ───────────────
   /** Buffer of .p8 file content during validation (only the PATH is persisted). */
   p8Content?: Buffer
+  /**
+   * True once the p8-method-select file-picker effect has opened the native
+   * dialog this drive — the engine returns it in transient and the driver
+   * threads it back as `deps.carried.pickerOpened` so a re-render does NOT
+   * re-open the picker. Mirrors the TUI's `pickerOpenedRef` guard.
+   */
+  pickerOpened?: boolean
 
   // ── ASC API key data surfaced after verifying-key (ephemeral mirror) ─────
   /** Verified key id + issuer id (mirror of completedSteps.apiKeyVerified). */
@@ -208,8 +219,21 @@ export interface IosEffectDeps {
   // ── apple-api ────────────────────────────────────────────────────────────
   /** Verify an ASC API key (keyId + issuerId via the .p8). */
   verifyApiKey?: (args: { keyId: string, issuerId: string, p8Content: Buffer }) => Promise<{ teamId?: string }>
-  /** Create a distribution certificate from a CSR. */
-  createCertificate?: (args: { csr: string, accessToken?: string }) => Promise<CertificateData>
+  /**
+   * Create a distribution certificate from a CSR. Returns the RAW Apple cert
+   * response (mirrors the real apple-api `createCertificate` helper): the cert
+   * resource id, the base64 DER `certificateContent`, the expiry, and the team
+   * id. The engine pairs `certificateContent` + the CSR private key via
+   * `createP12` to produce the final .p12 — keeping the IO-free engine in charge
+   * of assembling the CertificateData credential. Throws CertificateLimitError
+   * (carrying the existing certs) when Apple's per-team cert limit is hit.
+   */
+  createCertificate?: (args: { csr: string, accessToken?: string }) => Promise<{
+    certificateId: string
+    certificateContent: string
+    expirationDate: string
+    teamId: string
+  }>
   /** Revoke an existing certificate (cert-limit recovery). */
   revokeCertificate?: (certificateId: string) => Promise<void>
   /** Create a provisioning profile for a bundle id + cert. */
@@ -262,6 +286,21 @@ export interface IosEffectDeps {
   // ── file system (injected so effects can be tested without real FS) ──────
   readFile?: (path: string) => Promise<Buffer>
   copyFile?: (src: string, dest: string) => Promise<void>
+  /**
+   * Open the native .p8 file picker (p8-method-select). Resolves to the chosen
+   * absolute path, or null when the user cancels. The driver pre-binds the real
+   * `openFilePicker` here; tests inject a canned path/null. Mirrors the TUI's
+   * `openFilePicker()` call inside the p8-method-select effect.
+   */
+  openP8FilePicker?: () => Promise<string | null>
+  /**
+   * Whether the host is macOS. Gates the post-backup fork: on macOS the user is
+   * offered import-vs-create at `setup-method-select`; off-macOS the import
+   * sub-flow is unavailable so backing-up routes straight to the create-new
+   * `api-key-instructions`. Mirrors the TUI's `isMacOS()` branch. Defaults to
+   * true when omitted (the macOS-first onboarding target).
+   */
+  isMacOS?: () => boolean
 
   // ── shared post-save tail helpers (wired through toTailDeps in BATCH 1) ──
   // Reused from the android surface so the iOS engine can delegate the post-save
@@ -305,6 +344,22 @@ export interface IosEffectDeps {
     certData?: CertificateData
     profileData?: ProfileData
     teamId?: string
+    /**
+     * The validated .p8 file content (ASC private key) the driver carries
+     * between the .p8 input chain and `verifying-key`. ONLY the p8Path is
+     * persisted to progress.json — the raw key bytes ride this transient
+     * channel, mirroring the TUI's `p8ContentRef`. The verifying-key effect
+     * reads it from here; when absent (crash-recovery resume) it falls back to
+     * re-reading the file at `progress.p8Path` via `deps.readFile`.
+     */
+    p8Content?: Buffer
+    /**
+     * Tracks that the p8-method-select file-picker effect already ran, so a
+     * re-render does NOT re-open the native picker. Mirrors the TUI's
+     * `pickerOpenedRef`. The driver threads the returned `pickerOpened: true`
+     * transient back here on the next call.
+     */
+    pickerOpened?: boolean
     /**
      * Keychain export passphrase for the IMPORT path's .p12 (import-exporting).
      * Transient only — the import-exporting effect never persists it, so the
@@ -583,5 +638,289 @@ export async function runIosEffect(
     }
   }
 
-  throw new Error(`runIosEffect: not implemented for step '${step}'`)
+  switch (step) {
+    // ── backing-up ──────────────────────────────────────────────────────────
+    // app.tsx:1230–1255. Copy the existing ~/.capgo-credentials/credentials.json
+    // to a timestamped sibling (via the injected backup dep) BEFORE the cert/
+    // profile phase can overwrite it, then advance to the setup-method fork.
+    // A missing source file is non-fatal (yellow warning) — the gate's promise
+    // was "backup first", not "must exist". The gate flips to 'done' so a resume
+    // falls THROUGH to the setup routing instead of re-parking on backing-up.
+    //
+    // Routing mirrors the TUI: macOS offers the import-vs-create fork at
+    // setup-method-select; off-macOS the import sub-flow is unavailable, so the
+    // user goes straight to the create-new api-key-instructions. isMacOS defaults
+    // to true (the macOS-first target) when the dep is omitted.
+    case 'backing-up': {
+      const date = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
+      try {
+        await deps.copyFile?.(
+          credentialsBackupSourcePath(),
+          credentialsBackupDestPath(date),
+        )
+        deps.onLog?.('✔ Backup saved')
+      }
+      catch {
+        deps.onLog?.('⚠ Could not backup credentials (file may not exist yet)', 'yellow')
+      }
+      const nextProgress: OnboardingProgress = { ...progress, _credentialsExistGate: 'done' }
+      await deps.saveProgress?.(progress.appId, nextProgress)
+      const onMac = deps.isMacOS ? deps.isMacOS() : true
+      return { progress: nextProgress, next: onMac ? 'setup-method-select' : 'api-key-instructions' }
+    }
+
+    // ── p8-method-select (file-picker effect) ─────────────────────────────────
+    // app.tsx:1862–1895. Open the native .p8 picker EXACTLY ONCE (idempotent —
+    // the TUI guards with pickerOpenedRef; the engine guards with the carried
+    // `pickerOpened` flag so a re-render/redrive does NOT re-open the dialog).
+    //   - file chosen → read it, persist {p8Path, extracted keyId}, return the
+    //     raw bytes in transient.p8Content, advance to input-key-id.
+    //   - cancelled   → fall back to manual entry at input-p8-path.
+    // Persisting the extracted keyId here means a quit-before-the-Key-ID-step
+    // resume restores it instead of showing the empty placeholder (app.tsx:1879).
+    case 'p8-method-select': {
+      // Idempotency guard: if the picker already ran this drive, do not re-open.
+      if (deps.carried?.pickerOpened)
+        return { progress, next: 'input-p8-path', transient: { pickerOpened: true } }
+
+      const selected = await deps.openP8FilePicker?.()
+      if (!selected) {
+        // User cancelled the picker — fall back to manual path entry.
+        return { progress, next: 'input-p8-path', transient: { pickerOpened: true } }
+      }
+
+      const bytes = await deps.readFile!(selected)
+      const extracted = extractKeyIdFromP8Path(selected)
+      const nextProgress: OnboardingProgress = {
+        ...progress,
+        p8Path: selected,
+        ...(extracted ? { keyId: extracted } : {}),
+      }
+      await deps.saveProgress?.(progress.appId, nextProgress)
+      deps.onLog?.(`✔ Key file selected · ${selected}`)
+      return {
+        progress: nextProgress,
+        next: 'input-key-id',
+        transient: { pickerOpened: true, p8Content: bytes },
+      }
+    }
+
+    // ── verifying-key ─────────────────────────────────────────────────────────
+    // app.tsx:1897–1976. Verify the ASC API key with Apple, then (create-new
+    // path) advance to certificate creation. The .p8 BYTES are transient: the
+    // driver carries them from the .p8 input chain via deps.carried.p8Content;
+    // on a crash-recovery resume that lost them, re-read the file at p8Path.
+    //
+    // On success persist completedSteps.apiKeyVerified (keyId + issuerId), MERGING
+    // into existing progress so setupMethod / importDistribution are preserved
+    // (app.tsx:1907–1928 — a fresh-object save here once wiped the import context
+    // and resumed into create-new). The verified team id (if any) rides transient
+    // so the downstream cert/profile effects can reuse it without a re-fetch.
+    case 'verifying-key': {
+      const keyId = progress.keyId
+      const issuerId = progress.issuerId
+      if (!keyId || !issuerId)
+        throw new Error('verifying-key: keyId/issuerId not yet collected')
+
+      const p8Content = await resolveP8Content(progress, deps)
+
+      try {
+        const { teamId } = await deps.verifyApiKey!({ keyId, issuerId, p8Content })
+        const apiKey: ApiKeyData = { keyId, issuerId }
+        const nextProgress: OnboardingProgress = {
+          ...progress,
+          completedSteps: { ...progress.completedSteps, apiKeyVerified: apiKey },
+        }
+        await deps.saveProgress?.(progress.appId, nextProgress)
+        deps.onLog?.(`✔ API Key verified — Key: ${keyId}`)
+        return {
+          progress: nextProgress,
+          next: 'creating-certificate',
+          transient: { apiKey, ...(teamId ? { teamId } : {}) },
+        }
+      }
+      catch (err) {
+        deps.onLog?.(`✖ ${err instanceof Error ? err.message : String(err)}`, 'red')
+        return { progress, next: 'error' }
+      }
+    }
+
+    // ── creating-certificate ──────────────────────────────────────────────────
+    // app.tsx:1978–2025. Generate a CSR + private key, ask Apple to mint a
+    // distribution certificate from the CSR, then build the .p12 locally from
+    // Apple's cert content + the private key. The cert id / expiry / teamId /
+    // p12 base64 are persisted to completedSteps.certificateCreated (a MARKER —
+    // the p12 base64 IS the credential, written here so resume can rebuild the
+    // saved-credential map without re-minting). The private key PEM is NEVER
+    // persisted (the TUI stashes it on `_privateKeyPem` only across the await and
+    // deletes it after .p12 creation; the IO-free engine keeps it in a local).
+    //
+    // Cert-limit branch: Apple rejects a 4th cert → CertificateLimitError. Surface
+    // the existing certs in transient.existingCerts (fetched via listCertificates)
+    // and route to cert-limit-prompt (its view lands in BATCH 3). Other failures
+    // route to 'error'.
+    case 'creating-certificate': {
+      const { csr, privateKeyPem } = deps.generateCsr!()
+      try {
+        const cert = await deps.createCertificate!({ csr })
+        const p12Base64 = deps.createP12!({
+          certificatePem: cert.certificateContent,
+          privateKeyPem,
+          password: DEFAULT_P12_PASSWORD,
+        })
+        const certData: CertificateData = {
+          certificateId: cert.certificateId,
+          expirationDate: cert.expirationDate,
+          teamId: cert.teamId,
+          p12Base64,
+        }
+        const nextProgress: OnboardingProgress = {
+          ...progress,
+          completedSteps: { ...progress.completedSteps, certificateCreated: certData },
+        }
+        await deps.saveProgress?.(progress.appId, nextProgress)
+        deps.onLog?.(`✔ Distribution certificate created — Expires ${cert.expirationDate}`)
+        return {
+          progress: nextProgress,
+          next: 'creating-profile',
+          transient: { certData, ...(certData.teamId ? { teamId: certData.teamId } : {}) },
+        }
+      }
+      catch (err) {
+        if (err instanceof CertificateLimitError) {
+          // Offer the existing certs for revocation. Prefer the certs carried on
+          // the error; fall back to a fresh list via listCertificates.
+          const existingCerts = err.certificates?.length
+            ? err.certificates
+            : (await deps.listCertificates?.()) ?? []
+          return { progress, next: 'cert-limit-prompt', transient: { existingCerts } }
+        }
+        deps.onLog?.(`✖ ${err instanceof Error ? err.message : String(err)}`, 'red')
+        return { progress, next: 'error' }
+      }
+    }
+
+    // ── creating-profile ──────────────────────────────────────────────────────
+    // app.tsx:2049–2088. Register/find the bundle id on Apple and create the App
+    // Store provisioning profile linking the cert. The resolved bundle id is the
+    // confirmed override (iosBundleIdOverride) or config.appId — the SAME value
+    // the provisioning_map is keyed by at saving-credentials. On success persist
+    // completedSteps.profileCreated and thread cert/profile/teamId through
+    // transient so the saving-credentials handoff reuses them without a re-fetch.
+    //
+    // Duplicate branch: Apple already has Capgo profiles for this bundle id →
+    // DuplicateProfileError. Record duplicateProfileOrigin='creating-profile' so
+    // the post-deletion effect retries the create-new path (not the import D2),
+    // surface the duplicates in transient, and route to duplicate-profile-prompt
+    // (its view lands in BATCH 3). Other failures route to 'error'.
+    case 'creating-profile': {
+      const bundleId = resolveIosBundleId(progress)
+      const certificateId = deps.carried?.certData?.certificateId
+        ?? progress.completedSteps.certificateCreated?.certificateId
+      if (!certificateId)
+        throw new Error('creating-profile: certificate not yet created')
+
+      try {
+        const profile = await deps.createProfile!({ bundleId, certificateId })
+        // Detect duplicates AFTER a successful create as well — the TUI surfaces
+        // them via the createProfile DuplicateProfileError, but the injected dep
+        // may also expose a separate checkDuplicateProfiles probe. When it does
+        // and finds duplicates, route to the prompt instead of advancing.
+        const duplicates = (await deps.checkDuplicateProfiles?.(bundleId)) ?? []
+        if (duplicates.length > 0) {
+          const nextProgress: OnboardingProgress = {
+            ...progress,
+            duplicateProfileOrigin: 'creating-profile',
+          }
+          await deps.saveProgress?.(progress.appId, nextProgress)
+          return {
+            progress: nextProgress,
+            next: 'duplicate-profile-prompt',
+            transient: { duplicateProfiles: duplicates },
+          }
+        }
+
+        const profileData: ProfileData = {
+          profileId: profile.profileId,
+          profileName: profile.profileName,
+          profileBase64: profile.profileBase64,
+        }
+        const teamId = deps.carried?.teamId
+          ?? progress.completedSteps.certificateCreated?.teamId
+        const certData = deps.carried?.certData ?? progress.completedSteps.certificateCreated
+        const nextProgress: OnboardingProgress = {
+          ...progress,
+          completedSteps: { ...progress.completedSteps, profileCreated: profileData },
+        }
+        await deps.saveProgress?.(progress.appId, nextProgress)
+        deps.onLog?.(`✔ Provisioning profile created — "${profile.profileName}"`)
+        return {
+          progress: nextProgress,
+          next: 'saving-credentials',
+          transient: {
+            profileData,
+            ...(certData ? { certData } : {}),
+            ...(teamId ? { teamId } : {}),
+          },
+        }
+      }
+      catch (err) {
+        if (err instanceof DuplicateProfileError) {
+          const nextProgress: OnboardingProgress = {
+            ...progress,
+            duplicateProfileOrigin: 'creating-profile',
+          }
+          await deps.saveProgress?.(progress.appId, nextProgress)
+          return {
+            progress: nextProgress,
+            next: 'duplicate-profile-prompt',
+            transient: { duplicateProfiles: err.profiles },
+          }
+        }
+        deps.onLog?.(`✖ ${err instanceof Error ? err.message : String(err)}`, 'red')
+        return { progress, next: 'error' }
+      }
+    }
+
+    default:
+      throw new Error(`runIosEffect: not implemented for step '${step}'`)
+  }
+}
+
+// ─── Create-new effect helpers ─────────────────────────────────────────────────
+
+/** ~/.capgo-credentials/credentials.json — the backing-up source (app.tsx:1232). */
+function credentialsBackupSourcePath(): string {
+  return join(homedir(), '.capgo-credentials', 'credentials.json')
+}
+
+/** The timestamped sibling backup destination (app.tsx:1234). */
+function credentialsBackupDestPath(date: string): string {
+  return join(homedir(), '.capgo-credentials', `credentials-${date}.copy.json`)
+}
+
+/**
+ * Resolve the Apple-side iOS bundle id used for ensureBundleId / createProfile
+ * and as the provisioning_map key. Mirrors the TUI's `iosBundleId` = the
+ * confirmed override (when the user picked a bundle id different from
+ * config.appId at confirm-app-id) else config.appId (== progress.appId here).
+ */
+function resolveIosBundleId(progress: OnboardingProgress): string {
+  return progress.iosBundleIdOverride || progress.appId
+}
+
+/**
+ * Resolve the validated .p8 bytes for verifying-key. The driver carries them in
+ * deps.carried.p8Content (the transient channel mirroring the TUI's
+ * p8ContentRef); on a crash-recovery resume that lost them, fall back to
+ * re-reading the file at progress.p8Path via the injected readFile. Throws a
+ * NeedP8-style error when neither is available — the same fail-fast the TUI's
+ * getFreshToken does so the driver can re-prompt for the .p8.
+ */
+async function resolveP8Content(progress: OnboardingProgress, deps: IosEffectDeps): Promise<Buffer> {
+  if (deps.carried?.p8Content)
+    return deps.carried.p8Content
+  if (progress.p8Path && deps.readFile)
+    return deps.readFile(progress.p8Path)
+  throw new Error('verifying-key: .p8 content unavailable (no carried bytes and no readable p8Path)')
 }

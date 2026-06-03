@@ -333,15 +333,18 @@ await test('applyIosInput leaves a NON-tail step unchanged (still a stub)', asyn
   assertEquals(next, progress, 'non-tail steps stay stubs — progress unchanged')
 })
 
-await test('runIosEffect throws for a NON-tail effect step (still a stub)', async () => {
+await test('runIosEffect throws for a NON-tail, not-yet-implemented effect step (still a stub)', async () => {
+  // BATCH 2a implemented the create-new effects (backing-up / p8-method-select /
+  // verifying-key / creating-certificate / creating-profile). `import-scanning`
+  // is a still-stubbed import-flow effect, so it must still throw "not implemented".
   let threw = false
   try {
-    await runIosEffect('verifying-key', iosProgress(), makeDeps())
+    await runIosEffect('import-scanning', iosProgress(), makeDeps())
   }
   catch (err) {
     threw = /not implemented/.test(err instanceof Error ? err.message : String(err))
   }
-  assert(threw, 'a non-tail effect step must still throw "not implemented"')
+  assert(threw, 'a non-tail, not-yet-implemented effect step must still throw "not implemented"')
 })
 
 // ─── 4) Resume routing THROUGH the tail (getIosResumeStep) ─────────────────────
