@@ -1,5 +1,5 @@
 import type { OnboardingProgress, OnboardingStep } from '../types.js'
-import { getResumeStep } from '../progress.js'
+import { getIosResumeStep } from '../ios/progress.js'
 import { applyIosInput, iosViewForStep, runIosEffect } from '../ios/flow.js'
 import type { IosStepView } from '../ios/flow.js'
 import type { PlatformFlow, StepView } from './contract.js'
@@ -16,7 +16,7 @@ function mapIosViewToStepView(v: IosStepView): StepView {
 }
 
 export const iosFlow: PlatformFlow<OnboardingStep, OnboardingProgress, Record<string, unknown>> = {
-  resumeStep: progress => getResumeStep(progress),
+  resumeStep: progress => getIosResumeStep(progress),
   viewForStep: (step, progress, ctx) => mapIosViewToStepView(iosViewForStep(step, progress, ctx as never)),
   applyInput: (step, progress, input) => applyIosInput(step, progress, input as never),
   runEffect: (step, progress, deps) => runIosEffect(step, progress, deps as never),

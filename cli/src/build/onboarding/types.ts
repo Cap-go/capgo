@@ -227,6 +227,79 @@ export interface OnboardingProgress extends TailProgress {
    * bundle id the user already moved on from.
    */
   iosBundleIdContextAppId?: string
+  /**
+   * Whether the user has confirmed the iOS bundle id at the `confirm-app-id`
+   * step. The confirm-app-id gate is only shown when `capacitor.config.appId`
+   * and `project.pbxproj` disagree — a mismatch detected by a SYNC FS read the
+   * pure engine can NOT re-do on resume. So the driver records the mismatch by
+   * persisting `pendingAppIdNext` (the router target) and, once the user picks,
+   * sets `appIdConfirmed = true`. The engine then lands on `confirm-app-id` only
+   * while `pendingAppIdNext` is set and `appIdConfirmed` is not yet true — never
+   * re-asking after confirmation and never performing an FS read itself.
+   *
+   * Absent on legacy/in-flight progress files → treated as "not confirmed",
+   * which is harmless because `pendingAppIdNext` (the mismatch signal) is also
+   * absent there, so the gate is simply skipped.
+   *
+   * ADDITIVE (BATCH 0): only consumed by `getIosResumeStep`'s Phase-1 gate.
+   */
+  appIdConfirmed?: boolean
+  /**
+   * Router target the `confirm-app-id` step returns to once the user confirms
+   * (or overrides) the bundle id. Persisted (not ephemeral) so the confirm-app-id
+   * branch is resume-derivable: the driver records it when it detects a mismatch
+   * and routes into the gate. Its PRESENCE is the persisted "a mismatch was
+   * detected and is awaiting confirmation" signal the pure engine uses (combined
+   * with `!appIdConfirmed`) — the engine never re-runs the FS-based mismatch
+   * detection. `undefined` → no pending mismatch → the gate is skipped.
+   *
+   * ADDITIVE (BATCH 0): populated by the driver in a later batch; the engine
+   * only reads it.
+   */
+  pendingAppIdNext?: OnboardingStep
+  /**
+   * Lifecycle of the iOS data-safety gate that runs BEFORE the setup-method
+   * fork when saved iOS credentials already exist for this appId. Mirrors the
+   * android `_credentialsExistGate` marker so the gate is resume-derivable
+   * instead of living only in the TUI's `setStep` calls:
+   *   - 'pending' → saved iOS credentials exist; awaiting the user's
+   *                 backup-or-cancel choice (the `credentials-exist` step)
+   *   - 'backup'  → user chose backup; the `backing-up` effect must still run
+   *   - 'done'    → backup performed (or source absent); proceed to setup
+   *   - 'cancel'  → user chose to stop; onboarding halts to protect the
+   *                 existing credentials
+   *
+   * Absent on legacy/in-flight progress files → treated as "no gate", so the
+   * resume routing is unchanged for every existing progress file.
+   *
+   * ADDITIVE (BATCH 0): only consumed by `getIosResumeStep`'s Phase-0 gate.
+   */
+  _credentialsExistGate?: 'pending' | 'backup' | 'done' | 'cancel'
+  /**
+   * Which step triggered the `duplicate-profile-prompt`, so the post-deletion
+   * effect (`deleting-duplicate-profiles`) can route back to the right place on
+   * resume. The prompt is dual-origin: `creating-profile` reaches it on the
+   * create-new path, and `import-create-profile-only` reaches it on the import
+   * path. Persisting the origin prevents an import user from being routed back
+   * into the create-new `creating-profile` step (the exact class of resume bug
+   * the `setupMethod` branch was added to prevent).
+   *
+   * ADDITIVE (BATCH 0): persisted now so the engine surface is total; the
+   * effect that reads it is wired in a later batch.
+   */
+  duplicateProfileOrigin?: 'creating-profile' | 'import-create-profile-only'
+  /**
+   * Deferred recovery branch after the import `.p8` input chain. When the user
+   * picks "create" in `import-no-match-recovery` but has no ASC API key yet, the
+   * flow detours through `api-key-instructions` → `verifying-key` and must
+   * return to `import-create-profile-only` afterwards. Persisting the pending
+   * action (e.g. `'create-profile-only'`) lets resume restore that deferred
+   * target instead of dropping the user at the picker.
+   *
+   * ADDITIVE (BATCH 0): persisted now so the engine surface is total; the
+   * routing that reads it is wired in a later batch.
+   */
+  pendingRecoveryAction?: string
   completedSteps: {
     apiKeyVerified?: ApiKeyData
     certificateCreated?: CertificateData
