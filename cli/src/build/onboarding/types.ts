@@ -60,6 +60,7 @@ export type OnboardingStep
     | 'input-key-id'
     | 'input-issuer-id'
     | 'verifying-key'
+    | 'verify-app'
     | 'creating-certificate'
     | 'cert-limit-prompt'
     | 'revoking-certificate'
@@ -265,6 +266,7 @@ export const STEP_PROGRESS: Record<OnboardingStep, number> = {
   'input-key-id': 12,
   'input-issuer-id': 18,
   'verifying-key': 25,
+  'verify-app': 30,
   'creating-certificate': 45,
   'cert-limit-prompt': 45,
   'revoking-certificate': 48,
@@ -318,6 +320,8 @@ export function getPhaseLabel(step: OnboardingStep): string {
       return 'Setup method'
     case 'confirm-app-id':
       return 'Confirm iOS bundle ID'
+    case 'verify-app':
+      return 'Verify App Store app'
     case 'import-scanning':
       return 'Step 1 of 4 · Scanning your Mac'
     case 'import-distribution-mode':
