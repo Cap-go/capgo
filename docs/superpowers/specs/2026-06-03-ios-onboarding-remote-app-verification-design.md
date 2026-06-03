@@ -96,15 +96,19 @@ fails the build:
 
 - **Wrong build ID (Problem 1):** the user picks the intended App Store app; if
   it differs from the Release build ID we **gate** until the user fixes
-  `PRODUCT_BUNDLE_IDENTIFIER` themselves and the API confirms it. We **never**
-  edit `pbxproj`, and we **never** touch `capacitor.config.appId`.
+  `PRODUCT_BUNDLE_IDENTIFIER` and the API confirms it. The gate offers an
+  **"Update PRODUCT_BUNDLE_IDENTIFIER for me"** action that rewrites the Release
+  build id in `pbxproj` to the chosen app and re-checks; the user may also edit it
+  by hand. We **never** touch `capacitor.config.appId`, and only
+  `PRODUCT_BUNDLE_IDENTIFIER` assignments equal to the current build id change.
 - **App does not exist (Problem 2):** we **offer to open** the App Store Connect
   create-app page and **gate** until the API confirms an app exists for the build
   ID. We do **not** call `POST /v1/apps` (the API forbids it).
 
-Documented seam for one future opt-in: a Trapeze/hand-coded
-`PRODUCT_BUNDLE_IDENTIFIER` rewriter ("fix it for me") so the user doesn't have
-to hand-edit Xcode. Not built now.
+The Path A "fix it for me" rewriter is now implemented (hand-coded, no Trapeze
+dependency): `replaceBundleIdInPbxproj` (pure) + `writeReleaseBundleId` in
+`pbxproj-parser.ts`, wired into the gate. It edits only `pbxproj`
+`PRODUCT_BUNDLE_IDENTIFIER` assignments matching the current build id.
 
 ## Design
 
@@ -311,8 +315,8 @@ throw into the wizard.
 ## Out of scope (v1)
 
 - Android remote verification (API cannot enumerate apps).
-- Editing `pbxproj` (Trapeze or hand-coded) — deferred opt-in. `capacitor.config`
-  is never touched.
+- Trapeze (or any native-config dependency) — the `pbxproj` auto-fix is
+  hand-coded; `capacitor.config` is never touched.
 - Auto-creating the App Store Connect app — **impossible** via the API
   (`apps` is GET/UPDATE only); we open the web page and verify by re-polling.
 - `ad_hoc`-mode remote checks.
