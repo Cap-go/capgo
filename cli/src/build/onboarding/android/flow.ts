@@ -28,7 +28,7 @@ import type { BuildCredentials } from '../../../schemas/build.js'
 import type { BuildLogger, BuildRequestOptions, BuildRequestResult } from '../../request.js'
 import type { AsyncCommandRunner, CiSecretDiscovery, CiSecretEntry, CiSecretSetupAdvice, CiSecretTarget, CommandRunner } from '../ci-secrets.js'
 import type { EnvExportOpts, EnvExportResult } from '../env-export.js'
-import type { GeneratedWorkflow, WorkflowGeneratorOpts } from '../workflow-generator.js'
+import type { BuildScriptChoice, GeneratedWorkflow, PackageManager, WorkflowGeneratorOpts } from '../workflow-generator.js'
 import type { WorkflowWriteOptions, WorkflowWriteResult } from '../workflow-writer.js'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
@@ -69,6 +69,9 @@ import { generateProjectId, sanitizeGcpProjectDisplayName, ANDROIDPUBLISHER_API,
 import { generateRandomPassword } from './keystore.js'
 import { MissingScopesError } from './oauth-google.js'
 import { CAPGO_SA_DEVELOPER_PERMISSIONS, CAPGO_SA_APP_PERMISSIONS } from './play-api.js'
+import { getCiSecretTargetLabel } from '../ci-secrets.js'
+import { buildScriptPickerOptions } from '../workflow-ui-helpers.js'
+import { WORKFLOW_PATH } from '../workflow-generator.js'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -149,6 +152,19 @@ export interface AndroidStepCtx {
   buildOutput?: string[]
   /** Captured AI-analysis job id surfaced on a failed build (requesting-build). */
   aiJobId?: string
+
+  // ── Workflow-builder sub-flow ctx (pick-package-manager / pick-build-script) ──
+  // Optional runtime data the workflow-builder views surface. Every field is
+  // OPTIONAL so a driver that only passes { appId } still gets a usable view
+  // (the static option tables defined below already cover the menus).
+  /** Detected package manager from the project's lockfile (pick-package-manager). */
+  detectedPackageManager?: string
+  /** All scripts from package.json (pick-build-script picker). */
+  availableScripts?: Record<string, string>
+  /** Project-type recommendation surfaced at the top of pick-build-script. */
+  recommendedScript?: string | null
+  /** Default `.env` export path shown at ask-export-env (defaultExportPath). */
+  defaultEnvExportPath?: string
 }
 
 // ─── KIND_TABLE ───────────────────────────────────────────────────────────────
@@ -310,6 +326,79 @@ const OPTIONS_GCP_PROJECT_NEW: AndroidStepOption = {
   label: 'Create a new project',
 }
 
+// ─── Post-save "tail" option tables ───────────────────────────────────────────
+//
+// Mirror the <Select> options rendered in the Phase 6 tail of android/ui/app.tsx
+// (CI-secrets → env-export → workflow-file → build-request). Labels are copied
+// verbatim from the TUI so a driver renders the exact same menu. ci-secrets-
+// target-select and pick-build-script are built dynamically below because their
+// options depend on runtime data (detected targets / package.json scripts).
+
+// ci-secrets-setup (android-ci.tsx CiSecretsSetupStep): retry / skip.
+const OPTIONS_CI_SECRETS_SETUP: AndroidStepOption[] = [
+  { value: 'retry', label: 'I installed and logged in, check again' },
+  { value: 'skip', label: 'Skip upload' },
+]
+
+// confirm-ci-secret-overwrite (android-ci.tsx ConfirmCiSecretOverwriteStep).
+const OPTIONS_CONFIRM_CI_SECRET_OVERWRITE: AndroidStepOption[] = [
+  { value: 'replace', label: 'Replace existing env vars' },
+  { value: 'skip', label: 'Skip upload' },
+]
+
+// ci-secrets-failed (android-ci.tsx CiSecretsFailedStep): retry / continue.
+const OPTIONS_CI_SECRETS_FAILED: AndroidStepOption[] = [
+  { value: 'retry', label: 'Try upload again' },
+  { value: 'continue', label: 'Continue without upload' },
+]
+
+// ask-github-actions-setup (app.tsx ~2988): the 3-way GitHub Actions choice.
+const OPTIONS_ASK_GITHUB_ACTIONS_SETUP: AndroidStepOption[] = [
+  { value: 'with-workflow', label: '🚀  Yes — set the secrets AND create a workflow file' },
+  { value: 'secrets-only', label: '🔒  Yes — set ONLY the secrets' },
+  { value: 'no', label: '❌  No' },
+]
+
+// confirm-env-export-overwrite (app.tsx ~3054): replace / skip.
+const OPTIONS_CONFIRM_ENV_EXPORT_OVERWRITE: AndroidStepOption[] = [
+  { value: 'replace', label: '✏️   Replace it' },
+  { value: 'skip', label: '🛑  Skip — keep the existing file' },
+]
+
+// pick-package-manager (app.tsx ~3080): the four supported managers.
+const OPTIONS_PICK_PACKAGE_MANAGER: AndroidStepOption[] = [
+  { value: 'bun', label: '📦  bun' },
+  { value: 'npm', label: '📦  npm' },
+  { value: 'pnpm', label: '📦  pnpm' },
+  { value: 'yarn', label: '📦  yarn' },
+]
+
+// preview-workflow-file (app.tsx ~3174): write / view diff / cancel.
+const OPTIONS_PREVIEW_WORKFLOW_FILE: AndroidStepOption[] = [
+  { value: 'write', label: '✏️   Write file' },
+  { value: 'view', label: '👀  Show proposed file diff' },
+  { value: 'cancel', label: '❌  Do not write file' },
+]
+
+// view-workflow-diff (app.tsx FullscreenDiffViewer onExit → back to preview).
+const OPTIONS_VIEW_WORKFLOW_DIFF: AndroidStepOption[] = [
+  { value: 'close', label: 'Close diff' },
+]
+
+// ask-build (android-ci.tsx AskBuildStep): request a build now or not.
+const OPTIONS_ASK_BUILD: AndroidStepOption[] = [
+  { value: 'yes', label: '🚀  Yes, request a build' },
+  { value: 'no', label: '⏭   Not now' },
+]
+
+// pick-build-script fallback options — the two escape hatches that are always
+// present in buildScriptPickerOptions (custom command + skip). Used when the
+// driver has not yet supplied ctx.availableScripts.
+const OPTIONS_PICK_BUILD_SCRIPT_FALLBACK: AndroidStepOption[] = [
+  { value: '__custom__', label: 'Type a custom command…' },
+  { value: '__skip__', label: 'Skip build step (my app is raw HTML)' },
+]
+
 // ─── androidViewForStep ───────────────────────────────────────────────────────
 
 /**
@@ -447,6 +536,125 @@ export function androidViewForStep(
       return base
     }
 
+    // ── Phase 6 — Post-save "tail": CI-secrets → env-export → workflow-file ──
+    // Each case mirrors the matching <Select>/prompt in android/ui/app.tsx so a
+    // driver renders the same menu. Dynamic option lists (target picker, build-
+    // script picker) read OPTIONAL ctx; when the ctx is absent the static
+    // fallback options keep the view usable.
+
+    // ci-secrets-setup — git-hosting CLI not ready; retry or skip the upload.
+    case 'ci-secrets-setup':
+      return { ...base, title: 'Set up your git hosting CLI to upload env vars', options: OPTIONS_CI_SECRETS_SETUP }
+
+    // ci-secrets-target-select — one row per detected destination + a Skip row.
+    case 'ci-secrets-target-select': {
+      const targetOptions: AndroidStepOption[] = (ctx.ciSecretTargets ?? []).map(target => ({
+        value: target.provider,
+        label: target.provider === 'github' ? 'GitHub Actions repository secrets' : 'GitLab CI/CD variables',
+      }))
+      return {
+        ...base,
+        prompt: 'Where should Capgo upload the build env vars?',
+        options: [...targetOptions, { value: 'skip', label: 'Skip' }],
+      }
+    }
+
+    // ask-ci-secrets — confirm the upload to the chosen target (GitLab path).
+    case 'ask-ci-secrets': {
+      const entryCount = ctx.ciSecretEntries?.length ?? 0
+      const targetLabel = getCiSecretTargetLabel(progress?.ciSecretTarget ?? null)
+      const cli = progress?.ciSecretTarget?.cli || 'CLI'
+      return {
+        ...base,
+        prompt: `Upload ${entryCount} build env var${entryCount === 1 ? '' : 's'} to ${targetLabel}?`,
+        options: [
+          { value: 'yes', label: `Upload with ${cli}` },
+          { value: 'no', label: 'Skip' },
+        ],
+      }
+    }
+
+    // confirm-ci-secret-overwrite — some keys already exist; replace or skip.
+    case 'confirm-ci-secret-overwrite':
+      return { ...base, prompt: 'These env vars already exist and will be replaced:', options: OPTIONS_CONFIRM_CI_SECRET_OVERWRITE }
+
+    // ci-secrets-failed — the upload threw; retry or continue (credentials are saved).
+    case 'ci-secrets-failed':
+      return { ...base, message: 'Could not upload env vars.', options: OPTIONS_CI_SECRETS_FAILED }
+
+    // ask-github-actions-setup — the 3-way GitHub Actions choice.
+    case 'ask-github-actions-setup':
+      return { ...base, prompt: 'Set up GitHub Actions for you?', options: OPTIONS_ASK_GITHUB_ACTIONS_SETUP }
+
+    // confirm-secrets-push — last gate before pushing to the repo.
+    case 'confirm-secrets-push': {
+      const repo = ctx.ciSecretRepoLabel ?? 'the repository'
+      return {
+        ...base,
+        prompt: `Confirm before pushing secrets to ${repo}`,
+        options: [
+          { value: 'confirm', label: `Yes, push to ${repo}` },
+          { value: 'cancel', label: 'Cancel — don\'t push anything' },
+        ],
+      }
+    }
+
+    // ask-export-env — export the credentials as a .env file instead.
+    case 'ask-export-env': {
+      const fileName = (ctx.defaultEnvExportPath ?? '').split('/').slice(-1)[0]
+      const yesLabel = fileName ? `📝  Yes — write ${fileName}` : '📝  Yes — write the .env file'
+      return {
+        ...base,
+        prompt: 'Export the credentials as a .env file instead?',
+        options: [
+          { value: 'yes', label: yesLabel },
+          { value: 'no', label: '❌  No, exit without exporting' },
+        ],
+      }
+    }
+
+    // confirm-env-export-overwrite — the .env already exists; replace or skip.
+    case 'confirm-env-export-overwrite': {
+      const path = progress?.envExportTargetPath ?? ctx.defaultEnvExportPath ?? 'the file'
+      return { ...base, prompt: `${path} already exists. Replace it with a fresh export, or skip?`, options: OPTIONS_CONFIRM_ENV_EXPORT_OVERWRITE }
+    }
+
+    // pick-package-manager — drives install + build steps in the workflow.
+    case 'pick-package-manager': {
+      const detected = ctx.detectedPackageManager
+      const options: AndroidStepOption[] = OPTIONS_PICK_PACKAGE_MANAGER.map(opt =>
+        detected && opt.value === detected
+          ? { ...opt, label: `${opt.label}  (recommended — matches your lockfile)` }
+          : opt,
+      )
+      return { ...base, prompt: 'Which package manager does this project use?', options }
+    }
+
+    // pick-build-script — pick the script that builds the web assets.
+    case 'pick-build-script': {
+      const options = ctx.availableScripts
+        ? buildScriptPickerOptions(ctx.availableScripts, ctx.recommendedScript ?? null)
+            .map(o => ({ value: o.value, label: o.label }))
+        : OPTIONS_PICK_BUILD_SCRIPT_FALLBACK
+      return { ...base, prompt: 'Which script builds your web assets?', options }
+    }
+
+    // pick-build-script-custom — free-text custom build command.
+    case 'pick-build-script-custom':
+      return { ...base, prompt: 'Custom build command', collect: ['buildScriptCustomCommand'] }
+
+    // preview-workflow-file — write / view diff / cancel.
+    case 'preview-workflow-file':
+      return { ...base, prompt: `What should we do with ${WORKFLOW_PATH}?`, options: OPTIONS_PREVIEW_WORKFLOW_FILE }
+
+    // view-workflow-diff — fullscreen diff takeover; only action is to close.
+    case 'view-workflow-diff':
+      return { ...base, title: 'Proposed workflow diff', options: OPTIONS_VIEW_WORKFLOW_DIFF }
+
+    // ask-build — final prompt: request a build now or finish.
+    case 'ask-build':
+      return { ...base, prompt: 'Request a build now?', options: OPTIONS_ASK_BUILD }
+
     // ── Done ──
     case 'build-complete':
       return { ...base, message: 'Build complete.' }
@@ -563,6 +771,60 @@ export type AndroidInput =
   // (progress.serviceAccountMethod may already be set but is also passed
   // explicitly here to keep the function self-contained).
   | { step: 'android-package-select'; packageName: string; source: 'gradle' | 'capacitor-config' | 'user-input'; serviceAccountMethod: 'generate' | 'existing' }
+
+  // ── Phase 6 — Post-save "tail" inputs ───────────────────────────────────────
+  // One variant per tail choice/input step that records state on TailProgress.
+  // Navigation-only / spinner-gate choices (the 'retry'/'skip'/'view'/'close'
+  // routing values) carry no persisted field — applyAndroidInput returns
+  // progress unchanged for them; the driver owns the visual transition.
+
+  // ci-secrets-setup — retry the detection or skip the upload (navigation-only).
+  | { step: 'ci-secrets-setup'; value: 'retry' | 'skip' }
+
+  // ci-secrets-target-select — records the chosen destination (or skip).
+  | { step: 'ci-secrets-target-select'; ciSecretTarget: CiSecretTarget | null }
+
+  // ask-ci-secrets — confirm/skip the GitLab upload (navigation-only).
+  | { step: 'ask-ci-secrets'; value: 'yes' | 'no' }
+
+  // confirm-ci-secret-overwrite — replace existing or skip (navigation-only).
+  | { step: 'confirm-ci-secret-overwrite'; value: 'replace' | 'skip' }
+
+  // ci-secrets-failed — retry the upload or continue (navigation-only).
+  | { step: 'ci-secrets-failed'; value: 'retry' | 'continue' }
+
+  // ask-github-actions-setup — records the 3-way GitHub Actions setup mode.
+  | { step: 'ask-github-actions-setup'; value: 'with-workflow' | 'secrets-only' | 'declined' }
+
+  // confirm-secrets-push — confirm/cancel the push (navigation-only).
+  | { step: 'confirm-secrets-push'; value: 'confirm' | 'cancel' }
+
+  // ask-export-env — 'yes' records the resolved export path; 'no' exits.
+  | { step: 'ask-export-env'; value: 'no' }
+  | { step: 'ask-export-env'; value: 'yes'; envExportTargetPath: string }
+
+  // confirm-env-export-overwrite — replace/skip (navigation-only).
+  | { step: 'confirm-env-export-overwrite'; value: 'replace' | 'skip' }
+
+  // pick-package-manager — records the chosen package manager.
+  | { step: 'pick-package-manager'; selectedPackageManager: PackageManager }
+
+  // pick-build-script — records the build-script choice; '__custom__' routes to
+  // the custom-command input (navigation-only) and '__skip__' records a skip.
+  | { step: 'pick-build-script'; value: '__custom__' }
+  | { step: 'pick-build-script'; buildScriptChoice: BuildScriptChoice }
+
+  // pick-build-script-custom — records the free-text custom command.
+  | { step: 'pick-build-script-custom'; command: string }
+
+  // preview-workflow-file — write / view diff / cancel (navigation-only).
+  | { step: 'preview-workflow-file'; value: 'write' | 'view' | 'cancel' }
+
+  // view-workflow-diff — close the diff (navigation-only).
+  | { step: 'view-workflow-diff'; value: 'close' }
+
+  // ask-build — request a build now or finish (navigation-only).
+  | { step: 'ask-build'; value: 'yes' | 'no' }
 
 // ─── applyAndroidInput ────────────────────────────────────────────────────────
 //
@@ -793,6 +1055,67 @@ export function applyAndroidInput(
         ...progress,
         completedSteps: { ...progress.completedSteps, androidPackageChosen: choice },
       }
+    }
+
+    // ── Phase 6 — Post-save "tail" reducers ────────────────────────────────────
+    // Write the matching TailProgress field for each tail choice/input step,
+    // mirroring the `setX(...)` setState call the TUI fires in android/ui/app.tsx.
+    // Navigation-only / spinner-gate values (retry/skip/view/close/confirm/cancel
+    // and the yes/no build gate) carry no persisted field and fall through to the
+    // `default` below unchanged — exactly like the existing 'learn'/'manual' cases.
+
+    // ── ci-secrets-target-select ──────────────────────────────────────────────
+    // app.tsx ~2945: setCiSecretTarget(target) — records the chosen destination
+    // (null when the user picked "Skip").
+    case 'ci-secrets-target-select': {
+      const i = input as Extract<AndroidInput, { step: 'ci-secrets-target-select' }>
+      return { ...progress, ciSecretTarget: i.ciSecretTarget }
+    }
+
+    // ── ask-github-actions-setup ──────────────────────────────────────────────
+    // app.tsx ~2996/3000: setSetupMode('declined' | 'with-workflow' | 'secrets-only').
+    case 'ask-github-actions-setup': {
+      const i = input as Extract<AndroidInput, { step: 'ask-github-actions-setup' }>
+      return { ...progress, setupMode: i.value }
+    }
+
+    // ── ask-export-env ────────────────────────────────────────────────────────
+    // app.tsx ~3029: setEnvExportTargetPath(defaultExportPath(...)) on 'yes';
+    // 'no' exits without recording a path (falls through unchanged).
+    case 'ask-export-env': {
+      const i = input as Extract<AndroidInput, { step: 'ask-export-env' }>
+      if (i.value === 'yes')
+        return { ...progress, envExportTargetPath: i.envExportTargetPath }
+      return progress
+    }
+
+    // ── pick-package-manager ──────────────────────────────────────────────────
+    // app.tsx ~3088: setSelectedPackageManager(value).
+    case 'pick-package-manager': {
+      const i = input as Extract<AndroidInput, { step: 'pick-package-manager' }>
+      return { ...progress, selectedPackageManager: i.selectedPackageManager }
+    }
+
+    // ── pick-build-script ─────────────────────────────────────────────────────
+    // app.tsx ~3111/3119: setBuildScriptChoice({ type: 'skip' | 'npm-script' }).
+    // '__custom__' routes to the custom-command input (navigation-only) and so
+    // falls through unchanged.
+    case 'pick-build-script': {
+      const i = input as Extract<AndroidInput, { step: 'pick-build-script' }>
+      if ('buildScriptChoice' in i)
+        return { ...progress, buildScriptChoice: i.buildScriptChoice }
+      return progress
+    }
+
+    // ── pick-build-script-custom ──────────────────────────────────────────────
+    // app.tsx ~3149: setBuildScriptChoice({ type: 'custom', command }). Mirrors
+    // the TUI's trim + non-empty guard (empty → progress unchanged).
+    case 'pick-build-script-custom': {
+      const i = input as Extract<AndroidInput, { step: 'pick-build-script-custom' }>
+      const command = i.command.trim()
+      if (!command)
+        return progress
+      return { ...progress, buildScriptChoice: { type: 'custom', command } }
     }
 
     default:
