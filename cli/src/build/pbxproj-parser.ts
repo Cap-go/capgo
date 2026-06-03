@@ -134,11 +134,33 @@ function findPbxprojInDir(dir: string): string | null {
     return null
   }
 
+  // 1) A .xcodeproj directly inside `dir` (React Native: ios/MyApp.xcodeproj).
   for (const entry of entries) {
     if (entry.endsWith('.xcodeproj')) {
       const pbxprojPath = join(dir, entry, 'project.pbxproj')
       if (existsSync(pbxprojPath)) {
         return pbxprojPath
+      }
+    }
+  }
+
+  // 2) A .xcodeproj one level down (Capacitor nests it at ios/App/App.xcodeproj).
+  // Only reached when nothing matched directly, so the RN layout still wins first.
+  for (const entry of entries) {
+    const sub = join(dir, entry)
+    let subEntries: string[]
+    try {
+      subEntries = readdirSync(sub)
+    }
+    catch {
+      continue // not a directory / unreadable — skip
+    }
+    for (const subEntry of subEntries) {
+      if (subEntry.endsWith('.xcodeproj')) {
+        const pbxprojPath = join(sub, subEntry, 'project.pbxproj')
+        if (existsSync(pbxprojPath)) {
+          return pbxprojPath
+        }
       }
     }
   }

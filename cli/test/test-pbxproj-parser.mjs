@@ -109,6 +109,23 @@ t('findXcodeProject finds .xcodeproj in ios/ subdirectory', () => {
   }
 })
 
+t('findXcodeProject finds .xcodeproj nested under ios/App (Capacitor layout)', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'pbx-test-'))
+  try {
+    // Capacitor nests the project at ios/App/App.xcodeproj — one level deeper
+    // than the React Native ios/MyApp.xcodeproj layout the first test covers.
+    const xcodeprojDir = join(dir, 'ios', 'App', 'App.xcodeproj')
+    mkdirSync(xcodeprojDir, { recursive: true })
+    writeFileSync(join(xcodeprojDir, 'project.pbxproj'), 'fake content')
+
+    const result = findXcodeProject(dir)
+    assert.equal(result, join(xcodeprojDir, 'project.pbxproj'))
+  }
+  finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
 // --- resolveBundleId prefers Release over Debug ---
 
 const debugReleasePbxproj = `// !$*UTF8*$!
