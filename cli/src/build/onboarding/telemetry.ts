@@ -19,7 +19,11 @@ export interface TrackBuilderOnboardingStepInput {
 }
 
 export type BuilderOnboardingAction
-  = | 'android_sa_method_selected'
+  // Shared (both platforms): which branch the user picked on the resume-prompt
+  // fork — `continue` resumes saved progress, `restart` wipes it. Carries a
+  // `choice` tag with that value.
+  = | 'resume_prompt_decision'
+    | 'android_sa_method_selected'
     | 'android_sa_validation_recovery_selected'
     | 'android_sa_validation_result'
 

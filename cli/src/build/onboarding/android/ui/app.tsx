@@ -2300,10 +2300,20 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
           ? 'Import existing JSON'
           : serviceAccountMethod === 'generate' ? 'Create via Google' : null
         const keystoreReady = Boolean(completedSteps.keystoreReady)
+        const androidPackage = completedSteps.androidPackageChosen
+        // The service-account fork governs which downstream breadcrumbs make
+        // sense. On the import path the user never signs in with Google or
+        // picks a GCP project, so surfacing "Signed in with Google: No" there
+        // is misleading — only show the OAuth-path lines once the user is
+        // actually on (or has made progress along) that path. The import line
+        // likewise only shows on the import path. Before either is chosen we
+        // show neither, so a user who's about to auto-import isn't told they
+        // haven't done OAuth steps that don't apply to them.
+        const onImportPath = serviceAccountMethod === 'existing'
+        const onOAuthPath = serviceAccountMethod === 'generate' || hasAnyOAuthProgress(initialProgress)
         const signedIn = completedSteps.googleSignInComplete
         const playAccount = completedSteps.playAccountChosen
         const gcpProject = completedSteps.gcpProjectChosen
-        const androidPackage = completedSteps.androidPackageChosen
         const saProvisioned = completedSteps.serviceAccountProvisioned
         const resumeLabel = getAndroidPhaseLabel(startStep) || startStep
         return (
@@ -2315,11 +2325,24 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
               <Text>{`•  Keystore method: ${keystoreLabel}`}</Text>
               {saLabel && <Text>{`•  Service account method: ${saLabel}`}</Text>}
               <Text>{`•  Keystore ready: ${keystoreReady ? `Yes (${completedSteps.keystoreReady!.keystorePath})` : 'No'}`}</Text>
-              <Text>{`•  Signed in with Google: ${signedIn ? `Yes (${signedIn.email})` : 'No'}`}</Text>
-              <Text>{`•  Play Developer account: ${playAccount ? `Yes (${playAccount.displayName || playAccount.developerId})` : 'No'}`}</Text>
-              <Text>{`•  GCP project: ${gcpProject ? `Yes (${gcpProject.displayName})` : 'No'}`}</Text>
-              <Text>{`•  Android package: ${androidPackage ? `Yes (${androidPackage.packageName})` : 'No'}`}</Text>
-              <Text>{`•  Service account provisioned: ${saProvisioned ? `Yes (${saProvisioned.email})` : 'No'}`}</Text>
+              {onImportPath && (
+                <Text>{`•  Service account JSON: ${initialProgress.serviceAccountJsonPath ? `selected (${initialProgress.serviceAccountJsonPath})` : 'not selected yet'}`}</Text>
+              )}
+              {onOAuthPath && (
+                <Text>{`•  Signed in with Google: ${signedIn ? `Yes (${signedIn.email})` : 'No'}`}</Text>
+              )}
+              {onOAuthPath && (
+                <Text>{`•  Play Developer account: ${playAccount ? `Yes (${playAccount.displayName || playAccount.developerId})` : 'No'}`}</Text>
+              )}
+              {onOAuthPath && (
+                <Text>{`•  GCP project: ${gcpProject ? `Yes (${gcpProject.displayName})` : 'No'}`}</Text>
+              )}
+              {(onImportPath || onOAuthPath) && (
+                <Text>{`•  Android package: ${androidPackage ? `Yes (${androidPackage.packageName})` : 'No'}`}</Text>
+              )}
+              {onOAuthPath && (
+                <Text>{`•  Service account provisioned: ${saProvisioned ? `Yes (${saProvisioned.email})` : 'No'}`}</Text>
+              )}
               <Text dimColor>{`•  Resume target: ${resumeLabel}`}</Text>
             </Box>
             <Select
@@ -2332,6 +2355,11 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
                 if (selectFiredRef.current)
                   return
                 selectFiredRef.current = true
+                // Record which branch the user took. The funnel already shows
+                // the resume-prompt step + the next step (welcome on restart,
+                // the resume target on continue), but the explicit choice tag
+                // gives a clean continue-vs-restart split without inferring it.
+                trackAction('resume_prompt_decision', { choice: value })
                 if (value === 'continue') {
                   // Now that the user has committed to picking up where they
                   // left off, replay the breadcrumb log so they see the
