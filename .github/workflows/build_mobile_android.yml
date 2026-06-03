@@ -43,7 +43,15 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
       - name: Prepare mobile project
-        run: bun run build:mobile
+        # Use `cap sync android` instead of build:mobile's `cap copy`. `cap copy`
+        # only pushes web assets + config; `cap sync` also runs `cap update`, which
+        # regenerates the cordova plugins subproject including
+        # android/capacitor-cordova-android-plugins/cordova.variables.gradle.
+        # That dir is gitignored, so the remote builder never receives it unless we
+        # regenerate it here before `capgo build request` uploads the workspace.
+        run: |
+          bun run build
+          bunx cap sync android
       - name: Request Android build through Capgo CLI
         env:
           CAPGO_TOKEN: ${{ secrets.CAPGO_TOKEN }}
