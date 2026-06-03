@@ -4,6 +4,7 @@ import type { Database } from '../../utils/supabase.types.ts'
 import { type } from 'arktype'
 import { safeParseSchema } from '../../utils/ark_validation.ts'
 import { quickError, simpleError } from '../../utils/hono.ts'
+import { closeClient, getPgClient } from '../../utils/pg.ts'
 import { supabaseAdmin, supabaseWithAuth } from '../../utils/supabase.ts'
 import { normalizeWebsiteUrl } from './website.ts'
 
@@ -67,6 +68,70 @@ async function createPendingStripeInfo(c: Context<MiddlewareKeyVariables>, orgId
   return pendingCustomerId
 }
 
+async function getOwnerEmail(c: Context<MiddlewareKeyVariables>, auth: AuthInfo) {
+  if (auth.authType === 'jwt') {
+    const { data: self, error } = await supabaseWithAuth(c, auth)
+      .from('users')
+      .select('email')
+      .eq('id', auth.userId)
+      .single()
+
+    if (error || !self?.email) {
+      throw simpleError('cannot_get_user', 'Cannot get user', { error: error?.message })
+    }
+
+    return self.email
+  }
+
+  let pgClient
+  try {
+    pgClient = getPgClient(c)
+    const result = await pgClient.query<{ email: string }>(
+      'SELECT email FROM public.users WHERE id = $1::uuid LIMIT 1',
+      [auth.userId],
+    )
+    const email = result.rows[0]?.email
+    if (!email) {
+      throw simpleError('cannot_get_user', 'Cannot get user')
+    }
+
+    return email
+  }
+  finally {
+    if (pgClient) {
+      closeClient(c, pgClient)
+    }
+  }
+}
+
+async function ensureApiKeyCanCreateOrganization(c: Context<MiddlewareKeyVariables>, auth: AuthInfo) {
+  if (auth.authType !== 'apikey') {
+    return
+  }
+
+  const apikeyString = auth.apikey?.key ?? c.get('capgkey')
+  if (!apikeyString) {
+    throw quickError(401, 'invalid_apikey', 'Invalid apikey')
+  }
+
+  let pgClient
+  try {
+    pgClient = getPgClient(c)
+    const result = await pgClient.query<{ allowed: boolean }>(
+      'SELECT public.apikey_has_global_permission($1::text, public.rbac_perm_org_create()) AS allowed',
+      [apikeyString],
+    )
+    if (result.rows[0]?.allowed !== true) {
+      throw quickError(403, 'permission_denied', 'Permission denied: org.create')
+    }
+  }
+  finally {
+    if (pgClient) {
+      closeClient(c, pgClient)
+    }
+  }
+}
+
 export async function post(
   c: Context<MiddlewareKeyVariables>,
   bodyRaw: any,
@@ -84,22 +149,17 @@ export async function post(
   if (!auth?.userId) {
     throw simpleError('not_authorized', 'Not authorized')
   }
-  if (auth.authType === 'apikey') {
-    throw quickError(401, 'invalid_apikey', 'API keys cannot create organizations')
-  }
 
+  await ensureApiKeyCanCreateOrganization(c, auth)
+  const ownerEmail = await getOwnerEmail(c, auth)
   const supabase = supabaseWithAuth(c, auth)
-  const { data: self, error: userErr } = await supabase.from('users').select('email').eq('id', auth.userId).single()
-  if (userErr || !self?.email) {
-    throw simpleError('cannot_get_user', 'Cannot get user', { error: userErr?.message })
-  }
   const orgId = crypto.randomUUID()
   const pendingCustomerId = await createPendingStripeInfo(c, orgId, estimatedMau)
   const newOrg = {
     id: orgId,
     name: body.name,
     created_by: auth.userId,
-    management_email: body.email ?? self.email ?? '',
+    management_email: body.email ?? ownerEmail,
     customer_id: pendingCustomerId,
     website,
   }

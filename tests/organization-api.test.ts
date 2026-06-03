@@ -206,7 +206,7 @@ describe('read-only API keys cannot access destructive organization routes', () 
     expect(payload.error).toBe('cannot_access_organization')
   })
 
-  it.concurrent('rejects POST /organization', async () => {
+  it.concurrent('rejects POST /organization without org.create permission', async () => {
     const response = await fetch(`${BASE_URL}/organization`, {
       headers: { ...readOnlyHeaders, capgkey: readOnlyKey },
       method: 'POST',
@@ -216,10 +216,9 @@ describe('read-only API keys cannot access destructive organization routes', () 
       }),
     })
 
-    expect(response.status).toBe(401)
-    // Ensure this is blocked by API-key auth, not by RLS deeper in the handler.
+    expect(response.status).toBe(403)
     const payload = await response.json() as { error?: string }
-    expect(payload.error).toBe('invalid_apikey')
+    expect(payload.error).toBe('permission_denied')
   })
 
   it.concurrent('rejects DELETE /organization', async () => {
@@ -637,6 +636,87 @@ describe('x-limited-key-id subkeys enforce organization scope on middlewareKey r
     expect(response.status).toBe(400)
     const payload = await response.json() as { error: string }
     expect(payload.error).toBe('cannot_access_organization')
+  })
+})
+
+describe('API key organization creation', () => {
+  it('allows a key with org.create to create an organization and auto-binds that key', async () => {
+    const createKeyValue = randomUUID()
+    const createKey = await createDirectApiKeyWithBindings({
+      userId: USER_ID,
+      key: createKeyValue,
+      name: `Organization create key ${randomUUID()}`,
+      orgId: ORG_ID,
+      roleName: 'org_member',
+    })
+    if (!createKey?.key || !createKey.rbac_id || typeof createKey.id !== 'number') {
+      throw new Error('Failed to seed organization create API key')
+    }
+
+    await executeSQL(
+      `INSERT INTO public.apikey_global_permissions (
+         apikey_rbac_id,
+         permission_key,
+         granted_by,
+         reason
+       )
+       VALUES ($1::uuid, public.rbac_perm_org_create(), $2::uuid, 'Test org.create grant')
+       ON CONFLICT DO NOTHING`,
+      [createKey.rbac_id, USER_ID],
+    )
+
+    let createdOrgId: string | undefined
+    try {
+      const response = await fetch(`${BASE_URL}/organization`, {
+        headers: {
+          'Content-Type': 'application/json',
+          'capgkey': createKey.key,
+        },
+        method: 'POST',
+        body: JSON.stringify({
+          name: `API Key Created Org ${randomUUID()}`,
+          website: 'https://created-by-apikey.example',
+        }),
+      })
+
+      expect(response.status).toBe(200)
+      const responseType = type({ id: 'string.uuid' })
+      const payload = parseSchema(responseType, await response.json())
+      createdOrgId = payload.id
+
+      const bindingRows = await executeSQL(
+        `SELECT rb.id
+         FROM public.role_bindings rb
+         JOIN public.roles r ON r.id = rb.role_id
+         WHERE rb.principal_type = public.rbac_principal_apikey()
+           AND rb.principal_id = $1::uuid
+           AND rb.scope_type = public.rbac_scope_org()
+           AND rb.org_id = $2::uuid
+           AND r.name = public.rbac_role_org_super_admin()`,
+        [createKey.rbac_id, createdOrgId],
+      )
+      expect(bindingRows.length).toBe(1)
+
+      const getResponse = await fetch(`${BASE_URL}/organization?orgId=${createdOrgId}`, {
+        headers: {
+          'Content-Type': 'application/json',
+          'capgkey': createKey.key,
+        },
+        method: 'GET',
+      })
+      expect(getResponse.status).toBe(200)
+      const createdOrg = await getResponse.json() as { id: string, website: string | null }
+      expect(createdOrg.id).toBe(createdOrgId)
+      expect(createdOrg.website).toBe('https://created-by-apikey.example/')
+    }
+    finally {
+      if (createdOrgId) {
+        await getSupabaseClient().from('org_users').delete().eq('org_id', createdOrgId)
+        await getSupabaseClient().from('orgs').delete().eq('id', createdOrgId)
+        await getSupabaseClient().from('stripe_info').delete().eq('customer_id', `pending_${createdOrgId}`)
+      }
+      await getSupabaseClient().from('apikeys').delete().eq('id', createKey.id)
+    }
   })
 })
 
