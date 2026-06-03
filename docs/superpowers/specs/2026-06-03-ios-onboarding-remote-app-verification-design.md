@@ -98,8 +98,10 @@ Add a remote-verification step that runs **after `verifying-key` succeeds**
 `redirectIfMismatch` seam rather than replacing the local `confirm-app-id`
 machinery.
 
-1. Fetch the account's apps from ASC (`GET /v1/apps` → `bundleId` + `name`;
-   optionally `GET /v1/bundleIds` for registered-but-no-app identifiers).
+1. Fetch **both** ASC endpoints **in parallel** (`Promise.all`): `GET /v1/apps`
+   (→ `bundleId` + `name`, used for the picker) and `GET /v1/bundleIds` (→
+   registered identifier strings, used only as a diagnostic — see the no-match
+   branch). A failure of either degrades gracefully (see Fallback).
 2. Resolve the **Release** build bundle ID (reuse `detectIosBundleIds`,
    Release-anchored; exclude debug-only suffix variants).
 3. Branch:
@@ -116,9 +118,17 @@ machinery.
        `capacitor.config` `appId` to the chosen ID, else TestFlight upload will
        fail), record the intent, and **continue** with the profile created for
        the **actual Release build ID**. (This is the seam for future auto-fix.)
-   - **No apps in account, or user keeps a non-existent ID (Problem 2):** warn
-     clearly — no ASC app exists for this bundle ID; create it in App Store
-     Connect for `app_store` delivery; `ad_hoc` is unaffected. Continue.
+   - **No app matches the build ID (Problem 2):** use the `/v1/bundleIds`
+     diagnostic to sharpen the warning into one of two sub-states:
+     - *Identifier already registered (present in `/v1/bundleIds`) but no app
+       record* → "The identifier `com.foo.app` exists in your Apple account but
+       has no App Store listing; create the app in App Store Connect for
+       `app_store` delivery."
+     - *Identifier not registered at all* → "`com.foo.app` is not registered in
+       your Apple account — onboarding will create a **brand-new identifier**.
+       If that's a typo or the wrong ID, fix it now." (Directly addresses the
+       original silent-creation concern.)
+     `ad_hoc` is unaffected in both cases. Continue.
 4. **Fallback:** any ASC fetch/permission/network failure → silently degrade to
    today's local-only `confirm-app-id` behavior. The remote check never blocks
    onboarding.
@@ -133,9 +143,10 @@ value used for signing. Resume must not re-prompt when nothing changed.
 
 ## Components / boundaries
 
-- **`apple-api.ts`** — add a `listApps(token)` (and optionally
-  `listBundleIds(token)`) helper using the existing `ascFetch`. Pure data
-  fetch; returns `{ bundleId, name }[]`.
+- **`apple-api.ts`** — add `listApps(token)` (→ `{ bundleId, name }[]`, for the
+  picker) and `listBundleIds(token)` (→ registered identifier strings, for the
+  diagnostic), both using the existing `ascFetch`. The caller invokes them **in
+  parallel** (`Promise.all`). Pure data fetches.
 - **`bundle-id-detector.ts`** — extend (or add a sibling) so divergence can be
   computed against a remote app list, Release-anchored, with debug-suffix
   exclusion. Keep the pure/synchronous local detection intact; remote data is
@@ -158,7 +169,9 @@ value used for signing. Resume must not re-prompt when nothing changed.
 - **Unit (pure):** the extended detector — exact match, divergence with apps,
   no apps, debug-suffix exclusion, Release-anchoring, dedup/ordering. Follows
   the existing `cli/test/test-bundle-id-detector.mjs` style.
-- **Unit:** `listApps` response parsing (mock `ascFetch`).
+- **Unit:** `listApps` and `listBundleIds` response parsing (mock `ascFetch`),
+  including the parallel fetch and the two Problem-2 sub-states (identifier
+  registered vs. not registered).
 - **Branch/decision tests:** the three-way branch + `ad_hoc` skip + fetch-failure
   fallback as a pure decision function (mirrors `decideBuilderCtaSurface` /
   `shouldBlockIncompatibleUpload` in `builder-cta.ts`).
@@ -177,7 +190,5 @@ value used for signing. Resume must not re-prompt when nothing changed.
 
 - Exact placement of the new step relative to `creating-certificate` (before
   cert creation is ideal so a wrong ID is caught earliest).
-- Whether to also surface `GET /v1/bundleIds` (registered-but-no-app) in the
-  picker, or apps-only for v1 simplicity.
 - Telemetry events for the new step (mirror the existing onboarding step
   telemetry).
