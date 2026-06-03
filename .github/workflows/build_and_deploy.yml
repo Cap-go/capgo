@@ -203,8 +203,8 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
   deploy_translation_worker:
-    needs: [changes, deploy_api]
-    if: ${{ always() && needs.changes.result == 'success' && needs.changes.outputs.translation == 'true' && (needs.deploy_api.result == 'success' || needs.deploy_api.result == 'skipped') }}
+    needs: [changes, supabase_deploy, deploy_api]
+    if: ${{ always() && needs.changes.result == 'success' && needs.changes.outputs.translation == 'true' && (needs.supabase_deploy.result == 'success' || (needs.supabase_deploy.result == 'skipped' && needs.changes.outputs.supabase != 'true')) && (needs.deploy_api.result == 'success' || (needs.deploy_api.result == 'skipped' && needs.changes.outputs.api != 'true')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:

@@ -74,7 +74,7 @@ describe('deploy scope matching', () => {
       const responses: Record<string, string> = {
         'log -1 --format=%s capgo-12.0.0': 'chore(release): 12.0.0',
         'rev-parse capgo-12.0.0^': 'feature-head',
-        'describe --tags --match capgo-[0-9]* --abbrev=0 feature-head': 'capgo-11.0.0',
+        'describe --tags --match capgo-[0-9]* --exclude capgo-*-alpha* --abbrev=0 feature-head': 'capgo-11.0.0',
         'diff --name-only --diff-filter=ACMRT capgo-11.0.0..feature-head': 'src/pages/index.vue',
       }
 
@@ -93,13 +93,75 @@ describe('deploy scope matching', () => {
     })
   })
 
+  it.concurrent('excludes alpha tags when resolving production deploy scope', () => {
+    const run = (args: string[]) => {
+      const key = args.join(' ')
+      const responses: Record<string, string> = {
+        'log -1 --format=%s capgo-12.0.0': 'chore(release): 12.0.0',
+        'rev-parse capgo-12.0.0^': 'feature-head',
+        'describe --tags --match capgo-[0-9]* --exclude capgo-*-alpha* --abbrev=0 feature-head': 'capgo-11.0.0',
+        'diff --name-only --diff-filter=ACMRT capgo-11.0.0..feature-head': 'supabase/functions/_backend/plugins/updates.ts',
+      }
+
+      if (key in responses) {
+        return responses[key]
+      }
+
+      throw new Error(`Unexpected git call: ${key}`)
+    }
+
+    expect(resolveDeployScopeFromGit('capgo-12.0.0', run)).toEqual({
+      base: 'capgo-11.0.0',
+      files: ['supabase/functions/_backend/plugins/updates.ts'],
+      head: 'feature-head',
+      scope: {
+        api: false,
+        files: false,
+        plugins: true,
+        supabase: true,
+        translation: false,
+      },
+    })
+  })
+
+  it.concurrent('includes alpha tags when resolving alpha deploy scope', () => {
+    const run = (args: string[]) => {
+      const key = args.join(' ')
+      const responses: Record<string, string> = {
+        'log -1 --format=%s capgo-12.0.0-alpha.1': 'chore(release): 12.0.0-alpha.1',
+        'rev-parse capgo-12.0.0-alpha.1^': 'feature-head',
+        'describe --tags --match capgo-[0-9]* --abbrev=0 feature-head': 'capgo-11.0.0-alpha.9',
+        'diff --name-only --diff-filter=ACMRT capgo-11.0.0-alpha.9..feature-head': 'cloudflare_workers/translation/index.ts',
+      }
+
+      if (key in responses) {
+        return responses[key]
+      }
+
+      throw new Error(`Unexpected git call: ${key}`)
+    }
+
+    expect(resolveDeployScopeFromGit('capgo-12.0.0-alpha.1', run)).toEqual({
+      base: 'capgo-11.0.0-alpha.9',
+      files: ['cloudflare_workers/translation/index.ts'],
+      head: 'feature-head',
+      scope: {
+        api: false,
+        files: false,
+        plugins: false,
+        supabase: false,
+        translation: true,
+      },
+    })
+  })
+
   it.concurrent('deploys all targets when no previous Capgo tag exists', () => {
     const run = (args: string[]) => {
       const key = args.join(' ')
       if (key === 'log -1 --format=%s HEAD') {
         return 'feat: first capgo release'
       }
-      if (key === 'describe --tags --match capgo-[0-9]* --abbrev=0 HEAD') {
+      if (key === 'describe --tags --match capgo-[0-9]* --exclude capgo-*-alpha* --abbrev=0 HEAD') {
         throw Object.assign(new Error('git describe failed'), {
           stderr: 'fatal: No names found, cannot describe anything.',
         })

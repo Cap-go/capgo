@@ -147,9 +147,23 @@ export function getComparableDeployHead(after: string, run: GitRunner = runGit):
   }
 }
 
-export function getPreviousCapgoTag(head: string, run: GitRunner = runGit): string | null {
+export function isAlphaDeployRef(after: string, run: GitRunner = runGit): boolean {
+  if (after.includes('-alpha')) {
+    return true
+  }
+
+  return run(['log', '-1', '--format=%s', after]).includes('-alpha')
+}
+
+export function getPreviousCapgoTag(head: string, includePrereleaseTags: boolean, run: GitRunner = runGit): string | null {
   try {
-    const tag = run(['describe', '--tags', '--match', 'capgo-[0-9]*', '--abbrev=0', head])
+    const args = ['describe', '--tags', '--match', 'capgo-[0-9]*']
+    if (!includePrereleaseTags) {
+      args.push('--exclude', 'capgo-*-alpha*')
+    }
+    args.push('--abbrev=0', head)
+
+    const tag = run(args)
     return tag || null
   }
   catch (error) {
@@ -167,8 +181,9 @@ function getChangedFiles(base: string, head: string, run: GitRunner = runGit): s
 }
 
 export function resolveDeployScopeFromGit(after = 'HEAD', run: GitRunner = runGit): DeployScopeResult {
+  const includePrereleaseTags = isAlphaDeployRef(after, run)
   const head = getComparableDeployHead(after, run)
-  const base = getPreviousCapgoTag(head, run)
+  const base = getPreviousCapgoTag(head, includePrereleaseTags, run)
 
   if (!base) {
     return {
