@@ -39,6 +39,18 @@ interface AppleApiError {
   detail: string
 }
 
+// Carries the HTTP status alongside the message so error-categories.ts can map
+// 401 → 'apple_api_unauthorized' and 429 → 'apple_api_rate_limited' instead of
+// falling through to 'unknown'.
+export class AppleApiHttpError extends Error {
+  readonly status: number
+  constructor(status: number, message: string) {
+    super(message)
+    this.name = 'AppleApiHttpError'
+    this.status = status
+  }
+}
+
 async function ascFetch(
   path: string,
   token: string,
@@ -60,9 +72,9 @@ async function ascFetch(
     const errors: AppleApiError[] = body?.errors || []
     const first = errors[0]
     if (first) {
-      throw new Error(`Apple API error (${res.status}): ${first.title} — ${first.detail} (${first.code})`)
+      throw new AppleApiHttpError(res.status, `Apple API error (${res.status}): ${first.title} — ${first.detail} (${first.code})`)
     }
-    throw new Error(`Apple API error: HTTP ${res.status} ${res.statusText}`)
+    throw new AppleApiHttpError(res.status, `Apple API error: HTTP ${res.status} ${res.statusText}`)
   }
 
   return body
@@ -111,6 +123,98 @@ export interface AscDistributionCert {
   certificateContent?: string
 }
 
+// ─── Cert availability classifier ──────────────────────────────────
+
+/**
+ * Why a local Keychain cert can't be used to ship builds.
+ *
+ * Concrete enumeration so the import-pick-identity UI can render a stable
+ * Reason column and so we can add specific guidance per reason (e.g.
+ * "managed" certs get a "can't sign locally" note, "not-visible" certs get
+ * a "Open Developer Portal to verify" note).
+ */
+export type CertAvailabilityReason
+  = | 'expired'
+    | 'managed' // DISTRIBUTION_MANAGED — Apple-HSM signed, can't sign locally
+    | 'not-visible' // lookup didn't find a SHA1 match (revoked / wrong team / filter limitation)
+    | 'check-failed' // network or API error during lookup
+    | 'no-private-key' // for .p12 path — cert exists but key was stripped
+
+export interface CertAvailability {
+  available: boolean
+  reason?: CertAvailabilityReason
+  /** Short human-readable reason for display in the picker. */
+  reasonText?: string
+  /** When available — Apple-side cert resource id for downstream API calls. */
+  appleCertId?: string
+}
+
+/**
+ * Pure classifier: given a local cert + the result of an Apple-side lookup,
+ * decide whether it's usable for shipping builds and surface a short
+ * reasonText for the picker UI.
+ *
+ * Exported separately from the lookup function so we can unit-test the
+ * decision logic without mocking network calls. Callers compose:
+ *
+ *   const certId = await findCertIdBySha1(token, identity.sha1)
+ *     .catch(err => { lookupError = err; return null })
+ *   const availability = classifyCertAvailability({
+ *     localExpirationDate: identity.expirationDate,
+ *     appleCertId: certId,
+ *     lookupError,
+ *   })
+ *
+ * The `expired` and `managed` branches don't need a lookup — they're checked
+ * up-front from local metadata. Callers can pass null `appleCertId` without
+ * having run the lookup at all when those local-side conditions already
+ * disqualify the identity.
+ */
+export function classifyCertAvailability(args: {
+  localExpirationDate?: string
+  isManaged?: boolean
+  appleCertId: string | null
+  lookupError?: unknown
+}): CertAvailability {
+  // Local-side disqualifiers first — these don't require an API round-trip.
+  if (args.localExpirationDate) {
+    const exp = Date.parse(args.localExpirationDate)
+    if (!Number.isNaN(exp) && exp < Date.now()) {
+      return {
+        available: false,
+        reason: 'expired',
+        reasonText: `Expired (${args.localExpirationDate.split('T')[0]})`,
+      }
+    }
+  }
+  if (args.isManaged) {
+    return {
+      available: false,
+      reason: 'managed',
+      reasonText: 'Apple-managed — can\'t sign locally',
+    }
+  }
+  // Apple-side lookup outcomes.
+  if (args.lookupError) {
+    return {
+      available: false,
+      reason: 'check-failed',
+      reasonText: `Lookup failed: ${args.lookupError instanceof Error ? args.lookupError.message : String(args.lookupError)}`,
+    }
+  }
+  if (args.appleCertId) {
+    return { available: true, appleCertId: args.appleCertId }
+  }
+  // No match returned. We can't distinguish revoked vs. wrong-team vs. our
+  // own lookup having a buggy filter from the response alone, so surface a
+  // neutral reasonText that doesn't claim revocation we can't prove.
+  return {
+    available: false,
+    reason: 'not-visible',
+    reasonText: 'Not visible to current API key (revoked, different team, or lookup limitation)',
+  }
+}
+
 /**
  * List all iOS distribution certificates.
  *
@@ -121,8 +225,27 @@ export async function listDistributionCerts(
   token: string,
   options: { includeContent?: boolean } = {},
 ): Promise<AscDistributionCert[]> {
+  // Query BOTH cert types — the legacy iOS-specific and the newer cross-
+  // platform "Apple Distribution" — because Apple deprecated
+  // IOS_DISTRIBUTION around 2021 and new certs created from App Store
+  // Connect now default to DISTRIBUTION. A team that has churned through
+  // certs over the years almost always has both types in its ledger; an
+  // IOS_DISTRIBUTION-only filter silently excludes the newer ones and
+  // produces a false negative when matching against a local Keychain
+  // identity named "Apple Distribution:" (= DISTRIBUTION type).
+  //
+  // limit=200 is Apple's documented max for this endpoint and is wildly
+  // higher than the per-team cert limits, so pagination is unnecessary
+  // even for the most prolific teams.
+  //
+  // DISTRIBUTION_MANAGED is intentionally NOT in the filter — those certs
+  // are signed using Apple-held private keys (Xcode Cloud / managed
+  // signing) and cannot be used to sign builds on third-party CI like
+  // Capgo. Including them would surface unusable identities in the
+  // picker. They'll still appear in the Available/Unavailable table view
+  // (Phase 2) marked "Apple-managed — can't sign locally".
   const body = await ascFetch(
-    '/certificates?filter[certificateType]=IOS_DISTRIBUTION&limit=10',
+    '/certificates?filter[certificateType]=DISTRIBUTION,IOS_DISTRIBUTION&limit=200',
     token,
   )
   return (body.data || []).map((c: any): AscDistributionCert => ({
@@ -166,13 +289,31 @@ export function computeCertSha1(certificateContentBase64: string): string {
  * creation. Returns null if no Apple-side cert matches the SHA1.
  */
 export async function findCertIdBySha1(token: string, sha1: string): Promise<string | null> {
+  const match = await findCertBySha1(token, sha1)
+  return match ? match.id : null
+}
+
+/**
+ * Like {@link findCertIdBySha1} but returns the full Apple-side cert
+ * record (id + name + expirationDate + serialNumber) when matched. Used
+ * by the eager batch validation so the picker / manual-portal-walkthrough
+ * step can surface concrete disambiguators (expiration date, last few
+ * chars of serial number — both visible in the Apple Developer Portal
+ * when the user clicks into a cert) that help the user pick the right
+ * row when multiple distribution certs are listed for the same team.
+ *
+ * Apple's API does NOT expose a "created by" field on certs (the portal
+ * UI shows it, but `/v1/certificates` doesn't return that column). The
+ * disambiguators we can give are expirationDate + serialNumber.
+ */
+export async function findCertBySha1(token: string, sha1: string): Promise<AscDistributionCert | null> {
   const target = sha1.toLowerCase()
   const certs = await listDistributionCerts(token, { includeContent: true })
   for (const cert of certs) {
     if (!cert.certificateContent)
       continue
     if (computeCertSha1(cert.certificateContent) === target)
-      return cert.id
+      return cert
   }
   return null
 }
@@ -195,18 +336,58 @@ export async function listProfilesForCert(
   token: string,
   certificateId: string,
 ): Promise<AscProfileSummary[]> {
-  // The relationships filter does the server-side join for us
-  const body = await ascFetch(
-    `/profiles?filter[certificates]=${encodeURIComponent(certificateId)}&include=bundleId&limit=50`,
-    token,
-  )
-  const included: any[] = body.included || []
+  // There's no direct "profiles for a given cert" endpoint on the ASC
+  // API — both naïve attempts return 4xx:
+  //   - `/profiles?filter[certificates]=X` → 400, "'certificates' is not
+  //     a valid filter type" (filter is whitelisted to id / name /
+  //     profileState / profileType only).
+  //   - `/certificates/{id}/profiles`     → 404, "The relationship
+  //     'profiles' does not exist" (certificates is the to-many
+  //     side; profiles → certificates is the navigable direction).
+  //
+  // The supported approach is to list ALL profiles with
+  // `include=certificates,bundleId`, then filter client-side to those
+  // whose `relationships.certificates.data[]` array includes our cert id.
+  // Limit=200 is Apple's documented max for /profiles.
+  //
+  // PAGINATION: the 200 cap is on the TEAM's total profile count (apps ×
+  // distribution types × extensions × dev machines), NOT on profiles
+  // matching our cert. Teams with 200+ active profiles would silently
+  // lose matches on page 2+ if we ignored `body.links.next`, causing
+  // import-checking-apple-cert to misroute to no-match-recovery and
+  // create-new to collide with an existing-but-paginated-away profile.
+  // We walk every page and accumulate before applying the client-side
+  // cert-id filter.
+  const allData: any[] = []
+  const allIncluded: any[] = []
+  let url: string = '/profiles?include=certificates,bundleId&limit=200'
+  while (url) {
+    const body = await ascFetch(url, token)
+    if (Array.isArray(body.data))
+      allData.push(...body.data)
+    if (Array.isArray(body.included))
+      allIncluded.push(...body.included)
+    const next: string | undefined = body.links?.next
+    // Apple returns `links.next` as a fully-qualified URL; ascFetch builds
+    // `${ASC_BASE_URL}${path}`, so strip the base prefix to avoid a
+    // double-prefixed URL on the follow-up request. If a future API
+    // version ever returns a path-relative next link, the startsWith
+    // guard preserves it as-is.
+    url = next ? (next.startsWith(ASC_BASE_URL) ? next.slice(ASC_BASE_URL.length) : next) : ''
+  }
   const bundleById = new Map<string, string>()
-  for (const item of included) {
+  for (const item of allIncluded) {
     if (item.type === 'bundleIds' && item.attributes?.identifier)
       bundleById.set(item.id, item.attributes.identifier)
   }
-  return (body.data || []).map((p: any): AscProfileSummary => {
+  // Client-side cert-id filter on `relationships.certificates.data[].id`.
+  // Apple's included response includes the cert resources too, but we
+  // only need the reference array to decide which profiles to keep.
+  const profiles = allData.filter((p: any) => {
+    const certs: { id: string }[] = p.relationships?.certificates?.data ?? []
+    return certs.some(c => c.id === certificateId)
+  })
+  return profiles.map((p: any): AscProfileSummary => {
     const bundleRelId = p.relationships?.bundleId?.data?.id as string | undefined
     return {
       id: p.id,

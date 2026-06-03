@@ -5,6 +5,8 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
+  bundleIdMatches,
+  filterProfilesForApp,
   generateP12Passphrase,
   isMacOS,
   matchIdentitiesToProfiles,
@@ -249,6 +251,175 @@ t('parseHelperJson throws clearly when stdout is unparsable', () => {
 
 t('parseHelperJson throws clearly when JSON is not an object', () => {
   assert.throws(() => parseHelperJson('"a string, not object"', '', 1), /not an object/)
+})
+
+// ─── filterProfilesForApp ────────────────────────────────────────────
+
+function mockProfile({ bundleId, profileType }) {
+  return {
+    path: `/Mobile/${bundleId}-${profileType}.mobileprovision`,
+    uuid: `uuid-${bundleId}-${profileType}`,
+    name: `${bundleId} ${profileType}`,
+    applicationIdentifier: `TEAM.${bundleId}`,
+    bundleId,
+    teamId: 'TEAM',
+    expirationDate: '2099-01-01T00:00:00Z',
+    profileType,
+    certificateSha1s: ['abcd'],
+    creationDate: '2024-01-01T00:00:00Z',
+  }
+}
+
+t('filterProfilesForApp returns only profiles matching bundleId + distribution', () => {
+  const profiles = [
+    mockProfile({ bundleId: 'com.example.app', profileType: 'app_store' }),
+    mockProfile({ bundleId: 'com.example.app', profileType: 'ad_hoc' }),
+    mockProfile({ bundleId: 'com.other.app', profileType: 'app_store' }),
+  ]
+  const filtered = filterProfilesForApp(profiles, 'com.example.app', 'app_store')
+  assert.equal(filtered.length, 1)
+  assert.equal(filtered[0].bundleId, 'com.example.app')
+  assert.equal(filtered[0].profileType, 'app_store')
+})
+
+t('filterProfilesForApp returns empty when bundleId never matches', () => {
+  const profiles = [
+    mockProfile({ bundleId: 'com.other.app', profileType: 'app_store' }),
+    mockProfile({ bundleId: 'com.another.app', profileType: 'app_store' }),
+  ]
+  const filtered = filterProfilesForApp(profiles, 'com.example.app', 'app_store')
+  assert.equal(filtered.length, 0)
+})
+
+t('filterProfilesForApp returns empty when bundleId matches but distribution does not', () => {
+  const profiles = [mockProfile({ bundleId: 'com.example.app', profileType: 'ad_hoc' })]
+  const filtered = filterProfilesForApp(profiles, 'com.example.app', 'app_store')
+  assert.equal(filtered.length, 0)
+})
+
+t('filterProfilesForApp returns all bundleId matches when distribution is null/undefined', () => {
+  const profiles = [
+    mockProfile({ bundleId: 'com.example.app', profileType: 'app_store' }),
+    mockProfile({ bundleId: 'com.example.app', profileType: 'ad_hoc' }),
+    mockProfile({ bundleId: 'com.other.app', profileType: 'app_store' }),
+  ]
+  assert.equal(filterProfilesForApp(profiles, 'com.example.app', null).length, 2)
+  assert.equal(filterProfilesForApp(profiles, 'com.example.app', undefined).length, 2)
+})
+
+t('filterProfilesForApp returns empty for empty input', () => {
+  assert.equal(filterProfilesForApp([], 'com.example.app', 'app_store').length, 0)
+})
+
+// ─── mapIosOnboardingError: import-provide-profile-path → profile_read_failed ──
+//
+// Regression coverage for ultrareview issue #3 — the PR removed the
+// 'import-fetching-profile' → 'profile_read_failed' branch but didn't add
+// one for the replacement step 'import-provide-profile-path', so the five
+// file-picker validation failure modes (parse + 3 invariant checks +
+// generic catch) all fell through to 'unknown' in PostHog telemetry.
+import { mapIosOnboardingError } from '../src/build/onboarding/error-categories.ts'
+
+t('mapIosOnboardingError: import-provide-profile-path maps to profile_read_failed', () => {
+  assert.equal(
+    mapIosOnboardingError(new Error('parseMobileprovisionDetailed failed'), 'import-provide-profile-path'),
+    'profile_read_failed',
+  )
+})
+
+t('mapIosOnboardingError: import-pick-profile still maps to profile_no_match', () => {
+  assert.equal(
+    mapIosOnboardingError(new Error('no match'), 'import-pick-profile'),
+    'profile_no_match',
+  )
+})
+
+t('mapIosOnboardingError: import-no-match-recovery still maps to profile_no_match', () => {
+  assert.equal(
+    mapIosOnboardingError(new Error('still no match'), 'import-no-match-recovery'),
+    'profile_no_match',
+  )
+})
+
+t('mapIosOnboardingError: import-scanning still maps to keychain_no_identities', () => {
+  assert.equal(
+    mapIosOnboardingError(new Error('no identities'), 'import-scanning'),
+    'keychain_no_identities',
+  )
+})
+
+t('mapIosOnboardingError: import-exporting still maps to keychain_export_failed', () => {
+  assert.equal(
+    mapIosOnboardingError(new Error('export failed'), 'import-exporting'),
+    'keychain_export_failed',
+  )
+})
+
+t('mapIosOnboardingError: unmapped step falls through to unknown', () => {
+  assert.equal(
+    mapIosOnboardingError(new Error('something else'), 'welcome'),
+    'unknown',
+  )
+})
+
+// ─── bundleIdMatches + wildcard filtering ────────────────────────────
+// Verifies the fix for ultrareview issue #2: parseMobileprovisionDetailed
+// leaves the asterisk in place when stripping the team prefix, so
+// wildcard profiles arrive here as either bare `*` or suffix `.*` forms.
+// The old strict-equality check in filterProfilesForApp + the inline
+// filter in import-pick-profile + the file-picker validation all
+// rejected them — a user whose only installed profile was a wildcard
+// (typical for ad_hoc / enterprise teams) would land in no-match
+// recovery despite having a usable profile on disk.
+
+t('bundleIdMatches accepts exact equality', () => {
+  assert.equal(bundleIdMatches('com.example.app', 'com.example.app'), true)
+})
+
+t('bundleIdMatches rejects unrelated bundle ids', () => {
+  assert.equal(bundleIdMatches('com.example.app', 'com.other.app'), false)
+})
+
+t('bundleIdMatches accepts a suffix wildcard against a concrete app id', () => {
+  assert.equal(bundleIdMatches('com.example.*', 'com.example.myapp'), true)
+  assert.equal(bundleIdMatches('com.example.*', 'com.example.myapp.extension'), true)
+})
+
+t('bundleIdMatches rejects a suffix wildcard whose prefix does not match', () => {
+  assert.equal(bundleIdMatches('com.example.*', 'com.different.app'), false)
+})
+
+t('bundleIdMatches accepts the bare "*" wildcard for any app id', () => {
+  assert.equal(bundleIdMatches('*', 'com.example.app'), true)
+  assert.equal(bundleIdMatches('*', 'literally.anything'), true)
+})
+
+t('filterProfilesForApp accepts a wildcard profile against a concrete appId', () => {
+  const profiles = [
+    mockProfile({ bundleId: 'com.example.*', profileType: 'ad_hoc' }),
+    mockProfile({ bundleId: 'com.other.*', profileType: 'ad_hoc' }),
+  ]
+  const filtered = filterProfilesForApp(profiles, 'com.example.myapp', 'ad_hoc')
+  assert.equal(filtered.length, 1)
+  assert.equal(filtered[0].bundleId, 'com.example.*')
+})
+
+t('filterProfilesForApp drops a wildcard profile when distribution does not match', () => {
+  const profiles = [
+    mockProfile({ bundleId: 'com.example.*', profileType: 'ad_hoc' }),
+  ]
+  // Caller is asking for an app_store profile — wildcard ad_hoc must be filtered out
+  // by the distribution conjunction, even though the bundle id wildcard would match.
+  const filtered = filterProfilesForApp(profiles, 'com.example.myapp', 'app_store')
+  assert.equal(filtered.length, 0)
+})
+
+t('filterProfilesForApp accepts the bare "*" wildcard against any concrete appId', () => {
+  const profiles = [
+    mockProfile({ bundleId: '*', profileType: 'ad_hoc' }),
+  ]
+  const filtered = filterProfilesForApp(profiles, 'com.anything.here', 'ad_hoc')
+  assert.equal(filtered.length, 1)
 })
 
 process.stdout.write('OK\n')
