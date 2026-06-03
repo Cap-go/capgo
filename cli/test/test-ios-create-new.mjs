@@ -26,7 +26,18 @@ import process from 'node:process'
 
 const {
   runIosEffect,
+  iosViewForStep,
+  applyIosInput,
 } = await import('../src/build/onboarding/ios/flow.ts')
+
+// The TOTAL iOS resume resolver — the engine's single source of truth for "what
+// step comes next" after a reducer persists its field. The create-new choice/
+// input chain (BATCH 2b) asserts its next-step routing THROUGH this, exactly as
+// the driver would, so the persisted-state transitions stay byte-for-byte aligned
+// with the TUI's setStep() targets.
+const {
+  getIosResumeStep,
+} = await import('../src/build/onboarding/ios/progress.ts')
 
 // Re-import the apple-api error classes so the spec can throw the SAME error
 // instances the engine `instanceof`-checks against.
@@ -433,6 +444,188 @@ await test('DRIVER: verify → cert → profile threads transient as carried and
   assert(profiled.progress.completedSteps.profileCreated, 'profileCreated persisted')
 })
 
+// ════════════════════════════════════════════════════════════════════════════════
+// BATCH 2b — create-new choice/input VIEWS + reducers + next-step routing
+// ════════════════════════════════════════════════════════════════════════════════
+//
+// The .p8-chain + setup-method fork are pure choice/input screens. For each step
+// this section asserts THREE things, the same triple android's tail-engine spec
+// asserts:
+//   1. the VIEW shape from iosViewForStep (kind + options/prompt/collect),
+//   2. the REDUCER from applyIosInput (what field it persists),
+//   3. the NEXT step from getIosResumeStep(reducedProgress) — i.e. that a resume
+//      from the persisted state lands on the TUI's setStep() target.
+// The navigation-only api-key-instructions choice has no persisted next, so its
+// routing (picker → p8-method-select | manual → input-p8-path) is asserted via
+// the documented choice values instead of resume.
+
+console.log('\n🧪 iOS BATCH 2b — create-new choice/input views + reducers + routing\n')
+
+// ─── setup-method-select (choice) ───────────────────────────────────────────────
+
+await test("iosViewForStep('setup-method-select') is a choice with create | import options", async () => {
+  const view = iosViewForStep('setup-method-select', iosProgress())
+  assertEquals(view.step, 'setup-method-select', 'view echoes the step')
+  assertEquals(view.kind, 'choice', 'setup-method-select is a choice')
+  assert(Array.isArray(view.options), 'must expose options')
+  const values = view.options.map(o => o.value)
+  assert(values.includes('create'), "offers the 'create' (App Store Connect API) fork")
+  assert(values.includes('import'), "offers the 'import' (Keychain + Xcode) fork")
+})
+
+await test("setup-method-select 'create' → persists setupMethod='create-new'; resume → api-key-instructions", async () => {
+  const before = iosProgress({ setupMethod: undefined })
+  const after = applyIosInput('setup-method-select', before, { step: 'setup-method-select', value: 'create' })
+  assertEquals(after.setupMethod, 'create-new', "the create fork persists setupMethod='create-new'")
+  assertEquals(getIosResumeStep(after), 'api-key-instructions', 'create-new with no .p8 inputs resumes at api-key-instructions')
+})
+
+await test("setup-method-select 'import' → persists setupMethod='import-existing' (fork routed by resume, not create-new)", async () => {
+  const before = iosProgress({ setupMethod: undefined })
+  const after = applyIosInput('setup-method-select', before, { step: 'setup-method-select', value: 'import' })
+  assertEquals(after.setupMethod, 'import-existing', "the import fork persists setupMethod='import-existing'")
+  // import + no importDistribution + no .p8 → import-distribution-mode (NOT the
+  // create-new api-key-instructions): proves the fork is persisted, not lost.
+  assertEquals(getIosResumeStep(after), 'import-distribution-mode', 'import fork resumes into the import sub-flow')
+})
+
+// ─── api-key-instructions (choice, navigation-only) ─────────────────────────────
+
+await test("iosViewForStep('api-key-instructions') is a choice with picker | manual options", async () => {
+  const view = iosViewForStep('api-key-instructions', iosProgress())
+  assertEquals(view.step, 'api-key-instructions', 'view echoes the step')
+  assertEquals(view.kind, 'choice', 'api-key-instructions is a choice')
+  const values = (view.options ?? []).map(o => o.value)
+  assert(values.includes('picker'), "offers the 'picker' (native dialog) method")
+  assert(values.includes('manual'), "offers the 'manual' (type the path) method")
+})
+
+await test('api-key-instructions is navigation-only — applyIosInput leaves progress unchanged for either choice', async () => {
+  const before = iosProgress()
+  const afterPicker = applyIosInput('api-key-instructions', before, { step: 'api-key-instructions', value: 'picker' })
+  const afterManual = applyIosInput('api-key-instructions', before, { step: 'api-key-instructions', value: 'manual' })
+  assertEquals(JSON.stringify(afterPicker), JSON.stringify(before), "the 'picker' choice persists nothing")
+  assertEquals(JSON.stringify(afterManual), JSON.stringify(before), "the 'manual' choice persists nothing")
+  // Routing is the driver's job (picker → p8-method-select effect, manual →
+  // input-p8-path); resume of an un-advanced create-new progress stays put.
+  assertEquals(getIosResumeStep(before), 'api-key-instructions', 'a not-yet-advanced create-new progress remains at api-key-instructions')
+})
+
+// ─── input-p8-path (input) ──────────────────────────────────────────────────────
+
+await test("iosViewForStep('input-p8-path') is an input collecting p8Path", async () => {
+  const view = iosViewForStep('input-p8-path', iosProgress())
+  assertEquals(view.step, 'input-p8-path', 'view echoes the step')
+  assertEquals(view.kind, 'input', 'input-p8-path is an input')
+  assert(Array.isArray(view.collect) && view.collect.includes('p8Path'), 'collects p8Path')
+  assert(typeof view.prompt === 'string' && view.prompt.length > 0, 'carries a prompt')
+})
+
+await test('input-p8-path → persists p8Path ONLY (no keyId here); resume → input-key-id', async () => {
+  const before = iosProgress({ p8Path: undefined })
+  const after = applyIosInput('input-p8-path', before, { step: 'input-p8-path', value: '/Users/me/AuthKey_ABC123.p8' })
+  assertEquals(after.p8Path, '/Users/me/AuthKey_ABC123.p8', 'persists the raw .p8 path')
+  assert(after.keyId === undefined, 'does NOT persist keyId — extraction is the effect boundary, not the reducer')
+  assertEquals(getIosResumeStep(after), 'input-key-id', 'p8Path set + no keyId resumes at input-key-id (matches the TUI setStep)')
+})
+
+await test('input-p8-path ignores an empty submission (stays on the step)', async () => {
+  const before = iosProgress({ p8Path: undefined })
+  const after = applyIosInput('input-p8-path', before, { step: 'input-p8-path', value: '   ' })
+  assert(after.p8Path === undefined, 'an empty path is a no-op')
+})
+
+// ─── input-key-id (input) ───────────────────────────────────────────────────────
+
+await test("iosViewForStep('input-key-id') surfaces the filename-detected default when a p8Path is present", async () => {
+  const view = iosViewForStep('input-key-id', iosProgress({ p8Path: '/Users/me/AuthKey_ABC123.p8' }))
+  assertEquals(view.kind, 'input', 'input-key-id is an input')
+  assert(Array.isArray(view.collect) && view.collect.includes('keyId'), 'collects keyId')
+  assert(view.prompt.includes('ABC123'), 'the prompt offers the key id detected from the AuthKey_<id>.p8 filename')
+})
+
+await test("iosViewForStep('input-key-id') falls back to a fresh prompt when no key id is detectable", async () => {
+  const view = iosViewForStep('input-key-id', iosProgress({ p8Path: '/Users/me/renamed.p8' }))
+  assert(!view.prompt.includes('detected'), 'no detected default → a fresh Key ID prompt')
+})
+
+await test('input-key-id (typed value) → persists the typed keyId; resume → input-issuer-id', async () => {
+  const before = iosProgress({ p8Path: '/Users/me/AuthKey_ABC123.p8' })
+  const after = applyIosInput('input-key-id', before, { step: 'input-key-id', value: 'TYPED99' })
+  assertEquals(after.keyId, 'TYPED99', 'a typed Key ID overrides the detected default')
+  assertEquals(getIosResumeStep(after), 'input-issuer-id', 'p8Path + keyId + no issuerId resumes at input-issuer-id')
+})
+
+await test('input-key-id (empty submit) → reuses the filename-detected default; resume → input-issuer-id', async () => {
+  const before = iosProgress({ p8Path: '/Users/me/AuthKey_ABC123.p8' })
+  const after = applyIosInput('input-key-id', before, { step: 'input-key-id', value: '' })
+  assertEquals(after.keyId, 'ABC123', 'an empty submission reuses the key id detected from the filename')
+  assertEquals(getIosResumeStep(after), 'input-issuer-id', 'the reused default still advances to input-issuer-id')
+})
+
+await test('input-key-id (empty submit, no detectable default) is a no-op', async () => {
+  const before = iosProgress({ p8Path: '/Users/me/renamed.p8' })
+  const after = applyIosInput('input-key-id', before, { step: 'input-key-id', value: '' })
+  assert(after.keyId === undefined, 'no typed value + no detected default → stays on the step')
+})
+
+// ─── input-issuer-id (input) ────────────────────────────────────────────────────
+
+await test("iosViewForStep('input-issuer-id') is an input collecting issuerId", async () => {
+  const view = iosViewForStep('input-issuer-id', iosProgress())
+  assertEquals(view.kind, 'input', 'input-issuer-id is an input')
+  assert(Array.isArray(view.collect) && view.collect.includes('issuerId'), 'collects issuerId')
+})
+
+await test('input-issuer-id → persists issuerId; resume → verifying-key', async () => {
+  const before = iosProgress({ p8Path: '/Users/me/AuthKey_ABC123.p8', keyId: 'ABC123' })
+  const after = applyIosInput('input-issuer-id', before, { step: 'input-issuer-id', value: 'ISSUER-UUID' })
+  assertEquals(after.issuerId, 'ISSUER-UUID', 'persists the issuer id')
+  assertEquals(getIosResumeStep(after), 'verifying-key', 'all three .p8 inputs present → resumes at verifying-key')
+})
+
+await test('input-issuer-id ignores an empty submission (stays on the step)', async () => {
+  const before = iosProgress({ p8Path: '/Users/me/AuthKey_ABC123.p8', keyId: 'ABC123' })
+  const after = applyIosInput('input-issuer-id', before, { step: 'input-issuer-id', value: '  ' })
+  assert(after.issuerId === undefined, 'an empty issuer id is a no-op')
+})
+
+// ─── Full create-new choice/input chain (resume lands at each point) ─────────────
+
+await test('CHAIN: setup-method-select → api-key-instructions → input-p8-path → input-key-id → input-issuer-id → verifying-key', async () => {
+  // welcome is the entry; the fork is reached from backing-up/platform-select and
+  // is the first persisted-state choice. Walk the create-new chain reducer-by-
+  // reducer and confirm EACH resume point lands on the next step exactly.
+
+  // 1) setup-method-select (create) → api-key-instructions
+  let p = iosProgress({ setupMethod: undefined })
+  p = applyIosInput('setup-method-select', p, { step: 'setup-method-select', value: 'create' })
+  assertEquals(p.setupMethod, 'create-new', 'fork persisted')
+  assertEquals(getIosResumeStep(p), 'api-key-instructions', 'resume #1 → api-key-instructions')
+
+  // 2) api-key-instructions (manual) → input-p8-path (navigation-only; driver routes)
+  const beforeApi = JSON.stringify(p)
+  p = applyIosInput('api-key-instructions', p, { step: 'api-key-instructions', value: 'manual' })
+  assertEquals(JSON.stringify(p), beforeApi, 'api-key-instructions persists nothing (navigation-only)')
+
+  // 3) input-p8-path → input-key-id
+  p = applyIosInput('input-p8-path', p, { step: 'input-p8-path', value: '/Users/me/AuthKey_ABC123.p8' })
+  assertEquals(p.p8Path, '/Users/me/AuthKey_ABC123.p8', 'p8Path persisted')
+  assertEquals(getIosResumeStep(p), 'input-key-id', 'resume #2 → input-key-id')
+
+  // 4) input-key-id (Enter reuses detected ABC123) → input-issuer-id
+  p = applyIosInput('input-key-id', p, { step: 'input-key-id', value: '' })
+  assertEquals(p.keyId, 'ABC123', 'detected keyId reused')
+  assertEquals(getIosResumeStep(p), 'input-issuer-id', 'resume #3 → input-issuer-id')
+
+  // 5) input-issuer-id → verifying-key
+  p = applyIosInput('input-issuer-id', p, { step: 'input-issuer-id', value: 'ISSUER-UUID' })
+  assertEquals(p.issuerId, 'ISSUER-UUID', 'issuerId persisted')
+  assertEquals(getIosResumeStep(p), 'verifying-key', 'resume #4 → verifying-key (the .p8 chain is complete)')
+
+  // The chain persisted ONLY the create-new fields — no secret rode into progress.
+  assert(!p.completedSteps.apiKeyVerified, 'verifying-key has not run yet — no apiKeyVerified marker')
+})
 // ─── Summary ─────────────────────────────────────────────────────────────────────
 
 console.log(`\n${testsPassed} passed, ${testsFailed} failed`)

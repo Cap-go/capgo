@@ -574,11 +574,58 @@ function mapTailViewToIosStepView(v: TailStepView, step: OnboardingStep): IosSte
   }
 }
 
+// ─── Create-new choice/input vocabulary (BATCH 2b) ──────────────────────────────
+//
+// The create-new credential entry steps are pure choice/input screens — the .p8
+// chain (api-key-instructions → input-p8-path → input-key-id → input-issuer-id)
+// plus the setup-method fork. Their option labels MIRROR the TUI components
+// (ui/steps/ios-credentials.tsx); the values MIRROR the TUI onChange handlers
+// (ui/app.tsx). The per-step routing/persistence is split exactly as the TUI:
+//   - setup-method-select → persists setupMethod; resume routes the fork
+//   - api-key-instructions → navigation-only choice (picker | manual)
+//   - input-p8-path/key-id/issuer-id → persist p8Path/keyId/issuerId incrementally
+// File validation + keyId extraction are an IO boundary (the p8-method-select
+// effect / the driver), NOT the pure reducer — so applyIosInput only records the
+// path string. The detected Key ID default is re-derived from the filename here.
+
+/** setup-method-select options (ui/steps/ios-credentials.tsx:105–108). */
+const OPTIONS_SETUP_METHOD: IosStepOption[] = [
+  { value: 'create', label: '🆕  Create new via App Store Connect API' },
+  { value: 'import', label: '📥  Import existing from this Mac (Keychain + Xcode profiles)' },
+]
+
+/** api-key-instructions .p8-method options (ui/steps/ios-credentials.tsx:151–154). */
+const OPTIONS_API_KEY_METHOD: IosStepOption[] = [
+  { value: 'picker', label: '📂  Open file picker' },
+  { value: 'manual', label: '📝  Type the path' },
+]
+
+/**
+ * The create-new choice/input vocabulary. Mirrors android's `AndroidInput`:
+ * one variant per choice/input step that records (or routes) state. The iOS
+ * `applyIosInput` signature still accepts `unknown`, so callers cast to this.
+ * Navigation-only choices (api-key-instructions) are included for completeness
+ * but return progress unchanged.
+ */
+export type IosInput =
+  // setup-method fork — 'create' → create-new (.p8 chain); 'import' → import sub-flow.
+  | { step: 'setup-method-select', value: 'create' | 'import' }
+  // .p8-method choice — navigation only ('picker' → p8-method-select effect,
+  // 'manual' → input-p8-path). Persists nothing.
+  | { step: 'api-key-instructions', value: 'picker' | 'manual' }
+  // .p8 file PATH (validation + keyId extraction happen at the effect boundary).
+  | { step: 'input-p8-path', value: string }
+  // ASC Key ID (empty submission reuses the filename-detected default).
+  | { step: 'input-key-id', value: string }
+  // ASC Issuer ID.
+  | { step: 'input-issuer-id', value: string }
 // ─── Engine surface (tail-wired; non-tail steps remain stubs) ───────────────────
 
 /**
  * Build the view-model for a given step. Post-save tail steps delegate to the
- * shared neutral view (adapted back to IosStepView); all other steps return a
+ * shared neutral view (adapted back to IosStepView). The create-new choice/input
+ * steps (setup-method fork + .p8 chain) return real per-step views mirroring the
+ * TUI prompts/options (ui/steps/ios-credentials.tsx). All other steps return a
  * minimal placeholder 'auto' view echoing the step (real per-step views land in
  * later batches).
  */
@@ -592,13 +639,81 @@ export function iosViewForStep(
   if (TAIL_VIEW_STEPS.has(step))
     return mapTailViewToIosStepView(tailViewForStep(step as TailStep, progress, (ctx ?? {}) as TailStepCtx), step)
 
-  return { step, kind: 'auto', title: step }
+  switch (step) {
+    // ── setup-method-select (choice) ──────────────────────────────────────────
+    // ui/steps/ios-credentials.tsx:98–118. The create-vs-import fork.
+    case 'setup-method-select':
+      return {
+        step,
+        kind: 'choice',
+        title: 'How do you want to set up iOS credentials?',
+        options: OPTIONS_SETUP_METHOD,
+      }
+
+    // ── api-key-instructions (choice) ─────────────────────────────────────────
+    // ui/steps/ios-credentials.tsx:139–207. Navigation-only .p8-method fork:
+    // 'picker' → p8-method-select (native dialog effect), 'manual' → input-p8-path.
+    case 'api-key-instructions':
+      return {
+        step,
+        kind: 'choice',
+        title: 'We need an App Store Connect API key to manage certificates and profiles for you.',
+        prompt: 'How do you want to provide the .p8 file?',
+        options: OPTIONS_API_KEY_METHOD,
+      }
+
+    // ── input-p8-path (input) ─────────────────────────────────────────────────
+    // ui/steps/ios-credentials.tsx:240–250. The .p8 file path.
+    case 'input-p8-path':
+      return {
+        step,
+        kind: 'input',
+        prompt: 'Path to your .p8 file:',
+        collect: ['p8Path'],
+      }
+
+    // ── input-key-id (input) ──────────────────────────────────────────────────
+    // ui/steps/ios-credentials.tsx:270–305. The ASC Key ID, pre-filled with the
+    // value detected from the AuthKey_<id>.p8 filename (the picker effect persists
+    // it; for the manual path it is re-derived here so the view can offer it).
+    // An empty submission reuses this default (applyIosInput handles the reuse).
+    case 'input-key-id': {
+      const detected = progress.keyId || extractKeyIdFromP8Path(progress.p8Path ?? '')
+      return {
+        step,
+        kind: 'input',
+        prompt: detected
+          ? `Key ID (detected from filename): ${detected} — press Enter to confirm, or type a different one`
+          : 'Key ID (shown next to the key name in App Store Connect):',
+        collect: ['keyId'],
+      }
+    }
+
+    // ── input-issuer-id (input) ───────────────────────────────────────────────
+    // ui/steps/ios-credentials.tsx:317–338. The ASC Issuer ID (UUID).
+    case 'input-issuer-id':
+      return {
+        step,
+        kind: 'input',
+        prompt: 'Issuer ID (UUID at the very top of the API keys page, above the key list):',
+        collect: ['issuerId'],
+      }
+
+    default:
+      return { step, kind: 'auto', title: step }
+  }
 }
 
 /**
  * Apply a user input to progress. Post-save tail choice/input steps delegate
- * the reducer to the shared neutral module; all other steps return progress
- * unchanged (real per-step mutations land in later batches).
+ * the reducer to the shared neutral module. The create-new choice/input steps
+ * persist their field(s) exactly as the TUI's onSubmit/onChange handlers do
+ * (ui/app.tsx). All other steps return progress unchanged (real per-step
+ * mutations land in later batches).
+ *
+ * PURE — no IO. The .p8 file read + keyId extraction + Apple verification are
+ * effect-boundary concerns (p8-method-select / verifying-key); the reducers here
+ * only record the raw user input into progress.
  */
 export function applyIosInput(
   step: OnboardingStep,
@@ -611,7 +726,65 @@ export function applyIosInput(
   if (TAIL_INPUT_STEPS.has(step))
     return applyTailInput(step as TailStep, progress, input as TailInput)
 
-  return progress
+  switch (step) {
+    // ── setup-method-select ───────────────────────────────────────────────────
+    // ui/app.tsx:3042 — `value === 'import' ? 'import-existing' : 'create-new'`.
+    // Persisting the fork is what lets resume route the right path (create-new
+    // .p8 chain vs the import sub-flow) instead of re-asking.
+    case 'setup-method-select': {
+      const i = input as Extract<IosInput, { step: 'setup-method-select' }>
+      return { ...progress, setupMethod: i.value === 'import' ? 'import-existing' : 'create-new' }
+    }
+
+    // ── api-key-instructions ──────────────────────────────────────────────────
+    // ui/app.tsx:3800–3806 — navigation-only choice. 'picker' opens the native
+    // dialog (the p8-method-select effect), 'manual' goes to input-p8-path. The
+    // driver routes on the choice value; the pure reducer records nothing.
+    case 'api-key-instructions':
+      return progress
+
+    // ── input-p8-path ─────────────────────────────────────────────────────────
+    // ui/app.tsx:3836–3849 — the TUI reads/validates the file (IO) then persists
+    // the path. Here we ONLY persist the path string (file validation + keyId
+    // extraction are the effect boundary). Persisting just p8Path keeps the
+    // resume routing landing on input-key-id (getResumeStep: p8Path set, no keyId).
+    case 'input-p8-path': {
+      const i = input as Extract<IosInput, { step: 'input-p8-path' }>
+      const p8Path = i.value.trim()
+      if (!p8Path)
+        return progress
+      return { ...progress, p8Path }
+    }
+
+    // ── input-key-id ──────────────────────────────────────────────────────────
+    // ui/app.tsx:3863–3872 — `(value || keyId).trim()` reuses the detected key
+    // ID when the user just presses Enter. The detected default is the value the
+    // picker effect persisted (progress.keyId) or, on the manual path, the value
+    // re-derived from the AuthKey_<id>.p8 filename. An empty submission with no
+    // detectable default is a no-op (stays on the step) — mirroring the TUI guard.
+    case 'input-key-id': {
+      const i = input as Extract<IosInput, { step: 'input-key-id' }>
+      const detected = progress.keyId || extractKeyIdFromP8Path(progress.p8Path ?? '')
+      const keyId = (i.value || detected).trim()
+      if (!keyId)
+        return progress
+      return { ...progress, keyId }
+    }
+
+    // ── input-issuer-id ───────────────────────────────────────────────────────
+    // ui/app.tsx:3882–3888 — trim + reject empty, then persist. With p8Path +
+    // keyId + issuerId all present, resume routes to verifying-key.
+    case 'input-issuer-id': {
+      const i = input as Extract<IosInput, { step: 'input-issuer-id' }>
+      const issuerId = i.value.trim()
+      if (!issuerId)
+        return progress
+      return { ...progress, issuerId }
+    }
+
+    default:
+      return progress
+  }
 }
 
 /**

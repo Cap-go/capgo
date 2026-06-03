@@ -327,10 +327,13 @@ await test('applyIosInput delegates a tail input (ask-github-actions-setup) to a
   assertEquals(next.setupMode, 'with-workflow', 'the tail input reducer must record setupMode on iOS progress')
 })
 
-await test('applyIosInput leaves a NON-tail step unchanged (still a stub)', async () => {
+await test('applyIosInput leaves a still-stubbed NON-tail step unchanged', async () => {
+  // setup-method-select is now implemented (BATCH 2b records setupMethod), so use
+  // a still-stubbed import-flow choice as the "unchanged stub" example instead.
+  // import-distribution-mode's reducer lands in a later (import) batch.
   const progress = iosProgress()
-  const next = applyIosInput('setup-method-select', progress, { step: 'setup-method-select', value: 'create' })
-  assertEquals(next, progress, 'non-tail steps stay stubs — progress unchanged')
+  const next = applyIosInput('import-distribution-mode', progress, { step: 'import-distribution-mode', value: 'app_store' })
+  assertEquals(next, progress, 'a not-yet-implemented non-tail step stays a stub — progress unchanged')
 })
 
 await test('runIosEffect throws for a NON-tail, not-yet-implemented effect step (still a stub)', async () => {
