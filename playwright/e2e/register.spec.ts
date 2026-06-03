@@ -31,8 +31,14 @@ test.describe('Registration', () => {
     await page.click('[data-test="submit"]')
 
     await page.waitForURL(/\/onboarding\/organization/)
+    // New users are first asked their intent; the org form is revealed only
+    // after a choice is made, so pick an option before continuing.
+    await page.click('[data-test="onboarding-intent-ota"]')
     await expect(page.locator('[data-test="onboarding-mode-name"]')).toBeVisible()
-    await expectProtectedRouteRedirect(page, '/apps', /\/onboarding\/organization/, '[data-test="onboarding-mode-name"]')
+    // The redirect opens a fresh page where the intent hasn't been answered yet
+    // (it's only persisted after org creation), so assert on the always-present
+    // logout control rather than the intent-gated org form.
+    await expectProtectedRouteRedirect(page, '/apps', /\/onboarding\/organization/, '[data-test="onboarding-logout"]')
 
     await page.click('[data-test="onboarding-mode-name"]')
     await page.fill('[data-test="onboarding-org-name"]', `No Org E2E ${uniqueSuffix}`)
