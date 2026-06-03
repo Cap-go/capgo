@@ -32,7 +32,16 @@ export const STEP_ALLOWED_FIELDS: Partial<Record<AndroidOnboardingStep, string[]
   'sa-json-existing-path': ['serviceAccountJsonPath'],
   'sa-json-validation-failed': ['saMethodChoice'],
   'play-developer-id-input': ['playDeveloperId'],
-  'gcp-projects-select': ['gcpProjectId'],
+  // The GCP project picker accepts EITHER an existing project id OR a new
+  // project name — mirroring main's app.tsx onChange, where selecting the
+  // "Create a new project" (`__new__`) row routes to the create-name prompt.
+  // The strict gate still requires EXACTLY ONE of these per call, so the agent
+  // either picks an existing project (gcpProjectId) or creates one
+  // (gcpProjectName), never both. persistAndroidInput routes a supplied
+  // gcpProjectName through applyAndroidInput('gcp-project-create-name') so
+  // gcpProjectChosen{createdByOnboarding:true} is written and gcp-setup-running
+  // creates the project.
+  'gcp-projects-select': ['gcpProjectId', 'gcpProjectName'],
   'gcp-project-create-name': ['gcpProjectName'],
   'android-package-select': ['androidPackage'],
 }

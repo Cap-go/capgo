@@ -315,9 +315,13 @@ export function mapAndroidView(
         options: (view.options ?? []).map(o => ({ value: o.value, label: o.label, note: o.note })),
         next: {
           tool: NEXT_STEP_TOOL,
-          with: { gcpProjectId: '<projectId>' },
-          instruction: 'Present the GCP project options to the user, then call next_step with gcpProjectId.',
-          call: `${NEXT_STEP_TOOL}({ gcpProjectId: "my-gcp-project" })`,
+          // Two routes (mirrors main's app.tsx onChange): pick an EXISTING
+          // project by passing gcpProjectId, OR create a NEW project by passing
+          // gcpProjectName (the "Create a new project" / __new__ option). Send
+          // exactly one — the strict gate rejects both at once.
+          with: { gcpProjectId: '<projectId>', gcpProjectName: '<new project name>' },
+          instruction: 'Present the GCP project options to the user. To use an existing project call next_step with gcpProjectId. To create a new project (the "Create a new project" option), call next_step with gcpProjectName instead. Send exactly one.',
+          call: `${NEXT_STEP_TOOL}({ gcpProjectId: "my-gcp-project" })  // or, to create a new one: ${NEXT_STEP_TOOL}({ gcpProjectName: "My App Capgo" })`,
         },
       }
 
