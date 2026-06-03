@@ -178,6 +178,25 @@ test.describe('API Key Management', () => {
     await page.getByRole('button', { name: 'Cancel' }).click()
   })
 
+  test('should edit API key rights', async ({ page }) => {
+    const keyName = `Playwright Edit Rights ${Date.now()}`
+
+    await createRbacApiKey(page, keyName)
+
+    const keyRow = page.locator('tr', { hasText: keyName })
+    await expect(keyRow).toHaveCount(1)
+    await keyRow.locator('[data-test^="edit-key-"]').click()
+
+    const dialog = page.locator('#dialog-v2-content')
+    await expect(page.getByRole('heading', { name: 'Edit API key' })).toBeVisible()
+    await dialog.locator('[data-test="create-key-org-role-org_admin"]').check()
+    await page.getByRole('button', { name: 'Confirm' }).click()
+
+    const toast = page.locator('[data-test="toast"]')
+    await expect(toast).toContainText('API key updated')
+    await expect(keyRow).toContainText('Admin')
+  })
+
   test('should manage channel permission overrides for app-scoped API keys', async ({ page }) => {
     const keyName = uniqueKeyName('Channel')
     const keyRow = await createDemoAppApiKey(page, keyName)

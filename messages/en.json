@@ -612,6 +612,8 @@
   "captcha-required": "Captcha is required for this action!",
   "change": "Change",
   "change-api-key-name": "Change the apikey's name",
+  "edit": "Edit",
+  "edit-api-key": "Edit API key",
   "change-app-organisation-owner": "Transfer the application to another organisation",
   "change-encryption-key-confirm": "Change Key and Delete Bundles",
   "change-encryption-key-warning-description": "Changing the required encryption key will mark bundles encrypted with other keys as deleted.",
