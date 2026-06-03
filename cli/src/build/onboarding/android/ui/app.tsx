@@ -236,6 +236,13 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
       : startStep,
   )
 
+  // Mirror `step` into a ref so callbacks that must not depend on `step`
+  // (e.g. `persistAndStep`'s error handler) can read the current step without
+  // re-creating on every transition. Updated synchronously on each render so it
+  // always reflects the latest committed step.
+  const stepRef = useRef<AndroidOnboardingStep>(step)
+  stepRef.current = step
+
   // Telemetry: resolve org id once + emit per-step events
   const stepTimingRef = useRef<{ step: AndroidOnboardingStep | null, startedAt: number }>({
     step: null,
@@ -471,10 +478,9 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
   const [keyPasswordProbe, setKeyPasswordProbe] = useState<null | 'auto' | 'prompt'>(null)
   const keyPasswordProbeRef = useRef(false)
 
-  // Phase 2 — Service account method fork
-  const [serviceAccountMethod, setServiceAccountMethod] = useState<'existing' | 'generate' | null>(
-    initialProgress?.serviceAccountMethod || null,
-  )
+  // Phase 2 — Service account method fork. The chosen method lives on disk
+  // (progress.serviceAccountMethod); there is no React mirror (Plan 3.4) — every
+  // reader resolves it from initialProgress or freshly-loaded progress.
   const [serviceAccountJsonPath, setServiceAccountJsonPath] = useState(
     initialProgress?.serviceAccountJsonPath || '',
   )
@@ -748,39 +754,37 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
   const persistAndStep = useCallback(
     (
       updater: (p: AndroidOnboardingProgress) => AndroidOnboardingProgress,
-      nextStep: AndroidOnboardingStep,
+      // OPTIONAL. Omit to let the shared engine derive the next step from the
+      // just-saved progress via `getAndroidResumeStep` (the same function used
+      // for initial-step resolution at mount). Pass an explicit step ONLY when
+      // the target is a TUI-only step the engine cannot derive (e.g. the
+      // intermediate `keystore-new-key-password` input, or the `keystore-
+      // generating` effect screen) — those advance the wizard to a screen the
+      // stateless engine does not model.
+      nextStep?: AndroidOnboardingStep,
     ): void => {
       ;(async () => {
         try {
-          // Plan 3: route in-session sequencing through the shared engine.
-          // `persist` now returns the just-saved progress; we derive the next
-          // step from it via `getAndroidResumeStep` (the same function used for
-          // initial-step resolution at mount). When the engine-derived step
-          // matches the hardcoded `nextStep`, we advance via the engine. When
-          // they differ, we stay strictly behavior-preserving by keeping the
-          // hardcoded step, but surface a dev-only warning so tests can catch
-          // any divergence. A later phase drops the hardcoded arg once zero
-          // mismatches are confirmed.
+          // Plan 3.4: in-session sequencing flows through the shared engine.
+          // `persist` returns the just-saved progress; when no explicit
+          // `nextStep` is given we derive the next step from it — Phase 3.1's
+          // smoke + dev mismatch guard confirmed the engine derives the same
+          // step the TUI historically hardcoded for these call sites. An
+          // explicit `nextStep` is honored verbatim for TUI-only targets the
+          // engine cannot derive.
           const saved = await persist(updater)
-          const derived = getAndroidResumeStep(saved)
-          if (derived === nextStep) {
-            setStep(derived)
-          }
-          else {
-            if (globalThis.__CAPGO_DEV__) {
-              // eslint-disable-next-line no-console
-              console.warn(`[plan3] persistAndStep engine/TUI step mismatch: hardcoded=${nextStep} engine=${derived}`)
-            }
-            setStep(nextStep)
-          }
+          setStep(nextStep ?? getAndroidResumeStep(saved))
         }
         catch (err) {
           // saveAndroidProgress failures (disk full, permission, etc.) used to
           // become unhandled rejections and stall the UI silently. Route them
-          // through the same retry/error UX as inline await failures. The
-          // failedStep is `nextStep` because we never advanced — on resume,
-          // getAndroidResumeStep recomputes from progress.json anyway.
-          handleErrorRef.current?.(err, nextStep)
+          // through the same retry/error UX as inline await failures. We never
+          // advanced, so the failed step is the explicit `nextStep` (TUI-only
+          // target) or the step the user is currently on (`stepRef` mirrors
+          // `step` without making it a dep of this callback). On resume,
+          // getAndroidResumeStep recomputes from progress.json anyway, so this
+          // only governs the immediate retry target.
+          handleErrorRef.current?.(err, nextStep ?? stepRef.current)
         }
       })()
     },
@@ -897,8 +901,8 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
     setDetectedAliases([])
     setKeyPasswordProbe(null)
     keyPasswordProbeRef.current = false
-    // Phase 2 — service-account fork
-    setServiceAccountMethod(null)
+    // Phase 2 — service-account fork. serviceAccountMethod has no React mirror
+    // (Plan 3.4); deleteAndroidProgress above clears it from disk.
     setSaJsonPathMode('choose')
     setServiceAccountJsonPath('')
     setSaValidationResult(null)
@@ -2348,11 +2352,11 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
             }
             else if (choice === 'existing') {
               setKeystoreMethod('existing')
-              persistAndStep((p) => ({ ...p, keystoreMethod: 'existing' }), 'keystore-existing-path')
+              persistAndStep((p) => ({ ...p, keystoreMethod: 'existing' }))
             }
             else {
               setKeystoreMethod('generate')
-              persistAndStep((p) => ({ ...p, keystoreMethod: 'generate' }), 'keystore-new-alias')
+              persistAndStep((p) => ({ ...p, keystoreMethod: 'generate' }))
             }
           }}
         />
@@ -2381,7 +2385,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
             }
             setKeystoreExistingPath(abs)
             addLog(`✔ Keystore selected · ${abs}`)
-            persistAndStep((p) => ({ ...p, keystoreExistingPath: abs }), 'keystore-existing-store-password')
+            persistAndStep((p) => ({ ...p, keystoreExistingPath: abs }))
           }}
         />
       )}
@@ -2400,7 +2404,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
             }
             setKeystoreStorePassword(val)
             addLog('✔ Store password set')
-            persistAndStep((p) => ({ ...p, keystoreStorePassword: val }), 'keystore-existing-detecting-alias')
+            persistAndStep((p) => ({ ...p, keystoreStorePassword: val }))
           }}
         />
       )}
@@ -2414,7 +2418,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
           onSelect={(value) => {
             setKeystoreAlias(value)
             addLog(`✔ Alias selected · ${value}`)
-            persistAndStep((p) => ({ ...p, keystoreAlias: value }), 'keystore-existing-key-password')
+            persistAndStep((p) => ({ ...p, keystoreAlias: value }))
           }}
         />
       )}
@@ -2426,7 +2430,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
             const alias = val.trim() || RELEASE_ALIAS_DEFAULT
             setKeystoreAlias(alias)
             addLog(`✔ Key alias · ${alias}`)
-            persistAndStep((p) => ({ ...p, keystoreAlias: alias }), 'keystore-existing-key-password')
+            persistAndStep((p) => ({ ...p, keystoreAlias: alias }))
           }}
         />
       )}
@@ -2483,7 +2487,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
             const alias = val.trim() || RELEASE_ALIAS_DEFAULT
             setKeystoreAlias(alias)
             addLog(`✔ Key alias · ${alias}`)
-            persistAndStep((p) => ({ ...p, keystoreAlias: alias }), 'keystore-new-password-method')
+            persistAndStep((p) => ({ ...p, keystoreAlias: alias }))
           }}
         />
       )}
@@ -2498,7 +2502,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
               setKeystoreKeyPassword(pw)
               setRandomPasswordGenerated(true)
               addLog('✔ Store + key passwords generated')
-              persistAndStep((p) => ({ ...p, keystoreStorePassword: pw, keystoreKeyPassword: pw }), 'keystore-new-cn')
+              persistAndStep((p) => ({ ...p, keystoreStorePassword: pw, keystoreKeyPassword: pw }))
             }
             else {
               setStep('keystore-new-store-password')
@@ -2519,6 +2523,9 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
             }
             setKeystoreStorePassword(val)
             addLog('✔ Store password set')
+            // TUI-only target: the engine derives keystore-new-cn here (it does
+            // not model a separate manual key-password input), so we keep the
+            // explicit step to land on the dedicated key-password screen.
             persistAndStep((p) => ({ ...p, keystoreStorePassword: val }), 'keystore-new-key-password')
           }}
         />
@@ -2531,7 +2538,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
             const keyPw = val || keystoreStorePassword
             setKeystoreKeyPassword(keyPw)
             addLog('✔ Key password set')
-            persistAndStep((p) => ({ ...p, keystoreKeyPassword: keyPw }), 'keystore-new-cn')
+            persistAndStep((p) => ({ ...p, keystoreKeyPassword: keyPw }))
           }}
         />
       )}
@@ -2544,6 +2551,9 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
             const cn = val.trim() || appId
             setKeystoreCommonName(cn)
             addLog(`✔ Common name · ${cn}`)
+            // TUI-only target: keystore-generating is the effect screen the
+            // engine cannot derive (the keystore is not yet fully valid — the
+            // _keystoreBase64 / keystoreReady writes happen in the build effect).
             persistAndStep((p) => ({ ...p, keystoreCommonName: cn }), 'keystore-generating')
           }}
         />
@@ -2560,23 +2570,17 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
             if (selectFiredRef.current)
               return
             selectFiredRef.current = true
-            setServiceAccountMethod(method)
+            // serviceAccountMethod has no React mirror (Plan 3.4); persisted below.
             trackAction('android_sa_method_selected', { method })
             if (method === 'existing') {
               // Import path needs the package name first so validation can
               // probe edits.insert(packageName). The package-select step is
               // shared with the OAuth path and routes back here based on
               // serviceAccountMethod.
-              persistAndStep(
-                (p) => ({ ...p, serviceAccountMethod: 'existing' }),
-                'android-package-select',
-              )
+              persistAndStep((p) => ({ ...p, serviceAccountMethod: 'existing' }))
             }
             else {
-              persistAndStep(
-                (p) => ({ ...p, serviceAccountMethod: 'generate' }),
-                'google-sign-in',
-              )
+              persistAndStep((p) => ({ ...p, serviceAccountMethod: 'generate' }))
             }
           }}
         />
@@ -2614,10 +2618,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
             }
             setServiceAccountJsonPath(abs)
             addLog(`✔ Service account JSON · ${abs}`)
-            persistAndStep(
-              (p) => ({ ...p, serviceAccountJsonPath: abs }),
-              'sa-json-validating',
-            )
+            persistAndStep((p) => ({ ...p, serviceAccountJsonPath: abs }))
           }}
         />
       )}
@@ -2652,10 +2653,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
               setServiceAccountJsonPath('')
               setSaValidationResult(null)
               setSaJsonPathMode('choose')
-              persistAndStep(
-                (p) => ({ ...p, serviceAccountJsonPath: undefined }),
-                'sa-json-existing-path',
-              )
+              persistAndStep((p) => ({ ...p, serviceAccountJsonPath: undefined }))
               return
             }
             if (value === 'save-anyway') {
@@ -2683,12 +2681,9 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
             }
             // oauth — fall back to the OAuth provisioning path.
             trackAction('android_sa_validation_recovery_selected', { recovery_action: 'fallback_oauth' })
-            setServiceAccountMethod('generate')
+            // serviceAccountMethod has no React mirror (Plan 3.4); persisted below.
             setSaValidationResult(null)
-            persistAndStep(
-              (p) => ({ ...p, serviceAccountMethod: 'generate' }),
-              'google-sign-in',
-            )
+            persistAndStep((p) => ({ ...p, serviceAccountMethod: 'generate' }))
           }}
         />
       )}
@@ -2769,13 +2764,10 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
             const choice: PlayDeveloperAccountChoice = { developerId: id }
             setPlayAccountChoice(choice)
             addLog(`✔ Play Developer account — ${id}`)
-            persistAndStep(
-              (p) => ({
-                ...p,
-                completedSteps: { ...p.completedSteps, playAccountChosen: choice },
-              }),
-              'gcp-projects-loading',
-            )
+            persistAndStep((p) => ({
+              ...p,
+              completedSteps: { ...p.completedSteps, playAccountChosen: choice },
+            }))
           }}
         />
       )}
@@ -2812,13 +2804,10 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
             }
             setGcpProjectChoice(choice)
             addLog(`✔ GCP project — ${chosen.name}`)
-            persistAndStep(
-              (p) => ({
-                ...p,
-                completedSteps: { ...p.completedSteps, gcpProjectChosen: choice },
-              }),
-              'android-package-select',
-            )
+            persistAndStep((p) => ({
+              ...p,
+              completedSteps: { ...p.completedSteps, gcpProjectChosen: choice },
+            }))
           }}
         />
       )}
@@ -2840,15 +2829,12 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
             setGcpProjectChoice(choice)
             setNewProjectDisplayName(displayName)
             addLog(`✔ GCP project (new) — ${displayName} / ${projectId}`)
-            persistAndStep(
-              (p) => ({
-                ...p,
-                pendingNewProjectId: projectId,
-                pendingNewProjectDisplayName: displayName,
-                completedSteps: { ...p.completedSteps, gcpProjectChosen: choice },
-              }),
-              'android-package-select',
-            )
+            persistAndStep((p) => ({
+              ...p,
+              pendingNewProjectId: projectId,
+              pendingNewProjectDisplayName: displayName,
+              completedSteps: { ...p.completedSteps, gcpProjectChosen: choice },
+            }))
           }}
         />
       )}
@@ -2885,15 +2871,12 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
             }
             setAndroidPackageChoice(choice)
             addLog(`✔ Android package — ${value}`)
-            const nextStep: AndroidOnboardingStep
-              = serviceAccountMethod === 'existing' ? 'sa-json-existing-path' : 'gcp-setup-running'
-            persistAndStep(
-              (p) => ({
-                ...p,
-                completedSteps: { ...p.completedSteps, androidPackageChosen: choice },
-              }),
-              nextStep,
-            )
+            // Next step (sa-json-existing-path for the import path, else
+            // gcp-setup-running) is derived by the engine from serviceAccountMethod.
+            persistAndStep((p) => ({
+              ...p,
+              completedSteps: { ...p.completedSteps, androidPackageChosen: choice },
+            }))
           }}
           onSubmitManual={(val) => {
             const name = val.trim()
@@ -2909,15 +2892,12 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
             }
             setAndroidPackageChoice(choice)
             addLog(`✔ Android package — ${name}`)
-            const nextStep: AndroidOnboardingStep
-              = serviceAccountMethod === 'existing' ? 'sa-json-existing-path' : 'gcp-setup-running'
-            persistAndStep(
-              (p) => ({
-                ...p,
-                completedSteps: { ...p.completedSteps, androidPackageChosen: choice },
-              }),
-              nextStep,
-            )
+            // Next step (sa-json-existing-path for the import path, else
+            // gcp-setup-running) is derived by the engine from serviceAccountMethod.
+            persistAndStep((p) => ({
+              ...p,
+              completedSteps: { ...p.completedSteps, androidPackageChosen: choice },
+            }))
           }}
         />
       )}
