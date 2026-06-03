@@ -10,9 +10,11 @@ import { schema } from '../utils/postgres_schema.ts'
 import { checkPermission } from '../utils/rbac.ts'
 import { version } from '../utils/version.ts'
 import {
+  appIdParamSchema,
   bindingIdParamSchema,
   createRoleBindingBodyHook,
   createRoleBindingBodySchema,
+  invalidAppIdHook,
   invalidBindingIdHook,
   invalidOrgIdHook,
   orgIdParamSchema,
@@ -592,6 +594,85 @@ function isLastSuperAdminDemotionError(error: unknown): boolean {
   const errorCode = typeof error === 'object' && error !== null && 'code' in error ? (error as { code?: string }).code : undefined
   return errorMessage.includes('CANNOT_DEMOTE_LAST_SUPER_ADMIN_BINDING') || errorCode === 'CANNOT_DEMOTE_LAST_SUPER_ADMIN_BINDING'
 }
+
+// GET /private/role_bindings/app/:app_id/channel - List direct channel role bindings for an app
+app.get('/app/:app_id/channel', requireAuthAndGuardLimitedKeys, sValidator('param', appIdParamSchema, invalidAppIdHook), async (c) => {
+  const { app_id: appId } = c.req.valid('param')
+
+  let pgClient
+  try {
+    pgClient = getPgClient(c)
+    const drizzle = getDrizzleClient(pgClient)
+
+    const [appRow] = await drizzle
+      .select({
+        publicAppId: schema.apps.app_id,
+        ownerOrg: schema.apps.owner_org,
+      })
+      .from(schema.apps)
+      .where(eq(schema.apps.id, appId))
+      .limit(1)
+
+    if (!appRow) {
+      return c.json({ error: 'App not found' }, 404)
+    }
+
+    if (!(await checkPermission(c, 'app.read', { appId: appRow.publicAppId }))) {
+      return c.json({ error: 'Forbidden' }, 403)
+    }
+
+    const bindings = await drizzle
+      .select({
+        id: schema.role_bindings.id,
+        principal_type: schema.role_bindings.principal_type,
+        principal_id: schema.role_bindings.principal_id,
+        role_id: schema.role_bindings.role_id,
+        role_name: schema.roles.name,
+        role_description: schema.roles.description,
+        scope_type: schema.role_bindings.scope_type,
+        org_id: schema.role_bindings.org_id,
+        app_id: schema.role_bindings.app_id,
+        channel_id: schema.role_bindings.channel_id,
+        granted_at: schema.role_bindings.granted_at,
+        granted_by: schema.role_bindings.granted_by,
+        expires_at: schema.role_bindings.expires_at,
+        reason: schema.role_bindings.reason,
+        is_direct: schema.role_bindings.is_direct,
+      })
+      .from(schema.role_bindings)
+      .innerJoin(schema.roles, eq(schema.role_bindings.role_id, schema.roles.id))
+      .where(and(
+        eq(schema.role_bindings.scope_type, 'channel'),
+        eq(schema.role_bindings.app_id, appId),
+        eq(schema.role_bindings.org_id, appRow.ownerOrg),
+      ))
+      .orderBy(schema.role_bindings.granted_at)
+
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'role_bindings_app_channels_fetch',
+      appId,
+      orgId: appRow.ownerOrg,
+      count: bindings.length,
+    })
+
+    return c.json(bindings)
+  }
+  catch (error) {
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: 'role_bindings_app_channels_fetch_failed',
+      appId,
+      error,
+    })
+    return c.json({ error: 'Internal server error' }, 500)
+  }
+  finally {
+    if (pgClient) {
+      await closeClient(c, pgClient)
+    }
+  }
+})
 
 // GET /private/role_bindings/:org_id - List role bindings for an org
 app.get('/:org_id', requireAuthAndGuardLimitedKeys, sValidator('param', orgIdParamSchema, invalidOrgIdHook), async (c) => {

@@ -224,8 +224,8 @@ function normalizeChannelBindings(data: any[]): Element[] {
       principal_type: binding.principal_type,
       principal_id: binding.principal_id,
       role_id: binding.role_id,
-      role_name: binding.roles?.name ?? '',
-      role_description: binding.roles?.description ?? null,
+      role_name: binding.role_name ?? binding.roles?.name ?? '',
+      role_description: binding.role_description ?? binding.roles?.description ?? null,
       scope_type: 'channel',
       org_id: binding.org_id,
       app_id: binding.app_id,
@@ -260,10 +260,8 @@ async function fetchData() {
       throw error
 
     const { data: channelBindings, error: channelBindingsError } = await supabase
-      .from('role_bindings')
-      .select('id, principal_type, principal_id, role_id, scope_type, org_id, app_id, channel_id, granted_at, granted_by, expires_at, reason, is_direct, roles(name, description)')
-      .eq('scope_type', 'channel')
-      .eq('app_id', app.value.id)
+      .functions
+      .invoke(`private/role_bindings/app/${app.value.id}/channel`, { method: 'GET' })
 
     if (channelBindingsError)
       throw channelBindingsError

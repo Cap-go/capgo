@@ -302,6 +302,133 @@ describe.skipIf(USE_CLOUDFLARE)('/private/role_bindings', () => {
     }
   })
 
+  it('allows app readers to fetch direct channel bindings for an app', async () => {
+    const id = randomUUID()
+    const orgId = randomUUID()
+    const appUuid = randomUUID()
+    const publicAppId = `com.role-binding.app-reader.${id}`
+    const supabase = getSupabaseClient()
+
+    try {
+      const { error: orgError } = await supabase.from('orgs').insert({
+        id: orgId,
+        created_by: USER_ID_2,
+        name: `Role Binding App Reader Org ${id}`,
+        management_email: `role-binding-app-reader-${id}@capgo.app`,
+        use_new_rbac: true,
+      })
+      expect(orgError).toBeNull()
+
+      const { error: memberError } = await supabase.from('org_users').insert({
+        org_id: orgId,
+        user_id: USER_ID,
+        user_right: 'read',
+      })
+      expect(memberError).toBeNull()
+
+      const { error: appError } = await supabase.from('apps').insert({
+        id: appUuid,
+        app_id: publicAppId,
+        owner_org: orgId,
+        icon_url: 'role-binding-test-icon',
+        name: `App Reader App ${id}`,
+      })
+      expect(appError).toBeNull()
+
+      const { data: version, error: versionError } = await supabase
+        .from('app_versions')
+        .insert({
+          app_id: publicAppId,
+          name: `role-binding-version-${id.slice(0, 8)}`,
+          owner_org: orgId,
+          user_id: USER_ID_2,
+          checksum: `checksum-${id}`,
+          storage_provider: 'r2',
+          r2_path: `orgs/${orgId}/apps/${publicAppId}/${id}.zip`,
+          deleted: false,
+        })
+        .select('id')
+        .single()
+      expect(versionError).toBeNull()
+
+      const { data: channel, error: channelError } = await supabase
+        .from('channels')
+        .insert({
+          app_id: publicAppId,
+          name: `role-binding-channel-${id.slice(0, 8)}`,
+          version: version!.id,
+          owner_org: orgId,
+          created_by: USER_ID_2,
+          public: false,
+          allow_emulator: false,
+        })
+        .select('id, rbac_id')
+        .single()
+      expect(channelError).toBeNull()
+
+      const { data: roles, error: rolesError } = await supabase
+        .from('roles')
+        .select('id, name')
+        .in('name', ['app_reader', 'channel_reader'])
+      expect(rolesError).toBeNull()
+
+      const roleIds = new Map((roles ?? []).map(role => [role.name, role.id]))
+      const appReaderRoleId = roleIds.get('app_reader')
+      const channelReaderRoleId = roleIds.get('channel_reader')
+      expect(appReaderRoleId).toBeTruthy()
+      expect(channelReaderRoleId).toBeTruthy()
+
+      const { error: bindingError } = await supabase.from('role_bindings').insert([
+        {
+          principal_type: 'user',
+          principal_id: USER_ID,
+          role_id: appReaderRoleId!,
+          scope_type: 'app',
+          org_id: orgId,
+          app_id: appUuid,
+          channel_id: null,
+          granted_by: USER_ID_2,
+          reason: 'app-reader-fetches-channel-bindings-test',
+          is_direct: true,
+        },
+        {
+          principal_type: 'user',
+          principal_id: USER_ID,
+          role_id: channelReaderRoleId!,
+          scope_type: 'channel',
+          org_id: orgId,
+          app_id: appUuid,
+          channel_id: channel!.rbac_id,
+          granted_by: USER_ID_2,
+          reason: 'app-reader-fetches-channel-bindings-test',
+          is_direct: true,
+        },
+      ])
+      expect(bindingError).toBeNull()
+
+      const response = await fetch(getEndpointUrl(`/private/role_bindings/app/${appUuid}/channel`), {
+        method: 'GET',
+        headers: authHeaders,
+      })
+      const data = await response.json() as Array<{ app_id: string, channel_id: string, role_name: string, scope_type: string }>
+
+      expect(response.status).toBe(200)
+      expect(data.every(binding => binding.scope_type === 'channel' && binding.app_id === appUuid)).toBe(true)
+      expect(data).toContainEqual(expect.objectContaining({
+        channel_id: channel!.rbac_id,
+        role_name: 'channel_reader',
+      }))
+    }
+    finally {
+      await supabase.from('role_bindings').delete().eq('org_id', orgId)
+      await supabase.from('org_users').delete().eq('org_id', orgId)
+      await supabase.from('channels').delete().eq('owner_org', orgId)
+      await supabase.from('app_versions').delete().eq('owner_org', orgId)
+      await supabase.from('apps').delete().eq('id', appUuid)
+      await supabase.from('orgs').delete().eq('id', orgId)
+    }
+  })
+
   it('rejects app-scoped bindings when the target app belongs to another org', async () => {
     const fixture = await createRoleBindingFixture()
 
