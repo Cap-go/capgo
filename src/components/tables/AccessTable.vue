@@ -96,15 +96,27 @@ const selectedRoleOptions = computed(() => selectedRoleScope.value === 'channel'
 const assignRoleOptions = computed(() => assignAccessForm.value.scope_type === 'channel' ? channelRoleOptions.value : appRoleOptions.value)
 const channelByRbacId = computed(() => new Map(channels.value.map(channel => [channel.rbac_id, channel])))
 const filteredPrincipalOptions = computed(() => principalOptions.value.filter(option => option.type === assignAccessForm.value.principal_type))
+const selectedAssignRole = computed(() => assignRoleOptions.value.find(role => role.name === assignAccessForm.value.role_name))
+const canAssignAppScope = computed(() => appRoleOptions.value.length > 0)
+const canAssignChannelScope = computed(() => channels.value.length > 0 && channelRoleOptions.value.length > 0)
+const hasValidAssignRole = computed(() => assignRoleOptions.value.some(role => role.name === assignAccessForm.value.role_name))
 const isAssignAccessFormValid = computed(() => {
   return !!assignAccessForm.value.principal_id
     && !!assignAccessForm.value.role_name
+    && hasValidAssignRole.value
+    && (assignAccessForm.value.scope_type !== 'app' || canAssignAppScope.value)
+    && (assignAccessForm.value.scope_type !== 'channel' || canAssignChannelScope.value)
     && (assignAccessForm.value.scope_type === 'app' || !!assignAccessForm.value.channel_id)
 })
+const selectControlClass = 'd-select d-select-bordered min-h-11 w-full rounded-md bg-white text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary/30 dark:bg-slate-900 dark:text-slate-100'
 
 function getDefaultAssignRoleName(scopeType: 'app' | 'channel') {
   const options = scopeType === 'channel' ? channelRoleOptions.value : appRoleOptions.value
   return options[0]?.name ?? ''
+}
+
+function getRoleDescription(role?: Role) {
+  return role?.description ?? ''
 }
 
 function resetAssignScopeDefaults(scopeType: 'app' | 'channel') {
@@ -137,12 +149,6 @@ async function loadAppInfo() {
 function getRoleDisplayName(roleName: string): string {
   const i18nKey = getRbacRoleI18nKey(roleName)
   return i18nKey ? t(i18nKey) : roleName.replaceAll('_', ' ')
-}
-
-function getRoleOptionLabel(role: Role): string {
-  return role.description
-    ? `${getRoleDisplayName(role.name)} - ${role.description}`
-    : getRoleDisplayName(role.name)
 }
 
 function getPrincipalName(principalType: 'user' | 'group', principalId: string) {
@@ -316,7 +322,7 @@ async function openChannelPermissions(element: Element) {
 }
 
 function openAssignAccessModal() {
-  const defaultScope = channelRoleOptions.value.length && channels.value.length ? 'channel' : 'app'
+  const defaultScope = canAssignChannelScope.value ? 'channel' : 'app'
   assignAccessForm.value = {
     principal_type: 'user',
     principal_id: filteredPrincipalOptions.value[0]?.id ?? '',
@@ -661,18 +667,30 @@ watch(
     to="#dialog-v2-content"
   >
     <div class="w-full">
-      <div class="p-4 border rounded-lg dark:border-gray-600">
-        <div class="space-y-3">
+      <div class="rounded-md border border-slate-200 bg-slate-50/80 p-3 dark:border-slate-700 dark:bg-slate-900/60">
+        <div class="space-y-2">
           <div v-for="option in selectedRoleOptions" :key="option.id" class="form-control">
-            <label class="justify-start gap-3 p-3 rounded-lg cursor-pointer hover:bg-gray-50 label dark:hover:bg-gray-800">
+            <label
+              class="flex min-h-14 cursor-pointer items-start gap-3 rounded-md border p-3 text-left transition-colors"
+              :class="selectedRole === option.name
+                ? 'border-primary bg-primary/5 ring-1 ring-primary/30 dark:bg-primary/10'
+                : 'border-slate-200 bg-white hover:border-primary/60 dark:border-slate-700 dark:bg-slate-950'"
+            >
               <input
                 v-model="selectedRole"
                 type="radio"
                 name="access-role"
                 :value="option.name"
-                class="mr-2 radio radio-primary"
+                class="radio radio-primary radio-sm mt-0.5"
               >
-              <span class="text-base label-text">{{ getRoleOptionLabel(option) }}</span>
+              <span class="min-w-0">
+                <span class="block text-sm font-medium text-slate-900 dark:text-slate-100">
+                  {{ getRoleDisplayName(option.name) }}
+                </span>
+                <span v-if="getRoleDescription(option)" class="mt-1 block text-sm leading-5 text-slate-500 dark:text-slate-400">
+                  {{ getRoleDescription(option) }}
+                </span>
+              </span>
             </label>
           </div>
         </div>
@@ -685,7 +703,21 @@ watch(
     defer
     to="#dialog-v2-content"
   >
-    <div class="space-y-4">
+    <div class="space-y-5">
+      <div class="rounded-md border border-slate-200 bg-slate-50/80 p-3 dark:border-slate-700 dark:bg-slate-900/60">
+        <div class="flex flex-wrap items-center gap-2">
+          <span class="text-xs font-medium uppercase text-slate-500 dark:text-slate-400">
+            {{ t('assign-access-selected-scope') }}
+          </span>
+          <span class="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary dark:bg-primary/20">
+            {{ assignAccessForm.scope_type === 'channel' ? t('app-access-scope-channel') : t('app-access-scope-app') }}
+          </span>
+        </div>
+        <p class="mt-2 text-sm leading-5 text-slate-600 dark:text-slate-300">
+          {{ assignAccessForm.scope_type === 'channel' ? t('assign-access-scope-channel-description') : t('assign-access-scope-app-description') }}
+        </p>
+      </div>
+
       <div class="grid gap-4 md:grid-cols-2">
         <div class="form-control">
           <label for="assign-principal-type" class="label">
@@ -694,7 +726,7 @@ watch(
           <select
             id="assign-principal-type"
             v-model="assignAccessForm.principal_type"
-            class="min-h-11 rounded-md border border-slate-300 bg-white px-3 text-sm dark:border-slate-600 dark:bg-slate-900"
+            :class="selectControlClass"
           >
             <option value="user">
               {{ t('user') }}
@@ -714,7 +746,8 @@ watch(
           <select
             id="assign-principal"
             v-model="assignAccessForm.principal_id"
-            class="min-h-11 rounded-md border border-slate-300 bg-white px-3 text-sm dark:border-slate-600 dark:bg-slate-900"
+            :class="selectControlClass"
+            aria-describedby="assign-principal-helper"
           >
             <option value="">
               {{ assignAccessForm.principal_type === 'user' ? t('select-user') : t('select-group') }}
@@ -723,38 +756,76 @@ watch(
               {{ option.label }}
             </option>
           </select>
+          <p id="assign-principal-helper" class="mt-1.5 text-xs leading-5 text-slate-500 dark:text-slate-400">
+            {{ t('assign-access-principal-helper') }}
+          </p>
         </div>
       </div>
 
-      <fieldset class="space-y-2">
+      <fieldset class="space-y-2" aria-describedby="assign-scope-helper">
         <legend class="text-sm font-medium text-slate-700 dark:text-slate-200">
           {{ t('scope') }}
         </legend>
         <div class="grid gap-3 md:grid-cols-2">
-          <label class="flex min-h-11 cursor-pointer items-center gap-3 rounded-md border border-slate-300 px-3 text-sm dark:border-slate-700">
+          <label
+            class="flex min-h-16 items-start gap-3 rounded-md border p-3 text-sm transition-colors"
+            :class="[
+              assignAccessForm.scope_type === 'app'
+                ? 'border-primary bg-primary/5 ring-1 ring-primary/30 dark:bg-primary/10'
+                : 'border-slate-300 bg-white dark:border-slate-700 dark:bg-slate-950',
+              canAssignAppScope ? 'cursor-pointer hover:border-primary/60' : 'cursor-not-allowed opacity-60',
+            ]"
+          >
             <input
               v-model="assignAccessForm.scope_type"
               type="radio"
               name="assign-scope"
               value="app"
-              class="radio radio-primary radio-sm"
+              class="radio radio-primary radio-sm mt-0.5"
+              :disabled="!canAssignAppScope"
             >
-            <span>{{ t('app-access-scope-app') }}</span>
+            <span class="min-w-0">
+              <span class="block font-medium text-slate-900 dark:text-slate-100">
+                {{ t('app-access-scope-app') }}
+              </span>
+              <span class="mt-1 block leading-5 text-slate-500 dark:text-slate-400">
+                {{ t('assign-access-scope-app-description') }}
+              </span>
+            </span>
           </label>
-          <label class="flex min-h-11 cursor-pointer items-center gap-3 rounded-md border border-slate-300 px-3 text-sm dark:border-slate-700">
+          <label
+            class="flex min-h-16 items-start gap-3 rounded-md border p-3 text-sm transition-colors"
+            :class="[
+              assignAccessForm.scope_type === 'channel'
+                ? 'border-primary bg-primary/5 ring-1 ring-primary/30 dark:bg-primary/10'
+                : 'border-slate-300 bg-white dark:border-slate-700 dark:bg-slate-950',
+              canAssignChannelScope ? 'cursor-pointer hover:border-primary/60' : 'cursor-not-allowed opacity-60',
+            ]"
+          >
             <input
               v-model="assignAccessForm.scope_type"
               type="radio"
               name="assign-scope"
               value="channel"
-              class="radio radio-primary radio-sm"
+              class="radio radio-primary radio-sm mt-0.5"
+              :disabled="!canAssignChannelScope"
             >
-            <span>{{ t('app-access-scope-channel') }}</span>
+            <span class="min-w-0">
+              <span class="block font-medium text-slate-900 dark:text-slate-100">
+                {{ t('app-access-scope-channel') }}
+              </span>
+              <span class="mt-1 block leading-5 text-slate-500 dark:text-slate-400">
+                {{ t('assign-access-scope-channel-description') }}
+              </span>
+            </span>
           </label>
         </div>
+        <p id="assign-scope-helper" class="text-xs leading-5 text-slate-500 dark:text-slate-400">
+          {{ canAssignChannelScope ? t('assign-access-scope-helper') : t('assign-access-no-channel-scope') }}
+        </p>
       </fieldset>
 
-      <div class="grid gap-4 md:grid-cols-2">
+      <div class="grid gap-4 rounded-md border border-slate-200 bg-slate-50/70 p-3 dark:border-slate-700 dark:bg-slate-900/40 md:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
         <div v-if="assignAccessForm.scope_type === 'channel'" class="form-control">
           <label for="assign-channel" class="label">
             <span class="label-text">{{ t('channel') }}</span>
@@ -762,7 +833,8 @@ watch(
           <select
             id="assign-channel"
             v-model="assignAccessForm.channel_id"
-            class="min-h-11 rounded-md border border-slate-300 bg-white px-3 text-sm dark:border-slate-600 dark:bg-slate-900"
+            :class="selectControlClass"
+            aria-describedby="assign-channel-helper"
           >
             <option value="">
               {{ t('select-channel') }}
@@ -771,6 +843,9 @@ watch(
               {{ channel.name }}
             </option>
           </select>
+          <p id="assign-channel-helper" class="mt-1.5 text-xs leading-5 text-slate-500 dark:text-slate-400">
+            {{ t('assign-access-channel-helper') }}
+          </p>
         </div>
 
         <div class="form-control" :class="{ 'md:col-span-2': assignAccessForm.scope_type !== 'channel' }">
@@ -780,15 +855,19 @@ watch(
           <select
             id="assign-role"
             v-model="assignAccessForm.role_name"
-            class="min-h-11 rounded-md border border-slate-300 bg-white px-3 text-sm dark:border-slate-600 dark:bg-slate-900"
+            :class="selectControlClass"
+            aria-describedby="assign-role-helper"
           >
             <option value="">
               {{ t('select-role') }}
             </option>
             <option v-for="role in assignRoleOptions" :key="role.id" :value="role.name">
-              {{ getRoleOptionLabel(role) }}
+              {{ getRoleDisplayName(role.name) }}
             </option>
           </select>
+          <p id="assign-role-helper" class="mt-1.5 text-xs leading-5 text-slate-500 dark:text-slate-400">
+            {{ getRoleDescription(selectedAssignRole) || t('assign-access-role-helper') }}
+          </p>
         </div>
       </div>
     </div>
