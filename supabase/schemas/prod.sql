@@ -1315,6 +1315,7 @@ DECLARE
   v_user_id UUID;
   v_key TEXT;
   v_org_exists BOOLEAN;
+  v_stats_refresh_fields CONSTANT TEXT[] := ARRAY['stats_refresh_requested_at', 'stats_updated_at', 'updated_at'];
 BEGIN
   -- Skip audit logging for org DELETE operations
   -- When an org is deleted, we can't insert into audit_logs because the org_id
@@ -1325,7 +1326,6 @@ BEGIN
 
   -- Get current user from auth context or API key
   -- Uses get_identity() WITH key_mode parameter to support both JWT auth and API key authentication
-  -- This is the fix: previously called get_identity() without parameters which only checked auth.uid()
   v_user_id := public.get_identity('{read,upload,write,all}'::public.key_mode[]);
 
   -- Skip audit logging if no user is identified
@@ -1336,22 +1336,34 @@ BEGIN
 
   -- Convert records to JSONB based on operation type
   IF TG_OP = 'DELETE' THEN
-    v_old_record := to_jsonb(OLD);
+    v_old_record := pg_catalog.to_jsonb(OLD);
     v_new_record := NULL;
   ELSIF TG_OP = 'INSERT' THEN
     v_old_record := NULL;
-    v_new_record := to_jsonb(NEW);
+    v_new_record := pg_catalog.to_jsonb(NEW);
   ELSE -- UPDATE
-    v_old_record := to_jsonb(OLD);
-    v_new_record := to_jsonb(NEW);
+    v_old_record := pg_catalog.to_jsonb(OLD);
+    v_new_record := pg_catalog.to_jsonb(NEW);
 
     -- Calculate changed fields by comparing old and new values
-    FOR v_key IN SELECT jsonb_object_keys(v_new_record)
+    FOR v_key IN SELECT pg_catalog.jsonb_object_keys(v_new_record)
     LOOP
       IF v_old_record->v_key IS DISTINCT FROM v_new_record->v_key THEN
-        v_changed_fields := array_append(v_changed_fields, v_key);
+        v_changed_fields := pg_catalog.array_append(v_changed_fields, v_key);
       END IF;
     END LOOP;
+
+    -- Dashboard chart refreshes only touch stats refresh state. The apps table
+    -- also receives updated_at from its update trigger, so keep that out too.
+    IF TG_TABLE_NAME = ANY(ARRAY['apps', 'orgs'])
+      AND v_changed_fields && ARRAY['stats_refresh_requested_at', 'stats_updated_at']
+      AND NOT EXISTS (
+        SELECT 1
+        FROM pg_catalog.unnest(v_changed_fields) AS changed_field(field_name)
+        WHERE changed_field.field_name <> ALL(v_stats_refresh_fields)
+      ) THEN
+      RETURN NEW;
+    END IF;
   END IF;
 
   -- Get org_id and record_id based on table being modified
