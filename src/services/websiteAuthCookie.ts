@@ -1,7 +1,6 @@
 import { getLocalConfig } from '~/services/supabase'
 
 const WEBSITE_PAID_USER_COOKIE_NAME = 'capgo_paid_user'
-const LEGACY_WEBSITE_AUTH_COOKIE_NAME = 'capgo_logged_in'
 const WEBSITE_PAID_USER_COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 30
 
 interface WebsiteAuthOrganization {
@@ -9,18 +8,37 @@ interface WebsiteAuthOrganization {
   role?: string | null
 }
 
-function getWebsiteCookieDomain() {
-  try {
-    const { hostWeb } = getLocalConfig()
-    const hostname = new URL(hostWeb).hostname.replace(/^www\./, '')
-    if (!hostname || hostname === 'localhost' || /^[\d.]+$/.test(hostname))
-      return null
+function isCookieDomainUnsupported(hostname: string) {
+  return !hostname || hostname === 'localhost' || /^[\d.]+$/.test(hostname)
+}
 
-    return `.${hostname}`
+function hostnameFromUrl(url: string | undefined) {
+  if (!url)
+    return null
+
+  try {
+    return new URL(url).hostname
   }
   catch {
     return null
   }
+}
+
+function getWebsiteCookieDomain() {
+  const { host, hostWeb } = getLocalConfig()
+  const hostname = (
+    hostnameFromUrl(hostWeb)
+    ?? hostnameFromUrl(host)
+    ?? globalThis.location?.hostname
+    ?? ''
+  )
+    .replace(/^www\./, '')
+    .replace(/^console\./, '')
+
+  if (isCookieDomainUnsupported(hostname))
+    return null
+
+  return `.${hostname}`
 }
 
 function getCookieAttributes(maxAgeSeconds: number, domain?: string | null) {
@@ -55,7 +73,6 @@ export function clearWebsitePaidUserCookie() {
 
   const domain = getWebsiteCookieDomain()
   clearWebsiteCookie(WEBSITE_PAID_USER_COOKIE_NAME, domain)
-  clearWebsiteCookie(LEGACY_WEBSITE_AUTH_COOKIE_NAME, domain)
 }
 
 export function setWebsitePaidUserCookie(isPaidUser: boolean) {
@@ -69,7 +86,6 @@ export function setWebsitePaidUserCookie(isPaidUser: boolean) {
 
   const domain = getWebsiteCookieDomain()
   writeWebsiteCookie(WEBSITE_PAID_USER_COOKIE_NAME, '1', WEBSITE_PAID_USER_COOKIE_MAX_AGE_SECONDS, domain)
-  clearWebsiteCookie(LEGACY_WEBSITE_AUTH_COOKIE_NAME, domain)
 }
 
 export function syncWebsitePaidUserCookieFromOrganizations(organizations: WebsiteAuthOrganization[]) {
