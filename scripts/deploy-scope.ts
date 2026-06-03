@@ -38,7 +38,7 @@ export const deployMatchers: Record<DeployTarget, RegExp[]> = {
     /^supabase\/functions\//,
     /^supabase\/migrations\//,
     /^messages\/en\.json$/,
-    /^shared\/preview-subdomain\.ts$/,
+    /^supabase\/functions\/shared\/preview-subdomain\.ts$/,
   ],
   api: [
     ...workerDependencyMatchers,
@@ -63,7 +63,7 @@ export const deployMatchers: Record<DeployTarget, RegExp[]> = {
     /^supabase\/functions\/_backend\/files\//,
     /^supabase\/functions\/_backend\/private\/(download_link|upload_link)\.ts$/,
     /^supabase\/functions\/_backend\/public\/ok\.ts$/,
-    /^shared\/preview-subdomain\.ts$/,
+    /^supabase\/functions\/shared\/preview-subdomain\.ts$/,
   ],
   plugins: [
     ...workerDependencyMatchers,

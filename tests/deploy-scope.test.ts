@@ -58,6 +58,16 @@ describe('deploy scope matching', () => {
     })
   })
 
+  it.concurrent('deploys files worker when the shared preview subdomain helper changes', () => {
+    expect(resolveDeployScopeFromFiles(['supabase/functions/shared/preview-subdomain.ts'])).toEqual({
+      api: false,
+      files: true,
+      plugins: false,
+      supabase: true,
+      translation: false,
+    })
+  })
+
   it.concurrent('deploys package dependency changes to Cloudflare workers without forcing Supabase', () => {
     expect(resolveDeployScopeFromFiles(['package.json'])).toEqual({
       api: true,
