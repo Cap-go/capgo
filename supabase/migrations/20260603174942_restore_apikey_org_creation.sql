@@ -177,12 +177,10 @@ $$;
 
 ALTER FUNCTION public.apikey_has_global_permission(text, text) OWNER TO postgres;
 REVOKE ALL ON FUNCTION public.apikey_has_global_permission(text, text) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.apikey_has_global_permission(text, text) TO anon;
-GRANT EXECUTE ON FUNCTION public.apikey_has_global_permission(text, text) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.apikey_has_global_permission(text, text) TO service_role;
 
 COMMENT ON FUNCTION public.apikey_has_global_permission(text, text) IS
-  'Checks global API-key permissions such as org.create using the supplied key value, including hashed-key lookup.';
+  'Service-role helper that checks global API-key permissions such as org.create using the supplied key value, including hashed-key lookup.';
 
 CREATE OR REPLACE FUNCTION public.get_identity_for_apikey_creation()
 RETURNS uuid
