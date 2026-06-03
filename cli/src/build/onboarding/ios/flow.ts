@@ -17,17 +17,21 @@
 // iOS reuses the EXISTING master types — OnboardingStep / OnboardingProgress —
 // rather than inventing a parallel iOS step union.
 //
-// TYPING NOTE — the iOS Apple-API / CSR / macOS-signing / mobileprovision
-// helper modules do NOT exist in this codebase yet (the corresponding steps are
-// documented as "STUB – not implemented" in the transition-graph audit). So the
-// injected helper signatures below are MINIMAL STRUCTURAL types that mirror the
-// real signatures from the audit. When those helper modules land, swap the
-// structural aliases for the real exported types — the field names already
-// match so callers will not need to change. Types the codebase DOES define
-// (CertificateData / ProfileData / ApiKeyData / EnrichedIdentityAvailability,
-// the CI-secret + TailTransient shapes) are imported for real.
+// TYPING NOTE — the iOS Apple-API / CSR / macOS-signing / mobileprovision helper
+// modules DO exist in this codebase (pure, injectable, with tests). The injected
+// helper data types + ephemeral selections below import the REAL exported types
+// from those modules directly:
+//   - apple-api.ts            → AscDistributionCert / AscProfileSummary
+//   - macos-signing.ts        → SigningIdentity / DiscoveredProfile / IdentityProfileMatch
+//   - mobileprovision-parser  → MobileprovisionDetail
+//   - csr.ts                  → CsrResult / P12Result
+// Types the codebase also defines (CertificateData / ProfileData / ApiKeyData /
+// EnrichedIdentityAvailability, the CI-secret + TailTransient shapes) are imported
+// from types.ts / ci-secrets.ts / tail/flow.ts. The only structural type kept local
+// is IosNoMatchReason — the recovery-menu reason enum has no helper-module export.
 
 import type { Buffer } from 'node:buffer'
+import type { AscDistributionCert, AscProfileSummary } from '../apple-api.js'
 import type {
   ApiKeyData,
   CertificateData,
@@ -37,48 +41,24 @@ import type {
   ProfileData,
 } from '../types.js'
 import type { CiSecretEntry, CiSecretSetupAdvice, CiSecretTarget } from '../ci-secrets.js'
+import type { DiscoveredProfile, IdentityProfileMatch, SigningIdentity } from '../macos-signing.js'
+import type { MobileprovisionDetail } from '../../mobileprovision-parser.js'
 // The post-save tail transient is shared with android — reuse it verbatim so the
 // `saving-credentials → ask-build` handoff (BATCH 1) threads the same fields.
 import type { TailTransient } from '../tail/flow.js'
 
-// ─── Structural helper types (placeholders for the not-yet-existing modules) ──
+// ─── Local structural helper types ───────────────────────────────────────────
 //
-// Each mirrors the shape the audit attributes to the named helper module. They
-// are intentionally minimal — only the fields the engine threads. Replace with
-// the real exports from apple-api.ts / macos-signing.ts / mobileprovision-
-// parser.ts when those modules are added.
-
-/** A signing identity discovered on the Mac (macos-signing listSigningIdentities). */
-export interface IosSigningIdentity {
-  /** Common name / label as it appears in the Keychain. */
-  name: string
-  /** SHA-1 of the identity's certificate. */
-  sha1?: string
-  /** Apple team id, when resolvable. */
-  teamId?: string
-}
-
-/** A provisioning profile discovered on disk or synthesized from Apple. */
-export interface IosDiscoveredProfile {
-  /** Absolute path on disk, when the profile came from a local scan. */
-  path?: string
-  /** Profile name. */
-  name?: string
-  /** UUID. */
-  uuid?: string
-  /** Bundle id the profile is scoped to. */
-  bundleId?: string
-  /** Allowed-cert SHA-1 list. */
-  certificateSha1s?: string[]
-  /** Base64 of the profile bytes, when synthesized from an Apple-API response. */
-  profileBase64?: string
-}
-
-/** A scanned identity + its matched on-disk profiles (import-scanning result). */
-export interface IosImportMatch {
-  identity: IosSigningIdentity
-  profiles: IosDiscoveredProfile[]
-}
+// Almost every helper data type now comes from the REAL helper modules (imported
+// above). The two types defined here have NO direct helper-module export:
+//
+//   - IosNoMatchReason   — the import-no-match-recovery menu's reason enum. It is
+//     an engine-level concept, not produced by any helper module, so it stays local.
+//   - IosDuplicateProfile — the duplicate-Capgo-profile shape surfaced by
+//     apple-api's findCapgoProfiles() / DuplicateProfileError.profiles, which is the
+//     inline `{ id, name, profileType }` triple. apple-api does not export a named
+//     type for that triple, so we derive a minimal one from AscProfileSummary (the
+//     richest exported profile shape) via Pick — keeping it tied to the real source.
 
 /**
  * Stable reason an identity has no usable matching profile. Drives the
@@ -92,29 +72,13 @@ export type IosNoMatchReason
     | 'apple-other'
     | 'no-profile-on-disk'
 
-/** An existing Apple cert offered for revocation when the 3-cert limit is hit. */
-export interface IosExistingCert {
-  certificateId: string
-  name?: string
-  expirationDate?: string
-  serialNumber?: string
-}
-
-/** A duplicate Capgo provisioning profile (creating-profile / import-create). */
-export interface IosDuplicateProfile {
-  profileId: string
-  name?: string
-}
-
-/** Parsed result of a `.mobileprovision` file (mobileprovision-parser). */
-export interface IosParsedMobileprovision {
-  name?: string
-  uuid?: string
-  bundleId?: string
-  certificateSha1s?: string[]
-  /** Distribution type, e.g. 'app-store' | 'ad-hoc'. */
-  distributionType?: string
-}
+/**
+ * A duplicate Capgo provisioning profile (creating-profile / import-create).
+ * Matches the `{ id, name, profileType }` triple returned by apple-api's
+ * findCapgoProfiles() and carried on DuplicateProfileError.profiles. Derived
+ * from the real AscProfileSummary so it tracks any future field additions.
+ */
+export type IosDuplicateProfile = Pick<AscProfileSummary, 'id' | 'name' | 'profileType'>
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -153,17 +117,17 @@ export interface IosStepCtx {
 
   // ── Import-flow selections (the core ephemeral set) ──────────────────────
   /** Selected signing identity (import-pick-identity). REQUIRED by import-exporting. */
-  chosenIdentity?: IosSigningIdentity
+  chosenIdentity?: SigningIdentity
   /** Selected provisioning profile (import-pick-profile). REQUIRED by import-exporting. */
-  chosenProfile?: IosDiscoveredProfile
+  chosenProfile?: DiscoveredProfile
   /** Discovery result list from import-scanning (identities + on-disk profiles). */
-  importMatches?: IosImportMatch[]
+  importMatches?: IdentityProfileMatch[]
   /** Scanned on-disk profiles (paired with importMatches). */
-  importProfiles?: IosDiscoveredProfile[]
+  importProfiles?: DiscoveredProfile[]
   /** Per-identity Apple-side availability (import-validating-all-certs). */
   identityAvailability?: Record<string, EnrichedIdentityAvailability>
   /** Per-identity prefetched Apple profiles (parallel prefetch after validation). */
-  profilePrefetch?: Record<string, IosDiscoveredProfile[]>
+  profilePrefetch?: Record<string, DiscoveredProfile[]>
   /** Apple cert resource id for the chosen identity (import-checking-apple-cert). */
   _appleCertIdForChosen?: string
   /** Why the chosen identity has no usable profile — drives the recovery menu. */
@@ -173,9 +137,9 @@ export interface IosStepCtx {
   /** Duplicate Capgo profiles (creating-profile / import-create-profile-only). */
   duplicateProfiles?: IosDuplicateProfile[]
   /** Existing Apple certs offered for revocation when the cert limit is hit. */
-  existingCerts?: IosExistingCert[]
+  existingCerts?: AscDistributionCert[]
   /** The user's revoke selection (cert-limit-prompt → revoking-certificate). */
-  certToRevoke?: IosExistingCert
+  certToRevoke?: AscDistributionCert
 
   // ── Cert/profile export payloads (resolved once, carried to saving-credentials) ──
   /** Resolved certificate data (creating-profile create-new / import-exporting). */
@@ -221,8 +185,8 @@ export interface IosStepCtx {
  * export, mobileprovision parsing, persistence, the shared tail helpers, and
  * status/log callbacks). EVERY helper is OPTIONAL and ADDITIVE so a driver can
  * inject only what the path it drives needs and the skeleton's stubs keep
- * type-checking. Signatures mirror the audit's helper modules; the structural
- * placeholder types above stand in until the real modules land.
+ * type-checking. Data types are the REAL exports from apple-api / macos-signing /
+ * mobileprovision-parser / csr; only the call-shape envelopes are engine-local.
  */
 export interface IosEffectDeps {
   appId?: string
@@ -241,15 +205,15 @@ export interface IosEffectDeps {
   /** Resolve the Apple cert resource id from a local cert SHA-1. */
   findCertIdBySha1?: (sha1: string) => Promise<string | null>
   /** Classify a cert's Apple-side availability (import-validating-all-certs). */
-  classifyCertAvailability?: (identity: IosSigningIdentity) => Promise<EnrichedIdentityAvailability>
+  classifyCertAvailability?: (identity: SigningIdentity) => Promise<EnrichedIdentityAvailability>
   /** List the team's distribution certificates (cert-limit prompt). */
-  listCertificates?: () => Promise<IosExistingCert[]>
+  listCertificates?: () => Promise<AscDistributionCert[]>
   /** Check for duplicate Capgo profiles for a bundle id. */
   checkDuplicateProfiles?: (bundleId: string) => Promise<IosDuplicateProfile[]>
   /** Ensure the bundle id exists on Apple (import-create-profile-only). */
   ensureBundleId?: (bundleId: string) => Promise<void>
   /** List the Apple profiles linked to a cert (import-checking-apple-cert). */
-  listProfilesForCert?: (certificateId: string) => Promise<IosDiscoveredProfile[]>
+  listProfilesForCert?: (certificateId: string) => Promise<DiscoveredProfile[]>
 
   // ── csr ────────────────────────────────────────────────────────────────
   /** Generate a CSR + private key PEM. */
@@ -259,11 +223,11 @@ export interface IosEffectDeps {
 
   // ── macos-signing ────────────────────────────────────────────────────────
   /** List the Mac's code-signing identities (import-scanning). */
-  listSigningIdentities?: () => Promise<IosSigningIdentity[]>
+  listSigningIdentities?: () => Promise<SigningIdentity[]>
   /** Scan the Mac's on-disk provisioning profiles (import-scanning). */
-  scanProvisioningProfiles?: () => Promise<IosDiscoveredProfile[]>
+  scanProvisioningProfiles?: () => Promise<DiscoveredProfile[]>
   /** Export a .p12 (cert + key) from the Keychain (import-exporting). Returns base64. */
-  exportP12FromKeychain?: (args: { identity: IosSigningIdentity, password: string }) => Promise<string>
+  exportP12FromKeychain?: (args: { identity: SigningIdentity, password: string }) => Promise<string>
   /** Pre-compile the Swift keychain-export helper (import-compiling-helper). */
   precompileSwiftHelper?: () => Promise<void>
   /** Whether the Swift keychain-export helper is already compiled + cached. */
@@ -271,7 +235,7 @@ export interface IosEffectDeps {
 
   // ── mobileprovision-parser ───────────────────────────────────────────────
   /** Parse a `.mobileprovision` file in detail (import-provide-profile-path). */
-  parseMobileprovisionDetailed?: (bytes: Buffer) => IosParsedMobileprovision
+  parseMobileprovisionDetailed?: (bytes: Buffer) => MobileprovisionDetail
 
   // ── persistence (the iOS progress equivalents of the android deps) ───────
   loadProgress?: (appId: string) => Promise<OnboardingProgress | null>
@@ -315,9 +279,9 @@ export interface IosEffectDeps {
     ciSecretEntries?: CiSecretEntry[]
     ciSecretExistingKeys?: string[]
     /** The chosen signing identity (lossy re-scan source on resume). */
-    chosenIdentity?: IosSigningIdentity
+    chosenIdentity?: SigningIdentity
     /** The chosen provisioning profile (lossy re-scan source on resume). */
-    chosenProfile?: IosDiscoveredProfile
+    chosenProfile?: DiscoveredProfile
     /** Resolved cert/profile/team export payloads carried into saving-credentials. */
     certData?: CertificateData
     profileData?: ProfileData
