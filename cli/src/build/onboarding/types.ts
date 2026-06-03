@@ -174,6 +174,34 @@ export interface ProfileData {
   profileBase64: string
 }
 
+// ─── Post-save "tail" milestones (shared with android) ───────────────────────
+//
+// Mirror the android `CredentialsSaved` / `BuildRequested` / `CiSecretsUploaded`
+// markers so `getIosResumeStep` can route a saved progress THROUGH the shared
+// post-save tail (CI-secrets → env-export → workflow-file → build-request)
+// without re-running a side-effecting step. Each is a marker in the same
+// self-healing style as the cert/profile markers: presence means "this
+// irreversible step already happened — do NOT do it again". Absent on every
+// legacy/in-flight progress file → `tailResumeStep` returns null and resume is
+// unchanged (terminal stays `saving-credentials`).
+
+export interface IosCredentialsSaved {
+  /** ISO timestamp credentials.json was written — purely informational. */
+  savedAt: string
+}
+
+export interface IosBuildRequested {
+  /** The build dashboard URL surfaced after the queue request succeeded. */
+  buildUrl: string
+}
+
+export interface IosCiSecretsUploaded {
+  /** Provider the secrets were pushed to (matches the chosen ciSecretTarget). */
+  provider: 'github' | 'gitlab'
+  /** How many env vars were pushed — informational. */
+  count: number
+}
+
 export interface OnboardingProgress extends TailProgress {
   platform: Platform
   appId: string
@@ -304,6 +332,17 @@ export interface OnboardingProgress extends TailProgress {
     apiKeyVerified?: ApiKeyData
     certificateCreated?: CertificateData
     profileCreated?: ProfileData
+    // ── Post-save "tail" milestones (shared with android) ──
+    // Present only once the matching side-effecting tail step has finished, so
+    // `getIosResumeStep` can route a saved progress THROUGH the tail without
+    // re-running an irreversible step. Absent on every legacy/in-flight file →
+    // resume falls through to `saving-credentials` exactly as before.
+    /** Set once `saving-credentials` wrote credentials.json. Gates tail entry. */
+    credentialsSaved?: IosCredentialsSaved
+    /** Set once `requesting-build` queued a build. Guards a double build-request. */
+    buildRequested?: IosBuildRequested
+    /** Set once `uploading-ci-secrets` pushed the secrets. Guards a re-upload. */
+    ciSecretsUploaded?: IosCiSecretsUploaded
   }
   /** Temporary — wiped after .p12 creation */
   _privateKeyPem?: string

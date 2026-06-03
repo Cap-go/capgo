@@ -48,6 +48,86 @@
 import type { OnboardingProgress, OnboardingStep } from '../types.js'
 import { getResumeStep } from '../progress.js'
 
+/**
+ * Post-save "tail" resume routing (shared model with android's `tailResumeStep`).
+ *
+ * Once `saving-credentials` completes, the wizard runs the platform-neutral tail:
+ *   ask-build → requesting-build → detecting-ci-secrets → (ci-secrets sub-flow)
+ *   → uploading-ci-secrets → (with-workflow) pick-package-manager →
+ *   pick-build-script → preview/writing-workflow-file → build-complete
+ * with a parallel `.env`-export leaf (ask-export-env → exporting-env) taken when
+ * the user declines the GitHub Actions setup. This is the SAME derivation the
+ * android engine uses (`android/progress.ts`'s `tailResumeStep`) — the iOS engine
+ * delegates the tail EFFECTS to the same shared module (`tail/flow.ts`), so the
+ * resume routing into it must match android's step-for-step.
+ *
+ * Resume here is GUARDED by the three irreversible-side-effect markers
+ * (`credentialsSaved`, `buildRequested`, `ciSecretsUploaded`). The router never
+ * returns a step that would re-fire a side-effect that already has its marker:
+ *   - no `buildRequested`  → land on the `ask-build` user gate (never auto-fire
+ *                            `requesting-build`, so resume can't double-build)
+ *   - `buildRequested` but no `ciSecretsUploaded` → land on the read-only
+ *                            `detecting-ci-secrets` (or `checking-ci-secrets`
+ *                            once a target is chosen) — never `uploading-ci-secrets`
+ *   - `ciSecretsUploaded`  → only the (idempotent) workflow-builder choice/input
+ *                            steps or the terminal `build-complete` remain
+ *
+ * Returns `null` when no tail marker is present, so `getIosResumeStep` keeps
+ * returning whatever `getResumeStep` derives (the terminal `saving-credentials`)
+ * exactly as before — legacy/in-flight progress files (which never carry these
+ * markers) are completely unaffected.
+ */
+function tailResumeStep(progress: OnboardingProgress): OnboardingStep | null {
+  const { completedSteps } = progress
+
+  // Tail not entered yet — let the caller fall through to `getResumeStep`.
+  if (!completedSteps.credentialsSaved)
+    return null
+
+  // Phase 6a — Build request. The post-save entry point is the `ask-build` user
+  // gate; the build itself fires only after the user confirms. Resuming onto the
+  // gate (not `requesting-build`) is what prevents a double build on resume.
+  if (!completedSteps.buildRequested)
+    return 'ask-build'
+
+  // Phase 6b — CI-secrets push. Not yet uploaded: route forward toward the
+  // upload without ever landing on the upload step itself.
+  if (!completedSteps.ciSecretsUploaded) {
+    // The user declined GitHub Actions → the `.env`-export leaf. Resume onto the
+    // export prompt until a path is recorded, then onto the (overwrite-safe)
+    // write effect.
+    if (progress.setupMode === 'declined')
+      return progress.envExportTargetPath ? 'exporting-env' : 'ask-export-env'
+
+    // A destination is already chosen (single-target auto-pick, the
+    // target-select screen, or a decided setupMode) → the remote check is the
+    // next read-only step before the confirm gate + upload.
+    if (progress.ciSecretTarget)
+      return 'checking-ci-secrets'
+
+    // Credentials saved + build queued but no CI work started yet → re-run the
+    // read-only detection. Idempotent: it only inspects the repo and routes.
+    return 'detecting-ci-secrets'
+  }
+
+  // Phase 6c — Post-upload. Secrets are pushed; only the workflow-builder sub-
+  // flow (with-workflow) or the terminal screen remain. None of these re-touch
+  // the remote, so routing by which choice is still missing is side-effect-safe.
+  if (progress.setupMode === 'with-workflow') {
+    if (!progress.selectedPackageManager)
+      return 'pick-package-manager'
+    if (!progress.buildScriptChoice)
+      return 'pick-build-script'
+    // Package manager + build script chosen → ready to (over)write the workflow
+    // file. `writing-workflow-file` writes with overwrite=true, so re-running it
+    // is safe.
+    return 'writing-workflow-file'
+  }
+
+  // secrets-only / declined-after-upload / GitLab → nothing left to do.
+  return 'build-complete'
+}
+
 export function getIosResumeStep(progress: OnboardingProgress | null): OnboardingStep {
   if (!progress)
     return 'welcome'
@@ -74,11 +154,22 @@ export function getIosResumeStep(progress: OnboardingProgress | null): Onboardin
   if (progress.pendingAppIdNext && !progress.appIdConfirmed)
     return 'confirm-app-id'
 
-  // Phases 2+ — create-new / import `.p8`-chain / cert / profile →
+  // Phase 2 — Post-save "tail" (shared with android, checked FIRST after the
+  // front gates exactly as `getAndroidResumeStep` checks it before the cred
+  // fork). `credentialsSaved` is the unambiguous "save already happened" marker:
+  // it means the whole cert/profile sequence finished and credentials.json was
+  // written, so we route THROUGH the tail (build-request → CI-secrets →
+  // env/workflow) instead of past the create-new / import `.p8` routing below.
+  // When the marker is absent (every legacy/in-flight progress file),
+  // `tailResumeStep` returns null and we fall through to `getResumeStep`, which
+  // still terminates at `saving-credentials` — so existing files are unaffected.
+  const tailStep = tailResumeStep(progress)
+  if (tailStep)
+    return tailStep
+
+  // Phases 3+ — create-new / import `.p8`-chain / cert / profile →
   // saving-credentials. Delegated VERBATIM to the existing partial resume so the
   // import app_store `verifying-key` round-trip (and every other already-tested
-  // branch) is preserved unchanged. BATCH 1 will interpose the shared-tail
-  // router before this fall-through; for now the terminal stays
-  // `saving-credentials`.
+  // branch) is preserved unchanged.
   return getResumeStep(progress)
 }

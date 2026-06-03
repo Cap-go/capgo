@@ -40,12 +40,26 @@ import type {
   OnboardingStep,
   ProfileData,
 } from '../types.js'
-import type { CiSecretEntry, CiSecretSetupAdvice, CiSecretTarget } from '../ci-secrets.js'
+import type { AsyncCommandRunner, CiSecretDiscovery, CiSecretEntry, CiSecretTarget, CommandRunner } from '../ci-secrets.js'
 import type { DiscoveredProfile, IdentityProfileMatch, SigningIdentity } from '../macos-signing.js'
 import type { MobileprovisionDetail } from '../../mobileprovision-parser.js'
+// Real helper-module types the tail-aligned IosEffectDeps signatures reference —
+// the SAME set tail/flow.ts imports, so `toTailDeps` maps the deps 1:1.
+import type { BuildCredentials } from '../../../schemas/build.js'
+import type { BuildLogger, BuildRequestOptions, BuildRequestResult } from '../../request.js'
+import type { EnvExportOpts, EnvExportResult } from '../env-export.js'
+import type { GeneratedWorkflow, WorkflowGeneratorOpts } from '../workflow-generator.js'
+import type { WorkflowWriteOptions, WorkflowWriteResult } from '../workflow-writer.js'
 // The post-save tail transient is shared with android — reuse it verbatim so the
 // `saving-credentials → ask-build` handoff (BATCH 1) threads the same fields.
-import type { TailTransient } from '../tail/flow.js'
+// BATCH 1 also delegates the WHOLE post-save tail (saving-credentials → ask-build
+// → CI-secrets → env/workflow → build-complete) to the platform-neutral shared
+// module via `toTailDeps` — exactly as android/flow.ts does — so the routing is
+// implemented once for both platforms.
+import type { TailEffectDeps, TailInput, TailStep, TailStepCtx, TailStepView, TailTransient } from '../tail/flow.js'
+import { applyTailInput, runTailEffect, tailViewForStep } from '../tail/flow.js'
+import { DEFAULT_P12_PASSWORD } from '../csr.js'
+import { getIosResumeStep } from './progress.js'
 
 // ─── Local structural helper types ───────────────────────────────────────────
 //
@@ -250,21 +264,26 @@ export interface IosEffectDeps {
   copyFile?: (src: string, dest: string) => Promise<void>
 
   // ── shared post-save tail helpers (wired through toTailDeps in BATCH 1) ──
-  // Reused verbatim from the android surface so the iOS engine can delegate the
-  // post-save tail to runTailEffect/tailViewForStep/applyTailInput. Left here as
-  // OPTIONAL so BATCH 0 widens the surface without wiring the dispatch yet.
-  createCiSecretEntries?: (credentials: Record<string, string>, apiKey?: string) => CiSecretEntry[]
-  detectCiSecretTargets?: () => { targets: CiSecretTarget[], advice: CiSecretSetupAdvice[] }
-  getCiSecretRepoLabelAsync?: (target: CiSecretTarget) => Promise<string | null>
-  listExistingCiSecretKeysAsync?: (target: CiSecretTarget, keys: string[]) => Promise<string[]>
+  // Reused from the android surface so the iOS engine can delegate the post-save
+  // tail to runTailEffect/tailViewForStep/applyTailInput. The signatures mirror
+  // the real helper modules VERBATIM (the same shapes TailEffectDeps expects) so
+  // `toTailDeps` maps them 1:1 with no coercion, exactly as android/flow.ts does.
+  createCiSecretEntries?: (credentials: Partial<BuildCredentials>, apiKey?: string) => CiSecretEntry[]
+  detectCiSecretTargets?: (runner?: CommandRunner) => CiSecretDiscovery
+  getCiSecretRepoLabelAsync?: (target: CiSecretTarget, runner?: AsyncCommandRunner) => Promise<string | null>
+  listExistingCiSecretKeysAsync?: (target: CiSecretTarget, keys: string[], runner?: AsyncCommandRunner) => Promise<string[]>
   uploadCiSecretsAsync?: (
     target: CiSecretTarget,
     entries: CiSecretEntry[],
     existingKeys?: string[],
+    runner?: AsyncCommandRunner,
     onProgress?: (current: number, total: number, keyName: string) => void,
   ) => Promise<void>
+  exportCredentialsToEnv?: (opts: EnvExportOpts) => EnvExportResult
   defaultExportPath?: (appId: string, platform: 'ios' | 'android') => string
-  requestBuildInternal?: (appId: string, options: Record<string, unknown>, silent?: boolean) => Promise<unknown>
+  generateWorkflow?: (opts: WorkflowGeneratorOpts) => GeneratedWorkflow
+  writeWorkflowFile?: (opts: WorkflowGeneratorOpts, writeOptions?: WorkflowWriteOptions) => WorkflowWriteResult
+  requestBuildInternal?: (appId: string, options: BuildRequestOptions, silent?: boolean, logger?: BuildLogger) => Promise<BuildRequestResult>
 
   /**
    * DRIVER-HELD transient tail state threaded back into each post-save effect.
@@ -286,6 +305,14 @@ export interface IosEffectDeps {
     certData?: CertificateData
     profileData?: ProfileData
     teamId?: string
+    /**
+     * Keychain export passphrase for the IMPORT path's .p12 (import-exporting).
+     * Transient only — the import-exporting effect never persists it, so the
+     * saving-credentials handoff reads it from carried. Absent on the create-new
+     * path (which uses the well-known DEFAULT_P12_PASSWORD) and on a crash-recovery
+     * resume that lost the in-memory state.
+     */
+    importedP12Password?: string
   }
 
   // ── callbacks (optional — callers that don't need streaming can omit) ────
@@ -303,40 +330,258 @@ export interface IosEffectResult {
   transient?: Partial<IosStepCtx>
 }
 
-// ─── Stubs (to be filled in later batches) ──────────────────────────────────────
+// ─── Post-save tail delegation (BATCH 1) ────────────────────────────────────
+//
+// The post-save tail (saving-credentials → ask-build → CI-secrets → env/workflow
+// → build-complete) is platform-NEUTRAL and already implemented once in
+// `../tail/flow.js`. The iOS engine delegates to it exactly as android does:
+//   - runIosEffect      → runTailEffect       for steps in TAIL_EFFECT_STEPS
+//   - iosViewForStep    → tailViewForStep      for steps in TAIL_VIEW_STEPS
+//   - applyIosInput     → applyTailInput       for steps in TAIL_INPUT_STEPS
+// `toTailDeps(iosDeps)` adapts the iOS effect deps to the neutral TailEffectDeps,
+// supplying the iOS credential SHAPE (cert/profile/teamId/p12) + the iOS resume
+// resolver. The neutral view maps 1:1 back onto IosStepView. The step-id sets are
+// the SAME ids android uses (the shared TailStep union), echoed as OnboardingStep.
 
 /**
- * Build the view-model for a given step. Stub: returns a minimal placeholder
- * 'auto' view echoing the step. Real per-step views land in later batches.
+ * Post-save tail steps whose EFFECT the iOS engine delegates to the shared
+ * module. INCLUDES saving-credentials (the convergence point) so the
+ * saving-credentials → ask-build handoff (transient: ciSecretEntries,
+ * savedCredentials) is owned by the shared tail. EXCLUDES ai-analysis-*
+ * (TUI-only) and every iOS-specific provisioning effect.
+ */
+const TAIL_EFFECT_STEPS = new Set<OnboardingStep>([
+  'saving-credentials',
+  'detecting-ci-secrets',
+  'checking-ci-secrets',
+  'uploading-ci-secrets',
+  'exporting-env',
+  'overwrite-and-export-env',
+  'writing-workflow-file',
+  'requesting-build',
+])
+
+const TAIL_VIEW_STEPS = new Set<OnboardingStep>([
+  'ci-secrets-setup',
+  'ci-secrets-target-select',
+  'ask-ci-secrets',
+  'confirm-ci-secret-overwrite',
+  'ci-secrets-failed',
+  'ask-github-actions-setup',
+  'confirm-secrets-push',
+  'ask-export-env',
+  'confirm-env-export-overwrite',
+  'pick-package-manager',
+  'pick-build-script',
+  'pick-build-script-custom',
+  'preview-workflow-file',
+  'view-workflow-diff',
+  'ask-build',
+  'build-complete',
+])
+
+const TAIL_INPUT_STEPS = new Set<OnboardingStep>([
+  'ci-secrets-target-select',
+  'ask-github-actions-setup',
+  'ask-export-env',
+  'pick-package-manager',
+  'pick-build-script',
+  'pick-build-script-custom',
+])
+
+/**
+ * Build the iOS saved-credential SHAPE written at `saving-credentials`.
+ * Replicates the iOS TUI's `doSaveCredentials` map (ui/app.tsx) so the shared
+ * tail stays platform-neutral while iOS owns its field set. Reads the resolved
+ * cert/profile/team payloads from the driver's `carried` transient (the IMPORT
+ * path synthesizes them transiently) and falls back to the persisted
+ * create-new `completedSteps.certificateCreated/profileCreated` markers. Throws
+ * on missing inputs — the same fail-fast guard the android builder uses.
+ */
+function buildIosSavedCredentials(progress: OnboardingProgress, deps: IosEffectDeps): Record<string, string> {
+  const carried = deps.carried
+  const certData = carried?.certData ?? progress.completedSteps.certificateCreated
+  const profileData = carried?.profileData ?? progress.completedSteps.profileCreated
+  if (!certData)
+    throw new Error('iOS certificate not provisioned')
+  if (!profileData)
+    throw new Error('iOS provisioning profile not created')
+
+  const teamId = carried?.teamId ?? certData.teamId
+  if (!teamId)
+    throw new Error('iOS team id missing')
+
+  // Import path uses the random keychain-export passphrase; create-new uses the
+  // well-known DEFAULT_P12_PASSWORD that csr.ts's createP12 produces.
+  const isImport = progress.setupMethod === 'import-existing'
+  const p12Password = isImport && carried?.importedP12Password ? carried.importedP12Password : DEFAULT_P12_PASSWORD
+
+  // The provisioning_map key is the resolved iOS bundle id (override when the
+  // user confirmed a different one), matching what the build system looks up by
+  // PRODUCT_BUNDLE_IDENTIFIER at sign time.
+  const provisioningBundleId = progress.iosBundleIdOverride || progress.appId
+  const provisioningMap: Record<string, { profile: string, name: string }> = {
+    [provisioningBundleId]: {
+      profile: profileData.profileBase64,
+      name: profileData.profileName,
+    },
+  }
+
+  const distribution = isImport ? (progress.importDistribution || 'app_store') : 'app_store'
+
+  return {
+    BUILD_CERTIFICATE_BASE64: certData.p12Base64,
+    P12_PASSWORD: p12Password,
+    CAPGO_IOS_PROVISIONING_MAP: JSON.stringify(provisioningMap),
+    APP_STORE_CONNECT_TEAM_ID: teamId,
+    CAPGO_IOS_DISTRIBUTION: distribution,
+  }
+}
+
+/**
+ * Lossy fallback used when the driver did not thread the saved-credential map
+ * through `carried` (a crash-recovery resume that lost the in-memory state).
+ * Rebuilds ONLY from the persisted create-new `completedSteps` markers; the
+ * IMPORT path's exported cert/profile are synthesized-and-transient (never
+ * persisted), so an imported export cannot be rebuilt here — those resumes
+ * restart the import export sub-flow from import-scanning. Returns {} when not
+ * rebuildable (matching the android lossy-rebuild contract).
+ */
+function rebuildIosTailCredentials(progress: OnboardingProgress): Record<string, string> {
+  const certData = progress.completedSteps.certificateCreated
+  const profileData = progress.completedSteps.profileCreated
+  if (!certData || !profileData || !certData.teamId)
+    return {}
+
+  const provisioningBundleId = progress.iosBundleIdOverride || progress.appId
+  const provisioningMap: Record<string, { profile: string, name: string }> = {
+    [provisioningBundleId]: {
+      profile: profileData.profileBase64,
+      name: profileData.profileName,
+    },
+  }
+  const distribution = progress.setupMethod === 'import-existing' ? (progress.importDistribution || 'app_store') : 'app_store'
+
+  return {
+    BUILD_CERTIFICATE_BASE64: certData.p12Base64,
+    P12_PASSWORD: DEFAULT_P12_PASSWORD,
+    CAPGO_IOS_PROVISIONING_MAP: JSON.stringify(provisioningMap),
+    APP_STORE_CONNECT_TEAM_ID: certData.teamId,
+    CAPGO_IOS_DISTRIBUTION: distribution,
+  }
+}
+
+/**
+ * Adapt the iOS effect deps to the platform-neutral TailEffectDeps. The shared
+ * tail module owns the routing/branching; iOS supplies its platform tag, its
+ * credential SHAPE (closure-bound over `deps.carried` so the import path's
+ * transient cert/profile/p12 reach the builder), its lossy rebuild, and its
+ * resume resolver, plus the same injected helpers (passed straight through).
+ * Mirrors android/flow.ts's toTailDeps 1:1.
+ */
+function toTailDeps(deps: IosEffectDeps): TailEffectDeps<OnboardingProgress> {
+  return {
+    platform: 'ios',
+    buildSavedCredentials: progress => buildIosSavedCredentials(progress, deps),
+    rebuildTailCredentials: rebuildIosTailCredentials,
+    resumeStep: getIosResumeStep,
+    updateSavedCredentials: deps.updateSavedCredentials!,
+    loadProgress: deps.loadProgress!,
+    saveProgress: deps.saveProgress!,
+    deleteProgress: deps.deleteProgress!,
+    createCiSecretEntries: deps.createCiSecretEntries,
+    detectCiSecretTargets: deps.detectCiSecretTargets,
+    getCiSecretRepoLabelAsync: deps.getCiSecretRepoLabelAsync,
+    listExistingCiSecretKeysAsync: deps.listExistingCiSecretKeysAsync,
+    uploadCiSecretsAsync: deps.uploadCiSecretsAsync,
+    exportCredentialsToEnv: deps.exportCredentialsToEnv,
+    defaultExportPath: deps.defaultExportPath,
+    generateWorkflow: deps.generateWorkflow,
+    writeWorkflowFile: deps.writeWorkflowFile,
+    requestBuildInternal: deps.requestBuildInternal,
+    carried: deps.carried,
+    onStatus: deps.onStatus,
+    onLog: deps.onLog,
+    signal: deps.signal,
+  }
+}
+
+/** Map the shared TailStepView back onto IosStepView (same field shape). */
+function mapTailViewToIosStepView(v: TailStepView, step: OnboardingStep): IosStepView {
+  return {
+    step,
+    kind: v.kind,
+    title: v.title,
+    prompt: v.prompt,
+    collect: v.collect,
+    options: v.options,
+    message: v.message,
+  }
+}
+
+// ─── Engine surface (tail-wired; non-tail steps remain stubs) ───────────────────
+
+/**
+ * Build the view-model for a given step. Post-save tail steps delegate to the
+ * shared neutral view (adapted back to IosStepView); all other steps return a
+ * minimal placeholder 'auto' view echoing the step (real per-step views land in
+ * later batches).
  */
 export function iosViewForStep(
   step: OnboardingStep,
-  _progress: OnboardingProgress,
-  _ctx?: IosStepCtx,
+  progress: OnboardingProgress,
+  ctx?: IosStepCtx,
 ): IosStepView {
+  // Post-save tail: delegate to the shared platform-neutral view. IosStepCtx is
+  // a superset of TailStepCtx, so it threads straight through.
+  if (TAIL_VIEW_STEPS.has(step))
+    return mapTailViewToIosStepView(tailViewForStep(step as TailStep, progress, (ctx ?? {}) as TailStepCtx), step)
+
   return { step, kind: 'auto', title: step }
 }
 
 /**
- * Apply a user input to progress. Stub: returns progress unchanged. Real
- * per-step mutations land in later batches.
+ * Apply a user input to progress. Post-save tail choice/input steps delegate
+ * the reducer to the shared neutral module; all other steps return progress
+ * unchanged (real per-step mutations land in later batches).
  */
 export function applyIosInput(
-  _step: OnboardingStep,
+  step: OnboardingStep,
   progress: OnboardingProgress,
-  _input: unknown,
+  input: unknown,
 ): OnboardingProgress {
+  // Post-save tail: delegate the tail choice/input reducers to the shared
+  // platform-neutral module. The iOS tail input variants are structurally
+  // identical to TailInput, so they thread straight through.
+  if (TAIL_INPUT_STEPS.has(step))
+    return applyTailInput(step as TailStep, progress, input as TailInput)
+
   return progress
 }
 
 /**
- * Run the async side-effect for a step. Stub: not implemented yet — the real
- * Apple-API / keychain / build effects land in later batches.
+ * Run the async side-effect for a step. Post-save tail steps (incl.
+ * saving-credentials) delegate to the shared neutral module via toTailDeps; the
+ * neutral result maps 1:1 onto IosEffectResult (next is a wider OnboardingStep;
+ * transient is a subset of IosStepCtx). All other steps are not implemented yet
+ * — the real Apple-API / keychain / build effects land in later batches.
  */
-export function runIosEffect(
-  _step: OnboardingStep,
-  _progress: OnboardingProgress,
-  _deps: IosEffectDeps,
+export async function runIosEffect(
+  step: OnboardingStep,
+  progress: OnboardingProgress,
+  deps: IosEffectDeps,
 ): Promise<IosEffectResult> {
-  throw new Error('runIosEffect: not implemented')
+  // Post-save tail: delegate to the platform-neutral shared module. The tail
+  // routing/branching/transient-threading lives there once for ios + android;
+  // iOS supplies its platform tag + credential SHAPE via toTailDeps.
+  if (TAIL_EFFECT_STEPS.has(step)) {
+    const result = await runTailEffect(step as TailStep, progress, toTailDeps(deps))
+    return {
+      progress: result.progress,
+      next: result.next as OnboardingStep | undefined,
+      transient: result.transient,
+    }
+  }
+
+  throw new Error(`runIosEffect: not implemented for step '${step}'`)
 }
