@@ -49,7 +49,8 @@ import { getBuildOnboardingRecoveryAdvice } from '../recovery.js'
 import { createCiSecretEntries, detectCiSecretTargets, getCiSecretRepoLabelAsync, getCiSecretTargetLabel, listExistingCiSecretKeysAsync, uploadCiSecretsAsync } from '../ci-secrets.js'
 import type { CiSecretEntry, CiSecretSetupAdvice, CiSecretTarget } from '../ci-secrets.js'
 import { defaultExportPath, exportCredentialsToEnv } from '../env-export.js'
-import { trackBuilderOnboardingStep } from '../telemetry.js'
+import type { BuilderOnboardingAction } from '../telemetry.js'
+import { trackBuilderOnboardingAction, trackBuilderOnboardingStep } from '../telemetry.js'
 import { writeWorkflowFile, WORKFLOW_PATH } from '../workflow-writer.js'
 import type { BuildScriptChoice, PackageManager } from '../workflow-generator.js'
 import type { BuildCredentials } from '../../../schemas/build.js'
@@ -286,6 +287,11 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
     durationStep?: OnboardingStep
     errorCategory?: OnboardingErrorCategory
   }>>([])
+  const pendingActionTelemetryRef = useRef<Array<{
+    step: OnboardingStep
+    action: BuilderOnboardingAction
+    tags?: Record<string, boolean | number | string>
+  }>>([])
   const [resolvedOrgId, setResolvedOrgId] = useState<string | null>(null)
   const resolvedApiKeyRef = useRef<string | null>(apikey ?? null)
   const orgIdResolvedRef = useRef(false)
@@ -500,6 +506,18 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
       }
       pendingTelemetryRef.current = []
     }
+    if (resolvedOrgId && pendingActionTelemetryRef.current.length > 0) {
+      for (const queued of pendingActionTelemetryRef.current) {
+        void trackBuilderOnboardingAction({
+          apikey: resolvedApiKeyRef.current,
+          appId,
+          orgId: resolvedOrgId,
+          platform: 'ios',
+          ...queued,
+        })
+      }
+      pendingActionTelemetryRef.current = []
+    }
 
     // (2) Now safely skip the duplicate-step path.
     if (isDuplicateStep)
@@ -539,6 +557,35 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
     }
   }, [step, appId, resolvedOrgId, error])
 
+  // Emit a named "Builder Onboarding Action" event (distinct from the per-step
+  // funnel). Mirrors the Android helper: fires immediately once the org id is
+  // resolved, otherwise buffers until the resolver lands (drained in the
+  // telemetry effect above). Never throws — telemetry must not break the wizard.
+  const trackAction = useCallback(
+    (
+      action: BuilderOnboardingAction,
+      tags?: Record<string, boolean | number | string>,
+      actionStep: OnboardingStep = step,
+    ): void => {
+      if (!resolvedApiKeyRef.current)
+        return
+
+      const payload = { step: actionStep, action, tags }
+      if (resolvedOrgId) {
+        void trackBuilderOnboardingAction({
+          apikey: resolvedApiKeyRef.current,
+          appId,
+          orgId: resolvedOrgId,
+          platform: 'ios',
+          ...payload,
+        })
+      }
+      else {
+        pendingActionTelemetryRef.current.push(payload)
+      }
+    },
+    [appId, resolvedOrgId, step],
+  )
   const [teamId, setTeamId] = useState(initialProgress?.completedSteps.certificateCreated?.teamId || '')
   const [certData, setCertData] = useState<CertificateData | null>(initialProgress?.completedSteps.certificateCreated || null)
   const [profileData, setProfileData] = useState<ProfileData | null>(initialProgress?.completedSteps.profileCreated || null)
@@ -2859,6 +2906,11 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
                 { label: '🔄  Restart onboarding (wipe saved progress)', value: 'restart' },
               ]}
               onChange={async (value) => {
+                // Record which branch the user took. The funnel already shows
+                // the resume-prompt step + the next step (welcome on restart,
+                // the resume target on continue), but the explicit choice tag
+                // gives a clean continue-vs-restart split without inferring it.
+                trackAction('resume_prompt_decision', { choice: value })
                 if (value === 'continue') {
                   // Now that the user has committed to picking up where
                   // they left off, replay the breadcrumb log so they see

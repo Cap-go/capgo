@@ -208,8 +208,16 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
   const { exit } = useApp()
   const startStep: AndroidOnboardingStep = getAndroidResumeStep(initialProgress)
 
+  // When there's saved progress AND the resume target isn't trivially 'welcome',
+  // land on the resume-prompt fork so the user can see what's saved and decide
+  // whether to continue or restart from scratch — instead of being silently
+  // teleported to the middle of the wizard with no chance to bail out cleanly.
+  // The trivial case (no progress, or resume target is welcome) keeps the
+  // existing zero-friction path.
   const [step, setStep] = useState<AndroidOnboardingStep>(
-    startStep === 'welcome' ? 'welcome' : startStep,
+    initialProgress !== null && startStep !== 'welcome'
+      ? 'resume-prompt'
+      : startStep,
   )
 
   // Telemetry: resolve org id once + emit per-step events
@@ -743,7 +751,16 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
     [persist],
   )
 
-  useEffect(() => {
+  // Re-emit the breadcrumb entries the user "earned" before this session — the
+  // partial keystore inputs (path / alias / store + key password) and the
+  // completed-phase markers (sign-in, Play account, GCP project, package, SA).
+  // Wrapped in a useCallback so both the mount-time path AND the resume-prompt
+  // "Continue" handler can call it. We DON'T want this firing while the user is
+  // still on the resume-prompt screen — the side log would fill with stale
+  // entries BEFORE the user has chosen Continue vs Restart, and picking Restart
+  // would leave those entries dangling next to a fresh wizard. addLog's
+  // consecutive-dedupe protects against accidental double calls.
+  const hydrateCompletedLog = useCallback(() => {
     if (!initialProgress)
       return
     const { completedSteps } = initialProgress
@@ -802,7 +819,77 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
       addLog(`✔ Service account — ${completedSteps.serviceAccountProvisioned.email}`)
     if (completedSteps.playInviteProvisioned)
       addLog(`✔ Service account invited to Play Console`)
+  }, [initialProgress, addLog])
+
+  // Mount-time hydration. Suppressed when the initial step is the resume-prompt
+  // fork — that path defers hydration to the user's explicit Continue choice
+  // (see the resume-prompt onChange below). The trivial-progress paths
+  // (welcome / no progress) still hydrate here so any partial input the user
+  // had keeps its breadcrumb.
+  const skipMountHydrationRef = useRef(step === 'resume-prompt')
+  useEffect(() => {
+    if (skipMountHydrationRef.current)
+      return
+    hydrateCompletedLog()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  /**
+   * Reset everything for a fresh-start onboarding pass. Called from the
+   * resume-prompt restart handler (mount-time "start over" branch).
+   *
+   * Wipes the on-disk progress file AND every piece of in-memory state that
+   * could otherwise leak across into the next attempt (keystore inputs +
+   * outputs, the service-account fork choice and imported JSON path, OAuth
+   * tokens, the chosen Play account / GCP project / Android package, and the
+   * provisioning outputs). Does NOT addLog or setStep — the caller picks the
+   * user-facing message and the next step.
+   */
+  const resetForFreshStart = useCallback(async () => {
+    await deleteAndroidProgress(appId).catch(() => { /* best-effort */ })
+    // Phase 1 — keystore inputs + outputs
+    setKeystoreMethod(null)
+    setKeystorePathMode('choose')
+    setKeystoreExistingPath('')
+    setKeystoreAlias('')
+    setKeystoreStorePassword('')
+    setKeystoreKeyPassword('')
+    setKeystoreCommonName('')
+    setKeystoreReady(null)
+    setKeystoreBase64('')
+    setRandomPasswordGenerated(false)
+    setDetectedAliases([])
+    setKeyPasswordProbe(null)
+    keyPasswordProbeRef.current = false
+    // Phase 2 — service-account fork
+    setServiceAccountMethod(null)
+    setSaJsonPathMode('choose')
+    setServiceAccountJsonPath('')
+    setSaValidationResult(null)
+    // Phase 2b — Google sign-in / OAuth
+    setGoogleSignIn(null)
+    setAccessToken('')
+    setRefreshTokenState('')
+    setOauthClientId('')
+    setOauthStatusMessages([])
+    setShowOAuthLearnMore(false)
+    // Phase 3 — Play developer account
+    setPlayAccountChoice(null)
+    setPlayDevIdMode('actions')
+    // Phase 4 — GCP project
+    setGcpProjects([])
+    setGcpProjectChoice(null)
+    setNewProjectDisplayName('')
+    // Phase 4.5 — Android package
+    setAndroidPackageChoice(null)
+    setDetectedPackageIds([])
+    setPackageSelectMode('choose')
+    packageLoadedRef.current = false
+    // Phase 5 — provisioning outputs
+    setServiceAccountProvisioned(null)
+    setPlayInviteProvisioned(null)
+    setServiceAccountKeyBase64('')
+  }, [appId])
 
   const handleError = useCallback(
     (err: unknown, failedStep: AndroidOnboardingStep) => {
@@ -907,7 +994,15 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
           const existing = await loadSavedCredentials(appId)
           if (cancelled)
             return
-          if (existing?.android && !initialProgress)
+          // NB: do NOT gate this on `!initialProgress`. The welcome step is
+          // only reached via the trivial-welcome resume case or the
+          // resume-prompt Restart handler — never during an actual resume
+          // (that routes resume-prompt → startStep directly). Gating on the
+          // stale, still-non-null `initialProgress` prop would send a Restart
+          // straight to keystore-method-select and silently overwrite existing
+          // saved credentials without offering the backup flow. Mirror iOS
+          // (cli/src/build/onboarding/ui/app.tsx) and check creds only.
+          if (existing?.android)
             setStep('credentials-exist')
           else
             setStep('keystore-method-select')
@@ -2180,6 +2275,109 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
         </Box>
       )}
 
+      {/* Resume-or-restart prompt — only reachable when initialProgress is
+          non-null AND getAndroidResumeStep didn't resolve to 'welcome'. The
+          initial step useState above wires this branch. */}
+      {step === 'resume-prompt' && initialProgress && (() => {
+        const { startedAt, keystoreMethod, serviceAccountMethod, completedSteps } = initialProgress
+        // Defensive date parse: legacy / corrupted progress files can carry an
+        // unparseable startedAt — show the raw string with a dim suffix instead
+        // of crashing the wizard.
+        let whenLabel: string
+        try {
+          const d = new Date(startedAt)
+          if (Number.isNaN(d.getTime()))
+            throw new Error('NaN')
+          whenLabel = d.toLocaleString()
+        }
+        catch {
+          whenLabel = `${startedAt} (could not parse)`
+        }
+        const keystoreLabel = keystoreMethod === 'existing'
+          ? 'Import existing keystore'
+          : keystoreMethod === 'generate' ? 'Generate new keystore' : 'Not chosen yet'
+        const saLabel = serviceAccountMethod === 'existing'
+          ? 'Import existing JSON'
+          : serviceAccountMethod === 'generate' ? 'Create via Google' : null
+        const keystoreReady = Boolean(completedSteps.keystoreReady)
+        const androidPackage = completedSteps.androidPackageChosen
+        // The service-account fork governs which downstream breadcrumbs make
+        // sense. On the import path the user never signs in with Google or
+        // picks a GCP project, so surfacing "Signed in with Google: No" there
+        // is misleading — only show the OAuth-path lines once the user is
+        // actually on (or has made progress along) that path. The import line
+        // likewise only shows on the import path. Before either is chosen we
+        // show neither, so a user who's about to auto-import isn't told they
+        // haven't done OAuth steps that don't apply to them.
+        const onImportPath = serviceAccountMethod === 'existing'
+        const onOAuthPath = serviceAccountMethod === 'generate' || hasAnyOAuthProgress(initialProgress)
+        const signedIn = completedSteps.googleSignInComplete
+        const playAccount = completedSteps.playAccountChosen
+        const gcpProject = completedSteps.gcpProjectChosen
+        const saProvisioned = completedSteps.serviceAccountProvisioned
+        const resumeLabel = getAndroidPhaseLabel(startStep) || startStep
+        return (
+          <Box flexDirection="column" marginTop={1} gap={1}>
+            <Text bold color="cyan">{`↩️  Found in-progress onboarding for ${appId}`}</Text>
+            <Text>Pick up where you left off, or start over from the welcome step.</Text>
+            <Box flexDirection="column">
+              <Text>{`•  Started: ${whenLabel}`}</Text>
+              <Text>{`•  Keystore method: ${keystoreLabel}`}</Text>
+              {saLabel && <Text>{`•  Service account method: ${saLabel}`}</Text>}
+              <Text>{`•  Keystore ready: ${keystoreReady ? `Yes (${completedSteps.keystoreReady!.keystorePath})` : 'No'}`}</Text>
+              {onImportPath && (
+                <Text>{`•  Service account JSON: ${initialProgress.serviceAccountJsonPath ? `selected (${initialProgress.serviceAccountJsonPath})` : 'not selected yet'}`}</Text>
+              )}
+              {onOAuthPath && (
+                <Text>{`•  Signed in with Google: ${signedIn ? `Yes (${signedIn.email})` : 'No'}`}</Text>
+              )}
+              {onOAuthPath && (
+                <Text>{`•  Play Developer account: ${playAccount ? `Yes (${playAccount.displayName || playAccount.developerId})` : 'No'}`}</Text>
+              )}
+              {onOAuthPath && (
+                <Text>{`•  GCP project: ${gcpProject ? `Yes (${gcpProject.displayName})` : 'No'}`}</Text>
+              )}
+              {(onImportPath || onOAuthPath) && (
+                <Text>{`•  Android package: ${androidPackage ? `Yes (${androidPackage.packageName})` : 'No'}`}</Text>
+              )}
+              {onOAuthPath && (
+                <Text>{`•  Service account provisioned: ${saProvisioned ? `Yes (${saProvisioned.email})` : 'No'}`}</Text>
+              )}
+              <Text dimColor>{`•  Resume target: ${resumeLabel}`}</Text>
+            </Box>
+            <Select
+              options={[
+                { label: '▶️  Continue from where I left off', value: 'continue' },
+                { label: '🔄  Restart onboarding (wipe saved progress)', value: 'restart' },
+              ]}
+              onChange={async (value) => {
+                // @inkjs/ui re-fire guard — see selectFiredRef JSDoc.
+                if (selectFiredRef.current)
+                  return
+                selectFiredRef.current = true
+                // Record which branch the user took. The funnel already shows
+                // the resume-prompt step + the next step (welcome on restart,
+                // the resume target on continue), but the explicit choice tag
+                // gives a clean continue-vs-restart split without inferring it.
+                trackAction('resume_prompt_decision', { choice: value })
+                if (value === 'continue') {
+                  // Now that the user has committed to picking up where they
+                  // left off, replay the breadcrumb log so they see the
+                  // in-progress state they're resuming into. Held back at
+                  // mount so the resume-prompt screen itself wasn't surrounded
+                  // by stale "✔ …" entries while they were still deciding.
+                  hydrateCompletedLog()
+                  setStep(startStep)
+                  return
+                }
+                await resetForFreshStart()
+                addLog('↩️  Restarted — fresh start', 'yellow')
+                setStep('welcome')
+              }}
+            />
+          </Box>
+        )
+      })()}
       {step === 'welcome' && <WelcomeStep />}
 
       {step === 'no-platform' && <NoPlatformStep androidDir={androidDir} dense={false} />}
