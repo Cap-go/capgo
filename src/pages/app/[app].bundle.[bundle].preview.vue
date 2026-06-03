@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { Database } from '~/types/supabase.types'
+import { Capacitor } from '@capacitor/core'
 import { ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
@@ -19,6 +20,7 @@ const id = ref<number>(0)
 const loading = ref(true)
 const version = ref<Database['public']['Tables']['app_versions']['Row']>()
 const app = ref<Database['public']['Tables']['apps']['Row']>()
+const isNativePlatform = Capacitor.isNativePlatform()
 
 // Preview states
 type PreviewState = 'loading' | 'no-manifest' | 'preview-disabled' | 'encrypted' | 'ready'
@@ -81,6 +83,11 @@ function determinePreviewState() {
   // Check if preview is disabled for the app
   if (!app.value.allow_preview) {
     previewState.value = 'preview-disabled'
+    return
+  }
+
+  if (isNativePlatform) {
+    previewState.value = 'ready'
     return
   }
 
@@ -176,7 +183,7 @@ watchEffect(async () => {
     </div>
 
     <!-- Ready State - Show Preview -->
-    <div v-else-if="previewState === 'ready'" class="w-full h-full">
+    <div v-else-if="previewState === 'ready'" class="h-full min-h-0 w-full overflow-y-auto">
       <BundlePreviewFrame
         :app-id="packageId"
         :version-id="id"

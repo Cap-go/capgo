@@ -19,8 +19,9 @@ const config: CapacitorConfig = {
     },
     CapacitorUpdater: {
       shakeMenu: true,
+      allowPreview: true,
+      autoUpdate: 'atInstall',
       autoSplashscreen: true,
-      directUpdate: 'atInstall',
       version: pkg.version,
     },
   },

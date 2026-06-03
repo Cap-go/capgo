@@ -1,18 +1,25 @@
 <script setup lang="ts">
+import { Capacitor } from '@capacitor/core'
 import { toSvg } from 'better-qr'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useRouter } from 'vue-router'
 import IconExternalLink from '~icons/lucide/external-link'
+import IconPlay from '~icons/lucide/play'
 import IconSmartphone from '~icons/lucide/smartphone'
+import { buildBundlePreviewDeepLink, buildChannelPreviewDeepLink } from '~/services/previewLinks'
 import { buildChannelPreviewSubdomain, buildPreviewSubdomain } from '../../shared/preview-subdomain.ts'
 
 const props = defineProps<{
   appId: string
   versionId?: number
   channelId?: number
+  channelName?: string
 }>()
 
 const { t } = useI18n()
+const router = useRouter()
+const isNativePlatform = Capacitor.isNativePlatform()
 
 // Device configurations
 const devices = {
@@ -86,19 +93,41 @@ const previewUrl = computed<string | null>(() => {
   }
 })
 
+const qrCodeUrl = computed<string | null>(() => {
+  if (!previewUrl.value)
+    return null
+
+  if (typeof props.channelId === 'number' && props.channelName) {
+    return buildChannelPreviewDeepLink({
+      appId: props.appId,
+      channelId: props.channelId,
+      channelName: props.channelName,
+    })
+  }
+
+  if (typeof props.versionId === 'number') {
+    return buildBundlePreviewDeepLink({
+      appId: props.appId,
+      versionId: props.versionId,
+    })
+  }
+
+  return previewUrl.value
+})
+
 function svgToDataUrl(svg: string): string {
   return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`
 }
 
 // Generate QR code linking to the preview URL
 function generateQRCode() {
-  if (!previewUrl.value) {
+  if (isNativePlatform || !qrCodeUrl.value) {
     qrCodeDataUrl.value = ''
     return
   }
 
   try {
-    qrCodeDataUrl.value = svgToDataUrl(toSvg(previewUrl.value, {
+    qrCodeDataUrl.value = svgToDataUrl(toSvg(qrCodeUrl.value, {
       margin: 2,
       moduleSize: 4,
       foreground: '#000000',
@@ -111,17 +140,41 @@ function generateQRCode() {
 }
 
 // Watch for URL changes to regenerate QR
-watch(previewUrl, generateQRCode)
+watch(qrCodeUrl, generateQRCode)
 
 function openExternal() {
   if (!previewUrl.value)
     return
   window.open(previewUrl.value, '_blank')
 }
+
+async function startNativePreview() {
+  if (!qrCodeUrl.value)
+    return
+
+  await router.push({
+    path: '/scan',
+    query: { preview: qrCodeUrl.value },
+  })
+}
 </script>
 
 <template>
-  <div class="relative w-full h-full p-4 md:p-8">
+  <div
+    v-if="isNativePlatform"
+    class="flex min-h-[calc(100dvh-8rem)] w-full items-center justify-center px-4 py-6"
+  >
+    <button
+      class="inline-flex min-h-12 w-full max-w-xs items-center justify-center gap-2 rounded-xl bg-blue-500 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-500/20 transition-colors hover:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-60"
+      :disabled="!qrCodeUrl"
+      @click="startNativePreview"
+    >
+      <IconPlay class="h-5 w-5" />
+      {{ t('start-preview') }}
+    </button>
+  </div>
+
+  <div v-else class="relative min-h-[calc(100dvh-8rem)] w-full overflow-y-auto px-3 py-4 md:px-6 md:py-6">
     <!-- Open in external button -->
     <button
       class="absolute z-10 p-2 transition-colors bg-white rounded-lg shadow-lg top-4 right-4 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700"
@@ -133,9 +186,9 @@ function openExternal() {
     </button>
 
     <!-- Main content container -->
-    <div class="flex items-center justify-center h-full gap-8">
+    <div class="grid min-h-full items-start gap-5 lg:grid-cols-[minmax(0,1fr)_16rem]">
       <!-- Device frame -->
-      <div class="flex flex-col items-center">
+      <div class="flex min-w-0 flex-col items-center">
         <!-- Device selector -->
         <div class="flex items-center gap-2 mb-4">
           <button
@@ -162,11 +215,11 @@ function openExternal() {
 
         <!-- Phone frame -->
         <div
-          class="relative p-3 bg-gray-900 shadow-2xl"
+          class="relative max-w-full p-3 bg-gray-900 shadow-2xl"
           :class="currentDevice.frameClass"
           :style="{
             width: `${currentDevice.width + 24}px`,
-            height: `${Math.min(currentDevice.height + 24, 700)}px`,
+            height: `min(${Math.min(currentDevice.height + 24, 700)}px, calc(100dvh - 13rem))`,
           }"
         >
           <!-- Notch (for iPhone) -->
@@ -198,12 +251,12 @@ function openExternal() {
       <!-- QR Code section (desktop only) -->
       <div
         v-if="!isMobile && qrCodeDataUrl"
-        class="flex flex-col items-center p-6 bg-white shadow-lg dark:bg-gray-800 rounded-xl"
+        class="sticky top-4 flex w-full flex-col items-center rounded-xl bg-white p-5 shadow-lg dark:bg-gray-800"
       >
         <img
           :src="qrCodeDataUrl"
           alt="QR Code to preview on phone"
-          class="mb-3 w-36 h-36"
+          class="mb-3 h-44 w-44"
         >
         <p class="text-sm text-center text-gray-600 dark:text-gray-400 max-w-40">
           {{ t('scan-qr-to-preview') }}
