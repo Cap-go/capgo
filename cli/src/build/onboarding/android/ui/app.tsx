@@ -458,10 +458,10 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
   const [keystoreStorePassword, setKeystoreStorePassword] = useState(initialProgress?.keystoreStorePassword || '')
   const [keystoreKeyPassword, setKeystoreKeyPassword] = useState(initialProgress?.keystoreKeyPassword || '')
   const [, setKeystoreCommonName] = useState(initialProgress?.keystoreCommonName || '')
-  const [keystoreReady, setKeystoreReady] = useState<KeystoreReady | null>(
-    initialProgress?.completedSteps.keystoreReady || null,
-  )
-  const [keystoreBase64, setKeystoreBase64] = useState(initialProgress?._keystoreBase64 || '')
+  // Plan 3.3: keystoreReady / _keystoreBase64 are no longer mirrored in React
+  // state — doSaveCredentials reads them straight from the freshly-loaded
+  // on-disk progress (the single source of truth). They're still persisted to
+  // progress.json by the keystore effects/handlers below.
   const [randomPasswordGenerated, setRandomPasswordGenerated] = useState(false)
   const [detectedAliases, setDetectedAliases] = useState<string[]>([])
   /** Phase 1.5 — key-password auto-skip probe. `null` = haven't decided yet,
@@ -530,9 +530,9 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
   const [, setPlayInviteProvisioned] = useState<PlayInviteProvisioned | null>(
     initialProgress?.completedSteps.playInviteProvisioned || null,
   )
-  const [serviceAccountKeyBase64, setServiceAccountKeyBase64] = useState<string>(
-    initialProgress?._serviceAccountKeyBase64 || '',
-  )
+  // Plan 3.3: _serviceAccountKeyBase64 is no longer mirrored in React state —
+  // doSaveCredentials reads it from the freshly-loaded on-disk progress. It's
+  // still persisted to progress.json by the SA effects/handlers below.
 
   // Phase 6 — build output
   const [buildUrl, setBuildUrl] = useState('')
@@ -891,8 +891,8 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
     setKeystoreStorePassword('')
     setKeystoreKeyPassword('')
     setKeystoreCommonName('')
-    setKeystoreReady(null)
-    setKeystoreBase64('')
+    // keystoreReady / _keystoreBase64 no longer have React mirrors (Plan 3.3);
+    // deleteAndroidProgress above clears them from disk.
     setRandomPasswordGenerated(false)
     setDetectedAliases([])
     setKeyPasswordProbe(null)
@@ -924,7 +924,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
     // Phase 5 — provisioning outputs
     setServiceAccountProvisioned(null)
     setPlayInviteProvisioned(null)
-    setServiceAccountKeyBase64('')
+    // _serviceAccountKeyBase64 no longer has a React mirror (Plan 3.3); cleared from disk above.
   }, [appId])
 
   const handleError = useCallback(
@@ -993,7 +993,19 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
     return refreshed.accessToken
   }, [accessToken, refreshTokenState, oauthClientId, getCapgoConfig])
 
-  async function doSaveCredentials(): Promise<Parameters<typeof updateSavedCredentials>[2]> {
+  // Plan 3.3: read the credential payload from the freshly-loaded on-disk
+  // progress (single source of truth) instead of redundant React-state mirrors.
+  // The caller passes the same `fresh` progress it already loaded + validated
+  // via getAndroidResumeStep, which only routes here once every field below is
+  // present (keystoreFullyValid + _serviceAccountKeyBase64), so this is strictly
+  // safer than reading mirrors that could lag behind a persist.
+  async function doSaveCredentials(progress: AndroidOnboardingProgress): Promise<Parameters<typeof updateSavedCredentials>[2]> {
+    const keystoreReady = progress.completedSteps.keystoreReady
+    const keystoreBase64 = progress._keystoreBase64 || ''
+    const serviceAccountKeyBase64 = progress._serviceAccountKeyBase64 || ''
+    const keystoreAlias = progress.keystoreAlias || ''
+    const keystoreStorePassword = progress.keystoreStorePassword || ''
+    const keystoreKeyPassword = progress.keystoreKeyPassword || ''
     if (!keystoreReady || !keystoreBase64)
       throw new Error('keystore not ready')
     if (!serviceAccountKeyBase64)
@@ -1142,7 +1154,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
 
           if (result.ok) {
             const base64 = jsonBytes.toString('base64')
-            setServiceAccountKeyBase64(base64)
+            // _serviceAccountKeyBase64 persisted below — no React mirror (Plan 3.3).
             setSaValidationResult({ ok: true })
             trackAction('android_sa_validation_result', { result: 'success' }, 'sa-json-validating')
             await persist((p) => ({
@@ -1245,8 +1257,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
             alias: keystoreAlias || RELEASE_ALIAS_DEFAULT,
             isGenerated: false,
           }
-          setKeystoreBase64(base64)
-          setKeystoreReady(ready)
+          // _keystoreBase64 / keystoreReady persisted below — no React mirrors (Plan 3.3).
           await persist((p) => ({
             ...p,
             keystoreKeyPassword: keyPw,
@@ -1318,7 +1329,11 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
               return
             }
           }
-          const credentials = await doSaveCredentials()
+          // Pass the freshly-loaded progress (the single source of truth) into
+          // doSaveCredentials. On a null-progress resume `fresh` is null; fall
+          // back to an empty progress so doSaveCredentials throws the same
+          // "keystore not ready" error the empty mirrors used to produce.
+          const credentials = await doSaveCredentials(fresh ?? emptyProgress(appId))
           if (cancelled)
             return
           // Random-password backup hint: emitted only here (post-save) so the
@@ -1998,12 +2013,10 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
             setKeystoreAlias(np.keystoreAlias)
         }
         else if (step === 'keystore-generating') {
-          if (np._keystoreBase64)
-            setKeystoreBase64(np._keystoreBase64)
+          // _keystoreBase64 / keystoreReady are read straight from on-disk
+          // progress by doSaveCredentials now (Plan 3.3) — no React mirrors.
           if (np.keystoreAlias)
             setKeystoreAlias(np.keystoreAlias)
-          if (np.completedSteps.keystoreReady)
-            setKeystoreReady(np.completedSteps.keystoreReady)
           setRetryCount(0)
         }
         else if (step === 'google-sign-in-running') {
@@ -2020,8 +2033,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
             setServiceAccountProvisioned(np.completedSteps.serviceAccountProvisioned)
           if (np.completedSteps.playInviteProvisioned)
             setPlayInviteProvisioned(np.completedSteps.playInviteProvisioned)
-          if (np._serviceAccountKeyBase64)
-            setServiceAccountKeyBase64(np._serviceAccountKeyBase64)
+          // _serviceAccountKeyBase64 read from on-disk progress by doSaveCredentials now (Plan 3.3).
           setRetryCount(0)
         }
 
@@ -2436,8 +2448,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
                   alias: keystoreAlias || RELEASE_ALIAS_DEFAULT,
                   isGenerated: false,
                 }
-                setKeystoreBase64(base64)
-                setKeystoreReady(ready)
+                // _keystoreBase64 / keystoreReady persisted below — no React mirrors (Plan 3.3).
                 await persist((p) => ({
                   ...p,
                   keystoreKeyPassword: keyPw,
@@ -2655,7 +2666,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
                     throw new Error('No service account JSON path on record.')
                   const bytes = await readFile(serviceAccountJsonPath)
                   const base64 = bytes.toString('base64')
-                  setServiceAccountKeyBase64(base64)
+                  // _serviceAccountKeyBase64 persisted below — no React mirror (Plan 3.3).
                   await persist((p) => ({
                     ...p,
                     _serviceAccountKeyBase64: base64,
