@@ -2,6 +2,7 @@
 
 export type AndroidOnboardingStep
   = | 'welcome'
+    | 'resume-prompt'
     | 'credentials-exist'
     | 'backing-up'
     | 'no-platform'
@@ -193,6 +194,7 @@ export interface AndroidOnboardingProgress {
 
 export const ANDROID_STEP_PROGRESS: Record<AndroidOnboardingStep, number> = {
   'welcome': 0,
+  'resume-prompt': 2,
   'credentials-exist': 0,
   'backing-up': 0,
   'no-platform': 0,
@@ -274,6 +276,8 @@ export function getAndroidPhaseLabel(step: AndroidOnboardingStep): string {
     case 'backing-up':
     case 'no-platform':
       return ''
+    case 'resume-prompt':
+      return 'Resume or restart?'
     case 'keystore-method-select':
     case 'keystore-explainer':
     case 'keystore-existing-path':

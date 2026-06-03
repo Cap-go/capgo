@@ -208,8 +208,16 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
   const { exit } = useApp()
   const startStep: AndroidOnboardingStep = getAndroidResumeStep(initialProgress)
 
+  // When there's saved progress AND the resume target isn't trivially 'welcome',
+  // land on the resume-prompt fork so the user can see what's saved and decide
+  // whether to continue or restart from scratch — instead of being silently
+  // teleported to the middle of the wizard with no chance to bail out cleanly.
+  // The trivial case (no progress, or resume target is welcome) keeps the
+  // existing zero-friction path.
   const [step, setStep] = useState<AndroidOnboardingStep>(
-    startStep === 'welcome' ? 'welcome' : startStep,
+    initialProgress !== null && startStep !== 'welcome'
+      ? 'resume-prompt'
+      : startStep === 'welcome' ? 'welcome' : startStep,
   )
 
   // Telemetry: resolve org id once + emit per-step events
@@ -743,7 +751,16 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
     [persist],
   )
 
-  useEffect(() => {
+  // Re-emit the breadcrumb entries the user "earned" before this session — the
+  // partial keystore inputs (path / alias / store + key password) and the
+  // completed-phase markers (sign-in, Play account, GCP project, package, SA).
+  // Wrapped in a useCallback so both the mount-time path AND the resume-prompt
+  // "Continue" handler can call it. We DON'T want this firing while the user is
+  // still on the resume-prompt screen — the side log would fill with stale
+  // entries BEFORE the user has chosen Continue vs Restart, and picking Restart
+  // would leave those entries dangling next to a fresh wizard. addLog's
+  // consecutive-dedupe protects against accidental double calls.
+  const hydrateCompletedLog = useCallback(() => {
     if (!initialProgress)
       return
     const { completedSteps } = initialProgress
@@ -802,7 +819,77 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
       addLog(`✔ Service account — ${completedSteps.serviceAccountProvisioned.email}`)
     if (completedSteps.playInviteProvisioned)
       addLog(`✔ Service account invited to Play Console`)
+  }, [initialProgress, addLog])
+
+  // Mount-time hydration. Suppressed when the initial step is the resume-prompt
+  // fork — that path defers hydration to the user's explicit Continue choice
+  // (see the resume-prompt onChange below). The trivial-progress paths
+  // (welcome / no progress) still hydrate here so any partial input the user
+  // had keeps its breadcrumb.
+  const skipMountHydrationRef = useRef(step === 'resume-prompt')
+  useEffect(() => {
+    if (skipMountHydrationRef.current)
+      return
+    hydrateCompletedLog()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  /**
+   * Reset everything for a fresh-start onboarding pass. Called from the
+   * resume-prompt restart handler (mount-time "start over" branch).
+   *
+   * Wipes the on-disk progress file AND every piece of in-memory state that
+   * could otherwise leak across into the next attempt (keystore inputs +
+   * outputs, the service-account fork choice and imported JSON path, OAuth
+   * tokens, the chosen Play account / GCP project / Android package, and the
+   * provisioning outputs). Does NOT addLog or setStep — the caller picks the
+   * user-facing message and the next step.
+   */
+  const resetForFreshStart = useCallback(async () => {
+    await deleteAndroidProgress(appId).catch(() => { /* best-effort */ })
+    // Phase 1 — keystore inputs + outputs
+    setKeystoreMethod(null)
+    setKeystorePathMode('choose')
+    setKeystoreExistingPath('')
+    setKeystoreAlias('')
+    setKeystoreStorePassword('')
+    setKeystoreKeyPassword('')
+    setKeystoreCommonName('')
+    setKeystoreReady(null)
+    setKeystoreBase64('')
+    setRandomPasswordGenerated(false)
+    setDetectedAliases([])
+    setKeyPasswordProbe(null)
+    keyPasswordProbeRef.current = false
+    // Phase 2 — service-account fork
+    setServiceAccountMethod(null)
+    setSaJsonPathMode('choose')
+    setServiceAccountJsonPath('')
+    setSaValidationResult(null)
+    // Phase 2b — Google sign-in / OAuth
+    setGoogleSignIn(null)
+    setAccessToken('')
+    setRefreshTokenState('')
+    setOauthClientId('')
+    setOauthStatusMessages([])
+    setShowOAuthLearnMore(false)
+    // Phase 3 — Play developer account
+    setPlayAccountChoice(null)
+    setPlayDevIdMode('actions')
+    // Phase 4 — GCP project
+    setGcpProjects([])
+    setGcpProjectChoice(null)
+    setNewProjectDisplayName('')
+    // Phase 4.5 — Android package
+    setAndroidPackageChoice(null)
+    setDetectedPackageIds([])
+    setPackageSelectMode('choose')
+    packageLoadedRef.current = false
+    // Phase 5 — provisioning outputs
+    setServiceAccountProvisioned(null)
+    setPlayInviteProvisioned(null)
+    setServiceAccountKeyBase64('')
+  }, [appId])
 
   const handleError = useCallback(
     (err: unknown, failedStep: AndroidOnboardingStep) => {
@@ -2180,6 +2267,81 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
         </Box>
       )}
 
+      {/* Resume-or-restart prompt — only reachable when initialProgress is
+          non-null AND getAndroidResumeStep didn't resolve to 'welcome'. The
+          initial step useState above wires this branch. */}
+      {step === 'resume-prompt' && initialProgress && (() => {
+        const { startedAt, keystoreMethod, serviceAccountMethod, completedSteps } = initialProgress
+        // Defensive date parse: legacy / corrupted progress files can carry an
+        // unparseable startedAt — show the raw string with a dim suffix instead
+        // of crashing the wizard.
+        let whenLabel: string
+        try {
+          const d = new Date(startedAt)
+          if (Number.isNaN(d.getTime()))
+            throw new Error('NaN')
+          whenLabel = d.toLocaleString()
+        }
+        catch {
+          whenLabel = `${startedAt} (could not parse)`
+        }
+        const keystoreLabel = keystoreMethod === 'existing'
+          ? 'Import existing keystore'
+          : keystoreMethod === 'generate' ? 'Generate new keystore' : 'Not chosen yet'
+        const saLabel = serviceAccountMethod === 'existing'
+          ? 'Import existing JSON'
+          : serviceAccountMethod === 'generate' ? 'Create via Google' : null
+        const keystoreReady = Boolean(completedSteps.keystoreReady)
+        const signedIn = completedSteps.googleSignInComplete
+        const playAccount = completedSteps.playAccountChosen
+        const gcpProject = completedSteps.gcpProjectChosen
+        const androidPackage = completedSteps.androidPackageChosen
+        const saProvisioned = completedSteps.serviceAccountProvisioned
+        const resumeLabel = getAndroidPhaseLabel(startStep) || startStep
+        return (
+          <Box flexDirection="column" marginTop={1} gap={1}>
+            <Text bold color="cyan">{`↩️  Found in-progress onboarding for ${appId}`}</Text>
+            <Text>Pick up where you left off, or start over from the welcome step.</Text>
+            <Box flexDirection="column">
+              <Text>{`•  Started: ${whenLabel}`}</Text>
+              <Text>{`•  Keystore method: ${keystoreLabel}`}</Text>
+              {saLabel && <Text>{`•  Service account method: ${saLabel}`}</Text>}
+              <Text>{`•  Keystore ready: ${keystoreReady ? `Yes (${completedSteps.keystoreReady!.keystorePath})` : 'No'}`}</Text>
+              <Text>{`•  Signed in with Google: ${signedIn ? `Yes (${signedIn.email})` : 'No'}`}</Text>
+              <Text>{`•  Play Developer account: ${playAccount ? `Yes (${playAccount.displayName || playAccount.developerId})` : 'No'}`}</Text>
+              <Text>{`•  GCP project: ${gcpProject ? `Yes (${gcpProject.displayName})` : 'No'}`}</Text>
+              <Text>{`•  Android package: ${androidPackage ? `Yes (${androidPackage.packageName})` : 'No'}`}</Text>
+              <Text>{`•  Service account provisioned: ${saProvisioned ? `Yes (${saProvisioned.email})` : 'No'}`}</Text>
+              <Text dimColor>{`•  Resume target: ${resumeLabel}`}</Text>
+            </Box>
+            <Select
+              options={[
+                { label: '▶️  Continue from where I left off', value: 'continue' },
+                { label: '🔄  Restart onboarding (wipe saved progress)', value: 'restart' },
+              ]}
+              onChange={async (value) => {
+                // @inkjs/ui re-fire guard — see selectFiredRef JSDoc.
+                if (selectFiredRef.current)
+                  return
+                selectFiredRef.current = true
+                if (value === 'continue') {
+                  // Now that the user has committed to picking up where they
+                  // left off, replay the breadcrumb log so they see the
+                  // in-progress state they're resuming into. Held back at
+                  // mount so the resume-prompt screen itself wasn't surrounded
+                  // by stale "✔ …" entries while they were still deciding.
+                  hydrateCompletedLog()
+                  setStep(startStep)
+                  return
+                }
+                await resetForFreshStart()
+                addLog('↩️  Restarted — fresh start', 'yellow')
+                setStep('welcome')
+              }}
+            />
+          </Box>
+        )
+      })()}
       {step === 'welcome' && <WelcomeStep />}
 
       {step === 'no-platform' && <NoPlatformStep androidDir={androidDir} dense={false} />}
