@@ -47,7 +47,7 @@ export const app = new Hono<MiddlewareKeyVariables>()
 
 app.use('/', useCors)
 
-app.post('/', middlewareV2(['read', 'write', 'all', 'upload']), async (c) => {
+app.post('/', middlewareV2(), async (c) => {
   const bodyRaw = await parseBody<DataDevice>(c)
   if (hasInvalidQueryLimitInput(bodyRaw.limit))
     throw simpleError('invalid_body', 'Invalid body')

@@ -96,8 +96,8 @@ SELECT
         public.rbac_rollback_org(
             current_setting('test.rbac_admin_rpc_org')::uuid
         ) ->> 'status',
-        'success',
-        'rbac_rollback_org still works for service_role'
+        'not_supported',
+        'rbac_rollback_org keeps rollback disabled for service_role'
     );
 
 SELECT finish();

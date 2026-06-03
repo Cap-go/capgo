@@ -1,7 +1,20 @@
 import { randomUUID } from 'node:crypto'
 import { createClient } from '@supabase/supabase-js'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { appApiKeyBindings, BASE_URL, getAuthHeaders, getSupabaseClient, orgApiKeyBindings, resetAndSeedAppData, resetAppData } from './test-utils.ts'
+import {
+  APIKEY_MANAGEMENT_ALL,
+  appApiKeyBindings,
+  BASE_URL,
+  getAuthHeaders,
+  getAuthHeadersForCredentials,
+  getSupabaseClient,
+  ORG_ID_APIKEY_MANAGEMENT,
+  orgApiKeyBindings,
+  resetAndSeedAppData,
+  resetAppData,
+  USER_EMAIL_APIKEY_MANAGEMENT,
+  USER_PASSWORD,
+} from './test-utils.ts'
 
 const id = randomUUID()
 const APPNAME = `com.app.key.${id}`
@@ -122,8 +135,8 @@ describe('[POST] /apikey operations', () => {
 
     try {
       const limitedResponse = await fetch(`${BASE_URL}/apikey`, {
-      method: 'POST',
-      headers: authHeaders,
+        method: 'POST',
+        headers: authHeaders,
         body: JSON.stringify(await appKeyBody('app-management-blocked')),
       })
       expect(limitedResponse.status).toBe(200)
@@ -131,8 +144,8 @@ describe('[POST] /apikey operations', () => {
       createdKeyIds.push(limitedData.id)
 
       const siblingResponse = await fetch(`${BASE_URL}/apikey`, {
-      method: 'POST',
-      headers: authHeaders,
+        method: 'POST',
+        headers: authHeaders,
         body: JSON.stringify(orgKeyBody('sibling-management-target')),
       })
       expect(siblingResponse.status).toBe(200)
@@ -185,6 +198,192 @@ describe('[POST] /apikey operations', () => {
         await fetch(`${BASE_URL}/apikey/${keyId}`, {
           method: 'DELETE',
           headers: authHeaders,
+        })
+      }
+    }
+  })
+
+  it.concurrent('org-scoped API key cannot manage or upgrade API keys', async () => {
+    const createdKeyIds: number[] = []
+    const orgId = orgApiKeyBindings()[0].org_id
+
+    try {
+      const managerResponse = await fetch(`${BASE_URL}/apikey`, {
+        method: 'POST',
+        headers: authHeaders,
+        body: JSON.stringify(orgKeyBody('org-management-blocked')),
+      })
+      expect(managerResponse.status).toBe(200)
+      const managerData = await managerResponse.json<{ id: number, key: string }>()
+      createdKeyIds.push(managerData.id)
+
+      const siblingResponse = await fetch(`${BASE_URL}/apikey`, {
+        method: 'POST',
+        headers: authHeaders,
+        body: JSON.stringify(orgKeyBody('org-sibling-management-target')),
+      })
+      expect(siblingResponse.status).toBe(200)
+      const siblingData = await siblingResponse.json<{ id: number }>()
+      createdKeyIds.push(siblingData.id)
+
+      const managerHeaders = {
+        'Content-Type': 'application/json',
+        'capgkey': managerData.key,
+      }
+
+      const listResponse = await fetch(`${BASE_URL}/apikey`, {
+        method: 'GET',
+        headers: managerHeaders,
+      })
+      expect(listResponse.status).toBe(401)
+      await expect(listResponse.json()).resolves.toHaveProperty('error', 'cannot_list_apikeys')
+
+      const getResponse = await fetch(`${BASE_URL}/apikey/${siblingData.id}`, {
+        method: 'GET',
+        headers: managerHeaders,
+      })
+      expect(getResponse.status).toBe(401)
+      await expect(getResponse.json()).resolves.toHaveProperty('error', 'cannot_get_apikey')
+
+      const updateResponse = await fetch(`${BASE_URL}/apikey/${siblingData.id}`, {
+        method: 'PUT',
+        headers: managerHeaders,
+        body: JSON.stringify({
+          name: 'org-sibling-renamed-by-api-key',
+        }),
+      })
+      expect(updateResponse.status).toBe(401)
+      await expect(updateResponse.json()).resolves.toHaveProperty('error', 'cannot_update_apikey')
+
+      const selfUpgradeResponse = await fetch(`${BASE_URL}/apikey/${managerData.id}`, {
+        method: 'PUT',
+        headers: managerHeaders,
+        body: JSON.stringify({
+          bindings: orgApiKeyBindings(orgId, 'org_super_admin'),
+        }),
+      })
+      expect(selfUpgradeResponse.status).toBe(401)
+      await expect(selfUpgradeResponse.json()).resolves.toHaveProperty('error', 'cannot_update_apikey')
+
+      const regenerateResponse = await fetch(`${BASE_URL}/apikey/${siblingData.id}`, {
+        method: 'PUT',
+        headers: managerHeaders,
+        body: JSON.stringify({
+          regenerate: true,
+        }),
+      })
+      expect(regenerateResponse.status).toBe(401)
+      await expect(regenerateResponse.json()).resolves.toHaveProperty('error', 'cannot_update_apikey')
+
+      const deleteResponse = await fetch(`${BASE_URL}/apikey/${siblingData.id}`, {
+        method: 'DELETE',
+        headers: managerHeaders,
+      })
+      expect(deleteResponse.status).toBe(401)
+      await expect(deleteResponse.json()).resolves.toHaveProperty('error', 'cannot_delete_apikey')
+
+      const verifySiblingResponse = await fetch(`${BASE_URL}/apikey/${siblingData.id}`, { headers: authHeaders })
+      expect(verifySiblingResponse.status).toBe(200)
+      const verifySiblingData = await verifySiblingResponse.json<{ name: string }>()
+      expect(verifySiblingData.name).toBe('org-sibling-management-target')
+
+      const verifyManagerResponse = await fetch(`${BASE_URL}/apikey/${managerData.id}`, { headers: authHeaders })
+      expect(verifyManagerResponse.status).toBe(200)
+      const verifyManagerData = await verifyManagerResponse.json<{ name: string }>()
+      expect(verifyManagerData.name).toBe('org-management-blocked')
+    }
+    finally {
+      for (const keyId of createdKeyIds.reverse()) {
+        await fetch(`${BASE_URL}/apikey/${keyId}`, {
+          method: 'DELETE',
+          headers: authHeaders,
+        })
+      }
+    }
+  })
+
+  it.concurrent('all API key keeps sibling API key management but cannot mutate itself', async () => {
+    const createdKeyIds: number[] = []
+    const dedicatedAuthHeaders = await getAuthHeadersForCredentials(USER_EMAIL_APIKEY_MANAGEMENT, USER_PASSWORD)
+    const allKeyHeaders = {
+      'Content-Type': 'application/json',
+      'capgkey': APIKEY_MANAGEMENT_ALL,
+    }
+
+    try {
+      const siblingResponse = await fetch(`${BASE_URL}/apikey`, {
+        method: 'POST',
+        headers: dedicatedAuthHeaders,
+        body: JSON.stringify(orgKeyBody('all-key-sibling-management-target', {
+          bindings: orgApiKeyBindings(ORG_ID_APIKEY_MANAGEMENT),
+        })),
+      })
+      expect(siblingResponse.status).toBe(200)
+      const siblingData = await siblingResponse.json<{ id: number }>()
+      createdKeyIds.push(siblingData.id)
+
+      const listResponse = await fetch(`${BASE_URL}/apikey`, {
+        method: 'GET',
+        headers: allKeyHeaders,
+      })
+      expect(listResponse.status).toBe(200)
+
+      const getResponse = await fetch(`${BASE_URL}/apikey/${siblingData.id}`, {
+        method: 'GET',
+        headers: allKeyHeaders,
+      })
+      expect(getResponse.status).toBe(200)
+
+      const updateResponse = await fetch(`${BASE_URL}/apikey/${siblingData.id}`, {
+        method: 'PUT',
+        headers: allKeyHeaders,
+        body: JSON.stringify({
+          name: 'all-key-renamed-sibling',
+        }),
+      })
+      expect(updateResponse.status).toBe(200)
+      await expect(updateResponse.json()).resolves.toHaveProperty('name', 'all-key-renamed-sibling')
+
+      const bindingUpdateResponse = await fetch(`${BASE_URL}/apikey/${siblingData.id}`, {
+        method: 'PUT',
+        headers: allKeyHeaders,
+        body: JSON.stringify({
+          bindings: orgApiKeyBindings(ORG_ID_APIKEY_MANAGEMENT, 'org_super_admin'),
+        }),
+      })
+      expect(bindingUpdateResponse.status).toBe(401)
+      await expect(bindingUpdateResponse.json()).resolves.toHaveProperty('error', 'cannot_update_apikey')
+
+      const selfUpdateResponse = await fetch(`${BASE_URL}/apikey/112`, {
+        method: 'PUT',
+        headers: allKeyHeaders,
+        body: JSON.stringify({
+          name: 'all-key-self-update-blocked',
+        }),
+      })
+      expect(selfUpdateResponse.status).toBe(401)
+      await expect(selfUpdateResponse.json()).resolves.toHaveProperty('error', 'cannot_update_apikey')
+
+      const selfDeleteResponse = await fetch(`${BASE_URL}/apikey/112`, {
+        method: 'DELETE',
+        headers: allKeyHeaders,
+      })
+      expect(selfDeleteResponse.status).toBe(401)
+      await expect(selfDeleteResponse.json()).resolves.toHaveProperty('error', 'cannot_delete_apikey')
+
+      const deleteResponse = await fetch(`${BASE_URL}/apikey/${siblingData.id}`, {
+        method: 'DELETE',
+        headers: allKeyHeaders,
+      })
+      expect(deleteResponse.status).toBe(200)
+      await expect(deleteResponse.json()).resolves.toHaveProperty('status', 'ok')
+      createdKeyIds.pop()
+    }
+    finally {
+      for (const keyId of createdKeyIds.reverse()) {
+        await fetch(`${BASE_URL}/apikey/${keyId}`, {
+          method: 'DELETE',
+          headers: dedicatedAuthHeaders,
         })
       }
     }
@@ -926,5 +1125,62 @@ describe('[RLS] hashed API key with direct Supabase SDK', () => {
       method: 'DELETE',
       headers: authHeaders,
     })
+  })
+
+  it.concurrent('plain key cannot update apikeys table directly through RLS', async () => {
+    let createdKeyId: number | undefined
+
+    try {
+      const createResponse = await fetch(`${BASE_URL}/apikey`, {
+        method: 'POST',
+        headers: authHeaders,
+        body: JSON.stringify({
+          name: 'plain-key-rls-apikey-update-blocked',
+          hashed: false,
+          bindings: orgApiKeyBindings(),
+        }),
+      })
+      const createData = await createResponse.json<{ key: string, id: number }>()
+      expect(createResponse.status).toBe(200)
+      createdKeyId = createData.id
+
+      const supabaseWithPlainKey = createClient(
+        process.env.SUPABASE_URL!,
+        process.env.SUPABASE_ANON_KEY!,
+        {
+          global: {
+            headers: {
+              capgkey: createData.key,
+            },
+          },
+        },
+      )
+
+      const { data: updateData, error: updateError } = await supabaseWithPlainKey
+        .from('apikeys')
+        .update({ name: 'plain-key-rls-update-should-not-stick' })
+        .eq('id', createData.id)
+        .select('id, name')
+
+      if (updateError) {
+        expect(updateError.message).toMatch(/permission denied|row-level|not allowed|denied/i)
+      }
+      else {
+        expect(updateData).toEqual([])
+      }
+
+      const verifyResponse = await fetch(`${BASE_URL}/apikey/${createData.id}`, { headers: authHeaders })
+      expect(verifyResponse.status).toBe(200)
+      const verifyData = await verifyResponse.json<{ name: string }>()
+      expect(verifyData.name).toBe('plain-key-rls-apikey-update-blocked')
+    }
+    finally {
+      if (createdKeyId !== undefined) {
+        await fetch(`${BASE_URL}/apikey/${createdKeyId}`, {
+          method: 'DELETE',
+          headers: authHeaders,
+        })
+      }
+    }
   })
 })

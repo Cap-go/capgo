@@ -170,12 +170,12 @@ function createStatsReadParams(
   }
 }
 
-app.post('/', middlewareV2(['read', 'write', 'all', 'upload']), async (c) => {
+app.post('/', middlewareV2(), async (c) => {
   const { body, startDate, endDate } = await getValidatedStatsRequestBody(c, statsBodySchema, 'post private/stats body')
   return c.json(await readStats(c, createStatsReadParams(body, startDate, endDate)))
 })
 
-app.post('/export', middlewareV2(['read', 'write', 'all', 'upload']), async (c) => {
+app.post('/export', middlewareV2(), async (c) => {
   const { body, startDate, endDate } = await getValidatedStatsRequestBody(c, exportSchema, 'post private/stats/export body')
   const format: NonNullable<ExportBody['format']> = body.format ?? 'csv'
   const limit = Math.min(Math.max(body.limit ?? 10_000, 1), MAX_QUERY_LIMIT)

@@ -15,49 +15,49 @@ export const app = honoFactory.createApp()
 // Browser clients call this function directly and need CORS preflight support.
 app.use('*', useCors)
 
-app.get('/', middlewareKey(['all', 'write', 'read', 'upload']), async (c) => {
+app.get('/', middlewareKey(), async (c) => {
   const body = await getBodyOrQuery<any>(c)
   const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
   return get(c, body, apikey)
 })
 
-app.put('/', middlewareV2(['all', 'write']), async (c) => {
+app.put('/', middlewareV2(), async (c) => {
   const body = await getBodyOrQuery<any>(c)
   const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
   return put(c, body, apikey)
 })
 
-app.post('/', middlewareV2(['all', 'write']), async (c) => {
+app.post('/', middlewareV2(), async (c) => {
   const body = await getBodyOrQuery<any>(c)
   const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row'] | null | undefined
   return post(c, body, apikey)
 })
 
-app.delete('/', middlewareKey(['all', 'write']), async (c) => {
+app.delete('/', middlewareKey(), async (c) => {
   const body = await getBodyOrQuery<any>(c)
   const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
   return deleteOrg(c, body, apikey)
 })
 
-app.get('/members', middlewareKey(['all', 'write', 'read', 'upload']), async (c) => {
+app.get('/members', middlewareKey(), async (c) => {
   const body = await getBodyOrQuery<any>(c)
   const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
   return getMembers(c, body, apikey)
 })
 
-app.post('/members', middlewareKey(['all', 'write']), async (c) => {
+app.post('/members', middlewareKey(), async (c) => {
   const body = await getBodyOrQuery<any>(c)
   const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
   return inviteUser(c, body, apikey)
 })
 
-app.delete('/members', middlewareKey(['all', 'write']), async (c) => {
+app.delete('/members', middlewareKey(), async (c) => {
   const body = await getBodyOrQuery<any>(c)
   const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
   return deleteMember(c, body, apikey)
 })
 
-app.get('/audit', middlewareV2(['all', 'write', 'read', 'upload']), async (c) => {
+app.get('/audit', middlewareV2(), async (c) => {
   const body = await getBodyOrQuery<any>(c)
   return getAuditLogs(c, body)
 })

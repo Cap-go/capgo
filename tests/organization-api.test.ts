@@ -1532,6 +1532,64 @@ describe('[PUT] /organization - encrypted bundles settings', () => {
   })
 })
 
+describe('[PUT] /organization - password policy settings', () => {
+  afterAll(async () => {
+    await getSupabaseClient().from('orgs').update({
+      password_policy_config: null,
+    }).eq('id', ORG_ID)
+  })
+
+  it('updates password policy config through the API route', async () => {
+    const policyConfig = {
+      enabled: true,
+      min_length: 12,
+      require_uppercase: true,
+      require_number: true,
+      require_special: true,
+    }
+
+    const response = await fetch(`${BASE_URL}/organization`, {
+      headers,
+      method: 'PUT',
+      body: JSON.stringify({
+        orgId: ORG_ID,
+        password_policy_config: policyConfig,
+      }),
+    })
+    expect(response.status).toBe(200)
+
+    const { data, error } = await getSupabaseClient()
+      .from('orgs')
+      .select('password_policy_config')
+      .eq('id', ORG_ID)
+      .single()
+
+    expect(error).toBeNull()
+    expect(data?.password_policy_config).toEqual(policyConfig)
+  })
+
+  it('rejects invalid password policy lengths before updating the org', async () => {
+    const response = await fetch(`${BASE_URL}/organization`, {
+      headers,
+      method: 'PUT',
+      body: JSON.stringify({
+        orgId: ORG_ID,
+        password_policy_config: {
+          enabled: true,
+          min_length: 73,
+          require_uppercase: true,
+          require_number: true,
+          require_special: true,
+        },
+      }),
+    })
+
+    expect(response.status).toBe(400)
+    const responseData = await response.json() as { error: string }
+    expect(responseData.error).toBe('invalid_body')
+  })
+})
+
 describe('[PUT] /organization - enforce_hashed_api_keys setting', () => {
   const enforceOrgId = randomUUID()
   const enforceGlobalId = randomUUID()

@@ -45,7 +45,7 @@ const APIKEY_ORG_READER_ROLE = 'apikey_org_reader'
 export const app = createHono('', version)
 
 app.use('*', useCors)
-app.use('*', middlewareV2(['all']))
+app.use('*', middlewareV2())
 
 async function requireAuthAndGuardLimitedKeys(c: Context<MiddlewareKeyVariables>, next: () => Promise<void>) {
   const auth = c.get('auth')

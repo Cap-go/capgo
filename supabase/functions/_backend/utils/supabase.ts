@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Context } from 'hono'
-import type { AuthInfo, MiddlewareKeyVariables } from './hono.ts'
+import type { AuthInfo } from './hono.ts'
 import type { Database } from './supabase.types.ts'
 import type { DeviceWithoutCreatedAt, NativeVersionUsage, Order, ReadDevicesParams, ReadStatsParams, StatsMetadata, VersionUsage } from './types.ts'
 import { createClient } from '@supabase/supabase-js'
@@ -249,53 +249,6 @@ export async function checkAppOwner(c: Context, userId: string | undefined, appI
   }
 }
 
-export async function hasAppRight(c: Context, appId: string | undefined, userid: string, right: Database['public']['Enums']['user_min_right']) {
-  if (!appId)
-    return false
-
-  const { data, error } = await supabaseAdmin(c)
-    .rpc('has_app_right_userid', { appid: appId, right, userid })
-
-  if (error) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'has_app_right_userid error', error })
-    return false
-  }
-
-  return data
-}
-
-export async function hasAppRightApikey(c: Context<MiddlewareKeyVariables, any, object>, appId: string | undefined, userid: string, right: Database['public']['Enums']['user_min_right'], apikey: string | null | undefined) {
-  if (!appId) {
-    cloudlog({ requestId: c.get('requestId'), message: 'hasAppRightApikey - appId is undefined' })
-    return false
-  }
-
-  // For hashed keys, use the capgkey from the request header
-  const effectiveApikey = apikey ?? c.get('capgkey')
-  if (!effectiveApikey) {
-    cloudlog({ requestId: c.get('requestId'), message: 'hasAppRightApikey - no API key available' })
-    return false
-  }
-
-  cloudlog({ requestId: c.get('requestId'), message: 'hasAppRightApikey - calling RPC', appId, userid, right, apikeyPrefix: effectiveApikey?.substring(0, 15) })
-
-  const { data, error } = await supabaseAdmin(c)
-    .rpc('has_app_right_apikey', { appid: appId, right, userid, apikey: effectiveApikey })
-
-  cloudlog({ requestId: c.get('requestId'), message: 'hasAppRightApikey - RPC result', data, hasError: !!error, error })
-
-  if (error) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'has_app_right_apikey error', error, appId, userid, right })
-    return false
-  }
-
-  if (!data) {
-    cloudlog({ requestId: c.get('requestId'), message: 'hasAppRightApikey - permission denied', appId, userid, right, apikeyPrefix: effectiveApikey?.substring(0, 15) })
-  }
-
-  return data
-}
-
 export async function apikeyHasOrgRight(c: Context, key: Database['public']['Tables']['apikeys']['Row'], orgId: string) {
   if (!key.rbac_id)
     return false
@@ -343,44 +296,6 @@ export async function apikeyHasOrgRightWithPolicy(
   }
 
   return { valid: true }
-}
-
-export async function hasOrgRight(c: Context, orgId: string, userId: string, right: Database['public']['Enums']['user_min_right']) {
-  const userRight = await supabaseAdmin(c).rpc('check_min_rights', {
-    min_right: right,
-    org_id: orgId,
-    user_id: userId,
-    channel_id: null as any,
-    app_id: null as any,
-  })
-
-  cloudlog({ requestId: c.get('requestId'), message: 'check_min_rights (hasOrgRight)', userRight })
-
-  if (userRight.error || !userRight.data) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'check_min_rights (hasOrgRight) error', error: userRight.error })
-    return false
-  }
-
-  return userRight.data
-}
-
-export async function hasOrgRightApikey(c: Context, orgId: string, userId: string, right: Database['public']['Enums']['user_min_right'], apikey: string | null | undefined) {
-  const userRight = await supabaseApikey(c, apikey).rpc('check_min_rights', {
-    min_right: right,
-    org_id: orgId,
-    user_id: userId,
-    channel_id: null as any,
-    app_id: null as any,
-  })
-
-  cloudlog({ requestId: c.get('requestId'), message: 'check_min_rights (hasOrgRight)', userRight })
-
-  if (userRight.error || !userRight.data) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'check_min_rights (hasOrgRight) error', error: userRight.error })
-    return false
-  }
-
-  return userRight.data
 }
 
 interface PlanTotal {

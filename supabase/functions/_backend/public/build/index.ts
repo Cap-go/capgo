@@ -20,17 +20,17 @@ import { getBuildStatus } from './status.ts'
 import { tusProxy } from './upload.ts'
 
 export const app = honoFactory.createApp()
-const uploadWriteMiddleware = middlewareKey(['all', 'write'])
+const uploadWriteMiddleware = middlewareKey()
 
 // POST /build/request - Request a new native build
-app.post('/request', middlewareKey(['all', 'write']), async (c) => {
+app.post('/request', middlewareKey(), async (c) => {
   const body = await getBodyOrQuery<RequestBuildBody>(c)
   const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
   return requestBuild(c, body, apikey)
 })
 
 // POST /build/start/:jobId - Start a build after uploading bundle
-app.post('/start/:jobId', middlewareKey(['all', 'write']), async (c) => {
+app.post('/start/:jobId', middlewareKey(), async (c) => {
   const jobId = c.req.param('jobId')
   const body = await getBodyOrQuery<{ app_id: string }>(c)
   if (!body.app_id) {
@@ -41,14 +41,14 @@ app.post('/start/:jobId', middlewareKey(['all', 'write']), async (c) => {
 })
 
 // GET /build/status - Get build status and record billing
-app.get('/status', middlewareKey(['all', 'read']), async (c) => {
+app.get('/status', middlewareKey(), async (c) => {
   const params = await getBodyOrQuery<BuildStatusParams>(c)
   const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
   return getBuildStatus(c, params, apikey)
 })
 
 // GET /build/logs/:jobId - Stream build logs (SSE, requires app_id query param)
-app.get('/logs/:jobId', middlewareKey(['all', 'read']), async (c) => {
+app.get('/logs/:jobId', middlewareKey(), async (c) => {
   const jobId = c.req.param('jobId')
   const appId = c.req.query('app_id')
   if (!appId) {
@@ -59,7 +59,7 @@ app.get('/logs/:jobId', middlewareKey(['all', 'read']), async (c) => {
 })
 
 // POST /build/cancel/:jobId - Cancel a running build
-app.post('/cancel/:jobId', middlewareKey(['all', 'write']), async (c) => {
+app.post('/cancel/:jobId', middlewareKey(), async (c) => {
   const jobId = c.req.param('jobId')
   const body = await getBodyOrQuery<{ app_id: string }>(c)
   if (!body.app_id) {
@@ -70,7 +70,7 @@ app.post('/cancel/:jobId', middlewareKey(['all', 'write']), async (c) => {
 })
 
 // POST /build/ai_analyze - Analyze a failed build's logs with AI
-app.post('/ai_analyze', middlewareKey(['all', 'write']), async (c) => {
+app.post('/ai_analyze', middlewareKey(), async (c) => {
   const body = await getBodyOrQuery<{ jobId: string, appId: string, logs: string }>(c)
   if (!body.jobId || !body.appId || typeof body.logs !== 'string') {
     throw new Error('jobId, appId, and logs are required in request body')
@@ -94,7 +94,7 @@ function tusOptionsResponse() {
 
 // TUS proxy endpoints - POST/HEAD/PATCH proxied to builder with API key injection
 // POST /build/upload/:jobId - Create TUS upload (proxied to builder)
-app.post('/upload/:jobId', middlewareKey(['all', 'write']), async (c) => {
+app.post('/upload/:jobId', middlewareKey(), async (c) => {
   const jobId = c.req.param('jobId')
   const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
   return tusProxy(c, jobId, apikey)
@@ -140,7 +140,7 @@ app.get(
 )
 
 // PATCH /build/upload/:jobId/* - Upload TUS chunk (proxied to builder)
-app.patch('/upload/:jobId/*', middlewareKey(['all', 'write']), async (c) => {
+app.patch('/upload/:jobId/*', middlewareKey(), async (c) => {
   const jobId = c.req.param('jobId')
   const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
   return tusProxy(c, jobId, apikey)

@@ -16,7 +16,7 @@ export const app = honoFactory.createApp()
 // Enable CORS for all routes (browser requests need OPTIONS preflight for all app endpoints)
 app.use('*', useCors)
 
-app.get('/', middlewareKey(['all', 'read']), async (c) => {
+app.get('/', middlewareKey(), async (c) => {
   const pageQuery = c.req.query('page')
   const limitQuery = c.req.query('limit')
   const orgId = c.req.query('org_id')
@@ -31,7 +31,7 @@ app.get('/', middlewareKey(['all', 'read']), async (c) => {
   return getAll(c, keyToUse, page, limit, orgId)
 })
 
-app.get('/:id', middlewareKey(['all', 'read']), async (c) => {
+app.get('/:id', middlewareKey(), async (c) => {
   const id = c.req.param('id')
   const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
   const subkey = c.get('subkey') as Database['public']['Tables']['apikeys']['Row'] | undefined
@@ -39,12 +39,12 @@ app.get('/:id', middlewareKey(['all', 'read']), async (c) => {
   return get(c, id, keyToUse)
 })
 
-app.post('/', middlewareV2(['all', 'write']), async (c) => {
+app.post('/', middlewareV2(), async (c) => {
   const body = await getBodyOrQuery<CreateApp>(c)
   return post(c, body)
 })
 
-app.put('/:id', middlewareKey(['all', 'write']), async (c) => {
+app.put('/:id', middlewareKey(), async (c) => {
   const id = c.req.param('id')
   const body = await getBodyOrQuery<{
     name?: string
@@ -63,7 +63,7 @@ app.put('/:id', middlewareKey(['all', 'write']), async (c) => {
   return put(c, id, body, keyToUse)
 })
 
-app.delete('/:id', middlewareKey(['all', 'write']), async (c) => {
+app.delete('/:id', middlewareKey(), async (c) => {
   const id = c.req.param('id')
   const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
   const subkey = c.get('subkey') as Database['public']['Tables']['apikeys']['Row'] | undefined
@@ -72,12 +72,12 @@ app.delete('/:id', middlewareKey(['all', 'write']), async (c) => {
 })
 
 // Demo app creation supports both JWT (browser) and API key authentication
-app.post('/demo', middlewareV2(['all', 'write']), async (c) => {
+app.post('/demo', middlewareV2(), async (c) => {
   const body = await getBodyOrQuery<CreateDemoApp>(c)
   return createDemoApp(c, body)
 })
 
-app.post('/store-metadata', middlewareV2(['all', 'read']), async (c) => {
+app.post('/store-metadata', middlewareV2(), async (c) => {
   const body = await getBodyOrQuery<FetchStoreMetadataBody>(c)
   return fetchStoreMetadata(c, body)
 })

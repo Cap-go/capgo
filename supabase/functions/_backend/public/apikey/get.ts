@@ -2,31 +2,19 @@ import type { AuthInfo } from '../../utils/hono.ts'
 import type { Database } from '../../utils/supabase.types.ts'
 import { honoFactory, quickError, simpleError } from '../../utils/hono.ts'
 import { middlewareV2 } from '../../utils/hono_middleware.ts'
-import { supabaseWithAuth } from '../../utils/supabase.ts'
-import { apiKeyHasLimitedScope } from './scope.ts'
+import { apiKeyOwnerDataClient, ensureApiKeyManagementAllowed, isValidApiKeyIdFormat, selectOwnedApiKeyByIdentifier } from './scope.ts'
 
 const app = honoFactory.createApp()
 
-// Validate id format to prevent PostgREST filter injection
-// ID must be a valid UUID or numeric string
-function isValidIdFormat(id: string): boolean {
-  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-  const numericRegex = /^\d+$/
-  return uuidRegex.test(id) || numericRegex.test(id)
-}
-
-app.get('/', middlewareV2(['all']), async (c) => {
+app.get('/', middlewareV2(), async (c) => {
   const auth = c.get('auth') as AuthInfo
   const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row'] | undefined
 
-  if (auth.authType === 'apikey' && await apiKeyHasLimitedScope(c, apikey)) {
-    throw quickError(401, 'cannot_list_apikeys', 'You cannot do that as a limited API key', { apikeyId: apikey?.id })
-  }
+  await ensureApiKeyManagementAllowed(c, auth, apikey, 'cannot_list_apikeys')
 
-  // Use supabaseWithAuth which handles both JWT and API key authentication
-  const supabase = supabaseWithAuth(c, auth)
-
-  const { data: apikeys, error } = await supabase
+  // API-key auth reaches PostgREST as anon, so the server-mediated broad-key
+  // compatibility path uses a fixed owner filter after the limited-key guard.
+  const { data: apikeys, error } = await apiKeyOwnerDataClient(c, auth)
     .from('apikeys')
     .select('*')
     .eq('user_id', auth.userId)
@@ -38,13 +26,11 @@ app.get('/', middlewareV2(['all']), async (c) => {
   return c.json(apikeys)
 })
 
-app.get('/:id', middlewareV2(['all']), async (c) => {
+app.get('/:id', middlewareV2(), async (c) => {
   const auth = c.get('auth') as AuthInfo
   const authApikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row'] | undefined
 
-  if (auth.authType === 'apikey' && await apiKeyHasLimitedScope(c, authApikey)) {
-    throw quickError(401, 'cannot_get_apikey', 'You cannot do that as a limited API key', { apikeyId: authApikey?.id })
-  }
+  await ensureApiKeyManagementAllowed(c, auth, authApikey, 'cannot_get_apikey')
 
   const id = c.req.param('id')
   if (!id) {
@@ -52,23 +38,13 @@ app.get('/:id', middlewareV2(['all']), async (c) => {
   }
 
   // Validate id format to prevent PostgREST filter injection
-  if (!isValidIdFormat(id)) {
+  if (!isValidApiKeyIdFormat(id)) {
     throw simpleError('invalid_id_format', 'API key ID must be a valid UUID or number')
   }
 
-  // Use supabaseWithAuth which handles both JWT and API key authentication
-  const supabase = supabaseWithAuth(c, auth)
-  const baseQuery = supabase
-    .from('apikeys')
-    .select('*')
-    .eq('user_id', auth.userId)
-
-  const apikeyQuery = /^\d+$/.test(id)
-    ? baseQuery.eq('id', Number(id))
-    : baseQuery.eq('key', id)
-
-  const { data: fetchedApikey, error } = await apikeyQuery
-    .single()
+  // API-key auth reaches PostgREST as anon, so the server-mediated broad-key
+  // compatibility path uses a fixed owner filter after the limited-key guard.
+  const { data: fetchedApikey, error } = await selectOwnedApiKeyByIdentifier(c, auth, id)
   if (error) {
     throw quickError(404, 'failed_to_get_apikey', 'Failed to get API key', { supabaseError: error })
   }

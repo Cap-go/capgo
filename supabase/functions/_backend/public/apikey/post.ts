@@ -65,7 +65,7 @@ async function createApiKeyRecord(
   return apiKey
 }
 
-app.post('/', middlewareV2(['all']), async (c) => {
+app.post('/', middlewareV2(), async (c) => {
   const auth = c.get('auth') as AuthInfo
 
   const body = await parseBody<any>(c)

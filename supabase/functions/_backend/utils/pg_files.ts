@@ -112,48 +112,6 @@ export async function checkMinRightsPg(
 }
 
 /**
- * Check if an API key has the right access to an app using the existing Postgres function
- */
-export async function hasAppRightApikeyPg(
-  c: Context,
-  appId: string,
-  right: Database['public']['Enums']['user_min_right'],
-  userId: string,
-  apikey: string,
-  drizzleClient: ReturnType<typeof getDrizzleClient>,
-): Promise<boolean> {
-  try {
-    cloudlog({
-      requestId: c.get('requestId'),
-      message: 'hasAppRightApikeyPg - start',
-      appId,
-      right,
-      userId,
-      apikeyPrefix: apikey?.substring(0, 15),
-    })
-
-    // Call the existing Postgres function
-    const result = await drizzleClient.execute<{ has_app_right_apikey: boolean }>(
-      sql`SELECT has_app_right_apikey(${appId}, ${right}::user_min_right, ${userId}::uuid, ${apikey})`,
-    )
-
-    const hasPermission = result.rows[0]?.has_app_right_apikey ?? false
-
-    cloudlog({
-      requestId: c.get('requestId'),
-      message: 'hasAppRightApikeyPg - result',
-      hasPermission,
-    })
-
-    return hasPermission
-  }
-  catch (e: unknown) {
-    logPgError(c, 'hasAppRightApikeyPg', e)
-    return false
-  }
-}
-
-/**
  * Get app by app_id with owner_org
  */
 export async function getAppByAppIdPg(

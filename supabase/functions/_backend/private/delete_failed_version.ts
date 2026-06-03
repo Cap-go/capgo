@@ -15,7 +15,7 @@ interface DataUpload {
 
 export const app = new Hono<MiddlewareKeyVariables>()
 
-app.delete('/', middlewareKey(['all', 'write', 'upload']), async (c) => {
+app.delete('/', middlewareKey(), async (c) => {
   const body = await parseBody<DataUpload>(c)
   cloudlog({ requestId: c.get('requestId'), message: 'delete failed version body', body })
   const apikey = c.get('apikey')

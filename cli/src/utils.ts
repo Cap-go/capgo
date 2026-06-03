@@ -627,7 +627,7 @@ export async function getRemoteFileConfig() {
   }
 }
 
-function normalizeSupabaseHost(host: string): string {
+export function normalizeSupabaseHost(host: string): string {
   const parsed = new URL(host)
   if (!['http:', 'https:'].includes(parsed.protocol))
     throw new Error('Invalid Supabase host protocol')

@@ -3,7 +3,7 @@
 BEGIN;
 
 -- Plan the number of tests
-SELECT plan(44);
+SELECT plan(49);
 
 -- Test app_versions policies
 SELECT
@@ -133,10 +133,75 @@ SELECT
             'Allow insert org for user',
             'Allow org delete for super_admin',
             'Allow select for auth, api keys (read+)',
-            'Allow update for auth (admin+)',
+            'Allow org settings update via RBAC',
+            'Deny disabling RBAC flag on org insert',
+            'Deny disabling RBAC flag on org update',
             'Prevent non 2FA access'
         ],
         'orgs should have correct policies'
+    );
+
+SELECT
+    is(
+        (
+            SELECT permissive
+            FROM pg_policies
+            WHERE
+                schemaname = 'public'
+                AND tablename = 'orgs'
+                AND policyname = 'Deny disabling RBAC flag on org insert'
+        ),
+        'RESTRICTIVE',
+        'orgs use_new_rbac insert guard should be restrictive'
+    );
+
+SELECT
+    is(
+        (
+            SELECT permissive
+            FROM pg_policies
+            WHERE
+                schemaname = 'public'
+                AND tablename = 'orgs'
+                AND policyname = 'Deny disabling RBAC flag on org update'
+        ),
+        'RESTRICTIVE',
+        'orgs use_new_rbac update guard should be restrictive'
+    );
+
+SELECT
+    is(
+        (
+            SELECT count(*)
+            FROM pg_trigger
+            WHERE
+                tgname = 'force_org_rbac_enabled'
+                AND tgrelid = 'public.orgs'::regclass
+                AND NOT tgisinternal
+        ),
+        1::bigint,
+        'orgs should force use_new_rbac true through a trigger'
+    );
+
+SELECT
+    is(
+        public.rbac_rollback_org('00000000-0000-0000-0000-000000000000'::uuid)->>'status',
+        'not_supported',
+        'rbac_rollback_org should not disable RBAC'
+    );
+
+SELECT
+    is(
+        (
+            SELECT (COALESCE(qual, '') || COALESCE(with_check, '')) !~ 'key_mode|all,write'
+            FROM pg_policies
+            WHERE
+                schemaname = 'public'
+                AND tablename = 'orgs'
+                AND policyname = 'Allow org settings update via RBAC'
+        ),
+        true,
+        'orgs update policy should use named RBAC instead of legacy key modes'
     );
 
 -- Test devices policies
@@ -524,7 +589,7 @@ SELECT
     policy_cmd_is(
         'public',
         'orgs',
-        'Allow update for auth (admin+)',
+        'Allow org settings update via RBAC',
         'UPDATE',
         'Update policy on orgs should be for UPDATE command'
     );

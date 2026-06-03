@@ -11,19 +11,12 @@ import { closeClient, getDrizzleClient, getPgClient } from '../../utils/pg.ts'
 import { checkPermission } from '../../utils/rbac.ts'
 import { schema } from '../../utils/postgres_schema.ts'
 import { supabaseAdmin, supabaseWithAuth, validateExpirationAgainstOrgPolicies, validateExpirationDate } from '../../utils/supabase.ts'
-import { apiKeyHasLimitedScope } from './scope.ts'
+import { apiKeyOwnerDataClient, ensureApiKeyManagementAllowed, isValidApiKeyIdFormat, selectOwnedApiKeyByIdentifier } from './scope.ts'
 
 const app = honoFactory.createApp()
 const APIKEY_ORG_READER_ROLE = 'apikey_org_reader'
 type ApiKeyUpdateData = Partial<Pick<Database['public']['Tables']['apikeys']['Update'], 'name' | 'expires_at'>>
-
-// Validate id format to prevent PostgREST filter injection
-// ID must be a valid UUID or numeric string
-function isValidIdFormat(id: string): boolean {
-  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-  const numericRegex = /^\d+$/
-  return uuidRegex.test(id) || numericRegex.test(id)
-}
+type ApiKeyLookupRow = Pick<Database['public']['Tables']['apikeys']['Row'], 'id' | 'rbac_id' | 'expires_at' | 'key' | 'key_hash'>
 
 interface ApiKeyPut {
   id?: string | number
@@ -222,10 +215,7 @@ async function handlePut(c: Context<MiddlewareKeyVariables>, idParam?: string) {
   const auth = c.get('auth') as AuthInfo
   const authApikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row'] | undefined
 
-  // Block any constrained API key from mutating other keys owned by the same user.
-  if (auth.authType === 'apikey' && await apiKeyHasLimitedScope(c, authApikey)) {
-    throw quickError(401, 'cannot_update_apikey', 'You cannot do that as a limited API key', { requestId, apikeyId: authApikey?.id })
-  }
+  await ensureApiKeyManagementAllowed(c, auth, authApikey, 'cannot_update_apikey', { requestId })
 
   const body = await parseBody<ApiKeyPut>(c)
   const { id, name, expires_at, regenerate } = body
@@ -238,7 +228,7 @@ async function handlePut(c: Context<MiddlewareKeyVariables>, idParam?: string) {
   }
 
   // Validate id format to prevent PostgREST filter injection
-  if (!isValidIdFormat(resolvedId)) {
+  if (!isValidApiKeyIdFormat(resolvedId)) {
     throw simpleError('invalid_id_format', 'API key ID must be a valid UUID or number', { requestId })
   }
 
@@ -270,24 +260,15 @@ async function handlePut(c: Context<MiddlewareKeyVariables>, idParam?: string) {
     throw simpleError('no_valid_fields_provided_for_update', 'No valid fields provided for update. Provide name, expires_at, bindings, or regenerate.', { requestId })
   }
 
-  // Use supabaseWithAuth which handles both JWT and API key authentication
   const supabase = supabaseWithAuth(c, auth)
+  // API-key auth reaches PostgREST as anon, so the server-mediated broad-key
+  // compatibility path uses fixed owner filters after the limited-key guard.
+  const dataSupabase = apiKeyOwnerDataClient(c, auth)
   const policyLookupSupabase = supabaseAdmin(c)
 
-  // Check if the apikey to update exists (RLS handles ownership)
-  const baseQuery = supabase
-    .from('apikeys')
-    .select('id, rbac_id, expires_at, key, key_hash')
-    .eq('user_id', auth.userId)
-
-  // Avoid PostgREST cast errors by querying only the relevant column:
-  // - apikeys.id is bigint (numeric)
-  // - apikeys.key is varchar (UUID string)
-  const apikeyQuery = /^\d+$/.test(resolvedId)
-    ? baseQuery.eq('id', Number(resolvedId))
-    : baseQuery.eq('key', resolvedId)
-
-  const { data: existingApikey, error: fetchError } = await apikeyQuery.single()
+  // Check if the API key to update exists. JWT callers rely on RLS; API-key
+  // callers use the fixed user_id filter above after passing the limited-key guard.
+  const { data: existingApikey, error: fetchError } = await selectOwnedApiKeyByIdentifier<ApiKeyLookupRow>(c, auth, resolvedId, 'id, rbac_id, expires_at, key, key_hash')
 
   if (fetchError) {
     // RLS might return an error or just no data if not found/accessible
@@ -298,6 +279,12 @@ async function handlePut(c: Context<MiddlewareKeyVariables>, idParam?: string) {
   }
   if (!existingApikey.rbac_id) {
     throw quickError(409, 'apikey_missing_rbac_bindings', 'API key is missing RBAC bindings and cannot be updated', { requestId, apikeyId: existingApikey.id })
+  }
+  if (auth.authType === 'apikey' && authApikey?.id === existingApikey.id) {
+    throw quickError(401, 'cannot_update_apikey', 'API keys cannot update themselves', { requestId, apikeyId: authApikey.id })
+  }
+  if (auth.authType === 'apikey' && hasBindingUpdates) {
+    throw quickError(401, 'cannot_update_apikey', 'API keys cannot update API key bindings', { requestId, apikeyId: authApikey?.id })
   }
 
   // Validate expiration against org policies (only if expiration or scopes are changing)
@@ -324,6 +311,12 @@ async function handlePut(c: Context<MiddlewareKeyVariables>, idParam?: string) {
 
   const isHashedKey = existingApikey.key_hash !== null
 
+  // API-key auth reaches PostgREST as anon, so the server-mediated broad-key
+  // compatibility path uses fixed id/user_id filters after the limited-key and self-key guards.
+  const writeSupabase = auth.authType === 'apikey'
+    ? supabaseAdmin(c)
+    : supabase
+
   let updatedApikey: Database['public']['Tables']['apikeys']['Row'] | typeof existingApikey = existingApikey
   if (hasBindingUpdates) {
     await replaceApiKeyBindings(c, auth, {
@@ -331,7 +324,7 @@ async function handlePut(c: Context<MiddlewareKeyVariables>, idParam?: string) {
       rbac_id: existingApikey.rbac_id,
     }, currentBindingOrgIds, bindings, hasUpdates ? updateData : undefined)
 
-    const { data: updatedData, error: fetchUpdatedError } = await supabase
+    const { data: updatedData, error: fetchUpdatedError } = await dataSupabase
       .from('apikeys')
       .select()
       .eq('id', existingApikey.id)
@@ -344,7 +337,7 @@ async function handlePut(c: Context<MiddlewareKeyVariables>, idParam?: string) {
     updatedApikey = updatedData
   }
   else if (hasUpdates) {
-    const { data: updatedData, error: updateError } = await supabase
+    const { data: updatedData, error: updateError } = await writeSupabase
       .from('apikeys')
       .update(updateData)
       .eq('id', existingApikey.id) // Use the fetched ID to ensure we update the correct record
@@ -360,16 +353,21 @@ async function handlePut(c: Context<MiddlewareKeyVariables>, idParam?: string) {
 
   if (regenerate) {
     if (isHashedKey) {
-      const { data: regeneratedApikey, error: regenerateError } = await supabase.rpc('regenerate_hashed_apikey', {
-        p_apikey_id: existingApikey.id,
-      })
+      const { data: regeneratedApikey, error: regenerateError } = auth.authType === 'apikey'
+        ? await supabaseAdmin(c).rpc('regenerate_hashed_apikey_for_user', {
+            p_apikey_id: existingApikey.id,
+            p_user_id: auth.userId,
+          })
+        : await supabase.rpc('regenerate_hashed_apikey', {
+            p_apikey_id: existingApikey.id,
+          })
       if (regenerateError || !regeneratedApikey) {
         throw quickError(500, 'failed_to_update_apikey', 'Failed to regenerate API key', { requestId, supabaseError: regenerateError })
       }
       return c.json(regeneratedApikey)
     }
 
-    const { data: updatedData, error: updateError } = await supabase
+    const { data: updatedData, error: updateError } = await writeSupabase
       .from('apikeys')
       // Any non-null value different from the current key will trigger the
       // `apikeys_force_server_key()` database trigger to regenerate the key.
@@ -390,7 +388,7 @@ async function handlePut(c: Context<MiddlewareKeyVariables>, idParam?: string) {
   return c.json(updatedApikey)
 }
 
-app.put('/', middlewareV2(['all']), async c => handlePut(c))
-app.put('/:id', middlewareV2(['all']), async c => handlePut(c, c.req.param('id')))
+app.put('/', middlewareV2(), async c => handlePut(c))
+app.put('/:id', middlewareV2(), async c => handlePut(c, c.req.param('id')))
 
 export default app

@@ -18,7 +18,7 @@ dayjs.extend(utc)
 
 export const app = honoFactory.createApp()
 app.use('*', useCors)
-app.use('*', middlewareV2(['all', 'read']))
+app.use('*', middlewareV2())
 
 function accumulateNumbers(values: number[]): number[] {
   return values.reduce<number[]>((result, value) => {
