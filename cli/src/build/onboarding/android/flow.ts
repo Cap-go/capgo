@@ -20,6 +20,16 @@ import type { KeystoreOptions, KeystoreResult, ListAliasesResult, ProbeKeyPasswo
 import type { ValidateOptions, ValidationResult } from './service-account-validation.js'
 import type { GcpProject, GcpServiceAccount, GcpServiceAccountKey } from './gcp-api.js'
 import type { GoogleOAuthTokens, GoogleUserInfo, PendingOAuthSession, RunOAuthFlowOptions } from './oauth-google.js'
+// ── Post-save "tail" helper types (CI-secrets → env-export → workflow-file →
+//    build-request). Imported as types only; the engine never imports the
+//    concrete helpers — the driver injects them via the optional deps below so
+//    the core stays IO-free and the MCP bridge can supply its own bindings.
+import type { BuildCredentials } from '../../../schemas/build.js'
+import type { BuildLogger, BuildRequestOptions, BuildRequestResult } from '../../request.js'
+import type { AsyncCommandRunner, CiSecretDiscovery, CiSecretEntry, CiSecretTarget, CommandRunner } from '../ci-secrets.js'
+import type { EnvExportOpts, EnvExportResult } from '../env-export.js'
+import type { GeneratedWorkflow, WorkflowGeneratorOpts } from '../workflow-generator.js'
+import type { WorkflowWriteOptions, WorkflowWriteResult } from '../workflow-writer.js'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 
@@ -895,6 +905,85 @@ export interface AndroidEffectDeps {
    * the hood.
    */
   findAndroidApplicationIds: () => Promise<string[]>
+
+  // ── Post-save "tail" helpers (Phase 1 engine tail) ───────────────────────
+  // The CI-secrets → env-export → workflow-file → build-request sub-flow that
+  // runs after credentials are saved. Every field is OPTIONAL and ADDITIVE: the
+  // driver injects the concrete helper (pre-binding any cwd/runner/config it
+  // owns) so the core stays IO-free. Signatures mirror the matching helper
+  // modules verbatim so a driver can pass the real function unchanged. Cases
+  // that consume these are wired in later tasks (A3/A4) — A2 only widens the
+  // surface; existing call sites and the MCP bridge keep type-checking because
+  // none of these are required.
+
+  /**
+   * Build the CI-secret entries (key/value/masked) from the saved credentials.
+   * Mirrors ci-secrets.ts: createCiSecretEntries(credentials, apiKey?).
+   */
+  createCiSecretEntries?: (credentials: Partial<BuildCredentials>, apiKey?: string) => CiSecretEntry[]
+
+  /**
+   * Detect which CI-secret destinations (GitHub/GitLab) are reachable.
+   * Mirrors ci-secrets.ts: detectCiSecretTargets(runner?). The driver pre-binds
+   * the command runner, so the core calls this with no args.
+   */
+  detectCiSecretTargets?: (runner?: CommandRunner) => CiSecretDiscovery
+
+  /**
+   * Resolve the concrete `owner/repo` (GitHub) or `group/project` (GitLab) the
+   * CLI will target, so the user can confirm before any secret is overwritten.
+   * Mirrors ci-secrets.ts: getCiSecretRepoLabelAsync(target, runner?).
+   */
+  getCiSecretRepoLabelAsync?: (target: CiSecretTarget, runner?: AsyncCommandRunner) => Promise<string | null>
+
+  /**
+   * List which of `keys` already exist as secrets/variables on the remote.
+   * Mirrors ci-secrets.ts: listExistingCiSecretKeysAsync(target, keys, runner?).
+   */
+  listExistingCiSecretKeysAsync?: (target: CiSecretTarget, keys: string[], runner?: AsyncCommandRunner) => Promise<string[]>
+
+  /**
+   * Push the CI-secret entries to the target, reporting per-key progress.
+   * Mirrors ci-secrets.ts: uploadCiSecretsAsync(target, entries, existingKeys?, runner?, onProgress?).
+   */
+  uploadCiSecretsAsync?: (
+    target: CiSecretTarget,
+    entries: CiSecretEntry[],
+    existingKeys?: string[],
+    runner?: AsyncCommandRunner,
+    onProgress?: (current: number, total: number, keyName: string) => void,
+  ) => Promise<void>
+
+  /**
+   * Write the credentials to a local 0o600 `.env` file (no git operation).
+   * Mirrors env-export.ts: exportCredentialsToEnv(opts).
+   */
+  exportCredentialsToEnv?: (opts: EnvExportOpts) => EnvExportResult
+
+  /**
+   * Resolve the default `.env` export path for an app + platform (pure).
+   * Mirrors env-export.ts: defaultExportPath(appId, platform).
+   */
+  defaultExportPath?: (appId: string, platform: 'ios' | 'android') => string
+
+  /**
+   * Generate the GitHub Actions workflow YAML (pure).
+   * Mirrors workflow-generator.ts: generateWorkflow(opts).
+   */
+  generateWorkflow?: (opts: WorkflowGeneratorOpts) => GeneratedWorkflow
+
+  /**
+   * Generate + write the workflow file to `.github/workflows/capgo-build.yml`.
+   * Mirrors workflow-writer.ts: writeWorkflowFile(opts, writeOptions?).
+   */
+  writeWorkflowFile?: (opts: WorkflowGeneratorOpts, writeOptions?: WorkflowWriteOptions) => WorkflowWriteResult
+
+  /**
+   * Fire the actual `capgo build request`. The driver pre-binds the logger /
+   * silent flag it owns; the core supplies appId + options.
+   * Mirrors request.ts: requestBuildInternal(appId, options, silent?, logger?).
+   */
+  requestBuildInternal?: (appId: string, options: BuildRequestOptions, silent?: boolean, logger?: BuildLogger) => Promise<BuildRequestResult>
 
   // ── Callbacks (optional — callers that don't need streaming can omit) ────
   onStatus?: (message: string) => void
