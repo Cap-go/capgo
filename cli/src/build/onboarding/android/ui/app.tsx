@@ -994,7 +994,15 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
           const existing = await loadSavedCredentials(appId)
           if (cancelled)
             return
-          if (existing?.android && !initialProgress)
+          // NB: do NOT gate this on `!initialProgress`. The welcome step is
+          // only reached via the trivial-welcome resume case or the
+          // resume-prompt Restart handler — never during an actual resume
+          // (that routes resume-prompt → startStep directly). Gating on the
+          // stale, still-non-null `initialProgress` prop would send a Restart
+          // straight to keystore-method-select and silently overwrite existing
+          // saved credentials without offering the backup flow. Mirror iOS
+          // (cli/src/build/onboarding/ui/app.tsx) and check creds only.
+          if (existing?.android)
             setStep('credentials-exist')
           else
             setStep('keystore-method-select')
