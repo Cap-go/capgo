@@ -108,8 +108,15 @@ function keystoreResumeStep(progress: AndroidOnboardingProgress): AndroidOnboard
   if (progress.keystoreMethod === 'generate') {
     if (progress.keystoreStorePassword && progress.keystoreAlias)
       return 'keystore-new-cn'
-    if (progress.keystoreAlias)
+    if (progress.keystoreAlias) {
+      // Once the user picks "manual", advance to the dedicated store-password
+      // input so the step title changes and a stateless caller (the MCP) sees
+      // clear forward progress. "random" auto-fills the password above, so it
+      // never reaches this branch.
+      if (progress.keystorePasswordManual)
+        return 'keystore-new-store-password'
       return 'keystore-new-password-method'
+    }
     return 'keystore-new-alias'
   }
   return 'keystore-method-select'

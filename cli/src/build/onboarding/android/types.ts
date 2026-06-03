@@ -190,6 +190,13 @@ export interface AndroidOnboardingProgress {
   _keystoreBase64?: string
   /** Base64 of the downloaded SA JSON key — saved as PLAY_CONFIG_JSON at end. */
   _serviceAccountKeyBase64?: string
+  // ── MCP markers (added by the shared engine; harmless to the ink TUI) ──
+  /** Platform whose onboarding is currently in-flight. */
+  activePlatform?: 'android'
+  /** True when the new-keystore password was auto-generated (random). Never logged. */
+  keystorePasswordGenerated?: boolean
+  /** True once the user chose the MANUAL password method (lets the stateless MCP advance). */
+  keystorePasswordManual?: boolean
 }
 
 export const ANDROID_STEP_PROGRESS: Record<AndroidOnboardingStep, number> = {
