@@ -232,6 +232,22 @@ export interface IosStepCtx {
    */
   bundleIdCandidates?: BundleIdCandidate[]
 
+  // ── Error step transient (BATCH 8 — EPHEMERAL, NEVER persisted) ──────────
+  // The error screen's content. The failing effect sets transient.error (the
+  // human message it surfaced via deps.onLog) and, when the failure is
+  // recoverable, transient.retryStep (the step to re-run). The driver threads
+  // both back as deps.carried so the error VIEW renders the message + a retry
+  // action and the error RESOLVER (runIosEffect('error')) routes a retry to
+  // carried.retryStep. Mirrors the Ink TUI's setError + setRetryStep + the
+  // ErrorStep retry/restart/exit Select (ui/app.tsx:1087-1122 / 4454-4485).
+  // RISK: these MUST stay off progress.json — an error is transient runtime
+  // state, exactly like the android engine's wrongPassword signal. getIosResumeStep
+  // never returns 'error', so a resume always re-enters the failing phase fresh.
+  /** Human-readable error message the error view renders (failing step's message). */
+  error?: string
+  /** The step to re-run when the user picks "Try again" (absent = no retry offered). */
+  retryStep?: OnboardingStep
+
   // ── Shared post-save tail transient (reused verbatim from android) ───────
   // The same fields the android engine threads after saving-credentials. Spread
   // in so the `saving-credentials → ask-build` handoff (BATCH 1) carries them.
@@ -545,6 +561,25 @@ export interface IosEffectDeps {
      * variant. Mirrors the TUI leaving `noMatchReason` untouched on back-nav.
      */
     noMatchReason?: IosNoMatchReason
+    /**
+     * The step to re-run when the user picks "Try again" on the error screen
+     * (BATCH 8). EPHEMERAL — set by the failing effect into transient.retryStep,
+     * threaded back here by the driver, and read by the error RESOLVER
+     * (runIosEffect('error')) to route a retry. NEVER persisted: an error is
+     * transient runtime state, so a crash-recovery resume re-enters the failing
+     * phase fresh (getIosResumeStep never returns 'error'). Mirrors the TUI's
+     * setRetryStep + the ErrorStep 'retry' branch (app.tsx:1116 / 4468).
+     */
+    retryStep?: OnboardingStep
+    /**
+     * The user's pick on the error screen (BATCH 8). EPHEMERAL — `applyIosInput`
+     * persists nothing; the driver records the choice here and re-drives the step
+     * as a resolver. 'retry' → re-run carried.retryStep (the failing step);
+     * 'restart' → welcome (a fresh reset); 'exit'/absent → stay on 'error' (the
+     * terminal exit sink — the driver leaves onboarding, mirroring the TUI's
+     * exitOnboarding at app.tsx:4482). NEVER persisted.
+     */
+    errorAction?: 'retry' | 'restart' | 'exit'
   }
 
   // ── callbacks (optional — callers that don't need streaming can omit) ────
@@ -959,6 +994,18 @@ const OPTIONS_DUPLICATE_PROFILE: IosStepOption[] = [
   { value: 'delete', label: '🗑️   Delete the duplicate profile(s) and create a fresh one' },
   { value: 'exit', label: '✖  Exit onboarding' },
 ]
+
+// ─── error step vocabulary (BATCH 8) ────────────────────────────────────────────
+//
+// The error screen's action menu. Mirrors the TUI's ErrorStep RETRY_OPTIONS
+// (ui/steps/ios-shared.tsx:276) exactly: 'retry' (re-run the failing step),
+// 'restart' (reset to a fresh welcome), 'exit' (leave onboarding). The 'retry'
+// row is only offered when a retryStep is present — the TUI gates it on
+// `showRetry={!!retryStep}` (app.tsx:4459). The driver re-drives the step as a
+// resolver (runIosEffect('error')) reading deps.carried.retryStep.
+const OPTION_ERROR_RETRY: IosStepOption = { value: 'retry', label: '🔄  Try again' }
+const OPTION_ERROR_RESTART: IosStepOption = { value: 'restart', label: '↩️   Restart onboarding' }
+const OPTION_ERROR_EXIT: IosStepOption = { value: 'exit', label: '❌  Exit' }
 
 // ─── confirm-app-id vocabulary (BATCH 4) ────────────────────────────────────────
 //
@@ -1431,6 +1478,32 @@ export function iosViewForStep(
         ],
       }
     }
+
+    // ── error (kind 'error' — the recovery screen) ────────────────────────────
+    // app.tsx:4454-4485 + ui/steps/ios-shared.tsx (ErrorStep). Renders the
+    // failing step's message (ctx.error — set by the effect into transient.error
+    // and threaded back via deps.carried) and offers Try again / Restart / Exit.
+    // The 'retry' row is gated on a retryStep being present (the TUI's
+    // `showRetry={!!retryStep}`, app.tsx:4459): a recoverable failure carries a
+    // retryStep, an unrecoverable one (e.g. an EXIT sink from an export-warning
+    // 'exit' pick) carries none, so only Restart / Exit are offered. The message
+    // + options are ALL ephemeral (ctx), never derived from persisted progress —
+    // mirroring the TUI holding error/retryStep in React state, not progress.json.
+    case 'error': {
+      const message = ctx?.error ?? 'An error occurred.'
+      const options: IosStepOption[] = [
+        ...(ctx?.retryStep ? [OPTION_ERROR_RETRY] : []),
+        OPTION_ERROR_RESTART,
+        OPTION_ERROR_EXIT,
+      ]
+      return {
+        step,
+        kind: 'error',
+        title: 'Something went wrong',
+        message,
+        options,
+      }
+    }
     default:
       return { step, kind: 'auto', title: step }
   }
@@ -1646,6 +1719,34 @@ export function applyIosInput(
   }
 }
 
+// ─── error-step result helper (BATCH 8) ─────────────────────────────────────────
+//
+// Build the `next: 'error'` IosEffectResult, threading the failing step's MESSAGE
+// (so the error VIEW has content — iosViewForStep('error') reads ctx.error) and,
+// when the failure is recoverable, the step to re-run (so the view offers "Try
+// again" and the resolver routes a retry there). This mirrors the TUI's
+// handleError(err, failedStep) → setError(message) + setRetryStep(failedStep)
+// (app.tsx:1115-1116). Both ride transient ONLY — never persisted (error/retryStep
+// are EPHEMERAL runtime state; getIosResumeStep never returns 'error'). Effects
+// keep their existing deps.onLog('✖ …') call (the streaming log line); this just
+// ALSO surfaces the message to the error screen. `retryStep` is omitted for the
+// EXIT-sink branches (cert-limit / duplicate-profile / export-warning 'exit'),
+// which are user-initiated exits, not recoverable failures — so the error view
+// offers only Restart / Exit, exactly as the TUI shows no retry without a retryStep.
+function iosError(
+  progress: OnboardingProgress,
+  message: string,
+  retryStep?: OnboardingStep,
+  extraTransient?: Partial<IosStepCtx>,
+): IosEffectResult {
+  return {
+    progress,
+    next: 'error',
+    transient: { error: message, ...(retryStep ? { retryStep } : {}), ...extraTransient },
+  }
+}
+
+
 /**
  * Run the async side-effect for a step. Post-save tail steps (incl.
  * saving-credentials) delegate to the shared neutral module via toTailDeps; the
@@ -1783,7 +1884,7 @@ export async function runIosEffect(
       }
       catch (err) {
         deps.onLog?.(`✖ ${err instanceof Error ? err.message : String(err)}`, 'red')
-        return { progress, next: 'error' }
+        return iosError(progress, err instanceof Error ? err.message : String(err), step)
       }
     }
 
@@ -1838,7 +1939,7 @@ export async function runIosEffect(
           return { progress, next: 'cert-limit-prompt', transient: { existingCerts } }
         }
         deps.onLog?.(`✖ ${err instanceof Error ? err.message : String(err)}`, 'red')
-        return { progress, next: 'error' }
+        return iosError(progress, err instanceof Error ? err.message : String(err), step)
       }
     }
 
@@ -1920,7 +2021,7 @@ export async function runIosEffect(
           }
         }
         deps.onLog?.(`✖ ${err instanceof Error ? err.message : String(err)}`, 'red')
-        return { progress, next: 'error' }
+        return iosError(progress, err instanceof Error ? err.message : String(err), step)
       }
     }
 
@@ -1937,7 +2038,7 @@ export async function runIosEffect(
     case 'cert-limit-prompt': {
       const certToRevoke = deps.carried?.certToRevoke
       if (!certToRevoke)
-        return { progress, next: 'error' }
+        return iosError(progress, 'Onboarding cancelled at the certificate-limit prompt. Re-run `build init` to resume.')
       return { progress, next: 'revoking-certificate', transient: { certToRevoke } }
     }
 
@@ -1960,7 +2061,7 @@ export async function runIosEffect(
       }
       catch (err) {
         deps.onLog?.(`✖ ${err instanceof Error ? err.message : String(err)}`, 'red')
-        return { progress, next: 'error' }
+        return iosError(progress, err instanceof Error ? err.message : String(err), step)
       }
     }
 
@@ -1975,7 +2076,7 @@ export async function runIosEffect(
     // reads to route back to the right origin. PURE routing — no IO.
     case 'duplicate-profile-prompt': {
       if (!deps.carried?.confirmDeleteDuplicates)
-        return { progress, next: 'error' }
+        return iosError(progress, 'Onboarding cancelled at the duplicate-profile prompt. Re-run `build init` to resume.')
       return { progress, next: 'deleting-duplicate-profiles' }
     }
 
@@ -2003,7 +2104,7 @@ export async function runIosEffect(
       }
       catch (err) {
         deps.onLog?.(`✖ ${err instanceof Error ? err.message : String(err)}`, 'red')
-        return { progress, next: 'error' }
+        return iosError(progress, err instanceof Error ? err.message : String(err), step)
       }
     }
 
@@ -2039,8 +2140,9 @@ export async function runIosEffect(
         ])
         const distOnly = identities.filter(i => i.type === 'distribution')
         if (distOnly.length === 0) {
-          deps.onLog?.('✖ No iOS Distribution identities found in your default Keychain', 'red')
-          return { progress, next: 'error' }
+          const msg = 'No iOS Distribution identities found in your default Keychain.'
+          deps.onLog?.(`✖ ${msg}`, 'red')
+          return iosError(progress, msg, 'import-scanning')
         }
         const importMatches = matchIdentitiesToProfiles(distOnly, profiles)
         deps.onLog?.(`✔ Found ${distOnly.length} distribution identit${distOnly.length === 1 ? 'y' : 'ies'} and ${profiles.length} profile${profiles.length === 1 ? '' : 's'} on this Mac`)
@@ -2052,7 +2154,7 @@ export async function runIosEffect(
       }
       catch (err) {
         deps.onLog?.(`✖ ${err instanceof Error ? err.message : String(err)}`, 'red')
-        return { progress, next: 'error' }
+        return iosError(progress, err instanceof Error ? err.message : String(err), step)
       }
     }
 
@@ -2114,7 +2216,7 @@ export async function runIosEffect(
       }
       catch (err) {
         deps.onLog?.(`✖ ${err instanceof Error ? err.message : String(err)}`, 'red')
-        return { progress, next: 'error' }
+        return iosError(progress, err instanceof Error ? err.message : String(err), step)
       }
     }
     // ── import-pick-identity (resolver effect, EPHEMERAL-dep) ─────────────────
@@ -2177,7 +2279,7 @@ export async function runIosEffect(
     case 'import-checking-apple-cert': {
       const chosenIdentity = deps.carried?.chosenIdentity
       if (!chosenIdentity)
-        return { progress, next: 'error' }
+        return iosError(progress, 'Internal error: no identity chosen for the Apple cert check.', 'import-scanning')
 
       const appId = resolveIosBundleId(progress)
       const dist = progress.importDistribution
@@ -2246,7 +2348,7 @@ export async function runIosEffect(
       }
       catch (err) {
         deps.onLog?.(`✖ ${err instanceof Error ? err.message : String(err)}`, 'red')
-        return { progress, next: 'error' }
+        return iosError(progress, err instanceof Error ? err.message : String(err), step)
       }
     }
 
@@ -2280,26 +2382,22 @@ export async function runIosEffect(
       const bundleOk = bundleIdMatches(chosenProfile.bundleId, appId)
       const distOk = !dist || chosenProfile.profileType === dist
       if (!bundleOk || !distOk) {
-        deps.onLog?.(
-          `✖ Profile "${chosenProfile.name}" doesn't match this app: `
+        const msg = `Profile "${chosenProfile.name}" doesn't match this app: `
           + `bundle ${chosenProfile.bundleId} (expected ${appId}), `
-          + `type ${chosenProfile.profileType} (expected ${dist ?? 'any'}).`,
-          'red',
-        )
-        return { progress, next: 'error' }
+          + `type ${chosenProfile.profileType} (expected ${dist ?? 'any'}).`
+        deps.onLog?.(`✖ ${msg}`, 'red')
+        return iosError(progress, msg, 'import-pick-identity')
       }
       // Cert-trust check: the profile's allowed-certs list must include the chosen
       // identity's SHA-1 (app.tsx:3508–3519). Surface the entry count + truncated
       // SHA-1s so the user can see WHY the profile won't sign with their cert.
       if (chosenIdentity && !chosenProfile.certificateSha1s.includes(chosenIdentity.sha1)) {
         const shownSha1s = chosenProfile.certificateSha1s.map(s => `${s.slice(0, 8)}…`).join(', ') || '(none listed)'
-        deps.onLog?.(
-          `✖ Profile "${chosenProfile.name}" doesn't trust your chosen certificate "${chosenIdentity.name}". `
+        const msg = `Profile "${chosenProfile.name}" doesn't trust your chosen certificate "${chosenIdentity.name}". `
           + `The profile's allowed-certs list contains ${chosenProfile.certificateSha1s.length} entr${chosenProfile.certificateSha1s.length === 1 ? 'y' : 'ies'} (SHA1: ${shownSha1s}); your cert's SHA1 starts with ${chosenIdentity.sha1.slice(0, 8)}…. `
-          + `Either pick a different profile, or re-create this profile in the Apple Developer Portal and tick the right cert.`,
-          'red',
-        )
-        return { progress, next: 'error' }
+          + `Either pick a different profile, or re-create this profile in the Apple Developer Portal and tick the right cert.`
+        deps.onLog?.(`✖ ${msg}`, 'red')
+        return iosError(progress, msg, 'import-pick-identity')
       }
       deps.onLog?.(`✔ Profile · ${chosenProfile.name}`)
       return { progress, next: 'import-export-warning' }
@@ -2405,8 +2503,9 @@ export async function runIosEffect(
     case 'import-provide-profile-path': {
       const chosenIdentity = deps.carried?.chosenIdentity
       if (!chosenIdentity) {
-        deps.onLog?.('✖ Internal error: no identity chosen for .mobileprovision import.', 'red')
-        return { progress, next: 'error' }
+        const msg = 'Internal error: no identity chosen for .mobileprovision import.'
+        deps.onLog?.(`✖ ${msg}`, 'red')
+        return iosError(progress, msg)
       }
       const noMatchReason = deps.carried?.noMatchReason
       const stickyTransient = noMatchReason ? { noMatchReason } : {}
@@ -2433,38 +2532,33 @@ export async function runIosEffect(
           detail = deps.parseMobileprovisionDetailed!(bytes)
         }
         catch (err) {
-          deps.onLog?.(`✖ Couldn't parse "${filePath}": ${err instanceof Error ? err.message : String(err)}`, 'red')
-          return { progress, next: 'error', transient: { profilePickerOpened: true } }
+          const msg = `Couldn't parse "${filePath}": ${err instanceof Error ? err.message : String(err)}`
+          deps.onLog?.(`✖ ${msg}`, 'red')
+          return iosError(progress, msg, 'import-provide-profile-path', { profilePickerOpened: true })
         }
 
         // Invariant 1 — bundle id (wildcard-aware via bundleIdMatches).
         if (!bundleIdMatches(detail.bundleId, appId)) {
-          deps.onLog?.(
-            `✖ This .mobileprovision is for bundle ID "${detail.bundleId}" but the current app is "${appId}". `
-            + 'Pick a profile that targets the right app (wildcard profiles like "com.example.*" are accepted), or use "Create a new App Store profile" in the recovery menu.',
-            'red',
-          )
-          return { progress, next: 'error', transient: { profilePickerOpened: true } }
+          const msg = `This .mobileprovision is for bundle ID "${detail.bundleId}" but the current app is "${appId}". `
+            + 'Pick a profile that targets the right app (wildcard profiles like "com.example.*" are accepted), or use "Create a new App Store profile" in the recovery menu.'
+          deps.onLog?.(`✖ ${msg}`, 'red')
+          return iosError(progress, msg, 'import-provide-profile-path', { profilePickerOpened: true })
         }
         // Invariant 2 — distribution mode.
         if (dist && detail.profileType !== dist) {
-          deps.onLog?.(
-            `✖ This .mobileprovision is a ${detail.profileType} profile but you picked ${dist} distribution. `
-            + 'Pick a profile that matches, or restart and pick the matching distribution mode.',
-            'red',
-          )
-          return { progress, next: 'error', transient: { profilePickerOpened: true } }
+          const msg = `This .mobileprovision is a ${detail.profileType} profile but you picked ${dist} distribution. `
+            + 'Pick a profile that matches, or restart and pick the matching distribution mode.'
+          deps.onLog?.(`✖ ${msg}`, 'red')
+          return iosError(progress, msg, 'import-provide-profile-path', { profilePickerOpened: true })
         }
         // Invariant 3 — cert trust (the profile must list the chosen cert's SHA-1).
         if (!detail.certificateSha1s.includes(chosenIdentity.sha1)) {
           const shownSha1s = detail.certificateSha1s.map(c => `${c.slice(0, 8)}…`).join(', ') || '(none listed)'
-          deps.onLog?.(
-            `✖ This .mobileprovision doesn't trust your chosen certificate "${chosenIdentity.name}". `
+          const msg = `This .mobileprovision doesn't trust your chosen certificate "${chosenIdentity.name}". `
             + `Allowed certs in the profile (SHA1): ${shownSha1s}; your cert starts with ${chosenIdentity.sha1.slice(0, 8)}…. `
-            + 'Either pick a different cert at the identity step, or re-create this profile in the Apple Developer Portal and tick the right one.',
-            'red',
-          )
-          return { progress, next: 'error', transient: { profilePickerOpened: true } }
+            + 'Either pick a different cert at the identity step, or re-create this profile in the Apple Developer Portal and tick the right one.'
+          deps.onLog?.(`✖ ${msg}`, 'red')
+          return iosError(progress, msg, 'import-provide-profile-path', { profilePickerOpened: true })
         }
 
         // All checks pass — synthesize a DiscoveredProfile (preserving the on-disk
@@ -2493,8 +2587,9 @@ export async function runIosEffect(
         }
       }
       catch (err) {
-        deps.onLog?.(`✖ ${err instanceof Error ? err.message : String(err)}`, 'red')
-        return { progress, next: 'error', transient: { profilePickerOpened: true } }
+        const msg = err instanceof Error ? err.message : String(err)
+        deps.onLog?.(`✖ ${msg}`, 'red')
+        return iosError(progress, msg, 'import-provide-profile-path', { profilePickerOpened: true })
       }
     }
 
@@ -2520,30 +2615,27 @@ export async function runIosEffect(
     case 'import-create-profile-only': {
       const chosenIdentity = deps.carried?.chosenIdentity
       if (!chosenIdentity) {
-        deps.onLog?.('✖ Internal error: no identity chosen for profile creation.', 'red')
-        return { progress, next: 'error' }
+        const msg = 'Internal error: no identity chosen for profile creation.'
+        deps.onLog?.(`✖ ${msg}`, 'red')
+        return iosError(progress, msg)
       }
       // Defensive: D2 only synthesizes app_store profiles (apple-api createProfile
       // hardcodes IOS_APP_STORE). Refuse ad_hoc here as the TUI does (app.tsx:1794).
       if (progress.importDistribution === 'ad_hoc') {
-        deps.onLog?.(
-          '✖ Creating a new profile via Apple is not implemented for ad_hoc distribution yet. '
-          + 'Use "Open Apple Developer Portal" instead.',
-          'red',
-        )
-        return { progress, next: 'error' }
+        const msg = 'Creating a new profile via Apple is not implemented for ad_hoc distribution yet. '
+          + 'Use "Open Apple Developer Portal" instead.'
+        deps.onLog?.(`✖ ${msg}`, 'red')
+        return iosError(progress, msg)
       }
 
       const appId = resolveIosBundleId(progress)
       try {
         const certId = await deps.findCertIdBySha1!(chosenIdentity.sha1)
         if (!certId) {
-          deps.onLog?.(
-            `✖ Apple does not have a certificate matching "${chosenIdentity.name}". `
-            + 'Cannot create a profile without an Apple-side cert ID. Use the "Create new" path instead.',
-            'red',
-          )
-          return { progress, next: 'error' }
+          const msg = `Apple does not have a certificate matching "${chosenIdentity.name}". `
+            + 'Cannot create a profile without an Apple-side cert ID. Use the "Create new" path instead.'
+          deps.onLog?.(`✖ ${msg}`, 'red')
+          return iosError(progress, msg)
         }
         await deps.ensureBundleId!(appId)
         const profile = await deps.createProfile!({ bundleId: appId, certificateId: certId, distribution: 'app_store' })
@@ -2591,8 +2683,9 @@ export async function runIosEffect(
             transient: { duplicateProfiles: err.profiles },
           }
         }
-        deps.onLog?.(`✖ ${err instanceof Error ? err.message : String(err)}`, 'red')
-        return { progress, next: 'error' }
+        const msg = err instanceof Error ? err.message : String(err)
+        deps.onLog?.(`✖ ${msg}`, 'red')
+        return iosError(progress, msg, 'import-create-profile-only')
       }
     }
 
@@ -2622,7 +2715,7 @@ export async function runIosEffect(
       // 'exit' or no pick → leave onboarding. The engine has no 'exit' step, so
       // (like cert-limit-prompt / duplicate-profile-prompt's exit branches) this
       // routes to 'error', the driver's exitOnboarding equivalent (app.tsx:3783).
-      return { progress, next: 'error' }
+      return iosError(progress, `Onboarding cancelled. Re-run \`build init\` to resume.`)
     }
 
     // ── import-compiling-helper (effect, IDEMPOTENT) ──────────────────────────
@@ -2645,8 +2738,9 @@ export async function runIosEffect(
         return { progress, next: 'import-exporting', transient: { helperCompiled: true } }
       }
       catch (err) {
-        deps.onLog?.(`✖ ${err instanceof Error ? err.message : String(err)}`, 'red')
-        return { progress, next: 'error' }
+        const msg = err instanceof Error ? err.message : String(err)
+        deps.onLog?.(`✖ ${msg}`, 'red')
+        return iosError(progress, msg, 'import-compiling-helper')
       }
     }
 
@@ -2676,8 +2770,11 @@ export async function runIosEffect(
       const chosenIdentity = deps.carried?.chosenIdentity
       const chosenProfile = deps.carried?.chosenProfile
       if (!chosenIdentity || !chosenProfile) {
-        deps.onLog?.('✖ Internal error: no identity or profile chosen for export.', 'red')
-        return { progress, next: 'error' }
+        const msg = 'Internal error: no identity or profile chosen for export.'
+        deps.onLog?.(`✖ ${msg}`, 'red')
+        // Lost ephemeral selection (crash-recovery) — re-running the export
+        // can't help; only Restart/Exit are offered (no retryStep).
+        return iosError(progress, msg)
       }
       try {
         const exported = await deps.exportP12FromKeychain!(chosenIdentity.sha1)
@@ -2718,9 +2815,37 @@ export async function runIosEffect(
         }
       }
       catch (err) {
-        deps.onLog?.(`✖ ${err instanceof Error ? err.message : String(err)}`, 'red')
-        return { progress, next: 'error' }
+        const msg = err instanceof Error ? err.message : String(err)
+        deps.onLog?.(`✖ ${msg}`, 'red')
+        return iosError(progress, msg, 'import-exporting')
       }
+    }
+
+    // ── error (resolver effect, EPHEMERAL — the recovery screen) ──────────────
+    // app.tsx:4462-4484 (ErrorStep onChange). The error screen is an EPHEMERAL-
+    // branching choice: the user's pick is NEVER persisted, so the driver records
+    // it into deps.carried.errorAction and re-drives this step as a resolver. The
+    // routing mirrors the TUI onChange exactly:
+    //   - 'retry'   → re-run the failing step (deps.carried.retryStep). When the
+    //     failure was unrecoverable (no retryStep carried) a 'retry' is impossible
+    //     — the view never offered it — so this falls through to the exit sink.
+    //   - 'restart' → welcome (resetForFreshStart + setStep('welcome'),
+    //     app.tsx:4476-4478). The driver owns the actual reset side-effects; the
+    //     engine just routes there.
+    //   - 'exit' / absent → stay on 'error' (the terminal exit sink). The engine
+    //     has no 'exit' step; the driver interprets a self-loop on 'error' as
+    //     leave-onboarding, mirroring app.tsx:4482's exitOnboarding(). This is the
+    //     SAME convention the cert-limit-prompt / import-export-warning exit
+    //     branches use (they route to 'error').
+    // PURE routing — no IO, no persistence (error/retryStep ride transient only).
+    case 'error': {
+      const action = deps.carried?.errorAction
+      if (action === 'retry' && deps.carried?.retryStep)
+        return { progress, next: deps.carried.retryStep }
+      if (action === 'restart')
+        return { progress, next: 'welcome' }
+      // 'exit' (or no/invalid pick) → terminal exit sink.
+      return { progress, next: 'error' }
     }
 
     default:
