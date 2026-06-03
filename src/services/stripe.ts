@@ -78,10 +78,22 @@ export async function openPortal(orgId: string, t: ComposerTranslation) {
   return dialogStore.onDialogDismiss()
 }
 
+async function getCookieValue(name: string) {
+  if ('cookieStore' in globalThis && globalThis.cookieStore)
+    return (await globalThis.cookieStore.get(name))?.value
+
+  if (typeof document === 'undefined')
+    return undefined
+
+  const encodedName = `${encodeURIComponent(name)}=`
+  const cookie = document.cookie.split('; ').find(cookie => cookie.startsWith(encodedName))
+  return cookie ? decodeURIComponent(cookie.slice(encodedName.length)) : undefined
+}
+
 export async function getDatafastAttribution() {
   return {
-    visitorId: (await cookieStore.get('datafast_visitor_id'))?.value,
-    sessionId: (await cookieStore.get('datafast_session_id'))?.value,
+    visitorId: await getCookieValue('datafast_visitor_id'),
+    sessionId: await getCookieValue('datafast_session_id'),
   }
 }
 
