@@ -1754,6 +1754,44 @@ export async function runAndroidEffect(
       return { progress, next: 'build-complete' }
     }
 
+    // ── requesting-build ──────────────────────────────────────────────────
+    // app.tsx:1654–1741
+    //
+    // Fire the real `capgo build request`. The driver pre-binds the logger +
+    // silent flag + the resolved Capgo API key into deps.requestBuildInternal
+    // (it owns apikey resolution — CLI flag → findSavedKeySilent), so the core
+    // passes a minimal options object and never sees the key. `apikey: ''` is a
+    // type-satisfying placeholder the driver's binding overrides. Routing:
+    //   success + entries pending → detecting-ci-secrets (offer CI push)
+    //   success + no entries      → build-complete
+    //   failure + ai analysis     → ai-analysis-prompt (TUI-only sub-flow)
+    //   failure (no analysis)     → build-complete
+    case 'requesting-build': {
+      const result = await deps.requestBuildInternal!(
+        progress.appId,
+        { apikey: '', platform: 'android', aiAnalysisMode: 'caller-handled' },
+      )
+
+      if (result.success) {
+        const url = `https://capgo.app/app/${progress.appId}/builds`
+        deps.onLog?.(`✔ Build queued — ${url}`)
+        // Only offer to push CI secrets AFTER a build has been queued. If we
+        // never had any credentials to push (entries empty), skip to exit.
+        const entries = tailCiSecretEntries(progress, deps)
+        if (entries.length > 0)
+          return { progress, next: 'detecting-ci-secrets', transient: { buildUrl: url, ciSecretEntries: entries } }
+        return { progress, next: 'build-complete', transient: { buildUrl: url } }
+      }
+
+      deps.onLog?.(`⚠ ${result.error || 'unknown error'}`, 'yellow')
+      // Offer AI-assisted diagnosis when logs were captured. The TUI owns the
+      // ai-analysis-* sub-flow (no AI-calling-AI in the headless engine); the
+      // engine only routes there and surfaces the job id in transient.
+      if (result.aiAnalysis?.ready && result.aiAnalysis.jobId)
+        return { progress, next: 'ai-analysis-prompt', transient: { aiJobId: result.aiAnalysis.jobId } }
+      return { progress, next: 'build-complete' }
+    }
+
     // ── Not yet implemented (bootstrap / post-save tail / native-picker) ──
     default:
       throw new Error(`Unhandled effect step: ${step}`)
