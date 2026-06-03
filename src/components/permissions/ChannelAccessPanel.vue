@@ -61,6 +61,7 @@ const selectedChannelId = ref('')
 const selectedRoleName = ref('')
 
 const channelByRbacId = computed(() => new Map(channels.value.map(channel => [channel.rbac_id, channel])))
+const canUseChannelPermissionOverrides = computed(() => props.principalType !== 'group')
 
 const availableChannels = computed(() => {
   const usedChannelIds = new Set(channelBindings.value.map(binding => binding.channel_row_id).filter((id): id is number => typeof id === 'number'))
@@ -394,7 +395,7 @@ watch(
       </div>
     </section>
 
-    <section class="space-y-3 border-t border-slate-200 pt-5 dark:border-slate-700">
+    <section v-if="canUseChannelPermissionOverrides" class="space-y-3 border-t border-slate-200 pt-5 dark:border-slate-700">
       <div>
         <h3 class="text-sm font-semibold text-slate-900 dark:text-slate-100">
           {{ t('channel-permission-overrides-title') }}

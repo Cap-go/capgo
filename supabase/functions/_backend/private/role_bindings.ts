@@ -41,6 +41,12 @@ type ValidationResult<T> = { ok: true, data: T } | { ok: false, status: number, 
 type RouteValidationResult<T> = { ok: true, data: T } | { ok: false, response: Response }
 type RoleBindingRecord = typeof schema.role_bindings.$inferSelect
 type RoleRecord = typeof schema.roles.$inferSelect
+interface AssignablePrincipal {
+  type: 'user' | 'group'
+  id: string
+  label: string
+  detail: string | null
+}
 const INVALID_APIKEY_ACCESS_ERROR = 'Invalid API key or access'
 const APIKEY_ORG_READER_ROLE = 'apikey_org_reader'
 
@@ -595,6 +601,25 @@ function isLastSuperAdminDemotionError(error: unknown): boolean {
   return errorMessage.includes('CANNOT_DEMOTE_LAST_SUPER_ADMIN_BINDING') || errorCode === 'CANNOT_DEMOTE_LAST_SUPER_ADMIN_BINDING'
 }
 
+async function loadRoleBindingApp(
+  drizzle: ReturnType<typeof getDrizzleClient>,
+  appId: string,
+): Promise<{
+    publicAppId: string
+    ownerOrg: string
+  } | null> {
+  const [appRow] = await drizzle
+    .select({
+      publicAppId: schema.apps.app_id,
+      ownerOrg: schema.apps.owner_org,
+    })
+    .from(schema.apps)
+    .where(eq(schema.apps.id, appId))
+    .limit(1)
+
+  return appRow ?? null
+}
+
 // GET /private/role_bindings/app/:app_id/channel - List direct channel role bindings for an app
 app.get('/app/:app_id/channel', requireAuthAndGuardLimitedKeys, sValidator('param', appIdParamSchema, invalidAppIdHook), async (c) => {
   const { app_id: appId } = c.req.valid('param')
@@ -604,15 +629,7 @@ app.get('/app/:app_id/channel', requireAuthAndGuardLimitedKeys, sValidator('para
     pgClient = getPgClient(c)
     const drizzle = getDrizzleClient(pgClient)
 
-    const [appRow] = await drizzle
-      .select({
-        publicAppId: schema.apps.app_id,
-        ownerOrg: schema.apps.owner_org,
-      })
-      .from(schema.apps)
-      .where(eq(schema.apps.id, appId))
-      .limit(1)
-
+    const appRow = await loadRoleBindingApp(drizzle, appId)
     if (!appRow) {
       return c.json({ error: 'App not found' }, 404)
     }
@@ -638,9 +655,24 @@ app.get('/app/:app_id/channel', requireAuthAndGuardLimitedKeys, sValidator('para
         expires_at: schema.role_bindings.expires_at,
         reason: schema.role_bindings.reason,
         is_direct: schema.role_bindings.is_direct,
+        principal_name: sql<string>`
+          CASE
+            WHEN ${schema.role_bindings.principal_type} = 'user' THEN ${schema.users.email}
+            WHEN ${schema.role_bindings.principal_type} = 'group' THEN ${schema.groups.name}
+            ELSE ${schema.role_bindings.principal_id}::text
+          END
+        `,
       })
       .from(schema.role_bindings)
       .innerJoin(schema.roles, eq(schema.role_bindings.role_id, schema.roles.id))
+      .leftJoin(schema.users, and(
+        eq(schema.role_bindings.principal_type, 'user'),
+        eq(schema.role_bindings.principal_id, schema.users.id),
+      ))
+      .leftJoin(schema.groups, and(
+        eq(schema.role_bindings.principal_type, 'group'),
+        eq(schema.role_bindings.principal_id, schema.groups.id),
+      ))
       .where(and(
         eq(schema.role_bindings.scope_type, 'channel'),
         eq(schema.role_bindings.app_id, appId),
@@ -662,6 +694,94 @@ app.get('/app/:app_id/channel', requireAuthAndGuardLimitedKeys, sValidator('para
     cloudlogErr({
       requestId: c.get('requestId'),
       message: 'role_bindings_app_channels_fetch_failed',
+      appId,
+      error,
+    })
+    return c.json({ error: 'Internal server error' }, 500)
+  }
+  finally {
+    if (pgClient) {
+      await closeClient(c, pgClient)
+    }
+  }
+})
+
+// GET /private/role_bindings/app/:app_id/principals - List users/groups assignable for app/channel access
+app.get('/app/:app_id/principals', requireAuthAndGuardLimitedKeys, sValidator('param', appIdParamSchema, invalidAppIdHook), async (c) => {
+  const { app_id: appId } = c.req.valid('param')
+
+  let pgClient
+  try {
+    pgClient = getPgClient(c)
+    const drizzle = getDrizzleClient(pgClient)
+
+    const appRow = await loadRoleBindingApp(drizzle, appId)
+    if (!appRow) {
+      return c.json({ error: 'App not found' }, 404)
+    }
+
+    const canManageOrgRoles = await checkPermission(c, 'org.update_user_roles', { orgId: appRow.ownerOrg })
+    const canManageAppRoles = await checkPermission(c, 'app.update_user_roles', { appId: appRow.publicAppId })
+    if (!canManageOrgRoles && !canManageAppRoles) {
+      return c.json({ error: 'Forbidden' }, 403)
+    }
+
+    const principalResult = await pgClient.query<AssignablePrincipal>(`
+      WITH active_users AS (
+        SELECT DISTINCT
+          'user'::text AS type,
+          users.id,
+          users.email AS label,
+          NULL::text AS detail
+        FROM public.users users
+        WHERE EXISTS (
+          SELECT 1
+          FROM public.role_bindings role_bindings
+          WHERE role_bindings.principal_type = public.rbac_principal_user()
+            AND role_bindings.principal_id = users.id
+            AND role_bindings.org_id = $1::uuid
+            AND (role_bindings.expires_at IS NULL OR role_bindings.expires_at > now())
+        )
+        OR EXISTS (
+          SELECT 1
+          FROM public.org_users org_users
+          WHERE org_users.user_id = users.id
+            AND org_users.org_id = $1::uuid
+            AND org_users.user_right IS NOT NULL
+            AND org_users.user_right::text NOT LIKE 'invite_%'
+        )
+      ),
+      org_groups AS (
+        SELECT
+          'group'::text AS type,
+          groups.id,
+          groups.name AS label,
+          groups.description AS detail
+        FROM public.groups groups
+        WHERE groups.org_id = $1::uuid
+      )
+      SELECT type, id, label, detail
+      FROM active_users
+      UNION ALL
+      SELECT type, id, label, detail
+      FROM org_groups
+      ORDER BY label
+    `, [appRow.ownerOrg])
+
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'role_bindings_app_principals_fetch',
+      appId,
+      orgId: appRow.ownerOrg,
+      count: principalResult.rows.length,
+    })
+
+    return c.json(principalResult.rows)
+  }
+  catch (error) {
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: 'role_bindings_app_principals_fetch_failed',
       appId,
       error,
     })

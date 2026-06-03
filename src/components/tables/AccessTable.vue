@@ -159,7 +159,7 @@ async function loadAccessReferenceData() {
   if (!app.value?.owner_org || !app.value?.app_id)
     return
 
-  const [rolesResult, channelsResult, membersResult, groupsResult] = await Promise.all([
+  const [rolesResult, channelsResult] = await Promise.all([
     supabase
       .from('roles')
       .select('id, name, scope_type, description, priority_rank')
@@ -171,8 +171,6 @@ async function loadAccessReferenceData() {
       .select('id, rbac_id, name')
       .eq('app_id', app.value.app_id)
       .order('name', { ascending: true }),
-    supabase.rpc('get_org_members_rbac', { p_org_id: app.value.owner_org }),
-    supabase.functions.invoke(`private/groups/${app.value.owner_org}`, { method: 'GET' }),
   ])
 
   if (rolesResult.error)
@@ -185,33 +183,24 @@ async function loadAccessReferenceData() {
   channels.value = (channelsResult.data || []) as ChannelSummary[]
 
   const nextPrincipalOptions: PrincipalOption[] = []
-  if (membersResult.error) {
-    console.error('Error loading org members for app access:', membersResult.error)
-  }
-  else {
-    for (const member of (membersResult.data || []) as any[]) {
-      if (member.is_tmp || member.is_invite)
-        continue
-      nextPrincipalOptions.push({
-        type: 'user',
-        id: member.user_id,
-        label: member.email || member.user_id,
-        detail: t('user'),
-      })
-    }
-  }
+  if (canUpdateUserRoles.value) {
+    const { data: principals, error: principalsError } = await supabase.functions.invoke(`private/role_bindings/app/${app.value.id}/principals`, { method: 'GET' })
 
-  if (groupsResult.error) {
-    console.error('Error loading groups for app access:', groupsResult.error)
-  }
-  else {
-    for (const group of (groupsResult.data || []) as any[]) {
-      nextPrincipalOptions.push({
-        type: 'group',
-        id: group.id,
-        label: group.name || group.id,
-        detail: t('group'),
-      })
+    if (principalsError) {
+      console.error('Error loading assignable principals for app access:', principalsError)
+    }
+    else {
+      for (const principal of (principals || []) as PrincipalOption[]) {
+        if (principal.type !== 'user' && principal.type !== 'group')
+          continue
+
+        nextPrincipalOptions.push({
+          type: principal.type,
+          id: principal.id,
+          label: principal.label || principal.id,
+          detail: principal.detail || (principal.type === 'user' ? t('user') : t('group')),
+        })
+      }
     }
   }
 
@@ -253,9 +242,9 @@ function normalizeChannelBindings(data: any[]): Element[] {
       expires_at: binding.expires_at,
       reason: binding.reason,
       is_direct: binding.is_direct,
-      principal_name: getPrincipalName(binding.principal_type, binding.principal_id),
-      user_email: binding.principal_type === 'user' ? getPrincipalName(binding.principal_type, binding.principal_id) : null,
-      group_name: binding.principal_type === 'group' ? getPrincipalName(binding.principal_type, binding.principal_id) : null,
+      principal_name: binding.principal_name || getPrincipalName(binding.principal_type, binding.principal_id),
+      user_email: binding.principal_type === 'user' ? (binding.principal_name || getPrincipalName(binding.principal_type, binding.principal_id)) : null,
+      group_name: binding.principal_type === 'group' ? (binding.principal_name || getPrincipalName(binding.principal_type, binding.principal_id)) : null,
     } as Element
   })
 }
@@ -323,9 +312,12 @@ async function openChannelPermissions(element: Element) {
 
 function openAssignAccessModal() {
   const defaultScope = canAssignChannelScope.value ? 'channel' : 'app'
+  const defaultPrincipalType = principalOptions.value.some(option => option.type === 'user') ? 'user' : 'group'
+  const defaultPrincipalId = principalOptions.value.find(option => option.type === defaultPrincipalType)?.id ?? ''
+
   assignAccessForm.value = {
-    principal_type: 'user',
-    principal_id: filteredPrincipalOptions.value[0]?.id ?? '',
+    principal_type: defaultPrincipalType,
+    principal_id: defaultPrincipalId,
     scope_type: defaultScope,
     role_name: getDefaultAssignRoleName(defaultScope),
     channel_id: defaultScope === 'channel' ? (channels.value[0]?.id?.toString() ?? '') : '',

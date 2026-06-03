@@ -429,6 +429,120 @@ describe.skipIf(USE_CLOUDFLARE)('/private/role_bindings', () => {
     }
   })
 
+  it('allows app role managers to fetch assignable principals for an app', async () => {
+    const id = randomUUID()
+    const orgId = randomUUID()
+    const appUuid = randomUUID()
+    const groupId = randomUUID()
+    const publicAppId = `com.role-binding.app-principals.${id}`
+    const supabase = getSupabaseClient()
+
+    try {
+      const { error: orgError } = await supabase.from('orgs').insert({
+        id: orgId,
+        created_by: USER_ID_2,
+        name: `Role Binding App Principals Org ${id}`,
+        management_email: `role-binding-app-principals-${id}@capgo.app`,
+        use_new_rbac: true,
+      })
+      expect(orgError).toBeNull()
+
+      const { error: memberError } = await supabase.from('org_users').insert({
+        org_id: orgId,
+        user_id: USER_ID_2,
+        user_right: 'read',
+      })
+      expect(memberError).toBeNull()
+
+      const { error: appError } = await supabase.from('apps').insert({
+        id: appUuid,
+        app_id: publicAppId,
+        owner_org: orgId,
+        icon_url: 'role-binding-test-icon',
+        name: `App Principals App ${id}`,
+      })
+      expect(appError).toBeNull()
+
+      const { error: groupError } = await supabase.from('groups').insert({
+        id: groupId,
+        org_id: orgId,
+        name: `Role Binding Principal Group ${id}`,
+        description: 'Assignable app principal',
+        created_by: USER_ID_2,
+      })
+      expect(groupError).toBeNull()
+
+      const { data: roles, error: rolesError } = await supabase
+        .from('roles')
+        .select('id, name')
+        .in('name', ['app_admin', 'app_reader'])
+      expect(rolesError).toBeNull()
+
+      const roleIds = new Map((roles ?? []).map(role => [role.name, role.id]))
+      const appAdminRoleId = roleIds.get('app_admin')
+      const appReaderRoleId = roleIds.get('app_reader')
+      expect(appAdminRoleId).toBeTruthy()
+      expect(appReaderRoleId).toBeTruthy()
+
+      const { error: appAdminBindingError } = await supabase.from('role_bindings').insert({
+        principal_type: 'user',
+        principal_id: USER_ID,
+        role_id: appAdminRoleId!,
+        scope_type: 'app',
+        org_id: orgId,
+        app_id: appUuid,
+        channel_id: null,
+        granted_by: USER_ID_2,
+        reason: 'app-principals-manager-test',
+        is_direct: true,
+      })
+      expect(appAdminBindingError).toBeNull()
+
+      const managerResponse = await fetch(getEndpointUrl(`/private/role_bindings/app/${appUuid}/principals`), {
+        method: 'GET',
+        headers: authHeaders,
+      })
+      const managerData = await managerResponse.json() as Array<{ type: string, id: string, label: string, detail: string | null }>
+
+      expect(managerResponse.status).toBe(200)
+      expect(managerData).toContainEqual(expect.objectContaining({
+        type: 'user',
+        id: USER_ID_2,
+        label: 'test2@capgo.app',
+      }))
+      expect(managerData).toContainEqual(expect.objectContaining({
+        type: 'group',
+        id: groupId,
+        label: `Role Binding Principal Group ${id}`,
+      }))
+
+      const { error: appReaderBindingError } = await supabase
+        .from('role_bindings')
+        .update({ role_id: appReaderRoleId })
+        .eq('principal_type', 'user')
+        .eq('principal_id', USER_ID)
+        .eq('scope_type', 'app')
+        .eq('app_id', appUuid)
+      expect(appReaderBindingError).toBeNull()
+
+      const readerResponse = await fetch(getEndpointUrl(`/private/role_bindings/app/${appUuid}/principals`), {
+        method: 'GET',
+        headers: authHeaders,
+      })
+      const readerData = await readerResponse.json() as { error?: string }
+
+      expect(readerResponse.status).toBe(403)
+      expect(readerData.error).toBe('Forbidden')
+    }
+    finally {
+      await supabase.from('role_bindings').delete().eq('org_id', orgId)
+      await supabase.from('groups').delete().eq('id', groupId)
+      await supabase.from('org_users').delete().eq('org_id', orgId)
+      await supabase.from('apps').delete().eq('id', appUuid)
+      await supabase.from('orgs').delete().eq('id', orgId)
+    }
+  })
+
   it('rejects app-scoped bindings when the target app belongs to another org', async () => {
     const fixture = await createRoleBindingFixture()
 
