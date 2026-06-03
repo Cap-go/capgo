@@ -141,6 +141,10 @@ import {
   runOAuthFlow,
 } from '../oauth-google.js'
 import open from 'open'
+import { contactSupport } from '../../../../support/contact-support.js'
+import { copyToClipboard, revealInFinder } from '../../../../support/clipboard.js'
+import { getInternalLogPath } from '../../../../support/internal-log.js'
+import { writeSupportBundleFiles } from '../../../../onboarding-support.js'
 import {
   fetchCapgoOAuthConfig,
   PLAY_DEV_ID_TUTORIAL_URL,
@@ -521,6 +525,13 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
   // Phase 6 — build output
   const [buildUrl, setBuildUrl] = useState('')
   const [buildOutput, setBuildOutput] = useState<string[]>([])
+  // ── Contact-support confirmation gate. `supportConfirmMessage` holds the
+  // platform-aware copy passed up by contactSupport(); the Select resolves
+  // `supportConfirmResolveRef` with the user's yes/no choice. `support-confirm`
+  // always returns to the 'error' step afterwards so the failure menu stays
+  // reachable whether the user proceeds or cancels.
+  const [supportConfirmMessage, setSupportConfirmMessage] = useState<string>('')
+  const supportConfirmResolveRef = useRef<((proceed: boolean) => void) | null>(null)
   // ── AI-analysis sub-flow (see iOS sibling for full notes). Entered only when
   // requestBuildInternal returns aiAnalysis.ready=true on a failed build.
   const [aiJobId, setAiJobId] = useState<string | null>(null)
@@ -912,6 +923,58 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
     },
     [retryCount, addLog, exitOnboarding],
   )
+
+  // Show the contact-support confirmation gate as an Ink step and resolve once
+  // the user picks Yes/Cancel. Returns a promise so contactSupport() can await
+  // the user's decision before doing anything (writing logs / opening mail).
+  const askSupportConfirm = useCallback((message: string): Promise<boolean> => {
+    setSupportConfirmMessage(message)
+    setStep('support-confirm')
+    return new Promise<boolean>((resolve) => {
+      supportConfirmResolveRef.current = resolve
+    })
+  }, [])
+
+  // Read the verbose internal log (raw provider/API errors, secret-redacted) so
+  // it can be folded into the support bundle's "Internal log" section.
+  const readInternalLogLines = useCallback((): string[] => {
+    const internalLogPath = getInternalLogPath()
+    if (!internalLogPath)
+      return []
+    try {
+      return readFileSync(internalLogPath, 'utf8').split('\n')
+    }
+    catch {
+      return []
+    }
+  }, [])
+
+  // Drive the contact-support flow: confirm gate → write bundle → copy the
+  // .log.gz path → reveal in Finder (macOS) → open a pre-filled mailto. Every
+  // step but "write the bundle" is best-effort; failures degrade gracefully and
+  // we always return to the 'error' menu afterwards.
+  const handleSupport = useCallback(async () => {
+    await contactSupport({
+      subject: `Capgo Builder support — ${appId} (android)`,
+      body: `Hi Capgo team,\n\nMy build failed and I'd like help.\n\nApp: ${appId}\nPlatform: android\nError: ${error ?? 'unknown error'}\n\n(Logs saved locally; secrets removed — I'll attach the file.)`,
+      confirm: async msg => askSupportConfirm(msg),
+      buildFiles: () => writeSupportBundleFiles({
+        kind: 'build-init',
+        appId,
+        error: error ?? 'unknown error',
+        logs: [
+          ...logLines.slice(-12).map(entry => entry.text),
+          ...buildOutput.slice(-12),
+        ],
+        sections: [{ title: 'Internal log', lines: readInternalLogLines() }],
+      }),
+      copyPath: p => copyToClipboard(p).ok,
+      reveal: (p) => { revealInFinder(p) },
+      openUrl: u => open(u),
+      print: msg => addLog(msg, 'cyan'),
+    })
+    setStep('error')
+  }, [appId, error, logLines, buildOutput, askSupportConfirm, readInternalLogLines, addLog])
 
   // Wire the forward-declared ref so `persistAndStep`'s catch can surface
   // saveAndroidProgress failures through the same retry/error UX without
@@ -3470,12 +3533,42 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
 
       {/* (ai-analysis-result-scroll renders as a fullscreen early return above.) */}
 
+      {/* Contact-support confirmation gate — tells the user everything that's
+          about to happen (logs saved, revealed in Finder on macOS, email
+          opened) and waits for an explicit Yes before the mail client opens. */}
+      {step === 'support-confirm' && (
+        <Box flexDirection="column" marginTop={1} gap={1}>
+          <Text bold>Email Capgo support</Text>
+          <Text>{supportConfirmMessage}</Text>
+          <Select
+            options={[
+              { label: '📨  Yes, open the email', value: 'yes' },
+              { label: '✖  Cancel', value: 'no' },
+            ]}
+            onChange={(value) => {
+              const resolve = supportConfirmResolveRef.current
+              supportConfirmResolveRef.current = null
+              resolve?.(value === 'yes')
+            }}
+          />
+        </Box>
+      )}
+
       {step === 'error' && error && retryStep && (
         <ErrorStep
           message={error}
           dense={false}
+          hasBuildLog={!!aiJobId}
           onChoose={(choice) => {
-            if (choice === 'retry') {
+            if (choice === 'support') {
+              handleSupport().catch(() => {})
+            }
+            else if (choice === 'ai') {
+              // A captured build-failure log is available — route into the
+              // existing AI-analysis prompt (unchanged from today).
+              setStep('ai-analysis-prompt')
+            }
+            else if (choice === 'retry') {
               setError(null)
               errorCategoryRef.current = undefined
               const target = retryStep

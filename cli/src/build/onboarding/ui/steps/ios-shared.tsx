@@ -33,6 +33,7 @@ import { Select } from '@inkjs/ui'
 import { Box, Newline, Text } from 'ink'
 import React from 'react'
 import { AiResultBanner, ErrorLine, SpinnerLine, SuccessLine } from '../components.js'
+import { buildHelpMenuOptions } from '../../../../support/help-menu.js'
 
 // ── welcome ─────────────────────────────────────────────────────────────────
 export const WelcomeStep: FC = () => (
@@ -270,14 +271,24 @@ export interface ErrorStepProps {
    *  error headline + the action prompt here — keeping Try again / Restart /
    *  Exit reachable no matter how long the advice was. */
   collapsed?: boolean
+  /** A captured build log exists for this run (e.g. a build was attempted), so
+   *  the help menu may offer the "Ask AI for help" option. Defaults to false. */
+  hasBuildLog?: boolean
   onChange: (value: string) => void | Promise<void>
 }
 
-const RETRY_OPTIONS = [
-  { label: '🔄  Try again', value: 'retry' },
-  { label: '↩️   Restart onboarding', value: 'restart' },
-  { label: '❌  Exit', value: 'exit' },
-]
+const RESTART_OPTION = { label: '↩️   Restart onboarding', value: 'restart' }
+
+// Build the failure-menu options: support-first (and AI iff a build log exists)
+// from the shared `buildHelpMenuOptions`, with the onboarding-specific
+// "Restart onboarding" action spliced in just before Exit so it stays reachable.
+function buildErrorMenuOptions(hasBuildLog: boolean): { label: string, value: string }[] {
+  const options = buildHelpMenuOptions({ hasBuildLog })
+  const exitIndex = options.findIndex(option => option.value === 'exit')
+  if (exitIndex === -1)
+    return [...options, RESTART_OPTION]
+  return [...options.slice(0, exitIndex), RESTART_OPTION, ...options.slice(exitIndex)]
+}
 
 // Flatten an error + its recovery advice into plain text lines for the
 // scrollable FullscreenAiViewer. The recovery advice is UNBOUNDED — a stacked
@@ -366,7 +377,8 @@ export function estimateErrorBodyRows(
   return rows
 }
 
-export const ErrorStep: FC<ErrorStepProps> = ({ error, recoveryAdvice, supportBundlePath, showRetry, collapsed = false, onChange }) => {
+export const ErrorStep: FC<ErrorStepProps> = ({ error, recoveryAdvice, supportBundlePath, showRetry, collapsed = false, hasBuildLog = false, onChange }) => {
+  const errorMenuOptions = buildErrorMenuOptions(hasBuildLog)
   // Collapsed form: the full error + recovery advice was too tall for the
   // viewport, so the parent already showed it in the scrollable viewer. Render
   // only the error headline + the action prompt, so Try again / Restart / Exit
@@ -381,7 +393,7 @@ export const ErrorStep: FC<ErrorStepProps> = ({ error, recoveryAdvice, supportBu
             <Newline />
             <Text bold>What do you want to do?</Text>
             <Newline />
-            <Select options={RETRY_OPTIONS} onChange={onChange} />
+            <Select options={errorMenuOptions} onChange={onChange} />
           </>
         )}
       </Box>
@@ -435,7 +447,7 @@ export const ErrorStep: FC<ErrorStepProps> = ({ error, recoveryAdvice, supportBu
         <>
           <Text bold>What do you want to do?</Text>
           <Newline />
-          <Select options={RETRY_OPTIONS} onChange={onChange} />
+          <Select options={errorMenuOptions} onChange={onChange} />
         </>
       )}
     </Box>

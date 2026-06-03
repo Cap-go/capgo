@@ -1,6 +1,8 @@
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
+import { gzipSync } from 'node:zlib'
+import { redactSecrets } from './support/redact.js'
 
 const NON_SEGMENT_RE = /[^\w.-]+/g
 const DASHES_RE = /-+/g
@@ -87,6 +89,36 @@ export function writeOnboardingSupportBundle(input: OnboardingSupportBundleInput
 
     writeFileSync(filePath, renderOnboardingSupportBundle(input), 'utf8')
     return filePath
+  }
+  catch {
+    return null
+  }
+}
+
+export interface SupportBundleFiles {
+  logPath: string
+  gzPath: string
+}
+
+// Writes the combined bundle as BOTH a plain .log and a .log.gz (same content).
+export function writeSupportBundleFiles(
+  input: OnboardingSupportBundleInput,
+  supportDir = join(homedir(), '.capgo-credentials', 'support'),
+): SupportBundleFiles | null {
+  try {
+    mkdirSync(supportDir, { recursive: true })
+    const kind = sanitizeSegment(input.kind, 'onboarding')
+    const app = sanitizeSegment(input.appId, 'unknown-app')
+    const base = `builder-support-${kind}-${app}-${nowStamp()}`
+    const logPath = join(supportDir, `${base}.log`)
+    const gzPath = join(supportDir, `${base}.log.gz`)
+    // Redact the WHOLE rendered bundle (logs + sections + error), not just the
+    // internal-log lines — so the email's "secrets removed" promise holds for the
+    // build-output section too.
+    const rendered = redactSecrets(renderOnboardingSupportBundle(input))
+    writeFileSync(logPath, rendered, 'utf8')
+    writeFileSync(gzPath, gzipSync(rendered))
+    return { logPath, gzPath }
   }
   catch {
     return null

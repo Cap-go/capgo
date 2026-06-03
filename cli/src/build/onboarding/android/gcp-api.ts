@@ -12,6 +12,8 @@
 // Every network response is validated shape-wise before we trust it. Errors
 // include enough context that the TUI can show a useful message.
 
+import { appendInternalLog } from '../../../support/internal-log.js'
+
 const CRM_ENDPOINT = 'https://cloudresourcemanager.googleapis.com/v1'
 const SERVICEUSAGE_ENDPOINT = 'https://serviceusage.googleapis.com/v1'
 const IAM_ENDPOINT = 'https://iam.googleapis.com/v1'
@@ -125,6 +127,9 @@ async function gcpFetch<T>(args: {
         detail = `${parsed.error.status ?? ''}${parsed.error.status && parsed.error.message ? ': ' : ''}${parsed.error.message}`
     }
     catch {}
+    // Capture the raw Google Cloud API error in the internal support log
+    // (secret-redacted on write) so non-build failures are diagnosable.
+    appendInternalLog(`gcp-api ${args.method ?? 'GET'} ${args.url}: HTTP ${res.status} ${detail}`)
     throw new Error(`Google API ${res.status} at ${args.url}: ${detail}`)
   }
   if (!text.trim())

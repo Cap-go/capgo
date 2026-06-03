@@ -98,6 +98,8 @@ export type OnboardingStep
     | 'build-complete'
     | 'no-platform'
     | 'error'
+    // Contact-support confirmation gate (shown before we save logs + open mail)
+    | 'support-confirm'
 
 export type OnboardingErrorCategory
   = | 'apple_api_unauthorized'
@@ -302,6 +304,7 @@ export const STEP_PROGRESS: Record<OnboardingStep, number> = {
   'build-complete': 100,
   'no-platform': 0,
   'error': 0,
+  'support-confirm': 0,
 }
 
 export function getPhaseLabel(step: OnboardingStep): string {
@@ -390,6 +393,7 @@ export function getPhaseLabel(step: OnboardingStep): string {
       return 'Complete'
     case 'no-platform':
     case 'error':
+    case 'support-confirm':
       return ''
   }
 }

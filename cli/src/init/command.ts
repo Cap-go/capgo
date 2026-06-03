@@ -24,7 +24,10 @@ import { writeConfigUpdater } from '../config'
 import { getRepoStarStatus, isRepoStarredInSession, starAllRepositories, starRepository } from '../github'
 import { createKeyInternal } from '../key'
 import { doLoginExists, loginInternal } from '../login'
-import { writeOnboardingSupportBundle } from '../onboarding-support'
+import { writeOnboardingSupportBundle, writeSupportBundleFiles } from '../onboarding-support'
+import { contactSupport } from '../support/contact-support'
+import { copyToClipboard, revealInFinder } from '../support/clipboard'
+import { appendInternalLog, getInternalLogPath, startInternalLog } from '../support/internal-log'
 import { showReplicationProgress } from '../replicationProgress'
 import { formatRunnerCommand, splitRunnerCommand } from '../runner-command'
 import { createSupabaseClient, findBuildCommandForProjectType, findMainFile, findMainFileForProjectType, findProjectType, findRoot, findSavedKey, formatError, getAllPackagesDependencies, getAppId, getBundleVersion, getConfig, getLocalConfig, getNativeProjectResetAdvice, getOrganizationListWithPermission, getPackageScripts, getPMAndCommand, hasCliPermission, PACKNAME, projectIsMonorepo, resolveUserIdFromApiKey, updateConfigbyKey, updateConfigUpdater, validateIosUpdaterSync } from '../utils'
@@ -468,6 +471,45 @@ function writeInitSupportBundle(error: string, extraSections: { title: string, l
       },
       ...extraSections,
     ],
+  })
+}
+
+// Read the verbose internal log (raw provider/API errors, secret-redacted) so
+// it can be folded into the support bundle's "Internal log" section.
+function readInitInternalLogLines(): string[] {
+  const internalLogPath = getInternalLogPath()
+  if (!internalLogPath)
+    return []
+  try {
+    return readFileSync(internalLogPath, 'utf8').split('\n')
+  }
+  catch {
+    return []
+  }
+}
+
+// Init-flavoured contact-support flow: confirm gate → write bundle → copy the
+// .log.gz path → reveal in Finder (macOS) → open a pre-filled mailto. There's
+// no build log in init, so the support bundle carries diagnostics + the
+// internal log only. Every step but "write the bundle" is best-effort.
+async function runInitContactSupport(failureText: string): Promise<void> {
+  await contactSupport({
+    subject: `Capgo Builder onboarding support — ${globalAppId ?? 'unknown'}`,
+    body: `Hi Capgo team,\n\nI hit an error during Capgo Builder onboarding.\n\nApp: ${globalAppId ?? 'unknown'}\nError: ${failureText}\n\n(Logs saved locally; secrets removed — I'll attach the file.)`,
+    confirm: async (msg) => {
+      const proceed = await pConfirm({ message: msg })
+      return !pIsCancel(proceed) && proceed === true
+    },
+    buildFiles: () => writeSupportBundleFiles({
+      kind: 'init',
+      appId: globalAppId,
+      error: failureText,
+      sections: [{ title: 'Internal log', lines: readInitInternalLogLines() }],
+    }),
+    copyPath: p => copyToClipboard(p).ok,
+    reveal: (p) => { revealInFinder(p) },
+    openUrl: u => open(u),
+    print: msg => pLog.info(msg),
   })
 }
 
@@ -1142,13 +1184,14 @@ async function selectRecoveryOption<T extends string>(
   options: RecoveryOption<T>[],
   failureText = message,
 ): Promise<T> {
-  type RecoveryChoice = T | '__doctor__' | '__support__' | '__cancel__'
+  type RecoveryChoice = T | '__doctor__' | '__email_support__' | '__support__' | '__cancel__'
 
   while (true) {
     const choice = await pSelect<RecoveryChoice>({
       message,
       options: [
         ...options,
+        { value: '__email_support__', label: '📨 Email Capgo support' },
         { value: '__doctor__', label: 'Run doctor diagnostics now' },
         { value: '__support__', label: 'Save a support bundle' },
         { value: '__cancel__', label: 'Exit onboarding' },
@@ -1168,6 +1211,11 @@ async function selectRecoveryOption<T extends string>(
       catch (error) {
         pLog.warn(`Doctor found an issue: ${formatError(error)}`)
       }
+      continue
+    }
+
+    if (choice === '__email_support__') {
+      await runInitContactSupport(failureText)
       continue
     }
 
@@ -4213,6 +4261,10 @@ async function maybeStarCapgoRepo(includeSkillsRepository = false, repository?: 
 
 export async function initApp(apikeyCommand: string, appId: string, options: SuperOptions) {
   const pm = getPMAndCommand()
+  // Start the verbose internal log early so it captures the whole run (incl.
+  // raw provider/API errors) and survives crashes for the support bundle.
+  startInternalLog(appId || globalAppId)
+  appendInternalLog(`init: onboarding started for app ${appId || globalAppId || 'unknown'}`)
   pIntro('Capgo onboarding')
   renderInitOnboardingWelcome(initOnboardingSteps.length)
 

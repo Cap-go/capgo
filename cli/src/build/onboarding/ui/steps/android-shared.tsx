@@ -31,6 +31,7 @@ import { Select } from '@inkjs/ui'
 import { Box, Newline, Text } from 'ink'
 import React from 'react'
 import { AiResultBanner, ErrorLine, SpinnerLine, SuccessLine } from '../components.js'
+import { buildHelpMenuOptions } from '../../../../support/help-menu.js'
 
 // Longest a single failure message may be before we hard-truncate it with an
 // ellipsis in the DENSE form. A raw backend / CLI stderr can be hundreds of
@@ -206,22 +207,24 @@ export const BuildCompleteStep: FC<BuildCompleteStepProps> = ({ uploadSummary, b
 // text to the scrollback) and the blank line dropped, so the recovery control
 // always stays on screen within the 13-row budget.
 
+export type ErrorStepChoice = 'support' | 'ai' | 'retry' | 'exit'
+
 export interface ErrorStepProps {
   message: string
-  onChoose: (choice: 'retry' | 'exit') => void
+  onChoose: (choice: ErrorStepChoice) => void
+  /** A captured build log exists for this run (e.g. a build was attempted), so
+   *  the help menu may offer the "Ask AI for help" option. Defaults to false. */
+  hasBuildLog?: boolean
   dense?: boolean
 }
 
-export const ErrorStep: FC<ErrorStepProps> = ({ message, onChoose, dense = false }) => (
+export const ErrorStep: FC<ErrorStepProps> = ({ message, onChoose, hasBuildLog = false, dense = false }) => (
   <Box flexDirection="column" marginTop={1}>
     <ErrorLine text={dense ? truncate(message, MAX_ERROR_CHARS) : message} />
     {!dense && <Newline />}
     <Select
-      options={[
-        { label: '↻  Retry', value: 'retry' },
-        { label: '✖  Exit', value: 'exit' },
-      ]}
-      onChange={value => onChoose(value as 'retry' | 'exit')}
+      options={buildHelpMenuOptions({ hasBuildLog })}
+      onChange={value => onChoose(value as ErrorStepChoice)}
     />
   </Box>
 )

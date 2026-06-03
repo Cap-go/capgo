@@ -8,6 +8,8 @@
 // `androidpublisher` scope. The caller must be an Admin on the target
 // developer account; otherwise Users.create returns 403.
 
+import { appendInternalLog } from '../../../support/internal-log.js'
+
 const ANDROIDPUBLISHER_BASE = 'https://androidpublisher.googleapis.com/androidpublisher/v3'
 
 /**
@@ -130,6 +132,9 @@ async function playFetch<T>(args: {
         detail = `${parsed.error.status ?? ''}${parsed.error.status && parsed.error.message ? ': ' : ''}${parsed.error.message}`
     }
     catch {}
+    // Capture the raw Google Play Developer API error in the internal support
+    // log (secret-redacted on write) so non-build failures are diagnosable.
+    appendInternalLog(`play-api ${args.method} ${args.url}: HTTP ${res.status} ${detail}`)
     throw new Error(`Play API ${res.status} at ${args.url}: ${detail}`)
   }
   if (!text.trim())

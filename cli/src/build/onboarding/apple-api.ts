@@ -1,6 +1,7 @@
 // src/build/onboarding/apple-api.ts
 import jwt from 'jsonwebtoken'
 import { extractTeamIdFromCert } from './csr.js'
+import { appendInternalLog } from '../../support/internal-log.js'
 
 const ASC_BASE_URL = 'https://api.appstoreconnect.apple.com/v1'
 
@@ -71,6 +72,9 @@ async function ascFetch(
   if (!res.ok) {
     const errors: AppleApiError[] = body?.errors || []
     const first = errors[0]
+    // Capture the raw Apple App Store Connect error in the internal support log
+    // (secret-redacted on write) so non-build failures are diagnosable.
+    appendInternalLog(`apple-api ${options.method ?? 'GET'} ${path}: HTTP ${res.status} ${res.statusText} ${JSON.stringify(body?.errors ?? body ?? null)}`)
     if (first) {
       throw new AppleApiHttpError(res.status, `Apple API error (${res.status}): ${first.title} — ${first.detail} (${first.code})`)
     }
