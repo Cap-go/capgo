@@ -66,10 +66,14 @@ files or creating Apple resources in v1.
   TestFlight upload)") never needs it.
 - **Distribution mode.** The remote check is relevant only in **`app_store`
   mode** (the create-new default and import-app_store). `ad_hoc` skips it.
-- **Debug vs Release.** `parsePbxprojBundleId` already prefers the Release
-  config. The comparison must **anchor on the Release build ID** and ignore
-  Debug-only IDs (e.g. a `.debug`/`.dev` suffix variant of the Release ID) so a
-  debug suffix never false-triggers the picker.
+- **Debug vs Release.** The comparison uses the **Release-config bundle ID
+  only**. `parsePbxprojBundleId` must be **hardened to always resolve the
+  Release config** and never return a Debug value when a Release config is
+  present (it already prefers Release — see `test-bundle-id-detector.mjs:35` —
+  but tighten the guarantee and extend the tests, e.g. a Debug ID that diverges
+  from Release by more than a `.debug` suffix). When no Release config can be
+  resolved, the remote-verify step does **not** gate on a Debug fallback — it
+  warns and skips remote gating instead. No `.debug`/suffix heuristics.
 - **Lean dependencies.** The CLI deliberately hand-parses native files with
   small regexes (`pbxproj-parser.ts`, `bundle-id-detector.ts`) — no plist
   library, no Trapeze. v1 adds **no** native-file-editing dependency.
@@ -113,8 +117,10 @@ machinery.
    (→ `bundleId` + `name`, used for the picker) and `GET /v1/bundleIds` (→
    registered identifier strings, used only as a diagnostic — see the no-match
    branch). On failure, see step 4.
-2. Resolve the **Release** build bundle ID (reuse `detectIosBundleIds`,
-   Release-anchored; exclude debug-only suffix variants).
+2. Resolve the **Release** build bundle ID via the hardened
+   `parsePbxprojBundleId` (always the Release config; no debug/suffix
+   heuristics). If no Release config can be resolved, skip remote gating and
+   warn (see step 4).
 3. Branch:
    - **Exact match** (Release build ID == an ASC app's bundle ID): print a
      one-line confirmation, e.g.
@@ -186,11 +192,13 @@ produces. Resume must not re-prompt when nothing changed.
   picker) and `listBundleIds(token)` (→ registered identifier strings, for the
   diagnostic), both using the existing `ascFetch`. The caller invokes them **in
   parallel** (`Promise.all`). Pure data fetches.
-- **`bundle-id-detector.ts`** — extend (or add a sibling) so divergence can be
-  computed against a remote app list, Release-anchored, with debug-suffix
-  exclusion. Keep the pure/synchronous local detection intact; remote data is
-  passed in (no network inside the detector — keeps it unit-testable). Expose a
-  fresh-from-disk re-detection path for the gate (no memoization).
+- **`bundle-id-detector.ts`** — **harden `parsePbxprojBundleId` to always
+  resolve the Release-config bundle ID** (never a Debug value when Release is
+  present; deterministic main-target pick). Extend it (or add a sibling) so
+  divergence can be computed against a remote app list using that Release value.
+  Keep the pure/synchronous local detection intact; remote data is passed in (no
+  network inside the detector — keeps it unit-testable). Expose a fresh-from-disk
+  re-detection path for the gate (no memoization).
 - **`app.tsx` state machine** — add the remote-verification step wired into the
   post-`verifying-key` `redirectIfMismatch` fan-out, `app_store` mode only, with
   the branches above. Implements the divergence gate: re-detect fresh from disk
@@ -241,9 +249,12 @@ throw into the wizard.
 
 ## Testing
 
-- **Unit (pure):** the extended detector — exact match, divergence with apps,
-  no apps, debug-suffix exclusion, Release-anchoring, dedup/ordering. Follows
-  the existing `cli/test/test-bundle-id-detector.mjs` style.
+- **Unit (pure):** the hardened `parsePbxprojBundleId` — always picks Release
+  over Debug (incl. a Debug ID that diverges by more than a `.debug` suffix) and
+  the no-Release-config case — plus the extended detector (exact match,
+  divergence with apps, no apps, dedup/ordering). Extends the existing
+  `cli/test/test-bundle-id-detector.mjs`, which already covers Release-over-Debug
+  at line 35.
 - **Unit:** `listApps` and `listBundleIds` response parsing (mock `ascFetch`),
   including the parallel fetch and the two Problem-2 sub-states (identifier
   registered vs. not registered).
