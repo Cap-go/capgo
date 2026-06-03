@@ -25,9 +25,19 @@ const app = ref<Database['public']['Tables']['apps']['Row']>()
 
 type PreviewState = 'loading' | 'no-app' | 'preview-disabled' | 'ready'
 const previewState = ref<PreviewState>('loading')
+const browserPreviewUnavailableReason = computed<'missing-manifest' | 'encrypted' | null>(() => {
+  const currentVersion = channel.value?.version
+  if (!currentVersion)
+    return null
+  if (!currentVersion.manifest_count)
+    return 'missing-manifest'
+  if (currentVersion.session_key)
+    return 'encrypted'
+  return null
+})
 const browserPreviewAvailable = computed(() => {
   const currentVersion = channel.value?.version
-  return !!currentVersion?.manifest_count && !currentVersion.session_key
+  return !browserPreviewUnavailableReason.value && !!currentVersion
 })
 
 async function getChannel() {
@@ -183,6 +193,7 @@ watchEffect(async () => {
         :channel-id="id"
         :channel-name="channel.name"
         :browser-preview="browserPreviewAvailable"
+        :browser-preview-unavailable-reason="browserPreviewUnavailableReason"
       />
     </div>
   </div>

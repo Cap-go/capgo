@@ -21,9 +21,19 @@ const app = ref<Database['public']['Tables']['apps']['Row']>()
 
 type PreviewState = 'loading' | 'preview-disabled' | 'ready'
 const previewState = ref<PreviewState>('loading')
+const browserPreviewUnavailableReason = computed<'missing-manifest' | 'encrypted' | null>(() => {
+  const currentVersion = version.value
+  if (!currentVersion)
+    return null
+  if (!currentVersion.manifest_count)
+    return 'missing-manifest'
+  if (currentVersion.session_key)
+    return 'encrypted'
+  return null
+})
 const browserPreviewAvailable = computed(() => {
   const currentVersion = version.value
-  return !!currentVersion?.manifest_count && !currentVersion.session_key
+  return !browserPreviewUnavailableReason.value && !!currentVersion
 })
 
 async function getVersion() {
@@ -149,6 +159,7 @@ watchEffect(async () => {
         :app-id="packageId"
         :version-id="id"
         :browser-preview="browserPreviewAvailable"
+        :browser-preview-unavailable-reason="browserPreviewUnavailableReason"
       />
     </div>
   </div>

@@ -5,6 +5,7 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import IconExternalLink from '~icons/lucide/external-link'
+import IconInfo from '~icons/lucide/info'
 import IconPlay from '~icons/lucide/play'
 import IconSmartphone from '~icons/lucide/smartphone'
 import { buildBundlePreviewDeepLink, buildChannelPreviewDeepLink } from '~/services/previewLinks'
@@ -16,8 +17,10 @@ const props = withDefaults(defineProps<{
   channelId?: number
   channelName?: string
   browserPreview?: boolean
+  browserPreviewUnavailableReason?: 'missing-manifest' | 'encrypted' | null
 }>(), {
   browserPreview: true,
+  browserPreviewUnavailableReason: null,
 })
 
 const { t } = useI18n()
@@ -64,6 +67,25 @@ function checkMobile() {
 const currentDevice = computed(() => devices[selectedDevice.value])
 const showBrowserPreview = computed(() => props.browserPreview)
 const showQrCode = computed(() => !!qrCodeDataUrl.value && (!isMobile.value || !showBrowserPreview.value))
+const browserPreviewHelp = computed(() => {
+  if (props.browserPreviewUnavailableReason === 'missing-manifest') {
+    return {
+      title: t('web-preview-needs-manifest'),
+      description: t('web-preview-needs-manifest-description'),
+      command: 'npx @capgo/cli@latest bundle upload --delta',
+    }
+  }
+
+  if (props.browserPreviewUnavailableReason === 'encrypted') {
+    return {
+      title: t('web-preview-encrypted-unavailable'),
+      description: t('web-preview-encrypted-unavailable-description'),
+      command: '',
+    }
+  }
+
+  return null
+})
 
 // Build the preview URL using a reversible preview subdomain format.
 const previewUrl = computed<string | null>(() => {
@@ -255,7 +277,7 @@ async function startNativePreview() {
       <div
         v-if="showQrCode"
         class="flex w-full flex-col items-center rounded-xl bg-white p-5 shadow-lg dark:bg-gray-800"
-        :class="showBrowserPreview ? 'sticky top-4' : 'max-w-xs'"
+        :class="showBrowserPreview ? 'sticky top-4' : 'max-w-sm'"
       >
         <img
           :src="qrCodeDataUrl"
@@ -265,6 +287,29 @@ async function startNativePreview() {
         <p class="text-sm text-center text-gray-600 dark:text-gray-400 max-w-40">
           {{ t('scan-qr-to-preview') }}
         </p>
+
+        <div
+          v-if="browserPreviewHelp"
+          class="mt-4 w-full rounded-lg border border-blue-100 bg-blue-50 p-3 text-left dark:border-blue-500/30 dark:bg-blue-500/10"
+        >
+          <div class="flex items-start gap-2">
+            <IconInfo class="mt-0.5 h-4 w-4 shrink-0 text-blue-600 dark:text-blue-300" />
+            <div class="min-w-0">
+              <p class="text-sm font-semibold text-blue-950 dark:text-blue-100">
+                {{ browserPreviewHelp.title }}
+              </p>
+              <p class="mt-1 text-xs leading-5 text-blue-900/80 dark:text-blue-100/80">
+                {{ browserPreviewHelp.description }}
+              </p>
+              <code
+                v-if="browserPreviewHelp.command"
+                class="mt-2 block overflow-x-auto rounded-md bg-white px-2 py-1.5 text-[11px] text-slate-800 dark:bg-slate-950 dark:text-slate-100"
+              >
+                {{ browserPreviewHelp.command }}
+              </code>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
