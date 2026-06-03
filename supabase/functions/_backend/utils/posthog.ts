@@ -75,11 +75,11 @@ export async function trackPosthogEvent(c: Context, payload: PostHogCapturePaylo
 }
 
 function getPostHogExceptionUrl(host: string) {
-  const trimmedHost = host.replace(/\/+$/, '')
+  const trimmedHost = host.replace(/\/+$/g, '')
   if (trimmedHost.endsWith('/i/v0/e'))
     return `${trimmedHost}/`
 
-  const normalizedHost = trimmedHost.replace(/\/capture$/, '/')
+  const normalizedHost = trimmedHost.replace(/\/capture$/g, '/')
   return new URL('i/v0/e/', normalizedHost.endsWith('/') ? normalizedHost : `${normalizedHost}/`).toString()
 }
 
