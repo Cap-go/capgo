@@ -6,10 +6,9 @@
 //
 // We split this off from the existing pbxproj-parser.ts because that module
 // returns ALL signable targets (multi-target apps with extensions) and the
-// onboarding flow only cares about the main app's bundle ID for the
-// confirm-app-id step. Routing through one mainline-target helper keeps the
-// UI simple ("Use X from pbxproj / Use Y from capacitor.config / type your
-// own") and the detection deterministic.
+// onboarding flow only cares about the main app's bundle ID for the Apple-side
+// bundle-id resolution (redirectIfMismatch / verify-app). Routing through one
+// mainline-target helper keeps the detection deterministic.
 //
 // Release is AUTHORITATIVE: the Release-config bundle ID is the build ID used
 // for every Apple-side comparison and gate. We never silently substitute a
@@ -60,8 +59,8 @@ export interface DetectedBundleIds {
   recommended: BundleIdCandidate
   /**
    * True when the recommended value differs from capacitor.config.appId.
-   * Used by the confirm-app-id step to decide whether to surface a question
-   * at all — when they match, nothing's worth asking about.
+   * Used by redirectIfMismatch to decide whether to adopt the Release id —
+   * when they match, capacitor.config.appId is already the build id.
    */
   mismatch: boolean
   /**
@@ -315,8 +314,8 @@ export function detectIosBundleIds(opts: {
     }
   }
 
-  // Build a deduplicated candidate list. Order is priority-first so the
-  // confirm-app-id step renders the recommended choice on top.
+  // Build a deduplicated candidate list (priority-first); recommended[0] is the
+  // authoritative Release id. Retained as a detector API field.
   const seen = new Set<string>()
   const ordered: BundleIdCandidate[] = []
   for (const c of [pbxproj, plist, capacitor]) {

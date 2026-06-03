@@ -147,9 +147,10 @@ interface AppProps {
    * (cert lookup, profile filtering, ensureBundleId, createProfile, and the
    * provisioning_map key). Sourced from `config.appId` directly — what
    * `cap sync` writes into project.pbxproj's PRODUCT_BUNDLE_IDENTIFIER.
-   * The user can override at the `confirm-app-id` step when pbxproj and
-   * config.appId disagree. command.ts falls back to `appId` if config.appId
-   * is missing, so this prop is always a valid string.
+   * When pbxproj's Release id and config.appId disagree, the wizard adopts the
+   * authoritative Release id (verify-app confirms it remotely). command.ts
+   * falls back to `appId` if config.appId is missing, so this prop is always a
+   * valid string.
    */
   iosBundleIdInitial: string
   initialProgress: OnboardingProgress | null
@@ -232,9 +233,8 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
   // Trust the saved override only when it was confirmed for the SAME
   // `config.appId` we're seeing this run. If the user renamed the app
   // between CLI runs the previously-saved override is stale relative to
-  // the new files — fall back to `iosBundleIdInitial` so the mismatch
-  // detector can re-ask via the confirm-app-id step instead of silently
-  // using the old value.
+  // the new files — fall back to `iosBundleIdInitial` so redirectIfMismatch /
+  // verify-app re-resolve the bundle id instead of silently using the old value.
   const savedOverrideIsFresh = initialProgress?.iosBundleIdOverride !== undefined
     && initialProgress.iosBundleIdContextAppId === iosBundleIdInitial
   const [iosBundleId, setIosBundleId] = useState<string>(
@@ -247,11 +247,6 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
   // to suppress the question for the rest of the session in that case.
   // Stale overrides (context drift between runs) don't count as confirmed.
   const [appIdConfirmed, setAppIdConfirmed] = useState<boolean>(savedOverrideIsFresh)
-  // Where redirectIfMismatch wants to go after the user confirms.
-  const [pendingAppIdNext, setPendingAppIdNext] = useState<OnboardingStep | null>(null)
-  // Sub-mode for confirm-app-id: false = render the candidate Select;
-  // true = render a FilteredTextInput for a custom value.
-  const [confirmAppIdTyping, setConfirmAppIdTyping] = useState(false)
 
   // ─── verify-app (remote App Store Connect verification) ────────────────
   //
@@ -261,10 +256,8 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
   // before we commit to that bundle id for cert/profile creation. See
   // app-verification.ts for the pure classify/gate logic.
   //
-  // Where to go once verify-app passes (kept separate from pendingAppIdNext
-  // so confirm-app-id — which may run *before* verify-app via
-  // redirectIfMismatch('verify-app') — and verify-app never clobber each
-  // other's continuation target).
+  // Where to go once verify-app passes (e.g. creating-certificate on the
+  // create-new path, or the identity/profile picker on import).
   const [pendingVerifyNext, setPendingVerifyNext] = useState<OnboardingStep | null>(null)
   // True while the initial parallel apps+bundleIds fetch is in flight.
   const [verifyAppLoading, setVerifyAppLoading] = useState(false)
@@ -294,9 +287,9 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
   const verifyShownRef = useRef(false)
   const verifyFetchStartedRef = useRef(false)
   // Detection is synchronous (small files, no network); useMemo captures the
-  // result for the lifetime of the component. The confirm-app-id step
-  // renders only when `detectedIds.mismatch === true` AND the user hasn't
-  // already chosen this session.
+  // result for the lifetime of the component. redirectIfMismatch reads this to
+  // decide whether to adopt the Release id (on mismatch). verify-app re-detects
+  // FRESH from disk on each Continue, bypassing this memo.
   const detectedIds = useMemo(
     () => detectIosBundleIds({ cwd: process.cwd(), iosDir, capacitorAppId: iosBundleIdInitial }),
     [iosDir, iosBundleIdInitial],
@@ -311,8 +304,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
   // adopt the detected Release id for cert/profile/provisioning work and
   // continue. For app_store the authoritative check is verify-app (remote App
   // Store Connect verification); for ad_hoc the Release id is simply the build
-  // id, used as-is. (confirm-app-id remains in the state machine but is no
-  // longer auto-injected here.)
+  // id, used as-is.
   const redirectIfMismatch = (target: OnboardingStep): OnboardingStep => {
     if (appIdConfirmed)
       return target
@@ -837,13 +829,12 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
     })
   }, [appId, apikey, resolvedOrgId])
 
-  // Persist the verified Release build id as the iosBundleIdOverride, exactly
-  // like confirm-app-id's onChoose. After the gate passes the wired-in value
-  // is always a build id that both the project produces AND the App Store has,
-  // so cert/profile creation, ensureBundleId and the provisioning_map all key
-  // off the right identifier. Also snapshots the current config.appId so a
-  // later run can detect context drift and re-verify. Marks the app id as
-  // confirmed so the local confirm-app-id question doesn't re-fire afterwards.
+  // Persist the verified Release build id as the iosBundleIdOverride. After the
+  // gate passes the wired-in value is always a build id that both the project
+  // produces AND the App Store has, so cert/profile creation, ensureBundleId and
+  // the provisioning_map all key off the right identifier. Also snapshots the
+  // current config.appId so a later run can detect context drift and re-verify.
+  // Marks the app id as confirmed so redirectIfMismatch doesn't re-adopt later.
   const persistVerifyOverride = useCallback(async (releaseBundleId: string) => {
     setIosBundleId(releaseBundleId)
     setAppIdConfirmed(true)
@@ -1008,13 +999,11 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
     // File-picker re-open guards
     pickerOpenedRef.current = false
     mobileprovisionPickerOpenedRef.current = false
-    // iOS bundle id confirmation gate — without this a restart from inside
-    // confirm-app-id would silently keep the previously chosen override in
-    // this session, so the user would never see the question again.
+    // iOS bundle id resolution — reset so a restart re-resolves the authoritative
+    // Release bundle id from scratch (redirectIfMismatch / verify-app set these
+    // again) rather than keeping a stale override from the aborted run.
     setIosBundleId(iosBundleIdInitial)
     setAppIdConfirmed(false)
-    setPendingAppIdNext(null)
-    setConfirmAppIdTyping(false)
     // No-match recovery context — without this a restart would carry the
     // previous run's reason into the next pass and surface the wrong
     // bundle/distribution/profile-source wording in the recovery alert.
@@ -1396,10 +1385,9 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
           // .p8 input chain. See progress.ts → getImportEntryStep for the
           // full decision table and tests.
           //
-          // redirectIfMismatch then short-circuits to confirm-app-id when
-          // config.appId and project.pbxproj's PRODUCT_BUNDLE_IDENTIFIER
-          // disagree — surfaced AFTER p8 setup so the user has context
-          // before Apple-side filtering kicks in.
+          // redirectIfMismatch then silently adopts the authoritative Release
+          // PRODUCT_BUNDLE_IDENTIFIER when it differs from config.appId (no
+          // prompt) before Apple-side filtering kicks in.
           setStep(redirectIfMismatch(getImportEntryStep(await loadProgress(appId))))
         }
         catch (err) {
@@ -2006,10 +1994,9 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
           }
           else if (importMode) {
             // After p8 verification we're about to use the bundle id for
-            // Apple-side filtering; redirectIfMismatch routes through the
-            // confirm-app-id step when config.appId disagrees with
-            // pbxproj. Returns the same target step when there's no
-            // mismatch.
+            // Apple-side filtering; redirectIfMismatch silently adopts the
+            // authoritative Release bundle id when it differs from
+            // capacitor.config.appId (no prompt), then returns the target step.
             //
             // Eager batch validation runs BEFORE the picker renders when
             // there's at least one match — runs a single ASC cert fetch and
@@ -2041,12 +2028,10 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
             // holds (verify-app itself goes straight through on an exact match
             // or an ASC fetch failure).
             //
-            // redirectIfMismatch still runs first so the local confirm-app-id
-            // question (config.appId vs pbxproj) appears before verify-app when
-            // those local sources disagree; confirm-app-id then resumes at
-            // verify-app via its own pendingAppIdNext. Without this ordering a
-            // user whose project.pbxproj disagrees with config.appId would
-            // never see the confirm-app-id question on the create-new flow.
+            // redirectIfMismatch runs first only to silently adopt the
+            // authoritative Release bundle id when it differs from
+            // capacitor.config.appId (no prompt); verify-app then does the
+            // remote check.
             setPendingVerifyNext('creating-certificate')
             setStep(redirectIfMismatch('verify-app'))
           }
@@ -2066,8 +2051,8 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
     // exact match we log + persist the override + continue straight to the
     // pending target. On any ASC fetch failure (or an unresolvable Release
     // config) we warn and proceed — we can't verify a transient/unknown state
-    // and blocking on it would trap the user (the pre-existing local
-    // confirm-app-id checks still ran). Otherwise we stay parked on verify-app
+    // and blocking on it would trap the user (the local bundle-id resolution
+    // still ran). Otherwise we stay parked on verify-app
     // and the render below drives the picker + gate. Guarded by a ref so the
     // fetch fires exactly once per entry into the step.
     if (step === 'verify-app' && !verifyFetchStartedRef.current) {
@@ -2152,7 +2137,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
         catch {
           // ASC fetch failure (auth / rate-limit / network): we can't verify a
           // transient failure, and blocking on it would trap the user. Warn
-          // visibly and proceed — the local confirm-app-id checks already ran.
+          // visibly and proceed — the local bundle-id resolution already ran.
           if (cancelled)
             return
           setVerifyAppLoading(false)
@@ -3245,125 +3230,9 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
       {/* Import: scanning */}
       {step === 'import-scanning' && <ImportScanningStep />}
 
-      {/* Confirm iOS bundle id when config.appId and project.pbxproj
-          disagree. Only reached via redirectIfMismatch — never shown on
-          fresh runs where everything lines up. */}
-      {step === 'confirm-app-id' && (() => {
-        const onChoose = async (chosen: string) => {
-          setIosBundleId(chosen)
-          setAppIdConfirmed(true)
-          setConfirmAppIdTyping(false)
-          // Persist + snapshot the current config.appId so the next CLI
-          // run can detect "user changed the app id since last time" and
-          // re-ask. Merge with whatever progress already exists.
-          const existing = await loadProgress(appId) || {
-            platform: 'ios' as const,
-            appId,
-            startedAt: new Date().toISOString(),
-            completedSteps: {},
-          }
-          existing.iosBundleIdOverride = chosen
-          existing.iosBundleIdContextAppId = iosBundleIdInitial
-          await saveProgress(appId, existing)
-          if (chosen !== iosBundleIdInitial)
-            addLog(`✔ Using "${chosen}" as the iOS bundle ID for Apple operations (capacitor.config.appId is "${iosBundleIdInitial}")`)
-          else
-            addLog(`✔ Confirmed "${chosen}" as the iOS bundle ID`)
-          setStep(pendingAppIdNext ?? 'import-pick-identity')
-          setPendingAppIdNext(null)
-        }
-
-        if (confirmAppIdTyping) {
-          return (
-            <Box flexDirection="column" marginTop={1}>
-              <Alert variant="info">
-                Type the iOS bundle ID to use for Apple operations.
-              </Alert>
-              <Newline />
-              <Text dimColor>
-                {`Press Enter when done. This is what we'll send to Apple's API for cert and profile lookups — it must match `}
-                <Text bold>PRODUCT_BUNDLE_IDENTIFIER</Text>
-                {' in your Xcode project (and the App ID on developer.apple.com).'}
-              </Text>
-              <Newline />
-              <FilteredTextInput
-                placeholder="e.g. com.example.myapp"
-                allowedPattern={/[A-Za-z0-9.-]/}
-                maxLength={155}
-                initialValue={detectedIds.recommended.value}
-                onSubmit={(value) => {
-                  const trimmed = value.trim()
-                  if (!trimmed)
-                    return
-                  void onChoose(trimmed)
-                }}
-              />
-            </Box>
-          )
-        }
-
-        return (
-          <Box flexDirection="column" marginTop={1}>
-            <Alert variant="warning">
-              {`The iOS bundle ID in your Xcode project doesn't match capacitor.config.`}
-            </Alert>
-            <Newline />
-            <Text dimColor>
-              {`We use the iOS bundle ID for Apple Developer Portal operations (looking up certs, fetching/creating provisioning profiles). Picking the wrong one is the cause of "Apple returned X profiles but none target …" errors. capacitor.config.appId stays untouched — this only affects what we send to Apple.`}
-            </Text>
-            <Newline />
-            <Box flexDirection="column" marginLeft={2}>
-              {detectedIds.pbxproj && (
-                <Text>
-                  • Xcode (
-                  <Text bold>{detectedIds.pbxproj.label}</Text>
-                  ):
-                  {' '}
-                  <Text bold color="cyan">{detectedIds.pbxproj.value}</Text>
-                </Text>
-              )}
-              {detectedIds.plist && (
-                <Text>
-                  • Info.plist (CFBundleIdentifier):
-                  {' '}
-                  <Text bold color="cyan">{detectedIds.plist.value}</Text>
-                </Text>
-              )}
-              <Text>
-                • Capacitor (capacitor.config.appId):
-                {' '}
-                <Text bold color="cyan">{detectedIds.capacitor.value}</Text>
-              </Text>
-            </Box>
-            <Newline />
-            <Text>Which value should we use for Apple-side operations?</Text>
-            <Newline />
-            <Select
-              options={[
-                ...detectedIds.candidates.map((c, i) => ({
-                  label: i === 0
-                    ? `${c.value} — ${c.label} (recommended)`
-                    : `${c.value} — ${c.label}`,
-                  value: c.value,
-                })),
-                { label: '✏️   Type a custom bundle ID...', value: '__type__' },
-              ]}
-              onChange={(value) => {
-                if (value === '__type__') {
-                  setConfirmAppIdTyping(true)
-                  return
-                }
-                void onChoose(value)
-              }}
-            />
-          </Box>
-        )
-      })()}
-
       {/* Verify the App Store Connect app exists for the Release build id.
-          app_store mode only; reached after verifying-key (and after the
-          local confirm-app-id question when config.appId vs pbxproj
-          disagree). The single invariant: an ASC app exists whose bundleId
+          app_store mode only; reached after verifying-key. The single
+          invariant: an ASC app exists whose bundleId
           == the Release PRODUCT_BUNDLE_IDENTIFIER. The exact-match and
           fetch-failure cases are handled in the effect above (they transition
           straight through); this render only drives the picker + the two
