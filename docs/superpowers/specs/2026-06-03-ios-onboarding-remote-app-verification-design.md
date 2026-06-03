@@ -165,10 +165,12 @@ replacing the local `confirm-app-id` machinery.
        `/v1/bundleIds` diagnostic just tells us whether this registration already
        happened (sharpens the wording: "identifier already exists" vs. "will be
        registered").
-     - Offer **[Open App Store Connect to create the app]** (opens the new-app
-       page via `open`). The ASC API cannot create the app, so this is manual.
+     - Offer **[Open App Store Connect to create the app]** — opens the new-app
+       page via `open` **once, when the user explicitly chooses it** (the API
+       can't create the app, so this is manual).
      - On Continue, **re-poll `GET /v1/apps`**; pass once an app with
-       `bundleId == com.foo.app` exists.
+       `bundleId == com.foo.app` exists. **Never auto-re-open the browser** — if
+       the app still isn't found, *ask* before re-opening (see the gate).
 5. **On ASC fetch failure** (auth / rate-limit / network): show a visible warning
    — "Couldn't reach App Store Connect to verify your app; continuing without
    remote verification." — and proceed. We can't verify the invariant on a
@@ -188,9 +190,14 @@ resolution paths:
     against the chosen app.
   - Path B re-fetches `GET /v1/apps` and checks for an app matching the build ID.
   - If satisfied → proceed.
-- If still unmet, **block** and show a warning box naming the exact next action
-  (Path A: the precise `wrong → right` `PRODUCT_BUNDLE_IDENTIFIER` edit, noting
-  `capacitor.config.appId` can stay as-is; Path B: re-open the create-app page).
+- If still unmet, **block** and show a warning box naming the exact next action:
+  - **Path A:** the precise `wrong → right` `PRODUCT_BUNDLE_IDENTIFIER` edit
+    (noting `capacitor.config.appId` can stay as-is).
+  - **Path B:** **do not re-open the browser automatically.** Ask instead — e.g.
+    "Still no App Store app for `com.foo.app`. Re-open the create-app page?" —
+    with choices like **Re-open page** / **I've created it — re-check** /
+    **Cancel**. The browser opens only if the user picks "Re-open page";
+    "re-check" just re-polls; everything else stays on the gate.
 - **Escalate on repeated unmet attempts.** Track an attempt counter; each blocked
   Continue must look *visibly different* from the previous one (shift the box
   border colour, add an `(attempt N)` marker, surface the concrete file path /
