@@ -4,7 +4,7 @@
 import { readFileSync } from 'node:fs'
 
 const bundle = readFileSync(new URL('../dist/index.js', import.meta.url), 'utf8')
-const forbidden = ['__CAPGO_DEV__', 'CAPGO_SPOOF', 'src/__dev__/']
+const forbidden = ['__CAPGO_DEV__', 'CAPGO_SPOOF', 'src/__dev__/', '__CAPGO_MCP_ONBOARDING__', 'start_capgo_builder_onboarding', 'capgo_builder_onboarding_next_step']
 
 let fail = 0
 for (const m of forbidden) {
