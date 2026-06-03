@@ -169,7 +169,10 @@ async function loadAccessReferenceData() {
   channels.value = (channelsResult.data || []) as ChannelSummary[]
 
   const nextPrincipalOptions: PrincipalOption[] = []
-  if (!membersResult.error) {
+  if (membersResult.error) {
+    console.error('Error loading org members for app access:', membersResult.error)
+  }
+  else {
     for (const member of (membersResult.data || []) as any[]) {
       if (member.is_tmp || member.is_invite)
         continue
@@ -181,11 +184,11 @@ async function loadAccessReferenceData() {
       })
     }
   }
-  else {
-    console.error('Error loading org members for app access:', membersResult.error)
-  }
 
-  if (!groupsResult.error) {
+  if (groupsResult.error) {
+    console.error('Error loading groups for app access:', groupsResult.error)
+  }
+  else {
     for (const group of (groupsResult.data || []) as any[]) {
       nextPrincipalOptions.push({
         type: 'group',
@@ -194,9 +197,6 @@ async function loadAccessReferenceData() {
         detail: t('group'),
       })
     }
-  }
-  else {
-    console.error('Error loading groups for app access:', groupsResult.error)
   }
 
   principalOptions.value = nextPrincipalOptions.sort((a, b) => a.label.localeCompare(b.label))
