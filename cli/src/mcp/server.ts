@@ -4,6 +4,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod'
 import pack from '../../package.json'
 import { enableSupabaseInstrumentation, setInvocationSource, trackMcpServerStarted, withMcpToolTracking } from '../analytics/track'
+import { registerOnboardingTools } from '../build/onboarding/mcp/onboarding-tools'
 import { addAppOptionsSchema, cleanupOptionsSchema, getStatsOptionsSchema, requestBuildOptionsSchema, starAllRepositoriesOptionsSchema, starRepoOptionsSchema, updateAppOptionsSchema, updateChannelOptionsSchema, uploadOptionsSchema } from '../schemas/sdk'
 import { CapgoSDK } from '../sdk'
 import { findSavedKey } from '../utils'
@@ -57,6 +58,9 @@ export async function startMcpServer(): Promise<void> {
     savedApiKey = undefined
   }
   const sdk = new CapgoSDK({ apikey: savedApiKey })
+
+  // Guided Capgo Builder onboarding (2-tool spine: start + next_step).
+  registerOnboardingTools(server, sdk)
 
   // ============================================================================
   // App Management Tools

@@ -27,3 +27,12 @@ test/fixtures/lerna-monorepo/
 test/fixtures/version-mismatch/
 test/fixtures/wrong-nested-version/
 test/fixtures/fake-version-trap/
+
+# Private MCP test harness — lives in Cap-go/cli-mcp-tests (overlaid locally, never committed)
+test/e2e-mcp/
+test/test-mcp-onboarding.mjs
+test/test-android-flow.mjs
+test/test-app-id-validation.mjs
+test/test-build-output-record.mjs
+test/test-oauth-session.mjs
+test/test-terminal-launch.mjs

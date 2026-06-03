@@ -30,6 +30,41 @@ export interface KeystoreResult {
 const DEFAULT_VALIDITY_YEARS = 27
 const DEFAULT_KEY_SIZE = 2048
 const RANDOM_PASSWORD_BYTES = 24
+const DEFAULT_SAFE_ALIAS = 'keystore'
+
+/**
+ * Sanitize a keystore alias for use as an on-disk filename component.
+ *
+ * The alias originates from user input (e.g. `keystoreNewAlias`). It is used
+ * verbatim for the keystore crypto and the saved `KEYSTORE_KEY_ALIAS`, but the
+ * value used to build the `<alias>.p12` filename must be sanitized so a value
+ * like `../../evil` or `/etc/x` cannot escape the target directory.
+ *
+ * Rules:
+ * - strip any directory components (keep only the basename),
+ * - allow only `[A-Za-z0-9._-]`, replacing any other char with `_`,
+ * - normalize empty or dot-only results (``, `.`, `..`) to a safe default,
+ * - the return value never contains `/`, `\`, or `..`.
+ *
+ * IMPORTANT: this is ONLY for the filename. Do NOT use it for the crypto alias
+ * or the saved key alias — those must stay exactly what the user chose.
+ */
+export function sanitizeKeystoreAlias(alias: string): string {
+  // Take the basename: split on both POSIX and Windows separators and keep the
+  // last non-empty segment so `a/b`, `a\b\c`, `../../etc/passwd` all reduce to
+  // just the final name.
+  const segments = String(alias ?? '').split(/[/\\]+/)
+  const basename = segments.filter(Boolean).pop() ?? ''
+
+  // Replace any char outside the allowlist with `_`.
+  const cleaned = basename.replace(/[^A-Za-z0-9._-]/g, '_')
+
+  // Reject empty or dot-only results (``, `.`, `..`, etc.) → safe default.
+  if (cleaned.length === 0 || /^\.+$/.test(cleaned))
+    return DEFAULT_SAFE_ALIAS
+
+  return cleaned
+}
 
 /**
  * Generate a URL-safe random password suitable for Android keystore use.

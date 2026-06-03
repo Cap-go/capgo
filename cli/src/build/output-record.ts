@@ -1,5 +1,6 @@
-import { mkdir, writeFile } from 'node:fs/promises'
-import { dirname, resolve } from 'node:path'
+import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { dirname, join, resolve } from 'node:path'
 import { cwd } from 'node:process'
 import QRCode from 'qrcode'
 
@@ -81,6 +82,46 @@ export async function writeBuildOutputRecord(
   await writeFile(absoluteRecordPath, `${JSON.stringify(record, null, 2)}\n`, 'utf-8')
 
   return record
+}
+
+/**
+ * Returns a deterministic temp-file path for the build output record for a
+ * given (appId, platform) pair. Both the build hand-off (command emit) and
+ * the confirm (record read) call this helper so that the path is never passed
+ * back and forth across an MCP boundary.
+ *
+ * appId is sanitized: all `/` and `\` characters are replaced with `_`, and
+ * any `..` sequences are replaced with `_`, to prevent path traversal.
+ */
+export function defaultBuildRecordPath(appId: string, platform: 'ios' | 'android'): string {
+  const safe = appId.replace(/[/\\]/g, '_').replace(/\.\./g, '_')
+  return join(tmpdir(), `capgo-build-record-${safe}-${platform}.json`)
+}
+
+/**
+ * Read a build output record from `path`. Returns the parsed `BuildOutputRecord`
+ * if the file exists, is valid JSON, and the parsed object contains a string
+ * `jobId` property. Returns `null` in all other cases (missing file, parse
+ * error, missing/wrong-type jobId).
+ */
+export async function readBuildOutputRecord(path: string): Promise<BuildOutputRecord | null> {
+  try {
+    const raw = await readFile(path, 'utf-8')
+    const parsed: unknown = JSON.parse(raw)
+    if (
+      typeof parsed === 'object'
+      && parsed !== null
+      && typeof (parsed as Record<string, unknown>).jobId === 'string'
+      && typeof (parsed as Record<string, unknown>).status === 'string'
+      && ((parsed as Record<string, unknown>).outputUrl === null || typeof (parsed as Record<string, unknown>).outputUrl === 'string')
+    ) {
+      return parsed as BuildOutputRecord
+    }
+    return null
+  }
+  catch {
+    return null
+  }
 }
 
 function stringifyError(error: unknown): string {

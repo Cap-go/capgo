@@ -137,6 +137,13 @@ export interface AndroidOnboardingProgress {
   appId: string
   startedAt: string
 
+  /**
+   * Set the moment the user enters the android flow (platform chosen). Lets the
+   * MCP resume the android flow on a next_step that omits `platform`, instead of
+   * bouncing to platform-select. Independent of keystore-ready markers.
+   */
+  activePlatform?: 'android'
+
   // Keystore — partial input for resume
   keystoreMethod?: KeystoreMethod
   keystoreExistingPath?: string
@@ -144,6 +151,21 @@ export interface AndroidOnboardingProgress {
   keystoreStorePassword?: string
   keystoreKeyPassword?: string
   keystoreCommonName?: string
+  /**
+   * True when the new-keystore password was auto-generated (random method).
+   * `keystorePasswordMethod` is NOT persisted, so this is the signal the MCP uses
+   * to decide whether to surface the password to the user (manual passwords the
+   * user already knows are never surfaced). Never logged or sent to telemetry.
+   */
+  keystorePasswordGenerated?: boolean
+  /**
+   * True once the user chose the MANUAL password method at
+   * `keystore-new-password-method`. The interactive TUI tracks this manual →
+   * store-password transition in component state; the stateless MCP has no such
+   * state, so it persists this marker to advance the resume step to
+   * `keystore-new-store-password` instead of re-showing the choice screen.
+   */
+  keystorePasswordManual?: boolean
 
   // Set when a fresh run completes keystore setup and becomes eligible to
   // show `service-account-method-select`. This lets resume return to the fork
