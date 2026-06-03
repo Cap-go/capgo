@@ -90,6 +90,10 @@ WHERE EXISTS (
       public.rbac_scope_org(),
       public.rbac_scope_app()
     )
+    AND (
+      public.role_bindings.expires_at IS NULL
+      OR public.role_bindings.expires_at > pg_catalog.now()
+    )
     AND public.roles.name IN (
       public.rbac_role_org_super_admin(),
       public.rbac_role_org_admin(),
@@ -98,6 +102,46 @@ WHERE EXISTS (
     )
 )
 ON CONFLICT (apikey_rbac_id, permission_key) DO NOTHING;
+
+CREATE OR REPLACE FUNCTION public.apikey_has_current_org_create_capability(
+  p_apikey_rbac_id uuid
+)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.role_bindings AS rb
+    JOIN public.roles AS r ON r.id = rb.role_id
+    WHERE rb.principal_type = public.rbac_principal_apikey()
+      AND rb.principal_id = p_apikey_rbac_id
+      AND rb.scope_type IN (
+        public.rbac_scope_org(),
+        public.rbac_scope_app()
+      )
+      AND r.scope_type = rb.scope_type
+      AND (
+        rb.expires_at IS NULL
+        OR rb.expires_at > pg_catalog.now()
+      )
+      AND r.name IN (
+        public.rbac_role_org_super_admin(),
+        public.rbac_role_org_admin(),
+        public.rbac_role_app_admin(),
+        public.rbac_role_app_developer()
+      )
+  )
+$$;
+
+ALTER FUNCTION public.apikey_has_current_org_create_capability(uuid) OWNER TO postgres;
+REVOKE ALL ON FUNCTION public.apikey_has_current_org_create_capability(uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.apikey_has_current_org_create_capability(uuid) TO service_role;
+
+COMMENT ON FUNCTION public.apikey_has_current_org_create_capability(uuid) IS
+  'Private helper ensuring org.create grants only remain effective while the API key still has a current write-capable RBAC binding.';
 
 CREATE OR REPLACE FUNCTION public.apikey_has_global_permission(
   p_apikey text,
@@ -124,12 +168,20 @@ BEGIN
     RETURN false;
   END IF;
 
-  RETURN EXISTS (
+  IF NOT EXISTS (
     SELECT 1
     FROM public.apikey_global_permissions AS agp
     WHERE agp.apikey_rbac_id = v_api_key.rbac_id
       AND agp.permission_key = p_permission_key
-  );
+  ) THEN
+    RETURN false;
+  END IF;
+
+  IF p_permission_key = public.rbac_perm_org_create() THEN
+    RETURN public.apikey_has_current_org_create_capability(v_api_key.rbac_id);
+  END IF;
+
+  RETURN true;
 END;
 $$;
 
@@ -177,7 +229,8 @@ BEGIN
     FROM public.apikey_global_permissions AS agp
     WHERE agp.apikey_rbac_id = api_key.rbac_id
       AND agp.permission_key = public.rbac_perm_org_create()
-  ) THEN
+  )
+  AND public.apikey_has_current_org_create_capability(api_key.rbac_id) THEN
     RETURN api_key.user_id;
   END IF;
 
@@ -228,7 +281,8 @@ BEGIN
     FROM public.apikey_global_permissions AS agp
     WHERE agp.apikey_rbac_id = api_key.rbac_id
       AND agp.permission_key = public.rbac_perm_org_create()
-  ) THEN
+  )
+  OR NOT public.apikey_has_current_org_create_capability(api_key.rbac_id) THEN
     RETURN NEW;
   END IF;
 

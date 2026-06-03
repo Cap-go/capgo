@@ -647,7 +647,7 @@ describe('API key organization creation', () => {
       key: createKeyValue,
       name: `Organization create key ${randomUUID()}`,
       orgId: ORG_ID,
-      roleName: 'org_member',
+      roleName: 'org_admin',
     })
     if (!createKey?.key || !createKey.rbac_id || typeof createKey.id !== 'number') {
       throw new Error('Failed to seed organization create API key')
@@ -715,6 +715,102 @@ describe('API key organization creation', () => {
         await getSupabaseClient().from('orgs').delete().eq('id', createdOrgId)
         await getSupabaseClient().from('stripe_info').delete().eq('customer_id', `pending_${createdOrgId}`)
       }
+      await getSupabaseClient().from('apikeys').delete().eq('id', createKey.id)
+    }
+  })
+
+  it.concurrent('rejects org.create when the key was downgraded after the global grant', async () => {
+    const createKeyValue = randomUUID()
+    const createKey = await createDirectApiKeyWithBindings({
+      userId: USER_ID,
+      key: createKeyValue,
+      name: `Organization create stale grant key ${randomUUID()}`,
+      orgId: ORG_ID,
+      roleName: 'org_admin',
+    })
+    if (!createKey?.key || !createKey.rbac_id || typeof createKey.id !== 'number') {
+      throw new Error('Failed to seed stale organization create API key')
+    }
+
+    try {
+      await executeSQL(
+        `INSERT INTO public.apikey_global_permissions (
+           apikey_rbac_id,
+           permission_key,
+           granted_by,
+           reason
+         )
+         VALUES ($1::uuid, public.rbac_perm_org_create(), $2::uuid, 'Test stale org.create grant')
+         ON CONFLICT DO NOTHING`,
+        [createKey.rbac_id, USER_ID],
+      )
+
+      const grantRows = await executeSQL(
+        `SELECT 1
+         FROM public.apikey_global_permissions
+         WHERE apikey_rbac_id = $1::uuid
+           AND permission_key = public.rbac_perm_org_create()`,
+        [createKey.rbac_id],
+      )
+      expect(grantRows.length).toBe(1)
+
+      const [readOnlyRole] = await executeSQL(
+        `SELECT id
+         FROM public.roles
+         WHERE name = public.rbac_role_org_member()
+           AND scope_type = public.rbac_scope_org()
+         LIMIT 1`,
+      )
+      if (!readOnlyRole?.id) {
+        throw new Error('Unable to resolve org_member role')
+      }
+
+      await executeSQL(
+        `DELETE FROM public.role_bindings
+         WHERE principal_type = public.rbac_principal_apikey()
+           AND principal_id = $1::uuid`,
+        [createKey.rbac_id],
+      )
+      await executeSQL(
+        `INSERT INTO public.role_bindings (
+           principal_type,
+           principal_id,
+           role_id,
+           scope_type,
+           org_id,
+           granted_by,
+           reason,
+           is_direct
+         )
+         VALUES (
+           public.rbac_principal_apikey(),
+           $1::uuid,
+           $2::uuid,
+           public.rbac_scope_org(),
+           $3::uuid,
+           $4::uuid,
+           'Test downgraded API key binding',
+           true
+         )`,
+        [createKey.rbac_id, readOnlyRole.id, ORG_ID, USER_ID],
+      )
+
+      const response = await fetch(`${BASE_URL}/organization`, {
+        headers: {
+          'Content-Type': 'application/json',
+          'capgkey': createKey.key,
+        },
+        method: 'POST',
+        body: JSON.stringify({
+          name: `Blocked stale grant org ${randomUUID()}`,
+        }),
+      })
+
+      expect(response.status).toBe(403)
+      const payload = await response.json() as { error?: string }
+      expect(payload.error).toBe('permission_denied')
+    }
+    finally {
       await getSupabaseClient().from('apikeys').delete().eq('id', createKey.id)
     }
   })
