@@ -71,4 +71,6 @@ capgo = "capgo"
 forgr = "forgr"
 supabase = "supabase"
 ALS = "ALS" # AsyncLocalStorage abbreviation (used in CLI perf-tracking spec)
+UDID = "UDID" # Apple's "Unique Device IDentifier" — distinct from UUID, used in Developer Portal walkthroughs.
+unparseable = "unparseable" # Valid English synonym of "unparsable".
 # Add more project-specific terms as needed
