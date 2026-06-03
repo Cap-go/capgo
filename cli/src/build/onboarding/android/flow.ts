@@ -132,6 +132,13 @@ export interface AndroidStepCtx {
   // type-checking unchanged.
   /** CI-secret entries built at saving-credentials (key/value/masked). */
   ciSecretEntries?: CiSecretEntry[]
+  /**
+   * Full saved-credential map written at saving-credentials (the 5 build-cred
+   * fields, NO CAPGO_TOKEN). The Ink TUI holds the same in its `savedCredentials`
+   * React state and the env-export effects write it verbatim. Transient only —
+   * never persisted to progress.json (it carries the raw keystore/SA secrets).
+   */
+  savedCredentials?: Record<string, string>
   /** CI-secret destinations discovered at detecting-ci-secrets. */
   ciSecretTargets?: CiSecretTarget[]
   /** Per-destination setup advice surfaced when no target is reachable. */
@@ -1338,6 +1345,28 @@ export interface AndroidEffectDeps {
    */
   requestBuildInternal?: (appId: string, options: BuildRequestOptions, silent?: boolean, logger?: BuildLogger) => Promise<BuildRequestResult>
 
+  /**
+   * DRIVER-HELD transient tail state, threaded back into each post-save tail
+   * effect. The Ink TUI resolves these ONCE (at `saving-credentials`) and keeps
+   * them in React state (`savedCredentials` / `ciSecretEntries` /
+   * `ciSecretExistingKeys`); a headless driver mirrors that by capturing the
+   * matching `AndroidEffectResult.transient` from each effect and passing it
+   * back here on the NEXT effect. The engine NEVER persists these to
+   * progress.json — they are secrets/credentials/entries that must stay in
+   * memory only. When a field is absent (e.g. a crash-recovery resume where the
+   * driver lost its in-memory state) the effect falls back to a SINGLE lossy
+   * re-derivation from progress (rebuildTailCredentials / createCiSecretEntries)
+   * rather than resolving the Capgo API key a second time.
+   */
+  carried?: {
+    /** Full saved credentials map written at saving-credentials (5 fields, no CAPGO_TOKEN). */
+    savedCredentials?: Record<string, string>
+    /** CI-secret entries resolved ONCE at saving-credentials (creds + Capgo API key → CAPGO_TOKEN). */
+    ciSecretEntries?: CiSecretEntry[]
+    /** Which secret keys already exist on the remote, resolved at checking-ci-secrets. */
+    ciSecretExistingKeys?: string[]
+  }
+
   // ── Callbacks (optional — callers that don't need streaming can omit) ────
   onStatus?: (message: string) => void
   onLog?: (message: string, color?: string) => void
@@ -1363,16 +1392,20 @@ export interface AndroidEffectResult {
   transient?: Partial<AndroidStepCtx>
 }
 
-// ─── Tail credential reconstruction ──────────────────────────────────────────
+// ─── Tail credential threading (parity with the Ink TUI) ─────────────────────
 //
 // The post-save tail steps (checking-ci-secrets / uploading-ci-secrets /
-// writing-workflow-file) need the same CI-secret entries the Ink TUI carries in
-// `ciSecretEntries` state from `doSaveCredentials`. The stateless engine is
-// called with `progress` only, so it rebuilds the exact credentials map
-// `saving-credentials` wrote (deterministic from the ephemeral base64 + keystore
-// fields on progress) and re-derives the entries through the injected
-// `createCiSecretEntries` helper. Returns [] when the helper isn't provided or
-// the keystore/SA bytes aren't on progress (e.g. a post-delete resume).
+// exporting-env / writing-workflow-file) need the same CI-secret entries +
+// saved credentials the Ink TUI holds in `ciSecretEntries` / `savedCredentials`
+// React state, resolved ONCE at `saving-credentials` (where the Capgo API key
+// is folded into the entries so CAPGO_TOKEN rides along). A headless driver
+// mirrors that by threading those values back through `deps.carried.*` on each
+// subsequent effect — so the engine REUSES them rather than re-resolving the
+// API key (which it cannot see) a second time. The `rebuildTailCredentials`
+// fallback below is a SINGLE lossy re-derivation used only when the driver's
+// carried state is absent (e.g. a crash-recovery resume that lost the
+// in-memory React/driver state); it omits CAPGO_TOKEN, matching the worst-case
+// the TUI would hit on the same path.
 function rebuildTailCredentials(progress: AndroidOnboardingProgress): Record<string, string> {
   const keystoreBase64 = progress._keystoreBase64
   const serviceAccountKeyBase64 = progress._serviceAccountKeyBase64
@@ -1389,7 +1422,33 @@ function rebuildTailCredentials(progress: AndroidOnboardingProgress): Record<str
   }
 }
 
+/**
+ * The full saved-credential map for the env-export effects. Prefers the
+ * driver's carried copy (the exact map `saving-credentials` wrote, mirroring
+ * the TUI's `savedCredentials` state) so the exported .env carries the full
+ * field set; falls back to a single lossy rebuild from progress only when the
+ * driver did not thread it through.
+ */
+function tailSavedCredentials(progress: AndroidOnboardingProgress, deps: AndroidEffectDeps): Record<string, string> {
+  const carried = deps.carried?.savedCredentials
+  if (carried && Object.keys(carried).length > 0)
+    return carried
+  return rebuildTailCredentials(progress)
+}
+
+/**
+ * The CI-secret entries for the upload / workflow effects. Prefers the driver's
+ * carried entries (resolved ONCE at `saving-credentials` with the Capgo API key
+ * folded in) so we never re-derive — and never re-resolve the API key. Falls
+ * back to a single re-derivation from progress only when the driver did not
+ * thread them through (entries then omit CAPGO_TOKEN). Returns [] when neither
+ * the carried entries nor the `createCiSecretEntries` helper + rebuildable
+ * credentials are available (e.g. a post-delete resume).
+ */
 function tailCiSecretEntries(progress: AndroidOnboardingProgress, deps: AndroidEffectDeps): CiSecretEntry[] {
+  const carried = deps.carried?.ciSecretEntries
+  if (carried)
+    return carried
   if (!deps.createCiSecretEntries)
     return []
   const credentials = rebuildTailCredentials(progress)
@@ -1673,19 +1732,33 @@ export async function runAndroidEffect(
       await deps.deleteAndroidProgress(progress.appId)
       deps.onLog?.('✔ Credentials saved')
 
-      // Stash the CI-secret entries for the post-build sub-flow. We do NOT push
-      // to GitHub/GitLab here — the wizard offers that only AFTER a successful
-      // first build, so users never end up with orphan secrets in a repo whose
-      // build was never proven to work (app.tsx:1350–1363 doSaveCredentials).
-      // The driver pre-binds the Capgo API key into createCiSecretEntries (so
-      // CAPGO_TOKEN is included for the generated workflow); the core supplies
-      // the credentials it just wrote. Entries + the raw credentials ride in
-      // transient — the Ink TUI holds the same values in useState.
+      // Random-password backup hint — emitted only here (post-save) so the
+      // claim "stored in credentials.json" is true (app.tsx:1343–1349). The TUI
+      // gates this on its `randomPasswordGenerated` React state; the stateless
+      // engine reads the persisted `keystorePasswordGenerated` marker progress
+      // carries for the same situation. On a crash-recovery resume where that
+      // marker is absent the hint is skipped — same acceptable trade-off the TUI
+      // makes when its in-memory flag was wiped.
+      if (progress.keystorePasswordGenerated)
+        deps.onLog?.('  ℹ Your auto-generated keystore password is now in ~/.capgo-credentials/credentials.json — back up that file.', 'yellow')
+
+      // Stash the CI-secret entries + raw credentials for the post-build
+      // sub-flow. We do NOT push to GitHub/GitLab here — the wizard offers that
+      // only AFTER a successful first build, so users never end up with orphan
+      // secrets in a repo whose build was never proven to work (app.tsx:1350–
+      // 1367 doSaveCredentials). The driver pre-binds the Capgo API key into
+      // createCiSecretEntries (so CAPGO_TOKEN is included for the generated
+      // workflow); the core supplies the credentials it just wrote.
+      //
+      // Both values ride in transient — the Ink TUI holds the same in useState
+      // (ciSecretEntries / savedCredentials). They are resolved ONCE here; later
+      // tail effects REUSE them via deps.carried.* rather than rebuilding (which
+      // would re-resolve the API key AND risk landing secrets on disk).
       const entries = deps.createCiSecretEntries?.(credentials) ?? []
 
       // 'ask-build' is the Ink driver's post-save entry point.
       // The MCP bridge (Plan B) maps this to 'done'.
-      return { progress, next: 'ask-build', transient: { ciSecretEntries: entries } }
+      return { progress, next: 'ask-build', transient: { ciSecretEntries: entries, savedCredentials: credentials } }
     }
 
     // ── google-sign-in-running ────────────────────────────────────────────
@@ -1918,12 +1991,20 @@ export async function runAndroidEffect(
     case 'detecting-ci-secrets': {
       const discovery = deps.detectCiSecretTargets!()
 
+      // Surface the discovered targets + per-destination setup advice on EVERY
+      // return path. The TUI sets both unconditionally before branching
+      // (app.tsx:1383–1384 setCiSecretTargets / setCiSecretSetupAdvice), so a
+      // headless driver can render the same "how to enable a destination"
+      // guidance regardless of which branch we take below. This is transient
+      // only — never persisted to progress.
+      const discoveryTransient = { ciSecretTargets: discovery.targets, ciSecretSetupAdvice: discovery.setup }
+
       if (discovery.targets.length === 0) {
         if (discovery.setup.length > 0)
-          return { progress, next: 'ci-secrets-setup', transient: { ciSecretTargets: discovery.targets, ciSecretSetupAdvice: discovery.setup } }
+          return { progress, next: 'ci-secrets-setup', transient: discoveryTransient }
         for (const note of discovery.notes)
           deps.onLog?.(`ℹ ${note}`, 'yellow')
-        return { progress, next: 'build-complete', transient: { ciSecretTargets: discovery.targets } }
+        return { progress, next: 'build-complete', transient: discoveryTransient }
       }
 
       if (discovery.targets.length === 1) {
@@ -1934,10 +2015,10 @@ export async function runAndroidEffect(
         await deps.saveAndroidProgress(progress.appId, nextProgress)
         // GitHub → 3-option workflow flow; GitLab → legacy 2-option flow.
         const next = target.provider === 'github' ? 'ask-github-actions-setup' : 'ask-ci-secrets'
-        return { progress: nextProgress, next, transient: { ciSecretTargets: discovery.targets } }
+        return { progress: nextProgress, next, transient: discoveryTransient }
       }
 
-      return { progress, next: 'ci-secrets-target-select', transient: { ciSecretTargets: discovery.targets } }
+      return { progress, next: 'ci-secrets-target-select', transient: discoveryTransient }
     }
 
     // ── checking-ci-secrets ───────────────────────────────────────────────
@@ -1982,11 +2063,15 @@ export async function runAndroidEffect(
         throw new Error('No git hosting target selected.')
 
       const entries = tailCiSecretEntries(progress, deps)
-      // Existing-key list lives in the driver's transient (checking-ci-secrets);
-      // it is not persisted to progress. Leaving it undefined makes
-      // uploadCiSecretsAsync treat every key as a write, matching the TUI when
-      // the user accepted the overwrite prompt.
-      await deps.uploadCiSecretsAsync!(target, entries)
+      // The existing-key list lives in the driver's transient (set at
+      // checking-ci-secrets and threaded back via deps.carried) — it is NEVER
+      // persisted to progress. Pass it as the 4th arg exactly as the TUI does
+      // (app.tsx:1463–1466 uploadCiSecretsAsync(..., ciSecretExistingKeys)) so
+      // an already-existing secret is treated as an UPDATE rather than a
+      // create. When the driver did not thread it (crash-recovery resume), it
+      // stays undefined — uploadCiSecretsAsync then treats every key as a write,
+      // matching the TUI when the user accepted the overwrite prompt.
+      await deps.uploadCiSecretsAsync!(target, entries, deps.carried?.ciSecretExistingKeys)
 
       const summary = `Uploaded ${entries.length} env var${entries.length === 1 ? '' : 's'} to ${target.label}`
       deps.onLog?.(`✔ ${summary}`)
@@ -2008,7 +2093,7 @@ export async function runAndroidEffect(
       const result = deps.exportCredentialsToEnv!({
         appId: progress.appId,
         platform: 'android',
-        credentials: rebuildTailCredentials(progress),
+        credentials: tailSavedCredentials(progress, deps),
         targetPath,
       })
 
@@ -2034,7 +2119,7 @@ export async function runAndroidEffect(
       const result = deps.exportCredentialsToEnv!({
         appId: progress.appId,
         platform: 'android',
-        credentials: rebuildTailCredentials(progress),
+        credentials: tailSavedCredentials(progress, deps),
         targetPath: progress.envExportTargetPath,
         overwrite: true,
       })

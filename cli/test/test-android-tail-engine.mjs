@@ -264,6 +264,198 @@ await test("writing-workflow-file (written) → next 'build-complete' (uses writ
   assert(deps.__calls.some(c => c.name === 'writeWorkflowFile'), 'must call writeWorkflowFile')
 })
 
+// ─── DRIVER threading: resolve credentials + CI entries ONCE, reuse downstream ──
+//
+// This block acts like the headless DRIVER (mirroring the Ink TUI's React
+// state): it captures `AndroidEffectResult.transient` from each effect and
+// threads it back into the NEXT effect as `deps.carried`. The parity contract
+// (matching app.tsx's tail useEffect) is:
+//   1. saving-credentials resolves the CI-secret entries + saved credentials
+//      ONCE (createCiSecretEntries fires exactly once across the whole tail).
+//   2. checking/uploading/exporting REUSE the carried values — they NEVER call
+//      createCiSecretEntries again and NEVER re-resolve the Capgo API key.
+//   3. uploading passes the carried existing-keys list to uploadCiSecretsAsync.
+//   4. env-export writes the FULL carried savedCredentials (no lossy rebuild).
+//
+// Secrets/credentials/entries must stay in the driver's transient — never on
+// progress.json — so the test fixtures carry them ONLY through deps.carried.
+
+// The Capgo API key the driver pre-binds into createCiSecretEntries. We model
+// that binding by having the mock fold CAPGO_TOKEN in, then assert the entries
+// produced ONCE are the exact ones reused everywhere downstream.
+const RESOLVED_ENTRIES = [
+  { key: 'ANDROID_KEYSTORE_FILE', value: 'a2V5', masked: true },
+  { key: 'KEYSTORE_KEY_ALIAS', value: 'release', masked: false },
+  { key: 'CAPGO_TOKEN', value: 'resolved-capgo-key', masked: true },
+]
+const EXISTING_KEYS = ['CAPGO_TOKEN']
+
+/** A driver-style deps whose createCiSecretEntries records each call (so we can
+ *  prove it fires ONCE) and whose remote helpers return non-trivial data. */
+function makeDriverDeps(overrides = {}) {
+  return makeDeps({
+    createCiSecretEntries: (..._a) => {
+      // mirrors the TUI binding: only saving-credentials should hit this.
+      makeDriverDeps.__entryCalls = (makeDriverDeps.__entryCalls || 0) + 1
+      return RESOLVED_ENTRIES
+    },
+    // NB: listExistingCiSecretKeysAsync is intentionally NOT overridden — the
+    // base makeDeps mock records the call onto deps.__calls (which the spec
+    // asserts) and returns []. The existing-keys THREADING is exercised
+    // separately by passing carried.ciSecretExistingKeys directly into the
+    // uploading test, decoupled from this mock's return value.
+    ...overrides,
+  })
+}
+
+await test('DRIVER: createCiSecretEntries resolves ONCE at saving-credentials and is REUSED (not rebuilt) in checking', async () => {
+  makeDriverDeps.__entryCalls = 0
+  const deps = makeDriverDeps()
+
+  // ── 1) saving-credentials: resolve entries + credentials ONCE ──
+  const saved = await runAndroidEffect('saving-credentials', tailProgress(), deps)
+  assertEquals(saved.next, 'ask-build', 'saving-credentials routes to ask-build')
+  assertEquals(makeDriverDeps.__entryCalls, 1, 'createCiSecretEntries must be called exactly once (at saving-credentials)')
+  assert(saved.transient && saved.transient.ciSecretEntries, 'saving-credentials must return ciSecretEntries in transient')
+  assert(saved.transient.savedCredentials, 'saving-credentials must return savedCredentials in transient')
+  // The resolved entries carry CAPGO_TOKEN (the driver-bound API key) — proving
+  // the single resolution, not a progress-rebuild (which would omit the token).
+  assert(
+    saved.transient.ciSecretEntries.some(e => e.key === 'CAPGO_TOKEN'),
+    'resolved entries must include the CAPGO_TOKEN folded in at saving-credentials',
+  )
+
+  // The driver captures the transient and threads it back as carried.
+  const carried = {
+    savedCredentials: saved.transient.savedCredentials,
+    ciSecretEntries: saved.transient.ciSecretEntries,
+  }
+
+  // ── 2) checking-ci-secrets: REUSE carried entries — do NOT rebuild ──
+  const checkDeps = makeDriverDeps({ carried })
+  const checkProgress = tailProgress({ ciSecretTarget: GITHUB_TARGET, setupMode: 'with-workflow' })
+  const checked = await runAndroidEffect('checking-ci-secrets', checkProgress, checkDeps)
+  assertEquals(checked.next, 'confirm-secrets-push', 'GitHub target routes to confirm-secrets-push')
+  // checking-ci-secrets must NOT have called createCiSecretEntries again — the
+  // count is still 1 from saving-credentials (proving no rebuild, no second
+  // API-key resolution).
+  assertEquals(makeDriverDeps.__entryCalls, 1, 'checking-ci-secrets must REUSE carried entries, NOT rebuild them (createCiSecretEntries stays called once)')
+  assert(!checkDeps.__calls.some(c => c.name === 'createCiSecretEntries'), 'checking-ci-secrets must not call createCiSecretEntries')
+  // The keys listExistingCiSecretKeysAsync checked must be the carried entries' keys.
+  const listCall = checkDeps.__calls.find(c => c.name === 'listExistingCiSecretKeysAsync')
+  assert(listCall, 'must list existing secret keys')
+  assert(
+    listCall.args[1].includes('CAPGO_TOKEN'),
+    'listExistingCiSecretKeysAsync must receive the carried entries’ keys (incl. CAPGO_TOKEN)',
+  )
+  // The check surfaces the existing keys back to the driver.
+  assert(checked.transient && Array.isArray(checked.transient.ciSecretExistingKeys), 'checking must return ciSecretExistingKeys in transient')
+})
+
+await test('DRIVER: uploading-ci-secrets passes the carried existing-keys list to uploadCiSecretsAsync (4th arg)', async () => {
+  makeDriverDeps.__entryCalls = 0
+  const carried = {
+    ciSecretEntries: RESOLVED_ENTRIES,
+    ciSecretExistingKeys: EXISTING_KEYS,
+  }
+  const deps = makeDriverDeps({ carried })
+  const progress = tailProgress({ ciSecretTarget: GITHUB_TARGET, setupMode: 'with-workflow' })
+  const res = await runAndroidEffect('uploading-ci-secrets', progress, deps)
+  assertEquals(res.next, 'pick-package-manager', 'with-workflow continues into the workflow builder')
+  const upload = deps.__calls.find(c => c.name === 'uploadCiSecretsAsync')
+  assert(upload, 'must call uploadCiSecretsAsync')
+  // args: (target, entries, existingKeys, runner?, onProgress?)
+  assertEquals(upload.args[0], GITHUB_TARGET, 'uploadCiSecretsAsync target arg')
+  assertEquals(upload.args[1], RESOLVED_ENTRIES, 'uploadCiSecretsAsync must reuse the carried entries')
+  assertEquals(upload.args[2], EXISTING_KEYS, 'uploadCiSecretsAsync must receive the carried existing-keys as the 4th (3rd positional) arg')
+  // No rebuild happened — the carried entries were used directly.
+  assertEquals(makeDriverDeps.__entryCalls, 0, 'uploading must not call createCiSecretEntries when entries are carried')
+})
+
+await test('DRIVER: env-export writes the FULL carried savedCredentials (not a lossy rebuild)', async () => {
+  const FULL_CREDS = {
+    ANDROID_KEYSTORE_FILE: 'a2V5',
+    KEYSTORE_KEY_ALIAS: 'release',
+    KEYSTORE_STORE_PASSWORD: 'pw',
+    KEYSTORE_KEY_PASSWORD: 'pw',
+    PLAY_CONFIG_JSON: 'eyJ9',
+  }
+  const deps = makeDriverDeps({ carried: { savedCredentials: FULL_CREDS } })
+  const res = await runAndroidEffect('exporting-env', tailProgress(), deps)
+  assertEquals(res.next, 'build-complete', 'a successful export finishes the wizard')
+  const exportCall = deps.__calls.find(c => c.name === 'exportCredentialsToEnv')
+  assert(exportCall, 'must call exportCredentialsToEnv')
+  assertEquals(exportCall.args[0].credentials, FULL_CREDS, 'exportCredentialsToEnv must receive the full carried savedCredentials')
+})
+
+await test('DRIVER: overwrite-and-export-env also writes the FULL carried savedCredentials', async () => {
+  const FULL_CREDS = {
+    ANDROID_KEYSTORE_FILE: 'a2V5',
+    KEYSTORE_KEY_ALIAS: 'release',
+    KEYSTORE_STORE_PASSWORD: 'pw',
+    KEYSTORE_KEY_PASSWORD: 'pw',
+    PLAY_CONFIG_JSON: 'eyJ9',
+  }
+  const deps = makeDriverDeps({ carried: { savedCredentials: FULL_CREDS } })
+  const progress = tailProgress({ setupMode: 'declined', envExportTargetPath: `/tmp/.env.capgo.${APP_ID}.android` })
+  const res = await runAndroidEffect('overwrite-and-export-env', progress, deps)
+  assertEquals(res.next, 'build-complete', 'overwrite export finishes the wizard')
+  const exportCall = deps.__calls.find(c => c.name === 'exportCredentialsToEnv')
+  assert(exportCall, 'must call exportCredentialsToEnv')
+  assertEquals(exportCall.args[0].credentials, FULL_CREDS, 'overwrite export must receive the full carried savedCredentials')
+  assertEquals(exportCall.args[0].overwrite, true, 'overwrite export must pass overwrite: true')
+})
+
+await test('DRIVER: saving-credentials logs the random-password backup hint when keystorePasswordGenerated is set', async () => {
+  const logs = []
+  const deps = makeDriverDeps({ onLog: (msg, color) => logs.push({ msg, color }) })
+  await runAndroidEffect('saving-credentials', tailProgress({ keystorePasswordGenerated: true }), deps)
+  assert(
+    logs.some(l => /auto-generated keystore password/i.test(l.msg) && /back up that file/i.test(l.msg)),
+    'must emit the random-password backup hint when keystorePasswordGenerated is true',
+  )
+})
+
+await test('DRIVER: saving-credentials does NOT log the backup hint when keystorePasswordGenerated is unset', async () => {
+  const logs = []
+  const deps = makeDriverDeps({ onLog: (msg, color) => logs.push({ msg, color }) })
+  await runAndroidEffect('saving-credentials', tailProgress(), deps)
+  assert(
+    !logs.some(l => /auto-generated keystore password/i.test(l.msg)),
+    'must NOT emit the backup hint when the password was not auto-generated',
+  )
+})
+
+await test('DRIVER: writing-workflow-file reuses the carried entries’ keys (no rebuild)', async () => {
+  makeDriverDeps.__entryCalls = 0
+  const deps = makeDriverDeps({ carried: { ciSecretEntries: RESOLVED_ENTRIES } })
+  const progress = tailProgress({
+    ciSecretTarget: GITHUB_TARGET,
+    setupMode: 'with-workflow',
+    selectedPackageManager: 'bun',
+    buildScriptChoice: { type: 'npm-script', name: 'build' },
+  })
+  const res = await runAndroidEffect('writing-workflow-file', progress, deps)
+  assertEquals(res.next, 'build-complete', 'after the workflow file is written the wizard finishes')
+  const writeCall = deps.__calls.find(c => c.name === 'writeWorkflowFile')
+  assert(writeCall, 'must call writeWorkflowFile')
+  assert(
+    writeCall.args[0].secretKeys.includes('CAPGO_TOKEN'),
+    'workflow secretKeys must come from the carried entries (incl. CAPGO_TOKEN)',
+  )
+  assertEquals(makeDriverDeps.__entryCalls, 0, 'writing-workflow-file must not rebuild entries when they are carried')
+})
+
+await test('DRIVER: detecting-ci-secrets surfaces setup advice via transient on the single-target path', async () => {
+  const deps = makeDriverDeps({
+    detectCiSecretTargets: () => ({ targets: [GITHUB_TARGET], setup: [{ provider: 'github', steps: ['gh auth login'] }], notes: [] }),
+  })
+  const res = await runAndroidEffect('detecting-ci-secrets', tailProgress(), deps)
+  assert(res.transient, 'detecting must return a transient')
+  assert(Array.isArray(res.transient.ciSecretSetupAdvice), 'detecting must surface ciSecretSetupAdvice on every path (parity with setCiSecretSetupAdvice)')
+  assertEquals(res.transient.ciSecretSetupAdvice.length, 1, 'setup advice must be carried through even when a target is reachable')
+})
+
 // ─── CHOICE / INPUT tail steps: assert each exposes a usable (non-auto) view ──
 //
 // These do not run through runAndroidEffect; the driver renders them and waits
