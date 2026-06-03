@@ -50,6 +50,8 @@ const {
   applyAndroidInput,
 } = await import('../src/build/onboarding/android/flow.ts')
 
+const { getAndroidResumeStep } = await import('../src/build/onboarding/android/progress.ts')
+
 console.log('🧪 Android post-save TAIL engine — RED spec (drives runAndroidEffect through the tail)\n')
 
 let testsPassed = 0
@@ -296,6 +298,165 @@ await test("androidViewForStep('build-complete') is a done view", async () => {
   const view = androidViewForStep('build-complete', tailProgress(), { appId: APP_ID })
   assertEquals(view.kind, 'done', 'build-complete must be a done view')
   assert(typeof view.message === 'string' && view.message.length > 0, 'build-complete must carry a message')
+})
+
+// ─── Resume routing THROUGH the tail (getAndroidResumeStep) ──────────────────
+//
+// A saved progress mid-tail must resume at the correct tail step using the
+// persisted TailProgress fields + the post-save completedSteps markers
+// (credentialsSaved / buildRequested / ciSecretsUploaded), WITHOUT re-firing a
+// side-effect that already ran (no re-upload of secrets, no re-request of the
+// build). `tailProgress()` already satisfies the keystore-validity gate, so
+// adding the tail markers exercises only the new Phase-6 routing.
+
+const CREDS_SAVED = { savedAt: '2026-06-03T01:00:00.000Z' }
+const BUILD_REQUESTED = { buildUrl: `https://capgo.app/app/${APP_ID}/builds` }
+const CI_UPLOADED_GH = { provider: 'github', count: 3 }
+
+/**
+ * A FULLY-provisioned OAuth progress — keystore valid + every provisioning
+ * marker present + the ephemeral SA key — so `getAndroidResumeStep` reaches the
+ * terminal `saving-credentials` when NO tail marker is set. The engine-effect
+ * `tailProgress()` fixture above only carries the keystore + package markers
+ * (enough to DRIVE a single tail step), so it would otherwise resume on the
+ * OAuth path; this helper closes that gap for the resume-routing assertions.
+ */
+function provisionedProgress(overrides = {}) {
+  const base = tailProgress()
+  const { completedSteps: completedOverrides, ...rest } = overrides
+  return {
+    ...base,
+    _oauthRefreshToken: 'refresh-token',
+    ...rest,
+    completedSteps: {
+      ...base.completedSteps,
+      googleSignInComplete: { email: 'user@example.com', googleSubject: 'sub', scope: 'all' },
+      playAccountChosen: { developerId: '123456789' },
+      gcpProjectChosen: { projectId: 'capgo-test', displayName: 'Capgo', createdByOnboarding: false },
+      serviceAccountProvisioned: { email: 'sa@capgo-test.iam.gserviceaccount.com', projectId: 'capgo-test' },
+      playInviteProvisioned: { developerId: '123456789', serviceAccountEmail: 'sa@capgo-test.iam.gserviceaccount.com' },
+      ...completedOverrides,
+    },
+  }
+}
+
+/** A post-save tail progress: fully provisioned + credentials already written. */
+function savedTailProgress(overrides = {}) {
+  const { completedSteps: completedOverrides, ...rest } = overrides
+  return provisionedProgress({
+    ...rest,
+    completedSteps: {
+      credentialsSaved: CREDS_SAVED,
+      ...completedOverrides,
+    },
+  })
+}
+
+// Without ANY tail marker, resume is unchanged: a fully-provisioned progress
+// still lands on saving-credentials (legacy / in-flight files untouched).
+await test('no tail marker → resume stays saving-credentials (legacy parity)', async () => {
+  assertEquals(getAndroidResumeStep(provisionedProgress()), 'saving-credentials')
+})
+
+// credentialsSaved but no build requested → the ask-build USER GATE, never the
+// auto requesting-build step (this is the double-build guard).
+await test('credentials saved, pre-build → ask-build (not requesting-build)', async () => {
+  assertEquals(getAndroidResumeStep(savedTailProgress()), 'ask-build')
+})
+
+// Build queued, no CI work yet → detecting-ci-secrets (read-only, idempotent).
+await test('after build, pre-CI-detection → detecting-ci-secrets', async () => {
+  const p = savedTailProgress({ completedSteps: { buildRequested: BUILD_REQUESTED } })
+  assertEquals(getAndroidResumeStep(p), 'detecting-ci-secrets')
+})
+
+// Build queued + a CI target already chosen, not uploaded → checking-ci-secrets
+// (the read-only remote check before the confirm gate), NOT uploading.
+await test('after build, target chosen, pre-upload → checking-ci-secrets (no re-upload)', async () => {
+  const p = savedTailProgress({
+    ciSecretTarget: GITHUB_TARGET,
+    setupMode: 'with-workflow',
+    completedSteps: { buildRequested: BUILD_REQUESTED },
+  })
+  const next = getAndroidResumeStep(p)
+  assertEquals(next, 'checking-ci-secrets')
+  assert(next !== 'uploading-ci-secrets', 'must never resume directly onto the upload step')
+})
+
+// Declined GitHub Actions, no export path yet → the env-export prompt.
+await test('after build, declined GH Actions, no export path → ask-export-env', async () => {
+  const p = savedTailProgress({
+    setupMode: 'declined',
+    completedSteps: { buildRequested: BUILD_REQUESTED },
+  })
+  assertEquals(getAndroidResumeStep(p), 'ask-export-env')
+})
+
+// Declined GitHub Actions WITH an export path recorded → the (overwrite-safe)
+// export write effect.
+await test('after build, declined GH Actions, export path set → exporting-env', async () => {
+  const p = savedTailProgress({
+    setupMode: 'declined',
+    envExportTargetPath: `/tmp/.env.capgo.${APP_ID}.android`,
+    completedSteps: { buildRequested: BUILD_REQUESTED },
+  })
+  assertEquals(getAndroidResumeStep(p), 'exporting-env')
+})
+
+// Secrets uploaded + with-workflow, no package manager yet → pick-package-manager.
+await test('after upload, with-workflow, no PM → pick-package-manager', async () => {
+  const p = savedTailProgress({
+    ciSecretTarget: GITHUB_TARGET,
+    setupMode: 'with-workflow',
+    completedSteps: { buildRequested: BUILD_REQUESTED, ciSecretsUploaded: CI_UPLOADED_GH },
+  })
+  assertEquals(getAndroidResumeStep(p), 'pick-package-manager')
+})
+
+// Secrets uploaded + PM chosen, no build script yet → pick-build-script.
+await test('after upload, with-workflow, PM set, no build script → pick-build-script', async () => {
+  const p = savedTailProgress({
+    ciSecretTarget: GITHUB_TARGET,
+    setupMode: 'with-workflow',
+    selectedPackageManager: 'bun',
+    completedSteps: { buildRequested: BUILD_REQUESTED, ciSecretsUploaded: CI_UPLOADED_GH },
+  })
+  assertEquals(getAndroidResumeStep(p), 'pick-build-script')
+})
+
+// Secrets uploaded + PM + build script chosen → writing-workflow-file (the
+// overwrite=true write step; safe to re-run). This is the task's
+// "after CI upload, pre-workflow → writing-workflow-file" case.
+await test('after upload, with-workflow, PM + script set → writing-workflow-file', async () => {
+  const p = savedTailProgress({
+    ciSecretTarget: GITHUB_TARGET,
+    setupMode: 'with-workflow',
+    selectedPackageManager: 'bun',
+    buildScriptChoice: { type: 'npm-script', name: 'build' },
+    completedSteps: { buildRequested: BUILD_REQUESTED, ciSecretsUploaded: CI_UPLOADED_GH },
+  })
+  assertEquals(getAndroidResumeStep(p), 'writing-workflow-file')
+})
+
+// Secrets uploaded + secrets-only (no workflow) → terminal build-complete.
+await test('after upload, secrets-only → build-complete', async () => {
+  const p = savedTailProgress({
+    ciSecretTarget: GITHUB_TARGET,
+    setupMode: 'secrets-only',
+    completedSteps: { buildRequested: BUILD_REQUESTED, ciSecretsUploaded: CI_UPLOADED_GH },
+  })
+  assertEquals(getAndroidResumeStep(p), 'build-complete')
+})
+
+// The same tail routing must hold for the IMPORTED-SA path (serviceAccountMethod
+// 'existing'): credentialsSaved short-circuits BEFORE the service-account fork,
+// so an existing-SA tail progress resumes through the tail, not back to import.
+await test('imported-SA tail progress resumes through the tail, not the import fork', async () => {
+  const p = savedTailProgress({
+    serviceAccountMethod: 'existing',
+    completedSteps: { buildRequested: BUILD_REQUESTED },
+  })
+  assertEquals(getAndroidResumeStep(p), 'detecting-ci-secrets')
 })
 
 // `applyAndroidInput` is imported as part of the engine contract this spec

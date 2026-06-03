@@ -133,6 +133,84 @@ export function hasAnyOAuthProgress(progress: AndroidOnboardingProgress): boolea
 }
 
 /**
+ * Post-save "tail" resume routing.
+ *
+ * Once `saving-credentials` completes, the wizard runs a shared tail:
+ *   ask-build → requesting-build → detecting-ci-secrets → (ci-secrets sub-flow)
+ *   → uploading-ci-secrets → (with-workflow) pick-package-manager →
+ *   pick-build-script → preview/writing-workflow-file → build-complete
+ * with a parallel `.env`-export leaf (ask-export-env → exporting-env) taken when
+ * the user declines the GitHub Actions setup. This derivation mirrors the tail
+ * `useEffect` + view handlers in `android/ui/app.tsx` step-for-step.
+ *
+ * Resume here is GUARDED by the three irreversible-side-effect markers
+ * (`credentialsSaved`, `buildRequested`, `ciSecretsUploaded`). The router never
+ * returns a step that would re-fire a side-effect that already has its marker:
+ *   - no `buildRequested`  → land on the `ask-build` user gate (never auto-fire
+ *                            `requesting-build`, so resume can't double-build)
+ *   - `buildRequested` but no `ciSecretsUploaded` → land on the read-only
+ *                            `detecting-ci-secrets` (or `checking-ci-secrets`
+ *                            once a target is chosen) — never `uploading-ci-secrets`
+ *   - `ciSecretsUploaded`  → only the (idempotent) workflow-builder choice/input
+ *                            steps or the terminal `build-complete` remain
+ *
+ * Returns `null` when no tail marker is present, so `getAndroidResumeStep` keeps
+ * returning `saving-credentials` exactly as before — legacy/in-flight progress
+ * files (which never carry these markers) are completely unaffected.
+ */
+function tailResumeStep(progress: AndroidOnboardingProgress): AndroidOnboardingStep | null {
+  const { completedSteps } = progress
+
+  // Tail not entered yet — let the caller fall through to `saving-credentials`.
+  if (!completedSteps.credentialsSaved)
+    return null
+
+  // Phase 6a — Build request. The TUI's post-save entry point is the `ask-build`
+  // user gate; the build itself fires only after the user confirms. Resuming
+  // onto the gate (not `requesting-build`) is what prevents a double build on
+  // resume.
+  if (!completedSteps.buildRequested)
+    return 'ask-build'
+
+  // Phase 6b — CI-secrets push. Not yet uploaded: route forward toward the
+  // upload without ever landing on the upload step itself.
+  if (!completedSteps.ciSecretsUploaded) {
+    // The user declined GitHub Actions → the `.env`-export leaf. Resume onto the
+    // export prompt until a path is recorded, then onto the (overwrite-safe)
+    // write effect.
+    if (progress.setupMode === 'declined')
+      return progress.envExportTargetPath ? 'exporting-env' : 'ask-export-env'
+
+    // A destination is already chosen (single-target auto-pick, the
+    // target-select screen, or a decided setupMode) → the remote check is the
+    // next read-only step before the confirm gate + upload.
+    if (progress.ciSecretTarget)
+      return 'checking-ci-secrets'
+
+    // Credentials saved + build queued but no CI work started yet → re-run the
+    // read-only detection. Idempotent: it only inspects the repo and routes.
+    return 'detecting-ci-secrets'
+  }
+
+  // Phase 6c — Post-upload. Secrets are pushed; only the workflow-builder sub-
+  // flow (with-workflow) or the terminal screen remain. None of these re-touch
+  // the remote, so routing by which choice is still missing is side-effect-safe.
+  if (progress.setupMode === 'with-workflow') {
+    if (!progress.selectedPackageManager)
+      return 'pick-package-manager'
+    if (!progress.buildScriptChoice)
+      return 'pick-build-script'
+    // Package manager + build script chosen → ready to (over)write the workflow
+    // file. `writing-workflow-file` writes with overwrite=true, so re-running it
+    // is safe.
+    return 'writing-workflow-file'
+  }
+
+  // secrets-only / declined-after-upload / GitLab → nothing left to do.
+  return 'build-complete'
+}
+
+/**
  * Determine the first incomplete step for the Android flow.
  *
  * Each phase is validated by checking both:
@@ -169,6 +247,19 @@ export function getAndroidResumeStep(progress: AndroidOnboardingProgress | null)
   // Phase 1 — Keystore: marker + 3 ephemeral fields
   if (!keystoreFullyValid(progress))
     return keystoreResumeStep(progress)
+
+  // Phase 6 — Post-save "tail" (shared with iOS). `credentialsSaved` is the
+  // unambiguous "save already happened" marker: it means the whole provisioning
+  // sequence (OAuth or imported-SA) finished and credentials.json was written,
+  // so we route THROUGH the tail (build-request → CI-secrets → env/workflow)
+  // instead of past the service-account fork below. Checking it here — before
+  // the fork — keeps both the OAuth and import paths converging on one tail
+  // router. When the marker is absent (every legacy/in-flight progress file),
+  // `tailResumeStep` returns null and we fall through to the unchanged
+  // provisioning routing below.
+  const tailStep = tailResumeStep(progress)
+  if (tailStep)
+    return tailStep
 
   // Phase 2 — Service-account fork. Routes onto the import path or the OAuth
   // path. Legacy progress files don't have `serviceAccountMethod` — treat
