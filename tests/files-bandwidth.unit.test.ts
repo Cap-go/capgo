@@ -98,6 +98,32 @@ describe('files bandwidth tracking', () => {
     )
   })
 
+  it('does not track bandwidth for cached HEAD reads', async () => {
+    globalThis.caches = {
+      default: {
+        match: async () => new Response(null, {
+          headers: {
+            'cache-control': 'public, max-age=3600',
+            'content-length': '3478395',
+          },
+        }),
+        put: async () => { },
+      },
+    } as any
+    const appGlobal = await createFilesApp('/files')
+
+    const response = await appGlobal.fetch(
+      new Request('http://localhost/files/read/attachments/orgs/test-org/apps/com.test.app/bundle.zip?device_id=device-1', {
+        method: 'HEAD',
+      }),
+      { ATTACHMENT_BUCKET: {} },
+      { waitUntil: () => { } } as any,
+    )
+
+    expect(response.status).toBe(200)
+    expect(createStatsBandwidthMock).not.toHaveBeenCalled()
+  })
+
   it('keeps range response headers finite when suffix is present but empty', async () => {
     retryGetMock.mockResolvedValue(createR2Object(3_478_395, { offset: 0, length: 100, suffix: undefined } as unknown as R2Range))
     const appGlobal = await createFilesApp('/files')

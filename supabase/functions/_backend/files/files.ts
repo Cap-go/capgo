@@ -421,7 +421,9 @@ async function getHandler(c: Context): Promise<Response> {
   if (response != null) {
     response = ensureNoTransformResponse(response)
     cloudlog({ requestId: c.get('requestId'), message: 'getHandler files cache hit' })
-    await saveBandwidthUsage(c, getTransferredBytesFromResponse(response))
+    if (c.req.raw.method !== 'HEAD') {
+      await saveBandwidthUsage(c, getTransferredBytesFromResponse(response))
+    }
     // Best-effort restore: if file is cached but missing in R2, write it back.
     await backgroundTask(c, async () => {
       try {
