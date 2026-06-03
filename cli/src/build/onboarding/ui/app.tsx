@@ -1012,6 +1012,21 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
     // the previous session's emission would mute a hint that's now
     // newly relevant.
     adHocHintShownRef.current = false
+    // verify-app (remote App Store verification) — reset the one-shot guards and
+    // all step state so a Restart that re-enters verify-app re-runs the initial
+    // fetch instead of finding verifyFetchStartedRef already true and freezing on
+    // a blank/stale gate.
+    verifyShownRef.current = false
+    verifyFetchStartedRef.current = false
+    setPendingVerifyNext(null)
+    setVerifyAppLoading(false)
+    setVerifyReleaseBundleId('')
+    setVerifyApps([])
+    setVerifyRegisteredIds([])
+    setVerifyPath(null)
+    setVerifyChosenApp(null)
+    setVerifyAttempt(0)
+    setVerifyAskReopen(false)
   }, [appId, iosBundleIdInitial])
 
   // Extract Key ID from .p8 filename — delegates to the module-level helper so
@@ -2090,7 +2105,15 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
 
           if (result === 'exact-match' && matchedApp) {
             addLog(`✓ Building "${matchedApp.name}" (${releaseBundleId}) — matches your App Store app.`)
-            await persistVerifyOverride(releaseBundleId)
+            try {
+              await persistVerifyOverride(releaseBundleId)
+            }
+            catch {
+              // A disk error saving the override must not be reported as an ASC
+              // network failure (the outer catch's message). Non-fatal — the user
+              // may just be re-prompted on the next run.
+              addLog('⚠ Verified the App Store app but could not save the bundle ID override to disk — you may be re-prompted next run.', 'yellow')
+            }
             trackVerifyEvent('iOS App Verify Passed', '✅', { attempts: 0, path: 'exact-match' })
             setStep(pendingVerifyNext ?? 'creating-certificate')
             setPendingVerifyNext(null)
@@ -3568,7 +3591,14 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
                   // Already matches — pass straight through (defensive; the
                   // exact-match case is normally handled in the effect).
                   addLog(`✓ Building "${chosen.name}" (${releaseId}) — matches your App Store app.`)
-                  void passGate('fix-build-id', releaseId)
+                  void (async () => {
+                    try {
+                      await passGate('fix-build-id', releaseId)
+                    }
+                    catch {
+                      addLog('⚠ Could not save the verified bundle ID; you may be re-prompted next run.', 'yellow')
+                    }
+                  })()
                   return
                 }
                 setVerifyChosenApp(chosen)

@@ -564,11 +564,17 @@ export function parseBundleIdsResponse(json: any): string[] {
 // records is far more than any real team has.
 const MAX_LIST_PAGES = 10
 
-/** Turn an absolute `links.next` URL into an ascFetch-relative path. */
+/**
+ * Turn an absolute `links.next` URL into an ascFetch-relative path. Apple
+ * returns `links.next` fully-qualified, and ascFetch builds `${ASC_BASE_URL}${path}`,
+ * so we strip the base prefix to avoid a double-prefixed URL. If a future API
+ * version returns a path-relative next link, preserve it as-is rather than
+ * silently truncating pagination — mirrors `listProfilesForCert`'s handling.
+ */
 function nextPath(next: string | undefined): string | null {
   if (!next)
     return null
-  return next.startsWith(ASC_BASE_URL) ? next.slice(ASC_BASE_URL.length) : null
+  return next.startsWith(ASC_BASE_URL) ? next.slice(ASC_BASE_URL.length) : next
 }
 
 /**
