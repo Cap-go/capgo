@@ -26,7 +26,7 @@ import type { GoogleOAuthTokens, GoogleUserInfo, PendingOAuthSession, RunOAuthFl
 //    the core stays IO-free and the MCP bridge can supply its own bindings.
 import type { BuildCredentials } from '../../../schemas/build.js'
 import type { BuildLogger, BuildRequestOptions, BuildRequestResult } from '../../request.js'
-import type { AsyncCommandRunner, CiSecretDiscovery, CiSecretEntry, CiSecretTarget, CommandRunner } from '../ci-secrets.js'
+import type { AsyncCommandRunner, CiSecretDiscovery, CiSecretEntry, CiSecretSetupAdvice, CiSecretTarget, CommandRunner } from '../ci-secrets.js'
 import type { EnvExportOpts, EnvExportResult } from '../env-export.js'
 import type { GeneratedWorkflow, WorkflowGeneratorOpts } from '../workflow-generator.js'
 import type { WorkflowWriteOptions, WorkflowWriteResult } from '../workflow-writer.js'
@@ -119,6 +119,36 @@ export interface AndroidStepCtx {
    * + setStep('error') WITHOUT calling handleError (no retryCount bump).
    */
   wrongPassword?: boolean
+
+  // ── Post-save "tail" transient (Phase 1 engine tail) ─────────────────────
+  // Runtime data the tail effects surface to the driver but that is NOT
+  // persisted to progress.json. The Ink TUI holds the same values in useState
+  // (ciSecretEntries / ciSecretTargets / ciSecretRepoLabel / ciSecretExistingKeys
+  // / ciSecretUploadSummary / envExportPath / workflowWrittenPath / buildUrl /
+  // buildOutput). Every field is OPTIONAL so existing transient producers keep
+  // type-checking unchanged.
+  /** CI-secret entries built at saving-credentials (key/value/masked). */
+  ciSecretEntries?: CiSecretEntry[]
+  /** CI-secret destinations discovered at detecting-ci-secrets. */
+  ciSecretTargets?: CiSecretTarget[]
+  /** Per-destination setup advice surfaced when no target is reachable. */
+  ciSecretSetupAdvice?: CiSecretSetupAdvice[]
+  /** Resolved owner/repo (GitHub) the CLI will push secrets to. */
+  ciSecretRepoLabel?: string | null
+  /** Which secret keys already exist on the remote (checking-ci-secrets). */
+  ciSecretExistingKeys?: string[]
+  /** Human summary of the upload (uploading-ci-secrets). */
+  ciSecretUploadSummary?: string
+  /** Absolute path of the written .env file (exporting-env). */
+  envExportPath?: string
+  /** Absolute path of the written workflow file (writing-workflow-file). */
+  workflowFilePath?: string
+  /** The queued build URL (requesting-build). */
+  buildUrl?: string
+  /** Streamed build-request log lines (requesting-build). */
+  buildOutput?: string[]
+  /** Captured AI-analysis job id surfaced on a failed build (requesting-build). */
+  aiJobId?: string
 }
 
 // ─── KIND_TABLE ───────────────────────────────────────────────────────────────
@@ -1010,6 +1040,41 @@ export interface AndroidEffectResult {
   transient?: Partial<AndroidStepCtx>
 }
 
+// ─── Tail credential reconstruction ──────────────────────────────────────────
+//
+// The post-save tail steps (checking-ci-secrets / uploading-ci-secrets /
+// writing-workflow-file) need the same CI-secret entries the Ink TUI carries in
+// `ciSecretEntries` state from `doSaveCredentials`. The stateless engine is
+// called with `progress` only, so it rebuilds the exact credentials map
+// `saving-credentials` wrote (deterministic from the ephemeral base64 + keystore
+// fields on progress) and re-derives the entries through the injected
+// `createCiSecretEntries` helper. Returns [] when the helper isn't provided or
+// the keystore/SA bytes aren't on progress (e.g. a post-delete resume).
+function rebuildTailCredentials(progress: AndroidOnboardingProgress): Record<string, string> {
+  const keystoreBase64 = progress._keystoreBase64
+  const serviceAccountKeyBase64 = progress._serviceAccountKeyBase64
+  const keystoreStorePassword = progress.keystoreStorePassword
+  const keystoreAlias = progress.keystoreAlias
+  if (!keystoreBase64 || !serviceAccountKeyBase64 || !keystoreStorePassword || !keystoreAlias)
+    return {}
+  return {
+    ANDROID_KEYSTORE_FILE: keystoreBase64,
+    KEYSTORE_KEY_ALIAS: keystoreAlias,
+    KEYSTORE_STORE_PASSWORD: keystoreStorePassword,
+    KEYSTORE_KEY_PASSWORD: progress.keystoreKeyPassword || keystoreStorePassword,
+    PLAY_CONFIG_JSON: serviceAccountKeyBase64,
+  }
+}
+
+function tailCiSecretEntries(progress: AndroidOnboardingProgress, deps: AndroidEffectDeps): CiSecretEntry[] {
+  if (!deps.createCiSecretEntries)
+    return []
+  const credentials = rebuildTailCredentials(progress)
+  if (Object.keys(credentials).length === 0)
+    return []
+  return deps.createCiSecretEntries(credentials)
+}
+
 // ─── runAndroidEffect ─────────────────────────────────────────────────────────
 //
 // Dispatches to the right effect handler for auto steps that do IO.
@@ -1285,9 +1350,19 @@ export async function runAndroidEffect(
       await deps.deleteAndroidProgress(progress.appId)
       deps.onLog?.('✔ Credentials saved')
 
+      // Stash the CI-secret entries for the post-build sub-flow. We do NOT push
+      // to GitHub/GitLab here — the wizard offers that only AFTER a successful
+      // first build, so users never end up with orphan secrets in a repo whose
+      // build was never proven to work (app.tsx:1350–1363 doSaveCredentials).
+      // The driver pre-binds the Capgo API key into createCiSecretEntries (so
+      // CAPGO_TOKEN is included for the generated workflow); the core supplies
+      // the credentials it just wrote. Entries + the raw credentials ride in
+      // transient — the Ink TUI holds the same values in useState.
+      const entries = deps.createCiSecretEntries?.(credentials) ?? []
+
       // 'ask-build' is the Ink driver's post-save entry point.
       // The MCP bridge (Plan B) maps this to 'done'.
-      return { progress, next: 'ask-build' }
+      return { progress, next: 'ask-build', transient: { ciSecretEntries: entries } }
     }
 
     // ── google-sign-in-running ────────────────────────────────────────────
