@@ -67,7 +67,6 @@ dependencies {
     implementation project(':capgo-capacitor-intent-launcher')
     implementation project(':capgo-capacitor-intercom')
     implementation project(':capgo-capacitor-is-root')
-    implementation project(':capgo-capacitor-ivs-player')
     implementation project(':capgo-capacitor-jw-player')
     implementation project(':capgo-capacitor-keep-awake')
     implementation project(':capgo-capacitor-launch-navigator')

@@ -68,7 +68,6 @@
         "@capgo/capacitor-intent-launcher": "^8.3.19",
         "@capgo/capacitor-intercom": "^8.1.5",
         "@capgo/capacitor-is-root": "^8.1.11",
-        "@capgo/capacitor-ivs-player": "^8.0.19",
         "@capgo/capacitor-jw-player": "^8.0.28",
         "@capgo/capacitor-keep-awake": "^8.1.11",
         "@capgo/capacitor-launch-navigator": "^8.0.23",
@@ -216,7 +215,7 @@
     },
     "cli": {
       "name": "@capgo/cli",
-      "version": "7.123.0",
+      "version": "7.124.5",
       "bin": {
         "capgo": "dist/index.js",
       },
@@ -546,8 +545,6 @@
     "@capgo/capacitor-intercom": ["@capgo/capacitor-intercom@8.1.5", "", { "peerDependencies": { "@capacitor/core": ">=8.0.0" } }, "sha512-rFBmBfQ0Mack0Av5yb4KHc6MrP171MdcJHyZt3ThOhwY05VzjMunIX1xWbBtWOmB8ZRXxWTOkQscuJEOSrvkZg=="],
 
     "@capgo/capacitor-is-root": ["@capgo/capacitor-is-root@8.1.11", "", { "peerDependencies": { "@capacitor/core": ">=8.0.0" } }, "sha512-PcEEKOjIrWGWorpmMUdfrTQR+Xmn36bou2UkmcFcPe1Pfyw/VxdjGSQ2fCoVqpqdsCH6o28uGV6+EHepEEnkdw=="],
-
-    "@capgo/capacitor-ivs-player": ["@capgo/capacitor-ivs-player@8.0.19", "", { "peerDependencies": { "@capacitor/core": ">=8.0.0" } }, "sha512-YK9ZlcPPaCqtnPdOvRIz/Mmtl6V3Xnu6ODdKWNFKy8gFXWIUazBFzlfNVFr033VpWD6Iej2fgW0Alt8sQxliqw=="],
 
     "@capgo/capacitor-jw-player": ["@capgo/capacitor-jw-player@8.0.28", "", { "peerDependencies": { "@capacitor/core": ">=8.0.0" } }, "sha512-DwKSAfzDSrDCUMD44CVu1Syk0Z6ISbik53j5KTWqWWJgJrOQz4u+whvMjmKgn+0WqZiTvJI4J0TJowNI/TW5lA=="],
 
