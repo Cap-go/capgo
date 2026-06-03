@@ -328,21 +328,25 @@ await test('applyIosInput delegates a tail input (ask-github-actions-setup) to a
 })
 
 await test('applyIosInput leaves a still-stubbed NON-tail step unchanged', async () => {
-  // setup-method-select is now implemented (BATCH 2b records setupMethod), so use
-  // a still-stubbed import-flow choice as the "unchanged stub" example instead.
-  // import-distribution-mode's reducer lands in a later (import) batch.
+  // setup-method-select + import-distribution-mode are now implemented (BATCH 2b /
+  // BATCH 5 record setupMethod / importDistribution), so use a still-stubbed
+  // import-flow choice as the "unchanged stub" example instead. import-pick-identity
+  // is an EPHEMERAL-branching pick whose reducer lands in a later (import) batch —
+  // until then it stays in the default branch and returns progress unchanged.
   const progress = iosProgress()
-  const next = applyIosInput('import-distribution-mode', progress, { step: 'import-distribution-mode', value: 'app_store' })
+  const next = applyIosInput('import-pick-identity', progress, { step: 'import-pick-identity', value: 'some-sha1' })
   assertEquals(next, progress, 'a not-yet-implemented non-tail step stays a stub — progress unchanged')
 })
 
 await test('runIosEffect throws for a NON-tail, not-yet-implemented effect step (still a stub)', async () => {
   // BATCH 2a implemented the create-new effects (backing-up / p8-method-select /
-  // verifying-key / creating-certificate / creating-profile). `import-scanning`
-  // is a still-stubbed import-flow effect, so it must still throw "not implemented".
+  // verifying-key / creating-certificate / creating-profile); BATCH 5 implemented
+  // the import-discovery effects (import-scanning / import-validating-all-certs).
+  // `import-checking-apple-cert` is a still-stubbed import-flow effect (BATCH 6),
+  // so it must still throw "not implemented".
   let threw = false
   try {
-    await runIosEffect('import-scanning', iosProgress(), makeDeps())
+    await runIosEffect('import-checking-apple-cert', iosProgress(), makeDeps())
   }
   catch (err) {
     threw = /not implemented/.test(err instanceof Error ? err.message : String(err))

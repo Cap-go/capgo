@@ -63,7 +63,12 @@ import type { TailEffectDeps, TailInput, TailStep, TailStepCtx, TailStepView, Ta
 import { applyTailInput, runTailEffect, tailViewForStep } from '../tail/flow.js'
 import { CertificateLimitError, DuplicateProfileError } from '../apple-api.js'
 import { DEFAULT_P12_PASSWORD } from '../csr.js'
-import { extractKeyIdFromP8Path } from '../progress.js'
+// matchIdentitiesToProfiles is a PURE helper (no IO) — importing it keeps the
+// import-scanning effect IO-free while reusing the exact identity↔profile pairing
+// the TUI uses (app.tsx:1323). The actual scans are the injected listSigningIdentities
+// / scanProvisioningProfiles deps.
+import { matchIdentitiesToProfiles } from '../macos-signing.js'
+import { extractKeyIdFromP8Path, getImportEntryStep } from '../progress.js'
 import { getIosResumeStep } from './progress.js'
 
 // ─── Local structural helper types ───────────────────────────────────────────
@@ -349,6 +354,17 @@ export interface IosEffectDeps {
     chosenIdentity?: SigningIdentity
     /** The chosen provisioning profile (lossy re-scan source on resume). */
     chosenProfile?: DiscoveredProfile
+    /**
+     * The import-scanning discovery inventory (identity↔on-disk-profile matches +
+     * the raw scanned profiles), threaded forward so the NEXT import effect can
+     * read it without a re-scan. Produced by import-scanning into transient; the
+     * driver mirrors it back here for import-validating-all-certs (which batches
+     * classifyCertAvailability over importMatches) and the pickers. EPHEMERAL —
+     * never persisted; on a crash-recovery resume the engine re-lands on
+     * import-scanning and re-populates it.
+     */
+    importMatches?: IdentityProfileMatch[]
+    importProfiles?: DiscoveredProfile[]
     /** Resolved cert/profile/team export payloads carried into saving-credentials. */
     certData?: CertificateData
     profileData?: ProfileData
@@ -636,6 +652,19 @@ const OPTIONS_API_KEY_METHOD: IosStepOption[] = [
   { value: 'manual', label: '📝  Type the path' },
 ]
 
+/**
+ * import-distribution-mode options (ui/steps/ios-import.tsx:130–134). The import
+ * sub-flow's first visible fork: App Store (needs the ASC .p8 chain) vs Ad-hoc
+ * (no ASC key) vs a '__cancel__' escape to the create-new path. The VALUES mirror
+ * the TUI Select so applyIosInput can persist setupMethod/importDistribution and
+ * the driver can route via getImportEntryStep.
+ */
+const OPTIONS_IMPORT_DISTRIBUTION: IosStepOption[] = [
+  { value: 'app_store', label: '🛫  App Store / TestFlight' },
+  { value: 'ad_hoc', label: '📦  Ad-hoc (no TestFlight upload)' },
+  { value: '__cancel__', label: '↩️   Cancel and use Create new instead' },
+]
+
 // ─── Recovery choice vocabulary (BATCH 3) ───────────────────────────────────────
 //
 // cert-limit-prompt's per-cert options are DYNAMIC (built from ctx.existingCerts
@@ -708,6 +737,15 @@ export type IosInput =
   // The '__type__' sentinel is NOT a bundle id: the driver intercepts it to flip
   // confirmAppIdTyping, so it never reaches applyIosInput as a value to persist.
   | { step: 'confirm-app-id', value: string }
+  // ── import-distribution-mode (BATCH 5) ───────────────────────────────────
+  // The import sub-flow's FIRST visible fork (app.tsx:3176–3232). Persists
+  // setupMethod='import-existing' + importDistribution ('app_store' | 'ad_hoc');
+  // the '__cancel__' escape hatch instead switches to create-new (setupMethod=
+  // 'create-new', importDistribution cleared). The PERSISTED fields are what
+  // route resume/advance — the driver computes the next step via getImportEntryStep
+  // (ad_hoc → import-pick-identity; app_store → the .p8 chain entry / verifying-key;
+  // __cancel__ → api-key-instructions), mirroring the TUI onChange exactly.
+  | { step: 'import-distribution-mode', value: 'app_store' | 'ad_hoc' | '__cancel__' }
 // ─── Engine surface (tail-wired; non-tail steps remain stubs) ───────────────────
 
 /**
@@ -881,6 +919,20 @@ export function iosViewForStep(
       }
     }
 
+    // ── import-distribution-mode (choice) ─────────────────────────────────────
+    // app.tsx:3176–3232 / ui/steps/ios-import.tsx:114–138. The import sub-flow's
+    // FIRST visible step: how Capgo will distribute the build (App Store /
+    // TestFlight vs Ad-hoc), plus a '__cancel__' escape that bails to the
+    // create-new path. applyIosInput persists setupMethod + importDistribution;
+    // the driver routes via getImportEntryStep (NOT persisted in the view).
+    case 'import-distribution-mode':
+      return {
+        step,
+        kind: 'choice',
+        title: 'How will Capgo distribute your build?',
+        prompt: 'App Store uploads to TestFlight (needs an ASC API key); Ad-hoc is signed for direct/QR install (no ASC key).',
+        options: OPTIONS_IMPORT_DISTRIBUTION,
+      }
     default:
       return { step, kind: 'auto', title: step }
   }
@@ -1013,6 +1065,29 @@ export function applyIosInput(
     case 'duplicate-profile-prompt':
       return progress
 
+    // ── import-distribution-mode ──────────────────────────────────────────────
+    // app.tsx:3179–3231. The import sub-flow's first fork. Two persisted shapes:
+    //   - 'app_store' | 'ad_hoc' → persist setupMethod='import-existing' AND the
+    //     chosen importDistribution. These two fields are exactly what
+    //     getImportEntryStep reads to route the next step (ad_hoc →
+    //     import-pick-identity; app_store → the .p8 chain entry / verifying-key),
+    //     and what getIosResumeStep reads on a later restart — so resume ==
+    //     fresh-advance with no re-ask of the fork.
+    //   - '__cancel__' → the user bails to the create-new path: persist
+    //     setupMethod='create-new' and CLEAR any previously-saved
+    //     importDistribution (immutably — build a copy without the key) so a
+    //     stale ad_hoc/app_store choice can't leak back into the create-new
+    //     routing. Mirrors app.tsx:3186–3188 (existing.setupMethod='create-new';
+    //     delete existing.importDistribution). The driver then routes to
+    //     api-key-instructions (getImportEntryStep on a cleared progress).
+    case 'import-distribution-mode': {
+      const i = input as Extract<IosInput, { step: 'import-distribution-mode' }>
+      if (i.value === '__cancel__') {
+        const { importDistribution: _dropped, ...rest } = progress
+        return { ...rest, setupMethod: 'create-new' }
+      }
+      return { ...progress, setupMethod: 'import-existing', importDistribution: i.value }
+    }
     default:
       return progress
   }
@@ -1369,6 +1444,111 @@ export async function runIosEffect(
       }
     }
 
+    // ── import-scanning (effect) ──────────────────────────────────────────────
+    // app.tsx:1304–1338. The IMPORT branch's silent discovery pass. Run the two
+    // Mac scans in parallel (Keychain signing identities + on-disk .mobileprovision
+    // files), keep only the DISTRIBUTION identities (the import flow can't sign a
+    // release build with a development cert), and pair each identity with the
+    // on-disk profiles whose embedded cert SHA-1s include it (matchIdentitiesToProfiles
+    // — a PURE helper, so the engine stays IO-free; the IO is the two injected
+    // scan deps). The match list + the raw scanned profiles ride transient
+    // (importMatches / importProfiles) — NEVER persisted, exactly the android
+    // "ephemeral inventory, re-run on resume" contract.
+    //
+    // ZERO distribution identities → error (the TUI surfaces a support-bundle
+    // hint; the engine routes to 'error' and lets the driver render it). Any scan
+    // throwing also routes to 'error'.
+    //
+    // On success the next step is getImportEntryStep(progress): it reads the
+    // PERSISTED importDistribution (+ for app_store the .p8/apiKeyVerified chain)
+    // to skip questions the user already answered — ad_hoc → import-pick-identity,
+    // app_store → the furthest partial .p8 step / verifying-key, unset → back to
+    // import-distribution-mode. The TUI additionally wraps this in
+    // redirectIfMismatch (a SYNC FS bundle-id read); in the IO-free engine that
+    // mismatch redirect is the DRIVER's job — it persists pendingAppIdNext and the
+    // confirm-app-id gate is re-derived by getIosResumeStep — so the effect returns
+    // the un-redirected import-entry target.
+    case 'import-scanning': {
+      try {
+        const [identities, profiles] = await Promise.all([
+          deps.listSigningIdentities!(),
+          deps.scanProvisioningProfiles!(),
+        ])
+        const distOnly = identities.filter(i => i.type === 'distribution')
+        if (distOnly.length === 0) {
+          deps.onLog?.('✖ No iOS Distribution identities found in your default Keychain', 'red')
+          return { progress, next: 'error' }
+        }
+        const importMatches = matchIdentitiesToProfiles(distOnly, profiles)
+        deps.onLog?.(`✔ Found ${distOnly.length} distribution identit${distOnly.length === 1 ? 'y' : 'ies'} and ${profiles.length} profile${profiles.length === 1 ? '' : 's'} on this Mac`)
+        return {
+          progress,
+          next: getImportEntryStep(progress),
+          transient: { importMatches, importProfiles: profiles },
+        }
+      }
+      catch (err) {
+        deps.onLog?.(`✖ ${err instanceof Error ? err.message : String(err)}`, 'red')
+        return { progress, next: 'error' }
+      }
+    }
+
+    // ── import-validating-all-certs (effect) ──────────────────────────────────
+    // app.tsx:1351–1510. The eager batch pass that runs BEFORE the import-pick-identity
+    // picker renders (only when import-scanning found ≥1 match). For each scanned
+    // identity it asks Apple "is this cert still usable?" via the injected
+    // deps.classifyCertAvailability (the driver pre-binds the single team-wide cert
+    // fetch + SHA-1 index behind it, so the engine just maps identity → availability)
+    // and, in PARALLEL, prefetches the Apple profiles for every identity that came
+    // back available (deps.listProfilesForCert keyed by the resolved appleCertId).
+    // Both results ride transient (identityAvailability / profilePrefetch) — NEVER
+    // persisted; the picker reads them to split identities into Available /
+    // Unavailable tables. The next step is always import-pick-identity on success
+    // (the per-identity failures are sandboxed into the map, not the whole effect);
+    // a failure of the batch availability fetch routes to 'error'.
+    case 'import-validating-all-certs': {
+      const matches = deps.carried?.importMatches ?? []
+      try {
+        // Batch availability — one classify call per scanned identity. The driver
+        // pre-binds the single ASC cert fetch + SHA-1 index inside the dep, so a
+        // throw here is the batch fetch failing uniformly → route to error.
+        const identityAvailability: Record<string, EnrichedIdentityAvailability> = {}
+        for (const m of matches)
+          identityAvailability[m.identity.sha1] = await deps.classifyCertAvailability!(m.identity)
+
+        const availableCount = Object.values(identityAvailability).filter(a => a.available).length
+        deps.onLog?.(`✔ Apple validation complete — ${availableCount} available, ${matches.length - availableCount} unavailable`)
+
+        // Parallel profile prefetch for every identity Apple confirmed usable
+        // (available + a resolved appleCertId). Each fetch is independently
+        // sandboxed: one cert's failure leaves the others' results intact and the
+        // identity simply renders without a prefetched profile list.
+        const toPrefetch = matches.filter((m) => {
+          const a = identityAvailability[m.identity.sha1]
+          return a?.available && a?.appleCertId
+        })
+        const profilePrefetch: Record<string, DiscoveredProfile[]> = {}
+        await Promise.all(toPrefetch.map(async (m) => {
+          const certId = identityAvailability[m.identity.sha1].appleCertId!
+          try {
+            profilePrefetch[m.identity.sha1] = await deps.listProfilesForCert!(certId)
+          }
+          catch {
+            // Per-fetch error sandbox — leave this identity out of the prefetch map.
+          }
+        }))
+
+        return {
+          progress,
+          next: 'import-pick-identity',
+          transient: { identityAvailability, profilePrefetch },
+        }
+      }
+      catch (err) {
+        deps.onLog?.(`✖ ${err instanceof Error ? err.message : String(err)}`, 'red')
+        return { progress, next: 'error' }
+      }
+    }
     default:
       throw new Error(`runIosEffect: not implemented for step '${step}'`)
   }
