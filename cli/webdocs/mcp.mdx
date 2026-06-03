@@ -24,6 +24,10 @@ Available tools exposed via MCP:
   - capgo_star_all_repositories
   - capgo_get_account_id, capgo_doctor, capgo_get_stats
   - capgo_request_build, capgo_generate_encryption_keys
+
+For channel tools, `channelId` means the channel name, such as `production`.
+Numeric channel IDs returned by API responses are internal database identifiers.
+
 Example usage with Claude Desktop:
   Add to claude_desktop_config.json:
   {
@@ -38,6 +42,5 @@ Example usage with Claude Desktop:
 **Example:**
 
 ```bash
-npx @capgo/cli mcp
+npx @capgo/cli@latest mcp
 ```
-

@@ -324,7 +324,7 @@ export async function startMcpServer(): Promise<void> {
     'Create a new distribution channel for an app',
     {
       appId: z.string().describe('App ID'),
-      channelId: z.string().describe('Channel name/ID to create'),
+      channelId: z.string().describe('Channel name to create'),
       default: z.boolean().optional().describe('Set as default channel'),
       selfAssign: z.boolean().optional().describe('Allow devices to self-assign to this channel'),
     },
@@ -378,7 +378,7 @@ export async function startMcpServer(): Promise<void> {
     'Delete a channel from an app',
     {
       appId: z.string().describe('App ID'),
-      channelId: z.string().describe('Channel name/ID to delete'),
+      channelId: z.string().describe('Channel name to delete'),
       deleteBundle: z.boolean().optional().describe('Also delete the bundle linked to this channel'),
     },
     async ({ appId, channelId, deleteBundle }) => {
@@ -397,7 +397,7 @@ export async function startMcpServer(): Promise<void> {
     'Get the current bundle linked to a specific channel',
     {
       appId: z.string().describe('App ID'),
-      channelId: z.string().describe('Channel name/ID'),
+      channelId: z.string().describe('Channel name'),
     },
     async ({ appId, channelId }) => {
       const result = await sdk.getCurrentBundle(appId, channelId)
