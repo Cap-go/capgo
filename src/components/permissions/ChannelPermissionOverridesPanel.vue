@@ -76,6 +76,16 @@ const roleDefaultChannelPermissions: Record<string, Record<ChannelPermissionKey,
     'channel.read_history': false,
     'channel.promote_bundle': false,
   },
+  channel_admin: {
+    'channel.read': true,
+    'channel.read_history': true,
+    'channel.promote_bundle': true,
+  },
+  channel_reader: {
+    'channel.read': true,
+    'channel.read_history': true,
+    'channel.promote_bundle': false,
+  },
 }
 
 const filteredChannels = computed(() => {

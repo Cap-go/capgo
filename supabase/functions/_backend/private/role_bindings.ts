@@ -336,11 +336,45 @@ async function loadManagedBinding(
     return { ok: false, response: c.json({ error: 'Role binding not found' }, 404) }
   }
 
-  if (!(await checkPermission(c, 'org.update_user_roles', { orgId: binding.org_id ?? undefined }))) {
+  if (!(await canManageRoleBindingScope(c, drizzle, binding))) {
     return { ok: false, response: c.json({ error: 'Forbidden - Admin rights required' }, 403) }
   }
 
   return { ok: true, data: binding }
+}
+
+async function canManageRoleBindingScope(
+  c: Context<MiddlewareKeyVariables>,
+  drizzle: ReturnType<typeof getDrizzleClient>,
+  binding: Pick<RoleBindingRecord, 'scope_type' | 'org_id' | 'app_id'>,
+): Promise<boolean> {
+  if (binding.org_id && await checkPermission(c, 'org.update_user_roles', { orgId: binding.org_id })) {
+    return true
+  }
+
+  if ((binding.scope_type !== 'app' && binding.scope_type !== 'channel') || !binding.app_id) {
+    return false
+  }
+
+  const [app] = await drizzle
+    .select({
+      publicAppId: schema.apps.app_id,
+      ownerOrg: schema.apps.owner_org,
+    })
+    .from(schema.apps)
+    .where(
+      and(
+        eq(schema.apps.id, binding.app_id),
+        binding.org_id ? eq(schema.apps.owner_org, binding.org_id) : sql`true`,
+      ),
+    )
+    .limit(1)
+
+  if (!app) {
+    return false
+  }
+
+  return await checkPermission(c, 'app.update_user_roles', { appId: app.publicAppId })
 }
 
 async function loadAssignableRoleForBinding(
@@ -647,10 +681,6 @@ app.post('/', requireAuthAndGuardLimitedKeys, async (c) => {
     pgClient = getPgClient(c)
     const drizzle = getDrizzleClient(pgClient)
 
-    if (!(await checkPermission(c, 'org.update_user_roles', { orgId: org_id }))) {
-      return c.json({ error: 'Forbidden - Admin rights required' }, 403)
-    }
-
     // Retrieve the role by name
     const [role] = await drizzle
       .select()
@@ -688,6 +718,14 @@ app.post('/', requireAuthAndGuardLimitedKeys, async (c) => {
       return c.json({ error: scopedAppValidation.error }, scopedAppValidation.status as any)
     }
     const normalizedChannelId = scopedAppValidation.data.channelRbacId
+
+    if (!(await canManageRoleBindingScope(c, drizzle, {
+      scope_type,
+      org_id,
+      app_id: app_id || null,
+    } as Pick<RoleBindingRecord, 'scope_type' | 'org_id' | 'app_id'>))) {
+      return c.json({ error: 'Forbidden - Admin rights required' }, 403)
+    }
 
     const principalValidation = await validatePrincipalAccess(drizzle, principal_type, principal_id, org_id)
     if (!principalValidation.ok) {

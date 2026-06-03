@@ -171,6 +171,137 @@ describe.skipIf(USE_CLOUDFLARE)('/private/role_bindings', () => {
     }
   })
 
+  it('allows app role managers to create, update, and delete channel-scoped bindings', async () => {
+    const id = randomUUID()
+    const orgId = randomUUID()
+    const appUuid = randomUUID()
+    const publicAppId = `com.role-binding.app-manager.${id}`
+    const supabase = getSupabaseClient()
+
+    try {
+      const { error: orgError } = await supabase.from('orgs').insert({
+        id: orgId,
+        created_by: USER_ID_2,
+        name: `Role Binding App Manager Org ${id}`,
+        management_email: `role-binding-app-manager-${id}@capgo.app`,
+        use_new_rbac: true,
+      })
+      expect(orgError).toBeNull()
+
+      const { error: memberError } = await supabase.from('org_users').insert({
+        org_id: orgId,
+        user_id: USER_ID,
+        user_right: 'read',
+      })
+      expect(memberError).toBeNull()
+
+      const { error: appError } = await supabase.from('apps').insert({
+        id: appUuid,
+        app_id: publicAppId,
+        owner_org: orgId,
+        icon_url: 'role-binding-test-icon',
+        name: `App Manager App ${id}`,
+      })
+      expect(appError).toBeNull()
+
+      const { data: version, error: versionError } = await supabase
+        .from('app_versions')
+        .insert({
+          app_id: publicAppId,
+          name: `role-binding-version-${id.slice(0, 8)}`,
+          owner_org: orgId,
+          user_id: USER_ID_2,
+          checksum: `checksum-${id}`,
+          storage_provider: 'r2',
+          r2_path: `orgs/${orgId}/apps/${publicAppId}/${id}.zip`,
+          deleted: false,
+        })
+        .select('id')
+        .single()
+      expect(versionError).toBeNull()
+
+      const { data: channel, error: channelError } = await supabase
+        .from('channels')
+        .insert({
+          app_id: publicAppId,
+          name: `role-binding-channel-${id.slice(0, 8)}`,
+          version: version!.id,
+          owner_org: orgId,
+          created_by: USER_ID_2,
+          public: false,
+          allow_emulator: false,
+        })
+        .select('id, rbac_id')
+        .single()
+      expect(channelError).toBeNull()
+
+      const { data: appAdminRole, error: appAdminRoleError } = await supabase
+        .from('roles')
+        .select('id')
+        .eq('name', 'app_admin')
+        .single()
+      expect(appAdminRoleError).toBeNull()
+
+      const { error: appAdminBindingError } = await supabase.from('role_bindings').insert({
+        principal_type: 'user',
+        principal_id: USER_ID,
+        role_id: appAdminRole!.id,
+        scope_type: 'app',
+        org_id: orgId,
+        app_id: appUuid,
+        channel_id: null,
+        granted_by: USER_ID_2,
+        reason: 'app-manager-channel-binding-test',
+        is_direct: true,
+      })
+      expect(appAdminBindingError).toBeNull()
+
+      const createResponse = await fetch(getEndpointUrl('/private/role_bindings'), {
+        method: 'POST',
+        headers: authHeaders,
+        body: JSON.stringify({
+          principal_type: 'user',
+          principal_id: USER_ID_2,
+          role_name: 'channel_reader',
+          scope_type: 'channel',
+          org_id: orgId,
+          app_id: appUuid,
+          channel_id: channel!.id,
+          reason: 'app manager assigns lower-level channel role',
+        }),
+      })
+
+      const createData = await createResponse.json() as { id: string, channel_id: string, role_id: string, error?: string }
+      expect(createResponse.status).toBe(200)
+      expect(createData.channel_id).toBe(channel!.rbac_id)
+
+      const patchResponse = await fetch(getEndpointUrl(`/private/role_bindings/${createData.id}`), {
+        method: 'PATCH',
+        headers: authHeaders,
+        body: JSON.stringify({ role_name: 'channel_admin' }),
+      })
+      const patchData = await patchResponse.json() as { id: string, error?: string }
+      expect(patchResponse.status).toBe(200)
+      expect(patchData.id).toBe(createData.id)
+
+      const deleteResponse = await fetch(getEndpointUrl(`/private/role_bindings/${createData.id}`), {
+        method: 'DELETE',
+        headers: authHeaders,
+      })
+      const deleteData = await deleteResponse.json() as { success?: boolean, error?: string }
+      expect(deleteResponse.status).toBe(200)
+      expect(deleteData.success).toBe(true)
+    }
+    finally {
+      await supabase.from('role_bindings').delete().eq('org_id', orgId)
+      await supabase.from('org_users').delete().eq('org_id', orgId)
+      await supabase.from('channels').delete().eq('owner_org', orgId)
+      await supabase.from('app_versions').delete().eq('owner_org', orgId)
+      await supabase.from('apps').delete().eq('id', appUuid)
+      await supabase.from('orgs').delete().eq('id', orgId)
+    }
+  })
+
   it('rejects app-scoped bindings when the target app belongs to another org', async () => {
     const fixture = await createRoleBindingFixture()
 
