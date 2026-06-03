@@ -66,14 +66,18 @@ files or creating Apple resources in v1.
   TestFlight upload)") never needs it.
 - **Distribution mode.** The remote check is relevant only in **`app_store`
   mode** (the create-new default and import-app_store). `ad_hoc` skips it.
-- **Debug vs Release.** The comparison uses the **Release-config bundle ID
-  only**. `parsePbxprojBundleId` must be **hardened to always resolve the
-  Release config** and never return a Debug value when a Release config is
-  present (it already prefers Release — see `test-bundle-id-detector.mjs:35` —
-  but tighten the guarantee and extend the tests, e.g. a Debug ID that diverges
-  from Release by more than a `.debug` suffix). When no Release config can be
-  resolved, the remote-verify step does **not** gate on a Debug fallback — it
-  warns and skips remote gating instead. No `.debug`/suffix heuristics.
+- **Debug vs Release.** The Release-config bundle ID is the **authoritative**
+  build ID used for the comparison, the gate, and all Apple-side work — pbxproj
+  parsing must always resolve Release (never silently substitute a Debug value
+  when a Release config exists). It already prefers Release — see
+  `test-bundle-id-detector.mjs:35` — but tighten the guarantee and extend the
+  tests (e.g. a Debug ID that diverges from Release by more than a `.debug`
+  suffix). **"Harden to Release" means Release is authoritative, not that Debug
+  is discarded:** the parser already collects every `{config, value}` pair
+  internally, so we still **expose the Debug value** (or a `debugReleaseDiffer`
+  flag) — used *only* to print the Debug ≠ Release awareness note, never to gate.
+  When no Release config can be resolved, the remote-verify step warns and skips
+  gating rather than gating on a Debug fallback. No `.debug`/suffix heuristics.
 - **Lean dependencies.** The CLI deliberately hand-parses native files with
   small regexes (`pbxproj-parser.ts`, `bundle-id-detector.ts`) — no plist
   library, no Trapeze. v1 adds **no** native-file-editing dependency.
@@ -206,15 +210,16 @@ produces. Resume must not re-prompt when nothing changed.
   picker) and `listBundleIds(token)` (→ registered identifier strings, for the
   diagnostic), both using the existing `ascFetch`. The caller invokes them **in
   parallel** (`Promise.all`). Pure data fetches.
-- **`bundle-id-detector.ts`** — **harden `parsePbxprojBundleId` to always
-  resolve the Release-config bundle ID** (never a Debug value when Release is
-  present; deterministic main-target pick). Extend it (or add a sibling) so
-  divergence can be computed against a remote app list using that Release value.
-  Keep the pure/synchronous local detection intact; remote data is passed in (no
-  network inside the detector — keeps it unit-testable). Expose a fresh-from-disk
-  re-detection path for the gate (no memoization). Also surface the Debug-config
-  bundle ID (or a `debugReleaseDiffer` flag) so the step can print the Debug ≠
-  Release awareness note.
+- **`bundle-id-detector.ts`** — keep/extend the low-level parse that returns the
+  bundle ID for **each** build config (Release **and** Debug). A resolver returns
+  the **Release** value as the authoritative build ID (never a Debug value when
+  Release is present; deterministic main-target pick); the Debug value (or a
+  `debugReleaseDiffer` flag) is returned **alongside** and used only for the
+  awareness note. Extend it (or add a sibling) so divergence can be computed
+  against a remote app list using the Release value. Keep the pure/synchronous
+  local detection intact; remote data is passed in (no network inside the
+  detector — keeps it unit-testable). Expose a fresh-from-disk re-detection path
+  for the gate (no memoization).
 - **`app.tsx` state machine** — add the remote-verification step wired into the
   post-`verifying-key` `redirectIfMismatch` fan-out, `app_store` mode only, with
   the branches above. Implements the divergence gate: re-detect fresh from disk
