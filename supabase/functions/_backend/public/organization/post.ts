@@ -28,6 +28,11 @@ const bodySchema = type({
   'website?': 'string',
 })
 
+interface PgTransactionClient {
+  query: <T = unknown>(text: string, params?: unknown[]) => Promise<{ rows: T[], rowCount?: number | null }>
+  release: () => void
+}
+
 async function getInitialPlanForMau(c: Context<MiddlewareKeyVariables>, estimatedMau: number) {
   const adminClient = supabaseAdmin(c)
   const { data: plan, error } = await adminClient
@@ -154,11 +159,13 @@ async function insertOrgForApiKey(
   }
 
   // API-key Supabase clients run as anon, so this checked endpoint owns the write path instead of reopening direct anon RLS inserts.
-  let pgClient
+  let pgPool: ReturnType<typeof getPgClient> | null = null
+  let dbClient: PgTransactionClient | null = null
   let transactionStarted = false
   try {
-    pgClient = getPgClient(c)
-    const capabilityResult = await pgClient.query<{ allowed: boolean }>(
+    pgPool = getPgClient(c)
+    dbClient = await pgPool.connect() as PgTransactionClient
+    const capabilityResult = await dbClient.query<{ allowed: boolean }>(
       'SELECT public.apikey_has_current_org_create_capability($1::uuid) AS allowed',
       [apikeyRbacId],
     )
@@ -166,14 +173,14 @@ async function insertOrgForApiKey(
       throw quickError(403, 'permission_denied', 'Permission denied: org.create')
     }
 
-    await pgClient.query('BEGIN')
+    await dbClient.query('BEGIN')
     transactionStarted = true
-    await pgClient.query(
+    await dbClient.query(
       'SELECT set_config($1, $2, true)',
       ['request.headers', JSON.stringify({ capgkey: apikeyValue })],
     )
 
-    const roleResult = await pgClient.query<{ id: string }>(
+    const roleResult = await dbClient.query<{ id: string }>(
       'SELECT id FROM public.roles WHERE name = public.rbac_role_org_super_admin() AND scope_type = public.rbac_scope_org() LIMIT 1',
     )
     const orgSuperAdminRoleId = roleResult.rows[0]?.id
@@ -181,7 +188,7 @@ async function insertOrgForApiKey(
       throw simpleError('cannot_create_org', 'Cannot create org', { error: 'missing_org_super_admin_role' })
     }
 
-    await pgClient.query(
+    await dbClient.query(
       `INSERT INTO public.orgs (
          id,
          name,
@@ -194,7 +201,7 @@ async function insertOrgForApiKey(
       [org.id, org.name, org.created_by, org.management_email, org.customer_id, org.website],
     )
 
-    await pgClient.query(
+    await dbClient.query(
       `INSERT INTO public.role_bindings (
          principal_type,
          principal_id,
@@ -213,7 +220,7 @@ async function insertOrgForApiKey(
          public.rbac_scope_org(),
          $3::uuid,
          $4::uuid,
-         now(),
+         pg_catalog.now(),
          'Auto-granted to API key on org creation',
          true
        )
@@ -221,18 +228,23 @@ async function insertOrgForApiKey(
       [apikeyRbacId, orgSuperAdminRoleId, org.id, auth.userId],
     )
 
-    await pgClient.query('COMMIT')
-    transactionStarted = false
+    await dbClient.query('COMMIT')
   }
   catch (error) {
-    if (pgClient && transactionStarted) {
-      await pgClient.query('ROLLBACK')
+    if (dbClient && transactionStarted) {
+      try {
+        await dbClient.query('ROLLBACK')
+      }
+      catch {
+        // Keep the original error as the one reported to the caller.
+      }
     }
     throw error
   }
   finally {
-    if (pgClient) {
-      closeClient(c, pgClient)
+    dbClient?.release()
+    if (pgPool) {
+      closeClient(c, pgPool)
     }
   }
 }

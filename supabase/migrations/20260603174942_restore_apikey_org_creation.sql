@@ -277,7 +277,7 @@ BEGIN
     public.rbac_scope_org(),
     NEW.id,
     NEW.created_by,
-    now(),
+    pg_catalog.now(),
     'Auto-granted to API key on org creation',
     true
   )
