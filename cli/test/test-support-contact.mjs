@@ -2,10 +2,6 @@
 import assert from 'node:assert/strict'
 import { contactSupport } from '../src/support/contact-support.ts'
 
-function t(name, fn) {
-  try { fn(); process.stdout.write(`✓ ${name}\n`) }
-  catch (e) { process.stderr.write(`✗ ${name}\n`); throw e }
-}
 async function ta(name, fn) {
   try { await fn(); process.stdout.write(`✓ ${name}\n`) }
   catch (e) { process.stderr.write(`✗ ${name}\n`); throw e }

@@ -45,12 +45,14 @@ The only cost: `mailto:` can't auto-attach a file, so the user does one manual "
 > **Clipboard:** copy the **`.log.gz`** path (the compressed file), not the plain `.log`.
 
 ### The `mailto:` link
-```
+
+```text
 mailto:support@capgo.app
   ?subject=Capgo%20Builder%20support%20—%20<appId>%20(<platform>)
   &body=<short greeting + 1-line problem + tiny diagnostics summary +
          "Please attach the logs file saved at <path> (copied to your clipboard).">
 ```
+
 - Keep the body **short** (mailto URLs are length-limited in practice ~1.8–2 KB) — full logs live in the attached file, never in the body.
 - Opened via the existing `open` npm package (`open('mailto:…')`), which the CLI already uses everywhere.
 
@@ -104,6 +106,7 @@ Backend `/build/support` endpoint · capgo_builder worker `/support` · Cloudfla
 ---
 
 ## 9. Open items
+
 1. Final `mailto:` subject/body copy and the CLI instruction wording.
 2. Exact bundle filename/format and whether the `.gz` is on by default or produced alongside (current plan: produce both).
 3. Non-macOS reveal behavior (Linux/Windows: print path + clipboard; no Finder reveal).

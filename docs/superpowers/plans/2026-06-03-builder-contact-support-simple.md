@@ -909,6 +909,7 @@ git add -A && git commit -m "test(cli): finalize contact-support suite + docs cr
 ---
 
 ## Notes for the implementer
+
 - **Do not** add any backend/worker/Email-Service/bridge code — the user's own mail client sends the email; the existing `Cap-go/automations` bridge handles inbound natively.
 - Keep all support-flow failures **non-fatal**: clipboard, reveal, and mail-open failures must degrade to "your logs are at `<path>`; email support@capgo.app".
 - The orchestrator is UI-agnostic by design (injected deps) — that's what makes Tasks 1–7 unit-testable and Tasks 8–10 thin wiring.
