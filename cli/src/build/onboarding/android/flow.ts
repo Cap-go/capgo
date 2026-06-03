@@ -1673,6 +1673,87 @@ export async function runAndroidEffect(
       return { progress, next: 'build-complete', transient: { ciSecretUploadSummary: summary } }
     }
 
+    // ── exporting-env ─────────────────────────────────────────────────────
+    // app.tsx:1592–1625
+    //
+    // Write the saved credentials to a local 0o600 `.env` file. An existing
+    // target file (without overwrite) routes to the overwrite confirmation,
+    // persisting the resolved path so overwrite-and-export-env can reuse it.
+    // Empty / written outcomes both finish at build-complete.
+    case 'exporting-env': {
+      const targetPath = progress.envExportTargetPath || deps.defaultExportPath!(progress.appId, 'android')
+      const result = deps.exportCredentialsToEnv!({
+        appId: progress.appId,
+        platform: 'android',
+        credentials: rebuildTailCredentials(progress),
+        targetPath,
+      })
+
+      if (result.kind === 'empty')
+        return { progress, next: 'build-complete' }
+
+      if (result.kind === 'exists') {
+        const nextProgress: AndroidOnboardingProgress = { ...progress, envExportTargetPath: result.path }
+        await deps.saveAndroidProgress(progress.appId, nextProgress)
+        return { progress: nextProgress, next: 'confirm-env-export-overwrite' }
+      }
+
+      deps.onLog?.(`✔ Exported ${result.fieldCount} field${result.fieldCount === 1 ? '' : 's'} → ${result.path}`)
+      return { progress, next: 'build-complete', transient: { envExportPath: result.path } }
+    }
+
+    // ── overwrite-and-export-env ──────────────────────────────────────────
+    // app.tsx:1627–1652
+    //
+    // Re-export with overwrite=true to the path the user just confirmed, then
+    // finish at build-complete.
+    case 'overwrite-and-export-env': {
+      const result = deps.exportCredentialsToEnv!({
+        appId: progress.appId,
+        platform: 'android',
+        credentials: rebuildTailCredentials(progress),
+        targetPath: progress.envExportTargetPath,
+        overwrite: true,
+      })
+
+      if (result.kind === 'written') {
+        deps.onLog?.(`✔ Overwrote ${result.path} with ${result.fieldCount} field${result.fieldCount === 1 ? '' : 's'}`)
+        return { progress, next: 'build-complete', transient: { envExportPath: result.path } }
+      }
+      return { progress, next: 'build-complete' }
+    }
+
+    // ── writing-workflow-file ─────────────────────────────────────────────
+    // app.tsx:1553–1590
+    //
+    // Generate + write `.github/workflows/capgo-build.yml` (overwrite=true —
+    // the preview/diff confirmation already happened). The build script choice
+    // must be on progress (recorded at pick-build-script). Finishes at
+    // build-complete.
+    case 'writing-workflow-file': {
+      const buildScript = progress.buildScriptChoice
+      if (!buildScript)
+        throw new Error('Internal error: no build script choice recorded.')
+
+      const entries = tailCiSecretEntries(progress, deps)
+      const result = deps.writeWorkflowFile!(
+        {
+          appId: progress.appId,
+          defaultPlatform: 'android',
+          packageManager: progress.selectedPackageManager ?? 'npm',
+          buildScript,
+          secretKeys: entries.map(entry => entry.key),
+        },
+        { overwrite: true },
+      )
+
+      if (result.kind === 'written') {
+        deps.onLog?.(`✔ Wrote ${result.absolutePath}`)
+        return { progress, next: 'build-complete', transient: { workflowFilePath: result.absolutePath } }
+      }
+      return { progress, next: 'build-complete' }
+    }
+
     // ── Not yet implemented (bootstrap / post-save tail / native-picker) ──
     default:
       throw new Error(`Unhandled effect step: ${step}`)
