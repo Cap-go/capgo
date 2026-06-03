@@ -180,7 +180,9 @@ function makeDeps(overrides = {}) {
 console.log('🧪 import-no-match-recovery VIEW (menu variants)\n')
 
 await test("iosViewForStep('import-no-match-recovery') is a choice: create + provide-path + browser + back (app_store, ASC key, file picker)", async () => {
-  const view = iosViewForStep('import-no-match-recovery', iosProgress({ completedSteps: { apiKeyVerified: { keyId: 'K', issuerId: 'I' } } }), {
+  // ASC key present := a persisted progress.p8Path (a TUI-honored signal — app.tsx:3530
+  // uses p8PathRef, not completedSteps.apiKeyVerified, after the v1 hasAscKey refactor).
+  const view = iosViewForStep('import-no-match-recovery', iosProgress({ p8Path: '/Users/me/AuthKey_K.p8' }), {
     chosenIdentity: IDENTITY_A,
     noMatchReason: 'apple-no-profiles-linked',
     canUseFilePicker: true,
@@ -204,12 +206,28 @@ await test("import-no-match-recovery view title names the actual cause (sticky n
 })
 
 await test("import-no-match-recovery view 'create' label flips when no ASC key is present", async () => {
-  const withKey = iosViewForStep('import-no-match-recovery', iosProgress({ completedSteps: { apiKeyVerified: { keyId: 'K', issuerId: 'I' } } }), { chosenIdentity: IDENTITY_A })
+  // hasAscKey in the VIEW matches the TUI exactly (app.tsx:3530 — p8ContentRef OR
+  // p8PathRef): only a carried ctx.p8Content or a PERSISTED progress.p8Path flips the
+  // label to "create now". A persisted completedSteps.apiKeyVerified does NOT flip it
+  // (TUI-parity / v1 behavior-preservation — see the iOS transition-graph audit's
+  // divergence log), so the "with key" case here uses progress.p8Path.
+  const withKey = iosViewForStep('import-no-match-recovery', iosProgress({ p8Path: '/Users/me/AuthKey_K.p8' }), { chosenIdentity: IDENTITY_A })
   const withoutKey = iosViewForStep('import-no-match-recovery', iosProgress(), { chosenIdentity: IDENTITY_A })
   const createWith = withKey.options.find(o => o.value === 'create')
   const createWithout = withoutKey.options.find(o => o.value === 'create')
   assert(createWith && !/Provide ASC API key/.test(createWith.label), 'with a key the create row just creates')
   assert(createWithout && /Provide ASC API key/.test(createWithout.label), 'without a key the create row asks for the key first')
+})
+
+await test("import-no-match-recovery view 'create' label does NOT flip on a persisted apiKeyVerified alone (TUI-parity: app.tsx:3530 omits apiKeyVerified)", async () => {
+  // Regression guard for the v1 behavior-preserving refactor: the engine VIEW dropped
+  // the apiKeyVerified component of hasAscKey to match the TUI ref expression. A user
+  // who verified the ASC key but has no carried p8Content / persisted p8Path still sees
+  // the "provide ASC key first" label. FLAGGED for maintainer — including apiKeyVerified
+  // would be a post-v1 UX improvement (shared by TUI + engine once Phase 4 lands).
+  const view = iosViewForStep('import-no-match-recovery', iosProgress({ completedSteps: { apiKeyVerified: { keyId: 'K', issuerId: 'I' } } }), { chosenIdentity: IDENTITY_A })
+  const create = view.options.find(o => o.value === 'create')
+  assert(create && /Provide ASC API key/.test(create.label), 'apiKeyVerified alone does NOT flip the create-row label (matches the TUI)')
 })
 
 await test("import-no-match-recovery view HIDES 'create' for ad_hoc (apple-api only mints app_store)", async () => {

@@ -1341,8 +1341,11 @@ export function iosViewForStep(
     //     the reason was set by the step that ROUTED here (import-pick-identity /
     //     import-checking-apple-cert); re-entries from a file-picker cancel / portal
     //     "open anyway" thread it back UNCHANGED so the menu keeps the same variant.
-    //   - hasAscKey (ctx.p8Content OR a persisted apiKeyVerified) → the 'create' row
+    //   - hasAscKey (ctx.p8Content OR a persisted progress.p8Path) → the 'create' row
     //     label flips between "create now" and "provide ASC key first" (app.tsx:3564).
+    //     MATCHES the TUI exactly (p8ContentRef OR p8PathRef, app.tsx:3530): a
+    //     persisted completedSteps.apiKeyVerified does NOT flip the label — see the
+    //     v1 behavior-preservation divergence note in the iOS transition-graph audit.
     //   - importDistribution → 'create' is HIDDEN for ad_hoc (apple-api createProfile
     //     only mints app_store profiles — app.tsx:3538), so an ad_hoc user can't end
     //     up with an app_store profile saved under CAPGO_IOS_DISTRIBUTION='ad_hoc'.
@@ -1356,7 +1359,7 @@ export function iosViewForStep(
       const identityName = ctx?.chosenIdentity?.name ?? 'your certificate'
       const appId = resolveIosBundleId(progress)
       const dist = progress.importDistribution
-      const hasAscKey = !!(ctx?.p8Content || progress.completedSteps.apiKeyVerified || progress.p8Path)
+      const hasAscKey = !!(ctx?.p8Content || progress.p8Path)
       const canCreateProfile = dist !== 'ad_hoc'
       const canUseFilePicker = ctx?.canUseFilePicker ?? true
       const options: IosStepOption[] = [
