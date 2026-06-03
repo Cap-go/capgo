@@ -44,7 +44,7 @@ import type {
   ProfileData,
 } from '../types.js'
 import type { AsyncCommandRunner, CiSecretDiscovery, CiSecretEntry, CiSecretTarget, CommandRunner } from '../ci-secrets.js'
-import type { DiscoveredProfile, IdentityProfileMatch, SigningIdentity } from '../macos-signing.js'
+import type { DiscoveredProfile, ExportedP12, IdentityProfileMatch, SigningIdentity } from '../macos-signing.js'
 import type { MobileprovisionDetail } from '../../mobileprovision-parser.js'
 // Real helper-module types the tail-aligned IosEffectDeps signatures reference —
 // the SAME set tail/flow.ts imports, so `toTailDeps` maps the deps 1:1.
@@ -207,6 +207,14 @@ export interface IosStepCtx {
    * `mobileprovisionPickerOpenedRef` guard (app.tsx:1689).
    */
   profilePickerOpened?: boolean
+  /**
+   * True once the import-compiling-helper effect has compiled the Swift keychain-
+   * export helper this drive — returned in transient and threaded back as
+   * `deps.carried.helperCompiled` so a re-drive does NOT re-invoke swiftc (it
+   * skips straight to import-exporting). Mirrors the TUI's single-run compile
+   * effect (app.tsx:1611–1627).
+   */
+  helperCompiled?: boolean
 
   // ── ASC API key data surfaced after verifying-key (ephemeral mirror) ─────
   /** Verified key id + issuer id (mirror of completedSteps.apiKeyVerified). */
@@ -311,8 +319,14 @@ export interface IosEffectDeps {
   listSigningIdentities?: () => Promise<SigningIdentity[]>
   /** Scan the Mac's on-disk provisioning profiles (import-scanning). */
   scanProvisioningProfiles?: () => Promise<DiscoveredProfile[]>
-  /** Export a .p12 (cert + key) from the Keychain (import-exporting). Returns base64. */
-  exportP12FromKeychain?: (args: { identity: SigningIdentity, password: string }) => Promise<string>
+  /**
+   * Export a .p12 (cert + key) from the Keychain for the chosen identity
+   * (import-exporting). Signature mirrors the REAL macos-signing helper VERBATIM:
+   * takes the identity's SHA-1 and resolves to { base64, passphrase } (the
+   * auto-generated wrap passphrase becomes the transient importedP12Password the
+   * saving-credentials handoff reads — NEVER persisted, risk #2 / D-iOS-3).
+   */
+  exportP12FromKeychain?: (targetSha1: string) => Promise<ExportedP12>
   /** Pre-compile the Swift keychain-export helper (import-compiling-helper). */
   precompileSwiftHelper?: () => Promise<void>
   /** Whether the Swift keychain-export helper is already compiled + cached. */
@@ -505,6 +519,23 @@ export interface IosEffectDeps {
      * import-no-match-recovery. Mirrors app.tsx:3738.
      */
     portalAction?: 'use-create' | 'open-anyway' | 'use-file' | 'back'
+    /**
+     * The user's pick at `import-export-warning` (the heads-up before the one
+     * Keychain dialog). EPHEMERAL — `applyIosInput` persists nothing; the driver
+     * records the choice here and re-drives the step as a resolver. 'go' → compile
+     * the helper if needed then export (import-compiling-helper / import-exporting,
+     * keyed off isHelperCached); 'back' → import-pick-profile; 'exit'/absent →
+     * exit onboarding. Mirrors app.tsx:3769 onChange.
+     */
+    exportWarningAction?: 'go' | 'back' | 'exit'
+    /**
+     * Idempotency guard for `import-compiling-helper` (mirrors the TUI's
+     * single-run effect). Once the Swift keychain-export helper has been compiled
+     * this attempt, the driver threads the returned `helperCompiled: true`
+     * transient back here so a re-drive does NOT re-invoke swiftc — it skips
+     * straight to import-exporting. EPHEMERAL — never persisted.
+     */
+    helperCompiled?: boolean
     /**
      * The STICKY no-match reason set by the step that ROUTED into recovery
      * (import-pick-identity / import-checking-apple-cert). The recovery resolver
@@ -864,6 +895,25 @@ const OPTION_PORTAL_USE_FILE: IosStepOption = { value: 'use-file', label: '📁 
 /** import-portal-explanation 'back to recovery menu' row (app.tsx:3736). */
 const OPTION_PORTAL_BACK: IosStepOption = { value: 'back', label: '↩️   Back to recovery menu' }
 
+// ─── Export-warning vocabulary (BATCH 7b) ───────────────────────────────────────
+//
+// import-export-warning is the heads-up shown right before the single Keychain
+// permission dialog. Three static rows mirror the TUI's Select (app.tsx:3766 /
+// ui/steps/ios-import.tsx:356): 'go' (export now — the label names the identity),
+// 'back' (to profile selection), 'exit' (quit onboarding). The VALUES mirror the
+// TUI sentinels so the resolver effect routes each pick (app.tsx:3769).
+
+/** import-export-warning 'export now' row — label names the chosen identity (app.tsx:357). */
+function optionExportWarningGo(identityName: string): IosStepOption {
+  return { value: 'go', label: `🔓  Export "${identityName}" now` }
+}
+
+/** import-export-warning 'back to profile selection' row (app.tsx:358). */
+const OPTION_EXPORT_WARNING_BACK: IosStepOption = { value: 'back', label: '↩️   Back' }
+
+/** import-export-warning 'exit onboarding' row (app.tsx:359). */
+const OPTION_EXPORT_WARNING_EXIT: IosStepOption = { value: 'exit', label: '✖  Exit onboarding' }
+
 /**
  * The recovery-menu Alert sentence for a no-match reason. Mirrors the TUI's
  * `alertText` (ui/steps/ios-import.tsx:261) so the engine view's title names the
@@ -1006,6 +1056,13 @@ export type IosInput =
   // 'back' → import-no-match-recovery). Persists nothing; noMatchReason rides
   // transient untouched so the recovery menu re-renders the SAME variant.
   | { step: 'import-portal-explanation', value: 'use-create' | 'open-anyway' | 'use-file' | 'back' }
+  // import-export-warning — the heads-up before the single Keychain dialog
+  // (BATCH 7b). EPHEMERAL navigation choice: the driver records the pick in
+  // carried.exportWarningAction and re-drives the step as a resolver (mirrors
+  // app.tsx:3769 onChange — 'go' → import-compiling-helper / import-exporting
+  // keyed off isHelperCached; 'back' → import-pick-profile; 'exit' → exit).
+  // Persists nothing.
+  | { step: 'import-export-warning', value: 'go' | 'back' | 'exit' }
 // ─── Engine surface (tail-wired; non-tail steps remain stubs) ───────────────────
 
 /**
@@ -1346,6 +1403,31 @@ export function iosViewForStep(
         options,
       }
     }
+
+    // ── import-export-warning (choice, EPHEMERAL-dep) ─────────────────────────
+    // app.tsx:3765–3787 / ui/steps/ios-import.tsx:353. The heads-up shown right
+    // before the single Keychain permission dialog: a warning Alert ("macOS will
+    // now ask permission to access your private key") plus a 3-row Select. The
+    // 'go' row names the chosen identity so the user recognises the cert they're
+    // exporting (app.tsx:3767 passes chosenIdentity.name). The pick is EPHEMERAL —
+    // the driver records it into carried.exportWarningAction and re-drives this
+    // step as a resolver (which keys 'go' off isHelperCached). The TUI only renders
+    // this step when chosenIdentity is present (app.tsx:3765 `&& chosenIdentity`);
+    // mirror that by falling back to a neutral identity label when ctx omits it.
+    case 'import-export-warning': {
+      const identityName = ctx?.chosenIdentity?.name ?? 'your signing identity'
+      return {
+        step,
+        kind: 'choice',
+        title: 'macOS will now ask permission to access your private key.',
+        prompt: 'A Keychain dialog will pop up — click "Always Allow" so retries don\'t re-prompt. That\'s the only prompt; the export is otherwise non-interactive.',
+        options: [
+          optionExportWarningGo(identityName),
+          OPTION_EXPORT_WARNING_BACK,
+          OPTION_EXPORT_WARNING_EXIT,
+        ],
+      }
+    }
     default:
       return { step, kind: 'auto', title: step }
   }
@@ -1546,6 +1628,16 @@ export function applyIosInput(
     case 'import-portal-explanation':
       return progress
 
+    // ── import-export-warning (EPHEMERAL choice — persists NOTHING) ────────────
+    // app.tsx:3769–3784 — the export-warning pick (go / back / exit) is EPHEMERAL
+    // navigation; the TUI routes via setStep / exitOnboarding, never persisting the
+    // choice. The pure reducer records nothing — the driver records the pick into
+    // deps.carried.exportWarningAction and re-drives the step through runIosEffect
+    // ('go' → import-compiling-helper / import-exporting keyed off isHelperCached;
+    // 'back' → import-pick-profile; 'exit' → exit). Ephemeral, so resume re-renders.
+    case 'import-export-warning':
+      return progress
+
     default:
       return progress
   }
@@ -1664,15 +1756,25 @@ export async function runIosEffect(
       try {
         const { teamId } = await deps.verifyApiKey!({ keyId, issuerId, p8Content })
         const apiKey: ApiKeyData = { keyId, issuerId }
+        // pendingRecoveryAction (BATCH 7b): when the import no-ASC-key 'create'
+        // branch routed through the .p8 chain, it persisted
+        // pendingRecoveryAction='import-create-profile-only'. After a SUCCESSFUL
+        // verify we RESUME that deferred action (clearing the marker immutably so
+        // it can't re-fire) INSTEAD of the create-new creating-certificate, exactly
+        // as the TUI does (app.tsx:1936 importMode && pendingRecoveryAction →
+        // setStep(`import-${action}`)). The normal create-new path (no
+        // pendingRecoveryAction) is unchanged → creating-certificate.
+        const resumeAction = progress.pendingRecoveryAction === 'import-create-profile-only'
+        const { pendingRecoveryAction: _cleared, ...withoutPending } = progress
         const nextProgress: OnboardingProgress = {
-          ...progress,
+          ...(resumeAction ? withoutPending : progress),
           completedSteps: { ...progress.completedSteps, apiKeyVerified: apiKey },
         }
         await deps.saveProgress?.(progress.appId, nextProgress)
         deps.onLog?.(`✔ API Key verified — Key: ${keyId}`)
         return {
           progress: nextProgress,
-          next: 'creating-certificate',
+          next: resumeAction ? 'import-create-profile-only' : 'creating-certificate',
           transient: { apiKey, ...(teamId ? { teamId } : {}) },
         }
       }
@@ -2486,6 +2588,133 @@ export async function runIosEffect(
             transient: { duplicateProfiles: err.profiles },
           }
         }
+        deps.onLog?.(`✖ ${err instanceof Error ? err.message : String(err)}`, 'red')
+        return { progress, next: 'error' }
+      }
+    }
+
+    // ── import-export-warning (resolver effect, EPHEMERAL-dep) ────────────────
+    // app.tsx:3769–3784. The heads-up before the single Keychain dialog is an
+    // EPHEMERAL-branching choice: the pick rides deps.carried.exportWarningAction
+    // and the driver re-drives this step as a resolver. The routing mirrors the
+    // TUI onChange exactly:
+    //   - 'go'   → start the export. The TUI compiles the Swift helper FIRST when
+    //     it isn't cached, so the user sees a concrete progress step instead of a
+    //     silent swiftc pause behind the "look for the macOS dialog" spinner
+    //     (app.tsx:3776 setStep(isHelperCached() ? 'import-exporting' :
+    //     'import-compiling-helper')). isHelperCached defaults to true (helper
+    //     present on the macOS-first target) when the dep is omitted.
+    //   - 'back' → import-pick-profile (distribution mode is upstream now;
+    //     app.tsx:3780).
+    //   - 'exit' / absent → exit onboarding (app.tsx:3783).
+    // PURE routing — persists nothing (chosenIdentity/chosenProfile ride transient).
+    case 'import-export-warning': {
+      const action = deps.carried?.exportWarningAction
+      if (action === 'back')
+        return { progress, next: 'import-pick-profile' }
+      if (action === 'go') {
+        const helperCached = deps.isHelperCached ? deps.isHelperCached() : true
+        return { progress, next: helperCached ? 'import-exporting' : 'import-compiling-helper' }
+      }
+      // 'exit' or no pick → leave onboarding. The engine has no 'exit' step, so
+      // (like cert-limit-prompt / duplicate-profile-prompt's exit branches) this
+      // routes to 'error', the driver's exitOnboarding equivalent (app.tsx:3783).
+      return { progress, next: 'error' }
+    }
+
+    // ── import-compiling-helper (effect, IDEMPOTENT) ──────────────────────────
+    // app.tsx:1611–1627. One-time-per-CLI-version compile of the Swift keychain-
+    // export helper, surfaced as its own step so the user sees the ~2-3s swiftc
+    // invocation rather than a silent pause. IDEMPOTENT (mirrors the TUI's single-
+    // run effect): if the driver already compiled this attempt it threads
+    // carried.helperCompiled=true back, so a re-drive skips straight to
+    // import-exporting WITHOUT re-invoking swiftc. Outcomes:
+    //   - already compiled (guard)     → import-exporting (no re-compile).
+    //   - precompileSwiftHelper succeeds → import-exporting (+ helperCompiled flag).
+    //   - precompileSwiftHelper throws  → error (app.tsx:1624 handleError).
+    case 'import-compiling-helper': {
+      if (deps.carried?.helperCompiled)
+        return { progress, next: 'import-exporting' }
+      try {
+        const startedAt = Date.now()
+        await deps.precompileSwiftHelper!()
+        deps.onLog?.(`✔ Compiled keychain-export helper in ${Date.now() - startedAt}ms`)
+        return { progress, next: 'import-exporting', transient: { helperCompiled: true } }
+      }
+      catch (err) {
+        deps.onLog?.(`✖ ${err instanceof Error ? err.message : String(err)}`, 'red')
+        return { progress, next: 'error' }
+      }
+    }
+
+    // ── import-exporting (effect, EPHEMERAL-dep) ──────────────────────────────
+    // app.tsx:1629–1671. Export the chosen identity's cert + private key from the
+    // Keychain to a .p12 (the ONE Keychain permission prompt happens here), then
+    // synthesize the CertificateData + ProfileData records the shared
+    // saving-credentials tail (doSaveCredentials) consumes.
+    //
+    // GUARD (app.tsx:1632): chosenIdentity AND chosenProfile must both be present
+    // — they ride transient from the import pickers / D2, never progress.json. On a
+    // crash-recovery resume that lost them the driver re-lands on import-scanning
+    // and re-derives the selections; reaching here without them is an internal
+    // error → error/restart.
+    //
+    // RISK #2 / D-iOS-3 (NO SECRETS ON DISK): certData (incl. the p12 base64),
+    // profileData, teamId, and importedP12Password ride transient ONLY — this
+    // effect PERSISTS NOTHING. A crash before saving-credentials resumes from
+    // import-scanning and re-exports; the saving-credentials tail rebuilds the
+    // saved-credential map from these carried values.
+    //
+    // profileBase64 source (app.tsx:1648): an on-disk profile (chosenProfile.path
+    // set) is read + base64-encoded via deps.readFile; a synthesized Apple-API
+    // profile (D2 / Apple-fetch, path='') already carries profileBase64 on the
+    // structural cast.
+    case 'import-exporting': {
+      const chosenIdentity = deps.carried?.chosenIdentity
+      const chosenProfile = deps.carried?.chosenProfile
+      if (!chosenIdentity || !chosenProfile) {
+        deps.onLog?.('✖ Internal error: no identity or profile chosen for export.', 'red')
+        return { progress, next: 'error' }
+      }
+      try {
+        const exported = await deps.exportP12FromKeychain!(chosenIdentity.sha1)
+        // Synthesize a CertificateData record. Apple-API-only fields (certificateId)
+        // stay empty for an imported cert (app.tsx:1639); expiry comes from the
+        // chosen profile, team id from the identity.
+        const certData: CertificateData = {
+          certificateId: '',
+          expirationDate: chosenProfile.expirationDate,
+          teamId: chosenIdentity.teamId,
+          p12Base64: exported.base64,
+        }
+        // chosenProfile.path empty ⇒ synthesized Apple-API profile carries the
+        // .mobileprovision bytes on the structural cast; otherwise read from disk.
+        // deps.readFile resolves to a Buffer (matching macos-signing's readFile),
+        // so encode it directly — no `Buffer.from` value needed (the module imports
+        // Buffer as a TYPE only, keeping the engine value-import-free).
+        const profileBase64 = chosenProfile.path
+          ? (await deps.readFile!(chosenProfile.path)).toString('base64')
+          : (chosenProfile as DiscoveredProfile & { profileBase64?: string }).profileBase64 || ''
+        const profileData: ProfileData = {
+          profileId: chosenProfile.uuid,
+          profileName: chosenProfile.name,
+          profileBase64,
+        }
+        deps.onLog?.(`✔ Exported "${chosenIdentity.name}" from Keychain`)
+        // The export payload rides transient ONLY (risk #2) — never persisted.
+        // The shared saving-credentials tail runs next and reads it from carried.
+        return {
+          progress,
+          next: 'saving-credentials',
+          transient: {
+            certData,
+            profileData,
+            importedP12Password: exported.passphrase,
+            ...(chosenIdentity.teamId ? { teamId: chosenIdentity.teamId } : {}),
+          },
+        }
+      }
+      catch (err) {
         deps.onLog?.(`✖ ${err instanceof Error ? err.message : String(err)}`, 'red')
         return { progress, next: 'error' }
       }

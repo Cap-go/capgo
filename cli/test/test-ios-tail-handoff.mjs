@@ -343,12 +343,15 @@ await test('runIosEffect throws for a NON-tail, not-yet-implemented effect step 
   // verifying-key / creating-certificate / creating-profile); BATCH 5 implemented
   // the import-discovery effects (import-scanning / import-validating-all-certs);
   // BATCH 6 implemented the import pickers + apple-cert check (import-pick-identity /
-  // import-checking-apple-cert / import-pick-profile). `import-exporting` is a
-  // still-stubbed import-flow export effect (BATCH 7), so it must still throw
-  // "not implemented".
+  // import-checking-apple-cert / import-pick-profile); BATCH 7a/7b implemented the
+  // import recovery + export tail (import-no-match-recovery … import-create-profile-
+  // only / import-export-warning / import-compiling-helper / import-exporting). So
+  // use a pre-flow lifecycle effect the iOS engine never owns — `adding-platform`
+  // is driven by the master flow, not runIosEffect, so it stays in the default
+  // branch and must still throw "not implemented".
   let threw = false
   try {
-    await runIosEffect('import-exporting', iosProgress(), makeDeps())
+    await runIosEffect('adding-platform', iosProgress(), makeDeps())
   }
   catch (err) {
     threw = /not implemented/.test(err instanceof Error ? err.message : String(err))
