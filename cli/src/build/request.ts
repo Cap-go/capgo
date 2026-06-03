@@ -1119,11 +1119,14 @@ export async function zipDirectory(projectDir: string, outputPath: string, platf
   addDirectoryToZip(zip, projectDir, '', platform, nativeDeps, platformDir)
   addNativePackagesFromNodeModules(zip, parseNodeModulesPaths(options.nodeModules), platform, nativeDeps, platformDir)
 
-  // Rewrite pnpm store paths (node_modules/.pnpm/…/node_modules/@scope/pkg)
-  // to standard flat paths (node_modules/@scope/pkg).
-  // Scan all text-based entries because pnpm paths leak into Podfile, Podfile.lock,
-  // Pods.xcodeproj/project.pbxproj, .xcconfig files, Manifest.lock, settings.gradle, etc.
+  // Rewrite isolated-linker store paths to standard flat paths (node_modules/@scope/pkg).
+  // Both pnpm (node_modules/.pnpm/…/node_modules/@scope/pkg) and bun's isolated linker
+  // (node_modules/.bun/@scope+pkg@ver+hash/node_modules/@scope/pkg) leak store paths into
+  // Package.swift, Podfile, Podfile.lock, Pods.xcodeproj/project.pbxproj, .xcconfig files,
+  // Manifest.lock, settings.gradle, etc. The cloud builder only ships the flat plugin dirs,
+  // so these store paths must be collapsed back to node_modules/@scope/pkg.
   const pnpmPathPattern = /node_modules\/\.pnpm\/[^/\n\r]+(?:\/[^/\n\r]+)*\/node_modules\//g
+  const bunPathPattern = /node_modules\/\.bun\/[^/\n\r]+(?:\/[^/\n\r]+)*\/node_modules\//g
   const textExtensions = new Set([
     '',
     '.gradle',
@@ -1148,7 +1151,7 @@ export async function zipDirectory(projectDir: string, outputPath: string, platf
     if (!textExtensions.has(ext) && basename !== 'Podfile')
       continue
     const original = entry.getData().toString('utf-8')
-    let rewritten = original.replace(pnpmPathPattern, 'node_modules/')
+    let rewritten = original.replace(pnpmPathPattern, 'node_modules/').replace(bunPathPattern, 'node_modules/')
 
     // pnpm can leave deep relative paths in iOS files like Package.swift and Pods output.
     // Collapse any excessive ../ before project-root ios/ or node_modules/ paths back to

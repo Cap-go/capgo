@@ -248,6 +248,122 @@ await t('generated build zip supports nested Capacitor Podfile paths in monorepo
   }
 })
 
+await t('generated build zip rewrites bun isolated-store paths to flat node_modules (ios Package.swift)', async () => {
+  const testRoot = mkdtempSync(join(tmpdir(), 'capgo-build-zip-filter-'))
+  const zipPath = join(testRoot, 'build.zip')
+
+  try {
+    writeFile(
+      join(testRoot, 'package.json'),
+      JSON.stringify({
+        dependencies: {
+          '@capacitor/core': '^8.0.0',
+          '@capacitor/action-sheet': '^8.1.1',
+        },
+      }, null, 2),
+    )
+
+    writeFile(
+      join(testRoot, 'capacitor.config.json'),
+      JSON.stringify({
+        ios: { path: 'ios' },
+        appId: 'com.example.app',
+        appName: 'Example',
+      }, null, 2),
+    )
+
+    // `cap sync` run under bun's isolated linker bakes the .bun store path into Package.swift.
+    writeFile(
+      join(testRoot, 'ios/App/CapApp-SPM/Package.swift'),
+      'let package = Package(name: "CapApp-SPM", dependencies: [.package(name: "CapacitorActionSheet", path: "../../../node_modules/.bun/@capacitor+action-sheet@8.1.1+1b808583819c2ac6/node_modules/@capacitor/action-sheet")])\n',
+    )
+
+    writeFile(join(testRoot, 'www', 'index.html'), '<!doctype html><html></html>')
+    writeFile(
+      join(testRoot, 'node_modules', '@capacitor', 'action-sheet', 'package.json'),
+      JSON.stringify({ name: '@capacitor/action-sheet', version: '8.1.1' }, null, 2),
+    )
+    writeFile(
+      join(testRoot, 'node_modules', '@capacitor', 'action-sheet', 'Package.swift'),
+      'let package = Package(name: "CapacitorActionSheet")\n',
+    )
+
+    await zipDirectory(testRoot, zipPath, 'ios', {
+      ios: { path: 'ios' },
+    })
+
+    const zip = new AdmZip(zipPath)
+    const entries = zip.getEntries().map(entry => entry.entryName).sort()
+
+    assert.ok(entries.includes('node_modules/@capacitor/action-sheet/package.json'), 'missing plugin package.json in zip')
+    assert.equal(
+      zip.readAsText('ios/App/CapApp-SPM/Package.swift'),
+      'let package = Package(name: "CapApp-SPM", dependencies: [.package(name: "CapacitorActionSheet", path: "../../../node_modules/@capacitor/action-sheet")])\n',
+    )
+  }
+  finally {
+    rmSync(testRoot, { recursive: true, force: true })
+  }
+})
+
+await t('generated build zip rewrites bun isolated-store paths to flat node_modules (android settings.gradle)', async () => {
+  const testRoot = mkdtempSync(join(tmpdir(), 'capgo-build-zip-filter-'))
+  const zipPath = join(testRoot, 'build.zip')
+
+  try {
+    writeFile(
+      join(testRoot, 'package.json'),
+      JSON.stringify({
+        dependencies: {
+          '@capacitor/core': '^8.0.0',
+          '@capacitor/action-sheet': '^8.1.1',
+        },
+      }, null, 2),
+    )
+
+    writeFile(
+      join(testRoot, 'capacitor.config.json'),
+      JSON.stringify({
+        android: { path: 'android' },
+        appId: 'com.example.app',
+        appName: 'Example',
+      }, null, 2),
+    )
+
+    // `cap sync` run under bun's isolated linker bakes the .bun store path into settings.gradle.
+    writeFile(
+      join(testRoot, 'android/capacitor.settings.gradle'),
+      'include \':capacitor-action-sheet\'\nproject(\':capacitor-action-sheet\').projectDir = new File(\'../node_modules/.bun/@capacitor+action-sheet@8.1.1+1b808583819c2ac6/node_modules/@capacitor/action-sheet/android\')\n',
+    )
+
+    writeFile(join(testRoot, 'www', 'index.html'), '<!doctype html><html></html>')
+    writeFile(
+      join(testRoot, 'node_modules', '@capacitor', 'action-sheet', 'package.json'),
+      JSON.stringify({ name: '@capacitor/action-sheet', version: '8.1.1' }, null, 2),
+    )
+    writeFile(
+      join(testRoot, 'node_modules', '@capacitor', 'action-sheet', 'android', 'build.gradle'),
+      'apply plugin: \'com.android.library\'\n',
+    )
+
+    await zipDirectory(testRoot, zipPath, 'android', {
+      android: { path: 'android' },
+    })
+
+    const zip = new AdmZip(zipPath)
+    const entries = zip.getEntries().map(entry => entry.entryName).sort()
+
+    assert.ok(entries.includes('node_modules/@capacitor/action-sheet/android/build.gradle'), 'missing plugin android build.gradle in zip')
+    assert.equal(
+      zip.readAsText('android/capacitor.settings.gradle'),
+      'include \':capacitor-action-sheet\'\nproject(\':capacitor-action-sheet\').projectDir = new File(\'../node_modules/@capacitor/action-sheet/android\')\n',
+    )
+  }
+  finally {
+    rmSync(testRoot, { recursive: true, force: true })
+  }
+})
+
 await t('generated build zip includes SPM and CocoaPods metadata when both managers are configured', async () => {
   const testRoot = mkdtempSync(join(tmpdir(), 'capgo-build-zip-filter-'))
   const zipPath = join(testRoot, 'build.zip')
