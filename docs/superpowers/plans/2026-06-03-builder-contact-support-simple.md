@@ -613,6 +613,7 @@ await ta('opens a mailto: to support@capgo.app and prints instructions', async (
   const result = await contactSupport(deps)
   assert.equal(result, 'opened')
   assert.ok(calls.opened[0].startsWith('mailto:support@capgo.app?'))
+  assert.ok(decodeURIComponent(calls.opened[0]).includes('/x/b.log.gz')) // path is in the email body
   assert.ok(calls.printed.some(m => m.includes('support@capgo.app')))
 })
 
@@ -675,7 +676,10 @@ export async function contactSupport(deps: ContactSupportDeps): Promise<ContactS
   const copied = deps.copyPath(files.gzPath)
   deps.reveal?.(files.gzPath)
 
-  const url = buildMailtoUrl({ to: SUPPORT_EMAIL, subject: deps.subject, body: deps.body })
+  // Put the saved file path in the email body too — mailto: can't auto-attach, and
+  // the user is looking at their mail client now, not the terminal.
+  const body = `${deps.body}\n\nPlease attach the logs file saved at:\n${files.gzPath}\n(The path is already on your clipboard.)`
+  const url = buildMailtoUrl({ to: SUPPORT_EMAIL, subject: deps.subject, body })
   try {
     await deps.openUrl(url)
   }
@@ -743,7 +747,7 @@ import { readFileSync } from 'node:fs'
 async function handleSupport() {
   await contactSupport({
     subject: `Capgo Builder support — ${appId} (${platform})`,
-    body: `Hi Capgo team,\n\nMy build failed and I'd like help.\n\nApp: ${appId}\nPlatform: ${platform}\nError: ${error}\n\nMy logs are attached (secrets removed).`,
+    body: `Hi Capgo team,\n\nMy build failed and I'd like help.\n\nApp: ${appId}\nPlatform: ${platform}\nError: ${error}\n\n(Logs saved locally; secrets removed — I'll attach the file.)`,
     confirm: async msg => askYesNo(msg), // existing Ink confirm Select; see Step 3
     buildFiles: () => writeSupportBundleFiles({
       kind: 'build-init',
@@ -842,7 +846,7 @@ import { readFileSync } from 'node:fs'
 
 await contactSupport({
   subject: `Capgo Builder onboarding support — ${globalAppId ?? 'unknown'}`,
-  body: `Hi Capgo team,\n\nI hit an error during Capgo Builder onboarding.\n\nApp: ${globalAppId}\nError: ${error}\n\nMy logs are attached (secrets removed).`,
+  body: `Hi Capgo team,\n\nI hit an error during Capgo Builder onboarding.\n\nApp: ${globalAppId}\nError: ${error}\n\n(Logs saved locally; secrets removed — I'll attach the file.)`,
   confirm: async msg => /* existing init confirm prompt */ confirmPrompt(msg),
   buildFiles: () => writeSupportBundleFiles({
     kind: 'init',
