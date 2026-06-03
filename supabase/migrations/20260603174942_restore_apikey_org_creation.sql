@@ -78,7 +78,7 @@ SELECT
   apikeys.rbac_id,
   public.rbac_perm_org_create(),
   apikeys.user_id,
-  'Backfilled for write-capable API keys that existed before org.create became explicit'
+  'Backfilled for org-scoped write-capable API keys that existed before org.create became explicit'
 FROM public.apikeys
 WHERE EXISTS (
   SELECT 1
@@ -86,19 +86,14 @@ WHERE EXISTS (
   JOIN public.roles ON public.roles.id = public.role_bindings.role_id
   WHERE public.role_bindings.principal_type = public.rbac_principal_apikey()
     AND public.role_bindings.principal_id = apikeys.rbac_id
-    AND public.role_bindings.scope_type IN (
-      public.rbac_scope_org(),
-      public.rbac_scope_app()
-    )
+    AND public.role_bindings.scope_type = public.rbac_scope_org()
     AND (
       public.role_bindings.expires_at IS NULL
       OR public.role_bindings.expires_at > pg_catalog.now()
     )
     AND public.roles.name IN (
       public.rbac_role_org_super_admin(),
-      public.rbac_role_org_admin(),
-      public.rbac_role_app_admin(),
-      public.rbac_role_app_developer()
+      public.rbac_role_org_admin()
     )
 )
 ON CONFLICT (apikey_rbac_id, permission_key) DO NOTHING;
@@ -118,20 +113,15 @@ AS $$
     JOIN public.roles AS r ON r.id = rb.role_id
     WHERE rb.principal_type = public.rbac_principal_apikey()
       AND rb.principal_id = p_apikey_rbac_id
-      AND rb.scope_type IN (
-        public.rbac_scope_org(),
-        public.rbac_scope_app()
-      )
-      AND r.scope_type = rb.scope_type
+      AND rb.scope_type = public.rbac_scope_org()
+      AND r.scope_type = public.rbac_scope_org()
       AND (
         rb.expires_at IS NULL
         OR rb.expires_at > pg_catalog.now()
       )
       AND r.name IN (
         public.rbac_role_org_super_admin(),
-        public.rbac_role_org_admin(),
-        public.rbac_role_app_admin(),
-        public.rbac_role_app_developer()
+        public.rbac_role_org_admin()
       )
   )
 $$;
@@ -141,7 +131,7 @@ REVOKE ALL ON FUNCTION public.apikey_has_current_org_create_capability(uuid) FRO
 GRANT EXECUTE ON FUNCTION public.apikey_has_current_org_create_capability(uuid) TO service_role;
 
 COMMENT ON FUNCTION public.apikey_has_current_org_create_capability(uuid) IS
-  'Private helper ensuring org.create grants only remain effective while the API key still has a current write-capable RBAC binding.';
+  'Private helper ensuring org.create grants only remain effective while the API key still has a current org-scoped write-capable RBAC binding.';
 
 CREATE OR REPLACE FUNCTION public.apikey_has_global_permission(
   p_apikey text,

@@ -814,6 +814,104 @@ describe('API key organization creation', () => {
       await getSupabaseClient().from('apikeys').delete().eq('id', createKey.id)
     }
   })
+
+  it.concurrent('rejects org.create for app-scoped admin keys even with the global grant', async () => {
+    const createKeyValue = randomUUID()
+    const appId = `com.org-create-app-scope.${randomUUID()}`
+    const createKey = await createDirectApiKeyWithBindings({
+      userId: USER_ID,
+      key: createKeyValue,
+      name: `Organization create app-scoped key ${randomUUID()}`,
+      orgId: ORG_ID,
+      roleName: 'org_member',
+    })
+    if (!createKey?.key || !createKey.rbac_id || typeof createKey.id !== 'number') {
+      throw new Error('Failed to seed app-scoped organization create API key')
+    }
+
+    try {
+      await executeSQL(
+        `INSERT INTO public.apikey_global_permissions (
+           apikey_rbac_id,
+           permission_key,
+           granted_by,
+           reason
+         )
+         VALUES ($1::uuid, public.rbac_perm_org_create(), $2::uuid, 'Test app-scoped org.create grant')
+         ON CONFLICT DO NOTHING`,
+        [createKey.rbac_id, USER_ID],
+      )
+
+      const { error: appError } = await getSupabaseClient().from('apps').insert({
+        app_id: appId,
+        name: `Organization create app-scope fixture ${randomUUID()}`,
+        icon_url: 'https://example.com/icon.png',
+        owner_org: ORG_ID,
+      })
+      if (appError) {
+        throw appError
+      }
+
+      const [appScopedRole] = await executeSQL(
+        `SELECT roles.id AS role_id, apps.id AS app_id
+         FROM public.roles
+         JOIN public.apps ON apps.app_id = $1::varchar
+         WHERE roles.name = public.rbac_role_app_admin()
+           AND roles.scope_type = public.rbac_scope_app()
+           AND apps.owner_org = $2::uuid
+         LIMIT 1`,
+        [appId, ORG_ID],
+      )
+      if (!appScopedRole?.role_id || !appScopedRole.app_id) {
+        throw new Error('Unable to resolve app-scoped admin binding data')
+      }
+
+      await executeSQL(
+        `INSERT INTO public.role_bindings (
+           principal_type,
+           principal_id,
+           role_id,
+           scope_type,
+           org_id,
+           app_id,
+           granted_by,
+           reason,
+           is_direct
+         )
+         VALUES (
+           public.rbac_principal_apikey(),
+           $1::uuid,
+           $2::uuid,
+           public.rbac_scope_app(),
+           $3::uuid,
+           $4::uuid,
+           $5::uuid,
+           'Test app-scoped API key binding',
+           true
+         )`,
+        [createKey.rbac_id, appScopedRole.role_id, ORG_ID, appScopedRole.app_id, USER_ID],
+      )
+
+      const response = await fetch(`${BASE_URL}/organization`, {
+        headers: {
+          'Content-Type': 'application/json',
+          'capgkey': createKey.key,
+        },
+        method: 'POST',
+        body: JSON.stringify({
+          name: `Blocked app-scoped grant org ${randomUUID()}`,
+        }),
+      })
+
+      expect(response.status).toBe(403)
+      const payload = await response.json() as { error?: string }
+      expect(payload.error).toBe('permission_denied')
+    }
+    finally {
+      await getSupabaseClient().from('apikeys').delete().eq('id', createKey.id)
+      await getSupabaseClient().from('apps').delete().eq('app_id', appId)
+    }
+  })
 })
 
 describe('[GET] /organization', () => {
