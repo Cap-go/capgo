@@ -965,6 +965,8 @@ declare module 'vue-router/auto-routes' {
         | '/preview/channel'
       views:
         | never
+      pathParamNames:
+        | never
     }
     'src/pages/register.vue': {
       routes:
