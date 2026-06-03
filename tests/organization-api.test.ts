@@ -854,6 +854,14 @@ describe('API key organization creation', () => {
         [createKey.rbac_id, USER_ID],
       )
 
+      await executeSQL(
+        `DELETE FROM public.role_bindings
+         WHERE principal_type = public.rbac_principal_apikey()
+           AND principal_id = $1::uuid
+           AND scope_type = public.rbac_scope_org()`,
+        [createKey.rbac_id],
+      )
+
       const { error: appError } = await getSupabaseClient().from('apps').insert({
         app_id: appId,
         name: `Organization create app-scope fixture ${randomUUID()}`,

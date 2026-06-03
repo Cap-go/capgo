@@ -155,9 +155,19 @@ async function insertOrgForApiKey(
 
   // API-key Supabase clients run as anon, so this checked endpoint owns the write path instead of reopening direct anon RLS inserts.
   let pgClient
+  let transactionStarted = false
   try {
     pgClient = getPgClient(c)
+    const capabilityResult = await pgClient.query<{ allowed: boolean }>(
+      'SELECT public.apikey_has_current_org_create_capability($1::uuid) AS allowed',
+      [apikeyRbacId],
+    )
+    if (capabilityResult.rows[0]?.allowed !== true) {
+      throw quickError(403, 'permission_denied', 'Permission denied: org.create')
+    }
+
     await pgClient.query('BEGIN')
+    transactionStarted = true
     await pgClient.query(
       'SELECT set_config($1, $2, true)',
       ['request.headers', JSON.stringify({ capgkey: apikeyValue })],
@@ -212,9 +222,10 @@ async function insertOrgForApiKey(
     )
 
     await pgClient.query('COMMIT')
+    transactionStarted = false
   }
   catch (error) {
-    if (pgClient) {
+    if (pgClient && transactionStarted) {
       await pgClient.query('ROLLBACK')
     }
     throw error
