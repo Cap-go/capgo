@@ -6,10 +6,14 @@ import { toast } from 'vue-sonner'
 import IconArrowRight from '~icons/lucide/arrow-right'
 import IconBuilding from '~icons/lucide/building-2'
 import IconCheck from '~icons/lucide/check'
+import IconCompass from '~icons/lucide/compass'
 import IconGlobe from '~icons/lucide/globe-2'
 import IconImage from '~icons/lucide/image'
+import IconLayers from '~icons/lucide/layers'
 import IconLoader from '~icons/lucide/loader-2'
 import IconPencil from '~icons/lucide/pencil-line'
+import IconRefresh from '~icons/lucide/refresh-cw'
+import IconSmartphone from '~icons/lucide/smartphone'
 import IconSparkles from '~icons/lucide/sparkles'
 import IconUpload from '~icons/lucide/upload-cloud'
 import IconUserPlus from '~icons/lucide/user-plus'
@@ -17,7 +21,8 @@ import IconUsers from '~icons/lucide/users-round'
 import IconBack from '~icons/material-symbols/arrow-back-ios-rounded'
 import InviteTeammateModal from '~/components/dashboard/InviteTeammateModal.vue'
 import { uploadOrgLogoFile } from '~/services/photos'
-import { useSupabase } from '~/services/supabase'
+import { pushEvent } from '~/services/posthog'
+import { getLocalConfig, useSupabase } from '~/services/supabase'
 import { useDisplayStore } from '~/stores/display'
 import { useMainStore } from '~/stores/main'
 import { useOrganizationStore } from '~/stores/organization'
@@ -73,6 +78,26 @@ const inviteModalRef = ref<InviteTeammateModalRef | null>(null)
 const logoInputRef = useTemplateRef<HTMLInputElement>('logoInput')
 const isAdditionalOrgFlow = ref(false)
 const estimatedUsersIndex = ref<number | null>(null)
+const config = getLocalConfig()
+
+// One-time, per-user onboarding intent. Stored in auth.users metadata
+// (no public.users column / migration) and mirrored to PostHog for segmentation.
+const selectedIntent = ref<string | null>(null)
+const intentJustAnswered = ref(false)
+const intentOptions = [
+  { value: 'ota', icon: IconRefresh },
+  { value: 'builder', icon: IconSmartphone },
+  { value: 'both', icon: IconLayers },
+  { value: 'exploring', icon: IconCompass },
+] as const
+// Ask only when the user has never answered. Skips returning users and the
+// additional-org flow (their metadata is already set), so it shows once.
+const shouldAskIntent = computed(() => {
+  if (intentJustAnswered.value)
+    return false
+  const stored = main.auth?.user_metadata?.onboarding_intent
+  return typeof stored !== 'string' || stored.length === 0
+})
 
 const fallbackUserCountStops: UserCountStop[] = [
   { value: 2000, label: '2K', planName: 'Solo' },
@@ -124,6 +149,25 @@ const selectedUserCountStop = computed<UserCountStop | null>(() => {
     return null
   return userCountStops.value[Math.min(estimatedUsersIndex.value, userCountStops.value.length - 1)] ?? null
 })
+
+async function persistOnboardingIntent(intent: string) {
+  intentJustAnswered.value = true
+  try {
+    await supabase.auth.updateUser({ data: { onboarding_intent: intent } })
+  }
+  catch (error) {
+    console.error('Failed to persist onboarding intent', error)
+  }
+  try {
+    pushEvent('onboarding_intent_selected', config.supaHost, {
+      intent,
+      estimated_mau: selectedUserCountStop.value?.value ?? null,
+    })
+  }
+  catch (error) {
+    console.error('Failed to track onboarding intent', error)
+  }
+}
 const currentStepIndex = computed(() => onboardingSteps.findIndex(entry => entry.id === step.value) + 1)
 const stepProgress = computed(() => `${((currentStepIndex.value - 1) / Math.max(onboardingSteps.length - 1, 1)) * 100}%`)
 
@@ -371,6 +415,11 @@ async function createOrganization() {
     return
   }
 
+  if (shouldAskIntent.value && !selectedIntent.value) {
+    toast.error(t('organization-onboarding-intent-required'))
+    return
+  }
+
   isSubmitting.value = true
 
   try {
@@ -398,6 +447,9 @@ async function createOrganization() {
 
     createdOrgId.value = data.id
     toast.success(t('org-created-successfully'))
+
+    if (shouldAskIntent.value && selectedIntent.value)
+      await persistOnboardingIntent(selectedIntent.value)
 
     try {
       await organizationStore.fetchOrganizations()
@@ -586,7 +638,7 @@ onUnmounted(() => {
 
 <template>
   <section class="h-full min-h-0 overflow-y-auto bg-slate-50 px-4 py-4 text-slate-950 sm:px-5 sm:py-6 lg:px-6 dark:bg-slate-950 dark:text-slate-50">
-    <div class="mx-auto flex w-full max-w-5xl flex-col gap-4">
+    <div class="relative mx-auto flex w-full max-w-5xl flex-col gap-4">
       <InviteTeammateModal ref="inviteModalRef" @success="onInviteSuccess" />
       <input
         ref="logoInput"
@@ -669,7 +721,47 @@ onUnmounted(() => {
             </div>
           </div>
 
-          <div v-if="step === 'details'" class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-white/15 dark:bg-slate-900/95 dark:shadow-2xl dark:shadow-black/30">
+          <div v-if="step === 'details' && shouldAskIntent" class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-white/15 dark:bg-slate-900/95 dark:shadow-2xl dark:shadow-black/30">
+            <div class="space-y-4">
+              <div>
+                <p class="text-sm font-semibold text-primary-500 dark:text-slate-300">
+                  {{ t('organization-onboarding-intent-step') }}
+                </p>
+                <h2 class="mt-1.5 text-xl font-semibold text-slate-950 dark:text-white">
+                  {{ t('organization-onboarding-intent-question') }}
+                </h2>
+                <p class="mt-1 text-sm leading-6 text-slate-600 dark:text-slate-300">
+                  {{ t('organization-onboarding-intent-hint') }}
+                </p>
+              </div>
+
+              <div class="grid gap-3 sm:grid-cols-2">
+                <button
+                  v-for="option in intentOptions"
+                  :key="option.value"
+                  type="button"
+                  class="group flex min-h-24 items-start gap-3 rounded-xl border p-3 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-900"
+                  :class="whiteCardToggleButtonClass(selectedIntent === option.value)"
+                  :data-test="`onboarding-intent-${option.value}`"
+                  @click="selectedIntent = option.value"
+                >
+                  <span class="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary-500/10 text-primary-500 dark:bg-primary-500/20">
+                    <component :is="option.icon" class="h-5 w-5" />
+                  </span>
+                  <span class="min-w-0">
+                    <span class="block text-sm font-semibold text-slate-950 dark:text-white">
+                      {{ t(`organization-onboarding-intent-option-${option.value}-label`) }}
+                    </span>
+                    <span class="mt-1 block text-xs leading-5 text-slate-600 dark:text-slate-300">
+                      {{ t(`organization-onboarding-intent-option-${option.value}-desc`) }}
+                    </span>
+                  </span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div v-if="step === 'details' && (!shouldAskIntent || !!selectedIntent)" class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-white/15 dark:bg-slate-900/95 dark:shadow-2xl dark:shadow-black/30">
             <div class="space-y-4">
               <div>
                 <p class="text-sm font-semibold text-primary-500 dark:text-slate-300">
@@ -958,7 +1050,7 @@ onUnmounted(() => {
             </div>
           </div>
 
-          <div v-else class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-white/15 dark:bg-slate-900/95 dark:shadow-2xl dark:shadow-black/30">
+          <div v-else-if="step === 'invite'" class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-white/15 dark:bg-slate-900/95 dark:shadow-2xl dark:shadow-black/30">
             <div class="space-y-4">
               <div>
                 <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-500 text-white">
