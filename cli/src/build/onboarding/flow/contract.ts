@@ -1,6 +1,6 @@
 // Platform-agnostic onboarding flow contract. NO ink, NO MCP types. Both the
 // ink TUI and the MCP server render a StepView and feed input back through it.
-export type StepKind = 'auto' | 'human_gate' | 'choice' | 'info' | 'done' | 'error'
+export type StepKind = 'auto' | 'human_gate' | 'choice' | 'info' | 'input' | 'done' | 'error'
 
 export interface StepView {
   kind: StepKind
@@ -17,7 +17,7 @@ export interface PlatformFlow<Step extends string, Progress, Input> {
   runEffect: (step: Step, progress: Progress, deps: unknown) => Promise<unknown>
 }
 
-const KINDS: ReadonlySet<string> = new Set(['auto', 'human_gate', 'choice', 'info', 'done', 'error'])
+const KINDS: ReadonlySet<string> = new Set(['auto', 'human_gate', 'choice', 'info', 'input', 'done', 'error'])
 
 /** Runtime guard used by tests + frontends to validate a view-model. */
 export function isStepView(v: unknown): v is StepView {
