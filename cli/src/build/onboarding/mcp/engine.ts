@@ -10,7 +10,7 @@ import { explainForState } from './explanations.js'
 import { isSafeAppIdForCommand } from './app-id-validation.js'
 import { ANDROID_STEP_PROGRESS } from '../android/types.js'
 import { getAndroidResumeStep } from '../android/progress.js'
-import { validateStepInput } from './step-input.js'
+import { validateStepInput, validateStorePassword } from './step-input.js'
 import { androidViewForStep, applyAndroidInput, applyGoogleSignIn, runAndroidEffect } from '../android/flow.js'
 import { beginOAuthSession, clearOAuthSession, pollOAuthSession } from './oauth-session.js'
 
@@ -1370,6 +1370,16 @@ async function drive(deps: EngineDeps, input?: OnboardingInput): Promise<NextSte
           ? `This step accepts only one of: ${allowed.map(f => `{ ${f}: ... }`).join(' or ')}. Call ${NEXT_STEP_TOOL} with EXACTLY ONE of those fields and no others${check.extras.length ? ` — remove: ${check.extras.join(', ')}` : ''}. Do not batch multiple answers.`
           : `Call ${NEXT_STEP_TOOL} with only the field this step asks for.`
         return { ...corrective, summary: `${correction}\n\n${corrective.summary}` }
+      }
+      // Content gate: enforce the store-password rules the ink TUI applies inline
+      // (min 6 chars for a new keystore, non-empty for an existing one) BEFORE
+      // persistAndroidInput, so a weak/empty password never reaches keystore-
+      // generating. Re-renders the current step with the exact main wording.
+      const pwCheck = validateStorePassword(currentStep, input.keystoreStorePassword)
+      if (!pwCheck.ok) {
+        const facts = await gatherFacts(deps)
+        const corrective = await decideAndroid(facts, deps) // re-returns the current step; no input applied
+        return { ...corrective, summary: `${pwCheck.message}\n\n${corrective.summary}` }
       }
     }
   }

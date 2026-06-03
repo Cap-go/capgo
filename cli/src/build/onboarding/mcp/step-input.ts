@@ -2,19 +2,21 @@
 // The interactive android steps and the input field(s) each one accepts. Used to
 // enforce step-by-step input: a next_step must carry EXACTLY ONE of the current
 // step's allowed fields (and no other android key), or the engine rejects with a
-// correction. Most steps accept a single field; a few navigation states collect
-// a small set across consecutive calls while the resume step does not change
-// (e.g. the existing-keystore unlock stays on keystore-existing-store-password
-// while it gathers the store password and then, if needed, the key password).
+// correction. Each step accepts a single field per call. Store-password steps
+// additionally enforce a content rule (matching the ink TUI in app.tsx): the
+// new keystore store password must be at least 6 characters and the existing
+// keystore store password must be non-empty — see validateStorePassword.
 import type { AndroidOnboardingStep } from '../android/types.js'
 
 /** state → the set of input fields that legitimately answer it (in order). */
 export const STEP_ALLOWED_FIELDS: Partial<Record<AndroidOnboardingStep, string[]>> = {
   'keystore-method-select': ['keystoreMethod'],
   'keystore-existing-path': ['keystorePath'],
-  // The existing-keystore unlock collects the store password, then (if needed) the
-  // key password, while the resume step can stay on store-password — accept both.
-  'keystore-existing-store-password': ['keystoreStorePassword', 'keystoreKeyPassword'],
+  // The existing-keystore unlock collects ONLY the store password here. Once it
+  // is applied the resume step auto-advances to keystore-existing-detecting-alias
+  // — the store-password step never stays to collect a key password, so
+  // keystoreKeyPassword is not a legitimate answer at this step (vestigial).
+  'keystore-existing-store-password': ['keystoreStorePassword'],
   'keystore-existing-alias-select': ['keystoreAlias'],
   'keystore-existing-alias': ['keystoreAlias'],
   'keystore-existing-key-password': ['keystoreKeyPassword'],
@@ -69,4 +71,41 @@ export function validateStepInput(
   // Exactly one allowed field, and no other governed key. (One field per call.)
   const ok = presentAllowed.length === 1 && extras.length === 0
   return { ok, allowedFields: allowed, extras }
+}
+
+/**
+ * Content validation for the keystore store-password steps, mirroring the ink
+ * TUI onSubmit guards in app.tsx so the stateless MCP path enforces the SAME
+ * rule before a value is persisted (and before it can reach keystore-generating):
+ *
+ *   - keystore-new-store-password  → reject < 6 chars (app.tsx:2575,
+ *     'Password must be at least 6 characters')
+ *   - keystore-existing-store-password → reject empty (app.tsx:2455,
+ *     'Store password cannot be empty')
+ *
+ * Returns { ok:true } when the value passes (or the step is not a store-password
+ * step). On failure returns { ok:false, message } with the exact main wording so
+ * the gate can re-render the current step with a corrective summary and persist
+ * nothing.
+ *
+ * @param currentStep the resume step the user is currently on
+ * @param storePassword the supplied keystoreStorePassword (or undefined/null)
+ */
+export function validateStorePassword(
+  currentStep: AndroidOnboardingStep,
+  storePassword: string | undefined | null,
+): { ok: boolean, message?: string } {
+  if (storePassword === undefined || storePassword === null)
+    return { ok: true }
+  if (currentStep === 'keystore-new-store-password') {
+    if (storePassword.length < 6)
+      return { ok: false, message: 'Password must be at least 6 characters' }
+    return { ok: true }
+  }
+  if (currentStep === 'keystore-existing-store-password') {
+    if (storePassword.length === 0)
+      return { ok: false, message: 'Store password cannot be empty' }
+    return { ok: true }
+  }
+  return { ok: true }
 }
