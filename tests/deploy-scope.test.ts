@@ -1,0 +1,124 @@
+import { describe, expect, it } from 'vitest'
+import { resolveDeployScopeFromFiles, resolveDeployScopeFromGit } from '../scripts/deploy-scope.ts'
+
+const noBackendDeploys = {
+  api: false,
+  files: false,
+  plugins: false,
+  supabase: false,
+  translation: false,
+}
+
+describe('deploy scope matching', () => {
+  it.concurrent('does not deploy backend targets for frontend-only changes', () => {
+    expect(resolveDeployScopeFromFiles(['src/pages/index.vue'])).toEqual(noBackendDeploys)
+  })
+
+  it.concurrent('does not deploy backend targets for CLI-only lockfile changes', () => {
+    expect(resolveDeployScopeFromFiles(['bun.lock', 'cli/src/index.ts'])).toEqual(noBackendDeploys)
+  })
+
+  it.concurrent('deploys translation plus API surfaces when source messages change', () => {
+    expect(resolveDeployScopeFromFiles(['messages/en.json'])).toEqual({
+      api: true,
+      files: false,
+      plugins: false,
+      supabase: true,
+      translation: true,
+    })
+  })
+
+  it.concurrent('keeps plugin endpoint changes scoped to Supabase and plugin workers', () => {
+    expect(resolveDeployScopeFromFiles(['supabase/functions/_backend/plugins/updates.ts'])).toEqual({
+      api: false,
+      files: false,
+      plugins: true,
+      supabase: true,
+      translation: false,
+    })
+  })
+
+  it.concurrent('keeps public API changes scoped to Supabase and API workers', () => {
+    expect(resolveDeployScopeFromFiles(['supabase/functions/_backend/public/app/index.ts'])).toEqual({
+      api: true,
+      files: false,
+      plugins: false,
+      supabase: true,
+      translation: false,
+    })
+  })
+
+  it.concurrent('deploys shared Hono utilities to workers that import backend code', () => {
+    expect(resolveDeployScopeFromFiles(['supabase/functions/_backend/utils/hono.ts'])).toEqual({
+      api: true,
+      files: true,
+      plugins: true,
+      supabase: true,
+      translation: false,
+    })
+  })
+
+  it.concurrent('deploys package dependency changes to Cloudflare workers without forcing Supabase', () => {
+    expect(resolveDeployScopeFromFiles(['package.json'])).toEqual({
+      api: true,
+      files: true,
+      plugins: true,
+      supabase: false,
+      translation: true,
+    })
+  })
+
+  it.concurrent('ignores generated release commits when resolving changed code', () => {
+    const run = (args: string[]) => {
+      const key = args.join(' ')
+      const responses: Record<string, string> = {
+        'log -1 --format=%s capgo-12.0.0': 'chore(release): 12.0.0',
+        'rev-parse capgo-12.0.0^': 'feature-head',
+        'describe --tags --match capgo-[0-9]* --abbrev=0 feature-head': 'capgo-11.0.0',
+        'diff --name-only --diff-filter=ACMRT capgo-11.0.0..feature-head': 'src/pages/index.vue',
+      }
+
+      if (key in responses) {
+        return responses[key]
+      }
+
+      throw new Error(`Unexpected git call: ${key}`)
+    }
+
+    expect(resolveDeployScopeFromGit('capgo-12.0.0', run)).toEqual({
+      base: 'capgo-11.0.0',
+      files: ['src/pages/index.vue'],
+      head: 'feature-head',
+      scope: noBackendDeploys,
+    })
+  })
+
+  it.concurrent('deploys all targets when no previous Capgo tag exists', () => {
+    const run = (args: string[]) => {
+      const key = args.join(' ')
+      if (key === 'log -1 --format=%s HEAD') {
+        return 'feat: first capgo release'
+      }
+      if (key === 'describe --tags --match capgo-[0-9]* --abbrev=0 HEAD') {
+        throw Object.assign(new Error('git describe failed'), {
+          stderr: 'fatal: No names found, cannot describe anything.',
+        })
+      }
+
+      throw new Error(`Unexpected git call: ${key}`)
+    }
+
+    expect(resolveDeployScopeFromGit('HEAD', run)).toEqual({
+      base: null,
+      files: [],
+      head: 'HEAD',
+      scope: {
+        api: true,
+        files: true,
+        plugins: true,
+        supabase: true,
+        translation: true,
+      },
+    })
+  })
+})
