@@ -2018,6 +2018,84 @@ export async function getRemoteDependencies(supabase: SupabaseClient<Database>, 
   return convertNativePackages(((remoteNativePackages.version as any)?.native_packages as any) ?? [])
 }
 
+interface BundleCompatibilityCompareResponse {
+  comparisons: {
+    name: string
+    candidateVersion?: string
+    baselineVersion?: string
+    candidateIosChecksum?: string
+    baselineIosChecksum?: string
+    candidateAndroidChecksum?: string
+    baselineAndroidChecksum?: string
+  }[]
+}
+
+function mapBackendCompatibilityComparison(entry: BundleCompatibilityCompareResponse['comparisons'][number]): Compatibility {
+  return {
+    name: entry.name,
+    localVersion: entry.candidateVersion,
+    remoteVersion: entry.baselineVersion,
+    localIosChecksum: entry.candidateIosChecksum,
+    remoteIosChecksum: entry.baselineIosChecksum,
+    localAndroidChecksum: entry.candidateAndroidChecksum,
+    remoteAndroidChecksum: entry.baselineAndroidChecksum,
+  }
+}
+
+export function mapBackendCompatibilityResponse(response: BundleCompatibilityCompareResponse): Compatibility[] {
+  return response.comparisons.map(mapBackendCompatibilityComparison)
+}
+
+async function getChannelBaselineBundleId(supabase: SupabaseClient<Database>, appId: string, channel: string): Promise<number | null> {
+  const { data, error } = await supabase
+    .from('channels')
+    .select('version ( id )')
+    .eq('name', channel)
+    .eq('app_id', appId)
+    .single()
+
+  if (error) {
+    log.error(`Error fetching native packages: ${error.message}`)
+    throw new Error(`Error fetching native packages: ${error.message}`)
+  }
+
+  const bundleId = (data.version as any)?.id
+  return typeof bundleId === 'number' ? bundleId : null
+}
+
+async function checkCompatibilityWithBackend(
+  supabase: SupabaseClient<Database>,
+  appId: string,
+  channel: string,
+  nativePackages: NativePackage[],
+): Promise<Compatibility[] | null> {
+  const baselineBundleId = await getChannelBaselineBundleId(supabase, appId, channel)
+  if (!baselineBundleId)
+    return null
+
+  try {
+    const { data, error } = await supabase.functions.invoke<BundleCompatibilityCompareResponse>('private/bundle_compatibility/compare', {
+      body: {
+        appId,
+        candidate: {
+          nativePackages,
+        },
+        baseline: {
+          bundleId: baselineBundleId,
+        },
+      },
+    })
+
+    if (error || !data)
+      return null
+
+    return mapBackendCompatibilityResponse(data)
+  }
+  catch {
+    return null
+  }
+}
+
 export async function checkChecksum(supabase: SupabaseClient<Database>, appId: string, channel: string, currentChecksum: string) {
   const s = spinnerC()
   s.start(`Checking bundle checksum compatibility with channel ${channel}`)
@@ -2146,6 +2224,22 @@ export function isCompatible(pkg: Compatibility): boolean {
 
 export async function checkCompatibilityCloud(supabase: SupabaseClient<Database>, appId: string, channel: string, packageJsonPath: string | undefined, nodeModules: string | undefined) {
   const dependenciesObject = await getLocalDependencies(packageJsonPath, nodeModules)
+  const localNativePackages = dependenciesObject
+    .filter(a => !!a.native)
+    .map(({ name, version, ios_checksum, android_checksum }) => ({
+      name,
+      version,
+      ...(ios_checksum && { ios_checksum }),
+      ...(android_checksum && { android_checksum }),
+    }))
+  const backendCompatibility = await checkCompatibilityWithBackend(supabase, appId, channel, localNativePackages)
+  if (backendCompatibility) {
+    return {
+      finalCompatibility: backendCompatibility,
+      localDependencies: dependenciesObject,
+    }
+  }
+
   const mappedRemoteNativePackages = await getRemoteDependencies(supabase, appId, channel)
 
   const finalDependencies: Compatibility[] = dependenciesObject
@@ -2194,6 +2288,14 @@ export async function checkCompatibilityCloud(supabase: SupabaseClient<Database>
 }
 
 export async function checkCompatibilityNativePackages(supabase: SupabaseClient<Database>, appId: string, channel: string, nativePackages: NativePackage[]) {
+  const backendCompatibility = await checkCompatibilityWithBackend(supabase, appId, channel, nativePackages)
+  if (backendCompatibility) {
+    return {
+      finalCompatibility: backendCompatibility,
+      localDependencies: nativePackages,
+    }
+  }
+
   const mappedRemoteNativePackages = await getRemoteDependencies(supabase, appId, channel)
 
   const finalDependencies: Compatibility[] = nativePackages
