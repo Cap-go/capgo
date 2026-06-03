@@ -22,6 +22,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 // re-renders by accident.
 const SPINNER_FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'] as const
 import { detectIosBundleIds } from '../bundle-id-detector.js'
+import { writeReleaseBundleId } from '../../pbxproj-parser.js'
 import { writeOnboardingSupportBundle } from '../../../onboarding-support.js'
 import { formatRunnerCommand, splitRunnerCommand } from '../../../runner-command.js'
 import { createSupabaseClient, findBuildCommandForProjectType, findProjectType, findSavedKeySilent, getOrganizationId, getPackageScripts, getPMAndCommand } from '../../../utils.js'
@@ -3285,6 +3286,32 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
           trackVerifyEvent('iOS App Verify Gate Blocked', '🚧', { attempt, path: 'fix-build-id' })
         }
 
+        // Path A auto-fix — rewrite the Release PRODUCT_BUNDLE_IDENTIFIER in the
+        // Xcode project to the chosen App Store app's bundle id, then re-check
+        // (which now passes and advances the gate). Only PRODUCT_BUNDLE_IDENTIFIER
+        // assignments equal to the current build id are touched; capacitor.config
+        // is never modified.
+        const autoFixBuildId = async () => {
+          if (!verifyChosenApp)
+            return
+          const target = verifyChosenApp.bundleId
+          try {
+            const { changed } = writeReleaseBundleId(process.cwd(), iosDir, releaseId, target)
+            if (changed > 0) {
+              addLog(`🔧 Updated PRODUCT_BUNDLE_IDENTIFIER → "${target}" in your Xcode project.`)
+              trackVerifyEvent('iOS App Verify Auto Fixed', '🔧', { attempt: verifyAttempt, path: 'fix-build-id' })
+            }
+            else {
+              addLog(`⚠ Couldn't find PRODUCT_BUNDLE_IDENTIFIER "${releaseId}" to update — edit it in Xcode, then re-check.`, 'yellow')
+            }
+          }
+          catch {
+            addLog('⚠ Could not write to your Xcode project — edit PRODUCT_BUNDLE_IDENTIFIER manually, then re-check.', 'yellow')
+          }
+          // Re-check against disk; passes the gate when the write succeeded.
+          await continueFixBuildId()
+        }
+
         // Path B Continue — re-poll /v1/apps and check for an app matching the
         // Release build id. Never re-opens the browser automatically.
         const continueCreateApp = async () => {
@@ -3363,11 +3390,11 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
                 </Text>
                 <Newline />
                 <Text>
-                  {'In Xcode, set '}
+                  {'Set '}
                   <Text bold>PRODUCT_BUNDLE_IDENTIFIER</Text>
                   {' (Release) to '}
                   <Text bold color="cyan">{right}</Text>
-                  {', then choose Continue to re-check.'}
+                  {' — pick "Update … for me" below to do it automatically, or edit it in Xcode yourself and re-check.'}
                 </Text>
                 <Text dimColor>{'capacitor.config.appId can stay as-is — only the Release PRODUCT_BUNDLE_IDENTIFIER must match.'}</Text>
               </Box>
@@ -3375,12 +3402,15 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
               <Select
                 key={`gate-a-${gateActionSeq}`}
                 options={[
-                  { label: '✅ I\'ve edited it — re-check', value: 'continue' },
+                  { label: '🔧 Update PRODUCT_BUNDLE_IDENTIFIER for me', value: 'autofix' },
+                  { label: '✅ I\'ve edited it myself — re-check', value: 'continue' },
                   { label: '❌ Cancel onboarding', value: 'cancel' },
                 ]}
                 onChange={(value) => {
                   setGateActionSeq(s => s + 1)
-                  if (value === 'continue')
+                  if (value === 'autofix')
+                    void autoFixBuildId()
+                  else if (value === 'continue')
                     void continueFixBuildId()
                   else
                     cancelGate('fix-build-id')
