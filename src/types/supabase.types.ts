@@ -1364,6 +1364,7 @@ export type Database = {
           default_channel: string | null
           device_id: string
           id: number
+          install_source: string | null
           is_emulator: boolean | null
           is_prod: boolean | null
           key_id: string | null
@@ -1381,6 +1382,7 @@ export type Database = {
           default_channel?: string | null
           device_id: string
           id?: never
+          install_source?: string | null
           is_emulator?: boolean | null
           is_prod?: boolean | null
           key_id?: string | null
@@ -1398,6 +1400,7 @@ export type Database = {
           default_channel?: string | null
           device_id?: string
           id?: never
+          install_source?: string | null
           is_emulator?: boolean | null
           is_prod?: boolean | null
           key_id?: string | null

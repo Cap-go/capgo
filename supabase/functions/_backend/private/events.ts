@@ -18,6 +18,7 @@ import { backgroundTask } from '../utils/utils.ts'
 // PostHog event recording whether the org-member incompatibility email was sent
 // or skipped (and why). Powers the weekly sent-vs-skipped breakdown.
 const BUNDLE_INCOMPATIBLE_EMAIL_EVENT = 'Bundle Incompatible Email'
+const STORE_RELEASE_VALIDATION_EVENT = 'store-release-validation-needed'
 
 export const app = new Hono<MiddlewareKeyVariables>()
 
@@ -363,9 +364,35 @@ app.post('/', middlewareV2(['read', 'write', 'all', 'upload']), async (c) => {
       }
     }
   }
+  let storeReleaseValidationBentoEvent: BentoTrackingPayload | undefined
+  if (onboardingOrgId && appId && trackedBody.event === STORE_RELEASE_VALIDATION_EVENT) {
+    const [orgResult, appResult] = await Promise.all([
+      supabase.from('orgs').select('id, name').eq('id', onboardingOrgId).single(),
+      supabase.from('apps').select('name').eq('app_id', appId).single(),
+    ])
+    if (orgResult.error || appResult.error) {
+      cloudlog({ requestId: c.get('requestId'), message: 'store release validation bento lookup failed; skipping signal', org: orgResult.error, app: appResult.error })
+    }
+    else {
+      storeReleaseValidationBentoEvent = {
+        cron: '0 9 * * 1',
+        event: STORE_RELEASE_VALIDATION_EVENT,
+        preferenceKey: 'onboarding',
+        uniqId: `${STORE_RELEASE_VALIDATION_EVENT}:${appId}`,
+        data: {
+          org_id: orgResult.data.id,
+          org_name: orgResult.data.name,
+          app_id: appId,
+          app_name: appResult.data?.name ?? '',
+          has_testflight_device: trackedBody.tags?.has_testflight_device === true,
+          has_android_store_device: trackedBody.tags?.has_android_store_device === true,
+        },
+      }
+    }
+  }
 
   // Exactly one of these is ever set (distinct event names); `??` picks the active one.
-  const bentoEvent = onboardingBentoEvent ?? builderBentoEvent ?? bundleIncompatibleBentoEvent
+  const bentoEvent = onboardingBentoEvent ?? builderBentoEvent ?? bundleIncompatibleBentoEvent ?? storeReleaseValidationBentoEvent
   await sendEventToTracking(c, {
     ...trackedBody,
     bento: bentoEvent,

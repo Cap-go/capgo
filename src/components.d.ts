@@ -81,6 +81,7 @@ declare module 'vue' {
     StepsApp: typeof import('./components/dashboard/StepsApp.vue')['default']
     StepsBuild: typeof import('./components/dashboard/StepsBuild.vue')['default']
     StepsBundle: typeof import('./components/dashboard/StepsBundle.vue')['default']
+    StoreReleaseValidationModal: typeof import('./components/dashboard/StoreReleaseValidationModal.vue')['default']
     TableLog: typeof import('./components/TableLog.vue')['default']
     Tabs: typeof import('./components/Tabs.vue')['default']
     TabSidebar: typeof import('./components/TabSidebar.vue')['default']

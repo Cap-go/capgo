@@ -1241,7 +1241,7 @@ export async function trackDevicesSB(c: Context, device: DeviceWithoutCreatedAt)
 
   const { data: existingRow, error } = await client
     .from('devices')
-    .select('version_name, platform, plugin_version, os_version, version_build, custom_id, is_prod, is_emulator, default_channel, key_id')
+    .select('version_name, platform, plugin_version, os_version, version_build, custom_id, is_prod, is_emulator, install_source, default_channel, key_id')
     .eq('app_id', device.app_id)
     .eq('device_id', device.device_id)
     .maybeSingle()
@@ -1254,8 +1254,13 @@ export async function trackDevicesSB(c: Context, device: DeviceWithoutCreatedAt)
   // This avoids accidental clearing, and lets higher-level callers strip custom_id
   // (e.g., when an app disables device self-setting) without overwriting owner-set values.
   const requestedCustomId = nullableString(device.custom_id)
-  const deviceForWrite: DeviceWithoutCreatedAt = requestedCustomId === null && existingRow
-    ? { ...device, custom_id: existingRow.custom_id ?? '' }
+  const requestedInstallSource = nullableString(device.install_source)
+  const deviceForWrite: DeviceWithoutCreatedAt = existingRow
+    ? {
+        ...device,
+        ...(requestedCustomId === null ? { custom_id: existingRow.custom_id ?? '' } : {}),
+        ...(requestedInstallSource === null ? { install_source: existingRow.install_source ?? undefined } : {}),
+      }
     : device
 
   if (existingRow && !hasComparableDeviceChanged(existingRow, deviceForWrite)) {
@@ -1279,6 +1284,7 @@ export async function trackDevicesSB(c: Context, device: DeviceWithoutCreatedAt)
     version_name: normalizedDevice.version_name ?? deviceForWrite.version_name,
     is_prod: normalizedDevice.is_prod,
     is_emulator: normalizedDevice.is_emulator,
+    ...(requestedInstallSource === null ? {} : { install_source: normalizedDevice.install_source ?? undefined }),
     default_channel: device.default_channel ?? null,
     key_id: normalizedDevice.key_id ?? undefined,
   } as Database['public']['Tables']['devices']['Insert']
@@ -1470,6 +1476,9 @@ export async function readDevicesSB(c: Context, params: ReadDevicesParams, custo
   if (params.version_name)
     query = query.eq('version_name', params.version_name)
 
+  if (params.installSources?.length)
+    query = query.in('install_source', params.installSources)
+
   const devicesOrder = getDevicesOrder(params.order)
 
   if (params.cursor) {
@@ -1512,6 +1521,7 @@ export async function countDevicesSB(
   deviceIds: string[] = [],
   versionName?: string,
   search?: string,
+  installSources?: string[],
 ) {
   let req = supabaseAdmin(c)
     .from('devices')
@@ -1542,10 +1552,15 @@ export async function countDevicesSB(
   if (versionName)
     req = req.eq('version_name', versionName)
 
+  if (installSources?.length)
+    req = req.in('install_source', installSources)
+
   const { count, error } = await req
 
   if (error) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'Error counting devices', error })
+    if (installSources?.length)
+      throw new Error(error.message)
     return 0
   }
   return count ?? 0
