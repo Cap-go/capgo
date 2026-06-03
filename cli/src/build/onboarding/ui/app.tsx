@@ -302,16 +302,28 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
     [iosDir, iosBundleIdInitial],
   )
   // Shared sites that fan out into Apple-side work (end of import-scanning,
-  // end of verifying-key) wrap their setStep call with this so the
-  // confirmation question gets injected at the right moment without
-  // duplicating the "is there a mismatch?" logic per call site.
+  // end of verifying-key) wrap their setStep call with this.
+  //
+  // The Release-config PRODUCT_BUNDLE_IDENTIFIER is authoritative for Apple
+  // signing, and a differing capacitor.config.appId (the Capgo app key) is
+  // EXPECTED — not an error — so we no longer interrupt with the confirm-app-id
+  // prompt (which fired even before the .p8 was provided). Instead we silently
+  // adopt the detected Release id for cert/profile/provisioning work and
+  // continue. For app_store the authoritative check is verify-app (remote App
+  // Store Connect verification); for ad_hoc the Release id is simply the build
+  // id, used as-is. (confirm-app-id remains in the state machine but is no
+  // longer auto-injected here.)
   const redirectIfMismatch = (target: OnboardingStep): OnboardingStep => {
     if (appIdConfirmed)
       return target
     if (!detectedIds.mismatch)
       return target
-    setPendingAppIdNext(target)
-    return 'confirm-app-id'
+    setIosBundleId(detectedIds.recommended.value)
+    setAppIdConfirmed(true)
+    if (detectedIds.recommended.value !== iosBundleIdInitial) {
+      addLog(`ℹ Using "${detectedIds.recommended.value}" (your Xcode Release bundle ID) for Apple operations. capacitor.config.appId ("${iosBundleIdInitial}") is the Capgo app key and is left unchanged.`)
+    }
+    return target
   }
 
   // Telemetry: resolve org id once + emit per-step events
