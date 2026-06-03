@@ -102,6 +102,16 @@ const isAssignAccessFormValid = computed(() => {
     && (assignAccessForm.value.scope_type === 'app' || !!assignAccessForm.value.channel_id)
 })
 
+function getDefaultAssignRoleName(scopeType: 'app' | 'channel') {
+  const options = scopeType === 'channel' ? channelRoleOptions.value : appRoleOptions.value
+  return options[0]?.name ?? ''
+}
+
+function resetAssignScopeDefaults(scopeType: 'app' | 'channel') {
+  assignAccessForm.value.role_name = getDefaultAssignRoleName(scopeType)
+  assignAccessForm.value.channel_id = scopeType === 'channel' ? (channels.value[0]?.id?.toString() ?? '') : ''
+}
+
 async function loadAppInfo() {
   try {
     const { data: dataApp } = await supabase
@@ -306,12 +316,13 @@ async function openChannelPermissions(element: Element) {
 }
 
 function openAssignAccessModal() {
+  const defaultScope = channelRoleOptions.value.length && channels.value.length ? 'channel' : 'app'
   assignAccessForm.value = {
     principal_type: 'user',
     principal_id: filteredPrincipalOptions.value[0]?.id ?? '',
-    scope_type: 'channel',
-    role_name: channelRoleOptions.value[0]?.name ?? '',
-    channel_id: channels.value[0]?.id?.toString() ?? '',
+    scope_type: defaultScope,
+    role_name: getDefaultAssignRoleName(defaultScope),
+    channel_id: defaultScope === 'channel' ? (channels.value[0]?.id?.toString() ?? '') : '',
   }
 
   dialogStore.openDialog({
@@ -619,10 +630,8 @@ watch(
 
 watch(
   () => assignAccessForm.value.scope_type,
-  (scopeType) => {
-    assignAccessForm.value.role_name = assignRoleOptions.value[0]?.name ?? ''
-    assignAccessForm.value.channel_id = scopeType === 'channel' ? (channels.value[0]?.id?.toString() ?? '') : ''
-  },
+  scopeType => resetAssignScopeDefaults(scopeType),
+  { flush: 'sync' },
 )
 </script>
 
