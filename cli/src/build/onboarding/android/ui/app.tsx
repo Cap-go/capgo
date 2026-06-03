@@ -700,10 +700,11 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
   })
 
   const persist = useCallback(
-    async (updater: (p: AndroidOnboardingProgress) => AndroidOnboardingProgress) => {
+    async (updater: (p: AndroidOnboardingProgress) => AndroidOnboardingProgress): Promise<AndroidOnboardingProgress> => {
       const existing = (await loadAndroidProgress(appId)) || emptyProgress(appId)
       const next = updater(existing)
       await saveAndroidProgress(appId, next)
+      return next
     },
     [appId],
   )
@@ -735,8 +736,27 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
     ): void => {
       ;(async () => {
         try {
-          await persist(updater)
-          setStep(nextStep)
+          // Plan 3: route in-session sequencing through the shared engine.
+          // `persist` now returns the just-saved progress; we derive the next
+          // step from it via `getAndroidResumeStep` (the same function used for
+          // initial-step resolution at mount). When the engine-derived step
+          // matches the hardcoded `nextStep`, we advance via the engine. When
+          // they differ, we stay strictly behavior-preserving by keeping the
+          // hardcoded step, but surface a dev-only warning so tests can catch
+          // any divergence. A later phase drops the hardcoded arg once zero
+          // mismatches are confirmed.
+          const saved = await persist(updater)
+          const derived = getAndroidResumeStep(saved)
+          if (derived === nextStep) {
+            setStep(derived)
+          }
+          else {
+            if (globalThis.__CAPGO_DEV__) {
+              // eslint-disable-next-line no-console
+              console.warn(`[plan3] persistAndStep engine/TUI step mismatch: hardcoded=${nextStep} engine=${derived}`)
+            }
+            setStep(nextStep)
+          }
         }
         catch (err) {
           // saveAndroidProgress failures (disk full, permission, etc.) used to
