@@ -368,6 +368,33 @@ export interface IosEffectDeps {
      * resume that lost the in-memory state.
      */
     importedP12Password?: string
+    /**
+     * The cert the user picked at `cert-limit-prompt` (cert-limit recovery). The
+     * choice is EPHEMERAL — `applyIosInput` persists nothing; the driver records
+     * the picked AscDistributionCert here and re-drives the prompt as a resolver
+     * effect, exactly as the TUI stashes `certToRevoke` in React state before
+     * advancing to `revoking-certificate` (app.tsx:3923). The resolver returns
+     * `revoking-certificate` when present, `error` when absent (the user exited).
+     * Mirrors the BATCH 2 ephemeral-branching mechanism (`pickerOpened` /
+     * `chosenIdentity`): the selection lives in carried, never in progress.json.
+     */
+    certToRevoke?: AscDistributionCert
+    /**
+     * The duplicate Capgo profiles surfaced at `duplicate-profile-prompt`
+     * (duplicate-profile recovery). Produced by `creating-profile` /
+     * `import-create-profile-only` into transient; the driver threads the list
+     * back here so `deleting-duplicate-profiles` knows which profiles to delete.
+     * NEVER persisted (only `duplicateProfileOrigin` is — see types.ts).
+     */
+    duplicateProfiles?: IosDuplicateProfile[]
+    /**
+     * The user's confirm/exit decision at `duplicate-profile-prompt`. EPHEMERAL —
+     * `applyIosInput` persists nothing (per the audit's sequencing model); the
+     * driver records the choice here and re-drives the prompt as a resolver
+     * effect. `true` → `deleting-duplicate-profiles`; falsy (the user exited) →
+     * `error` (mirroring app.tsx:3942's delete-vs-exitOnboarding branch).
+     */
+    confirmDeleteDuplicates?: boolean
   }
 
   // ── callbacks (optional — callers that don't need streaming can omit) ────
@@ -600,6 +627,23 @@ const OPTIONS_API_KEY_METHOD: IosStepOption[] = [
   { value: 'manual', label: '📝  Type the path' },
 ]
 
+// ─── Recovery choice vocabulary (BATCH 3) ───────────────────────────────────────
+//
+// cert-limit-prompt's per-cert options are DYNAMIC (built from ctx.existingCerts
+// in iosViewForStep); only the trailing exit option is a constant. The
+// duplicate-profile-prompt options are fully static (delete | exit). The exit
+// VALUES mirror the TUI sentinels (app.tsx:3915 '__exit__'; app.tsx:3941
+// delete-vs-else) so the resolver effects can route a non-pick to 'error'.
+
+/** cert-limit-prompt trailing exit option (app.tsx:3915). */
+const OPTION_CERT_LIMIT_EXIT: IosStepOption = { value: '__exit__', label: '✖  Exit onboarding' }
+
+/** duplicate-profile-prompt options (app.tsx:3936–3951). */
+const OPTIONS_DUPLICATE_PROFILE: IosStepOption[] = [
+  { value: 'delete', label: '🗑️   Delete the duplicate profile(s) and create a fresh one' },
+  { value: 'exit', label: '✖  Exit onboarding' },
+]
+
 /**
  * The create-new choice/input vocabulary. Mirrors android's `AndroidInput`:
  * one variant per choice/input step that records (or routes) state. The iOS
@@ -619,6 +663,17 @@ export type IosInput =
   | { step: 'input-key-id', value: string }
   // ASC Issuer ID.
   | { step: 'input-issuer-id', value: string }
+  // ── Cert-limit & duplicate-profile recovery (BATCH 3) ────────────────────
+  // cert-limit-prompt — pick an existing cert to revoke (its Apple resource id)
+  // OR exit. EPHEMERAL: the reducer persists nothing; the driver records the
+  // picked AscDistributionCert in carried.certToRevoke and re-drives the prompt
+  // as a resolver effect (mirrors app.tsx:3917 setCertToRevoke + setStep).
+  | { step: 'cert-limit-prompt', value: string }
+  // duplicate-profile-prompt — confirm deletion of the duplicate Capgo profiles
+  // OR exit. EPHEMERAL: the reducer persists nothing; the driver records the
+  // confirm/exit decision in carried.confirmDeleteDuplicates and re-drives the
+  // prompt as a resolver effect (mirrors app.tsx:3941 delete-vs-exitOnboarding).
+  | { step: 'duplicate-profile-prompt', value: 'delete' | 'exit' }
 // ─── Engine surface (tail-wired; non-tail steps remain stubs) ───────────────────
 
 /**
@@ -698,6 +753,58 @@ export function iosViewForStep(
         prompt: 'Issuer ID (UUID at the very top of the API keys page, above the key list):',
         collect: ['issuerId'],
       }
+
+    // ── cert-limit-prompt (choice, EPHEMERAL-dep) ─────────────────────────────
+    // app.tsx:3900–3928. Apple's per-team distribution-cert limit (3) was hit, so
+    // we offer each EXISTING cert (from ctx.existingCerts, surfaced transiently by
+    // creating-certificate) for revocation, plus an exit option. The option VALUE
+    // is the cert's Apple resource id — the driver records the picked cert into
+    // carried.certToRevoke and re-drives this step as a resolver effect. The
+    // selection is EPHEMERAL (never persisted); on resume the user re-enters via a
+    // fresh creating-certificate, so this step is never a resume target.
+    case 'cert-limit-prompt': {
+      const certs = ctx?.existingCerts ?? []
+      const ourCertId = ctx?.certData?.certificateId
+        ?? progress.completedSteps.certificateCreated?.certificateId
+      const options: IosStepOption[] = [
+        ...certs.map((c) => {
+          const created = ourCertId === c.id ? ' · 🔧 Created by Capgo' : ''
+          return {
+            value: c.id,
+            label: `🗑️   ${c.name} · expires ${c.expirationDate.split('T')[0]}${created}`,
+          }
+        }),
+        OPTION_CERT_LIMIT_EXIT,
+      ]
+      return {
+        step,
+        kind: 'choice',
+        title: `Certificate limit reached — ${certs.length} existing distribution certificate(s).`,
+        prompt: 'Pick a certificate to revoke (frees a slot to create a new one), or exit:',
+        options,
+      }
+    }
+
+    // ── duplicate-profile-prompt (choice, EPHEMERAL-dep) ──────────────────────
+    // app.tsx:3936–3951. Apple already has Capgo provisioning profiles for this
+    // bundle id. Offer to delete them (then recreate) or exit. The duplicate list
+    // (ctx.duplicateProfiles) is EPHEMERAL — the reducer persists nothing; only
+    // duplicateProfileOrigin was persisted upstream (creating-profile /
+    // import-create-profile-only) so deleting-duplicate-profiles routes back to the
+    // right origin. The driver records the confirm/exit choice into carried and
+    // re-drives this step as a resolver effect.
+    case 'duplicate-profile-prompt': {
+      const count = (ctx?.duplicateProfiles ?? []).length
+      return {
+        step,
+        kind: 'choice',
+        title: count
+          ? `Found ${count} existing Capgo provisioning profile(s) for this app.`
+          : 'Found existing Capgo provisioning profile(s) for this app.',
+        prompt: 'Delete them and create a fresh one, or exit:',
+        options: OPTIONS_DUPLICATE_PROFILE,
+      }
+    }
 
     default:
       return { step, kind: 'auto', title: step }
@@ -781,6 +888,28 @@ export function applyIosInput(
         return progress
       return { ...progress, issuerId }
     }
+
+    // ── cert-limit-prompt (EPHEMERAL choice — persists NOTHING) ────────────────
+    // app.tsx:3917–3926 — the picked cert id (or '__exit__') is EPHEMERAL; the TUI
+    // stashes it in setCertToRevoke (React state), never in progress.json. The
+    // pure reducer records nothing — the driver resolves the picked
+    // AscDistributionCert into deps.carried.certToRevoke and re-drives the step
+    // through runIosEffect, which returns revoking-certificate (pick) or error
+    // (exit). Keeping this a no-op means a resume never re-derives the ephemeral
+    // revoke selection (it re-enters via a fresh creating-certificate).
+    case 'cert-limit-prompt':
+      return progress
+
+    // ── duplicate-profile-prompt (EPHEMERAL choice — persists NOTHING) ─────────
+    // app.tsx:3941–3949 — the delete/exit decision is EPHEMERAL. Per the audit's
+    // sequencing model the reducer persists nothing: duplicateProfileOrigin was
+    // already persisted upstream (creating-profile / import-create-profile-only),
+    // which is the ONLY persisted state the post-deletion routing needs. The
+    // driver records the choice into deps.carried.confirmDeleteDuplicates and
+    // re-drives the step through runIosEffect (delete → deleting-duplicate-profiles;
+    // exit → error).
+    case 'duplicate-profile-prompt':
+      return progress
 
     default:
       return progress
@@ -1050,6 +1179,89 @@ export async function runIosEffect(
             transient: { duplicateProfiles: err.profiles },
           }
         }
+        deps.onLog?.(`✖ ${err instanceof Error ? err.message : String(err)}`, 'red')
+        return { progress, next: 'error' }
+      }
+    }
+
+    // ── cert-limit-prompt (resolver effect) ───────────────────────────────────
+    // app.tsx:3917–3926. cert-limit-prompt is an EPHEMERAL-branching choice: the
+    // user's pick is NEVER persisted, so getIosResumeStep cannot reproduce the
+    // target. The driver applies the picked AscDistributionCert into
+    // deps.carried.certToRevoke (resolving it from the option id against the
+    // carried existingCerts) and re-drives this step as a resolver — exactly the
+    // BATCH 2 ephemeral-branching mechanism. A picked cert → revoking-certificate
+    // (threaded forward in transient.certToRevoke so the revoke effect has it);
+    // no pick (the user chose '__exit__') → error, mirroring the TUI's
+    // exitOnboarding branch. PURE routing — no IO, no persistence.
+    case 'cert-limit-prompt': {
+      const certToRevoke = deps.carried?.certToRevoke
+      if (!certToRevoke)
+        return { progress, next: 'error' }
+      return { progress, next: 'revoking-certificate', transient: { certToRevoke } }
+    }
+
+    // ── revoking-certificate (effect) ─────────────────────────────────────────
+    // app.tsx:2027–2047. Revoke the cert the user picked at cert-limit-prompt,
+    // freeing a slot, then RETRY certificate creation. The picked cert rides the
+    // transient channel (deps.carried.certToRevoke — its Apple resource id); the
+    // driver pre-binds the ASC token into deps.revokeCertificate. On success route
+    // back to creating-certificate (the retry); on failure route to error. Nothing
+    // is persisted — the cert id is transient only, matching the TUI which clears
+    // certToRevoke/existingCerts after the revoke.
+    case 'revoking-certificate': {
+      const certToRevoke = deps.carried?.certToRevoke
+      if (!certToRevoke)
+        throw new Error('revoking-certificate: no certToRevoke carried')
+      try {
+        await deps.revokeCertificate!(certToRevoke.id)
+        deps.onLog?.('✔ Old certificate revoked')
+        return { progress, next: 'creating-certificate' }
+      }
+      catch (err) {
+        deps.onLog?.(`✖ ${err instanceof Error ? err.message : String(err)}`, 'red')
+        return { progress, next: 'error' }
+      }
+    }
+
+    // ── duplicate-profile-prompt (resolver effect) ────────────────────────────
+    // app.tsx:3941–3949. Another EPHEMERAL-branching choice: the delete/exit
+    // decision is never persisted. The driver records it into
+    // deps.carried.confirmDeleteDuplicates and re-drives this step as a resolver.
+    // confirm → deleting-duplicate-profiles; exit → error (the TUI's
+    // exitOnboarding branch). The reducer already persisted nothing; the ONLY
+    // persisted state is the upstream duplicateProfileOrigin (set by
+    // creating-profile / import-create-profile-only), which the deletion effect
+    // reads to route back to the right origin. PURE routing — no IO.
+    case 'duplicate-profile-prompt': {
+      if (!deps.carried?.confirmDeleteDuplicates)
+        return { progress, next: 'error' }
+      return { progress, next: 'deleting-duplicate-profiles' }
+    }
+
+    // ── deleting-duplicate-profiles (effect, EPHEMERAL-dep) ───────────────────
+    // app.tsx:2090–2112. Delete EACH duplicate Capgo profile (the driver pre-binds
+    // the ASC token into deps.deleteProfile), then route back to the step that
+    // raised the duplicate. That origin is the PERSISTED duplicateProfileOrigin —
+    // 'creating-profile' on the create-new path, 'import-create-profile-only' on
+    // the import path — so an import user is NOT routed back into the create-new
+    // creating-profile (the dual-origin resume bug the audit calls out). The
+    // duplicate list is EPHEMERAL (deps.carried.duplicateProfiles, surfaced
+    // transiently upstream). On any delete failure route to error. Nothing new is
+    // persisted (the origin was persisted upstream; the list is transient only).
+    case 'deleting-duplicate-profiles': {
+      const duplicates = deps.carried?.duplicateProfiles ?? []
+      try {
+        for (const profile of duplicates)
+          await deps.deleteProfile!(profile.id)
+        deps.onLog?.(`✔ Removed ${duplicates.length} old profile(s)`)
+        // Route back to the persisted origin so the right path retries. Default to
+        // creating-profile (the create-new origin) when the marker is absent — the
+        // same fallback the TUI's setStep(duplicateProfileOrigin) relies on.
+        const origin: OnboardingStep = progress.duplicateProfileOrigin ?? 'creating-profile'
+        return { progress, next: origin }
+      }
+      catch (err) {
         deps.onLog?.(`✖ ${err instanceof Error ? err.message : String(err)}`, 'red')
         return { progress, next: 'error' }
       }
