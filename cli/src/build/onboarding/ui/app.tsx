@@ -2004,7 +2004,20 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
             // indexes by SHA1 so the picker can split identities into
             // Available / Unavailable tables with concrete reasons rather
             // than a flat list with surprises on pick.
-            setStep(redirectIfMismatch(importMatches.length > 0 ? 'import-validating-all-certs' : 'import-pick-identity'))
+            const importTarget: OnboardingStep = importMatches.length > 0 ? 'import-validating-all-certs' : 'import-pick-identity'
+            // Import + app_store carries the SAME wrong/missing-app risk as
+            // create-new — the local Release bundle id may not match any App Store
+            // app — and a verified .p8 is present here, so run verify-app first and
+            // resume at the identity/profile picker once the invariant holds.
+            // ad_hoc import never uploads to TestFlight (and may have entered a
+            // one-shot .p8 via no-match recovery) → skip verify-app entirely.
+            if (importDistribution === 'app_store') {
+              setPendingVerifyNext(importTarget)
+              setStep(redirectIfMismatch('verify-app'))
+            }
+            else {
+              setStep(redirectIfMismatch(importTarget))
+            }
           }
           else {
             // Create-new path (always app_store): before creating the cert,
