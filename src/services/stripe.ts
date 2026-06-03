@@ -78,9 +78,11 @@ export async function openPortal(orgId: string, t: ComposerTranslation) {
   return dialogStore.onDialogDismiss()
 }
 
-async function getAttributionId() {
-  // attribute is made via cookie of name datafast_visitor_id
-  return (await cookieStore.get('datafast_visitor_id'))?.value
+export async function getDatafastAttribution() {
+  return {
+    visitorId: (await cookieStore.get('datafast_visitor_id'))?.value,
+    sessionId: (await cookieStore.get('datafast_session_id'))?.value,
+  }
 }
 
 export async function openCheckout(priceId: string, successUrl: string, cancelUrl: string, isYear: boolean, orgId: string) {
@@ -89,7 +91,7 @@ export async function openCheckout(priceId: string, successUrl: string, cancelUr
   const session = await supabase.auth.getSession()
   if (!session)
     return
-  const attributionId = await getAttributionId()
+  const datafastAttribution = await getDatafastAttribution()
   try {
     const resp = await supabase.functions.invoke('private/stripe_checkout', {
       body: JSON.stringify({
@@ -98,7 +100,9 @@ export async function openCheckout(priceId: string, successUrl: string, cancelUr
         cancelUrl,
         recurrence: isYear ? 'year' : 'month',
         orgId,
-        attributionId,
+        attributionId: datafastAttribution.visitorId,
+        datafastVisitorId: datafastAttribution.visitorId,
+        datafastSessionId: datafastAttribution.sessionId,
       }),
     })
     if (!resp.error && resp.data?.url)
@@ -114,9 +118,15 @@ export async function startCreditTopUp(orgId: string, quantity = 100) {
   if (!orgId)
     return
   const supabase = useSupabase()
+  const datafastAttribution = await getDatafastAttribution()
   try {
     const { data, error } = await supabase.functions.invoke('private/credits/start-top-up', {
-      body: JSON.stringify({ orgId, quantity }),
+      body: JSON.stringify({
+        orgId,
+        quantity,
+        datafastVisitorId: datafastAttribution.visitorId,
+        datafastSessionId: datafastAttribution.sessionId,
+      }),
     })
     if (error || !data?.url) {
       console.error('Failed to start credit top-up', error ?? data)
