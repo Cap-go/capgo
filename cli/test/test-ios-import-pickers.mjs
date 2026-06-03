@@ -110,12 +110,37 @@ const MATCHES_NO_PROFILES = [
   { identity: IDENTITY_B, profiles: [] },
 ]
 
-// Apple-side profiles the driver pre-synthesizes (DiscoveredProfile shape) and
-// listProfilesForCert returns. Usable: bundle + app_store match for IDENTITY_A.
-const APPLE_PROFILE_USABLE = profile({ uuid: 'APPLE-USABLE', name: 'Apple App Store', path: '', certificateSha1s: [IDENTITY_A.sha1] })
+// Apple-side profiles `listProfilesForCert` returns — the RAW AscProfileSummary
+// shape (apple-api.ts:326) the real helper produces: id / name / profileType
+// (Apple's IOS_APP_STORE / IOS_APP_ADHOC enum) / profileContent (base64
+// .mobileprovision) / expirationDate / bundleIdentifier. The ENGINE synthesizes
+// each into a DiscoveredProfile (NOT the driver) — so the mock must NOT pre-bake
+// a DiscoveredProfile; it returns the Apple shape and we assert the synthesis.
+function ascSummary(overrides = {}) {
+  return {
+    id: 'APPLE-PROFILE-ID',
+    name: 'Apple App Store',
+    profileType: 'IOS_APP_STORE',
+    profileContent: 'QVBQTEUtUFJPRklMRS1CQVNFNjQ=', // base64 marker, rides → profileBase64
+    expirationDate: '2027-01-01T00:00:00.000Z',
+    bundleIdentifier: APP_ID,
+    ...overrides,
+  }
+}
+
+// Usable: bundle + IOS_APP_STORE match for IDENTITY_A. id → synthesized uuid.
+const APPLE_SUMMARY_USABLE = ascSummary({ id: 'APPLE-USABLE', name: 'Apple App Store' })
 // Apple-side profile for a DIFFERENT bundle id (bundle mismatch).
+const APPLE_SUMMARY_WRONG_BUNDLE = ascSummary({ id: 'APPLE-WRONGB', name: 'Apple Other App', bundleIdentifier: 'com.other.app' })
+// Apple-side profile for THIS bundle but IOS_APP_ADHOC (distribution mismatch when app_store).
+const APPLE_SUMMARY_WRONG_DIST = ascSummary({ id: 'APPLE-WRONGD', name: 'Apple Ad-hoc', profileType: 'IOS_APP_ADHOC' })
+
+// Already-synthesized DiscoveredProfile fixtures (path='' like Apple-fetched ones)
+// used where a profile is consumed DIRECTLY — set as carried.chosenProfile or
+// already present in importMatches — i.e. NOT passed through listProfilesForCert
+// (so NOT re-synthesized by the engine). The picker-filter + resolver tests below
+// need the DiscoveredProfile shape, not the raw Apple summary.
 const APPLE_PROFILE_WRONG_BUNDLE = profile({ uuid: 'APPLE-WRONGB', name: 'Apple Other App', path: '', bundleId: 'com.other.app', certificateSha1s: [IDENTITY_A.sha1] })
-// Apple-side profile for THIS bundle but ad_hoc (distribution mismatch when app_store).
 const APPLE_PROFILE_WRONG_DIST = profile({ uuid: 'APPLE-WRONGD', name: 'Apple Ad-hoc', path: '', profileType: 'ad_hoc', certificateSha1s: [IDENTITY_A.sha1] })
 
 /**
@@ -150,7 +175,7 @@ function makeDeps(overrides = {}) {
     appId: APP_ID,
 
     findCertIdBySha1: async (...a) => { calls.push({ name: 'findCertIdBySha1', args: a }); return 'APPLECERT1' },
-    listProfilesForCert: async (...a) => { calls.push({ name: 'listProfilesForCert', args: a }); return [APPLE_PROFILE_USABLE] },
+    listProfilesForCert: async (...a) => { calls.push({ name: 'listProfilesForCert', args: a }); return [APPLE_SUMMARY_USABLE] },
 
     saveProgress: async (appId, progress) => { calls.push({ name: 'saveProgress', args: [appId, progress] }) },
     loadProgress: async () => null,
@@ -265,11 +290,21 @@ await test('import-checking-apple-cert: cert found + usable profiles → import-
   const res = await runIosEffect('import-checking-apple-cert', iosProgress(), deps)
   assertEquals(res.next, 'import-pick-profile', 'a recognized cert with usable Apple profiles opens the profile picker')
   assertEquals(res.transient?._appleCertIdForChosen, 'APPLECERT1', 'the resolved Apple cert id rides transient')
-  // The synthesized Apple profile is injected into the chosen identity's match so
-  // the profile picker lists it like an on-disk one.
+  // The ENGINE synthesized the RAW AscProfileSummary into a DiscoveredProfile and
+  // injected it into the chosen identity's match so the picker lists it like an
+  // on-disk one. Assert the synthesis populated the TUI-critical fields the old
+  // (divergent) code dropped: uuid ← summary.id, profileBase64 ← profileContent,
+  // certificateSha1s ← [chosenIdentity.sha1] (+ the mapped bundleId/profileType/teamId).
   const injectedMatch = res.transient?.importMatches?.find(m => m.identity.sha1 === IDENTITY_A.sha1)
   assert(injectedMatch, 'the chosen identity match is present in the injected importMatches')
-  assert(injectedMatch.profiles.some(p => p.uuid === 'APPLE-USABLE'), 'the synthesized Apple profile is injected into the match')
+  const syn = injectedMatch.profiles.find(p => p.uuid === 'APPLE-USABLE')
+  assert(syn, 'the synthesized Apple profile (uuid ← summary.id) is injected into the match')
+  assertEquals(syn.profileBase64, APPLE_SUMMARY_USABLE.profileContent, 'profileBase64 is synthesized from the summary profileContent (NOT dropped)')
+  assertEquals(JSON.stringify(syn.certificateSha1s), JSON.stringify([IDENTITY_A.sha1]), 'certificateSha1s is [chosenIdentity.sha1] so the cert-trust validation accepts it')
+  assertEquals(syn.bundleId, APP_ID, 'bundleId ← summary.bundleIdentifier')
+  assertEquals(syn.profileType, 'app_store', "profileType IOS_APP_STORE → 'app_store'")
+  assertEquals(syn.teamId, IDENTITY_A.teamId, 'teamId ← chosenIdentity.teamId')
+  assertEquals(syn.path, '', "synthesized Apple profiles have path='' (no on-disk file)")
   assert(deps.__calls.some(c => c.name === 'findCertIdBySha1'), 'resolves the Apple cert id from the identity SHA-1')
   assert(deps.__calls.some(c => c.name === 'listProfilesForCert'), 'lists the Apple profiles for the cert')
   assert(!deps.__calls.some(c => c.name === 'saveProgress'), 'the apple-cert check persists nothing (all transient)')
@@ -300,7 +335,7 @@ await test("import-checking-apple-cert: listProfilesForCert empty → import-no-
 await test("import-checking-apple-cert: profiles for ANOTHER bundle id → import-no-match-recovery 'apple-bundle-mismatch'", async () => {
   const deps = makeDeps({
     carried: { chosenIdentity: IDENTITY_A, importMatches: MATCHES_NO_PROFILES },
-    listProfilesForCert: async () => [APPLE_PROFILE_WRONG_BUNDLE],
+    listProfilesForCert: async () => [APPLE_SUMMARY_WRONG_BUNDLE],
   })
   const res = await runIosEffect('import-checking-apple-cert', iosProgress(), deps)
   assertEquals(res.next, 'import-no-match-recovery', 'profiles for a different bundle id → recovery')
@@ -310,7 +345,7 @@ await test("import-checking-apple-cert: profiles for ANOTHER bundle id → impor
 await test("import-checking-apple-cert: right bundle, wrong distribution → import-no-match-recovery 'apple-distribution-mismatch'", async () => {
   const deps = makeDeps({
     carried: { chosenIdentity: IDENTITY_A, importMatches: MATCHES_NO_PROFILES },
-    listProfilesForCert: async () => [APPLE_PROFILE_WRONG_DIST],
+    listProfilesForCert: async () => [APPLE_SUMMARY_WRONG_DIST],
   })
   // progress.importDistribution is 'app_store'; the Apple profile is ad_hoc for THIS bundle.
   const res = await runIosEffect('import-checking-apple-cert', iosProgress(), deps)
@@ -319,12 +354,13 @@ await test("import-checking-apple-cert: right bundle, wrong distribution → imp
 })
 
 await test("import-checking-apple-cert: profiles exist but none classifiable → import-no-match-recovery 'apple-other'", async () => {
-  // A profile with an empty bundle id: not 'other bundle' (filtered out by `p.bundleId &&`)
-  // and not same-bundle → falls through to the generic 'apple-other' reason.
-  const emptyBundleProfile = profile({ uuid: 'APPLE-EMPTY', name: 'Apple Empty', path: '', bundleId: '', certificateSha1s: [IDENTITY_A.sha1] })
+  // A raw Apple summary with an empty bundleIdentifier: after synthesis its
+  // bundleId is '' → not 'other bundle' (filtered out by `p.bundleId &&`) and not
+  // same-bundle → falls through to the generic 'apple-other' reason.
+  const emptyBundleSummary = ascSummary({ id: 'APPLE-EMPTY', name: 'Apple Empty', bundleIdentifier: '' })
   const deps = makeDeps({
     carried: { chosenIdentity: IDENTITY_A, importMatches: MATCHES_NO_PROFILES },
-    listProfilesForCert: async () => [emptyBundleProfile],
+    listProfilesForCert: async () => [emptyBundleSummary],
   })
   const res = await runIosEffect('import-checking-apple-cert', iosProgress(), deps)
   assertEquals(res.next, 'import-no-match-recovery', 'unclassifiable profiles → recovery')
@@ -402,23 +438,55 @@ await test("import-pick-profile resolver: '__back__' (no carried.chosenProfile) 
   assertEquals(res.next, 'import-pick-identity', 'back returns to the identity picker')
 })
 
-await test('import-pick-profile resolver: profile with wrong bundle id → error', async () => {
-  const deps = makeDeps({ carried: { chosenIdentity: IDENTITY_A, chosenProfile: APPLE_PROFILE_WRONG_BUNDLE } })
+await test('import-pick-profile resolver: profile with wrong bundle id → error (detailed message)', async () => {
+  const logs = []
+  const deps = makeDeps({
+    carried: { chosenIdentity: IDENTITY_A, chosenProfile: APPLE_PROFILE_WRONG_BUNDLE },
+    onLog: msg => logs.push(msg),
+  })
   const res = await runIosEffect('import-pick-profile', iosProgress(), deps)
   assertEquals(res.next, 'error', 'a bundle-id mismatch hard-fails (defense in depth)')
+  // TUI parity (app.tsx:3487–3492): the message names the actual bundle + the
+  // expected one, NOT a generic "doesn't match this app." line.
+  const msg = logs.find(l => l.includes("doesn't match this app:"))
+  assert(msg, 'logs the detailed bundle/type mismatch message')
+  assert(msg.includes('bundle com.other.app'), 'names the profile\'s actual bundle id')
+  assert(msg.includes(`expected ${APP_ID}`), 'names the expected bundle id')
+  assert(msg.includes('type app_store'), 'names the profile\'s profileType')
 })
 
-await test('import-pick-profile resolver: profile with wrong distribution → error', async () => {
-  const deps = makeDeps({ carried: { chosenIdentity: IDENTITY_A, chosenProfile: APPLE_PROFILE_WRONG_DIST } })
+await test('import-pick-profile resolver: profile with wrong distribution → error (detailed message)', async () => {
+  const logs = []
+  const deps = makeDeps({
+    carried: { chosenIdentity: IDENTITY_A, chosenProfile: APPLE_PROFILE_WRONG_DIST },
+    onLog: msg => logs.push(msg),
+  })
   const res = await runIosEffect('import-pick-profile', iosProgress(), deps)
   assertEquals(res.next, 'error', 'a distribution-type mismatch hard-fails')
+  const msg = logs.find(l => l.includes("doesn't match this app:"))
+  assert(msg, 'logs the detailed bundle/type mismatch message')
+  assert(msg.includes('type ad_hoc'), 'names the profile\'s actual distribution type')
+  assert(msg.includes('expected app_store'), 'names the expected distribution type')
 })
 
-await test("import-pick-profile resolver: profile that doesn't trust the chosen cert → error", async () => {
-  const wrongCertProfile = profile({ uuid: 'WRONGCERT', name: 'Wrong Cert', certificateSha1s: ['c'.repeat(40)] })
-  const deps = makeDeps({ carried: { chosenIdentity: IDENTITY_A, chosenProfile: wrongCertProfile } })
+await test("import-pick-profile resolver: profile that doesn't trust the chosen cert → error (detailed cert message)", async () => {
+  const otherSha1 = 'c'.repeat(40)
+  const wrongCertProfile = profile({ uuid: 'WRONGCERT', name: 'Wrong Cert', certificateSha1s: [otherSha1] })
+  const logs = []
+  const deps = makeDeps({
+    carried: { chosenIdentity: IDENTITY_A, chosenProfile: wrongCertProfile },
+    onLog: msg => logs.push(msg),
+  })
   const res = await runIosEffect('import-pick-profile', iosProgress(), deps)
   assertEquals(res.next, 'error', "a profile that doesn't include the chosen cert's SHA-1 hard-fails")
+  // TUI parity (app.tsx:3510–3514): the cert-trust failure is a DISTINCT message
+  // naming the chosen cert, the entry count, the truncated SHA-1s, and the cert's prefix.
+  const msg = logs.find(l => l.includes("doesn't trust your chosen certificate"))
+  assert(msg, 'logs the distinct cert-trust message (NOT the generic bundle line)')
+  assert(msg.includes(IDENTITY_A.name), 'names the chosen certificate')
+  assert(msg.includes('contains 1 entry'), 'reports the allowed-certs entry count')
+  assert(msg.includes(`${otherSha1.slice(0, 8)}…`), 'shows the profile\'s allowed-cert SHA-1 (truncated)')
+  assert(msg.includes(`${IDENTITY_A.sha1.slice(0, 8)}…`), 'shows the chosen cert\'s SHA-1 prefix')
 })
 
 // ════════════════════════════════════════════════════════════════════════════════
@@ -434,21 +502,28 @@ await test('DRIVER: pick-identity (no on-disk) → checking-apple-cert → pick-
   const idRes = await runIosEffect('import-pick-identity', iosProgress(), idDeps)
   assertEquals(idRes.next, 'import-checking-apple-cert', 'pick advances to the apple-cert check')
 
-  // 2) import-checking-apple-cert: Apple has a usable profile for B → inject it and
-  //    open the profile picker. Driver threads chosenIdentity + importMatches forward.
-  const appleUsableForB = profile({ uuid: 'APPLE-B', name: 'Apple B Store', path: '', certificateSha1s: [IDENTITY_B.sha1] })
+  // 2) import-checking-apple-cert: Apple returns the RAW summary for B → the engine
+  //    synthesizes it into a DiscoveredProfile, injects it, and opens the picker.
+  //    Driver threads chosenIdentity + the injected importMatches forward.
+  const appleSummaryForB = ascSummary({ id: 'APPLE-B', name: 'Apple B Store', bundleIdentifier: APP_ID })
   const checkDeps = makeDeps({
     carried: { chosenIdentity: IDENTITY_B, importMatches: MATCHES_NO_PROFILES },
-    listProfilesForCert: async () => [appleUsableForB],
+    listProfilesForCert: async () => [appleSummaryForB],
   })
   const checkRes = await runIosEffect('import-checking-apple-cert', iosProgress(), checkDeps)
   assertEquals(checkRes.next, 'import-pick-profile', 'a usable Apple profile opens the picker')
   const injected = checkRes.transient.importMatches
-  assert(injected.find(m => m.identity.sha1 === IDENTITY_B.sha1).profiles.some(p => p.uuid === 'APPLE-B'), 'the Apple profile is injected into B\'s match')
+  const synthesizedB = injected.find(m => m.identity.sha1 === IDENTITY_B.sha1).profiles.find(p => p.uuid === 'APPLE-B')
+  assert(synthesizedB, 'the engine-synthesized Apple profile is injected into B\'s match')
+  // The synthesis must trust B's cert (certificateSha1s=[IDENTITY_B.sha1]) and carry
+  // the base64 — otherwise the pick-profile cert-trust validation in step 3 rejects it.
+  assertEquals(JSON.stringify(synthesizedB.certificateSha1s), JSON.stringify([IDENTITY_B.sha1]), 'synthesized profile trusts B\'s cert')
+  assertEquals(synthesizedB.profileBase64, appleSummaryForB.profileContent, 'synthesized profile carries profileBase64 from profileContent')
 
-  // 3) import-pick-profile: driver threads the INJECTED importMatches back as
-  //    carried and records the picked profile → export-warning.
-  const profDeps = makeDeps({ carried: { chosenIdentity: IDENTITY_B, importMatches: injected, chosenProfile: appleUsableForB } })
+  // 3) import-pick-profile: driver threads the INJECTED importMatches back as carried
+  //    and records the SYNTHESIZED profile (the one the picker actually offered, NOT
+  //    the raw Apple summary) → export-warning.
+  const profDeps = makeDeps({ carried: { chosenIdentity: IDENTITY_B, importMatches: injected, chosenProfile: synthesizedB } })
   const profRes = await runIosEffect('import-pick-profile', iosProgress(), profDeps)
   assertEquals(profRes.next, 'import-export-warning', 'the injected Apple profile is a valid pick')
 })

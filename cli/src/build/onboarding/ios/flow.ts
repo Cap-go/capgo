@@ -267,8 +267,19 @@ export interface IosEffectDeps {
   checkDuplicateProfiles?: (bundleId: string) => Promise<IosDuplicateProfile[]>
   /** Ensure the bundle id exists on Apple (import-create-profile-only). */
   ensureBundleId?: (bundleId: string) => Promise<void>
-  /** List the Apple profiles linked to a cert (import-checking-apple-cert). */
-  listProfilesForCert?: (certificateId: string) => Promise<DiscoveredProfile[]>
+  /**
+   * List the Apple profiles linked to a cert (import-checking-apple-cert).
+   *
+   * Returns the RAW Apple shape (AscProfileSummary[]) exactly as the real
+   * apple-api `listProfilesForCert` helper does — id / name / profileType /
+   * profileContent / expirationDate / bundleIdentifier. The engine itself
+   * synthesizes each summary into a DiscoveredProfile (populating profileBase64
+   * + certificateSha1s=[identity.sha1]) via `synthesizeProfileFromAscSummary`,
+   * byte-for-byte mirroring the TUI's inline mapping at app.tsx:1556 / :1460.
+   * Keeping the dep at the raw Apple shape means the driver pre-binds nothing
+   * more than the real helper.
+   */
+  listProfilesForCert?: (certificateId: string) => Promise<AscProfileSummary[]>
 
   // ── csr ────────────────────────────────────────────────────────────────
   /** Generate a CSR + private key PEM. */
@@ -438,6 +449,48 @@ export interface IosEffectResult {
   next?: OnboardingStep
   /** Transient runtime data that lives in the driver but is NOT persisted. */
   transient?: Partial<IosStepCtx>
+}
+
+// ─── Apple-side profile synthesis ───────────────────────────────────────────
+//
+// `deps.listProfilesForCert` returns the RAW Apple shape (AscProfileSummary) —
+// id / name / profileType / profileContent / expirationDate / bundleIdentifier.
+// Before the engine can treat those like on-disk profiles (filterProfilesForApp,
+// the import-pick-profile picker, the import-exporting handoff), each summary has
+// to be synthesized into a DiscoveredProfile. This is the SAME inline mapping the
+// TUI does in two places:
+//   - import-checking-apple-cert    → ui/app.tsx:1556–1567
+//   - import-validating-all-certs   → ui/app.tsx:1460–1471 (prefetch)
+// Both build the identical shape, so it lives here once and is reused at both
+// engine call sites. The two TUI-critical fields the divergent code dropped:
+//   - profileBase64    ← p.profileContent  (the .mobileprovision bytes the
+//                        import-exporting → saving-credentials handoff persists)
+//   - certificateSha1s ← [identity.sha1]   (so the import-pick-profile cert-trust
+//                        validation + filterProfilesForApp accept the profile)
+// teamId comes from the chosen identity (Apple's profile summary has no team
+// field); profileType is mapped from Apple's enum to the DiscoveredProfile union.
+// profileBase64 is NOT on the DiscoveredProfile type (it extends
+// MobileprovisionDetail) — the TUI carries it via the same structural cast.
+function synthesizeProfileFromAscSummary(
+  summary: AscProfileSummary,
+  identity: SigningIdentity,
+): DiscoveredProfile {
+  return {
+    path: '',
+    uuid: summary.id,
+    name: summary.name,
+    applicationIdentifier: '',
+    bundleId: summary.bundleIdentifier,
+    teamId: identity.teamId,
+    expirationDate: summary.expirationDate,
+    profileType: (summary.profileType === 'IOS_APP_STORE'
+      ? 'app_store'
+      : summary.profileType === 'IOS_APP_ADHOC'
+        ? 'ad_hoc'
+        : 'unknown') as DiscoveredProfile['profileType'],
+    certificateSha1s: [identity.sha1],
+    profileBase64: summary.profileContent,
+  } as DiscoveredProfile & { profileBase64: string }
 }
 
 // ─── Post-save tail delegation (BATCH 1) ────────────────────────────────────
@@ -1669,7 +1722,12 @@ export async function runIosEffect(
         await Promise.all(toPrefetch.map(async (m) => {
           const certId = identityAvailability[m.identity.sha1].appleCertId!
           try {
-            profilePrefetch[m.identity.sha1] = await deps.listProfilesForCert!(certId)
+            // listProfilesForCert returns RAW AscProfileSummary[] — synthesize
+            // each into a DiscoveredProfile (TUI app.tsx:1460–1471) so the picker
+            // + filterProfilesForApp consume them like on-disk profiles. teamId /
+            // certificateSha1s come from THIS identity (m.identity).
+            const summaries = await deps.listProfilesForCert!(certId)
+            profilePrefetch[m.identity.sha1] = summaries.map(s => synthesizeProfileFromAscSummary(s, m.identity))
           }
           catch {
             // Per-fetch error sandbox — leave this identity out of the prefetch map.
@@ -1729,9 +1787,11 @@ export async function runIosEffect(
     // identity picker routes into when an identity has no usable on-disk profile but
     // an ASC key is available. Resolve the chosen identity's Apple cert resource id
     // (findCertIdBySha1; the driver pre-binds the ASC token), then list the profiles
-    // linked to that cert (listProfilesForCert returns ready DiscoveredProfiles — the
-    // driver pre-binds the AscProfileSummary→DiscoveredProfile synthesis the TUI does
-    // at app.tsx:1556). Four outcomes set noMatchReason + route to recovery, the
+    // linked to that cert (listProfilesForCert returns RAW AscProfileSummary[]; the
+    // engine synthesizes each into a DiscoveredProfile via
+    // synthesizeProfileFromAscSummary — the SAME inline mapping the TUI does at
+    // app.tsx:1556, populating profileBase64 + certificateSha1s=[chosenIdentity.sha1]).
+    // Four outcomes set noMatchReason + route to recovery, the
     // happy path injects the synthesized profiles into the chosen identity's match
     // (so import-pick-profile lists them like on-disk ones) and routes to the picker:
     //   - findCertIdBySha1 null → 'apple-no-cert-match' → import-no-match-recovery.
@@ -1759,7 +1819,14 @@ export async function runIosEffect(
         }
         deps.onLog?.(`✔ Apple recognizes this certificate (ASC id ${certId.slice(0, 8)}…)`)
 
-        const synthesized = await deps.listProfilesForCert!(certId)
+        // listProfilesForCert returns RAW AscProfileSummary[] — synthesize each
+        // into a DiscoveredProfile here, exactly as the TUI does inline at
+        // app.tsx:1556–1567 (populating profileBase64 ← profileContent and
+        // certificateSha1s ← [chosenIdentity.sha1], teamId ← chosenIdentity.teamId).
+        // The synthesized list is what gets filtered + injected below, so the
+        // import-pick-profile picker / cert-trust validation see ready profiles.
+        const summaries = await deps.listProfilesForCert!(certId)
+        const synthesized = summaries.map(s => synthesizeProfileFromAscSummary(s, chosenIdentity))
         if (synthesized.length === 0) {
           deps.onLog?.('ℹ️  Apple has the cert but no profiles linked to it yet.', 'yellow')
           return {
@@ -1833,11 +1900,33 @@ export async function runIosEffect(
       const appId = resolveIosBundleId(progress)
       const dist = progress.importDistribution
       const chosenIdentity = deps.carried?.chosenIdentity
+      // Defense-in-depth validation mirroring the TUI's onChange guards
+      // (app.tsx:3485–3519). Two separate checks emit DISTINCT, detailed log lines
+      // with the actual expected-vs-found values — not one generic "doesn't match"
+      // line — so a regressed filter / hand-imported .mobileprovision surfaces the
+      // real cause. Routing is identical (any failure → error).
       const bundleOk = bundleIdMatches(chosenProfile.bundleId, appId)
       const distOk = !dist || chosenProfile.profileType === dist
-      const certOk = !chosenIdentity || chosenProfile.certificateSha1s.includes(chosenIdentity.sha1)
-      if (!bundleOk || !distOk || !certOk) {
-        deps.onLog?.(`✖ Profile "${chosenProfile.name}" doesn't match this app.`, 'red')
+      if (!bundleOk || !distOk) {
+        deps.onLog?.(
+          `✖ Profile "${chosenProfile.name}" doesn't match this app: `
+          + `bundle ${chosenProfile.bundleId} (expected ${appId}), `
+          + `type ${chosenProfile.profileType} (expected ${dist ?? 'any'}).`,
+          'red',
+        )
+        return { progress, next: 'error' }
+      }
+      // Cert-trust check: the profile's allowed-certs list must include the chosen
+      // identity's SHA-1 (app.tsx:3508–3519). Surface the entry count + truncated
+      // SHA-1s so the user can see WHY the profile won't sign with their cert.
+      if (chosenIdentity && !chosenProfile.certificateSha1s.includes(chosenIdentity.sha1)) {
+        const shownSha1s = chosenProfile.certificateSha1s.map(s => `${s.slice(0, 8)}…`).join(', ') || '(none listed)'
+        deps.onLog?.(
+          `✖ Profile "${chosenProfile.name}" doesn't trust your chosen certificate "${chosenIdentity.name}". `
+          + `The profile's allowed-certs list contains ${chosenProfile.certificateSha1s.length} entr${chosenProfile.certificateSha1s.length === 1 ? 'y' : 'ies'} (SHA1: ${shownSha1s}); your cert's SHA1 starts with ${chosenIdentity.sha1.slice(0, 8)}…. `
+          + `Either pick a different profile, or re-create this profile in the Apple Developer Portal and tick the right cert.`,
+          'red',
+        )
         return { progress, next: 'error' }
       }
       deps.onLog?.(`✔ Profile · ${chosenProfile.name}`)
