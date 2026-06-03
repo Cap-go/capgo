@@ -14,6 +14,10 @@
 //   Phase 1 — confirm-app-id gate
 //             a persisted bundle-id mismatch awaiting confirmation
 //             (`pendingAppIdNext` set AND !appIdConfirmed) → confirm-app-id
+//   Phase 1b — confirm-app-id post-confirm routing (BATCH 4)
+//             once confirmed but `pendingAppIdNext` not yet cleared by the driver
+//             (`appIdConfirmed` AND `pendingAppIdNext` set) → that recorded target
+//             (mirrors the TUI's setStep(pendingAppIdNext ?? 'import-pick-identity'))
 //
 // Everything AFTER the gates — the create-new / import `.p8`-chain / cert /
 // profile → `saving-credentials` routing — is delegated VERBATIM to the
@@ -153,6 +157,19 @@ export function getIosResumeStep(progress: OnboardingProgress | null): Onboardin
   // never re-asks. Legacy/in-flight files (no `pendingAppIdNext`) skip it.
   if (progress.pendingAppIdNext && !progress.appIdConfirmed)
     return 'confirm-app-id'
+
+  // Phase 1b — post-confirm routing. Once the user has confirmed at confirm-app-id
+  // (`appIdConfirmed` set) but `pendingAppIdNext` has not yet been cleared, resume
+  // routes FORWARD to that recorded target rather than re-asking or falling into
+  // the generic create-new/import routing below — mirroring the TUI's
+  // `setStep(pendingAppIdNext ?? 'import-pick-identity')` (app.tsx:3084). The
+  // driver clears `pendingAppIdNext` on the next applyInput (TUI: setPendingAppIdNext(null),
+  // app.tsx:3085), after which this branch is dormant and resume falls through to
+  // the normal routing. The TUI's `?? 'import-pick-identity'` default is already
+  // covered: `pendingAppIdNext` is the persisted mismatch signal (types.ts), so its
+  // PRESENCE is what guards this branch — when it's cleared we don't route here at all.
+  if (progress.appIdConfirmed && progress.pendingAppIdNext)
+    return progress.pendingAppIdNext
 
   // Phase 2 — Post-save "tail" (shared with android, checked FIRST after the
   // front gates exactly as `getAndroidResumeStep` checks it before the cred

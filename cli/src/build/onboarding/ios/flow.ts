@@ -34,6 +34,7 @@ import type { Buffer } from 'node:buffer'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import type { AscDistributionCert, AscProfileSummary } from '../apple-api.js'
+import type { BundleIdCandidate } from '../bundle-id-detector.js'
 import type {
   ApiKeyData,
   CertificateData,
@@ -184,9 +185,17 @@ export interface IosStepCtx {
   /** Verified key id + issuer id (mirror of completedSteps.apiKeyVerified). */
   apiKey?: ApiKeyData
 
-  // ── Confirm-app-id custom-input sub-mode (pure UI) ───────────────────────
+  // ── Confirm-app-id custom-input sub-mode + candidate list (pure UI) ──────
   /** True while the confirm-app-id step is in its custom-input sub-mode. */
   confirmAppIdTyping?: boolean
+  /**
+   * Detected bundle-id candidates the confirm-app-id CHOICE view lists. The
+   * mismatch detection is a SYNC FS read the engine must NOT do (IO-free), so
+   * the DRIVER runs `detectIosBundleIds` and threads the resulting candidates
+   * (capacitor + pbxproj/plist sources, recommended first) here. Purely
+   * ephemeral — the chosen value is persisted, the list never is.
+   */
+  bundleIdCandidates?: BundleIdCandidate[]
 
   // ── Shared post-save tail transient (reused verbatim from android) ───────
   // The same fields the android engine threads after saving-credentials. Spread
@@ -644,6 +653,24 @@ const OPTIONS_DUPLICATE_PROFILE: IosStepOption[] = [
   { value: 'exit', label: '✖  Exit onboarding' },
 ]
 
+// ─── confirm-app-id vocabulary (BATCH 4) ────────────────────────────────────────
+//
+// The confirm-app-id CHOICE view lists the driver-detected candidate bundle ids
+// (ctx.bundleIdCandidates, recommended first) followed by a single "type a custom
+// id" escape hatch. Selecting the escape value flips the driver's ephemeral
+// confirmAppIdTyping sub-mode (app.tsx:3164), which re-renders this step as an
+// INPUT. The sentinel VALUE mirrors the TUI's '__type__' so the driver routes a
+// custom-typing pick into the input sub-mode instead of treating it as a bundle id.
+
+/** confirm-app-id "type a custom id" escape value (app.tsx:3161). */
+const CONFIRM_APP_ID_TYPE_VALUE = '__type__'
+
+/** confirm-app-id trailing "type a custom id" option (app.tsx:3161). */
+const OPTION_CONFIRM_APP_ID_TYPE: IosStepOption = {
+  value: CONFIRM_APP_ID_TYPE_VALUE,
+  label: '✏️   Type a custom bundle ID...',
+}
+
 /**
  * The create-new choice/input vocabulary. Mirrors android's `AndroidInput`:
  * one variant per choice/input step that records (or routes) state. The iOS
@@ -674,6 +701,13 @@ export type IosInput =
   // confirm/exit decision in carried.confirmDeleteDuplicates and re-drives the
   // prompt as a resolver effect (mirrors app.tsx:3941 delete-vs-exitOnboarding).
   | { step: 'duplicate-profile-prompt', value: 'delete' | 'exit' }
+  // ── confirm-app-id (BATCH 4) ─────────────────────────────────────────────
+  // The chosen/typed bundle id — either a candidate value picked from the
+  // CHOICE view or the string submitted in the custom-input sub-mode. Persists
+  // iosBundleIdOverride + iosBundleIdContextAppId + appIdConfirmed (app.tsx:3064–3085).
+  // The '__type__' sentinel is NOT a bundle id: the driver intercepts it to flip
+  // confirmAppIdTyping, so it never reaches applyIosInput as a value to persist.
+  | { step: 'confirm-app-id', value: string }
 // ─── Engine surface (tail-wired; non-tail steps remain stubs) ───────────────────
 
 /**
@@ -753,6 +787,47 @@ export function iosViewForStep(
         prompt: 'Issuer ID (UUID at the very top of the API keys page, above the key list):',
         collect: ['issuerId'],
       }
+
+    // ── confirm-app-id (choice | input, EPHEMERAL-dep) ────────────────────────
+    // app.tsx:3063–3173. Shown only when the Xcode bundle id disagrees with
+    // capacitor.config.appId (a mismatch the DRIVER detects via a sync FS read
+    // and routes into via pendingAppIdNext). Two sub-modes keyed off the driver's
+    // ephemeral ctx.confirmAppIdTyping:
+    //   - falsy → a CHOICE listing the driver-detected candidate bundle ids
+    //     (ctx.bundleIdCandidates, recommended first) + a "type a custom id"
+    //     escape option (value '__type__', which the driver intercepts to flip
+    //     the typing sub-mode — app.tsx:3164).
+    //   - truthy → an INPUT collecting a free-form bundle id (app.tsx:3088–3115).
+    // The candidate list is driver-provided + ephemeral; applyIosInput persists
+    // only the chosen/typed value (as iosBundleIdOverride), never the list.
+    case 'confirm-app-id': {
+      if (ctx?.confirmAppIdTyping) {
+        return {
+          step,
+          kind: 'input',
+          title: 'Type the iOS bundle ID to use for Apple operations.',
+          prompt: 'This is what we\'ll send to Apple\'s API for cert and profile lookups — it must match PRODUCT_BUNDLE_IDENTIFIER in your Xcode project (and the App ID on developer.apple.com).',
+          collect: ['iosBundleId'],
+        }
+      }
+      const candidates = ctx?.bundleIdCandidates ?? []
+      const options: IosStepOption[] = [
+        ...candidates.map((c, i) => ({
+          value: c.value,
+          label: i === 0
+            ? `${c.value} — ${c.label} (recommended)`
+            : `${c.value} — ${c.label}`,
+        })),
+        OPTION_CONFIRM_APP_ID_TYPE,
+      ]
+      return {
+        step,
+        kind: 'choice',
+        title: 'The iOS bundle ID in your Xcode project doesn\'t match capacitor.config.',
+        prompt: 'Which value should we use for Apple-side operations?',
+        options,
+      }
+    }
 
     // ── cert-limit-prompt (choice, EPHEMERAL-dep) ─────────────────────────────
     // app.tsx:3900–3928. Apple's per-team distribution-cert limit (3) was hit, so
@@ -887,6 +962,33 @@ export function applyIosInput(
       if (!issuerId)
         return progress
       return { ...progress, issuerId }
+    }
+
+    // ── confirm-app-id ────────────────────────────────────────────────────────
+    // app.tsx:3064–3085 (onChoose). Persist the chosen/typed bundle id as the
+    // override the rest of the wizard sends to Apple, snapshot the config.appId
+    // it was confirmed against (iosBundleIdContextAppId) so a later run can detect
+    // staleness and re-ask, and mark appIdConfirmed so the confirm-app-id gate is
+    // never re-shown this session (or on resume — getIosResumeStep reads it).
+    //
+    // The '__type__' escape sentinel never reaches here (the driver intercepts it
+    // to flip confirmAppIdTyping); an empty submission is a no-op, mirroring the
+    // TUI's `if (!trimmed) return` guard (app.tsx:3108). We persist ONLY the value
+    // — the candidate list (ctx.bundleIdCandidates) is ephemeral and never stored.
+    // pendingAppIdNext is left untouched: the driver clears it on the NEXT
+    // applyInput exactly as the TUI does (setStep(pendingAppIdNext ?? …) then
+    // setPendingAppIdNext(null), app.tsx:3084–3085).
+    case 'confirm-app-id': {
+      const i = input as Extract<IosInput, { step: 'confirm-app-id' }>
+      const chosen = i.value.trim()
+      if (!chosen || chosen === CONFIRM_APP_ID_TYPE_VALUE)
+        return progress
+      return {
+        ...progress,
+        iosBundleIdOverride: chosen,
+        iosBundleIdContextAppId: progress.appId,
+        appIdConfirmed: true,
+      }
     }
 
     // ── cert-limit-prompt (EPHEMERAL choice — persists NOTHING) ────────────────

@@ -136,14 +136,27 @@ await test('pendingAppIdNext set + not confirmed → confirm-app-id', async () =
   )
 })
 
-await test('pendingAppIdNext set + appIdConfirmed → gate skipped (normal routing)', async () => {
-  // Once confirmed the gate must NOT re-ask. A bare create-new file then lands
-  // on api-key-instructions.
+await test('pendingAppIdNext set + appIdConfirmed → routes FORWARD to pendingAppIdNext (BATCH 4 post-confirm, no re-ask)', async () => {
+  // Once confirmed the gate must NOT re-ask. Until the driver clears
+  // pendingAppIdNext (on the next applyInput — setPendingAppIdNext(null),
+  // app.tsx:3085) resume routes FORWARD to the recorded target, mirroring the
+  // TUI's setStep(pendingAppIdNext ?? 'import-pick-identity') (app.tsx:3084).
+  // This is the documented one-shot post-confirm hop (graph doc L243) — the only
+  // case where resume may hand back an ephemeral picker target.
   assertEquals(
     getIosResumeStep(makeProgress({
       pendingAppIdNext: 'import-pick-identity',
       appIdConfirmed: true,
     })),
+    'import-pick-identity',
+  )
+})
+
+await test('appIdConfirmed but pendingAppIdNext CLEARED → gate fully behind us (normal routing)', async () => {
+  // After the driver clears pendingAppIdNext the post-confirm branch is dormant;
+  // a bare create-new file lands on api-key-instructions exactly as a no-gate file.
+  assertEquals(
+    getIosResumeStep(makeProgress({ appIdConfirmed: true })),
     'api-key-instructions',
   )
 })
@@ -152,10 +165,13 @@ await test('no pendingAppIdNext → confirm-app-id never shown (even if appIdCon
   assertEquals(getIosResumeStep(makeProgress()), 'api-key-instructions')
 })
 
-await test('confirm-app-id gate does not block a later cert/profile resume once confirmed', async () => {
+await test('confirm-app-id gate does not block a later cert/profile resume once confirmed (pendingAppIdNext cleared by driver)', async () => {
+  // A later cert/profile resume is the steady state AFTER the driver cleared
+  // pendingAppIdNext (the post-confirm one-shot hop already happened). With the
+  // mismatch fully behind us, an apiKeyVerified file routes straight to the next
+  // create-new effect — the confirmed gate never re-asks or blocks.
   assertEquals(
     getIosResumeStep(makeProgress({
-      pendingAppIdNext: 'setup-method-select',
       appIdConfirmed: true,
       completedSteps: {
         apiKeyVerified: { keyId: 'X', issuerId: 'Y' },
@@ -360,7 +376,11 @@ await test('resume NEVER returns an ephemeral picker step across many persisted 
     makeProgress({ _credentialsExistGate: 'backup' }),
     makeProgress({ _credentialsExistGate: 'done' }),
     makeProgress({ pendingAppIdNext: 'import-pick-identity' }),
-    makeProgress({ pendingAppIdNext: 'import-pick-identity', appIdConfirmed: true }),
+    // NOTE: the CONFIRMED post-confirm hop ({ pendingAppIdNext, appIdConfirmed:true })
+    // is intentionally EXCLUDED here — it is the one documented case (graph doc L243,
+    // app.tsx:3084) where resume legitimately hands back the ephemeral pendingAppIdNext
+    // target as a one-shot before the driver clears it. It is asserted explicitly in
+    // the BATCH 4 post-confirm test above + in test-ios-confirm-app-id.mjs.
     makeProgress({ p8Path: '/tmp/AuthKey_ABC1234567.p8' }),
     makeProgress({ p8Path: '/tmp/AuthKey_ABC1234567.p8', keyId: 'ABC1234567' }),
     makeProgress({ setupMethod: 'import-existing' }),
