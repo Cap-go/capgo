@@ -348,7 +348,7 @@
     "oxlint": "^1.67.0",
     "sass": "1.100.0",
     "simple-git-hooks": "^2.13.1",
-    "supabase": "^2.101.0",
+    "supabase": "^2.104.0",
     "tailwindcss": "^4.3.0",
     "typescript": "6.0.3",
     "unplugin-auto-import": "^21.0.0",
