@@ -2337,7 +2337,7 @@ export async function runIosEffect(
         return { progress, next: 'import-provide-profile-path', transient: stickyTransient }
 
       // action === 'create'
-      const hasAscKey = !!(deps.carried?.p8Content || progress.completedSteps.apiKeyVerified || progress.p8Path)
+      const hasAscKey = !!(deps.carried?.p8Content || progress.p8Path)
       if (hasAscKey)
         return { progress, next: 'import-create-profile-only', transient: stickyTransient }
 

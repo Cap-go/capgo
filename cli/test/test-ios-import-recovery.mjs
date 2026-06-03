@@ -286,9 +286,22 @@ await test("recovery resolver 'create' + ASC key (carried.p8Content) -> import-c
   assert(!deps.__calls.some(c => c.name === 'saveProgress'), 'the ASC-key-present create branch persists nothing')
 })
 
-await test("recovery resolver 'create' + ASC key (persisted apiKeyVerified) -> import-create-profile-only", async () => {
+await test("recovery resolver 'create' + ASC key (persisted p8Path) -> import-create-profile-only", async () => {
+  // A genuinely-reachable hasAscKey state: progress.p8Path is set (the TUI's p8PathRef
+  // signal). apiKeyVerified rides alongside it in every reachable state, but the resolver
+  // hasAscKey no longer reads apiKeyVerified — it matches the TUI's
+  // !!(p8ContentRef.current || p8PathRef.current) (app.tsx:3601-3604).
+  const res = await runIosEffect('import-no-match-recovery', iosProgress({ p8Path: '/Users/me/AuthKey_K.p8', completedSteps: { apiKeyVerified: { keyId: 'K', issuerId: 'I' } } }), makeDeps({ carried: { recoveryAction: 'create' } }))
+  assertEquals(res.next, 'import-create-profile-only', 'a persisted p8Path counts as an available ASC key')
+})
+
+await test("recovery resolver 'create' + apiKeyVerified ALONE (no p8Content/p8Path) -> api-key-instructions (TUI-parity: app.tsx:3601-3604 omits apiKeyVerified)", async () => {
+  // Defensive / unreachable-in-practice: a persisted apiKeyVerified with NO carried
+  // p8Content and NO persisted p8Path. The resolver hasAscKey dropped apiKeyVerified to
+  // match the TUI ref expression, so 'create' falls through to the .p8 chain.
   const res = await runIosEffect('import-no-match-recovery', iosProgress({ completedSteps: { apiKeyVerified: { keyId: 'K', issuerId: 'I' } } }), makeDeps({ carried: { recoveryAction: 'create' } }))
-  assertEquals(res.next, 'import-create-profile-only', 'a persisted verified key counts as an available ASC key')
+  assertEquals(res.next, 'api-key-instructions', 'apiKeyVerified alone is NOT an ASC key for routing (matches the TUI)')
+  assertEquals(res.progress.pendingRecoveryAction, 'import-create-profile-only', 'remembers to resume D2 after key verification')
 })
 
 await test("recovery resolver 'create' + NO ASC key -> api-key-instructions; PERSISTS pendingRecoveryAction='import-create-profile-only'", async () => {
