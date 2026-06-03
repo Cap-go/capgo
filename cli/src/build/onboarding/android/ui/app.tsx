@@ -217,7 +217,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
   const [step, setStep] = useState<AndroidOnboardingStep>(
     initialProgress !== null && startStep !== 'welcome'
       ? 'resume-prompt'
-      : startStep === 'welcome' ? 'welcome' : startStep,
+      : startStep,
   )
 
   // Telemetry: resolve org id once + emit per-step events
