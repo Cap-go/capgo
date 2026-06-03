@@ -5,17 +5,23 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import IconExternalLink from '~icons/lucide/external-link'
+import IconInfo from '~icons/lucide/info'
 import IconPlay from '~icons/lucide/play'
 import IconSmartphone from '~icons/lucide/smartphone'
 import { buildBundlePreviewDeepLink, buildChannelPreviewDeepLink } from '~/services/previewLinks'
 import { buildChannelPreviewSubdomain, buildPreviewSubdomain } from '../../shared/preview-subdomain.ts'
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   appId: string
   versionId?: number
   channelId?: number
   channelName?: string
-}>()
+  browserPreview?: boolean
+  browserPreviewUnavailableReason?: 'missing-manifest' | 'encrypted' | null
+}>(), {
+  browserPreview: true,
+  browserPreviewUnavailableReason: null,
+})
 
 const { t } = useI18n()
 const router = useRouter()
@@ -59,6 +65,27 @@ function checkMobile() {
 }
 
 const currentDevice = computed(() => devices[selectedDevice.value])
+const showBrowserPreview = computed(() => props.browserPreview)
+const showQrCode = computed(() => !!qrCodeDataUrl.value && (!isMobile.value || !showBrowserPreview.value))
+const browserPreviewHelp = computed(() => {
+  if (props.browserPreviewUnavailableReason === 'missing-manifest') {
+    return {
+      title: t('web-preview-needs-manifest'),
+      description: t('web-preview-needs-manifest-description'),
+      command: 'npx @capgo/cli@latest bundle upload --delta',
+    }
+  }
+
+  if (props.browserPreviewUnavailableReason === 'encrypted') {
+    return {
+      title: t('web-preview-encrypted-unavailable'),
+      description: t('web-preview-encrypted-unavailable-description'),
+      command: '',
+    }
+  }
+
+  return null
+})
 
 // Build the preview URL using a reversible preview subdomain format.
 const previewUrl = computed<string | null>(() => {
@@ -175,8 +202,8 @@ async function startNativePreview() {
   </div>
 
   <div v-else class="relative min-h-[calc(100dvh-8rem)] w-full overflow-y-auto px-3 py-4 md:px-6 md:py-6">
-    <!-- Open in external button -->
     <button
+      v-if="showBrowserPreview"
       class="absolute z-10 p-2 transition-colors bg-white rounded-lg shadow-lg top-4 right-4 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700"
       :title="t('open-in-external')"
       :disabled="!previewUrl"
@@ -185,11 +212,13 @@ async function startNativePreview() {
       <IconExternalLink class="w-5 h-5" />
     </button>
 
-    <!-- Main content container -->
-    <div class="grid min-h-full items-start gap-5 lg:grid-cols-[minmax(0,1fr)_16rem]">
-      <!-- Device frame -->
-      <div class="flex min-w-0 flex-col items-center">
-        <!-- Device selector -->
+    <div
+      class="min-h-full gap-5"
+      :class="showBrowserPreview
+        ? 'grid items-start lg:grid-cols-[minmax(0,1fr)_16rem]'
+        : 'flex items-center justify-center'"
+    >
+      <div v-if="showBrowserPreview" class="flex min-w-0 flex-col items-center">
         <div class="flex items-center gap-2 mb-4">
           <button
             class="flex items-center gap-2 px-3 py-2 text-sm transition-colors border rounded-lg"
@@ -213,7 +242,6 @@ async function startNativePreview() {
           </button>
         </div>
 
-        <!-- Phone frame -->
         <div
           class="relative max-w-full p-3 bg-gray-900 shadow-2xl"
           :class="currentDevice.frameClass"
@@ -222,13 +250,11 @@ async function startNativePreview() {
             height: `min(${Math.min(currentDevice.height + 24, 700)}px, calc(100dvh - 13rem))`,
           }"
         >
-          <!-- Notch (for iPhone) -->
           <div
             v-if="selectedDevice === 'iphone'"
             class="absolute z-10 w-32 transform -translate-x-1/2 bg-gray-900 top-3 left-1/2 h-7 rounded-b-2xl"
           />
 
-          <!-- Screen -->
           <div
             class="w-full h-full overflow-hidden bg-white"
             :class="currentDevice.screenClass"
@@ -248,10 +274,10 @@ async function startNativePreview() {
         </div>
       </div>
 
-      <!-- QR Code section (desktop only) -->
       <div
-        v-if="!isMobile && qrCodeDataUrl"
-        class="sticky top-4 flex w-full flex-col items-center rounded-xl bg-white p-5 shadow-lg dark:bg-gray-800"
+        v-if="showQrCode"
+        class="flex w-full flex-col items-center rounded-xl bg-white p-5 shadow-lg dark:bg-gray-800"
+        :class="showBrowserPreview ? 'sticky top-4' : 'max-w-sm'"
       >
         <img
           :src="qrCodeDataUrl"
@@ -261,6 +287,29 @@ async function startNativePreview() {
         <p class="text-sm text-center text-gray-600 dark:text-gray-400 max-w-40">
           {{ t('scan-qr-to-preview') }}
         </p>
+
+        <div
+          v-if="browserPreviewHelp"
+          class="mt-4 w-full rounded-lg border border-blue-100 bg-blue-50 p-3 text-left dark:border-blue-500/30 dark:bg-blue-500/10"
+        >
+          <div class="flex items-start gap-2">
+            <IconInfo class="mt-0.5 h-4 w-4 shrink-0 text-blue-600 dark:text-blue-300" />
+            <div class="min-w-0">
+              <p class="text-sm font-semibold text-blue-950 dark:text-blue-100">
+                {{ browserPreviewHelp.title }}
+              </p>
+              <p class="mt-1 text-xs leading-5 text-blue-900/80 dark:text-blue-100/80">
+                {{ browserPreviewHelp.description }}
+              </p>
+              <code
+                v-if="browserPreviewHelp.command"
+                class="mt-2 block overflow-x-auto rounded-md bg-white px-2 py-1.5 text-[11px] text-slate-800 dark:bg-slate-950 dark:text-slate-100"
+              >
+                {{ browserPreviewHelp.command }}
+              </code>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
