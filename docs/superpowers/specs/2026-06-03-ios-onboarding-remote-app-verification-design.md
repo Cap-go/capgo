@@ -120,7 +120,11 @@ machinery.
 2. Resolve the **Release** build bundle ID via the hardened
    `parsePbxprojBundleId` (always the Release config; no debug/suffix
    heuristics). If no Release config can be resolved, skip remote gating and
-   warn (see step 4).
+   warn (see step 4). **If the Debug-config bundle ID differs from the Release
+   one, print a one-line informational note** (e.g. "Note: Debug builds
+   `com.foo.app.debug`, Release builds `com.foo.app` — Capgo Builder uses the
+   Release ID `com.foo.app`."). Awareness only — it never triggers the picker or
+   the gate.
 3. Branch:
    - **Exact match** (Release build ID == an ASC app's bundle ID): print a
      one-line confirmation, e.g.
@@ -137,18 +141,28 @@ machinery.
      - If the user picks "none of these / my build ID is correct" → fall to
        Problem 2 handling.
    - **No app matches the build ID (Problem 2):** use the `/v1/bundleIds`
-     diagnostic to sharpen the warning into one of two sub-states:
+     diagnostic to sharpen the warning into one of two sub-states, **each with a
+     concrete action**:
      - *Identifier already registered (present in `/v1/bundleIds`) but no app
        record* → "The identifier `com.foo.app` exists in your Apple account but
-       has no App Store listing; create the app in App Store Connect for
-       `app_store` delivery."
-     - *Identifier not registered at all* → "`com.foo.app` is not registered in
-       your Apple account — onboarding will create a **brand-new identifier**.
-       If that's a typo or the wrong ID, fix it now." (Directly addresses the
-       original silent-creation concern.)
-     Problem 2 is **not gated** — there is no local file fix (the resolution is
-     creating the app, which is deferred); the user may proceed (and create the
-     app in App Store Connect themselves or ship ad-hoc). `ad_hoc` is unaffected.
+       has no App Store listing. Signing will work; for `app_store`/TestFlight
+       delivery you must create the app in App Store Connect first (ad-hoc needs
+       nothing more)."
+     - *Identifier not registered at all* → "`com.foo.app` isn't registered in
+       your Apple account yet — onboarding will register it as a new identifier
+       so signing works.
+       • **If this is a new app:** that's expected — create the App Store listing
+         in App Store Connect for TestFlight delivery (ad-hoc needs nothing more).
+       • **If `com.foo.app` is a typo, or you meant an existing app:** cancel
+         onboarding, correct `PRODUCT_BUNDLE_IDENTIFIER` (Release) in Xcode, and
+         re-run."
+       (This replaces the old vague "fix it now": it spells out both the
+       genuinely-new-app path and the wrong-ID path, and addresses the original
+       silent-creation concern by naming exactly what onboarding is about to do.)
+     Problem 2 is **not gated** — there is no local file fix that resolves it
+     (the remaining step is creating the ASC app, which is deferred); the user
+     may proceed and create the app themselves, or ship ad-hoc. `ad_hoc` is
+     unaffected.
 4. **On ASC fetch failure** (auth / rate-limit / network): show a visible
    warning — "Couldn't reach App Store Connect to verify your app; continuing
    without remote verification." — and proceed. The pre-existing local
@@ -198,7 +212,9 @@ produces. Resume must not re-prompt when nothing changed.
   divergence can be computed against a remote app list using that Release value.
   Keep the pure/synchronous local detection intact; remote data is passed in (no
   network inside the detector — keeps it unit-testable). Expose a fresh-from-disk
-  re-detection path for the gate (no memoization).
+  re-detection path for the gate (no memoization). Also surface the Debug-config
+  bundle ID (or a `debugReleaseDiffer` flag) so the step can print the Debug ≠
+  Release awareness note.
 - **`app.tsx` state machine** — add the remote-verification step wired into the
   post-`verifying-key` `redirectIfMismatch` fan-out, `app_store` mode only, with
   the branches above. Implements the divergence gate: re-detect fresh from disk
@@ -220,7 +236,8 @@ via `JSONExtractString`), so an unset `step` drops the event from funnels.
 Events:
 
 - **`iOS App Verify Shown`** — step entered (app_store mode). tags: `app_count`,
-  `bundle_id_count`.
+  `bundle_id_count`, `debug_release_differ` (bool — whether the Debug-config
+  bundle ID differs from Release).
 - **`iOS App Verify Result`** — classification. tags: `result` ∈ {`exact-match`,
   `divergence`, `problem2-identifier-exists`, `problem2-unregistered`,
   `no-apps-in-account`, `fetch-failed`}, `app_count`, `bundle_id_count`.
