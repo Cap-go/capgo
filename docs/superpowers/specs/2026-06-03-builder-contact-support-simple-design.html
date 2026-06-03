@@ -55,12 +55,12 @@
     <ol>
       <li><b>Hidden internal log</b> captured during builder/onboarding (verbose, secret-redacted, CLI-only) — including <b>non-build failures</b> (onboarding errors, raw Apple/Google API errors). Build failures also fold in the captured build log.</li>
       <li>On failure → menu offers <b>📨 Email Capgo support</b> (+ <b>🤖 Ask AI</b> when a build log exists).</li>
-      <li>On "Email Capgo support", the CLI:
+      <li>On "Email Capgo support", the CLI <b>first shows a confirmation</b> ("We'll save your logs and open a pre-filled email to support@capgo.app — continue?"). Only on confirm it:
         <ul>
           <li>writes ONE combined bundle in <b>both</b> forms: <code>builder-support-&lt;appId&gt;-&lt;ts&gt;.log</code> (readable) <b>and</b> <code>.log.gz</code> (compact), in <code>~/.capgo-credentials/support/</code>;</li>
-          <li><b>copies the path to the clipboard</b>; on macOS <b>reveals it in Finder</b> (<code>open -R</code>);</li>
+          <li><b>copies the GZIPPED <code>.log.gz</code> path to the clipboard</b>; on macOS <b>reveals it in Finder</b> (<code>open -R</code>);</li>
           <li><b>opens <code>mailto:support@capgo.app</code></b> with a pre-filled subject + short body;</li>
-          <li>prints: <i>"Opened an email to support@capgo.app and saved your logs to &lt;path&gt; (copied to clipboard). Attach that file and send."</i></li>
+          <li>prints: <i>"Opened an email to support@capgo.app and saved your logs to &lt;path&gt;.log.gz (copied to clipboard). Attach that file and send."</i></li>
         </ul>
       </li>
       <li>Done. No network calls of our own.</li>

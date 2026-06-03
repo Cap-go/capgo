@@ -32,14 +32,17 @@ The only cost: `mailto:` can't auto-attach a file, so the user does one manual "
 
 1. **A hidden internal log** is captured during builder/onboarding runs (verbose, secret-redacted, CLI-only) — including **failures that aren't build failures** (onboarding errors, raw Apple/Google API errors). For build failures it also folds in the captured build log.
 2. On failure, the menu offers **📨 Email Capgo support** (plus **🤖 Ask AI for help** when a build log exists — unchanged from today).
-3. When the user picks **Email Capgo support**, the CLI:
+3. When the user picks **Email Capgo support**, the CLI **first shows a confirmation** — it explains *"We'll save your logs locally and open a pre-filled email to support@capgo.app in your mail app"* and asks the user to **continue or cancel**. Only on confirm does it proceed. On confirm it:
    - writes **ONE combined logs bundle** — saved in **both** forms so the user can attach whichever they prefer:
      - `~/.capgo-credentials/support/builder-support-<appId>-<ts>.log` (plain, human-readable)
      - `…/builder-support-<appId>-<ts>.log.gz` (compact)
-   - **copies the file path to the clipboard** (the plain `.log` path) and, on macOS, **reveals it in Finder** (`open -R`) so it's a one-drag attach;
+   - **copies the GZIPPED file's path (`.log.gz`) to the clipboard** and, on macOS, **reveals it in Finder** (`open -R`) so it's a one-drag attach;
    - **opens `mailto:support@capgo.app`** with a pre-filled subject + short body;
-   - prints a clear instruction: *"We opened an email to support@capgo.app and saved your logs to `<path>` (copied to your clipboard). Attach that file and send."*
+   - prints a clear instruction: *"We opened an email to support@capgo.app and saved your logs to `<path>.log.gz` (copied to your clipboard). Attach that file and send."*
 4. Done. No network calls of our own.
+
+> **Confirmation gate (required):** picking "Email Capgo support" must always present a continue/cancel confirmation that tells the user an email will be opened for them — never silently launch the mail client.
+> **Clipboard:** copy the **`.log.gz`** path (the compressed file), not the plain `.log`.
 
 ### The `mailto:` link
 ```
