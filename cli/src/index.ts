@@ -434,7 +434,7 @@ const channel = program
   .description(`📢 Manage distribution channels for app updates in Capgo Cloud, controlling how updates are delivered to devices.`)
 
 channel
-  .command('add [channelId] [appId]')
+  .command('add [channelName] [appId]')
   .alias('a')
   .description(`➕ Create a new channel for app distribution in Capgo Cloud to manage update delivery.
 
@@ -447,7 +447,7 @@ Example: npx @capgo/cli@latest channel add production com.example.app --default`
   .option('--supa-anon <supaAnon>', optionDescriptions.supaAnon)
 
 channel
-  .command('delete [channelId] [appId]')
+  .command('delete [channelName] [appId]')
   .alias('d')
   .description(`🗑️ Delete a channel from Capgo Cloud, optionally removing associated bundles to free up resources.
 
@@ -489,7 +489,7 @@ Example: npx @capgo/cli@latest channel currentBundle production com.example.app`
   .option('--supa-anon <supaAnon>', optionDescriptions.supaAnon)
 
 channel
-  .command('set [channelId] [appId]')
+  .command('set [channelName] [appId]')
   .alias('s')
   .description(`⚙️ Configure settings for a channel, such as linking a bundle, setting update strategies (major, minor, metadata, patch, none), or device targeting (iOS, Android, dev, prod, emulator, device).
 
