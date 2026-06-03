@@ -192,39 +192,13 @@ SET search_path = ''
 AS $$
 DECLARE
   auth_uid uuid;
-  api_key_text text;
-  api_key public.apikeys%ROWTYPE;
 BEGIN
   SELECT auth.uid() INTO auth_uid;
   IF auth_uid IS NOT NULL THEN
     RETURN auth_uid;
   END IF;
 
-  SELECT public.get_apikey_header() INTO api_key_text;
-  IF api_key_text IS NULL THEN
-    RETURN NULL;
-  END IF;
-
-  SELECT *
-  INTO api_key
-  FROM public.find_apikey_by_value(api_key_text)
-  LIMIT 1;
-
-  IF api_key.id IS NULL OR public.is_apikey_expired(api_key.expires_at) THEN
-    RETURN NULL;
-  END IF;
-
-  IF EXISTS (
-    SELECT 1
-    FROM public.apikey_global_permissions AS agp
-    WHERE agp.apikey_rbac_id = api_key.rbac_id
-      AND agp.permission_key = public.rbac_perm_org_create()
-  )
-  AND public.apikey_has_current_org_create_capability(api_key.rbac_id) THEN
-    RETURN api_key.user_id;
-  END IF;
-
-  PERFORM public.pg_log('deny: APIKEY_CREATE_ORG_PERMISSION', jsonb_build_object('key_id', api_key.id));
+  PERFORM public.pg_log('deny: APIKEY_CREATE_WITH_API_KEY_DISABLED', '{}'::jsonb);
   RETURN NULL;
 END;
 $$;
@@ -236,7 +210,7 @@ GRANT EXECUTE ON FUNCTION public.get_identity_for_apikey_creation() TO authentic
 GRANT EXECUTE ON FUNCTION public.get_identity_for_apikey_creation() TO service_role;
 
 COMMENT ON FUNCTION public.get_identity_for_apikey_creation() IS
-  'Returns auth.uid() for JWT callers, or the API key owner only when the key has the global org.create permission.';
+  'Returns auth.uid() for JWT callers; API-key creation of API keys stays disabled even when org.create is granted.';
 
 CREATE OR REPLACE FUNCTION public.bind_creating_apikey_to_org_on_create()
 RETURNS trigger
@@ -325,9 +299,10 @@ AFTER INSERT ON public.orgs
 FOR EACH ROW
 EXECUTE FUNCTION public.bind_creating_apikey_to_org_on_create();
 
-DROP POLICY IF EXISTS "Allow insert org for apikey or user" ON public.orgs;
 DROP POLICY IF EXISTS "Allow insert org for user" ON public.orgs;
-CREATE POLICY "Allow insert org for user or apikey with org.create"
+DROP POLICY IF EXISTS "Allow insert org for apikey or user" ON public.orgs;
+DROP POLICY IF EXISTS "Allow insert org for user or apikey with org.create" ON public.orgs;
+CREATE POLICY "Allow insert org for user"
 ON public.orgs
 FOR INSERT
 TO authenticated

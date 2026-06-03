@@ -130,7 +130,7 @@ SELECT
         'public',
         'orgs',
         ARRAY[
-            'Allow insert org for user or apikey with org.create',
+            'Allow insert org for user',
             'Allow org delete for super_admin',
             'Allow select for auth, api keys (read+)',
             'Allow update for auth (admin+)',
