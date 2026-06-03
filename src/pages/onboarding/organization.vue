@@ -81,7 +81,7 @@ const estimatedUsersIndex = ref<number | null>(null)
 const config = getLocalConfig()
 
 // Org-level onboarding intent: what the user wants to do with Capgo first.
-// Persisted on the new org (orgs.onboarding_intent) by the organization edge
+// Persisted on the new org (orgs.onboarding jsonb, keyed by `intent`) by the
 // function, and mirrored to PostHog for segmentation. Asked once per org.
 const selectedIntent = ref<string | null>(null)
 const intentOptions = [

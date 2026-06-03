@@ -103,7 +103,7 @@ export async function post(
     management_email: body.email ?? self.email ?? '',
     customer_id: pendingCustomerId,
     website,
-    onboarding_intent: body.intent ?? 'unknown',
+    onboarding: { intent: body.intent ?? 'unknown' },
   }
   const { error: errorOrg } = await supabase
     .from('orgs')
