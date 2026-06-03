@@ -634,8 +634,12 @@ Expected: FAIL — module not found.
 import { buildMailtoUrl } from './mailto.ts'
 
 const SUPPORT_EMAIL = 'support@capgo.app'
-const CONFIRM_MESSAGE
-  = 'We\'ll save your logs locally and open a pre-filled email to support@capgo.app in your mail app. Continue?'
+
+// Tell the user everything that's about to happen — incl. the macOS Finder reveal.
+function confirmMessage(): string {
+  const reveal = process.platform === 'darwin' ? ', reveal them in Finder,' : ''
+  return `We'll save your logs locally${reveal} and open a pre-filled email to support@capgo.app in your mail app. Continue?`
+}
 
 export interface ContactSupportDeps {
   subject: string
@@ -657,7 +661,7 @@ export interface ContactSupportDeps {
 export type ContactSupportResult = 'opened' | 'cancelled' | 'failed'
 
 export async function contactSupport(deps: ContactSupportDeps): Promise<ContactSupportResult> {
-  const proceed = await deps.confirm(CONFIRM_MESSAGE)
+  const proceed = await deps.confirm(confirmMessage())
   if (!proceed)
     return 'cancelled'
 

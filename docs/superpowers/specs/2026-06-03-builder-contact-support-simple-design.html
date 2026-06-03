@@ -55,7 +55,7 @@
     <ol>
       <li><b>Hidden internal log</b> captured during builder/onboarding (verbose, secret-redacted, CLI-only) — including <b>non-build failures</b> (onboarding errors, raw Apple/Google API errors). Build failures also fold in the captured build log.</li>
       <li>On failure → menu offers <b>📨 Email Capgo support</b> (+ <b>🤖 Ask AI</b> when a build log exists).</li>
-      <li>On "Email Capgo support", the CLI <b>first shows a confirmation</b> ("We'll save your logs and open a pre-filled email to support@capgo.app — continue?"). Only on confirm it:
+      <li>On "Email Capgo support", the CLI <b>first shows a confirmation</b> ("We'll save your logs<b>, reveal them in Finder (macOS),</b> and open a pre-filled email to support@capgo.app — continue?" — the Finder clause shows only on macOS). Only on confirm it:
         <ul>
           <li>writes ONE combined bundle in <b>both</b> forms: <code>builder-support-&lt;appId&gt;-&lt;ts&gt;.log</code> (readable) <b>and</b> <code>.log.gz</code> (compact), in <code>~/.capgo-credentials/support/</code>;</li>
           <li><b>copies the GZIPPED <code>.log.gz</code> path to the clipboard</b>; on macOS <b>reveals it in Finder</b> (<code>open -R</code>);</li>
