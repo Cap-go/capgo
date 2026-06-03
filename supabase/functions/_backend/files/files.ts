@@ -492,6 +492,7 @@ async function getHandler(c: Context): Promise<Response> {
   const bytesTransferred = calculateBytesTransferred(object.size, object.range)
   await saveBandwidthUsage(c, bytesTransferred)
   const headers = objectHeaders(object)
+  headers.set('content-length', bytesTransferred.toString())
   if (object.range != null && c.req.header('range')) {
     cloudlog({ requestId: c.get('requestId'), message: 'getHandler files range request', range: rangeHeader(object.size, object.range) })
     headers.set('content-range', rangeHeader(object.size, object.range))
@@ -536,7 +537,7 @@ function rangeHeader(objLen: number, r2Range: R2Range): string {
   if ('length' in r2Range && r2Range.length != null) {
     endIndexInclusive = startIndexInclusive + r2Range.length - 1
   }
-  if ('suffix' in r2Range) {
+  if ('suffix' in r2Range && r2Range.suffix != null) {
     startIndexInclusive = objLen - r2Range.suffix
   }
   return `bytes ${startIndexInclusive}-${endIndexInclusive}/${objLen}`

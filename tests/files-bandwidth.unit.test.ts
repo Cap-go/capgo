@@ -89,11 +89,35 @@ describe('files bandwidth tracking', () => {
     )
 
     expect(response.status).toBe(200)
+    expect(response.headers.get('content-length')).toBe('3478395')
     expect(createStatsBandwidthMock).toHaveBeenCalledWith(
       expect.anything(),
       'device-1',
       'com.test.app',
       3_478_395,
+    )
+  })
+
+  it('keeps range response headers finite when suffix is present but empty', async () => {
+    retryGetMock.mockResolvedValue(createR2Object(3_478_395, { offset: 0, length: 100, suffix: undefined } as unknown as R2Range))
+    const appGlobal = await createFilesApp('/files')
+
+    const response = await appGlobal.fetch(
+      new Request('http://localhost/files/read/attachments/orgs/test-org/apps/com.test.app/bundle.zip?device_id=device-1', {
+        headers: { range: 'bytes=0-99' },
+      }),
+      { ATTACHMENT_BUCKET: {} },
+      { waitUntil: () => { } } as any,
+    )
+
+    expect(response.status).toBe(206)
+    expect(response.headers.get('content-range')).toBe('bytes 0-99/3478395')
+    expect(response.headers.get('content-length')).toBe('100')
+    expect(createStatsBandwidthMock).toHaveBeenCalledWith(
+      expect.anything(),
+      'device-1',
+      'com.test.app',
+      100,
     )
   })
 })
