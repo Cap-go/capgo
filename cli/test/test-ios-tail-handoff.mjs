@@ -341,12 +341,14 @@ await test('applyIosInput leaves a still-stubbed NON-tail step unchanged', async
 await test('runIosEffect throws for a NON-tail, not-yet-implemented effect step (still a stub)', async () => {
   // BATCH 2a implemented the create-new effects (backing-up / p8-method-select /
   // verifying-key / creating-certificate / creating-profile); BATCH 5 implemented
-  // the import-discovery effects (import-scanning / import-validating-all-certs).
-  // `import-checking-apple-cert` is a still-stubbed import-flow effect (BATCH 6),
-  // so it must still throw "not implemented".
+  // the import-discovery effects (import-scanning / import-validating-all-certs);
+  // BATCH 6 implemented the import pickers + apple-cert check (import-pick-identity /
+  // import-checking-apple-cert / import-pick-profile). `import-exporting` is a
+  // still-stubbed import-flow export effect (BATCH 7), so it must still throw
+  // "not implemented".
   let threw = false
   try {
-    await runIosEffect('import-checking-apple-cert', iosProgress(), makeDeps())
+    await runIosEffect('import-exporting', iosProgress(), makeDeps())
   }
   catch (err) {
     threw = /not implemented/.test(err instanceof Error ? err.message : String(err))

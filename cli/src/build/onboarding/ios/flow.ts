@@ -66,8 +66,11 @@ import { DEFAULT_P12_PASSWORD } from '../csr.js'
 // matchIdentitiesToProfiles is a PURE helper (no IO) — importing it keeps the
 // import-scanning effect IO-free while reusing the exact identity↔profile pairing
 // the TUI uses (app.tsx:1323). The actual scans are the injected listSigningIdentities
-// / scanProvisioningProfiles deps.
-import { matchIdentitiesToProfiles } from '../macos-signing.js'
+// / scanProvisioningProfiles deps. filterProfilesForApp / bundleIdMatches are the
+// SAME pure profile-usability + wildcard-bundle-id matchers the TUI's pickers use
+// (app.tsx:3296/3448/3485) — importing them keeps the BATCH 6 import-picker
+// resolvers IO-free while staying byte-for-byte aligned with the TUI's branch keys.
+import { bundleIdMatches, filterProfilesForApp, matchIdentitiesToProfiles } from '../macos-signing.js'
 import { extractKeyIdFromP8Path, getImportEntryStep } from '../progress.js'
 import { getIosResumeStep } from './progress.js'
 
@@ -665,6 +668,22 @@ const OPTIONS_IMPORT_DISTRIBUTION: IosStepOption[] = [
   { value: '__cancel__', label: '↩️   Cancel and use Create new instead' },
 ]
 
+// ─── Import picker choice vocabulary (BATCH 6) ──────────────────────────────────
+//
+// The import-pick-identity / import-pick-profile per-row options are DYNAMIC (built
+// from ctx.importMatches in iosViewForStep); only the trailing escape options are
+// constants. Their VALUES mirror the TUI sentinels so the resolver effects can route
+// a non-pick: import-pick-identity '__cancel__' → api-key-instructions (switch to
+// create-new, app.tsx:3271); import-pick-profile '__back__' → import-pick-identity
+// (app.tsx:3470). A picked row carries the identity SHA-1 / profile UUID, which the
+// driver resolves into carried.chosenIdentity / carried.chosenProfile.
+
+/** import-pick-identity trailing "switch to create-new" escape (app.tsx:3324/3430). */
+const OPTION_IMPORT_PICK_IDENTITY_CANCEL: IosStepOption = { value: '__cancel__', label: '↩️   Cancel and use Create new instead' }
+
+/** import-pick-profile trailing "back to identity selection" escape (app.tsx:3467). */
+const OPTION_IMPORT_PICK_PROFILE_BACK: IosStepOption = { value: '__back__', label: '↩️   Back to identity selection' }
+
 // ─── Recovery choice vocabulary (BATCH 3) ───────────────────────────────────────
 //
 // cert-limit-prompt's per-cert options are DYNAMIC (built from ctx.existingCerts
@@ -746,6 +765,20 @@ export type IosInput =
   // (ad_hoc → import-pick-identity; app_store → the .p8 chain entry / verifying-key;
   // __cancel__ → api-key-instructions), mirroring the TUI onChange exactly.
   | { step: 'import-distribution-mode', value: 'app_store' | 'ad_hoc' | '__cancel__' }
+  // ── Import pickers (BATCH 6) ─────────────────────────────────────────────
+  // import-pick-identity — pick a signing identity (its Keychain SHA-1) OR
+  // '__cancel__' to switch to create-new. EPHEMERAL: the reducer persists
+  // nothing; the driver resolves the SHA-1 to the picked SigningIdentity, records
+  // it in carried.chosenIdentity, and re-drives the prompt as a resolver effect
+  // (mirrors app.tsx:3270 setChosenIdentity + the three-way setStep).
+  | { step: 'import-pick-identity', value: string }
+  // import-pick-profile — pick a provisioning profile (its UUID) OR '__back__'
+  // to return to identity selection. EPHEMERAL: the reducer persists nothing; the
+  // driver resolves the UUID to the picked DiscoveredProfile, records it in
+  // carried.chosenProfile, and re-drives the prompt as a resolver effect (mirrors
+  // app.tsx:3469 onChange — '__back__' → import-pick-identity, valid →
+  // import-export-warning, invalid → handleError).
+  | { step: 'import-pick-profile', value: string }
 // ─── Engine surface (tail-wired; non-tail steps remain stubs) ───────────────────
 
 /**
@@ -933,6 +966,88 @@ export function iosViewForStep(
         prompt: 'App Store uploads to TestFlight (needs an ASC API key); Ad-hoc is signed for direct/QR install (no ASC key).',
         options: OPTIONS_IMPORT_DISTRIBUTION,
       }
+
+    // ── import-pick-identity (choice, EPHEMERAL-dep) ──────────────────────────
+    // app.tsx:3254–3436. The signing-identity picker. The driver-held inventory
+    // (ctx.importMatches from import-scanning) is partitioned by the Apple-side
+    // availability map (ctx.identityAvailability from import-validating-all-certs):
+    // when classification ran, ONLY identities Apple confirmed usable (available)
+    // are offered; when it didn't (no .p8 yet — the ad_hoc-without-key entry) every
+    // identity is offered (a fresh classification map is empty, so every row counts
+    // as available, exactly like the TUI's `!haveClassification` flat-list fallback).
+    // Each row is labelled with how many of THIS identity's on-disk profiles are
+    // usable for this app + distribution (filterProfilesForApp), and the trailing
+    // option is the create-new escape ('__cancel__'). The option VALUE is the
+    // identity SHA-1 — the driver resolves it to the picked SigningIdentity, records
+    // it into carried.chosenIdentity, and re-drives this step as a resolver effect
+    // (the BATCH 3 ephemeral-branching mechanism). The selection is EPHEMERAL (never
+    // persisted); on resume the user re-enters via a re-run import-scanning.
+    case 'import-pick-identity': {
+      const matches = ctx?.importMatches ?? []
+      const availability = ctx?.identityAvailability ?? {}
+      const haveClassification = Object.keys(availability).length > 0
+      const appId = resolveIosBundleId(progress)
+      const dist = progress.importDistribution
+      const available = matches.filter((m) => {
+        const a = availability[m.identity.sha1]
+        return !haveClassification || a?.available
+      })
+      const options: IosStepOption[] = [
+        ...available.map((m) => {
+          const matchCount = filterProfilesForApp(m.profiles, appId, dist).length
+          return {
+            value: m.identity.sha1,
+            label: matchCount > 0
+              ? `🔑  ${m.identity.name} · ${matchCount} matching profile${matchCount === 1 ? '' : 's'}`
+              : `🔑  ${m.identity.name} · ⚠ no matching profiles on this Mac (recovery available)`,
+          }
+        }),
+        OPTION_IMPORT_PICK_IDENTITY_CANCEL,
+      ]
+      return {
+        step,
+        kind: 'choice',
+        title: 'Pick a signing identity to import.',
+        prompt: 'These are the iOS Distribution certificates in your Keychain. Pick one, or switch to creating a fresh cert + profile.',
+        options,
+      }
+    }
+
+    // ── import-pick-profile (choice, EPHEMERAL-dep) ───────────────────────────
+    // app.tsx:3439–3526. The provisioning-profile picker for the chosen identity.
+    // Lists only the profiles usable for THIS app + THIS distribution mode
+    // (filterProfilesForApp over the chosen identity's profiles in ctx.importMatches —
+    // which now ALSO includes any Apple-side profiles import-checking-apple-cert /
+    // import-provide-profile-path synthesized into the match), keyed by UUID (unique
+    // for both on-disk and synthesized profiles), plus a '__back__' option to return
+    // to identity selection. The option VALUE is the profile UUID — the driver
+    // resolves it to the picked DiscoveredProfile, records it into
+    // carried.chosenProfile, and re-drives this step as a resolver effect. The
+    // selection is EPHEMERAL (never persisted).
+    case 'import-pick-profile': {
+      const chosen = ctx?.chosenIdentity
+      const matches = ctx?.importMatches ?? []
+      const allMatchedProfiles = chosen
+        ? matches.find(m => m.identity.sha1 === chosen.sha1)?.profiles ?? []
+        : []
+      const appId = resolveIosBundleId(progress)
+      const dist = progress.importDistribution
+      const matchedProfiles = filterProfilesForApp(allMatchedProfiles, appId, dist)
+      const options: IosStepOption[] = [
+        ...matchedProfiles.map(p => ({
+          value: p.uuid,
+          label: `📜  ${p.name} · bundle ${p.bundleId} · ${p.profileType} · expires ${p.expirationDate.split('T')[0]}`,
+        })),
+        OPTION_IMPORT_PICK_PROFILE_BACK,
+      ]
+      return {
+        step,
+        kind: 'choice',
+        title: 'Pick a provisioning profile to import.',
+        prompt: 'These profiles are linked to your chosen certificate and match this app. Pick one, or go back to change the identity.',
+        options,
+      }
+    }
     default:
       return { step, kind: 'auto', title: step }
   }
@@ -1088,6 +1203,29 @@ export function applyIosInput(
       }
       return { ...progress, setupMethod: 'import-existing', importDistribution: i.value }
     }
+
+    // ── import-pick-identity (EPHEMERAL choice — persists NOTHING) ─────────────
+    // app.tsx:3270–3305 — the picked identity SHA-1 (or '__cancel__') is EPHEMERAL;
+    // the TUI stashes the identity in setChosenIdentity (React state), never in
+    // progress.json. The pure reducer records nothing — the driver resolves the
+    // SHA-1 to the picked SigningIdentity against the carried importMatches, records
+    // it in deps.carried.chosenIdentity, and re-drives the step through runIosEffect
+    // (the BATCH 3 ephemeral-branching mechanism). Keeping this a no-op means a
+    // resume never re-derives the ephemeral identity (it re-enters via a re-run
+    // import-scanning + re-rendered picker, per the audit's resume contract).
+    case 'import-pick-identity':
+      return progress
+
+    // ── import-pick-profile (EPHEMERAL choice — persists NOTHING) ──────────────
+    // app.tsx:3469–3522 — the picked profile UUID (or '__back__') is EPHEMERAL; the
+    // TUI stashes the profile in setChosenProfile, never in progress.json. The pure
+    // reducer records nothing — the driver resolves the UUID to the picked
+    // DiscoveredProfile, records it in deps.carried.chosenProfile, and re-drives the
+    // step through runIosEffect (valid → import-export-warning; '__back__' →
+    // import-pick-identity; invalid → error). Ephemeral, so resume re-renders.
+    case 'import-pick-profile':
+      return progress
+
     default:
       return progress
   }
@@ -1549,6 +1687,163 @@ export async function runIosEffect(
         return { progress, next: 'error' }
       }
     }
+    // ── import-pick-identity (resolver effect, EPHEMERAL-dep) ─────────────────
+    // app.tsx:3270–3305. import-pick-identity is an EPHEMERAL-branching choice: the
+    // picked identity is NEVER persisted, so getIosResumeStep cannot reproduce the
+    // target. The driver records the picked SigningIdentity into
+    // deps.carried.chosenIdentity (resolving it from the option SHA-1 against the
+    // carried importMatches) and re-drives this step as a resolver — exactly the
+    // BATCH 3 ephemeral-branching mechanism. The routing mirrors the TUI onPick
+    // three-way (plus the '__cancel__' escape):
+    //   - no chosenIdentity recorded → the user chose '__cancel__' → switch to
+    //     create-new at api-key-instructions (app.tsx:3271–3280; the driver clears
+    //     setupMethod/importDistribution before re-driving, so this is pure routing).
+    //   - usable on-disk profiles for this app+distribution (filterProfilesForApp
+    //     over the chosen identity's match.profiles) → import-pick-profile.
+    //   - no usable on-disk + an ASC key available (carried .p8 bytes OR a persisted
+    //     apiKeyVerified marker) → import-checking-apple-cert (auto-fetch from Apple).
+    //   - no usable on-disk + no ASC key → import-no-match-recovery with
+    //     noMatchReason='no-profile-on-disk' (app.tsx:3302–3304).
+    // PURE routing — no IO, no persistence (the selection lives in carried).
+    case 'import-pick-identity': {
+      const chosenIdentity = deps.carried?.chosenIdentity
+      if (!chosenIdentity)
+        return { progress, next: 'api-key-instructions' }
+
+      const matches = deps.carried?.importMatches ?? []
+      const match = matches.find(m => m.identity.sha1 === chosenIdentity.sha1)
+      const appId = resolveIosBundleId(progress)
+      const dist = progress.importDistribution
+      const usable = filterProfilesForApp(match?.profiles ?? [], appId, dist)
+      if (usable.length > 0)
+        return { progress, next: 'import-pick-profile' }
+
+      const apiKeyAvailable = !!(deps.carried?.p8Content || progress.completedSteps.apiKeyVerified)
+      if (apiKeyAvailable)
+        return { progress, next: 'import-checking-apple-cert' }
+      return { progress, next: 'import-no-match-recovery', transient: { noMatchReason: 'no-profile-on-disk' } }
+    }
+
+    // ── import-checking-apple-cert (effect, EPHEMERAL-dep) ────────────────────
+    // app.tsx:1518–1609. The per-identity Apple-side cert+profile auto-fetch the
+    // identity picker routes into when an identity has no usable on-disk profile but
+    // an ASC key is available. Resolve the chosen identity's Apple cert resource id
+    // (findCertIdBySha1; the driver pre-binds the ASC token), then list the profiles
+    // linked to that cert (listProfilesForCert returns ready DiscoveredProfiles — the
+    // driver pre-binds the AscProfileSummary→DiscoveredProfile synthesis the TUI does
+    // at app.tsx:1556). Four outcomes set noMatchReason + route to recovery, the
+    // happy path injects the synthesized profiles into the chosen identity's match
+    // (so import-pick-profile lists them like on-disk ones) and routes to the picker:
+    //   - findCertIdBySha1 null → 'apple-no-cert-match' → import-no-match-recovery.
+    //   - listProfilesForCert empty → 'apple-no-profiles-linked' → recovery.
+    //   - profiles exist but none usable → classify the cause (bundle mismatch /
+    //     distribution mismatch / other) → recovery with the matching reason.
+    //   - usable profiles found → import-pick-profile (transient: updated
+    //     importMatches + _appleCertIdForChosen).
+    // Any thrown Apple-API error routes to 'error'. The cert id, the reason, and the
+    // injected profiles are ALL transient (carried) — nothing is persisted.
+    case 'import-checking-apple-cert': {
+      const chosenIdentity = deps.carried?.chosenIdentity
+      if (!chosenIdentity)
+        return { progress, next: 'error' }
+
+      const appId = resolveIosBundleId(progress)
+      const dist = progress.importDistribution
+      const matches = deps.carried?.importMatches ?? []
+
+      try {
+        const certId = await deps.findCertIdBySha1!(chosenIdentity.sha1)
+        if (!certId) {
+          deps.onLog?.(`⚠ Apple lookup returned no match for "${chosenIdentity.name}".`, 'yellow')
+          return { progress, next: 'import-no-match-recovery', transient: { noMatchReason: 'apple-no-cert-match' } }
+        }
+        deps.onLog?.(`✔ Apple recognizes this certificate (ASC id ${certId.slice(0, 8)}…)`)
+
+        const synthesized = await deps.listProfilesForCert!(certId)
+        if (synthesized.length === 0) {
+          deps.onLog?.('ℹ️  Apple has the cert but no profiles linked to it yet.', 'yellow')
+          return {
+            progress,
+            next: 'import-no-match-recovery',
+            transient: { noMatchReason: 'apple-no-profiles-linked', _appleCertIdForChosen: certId },
+          }
+        }
+
+        // Inject the synthesized Apple-side profiles into the chosen identity's
+        // match so the import-pick-profile picker lists them like on-disk profiles
+        // (app.tsx:1568–1571). Immutable update — a fresh matches array.
+        const injectedMatches = matches.map(m => m.identity.sha1 === chosenIdentity.sha1
+          ? { ...m, profiles: [...m.profiles, ...synthesized] }
+          : m)
+
+        const usableHere = filterProfilesForApp(synthesized, appId, dist)
+        if (usableHere.length === 0) {
+          // Classify the no-match cause exactly as the TUI (app.tsx:1573–1599):
+          // a profile for a DIFFERENT bundle id → bundle mismatch; the right bundle
+          // but the wrong distribution → distribution mismatch; otherwise → other.
+          const otherBundleIds = synthesized.filter(p => p.bundleId && p.bundleId !== appId)
+          const sameBundleWrongDist = synthesized.filter(p => p.bundleId === appId)
+          let noMatchReason: IosNoMatchReason
+          if (otherBundleIds.length > 0)
+            noMatchReason = 'apple-bundle-mismatch'
+          else if (sameBundleWrongDist.length > 0)
+            noMatchReason = 'apple-distribution-mismatch'
+          else
+            noMatchReason = 'apple-other'
+          deps.onLog?.(`⚠ Apple returned ${synthesized.length} profile${synthesized.length === 1 ? '' : 's'} for this cert but none match this app.`, 'yellow')
+          return {
+            progress,
+            next: 'import-no-match-recovery',
+            transient: { noMatchReason, _appleCertIdForChosen: certId, importMatches: injectedMatches },
+          }
+        }
+
+        deps.onLog?.(`✔ Apple has ${usableHere.length} matching profile${usableHere.length === 1 ? '' : 's'} for "${appId}" — opening the picker`)
+        return {
+          progress,
+          next: 'import-pick-profile',
+          transient: { _appleCertIdForChosen: certId, importMatches: injectedMatches },
+        }
+      }
+      catch (err) {
+        deps.onLog?.(`✖ ${err instanceof Error ? err.message : String(err)}`, 'red')
+        return { progress, next: 'error' }
+      }
+    }
+
+    // ── import-pick-profile (resolver effect, EPHEMERAL-dep) ──────────────────
+    // app.tsx:3469–3522. Another EPHEMERAL-branching choice: the picked profile is
+    // never persisted. The driver records the picked DiscoveredProfile into
+    // deps.carried.chosenProfile (resolving it from the option UUID against the
+    // chosen identity's match profiles) and re-drives this step as a resolver. The
+    // routing mirrors the TUI onChange:
+    //   - no chosenProfile recorded → the user chose '__back__' → import-pick-identity.
+    //   - a profile that passes ALL three validations (bundle id via bundleIdMatches,
+    //     distribution type, and the chosen cert's SHA-1 in the profile's allowed-
+    //     certs list) → import-export-warning.
+    //   - a profile that fails any validation → error (the TUI's handleError; the
+    //     filter should make this unreachable, but defense-in-depth catches a
+    //     regressed filter / a hand-imported .mobileprovision with the wrong cert).
+    // PURE routing — no IO, no persistence (the selection lives in carried).
+    case 'import-pick-profile': {
+      const chosenProfile = deps.carried?.chosenProfile
+      if (!chosenProfile)
+        return { progress, next: 'import-pick-identity' }
+
+      const appId = resolveIosBundleId(progress)
+      const dist = progress.importDistribution
+      const chosenIdentity = deps.carried?.chosenIdentity
+      const bundleOk = bundleIdMatches(chosenProfile.bundleId, appId)
+      const distOk = !dist || chosenProfile.profileType === dist
+      const certOk = !chosenIdentity || chosenProfile.certificateSha1s.includes(chosenIdentity.sha1)
+      if (!bundleOk || !distOk || !certOk) {
+        deps.onLog?.(`✖ Profile "${chosenProfile.name}" doesn't match this app.`, 'red')
+        return { progress, next: 'error' }
+      }
+      deps.onLog?.(`✔ Profile · ${chosenProfile.name}`)
+      return { progress, next: 'import-export-warning' }
+    }
+
     default:
       throw new Error(`runIosEffect: not implemented for step '${step}'`)
   }
