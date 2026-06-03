@@ -310,6 +310,7 @@ const buildCLI = Bun.build({
   env: 'disable',
   define: {
     'process.env.SUPA_DB': '"production"',
+    'globalThis.__CAPGO_DEV__': 'false',
   },
   plugins: [
     fixCapacitorCliDirname,
@@ -338,6 +339,7 @@ const buildSDK = Bun.build({
   env: 'disable',
   define: {
     'process.env.SUPA_DB': '"production"',
+    'globalThis.__CAPGO_DEV__': 'false',
   },
   plugins: [
     fixCapacitorCliDirname,
