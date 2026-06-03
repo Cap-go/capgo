@@ -1,5 +1,7 @@
 // src/build/onboarding/android/types.ts
 
+import type { TailProgress } from '../tail-types.js'
+
 export type AndroidOnboardingStep
   = | 'welcome'
     | 'resume-prompt'
@@ -138,7 +140,7 @@ export interface AndroidPackageChoice {
   source: 'gradle' | 'capacitor-config' | 'user-input'
 }
 
-export interface AndroidOnboardingProgress {
+export interface AndroidOnboardingProgress extends TailProgress {
   platform: 'android'
   appId: string
   startedAt: string

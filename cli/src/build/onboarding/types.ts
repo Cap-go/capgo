@@ -1,5 +1,7 @@
 // src/build/onboarding/types.ts
 
+import type { TailProgress } from './tail-types.js'
+
 export type Platform = 'ios' | 'android'
 
 // The outcome a wizard app reports to the shell/command when Ink exits, so the
@@ -172,7 +174,7 @@ export interface ProfileData {
   profileBase64: string
 }
 
-export interface OnboardingProgress {
+export interface OnboardingProgress extends TailProgress {
   platform: Platform
   appId: string
   startedAt: string
