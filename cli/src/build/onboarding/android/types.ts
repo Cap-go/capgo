@@ -197,6 +197,20 @@ export interface AndroidOnboardingProgress {
   keystorePasswordGenerated?: boolean
   /** True once the user chose the MANUAL password method (lets the stateless MCP advance). */
   keystorePasswordManual?: boolean
+  /**
+   * Data-safety gate state for the shared engine (mirrors main's ink TUI
+   * `credentials-exist` → `backing-up` flow). The Ink driver does not read this
+   * field — it gates the same situation via React state — so it is harmless to
+   * the TUI. Lifecycle:
+   *   - undefined → gate not yet evaluated (or no saved credentials exist)
+   *   - 'pending' → saved android credentials exist; awaiting the user's
+   *                 backup-or-cancel choice (the `credentials-exist` step)
+   *   - 'backup'  → user chose backup; the `backing-up` effect must still run
+   *   - 'done'    → backup performed (or source absent); proceed to keystore
+   *   - 'cancel'  → user chose to stop; onboarding halts to protect the
+   *                 existing credentials (mirrors main's exitOnboarding())
+   */
+  _credentialsExistGate?: 'pending' | 'backup' | 'done' | 'cancel'
 }
 
 export const ANDROID_STEP_PROGRESS: Record<AndroidOnboardingStep, number> = {

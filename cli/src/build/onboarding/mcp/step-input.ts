@@ -10,6 +10,9 @@ import type { AndroidOnboardingStep } from '../android/types.js'
 
 /** state → the set of input fields that legitimately answer it (in order). */
 export const STEP_ALLOWED_FIELDS: Partial<Record<AndroidOnboardingStep, string[]>> = {
+  // Data-safety gate shown when saved android credentials already exist. Accepts
+  // only the backup-or-cancel choice (mirrors main's CredentialsExistStep).
+  'credentials-exist': ['credentialsExistChoice'],
   'keystore-method-select': ['keystoreMethod'],
   'keystore-existing-path': ['keystorePath'],
   // The existing-keystore unlock collects ONLY the store password here. Once it
@@ -51,7 +54,7 @@ export const ANDROID_INPUT_KEYS: string[] = [
   'keystoreMethod', 'keystorePath', 'keystoreStorePassword', 'keystoreAlias',
   'keystoreKeyPassword', 'keystoreNewAlias', 'keystorePasswordMethod', 'keystoreCommonName',
   'serviceAccountMethod', 'serviceAccountJsonPath', 'saMethodChoice', 'playDeveloperId',
-  'gcpProjectId', 'gcpProjectName', 'androidPackage',
+  'gcpProjectId', 'gcpProjectName', 'androidPackage', 'credentialsExistChoice',
 ]
 
 /**

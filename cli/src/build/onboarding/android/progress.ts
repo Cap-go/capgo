@@ -154,6 +154,18 @@ export function getAndroidResumeStep(progress: AndroidOnboardingProgress | null)
 
   const { completedSteps } = progress
 
+  // Phase 0 — Data-safety gate (shared engine). When saved android credentials
+  // already exist, the engine routes through `credentials-exist` (backup-or-
+  // cancel choice) and, on backup, `backing-up` (the credentials.json → dated
+  // copy) BEFORE entering the keystore phase — mirroring main's ink TUI. The
+  // gate lifecycle lives in `_credentialsExistGate`; only 'pending'/'backup'
+  // park the user on a gate step. 'done'/'cancel'/undefined fall through to the
+  // normal keystore routing (the engine handles 'cancel' as a hard stop).
+  if (progress._credentialsExistGate === 'pending')
+    return 'credentials-exist'
+  if (progress._credentialsExistGate === 'backup')
+    return 'backing-up'
+
   // Phase 1 — Keystore: marker + 3 ephemeral fields
   if (!keystoreFullyValid(progress))
     return keystoreResumeStep(progress)

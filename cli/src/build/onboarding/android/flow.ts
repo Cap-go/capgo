@@ -20,6 +20,8 @@ import type { KeystoreOptions, KeystoreResult, ListAliasesResult, ProbeKeyPasswo
 import type { ValidateOptions, ValidationResult } from './service-account-validation.js'
 import type { GcpProject, GcpServiceAccount, GcpServiceAccountKey } from './gcp-api.js'
 import type { GoogleOAuthTokens, GoogleUserInfo, PendingOAuthSession, RunOAuthFlowOptions } from './oauth-google.js'
+import { homedir } from 'node:os'
+import { join } from 'node:path'
 
 // ─── applyGoogleSignIn ────────────────────────────────────────────────────────
 
@@ -212,6 +214,15 @@ const OPTIONS_KEYSTORE_METHOD: AndroidStepOption[] = [
   { value: 'learn', label: 'What is a keystore?' },
 ]
 
+// Data-safety gate shown when saved android credentials already exist for the
+// app. Mirrors main's CredentialsExistStep (android-shared.tsx): backup the
+// existing credentials.json first, or stop. 'backup' → backing-up effect →
+// keystore-method-select; 'cancel' → halt onboarding (main's exitOnboarding()).
+const OPTIONS_CREDENTIALS_EXIST: AndroidStepOption[] = [
+  { value: 'backup', label: 'Start fresh (backup existing credentials first)' },
+  { value: 'cancel', label: 'Exit onboarding' },
+]
+
 const OPTIONS_KEYSTORE_EXPLAINER: AndroidStepOption[] = [
   { value: 'back', label: 'Back' },
 ]
@@ -297,6 +308,13 @@ export function androidViewForStep(
     // ── Bootstrap ──
     case 'no-platform':
       return { ...base, message: 'No Android platform found. Run `npx cap add android` first.' }
+
+    // ── Data-safety gate (saved android credentials already exist) ──
+    // Mirrors main's CredentialsExistStep: a backup-or-cancel choice. The
+    // `backing-up` step is an auto effect (the credentials.json → dated copy),
+    // so it carries only kind (no options/prompt).
+    case 'credentials-exist':
+      return { ...base, options: OPTIONS_CREDENTIALS_EXIST }
 
     // ── Phase 1 — Keystore ──
     case 'keystore-method-select':
@@ -436,6 +454,10 @@ const RELEASE_ALIAS_DEFAULT = 'release'
 // progress unchanged in applyAndroidInput.
 
 export type AndroidInput =
+  // Phase 0 — Data-safety gate (saved android credentials already exist).
+  // 'backup' → mark gate for backing-up; 'cancel' → halt onboarding.
+  | { step: 'credentials-exist'; value: 'backup' | 'cancel' }
+
   // Phase 1 — Keystore method
   | { step: 'keystore-method-select'; value: 'existing' | 'generate' | 'learn' }
 
@@ -517,6 +539,18 @@ export function applyAndroidInput(
   input: AndroidInput,
 ): AndroidOnboardingProgress {
   switch (step) {
+    // ── credentials-exist ─────────────────────────────────────────────────────
+    // Data-safety gate. app.tsx routes 'backup' → setStep('backing-up') and
+    // 'exit' → exitOnboarding(). The stateless engine encodes that choice in
+    // `_credentialsExistGate`: 'backup' parks the resume step on `backing-up`
+    // (the copy effect runs next); 'cancel' halts onboarding.
+    case 'credentials-exist': {
+      const i = input as Extract<AndroidInput, { step: 'credentials-exist' }>
+      if (i.value === 'backup')
+        return { ...progress, _credentialsExistGate: 'backup' }
+      return { ...progress, _credentialsExistGate: 'cancel' }
+    }
+
     // ── keystore-method-select ────────────────────────────────────────────────
     // app.tsx:1900, 1904
     case 'keystore-method-select': {
@@ -906,6 +940,28 @@ export async function runAndroidEffect(
   deps: AndroidEffectDeps,
 ): Promise<AndroidEffectResult> {
   switch (step) {
+    // ── backing-up ────────────────────────────────────────────────────────
+    // app.tsx:1017–1035. Copy the existing ~/.capgo-credentials/credentials.json
+    // to a timestamped sibling before the keystore phase overwrites it, then
+    // advance to keystore-method-select. A missing source file is non-fatal
+    // (yellow warning) — the gate's promise was "backup first", not "must exist".
+    // The gate transitions to 'done' so resume falls through to keystore.
+    case 'backing-up': {
+      const credPath = join(homedir(), '.capgo-credentials', 'credentials.json')
+      const date = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
+      const backupPath = join(homedir(), '.capgo-credentials', `credentials-${date}.copy.json`)
+      try {
+        await deps.copyFile(credPath, backupPath)
+        deps.onLog?.(`✔ Backup saved · ${backupPath}`)
+      }
+      catch {
+        deps.onLog?.('⚠ Could not backup credentials (file may not exist yet)', 'yellow')
+      }
+      const nextProgress: AndroidOnboardingProgress = { ...progress, _credentialsExistGate: 'done' }
+      await deps.saveAndroidProgress(progress.appId, nextProgress)
+      return { progress: nextProgress, next: 'keystore-method-select' }
+    }
+
     // ── keystore-existing-detecting-alias ─────────────────────────────────
     // app.tsx:903–942
     case 'keystore-existing-detecting-alias': {

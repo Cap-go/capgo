@@ -49,6 +49,7 @@ interface OnboardingInput {
   gcpProjectName?: string
   androidPackage?: string
   saMethodChoice?: 'retry' | 'save-anyway' | 'oauth'
+  credentialsExistChoice?: 'backup' | 'cancel'
   keystoreMethod?: 'existing' | 'generate'
   keystorePath?: string
   keystoreStorePassword?: string
@@ -256,6 +257,23 @@ export function mapAndroidView(
   }
 
   switch (view.step) {
+    case 'credentials-exist':
+      // Data-safety gate. Mirrors main's CredentialsExistStep: warn that saved
+      // android credentials already exist and offer to back them up (then
+      // continue) or stop. The agent must collect the choice and call next_step
+      // with credentialsExistChoice.
+      return {
+        ...base,
+        kind: 'choice',
+        summary: `Android credentials already exist for "${facts.appId}". Continuing onboarding will create new credentials and replace the existing ones. Back them up first, or stop?`,
+        options: (view.options ?? []).map(o => ({ value: o.value, label: o.label, note: o.note })),
+        next: {
+          tool: NEXT_STEP_TOOL,
+          with: { credentialsExistChoice: '<backup|cancel>' },
+          instruction: 'Tell the user their existing Android credentials will be replaced. Ask whether to back them up first and continue, or stop. Then call next_step with credentialsExistChoice.',
+          call: `${NEXT_STEP_TOOL}({ credentialsExistChoice: "backup" })`,
+        },
+      }
     case 'service-account-method-select': {
       const savedLine = opts?.keystorePath
         ? `✓ Keystore created and saved to ${opts.keystorePath}${opts.keystorePassword ? ` (password: ${opts.keystorePassword})` : ''} — keep ${opts.keystorePassword ? 'both' : 'this file'} safe (you'll need ${opts.keystorePassword ? 'them' : 'it'} for every release). `
@@ -673,6 +691,46 @@ export async function decideAndroid(
     await deps.androidEffectDeps.saveAndroidProgress(appId, progress)
   }
 
+  // ── Data-safety gate (mirrors main's welcome-effect L1005) ────────────────
+  // When saved android credentials already exist for this app AND the user is
+  // about to enter the keystore phase fresh (no keystore progress yet) AND the
+  // gate has not been evaluated, route through `credentials-exist` (backup-or-
+  // cancel) before anything can overwrite the saved credentials. Encode the
+  // decision in `_credentialsExistGate` so the stateless engine reproduces it on
+  // every subsequent call. Only fires on a truly fresh keystore entry, so an
+  // in-flight onboarding (and the e2e happy path, which has no saved creds) is
+  // unaffected.
+  if (
+    progress._credentialsExistGate === undefined
+    && getAndroidResumeStep(progress) === 'keystore-method-select'
+  ) {
+    let hasSavedAndroid = false
+    try {
+      const saved = await deps.androidEffectDeps.loadSavedCredentials(appId)
+      hasSavedAndroid = !!(saved && typeof saved === 'object' && (saved as { android?: unknown }).android)
+    }
+    catch {
+      // Treat a load failure as "no saved credentials" — never block onboarding
+      // on a read error; the worst case is the pre-existing (no-gate) behavior.
+      hasSavedAndroid = false
+    }
+    if (hasSavedAndroid) {
+      progress = { ...progress, _credentialsExistGate: 'pending' }
+      await deps.androidEffectDeps.saveAndroidProgress(appId, progress)
+    }
+  }
+
+  // 'cancel' is a hard stop: the user declined to back up existing credentials,
+  // so onboarding halts to protect them (mirrors main's exitOnboarding()).
+  if (progress._credentialsExistGate === 'cancel') {
+    return {
+      onboarding: 'capgo-builder', phase: 'credentials', state: 'credentials-exist', platform: 'android',
+      progress: ANDROID_STEP_PROGRESS['credentials-exist'], kind: 'done',
+      summary: `Onboarding stopped to protect the existing Android credentials for "${appId}". Nothing was changed. Re-run onboarding and choose "Start fresh (backup existing credentials first)" when you're ready to replace them.`,
+      rules: ONBOARDING_RULES,
+    }
+  }
+
   let ctx: AndroidStepCtx = { appId }
   // When an effect signals an explicit next step (e.g. gcp-projects-loading → gcp-projects-select),
   // use that instead of re-deriving from progress on the next iteration.
@@ -1008,6 +1066,15 @@ async function persistAndroidInput(deps: EngineDeps, appId: string, input: Onboa
 
   let updated = progressRaw
 
+  // Data-safety gate answer (credentials-exist). 'backup' parks resume on
+  // backing-up (the copy effect runs next); 'cancel' halts onboarding. Applied
+  // first so it gates everything that follows.
+  if (input.credentialsExistChoice) {
+    updated = applyAndroidInput('credentials-exist', updated, {
+      step: 'credentials-exist',
+      value: input.credentialsExistChoice,
+    })
+  }
   if (input.serviceAccountMethod) {
     updated = applyAndroidInput('service-account-method-select', updated, {
       step: 'service-account-method-select',
@@ -1345,6 +1412,7 @@ async function drive(deps: EngineDeps, input?: OnboardingInput): Promise<NextSte
     || input.androidPackage !== undefined
     || input.serviceAccountJsonPath !== undefined
     || input.saMethodChoice !== undefined
+    || input.credentialsExistChoice !== undefined
     || input.keystoreMethod !== undefined
     || input.keystorePath !== undefined
     || input.keystoreStorePassword !== undefined
