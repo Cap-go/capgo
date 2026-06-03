@@ -32,10 +32,12 @@ before committing to a bundle ID.
 ## Goal
 
 Stop silently trusting the local bundle ID. After the user provides their ASC
-API key (`.p8`), use App Store Connect to surface the real app identity, catch
-the two failure modes **early**, and — when the project would build the wrong
-app — **gate** the user until they fix it, without us editing their project
-files or creating Apple resources in v1.
+API key (`.p8`), use App Store Connect to verify the app identity and **never let
+onboarding pass the step in a state that will fail the `app_store` build later**.
+When the project would build the wrong app (or no app exists yet), **gate** the
+user and **verify the fix via the API** before continuing — without us editing
+their project files or auto-creating Apple resources (the ASC API cannot create
+apps anyway; see below).
 
 ## Key constraints (discovered, load-bearing)
 
@@ -43,6 +45,13 @@ files or creating Apple resources in v1.
   (`GET /v1/apps`, `GET /v1/bundleIds`). The Google Play Developer API has **no
   list-all-apps endpoint** (per-package model). → **This feature is iOS only.**
   Android onboarding is unchanged.
+- **The ASC API cannot create an app record.** `POST /v1/apps` returns
+  `403 FORBIDDEN_ERROR`: *"The resource 'apps' does not allow 'CREATE'. Allowed
+  operations are: GET_COLLECTION, GET_INSTANCE, UPDATE."* App creation is
+  **web-only** (appstoreconnect.com). The API *can* create **bundle IDs**
+  (`ensureBundleId` already does) and *read* apps — so our only lever for the
+  "no app" case is: send the user to the web page and **verify via the API** that
+  the app now exists.
 - **The bundle ID matters for every build, not just onboarding.** Saved
   credentials contain `CAPGO_IOS_PROVISIONING_MAP` (bundle ID → profile,
   `cli/src/build/request.ts:1462-1473`). Every cloud build runs `xcodebuild`,
@@ -58,14 +67,11 @@ files or creating Apple resources in v1.
   via `iosBundleIdOverride`. → We **never** ask the user to change
   `capacitor.config.appId`; the only thing that must match the chosen App Store
   app is `PRODUCT_BUNDLE_IDENTIFIER` (Release).
-- **Onboarding's credential setup can always complete.** Cert + profile creation
-  only need the bundle ID *registered as an identifier* (which `ensureBundleId`
-  auto-creates); they do **not** need an ASC *app* to exist. The ASC app only
-  matters at **TestFlight upload time**, i.e. only for **`app_store` mode**.
-  `ad_hoc` (`cli/src/build/onboarding/ui/steps/ios-import.tsx:132` — "Ad-hoc (no
-  TestFlight upload)") never needs it.
-- **Distribution mode.** The remote check is relevant only in **`app_store`
-  mode** (the create-new default and import-app_store). `ad_hoc` skips it.
+- **Distribution mode.** This whole step runs **only in `app_store` mode** (the
+  create-new default and import-app_store). `ad_hoc`
+  (`cli/src/build/onboarding/ui/steps/ios-import.tsx:132` — "Ad-hoc (no
+  TestFlight upload)") **skips the step entirely** — so no branch below mentions
+  ad-hoc; by the time we are here, the build is app_store and the app must exist.
 - **Debug vs Release.** The Release-config bundle ID is the **authoritative**
   build ID used for the comparison, the gate, and all Apple-side work — pbxproj
   parsing must always resolve Release (never silently substitute a Debug value
@@ -76,156 +82,155 @@ files or creating Apple resources in v1.
   is discarded:** the parser already collects every `{config, value}` pair
   internally, so we still **expose the Debug value** (or a `debugReleaseDiffer`
   flag) — used *only* to print the Debug ≠ Release awareness note, never to gate.
-  When no Release config can be resolved, the remote-verify step warns and skips
-  gating rather than gating on a Debug fallback. No `.debug`/suffix heuristics.
+  When no Release config can be resolved, the step warns and skips gating rather
+  than gating on a Debug fallback. No `.debug`/suffix heuristics.
 - **Lean dependencies.** The CLI deliberately hand-parses native files with
   small regexes (`pbxproj-parser.ts`, `bundle-id-detector.ts`) — no plist
   library, no Trapeze. v1 adds **no** native-file-editing dependency.
 
-## v1 scope decision: detect + guide, never auto-edit
+## v1 scope decision: detect + verify-by-API gate, never auto-edit/auto-create
 
-v1 **never edits the user's files or creates Apple resources** — but it does
-**gate** on a real bundle-ID divergence:
+v1 **never edits the user's files and never auto-creates Apple resources** — but
+it **gates and verifies via the API** so onboarding can't pass into a state that
+fails the build:
 
-- **Bundle-ID mismatch (Problem 1):** the user picks the intended App Store app;
-  if it differs from the Release build ID we **gate Continue** until the user
-  fixes `PRODUCT_BUNDLE_IDENTIFIER` themselves (we re-detect each attempt). We
-  **never** edit `pbxproj`, and we **never** touch `capacitor.config.appId`.
-- **App does not exist (Problem 2):** warn (with the registered-vs-unregistered
-  sub-state) and let the user proceed; **do not** call `POST /v1/apps`.
+- **Wrong build ID (Problem 1):** the user picks the intended App Store app; if
+  it differs from the Release build ID we **gate** until the user fixes
+  `PRODUCT_BUNDLE_IDENTIFIER` themselves and the API confirms it. We **never**
+  edit `pbxproj`, and we **never** touch `capacitor.config.appId`.
+- **App does not exist (Problem 2):** we **offer to open** the App Store Connect
+  create-app page and **gate** until the API confirms an app exists for the build
+  ID. We do **not** call `POST /v1/apps` (the API forbids it).
 
-Documented seams are left for two future opt-ins: a Trapeze/hand-coded
-`PRODUCT_BUNDLE_IDENTIFIER` rewriter ("fix it for me"), and an "offer to create
-the app" flow. Neither is built now.
+Documented seam for one future opt-in: a Trapeze/hand-coded
+`PRODUCT_BUNDLE_IDENTIFIER` rewriter ("fix it for me") so the user doesn't have
+to hand-edit Xcode. Not built now.
 
 ## Design
 
-### Source of truth (remote-informed, Release-anchored)
+### The single invariant
+
+To pass this step (always `app_store` mode), one thing must be true:
+
+> **An App Store Connect app exists whose `bundleId` == the Release build ID.**
+
+Everything below is just *why* the invariant is unmet and *which* action resolves
+it. The gate re-checks the invariant **via the API** on every Continue.
+
+### Source of truth (remote-verified, Release-anchored)
 
 - The bundle ID **wired into Apple-side work** (`ensureBundleId`, profile,
   provisioning map, `iosBundleIdOverride`) is always the **Release build ID**.
-  Combined with the divergence gate, the user only proceeds once that build ID
-  matches the App Store app they intend to ship to.
-- App Store Connect data is **authoritative for truth** (which apps exist) and
-  drives the warnings, the picker, and the divergence gate — but in v1 it never
-  triggers silent file edits or Apple-resource creation.
+  The gate guarantees the user only proceeds once an ASC app exists for it.
+- App Store Connect data is **authoritative** (what exists) and is what we
+  re-poll to confirm the user actually did the required action. In v1 we never
+  silently edit files or auto-create resources.
 
 ### New verification step
 
-Add a remote-verification step that runs **after `verifying-key` succeeds**
-(ASC token available), **only in `app_store` mode**. It extends the existing
-`redirectIfMismatch` seam rather than replacing the local `confirm-app-id`
-machinery.
+Runs **after `verifying-key` succeeds** (ASC token available), **only in
+`app_store` mode**. Extends the existing `redirectIfMismatch` seam rather than
+replacing the local `confirm-app-id` machinery.
 
 1. Fetch **both** ASC endpoints **in parallel** (`Promise.all`): `GET /v1/apps`
-   (→ `bundleId` + `name`, used for the picker) and `GET /v1/bundleIds` (→
-   registered identifier strings, used only as a diagnostic — see the no-match
-   branch). On failure, see step 4.
-2. Resolve the **Release** build bundle ID via the hardened
-   `parsePbxprojBundleId` (always the Release config; no debug/suffix
-   heuristics). If no Release config can be resolved, skip remote gating and
-   warn (see step 4). **If the Debug-config bundle ID differs from the Release
-   one, print a one-line informational note** (e.g. "Note: Debug builds
-   `com.foo.app.debug`, Release builds `com.foo.app` — Capgo Builder uses the
-   Release ID `com.foo.app`."). Awareness only — it never triggers the picker or
-   the gate.
-3. Branch:
-   - **Exact match** (Release build ID == an ASC app's bundle ID): print a
-     one-line confirmation, e.g.
+   (→ `bundleId` + `name`, for the picker + invariant check) and
+   `GET /v1/bundleIds` (→ registered identifiers, diagnostic only). On failure,
+   see step 5.
+2. Resolve the **Release** build bundle ID via the hardened `parsePbxprojBundleId`
+   (always Release; no debug/suffix heuristics). If no Release config can be
+   resolved, skip gating and warn (step 5). **If the Debug-config bundle ID
+   differs from Release, print a one-line informational note** (e.g. "Note:
+   Debug builds `com.foo.app.debug`, Release builds `com.foo.app` — Capgo Builder
+   uses the Release ID `com.foo.app`."). Awareness only — never gates.
+3. Evaluate the invariant:
+   - **Satisfied** (an ASC app's bundle ID == the Release build ID): print
      `✓ Building "Foo" (com.foo.app) — matches your App Store app.` No prompt.
-     Continue. (Also the all-agree case.)
-   - **No match, account has apps (Problem 1):** show a picker listing the
-     **real App Store apps** (name + bundle ID, marked as existing) plus a
-     "my project is correct as-is / none of these" option. The user picks the
-     intended app.
-     - If the picked app's bundle ID ≠ the Release build ID → **gate the
-       Continue action** (see "Divergence gate" below). We never edit files; the
-       user fixes `PRODUCT_BUNDLE_IDENTIFIER` (Release) themselves and the gate
-       re-detects on each Continue. `capacitor.config.appId` is left untouched.
-     - If the user picks "none of these / my build ID is correct" → fall to
-       Problem 2 handling.
-   - **No app matches the build ID (Problem 2):** use the `/v1/bundleIds`
-     diagnostic to sharpen the warning into one of two sub-states, **each with a
-     concrete action**:
-     - *Identifier already registered (present in `/v1/bundleIds`) but no app
-       record* → "The identifier `com.foo.app` exists in your Apple account but
-       has no App Store listing. Signing will work; for `app_store`/TestFlight
-       delivery you must create the app in App Store Connect first (ad-hoc needs
-       nothing more)."
-     - *Identifier not registered at all* → "`com.foo.app` isn't registered in
-       your Apple account yet — onboarding will register it as a new identifier
-       so signing works.
-       • **If this is a new app:** that's expected — create the App Store listing
-         in App Store Connect for TestFlight delivery (ad-hoc needs nothing more).
-       • **If `com.foo.app` is a typo, or you meant an existing app:** cancel
-         onboarding, correct `PRODUCT_BUNDLE_IDENTIFIER` (Release) in Xcode, and
-         re-run."
-       (This replaces the old vague "fix it now": it spells out both the
-       genuinely-new-app path and the wrong-ID path, and addresses the original
-       silent-creation concern by naming exactly what onboarding is about to do.)
-     Problem 2 is **not gated** — there is no local file fix that resolves it
-     (the remaining step is creating the ASC app, which is deferred); the user
-     may proceed and create the app themselves, or ship ad-hoc. `ad_hoc` is
-     unaffected.
-4. **On ASC fetch failure** (auth / rate-limit / network): show a visible
-   warning — "Couldn't reach App Store Connect to verify your app; continuing
-   without remote verification." — and proceed. The pre-existing local
-   `confirm-app-id` logic is unchanged and still runs; there is no special
-   degrade path to maintain.
+     Continue.
+   - **Not satisfied** → enter the **verification gate** (step 4).
+4. **Verification gate.** Show the situation and the resolution path, then block
+   Continue until the invariant holds (re-checked via the API on each Continue —
+   see "Verification gate" below). Two resolution paths, chosen by sub-case:
+   - **Account has apps, none match the build ID** → likely a wrong build ID.
+     Show a picker of the **real App Store apps** (name + bundle ID) plus a
+     "None of these — my build ID is correct, create a new app" option.
+     - User picks an existing app whose bundle ID ≠ the build ID → **Path A (fix
+       the build ID):** instruct "Edit `PRODUCT_BUNDLE_IDENTIFIER` (Release) to
+       `com.foo.real` in Xcode." On Continue, re-detect from disk; pass when the
+       build ID matches that app.
+     - User picks "create a new app for my build ID" → **Path B (create the app)**.
+   - **No apps in account, or the user chose Path B** → **Path B (create the
+     app):** "No App Store app exists for `com.foo.app`."
+     - First, **register the identifier** (idempotent `ensureBundleId` for the
+       Release build ID) so it is selectable in the ASC new-app form. The
+       `/v1/bundleIds` diagnostic just tells us whether this registration already
+       happened (sharpens the wording: "identifier already exists" vs. "will be
+       registered").
+     - Offer **[Open App Store Connect to create the app]** (opens the new-app
+       page via `open`). The ASC API cannot create the app, so this is manual.
+     - On Continue, **re-poll `GET /v1/apps`**; pass once an app with
+       `bundleId == com.foo.app` exists.
+5. **On ASC fetch failure** (auth / rate-limit / network): show a visible warning
+   — "Couldn't reach App Store Connect to verify your app; continuing without
+   remote verification." — and proceed. We can't verify the invariant on a
+   transient failure, and blocking on it would trap the user; the pre-existing
+   local `confirm-app-id` logic still runs. (The gate only blocks on a *known*
+   unmet invariant, never on an unknown one.)
 
-### Divergence gate (Problem 1)
+### Verification gate
 
 The gate is enforced **on the Continue action** — there is no separate "press R
-to retry" (choosing Continue *is* the re-check):
+to retry" (choosing Continue *is* the re-check). The same mechanics apply to both
+resolution paths:
 
-- Each time the user chooses **Continue**, re-run detection **fresh from disk**
-  (re-read `pbxproj`/`Info.plist`; do **not** reuse the memoized initial
-  detection at `app.tsx:256`). If `PRODUCT_BUNDLE_IDENTIFIER` (Release) now
-  matches the chosen App Store app → proceed.
-- If it still diverges, **block** and show a warning box with the exact edit:
-  "Your project still builds `com.foo.wrong`. Edit `PRODUCT_BUNDLE_IDENTIFIER`
-  (Release) to `com.foo.real` in Xcode, then choose Continue again.
-  (`capacitor.config.appId` can stay as-is.)"
-- **Escalate on repeated unfixed attempts.** Track an attempt counter. Each
-  blocked Continue must look *visibly different* from the previous one so the
-  user never thinks the CLI is stuck — e.g. shift the box border colour, add an
-  `(attempt N)` marker, and surface the concrete detected file path and the
-  exact `wrong → right` values. Do **not** reprint the identical warning (that
-  reads as "nothing happened").
-- The user is never trapped: cancelling/exiting onboarding (the wizard's
-  standard exit) is always available. There is **no "continue anyway" override**
-  — proceeding past the gate requires the file to actually be fixed.
+- Each **Continue** re-evaluates the invariant **live**:
+  - Path A re-reads `pbxproj`/`Info.plist` **fresh from disk** (do **not** reuse
+    the memoized initial detection at `app.tsx:256`) and re-checks the build ID
+    against the chosen app.
+  - Path B re-fetches `GET /v1/apps` and checks for an app matching the build ID.
+  - If satisfied → proceed.
+- If still unmet, **block** and show a warning box naming the exact next action
+  (Path A: the precise `wrong → right` `PRODUCT_BUNDLE_IDENTIFIER` edit, noting
+  `capacitor.config.appId` can stay as-is; Path B: re-open the create-app page).
+- **Escalate on repeated unmet attempts.** Track an attempt counter; each blocked
+  Continue must look *visibly different* from the previous one (shift the box
+  border colour, add an `(attempt N)` marker, surface the concrete file path /
+  the bundle ID being polled) so the user never thinks the CLI is stuck. Do
+  **not** reprint the identical warning.
+- The user is never trapped: cancelling/exiting onboarding (the wizard's standard
+  exit) is always available. There is **no "continue anyway" override** —
+  proceeding requires the invariant to actually hold.
 
 ### Persistence / resume
 
 Reuse the existing `iosBundleIdOverride` + `iosBundleIdContextAppId` progress
-fields (`cli/src/build/onboarding/types.ts`). Because the divergence gate only
-lets the user past once `PRODUCT_BUNDLE_IDENTIFIER` (Release) matches the chosen
-App Store app, the wired-in value is always a build ID the project actually
-produces. Resume must not re-prompt when nothing changed.
+fields (`cli/src/build/onboarding/types.ts`). Because the gate only lets the user
+past once an ASC app exists for the Release build ID, the wired-in value is always
+a build ID that both the project produces and the App Store has. Resume must not
+re-prompt when nothing changed (re-run the invariant check on resume; if it now
+holds, don't gate).
 
 ## Components / boundaries
 
 - **`apple-api.ts`** — add `listApps(token)` (→ `{ bundleId, name }[]`, for the
-  picker) and `listBundleIds(token)` (→ registered identifier strings, for the
-  diagnostic), both using the existing `ascFetch`. The caller invokes them **in
-  parallel** (`Promise.all`). Pure data fetches.
+  picker + invariant + Path B re-poll) and `listBundleIds(token)` (→ registered
+  identifier strings, diagnostic), both using the existing `ascFetch`. The caller
+  invokes them **in parallel** (`Promise.all`). Pure data fetches. (`ensureBundleId`
+  already exists and is reused for Path B registration.)
 - **`bundle-id-detector.ts`** — keep/extend the low-level parse that returns the
   bundle ID for **each** build config (Release **and** Debug). A resolver returns
   the **Release** value as the authoritative build ID (never a Debug value when
   Release is present; deterministic main-target pick); the Debug value (or a
   `debugReleaseDiffer` flag) is returned **alongside** and used only for the
-  awareness note. Extend it (or add a sibling) so divergence can be computed
-  against a remote app list using the Release value. Keep the pure/synchronous
-  local detection intact; remote data is passed in (no network inside the
-  detector — keeps it unit-testable). Expose a fresh-from-disk re-detection path
-  for the gate (no memoization).
-- **`app.tsx` state machine** — add the remote-verification step wired into the
-  post-`verifying-key` `redirectIfMismatch` fan-out, `app_store` mode only, with
-  the branches above. Implements the divergence gate: re-detect fresh from disk
-  on each Continue (bypassing the memoized detection at `app.tsx:256`), an
-  attempt counter, and an escalating warning box. On ASC fetch failure it warns
-  and proceeds.
+  awareness note. Expose a fresh-from-disk re-detection path for Path A of the
+  gate (no memoization). Keep the pure/synchronous local detection intact; remote
+  data is passed in (no network inside the detector — keeps it unit-testable).
+- **`app.tsx` state machine** — add the verification step wired into the
+  post-`verifying-key` `redirectIfMismatch` fan-out, `app_store` mode only.
+  Implements the invariant check and the gate: Path A re-detects fresh from disk
+  on each Continue (bypassing the memoized detection at `app.tsx:256`); Path B
+  re-polls `GET /v1/apps` on each Continue and offers to open the create-app
+  page; both share the attempt counter + escalating warning box. On ASC fetch
+  failure it warns and proceeds.
 - **`types.ts`** — extend the `OnboardingStep` union and `STEP_PROGRESS`/
   `getPhaseLabel` for the new step; reuse existing progress fields.
 
@@ -240,32 +245,36 @@ via `JSONExtractString`), so an unset `step` drops the event from funnels.
 
 Events:
 
-- **`iOS App Verify Shown`** — step entered (app_store mode). tags: `app_count`,
-  `bundle_id_count`, `debug_release_differ` (bool — whether the Debug-config
-  bundle ID differs from Release).
-- **`iOS App Verify Result`** — classification. tags: `result` ∈ {`exact-match`,
-  `divergence`, `problem2-identifier-exists`, `problem2-unregistered`,
-  `no-apps-in-account`, `fetch-failed`}, `app_count`, `bundle_id_count`.
+- **`iOS App Verify Shown`** — step entered. tags: `app_count`, `bundle_id_count`,
+  `debug_release_differ` (bool).
+- **`iOS App Verify Result`** — invariant classification. tags: `result` ∈
+  {`exact-match`, `wrong-build-id`, `no-app-identifier-exists`,
+  `no-app-unregistered`, `no-apps-in-account`, `fetch-failed`}, `app_count`,
+  `bundle_id_count`.
 - **`iOS App Verify Picked`** — user chose an app in the picker. tags:
-  `matches_build_id` (bool).
-- **`iOS App Verify Gate Blocked`** — a Continue was blocked by the divergence
-  gate. tags: `attempt` (N).
-- **`iOS App Verify Fixed`** — re-detect passed after the user edited the file.
-  tags: `attempts` (total before success).
+  `matches_build_id` (bool), `chose_create_new` (bool).
+- **`iOS App Verify Create App Opened`** — user opened the ASC create-app page
+  (Path B). tags: `attempt`.
+- **`iOS App Verify Gate Blocked`** — a Continue was blocked. tags: `attempt`,
+  `path` (`fix-build-id` | `create-app`).
+- **`iOS App Verify Passed`** — invariant satisfied after the gate. tags:
+  `attempts` (total), `path`.
 - **`iOS App Verify Cancelled`** — user exited onboarding from the gate. tags:
-  `attempt`.
+  `attempt`, `path`.
 
 All events fire best-effort (`void trackEvent(...)`) and must never block or
 throw into the wizard.
 
 ## Error handling
 
-- ASC fetch failure (auth/rate-limit/network) → visible warning, proceed
-  (pre-existing local checks unchanged).
-- `ad_hoc` mode → skip the remote check entirely.
-- Empty app list → treated as Problem 2 (warn, not gated).
-- Problem 1 divergence → gate Continue until the file is fixed (re-detect each
-  attempt); exit/cancel always available.
+- ASC fetch failure (auth/rate-limit/network) → visible warning, proceed (we
+  can't verify a transient failure; pre-existing local checks still run).
+- `ad_hoc` mode → step is skipped entirely (never reached).
+- No Release config resolvable → warn, skip gating (don't gate on a Debug value).
+- Unmet invariant → gate Continue (Path A or B); re-verify via API each attempt;
+  exit/cancel always available.
+- `open` (create-app page) failure → print the URL so the user can open it
+  manually; keep gating.
 - Never throw out of the verification step in a way that aborts onboarding
   unexpectedly.
 
@@ -273,22 +282,22 @@ throw into the wizard.
 
 - **Unit (pure):** the hardened `parsePbxprojBundleId` — always picks Release
   over Debug (incl. a Debug ID that diverges by more than a `.debug` suffix) and
-  the no-Release-config case — plus the extended detector (exact match,
-  divergence with apps, no apps, dedup/ordering). Extends the existing
+  the no-Release-config case — plus the extended detector (exact match, wrong
+  build ID, dedup/ordering, Debug value exposed). Extends the existing
   `cli/test/test-bundle-id-detector.mjs`, which already covers Release-over-Debug
   at line 35.
 - **Unit:** `listApps` and `listBundleIds` response parsing (mock `ascFetch`),
-  including the parallel fetch and the two Problem-2 sub-states (identifier
-  registered vs. not registered).
-- **Branch/decision tests:** the branch classifier (exact-match / divergence /
-  Problem-2 sub-states / no-apps / fetch-failed) + `ad_hoc` skip as a pure
-  decision function (mirrors `decideBuilderCtaSurface` /
-  `shouldBlockIncompatibleUpload` in `builder-cta.ts`).
-- **Gate logic (pure):** given (chosen app bundle ID, freshly-detected Release
-  build ID, attempt N) → `{ proceed | block, escalationLevel }`. Covers
-  fixed-on-attempt-2 (proceed) and still-broken (block + higher escalation).
-- **Analytics:** assert the events above fire with the expected properties
-  (incl. a non-null `step`), following `cli/test/test-onboarding-telemetry.mjs`.
+  including the parallel fetch.
+- **Invariant/decision tests (pure):** classify (exact-match / wrong-build-id /
+  no-app-identifier-exists / no-app-unregistered / no-apps-in-account /
+  fetch-failed), mirroring `decideBuilderCtaSurface` / `shouldBlockIncompatibleUpload`
+  in `builder-cta.ts`.
+- **Gate logic (pure):** given (invariant inputs, path, attempt N) →
+  `{ proceed | block, escalationLevel }`. Path A: fixed-on-attempt-2 proceeds,
+  still-wrong blocks with higher escalation. Path B: app-appears-on-re-poll
+  proceeds, still-absent blocks.
+- **Analytics:** assert the events above fire with the expected properties (incl.
+  a non-null `step`), following `cli/test/test-onboarding-telemetry.mjs`.
 - Wire a `test:` script entry in `cli/package.json` and the aggregate `test`
   chain, matching the existing onboarding test pattern.
 
@@ -297,13 +306,17 @@ throw into the wizard.
 - Android remote verification (API cannot enumerate apps).
 - Editing `pbxproj` (Trapeze or hand-coded) — deferred opt-in. `capacitor.config`
   is never touched.
-- Creating the App Store Connect app (`POST /v1/apps`) — deferred opt-in.
+- Auto-creating the App Store Connect app — **impossible** via the API
+  (`apps` is GET/UPDATE only); we open the web page and verify by re-polling.
 - `ad_hoc`-mode remote checks.
 
 ## Open questions for implementation plan
 
-- Exact placement of the new step relative to `creating-certificate` (before
-  cert creation is ideal so a wrong ID is caught earliest).
+- Exact placement of the new step relative to `creating-certificate` (before cert
+  creation is ideal so a wrong/missing app is caught earliest; note Path B calls
+  `ensureBundleId` here, which the create-new path also calls later — idempotent).
 - The precise Ink rendering of the escalating warning box (border colour ramp,
-  attempt marker, file path surfacing) — behaviour is specified above; the
-  visual treatment is an implementation detail.
+  attempt marker, file path / polled bundle ID surfacing) — behaviour is
+  specified above; the visual treatment is an implementation detail.
+- Re-poll cadence / debounce for Path B (it re-polls only on Continue, so this is
+  user-driven — confirm no background polling is wanted).
