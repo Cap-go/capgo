@@ -282,6 +282,14 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
   // Path B only: when a Continue re-poll still finds no app, we flip this so
   // the next render asks before re-opening the browser (never auto-reopen).
   const [verifyAskReopen, setVerifyAskReopen] = useState(false)
+  // Bumped on every gate Select action so the gate Select remounts with a fresh
+  // key. @inkjs/ui's Select re-fires onChange on EVERY render once it stays
+  // mounted after a selection (its internal onChange effect deps include the
+  // inline options/onChange identities, and previousValue !== value stays true)
+  // — which otherwise loops the gate (e.g. "attempt 3427"). Every other Select in
+  // the wizard dodges this by navigating away on select; the gate stays on-step,
+  // so we force a remount to reset the Select's internal value.
+  const [gateActionSeq, setGateActionSeq] = useState(0)
   // Guards the one-shot Shown event + the initial fetch effect from re-firing
   // on every re-render while we're parked on verify-app.
   const verifyShownRef = useRef(false)
@@ -1028,6 +1036,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
     setVerifyChosenApp(null)
     setVerifyAttempt(0)
     setVerifyAskReopen(false)
+    setGateActionSeq(0)
   }, [appId, iosBundleIdInitial])
 
   // Extract Key ID from .p8 filename — delegates to the module-level helper so
@@ -3364,11 +3373,13 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
               </Box>
               <Newline />
               <Select
+                key={`gate-a-${gateActionSeq}`}
                 options={[
                   { label: '✅ I\'ve edited it — re-check', value: 'continue' },
                   { label: '❌ Cancel onboarding', value: 'cancel' },
                 ]}
                 onChange={(value) => {
+                  setGateActionSeq(s => s + 1)
                   if (value === 'continue')
                     void continueFixBuildId()
                   else
@@ -3394,12 +3405,14 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
                 </Box>
                 <Newline />
                 <Select
+                  key={`gate-b-reopen-${gateActionSeq}`}
                   options={[
                     { label: '🔁 I\'ve created it — re-check', value: 'recheck' },
                     { label: '🌐 Re-open the create-app page', value: 'reopen' },
                     { label: '❌ Cancel onboarding', value: 'cancel' },
                   ]}
                   onChange={(value) => {
+                    setGateActionSeq(s => s + 1)
                     if (value === 'recheck')
                       void continueCreateApp()
                     else if (value === 'reopen')
@@ -3431,12 +3444,14 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
               </Box>
               <Newline />
               <Select
+                key={`gate-b-${gateActionSeq}`}
                 options={[
                   { label: '🌐 Open App Store Connect to create the app', value: 'open' },
                   { label: '🔁 I\'ve already created it — re-check', value: 'recheck' },
                   { label: '❌ Cancel onboarding', value: 'cancel' },
                 ]}
                 onChange={(value) => {
+                  setGateActionSeq(s => s + 1)
                   if (value === 'open')
                     void openCreatePage()
                   else if (value === 'recheck')
