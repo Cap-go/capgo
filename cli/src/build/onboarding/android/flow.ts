@@ -69,9 +69,12 @@ import { generateProjectId, sanitizeGcpProjectDisplayName, ANDROIDPUBLISHER_API,
 import { generateRandomPassword } from './keystore.js'
 import { MissingScopesError } from './oauth-google.js'
 import { CAPGO_SA_DEVELOPER_PERMISSIONS, CAPGO_SA_APP_PERMISSIONS } from './play-api.js'
-import { getCiSecretTargetLabel } from '../ci-secrets.js'
-import { buildScriptPickerOptions } from '../workflow-ui-helpers.js'
-import { WORKFLOW_PATH } from '../workflow-generator.js'
+// ── Platform-neutral post-save tail (CI-secrets → env-export → workflow-file →
+//    build-request). The android engine delegates the tail steps to this shared
+//    module and adapts its neutral view to AndroidStepView. EXCLUDES the
+//    ai-analysis-* sub-flow (TUI-only).
+import type { TailEffectDeps, TailInput, TailStep, TailStepCtx, TailStepView } from '../tail/flow.js'
+import { applyTailInput, runTailEffect, tailViewForStep } from '../tail/flow.js'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -333,79 +336,6 @@ const OPTIONS_GCP_PROJECT_NEW: AndroidStepOption = {
   label: 'Create a new project',
 }
 
-// ─── Post-save "tail" option tables ───────────────────────────────────────────
-//
-// Mirror the <Select> options rendered in the Phase 6 tail of android/ui/app.tsx
-// (CI-secrets → env-export → workflow-file → build-request). Labels are copied
-// verbatim from the TUI so a driver renders the exact same menu. ci-secrets-
-// target-select and pick-build-script are built dynamically below because their
-// options depend on runtime data (detected targets / package.json scripts).
-
-// ci-secrets-setup (android-ci.tsx CiSecretsSetupStep): retry / skip.
-const OPTIONS_CI_SECRETS_SETUP: AndroidStepOption[] = [
-  { value: 'retry', label: 'I installed and logged in, check again' },
-  { value: 'skip', label: 'Skip upload' },
-]
-
-// confirm-ci-secret-overwrite (android-ci.tsx ConfirmCiSecretOverwriteStep).
-const OPTIONS_CONFIRM_CI_SECRET_OVERWRITE: AndroidStepOption[] = [
-  { value: 'replace', label: 'Replace existing env vars' },
-  { value: 'skip', label: 'Skip upload' },
-]
-
-// ci-secrets-failed (android-ci.tsx CiSecretsFailedStep): retry / continue.
-const OPTIONS_CI_SECRETS_FAILED: AndroidStepOption[] = [
-  { value: 'retry', label: 'Try upload again' },
-  { value: 'continue', label: 'Continue without upload' },
-]
-
-// ask-github-actions-setup (app.tsx ~2988): the 3-way GitHub Actions choice.
-const OPTIONS_ASK_GITHUB_ACTIONS_SETUP: AndroidStepOption[] = [
-  { value: 'with-workflow', label: '🚀  Yes — set the secrets AND create a workflow file' },
-  { value: 'secrets-only', label: '🔒  Yes — set ONLY the secrets' },
-  { value: 'no', label: '❌  No' },
-]
-
-// confirm-env-export-overwrite (app.tsx ~3054): replace / skip.
-const OPTIONS_CONFIRM_ENV_EXPORT_OVERWRITE: AndroidStepOption[] = [
-  { value: 'replace', label: '✏️   Replace it' },
-  { value: 'skip', label: '🛑  Skip — keep the existing file' },
-]
-
-// pick-package-manager (app.tsx ~3080): the four supported managers.
-const OPTIONS_PICK_PACKAGE_MANAGER: AndroidStepOption[] = [
-  { value: 'bun', label: '📦  bun' },
-  { value: 'npm', label: '📦  npm' },
-  { value: 'pnpm', label: '📦  pnpm' },
-  { value: 'yarn', label: '📦  yarn' },
-]
-
-// preview-workflow-file (app.tsx ~3174): write / view diff / cancel.
-const OPTIONS_PREVIEW_WORKFLOW_FILE: AndroidStepOption[] = [
-  { value: 'write', label: '✏️   Write file' },
-  { value: 'view', label: '👀  Show proposed file diff' },
-  { value: 'cancel', label: '❌  Do not write file' },
-]
-
-// view-workflow-diff (app.tsx FullscreenDiffViewer onExit → back to preview).
-const OPTIONS_VIEW_WORKFLOW_DIFF: AndroidStepOption[] = [
-  { value: 'close', label: 'Close diff' },
-]
-
-// ask-build (android-ci.tsx AskBuildStep): request a build now or not.
-const OPTIONS_ASK_BUILD: AndroidStepOption[] = [
-  { value: 'yes', label: '🚀  Yes, request a build' },
-  { value: 'no', label: '⏭   Not now' },
-]
-
-// pick-build-script fallback options — the two escape hatches that are always
-// present in buildScriptPickerOptions (custom command + skip). Used when the
-// driver has not yet supplied ctx.availableScripts.
-const OPTIONS_PICK_BUILD_SCRIPT_FALLBACK: AndroidStepOption[] = [
-  { value: '__custom__', label: 'Type a custom command…' },
-  { value: '__skip__', label: 'Skip build step (my app is raw HTML)' },
-]
-
 // ─── androidViewForStep ───────────────────────────────────────────────────────
 
 /**
@@ -431,6 +361,12 @@ export function androidViewForStep(
   progress: AndroidOnboardingProgress | null,
   ctx: AndroidStepCtx,
 ): AndroidStepView {
+  // Post-save tail: delegate to the shared platform-neutral view and adapt its
+  // output back to AndroidStepView. AndroidStepCtx is a superset of TailStepCtx,
+  // so it threads straight through.
+  if (TAIL_VIEW_STEPS.has(step))
+    return mapTailViewToAndroidStepView(tailViewForStep(step as TailStep, progress, ctx as TailStepCtx), step)
+
   // Dynamic kind for android-package-select; all others fall through to KIND_TABLE.
   const kind: AndroidStepView['kind'] = step === 'android-package-select'
     ? (ctx.detectedPackageIds === undefined
@@ -542,129 +478,6 @@ export function androidViewForStep(
       }
       return base
     }
-
-    // ── Phase 6 — Post-save "tail": CI-secrets → env-export → workflow-file ──
-    // Each case mirrors the matching <Select>/prompt in android/ui/app.tsx so a
-    // driver renders the same menu. Dynamic option lists (target picker, build-
-    // script picker) read OPTIONAL ctx; when the ctx is absent the static
-    // fallback options keep the view usable.
-
-    // ci-secrets-setup — git-hosting CLI not ready; retry or skip the upload.
-    case 'ci-secrets-setup':
-      return { ...base, title: 'Set up your git hosting CLI to upload env vars', options: OPTIONS_CI_SECRETS_SETUP }
-
-    // ci-secrets-target-select — one row per detected destination + a Skip row.
-    case 'ci-secrets-target-select': {
-      const targetOptions: AndroidStepOption[] = (ctx.ciSecretTargets ?? []).map(target => ({
-        value: target.provider,
-        label: target.provider === 'github' ? 'GitHub Actions repository secrets' : 'GitLab CI/CD variables',
-      }))
-      return {
-        ...base,
-        prompt: 'Where should Capgo upload the build env vars?',
-        options: [...targetOptions, { value: 'skip', label: 'Skip' }],
-      }
-    }
-
-    // ask-ci-secrets — confirm the upload to the chosen target (GitLab path).
-    case 'ask-ci-secrets': {
-      const entryCount = ctx.ciSecretEntries?.length ?? 0
-      const targetLabel = getCiSecretTargetLabel(progress?.ciSecretTarget ?? null)
-      const cli = progress?.ciSecretTarget?.cli || 'CLI'
-      return {
-        ...base,
-        prompt: `Upload ${entryCount} build env var${entryCount === 1 ? '' : 's'} to ${targetLabel}?`,
-        options: [
-          { value: 'yes', label: `Upload with ${cli}` },
-          { value: 'no', label: 'Skip' },
-        ],
-      }
-    }
-
-    // confirm-ci-secret-overwrite — some keys already exist; replace or skip.
-    case 'confirm-ci-secret-overwrite':
-      return { ...base, prompt: 'These env vars already exist and will be replaced:', options: OPTIONS_CONFIRM_CI_SECRET_OVERWRITE }
-
-    // ci-secrets-failed — the upload threw; retry or continue (credentials are saved).
-    case 'ci-secrets-failed':
-      return { ...base, message: 'Could not upload env vars.', options: OPTIONS_CI_SECRETS_FAILED }
-
-    // ask-github-actions-setup — the 3-way GitHub Actions choice.
-    case 'ask-github-actions-setup':
-      return { ...base, prompt: 'Set up GitHub Actions for you?', options: OPTIONS_ASK_GITHUB_ACTIONS_SETUP }
-
-    // confirm-secrets-push — last gate before pushing to the repo.
-    case 'confirm-secrets-push': {
-      const repo = ctx.ciSecretRepoLabel ?? 'the repository'
-      return {
-        ...base,
-        prompt: `Confirm before pushing secrets to ${repo}`,
-        options: [
-          { value: 'confirm', label: `Yes, push to ${repo}` },
-          { value: 'cancel', label: 'Cancel — don\'t push anything' },
-        ],
-      }
-    }
-
-    // ask-export-env — export the credentials as a .env file instead.
-    case 'ask-export-env': {
-      const fileName = (ctx.defaultEnvExportPath ?? '').split('/').slice(-1)[0]
-      const yesLabel = fileName ? `📝  Yes — write ${fileName}` : '📝  Yes — write the .env file'
-      return {
-        ...base,
-        prompt: 'Export the credentials as a .env file instead?',
-        options: [
-          { value: 'yes', label: yesLabel },
-          { value: 'no', label: '❌  No, exit without exporting' },
-        ],
-      }
-    }
-
-    // confirm-env-export-overwrite — the .env already exists; replace or skip.
-    case 'confirm-env-export-overwrite': {
-      const path = progress?.envExportTargetPath ?? ctx.defaultEnvExportPath ?? 'the file'
-      return { ...base, prompt: `${path} already exists. Replace it with a fresh export, or skip?`, options: OPTIONS_CONFIRM_ENV_EXPORT_OVERWRITE }
-    }
-
-    // pick-package-manager — drives install + build steps in the workflow.
-    case 'pick-package-manager': {
-      const detected = ctx.detectedPackageManager
-      const options: AndroidStepOption[] = OPTIONS_PICK_PACKAGE_MANAGER.map(opt =>
-        detected && opt.value === detected
-          ? { ...opt, label: `${opt.label}  (recommended — matches your lockfile)` }
-          : opt,
-      )
-      return { ...base, prompt: 'Which package manager does this project use?', options }
-    }
-
-    // pick-build-script — pick the script that builds the web assets.
-    case 'pick-build-script': {
-      const options = ctx.availableScripts
-        ? buildScriptPickerOptions(ctx.availableScripts, ctx.recommendedScript ?? null)
-            .map(o => ({ value: o.value, label: o.label }))
-        : OPTIONS_PICK_BUILD_SCRIPT_FALLBACK
-      return { ...base, prompt: 'Which script builds your web assets?', options }
-    }
-
-    // pick-build-script-custom — free-text custom build command.
-    case 'pick-build-script-custom':
-      return { ...base, prompt: 'Custom build command', collect: ['buildScriptCustomCommand'] }
-
-    // preview-workflow-file — write / view diff / cancel.
-    case 'preview-workflow-file':
-      return { ...base, prompt: `What should we do with ${WORKFLOW_PATH}?`, options: OPTIONS_PREVIEW_WORKFLOW_FILE }
-
-    // view-workflow-diff — fullscreen diff takeover; only action is to close.
-    case 'view-workflow-diff':
-      return { ...base, title: 'Proposed workflow diff', options: OPTIONS_VIEW_WORKFLOW_DIFF }
-
-    // ask-build — final prompt: request a build now or finish.
-    case 'ask-build':
-      return { ...base, prompt: 'Request a build now?', options: OPTIONS_ASK_BUILD }
-
-    // ── Done ──
-    case 'build-complete':
-      return { ...base, message: 'Build complete.' }
 
     // ── Error ──
     case 'error':
@@ -847,6 +660,12 @@ export function applyAndroidInput(
   progress: AndroidOnboardingProgress,
   input: AndroidInput,
 ): AndroidOnboardingProgress {
+  // Post-save tail: delegate the tail choice/input reducers to the shared
+  // platform-neutral module. The android tail AndroidInput variants are
+  // structurally identical to TailInput, so they thread straight through.
+  if (TAIL_INPUT_STEPS.has(step))
+    return applyTailInput(step as TailStep, progress, input as TailInput)
+
   switch (step) {
     // ── credentials-exist ─────────────────────────────────────────────────────
     // Data-safety gate. app.tsx routes 'backup' → setStep('backing-up') and
@@ -1062,67 +881,6 @@ export function applyAndroidInput(
         ...progress,
         completedSteps: { ...progress.completedSteps, androidPackageChosen: choice },
       }
-    }
-
-    // ── Phase 6 — Post-save "tail" reducers ────────────────────────────────────
-    // Write the matching TailProgress field for each tail choice/input step,
-    // mirroring the `setX(...)` setState call the TUI fires in android/ui/app.tsx.
-    // Navigation-only / spinner-gate values (retry/skip/view/close/confirm/cancel
-    // and the yes/no build gate) carry no persisted field and fall through to the
-    // `default` below unchanged — exactly like the existing 'learn'/'manual' cases.
-
-    // ── ci-secrets-target-select ──────────────────────────────────────────────
-    // app.tsx ~2945: setCiSecretTarget(target) — records the chosen destination
-    // (null when the user picked "Skip").
-    case 'ci-secrets-target-select': {
-      const i = input as Extract<AndroidInput, { step: 'ci-secrets-target-select' }>
-      return { ...progress, ciSecretTarget: i.ciSecretTarget }
-    }
-
-    // ── ask-github-actions-setup ──────────────────────────────────────────────
-    // app.tsx ~2996/3000: setSetupMode('declined' | 'with-workflow' | 'secrets-only').
-    case 'ask-github-actions-setup': {
-      const i = input as Extract<AndroidInput, { step: 'ask-github-actions-setup' }>
-      return { ...progress, setupMode: i.value }
-    }
-
-    // ── ask-export-env ────────────────────────────────────────────────────────
-    // app.tsx ~3029: setEnvExportTargetPath(defaultExportPath(...)) on 'yes';
-    // 'no' exits without recording a path (falls through unchanged).
-    case 'ask-export-env': {
-      const i = input as Extract<AndroidInput, { step: 'ask-export-env' }>
-      if (i.value === 'yes')
-        return { ...progress, envExportTargetPath: i.envExportTargetPath }
-      return progress
-    }
-
-    // ── pick-package-manager ──────────────────────────────────────────────────
-    // app.tsx ~3088: setSelectedPackageManager(value).
-    case 'pick-package-manager': {
-      const i = input as Extract<AndroidInput, { step: 'pick-package-manager' }>
-      return { ...progress, selectedPackageManager: i.selectedPackageManager }
-    }
-
-    // ── pick-build-script ─────────────────────────────────────────────────────
-    // app.tsx ~3111/3119: setBuildScriptChoice({ type: 'skip' | 'npm-script' }).
-    // '__custom__' routes to the custom-command input (navigation-only) and so
-    // falls through unchanged.
-    case 'pick-build-script': {
-      const i = input as Extract<AndroidInput, { step: 'pick-build-script' }>
-      if ('buildScriptChoice' in i)
-        return { ...progress, buildScriptChoice: i.buildScriptChoice }
-      return progress
-    }
-
-    // ── pick-build-script-custom ──────────────────────────────────────────────
-    // app.tsx ~3149: setBuildScriptChoice({ type: 'custom', command }). Mirrors
-    // the TUI's trim + non-empty guard (empty → progress unchanged).
-    case 'pick-build-script-custom': {
-      const i = input as Extract<AndroidInput, { step: 'pick-build-script-custom' }>
-      const command = i.command.trim()
-      if (!command)
-        return progress
-      return { ...progress, buildScriptChoice: { type: 'custom', command } }
     }
 
     default:
@@ -1423,38 +1181,120 @@ function rebuildTailCredentials(progress: AndroidOnboardingProgress): Record<str
 }
 
 /**
- * The full saved-credential map for the env-export effects. Prefers the
- * driver's carried copy (the exact map `saving-credentials` wrote, mirroring
- * the TUI's `savedCredentials` state) so the exported .env carries the full
- * field set; falls back to a single lossy rebuild from progress only when the
- * driver did not thread it through.
+ * Build the ANDROID saved-credential SHAPE written at `saving-credentials`.
+ * Replicates the doSaveCredentials guards verbatim (app.tsx:704–709) so the
+ * shared tail module stays platform-neutral while android owns its field set.
  */
-function tailSavedCredentials(progress: AndroidOnboardingProgress, deps: AndroidEffectDeps): Record<string, string> {
-  const carried = deps.carried?.savedCredentials
-  if (carried && Object.keys(carried).length > 0)
-    return carried
-  return rebuildTailCredentials(progress)
+function buildAndroidSavedCredentials(progress: AndroidOnboardingProgress): Record<string, string> {
+  const keystoreBase64 = progress._keystoreBase64
+  if (!keystoreBase64)
+    throw new Error('keystore not ready')
+  const serviceAccountKeyBase64 = progress._serviceAccountKeyBase64
+  if (!serviceAccountKeyBase64)
+    throw new Error('service-account key not provisioned')
+  const keystoreStorePassword = progress.keystoreStorePassword
+  const keystoreAlias = progress.keystoreAlias
+  if (!keystoreStorePassword || !keystoreAlias)
+    throw new Error('keystore inputs missing')
+
+  return {
+    ANDROID_KEYSTORE_FILE: keystoreBase64,
+    KEYSTORE_KEY_ALIAS: keystoreAlias,
+    KEYSTORE_STORE_PASSWORD: keystoreStorePassword,
+    KEYSTORE_KEY_PASSWORD: progress.keystoreKeyPassword || keystoreStorePassword,
+    PLAY_CONFIG_JSON: serviceAccountKeyBase64,
+  }
 }
 
 /**
- * The CI-secret entries for the upload / workflow effects. Prefers the driver's
- * carried entries (resolved ONCE at `saving-credentials` with the Capgo API key
- * folded in) so we never re-derive — and never re-resolve the API key. Falls
- * back to a single re-derivation from progress only when the driver did not
- * thread them through (entries then omit CAPGO_TOKEN). Returns [] when neither
- * the carried entries nor the `createCiSecretEntries` helper + rebuildable
- * credentials are available (e.g. a post-delete resume).
+ * The set of post-save tail steps the android engine delegates to the shared
+ * platform-neutral module (`../tail/flow.js`). EXCLUDES ai-analysis-* (TUI-only)
+ * and the android-specific provisioning effects. Effect-bearing tail steps live
+ * in TAIL_EFFECT_STEPS; the view/input delegation uses TAIL_STEPS.
  */
-function tailCiSecretEntries(progress: AndroidOnboardingProgress, deps: AndroidEffectDeps): CiSecretEntry[] {
-  const carried = deps.carried?.ciSecretEntries
-  if (carried)
-    return carried
-  if (!deps.createCiSecretEntries)
-    return []
-  const credentials = rebuildTailCredentials(progress)
-  if (Object.keys(credentials).length === 0)
-    return []
-  return deps.createCiSecretEntries(credentials)
+const TAIL_EFFECT_STEPS = new Set<AndroidOnboardingStep>([
+  'saving-credentials',
+  'detecting-ci-secrets',
+  'checking-ci-secrets',
+  'uploading-ci-secrets',
+  'exporting-env',
+  'overwrite-and-export-env',
+  'writing-workflow-file',
+  'requesting-build',
+])
+
+const TAIL_VIEW_STEPS = new Set<AndroidOnboardingStep>([
+  'ci-secrets-setup',
+  'ci-secrets-target-select',
+  'ask-ci-secrets',
+  'confirm-ci-secret-overwrite',
+  'ci-secrets-failed',
+  'ask-github-actions-setup',
+  'confirm-secrets-push',
+  'ask-export-env',
+  'confirm-env-export-overwrite',
+  'pick-package-manager',
+  'pick-build-script',
+  'pick-build-script-custom',
+  'preview-workflow-file',
+  'view-workflow-diff',
+  'ask-build',
+  'build-complete',
+])
+
+const TAIL_INPUT_STEPS = new Set<AndroidOnboardingStep>([
+  'ci-secrets-target-select',
+  'ask-github-actions-setup',
+  'ask-export-env',
+  'pick-package-manager',
+  'pick-build-script',
+  'pick-build-script-custom',
+])
+
+/**
+ * Adapt the android effect deps to the platform-neutral TailEffectDeps. The
+ * shared tail module owns the routing/branching; android supplies its platform
+ * tag, credential SHAPE, lossy rebuild and resume resolver, plus the same
+ * injected helpers (passed straight through).
+ */
+function toTailDeps(deps: AndroidEffectDeps): TailEffectDeps<AndroidOnboardingProgress> {
+  return {
+    platform: 'android',
+    buildSavedCredentials: buildAndroidSavedCredentials,
+    rebuildTailCredentials,
+    resumeStep: getAndroidResumeStep,
+    updateSavedCredentials: deps.updateSavedCredentials,
+    loadProgress: deps.loadAndroidProgress,
+    saveProgress: deps.saveAndroidProgress,
+    deleteProgress: deps.deleteAndroidProgress,
+    createCiSecretEntries: deps.createCiSecretEntries,
+    detectCiSecretTargets: deps.detectCiSecretTargets,
+    getCiSecretRepoLabelAsync: deps.getCiSecretRepoLabelAsync,
+    listExistingCiSecretKeysAsync: deps.listExistingCiSecretKeysAsync,
+    uploadCiSecretsAsync: deps.uploadCiSecretsAsync,
+    exportCredentialsToEnv: deps.exportCredentialsToEnv,
+    defaultExportPath: deps.defaultExportPath,
+    generateWorkflow: deps.generateWorkflow,
+    writeWorkflowFile: deps.writeWorkflowFile,
+    requestBuildInternal: deps.requestBuildInternal,
+    carried: deps.carried,
+    onStatus: deps.onStatus,
+    onLog: deps.onLog,
+    signal: deps.signal,
+  }
+}
+
+/** Map the shared TailStepView back onto AndroidStepView (same field shape). */
+function mapTailViewToAndroidStepView(v: TailStepView, step: AndroidOnboardingStep): AndroidStepView {
+  return {
+    step,
+    kind: v.kind,
+    title: v.title,
+    prompt: v.prompt,
+    collect: v.collect,
+    options: v.options,
+    message: v.message,
+  }
 }
 
 // ─── runAndroidEffect ─────────────────────────────────────────────────────────
@@ -1475,6 +1315,20 @@ export async function runAndroidEffect(
   progress: AndroidOnboardingProgress,
   deps: AndroidEffectDeps,
 ): Promise<AndroidEffectResult> {
+  // Post-save tail: delegate to the platform-neutral shared module. The tail
+  // routing/branching/transient-threading lives there once for ios + android;
+  // android supplies its platform tag + credential SHAPE via toTailDeps. The
+  // returned neutral result maps 1:1 onto AndroidEffectResult (next is a wider
+  // AndroidOnboardingStep; transient is a subset of AndroidStepCtx).
+  if (TAIL_EFFECT_STEPS.has(step)) {
+    const result = await runTailEffect(step as TailStep, progress, toTailDeps(deps))
+    return {
+      progress: result.progress,
+      next: result.next as AndroidOnboardingStep | undefined,
+      transient: result.transient,
+    }
+  }
+
   switch (step) {
     // ── backing-up ────────────────────────────────────────────────────────
     // app.tsx:1017–1035. Copy the existing ~/.capgo-credentials/credentials.json
@@ -1695,72 +1549,6 @@ export async function runAndroidEffect(
       }
     }
 
-    // ── saving-credentials ────────────────────────────────────────────────
-    // app.tsx:1345–1399 + doSaveCredentials:703–723
-    case 'saving-credentials': {
-      // Self-heal: re-validate progress before attempting the save.
-      // app.tsx:1353–1363
-      const fresh = await deps.loadAndroidProgress(progress.appId)
-      if (fresh) {
-        const expectedStep = getAndroidResumeStep(fresh)
-        if (expectedStep !== 'saving-credentials') {
-          return { progress, next: expectedStep }
-        }
-      }
-
-      // doSaveCredentials guards — app.tsx:704–709
-      const keystoreBase64 = progress._keystoreBase64
-      if (!keystoreBase64)
-        throw new Error('keystore not ready')
-      const serviceAccountKeyBase64 = progress._serviceAccountKeyBase64
-      if (!serviceAccountKeyBase64)
-        throw new Error('service-account key not provisioned')
-      const keystoreStorePassword = progress.keystoreStorePassword
-      const keystoreAlias = progress.keystoreAlias
-      if (!keystoreStorePassword || !keystoreAlias)
-        throw new Error('keystore inputs missing')
-
-      const credentials: Record<string, string> = {
-        ANDROID_KEYSTORE_FILE: keystoreBase64,
-        KEYSTORE_KEY_ALIAS: keystoreAlias,
-        KEYSTORE_STORE_PASSWORD: keystoreStorePassword,
-        KEYSTORE_KEY_PASSWORD: progress.keystoreKeyPassword || keystoreStorePassword,
-        PLAY_CONFIG_JSON: serviceAccountKeyBase64,
-      }
-
-      await deps.updateSavedCredentials(progress.appId, 'android', credentials)
-      await deps.deleteAndroidProgress(progress.appId)
-      deps.onLog?.('✔ Credentials saved')
-
-      // Random-password backup hint — emitted only here (post-save) so the
-      // claim "stored in credentials.json" is true (app.tsx:1343–1349). The TUI
-      // gates this on its `randomPasswordGenerated` React state; the stateless
-      // engine reads the persisted `keystorePasswordGenerated` marker progress
-      // carries for the same situation. On a crash-recovery resume where that
-      // marker is absent the hint is skipped — same acceptable trade-off the TUI
-      // makes when its in-memory flag was wiped.
-      if (progress.keystorePasswordGenerated)
-        deps.onLog?.('  ℹ Your auto-generated keystore password is now in ~/.capgo-credentials/credentials.json — back up that file.', 'yellow')
-
-      // Stash the CI-secret entries + raw credentials for the post-build
-      // sub-flow. We do NOT push to GitHub/GitLab here — the wizard offers that
-      // only AFTER a successful first build, so users never end up with orphan
-      // secrets in a repo whose build was never proven to work (app.tsx:1350–
-      // 1367 doSaveCredentials). The driver pre-binds the Capgo API key into
-      // createCiSecretEntries (so CAPGO_TOKEN is included for the generated
-      // workflow); the core supplies the credentials it just wrote.
-      //
-      // Both values ride in transient — the Ink TUI holds the same in useState
-      // (ciSecretEntries / savedCredentials). They are resolved ONCE here; later
-      // tail effects REUSE them via deps.carried.* rather than rebuilding (which
-      // would re-resolve the API key AND risk landing secrets on disk).
-      const entries = deps.createCiSecretEntries?.(credentials) ?? []
-
-      // 'ask-build' is the Ink driver's post-save entry point.
-      // The MCP bridge (Plan B) maps this to 'done'.
-      return { progress, next: 'ask-build', transient: { ciSecretEntries: entries, savedCredentials: credentials } }
-    }
-
     // ── google-sign-in-running ────────────────────────────────────────────
     // app.tsx:1095–1166
     //
@@ -1979,225 +1767,6 @@ export async function runAndroidEffect(
 
       deps.onLog?.('✔ Google Cloud + Play setup complete')
       return { progress: currentProgress, next: 'saving-credentials' }
-    }
-
-    // ── detecting-ci-secrets ──────────────────────────────────────────────
-    // app.tsx:1377–1412
-    //
-    // Discover which CI-secret destinations (GitHub/GitLab) are reachable, then
-    // route on the result. A single GitHub target persists `ciSecretTarget` and
-    // continues into the GitHub Actions setup prompt; a single GitLab target
-    // uses the legacy 2-option flow; multiple targets ask the user to pick.
-    case 'detecting-ci-secrets': {
-      const discovery = deps.detectCiSecretTargets!()
-
-      // Surface the discovered targets + per-destination setup advice on EVERY
-      // return path. The TUI sets both unconditionally before branching
-      // (app.tsx:1383–1384 setCiSecretTargets / setCiSecretSetupAdvice), so a
-      // headless driver can render the same "how to enable a destination"
-      // guidance regardless of which branch we take below. This is transient
-      // only — never persisted to progress.
-      const discoveryTransient = { ciSecretTargets: discovery.targets, ciSecretSetupAdvice: discovery.setup }
-
-      if (discovery.targets.length === 0) {
-        if (discovery.setup.length > 0)
-          return { progress, next: 'ci-secrets-setup', transient: discoveryTransient }
-        for (const note of discovery.notes)
-          deps.onLog?.(`ℹ ${note}`, 'yellow')
-        return { progress, next: 'build-complete', transient: discoveryTransient }
-      }
-
-      if (discovery.targets.length === 1) {
-        const target = discovery.targets[0]
-        // Persist the chosen destination — the TUI sets this via setCiSecretTarget
-        // and the later checking/uploading steps read it back.
-        const nextProgress: AndroidOnboardingProgress = { ...progress, ciSecretTarget: target }
-        await deps.saveAndroidProgress(progress.appId, nextProgress)
-        // GitHub → 3-option workflow flow; GitLab → legacy 2-option flow.
-        const next = target.provider === 'github' ? 'ask-github-actions-setup' : 'ask-ci-secrets'
-        return { progress: nextProgress, next, transient: discoveryTransient }
-      }
-
-      return { progress, next: 'ci-secrets-target-select', transient: discoveryTransient }
-    }
-
-    // ── checking-ci-secrets ───────────────────────────────────────────────
-    // app.tsx:1414–1456
-    //
-    // Resolve the concrete repo/group label (GitHub only) and list which secret
-    // keys already exist on the remote so the user can confirm before any
-    // overwrite. GitHub routes to the confirm-secrets-push gate unconditionally;
-    // GitLab routes to the overwrite confirmation only when keys already exist.
-    case 'checking-ci-secrets': {
-      const target = progress.ciSecretTarget
-      if (!target)
-        throw new Error('No git hosting target selected.')
-
-      let repoLabel: string | null = null
-      if (target.provider === 'github') {
-        repoLabel = await deps.getCiSecretRepoLabelAsync!(target)
-        if (!repoLabel)
-          return { progress, next: 'ci-secrets-failed', transient: { ciSecretRepoLabel: null } }
-      }
-
-      const entries = tailCiSecretEntries(progress, deps)
-      const existing = await deps.listExistingCiSecretKeysAsync!(target, entries.map(entry => entry.key))
-
-      if (target.provider === 'github')
-        return { progress, next: 'confirm-secrets-push', transient: { ciSecretRepoLabel: repoLabel, ciSecretExistingKeys: existing, ciSecretEntries: entries } }
-
-      const next = existing.length > 0 ? 'confirm-ci-secret-overwrite' : 'uploading-ci-secrets'
-      return { progress, next, transient: { ciSecretExistingKeys: existing, ciSecretEntries: entries } }
-    }
-
-    // ── uploading-ci-secrets ──────────────────────────────────────────────
-    // app.tsx:1458–1508
-    //
-    // Push the entries to the target, then branch on the GitHub Actions setup
-    // choice made earlier: 'with-workflow' continues into the workflow-builder
-    // sub-flow (pick-package-manager); every other mode (secrets-only / GitLab
-    // 'undecided') finishes at build-complete.
-    case 'uploading-ci-secrets': {
-      const target = progress.ciSecretTarget
-      if (!target)
-        throw new Error('No git hosting target selected.')
-
-      const entries = tailCiSecretEntries(progress, deps)
-      // The existing-key list lives in the driver's transient (set at
-      // checking-ci-secrets and threaded back via deps.carried) — it is NEVER
-      // persisted to progress. Pass it as the 4th arg exactly as the TUI does
-      // (app.tsx:1463–1466 uploadCiSecretsAsync(..., ciSecretExistingKeys)) so
-      // an already-existing secret is treated as an UPDATE rather than a
-      // create. When the driver did not thread it (crash-recovery resume), it
-      // stays undefined — uploadCiSecretsAsync then treats every key as a write,
-      // matching the TUI when the user accepted the overwrite prompt.
-      await deps.uploadCiSecretsAsync!(target, entries, deps.carried?.ciSecretExistingKeys)
-
-      const summary = `Uploaded ${entries.length} env var${entries.length === 1 ? '' : 's'} to ${target.label}`
-      deps.onLog?.(`✔ ${summary}`)
-
-      if (progress.setupMode === 'with-workflow')
-        return { progress, next: 'pick-package-manager', transient: { ciSecretUploadSummary: summary } }
-      return { progress, next: 'build-complete', transient: { ciSecretUploadSummary: summary } }
-    }
-
-    // ── exporting-env ─────────────────────────────────────────────────────
-    // app.tsx:1592–1625
-    //
-    // Write the saved credentials to a local 0o600 `.env` file. An existing
-    // target file (without overwrite) routes to the overwrite confirmation,
-    // persisting the resolved path so overwrite-and-export-env can reuse it.
-    // Empty / written outcomes both finish at build-complete.
-    case 'exporting-env': {
-      const targetPath = progress.envExportTargetPath || deps.defaultExportPath!(progress.appId, 'android')
-      const result = deps.exportCredentialsToEnv!({
-        appId: progress.appId,
-        platform: 'android',
-        credentials: tailSavedCredentials(progress, deps),
-        targetPath,
-      })
-
-      if (result.kind === 'empty')
-        return { progress, next: 'build-complete' }
-
-      if (result.kind === 'exists') {
-        const nextProgress: AndroidOnboardingProgress = { ...progress, envExportTargetPath: result.path }
-        await deps.saveAndroidProgress(progress.appId, nextProgress)
-        return { progress: nextProgress, next: 'confirm-env-export-overwrite' }
-      }
-
-      deps.onLog?.(`✔ Exported ${result.fieldCount} field${result.fieldCount === 1 ? '' : 's'} → ${result.path}`)
-      return { progress, next: 'build-complete', transient: { envExportPath: result.path } }
-    }
-
-    // ── overwrite-and-export-env ──────────────────────────────────────────
-    // app.tsx:1627–1652
-    //
-    // Re-export with overwrite=true to the path the user just confirmed, then
-    // finish at build-complete.
-    case 'overwrite-and-export-env': {
-      const result = deps.exportCredentialsToEnv!({
-        appId: progress.appId,
-        platform: 'android',
-        credentials: tailSavedCredentials(progress, deps),
-        targetPath: progress.envExportTargetPath,
-        overwrite: true,
-      })
-
-      if (result.kind === 'written') {
-        deps.onLog?.(`✔ Overwrote ${result.path} with ${result.fieldCount} field${result.fieldCount === 1 ? '' : 's'}`)
-        return { progress, next: 'build-complete', transient: { envExportPath: result.path } }
-      }
-      return { progress, next: 'build-complete' }
-    }
-
-    // ── writing-workflow-file ─────────────────────────────────────────────
-    // app.tsx:1553–1590
-    //
-    // Generate + write `.github/workflows/capgo-build.yml` (overwrite=true —
-    // the preview/diff confirmation already happened). The build script choice
-    // must be on progress (recorded at pick-build-script). Finishes at
-    // build-complete.
-    case 'writing-workflow-file': {
-      const buildScript = progress.buildScriptChoice
-      if (!buildScript)
-        throw new Error('Internal error: no build script choice recorded.')
-
-      const entries = tailCiSecretEntries(progress, deps)
-      const result = deps.writeWorkflowFile!(
-        {
-          appId: progress.appId,
-          defaultPlatform: 'android',
-          packageManager: progress.selectedPackageManager ?? 'npm',
-          buildScript,
-          secretKeys: entries.map(entry => entry.key),
-        },
-        { overwrite: true },
-      )
-
-      if (result.kind === 'written') {
-        deps.onLog?.(`✔ Wrote ${result.absolutePath}`)
-        return { progress, next: 'build-complete', transient: { workflowFilePath: result.absolutePath } }
-      }
-      return { progress, next: 'build-complete' }
-    }
-
-    // ── requesting-build ──────────────────────────────────────────────────
-    // app.tsx:1654–1741
-    //
-    // Fire the real `capgo build request`. The driver pre-binds the logger +
-    // silent flag + the resolved Capgo API key into deps.requestBuildInternal
-    // (it owns apikey resolution — CLI flag → findSavedKeySilent), so the core
-    // passes a minimal options object and never sees the key. `apikey: ''` is a
-    // type-satisfying placeholder the driver's binding overrides. Routing:
-    //   success + entries pending → detecting-ci-secrets (offer CI push)
-    //   success + no entries      → build-complete
-    //   failure + ai analysis     → ai-analysis-prompt (TUI-only sub-flow)
-    //   failure (no analysis)     → build-complete
-    case 'requesting-build': {
-      const result = await deps.requestBuildInternal!(
-        progress.appId,
-        { apikey: '', platform: 'android', aiAnalysisMode: 'caller-handled' },
-      )
-
-      if (result.success) {
-        const url = `https://capgo.app/app/${progress.appId}/builds`
-        deps.onLog?.(`✔ Build queued — ${url}`)
-        // Only offer to push CI secrets AFTER a build has been queued. If we
-        // never had any credentials to push (entries empty), skip to exit.
-        const entries = tailCiSecretEntries(progress, deps)
-        if (entries.length > 0)
-          return { progress, next: 'detecting-ci-secrets', transient: { buildUrl: url, ciSecretEntries: entries } }
-        return { progress, next: 'build-complete', transient: { buildUrl: url } }
-      }
-
-      deps.onLog?.(`⚠ ${result.error || 'unknown error'}`, 'yellow')
-      // Offer AI-assisted diagnosis when logs were captured. The TUI owns the
-      // ai-analysis-* sub-flow (no AI-calling-AI in the headless engine); the
-      // engine only routes there and surfaces the job id in transient.
-      if (result.aiAnalysis?.ready && result.aiAnalysis.jobId)
-        return { progress, next: 'ai-analysis-prompt', transient: { aiJobId: result.aiAnalysis.jobId } }
-      return { progress, next: 'build-complete' }
     }
 
     // ── Not yet implemented (bootstrap / post-save tail / native-picker) ──
