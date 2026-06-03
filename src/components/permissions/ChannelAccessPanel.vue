@@ -94,8 +94,8 @@ function normalizeChannelBindings(rows: any[]): ChannelRoleBinding[] {
     return {
       id: row.id,
       role_id: row.role_id,
-      role_name: row.roles?.name ?? '',
-      role_description: row.roles?.description ?? null,
+      role_name: row.role_name ?? row.roles?.name ?? '',
+      role_description: row.role_description ?? row.roles?.description ?? null,
       channel_id: row.channel_id,
       channel_row_id: channel?.id ?? null,
       channel_name: channel?.name ?? row.channel_id,
@@ -135,19 +135,17 @@ async function loadChannelAccess() {
     channels.value = (channelsResult.data || []) as ChannelSummary[]
     channelRoles.value = (rolesResult.data || []) as Role[]
 
-    const { data, error } = await supabase
-      .from('role_bindings')
-      .select('id, role_id, channel_id, roles(name, description)')
-      .eq('principal_type', props.principalType)
-      .eq('principal_id', props.principalId)
-      .eq('scope_type', 'channel')
-      .eq('app_id', props.appUuid)
-      .order('granted_at', { ascending: false })
+    const { data, error } = await supabase.functions.invoke(`private/role_bindings/app/${props.appUuid}/channel`, {
+      method: 'GET',
+    })
 
     if (error)
       throw error
 
-    channelBindings.value = normalizeChannelBindings(data || [])
+    const principalBindings = ((data as any[]) || []).filter((binding) => {
+      return binding.principal_type === props.principalType && binding.principal_id === props.principalId
+    })
+    channelBindings.value = normalizeChannelBindings(principalBindings)
     selectedChannelId.value = availableChannels.value[0]?.id?.toString() ?? ''
     selectedRoleName.value = channelRoles.value[0]?.name ?? ''
   }
