@@ -1585,6 +1585,94 @@ export async function runAndroidEffect(
       return { progress: currentProgress, next: 'saving-credentials' }
     }
 
+    // ── detecting-ci-secrets ──────────────────────────────────────────────
+    // app.tsx:1377–1412
+    //
+    // Discover which CI-secret destinations (GitHub/GitLab) are reachable, then
+    // route on the result. A single GitHub target persists `ciSecretTarget` and
+    // continues into the GitHub Actions setup prompt; a single GitLab target
+    // uses the legacy 2-option flow; multiple targets ask the user to pick.
+    case 'detecting-ci-secrets': {
+      const discovery = deps.detectCiSecretTargets!()
+
+      if (discovery.targets.length === 0) {
+        if (discovery.setup.length > 0)
+          return { progress, next: 'ci-secrets-setup', transient: { ciSecretTargets: discovery.targets, ciSecretSetupAdvice: discovery.setup } }
+        for (const note of discovery.notes)
+          deps.onLog?.(`ℹ ${note}`, 'yellow')
+        return { progress, next: 'build-complete', transient: { ciSecretTargets: discovery.targets } }
+      }
+
+      if (discovery.targets.length === 1) {
+        const target = discovery.targets[0]
+        // Persist the chosen destination — the TUI sets this via setCiSecretTarget
+        // and the later checking/uploading steps read it back.
+        const nextProgress: AndroidOnboardingProgress = { ...progress, ciSecretTarget: target }
+        await deps.saveAndroidProgress(progress.appId, nextProgress)
+        // GitHub → 3-option workflow flow; GitLab → legacy 2-option flow.
+        const next = target.provider === 'github' ? 'ask-github-actions-setup' : 'ask-ci-secrets'
+        return { progress: nextProgress, next, transient: { ciSecretTargets: discovery.targets } }
+      }
+
+      return { progress, next: 'ci-secrets-target-select', transient: { ciSecretTargets: discovery.targets } }
+    }
+
+    // ── checking-ci-secrets ───────────────────────────────────────────────
+    // app.tsx:1414–1456
+    //
+    // Resolve the concrete repo/group label (GitHub only) and list which secret
+    // keys already exist on the remote so the user can confirm before any
+    // overwrite. GitHub routes to the confirm-secrets-push gate unconditionally;
+    // GitLab routes to the overwrite confirmation only when keys already exist.
+    case 'checking-ci-secrets': {
+      const target = progress.ciSecretTarget
+      if (!target)
+        throw new Error('No git hosting target selected.')
+
+      let repoLabel: string | null = null
+      if (target.provider === 'github') {
+        repoLabel = await deps.getCiSecretRepoLabelAsync!(target)
+        if (!repoLabel)
+          return { progress, next: 'ci-secrets-failed', transient: { ciSecretRepoLabel: null } }
+      }
+
+      const entries = tailCiSecretEntries(progress, deps)
+      const existing = await deps.listExistingCiSecretKeysAsync!(target, entries.map(entry => entry.key))
+
+      if (target.provider === 'github')
+        return { progress, next: 'confirm-secrets-push', transient: { ciSecretRepoLabel: repoLabel, ciSecretExistingKeys: existing, ciSecretEntries: entries } }
+
+      const next = existing.length > 0 ? 'confirm-ci-secret-overwrite' : 'uploading-ci-secrets'
+      return { progress, next, transient: { ciSecretExistingKeys: existing, ciSecretEntries: entries } }
+    }
+
+    // ── uploading-ci-secrets ──────────────────────────────────────────────
+    // app.tsx:1458–1508
+    //
+    // Push the entries to the target, then branch on the GitHub Actions setup
+    // choice made earlier: 'with-workflow' continues into the workflow-builder
+    // sub-flow (pick-package-manager); every other mode (secrets-only / GitLab
+    // 'undecided') finishes at build-complete.
+    case 'uploading-ci-secrets': {
+      const target = progress.ciSecretTarget
+      if (!target)
+        throw new Error('No git hosting target selected.')
+
+      const entries = tailCiSecretEntries(progress, deps)
+      // Existing-key list lives in the driver's transient (checking-ci-secrets);
+      // it is not persisted to progress. Leaving it undefined makes
+      // uploadCiSecretsAsync treat every key as a write, matching the TUI when
+      // the user accepted the overwrite prompt.
+      await deps.uploadCiSecretsAsync!(target, entries)
+
+      const summary = `Uploaded ${entries.length} env var${entries.length === 1 ? '' : 's'} to ${target.label}`
+      deps.onLog?.(`✔ ${summary}`)
+
+      if (progress.setupMode === 'with-workflow')
+        return { progress, next: 'pick-package-manager', transient: { ciSecretUploadSummary: summary } }
+      return { progress, next: 'build-complete', transient: { ciSecretUploadSummary: summary } }
+    }
+
     // ── Not yet implemented (bootstrap / post-save tail / native-picker) ──
     default:
       throw new Error(`Unhandled effect step: ${step}`)
