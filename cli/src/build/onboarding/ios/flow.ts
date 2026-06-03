@@ -168,6 +168,17 @@ export interface IosStepCtx {
   /** The user's revoke selection (cert-limit-prompt → revoking-certificate). */
   certToRevoke?: AscDistributionCert
 
+  // ── Import recovery menu gating (BATCH 7a) ───────────────────────────────
+  /**
+   * Whether the host can show a native file picker — gates the
+   * import-no-match-recovery / import-portal-explanation "use a .mobileprovision
+   * from disk" option (the TUI's canUseFilePicker(), app.tsx:3570/3733). The
+   * DRIVER threads the host capability here; the view defaults it to true (the
+   * macOS-first onboarding target) so a caller that only passes { appId } still
+   * gets the file-picker recovery option.
+   */
+  canUseFilePicker?: boolean
+
   // ── Cert/profile export payloads (resolved once, carried to saving-credentials) ──
   /** Resolved certificate data (creating-profile create-new / import-exporting). */
   certData?: CertificateData
@@ -188,6 +199,14 @@ export interface IosStepCtx {
    * re-open the picker. Mirrors the TUI's `pickerOpenedRef` guard.
    */
   pickerOpened?: boolean
+  /**
+   * True once the import-provide-profile-path .mobileprovision picker has opened
+   * the native dialog this drive — returned in transient and threaded back as
+   * `deps.carried.profilePickerOpened` so a re-render does NOT re-open the
+   * picker. SEPARATE from `pickerOpened` (the .p8 picker). Mirrors the TUI's
+   * `mobileprovisionPickerOpenedRef` guard (app.tsx:1689).
+   */
+  profilePickerOpened?: boolean
 
   // ── ASC API key data surfaced after verifying-key (ephemeral mirror) ─────
   /** Verified key id + issuer id (mirror of completedSteps.apiKeyVerified). */
@@ -322,6 +341,29 @@ export interface IosEffectDeps {
    */
   openP8FilePicker?: () => Promise<string | null>
   /**
+   * Open the native .mobileprovision file picker (import-provide-profile-path).
+   * Resolves to the chosen absolute path, or null when the user cancels. The
+   * driver pre-binds the real `openMobileprovisionPicker` here; tests inject a
+   * canned path/null. Mirrors the TUI's `openMobileprovisionPicker()` call
+   * inside the import-provide-profile-path effect (app.tsx:1696). The bytes are
+   * then read via `deps.readFile` and parsed via `deps.parseMobileprovisionDetailed`.
+   */
+  openProfilePicker?: () => Promise<string | null>
+  /**
+   * Whether the host can show a native file picker. Gates the
+   * import-no-match-recovery / import-portal-explanation "use a .mobileprovision
+   * from disk" option exactly as the TUI's `canUseFilePicker()` does
+   * (app.tsx:3570/3733). Defaults to true when omitted (the macOS-first target).
+   */
+  canUseFilePicker?: () => boolean
+  /**
+   * Open a URL in the host's default browser (import-portal-explanation's
+   * "open the portal anyway" branch). Best-effort — the driver pre-binds the
+   * real `open` helper; tests inject a recorder/no-op. Mirrors the TUI's
+   * `open(...)` call at app.tsx:3749. A failure must NOT abort recovery.
+   */
+  openExternal?: (url: string) => Promise<void> | void
+  /**
    * Whether the host is macOS. Gates the post-backup fork: on macOS the user is
    * offered import-vs-create at `setup-method-select`; off-macOS the import
    * sub-flow is unavailable so backing-up routes straight to the create-new
@@ -400,6 +442,17 @@ export interface IosEffectDeps {
      */
     pickerOpened?: boolean
     /**
+     * Tracks that the import-provide-profile-path .mobileprovision file-picker
+     * effect already ran this attempt, so a re-render / re-drive does NOT re-open
+     * the native picker. SEPARATE from `pickerOpened` (the .p8 picker guard) so
+     * the two file pickers never cross-suppress each other — mirrors the TUI's
+     * distinct `mobileprovisionPickerOpenedRef` (app.tsx:1689). The driver threads
+     * the returned `profilePickerOpened: true` transient back here; it RESETS the
+     * flag (to false) before routing into import-provide-profile-path from the
+     * recovery menu, exactly as the TUI clears the ref at app.tsx:3593.
+     */
+    profilePickerOpened?: boolean
+    /**
      * Keychain export passphrase for the IMPORT path's .p12 (import-exporting).
      * Transient only — the import-exporting effect never persists it, so the
      * saving-credentials handoff reads it from carried. Absent on the create-new
@@ -434,6 +487,33 @@ export interface IosEffectDeps {
      * `error` (mirroring app.tsx:3942's delete-vs-exitOnboarding branch).
      */
     confirmDeleteDuplicates?: boolean
+    /**
+     * The user's pick at `import-no-match-recovery` (the 5-way HUB). EPHEMERAL —
+     * `applyIosInput` persists nothing; the driver records the choice here and
+     * re-drives the prompt as a resolver effect. 'create' →
+     * import-create-profile-only (with an ASC key) or api-key-instructions
+     * (without); 'provide-profile-path' → import-provide-profile-path; 'browser'
+     * → import-portal-explanation; 'back' → import-pick-identity. Mirrors the
+     * TUI's recovery-menu onChange (app.tsx:3579).
+     */
+    recoveryAction?: 'create' | 'provide-profile-path' | 'browser' | 'back'
+    /**
+     * The user's pick at `import-portal-explanation` (the manual-portal
+     * walkthrough). EPHEMERAL — the driver records the choice here and re-drives
+     * the step as a resolver. 'use-create' → import-create-profile-only;
+     * 'use-file' → import-provide-profile-path; 'open-anyway' / 'back' →
+     * import-no-match-recovery. Mirrors app.tsx:3738.
+     */
+    portalAction?: 'use-create' | 'open-anyway' | 'use-file' | 'back'
+    /**
+     * The STICKY no-match reason set by the step that ROUTED into recovery
+     * (import-pick-identity / import-checking-apple-cert). The recovery resolver
+     * + the import-provide-profile-path cancel branch thread it back so a
+     * re-entry from a file-picker cancel / portal "open anyway" does NOT
+     * recompute or overwrite it (risk #8) — the menu keeps showing the SAME
+     * variant. Mirrors the TUI leaving `noMatchReason` untouched on back-nav.
+     */
+    noMatchReason?: IosNoMatchReason
   }
 
   // ── callbacks (optional — callers that don't need streaming can omit) ────
@@ -737,6 +817,82 @@ const OPTION_IMPORT_PICK_IDENTITY_CANCEL: IosStepOption = { value: '__cancel__',
 /** import-pick-profile trailing "back to identity selection" escape (app.tsx:3467). */
 const OPTION_IMPORT_PICK_PROFILE_BACK: IosStepOption = { value: '__back__', label: '↩️   Back to identity selection' }
 
+// ─── Import recovery menu vocabulary (BATCH 7a) ─────────────────────────────────
+//
+// The import-no-match-recovery HUB options are DYNAMIC: the 'create' row is
+// hidden for ad_hoc (apple-api createProfile only mints IOS_APP_STORE — app.tsx:3538),
+// its label flips on whether an ASC key is already present (app.tsx:3564), and the
+// 'provide-profile-path' row only shows when a file picker is available
+// (canUseFilePicker, app.tsx:3570). The 'browser' + 'back' rows are constant. The
+// import-portal-explanation options are likewise dynamic ('use-create' only for the
+// app_store auto-path; 'use-file' only with a file picker). The VALUES mirror the
+// TUI sentinels so the resolver effects route each pick (app.tsx:3579 / :3738).
+
+/** import-no-match-recovery 'create' row — label flips on whether an ASC key exists (app.tsx:3564). */
+function optionRecoveryCreate(hasAscKey: boolean): IosStepOption {
+  return {
+    value: 'create',
+    label: hasAscKey
+      ? '✨  Create a new App Store profile for this cert via Apple'
+      : '✨  Provide ASC API key, then create a new App Store profile for this cert',
+  }
+}
+
+/** import-no-match-recovery 'use a .mobileprovision from disk' row (app.tsx:3571). */
+const OPTION_RECOVERY_PROVIDE_PATH: IosStepOption = { value: 'provide-profile-path', label: '📁  Use a .mobileprovision file from disk' }
+
+/** import-no-match-recovery 'open the Apple Developer Portal' row (app.tsx:3574). */
+const OPTION_RECOVERY_BROWSER: IosStepOption = { value: 'browser', label: '🌐  Open Apple Developer Portal (browse / create profiles manually)' }
+
+/** import-no-match-recovery 'back to identity selection' row (app.tsx:3577). */
+const OPTION_RECOVERY_BACK: IosStepOption = { value: 'back', label: '↩️   Back to identity selection' }
+
+/** import-portal-explanation 'use Create new instead' row — app_store only (app.tsx:3725). */
+const OPTION_PORTAL_USE_CREATE: IosStepOption = { value: 'use-create', label: '✨  Use "Create a new App Store profile" instead (recommended)' }
+
+/** import-portal-explanation 'open the portal' row — label flips on the auto-path availability (app.tsx:3728). */
+function optionPortalOpenAnyway(canAutoCreate: boolean): IosStepOption {
+  return {
+    value: 'open-anyway',
+    label: canAutoCreate ? '🌐  Open the portal anyway (advanced)' : '🌐  Open Apple Developer Portal',
+  }
+}
+
+/** import-portal-explanation 'I already have one on disk' row (app.tsx:3734). */
+const OPTION_PORTAL_USE_FILE: IosStepOption = { value: 'use-file', label: '📁  I already have a .mobileprovision on disk — let me pick it' }
+
+/** import-portal-explanation 'back to recovery menu' row (app.tsx:3736). */
+const OPTION_PORTAL_BACK: IosStepOption = { value: 'back', label: '↩️   Back to recovery menu' }
+
+/**
+ * The recovery-menu Alert sentence for a no-match reason. Mirrors the TUI's
+ * `alertText` (ui/steps/ios-import.tsx:261) so the engine view's title names the
+ * actual cause. The undefined / 'no-profile-on-disk' branch keeps the legacy
+ * wording, exactly as the TUI's back-compat default does.
+ */
+function recoveryAlertText(
+  reason: IosNoMatchReason | undefined,
+  identityName: string,
+  appId: string | undefined,
+  distribution: 'app_store' | 'ad_hoc' | undefined,
+): string {
+  switch (reason) {
+    case 'apple-no-cert-match':
+      return `Apple's records don't include the certificate "${identityName}". It may have been revoked, never uploaded, or belong to a different team.`
+    case 'apple-no-profiles-linked':
+      return `Apple has the certificate "${identityName}" but no provisioning profiles are linked to it yet.`
+    case 'apple-bundle-mismatch':
+      return `Apple has profiles for "${identityName}" but none target "${appId ?? 'this app'}".`
+    case 'apple-distribution-mismatch':
+      return `Apple has profiles for "${appId ?? 'this app'}" under "${identityName}" but none are ${distribution ?? 'the requested distribution'}.`
+    case 'apple-other':
+      return `Apple returned profiles for "${identityName}" but none match this app.`
+    case 'no-profile-on-disk':
+    default:
+      return `No provisioning profile on this Mac is linked to "${identityName}".`
+  }
+}
+
 // ─── Recovery choice vocabulary (BATCH 3) ───────────────────────────────────────
 //
 // cert-limit-prompt's per-cert options are DYNAMIC (built from ctx.existingCerts
@@ -832,6 +988,24 @@ export type IosInput =
   // app.tsx:3469 onChange — '__back__' → import-pick-identity, valid →
   // import-export-warning, invalid → handleError).
   | { step: 'import-pick-profile', value: string }
+  // ── Import recovery (BATCH 7a) ───────────────────────────────────────────
+  // import-no-match-recovery — the 5-way recovery HUB shown when the chosen
+  // identity has no usable matching profile. EPHEMERAL: the reducer persists
+  // nothing; the driver records the user's pick in carried.recoveryAction and
+  // re-drives the step as a resolver effect (mirrors app.tsx:3579 onChange —
+  // 'create' → import-create-profile-only / api-key-instructions; 'provide-
+  // profile-path' → import-provide-profile-path; 'browser' → import-portal-
+  // explanation; 'back' → import-pick-identity). STICKY: noMatchReason is NOT
+  // recomputed here — the carried reason set by the prior step is preserved.
+  | { step: 'import-no-match-recovery', value: 'create' | 'provide-profile-path' | 'browser' | 'back' }
+  // import-portal-explanation — the manual-portal walkthrough reached from the
+  // recovery menu's 'browser' option. EPHEMERAL navigation choice: the driver
+  // records the pick in carried.portalAction and re-drives the step as a
+  // resolver (mirrors app.tsx:3738 onChange — 'use-create' → import-create-
+  // profile-only; 'use-file' → import-provide-profile-path; 'open-anyway' /
+  // 'back' → import-no-match-recovery). Persists nothing; noMatchReason rides
+  // transient untouched so the recovery menu re-renders the SAME variant.
+  | { step: 'import-portal-explanation', value: 'use-create' | 'open-anyway' | 'use-file' | 'back' }
 // ─── Engine surface (tail-wired; non-tail steps remain stubs) ───────────────────
 
 /**
@@ -1101,6 +1275,77 @@ export function iosViewForStep(
         options,
       }
     }
+
+    // ── import-no-match-recovery (choice, EPHEMERAL-dep) ──────────────────────
+    // app.tsx:3529–3612. The 5-way recovery HUB shown when the chosen identity
+    // has no usable matching profile. The menu VARIANT depends on three ephemeral
+    // / persisted inputs:
+    //   - ctx.noMatchReason → the Alert title sentence (recoveryAlertText). STICKY:
+    //     the reason was set by the step that ROUTED here (import-pick-identity /
+    //     import-checking-apple-cert); re-entries from a file-picker cancel / portal
+    //     "open anyway" thread it back UNCHANGED so the menu keeps the same variant.
+    //   - hasAscKey (ctx.p8Content OR a persisted apiKeyVerified) → the 'create' row
+    //     label flips between "create now" and "provide ASC key first" (app.tsx:3564).
+    //   - importDistribution → 'create' is HIDDEN for ad_hoc (apple-api createProfile
+    //     only mints app_store profiles — app.tsx:3538), so an ad_hoc user can't end
+    //     up with an app_store profile saved under CAPGO_IOS_DISTRIBUTION='ad_hoc'.
+    //   - ctx.canUseFilePicker (default true) → the 'provide-profile-path' row only
+    //     shows when a native picker is available (app.tsx:3570).
+    // The option VALUE is the recovery action — the driver records it into
+    // carried.recoveryAction and re-drives this step as a resolver effect. EPHEMERAL
+    // (never persisted); on resume the user re-enters via a re-run import-scanning.
+    case 'import-no-match-recovery': {
+      const reason = ctx?.noMatchReason
+      const identityName = ctx?.chosenIdentity?.name ?? 'your certificate'
+      const appId = resolveIosBundleId(progress)
+      const dist = progress.importDistribution
+      const hasAscKey = !!(ctx?.p8Content || progress.completedSteps.apiKeyVerified || progress.p8Path)
+      const canCreateProfile = dist !== 'ad_hoc'
+      const canUseFilePicker = ctx?.canUseFilePicker ?? true
+      const options: IosStepOption[] = [
+        ...(canCreateProfile ? [optionRecoveryCreate(hasAscKey)] : []),
+        ...(canUseFilePicker ? [OPTION_RECOVERY_PROVIDE_PATH] : []),
+        OPTION_RECOVERY_BROWSER,
+        OPTION_RECOVERY_BACK,
+      ]
+      return {
+        step,
+        kind: 'choice',
+        title: recoveryAlertText(reason, identityName, appId, dist),
+        prompt: 'Pick a recovery path:',
+        options,
+      }
+    }
+
+    // ── import-portal-explanation (choice, EPHEMERAL-dep) ─────────────────────
+    // app.tsx:3626–3759. The manual-portal walkthrough reached from the recovery
+    // menu's 'browser' option. Informational: it explains the manual portal steps
+    // and steers toward the automatic "Create new" path. Two flavours keyed off the
+    // distribution mode (app.tsx:3627): app_store offers the auto-create nudge
+    // ('use-create'); ad_hoc omits it (apple-api can't mint ad_hoc profiles). The
+    // 'use-file' row only shows when a native picker is available. 'open-anyway' and
+    // 'back' both route back to the recovery menu WITHOUT clearing noMatchReason —
+    // the resolver opens the portal for 'open-anyway'. The VALUE is the pick — the
+    // driver records it into carried.portalAction and re-drives as a resolver.
+    case 'import-portal-explanation': {
+      const canAutoCreate = progress.importDistribution !== 'ad_hoc'
+      const canUseFilePicker = ctx?.canUseFilePicker ?? true
+      const options: IosStepOption[] = [
+        ...(canAutoCreate ? [OPTION_PORTAL_USE_CREATE] : []),
+        optionPortalOpenAnyway(canAutoCreate),
+        ...(canUseFilePicker ? [OPTION_PORTAL_USE_FILE] : []),
+        OPTION_PORTAL_BACK,
+      ]
+      return {
+        step,
+        kind: 'choice',
+        title: canAutoCreate
+          ? 'You can do this manually in the Apple Developer Portal — but the automatic path is much easier.'
+          : 'Ad-hoc distribution is genuinely fiddly (you also need to register every target device on Apple\'s side). Here\'s what\'s involved — and how to get help if you\'re stuck.',
+        prompt: 'Create the profile manually in the portal, or let Capgo do it automatically:',
+        options,
+      }
+    }
     default:
       return { step, kind: 'auto', title: step }
   }
@@ -1277,6 +1522,28 @@ export function applyIosInput(
     // step through runIosEffect (valid → import-export-warning; '__back__' →
     // import-pick-identity; invalid → error). Ephemeral, so resume re-renders.
     case 'import-pick-profile':
+      return progress
+
+    // ── import-no-match-recovery (EPHEMERAL choice — persists NOTHING) ─────────
+    // app.tsx:3579–3609 — the recovery-menu pick (create / provide-profile-path /
+    // browser / back) is EPHEMERAL; the TUI routes via setStep, never persisting
+    // the choice. The pure reducer records nothing — the driver records the pick
+    // into deps.carried.recoveryAction and re-drives the step through runIosEffect.
+    // CRITICAL (risk #8): the reducer must NOT touch noMatchReason; the resolver
+    // threads the carried reason back unchanged so a re-entry keeps the SAME menu
+    // variant. The ONLY persisted write on this branch — pendingRecoveryAction for
+    // the no-ASC-key 'create' path — happens in the resolver (it routes through the
+    // .p8 chain), NOT here, mirroring app.tsx:3605 setPendingRecoveryAction.
+    case 'import-no-match-recovery':
+      return progress
+
+    // ── import-portal-explanation (EPHEMERAL choice — persists NOTHING) ────────
+    // app.tsx:3738–3755 — the portal-walkthrough pick (use-create / use-file /
+    // open-anyway / back) is EPHEMERAL navigation; the TUI routes via setStep. The
+    // pure reducer records nothing — the driver records the pick into
+    // deps.carried.portalAction and re-drives as a resolver. noMatchReason is left
+    // untouched so the 'open-anyway' / 'back' bounce keeps the recovery variant.
+    case 'import-portal-explanation':
       return progress
 
     default:
@@ -1931,6 +2198,297 @@ export async function runIosEffect(
       }
       deps.onLog?.(`✔ Profile · ${chosenProfile.name}`)
       return { progress, next: 'import-export-warning' }
+    }
+
+    // ── import-no-match-recovery (resolver effect, EPHEMERAL-dep) ─────────────
+    // app.tsx:3579–3609. The 5-way recovery HUB is an EPHEMERAL-branching choice:
+    // the pick is never persisted, so the driver records it into
+    // deps.carried.recoveryAction and re-drives this step as a resolver. The
+    // routing mirrors the TUI onChange exactly:
+    //   - no recoveryAction recorded OR 'back' → import-pick-identity (the user
+    //     bailed back to identity selection; app.tsx:3597).
+    //   - 'browser' → import-portal-explanation (the manual walkthrough; :3589).
+    //   - 'provide-profile-path' → import-provide-profile-path (the file picker;
+    //     :3592 — the driver RESETS carried.profilePickerOpened before re-driving).
+    //   - 'create' + an ASC key available → import-create-profile-only (:3603).
+    //   - 'create' + NO ASC key → start the .p8 chain at api-key-instructions,
+    //     PERSISTING pendingRecoveryAction='import-create-profile-only' so a later
+    //     verifying-key returns here (:3605 setPendingRecoveryAction). This is the
+    //     ONLY persisted write on this step.
+    // STICKY (risk #8): noMatchReason is NEVER recomputed here — the carried reason
+    // (set by the step that ROUTED into recovery) is threaded back UNCHANGED on the
+    // bounce branches so the menu keeps the SAME variant. PURE routing otherwise.
+    case 'import-no-match-recovery': {
+      const action = deps.carried?.recoveryAction
+      // The sticky reason rides transient untouched on every bounce branch.
+      const noMatchReason = deps.carried?.noMatchReason
+      const stickyTransient = noMatchReason ? { noMatchReason } : {}
+
+      if (!action || action === 'back')
+        return { progress, next: 'import-pick-identity', transient: stickyTransient }
+      if (action === 'browser')
+        return { progress, next: 'import-portal-explanation', transient: stickyTransient }
+      if (action === 'provide-profile-path')
+        return { progress, next: 'import-provide-profile-path', transient: stickyTransient }
+
+      // action === 'create'
+      const hasAscKey = !!(deps.carried?.p8Content || progress.completedSteps.apiKeyVerified || progress.p8Path)
+      if (hasAscKey)
+        return { progress, next: 'import-create-profile-only', transient: stickyTransient }
+
+      // No ASC key yet — start the .p8 chain and remember to return to the
+      // profile-creation action once the key is verified. The task stores the
+      // FULL target step name (not the TUI's bare 'create-profile-only') so a
+      // stateless verifying-key can route to it directly.
+      const nextProgress: OnboardingProgress = { ...progress, pendingRecoveryAction: 'import-create-profile-only' }
+      await deps.saveProgress?.(progress.appId, nextProgress)
+      return { progress: nextProgress, next: 'api-key-instructions', transient: stickyTransient }
+    }
+
+    // ── import-portal-explanation (resolver effect, EPHEMERAL-dep) ────────────
+    // app.tsx:3738–3755. The manual-portal walkthrough is an EPHEMERAL navigation
+    // choice: the pick rides deps.carried.portalAction and the driver re-drives
+    // this step as a resolver. The routing mirrors the TUI onChange:
+    //   - 'use-create' → import-create-profile-only (the recommended auto path).
+    //   - 'use-file'   → import-provide-profile-path (driver resets profilePickerOpened).
+    //   - 'open-anyway'→ open the portal (deps.openExternal, best-effort) + a yellow
+    //     breadcrumb, then BACK to import-no-match-recovery (:3748).
+    //   - 'back' / default → import-no-match-recovery (:3754).
+    // STICKY: noMatchReason is threaded back UNCHANGED on the back/open-anyway bounce
+    // so the recovery menu re-renders the SAME variant. PURE routing (open-external
+    // is fire-and-forget). No persistence.
+    case 'import-portal-explanation': {
+      const action = deps.carried?.portalAction
+      const noMatchReason = deps.carried?.noMatchReason
+      const stickyTransient = noMatchReason ? { noMatchReason } : {}
+
+      if (action === 'use-create')
+        return { progress, next: 'import-create-profile-only', transient: stickyTransient }
+      if (action === 'use-file')
+        return { progress, next: 'import-provide-profile-path', transient: stickyTransient }
+      if (action === 'open-anyway') {
+        try {
+          await deps.openExternal?.('https://developer.apple.com/account/resources/profiles/list')
+        }
+        catch {
+          // Opening the portal is best-effort — a failure must not abort recovery.
+        }
+        deps.onLog?.('🌐 Opened Apple Developer Portal — once you have downloaded the .mobileprovision file, come back and pick "📁 Use a .mobileprovision file from disk".', 'yellow')
+        return { progress, next: 'import-no-match-recovery', transient: stickyTransient }
+      }
+      // 'back' or an unrecognized value bounces to the recovery menu.
+      return { progress, next: 'import-no-match-recovery', transient: stickyTransient }
+    }
+
+    // ── import-provide-profile-path (file-picker effect, idempotent) ──────────
+    // app.tsx:1688–1781. Open the native .mobileprovision picker EXACTLY ONCE
+    // (idempotent — the TUI guards with mobileprovisionPickerOpenedRef; the engine
+    // guards with the carried profilePickerOpened flag so a re-render / re-drive
+    // does NOT re-open the dialog). Then read + parse the file and run the THREE
+    // invariant checks (bundle id, distribution, cert SHA-1) before synthesizing a
+    // DiscoveredProfile and routing to the picker. Outcomes:
+    //   - already opened this attempt (guard) → bounce back to import-no-match-
+    //     recovery WITHOUT recomputing noMatchReason (risk #8 sticky).
+    //   - picker cancelled (null) → import-no-match-recovery, noMatchReason kept.
+    //   - parse error / any failed invariant → error (the TUI's handleError).
+    //   - all checks pass → set carried.chosenProfile + inject the synthesized
+    //     profile into importMatches → import-pick-profile.
+    // The chosen identity is REQUIRED (guarded). noMatchReason rides transient on
+    // every bounce so the recovery menu keeps its variant. The synthesized profile
+    // is transient only — nothing is persisted (the import export payload is
+    // re-derived later, risk #2).
+    case 'import-provide-profile-path': {
+      const chosenIdentity = deps.carried?.chosenIdentity
+      if (!chosenIdentity) {
+        deps.onLog?.('✖ Internal error: no identity chosen for .mobileprovision import.', 'red')
+        return { progress, next: 'error' }
+      }
+      const noMatchReason = deps.carried?.noMatchReason
+      const stickyTransient = noMatchReason ? { noMatchReason } : {}
+
+      // Idempotency guard: the picker already ran this attempt — do NOT re-open.
+      // Bounce back to the recovery menu, keeping the sticky reason (risk #8).
+      if (deps.carried?.profilePickerOpened)
+        return { progress, next: 'import-no-match-recovery', transient: { ...stickyTransient, profilePickerOpened: true } }
+
+      const appId = resolveIosBundleId(progress)
+      const dist = progress.importDistribution
+
+      try {
+        const filePath = await deps.openProfilePicker?.()
+        if (!filePath) {
+          // Cancelled — bounce back to the recovery menu (keep noMatchReason).
+          return { progress, next: 'import-no-match-recovery', transient: { ...stickyTransient, profilePickerOpened: true } }
+        }
+
+        // Read + parse. A parse failure routes to error (the TUI's handleError).
+        const bytes = await deps.readFile!(filePath)
+        let detail: MobileprovisionDetail
+        try {
+          detail = deps.parseMobileprovisionDetailed!(bytes)
+        }
+        catch (err) {
+          deps.onLog?.(`✖ Couldn't parse "${filePath}": ${err instanceof Error ? err.message : String(err)}`, 'red')
+          return { progress, next: 'error', transient: { profilePickerOpened: true } }
+        }
+
+        // Invariant 1 — bundle id (wildcard-aware via bundleIdMatches).
+        if (!bundleIdMatches(detail.bundleId, appId)) {
+          deps.onLog?.(
+            `✖ This .mobileprovision is for bundle ID "${detail.bundleId}" but the current app is "${appId}". `
+            + 'Pick a profile that targets the right app (wildcard profiles like "com.example.*" are accepted), or use "Create a new App Store profile" in the recovery menu.',
+            'red',
+          )
+          return { progress, next: 'error', transient: { profilePickerOpened: true } }
+        }
+        // Invariant 2 — distribution mode.
+        if (dist && detail.profileType !== dist) {
+          deps.onLog?.(
+            `✖ This .mobileprovision is a ${detail.profileType} profile but you picked ${dist} distribution. `
+            + 'Pick a profile that matches, or restart and pick the matching distribution mode.',
+            'red',
+          )
+          return { progress, next: 'error', transient: { profilePickerOpened: true } }
+        }
+        // Invariant 3 — cert trust (the profile must list the chosen cert's SHA-1).
+        if (!detail.certificateSha1s.includes(chosenIdentity.sha1)) {
+          const shownSha1s = detail.certificateSha1s.map(c => `${c.slice(0, 8)}…`).join(', ') || '(none listed)'
+          deps.onLog?.(
+            `✖ This .mobileprovision doesn't trust your chosen certificate "${chosenIdentity.name}". `
+            + `Allowed certs in the profile (SHA1): ${shownSha1s}; your cert starts with ${chosenIdentity.sha1.slice(0, 8)}…. `
+            + 'Either pick a different cert at the identity step, or re-create this profile in the Apple Developer Portal and tick the right one.',
+            'red',
+          )
+          return { progress, next: 'error', transient: { profilePickerOpened: true } }
+        }
+
+        // All checks pass — synthesize a DiscoveredProfile (preserving the on-disk
+        // path so import-exporting reads the bytes directly) and inject it into the
+        // chosen identity's match so import-pick-profile lists it (app.tsx:1758–1772).
+        const synthesized: DiscoveredProfile = {
+          path: filePath,
+          uuid: detail.uuid,
+          name: detail.name,
+          applicationIdentifier: detail.applicationIdentifier,
+          bundleId: detail.bundleId,
+          teamId: chosenIdentity.teamId,
+          expirationDate: detail.expirationDate,
+          profileType: detail.profileType as DiscoveredProfile['profileType'],
+          certificateSha1s: detail.certificateSha1s,
+        }
+        const matches = deps.carried?.importMatches ?? []
+        const injectedMatches = matches.map(m => m.identity.sha1 === chosenIdentity.sha1
+          ? { ...m, profiles: [...m.profiles, synthesized] }
+          : m)
+        deps.onLog?.(`✔ Loaded profile from file · ${detail.name}`)
+        return {
+          progress,
+          next: 'import-pick-profile',
+          transient: { profilePickerOpened: true, chosenProfile: synthesized, importMatches: injectedMatches },
+        }
+      }
+      catch (err) {
+        deps.onLog?.(`✖ ${err instanceof Error ? err.message : String(err)}`, 'red')
+        return { progress, next: 'error', transient: { profilePickerOpened: true } }
+      }
+    }
+
+    // ── import-create-profile-only (effect, EPHEMERAL-dep) ────────────────────
+    // app.tsx:1783–1860. The recovery path that creates a fresh App Store profile
+    // via Apple for the cert ALREADY in the Keychain (cert creation is skipped).
+    // Resolve the chosen identity's Apple cert id (findCertIdBySha1), ensure the
+    // bundle id exists (ensureBundleId), then create the profile (createProfile).
+    // Outcomes:
+    //   - chosenIdentity missing → error (guarded).
+    //   - ad_hoc distribution → error: apple-api createProfile only mints
+    //     IOS_APP_STORE, so refuse rather than save a mismatched distribution pair
+    //     (app.tsx:1794 — the menu already hides 'create' for ad_hoc).
+    //   - Apple has no cert matching the identity → error (app.tsx:1804).
+    //   - DuplicateProfileError → PERSIST duplicateProfileOrigin=
+    //     'import-create-profile-only' (so deleting-duplicate-profiles routes back
+    //     HERE, not the create-new creating-profile — the dual-origin contract) and
+    //     surface the duplicates transiently → duplicate-profile-prompt (:1845).
+    //   - success → synthesize the new profile as chosenProfile + inject it into the
+    //     chosen identity's match → import-export-warning (:1840).
+    // The synthesized cert/profile ride transient only (risk #2 — nothing persisted
+    // beyond the duplicateProfileOrigin marker).
+    case 'import-create-profile-only': {
+      const chosenIdentity = deps.carried?.chosenIdentity
+      if (!chosenIdentity) {
+        deps.onLog?.('✖ Internal error: no identity chosen for profile creation.', 'red')
+        return { progress, next: 'error' }
+      }
+      // Defensive: D2 only synthesizes app_store profiles (apple-api createProfile
+      // hardcodes IOS_APP_STORE). Refuse ad_hoc here as the TUI does (app.tsx:1794).
+      if (progress.importDistribution === 'ad_hoc') {
+        deps.onLog?.(
+          '✖ Creating a new profile via Apple is not implemented for ad_hoc distribution yet. '
+          + 'Use "Open Apple Developer Portal" instead.',
+          'red',
+        )
+        return { progress, next: 'error' }
+      }
+
+      const appId = resolveIosBundleId(progress)
+      try {
+        const certId = await deps.findCertIdBySha1!(chosenIdentity.sha1)
+        if (!certId) {
+          deps.onLog?.(
+            `✖ Apple does not have a certificate matching "${chosenIdentity.name}". `
+            + 'Cannot create a profile without an Apple-side cert ID. Use the "Create new" path instead.',
+            'red',
+          )
+          return { progress, next: 'error' }
+        }
+        await deps.ensureBundleId!(appId)
+        const profile = await deps.createProfile!({ bundleId: appId, certificateId: certId, distribution: 'app_store' })
+
+        // Use the freshly-created profile directly as the chosen profile. Carry
+        // profileBase64 (the .mobileprovision bytes) via the same structural cast
+        // the TUI uses (app.tsx:1817–1828) so import-exporting → saving-credentials
+        // has the profile content without a re-fetch.
+        const synthesized = {
+          path: '',
+          uuid: profile.profileId,
+          name: profile.profileName,
+          applicationIdentifier: '',
+          bundleId: appId,
+          teamId: chosenIdentity.teamId,
+          expirationDate: (profile as ProfileData & { expirationDate?: string }).expirationDate ?? '',
+          profileType: 'app_store' as const,
+          certificateSha1s: [chosenIdentity.sha1],
+          profileBase64: profile.profileBase64,
+        } as DiscoveredProfile & { profileBase64: string }
+        const matches = deps.carried?.importMatches ?? []
+        const injectedMatches = matches.map(m => m.identity.sha1 === chosenIdentity.sha1
+          ? { ...m, profiles: [...m.profiles, synthesized] }
+          : m)
+        deps.onLog?.(`✔ Created new profile "${profile.profileName}" on Apple, linked to your existing cert`)
+        return {
+          progress,
+          next: 'import-export-warning',
+          transient: { chosenProfile: synthesized, importMatches: injectedMatches },
+        }
+      }
+      catch (err) {
+        if (err instanceof DuplicateProfileError) {
+          // Route to the shared duplicate-profile-prompt, persisting the IMPORT
+          // origin so the post-deletion retry runs THIS step again (not the
+          // create-new creating-profile, which can't succeed in import mode).
+          const nextProgress: OnboardingProgress = {
+            ...progress,
+            duplicateProfileOrigin: 'import-create-profile-only',
+          }
+          await deps.saveProgress?.(progress.appId, nextProgress)
+          return {
+            progress: nextProgress,
+            next: 'duplicate-profile-prompt',
+            transient: { duplicateProfiles: err.profiles },
+          }
+        }
+        deps.onLog?.(`✖ ${err instanceof Error ? err.message : String(err)}`, 'red')
+        return { progress, next: 'error' }
+      }
     }
 
     default:
