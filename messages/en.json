@@ -1290,7 +1290,7 @@
   "new-record": "New Record",
   "new-release-available": "New release available",
   "compatibility-banner-title": "Default channel update may need a native build",
-  "compatibility-banner-body": "{current} is live on your default channel, but its native dependencies differ from {previous}. Devices on the previous bundle may not receive this update until they install a new native build.",
+  "compatibility-banner-body": "{current} is live on your default channel and its native dependencies differ from the previous bundle {previous}. Review the dependency diff to see what changed.",
   "compatibility-banner-cta": "View incompatible dependencies",
   "next": "Next",
   "next-run": "Next update",
