@@ -838,42 +838,57 @@ export async function runTailEffect<P extends TailEffectProgress>(
 
     // ── exporting-env ─────────────────────────────────────────────────────
     case 'exporting-env': {
-      const targetPath = progress.envExportTargetPath || deps.defaultExportPath!(progress.appId, deps.platform)
-      const result = deps.exportCredentialsToEnv!({
-        appId: progress.appId,
-        platform: deps.platform,
-        credentials: tailSavedCredentials(progress, deps),
-        targetPath,
-      })
+      // Mirror the bespoke android tail (app.tsx ~L1592-1624): an empty export or a
+      // thrown helper records the reason in transient.envExportError and routes to
+      // build-complete — it NEVER throws (credentials are already saved).
+      try {
+        const targetPath = progress.envExportTargetPath || deps.defaultExportPath!(progress.appId, deps.platform)
+        const result = deps.exportCredentialsToEnv!({
+          appId: progress.appId,
+          platform: deps.platform,
+          credentials: tailSavedCredentials(progress, deps),
+          targetPath,
+        })
 
-      if (result.kind === 'empty')
-        return { progress, next: 'build-complete' }
+        if (result.kind === 'empty')
+          return { progress, next: 'build-complete', transient: { envExportError: 'No credentials to export — saved state is empty.' } }
 
-      if (result.kind === 'exists') {
-        const nextProgress: P = { ...progress, envExportTargetPath: result.path }
-        await deps.saveProgress(progress.appId, nextProgress)
-        return { progress: nextProgress, next: 'confirm-env-export-overwrite' }
+        if (result.kind === 'exists') {
+          const nextProgress: P = { ...progress, envExportTargetPath: result.path }
+          await deps.saveProgress(progress.appId, nextProgress)
+          return { progress: nextProgress, next: 'confirm-env-export-overwrite' }
+        }
+
+        deps.onLog?.(`✔ Exported ${result.fieldCount} field${result.fieldCount === 1 ? '' : 's'} → ${result.path}`)
+        return { progress, next: 'build-complete', transient: { envExportPath: result.path } }
       }
-
-      deps.onLog?.(`✔ Exported ${result.fieldCount} field${result.fieldCount === 1 ? '' : 's'} → ${result.path}`)
-      return { progress, next: 'build-complete', transient: { envExportPath: result.path } }
+      catch (err) {
+        return { progress, next: 'build-complete', transient: { envExportError: err instanceof Error ? err.message : String(err) } }
+      }
     }
 
     // ── overwrite-and-export-env ──────────────────────────────────────────
     case 'overwrite-and-export-env': {
-      const result = deps.exportCredentialsToEnv!({
-        appId: progress.appId,
-        platform: deps.platform,
-        credentials: tailSavedCredentials(progress, deps),
-        targetPath: progress.envExportTargetPath,
-        overwrite: true,
-      })
+      // Same error contract as exporting-env (app.tsx ~L1627-1651): a thrown helper
+      // records transient.envExportError and routes to build-complete, never throws.
+      try {
+        const result = deps.exportCredentialsToEnv!({
+          appId: progress.appId,
+          platform: deps.platform,
+          credentials: tailSavedCredentials(progress, deps),
+          targetPath: progress.envExportTargetPath,
+          overwrite: true,
+        })
 
-      if (result.kind === 'written') {
-        deps.onLog?.(`✔ Overwrote ${result.path} with ${result.fieldCount} field${result.fieldCount === 1 ? '' : 's'}`)
-        return { progress, next: 'build-complete', transient: { envExportPath: result.path } }
+        if (result.kind === 'written') {
+          deps.onLog?.(`✔ Overwrote ${result.path} with ${result.fieldCount} field${result.fieldCount === 1 ? '' : 's'}`)
+          return { progress, next: 'build-complete', transient: { envExportPath: result.path } }
+        }
+        return { progress, next: 'build-complete' }
       }
-      return { progress, next: 'build-complete' }
+      catch (err) {
+        return { progress, next: 'build-complete', transient: { envExportError: err instanceof Error ? err.message : String(err) } }
+      }
     }
 
     // ── writing-workflow-file ─────────────────────────────────────────────
@@ -895,7 +910,12 @@ export async function runTailEffect<P extends TailEffectProgress>(
       )
 
       if (result.kind === 'written') {
-        deps.onLog?.(`✔ Wrote ${result.absolutePath}`)
+        // Match the bespoke android log text (app.tsx ~L1572): the workflow path
+        // constant, not the absolute path. The engine has no preview `isNew` flag
+        // (that is TUI-only state) so it always reports 'Wrote'.
+        deps.onLog?.(`✔ Wrote ${WORKFLOW_PATH}`)
+        // Workflow-file telemetry (android: trackWorkflowEvent). OPTIONAL — no-op on iOS.
+        deps.trackWorkflowEvent?.('workflow-file-written', { decision: 'write' })
         return { progress, next: 'build-complete', transient: { workflowFilePath: result.absolutePath } }
       }
       return { progress, next: 'build-complete' }

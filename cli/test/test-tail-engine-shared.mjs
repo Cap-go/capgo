@@ -415,6 +415,87 @@ await test("writing-workflow-file (written) → next 'build-complete' (uses writ
   assertEquals(wf.args[0].defaultPlatform, 'android', 'workflow defaultPlatform comes from deps.platform')
 })
 
+// ─── CONCERN 4: writing-workflow-file telemetry + log text ─────────────────────
+
+await test('writing-workflow-file (written) calls trackWorkflowEvent("workflow-file-written") and logs the workflow path', async () => {
+  const events = []
+  const logs = []
+  const deps = makeDeps({
+    trackWorkflowEvent: (event, options) => events.push({ event, options }),
+    onLog: (msg, color) => logs.push({ msg, color }),
+  })
+  const progress = tailProgress({
+    ciSecretTarget: GITHUB_TARGET,
+    setupMode: 'with-workflow',
+    selectedPackageManager: 'bun',
+    buildScriptChoice: { type: 'npm-script', name: 'build' },
+  })
+  const res = await runTailEffect('writing-workflow-file', progress, deps)
+  assertEquals(res.next, 'build-complete', 'after the workflow file is written the wizard finishes')
+  assert(events.some(e => e.event === 'workflow-file-written'), 'must fire the workflow-file-written telemetry event')
+  const written = events.find(e => e.event === 'workflow-file-written')
+  assertEquals(written.options && written.options.decision, 'write', 'telemetry carries decision: write')
+  assert(logs.some(l => /✔ (Wrote|Overwrote) .+capgo-build\.yml/.test(l.msg)), 'must log the written workflow path')
+})
+
+await test('writing-workflow-file degrades gracefully when trackWorkflowEvent is ABSENT (iOS)', async () => {
+  const deps = makeDeps()
+  const progress = tailProgress({
+    ciSecretTarget: GITHUB_TARGET,
+    setupMode: 'with-workflow',
+    selectedPackageManager: 'npm',
+    buildScriptChoice: { type: 'npm-script', name: 'build' },
+  })
+  const res = await runTailEffect('writing-workflow-file', progress, deps)
+  assertEquals(res.next, 'build-complete', 'no telemetry hook → still finishes (no throw)')
+})
+
+// ─── CONCERN 5: env-export error routes to build-complete (never throws) ───────
+
+await test('exporting-env (empty result) sets transient.envExportError and routes to build-complete (no throw)', async () => {
+  const deps = makeDeps({
+    exportCredentialsToEnv: (...a) => { deps.__calls.push({ name: 'exportCredentialsToEnv', args: a }); return { kind: 'empty' } },
+  })
+  const res = await runTailEffect('exporting-env', tailProgress(), deps)
+  assertEquals(res.next, 'build-complete', 'an empty export must still finish at build-complete')
+  assert(res.transient && typeof res.transient.envExportError === 'string', 'an empty export must surface envExportError in transient')
+})
+
+await test('exporting-env that THROWS routes to build-complete with envExportError (does not propagate)', async () => {
+  const deps = makeDeps({
+    exportCredentialsToEnv: () => { throw new Error('disk full') },
+  })
+  let threw = false
+  let res
+  try {
+    res = await runTailEffect('exporting-env', tailProgress(), deps)
+  }
+  catch {
+    threw = true
+  }
+  assert(!threw, 'exporting-env must NOT propagate the throw')
+  assertEquals(res.next, 'build-complete', 'a thrown export still finishes at build-complete')
+  assert(res.transient && /disk full/.test(res.transient.envExportError), 'the thrown error message rides in transient.envExportError')
+})
+
+await test('overwrite-and-export-env that THROWS routes to build-complete with envExportError (does not propagate)', async () => {
+  const deps = makeDeps({
+    exportCredentialsToEnv: () => { throw new Error('permission denied') },
+  })
+  const progress = tailProgress({ setupMode: 'declined', envExportTargetPath: `/tmp/.env.capgo.${APP_ID}.android` })
+  let threw = false
+  let res
+  try {
+    res = await runTailEffect('overwrite-and-export-env', progress, deps)
+  }
+  catch {
+    threw = true
+  }
+  assert(!threw, 'overwrite-and-export-env must NOT propagate the throw')
+  assertEquals(res.next, 'build-complete', 'a thrown overwrite-export still finishes at build-complete')
+  assert(res.transient && /permission denied/.test(res.transient.envExportError), 'the thrown error message rides in transient.envExportError')
+})
+
 // ─── DRIVER threading: resolve credentials + CI entries ONCE, reuse downstream ──
 
 const RESOLVED_ENTRIES = [
