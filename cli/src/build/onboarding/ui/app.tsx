@@ -39,11 +39,11 @@ import { isAiAnalysisTooTall, resolveAiResultRoute } from '../ai-fit.js'
 const MAX_AI_RETRIES = 2
 import type { AscDistributionCert } from '../apple-api.js'
 import { CertificateLimitError, classifyCertAvailability, computeCertSha1, createCertificate, createProfile, deleteProfile, DuplicateProfileError, ensureBundleId, findCertIdBySha1, generateJwt, listDistributionCerts, listProfilesForCert, revokeCertificate, verifyApiKey } from '../apple-api.js'
-import { createP12, DEFAULT_P12_PASSWORD, generateCsr } from '../csr.js'
+import { createP12, generateCsr } from '../csr.js'
 import { mapIosOnboardingError } from '../error-categories.js'
 import { canUseFilePicker, openFilePicker, openMobileprovisionPicker } from '../file-picker.js'
-import { parseMobileprovisionBufferDetailed, parseMobileprovisionDetailed } from '../../mobileprovision-parser.js'
-import { bundleIdMatches, exportP12FromKeychain, filterProfilesForApp, isHelperCached, isMacOS, listSigningIdentities, matchIdentitiesToProfiles, precompileSwiftHelper, scanProvisioningProfiles } from '../macos-signing.js'
+import { parseMobileprovisionBufferDetailed } from '../../mobileprovision-parser.js'
+import { bundleIdMatches, exportP12FromKeychain, filterProfilesForApp, isHelperCached, isMacOS, listSigningIdentities, precompileSwiftHelper, scanProvisioningProfiles } from '../macos-signing.js'
 import { deleteProgress, extractKeyIdFromP8Path, getImportEntryStep, getResumeStep, loadProgress, saveProgress } from '../progress.js'
 import { getBuildOnboardingRecoveryAdvice } from '../recovery.js'
 import { createCiSecretEntries, detectCiSecretTargets, getCiSecretRepoLabelAsync, getCiSecretTargetLabel, listExistingCiSecretKeysAsync, uploadCiSecretsAsync } from '../ci-secrets.js'
@@ -891,7 +891,6 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
   const doctorCommand = formatRunnerCommand(pm.runner, ['@capgo/cli@latest', 'doctor'])
   const buildInitCommand = formatRunnerCommand(pm.runner, ['@capgo/cli@latest', 'build', 'init'])
   const buildRequestCommand = formatRunnerCommand(pm.runner, ['@capgo/cli@latest', 'build', 'request', appId, '--platform', 'ios'])
-  const loginCommand = formatRunnerCommand(pm.runner, ['@capgo/cli@latest', 'login'])
 
   const trackWorkflowEvent = (
     event: BuildOnboardingWorkflowEvent,
@@ -1198,81 +1197,6 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
     }
     setStep('error')
   }, [retryCount, addLog, appId, buildInitCommand, buildOutput, doctorCommand, log, pm.pm])
-
-  // ── Credential save logic ──
-
-  async function doSaveCredentials(): Promise<Parameters<typeof updateSavedCredentials>[2]> {
-    // For import mode in ad_hoc distribution, no .p8 is needed at all.
-    const needsAscKey = !importMode || importDistribution === 'app_store'
-
-    let keyContent = p8ContentRef.current
-    if (needsAscKey) {
-      // Re-read .p8 for APPLE_KEY_CONTENT (use refs for fresh values)
-      if (!keyContent && p8PathRef.current) {
-        try {
-          keyContent = await readFile(p8PathRef.current, 'utf-8')
-          setP8Content(keyContent)
-        }
-        catch {
-          throw new Error('Could not read .p8 file. Please provide the path again.')
-        }
-      }
-      // Defensive guard: do NOT silently save credentials missing the ASC
-      // API key. Without this, an empty p8ContentRef + empty p8PathRef
-      // (legacy or malformed progress) would skip the `APPLE_KEY_*` writes
-      // below and leave the user with a working-looking save and no key.
-      if (!keyContent)
-        throw new Error('Internal error: app_store distribution requires a .p8 key but none was provided. Re-run `build init` and provide the key file.')
-    }
-
-    // Use the bundle ID from the imported profile when available; falls back
-    // to the iOS bundle id (config.appId) for the create-new path. Whichever
-    // we end up writing here becomes the provisioning_map key, which the iOS
-    // build system looks up by PRODUCT_BUNDLE_IDENTIFIER at sign time — so
-    // the Capgo lookup key would be wrong here whenever it diverges from
-    // config.appId (e.g. dev-tunnel sandboxes).
-    //
-    // Wildcard profiles (bundleId like `com.example.*` or bare `*`) are valid
-    // for many concrete app ids — but Xcode resolves the map by the concrete
-    // PRODUCT_BUNDLE_IDENTIFIER, so we substitute the resolved iosBundleId in
-    // that case. The chosenProfile?.bundleId branch is only reached on the
-    // importMode path; the create-new path already falls through to
-    // iosBundleId, so the wildcard substitution doesn't affect it.
-    const importedBundleId = chosenProfile?.bundleId
-    const isWildcardProfile = Boolean(importedBundleId && importedBundleId.includes('*'))
-    const provisioningBundleId = importMode && importedBundleId && !isWildcardProfile ? importedBundleId : iosBundleId
-    const provisioningMap: Record<string, { profile: string, name: string }> = {
-      [provisioningBundleId]: {
-        profile: profileData!.profileBase64,
-        name: profileData!.profileName,
-      },
-    }
-
-    // Import mode uses the random passphrase generated at export time;
-    // create-new uses the well-known DEFAULT_P12_PASSWORD that csr.ts produces.
-    const p12Password = importMode && importedP12Password ? importedP12Password : DEFAULT_P12_PASSWORD
-    const distribution = importMode ? (importDistribution || 'app_store') : 'app_store'
-
-    const credentials = {
-      BUILD_CERTIFICATE_BASE64: certData!.p12Base64,
-      P12_PASSWORD: p12Password,
-      CAPGO_IOS_PROVISIONING_MAP: JSON.stringify(provisioningMap),
-      APP_STORE_CONNECT_TEAM_ID: teamId || certData!.teamId,
-      CAPGO_IOS_DISTRIBUTION: distribution,
-    } as Parameters<typeof updateSavedCredentials>[2]
-
-    if (needsAscKey && keyContent) {
-      credentials.APPLE_KEY_ID = keyIdRef.current
-      credentials.APPLE_ISSUER_ID = issuerIdRef.current
-      credentials.APPLE_KEY_CONTENT = Buffer.from(keyContent).toString('base64')
-    }
-
-    await updateSavedCredentials(appId, 'ios', credentials)
-
-    await deleteProgress(appId)
-    addLog('✔ Credentials saved')
-    return credentials
-  }
 
   // ── Async step handlers ──
 
