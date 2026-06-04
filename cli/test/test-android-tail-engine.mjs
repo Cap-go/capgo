@@ -456,6 +456,95 @@ await test('DRIVER: detecting-ci-secrets surfaces setup advice via transient on 
   assertEquals(res.transient.ciSecretSetupAdvice.length, 1, 'setup advice must be carried through even when a target is reachable')
 })
 
+// ─── ADAPTER: streaming / telemetry / preload deps forwarded by toTailDeps ───
+//
+// A2 widened AndroidEffectDeps with the tail's streaming/telemetry/preload deps
+// (logger, resolveApikey, onCiSecretUploadProgress, onCiSecretCheckPhase,
+// getPackageScripts, findProjectType, findBuildCommandForProjectType,
+// trackWorkflowEvent) and `toTailDeps` must FORWARD them verbatim into the shared
+// TailEffectDeps so `runTailEffect` (driven here via `runAndroidEffect`) actually
+// uses them. These tests inject each dep on AndroidEffectDeps and assert the
+// shared tail consumed it — proving the adapter forwarding is wired.
+
+await test('ADAPTER: onCiSecretUploadProgress is forwarded as the 5th arg of uploadCiSecretsAsync', async () => {
+  const progressEvents = []
+  const deps = makeDeps({
+    // The real uploader reports per-key progress via its 5th callback arg; mirror
+    // that so we can prove the forwarded hook actually fires through the adapter.
+    uploadCiSecretsAsync: async (_target, _entries, _existingKeys, _runner, onProgress) => {
+      onProgress?.(1, 1, 'CAPGO_TOKEN')
+    },
+    onCiSecretUploadProgress: (current, total, keyName) => {
+      progressEvents.push({ current, total, keyName })
+    },
+  })
+  const progress = tailProgress({ ciSecretTarget: GITHUB_TARGET, setupMode: 'secrets-only' })
+  await runAndroidEffect('uploading-ci-secrets', progress, deps)
+  assertEquals(progressEvents.length, 1, 'onCiSecretUploadProgress must fire once (forwarded as uploadCiSecretsAsync 5th arg)')
+  assertEquals(progressEvents[0].keyName, 'CAPGO_TOKEN', 'the forwarded progress callback must receive the per-key payload')
+})
+
+await test('ADAPTER: onCiSecretCheckPhase is forwarded into the 2-phase checking-ci-secrets status', async () => {
+  const phases = []
+  const deps = makeDeps({ onCiSecretCheckPhase: phase => phases.push(phase) })
+  const progress = tailProgress({ ciSecretTarget: GITHUB_TARGET, setupMode: 'with-workflow' })
+  await runAndroidEffect('checking-ci-secrets', progress, deps)
+  assert(phases.length >= 2, 'onCiSecretCheckPhase must receive both check phases (resolve repo → list env vars)')
+  assert(phases.some(p => /Resolving GitHub repository/i.test(p)), 'phase 1 (resolve repo) must be forwarded')
+  assert(phases.some(p => /Checking existing env vars/i.test(p)), 'phase 2 (list env vars) must be forwarded')
+})
+
+await test('ADAPTER: resolveApikey + logger reach requestBuildInternal', async () => {
+  const RESOLVED_KEY = 'cli-flag-key'
+  const LOGGER = { __isLogger: true }
+  const deps = makeDeps({
+    resolveApikey: () => RESOLVED_KEY,
+    logger: LOGGER,
+  })
+  const res = await runAndroidEffect('requesting-build', tailProgress(), deps)
+  assertEquals(res.next, 'detecting-ci-secrets', 'a successful build with pending entries must route to detecting-ci-secrets')
+  const buildCall = deps.__calls.find(c => c.name === 'requestBuildInternal')
+  assert(buildCall, 'must call requestBuildInternal')
+  // args: (appId, options, silent, logger)
+  assertEquals(buildCall.args[1].apikey, RESOLVED_KEY, 'requestBuildInternal must receive the resolved CLI-flag apikey (forwarded resolveApikey)')
+  assertEquals(buildCall.args[3], LOGGER, 'requestBuildInternal must receive the forwarded streaming logger as its 4th arg')
+})
+
+await test('ADAPTER: resolveApikey returning nothing finishes at build-complete WITHOUT requesting a build', async () => {
+  const deps = makeDeps({ resolveApikey: () => undefined })
+  const res = await runAndroidEffect('requesting-build', tailProgress(), deps)
+  assertEquals(res.next, 'build-complete', 'no resolvable key must short-circuit to build-complete (android no-key UX)')
+  assert(!deps.__calls.some(c => c.name === 'requestBuildInternal'), 'requestBuildInternal must NOT be called when no key is resolvable')
+})
+
+await test('ADAPTER: getPackageScripts/findProjectType/findBuildCommandForProjectType preload availableScripts + recommendedScript', async () => {
+  const SCRIPTS = { build: 'vite build', dev: 'vite', lint: 'eslint .' }
+  const deps = makeDeps({
+    getPackageScripts: () => SCRIPTS,
+    findProjectType: async () => 'vite',
+    findBuildCommandForProjectType: async () => 'build',
+  })
+  const progress = tailProgress({ ciSecretTarget: GITHUB_TARGET, setupMode: 'with-workflow' })
+  const res = await runAndroidEffect('uploading-ci-secrets', progress, deps)
+  assertEquals(res.next, 'pick-package-manager', 'with-workflow continues into the workflow-builder sub-flow')
+  assert(res.transient, 'uploading-ci-secrets (with-workflow) must return a transient')
+  assertEquals(res.transient.availableScripts, SCRIPTS, 'forwarded getPackageScripts must populate transient.availableScripts')
+  assertEquals(res.transient.recommendedScript, 'build', 'forwarded project-type deps must resolve the recommended build script')
+})
+
+await test('ADAPTER: trackWorkflowEvent fires when the workflow file is written', async () => {
+  const events = []
+  const deps = makeDeps({ trackWorkflowEvent: (event, options) => events.push({ event, options }) })
+  const progress = tailProgress({
+    ciSecretTarget: GITHUB_TARGET,
+    setupMode: 'with-workflow',
+    selectedPackageManager: 'bun',
+    buildScriptChoice: { type: 'npm-script', name: 'build' },
+  })
+  await runAndroidEffect('writing-workflow-file', progress, deps)
+  assert(events.some(e => e.event === 'workflow-file-written'), 'trackWorkflowEvent must be forwarded and fire on workflow-file-written')
+})
+
 // ─── CHOICE / INPUT tail steps: assert each exposes a usable (non-auto) view ──
 //
 // These do not run through runAndroidEffect; the driver renders them and waits

@@ -1103,6 +1103,54 @@ export interface AndroidEffectDeps {
    */
   requestBuildInternal?: (appId: string, options: BuildRequestOptions, silent?: boolean, logger?: BuildLogger) => Promise<BuildRequestResult>
 
+  // ── streaming / telemetry / preload deps (forwarded to the shared tail) ────
+  // OPTIONAL/ADDITIVE — the android TUI resolves these and the engine adapter
+  // forwards them straight through `toTailDeps` into the shared `TailEffectDeps`
+  // so `runTailEffect` streams build output, reports CI-secret progress/phase,
+  // preloads workflow-builder scripts and fires workflow telemetry. Signatures
+  // mirror the matching `TailEffectDeps` fields verbatim. When absent the shared
+  // tail degrades gracefully (legacy behaviour), so existing callers and the MCP
+  // bridge keep type-checking.
+
+  /**
+   * The streaming BuildLogger the TUI threads into requestBuildInternal (the 4th
+   * arg) so every build line streams into `setBuildOutput`. Forwarded verbatim.
+   */
+  logger?: BuildLogger
+
+  /**
+   * Resolves the Capgo API key the build request should use, mirroring the
+   * android tail's CLI-flag-over-saved precedence. Returns undefined when no key
+   * is resolvable (the no-key UX finishes at build-complete). Forwarded verbatim.
+   */
+  resolveApikey?: () => string | undefined
+
+  /**
+   * Per-key CI-secret upload progress, forwarded as the 5th arg of
+   * uploadCiSecretsAsync. The android tail feeds this into
+   * `setCiSecretUploadProgress`. No-op when absent.
+   */
+  onCiSecretUploadProgress?: (current: number, total: number, keyName: string) => void
+
+  /**
+   * The 2-phase checking-ci-secrets status text. The android tail feeds this into
+   * `setCiSecretCheckPhase`. No-op when absent.
+   */
+  onCiSecretCheckPhase?: (phase: string) => void
+
+  /** Reads the project's package.json scripts map (workflow-builder preload). */
+  getPackageScripts?: () => Record<string, string>
+  /** Detects the web-framework project type (best-effort; may resolve null). */
+  findProjectType?: (options?: { quiet?: boolean }) => Promise<string | null>
+  /** Maps a detected project type to its recommended build script name. */
+  findBuildCommandForProjectType?: (projectType: string) => Promise<string | null>
+
+  /**
+   * Workflow-file telemetry hook (e.g. 'workflow-file-written'). The android tail
+   * calls `trackWorkflowEvent`. No-op when absent.
+   */
+  trackWorkflowEvent?: (event: string, options?: { decision?: string }) => void
+
   /**
    * DRIVER-HELD transient tail state, threaded back into each post-save tail
    * effect. The Ink TUI resolves these ONCE (at `saving-credentials`) and keeps
@@ -1277,6 +1325,15 @@ function toTailDeps(deps: AndroidEffectDeps): TailEffectDeps<AndroidOnboardingPr
     generateWorkflow: deps.generateWorkflow,
     writeWorkflowFile: deps.writeWorkflowFile,
     requestBuildInternal: deps.requestBuildInternal,
+    // ── streaming / telemetry / preload deps forwarded verbatim ──────────────
+    logger: deps.logger,
+    resolveApikey: deps.resolveApikey,
+    onCiSecretUploadProgress: deps.onCiSecretUploadProgress,
+    onCiSecretCheckPhase: deps.onCiSecretCheckPhase,
+    getPackageScripts: deps.getPackageScripts,
+    findProjectType: deps.findProjectType,
+    findBuildCommandForProjectType: deps.findBuildCommandForProjectType,
+    trackWorkflowEvent: deps.trackWorkflowEvent,
     carried: deps.carried,
     onStatus: deps.onStatus,
     onLog: deps.onLog,
