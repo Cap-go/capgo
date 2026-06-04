@@ -1,6 +1,5 @@
 import type { Context } from 'hono'
-import type { AuthInfo } from '../../utils/hono.ts'
-import type { MiddlewareKeyVariables } from '../../utils/hono.ts'
+import type { AuthInfo, MiddlewareKeyVariables } from '../../utils/hono.ts'
 import type { Database } from '../../utils/supabase.types.ts'
 import { honoFactory, quickError, simpleError } from '../../utils/hono.ts'
 import { middlewareV2 } from '../../utils/hono_middleware.ts'
