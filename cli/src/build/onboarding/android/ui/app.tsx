@@ -188,6 +188,28 @@ const ENGINE_AUTO_FAILED_STEP: { [K in AndroidOnboardingStep]?: AndroidOnboardin
   'android-package-select': undefined,
 }
 
+// ─── TAIL_DRIVER_STEPS ────────────────────────────────────────────────────────
+//
+// The post-save "tail" AUTO steps the TUI delegates to the shared engine's
+// `runAndroidEffect` (which routes them into the platform-neutral tail module).
+// Unlike the early/mid engine-driven steps (ENGINE_AUTO_FAILED_STEP) these run
+// AFTER saving-credentials has DELETED progress.json, so the driver feeds the
+// engine a SYNTHETIC progress carrying the in-memory React tail state
+// (setupMode / ciSecretTarget / selectedPackageManager / buildScriptChoice /
+// envExportTargetPath / keystorePasswordGenerated) and threads the transient
+// (savedCredentials / ciSecretEntries / ciSecretExistingKeys / workflowIsNew)
+// back via deps.carried — the engine NEVER re-creates progress.json here.
+//
+// ai-analysis-* + the build-log viewer stay ink-only (no AI-calling-AI in the
+// headless engine); the requesting-build → ai-analysis-prompt handoff still
+// reaches the AI UI because the engine returns next: 'ai-analysis-prompt'.
+const TAIL_DRIVER_STEPS = new Set<AndroidOnboardingStep>([
+  'saving-credentials',
+  'detecting-ci-secrets',
+  'checking-ci-secrets',
+  'uploading-ci-secrets',
+])
+
 /** OAuth scopes — superset of `androidpublisher` because we also need
  *  cloud-platform to create GCP projects, service accounts, and keys on the
  *  user's behalf. userinfo.email + openid are for identifying the signed-in
@@ -997,40 +1019,6 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
     return refreshed.accessToken
   }, [accessToken, refreshTokenState, oauthClientId, getCapgoConfig])
 
-  // Plan 3.3: read the credential payload from the freshly-loaded on-disk
-  // progress (single source of truth) instead of redundant React-state mirrors.
-  // The caller passes the same `fresh` progress it already loaded + validated
-  // via getAndroidResumeStep, which only routes here once every field below is
-  // present (keystoreFullyValid + _serviceAccountKeyBase64), so this is strictly
-  // safer than reading mirrors that could lag behind a persist.
-  async function doSaveCredentials(progress: AndroidOnboardingProgress): Promise<Parameters<typeof updateSavedCredentials>[2]> {
-    const keystoreReady = progress.completedSteps.keystoreReady
-    const keystoreBase64 = progress._keystoreBase64 || ''
-    const serviceAccountKeyBase64 = progress._serviceAccountKeyBase64 || ''
-    const keystoreAlias = progress.keystoreAlias || ''
-    const keystoreStorePassword = progress.keystoreStorePassword || ''
-    const keystoreKeyPassword = progress.keystoreKeyPassword || ''
-    if (!keystoreReady || !keystoreBase64)
-      throw new Error('keystore not ready')
-    if (!serviceAccountKeyBase64)
-      throw new Error('service-account key not provisioned')
-    if (!keystoreStorePassword || !keystoreAlias)
-      throw new Error('keystore inputs missing')
-
-    const credentials = {
-      ANDROID_KEYSTORE_FILE: keystoreBase64,
-      KEYSTORE_KEY_ALIAS: keystoreAlias,
-      KEYSTORE_STORE_PASSWORD: keystoreStorePassword,
-      KEYSTORE_KEY_PASSWORD: keystoreKeyPassword || keystoreStorePassword,
-      PLAY_CONFIG_JSON: serviceAccountKeyBase64,
-    } as Parameters<typeof updateSavedCredentials>[2]
-
-    await updateSavedCredentials(appId, 'android', credentials)
-    await deleteAndroidProgress(appId)
-    addLog('✔ Credentials saved')
-    return credentials
-  }
-
   useEffect(() => {
     let cancelled = false
 
@@ -1310,199 +1298,6 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
         catch (err) {
           if (!cancelled)
             handleError(err, 'gcp-projects-loading')
-        }
-      })()
-    }
-
-    if (step === 'saving-credentials') {
-      ;(async () => {
-        try {
-          // Self-heal: re-validate progress before attempting the save. If
-          // the resume logic says we should be somewhere earlier (e.g. a
-          // race lost the keystoreStorePassword between phases), route back
-          // to the matching input step instead of crashing on a thrown
-          // "keystore inputs missing" error.
-          const fresh = await loadAndroidProgress(appId)
-          if (fresh) {
-            const expectedStep = getAndroidResumeStep(fresh)
-            if (expectedStep !== 'saving-credentials') {
-              if (cancelled)
-                return
-              addLog('ℹ Some required input was missing — sending you back to fill it in.', 'yellow')
-              setStep(expectedStep)
-              return
-            }
-          }
-          // Pass the freshly-loaded progress (the single source of truth) into
-          // doSaveCredentials. On a null-progress resume `fresh` is null; fall
-          // back to an empty progress so doSaveCredentials throws the same
-          // "keystore not ready" error the empty mirrors used to produce.
-          const credentials = await doSaveCredentials(fresh ?? emptyProgress(appId))
-          if (cancelled)
-            return
-          // Random-password backup hint: emitted only here (post-save) so the
-          // claim "stored in credentials.json" is true. Note: on resume from a
-          // crash that wiped the in-memory state, `randomPasswordGenerated` is
-          // false and the hint is skipped — acceptable trade-off versus
-          // persisting a one-off flag to progress.json.
-          if (randomPasswordGenerated)
-            addLog(`  ℹ Your auto-generated keystore password is now in ~/.capgo-credentials/credentials.json — back up that file.`, 'yellow')
-          // Stash CI secret entries for later. We do NOT push to GitHub/GitLab
-          // yet — the wizard now offers that step only AFTER a successful first
-          // build, so users never end up with orphan secrets in a repo whose
-          // build was never proven to work.
-          //
-          // Pass the API key so CAPGO_TOKEN gets included — the generated
-          // GitHub Actions workflow references ${{ secrets.CAPGO_TOKEN }} for
-          // --apikey, and users who pick "secrets only" still benefit from
-          // having it ready in their repo for a workflow they'll write later.
-          let capgoKey: string | undefined = apikey
-          if (!capgoKey)
-            capgoKey = findSavedKeySilent()
-          const entries = createCiSecretEntries(credentials, capgoKey)
-          setCiSecretEntries(entries)
-          // Stash the raw credentials so the .env-export branch can write the
-          // same shape `build credentials manage`'s export writes — without
-          // CAPGO_TOKEN.
-          setSavedCredentials(credentials)
-          setStep('ask-build')
-        }
-        catch (err) {
-          if (!cancelled)
-            handleError(err, 'saving-credentials')
-        }
-      })()
-    }
-
-    if (step === 'detecting-ci-secrets') {
-      ;(async () => {
-        try {
-          const discovery = detectCiSecretTargets()
-          if (cancelled)
-            return
-          setCiSecretTargets(discovery.targets)
-          setCiSecretSetupAdvice(discovery.setup)
-          if (discovery.targets.length === 0) {
-            if (discovery.setup.length > 0) {
-              setStep('ci-secrets-setup')
-              return
-            }
-            for (const note of discovery.notes)
-              addLog(`ℹ ${note}`, 'yellow')
-            setStep('build-complete')
-            return
-          }
-          if (discovery.targets.length === 1) {
-            const target = discovery.targets[0]
-            setCiSecretTarget(target)
-            // GitHub → new 3-option flow; GitLab → keep existing 2-option flow.
-            // Workflow generation for GitLab CI is out of scope for v1.
-            setStep(target.provider === 'github' ? 'ask-github-actions-setup' : 'ask-ci-secrets')
-            return
-          }
-          setStep('ci-secrets-target-select')
-        }
-        catch (err) {
-          if (!cancelled) {
-            setCiSecretError(err instanceof Error ? err.message : String(err))
-            setStep('ci-secrets-failed')
-          }
-        }
-      })()
-    }
-
-    if (step === 'checking-ci-secrets') {
-      ;(async () => {
-        try {
-          if (!ciSecretTarget)
-            throw new Error('No git hosting target selected.')
-          // Phase 1: resolve target repo via async gh — non-blocking so the
-          // spinner keeps animating.
-          setCiSecretCheckPhase('Resolving GitHub repository…')
-          let repoLabel: string | null = null
-          if (ciSecretTarget.provider === 'github') {
-            repoLabel = await getCiSecretRepoLabelAsync(ciSecretTarget)
-            if (cancelled)
-              return
-            if (!repoLabel) {
-              setCiSecretRepoLabel(null)
-              setCiSecretError('Could not resolve the GitHub repository. Run `gh repo view` from this directory, then try again.')
-              setStep('ci-secrets-failed')
-              return
-            }
-            setCiSecretRepoLabel(repoLabel)
-          }
-          // Phase 2: list existing secrets.
-          setCiSecretCheckPhase(repoLabel
-            ? `Checking existing env vars in ${repoLabel}…`
-            : `Checking existing env vars in ${getCiSecretTargetLabel(ciSecretTarget)}…`)
-          const existing = await listExistingCiSecretKeysAsync(ciSecretTarget, ciSecretEntries.map(entry => entry.key))
-          if (cancelled)
-            return
-          setCiSecretExistingKeys(existing)
-          if (ciSecretTarget.provider === 'github') {
-            setStep('confirm-secrets-push')
-            return
-          }
-          setStep(existing.length > 0 ? 'confirm-ci-secret-overwrite' : 'uploading-ci-secrets')
-        }
-        catch (err) {
-          if (!cancelled) {
-            setCiSecretError(err instanceof Error ? err.message : String(err))
-            setStep('ci-secrets-failed')
-          }
-        }
-      })()
-    }
-
-    if (step === 'uploading-ci-secrets') {
-      ;(async () => {
-        try {
-          if (!ciSecretTarget)
-            throw new Error('No git hosting target selected.')
-          await uploadCiSecretsAsync(
-            ciSecretTarget,
-            ciSecretEntries,
-            ciSecretExistingKeys,
-            undefined,
-            (current, total, key) => {
-              if (!cancelled)
-                setCiSecretUploadProgress({ current, total, key })
-            },
-          )
-          if (cancelled)
-            return
-          setCiSecretUploadProgress(null)
-          const summary = `Uploaded ${ciSecretEntries.length} env var${ciSecretEntries.length === 1 ? '' : 's'} to ${getCiSecretTargetLabel(ciSecretTarget)}`
-          setCiSecretUploadSummary(summary)
-          addLog(`✔ ${summary}`)
-          // Branch on what the user picked at ask-github-actions-setup. GitLab
-          // path leaves setupMode='undecided' and falls through to build-complete.
-          if (setupMode === 'with-workflow') {
-            try {
-              const scripts = getPackageScripts() ?? {}
-              setAvailableScripts(scripts)
-              const projectType = await findProjectType({ quiet: true }).catch(() => null)
-              if (projectType) {
-                const recommended = await findBuildCommandForProjectType(projectType).catch(() => null)
-                if (recommended && Object.hasOwn(scripts, recommended))
-                  setRecommendedScript(recommended)
-              }
-            }
-            catch {
-              // Best-effort; pick-build-script falls back to empty list + escape hatches.
-            }
-            // Ask the user to confirm the package manager before we build the workflow.
-            setStep('pick-package-manager')
-            return
-          }
-          setStep('build-complete')
-        }
-        catch (err) {
-          if (!cancelled) {
-            setCiSecretError(err instanceof Error ? err.message : String(err))
-            setStep('ci-secrets-failed')
-          }
         }
       })()
     }
@@ -2070,6 +1865,189 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
         // had no catch in the original (best-effort pre-load) — swallow there.
         if (failedStep)
           handleError(err, failedStep)
+      }
+    })()
+
+    return () => {
+      cancelled = true
+      abort.abort()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step])
+
+  // ─── Engine-driven post-save TAIL driver (ink-thin-wrapper) ─────────────────
+  // Delegate the post-save tail AUTO steps (TAIL_DRIVER_STEPS) to the shared
+  // engine's `runAndroidEffect`, which routes them into the platform-neutral tail
+  // module. The FLOW lives in the engine; the RENDERING stays ink. Unlike the
+  // early/mid driver above, the tail runs AFTER saving-credentials deletes
+  // progress.json, so the engine reads its inputs from a SYNTHETIC progress this
+  // driver builds from the in-memory React tail state, and threads the prior
+  // effects' transient back via deps.carried. The engine NEVER persists here.
+  useEffect(() => {
+    if (!TAIL_DRIVER_STEPS.has(step))
+      return
+
+    let cancelled = false
+    const abort = new AbortController()
+
+    void (async () => {
+      // The Capgo API key the build/secret entries should reference — CLI flag
+      // takes precedence over the saved one (mirrors the bespoke tail's
+      // `apikey ?? findSavedKeySilent()` at saving-credentials/requesting-build).
+      const resolveCapgoKey = (): string | undefined => apikey ?? findSavedKeySilent()
+
+      // Load the on-disk progress so the saving-credentials self-heal guard can
+      // re-validate it (the engine re-loads internally too via deps.loadProgress).
+      // For the later tail steps progress.json is already deleted, so this is null
+      // and the SYNTHETIC progress below carries the in-memory tail inputs instead.
+      const disk = await loadAndroidProgress(appId)
+      if (cancelled)
+        return
+      const base = disk ?? emptyProgress(appId)
+      // SYNTHETIC progress: overlay the in-memory React tail inputs the engine
+      // reads (setupMode / ciSecretTarget / selectedPackageManager /
+      // buildScriptChoice / envExportTargetPath) plus the keystorePasswordGenerated
+      // marker that gates the random-password backup hint (the bespoke held this in
+      // React `randomPasswordGenerated`, never persisted — thread it here so the
+      // hint still fires).
+      const tailProgress: AndroidOnboardingProgress = {
+        ...base,
+        setupMode,
+        ciSecretTarget,
+        selectedPackageManager,
+        buildScriptChoice,
+        envExportTargetPath,
+        keystorePasswordGenerated: randomPasswordGenerated,
+      }
+
+      const deps: AndroidEffectDeps = {
+        // Keystore / provisioning deps — unused by the tail, present to satisfy
+        // the AndroidEffectDeps shape (the tail never calls them).
+        generateKeystore,
+        listKeystoreAliases,
+        tryUnlockPrivateKey,
+        validateServiceAccountJson,
+        updateSavedCredentials,
+        loadSavedCredentials,
+        saveAndroidProgress,
+        loadAndroidProgress,
+        deleteAndroidProgress,
+        readFile,
+        copyFile,
+        runOAuthFlow: async () => { throw new Error('not used in tail') },
+        fetchUserInfo,
+        getAccessToken: ensureAccessToken,
+        revokeToken,
+        listProjects,
+        createProject: gcpCreateProject,
+        enableService,
+        ensureServiceAccount,
+        createServiceAccountKey,
+        inviteServiceAccount: async (args) => {
+          await inviteServiceAccount(args)
+        },
+        findAndroidApplicationIds: () => findAndroidApplicationIds(androidDir),
+
+        // ── tail helpers — pre-bind the resolved Capgo key into the entry builder
+        // so CAPGO_TOKEN is included (mirrors createCiSecretEntries(creds, capgoKey)).
+        createCiSecretEntries: creds => createCiSecretEntries(creds, resolveCapgoKey()),
+        detectCiSecretTargets,
+        getCiSecretRepoLabelAsync,
+        listExistingCiSecretKeysAsync,
+        uploadCiSecretsAsync,
+        exportCredentialsToEnv,
+        defaultExportPath,
+        generateWorkflow,
+        writeWorkflowFile,
+        requestBuildInternal,
+
+        // ── streaming / telemetry / preload sinks (forwarded into the shared tail) ──
+        logger: undefined,
+        onBuildOutput: (line) => {
+          if (!cancelled)
+            setBuildOutput(prev => [...prev, line])
+        },
+        resolveApikey: resolveCapgoKey,
+        onCiSecretUploadProgress: (current, total, keyName) => {
+          if (!cancelled)
+            setCiSecretUploadProgress({ current, total, key: keyName })
+        },
+        onCiSecretCheckPhase: (phase) => {
+          if (!cancelled)
+            setCiSecretCheckPhase(phase)
+        },
+        onCiSecretError: (message) => {
+          if (!cancelled)
+            setCiSecretError(message)
+        },
+        getPackageScripts,
+        findProjectType,
+        findBuildCommandForProjectType,
+        trackWorkflowEvent: (event, options) => {
+          trackWorkflowEvent(event as BuildOnboardingWorkflowEvent, options as { decision?: BuildOnboardingWorkflowDecision })
+        },
+
+        // ── carried transient (in-memory React tail state) ──
+        carried: {
+          // savedCredentials holds the exact 5-field string map the engine wrote
+          // at saving-credentials (no undefined values in practice); cast to the
+          // engine's Record<string, string> carried shape.
+          savedCredentials: (savedCredentials ?? undefined) as Record<string, string> | undefined,
+          ciSecretEntries,
+          ciSecretExistingKeys,
+          workflowIsNew: previewIsNew,
+        },
+
+        onLog: (message, color) => {
+          if (!cancelled)
+            addLog(message, color)
+        },
+        signal: abort.signal,
+      }
+
+      try {
+        const result = await runAndroidEffect(step, tailProgress, deps)
+        if (cancelled)
+          return
+
+        const t = result.transient
+        const np = result.progress
+
+        // ── Mirror engine transient → render state ─────────────────────────────
+        if (t?.savedCredentials !== undefined)
+          setSavedCredentials(t.savedCredentials)
+        if (t?.ciSecretEntries !== undefined)
+          setCiSecretEntries(t.ciSecretEntries)
+        if (t?.ciSecretTargets !== undefined)
+          setCiSecretTargets(t.ciSecretTargets)
+        if (t?.ciSecretSetupAdvice !== undefined)
+          setCiSecretSetupAdvice(t.ciSecretSetupAdvice)
+        if (t?.ciSecretRepoLabel !== undefined)
+          setCiSecretRepoLabel(t.ciSecretRepoLabel)
+        if (t?.ciSecretExistingKeys !== undefined)
+          setCiSecretExistingKeys(t.ciSecretExistingKeys)
+        if (t?.ciSecretUploadSummary !== undefined)
+          setCiSecretUploadSummary(t.ciSecretUploadSummary)
+        if (t?.availableScripts !== undefined)
+          setAvailableScripts(t.availableScripts)
+        if (t?.recommendedScript !== undefined)
+          setRecommendedScript(t.recommendedScript)
+        // The chosen CI-secret target rides on the RETURNED progress (the engine
+        // sets it when detecting resolves a single target); mirror it into the
+        // React state the downstream choice/auto steps read.
+        if (np.ciSecretTarget !== undefined && np.ciSecretTarget !== null)
+          setCiSecretTarget(np.ciSecretTarget)
+        // The upload progress bar is cleared by uploading-ci-secrets completing.
+        if (step === 'uploading-ci-secrets')
+          setCiSecretUploadProgress(null)
+
+        // ── Advance ────────────────────────────────────────────────────────────
+        if (result.next && result.next !== step)
+          setStep(result.next)
+      }
+      catch (err) {
+        if (!cancelled)
+          handleError(err, 'saving-credentials')
       }
     })()
 
