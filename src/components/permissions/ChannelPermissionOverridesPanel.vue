@@ -118,13 +118,16 @@ function getOverrideValue(channelId: number, permission: ChannelPermissionKey) {
   return channelOverrides.value[key]
 }
 
-function getDefaultRoleName(channelId: number) {
-  return props.channelRoleNameById[channelId] ?? props.roleName
+function getRoleDefaultPermission(roleName: string, permission: ChannelPermissionKey) {
+  return roleDefaultChannelPermissions[roleName]?.[permission] ?? false
 }
 
 function getDefaultPermission(channelId: number, permission: ChannelPermissionKey) {
-  const roleName = getDefaultRoleName(channelId)
-  return roleDefaultChannelPermissions[roleName]?.[permission] ?? false
+  const inheritedAllowed = getRoleDefaultPermission(props.roleName, permission)
+  const channelRoleName = props.channelRoleNameById[channelId]
+  if (!channelRoleName)
+    return inheritedAllowed
+  return inheritedAllowed || getRoleDefaultPermission(channelRoleName, permission)
 }
 
 function getSelectValue(channelId: number, permission: ChannelPermissionKey): 'default' | 'allow' | 'deny' {
