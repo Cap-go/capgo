@@ -3048,8 +3048,15 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
                 { label: `📦  yarn${detected === 'yarn' ? '  (recommended — matches your lockfile)' : ''}`, value: 'yarn' },
               ]}
               onChange={(value) => {
-                setSelectedPackageManager(value as PackageManager)
-                setStep('pick-build-script')
+                const selected = value as PackageManager
+                setSelectedPackageManager(selected)
+                // Engine-derived [MATCH]: post-upload with-workflow + a chosen PM
+                // (no build-script yet) resumes to pick-build-script.
+                setStep(tailEngineNext(
+                  'pick-package-manager',
+                  { step: 'pick-package-manager', selectedPackageManager: selected },
+                  { buildRequested: true, ciSecretsUploaded: true },
+                ))
               }}
             />
           </Box>
