@@ -124,7 +124,13 @@ export interface TailEffectProgress {
   selectedPackageManager?: PackageManager | null
   buildScriptChoice?: BuildScriptChoice | null
   envExportTargetPath?: string
-  /** Android-only marker that gates the random-password backup hint. */
+  /**
+   * Android-only marker that gates the random-password backup hint at
+   * saving-credentials. DRIVER REQUIREMENT: the driver MUST set this on `progress`
+   * when its keystore step auto-generated the store password (the bespoke android
+   * tail only held this in React `randomPasswordGenerated` state, never persisted);
+   * the engine reads it from `progress` and has no other source. Never set on iOS.
+   */
   keystorePasswordGenerated?: boolean
 }
 
@@ -755,6 +761,15 @@ export async function runTailEffect<P extends TailEffectProgress>(
       // `keystorePasswordGenerated` marker; absent on a crash-recovery resume
       // (same acceptable trade-off the TUI makes when its in-memory flag was
       // wiped) and never set on iOS.
+      //
+      // DRIVER REQUIREMENT: the engine reads this flag off `progress` — it has no
+      // other source. The bespoke android keystore handler only set the React
+      // `randomPasswordGenerated` state (NOT persisted to progress.json), so a
+      // driver delegating its keystore step to the engine MUST thread that flag
+      // onto the progress it hands to saving-credentials (e.g. set
+      // `progress.keystorePasswordGenerated = true` when it auto-generated the
+      // store password) — otherwise this hint never fires. Persisting it also
+      // makes the hint survive a crash-recovery resume (the bespoke does not).
       if (progress.keystorePasswordGenerated)
         deps.onLog?.('  ℹ Your auto-generated keystore password is now in ~/.capgo-credentials/credentials.json — back up that file.', 'yellow')
 

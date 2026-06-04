@@ -821,6 +821,30 @@ await test('DRIVER: saving-credentials does NOT log the backup hint when keystor
   )
 })
 
+// ─── GAP 6: the backup hint is gated on progress.keystorePasswordGenerated ──
+//
+// DRIVER CONTRACT: the engine reads keystorePasswordGenerated off PROGRESS — it
+// has no dep/carried source. A driver delegating its keystore step MUST thread
+// the flag onto progress (the bespoke held it only in React state). This test
+// pins the read site: the hint fires from the progress flag alone, with no dep.
+
+await test('GAP6: the backup hint is gated ONLY on progress.keystorePasswordGenerated (no dep/carried source)', async () => {
+  const onLog = []
+  // A driver that did NOT thread the flag onto progress — even though it stuffed a
+  // bogus carried flag — gets NO hint (proving progress is the only source).
+  const noFlag = makeDriverDeps({ onLog: (m, c) => onLog.push({ m, c }), carried: { keystorePasswordGenerated: true } })
+  await runTailEffect('saving-credentials', tailProgress(), noFlag)
+  assert(!onLog.some(l => /auto-generated keystore password/i.test(l.m)), 'a carried/dep flag must NOT trigger the hint — only the progress field does')
+
+  // The same driver that DID thread it onto progress gets the hint.
+  const onLog2 = []
+  const withFlag = makeDriverDeps({ onLog: (m, c) => onLog2.push({ m, c }) })
+  await runTailEffect('saving-credentials', tailProgress({ keystorePasswordGenerated: true }), withFlag)
+  const hit = onLog2.find(l => /auto-generated keystore password/i.test(l.m) && /back up that file/i.test(l.m))
+  assert(hit, 'the progress flag fires the hint')
+  assertEquals(hit.c, 'yellow', 'the backup hint is yellow')
+})
+
 await test('DRIVER: writing-workflow-file reuses the carried entries’ keys (no rebuild)', async () => {
   makeDriverDeps.__entryCalls = 0
   const deps = makeDriverDeps({ carried: { ciSecretEntries: RESOLVED_ENTRIES } })
