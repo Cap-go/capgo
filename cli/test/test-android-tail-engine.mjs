@@ -545,6 +545,43 @@ await test('ADAPTER: trackWorkflowEvent fires when the workflow file is written'
   assert(events.some(e => e.event === 'workflow-file-written'), 'trackWorkflowEvent must be forwarded and fire on workflow-file-written')
 })
 
+// ─── GAP 1 (ADAPTER): onBuildOutput is forwarded into the requesting-build viewer ──
+
+await test('GAP1 ADAPTER: requesting-build forwards the build-viewer lines into onBuildOutput (header + queued)', async () => {
+  const buildLines = []
+  const deps = makeDeps({
+    onBuildOutput: line => buildLines.push(line),
+    resolveApikey: () => 'k',
+    carried: { ciSecretEntries: [] },
+  })
+  const res = await runAndroidEffect('requesting-build', tailProgress(), deps)
+  assertEquals(res.next, 'build-complete', 'success with no entries finishes at build-complete')
+  assertEquals(buildLines[0], `Requesting build for ${APP_ID} (android)...`, 'header line forwarded into onBuildOutput')
+  assert(buildLines.some(l => /^✔ Build queued —/.test(l)), 'queued line forwarded into onBuildOutput')
+})
+
+await test('GAP1 ADAPTER: a thrown requesting-build routes to build-complete with the 2 catch lines via onBuildOutput (no throw)', async () => {
+  const buildLines = []
+  const deps = makeDeps({
+    onBuildOutput: line => buildLines.push(line),
+    resolveApikey: () => 'k',
+    requestBuildInternal: async () => { throw new Error('network down') },
+  })
+  let threw = false
+  let res
+  try {
+    res = await runAndroidEffect('requesting-build', tailProgress(), deps)
+  }
+  catch {
+    threw = true
+  }
+  assert(!threw, 'a thrown build request must NOT propagate through the adapter')
+  assertEquals(res.next, 'build-complete', 'a thrown build request still finishes at build-complete')
+  assert(res.transient && /network down/.test(res.transient.error), 'the thrown error rides in transient.error')
+  assert(buildLines.some(l => /^⚠ network down/.test(l)), 'catch line 1 forwarded into onBuildOutput')
+  assert(buildLines.some(l => /Your credentials are saved.*try again/.test(l)), 'catch line 2 forwarded into onBuildOutput')
+})
+
 // ─── CHOICE / INPUT tail steps: assert each exposes a usable (non-auto) view ──
 //
 // These do not run through runAndroidEffect; the driver renders them and waits

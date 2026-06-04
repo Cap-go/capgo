@@ -1119,6 +1119,14 @@ export interface AndroidEffectDeps {
   logger?: BuildLogger
 
   /**
+   * The build VIEWER sink — the android TUI feeds this into `setBuildOutput` (the
+   * dedicated build output pane, DISTINCT from the `onLog` side-log). The shared
+   * tail writes the build header / blank+queued / ⚠ failure / no-key UX / catch
+   * lines here. Forwarded verbatim through `toTailDeps`. No-op when absent.
+   */
+  onBuildOutput?: (line: string) => void
+
+  /**
    * Resolves the Capgo API key the build request should use, mirroring the
    * android tail's CLI-flag-over-saved precedence. Returns undefined when no key
    * is resolvable (the no-key UX finishes at build-complete). Forwarded verbatim.
@@ -1327,6 +1335,7 @@ function toTailDeps(deps: AndroidEffectDeps): TailEffectDeps<AndroidOnboardingPr
     requestBuildInternal: deps.requestBuildInternal,
     // ── streaming / telemetry / preload deps forwarded verbatim ──────────────
     logger: deps.logger,
+    onBuildOutput: deps.onBuildOutput,
     resolveApikey: deps.resolveApikey,
     onCiSecretUploadProgress: deps.onCiSecretUploadProgress,
     onCiSecretCheckPhase: deps.onCiSecretCheckPhase,

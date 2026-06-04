@@ -197,6 +197,17 @@ export interface TailEffectDeps<P extends TailEffectProgress = TailEffectProgres
   logger?: BuildLogger
 
   /**
+   * The build VIEWER sink — DISTINCT from `onLog` (the side-log). The bespoke
+   * android tail (app.tsx ~L1654-1740) writes the build header / blank+queued /
+   * ⚠ failure / no-key UX / catch lines via `setBuildOutput` (a dedicated build
+   * output pane), NOT via the side-log `addLog`. The shared engine forwards
+   * those build-viewer lines here so the driver can route them to the right
+   * sink. OPTIONAL — absent on iOS (and legacy callers), where the lines are
+   * simply dropped and routing is unaffected.
+   */
+  onBuildOutput?: (line: string) => void
+
+  /**
    * Resolves the Capgo API key the build request should use, mirroring the
    * android tail's CLI-flag-over-saved precedence (`apikey ?? findSavedKeySilent()`).
    * Returns undefined when no key is resolvable — in which case requesting-build
@@ -286,6 +297,10 @@ export interface TailTransient {
   recommendedScript?: string | null
   /** Set when env-export found nothing to write or threw — routed to build-complete, never thrown. */
   envExportError?: string
+  /** Set when requesting-build THREW — routed to build-complete, never thrown (app.tsx ~L1733). */
+  error?: string
+  /** Set on the ci-secrets-failed routes (repo-null / catch) so the failed-step view can render the reason. */
+  ciSecretError?: string
 }
 
 // ─── Tail input ───────────────────────────────────────────────────────────────
@@ -926,45 +941,70 @@ export async function runTailEffect<P extends TailEffectProgress>(
       // CLI-flag key takes precedence over the saved one — the driver resolves it
       // (apikey ?? findSavedKeySilent()) and hands it back via deps.resolveApikey.
       // When that dep is wired and yields nothing, mirror the android no-key UX:
-      // log the guidance and finish at build-complete WITHOUT attempting a build.
-      // When the dep is ABSENT (legacy callers / iOS not-yet-wired) fall back to the
-      // empty-string apikey so the existing behaviour is preserved.
+      // write the guidance to the build VIEWER and finish at build-complete
+      // WITHOUT attempting a build. When the dep is ABSENT (legacy callers / iOS
+      // not-yet-wired) fall back to the empty-string apikey so the existing
+      // behaviour is preserved.
+      //
+      // Every user-facing line here goes to the build VIEWER sink (onBuildOutput,
+      // the android setBuildOutput pane) — NOT the side-log onLog — exactly as the
+      // bespoke android tail does (app.tsx ~L1654-1740). onBuildOutput is OPTIONAL,
+      // so iOS/legacy callers simply drop the lines and routing is unaffected.
       let apikey = ''
       if (deps.resolveApikey) {
         const resolved = deps.resolveApikey()
         if (!resolved) {
-          deps.onLog?.('⚠ No Capgo API key found.', 'yellow')
-          deps.onLog?.(`Run \`capgo login\` first, then \`capgo build request --platform ${deps.platform}\`.`)
+          deps.onBuildOutput?.('⚠ No Capgo API key found.')
+          deps.onBuildOutput?.(`Run \`capgo login\` first, then \`capgo build request --platform ${deps.platform}\`.`)
           return { progress, next: 'build-complete' }
         }
         apikey = resolved
       }
 
-      const result = await deps.requestBuildInternal!(
-        progress.appId,
-        { apikey, platform: deps.platform, aiAnalysisMode: 'caller-handled' },
-        true,
-        deps.logger,
-      )
+      // The build VIEWER header — the bespoke writes it with setBuildOutput([...])
+      // (a REPLACE that resets the pane to just the header) right before firing the
+      // request; the streaming logger then APPENDS each build line under it.
+      deps.onBuildOutput?.(`Requesting build for ${progress.appId} (${deps.platform})...`)
 
-      if (result.success) {
-        const url = `https://capgo.app/app/${progress.appId}/builds`
-        deps.onLog?.(`✔ Build queued — ${url}`)
-        // Only offer to push CI secrets AFTER a build has been queued. If we
-        // never had any credentials to push (entries empty), skip to exit.
-        const entries = tailCiSecretEntries(progress, deps)
-        if (entries.length > 0)
-          return { progress, next: 'detecting-ci-secrets', transient: { buildUrl: url, ciSecretEntries: entries } }
-        return { progress, next: 'build-complete', transient: { buildUrl: url } }
+      try {
+        const result = await deps.requestBuildInternal!(
+          progress.appId,
+          { apikey, platform: deps.platform, aiAnalysisMode: 'caller-handled' },
+          true,
+          deps.logger,
+        )
+
+        if (result.success) {
+          const url = `https://capgo.app/app/${progress.appId}/builds`
+          // Blank line + queued line — parity with setBuildOutput([..., '', queued]).
+          deps.onBuildOutput?.('')
+          deps.onBuildOutput?.(`✔ Build queued — ${url}`)
+          // Only offer to push CI secrets AFTER a build has been queued. If we
+          // never had any credentials to push (entries empty), skip to exit.
+          const entries = tailCiSecretEntries(progress, deps)
+          if (entries.length > 0)
+            return { progress, next: 'detecting-ci-secrets', transient: { buildUrl: url, ciSecretEntries: entries } }
+          return { progress, next: 'build-complete', transient: { buildUrl: url } }
+        }
+
+        deps.onBuildOutput?.(`⚠ ${result.error || 'unknown error'}`)
+        // Offer AI-assisted diagnosis when logs were captured. The TUI owns the
+        // ai-analysis-* sub-flow (no AI-calling-AI in the headless engine); the
+        // engine only routes there and surfaces the job id in transient.
+        if (result.aiAnalysis?.ready && result.aiAnalysis.jobId)
+          return { progress, next: 'ai-analysis-prompt', transient: { aiJobId: result.aiAnalysis.jobId } }
+        return { progress, next: 'build-complete' }
       }
-
-      deps.onLog?.(`⚠ ${result.error || 'unknown error'}`, 'yellow')
-      // Offer AI-assisted diagnosis when logs were captured. The TUI owns the
-      // ai-analysis-* sub-flow (no AI-calling-AI in the headless engine); the
-      // engine only routes there and surfaces the job id in transient.
-      if (result.aiAnalysis?.ready && result.aiAnalysis.jobId)
-        return { progress, next: 'ai-analysis-prompt', transient: { aiJobId: result.aiAnalysis.jobId } }
-      return { progress, next: 'build-complete' }
+      catch (err) {
+        // The bespoke try/catch (app.tsx ~L1733-1738): a thrown build request writes
+        // 2 lines to the build VIEWER and routes to build-complete — credentials are
+        // already saved, so it NEVER throws (no handleError). The reason rides in
+        // transient.error so the driver can surface it.
+        const message = err instanceof Error ? err.message : String(err)
+        deps.onBuildOutput?.(`⚠ ${message}`)
+        deps.onBuildOutput?.(`Your credentials are saved. Run \`capgo build request --platform ${deps.platform}\` to try again.`)
+        return { progress, next: 'build-complete', transient: { error: message } }
+      }
     }
 
     // ── Not a tail effect step ────────────────────────────────────────────

@@ -260,6 +260,82 @@ await test('requesting-build failure with NO AI job → build-complete', async (
   assertEquals(res.next, 'build-complete', 'a failed build with no AI job finishes the wizard')
 })
 
+// ─── GAP 1: requesting-build writes the build VIEWER lines via onBuildOutput ───
+//
+// The bespoke android tail (app.tsx ~L1654-1740) writes the build VIEWER lines
+// (header / queued / error / no-key UX) via setBuildOutput — a sink DISTINCT
+// from the side-log addLog. The shared engine must emit those via the OPTIONAL
+// deps.onBuildOutput, and a thrown build request must route to build-complete
+// (NOT throw) after emitting the 2 catch lines via onBuildOutput.
+
+await test('GAP1: requesting-build emits header + blank + queued lines via onBuildOutput (success path)', async () => {
+  const buildLines = []
+  const deps = makeDeps({
+    onBuildOutput: line => buildLines.push(line),
+    resolveApikey: () => 'k',
+    carried: { ciSecretEntries: [] },
+  })
+  const res = await runTailEffect('requesting-build', tailProgress(), deps)
+  assertEquals(res.next, 'build-complete', 'success with no entries finishes at build-complete')
+  assert(buildLines[0] === `Requesting build for ${APP_ID} (android)...`, 'first build-viewer line is the header (replaces, not the side-log)')
+  assert(buildLines.includes(''), 'a blank line precedes the queued line (parity with setBuildOutput([..., \'\', queued]))')
+  assert(buildLines.some(l => /^✔ Build queued — https:\/\/capgo\.app\/app\//.test(l)), 'queued line goes to the build viewer')
+})
+
+await test('GAP1: requesting-build emits the no-key 2-line UX via onBuildOutput and finishes at build-complete', async () => {
+  const buildLines = []
+  const deps = makeDeps({
+    onBuildOutput: line => buildLines.push(line),
+    resolveApikey: () => undefined,
+  })
+  const res = await runTailEffect('requesting-build', tailProgress(), deps)
+  assertEquals(res.next, 'build-complete', 'no key → finish at build-complete')
+  assert(!deps.__calls.some(c => c.name === 'requestBuildInternal'), 'must NOT attempt a build with no key')
+  assert(buildLines.some(l => /No Capgo API key found/.test(l)), 'no-key line 1 goes to the build viewer')
+  assert(buildLines.some(l => /capgo login.*capgo build request --platform android/.test(l)), 'no-key line 2 goes to the build viewer')
+})
+
+await test('GAP1: requesting-build emits the failure ⚠ line via onBuildOutput', async () => {
+  const buildLines = []
+  const deps = makeDeps({
+    onBuildOutput: line => buildLines.push(line),
+    resolveApikey: () => 'k',
+    requestBuildInternal: async (...a) => { deps.__calls.push({ name: 'requestBuildInternal', args: a }); return { success: false, error: 'boom' } },
+  })
+  const res = await runTailEffect('requesting-build', tailProgress(), deps)
+  assertEquals(res.next, 'build-complete', 'a failed build with no AI job finishes at build-complete')
+  assert(buildLines.some(l => /^⚠ boom/.test(l)), 'the failure line goes to the build viewer')
+})
+
+await test('GAP1: requesting-build that THROWS routes to build-complete with transient.error + 2 catch lines via onBuildOutput (no throw)', async () => {
+  const buildLines = []
+  const deps = makeDeps({
+    onBuildOutput: line => buildLines.push(line),
+    resolveApikey: () => 'k',
+    requestBuildInternal: async () => { throw new Error('network down') },
+  })
+  let threw = false
+  let res
+  try {
+    res = await runTailEffect('requesting-build', tailProgress(), deps)
+  }
+  catch {
+    threw = true
+  }
+  assert(!threw, 'requesting-build must NOT propagate a thrown build request')
+  assertEquals(res.next, 'build-complete', 'a thrown build request still finishes at build-complete')
+  assert(res.transient && /network down/.test(res.transient.error), 'the thrown error rides in transient.error')
+  assert(buildLines.some(l => /^⚠ network down/.test(l)), 'catch line 1 (the error) goes to the build viewer')
+  assert(buildLines.some(l => /Your credentials are saved.*capgo build request --platform android.*try again/.test(l)), 'catch line 2 (the retry hint) goes to the build viewer')
+})
+
+await test('GAP1: requesting-build degrades gracefully when onBuildOutput is ABSENT (iOS)', async () => {
+  // No onBuildOutput injected — the build-viewer lines are simply dropped.
+  const deps = makeDeps({ resolveApikey: () => undefined })
+  const res = await runTailEffect('requesting-build', tailProgress(), deps)
+  assertEquals(res.next, 'build-complete', 'routing is unaffected when onBuildOutput is absent')
+})
+
 await test("detecting-ci-secrets (single GitHub target) → next 'ask-github-actions-setup' (uses detectCiSecretTargets)", async () => {
   const deps = makeDeps()
   const res = await runTailEffect('detecting-ci-secrets', tailProgress(), deps)
