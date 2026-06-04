@@ -230,7 +230,6 @@
     "@capgo/capacitor-intent-launcher": "^8.3.19",
     "@capgo/capacitor-intercom": "^8.1.5",
     "@capgo/capacitor-is-root": "^8.1.11",
-    "@capgo/capacitor-ivs-player": "^8.0.19",
     "@capgo/capacitor-jw-player": "^8.0.28",
     "@capgo/capacitor-keep-awake": "^8.1.11",
     "@capgo/capacitor-launch-navigator": "^8.0.23",
