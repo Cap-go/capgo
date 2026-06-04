@@ -3543,10 +3543,6 @@ export type Database = {
           user_id: string
         }[]
       }
-      get_org_owner_id: {
-        Args: { apikey: string; app_id: string }
-        Returns: string
-      }
       get_org_user_access_rbac: {
         Args: { p_org_id: string; p_user_id: string }
         Returns: {

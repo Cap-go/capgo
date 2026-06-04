@@ -591,6 +591,7 @@ SELECT
                 'get_identity_org_allowed',
                 'get_identity_org_allowed_apikey_only',
                 'get_identity_org_appid',
+                'get_org_owner_id',
                 'get_org_perm_for_apikey',
                 'get_org_perm_for_apikey_v2',
                 'has_app_right',

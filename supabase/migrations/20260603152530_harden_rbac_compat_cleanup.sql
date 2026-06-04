@@ -2276,46 +2276,6 @@ GRANT EXECUTE ON FUNCTION public.check_org_members_password_policy(uuid) TO anon
 GRANT EXECUTE ON FUNCTION public.check_org_members_password_policy(uuid) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.check_org_members_password_policy(uuid) TO service_role;
 
-CREATE OR REPLACE FUNCTION public.is_member_of_org(user_id uuid, org_id uuid)
-RETURNS boolean
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = ''
-AS $$
-DECLARE
-  v_actor_id uuid;
-BEGIN
-  IF NOT public.is_internal_request_role(public.current_request_role()) THEN
-    v_actor_id := public.request_actor_user_id();
-
-    IF v_actor_id IS NULL
-      OR v_actor_id <> is_member_of_org.user_id
-      OR NOT public.rbac_check_permission_request(
-        public.rbac_perm_org_read(),
-        is_member_of_org.org_id,
-        NULL::character varying,
-        NULL::bigint
-      )
-    THEN
-      RETURN false;
-    END IF;
-  END IF;
-
-  RETURN EXISTS (
-    SELECT 1
-    FROM public.org_users
-    WHERE org_users.user_id = is_member_of_org.user_id
-      AND org_users.org_id = is_member_of_org.org_id
-  );
-END;
-$$;
-
-ALTER FUNCTION public.is_member_of_org(uuid, uuid) OWNER TO postgres;
-REVOKE ALL ON FUNCTION public.is_member_of_org(uuid, uuid) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.is_member_of_org(uuid, uuid) TO anon;
-GRANT EXECUTE ON FUNCTION public.is_member_of_org(uuid, uuid) TO authenticated;
-GRANT EXECUTE ON FUNCTION public.is_member_of_org(uuid, uuid) TO service_role;
-
 CREATE OR REPLACE FUNCTION public.reject_access_due_to_2fa_for_org(org_id uuid)
 RETURNS boolean
 LANGUAGE plpgsql
@@ -3806,6 +3766,7 @@ DROP FUNCTION IF EXISTS public.get_identity_for_apikey_creation();
 DROP FUNCTION IF EXISTS public.get_identity_org_allowed(public.key_mode[], uuid);
 DROP FUNCTION IF EXISTS public.get_identity_org_allowed_apikey_only(public.key_mode[], uuid);
 DROP FUNCTION IF EXISTS public.get_identity_org_appid(public.key_mode[], uuid, character varying);
+DROP FUNCTION IF EXISTS public.get_org_owner_id(text, text);
 DROP FUNCTION IF EXISTS public.has_app_right(character varying, public.user_min_right);
 DROP FUNCTION IF EXISTS public.has_app_right_apikey(character varying, public.user_min_right, uuid, text);
 DROP FUNCTION IF EXISTS public.has_app_right_userid(character varying, public.user_min_right, uuid);
