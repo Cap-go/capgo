@@ -297,7 +297,7 @@ CREATE TABLE public.org_users (
     org_id uuid NOT NULL,
     app_id character varying,
     channel_id bigint,
-    rbac_role_name text,
+    rbac_role_name text DEFAULT 'org_member'::text,
     is_invite boolean DEFAULT false NOT NULL
 );
 
