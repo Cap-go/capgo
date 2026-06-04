@@ -40,14 +40,20 @@
 
         </activity>
 
+        <!-- @capgo/capacitor-pdf-generator also declares an androidx.core.content.FileProvider
+             (different authority + paths). The manifest merger keys providers by android:name,
+             so it conflicts on authorities/resource. tools:replace makes the app's FileProvider
+             authoritative (${applicationId}.fileprovider + @xml/file_paths) and resolves the merge. -->
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
             android:exported="false"
-            android:grantUriPermissions="true">
+            android:grantUriPermissions="true"
+            tools:replace="android:authorities">
             <meta-data
                 android:name="android.support.FILE_PROVIDER_PATHS"
-                android:resource="@xml/file_paths"></meta-data>
+                android:resource="@xml/file_paths"
+                tools:replace="android:resource"></meta-data>
         </provider>
     </application>
 
