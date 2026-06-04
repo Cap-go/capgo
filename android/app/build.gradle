@@ -22,6 +22,12 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
     }
+    packaging {
+        jniLibs {
+            // Capgo's dependency graph already ships stripped native libs; avoid redundant NDK strip work.
+            keepDebugSymbols += ['**/*.so']
+        }
+    }
 }
 
 repositories {
