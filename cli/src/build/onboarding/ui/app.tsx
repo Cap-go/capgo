@@ -125,7 +125,7 @@ import {
   WelcomeStep,
 } from './steps/ios-shared.js'
 import type { IosEffectDeps, IosStepCtx } from '../ios/flow.js'
-import { runIosEffect } from '../ios/flow.js'
+import { applyIosInput, runIosEffect } from '../ios/flow.js'
 import { getIosResumeStep } from '../ios/progress.js'
 
 const OUTPUT_LINE_SPLIT_RE = /\r?\n/
@@ -3096,23 +3096,34 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
             // Persist the fork choice to progress so resume after CLI close
             // routes to the right path. Without this, an interrupted import
             // run resumes into the create-new path's `creating-certificate`
-            // step and triggers the cert-limit error.
+            // step and triggers the cert-limit error. applyIosInput records
+            // setupMethod ('import-existing' | 'create-new') exactly as the
+            // bespoke `existing.setupMethod = …` did.
             const existing = await loadProgress(appId) || {
               platform: 'ios' as const,
               appId,
               startedAt: new Date().toISOString(),
               completedSteps: {},
             }
-            existing.setupMethod = value === 'import' ? 'import-existing' : 'create-new'
-            await saveProgress(appId, existing)
+            const reduced = applyIosInput('setup-method-select', existing, { step: 'setup-method-select', value })
+            await saveProgress(appId, reduced)
 
+            // Keep the React `importMode` mirror in sync (read by the
+            // create-new effect driver's verifying-key guard + saving-credentials).
             if (value === 'import') {
               setImportMode(true)
+              // DIVERGE: the bespoke jumps STRAIGHT to the silent import-scanning
+              // discovery, which is NOT a resume target (getIosResumeStep with no
+              // importDistribution yet collapses onto import-distribution-mode).
+              // The driver runs import-scanning as a navigation gate, so keep the
+              // explicit setStep here (matches the routing test's DIVERGE class).
               setStep('import-scanning')
             }
             else {
               setImportMode(false)
-              setStep('api-key-instructions')
+              // MATCH: create-new resume (setupMethod='create-new', no .p8) lands
+              // on api-key-instructions — engine-derived.
+              setStep(getIosResumeStep(reduced))
             }
           }}
         />
@@ -3881,8 +3892,13 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
               addLog(`✔ Key file found · ${filePath}`)
               // Persist the extracted keyId too, so a quit-before-confirm resume
               // restores it instead of showing the empty placeholder.
-              void savePartialProgress({ p8Path: filePath, keyId: extracted || undefined })
-              setStep('input-key-id')
+              await savePartialProgress({ p8Path: filePath, keyId: extracted || undefined })
+              // Engine-derived routing (same as the input-p8-path onSubmit): the
+              // direct path-submit on the api-key-instructions screen is an
+              // input-p8-path action. Route off a base WITHOUT keyId so it lands
+              // on input-key-id, MATCHing the bespoke setStep('input-key-id').
+              const reduced = applyIosInput('input-p8-path', { platform: 'ios', appId, startedAt: new Date().toISOString(), completedSteps: {}, setupMethod: importMode ? 'import-existing' : 'create-new', ...(importMode && importDistribution ? { importDistribution } : {}) }, { step: 'input-p8-path', value: filePath })
+              setStep(getIosResumeStep(reduced))
             }
             catch {
               handleError(new Error(`File not found: ${filePath}`), 'api-key-instructions')
@@ -3909,8 +3925,15 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
               addLog(`✔ Key file found · ${filePath}`)
               // Persist the extracted keyId too, so a quit-before-confirm resume
               // restores it instead of showing the empty placeholder.
-              void savePartialProgress({ p8Path: filePath, keyId: extracted || undefined })
-              setStep('input-key-id')
+              await savePartialProgress({ p8Path: filePath, keyId: extracted || undefined })
+              // Engine-derived routing: applyIosInput records ONLY p8Path (file
+              // read + keyId extraction are the effect boundary, done above), then
+              // getIosResumeStep routes on the .p8 chain. We route off a base WITHOUT
+              // keyId so it lands on input-key-id (the user still confirms/overrides
+              // the auto-detected Key ID), MATCHing the bespoke setStep('input-key-id')
+              // — even though keyId is persisted to disk for resume restoration.
+              const reduced = applyIosInput('input-p8-path', { platform: 'ios', appId, startedAt: new Date().toISOString(), completedSteps: {}, setupMethod: importMode ? 'import-existing' : 'create-new', ...(importMode && importDistribution ? { importDistribution } : {}) }, { step: 'input-p8-path', value: filePath })
+              setStep(getIosResumeStep(reduced))
             }
             catch {
               handleError(new Error(`File not found: ${value}`), 'input-p8-path')
@@ -3924,7 +3947,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
         <InputKeyIdStep
           keyId={keyId}
           dense={dense}
-          onSubmit={(value) => {
+          onSubmit={async (value) => {
             // `value || keyId` reuses the detected key ID when the user just
             // presses Enter; the trim+guard rejects an empty submission in the
             // no-detection case (keyId='' makes the fallback a no-op).
@@ -3933,8 +3956,16 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
               return
             setKeyId(finalKeyId)
             upsertLog('✔ Key ID · ', `✔ Key ID · ${finalKeyId}`)
-            void savePartialProgress({ keyId: finalKeyId })
-            setStep('input-issuer-id')
+            await savePartialProgress({ keyId: finalKeyId })
+            // Engine-derived routing: applyIosInput records keyId (we pass the
+            // already-resolved finalKeyId so the engine's `value || detected`
+            // matches the bespoke `value || keyId`), then getIosResumeStep
+            // re-derives the next step from the persisted .p8 chain (p8Path +
+            // keyId set, no issuerId → input-issuer-id). MATCHes the bespoke
+            // setStep('input-issuer-id').
+            const loaded = await loadProgress(appId)
+            const reduced = applyIosInput('input-key-id', loaded ?? { platform: 'ios', appId, startedAt: new Date().toISOString(), completedSteps: {} }, { step: 'input-key-id', value: finalKeyId })
+            setStep(getIosResumeStep(reduced))
           }}
         />
       )}
@@ -3943,14 +3974,21 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
       {step === 'input-issuer-id' && (
         <InputIssuerIdStep
           dense={dense}
-          onSubmit={(value) => {
+          onSubmit={async (value) => {
             const cleaned = value.trim()
             if (!cleaned)
               return
             setIssuerId(cleaned)
             upsertLog('✔ Issuer ID · ', `✔ Issuer ID · ${cleaned}`)
-            void savePartialProgress({ issuerId: cleaned })
-            setStep('verifying-key')
+            await savePartialProgress({ issuerId: cleaned })
+            // Engine-derived routing: applyIosInput records issuerId, then
+            // getIosResumeStep re-derives the next step from the persisted .p8
+            // chain (p8Path + keyId + issuerId all set → verifying-key). MATCHes
+            // the bespoke setStep('verifying-key'). Works for both create-new and
+            // import app_store (getResumeStep routes the same on a full .p8 chain).
+            const loaded = await loadProgress(appId)
+            const reduced = applyIosInput('input-issuer-id', loaded ?? { platform: 'ios', appId, startedAt: new Date().toISOString(), completedSteps: {} }, { step: 'input-issuer-id', value })
+            setStep(getIosResumeStep(reduced))
           }}
         />
       )}
@@ -3978,14 +4016,28 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
             }),
             { label: '✖  Exit onboarding', value: '__exit__' },
           ]}
-          onChange={(value) => {
+          onChange={async (value) => {
             if (value === '__exit__') {
+              // DIVERGE: the bespoke exit escape calls exitOnboarding directly
+              // (the engine models this as the resolver's 'error' route, but the
+              // TUI's user-facing exit sink is exitOnboarding — keep it).
               addLog(`Exiting. Revoke a certificate manually in App Store Connect, then resume with ${buildInitCommand}.`, 'yellow')
               exitOnboarding()
             }
             else {
+              // EPHEMERAL-branching: stash the picked cert into the carried ref
+              // (resolved to the AscDistributionCert the revoke effect needs) +
+              // keep the React `certToRevoke` mirror (the create-new effect driver
+              // reconstructs the cert object from it). Then run the pure resolver
+              // effect to derive next (always → revoking-certificate on a pick),
+              // mirroring the BATCH-2 ephemeral-branching mechanism.
               setCertToRevoke(value)
-              setStep('revoking-certificate')
+              const certObj = existingCerts.find(c => c.id === value) ?? { id: value, name: '', serialNumber: '', expirationDate: '' }
+              iosCarriedRef.current = { ...iosCarriedRef.current, certToRevoke: certObj }
+              const current = (await loadProgress(appId)) ?? { platform: 'ios' as const, appId, startedAt: new Date().toISOString(), completedSteps: {} }
+              const res = await runIosEffect('cert-limit-prompt', current, { appId, carried: iosCarriedRef.current })
+              if (res.next && res.next !== 'cert-limit-prompt')
+                setStep(res.next)
             }
           }}
         />
@@ -4002,11 +4054,22 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
         <DuplicateProfilePromptStep
           duplicateCount={duplicateProfiles.length}
           dense={dense}
-          onChange={(value) => {
+          onChange={async (value) => {
             if (value === 'delete') {
-              setStep('deleting-duplicate-profiles')
+              // EPHEMERAL-branching: record the confirm into the carried ref +
+              // thread the duplicate list (the delete effect reads it). Then run
+              // the pure resolver effect to derive next (confirm →
+              // deleting-duplicate-profiles), mirroring the BATCH-2 mechanism.
+              iosCarriedRef.current = { ...iosCarriedRef.current, confirmDeleteDuplicates: true, duplicateProfiles }
+              const current = (await loadProgress(appId)) ?? { platform: 'ios' as const, appId, startedAt: new Date().toISOString(), completedSteps: {} }
+              const res = await runIosEffect('duplicate-profile-prompt', current, { appId, carried: iosCarriedRef.current })
+              if (res.next && res.next !== 'duplicate-profile-prompt')
+                setStep(res.next)
             }
             else {
+              // DIVERGE: the bespoke exit escape calls exitOnboarding directly
+              // (the engine models it as the resolver's 'error' route; the TUI's
+              // user-facing exit sink is exitOnboarding — keep it).
               addLog(`Exiting. Delete the duplicate profiles in App Store Connect, then resume with ${buildInitCommand}.`, 'yellow')
               exitOnboarding()
             }
