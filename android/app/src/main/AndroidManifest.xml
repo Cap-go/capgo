@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <application
         android:allowBackup="true"
@@ -39,8 +40,14 @@
 
         </activity>
 
+        <!-- Use a uniquely-named FileProvider subclass (.AppFileProvider) so the app's
+             provider doesn't collide by android:name with @capgo/capacitor-pdf-generator's
+             androidx.core.content.FileProvider during manifest merge. Both providers then
+             coexist, each keeping its own authority + paths — so PDF share (which looks up
+             ${applicationId}.capgo.pdfgenerator.fileprovider) keeps working. FileProvider
+             resolves by authority at runtime, so the subclass is transparent to Capacitor. -->
         <provider
-            android:name="androidx.core.content.FileProvider"
+            android:name=".AppFileProvider"
             android:authorities="${applicationId}.fileprovider"
             android:exported="false"
             android:grantUriPermissions="true">

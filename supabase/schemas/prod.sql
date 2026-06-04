@@ -1315,6 +1315,7 @@ DECLARE
   v_user_id UUID;
   v_key TEXT;
   v_org_exists BOOLEAN;
+  v_stats_refresh_fields CONSTANT TEXT[] := ARRAY['stats_refresh_requested_at', 'stats_updated_at', 'updated_at'];
 BEGIN
   -- Skip audit logging for org DELETE operations
   -- When an org is deleted, we can't insert into audit_logs because the org_id
@@ -1325,7 +1326,6 @@ BEGIN
 
   -- Get current user from auth context or API key
   -- Uses get_identity() WITH key_mode parameter to support both JWT auth and API key authentication
-  -- This is the fix: previously called get_identity() without parameters which only checked auth.uid()
   v_user_id := public.get_identity('{read,upload,write,all}'::public.key_mode[]);
 
   -- Skip audit logging if no user is identified
@@ -1336,22 +1336,34 @@ BEGIN
 
   -- Convert records to JSONB based on operation type
   IF TG_OP = 'DELETE' THEN
-    v_old_record := to_jsonb(OLD);
+    v_old_record := pg_catalog.to_jsonb(OLD);
     v_new_record := NULL;
   ELSIF TG_OP = 'INSERT' THEN
     v_old_record := NULL;
-    v_new_record := to_jsonb(NEW);
+    v_new_record := pg_catalog.to_jsonb(NEW);
   ELSE -- UPDATE
-    v_old_record := to_jsonb(OLD);
-    v_new_record := to_jsonb(NEW);
+    v_old_record := pg_catalog.to_jsonb(OLD);
+    v_new_record := pg_catalog.to_jsonb(NEW);
 
     -- Calculate changed fields by comparing old and new values
-    FOR v_key IN SELECT jsonb_object_keys(v_new_record)
+    FOR v_key IN SELECT pg_catalog.jsonb_object_keys(v_new_record)
     LOOP
       IF v_old_record->v_key IS DISTINCT FROM v_new_record->v_key THEN
-        v_changed_fields := array_append(v_changed_fields, v_key);
+        v_changed_fields := pg_catalog.array_append(v_changed_fields, v_key);
       END IF;
     END LOOP;
+
+    -- Dashboard chart refreshes only touch stats refresh state. The apps table
+    -- also receives updated_at from its update trigger, so keep that out too.
+    IF TG_TABLE_NAME = ANY(ARRAY['apps', 'orgs'])
+      AND v_changed_fields && ARRAY['stats_refresh_requested_at', 'stats_updated_at']
+      AND NOT EXISTS (
+        SELECT 1
+        FROM pg_catalog.unnest(v_changed_fields) AS changed_field(field_name)
+        WHERE changed_field.field_name <> ALL(v_stats_refresh_fields)
+      ) THEN
+      RETURN NEW;
+    END IF;
   END IF;
 
   -- Get org_id and record_id based on table being modified
@@ -4404,6 +4416,20 @@ $$;
 
 
 ALTER FUNCTION "public"."force_valid_user_id_on_app"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."force_org_rbac_enabled"() RETURNS "trigger"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+BEGIN
+  NEW.use_new_rbac := true;
+  RETURN NEW;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."force_org_rbac_enabled"() OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."generate_org_on_user_create"() RETURNS "trigger"
@@ -10943,26 +10969,16 @@ CREATE OR REPLACE FUNCTION "public"."rbac_enable_for_org"("p_org_id" "uuid", "p_
     AS $$
 DECLARE
   v_migration_result jsonb;
-  v_was_enabled boolean;
 BEGIN
-  -- Check if already enabled
-  SELECT use_new_rbac INTO v_was_enabled FROM public.orgs WHERE id = p_org_id;
-  IF v_was_enabled THEN
-    RETURN jsonb_build_object(
-      'status', 'already_enabled',
-      'org_id', p_org_id,
-      'message', 'RBAC was already enabled for this org'
-    );
-  END IF;
-
-  -- Migrate org_users to role_bindings
   v_migration_result := public.rbac_migrate_org_users_to_bindings(p_org_id, p_granted_by);
 
-  -- Enable RBAC flag
-  UPDATE public.orgs SET use_new_rbac = true WHERE id = p_org_id;
+  UPDATE public.orgs
+  SET use_new_rbac = true
+  WHERE id = p_org_id
+    AND use_new_rbac IS DISTINCT FROM true;
 
-  RETURN jsonb_build_object(
-    'status', 'success',
+  RETURN pg_catalog.jsonb_build_object(
+    'status', 'already_enabled',
     'org_id', p_org_id,
     'migration_result', v_migration_result,
     'rbac_enabled', true
@@ -10974,7 +10990,7 @@ $$;
 ALTER FUNCTION "public"."rbac_enable_for_org"("p_org_id" "uuid", "p_granted_by" "uuid") OWNER TO "postgres";
 
 
-COMMENT ON FUNCTION "public"."rbac_enable_for_org"("p_org_id" "uuid", "p_granted_by" "uuid") IS 'Migrates org_users to role_bindings and enables RBAC for an org in one transaction.';
+COMMENT ON FUNCTION "public"."rbac_enable_for_org"("p_org_id" "uuid", "p_granted_by" "uuid") IS 'Compatibility helper retained for service-role callers. RBAC is always enabled; this function only backfills bindings and returns enabled.';
 
 
 
@@ -12295,26 +12311,17 @@ CREATE OR REPLACE FUNCTION "public"."rbac_rollback_org"("p_org_id" "uuid") RETUR
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
     AS $$
-DECLARE
-  v_deleted_count int;
-  v_migration_reason text := 'Migrated from org_users (legacy)';
 BEGIN
-  -- Delete all role_bindings that were migrated from org_users
-  DELETE FROM public.role_bindings
-  WHERE org_id = p_org_id
-    AND reason = v_migration_reason
-    AND is_direct = true;
+  UPDATE public.orgs
+  SET use_new_rbac = true
+  WHERE id = p_org_id
+    AND use_new_rbac IS DISTINCT FROM true;
 
-  GET DIAGNOSTICS v_deleted_count = ROW_COUNT;
-
-  -- Disable RBAC flag
-  UPDATE public.orgs SET use_new_rbac = false WHERE id = p_org_id;
-
-  RETURN jsonb_build_object(
-    'status', 'success',
+  RETURN pg_catalog.jsonb_build_object(
+    'status', 'not_supported',
     'org_id', p_org_id,
-    'deleted_bindings', v_deleted_count,
-    'rbac_enabled', false
+    'message', 'RBAC rollback is disabled because RBAC is always enabled',
+    'rbac_enabled', true
   );
 END;
 $$;
@@ -12323,7 +12330,7 @@ $$;
 ALTER FUNCTION "public"."rbac_rollback_org"("p_org_id" "uuid") OWNER TO "postgres";
 
 
-COMMENT ON FUNCTION "public"."rbac_rollback_org"("p_org_id" "uuid") IS 'Removes migrated role_bindings and disables RBAC for an org (rollback migration).';
+COMMENT ON FUNCTION "public"."rbac_rollback_org"("p_org_id" "uuid") IS 'Compatibility helper retained for service-role callers. It cannot disable RBAC or delete RBAC bindings.';
 
 
 
@@ -17018,7 +17025,9 @@ CREATE TABLE IF NOT EXISTS "public"."orgs" (
     "has_usage_credits" boolean DEFAULT false NOT NULL,
     "website" "text",
     "stats_refresh_requested_at" timestamp without time zone,
+    "onboarding" "jsonb" DEFAULT '{"intent": "unknown"}'::"jsonb" NOT NULL,
     CONSTRAINT "orgs_max_apikey_expiration_days_valid" CHECK ((("max_apikey_expiration_days" IS NULL) OR (("max_apikey_expiration_days" >= 1) AND ("max_apikey_expiration_days" <= 365)))),
+    CONSTRAINT "orgs_onboarding_valid" CHECK ((("jsonb_typeof"("onboarding") = 'object'::"text") AND ((NOT ("onboarding" ? 'intent'::"text")) OR (("onboarding" ->> 'intent'::"text") = ANY (ARRAY['unknown'::"text", 'ota'::"text", 'builder'::"text", 'both'::"text", 'exploring'::"text"]))))),
     CONSTRAINT "orgs_password_policy_config_min_length_check" CHECK ((("password_policy_config" IS NULL) OR (("jsonb_typeof"("password_policy_config") = 'object'::"text") AND ((NOT ("password_policy_config" ? 'min_length'::"text")) OR (("jsonb_typeof"(("password_policy_config" -> 'min_length'::"text")) = 'number'::"text") AND ((("password_policy_config" ->> 'min_length'::"text"))::numeric = "trunc"((("password_policy_config" ->> 'min_length'::"text"))::numeric)) AND (((("password_policy_config" ->> 'min_length'::"text"))::numeric >= (6)::numeric) AND ((("password_policy_config" ->> 'min_length'::"text"))::numeric <= (72)::numeric))))))),
     CONSTRAINT "orgs_required_encryption_key_valid" CHECK ((("required_encryption_key" IS NULL) OR ("length"(("required_encryption_key")::"text") = ANY (ARRAY[20, 21]))))
 );
@@ -17060,7 +17069,7 @@ COMMENT ON COLUMN "public"."orgs"."required_encryption_key" IS 'Optional: First 
 
 
 
-COMMENT ON COLUMN "public"."orgs"."use_new_rbac" IS 'Feature flag: when true, org uses RBAC instead of legacy org_users rights.';
+COMMENT ON COLUMN "public"."orgs"."use_new_rbac" IS 'Compatibility field retained for old org payloads. RBAC is always enabled and this value is forced true.';
 
 
 
@@ -18899,6 +18908,10 @@ COMMENT ON TRIGGER "enforce_role_binding_role_scope" ON "public"."role_bindings"
 
 
 
+CREATE OR REPLACE TRIGGER "force_org_rbac_enabled" BEFORE INSERT OR UPDATE OF "use_new_rbac" ON "public"."orgs" FOR EACH ROW EXECUTE FUNCTION "public"."force_org_rbac_enabled"();
+
+
+
 CREATE OR REPLACE TRIGGER "force_valid_apikey_name" BEFORE INSERT OR UPDATE ON "public"."apikeys" FOR EACH ROW EXECUTE FUNCTION "public"."auto_apikey_name_by_id"();
 
 
@@ -19641,6 +19654,10 @@ CREATE POLICY "Allow insert org for user" ON "public"."orgs" FOR INSERT TO "auth
 
 
 
+CREATE POLICY "Deny disabling RBAC flag on org insert" ON "public"."orgs" AS RESTRICTIVE FOR INSERT TO "anon", "authenticated" WITH CHECK (("use_new_rbac" IS TRUE));
+
+
+
 CREATE POLICY "Allow member and owner to select" ON "public"."org_users" FOR SELECT TO "anon", "authenticated" USING ("public"."is_member_of_org"(( SELECT "public"."get_identity_org_allowed"('{read,upload,write,all}'::"public"."key_mode"[], "org_users"."org_id") AS "get_identity_org_allowed"), "org_id"));
 
 
@@ -19861,7 +19878,7 @@ CREATE POLICY "Allow to self delete" ON "public"."org_users" FOR DELETE TO "anon
 
 
 
-CREATE POLICY "Allow update for auth (admin+)" ON "public"."orgs" FOR UPDATE TO "anon", "authenticated" USING ("public"."check_min_rights"('admin'::"public"."user_min_right", "public"."get_identity_org_allowed"('{all,write}'::"public"."key_mode"[], "id"), "id", NULL::character varying, NULL::bigint)) WITH CHECK (("public"."check_min_rights"('admin'::"public"."user_min_right", "public"."get_identity_org_allowed"('{all,write}'::"public"."key_mode"[], "id"), "id", NULL::character varying, NULL::bigint) AND (("enforcing_2fa" IS NOT TRUE) OR "public"."has_2fa_enabled"()) AND (("password_policy_config" IS NULL) OR (("jsonb_typeof"("password_policy_config") = 'object'::"text") AND ((NOT ("password_policy_config" ? 'min_length'::"text")) OR (("jsonb_typeof"(("password_policy_config" -> 'min_length'::"text")) = 'number'::"text") AND ((("password_policy_config" ->> 'min_length'::"text"))::numeric = "trunc"((("password_policy_config" ->> 'min_length'::"text"))::numeric)) AND (((("password_policy_config" ->> 'min_length'::"text"))::numeric >= (6)::numeric) AND ((("password_policy_config" ->> 'min_length'::"text"))::numeric <= (72)::numeric))))))));
+CREATE POLICY "Allow org settings update via RBAC" ON "public"."orgs" FOR UPDATE TO "authenticated" USING ("public"."rbac_check_permission_request"("public"."rbac_perm_org_update_settings"(), "id", NULL::character varying, NULL::bigint)) WITH CHECK (("public"."rbac_check_permission_request"("public"."rbac_perm_org_update_settings"(), "id", NULL::character varying, NULL::bigint) AND (("enforcing_2fa" IS NOT TRUE) OR "public"."has_2fa_enabled"())));
 
 
 
@@ -19950,6 +19967,10 @@ CREATE POLICY "Deny delete on daily_storage_hourly" ON "public"."daily_storage_h
 
 
 CREATE POLICY "Deny delete on deploy history" ON "public"."deploy_history" FOR DELETE USING (false);
+
+
+
+CREATE POLICY "Deny disabling RBAC flag on org update" ON "public"."orgs" AS RESTRICTIVE FOR UPDATE TO "anon", "authenticated" USING (true) WITH CHECK (("use_new_rbac" IS TRUE));
 
 
 
@@ -21394,6 +21415,11 @@ GRANT ALL ON FUNCTION "public"."generate_org_user_on_org_create"() TO "service_r
 
 REVOKE ALL ON FUNCTION "public"."generate_org_user_stripe_info_on_org_create"() FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."generate_org_user_stripe_info_on_org_create"() TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."force_org_rbac_enabled"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."force_org_rbac_enabled"() TO "service_role";
 
 
 
@@ -23662,7 +23688,6 @@ ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT SELECT,INS
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLES TO "anon";
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLES TO "authenticated";
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLES TO "service_role";
-
 
 
 

@@ -7,7 +7,7 @@ import { isSsoUser, provisionSsoUser } from '~/services/ssoProvisioning'
 import { createSignedImageUrl, getImmediateImageUrl } from '~/services/storage'
 import { getLocalConfig, useSupabase } from '~/services/supabase'
 import { sendEvent } from '~/services/tracking'
-import { clearWebsitePaidUserCookie } from '~/services/websiteAuthCookie'
+import { clearWebsitePaidUserCookie, setWebsitePaidUserCookie } from '~/services/websiteAuthCookie'
 import { useMainStore } from '~/stores/main'
 import { useOrganizationStore } from '~/stores/organization'
 import { hasPendingInviteSkip } from '~/utils/pendingInviteSkip'
@@ -292,6 +292,8 @@ async function guard(
     if (organizationsLoaded && isAdminRoute) {
       try {
         main.isAdmin = await isPlatformAdmin()
+        if (main.isAdmin)
+          setWebsitePaidUserCookie(true)
       }
       catch (error) {
         console.error('Failed to resolve platform admin status:', error)
@@ -317,6 +319,8 @@ async function guard(
     try {
       // isPlatformAdmin() is the only frontend admin-rights source.
       main.isAdmin = await isPlatformAdmin()
+      if (main.isAdmin)
+        setWebsitePaidUserCookie(true)
     }
     catch (error) {
       console.error('Failed to resolve platform admin status:', error)
@@ -386,6 +390,8 @@ async function guard(
       try {
         // Re-check via the single approved frontend path for admin-rights.
         main.isAdmin = await isPlatformAdmin()
+        if (main.isAdmin)
+          setWebsitePaidUserCookie(true)
       }
       catch (error) {
         console.error('Failed to resolve platform admin status:', error)

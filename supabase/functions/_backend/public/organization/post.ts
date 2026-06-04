@@ -25,6 +25,7 @@ const bodySchema = type({
   'email?': 'string.email',
   'estimatedMau?': estimatedMauSchema,
   'website?': 'string',
+  'intent?': "'ota' | 'builder' | 'both' | 'exploring' | 'unknown'",
 })
 
 async function getInitialPlanForMau(c: Context<MiddlewareKeyVariables>, estimatedMau: number) {
