@@ -62,6 +62,13 @@ const selectedRoleName = ref('')
 
 const channelByRbacId = computed(() => new Map(channels.value.map(channel => [channel.rbac_id, channel])))
 const canUseChannelPermissionOverrides = computed(() => props.principalType !== 'group')
+const channelRoleNameById = computed(() => {
+  return Object.fromEntries(
+    channelBindings.value
+      .filter(binding => typeof binding.channel_row_id === 'number')
+      .map(binding => [binding.channel_row_id!, binding.role_name]),
+  ) as Record<number, string>
+})
 
 const availableChannels = computed(() => {
   const usedChannelIds = new Set(channelBindings.value.map(binding => binding.channel_row_id).filter((id): id is number => typeof id === 'number'))
@@ -411,6 +418,7 @@ watch(
         :principal-id="principalId"
         :principal-name="principalName"
         :role-name="inheritedRoleName"
+        :channel-role-name-by-id="channelRoleNameById"
         :editable="editable"
       />
     </section>

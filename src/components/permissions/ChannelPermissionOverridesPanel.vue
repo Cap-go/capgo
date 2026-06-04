@@ -25,8 +25,10 @@ const props = withDefaults(defineProps<{
   principalId: string
   principalName: string
   roleName: string
+  channelRoleNameById?: Record<number, string>
   editable?: boolean
 }>(), {
+  channelRoleNameById: () => ({}),
   editable: true,
 })
 
@@ -116,7 +118,12 @@ function getOverrideValue(channelId: number, permission: ChannelPermissionKey) {
   return channelOverrides.value[key]
 }
 
-function getDefaultPermission(roleName: string, permission: ChannelPermissionKey) {
+function getDefaultRoleName(channelId: number) {
+  return props.channelRoleNameById[channelId] ?? props.roleName
+}
+
+function getDefaultPermission(channelId: number, permission: ChannelPermissionKey) {
+  const roleName = getDefaultRoleName(channelId)
   return roleDefaultChannelPermissions[roleName]?.[permission] ?? false
 }
 
@@ -127,8 +134,8 @@ function getSelectValue(channelId: number, permission: ChannelPermissionKey): 'd
   return override ? 'allow' : 'deny'
 }
 
-function getDefaultLabel(roleName: string, permission: ChannelPermissionKey) {
-  return getDefaultPermission(roleName, permission)
+function getDefaultLabel(channelId: number, permission: ChannelPermissionKey) {
+  return getDefaultPermission(channelId, permission)
     ? t('channel-permissions-default-allow')
     : t('channel-permissions-default-deny')
 }
@@ -208,7 +215,7 @@ async function updateChannelPermission(channelId: number, permission: ChannelPer
   if (channelOverridesSaving.value[key])
     return
 
-  const defaultAllowed = getDefaultPermission(props.roleName, permission)
+  const defaultAllowed = getDefaultPermission(channelId, permission)
   const previousOverrides = { ...channelOverrides.value }
 
   channelOverridesSaving.value = { ...channelOverridesSaving.value, [key]: true }
@@ -357,7 +364,7 @@ watch(
                 @change="updateChannelPermission(channel.id, perm.key, ($event.target as HTMLSelectElement).value as 'default' | 'allow' | 'deny')"
               >
                 <option value="default">
-                  {{ getDefaultLabel(roleName, perm.key) }}
+                  {{ getDefaultLabel(channel.id, perm.key) }}
                 </option>
                 <option value="allow">
                   {{ t('channel-permissions-allow') }}
