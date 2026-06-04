@@ -2614,6 +2614,20 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
         // The upload progress bar is cleared by uploading-ci-secrets completing.
         if (step === 'uploading-ci-secrets')
           setCiSecretUploadProgress(null)
+        // The shared tail engine routes a CI-secret check/upload failure to
+        // ci-secrets-failed on its SUCCESS path (it RETURNS the failure route +
+        // transient.ciSecretError rather than throwing — tail/flow.ts checking-
+        // ci-secrets). ci-secrets-failed renders `error={ciSecretError}`, so
+        // mirror the engine transient into React state or the screen shows a
+        // blank reason. (The catch branch below covers the THROW path.)
+        if (t?.ciSecretError !== undefined)
+          setCiSecretError(t.ciSecretError)
+        // requesting-build surfaces a non-throwing build-request failure via
+        // transient.error (tail/flow.ts requesting-build catch → build-complete).
+        // Mirror it to React error state for parity with the bespoke setError
+        // path; the reason is also already streamed into the build viewer.
+        if (t?.error !== undefined)
+          setError(t.error)
 
         // ── Advance ────────────────────────────────────────────────────────────
         // writing-workflow-file keeps the bespoke 150ms settle before advancing to
