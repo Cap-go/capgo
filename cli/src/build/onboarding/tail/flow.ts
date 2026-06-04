@@ -637,6 +637,41 @@ function tailCiSecretEntries<P extends TailEffectProgress>(progress: P, deps: Ta
   return deps.createCiSecretEntries(credentials)
 }
 
+/**
+ * The workflow-builder script preload run at `uploading-ci-secrets` on the
+ * with-workflow path, BEFORE routing to `pick-package-manager`, so the later
+ * `pick-build-script` view has real options. Mirrors the bespoke android tail
+ * (app.tsx ~L1481-1498): read the package.json scripts, detect the project type,
+ * and pick the recommended build script ONLY when it is actually one of the
+ * scripts. Every dep is OPTIONAL and the whole thing is best-effort — a missing
+ * dep or a thrown helper yields a smaller/empty preload (pick-build-script falls
+ * back to its escape hatches) and NEVER blocks the flow. Returns the transient
+ * fragment to spread into the effect result.
+ */
+async function preloadWorkflowScripts<P extends TailEffectProgress>(
+  deps: TailEffectDeps<P>,
+): Promise<{ availableScripts?: Record<string, string>, recommendedScript?: string | null }> {
+  if (!deps.getPackageScripts)
+    return {}
+  try {
+    const availableScripts = deps.getPackageScripts() ?? {}
+    let recommendedScript: string | null = null
+    if (deps.findProjectType) {
+      const projectType = await deps.findProjectType({ quiet: true }).catch(() => null)
+      if (projectType && deps.findBuildCommandForProjectType) {
+        const recommended = await deps.findBuildCommandForProjectType(projectType).catch(() => null)
+        if (recommended && Object.hasOwn(availableScripts, recommended))
+          recommendedScript = recommended
+      }
+    }
+    return { availableScripts, recommendedScript }
+  }
+  catch {
+    // Best-effort; pick-build-script falls back to its empty list + escape hatches.
+    return {}
+  }
+}
+
 // ─── runTailEffect ────────────────────────────────────────────────────────────
 
 /**
@@ -756,13 +791,31 @@ export async function runTailEffect<P extends TailEffectProgress>(
       // persisted to progress. Pass it as the 4th arg so an already-existing
       // secret is treated as an UPDATE rather than a create. When the driver did
       // not thread it (crash-recovery resume), it stays undefined.
-      await deps.uploadCiSecretsAsync!(target, entries, deps.carried?.ciSecretExistingKeys)
+      // Forward the per-key upload progress callback as the 5th arg so the driver
+      // can render a progress bar (android: setCiSecretUploadProgress). The 4th
+      // (runner) stays undefined — the helper uses its default. When the driver did
+      // not thread the existing-key list (crash-recovery resume) it stays undefined.
+      await deps.uploadCiSecretsAsync!(
+        target,
+        entries,
+        deps.carried?.ciSecretExistingKeys,
+        undefined,
+        deps.onCiSecretUploadProgress,
+      )
 
       const summary = `Uploaded ${entries.length} env var${entries.length === 1 ? '' : 's'} to ${target.label}`
       deps.onLog?.(`✔ ${summary}`)
 
-      if (progress.setupMode === 'with-workflow')
-        return { progress, next: 'pick-package-manager', transient: { ciSecretUploadSummary: summary } }
+      if (progress.setupMode === 'with-workflow') {
+        // Pre-pick-package-manager script preload — resolve the package.json scripts
+        // + recommended build script BEFORE routing to pick-package-manager so
+        // pick-build-script has real options (mirrors app.tsx ~L1481-1498). Each dep
+        // is OPTIONAL and best-effort: any absent dep or thrown helper just yields a
+        // smaller (or empty) preload and pick-build-script falls back to its escape
+        // hatches. Surfaced in transient — never persisted.
+        const preload = await preloadWorkflowScripts(deps)
+        return { progress, next: 'pick-package-manager', transient: { ciSecretUploadSummary: summary, ...preload } }
+      }
       return { progress, next: 'build-complete', transient: { ciSecretUploadSummary: summary } }
     }
 

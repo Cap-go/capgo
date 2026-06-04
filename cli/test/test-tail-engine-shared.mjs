@@ -291,6 +291,65 @@ await test("uploading-ci-secrets (setupMode=secrets-only) → next 'build-comple
   assertEquals(res.next, 'build-complete', 'secrets-only finishes after upload')
 })
 
+// ─── CONCERN 2: upload progress callback + workflow-builder script preload ─────
+
+await test('uploading-ci-secrets forwards the injected onCiSecretUploadProgress as the 5th arg of uploadCiSecretsAsync', async () => {
+  const progressEvents = []
+  const deps = makeDeps({
+    onCiSecretUploadProgress: (current, total, key) => progressEvents.push({ current, total, key }),
+    uploadCiSecretsAsync: async (target, entries, existing, runner, onProgress) => {
+      deps.__calls.push({ name: 'uploadCiSecretsAsync', args: [target, entries, existing, runner, onProgress] })
+      // The engine must pass a callback through — simulate the helper invoking it.
+      onProgress?.(1, 2, 'CAPGO_TOKEN')
+    },
+  })
+  const progress = tailProgress({ ciSecretTarget: GITHUB_TARGET, setupMode: 'secrets-only' })
+  const res = await runTailEffect('uploading-ci-secrets', progress, deps)
+  assertEquals(res.next, 'build-complete', 'secrets-only finishes after upload')
+  const upload = deps.__calls.find(c => c.name === 'uploadCiSecretsAsync')
+  assert(upload, 'must call uploadCiSecretsAsync')
+  assertEquals(typeof upload.args[4], 'function', 'uploadCiSecretsAsync must receive an onProgress callback as the 5th arg')
+  assertEquals(progressEvents.length, 1, 'the injected onCiSecretUploadProgress must be invoked by the forwarded callback')
+  assertEquals(progressEvents[0].key, 'CAPGO_TOKEN', 'progress event carries the key name')
+})
+
+await test('uploading-ci-secrets (with-workflow) preloads scripts + recommended script into transient BEFORE pick-package-manager', async () => {
+  const deps = makeDeps({
+    getPackageScripts: () => ({ build: 'vite build', dev: 'vite', test: 'vitest' }),
+    findProjectType: async () => 'vue',
+    findBuildCommandForProjectType: async () => 'build',
+  })
+  const progress = tailProgress({ ciSecretTarget: GITHUB_TARGET, setupMode: 'with-workflow' })
+  const res = await runTailEffect('uploading-ci-secrets', progress, deps)
+  assertEquals(res.next, 'pick-package-manager', 'with-workflow continues into the workflow-builder sub-flow')
+  assert(res.transient && res.transient.availableScripts, 'preload must surface availableScripts in transient')
+  assertEquals(res.transient.availableScripts.build, 'vite build', 'availableScripts carries the package.json scripts')
+  assertEquals(res.transient.recommendedScript, 'build', 'recommendedScript is the build command for the detected project type')
+})
+
+await test('uploading-ci-secrets (with-workflow) recommendedScript stays null when the recommended command is not in scripts', async () => {
+  const deps = makeDeps({
+    getPackageScripts: () => ({ dev: 'vite' }),
+    findProjectType: async () => 'nuxtjs',
+    findBuildCommandForProjectType: async () => 'generate', // not present in scripts
+  })
+  const progress = tailProgress({ ciSecretTarget: GITHUB_TARGET, setupMode: 'with-workflow' })
+  const res = await runTailEffect('uploading-ci-secrets', progress, deps)
+  assertEquals(res.next, 'pick-package-manager', 'with-workflow still routes to pick-package-manager')
+  assert(res.transient && res.transient.availableScripts, 'still surfaces the scripts map')
+  assert(!res.transient.recommendedScript, 'recommendedScript must stay null/undefined when the command is not a known script')
+})
+
+await test('uploading-ci-secrets (with-workflow) degrades gracefully when the preload deps are ABSENT (iOS)', async () => {
+  // No getPackageScripts/findProjectType/findBuildCommandForProjectType injected.
+  const deps = makeDeps()
+  const progress = tailProgress({ ciSecretTarget: GITHUB_TARGET, setupMode: 'with-workflow' })
+  const res = await runTailEffect('uploading-ci-secrets', progress, deps)
+  assertEquals(res.next, 'pick-package-manager', 'with-workflow still routes to pick-package-manager without a preload')
+  // No throw, and no scripts surfaced — pick-build-script will fall back to escape hatches.
+  assert(!res.transient || !res.transient.availableScripts, 'no availableScripts surfaced when the preload deps are absent')
+})
+
 await test("exporting-env (written) → next 'build-complete' (uses exportCredentialsToEnv + defaultExportPath)", async () => {
   const deps = makeDeps()
   const res = await runTailEffect('exporting-env', tailProgress(), deps)
