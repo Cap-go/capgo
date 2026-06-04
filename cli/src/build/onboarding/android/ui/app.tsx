@@ -2955,13 +2955,17 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
               { label: '❌  No', value: 'no' },
             ]}
             onChange={(value) => {
-              if (value === 'no') {
-                setSetupMode('declined')
-                setStep('ask-export-env')
-                return
-              }
-              setSetupMode(value as 'with-workflow' | 'secrets-only')
-              setStep('checking-ci-secrets')
+              // Option value 'no' maps to the persisted setupMode 'declined'.
+              const mode = value === 'no' ? 'declined' : (value as 'with-workflow' | 'secrets-only')
+              setSetupMode(mode)
+              // Engine-derived [MATCH]: with the GitHub target chosen (post-build,
+              // pre-upload), with-workflow/secrets-only resume to checking-ci-secrets
+              // and declined resumes to ask-export-env.
+              setStep(tailEngineNext(
+                'ask-github-actions-setup',
+                { step: 'ask-github-actions-setup', value: mode },
+                { buildRequested: true },
+              ))
             }}
           />
         </Box>
