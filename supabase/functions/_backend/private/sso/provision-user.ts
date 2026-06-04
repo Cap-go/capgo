@@ -13,17 +13,11 @@ interface PublicUserSeed {
   last_name: string | null
 }
 
-type OrgMembershipRight
-  = 'read'
-    | 'upload'
-    | 'write'
-    | 'admin'
-    | 'super_admin'
-    | 'invite_read'
-    | 'invite_upload'
-    | 'invite_write'
-    | 'invite_admin'
-    | 'invite_super_admin'
+type OrgRoleName
+  = 'org_member'
+    | 'org_billing_admin'
+    | 'org_admin'
+    | 'org_super_admin'
 
 interface EnsureOrgMembershipResult {
   alreadyMember: boolean
@@ -195,36 +189,17 @@ function buildPublicUserSeed(userId: string, email: string, userMetadata: Record
   }
 }
 
-function isInviteRole(role: string | null | undefined): role is Extract<OrgMembershipRight, `invite_${string}`> {
-  return !!role && role.startsWith('invite_')
-}
-
-function promoteInviteRole(role: Extract<OrgMembershipRight, `invite_${string}`>): Exclude<OrgMembershipRight, `invite_${string}`> {
-  switch (role) {
-    case 'invite_read':
-      return 'read'
-    case 'invite_upload':
-      return 'upload'
-    case 'invite_write':
-      return 'write'
-    case 'invite_admin':
-      return 'admin'
-    case 'invite_super_admin':
-      return 'super_admin'
-  }
-}
-
 async function ensureOrgMembership(
   admin: ReturnType<typeof supabaseAdmin>,
   requestId: string,
   userId: string,
   orgId: string,
-  fallbackRole: Exclude<OrgMembershipRight, `invite_${string}`> = 'read',
+  fallbackRole: OrgRoleName = 'org_member',
   allowRetry = true,
 ): Promise<EnsureOrgMembershipResult> {
   const { data: existingMembership, error: membershipCheckError } = await (admin as any)
     .from('org_users')
-    .select('id, user_right')
+    .select('id, is_invite, rbac_role_name')
     .eq('user_id', userId)
     .eq('org_id', orgId)
     .maybeSingle()
@@ -234,23 +209,21 @@ async function ensureOrgMembership(
     throw new Error('membership_check_failed')
   }
 
-  const currentRight = typeof existingMembership?.user_right === 'string'
-    ? existingMembership.user_right as OrgMembershipRight
-    : null
-
   if (existingMembership) {
-    if (!isInviteRole(currentRight)) {
+    if (!existingMembership.is_invite) {
       return { alreadyMember: true }
     }
 
-    const promotedRole = promoteInviteRole(currentRight)
     const { error: promotionError } = await (admin as any)
       .from('org_users')
-      .update({ user_right: promotedRole })
+      .update({
+        is_invite: false,
+        rbac_role_name: existingMembership.rbac_role_name ?? fallbackRole,
+      })
       .eq('id', existingMembership.id)
 
     if (promotionError) {
-      cloudlogErr({ requestId, message: 'Failed to promote invited org membership during SSO provisioning', userId, orgId, fromRole: currentRight, toRole: promotedRole, error: promotionError })
+      cloudlogErr({ requestId, message: 'Failed to promote invited org membership during SSO provisioning', userId, orgId, roleName: existingMembership.rbac_role_name ?? fallbackRole, error: promotionError })
       throw new Error('membership_promotion_failed')
     }
 
@@ -262,7 +235,8 @@ async function ensureOrgMembership(
     .insert({
       user_id: userId,
       org_id: orgId,
-      user_right: fallbackRole,
+      rbac_role_name: fallbackRole,
+      is_invite: false,
     })
 
   if (!insertError) {
@@ -356,28 +330,28 @@ async function ensureOrgMembershipInTransaction(
   requestId: string,
   userId: string,
   orgId: string,
-  fallbackRole: Exclude<OrgMembershipRight, `invite_${string}`> = 'read',
+  fallbackRole: OrgRoleName = 'org_member',
 ): Promise<void> {
-  const promoteExistingInvite = async (membershipId: string, currentRight: OrgMembershipRight | null) => {
-    if (!isInviteRole(currentRight)) {
+  const promoteExistingInvite = async (membershipId: string, isInvite: boolean, roleName: string | null) => {
+    if (!isInvite) {
       return
     }
 
-    const promotedRole = promoteInviteRole(currentRight)
     await pgClient.query(
       `
         update public.org_users
-        set user_right = $1
-        where id = $2
+        set is_invite = false,
+            rbac_role_name = coalesce($1::text, rbac_role_name, $2::text)
+        where id = $3
       `,
-      [promotedRole, membershipId],
+      [roleName, fallbackRole, membershipId],
     )
   }
 
   try {
-    const existingMembership = await pgClient.query<{ id: string, user_right: OrgMembershipRight | null }>(
+    const existingMembership = await pgClient.query<{ id: string, is_invite: boolean, rbac_role_name: string | null }>(
       `
-        select id, user_right
+        select id, is_invite, rbac_role_name
         from public.org_users
         where user_id = $1
           and org_id = $2
@@ -388,14 +362,14 @@ async function ensureOrgMembershipInTransaction(
 
     const existing = existingMembership.rows[0]
     if (existing) {
-      await promoteExistingInvite(existing.id, existing.user_right)
+      await promoteExistingInvite(existing.id, existing.is_invite, existing.rbac_role_name)
       return
     }
 
     const insertedMembership = await pgClient.query(
       `
-        insert into public.org_users (user_id, org_id, user_right)
-        values ($1, $2, $3)
+        insert into public.org_users (user_id, org_id, rbac_role_name, is_invite)
+        values ($1, $2, $3, false)
         on conflict do nothing
       `,
       [userId, orgId, fallbackRole],
@@ -405,9 +379,9 @@ async function ensureOrgMembershipInTransaction(
       return
     }
 
-    const racedMembership = await pgClient.query<{ id: string, user_right: OrgMembershipRight | null }>(
+    const racedMembership = await pgClient.query<{ id: string, is_invite: boolean, rbac_role_name: string | null }>(
       `
-        select id, user_right
+        select id, is_invite, rbac_role_name
         from public.org_users
         where user_id = $1
           and org_id = $2
@@ -418,7 +392,7 @@ async function ensureOrgMembershipInTransaction(
 
     const raced = racedMembership.rows[0]
     if (raced) {
-      await promoteExistingInvite(raced.id, raced.user_right)
+      await promoteExistingInvite(raced.id, raced.is_invite, raced.rbac_role_name)
       return
     }
 

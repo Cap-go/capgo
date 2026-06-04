@@ -192,12 +192,9 @@ const columns = ref<TableColumn[]>([
       if (!roleName)
         return t('unknown')
 
-      // Normalize role (remove invite_ prefix if present)
-      const normalizedRole = roleName.replace(/^invite_/, '')
-
       // Get i18n key and translate, or fallback to human-readable format
-      const i18nKey = getRbacRoleI18nKey(normalizedRole)
-      return i18nKey ? t(i18nKey) : normalizedRole.replaceAll('_', ' ')
+      const i18nKey = getRbacRoleI18nKey(roleName)
+      return i18nKey ? t(i18nKey) : roleName.replaceAll('_', ' ')
     },
   },
   {

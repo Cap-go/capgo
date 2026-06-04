@@ -67,7 +67,7 @@ const displayStore = useDisplayStore()
 // Check if user is super_admin
 const isSuperAdmin = computed(() => {
   const orgId = organizationStore.currentOrganization?.gid
-  return organizationStore.hasPermissionsInRole('super_admin', ['org_super_admin'], orgId)
+  return organizationStore.hasPermissionsInRole('org_super_admin', ['org_super_admin'], orgId)
 })
 
 // Modal state for non-admin access

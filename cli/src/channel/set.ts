@@ -15,7 +15,6 @@ import {
   getConfig,
   getOrganizationId,
   isCompatible,
-  OrganizationPerm,
   resolveUserIdFromApiKey,
   sendEvent,
   updateOrCreateChannel,
@@ -76,7 +75,7 @@ export async function setChannelInternal(channel: string, appId: string, options
   await check2FAComplianceForApp(supabase, appId, silent)
   const userId = await resolveUserIdFromApiKey(supabase, options.apikey)
 
-  await checkAppExistsAndHasPermissionOrgErr(supabase, options.apikey, appId, OrganizationPerm.admin, silent, true)
+  await checkAppExistsAndHasPermissionOrgErr(supabase, options.apikey, appId, 'app.update_settings', silent, true)
   const orgId = await getOrganizationId(supabase, appId)
 
   const {
@@ -337,8 +336,8 @@ export async function setChannelInternal(channel: string, appId: string, options
   const { error: dbError } = await updateOrCreateChannel(supabase, channelPayload)
   if (dbError) {
     if (!silent)
-      log.error('Cannot set channel the upload key is not allowed to do that, use the "all" for this.')
-    throw new Error('Upload key is not allowed to set this channel')
+      log.error('Cannot set channel because this API key does not have the required RBAC permission.')
+    throw new Error('API key is not allowed to set this channel')
   }
 
   await sendEvent(options.apikey, {

@@ -1,6 +1,5 @@
 import type { Context } from 'hono'
 import type { getDrizzleClient } from './pg.ts'
-import type { Database } from './supabase.types.ts'
 import { eq, sql } from 'drizzle-orm'
 import { cloudlog } from './logging.ts'
 import { logPgError } from './pg.ts'
@@ -39,75 +38,6 @@ export async function getUserIdFromApikey(
   catch (e: unknown) {
     logPgError(c, 'getUserIdFromApikey', e)
     return null
-  }
-}
-
-/**
- * Get owner_org from app_id using the existing Postgres function
- */
-export async function getOwnerOrgByAppId(
-  c: Context,
-  appId: string,
-  drizzleClient: ReturnType<typeof getDrizzleClient>,
-): Promise<string | null> {
-  try {
-    // Call the existing Postgres function
-    const result = await drizzleClient.execute<{ get_user_main_org_id_by_app_id: string }>(
-      sql`SELECT get_user_main_org_id_by_app_id(${appId})`,
-    )
-
-    return result.rows[0]?.get_user_main_org_id_by_app_id ?? null
-  }
-  catch (e: unknown) {
-    logPgError(c, 'getOwnerOrgByAppId', e)
-    return null
-  }
-}
-
-/**
- * Check minimum rights for a user using the existing Postgres function
- */
-export async function checkMinRightsPg(
-  c: Context,
-  minRight: Database['public']['Enums']['user_min_right'],
-  userId: string,
-  orgId: string,
-  appId: string | null,
-  channelId: number | null,
-  drizzleClient: ReturnType<typeof getDrizzleClient>,
-): Promise<boolean> {
-  try {
-    if (!userId) {
-      cloudlog({
-        requestId: c.get('requestId'),
-        message: 'checkMinRightsPg - userId is null',
-      })
-      return false
-    }
-
-    // Call the existing Postgres function
-    const result = await drizzleClient.execute<{ check_min_rights: boolean }>(
-      sql`SELECT check_min_rights(${minRight}::user_min_right, ${userId}::uuid, ${orgId}::uuid, ${appId}, ${channelId})`,
-    )
-
-    const hasPermission = result.rows[0]?.check_min_rights ?? false
-
-    cloudlog({
-      requestId: c.get('requestId'),
-      message: 'checkMinRightsPg - result',
-      hasPermission,
-      minRight,
-      userId,
-      orgId,
-      appId,
-      channelId,
-    })
-
-    return hasPermission
-  }
-  catch (e: unknown) {
-    logPgError(c, 'checkMinRightsPg', e)
-    return false
   }
 }
 

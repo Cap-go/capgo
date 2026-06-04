@@ -208,9 +208,9 @@ app.post('/', async (c) => {
 
   // Fetch the org's password policy after membership verification.
   //
-  // IMPORTANT: do not use userClient here. orgs SELECT is guarded by check_min_rights,
-  // which enforces password-policy compliance, creating a circular dependency for users
-  // who are non-compliant (this endpoint is their remediation path).
+  // IMPORTANT: do not use userClient here. org reads enforce password-policy
+  // compliance, creating a circular dependency for users who are non-compliant
+  // (this endpoint is their remediation path).
   const { data: org, error: orgError } = await adminClient
     .from('orgs')
     .select('id, password_policy_config')

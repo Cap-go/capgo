@@ -3,7 +3,7 @@ import type { CreateDemoApp } from './demo.ts'
 import type { CreateApp } from './post.ts'
 import type { FetchStoreMetadataBody } from './store_metadata.ts'
 import { getBodyOrQuery, honoFactory, useCors } from '../../utils/hono.ts'
-import { middlewareKey, middlewareV2 } from '../../utils/hono_middleware.ts'
+import { middlewareKey, middlewareAuth } from '../../utils/hono_middleware.ts'
 import { deleteApp } from './delete.ts'
 import { createDemoApp } from './demo.ts'
 import { get, getAll } from './get.ts'
@@ -39,7 +39,7 @@ app.get('/:id', middlewareKey(), async (c) => {
   return get(c, id, keyToUse)
 })
 
-app.post('/', middlewareV2(), async (c) => {
+app.post('/', middlewareAuth(), async (c) => {
   const body = await getBodyOrQuery<CreateApp>(c)
   return post(c, body)
 })
@@ -72,12 +72,12 @@ app.delete('/:id', middlewareKey(), async (c) => {
 })
 
 // Demo app creation supports both JWT (browser) and API key authentication
-app.post('/demo', middlewareV2(), async (c) => {
+app.post('/demo', middlewareAuth(), async (c) => {
   const body = await getBodyOrQuery<CreateDemoApp>(c)
   return createDemoApp(c, body)
 })
 
-app.post('/store-metadata', middlewareV2(), async (c) => {
+app.post('/store-metadata', middlewareAuth(), async (c) => {
   const body = await getBodyOrQuery<FetchStoreMetadataBody>(c)
   return fetchStoreMetadata(c, body)
 })

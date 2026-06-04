@@ -5,8 +5,8 @@ import type { CompatibilitySummary, NativePackage, PackageComparison } from '../
 import { Hono } from 'hono/tiny'
 import { safeParseSchema } from '../utils/ark_validation.ts'
 import { compareNativePackages, selectCurrentDeploymentPair, summarizeBundleCompatibility } from '../utils/bundle_compatibility.ts'
-import { middlewareAuth, parseBody, simpleError, useCors } from '../utils/hono.ts'
-import { middlewareV2 } from '../utils/hono_middleware.ts'
+import { parseBody, simpleError, useCors } from '../utils/hono.ts'
+import { middlewareAuth } from '../utils/hono_middleware.ts'
 import { cloudlog } from '../utils/logging.ts'
 import { appIdSchema, hasControlChars } from '../utils/privateAnalyticsValidation.ts'
 import { checkPermission } from '../utils/rbac.ts'
@@ -317,7 +317,7 @@ async function assertCanReadBundles(c: Context<MiddlewareKeyVariables>, appId: s
     throw simpleError('app_access_denied', 'You can\'t access this app', { app_id: appId })
 }
 
-app.post('/compare', middlewareV2(['read', 'write', 'all', 'upload']), async (c) => {
+app.post('/compare', middlewareAuth(), async (c) => {
   const body = await parseBody<CompareBody>(c)
   const appId = validateAppId(body.appId)
   await assertCanReadBundles(c, appId)

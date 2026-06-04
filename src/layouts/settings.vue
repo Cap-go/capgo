@@ -36,7 +36,7 @@ const adminOnlyRoutes = [
 // Check if user is super_admin
 const isSuperAdmin = computed(() => {
   const orgId = organizationStore.currentOrganization?.gid
-  return organizationStore.hasPermissionsInRole('super_admin', ['org_super_admin'], orgId)
+  return organizationStore.hasPermissionsInRole('org_super_admin', ['org_super_admin'], orgId)
 })
 
 // Check if current route is admin-only and user is not admin
@@ -202,7 +202,7 @@ watchEffect(() => {
       key: '/billing',
       onClick: () => {
         // Check permissions at click time to handle role changes
-        if (organizationStore.hasPermissionsInRole('super_admin', ['org_super_admin'], organizationStore.currentOrganization?.gid)) {
+        if (organizationStore.hasPermissionsInRole('org_super_admin', ['org_super_admin'], organizationStore.currentOrganization?.gid)) {
           openPortal(organizationStore.currentOrganization?.gid ?? '', t)
         }
         else {

@@ -91,7 +91,7 @@ if [[ -f "$TYPES_DUMP" ]]; then
   if [[ -f "$TYPES_LIST" ]]; then
     # Extract types
     grep -E '\bTYPE\b' "$TYPES_LIST" | \
-      grep -E 'manifest_entry|disable_update|user_min_right|stripe_status' > "$TYPES_FILTERED_LIST" || true
+      grep -E 'manifest_entry|disable_update|stripe_status' > "$TYPES_FILTERED_LIST" || true
     
     # Also extract the one_month_ahead function (required by stripe_info table)
     grep -E '\bFUNCTION\b' "$TYPES_LIST" | \
@@ -134,7 +134,7 @@ perl -0777 -i -pe '
   printf 'DROP TABLE IF EXISTS public.channel_devices, public.manifest, public.onboarding_demo_data, public.app_versions, public.channels, public.apps, public.notifications, public.org_users, public.orgs, public.stripe_info CASCADE;\n'
   printf 'DROP SEQUENCE IF EXISTS public.app_versions_id_seq, public.channel_devices_id_seq, public.channel_id_seq, public.manifest_id_seq, public.org_users_id_seq, public.stripe_info_id_seq CASCADE;\n'
   printf 'DROP FUNCTION IF EXISTS public.one_month_ahead();\n'
-  printf 'DROP TYPE IF EXISTS public.manifest_entry, public.disable_update, public.user_min_right, public.stripe_status;\n\n'
+  printf 'DROP TYPE IF EXISTS public.manifest_entry, public.disable_update, public.stripe_status;\n\n'
   cat "$OUT_SQL"
   printf '\nCOMMIT;\n'
 } > "${OUT_SQL}.tmp"

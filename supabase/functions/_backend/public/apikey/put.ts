@@ -5,7 +5,7 @@ import type { Database } from '../../utils/supabase.types.ts'
 import { sql } from 'drizzle-orm'
 import { createRoleBindingForPrincipal } from '../../private/role_bindings.ts'
 import { honoFactory, parseBody, quickError, simpleError } from '../../utils/hono.ts'
-import { middlewareV2 } from '../../utils/hono_middleware.ts'
+import { middlewareAuth } from '../../utils/hono_middleware.ts'
 import { cloudlog, cloudlogErr } from '../../utils/logging.ts'
 import { closeClient, getDrizzleClient, getPgClient } from '../../utils/pg.ts'
 import { checkPermission } from '../../utils/rbac.ts'
@@ -261,8 +261,9 @@ async function handlePut(c: Context<MiddlewareKeyVariables>, idParam?: string) {
   }
 
   const supabase = supabaseWithAuth(c, auth)
-  // API-key auth reaches PostgREST as anon, so the server-mediated broad-key
-  // compatibility path uses fixed owner filters after the limited-key guard.
+  // API-key auth reaches PostgREST as anon. Metadata writes go through the
+  // service role below with fixed owner filters so table RLS can deny direct
+  // apikey updates for user-facing roles.
   const dataSupabase = apiKeyOwnerDataClient(c, auth)
   const policyLookupSupabase = supabaseAdmin(c)
 
@@ -311,11 +312,7 @@ async function handlePut(c: Context<MiddlewareKeyVariables>, idParam?: string) {
 
   const isHashedKey = existingApikey.key_hash !== null
 
-  // API-key auth reaches PostgREST as anon, so the server-mediated broad-key
-  // compatibility path uses fixed id/user_id filters after the limited-key and self-key guards.
-  const writeSupabase = auth.authType === 'apikey'
-    ? supabaseAdmin(c)
-    : supabase
+  const writeSupabase = supabaseAdmin(c)
 
   let updatedApikey: Database['public']['Tables']['apikeys']['Row'] | typeof existingApikey = existingApikey
   if (hasBindingUpdates) {
@@ -353,14 +350,10 @@ async function handlePut(c: Context<MiddlewareKeyVariables>, idParam?: string) {
 
   if (regenerate) {
     if (isHashedKey) {
-      const { data: regeneratedApikey, error: regenerateError } = auth.authType === 'apikey'
-        ? await supabaseAdmin(c).rpc('regenerate_hashed_apikey_for_user', {
-            p_apikey_id: existingApikey.id,
-            p_user_id: auth.userId,
-          })
-        : await supabase.rpc('regenerate_hashed_apikey', {
-            p_apikey_id: existingApikey.id,
-          })
+      const { data: regeneratedApikey, error: regenerateError } = await supabaseAdmin(c).rpc('regenerate_hashed_apikey_for_user', {
+        p_apikey_id: existingApikey.id,
+        p_user_id: auth.userId,
+      })
       if (regenerateError || !regeneratedApikey) {
         throw quickError(500, 'failed_to_update_apikey', 'Failed to regenerate API key', { requestId, supabaseError: regenerateError })
       }
@@ -388,7 +381,7 @@ async function handlePut(c: Context<MiddlewareKeyVariables>, idParam?: string) {
   return c.json(updatedApikey)
 }
 
-app.put('/', middlewareV2(), async c => handlePut(c))
-app.put('/:id', middlewareV2(), async c => handlePut(c, c.req.param('id')))
+app.put('/', middlewareAuth(), async c => handlePut(c))
+app.put('/:id', middlewareAuth(), async c => handlePut(c, c.req.param('id')))
 
 export default app

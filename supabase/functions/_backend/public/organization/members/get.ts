@@ -17,7 +17,7 @@ const memberSchema = type({
   uid: 'string.uuid',
   email: 'string.email',
   image_url: 'string | null | undefined',
-  role: '"invite_read" | "invite_upload" | "invite_write" | "invite_admin" | "invite_super_admin" | "read" | "upload" | "write" | "admin" | "super_admin"',
+  role: 'string',
   is_tmp: 'boolean',
 }).array()
 
@@ -47,7 +47,6 @@ export async function get(c: Context<MiddlewareKeyVariables>, bodyRaw: any, apik
   // Use authenticated client for data queries - RLS will enforce access
   const { data, error } = await supabase
     .rpc('get_org_members', {
-      user_id: effectiveApikey.user_id,
       guild_id: body.orgId,
     })
 

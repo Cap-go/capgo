@@ -6,7 +6,7 @@ import { Hono } from 'hono/tiny'
 import { BUILDER_RECOVERY_MILESTONES, buildBuilderOnboardingBentoEvent } from '../utils/builder_onboarding_recovery.ts'
 import { BUNDLE_INCOMPATIBLE_EVENT, buildBundleCompatibilityBentoEvent } from '../utils/bundle_compatibility_recovery.ts'
 import { BRES, parseBody, quickError, simpleError, useCors } from '../utils/hono.ts'
-import { middlewareV2 } from '../utils/hono_middleware.ts'
+import { middlewareAuth } from '../utils/hono_middleware.ts'
 import { cloudlog } from '../utils/logging.ts'
 import { trackPosthogEvent } from '../utils/posthog.ts'
 import { checkPermission } from '../utils/rbac.ts'
@@ -347,7 +347,7 @@ async function buildBundleIncompatibleBentoEvent(
   })
 }
 
-app.post('/', middlewareV2(), async (c) => {
+app.post('/', middlewareAuth(), async (c) => {
   const body = await parseBody<TrackEventBody>(c)
   const { notifyConsole = false, org_id: _orgId, tracking_version: _trackingVersion, ...trackOptions } = body
   const trackingV2 = isTrackingV2(body.tracking_version)

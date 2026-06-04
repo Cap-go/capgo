@@ -218,7 +218,7 @@ beforeAll(async () => {
   const { error: baseMemberError } = await getSupabaseClient().from('org_users').insert({
     org_id: BASE_ORG_ID,
     user_id: USER_ID_APIKEY_EXPIRATION,
-    user_right: 'super_admin',
+    rbac_role_name: 'org_super_admin',
   })
   if (baseMemberError)
     throw baseMemberError
@@ -250,7 +250,7 @@ beforeAll(async () => {
   const { error: policyMemberError } = await getSupabaseClient().from('org_users').insert({
     org_id: POLICY_ORG_ID,
     user_id: USER_ID_APIKEY_EXPIRATION,
-    user_right: 'super_admin',
+    rbac_role_name: 'org_super_admin',
   })
   if (policyMemberError)
     throw policyMemberError
@@ -685,7 +685,7 @@ describe('[PUT] /organization with API key policy', () => {
     const { error: memberError } = await getSupabaseClient().from('org_users').insert({
       org_id: updateOrgId,
       user_id: USER_ID_APIKEY_EXPIRATION,
-      user_right: 'super_admin',
+      rbac_role_name: 'org_super_admin',
     })
     if (memberError)
       throw memberError

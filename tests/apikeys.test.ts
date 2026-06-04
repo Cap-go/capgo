@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { createClient } from '@supabase/supabase-js'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import {
-  APIKEY_MANAGEMENT_ALL,
+  APIKEY_MANAGEMENT_ORG_SUPER_ADMIN,
   appApiKeyBindings,
   BASE_URL,
   getAuthHeaders,
@@ -307,7 +307,7 @@ describe('[POST] /apikey operations', () => {
     const dedicatedAuthHeaders = await getAuthHeadersForCredentials(USER_EMAIL_APIKEY_MANAGEMENT, USER_PASSWORD)
     const allKeyHeaders = {
       'Content-Type': 'application/json',
-      'capgkey': APIKEY_MANAGEMENT_ALL,
+      'capgkey': APIKEY_MANAGEMENT_ORG_SUPER_ADMIN,
     }
 
     try {
@@ -1061,7 +1061,7 @@ describe('[RLS] hashed API key with direct Supabase SDK', () => {
       },
     )
 
-    // Try to query apps table - this goes through RLS which uses get_identity()
+    // Try to query apps table - this goes through RBAC-backed RLS.
     const { data: apps, error: appsError } = await supabaseWithHashedKey
       .from('apps')
       .select('app_id, name')
@@ -1070,7 +1070,7 @@ describe('[RLS] hashed API key with direct Supabase SDK', () => {
     expect(appsError).toBeNull()
     expect(Array.isArray(apps)).toBe(true)
 
-    // Also test calling an RPC that uses get_identity
+    // Also test calling an RPC that uses request-scoped RBAC identity.
     const { data: orgs, error: orgsError } = await supabaseWithHashedKey
       .rpc('get_orgs_v7')
 

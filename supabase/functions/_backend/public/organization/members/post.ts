@@ -11,22 +11,12 @@ import { supabaseApikey } from '../../../utils/supabase.ts'
 const inviteBodySchema = type({
   orgId: 'string',
   email: 'string.email',
-  invite_type: '"read" | "upload" | "write" | "admin" | "super_admin" | "org_member" | "org_billing_admin" | "org_admin" | "org_super_admin"',
+  invite_type: '"org_member" | "org_billing_admin" | "org_admin" | "org_super_admin"',
 })
 
 const rbacInviteRoles = ['org_member', 'org_billing_admin', 'org_admin', 'org_super_admin'] as const
-const _legacyInviteRoles = ['read', 'upload', 'write', 'admin', 'super_admin'] as const
 
-type LegacyInviteRole = (typeof _legacyInviteRoles)[number]
 type RbacInviteRole = (typeof rbacInviteRoles)[number]
-
-const legacyToRbac: Partial<Record<LegacyInviteRole, RbacInviteRole>> = {
-  read: 'org_member',
-  upload: 'org_member',
-  write: 'org_member',
-  admin: 'org_admin',
-  super_admin: 'org_super_admin',
-}
 
 export async function post(c: Context<MiddlewareKeyVariables>, bodyRaw: any, _apikey: Database['public']['Tables']['apikeys']['Row']) {
   const bodyParsed = safeParseSchema(inviteBodySchema, bodyRaw)
@@ -42,13 +32,9 @@ export async function post(c: Context<MiddlewareKeyVariables>, bodyRaw: any, _ap
 
   const supabase = supabaseApikey(c, _apikey?.key)
 
-  const isRbacRole = rbacInviteRoles.includes(body.invite_type as RbacInviteRole)
-  const legacyInviteType = body.invite_type as LegacyInviteRole
-  const rbacRoleName = isRbacRole
-    ? (body.invite_type as RbacInviteRole)
-    : legacyToRbac[legacyInviteType]
+  const rbacRoleName = body.invite_type as RbacInviteRole
 
-  if (!rbacRoleName)
+  if (!rbacInviteRoles.includes(rbacRoleName))
     throw simpleError('invalid_body', 'Invalid invite type', { invite_type: body.invite_type })
 
   const { data, error } = await supabase.rpc('invite_user_to_org_rbac', {

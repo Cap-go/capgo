@@ -23,7 +23,7 @@ import { confirmWithRememberedChoice } from '../promptPreferences'
 import { showReplicationProgress } from '../replicationProgress'
 import { formatTable } from '../terminal-table'
 import { usesAlwaysDirectUpdate } from '../updaterConfig'
-import { baseKeyV2, BROTLI_MIN_UPDATER_VERSION_V5, BROTLI_MIN_UPDATER_VERSION_V6, BROTLI_MIN_UPDATER_VERSION_V7, canPromptInteractively, checkChecksum, checkCompatibilityCloud, checkPlanValidUpload, checkRemoteCliMessages, createSupabaseClient, deletedFailedVersion, findRoot, findSavedKey, formatError, getAppId, getBundleVersion, getCompatibilityDetails, getConfig, getInstalledVersion, getLocalConfig, getLocalDependencies, getOrganizationId, getPMAndCommand, getRemoteFileConfig, hasCliPermission, hasOrganizationPerm, isCompatible, isDeprecatedPluginVersion, OrganizationPerm, regexSemver, resolveUserIdFromApiKey, sendEvent, updateConfigUpdater, updateOrCreateChannel, updateOrCreateVersion, UPLOAD_TIMEOUT, uploadTUS, uploadUrl, zipFile } from '../utils'
+import { baseKeyV2, BROTLI_MIN_UPDATER_VERSION_V5, BROTLI_MIN_UPDATER_VERSION_V6, BROTLI_MIN_UPDATER_VERSION_V7, canPromptInteractively, checkChecksum, checkCompatibilityCloud, checkPlanValidUpload, checkRemoteCliMessages, createSupabaseClient, deletedFailedVersion, findRoot, findSavedKey, formatError, getAppId, getBundleVersion, getCompatibilityDetails, getConfig, getInstalledVersion, getLocalConfig, getLocalDependencies, getOrganizationId, getPMAndCommand, getRemoteFileConfig, hasCliPermission, isCompatible, isDeprecatedPluginVersion, regexSemver, resolveUserIdFromApiKey, sendEvent, updateConfigUpdater, updateOrCreateChannel, updateOrCreateVersion, UPLOAD_TIMEOUT, uploadTUS, uploadUrl, zipFile } from '../utils'
 import { getVersionSuggestions, interactiveVersionBump } from '../versionHelpers'
 import { maybePromptBuilderCta, shouldBlockIncompatibleUpload } from './builder-cta'
 import { checkIndexPosition, searchInDirectory } from './check'
@@ -731,7 +731,8 @@ async function setVersionInChannel(
   if (!versionId)
     uploadFail('Cannot get version id, cannot set channel')
 
-  const apiAccess = await hasCliPermission(supabase, apikey, 'app.create_channel', { appId: appid })
+  const apiAccess = await hasCliPermission(supabase, apikey, 'app.update_settings', { appId: appid })
+    || await hasCliPermission(supabase, apikey, 'app.create_channel', { appId: appid })
 
   if (apiAccess) {
     const { error: dbError3, data } = await updateOrCreateChannel(supabase, {
@@ -743,7 +744,7 @@ async function setVersionInChannel(
       ...(selfAssign ? { allow_device_self_set: true } : {}),
     })
     if (dbError3)
-      uploadFail(`Cannot set channel, the upload key is not allowed to do that, use the "all" for this. ${formatError(dbError3)}`)
+      uploadFail(`Cannot set channel because this API key does not have the required RBAC permission. ${formatError(dbError3)}`)
     const bundleUrl = `${localConfig.hostWeb}/app/${appid}/channel/${data.id}`
     if (data?.public)
       log.info('Your update is now available in your public channel 🎉')
@@ -755,7 +756,7 @@ async function setVersionInChannel(
     return true
   }
 
-  log.warn('The upload key is not allowed to set the version in the channel')
+  log.warn('This API key is not allowed to set the version in the channel')
   return false
 }
 
@@ -1329,25 +1330,29 @@ export async function uploadBundleInternal(preAppid: string, options: OptionsUpl
   if (options.verbose)
     log.info(`[Verbose] Checking app permissions...`)
 
-  const permissions = await checkAppExistsAndHasPermissionOrgErr(supabase, apikey, appid, OrganizationPerm.upload, false, true)
+  await checkAppExistsAndHasPermissionOrgErr(supabase, apikey, appid, 'app.upload_bundle', false, true)
+  const canUploadBundle = true
+  const canDeleteBundle = await hasCliPermission(supabase, apikey, 'bundle.delete', { appId: appid })
+  const canUpdateChannel = await hasCliPermission(supabase, apikey, 'app.update_settings', { appId: appid })
+    || await hasCliPermission(supabase, apikey, 'app.create_channel', { appId: appid })
 
   if (options.verbose) {
     log.info(`[Verbose] Permissions:`)
-    log.info(`  - Upload: ${hasOrganizationPerm(permissions, OrganizationPerm.upload) ? 'yes' : 'no'}`)
-    log.info(`  - Write: ${hasOrganizationPerm(permissions, OrganizationPerm.write) ? 'yes' : 'no'}`)
-    log.info(`  - Admin: ${hasOrganizationPerm(permissions, OrganizationPerm.admin) ? 'yes' : 'no'}`)
+    log.info(`  - app.upload_bundle: ${canUploadBundle ? 'yes' : 'no'}`)
+    log.info(`  - bundle.delete: ${canDeleteBundle ? 'yes' : 'no'}`)
+    log.info(`  - channel update: ${canUpdateChannel ? 'yes' : 'no'}`)
   }
 
-  const shouldDeleteLinkedBundle = options.deleteLinkedBundleOnUpload && hasOrganizationPerm(permissions, OrganizationPerm.write)
+  const shouldDeleteLinkedBundle = options.deleteLinkedBundleOnUpload && canDeleteBundle
   const linkedBundleToDelete = shouldDeleteLinkedBundle
     ? await getLinkedBundleOnChannel(supabase, appid, channel)
     : null
   if (options.deleteLinkedBundleOnUpload && !shouldDeleteLinkedBundle) {
-    log.warn('Cannot delete linked bundle on upload as a upload organization member')
+    log.warn('Cannot delete linked bundle on upload because this API key lacks bundle.delete')
   }
 
   let channelVersionSet = false
-  if (hasOrganizationPerm(permissions, OrganizationPerm.write)) {
+  if (canUpdateChannel) {
     if (options.verbose)
       log.info(`[Verbose] Setting bundle ${bundle} to channel ${channel}...`)
     channelVersionSet = await setVersionInChannel(supabase, apikey, !!options.bundleUrl, bundle, channel, userId, orgId, appid, localConfig, options.selfAssign)
@@ -1361,7 +1366,7 @@ export async function uploadBundleInternal(preAppid: string, options: OptionsUpl
     }
   }
   else {
-    log.warn('Cannot set channel as a upload organization member')
+    log.warn('Cannot set channel because this API key lacks the required RBAC permission')
   }
 
   if (options.verbose)

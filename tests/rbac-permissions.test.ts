@@ -3,11 +3,11 @@ import { randomUUID } from 'node:crypto'
 /**
  * RBAC Permission System Tests
  *
- * Tests the checkPermission function with legacy-compatible inputs backed by RBAC.
+ * Tests the RBAC permission functions and role binding enforcement.
  */
 import { Pool } from 'pg'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
-import { APIKEY_TEST_ALL, ORG_ID, POSTGRES_URL, USER_ID, USER_ID_2, USER_PASSWORD_HASH } from './test-utils'
+import { ORG_ID, POSTGRES_URL, USER_ID, USER_ID_2, USER_PASSWORD_HASH } from './test-utils'
 
 // Test constants
 const TEST_APP_ID = 'com.demo.app'
@@ -92,13 +92,8 @@ describe('rbac permission system', () => {
   })
 
   describe('rbac_check_permission_direct SQL function', () => {
-    describe('legacy-compatible inputs with RBAC enforced', () => {
-      beforeEach(async () => {
-        await query(`SELECT set_config('capgo.rbac_enabled', 'false', true)`)
-        await query(`UPDATE public.orgs SET use_new_rbac = false WHERE id = $1`, [ORG_ID])
-      })
-
-      it('should allow read permission for user with read right', async () => {
+    describe('RBAC permission inputs', () => {
+      it('should allow app read permission for an authorized user', async () => {
         const result = await query(`
           SELECT public.rbac_check_permission_direct(
             'app.read',
@@ -113,7 +108,7 @@ describe('rbac permission system', () => {
         expect(result.rows[0].allowed).toBe(true)
       })
 
-      it('should allow upload permission for user with upload right', async () => {
+      it('should allow app upload permission for an authorized user', async () => {
         const result = await query(`
           SELECT public.rbac_check_permission_direct(
             'app.upload_bundle',
@@ -165,18 +160,11 @@ describe('rbac permission system', () => {
         const scopedKey = `org-bound-${randomUUID()}`
 
         await query(`
-          INSERT INTO public.orgs (id, name, management_email, created_by, use_new_rbac)
+          INSERT INTO public.orgs (id, name, management_email, created_by)
           VALUES
-            ($1::uuid, $3, $5, $6::uuid, false),
-            ($2::uuid, $4, $5, $6::uuid, false)
+            ($1::uuid, $3, $5, $6::uuid),
+            ($2::uuid, $4, $5, $6::uuid)
         `, [allowedOrgId, targetOrgId, `API Key Allowed ${allowedOrgId}`, `API Key Target ${targetOrgId}`, `org-bound-${randomUUID()}@capgo.app`, USER_ID])
-
-        await query(`
-          INSERT INTO public.org_users (org_id, user_id, user_right)
-          VALUES
-            ($1::uuid, $3::uuid, 'super_admin'),
-            ($2::uuid, $3::uuid, 'super_admin')
-        `, [allowedOrgId, targetOrgId, USER_ID])
 
         await createApiKeyForOrg(scopedKey, `Org bound ${allowedOrgId}`, allowedOrgId)
 
@@ -222,13 +210,13 @@ describe('rbac permission system', () => {
         `, [staleUserId, staleEmail])
 
         await query(`
-          INSERT INTO public.orgs (id, name, management_email, created_by, use_new_rbac)
-          VALUES ($1::uuid, $2, $3, $4::uuid, false)
+          INSERT INTO public.orgs (id, name, management_email, created_by)
+          VALUES ($1::uuid, $2, $3, $4::uuid)
         `, [staleOrgId, `Stale RBAC ${staleOrgId}`, staleEmail, USER_ID])
 
         await query(`
-          INSERT INTO public.org_users (org_id, user_id, user_right)
-          VALUES ($1::uuid, $2::uuid, 'super_admin')
+          INSERT INTO public.org_users (org_id, user_id, rbac_role_name)
+          VALUES ($1::uuid, $2::uuid, public.rbac_role_org_super_admin())
         `, [staleOrgId, staleUserId])
 
         await query(`
@@ -295,34 +283,11 @@ describe('rbac permission system', () => {
               $2::uuid,
               $3,
               NULL::bigint
-            ) AS app_permission_allowed,
-            public.check_min_rights(
-              'write'::public.user_min_right,
-              $1::uuid,
-              $2::uuid,
-              $3,
-              NULL::bigint
-            ) AS write_allowed
+            ) AS app_permission_allowed
         `, [USER_ID, ORG_ID, newAppId])
 
         expect(result.rows[0].app_missing).toBe(true)
         expect(result.rows[0].app_permission_allowed).toBe(true)
-        expect(result.rows[0].write_allowed).toBe(true)
-      })
-
-      it('should derive coarse app permission from RBAC when legacy org_users.user_right is null', async () => {
-        await query(`
-          UPDATE public.org_users
-          SET user_right = NULL
-          WHERE user_id = $1::uuid
-            AND org_id = $2::uuid
-        `, [USER_ID, ORG_ID])
-
-        const result = await query(`
-          SELECT public.get_org_perm_for_apikey($1, $2) AS perm
-        `, [APIKEY_TEST_ALL, TEST_APP_ID])
-
-        expect(result.rows[0].perm).toBe('perm_owner')
       })
 
       it('should ignore role bindings whose role scope does not match the binding scope', async () => {
@@ -367,18 +332,10 @@ describe('rbac permission system', () => {
               $2::uuid,
               $3,
               NULL::bigint
-            ) AS app_permission_allowed,
-            public.check_min_rights(
-              'write'::public.user_min_right,
-              $1::uuid,
-              $2::uuid,
-              $3,
-              NULL::bigint
-            ) AS write_allowed
+            ) AS app_permission_allowed
         `, [fakeUserId, ORG_ID, TEST_APP_ID])
 
         expect(result.rows[0].app_permission_allowed).toBe(false)
-        expect(result.rows[0].write_allowed).toBe(false)
       })
 
       it('should ignore cross-scope hierarchy descendants during permission expansion', async () => {
@@ -457,9 +414,8 @@ describe('rbac permission system', () => {
             id,
             created_by,
             name,
-            management_email,
-            use_new_rbac
-          ) VALUES ($1::uuid, $2::uuid, $3, $4, true)
+            management_email
+          ) VALUES ($1::uuid, $2::uuid, $3, $4)
         `, [
           victimOrgId,
           USER_ID_2,
@@ -543,8 +499,8 @@ describe('rbac permission system', () => {
         const foreignAppId = `com.channel.scope.${id}`
 
         await query(`
-          INSERT INTO public.orgs (id, name, management_email, created_by, use_new_rbac)
-          VALUES ($1::uuid, $2, $3, $4::uuid, true)
+          INSERT INTO public.orgs (id, name, management_email, created_by)
+          VALUES ($1::uuid, $2, $3, $4::uuid)
         `, [foreignOrgId, `Channel Scope Org ${id}`, `channel-scope-${id}@capgo.app`, USER_ID_2])
 
         await query(`
@@ -599,9 +555,8 @@ describe('rbac permission system', () => {
             id,
             created_by,
             name,
-            management_email,
-            use_new_rbac
-          ) VALUES ($1::uuid, $2::uuid, $3, $4, true)
+            management_email
+          ) VALUES ($1::uuid, $2::uuid, $3, $4)
         `, [
           victimOrgId,
           USER_ID_2,
@@ -752,10 +707,10 @@ describe('rbac permission system', () => {
         const scopedKey = `rbac-bound-${randomUUID()}`
 
         await query(`
-          INSERT INTO public.orgs (id, name, management_email, created_by, use_new_rbac)
+          INSERT INTO public.orgs (id, name, management_email, created_by)
           VALUES
-            ($1::uuid, $3, $5, $6::uuid, true),
-            ($2::uuid, $4, $5, $6::uuid, true)
+            ($1::uuid, $3, $5, $6::uuid),
+            ($2::uuid, $4, $5, $6::uuid)
         `, [allowedOrgId, targetOrgId, `RBAC Allowed ${allowedOrgId}`, `RBAC Target ${targetOrgId}`, `rbac-bound-${randomUUID()}@capgo.app`, USER_ID])
 
         await createApiKeyForOrg(scopedKey, `RBAC bound ${allowedOrgId}`, allowedOrgId)
@@ -793,8 +748,8 @@ describe('rbac permission system', () => {
         const appId = `com.rbac.channel.promote-deny.${testId}`
 
         await query(`
-          INSERT INTO public.orgs (id, name, management_email, created_by, use_new_rbac)
-          VALUES ($1::uuid, $2, $3, $4::uuid, true)
+          INSERT INTO public.orgs (id, name, management_email, created_by)
+          VALUES ($1::uuid, $2, $3, $4::uuid)
         `, [orgId, `RBAC Promote Deny ${testId}`, `rbac-promote-deny-${testId}@capgo.app`, USER_ID])
 
         await query(`
@@ -900,8 +855,8 @@ describe('rbac permission system', () => {
         const apiKey = `apikey-channel-override-${testId}`
 
         await query(`
-          INSERT INTO public.orgs (id, name, management_email, created_by, use_new_rbac)
-          VALUES ($1::uuid, $2, $3, $4::uuid, true)
+          INSERT INTO public.orgs (id, name, management_email, created_by)
+          VALUES ($1::uuid, $2, $3, $4::uuid)
         `, [orgId, `RBAC API Key Channel Override ${testId}`, `rbac-apikey-channel-${testId}@capgo.app`, USER_ID])
 
         await query(`
@@ -995,119 +950,6 @@ describe('rbac permission system', () => {
         `, [USER_ID, orgId, appId, channel.rows[0].id, apiKey])
 
         expect(allowedAfterOverride.rows[0].allowed).toBe(false)
-      })
-    })
-
-    describe('RBAC compatibility flag', () => {
-      it('should keep using RBAC when the old org flag is false', async () => {
-        await query(`UPDATE public.orgs SET use_new_rbac = false WHERE id = $1`, [ORG_ID])
-        await query(`SELECT set_config('capgo.rbac_enabled', 'false', true)`)
-
-        const result = await query(`
-          SELECT public.rbac_check_permission_direct(
-            'app.read',
-            $1::uuid,
-            $2::uuid,
-            $3,
-            NULL::bigint,
-            NULL
-          ) as allowed
-        `, [USER_ID, ORG_ID, TEST_APP_ID])
-
-        expect(result.rows[0].allowed).toBe(true)
-      })
-
-      it('should use RBAC for orgs with RBAC flag enabled', async () => {
-        await query(`
-          UPDATE public.orgs SET use_new_rbac = true WHERE id = $1;
-        `, [ORG_ID])
-
-        const result = await query(`
-          SELECT public.rbac_check_permission_direct(
-            'app.read',
-            $1::uuid,
-            $2::uuid,
-            $3,
-            NULL::bigint,
-            NULL
-          ) as allowed
-        `, [USER_ID, ORG_ID, TEST_APP_ID])
-
-        expect(result.rows[0].allowed).toBe(true)
-      })
-    })
-
-    describe('rbac_legacy_right_for_permission mapping', () => {
-      const permissionMappings = [
-        // Read permissions
-        { permission: 'org.read', expectedRight: 'read' },
-        { permission: 'app.read', expectedRight: 'read' },
-        { permission: 'channel.read', expectedRight: 'read' },
-        // Upload permissions
-        { permission: 'app.upload_bundle', expectedRight: 'upload' },
-        // Write permissions
-        { permission: 'app.update_settings', expectedRight: 'write' },
-        { permission: 'channel.promote_bundle', expectedRight: 'write' },
-        // Admin permissions
-        { permission: 'org.invite_user', expectedRight: 'admin' },
-        { permission: 'app.delete', expectedRight: 'admin' },
-        // Super admin permissions
-        { permission: 'org.update_billing', expectedRight: 'super_admin' },
-      ]
-
-      for (const { permission, expectedRight } of permissionMappings) {
-        it(`should map ${permission} to ${expectedRight}`, async () => {
-          const result = await query(`
-            SELECT public.rbac_legacy_right_for_permission($1) as legacy_right
-          `, [permission])
-
-          expect(result.rows[0].legacy_right).toBe(expectedRight)
-        })
-      }
-
-      it('should return NULL for unknown permission', async () => {
-        const result = await query(`
-          SELECT public.rbac_legacy_right_for_permission('unknown.permission') as legacy_right
-        `)
-
-        expect(result.rows[0].legacy_right).toBeNull()
-      })
-    })
-
-    describe('rbac_is_enabled_for_org', () => {
-      it('should return true when global flag is enabled', async () => {
-        await query(`SELECT set_config('capgo.rbac_enabled', 'true', true)`)
-
-        const result = await query(`
-          SELECT public.rbac_is_enabled_for_org($1::uuid) as enabled
-        `, [ORG_ID])
-
-        await query(`SELECT set_config('capgo.rbac_enabled', 'false', true)`)
-
-        expect(result.rows[0].enabled).toBe(true)
-      })
-
-      it('should return true when org flag is enabled', async () => {
-        await query(`UPDATE public.orgs SET use_new_rbac = true WHERE id = $1`, [ORG_ID])
-
-        const result = await query(`
-          SELECT public.rbac_is_enabled_for_org($1::uuid) as enabled
-        `, [ORG_ID])
-
-        await query(`UPDATE public.orgs SET use_new_rbac = false WHERE id = $1`, [ORG_ID])
-
-        expect(result.rows[0].enabled).toBe(true)
-      })
-
-      it('should return true even when old flags are disabled', async () => {
-        await query(`SELECT set_config('capgo.rbac_enabled', 'false', true)`)
-        await query(`UPDATE public.orgs SET use_new_rbac = false WHERE id = $1`, [ORG_ID])
-
-        const result = await query(`
-          SELECT public.rbac_is_enabled_for_org($1::uuid) as enabled
-        `, [ORG_ID])
-
-        expect(result.rows[0].enabled).toBe(true)
       })
     })
 

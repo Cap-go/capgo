@@ -79,7 +79,7 @@ beforeAll(async () => {
   const { error: memberError } = await getSupabaseClient().from('org_users').insert({
     org_id: WEBHOOK_TEST_ORG_ID,
     user_id: USER_ID,
-    user_right: 'super_admin',
+    rbac_role_name: 'org_super_admin',
   })
   if (memberError)
     throw memberError

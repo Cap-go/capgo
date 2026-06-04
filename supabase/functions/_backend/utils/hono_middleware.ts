@@ -14,14 +14,12 @@ import { checkKey, checkKeyById, supabaseAdmin } from './supabase.ts'
 //  Accept capgkey header (legacy apikey header name for CLI)
 //  Accept x-api-key header (new apikey header name for CLI + public api)
 //  Accept x-limited-key-id header (subkey id, for whitelabel api, only work in combination with x-api-key)
-// It takes rights as an argument, so it can be used in public and private api
 // It sets apikey, capgkey, subkey to the context
 // It throws an error if the apikey is invalid
 // It throws an error if the subkey is invalid
 // It throws an error if the apikey is invalid and the subkey is invalid
 // It throws an error if the apikey is invalid and the subkey is invalid
 // It throws an error if no apikey or subkey is provided
-// It throws an error if the rights are invalid
 
 function isUUID(str: string) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str)
@@ -55,8 +53,6 @@ type FindApikeyByValueResult = {
   expires_at: string | null
 } & Record<string, unknown>
 
-const AUTH_COMPAT_KEY_MODES: Database['public']['Enums']['key_mode'][] = ['read', 'upload', 'write', 'all']
-
 /**
  * Check API key using Postgres/Drizzle instead of Supabase SDK
  * Uses find_apikey_by_value SQL function to look up both plain-text and hashed keys
@@ -64,7 +60,6 @@ const AUTH_COMPAT_KEY_MODES: Database['public']['Enums']['key_mode'][] = ['read'
 async function checkKeyPg(
   _c: Context,
   keyString: string,
-  rights: Database['public']['Enums']['key_mode'][],
   drizzleClient: ReturnType<typeof getDrizzleClient>,
 ): Promise<Database['public']['Tables']['apikeys']['Row'] | null> {
   try {
@@ -75,7 +70,7 @@ async function checkKeyPg(
 
     const apiKey = result.rows[0]
     if (!apiKey) {
-      cloudlog({ requestId: _c.get('requestId'), message: 'Invalid apikey (pg)', keyStringPrefix: keyString?.substring(0, 8), rights })
+      cloudlog({ requestId: _c.get('requestId'), message: 'Invalid apikey (pg)', keyStringPrefix: keyString?.substring(0, 8) })
       return null
     }
 
@@ -111,7 +106,6 @@ async function checkKeyPg(
 async function checkKeyByIdPg(
   _c: Context,
   id: number,
-  _rights: Database['public']['Enums']['key_mode'][],
   drizzleClient: ReturnType<typeof getDrizzleClient>,
   expectedUserId?: string,
 ): Promise<Database['public']['Tables']['apikeys']['Row'] | null> {
@@ -398,19 +392,18 @@ function resolveKeyHeaders(c: Context) {
 async function resolveApiKey(
   c: Context,
   key: string,
-  rights: Database['public']['Enums']['key_mode'][],
   usePostgres: boolean,
   readOnly = true,
 ) {
   if (!usePostgres) {
-    return checkKey(c, key, supabaseAdmin(c), rights)
+    return checkKey(c, key, supabaseAdmin(c))
   }
 
   let pgClient: ReturnType<typeof getPgClient> | null = null
   try {
     pgClient = getPgClient(c, readOnly)
     const drizzleClient = getDrizzleClient(pgClient)
-    return await checkKeyPg(c, key, rights, drizzleClient)
+    return await checkKeyPg(c, key, drizzleClient)
   }
   finally {
     if (pgClient) {
@@ -422,20 +415,19 @@ async function resolveApiKey(
 async function resolveSubkey(
   c: Context,
   subkeyId: number,
-  rights: Database['public']['Enums']['key_mode'][],
   usePostgres: boolean,
   expectedUserId?: string,
   readOnly = true,
 ) {
   if (!usePostgres) {
-    return checkKeyById(c, subkeyId, supabaseAdmin(c), rights, expectedUserId)
+    return checkKeyById(c, subkeyId, supabaseAdmin(c), expectedUserId)
   }
 
   let subkeyPgClient: ReturnType<typeof getPgClient> | null = null
   try {
     subkeyPgClient = getPgClient(c, readOnly)
     const drizzleClient = getDrizzleClient(subkeyPgClient)
-    return await checkKeyByIdPg(c, subkeyId, rights, drizzleClient, expectedUserId)
+    return await checkKeyByIdPg(c, subkeyId, drizzleClient, expectedUserId)
   }
   finally {
     if (subkeyPgClient) {
@@ -449,16 +441,15 @@ async function resolveSubkey(
  *
  * @param c - Hono context used for logging and auth storage.
  * @param capgkeyString - The key string provided in capgkey or authorization headers.
- * @param rights - Required key modes for the request.
  * @returns quickError when authentication fails or undefined when authentication succeeds.
  */
-async function foundAPIKey(c: Context, capgkeyString: string, rights: Database['public']['Enums']['key_mode'][]) {
+async function foundAPIKey(c: Context, capgkeyString: string) {
   const subkey_id = await getSubkeyId(c)
 
   cloudlog({ requestId: c.get('requestId'), message: 'Capgkey provided', capgkeyPrefix: maskSecret(capgkeyString) })
-  const apikey = await resolveApiKey(c, capgkeyString, rights, false)
+  const apikey = await resolveApiKey(c, capgkeyString, false)
   if (!apikey) {
-    cloudlog({ requestId: c.get('requestId'), message: 'Invalid apikey', capgkeyPrefix: maskSecret(capgkeyString), rights })
+    cloudlog({ requestId: c.get('requestId'), message: 'Invalid apikey', capgkeyPrefix: maskSecret(capgkeyString) })
     // Record failed auth attempt - await to ensure accurate counting
     await recordFailedAuth(c)
     return quickError(401, 'invalid_apikey', 'Invalid apikey')
@@ -478,7 +469,7 @@ async function foundAPIKey(c: Context, capgkeyString: string, rights: Database['
   setApiKeyAuthContext(c, apikey, capgkeyString)
   if (subkey_id !== null) {
     cloudlog({ requestId: c.get('requestId'), message: 'Subkey id provided', subkey_id })
-    const subkey = await resolveSubkey(c, subkey_id, rights, false, apikey.user_id)
+    const subkey = await resolveSubkey(c, subkey_id, false, apikey.user_id)
     if (!subkey) {
       cloudlog({ requestId: c.get('requestId'), message: 'Invalid subkey', subkey_id })
       return quickError(401, 'invalid_subkey', 'Invalid subkey')
@@ -522,7 +513,7 @@ async function foundJWT(c: Context, jwt: string) {
   })
 }
 
-export function middlewareV2(rights: Database['public']['Enums']['key_mode'][] = AUTH_COMPAT_KEY_MODES) {
+export function middlewareAuth() {
   return honoFactory.createMiddleware(async (c, next) => {
     // Check if IP is rate limited due to failed auth attempts
     const ipRateLimited = await isIPRateLimited(c)
@@ -538,7 +529,7 @@ export function middlewareV2(rights: Database['public']['Enums']['key_mode'][] =
       }
     }
     else if (capgkey) {
-      const res = await foundAPIKey(c, capgkey, rights)
+      const res = await foundAPIKey(c, capgkey)
       if (res) {
         return res
       }
@@ -560,7 +551,6 @@ interface MiddlewareKeyOptions {
 
 function resolveMiddlewareKeyOptions(options: MiddlewareKeyOptions = {}) {
   return {
-    rights: AUTH_COMPAT_KEY_MODES,
     usePostgres: options.usePostgres ?? false,
     readOnly: options.readOnly ?? true,
   }
@@ -569,10 +559,10 @@ function resolveMiddlewareKeyOptions(options: MiddlewareKeyOptions = {}) {
 /**
  * Middleware factory that validates API keys and optional subkeys.
  *
- * Key-mode authorization is compatibility-only now; route handlers and RLS use RBAC.
+ * Route handlers and RLS authorize with RBAC after authentication succeeds.
  */
 export function middlewareKey(options?: MiddlewareKeyOptions) {
-  const { rights, usePostgres, readOnly } = resolveMiddlewareKeyOptions(options)
+  const { usePostgres, readOnly } = resolveMiddlewareKeyOptions(options)
   const subMiddlewareKey = honoFactory.createMiddleware(async (c, next) => {
     // Check if IP is rate limited due to failed auth attempts
     const ipRateLimited = await isIPRateLimited(c)
@@ -600,7 +590,7 @@ export function middlewareKey(options?: MiddlewareKeyOptions) {
       return quickError(401, 'no_key_provided', 'No key provided')
     }
 
-    const apikey = await resolveApiKey(c, key, rights, usePostgres, readOnly)
+    const apikey = await resolveApiKey(c, key, usePostgres, readOnly)
 
     if (!apikey) {
       cloudlog({ requestId: c.get('requestId'), message: 'Invalid apikey', keyPrefix: maskSecret(key), method: c.req.method, url: c.req.url })
@@ -622,7 +612,7 @@ export function middlewareKey(options?: MiddlewareKeyOptions) {
     setApiKeyAuthContext(c, apikey, key)
 
     if (subkey_id !== null) {
-      const subkey = await resolveSubkey(c, subkey_id, rights, usePostgres, apikey.user_id, readOnly)
+      const subkey = await resolveSubkey(c, subkey_id, usePostgres, apikey.user_id, readOnly)
 
       if (!subkey) {
         cloudlog({ requestId: c.get('requestId'), message: 'Invalid subkey', subkey_id })

@@ -2,7 +2,7 @@ import type { Context } from 'hono'
 import type { AuthInfo, MiddlewareKeyVariables } from '../../utils/hono.ts'
 import type { Database } from '../../utils/supabase.types.ts'
 import { getBodyOrQuery, honoFactory, quickError, simpleError } from '../../utils/hono.ts'
-import { middlewareV2 } from '../../utils/hono_middleware.ts'
+import { middlewareAuth } from '../../utils/hono_middleware.ts'
 import { closeClient, getPgClient, logPgError } from '../../utils/pg.ts'
 import { checkPermission } from '../../utils/rbac.ts'
 import { apikeyHasOrgRight, apikeyHasOrgRightWithPolicy, supabaseApikey } from '../../utils/supabase.ts'
@@ -147,49 +147,49 @@ export async function checkWebhookPermissionV2(
 }
 
 // List all webhooks for org
-app.get('/', middlewareV2(), async (c) => {
+app.get('/', middlewareAuth(), async (c) => {
   const body = await getBodyOrQuery<any>(c)
   const auth = c.get('auth') as AuthInfo
   return get(c, body, auth)
 })
 
 // Create webhook
-app.post('/', middlewareV2(), async (c) => {
+app.post('/', middlewareAuth(), async (c) => {
   const body = await getBodyOrQuery<any>(c)
   const auth = c.get('auth') as AuthInfo
   return post(c, body, auth)
 })
 
 // Update webhook
-app.put('/', middlewareV2(), async (c) => {
+app.put('/', middlewareAuth(), async (c) => {
   const body = await getBodyOrQuery<any>(c)
   const auth = c.get('auth') as AuthInfo
   return put(c, body, auth)
 })
 
 // Delete webhook
-app.delete('/', middlewareV2(), async (c) => {
+app.delete('/', middlewareAuth(), async (c) => {
   const body = await getBodyOrQuery<any>(c)
   const auth = c.get('auth') as AuthInfo
   return deleteWebhook(c, body, auth)
 })
 
 // Test webhook (supports both JWT and API key auth)
-app.post('/test', middlewareV2(), async (c) => {
+app.post('/test', middlewareAuth(), async (c) => {
   const body = await getBodyOrQuery<any>(c)
   const auth = c.get('auth') as AuthInfo
   return test(c, body, auth)
 })
 
 // Get webhook deliveries
-app.get('/deliveries', middlewareV2(), async (c) => {
+app.get('/deliveries', middlewareAuth(), async (c) => {
   const body = await getBodyOrQuery<any>(c)
   const auth = c.get('auth') as AuthInfo
   return getDeliveries(c, body, auth)
 })
 
 // Retry a failed delivery (supports both JWT and API key auth)
-app.post('/deliveries/retry', middlewareV2(), async (c) => {
+app.post('/deliveries/retry', middlewareAuth(), async (c) => {
   const body = await getBodyOrQuery<any>(c)
   const auth = c.get('auth') as AuthInfo
   return retryDelivery(c, body, auth)

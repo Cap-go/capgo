@@ -342,7 +342,7 @@ describe('/app hashed subkey enforcement', () => {
     expect(data.error).toBe('invalid_subkey')
   })
 
-  it('should reject hashed subkeys on middlewareV2 routes', async () => {
+  it('should reject hashed subkeys on JWT/API-key auth routes', async () => {
     const response = await fetch(`${BASE_URL}/app`, {
       method: 'POST',
       headers: { ...headers, 'x-limited-key-id': String(subkeyId) },
@@ -423,7 +423,6 @@ describe('[POST] /app operations with non-owner user', () => {
         management_email: `no-access-${safeId}@capgo.test`,
         created_by: USER_ID_2,
         customer_id: noAccessCustomerId,
-        use_new_rbac: false,
       },
       {
         id: adminAccessOrgId,
@@ -431,7 +430,6 @@ describe('[POST] /app operations with non-owner user', () => {
         management_email: `admin-access-${safeId}@capgo.test`,
         created_by: USER_ID_2,
         customer_id: adminAccessCustomerId,
-        use_new_rbac: false,
       },
     ])
     if (orgError)
@@ -440,7 +438,7 @@ describe('[POST] /app operations with non-owner user', () => {
     const { error: orgUserError } = await supabase.from('org_users').insert({
       org_id: noAccessOrgId,
       user_id: USER_ID,
-      user_right: 'read',
+      rbac_role_name: 'org_member',
     })
     if (orgUserError)
       throw orgUserError
@@ -496,7 +494,7 @@ describe('[POST] /app operations with non-owner user', () => {
     await supabase.from('stripe_info').delete().in('customer_id', [noAccessCustomerId, adminAccessCustomerId])
   })
 
-  it('should ignore stale legacy org_users rights when creating an app', async () => {
+  it('should ignore stale org_users role metadata when creating an app', async () => {
     const createApp = await fetch(`${BASE_URL}/app`, {
       method: 'POST',
       headers: authHeaders,

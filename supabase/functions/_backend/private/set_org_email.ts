@@ -3,7 +3,7 @@ import { type } from 'arktype'
 import { Hono } from 'hono/tiny'
 import { safeParseSchema } from '../utils/ark_validation.ts'
 import { BRES, parseBody, quickError, simpleError, useCors } from '../utils/hono.ts'
-import { middlewareV2 } from '../utils/hono_middleware.ts'
+import { middlewareAuth } from '../utils/hono_middleware.ts'
 import { checkPermission } from '../utils/rbac.ts'
 import { updateCustomerEmail } from '../utils/stripe.ts'
 import { supabaseAdmin, supabaseWithAuth } from '../utils/supabase.ts'
@@ -17,7 +17,7 @@ export const app = new Hono<MiddlewareKeyVariables>()
 
 app.use('/', useCors)
 
-app.post('/', middlewareV2(), async (c) => {
+app.post('/', middlewareAuth(), async (c) => {
   const auth = c.get('auth')!
 
   const body = await parseBody<any>(c)

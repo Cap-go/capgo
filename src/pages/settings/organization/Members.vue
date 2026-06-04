@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import type { TableColumn } from '~/components/comp_def'
 import type { ExtendedOrganizationMember } from '~/stores/organization'
-import type { Database } from '~/types/supabase.types'
 
 import { computedAsync } from '@vueuse/core'
 import { storeToRefs } from 'pinia'
@@ -76,7 +75,7 @@ interface RoleBinding {
 }
 
 // Permission modal state
-const selectedPermission = ref<Database['public']['Enums']['user_min_right'] | string | undefined>()
+const selectedPermission = ref<string | undefined>()
 const selectedPermissionForm = ref('')
 const isInvitePermissionModal = ref(false)
 
@@ -175,15 +174,12 @@ const appAccessRoleTouched = ref(false)
 function isInviteMember(member: OrganizationMemberRow) {
   if (member.is_invite || member.is_tmp)
     return true
-  if (typeof member.role === 'string')
-    return member.role.includes('invite')
   return false
 }
 
 function getMemberRoleLabel(member: OrganizationMemberRow) {
-  const normalizedRole = member.role.replace(/^invite_/, '')
-  const i18nKey = getRbacRoleI18nKey(normalizedRole)
-  return i18nKey ? t(i18nKey) : normalizedRole.replaceAll('_', ' ')
+  const i18nKey = getRbacRoleI18nKey(member.role)
+  return i18nKey ? t(i18nKey) : member.role.replaceAll('_', ' ')
 }
 
 function renderRoleCell(member: OrganizationMemberRow) {
@@ -276,14 +272,13 @@ const appAccessBindingByAppId = computed(() => {
 function getInheritedAppAccessLabel(roleName?: string): string | null {
   if (!roleName)
     return null
-  const normalizedRole = roleName.replace(/^invite_/, '')
-  if (normalizedRole === 'org_billing_admin')
+  if (roleName === 'org_billing_admin')
     return t('app-access-none')
-  if (normalizedRole === 'org_member')
+  if (roleName === 'org_member')
     return t('app-access-none')
-  if (normalizedRole === 'org_admin')
+  if (roleName === 'org_admin')
     return t('app-access-inherited', { role: getRoleDisplayName('app_admin') })
-  if (normalizedRole === 'org_super_admin')
+  if (roleName === 'org_super_admin')
     return t('app-access-inherited', { role: getRoleDisplayName('app_admin') })
   return null
 }
@@ -383,8 +378,7 @@ columns.value = [
         visible: (member: OrganizationMemberRow) => {
           if (!canUpdateUserRoles.value || isInviteMember(member))
             return false
-          const normalizedRole = member.role.replace(/^invite_/, '')
-          return !['org_super_admin', 'org_admin'].includes(normalizedRole)
+          return !['org_super_admin', 'org_admin'].includes(member.role)
         },
         onClick: (member: OrganizationMemberRow) => {
           openAppAccessModal(member)
@@ -494,12 +488,9 @@ function validateEmail(email: string) {
     )
 }
 
-async function showPermModal(invite: boolean, onConfirm?: (permission: Database['public']['Enums']['user_min_right'] | string) => Promise<boolean>, currentRole?: string): Promise<Database['public']['Enums']['user_min_right'] | string | undefined> {
-  const normalizedRole = currentRole?.replace(/^invite_/, '')
-  const initialRole = normalizedRole ? normalizedRole.trim().toLowerCase().replace(/\s+/g, '_') : ''
-  selectedPermission.value = initialRole
-    ? initialRole as Database['public']['Enums']['user_min_right']
-    : undefined
+async function showPermModal(invite: boolean, onConfirm?: (permission: string) => Promise<boolean>, currentRole?: string): Promise<string | undefined> {
+  const initialRole = currentRole ? currentRole.trim().toLowerCase().replace(/\s+/g, '_') : ''
+  selectedPermission.value = initialRole || undefined
   selectedPermissionForm.value = initialRole
   isInvitePermissionModal.value = invite
 
@@ -614,7 +605,7 @@ async function showInviteModal() {
   })
 }
 
-async function sendInvitation(email: string, type: Database['public']['Enums']['user_min_right'] | string): Promise<boolean> {
+async function sendInvitation(email: string, type: string): Promise<boolean> {
   console.log(`Invite ${email} with perm ${type}`)
 
   const orgId = currentOrganization.value?.gid
@@ -653,7 +644,7 @@ async function sendInvitation(email: string, type: Database['public']['Enums']['
   }
 }
 
-async function handleSendInvitationOutput(output: string, email: string, type: Database['public']['Enums']['user_min_right'] | string): Promise<boolean> {
+async function handleSendInvitationOutput(output: string, email: string, type: string): Promise<boolean> {
   console.log('Output: ', output)
   if (!output)
     return false
@@ -1027,7 +1018,7 @@ async function updateRbacInviteRole(member: OrganizationMemberRow, perm: string)
   }
 }
 
-async function _changeMemberPermission(member: OrganizationMemberRow, perm: Database['public']['Enums']['user_min_right'] | string) {
+async function _changeMemberPermission(member: OrganizationMemberRow, perm: string) {
   isLoading.value = true
   try {
     if (!currentOrganization.value) {
@@ -1102,8 +1093,8 @@ function canDelete(member: OrganizationMemberRow) {
   return currentUserIsAdmin
 }
 
-function handlePermissionSelection(permission: Database['public']['Enums']['user_min_right'] | string, _invite: boolean) {
-  selectedPermission.value = permission as any
+function handlePermissionSelection(permission: string, _invite: boolean) {
+  selectedPermission.value = permission
 }
 
 function handleFormKitPermissionSelection(value: string | undefined) {
@@ -1118,7 +1109,7 @@ function delegateSuperAdmin(value: unknown) {
   selectedUserToDelegateAdmin.value = value
 }
 
-async function showInviteNewUserDialog(email: string, roleType: Database['public']['Enums']['user_min_right'] | string) {
+async function showInviteNewUserDialog(email: string, roleType: string) {
   // Reset form state
   inviteUserEmail.value = email
   inviteUserRole.value = roleType.replace(/_/g, ' ')
@@ -1161,9 +1152,8 @@ async function showInviteNewUserDialog(email: string, roleType: Database['public
 function getRoleDisplayName(roleName?: string): string {
   if (!roleName)
     return t('none')
-  const normalizedRole = roleName.replace(/^invite_/, '')
-  const i18nKey = getRbacRoleI18nKey(normalizedRole)
-  return i18nKey ? t(i18nKey) : normalizedRole.replaceAll('_', ' ')
+  const i18nKey = getRbacRoleI18nKey(roleName)
+  return i18nKey ? t(i18nKey) : roleName.replaceAll('_', ' ')
 }
 
 async function fetchAppAccessApps() {
@@ -1398,8 +1388,7 @@ async function handleInviteNewUserSubmit() {
   isSubmittingInvite.value = true
 
   try {
-    // Extract the actual role without 'invite_' prefix
-    const inviteType = inviteUserRole.value.replace(/\s+/g, '_').replace('invite_', '')
+    const inviteType = inviteUserRole.value.replace(/\s+/g, '_')
 
     const { error } = await supabase.functions.invoke('private/invite_new_user_to_org', {
       body: {

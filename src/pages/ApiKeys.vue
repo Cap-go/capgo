@@ -157,9 +157,8 @@ function isHashedKey(key: Database['public']['Tables']['apikeys']['Row']) {
 }
 
 function getRoleDisplayName(roleName: string): string {
-  const normalized = roleName.replace(/^invite_/, '')
-  const i18nKey = getRbacRoleI18nKey(normalized)
-  return i18nKey ? t(i18nKey) : normalized.replaceAll('_', ' ')
+  const i18nKey = getRbacRoleI18nKey(roleName)
+  return i18nKey ? t(i18nKey) : roleName.replaceAll('_', ' ')
 }
 
 // Get bindings for a specific key
@@ -629,24 +628,10 @@ const unsupportedApiKeyOrgRoles = new Set(['org_billing_admin'])
 const orgRoles = computed(() => roles.value.filter(r => r.scope_type === 'org' && !unsupportedApiKeyOrgRoles.has(r.name)))
 const appRoles = computed(() => roles.value.filter(r => r.scope_type === 'app'))
 
-const legacyOrgRoleAliases: Record<string, string> = {
-  owner: 'org_super_admin',
-  super_admin: 'org_super_admin',
-  admin: 'org_admin',
-  write: 'org_member',
-  upload: 'org_member',
-  read: 'org_member',
-}
-
-function normalizeOrgRoleName(roleName: string) {
-  const normalized = roleName.replace(/^invite_/, '')
-  return legacyOrgRoleAliases[normalized] ?? normalized
-}
-
 function getRolePriority(roleName?: string | null) {
   if (!roleName)
     return 0
-  return roles.value.find(r => r.name === normalizeOrgRoleName(roleName))?.priority_rank ?? 0
+  return roles.value.find(r => r.name === roleName)?.priority_rank ?? 0
 }
 
 const callerOrgPriorityByOrgId = computed(() => new Map(

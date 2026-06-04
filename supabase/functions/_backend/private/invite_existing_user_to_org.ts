@@ -44,43 +44,24 @@ function getInviteNotificationLockKey(orgId: string, userId: string) {
 }
 
 export function getInviteResendRequiredPermission(
-  userRight: string | null | undefined,
+  roleName: string | null | undefined,
   canInviteUser: boolean,
   canUpdateUserRoles: boolean,
 ) {
-  if (!userRight?.startsWith('invite_'))
+  if (!roleName?.trim())
     return null
-  if (userRight === 'invite_super_admin')
+  if (roleName === 'org_super_admin')
     return canUpdateUserRoles ? null : 'org.update_user_roles'
   return canInviteUser ? null : 'org.invite_user'
-}
-
-function getInviteTargetRoleName(userRight: string, rbacRoleName?: string | null) {
-  if (rbacRoleName?.trim())
-    return rbacRoleName.trim()
-
-  switch (userRight) {
-    case 'invite_super_admin':
-      return 'org_super_admin'
-    case 'invite_admin':
-      return 'org_admin'
-    case 'invite_read':
-    case 'invite_upload':
-    case 'invite_write':
-      return 'org_member'
-    default:
-      return null
-  }
 }
 
 async function canCallerResendInviteRole(
   c: AppContext,
   auth: AuthInfo,
   orgId: string,
-  userRight: string,
-  rbacRoleName?: string | null,
+  roleName?: string | null,
 ) {
-  const targetRoleName = getInviteTargetRoleName(userRight, rbacRoleName)
+  const targetRoleName = roleName?.trim()
   if (!targetRoleName)
     return false
 
@@ -278,7 +259,7 @@ app.post('/', middlewareAuth, async (c) => {
   })
   const { data: membership, error: membershipError } = await supabaseAdminClient
     .from('org_users')
-    .select('id, user_right, rbac_role_name')
+    .select('id, is_invite, rbac_role_name')
     .eq('org_id', body.org_id)
     .eq('user_id', invitedUser.id)
     .maybeSingle()
@@ -291,12 +272,16 @@ app.post('/', middlewareAuth, async (c) => {
     return quickError(404, 'invite_not_found', 'Pending invitation not found')
   }
 
-  if (!membership.user_right?.startsWith('invite_')) {
+  if (!membership.is_invite) {
     return quickError(409, 'invite_already_accepted', 'Invitation already accepted')
   }
 
+  if (!membership.rbac_role_name) {
+    return quickError(500, 'failed_to_invite_user', 'Invitation has no RBAC role')
+  }
+
   const missingPermission = getInviteResendRequiredPermission(
-    membership.user_right,
+    membership.rbac_role_name,
     canInviteUser,
     canUpdateUserRoles,
   )
@@ -312,7 +297,6 @@ app.post('/', middlewareAuth, async (c) => {
     c,
     authContext,
     body.org_id,
-    membership.user_right,
     membership.rbac_role_name,
   )
   if (!canManageInviteRole) {

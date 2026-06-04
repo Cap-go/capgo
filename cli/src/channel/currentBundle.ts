@@ -7,7 +7,6 @@ import {
   findSavedKey,
   getAppId,
   getConfig,
-  OrganizationPerm,
   resolveUserIdFromApiKey,
 } from '../utils'
 
@@ -42,7 +41,7 @@ export async function currentBundleInternal(channel: string, appId: string, opti
   const supabase = await createSupabaseClient(options.apikey, options.supaHost, options.supaAnon)
   await check2FAComplianceForApp(supabase, appId, silent)
   await resolveUserIdFromApiKey(supabase, options.apikey)
-  await checkAppExistsAndHasPermissionOrgErr(supabase, options.apikey, appId, OrganizationPerm.read, silent, true)
+  await checkAppExistsAndHasPermissionOrgErr(supabase, options.apikey, appId, 'app.read_bundles', silent, true)
 
   if (!channel) {
     if (!silent)

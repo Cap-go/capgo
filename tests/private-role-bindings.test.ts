@@ -36,7 +36,6 @@ async function createRoleBindingFixture(): Promise<RoleBindingFixture> {
     created_by: USER_ID,
     name: `Role Binding Attacker Org ${id}`,
     management_email: `role-binding-attacker-${id}@capgo.app`,
-    use_new_rbac: true,
   })
   if (attackerOrgError)
     throw attackerOrgError
@@ -46,7 +45,6 @@ async function createRoleBindingFixture(): Promise<RoleBindingFixture> {
     created_by: USER_ID_2,
     name: `Role Binding Victim Org ${id}`,
     management_email: `role-binding-victim-${id}@capgo.app`,
-    use_new_rbac: true,
   })
   if (victimOrgError)
     throw victimOrgError
@@ -120,6 +118,31 @@ async function createRoleBindingFixture(): Promise<RoleBindingFixture> {
       await supabase.from('orgs').delete().in('id', [attackerOrgId, victimOrgId])
     },
   }
+}
+
+async function createUserOrgBinding(orgId: string, userId: string, roleName: string, grantedBy: string) {
+  const supabase = getSupabaseClient()
+  const { data: role, error: roleError } = await supabase
+    .from('roles')
+    .select('id')
+    .eq('name', roleName)
+    .eq('scope_type', 'org')
+    .single()
+  if (roleError)
+    throw roleError
+
+  const { error: bindingError } = await supabase.from('role_bindings').insert({
+    principal_type: 'user',
+    principal_id: userId,
+    role_id: role!.id,
+    scope_type: 'org',
+    org_id: orgId,
+    granted_by: grantedBy,
+    reason: 'Test RBAC binding',
+    is_direct: true,
+  })
+  if (bindingError && bindingError.code !== '23505')
+    throw bindingError
 }
 
 beforeAll(async () => {
@@ -209,7 +232,7 @@ describe.skipIf(USE_CLOUDFLARE)('/private/role_bindings', () => {
     }
   })
 
-  it('clears legacy org_users rights when an org-scope user binding is deleted', async () => {
+  it('clears org_users RBAC role when an org-scope user binding is deleted', async () => {
     const id = randomUUID()
     const orgId = randomUUID()
     const supabase = getSupabaseClient()
@@ -220,36 +243,16 @@ describe.skipIf(USE_CLOUDFLARE)('/private/role_bindings', () => {
         created_by: USER_ID,
         name: `Role Binding Delete Org ${id}`,
         management_email: `role-binding-delete-${id}@capgo.app`,
-        use_new_rbac: true,
       })
       expect(orgError).toBeNull()
 
       const { error: memberError } = await supabase.from('org_users').insert({
         org_id: orgId,
         user_id: USER_ID_2,
-        user_right: 'super_admin',
         rbac_role_name: 'org_super_admin',
       })
       expect(memberError).toBeNull()
-
-      const { data: superAdminRole, error: roleError } = await supabase
-        .from('roles')
-        .select('id')
-        .eq('name', 'org_super_admin')
-        .single()
-      expect(roleError).toBeNull()
-
-      const { error: bindingInsertError } = await supabase.from('role_bindings').insert({
-        principal_type: 'user',
-        principal_id: USER_ID_2,
-        role_id: superAdminRole!.id,
-        scope_type: 'org',
-        org_id: orgId,
-        granted_by: USER_ID,
-        reason: 'delete advisory regression',
-        is_direct: true,
-      })
-      expect(bindingInsertError).toBeNull()
+      await createUserOrgBinding(orgId, USER_ID_2, 'org_super_admin', USER_ID)
 
       const { data: binding, error: bindingError } = await supabase
         .from('role_bindings')
@@ -272,22 +275,20 @@ describe.skipIf(USE_CLOUDFLARE)('/private/role_bindings', () => {
       expect(deleteResponse.status).toBe(200)
       expect(deleteData.success).toBe(true)
 
-      const { data: legacyRows, error: legacyError } = await supabase
+      const { data: orgUserRows, error: orgUserError } = await supabase
         .from('org_users')
-        .select('user_right, rbac_role_name')
+        .select('rbac_role_name, is_invite')
         .eq('org_id', orgId)
         .eq('user_id', USER_ID_2)
         .is('app_id', null)
         .is('channel_id', null)
 
-      expect(legacyError).toBeNull()
-      expect(legacyRows).toHaveLength(1)
-      expect(legacyRows?.[0]?.user_right).toBeNull()
-      expect(legacyRows?.[0]?.rbac_role_name).toBeNull()
+      expect(orgUserError).toBeNull()
+      expect(orgUserRows).toHaveLength(1)
+      expect(orgUserRows?.[0]?.rbac_role_name).toBeNull()
+      expect(orgUserRows?.[0]?.is_invite).toBe(false)
     }
     finally {
-      await supabase.from('role_bindings').delete().eq('org_id', orgId)
-      await supabase.from('org_users').delete().eq('org_id', orgId)
       await supabase.from('orgs').delete().eq('id', orgId)
     }
   })
@@ -316,16 +317,16 @@ describe.skipIf(USE_CLOUDFLARE)('[PATCH] /private/role_bindings/:binding_id', ()
         created_by: USER_ID_2,
         name: `Role Binding Rank Org ${id}`,
         management_email: `role-binding-rank-${id}@capgo.app`,
-        use_new_rbac: true,
       })
       if (orgError)
         throw orgError
 
       const { error: membersError } = await supabase.from('org_users').insert([
-        { org_id: orgId, user_id: USER_ID, user_right: 'admin' },
+        { org_id: orgId, user_id: USER_ID, rbac_role_name: 'org_admin' },
       ])
       if (membersError)
         throw membersError
+      await createUserOrgBinding(orgId, USER_ID, 'org_admin', USER_ID_2)
 
       const { data: targetBinding, error: bindingError } = await supabase
         .from('role_bindings')
@@ -375,7 +376,6 @@ describe.skipIf(USE_CLOUDFLARE)('[PATCH] /private/role_bindings/:binding_id', ()
         created_by: USER_ID_2,
         name: `Last Super Admin API Org ${id}`,
         management_email: `last-super-admin-api-${id}@capgo.app`,
-        use_new_rbac: true,
       })
       if (orgError)
         throw orgError
@@ -415,20 +415,50 @@ describe('private role bindings helpers', () => {
     return client.query(text, params)
   }
 
-  async function createFixture(targetUserRight: 'admin' | 'invite_read') {
+  async function createFixture(targetRoleName: 'org_admin' | 'org_member', isInvite = false) {
     const id = randomUUID()
     const orgId = randomUUID()
     const managementEmail = `role-binding-${id}@capgo.app`
 
     await query(`
-      INSERT INTO public.orgs (id, name, management_email, created_by, use_new_rbac)
-      VALUES ($1::uuid, $2, $3, $4::uuid, true)
+      INSERT INTO public.orgs (id, name, management_email, created_by)
+      VALUES ($1::uuid, $2, $3, $4::uuid)
     `, [orgId, `Role Binding Test Org ${id}`, managementEmail, USER_ID])
 
     await query(`
-      INSERT INTO public.org_users (org_id, user_id, user_right)
-      VALUES ($1::uuid, $2::uuid, $3::public.user_min_right)
-    `, [orgId, USER_ID_2, targetUserRight])
+      INSERT INTO public.org_users (org_id, user_id, rbac_role_name, is_invite)
+      VALUES ($1::uuid, $2::uuid, $3, $4)
+    `, [orgId, USER_ID_2, targetRoleName, isInvite])
+
+    if (!isInvite) {
+      await query(`
+        INSERT INTO public.role_bindings (
+          principal_type,
+          principal_id,
+          role_id,
+          scope_type,
+          org_id,
+          granted_by,
+          granted_at,
+          reason,
+          is_direct
+        )
+        SELECT
+          public.rbac_principal_user(),
+          $1::uuid,
+          r.id,
+          public.rbac_scope_org(),
+          $2::uuid,
+          $3::uuid,
+          now(),
+          'fixture RBAC membership',
+          true
+        FROM public.roles r
+        WHERE r.name = $4
+          AND r.scope_type = public.rbac_scope_org()
+        ON CONFLICT DO NOTHING
+      `, [USER_ID_2, orgId, USER_ID, targetRoleName])
+    }
 
     return { orgId }
   }
@@ -458,7 +488,7 @@ describe('private role bindings helpers', () => {
   })
 
   it('accepts active org members as assignment targets', async () => {
-    const fixture = await createFixture('admin')
+    const fixture = await createFixture('org_admin')
     const drizzle = getDrizzleClient(client as any)
 
     const result = await validatePrincipalAccess(drizzle, 'user', USER_ID_2, fixture.orgId)
@@ -467,7 +497,7 @@ describe('private role bindings helpers', () => {
   })
 
   it('rejects pending invitees as assignment targets', async () => {
-    const fixture = await createFixture('invite_read')
+    const fixture = await createFixture('org_member', true)
     const drizzle = getDrizzleClient(client as any)
 
     const result = await validatePrincipalAccess(drizzle, 'user', USER_ID_2, fixture.orgId)
@@ -479,41 +509,14 @@ describe('private role bindings helpers', () => {
     })
   })
 
-  it('accepts users with an active membership beyond invite-only legacy rows', async () => {
-    const id = randomUUID()
-    const orgId = randomUUID()
-    const drizzle = getDrizzleClient(client as any)
-
-    await query(`
-      INSERT INTO public.orgs (id, name, management_email, created_by, use_new_rbac)
-      VALUES ($1::uuid, $2, $3, $4::uuid, true)
-    `, [orgId, `Role Binding Invite Overflow Org ${id}`, `role-binding-invite-overflow-${id}@capgo.app`, USER_ID])
-
-    for (let index = 0; index < 10; index += 1) {
-      await query(`
-        INSERT INTO public.org_users (org_id, user_id, user_right)
-        VALUES ($1::uuid, $2::uuid, 'invite_read'::public.user_min_right)
-      `, [orgId, USER_ID_2])
-    }
-
-    await query(`
-      INSERT INTO public.org_users (org_id, user_id, user_right)
-      VALUES ($1::uuid, $2::uuid, 'admin'::public.user_min_right)
-    `, [orgId, USER_ID_2])
-
-    const result = await validatePrincipalAccess(drizzle, 'user', USER_ID_2, orgId)
-
-    expect(result).toEqual({ ok: true, data: null })
-  })
-
   it('accepts active scope-valid RBAC bindings as membership proof', async () => {
     const id = randomUUID()
     const orgId = randomUUID()
     const drizzle = getDrizzleClient(client as any)
 
     await query(`
-      INSERT INTO public.orgs (id, name, management_email, created_by, use_new_rbac)
-      VALUES ($1::uuid, $2, $3, $4::uuid, true)
+      INSERT INTO public.orgs (id, name, management_email, created_by)
+      VALUES ($1::uuid, $2, $3, $4::uuid)
     `, [orgId, `Role Binding Membership Org ${id}`, `role-binding-membership-${id}@capgo.app`, USER_ID])
 
     await query(`
@@ -553,8 +556,8 @@ describe('private role bindings helpers', () => {
     const drizzle = getDrizzleClient(client as any)
 
     await query(`
-      INSERT INTO public.orgs (id, name, management_email, created_by, use_new_rbac)
-      VALUES ($1::uuid, $2, $3, $4::uuid, true)
+      INSERT INTO public.orgs (id, name, management_email, created_by)
+      VALUES ($1::uuid, $2, $3, $4::uuid)
     `, [orgId, `Expired Role Binding Org ${id}`, `expired-role-binding-${id}@capgo.app`, USER_ID])
 
     await query(`
@@ -608,8 +611,8 @@ describe('private role bindings helpers', () => {
     const orgId = randomUUID()
 
     await query(`
-      INSERT INTO public.orgs (id, name, management_email, created_by, use_new_rbac)
-      VALUES ($1::uuid, $2, $3, $4::uuid, true)
+      INSERT INTO public.orgs (id, name, management_email, created_by)
+      VALUES ($1::uuid, $2, $3, $4::uuid)
     `, [orgId, `Last Super Admin Demotion Org ${id}`, `last-super-admin-demotion-${id}@capgo.app`, USER_ID])
 
     const bindingResult = await query(`

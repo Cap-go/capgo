@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { APIKEY_TEST_ALL, APP_NAME, fetchWithRetry, SUPABASE_ANON_KEY, SUPABASE_BASE_URL } from './test-utils.ts'
+import { APIKEY_TEST_ORG_SUPER_ADMIN, APP_NAME, fetchWithRetry, SUPABASE_ANON_KEY, SUPABASE_BASE_URL } from './test-utils.ts'
 
 function getAnonHeaders() {
   if (!SUPABASE_BASE_URL || !SUPABASE_ANON_KEY)
@@ -14,7 +14,7 @@ function getAnonHeaders() {
 function getApiKeyHeaders() {
   return {
     ...getAnonHeaders(),
-    capgkey: APIKEY_TEST_ALL,
+    capgkey: APIKEY_TEST_ORG_SUPER_ADMIN,
   }
 }
 

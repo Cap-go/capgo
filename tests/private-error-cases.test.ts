@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { APIKEY_STATS, createDirectApiKeyWithBindings, getEndpointUrl, getSupabaseClient, headers, NON_OWNER_ORG_ID, ORG_ID, resetAndSeedAppData, resetAppData, USER_ID } from './test-utils.ts'
+import { APIKEY_STATS, createDirectApiKeyWithBindings, executeSQL, getEndpointUrl, getSupabaseClient, headers, NON_OWNER_ORG_ID, ORG_ID, resetAndSeedAppData, resetAppData, USER_ID } from './test-utils.ts'
 
 const id = randomUUID()
 const APPNAME = `com.private.error.${id}`
@@ -27,29 +27,17 @@ beforeAll(async () => {
   if (stripeError)
     throw stripeError
 
-  // Create unique test organization (WITH a customer_id so RLS allows access)
-  // use_new_rbac false is kept to verify compatibility flag handling while RBAC remains authoritative.
-  // In RBAC mode check_min_rights fails for non-existent apps before the app lookup.
+  // Create unique test organization with a customer_id so RLS allows access.
   const { error: orgError } = await getSupabaseClient().from('orgs').insert({
     id: testOrgId,
     name: `Test Private Error Org ${id}`,
     management_email: testOrgEmail,
     created_by: USER_ID,
     customer_id: testCustomerId,
-    use_new_rbac: false,
   })
 
   if (orgError)
     throw orgError
-
-  // Add test user as super_admin to the org
-  const { error: orgUserError } = await getSupabaseClient().from('org_users').insert({
-    org_id: testOrgId,
-    user_id: USER_ID,
-    user_right: 'super_admin' as const,
-  })
-  if (orgUserError)
-    throw orgUserError
 
   const apiKey = await createDirectApiKeyWithBindings({
     key: testOrgApiKey,
@@ -73,23 +61,49 @@ afterAll(async () => {
   // Clean up the unique test organization
   if (testOrgApiKeyId !== null)
     await getSupabaseClient().from('apikeys').delete().eq('id', testOrgApiKeyId).throwOnError()
-  await getSupabaseClient().from('org_users').delete().eq('org_id', testOrgId)
   await getSupabaseClient().from('orgs').delete().eq('id', testOrgId)
   await getSupabaseClient().from('stripe_info').delete().eq('customer_id', testCustomerId)
 })
 
 describe('[POST] /private/create_device - Error Cases', () => {
   it.concurrent('should reject app/org scope mismatch in permission checks', async () => {
-    const { data, error } = await getSupabaseClient().rpc('check_min_rights', {
-      min_right: 'write',
-      org_id: testOrgId,
-      user_id: USER_ID,
-      channel_id: null as any,
-      app_id: APPNAME,
-    })
+    const [result] = await executeSQL(`
+      SELECT public.rbac_check_permission_direct(
+        public.rbac_perm_app_update_settings(),
+        $1::uuid,
+        $2::uuid,
+        $3,
+        NULL::bigint,
+        NULL
+      ) AS allowed
+    `, [USER_ID, testOrgId, APPNAME])
 
-    expect(error).toBeNull()
-    expect(data).toBe(false)
+    expect(result.allowed).toBe(false)
+  })
+
+  it.concurrent('should reject API key app/org scope mismatch in direct permission checks', async () => {
+    const [result] = await executeSQL(`
+      SELECT
+        public.rbac_check_permission_direct(
+          public.rbac_perm_app_update_settings(),
+          $1::uuid,
+          $2::uuid,
+          $3,
+          NULL::bigint,
+          $4
+        ) AS allowed,
+        public.rbac_check_permission_direct_no_password_policy(
+          public.rbac_perm_app_update_settings(),
+          $1::uuid,
+          $2::uuid,
+          $3,
+          NULL::bigint,
+          $4
+        ) AS allowed_no_password_policy
+    `, [USER_ID, testOrgId, APPNAME, testOrgApiKey])
+
+    expect(result.allowed).toBe(false)
+    expect(result.allowed_no_password_policy).toBe(false)
   })
 
   it.concurrent('should return 401 when org_id does not own the app', async () => {
@@ -524,7 +538,7 @@ describe('[POST] /private/invite_new_user_to_org - Error Cases', () => {
       body: JSON.stringify({
         org_id: testOrgId,
         email: 'existing@example.com',
-        invite_type: 'read',
+        invite_type: 'org_member',
         captcha_token: 'test-captcha-token',
         first_name: 'Test',
         last_name: 'User',
@@ -544,7 +558,7 @@ describe('[POST] /private/invite_new_user_to_org - Error Cases', () => {
       body: JSON.stringify({
         org_id: randomUUID(),
         email: 'test@example.com',
-        invite_type: 'read',
+        invite_type: 'org_member',
         captcha_token: 'test-captcha-token',
         first_name: 'Test',
         last_name: 'User',

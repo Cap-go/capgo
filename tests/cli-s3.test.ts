@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { APIKEY_TEST_ALL, getSupabaseClient, ORG_ID, resetAndSeedAppData, resetAppData, resetAppDataStats, USER_ID } from './test-utils'
+import { APIKEY_TEST_ORG_SUPER_ADMIN, getSupabaseClient, ORG_ID, resetAndSeedAppData, resetAppData, resetAppDataStats, USER_ID } from './test-utils'
 
 interface UploadResponse {
   url: string
@@ -79,7 +79,7 @@ describe('upload_link', async () => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'capgkey': APIKEY_TEST_ALL,
+        'capgkey': APIKEY_TEST_ORG_SUPER_ADMIN,
       },
       body: JSON.stringify(body),
     })
@@ -117,7 +117,7 @@ describe('upload_link', async () => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'capgkey': APIKEY_TEST_ALL,
+        'capgkey': APIKEY_TEST_ORG_SUPER_ADMIN,
       },
       body: JSON.stringify({ fileId: '' }),
     })

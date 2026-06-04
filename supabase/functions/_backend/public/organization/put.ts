@@ -297,7 +297,7 @@ export async function put(
     : supabaseApikey(c, apikey?.key)
   const authUserId = auth.userId
 
-  // Auth context is already set by middlewareV2
+  // Auth context is already set by middlewareAuth
   await ensureOrgAccess(c, apikey, body.orgId, supabase)
   const writeSupabase = auth.authType === 'apikey'
     ? supabaseAdmin(c)

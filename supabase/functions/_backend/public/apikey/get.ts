@@ -1,11 +1,11 @@
 import type { Database } from '../../utils/supabase.types.ts'
 import { honoFactory, quickError, simpleError } from '../../utils/hono.ts'
-import { middlewareV2 } from '../../utils/hono_middleware.ts'
+import { middlewareAuth } from '../../utils/hono_middleware.ts'
 import { apiKeyOwnerDataClient, ensureApiKeyManagementAllowed, isValidApiKeyIdFormat, requireApiKeyManagementAuth, selectOwnedApiKeyByIdentifier } from './scope.ts'
 
 const app = honoFactory.createApp()
 
-app.get('/', middlewareV2(), async (c) => {
+app.get('/', middlewareAuth(), async (c) => {
   const auth = requireApiKeyManagementAuth(c, 'not_authorized', 'API key management requires authentication')
   const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row'] | undefined
 
@@ -25,7 +25,7 @@ app.get('/', middlewareV2(), async (c) => {
   return c.json(apikeys)
 })
 
-app.get('/:id', middlewareV2(), async (c) => {
+app.get('/:id', middlewareAuth(), async (c) => {
   const auth = requireApiKeyManagementAuth(c, 'not_authorized', 'API key management requires authentication')
   const authApikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row'] | undefined
 

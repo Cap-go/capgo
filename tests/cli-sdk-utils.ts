@@ -9,7 +9,7 @@ import { chdir, cwd, env } from 'node:process'
 import { CapgoSDK } from '@capgo/cli/sdk'
 import AdmZip from 'adm-zip'
 import { BASE_DEPENDENCIES, BASE_DEPENDENCIES_OLD, BASE_PACKAGE_JSON, TEMP_DIR_NAME } from './cli-utils'
-import { APIKEY_TEST_ALL, getSupabaseClient, USER_ID } from './test-utils'
+import { APIKEY_TEST_ORG_SUPER_ADMIN, getSupabaseClient, USER_ID } from './test-utils'
 
 const ROOT_DIR = cwd()
 
@@ -187,7 +187,7 @@ type ApiKeyRow = Pick<
   Database['public']['Tables']['apikeys']['Row'],
   'expires_at' | 'id' | 'key' | 'key_hash' | 'rbac_id' | 'user_id'
 >
-type ApiKeyPermissionMode = 'all' | 'read' | 'upload' | 'write'
+type RbacPermissionKey = string
 
 interface NativePackage {
   name: string
@@ -224,27 +224,16 @@ async function getApiKeyRecord(apikey: string) {
   return row
 }
 
-const permissionKeysByMode: Record<ApiKeyPermissionMode, string[]> = {
-  read: ['app.read'],
-  upload: ['app.upload_bundle'],
-  write: ['app.manage_devices'],
-  all: ['app.update_user_roles'],
-}
-
-function permissionKeysForModes(allowedModes: ApiKeyPermissionMode[]) {
-  return Array.from(new Set(allowedModes.flatMap(mode => permissionKeysByMode[mode])))
-}
-
 async function apiKeyHasAnyAppPermission(
   apikey: string,
   apiKey: ApiKeyRow,
   app: { app_id: string, owner_org: string | null },
-  allowedModes: ApiKeyPermissionMode[],
+  requiredPermissions: RbacPermissionKey[],
 ) {
   if (!app.owner_org)
     return false
 
-  for (const permissionKey of permissionKeysForModes(allowedModes)) {
+  for (const permissionKey of Array.from(new Set(requiredPermissions))) {
     const { data, error } = await getSupabaseClient().rpc('rbac_check_permission_direct' as any, {
       p_permission_key: permissionKey,
       p_user_id: apiKey.user_id,
@@ -264,7 +253,7 @@ async function apiKeyHasAnyAppPermission(
 async function getAuthorizedApp(
   apikey: string,
   appId: string,
-  allowedModes: ApiKeyPermissionMode[],
+  requiredPermissions: RbacPermissionKey[],
 ) {
   const apiKey = await getApiKeyRecord(apikey)
   if (!apiKey)
@@ -274,13 +263,13 @@ async function getAuthorizedApp(
   if (!app)
     return { error: `App ${appId} does not exist` as const }
 
-  if (!(await apiKeyHasAnyAppPermission(apikey, apiKey, app, allowedModes)))
+  if (!(await apiKeyHasAnyAppPermission(apikey, apiKey, app, requiredPermissions)))
     return { error: 'Invalid API key or insufficient permissions.' as const }
 
   return { apiKey, app } as const
 }
 
-async function getAppsForApiKey(apikey: string, allowedModes: ApiKeyPermissionMode[]) {
+async function getAppsForApiKey(apikey: string, requiredPermissions: RbacPermissionKey[]) {
   const apiKey = await getApiKeyRecord(apikey)
   if (!apiKey)
     return { error: 'Invalid API key or insufficient permissions.' as const }
@@ -295,7 +284,7 @@ async function getAppsForApiKey(apikey: string, allowedModes: ApiKeyPermissionMo
 
   const filteredApps = []
   for (const app of data ?? []) {
-    if (await apiKeyHasAnyAppPermission(apikey, apiKey, app, allowedModes))
+    if (await apiKeyHasAnyAppPermission(apikey, apiKey, app, requiredPermissions))
       filteredApps.push(app)
   }
 
@@ -582,23 +571,22 @@ async function buildUploadPayload(appId: string, options: UploadOptions) {
 /**
  * Create an SDK instance with test credentials
  */
-export function createTestSDK(apikey: string = APIKEY_TEST_ALL) {
+export function createTestSDK(apikey: string = APIKEY_TEST_ORG_SUPER_ADMIN) {
   const sdk = new CapgoSDK({
     apikey,
     supaHost: SUPABASE_URL,
     supaAnon: SUPABASE_ANON_KEY,
   })
 
-  // The published CLI still uses the legacy anonymous API key auth helpers
-  // removed by the advisory fix. Keep repo tests on repo-controlled shims
-  // until the CLI repo has its own compatible auth path.
+  // Keep repo tests on repo-controlled RBAC checks while the published CLI SDK
+  // still uses anonymous Supabase clients for direct table access.
   ;(sdk as any).addChannel = async ({ channelId, appId, default: isDefault, selfAssign }: {
     channelId: string
     appId: string
     default?: boolean
     selfAssign?: boolean
   }) => {
-    const access = await getAuthorizedApp(apikey, appId, ['write', 'all'])
+    const access = await getAuthorizedApp(apikey, appId, ['app.create_channel'])
     if ('error' in access)
       return { success: false, error: access.error }
 
@@ -640,7 +628,7 @@ export function createTestSDK(apikey: string = APIKEY_TEST_ALL) {
   }
 
   ;(sdk as any).listChannels = async (appId: string) => {
-    const access = await getAuthorizedApp(apikey, appId, ['read', 'upload', 'write', 'all'])
+    const access = await getAuthorizedApp(apikey, appId, ['app.read_channels'])
     if ('error' in access)
       return { success: false, error: access.error }
 
@@ -688,7 +676,7 @@ export function createTestSDK(apikey: string = APIKEY_TEST_ALL) {
     device?: boolean
     prod?: boolean
   }) => {
-    const access = await getAuthorizedApp(apikey, appId, ['write', 'all'])
+    const access = await getAuthorizedApp(apikey, appId, ['channel.update_settings'])
     if ('error' in access)
       return { success: false, error: access.error }
 
@@ -731,7 +719,7 @@ export function createTestSDK(apikey: string = APIKEY_TEST_ALL) {
   }
 
   ;(sdk as any).deleteChannel = async (channelId: string, appId: string) => {
-    const access = await getAuthorizedApp(apikey, appId, ['write', 'all'])
+    const access = await getAuthorizedApp(apikey, appId, ['channel.delete'])
     if ('error' in access)
       return { success: false, error: access.error }
 
@@ -757,7 +745,7 @@ export function createTestSDK(apikey: string = APIKEY_TEST_ALL) {
   }
 
   ;(sdk as any).getCurrentBundle = async (appId: string, channelId: string) => {
-    const access = await getAuthorizedApp(apikey, appId, ['read', 'write', 'all'])
+    const access = await getAuthorizedApp(apikey, appId, ['app.read_bundles'])
     if ('error' in access)
       return { success: false, error: access.error }
 
@@ -772,7 +760,7 @@ export function createTestSDK(apikey: string = APIKEY_TEST_ALL) {
   }
 
   ;(sdk as any).listApps = async () => {
-    const access = await getAppsForApiKey(apikey, ['read', 'upload', 'write', 'all'])
+    const access = await getAppsForApiKey(apikey, ['app.read'])
     if ('error' in access)
       return { success: false, error: access.error }
 
@@ -798,7 +786,7 @@ export function createTestSDK(apikey: string = APIKEY_TEST_ALL) {
     nodeModules?: string
     packageJson?: string
   }) => {
-    const access = await getAuthorizedApp(apikey, appId, ['read', 'upload', 'write', 'all'])
+    const access = await getAuthorizedApp(apikey, appId, ['app.read_bundles'])
     if ('error' in access)
       return { success: false, error: access.error }
 
@@ -816,7 +804,7 @@ export function createTestSDK(apikey: string = APIKEY_TEST_ALL) {
 
   ;(sdk as any).uploadBundle = async (options: UploadOptions) => {
     const resolvedApiKey = options.apikey || apikey
-    const access = await getAuthorizedApp(resolvedApiKey, options.appId, ['upload', 'write', 'all'])
+    const access = await getAuthorizedApp(resolvedApiKey, options.appId, ['app.upload_bundle'])
     if ('error' in access)
       return { success: false, error: access.error }
 
@@ -918,7 +906,7 @@ export async function uploadBundleSDK(
   channel?: string,
   additionalOptions?: Partial<UploadOptions>,
 ) {
-  const sdk = createTestSDK(additionalOptions?.apikey ?? APIKEY_TEST_ALL)
+  const sdk = createTestSDK(additionalOptions?.apikey ?? APIKEY_TEST_ORG_SUPER_ADMIN)
 
   const options: UploadOptions = {
     appId,

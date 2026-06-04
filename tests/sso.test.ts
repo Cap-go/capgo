@@ -36,7 +36,7 @@ beforeAll(async () => {
   const { error: orgUserError } = await getSupabaseClient().from('org_users').insert({
     org_id: SSO_TEST_ORG_ID,
     user_id: USER_ID,
-    user_right: 'super_admin' as const,
+    rbac_role_name: 'org_super_admin' as const,
   })
   if (orgUserError)
     throw orgUserError
@@ -319,7 +319,7 @@ describe('[POST] /private/sso/providers', () => {
       const { error: orgUserError } = await getSupabaseClient().from('org_users').insert({
         org_id: orgId,
         user_id: USER_ID,
-        user_right: 'super_admin' as const,
+        rbac_role_name: 'org_super_admin' as const,
       })
       if (orgUserError)
         throw orgUserError
@@ -386,7 +386,7 @@ describe('[POST] /private/sso/prelink-users', () => {
       const { error: prelinkAdminError } = await getSupabaseClient().from('org_users').insert({
         org_id: prelinkOrgId,
         user_id: USER_ID,
-        user_right: 'super_admin' as const,
+        rbac_role_name: 'org_super_admin' as const,
       })
       if (prelinkAdminError)
         throw prelinkAdminError
@@ -471,12 +471,12 @@ describe('[POST] /private/sso/prelink-users', () => {
         {
           org_id: prelinkOrgId,
           user_id: memberUserId,
-          user_right: 'read' as const,
+          rbac_role_name: 'org_member' as const,
         },
         {
           org_id: foreignOrgId,
           user_id: outsiderUserId,
-          user_right: 'read' as const,
+          rbac_role_name: 'org_member' as const,
         },
       ])
       if (orgUsersError)
@@ -1090,7 +1090,7 @@ describe('[POST] /private/sso/provision-user', () => {
       const { error: inviteMembershipError } = await getSupabaseClient().from('org_users').insert({
         org_id: managedOrgId,
         user_id: createdUser.user.id,
-        user_right: 'invite_read' as const,
+        rbac_role_name: 'org_member' as const, is_invite: true,
       })
       if (inviteMembershipError)
         throw inviteMembershipError
@@ -1117,13 +1117,13 @@ describe('[POST] /private/sso/provision-user', () => {
 
       const { data: membership, error: membershipError } = await getSupabaseClient()
         .from('org_users')
-        .select('user_right')
+        .select('rbac_role_name')
         .eq('org_id', managedOrgId)
         .eq('user_id', createdUser.user.id)
         .single()
 
       expect(membershipError).toBeNull()
-      expect(membership?.user_right).toBe('read')
+      expect(membership?.rbac_role_name).toBe('org_member')
     }
     finally {
       await Promise.allSettled([
@@ -1297,7 +1297,7 @@ describe('[POST] /private/sso/provision-user', () => {
 
       const { data: mergedMembership, error: mergedMembershipError } = await getSupabaseClient()
         .from('org_users')
-        .select('org_id, user_id, user_right')
+        .select('org_id, user_id, rbac_role_name')
         .eq('org_id', managedOrgId)
         .eq('user_id', originalUser.user.id)
         .maybeSingle()
@@ -1306,7 +1306,7 @@ describe('[POST] /private/sso/provision-user', () => {
       expect(mergedMembership).toMatchObject({
         org_id: managedOrgId,
         user_id: originalUser.user.id,
-        user_right: 'read',
+        rbac_role_name: 'org_member',
       })
 
       const identitiesAfterMerge = await pool.query(
@@ -1481,7 +1481,7 @@ describe('[POST] /private/sso/provision-user', () => {
 
       const { data: ssoMembership, error: ssoMembershipError } = await getSupabaseClient()
         .from('org_users')
-        .select('org_id, user_id, user_right')
+        .select('org_id, user_id, rbac_role_name')
         .eq('org_id', managedOrgId)
         .eq('user_id', ssoUser.user.id)
         .maybeSingle()
@@ -1490,7 +1490,7 @@ describe('[POST] /private/sso/provision-user', () => {
       expect(ssoMembership).toMatchObject({
         org_id: managedOrgId,
         user_id: ssoUser.user.id,
-        user_right: 'read',
+        rbac_role_name: 'org_member',
       })
 
       const identitiesAfterProvision = await pool.query(
@@ -1802,7 +1802,7 @@ describe('[POST] /private/sso/provision-user', () => {
 
       const { data: membership, error: membershipError } = await getSupabaseClient()
         .from('org_users')
-        .select('id, org_id, user_id, user_right')
+        .select('id, org_id, user_id, rbac_role_name')
         .eq('org_id', managedOrgId)
         .eq('user_id', createdUser.user.id)
         .maybeSingle()
@@ -1811,7 +1811,7 @@ describe('[POST] /private/sso/provision-user', () => {
       expect(membership).toMatchObject({
         org_id: managedOrgId,
         user_id: createdUser.user.id,
-        user_right: 'read',
+        rbac_role_name: 'org_member',
       })
     }
     finally {

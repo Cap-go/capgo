@@ -3,7 +3,7 @@ import type { Database } from '../../utils/supabase.types.ts'
 import { sql } from 'drizzle-orm'
 import { createRoleBindingForPrincipal } from '../../private/role_bindings.ts'
 import { honoFactory, parseBody, quickError, simpleError } from '../../utils/hono.ts'
-import { middlewareV2 } from '../../utils/hono_middleware.ts'
+import { middlewareAuth } from '../../utils/hono_middleware.ts'
 import { cloudlog, cloudlogErr } from '../../utils/logging.ts'
 import { closeClient, getDrizzleClient, getPgClient } from '../../utils/pg.ts'
 import { checkPermission } from '../../utils/rbac.ts'
@@ -65,7 +65,7 @@ async function createApiKeyRecord(
   return apiKey
 }
 
-app.post('/', middlewareV2(), async (c) => {
+app.post('/', middlewareAuth(), async (c) => {
   const auth = requireApiKeyManagementAuth(c, 'not_authorized', 'API key management requires authentication')
 
   const body = await parseBody<any>(c)

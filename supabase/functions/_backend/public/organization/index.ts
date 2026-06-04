@@ -1,6 +1,6 @@
 import type { Database } from '../../utils/supabase.types.ts'
 import { getBodyOrQuery, honoFactory, useCors } from '../../utils/hono.ts'
-import { middlewareKey, middlewareV2 } from '../../utils/hono_middleware.ts'
+import { middlewareKey, middlewareAuth } from '../../utils/hono_middleware.ts'
 import { getAuditLogs } from './audit.ts'
 import { deleteOrg } from './delete.ts'
 import { get } from './get.ts'
@@ -21,13 +21,13 @@ app.get('/', middlewareKey(), async (c) => {
   return get(c, body, apikey)
 })
 
-app.put('/', middlewareV2(), async (c) => {
+app.put('/', middlewareAuth(), async (c) => {
   const body = await getBodyOrQuery<any>(c)
   const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
   return put(c, body, apikey)
 })
 
-app.post('/', middlewareV2(), async (c) => {
+app.post('/', middlewareAuth(), async (c) => {
   const body = await getBodyOrQuery<any>(c)
   const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row'] | null | undefined
   return post(c, body, apikey)
@@ -57,7 +57,7 @@ app.delete('/members', middlewareKey(), async (c) => {
   return deleteMember(c, body, apikey)
 })
 
-app.get('/audit', middlewareV2(), async (c) => {
+app.get('/audit', middlewareAuth(), async (c) => {
   const body = await getBodyOrQuery<any>(c)
   return getAuditLogs(c, body)
 })

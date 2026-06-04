@@ -10,7 +10,6 @@ import {
   getAppId,
   getConfig,
   getOrganizationId,
-  OrganizationPerm,
   resolveUserIdFromApiKey,
   sendEvent,
 } from '../utils'
@@ -39,7 +38,7 @@ export async function deleteChannelInternal(channelId: string, appId: string, op
   await check2FAComplianceForApp(supabase, appId, silent)
   const userId = await resolveUserIdFromApiKey(supabase, options.apikey)
 
-  await checkAppExistsAndHasPermissionOrgErr(supabase, options.apikey, appId, OrganizationPerm.admin, silent, true)
+  await checkAppExistsAndHasPermissionOrgErr(supabase, options.apikey, appId, 'channel.delete', silent, true)
 
   if (options.deleteBundle && !silent)
     log.info(`Deleting bundle ${appId}#${channelId} from Capgo`)

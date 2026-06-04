@@ -24,26 +24,6 @@ interface PasswordPolicy {
   require_special: boolean
 }
 
-const rbacRoleToLegacy: Record<string, 'read' | 'admin' | 'super_admin'> = {
-  org_member: 'read',
-  org_billing_admin: 'read',
-  org_admin: 'admin',
-  org_super_admin: 'super_admin',
-}
-
-const legacyInviteToRbac: Record<string, string> = {
-  read: 'org_member',
-  upload: 'org_member',
-  write: 'org_member',
-  admin: 'org_admin',
-  super_admin: 'org_super_admin',
-  invite_read: 'org_member',
-  invite_upload: 'org_member',
-  invite_write: 'org_member',
-  invite_admin: 'org_admin',
-  invite_super_admin: 'org_super_admin',
-}
-
 // Default password policy (when org has no policy set)
 const DEFAULT_PASSWORD_POLICY: PasswordPolicy = {
   enabled: true,
@@ -171,13 +151,14 @@ async function ensureOrgMembership(
   userId: string,
   invitation: any,
 ) {
-  const rbacRoleName = invitation.rbac_role_name ?? legacyInviteToRbac[invitation.role as keyof typeof legacyInviteToRbac]
+  const rbacRoleName = typeof invitation.rbac_role_name === 'string'
+    ? invitation.rbac_role_name.trim()
+    : ''
 
   if (!rbacRoleName) {
     return quickError(500, 'failed_to_accept_invitation', 'Failed to resolve RBAC role', { error: 'Missing RBAC role name' })
   }
 
-  const legacyRight = rbacRoleToLegacy[rbacRoleName] ?? 'read'
   let rbacRoleId: string | null = null
 
   const { data: role, error: roleError } = await supabaseAdmin
@@ -210,8 +191,8 @@ async function ensureOrgMembership(
     const { error: updateMembershipError } = await supabaseAdmin
       .from('org_users')
       .update({
-        user_right: legacyRight,
         rbac_role_name: rbacRoleName,
+        is_invite: false,
       })
       .eq('user_id', userId)
       .eq('org_id', invitation.org_id)
@@ -226,8 +207,8 @@ async function ensureOrgMembership(
     const { error: insertIntoMainTableError } = await supabaseAdmin.from('org_users').insert({
       user_id: userId,
       org_id: invitation.org_id,
-      user_right: legacyRight,
       rbac_role_name: rbacRoleName,
+      is_invite: false,
     })
 
     if (insertIntoMainTableError) {

@@ -9,7 +9,6 @@ import {
   getAppId,
   getConfig,
   getOrganizationId,
-  OrganizationPerm,
   resolveUserIdFromApiKey,
   sendEvent,
 } from '../utils'
@@ -37,7 +36,7 @@ export async function addChannelInternal(channelId: string, appId: string, optio
   const supabase = await createSupabaseClient(options.apikey, options.supaHost, options.supaAnon, silent)
   await check2FAComplianceForApp(supabase, appId, silent)
   await resolveUserIdFromApiKey(supabase, options.apikey)
-  await checkAppExistsAndHasPermissionOrgErr(supabase, options.apikey, appId, OrganizationPerm.admin, silent, true)
+  await checkAppExistsAndHasPermissionOrgErr(supabase, options.apikey, appId, 'app.create_channel', silent, true)
 
   if (!silent)
     log.info(`Creating channel ${appId}#${channelId} to Capgo`)

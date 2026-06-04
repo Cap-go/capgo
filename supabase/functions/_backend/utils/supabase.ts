@@ -803,7 +803,13 @@ export async function createApiKey(c: Context, userId: string) {
     }
 
     await pgClient.query(
-      `WITH inserted AS (
+      `WITH default_keys(name, org_role_name, app_role_name) AS (
+         VALUES
+           ('default org admin', public.rbac_role_org_admin(), NULL::text),
+           ('default app uploader', public.rbac_role_org_member(), public.rbac_role_app_uploader()),
+           ('default app reader', public.rbac_role_org_member(), public.rbac_role_app_reader())
+       ),
+       inserted AS (
          INSERT INTO public.apikeys (
            user_id,
            key,
@@ -815,8 +821,18 @@ export async function createApiKey(c: Context, userId: string) {
            gen_random_uuid()::text,
            NULL,
            default_key.name
-         FROM (VALUES ('all'), ('upload'), ('read')) AS default_key(name)
+         FROM default_keys AS default_key
          RETURNING user_id, rbac_id, name
+       ),
+       inserted_with_roles AS (
+         SELECT
+           inserted.user_id,
+           inserted.rbac_id,
+           inserted.name,
+           default_keys.org_role_name,
+           default_keys.app_role_name
+         FROM inserted
+         JOIN default_keys USING (name)
        ),
        current_orgs AS (
          SELECT DISTINCT rb.org_id
@@ -852,20 +868,17 @@ export async function createApiKey(c: Context, userId: string) {
          )
          SELECT
            public.rbac_principal_apikey(),
-           inserted.rbac_id,
+           inserted_with_roles.rbac_id,
            roles.id,
            public.rbac_scope_org(),
            current_orgs.org_id,
-           inserted.user_id,
-           'Default API key V2 binding',
+           inserted_with_roles.user_id,
+           'Default API key RBAC org binding',
            true
-         FROM inserted
+         FROM inserted_with_roles
          CROSS JOIN current_orgs
          JOIN public.roles roles
-           ON roles.name = CASE
-             WHEN inserted.name = 'all' THEN public.rbac_role_org_admin()
-             ELSE public.rbac_role_org_member()
-           END
+           ON roles.name = inserted_with_roles.org_role_name
          ON CONFLICT DO NOTHING
        )
        INSERT INTO public.role_bindings (
@@ -881,24 +894,20 @@ export async function createApiKey(c: Context, userId: string) {
        )
        SELECT
          public.rbac_principal_apikey(),
-         inserted.rbac_id,
+         inserted_with_roles.rbac_id,
          roles.id,
          public.rbac_scope_app(),
          apps.owner_org,
          apps.id,
-         inserted.user_id,
-         'Default API key V2 app binding',
+         inserted_with_roles.user_id,
+         'Default API key RBAC app binding',
          true
-       FROM inserted
+       FROM inserted_with_roles
        JOIN current_orgs ON true
        JOIN public.apps apps ON apps.owner_org = current_orgs.org_id
        JOIN public.roles roles
-         ON roles.name = CASE inserted.name
-           WHEN 'upload' THEN public.rbac_role_app_uploader()
-           WHEN 'read' THEN public.rbac_role_app_reader()
-           ELSE NULL
-         END
-       WHERE inserted.name IN ('upload', 'read')
+         ON roles.name = inserted_with_roles.app_role_name
+       WHERE inserted_with_roles.app_role_name IS NOT NULL
        ON CONFLICT DO NOTHING`,
       [userId],
     )
@@ -1554,7 +1563,7 @@ export async function getUpdateStatsSB(c: Context): Promise<UpdateStats> {
  * Uses find_apikey_by_value SQL function to look up both plain-text and hashed keys
  * Expiration is checked after lookup
  */
-export async function checkKey(c: Context, authorization: string | undefined, supabase: SupabaseClient<Database>, allowed: Database['public']['Enums']['key_mode'][]): Promise<Database['public']['Tables']['apikeys']['Row'] | null> {
+export async function checkKey(c: Context, authorization: string | undefined, supabase: SupabaseClient<Database>): Promise<Database['public']['Tables']['apikeys']['Row'] | null> {
   if (!authorization)
     return null
 
@@ -1566,7 +1575,7 @@ export async function checkKey(c: Context, authorization: string | undefined, su
       .single()
 
     if (error || !data) {
-      cloudlog({ requestId: c.get('requestId'), message: 'Invalid apikey', authorizationPrefix: authorization?.substring(0, 8), allowed, error })
+      cloudlog({ requestId: c.get('requestId'), message: 'Invalid apikey', authorizationPrefix: authorization?.substring(0, 8), error })
       return null
     }
 
@@ -1592,7 +1601,6 @@ export async function checkKeyById(
   c: Context,
   id: number,
   supabase: SupabaseClient<Database>,
-  _allowed: Database['public']['Enums']['key_mode'][],
   userId?: string,
 ): Promise<Database['public']['Tables']['apikeys']['Row'] | null> {
   if (!id)
