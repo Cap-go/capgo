@@ -265,6 +265,11 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
   // The authoritative Release build id resolved fresh from pbxproj for this
   // verification. Empty string when no Release config could be resolved.
   const [verifyReleaseBundleId, setVerifyReleaseBundleId] = useState('')
+  // The Debug-config bundle id when it differs from Release (else ''). Drives a
+  // persistent, bordered warning box on the verify-app step so the user always
+  // sees which id Capgo Builder actually signs — a scrolling gray log line was
+  // being missed.
+  const [verifyDebugBundleId, setVerifyDebugBundleId] = useState('')
   // Apps that exist in the user's App Store Connect account (picker source +
   // Path B re-poll). Refreshed live on each Path B Continue.
   const [verifyApps, setVerifyApps] = useState<AscApp[]>([])
@@ -1031,6 +1036,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
     setPendingVerifyNext(null)
     setVerifyAppLoading(false)
     setVerifyReleaseBundleId('')
+    setVerifyDebugBundleId('')
     setVerifyApps([])
     setVerifyRegisteredIds([])
     setVerifyPath(null)
@@ -2074,12 +2080,19 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
         const fresh = detectIosBundleIds({ cwd: process.cwd(), iosDir, capacitorAppId: iosBundleIdInitial })
         const releaseBundleId = fresh.releaseResolved && fresh.pbxproj ? fresh.pbxproj.value : ''
         const debugReleaseDiffer = fresh.debugReleaseDiffer
-        // Debug ≠ Release awareness note — informational only, never gates.
+        // Debug ≠ Release awareness note — informational only, never gates. Shown
+        // as a persistent boxed warning on the verify-app step (via the state set
+        // here) AND as a yellow log line for the exact-match pass-through, which
+        // never renders the step.
         if (debugReleaseDiffer && fresh.debug && fresh.pbxproj) {
+          setVerifyDebugBundleId(fresh.debug.value)
           addLog(
-            `Note: Debug builds "${fresh.debug.value}", Release builds "${fresh.pbxproj.value}" — Capgo Builder uses the Release ID "${fresh.pbxproj.value}".`,
-            'gray',
+            `⚠ Debug builds "${fresh.debug.value}" but Release builds "${fresh.pbxproj.value}" — Capgo Builder signs the RELEASE ID "${fresh.pbxproj.value}".`,
+            'yellow',
           )
+        }
+        else {
+          setVerifyDebugBundleId('')
         }
 
         try {
@@ -3247,7 +3260,28 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
           fetch-failure cases are handled in the effect above (they transition
           straight through); this render only drives the picker + the two
           resolution-path gates. */}
-      {step === 'verify-app' && (() => {
+      {step === 'verify-app' && (
+        <Box flexDirection="column">
+          {verifyDebugBundleId && verifyReleaseBundleId
+            ? (
+                <Box flexDirection="column" borderStyle="round" borderColor="yellow" paddingX={1} marginTop={1}>
+                  <Text bold color="yellow">{'⚠  Debug and Release use different bundle IDs'}</Text>
+                  <Text>
+                    {'Debug builds '}
+                    <Text bold>{verifyDebugBundleId}</Text>
+                    {'   ·   Release builds '}
+                    <Text bold color="cyan">{verifyReleaseBundleId}</Text>
+                  </Text>
+                  <Text>
+                    {'Capgo Builder signs the '}
+                    <Text bold color="cyan">Release</Text>
+                    {' ID → '}
+                    <Text bold color="cyan">{verifyReleaseBundleId}</Text>
+                  </Text>
+                </Box>
+              )
+            : null}
+          {(() => {
         if (verifyAppLoading) {
           return (
             <Box flexDirection="column" marginTop={1}>
@@ -3546,7 +3580,9 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
             />
           </Box>
         )
-      })()}
+          })()}
+        </Box>
+      )}
 
       {/* Import: distribution mode (now FIRST visible step in import flow) */}
       {step === 'import-distribution-mode' && (
