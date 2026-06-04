@@ -148,8 +148,8 @@ import {
 } from '../play-api.js'
 import { deleteAndroidProgress, getAndroidResumeStep, hasAnyOAuthProgress, loadAndroidProgress, saveAndroidProgress } from '../progress.js'
 import { ANDROID_STEP_PROGRESS, getAndroidPhaseLabel } from '../types.js'
-import type { AndroidEffectDeps } from '../flow.js'
-import { runAndroidEffect } from '../flow.js'
+import type { AndroidEffectDeps, AndroidInput } from '../flow.js'
+import { applyAndroidInput, runAndroidEffect } from '../flow.js'
 
 interface LogEntry { text: string, color?: string }
 
@@ -816,6 +816,66 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
     },
     [persist],
   )
+
+  // ─── Engine-derived tail routing (choice/input → next step) ─────────────────
+  //
+  // The post-save tail CHOICE/INPUT steps record their field in React state (the
+  // synthetic-progress tail driver above reads it back), then advance. Rather
+  // than hardcode the next step in each handler, the MATCH-class tail inputs (see
+  // test/test-android-tail-routing.mjs) derive it the same way the engine does:
+  //
+  //     getAndroidResumeStep(applyAndroidInput(step, syntheticProgress, input))
+  //
+  // `syntheticProgress` overlays the in-memory React tail state onto a base that
+  // (a) PASSES the keystore gate — we are provably past it in the tail, so the
+  // gate-passing markers are stubbed — and (b) carries the tail phase markers
+  // (`credentialsSaved` always; `buildRequested` / `ciSecretsUploaded` per the
+  // step's position) that `getAndroidResumeStep` reads to enter `tailResumeStep`.
+  // The stub keystore values are never inspected by the tail router; only their
+  // presence matters (it short-circuits the early keystore phase). This mirrors
+  // the fixtures in the routing-parity test step-for-step.
+  //
+  // ONLY MATCH-class options are routed through here. DIVERGE-class options
+  // (confirm gates, preview gates, transient viewers, provider fan-outs,
+  // navigation-only) keep their explicit `setStep` — the resume router
+  // deliberately collapses those onto the nearest idempotent re-entry point, so
+  // engine-deriving them would change the in-session destination.
+  const tailEngineNext = (
+    step: AndroidOnboardingStep,
+    input: AndroidInput,
+    markers: { buildRequested?: boolean, ciSecretsUploaded?: boolean },
+  ): AndroidOnboardingStep => {
+    // Stub markers that satisfy `keystoreFullyValid` so the router skips the
+    // keystore phase and reaches the tail. Presence-only — values are inert.
+    const keystoreReadyStub: KeystoreReady = {
+      keystorePath: 'android/app/release.keystore',
+      alias: keystoreAlias || 'release',
+      isGenerated: true,
+    }
+    const synthetic: AndroidOnboardingProgress = {
+      platform: 'android',
+      appId,
+      startedAt: new Date().toISOString(),
+      _keystoreBase64: '_',
+      keystoreAlias: keystoreAlias || 'release',
+      keystoreStorePassword: keystoreStorePassword || '_',
+      // ── in-memory React tail inputs the router reads (mirrors tailProgress) ──
+      setupMode,
+      ciSecretTarget,
+      selectedPackageManager: selectedPackageManager ?? normalizePackageManager(pm.pm),
+      buildScriptChoice,
+      envExportTargetPath,
+      completedSteps: {
+        keystoreReady: keystoreReadyStub,
+        credentialsSaved: { savedAt: new Date().toISOString() },
+        ...(markers.buildRequested ? { buildRequested: { buildUrl: buildUrl || '' } } : {}),
+        ...(markers.ciSecretsUploaded
+          ? { ciSecretsUploaded: { provider: ciSecretTarget?.provider ?? 'github', count: ciSecretEntries.length } }
+          : {}),
+      },
+    }
+    return getAndroidResumeStep(applyAndroidInput(step, synthetic, input))
+  }
 
   // Re-emit the breadcrumb entries the user "earned" before this session — the
   // partial keystore inputs (path / alias / store + key password) and the
