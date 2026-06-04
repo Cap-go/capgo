@@ -7,6 +7,20 @@ import { supabaseAdmin, supabaseWithAuth } from '../../utils/supabase.ts'
 
 type ApiKeyRow = Database['public']['Tables']['apikeys']['Row']
 
+export function requireApiKeyManagementAuth(
+  c: Context<MiddlewareKeyVariables>,
+  errorCode: string,
+  message: string,
+  moreInfo: Record<string, unknown> = {},
+): AuthInfo {
+  const auth = c.get('auth') as AuthInfo | undefined
+  if (!auth?.userId) {
+    throw quickError(401, errorCode, message, moreInfo)
+  }
+
+  return auth
+}
+
 export function isValidApiKeyIdFormat(id: string): boolean {
   const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
   const numericRegex = /^\d+$/

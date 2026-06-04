@@ -1,13 +1,12 @@
-import type { AuthInfo } from '../../utils/hono.ts'
 import type { Database } from '../../utils/supabase.types.ts'
 import { honoFactory, quickError, simpleError } from '../../utils/hono.ts'
 import { middlewareV2 } from '../../utils/hono_middleware.ts'
-import { apiKeyOwnerDataClient, ensureApiKeyManagementAllowed, isValidApiKeyIdFormat, selectOwnedApiKeyByIdentifier } from './scope.ts'
+import { apiKeyOwnerDataClient, ensureApiKeyManagementAllowed, isValidApiKeyIdFormat, requireApiKeyManagementAuth, selectOwnedApiKeyByIdentifier } from './scope.ts'
 
 const app = honoFactory.createApp()
 
 app.get('/', middlewareV2(), async (c) => {
-  const auth = c.get('auth') as AuthInfo
+  const auth = requireApiKeyManagementAuth(c, 'not_authorized', 'API key management requires authentication')
   const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row'] | undefined
 
   await ensureApiKeyManagementAllowed(c, auth, apikey, 'cannot_list_apikeys')
@@ -27,7 +26,7 @@ app.get('/', middlewareV2(), async (c) => {
 })
 
 app.get('/:id', middlewareV2(), async (c) => {
-  const auth = c.get('auth') as AuthInfo
+  const auth = requireApiKeyManagementAuth(c, 'not_authorized', 'API key management requires authentication')
   const authApikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row'] | undefined
 
   await ensureApiKeyManagementAllowed(c, auth, authApikey, 'cannot_get_apikey')
@@ -45,7 +44,7 @@ app.get('/:id', middlewareV2(), async (c) => {
   // API-key auth reaches PostgREST as anon, so the server-mediated broad-key
   // compatibility path uses a fixed owner filter after the limited-key guard.
   const { data: fetchedApikey, error } = await selectOwnedApiKeyByIdentifier(c, auth, id)
-  if (error) {
+  if (error || !fetchedApikey) {
     throw quickError(404, 'failed_to_get_apikey', 'Failed to get API key', { supabaseError: error })
   }
   return c.json(fetchedApikey)

@@ -1,5 +1,4 @@
 import type { CreateBindingParams } from '../../private/role_bindings.ts'
-import type { AuthInfo } from '../../utils/hono.ts'
 import type { Database } from '../../utils/supabase.types.ts'
 import { sql } from 'drizzle-orm'
 import { createRoleBindingForPrincipal } from '../../private/role_bindings.ts'
@@ -9,6 +8,7 @@ import { cloudlog, cloudlogErr } from '../../utils/logging.ts'
 import { closeClient, getDrizzleClient, getPgClient } from '../../utils/pg.ts'
 import { checkPermission } from '../../utils/rbac.ts'
 import { supabaseWithAuth, validateExpirationAgainstOrgPolicies, validateExpirationDate } from '../../utils/supabase.ts'
+import { requireApiKeyManagementAuth } from './scope.ts'
 
 interface BindingInput {
   role_name: string
@@ -66,7 +66,7 @@ async function createApiKeyRecord(
 }
 
 app.post('/', middlewareV2(), async (c) => {
-  const auth = c.get('auth') as AuthInfo
+  const auth = requireApiKeyManagementAuth(c, 'not_authorized', 'API key management requires authentication')
 
   const body = await parseBody<any>(c)
 

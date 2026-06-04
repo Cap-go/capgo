@@ -11,7 +11,7 @@ import { closeClient, getDrizzleClient, getPgClient } from '../../utils/pg.ts'
 import { checkPermission } from '../../utils/rbac.ts'
 import { schema } from '../../utils/postgres_schema.ts'
 import { supabaseAdmin, supabaseWithAuth, validateExpirationAgainstOrgPolicies, validateExpirationDate } from '../../utils/supabase.ts'
-import { apiKeyOwnerDataClient, ensureApiKeyManagementAllowed, isValidApiKeyIdFormat, selectOwnedApiKeyByIdentifier } from './scope.ts'
+import { apiKeyOwnerDataClient, ensureApiKeyManagementAllowed, isValidApiKeyIdFormat, requireApiKeyManagementAuth, selectOwnedApiKeyByIdentifier } from './scope.ts'
 
 const app = honoFactory.createApp()
 const APIKEY_ORG_READER_ROLE = 'apikey_org_reader'
@@ -212,7 +212,7 @@ async function replaceApiKeyBindings(
 
 async function handlePut(c: Context<MiddlewareKeyVariables>, idParam?: string) {
   const requestId = c.get('requestId')
-  const auth = c.get('auth') as AuthInfo
+  const auth = requireApiKeyManagementAuth(c, 'not_authorized', 'API key management requires authentication', { requestId })
   const authApikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row'] | undefined
 
   await ensureApiKeyManagementAllowed(c, auth, authApikey, 'cannot_update_apikey', { requestId })
