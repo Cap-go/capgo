@@ -2899,6 +2899,14 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
             })),
             { label: 'Skip', value: 'skip' },
           ]}
+          // [DIVERGE — driver-routed] Although this step IS a tail input (it
+          // records ciSecretTarget), every option diverges from the resume router:
+          // the provider FAN-OUT (github → ask-github-actions-setup, gitlab →
+          // ask-ci-secrets) is an in-session branch the engine collapses onto the
+          // read-only checking-ci-secrets (any chosen target), and skip/null →
+          // re-detection, not build-complete. The fan-out is effect-routed in the
+          // engine (detecting-ci-secrets), so keep these explicit. See
+          // test/test-android-tail-routing.mjs (ci-secrets-target-select cases).
           onChange={(value) => {
             if (value === 'skip') {
               setStep('build-complete')
@@ -3090,6 +3098,12 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
           <Newline />
           <Select
             options={buildScriptPickerOptions(availableScripts, recommendedScript)}
+            // [DIVERGE — driver-routed] This step IS a tail input (records
+            // buildScriptChoice), but its next screen is the preview-workflow-file
+            // CONFIRM gate, which the resume router collapses past onto the
+            // overwrite-safe writing-workflow-file. __custom__ records no field and
+            // navigates into the custom-command input. Keep these explicit. See
+            // test/test-android-tail-routing.mjs (pick-build-script cases).
             onChange={(value) => {
               if (value === '__skip__') {
                 setBuildScriptChoice({ type: 'skip' })
@@ -3126,6 +3140,11 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
           <Box marginTop={1}>
             <FilteredTextInput
               placeholder="make web"
+              // [DIVERGE — driver-routed] Records buildScriptChoice (a tail
+              // input), but advances to the preview-workflow-file CONFIRM gate; the
+              // resume router collapses that onto writing-workflow-file. An empty
+              // command is a no-op (no transition). Keep explicit. See
+              // test/test-android-tail-routing.mjs (pick-build-script-custom cases).
               onSubmit={(value) => {
                 const cleaned = value.trim()
                 if (!cleaned)
