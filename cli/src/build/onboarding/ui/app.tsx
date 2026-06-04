@@ -37,12 +37,12 @@ import { isAiAnalysisTooTall, resolveAiResultRoute } from '../ai-fit.js'
 // suggestion doesn't actually fix the failure mode while still giving the user
 // a couple of in-wizard chances to iterate.
 const MAX_AI_RETRIES = 2
-import type { AscProfileSummary } from '../apple-api.js'
+import type { AscDistributionCert } from '../apple-api.js'
 import { CertificateLimitError, classifyCertAvailability, computeCertSha1, createCertificate, createProfile, deleteProfile, DuplicateProfileError, ensureBundleId, findCertIdBySha1, generateJwt, listDistributionCerts, listProfilesForCert, revokeCertificate, verifyApiKey } from '../apple-api.js'
 import { createP12, DEFAULT_P12_PASSWORD, generateCsr } from '../csr.js'
 import { mapIosOnboardingError } from '../error-categories.js'
 import { canUseFilePicker, openFilePicker, openMobileprovisionPicker } from '../file-picker.js'
-import { parseMobileprovisionDetailed } from '../../mobileprovision-parser.js'
+import { parseMobileprovisionBufferDetailed, parseMobileprovisionDetailed } from '../../mobileprovision-parser.js'
 import { bundleIdMatches, exportP12FromKeychain, filterProfilesForApp, isHelperCached, isMacOS, listSigningIdentities, matchIdentitiesToProfiles, precompileSwiftHelper, scanProvisioningProfiles } from '../macos-signing.js'
 import { deleteProgress, extractKeyIdFromP8Path, getImportEntryStep, getResumeStep, loadProgress, saveProgress } from '../progress.js'
 import { getBuildOnboardingRecoveryAdvice } from '../recovery.js'
@@ -144,6 +144,26 @@ const IOS_ENGINE_CREATE_EFFECT_STEPS = new Set<OnboardingStep>([
   'revoking-certificate',
   'creating-profile',
   'deleting-duplicate-profiles',
+])
+
+// The IMPORT credential EFFECT steps the iOS engine-driver routes through the
+// shared engine's `runIosEffect` (Stage 3 slice C). These run the Mac scans /
+// Apple-side lookups / Keychain export the bespoke import effect bodies used to
+// run inline. The CHOICE steps (import-distribution-mode, the pickers, the
+// recovery hub, portal-explanation, export-warning) stay on the inline onChange
+// resolvers (which stash the ephemeral pick into iosCarriedRef + re-drive the
+// step as a pure resolver effect, exactly like cert-limit-prompt /
+// duplicate-profile-prompt). import-mode verifying-key is NOT in this set — it
+// shares the create-new verifying-key effect but needs the import-branch `next`
+// routing, handled in the create-new effect driver's verifying-key arm.
+const IOS_ENGINE_IMPORT_EFFECT_STEPS = new Set<OnboardingStep>([
+  'import-scanning',
+  'import-validating-all-certs',
+  'import-checking-apple-cert',
+  'import-provide-profile-path',
+  'import-create-profile-only',
+  'import-compiling-helper',
+  'import-exporting',
 ])
 
 // ─── IOS_TAIL_DRIVER_STEPS (ink-thin-wrapper, Stage 3 slice A) ─────────────────
@@ -1334,566 +1354,18 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
     }
 
     // ── Import-existing sub-flow (macOS only) ──
-
-    if (step === 'import-scanning') {
-      ;(async () => {
-        try {
-          const [identities, profiles] = await Promise.all([
-            listSigningIdentities(),
-            scanProvisioningProfiles(),
-          ])
-          if (cancelled)
-            return
-          const distOnly = identities.filter(i => i.type === 'distribution')
-          if (distOnly.length === 0) {
-            handleError(
-              new Error(
-                'No iOS Distribution identities found in your default Keychain. '
-                + 'If you have certificates in a custom keychain, the v1 import flow does not support that — '
-                + 'use "Create new" instead, or run `build credentials save` directly.',
-              ),
-              'import-scanning',
-            )
-            return
-          }
-          const matches = matchIdentitiesToProfiles(distOnly, profiles)
-          setImportProfiles(profiles)
-          setImportMatches(matches)
-          addLog(`✔ Found ${distOnly.length} distribution identity${distOnly.length === 1 ? '' : 'ies'} and ${profiles.length} profile${profiles.length === 1 ? '' : 's'} on this Mac`)
-          // Skip questions the user already answered on a previous attempt:
-          // if importDistribution + (for app_store) apiKeyVerified are
-          // already saved in progress, jump past distribution-mode and the
-          // .p8 input chain. See progress.ts → getImportEntryStep for the
-          // full decision table and tests.
-          //
-          // redirectIfMismatch then short-circuits to confirm-app-id when
-          // config.appId and project.pbxproj's PRODUCT_BUNDLE_IDENTIFIER
-          // disagree — surfaced AFTER p8 setup so the user has context
-          // before Apple-side filtering kicks in.
-          setStep(redirectIfMismatch(getImportEntryStep(await loadProgress(appId))))
-        }
-        catch (err) {
-          if (!cancelled)
-            handleError(err, 'import-scanning')
-        }
-      })()
-    }
-
-    // Eager batch validation: classify every scanned distribution identity
-    // against Apple's API up-front so the picker can show two tables
-    // (Available + Unavailable) with concrete reasons. Only reached when
-    // there's at least one match — see the verifying-key fan-out comment
-    // and getImportEntryStep for the entry conditions.
-    if (step === 'import-validating-all-certs' && importMatches.length > 0) {
-      ;(async () => {
-        try {
-          const token = await getFreshToken()
-          // Single team-wide cert fetch + SHA1 index. Previously this was a
-          // Promise.all(findCertBySha1) fan-out: each lookup internally
-          // refetched the entire /certificates list, so N identities meant
-          // N identical downloads + N×M SHA1 hashes and N concurrent hits
-          // against Apple's rate limiter. Indexing once by SHA1 turns that
-          // into one download + M hashes + N O(1) map lookups.
-          //
-          // includeContent:true so we still get the cert DER needed to
-          // compute the SHA1 key; the AscDistributionCert record we store
-          // in the map is the same shape findCertBySha1 used to return —
-          // name, expirationDate, serialNumber — so the manual-portal
-          // walkthrough disambiguators remain available downstream.
-          //
-          // One try/catch around the single fetch: either the cert list
-          // lands or it doesn't. The previous per-identity error capture
-          // is now redundant because a single network blip uniformly
-          // affects all lookups in this batch.
-          const allCerts = await listDistributionCerts(token, { includeContent: true })
-          if (cancelled)
-            return
-          const bySha1 = new Map<string, typeof allCerts[number]>()
-          for (const cert of allCerts) {
-            if (!cert.certificateContent)
-              continue
-            bySha1.set(computeCertSha1(cert.certificateContent), cert)
-          }
-          const results = importMatches.map((m) => {
-            const cert = bySha1.get(m.identity.sha1.toLowerCase()) ?? null
-            return { sha1: m.identity.sha1, cert, error: null as unknown }
-          })
-          const map: Record<string, EnrichedIdentityAvailability> = {}
-          let availableCount = 0
-          for (const r of results) {
-            const classified = classifyCertAvailability({
-              appleCertId: r.cert ? r.cert.id : null,
-              lookupError: r.error,
-            })
-            const entry: EnrichedIdentityAvailability = {
-              available: classified.available,
-              reason: classified.reason,
-              reasonText: classified.reasonText,
-              appleCertId: classified.appleCertId,
-              ...(r.cert && classified.available
-                ? {
-                    appleCertName: r.cert.name,
-                    appleCertExpirationDate: r.cert.expirationDate,
-                    appleCertSerialNumber: r.cert.serialNumber,
-                  }
-                : {}),
-            }
-            map[r.sha1] = entry
-            if (entry.available)
-              availableCount++
-          }
-          setIdentityAvailability(map)
-          addLog(`✔ Apple validation complete — ${availableCount} available, ${results.length - availableCount} unavailable`)
-
-          // Profile prefetch trigger — fires in parallel for every identity
-          // whose batch validation yielded an Apple-side certId. Identities
-          // marked unavailable (no appleCertId) are not prefetched: they're
-          // already in the UNAVAILABLE table and clicking them re-routes via
-          // import-checking-apple-cert.
-          //
-          // The one-shot ref guards against this useEffect re-running on
-          // re-renders triggered by our own setImportMatches injections.
-          // Once flipped true it stays true until resetForFreshStart wipes it.
-          if (!prefetchTriggeredRef.current) {
-            prefetchTriggeredRef.current = true
-            // Snapshot the current generation so every in-flight fetch can
-            // self-invalidate on resetForFreshStart. Captured by reference
-            // semantics — the closures read prefetchGenerationRef.current
-            // when they resolve, not the closed-over value here.
-            const myGen = prefetchGenerationRef.current
-            const toPrefetch = importMatches.filter(m => map[m.identity.sha1]?.available && map[m.identity.sha1]?.appleCertId)
-            if (toPrefetch.length > 0) {
-              const pendingSeed: Record<string, { kind: 'pending' }> = {}
-              for (const m of toPrefetch)
-                pendingSeed[m.identity.sha1] = { kind: 'pending' }
-              setProfilePrefetch(prev => ({ ...prev, ...pendingSeed }))
-
-              // Fire each fetch independently — one slow / failing cert must
-              // not delay or poison the others. Token is captured from the
-              // outer scope (already fetched for the batch validation).
-              for (const m of toPrefetch) {
-                const sha1 = m.identity.sha1
-                const certId = map[sha1].appleCertId!
-                const teamId = m.identity.teamId
-                ;(async () => {
-                  try {
-                    const raced = await Promise.race<AscProfileSummary[] | '__timeout__'>([
-                      listProfilesForCert(token, certId),
-                      new Promise<'__timeout__'>(resolve => setTimeout(() => resolve('__timeout__'), 7000)),
-                    ])
-                    // Check generation, NOT the step-tied `cancelled` —
-                    // setStep('import-pick-identity') below trips cancelled
-                    // before we ever resolve, so a `cancelled` check here
-                    // would discard every prefetch result and spin forever.
-                    if (prefetchGenerationRef.current !== myGen)
-                      return
-                    if (raced === '__timeout__') {
-                      setProfilePrefetch(prev => ({ ...prev, [sha1]: { kind: 'timeout' } }))
-                      return
-                    }
-                    // Map AscProfileSummary[] → DiscoveredProfile[] using the
-                    // SAME shape import-checking-apple-cert builds (see ~1328).
-                    const synthesized: DiscoveredProfile[] = raced.map(p => ({
-                      path: '',
-                      uuid: p.id,
-                      name: p.name,
-                      applicationIdentifier: '',
-                      bundleId: p.bundleIdentifier,
-                      teamId,
-                      expirationDate: p.expirationDate,
-                      profileType: (p.profileType === 'IOS_APP_STORE' ? 'app_store' : p.profileType === 'IOS_APP_ADHOC' ? 'ad_hoc' : 'unknown') as DiscoveredProfile['profileType'],
-                      certificateSha1s: [sha1],
-                      profileBase64: p.profileContent,
-                    } as DiscoveredProfile & { profileBase64: string }))
-                    const usableHere = filterProfilesForApp(synthesized, iosBundleId, importDistribution)
-                    if (usableHere.length === 0) {
-                      // Apple returned zero (or none usable for this app +
-                      // distribution). Cell renders UNAVAILABLE; clicking it
-                      // re-routes through import-checking-apple-cert so the
-                      // user still gets the rich "why" messaging there.
-                      setProfilePrefetch(prev => ({ ...prev, [sha1]: { kind: 'unavailable' } }))
-                      return
-                    }
-                    // Inject synthesized profiles into importMatches so the
-                    // existing matchCount > 0 check in the row builder lights
-                    // the cell green without needing a second branch.
-                    setImportMatches(prev => prev.map(mm => mm.identity.sha1 === sha1
-                      ? { ...mm, profiles: [...mm.profiles, ...synthesized] }
-                      : mm,
-                    ))
-                    setProfilePrefetch(prev => ({ ...prev, [sha1]: { kind: 'available' } }))
-                  }
-                  catch {
-                    if (prefetchGenerationRef.current !== myGen)
-                      return
-                    // Per-fetch error sandbox: any one cert's failure stays
-                    // contained. The user can still click the row and the
-                    // existing import-checking-apple-cert handler will retry
-                    // with the cached cert id.
-                    setProfilePrefetch(prev => ({ ...prev, [sha1]: { kind: 'error' } }))
-                  }
-                })()
-              }
-            }
-          }
-
-          setStep('import-pick-identity')
-        }
-        catch (err) {
-          if (!cancelled)
-            handleError(err, 'import-validating-all-certs')
-        }
-      })()
-    }
-
-    // Per-identity Apple-side check + auto-fetch profile. Runs when the
-    // user picks an identity that has no matching on-disk profile — we
-    // try to recover from Apple before showing the recovery menu. Trusts
-    // the cached appleCertId from the eager batch validation when present;
-    // falls back to a fresh findCertIdBySha1 lookup otherwise.
-    if (step === 'import-checking-apple-cert' && chosenIdentity) {
-      ;(async () => {
-        try {
-          const token = await getFreshToken()
-          let certId: string | null = identityAvailability[chosenIdentity.sha1]?.appleCertId ?? null
-          if (certId === null) {
-            certId = await findCertIdBySha1(token, chosenIdentity.sha1)
-          }
-          if (cancelled)
-            return
-          if (!certId) {
-            addLog(
-              `⚠ Apple lookup returned no match for "${chosenIdentity.name}". `
-              + `Open Developer Portal or use a different identity.`,
-              'yellow',
-            )
-            setAppleCertIdForChosen(null)
-            setNoMatchReason('apple-no-cert-match')
-            setStep('import-no-match-recovery')
-            return
-          }
-          setAppleCertIdForChosen(certId)
-          addLog(`✔ Apple recognizes this certificate (ASC id ${certId.slice(0, 8)}…)`)
-
-          // Auto-fetch profiles for this cert. Sends the user straight to
-          // import-pick-profile when Apple has a matching profile waiting,
-          // skipping the recovery menu entirely on the happy path.
-          const profiles = await listProfilesForCert(token, certId)
-          if (cancelled)
-            return
-          if (profiles.length === 0) {
-            addLog('ℹ️  Apple has the cert but no profiles linked to it yet — use "Create a new App Store profile" to add one.', 'yellow')
-            setNoMatchReason('apple-no-profiles-linked')
-            setStep('import-no-match-recovery')
-            return
-          }
-          // Synthesize so filterProfilesForApp + the picker can consume
-          // them the same way as on-disk profiles.
-          const synthesized: DiscoveredProfile[] = profiles.map(p => ({
-            path: '',
-            uuid: p.id,
-            name: p.name,
-            applicationIdentifier: '',
-            bundleId: p.bundleIdentifier,
-            teamId: chosenIdentity.teamId,
-            expirationDate: p.expirationDate,
-            profileType: (p.profileType === 'IOS_APP_STORE' ? 'app_store' : p.profileType === 'IOS_APP_ADHOC' ? 'ad_hoc' : 'unknown') as DiscoveredProfile['profileType'],
-            certificateSha1s: [chosenIdentity.sha1],
-            profileBase64: p.profileContent,
-          } as DiscoveredProfile & { profileBase64: string }))
-          setImportMatches(prev => prev.map(m => m.identity.sha1 === chosenIdentity.sha1
-            ? { ...m, profiles: [...m.profiles, ...synthesized] }
-            : m,
-          ))
-          const usableHere = filterProfilesForApp(synthesized, iosBundleId, importDistribution)
-          if (usableHere.length === 0) {
-            const otherBundleIds = Array.from(new Set(synthesized.map(p => p.bundleId).filter(b => b && b !== iosBundleId)))
-            const sameBundleWrongDist = synthesized.filter(p => p.bundleId === iosBundleId)
-            if (otherBundleIds.length > 0) {
-              // Split into two log lines instead of one long "X (found: Y, Z)" line —
-              // when the bundle ids are long the opening paren slides off the terminal
-              // and the trailing ")" looks orphaned. The Profiles-returned-for line
-              // also stands alone better than nested parenthetical metadata.
-              addLog(`⚠ Apple returned ${profiles.length} profile${profiles.length === 1 ? '' : 's'} for this cert but none target "${iosBundleId}".`, 'yellow')
-              addLog(`  Apple linked them to: ${otherBundleIds.join(', ')}. Use "Create a new App Store profile" to add one for "${iosBundleId}".`, 'yellow')
-              setNoMatchReason('apple-bundle-mismatch')
-            }
-            else if (sameBundleWrongDist.length > 0) {
-              // Bundle matches but distribution mode does not — surface the actual mismatch
-              // instead of the generic "none match this app" line, which falsely suggests
-              // the bundle id is wrong and sends users hunting for the wrong fix.
-              const foundDist = Array.from(new Set(sameBundleWrongDist.map(p => p.profileType))).join(', ')
-              addLog(`⚠ Apple has ${sameBundleWrongDist.length} profile${sameBundleWrongDist.length === 1 ? '' : 's'} for "${iosBundleId}" but none are ${importDistribution} (found: ${foundDist}).`, 'yellow')
-              addLog(`  Re-run with the matching distribution, or use "Create a new App Store profile" to add one.`, 'yellow')
-              setNoMatchReason('apple-distribution-mismatch')
-            }
-            else {
-              addLog(`⚠ Apple returned ${profiles.length} profile${profiles.length === 1 ? '' : 's'} for this cert but none match this app.`, 'yellow')
-              setNoMatchReason('apple-other')
-            }
-            setStep('import-no-match-recovery')
-            return
-          }
-          addLog(`✔ Apple has ${usableHere.length} matching profile${usableHere.length === 1 ? '' : 's'} for "${iosBundleId}" — opening the picker`)
-          setStep('import-pick-profile')
-        }
-        catch (err) {
-          if (!cancelled)
-            handleError(err, 'import-checking-apple-cert')
-        }
-      })()
-    }
-
-    if (step === 'import-compiling-helper') {
-      ;(async () => {
-        try {
-          const startedAt = Date.now()
-          await precompileSwiftHelper()
-          if (cancelled)
-            return
-          const elapsedMs = Date.now() - startedAt
-          addLog(`✔ Compiled keychain-export helper in ${elapsedMs}ms`)
-          setStep('import-exporting')
-        }
-        catch (err) {
-          if (!cancelled)
-            handleError(err, 'import-compiling-helper')
-        }
-      })()
-    }
-
-    if (step === 'import-exporting') {
-      ;(async () => {
-        try {
-          if (!chosenIdentity || !chosenProfile)
-            throw new Error('Internal error: no identity or profile chosen for export.')
-          const exported = await exportP12FromKeychain(chosenIdentity.sha1)
-          if (cancelled)
-            return
-          // Build cert + profile records to drop into doSaveCredentials. We
-          // synthesize a CertificateData record (Apple-API-only fields stay empty).
-          const importedCertData: CertificateData = {
-            certificateId: '',
-            expirationDate: chosenProfile.expirationDate,
-            teamId: chosenIdentity.teamId,
-            p12Base64: exported.base64,
-          }
-          // chosenProfile.path can be empty when the profile was synthesized
-          // from an Apple API response (D2 path) — in that case, profileBase64
-          // is already set in chosenProfile.profileContent-equivalent.
-          const profileBase64 = chosenProfile.path
-            ? Buffer.from(await readFile(chosenProfile.path)).toString('base64')
-            : (chosenProfile as DiscoveredProfile & { profileBase64?: string }).profileBase64 || ''
-          const importedProfileData: ProfileData = {
-            profileId: chosenProfile.uuid,
-            profileName: chosenProfile.name,
-            profileBase64,
-          }
-          setCertData(importedCertData)
-          setProfileData(importedProfileData)
-          if (chosenIdentity.teamId)
-            setTeamId(chosenIdentity.teamId)
-          setImportedP12Password(exported.passphrase)
-          addLog(`✔ Exported "${chosenIdentity.name}" from Keychain`)
-          // .p8 was handled upfront for app_store via the distribution-mode
-          // fork; ad_hoc never needs it. So we go straight to save.
-          setStep('saving-credentials')
-        }
-        catch (err) {
-          if (!cancelled)
-            handleError(err, 'import-exporting')
-        }
-      })()
-    }
-
-    // The legacy `import-fetching-profile` step (used by the "Rescan Apple
-    // API" recovery option) was removed in favour of the per-identity
-    // auto-fetch built into the upcoming `import-checking-apple-cert` step
-    // and the `📁 Use a .mobileprovision file from disk` recovery option.
-    // Auto-fetch runs once after the user picks an identity; the file picker
-    // covers the "I just created a profile in the portal, here it is on
-    // disk" workflow. Two parallel rescan paths confused users so we kept
-    // only the file picker. (See commit 36a7c282 and the no-match recovery
-    // menu's order comment.)
-
-    // ── import-provide-profile-path ──
-    // User picked "📁 Use a .mobileprovision file from disk" from the
-    // no-match recovery menu. Open the native picker, validate the file
-    // (bundle id + distribution + cert SHA1), and feed it into the
-    // import-pick-profile path as a freshly-synthesized DiscoveredProfile.
-    if (step === 'import-provide-profile-path') {
-      if (mobileprovisionPickerOpenedRef.current)
-        return
-      mobileprovisionPickerOpenedRef.current = true
-      ;(async () => {
-        try {
-          if (!chosenIdentity)
-            throw new Error('Internal error: no identity chosen for .mobileprovision import.')
-          const filePath = await openMobileprovisionPicker()
-          if (cancelled)
-            return
-          if (!filePath) {
-            // User cancelled the picker — bounce back to the recovery menu.
-            setStep('import-no-match-recovery')
-            return
-          }
-          // Parse + run our three invariant checks (bundle id, distribution,
-          // cert SHA1) before persisting anything. Errors route through
-          // handleError so the user gets the support-bundle screen with a
-          // clear "this file is wrong because X" message.
-          let detail
-          try {
-            detail = parseMobileprovisionDetailed(filePath)
-          }
-          catch (err) {
-            handleError(
-              new Error(`Couldn't parse "${filePath}": ${err instanceof Error ? err.message : String(err)}`),
-              'import-provide-profile-path',
-            )
-            return
-          }
-          if (!bundleIdMatches(detail.bundleId, iosBundleId)) {
-            handleError(
-              new Error(
-                `This .mobileprovision is for bundle ID "${detail.bundleId}" but the current app is "${iosBundleId}". `
-                + `Pick a profile that targets the right app (wildcard profiles like "com.example.*" are accepted), or use "Create a new App Store profile" in the recovery menu.`,
-              ),
-              'import-provide-profile-path',
-            )
-            return
-          }
-          // parseMobileprovisionDetailed already returns Capgo's distribution
-          // enum (app_store/ad_hoc/development/enterprise/unknown) — no need
-          // to remap from Apple's IOS_APP_* constants here.
-          if (importDistribution && detail.profileType !== importDistribution) {
-            handleError(
-              new Error(
-                `This .mobileprovision is a ${detail.profileType} profile but you picked ${importDistribution} distribution. `
-                + `Pick a profile that matches, or restart and pick the matching distribution mode.`,
-              ),
-              'import-provide-profile-path',
-            )
-            return
-          }
-          if (!detail.certificateSha1s.includes(chosenIdentity.sha1)) {
-            const shownSha1s = detail.certificateSha1s.map(s => `${s.slice(0, 8)}…`).join(', ') || '(none listed)'
-            handleError(
-              new Error(
-                `This .mobileprovision doesn't trust your chosen certificate "${chosenIdentity.name}". `
-                + `Allowed certs in the profile (SHA1): ${shownSha1s}; your cert starts with ${chosenIdentity.sha1.slice(0, 8)}…. `
-                + `Either pick a different cert at the identity step, or re-create this profile in the Apple Developer Portal and tick the right one.`,
-              ),
-              'import-provide-profile-path',
-            )
-            return
-          }
-          // All checks pass — synthesize a DiscoveredProfile and route
-          // straight to the picker. The on-disk `path` is preserved so
-          // import-exporting reads the profile bytes from it directly,
-          // exactly like a profile we found via scanProvisioningProfiles.
-          const synthesized: DiscoveredProfile = {
-            path: filePath,
-            uuid: detail.uuid,
-            name: detail.name,
-            applicationIdentifier: detail.applicationIdentifier,
-            bundleId: detail.bundleId,
-            teamId: chosenIdentity.teamId,
-            expirationDate: detail.expirationDate,
-            profileType: detail.profileType,
-            certificateSha1s: detail.certificateSha1s,
-          }
-          setImportMatches(prev => prev.map(m => m.identity.sha1 === chosenIdentity.sha1
-            ? { ...m, profiles: [...m.profiles, synthesized] }
-            : m,
-          ))
-          addLog(`✔ Loaded profile from file · ${detail.name}`)
-          setStep('import-pick-profile')
-        }
-        catch (err) {
-          if (!cancelled)
-            handleError(err, 'import-provide-profile-path')
-        }
-      })()
-    }
-
-    if (step === 'import-create-profile-only') {
-      ;(async () => {
-        try {
-          if (!chosenIdentity)
-            throw new Error('Internal error: no identity chosen for profile creation.')
-          // Defensive: D2 only synthesizes app_store profiles right now (the
-          // underlying apple-api.ts createProfile hardcodes IOS_APP_STORE).
-          // The no-match-recovery menu already hides "Create" for ad_hoc, but
-          // if some code path bypasses the menu we still refuse rather than
-          // silently produce a mismatched provisioning_map / distribution
-          // pair in credentials.json.
-          if (importDistribution === 'ad_hoc') {
-            throw new Error(
-              'Creating a new profile via Apple is not implemented for ad_hoc distribution yet. '
-              + 'Use "Fetch matching profile from Apple" or "Open Apple Developer Portal" instead.',
-            )
-          }
-          const token = await getFreshToken()
-          const certId = await findCertIdBySha1(token, chosenIdentity.sha1)
-          if (cancelled)
-            return
-          if (!certId) {
-            throw new Error(
-              `Apple does not have a certificate matching "${chosenIdentity.name}". `
-              + `Cannot create a profile without an Apple-side cert ID. Use "Create new" path instead.`,
-            )
-          }
-          const { bundleIdResourceId } = await ensureBundleId(token, iosBundleId)
-          if (cancelled)
-            return
-          const profile = await createProfile(token, bundleIdResourceId, certId, iosBundleId)
-          if (cancelled)
-            return
-          // Use the freshly-created profile directly as the chosen profile.
-          const synthesized = {
-            path: '',
-            uuid: profile.profileId,
-            name: profile.profileName,
-            applicationIdentifier: '',
-            bundleId: iosBundleId,
-            teamId: chosenIdentity.teamId,
-            expirationDate: profile.expirationDate,
-            profileType: 'app_store' as const,
-            certificateSha1s: [chosenIdentity.sha1],
-            profileBase64: profile.profileContent,
-          } as DiscoveredProfile & { profileBase64: string }
-          setChosenProfile(synthesized)
-          // Also append to importMatches so the picker shows the new profile
-          // if the user clicks Back from import-export-warning. Without this,
-          // import-pick-profile renders from importMatches (which doesn't
-          // include the freshly-created one) and the user gets stuck in a
-          // loop with no way to select what they just created.
-          setImportMatches(prev => prev.map(m => m.identity.sha1 === chosenIdentity.sha1
-            ? { ...m, profiles: [...m.profiles, synthesized] }
-            : m,
-          ))
-          addLog(`✔ Created new profile "${profile.profileName}" on Apple, linked to your existing cert`)
-          setStep('import-export-warning')
-        }
-        catch (err) {
-          if (cancelled)
-            return
-          if (err instanceof DuplicateProfileError) {
-            // Route to the shared duplicate-profile-prompt, but record where
-            // to RESUME after the deletion so the retry runs the import-side
-            // re-creation (which goes back through findCertIdBySha1) instead
-            // of the create-new path's creating-certificate→creating-profile
-            // chain (which can't succeed in import mode — no certData).
-            setDuplicateProfileOrigin('import-create-profile-only')
-            setDuplicateProfiles(err.profiles)
-            setStep('duplicate-profile-prompt')
-          }
-          else {
-            handleError(err, 'import-create-profile-only')
-          }
-        }
-      })()
-    }
+    //
+    // The import EFFECT steps (import-scanning, import-validating-all-certs,
+    // import-checking-apple-cert, import-provide-profile-path,
+    // import-create-profile-only, import-compiling-helper, import-exporting) are
+    // now engine-driven (IOS_ENGINE_IMPORT_EFFECT_STEPS) — see the import effect
+    // driver below. The engine runs the Mac scans / Apple-side cert+profile
+    // lookups / .mobileprovision parse / Keychain export the bespoke bodies used
+    // to run inline here; the driver threads the ephemeral selections (chosen
+    // identity/profile) from iosCarriedRef + mirrors importMatches /
+    // importProfiles / identityAvailability / profilePrefetch / noMatchReason /
+    // certData / profileData / importedP12Password back into React state, applies
+    // redirectIfMismatch after import-scanning, and advances.
 
     // p8-method-select is now engine-driven (IOS_ENGINE_CREATE_EFFECT_STEPS) —
     // the engine opens the native .p8 picker (idempotent via carried.pickerOpened),
@@ -2380,6 +1852,269 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
         if (!next)
           return
         const advanceTo = step === 'verifying-key' ? redirectIfMismatch(next) : next
+        if (advanceTo !== step)
+          setStep(advanceTo)
+      }
+      catch (err) {
+        if (!cancelled)
+          handleError(err, step)
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step])
+
+  // ─── Engine-driven IMPORT effect driver (ink-thin-wrapper, Stage 3 slice C) ──
+  // Route the IMPORT credential EFFECT steps (IOS_ENGINE_IMPORT_EFFECT_STEPS)
+  // through the shared engine's `runIosEffect` instead of the hand-rolled per-step
+  // bodies that used to live in the big bespoke effect above. The FLOW lives in
+  // the engine (ios/flow.ts, e2e-tested via test/test-ios-import-*.mjs +
+  // test-ios-e2e.mjs); the RENDERING stays ink (the same ImportScanningStep /
+  // ImportPickIdentityStep / … components). Mirrors the create-new effect driver:
+  // build the import deps wiring the REAL macos-signing / apple-api helpers
+  // (token-adapted via getFreshToken; the classify pre-binds the single team-wide
+  // cert fetch + SHA-1 index so the engine just maps identity → availability), run
+  // the effect against the freshest persisted progress + the ephemeral selections
+  // the choice handlers stash in iosCarriedRef, thread the engine transient back
+  // into iosCarriedRef + mirror it into the React render state, and advance.
+  useEffect(() => {
+    if (!IOS_ENGINE_IMPORT_EFFECT_STEPS.has(step))
+      return
+
+    let cancelled = false
+
+    void (async () => {
+      // classifyCertAvailability pre-binds the single team-wide cert fetch + SHA-1
+      // index (the bespoke import-validating-all-certs optimisation, app.tsx old
+      // L1391): one /certificates download, M SHA-1 hashes, then N O(1) lookups —
+      // NOT N re-downloads. Memoised so the engine's per-identity loop shares it.
+      let certIndexPromise: Promise<Map<string, AscDistributionCert>> | null = null
+      const getCertIndex = () => {
+        if (!certIndexPromise) {
+          certIndexPromise = (async () => {
+            const token = await getFreshToken()
+            const allCerts = await listDistributionCerts(token, { includeContent: true })
+            const bySha1 = new Map<string, AscDistributionCert>()
+            for (const cert of allCerts) {
+              if (!cert.certificateContent)
+                continue
+              bySha1.set(computeCertSha1(cert.certificateContent), cert)
+            }
+            return bySha1
+          })()
+        }
+        return certIndexPromise
+      }
+
+      const deps: IosEffectDeps = {
+        appId,
+
+        // ── macos-signing (import-scanning + export) ──
+        listSigningIdentities,
+        scanProvisioningProfiles,
+        exportP12FromKeychain,
+        precompileSwiftHelper: async () => { await precompileSwiftHelper() },
+        isHelperCached,
+
+        // ── apple-api (token-adapted, mirroring the bespoke import effects) ──
+        // classifyCertAvailability resolves the identity's cert from the pre-built
+        // SHA-1 index, then enriches via the apple-api classifier — byte-for-byte
+        // the bespoke map[r.sha1] entry (old app.tsx L1417-1444).
+        classifyCertAvailability: async (identity) => {
+          const bySha1 = await getCertIndex()
+          const cert = bySha1.get(identity.sha1.toLowerCase()) ?? null
+          const classified = classifyCertAvailability({
+            appleCertId: cert ? cert.id : null,
+            lookupError: null,
+          })
+          return {
+            available: classified.available,
+            reason: classified.reason,
+            reasonText: classified.reasonText,
+            appleCertId: classified.appleCertId,
+            ...(cert && classified.available
+              ? {
+                  appleCertName: cert.name,
+                  appleCertExpirationDate: cert.expirationDate,
+                  appleCertSerialNumber: cert.serialNumber,
+                }
+              : {}),
+          }
+        },
+        listProfilesForCert: async certId => listProfilesForCert(await getFreshToken(), certId),
+        findCertIdBySha1: async sha1 => findCertIdBySha1(await getFreshToken(), sha1),
+        ensureBundleId: async (bundleId) => {
+          await ensureBundleId(await getFreshToken(), bundleId)
+        },
+        createProfile: async ({ bundleId, certificateId }) => {
+          const token = await getFreshToken()
+          const { bundleIdResourceId } = await ensureBundleId(token, bundleId)
+          const p = await createProfile(token, bundleIdResourceId, certificateId, bundleId)
+          return {
+            profileId: p.profileId,
+            profileName: p.profileName,
+            profileBase64: p.profileContent,
+            expirationDate: p.expirationDate,
+          } as ProfileData & { expirationDate?: string }
+        },
+
+        // ── mobileprovision-parser + file pickers ──
+        // The engine reads the .mobileprovision bytes via deps.readFile then parses
+        // them here — so wire the BUFFER variant (the path-based
+        // parseMobileprovisionDetailed reads the file itself, which the engine has
+        // already done at its IO boundary).
+        parseMobileprovisionDetailed: bytes => parseMobileprovisionBufferDetailed(bytes),
+        openProfilePicker: openMobileprovisionPicker,
+        readFile: async path => Buffer.from(await readFile(path)),
+
+        // ── persistence ──
+        loadProgress,
+        saveProgress,
+
+        // ── carried transient (driver-held) — the choice handlers stash the
+        // ephemeral picks (chosenIdentity / chosenProfile / noMatchReason /
+        // profilePickerOpened / helperCompiled) here so the import effects find
+        // their inputs, exactly as the engine resolver contract expects.
+        carried: {
+          ...iosCarriedRef.current,
+          // The import effects read chosenIdentity / chosenProfile from carried;
+          // bridge the React mirrors in case a choice handler set the React state
+          // but the carried ref hasn't been threaded yet (slice-C bridge).
+          ...(chosenIdentity ? { chosenIdentity } : {}),
+          ...(chosenProfile ? { chosenProfile } : {}),
+          ...(importMatches.length > 0 ? { importMatches } : {}),
+          ...(noMatchReason ? { noMatchReason } : {}),
+          p8Content: iosCarriedRef.current.p8Content ?? (p8ContentRef.current ? Buffer.from(p8ContentRef.current) : undefined),
+        },
+
+        onLog: (message, color) => {
+          if (!cancelled)
+            addLog(message, color)
+        },
+      }
+
+      try {
+        const current = (await loadProgress(appId)) ?? {
+          platform: 'ios' as const,
+          appId,
+          startedAt: new Date().toISOString(),
+          completedSteps: {},
+        }
+        if (cancelled)
+          return
+        const result = await runIosEffect(step, current, deps)
+        if (cancelled)
+          return
+
+        const t: Partial<IosStepCtx> | undefined = result.transient
+        const np = result.progress
+
+        // ── error route: surface through handleError so the support bundle +
+        // retryCount + telemetry UX is identical to the bespoke catch ──
+        if (result.next === 'error') {
+          handleError(new Error(t?.error ?? 'Onboarding failed.'), (t?.retryStep as OnboardingStep) ?? step)
+          return
+        }
+
+        // ── merge engine transient into iosCarriedRef + mirror into React state ──
+        if (t) {
+          iosCarriedRef.current = { ...iosCarriedRef.current, ...t }
+          if (t.chosenProfile !== undefined)
+            setChosenProfile(t.chosenProfile)
+          if (t.certData !== undefined)
+            setCertData(t.certData)
+          if (t.profileData !== undefined)
+            setProfileData(t.profileData)
+          if (t.teamId !== undefined)
+            setTeamId(t.teamId)
+          if (t.importedP12Password !== undefined)
+            setImportedP12Password(t.importedP12Password)
+          // import-scanning surfaces the scanned matches + profiles; the picker +
+          // the validating pass read the React mirrors.
+          if (t.importProfiles !== undefined)
+            setImportProfiles(t.importProfiles)
+          // identityAvailability rides transient verbatim from validating-all-certs.
+          if (t.identityAvailability !== undefined)
+            setIdentityAvailability(t.identityAvailability)
+          // noMatchReason rides transient from the pick / apple-cert-check / file-
+          // picker steps; the recovery menu reads the React mirror.
+          if (t.noMatchReason !== undefined)
+            setNoMatchReason(t.noMatchReason as NoMatchReason)
+          // The per-identity Apple cert id surfaced by import-checking-apple-cert.
+          if (t._appleCertIdForChosen !== undefined)
+            setAppleCertIdForChosen(t._appleCertIdForChosen)
+          // import-create-profile-only routes to duplicate-profile-prompt with the
+          // duplicate list; mirror it + the persisted origin so the shared prompt +
+          // the deleting-duplicate-profiles route agree.
+          if (t.duplicateProfiles !== undefined)
+            setDuplicateProfiles(t.duplicateProfiles)
+        }
+
+        // ── importMatches mirror ──────────────────────────────────────────────
+        // import-scanning (raw scan) + the apple-cert-check / file-picker / D2
+        // steps (which INJECT synthesized profiles into the chosen identity's
+        // match) emit the updated match list via transient.importMatches; mirror
+        // it so the pickers render the freshest profiles.
+        if (t?.importMatches !== undefined)
+          setImportMatches(t.importMatches)
+
+        // ── profilePrefetch mirror (validating-all-certs) ─────────────────────
+        // The engine emits transient.profilePrefetch as Record<sha1, profiles[]>
+        // (the synthesized Apple-side profiles per available identity). The React
+        // picker reads TWO derived signals: (1) the per-identity status map
+        // (profilePrefetch state) the Available table colours, and (2) the
+        // injected profiles in importMatches that light the cell green. Reproduce
+        // the bespoke parallel-prefetch outcome (old app.tsx L1508-1524): filter
+        // each identity's profiles for THIS app+distribution; usable → inject +
+        // 'available', none usable → 'unavailable'.
+        if (t?.profilePrefetch !== undefined) {
+          const prefetch = t.profilePrefetch
+          const statusMap: Record<string, { kind: 'pending' | 'available' | 'unavailable' | 'timeout' | 'error' }> = {}
+          const injections: Record<string, DiscoveredProfile[]> = {}
+          for (const [sha1, profiles] of Object.entries(prefetch)) {
+            const usableHere = filterProfilesForApp(profiles, iosBundleId, importDistribution)
+            if (usableHere.length === 0) {
+              statusMap[sha1] = { kind: 'unavailable' }
+            }
+            else {
+              injections[sha1] = profiles
+              statusMap[sha1] = { kind: 'available' }
+            }
+          }
+          setProfilePrefetch(prev => ({ ...prev, ...statusMap }))
+          if (Object.keys(injections).length > 0) {
+            setImportMatches(prev => prev.map(m => injections[m.identity.sha1]
+              ? { ...m, profiles: [...m.profiles, ...injections[m.identity.sha1]] }
+              : m))
+            // Thread the injected matches into the carried ref too so the next
+            // resolver (import-pick-identity) sees the prefetched profiles.
+            iosCarriedRef.current = {
+              ...iosCarriedRef.current,
+              importMatches: (iosCarriedRef.current.importMatches ?? importMatches).map(m => injections[m.identity.sha1]
+                ? { ...m, profiles: [...m.profiles, ...injections[m.identity.sha1]] }
+                : m),
+            }
+          }
+        }
+
+        // creating a profile via D2 can persist duplicateProfileOrigin; mirror it.
+        if (np.duplicateProfileOrigin)
+          setDuplicateProfileOrigin(np.duplicateProfileOrigin)
+
+        // ── advance ──────────────────────────────────────────────────────────
+        // import-scanning's engine `next` is getImportEntryStep(progress) — the
+        // un-redirected import-entry target. The bespoke wrapped it in
+        // redirectIfMismatch (the confirm-app-id bundle-id gate, a SYNC FS read the
+        // IO-free engine can't do) so the import path detours through confirm-app-id
+        // when config.appId and pbxproj disagree. Re-apply it here for import-
+        // scanning; every other import effect's next is used verbatim.
+        const next = result.next ?? getIosResumeStep(np)
+        if (!next)
+          return
+        const advanceTo = step === 'import-scanning' ? redirectIfMismatch(next) : next
         if (advanceTo !== step)
           setStep(advanceTo)
       }
