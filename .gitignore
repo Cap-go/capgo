@@ -94,3 +94,6 @@ internal/Certificates.p12
 .opencode
 .superpowers/
 .playwright-mcp/
+
+# Graphify generated knowledge graph output
+graphify-out/
