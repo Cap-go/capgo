@@ -2196,6 +2196,12 @@ BEGIN
       AND gm.user_id = v_user_id
       AND rb.channel_id IS NOT NULL
       AND (rb.expires_at IS NULL OR rb.expires_at > now())
+    UNION
+    SELECT ou.org_id AS org_uuid
+    FROM public.org_users ou
+    WHERE ou.user_id = v_user_id
+      AND ou.is_invite IS TRUE
+      AND ou.org_id IS NOT NULL
   ) scoped
   WHERE scoped.org_uuid IS NOT NULL;
 END;

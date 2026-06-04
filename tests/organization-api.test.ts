@@ -822,41 +822,71 @@ describe('[GET] /organization/members', () => {
 
 describe('[POST] /organization/members', () => {
   it('add organization member', async () => {
-    const response = await fetch(`${BASE_URL}/organization/members`, {
-      headers,
-      method: 'POST',
-      body: JSON.stringify({
-        orgId: ORG_ID,
+    if (!normalizedSupabaseBaseUrl || !SUPABASE_ANON_KEY)
+      throw new Error('SUPABASE_URL and SUPABASE_ANON_KEY are required for this test')
+
+    let invitedUserId: string | undefined
+    const inviteeSupabase = createClient(normalizedSupabaseBaseUrl, SUPABASE_ANON_KEY, {
+      auth: {
+        persistSession: false,
+      },
+    })
+
+    try {
+      const response = await fetch(`${BASE_URL}/organization/members`, {
+        headers,
+        method: 'POST',
+        body: JSON.stringify({
+          orgId: ORG_ID,
+          email: USER_ADMIN_EMAIL,
+          invite_type: 'org_member',
+        }),
+      })
+
+      const responseData = await response.json()
+      expect(response.status).toBe(200)
+      const responseType = type({
+        status: 'string',
+      })
+      const safe = safeParseSchema(responseType, responseData)
+      expect(safe.success).toBe(true)
+      if (!safe.success)
+        throw safe.error
+      expect(safe.data.status).toBe('ok')
+
+      const { data: userData, error: userError } = await getSupabaseClient().from('users').select().eq('email', USER_ADMIN_EMAIL).single()
+      expect(userError).toBeNull()
+      expect(userData).toBeTruthy()
+      expect(userData?.email).toBe(USER_ADMIN_EMAIL)
+      invitedUserId = userData!.id
+
+      const { data, error } = await getSupabaseClient().from('org_users').select().eq('org_id', ORG_ID).eq('user_id', invitedUserId).single()
+      expect(error).toBeNull()
+      expect(data).toBeTruthy()
+      expect(data?.org_id).toBe(ORG_ID)
+      expect(data?.rbac_role_name).toBe('org_member')
+      expect(data?.is_invite).toBe(true)
+
+      const { error: signInError } = await inviteeSupabase.auth.signInWithPassword({
         email: USER_ADMIN_EMAIL,
-        invite_type: 'org_member',
-      }),
-    })
+        password: 'adminadmin',
+      })
+      expect(signInError).toBeNull()
 
-    const responseData = await response.json()
-    expect(response.status).toBe(200)
-    const responseType = type({
-      status: 'string',
-    })
-    const safe = safeParseSchema(responseType, responseData)
-    expect(safe.success).toBe(true)
-    if (!safe.success)
-      throw safe.error
-    expect(safe.data.status).toBe('ok')
-
-    const { data: userData, error: userError } = await getSupabaseClient().from('users').select().eq('email', USER_ADMIN_EMAIL).single()
-    expect(userError).toBeNull()
-    expect(userData).toBeTruthy()
-    expect(userData?.email).toBe(USER_ADMIN_EMAIL)
-
-    const { data, error } = await getSupabaseClient().from('org_users').select().eq('org_id', ORG_ID).eq('user_id', userData!.id).single()
-    expect(error).toBeNull()
-    expect(data).toBeTruthy()
-    expect(data?.org_id).toBe(ORG_ID)
-    expect(data?.rbac_role_name).toBe('org_member')
-    expect(data?.is_invite).toBe(true)
-
-    // Cleanup: Remove the added member to avoid affecting other tests
-    await getSupabaseClient().from('org_users').delete().eq('org_id', ORG_ID).eq('user_id', userData!.id)
+      const { data: invitedOrgs, error: invitedOrgsError } = await inviteeSupabase.rpc('get_orgs_v7')
+      expect(invitedOrgsError).toBeNull()
+      const invitedOrg = invitedOrgs?.find((org: { gid: string }) => org.gid === ORG_ID)
+      expect(invitedOrg).toBeTruthy()
+      expect(invitedOrg?.is_invite).toBe(true)
+      expect(invitedOrg?.role).toBe('org_member')
+    }
+    finally {
+      await inviteeSupabase.auth.signOut()
+      if (invitedUserId) {
+        await getSupabaseClient().from('role_bindings').delete().eq('principal_type', 'user').eq('principal_id', invitedUserId).eq('org_id', ORG_ID)
+        await getSupabaseClient().from('org_users').delete().eq('org_id', ORG_ID).eq('user_id', invitedUserId)
+      }
+    }
   })
 
   it('add organization member with invalid body', async () => {
