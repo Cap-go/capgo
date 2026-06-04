@@ -154,6 +154,8 @@ export interface AndroidStepCtx {
   ciSecretUploadSummary?: string
   /** Absolute path of the written .env file (exporting-env). */
   envExportPath?: string
+  /** Set when env-export found nothing to write or threw — routed to build-complete, never thrown (exporting-env / overwrite-and-export-env). */
+  envExportError?: string
   /** Absolute path of the written workflow file (writing-workflow-file). */
   workflowFilePath?: string
   /** The queued build URL (requesting-build). */

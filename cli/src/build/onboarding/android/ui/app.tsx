@@ -208,6 +208,9 @@ const TAIL_DRIVER_STEPS = new Set<AndroidOnboardingStep>([
   'detecting-ci-secrets',
   'checking-ci-secrets',
   'uploading-ci-secrets',
+  'exporting-env',
+  'overwrite-and-export-env',
+  'writing-workflow-file',
 ])
 
 /** OAuth scopes — superset of `androidpublisher` because we also need
@@ -1345,107 +1348,6 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
       })()
     }
 
-    if (step === 'writing-workflow-file') {
-      ;(() => {
-        try {
-          if (!buildScriptChoice)
-            throw new Error('Internal error: no build script choice recorded.')
-          const result = writeWorkflowFile(
-            {
-              appId,
-              defaultPlatform: 'android',
-              packageManager: selectedPackageManager ?? normalizePackageManager(pm.pm),
-              buildScript: buildScriptChoice,
-              secretKeys: ciSecretEntries.map(entry => entry.key),
-            },
-            { overwrite: true },
-          )
-          if (cancelled)
-            return
-          if (result.kind === 'written') {
-            setWorkflowWrittenPath(result.absolutePath)
-            addLog(`✔ ${previewIsNew ? 'Wrote' : 'Overwrote'} ${WORKFLOW_PATH}`)
-            trackWorkflowEvent('workflow-file-written', { decision: 'write' })
-          }
-          setTimeout(() => {
-            if (!cancelled)
-              setStep('build-complete')
-          }, 150)
-        }
-        catch (err) {
-          if (!cancelled) {
-            addLog(`⚠ Failed to write workflow file: ${err instanceof Error ? err.message : String(err)}`, 'yellow')
-            setTimeout(() => {
-              if (!cancelled)
-                setStep('build-complete')
-            }, 150)
-          }
-        }
-      })()
-    }
-
-    if (step === 'exporting-env') {
-      ;(() => {
-        try {
-          const targetPath = envExportTargetPath || defaultExportPath(appId, 'android')
-          const result = exportCredentialsToEnv({
-            appId,
-            platform: 'android',
-            credentials: savedCredentials ?? {},
-            targetPath,
-          })
-          if (cancelled)
-            return
-          if (result.kind === 'empty') {
-            setEnvExportError('No credentials to export — saved state is empty.')
-            setStep('build-complete')
-            return
-          }
-          if (result.kind === 'exists') {
-            setEnvExportTargetPath(result.path)
-            setStep('confirm-env-export-overwrite')
-            return
-          }
-          setEnvExportPath(result.path)
-          addLog(`✔ Exported ${result.fieldCount} field${result.fieldCount === 1 ? '' : 's'} → ${result.path}`)
-          setStep('build-complete')
-        }
-        catch (err) {
-          if (!cancelled) {
-            setEnvExportError(err instanceof Error ? err.message : String(err))
-            setStep('build-complete')
-          }
-        }
-      })()
-    }
-
-    if (step === 'overwrite-and-export-env') {
-      ;(() => {
-        try {
-          const result = exportCredentialsToEnv({
-            appId,
-            platform: 'android',
-            credentials: savedCredentials ?? {},
-            targetPath: envExportTargetPath,
-            overwrite: true,
-          })
-          if (cancelled)
-            return
-          if (result.kind === 'written') {
-            setEnvExportPath(result.path)
-            addLog(`✔ Overwrote ${result.path} with ${result.fieldCount} field${result.fieldCount === 1 ? '' : 's'}`)
-          }
-          setStep('build-complete')
-        }
-        catch (err) {
-          if (!cancelled) {
-            setEnvExportError(err instanceof Error ? err.message : String(err))
-            setStep('build-complete')
-          }
-        }
-      })()
-    }
-
     if (step === 'requesting-build') {
       ;(async () => {
         try {
@@ -1909,12 +1811,14 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
       // buildScriptChoice / envExportTargetPath) plus the keystorePasswordGenerated
       // marker that gates the random-password backup hint (the bespoke held this in
       // React `randomPasswordGenerated`, never persisted — thread it here so the
-      // hint still fires).
+      // hint still fires). selectedPackageManager carries the bespoke
+      // writing-workflow-file fallback (selectedPackageManager ?? detected pm) so the
+      // engine's own `?? 'npm'` fallback never diverges from the prior behaviour.
       const tailProgress: AndroidOnboardingProgress = {
         ...base,
         setupMode,
         ciSecretTarget,
-        selectedPackageManager,
+        selectedPackageManager: selectedPackageManager ?? normalizePackageManager(pm.pm),
         buildScriptChoice,
         envExportTargetPath,
         keystorePasswordGenerated: randomPasswordGenerated,
@@ -2032,22 +1936,77 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
           setAvailableScripts(t.availableScripts)
         if (t?.recommendedScript !== undefined)
           setRecommendedScript(t.recommendedScript)
+        // env-export results (exporting-env / overwrite-and-export-env).
+        if (t?.envExportPath !== undefined)
+          setEnvExportPath(t.envExportPath)
+        if (t?.envExportError !== undefined)
+          setEnvExportError(t.envExportError)
+        // writing-workflow-file: the written path (transient.workflowFilePath →
+        // the bespoke setWorkflowWrittenPath). The engine already emitted the
+        // Wrote/Overwrote log + workflow-file-written telemetry via onLog/
+        // trackWorkflowEvent.
+        if (t?.workflowFilePath !== undefined)
+          setWorkflowWrittenPath(t.workflowFilePath)
         // The chosen CI-secret target rides on the RETURNED progress (the engine
         // sets it when detecting resolves a single target); mirror it into the
         // React state the downstream choice/auto steps read.
         if (np.ciSecretTarget !== undefined && np.ciSecretTarget !== null)
           setCiSecretTarget(np.ciSecretTarget)
+        // exporting-env 'exists' carries the resolved export path forward on the
+        // RETURNED progress (the bespoke setEnvExportTargetPath) so
+        // overwrite-and-export-env can write to it.
+        if (np.envExportTargetPath !== undefined && np.envExportTargetPath !== envExportTargetPath)
+          setEnvExportTargetPath(np.envExportTargetPath)
         // The upload progress bar is cleared by uploading-ci-secrets completing.
         if (step === 'uploading-ci-secrets')
           setCiSecretUploadProgress(null)
 
         // ── Advance ────────────────────────────────────────────────────────────
-        if (result.next && result.next !== step)
-          setStep(result.next)
+        // writing-workflow-file keeps the bespoke 150ms settle before advancing to
+        // build-complete (a driver concern — the engine returns next immediately).
+        if (result.next && result.next !== step) {
+          if (step === 'writing-workflow-file') {
+            const next = result.next
+            setTimeout(() => {
+              if (!cancelled)
+                setStep(next)
+            }, 150)
+          }
+          else {
+            setStep(result.next)
+          }
+        }
       }
       catch (err) {
-        if (!cancelled)
+        if (cancelled)
+          return
+        // Step-aware error routing — match each bespoke tail handler's catch
+        // EXACTLY. The shared engine wraps checking-ci-secrets / exporting-env /
+        // overwrite-and-export-env internally (returns a failure route, never
+        // throws), but detecting-ci-secrets / uploading-ci-secrets /
+        // writing-workflow-file can still throw OUT of the engine, so the driver
+        // reproduces the bespoke recovery for those here. Credentials are already
+        // saved on every tail step, so only saving-credentials uses handleError.
+        const message = err instanceof Error ? err.message : String(err)
+        if (step === 'saving-credentials') {
           handleError(err, 'saving-credentials')
+        }
+        else if (step === 'exporting-env' || step === 'overwrite-and-export-env') {
+          setEnvExportError(message)
+          setStep('build-complete')
+        }
+        else if (step === 'writing-workflow-file') {
+          addLog(`⚠ Failed to write workflow file: ${message}`, 'yellow')
+          setTimeout(() => {
+            if (!cancelled)
+              setStep('build-complete')
+          }, 150)
+        }
+        else {
+          // detecting-ci-secrets / checking-ci-secrets / uploading-ci-secrets
+          setCiSecretError(message)
+          setStep('ci-secrets-failed')
+        }
       }
     })()
 
