@@ -271,7 +271,7 @@
   "allow-emulator": "Allow Emulators",
   "allow-api-key-create-organizations": "Allow creating organizations",
   "allow-api-key-create-organizations-description": "Adds org.create to this API key.",
-  "allow-api-key-create-organizations-requires-admin": "Requires an Admin organization role.",
+  "allow-api-key-create-organizations-requires-admin": "Requires an Admin or Super Admin organization role.",
   "allow-physical-device": "Allow physical devices",
   "allow-preview": "Allow bundle preview",
   "allow-preview-help": "Makes bundle preview publicly accessible via a shareable link",

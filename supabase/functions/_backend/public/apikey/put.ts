@@ -11,7 +11,7 @@ import { closeClient, getDrizzleClient, getPgClient } from '../../utils/pg.ts'
 import { checkPermission } from '../../utils/rbac.ts'
 import { schema } from '../../utils/postgres_schema.ts'
 import { supabaseAdmin, supabaseWithAuth, validateExpirationAgainstOrgPolicies, validateExpirationDate } from '../../utils/supabase.ts'
-import { assertApiKeyCanKeepOrgCreateGrant, parseApiKeyGlobalPermissions, replaceApiKeyGlobalPermissions, validateApiKeyGlobalPermissionsForBindings } from './global_permissions.ts'
+import { apiKeyBindingsAllowOrgCreate, assertApiKeyCanKeepOrgCreateGrant, parseApiKeyGlobalPermissions, replaceApiKeyGlobalPermissions, validateApiKeyGlobalPermissionsForBindings } from './global_permissions.ts'
 import { apiKeyHasLimitedScope } from './scope.ts'
 
 const app = honoFactory.createApp()
@@ -195,6 +195,10 @@ async function replaceApiKeyBindings(
 
       if (globalPermissions !== undefined) {
         await replaceApiKeyGlobalPermissions(tx, apikey.rbac_id, globalPermissions, auth.userId)
+      }
+      else if (!apiKeyBindingsAllowOrgCreate(bindings)) {
+        // Legacy clients can omit global_permissions; keep stored grants aligned with the new bindings.
+        await replaceApiKeyGlobalPermissions(tx, apikey.rbac_id, [], auth.userId)
       }
     })
 

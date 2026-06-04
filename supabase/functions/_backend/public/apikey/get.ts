@@ -40,7 +40,7 @@ async function withGlobalPermissions<T extends Database['public']['Tables']['api
   }
   finally {
     if (pgClient) {
-      closeClient(c, pgClient)
+      await closeClient(c, pgClient)
     }
   }
 }

@@ -121,7 +121,7 @@ describe.skipIf(USE_CLOUDFLARE)('[POST] /apikey with atomic bindings', () => {
     expect(bindings![0].reason).toBe('atomic creation test')
   })
 
-  it('creates an org.create API key permission for org admin keys', async () => {
+  it.concurrent('creates an org.create API key permission for org admin keys', async () => {
     const response = await fetch(getEndpointUrl('/apikey'), {
       method: 'POST',
       headers: authHeaders,
@@ -152,7 +152,7 @@ describe.skipIf(USE_CLOUDFLARE)('[POST] /apikey with atomic bindings', () => {
     expect(permissionRows).toEqual([{ permission_key: 'org.create' }])
   })
 
-  it('rejects org.create API key permission without an org admin binding', async () => {
+  it.concurrent('rejects org.create API key permission without an org admin binding', async () => {
     const response = await fetch(getEndpointUrl('/apikey'), {
       method: 'POST',
       headers: authHeaders,
@@ -174,7 +174,7 @@ describe.skipIf(USE_CLOUDFLARE)('[POST] /apikey with atomic bindings', () => {
     expect(data.error).toBe('invalid_global_permissions')
   })
 
-  it('updates org.create API key permission from the API key editor payload', async () => {
+  it.concurrent('updates org.create API key permission from the API key editor payload', async () => {
     const createResponse = await fetch(getEndpointUrl('/apikey'), {
       method: 'POST',
       headers: authHeaders,
@@ -241,6 +241,47 @@ describe.skipIf(USE_CLOUDFLARE)('[POST] /apikey with atomic bindings', () => {
       [createData.rbac_id],
     )
     expect(permissionRows).toEqual([])
+
+    const regrantResponse = await fetch(getEndpointUrl('/apikey'), {
+      method: 'PUT',
+      headers: authHeaders,
+      body: JSON.stringify({
+        id: createData.id,
+        bindings: [
+          {
+            role_name: 'org_admin',
+            scope_type: 'org',
+            org_id: TEST_ORG_ID,
+          },
+        ],
+        global_permissions: ['org.create'],
+      }),
+    })
+    expect(regrantResponse.status).toBe(200)
+
+    const downgradeResponse = await fetch(getEndpointUrl('/apikey'), {
+      method: 'PUT',
+      headers: authHeaders,
+      body: JSON.stringify({
+        id: createData.id,
+        bindings: [
+          {
+            role_name: 'org_member',
+            scope_type: 'org',
+            org_id: TEST_ORG_ID,
+          },
+        ],
+      }),
+    })
+    expect(downgradeResponse.status).toBe(200)
+
+    const downgradedPermissionRows = await executeSQL(
+      `SELECT permission_key
+       FROM public.apikey_global_permissions
+       WHERE apikey_rbac_id = $1::uuid`,
+      [createData.rbac_id],
+    )
+    expect(downgradedPermissionRows).toEqual([])
   })
 
   it('requires explicit V2 bindings', async () => {
@@ -369,7 +410,7 @@ describe.skipIf(USE_CLOUDFLARE)('[POST] /apikey with atomic bindings', () => {
     expect(data.error).toBe('invalid_bindings')
   })
 
-  it('V2 key can authenticate', async () => {
+  it('v2 key can authenticate', async () => {
     // First create a V2 key with role bindings.
     const createResponse = await fetch(getEndpointUrl('/apikey'), {
       method: 'POST',
