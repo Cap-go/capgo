@@ -339,6 +339,66 @@ COMMENT ON FUNCTION public.rbac_check_permission_request(text, uuid, character v
 COMMENT ON FUNCTION public.rbac_check_permission(text, uuid, character varying, bigint) IS
   'Public RBAC permission check for authenticated users. Uses auth.uid() and delegates to rbac_check_permission_direct.';
 
+CREATE OR REPLACE FUNCTION public.user_has_app_update_user_roles(p_user_id uuid, p_app_id uuid)
+RETURNS boolean
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+  v_app_id_varchar text;
+  v_org_id uuid;
+  v_caller_id uuid;
+BEGIN
+  SELECT auth.uid() INTO v_caller_id;
+
+  IF v_caller_id IS NULL THEN
+    RETURN false;
+  END IF;
+
+  SELECT apps.app_id, apps.owner_org
+  INTO v_app_id_varchar, v_org_id
+  FROM public.apps
+  WHERE apps.id = p_app_id
+  LIMIT 1;
+
+  IF v_app_id_varchar IS NULL OR v_org_id IS NULL THEN
+    RETURN false;
+  END IF;
+
+  IF v_caller_id <> p_user_id THEN
+    IF NOT public.rbac_check_permission_direct(
+      public.rbac_perm_app_update_user_roles(),
+      v_caller_id,
+      v_org_id,
+      v_app_id_varchar,
+      NULL::bigint,
+      NULL::text
+    ) THEN
+      RETURN false;
+    END IF;
+  END IF;
+
+  RETURN public.rbac_check_permission_direct(
+    public.rbac_perm_app_update_user_roles(),
+    p_user_id,
+    v_org_id,
+    v_app_id_varchar,
+    NULL::bigint,
+    NULL::text
+  );
+END;
+$$;
+
+ALTER FUNCTION public.user_has_app_update_user_roles(uuid, uuid) OWNER TO postgres;
+REVOKE ALL ON FUNCTION public.user_has_app_update_user_roles(uuid, uuid) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.user_has_app_update_user_roles(uuid, uuid) FROM anon;
+GRANT EXECUTE ON FUNCTION public.user_has_app_update_user_roles(uuid, uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.user_has_app_update_user_roles(uuid, uuid) TO service_role;
+
+COMMENT ON FUNCTION public.user_has_app_update_user_roles(uuid, uuid) IS
+  'Checks app.update_user_roles using RBAC only. The caller must be the checked user or already hold the same RBAC permission.';
+
 CREATE OR REPLACE FUNCTION capgo_private.matches_app_storage_rbac_owner(
   folder_user_id text,
   target_app_id character varying,
@@ -346,7 +406,6 @@ CREATE OR REPLACE FUNCTION capgo_private.matches_app_storage_rbac_owner(
 )
 RETURNS boolean
 LANGUAGE plpgsql
-STABLE
 SECURITY DEFINER
 SET search_path = ''
 AS $$
@@ -401,7 +460,6 @@ GRANT EXECUTE ON FUNCTION capgo_private.matches_app_storage_rbac_owner(text, cha
 CREATE OR REPLACE FUNCTION public.get_user_main_org_id_by_app_id(app_id text)
 RETURNS uuid
 LANGUAGE plpgsql
-STABLE
 SECURITY DEFINER
 SET search_path = ''
 AS $$
@@ -439,7 +497,6 @@ GRANT EXECUTE ON FUNCTION public.get_user_main_org_id_by_app_id(text) TO service
 CREATE OR REPLACE FUNCTION public.request_has_org_read_access(orgid uuid)
 RETURNS boolean
 LANGUAGE plpgsql
-STABLE
 SECURITY DEFINER
 SET search_path = ''
 AS $$
@@ -462,7 +519,6 @@ GRANT EXECUTE ON FUNCTION public.request_has_org_read_access(uuid) TO service_ro
 CREATE OR REPLACE FUNCTION public.request_has_app_read_access(orgid uuid, appid character varying)
 RETURNS boolean
 LANGUAGE plpgsql
-STABLE
 SECURITY DEFINER
 SET search_path = ''
 AS $$
@@ -485,7 +541,6 @@ GRANT EXECUTE ON FUNCTION public.request_has_app_read_access(uuid, character var
 CREATE OR REPLACE FUNCTION public.usage_credit_readable_org_ids()
 RETURNS uuid[]
 LANGUAGE sql
-STABLE
 SECURITY DEFINER
 SET search_path = ''
 AS $$
@@ -508,7 +563,6 @@ GRANT EXECUTE ON FUNCTION public.usage_credit_readable_org_ids() TO service_role
 CREATE OR REPLACE FUNCTION public.audit_logs_allowed_orgs()
 RETURNS uuid[]
 LANGUAGE sql
-STABLE
 SECURITY DEFINER
 SET search_path = ''
 AS $$
@@ -1861,7 +1915,6 @@ WITH CHECK (
 CREATE OR REPLACE FUNCTION public.request_actor_user_id()
 RETURNS uuid
 LANGUAGE plpgsql
-STABLE
 SECURITY DEFINER
 SET search_path = ''
 AS $$
@@ -2737,7 +2790,6 @@ $$;
 CREATE OR REPLACE FUNCTION public.is_good_plan_v5_org(orgid uuid)
 RETURNS boolean
 LANGUAGE plpgsql
-STABLE
 SECURITY DEFINER
 SET search_path = ''
 AS $$
@@ -2967,7 +3019,6 @@ GRANT EXECUTE ON FUNCTION public.get_orgs_v6() TO service_role;
 CREATE OR REPLACE FUNCTION public.get_current_plan_max_org(orgid uuid)
 RETURNS TABLE(mau bigint, bandwidth bigint, storage bigint, build_time_unit bigint, native_build_concurrency integer)
 LANGUAGE plpgsql
-STABLE
 SECURITY DEFINER
 SET search_path = ''
 AS $$
@@ -3000,7 +3051,6 @@ $$;
 CREATE OR REPLACE FUNCTION public.get_current_plan_name_org(orgid uuid)
 RETURNS character varying
 LANGUAGE plpgsql
-STABLE
 SECURITY DEFINER
 SET search_path = ''
 AS $$
@@ -3030,7 +3080,6 @@ $$;
 CREATE OR REPLACE FUNCTION public.get_cycle_info_org(orgid uuid)
 RETURNS TABLE(subscription_anchor_start timestamp with time zone, subscription_anchor_end timestamp with time zone)
 LANGUAGE plpgsql
-STABLE
 SECURITY DEFINER
 SET search_path = ''
 AS $$
@@ -3087,7 +3136,6 @@ ALTER FUNCTION public.get_cycle_info_org(uuid) OWNER TO postgres;
 CREATE OR REPLACE FUNCTION public.get_plan_usage_percent_detailed(orgid uuid)
 RETURNS TABLE(total_percent double precision, mau_percent double precision, bandwidth_percent double precision, storage_percent double precision, build_time_percent double precision)
 LANGUAGE plpgsql
-STABLE
 SECURITY DEFINER
 SET search_path = ''
 AS $$
@@ -3162,7 +3210,6 @@ $$;
 CREATE OR REPLACE FUNCTION public.get_plan_usage_percent_detailed(orgid uuid, cycle_start date, cycle_end date)
 RETURNS TABLE(total_percent double precision, mau_percent double precision, bandwidth_percent double precision, storage_percent double precision, build_time_percent double precision)
 LANGUAGE plpgsql
-STABLE
 SECURITY DEFINER
 SET search_path = ''
 AS $$
@@ -3846,6 +3893,34 @@ WHERE rbac_role_name IS NULL;
 
 ALTER TABLE public.tmp_users
   ALTER COLUMN rbac_role_name SET NOT NULL;
+
+DROP FUNCTION IF EXISTS public.get_invite_by_magic_lookup(text);
+
+CREATE OR REPLACE FUNCTION public.get_invite_by_magic_lookup(lookup text)
+RETURNS TABLE(org_name text, org_logo text, role text)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+BEGIN
+  RETURN QUERY
+  SELECT
+    o.name AS org_name,
+    o.logo AS org_logo,
+    tmp.rbac_role_name AS role
+  FROM public.tmp_users tmp
+  JOIN public.orgs o ON tmp.org_id = o.id
+  WHERE tmp.invite_magic_string = get_invite_by_magic_lookup.lookup
+    AND tmp.cancelled_at IS NULL
+    AND GREATEST(tmp.updated_at, tmp.created_at) > (CURRENT_TIMESTAMP - INTERVAL '7 days');
+END;
+$$;
+
+ALTER FUNCTION public.get_invite_by_magic_lookup(text) OWNER TO postgres;
+REVOKE ALL ON FUNCTION public.get_invite_by_magic_lookup(text) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.get_invite_by_magic_lookup(text) TO anon;
+GRANT EXECUTE ON FUNCTION public.get_invite_by_magic_lookup(text) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.get_invite_by_magic_lookup(text) TO service_role;
 
 DO $$
 DECLARE
