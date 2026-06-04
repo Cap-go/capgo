@@ -2987,35 +2987,27 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
         <ImportDistributionModeStep
           dense={dense}
           onChange={async (value) => {
-            if (value === '__cancel__') {
-              setImportMode(false)
-              // Clear the persisted import-distribution and setupMethod since
-              // the user is bailing to the create-new path.
-              const existing = await loadProgress(appId)
-              if (existing) {
-                existing.setupMethod = 'create-new'
-                delete existing.importDistribution
-                await saveProgress(appId, existing)
-              }
-              setStep('api-key-instructions')
-              return
-            }
-            const mode = value as 'app_store' | 'ad_hoc'
-            setImportDistribution(mode)
-            // Persist so a CLI restart at any later step (incl. verifying-key
-            // or saving-credentials) knows we're in app_store vs ad_hoc.
-            // Codex caught a bug where without this, resumed sessions
-            // re-entered the create-new path via the stale `importMode=false`
-            // default — fixed here by hydrating both fields on mount.
-            const existing = await loadProgress(appId) || {
+            // Engine-derived persistence: applyIosInput records the import fork —
+            // 'app_store'/'ad_hoc' → setupMethod='import-existing' + importDistribution;
+            // '__cancel__' → setupMethod='create-new' (importDistribution dropped).
+            const base = await loadProgress(appId) || {
               platform: 'ios' as const,
               appId,
               startedAt: new Date().toISOString(),
               completedSteps: {},
             }
-            existing.setupMethod = 'import-existing'
-            existing.importDistribution = mode
-            await saveProgress(appId, existing)
+            const reduced = applyIosInput('import-distribution-mode', base, { step: 'import-distribution-mode', value: value as 'app_store' | 'ad_hoc' | '__cancel__' })
+            await saveProgress(appId, reduced)
+
+            if (value === '__cancel__') {
+              // The user bailed to the create-new path. Keep the React importMode
+              // mirror in sync; the reducer already cleared importDistribution.
+              setImportMode(false)
+              setStep('api-key-instructions')
+              return
+            }
+            const mode = value as 'app_store' | 'ad_hoc'
+            setImportDistribution(mode)
             upsertLog('✔ Distribution · ', `✔ Distribution · ${mode}`)
             if (mode === 'app_store') {
               // Need .p8 for TestFlight upload AND for any profile auto-recovery.
@@ -3024,8 +3016,9 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
               // verified on a previous attempt (resume) — otherwise we
               // re-ask "How do you want to provide the .p8 file?" even
               // though APPLE_KEY_CONTENT is already known. Use the same
-              // routing decision as the post-scan entry point.
-              setStep(getImportEntryStep(existing))
+              // routing decision as the post-scan entry point. (DIVERGE from a
+              // bare getIosResumeStep: getImportEntryStep is the bespoke router.)
+              setStep(getImportEntryStep(reduced))
             }
             else {
               // ad_hoc skips .p8; can opt into it later from no-match recovery.
@@ -3034,7 +3027,9 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
               // they've now committed to the harder path and deserve to
               // know help is available before they hit a wall. The helper
               // is idempotent across the session, so re-picking Ad Hoc
-              // after a back-navigation doesn't re-emit.
+              // after a back-navigation doesn't re-emit. (DIVERGE: the
+              // bespoke jumps straight to the picker; the matches are already
+              // scanned upstream.)
               logAdHocSupportHint()
               setStep('import-pick-identity')
             }
@@ -3078,40 +3073,52 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
         }
 
         const onPick = async (value: string) => {
+          const current = (await loadProgress(appId)) ?? { platform: 'ios' as const, appId, startedAt: new Date().toISOString(), completedSteps: {} }
           if (value === '__cancel__') {
+            // EPHEMERAL-branching: the user bailed to create-new. The engine
+            // resolver routes no-chosenIdentity → api-key-instructions, but the
+            // DRIVER owns the persistence (switch setupMethod, drop the stale
+            // importDistribution) BEFORE re-driving — exactly the routing test's
+            // contract. Clear the carried identity so the resolver sees __cancel__.
             setImportMode(false)
-            const existing = await loadProgress(appId)
-            if (existing) {
-              existing.setupMethod = 'create-new'
-              delete existing.importDistribution
-              await saveProgress(appId, existing)
-            }
-            setStep('api-key-instructions')
+            const cleared: OnboardingProgress = { ...current, setupMethod: 'create-new' }
+            delete cleared.importDistribution
+            await saveProgress(appId, cleared)
+            iosCarriedRef.current = { ...iosCarriedRef.current, chosenIdentity: undefined }
+            const res = await runIosEffect('import-pick-identity', cleared, { appId, carried: iosCarriedRef.current })
+            if (res.next && res.next !== 'import-pick-identity')
+              setStep(res.next)
             return
           }
           const match = importMatches.find(m => m.identity.sha1 === value)
           if (!match)
             return
+          // EPHEMERAL-branching: stash the picked identity into the carried ref
+          // (resolved from the option SHA-1 against importMatches) + keep the React
+          // mirror, then run the PURE resolver effect for next. The engine's
+          // three-way routing (usable on-disk → import-pick-profile; no on-disk +
+          // ASC key → import-checking-apple-cert; otherwise → import-no-match-
+          // recovery with noMatchReason='no-profile-on-disk') mirrors the bespoke.
           setChosenIdentity(match.identity)
           // Clear stale per-identity cert id from a previous pick so the
           // per-identity check doesn't trust an old result.
           setAppleCertIdForChosen(undefined)
           addLog(`✔ Identity · ${match.identity.name}`)
-          // Three-way routing:
-          //   - Local profile already matches → straight to picker
-          //   - No local match but ASC key available + cert is verified
-          //     by the batch validation → per-identity check (auto-fetch
-          //     from Apple before showing recovery menu)
-          //   - Otherwise → straight to recovery menu
-          const usable = filterProfilesForApp(match.profiles, iosBundleId, importDistribution)
-          if (usable.length > 0) {
-            setStep('import-pick-profile')
-            return
+          iosCarriedRef.current = {
+            ...iosCarriedRef.current,
+            chosenIdentity: match.identity,
+            importMatches,
+            p8Content: iosCarriedRef.current.p8Content ?? (p8ContentRef.current ? Buffer.from(p8ContentRef.current) : undefined),
           }
-          const apiKeyAvailable = !!(p8ContentRef.current || (await loadProgress(appId))?.completedSteps?.apiKeyVerified)
-          if (!apiKeyAvailable)
-            setNoMatchReason('no-profile-on-disk')
-          setStep(apiKeyAvailable ? 'import-checking-apple-cert' : 'import-no-match-recovery')
+          const res = await runIosEffect('import-pick-identity', current, { appId, carried: iosCarriedRef.current })
+          // The no-ASC-key branch sets noMatchReason in transient; mirror it so the
+          // recovery menu renders the right variant.
+          if (res.transient?.noMatchReason !== undefined) {
+            iosCarriedRef.current = { ...iosCarriedRef.current, noMatchReason: res.transient.noMatchReason }
+            setNoMatchReason(res.transient.noMatchReason as NoMatchReason)
+          }
+          if (res.next && res.next !== 'import-pick-identity')
+            setStep(res.next)
         }
 
         // When classification ran we render two tables + a Select with
@@ -3276,60 +3283,37 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
               })),
               { label: '↩️   Back to identity selection', value: '__back__' },
             ]}
-            onChange={(value) => {
-              if (value === '__back__') {
-                setStep('import-pick-identity')
+            onChange={async (value) => {
+              // EPHEMERAL-branching: '__back__' records no profile → the resolver
+              // routes to import-pick-identity. A valid pick stashes the resolved
+              // DiscoveredProfile into the carried ref (+ React mirror) and runs the
+              // PURE resolver effect, which re-runs the SAME three validations
+              // (bundle id via bundleIdMatches, distribution type, the chosen cert's
+              // SHA-1 in the allowed-certs list — byte-for-byte the bespoke
+              // messages) and routes valid → import-export-warning, invalid → error.
+              const current = (await loadProgress(appId)) ?? { platform: 'ios' as const, appId, startedAt: new Date().toISOString(), completedSteps: {} }
+              const profile = value === '__back__' ? undefined : matchedProfiles.find(p => p.uuid === value)
+              if (value !== '__back__' && !profile)
+                return
+              if (profile) {
+                setChosenProfile(profile)
+                iosCarriedRef.current = { ...iosCarriedRef.current, chosenProfile: profile, chosenIdentity: chosenIdentity ?? iosCarriedRef.current.chosenIdentity }
+              }
+              else {
+                iosCarriedRef.current = { ...iosCarriedRef.current, chosenProfile: undefined }
+              }
+              const res = await runIosEffect('import-pick-profile', current, { appId, carried: iosCarriedRef.current })
+              if (res.next === 'error') {
+                // The resolver's validation failure → surface through handleError
+                // exactly as the bespoke onChange guards did (the engine emits the
+                // same detailed message + retryStep='import-pick-identity').
+                handleError(new Error(res.transient?.error ?? 'Profile validation failed.'), (res.transient?.retryStep as OnboardingStep) ?? 'import-pick-profile')
                 return
               }
-              const profile = matchedProfiles.find(p => p.uuid === value)
-              if (!profile)
-                return
-              // Defense in depth: verify bundleId + profileType match before
-              // committing. The filter above should make this unreachable,
-              // but if the filter regresses, we'd rather hard-fail than
-              // silently save bad creds. Wildcard bundle ids
-              // (`com.example.*`, bare `*`) are accepted via bundleIdMatches
-              // so this guard stays in sync with the picker's filter — a
-              // strict equality here would over-reject wildcards the filter
-              // intentionally accepted upstream.
-              if (!bundleIdMatches(profile.bundleId, iosBundleId)
-                || (importDistribution && profile.profileType !== importDistribution)) {
-                handleError(
-                  new Error(
-                    `Profile "${profile.name}" doesn't match this app: `
-                    + `bundle ${profile.bundleId} (expected ${iosBundleId}), `
-                    + `type ${profile.profileType} (expected ${importDistribution ?? 'any'}).`,
-                  ),
-                  'import-pick-profile',
-                )
-                return
-              }
-              // Belt-and-suspenders: the upstream matchIdentitiesToProfiles
-              // filter and Apple-fetched profile synthesizing should both
-              // guarantee `profile.certificateSha1s` contains
-              // `chosenIdentity.sha1`. But the file-picker recovery path
-              // imports a .mobileprovision the user might have hand-created
-              // in the portal — if they ticked the wrong cert in the cert
-              // list there, we'd otherwise save credentials that the build
-              // server can't actually sign with (private key from
-              // chosenIdentity but profile only trusts a different cert).
-              // Catch that here with a clear error rather than discovering
-              // it during a build hours later.
-              if (chosenIdentity && !profile.certificateSha1s.includes(chosenIdentity.sha1)) {
-                const shownSha1s = profile.certificateSha1s.map(s => `${s.slice(0, 8)}…`).join(', ') || '(none listed)'
-                handleError(
-                  new Error(
-                    `Profile "${profile.name}" doesn't trust your chosen certificate "${chosenIdentity.name}". `
-                    + `The profile's allowed-certs list contains ${profile.certificateSha1s.length} entr${profile.certificateSha1s.length === 1 ? 'y' : 'ies'} (SHA1: ${shownSha1s}); your cert's SHA1 starts with ${chosenIdentity.sha1.slice(0, 8)}…. `
-                    + `Either pick a different profile, or re-create this profile in the Apple Developer Portal and tick the right cert.`,
-                  ),
-                  'import-pick-profile',
-                )
-                return
-              }
-              setChosenProfile(profile)
-              addLog(`✔ Profile · ${profile.name}`)
-              setStep('import-export-warning')
+              if (profile)
+                addLog(`✔ Profile · ${profile.name}`)
+              if (res.next && res.next !== 'import-pick-profile')
+                setStep(res.next)
             }}
           />
         )
