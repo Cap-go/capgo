@@ -41,6 +41,10 @@
 	<string>Allow camera access to try camera features in the sandbox app you are developing.</string>
 	<key>NSCalendarsUsageDescription</key>
 	<string>Allow calendar access to try calendar features in the sandbox app you are developing.</string>
+	<key>NSCalendarsFullAccessUsageDescription</key>
+	<string>Allow full calendar access to try calendar features in the sandbox app you are developing.</string>
+	<key>NSCalendarsWriteOnlyAccessUsageDescription</key>
+	<string>Allow calendar write access to try calendar event creation features in the sandbox app you are developing.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Allow microphone access to record audio in the sandbox app you are developing.</string>
 	<key>NSMotionUsageDescription</key>
