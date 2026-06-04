@@ -139,8 +139,18 @@ export function getResumeStep(progress: OnboardingProgress | null): OnboardingSt
       return 'input-key-id'
     return 'api-key-instructions'
   }
-  if (!completedSteps.certificateCreated)
-    return 'creating-certificate'
+  if (!completedSteps.certificateCreated) {
+    // Create-new is always app_store, so before committing the bundle id to
+    // cert creation it must clear the remote App Store verification gate — the
+    // same step the live flow runs between verifying-key and creating-certificate
+    // (app.tsx, the verifying-key create-new branch). Resuming straight to
+    // creating-certificate would skip that gate, letting a user who quit while
+    // blocked on the App Store app check proceed with cert/profile creation for
+    // an unverified bundle id — defeating the invariant. We re-run verify-app
+    // (it re-checks via the ASC API and, on a fresh mount, has no
+    // pendingVerifyNext, so every exit path falls back to creating-certificate).
+    return 'verify-app'
+  }
   if (!completedSteps.profileCreated)
     return 'creating-profile'
 
