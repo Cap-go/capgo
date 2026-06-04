@@ -21,6 +21,7 @@ OUT_DIR = ROOT / "graphify-out"
 
 
 def clean_generated_files() -> None:
+    """Remove generated Graphify outputs that should be replaced on each run."""
     OUT_DIR.mkdir(exist_ok=True)
     for name in ("graph.json", "GRAPH_REPORT.md", "manifest.json", "cost.json"):
         (OUT_DIR / name).unlink(missing_ok=True)
@@ -35,6 +36,7 @@ def clean_generated_files() -> None:
 
 
 def code_files_from_detection(detection: dict) -> list[Path]:
+    """Return the supported code files discovered by Graphify detection."""
     files: list[Path] = []
     for detected_path in detection.get("files", {}).get("code", []):
         path = Path(detected_path)
@@ -47,6 +49,7 @@ def code_files_from_detection(detection: dict) -> list[Path]:
 
 
 def main() -> None:
+    """Build and write the committed deterministic Graphify code graph."""
     clean_generated_files()
 
     detection = detect(ROOT)
