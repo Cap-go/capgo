@@ -24,8 +24,19 @@ android {
     }
     packaging {
         jniLibs {
-            // Capgo's dependency graph already ships stripped native libs; avoid redundant NDK strip work.
-            keepDebugSymbols += ['**/*.so']
+            // NDK 27 llvm-strip can hang on these current prebuilt native libraries locally.
+            keepDebugSymbols += [
+                '**/libandroidx.graphics.path.so',
+                '**/libc++_shared.so',
+                '**/libdatastore_shared_counter.so',
+                '**/libexecutorch.so',
+                '**/libfbjni.so',
+                '**/libimage_processing_util_jni.so',
+                '**/libllm_inference_engine_jni.so',
+                '**/libsqlcipher.so',
+                '**/libsurface_util_jni.so',
+                '**/libtoolChecker.so',
+            ]
         }
     }
 }
