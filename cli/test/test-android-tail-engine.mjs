@@ -576,6 +576,22 @@ await test('ADAPTER: trackWorkflowEvent fires when the workflow file is written'
   assert(events.some(e => e.event === 'workflow-file-written'), 'trackWorkflowEvent must be forwarded and fire on workflow-file-written')
 })
 
+// ─── GAP 3 (ADAPTER): carried.workflowIsNew drives Wrote vs Overwrote ──
+
+await test('GAP3 ADAPTER: writing-workflow-file logs ✔ Overwrote when carried.workflowIsNew === false', async () => {
+  const logs = []
+  const deps = makeDeps({ onLog: (msg, color) => logs.push({ msg, color }), carried: { workflowIsNew: false } })
+  const progress = tailProgress({
+    ciSecretTarget: GITHUB_TARGET,
+    setupMode: 'with-workflow',
+    selectedPackageManager: 'bun',
+    buildScriptChoice: { type: 'npm-script', name: 'build' },
+  })
+  const res = await runAndroidEffect('writing-workflow-file', progress, deps)
+  assertEquals(res.next, 'build-complete', 'still finishes the wizard')
+  assert(logs.some(l => /^✔ Overwrote .+capgo-build\.yml/.test(l.msg)), 'an existing file logs Overwrote through the adapter')
+})
+
 // ─── GAP 1 (ADAPTER): onBuildOutput is forwarded into the requesting-build viewer ──
 
 await test('GAP1 ADAPTER: requesting-build forwards the build-viewer lines into onBuildOutput (header + queued)', async () => {

@@ -587,6 +587,48 @@ await test('writing-workflow-file degrades gracefully when trackWorkflowEvent is
   assertEquals(res.next, 'build-complete', 'no telemetry hook → still finishes (no throw)')
 })
 
+// ─── GAP 3: writing-workflow-file logs Wrote vs Overwrote from carried.workflowIsNew ──
+//
+// The bespoke android tail (app.tsx ~L1572) logs `✔ ${previewIsNew ? 'Wrote'
+// : 'Overwrote'} ${WORKFLOW_PATH}`. previewIsNew is resolved at the preview step
+// (existsSync) — TUI/driver state — so the driver threads it back via
+// deps.carried.workflowIsNew. Default (absent / undefined) is NEW ('Wrote'),
+// matching the bespoke React useState(true) default.
+
+function wfProgress() {
+  return tailProgress({
+    ciSecretTarget: GITHUB_TARGET,
+    setupMode: 'with-workflow',
+    selectedPackageManager: 'bun',
+    buildScriptChoice: { type: 'npm-script', name: 'build' },
+  })
+}
+
+await test('GAP3: writing-workflow-file logs ✔ Overwrote when carried.workflowIsNew === false', async () => {
+  const logs = []
+  const deps = makeDeps({ onLog: (msg, color) => logs.push({ msg, color }), carried: { workflowIsNew: false } })
+  const res = await runTailEffect('writing-workflow-file', wfProgress(), deps)
+  assertEquals(res.next, 'build-complete', 'still finishes the wizard')
+  assert(logs.some(l => /^✔ Overwrote .+capgo-build\.yml/.test(l.msg)), 'an existing file logs Overwrote')
+  assert(!logs.some(l => /^✔ Wrote /.test(l.msg)), 'must NOT log Wrote when the file already existed')
+})
+
+await test('GAP3: writing-workflow-file logs ✔ Wrote when carried.workflowIsNew === true', async () => {
+  const logs = []
+  const deps = makeDeps({ onLog: (msg, color) => logs.push({ msg, color }), carried: { workflowIsNew: true } })
+  const res = await runTailEffect('writing-workflow-file', wfProgress(), deps)
+  assertEquals(res.next, 'build-complete', 'still finishes the wizard')
+  assert(logs.some(l => /^✔ Wrote .+capgo-build\.yml/.test(l.msg)), 'a new file logs Wrote')
+})
+
+await test('GAP3: writing-workflow-file defaults to ✔ Wrote when carried.workflowIsNew is absent (new-file default)', async () => {
+  const logs = []
+  const deps = makeDeps({ onLog: (msg, color) => logs.push({ msg, color }) })
+  const res = await runTailEffect('writing-workflow-file', wfProgress(), deps)
+  assertEquals(res.next, 'build-complete', 'still finishes the wizard')
+  assert(logs.some(l => /^✔ Wrote .+capgo-build\.yml/.test(l.msg)), 'absent signal defaults to Wrote (parity with useState(true))')
+})
+
 // ─── CONCERN 5: env-export error routes to build-complete (never throws) ───────
 
 await test('exporting-env (empty result) sets transient.envExportError and routes to build-complete (no throw)', async () => {

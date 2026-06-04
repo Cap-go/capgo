@@ -271,6 +271,14 @@ export interface TailEffectDeps<P extends TailEffectProgress = TailEffectProgres
     savedCredentials?: Record<string, string>
     ciSecretEntries?: CiSecretEntry[]
     ciSecretExistingKeys?: string[]
+    /**
+     * Whether the workflow file did NOT exist when previewed (app.tsx's
+     * `previewIsNew`, resolved at `preview-workflow-file` via existsSync — driver
+     * state, never persisted). `writing-workflow-file` logs '✔ Wrote' vs
+     * '✔ Overwrote' from it. Absent/undefined defaults to NEW ('Wrote'), matching
+     * the bespoke React `useState(true)` default.
+     */
+    workflowIsNew?: boolean
   }
 
   onStatus?: (message: string) => void
@@ -954,9 +962,12 @@ export async function runTailEffect<P extends TailEffectProgress>(
 
       if (result.kind === 'written') {
         // Match the bespoke android log text (app.tsx ~L1572): the workflow path
-        // constant, not the absolute path. The engine has no preview `isNew` flag
-        // (that is TUI-only state) so it always reports 'Wrote'.
-        deps.onLog?.(`✔ Wrote ${WORKFLOW_PATH}`)
+        // constant, not the absolute path, and 'Wrote' vs 'Overwrote' from the
+        // driver-resolved preview flag (carried.workflowIsNew). The engine never
+        // touches the FS to recompute it — it is TUI/driver state — so an absent
+        // signal defaults to NEW ('Wrote'), matching React's useState(true).
+        const wrote = deps.carried?.workflowIsNew === false ? 'Overwrote' : 'Wrote'
+        deps.onLog?.(`✔ ${wrote} ${WORKFLOW_PATH}`)
         // Workflow-file telemetry (android: trackWorkflowEvent). OPTIONAL — no-op on iOS.
         deps.trackWorkflowEvent?.('workflow-file-written', { decision: 'write' })
         return { progress, next: 'build-complete', transient: { workflowFilePath: result.absolutePath } }

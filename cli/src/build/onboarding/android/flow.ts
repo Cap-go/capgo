@@ -1186,6 +1186,8 @@ export interface AndroidEffectDeps {
     ciSecretEntries?: CiSecretEntry[]
     /** Which secret keys already exist on the remote, resolved at checking-ci-secrets. */
     ciSecretExistingKeys?: string[]
+    /** Whether the workflow file did NOT exist at preview (app.tsx's `previewIsNew`); drives 'Wrote' vs 'Overwrote'. Defaults to NEW when absent. */
+    workflowIsNew?: boolean
   }
 
   // ── Callbacks (optional — callers that don't need streaming can omit) ────
