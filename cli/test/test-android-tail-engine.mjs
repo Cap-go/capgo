@@ -494,6 +494,37 @@ await test('ADAPTER: onCiSecretCheckPhase is forwarded into the 2-phase checking
   assert(phases.some(p => /Checking existing env vars/i.test(p)), 'phase 2 (list env vars) must be forwarded')
 })
 
+// ─── GAP 2 (ADAPTER): onCiSecretError forwarded + ci-secrets-failed routing ──
+
+await test('GAP2 ADAPTER: checking-ci-secrets repo-null forwards onCiSecretError + routes to ci-secrets-failed', async () => {
+  const errors = []
+  const deps = makeDeps({
+    onCiSecretError: msg => errors.push(msg),
+    getCiSecretRepoLabelAsync: async () => null,
+  })
+  const progress = tailProgress({ ciSecretTarget: GITHUB_TARGET, setupMode: 'with-workflow' })
+  const res = await runAndroidEffect('checking-ci-secrets', progress, deps)
+  assertEquals(res.next, 'ci-secrets-failed', 'an unresolvable GitHub repo routes to ci-secrets-failed')
+  assert(res.transient && /Could not resolve the GitHub repository/.test(res.transient.ciSecretError), 'transient.ciSecretError carries the repo-null reason')
+  assert(errors.some(e => /Could not resolve the GitHub repository/.test(e)), 'onCiSecretError forwarded with the repo-null reason')
+})
+
+await test('GAP2 ADAPTER: a thrown checking-ci-secrets routes to ci-secrets-failed (no throw)', async () => {
+  const deps = makeDeps({ getCiSecretRepoLabelAsync: async () => { throw new Error('gh exploded') } })
+  const progress = tailProgress({ ciSecretTarget: GITHUB_TARGET, setupMode: 'with-workflow' })
+  let threw = false
+  let res
+  try {
+    res = await runAndroidEffect('checking-ci-secrets', progress, deps)
+  }
+  catch {
+    threw = true
+  }
+  assert(!threw, 'a thrown check must NOT propagate through the adapter')
+  assertEquals(res.next, 'ci-secrets-failed', 'a thrown check routes to ci-secrets-failed')
+  assert(res.transient && /gh exploded/.test(res.transient.ciSecretError), 'transient.ciSecretError carries the thrown reason')
+})
+
 await test('ADAPTER: resolveApikey + logger reach requestBuildInternal', async () => {
   const RESOLVED_KEY = 'cli-flag-key'
   const LOGGER = { __isLogger: true }

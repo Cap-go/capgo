@@ -226,9 +226,20 @@ export interface TailEffectDeps<P extends TailEffectProgress = TailEffectProgres
   /**
    * The 2-phase checking-ci-secrets status text ('Resolving GitHub repository…'
    * then 'Checking existing env vars in <repo>…'). The android tail feeds this into
-   * `setCiSecretCheckPhase`. Also surfaced via `onStatus`. No-op when absent.
+   * `setCiSecretCheckPhase`. This is the ONLY sink for the check phases — they are
+   * intentionally NOT surfaced via `onStatus`, which the driver routes to the
+   * oauth/gcp panes (sending the check phases there would corrupt those). No-op
+   * when absent.
    */
   onCiSecretCheckPhase?: (phase: string) => void
+
+  /**
+   * The ci-secrets-failed reason (repo-null / catch in checking-ci-secrets). The
+   * android tail feeds this into `setCiSecretError`, which the CiSecretsFailedStep
+   * renders. Also surfaced via `transient.ciSecretError`. OPTIONAL — no-op when
+   * absent (the failed-step view falls back to its generic message).
+   */
+  onCiSecretError?: (message: string) => void
 
   // ── workflow-builder script preload (uploading-ci-secrets, with-workflow) ──
   //
@@ -773,42 +784,59 @@ export async function runTailEffect<P extends TailEffectProgress>(
 
     // ── checking-ci-secrets ───────────────────────────────────────────────
     case 'checking-ci-secrets': {
-      const target = progress.ciSecretTarget
-      if (!target)
-        throw new Error('No git hosting target selected.')
-
-      // 2-phase status text, mirroring the bespoke android tail (app.tsx
-      // ~L1421-1438). Surface it on BOTH onStatus (the neutral status channel) and
-      // the dedicated onCiSecretCheckPhase hook (android: setCiSecretCheckPhase).
-      // Both are OPTIONAL — absent on iOS, where this is a no-op.
-      const emitCheckPhase = (phase: string): void => {
-        deps.onStatus?.(phase)
-        deps.onCiSecretCheckPhase?.(phase)
+      // Mirror the bespoke android tail (app.tsx ~L1414-1455): the whole check is
+      // wrapped in a try/catch — any throw (incl. a missing target) sets the
+      // ci-secrets-failed reason and routes to that step. It NEVER throws out of
+      // the engine, because credentials are already saved.
+      const emitError = (message: string): TailEffectResult<P> => {
+        deps.onCiSecretError?.(message)
+        return { progress, next: 'ci-secrets-failed', transient: { ciSecretError: message } }
       }
+      try {
+        const target = progress.ciSecretTarget
+        if (!target)
+          throw new Error('No git hosting target selected.')
 
-      // Phase 1: resolve the target repo (GitHub only) — non-blocking so the
-      // spinner keeps animating.
-      emitCheckPhase('Resolving GitHub repository…')
-      let repoLabel: string | null = null
-      if (target.provider === 'github') {
-        repoLabel = await deps.getCiSecretRepoLabelAsync!(target)
-        if (!repoLabel)
-          return { progress, next: 'ci-secrets-failed', transient: { ciSecretRepoLabel: null } }
+        // 2-phase status text, mirroring the bespoke android tail (app.tsx
+        // ~L1421-1438). Surfaced ONLY via the dedicated onCiSecretCheckPhase hook
+        // (android: setCiSecretCheckPhase) — NOT onStatus, which the driver routes
+        // to the oauth/gcp panes. OPTIONAL — a no-op on iOS.
+        const emitCheckPhase = (phase: string): void => {
+          deps.onCiSecretCheckPhase?.(phase)
+        }
+
+        // Phase 1: resolve the target repo (GitHub only) — non-blocking so the
+        // spinner keeps animating.
+        emitCheckPhase('Resolving GitHub repository…')
+        let repoLabel: string | null = null
+        if (target.provider === 'github') {
+          repoLabel = await deps.getCiSecretRepoLabelAsync!(target)
+          if (!repoLabel) {
+            // app.tsx ~L1427-1431: repo-null sets the explicit guidance reason +
+            // null repo label and routes to ci-secrets-failed.
+            const message = 'Could not resolve the GitHub repository. Run `gh repo view` from this directory, then try again.'
+            deps.onCiSecretError?.(message)
+            return { progress, next: 'ci-secrets-failed', transient: { ciSecretRepoLabel: null, ciSecretError: message } }
+          }
+        }
+
+        // Phase 2: list existing secrets in the resolved repo (or the target label
+        // when there is no GitHub repo to name).
+        emitCheckPhase(repoLabel
+          ? `Checking existing env vars in ${repoLabel}…`
+          : `Checking existing env vars in ${getCiSecretTargetLabel(target)}…`)
+        const entries = tailCiSecretEntries(progress, deps)
+        const existing = await deps.listExistingCiSecretKeysAsync!(target, entries.map(entry => entry.key))
+
+        if (target.provider === 'github')
+          return { progress, next: 'confirm-secrets-push', transient: { ciSecretRepoLabel: repoLabel, ciSecretExistingKeys: existing, ciSecretEntries: entries } }
+
+        const next = existing.length > 0 ? 'confirm-ci-secret-overwrite' : 'uploading-ci-secrets'
+        return { progress, next, transient: { ciSecretExistingKeys: existing, ciSecretEntries: entries } }
       }
-
-      // Phase 2: list existing secrets in the resolved repo (or the target label
-      // when there is no GitHub repo to name).
-      emitCheckPhase(repoLabel
-        ? `Checking existing env vars in ${repoLabel}…`
-        : `Checking existing env vars in ${getCiSecretTargetLabel(target)}…`)
-      const entries = tailCiSecretEntries(progress, deps)
-      const existing = await deps.listExistingCiSecretKeysAsync!(target, entries.map(entry => entry.key))
-
-      if (target.provider === 'github')
-        return { progress, next: 'confirm-secrets-push', transient: { ciSecretRepoLabel: repoLabel, ciSecretExistingKeys: existing, ciSecretEntries: entries } }
-
-      const next = existing.length > 0 ? 'confirm-ci-secret-overwrite' : 'uploading-ci-secrets'
-      return { progress, next, transient: { ciSecretExistingKeys: existing, ciSecretEntries: entries } }
+      catch (err) {
+        return emitError(err instanceof Error ? err.message : String(err))
+      }
     }
 
     // ── uploading-ci-secrets ──────────────────────────────────────────────

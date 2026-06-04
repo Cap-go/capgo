@@ -1146,6 +1146,13 @@ export interface AndroidEffectDeps {
    */
   onCiSecretCheckPhase?: (phase: string) => void
 
+  /**
+   * The ci-secrets-failed reason (repo-null / catch in checking-ci-secrets). The
+   * android tail feeds this into `setCiSecretError` (rendered by the
+   * CiSecretsFailedStep). Forwarded verbatim through `toTailDeps`. No-op when absent.
+   */
+  onCiSecretError?: (message: string) => void
+
   /** Reads the project's package.json scripts map (workflow-builder preload). */
   getPackageScripts?: () => Record<string, string>
   /** Detects the web-framework project type (best-effort; may resolve null). */
@@ -1339,6 +1346,7 @@ function toTailDeps(deps: AndroidEffectDeps): TailEffectDeps<AndroidOnboardingPr
     resolveApikey: deps.resolveApikey,
     onCiSecretUploadProgress: deps.onCiSecretUploadProgress,
     onCiSecretCheckPhase: deps.onCiSecretCheckPhase,
+    onCiSecretError: deps.onCiSecretError,
     getPackageScripts: deps.getPackageScripts,
     findProjectType: deps.findProjectType,
     findBuildCommandForProjectType: deps.findBuildCommandForProjectType,

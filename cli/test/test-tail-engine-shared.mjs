@@ -354,7 +354,7 @@ await test("checking-ci-secrets (GitHub) → next 'confirm-secrets-push' (uses g
 
 // ─── CONCERN 3: checking-ci-secrets surfaces the 2-phase status text ───────────
 
-await test('checking-ci-secrets (GitHub) surfaces the 2-phase status via onStatus + onCiSecretCheckPhase', async () => {
+await test('checking-ci-secrets (GitHub) surfaces the 2-phase status via onCiSecretCheckPhase ONLY (not onStatus)', async () => {
   const statuses = []
   const phases = []
   const deps = makeDeps({
@@ -365,24 +365,85 @@ await test('checking-ci-secrets (GitHub) surfaces the 2-phase status via onStatu
   const progress = tailProgress({ ciSecretTarget: GITHUB_TARGET, setupMode: 'with-workflow' })
   const res = await runTailEffect('checking-ci-secrets', progress, deps)
   assertEquals(res.next, 'confirm-secrets-push', 'GitHub target routes to confirm-secrets-push')
-  // Phase 1 — resolve the repo (GitHub-specific), then Phase 2 — list existing vars in the resolved repo.
-  assert(statuses.some(s => /Resolving GitHub repository/i.test(s)), 'phase 1 status must announce resolving the GitHub repository')
-  assert(statuses.some(s => /Checking existing env vars in octo\/repo/i.test(s)), 'phase 2 status must name the resolved repo')
-  // The dedicated check-phase hook receives the same text.
-  assert(phases.some(p => /Resolving GitHub repository/i.test(p)), 'phase 1 must also fire onCiSecretCheckPhase')
-  assert(phases.some(p => /Checking existing env vars in octo\/repo/i.test(p)), 'phase 2 must also fire onCiSecretCheckPhase with the repo')
+  // GAP 2: the check phases fire on the DEDICATED onCiSecretCheckPhase hook only
+  // (android: setCiSecretCheckPhase). They MUST NOT go through onStatus — the
+  // driver routes onStatus to the oauth/gcp sinks, so reusing it here would
+  // corrupt those panes.
+  assert(phases.some(p => /Resolving GitHub repository/i.test(p)), 'phase 1 fires onCiSecretCheckPhase')
+  assert(phases.some(p => /Checking existing env vars in octo\/repo/i.test(p)), 'phase 2 fires onCiSecretCheckPhase with the repo')
+  assert(!statuses.some(s => /Resolving GitHub repository/i.test(s)), 'phase 1 must NOT go through onStatus')
+  assert(!statuses.some(s => /Checking existing env vars/i.test(s)), 'phase 2 must NOT go through onStatus')
 })
 
-await test('checking-ci-secrets (GitLab) phase 2 names the target label (no repo resolution)', async () => {
+await test('checking-ci-secrets (GitLab) phase 2 names the target label via onCiSecretCheckPhase only (no repo resolution)', async () => {
   const GITLAB_TARGET = { provider: 'gitlab', label: 'GitLab CI/CD variables', cli: 'glab' }
   const statuses = []
-  const deps = makeDeps({ onStatus: msg => statuses.push(msg) })
+  const phases = []
+  const deps = makeDeps({ onStatus: msg => statuses.push(msg), onCiSecretCheckPhase: p => phases.push(p) })
   const progress = tailProgress({ ciSecretTarget: GITLAB_TARGET, setupMode: 'secrets-only' })
   const res = await runTailEffect('checking-ci-secrets', progress, deps)
   // GitLab with no existing keys → uploading-ci-secrets.
   assertEquals(res.next, 'uploading-ci-secrets', 'GitLab with no existing keys routes to upload')
-  assert(statuses.some(s => /Checking existing env vars in GitLab CI\/CD variables/i.test(s)), 'GitLab phase 2 status names the target label')
+  assert(phases.some(p => /Checking existing env vars in GitLab CI\/CD variables/i.test(p)), 'GitLab phase 2 names the target label via onCiSecretCheckPhase')
+  assert(!statuses.some(s => /Checking existing env vars/i.test(s)), 'GitLab phase 2 must NOT go through onStatus')
   assert(!deps.__calls.some(c => c.name === 'getCiSecretRepoLabelAsync'), 'GitLab must not resolve a GitHub repo label')
+})
+
+// ─── GAP 2: checking-ci-secrets sets ciSecretError + routes to ci-secrets-failed ──
+//
+// The bespoke android tail (app.tsx ~L1421-1452) sets ciSecretError on the
+// repo-null path and in its catch, then routes to ci-secrets-failed — it never
+// throws (credentials are already saved). The shared engine surfaces the reason
+// via transient.ciSecretError AND the OPTIONAL deps.onCiSecretError hook.
+
+await test('GAP2: checking-ci-secrets repo-null sets transient.ciSecretError + onCiSecretError and routes to ci-secrets-failed', async () => {
+  const errors = []
+  const deps = makeDeps({
+    onCiSecretError: msg => errors.push(msg),
+    getCiSecretRepoLabelAsync: async (...a) => { deps.__calls.push({ name: 'getCiSecretRepoLabelAsync', args: a }); return null },
+  })
+  const progress = tailProgress({ ciSecretTarget: GITHUB_TARGET, setupMode: 'with-workflow' })
+  const res = await runTailEffect('checking-ci-secrets', progress, deps)
+  assertEquals(res.next, 'ci-secrets-failed', 'an unresolvable GitHub repo routes to ci-secrets-failed')
+  assert(res.transient && /Could not resolve the GitHub repository/.test(res.transient.ciSecretError), 'the repo-null reason rides in transient.ciSecretError')
+  assert(res.transient.ciSecretRepoLabel === null, 'the repo label is surfaced as null')
+  assert(errors.some(e => /Could not resolve the GitHub repository/.test(e)), 'onCiSecretError fires with the repo-null reason')
+})
+
+await test('GAP2: checking-ci-secrets that THROWS routes to ci-secrets-failed with transient.ciSecretError (no throw)', async () => {
+  const errors = []
+  const deps = makeDeps({
+    onCiSecretError: msg => errors.push(msg),
+    getCiSecretRepoLabelAsync: async () => { throw new Error('gh exploded') },
+  })
+  const progress = tailProgress({ ciSecretTarget: GITHUB_TARGET, setupMode: 'with-workflow' })
+  let threw = false
+  let res
+  try {
+    res = await runTailEffect('checking-ci-secrets', progress, deps)
+  }
+  catch {
+    threw = true
+  }
+  assert(!threw, 'checking-ci-secrets must NOT propagate the throw')
+  assertEquals(res.next, 'ci-secrets-failed', 'a thrown check routes to ci-secrets-failed')
+  assert(res.transient && /gh exploded/.test(res.transient.ciSecretError), 'the thrown reason rides in transient.ciSecretError')
+  assert(errors.some(e => /gh exploded/.test(e)), 'onCiSecretError fires with the thrown reason')
+})
+
+await test('GAP2: checking-ci-secrets with NO target routes to ci-secrets-failed (no throw)', async () => {
+  const deps = makeDeps()
+  let threw = false
+  let res
+  try {
+    res = await runTailEffect('checking-ci-secrets', tailProgress(), deps)
+  }
+  catch {
+    threw = true
+  }
+  assert(!threw, 'a missing target must NOT throw out of the engine')
+  assertEquals(res.next, 'ci-secrets-failed', 'a missing target routes to ci-secrets-failed')
+  assert(res.transient && typeof res.transient.ciSecretError === 'string', 'the missing-target reason rides in transient.ciSecretError')
 })
 
 await test('checking-ci-secrets degrades gracefully when onStatus/onCiSecretCheckPhase are absent (iOS)', async () => {
