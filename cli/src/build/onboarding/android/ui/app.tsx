@@ -2993,10 +2993,20 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
             ]}
             onChange={(value) => {
               if (value === 'yes') {
-                setEnvExportTargetPath(defaultExportPath(appId, 'android'))
-                setStep('exporting-env')
+                const exportPath = defaultExportPath(appId, 'android')
+                setEnvExportTargetPath(exportPath)
+                // Engine-derived [MATCH]: declined GH Actions + a chosen export
+                // path resumes to the (overwrite-safe) exporting-env write effect.
+                setStep(tailEngineNext(
+                  'ask-export-env',
+                  { step: 'ask-export-env', value: 'yes', envExportTargetPath: exportPath },
+                  { buildRequested: true },
+                ))
                 return
               }
+              // [DIVERGE] 'no' records no field — there is no "export declined"
+              // marker, so the resume router would re-show this prompt. The
+              // in-session decline ends the tail, so keep it driver-routed.
               setStep('build-complete')
             }}
           />
