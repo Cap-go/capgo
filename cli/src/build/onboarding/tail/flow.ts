@@ -762,6 +762,18 @@ export async function runTailEffect<P extends TailEffectProgress>(
       if (!target)
         throw new Error('No git hosting target selected.')
 
+      // 2-phase status text, mirroring the bespoke android tail (app.tsx
+      // ~L1421-1438). Surface it on BOTH onStatus (the neutral status channel) and
+      // the dedicated onCiSecretCheckPhase hook (android: setCiSecretCheckPhase).
+      // Both are OPTIONAL — absent on iOS, where this is a no-op.
+      const emitCheckPhase = (phase: string): void => {
+        deps.onStatus?.(phase)
+        deps.onCiSecretCheckPhase?.(phase)
+      }
+
+      // Phase 1: resolve the target repo (GitHub only) — non-blocking so the
+      // spinner keeps animating.
+      emitCheckPhase('Resolving GitHub repository…')
       let repoLabel: string | null = null
       if (target.provider === 'github') {
         repoLabel = await deps.getCiSecretRepoLabelAsync!(target)
@@ -769,6 +781,11 @@ export async function runTailEffect<P extends TailEffectProgress>(
           return { progress, next: 'ci-secrets-failed', transient: { ciSecretRepoLabel: null } }
       }
 
+      // Phase 2: list existing secrets in the resolved repo (or the target label
+      // when there is no GitHub repo to name).
+      emitCheckPhase(repoLabel
+        ? `Checking existing env vars in ${repoLabel}…`
+        : `Checking existing env vars in ${getCiSecretTargetLabel(target)}…`)
       const entries = tailCiSecretEntries(progress, deps)
       const existing = await deps.listExistingCiSecretKeysAsync!(target, entries.map(entry => entry.key))
 

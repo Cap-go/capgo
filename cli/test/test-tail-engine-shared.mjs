@@ -276,6 +276,47 @@ await test("checking-ci-secrets (GitHub) → next 'confirm-secrets-push' (uses g
   assert(deps.__calls.some(c => c.name === 'listExistingCiSecretKeysAsync'), 'must list existing secret keys')
 })
 
+// ─── CONCERN 3: checking-ci-secrets surfaces the 2-phase status text ───────────
+
+await test('checking-ci-secrets (GitHub) surfaces the 2-phase status via onStatus + onCiSecretCheckPhase', async () => {
+  const statuses = []
+  const phases = []
+  const deps = makeDeps({
+    onStatus: msg => statuses.push(msg),
+    onCiSecretCheckPhase: phase => phases.push(phase),
+    getCiSecretRepoLabelAsync: async (...a) => { deps.__calls.push({ name: 'getCiSecretRepoLabelAsync', args: a }); return 'octo/repo' },
+  })
+  const progress = tailProgress({ ciSecretTarget: GITHUB_TARGET, setupMode: 'with-workflow' })
+  const res = await runTailEffect('checking-ci-secrets', progress, deps)
+  assertEquals(res.next, 'confirm-secrets-push', 'GitHub target routes to confirm-secrets-push')
+  // Phase 1 — resolve the repo (GitHub-specific), then Phase 2 — list existing vars in the resolved repo.
+  assert(statuses.some(s => /Resolving GitHub repository/i.test(s)), 'phase 1 status must announce resolving the GitHub repository')
+  assert(statuses.some(s => /Checking existing env vars in octo\/repo/i.test(s)), 'phase 2 status must name the resolved repo')
+  // The dedicated check-phase hook receives the same text.
+  assert(phases.some(p => /Resolving GitHub repository/i.test(p)), 'phase 1 must also fire onCiSecretCheckPhase')
+  assert(phases.some(p => /Checking existing env vars in octo\/repo/i.test(p)), 'phase 2 must also fire onCiSecretCheckPhase with the repo')
+})
+
+await test('checking-ci-secrets (GitLab) phase 2 names the target label (no repo resolution)', async () => {
+  const GITLAB_TARGET = { provider: 'gitlab', label: 'GitLab CI/CD variables', cli: 'glab' }
+  const statuses = []
+  const deps = makeDeps({ onStatus: msg => statuses.push(msg) })
+  const progress = tailProgress({ ciSecretTarget: GITLAB_TARGET, setupMode: 'secrets-only' })
+  const res = await runTailEffect('checking-ci-secrets', progress, deps)
+  // GitLab with no existing keys → uploading-ci-secrets.
+  assertEquals(res.next, 'uploading-ci-secrets', 'GitLab with no existing keys routes to upload')
+  assert(statuses.some(s => /Checking existing env vars in GitLab CI\/CD variables/i.test(s)), 'GitLab phase 2 status names the target label')
+  assert(!deps.__calls.some(c => c.name === 'getCiSecretRepoLabelAsync'), 'GitLab must not resolve a GitHub repo label')
+})
+
+await test('checking-ci-secrets degrades gracefully when onStatus/onCiSecretCheckPhase are absent (iOS)', async () => {
+  // makeDeps provides a no-op onStatus; remove the check-phase hook entirely.
+  const deps = makeDeps()
+  const progress = tailProgress({ ciSecretTarget: GITHUB_TARGET, setupMode: 'with-workflow' })
+  const res = await runTailEffect('checking-ci-secrets', progress, deps)
+  assertEquals(res.next, 'confirm-secrets-push', 'routing is unaffected when the status hooks are no-ops/absent')
+})
+
 await test("uploading-ci-secrets (setupMode=with-workflow) → next 'pick-package-manager' (uses uploadCiSecretsAsync)", async () => {
   const deps = makeDeps()
   const progress = tailProgress({ ciSecretTarget: GITHUB_TARGET, setupMode: 'with-workflow' })
