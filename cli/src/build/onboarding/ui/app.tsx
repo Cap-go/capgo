@@ -124,9 +124,27 @@ import {
   PlatformSelectStep,
   WelcomeStep,
 } from './steps/ios-shared.js'
+import type { IosEffectDeps, IosStepCtx } from '../ios/flow.js'
+import { runIosEffect } from '../ios/flow.js'
+import { getIosResumeStep } from '../ios/progress.js'
 
 const OUTPUT_LINE_SPLIT_RE = /\r?\n/
 const CARRIAGE_RETURN_RE = /\r/g
+
+// The create-new credential PROVISIONING effect steps the iOS engine-driver
+// (below) routes through the shared engine's `runIosEffect`. The CHOICE / INPUT
+// steps and the import-side effects keep their bespoke bodies for now (Stage 3
+// swaps the choice/input routing). verifying-key is in the set but the driver
+// guards it to the create-new path only (import keeps the bespoke routing).
+const IOS_ENGINE_CREATE_EFFECT_STEPS = new Set<OnboardingStep>([
+  'backing-up',
+  'p8-method-select',
+  'verifying-key',
+  'creating-certificate',
+  'revoking-certificate',
+  'creating-profile',
+  'deleting-duplicate-profiles',
+])
 
 interface LogEntry { text: string, color?: string }
 
@@ -764,6 +782,18 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
    */
   const [duplicateProfileOrigin, setDuplicateProfileOrigin] = useState<'creating-profile' | 'import-create-profile-only'>('creating-profile')
 
+  // ─── Engine-driven create-new effect carried transient (ink-thin-wrapper) ───
+  // Driver-held transient threaded between the create-new provisioning effects
+  // (verifying-key → creating-certificate → creating-profile, plus the cert-limit
+  // / duplicate recovery branches). Mirrors the e2e driver's `carried` and the
+  // android driver's deps.carried: the engine's IosEffectResult.transient is
+  // merged in here after each effect and passed back as deps.carried on the next.
+  // NEVER persisted — these are the ephemeral cert/profile/p12 payloads + the
+  // .p8 bytes + the cert-limit / duplicate selections. Held in a ref (not state)
+  // so a re-render between effects doesn't lose it and reads see the freshest
+  // value synchronously, exactly like p8ContentRef.
+  const iosCarriedRef = useRef<NonNullable<IosEffectDeps['carried']>>({})
+
   const addLog = useCallback((text: string, color = 'green') => {
     setLog((prev) => {
       // Drop a consecutive duplicate: completed-step breadcrumbs are idempotent,
@@ -1227,32 +1257,10 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
       }, 800)
     }
 
-    if (step === 'backing-up') {
-      ;(async () => {
-        const credPath = join(homedir(), '.capgo-credentials', 'credentials.json')
-        const date = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
-        const backupPath = join(homedir(), '.capgo-credentials', `credentials-${date}.copy.json`)
-        try {
-          await copyFile(credPath, backupPath)
-          if (cancelled)
-            return
-          addLog(`✔ Backup saved · ${backupPath}`)
-        }
-        catch {
-          if (cancelled)
-            return
-          addLog('⚠ Could not backup credentials (file may not exist yet)', 'yellow')
-        }
-        // After backup, offer the setup-method fork on macOS so the user can
-        // pick between import and create-new. Non-macOS goes straight to ASC.
-        if (isMacOS()) {
-          setStep('setup-method-select')
-        }
-        else {
-          setStep('api-key-instructions')
-        }
-      })()
-    }
+    // backing-up is now engine-driven (IOS_ENGINE_CREATE_EFFECT_STEPS) —
+    // see the create-new effect driver below. The engine copies the credentials
+    // backup, persists the _credentialsExistGate='done' marker, and routes to
+    // setup-method-select (macOS) / api-key-instructions (off-macOS).
 
     if (step === 'platform-select') {
       // Check if ios/ exists — if not, skip Select and go straight to error
@@ -1859,42 +1867,19 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
       })()
     }
 
-    if (step === 'p8-method-select' && !pickerOpenedRef.current) {
-      pickerOpenedRef.current = true
-      ;(async () => {
-        try {
-          const selected = await openFilePicker()
-          if (cancelled)
-            return
-          if (selected) {
-            const content = await readFile(selected, 'utf-8')
-            if (cancelled)
-              return
-            setP8Path(selected)
-            setP8Content(content)
-            const extracted = extractKeyIdFromPath(selected)
-            if (extracted)
-              setKeyId(extracted)
-            upsertLog('✔ Key file selected · ', `✔ Key file selected · ${selected}`)
-            // Persist the extracted keyId too — otherwise quitting before the
-            // Key ID step loses it and resume shows the empty placeholder.
-            void savePartialProgress({ p8Path: selected, keyId: extracted || undefined })
-            setStep('input-key-id')
-          }
-          else {
-            // User cancelled picker — fall back to manual
-            setStep('input-p8-path')
-          }
-        }
-        catch (err) {
-          if (cancelled)
-            return
-          handleError(new Error(`Could not read file: ${err instanceof Error ? err.message : String(err)}`), 'api-key-instructions')
-        }
-      })()
-    }
+    // p8-method-select is now engine-driven (IOS_ENGINE_CREATE_EFFECT_STEPS) —
+    // the engine opens the native .p8 picker (idempotent via carried.pickerOpened),
+    // reads the bytes, persists {p8Path, extracted keyId}, threads the raw bytes
+    // back in transient.p8Content, and routes to input-key-id (or input-p8-path on
+    // cancel). The driver below mirrors p8Path/keyId/p8Content into React state.
 
-    if (step === 'verifying-key') {
+    // verifying-key for the create-new path is now engine-driven
+    // (IOS_ENGINE_CREATE_EFFECT_STEPS). This bespoke body keeps ONLY the IMPORT /
+    // pendingRecoveryAction routing (import-validating-all-certs /
+    // import-pick-identity / import-{recovery-action}) the engine's `next` doesn't
+    // express — the Stage-2 driver guards verifying-key to !importMode &&
+    // !pendingRecoveryAction so the two never double-fire.
+    if (step === 'verifying-key' && (importMode || pendingRecoveryAction)) {
       ;(async () => {
         try {
           const token = await getFreshToken()
@@ -1975,141 +1960,16 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
       })()
     }
 
-    if (step === 'creating-certificate') {
-      ;(async () => {
-        try {
-          const token = await getFreshToken()
-          const { csrPem, privateKeyPem } = generateCsr()
-          // Save private key to progress in case of crash
-          const existing = await loadProgress(appId)
-          if (existing) {
-            existing._privateKeyPem = privateKeyPem
-            await saveProgress(appId, existing)
-          }
-          const cert = await createCertificate(token, csrPem)
-          if (cancelled)
-            return
-          const { p12Base64 } = createP12(cert.certificateContent, privateKeyPem)
-          const certResult: CertificateData = {
-            certificateId: cert.certificateId,
-            expirationDate: cert.expirationDate,
-            teamId: cert.teamId,
-            p12Base64,
-          }
-          setCertData(certResult)
-          if (cert.teamId)
-            setTeamId(cert.teamId)
-          // Update progress: save cert data, wipe private key
-          const progress = await loadProgress(appId)
-          if (progress) {
-            progress.completedSteps.certificateCreated = certResult
-            delete progress._privateKeyPem
-            await saveProgress(appId, progress)
-          }
-          addLog(`✔ Distribution certificate created — Expires ${cert.expirationDate}`)
-          setRetryCount(0)
-          setStep('creating-profile')
-        }
-        catch (err) {
-          if (cancelled)
-            return
-          if (err instanceof CertificateLimitError) {
-            setExistingCerts(err.certificates)
-            setStep('cert-limit-prompt')
-          }
-          else {
-            handleError(err, 'creating-certificate')
-          }
-        }
-      })()
-    }
-
-    if (step === 'revoking-certificate') {
-      ;(async () => {
-        try {
-          if (!certToRevoke)
-            return
-          const token = await getFreshToken()
-          await revokeCertificate(token, certToRevoke)
-          if (cancelled)
-            return
-          addLog('✔ Old certificate revoked')
-          setCertToRevoke(null)
-          setExistingCerts([])
-          // Retry creating
-          setStep('creating-certificate')
-        }
-        catch (err) {
-          if (!cancelled)
-            handleError(err, 'creating-certificate')
-        }
-      })()
-    }
-
-    if (step === 'creating-profile') {
-      ;(async () => {
-        try {
-          const token = await getFreshToken()
-          const { bundleIdResourceId } = await ensureBundleId(token, iosBundleId)
-          const profile = await createProfile(token, bundleIdResourceId, certData!.certificateId, iosBundleId)
-          if (cancelled)
-            return
-          const profileResult: ProfileData = {
-            profileId: profile.profileId,
-            profileName: profile.profileName,
-            profileBase64: profile.profileContent,
-          }
-          setProfileData(profileResult)
-          // Update progress
-          const progress = await loadProgress(appId)
-          if (progress) {
-            progress.completedSteps.profileCreated = profileResult
-            await saveProgress(appId, progress)
-          }
-          addLog(`✔ Provisioning profile created — "${profile.profileName}"`)
-          setRetryCount(0)
-          setStep('saving-credentials')
-        }
-        catch (err) {
-          if (cancelled)
-            return
-          if (err instanceof DuplicateProfileError) {
-            // Record origin so deleting-duplicate-profiles retries the
-            // right path (create-new vs import D2).
-            setDuplicateProfileOrigin('creating-profile')
-            setDuplicateProfiles(err.profiles)
-            setStep('duplicate-profile-prompt')
-          }
-          else {
-            handleError(err, 'creating-profile')
-          }
-        }
-      })()
-    }
-
-    if (step === 'deleting-duplicate-profiles') {
-      ;(async () => {
-        try {
-          const token = await getFreshToken()
-          // Delete all duplicate profiles
-          for (const profile of duplicateProfiles) {
-            await deleteProfile(token, profile.id)
-          }
-          if (cancelled)
-            return
-          addLog(`✔ Removed ${duplicateProfiles.length} old profile(s)`)
-          setDuplicateProfiles([])
-          // Retry the step that originally raised the duplicate — import D2
-          // or the create-new path. duplicateProfileOrigin is set wherever
-          // DuplicateProfileError is caught and routed here.
-          setStep(duplicateProfileOrigin)
-        }
-        catch (err) {
-          if (!cancelled)
-            handleError(err, duplicateProfileOrigin)
-        }
-      })()
-    }
+    // creating-certificate / revoking-certificate / creating-profile /
+    // deleting-duplicate-profiles are now engine-driven
+    // (IOS_ENGINE_CREATE_EFFECT_STEPS) — see the create-new effect driver below.
+    // The engine generates the CSR + .p12, mints the cert (routing to
+    // cert-limit-prompt on CertificateLimitError), registers the bundle id +
+    // creates the profile (routing to duplicate-profile-prompt on
+    // DuplicateProfileError, persisting duplicateProfileOrigin), revokes the
+    // user-picked cert and retries, and deletes the duplicate profiles then
+    // routes back to the persisted origin. The driver mirrors certData /
+    // profileData / teamId / existingCerts / duplicateProfiles into React state.
 
     if (step === 'saving-credentials') {
       ;(async () => {
@@ -2627,6 +2487,225 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
     return () => {
       cancelled = true
     }
+  }, [step])
+
+  // ─── Engine-driven create-new effect driver (ink-thin-wrapper, Stage 2) ─────
+  // Route the create-new credential PROVISIONING effects through the shared iOS
+  // engine's `runIosEffect` instead of the hand-rolled per-step bodies in the
+  // useEffect above. The FLOW lives in the engine (ios/flow.ts, e2e-tested via
+  // test/test-ios-e2e.mjs); the RENDERING stays ink (the same ios-* step
+  // components). This mirrors the android engine-driver (android/ui/app.tsx) and
+  // the headless e2e driver: build a single iosDeps wiring the REAL apple-api /
+  // csr helpers (adapted from their JWT-token call shape to the engine's
+  // abstracted dep shapes via getFreshToken), run the effect against the freshest
+  // persisted progress, thread the returned transient into iosCarriedRef +
+  // mirror it into the React render state, and advance to result.next.
+  //
+  // SCOPE (Stage 2 create-new fork): backing-up, p8-method-select, verifying-key
+  // (create-new path only), creating-certificate, revoking-certificate,
+  // creating-profile, deleting-duplicate-profiles. The CHOICE steps
+  // (setup-method-select, cert-limit-prompt, duplicate-profile-prompt, the input
+  // steps) stay on the bespoke setStep handlers (Stage 3 swaps the choice/input
+  // routing). saving-credentials + the post-save tail are NOT routed here: the
+  // shared tail's buildIosSavedCredentials omits the APPLE_KEY_* fields the
+  // create-new app_store path writes via doSaveCredentials, so routing it would
+  // drop credentials — that needs an engine change (see the report).
+  //
+  // The IMPORT effects (import-scanning, import-validating-all-certs,
+  // import-checking-apple-cert, import-provide-profile-path,
+  // import-create-profile-only, import-compiling-helper, import-exporting) and
+  // the import-mode verifying-key routing keep their bespoke bodies for now.
+  useEffect(() => {
+    // verifying-key is SHARED between create-new and import: the engine's `next`
+    // covers only the create-new (→ creating-certificate) and pendingRecoveryAction
+    // (→ import-create-profile-only) cases — NOT the import app_store routing to
+    // import-validating-all-certs / import-pick-identity. So route it through the
+    // engine ONLY on the create-new path; import + pendingRecoveryAction keep the
+    // bespoke body above.
+    if (step === 'verifying-key' && (importMode || pendingRecoveryAction))
+      return
+    if (!IOS_ENGINE_CREATE_EFFECT_STEPS.has(step))
+      return
+
+    let cancelled = false
+
+    void (async () => {
+      // getFreshToken (the component's existing ASC JWT builder) adapts the raw
+      // apple-api helpers — which take a JWT `token` — to the engine's abstracted
+      // dep shapes. A NeedP8Error thrown here routes the user back to
+      // api-key-instructions via handleError, exactly as the bespoke effects did.
+      const deps: IosEffectDeps = {
+        appId,
+
+        // ── apple-api (token-adapted) ──
+        verifyApiKey: async () => {
+          const r = await verifyApiKey(await getFreshToken())
+          return { teamId: r.teamId }
+        },
+        createCertificate: async ({ csr }) => createCertificate(await getFreshToken(), csr),
+        revokeCertificate: async (certificateId) => {
+          await revokeCertificate(await getFreshToken(), certificateId)
+        },
+        createProfile: async ({ bundleId, certificateId }) => {
+          const token = await getFreshToken()
+          const { bundleIdResourceId } = await ensureBundleId(token, bundleId)
+          const p = await createProfile(token, bundleIdResourceId, certificateId, bundleId)
+          return {
+            profileId: p.profileId,
+            profileName: p.profileName,
+            profileBase64: p.profileContent,
+          }
+        },
+        deleteProfile: async (profileId) => {
+          await deleteProfile(await getFreshToken(), profileId)
+        },
+        listCertificates: async () => listDistributionCerts(await getFreshToken()),
+
+        // ── csr (shape-adapted) ──
+        generateCsr: () => {
+          const r = generateCsr()
+          return { csr: r.csrPem, privateKeyPem: r.privateKeyPem }
+        },
+        createP12: ({ certificatePem, privateKeyPem, password }) =>
+          createP12(certificatePem, privateKeyPem, password).p12Base64,
+
+        // ── file system + pickers ──
+        readFile: async path => Buffer.from(await readFile(path)),
+        copyFile,
+        openP8FilePicker: openFilePicker,
+        isMacOS,
+
+        // ── persistence ──
+        loadProgress,
+        saveProgress,
+
+        // ── carried transient (driver-held) — merged with the cert-limit /
+        // duplicate-profile selections the bespoke choice handlers stash in React
+        // state so the revoke / delete effects find their (ephemeral) inputs.
+        carried: {
+          ...iosCarriedRef.current,
+          // cert-limit-prompt's choice handler stores the picked cert id in
+          // `certToRevoke` (React) against the `existingCerts` list; the revoke
+          // effect only reads `.id`, so reconstruct the minimal cert object.
+          ...(step === 'revoking-certificate' && certToRevoke
+            ? { certToRevoke: existingCerts.find(c => c.id === certToRevoke) ?? { id: certToRevoke, name: '', serialNumber: '', expirationDate: '' } }
+            : {}),
+          // duplicate-profile-prompt's choice handler keeps the duplicate list in
+          // React `duplicateProfiles`; thread it so the delete effect knows what
+          // to delete.
+          ...(step === 'deleting-duplicate-profiles' ? { duplicateProfiles } : {}),
+        },
+
+        onLog: (message, color) => {
+          if (!cancelled)
+            addLog(message, color)
+        },
+      }
+
+      try {
+        // Run against the freshest persisted progress — the prior input steps
+        // persisted p8Path / keyId / issuerId before these auto steps run, so the
+        // loaded progress carries the same values the bespoke effects read from
+        // refs. Falls back to a fresh-progress skeleton when nothing is on disk.
+        const current = (await loadProgress(appId)) ?? {
+          platform: 'ios' as const,
+          appId,
+          startedAt: new Date().toISOString(),
+          completedSteps: {},
+        }
+        if (cancelled)
+          return
+        const result = await runIosEffect(step, current, deps)
+        if (cancelled)
+          return
+
+        const t: Partial<IosStepCtx> | undefined = result.transient
+        const np = result.progress
+
+        // ── error route: surface through the TUI's handleError so the support
+        // bundle + retryCount + telemetry UX is identical to the bespoke catch ──
+        if (result.next === 'error') {
+          handleError(new Error(t?.error ?? 'Onboarding failed.'), (t?.retryStep as OnboardingStep) ?? step)
+          return
+        }
+
+        // ── merge engine transient into the carried ref (threaded into the next
+        // effect) AND mirror it into the React render state downstream code reads ──
+        if (t) {
+          iosCarriedRef.current = { ...iosCarriedRef.current, ...t }
+          if (t.certData !== undefined)
+            setCertData(t.certData)
+          if (t.profileData !== undefined)
+            setProfileData(t.profileData)
+          if (t.teamId !== undefined)
+            setTeamId(t.teamId)
+          if (t.p8Content !== undefined)
+            setP8Content(t.p8Content.toString('utf-8'))
+          // cert-limit branch: creating-certificate surfaces the existing certs to
+          // offer for revocation (React `existingCerts` drives the prompt's list).
+          if (t.existingCerts !== undefined)
+            setExistingCerts(t.existingCerts)
+          // duplicate branch: creating-profile surfaces the duplicate Capgo
+          // profiles (React `duplicateProfiles` drives the prompt + delete count).
+          if (t.duplicateProfiles !== undefined)
+            setDuplicateProfiles(t.duplicateProfiles)
+        }
+
+        // ── p8-method-select picker effect: mirror the persisted p8Path/keyId so
+        // the input steps + getFreshToken see them, exactly as the bespoke body did.
+        if (step === 'p8-method-select') {
+          if (np.p8Path)
+            setP8Path(np.p8Path)
+          if (np.keyId)
+            setKeyId(np.keyId)
+        }
+
+        // creating-profile (engine) persists duplicateProfileOrigin='creating-profile'
+        // when it routes to the duplicate prompt; mirror it so the React render +
+        // the deleting-duplicate-profiles route agree.
+        if (np.duplicateProfileOrigin)
+          setDuplicateProfileOrigin(np.duplicateProfileOrigin)
+
+        // revoking-certificate success clears the cert-limit selection, matching
+        // the bespoke body (setCertToRevoke(null) + setExistingCerts([])).
+        if (step === 'revoking-certificate') {
+          setCertToRevoke(null)
+          setExistingCerts([])
+        }
+        // deleting-duplicate-profiles success clears the duplicate list, matching
+        // the bespoke body (setDuplicateProfiles([])).
+        if (step === 'deleting-duplicate-profiles')
+          setDuplicateProfiles([])
+
+        // A successful provisioning step resets the retry counter, mirroring the
+        // bespoke setRetryCount(0) at each create-new success point.
+        if (step === 'verifying-key' || step === 'creating-certificate' || step === 'creating-profile')
+          setRetryCount(0)
+
+        // ── advance ──────────────────────────────────────────────────────────
+        // The engine returns an explicit `next` for every effect step. For the
+        // create-new verifying-key the bespoke wrapped its next in
+        // redirectIfMismatch (the confirm-app-id bundle-id gate, a SYNC FS read
+        // the IO-free engine can't do) — re-apply it here so the create-new path
+        // still detours through confirm-app-id when config.appId and pbxproj
+        // disagree. Every other step's next is used verbatim.
+        const next = result.next ?? getIosResumeStep(np)
+        if (!next)
+          return
+        const advanceTo = step === 'verifying-key' ? redirectIfMismatch(next) : next
+        if (advanceTo !== step)
+          setStep(advanceTo)
+      }
+      catch (err) {
+        if (!cancelled)
+          handleError(err, step)
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step])
 
   // Spinner-frame ticker for the in-flight profile prefetch cells. Runs only
