@@ -67,9 +67,9 @@ const roleDefaultChannelPermissions: Record<string, Record<ChannelPermissionKey,
     'channel.promote_bundle': true,
   },
   app_uploader: {
-    'channel.read': true,
-    'channel.read_history': true,
-    'channel.promote_bundle': true,
+    'channel.read': false,
+    'channel.read_history': false,
+    'channel.promote_bundle': false,
   },
   app_reader: {
     'channel.read': false,
