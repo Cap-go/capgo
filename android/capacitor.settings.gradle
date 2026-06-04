@@ -176,8 +176,6 @@ project(':capgo-capacitor-intercom').projectDir = new File('../node_modules/.bun
 include ':capgo-capacitor-is-root'
 project(':capgo-capacitor-is-root').projectDir = new File('../node_modules/.bun/@capgo+capacitor-is-root@8.1.11+1b808583819c2ac6/node_modules/@capgo/capacitor-is-root/android')
 
-include ':capgo-capacitor-ivs-player'
-project(':capgo-capacitor-ivs-player').projectDir = new File('../node_modules/.bun/@capgo+capacitor-ivs-player@8.0.19+1b808583819c2ac6/node_modules/@capgo/capacitor-ivs-player/android')
 
 include ':capgo-capacitor-jw-player'
 project(':capgo-capacitor-jw-player').projectDir = new File('../node_modules/.bun/@capgo+capacitor-jw-player@8.0.28+1b808583819c2ac6/node_modules/@capgo/capacitor-jw-player/android')

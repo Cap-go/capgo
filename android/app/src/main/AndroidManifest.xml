@@ -49,15 +49,6 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths"></meta-data>
         </provider>
-
-        <!-- Google Cast: @capgo/capacitor-jw-player and @capgo/capacitor-ivs-player both
-             declare OPTIONS_PROVIDER_CLASS_NAME, but Android allows only one Cast
-             OptionsProvider per app, which fails manifest merge. Force a single winner
-             here. Swap the value to ee.forgr.ivsplayer.CastOptionsProvider to use IVS. -->
-        <meta-data
-            android:name="com.google.android.gms.cast.framework.OPTIONS_PROVIDER_CLASS_NAME"
-            android:value="ee.forgr.capacitor_jw_player.CastOptionsProvider"
-            tools:replace="android:value" />
     </application>
 
     <!-- Permissions -->
