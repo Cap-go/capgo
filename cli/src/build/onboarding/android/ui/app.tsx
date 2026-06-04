@@ -211,6 +211,7 @@ const TAIL_DRIVER_STEPS = new Set<AndroidOnboardingStep>([
   'exporting-env',
   'overwrite-and-export-env',
   'writing-workflow-file',
+  'requesting-build',
 ])
 
 /** OAuth scopes — superset of `androidpublisher` because we also need
@@ -1348,95 +1349,6 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
       })()
     }
 
-    if (step === 'requesting-build') {
-      ;(async () => {
-        try {
-          // CLI-flag key takes precedence over the saved one — same precedence
-          // the iOS path uses (build/onboarding/ui/app.tsx#624). Without this,
-          // `build init --platform android --apikey FOO` silently ignored FOO
-          // and fell back to whichever key was on disk.
-          let capgoKey: string | undefined = apikey
-          if (!capgoKey)
-            capgoKey = findSavedKeySilent()
-          if (!capgoKey) {
-            setBuildOutput(prev => [...prev, '⚠ No Capgo API key found.'])
-            setBuildOutput(prev => [...prev, 'Run `capgo login` first, then `capgo build request --platform android`.'])
-            setStep('build-complete')
-            return
-          }
-          const buildLogger: BuildLogger = {
-            info: (msg: string) => setBuildOutput(prev => [...prev, msg]),
-            error: (msg: string) => setBuildOutput(prev => [...prev, `✖ ${msg}`]),
-            warn: (msg: string) => setBuildOutput(prev => [...prev, `⚠ ${msg}`]),
-            success: (msg: string) => setBuildOutput(prev => [...prev, `✔ ${msg}`]),
-            buildLog: (msg: string) => setBuildOutput(prev => [...prev, ...sanitizeBuildLogLines(msg)]),
-            uploadProgress: (percent: number) => {
-              setBuildOutput((prev) => {
-                const idx = prev.findIndex(l => l.startsWith('Uploading:'))
-                const line = `Uploading: ${percent.toFixed(0)}%`
-                if (idx >= 0) {
-                  const next = [...prev]
-                  next[idx] = line
-                  return next
-                }
-                return [...prev, line]
-              })
-            },
-            customMsg: async (kind: string, data: Record<string, unknown>) => {
-              await handleCustomMsg(
-                kind,
-                data,
-                (line: string) => setBuildOutput(prev => [...prev, line]),
-                (line: string) => setBuildOutput(prev => [...prev, line]),
-              )
-            },
-          }
-          setBuildOutput([`Requesting build for ${appId} (android)...`])
-          const result = await requestBuildInternal(appId, {
-            platform: 'android',
-            apikey: capgoKey,
-            // The Ink TUI owns the terminal — @clack/prompts inside
-            // requestBuildInternal would corrupt rendering. Caller-handled mode
-            // surfaces the captured log path via result.aiAnalysis and lets us
-            // render the AI flow with Ink-native components.
-            aiAnalysisMode: 'caller-handled',
-          }, true, buildLogger)
-          if (cancelled)
-            return
-          if (result.success) {
-            const url = `https://capgo.app/app/${appId}/builds`
-            setBuildUrl(url)
-            setBuildOutput(prev => [...prev, '', `✔ Build queued — ${url}`])
-            // Only offer to push CI secrets AFTER we've successfully queued a
-            // build. If the build request failed (else branch) or we never had
-            // any credentials to push (entries empty), skip straight to exit.
-            if (ciSecretEntries.length > 0) {
-              setStep('detecting-ci-secrets')
-              return
-            }
-          }
-          else {
-            setBuildOutput(prev => [...prev, `⚠ ${result.error || 'unknown error'}`])
-            // Offer AI-assisted diagnosis when logs were captured. The log file
-            // stays on disk until releaseCapturedLogs runs in 'build-complete'.
-            if (result.aiAnalysis?.ready && result.aiAnalysis.jobId) {
-              setAiJobId(result.aiAnalysis.jobId)
-              setStep('ai-analysis-prompt')
-              return
-            }
-          }
-          setStep('build-complete')
-        }
-        catch (err) {
-          if (!cancelled) {
-            setBuildOutput(prev => [...prev, `⚠ ${err instanceof Error ? err.message : String(err)}`])
-            setBuildOutput(prev => [...prev, 'Your credentials are saved. Run `capgo build request --platform android` to try again.'])
-            setStep('build-complete')
-          }
-        }
-      })()
-    }
-
     // AI analysis — entered only when requestBuildInternal returned with
     // aiAnalysis.ready=true. See iOS sibling for full notes.
     if (step === 'ai-analysis-running' && aiJobId) {
@@ -1866,7 +1778,40 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
         requestBuildInternal,
 
         // ── streaming / telemetry / preload sinks (forwarded into the shared tail) ──
-        logger: undefined,
+        // The rich streaming BuildLogger requesting-build forwards into
+        // requestBuildInternal (4th arg) — every build line streams into the
+        // FullscreenBuildOutput pane via setBuildOutput, byte-for-byte the bespoke
+        // logger (info/error/warn/success/buildLog sanitize/uploadProgress dedup/
+        // customMsg → handleCustomMsg). Only requesting-build consumes it.
+        logger: {
+          info: (msg: string) => { if (!cancelled) setBuildOutput(prev => [...prev, msg]) },
+          error: (msg: string) => { if (!cancelled) setBuildOutput(prev => [...prev, `✖ ${msg}`]) },
+          warn: (msg: string) => { if (!cancelled) setBuildOutput(prev => [...prev, `⚠ ${msg}`]) },
+          success: (msg: string) => { if (!cancelled) setBuildOutput(prev => [...prev, `✔ ${msg}`]) },
+          buildLog: (msg: string) => { if (!cancelled) setBuildOutput(prev => [...prev, ...sanitizeBuildLogLines(msg)]) },
+          uploadProgress: (percent: number) => {
+            if (cancelled)
+              return
+            setBuildOutput((prev) => {
+              const idx = prev.findIndex(l => l.startsWith('Uploading:'))
+              const line = `Uploading: ${percent.toFixed(0)}%`
+              if (idx >= 0) {
+                const next = [...prev]
+                next[idx] = line
+                return next
+              }
+              return [...prev, line]
+            })
+          },
+          customMsg: async (kind: string, data: Record<string, unknown>) => {
+            await handleCustomMsg(
+              kind,
+              data,
+              (line: string) => { if (!cancelled) setBuildOutput(prev => [...prev, line]) },
+              (line: string) => { if (!cancelled) setBuildOutput(prev => [...prev, line]) },
+            )
+          },
+        },
         onBuildOutput: (line) => {
           if (!cancelled)
             setBuildOutput(prev => [...prev, line])
@@ -1909,6 +1854,13 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
         signal: abort.signal,
       }
 
+      // requesting-build resets the build VIEWER to empty BEFORE the engine streams
+      // in, so the engine's appended header (onBuildOutput) reproduces the bespoke
+      // `setBuildOutput([header])` REPLACE — wiping a prior build's output on the AI
+      // retry re-entry instead of appending under it.
+      if (step === 'requesting-build')
+        setBuildOutput([])
+
       try {
         const result = await runAndroidEffect(step, tailProgress, deps)
         if (cancelled)
@@ -1947,6 +1899,13 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
         // trackWorkflowEvent.
         if (t?.workflowFilePath !== undefined)
           setWorkflowWrittenPath(t.workflowFilePath)
+        // requesting-build: the queued build URL (transient.buildUrl) and the
+        // captured AI-analysis job id surfaced on a failed build (transient.aiJobId →
+        // the bespoke setAiJobId, which the ai-analysis-* ink sub-flow reads).
+        if (t?.buildUrl !== undefined)
+          setBuildUrl(t.buildUrl)
+        if (t?.aiJobId !== undefined)
+          setAiJobId(t.aiJobId)
         // The chosen CI-secret target rides on the RETURNED progress (the engine
         // sets it when detecting resolves a single target); mirror it into the
         // React state the downstream choice/auto steps read.
@@ -1982,14 +1941,21 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
           return
         // Step-aware error routing — match each bespoke tail handler's catch
         // EXACTLY. The shared engine wraps checking-ci-secrets / exporting-env /
-        // overwrite-and-export-env internally (returns a failure route, never
-        // throws), but detecting-ci-secrets / uploading-ci-secrets /
+        // overwrite-and-export-env / requesting-build internally (returns a failure
+        // route, never throws), but detecting-ci-secrets / uploading-ci-secrets /
         // writing-workflow-file can still throw OUT of the engine, so the driver
         // reproduces the bespoke recovery for those here. Credentials are already
         // saved on every tail step, so only saving-credentials uses handleError.
         const message = err instanceof Error ? err.message : String(err)
         if (step === 'saving-credentials') {
           handleError(err, 'saving-credentials')
+        }
+        else if (step === 'requesting-build') {
+          // The engine catches build-request throws internally (→ build-complete),
+          // so this is defensive parity with the bespoke catch (app.tsx ~L1430).
+          setBuildOutput(prev => [...prev, `⚠ ${message}`])
+          setBuildOutput(prev => [...prev, `Your credentials are saved. Run \`capgo build request --platform android\` to try again.`])
+          setStep('build-complete')
         }
         else if (step === 'exporting-env' || step === 'overwrite-and-export-env') {
           setEnvExportError(message)
