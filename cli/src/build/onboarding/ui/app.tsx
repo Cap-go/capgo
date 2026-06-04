@@ -3349,26 +3349,38 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
         // Path B Continue — re-poll /v1/apps and check for an app matching the
         // Release build id. Never re-opens the browser automatically.
         const continueCreateApp = async () => {
+          // Show the step's loader while we re-poll ASC (an async network call) —
+          // otherwise the re-check feels instant and the user can't tell it ran.
+          setVerifyAppLoading(true)
+          const attempt = verifyAttempt + 1
           try {
             const token = await getFreshToken()
             const apps = await listApps(token)
             setVerifyApps(apps)
             const satisfied = apps.some(a => a.bundleId === releaseId)
-            const attempt = verifyAttempt + 1
-            const gate = evaluateGate({ satisfied, attempt })
-            if (gate.proceed) {
+            if (evaluateGate({ satisfied, attempt }).proceed) {
               const matched = apps.find(a => a.bundleId === releaseId)
               addLog(`✓ Building "${matched?.name ?? releaseId}" (${releaseId}) — matches your App Store app.`)
               await passGate('create-app', releaseId)
               return
             }
+            // Still not found — count the attempt so the escalating box visibly
+            // advances, then ask before re-opening the browser.
             setVerifyAttempt(attempt)
             setVerifyAskReopen(true)
             trackVerifyEvent('iOS App Verify Gate Blocked', '🚧', { attempt, path: 'create-app' })
           }
           catch {
-            addLog("⚠ Couldn't re-check App Store Connect; try again in a moment.", 'yellow')
+            // Couldn't reach ASC — still count the attempt so the user sees the
+            // re-check happened (not a silent no-op) and surface a connectivity
+            // message distinct from "app still missing".
+            setVerifyAttempt(attempt)
             setVerifyAskReopen(true)
+            addLog("⚠ Couldn't reach App Store Connect to re-check — check your connection and try again.", 'yellow')
+            trackVerifyEvent('iOS App Verify Gate Blocked', '🚧', { attempt, path: 'create-app' })
+          }
+          finally {
+            setVerifyAppLoading(false)
           }
         }
 
