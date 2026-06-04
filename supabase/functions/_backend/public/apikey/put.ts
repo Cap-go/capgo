@@ -11,7 +11,7 @@ import { closeClient, getDrizzleClient, getPgClient } from '../../utils/pg.ts'
 import { checkPermission } from '../../utils/rbac.ts'
 import { schema } from '../../utils/postgres_schema.ts'
 import { supabaseAdmin, supabaseWithAuth, validateExpirationAgainstOrgPolicies, validateExpirationDate } from '../../utils/supabase.ts'
-import { apiKeyOwnerDataClient, ensureApiKeyManagementAllowed, isValidApiKeyIdFormat, requireApiKeyManagementAuth, selectOwnedApiKeyByIdentifier } from './scope.ts'
+import { ensureApiKeyManagementAllowed, isValidApiKeyIdFormat, requireApiKeyManagementAuth, selectOwnedApiKeyByIdentifier } from './scope.ts'
 
 const app = honoFactory.createApp()
 const APIKEY_ORG_READER_ROLE = 'apikey_org_reader'
@@ -261,14 +261,10 @@ async function handlePut(c: Context<MiddlewareKeyVariables>, idParam?: string) {
   }
 
   const supabase = supabaseWithAuth(c, auth)
-  // API-key auth reaches PostgREST as anon. Metadata writes go through the
-  // service role below with fixed owner filters so table RLS can deny direct
-  // apikey updates for user-facing roles.
-  const dataSupabase = apiKeyOwnerDataClient(c, auth)
+  const dataSupabase = supabase
   const policyLookupSupabase = supabaseAdmin(c)
 
-  // Check if the API key to update exists. JWT callers rely on RLS; API-key
-  // callers use the fixed user_id filter above after passing the limited-key guard.
+  // Check if the API key to update exists. JWT callers rely on RLS.
   const { data: existingApikey, error: fetchError } = await selectOwnedApiKeyByIdentifier<ApiKeyLookupRow>(c, auth, resolvedId, 'id, rbac_id, expires_at, key, key_hash')
 
   if (fetchError) {

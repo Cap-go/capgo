@@ -1,7 +1,8 @@
 import type { Database } from '../../utils/supabase.types.ts'
 import { honoFactory, quickError, simpleError } from '../../utils/hono.ts'
 import { middlewareAuth } from '../../utils/hono_middleware.ts'
-import { apiKeyOwnerDataClient, ensureApiKeyManagementAllowed, isValidApiKeyIdFormat, requireApiKeyManagementAuth, selectOwnedApiKeyByIdentifier } from './scope.ts'
+import { supabaseWithAuth } from '../../utils/supabase.ts'
+import { ensureApiKeyManagementAllowed, isValidApiKeyIdFormat, requireApiKeyManagementAuth, selectOwnedApiKeyByIdentifier } from './scope.ts'
 
 const app = honoFactory.createApp()
 
@@ -11,9 +12,7 @@ app.get('/', middlewareAuth(), async (c) => {
 
   await ensureApiKeyManagementAllowed(c, auth, apikey, 'cannot_list_apikeys')
 
-  // API-key auth reaches PostgREST as anon, so the server-mediated broad-key
-  // compatibility path uses a fixed owner filter after the limited-key guard.
-  const { data: apikeys, error } = await apiKeyOwnerDataClient(c, auth)
+  const { data: apikeys, error } = await supabaseWithAuth(c, auth)
     .from('apikeys')
     .select('*')
     .eq('user_id', auth.userId)
@@ -41,8 +40,6 @@ app.get('/:id', middlewareAuth(), async (c) => {
     throw simpleError('invalid_id_format', 'API key ID must be a valid UUID or number')
   }
 
-  // API-key auth reaches PostgREST as anon, so the server-mediated broad-key
-  // compatibility path uses a fixed owner filter after the limited-key guard.
   const { data: fetchedApikey, error } = await selectOwnedApiKeyByIdentifier(c, auth, id)
   if (error || !fetchedApikey) {
     throw quickError(404, 'failed_to_get_apikey', 'Failed to get API key', { supabaseError: error })

@@ -21,8 +21,6 @@ app.delete('/:id', middlewareAuth(), async (c) => {
     throw simpleError('invalid_id_format', 'API key ID must be a valid UUID or number')
   }
 
-  // API-key auth reaches PostgREST as anon, so the server-mediated broad-key
-  // compatibility path uses fixed id/user_id filters after the limited-key guard.
   const { data: apikey, error: apikeyError } = await selectOwnedApiKeyByIdentifier(c, auth, id)
   if (!apikey || apikeyError) {
     throw quickError(404, 'api_key_not_found', 'API key not found', { supabaseError: apikeyError })

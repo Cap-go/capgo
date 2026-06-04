@@ -302,10 +302,10 @@ describe('[POST] /apikey operations', () => {
     }
   })
 
-  it.concurrent('all API key keeps sibling API key management but cannot mutate itself', async () => {
+  it.concurrent('org super admin API key cannot manage sibling API keys', async () => {
     const createdKeyIds: number[] = []
     const dedicatedAuthHeaders = await getAuthHeadersForCredentials(USER_EMAIL_APIKEY_MANAGEMENT, USER_PASSWORD)
-    const allKeyHeaders = {
+    const superAdminKeyHeaders = {
       'Content-Type': 'application/json',
       'capgkey': APIKEY_MANAGEMENT_ORG_SUPER_ADMIN,
     }
@@ -314,7 +314,7 @@ describe('[POST] /apikey operations', () => {
       const siblingResponse = await fetch(`${BASE_URL}/apikey`, {
         method: 'POST',
         headers: dedicatedAuthHeaders,
-        body: JSON.stringify(orgKeyBody('all-key-sibling-management-target', {
+        body: JSON.stringify(orgKeyBody('org-super-admin-key-sibling-management-target', {
           bindings: orgApiKeyBindings(ORG_ID_APIKEY_MANAGEMENT),
         })),
       })
@@ -324,29 +324,31 @@ describe('[POST] /apikey operations', () => {
 
       const listResponse = await fetch(`${BASE_URL}/apikey`, {
         method: 'GET',
-        headers: allKeyHeaders,
+        headers: superAdminKeyHeaders,
       })
-      expect(listResponse.status).toBe(200)
+      expect(listResponse.status).toBe(401)
+      await expect(listResponse.json()).resolves.toHaveProperty('error', 'cannot_list_apikeys')
 
       const getResponse = await fetch(`${BASE_URL}/apikey/${siblingData.id}`, {
         method: 'GET',
-        headers: allKeyHeaders,
+        headers: superAdminKeyHeaders,
       })
-      expect(getResponse.status).toBe(200)
+      expect(getResponse.status).toBe(401)
+      await expect(getResponse.json()).resolves.toHaveProperty('error', 'cannot_get_apikey')
 
       const updateResponse = await fetch(`${BASE_URL}/apikey/${siblingData.id}`, {
         method: 'PUT',
-        headers: allKeyHeaders,
+        headers: superAdminKeyHeaders,
         body: JSON.stringify({
-          name: 'all-key-renamed-sibling',
+          name: 'org-super-admin-key-renamed-sibling',
         }),
       })
-      expect(updateResponse.status).toBe(200)
-      await expect(updateResponse.json()).resolves.toHaveProperty('name', 'all-key-renamed-sibling')
+      expect(updateResponse.status).toBe(401)
+      await expect(updateResponse.json()).resolves.toHaveProperty('error', 'cannot_update_apikey')
 
       const bindingUpdateResponse = await fetch(`${BASE_URL}/apikey/${siblingData.id}`, {
         method: 'PUT',
-        headers: allKeyHeaders,
+        headers: superAdminKeyHeaders,
         body: JSON.stringify({
           bindings: orgApiKeyBindings(ORG_ID_APIKEY_MANAGEMENT, 'org_super_admin'),
         }),
@@ -356,9 +358,9 @@ describe('[POST] /apikey operations', () => {
 
       const selfUpdateResponse = await fetch(`${BASE_URL}/apikey/112`, {
         method: 'PUT',
-        headers: allKeyHeaders,
+        headers: superAdminKeyHeaders,
         body: JSON.stringify({
-          name: 'all-key-self-update-blocked',
+          name: 'org-super-admin-key-self-update-blocked',
         }),
       })
       expect(selfUpdateResponse.status).toBe(401)
@@ -366,18 +368,22 @@ describe('[POST] /apikey operations', () => {
 
       const selfDeleteResponse = await fetch(`${BASE_URL}/apikey/112`, {
         method: 'DELETE',
-        headers: allKeyHeaders,
+        headers: superAdminKeyHeaders,
       })
       expect(selfDeleteResponse.status).toBe(401)
       await expect(selfDeleteResponse.json()).resolves.toHaveProperty('error', 'cannot_delete_apikey')
 
       const deleteResponse = await fetch(`${BASE_URL}/apikey/${siblingData.id}`, {
         method: 'DELETE',
-        headers: allKeyHeaders,
+        headers: superAdminKeyHeaders,
       })
-      expect(deleteResponse.status).toBe(200)
-      await expect(deleteResponse.json()).resolves.toHaveProperty('status', 'ok')
-      createdKeyIds.pop()
+      expect(deleteResponse.status).toBe(401)
+      await expect(deleteResponse.json()).resolves.toHaveProperty('error', 'cannot_delete_apikey')
+
+      const verifySiblingResponse = await fetch(`${BASE_URL}/apikey/${siblingData.id}`, { headers: dedicatedAuthHeaders })
+      expect(verifySiblingResponse.status).toBe(200)
+      const verifySiblingData = await verifySiblingResponse.json<{ name: string }>()
+      expect(verifySiblingData.name).toBe('org-super-admin-key-sibling-management-target')
     }
     finally {
       for (const keyId of createdKeyIds.reverse()) {
