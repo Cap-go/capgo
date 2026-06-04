@@ -1,7 +1,7 @@
 import type { FC } from 'react'
 import type { BuildLogger } from '../../request.js'
 import type { DiscoveredProfile, IdentityProfileMatch, SigningIdentity } from '../macos-signing.js'
-import type { ApiKeyData, CertificateData, EnrichedIdentityAvailability, OnboardingErrorCategory, OnboardingProgress, OnboardingResult, OnboardingStep, ProfileData } from '../types.js'
+import type { CertificateData, EnrichedIdentityAvailability, OnboardingErrorCategory, OnboardingProgress, OnboardingResult, OnboardingStep, ProfileData } from '../types.js'
 import { handleCustomMsg } from '../../qr.js'
 import { spawn } from 'node:child_process'
 import { Buffer } from 'node:buffer'
@@ -1373,84 +1373,69 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
     // back in transient.p8Content, and routes to input-key-id (or input-p8-path on
     // cancel). The driver below mirrors p8Path/keyId/p8Content into React state.
 
-    // verifying-key for the create-new path is now engine-driven
-    // (IOS_ENGINE_CREATE_EFFECT_STEPS). This bespoke body keeps ONLY the IMPORT /
-    // pendingRecoveryAction routing (import-validating-all-certs /
-    // import-pick-identity / import-{recovery-action}) the engine's `next` doesn't
-    // express — the Stage-2 driver guards verifying-key to !importMode &&
-    // !pendingRecoveryAction so the two never double-fire.
+    // verifying-key is SHARED between create-new and import. The create-new path
+    // is engine-driven (IOS_ENGINE_CREATE_EFFECT_STEPS, guarded to !importMode &&
+    // !pendingRecoveryAction). The IMPORT path routes through the SAME engine
+    // effect here, but OVERRIDES the engine's `next`: the engine expresses only
+    // create-new (→ creating-certificate) and pendingRecoveryAction (→
+    // import-create-profile-only); the plain import app_store entry must instead
+    // go to import-validating-all-certs / import-pick-identity (the engine has no
+    // way to express that). So run the engine for the verify + the apiKeyVerified
+    // persist (which preserves setupMethod / importDistribution), mirror teamId,
+    // then route per flow mode.
     if (step === 'verifying-key' && (importMode || pendingRecoveryAction)) {
       ;(async () => {
         try {
-          const token = await getFreshToken()
-          const verifyResult = await verifyApiKey(token)
+          const current = (await loadProgress(appId)) ?? {
+            platform: 'ios' as const,
+            appId,
+            startedAt: new Date().toISOString(),
+            completedSteps: {},
+          }
+          const res = await runIosEffect('verifying-key', current, {
+            appId,
+            verifyApiKey: async () => {
+              const r = await verifyApiKey(await getFreshToken())
+              return { teamId: r.teamId }
+            },
+            readFile: async path => Buffer.from(await readFile(path)),
+            loadProgress,
+            saveProgress,
+            carried: {
+              ...iosCarriedRef.current,
+              p8Content: iosCarriedRef.current.p8Content ?? (p8ContentRef.current ? Buffer.from(p8ContentRef.current) : undefined),
+            },
+            onLog: (message, color) => {
+              if (!cancelled)
+                addLog(message, color)
+            },
+          })
           if (cancelled)
             return
-          if (verifyResult.teamId)
-            setTeamId(verifyResult.teamId)
-          const apiKeyData: ApiKeyData = { keyId: keyIdRef.current, issuerId: issuerIdRef.current }
-          // Merge into existing progress instead of constructing fresh. The
-          // previous fresh-object approach wiped setupMethod / importDistribution
-          // (set by import-distribution-mode upstream), so a CLI restart after
-          // verifying-key succeeded but before saving-credentials would lose
-          // the import-flow context and resume into create-new — exactly the
-          // class of resume regression we already fixed once via the importMode
-          // hydration patch in commit 81a6f1c7. Same root cause, different
-          // site: every saveProgress must preserve fields it doesn't own.
-          const existing = await loadProgress(appId)
-          const progress: OnboardingProgress = {
-            ...(existing ?? {
-              platform: 'ios' as const,
-              appId,
-              startedAt: new Date().toISOString(),
-              completedSteps: {},
-            }),
-            p8Path: p8PathRef.current,
-            completedSteps: {
-              ...(existing?.completedSteps ?? {}),
-              apiKeyVerified: apiKeyData,
-            },
+          if (res.next === 'error') {
+            handleError(new Error(res.transient?.error ?? 'API key verification failed.'), (res.transient?.retryStep as OnboardingStep) ?? 'verifying-key')
+            return
           }
-          await saveProgress(appId, progress)
-          addLog(`✔ API Key verified — Key: ${keyId}`)
+          if (res.transient?.teamId !== undefined) {
+            iosCarriedRef.current = { ...iosCarriedRef.current, teamId: res.transient.teamId }
+            setTeamId(res.transient.teamId)
+          }
           setRetryCount(0)
-          // Branch on flow mode:
-          //  - import + pending recovery action → resume the action
-          //  - import (no pending action, app_store entry point) → continue to identity pick
-          //  - create-new (default) → continue to certificate creation
+          // Branch on flow mode — mirrors the bespoke routing exactly:
+          //  - import + pending recovery action → the engine resumed it
+          //    (res.next === 'import-create-profile-only'); clear the React mirror.
+          //  - import (no pending action, app_store entry point) → OVERRIDE the
+          //    engine's create-new 'creating-certificate' with the import target:
+          //    redirectIfMismatch(matches>0 ? import-validating-all-certs :
+          //    import-pick-identity). The eager batch validation runs before the
+          //    picker when there's at least one match.
           if (importMode && pendingRecoveryAction) {
-            const action = pendingRecoveryAction
             setPendingRecoveryAction(null)
-            setStep(`import-${action}` as OnboardingStep)
+            if (res.next)
+              setStep(res.next)
           }
           else if (importMode) {
-            // After p8 verification we're about to use the bundle id for
-            // Apple-side filtering; redirectIfMismatch routes through the
-            // confirm-app-id step when config.appId disagrees with
-            // pbxproj. Returns the same target step when there's no
-            // mismatch.
-            //
-            // Eager batch validation runs BEFORE the picker renders when
-            // there's at least one match — runs a single ASC cert fetch and
-            // indexes by SHA1 so the picker can split identities into
-            // Available / Unavailable tables with concrete reasons rather
-            // than a flat list with surprises on pick.
             setStep(redirectIfMismatch(importMatches.length > 0 ? 'import-validating-all-certs' : 'import-pick-identity'))
-          }
-          else {
-            // Create-new path: gate cert/profile creation on the iOS bundle
-            // id confirmation just like the import path two lines above.
-            // Without redirectIfMismatch here, a user whose project.pbxproj
-            // disagrees with config.appId would never see the confirm-app-id
-            // question on the create-new flow — and the downstream
-            // `creating-profile` would call `ensureBundleId(token, iosBundleId)`
-            // + `createProfile(token, …, iosBundleId)` with the un-confirmed
-            // default (= config.appId), registering a profile under the wrong
-            // bundle id on Apple's side. Certs themselves are team-wide so
-            // the gate placement at 'creating-certificate' is fine — when
-            // the user picks at confirm-app-id, the wizard resumes at this
-            // exact target step with the chosen iosBundleId in scope.
-            setStep(redirectIfMismatch('creating-certificate'))
           }
         }
         catch (err) {
@@ -3370,36 +3355,36 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
               },
               { label: '↩️   Back to identity selection', value: 'back' },
             ]}
-            onChange={(value) => {
-              if (value === 'browser') {
-                // Don't immediately open the portal — manual cert/profile
-                // creation on developer.apple.com is genuinely tricky
-                // (right cert type, allowed-certs list on the profile,
-                // bundle ID + capabilities, push the .mobileprovision
-                // back into Xcode). Route to a step that explains the
-                // manual steps + steers the user toward the automatic
-                // "Create a new App Store profile via Apple" option
-                // when it's available (almost always the better pick).
-                setStep('import-portal-explanation')
-                return
-              }
+            onChange={async (value) => {
+              // EPHEMERAL-branching: record the recovery pick into the carried ref
+              // + thread the sticky noMatchReason (so the menu keeps its variant on
+              // a bounce) and run the resolver effect. The engine routes 'browser' →
+              // import-portal-explanation, 'provide-profile-path' →
+              // import-provide-profile-path, 'back' → import-pick-identity, 'create'
+              // + ASC key → import-create-profile-only, 'create' + no key →
+              // api-key-instructions (PERSISTING pendingRecoveryAction). The driver
+              // RESETS profilePickerOpened before the file-picker path so the picker
+              // re-opens, mirroring the bespoke mobileprovisionPickerOpenedRef reset.
               if (value === 'provide-profile-path') {
                 mobileprovisionPickerOpenedRef.current = false
-                setStep('import-provide-profile-path')
-                return
+                iosCarriedRef.current = { ...iosCarriedRef.current, profilePickerOpened: false }
               }
-              if (value === 'back') {
-                setStep('import-pick-identity')
-                return
+              const current = (await loadProgress(appId)) ?? { platform: 'ios' as const, appId, startedAt: new Date().toISOString(), completedSteps: {} }
+              iosCarriedRef.current = {
+                ...iosCarriedRef.current,
+                recoveryAction: value as 'create' | 'provide-profile-path' | 'browser' | 'back',
+                chosenIdentity: chosenIdentity ?? iosCarriedRef.current.chosenIdentity,
+                noMatchReason: (noMatchReason ?? iosCarriedRef.current.noMatchReason) ?? undefined,
+                p8Content: iosCarriedRef.current.p8Content ?? (p8ContentRef.current ? Buffer.from(p8ContentRef.current) : undefined),
               }
-              if (value === 'create') {
-                if (hasAscKey)
-                  setStep('import-create-profile-only')
-                else {
-                  setPendingRecoveryAction('create-profile-only')
-                  setStep('api-key-instructions')
-                }
-              }
+              const res = await runIosEffect('import-no-match-recovery', current, { appId, carried: iosCarriedRef.current, saveProgress })
+              // 'create' + no ASC key persists pendingRecoveryAction in progress; keep
+              // the React mirror in sync so the import-mode verifying-key resume can
+              // route back to the profile-creation action.
+              if (res.next === 'api-key-instructions')
+                setPendingRecoveryAction('create-profile-only')
+              if (res.next && res.next !== 'import-no-match-recovery')
+                setStep(res.next)
             }}
           />
         )
@@ -3529,23 +3514,32 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
                   : []),
                 { label: '↩️   Back to recovery menu', value: 'back' },
               ]}
-              onChange={(value) => {
-                if (value === 'use-create') {
-                  setStep('import-create-profile-only')
-                  return
-                }
+              onChange={async (value) => {
+                // EPHEMERAL-branching: record the portal pick into the carried ref +
+                // thread the sticky noMatchReason and run the resolver effect. The
+                // engine routes 'use-create' → import-create-profile-only, 'use-file'
+                // → import-provide-profile-path, 'open-anyway' → opens the portal
+                // (deps.openExternal, best-effort) + a yellow breadcrumb then BACK to
+                // import-no-match-recovery, 'back' → import-no-match-recovery. The
+                // driver resets profilePickerOpened before the file-picker path.
                 if (value === 'use-file') {
                   mobileprovisionPickerOpenedRef.current = false
-                  setStep('import-provide-profile-path')
-                  return
+                  iosCarriedRef.current = { ...iosCarriedRef.current, profilePickerOpened: false }
                 }
-                if (value === 'open-anyway') {
-                  open('https://developer.apple.com/account/resources/profiles/list')
-                  addLog('🌐 Opened Apple Developer Portal — once you have downloaded the .mobileprovision file, come back and pick "📁 Use a .mobileprovision file from disk".', 'yellow')
-                  setStep('import-no-match-recovery')
-                  return
+                const current = (await loadProgress(appId)) ?? { platform: 'ios' as const, appId, startedAt: new Date().toISOString(), completedSteps: {} }
+                iosCarriedRef.current = {
+                  ...iosCarriedRef.current,
+                  portalAction: value as 'use-create' | 'open-anyway' | 'use-file' | 'back',
+                  noMatchReason: (noMatchReason ?? iosCarriedRef.current.noMatchReason) ?? undefined,
                 }
-                setStep('import-no-match-recovery')
+                const res = await runIosEffect('import-portal-explanation', current, {
+                  appId,
+                  carried: iosCarriedRef.current,
+                  openExternal: async (url) => { await open(url) },
+                  onLog: (message, color) => addLog(message, color),
+                })
+                if (res.next && res.next !== 'import-portal-explanation')
+                  setStep(res.next)
               }}
             />
           </Box>
@@ -3560,22 +3554,23 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
         <ImportExportWarningStep
           identityName={chosenIdentity.name}
           dense={dense}
-          onChange={(value) => {
-            if (value === 'go') {
-              // First run on this CLI version: compile the Swift helper
-              // explicitly so the user sees what's happening, instead of
-              // staring at the "look for the macOS dialog" spinner while
-              // we silently do a 2-3s swiftc invocation. Cache hit skips
-              // straight to export.
-              setStep(isHelperCached() ? 'import-exporting' : 'import-compiling-helper')
-            }
-            else if (value === 'back') {
-              // Back goes to profile selection (distribution mode is now upstream of this step)
-              setStep('import-pick-profile')
-            }
-            else {
+          onChange={async (value) => {
+            if (value === 'exit') {
+              // DIVERGE: the bespoke exit escape calls exitOnboarding directly (the
+              // engine models it as the resolver's 'error' route; the TUI's
+              // user-facing exit sink is exitOnboarding — keep it).
               exitOnboarding('Exiting. Re-run `build init` whenever you\'re ready.')
+              return
             }
+            // EPHEMERAL-branching: record 'go' / 'back' into the carried ref and run
+            // the resolver effect. 'go' → isHelperCached() ? import-exporting :
+            // import-compiling-helper (so the first run shows the swiftc compile
+            // instead of a silent pause); 'back' → import-pick-profile.
+            const current = (await loadProgress(appId)) ?? { platform: 'ios' as const, appId, startedAt: new Date().toISOString(), completedSteps: {} }
+            iosCarriedRef.current = { ...iosCarriedRef.current, exportWarningAction: value as 'go' | 'back' | 'exit' }
+            const res = await runIosEffect('import-export-warning', current, { appId, carried: iosCarriedRef.current, isHelperCached })
+            if (res.next && res.next !== 'import-export-warning')
+              setStep(res.next)
           }}
         />
       )}
