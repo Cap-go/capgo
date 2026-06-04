@@ -171,7 +171,7 @@ describe.skipIf(USE_CLOUDFLARE)('/private/role_bindings', () => {
     }
   })
 
-  it('allows app role managers to create, update, and delete channel-scoped bindings', async () => {
+  it.concurrent('allows app role managers to create, update, and delete channel-scoped bindings', async () => {
     const id = randomUUID()
     const orgId = randomUUID()
     const appUuid = randomUUID()
@@ -302,7 +302,7 @@ describe.skipIf(USE_CLOUDFLARE)('/private/role_bindings', () => {
     }
   })
 
-  it('allows app readers to fetch direct channel bindings for an app', async () => {
+  it.concurrent('allows app readers to fetch direct channel bindings for an app', async () => {
     const id = randomUUID()
     const orgId = randomUUID()
     const appUuid = randomUUID()
@@ -429,11 +429,12 @@ describe.skipIf(USE_CLOUDFLARE)('/private/role_bindings', () => {
     }
   })
 
-  it('allows app role managers to fetch assignable principals for an app', async () => {
+  it.concurrent('allows app role managers to fetch assignable principals for an app', async () => {
     const id = randomUUID()
     const orgId = randomUUID()
     const appUuid = randomUUID()
     const groupId = randomUUID()
+    const legacyOnlyUserId = randomUUID()
     const publicAppId = `com.role-binding.app-principals.${id}`
     const supabase = getSupabaseClient()
 
@@ -453,6 +454,35 @@ describe.skipIf(USE_CLOUDFLARE)('/private/role_bindings', () => {
         user_right: 'read',
       })
       expect(memberError).toBeNull()
+
+      const legacyOnlyEmail = `legacy-only-role-binding-${id}@capgo.app`
+      const { error: legacyOnlyAuthError } = await supabase.auth.admin.createUser({
+        id: legacyOnlyUserId,
+        email: legacyOnlyEmail,
+        email_confirm: true,
+      })
+      expect(legacyOnlyAuthError).toBeNull()
+
+      const { error: legacyOnlyUserError } = await supabase.from('users').insert({
+        id: legacyOnlyUserId,
+        email: legacyOnlyEmail,
+      })
+      expect(legacyOnlyUserError).toBeNull()
+
+      const { error: legacyOnlyMemberError } = await supabase.from('org_users').insert({
+        org_id: orgId,
+        user_id: legacyOnlyUserId,
+        user_right: 'read',
+      })
+      expect(legacyOnlyMemberError).toBeNull()
+
+      const { error: legacyOnlyBindingDeleteError } = await supabase
+        .from('role_bindings')
+        .delete()
+        .eq('principal_type', 'user')
+        .eq('principal_id', legacyOnlyUserId)
+        .eq('org_id', orgId)
+      expect(legacyOnlyBindingDeleteError).toBeNull()
 
       const { error: appError } = await supabase.from('apps').insert({
         id: appUuid,
@@ -510,6 +540,10 @@ describe.skipIf(USE_CLOUDFLARE)('/private/role_bindings', () => {
         id: USER_ID_2,
         label: 'test2@capgo.app',
       }))
+      expect(managerData).not.toContainEqual(expect.objectContaining({
+        type: 'user',
+        id: legacyOnlyUserId,
+      }))
       expect(managerData).toContainEqual(expect.objectContaining({
         type: 'group',
         id: groupId,
@@ -538,6 +572,8 @@ describe.skipIf(USE_CLOUDFLARE)('/private/role_bindings', () => {
       await supabase.from('role_bindings').delete().eq('org_id', orgId)
       await supabase.from('groups').delete().eq('id', groupId)
       await supabase.from('org_users').delete().eq('org_id', orgId)
+      await supabase.from('users').delete().eq('id', legacyOnlyUserId)
+      await supabase.auth.admin.deleteUser(legacyOnlyUserId)
       await supabase.from('apps').delete().eq('id', appUuid)
       await supabase.from('orgs').delete().eq('id', orgId)
     }
@@ -664,7 +700,7 @@ describe.skipIf(USE_CLOUDFLARE)('/private/role_bindings', () => {
     }
   })
 
-  it('removes user channel permission overrides when app access is removed', async () => {
+  it.concurrent('removes user channel permission overrides when app access is removed', async () => {
     const id = randomUUID()
     const orgId = randomUUID()
     const appUuid = randomUUID()

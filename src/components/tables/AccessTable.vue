@@ -357,6 +357,15 @@ async function assignAccessRole() {
 
   isLoading.value = true
   try {
+    const selectedChannel = assignAccessForm.value.scope_type === 'channel'
+      ? channels.value.find(channel => channel.id.toString() === assignAccessForm.value.channel_id)
+      : undefined
+
+    if (assignAccessForm.value.scope_type === 'channel' && !selectedChannel?.rbac_id) {
+      toast.error(t('please-select-channel'))
+      return false
+    }
+
     const { error } = await supabase.functions.invoke('private/role_bindings', {
       method: 'POST',
       body: {
@@ -366,7 +375,7 @@ async function assignAccessRole() {
         scope_type: assignAccessForm.value.scope_type,
         org_id: app.value.owner_org,
         app_id: app.value.id,
-        channel_id: assignAccessForm.value.scope_type === 'channel' ? assignAccessForm.value.channel_id : null,
+        channel_id: assignAccessForm.value.scope_type === 'channel' ? selectedChannel!.rbac_id : null,
         reason: null,
       },
     })

@@ -605,10 +605,6 @@ async function deleteChannelPermissionOverridesForBinding(
   tx: Parameters<Parameters<ReturnType<typeof getDrizzleClient>['transaction']>[0]>[0],
   binding: RoleBindingRecord,
 ) {
-  if (binding.principal_type !== 'user' && binding.principal_type !== 'apikey') {
-    return
-  }
-
   if (binding.scope_type === 'app' && binding.app_id) {
     await tx.execute(sql`
       DELETE FROM public.channel_permission_overrides AS overrides
@@ -619,6 +615,22 @@ async function deleteChannelPermissionOverridesForBinding(
         AND apps.id = ${binding.app_id}
         AND overrides.principal_type = ${binding.principal_type}
         AND overrides.principal_id = ${binding.principal_id}
+        AND NOT EXISTS (
+          SELECT 1
+          FROM public.role_bindings AS remaining_bindings
+          WHERE remaining_bindings.id <> ${binding.id}
+            AND remaining_bindings.principal_type = ${binding.principal_type}
+            AND remaining_bindings.principal_id = ${binding.principal_id}
+            AND remaining_bindings.app_id = ${binding.app_id}
+            AND (remaining_bindings.expires_at IS NULL OR remaining_bindings.expires_at > now())
+            AND (
+              remaining_bindings.scope_type = 'app'
+              OR (
+                remaining_bindings.scope_type = 'channel'
+                AND remaining_bindings.channel_id = channels.rbac_id
+              )
+            )
+        )
     `)
     return
   }
@@ -634,6 +646,22 @@ async function deleteChannelPermissionOverridesForBinding(
         AND channels.rbac_id = ${binding.channel_id}
         AND overrides.principal_type = ${binding.principal_type}
         AND overrides.principal_id = ${binding.principal_id}
+        AND NOT EXISTS (
+          SELECT 1
+          FROM public.role_bindings AS remaining_bindings
+          WHERE remaining_bindings.id <> ${binding.id}
+            AND remaining_bindings.principal_type = ${binding.principal_type}
+            AND remaining_bindings.principal_id = ${binding.principal_id}
+            AND remaining_bindings.app_id = ${binding.app_id}
+            AND (remaining_bindings.expires_at IS NULL OR remaining_bindings.expires_at > now())
+            AND (
+              remaining_bindings.scope_type = 'app'
+              OR (
+                remaining_bindings.scope_type = 'channel'
+                AND remaining_bindings.channel_id = ${binding.channel_id}
+              )
+            )
+        )
     `)
   }
 }
@@ -778,14 +806,6 @@ app.get('/app/:app_id/principals', requireAuthAndGuardLimitedKeys, sValidator('p
             AND role_bindings.principal_id = users.id
             AND role_bindings.org_id = $1::uuid
             AND (role_bindings.expires_at IS NULL OR role_bindings.expires_at > now())
-        )
-        OR EXISTS (
-          SELECT 1
-          FROM public.org_users org_users
-          WHERE org_users.user_id = users.id
-            AND org_users.org_id = $1::uuid
-            AND org_users.user_right IS NOT NULL
-            AND org_users.user_right::text NOT LIKE 'invite_%'
         )
       ),
       org_groups AS (
