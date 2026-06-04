@@ -3399,6 +3399,16 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
           exitOnboarding()
         }
 
+        // Return to the app picker (verifyPath === null) to choose a different
+        // App Store app or switch to "create a new app". Resets the per-attempt
+        // gate state so the re-picked target starts fresh.
+        const backToPicker = () => {
+          setVerifyPath(null)
+          setVerifyChosenApp(null)
+          setVerifyAttempt(0)
+          setVerifyAskReopen(false)
+        }
+
         // Escalating border colour ramp so a repeatedly-blocked gate never
         // looks frozen (spec: each blocked Continue must look visibly
         // different). Tops out at red.
@@ -3438,6 +3448,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
                 options={[
                   { label: '🔧 Update PRODUCT_BUNDLE_IDENTIFIER for me', value: 'autofix' },
                   { label: '✅ I\'ve edited it myself — re-check', value: 'continue' },
+                  { label: '↩  Back — pick a different app', value: 'back' },
                   { label: '❌ Cancel onboarding', value: 'cancel' },
                 ]}
                 onChange={(value) => {
@@ -3446,6 +3457,8 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
                     void autoFixBuildId()
                   else if (value === 'continue')
                     void continueFixBuildId()
+                  else if (value === 'back')
+                    backToPicker()
                   else
                     cancelGate('fix-build-id')
                 }}
@@ -3512,6 +3525,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
                 options={[
                   { label: '🌐 Open App Store Connect to create the app', value: 'open' },
                   { label: '🔁 I\'ve already created it — re-check', value: 'recheck' },
+                  ...(verifyApps.length > 0 ? [{ label: '↩  Back — pick an existing app', value: 'back' }] : []),
                   { label: '❌ Cancel onboarding', value: 'cancel' },
                 ]}
                 onChange={(value) => {
@@ -3520,6 +3534,8 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
                     void openCreatePage()
                   else if (value === 'recheck')
                     void continueCreateApp()
+                  else if (value === 'back')
+                    backToPicker()
                   else
                     cancelGate('create-app')
                 }}
