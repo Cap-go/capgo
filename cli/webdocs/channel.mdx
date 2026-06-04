@@ -8,8 +8,6 @@ sidebar:
 
 📢 Manage distribution channels for app updates in Capgo Cloud, controlling how updates are delivered to devices.
 
-Channel commands use the channel name, such as `production`, `beta`, or `development`.
-The numeric channel `id` returned by API responses is an internal database identifier.
 
 ### <a id="channel-add"></a> ➕ **Add**
 
@@ -158,3 +156,4 @@ npx @capgo/cli@latest channel set production com.example.app --bundle 1.0.0 --st
 | **--ignore-metadata-check** | <code>boolean</code> | Ignore checking node_modules compatibility if present in the bundle |
 | **--supa-host** | <code>string</code> | Custom Supabase host URL (for self-hosting or Capgo development) |
 | **--supa-anon** | <code>string</code> | Custom Supabase anon key (for self-hosting) |
+
