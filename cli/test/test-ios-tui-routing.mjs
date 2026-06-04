@@ -260,6 +260,38 @@ test("input-p8-path · path → bespoke 'input-key-id' [MATCH]", () => {
     klass: 'MATCH',
   })
 })
+// REGRESSION GUARD (input-p8-path routing loads FULL progress): when the .p8 path
+// is submitted while a confirm-app-id mismatch is still PENDING (pendingAppIdNext
+// set, !appIdConfirmed — recorded by the driver on an earlier step), the routing
+// base MUST carry those fields so getIosResumeStep's front gate fires. The fixed
+// TUI handlers route off `loadProgress(appId)` merged with {p8Path, keyId:undefined}
+// — modelled here by a progress fixture that already holds pendingAppIdNext. The
+// front gate (progress.ts:158) takes priority over the .p8 chain, so the next step
+// is confirm-app-id, NOT input-key-id. The OLD minimal-synthetic base dropped
+// pendingAppIdNext and silently skipped the gate (would have landed on input-key-id).
+const createNewPendingAppId = () => iosProgress({ setupMethod: 'create-new', pendingAppIdNext: 'input-key-id' })
+test("input-p8-path · path WITH pendingAppIdNext (!appIdConfirmed) → 'confirm-app-id' [MATCH: front gate survives full-progress base]", () => {
+  parity({
+    step: 'input-p8-path',
+    progress: createNewPendingAppId(),
+    input: { step: 'input-p8-path', value: '/Users/me/AuthKey_ABC123.p8' },
+    bespoke: 'confirm-app-id',
+    engine: 'confirm-app-id',
+    klass: 'MATCH',
+  })
+})
+test("input-p8-path · path WITH pendingAppIdNext but appIdConfirmed → gate skipped, 'input-key-id' [MATCH]", () => {
+  parity({
+    step: 'input-p8-path',
+    progress: iosProgress({ setupMethod: 'create-new', pendingAppIdNext: 'input-key-id', appIdConfirmed: true }),
+    input: { step: 'input-p8-path', value: '/Users/me/AuthKey_ABC123.p8' },
+    // appIdConfirmed=true + pendingAppIdNext set → post-confirm branch (progress.ts:171)
+    // routes FORWARD to the recorded target (input-key-id), never re-asking the gate.
+    bespoke: 'input-key-id',
+    engine: 'input-key-id',
+    klass: 'MATCH',
+  })
+})
 test("input-p8-path · empty → bespoke stays 'input-p8-path' [DIVERGE: no-op input; resume → api-key-instructions]", () => {
   parity({
     step: 'input-p8-path',

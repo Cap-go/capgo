@@ -3897,7 +3897,16 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
               // direct path-submit on the api-key-instructions screen is an
               // input-p8-path action. Route off a base WITHOUT keyId so it lands
               // on input-key-id, MATCHing the bespoke setStep('input-key-id').
-              const reduced = applyIosInput('input-p8-path', { platform: 'ios', appId, startedAt: new Date().toISOString(), completedSteps: {}, setupMethod: importMode ? 'import-existing' : 'create-new', ...(importMode && importDistribution ? { importDistribution } : {}) }, { step: 'input-p8-path', value: filePath })
+              // We load the FULL persisted progress first (the sibling input-key-id
+              // / input-issuer-id handlers do the same) so routing-critical fields
+              // — esp. pendingAppIdNext + appIdConfirmed (the confirm-app-id gate) —
+              // survive into the routing base instead of being dropped by a minimal
+              // synthetic object. We then merge the new p8Path but CLEAR keyId so
+              // getIosResumeStep still lands on input-key-id (the user confirms the
+              // auto-detected Key ID). Note: keyId is still SAVED above for resume.
+              const loaded = await loadProgress(appId)
+              const base = { ...(loaded ?? { platform: 'ios' as const, appId, startedAt: new Date().toISOString(), completedSteps: {}, setupMethod: importMode ? 'import-existing' as const : 'create-new' as const, ...(importMode && importDistribution ? { importDistribution } : {}) }), p8Path: filePath, keyId: undefined }
+              const reduced = applyIosInput('input-p8-path', base, { step: 'input-p8-path', value: filePath })
               setStep(getIosResumeStep(reduced))
             }
             catch {
@@ -3932,7 +3941,16 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
               // keyId so it lands on input-key-id (the user still confirms/overrides
               // the auto-detected Key ID), MATCHing the bespoke setStep('input-key-id')
               // — even though keyId is persisted to disk for resume restoration.
-              const reduced = applyIosInput('input-p8-path', { platform: 'ios', appId, startedAt: new Date().toISOString(), completedSteps: {}, setupMethod: importMode ? 'import-existing' : 'create-new', ...(importMode && importDistribution ? { importDistribution } : {}) }, { step: 'input-p8-path', value: filePath })
+              // We load the FULL persisted progress first (the sibling input-key-id
+              // / input-issuer-id handlers do the same) so routing-critical fields
+              // — esp. pendingAppIdNext + appIdConfirmed (the confirm-app-id gate) —
+              // survive into the routing base instead of being dropped by a minimal
+              // synthetic object. We then merge the new p8Path but CLEAR keyId so
+              // getIosResumeStep still lands on input-key-id (the user confirms the
+              // auto-detected Key ID). Note: keyId is still SAVED above for resume.
+              const loaded = await loadProgress(appId)
+              const base = { ...(loaded ?? { platform: 'ios' as const, appId, startedAt: new Date().toISOString(), completedSteps: {}, setupMethod: importMode ? 'import-existing' as const : 'create-new' as const, ...(importMode && importDistribution ? { importDistribution } : {}) }), p8Path: filePath, keyId: undefined }
+              const reduced = applyIosInput('input-p8-path', base, { step: 'input-p8-path', value: filePath })
               setStep(getIosResumeStep(reduced))
             }
             catch {
