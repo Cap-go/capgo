@@ -706,6 +706,12 @@ const TAIL_INPUT_STEPS = new Set<OnboardingStep>([
  * path synthesizes them transiently) and falls back to the persisted
  * create-new `completedSteps.certificateCreated/profileCreated` markers. Throws
  * on missing inputs — the same fail-fast guard the android builder uses.
+ *
+ * Emits the FULL credential map the TUI's `doSaveCredentials` produces — the 5
+ * base fields PLUS the ASC API key fields (APPLE_KEY_ID / APPLE_ISSUER_ID /
+ * APPLE_KEY_CONTENT) on the create-new (always) and import-app_store paths. The
+ * secret .p8 bytes come from the transient `carried.p8Content` (NEVER persisted);
+ * the non-secret key/issuer ids come from persisted progress.keyId/issuerId.
  */
 function buildIosSavedCredentials(progress: OnboardingProgress, deps: IosEffectDeps): Record<string, string> {
   const carried = deps.carried
@@ -738,13 +744,37 @@ function buildIosSavedCredentials(progress: OnboardingProgress, deps: IosEffectD
 
   const distribution = isImport ? (progress.importDistribution || 'app_store') : 'app_store'
 
-  return {
+  const credentials: Record<string, string> = {
     BUILD_CERTIFICATE_BASE64: certData.p12Base64,
     P12_PASSWORD: p12Password,
     CAPGO_IOS_PROVISIONING_MAP: JSON.stringify(provisioningMap),
     APP_STORE_CONNECT_TEAM_ID: teamId,
     CAPGO_IOS_DISTRIBUTION: distribution,
   }
+
+  // ASC API key fields (mirrors the TUI's doSaveCredentials APPLE_KEY_* writes,
+  // app.tsx:1216–1219). The .p8/ASC key is needed on the create-new path always
+  // and on the import path only for app_store distribution — `needsAscKey` is the
+  // TUI's `!importMode || importDistribution === 'app_store'` guard. The raw .p8
+  // bytes are the ONE secret here: they ride the transient `carried.p8Content`
+  // channel (the IO-free engine never re-reads the file), mirroring the TUI's
+  // p8ContentRef. APPLE_KEY_ID / APPLE_ISSUER_ID are non-secret Apple identifiers
+  // read from persisted progress.keyId / progress.issuerId (with the
+  // apiKeyVerified mirror as the resume-hydrated fallback, matching the TUI refs).
+  const needsAscKey = !isImport || progress.importDistribution === 'app_store'
+  const keyContent = carried?.p8Content
+  if (needsAscKey && keyContent) {
+    const apiKeyVerified = progress.completedSteps.apiKeyVerified
+    const keyId = progress.keyId ?? apiKeyVerified?.keyId
+    const issuerId = progress.issuerId ?? apiKeyVerified?.issuerId
+    if (keyId)
+      credentials.APPLE_KEY_ID = keyId
+    if (issuerId)
+      credentials.APPLE_ISSUER_ID = issuerId
+    credentials.APPLE_KEY_CONTENT = keyContent.toString('base64')
+  }
+
+  return credentials
 }
 
 /**

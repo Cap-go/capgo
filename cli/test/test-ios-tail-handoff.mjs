@@ -209,6 +209,84 @@ await test('saving-credentials (IMPORT path) prefers the carried cert/profile/te
   assertEquals(creds.P12_PASSWORD, 'random-keychain-pass', 'import path must use the carried keychain-export passphrase')
   assertEquals(creds.APP_STORE_CONNECT_TEAM_ID, 'ITEAM', 'import path must use the carried team id')
   assertEquals(creds.CAPGO_IOS_DISTRIBUTION, 'ad_hoc', 'import ad_hoc distribution must be carried through')
+  // ad_hoc import needs NO ASC key (needsAscKey = !import || app_store) — even
+  // if a .p8 were carried, the per-fork guard must omit the APPLE_KEY_* fields.
+  assert(!('APPLE_KEY_ID' in creds), 'import ad_hoc must NOT emit APPLE_KEY_ID')
+  assert(!('APPLE_ISSUER_ID' in creds), 'import ad_hoc must NOT emit APPLE_ISSUER_ID')
+  assert(!('APPLE_KEY_CONTENT' in creds), 'import ad_hoc must NOT emit APPLE_KEY_CONTENT')
+})
+
+// ─── 1b) ASC API key fields (APPLE_KEY_*) carried through saving-credentials ────
+
+await test('saving-credentials (create-new app_store) emits APPLE_KEY_ID/ISSUER_ID/CONTENT from progress + carried.p8Content', async () => {
+  const P8_BYTES = Buffer.from('-----BEGIN PRIVATE KEY-----\nMOCKP8\n-----END PRIVATE KEY-----\n')
+  const deps = makeDeps({ carried: { p8Content: P8_BYTES } })
+  // Persisted progress.keyId/issuerId are the non-secret Apple identifiers; the
+  // secret .p8 bytes ride carried.p8Content (never persisted to progress.json).
+  const progress = iosProgress({ keyId: 'KEYTOP', issuerId: 'ISSTOP' })
+  await runIosEffect('saving-credentials', progress, deps)
+  const creds = deps.__calls.find(c => c.name === 'updateSavedCredentials').args[2]
+  // The 5 base fields stay intact alongside the ASC key fields.
+  assertEquals(creds.BUILD_CERTIFICATE_BASE64, CERT_DATA.p12Base64, 'base cert field must remain')
+  assertEquals(creds.P12_PASSWORD, 'capgo', 'create-new keeps the default P12 password')
+  assertEquals(creds.CAPGO_IOS_DISTRIBUTION, 'app_store', 'create-new defaults to app_store')
+  // The ASC key fields the bespoke doSaveCredentials writes (app.tsx:1216–1219).
+  assertEquals(creds.APPLE_KEY_ID, 'KEYTOP', 'APPLE_KEY_ID must come from progress.keyId')
+  assertEquals(creds.APPLE_ISSUER_ID, 'ISSTOP', 'APPLE_ISSUER_ID must come from progress.issuerId')
+  assertEquals(creds.APPLE_KEY_CONTENT, P8_BYTES.toString('base64'), 'APPLE_KEY_CONTENT must be the base64 of the carried .p8 bytes')
+})
+
+await test('saving-credentials (create-new app_store) falls back to apiKeyVerified for APPLE_KEY_ID/ISSUER_ID when top-level keyId/issuerId absent', async () => {
+  const P8_BYTES = Buffer.from('MOCKP8')
+  const deps = makeDeps({ carried: { p8Content: P8_BYTES } })
+  // No top-level keyId/issuerId — only the resume-hydrated apiKeyVerified mirror
+  // ({ keyId: 'KEY1', issuerId: 'ISS1' }) the default iosProgress() fixture sets.
+  await runIosEffect('saving-credentials', iosProgress(), deps)
+  const creds = deps.__calls.find(c => c.name === 'updateSavedCredentials').args[2]
+  assertEquals(creds.APPLE_KEY_ID, 'KEY1', 'APPLE_KEY_ID falls back to apiKeyVerified.keyId')
+  assertEquals(creds.APPLE_ISSUER_ID, 'ISS1', 'APPLE_ISSUER_ID falls back to apiKeyVerified.issuerId')
+  assertEquals(creds.APPLE_KEY_CONTENT, P8_BYTES.toString('base64'), 'APPLE_KEY_CONTENT must be the base64 of the carried .p8 bytes')
+})
+
+await test('saving-credentials (IMPORT app_store) uses importedP12Password AND emits the APPLE_KEY_* fields', async () => {
+  const IMPORT_CERT = { certificateId: 'ICERT', expirationDate: '2027-02-02', teamId: 'ITEAM', p12Base64: 'import-p12' }
+  const IMPORT_PROFILE = { profileId: 'IPROF', profileName: 'Imported Profile', profileBase64: 'import-prof' }
+  const P8_BYTES = Buffer.from('IMPORT-MOCKP8')
+  const deps = makeDeps({
+    carried: {
+      certData: IMPORT_CERT,
+      profileData: IMPORT_PROFILE,
+      teamId: 'ITEAM',
+      importedP12Password: 'random-keychain-pass',
+      p8Content: P8_BYTES,
+    },
+  })
+  // An app_store import still needs the ASC key (needsAscKey = !import || app_store).
+  const progress = iosProgress({
+    setupMethod: 'import-existing',
+    importDistribution: 'app_store',
+    keyId: 'IKEY',
+    issuerId: 'IISS',
+    completedSteps: { certificateCreated: undefined, profileCreated: undefined, apiKeyVerified: undefined },
+  })
+  await runIosEffect('saving-credentials', progress, deps)
+  const creds = deps.__calls.find(c => c.name === 'updateSavedCredentials').args[2]
+  assertEquals(creds.P12_PASSWORD, 'random-keychain-pass', 'import path must use the carried keychain-export passphrase')
+  assertEquals(creds.CAPGO_IOS_DISTRIBUTION, 'app_store', 'import app_store distribution must be carried through')
+  assertEquals(creds.APPLE_KEY_ID, 'IKEY', 'import app_store must emit APPLE_KEY_ID from progress.keyId')
+  assertEquals(creds.APPLE_ISSUER_ID, 'IISS', 'import app_store must emit APPLE_ISSUER_ID from progress.issuerId')
+  assertEquals(creds.APPLE_KEY_CONTENT, P8_BYTES.toString('base64'), 'import app_store must emit APPLE_KEY_CONTENT from carried.p8Content')
+})
+
+await test('saving-credentials (create-new) WITHOUT carried.p8Content omits the APPLE_KEY_* fields (IO-free: no raw fs read)', async () => {
+  // The engine never re-reads the .p8 from disk; when the driver did not thread
+  // the secret bytes, the ASC key fields are simply absent (the 5 base fields stay).
+  const deps = makeDeps()
+  await runIosEffect('saving-credentials', iosProgress(), deps)
+  const creds = deps.__calls.find(c => c.name === 'updateSavedCredentials').args[2]
+  assert(!('APPLE_KEY_CONTENT' in creds), 'no carried .p8 → no APPLE_KEY_CONTENT (engine does no fs read)')
+  assert(!('APPLE_KEY_ID' in creds), 'no carried .p8 → no APPLE_KEY_ID')
+  assertEquals(creds.BUILD_CERTIFICATE_BASE64, CERT_DATA.p12Base64, 'the 5 base fields are still emitted')
 })
 
 // ─── 2) DRIVER threading: resolve ONCE, reuse downstream, reach build-complete ──
