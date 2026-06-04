@@ -40,8 +40,14 @@
 
         </activity>
 
+        <!-- Use a uniquely-named FileProvider subclass (.AppFileProvider) so the app's
+             provider doesn't collide by android:name with @capgo/capacitor-pdf-generator's
+             androidx.core.content.FileProvider during manifest merge. Both providers then
+             coexist, each keeping its own authority + paths — so PDF share (which looks up
+             ${applicationId}.capgo.pdfgenerator.fileprovider) keeps working. FileProvider
+             resolves by authority at runtime, so the subclass is transparent to Capacitor. -->
         <provider
-            android:name="androidx.core.content.FileProvider"
+            android:name=".AppFileProvider"
             android:authorities="${applicationId}.fileprovider"
             android:exported="false"
             android:grantUriPermissions="true">
@@ -49,15 +55,6 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths"></meta-data>
         </provider>
-
-        <!-- Google Cast: @capgo/capacitor-jw-player and @capgo/capacitor-ivs-player both
-             declare OPTIONS_PROVIDER_CLASS_NAME, but Android allows only one Cast
-             OptionsProvider per app, which fails manifest merge. Force a single winner
-             here. Swap the value to ee.forgr.ivsplayer.CastOptionsProvider to use IVS. -->
-        <meta-data
-            android:name="com.google.android.gms.cast.framework.OPTIONS_PROVIDER_CLASS_NAME"
-            android:value="ee.forgr.capacitor_jw_player.CastOptionsProvider"
-            tools:replace="android:value" />
     </application>
 
     <!-- Permissions -->

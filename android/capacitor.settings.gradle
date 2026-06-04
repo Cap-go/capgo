@@ -162,7 +162,7 @@ include ':capgo-capacitor-in-app-review'
 project(':capgo-capacitor-in-app-review').projectDir = new File('../node_modules/.bun/@capgo+capacitor-in-app-review@8.1.5+1b808583819c2ac6/node_modules/@capgo/capacitor-in-app-review/android')
 
 include ':capgo-capacitor-inappbrowser'
-project(':capgo-capacitor-inappbrowser').projectDir = new File('../node_modules/.bun/@capgo+capacitor-inappbrowser@8.6.16+1b808583819c2ac6/node_modules/@capgo/capacitor-inappbrowser/android')
+project(':capgo-capacitor-inappbrowser').projectDir = new File('../node_modules/.bun/@capgo+capacitor-inappbrowser@8.6.18+1b808583819c2ac6/node_modules/@capgo/capacitor-inappbrowser/android')
 
 include ':capgo-capacitor-install-referrer'
 project(':capgo-capacitor-install-referrer').projectDir = new File('../node_modules/.bun/@capgo+capacitor-install-referrer@8.1.1+1b808583819c2ac6/node_modules/@capgo/capacitor-install-referrer/android')
@@ -204,7 +204,7 @@ include ':capgo-capacitor-mux-player'
 project(':capgo-capacitor-mux-player').projectDir = new File('../node_modules/.bun/@capgo+capacitor-mux-player@8.0.11+fa534fdbb4a44ffc/node_modules/@capgo/capacitor-mux-player/android')
 
 include ':capgo-capacitor-native-audio'
-project(':capgo-capacitor-native-audio').projectDir = new File('../node_modules/.bun/@capgo+capacitor-native-audio@8.4.4+1b808583819c2ac6/node_modules/@capgo/capacitor-native-audio/android')
+project(':capgo-capacitor-native-audio').projectDir = new File('../node_modules/.bun/@capgo+capacitor-native-audio@8.4.5+1b808583819c2ac6/node_modules/@capgo/capacitor-native-audio/android')
 
 include ':capgo-capacitor-native-biometric'
 project(':capgo-capacitor-native-biometric').projectDir = new File('../node_modules/.bun/@capgo+capacitor-native-biometric@8.4.5+1b808583819c2ac6/node_modules/@capgo/capacitor-native-biometric/android')
@@ -213,7 +213,7 @@ include ':capgo-capacitor-native-market'
 project(':capgo-capacitor-native-market').projectDir = new File('../node_modules/.bun/@capgo+capacitor-native-market@8.0.31+1b808583819c2ac6/node_modules/@capgo/capacitor-native-market/android')
 
 include ':capgo-capacitor-native-navigation'
-project(':capgo-capacitor-native-navigation').projectDir = new File('../node_modules/.bun/@capgo+capacitor-native-navigation@8.0.21+1b808583819c2ac6/node_modules/@capgo/capacitor-native-navigation/android')
+project(':capgo-capacitor-native-navigation').projectDir = new File('../node_modules/.bun/@capgo+capacitor-native-navigation@8.0.22+1b808583819c2ac6/node_modules/@capgo/capacitor-native-navigation/android')
 
 include ':capgo-capacitor-nativegeocoder'
 project(':capgo-capacitor-nativegeocoder').projectDir = new File('../node_modules/.bun/@capgo+capacitor-nativegeocoder@8.0.34+1b808583819c2ac6/node_modules/@capgo/capacitor-nativegeocoder/android')
@@ -243,7 +243,7 @@ include ':capgo-capacitor-printer'
 project(':capgo-capacitor-printer').projectDir = new File('../node_modules/.bun/@capgo+capacitor-printer@8.0.14+1b808583819c2ac6/node_modules/@capgo/capacitor-printer/android')
 
 include ':capgo-capacitor-privacy-screen'
-project(':capgo-capacitor-privacy-screen').projectDir = new File('../node_modules/.bun/@capgo+capacitor-privacy-screen@8.2.2+1b808583819c2ac6/node_modules/@capgo/capacitor-privacy-screen/android')
+project(':capgo-capacitor-privacy-screen').projectDir = new File('../node_modules/.bun/@capgo+capacitor-privacy-screen@8.3.0+1b808583819c2ac6/node_modules/@capgo/capacitor-privacy-screen/android')
 
 include ':capgo-capacitor-proximity'
 project(':capgo-capacitor-proximity').projectDir = new File('../node_modules/.bun/@capgo+capacitor-proximity@8.1.2+1b808583819c2ac6/node_modules/@capgo/capacitor-proximity/android')
@@ -279,7 +279,7 @@ include ':capgo-capacitor-textinteraction'
 project(':capgo-capacitor-textinteraction').projectDir = new File('../node_modules/.bun/@capgo+capacitor-textinteraction@8.0.25+1b808583819c2ac6/node_modules/@capgo/capacitor-textinteraction/android')
 
 include ':capgo-capacitor-updater'
-project(':capgo-capacitor-updater').projectDir = new File('../node_modules/.bun/@capgo+capacitor-updater@8.47.5+1b808583819c2ac6/node_modules/@capgo/capacitor-updater/android')
+project(':capgo-capacitor-updater').projectDir = new File('../node_modules/.bun/@capgo+capacitor-updater@8.47.6+1b808583819c2ac6/node_modules/@capgo/capacitor-updater/android')
 
 include ':capgo-capacitor-uploader'
 project(':capgo-capacitor-uploader').projectDir = new File('../node_modules/.bun/@capgo+capacitor-uploader@8.2.1+1b808583819c2ac6/node_modules/@capgo/capacitor-uploader/android')

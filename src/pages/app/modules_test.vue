@@ -64,7 +64,6 @@ const pluginTests: PluginTest[] = [
   { packageName: '@capgo/capacitor-intent-launcher', pluginName: 'IntentLauncher', method: 'getPluginVersion', label: 'capacitor-intent-launcher' },
   { packageName: '@capgo/capacitor-intercom', pluginName: 'CapgoIntercom', method: 'getUnreadConversationCount', label: 'capacitor-intercom' },
   { packageName: '@capgo/capacitor-is-root', pluginName: 'IsRoot', method: 'getPluginVersion', label: 'capacitor-is-root' },
-  { packageName: '@capgo/capacitor-ivs-player', pluginName: 'CapacitorIvsPlayer', method: 'getPluginVersion', label: 'capacitor-ivs-player' },
   { packageName: '@capgo/capacitor-jw-player', pluginName: 'JwPlayer', method: 'getPluginVersion', label: 'capacitor-jw-player' },
   { packageName: '@capgo/capacitor-keep-awake', pluginName: 'CapacitorKeepAwake', method: 'getPluginVersion', label: 'capacitor-keep-awake' },
   { packageName: '@capgo/capacitor-launch-navigator', pluginName: 'LaunchNavigator', method: 'getPluginVersion', label: 'capacitor-launch-navigator' },
