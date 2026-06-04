@@ -17,6 +17,7 @@ import { useMainStore } from '~/stores/main'
 import { useOrganizationStore } from '~/stores/organization'
 
 const id = ref('')
+const compatReloadTrigger = ref(0)
 const route = useRoute('/app/[app]')
 const router = useRouter()
 const lastPath = ref('')
@@ -135,6 +136,13 @@ async function refreshData() {
   isLoading.value = false
 }
 
+// After a deploy, the default channel's deploy_history changes, so re-run the
+// compatibility banner check (it otherwise only re-evaluates when appId changes).
+function handleDeployed() {
+  refreshData()
+  compatReloadTrigger.value++
+}
+
 function finishRealOnboarding() {
   if (!id.value)
     return
@@ -198,9 +206,9 @@ watchEffect(async () => {
               </div>
             </div>
           </div>
-          <DeploymentBanner v-if="!appNotFound" :app-id="id" @deployed="refreshData" />
+          <DeploymentBanner v-if="!appNotFound" :app-id="id" @deployed="handleDeployed" />
           <ReleaseBanner v-if="!appNotFound" :app-id="id" />
-          <CompatibilityBanner v-if="!appNotFound" :app-id="id" />
+          <CompatibilityBanner v-if="!appNotFound" :app-id="id" :reload-trigger="compatReloadTrigger" />
 
           <!-- Capgo Builder promo banner (only for valid apps with no native build yet) -->
           <BuilderPromoBanner v-if="!appNotFound" :app-id="id" />

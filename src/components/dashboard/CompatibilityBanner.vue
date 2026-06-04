@@ -9,6 +9,7 @@ import { useSupabase } from '~/services/supabase'
 
 const props = defineProps<{
   appId: string
+  reloadTrigger?: number
 }>()
 
 const router = useRouter()
@@ -23,6 +24,8 @@ interface IncompatibleWarning {
 }
 
 const warning = ref<IncompatibleWarning | null>(null)
+// Guards a stale in-flight check from overwriting the result for a newer app / refresh.
+let latestRequestToken = 0
 
 function toNativePackages(value: unknown): NativePackage[] | null {
   return Array.isArray(value) ? (value as NativePackage[]) : null
@@ -32,6 +35,7 @@ function toNativePackages(value: unknown): NativePackage[] | null {
 // bundle against the immediately previous one (from deploy_history). If their
 // native dependencies are not OTA-compatible, surface a warning banner.
 async function checkCompatibility() {
+  const requestToken = ++latestRequestToken
   warning.value = null
   if (!props.appId)
     return
@@ -62,10 +66,13 @@ async function checkCompatibility() {
   if (currentId === previousId)
     return
 
+  // Filter out soft-deleted bundles so the banner stays consistent with the
+  // dependency diff page, which refuses a deleted baseline in restoreCompareFromQuery().
   const { data: versions } = await supabase
     .from('app_versions')
     .select('id, name, native_packages')
     .eq('app_id', props.appId)
+    .eq('deleted', false)
     .in('id', [currentId, previousId])
 
   const current = versions?.find(version => version.id === currentId)
@@ -77,6 +84,10 @@ async function checkCompatibility() {
 
   const summary = summarizeCompatibility(comparePackages(currentPackages, previousPackages))
   if (summary.compatible)
+    return
+
+  // Drop the result if a newer check started while we were awaiting.
+  if (requestToken !== latestRequestToken)
     return
 
   warning.value = {
@@ -93,7 +104,7 @@ function viewDependencies() {
   router.push(`/app/${encodeURIComponent(props.appId)}/bundle/${warning.value.currentBundleId}/dependencies?compare=${warning.value.previousBundleId}`)
 }
 
-watch(() => props.appId, () => {
+watch(() => [props.appId, props.reloadTrigger], () => {
   checkCompatibility()
 }, { immediate: true })
 </script>
