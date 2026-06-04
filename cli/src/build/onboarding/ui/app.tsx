@@ -146,6 +146,34 @@ const IOS_ENGINE_CREATE_EFFECT_STEPS = new Set<OnboardingStep>([
   'deleting-duplicate-profiles',
 ])
 
+// ─── IOS_TAIL_DRIVER_STEPS (ink-thin-wrapper, Stage 3 slice A) ─────────────────
+//
+// The post-save "tail" AUTO/EFFECT steps the TUI delegates to the shared engine's
+// `runIosEffect`, which routes them into the platform-neutral tail module
+// (TAIL_EFFECT_STEPS in ios/flow.ts). Mirrors the android TAIL_DRIVER_STEPS. These
+// run AT or AFTER saving-credentials — which deletes progress.json — so the driver
+// feeds the engine a SYNTHETIC progress carrying the in-memory React tail state
+// (setupMode / ciSecretTarget / selectedPackageManager / buildScriptChoice /
+// envExportTargetPath) plus the resolved create-new/import cert/profile payloads via
+// deps.carried, and threads the engine transient (savedCredentials / ciSecretEntries
+// / ciSecretExistingKeys / workflowIsNew) back. The engine NEVER re-creates
+// progress.json here.
+//
+// ai-analysis-* + the build-log viewer stay ink-only (no AI-calling-AI in the
+// headless engine); the requesting-build → ai-analysis-prompt handoff still reaches
+// the AI UI because the engine returns next: 'ai-analysis-prompt'. preview-workflow-
+// file stays bespoke (a VIEW prep, not a TAIL_EFFECT_STEP).
+const IOS_TAIL_DRIVER_STEPS = new Set<OnboardingStep>([
+  'saving-credentials',
+  'detecting-ci-secrets',
+  'checking-ci-secrets',
+  'uploading-ci-secrets',
+  'exporting-env',
+  'overwrite-and-export-env',
+  'writing-workflow-file',
+  'requesting-build',
+])
+
 interface LogEntry { text: string, color?: string }
 
 interface AppProps {
@@ -1971,180 +1999,17 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
     // routes back to the persisted origin. The driver mirrors certData /
     // profileData / teamId / existingCerts / duplicateProfiles into React state.
 
-    if (step === 'saving-credentials') {
-      ;(async () => {
-        try {
-          const credentials = await doSaveCredentials()
-          if (cancelled)
-            return
-          // Stash CI secret entries for later. We do NOT push to GitHub/GitLab
-          // yet — the wizard now offers that step only AFTER a successful first
-          // build, so users never end up with orphan secrets in a repo whose
-          // build was never proven to work.
-          //
-          // Pass the API key so CAPGO_TOKEN gets included in the bundle — the
-          // generated GitHub Actions workflow references ${{ secrets.CAPGO_TOKEN }}
-          // for --apikey, and users who pick "secrets only" still benefit from
-          // having it ready in their repo for a workflow they'll write later.
-          const capgoKey = apikey ?? findSavedKeySilent()
-          const entries = createCiSecretEntries(credentials, capgoKey ?? undefined)
-          setCiSecretEntries(entries)
-          // Stash the raw credentials so the .env-export branch can write the
-          // same shape `build credentials manage`'s export writes — without the
-          // CAPGO_TOKEN entry, which only belongs in CI secrets, not in a .env
-          // meant as a local CI-setup reference.
-          setSavedCredentials(credentials)
-          setStep('ask-build')
-        }
-        catch (err) {
-          if (!cancelled)
-            handleError(err, 'saving-credentials')
-        }
-      })()
-    }
-
-    if (step === 'detecting-ci-secrets') {
-      ;(async () => {
-        try {
-          const discovery = detectCiSecretTargets()
-          if (cancelled)
-            return
-          setCiSecretTargets(discovery.targets)
-          setCiSecretSetupAdvice(discovery.setup)
-          if (discovery.targets.length === 0) {
-            if (discovery.setup.length > 0) {
-              setStep('ci-secrets-setup')
-              return
-            }
-            for (const note of discovery.notes)
-              addLog(`ℹ ${note}`, 'yellow')
-            setStep('build-complete')
-            return
-          }
-          if (discovery.targets.length === 1) {
-            const target = discovery.targets[0]
-            setCiSecretTarget(target)
-            // GitHub gets the new 3-option flow ("secrets + workflow" / "secrets only" / "no").
-            // GitLab keeps the existing 2-option flow — workflow generation for GitLab CI is
-            // out of scope for v1.
-            setStep(target.provider === 'github' ? 'ask-github-actions-setup' : 'ask-ci-secrets')
-            return
-          }
-          setStep('ci-secrets-target-select')
-        }
-        catch (err) {
-          if (!cancelled) {
-            setCiSecretError(err instanceof Error ? err.message : String(err))
-            setStep('ci-secrets-failed')
-          }
-        }
-      })()
-    }
-
-    if (step === 'checking-ci-secrets') {
-      ;(async () => {
-        try {
-          if (!ciSecretTarget)
-            throw new Error('No git hosting target selected.')
-          // Phase 1: Resolve the target repo. Uses async runner so the
-          // spinner keeps animating during the gh shell-out.
-          setCiSecretCheckPhase('Resolving GitHub repository…')
-          let repoLabel: string | null = null
-          if (ciSecretTarget.provider === 'github') {
-            repoLabel = await getCiSecretRepoLabelAsync(ciSecretTarget)
-            if (cancelled)
-              return
-            if (!repoLabel) {
-              setCiSecretRepoLabel(null)
-              setCiSecretError('Could not resolve the GitHub repository. Run `gh repo view` from this directory, then try again.')
-              setStep('ci-secrets-failed')
-              return
-            }
-            setCiSecretRepoLabel(repoLabel)
-          }
-          // Phase 2: List existing secrets to figure out what NEW vs REPLACE
-          // means. Uses a label that includes the resolved repo when we have it.
-          setCiSecretCheckPhase(repoLabel
-            ? `Checking existing env vars in ${repoLabel}…`
-            : `Checking existing env vars in ${getCiSecretTargetLabel(ciSecretTarget)}…`)
-          const existing = await listExistingCiSecretKeysAsync(ciSecretTarget, ciSecretEntries.map(entry => entry.key))
-          if (cancelled)
-            return
-          setCiSecretExistingKeys(existing)
-          // GitHub: ALWAYS gate on confirm-secrets-push (target repo + full
-          // list). GitLab: legacy confirm-on-collision behaviour for v1.
-          if (ciSecretTarget.provider === 'github') {
-            setStep('confirm-secrets-push')
-            return
-          }
-          setStep(existing.length > 0 ? 'confirm-ci-secret-overwrite' : 'uploading-ci-secrets')
-        }
-        catch (err) {
-          if (!cancelled) {
-            setCiSecretError(err instanceof Error ? err.message : String(err))
-            setStep('ci-secrets-failed')
-          }
-        }
-      })()
-    }
-
-    if (step === 'uploading-ci-secrets') {
-      ;(async () => {
-        try {
-          if (!ciSecretTarget)
-            throw new Error('No git hosting target selected.')
-          await uploadCiSecretsAsync(
-            ciSecretTarget,
-            ciSecretEntries,
-            ciSecretExistingKeys,
-            undefined, // default async runner
-            (current, total, key) => {
-              if (!cancelled)
-                setCiSecretUploadProgress({ current, total, key })
-            },
-          )
-          if (cancelled)
-            return
-          setCiSecretUploadProgress(null)
-          const summary = `Uploaded ${ciSecretEntries.length} env var${ciSecretEntries.length === 1 ? '' : 's'} to ${getCiSecretTargetLabel(ciSecretTarget)}`
-          setCiSecretUploadSummary(summary)
-          addLog(`✔ ${summary}`)
-          // Branch on what the user picked at ask-github-actions-setup. The
-          // GitLab path leaves setupMode='undecided' and falls through to
-          // build-complete just like before.
-          if (setupMode === 'with-workflow') {
-            // Eager-load the package.json scripts and the project-type-aware
-            // recommendation here so the pick-build-script screen can render
-            // synchronously and the user doesn't see a loading flicker.
-            try {
-              const scripts = getPackageScripts() ?? {}
-              setAvailableScripts(scripts)
-              const projectType = await findProjectType({ quiet: true }).catch(() => null)
-              if (projectType) {
-                const recommended = await findBuildCommandForProjectType(projectType).catch(() => null)
-                if (recommended && Object.hasOwn(scripts, recommended))
-                  setRecommendedScript(recommended)
-              }
-            }
-            catch {
-              // Detection is best-effort; pick-build-script falls back to the
-              // empty scripts list + "type a custom command" / "skip" options.
-            }
-            // Land at pick-package-manager first — we DETECT via getPMAndCommand
-            // but the user explicitly confirms before we generate a workflow.
-            setStep('pick-package-manager')
-            return
-          }
-          setStep('build-complete')
-        }
-        catch (err) {
-          if (!cancelled) {
-            setCiSecretError(err instanceof Error ? err.message : String(err))
-            setStep('ci-secrets-failed')
-          }
-        }
-      })()
-    }
+    // saving-credentials / detecting-ci-secrets / checking-ci-secrets /
+    // uploading-ci-secrets are now engine-driven (IOS_TAIL_DRIVER_STEPS) — see the
+    // post-save TAIL driver below. saving-credentials builds + writes the iOS
+    // credential map (reading the create-new payloads from iosCarriedRef + the
+    // import payloads from React state), deletes progress.json, stashes the
+    // CI-secret entries + raw credentials, and routes to ask-build. The CI-secret
+    // detection / repo-resolution / upload + the with-workflow script preload all
+    // run in the shared tail; the driver mirrors ciSecretEntries / ciSecretTargets /
+    // ciSecretSetupAdvice / ciSecretRepoLabel / ciSecretExistingKeys /
+    // ciSecretUploadSummary / availableScripts / recommendedScript + the chosen
+    // target into React state.
 
     if (step === 'preview-workflow-file') {
       ;(() => {
@@ -2192,194 +2057,16 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
       })()
     }
 
-    if (step === 'writing-workflow-file') {
-      ;(() => {
-        try {
-          if (!buildScriptChoice)
-            throw new Error('Internal error: no build script choice recorded.')
-          const result = writeWorkflowFile(
-            {
-              appId,
-              defaultPlatform: 'ios',
-              packageManager: selectedPackageManager ?? normalizePackageManager(pm.pm),
-              buildScript: buildScriptChoice,
-              secretKeys: ciSecretEntries.map(entry => entry.key),
-            },
-            { overwrite: true },
-          )
-          if (cancelled)
-            return
-          if (result.kind === 'written') {
-            setWorkflowWrittenPath(result.absolutePath)
-            addLog(`✔ ${previewIsNew ? 'Wrote' : 'Overwrote'} ${WORKFLOW_PATH}`)
-            trackWorkflowEvent('workflow-file-written', { decision: 'write' })
-          }
-          setTimeout(() => {
-            if (!cancelled)
-              setStep('build-complete')
-          }, 150)
-        }
-        catch (err) {
-          if (!cancelled) {
-            addLog(`⚠ Failed to write workflow file: ${err instanceof Error ? err.message : String(err)}`, 'yellow')
-            setTimeout(() => {
-              if (!cancelled)
-                setStep('build-complete')
-            }, 150)
-          }
-        }
-      })()
-    }
-
-    if (step === 'exporting-env') {
-      ;(() => {
-        try {
-          const targetPath = envExportTargetPath || defaultExportPath(appId, 'ios')
-          const result = exportCredentialsToEnv({
-            appId,
-            platform: 'ios',
-            credentials: savedCredentials ?? {},
-            targetPath,
-          })
-          if (cancelled)
-            return
-          if (result.kind === 'empty') {
-            setEnvExportError('No credentials to export — saved state is empty.')
-            setStep('build-complete')
-            return
-          }
-          if (result.kind === 'exists') {
-            setEnvExportTargetPath(result.path)
-            setStep('confirm-env-export-overwrite')
-            return
-          }
-          setEnvExportPath(result.path)
-          addLog(`✔ Exported ${result.fieldCount} field${result.fieldCount === 1 ? '' : 's'} → ${result.path}`)
-          setStep('build-complete')
-        }
-        catch (err) {
-          if (!cancelled) {
-            setEnvExportError(err instanceof Error ? err.message : String(err))
-            setStep('build-complete')
-          }
-        }
-      })()
-    }
-
-    if (step === 'overwrite-and-export-env') {
-      ;(() => {
-        try {
-          const result = exportCredentialsToEnv({
-            appId,
-            platform: 'ios',
-            credentials: savedCredentials ?? {},
-            targetPath: envExportTargetPath,
-            overwrite: true,
-          })
-          if (cancelled)
-            return
-          if (result.kind === 'written') {
-            setEnvExportPath(result.path)
-            addLog(`✔ Overwrote ${result.path} with ${result.fieldCount} field${result.fieldCount === 1 ? '' : 's'}`)
-          }
-          setStep('build-complete')
-        }
-        catch (err) {
-          if (!cancelled) {
-            setEnvExportError(err instanceof Error ? err.message : String(err))
-            setStep('build-complete')
-          }
-        }
-      })()
-    }
-
-    if (step === 'requesting-build') {
-      ;(async () => {
-        try {
-          const capgoKey = apikey ?? findSavedKeySilent()
-          if (!capgoKey) {
-            setBuildOutput(prev => [...prev, '⚠ No Capgo API key found.'])
-            setBuildOutput(prev => [...prev, `Run \`${loginCommand}\` first, then \`${buildRequestCommand}\`.`])
-            setStep('build-complete')
-            return
-          }
-
-          // Use BuildLogger callbacks — no stdout/stderr interception needed
-          const buildLogger: BuildLogger = {
-            info: (msg: string) => setBuildOutput(prev => [...prev, msg]),
-            error: (msg: string) => setBuildOutput(prev => [...prev, `✖ ${msg}`]),
-            warn: (msg: string) => setBuildOutput(prev => [...prev, `⚠ ${msg}`]),
-            success: (msg: string) => setBuildOutput(prev => [...prev, `✔ ${msg}`]),
-            buildLog: (msg: string) => setBuildOutput(prev => [...prev, ...sanitizeBuildLogLines(msg)]),
-            uploadProgress: (percent: number) => {
-              setBuildOutput((prev) => {
-                const uploadLineIdx = prev.findIndex(l => l.startsWith('Uploading:'))
-                const line = `Uploading: ${percent.toFixed(0)}%`
-                if (uploadLineIdx >= 0) {
-                  const next = [...prev]
-                  next[uploadLineIdx] = line
-                  return next
-                }
-                return [...prev, line]
-              })
-            },
-            customMsg: async (kind: string, data: Record<string, unknown>) => {
-              await handleCustomMsg(
-                kind,
-                data,
-                (line: string) => setBuildOutput(prev => [...prev, line]),
-                (line: string) => setBuildOutput(prev => [...prev, line]),
-              )
-            },
-          }
-
-          setBuildOutput([`Requesting build for ${appId} (ios)...`])
-          const result = await requestBuildInternal(appId, {
-            platform: 'ios',
-            apikey: capgoKey,
-            // The Ink TUI owns the terminal — @clack/prompts inside
-            // requestBuildInternal would corrupt rendering. Caller-handled mode
-            // surfaces the captured log path via result.aiAnalysis and lets us
-            // render the AI flow with Ink-native components.
-            aiAnalysisMode: 'caller-handled',
-          }, true, buildLogger) // silent=true, use our logger
-          if (cancelled)
-            return
-          if (result.success) {
-            const url = `https://capgo.app/app/${appId}/builds`
-            setBuildUrl(url)
-            setBuildOutput(prev => [...prev, '', `✔ Build queued — ${url}`])
-            // Only offer to push CI secrets AFTER we've successfully queued a
-            // build. If the build request failed (else branch) or we never had
-            // any credentials to push (entries empty), skip straight to exit.
-            if (ciSecretEntries.length > 0) {
-              setStep('detecting-ci-secrets')
-              return
-            }
-          }
-          else {
-            setBuildOutput(prev => [...prev, `⚠ ${result.error || 'unknown error'}`])
-            // If logs were captured we can offer AI-assisted diagnosis. The
-            // captured log file stays on disk until the user views the result
-            // (or skips); 'ai-analysis-result' calls releaseCapturedLogs on exit.
-            if (result.aiAnalysis?.ready && result.aiAnalysis.jobId) {
-              setAiJobId(result.aiAnalysis.jobId)
-              setStep('ai-analysis-prompt')
-              return
-            }
-          }
-          setStep('build-complete')
-        }
-        catch (err) {
-          // Build failure is non-fatal — credentials are saved
-          if (!cancelled) {
-            setBuildOutput(prev => [...prev, `⚠ ${err instanceof Error ? err.message : String(err)}`])
-            setBuildOutput(prev => [...prev, `Your credentials are saved. Run \`${buildRequestCommand}\` to try again.`])
-            setStep('build-complete')
-          }
-        }
-      })()
-    }
+    // writing-workflow-file / exporting-env / overwrite-and-export-env /
+    // requesting-build are now engine-driven (IOS_TAIL_DRIVER_STEPS) — see the
+    // post-save TAIL driver below. The engine writes the workflow file (logging
+    // Wrote/Overwrote + workflow-file-written telemetry), exports the .env
+    // (routing the 'exists' branch to confirm-env-export-overwrite), and fires the
+    // build request (streaming every line into the FullscreenBuildOutput pane via
+    // the BuildLogger, routing a failed build with captured logs to
+    // ai-analysis-prompt). The driver mirrors workflowFilePath / envExportPath /
+    // envExportError / buildUrl / aiJobId into React state + applies the 150ms
+    // writing-workflow-file settle.
 
     // AI analysis — entered only when requestBuildInternal returned with
     // aiAnalysis.ready=true. The captured log file is on disk; we call the
@@ -2704,6 +2391,290 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
 
     return () => {
       cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step])
+
+  // ─── Engine-driven post-save TAIL driver (ink-thin-wrapper, Stage 3 slice A) ──
+  // Delegate the post-save tail effect steps (IOS_TAIL_DRIVER_STEPS) to the shared
+  // engine's `runIosEffect`, which routes them into the platform-neutral tail module
+  // (via toTailDeps). The FLOW lives in the engine (tail/flow.ts, e2e-tested); the
+  // RENDERING stays ink. Mirrors the android post-save tail driver
+  // (android/ui/app.tsx). saving-credentials still finds the create-new payloads in
+  // iosCarriedRef (mirrored by the create driver) and the import payloads in React
+  // state (the import effects stay bespoke until slice C); the env/workflow/build
+  // steps read the in-memory React tail inputs via a SYNTHETIC progress. The engine
+  // NEVER re-creates progress.json here. ai-analysis-* + the fullscreen build/diff
+  // takeovers stay ink-only; the requesting-build → ai-analysis-prompt handoff still
+  // reaches the AI UI because the engine returns next: 'ai-analysis-prompt'.
+  useEffect(() => {
+    if (!IOS_TAIL_DRIVER_STEPS.has(step))
+      return
+
+    let cancelled = false
+    const abort = new AbortController()
+
+    void (async () => {
+      // CLI-flag key takes precedence over the saved one (mirrors the bespoke tail's
+      // `apikey ?? findSavedKeySilent()` at saving-credentials / requesting-build).
+      const resolveCapgoKey = (): string | undefined => apikey ?? findSavedKeySilent()
+
+      // Load the on-disk progress so the saving-credentials self-heal guard can
+      // re-validate it (the engine re-loads internally too via deps.loadProgress).
+      // For the later tail steps progress.json is already deleted, so this is null
+      // and the SYNTHETIC progress below carries the in-memory tail inputs instead.
+      const disk = await loadProgress(appId)
+      if (cancelled)
+        return
+      const base: OnboardingProgress = disk ?? {
+        platform: 'ios',
+        appId,
+        startedAt: new Date().toISOString(),
+        completedSteps: {},
+      }
+      // SYNTHETIC progress: overlay the in-memory React tail inputs the engine reads
+      // (setupMode / ciSecretTarget / selectedPackageManager / buildScriptChoice /
+      // envExportTargetPath). For saving-credentials `disk` carries the create-new
+      // completedSteps + setupMethod + importDistribution + iosBundleIdOverride; the
+      // import path's cert/profile payloads ride deps.carried below.
+      const tailProgress: OnboardingProgress = {
+        ...base,
+        setupMode,
+        ciSecretTarget,
+        selectedPackageManager: selectedPackageManager ?? normalizePackageManager(pm.pm),
+        buildScriptChoice,
+        envExportTargetPath,
+      }
+
+      const deps: IosEffectDeps = {
+        appId,
+
+        // ── persistence (saving-credentials writes + deletes progress.json) ──
+        loadProgress,
+        saveProgress,
+        deleteProgress,
+        updateSavedCredentials,
+
+        // ── tail helpers — pre-bind the resolved Capgo key into the entry builder
+        // so CAPGO_TOKEN is included (mirrors createCiSecretEntries(creds, capgoKey)).
+        createCiSecretEntries: creds => createCiSecretEntries(creds, resolveCapgoKey()),
+        detectCiSecretTargets,
+        getCiSecretRepoLabelAsync,
+        listExistingCiSecretKeysAsync,
+        uploadCiSecretsAsync,
+        exportCredentialsToEnv,
+        defaultExportPath,
+        generateWorkflow,
+        writeWorkflowFile,
+        requestBuildInternal,
+
+        // ── streaming / telemetry / preload sinks (forwarded into the shared tail) ──
+        // The rich streaming BuildLogger requesting-build forwards into
+        // requestBuildInternal (4th arg) — every build line streams into the
+        // FullscreenBuildOutput pane via setBuildOutput, byte-for-byte the bespoke
+        // logger (info/error/warn/success/buildLog sanitize/uploadProgress dedup/
+        // customMsg → handleCustomMsg). Only requesting-build consumes it.
+        logger: {
+          info: (msg: string) => { if (!cancelled) setBuildOutput(prev => [...prev, msg]) },
+          error: (msg: string) => { if (!cancelled) setBuildOutput(prev => [...prev, `✖ ${msg}`]) },
+          warn: (msg: string) => { if (!cancelled) setBuildOutput(prev => [...prev, `⚠ ${msg}`]) },
+          success: (msg: string) => { if (!cancelled) setBuildOutput(prev => [...prev, `✔ ${msg}`]) },
+          buildLog: (msg: string) => { if (!cancelled) setBuildOutput(prev => [...prev, ...sanitizeBuildLogLines(msg)]) },
+          uploadProgress: (percent: number) => {
+            if (cancelled)
+              return
+            setBuildOutput((prev) => {
+              const idx = prev.findIndex(l => l.startsWith('Uploading:'))
+              const line = `Uploading: ${percent.toFixed(0)}%`
+              if (idx >= 0) {
+                const next = [...prev]
+                next[idx] = line
+                return next
+              }
+              return [...prev, line]
+            })
+          },
+          customMsg: async (kind: string, data: Record<string, unknown>) => {
+            await handleCustomMsg(
+              kind,
+              data,
+              (line: string) => { if (!cancelled) setBuildOutput(prev => [...prev, line]) },
+              (line: string) => { if (!cancelled) setBuildOutput(prev => [...prev, line]) },
+            )
+          },
+        },
+        onBuildOutput: (line) => {
+          if (!cancelled)
+            setBuildOutput(prev => [...prev, line])
+        },
+        resolveApikey: resolveCapgoKey,
+        onCiSecretUploadProgress: (current, total, keyName) => {
+          if (!cancelled)
+            setCiSecretUploadProgress({ current, total, key: keyName })
+        },
+        onCiSecretCheckPhase: (phase) => {
+          if (!cancelled)
+            setCiSecretCheckPhase(phase)
+        },
+        onCiSecretError: (message) => {
+          if (!cancelled)
+            setCiSecretError(message)
+        },
+        getPackageScripts,
+        findProjectType,
+        findBuildCommandForProjectType,
+        trackWorkflowEvent: (event, options) => {
+          trackWorkflowEvent(event as BuildOnboardingWorkflowEvent, options as { decision?: BuildOnboardingWorkflowDecision })
+        },
+
+        // ── carried transient (driver-held) — the create-new payloads live in
+        // iosCarriedRef (mirrored by the create driver); the import path's
+        // cert/profile/p12 + the .p8 bytes live in React state until slice C routes
+        // the import effects, so thread BOTH so saving-credentials finds its inputs
+        // on either path. The tail state (savedCredentials / ciSecretEntries /
+        // ciSecretExistingKeys / workflowIsNew) is the in-memory React tail state.
+        carried: {
+          ...iosCarriedRef.current,
+          certData: iosCarriedRef.current.certData ?? certData ?? undefined,
+          profileData: iosCarriedRef.current.profileData ?? profileData ?? undefined,
+          teamId: iosCarriedRef.current.teamId ?? teamId ?? undefined,
+          p8Content: iosCarriedRef.current.p8Content ?? (p8ContentRef.current ? Buffer.from(p8ContentRef.current) : undefined),
+          importedP12Password: iosCarriedRef.current.importedP12Password ?? (importedP12Password || undefined),
+          savedCredentials: (savedCredentials ?? undefined) as Record<string, string> | undefined,
+          ciSecretEntries,
+          ciSecretExistingKeys,
+          workflowIsNew: previewIsNew,
+        },
+
+        onLog: (message, color) => {
+          if (!cancelled)
+            addLog(message, color)
+        },
+        signal: abort.signal,
+      }
+
+      // requesting-build resets the build VIEWER to empty BEFORE the engine streams
+      // in, so the engine's appended header (onBuildOutput) reproduces the bespoke
+      // `setBuildOutput([header])` REPLACE — wiping a prior build's output on the AI
+      // retry re-entry instead of appending under it.
+      if (step === 'requesting-build')
+        setBuildOutput([])
+
+      try {
+        const result = await runIosEffect(step, tailProgress, deps)
+        if (cancelled)
+          return
+
+        const t = result.transient
+        const np = result.progress
+
+        // ── Mirror engine transient → render state ─────────────────────────────
+        if (t?.savedCredentials !== undefined)
+          setSavedCredentials(t.savedCredentials)
+        if (t?.ciSecretEntries !== undefined)
+          setCiSecretEntries(t.ciSecretEntries)
+        if (t?.ciSecretTargets !== undefined)
+          setCiSecretTargets(t.ciSecretTargets)
+        if (t?.ciSecretSetupAdvice !== undefined)
+          setCiSecretSetupAdvice(t.ciSecretSetupAdvice)
+        if (t?.ciSecretRepoLabel !== undefined)
+          setCiSecretRepoLabel(t.ciSecretRepoLabel)
+        if (t?.ciSecretExistingKeys !== undefined)
+          setCiSecretExistingKeys(t.ciSecretExistingKeys)
+        if (t?.ciSecretUploadSummary !== undefined)
+          setCiSecretUploadSummary(t.ciSecretUploadSummary)
+        if (t?.availableScripts !== undefined)
+          setAvailableScripts(t.availableScripts)
+        if (t?.recommendedScript !== undefined)
+          setRecommendedScript(t.recommendedScript)
+        // env-export results (exporting-env / overwrite-and-export-env).
+        if (t?.envExportPath !== undefined)
+          setEnvExportPath(t.envExportPath)
+        if (t?.envExportError !== undefined)
+          setEnvExportError(t.envExportError)
+        // writing-workflow-file: the written path (transient.workflowFilePath →
+        // setWorkflowWrittenPath). The engine already emitted the Wrote/Overwrote
+        // log + workflow-file-written telemetry via onLog / trackWorkflowEvent.
+        if (t?.workflowFilePath !== undefined)
+          setWorkflowWrittenPath(t.workflowFilePath)
+        // requesting-build: the queued build URL + the captured AI-analysis job id
+        // surfaced on a failed build (transient.aiJobId → the ai-analysis-* sub-flow).
+        if (t?.buildUrl !== undefined)
+          setBuildUrl(t.buildUrl)
+        if (t?.aiJobId !== undefined)
+          setAiJobId(t.aiJobId)
+        // The chosen CI-secret target rides on the RETURNED progress (the engine sets
+        // it when detecting resolves a single target); mirror it into React state.
+        if (np.ciSecretTarget !== undefined && np.ciSecretTarget !== null)
+          setCiSecretTarget(np.ciSecretTarget)
+        // exporting-env 'exists' carries the resolved export path forward on the
+        // RETURNED progress so overwrite-and-export-env can write to it.
+        if (np.envExportTargetPath !== undefined && np.envExportTargetPath !== envExportTargetPath)
+          setEnvExportTargetPath(np.envExportTargetPath)
+        // The upload progress bar is cleared by uploading-ci-secrets completing.
+        if (step === 'uploading-ci-secrets')
+          setCiSecretUploadProgress(null)
+
+        // ── Advance ────────────────────────────────────────────────────────────
+        // writing-workflow-file keeps the bespoke 150ms settle before advancing to
+        // build-complete (a driver concern — the engine returns next immediately).
+        if (result.next && result.next !== step) {
+          if (step === 'writing-workflow-file') {
+            const next = result.next
+            setTimeout(() => {
+              if (!cancelled)
+                setStep(next)
+            }, 150)
+          }
+          else {
+            setStep(result.next)
+          }
+        }
+      }
+      catch (err) {
+        if (cancelled)
+          return
+        // Step-aware error routing — match each bespoke tail handler's catch EXACTLY.
+        // The shared engine wraps checking-ci-secrets / exporting-env /
+        // overwrite-and-export-env / requesting-build internally (returns a failure
+        // route, never throws), but detecting-ci-secrets / uploading-ci-secrets /
+        // writing-workflow-file can still throw OUT of the engine, so the driver
+        // reproduces the bespoke recovery for those here. Credentials are already
+        // saved on every post-save tail step, so only saving-credentials uses
+        // handleError.
+        const message = err instanceof Error ? err.message : String(err)
+        if (step === 'saving-credentials') {
+          handleError(err, 'saving-credentials')
+        }
+        else if (step === 'requesting-build') {
+          // The engine catches build-request throws internally (→ build-complete),
+          // so this is defensive parity with the bespoke catch.
+          setBuildOutput(prev => [...prev, `⚠ ${message}`])
+          setBuildOutput(prev => [...prev, `Your credentials are saved. Run \`${buildRequestCommand}\` to try again.`])
+          setStep('build-complete')
+        }
+        else if (step === 'exporting-env' || step === 'overwrite-and-export-env') {
+          setEnvExportError(message)
+          setStep('build-complete')
+        }
+        else if (step === 'writing-workflow-file') {
+          addLog(`⚠ Failed to write workflow file: ${message}`, 'yellow')
+          setTimeout(() => {
+            if (!cancelled)
+              setStep('build-complete')
+          }, 150)
+        }
+        else {
+          // detecting-ci-secrets / checking-ci-secrets / uploading-ci-secrets
+          setCiSecretError(message)
+          setStep('ci-secrets-failed')
+        }
+      }
+    })()
+
+    return () => {
+      cancelled = true
+      abort.abort()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step])

@@ -263,6 +263,13 @@ export interface IosStepCtx {
   buildUrl?: TailTransient['buildUrl']
   buildOutput?: TailTransient['buildOutput']
   aiJobId?: TailTransient['aiJobId']
+  // The with-workflow script preload (uploading-ci-secrets) + env-export error +
+  // ci-secrets-failed reason the post-save tail surfaces. Mirror the remaining
+  // TailTransient fields so the iOS driver can read the full tail result.
+  availableScripts?: TailTransient['availableScripts']
+  recommendedScript?: TailTransient['recommendedScript']
+  envExportError?: TailTransient['envExportError']
+  ciSecretError?: TailTransient['ciSecretError']
 }
 
 /**
@@ -424,6 +431,33 @@ export interface IosEffectDeps {
   writeWorkflowFile?: (opts: WorkflowGeneratorOpts, writeOptions?: WorkflowWriteOptions) => WorkflowWriteResult
   requestBuildInternal?: (appId: string, options: BuildRequestOptions, silent?: boolean, logger?: BuildLogger) => Promise<BuildRequestResult>
 
+  // ── streaming / telemetry / preload sinks (forwarded into the shared tail) ──
+  // The post-save tail's requesting-build / checking-ci-secrets / uploading-ci-
+  // secrets / writing-workflow-file effects stream into DEDICATED TUI sinks
+  // (distinct from the side-log onLog). These mirror the android surface VERBATIM
+  // so `toTailDeps` forwards them 1:1 into the shared TailEffectDeps; all OPTIONAL
+  // so a headless caller that omits them degrades gracefully (the engine no-ops).
+  /** The streaming BuildLogger threaded into requestBuildInternal (4th arg). */
+  logger?: BuildLogger
+  /** The build VIEWER sink (FullscreenBuildOutput), distinct from onLog. */
+  onBuildOutput?: (line: string) => void
+  /** Resolves the Capgo API key for the build request (CLI-flag-over-saved). */
+  resolveApikey?: () => string | undefined
+  /** Per-key CI-secret upload progress (uploadCiSecretsAsync 5th arg). */
+  onCiSecretUploadProgress?: (current: number, total: number, keyName: string) => void
+  /** The 2-phase checking-ci-secrets status text. */
+  onCiSecretCheckPhase?: (phase: string) => void
+  /** The ci-secrets-failed reason. */
+  onCiSecretError?: (message: string) => void
+  /** Reads the project's package.json scripts map (with-workflow preload). */
+  getPackageScripts?: () => Record<string, string>
+  /** Detects the web-framework project type (best-effort; may resolve null). */
+  findProjectType?: (options?: { quiet?: boolean }) => Promise<string | null>
+  /** Maps a detected project type to its recommended build script name. */
+  findBuildCommandForProjectType?: (projectType: string) => Promise<string | null>
+  /** Workflow-file telemetry hook (e.g. 'workflow-file-written'). */
+  trackWorkflowEvent?: (event: string, options?: { decision?: string }) => void
+
   /**
    * DRIVER-HELD transient tail state threaded back into each post-save effect.
    * The TUI resolves these ONCE (at saving-credentials) and keeps them in React
@@ -436,6 +470,13 @@ export interface IosEffectDeps {
     savedCredentials?: Record<string, string>
     ciSecretEntries?: CiSecretEntry[]
     ciSecretExistingKeys?: string[]
+    /**
+     * Whether the workflow file did NOT exist when previewed (the TUI's
+     * `previewIsNew`, resolved at preview-workflow-file via existsSync). The
+     * writing-workflow-file effect logs '✔ Wrote' vs '✔ Overwrote' from it.
+     * Absent defaults to NEW ('Wrote'). EPHEMERAL — never persisted.
+     */
+    workflowIsNew?: boolean
     /** The chosen signing identity (lossy re-scan source on resume). */
     chosenIdentity?: SigningIdentity
     /** The chosen provisioning profile (lossy re-scan source on resume). */
@@ -838,6 +879,17 @@ function toTailDeps(deps: IosEffectDeps): TailEffectDeps<OnboardingProgress> {
     generateWorkflow: deps.generateWorkflow,
     writeWorkflowFile: deps.writeWorkflowFile,
     requestBuildInternal: deps.requestBuildInternal,
+    // ── streaming / telemetry / preload sinks (forwarded 1:1, mirror android) ──
+    logger: deps.logger,
+    onBuildOutput: deps.onBuildOutput,
+    resolveApikey: deps.resolveApikey,
+    onCiSecretUploadProgress: deps.onCiSecretUploadProgress,
+    onCiSecretCheckPhase: deps.onCiSecretCheckPhase,
+    onCiSecretError: deps.onCiSecretError,
+    getPackageScripts: deps.getPackageScripts,
+    findProjectType: deps.findProjectType,
+    findBuildCommandForProjectType: deps.findBuildCommandForProjectType,
+    trackWorkflowEvent: deps.trackWorkflowEvent,
     carried: deps.carried,
     onStatus: deps.onStatus,
     onLog: deps.onLog,
