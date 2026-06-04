@@ -456,6 +456,34 @@ await test('DRIVER: detecting-ci-secrets surfaces setup advice via transient on 
   assertEquals(res.transient.ciSecretSetupAdvice.length, 1, 'setup advice must be carried through even when a target is reachable')
 })
 
+// ─── GAP 4 (ADAPTER): post-save tail steps must not re-create progress.json ──
+//
+// saving-credentials deletes android progress.json; the bespoke tail then runs
+// from React state only. Through the adapter, detecting/exporting must NOT call
+// saveAndroidProgress (which would resurrect the deleted file). The chosen field
+// still rides the RETURNED progress so the driver threads it forward. The
+// pre-delete resume markers (buildRequested / ciSecretsUploaded) keep crash-
+// recovery resume routing intact — see the getAndroidResumeStep resume-routing
+// tests below, which still pass.
+
+await test('GAP4 ADAPTER: detecting-ci-secrets (single target) does NOT call saveAndroidProgress', async () => {
+  const deps = makeDeps()
+  const res = await runAndroidEffect('detecting-ci-secrets', tailProgress(), deps)
+  assertEquals(res.next, 'ask-github-actions-setup', 'a single GitHub target still routes to the GitHub Actions setup prompt')
+  assert(!deps.__calls.some(c => c.name === 'saveAndroidProgress'), 'detecting-ci-secrets must NOT re-create progress.json through the adapter')
+  assertEquals(res.progress.ciSecretTarget, GITHUB_TARGET, 'the chosen target still rides the RETURNED progress')
+})
+
+await test('GAP4 ADAPTER: exporting-env (exists) does NOT call saveAndroidProgress', async () => {
+  const deps = makeDeps({
+    exportCredentialsToEnv: (...a) => { deps.__calls.push({ name: 'exportCredentialsToEnv', args: a }); return { kind: 'exists', path: `/tmp/.env.capgo.${APP_ID}.android` } },
+  })
+  const res = await runAndroidEffect('exporting-env', tailProgress(), deps)
+  assertEquals(res.next, 'confirm-env-export-overwrite', 'an existing .env routes to the overwrite confirm gate')
+  assert(!deps.__calls.some(c => c.name === 'saveAndroidProgress'), 'exporting-env must NOT re-create progress.json through the adapter')
+  assertEquals(res.progress.envExportTargetPath, `/tmp/.env.capgo.${APP_ID}.android`, 'the export path still rides the RETURNED progress')
+})
+
 // ─── ADAPTER: streaming / telemetry / preload deps forwarded by toTailDeps ───
 //
 // A2 widened AndroidEffectDeps with the tail's streaming/telemetry/preload deps

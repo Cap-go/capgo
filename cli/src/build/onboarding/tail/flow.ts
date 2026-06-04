@@ -162,6 +162,13 @@ export interface TailEffectDeps<P extends TailEffectProgress = TailEffectProgres
   // ── persistence ──────────────────────────────────────────────────────────
   updateSavedCredentials: (appId: string, platform: 'ios' | 'android', credentials: Record<string, string>) => Promise<void>
   loadProgress: (appId: string) => Promise<P | null>
+  /**
+   * Persist progress. NOTE: the POST-SAVE tail never calls this — saving-credentials
+   * deletes progress.json and every later tail step runs purely from transient/
+   * carried (the bespoke android tail is in-memory-only), so persisting would
+   * re-create the deleted file. Kept on the surface so drivers can still supply it
+   * (and for symmetry with the pre-save engine), but unused by runTailEffect.
+   */
   saveProgress: (appId: string, progress: P) => Promise<void>
   deleteProgress: (appId: string) => Promise<void>
 
@@ -778,10 +785,15 @@ export async function runTailEffect<P extends TailEffectProgress>(
 
       if (discovery.targets.length === 1) {
         const target = discovery.targets[0]
-        // Persist the chosen destination — the later checking/uploading steps
-        // read it back.
+        // Carry the chosen destination on the RETURNED progress so the driver
+        // threads it forward (mirroring the bespoke setCiSecretTarget React
+        // state). We do NOT saveProgress here: this is the POST-SAVE tail —
+        // saving-credentials already deleted progress.json, and the bespoke tail
+        // is in-memory-only — so persisting would RE-CREATE the deleted file
+        // mid post-build flow. Crash-recovery resume relies on the completedSteps
+        // markers (buildRequested / ciSecretsUploaded) set BEFORE the delete, not
+        // on a resurrected progress.json.
         const nextProgress: P = { ...progress, ciSecretTarget: target }
-        await deps.saveProgress(progress.appId, nextProgress)
         // GitHub → 3-option workflow flow; GitLab → legacy 2-option flow.
         const next = target.provider === 'github' ? 'ask-github-actions-setup' : 'ask-ci-secrets'
         return { progress: nextProgress, next, transient: discoveryTransient }
@@ -905,8 +917,12 @@ export async function runTailEffect<P extends TailEffectProgress>(
           return { progress, next: 'build-complete', transient: { envExportError: 'No credentials to export — saved state is empty.' } }
 
         if (result.kind === 'exists') {
+          // Carry the resolved export path on the RETURNED progress so the driver
+          // threads it forward to overwrite-and-export-env (mirroring the bespoke
+          // setEnvExportTargetPath React state). We do NOT saveProgress here — the
+          // post-save tail is in-memory-only and saving-credentials already deleted
+          // progress.json; persisting would re-create the deleted file.
           const nextProgress: P = { ...progress, envExportTargetPath: result.path }
-          await deps.saveProgress(progress.appId, nextProgress)
           return { progress: nextProgress, next: 'confirm-env-export-overwrite' }
         }
 

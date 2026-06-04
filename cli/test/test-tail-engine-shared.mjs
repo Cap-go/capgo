@@ -821,6 +821,53 @@ await test('DRIVER: detecting-ci-secrets surfaces setup advice via transient on 
   assertEquals(res.transient.ciSecretSetupAdvice.length, 1, 'setup advice must be carried through even when a target is reachable')
 })
 
+// ─── GAP 4: post-save tail steps must NOT re-create progress.json (no saveProgress) ──
+//
+// saving-credentials deletes progress.json; the post-save tail then runs purely
+// from transient/carried (the bespoke android tail uses React state — it never
+// persists). The engine previously called saveProgress at detecting (single
+// target → ciSecretTarget) and exporting-env (exists → envExportTargetPath),
+// RE-CREATING the deleted progress.json mid post-build flow. None of the post-
+// save tail steps may persist. The chosen field still rides the RETURNED progress
+// so the driver threads it forward (mirroring setCiSecretTarget / state), but it
+// is never written to disk.
+
+await test('GAP4: detecting-ci-secrets (single target) does NOT call saveProgress but still carries ciSecretTarget on returned progress', async () => {
+  const deps = makeDeps()
+  const res = await runTailEffect('detecting-ci-secrets', tailProgress(), deps)
+  assertEquals(res.next, 'ask-github-actions-setup', 'a single GitHub target still routes to the GitHub Actions setup prompt')
+  assert(!deps.__calls.some(c => c.name === 'saveProgress'), 'detecting-ci-secrets must NOT re-create progress.json (no saveProgress in the post-save tail)')
+  assertEquals(res.progress.ciSecretTarget, GITHUB_TARGET, 'the chosen target still rides the RETURNED progress so the driver threads it forward')
+})
+
+await test('GAP4: exporting-env (exists) does NOT call saveProgress but still carries envExportTargetPath on returned progress', async () => {
+  const deps = makeDeps({
+    exportCredentialsToEnv: (...a) => { deps.__calls.push({ name: 'exportCredentialsToEnv', args: a }); return { kind: 'exists', path: `/tmp/.env.capgo.${APP_ID}.android` } },
+  })
+  const res = await runTailEffect('exporting-env', tailProgress(), deps)
+  assertEquals(res.next, 'confirm-env-export-overwrite', 'an existing .env routes to the overwrite confirm gate')
+  assert(!deps.__calls.some(c => c.name === 'saveProgress'), 'exporting-env must NOT re-create progress.json (no saveProgress in the post-save tail)')
+  assertEquals(res.progress.envExportTargetPath, `/tmp/.env.capgo.${APP_ID}.android`, 'the export path still rides the RETURNED progress so overwrite-and-export-env can read it')
+})
+
+await test('GAP4: a full post-save tail walk (detect → check → upload → export → write) never calls saveProgress', async () => {
+  // The driver threads each result.transient back as carried and result.progress
+  // forward as progress — exactly as the Ink TUI mirrors its React state — and
+  // NOTHING along the way re-creates progress.json.
+  const carried = { ciSecretEntries: CI_ENTRIES, savedCredentials: ANDROID_CREDENTIALS }
+  for (const [step, progress] of [
+    ['detecting-ci-secrets', tailProgress()],
+    ['checking-ci-secrets', tailProgress({ ciSecretTarget: GITHUB_TARGET, setupMode: 'with-workflow' })],
+    ['uploading-ci-secrets', tailProgress({ ciSecretTarget: GITHUB_TARGET, setupMode: 'with-workflow' })],
+    ['exporting-env', tailProgress({ setupMode: 'declined' })],
+    ['writing-workflow-file', tailProgress({ ciSecretTarget: GITHUB_TARGET, setupMode: 'with-workflow', selectedPackageManager: 'bun', buildScriptChoice: { type: 'npm-script', name: 'build' } })],
+  ]) {
+    const deps = makeDeps({ carried })
+    await runTailEffect(step, progress, deps)
+    assert(!deps.__calls.some(c => c.name === 'saveProgress'), `${step} must NOT call saveProgress in the post-save tail`)
+  }
+})
+
 // ─── CROSS-PLATFORM: detection / upload / build-request are credential-agnostic ─
 //
 // platform:'ios' through the neutral steps. These do NOT need an iOS credential
