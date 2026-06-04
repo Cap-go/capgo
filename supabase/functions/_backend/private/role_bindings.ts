@@ -426,24 +426,68 @@ async function getCallerMaxPriorityRank(
   principalId: string,
   orgId: string,
 ): Promise<number> {
-  const principalType = authType === 'apikey' ? 'apikey' : 'user'
-  const result = await drizzle
-    .select({ max_rank: sql<number>`MAX(${schema.roles.priority_rank})` })
-    .from(schema.role_bindings)
-    .innerJoin(schema.roles, and(
-      eq(schema.role_bindings.role_id, schema.roles.id),
-      eq(schema.role_bindings.scope_type, schema.roles.scope_type),
-    ))
-    .where(
-      and(
-        eq(schema.role_bindings.principal_type, principalType),
-        eq(schema.role_bindings.principal_id, principalId),
-        eq(schema.role_bindings.org_id, orgId),
-      ),
-    )
-    .limit(1)
+  if (authType === 'apikey') {
+    const result = await drizzle
+      .select({ max_rank: sql<number>`MAX(${schema.roles.priority_rank})` })
+      .from(schema.role_bindings)
+      .innerJoin(schema.roles, and(
+        eq(schema.role_bindings.role_id, schema.roles.id),
+        eq(schema.role_bindings.scope_type, schema.roles.scope_type),
+      ))
+      .where(
+        and(
+          eq(schema.role_bindings.principal_type, 'apikey'),
+          eq(schema.role_bindings.principal_id, principalId),
+          eq(schema.role_bindings.org_id, orgId),
+          sql`(${schema.role_bindings.expires_at} IS NULL OR ${schema.role_bindings.expires_at} > now())`,
+        ),
+      )
+      .limit(1)
 
-  return result[0]?.max_rank ?? 0
+    return result[0]?.max_rank ?? 0
+  }
+
+  const result = await drizzle.execute(
+    sql`
+      WITH active_caller_bindings AS (
+        SELECT role_bindings.role_id, role_bindings.scope_type
+        FROM public.role_bindings role_bindings
+        WHERE role_bindings.principal_type = public.rbac_principal_user()
+          AND role_bindings.principal_id = ${principalId}::uuid
+          AND role_bindings.org_id = ${orgId}::uuid
+          AND (role_bindings.expires_at IS NULL OR role_bindings.expires_at > now())
+
+        UNION ALL
+
+        SELECT role_bindings.role_id, role_bindings.scope_type
+        FROM public.group_members group_members
+        INNER JOIN public.groups groups
+          ON groups.id = group_members.group_id
+          AND groups.org_id = ${orgId}::uuid
+        INNER JOIN public.role_bindings role_bindings
+          ON role_bindings.principal_type = public.rbac_principal_group()
+          AND role_bindings.principal_id = group_members.group_id
+          AND role_bindings.org_id = groups.org_id
+        WHERE group_members.user_id = ${principalId}::uuid
+          AND (role_bindings.expires_at IS NULL OR role_bindings.expires_at > now())
+      )
+      SELECT MAX(roles.priority_rank) AS max_rank
+      FROM active_caller_bindings
+      INNER JOIN public.roles roles
+        ON roles.id = active_caller_bindings.role_id
+        AND roles.scope_type = active_caller_bindings.scope_type
+    `,
+  )
+
+  const maxRank = (result.rows[0] as { max_rank?: number | string | null } | undefined)?.max_rank
+  if (typeof maxRank === 'number') {
+    return maxRank
+  }
+  if (typeof maxRank === 'string') {
+    return Number(maxRank)
+  }
+
+  return 0
 }
 
 // Reusable binding creation logic - used by both the POST route and apikey/post.ts
