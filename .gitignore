@@ -95,5 +95,15 @@ internal/Certificates.p12
 .superpowers/
 .playwright-mcp/
 
-# Graphify generated knowledge graph output
-graphify-out/
+# Graphify local cache and optional exports. Keep graph.json, cost.json, and
+# GRAPH_REPORT.md committed.
+graphify-out/.*
+graphify-out/cache/
+graphify-out/manifest.json
+graphify-out/obsidian/
+graphify-out/wiki/
+graphify-out/memory/
+graphify-out/*.html
+graphify-out/*.svg
+graphify-out/*.graphml
+graphify-out/cypher.txt

@@ -879,13 +879,14 @@ code, and where code is used.
 Rules:
 - When the user types `/graphify`, follow the project skill before doing
   anything else.
-- If `graphify-out/graph.json` exists, prefer `graphify query "<question>"`,
-  `graphify affected "<node>"`, `graphify path "<A>" "<B>"`, or
-  `graphify explain "<concept>"` before broad source searches.
-- Keep `graphify-out/` uncommitted. It is generated local analysis output and
-  is ignored by Git.
+- `graphify-out/graph.json` is committed and refreshed during release version
+  bumps. Prefer `graphify query "<question>"`, `graphify affected "<node>"`,
+  `graphify path "<A>" "<B>"`, or `graphify explain "<concept>"` before broad
+  source searches.
+- Use `bun run graphify:generate` to refresh the committed code graph. The
+  generator is deterministic AST/code extraction and does not require LLM API
+  keys.
 - For deterministic unused export checks, keep using `bun run lint:deadcode`
   alongside Graphify's graph queries.
-- After modifying code, run `graphify update .` when the Graphify CLI and a
-  local graph are available. This refreshes AST/code relationships without LLM
-  extraction cost.
+- After code changes that should update the repository graph, run
+  `bun run graphify:generate` and commit the resulting `graphify-out/` changes.
