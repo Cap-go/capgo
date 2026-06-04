@@ -601,6 +601,43 @@ function isLastSuperAdminDemotionError(error: unknown): boolean {
   return errorMessage.includes('CANNOT_DEMOTE_LAST_SUPER_ADMIN_BINDING') || errorCode === 'CANNOT_DEMOTE_LAST_SUPER_ADMIN_BINDING'
 }
 
+async function deleteChannelPermissionOverridesForBinding(
+  tx: Parameters<Parameters<ReturnType<typeof getDrizzleClient>['transaction']>[0]>[0],
+  binding: RoleBindingRecord,
+) {
+  if (binding.principal_type !== 'user' && binding.principal_type !== 'apikey') {
+    return
+  }
+
+  if (binding.scope_type === 'app' && binding.app_id) {
+    await tx.execute(sql`
+      DELETE FROM public.channel_permission_overrides AS overrides
+      USING public.channels AS channels
+      INNER JOIN public.apps AS apps
+        ON apps.app_id = channels.app_id
+      WHERE overrides.channel_id = channels.id
+        AND apps.id = ${binding.app_id}
+        AND overrides.principal_type = ${binding.principal_type}
+        AND overrides.principal_id = ${binding.principal_id}
+    `)
+    return
+  }
+
+  if (binding.scope_type === 'channel' && binding.app_id && binding.channel_id) {
+    await tx.execute(sql`
+      DELETE FROM public.channel_permission_overrides AS overrides
+      USING public.channels AS channels
+      INNER JOIN public.apps AS apps
+        ON apps.app_id = channels.app_id
+      WHERE overrides.channel_id = channels.id
+        AND apps.id = ${binding.app_id}
+        AND channels.rbac_id = ${binding.channel_id}
+        AND overrides.principal_type = ${binding.principal_type}
+        AND overrides.principal_id = ${binding.principal_id}
+    `)
+  }
+}
+
 async function loadRoleBindingApp(
   drizzle: ReturnType<typeof getDrizzleClient>,
   appId: string,
@@ -1108,6 +1145,8 @@ app.delete('/:binding_id', requireAuthAndGuardLimitedKeys, sValidator('param', b
       return c.json({ error: 'Cannot delete a binding for a role with higher privileges than your own' }, 403)
     }
     await drizzle.transaction(async (tx) => {
+      await deleteChannelPermissionOverridesForBinding(tx, binding)
+
       await tx
         .delete(schema.role_bindings)
         .where(eq(schema.role_bindings.id, bindingId))
