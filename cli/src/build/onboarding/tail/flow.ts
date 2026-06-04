@@ -734,6 +734,11 @@ export async function runTailEffect<P extends TailEffectProgress>(
       if (fresh) {
         const expectedStep = deps.resumeStep(fresh)
         if (expectedStep !== 'saving-credentials') {
+          // The self-heal diverted (a fresh load resumes elsewhere because some
+          // required input went missing). Emit the same guidance the bespoke
+          // android tail logs before routing back (app.tsx ~L1331) so the user
+          // knows why they were sent back. Yellow side-log; no-op on iOS.
+          deps.onLog?.('ℹ Some required input was missing — sending you back to fill it in.', 'yellow')
           return { progress, next: expectedStep }
         }
       }

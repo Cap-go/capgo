@@ -484,6 +484,27 @@ await test('GAP4 ADAPTER: exporting-env (exists) does NOT call saveAndroidProgre
   assertEquals(res.progress.envExportTargetPath, `/tmp/.env.capgo.${APP_ID}.android`, 'the export path still rides the RETURNED progress')
 })
 
+// ─── GAP 5 (ADAPTER): saving-credentials self-heal emits the missing-input log ──
+//
+// A fresh load whose getAndroidResumeStep is NOT saving-credentials (input went
+// missing) must divert AND emit the yellow guidance via onLog before routing back
+// (app.tsx ~L1331). tailProgress() has no googleSignInComplete/_oauthRefreshToken
+// so getAndroidResumeStep resolves to 'google-sign-in' — a divert.
+
+await test('GAP5 ADAPTER: saving-credentials self-heal forwards the yellow missing-input log + diverts', async () => {
+  const logs = []
+  const deps = makeDeps({
+    onLog: (msg, color) => logs.push({ msg, color }),
+    loadAndroidProgress: async () => tailProgress(),
+  })
+  const res = await runAndroidEffect('saving-credentials', tailProgress(), deps)
+  assert(res.next !== 'saving-credentials' && res.next !== 'ask-build', 'self-heal must divert to an earlier (input) step')
+  assert(!deps.__calls.some(c => c.name === 'updateSavedCredentials'), 'must NOT save when diverted')
+  const hit = logs.find(l => /Some required input was missing/.test(l.msg))
+  assert(hit, 'must forward the missing-input guidance log through the adapter')
+  assertEquals(hit.color, 'yellow', 'the missing-input log is yellow')
+})
+
 // ─── ADAPTER: streaming / telemetry / preload deps forwarded by toTailDeps ───
 //
 // A2 widened AndroidEffectDeps with the tail's streaming/telemetry/preload deps

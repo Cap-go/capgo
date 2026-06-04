@@ -193,6 +193,36 @@ await test("saving-credentials self-heal: resumeStep diverts when progress moved
   assert(!deps.__calls.some(c => c.name === 'updateSavedCredentials'), 'must NOT save when diverted')
 })
 
+// ─── GAP 5: saving-credentials self-heal emits the 'missing input' log ──
+//
+// When the self-heal guard diverts (a fresh load resumes somewhere other than
+// saving-credentials — input was missing), the bespoke android tail emits
+// addLog('ℹ Some required input was missing — sending you back to fill it in.',
+// 'yellow') BEFORE routing back (app.tsx ~L1331). The engine must emit the same
+// via deps.onLog on the self-heal path.
+
+await test('GAP5: saving-credentials self-heal emits the yellow missing-input log via onLog', async () => {
+  const logs = []
+  const deps = makeDeps({
+    onLog: (msg, color) => logs.push({ msg, color }),
+    loadProgress: async () => tailProgress(),
+    resumeStep: () => 'gcp-projects-loading', // diverts somewhere earlier (input missing)
+  })
+  const res = await runTailEffect('saving-credentials', tailProgress(), deps)
+  assertEquals(res.next, 'gcp-projects-loading', 'self-heal diverts to the resolved resume step')
+  const hit = logs.find(l => /Some required input was missing/.test(l.msg) && /sending you back to fill it in/.test(l.msg))
+  assert(hit, 'must emit the missing-input guidance log on the self-heal path')
+  assertEquals(hit.color, 'yellow', 'the missing-input log is yellow')
+})
+
+await test('GAP5: saving-credentials does NOT emit the missing-input log on the normal save path', async () => {
+  const logs = []
+  const deps = makeDeps({ onLog: (msg, color) => logs.push({ msg, color }) })
+  const res = await runTailEffect('saving-credentials', tailProgress(), deps)
+  assertEquals(res.next, 'ask-build', 'a normal save routes to ask-build')
+  assert(!logs.some(l => /Some required input was missing/.test(l.msg)), 'the missing-input log fires ONLY on the self-heal divert')
+})
+
 await test("requesting-build (success, entries present) → next 'detecting-ci-secrets' (uses requestBuildInternal)", async () => {
   const deps = makeDeps()
   const res = await runTailEffect('requesting-build', tailProgress(), deps)
