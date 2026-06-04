@@ -183,6 +183,62 @@ export interface TailEffectDeps<P extends TailEffectProgress = TailEffectProgres
   writeWorkflowFile?: (opts: WorkflowGeneratorOpts, writeOptions?: WorkflowWriteOptions) => WorkflowWriteResult
   requestBuildInternal?: (appId: string, options: BuildRequestOptions, silent?: boolean, logger?: BuildLogger) => Promise<BuildRequestResult>
 
+  // ── streaming / build-request injection (requesting-build) ─────────────────
+  //
+  // All OPTIONAL — the iOS consumer (which won't provide them yet) degrades
+  // gracefully, so the headless build-request path stays behaviour-matched only
+  // when the driver wires them up.
+
+  /**
+   * The streaming BuildLogger the TUI threads into requestBuildInternal (the 4th
+   * arg). On android it streams every line into `setBuildOutput`; the engine just
+   * forwards it. When absent, requestBuildInternal is called without a logger.
+   */
+  logger?: BuildLogger
+
+  /**
+   * Resolves the Capgo API key the build request should use, mirroring the
+   * android tail's CLI-flag-over-saved precedence (`apikey ?? findSavedKeySilent()`).
+   * Returns undefined when no key is resolvable — in which case requesting-build
+   * skips the build attempt and finishes at build-complete (the android no-key UX).
+   * When this dep is ABSENT the engine falls back to the legacy empty-string apikey
+   * so existing callers/tests that never resolved a key keep working.
+   */
+  resolveApikey?: () => string | undefined
+
+  /**
+   * Per-key upload progress, forwarded as the 5th arg of uploadCiSecretsAsync.
+   * The android tail feeds this into `setCiSecretUploadProgress`. No-op when absent.
+   */
+  onCiSecretUploadProgress?: (current: number, total: number, keyName: string) => void
+
+  /**
+   * The 2-phase checking-ci-secrets status text ('Resolving GitHub repository…'
+   * then 'Checking existing env vars in <repo>…'). The android tail feeds this into
+   * `setCiSecretCheckPhase`. Also surfaced via `onStatus`. No-op when absent.
+   */
+  onCiSecretCheckPhase?: (phase: string) => void
+
+  // ── workflow-builder script preload (uploading-ci-secrets, with-workflow) ──
+  //
+  // The android tail preloads the package.json scripts + recommended build script
+  // BEFORE routing to pick-package-manager so pick-build-script has options. All
+  // OPTIONAL — when absent the preload is skipped and pick-build-script falls back
+  // to its escape-hatch list.
+
+  /** Reads the project's package.json scripts map. */
+  getPackageScripts?: () => Record<string, string>
+  /** Detects the web-framework project type (best-effort; may resolve null). */
+  findProjectType?: (options?: { quiet?: boolean }) => Promise<string | null>
+  /** Maps a detected project type to its recommended build script name. */
+  findBuildCommandForProjectType?: (projectType: string) => Promise<string | null>
+
+  /**
+   * Workflow-file telemetry hook (e.g. 'workflow-file-written'). The android tail
+   * calls `trackWorkflowEvent`. No-op when absent.
+   */
+  trackWorkflowEvent?: (event: string, options?: { decision?: string }) => void
+
   /**
    * DRIVER-HELD transient tail state, threaded back into each effect. The TUI
    * resolves these ONCE (at `saving-credentials`) and keeps them in React state;
@@ -225,6 +281,11 @@ export interface TailTransient {
   buildUrl?: string
   buildOutput?: string[]
   aiJobId?: string
+  /** Workflow-builder script preload (resolved at uploading-ci-secrets, with-workflow). */
+  availableScripts?: Record<string, string>
+  recommendedScript?: string | null
+  /** Set when env-export found nothing to write or threw — routed to build-complete, never thrown. */
+  envExportError?: string
 }
 
 // ─── Tail input ───────────────────────────────────────────────────────────────
@@ -772,9 +833,28 @@ export async function runTailEffect<P extends TailEffectProgress>(
 
     // ── requesting-build ──────────────────────────────────────────────────
     case 'requesting-build': {
+      // CLI-flag key takes precedence over the saved one — the driver resolves it
+      // (apikey ?? findSavedKeySilent()) and hands it back via deps.resolveApikey.
+      // When that dep is wired and yields nothing, mirror the android no-key UX:
+      // log the guidance and finish at build-complete WITHOUT attempting a build.
+      // When the dep is ABSENT (legacy callers / iOS not-yet-wired) fall back to the
+      // empty-string apikey so the existing behaviour is preserved.
+      let apikey = ''
+      if (deps.resolveApikey) {
+        const resolved = deps.resolveApikey()
+        if (!resolved) {
+          deps.onLog?.('⚠ No Capgo API key found.', 'yellow')
+          deps.onLog?.(`Run \`capgo login\` first, then \`capgo build request --platform ${deps.platform}\`.`)
+          return { progress, next: 'build-complete' }
+        }
+        apikey = resolved
+      }
+
       const result = await deps.requestBuildInternal!(
         progress.appId,
-        { apikey: '', platform: deps.platform, aiAnalysisMode: 'caller-handled' },
+        { apikey, platform: deps.platform, aiAnalysisMode: 'caller-handled' },
+        true,
+        deps.logger,
       )
 
       if (result.success) {

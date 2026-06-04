@@ -202,6 +202,64 @@ await test("requesting-build (success, entries present) → next 'detecting-ci-s
   assertEquals(req.args[1].platform, 'android', 'requestBuildInternal platform comes from deps.platform')
 })
 
+// ─── CONCERN 1: requesting-build threads logger + driver-resolved apikey ───────
+
+await test('requesting-build threads the injected logger AND a driver-RESOLVED apikey into requestBuildInternal', async () => {
+  const logger = { info() {}, error() {}, warn() {}, success() {}, buildLog() {}, uploadProgress() {}, customMsg() {} }
+  const deps = makeDeps({
+    logger,
+    resolveApikey: () => 'resolved-cli-key',
+  })
+  const res = await runTailEffect('requesting-build', tailProgress(), deps)
+  assertEquals(res.next, 'detecting-ci-secrets', 'a successful build with pending entries routes to detecting-ci-secrets')
+  const req = deps.__calls.find(c => c.name === 'requestBuildInternal')
+  assert(req, 'must call requestBuildInternal')
+  assertEquals(req.args[1].apikey, 'resolved-cli-key', 'requestBuildInternal must receive the driver-resolved apikey (NOT hardcoded empty string)')
+  assertEquals(req.args[1].aiAnalysisMode, 'caller-handled', 'caller-handled mode so the TUI owns the AI sub-flow')
+  assertEquals(req.args[3], logger, 'requestBuildInternal must receive the injected BuildLogger as the 4th arg')
+})
+
+await test('requesting-build with no resolved apikey routes straight to build-complete (no build attempt)', async () => {
+  const deps = makeDeps({
+    resolveApikey: () => undefined,
+  })
+  const res = await runTailEffect('requesting-build', tailProgress(), deps)
+  assertEquals(res.next, 'build-complete', 'no API key → skip the build attempt and finish')
+  assert(!deps.__calls.some(c => c.name === 'requestBuildInternal'), 'must NOT call requestBuildInternal when no key is resolvable')
+})
+
+await test('requesting-build success (success, NO entries) → build-complete with buildUrl', async () => {
+  const deps = makeDeps({ carried: { ciSecretEntries: [] } })
+  const res = await runTailEffect('requesting-build', tailProgress(), deps)
+  assertEquals(res.next, 'build-complete', 'a successful build with no pending entries finishes the wizard')
+  assert(res.transient && typeof res.transient.buildUrl === 'string', 'must surface the build URL in transient')
+})
+
+await test('requesting-build failure with AI job ready → next ai-analysis-prompt (TUI renders it; aiJobId in transient)', async () => {
+  const deps = makeDeps({
+    requestBuildInternal: async (...a) => {
+      deps.__calls.push({ name: 'requestBuildInternal', args: a })
+      return { success: false, error: 'boom', aiAnalysis: { jobId: 'JOB1', capturedLogPath: '/tmp/log', ready: true } }
+    },
+    resolveApikey: () => 'k',
+  })
+  const res = await runTailEffect('requesting-build', tailProgress(), deps)
+  assertEquals(res.next, 'ai-analysis-prompt', 'a failed build with a ready AI job routes to ai-analysis-prompt')
+  assertEquals(res.transient && res.transient.aiJobId, 'JOB1', 'the AI job id must ride in transient for the TUI')
+})
+
+await test('requesting-build failure with NO AI job → build-complete', async () => {
+  const deps = makeDeps({
+    requestBuildInternal: async (...a) => {
+      deps.__calls.push({ name: 'requestBuildInternal', args: a })
+      return { success: false, error: 'boom' }
+    },
+    resolveApikey: () => 'k',
+  })
+  const res = await runTailEffect('requesting-build', tailProgress(), deps)
+  assertEquals(res.next, 'build-complete', 'a failed build with no AI job finishes the wizard')
+})
+
 await test("detecting-ci-secrets (single GitHub target) → next 'ask-github-actions-setup' (uses detectCiSecretTargets)", async () => {
   const deps = makeDeps()
   const res = await runTailEffect('detecting-ci-secrets', tailProgress(), deps)
