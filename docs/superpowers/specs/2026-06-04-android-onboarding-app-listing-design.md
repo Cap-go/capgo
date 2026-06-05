@@ -44,10 +44,46 @@ The iOS `app-verification.ts` (`classifyAppVerification`, `evaluateGate`) is alr
 
 When entering `android-package-select` AND `serviceAccountMethod === 'generate'`:
 1. Detect Gradle ids (`findAndroidApplicationIds`, already done) **and** fetch `listPlayApps(await ensureAccessToken())` in the existing effect.
-2. Reconcile ("expand the Gradle list"):
+2. Reconcile ("expand the Gradle list") and route to a resolution path:
    - **Exactly one Gradle id and it's in `apps` → auto-select it and skip the picker** (don't pose the question). `addLog('✓ Building "<name>" (<pkg>) — matches your Play Store app.')` and continue to `gcp-setup-running`.
-   - **Otherwise → render the picker enriched with the real Play apps**: union of Play apps (annotated `✓ in Play Console`, with `displayName`), the Gradle ids, and "type a different package name". If the build's Gradle id matches **no** Play app, show an iOS-style warning box: *"No Play Console app exists for `com.foo.app` — an app_store publish needs one. Create it in Play Console (or upload the first build there); the API can't create it for you."* with an "Open Play Console" action.
-3. The chosen package still flows into `androidPackageChosen` / SA grant exactly as today.
+   - **Account has apps but the build's id matches none → Path A picker.** Render the picker enriched with the real Play apps (annotated `✓ in Play Console` + `displayName`), the Gradle ids, "type a different package name", and a **"Create a new app in Play Console" → Path B** entry. Picking a real Play app whose `packageName` ≠ the build's Gradle id offers the **Trapeze auto-rename** (Path A below).
+   - **No apps in the account at all → Path B (create app).**
+3. The chosen/renamed package still flows into `androidPackageChosen` / SA grant exactly as today.
+
+### Path A — auto-rename the Android project (Trapeze)
+
+Hand-editing an Android `applicationId` to match a Play app is genuinely hard — it spans `build.gradle` (`applicationId`), the `namespace`, the manifest/package + source dirs, then needs `cap sync`. "Retype it yourself" is a non-starter. So when the user picks a real Play app whose `packageName` differs from the build's Gradle id, offer **"Rename my Android project to `<pkg>` for me"**, powered by **Trapeze** (`@trapezedev/project`):
+
+```ts
+const project = new MobileProject('.', { android: { path: 'android' } })
+await project.load()
+await project.android?.setPackageName(appId)
+const gradle = await project.android?.getGradleFile('app/build.gradle')
+await gradle?.setApplicationId(appId)
+await gradle?.setNamespace(appId)
+await project.commit()
+```
+
+**Trapeze is NOT bundled** (the CLI stays lean — same reasoning as the iOS pbxproj rewriter being hand-coded; Trapeze is a heavy dep). It's installed **on demand** into a temp dir only when the user opts in. Orchestrated sequence:
+
+1. **Prepare** — `mkdtemp`; write a tiny `package.json` (`type: module`) + `rename.mjs` (the script above, reading `<appId>` from `argv`); `npm install @trapezedev/project@<pinned>` in the temp dir (spinner: "Preparing the project renamer…"). Node resolves the import from `<tmp>/node_modules`; run the script with **cwd = the user's project** so `MobileProject('.')` targets it.
+2. **Close Android Studio (gate).** Editing the Gradle/native files while Android Studio holds them open risks a half-written project / Studio clobbering the change on its next sync. So detect it and **block until closed**:
+   - **macOS:** `pgrep -f "Android Studio"` (best-effort). If running → "Please quit Android Studio — this continues automatically once it's closed" and re-check ~every 1s until gone.
+   - **Other OSes:** can't reliably detect → one-time "Close Android Studio if it's open" confirm, then proceed.
+3. **Run** the rename (`node <tmp>/rename.mjs <pkg>`, cwd = project); capture stdout/stderr.
+4. **Verify** it took — re-read `findAndroidApplicationIds(androidDir)` and confirm it now contains `<pkg>`. If not, surface the script output and fall back to manual instructions (never claim success).
+5. **`npx cap sync`** (cwd = project; spinner) to keep Capacitor's native/config state consistent after the package change. Non-zero exit is surfaced but non-fatal (the rename is the load-bearing part).
+6. **Re-reconcile** → the Gradle id now matches the Play app → proceed (mirrors iOS Path A's re-check passing).
+
+Loader + attempt feedback mirror iOS — each step shows a spinner; failures warn rather than silently no-op; cancel/back always available.
+
+> ⚠ `setNamespace(appId)` aligns the namespace with the applicationId. For a standard Capacitor app these already match; for a project that *intentionally* keeps `namespace ≠ applicationId`, this is more aggressive than strictly necessary (only `setApplicationId` is required for the Play-app match). See Open questions.
+
+### Path B — create the app in Play Console
+
+Offer **"Open Play Console to create this app"** → opens `https://play.google.com/console`; the user creates the app there. Then re-poll `apps:search` (loader + attempt counting + ask-before-reopen, same mechanics as iOS) to detect it.
+
+**Android-specific caveat (load-bearing):** a brand-new package only becomes API-visible after its **first bundle upload** — `androidpublisher` returns `404 "Package not found"` for a package with no app/first upload, and the first upload for a *new* package must happen via the web/Play Console (the API can't bootstrap it; Capgo Builder's first build is what ultimately uploads it). So Path B's re-poll may legitimately keep returning nothing until the first build runs — which means Android Path B should **inform + allow proceed**, not hard-block. (Strongest argument for "inform, don't gate" on Android — see Open questions.)
 
 ### Import (custom-SA) path — keep Gradle-only, warn
 
@@ -69,6 +105,8 @@ Mirror iOS, `channel: 'bundle'`, `tags.step: 'android-app-verify'` always set:
 - `Android App Verify Shown` — generate path, step entered. tags: `app_count`, `gradle_id_count`.
 - `Android App Verify Result` — `result` ∈ `exact-match` / `wrong-build-id` / `no-app` / `multi-gradle` / `scope-missing` / `fetch-failed` / `skipped-import`.
 - `Android App Verify Picked` — user chose a package. tags: `matches_play_app` (bool), `source` (gradle | play-app | manual).
+- `Android App Verify Auto Fixed` — Trapeze rename completed + verified. tags: `from`, `to`, `cap_sync_ok` (bool), `studio_wait_ms`.
+- `Android App Verify Create App Opened` — opened Play Console (Path B). tags: `attempt`.
 
 ## Error handling
 
@@ -81,18 +119,23 @@ Mirror iOS, `channel: 'bundle'`, `tags.step: 'android-app-verify'` always set:
 - **Unit (pure):** `parseAppsSearchResponse` (well-formed, empty, missing fields, pagination shape).
 - **Decision (pure):** reuse/extend `app-verification` tests for the Android inputs — single-match-skip, no-match, multi-Gradle (no auto-skip), empty Play list.
 - **Branch:** generate-vs-import gating, and the scope-missing/fetch-failed → fallback path, as a pure decision function.
+- **Trapeze rename (pure-testable parts):** the temp-script/`package.json` generation and the post-run **verification** (re-read Gradle ids → contains `<pkg>`), plus the Android-Studio-detection predicate (mock `pgrep` output → running/closed). The actual `npm install` + `node` + `cap sync` spawns are integration-only (mock the spawner in unit tests).
 - Wire a `test:` script + aggregate entry, matching the onboarding test pattern.
 
 ## Out of scope (v1)
 
-- **Auto-editing `build.gradle`** (no Android analog of the iOS pbxproj rewriter yet) — the no-match path informs + lets the user pick/retype, but doesn't rewrite `applicationId`. Candidate follow-up.
+- **Bundling Trapeze in the CLI** — it's installed **on demand** into a temp dir only when the user opts into Path A's auto-rename (keeps the dist lean). The auto-rename itself is **in scope** (see Path A).
 - **Enabling the Reporting API on, or granting the reporting scope to, the user's service account** — explicitly excluded; OAuth-token only.
 - **Verification on the import (custom-SA) path** — warn + skip.
-- **Auto-creating the Play app** — impossible via API (web/first-upload only).
-- Hard-gating: v1 **informs** (iOS-style warning + enriched picker) rather than hard-blocking, per the request. (Open question below.)
+- **Auto-creating the Play app** — impossible via API (web + first-upload only); Path B opens Play Console and informs.
+- **Hard-gating Path B** — Android can't pre-verify a never-uploaded package (first upload bootstraps it), so Path B **informs + allows proceed** rather than blocking. (Open question.)
 
 ## Open questions
 
-- **Inform vs gate.** iOS hard-gates the no-app case (can't proceed until the invariant holds). The request says "inform" — so v1 informs and lets the user proceed/pick. Confirm whether Android should also hard-gate or stay informational.
-- **Multiple Gradle flavors.** When several `applicationId`s exist and more than one matches a Play app, we show the enriched picker (no auto-skip). Confirm that's the desired behavior vs. picking the shortest/main like iOS.
-- **Backend coordination.** The reporting scope must be added to `/private/config/builder`'s `scopes[]` for this to activate in production; until then the CLI silently degrades. Track that as a dependency.
+- **`setNamespace` aggressiveness.** Path A's script sets `applicationId` **and** `namespace` (+ `setPackageName`). Only `applicationId` is strictly required to match the Play app. Setting `namespace`/package is a fuller rename (matches the user-provided working script, fine for standard Capacitor apps) but is more invasive for projects that intentionally keep them different. Confirm we always do the full rename, or make namespace/package opt-in.
+- **Is `npx cap sync` needed after the rename?** Trapeze edits the native project directly; `applicationId` doesn't require a sync. It's included to keep Capacitor consistent after a package/namespace change. Confirm keep vs. drop (it's a slow, network-touching step).
+- **On-demand Trapeze install fragility.** Path A `npm install @trapezedev/project` mid-onboarding needs npm + network + time. Pin a version; show a spinner; on install failure fall back to manual instructions. Acceptable, or pre-resolve another way (e.g. `npx --package @trapezedev/project`)?
+- **Android Studio detection off macOS.** Only macOS gets the `pgrep` auto-detect + poll-until-closed. Linux/Windows get a one-time "close it" confirm. Acceptable for v1?
+- **Path B can't pre-verify (first-upload bootstrap).** A new Android package isn't API-visible until its first bundle upload, which Capgo Builder itself performs. So Path B informs + proceeds rather than gating. Confirm.
+- **Multiple Gradle flavors.** When several `applicationId`s exist and >1 matches a Play app, show the enriched picker (no auto-skip). Confirm vs. picking the shortest/main like iOS.
+- **Backend coordination.** The reporting scope must be added to `/private/config/builder`'s `scopes[]` (optional) for this to activate in production; until then the CLI silently degrades. Track as a dependency.
