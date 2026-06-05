@@ -44,7 +44,7 @@ import { mapIosOnboardingError } from '../error-categories.js'
 import { canUseFilePicker, openFilePicker, openMobileprovisionPicker } from '../file-picker.js'
 import { parseMobileprovisionBufferDetailed } from '../../mobileprovision-parser.js'
 import { bundleIdMatches, exportP12FromKeychain, filterProfilesForApp, isHelperCached, isMacOS, listSigningIdentities, precompileSwiftHelper, scanProvisioningProfiles } from '../macos-signing.js'
-import { deleteProgress, extractKeyIdFromP8Path, getImportEntryStep, getResumeStep, loadProgress, saveProgress } from '../progress.js'
+import { deleteProgress, extractKeyIdFromP8Path, getImportEntryStep, loadProgress, saveProgress } from '../progress.js'
 import { getBuildOnboardingRecoveryAdvice } from '../recovery.js'
 import { createCiSecretEntries, detectCiSecretTargets, getCiSecretRepoLabelAsync, getCiSecretTargetLabel, listExistingCiSecretKeysAsync, uploadCiSecretsAsync } from '../ci-secrets.js'
 import type { CiSecretEntry, CiSecretSetupAdvice, CiSecretTarget } from '../ci-secrets.js'
@@ -266,7 +266,7 @@ async function runRunnerCommand(runner: string, args: string[]): Promise<{ succe
 
 const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgress, iosDir, apikey, onResult }) => {
   const { exit } = useApp()
-  const startStep = getResumeStep(initialProgress)
+  const startStep = getIosResumeStep(initialProgress)
 
   // When there's saved progress AND the resume target isn't trivially 'welcome',
   // land on the resume-prompt fork so the user can see what's saved and decide
