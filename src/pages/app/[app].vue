@@ -5,6 +5,7 @@ import { useRoute, useRouter } from 'vue-router'
 import IconCheck from '~icons/lucide/check'
 import AppNotFoundModal from '~/components/AppNotFoundModal.vue'
 import BundleUploadsCard from '~/components/dashboard/BundleUploadsCard.vue'
+import CompatibilityBanner from '~/components/dashboard/CompatibilityBanner.vue'
 import DeploymentBanner from '~/components/dashboard/DeploymentBanner.vue'
 import DeploymentStatsCard from '~/components/dashboard/DeploymentStatsCard.vue'
 import DevicesStats from '~/components/dashboard/DevicesStats.vue'
@@ -204,6 +205,7 @@ watchEffect(async () => {
           </div>
           <DeploymentBanner v-if="!appNotFound" :app-id="id" @deployed="refreshData" />
           <ReleaseBanner v-if="!appNotFound" :app-id="id" />
+          <CompatibilityBanner v-if="!appNotFound" :app-id="id" />
 
           <!-- Capgo Builder promo banner (only for valid apps with no native build yet) -->
           <BuilderPromoBanner v-if="!appNotFound" :app-id="id" />
