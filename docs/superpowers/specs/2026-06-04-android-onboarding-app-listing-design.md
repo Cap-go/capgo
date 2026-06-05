@@ -83,7 +83,12 @@ Loader + attempt feedback mirror iOS — each step shows a spinner; failures war
 
 Offer **"Open Play Console to create this app"** → opens `https://play.google.com/console`; the user creates the app there. Then re-poll `apps:search` (loader + attempt counting + ask-before-reopen, same mechanics as iOS) to detect it.
 
-**Android-specific caveat (load-bearing):** a brand-new package only becomes API-visible after its **first bundle upload** — `androidpublisher` returns `404 "Package not found"` for a package with no app/first upload, and the first upload for a *new* package must happen via the web/Play Console (the API can't bootstrap it; Capgo Builder's first build is what ultimately uploads it). So Path B's re-poll may legitimately keep returning nothing until the first build runs — which means Android Path B should **inform + allow proceed**, not hard-block. (Strongest argument for "inform, don't gate" on Android — see Open questions.)
+**Android-specific caveat:** two separate facts here, with different confidence —
+
+- **Documented (`androidpublisher`):** a never-published package returns `404 "Package not found"` from `edits.insert`, and the *first* AAB upload for a new package must be done via the web/Play Console (the publishing API can't bootstrap a brand-new package). Evidence: gradle-play-publisher #75 ("the first upload of an APK needs to be done through the web interface") and #836/#979 (raw 404 logs); Codemagic's troubleshooting docs. This is about the **publishing** API, not `apps:search`.
+- **UNVERIFIED (`apps:search`):** whether the Reporting API lists a *Draft* app (created in Play Console, zero releases). We have **no evidence** either way — a Draft might well appear, since `apps:search` returns "apps accessible by the user" and listing ≠ publishing. Do **not** treat "apps:search won't show it until first upload" as fact; it's an open empirical question (create a Draft app → call `apps:search` → observe). See Open questions.
+
+Because the freshness semantics of `apps:search` for new apps are unconfirmed, Path B should **inform + allow proceed**, not hard-block — gating on an API whose behavior we haven't tested would risk trapping a user whose freshly-created app simply hasn't propagated yet.
 
 ### Import (custom-SA) path — keep Gradle-only, warn
 
@@ -136,6 +141,6 @@ Mirror iOS, `channel: 'bundle'`, `tags.step: 'android-app-verify'` always set:
 - **Is `npx cap sync` needed after the rename?** Trapeze edits the native project directly; `applicationId` doesn't require a sync. It's included to keep Capacitor consistent after a package/namespace change. Confirm keep vs. drop (it's a slow, network-touching step).
 - **On-demand Trapeze install fragility.** Path A `npm install @trapezedev/project` mid-onboarding needs npm + network + time. Pin a version; show a spinner; on install failure fall back to manual instructions. Acceptable, or pre-resolve another way (e.g. `npx --package @trapezedev/project`)?
 - **Android Studio detection off macOS.** Only macOS gets the `pgrep` auto-detect + poll-until-closed. Linux/Windows get a one-time "close it" confirm. Acceptable for v1?
-- **Path B can't pre-verify (first-upload bootstrap).** A new Android package isn't API-visible until its first bundle upload, which Capgo Builder itself performs. So Path B informs + proceeds rather than gating. Confirm.
+- **Does `apps:search` list Draft apps? (UNVERIFIED — must test.)** I do not actually know whether a Play app created in the Console with zero releases appears in `apps:search`. The `androidpublisher` first-upload requirement is documented, but that's a different API and I wrongly extrapolated it. Test: create a Draft app → call `apps:search` → observe. The result decides whether Path B can ever gate, or must always inform-and-proceed.
 - **Multiple Gradle flavors.** When several `applicationId`s exist and >1 matches a Play app, show the enriched picker (no auto-skip). Confirm vs. picking the shortest/main like iOS.
 - **Backend coordination.** The reporting scope must be added to `/private/config/builder`'s `scopes[]` (optional) for this to activate in production; until then the CLI silently degrades. Track as a dependency.
