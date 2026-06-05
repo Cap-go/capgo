@@ -54,6 +54,10 @@ import {
 } from '../ai/log-capture'
 import { renderMarkdown } from '../ai/render-markdown'
 import { trackAiAnalysisChoice, trackAiAnalysisResult } from '../ai/telemetry'
+import { writeSupportBundleFiles } from '../onboarding-support.js'
+import { copyToClipboard, revealInFinder } from '../support/clipboard.js'
+import { contactSupport } from '../support/contact-support.js'
+import { getInternalLogPath } from '../support/internal-log.js'
 import { assertCliPermission, canPromptInteractively, createSupabaseClient, findSavedKey, getConfig, getOrganizationId, sendEvent } from '../utils'
 import { mergeCredentials, MIN_OUTPUT_RETENTION_SECONDS, parseInAppUpdatePriority, parseOptionalBoolean, parseOutputRetentionSeconds } from './credentials'
 import { buildProvisioningMap } from './credentials-command'
@@ -2131,6 +2135,41 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
           })
         }
 
+        // Spec: at a build failure, "Email Capgo support" comes first — the same
+        // contact-support flow as the onboarding wizard, with clack-flavored deps.
+        const runEmailSupport = async (): Promise<void> => {
+          const internalLogPath = getInternalLogPath()
+          let internalLines: string[] = []
+          if (internalLogPath) {
+            try {
+              internalLines = readFileSync(internalLogPath, 'utf8').split('\n')
+            }
+            catch { /* best-effort */ }
+          }
+          let buildLogLines: string[] = []
+          try {
+            const logsPath = `${process.env.CAPGO_AI_LOG_BASE_DIR || '/tmp/capgo-builds'}/${capturedJobId}.log`
+            buildLogLines = readFileSync(logsPath, 'utf8').split('\n').slice(-200)
+          }
+          catch { /* best-effort */ }
+          await contactSupport({
+            subject: `Capgo Builder support — ${appId} (${platform})`,
+            body: `Hi Capgo team,\n\nMy cloud build failed and I'd like help.\n\nApp: ${appId}\nPlatform: ${platform}\nJob: ${capturedJobId}\n\n(Logs saved locally; secrets removed — I'll attach the file.)`,
+            confirm: async msg => (await confirm({ message: msg })) === true,
+            buildFiles: () => writeSupportBundleFiles({
+              kind: 'build-request',
+              appId,
+              error: `Cloud build ${capturedJobId} failed`,
+              logs: buildLogLines,
+              sections: internalLines.length > 0 ? [{ title: 'Internal log', lines: internalLines }] : [],
+            }),
+            copyPath: p => copyToClipboard(p).ok,
+            reveal: (p) => { revealInFinder(p) },
+            openUrl: async u => (await import('open')).default(u),
+            print: msg => clackLog.info(msg),
+          })
+        }
+
         async function showMenu(): Promise<void> {
           if (await isLogTooBig(capturedJobId!)) {
             process.stdout.write('Log too big for AI analysis (>10 MB). Offering local AI instead.\n')
@@ -2138,14 +2177,17 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
             return
           }
           const choice = await select({
-            message: 'Choose AI analysis',
+            message: 'Build failed — get help or analyze the log',
             options: [
-              { value: 'capgo', label: 'Capgo AI' },
+              { value: 'support', label: '📨  Email Capgo support' },
+              { value: 'capgo', label: '🤖  Capgo AI' },
               { value: 'local', label: 'Local AI (write prompt to file)' },
               { value: 'skip', label: 'Skip' },
             ],
           })
-          if (choice === 'capgo')
+          if (choice === 'support')
+            await runEmailSupport()
+          else if (choice === 'capgo')
             await runCapgoAi('capgo_ai', 'menu')
           else if (choice === 'local')
             await runLocalAi()
@@ -2169,7 +2211,7 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
           else {
             // interactive: show_menu or ask_then_menu
             if (behavior === 'ask_then_menu') {
-              const wants = await confirm({ message: 'Build failed. Run AI analysis?' })
+              const wants = await confirm({ message: 'Build failed. See help options (email Capgo support / AI analysis)?' })
               if (!wants || typeof wants === 'symbol') {
                 // user cancelled or declined — skip
                 await emitSkipChoice()

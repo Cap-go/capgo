@@ -15,7 +15,7 @@ export interface OnboardingSupportSection {
 }
 
 export interface OnboardingSupportBundleInput {
-  kind: 'init' | 'build-init'
+  kind: 'init' | 'build-init' | 'build-request'
   error: string
   appId?: string
   currentStep?: string
