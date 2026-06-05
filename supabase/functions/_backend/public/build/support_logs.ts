@@ -1,0 +1,114 @@
+import type { Context } from 'hono'
+import type { Database } from '../../utils/supabase.types.ts'
+import { CacheHelper } from '../../utils/cache.ts'
+import { quickError, simpleError } from '../../utils/hono.ts'
+import { cloudlogErr } from '../../utils/logging.ts'
+import { getEnv } from '../../utils/utils.ts'
+
+// Proxy for the CLI's "Email Capgo support" logs upload — forwards gzipped text
+// logs to the capgo_builder worker, which stores them content-addressed in R2
+// (sha256 key, 30-day lifecycle). Spec:
+// docs/superpowers/specs/2026-06-05-builder-support-logs-upload-design.md
+
+// 10 MB gzipped cap (the builder worker enforces it too); base64 inflates ~4/3.
+const MAX_GZ_B64_LENGTH = Math.ceil((10 * 1024 * 1024 * 4) / 3) + 4
+
+// Account-keyed rate limit: 1/min + 10/day. Backed by the Cloudflare Cache API
+// (per-colo, fails open) — a speed bump, not a guarantee. The load-bearing
+// defenses are the size cap, the builder's text-only check, the bucket's
+// 30-day lifecycle, and account bans (spec §5).
+const MINUTE_PATH = '/rate-limit/support-logs-minute'
+const MINUTE_LIMIT = 1
+const MINUTE_TTL_SECONDS = 60
+const DAY_PATH = '/rate-limit/support-logs-day'
+const DAY_LIMIT = 10
+const DAY_TTL_SECONDS = 24 * 60 * 60
+
+interface RateWindow {
+  count: number
+  resetAt: number
+}
+
+// Returns false when the window is exhausted. Fails open on cache errors,
+// matching the behavior of the rest of utils/rate_limit.ts.
+async function bumpWindow(c: Context, path: string, userId: string, limit: number, ttlSeconds: number): Promise<boolean> {
+  try {
+    const helper = new CacheHelper(c)
+    const key = helper.buildRequest(path, { user_id: userId })
+    const existing = await helper.matchJson<RateWindow>(key)
+    const count = (existing?.count ?? 0) + 1
+    if (count > limit)
+      return false
+    const resetAt = existing?.resetAt ?? (Date.now() + ttlSeconds * 1000)
+    const remainingSeconds = Math.max(1, Math.ceil((resetAt - Date.now()) / 1000))
+    await helper.putJson(key, { count, resetAt }, remainingSeconds)
+    return true
+  }
+  catch {
+    return true
+  }
+}
+
+export async function uploadSupportLogs(
+  c: Context,
+  apikey: Database['public']['Tables']['apikeys']['Row'],
+  body: { appId?: string, jobId?: string, gzB64: string },
+): Promise<Response> {
+  // Deliberately NO app-ownership permission check: onboarding failures can
+  // reference apps that were never registered, and these are the caller's own
+  // logs — the authenticated account (capgkey) is the abuse anchor.
+  if (body.gzB64.length > MAX_GZ_B64_LENGTH)
+    throw quickError(413, 'too_big', 'Logs exceed the 10 MB gzipped limit')
+
+  const userId = apikey.user_id
+  const minuteOk = await bumpWindow(c, MINUTE_PATH, userId, MINUTE_LIMIT, MINUTE_TTL_SECONDS)
+  const dayOk = minuteOk && await bumpWindow(c, DAY_PATH, userId, DAY_LIMIT, DAY_TTL_SECONDS)
+  if (!minuteOk || !dayOk)
+    throw quickError(429, 'rate_limited', 'Too many support log uploads — try again later')
+
+  const builderUrl = getEnv(c, 'BUILDER_URL')
+  const builderApiKey = getEnv(c, 'BUILDER_API_KEY')
+  if (!builderUrl || !builderApiKey)
+    throw simpleError('config_error', 'Builder service not configured')
+
+  let builderResp: Response
+  try {
+    builderResp = await fetch(`${builderUrl}/support-logs`, {
+      method: 'POST',
+      headers: {
+        'x-api-key': builderApiKey,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({ gzB64: body.gzB64, appId: body.appId, jobId: body.jobId, userId }),
+      signal: AbortSignal.timeout(60_000),
+    })
+  }
+  catch (err) {
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: 'support-logs upload to builder failed',
+      error: err instanceof Error ? err.message : String(err),
+    })
+    throw simpleError('builder_error', 'Support logs upload failed')
+  }
+
+  if (builderResp.status === 413)
+    throw quickError(413, 'too_big', 'Logs exceed the 10 MB gzipped limit')
+  if (builderResp.status === 415)
+    throw quickError(415, 'not_text', 'Only gzipped text logs are accepted')
+  if (!builderResp.ok) {
+    const errText = await builderResp.text().catch(() => '<no body>')
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: 'support-logs builder error',
+      status: builderResp.status,
+      error: errText,
+    })
+    throw simpleError('builder_error', 'Support logs upload failed')
+  }
+
+  const result = await builderResp.json() as { id?: string, url?: string }
+  if (typeof result.id !== 'string' || typeof result.url !== 'string')
+    throw simpleError('builder_error', 'Malformed builder response')
+  return c.json({ id: result.id, url: result.url }, 200)
+}

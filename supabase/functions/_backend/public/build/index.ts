@@ -12,6 +12,7 @@ import {
 import { getBodyOrQuery, honoFactory } from '../../utils/hono.ts'
 import { middlewareKey } from '../../utils/hono_middleware.ts'
 import { aiAnalyzeBuild } from './ai_analyze.ts'
+import { uploadSupportLogs } from './support_logs.ts'
 import { cancelBuild } from './cancel.ts'
 import { streamBuildLogs } from './logs.ts'
 import { requestBuild } from './request.ts'
@@ -77,6 +78,18 @@ app.post('/ai_analyze', middlewareKey(['all', 'write']), async (c) => {
   }
   const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
   return aiAnalyzeBuild(c, body.jobId, body.appId, apikey, body.logs)
+})
+
+// POST /build/support_logs - Upload gzipped support logs; returns a 30-day download link.
+// (No app-ownership check on purpose: onboarding failures can reference apps that
+// were never registered — the authenticated account is the abuse anchor.)
+app.post('/support_logs', middlewareKey(['all', 'write']), async (c) => {
+  const body = await getBodyOrQuery<{ appId?: string, jobId?: string, gzB64: string }>(c)
+  if (!body || typeof body.gzB64 !== 'string' || body.gzB64.length === 0) {
+    throw new Error('gzB64 is required in request body')
+  }
+  const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
+  return uploadSupportLogs(c, apikey, body)
 })
 
 function tusOptionsResponse() {

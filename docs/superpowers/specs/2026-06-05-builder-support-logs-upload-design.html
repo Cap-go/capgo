@@ -54,7 +54,7 @@ capgo_builder worker  POST /support-logs
   3. R2 put  capgo-builder-support-logs / &lt;sha256&gt;.log.gz   (idempotent by key)
   4. → { id, url }
         ▼
-email body:  "Support logs: &lt;sha256&gt; · Download: &lt;url&gt; · (kept 30 days)"  → SEND-READY
+email body:  "Support logs (kept 30 days): &lt;url&gt;"  → SEND-READY (URL-only; the id is inside it)
 support:     GET /support-logs/&lt;sha256&gt; → streams the .log.gz (404 after expiry)
 
 FALLBACK (upload fails/offline): exactly today's shipped behavior —
@@ -100,7 +100,7 @@ npx wrangler r2 bucket lifecycle add capgo-builder-support-logs --expire-days 30
   <h2>6 · CLI changes</h2>
   <div class="card">
     <ul>
-      <li><b><code>contact-support.ts</code>:</b> new optional <code>upload</code> dep after the confirm + bundle write. <b>Upload OK</b> → email body gets ID + URL + "kept 30 days"; <b>skip</b> clipboard-path/reveal/attach text (nothing to attach); local paths still printed. <b>Upload fails</b> (≈10 s timeout) → exactly today's behavior. Never blocks the flow.</li>
+      <li><b><code>contact-support.ts</code>:</b> new optional <code>upload</code> dep after the confirm + bundle write. <b>Upload OK</b> → email body gets the download URL + "kept 30 days" (URL-only; the id is embedded in it); <b>skip</b> clipboard-path/reveal/attach text (nothing to attach); local paths still printed. <b>Upload fails</b> (15 s timeout) → exactly today's behavior. Never blocks the flow.</li>
       <li><b><code>support-upload.ts</code> (new):</b> gz→base64 POST to <code>${apiHost}/build/support_logs</code> (same client pattern as <code>ai/analyze.ts</code>); null on any error.</li>
       <li><b>Confirm copy:</b> "We'll save your logs locally, <b>upload a copy to Capgo support (kept 30 days)</b>, and open a pre-filled email…" — preview choice unchanged (shows exactly what's uploaded).</li>
       <li>All five entry points (iOS/Android error step, AI prompt, AI result escalation, init, build request) inherit this for free via <code>contactSupport</code>.</li>

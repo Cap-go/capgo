@@ -24,6 +24,7 @@ const SPINNER_FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', 
 import { detectIosBundleIds } from '../bundle-id-detector.js'
 import { writeOnboardingSupportBundle, writeSupportBundleFiles } from '../../../onboarding-support.js'
 import { contactSupport } from '../../../support/contact-support.js'
+import { uploadSupportLogs } from '../../../support/support-upload.js'
 import { copyToClipboard, revealInFinder } from '../../../support/clipboard.js'
 import { getInternalLogPath } from '../../../support/internal-log.js'
 import { redactSecrets } from '../../../support/redact.js'
@@ -1189,9 +1190,16 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
       reveal: p => revealInFinder(p),
       openUrl: u => open(u),
       print: msg => addLog(msg, 'cyan'),
+      upload: gzPath => uploadSupportLogs({
+        apiHost: 'https://api.capgo.app',
+        apikey: resolvedApiKeyRef.current ?? apikey ?? '',
+        appId,
+        jobId: aiJobId ?? undefined,
+        gzPath,
+      }),
     })
     setStep(returnTo)
-  }, [appId, error, log, buildOutput, aiAnalysisText, askSupportConfirm, readInternalLogLines, addLog])
+  }, [appId, apikey, aiJobId, error, log, buildOutput, aiAnalysisText, askSupportConfirm, readInternalLogLines, addLog])
 
   // ── Credential save logic ──
 

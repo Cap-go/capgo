@@ -33,10 +33,9 @@ capgo_builder worker  POST /support-logs
      → idempotent by construction: identical re-upload = same key, no new storage
   4. return { id: <sha256>, url: <public GET url> }
         ▼
-CLI email body:
-  "Support logs: <sha256>
-   Download:     <url>
-   (Logs are kept for 30 days.)"
+CLI email body (URL-only — the sha256 id is visibly embedded in it):
+  "Support logs (kept 30 days):
+   <url>"
   → email is SEND-READY. No attach, no reveal, no clipboard-path needed on this path.
 
 support team (from the Discord thread the bridge opens):
@@ -102,7 +101,7 @@ The defenses, strongest first:
 ## 6. CLI changes (`cli/src/support/`)
 
 - **`contact-support.ts`:** after the confirm gate (unchanged gate, updated copy — see below) and bundle write, attempt the upload (new injected dep `upload?: (gz: Buffer) => Promise<{ id, url } | null>`):
-  - **Upload OK** → email body gains the ID + URL + "kept 30 days"; **skip** clipboard-path / Finder reveal / attach instructions (nothing to attach); terminal print still shows the local paths for reference.
+  - **Upload OK** → email body gains the download URL + "kept 30 days" (URL-only; the id is embedded in it); **skip** clipboard-path / Finder reveal / attach instructions (nothing to attach); terminal print still shows the local paths for reference.
   - **Upload fails/absent** → exact current behavior (clipboard `.log.gz` path, reveal, attach instructions). Never block on the upload: short timeout (~10 s), degrade silently to fallback.
 - **`support-upload.ts` (new):** gzip→base64, POST to `${apiHost}/build/support_logs` with capgkey (same client pattern as `ai/analyze.ts`'s `postAnalyzeRequest`), parse `{ id, url }`, return null on any error.
 - **Confirm copy (platform-aware bits preserved):**

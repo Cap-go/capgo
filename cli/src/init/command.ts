@@ -26,11 +26,12 @@ import { createKeyInternal } from '../key'
 import { doLoginExists, loginInternal } from '../login'
 import { writeOnboardingSupportBundle, writeSupportBundleFiles } from '../onboarding-support'
 import { contactSupport } from '../support/contact-support'
+import { uploadSupportLogs } from '../support/support-upload'
 import { copyToClipboard, revealInFinder } from '../support/clipboard'
 import { appendInternalLog, getInternalLogPath, startInternalLog } from '../support/internal-log'
 import { showReplicationProgress } from '../replicationProgress'
 import { formatRunnerCommand, splitRunnerCommand } from '../runner-command'
-import { createSupabaseClient, findBuildCommandForProjectType, findMainFile, findMainFileForProjectType, findProjectType, findRoot, findSavedKey, formatError, getAllPackagesDependencies, getAppId, getBundleVersion, getConfig, getLocalConfig, getNativeProjectResetAdvice, getOrganizationListWithPermission, getPackageScripts, getPMAndCommand, hasCliPermission, PACKNAME, projectIsMonorepo, resolveUserIdFromApiKey, updateConfigbyKey, updateConfigUpdater, validateIosUpdaterSync } from '../utils'
+import { createSupabaseClient, defaultApiHost, findBuildCommandForProjectType, findMainFile, findMainFileForProjectType, findProjectType, findRoot, findSavedKey, findSavedKeySilent, formatError, getAllPackagesDependencies, getAppId, getBundleVersion, getConfig, getLocalConfig, getNativeProjectResetAdvice, getOrganizationListWithPermission, getPackageScripts, getPMAndCommand, hasCliPermission, PACKNAME, projectIsMonorepo, resolveUserIdFromApiKey, updateConfigbyKey, updateConfigUpdater, validateIosUpdaterSync } from '../utils'
 import { buildAppIdConflictSuggestions, isAppAlreadyExistsError } from './app-conflict'
 import { cancel as pCancel, confirm as pConfirm, intro as pIntro, isCancel as pIsCancel, log as pLog, outro as pOutro, select as pSelect, spinner as pSpinner, text as pText } from './prompts'
 import { appendInitStreamingLine, clearInitStreamingOutput, setInitCodeDiff, setInitEncryptionSummary, setInitVersionWarning, startInitStreamingOutput, stopInitInkSession, updateInitStreamingStatus } from './runtime'
@@ -510,6 +511,12 @@ async function runInitContactSupport(failureText: string): Promise<void> {
     reveal: p => revealInFinder(p),
     openUrl: u => open(u),
     print: msg => pLog.info(msg),
+    upload: (gzPath) => {
+      const key = findSavedKeySilent()
+      if (!key)
+        return Promise.resolve(null)
+      return uploadSupportLogs({ apiHost: defaultApiHost, apikey: key, appId: globalAppId, gzPath })
+    },
   })
 }
 

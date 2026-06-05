@@ -142,6 +142,7 @@ import {
 } from '../oauth-google.js'
 import open from 'open'
 import { contactSupport } from '../../../../support/contact-support.js'
+import { uploadSupportLogs } from '../../../../support/support-upload.js'
 import { copyToClipboard, revealInFinder } from '../../../../support/clipboard.js'
 import { getInternalLogPath } from '../../../../support/internal-log.js'
 import { redactSecrets } from '../../../../support/redact.js'
@@ -982,9 +983,16 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
       reveal: p => revealInFinder(p),
       openUrl: u => open(u),
       print: msg => addLog(msg, 'cyan'),
+      upload: gzPath => uploadSupportLogs({
+        apiHost: 'https://api.capgo.app',
+        apikey: resolvedApiKeyRef.current ?? apikey ?? '',
+        appId,
+        jobId: aiJobId ?? undefined,
+        gzPath,
+      }),
     })
     setStep(returnTo)
-  }, [appId, error, logLines, buildOutput, aiAnalysisText, askSupportConfirm, readInternalLogLines, addLog])
+  }, [appId, apikey, aiJobId, error, logLines, buildOutput, aiAnalysisText, askSupportConfirm, readInternalLogLines, addLog])
 
   // Wire the forward-declared ref so `persistAndStep`'s catch can surface
   // saveAndroidProgress failures through the same retry/error UX without

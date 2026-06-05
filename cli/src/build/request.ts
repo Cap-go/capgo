@@ -58,6 +58,7 @@ import { writeSupportBundleFiles } from '../onboarding-support.js'
 import { copyToClipboard, revealInFinder } from '../support/clipboard.js'
 import { contactSupport } from '../support/contact-support.js'
 import { getInternalLogPath } from '../support/internal-log.js'
+import { uploadSupportLogs } from '../support/support-upload.js'
 import { assertCliPermission, canPromptInteractively, createSupabaseClient, findSavedKey, getConfig, getOrganizationId, sendEvent } from '../utils'
 import { mergeCredentials, MIN_OUTPUT_RETENTION_SECONDS, parseInAppUpdatePriority, parseOptionalBoolean, parseOutputRetentionSeconds } from './credentials'
 import { buildProvisioningMap } from './credentials-command'
@@ -2167,6 +2168,13 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
             reveal: p => revealInFinder(p),
             openUrl: async u => (await import('open')).default(u),
             print: msg => clackLog.info(msg),
+            upload: gzPath => uploadSupportLogs({
+              apiHost: host,
+              apikey: options.apikey,
+              appId,
+              jobId: capturedJobId ?? undefined,
+              gzPath,
+            }),
           })
         }
 

@@ -50,3 +50,38 @@ await ta('returns failed when files cannot be written', async () => {
   const { deps } = makeDeps({ buildFiles: () => null })
   assert.equal(await contactSupport(deps), 'failed')
 })
+
+await ta('upload success: link in email body, no clipboard/reveal/attach text', async () => {
+  const uploads = []
+  const { deps, calls } = makeDeps({
+    upload: async (gzPath) => { uploads.push(gzPath); return { id: 'a'.repeat(64), url: 'https://api.capgo.app/builder_support_logs/' + 'a'.repeat(64) } },
+  })
+  const result = await contactSupport(deps)
+  assert.equal(result, 'opened')
+  assert.deepEqual(uploads, ['/x/b.log.gz']) // uploads the gzip
+  const body = decodeURIComponent(calls.opened[0])
+  assert.ok(body.includes('builder_support_logs/' + 'a'.repeat(64))) // download link in the email
+  assert.ok(!body.includes('Please attach')) // send-ready, no attach instructions
+  assert.equal(calls.copied.length, 0) // no clipboard needed
+  assert.equal(calls.revealed.length, 0) // no Finder reveal needed
+  assert.ok(calls.printed.some(m => m.includes('press Send')))
+})
+
+await ta('upload failure degrades to the manual attach flow', async () => {
+  const { deps, calls } = makeDeps({ upload: async () => null })
+  const result = await contactSupport(deps)
+  assert.equal(result, 'opened')
+  assert.deepEqual(calls.copied, ['/x/b.log.gz']) // clipboard fallback kicks in
+  assert.ok(decodeURIComponent(calls.opened[0]).includes('Please attach')) // attach instructions back
+})
+
+await ta('confirm copy discloses the upload + 30-day retention when uploading', async () => {
+  let confirmMsg = ''
+  const { deps } = makeDeps({
+    confirm: async (msg) => { confirmMsg = msg; return false },
+    upload: async () => null,
+  })
+  await contactSupport(deps)
+  assert.ok(confirmMsg.includes('upload a copy to Capgo support'))
+  assert.ok(confirmMsg.includes('kept 30 days'))
+})

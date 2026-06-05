@@ -3,8 +3,10 @@ import { buildMailtoUrl } from './mailto.js'
 
 const SUPPORT_EMAIL = 'support@capgo.app'
 
-// Tell the user everything that's about to happen — incl. the macOS Finder reveal.
-function confirmMessage(): string {
+// Tell the user everything that's about to happen — before anything happens.
+function confirmMessage(hasUpload: boolean): string {
+  if (hasUpload)
+    return `We'll save your logs locally, upload a copy to Capgo support (kept 30 days), and open a pre-filled email to support@capgo.app in your mail app. Continue?`
   const reveal = process.platform === 'darwin' ? ', reveal them in Finder,' : ''
   return `We'll save your logs locally${reveal} and open a pre-filled email to support@capgo.app in your mail app. Continue?`
 }
@@ -24,6 +26,10 @@ export interface ContactSupportDeps {
   openUrl: (url: string) => Promise<unknown>
   // Emit a user-facing line.
   print: (message: string) => void
+  // Optional logs upload (R2-backed, 30-day lifecycle — see the support-logs
+  // spec). Returns the public download link, or null on any failure; the flow
+  // then degrades to the manual-attach path. Never blocks.
+  upload?: (gzPath: string) => Promise<{ id: string, url: string } | null>
 }
 
 export type ContactSupportResult = 'opened' | 'cancelled' | 'failed'
@@ -45,7 +51,7 @@ export async function contactSupport(deps: ContactSupportDeps): Promise<ContactS
 }
 
 async function runContactSupport(deps: ContactSupportDeps): Promise<ContactSupportResult> {
-  const proceed = await deps.confirm(confirmMessage())
+  const proceed = await deps.confirm(confirmMessage(Boolean(deps.upload)))
   if (!proceed)
     return 'cancelled'
 
@@ -55,6 +61,27 @@ async function runContactSupport(deps: ContactSupportDeps): Promise<ContactSuppo
     return 'failed'
   }
 
+  // Preferred path: upload the gz and put the download link in the email body —
+  // the mail is send-ready, there's nothing to attach (so no clipboard/Finder).
+  const uploaded = deps.upload ? await deps.upload(files.gzPath) : null
+  if (uploaded) {
+    const body = `${deps.body}\n\nSupport logs (kept 30 days):\n${uploaded.url}`
+    const url = buildMailtoUrl({ to: SUPPORT_EMAIL, subject: deps.subject, body })
+    let mailOpened = true
+    try {
+      await deps.openUrl(url)
+    }
+    catch {
+      mailOpened = false
+    }
+    if (mailOpened)
+      deps.print(`Opened an email to ${SUPPORT_EMAIL} — it already links to your uploaded logs, just press Send. (Local copies: ${files.logPath})`)
+    else
+      deps.print(`Couldn't open your mail app automatically. Please email ${SUPPORT_EMAIL} and include this link to your uploaded logs: ${uploaded.url}`)
+    return 'opened'
+  }
+
+  // Fallback (no uploader, upload failed, or offline): the manual attach flow.
   // Clipboard must hold the GZIPPED file path (the compact attachment).
   const copied = deps.copyPath(files.gzPath)
   const revealed = deps.reveal?.(files.gzPath) === true
