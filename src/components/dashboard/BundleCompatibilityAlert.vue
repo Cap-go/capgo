@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { DefaultChannelCompatibilityResponse } from '~/services/bundleCompatibilityApi'
-import { computed, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import IconAlertTriangle from '~icons/lucide/alert-triangle'
@@ -19,6 +19,7 @@ const router = useRouter()
 const loading = ref(false)
 const report = ref<DefaultChannelCompatibilityResponse | null>(null)
 const requestId = ref(0)
+let scheduledLoad: ReturnType<typeof setTimeout> | undefined
 
 const showAlert = computed(() => report.value?.alert === true && report.value.candidate?.id && report.value.baseline?.id)
 const candidateName = computed(() => report.value?.candidate?.name ?? t('unknown'))
@@ -27,21 +28,56 @@ const channelName = computed(() => report.value?.channel?.name ?? t('unknown'))
 const offendersPreview = computed(() => report.value?.summary.offenders.slice(0, 3).join(', ') ?? '')
 const hiddenOffendersCount = computed(() => Math.max((report.value?.summary.offenders.length ?? 0) - 3, 0))
 
-async function loadCompatibilityAlert() {
-  const appId = props.appId
+function clearScheduledLoad() {
+  if (!scheduledLoad)
+    return
+
+  clearTimeout(scheduledLoad)
+  scheduledLoad = undefined
+}
+
+async function loadCompatibilityAlert(appId: string, currentRequest: number) {
   if (!appId) {
     report.value = null
     loading.value = false
     return
   }
 
-  const currentRequest = ++requestId.value
-  loading.value = true
-  const result = await getDefaultChannelCompatibility(appId)
-  if (currentRequest === requestId.value) {
-    report.value = result
-    loading.value = false
+  try {
+    loading.value = true
+    const result = await getDefaultChannelCompatibility(appId)
+    if (currentRequest === requestId.value && appId === props.appId.trim())
+      report.value = result
   }
+  catch (error) {
+    console.error('Failed to load default channel compatibility', error)
+    if (currentRequest === requestId.value)
+      report.value = null
+  }
+  finally {
+    if (currentRequest === requestId.value)
+      loading.value = false
+  }
+}
+
+function scheduleCompatibilityAlert(clearCurrentReport = false) {
+  clearScheduledLoad()
+  const appId = props.appId.trim()
+  const currentRequest = ++requestId.value
+  loading.value = false
+
+  if (clearCurrentReport)
+    report.value = null
+
+  if (!appId) {
+    report.value = null
+    return
+  }
+
+  scheduledLoad = setTimeout(() => {
+    scheduledLoad = undefined
+    void loadCompatibilityAlert(appId, currentRequest)
+  }, 0)
 }
 
 function reviewDependencies() {
@@ -53,9 +89,15 @@ function reviewDependencies() {
   router.push(`/app/${encodeURIComponent(props.appId)}/bundle/${candidateId}/dependencies?compare=${baselineId}`)
 }
 
-watch([() => props.appId, () => props.refreshKey], () => {
-  loadCompatibilityAlert()
+watch([() => props.appId, () => props.refreshKey], ([appId], previousValue) => {
+  const previousAppId = previousValue?.[0]
+  scheduleCompatibilityAlert(appId !== previousAppId)
 }, { immediate: true })
+
+onBeforeUnmount(() => {
+  clearScheduledLoad()
+  requestId.value += 1
+})
 </script>
 
 <template>
@@ -95,27 +137,6 @@ watch([() => props.appId, () => props.refreshKey], () => {
         {{ t('dashboard-compat-alert-action') }}
         <IconArrowRight class="h-4 w-4" aria-hidden="true" />
       </button>
-    </div>
-  </div>
-
-  <div
-    v-else-if="loading"
-    class="mb-4 rounded-lg border border-slate-200 bg-white/80 p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900/60"
-    role="status"
-    aria-live="polite"
-    :aria-label="t('loading')"
-  >
-    <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-      <div class="flex min-w-0 flex-1 gap-3">
-        <div class="h-10 w-10 shrink-0 animate-pulse rounded-full bg-slate-200 dark:bg-slate-700" />
-        <div class="min-w-0 flex-1 space-y-2 py-1">
-          <div class="h-4 w-48 max-w-full animate-pulse rounded bg-slate-200 dark:bg-slate-700" />
-          <div class="h-3 w-full max-w-lg animate-pulse rounded bg-slate-200 dark:bg-slate-700" />
-          <div class="h-3 w-64 max-w-full animate-pulse rounded bg-slate-200 dark:bg-slate-700" />
-        </div>
-      </div>
-
-      <div class="h-11 w-36 shrink-0 animate-pulse rounded-lg bg-slate-200 dark:bg-slate-700" />
     </div>
   </div>
 </template>

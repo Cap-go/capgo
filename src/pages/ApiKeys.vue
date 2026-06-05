@@ -81,6 +81,10 @@ interface ApiKeyAppAccessOption {
   roleName: string
 }
 
+type ApiKeyRow = Database['public']['Tables']['apikeys']['Row'] & {
+  global_permissions?: string[]
+}
+
 const { t } = useI18n()
 const isDark = useDark()
 const dialogStore = useDialogV2Store()
@@ -95,7 +99,7 @@ const defaultScopeFilterKey = ref<string | null>(null)
 const scopePicker = ref<ScopePickerState | null>(null)
 const scopePickerQuery = ref('')
 const supabase = useSupabase()
-const keys = ref<Database['public']['Tables']['apikeys']['Row'][]>([])
+const keys = ref<ApiKeyRow[]>([])
 const organizationStore = useOrganizationStore()
 const currentOrganizationId = computed(() => organizationStore.currentOrganization?.gid ?? null)
 const columns: Ref<TableColumn[]> = ref<TableColumn[]>([])
@@ -106,7 +110,7 @@ const allBindings = ref<RoleBindingRow[]>([])
 
 // State for API key dialog
 const newApiKeyName = ref('')
-const editingApiKey = ref<Database['public']['Tables']['apikeys']['Row'] | null>(null)
+const editingApiKey = ref<ApiKeyRow | null>(null)
 
 // State for hashed key creation
 const createAsHashed = ref(false)
@@ -117,6 +121,7 @@ const expirationDate = ref<Date | null>(null)
 
 // RBAC creation state
 const selectedOrgRole = ref('org_member')
+const allowOrgCreation = ref(false)
 const selectedOrgsForCreation = ref<string[]>([])
 const selectedOrgRolesById = ref<Record<string, string>>({})
 const isHydratingApiKeyEdit = ref(false)
@@ -124,7 +129,7 @@ const manageableOrgIds = ref(new Set<string>())
 const pendingAppBindings = ref<Record<string, string>>({})
 const showOrgDropdown = ref(false)
 const showAppDropdown = ref(false)
-const selectedApiKeyForChannelPermissions = ref<Database['public']['Tables']['apikeys']['Row'] | null>(null)
+const selectedApiKeyForChannelPermissions = ref<ApiKeyRow | null>(null)
 const channelPermissionAppOptions = ref<ApiKeyAppAccessOption[]>([])
 const selectedChannelPermissionAppUuid = ref('')
 const channelPermissionAppsLoading = ref(false)
@@ -671,7 +676,9 @@ const appRoleOptions = computed(() =>
 )
 
 const rolesWithInheritedAppAccess = new Set(['org_admin', 'org_super_admin'])
+const rolesWithOrgCreateAccess = new Set(['org_admin', 'org_super_admin'])
 const systemApiKeyOrgReaderRole = 'apikey_org_reader'
+const apiKeyOrgCreatePermission = 'org.create'
 const isEditingApiKey = computed(() => editingApiKey.value !== null)
 const showAppAccessInModal = computed(() =>
   !!selectedOrgRole.value && !rolesWithInheritedAppAccess.has(selectedOrgRole.value),
@@ -726,6 +733,9 @@ function getOrgRoleForBinding(orgId: string) {
   return selectedOrgRolesById.value[orgId] || selectedOrgRole.value
 }
 
+const canEnableOrgCreation = computed(() =>
+  selectedOrgsForCreation.value.some(orgId => rolesWithOrgCreateAccess.has(getOrgRoleForBinding(orgId))),
+)
 const selectedAppIds = computed(() => Object.keys(pendingAppBindings.value))
 const selectedChannelPermissionApp = computed(() =>
   channelPermissionAppOptions.value.find(app => app.appUuid === selectedChannelPermissionAppUuid.value),
@@ -848,13 +858,16 @@ async function refreshData() {
 
 async function getKeys(retry = true): Promise<void> {
   isLoading.value = true
-  const { data } = await supabase
-    .from('apikeys')
-    .select()
-    .eq('user_id', main.user?.id ?? '')
-    .order('created_at', { ascending: false })
+  const { data, error } = await supabase.functions.invoke<ApiKeyRow[]>('apikey', {
+    method: 'GET',
+  })
+  if (error) {
+    console.error('Error fetching API keys:', error)
+  }
   if (data) {
-    keys.value = data
+    keys.value = [...data].sort((a, b) =>
+      new Date(b.created_at ?? 0).getTime() - new Date(a.created_at ?? 0).getTime(),
+    )
     if (data.length > 0) {
       await Promise.all([fetchAllBindings(), fetchRoles()])
       await fetchOrgAndAppNames()
@@ -998,6 +1011,7 @@ async function createApiKey() {
         expires_at: expiresAt,
         hashed: isHashed,
         bindings,
+        global_permissions: buildApiKeyGlobalPermissionsFromForm(),
       },
     })
 
@@ -1068,11 +1082,23 @@ function buildApiKeyBindingsFromForm(): ApiKeyBindingInput[] {
   return bindings
 }
 
+function buildApiKeyGlobalPermissionsFromForm() {
+  if (!allowOrgCreation.value || !canEnableOrgCreation.value)
+    return []
+
+  return [apiKeyOrgCreatePermission]
+}
+
+function hasOrgCreatePermission(key: ApiKeyRow) {
+  return key.global_permissions?.includes(apiKeyOrgCreatePermission) === true
+}
+
 async function addNewApiKey() {
   // Clear state
   editingApiKey.value = null
   newApiKeyName.value = ''
   createAsHashed.value = false
+  allowOrgCreation.value = false
   setExpirationCheckbox.value = false
   expirationDate.value = null
   selectedOrgRole.value = 'org_member'
@@ -1100,6 +1126,7 @@ async function editApiKey(key: Database['public']['Tables']['apikeys']['Row']) {
     editingApiKey.value = key
     newApiKeyName.value = key.name || ''
     createAsHashed.value = isHashedKey(key)
+    allowOrgCreation.value = hasOrgCreatePermission(key as ApiKeyRow)
     setExpirationCheckbox.value = !!key.expires_at
     expirationDate.value = key.expires_at ? new Date(key.expires_at) : null
     selectedOrgRolesById.value = {}
@@ -1196,6 +1223,7 @@ async function updateApiKey() {
       ...(nameChanged ? { name: trimmedName } : {}),
       expires_at: expiresAt,
       bindings: buildApiKeyBindingsFromForm(),
+      global_permissions: buildApiKeyGlobalPermissionsFromForm(),
     },
   })
 
@@ -1537,6 +1565,11 @@ watch(orgRoleOptions, () => {
   ensureSelectedOrgRoleAllowed()
 })
 
+watch(canEnableOrgCreation, (canEnable) => {
+  if (!canEnable)
+    allowOrgCreation.value = false
+})
+
 // Watch for org role changes - clear app bindings if role grants inherited access
 watch(selectedOrgRole, (newRole) => {
   if (isHydratingApiKeyEdit.value)
@@ -1784,6 +1817,27 @@ getKeys()
                 <span class="text-sm font-medium dark:text-white text-slate-800">{{ role.description }}</span>
               </label>
             </div>
+          </div>
+
+          <!-- Global organization permissions -->
+          <div class="rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-900/40">
+            <label class="flex items-start gap-3" :class="canEnableOrgCreation ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'">
+              <input
+                v-model="allowOrgCreation"
+                type="checkbox"
+                data-test="create-key-org-create-permission"
+                class="mt-1 d-checkbox d-checkbox-primary d-checkbox-sm"
+                :disabled="!canEnableOrgCreation"
+              >
+              <span>
+                <span class="block text-sm font-medium text-slate-800 dark:text-white">
+                  {{ t('allow-api-key-create-organizations') }}
+                </span>
+                <span class="mt-1 block text-sm text-slate-500 dark:text-slate-400">
+                  {{ t(canEnableOrgCreation ? 'allow-api-key-create-organizations-description' : 'allow-api-key-create-organizations-requires-admin') }}
+                </span>
+              </span>
+            </label>
           </div>
 
           <!-- App Access Control (only when role is not admin) -->

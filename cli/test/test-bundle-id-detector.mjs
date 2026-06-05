@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { detectIosBundleIds, parseInfoPlistBundleId, parsePbxprojBundleId } from '../src/build/onboarding/bundle-id-detector.ts'
+import { detectIosBundleIds, parseInfoPlistBundleId, parsePbxprojBundleId, parsePbxprojBundleIds } from '../src/build/onboarding/bundle-id-detector.ts'
 
 function t(name, fn) {
   try {
@@ -134,6 +134,58 @@ t('parsePbxprojBundleId falls back to non-Release when no Release config exists'
     source: 'pbxproj-fallback',
     label: 'project.pbxproj (Debug config)',
   })
+})
+
+// ─── parsePbxprojBundleIds (Release-authoritative + Debug exposure) ────
+
+t('parsePbxprojBundleIds exposes Release as authoritative and Debug alongside', () => {
+  // Debug diverges from Release by more than a `.debug` suffix — a fully
+  // different bundle id. Release must remain authoritative; Debug exposed but
+  // never promoted.
+  const pbxproj = `
+    1A2B3C /* Release */ = {
+      isa = XCBuildConfiguration;
+      buildSettings = {
+        PRODUCT_BUNDLE_IDENTIFIER = ee.forgr.prod;
+      };
+      name = Release;
+    };
+    1D2E3F /* Debug */ = {
+      isa = XCBuildConfiguration;
+      buildSettings = {
+        PRODUCT_BUNDLE_IDENTIFIER = com.someoneelse.staging;
+      };
+      name = Debug;
+    };
+  `
+  const result = parsePbxprojBundleIds(pbxproj)
+  assert.equal(result.releaseResolved, true)
+  assert.deepEqual(result.release, {
+    value: 'ee.forgr.prod',
+    source: 'pbxproj-release',
+    label: 'project.pbxproj (Release config)',
+  })
+  assert.deepEqual(result.debug, {
+    value: 'com.someoneelse.staging',
+    source: 'pbxproj-debug',
+    label: 'project.pbxproj (Debug config)',
+  })
+})
+
+t('parsePbxprojBundleIds reports releaseResolved false when no Release config exists', () => {
+  const pbxproj = `
+    A /* Debug */ = {
+      isa = XCBuildConfiguration;
+      buildSettings = {
+        PRODUCT_BUNDLE_IDENTIFIER = ee.forgr.debug;
+      };
+      name = Debug;
+    };
+  `
+  const result = parsePbxprojBundleIds(pbxproj)
+  assert.equal(result.releaseResolved, false)
+  assert.equal(result.release, null)
+  assert.equal(result.debug?.value, 'ee.forgr.debug')
 })
 
 // ─── parseInfoPlistBundleId ───────────────────────────────────────────
@@ -347,6 +399,90 @@ t('detectIosBundleIds finds pbxproj at the root when no ios/ subdir exists', () 
 
     assert.equal(result.pbxproj?.value, 'ee.forgr.rootlevel')
     assert.equal(result.mismatch, true)
+  }
+  finally {
+    rmSync(tmp, { recursive: true, force: true })
+  }
+})
+
+t('detectIosBundleIds returns Release + sets debugReleaseDiffer when Debug diverges', () => {
+  // Debug diverges from Release by more than a `.debug` suffix. The
+  // authoritative recommended/pbxproj value must stay Release, the Debug value
+  // is exposed alongside, and debugReleaseDiffer flips true for the note.
+  const tmp = mkdtempSync(join(tmpdir(), 'bundle-id-detect-'))
+  try {
+    const xcodeDir = join(tmp, 'ios', 'App.xcodeproj')
+    mkdirSync(xcodeDir, { recursive: true })
+    writeFileSync(join(xcodeDir, 'project.pbxproj'), `
+      A /* Release */ = {
+        isa = XCBuildConfiguration;
+        buildSettings = {
+          PRODUCT_BUNDLE_IDENTIFIER = ee.forgr.prod;
+        };
+        name = Release;
+      };
+      B /* Debug */ = {
+        isa = XCBuildConfiguration;
+        buildSettings = {
+          PRODUCT_BUNDLE_IDENTIFIER = com.someoneelse.staging;
+        };
+        name = Debug;
+      };
+    `, 'utf-8')
+
+    const result = detectIosBundleIds({
+      cwd: tmp,
+      iosDir: 'ios',
+      capacitorAppId: 'ee.forgr.prod',
+    })
+
+    // Release is authoritative — never the Debug value
+    assert.equal(result.pbxproj?.source, 'pbxproj-release')
+    assert.equal(result.pbxproj?.value, 'ee.forgr.prod')
+    assert.equal(result.recommended.value, 'ee.forgr.prod')
+    assert.equal(result.releaseResolved, true)
+    // Debug exposed alongside, not promoted
+    assert.equal(result.debug?.source, 'pbxproj-debug')
+    assert.equal(result.debug?.value, 'com.someoneelse.staging')
+    assert.equal(result.debugReleaseDiffer, true)
+  }
+  finally {
+    rmSync(tmp, { recursive: true, force: true })
+  }
+})
+
+t('detectIosBundleIds reports releaseResolved false when no Release config is present', () => {
+  // Debug-only pbxproj: the recommended value still falls back to Debug so the
+  // picker has something, but releaseResolved must be false so the gate knows
+  // it cannot trust an authoritative Release build ID.
+  const tmp = mkdtempSync(join(tmpdir(), 'bundle-id-detect-'))
+  try {
+    const xcodeDir = join(tmp, 'ios', 'App.xcodeproj')
+    mkdirSync(xcodeDir, { recursive: true })
+    writeFileSync(join(xcodeDir, 'project.pbxproj'), `
+      A /* Debug */ = {
+        isa = XCBuildConfiguration;
+        buildSettings = {
+          PRODUCT_BUNDLE_IDENTIFIER = ee.forgr.onlydebug;
+        };
+        name = Debug;
+      };
+    `, 'utf-8')
+
+    const result = detectIosBundleIds({
+      cwd: tmp,
+      iosDir: 'ios',
+      capacitorAppId: 'ee.forgr.cap',
+    })
+
+    assert.equal(result.releaseResolved, false)
+    // Fallback still surfaces a Debug-derived pbxproj value for the picker
+    assert.equal(result.pbxproj?.source, 'pbxproj-fallback')
+    assert.equal(result.pbxproj?.value, 'ee.forgr.onlydebug')
+    // debug is still exposed
+    assert.equal(result.debug?.value, 'ee.forgr.onlydebug')
+    // No Release means no Release-vs-Debug comparison to flag
+    assert.equal(result.debugReleaseDiffer, false)
   }
   finally {
     rmSync(tmp, { recursive: true, force: true })

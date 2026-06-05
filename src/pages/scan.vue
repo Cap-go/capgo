@@ -239,7 +239,9 @@ onMounted(async () => {
   if (!isNativePlatform) {
     debugLog('native scanner unavailable on web platform')
     statusMessage.value = 'Live camera scanning is available in the iOS and Android app. Paste a preview link or bundle URL below.'
+    return
   }
+  await startScanner()
 })
 
 onUnmounted(async () => {
