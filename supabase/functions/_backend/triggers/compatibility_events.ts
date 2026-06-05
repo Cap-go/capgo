@@ -1,6 +1,6 @@
 import type { CompatibilitySummary, NativePackage } from '../utils/bundle_compatibility.ts'
 import type { Database } from '../utils/supabase.types.ts'
-import { comparePackages, summarizeCompatibility } from '../utils/bundle_compatibility.ts'
+import { compareNativePackages, summarizeBundleCompatibility } from '../utils/bundle_compatibility.ts'
 
 /**
  * Pure decision logic for the `compatibility_events` feature.
@@ -139,8 +139,8 @@ export function decideCompatibilityEvents(input: DecideCompatibilityEventsInput)
     if (previous.bundle.id === currentBundle.id)
       continue
 
-    const summary: CompatibilitySummary = summarizeCompatibility(
-      comparePackages(currentBundle.nativePackages, previous.bundle.nativePackages),
+    const summary: CompatibilitySummary = summarizeBundleCompatibility(
+      compareNativePackages(currentBundle.nativePackages, previous.bundle.nativePackages),
     )
 
     if (summary.compatible)
@@ -225,7 +225,7 @@ export function decideAutoResolves(
     if (!hasNativePackages(baseline))
       continue
 
-    const summary = summarizeCompatibility(comparePackages(currentBundle.nativePackages, baseline.nativePackages))
+    const summary = summarizeBundleCompatibility(compareNativePackages(currentBundle.nativePackages, baseline.nativePackages))
     if (!summary.compatible)
       continue
 
