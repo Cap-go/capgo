@@ -340,7 +340,7 @@ test('verifying-key shows the Apple-verify spinner copy', () => {
 test('creating-certificate shows the CSR + distribution-certificate spinner copy', () => {
   assertContains(
     h(CreatingCertificateStep),
-    ['Generating signing key and CSR...', 'Creating iOS distribution certificate...'],
+    ['Generating signing key and CSR...', 'Creating Apple Distribution certificate...'],
     'creating-certificate',
   )
 })
@@ -358,7 +358,7 @@ test('cert-limit-prompt shows the limit error, the revoke prompt and the provide
       onChange: noop,
     }),
     [
-      'iOS distribution certificate limit reached (3 existing).',
+      'Apple Distribution certificate limit reached (3 existing).',
       'Select a certificate to revoke:',
       'Distribution: Old Cert',
       'Created by Capgo',

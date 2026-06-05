@@ -1370,7 +1370,7 @@ export function iosViewForStep(
       return {
         step,
         kind: 'choice',
-        title: `Certificate limit reached — ${certs.length} existing distribution certificate(s).`,
+        title: `Certificate limit reached — ${certs.length} existing Apple Distribution certificate(s).`,
         prompt: 'Pick a certificate to revoke (frees a slot to create a new one), or exit:',
         options,
       }

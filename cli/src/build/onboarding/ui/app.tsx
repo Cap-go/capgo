@@ -1788,7 +1788,9 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
         deleteProfile: async (profileId) => {
           await deleteProfile(await getFreshToken(), profileId)
         },
-        listCertificates: async () => listDistributionCerts(await getFreshToken()),
+        // Scoped to the DISTRIBUTION pool — same reasoning as createCertificate's
+        // limit recovery: only same-type revocations free a slot.
+        listCertificates: async () => listDistributionCerts(await getFreshToken(), { types: ['DISTRIBUTION'] }),
 
         // ── verify-app (remote App Store verification, PR #2397) ──
         listApps: async () => listApps(await getFreshToken()),
