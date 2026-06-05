@@ -259,7 +259,6 @@
     "@capgo/capacitor-photo-library": "^8.0.13",
     "@capgo/capacitor-pretty-toast": "^8.1.7",
     "@capgo/capacitor-printer": "^8.0.14",
-    "@capgo/capacitor-privacy-screen": "^8.3.1",
     "@capgo/capacitor-proximity": "^8.1.3",
     "@capgo/capacitor-recaptcha": "^8.1.2",
     "@capgo/capacitor-ricoh360": "^8.0.13",
