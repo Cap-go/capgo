@@ -145,6 +145,28 @@ function makeDeps(overrides = {}) {
     checkDuplicateProfiles: async (...a) => { calls.push({ name: 'checkDuplicateProfiles', args: a }); return [] },
     listCertificates: async (...a) => { calls.push({ name: 'listCertificates', args: a }); return EXISTING_CERTS },
 
+    // ── verify-app (remote App Store verification, PR #2397) — exact-match by
+    // default so the create-new chain passes straight through the gate. ──
+    listApps: async (...a) => { calls.push({ name: 'listApps', args: a }); return [{ id: 'APPSTORE1', bundleId: APP_ID, name: 'Example App' }] },
+    listBundleIds: async (...a) => { calls.push({ name: 'listBundleIds', args: a }); return [APP_ID] },
+    detectBundleIds: (...a) => {
+      calls.push({ name: 'detectBundleIds', args: a })
+      return {
+        pbxproj: { value: APP_ID, source: 'pbxproj-release', label: 'project.pbxproj (Release config)' },
+        debug: null,
+        plist: null,
+        capacitor: { value: APP_ID, source: 'capacitor-config', label: 'capacitor.config.ts (appId)' },
+        recommended: { value: APP_ID, source: 'pbxproj-release', label: 'project.pbxproj (Release config)' },
+        mismatch: false,
+        debugReleaseDiffer: false,
+        releaseResolved: true,
+        candidates: [],
+      }
+    },
+    writeReleaseBundleId: (...a) => { calls.push({ name: 'writeReleaseBundleId', args: a }); return { changed: 1 } },
+    ensureBundleId: async (...a) => { calls.push({ name: 'ensureBundleId', args: a }) },
+    openExternal: async (...a) => { calls.push({ name: 'openExternal', args: a }) },
+
     // ── persistence ──
     saveProgress: async (appId, progress) => { calls.push({ name: 'saveProgress', args: [appId, progress] }); lastSaved = progress },
     loadProgress: async () => null,
@@ -222,11 +244,12 @@ await test('p8-method-select is IDEMPOTENT — carried.pickerOpened short-circui
 
 // ─── 3) verifying-key ─────────────────────────────────────────────────────────────
 
-await test('verifying-key (success) → creating-certificate; persists completedSteps.apiKeyVerified; transient apiKey + teamId', async () => {
+await test('verifying-key (success) → verify-app; persists completedSteps.apiKeyVerified; transient apiKey + teamId', async () => {
   const deps = makeDeps({ carried: { p8Content: P8_BYTES } })
   const progress = iosProgress({ p8Path: '/Users/me/AuthKey_ABC123.p8', keyId: 'KEY1', issuerId: 'ISS1' })
   const res = await runIosEffect('verifying-key', progress, deps)
-  assertEquals(res.next, 'creating-certificate', 'a verified key advances to certificate creation (create-new)')
+  assertEquals(res.next, 'verify-app', 'a verified key advances to the remote App Store verification gate (create-new, PR #2397)')
+  assert(res.transient.pendingVerifyNext === undefined, 'create-new sets NO pendingVerifyNext — verify-app falls back to creating-certificate')
   const verifyCall = deps.__calls.find(c => c.name === 'verifyApiKey')
   assert(verifyCall, 'must call verifyApiKey')
   assertEquals(verifyCall.args[0].keyId, 'KEY1', 'verifyApiKey receives the persisted keyId')
@@ -243,7 +266,7 @@ await test('verifying-key falls back to readFile(p8Path) when the .p8 bytes were
   const deps = makeDeps() // no carried.p8Content
   const progress = iosProgress({ p8Path: '/Users/me/AuthKey_ABC123.p8', keyId: 'KEY1', issuerId: 'ISS1' })
   const res = await runIosEffect('verifying-key', progress, deps)
-  assertEquals(res.next, 'creating-certificate', 'resume still verifies after re-reading the .p8 from disk')
+  assertEquals(res.next, 'verify-app', 'resume still verifies after re-reading the .p8 from disk (→ the verify-app gate)')
   assert(deps.__calls.some(c => c.name === 'readFile'), 'must re-read the .p8 file when bytes were not carried')
 })
 
@@ -410,19 +433,26 @@ await test('creating-profile (generic failure) → error; no profile persisted',
 
 // ─── 6) Full create-new happy path (driver threads transient as carried) ──────────
 
-await test('DRIVER: verify → cert → profile threads transient as carried and reaches saving-credentials with the credential payloads', async () => {
+await test('DRIVER: verify → verify-app → cert → profile threads transient as carried and reaches saving-credentials with the credential payloads', async () => {
   // verifying-key (the driver carries the .p8 bytes from the input chain).
   const vDeps = makeDeps({ carried: { p8Content: P8_BYTES } })
   const vProgress = iosProgress({ p8Path: '/x.p8', keyId: 'KEY1', issuerId: 'ISS1' })
   const verified = await runIosEffect('verifying-key', vProgress, vDeps)
-  assertEquals(verified.next, 'creating-certificate', 'verify advances to cert creation')
+  assertEquals(verified.next, 'verify-app', 'verify advances to the remote App Store verification gate (PR #2397)')
+
+  // verify-app — the exact-match default deps pass straight through; with no
+  // carried pendingVerifyNext (create-new) the exit falls back to cert creation.
+  const gDeps = makeDeps({ carried: { p8Content: P8_BYTES, teamId: verified.transient.teamId } })
+  const gated = await runIosEffect('verify-app', verified.progress, gDeps)
+  assertEquals(gated.next, 'creating-certificate', 'the exact-match verify-app pass advances to cert creation')
+  assertEquals(gated.progress.iosBundleIdOverride, APP_ID, 'the verified Release id is persisted as the bundle-id override')
 
   // The driver captures the transient and threads it back as carried.
   const carriedAfterVerify = { p8Content: P8_BYTES, teamId: verified.transient.teamId }
 
   // creating-certificate (resume from the persisted apiKeyVerified marker).
   const cDeps = makeDeps({ carried: carriedAfterVerify })
-  const certed = await runIosEffect('creating-certificate', verified.progress, cDeps)
+  const certed = await runIosEffect('creating-certificate', gated.progress, cDeps)
   assertEquals(certed.next, 'creating-profile', 'cert advances to profile creation')
 
   // Driver threads cert/team into the next effect.

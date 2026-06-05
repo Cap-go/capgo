@@ -368,19 +368,20 @@ await test("verifying-key + pendingRecoveryAction='import-create-profile-only' -
   assert(save.args[1].pendingRecoveryAction === undefined, 'the PERSISTED progress also clears pendingRecoveryAction')
 })
 
-await test('verifying-key WITHOUT pendingRecoveryAction -> creating-certificate (the normal create-new path is unchanged)', async () => {
+await test('verifying-key WITHOUT pendingRecoveryAction -> verify-app (the create-new path detours through the App Store gate, PR #2397)', async () => {
   const deps = makeDeps({ carried: { p8Content: P8_BYTES } })
   const progress = iosProgress({ setupMethod: 'create-new', p8Path: '/Users/me/AuthKey_ABC123.p8', keyId: 'KEY1', issuerId: 'ISS1' })
   const res = await runIosEffect('verifying-key', progress, deps)
-  assertEquals(res.next, 'creating-certificate', 'no pending action -> the create-new backbone continues to cert creation')
+  assertEquals(res.next, 'verify-app', 'no pending action -> the create-new backbone detours through verify-app (falls back to creating-certificate)')
   assert(res.progress.completedSteps.apiKeyVerified, 'still persists the apiKeyVerified marker')
 })
 
-await test("verifying-key ignores an UNKNOWN pendingRecoveryAction value -> creating-certificate (only the import D2 marker reroutes)", async () => {
+await test("verifying-key ignores an UNKNOWN pendingRecoveryAction value -> verify-app (only the import D2 marker reroutes)", async () => {
   const deps = makeDeps({ carried: { p8Content: P8_BYTES } })
   const progress = iosProgress({ p8Path: '/Users/me/AuthKey_ABC123.p8', keyId: 'KEY1', issuerId: 'ISS1', pendingRecoveryAction: 'something-else' })
   const res = await runIosEffect('verifying-key', progress, deps)
-  assertEquals(res.next, 'creating-certificate', 'an unrecognised marker does not reroute (only import-create-profile-only does)')
+  assertEquals(res.next, 'verify-app', 'an unrecognised marker does not reroute to D2 (import app_store continues into the verify-app gate)')
+  assertEquals(res.transient.pendingVerifyNext, 'import-pick-identity', 'the import continuation rides transient for the gate to use')
 })
 
 // ════════════════════════════════════════════════════════════════════════════════

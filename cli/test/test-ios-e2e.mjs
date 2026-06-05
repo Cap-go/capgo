@@ -147,6 +147,27 @@ function makeDeps(overrides = {}) {
     listCertificates: async () => { calls.push({ name: 'listCertificates', args: [] }); return [] },
 
     // import chain
+    // verify-app (remote App Store verification, PR #2397) — exact-match by
+    // default so the create-new + import app_store drives pass straight through.
+    listApps: async () => { calls.push({ name: 'listApps', args: [] }); return [{ id: 'ASC1', bundleId: APP_ID, name: 'Example App' }] },
+    listBundleIds: async () => { calls.push({ name: 'listBundleIds', args: [] }); return [APP_ID] },
+    detectBundleIds: () => {
+      calls.push({ name: 'detectBundleIds', args: [] })
+      return {
+        pbxproj: { value: APP_ID, source: 'pbxproj-release', label: 'project.pbxproj (Release config)' },
+        debug: null,
+        plist: null,
+        capacitor: { value: APP_ID, source: 'capacitor-config', label: 'capacitor.config.ts (appId)' },
+        recommended: { value: APP_ID, source: 'pbxproj-release', label: 'project.pbxproj (Release config)' },
+        mismatch: false,
+        debugReleaseDiffer: false,
+        releaseResolved: true,
+        candidates: [],
+      }
+    },
+    writeReleaseBundleId: () => { calls.push({ name: 'writeReleaseBundleId', args: [] }); return { changed: 1 } },
+    openExternal: async (url) => { calls.push({ name: 'openExternal', args: [url] }) },
+
     listSigningIdentities: async () => { calls.push({ name: 'listSigningIdentities', args: [] }); return [IDENTITY_A, IDENTITY_B] },
     scanProvisioningProfiles: async () => { calls.push({ name: 'scanProvisioningProfiles', args: [] }); return [PROFILE_ON_DISK] },
     classifyCertAvailability: async (identity) => {
@@ -216,6 +237,7 @@ const FORBIDDEN_SUBSTRINGS = [
   EXPORTED_P12.base64, EXPORTED_P12.passphrase,
   'chosenIdentity', 'chosenProfile', 'importMatches', 'noMatchReason',
   'certData', 'profileData', 'retryStep',
+  'pendingVerifyNext', 'verifyAction', 'verifyApps',
 ]
 
 function assertProgressClean(progress, label) {
@@ -337,8 +359,11 @@ await test('(a) CREATE-NEW: setup-method(create) → .p8 chain → cert → prof
     },
   })
   assertEquals(result.step, 'build-complete', `create-new must reach build-complete (visited: ${result.visited.join(' → ')})`)
-  for (const s of ['verifying-key', 'creating-certificate', 'creating-profile', 'saving-credentials'])
+  for (const s of ['verifying-key', 'verify-app', 'creating-certificate', 'creating-profile', 'saving-credentials'])
     assert(result.visited.includes(s), `passed through ${s}`)
+  assert(result.visited.indexOf('verify-app') > result.visited.indexOf('verifying-key')
+    && result.visited.indexOf('verify-app') < result.visited.indexOf('creating-certificate'), 'verify-app runs BETWEEN verifying-key and creating-certificate (PR #2397)')
+  assert(persisted.some(p => p.iosBundleIdOverride === APP_ID), 'the exact-match pass persisted the verified bundle-id override')
   assert(result.carried.certData && result.carried.profileData, 'cert/profile export payloads rode transient into the tail')
   assert(persisted.length > 0, 'progress was persisted along the way')
 })
@@ -439,6 +464,7 @@ await test('(c) IMPORT app_store recovery: no-match-recovery(create, no ASC key)
   assert(result.visited.includes('import-create-profile-only'), 'recovery routed through import-create-profile-only (D2)')
   assert(result.visited.includes('verifying-key'), 'the .p8 chain ran verifying-key')
   assert(result.visited.indexOf('verifying-key') < result.visited.indexOf('import-create-profile-only'), 'verifying-key ran BEFORE the resumed D2 step')
+  assert(!result.visited.includes('verify-app'), 'the pendingRecoveryAction resume NEVER detours via verify-app (PR #2397 leaves it unchanged)')
   assert(persisted.some(p => p.pendingRecoveryAction === 'import-create-profile-only'), 'pendingRecoveryAction was persisted while detouring through the .p8 chain')
   for (const p of persisted)
     assertProgressClean(p, 'app_store recovery persisted snapshot')
