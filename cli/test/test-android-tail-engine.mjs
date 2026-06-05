@@ -497,7 +497,9 @@ await test('GAP5 ADAPTER: saving-credentials self-heal forwards the yellow missi
     onLog: (msg, color) => logs.push({ msg, color }),
     loadAndroidProgress: async () => tailProgress(),
   })
-  const res = await runAndroidEffect('saving-credentials', tailProgress(), deps)
+  // Build-first contract: the divert fires only when the credential build
+  // genuinely fails — hand the effect a progress with NO buildable inputs.
+  const res = await runAndroidEffect('saving-credentials', { ...tailProgress(), completedSteps: {}, keystoreStorePassword: undefined, keystoreKeyPassword: undefined }, deps)
   assert(res.next !== 'saving-credentials' && res.next !== 'ask-build', 'self-heal must divert to an earlier (input) step')
   assert(!deps.__calls.some(c => c.name === 'updateSavedCredentials'), 'must NOT save when diverted')
   const hit = logs.find(l => /Some required input was missing/.test(l.msg))

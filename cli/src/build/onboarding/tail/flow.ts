@@ -735,22 +735,35 @@ export async function runTailEffect<P extends TailEffectProgress>(
   switch (step) {
     // ── saving-credentials ────────────────────────────────────────────────
     case 'saving-credentials': {
-      // Self-heal: re-validate progress before attempting the save.
-      const fresh = await deps.loadProgress(progress.appId)
-      if (fresh) {
-        const expectedStep = deps.resumeStep(fresh)
-        if (expectedStep !== 'saving-credentials') {
-          // The self-heal diverted (a fresh load resumes elsewhere because some
-          // required input went missing). Emit the same guidance the bespoke
-          // android tail logs before routing back (app.tsx ~L1331) so the user
-          // knows why they were sent back. Yellow side-log; no-op on iOS.
-          deps.onLog?.('ℹ Some required input was missing — sending you back to fill it in.', 'yellow')
-          return { progress, next: expectedStep }
-        }
+      // Build the platform credential SHAPE FIRST (throws on missing inputs).
+      //
+      // Order matters: the build is attempted BEFORE the resume-based
+      // self-heal. The iOS IMPORT payload (cert/profile/p12 password) is
+      // ephemeral by design — it rides deps.carried and is NEVER persisted —
+      // so the persisted-progress resume resolver always points back to
+      // import-scanning at save time. Diverting on the resolver alone (the old
+      // order) therefore looped the import fork forever even though the save
+      // had everything it needed. If the map builds, the inputs are
+      // demonstrably present: save. Only when the build THROWS do we consult
+      // the resolver to route the user back to re-collect the missing input.
+      let credentials: Record<string, string>
+      try {
+        credentials = deps.buildSavedCredentials(progress)
       }
-
-      // Build the platform credential SHAPE (throws on missing inputs).
-      const credentials = deps.buildSavedCredentials(progress)
+      catch (buildError) {
+        // Self-heal: the save genuinely cannot proceed. Emit the same guidance
+        // the bespoke android tail logs before routing back (app.tsx ~L1331).
+        const fresh = await deps.loadProgress(progress.appId)
+        if (fresh) {
+          const expectedStep = deps.resumeStep(fresh)
+          if (expectedStep !== 'saving-credentials') {
+            deps.onLog?.('ℹ Some required input was missing — sending you back to fill it in.', 'yellow')
+            return { progress, next: expectedStep }
+          }
+        }
+        // Nothing to heal back to — surface the real failure.
+        throw buildError
+      }
 
       await deps.updateSavedCredentials(progress.appId, deps.platform, credentials)
       await deps.deleteProgress(progress.appId)

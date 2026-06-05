@@ -216,6 +216,35 @@ await test('saving-credentials (IMPORT path) prefers the carried cert/profile/te
   assert(!('APPLE_KEY_CONTENT' in creds), 'import ad_hoc must NOT emit APPLE_KEY_CONTENT')
 })
 
+await test('REGRESSION (live loop): import save proceeds even though persisted progress resumes at import-scanning', async () => {
+  // tail/flow.ts used to consult resumeStep(loadProgress()) BEFORE building
+  // the credential map. The import payload is ephemeral (carried-only), so the
+  // persisted progress ALWAYS resumed at import-scanning → an infinite
+  // export → self-heal → re-import loop in the live TUI. Build-first fixes it.
+  const IMPORT_CERT = { certificateId: 'ICERT', expirationDate: '2027-02-02', teamId: 'ITEAM', p12Base64: 'import-p12' }
+  const IMPORT_PROFILE = { profileId: 'IPROF', profileName: 'Imported Profile', profileBase64: 'import-prof' }
+  const logs = []
+  const progress = iosProgress({
+    setupMethod: 'import-existing',
+    importDistribution: 'app_store',
+    completedSteps: { apiKeyVerified: { keyId: 'K66', issuerId: 'ISS' } },
+  })
+  const deps = makeDeps({
+    onLog: (msg, color) => logs.push({ msg, color }),
+    loadProgress: async () => progress, // the LIVE shape: a persisted import progress exists
+    carried: {
+      certData: IMPORT_CERT,
+      profileData: IMPORT_PROFILE,
+      teamId: 'ITEAM',
+      importedP12Password: 'random-keychain-pass',
+    },
+  })
+  const res = await runIosEffect('saving-credentials', progress, deps)
+  assertEquals(res.next, 'ask-build', 'the import save must proceed (no self-heal divert)')
+  assert(deps.__calls.some(c => c.name === 'updateSavedCredentials'), 'credentials must be saved')
+  assert(!logs.some(l => /Some required input was missing/.test(l.msg)), 'no missing-input divert log')
+})
+
 // ─── 1b) ASC API key fields (APPLE_KEY_*) carried through saving-credentials ────
 
 await test('saving-credentials (create-new app_store) emits APPLE_KEY_ID/ISSUER_ID/CONTENT from progress + carried.p8Content', async () => {

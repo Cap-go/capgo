@@ -186,11 +186,31 @@ await test("saving-credentials → next 'ask-build' (uses createCiSecretEntries 
 await test("saving-credentials self-heal: resumeStep diverts when progress moved on", async () => {
   const deps = makeDeps({
     loadProgress: async () => tailProgress(),
+    // Build-first contract: the divert only fires when the build genuinely fails.
+    buildSavedCredentials: () => { throw new Error('required input missing (test)') },
     resumeStep: () => 'ask-build', // a fresh load that no longer wants saving-credentials
   })
   const res = await runTailEffect('saving-credentials', tailProgress(), deps)
   assertEquals(res.next, 'ask-build', 'self-heal diverts to the resolved resume step')
   assert(!deps.__calls.some(c => c.name === 'updateSavedCredentials'), 'must NOT save when diverted')
+})
+
+await test("saving-credentials SAVES when the build succeeds even though the persisted resume points elsewhere (iOS-import ephemeral payload)", async () => {
+  // The iOS IMPORT payload is transient-only: the persisted progress always
+  // resumes at import-scanning. The old guard order diverted on that alone,
+  // looping the import fork forever after a successful keychain export. The
+  // build-first contract: a buildable credential map proves the inputs are
+  // present — save, never divert.
+  const logs = []
+  const deps = makeDeps({
+    onLog: (msg, color) => logs.push({ msg, color }),
+    loadProgress: async () => tailProgress(),
+    resumeStep: () => 'import-scanning', // persisted shape resumes elsewhere — must NOT divert
+  })
+  const res = await runTailEffect('saving-credentials', tailProgress(), deps)
+  assertEquals(res.next, 'ask-build', 'a buildable save proceeds to ask-build')
+  assert(deps.__calls.some(c => c.name === 'updateSavedCredentials'), 'must save when the credential map builds')
+  assert(!logs.some(l => /Some required input was missing/.test(l.msg)), 'no self-heal log on a successful build')
 })
 
 // ─── GAP 5: saving-credentials self-heal emits the 'missing input' log ──
@@ -206,6 +226,7 @@ await test('GAP5: saving-credentials self-heal emits the yellow missing-input lo
   const deps = makeDeps({
     onLog: (msg, color) => logs.push({ msg, color }),
     loadProgress: async () => tailProgress(),
+    buildSavedCredentials: () => { throw new Error('required input missing (test)') },
     resumeStep: () => 'gcp-projects-loading', // diverts somewhere earlier (input missing)
   })
   const res = await runTailEffect('saving-credentials', tailProgress(), deps)
