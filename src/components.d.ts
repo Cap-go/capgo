@@ -32,7 +32,6 @@ declare module 'vue' {
     BuilderPromoBanner: typeof import('./components/dashboard/BuilderPromoBanner.vue')['default']
     BuildTable: typeof import('./components/tables/BuildTable.vue')['default']
     BundleCompareSelect: typeof import('./components/bundle/BundleCompareSelect.vue')['default']
-    BundleCompatibilityAlert: typeof import('./components/dashboard/BundleCompatibilityAlert.vue')['default']
     BundlePreviewFrame: typeof import('./components/BundlePreviewFrame.vue')['default']
     BundleTable: typeof import('./components/tables/BundleTable.vue')['default']
     BundleUploadsCard: typeof import('./components/dashboard/BundleUploadsCard.vue')['default']

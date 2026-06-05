@@ -8,6 +8,10 @@
     "src/components.d.ts": [
       "types"
     ],
+    "supabase/functions/_backend/utils/bundle_compatibility.ts": [
+      "exports",
+      "types"
+    ],
     "supabase/functions/_backend/utils/postgres_schema.ts": [
       "exports"
     ],
