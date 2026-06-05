@@ -4,7 +4,7 @@ CREATE TABLE IF NOT EXISTS public.compatibility_events (
   app_id               text NOT NULL REFERENCES public.apps(app_id) ON DELETE CASCADE,
   source               text NOT NULL,            -- default_channel_version_changed | default_channel_changed
   platform             text NOT NULL,            -- ios | android | electron
-  channel_id           bigint,
+  channel_id           bigint,                   -- nullable snapshot; intentionally NO FK (event must survive channel deletion)
   channel_name         text NOT NULL,
   current_version_id   bigint,
   current_version_name text NOT NULL,

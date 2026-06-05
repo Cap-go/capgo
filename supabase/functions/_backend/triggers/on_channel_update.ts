@@ -26,6 +26,11 @@ export const app = new Hono<MiddlewareKeyVariables>()
 const UPDATE_RETRY_ATTEMPTS = 3
 const UPDATE_RETRY_DELAY_MS = 300
 const COMPATIBILITY_DEDUP_CONFLICT = 'app_id,channel_id,platform,current_version_id,previous_version_id'
+// Upper bound on unresolved events scanned per auto-resolve pass: bounds the
+// in-memory result set and the per-row UPDATE blast radius for busy apps. Far
+// above any realistic count of distinct unresolved (version × platform) events;
+// anything beyond is revisited on the next channel update.
+const COMPATIBILITY_AUTO_RESOLVE_SCAN_LIMIT = 200
 type ChannelRow = Database['public']['Tables']['channels']['Row']
 type ChannelPlatformScope = 'ios' | 'android' | 'electron'
 
@@ -319,6 +324,8 @@ async function autoResolveCompatibilityEvents(
     .select('id, platform, previous_version_id, previous_version_name, current_version_id')
     .eq('app_id', record.app_id)
     .is('resolved_at', null)
+    .order('id', { ascending: false })
+    .limit(COMPATIBILITY_AUTO_RESOLVE_SCAN_LIMIT)
 
   if (error || !unresolved || unresolved.length === 0) {
     if (error) {
