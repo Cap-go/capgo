@@ -90,14 +90,19 @@ Always returns, regardless of body:
 
 ```
 426 Upgrade Required
-{ "error": "upgrade_required",
-  "message": "AI build analysis requires a newer CLI. Please upgrade: npm i -g @capgo/cli@latest" }
+{ "error": "AI build analysis requires a newer CLI. Please upgrade: npm i -g @capgo/cli@latest",
+  "code": "upgrade_required" }
 ```
 
-Old CLIs already print `AI analysis failed (426): <message>.` via their generic
-error branch, so deployed CLI versions surface the upgrade instruction with no
-client change. The handler keeps the apikey middleware (consistent auth
-surface, and telemetry below) but performs no DB reads/writes and never
+The human-readable text MUST be in the `error` field: the deployed CLI's
+error branch resolves the printed message as `body.error || body.message`
+(`cli/src/ai/analyze.ts`, unchanged since the feature's first release,
+commit `803e4752c`), so a machine code in `error` would shadow the
+instruction. With this shape, old CLIs print
+`AI analysis failed (426): AI build analysis requires a newer CLI. Please upgrade: npm i -g @capgo/cli@latest.`
+with no client change. `code` carries the machine-readable identifier for
+new clients and tests. The handler keeps the apikey middleware (consistent
+auth surface, and telemetry below) but performs no DB reads/writes and never
 contacts the builder.
 
 ### 3.3 Builder endpoint: `POST {BUILDER_URL}/jobs/{jobId}/ai-analyze`
