@@ -38,11 +38,7 @@
         "@capgo/capacitor-android-inline-install": "^8.0.7",
         "@capgo/capacitor-android-kiosk": "^8.2.3",
         "@capgo/capacitor-android-sms-retriever": "^8.0.3",
-        "@capgo/capacitor-android-usagestatsmanager": "^8.0.26",
         "@capgo/capacitor-app-attest": "^8.1.10",
-        "@capgo/capacitor-app-tracking-transparency": "^8.1.9",
-        "@capgo/capacitor-appinsights": "^8.0.33",
-        "@capgo/capacitor-appsflyer": "^8.1.5",
         "@capgo/capacitor-audio-recorder": "^8.2.1",
         "@capgo/capacitor-audio-session": "^8.0.39",
         "@capgo/capacitor-autofill-save-password": "^8.0.28",
@@ -215,7 +211,7 @@
     },
     "cli": {
       "name": "@capgo/cli",
-      "version": "7.124.13",
+      "version": "7.125.1",
       "bin": {
         "capgo": "dist/index.js",
       },
@@ -478,15 +474,7 @@
 
     "@capgo/capacitor-android-sms-retriever": ["@capgo/capacitor-android-sms-retriever@8.0.3", "", { "peerDependencies": { "@capacitor/core": ">=8.0.0" } }, "sha512-+xE3w+OC2pZv0Q5be/fVl0trNnp9fzlIHp3KqP94qutgYU9IkmNzESXTLdgZYsolgViwloJk/w1K19JDxOeUXQ=="],
 
-    "@capgo/capacitor-android-usagestatsmanager": ["@capgo/capacitor-android-usagestatsmanager@8.0.26", "", { "peerDependencies": { "@capacitor/core": ">=8.0.0" } }, "sha512-/MlxdMYnnDw6NkZpDVmJx8deiwQFRvBPVRGVg31wJEVQADvp4J7zeHeOT7Ekj206SWR0USbx6VDNSuIMd/2tVg=="],
-
     "@capgo/capacitor-app-attest": ["@capgo/capacitor-app-attest@8.1.10", "", { "peerDependencies": { "@capacitor/core": "^8.0.0" } }, "sha512-Jf7crpRsNbocg0OHuT2pK5mqLOsvOPfIkATymnHUqE9RCro3iIe/Yxe5XHCGJZnI2FnsrJVUI7a2+di5slW/2A=="],
-
-    "@capgo/capacitor-app-tracking-transparency": ["@capgo/capacitor-app-tracking-transparency@8.1.9", "", { "peerDependencies": { "@capacitor/core": ">=8.0.0" } }, "sha512-2LTWuv6D9YuqjSeJj/QXDGnjFEMJQTSvOpLZ2MHlf1M/BTX98+R5+3/wyhKQUWZAmw92bz1KkaYqIfwCR1EEqw=="],
-
-    "@capgo/capacitor-appinsights": ["@capgo/capacitor-appinsights@8.0.33", "", { "peerDependencies": { "@capacitor/core": ">=8.0.0" } }, "sha512-dsmrO7fryFgl96Ncmd56585eCa1B6AzETZHI5Gn9yWNNw4fStWJixWD0Z3Tgy1ufBUAgLtvfhYyuqedVCFqZHg=="],
-
-    "@capgo/capacitor-appsflyer": ["@capgo/capacitor-appsflyer@8.1.5", "", { "peerDependencies": { "@capacitor/core": ">=8.0.0" } }, "sha512-NG4OvOKXCtlkRG2AZ8CIFonBputGlCHN325CAaRyQJrZf/JJ1vqP33vSYW0qJiQrDiJfsSbMJD3H6i2hdcf0+A=="],
 
     "@capgo/capacitor-audio-recorder": ["@capgo/capacitor-audio-recorder@8.2.1", "", { "peerDependencies": { "@capacitor/core": ">=8.0.0" } }, "sha512-1882s8314pgbod+kEYUERp0L7vOl2IOsF+AoobDkzNUxyZ/dg+Q/PO9Vd3v4lSXonNDQsvRZUn3U+TEYFej/IQ=="],
 
