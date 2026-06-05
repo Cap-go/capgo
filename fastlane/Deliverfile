@@ -1,6 +1,5 @@
 platform('ios')
 
-app_version('12.159.14')
 screenshots_path('./fastlane/screenshots')
 
 skip_binary_upload(true)
