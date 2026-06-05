@@ -3,7 +3,7 @@
 BEGIN;
 
 -- Plan the number of tests
-SELECT plan(58);
+SELECT plan(59);
 
 -- Test app_versions policies
 SELECT
@@ -280,6 +280,27 @@ SELECT
             'Prevent non 2FA access'
         ],
         'channels should have correct policies'
+    );
+
+SELECT
+    ok(
+        (
+            SELECT (
+                COALESCE(qual, '')
+                || ' '
+                || COALESCE(with_check, '')
+            ) ~ 'rbac_perm_channel_update_settings'
+            AND (
+                COALESCE(qual, '')
+                || ' '
+                || COALESCE(with_check, '')
+            ) !~ 'rbac_perm_app_update_settings'
+            FROM pg_policies
+            WHERE schemaname = 'public'
+              AND tablename = 'channels'
+              AND policyname = 'Allow RBAC channels update'
+        ),
+        'channels update policy should honor channel-scoped update permission'
     );
 
 -- Test stripe_info policies

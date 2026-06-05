@@ -560,6 +560,9 @@ GRANT EXECUTE ON FUNCTION public.usage_credit_readable_org_ids() TO anon;
 GRANT EXECUTE ON FUNCTION public.usage_credit_readable_org_ids() TO authenticated;
 GRANT EXECUTE ON FUNCTION public.usage_credit_readable_org_ids() TO service_role;
 
+COMMENT ON FUNCTION public.usage_credit_readable_org_ids() IS
+  'Returns org IDs whose usage-credit rows are readable by the current user session or Capgo API key through RBAC billing-read permission checks.';
+
 CREATE OR REPLACE FUNCTION public.audit_logs_allowed_orgs()
 RETURNS uuid[]
 LANGUAGE sql
@@ -887,18 +890,18 @@ FOR UPDATE
 TO anon, authenticated
 USING (
   public.rbac_check_permission_request(
-    public.rbac_perm_app_update_settings(),
+    public.rbac_perm_channel_update_settings(),
     owner_org,
     app_id,
-    NULL::bigint
+    id
   )
 )
 WITH CHECK (
   public.rbac_check_permission_request(
-    public.rbac_perm_app_update_settings(),
+    public.rbac_perm_channel_update_settings(),
     owner_org,
     app_id,
-    NULL::bigint
+    id
   )
 );
 
