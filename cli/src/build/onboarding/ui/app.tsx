@@ -2585,7 +2585,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
         else {
           setAiAnalysisText(null)
           const detail = [
-            result.status ? `(status ${result.status})` : null,
+            result.kind === 'error' && result.status ? `(status ${result.status})` : null,
             result.message,
           ].filter(Boolean).join(' ')
           setAiResult({ kind: 'error', message: `AI analysis failed${detail ? `: ${detail}` : ''}.` })

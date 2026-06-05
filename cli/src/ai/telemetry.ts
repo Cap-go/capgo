@@ -2,7 +2,7 @@ import { sendEvent } from '../utils.js'
 
 export type AiAnalysisChoice = 'capgo_ai' | 'local_ai' | 'skip' | 'auto_upload' | 'retry'
 export type AiAnalysisTriggeredBy = 'menu' | 'ci_flag' | 'onboarding'
-export type AiAnalysisResult = 'success' | 'already_analyzed' | 'too_big' | 'error'
+export type AiAnalysisResult = 'success' | 'already_analyzed' | 'too_big' | 'error' | 'mid_stream_error' | 'upgrade_required'
 
 export interface TrackAiAnalysisChoiceInput {
   apikey: string

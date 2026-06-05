@@ -1,6 +1,7 @@
 import { readFile, stat, writeFile } from 'node:fs/promises'
 import { cleanupCapturedJobFiles, getAiPromptPath, getLogCapturePath } from './log-capture'
 import { SYSTEM_PROMPT } from './prompt'
+import { createSseParser } from './sse'
 
 export type AnalyzeBehavior = 'show_menu' | 'ask_then_menu' | 'auto_upload' | 'skip'
 
@@ -39,53 +40,110 @@ export interface PostAnalyzeInput {
   logs: string
 }
 
+// Watchdog values deliberately LARGER than the edge fn's (90s/30s) so the
+// server layer always times out first and can send an in-band error event.
+export const STREAM_FIRST_BYTE_TIMEOUT_MS = 120_000
+export const STREAM_IDLE_TIMEOUT_MS = 45_000
+export const STREAM_TOTAL_TIMEOUT_MS = 600_000
+
 export type PostAnalyzeResult
   = | { kind: 'ok', analysis: string }
     | { kind: 'already_analyzed' }
     | { kind: 'too_big' }
-    | { kind: 'error', status?: number, message?: string }
+    | { kind: 'upgrade_required', message?: string }
+    | { kind: 'error', status?: number, message?: string, partial?: string }
 
-export async function postAnalyzeRequest(input: PostAnalyzeInput): Promise<PostAnalyzeResult> {
-  // apiHost is the Capgo CF Workers API gateway (e.g. https://api.capgo.app),
-  // NOT a Supabase Edge Functions URL — so no '/functions/v1/' prefix. All other
-  // /build/* endpoints (start, cancel, status, logs) live directly under the host.
-  const url = `${input.apiHost}/build/ai_analyze`
+export interface PostAnalyzeStreamInput extends PostAnalyzeInput {
+  // Fired once per text delta as it arrives — used for progressive TTY rendering.
+  onChunk?: (text: string) => void
+}
+
+export async function postAnalyzeStreamRequest(input: PostAnalyzeStreamInput): Promise<PostAnalyzeResult> {
+  const url = `${input.apiHost}/build/ai_analyze_stream`
+  const controller = new AbortController()
+  let idleTimer = setTimeout(() => controller.abort(), STREAM_FIRST_BYTE_TIMEOUT_MS)
+  const totalTimer = setTimeout(() => controller.abort(), STREAM_TOTAL_TIMEOUT_MS)
+  let partial = ''
   try {
     const res = await fetch(url, {
       method: 'POST',
       headers: {
         'capgkey': input.apikey,
         'content-type': 'application/json',
+        'accept': 'text/event-stream',
       },
       body: JSON.stringify({ jobId: input.jobId, appId: input.appId, logs: input.logs }),
-      signal: AbortSignal.timeout(60_000),
+      signal: controller.signal,
     })
-    if (res.status === 200) {
-      const body = await res.json() as { analysis?: string }
-      if (typeof body.analysis !== 'string')
-        return { kind: 'error', status: 200, message: 'malformed_response' }
-      return { kind: 'ok', analysis: body.analysis }
-    }
-    if (res.status === 409) {
+    if (res.status === 409)
       return { kind: 'already_analyzed' }
-    }
-    if (res.status === 413) {
-      // Backend rejected the payload as too large (>10 MB). Surface this as
-      // the dedicated variant so callers can fall back to local AI cleanly.
+    if (res.status === 413)
       return { kind: 'too_big' }
+    if (res.status === 426) {
+      const body = await res.json().catch(() => ({})) as { error?: string, message?: string }
+      return { kind: 'upgrade_required', message: body.error || body.message }
     }
-    let message: string | undefined
-    try {
-      const body = await res.json() as { error?: string, message?: string }
-      message = body.error || body.message
+    if (res.status !== 200) {
+      let message: string | undefined
+      try {
+        const body = await res.json() as { error?: string, message?: string }
+        message = body.error || body.message
+      }
+      catch {
+        // ignore
+      }
+      return { kind: 'error', status: res.status, message }
     }
-    catch {
-      // ignore
+    if (!res.body)
+      return { kind: 'error', status: 200, message: 'no_body' }
+
+    let terminal: PostAnalyzeResult | undefined
+    const feed = createSseParser((e) => {
+      if (e.event === 'chunk') {
+        try {
+          const text = (JSON.parse(e.data) as { text?: string }).text
+          if (typeof text === 'string') {
+            partial += text
+            input.onChunk?.(text)
+          }
+        }
+        catch {
+          // malformed chunk frame — skip
+        }
+      }
+      else if (e.event === 'done') {
+        terminal = { kind: 'ok', analysis: partial }
+      }
+      else if (e.event === 'error') {
+        let code = 'ai_error'
+        try {
+          code = (JSON.parse(e.data) as { code?: string }).code ?? code
+        }
+        catch {
+          // keep default
+        }
+        terminal = { kind: 'error', message: code, partial }
+      }
+    })
+
+    const reader = res.body.getReader()
+    const decoder = new TextDecoder()
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done)
+        break
+      clearTimeout(idleTimer)
+      idleTimer = setTimeout(() => controller.abort(), STREAM_IDLE_TIMEOUT_MS)
+      feed(decoder.decode(value, { stream: true }))
     }
-    return { kind: 'error', status: res.status, message }
+    return terminal ?? { kind: 'error', message: 'stream_ended_without_done', partial }
   }
   catch (err) {
-    return { kind: 'error', message: err instanceof Error ? err.message : String(err) }
+    return { kind: 'error', message: err instanceof Error ? err.message : String(err), partial: partial || undefined }
+  }
+  finally {
+    clearTimeout(idleTimer)
+    clearTimeout(totalTimer)
   }
 }
 
@@ -125,7 +183,7 @@ export async function runCapgoAiAnalysis(input: RunCapgoAiAnalysisInput): Promis
     return { kind: 'error', message: err instanceof Error ? err.message : 'log_unavailable' }
   }
 
-  return postAnalyzeRequest({
+  return postAnalyzeStreamRequest({
     apiHost: input.apiHost,
     apikey: input.apikey,
     jobId: input.jobId,
