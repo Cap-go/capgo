@@ -74,6 +74,7 @@ const ANON_ALLOWED_PROCS = [
 
 const AUTHENTICATED_ONLY_PROCS = [
   'public.accept_invitation_to_org(uuid)',
+  'public.acknowledge_compatibility_event(bigint, text)',
   'public.check_org_members_2fa_enabled(uuid)',
   'public.check_org_members_password_policy(uuid)',
   'public.count_non_compliant_bundles(uuid, text)',
