@@ -144,6 +144,7 @@ import open from 'open'
 import { contactSupport } from '../../../../support/contact-support.js'
 import { copyToClipboard, revealInFinder } from '../../../../support/clipboard.js'
 import { getInternalLogPath } from '../../../../support/internal-log.js'
+import { redactSecrets } from '../../../../support/redact.js'
 import { writeSupportBundleFiles } from '../../../../onboarding-support.js'
 import {
   fetchCapgoOAuthConfig,
@@ -954,9 +955,13 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
   // step but "write the bundle" is best-effort; failures degrade gracefully and
   // we always return to the 'error' menu afterwards.
   const handleSupport = useCallback(async () => {
+    // Redact the error before it goes into the pre-filled email body — the body
+    // is plain outbound text (unlike the attached bundle, which is redacted on
+    // write), so an un-sanitized error could leak tokens/identifiers.
+    const sanitizedError = redactSecrets(error ?? 'unknown error')
     await contactSupport({
       subject: `Capgo Builder support — ${appId} (android)`,
-      body: `Hi Capgo team,\n\nMy build failed and I'd like help.\n\nApp: ${appId}\nPlatform: android\nError: ${error ?? 'unknown error'}\n\n(Logs saved locally; secrets removed — I'll attach the file.)`,
+      body: `Hi Capgo team,\n\nMy build failed and I'd like help.\n\nApp: ${appId}\nPlatform: android\nError: ${sanitizedError}\n\n(Logs saved locally; secrets removed — I'll attach the file.)`,
       confirm: async msg => askSupportConfirm(msg),
       buildFiles: () => writeSupportBundleFiles({
         kind: 'build-init',
@@ -3561,7 +3566,8 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
           hasBuildLog={!!aiJobId}
           onChoose={(choice) => {
             if (choice === 'support') {
-              handleSupport().catch(() => {})
+              // Best-effort flow — surface unexpected failures but don't block.
+              handleSupport().catch((err) => { console.error('[support-flow]', err) })
             }
             else if (choice === 'ai') {
               // A captured build-failure log is available — route into the

@@ -32,7 +32,7 @@ The only cost: `mailto:` can't auto-attach a file, so the user does one manual "
 
 1. **A hidden internal log** is captured during builder/onboarding runs (verbose, secret-redacted, CLI-only) — including **failures that aren't build failures** (onboarding errors, raw Apple/Google API errors). For build failures it also folds in the captured build log.
 2. On failure, the menu offers **📨 Email Capgo support** (plus **🤖 Ask AI for help** when a build log exists — unchanged from today).
-3. When the user picks **Email Capgo support**, the CLI **first shows a confirmation** — it explains *"We'll save your logs locally**, reveal them in Finder (macOS),** and open a pre-filled email to support@capgo.app in your mail app"* and asks the user to **continue or cancel**. The Finder-reveal clause is included only on macOS. Only on confirm does it proceed. On confirm it:
+3. When the user picks **Email Capgo support**, the CLI **first shows a confirmation** — it explains *"We'll save your logs locally, reveal them in Finder (macOS), and open a pre-filled email to support@capgo.app in your mail app"* and asks the user to **continue or cancel**. The Finder-reveal clause is included only on macOS. Only on confirm does it proceed. On confirm it:
    - writes **ONE combined logs bundle** — saved in **both** forms so the user can attach whichever they prefer:
      - `~/.capgo-credentials/support/builder-support-<appId>-<ts>.log` (plain, human-readable)
      - `…/builder-support-<appId>-<ts>.log.gz` (compact)

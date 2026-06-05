@@ -10,9 +10,16 @@ function t(name, fn) {
   catch (e) { process.stderr.write(`✗ ${name}\n`); throw e }
 }
 
+// Runs before any startInternalLog call so the null-before-start contract is
+// actually exercised (module state is per-process).
+t('getInternalLogPath returns null before start', () => {
+  assert.equal(getInternalLogPath(), null)
+})
+
 t('writes redacted lines to the log file', () => {
   const dir = join(tmpdir(), `capgo-ilog-${Date.now()}`)
   const path = startInternalLog('com.example.app', dir)
+  assert.ok(path)
   appendInternalLog('normal line')
   appendInternalLog('Authorization: Bearer SECRETTOKEN123')
   const content = readFileSync(path, 'utf8')
@@ -20,9 +27,4 @@ t('writes redacted lines to the log file', () => {
   assert.ok(!content.includes('SECRETTOKEN123'))
   assert.ok(content.includes('[REDACTED]'))
   rmSync(dir, { recursive: true, force: true })
-})
-
-t('getInternalLogPath returns null before start', () => {
-  // fresh import state is per-process; this test runs first in isolation when run alone
-  assert.equal(typeof getInternalLogPath, 'function')
 })

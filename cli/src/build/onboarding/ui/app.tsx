@@ -26,6 +26,7 @@ import { writeOnboardingSupportBundle, writeSupportBundleFiles } from '../../../
 import { contactSupport } from '../../../support/contact-support.js'
 import { copyToClipboard, revealInFinder } from '../../../support/clipboard.js'
 import { getInternalLogPath } from '../../../support/internal-log.js'
+import { redactSecrets } from '../../../support/redact.js'
 import { formatRunnerCommand, splitRunnerCommand } from '../../../runner-command.js'
 import { createSupabaseClient, findBuildCommandForProjectType, findProjectType, findSavedKeySilent, getOrganizationId, getPackageScripts, getPMAndCommand } from '../../../utils.js'
 import { loadSavedCredentials, updateSavedCredentials } from '../../credentials.js'
@@ -1161,9 +1162,13 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
   // step but "write the bundle" is best-effort; failures degrade gracefully and
   // we always return to the 'error' menu afterwards.
   const handleSupport = useCallback(async () => {
+    // Redact the error before it goes into the pre-filled email body — the body
+    // is plain outbound text (unlike the attached bundle, which is redacted on
+    // write), so an un-sanitized error could leak tokens/identifiers.
+    const sanitizedError = redactSecrets(error ?? 'unknown error')
     await contactSupport({
       subject: `Capgo Builder support — ${appId} (ios)`,
-      body: `Hi Capgo team,\n\nMy build failed and I'd like help.\n\nApp: ${appId}\nPlatform: ios\nError: ${error ?? 'unknown error'}\n\n(Logs saved locally; secrets removed — I'll attach the file.)`,
+      body: `Hi Capgo team,\n\nMy build failed and I'd like help.\n\nApp: ${appId}\nPlatform: ios\nError: ${sanitizedError}\n\n(Logs saved locally; secrets removed — I'll attach the file.)`,
       confirm: async msg => askSupportConfirm(msg),
       buildFiles: () => writeSupportBundleFiles({
         kind: 'build-init',
