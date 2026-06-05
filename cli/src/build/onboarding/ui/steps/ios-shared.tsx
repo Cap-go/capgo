@@ -350,6 +350,7 @@ export function estimateErrorBodyRows(
   supportBundlePath: string | null,
   cols: number,
   showRetry: boolean,
+  hasBuildLog: boolean,
 ): number {
   let rows = 1 // outer marginTop
   rows += wrapRows(`✖  ${error}`, cols) // ErrorLine (wraps)
@@ -373,7 +374,10 @@ export function estimateErrorBodyRows(
     rows += 2 + wrapRows(supportBundlePath, cols) // Newline + "Support bundle" + path
   rows += 1 // Newline before the action prompt
   if (showRetry)
-    rows += 5 // "What do you want to do?" + Newline + Select (3 options)
+    // "What do you want to do?" + Newline + Select (one row per option). The
+    // option count tracks buildErrorMenuOptions (support [+ AI iff hasBuildLog]
+    // + retry + restart + exit), so it stays correct as the menu grows.
+    rows += 2 + buildErrorMenuOptions(hasBuildLog).length
   return rows
 }
 

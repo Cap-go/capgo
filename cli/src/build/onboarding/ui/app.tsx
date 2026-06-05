@@ -2793,7 +2793,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
   const ERROR_FRAME_CHROME_ROWS = 15
   const errorViewerLines = error ? formatErrorViewerLines(error, recoveryAdvice, supportBundlePath) : []
   const errorTooTall = step === 'error' && !!error
-    && estimateErrorBodyRows(error, recoveryAdvice, supportBundlePath, terminalCols, !!retryStep) + ERROR_FRAME_CHROME_ROWS > terminalRows
+    && estimateErrorBodyRows(error, recoveryAdvice, supportBundlePath, terminalCols, !!retryStep, !!aiJobId) + ERROR_FRAME_CHROME_ROWS > terminalRows
   const isErrorScroll = errorTooTall && !errorViewedFull
 
   // The streaming build output is a fullscreen takeover too — same reasoning as
