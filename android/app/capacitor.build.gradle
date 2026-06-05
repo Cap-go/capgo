@@ -89,6 +89,7 @@ dependencies {
     implementation project(':capgo-capacitor-photo-library')
     implementation project(':capgo-capacitor-pretty-toast')
     implementation project(':capgo-capacitor-printer')
+    implementation project(':capgo-capacitor-privacy-screen')
     implementation project(':capgo-capacitor-proximity')
     implementation project(':capgo-capacitor-recaptcha')
     implementation project(':capgo-capacitor-ricoh360')
