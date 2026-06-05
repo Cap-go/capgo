@@ -1,6 +1,6 @@
 platform('ios')
 
-app('1602316563')
+app(1602316563)
 screenshots_path('./fastlane/screenshots')
 
 skip_binary_upload(true)
