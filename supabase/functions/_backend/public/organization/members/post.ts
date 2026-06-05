@@ -11,12 +11,32 @@ import { supabaseApikey } from '../../../utils/supabase.ts'
 const inviteBodySchema = type({
   orgId: 'string',
   email: 'string.email',
-  invite_type: '"org_member" | "org_billing_admin" | "org_admin" | "org_super_admin"',
+  invite_type: '"org_member" | "org_billing_admin" | "org_admin" | "org_super_admin" | "read" | "upload" | "write" | "admin" | "super_admin" | "invite_read" | "invite_upload" | "invite_write" | "invite_admin" | "invite_super_admin"',
 })
 
 const rbacInviteRoles = ['org_member', 'org_billing_admin', 'org_admin', 'org_super_admin'] as const
 
 type RbacInviteRole = (typeof rbacInviteRoles)[number]
+
+const inviteRoleAliases: Record<string, RbacInviteRole> = {
+  read: 'org_member',
+  upload: 'org_member',
+  write: 'org_member',
+  admin: 'org_admin',
+  super_admin: 'org_super_admin',
+  invite_read: 'org_member',
+  invite_upload: 'org_member',
+  invite_write: 'org_member',
+  invite_admin: 'org_admin',
+  invite_super_admin: 'org_super_admin',
+}
+
+export function normalizeInviteRole(inviteType: string): RbacInviteRole | null {
+  if ((rbacInviteRoles as readonly string[]).includes(inviteType))
+    return inviteType as RbacInviteRole
+
+  return inviteRoleAliases[inviteType] ?? null
+}
 
 export async function post(c: Context<MiddlewareKeyVariables>, bodyRaw: any, _apikey: Database['public']['Tables']['apikeys']['Row']) {
   const bodyParsed = safeParseSchema(inviteBodySchema, bodyRaw)
@@ -32,9 +52,9 @@ export async function post(c: Context<MiddlewareKeyVariables>, bodyRaw: any, _ap
 
   const supabase = supabaseApikey(c, _apikey?.key)
 
-  const rbacRoleName = body.invite_type as RbacInviteRole
+  const rbacRoleName = normalizeInviteRole(body.invite_type)
 
-  if (!rbacInviteRoles.includes(rbacRoleName))
+  if (!rbacRoleName)
     throw simpleError('invalid_body', 'Invalid invite type', { invite_type: body.invite_type })
 
   const { data, error } = await supabase.rpc('invite_user_to_org_rbac', {
