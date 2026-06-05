@@ -41,7 +41,7 @@ function buildPlanValidationExpression(
   actions: ('mau' | 'storage' | 'bandwidth')[],
   ownerColumn: typeof schema.app_versions.owner_org | typeof schema.apps.owner_org,
 ) {
-  const extraConditions = actions.map(action => ` AND ${PLAN_EXCEEDED_COLUMNS[action]} = false`).join('')
+  const extraConditions = actions.map(action => ` AND COALESCE(${PLAN_EXCEEDED_COLUMNS[action]}, false) = false`).join('')
   const customerIdSubquery = sql<string | null>`(
     SELECT ${schema.orgs.customer_id}
     FROM ${schema.orgs}
@@ -54,6 +54,9 @@ function buildPlanValidationExpression(
   // Backward compatibility for replicas that haven't replicated the column yet:
   // read via `to_jsonb(row)->>'has_usage_credits'` so the query still parses
   // even if the column doesn't exist. Missing column fails closed.
+  //
+  // Keep the subscription branch action-specific. is_good_plan also includes
+  // build_time, which must not block update/upload paths when their own metrics fit.
   const hasCreditsExpression = sql`EXISTS (
     SELECT 1
     FROM ${schema.orgs}
@@ -70,7 +73,6 @@ function buildPlanValidationExpression(
       (${schema.stripe_info.trial_at}::date > CURRENT_DATE)
       OR (
         ${schema.stripe_info.status} = 'succeeded'
-        AND ${schema.stripe_info.is_good_plan} = true
         ${sql.raw(extraConditions)}
       )
     )
