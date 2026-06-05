@@ -216,7 +216,17 @@ export async function updateWithPG(
   // Only query link/comment if plugin supports it (v5.35.0+, v6.35.0+, v7.35.0+, v8.35.0+) AND app has expose_metadata enabled
   const needsMetadata = appOwner.expose_metadata && !isDeprecatedPluginVersion(pluginVersion, '5.35.0', '6.35.0', '7.35.0', '8.35.0')
 
-  const requestedInto = await requestInfosPostgres(c, platform, app_id, device_id, defaultChannel, drizzleClient, channelDeviceCount, manifestBundleCount, needsMetadata)
+  const requestedInto = await requestInfosPostgres({
+    c,
+    platform,
+    app_id,
+    device_id,
+    defaultChannel,
+    drizzleClient,
+    channelDeviceCount,
+    manifestBundleCount,
+    includeMetadata: needsMetadata,
+  })
   const { channelOverride } = requestedInto
   let { channelData } = requestedInto
   cloudlog({ requestId: c.get('requestId'), message: `channelData exists ? ${channelData !== undefined}, channelOverride exists ? ${channelOverride !== undefined}` })
