@@ -155,6 +155,34 @@ export async function requestBuild(
 
   const org_id = app.owner_org
 
+  // Native builds consume build-time credits; check that metric before creating a builder job.
+  const buildTimePlanArgs = { orgid: org_id, actions: ['build_time'], appid: app_id } as never
+  const { data: buildTimeAllowed, error: buildTimePlanError } = await supabase.rpc('is_allowed_action_org_action', buildTimePlanArgs)
+  if (buildTimePlanError) {
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: 'Cannot validate native build plan',
+      org_id,
+      app_id,
+      error: buildTimePlanError,
+    })
+    throw quickError(503, 'cannot_validate_build_plan', 'Cannot validate native build plan', { app_id, org_id })
+  }
+
+  if (!buildTimeAllowed) {
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'Native build blocked by build time plan limit',
+      org_id,
+      app_id,
+    })
+    throw quickError(429, 'need_plan_upgrade', 'Cannot request native build, upgrade plan to continue to build', {
+      app_id,
+      org_id,
+      reason: 'build_time',
+    }, undefined, { alert: false })
+  }
+
   cloudlog({
     requestId: c.get('requestId'),
     message: 'Creating job in builder',
