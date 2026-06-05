@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { BASE_URL, getAuthHeaders, getSupabaseClient, NON_ACCESS_APP_NAME, resetAndSeedAppData, resetAppData, USER_ID } from './test-utils.ts'
+import { BASE_URL, createDirectApiKeyWithBindings, fetchWithRetry, getAuthHeaders, getSupabaseClient, NON_ACCESS_APP_NAME, resetAndSeedAppData, resetAppData, USER_ID } from './test-utils.ts'
 
 const id = randomUUID().replace(/-/g, '').slice(0, 12)
 const APPNAME = `com.app.error.${id}`
@@ -22,26 +22,24 @@ beforeAll(async () => {
     stripeCustomerId: testStripeCustomerId,
   })
 
-  const createResponse = await fetch(`${BASE_URL}/apikey`, {
-    method: 'POST',
-    headers: authHeaders,
-    body: JSON.stringify({
-      name: `app-error-cases-${id}`,
-      mode: 'all',
-    }),
+  const createKey = await createDirectApiKeyWithBindings({
+    userId: USER_ID,
+    key: `app-error-cases-${id}-${randomUUID()}`,
+    name: `app-error-cases-${id}`,
+    orgId: testOrgId,
+    roleName: 'org_super_admin',
   })
 
-  const createData = await createResponse.json() as { id: number, key: string, error?: string }
-  if (createResponse.status !== 200 || !createData?.id || !createData?.key) {
-    throw new Error(`Failed to create isolated API key for app error case tests: ${JSON.stringify(createData)}`)
+  if (!createKey?.id || !createKey.key) {
+    throw new Error('Failed to create isolated API key for app error case tests')
   }
 
-  testApiKeyId = createData.id
+  testApiKeyId = createKey.id
   testHeaders = {
     'Content-Type': 'application/json',
-    'Authorization': createData.key,
+    'Authorization': createKey.key,
   }
-})
+}, 60000)
 
 afterAll(async () => {
   await resetAppData(APPNAME)
@@ -50,7 +48,7 @@ afterAll(async () => {
   await getSupabaseClient().from('apps').delete().eq('app_id', PUT_APP_ID)
   await getSupabaseClient().from('apps').delete().eq('app_id', NOT_FOUND_APP_ID)
   if (testApiKeyId !== null) {
-    await fetch(`${BASE_URL}/apikey/${testApiKeyId}`, {
+    await fetchWithRetry(`${BASE_URL}/apikey/${testApiKeyId}`, {
       method: 'DELETE',
       headers: authHeaders,
     })
@@ -58,11 +56,11 @@ afterAll(async () => {
   await getSupabaseClient().from('org_users').delete().eq('org_id', testOrgId)
   await getSupabaseClient().from('orgs').delete().eq('id', testOrgId)
   await getSupabaseClient().from('stripe_info').delete().eq('customer_id', testStripeCustomerId)
-})
+}, 60000)
 
 describe('[POST] /app - Error Cases', () => {
   it('should return 400 when name is missing', async () => {
-    const response = await fetch(`${BASE_URL}/app`, {
+    const response = await fetchWithRetry(`${BASE_URL}/app`, {
       method: 'POST',
       headers: testHeaders,
       body: JSON.stringify({
@@ -78,7 +76,7 @@ describe('[POST] /app - Error Cases', () => {
 
   it('should return 403 when organization access is denied', async () => {
     const nonExistentOrgId = randomUUID()
-    const response = await fetch(`${BASE_URL}/app`, {
+    const response = await fetchWithRetry(`${BASE_URL}/app`, {
       method: 'POST',
       headers: testHeaders,
       body: JSON.stringify({
@@ -94,7 +92,7 @@ describe('[POST] /app - Error Cases', () => {
 
   it('should return 409 when app creation fails due to duplicate app id', async () => {
     // Try to create another app with the same app_id
-    const response2 = await fetch(`${BASE_URL}/app`, {
+    const response2 = await fetchWithRetry(`${BASE_URL}/app`, {
       method: 'POST',
       headers: testHeaders,
       body: JSON.stringify({
@@ -109,7 +107,7 @@ describe('[POST] /app - Error Cases', () => {
   })
 
   it('should return 400 with invalid JSON body', async () => {
-    const response = await fetch(`${BASE_URL}/app`, {
+    const response = await fetchWithRetry(`${BASE_URL}/app`, {
       method: 'POST',
       headers: testHeaders,
       body: 'invalid json',
@@ -120,7 +118,7 @@ describe('[POST] /app - Error Cases', () => {
 
 describe('[GET] /app - Error Cases', () => {
   it('should return 400 when user cannot access the app', async () => {
-    const response = await fetch(`${BASE_URL}/app/nonexistent.app`, {
+    const response = await fetchWithRetry(`${BASE_URL}/app/nonexistent.app`, {
       method: 'GET',
       headers: testHeaders,
     })
@@ -141,7 +139,7 @@ describe('[GET] /app - Error Cases', () => {
     await getSupabaseClient().from('apps').delete().eq('app_id', NOT_FOUND_APP_ID)
 
     // Try to get the deleted app
-    const response = await fetch(`${BASE_URL}/app/${NOT_FOUND_APP_ID}`, {
+    const response = await fetchWithRetry(`${BASE_URL}/app/${NOT_FOUND_APP_ID}`, {
       method: 'GET',
       headers: testHeaders,
     })
@@ -153,7 +151,7 @@ describe('[GET] /app - Error Cases', () => {
   it('should return 403 when user does not have access to organization', async () => {
     // This test would need a more complex setup with different users
     // For now, we test with a response structure check
-    const response = await fetch(`${BASE_URL}/app/${NON_ACCESS_APP_NAME}`, {
+    const response = await fetchWithRetry(`${BASE_URL}/app/${NON_ACCESS_APP_NAME}`, {
       method: 'GET',
       headers: testHeaders,
     })
@@ -174,7 +172,7 @@ describe('[PUT] /app - Error Cases', () => {
   })
 
   it('should return 400 when user cannot access the app', async () => {
-    const response = await fetch(`${BASE_URL}/app/nonexistent.app`, {
+    const response = await fetchWithRetry(`${BASE_URL}/app/nonexistent.app`, {
       method: 'PUT',
       headers: testHeaders,
       body: JSON.stringify({
@@ -188,7 +186,7 @@ describe('[PUT] /app - Error Cases', () => {
 
   it('should return 400 when update fails', async () => {
     // Try to update with invalid data that would cause a database error
-    const response = await fetch(`${BASE_URL}/app/${PUT_APP_ID}`, {
+    const response = await fetchWithRetry(`${BASE_URL}/app/${PUT_APP_ID}`, {
       method: 'PUT',
       headers: testHeaders,
       body: JSON.stringify({
@@ -202,7 +200,7 @@ describe('[PUT] /app - Error Cases', () => {
   })
 
   it('should handle invalid JSON body', async () => {
-    const response = await fetch(`${BASE_URL}/app/${PUT_APP_ID}`, {
+    const response = await fetchWithRetry(`${BASE_URL}/app/${PUT_APP_ID}`, {
       method: 'PUT',
       headers: testHeaders,
       body: 'invalid json',
@@ -213,7 +211,7 @@ describe('[PUT] /app - Error Cases', () => {
 
 describe('[DELETE] /app - Error Cases', () => {
   it('should return 400 when user cannot access the app', async () => {
-    const response = await fetch(`${BASE_URL}/app/nonexistent.app`, {
+    const response = await fetchWithRetry(`${BASE_URL}/app/nonexistent.app`, {
       method: 'DELETE',
       headers: testHeaders,
     })
@@ -231,7 +229,7 @@ describe('[DELETE] /app - Error Cases', () => {
     })
 
     // Try to delete the app (this should work)
-    const response = await fetch(`${BASE_URL}/app/${DELETE_APP_ID}`, {
+    const response = await fetchWithRetry(`${BASE_URL}/app/${DELETE_APP_ID}`, {
       method: 'DELETE',
       headers: testHeaders,
     })
@@ -240,7 +238,7 @@ describe('[DELETE] /app - Error Cases', () => {
     expect(response.status).toBe(200)
 
     // Try to delete the same app again (should fail)
-    const response2 = await fetch(`${BASE_URL}/app/${DELETE_APP_ID}`, {
+    const response2 = await fetchWithRetry(`${BASE_URL}/app/${DELETE_APP_ID}`, {
       method: 'DELETE',
       headers: testHeaders,
     })

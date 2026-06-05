@@ -94,18 +94,16 @@ describe('updates channel_self store override routing', () => {
     expect(oldResponse.status).toBe(500)
     expect(getChannelSelfOverrideMock).toHaveBeenCalledOnce()
 
-    expect(requestInfosPostgresMock).toHaveBeenCalledWith(
-      expect.anything(),
-      'ios',
-      'com.test.app',
-      '11111111-1111-4111-8111-111111111111',
-      '',
-      expect.anything(),
-      12,
-      0,
-      false,
-      42,
-    )
+    expect(requestInfosPostgresMock).toHaveBeenCalledWith(expect.objectContaining({
+      app_id: 'com.test.app',
+      channelDeviceCount: 0,
+      channelSelfOverrideChannelId: 42,
+      defaultChannel: '',
+      device_id: '11111111-1111-4111-8111-111111111111',
+      includeMetadata: false,
+      manifestBundleCount: 0,
+      platform: 'ios',
+    }))
 
     getChannelSelfOverrideMock.mockClear()
     requestInfosPostgresMock.mockClear()
@@ -114,18 +112,16 @@ describe('updates channel_self store override routing', () => {
 
     expect(newResponse.status).toBe(500)
     expect(getChannelSelfOverrideMock).not.toHaveBeenCalled()
-    expect(requestInfosPostgresMock).toHaveBeenCalledWith(
-      expect.anything(),
-      'ios',
-      'com.test.app',
-      '11111111-1111-4111-8111-111111111111',
-      '',
-      expect.anything(),
-      12,
-      0,
-      false,
-      undefined,
-    )
+    expect(requestInfosPostgresMock).toHaveBeenCalledWith(expect.objectContaining({
+      app_id: 'com.test.app',
+      channelDeviceCount: 0,
+      channelSelfOverrideChannelId: undefined,
+      defaultChannel: '',
+      device_id: '11111111-1111-4111-8111-111111111111',
+      includeMetadata: false,
+      manifestBundleCount: 0,
+      platform: 'ios',
+    }))
 
     getChannelSelfOverrideMock.mockResolvedValue(null)
     requestInfosPostgresMock.mockClear()
@@ -134,17 +130,15 @@ describe('updates channel_self store override routing', () => {
 
     expect(oldMissingKvResponse.status).toBe(500)
     expect(getChannelSelfOverrideMock).toHaveBeenCalledOnce()
-    expect(requestInfosPostgresMock).toHaveBeenCalledWith(
-      expect.anything(),
-      'ios',
-      'com.test.app',
-      '11111111-1111-4111-8111-111111111111',
-      '',
-      expect.anything(),
-      12,
-      0,
-      false,
-      undefined,
-    )
+    expect(requestInfosPostgresMock).toHaveBeenCalledWith(expect.objectContaining({
+      app_id: 'com.test.app',
+      channelDeviceCount: 0,
+      channelSelfOverrideChannelId: undefined,
+      defaultChannel: '',
+      device_id: '11111111-1111-4111-8111-111111111111',
+      includeMetadata: false,
+      manifestBundleCount: 0,
+      platform: 'ios',
+    }))
   })
 })

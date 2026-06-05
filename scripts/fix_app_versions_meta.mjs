@@ -1,4 +1,4 @@
-// list all apps in supabase and create version unknown for each
+// Backfill metadata size for deleted app versions.
 import { createClient } from '@supabase/supabase-js'
 
 const supabaseUrl = 'https://***.supabase.co'

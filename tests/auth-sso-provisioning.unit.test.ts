@@ -90,6 +90,7 @@ function createTestContext() {
   const mockCreateSignedImageUrl = vi.fn(async (value: string) => value)
   const mockGetPlans = vi.fn(async () => [])
   const mockIsPlatformAdmin = vi.fn(async () => false)
+  const mockSetWebsitePaidUserCookie = vi.fn()
   const mockFetch = vi.fn<(...args: unknown[]) => Promise<MockFetchResponse>>(async () => ({
     ok: true,
     json: async () => ({ success: true }),
@@ -109,6 +110,7 @@ function createTestContext() {
     mockRpc,
     mockSendEvent,
     mockSetUser,
+    mockSetWebsitePaidUserCookie,
     mockGetSession,
     mockSignOut,
     organizationStore,
@@ -150,6 +152,11 @@ vi.mock('~/services/storage', () => ({
 
 vi.mock('~/services/tracking', () => ({
   sendEvent: (...args: unknown[]) => getContext().mockSendEvent(...args),
+}))
+
+vi.mock('~/services/websiteAuthCookie', () => ({
+  clearWebsitePaidUserCookie: vi.fn(),
+  setWebsitePaidUserCookie: (isPaidUser: boolean) => getContext().mockSetWebsitePaidUserCookie(isPaidUser),
 }))
 
 vi.mock('~/services/supabase', () => ({
@@ -325,7 +332,7 @@ describe('auth guard SSO provisioning', () => {
     })
   })
 
-  it.concurrent('fails closed when the disabled-account RPC errors', async () => {
+  it.concurrent('continues navigation when the disabled-account RPC errors', async () => {
     await withTestContext(async (context) => {
       context.mockRpc.mockResolvedValueOnce({
         data: null,
@@ -341,13 +348,61 @@ describe('auth guard SSO provisioning', () => {
         next,
       )
 
-      expect(context.organizationStore.fetchOrganizations).not.toHaveBeenCalled()
-      expect(next).toHaveBeenCalledWith({
+      expect(context.organizationStore.fetchOrganizations).toHaveBeenCalled()
+      expect(next).toHaveBeenCalledWith()
+      expect(next).not.toHaveBeenCalledWith(expect.objectContaining({
         path: '/accountDisabled',
-        query: {
-          to: '/dashboard',
-        },
+      }))
+    })
+  })
+
+  it.concurrent('sets the website paid user cookie for platform admins after login', async () => {
+    await withTestContext(async (context) => {
+      context.mockIsPlatformAdmin.mockResolvedValue(true)
+
+      const guard = await getGuard()
+      const next = vi.fn()
+
+      await guard(
+        { path: '/dashboard', fullPath: '/dashboard', meta: { middleware: 'auth' }, query: {} },
+        { path: '/login', fullPath: '/login', meta: {}, query: {} },
+        next,
+      )
+
+      expect(context.mockSetWebsitePaidUserCookie).toHaveBeenCalledWith(true)
+      expect(context.mainStore.isAdmin).toBe(true)
+      expect(next).toHaveBeenCalledWith()
+    })
+  })
+
+  it.concurrent('redirects active users away from the recovery page when the disabled-account check errors', async () => {
+    await withTestContext(async (context) => {
+      context.mainStore.auth = {
+        id: 'user-123',
+        email: 'user@managed.test',
+        email_confirmed_at: '2026-04-15T10:00:00.000Z',
+      }
+      context.mockRpc.mockResolvedValueOnce({
+        data: null,
+        error: new Error('rpc failed'),
       })
+
+      const guard = await getGuard()
+      const next = vi.fn()
+
+      await guard(
+        {
+          path: '/accountDisabled',
+          fullPath: '/accountDisabled?to=/apps/app-123',
+          meta: { middleware: 'auth' },
+          query: { to: '/apps/app-123' },
+        },
+        { path: '/apps/app-123', fullPath: '/apps/app-123', meta: { middleware: 'auth' }, query: {} },
+        next,
+      )
+
+      expect(next).toHaveBeenCalledTimes(1)
+      expect(next).toHaveBeenCalledWith('/apps/app-123')
     })
   })
 

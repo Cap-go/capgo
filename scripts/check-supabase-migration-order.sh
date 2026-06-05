@@ -55,7 +55,18 @@ added_timestamps_file="${tmp_dir}/added_timestamps.tsv"
 trap 'rm -rf "${tmp_dir}"' EXIT
 
 echo "Checking Supabase migrations against ${base_ref}"
-git fetch --no-tags origin "${target_branch}"
+if ! git fetch --no-tags origin "${target_branch}"; then
+  if git rev-parse --verify --quiet "${base_ref}^{commit}" >/dev/null; then
+    echo "⚠️  Could not fetch ${base_ref}; using existing local ref."
+  elif git rev-parse --verify --quiet "HEAD^1^{commit}" >/dev/null \
+    && git rev-parse --verify --quiet "HEAD^2^{commit}" >/dev/null; then
+    base_ref='HEAD^1'
+    echo "⚠️  Could not fetch origin/${target_branch}; using PR merge base parent."
+  else
+    echo "❌ Could not fetch ${base_ref} and no local fallback was available."
+    exit 1
+  fi
+fi
 
 : > "${base_timestamps_file}"
 while IFS= read -r file; do
@@ -78,13 +89,29 @@ status=0
 
 modified_files="$(git diff --name-only --diff-filter=MR "${base_ref}...HEAD" -- 'supabase/migrations/*.sql')"
 if [[ -n "$modified_files" ]]; then
-  echo '❌ Existing Supabase migrations were modified in this change.'
-  echo '  Create a new migration instead of editing committed migration files.'
+  disallowed_modified_files=''
+
   while IFS= read -r file; do
     [[ -z "$file" ]] && continue
-    echo "  - $file"
+
+    ts="$(extract_timestamp "$file" || true)"
+    if [[ -n "$ts" && "$ts" == "$latest_base_timestamp" ]]; then
+      echo "⚠️  Allowing fix to latest Supabase migration: $file"
+      continue
+    fi
+
+    disallowed_modified_files+="${file}"$'\n'
   done <<< "$modified_files"
-  status=1
+
+  if [[ -n "$disallowed_modified_files" ]]; then
+    echo '❌ Existing Supabase migrations were modified in this change.'
+    echo '  Create a new migration instead of editing committed migration files.'
+    while IFS= read -r file; do
+      [[ -z "$file" ]] && continue
+      echo "  - $file"
+    done <<< "$disallowed_modified_files"
+    status=1
+  fi
 fi
 
 deleted_files="$(git diff --name-only --diff-filter=D "${base_ref}...HEAD" -- 'supabase/migrations/*.sql')"

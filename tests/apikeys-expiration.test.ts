@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto'
 import { env } from 'node:process'
 import { createClient } from '@supabase/supabase-js'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { BASE_URL, executeSQL, fetchWithRetry, getAuthHeadersForCredentials, getSupabaseClient, normalizeLocalhostUrl, resetAndSeedAppData, resetAppData, TEST_EMAIL, USER_EMAIL_APIKEY_EXPIRATION, USER_ID_APIKEY_EXPIRATION, USER_PASSWORD } from './test-utils.ts'
+import { appApiKeyBindings, BASE_URL, createDirectApiKeyWithBindings, executeSQL, fetchWithRetry, getAuthHeadersForCredentials, getSupabaseClient, normalizeLocalhostUrl, orgApiKeyBindings, resetAndSeedAppData, resetAppData, TEST_EMAIL, USER_EMAIL_APIKEY_EXPIRATION, USER_ID_APIKEY_EXPIRATION, USER_PASSWORD } from './test-utils.ts'
 
 const id = randomUUID()
 const BASE_ORG_ID = randomUUID()
@@ -22,25 +22,93 @@ function keyName(name: string): string {
   return `${name}-${id}`
 }
 
-async function seedPlainApiKey(name: string, expiresAt: string | null, limitedToOrgs: string[] = []) {
-  const key = randomUUID()
-  const { data, error } = await getSupabaseClient()
-    .from('apikeys')
-    .insert({
-      user_id: USER_ID_APIKEY_EXPIRATION,
-      key,
-      key_hash: null,
-      mode: 'all',
-      name: keyName(name),
-      limited_to_apps: [],
-      limited_to_orgs: limitedToOrgs,
-      expires_at: expiresAt,
-    })
-    .select('id, key, expires_at')
-    .single()
+function orgKeyBody(name: string, orgId = BASE_ORG_ID, extra: Record<string, unknown> = {}) {
+  return {
+    name: keyName(name),
+    bindings: orgApiKeyBindings(orgId),
+    ...extra,
+  }
+}
 
-  if (error || !data?.key)
-    throw error ?? new Error('Missing seeded API key')
+async function appKeyBody(name: string, appId = POLICY_APPNAME, extra: Record<string, unknown> = {}) {
+  return {
+    name: keyName(name),
+    bindings: await appApiKeyBindings(appId),
+    ...extra,
+  }
+}
+
+async function seedPlainApiKey(name: string, expiresAt: string | null, orgId = BASE_ORG_ID) {
+  const key = randomUUID()
+  const data = await createDirectApiKeyWithBindings({
+    userId: USER_ID_APIKEY_EXPIRATION,
+    key,
+    name: keyName(name),
+    orgId,
+    roleName: 'org_admin',
+    expiresAt,
+  })
+
+  if (!data.key)
+    throw new Error(`Failed to seed API key ${name}`)
+
+  const supabase = getSupabaseClient()
+  const { data: memberships, error: membershipsError } = await supabase
+    .from('org_users')
+    .select('org_id')
+    .eq('user_id', USER_ID_APIKEY_EXPIRATION)
+
+  if (membershipsError)
+    throw membershipsError
+
+  const extraOrgIds = [...new Set((memberships ?? []).map(row => row.org_id).filter((membershipOrgId): membershipOrgId is string => !!membershipOrgId && membershipOrgId !== orgId))]
+  if (extraOrgIds.length > 0) {
+    const { data: orgPolicies, error: orgPoliciesError } = await supabase
+      .from('orgs')
+      .select('id, require_apikey_expiration, max_apikey_expiration_days')
+      .in('id', extraOrgIds)
+
+    if (orgPoliciesError)
+      throw orgPoliciesError
+
+    const expiresAtTime = expiresAt ? new Date(expiresAt).getTime() : null
+    const compatibleExtraOrgIds = (orgPolicies ?? [])
+      .filter((org) => {
+        if (org.require_apikey_expiration && expiresAt === null)
+          return false
+        if (org.max_apikey_expiration_days !== null && expiresAtTime !== null) {
+          return expiresAtTime <= Date.now() + org.max_apikey_expiration_days * 24 * 60 * 60 * 1000
+        }
+        return true
+      })
+      .map(org => org.id)
+
+    if (compatibleExtraOrgIds.length === 0)
+      return { id: data.id, key: data.key, expires_at: data.expires_at }
+
+    const { data: role, error: roleError } = await supabase
+      .from('roles')
+      .select('id')
+      .eq('name', 'org_admin')
+      .single()
+
+    if (roleError || !role)
+      throw roleError ?? new Error('Unable to resolve org_admin role')
+
+    const { error: bindingError } = await supabase.from('role_bindings').insert(compatibleExtraOrgIds.map(extraOrgId => ({
+      principal_type: 'apikey' as const,
+      principal_id: data.rbac_id,
+      role_id: role.id,
+      scope_type: 'org' as const,
+      org_id: extraOrgId,
+      granted_by: USER_ID_APIKEY_EXPIRATION,
+      reason: 'Expiration test full-org key binding',
+      is_direct: true,
+    })))
+
+    if (bindingError)
+      throw bindingError
+  }
 
   return { id: data.id, key: data.key, expires_at: data.expires_at }
 }
@@ -178,11 +246,7 @@ describe('[POST] /apikey with expiration', () => {
     const response = await apiFetch('/apikey', {
       method: 'POST',
       headers: authHeaders,
-      body: JSON.stringify({
-        name: keyName('key-with-expiration'),
-        mode: 'all',
-        expires_at: futureDate,
-      }),
+      body: JSON.stringify(orgKeyBody('key-with-expiration', BASE_ORG_ID, { expires_at: futureDate })),
     })
     const data = await response.json<{ key: string, id: number, expires_at: string }>()
     expect(response.status).toBe(200)
@@ -196,11 +260,7 @@ describe('[POST] /apikey with expiration', () => {
     const response = await apiFetch('/apikey', {
       method: 'POST',
       headers: authHeaders,
-      body: JSON.stringify({
-        name: keyName('key-no-expiration'),
-        mode: 'all',
-        limited_to_orgs: [BASE_ORG_ID],
-      }),
+      body: JSON.stringify(orgKeyBody('key-no-expiration')),
     })
     const data = await response.json<{ key: string, id: number, expires_at: string | null }>()
     expect(response.status).toBe(200)
@@ -213,11 +273,7 @@ describe('[POST] /apikey with expiration', () => {
     const response = await apiFetch('/apikey', {
       method: 'POST',
       headers: authHeaders,
-      body: JSON.stringify({
-        name: keyName('key-past-expiration'),
-        mode: 'all',
-        expires_at: pastDate,
-      }),
+      body: JSON.stringify(orgKeyBody('key-past-expiration', BASE_ORG_ID, { expires_at: pastDate })),
     })
     const data = await response.json() as { error: string }
     expect(response.status).toBe(400)
@@ -228,11 +284,7 @@ describe('[POST] /apikey with expiration', () => {
     const response = await apiFetch('/apikey', {
       method: 'POST',
       headers: authHeaders,
-      body: JSON.stringify({
-        name: keyName('key-invalid-date'),
-        mode: 'all',
-        expires_at: 'not-a-date',
-      }),
+      body: JSON.stringify(orgKeyBody('key-invalid-date', BASE_ORG_ID, { expires_at: 'not-a-date' })),
     })
     const data = await response.json() as { error: string }
     expect(response.status).toBe(400)
@@ -248,11 +300,7 @@ describe('[PUT] /apikey/:id with expiration', () => {
     const response = await apiFetch('/apikey', {
       method: 'POST',
       headers: authHeaders,
-      body: JSON.stringify({
-        name: keyName('key-for-update-expiration'),
-        mode: 'all',
-        limited_to_orgs: [BASE_ORG_ID],
-      }),
+      body: JSON.stringify(orgKeyBody('key-for-update-expiration')),
     })
     expect(response.status).toBe(200)
     const data = await response.json<{ id: number }>()
@@ -325,11 +373,7 @@ describe('[GET] /apikey with expiration info', () => {
     const response1 = await apiFetch('/apikey', {
       method: 'POST',
       headers: authHeaders,
-      body: JSON.stringify({
-        name: keyName('key-with-exp-get-test'),
-        mode: 'all',
-        expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-      }),
+      body: JSON.stringify(orgKeyBody('key-with-exp-get-test', BASE_ORG_ID, { expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() })),
     })
     expect(response1.status).toBe(200)
     keyWithExpiration = await response1.json()
@@ -338,11 +382,7 @@ describe('[GET] /apikey with expiration info', () => {
     const response2 = await apiFetch('/apikey', {
       method: 'POST',
       headers: authHeaders,
-      body: JSON.stringify({
-        name: keyName('key-without-exp-get-test'),
-        mode: 'all',
-        limited_to_orgs: [BASE_ORG_ID],
-      }),
+      body: JSON.stringify(orgKeyBody('key-without-exp-get-test')),
     })
     expect(response2.status).toBe(200)
     keyWithoutExpiration = await response2.json()
@@ -396,11 +436,7 @@ describe('organization API key expiration policy', () => {
     const response = await apiFetch('/apikey', {
       method: 'POST',
       headers: authHeaders,
-      body: JSON.stringify({
-        name: keyName('key-policy-test'),
-        mode: 'all',
-        limited_to_orgs: [POLICY_ORG_ID],
-      }),
+      body: JSON.stringify(orgKeyBody('key-policy-test', POLICY_ORG_ID)),
     })
     const data = await response.json() as { error: string }
     expect(response.status).toBe(400)
@@ -413,12 +449,7 @@ describe('organization API key expiration policy', () => {
     const response = await apiFetch('/apikey', {
       method: 'POST',
       headers: authHeaders,
-      body: JSON.stringify({
-        name: keyName('key-policy-exceeds-max'),
-        mode: 'all',
-        limited_to_orgs: [POLICY_ORG_ID],
-        expires_at: tooFarDate,
-      }),
+      body: JSON.stringify(orgKeyBody('key-policy-exceeds-max', POLICY_ORG_ID, { expires_at: tooFarDate })),
     })
     const data = await response.json() as { error: string }
     expect(response.status).toBe(400)
@@ -431,12 +462,7 @@ describe('organization API key expiration policy', () => {
     const response = await apiFetch('/apikey', {
       method: 'POST',
       headers: authHeaders,
-      body: JSON.stringify({
-        name: keyName('key-policy-valid'),
-        mode: 'all',
-        limited_to_orgs: [POLICY_ORG_ID],
-        expires_at: validDate,
-      }),
+      body: JSON.stringify(orgKeyBody('key-policy-valid', POLICY_ORG_ID, { expires_at: validDate })),
     })
     const data = await response.json<{ key: string, id: number, expires_at: string }>()
     expect(response.status).toBe(200)
@@ -449,11 +475,7 @@ describe('organization API key expiration policy', () => {
     const response = await apiFetch('/apikey', {
       method: 'POST',
       headers: authHeaders,
-      body: JSON.stringify({
-        name: keyName('key-no-policy-org'),
-        mode: 'all',
-        limited_to_orgs: [BASE_ORG_ID],
-      }),
+      body: JSON.stringify(orgKeyBody('key-no-policy-org')),
     })
     const data = await response.json<{ key: string, id: number, expires_at: string | null }>()
     expect(response.status).toBe(200)
@@ -467,8 +489,12 @@ describe('organization API key expiration policy', () => {
       headers: authHeaders,
       body: JSON.stringify({
         name: keyName('key-policy-app-scope'),
-        mode: 'all',
-        app_id: policyAppUuid,
+        bindings: [{
+          role_name: 'app_admin',
+          scope_type: 'app',
+          org_id: POLICY_ORG_ID,
+          app_id: policyAppUuid,
+        }],
       }),
     })
     const data = await response.json() as { error: string }
@@ -481,12 +507,7 @@ describe('organization API key expiration policy', () => {
     const response = await apiFetch('/apikey', {
       method: 'POST',
       headers: authHeaders,
-      body: JSON.stringify({
-        name: keyName('key-policy-app-scope-too-far'),
-        mode: 'all',
-        limited_to_apps: [POLICY_APPNAME],
-        expires_at: tooFarDate,
-      }),
+      body: JSON.stringify(await appKeyBody('key-policy-app-scope-too-far', POLICY_APPNAME, { expires_at: tooFarDate })),
     })
     const data = await response.json() as { error: string }
     expect(response.status).toBe(400)
@@ -499,25 +520,26 @@ describe('organization API key expiration policy', () => {
       headers: authHeaders,
       body: JSON.stringify({
         name: keyName('key-policy-app-scope-missing-app'),
-        mode: 'all',
-        limited_to_apps: [`com.app.expiration.missing.${id}`],
+        expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+        bindings: [{
+          role_name: 'app_admin',
+          scope_type: 'app',
+          org_id: POLICY_ORG_ID,
+          app_id: randomUUID(),
+        }],
       }),
     })
     const data = await response.json() as { error: string }
 
-    expect(response.status).toBe(400)
-    expect(data.error).toBe('failed_to_resolve_apikey_policy_scope')
+    expect(response.status).toBe(404)
+    expect(data.error).toBe('binding_failed')
   })
 
-  it('fail to update api key scope to app owner org without expiration (scope-change regression)', async () => {
+  it('reject unsupported api key scope updates', async () => {
     const createResponse = await apiFetch('/apikey', {
       method: 'POST',
       headers: authHeaders,
-      body: JSON.stringify({
-        name: keyName('key-policy-app-scope-update'),
-        mode: 'all',
-        limited_to_orgs: [BASE_ORG_ID],
-      }),
+      body: JSON.stringify(orgKeyBody('key-policy-app-scope-update')),
     })
     expect(createResponse.status).toBe(200)
     const createdKey = await createResponse.json<{ id: number }>()
@@ -526,26 +548,21 @@ describe('organization API key expiration policy', () => {
       method: 'PUT',
       headers: authHeaders,
       body: JSON.stringify({
-        limited_to_apps: [POLICY_APPNAME],
+        unsupported_app_scope: [POLICY_APPNAME],
       }),
     })
     const data = await updateResponse.json() as { error: string }
 
     expect(updateResponse.status).toBe(400)
-    expect(data.error).toBe('expiration_required')
+    expect(data.error).toContain('no_valid_fields_provided_for_update')
   })
 
-  it('reject limited app-scoped api keys from updating sibling keys', async () => {
+  it('reject app-scoped api keys from updating sibling keys', async () => {
     const validDate = new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString()
     const limitedKeyResponse = await apiFetch('/apikey', {
       method: 'POST',
       headers: authHeaders,
-      body: JSON.stringify({
-        name: keyName('key-policy-limited-updater'),
-        mode: 'all',
-        limited_to_apps: [POLICY_APPNAME],
-        expires_at: validDate,
-      }),
+      body: JSON.stringify(await appKeyBody('key-policy-app-updater', POLICY_APPNAME, { expires_at: validDate })),
     })
     expect(limitedKeyResponse.status).toBe(200)
     const limitedKey = await limitedKeyResponse.json<{ key: string }>()
@@ -553,11 +570,7 @@ describe('organization API key expiration policy', () => {
     const siblingKeyResponse = await apiFetch('/apikey', {
       method: 'POST',
       headers: authHeaders,
-      body: JSON.stringify({
-        name: keyName('key-policy-sibling-target'),
-        mode: 'all',
-        limited_to_orgs: [BASE_ORG_ID],
-      }),
+      body: JSON.stringify(orgKeyBody('key-policy-sibling-target')),
     })
     expect(siblingKeyResponse.status).toBe(200)
     const siblingKey = await siblingKeyResponse.json<{ id: number }>()
@@ -579,7 +592,7 @@ describe('organization API key expiration policy', () => {
     expect(data.error).toBe('cannot_update_apikey')
   })
 
-  it('reject direct apikey inserts that bypass app-scoped expiration policy', async () => {
+  it('reject direct apikey inserts that bypass the server creation path', async () => {
     const supabase = createAuthenticatedSupabaseClient(authHeaders)
     const { data, error } = await supabase
       .from('apikeys')
@@ -587,32 +600,14 @@ describe('organization API key expiration policy', () => {
         user_id: USER_ID_APIKEY_EXPIRATION,
         key: null,
         key_hash: '0'.repeat(64),
-        mode: 'all',
         name: keyName('direct-insert-policy-bypass'),
-        limited_to_apps: [POLICY_APPNAME],
-        limited_to_orgs: [],
         expires_at: null,
       })
       .select()
       .single()
 
     expect(data).toBeNull()
-    expect(error?.message).toBe('expiration_required')
-  })
-
-  it('reject hashed apikey RPC creation that exceeds app owner org max expiration', async () => {
-    const supabase = createAuthenticatedSupabaseClient(authHeaders)
-    const tooFarDate = new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString()
-    const { data, error } = await supabase.rpc('create_hashed_apikey', {
-      p_mode: 'all',
-      p_name: keyName('direct-rpc-policy-bypass'),
-      p_limited_to_orgs: [],
-      p_limited_to_apps: [POLICY_APPNAME],
-      p_expires_at: tooFarDate,
-    })
-
-    expect(data).toBeNull()
-    expect(error?.message).toBe('expiration_exceeds_max')
+    expect(error?.message).toContain('row-level security policy')
   })
 })
 
@@ -828,7 +823,7 @@ describe('api key expiration boundary conditions', () => {
   })
 
   it.concurrent('api key with null expiration should not be expired', async () => {
-    const data = await seedPlainApiKey('key-no-expiration-test', null, [BASE_ORG_ID])
+    const data = await seedPlainApiKey('key-no-expiration-test', null, BASE_ORG_ID)
 
     try {
       expect(data.expires_at).toBeNull()

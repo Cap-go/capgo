@@ -1,16 +1,14 @@
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import process from 'node:process'
-import { isCancel, log, select } from '@clack/prompts'
+import { log } from '@clack/prompts'
 // src/build/onboarding/command.ts
 import { render } from 'ink'
 import React from 'react'
 import { getAppId, getConfig } from '../../utils.js'
 import { getPlatformDirFromCapacitorConfig } from '../platform-paths.js'
-import { loadAndroidProgress } from './android/progress.js'
-import AndroidOnboardingApp from './android/ui/app.js'
-import { loadProgress } from './progress.js'
-import OnboardingApp from './ui/app.js'
+import OnboardingShell from './ui/shell.js'
+import type { OnboardingResult } from './types.js'
 
 export interface OnboardingBuilderOptions {
   apikey?: string
@@ -20,20 +18,19 @@ export interface OnboardingBuilderOptions {
 type Platform = 'ios' | 'android'
 
 /**
- * Decide which platform to onboard. Order:
+ * Decide which platform to onboard WITHOUT prompting:
  *   1. Explicit `--platform` flag.
  *   2. If only one of `ios/` or `android/` exists in cwd, use that one.
- *   3. Otherwise (both or neither), prompt the user.
- *
- * Lifting this up to before the Ink render means we can dispatch the right
- * onboarding app without the iOS-specific Ink component pretending to handle
- * Android picks.
+ *   3. Otherwise (both or neither) → undefined: the in-wizard PlatformPicker
+ *      asks inside the alt screen (see OnboardingShell), so the prompt is
+ *      consistent with the rest of the wizard instead of a pre-render
+ *      `@clack/prompts` select in the normal buffer.
  */
-async function resolvePlatform(
+function resolveInitialPlatform(
   options: OnboardingBuilderOptions,
   iosDir: string,
   androidDir: string,
-): Promise<Platform> {
+): Platform | undefined {
   const requested = (options.platform || '').toLowerCase()
   if (requested === 'ios' || requested === 'android')
     return requested
@@ -45,25 +42,37 @@ async function resolvePlatform(
   const cwd = process.cwd()
   const iosExists = existsSync(join(cwd, iosDir))
   const androidExists = existsSync(join(cwd, androidDir))
-
   if (iosExists && !androidExists)
     return 'ios'
   if (androidExists && !iosExists)
     return 'android'
-
-  const choice = await select({
-    message: 'Which platform do you want to set up?',
-    options: [
-      { label: '🍎  iOS', value: 'ios' as const },
-      { label: '🤖  Android', value: 'android' as const },
-    ],
-  })
-  if (isCancel(choice)) {
-    log.info('Onboarding cancelled.')
-    process.exit(0)
-  }
-  return choice
+  return undefined
 }
+
+// The whole onboarding wizard runs inside the terminal's alternative screen
+// buffer (vim / htop / less style), enabled via Ink's `alternateScreen: true`
+// render option (Ink ≥ 7):
+//
+//   - In the alt buffer there is NO scrollback, so every Ink frame fully
+//     replaces the previous one. That eliminates the entire class of
+//     main-buffer artifacts we fought with — duplicate Header on step
+//     transitions, "scrolling added a line", frame-height drift.
+//   - Tall content (e.g. the AI analysis) still needs in-app scrolling
+//     because the alt buffer is viewport-sized; that's what the
+//     FullscreenAiViewer component handles.
+//   - Ink owns enter/exit: it enters on render (only when interactive + TTY)
+//     and restores the primary buffer on unmount — including on SIGINT/SIGTERM
+//     and process exit (via signal-exit) — so no manual escape codes or
+//     restore handlers are needed. It also shows the cursor again on teardown.
+//
+// A single OnboardingShell is rendered: it shows the platform picker inside the
+// alt screen (when the platform isn't pre-resolved) and then mounts the chosen
+// platform's app inline in the same Ink tree (no second render, no flash).
+//
+// Trade-off: on exit the terminal restores to whatever was on screen before
+// the wizard started — the wizard's frames are gone (same as quitting vim).
+// We print a one-line completion summary AFTER Ink restores the primary buffer
+// so the user has a durable breadcrumb in their normal terminal flow.
 
 export async function onboardingBuilderCommand(options: OnboardingBuilderOptions = {}): Promise<void> {
   // Ink requires an interactive terminal — fail fast in CI/pipes
@@ -76,11 +85,19 @@ export async function onboardingBuilderCommand(options: OnboardingBuilderOptions
 
   // Detect app ID and platform directories from capacitor.config.ts
   let appId: string | undefined
+  // `iosBundleIdInitial` is the iOS-side default — the top-level
+  // `config.appId` (what `cap sync` writes into PRODUCT_BUNDLE_IDENTIFIER).
+  // This is distinct from `appId` above, which `getAppId` resolves to the
+  // CapacitorUpdater plugin override when present (e.g. a Capgo dev-tunnel
+  // suffix). The iOS onboarding flow uses these for different purposes —
+  // never collapse them — see the AppProps doc-block in ui/app.tsx.
+  let iosBundleIdInitial: string | undefined
   let iosDir = 'ios'
   let androidDir = 'android'
   try {
     const extConfig = await getConfig()
     appId = getAppId(undefined, extConfig?.config)
+    iosBundleIdInitial = extConfig?.config?.appId
     iosDir = getPlatformDirFromCapacitorConfig(extConfig?.config, 'ios')
     androidDir = getPlatformDirFromCapacitorConfig(extConfig?.config, 'android')
   }
@@ -92,26 +109,72 @@ export async function onboardingBuilderCommand(options: OnboardingBuilderOptions
     log.error('Could not detect app ID from capacitor.config.ts. Make sure you are in a Capacitor project directory.')
     process.exit(1)
   }
+  // If config.appId is missing (very rare — CapacitorConfig.appId is required
+  // for `cap sync` to produce a working iOS project), fall back to the
+  // resolved Capgo lookup key. Mismatch detection will still surface the
+  // pbxproj/plist values; the user can pick the right one from there.
+  const iosBundleIdForOnboarding = iosBundleIdInitial || appId
 
-  const platform = await resolvePlatform(options, iosDir, androidDir)
+  const initialPlatform = resolveInitialPlatform(options, iosDir, androidDir)
 
-  if (platform === 'android') {
-    const androidProgress = await loadAndroidProgress(appId)
-    const { waitUntilExit } = render(
-      React.createElement(AndroidOnboardingApp, {
-        appId,
-        initialProgress: androidProgress,
-        androidDir,
-        apikey: options.apikey,
-      }),
-    )
-    await waitUntilExit()
-    return
-  }
-
-  const progress = await loadProgress(appId)
+  // The shell resolves the platform (immediately if initialPlatform is set,
+  // else once the user picks). Capture it so the breadcrumb below — printed
+  // after Ink restores the primary buffer — names the right platform.
+  let resolvedPlatform: Platform | undefined = initialPlatform
+  // Default to 'cancelled': the wizard reports 'completed' (with a summary) ONLY
+  // when it reaches build-complete. Any other exit (missing platform, user
+  // cancel, error) leaves this untouched, so we never claim false success.
+  let result: OnboardingResult = { outcome: 'cancelled' }
   const { waitUntilExit } = render(
-    React.createElement(OnboardingApp, { appId, initialProgress: progress, iosDir, apikey: options.apikey }),
+    React.createElement(OnboardingShell, {
+      appId,
+      // Threaded through to the iOS OnboardingApp so it can use the iOS
+      // bundle id (config.appId) for Apple-side operations while keeping
+      // `appId` (the Capgo lookup key, which may include a dev-tunnel
+      // suffix via plugins.CapacitorUpdater.appId) for Capgo SaaS calls.
+      // See the AppProps doc-block in ui/app.tsx for the split.
+      iosBundleIdInitial: iosBundleIdForOnboarding,
+      iosDir,
+      androidDir,
+      apikey: options.apikey,
+      initialPlatform,
+      onResolvePlatform: (platform: Platform) => {
+        resolvedPlatform = platform
+      },
+      onResult: (r: OnboardingResult) => {
+        result = r
+      },
+    }),
+    { alternateScreen: true },
   )
   await waitUntilExit()
+
+  // Durable post-exit output in the user's normal terminal flow — the alt buffer
+  // restore wiped the wizard's last frame, so anything the user needs to keep
+  // (build URL, generated file paths) must be reprinted here. Written via
+  // process.stdout to bypass the project-wide no-console lint rule (one-shot UX
+  // message, not application logging).
+  if (result.outcome === 'completed') {
+    const platformSuffix = resolvedPlatform ? ` (${resolvedPlatform})` : ''
+    process.stdout.write(`\n✔ Capgo onboarding complete for ${appId}${platformSuffix}.\n`)
+    const s = result.summary
+    if (s) {
+      if (s.buildUrl)
+        process.stdout.write(`  Build:    ${s.buildUrl}\n`)
+      if (s.workflowFilePath)
+        process.stdout.write(`  Workflow: ${s.workflowFilePath}\n`)
+      if (s.envExportPath)
+        process.stdout.write(`  Env file: ${s.envExportPath}\n`)
+      if (s.ciSecretUploadSummary)
+        process.stdout.write(`  Secrets:  ${s.ciSecretUploadSummary}\n`)
+      if (s.buildRequestCommand)
+        process.stdout.write(`  Run anytime: ${s.buildRequestCommand}\n`)
+    }
+  }
+  else {
+    // Cancelled / incomplete — do NOT claim success. The wizard already showed
+    // the user why it stopped (e.g. the "no native platform" screen); this is
+    // just a neutral closing line so the exit isn't silent.
+    process.stdout.write(`\nCapgo onboarding exited — setup not completed. Re-run \`capgo build init\` to continue.\n`)
+  }
 }

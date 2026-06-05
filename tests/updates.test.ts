@@ -266,7 +266,7 @@ describe('[POST] /updates', () => {
     expect(json.checksum).toBe(expectedFallbackJson.checksum)
   })
 
-  it('keeps builtin channel targets addressable', async () => {
+  it('keeps native channel targets addressable without app_versions placeholders', async () => {
     const supabase = getSupabaseClient()
     const { data: productionChannel } = await supabase
       .from('channels')
@@ -276,17 +276,9 @@ describe('[POST] /updates', () => {
       .single()
       .throwOnError()
 
-    const { data: builtinVersion } = await supabase
-      .from('app_versions')
-      .select('id')
-      .eq('app_id', APP_NAME_UPDATE)
-      .eq('name', 'builtin')
-      .single()
-      .throwOnError()
-
     await supabase
       .from('channels')
-      .update({ version: builtinVersion.id })
+      .update({ version: null })
       .eq('id', productionChannel.id)
       .eq('app_id', APP_NAME_UPDATE)
       .throwOnError()

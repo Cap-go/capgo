@@ -21,10 +21,12 @@ function normalizeRel(rel?: string, target?: string) {
 }
 
 const sizeClasses = {
-  sm: 'max-w-sm',
-  md: 'max-w-md',
-  lg: 'max-w-lg',
-  xl: 'max-w-xl',
+  'sm': 'max-w-sm',
+  'md': 'max-w-md',
+  'lg': 'max-w-lg',
+  'xl': 'max-w-xl',
+  '2xl': 'max-w-2xl',
+  '3xl': 'max-w-3xl',
 }
 
 function getButtonClasses(button: DialogV2Button) {
@@ -145,7 +147,7 @@ onUnmounted(() => {
         <div class="px-6" :class="{ 'pt-6': !dialogStore.dialogOptions?.title }">
           <!-- Default description -->
           <div v-if="dialogStore.dialogOptions?.description" class="pb-4">
-            <p class="text-base text-base-content/70 whitespace-pre-wrap break-all">
+            <p class="text-base text-base-content/70 whitespace-pre-wrap break-words">
               {{ dialogStore.dialogOptions.description }}
             </p>
           </div>

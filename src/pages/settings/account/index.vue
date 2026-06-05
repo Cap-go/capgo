@@ -90,34 +90,17 @@ async function checkOrganizationImpact() {
   // Check each organization to see if user is the only super_admin
   for (const org of superAdminOrgs) {
     try {
-      const useNewRbac = org.use_new_rbac === true
-      let superAdminCount = 0
+      const { data: members, error } = await supabase
+        .rpc('get_org_members_rbac', { p_org_id: org.gid })
 
-      if (useNewRbac) {
-        const { data: members, error } = await supabase
-          .rpc('get_org_members_rbac', { p_org_id: org.gid })
-
-        if (error) {
-          console.error('Error getting RBAC org members:', error)
-          continue
-        }
-
-        superAdminCount = members.filter(member =>
-          !member.is_invite && !member.is_tmp && isSuperAdminRole(member.role_name),
-        ).length
+      if (error) {
+        console.error('Error getting RBAC org members:', error)
+        continue
       }
-      else {
-        const { data: members, error } = await supabase
-          .rpc('get_org_members', { guild_id: org.gid })
 
-        if (error) {
-          console.error('Error getting org members:', error)
-          continue
-        }
-
-        // Count super_admins (excluding temporary users)
-        superAdminCount = members.filter(member => isSuperAdminRole(member.role) && !member.is_tmp).length
-      }
+      const superAdminCount = members.filter(member =>
+        !member.is_invite && !member.is_tmp && isSuperAdminRole(member.role_name),
+      ).length
 
       // If user is the only super_admin, this org will be deleted
       if (superAdminCount === 1) {

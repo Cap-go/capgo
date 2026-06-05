@@ -20,7 +20,7 @@ import IconSmartphone from '~icons/lucide/smartphone'
 import IconSparkles from '~icons/lucide/sparkles'
 import IconStore from '~icons/lucide/store'
 import IconTerminal from '~icons/lucide/terminal'
-import { createDefaultApiKey } from '~/services/apikeys'
+import { createDefaultApiKey, findUsablePlainApiKey } from '~/services/apikeys'
 import { createSignedImageUrl, getImmediateImageUrl } from '~/services/storage'
 import { getLocalConfig, isLocal, useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
@@ -165,13 +165,16 @@ function whiteCardPrimaryButtonClass() {
 }
 
 function slugify(value: string) {
-  return value
+  const slug = value
     .normalize('NFKD')
     .replace(/[^\w\s-]/g, '')
     .trim()
     .toLowerCase()
     .replace(/[_\s-]+/g, '.')
-    .replace(/^\.+|\.+$/g, '')
+
+  return slug
+    .replace(/^\./g, '')
+    .replace(/\.$/g, '')
     || 'app'
 }
 
@@ -257,18 +260,9 @@ async function ensureApiKey() {
   if (!userId)
     return
 
-  const isLiveKey = (expiresAt: string | null) => !expiresAt || new Date(expiresAt).getTime() > Date.now()
-
-  const { data, error } = await supabase
-    .from('apikeys')
-    .select('key, expires_at')
-    .eq('user_id', userId)
-    .eq('mode', 'all')
-    .order('created_at', { ascending: false })
-
-  const validKey = !error ? data?.find(key => !!key.key && isLiveKey(key.expires_at)) : null
-  if (validKey?.key) {
-    apiKey.value = validKey.key
+  const existingKey = await findUsablePlainApiKey(supabase, userId, currentOrg.value?.gid, resumeAppId.value)
+  if (existingKey) {
+    apiKey.value = existingKey
     return
   }
 
@@ -277,18 +271,16 @@ async function ensureApiKey() {
   if (!claimsUserId)
     return
 
-  const { error: createError } = await createDefaultApiKey(supabase, 'api-key')
+  const { data, error: createError } = await createDefaultApiKey(supabase, 'api-key', {
+    orgId: currentOrg.value?.gid,
+    appId: resumeAppId.value,
+  })
   if (createError)
     throw createError
 
-  const { data: refreshedData } = await supabase
-    .from('apikeys')
-    .select('key, expires_at')
-    .eq('user_id', claimsUserId)
-    .eq('mode', 'all')
-    .order('created_at', { ascending: false })
-
-  apiKey.value = refreshedData?.find(key => !!key.key && isLiveKey(key.expires_at))?.key ?? null
+  apiKey.value = typeof data?.key === 'string'
+    ? data.key
+    : await findUsablePlainApiKey(supabase, claimsUserId, currentOrg.value?.gid, resumeAppId.value)
 }
 
 async function loadResumeApp() {

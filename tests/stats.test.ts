@@ -183,15 +183,13 @@ describe('[POST] /stats', () => {
     await getSupabaseClient().from('devices').delete().eq('device_id', uuid).eq('app_id', APP_NAME_STATS)
   })
 
-  it('uses deleted unknown placeholder instead of scheduling repeated placeholder inserts', async () => {
+  it.concurrent('does not recreate unknown placeholder rows for missing versions', async () => {
     const uuid = randomUUID().toLowerCase()
     const appId = `${APP_NAME}.deleted.unknown.${randomUUID().split('-')[0]}`
     await resetAndSeedAppData(appId)
     await resetAndSeedAppDataStats(appId)
 
     try {
-      await createAppVersions('unknown', appId, { deleted: true })
-
       const baseData = getBaseData(appId) as StatsPayload
       baseData.device_id = uuid
       baseData.action = 'set'
@@ -200,7 +198,16 @@ describe('[POST] /stats', () => {
 
       const response = await postStats(baseData)
       expect(response.status).toBe(200)
-      expect(await response.json<StatsRes>()).toEqual({ status: 'ok' })
+      expect(await response.json<StatsRes>()).toMatchObject({ error: 'version_not_found' })
+
+      const { count, error } = await getSupabaseClient()
+        .from('app_versions')
+        .select('id', { count: 'exact', head: true })
+        .eq('app_id', appId)
+        .eq('name', 'unknown')
+
+      expect(error).toBeNull()
+      expect(count).toBe(0)
     }
     finally {
       await getSupabaseClient().from('devices').delete().eq('device_id', uuid).eq('app_id', appId)
@@ -368,6 +375,8 @@ describe('[POST] /stats', () => {
         const baseData = getBaseData(APP_NAME_STATS) as StatsPayload
         baseData.device_id = uuid
         baseData.action = action
+        if (action === 'download_fail')
+          baseData.plugin_version = '7.17.0'
         baseData.version_build = getVersionFromAction(action)
 
         const version = await createAppVersions(baseData.version_build, APP_NAME_STATS)
@@ -417,6 +426,56 @@ describe('[POST] /stats', () => {
           await getSupabaseClient().from('devices').delete().eq('device_id', uuid).eq('app_id', APP_NAME_STATS)
         }
       })
+    }
+  })
+
+  testIt('filters legacy download_fail before saved stats and logs', async () => {
+    const cases = [
+      { pluginVersion: '7.16.9', shouldRecord: false, createVersion: true },
+      { pluginVersion: '7.16.9', shouldRecord: false, createVersion: false },
+      { pluginVersion: '7.17.0', shouldRecord: true, createVersion: true },
+      { pluginVersion: '6.14.24', shouldRecord: false, createVersion: true },
+      { pluginVersion: '6.14.25', shouldRecord: true, createVersion: true },
+      { pluginVersion: 'not-a-version', shouldRecord: false, createVersion: true },
+    ]
+
+    for (const [caseIndex, testCase] of cases.entries()) {
+      const uuid = randomUUID().toLowerCase()
+      const caseId = randomUUID().slice(0, 8)
+      const baseData = getBaseData(APP_NAME_STATS) as StatsPayload
+      baseData.device_id = uuid
+      baseData.action = 'download_fail'
+      baseData.plugin_version = testCase.pluginVersion
+      baseData.version_build = `1.0.0-download-fail-${caseIndex}-${caseId}-${testCase.pluginVersion.replace(/\./g, '-')}-${testCase.createVersion ? 'existing' : 'missing'}`
+      const versionName = testCase.createVersion
+        ? (await createAppVersions(baseData.version_build, APP_NAME_STATS)).name
+        : baseData.version_build
+      baseData.version_name = versionName
+
+      const response = await postStats(baseData)
+      const responseData = await response.json<StatsRes>()
+      expect(response.status).toBe(200)
+      expect(responseData.status).toBe('ok')
+
+      const { error: statsError, count: statsCount } = await getSupabaseClient()
+        .from('stats')
+        .select('*', { count: 'exact', head: true })
+        .eq('device_id', uuid)
+        .eq('app_id', APP_NAME_STATS)
+        .eq('action', 'download_fail')
+
+      expect(statsError).toBeNull()
+      expect(statsCount).toBe(testCase.shouldRecord ? 1 : 0)
+
+      const { error: versionUsageError, count: versionUsageCount } = await getSupabaseClient()
+        .from('version_usage')
+        .select('*', { count: 'exact', head: true })
+        .eq('app_id', APP_NAME_STATS)
+        .eq('version_name', versionName)
+        .eq('action', 'fail')
+
+      expect(versionUsageError).toBeNull()
+      expect(versionUsageCount).toBe(testCase.shouldRecord ? 1 : 0)
     }
   })
 

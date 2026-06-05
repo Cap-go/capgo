@@ -13,6 +13,7 @@ const {
   isBuildNeeded,
   selectDefaultChannelName,
 } = await import('../src/build/needed.ts')
+const { formatTable, visibleWidth } = await import('../src/terminal-table.ts')
 
 let failures = 0
 
@@ -142,6 +143,19 @@ await test('formats verbose table with version-change color coding', () => {
   assert.match(output, /\x1B\[31mmajor\x1B\[0m/)
   assert.match(output, /\x1B\[33mminor\x1B\[0m/)
   assert.match(output, /\x1B\[32mpatch\x1B\[0m/)
+})
+
+await test('formats table borders around emoji and ansi cells', () => {
+  const output = formatTable({
+    headers: ['Package', 'Status', 'Details'],
+    rows: [
+      ['@capacitor/android', '❌', 'version changed: 8.1.0 → 0.1.0'],
+      ['@capacitor/ios', '✅', '\x1B[32mCompatible\x1B[0m'],
+    ],
+  })
+
+  const lineWidths = output.split('\n').map(line => visibleWidth(line))
+  assert.deepEqual([...new Set(lineWidths)], [lineWidths[0]])
 })
 
 if (failures > 0) {

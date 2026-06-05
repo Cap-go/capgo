@@ -8,6 +8,7 @@
  * IMPORTANT: This test uses a completely isolated user (USER_ID_RLS) with its own
  * org and API key to prevent interference with other tests that create/delete API keys.
  */
+import type { PoolClient } from 'pg'
 import { randomUUID } from 'node:crypto'
 import { createClient } from '@supabase/supabase-js'
 import { Pool } from 'pg'
@@ -33,13 +34,29 @@ let originalEnforcing2fa: boolean | null = null
 async function execWithCapgkey(sql: string, capgkey: string): Promise<any> {
   const client = await pool.connect()
   try {
-    // Set the capgkey header in request.headers (how Supabase passes it to RLS)
-    await client.query(`SET request.headers = '{"capgkey": "${capgkey}"}'`)
-    const result = await client.query(sql)
-    return result.rows
+    await client.query('BEGIN')
+    try {
+      // Set the capgkey header in request.headers (how Supabase passes it to RLS)
+      await client.query(
+        'SELECT set_config(\'request.headers\', $1, true)',
+        [JSON.stringify({ capgkey })],
+      )
+      const result = await client.query(sql)
+      await client.query('COMMIT')
+      return result.rows
+    }
+    catch (error) {
+      try {
+        await client.query('ROLLBACK')
+      }
+      catch {
+        // Ignore rollback failures for clearer root error handling.
+      }
+      throw error
+    }
   }
   finally {
-    client.release()
+    client.release(true)
   }
 }
 
@@ -91,7 +108,7 @@ async function execWithRoleClaims(
     }
   }
   finally {
-    client.release()
+    client.release(true)
   }
 }
 
@@ -126,26 +143,76 @@ async function execAsRoleWithCapgkey(
     }
   }
   finally {
-    client.release()
+    client.release(true)
   }
 }
 
-// Helper to create a hashed API key via the API
+interface ApiKeyAccessOptions {
+  orgId?: string
+  orgRoleName?: 'org_admin' | 'org_member'
+  appId?: string
+  appRoleName?: 'app_admin' | 'app_developer' | 'app_reader' | 'app_uploader'
+}
+
+async function bindApiKeyRole(
+  client: PoolClient,
+  rbacId: string,
+  userId: string,
+  roleName: string,
+  scopeType: 'app' | 'org',
+  orgId: string,
+  appUuid: string | null = null,
+) {
+  await client.query(
+    `INSERT INTO public.role_bindings (principal_type, principal_id, role_id, scope_type, org_id, app_id, granted_by, reason, is_direct)
+     SELECT 'apikey', $1::uuid, roles.id, $2, $3::uuid, $4::uuid, $5::uuid, $6, true
+     FROM public.roles
+     WHERE roles.name = $7`,
+    [rbacId, scopeType, orgId, appUuid, userId, 'Hashed API key RLS test binding', roleName],
+  )
+}
+
+async function bindApiKeyAccess(client: PoolClient, rbacId: string, userId: string, options: ApiKeyAccessOptions = {}) {
+  const orgId = options.orgId ?? ORG_ID_RLS
+  await bindApiKeyRole(client, rbacId, userId, options.orgRoleName ?? 'org_admin', 'org', orgId)
+
+  if (!options.appId)
+    return
+
+  const appResult = await client.query(
+    'SELECT id, owner_org FROM public.apps WHERE app_id = $1 LIMIT 1',
+    [options.appId],
+  )
+  const app = appResult.rows[0]
+  if (!app?.id || !app.owner_org)
+    throw new Error(`Unable to resolve app ${options.appId}`)
+
+  await bindApiKeyRole(
+    client,
+    rbacId,
+    userId,
+    options.appRoleName ?? 'app_admin',
+    'app',
+    app.owner_org,
+    app.id,
+  )
+}
+
+// Helper to create a hashed API key via the database
 async function createHashedApiKey(
   name: string,
-  mode: 'all' | 'write' | 'read' | 'upload' = 'all',
-  limitedToOrgs: string[] = [],
-  limitedToApps: string[] = [],
+  options: ApiKeyAccessOptions = {},
 ): Promise<{ id: number, key: string, key_hash: string }> {
   const client = await pool.connect()
   const plainKey = randomUUID()
   try {
     const { rows } = await client.query(
-      `INSERT INTO public.apikeys (user_id, key, key_hash, mode, name, limited_to_orgs, limited_to_apps)
-       VALUES ($1, NULL, encode(extensions.digest($2, 'sha256'), 'hex'), $3, $4, $5, $6)
-       RETURNING id, key_hash`,
-      [RLS_TEST_USER_ID, plainKey, mode, name, limitedToOrgs, limitedToApps],
+      `INSERT INTO public.apikeys (user_id, key, key_hash, name)
+       VALUES ($1, NULL, encode(extensions.digest($2, 'sha256'), 'hex'), $3)
+       RETURNING id, key_hash, rbac_id`,
+      [RLS_TEST_USER_ID, plainKey, name],
     )
+    await bindApiKeyAccess(client, rows[0].rbac_id, RLS_TEST_USER_ID, options)
     return { id: Number(rows[0].id), key: plainKey, key_hash: rows[0].key_hash }
   }
   finally {
@@ -153,22 +220,21 @@ async function createHashedApiKey(
   }
 }
 
-// Helper to create a plain API key via the API
+// Helper to create a plain API key via the database
 async function createPlainApiKey(
   name: string,
-  mode: 'all' | 'write' | 'read' | 'upload' = 'all',
-  limitedToOrgs: string[] = [],
-  limitedToApps: string[] = [],
+  options: ApiKeyAccessOptions = {},
 ): Promise<{ id: number, key: string }> {
   const client = await pool.connect()
   const plainKey = randomUUID()
   try {
     const { rows } = await client.query(
-      `INSERT INTO public.apikeys (user_id, key, mode, name, limited_to_orgs, limited_to_apps)
-       VALUES ($1, $2, $3, $4, $5, $6)
-       RETURNING id, key`,
-      [RLS_TEST_USER_ID, plainKey, mode, name, limitedToOrgs, limitedToApps],
+      `INSERT INTO public.apikeys (user_id, key, name)
+       VALUES ($1, $2, $3)
+       RETURNING id, key, rbac_id`,
+      [RLS_TEST_USER_ID, plainKey, name],
     )
+    await bindApiKeyAccess(client, rows[0].rbac_id, RLS_TEST_USER_ID, options)
     return { id: Number(rows[0].id), key: rows[0].key }
   }
   finally {
@@ -546,28 +612,6 @@ describe('get_identity() with hashed API keys', () => {
     expect(rows[0].user_id).toBeNull()
   })
 
-  it('returns NULL when key mode does not match', async () => {
-    // Create a read-only key
-    const readOnlyKey = await createHashedApiKey('test-readonly-key')
-    // Update it to read mode
-    const client = await pool.connect()
-    try {
-      await client.query('UPDATE apikeys SET mode = $1 WHERE id = $2', ['read', readOnlyKey.id])
-    }
-    finally {
-      client.release()
-    }
-
-    // Try to use it with write mode requirement
-    const rows = await execWithCapgkey(
-      `SELECT get_identity('{write}'::key_mode[]) as user_id`,
-      readOnlyKey.key,
-    )
-    expect(rows[0].user_id).toBeNull()
-
-    await deleteApiKey(readOnlyKey.id)
-  })
-
   it('returns NULL for expired hashed API key', async () => {
     const expiredKey = await createHashedApiKey('test-expired-hashed')
     // Set expiration to yesterday
@@ -604,8 +648,8 @@ describe('enforce_hashed_api_keys blocks plaintext capgkey auth on the RLS plane
 
   beforeAll(async () => {
     suiteOrgId = await createEnforcedMemberOrgForUser(RLS_TEST_USER_ID, true)
-    hashedKey = await createHashedApiKey('test-hashed-enforced-rls')
-    plainKey = await createPlainApiKey('test-plain-enforced-rls')
+    hashedKey = await createHashedApiKey('test-hashed-enforced-rls', { orgId: suiteOrgId })
+    plainKey = await createPlainApiKey('test-plain-enforced-rls', { orgId: suiteOrgId })
   }, 60000)
 
   afterAll(async () => {
@@ -662,7 +706,7 @@ describe('enforce_hashed_api_keys blocks plaintext capgkey auth on the RLS plane
     }
   })
 
-  it('rejects a plain API key when hashed enforcement is reached through RBAC-only org membership', async () => {
+  it('does not reject a plain API key for an enforced org that is only bound to the user', async () => {
     const rbacOnlyOrgId = await createEnforcedRbacOnlyOrgForUser(RLS_TEST_USER_ID)
 
     try {
@@ -672,7 +716,7 @@ describe('enforce_hashed_api_keys blocks plaintext capgkey auth on the RLS plane
         `SELECT get_identity('{all,write,read,upload}'::key_mode[]) AS user_id`,
         plainKey.key,
       )
-      expect(rows[0].user_id).toBeNull()
+      expect(rows[0].user_id).toBe(RLS_TEST_USER_ID)
     }
     finally {
       await setOrgHashedApiKeyEnforcement(suiteOrgId, true)
@@ -787,29 +831,17 @@ describe('get_identity_apikey_only() with hashed API keys', () => {
 
 describe('get_identity_org_allowed() with hashed API keys', () => {
   let hashedKey: { id: number, key: string, key_hash: string }
-  let limitedKey: { id: number, key: string, key_hash: string }
+  let otherOrgKey: { id: number, key: string, key_hash: string }
 
   beforeAll(async () => {
     hashedKey = await createHashedApiKey('test-hashed-org-allowed')
-    limitedKey = await createHashedApiKey('test-limited-org')
-
-    // Limit the second key to a different org
-    const client = await pool.connect()
-    try {
-      await client.query(
-        `UPDATE apikeys SET limited_to_orgs = $1 WHERE id = $2`,
-        [['00000000-0000-0000-0000-000000000000'], limitedKey.id], // Non-existent org
-      )
-    }
-    finally {
-      client.release()
-    }
+    otherOrgKey = await createHashedApiKey('test-other-org', { orgId: ORG_ID_2 })
   }, 60000)
 
   afterAll(async () => {
     await deleteApiKey(hashedKey.id)
-    await deleteApiKey(limitedKey.id)
-  })
+    await deleteApiKey(otherOrgKey.id)
+  }, 60000)
 
   it('returns user_id for hashed API key with matching org', async () => {
     const rows = await execWithCapgkey(
@@ -819,10 +851,10 @@ describe('get_identity_org_allowed() with hashed API keys', () => {
     expect(rows[0].user_id).toBe(RLS_TEST_USER_ID)
   })
 
-  it('returns NULL for hashed API key limited to different org', async () => {
+  it('returns NULL for hashed API key bound to different org', async () => {
     const rows = await execWithCapgkey(
       `SELECT get_identity_org_allowed('{all,write,read,upload}'::key_mode[], '${ORG_ID_RLS}'::uuid) as user_id`,
-      limitedKey.key,
+      otherOrgKey.key,
     )
     expect(rows[0].user_id).toBeNull()
   })
@@ -838,28 +870,16 @@ describe('get_identity_org_allowed() with hashed API keys', () => {
 
 describe('get_identity_org_appid() with hashed API keys', () => {
   let hashedKey: { id: number, key: string, key_hash: string }
-  let appLimitedKey: { id: number, key: string, key_hash: string }
+  let otherOrgKey: { id: number, key: string, key_hash: string }
 
   beforeAll(async () => {
     hashedKey = await createHashedApiKey('test-hashed-org-appid')
-    appLimitedKey = await createHashedApiKey('test-limited-app')
-
-    // Limit the second key to a different app
-    const client = await pool.connect()
-    try {
-      await client.query(
-        `UPDATE apikeys SET limited_to_apps = $1 WHERE id = $2`,
-        [['com.nonexistent.app'], appLimitedKey.id],
-      )
-    }
-    finally {
-      client.release()
-    }
+    otherOrgKey = await createHashedApiKey('test-other-org-app', { orgId: ORG_ID_2 })
   }, 60000)
 
   afterAll(async () => {
     await deleteApiKey(hashedKey.id)
-    await deleteApiKey(appLimitedKey.id)
+    await deleteApiKey(otherOrgKey.id)
   })
 
   it('returns user_id for hashed API key with matching app', async () => {
@@ -870,10 +890,10 @@ describe('get_identity_org_appid() with hashed API keys', () => {
     expect(rows[0].user_id).toBe(RLS_TEST_USER_ID)
   })
 
-  it('returns NULL for hashed API key limited to different app', async () => {
+  it('returns NULL for hashed API key without requested app permission', async () => {
     const rows = await execWithCapgkey(
       `SELECT get_identity_org_appid('{all,write,read,upload}'::key_mode[], '${ORG_ID_RLS}'::uuid, '${APP_NAME_RLS}') as user_id`,
-      appLimitedKey.key,
+      otherOrgKey.key,
     )
     expect(rows[0].user_id).toBeNull()
   })
@@ -1050,8 +1070,18 @@ describe('channels rls blocks direct api-key updates', () => {
   const channelName = `rls-direct-channel-${randomUUID().slice(0, 8)}`
 
   beforeAll(async () => {
-    allKey = await createHashedApiKey('test-channel-direct-all-key', 'all', [ORG_ID_RLS], [APP_NAME_RLS])
-    writeKey = await createHashedApiKey('test-channel-direct-write-key', 'write', [ORG_ID_RLS], [APP_NAME_RLS])
+    allKey = await createHashedApiKey('test-channel-direct-admin-key', {
+      orgId: ORG_ID_RLS,
+      orgRoleName: 'org_admin',
+      appId: APP_NAME_RLS,
+      appRoleName: 'app_admin',
+    })
+    writeKey = await createHashedApiKey('test-channel-direct-developer-key', {
+      orgId: ORG_ID_RLS,
+      orgRoleName: 'org_member',
+      appId: APP_NAME_RLS,
+      appRoleName: 'app_developer',
+    })
 
     const versionResult = await pool.query(
       `INSERT INTO public.app_versions (app_id, name, owner_org, user_id, checksum, storage_provider, r2_path, deleted)
@@ -1100,7 +1130,7 @@ describe('channels rls blocks direct api-key updates', () => {
       await deleteApiKey(writeKey.id)
   })
 
-  it('does not let a write-scoped API key mutate protected channel fields via anon role access', async () => {
+  it('does not let a developer API key mutate protected channel fields via anon role access', async () => {
     if (!writeKey || !channelId)
       throw new Error('RLS channel test setup did not complete')
 
@@ -1127,7 +1157,7 @@ describe('channels rls blocks direct api-key updates', () => {
     expect(rows[0].allow_emulator).toBe(false)
   })
 
-  it('still lets an all-scoped API key mutate supported channel fields via anon role access', async () => {
+  it('still lets an admin API key mutate supported channel fields via anon role access', async () => {
     if (!allKey || !channelId)
       throw new Error('RLS channel test setup did not complete')
 
@@ -1154,23 +1184,15 @@ describe('channels rls blocks direct api-key updates', () => {
   })
 })
 
-describe('webhook and webhook_delivery rls with api-key org scope precedence', () => {
-  let limitedKey: { id: number, key: string, key_hash: string }
-  let scopedKey: { id: number, key: string, key_hash: string }
+describe('webhook and webhook_delivery rls with api-key org bindings', () => {
+  let unauthorizedKey: { id: number, key: string, key_hash: string }
+  let authorizedKey: { id: number, key: string, key_hash: string }
   let webhookId: string
   let deliveryId: string
 
   beforeAll(async () => {
-    limitedKey = await createHashedApiKey('rls-webhook-org-scope-key', 'all')
-    scopedKey = await createHashedApiKey('rls-webhook-org-scope-update-key', 'all')
-    await pool.query(
-      `UPDATE public.apikeys SET limited_to_orgs = $1 WHERE id = $2`,
-      [['00000000-0000-0000-0000-000000000000'], limitedKey.id],
-    )
-    await pool.query(
-      `UPDATE public.apikeys SET limited_to_orgs = $1 WHERE id = $2`,
-      [[ORG_ID_RLS], scopedKey.id],
-    )
+    unauthorizedKey = await createHashedApiKey('rls-webhook-other-org-key', { orgId: ORG_ID_2 })
+    authorizedKey = await createHashedApiKey('rls-webhook-org-bound-key', { orgId: ORG_ID_RLS })
 
     webhookId = randomUUID()
     await pool.query(
@@ -1205,47 +1227,14 @@ describe('webhook and webhook_delivery rls with api-key org scope precedence', (
   afterAll(async () => {
     await pool.query('DELETE FROM public.webhook_deliveries WHERE id = $1', [deliveryId])
     await pool.query('DELETE FROM public.webhooks WHERE id = $1', [webhookId])
-    await deleteApiKey(limitedKey.id)
-    await deleteApiKey(scopedKey.id)
+    await deleteApiKey(unauthorizedKey.id)
+    await deleteApiKey(authorizedKey.id)
   })
 
-  it('uses API key org scope when auth context is also present for webhook reads', async () => {
-    const webhookRows = await execWithRoleClaims(
-      'SELECT id FROM public.webhooks WHERE id = $1',
-      {
-        role: 'authenticated',
-        claims: {
-          sub: USER_ID_RLS,
-          role: 'authenticated',
-          aud: 'authenticated',
-        },
-        headers: { capgkey: limitedKey.key },
-        params: [webhookId],
-      },
-    ).then(result => result.rows)
-
-    const deliveryRows = await execWithRoleClaims(
-      'SELECT id FROM public.webhook_deliveries WHERE id = $1',
-      {
-        role: 'authenticated',
-        claims: {
-          sub: USER_ID_RLS,
-          role: 'authenticated',
-          aud: 'authenticated',
-        },
-        headers: { capgkey: limitedKey.key },
-        params: [deliveryId],
-      },
-    ).then(result => result.rows)
-
-    expect(webhookRows).toEqual([])
-    expect(deliveryRows).toEqual([])
-  })
-
-  it('prevents webhook_delivery org_id changes when update payload org_id is unauthorized', async () => {
+  it('denies direct webhook reads even when API key scope matches', async () => {
     await expect(
       execWithRoleClaims(
-        'UPDATE public.webhook_deliveries SET org_id = $1 WHERE id = $2',
+        'SELECT id FROM public.webhooks WHERE id = $1',
         {
           role: 'authenticated',
           claims: {
@@ -1253,11 +1242,43 @@ describe('webhook and webhook_delivery rls with api-key org scope precedence', (
             role: 'authenticated',
             aud: 'authenticated',
           },
-          headers: { capgkey: scopedKey.key },
-          params: [ORG_ID_2, deliveryId],
+          headers: { capgkey: authorizedKey.key },
+          params: [webhookId],
         },
       ),
     ).rejects.toMatchObject({ code: '42501' })
+
+    await expect(
+      execWithRoleClaims(
+        'SELECT id FROM public.webhook_deliveries WHERE id = $1',
+        {
+          role: 'authenticated',
+          claims: {
+            sub: USER_ID_RLS,
+            role: 'authenticated',
+            aud: 'authenticated',
+          },
+          headers: { capgkey: authorizedKey.key },
+          params: [deliveryId],
+        },
+      ),
+    ).rejects.toMatchObject({ code: '42501' })
+  })
+
+  it('prevents webhook_delivery org_id changes when update payload org_id is unauthorized', async () => {
+    await expect(execWithRoleClaims(
+      'UPDATE public.webhook_deliveries SET org_id = $1 WHERE id = $2',
+      {
+        role: 'authenticated',
+        claims: {
+          sub: USER_ID_RLS,
+          role: 'authenticated',
+          aud: 'authenticated',
+        },
+        headers: { capgkey: authorizedKey.key },
+        params: [ORG_ID_2, deliveryId],
+      },
+    )).rejects.toMatchObject({ code: '42501' })
 
     const { rows } = await pool.query(
       'SELECT org_id FROM public.webhook_deliveries WHERE id = $1',

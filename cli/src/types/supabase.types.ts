@@ -715,7 +715,7 @@ export type Database = {
           public: boolean
           rbac_id: string
           updated_at: string
-          version: number
+          version: number | null
         }
         Insert: {
           allow_dev?: boolean
@@ -737,7 +737,7 @@ export type Database = {
           public?: boolean
           rbac_id?: string
           updated_at?: string
-          version: number
+          version?: number | null
         }
         Update: {
           allow_dev?: boolean
@@ -759,7 +759,7 @@ export type Database = {
           public?: boolean
           rbac_id?: string
           updated_at?: string
-          version?: number
+          version?: number | null
         }
         Relationships: [
           {
@@ -2761,7 +2761,7 @@ export type Database = {
       webhooks: {
         Row: {
           created_at: string
-          created_by: string | null
+          created_by: string
           enabled: boolean
           events: string[]
           id: string
@@ -2773,7 +2773,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
-          created_by?: string | null
+          created_by: string
           enabled?: boolean
           events: string[]
           id?: string
@@ -2785,7 +2785,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
-          created_by?: string | null
+          created_by?: string
           enabled?: boolean
           events?: string[]
           id?: string
@@ -2993,7 +2993,7 @@ export type Database = {
       }
       check_revert_to_builtin_version: {
         Args: { appid: string }
-        Returns: number
+        Returns: number | null
       }
       cleanup_expired_apikeys: { Args: never; Returns: undefined }
       cleanup_expired_demo_apps: { Args: never; Returns: undefined }

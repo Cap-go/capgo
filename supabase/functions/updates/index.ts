@@ -1,10 +1,11 @@
 import { app } from '../_backend/plugins/updates.ts'
-import { createAllCatch, createHono } from '../_backend/utils/hono.ts'
+import { createAllCatch, createHono, useCors } from '../_backend/utils/hono.ts'
 import { version } from '../_backend/utils/version.ts'
 
 const functionName = 'updates'
 const appGlobal = createHono(functionName, version)
 
+appGlobal.use('*', useCors)
 appGlobal.route('/', app)
 createAllCatch(appGlobal, functionName)
 Deno.serve(appGlobal.fetch)

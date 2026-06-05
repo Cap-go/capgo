@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { env } from 'node:process'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { getAuthHeaders, getEndpointUrl, getSupabaseClient, USER_ID } from './test-utils.ts'
+import { executeSQL, getAuthHeaders, getEndpointUrl, getSupabaseClient, USER_ID } from './test-utils.ts'
 
 const USE_CLOUDFLARE = env.USE_CLOUDFLARE_WORKERS === 'true'
 
@@ -83,13 +83,12 @@ afterAll(async () => {
 
 // Atomic API key + bindings tests use /private/ route which is Supabase-only
 describe.skipIf(USE_CLOUDFLARE)('[POST] /apikey with atomic bindings', () => {
-  it('creates an API key with bindings and no mode', async () => {
+  it('creates an API key with bindings', async () => {
     const response = await fetch(getEndpointUrl('/apikey'), {
       method: 'POST',
       headers: authHeaders,
       body: JSON.stringify({
         name: `atomic-bindings-key-${TEST_ID.slice(0, 8)}`,
-        limited_to_orgs: [TEST_ORG_ID],
         bindings: [
           {
             role_name: 'org_member',
@@ -101,10 +100,9 @@ describe.skipIf(USE_CLOUDFLARE)('[POST] /apikey with atomic bindings', () => {
       }),
     })
 
-    const data = await response.json() as { id: number, key: string | null, mode: string | null, rbac_id: string }
+    const data = await response.json() as { id: number, key: string | null, rbac_id: string }
     expect(response.status).toBe(200)
     expect(data).toHaveProperty('id')
-    expect(data.mode).toBeNull()
     expect(data.rbac_id).toBeTruthy()
     createdKeyIds.push(data.id)
 
@@ -123,37 +121,195 @@ describe.skipIf(USE_CLOUDFLARE)('[POST] /apikey with atomic bindings', () => {
     expect(bindings![0].reason).toBe('atomic creation test')
   })
 
-  it('creates an API key with mode and no bindings (backward compat)', async () => {
+  it.concurrent('creates an org.create API key permission for org admin keys', async () => {
     const response = await fetch(getEndpointUrl('/apikey'), {
       method: 'POST',
       headers: authHeaders,
       body: JSON.stringify({
-        name: `legacy-mode-key-${TEST_ID.slice(0, 8)}`,
-        mode: 'all',
-        limited_to_orgs: [TEST_ORG_ID],
+        name: `org-create-permission-key-${TEST_ID.slice(0, 8)}`,
+        bindings: [
+          {
+            role_name: 'org_admin',
+            scope_type: 'org',
+            org_id: TEST_ORG_ID,
+          },
+        ],
+        global_permissions: ['org.create'],
       }),
     })
 
-    const data = await response.json() as { id: number, mode: string | null }
+    const data = await response.json() as { id: number, rbac_id: string, global_permissions: string[] }
     expect(response.status).toBe(200)
-    expect(data).toHaveProperty('id')
-    expect(data.mode).toBe('all')
+    expect(data.global_permissions).toContain('org.create')
     createdKeyIds.push(data.id)
+
+    const permissionRows = await executeSQL(
+      `SELECT permission_key
+       FROM public.apikey_global_permissions
+       WHERE apikey_rbac_id = $1::uuid`,
+      [data.rbac_id],
+    )
+    expect(permissionRows).toEqual([{ permission_key: 'org.create' }])
   })
 
-  it('rejects creating an API key without mode and without bindings', async () => {
+  it.concurrent('rejects org.create API key permission without an org admin binding', async () => {
     const response = await fetch(getEndpointUrl('/apikey'), {
       method: 'POST',
       headers: authHeaders,
       body: JSON.stringify({
-        name: `no-mode-no-bindings-${TEST_ID.slice(0, 8)}`,
-        limited_to_orgs: [TEST_ORG_ID],
+        name: `invalid-org-create-permission-key-${TEST_ID.slice(0, 8)}`,
+        bindings: [
+          {
+            role_name: 'org_member',
+            scope_type: 'org',
+            org_id: TEST_ORG_ID,
+          },
+        ],
+        global_permissions: ['org.create'],
       }),
     })
 
     const data = await response.json() as { error: string }
     expect(response.status).toBe(400)
-    expect(data.error).toBe('mode_is_required')
+    expect(data.error).toBe('invalid_global_permissions')
+  })
+
+  it.concurrent('updates org.create API key permission from the API key editor payload', async () => {
+    const createResponse = await fetch(getEndpointUrl('/apikey'), {
+      method: 'POST',
+      headers: authHeaders,
+      body: JSON.stringify({
+        name: `update-org-create-permission-key-${TEST_ID.slice(0, 8)}`,
+        bindings: [
+          {
+            role_name: 'org_admin',
+            scope_type: 'org',
+            org_id: TEST_ORG_ID,
+          },
+        ],
+      }),
+    })
+
+    const createData = await createResponse.json() as { id: number, rbac_id: string }
+    expect(createResponse.status).toBe(200)
+    createdKeyIds.push(createData.id)
+
+    const grantResponse = await fetch(getEndpointUrl('/apikey'), {
+      method: 'PUT',
+      headers: authHeaders,
+      body: JSON.stringify({
+        id: createData.id,
+        bindings: [
+          {
+            role_name: 'org_admin',
+            scope_type: 'org',
+            org_id: TEST_ORG_ID,
+          },
+        ],
+        global_permissions: ['org.create'],
+      }),
+    })
+
+    const grantData = await grantResponse.json() as { global_permissions: string[] }
+    expect(grantResponse.status).toBe(200)
+    expect(grantData.global_permissions).toContain('org.create')
+
+    const revokeResponse = await fetch(getEndpointUrl('/apikey'), {
+      method: 'PUT',
+      headers: authHeaders,
+      body: JSON.stringify({
+        id: createData.id,
+        bindings: [
+          {
+            role_name: 'org_admin',
+            scope_type: 'org',
+            org_id: TEST_ORG_ID,
+          },
+        ],
+        global_permissions: [],
+      }),
+    })
+
+    const revokeData = await revokeResponse.json() as { global_permissions: string[] }
+    expect(revokeResponse.status).toBe(200)
+    expect(revokeData.global_permissions).toEqual([])
+
+    const permissionRows = await executeSQL(
+      `SELECT permission_key
+       FROM public.apikey_global_permissions
+       WHERE apikey_rbac_id = $1::uuid`,
+      [createData.rbac_id],
+    )
+    expect(permissionRows).toEqual([])
+
+    const regrantResponse = await fetch(getEndpointUrl('/apikey'), {
+      method: 'PUT',
+      headers: authHeaders,
+      body: JSON.stringify({
+        id: createData.id,
+        bindings: [
+          {
+            role_name: 'org_admin',
+            scope_type: 'org',
+            org_id: TEST_ORG_ID,
+          },
+        ],
+        global_permissions: ['org.create'],
+      }),
+    })
+    expect(regrantResponse.status).toBe(200)
+
+    const downgradeResponse = await fetch(getEndpointUrl('/apikey'), {
+      method: 'PUT',
+      headers: authHeaders,
+      body: JSON.stringify({
+        id: createData.id,
+        bindings: [
+          {
+            role_name: 'org_member',
+            scope_type: 'org',
+            org_id: TEST_ORG_ID,
+          },
+        ],
+      }),
+    })
+    expect(downgradeResponse.status).toBe(200)
+
+    const downgradedPermissionRows = await executeSQL(
+      `SELECT permission_key
+       FROM public.apikey_global_permissions
+       WHERE apikey_rbac_id = $1::uuid`,
+      [createData.rbac_id],
+    )
+    expect(downgradedPermissionRows).toEqual([])
+  })
+
+  it('requires explicit V2 bindings', async () => {
+    const response = await fetch(getEndpointUrl('/apikey'), {
+      method: 'POST',
+      headers: authHeaders,
+      body: JSON.stringify({
+        name: `missing-bindings-key-${TEST_ID.slice(0, 8)}`,
+      }),
+    })
+
+    const data = await response.json() as { error: string }
+    expect(response.status).toBe(400)
+    expect(data.error).toBe('bindings_required')
+  })
+
+  it('rejects creating an API key without bindings', async () => {
+    const response = await fetch(getEndpointUrl('/apikey'), {
+      method: 'POST',
+      headers: authHeaders,
+      body: JSON.stringify({
+        name: `no-bindings-${TEST_ID.slice(0, 8)}`,
+      }),
+    })
+
+    const data = await response.json() as { error: string }
+    expect(response.status).toBe(400)
+    expect(data.error).toBe('bindings_required')
   })
 
   it('rolls back the API key when a binding fails', async () => {
@@ -164,7 +320,6 @@ describe.skipIf(USE_CLOUDFLARE)('[POST] /apikey with atomic bindings', () => {
       headers: authHeaders,
       body: JSON.stringify({
         name: uniqueKeyName,
-        limited_to_orgs: [TEST_ORG_ID],
         bindings: [
           {
             role_name: 'nonexistent_role_that_should_fail',
@@ -194,7 +349,6 @@ describe.skipIf(USE_CLOUDFLARE)('[POST] /apikey with atomic bindings', () => {
       headers: authHeaders,
       body: JSON.stringify({
         name: `multi-binding-key-${TEST_ID.slice(0, 8)}`,
-        limited_to_orgs: [TEST_ORG_ID],
         bindings: [
           {
             role_name: 'org_member',
@@ -241,7 +395,6 @@ describe.skipIf(USE_CLOUDFLARE)('[POST] /apikey with atomic bindings', () => {
       headers: authHeaders,
       body: JSON.stringify({
         name: `invalid-binding-shape-${TEST_ID.slice(0, 8)}`,
-        limited_to_orgs: [TEST_ORG_ID],
         bindings: [
           {
             // missing role_name
@@ -257,8 +410,8 @@ describe.skipIf(USE_CLOUDFLARE)('[POST] /apikey with atomic bindings', () => {
     expect(data.error).toBe('invalid_bindings')
   })
 
-  it('RBAC-only key (mode=NULL) can authenticate', async () => {
-    // First create an RBAC-only key (no limited_to_orgs so it's not a limited-scope key)
+  it('v2 key can authenticate', async () => {
+    // First create a V2 key with role bindings.
     const createResponse = await fetch(getEndpointUrl('/apikey'), {
       method: 'POST',
       headers: authHeaders,
@@ -275,12 +428,12 @@ describe.skipIf(USE_CLOUDFLARE)('[POST] /apikey with atomic bindings', () => {
     })
 
     expect(createResponse.status).toBe(200)
-    const createData = await createResponse.json() as { id: number, key: string, mode: string | null }
+    const createData = await createResponse.json() as { id: number, key: string }
     expect(createData.key).toBeTruthy()
-    expect(createData.mode).toBeNull()
     createdKeyIds.push(createData.id)
 
-    // Use the RBAC-only key to authenticate (GET /apikey should work)
+    // Use the RBAC-only key to authenticate. The request should reach the
+    // API-key guard and be rejected as scoped, not as an invalid credential.
     const apiKeyHeaders = {
       'Content-Type': 'application/json',
       'Authorization': createData.key,
@@ -290,10 +443,10 @@ describe.skipIf(USE_CLOUDFLARE)('[POST] /apikey with atomic bindings', () => {
       headers: apiKeyHeaders,
     })
 
-    const getBody = await getResponse.json()
+    const getBody = await getResponse.json() as { error?: string }
 
-    // The key should authenticate successfully (mode=NULL is now allowed)
-    expect(getResponse.status, `Auth failed with body: ${JSON.stringify(getBody)}`).toBe(200)
+    expect(getResponse.status, `Auth failed with body: ${JSON.stringify(getBody)}`).toBe(401)
+    expect(getBody.error).toBe('cannot_list_apikeys')
   })
 })
 
@@ -310,15 +463,20 @@ describe.skipIf(USE_CLOUDFLARE)('[GET] /private/role_bindings with API key auth'
     expect(Array.isArray(data)).toBe(true)
   })
 
-  it('rejects limited-scope API key on role_bindings endpoint', async () => {
-    // Create a limited-scope key first
+  it('rejects API key auth on role_bindings endpoint', async () => {
+    // Create an API key first
     const createResponse = await fetch(getEndpointUrl('/apikey'), {
       method: 'POST',
       headers: authHeaders,
       body: JSON.stringify({
-        name: `limited-scope-test-${TEST_ID.slice(0, 8)}`,
-        mode: 'all',
-        limited_to_orgs: [TEST_ORG_ID],
+        name: `role-binding-auth-test-${TEST_ID.slice(0, 8)}`,
+        bindings: [
+          {
+            role_name: 'org_admin',
+            scope_type: 'org',
+            org_id: TEST_ORG_ID,
+          },
+        ],
       }),
     })
 
@@ -326,7 +484,7 @@ describe.skipIf(USE_CLOUDFLARE)('[GET] /private/role_bindings with API key auth'
     const createData = await createResponse.json() as { id: number, key: string }
     createdKeyIds.push(createData.id)
 
-    // Try using this limited-scope key on role_bindings endpoint
+    // Try using this API key on role_bindings endpoint
     const response = await fetch(getEndpointUrl(`/private/role_bindings/${TEST_ORG_ID}`), {
       method: 'GET',
       headers: {
@@ -337,6 +495,6 @@ describe.skipIf(USE_CLOUDFLARE)('[GET] /private/role_bindings with API key auth'
 
     expect(response.status).toBe(403)
     const data = await response.json() as { error: string }
-    expect(data.error).toBe('Limited-scope API keys cannot manage role bindings')
+    expect(data.error).toBe('API keys cannot manage role bindings')
   })
 })

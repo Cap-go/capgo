@@ -1,17 +1,24 @@
 import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
+import type { Database } from '../utils/supabase.types.ts'
 import { type } from 'arktype'
 import { Hono } from 'hono/tiny'
 // --- Worker logic imports ---
 import { safeParseSchema } from '../utils/ark_validation.ts'
 import { sendDiscordAlert } from '../utils/discord.ts'
 import { BRES, middlewareAPISecret, parseBody, simpleError } from '../utils/hono.ts'
-import { cloudlog, cloudlogErr } from '../utils/logging.ts'
+import { cloudlog, cloudlogErr, serializeError } from '../utils/logging.ts'
 import { closeClient, getPgClient } from '../utils/pg.ts'
 import { backgroundTask, getEnv } from '../utils/utils.ts'
+import { updateManifestSize } from './on_manifest_create.ts'
 
 // Define constants
 const DEFAULT_BATCH_SIZE = 950 // Default batch size for queue reads limit of CF is 1000 fetches so we take a safe margin
+const MANIFEST_QUEUE_BATCH_SIZE = 100
+const DEFAULT_QUEUE_HTTP_CONCURRENCY = 25
+const MANIFEST_QUEUE_HTTP_CONCURRENCY = 10
+const QUEUE_HTTP_TIMEOUT_MS = 15_000
+const HEALTHCHECK_HTTP_TIMEOUT_MS = 8_000
 export const MAX_QUEUE_READS = 5
 const DISCORD_IGNORED_ERROR_CODES = new Set(['version_not_found', 'no_channel'])
 
@@ -40,6 +47,12 @@ interface Message {
 
 export const messagesArraySchema = messageSchema.array()
 
+interface QueueMessageMetadata {
+  queueName: string
+  msgId: number
+  readCount: number
+}
+
 interface FailureDetail {
   function_name: string
   function_type: string
@@ -52,6 +65,28 @@ interface FailureDetail {
   response_body?: string
   payload_size: number
   cf_id: string
+  duration_ms?: number
+  target_url?: string
+}
+
+interface ProcessedQueueMessage extends Message {
+  httpResponse: Response
+  errorDetails: Awaited<ReturnType<typeof extractErrorDetails>>
+  cfId: string
+  payloadSize: number
+  durationMs: number
+  targetUrl: string | null
+}
+
+interface QueueProcessResult {
+  actionableFailureCount: number
+  archivedCount: number
+  failedCount: number
+  processedCount: number
+  readSucceeded: boolean
+  skippedCount: number
+  success: boolean
+  successCount: number
 }
 
 function extractMessageBody(message: Message): Record<string, unknown> {
@@ -163,51 +198,273 @@ function generateUUID(): string {
   return crypto.randomUUID()
 }
 
-async function processQueue(c: Context, db: ReturnType<typeof getPgClient>, queueName: string, batchSize: number = DEFAULT_BATCH_SIZE) {
-  const messages = await readQueue(c, db, queueName, batchSize)
+function resolveFunctionUrl(c: Context, function_name: string, function_type: string | null | undefined): string {
+  const cfPpUrl = getEnv(c, 'CLOUDFLARE_PP_FUNCTION_URL')
+  const cfUrl = getEnv(c, 'CLOUDFLARE_FUNCTION_URL')
+  const normalizedType = (function_type ?? '').trim()
 
-  if (!messages) {
-    cloudlog(`[${queueName}] No messages found in queue or an error occurred.`)
-    return
+  if (normalizedType === 'cloudflare_pp' && cfPpUrl)
+    return `${cfPpUrl}/triggers/${function_name}`
+
+  if (normalizedType === 'cloudflare' && cfUrl)
+    return `${cfUrl}/triggers/${function_name}`
+
+  if (normalizedType === '' && cfUrl)
+    return `${cfUrl}/triggers/${function_name}`
+
+  return `${getEnv(c, 'SUPABASE_URL')}/functions/v1/triggers/${function_name}`
+}
+
+function queueFailureResponse(errorCode: string, message: string, moreInfo: Record<string, unknown> = {}, status = 599): Response {
+  return new Response(JSON.stringify({
+    error: errorCode,
+    message,
+    moreInfo,
+  }), {
+    headers: {
+      'content-type': 'application/json',
+    },
+    status,
+    statusText: status === 599 ? 'Queue Transport Error' : undefined,
+  })
+}
+
+function httpExceptionToQueueResponse(error: unknown): Response | null {
+  if (!error || typeof error !== 'object')
+    return null
+
+  const maybeException = error as {
+    cause?: unknown
+    message?: unknown
+    status?: unknown
   }
+  if (typeof maybeException.status !== 'number')
+    return null
 
-  const [messagesToProcess, messagesToSkip] = messages.reduce((acc, message) => {
-    acc[message.read_ct <= 5 ? 0 : 1].push(message)
-    return acc
-  }, [[], []] as [typeof messages, typeof messages])
-
-  cloudlog(`[${queueName}] Processing ${messagesToProcess.length} messages and skipping ${messagesToSkip.length} messages.`)
-
-  // Archive messages that have been read 5 or more times
-  if (messagesToSkip.length > 0) {
-    cloudlog(`[${queueName}] Archiving ${messagesToSkip.length} messages that have been read 5 or more times.`)
-    await archive_queue_messages(c, db, queueName, messagesToSkip.map(msg => msg.msg_id))
-  }
-
-  // Process messages that have been read less than 5 times
-  const results = await Promise.all(messagesToProcess.map(async (message) => {
-    const function_name = message.message?.function_name ?? 'unknown'
-    const function_type = message.message?.function_type ?? 'supabase'
-    const body = extractMessageBody(message)
-    if (message.message?.payload === undefined && Object.keys(body).length > 0) {
-      cloudlog({
-        requestId: c.get('requestId'),
-        message: `[${queueName}] Using legacy queue message body shape for ${function_name}.`,
-        msgId: message.msg_id,
-      })
+  const cause = maybeException.cause
+  if (cause && typeof cause === 'object' && 'error' in cause) {
+    const causeData = cause as {
+      error?: unknown
+      message?: unknown
+      moreInfo?: unknown
     }
-    const cfId = generateUUID()
-    const httpResponse = await http_post_helper(c, function_name, function_type, body, cfId)
+    const resolvedMessage = typeof causeData.message === 'string'
+      ? causeData.message
+      : typeof maybeException.message === 'string'
+        ? maybeException.message
+        : 'Queue handler failed'
+
+    return queueFailureResponse(
+      typeof causeData.error === 'string' ? causeData.error : 'http_exception',
+      resolvedMessage,
+      causeData.moreInfo && typeof causeData.moreInfo === 'object'
+        ? causeData.moreInfo as Record<string, unknown>
+        : {},
+      maybeException.status,
+    )
+  }
+
+  return queueFailureResponse(
+    'http_exception',
+    typeof maybeException.message === 'string' ? maybeException.message : 'Queue handler failed',
+    {},
+    maybeException.status,
+  )
+}
+
+function getManifestRecordFromQueueBody(body: Record<string, unknown>): Database['public']['Tables']['manifest']['Row'] {
+  const record = body.record
+  if (body.type !== 'INSERT' || body.table !== 'manifest' || !record || typeof record !== 'object') {
+    throw simpleError('invalid_manifest_queue_payload', 'Invalid manifest queue payload', { body })
+  }
+
+  return record as Database['public']['Tables']['manifest']['Row']
+}
+
+async function dispatchQueueMessage(
+  c: Context,
+  function_name: string,
+  function_type: string | null | undefined,
+  body: Record<string, unknown>,
+  cfId: string,
+  metadata: QueueMessageMetadata,
+  targetUrl: string,
+): Promise<{ response: Response, targetUrl: string }> {
+  if (function_name === 'on_manifest_create') {
+    const record = getManifestRecordFromQueueBody(body)
+    const response = await updateManifestSize(c, record, {
+      cfId,
+      queueMsgId: String(metadata.msgId),
+      queueName: metadata.queueName,
+      queueReadCount: String(metadata.readCount),
+    })
+    return { response, targetUrl }
+  }
+
+  const response = await http_post_helper(c, function_name, function_type, body, cfId, metadata, targetUrl)
+  return { response, targetUrl }
+}
+
+async function processQueueMessage(c: Context, queueName: string, message: Message): Promise<ProcessedQueueMessage> {
+  const function_name = message.message?.function_name ?? 'unknown'
+  const function_type = message.message?.function_type ?? 'supabase'
+  const body = extractMessageBody(message)
+  if (message.message?.payload === undefined && Object.keys(body).length > 0) {
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: `[${queueName}] Using legacy queue message body shape for ${function_name}.`,
+      msgId: message.msg_id,
+    })
+  }
+
+  const cfId = generateUUID()
+  const payloadSize = JSON.stringify(body).length
+  const start = Date.now()
+  const targetUrl = function_name === 'on_manifest_create' ? 'direct:on_manifest_create' : resolveFunctionUrl(c, function_name, function_type)
+
+  try {
+    const result = await dispatchQueueMessage(c, function_name, function_type, body, cfId, {
+      msgId: message.msg_id,
+      queueName,
+      readCount: message.read_ct,
+    }, targetUrl)
+    const errorDetails = await extractErrorDetails(result.response)
+
+    return {
+      httpResponse: result.response,
+      errorDetails,
+      cfId,
+      payloadSize,
+      durationMs: Date.now() - start,
+      targetUrl,
+      ...message,
+    }
+  }
+  catch (error) {
+    const serializedError = serializeError(error)
+    const durationMs = Date.now() - start
+    const httpResponse = httpExceptionToQueueResponse(error) ?? queueFailureResponse('queue_message_failed', serializedError.message ?? 'Queue message failed before receiving a response', {
+      cfId,
+      durationMs,
+      error: serializedError,
+      function_name,
+      function_type,
+      msgId: message.msg_id,
+      queueName,
+      readCount: message.read_ct,
+      targetUrl,
+    })
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: `[${queueName}] Queue message failed during processing.`,
+      cfId,
+      durationMs,
+      error: serializedError,
+      responseStatus: httpResponse.status,
+      function_name,
+      function_type,
+      msgId: message.msg_id,
+      readCount: message.read_ct,
+      targetUrl,
+    })
     const errorDetails = await extractErrorDetails(httpResponse)
 
     return {
       httpResponse,
       errorDetails,
       cfId,
-      payloadSize: JSON.stringify(body).length,
+      payloadSize,
+      durationMs,
+      targetUrl,
       ...message,
     }
-  }))
+  }
+}
+
+function getQueueBatchSize(queueName: string, requestedBatchSize: number): number {
+  if (queueName === 'on_manifest_create')
+    return Math.min(requestedBatchSize, MANIFEST_QUEUE_BATCH_SIZE)
+  return requestedBatchSize
+}
+
+function getQueueHttpConcurrency(queueName: string): number {
+  if (queueName === 'on_manifest_create')
+    return MANIFEST_QUEUE_HTTP_CONCURRENCY
+  return DEFAULT_QUEUE_HTTP_CONCURRENCY
+}
+
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  concurrency: number,
+  mapper: (item: T, index: number) => Promise<R>,
+): Promise<R[]> {
+  const results: R[] = []
+  let cursor = 0
+
+  async function worker() {
+    while (cursor < items.length) {
+      const index = cursor++
+      results[index] = await mapper(items[index]!, index)
+    }
+  }
+
+  const workerCount = Math.min(Math.max(1, concurrency), items.length)
+  await Promise.all(Array.from({ length: workerCount }, () => worker()))
+  return results
+}
+
+async function processQueue(c: Context, db: ReturnType<typeof getPgClient>, queueName: string, batchSize: number = DEFAULT_BATCH_SIZE): Promise<QueueProcessResult> {
+  const messages = await readQueue(c, db, queueName, batchSize)
+
+  if (messages === null) {
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: `[${queueName}] Queue read failed.`,
+      queueName,
+    })
+    return {
+      actionableFailureCount: 0,
+      archivedCount: 0,
+      failedCount: 0,
+      processedCount: 0,
+      readSucceeded: false,
+      skippedCount: 0,
+      success: false,
+      successCount: 0,
+    }
+  }
+
+  const [messagesToProcess, messagesToSkip] = messages.reduce((acc, message) => {
+    acc[message.read_ct <= MAX_QUEUE_READS ? 0 : 1].push(message)
+    return acc
+  }, [[], []] as [typeof messages, typeof messages])
+
+  const processConcurrency = getQueueHttpConcurrency(queueName)
+  cloudlog({
+    requestId: c.get('requestId'),
+    message: `[${queueName}] Processing queue batch.`,
+    queueName,
+    processingCount: messagesToProcess.length,
+    skippedCount: messagesToSkip.length,
+    concurrency: processConcurrency,
+    retryBudget: MAX_QUEUE_READS,
+  })
+
+  // Archive messages after the configured retry budget is exhausted.
+  if (messagesToSkip.length > 0) {
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: `[${queueName}] Archiving messages that exceeded the retry budget.`,
+      queueName,
+      archiveCount: messagesToSkip.length,
+      retryBudget: MAX_QUEUE_READS,
+    })
+    await archive_queue_messages(c, db, queueName, messagesToSkip.map(msg => msg.msg_id))
+  }
+
+  // Process messages that are still within the retry budget.
+  const results = await mapWithConcurrency(messagesToProcess, processConcurrency, async message => processQueueMessage(c, queueName, message))
+  let actionableFailureCount = 0
 
   // Update all messages with their CF IDs
   const cfIdUpdates = results.map(result => ({
@@ -218,7 +475,18 @@ async function processQueue(c: Context, db: ReturnType<typeof getPgClient>, queu
 
   if (cfIdUpdates.length > 0) {
     cloudlog({ requestId: c.get('requestId'), message: `[${queueName}] Updating ${cfIdUpdates.length} messages with CF IDs.` })
-    await mass_edit_queue_messages_cf_ids(c, db, cfIdUpdates)
+    try {
+      await mass_edit_queue_messages_cf_ids(c, db, cfIdUpdates)
+    }
+    catch (error) {
+      cloudlogErr({
+        requestId: c.get('requestId'),
+        message: `[${queueName}] Failed to persist queue CF IDs. Continuing queue cleanup.`,
+        error: serializeError(error),
+        queueName,
+        updateCount: cfIdUpdates.length,
+      })
+    }
   }
 
   // Batch remove all messages that have succeeded
@@ -247,9 +515,12 @@ async function processQueue(c: Context, db: ReturnType<typeof getPgClient>, queu
       response_body: msg.errorDetails.bodyPreview ?? undefined,
       payload_size: msg.payloadSize,
       cf_id: msg.cfId,
+      duration_ms: msg.durationMs,
+      target_url: msg.targetUrl ?? undefined,
     }))
 
     const actionableFailures = getActionableQueueFailures(failureDetails)
+    actionableFailureCount = actionableFailures.length
 
     const groupedByFunction = actionableFailures.reduce((acc, detail) => {
       const key = detail.function_name
@@ -283,7 +554,9 @@ async function processQueue(c: Context, db: ReturnType<typeof getPgClient>, queu
                   const cfLogUrl = `https://dash.cloudflare.com/${getEnv(c, 'CF_ACCOUNT_ANALYTICS_ID')}/workers/services/view/capgo_api-prod/production/observability/logs?workers-observability-view=%22invocations%22&filters=%5B%7B%22key%22%3A%22%24workers.event.request.headers.x-capgo-cf-id%22%2C%22type%22%3A%22string%22%2C%22value%22%3A%22${detail.cf_id}%22%2C%22operation%22%3A%22eq%22%7D%5D`
                   const errorInfo = detail.error_code ? ` | Error: ${detail.error_code}` : ''
                   const messageInfo = detail.error_message ? ` | ${truncateDiscordField(detail.error_message.replace(/\s+/g, ' ').trim(), 180)}` : ''
-                  return `**${detail.function_name}** | Status: ${detail.status} | Read: ${detail.read_count}/${MAX_QUEUE_READS}${errorInfo}${messageInfo} | [CF Logs](${cfLogUrl})`
+                  const durationInfo = typeof detail.duration_ms === 'number' ? ` | ${detail.duration_ms}ms` : ''
+                  const targetInfo = detail.target_url ? ` | Target: ${truncateDiscordField(detail.target_url, 120)}` : ''
+                  return `**${detail.function_name}** | Status: ${detail.status} | Read: ${detail.read_count}/${MAX_QUEUE_READS}${durationInfo}${errorInfo}${messageInfo}${targetInfo} | [CF Logs](${cfLogUrl})`
                 }).join('\n')),
                 inline: false,
               },
@@ -339,6 +612,17 @@ async function processQueue(c: Context, db: ReturnType<typeof getPgClient>, queu
   else {
     cloudlog({ requestId: c.get('requestId'), message: `[${queueName}] All messages were processed successfully.` })
   }
+
+  return {
+    actionableFailureCount,
+    archivedCount: messagesToSkip.length,
+    failedCount: messagesFailed.length,
+    processedCount: messagesToProcess.length,
+    readSucceeded: true,
+    skippedCount: messagesToSkip.length,
+    success: messagesToSkip.length === 0 && messagesFailed.length === 0,
+    successCount: successMessages.length,
+  }
 }
 
 async function extractErrorDetails(response: Response): Promise<{
@@ -347,6 +631,7 @@ async function extractErrorDetails(response: Response): Promise<{
   bodyPreview: string | null
 }> {
   if (response.status < 400) {
+    response.body?.cancel()
     return {
       bodyPreview: null,
       errorCode: null,
@@ -396,7 +681,7 @@ async function extractErrorDetails(response: Response): Promise<{
 }
 
 // Reads messages from the queue and logs them
-async function readQueue(c: Context, db: ReturnType<typeof getPgClient>, queueName: string, batchSize: number = DEFAULT_BATCH_SIZE): Promise<Message[]> {
+async function readQueue(c: Context, db: ReturnType<typeof getPgClient>, queueName: string, batchSize: number = DEFAULT_BATCH_SIZE): Promise<Message[] | null> {
   const queueKey = 'readQueue'
   const startTime = Date.now()
   let messages: Message[] = []
@@ -437,7 +722,7 @@ async function readQueue(c: Context, db: ReturnType<typeof getPgClient>, queueNa
   finally {
     cloudlog({ requestId: c.get('requestId'), message: `[${queueKey}] Finished reading queue messages in ${Date.now() - startTime}ms.` })
   }
-  return messages
+  return null
 }
 
 // The main HTTP POST helper function
@@ -447,54 +732,103 @@ export async function http_post_helper(
   function_type: string | null | undefined,
   body: any,
   cfId: string,
+  metadata?: QueueMessageMetadata,
+  targetUrl = resolveFunctionUrl(c, function_name, function_type),
 ): Promise<Response> {
-  const headers = {
+  const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     'apisecret': getEnv(c, 'API_SECRET'),
     'x-capgo-cf-id': cfId,
   }
-
-  let url: string
-  const cfPpUrl = getEnv(c, 'CLOUDFLARE_PP_FUNCTION_URL')
-  const cfUrl = getEnv(c, 'CLOUDFLARE_FUNCTION_URL')
-  const normalizedType = (function_type ?? '').trim()
-
-  if (normalizedType === 'cloudflare_pp' && cfPpUrl) {
-    url = `${cfPpUrl}/triggers/${function_name}`
-  }
-  else if (normalizedType === 'cloudflare' && cfUrl) {
-    url = `${cfUrl}/triggers/${function_name}`
-  }
-  else if (normalizedType === '' && cfUrl) {
-    // Backward compatibility: older queue messages may not have function_type set.
-    // If a Cloudflare URL is configured, prefer it.
-    url = `${cfUrl}/triggers/${function_name}`
-  }
-  else {
-    url = `${getEnv(c, 'SUPABASE_URL')}/functions/v1/triggers/${function_name}`
+  if (metadata) {
+    headers['x-capgo-queue-name'] = metadata.queueName
+    headers['x-capgo-queue-msg-id'] = String(metadata.msgId)
+    headers['x-capgo-queue-read-count'] = String(metadata.readCount)
   }
 
-  // Create an AbortController for timeout
   const controller = new AbortController()
-  const timeoutId = setTimeout(() => controller.abort(), 15000)
-  // 15 second timeout, as the queue consumer is running every 10 seconds and the visibility timeout is 60 seconds
+  const timeoutId = setTimeout(() => controller.abort(), QUEUE_HTTP_TIMEOUT_MS)
 
   try {
-    cloudlog({ requestId: c.get('requestId'), message: `[${function_name}] Making HTTP POST request to "${url}" with body:`, body })
-    const response = await fetch(url, {
+    cloudlog({ requestId: c.get('requestId'), message: `[${function_name}] Making HTTP POST request to "${targetUrl}" with body:`, body })
+    const response = await fetch(targetUrl, {
       method: 'POST',
       headers,
       body: JSON.stringify(body),
-      // signal: controller.signal,
+      signal: controller.signal,
     })
     return response
   }
   catch (error) {
-    throw simpleError('request_timeout', 'Request Timeout (Internal QUEUE handling error)', { function_name }, error)
+    const serializedError = serializeError(error)
+    throw simpleError('queue_http_post_failed', 'Queue HTTP POST failed', {
+      cfId,
+      error: serializedError,
+      function_name,
+      function_type: function_type ?? null,
+      metadata: metadata ?? null,
+      targetUrl,
+      timeoutMs: QUEUE_HTTP_TIMEOUT_MS,
+    }, error)
   }
   finally {
     clearTimeout(timeoutId)
   }
+}
+
+async function pingCronHealthcheck(
+  healthcheckUrl: string,
+  fetchImpl: typeof fetch,
+): Promise<boolean> {
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), HEALTHCHECK_HTTP_TIMEOUT_MS)
+
+  try {
+    const response = await fetchImpl(healthcheckUrl, {
+      method: 'GET',
+      signal: controller.signal,
+    })
+    await response.body?.cancel()
+    return response.ok
+  }
+  catch {
+    return false
+  }
+  finally {
+    clearTimeout(timeoutId)
+  }
+}
+
+function trimTrailingSlashes(value: string): string {
+  let end = value.length
+  while (end > 0 && value[end - 1] === '/')
+    end--
+  return value.slice(0, end)
+}
+
+function getCronHealthcheckStartUrl(healthcheckUrl: string): string {
+  return `${trimTrailingSlashes(healthcheckUrl)}/start`
+}
+
+async function maybePingCronHealthcheckStart(
+  healthcheckUrl: string | null,
+  fetchImpl: typeof fetch = fetch,
+): Promise<boolean> {
+  if (!healthcheckUrl)
+    return false
+
+  return pingCronHealthcheck(getCronHealthcheckStartUrl(healthcheckUrl), fetchImpl)
+}
+
+async function maybePingCronHealthcheck(
+  processResult: QueueProcessResult,
+  healthcheckUrl: string | null,
+  fetchImpl: typeof fetch = fetch,
+): Promise<boolean> {
+  if (!healthcheckUrl || !processResult.readSucceeded || processResult.skippedCount > 0 || processResult.actionableFailureCount > 0)
+    return false
+
+  return pingCronHealthcheck(healthcheckUrl, fetchImpl)
 }
 
 // Helper function to delete multiple messages from the queue in a single batch
@@ -587,9 +921,10 @@ app.post('/sync', async (c) => {
   cloudlog({ requestId: c.get('requestId'), message: `[Sync Request] Received trigger to process queue.` })
 
   // Require JSON body with queue_name and optional batch_size
-  const body = await parseBody<{ queue_name: string, batch_size?: number }>(c)
+  const body = await parseBody<{ queue_name: string, batch_size?: number, healthcheck_url?: string | null }>(c)
   const queueName = body?.queue_name
   const batchSize = body?.batch_size
+  const healthcheckUrl = typeof body?.healthcheck_url === 'string' && body.healthcheck_url.trim() ? body.healthcheck_url.trim() : null
 
   if (!queueName || typeof queueName !== 'string') {
     throw simpleError('missing_or_invalid_queue_name', 'Missing or invalid queue_name in body', { body })
@@ -602,16 +937,34 @@ app.post('/sync', async (c) => {
     }
   }
 
-  // Compute finalBatchSize: use provided batchSize capped with DEFAULT_BATCH_SIZE, or fall back to DEFAULT_BATCH_SIZE
-  const finalBatchSize = batchSize !== undefined ? Math.min(batchSize, DEFAULT_BATCH_SIZE) : DEFAULT_BATCH_SIZE
+  // Compute finalBatchSize: use provided batchSize capped with DEFAULT_BATCH_SIZE, or fall back to DEFAULT_BATCH_SIZE.
+  const requestedBatchSize = batchSize !== undefined ? Math.min(batchSize, DEFAULT_BATCH_SIZE) : DEFAULT_BATCH_SIZE
+  const finalBatchSize = getQueueBatchSize(queueName, requestedBatchSize)
+  if (finalBatchSize !== requestedBatchSize) {
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: `[Sync Request] Queue batch size capped for ${queueName}.`,
+      requestedBatchSize,
+      finalBatchSize,
+    })
+  }
 
   await backgroundTask(c, (async () => {
     cloudlog({ requestId: c.get('requestId'), message: `[Background Queue Sync] Starting background execution for queue: ${queueName} with batch size: ${finalBatchSize}` })
     let db: ReturnType<typeof getPgClient> | null = null
     try {
       db = getPgClient(c)
-      await processQueue(c, db, queueName, finalBatchSize)
-      cloudlog({ requestId: c.get('requestId'), message: `[Background Queue Sync] Background execution finished successfully.` })
+      if (healthcheckUrl !== null)
+        await maybePingCronHealthcheckStart(healthcheckUrl)
+      const result = await processQueue(c, db, queueName, finalBatchSize)
+      await maybePingCronHealthcheck(result, healthcheckUrl)
+      cloudlog({
+        requestId: c.get('requestId'),
+        message: result.success
+          ? `[Background Queue Sync] Background execution finished successfully.`
+          : `[Background Queue Sync] Background execution finished with queue failures.`,
+        result,
+      })
     }
     finally {
       if (db)
@@ -627,5 +980,13 @@ export const __queueConsumerTestUtils__ = {
   extractErrorDetails,
   extractMessageBody,
   getActionableQueueFailures,
+  getCronHealthcheckStartUrl,
+  getQueueBatchSize,
+  getQueueHttpConcurrency,
+  httpExceptionToQueueResponse,
+  maybePingCronHealthcheck,
+  maybePingCronHealthcheckStart,
+  queueFailureResponse,
+  resolveFunctionUrl,
   sanitizeDiscordResponseBody,
 }

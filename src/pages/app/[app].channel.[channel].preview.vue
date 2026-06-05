@@ -1,10 +1,9 @@
 <script setup lang="ts">
 import type { Database } from '~/types/supabase.types'
-import { ref, watchEffect } from 'vue'
+import { computed, ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import IconAlertCircle from '~icons/lucide/alert-circle'
-import IconLock from '~icons/lucide/lock'
 import IconSettings from '~icons/lucide/settings'
 import { useSupabase } from '~/services/supabase'
 import { useDisplayStore } from '~/stores/display'
@@ -24,8 +23,22 @@ const loading = ref(true)
 const channel = ref<Database['public']['Tables']['channels']['Row'] & ChannelPreview>()
 const app = ref<Database['public']['Tables']['apps']['Row']>()
 
-type PreviewState = 'loading' | 'no-app' | 'no-manifest' | 'preview-disabled' | 'encrypted' | 'ready'
+type PreviewState = 'loading' | 'no-app' | 'preview-disabled' | 'ready'
 const previewState = ref<PreviewState>('loading')
+const browserPreviewUnavailableReason = computed<'missing-manifest' | 'encrypted' | null>(() => {
+  const currentVersion = channel.value?.version
+  if (!currentVersion)
+    return null
+  if (!currentVersion.manifest_count)
+    return 'missing-manifest'
+  if (currentVersion.session_key)
+    return 'encrypted'
+  return null
+})
+const browserPreviewAvailable = computed(() => {
+  const currentVersion = channel.value?.version
+  return !browserPreviewUnavailableReason.value && !!currentVersion
+})
 
 async function getChannel() {
   if (!id.value)
@@ -107,16 +120,6 @@ function determinePreviewState() {
     return
   }
 
-  if (!channel.value.version?.manifest_count) {
-    previewState.value = 'no-manifest'
-    return
-  }
-
-  if (channel.value.version.session_key) {
-    previewState.value = 'encrypted'
-    return
-  }
-
   previewState.value = 'ready'
 }
 
@@ -184,30 +187,13 @@ watchEffect(async () => {
       </button>
     </div>
 
-    <div v-else-if="previewState === 'no-manifest'" class="flex flex-col justify-center items-center min-h-[50vh]">
-      <IconAlertCircle class="w-16 h-16 mb-4 text-amber-500" />
-      <h2 class="text-xl font-semibold text-foreground">
-        {{ t('preview-not-available') }}
-      </h2>
-      <p class="mt-2 text-center text-muted-foreground max-w-md">
-        {{ t('preview-no-manifest') }}
-      </p>
-    </div>
-
-    <div v-else-if="previewState === 'encrypted'" class="flex flex-col justify-center items-center min-h-[50vh]">
-      <IconLock class="w-16 h-16 mb-4 text-amber-500" />
-      <h2 class="text-xl font-semibold text-foreground">
-        {{ t('preview-encrypted') }}
-      </h2>
-      <p class="mt-2 text-center text-muted-foreground max-w-md">
-        {{ t('preview-encrypted-description') }}
-      </p>
-    </div>
-
-    <div v-else-if="previewState === 'ready'" class="w-full h-full">
+    <div v-else-if="previewState === 'ready'" class="h-full min-h-0 w-full overflow-y-auto">
       <BundlePreviewFrame
         :app-id="packageId"
         :channel-id="id"
+        :channel-name="channel.name"
+        :browser-preview="browserPreviewAvailable"
+        :browser-preview-unavailable-reason="browserPreviewUnavailableReason"
       />
     </div>
   </div>

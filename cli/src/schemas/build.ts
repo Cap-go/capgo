@@ -21,6 +21,9 @@ export const buildCredentialsSchema = z.object({
   KEYSTORE_KEY_PASSWORD: z.string().optional(),
   KEYSTORE_STORE_PASSWORD: z.string().optional(),
   PLAY_CONFIG_JSON: z.string().optional(),
+  // Stored as a string-encoded integer in the 0–5 range; the CLI flag (inAppUpdatePriority)
+  // enforces the numeric range, this field holds the env-var-style serialized form.
+  PLAY_STORE_IN_APP_UPDATE_PRIORITY: z.string().optional(),
 }).catchall(z.string().optional())
 
 export type BuildCredentials = z.infer<typeof buildCredentialsSchema>
@@ -54,12 +57,25 @@ export const buildRequestOptionsSchema = optionsBaseSchema.extend({
   keystoreStorePassword: z.string().optional(),
   playConfigJson: z.string().optional(),
   androidFlavor: z.string().trim().min(1).optional(),
+  inAppUpdatePriority: z.coerce.number().int().min(0).max(5).optional(),
   // Output control
   outputUpload: z.boolean().optional(),
   outputRetention: z.string().optional(),
+  outputRecord: z.string().optional(),
   skipBuildNumberBump: z.boolean().optional(),
   playstoreUpload: z.boolean().optional(),
   verbose: z.boolean().optional(),
+  aiAnalytics: z.boolean().optional(),
+  // Controls the on-failure AI-analysis flow inside requestBuildInternal:
+  //   - 'auto-prompt' (default) — current behavior: clack-driven menu when
+  //     interactive, decideAnalyzeBehavior matrix in CI.
+  //   - 'caller-handled'        — skip the clack block entirely and surface
+  //     `aiAnalysis` on the result so the caller (e.g. the Ink onboarding
+  //     wizard) drives the UX. The captured log file is preserved so the
+  //     caller can read it before calling `releaseCapturedLogs`.
+  //   - 'skip'                  — skip the AI block entirely; normal cleanup
+  //     runs (log file deleted on exit).
+  aiAnalysisMode: z.enum(['auto-prompt', 'caller-handled', 'skip']).optional(),
 })
 
 export type BuildRequestOptions = z.infer<typeof buildRequestOptionsSchema>
@@ -83,6 +99,16 @@ export const buildRequestResultSchema = z.object({
   uploadUrl: z.string().optional(),
   status: z.string().optional(),
   error: z.string().optional(),
+  // Populated only when `aiAnalysisMode === 'caller-handled'` AND the build
+  // failed AND log capture was active. `ready: true` means the captured log
+  // file is on disk at `capturedLogPath` and a caller can run `runCapgoAiAnalysis`
+  // immediately. Callers must invoke `releaseCapturedLogs(jobId)` when they're
+  // done viewing the analysis (or chose to skip) so the file gets cleaned up.
+  aiAnalysis: z.object({
+    jobId: z.string(),
+    capturedLogPath: z.string(),
+    ready: z.boolean(),
+  }).optional(),
 })
 
 export type BuildRequestResult = z.infer<typeof buildRequestResultSchema>

@@ -24,10 +24,12 @@ const props = withDefaults(defineProps<{
   noResultsLabel: string
   disabled?: boolean
   showSpinner?: boolean
+  compareMode?: 'manifest' | 'dependencies'
 }>(), {
   modelValue: null,
   disabled: false,
   showSpinner: false,
+  compareMode: 'manifest',
 })
 
 const emit = defineEmits<{
@@ -72,6 +74,26 @@ function resetSearchState() {
 function selectCompareVersion(option: VersionRow | null) {
   resetSearchState()
   emit('update:modelValue', option)
+  // The DaisyUI dropdown is CSS-only (opens on :focus-within), so blur the
+  // active element to close it after a selection.
+  if (typeof document !== 'undefined' && document.activeElement instanceof HTMLElement)
+    document.activeElement.blur()
+}
+
+// The manifest tab compares per-file manifest entries (manifest_count), while the
+// dependencies tab compares native_packages. Only offer bundles that actually carry
+// the data the current tab diffs on, so gate the candidate list per mode. Deleted
+// bundles are excluded — their storage may be gone (and is purged after 90 days),
+// so they are not meaningful comparison targets.
+function buildCompareBaseQuery() {
+  const query = supabase
+    .from('app_versions')
+    .select('id, name, created_at, manifest_count, app_id')
+    .eq('app_id', props.appId)
+    .eq('deleted', false)
+  return props.compareMode === 'dependencies'
+    ? query.not('native_packages', 'is', null)
+    : query.gt('manifest_count', 0)
 }
 
 async function loadLatestCompareVersions() {
@@ -80,11 +102,7 @@ async function loadLatestCompareVersions() {
     return
   }
   const requestId = ++latestCompareRequestId.value
-  const { data, error } = await supabase
-    .from('app_versions')
-    .select('id, name, created_at, manifest_count, app_id')
-    .eq('app_id', props.appId)
-    .gt('manifest_count', 0)
+  const { data, error } = await buildCompareBaseQuery()
     .neq('id', props.currentVersionId)
     .order('created_at', { ascending: false })
     .limit(5)
@@ -153,7 +171,12 @@ async function loadPreferredCompareVersions() {
   if (channelIds.size === 0)
     return
 
-  const preferredHistory: Array<{ versionId: number, deployedAt: string | null }> = []
+  // Fetch several recent prior deployments per channel (not just one): if the
+  // most recent points to a now-deleted bundle, the deleted filter below would
+  // otherwise leave the channel with no baseline. Keeping a small lookback lets
+  // us fall back to the next older non-deleted deployment instead.
+  const PREFERRED_LOOKBACK = 20
+  const candidatesByChannel: Array<Array<{ versionId: number, deployedAt: string | null }>> = []
   for (const channelId of channelIds) {
     const cutoff = deployedAtByChannel.get(channelId)
     let query = supabase
@@ -168,7 +191,7 @@ async function loadPreferredCompareVersions() {
 
     const { data, error } = await query
       .order('created_at', { ascending: false })
-      .limit(1)
+      .limit(PREFERRED_LOOKBACK)
 
     if (requestId !== preferredCompareRequestId)
       return
@@ -178,24 +201,19 @@ async function loadPreferredCompareVersions() {
       continue
     }
 
-    const entry = (data ?? [])[0] as DeployHistoryRow | undefined
-    if (!entry)
-      continue
-    preferredHistory.push({
+    const candidates = ((data ?? []) as DeployHistoryRow[]).map(entry => ({
       versionId: entry.version_id,
       deployedAt: entry.created_at ?? entry.deployed_at ?? null,
-    })
+    }))
+    if (candidates.length)
+      candidatesByChannel.push(candidates)
   }
 
-  if (!preferredHistory.length)
+  if (!candidatesByChannel.length)
     return
 
-  const uniqueIds = [...new Set(preferredHistory.map(entry => entry.versionId))]
-  const { data: versions, error } = await supabase
-    .from('app_versions')
-    .select('id, name, created_at, manifest_count, app_id')
-    .eq('app_id', props.appId)
-    .gt('manifest_count', 0)
+  const uniqueIds = [...new Set(candidatesByChannel.flat().map(entry => entry.versionId))]
+  const { data: versions, error } = await buildCompareBaseQuery()
     .in('id', uniqueIds)
 
   if (requestId !== preferredCompareRequestId)
@@ -207,11 +225,20 @@ async function loadPreferredCompareVersions() {
   }
 
   const versionMap = new Map((versions ?? []).map(version => [version.id, version]))
-  const sorted = preferredHistory
-    .filter(entry => versionMap.has(entry.versionId))
+  // Per channel, keep the most recent deployment whose bundle survived the
+  // deleted filter (candidates are already ordered newest-first).
+  const seen = new Set<number>()
+  preferredCompareVersions.value = candidatesByChannel
+    .map(candidates => candidates.find(entry => versionMap.has(entry.versionId)))
+    .filter((entry): entry is { versionId: number, deployedAt: string | null } => Boolean(entry))
     .sort((a, b) => (b.deployedAt ?? '').localeCompare(a.deployedAt ?? ''))
-
-  preferredCompareVersions.value = sorted
+    .filter((entry) => {
+      // Dedupe: the same bundle can be the surviving pick for multiple channels.
+      if (seen.has(entry.versionId))
+        return false
+      seen.add(entry.versionId)
+      return true
+    })
     .map(entry => versionMap.get(entry.versionId))
     .filter((version): version is VersionRow => Boolean(version))
 }
@@ -225,19 +252,17 @@ async function searchCompareVersions(term: string) {
 
   const requestId = ++compareSearchRequestId.value
   compareSearchLoading.value = true
-  const baseQuery = supabase
-    .from('app_versions')
-    .select('id, name, created_at, manifest_count, app_id')
-    .eq('app_id', props.appId)
-    .gt('manifest_count', 0)
-    .neq('id', props.currentVersionId)
 
+  // Each chain must start from its own builder: the Supabase query builder is
+  // mutable and returns `this`, so reusing one instance across concurrent
+  // chains would leak filters between the requests.
   const numericId = Number(term)
   let data: VersionRow[] | null = null
   let error: unknown = null
 
   if (Number.isNaN(numericId)) {
-    const response = await baseQuery
+    const response = await buildCompareBaseQuery()
+      .neq('id', props.currentVersionId)
       .ilike('name', `%${term}%`)
       .order('created_at', { ascending: false })
       .limit(5)
@@ -250,11 +275,13 @@ async function searchCompareVersions(term: string) {
   }
   else {
     const [nameResponse, idResponse] = await Promise.all([
-      baseQuery
+      buildCompareBaseQuery()
+        .neq('id', props.currentVersionId)
         .ilike('name', `%${term}%`)
         .order('created_at', { ascending: false })
         .limit(5),
-      baseQuery
+      buildCompareBaseQuery()
+        .neq('id', props.currentVersionId)
         .eq('id', numericId)
         .order('created_at', { ascending: false })
         .limit(5),

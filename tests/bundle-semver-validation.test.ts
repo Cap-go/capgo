@@ -1,9 +1,12 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { BASE_URL, getSupabaseClient, headers, resetAndSeedAppData, resetAppData, SEMVER_ORG_ID, SEMVER_STRIPE_CUSTOMER_ID, USER_ID } from './test-utils.ts'
+import { BASE_URL, createDirectApiKeyWithBindings, getSupabaseClient, resetAndSeedAppData, resetAppData, SEMVER_ORG_ID, SEMVER_STRIPE_CUSTOMER_ID, USER_ID } from './test-utils.ts'
 
 const id = randomUUID()
 const APPNAME = `com.bundle.semver.${id}`
+const semverApiKey = randomUUID()
+let headers: Record<string, string>
+let semverApiKeyId: number | null = null
 
 beforeAll(async () => {
   // Use dedicated semver test org and stripe info for isolation
@@ -12,9 +15,33 @@ beforeAll(async () => {
     userId: USER_ID,
     stripeCustomerId: SEMVER_STRIPE_CUSTOMER_ID,
   })
+  const apiKey = await createDirectApiKeyWithBindings({
+    key: semverApiKey,
+    name: `semver-test-${id}`,
+    orgId: SEMVER_ORG_ID,
+    roleName: 'org_super_admin',
+    appId: APPNAME,
+    appRoleName: 'app_admin',
+  })
+  if (!apiKey.key)
+    throw new Error('Failed to create semver API key')
+
+  semverApiKeyId = apiKey.id
+  headers = {
+    'Content-Type': 'application/json',
+    'Authorization': apiKey.key,
+  }
 })
 
 afterAll(async () => {
+  if (semverApiKeyId !== null) {
+    await getSupabaseClient()
+      .from('apikeys')
+      .delete()
+      .eq('id', semverApiKeyId)
+      .throwOnError()
+  }
+
   // Clean up all versions created during tests
   await getSupabaseClient()
     .from('app_versions')

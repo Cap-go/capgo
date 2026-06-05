@@ -5,7 +5,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { getBaseData, getSupabaseClient, PLUGIN_BASE_URL, resetAndSeedAppData, resetAppData, resetAppDataStats } from './test-utils.ts'
 
 interface ChannelInfo {
-  id: string
+  id: number
   name: string
   public: boolean
   allow_self_set: boolean

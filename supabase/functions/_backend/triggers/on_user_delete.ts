@@ -38,27 +38,6 @@ function isBindingActive(binding: RbacBinding, now: Date) {
   return !expiresAt || new Date(expiresAt) > now
 }
 
-async function fetchLegacySuperAdminOrgIds(
-  c: Context,
-  supabase: ReturnType<typeof supabaseAdmin>,
-  userId: string,
-) {
-  const { data, error } = await supabase
-    .from('org_users')
-    .select('org_id')
-    .eq('user_id', userId)
-    .eq('user_right', 'super_admin')
-
-  if (error) {
-    logFailure(c, 'legacy super admin lookup failed', error)
-    return null
-  }
-
-  return (data ?? [])
-    .map(item => item.org_id)
-    .filter((orgId): orgId is string => Boolean(orgId))
-}
-
 async function fetchDirectRbacBindings(
   c: Context,
   supabase: ReturnType<typeof supabaseAdmin>,
@@ -125,12 +104,11 @@ async function fetchGroupRbacBindings(
 }
 
 function collectCandidateOrgIds(
-  legacyOrgIds: string[],
   directBindings: RbacBinding[],
   groupBindings: RbacBinding[],
   now: Date,
 ) {
-  const candidateOrgIds = new Set<string>(legacyOrgIds)
+  const candidateOrgIds = new Set<string>()
 
   for (const binding of directBindings) {
     if (!isBindingActive(binding, now))
@@ -149,25 +127,6 @@ function collectCandidateOrgIds(
   }
 
   return Array.from(candidateOrgIds)
-}
-
-async function fetchLegacySuperAdmins(
-  c: Context,
-  supabase: ReturnType<typeof supabaseAdmin>,
-  orgIds: string[],
-) {
-  const { data, error } = await supabase
-    .from('org_users')
-    .select('org_id, user_id')
-    .in('org_id', orgIds)
-    .eq('user_right', 'super_admin')
-
-  if (error || !data) {
-    logFailure(c, 'legacy super admin count failed', error)
-    return null
-  }
-
-  return data
 }
 
 async function fetchRbacUserAdmins(
@@ -246,7 +205,6 @@ function buildGroupMembersByGroup(groupMembers: GroupMember[]) {
 }
 
 function buildOrgAdminUsers(
-  legacySuperAdmins: Array<{ org_id: string | null, user_id: string | null }>,
   rbacUserAdmins: RbacBinding[],
   activeGroupBindings: RbacBinding[],
   groupMembersByGroup: Map<string, string[]>,
@@ -259,10 +217,6 @@ function buildOrgAdminUsers(
     const existing = orgAdminUsers.get(orgId) ?? new Set<string>()
     existing.add(userId)
     orgAdminUsers.set(orgId, existing)
-  }
-
-  for (const item of legacySuperAdmins) {
-    addOrgAdminUser(item.org_id, item.user_id)
   }
 
   for (const binding of rbacUserAdmins) {
@@ -355,12 +309,7 @@ async function deleteUser(c: Context, record: Database['public']['Tables']['user
   const supabase = supabaseAdmin(c)
   const now = new Date()
 
-  // 1. Find organizations where this user is the only super admin
-  const legacyOrgIds = await fetchLegacySuperAdminOrgIds(c, supabase, record.id)
-  if (!legacyOrgIds) {
-    return c.json(BRES)
-  }
-
+  // 1. Find organizations where this user is the only RBAC super admin
   const directRbacBindings = await fetchDirectRbacBindings(c, supabase, record.id)
   if (!directRbacBindings) {
     return c.json(BRES)
@@ -376,17 +325,12 @@ async function deleteUser(c: Context, record: Database['public']['Tables']['user
     return c.json(BRES)
   }
 
-  const orgIds = collectCandidateOrgIds(legacyOrgIds, directRbacBindings, groupRbacBindings, now)
+  const orgIds = collectCandidateOrgIds(directRbacBindings, groupRbacBindings, now)
   if (orgIds.length === 0) {
     return c.json(BRES)
   }
 
   // For each org where user is super admin, check if they are the only one
-  const legacySuperAdmins = await fetchLegacySuperAdmins(c, supabase, orgIds)
-  if (!legacySuperAdmins) {
-    return c.json(BRES)
-  }
-
   const rbacUserAdmins = await fetchRbacUserAdmins(c, supabase, orgIds)
   if (!rbacUserAdmins) {
     return c.json(BRES)
@@ -409,7 +353,6 @@ async function deleteUser(c: Context, record: Database['public']['Tables']['user
 
   const groupMembersByGroup = buildGroupMembersByGroup(groupMembers)
   const orgAdminUsers = buildOrgAdminUsers(
-    legacySuperAdmins,
     rbacUserAdmins,
     activeGroupBindings,
     groupMembersByGroup,

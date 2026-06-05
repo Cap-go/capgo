@@ -102,7 +102,6 @@ async function loadGlobalStatsTrend() {
   isLoadingGlobalStatsTrend.value = true
   try {
     const data = await adminStore.fetchStats('global_stats_trend')
-    console.log('[Admin Dashboard] Global stats trend data:', data)
     globalStatsTrendData.value = data || []
   }
   catch (error) {

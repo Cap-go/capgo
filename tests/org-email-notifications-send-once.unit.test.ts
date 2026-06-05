@@ -86,7 +86,11 @@ function createDrizzleStub(options?: {
     }
     if (
       table === schema.role_bindings
-      || table === schema.group_members
+    ) {
+      return adminUsers.map(user => ({ principal_id: user.id, expires_at: null }))
+    }
+    if (
+      table === schema.group_members
     ) {
       return []
     }

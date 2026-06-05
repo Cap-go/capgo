@@ -56,6 +56,7 @@ npx @capgo/cli@latest bundle upload com.example.app --path ./dist --channel prod
 | **--min-update-version** | <code>string</code> | Minimal version required to update to this version. Used only if the disable auto update is set to metadata in channel |
 | **--auto-min-update-version** | <code>boolean</code> | Set the min update version based on native packages |
 | **--ignore-metadata-check** | <code>boolean</code> | Ignores the metadata (node_modules) check when uploading |
+| **--fail-on-incompatible** | <code>boolean</code> | Fail the upload (exit non-zero) instead of uploading when the bundle is incompatible with the channel's current native packages. In an interactive terminal you can still choose a native build; declining fails. Cannot be combined with --ignore-metadata-check. |
 | **--ignore-checksum-check** | <code>boolean</code> | Ignores the checksum check when uploading |
 | **--force-crc32-checksum** | <code>boolean</code> | Force CRC32 checksum for upload (override auto-detection) |
 | **--timeout** | <code>string</code> | Timeout for the upload process in seconds |
@@ -67,7 +68,7 @@ npx @capgo/cli@latest bundle upload com.example.app --path ./dist --channel prod
 | **--partial-only** | <code>boolean</code> | [DEPRECATED] Use --delta-only instead. Upload only incremental updates, skip full bundle |
 | **--delta** | <code>boolean</code> | Upload delta updates (only changed files) for instant, super-fast updates instead of big zip downloads |
 | **--delta-only** | <code>boolean</code> | Upload only delta updates without full bundle for maximum speed (useful for large apps) |
-| **--no-delta** | <code>boolean</code> | Disable delta updates even if Direct Update is enabled |
+| **--no-delta** | <code>boolean</code> | Disable delta updates even if instant updates are enabled |
 | **--encrypted-checksum** | <code>string</code> | An encrypted checksum (signature). Used only when uploading an external bundle. |
 | **--auto-set-bundle** | <code>boolean</code> | Set the bundle in capacitor.config.json |
 | **--dry-upload** | <code>boolean</code> | Dry upload the bundle process: add the row in database without uploading files or updating channels (Used by Capgo for internal testing) |

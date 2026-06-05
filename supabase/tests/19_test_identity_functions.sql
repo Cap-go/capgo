@@ -41,8 +41,8 @@ SELECT
 SELECT
     is(
         get_identity_apikey_only('{read}'),
-        null,
-        'get_identity_apikey_only test - returns null when key mode does not match'
+        '6aa76066-55ef-4238-ade6-0b32334a4097',
+        'get_identity_apikey_only test - returns user for valid V2 key regardless of legacy mode argument'
     );
 
 -- Test with read key
@@ -81,8 +81,8 @@ SELECT
 SELECT
     is(
         get_identity_apikey_only('{read}'),
-        null,
-        'get_identity_apikey_only test - returns null when upload key used for read access'
+        'c591b04e-cf29-4945-b9a0-776d0672061a',
+        'get_identity_apikey_only test - returns user for valid upload key regardless of legacy mode argument'
     );
 
 -- Test with invalid API key

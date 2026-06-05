@@ -12,7 +12,6 @@ import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { homedir, platform as osPlatform } from 'node:os'
 import path, { dirname, join, relative, resolve, sep } from 'node:path'
 import { cwd, env, stdin, stdout } from 'node:process'
-import { findMonorepoRoot, findNXMonorepoRoot, isMonorepo, isNXMonorepo } from '@capacitor/cli/dist/util/monorepotools'
 import { findInstallCommand, findPackageManagerRunner, findPackageManagerType } from '@capgo/find-package-manager'
 import { confirm as confirmC, isCancel, log, select, spinner as spinnerC } from '@clack/prompts'
 import { canParse, format, lessThan, parse, parseRange, rangeIntersects } from '@std/semver'
@@ -23,10 +22,12 @@ import { isCI } from 'ci-info'
 import prettyjson from 'prettyjson'
 import * as tus from 'tus-js-client'
 import { markSnag } from './app/debug'
+import { findMonorepoRoot, findNXMonorepoRoot, isMonorepo, isNXMonorepo } from './capacitor-cli'
 import { getChecksum } from './checksum'
 import { loadConfig, writeConfig } from './config'
 import { nativePackageSchema } from './schemas/common'
 import { formatApiErrorForCli, parseSecurityPolicyError } from './utils/security_policy_errors'
+import { createTimedFetch, isSupabaseInstrumentationEnabled } from './analytics/supabase-perf'
 
 export const baseKey = '.capgo_key'
 export const baseKeyV2 = '.capgo_key_v2'
@@ -158,6 +159,14 @@ interface TrackOptions {
    * example: "user-123"
    */
   user_id?: string
+  /**
+   * Organization ID for actor-scoped tracking.
+   */
+  org_id?: string
+  /**
+   * Tracking payload contract version.
+   */
+  tracking_version?: number
   /**
    * Event icon (emoji)
    * must be a single emoji
@@ -567,11 +576,11 @@ interface CapgoConfig {
   hostFilesApi: string
   hostApi: string
 }
-export async function getRemoteConfig(silent = false) {
+export async function getRemoteConfig(silent = false, signal?: AbortSignal) {
   // call host + /api/get_config and parse the result as json using fetch
   const localConfig = await getLocalConfig(silent)
   try {
-    const response = await fetch(`${localConfig.hostApi}/private/config`)
+    const response = await fetch(`${localConfig.hostApi}/private/config`, signal ? { signal } : {})
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`)
     }
@@ -631,7 +640,7 @@ function normalizeSupabaseHost(host: string): string {
   return `${parsed.origin}${normalizedPath}`
 }
 
-export async function createSupabaseClient(apikey: string, supaHost?: string, supaKey?: string, silent = false) {
+export async function createSupabaseClient(apikey: string, supaHost?: string, supaKey?: string, silent = false, instrument = true) {
   const config = await getRemoteConfig(silent)
   if (supaHost && supaKey) {
     if (!silent)
@@ -654,6 +663,7 @@ export async function createSupabaseClient(apikey: string, supaHost?: string, su
       headers: {
         capgkey: apikey,
       },
+      ...(isSupabaseInstrumentationEnabled() && instrument ? { fetch: createTimedFetch() } : {}),
     },
   })
 }
@@ -840,8 +850,20 @@ export async function checkPlanValid(supabase: SupabaseClient<Database>, orgId: 
 export async function checkPlanValidUpload(supabase: SupabaseClient<Database>, orgId: string, apikey: string, appId?: string, warning = true) {
   const config = await getRemoteConfig()
 
-  // isAllowedActionAppIdApiKey was updated in the orgs_v3 migration to work with the new system
-  const { data: validPlan } = await supabase.rpc('is_allowed_action_org_action', { orgid: orgId, actions: ['storage'] })
+  // Pass appid so check_min_rights gets the app context. Without it,
+  // RBAC denies API keys with limited_to_apps set and the org-scope
+  // plan check returns false even when the plan is healthy. PostgREST
+  // routes to the 3-arg overload at runtime; the `as never` cast bypasses
+  // a `supabase gen types` quirk that collapses overloads sharing the
+  // same name (the 3-arg signature exists in the DB but is not emitted
+  // by the generator).
+  const args = { orgid: orgId, actions: ['storage'], appid: appId } as never
+  const { data: validPlan, error: validPlanError } = await supabase.rpc('is_allowed_action_org_action', args)
+  if (validPlanError) {
+    const message = `Cannot validate upload plan: ${formatError(validPlanError)}`
+    log.error(message)
+    throw new Error(message)
+  }
   if (!validPlan) {
     log.error(`You need to upgrade your plan to continue to use capgo.\n Upgrade here: ${config.hostWeb}/settings/organization/plans\n`)
     wait(100)
@@ -1284,7 +1306,8 @@ export async function uploadTUS(apikey: string, data: Buffer, orgId: string, app
       channel: 'app',
       event: 'App TUS upload',
       icon: '⏫',
-      user_id: orgId,
+      org_id: orgId,
+      tracking_version: 2,
       tags: {
         'app-id': appId,
       },
@@ -1328,7 +1351,8 @@ export async function uploadTUS(apikey: string, data: Buffer, orgId: string, app
           channel: 'app',
           event: 'App TUS done',
           icon: '⏫',
-          user_id: orgId,
+          org_id: orgId,
+          tracking_version: 2,
           tags: {
             'app-id': appId,
           },
@@ -1406,19 +1430,24 @@ export async function updateOrCreateChannel(supabase: SupabaseClient<Database>, 
     .single()
 }
 
-export async function sendEvent(capgkey: string, payload: TrackOptions & { notifyConsole?: boolean }, verbose?: boolean): Promise<void> {
+export async function sendEvent(capgkey: string, payload: TrackOptions & { notifyConsole?: boolean }, verbose?: boolean, signal?: AbortSignal): Promise<void> {
   try {
     if (verbose) {
       log.info(`Get remove config: for ${payload.event}`)
     }
     // Always fetch remote config silently — sendEvent is telemetry and must
     // not bypass an Ink-controlled stdout (e.g. during `capgo init`).
-    const config = await getRemoteConfig(true)
+    const config = await getRemoteConfig(true, signal)
     if (verbose) {
       log.info(`Sending LogSnag event: ${JSON.stringify(payload)}`)
     }
     const controller = new AbortController()
     const timeoutId = setTimeout(() => controller.abort(), 10000) // 10 seconds timeout
+    // Combine the internal timeout with any caller-supplied signal (e.g. the
+    // analytics flush) so in-flight telemetry can be released promptly.
+    const eventSignal = signal
+      ? (typeof AbortSignal.any === 'function' ? AbortSignal.any([controller.signal, signal]) : signal)
+      : controller.signal
 
     try {
       const fetchResponse = await fetch(`${config.hostApi}/private/events`, {
@@ -1428,7 +1457,7 @@ export async function sendEvent(capgkey: string, payload: TrackOptions & { notif
           'Content-Type': 'application/json',
           'capgkey': capgkey,
         },
-        signal: controller.signal,
+        signal: eventSignal,
       })
 
       clearTimeout(timeoutId)
@@ -1986,7 +2015,7 @@ export async function getRemoteDependencies(supabase: SupabaseClient<Database>, 
     log.error(`Error fetching native packages: ${error.message}`)
     throw new Error(`Error fetching native packages: ${error.message}`)
   }
-  return convertNativePackages((remoteNativePackages.version.native_packages as any) ?? [])
+  return convertNativePackages(((remoteNativePackages.version as any)?.native_packages as any) ?? [])
 }
 
 export async function checkChecksum(supabase: SupabaseClient<Database>, appId: string, channel: string, currentChecksum: string) {

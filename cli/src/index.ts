@@ -2,6 +2,9 @@ import { exit } from 'node:process'
 import { log } from '@clack/prompts'
 import { Option, program } from 'commander'
 import pack from '../package.json'
+import { categorizeCliError } from './analytics/error-category'
+import { enableSupabaseInstrumentation } from './analytics/supabase-perf'
+import { extractCommandContext, flushAnalytics, trackCommandFailed, trackCommandInvoked, trackCommandSucceeded } from './analytics/track'
 import { addApp } from './app/add'
 import { debugApp } from './app/debug'
 import { deleteApp } from './app/delete'
@@ -11,6 +14,7 @@ import { setApp } from './app/set'
 import { setSetting } from './app/setting'
 import { clearCredentialsCommand, listCredentialsCommand, migrateCredentialsCommand, saveCredentialsCommand, updateCredentialsCommand } from './build/credentials-command'
 import { manageCredentialsCommand } from './build/credentials-manage'
+import { lastOutputCommand } from './build/last-output-command'
 import { checkBuildNeeded } from './build/needed'
 import { onboardingBuilderCommand } from './build/onboarding/command'
 import { requestBuildCommand } from './build/request'
@@ -21,7 +25,7 @@ import { deleteBundle } from './bundle/delete'
 import { encryptZip } from './bundle/encrypt'
 import { listBundle } from './bundle/list'
 import { printReleaseType } from './bundle/releaseType'
-import { uploadBundle } from './bundle/upload'
+import { handleBundleUploadCommand } from './bundle/upload-command'
 import { zipBundle } from './bundle/zip'
 import { addChannel } from './channel/add'
 import { currentBundle } from './channel/currentBundle'
@@ -62,10 +66,19 @@ program
   .description(`📦 Manage packages and bundle versions in Capgo Cloud`)
   .version(pack.version, '-v, --version', `output the current version`)
 
+// Turn on client-side Supabase perf tracking for the CLI. (Off by default so
+// the SDK bundle, which transitively imports createSupabaseClient, stays clean.)
+enableSupabaseInstrumentation()
+
 let currentCommandPath = 'unknown'
 
 program.hook('preAction', (_thisCommand, actionCommand) => {
   currentCommandPath = getCommandPath(actionCommand)
+  trackCommandInvoked(currentCommandPath, extractCommandContext(actionCommand))
+})
+
+program.hook('postAction', (_thisCommand, actionCommand) => {
+  trackCommandSucceeded(getCommandPath(actionCommand))
 })
 
 program
@@ -159,9 +172,7 @@ External option: Store only a URL link (useful for apps >200MB or privacy requir
 Capgo never inspects external content. Add encryption for trustless security.
 
 Example: npx @capgo/cli@latest bundle upload com.example.app --path ./dist --channel production`)
-  .action(async (...args: Parameters<typeof uploadBundle>): Promise<void> => {
-    await uploadBundle(...args)
-  })
+  .action(handleBundleUploadCommand)
   .option('-a, --apikey <apikey>', optionDescriptions.apikey)
   .option('-p, --path <path>', `Path of the folder to upload, if not provided it will use the webDir set in capacitor.config`)
   .option('-c, --channel <channel>', `Channel to link to`)
@@ -189,6 +200,7 @@ Example: npx @capgo/cli@latest bundle upload com.example.app --path ./dist --cha
   )
   .option('--auto-min-update-version', `Set the min update version based on native packages`)
   .option('--ignore-metadata-check', `Ignores the metadata (node_modules) check when uploading`)
+  .option('--fail-on-incompatible', `Fail the upload (exit non-zero) instead of uploading when the bundle is incompatible with the channel's current native packages. In an interactive terminal you can still choose a native build; declining fails. Cannot be combined with --ignore-metadata-check.`)
   .option('--ignore-checksum-check', `Ignores the checksum check when uploading`)
   .option('--force-crc32-checksum', `Force CRC32 checksum for upload (override auto-detection)`)
   .option('--timeout <timeout>', `Timeout for the upload process in seconds`)
@@ -200,7 +212,7 @@ Example: npx @capgo/cli@latest bundle upload com.example.app --path ./dist --cha
   .option('--partial-only', `[DEPRECATED] Use --delta-only instead. Upload only incremental updates, skip full bundle`)
   .option('--delta', `Upload delta updates (only changed files) for instant, super-fast updates instead of big zip downloads`)
   .option('--delta-only', `Upload only delta updates without full bundle for maximum speed (useful for large apps)`)
-  .option('--no-delta', `Disable delta updates even if Direct Update is enabled`)
+  .option('--no-delta', `Disable delta updates even if instant updates are enabled`)
   .option('--encrypted-checksum <encryptedChecksum>', `An encrypted checksum (signature). Used only when uploading an external bundle.`)
   .option('--auto-set-bundle', `Set the bundle in capacitor.config.json`)
   .option('--dry-upload', `Dry upload the bundle process: add the row in database without uploading files or updating channels (Used by Capgo for internal testing)`)
@@ -422,7 +434,7 @@ const channel = program
   .description(`📢 Manage distribution channels for app updates in Capgo Cloud, controlling how updates are delivered to devices.`)
 
 channel
-  .command('add [channelId] [appId]')
+  .command('add [channelName] [appId]')
   .alias('a')
   .description(`➕ Create a new channel for app distribution in Capgo Cloud to manage update delivery.
 
@@ -435,7 +447,7 @@ Example: npx @capgo/cli@latest channel add production com.example.app --default`
   .option('--supa-anon <supaAnon>', optionDescriptions.supaAnon)
 
 channel
-  .command('delete [channelId] [appId]')
+  .command('delete [channelName] [appId]')
   .alias('d')
   .description(`🗑️ Delete a channel from Capgo Cloud, optionally removing associated bundles to free up resources.
 
@@ -477,7 +489,7 @@ Example: npx @capgo/cli@latest channel currentBundle production com.example.app`
   .option('--supa-anon <supaAnon>', optionDescriptions.supaAnon)
 
 channel
-  .command('set [channelId] [appId]')
+  .command('set [channelName] [appId]')
   .alias('s')
   .description(`⚙️ Configure settings for a channel, such as linking a bundle, setting update strategies (major, minor, metadata, patch, none), or device targeting (iOS, Android, dev, prod, emulator, device).
 
@@ -756,7 +768,13 @@ const build = program
 📋 BEFORE BUILDING:
    Save your credentials first:
    npx @capgo/cli build credentials save --appId <your-app-id> --platform ios
-   npx @capgo/cli build credentials save --appId <your-app-id> --platform android`)
+   npx @capgo/cli build credentials save --appId <your-app-id> --platform android
+
+📤 CAPTURE THE OUTPUT URL FROM CI:
+   Pass --output-record to persist the download URL + QR code, then read it
+   back with \`build last-output\`:
+   npx @capgo/cli build request <appId> --platform android --output-upload --output-record /tmp/build.json
+   URL=$(npx @capgo/cli build last-output --path /tmp/build.json --field outputUrl)`)
 
 build
   .command('needed [appId]')
@@ -819,16 +837,36 @@ Example: npx @capgo/cli@latest build request com.example.app --platform ios --pa
   .option('--keystore-store-password <password>', 'Android: Keystore store password')
   .option('--play-config-json <json>', 'Android: Base64-encoded Google Play service account JSON')
   .option('--android-flavor <flavor>', 'Android: Product flavor to build (e.g. production). Required if your project has multiple flavors.')
+  .option('--in-app-update-priority <priority>', 'Android: Google Play in-app update priority for this release (integer 0–5; higher = more urgent). See https://developer.android.com/guide/playcore/in-app-updates. Precedence: CLI > env > saved credentials')
   .option('--no-playstore-upload', 'Skip Play Store upload for this build (nulls out saved play config). Requires --output-upload.')
   .option('--output-upload', 'Override output upload behavior for this build only (enable). Precedence: CLI > env > saved credentials')
   .option('--no-output-upload', 'Override output upload behavior for this build only (disable). Precedence: CLI > env > saved credentials')
   .option('--output-retention <duration>', 'Override output link TTL for this build only (1h to 7d). Examples: 1h, 6h, 2d. Precedence: CLI > env > saved credentials')
+  .option('--output-record <path>', 'After a successful build, write a JSON record (jobId, status, outputUrl, qrCodeAscii, qrCodePngPath, finishedAt) to <path>. A PNG QR code is also written next to it as <path>.qr.png. Read fields back with `build last-output`.')
   .option('--skip-build-number-bump', 'Skip automatic build number/version code incrementing. Uses whatever version is already in the project files.')
   .option('--no-skip-build-number-bump', 'Override saved credentials to re-enable automatic build number incrementing for this build only.')
+  .option('--ai-analytics', 'On build failure, send logs to Capgo AI for diagnosis. In interactive terminals this skips the upfront confirmation; in CI this auto-uploads and prints the analysis to stderr.')
   .option('-a, --apikey <apikey>', optionDescriptions.apikey)
   .option('--supa-host <supaHost>', optionDescriptions.supaHost)
   .option('--supa-anon <supaAnon>', optionDescriptions.supaAnon)
   .option('--verbose', optionDescriptions.verbose)
+
+build
+  .command('last-output')
+  .description(`Read the build output record written by a previous \`build request --output-record\`.
+
+Prints the full JSON by default, a single field with --field, or the ASCII QR
+code with --qr. Useful in CI to grab the download URL or QR for posting back
+to a PR or issue.
+
+Examples:
+  npx @capgo/cli build last-output --path /tmp/build.json
+  npx @capgo/cli build last-output --path /tmp/build.json --field outputUrl
+  npx @capgo/cli build last-output --path /tmp/build.json --qr`)
+  .action(lastOutputCommand)
+  .option('--path <path>', 'Path to the JSON record written by --output-record (required)')
+  .option('--field <field>', 'Print a single field (one of: jobId, appId, platform, buildMode, status, outputUrl, qrCodeAscii, qrCodePngPath, finishedAt, schemaVersion)')
+  .option('--qr', 'Print the rendered ASCII QR code (shortcut for --field qrCodeAscii)')
 
 const buildCredentials = build
   .command('credentials')
@@ -903,6 +941,7 @@ Local storage (per-project):
   .option('--keystore-store-password <password>', 'Android: Keystore store password')
   .option('--play-config <path>', 'Android: Path to Play Store service account JSON')
   .option('--android-flavor <flavor>', 'Android: Product flavor to build (e.g. production). Required if your project has multiple flavors.')
+  .option('--in-app-update-priority <priority>', 'Android: Google Play in-app update priority for future releases (integer 0–5; higher = more urgent). Omit to leave Play’s existing value untouched.')
   // Storage option
   .option('--local', 'Save to .capgo-credentials.json in project root instead of global ~/.capgo-credentials/')
   .option('--output-upload', 'Upload build outputs (IPA/APK/AAB) to Capgo storage and print download links')
@@ -971,6 +1010,7 @@ Examples:
   .option('--keystore-store-password <password>', 'Keystore store password')
   .option('--play-config <path>', 'Path to Google Play service account JSON')
   .option('--android-flavor <flavor>', 'Android: Product flavor to build (e.g. production). Required if your project has multiple flavors.')
+  .option('--in-app-update-priority <priority>', 'Android: Google Play in-app update priority for future releases (integer 0–5; higher = more urgent).')
   .option('--output-upload', 'Upload build outputs (IPA/APK/AAB) to Capgo storage and print download links')
   .option('--no-output-upload', 'Do not upload build outputs (IPA/APK/AAB) to Capgo storage')
   .option('--output-retention <duration>', 'Output link TTL: 1h to 7d. Examples: 1h, 6h, 2d')
@@ -1068,37 +1108,48 @@ program.configureOutput({
   },
 })
 
-program.parseAsync().catch(async (error: unknown) => {
-  if (typeof error === 'object' && error !== null && 'code' in error) {
-    const commanderError = error as { code: string, exitCode?: number, message?: string }
-    // These are normal Commander.js exits (help, version, etc.) - exit silently
-    if (commanderError.code === 'commander.version' || commanderError.code === 'commander.helpDisplayed') {
-      exit(0)
-    }
-    const capturePromise = shouldCapturePosthogException(error)
-      ? capturePosthogException({
+void (async () => {
+  try {
+    await program.parseAsync()
+    await flushAnalytics()
+  }
+  catch (error: unknown) {
+    if (typeof error === 'object' && error !== null && 'code' in error) {
+      const commanderError = error as { code: string, exitCode?: number, message?: string }
+      // These are normal Commander.js exits (help, version, etc.) - exit silently
+      if (commanderError.code === 'commander.version' || commanderError.code === 'commander.helpDisplayed') {
+        await flushAnalytics()
+        exit(0)
+      }
+      const capturePromise = shouldCapturePosthogException(error)
+        ? capturePosthogException({
           error,
           functionName: currentCommandPath,
           kind: 'unhandled_error',
           status: commanderError.exitCode ?? 1,
         })
-      : Promise.resolve(false)
-    // For actual errors, show just the message without the full stack trace
-    if (commanderError.message) {
-      log.error(commanderError.message)
+        : Promise.resolve(false)
+      // For actual errors, show just the message without the full stack trace
+      if (commanderError.message) {
+        log.error(commanderError.message)
+      }
+      const exitCode = commanderError.exitCode ?? 1
+      // Track the failure for usage analytics regardless of exception-capture
+      // policy (commander usage errors are real failures, categorized 'commander').
+      trackCommandFailed(currentCommandPath, { errorCategory: categorizeCliError(error), exitCode })
+      await Promise.all([capturePromise, flushAnalytics()])
+      exit(exitCode)
     }
-    await capturePromise
-    const exitCode = commanderError.exitCode ?? 1
-    exit(exitCode)
+    const capturePromise = capturePosthogException({
+      error,
+      functionName: currentCommandPath,
+      kind: 'unhandled_error',
+      status: 1,
+    })
+    // For non-Commander errors, show full error details
+    log.error(`Error: ${formatError(error)}`)
+    trackCommandFailed(currentCommandPath, { errorCategory: categorizeCliError(error), exitCode: 1 })
+    await Promise.all([capturePromise, flushAnalytics()])
+    exit(1)
   }
-  const capturePromise = capturePosthogException({
-    error,
-    functionName: currentCommandPath,
-    kind: 'unhandled_error',
-    status: 1,
-  })
-  // For non-Commander errors, show full error details
-  log.error(`Error: ${formatError(error)}`)
-  await capturePromise
-  exit(1)
-})
+})()

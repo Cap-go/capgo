@@ -21,7 +21,7 @@
         "enabled": true
       },
       "placement": {
-        "region": "aws:eu-central-1"
+        "region": "gcp:europe-west8"
       },
       "routes": [
         {
@@ -352,7 +352,7 @@
         "enabled": true
       },
       "placement": {
-        "region": "aws:ap-northeast-1"
+        "region": "gcp:asia-northeast1"
       },
       "routes": [
         {
@@ -451,7 +451,7 @@
         "enabled": true
       },
       "placement": {
-        "region": "aws:ap-south-1"
+        "region": "gcp:asia-south1"
       },
       "routes": [
         {
@@ -550,7 +550,7 @@
         "enabled": true
       },
       "placement": {
-        "region": "aws:us-east-1"
+        "region": "gcp:us-east5"
       },
       "routes": [
         {
@@ -748,7 +748,7 @@
         "enabled": true
       },
       "placement": {
-        "region": "aws:ap-southeast-2"
+        "region": "gcp:australia-southeast1"
       },
       "routes": [
         {
@@ -847,7 +847,7 @@
         "enabled": true
       },
       "placement": {
-        "region": "aws:sa-east-1"
+        "region": "gcp:southamerica-east1"
       },
       "routes": [
         {
@@ -1016,7 +1016,7 @@
         }
       ],
       "placement": {
-        "region": "aws:us-east-1"
+        "region": "gcp:europe-west8"
       }
     },
     "alpha": {
@@ -1115,7 +1115,7 @@
         }
       ],
       "placement": {
-        "region": "aws:us-east-1"
+        "region": "gcp:europe-west8"
       }
     },
     "local": {

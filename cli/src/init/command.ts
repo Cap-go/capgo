@@ -209,10 +209,9 @@ export function getInitUpdaterPluginConfig(appId: string, directInstall: boolean
   return {
     version: initNativeBundleVersion,
     appId,
-    autoUpdate: true,
+    autoUpdate: directInstall ? 'always' : 'atBackground',
     ...(directInstall
       ? {
-          directUpdate: 'always',
           autoSplashscreen: true,
         }
       : {}),
@@ -1936,7 +1935,7 @@ async function addAppStep(organization: Organization, apikey: string, appId: str
       const s = pSpinner()
       s.start(`Running: ${pm.runner} @capgo/cli@latest app add ${currentAppId}`)
       try {
-        await addAppInternal(currentAppId, options, organization, true)
+        await addAppInternal(currentAppId, options, organization, true, 'onboarding')
         await saveAppIdToCapacitorConfig(currentAppId)
       }
       catch (innerError) {

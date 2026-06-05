@@ -184,6 +184,7 @@ export interface AppUsageByApp {
   date: string
   mau: number
   storage: number
+  storage_byte_hours?: number
   bandwidth: number
   build_time_seconds: number
   get: number
@@ -194,6 +195,7 @@ export interface AppUsageGlobal {
   bandwidth: number
   mau: number
   storage: number
+  storage_byte_hours?: number
   build_time_seconds: number
   get: number
 }
@@ -269,8 +271,8 @@ export async function getAllDashboard(orgId: string, startDate?: string, endDate
     }
 
     const { global, byApp } = response.data as {
-      global: { mau: number, storage: number, bandwidth: number, build_time_seconds: number, date: string, get: number }[]
-      byApp: { app_id: string, mau: number, storage: number, bandwidth: number, build_time_seconds: number, date: string, get: number }[]
+      global: { mau: number, storage: number, storage_byte_hours?: number, bandwidth: number, build_time_seconds: number, date: string, get: number }[]
+      byApp: { app_id: string, mau: number, storage: number, storage_byte_hours?: number, bandwidth: number, build_time_seconds: number, date: string, get: number }[]
     }
 
     return {
@@ -570,7 +572,7 @@ export async function getRemoteDependencies(appId: string, channel: string) {
   if (error) {
     throw new Error(error.message)
   }
-  return convertNativePackages((remoteNativePackages.version.native_packages as any) ?? [])
+  return convertNativePackages(((remoteNativePackages.version as any)?.native_packages as any) ?? [])
 }
 
 interface Compatibility {

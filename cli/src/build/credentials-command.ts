@@ -3,6 +3,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { cwd, exit } from 'node:process'
 import { log } from '@clack/prompts'
+import { trackEvent } from '../analytics/track'
 import { createSupabaseClient, findSavedKey, getAppId, getConfig, getOrganizationId, sendEvent } from '../utils'
 import {
   clearSavedCredentials,
@@ -13,6 +14,7 @@ import {
   listAllApps,
   loadSavedCredentials,
   MIN_OUTPUT_RETENTION_SECONDS,
+  parseInAppUpdatePriority,
   parseOptionalBoolean,
   parseOutputRetentionSeconds,
   removeSavedCredentialKeys,
@@ -48,6 +50,7 @@ interface SaveCredentialsOptions {
   keystoreStorePassword?: string
   playConfig?: string
   androidFlavor?: string
+  inAppUpdatePriority?: number | string
 }
 
 /**
@@ -348,6 +351,18 @@ export async function saveCredentialsCommand(options: SaveCredentialsOptions): P
       else {
         log.info('ℹ️  --android-flavor not specified, no product flavor will be used')
       }
+
+      if (options.inAppUpdatePriority !== undefined) {
+        try {
+          const priority = parseInAppUpdatePriority(options.inAppUpdatePriority)
+          credentials.PLAY_STORE_IN_APP_UPDATE_PRIORITY = String(priority)
+          log.info(`✓ In-app update priority: ${priority}`)
+        }
+        catch (error) {
+          log.error(`❌ ${(error as Error).message}`)
+          exit(1)
+        }
+      }
     }
 
     // Convert files to base64 and merge with other credentials
@@ -459,6 +474,10 @@ export async function saveCredentialsCommand(options: SaveCredentialsOptions): P
     if (platform === 'android' && !options.androidFlavor) {
       await removeSavedCredentialKeys(appId, platform, ['CAPGO_ANDROID_FLAVOR'], options.local)
     }
+    // Same semantics for --in-app-update-priority: re-saving without it clears the prior value.
+    if (platform === 'android' && options.inAppUpdatePriority === undefined) {
+      await removeSavedCredentialKeys(appId, platform, ['PLAY_STORE_IN_APP_UPDATE_PRIORITY'], options.local)
+    }
 
     // Send analytics event
     try {
@@ -470,7 +489,8 @@ export async function saveCredentialsCommand(options: SaveCredentialsOptions): P
           channel: 'credentials',
           event: 'Credentials saved',
           icon: '🔐',
-          user_id: orgId,
+          org_id: orgId,
+          tracking_version: 2,
           tags: {
             'app-id': appId,
             'platform': platform,
@@ -577,6 +597,8 @@ export async function listCredentialsCommand(options?: { appId?: string, local?:
           log.info('    ✓ Key Password: ********')
         if (android.KEYSTORE_STORE_PASSWORD)
           log.info('    ✓ Store Password: ********')
+        if (android.PLAY_STORE_IN_APP_UPDATE_PRIORITY)
+          log.info(`    ✓ In-app Update Priority: ${android.PLAY_STORE_IN_APP_UPDATE_PRIORITY}`)
       }
     }
 
@@ -584,6 +606,8 @@ export async function listCredentialsCommand(options?: { appId?: string, local?:
     log.info(`Local:  ${getLocalCredentialsPath()}`)
     log.info('\n🔒 These credentials are stored locally on your machine only.')
     log.info('   When building, they are sent to Capgo but NEVER stored there.\n')
+
+    void trackEvent({ channel: 'credentials', event: 'Credentials Listed', icon: '📋', tags: { credentials_count: appsToShow.length } })
   }
   catch (error) {
     log.error(`Failed to list credentials: ${error instanceof Error ? error.message : String(error)}`)
@@ -636,6 +660,8 @@ export async function clearCredentialsCommand(options: { appId?: string, platfor
     }
 
     log.info(`   Location: ${credentialsPath}\n`)
+
+    void trackEvent({ channel: 'credentials', event: 'Credentials Cleared', icon: '🧹', tags: {} })
   }
   catch (error) {
     log.error(`Failed to clear credentials: ${error instanceof Error ? error.message : String(error)}`)
@@ -654,7 +680,7 @@ export async function updateCredentialsCommand(options: SaveCredentialsOptions):
       || options.p12Password || options.appleKey || options.appleKeyId || options.appleIssuerId
       || options.appleTeamId)
     const hasAndroidOptions = !!(options.keystore || options.keystoreAlias || options.keystoreKeyPassword
-      || options.keystoreStorePassword || options.playConfig || options.androidFlavor)
+      || options.keystoreStorePassword || options.playConfig || options.androidFlavor || options.inAppUpdatePriority !== undefined)
     const hasCrossPlatformOptions = options.outputUpload !== undefined || options.outputRetention !== undefined || options.skipBuildNumberBump !== undefined
 
     let platform = options.platform
@@ -850,6 +876,17 @@ export async function updateCredentialsCommand(options: SaveCredentialsOptions):
           log.warn('Ignoring whitespace-only --android-flavor value')
         }
       }
+      if (options.inAppUpdatePriority !== undefined) {
+        try {
+          const priority = parseInAppUpdatePriority(options.inAppUpdatePriority)
+          credentials.PLAY_STORE_IN_APP_UPDATE_PRIORITY = String(priority)
+          log.info(`✓ Updating in-app update priority: ${priority}`)
+        }
+        catch (error) {
+          log.error(`❌ ${(error as Error).message}`)
+          exit(1)
+        }
+      }
     }
 
     // Convert files to base64 and merge with other credentials
@@ -861,6 +898,8 @@ export async function updateCredentialsCommand(options: SaveCredentialsOptions):
     const credentialsPath = options.local ? getLocalCredentialsPath() : getGlobalCredentialsPath()
     log.success(`\n✅ ${platform.toUpperCase()} credentials updated for ${appId}!`)
     log.info(`   Location: ${credentialsPath}\n`)
+
+    void trackEvent({ channel: 'credentials', event: 'Credentials Updated', icon: '✏️', tags: {} })
   }
   catch (error) {
     log.error(`Failed to update credentials: ${error instanceof Error ? error.message : String(error)}`)
@@ -1001,6 +1040,8 @@ export async function migrateCredentialsCommand(options: { appId?: string, platf
     }
 
     log.info('')
+
+    void trackEvent({ channel: 'credentials', event: 'Credentials Migrated', icon: '🔀', tags: {} })
   }
   catch (error) {
     log.error(`Failed to migrate credentials: ${error instanceof Error ? error.message : String(error)}`)

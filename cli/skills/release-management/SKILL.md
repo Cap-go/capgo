@@ -37,6 +37,7 @@ Use this skill for OTA update workflows in Capgo Cloud.
   - `--min-update-version <minUpdateVersion>`
   - `--auto-min-update-version`
   - `--ignore-metadata-check`
+  - `--fail-on-incompatible` (fail the upload instead of uploading when the bundle is incompatible with the channel's current native packages; cannot be combined with `--ignore-metadata-check`)
   - `--ignore-checksum-check`
   - `--force-crc32-checksum`
   - `--timeout <timeout>`

@@ -20,6 +20,13 @@ export const app = honoFactory.createApp()
 app.use('*', useCors)
 app.use('*', middlewareV2(['all', 'read']))
 
+function accumulateNumbers(values: number[]): number[] {
+  return values.reduce<number[]>((result, value) => {
+    result.push(value + (result.at(-1) ?? 0))
+    return result
+  }, [])
+}
+
 function parseQueryDate(query: Record<string, string>, key: 'from' | 'to', issues: ValidationIssue[]): Date | undefined {
   const value = query[key]
   if (typeof value !== 'string') {
@@ -135,6 +142,12 @@ interface AppMetricRow {
   uninstall: number
 }
 
+interface StorageHourlyMetricRow {
+  app_id: string
+  date: string
+  storage_byte_hours: number
+}
+
 interface QueryResult<T> {
   data: T | null
   error: unknown
@@ -147,6 +160,7 @@ interface AppOwnerOrgRow {
 
 const STATS_QUERY_RETRY_ATTEMPTS = 3
 const STATS_QUERY_RETRY_DELAY_MS = 250
+const STORAGE_BYTE_HOURS_PAGE_SIZE = 1000
 
 // Helper to get authenticated supabase client based on auth type
 function getAuthenticatedSupabase(c: Context, auth: AuthInfo) {
@@ -159,20 +173,6 @@ function getAuthenticatedSupabase(c: Context, auth: AuthInfo) {
     throw quickError(401, 'no_authorization', 'No authorization header')
   }
   return supabaseClient(c, authorization)
-}
-
-function denyAppLimitedApiKeyOutsideScope(auth: AuthInfo, appId: string) {
-  if (auth.authType !== 'apikey')
-    return
-
-  const limitedToApps = auth.apikey?.limited_to_apps
-  if (!Array.isArray(limitedToApps) || limitedToApps.length === 0)
-    return
-
-  // Deny before app lookups so real sibling apps and missing apps are indistinguishable to scoped keys.
-  if (!limitedToApps.includes(appId)) {
-    throw quickError(401, 'no_access_to_app', 'No access to app', { data: auth.userId ?? null })
-  }
 }
 
 function isRetryableStatsError(error: unknown) {
@@ -308,6 +308,70 @@ async function checkOrganizationAccess(c: Context, orgId: string, supabase: Retu
   return { isPayingAndGoodPlan }
 }
 
+async function getStorageByteHoursByApp(
+  c: Context,
+  ownerOrg: string | null,
+  appIds: string[],
+  from: Date,
+  to: Date,
+  graphDays: number,
+  supabase: ReturnType<typeof supabaseClient>,
+) {
+  const storageByteHoursByApp = appIds.reduce((acc, appId) => {
+    acc[appId] = Array.from({ length: graphDays }).fill(0) as number[]
+    return acc
+  }, {} as Record<string, number[]>)
+
+  if (appIds.length === 0)
+    return { data: storageByteHoursByApp, error: null }
+
+  const rows: StorageHourlyMetricRow[] = []
+  const fromDay = dayjs(from).utc().format('YYYY-MM-DD')
+  const toDay = dayjs(to).utc().format('YYYY-MM-DD')
+
+  for (let pageStart = 0; ; pageStart += STORAGE_BYTE_HOURS_PAGE_SIZE) {
+    let query = (supabase as any)
+      .from('daily_storage_hourly')
+      .select('app_id,date,storage_byte_hours')
+      .gte('date', fromDay)
+      .lt('date', toDay)
+      .order('date', { ascending: true })
+      .order('app_id', { ascending: true })
+      .range(pageStart, pageStart + STORAGE_BYTE_HOURS_PAGE_SIZE - 1)
+
+    if (ownerOrg)
+      query = query.eq('owner_org', ownerOrg)
+    if (appIds.length === 1)
+      query = query.eq('app_id', appIds[0])
+
+    const { data, error } = await executeStatsQueryWithRetry<StorageHourlyMetricRow[]>(
+      c,
+      'get_daily_storage_hourly_for_stats',
+      async () => await query as QueryResult<StorageHourlyMetricRow[]>,
+    )
+
+    if (error)
+      return { data: storageByteHoursByApp, error }
+
+    rows.push(...(data ?? []))
+    if ((data?.length ?? 0) < STORAGE_BYTE_HOURS_PAGE_SIZE)
+      break
+  }
+
+  for (const row of rows) {
+    if (!storageByteHoursByApp[row.app_id])
+      continue
+
+    const dayNumber = dayjs(row.date).utc().startOf('day').diff(dayjs(from).utc().startOf('day'), 'day')
+    if (dayNumber < 0 || dayNumber >= graphDays)
+      continue
+
+    storageByteHoursByApp[row.app_id][dayNumber] += Number(row.storage_byte_hours ?? 0)
+  }
+
+  return { data: storageByteHoursByApp, error: null }
+}
+
 async function getNormalStats(c: Context, appId: string | null, ownerOrg: string | null, from: Date, to: Date, supabase: ReturnType<typeof supabaseClient>, isDashboard: boolean = false, includeBreakdown: boolean = false, noAccumulate: boolean = false) {
   if (!appId && !ownerOrg)
     return { data: null, error: 'Invalid appId or ownerOrg' }
@@ -390,6 +454,26 @@ async function getNormalStats(c: Context, appId: string | null, ownerOrg: string
     metricsByApp[key] ??= []
   }
 
+  const metricAppIds = Object.keys(metricsByApp).filter(Boolean)
+  const { data: storageByteHoursByApp, error: storageByteHoursError } = await getStorageByteHoursByApp(
+    c,
+    ownerOrgId,
+    appId ? [appId] : metricAppIds,
+    from,
+    to,
+    graphDays,
+    supabase,
+  )
+  if (storageByteHoursError)
+    return { data: null, error: storageByteHoursError }
+
+  let storageByteHours = createUndefinedArray(graphDays) as number[]
+  Object.values(storageByteHoursByApp).forEach((appStorageByteHours) => {
+    appStorageByteHours.forEach((value, index) => {
+      storageByteHours[index] += value ?? 0
+    })
+  })
+
   Object.values(metricsByApp)
     .forEach((arrItem) => {
       const sortedArrItem = arrItem.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
@@ -447,22 +531,18 @@ async function getNormalStats(c: Context, appId: string | null, ownerOrg: string
 
   // Accumulate data if requested (default behavior for backward compatibility)
   if (noAccumulate === false) {
-    // eslint-disable-next-line style/max-statements-per-line
-    storage = (storage as number[]).reduce((p, c) => { if (p.length > 0) { c += p[p.length - 1] } p.push(c); return p }, [] as number[])
-    // eslint-disable-next-line style/max-statements-per-line
-    mau = (mau as number[]).reduce((p, c) => { if (p.length > 0) { c += p[p.length - 1] } p.push(c); return p }, [] as number[])
-    // eslint-disable-next-line style/max-statements-per-line
-    bandwidth = (bandwidth as number[]).reduce((p, c) => { if (p.length > 0) { c += p[p.length - 1] } p.push(c); return p }, [] as number[])
-    // eslint-disable-next-line style/max-statements-per-line
-    buildTime = (buildTime as number[]).reduce((p, c) => { if (p.length > 0) { c += p[p.length - 1] } p.push(c); return p }, [] as number[])
+    storage = accumulateNumbers(storage)
+    storageByteHours = accumulateNumbers(storageByteHours)
+    mau = accumulateNumbers(mau)
+    bandwidth = accumulateNumbers(bandwidth)
+    buildTime = accumulateNumbers(buildTime)
     if (isDashboard) {
-      // eslint-disable-next-line style/max-statements-per-line
-      gets = (gets as number[]).reduce((p, c) => { if (p.length > 0) { c += p[p.length - 1] } p.push(c); return p }, [] as number[])
+      gets = accumulateNumbers(gets)
     }
   }
   const baseDay = dayjs(from).utc()
 
-  const finalStats = createUndefinedArray(graphDays) as { date: string, mau: number, storage: number, bandwidth: number, build_time_seconds: number, get: number | undefined }[]
+  const finalStats = createUndefinedArray(graphDays) as { date: string, mau: number, storage: number, storage_byte_hours: number, bandwidth: number, build_time_seconds: number, get: number | undefined }[]
   const today = dayjs().utc()
   for (let i = 0; i < graphDays; i++) {
     const day = baseDay.add(i, 'day')
@@ -471,6 +551,7 @@ async function getNormalStats(c: Context, appId: string | null, ownerOrg: string
     finalStats[i] = {
       mau: mau[i],
       storage: storage[i],
+      storage_byte_hours: storageByteHours[i],
       bandwidth: bandwidth[i],
       build_time_seconds: buildTime[i],
       get: isDashboard ? gets[i] : undefined,
@@ -489,6 +570,7 @@ async function getNormalStats(c: Context, appId: string | null, ownerOrg: string
       // Initialize arrays for this app
       let appMau = createUndefinedArray(graphDays) as number[]
       let appStorage = createUndefinedArray(graphDays) as number[]
+      let appStorageByteHours = [...(storageByteHoursByApp[appId] ?? createUndefinedArray(graphDays))] as number[]
       let appBandwidth = createUndefinedArray(graphDays) as number[]
       let appBuildTime = createUndefinedArray(graphDays) as number[]
       let appGets = isDashboard ? createUndefinedArray(graphDays) as number[] : []
@@ -528,42 +610,13 @@ async function getNormalStats(c: Context, appId: string | null, ownerOrg: string
 
       // Accumulate data if requested (default behavior for backward compatibility)
       if (noAccumulate === false) {
-        appStorage = (appStorage as number[]).reduce((p, c) => {
-          if (p.length > 0) {
-            c += p[p.length - 1]
-          }
-          p.push(c)
-          return p
-        }, [] as number[])
-        appMau = (appMau as number[]).reduce((p, c) => {
-          if (p.length > 0) {
-            c += p[p.length - 1]
-          }
-          p.push(c)
-          return p
-        }, [] as number[])
-        appBandwidth = (appBandwidth as number[]).reduce((p, c) => {
-          if (p.length > 0) {
-            c += p[p.length - 1]
-          }
-          p.push(c)
-          return p
-        }, [] as number[])
-        appBuildTime = (appBuildTime as number[]).reduce((p, c) => {
-          if (p.length > 0) {
-            c += p[p.length - 1]
-          }
-          p.push(c)
-          return p
-        }, [] as number[])
+        appStorage = accumulateNumbers(appStorage)
+        appStorageByteHours = accumulateNumbers(appStorageByteHours)
+        appMau = accumulateNumbers(appMau)
+        appBandwidth = accumulateNumbers(appBandwidth)
+        appBuildTime = accumulateNumbers(appBuildTime)
         if (isDashboard) {
-          appGets = (appGets as number[]).reduce((p, c) => {
-            if (p.length > 0) {
-              c += p[p.length - 1]
-            }
-            p.push(c)
-            return p
-          }, [] as number[])
+          appGets = accumulateNumbers(appGets)
         }
       }
 
@@ -578,6 +631,7 @@ async function getNormalStats(c: Context, appId: string | null, ownerOrg: string
           date: day.toISOString(),
           mau: appMau[i],
           storage: appStorage[i],
+          storage_byte_hours: appStorageByteHours[i],
           bandwidth: appBandwidth[i],
           build_time_seconds: appBuildTime[i],
           get: isDashboard ? appGets[i] : undefined,
@@ -695,8 +749,6 @@ function buildNativeVersionCounts(rows: NativeVersionUsageRow[], dates: string[]
 
 async function getAuthorizedStatsAppClient(c: Context, appId: string) {
   const auth = c.get('auth') as AuthInfo
-
-  denyAppLimitedApiKeyOutsideScope(auth, appId)
 
   if (!await checkPermission(c, 'app.read', { appId })) {
     throw quickError(401, 'no_access_to_app', 'No access to app', { data: auth?.userId ?? null })
@@ -871,8 +923,6 @@ app.get('/app/:app_id', async (c) => {
   const body = bodyParsed.data
   const auth = c.get('auth') as AuthInfo
 
-  denyAppLimitedApiKeyOutsideScope(auth, appId)
-
   // Use unified RBAC permission check
   if (!await checkPermission(c, 'app.read', { appId })) {
     throw quickError(401, 'no_access_to_app', 'No access to app', { data: auth?.userId ?? null })
@@ -907,16 +957,6 @@ app.get('/org/:org_id', async (c) => {
   if (!(await checkPermission(c, 'org.read', { orgId }))) {
     throw quickError(401, 'no_access_to_organization', 'No access to organization', { data: auth?.userId ?? null })
   }
-  if (auth.authType === 'apikey' && auth.apikey!.limited_to_orgs && auth.apikey!.limited_to_orgs.length > 0) {
-    if (!auth.apikey!.limited_to_orgs.includes(orgId)) {
-      throw quickError(401, 'invalid_apikey', 'Invalid apikey', { data: auth.apikey!.key })
-    }
-  }
-
-  if (auth.authType === 'apikey' && auth.apikey!.limited_to_apps && auth.apikey!.limited_to_apps.length > 0) {
-    throw quickError(401, 'invalid_apikey', 'Invalid apikey', { data: auth.apikey!.key })
-  }
-
   // Use authenticated client - RLS will enforce access
   const supabase = getAuthenticatedSupabase(c, auth)
 
@@ -1008,8 +1048,14 @@ app.get('/user', async (c) => {
   }
 
   let stats: Array<{ data: any, error: any }> = []
-  if (auth.authType === 'apikey' && auth.apikey!.limited_to_apps && auth.apikey!.limited_to_apps.length > 0) {
-    stats = await Promise.all(auth.apikey!.limited_to_apps.map(appId => getNormalStats(c, appId, null, body.from, body.to, supabase, auth.authType === 'jwt', false, body.noAccumulate ?? false)))
+  if (auth.authType === 'apikey') {
+    const { data: apps, error: appsError } = await supabase.rpc('get_accessible_apps_for_apikey_v2', {
+      apikey: c.get('capgkey') as string,
+    })
+    if (appsError) {
+      throw quickError(404, 'apps_not_found', 'Apps not found', { error: appsError })
+    }
+    stats = await Promise.all((apps ?? []).map(app => getNormalStats(c, app.app_id, null, body.from, body.to, supabase, false, false, body.noAccumulate ?? false)))
   }
   else {
     stats = await Promise.all(orgIds.map(orgId => getNormalStats(c, null, orgId, body.from, body.to, supabase, auth.authType === 'jwt', false, body.noAccumulate ?? false)))

@@ -80,3 +80,33 @@ export function openKeystorePicker(): Promise<string | null> {
     'POSIX path of (choose file of type {"jks", "keystore", "p12"} with prompt "Select your Android keystore")',
   )
 }
+
+/**
+ * Open the macOS native file picker filtered to .mobileprovision files.
+ * Returns the selected path, or null if the user cancelled.
+ *
+ * Used by the no-match-recovery "Use a .mobileprovision file from disk"
+ * option — covers users who have a profile downloaded somewhere outside
+ * Xcode's standard provisioning-profile directories (e.g. a downloads
+ * folder, an artifact from another machine, a shared team archive).
+ */
+export function openMobileprovisionPicker(): Promise<string | null> {
+  return openMacFilePicker(
+    'POSIX path of (choose file of type {"mobileprovision"} with prompt "Select your .mobileprovision file")',
+  )
+}
+
+/**
+ * Open the macOS native file picker filtered to Google Play service account
+ * JSON files. Used by the Android onboarding "import existing SA" path.
+ *
+ * Uses the official `public.json` Uniform Type Identifier rather than the raw
+ * `"json"` extension hint — AppleScript treats unrecognized strings as 4-char
+ * OSType codes, and the legacy OSType code for `"json"` does not match real
+ * `.json` files, which makes the dialog grey them all out.
+ */
+export function openServiceAccountJsonPicker(): Promise<string | null> {
+  return openMacFilePicker(
+    'POSIX path of (choose file of type {"public.json"} with prompt "Select your Google Play service account JSON")',
+  )
+}

@@ -59,7 +59,8 @@ export async function markSnag(channel: string, orgId: string, apikey: string, e
     channel,
     event,
     icon,
-    user_id: orgId,
+    org_id: orgId,
+    tracking_version: 2,
     ...(appId ? { tags: { 'app-id': appId } } : {}),
     notify: false,
   })

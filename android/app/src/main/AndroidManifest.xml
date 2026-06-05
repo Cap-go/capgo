@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <application
         android:allowBackup="true"
@@ -25,20 +26,38 @@
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="https" />
-                <data android:host="console.capgo.app" />
+                <data android:scheme="https" android:host="console.capgo.app" />
+                <data android:scheme="https" android:host="console.dev.capgo.app" />
+                <data android:scheme="https" android:host="console.preprod.capgo.app" />
+                <data android:scheme="https" android:host="console.staging.capgo.app" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="capgo" />
             </intent-filter>
 
         </activity>
 
+        <!-- Single FileProvider serving every authority used in the app. Three sources declare
+             androidx.core.content.FileProvider: the app + @capgo/capacitor-inappbrowser (both
+             ${applicationId}.fileprovider) and @capgo/capacitor-pdf-generator
+             (${applicationId}.capgo.pdfgenerator.fileprovider). The manifest merger keys
+             providers by android:name, so the differing authority/resource conflict. We merge
+             them into one provider here: tools:replace makes this node authoritative, the
+             authorities list registers BOTH (so pdf-generator's getUriForFile keeps working),
+             and @xml/file_paths covers all roots (app cache/external + pdf's cache). -->
         <provider
             android:name="androidx.core.content.FileProvider"
-            android:authorities="${applicationId}.fileprovider"
+            android:authorities="${applicationId}.fileprovider;${applicationId}.capgo.pdfgenerator.fileprovider"
             android:exported="false"
-            android:grantUriPermissions="true">
+            android:grantUriPermissions="true"
+            tools:replace="android:authorities">
             <meta-data
                 android:name="android.support.FILE_PROVIDER_PATHS"
-                android:resource="@xml/file_paths"></meta-data>
+                android:resource="@xml/file_paths"
+                tools:replace="android:resource"></meta-data>
         </provider>
     </application>
 

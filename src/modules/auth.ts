@@ -7,8 +7,10 @@ import { isSsoUser, provisionSsoUser } from '~/services/ssoProvisioning'
 import { createSignedImageUrl, getImmediateImageUrl } from '~/services/storage'
 import { getLocalConfig, useSupabase } from '~/services/supabase'
 import { sendEvent } from '~/services/tracking'
+import { clearWebsitePaidUserCookie, setWebsitePaidUserCookie } from '~/services/websiteAuthCookie'
 import { useMainStore } from '~/stores/main'
 import { useOrganizationStore } from '~/stores/organization'
+import { hasPendingInviteSkip } from '~/utils/pendingInviteSkip'
 import { getPlans, isPlatformAdmin } from './../services/supabase'
 
 async function updateUser(
@@ -145,14 +147,14 @@ async function isDisabledAccount(supabase: SupabaseClient, userId: string | null
 
     if (error) {
       console.error('Error checking account status:', error)
-      return true
+      return false
     }
 
     return !!isDisabled
   }
   catch (error) {
     console.error('Error checking if account is disabled:', error)
-    return true
+    return false
   }
 }
 
@@ -204,9 +206,21 @@ async function guard(
   function shouldRedirectToOrgOnboarding() {
     if (to.path.startsWith('/onboarding/organization'))
       return false
+    if (to.path.startsWith('/onboarding/invitation'))
+      return false
     if (!inviteOrgId)
       return true
     return !organizationStore.organizations.some(org => org.gid === inviteOrgId && org.role.startsWith('invite'))
+  }
+
+  function shouldRedirectToPendingInviteOnboarding(organizationsLoaded: boolean) {
+    if (!organizationsLoaded)
+      return false
+    if (to.path.startsWith('/onboarding/invitation'))
+      return false
+    if (hasPendingInviteSkip(sessionUser?.id ?? main.auth?.id))
+      return false
+    return organizationStore.organizations.some(org => org.role.startsWith('invite'))
   }
 
   if (hasAuth && sessionUser) {
@@ -266,9 +280,20 @@ async function guard(
     }
 
     const organizationsLoaded = await tryLoadOrganizations(() => organizationStore.fetchOrganizations())
+    if (shouldRedirectToPendingInviteOnboarding(organizationsLoaded)) {
+      return next({
+        path: '/onboarding/invitation',
+        query: {
+          to: to.path.startsWith('/onboarding/') ? '/dashboard' : to.fullPath,
+        },
+      })
+    }
+
     if (organizationsLoaded && isAdminRoute) {
       try {
         main.isAdmin = await isPlatformAdmin()
+        if (main.isAdmin)
+          setWebsitePaidUserCookie(true)
       }
       catch (error) {
         console.error('Failed to resolve platform admin status:', error)
@@ -294,6 +319,8 @@ async function guard(
     try {
       // isPlatformAdmin() is the only frontend admin-rights source.
       main.isAdmin = await isPlatformAdmin()
+      if (main.isAdmin)
+        setWebsitePaidUserCookie(true)
     }
     catch (error) {
       console.error('Failed to resolve platform admin status:', error)
@@ -332,6 +359,15 @@ async function guard(
     }
 
     let organizationsLoaded = await tryLoadOrganizations(() => organizationStore.dedupFetchOrganizations())
+    if (shouldRedirectToPendingInviteOnboarding(organizationsLoaded)) {
+      return next({
+        path: '/onboarding/invitation',
+        query: {
+          to: to.path.startsWith('/onboarding/') ? '/dashboard' : to.fullPath,
+        },
+      })
+    }
+
     if (organizationsLoaded && !organizationStore.hasOrganizations && isSsoUser(sessionUser)) {
       const didProvisionSsoMembership = await maybeProvisionSsoMembership(supabase, sessionData?.session ?? null)
       if (didProvisionSsoMembership === 'redirect_login') {
@@ -354,6 +390,8 @@ async function guard(
       try {
         // Re-check via the single approved frontend path for admin-rights.
         main.isAdmin = await isPlatformAdmin()
+        if (main.isAdmin)
+          setWebsitePaidUserCookie(true)
       }
       catch (error) {
         console.error('Failed to resolve platform admin status:', error)
@@ -377,6 +415,21 @@ async function guard(
 }
 
 export const install: UserModule = ({ router }) => {
+  const supabase = useSupabase()
+  supabase.auth.getSession()
+    .then(({ data }) => {
+      if (!data.session)
+        clearWebsitePaidUserCookie()
+    })
+    .catch(error => console.error('Failed to clear website paid user cookie', error))
+
+  if (typeof supabase.auth.onAuthStateChange === 'function') {
+    supabase.auth.onAuthStateChange((_event, session) => {
+      if (!session)
+        clearWebsitePaidUserCookie()
+    })
+  }
+
   router.beforeEach(async (to, from, next) => {
     if (to.meta.middleware) {
       await guard(next, to, from)

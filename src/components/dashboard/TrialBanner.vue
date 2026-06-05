@@ -36,6 +36,7 @@ const config = getLocalConfig()
 function trackBannerEvent(eventName: string) {
   const org = currentOrg.value
   pushEvent(eventName, config.supaHost, {
+    ...(org?.gid ? { org_id: org.gid } : {}),
     trial_days_left: org?.trial_left ?? 0,
     org_gid: org?.gid ?? '',
   })

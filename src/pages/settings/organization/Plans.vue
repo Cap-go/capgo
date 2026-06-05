@@ -10,7 +10,7 @@ import AdminOnlyModal from '~/components/AdminOnlyModal.vue'
 import CreditsCta from '~/components/CreditsCta.vue'
 import { formatIncludedThenPrice } from '~/services/creditPricing'
 import { checkPermissions } from '~/services/permissions'
-import { openCheckout } from '~/services/stripe'
+import { getDatafastAttribution, openCheckout } from '~/services/stripe'
 import { getCreditUnitPricing, getCurrentPlanNameOrg, useSupabase } from '~/services/supabase'
 import { openSupport } from '~/services/support'
 import { sendEvent } from '~/services/tracking'
@@ -152,10 +152,6 @@ function isSafariBrowser() {
   return /Version\/[\d.]+/.test(ua) && /Safari\//.test(ua) && !/Chrome|CriOS|FxiOS|OPiOS|Edg|Chromium/.test(ua)
 }
 
-async function getStripeAttributionId() {
-  return (await cookieStore.get('datafast_visitor_id'))?.value
-}
-
 async function prefetchStripeCheckoutUrl(plan: Database['public']['Tables']['plans']['Row'], isYear: boolean) {
   if (!plan.stripe_id)
     return
@@ -166,7 +162,7 @@ async function prefetchStripeCheckoutUrl(plan: Database['public']['Tables']['pla
 
   const successUrl = `${window.location.href}?success=1`
   const cancelUrl = `${window.location.href}?cancel=1`
-  const attributionId = await getStripeAttributionId()
+  const datafastAttribution = await getDatafastAttribution()
   try {
     const resp = await supabase.functions.invoke('private/stripe_checkout', {
       body: JSON.stringify({
@@ -175,7 +171,9 @@ async function prefetchStripeCheckoutUrl(plan: Database['public']['Tables']['pla
         cancelUrl,
         recurrence: isYear ? 'year' : 'month',
         orgId: currentOrganization.value?.gid ?? '',
-        attributionId,
+        attributionId: datafastAttribution.visitorId,
+        datafastVisitorId: datafastAttribution.visitorId,
+        datafastSessionId: datafastAttribution.sessionId,
       }),
     })
 
@@ -369,13 +367,17 @@ watchEffect(async () => {
       }
 
       loadData(true)
-      sendEvent({
-        channel: 'usage',
-        event: 'User visit',
-        icon: '💳',
-        user_id: currentOrganization.value?.gid,
-        notify: false,
-      }).catch()
+      const orgId = currentOrganization.value?.gid
+      if (orgId) {
+        sendEvent({
+          channel: 'usage',
+          event: 'User visit',
+          icon: '💳',
+          org_id: orgId,
+          tracking_version: 2,
+          notify: false,
+        }).catch()
+      }
     }
   }
 })

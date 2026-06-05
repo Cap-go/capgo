@@ -2,3 +2,10 @@
 extend-exclude = [
   "test/data.ts"
 ]
+
+# Apple developer-portal vocabulary and other domain words the CI typos
+# checker mis-flags. Add identifiers here as "wrong" = "right" — but to
+# accept them as-is we set the value to the same word.
+[default.extend-words]
+UDID = "UDID"
+unparseable = "unparseable"

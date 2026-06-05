@@ -12,8 +12,38 @@ on:
 permissions: {}
 
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    name: Resolve deploy scope
+    permissions:
+      contents: read
+    outputs:
+      api: ${{ steps.scope.outputs.api }}
+      files: ${{ steps.scope.outputs.files }}
+      plugins: ${{ steps.scope.outputs.plugins }}
+      supabase: ${{ steps.scope.outputs.supabase }}
+      translation: ${{ steps.scope.outputs.translation }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          filter: blob:none
+      - name: Setup bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - name: Resolve deploy scope
+        id: scope
+        env:
+          REF_NAME: ${{ github.ref_name }}
+        run: bun scripts/deploy-scope.ts "$REF_NAME" >> "$GITHUB_OUTPUT"
+
   # Tests already passed before tag was created, so just build and deploy
   supabase_deploy:
+    needs: changes
+    if: ${{ needs.changes.outputs.supabase == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     name: Build code and deploy to Supabase
@@ -52,8 +82,14 @@ jobs:
         run: bun install
       - name: Install Supabase CLI
         uses: supabase/setup-cli@v2.0.0
+        # Pinned to 2.98.2 because Supabase CLI v2.99.0 (2026-05-18) ships
+        # release assets with version in the filename (supabase_2.99.0_linux_amd64.tar.gz)
+        # while setup-cli@v2.0.0 hardcodes the unversioned name
+        # (supabase_linux_amd64.tar.gz) for any version >= 1.28.0, causing 404.
+        # Revert to `latest` once setup-cli ships a fix or Supabase restores
+        # the unversioned assets. Tracking: https://github.com/supabase/setup-cli
         with:
-          version: latest
+          version: 2.98.2
       - name: Show Supabase CLI version
         run: supabase --version
       - name: Prepare Supabase
@@ -68,7 +104,8 @@ jobs:
         run: supabase functions deploy
 
   deploy_webapp:
-    needs: supabase_deploy
+    needs: [changes, supabase_deploy]
+    if: ${{ always() && needs.changes.result == 'success' && (needs.supabase_deploy.result == 'success' || needs.supabase_deploy.result == 'skipped') }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -138,7 +175,8 @@ jobs:
           prerelease: ${{ contains(github.ref, '-alpha.') }}
 
   deploy_api:
-    needs: supabase_deploy
+    needs: [changes, supabase_deploy]
+    if: ${{ always() && needs.changes.result == 'success' && needs.changes.outputs.api == 'true' && (needs.supabase_deploy.result == 'success' || needs.supabase_deploy.result == 'skipped') }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -167,7 +205,8 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
   deploy_translation_worker:
-    needs: deploy_api
+    needs: [changes, supabase_deploy]
+    if: ${{ always() && needs.changes.result == 'success' && needs.changes.outputs.translation == 'true' && (needs.supabase_deploy.result == 'success' || (needs.supabase_deploy.result == 'skipped' && needs.changes.outputs.supabase != 'true')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -196,7 +235,8 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
   deploy_files:
-    needs: supabase_deploy
+    needs: [changes, supabase_deploy]
+    if: ${{ always() && needs.changes.result == 'success' && needs.changes.outputs.files == 'true' && (needs.supabase_deploy.result == 'success' || needs.supabase_deploy.result == 'skipped') }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -225,7 +265,8 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
   deploy_plugin_regions:
-    needs: supabase_deploy
+    needs: [changes, supabase_deploy]
+    if: ${{ always() && needs.changes.result == 'success' && needs.changes.outputs.plugins == 'true' && (needs.supabase_deploy.result == 'success' || needs.supabase_deploy.result == 'skipped') }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:

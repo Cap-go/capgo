@@ -20,6 +20,7 @@ const { deliverWebhook } = await import('../supabase/functions/_backend/utils/we
 
 describe('webhook delivery redirect handling', () => {
   const payload = {
+    type: 'app_versions.INSERT',
     event: 'app_versions.INSERT',
     event_id: 'event-123',
     timestamp: '2026-03-16T00:00:00.000Z',
@@ -63,6 +64,7 @@ describe('webhook delivery redirect handling', () => {
       'https://example.com/webhook',
       payload,
       'whsec_test_secret',
+      'standard',
     )
 
     const webhookCalls = fetchMock.mock.calls.filter(([url]) => url === 'https://example.com/webhook')

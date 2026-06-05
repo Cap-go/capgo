@@ -49,6 +49,15 @@ describe('admin stats validation', () => {
     expect(parsed.success).toBe(true)
   })
 
+  it.concurrent('accepts the trial plan breakdown metric', () => {
+    const parsed = safeParseSchema(adminStatsBodySchema, {
+      ...baseBody,
+      metric_category: 'trial_plan_breakdown',
+    })
+
+    expect(parsed.success).toBe(true)
+  })
+
   it.concurrent('accepts organization insights filters', () => {
     const parsed = safeParseSchema(adminStatsBodySchema, {
       ...baseBody,

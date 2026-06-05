@@ -2,7 +2,8 @@ import type { Context } from 'hono'
 import type { AuthInfo, MiddlewareKeyVariables } from '../../utils/hono.ts'
 import type { Database } from '../../utils/supabase.types.ts'
 import { getBodyOrQuery, honoFactory, quickError, simpleError } from '../../utils/hono.ts'
-import { middlewareKey, middlewareV2 } from '../../utils/hono_middleware.ts'
+import { middlewareV2 } from '../../utils/hono_middleware.ts'
+import { closeClient, getPgClient, logPgError } from '../../utils/pg.ts'
 import { apikeyHasOrgRight, apikeyHasOrgRightWithPolicy, hasOrgRight, hasOrgRightApikey, supabaseApikey } from '../../utils/supabase.ts'
 import { deleteWebhook } from './delete.ts'
 import { getDeliveries, retryDelivery } from './deliveries.ts'
@@ -13,15 +14,50 @@ import { test } from './test.ts'
 
 export const app = honoFactory.createApp()
 
-function assertOrgWebhookScope(
+async function apiKeyHasAppScopedBinding(
+  c: Context<MiddlewareKeyVariables, any, any>,
+  apikey: Database['public']['Tables']['apikeys']['Row'],
+): Promise<boolean> {
+  if (!apikey.rbac_id)
+    return false
+
+  const pgClient = getPgClient(c)
+  try {
+    const result = await pgClient.query<{ has_app_scope: boolean }>(
+      `
+      SELECT EXISTS (
+        SELECT 1
+        FROM public.role_bindings
+        WHERE principal_type = public.rbac_principal_apikey()
+          AND principal_id = $1::uuid
+          AND scope_type <> public.rbac_scope_org()
+          AND (expires_at IS NULL OR expires_at > now())
+      ) AS has_app_scope
+      `,
+      [apikey.rbac_id],
+    )
+
+    return result.rows[0]?.has_app_scope ?? true
+  }
+  catch (error) {
+    logPgError(c, 'apiKeyHasAppScopedBinding', error)
+    return true
+  }
+  finally {
+    await closeClient(c, pgClient)
+  }
+}
+
+async function assertOrgWebhookScope(
+  c: Context<MiddlewareKeyVariables, any, any>,
   orgId: string,
   apikey: Database['public']['Tables']['apikeys']['Row'],
-): void {
-  if (apikey.limited_to_apps?.length) {
+): Promise<void> {
+  if (await apiKeyHasAppScopedBinding(c, apikey)) {
     throw simpleError('no_permission', 'App-scoped API keys cannot manage organization webhooks', { org_id: orgId })
   }
 
-  if (!apikeyHasOrgRight(apikey, orgId)) {
+  if (!(await apikeyHasOrgRight(c, apikey, orgId))) {
     throw simpleError('invalid_org_id', 'You can\'t access this organization', { org_id: orgId })
   }
 }
@@ -69,7 +105,7 @@ async function assertWebhookApiKeyChain(
   apiKeyChain: Database['public']['Tables']['apikeys']['Row'][],
 ) {
   for (const apikey of apiKeyChain) {
-    assertOrgWebhookScope(orgId, apikey)
+    await assertOrgWebhookScope(c, orgId, apikey)
   }
 
   for (const apikey of apiKeyChain) {
@@ -114,31 +150,31 @@ export async function checkWebhookPermissionV2(
 }
 
 // List all webhooks for org
-app.get('/', middlewareKey(['all', 'write']), async (c) => {
+app.get('/', middlewareV2(['all', 'write']), async (c) => {
   const body = await getBodyOrQuery<any>(c)
-  const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
-  return get(c, body, apikey)
+  const auth = c.get('auth') as AuthInfo
+  return get(c, body, auth)
 })
 
 // Create webhook
-app.post('/', middlewareKey(['all', 'write']), async (c) => {
+app.post('/', middlewareV2(['all', 'write']), async (c) => {
   const body = await getBodyOrQuery<any>(c)
-  const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
-  return post(c, body, apikey)
+  const auth = c.get('auth') as AuthInfo
+  return post(c, body, auth)
 })
 
 // Update webhook
-app.put('/', middlewareKey(['all', 'write']), async (c) => {
+app.put('/', middlewareV2(['all', 'write']), async (c) => {
   const body = await getBodyOrQuery<any>(c)
-  const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
-  return put(c, body, apikey)
+  const auth = c.get('auth') as AuthInfo
+  return put(c, body, auth)
 })
 
 // Delete webhook
-app.delete('/', middlewareKey(['all', 'write']), async (c) => {
+app.delete('/', middlewareV2(['all', 'write']), async (c) => {
   const body = await getBodyOrQuery<any>(c)
-  const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
-  return deleteWebhook(c, body, apikey)
+  const auth = c.get('auth') as AuthInfo
+  return deleteWebhook(c, body, auth)
 })
 
 // Test webhook (supports both JWT and API key auth)
@@ -149,10 +185,10 @@ app.post('/test', middlewareV2(['all', 'write']), async (c) => {
 })
 
 // Get webhook deliveries
-app.get('/deliveries', middlewareKey(['all', 'write']), async (c) => {
+app.get('/deliveries', middlewareV2(['all', 'write']), async (c) => {
   const body = await getBodyOrQuery<any>(c)
-  const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
-  return getDeliveries(c, body, apikey)
+  const auth = c.get('auth') as AuthInfo
+  return getDeliveries(c, body, auth)
 })
 
 // Retry a failed delivery (supports both JWT and API key auth)

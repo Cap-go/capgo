@@ -6,7 +6,7 @@ import { literalUnion, safeParseSchema } from '../utils/ark_validation.ts'
 import { getAdminAppsTrend, getAdminBandwidthTrend, getAdminBundlesTrend, getAdminDistributionMetrics, getAdminFailureMetrics, getAdminMauTrend, getAdminOrgMetrics, getAdminPlatformOverview, getAdminStorageTrend, getAdminSuccessRate, getAdminSuccessRateTrend, getAdminUploadMetrics } from '../utils/cloudflare.ts'
 import { middlewareAuth, parseBody, simpleError, useCors } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
-import { getAdminCancelledOrganizations, getAdminCustomerCountryBreakdown, getAdminDeploymentsTrend, getAdminEmailTypeBreakdown, getAdminGlobalStatsTrend, getAdminOnboardingFunnel, getAdminOrganizationInsights, getAdminPluginBreakdown, getAdminTrialOrganizations } from '../utils/pg.ts'
+import { getAdminCancelledOrganizations, getAdminCustomerCountryBreakdown, getAdminDeploymentsTrend, getAdminEmailTypeBreakdown, getAdminGlobalStatsTrend, getAdminOnboardingFunnel, getAdminOrganizationInsights, getAdminPluginBreakdown, getAdminTrialOrganizations, getAdminTrialPlanBreakdown } from '../utils/pg.ts'
 import { getCancellationDetails } from '../utils/stripe.ts'
 import { supabaseClient as useSupabaseClient } from '../utils/supabase.ts'
 
@@ -32,6 +32,7 @@ const metricCategories = [
   'global_stats_trend',
   'plugin_breakdown',
   'trial_organizations',
+  'trial_plan_breakdown',
   'onboarding_funnel',
   'cancelled_users',
   'email_type_breakdown',
@@ -245,6 +246,10 @@ app.post('/', middlewareAuth, async (c) => {
 
       case 'trial_organizations':
         result = await getAdminTrialOrganizations(c, limit || 20, offset || 0)
+        break
+
+      case 'trial_plan_breakdown':
+        result = await getAdminTrialPlanBreakdown(c, start_date, end_date)
         break
 
       case 'cancelled_users': {
