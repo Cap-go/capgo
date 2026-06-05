@@ -272,7 +272,7 @@ async function persistCompatibilityEvents(
     for (const event of events) {
       await updateChannelsWithRetry(
         c,
-        async () => await (supabaseAdmin(c) as any)
+        async () => await supabaseAdmin(c)
           .from('compatibility_events')
           .upsert(event as CompatibilityEventInsert, { onConflict: COMPATIBILITY_DEDUP_CONFLICT }),
         { app_id: event.app_id, channel_id: event.channel_id, platform: event.platform, op: 'compatibility_event_upsert' },
@@ -314,7 +314,7 @@ async function autoResolveCompatibilityEvents(
   if (currentDefaultByPlatform.length === 0)
     return
 
-  const { data: unresolved, error } = await (supabaseAdmin(c) as any)
+  const { data: unresolved, error } = await supabaseAdmin(c)
     .from('compatibility_events')
     .select('id, platform, previous_version_id, previous_version_name, current_version_id')
     .eq('app_id', record.app_id)
@@ -354,7 +354,7 @@ async function autoResolveCompatibilityEvents(
   for (const resolve of resolves) {
     await updateChannelsWithRetry(
       c,
-      async () => await (supabaseAdmin(c) as any)
+      async () => await supabaseAdmin(c)
         .from('compatibility_events')
         .update({
           resolved_at: new Date().toISOString(),
