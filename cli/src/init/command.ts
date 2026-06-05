@@ -507,7 +507,7 @@ async function runInitContactSupport(failureText: string): Promise<void> {
       sections: [{ title: 'Internal log', lines: readInitInternalLogLines() }],
     }),
     copyPath: p => copyToClipboard(p).ok,
-    reveal: (p) => { revealInFinder(p) },
+    reveal: p => revealInFinder(p),
     openUrl: u => open(u),
     print: msg => pLog.info(msg),
   })

@@ -1186,7 +1186,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
         ],
       }),
       copyPath: p => copyToClipboard(p).ok,
-      reveal: (p) => { revealInFinder(p) },
+      reveal: p => revealInFinder(p),
       openUrl: u => open(u),
       print: msg => addLog(msg, 'cyan'),
     })

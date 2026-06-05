@@ -2164,7 +2164,7 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
               sections: internalLines.length > 0 ? [{ title: 'Internal log', lines: internalLines }] : [],
             }),
             copyPath: p => copyToClipboard(p).ok,
-            reveal: (p) => { revealInFinder(p) },
+            reveal: p => revealInFinder(p),
             openUrl: async u => (await import('open')).default(u),
             print: msg => clackLog.info(msg),
           })

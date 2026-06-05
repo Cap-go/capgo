@@ -18,8 +18,8 @@ export interface ContactSupportDeps {
   buildFiles: () => { logPath: string, gzPath: string } | null
   // Copy a path to the clipboard; return success.
   copyPath: (path: string) => boolean
-  // Optional macOS Finder reveal.
-  reveal?: (path: string) => void
+  // Optional macOS Finder reveal; return true when the reveal actually happened.
+  reveal?: (path: string) => boolean | void
   // Open a URL (the mailto:).
   openUrl: (url: string) => Promise<unknown>
   // Emit a user-facing line.
@@ -28,7 +28,23 @@ export interface ContactSupportDeps {
 
 export type ContactSupportResult = 'opened' | 'cancelled' | 'failed'
 
+// Re-entrancy guard: TUI selects can re-fire their onChange on re-render
+// (@inkjs/ui gotcha), and a double invocation would open two mail windows.
+let supportFlowInFlight = false
+
 export async function contactSupport(deps: ContactSupportDeps): Promise<ContactSupportResult> {
+  if (supportFlowInFlight)
+    return 'cancelled'
+  supportFlowInFlight = true
+  try {
+    return await runContactSupport(deps)
+  }
+  finally {
+    supportFlowInFlight = false
+  }
+}
+
+async function runContactSupport(deps: ContactSupportDeps): Promise<ContactSupportResult> {
   const proceed = await deps.confirm(confirmMessage())
   if (!proceed)
     return 'cancelled'
@@ -41,7 +57,7 @@ export async function contactSupport(deps: ContactSupportDeps): Promise<ContactS
 
   // Clipboard must hold the GZIPPED file path (the compact attachment).
   const copied = deps.copyPath(files.gzPath)
-  deps.reveal?.(files.gzPath)
+  const revealed = deps.reveal?.(files.gzPath) === true
 
   // Put the saved file path in the email body too — mailto: can't auto-attach, and
   // the user is looking at their mail client now, not the terminal. Only claim it's
@@ -60,9 +76,11 @@ export async function contactSupport(deps: ContactSupportDeps): Promise<ContactS
   }
 
   const clip = copied ? ' (copied to your clipboard)' : ''
+  // The mail window launches on top of the Finder reveal — tell the user it's there.
+  const finderNote = revealed ? ' A Finder window showing the file is open behind your mail app.' : ''
   if (mailOpened)
-    deps.print(`Opened an email to ${SUPPORT_EMAIL}. Your logs are saved at ${files.gzPath}${clip} — attach that file and send. (A readable copy is also at ${files.logPath}.)`)
+    deps.print(`Opened an email to ${SUPPORT_EMAIL}. Your logs are saved at ${files.gzPath}${clip} — attach that file and send.${finderNote} (A readable copy is also at ${files.logPath}.)`)
   else
-    deps.print(`Couldn't open your mail app automatically. Please email ${SUPPORT_EMAIL} and attach your logs saved at ${files.gzPath}${clip}. (A readable copy is also at ${files.logPath}.)`)
+    deps.print(`Couldn't open your mail app automatically. Please email ${SUPPORT_EMAIL} and attach your logs saved at ${files.gzPath}${clip}.${finderNote} (A readable copy is also at ${files.logPath}.)`)
   return 'opened'
 }
