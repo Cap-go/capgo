@@ -41,7 +41,7 @@ const MAX_AI_RETRIES = 2
 import type { AscApp, AscDistributionCert } from '../apple-api.js'
 import { CertificateLimitError, classifyCertAvailability, computeCertSha1, createCertificate, createProfile, deleteProfile, DuplicateProfileError, ensureBundleId, findCertIdBySha1, generateJwt, listApps, listBundleIds, listDistributionCerts, listProfilesForCert, revokeCertificate, verifyApiKey } from '../apple-api.js'
 import type { AscAppLike, GatePath } from '../app-verification.js'
-import { classifyAppVerification, evaluateGate } from '../app-verification.js'
+import { evaluateGate } from '../app-verification.js'
 import { trackEvent } from '../../../analytics/track.js'
 import { createP12, generateCsr } from '../csr.js'
 import { mapIosOnboardingError } from '../error-categories.js'
@@ -138,12 +138,16 @@ const CARRIAGE_RETURN_RE = /\r/g
 // The create-new credential PROVISIONING effect steps the iOS engine-driver
 // (below) routes through the shared engine's `runIosEffect`. The CHOICE / INPUT
 // steps and the import-side effects keep their bespoke bodies for now (Stage 3
-// swaps the choice/input routing). verifying-key is in the set but the driver
-// guards it to the create-new path only (import keeps the bespoke routing).
+// swaps the choice/input routing). verifying-key is fully engine-routed (BOTH
+// the create-new and import paths — the engine expresses the import app_store
+// continuation itself via transient.pendingVerifyNext), and verify-app (the
+// remote App Store verification gate, PR #2397) runs its fetch +
+// classification + gate resolver in the engine too.
 const IOS_ENGINE_CREATE_EFFECT_STEPS = new Set<OnboardingStep>([
   'backing-up',
   'p8-method-select',
   'verifying-key',
+  'verify-app',
   'creating-certificate',
   'revoking-certificate',
   'creating-profile',
@@ -325,8 +329,10 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
   // app-verification.ts for the pure classify/gate logic.
   //
   // Where to go once verify-app passes (e.g. creating-certificate on the
-  // create-new path, or the identity/profile picker on import).
-  const [pendingVerifyNext, setPendingVerifyNext] = useState<OnboardingStep | null>(null)
+  // create-new path, or the identity/profile picker on import) is now
+  // ENGINE-OWNED: verifying-key returns it in transient.pendingVerifyNext and
+  // the driver threads it back via iosCarriedRef (EPHEMERAL — never persisted;
+  // a fresh mount has none, so verify-app falls back to creating-certificate).
   // True while the initial parallel apps+bundleIds fetch is in flight.
   const [verifyAppLoading, setVerifyAppLoading] = useState(false)
   // The authoritative Release build id resolved fresh from pbxproj for this
@@ -363,10 +369,10 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
   // the wizard dodges this by navigating away on select; the gate stays on-step,
   // so we force a remount to reset the Select's internal value.
   const [gateActionSeq, setGateActionSeq] = useState(0)
-  // Guards the one-shot Shown event + the initial fetch effect from re-firing
-  // on every re-render while we're parked on verify-app.
+  // Guards the one-shot Shown telemetry event from re-firing on every
+  // re-render while we're parked on verify-app (the initial fetch itself is
+  // now the engine-driver effect, keyed on the step transition).
   const verifyShownRef = useRef(false)
-  const verifyFetchStartedRef = useRef(false)
   // Detection is synchronous (small files, no network); useMemo captures the
   // result for the lifetime of the component. redirectIfMismatch reads this to
   // decide whether to adopt the Release id (on mismatch). verify-app re-detects
@@ -968,25 +974,111 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
     })
   }, [appId, apikey, resolvedOrgId])
 
-  // Persist the verified Release build id as the iosBundleIdOverride. After the
-  // gate passes the wired-in value is always a build id that both the project
-  // produces AND the App Store has, so cert/profile creation, ensureBundleId and
-  // the provisioning_map all key off the right identifier. Also snapshots the
-  // current config.appId so a later run can detect context drift and re-verify.
-  // Marks the app id as confirmed so redirectIfMismatch doesn't re-adopt later.
-  const persistVerifyOverride = useCallback(async (releaseBundleId: string) => {
-    setIosBundleId(releaseBundleId)
-    setAppIdConfirmed(true)
-    const existing = await loadProgress(appId) || {
-      platform: 'ios' as const,
-      appId,
-      startedAt: new Date().toISOString(),
-      completedSteps: {},
+  // ── verify-app gate resolver (engine-driven, PR #2397 port) ──────────────
+  // The PARKED gate's actions (pick an app / autofix / re-check / re-poll /
+  // open the create-app page / back) are EPHEMERAL: record the pick into
+  // iosCarriedRef.verifyAction (+ the chosen app) and re-drive the engine's
+  // verify-app step as a RESOLVER effect — the same carried-driven mechanism
+  // as cert-limit-prompt. The ENGINE does the IO (fresh pbxproj re-detect /
+  // writeReleaseBundleId auto-fix / ASC re-poll / the persistVerifyOverride
+  // write) + the evaluateGate escalation; this driver mirrors the returned
+  // transient back into the React render state, fires the PostHog telemetry
+  // (kept driver-side), and advances when the gate passes. verifyAction is
+  // CLEARED after every run so a later re-entry into verify-app re-runs the
+  // engine's initial fetch. Cancel stays a bespoke driver exit (cancelGate →
+  // exitOnboarding); the engine's error-sink 'cancel' is for headless drivers.
+  const runVerifyGateAction = async (
+    action: 'pick' | 'create-new' | 'autofix' | 'continue' | 'recheck' | 'open' | 'reopen' | 'back',
+    chosenApp?: AscAppLike | null,
+  ) => {
+    iosCarriedRef.current = {
+      ...iosCarriedRef.current,
+      verifyAction: action,
+      ...(chosenApp !== undefined ? { verifyChosenApp: chosenApp } : {}),
     }
-    existing.iosBundleIdOverride = releaseBundleId
-    existing.iosBundleIdContextAppId = iosBundleIdInitial
-    await saveProgress(appId, existing)
-  }, [appId, iosBundleIdInitial])
+    const preAttempt = iosCarriedRef.current.verifyAttempt ?? 0
+    const gatePath: GatePath = action === 'recheck' || action === 'open' || action === 'reopen' || action === 'create-new'
+      ? 'create-app'
+      : 'fix-build-id'
+    // Capture the auto-fix write result so the driver can fire the Auto Fixed
+    // telemetry exactly when the bespoke handler did (changed > 0).
+    let autoFixChanged = 0
+    // The Path B re-poll is a network round-trip — show the step loader so the
+    // re-check doesn't feel like a silent no-op.
+    if (action === 'recheck')
+      setVerifyAppLoading(true)
+    try {
+      const current = (await loadProgress(appId)) ?? {
+        platform: 'ios' as const,
+        appId,
+        startedAt: new Date().toISOString(),
+        completedSteps: {},
+      }
+      const result = await runIosEffect('verify-app', current, {
+        appId,
+        listApps: async () => listApps(await getFreshToken()),
+        listBundleIds: async () => listBundleIds(await getFreshToken()),
+        detectBundleIds: () => detectIosBundleIds({ cwd: process.cwd(), iosDir, capacitorAppId: iosBundleIdInitial }),
+        writeReleaseBundleId: (fromId, toId) => {
+          const r = writeReleaseBundleId(process.cwd(), iosDir, fromId, toId)
+          autoFixChanged = r.changed
+          return r
+        },
+        ensureBundleId: async (bundleId) => { await ensureBundleId(await getFreshToken(), bundleId) },
+        openExternal: async (url) => { await open(url) },
+        loadProgress,
+        saveProgress,
+        carried: iosCarriedRef.current,
+        onLog: (message, color) => addLog(message, color),
+      })
+      const t = result.transient
+      // Merge the resolver transient back + CLEAR the consumed action so a
+      // later verify-app re-entry runs the initial fetch.
+      iosCarriedRef.current = { ...iosCarriedRef.current, ...(t ?? {}), verifyAction: undefined }
+      if (t) {
+        if (t.verifyApps !== undefined)
+          setVerifyApps(t.verifyApps)
+        if (t.verifyReleaseBundleId !== undefined)
+          setVerifyReleaseBundleId(t.verifyReleaseBundleId)
+        if (t.verifyPath !== undefined)
+          setVerifyPath(t.verifyPath)
+        if (t.verifyChosenApp !== undefined)
+          setVerifyChosenApp(t.verifyChosenApp)
+        if (t.verifyAttempt !== undefined)
+          setVerifyAttempt(t.verifyAttempt)
+        if (t.verifyAskReopen !== undefined)
+          setVerifyAskReopen(t.verifyAskReopen)
+      }
+      // A gate PASS persisted the verified override — mirror the
+      // persistVerifyOverride React effects (wire the id into Apple-side work
+      // and stop redirectIfMismatch re-adopting later).
+      if (result.progress.iosBundleIdOverride && result.progress.iosBundleIdOverride !== current.iosBundleIdOverride) {
+        setIosBundleId(result.progress.iosBundleIdOverride)
+        setAppIdConfirmed(true)
+      }
+      // Telemetry (driver-side): the same events + tags the bespoke handlers
+      // fired — Auto Fixed (changed > 0), Create App Opened, Gate Blocked (the
+      // attempt counter advanced while staying parked), Passed (advanced).
+      if (action === 'autofix' && autoFixChanged > 0)
+        trackVerifyEvent('iOS App Verify Auto Fixed', '🔧', { attempt: preAttempt, path: 'fix-build-id' })
+      if (action === 'open' || action === 'reopen')
+        trackVerifyEvent('iOS App Verify Create App Opened', '🌐', { attempt: preAttempt })
+      const attemptAfter = t?.verifyAttempt ?? preAttempt
+      if (result.next === 'verify-app' && attemptAfter > preAttempt)
+        trackVerifyEvent('iOS App Verify Gate Blocked', '🚧', { attempt: attemptAfter, path: gatePath })
+      if (result.next && result.next !== 'verify-app' && result.next !== 'error') {
+        trackVerifyEvent('iOS App Verify Passed', '✅', { attempts: preAttempt, path: gatePath })
+        setStep(result.next)
+      }
+    }
+    catch (err) {
+      handleError(err, 'verify-app')
+    }
+    finally {
+      if (action === 'recheck')
+        setVerifyAppLoading(false)
+    }
+  }
 
   const pm = getPMAndCommand()
   const addIosCommand = formatRunnerCommand(pm.runner, ['cap', 'add', 'ios'])
@@ -1151,13 +1243,25 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
     // the previous session's emission would mute a hint that's now
     // newly relevant.
     adHocHintShownRef.current = false
-    // verify-app (remote App Store verification) — reset the one-shot guards and
-    // all step state so a Restart that re-enters verify-app re-runs the initial
-    // fetch instead of finding verifyFetchStartedRef already true and freezing on
-    // a blank/stale gate.
+    // verify-app (remote App Store verification) — reset the one-shot Shown
+    // guard, all step render state AND the carried gate threading so a Restart
+    // that re-enters verify-app re-runs the engine's initial fetch with no
+    // stale gate state (pendingVerifyNext is EPHEMERAL: a fresh pass falls
+    // back to creating-certificate).
     verifyShownRef.current = false
-    verifyFetchStartedRef.current = false
-    setPendingVerifyNext(null)
+    iosCarriedRef.current = {
+      ...iosCarriedRef.current,
+      pendingVerifyNext: undefined,
+      verifyAction: undefined,
+      verifyChosenApp: undefined,
+      verifyApps: undefined,
+      verifyRegisteredIds: undefined,
+      verifyReleaseBundleId: undefined,
+      verifyDebugBundleId: undefined,
+      verifyPath: undefined,
+      verifyAttempt: undefined,
+      verifyAskReopen: undefined,
+    }
     setVerifyAppLoading(false)
     setVerifyReleaseBundleId('')
     setVerifyDebugBundleId('')
@@ -1415,208 +1519,19 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
     // back in transient.p8Content, and routes to input-key-id (or input-p8-path on
     // cancel). The driver below mirrors p8Path/keyId/p8Content into React state.
 
-    // verifying-key is SHARED between create-new and import. The create-new path
-    // is engine-driven (IOS_ENGINE_CREATE_EFFECT_STEPS, guarded to !importMode &&
-    // !pendingRecoveryAction). The IMPORT path routes through the SAME engine
-    // effect here, but OVERRIDES the engine's `next`: the engine expresses only
-    // create-new (→ creating-certificate) and pendingRecoveryAction (→
-    // import-create-profile-only); the plain import entry must instead go through
-    // verify-app (app_store) or straight to import-validating-all-certs /
-    // import-pick-identity (ad_hoc) — the engine has no way to express that. So
-    // run the engine for the verify + the apiKeyVerified persist (which preserves
-    // setupMethod / importDistribution), mirror teamId, then route per flow mode.
-    if (step === 'verifying-key' && (importMode || pendingRecoveryAction)) {
-      ;(async () => {
-        try {
-          const current = (await loadProgress(appId)) ?? {
-            platform: 'ios' as const,
-            appId,
-            startedAt: new Date().toISOString(),
-            completedSteps: {},
-          }
-          const res = await runIosEffect('verifying-key', current, {
-            appId,
-            verifyApiKey: async () => {
-              const r = await verifyApiKey(await getFreshToken())
-              return { teamId: r.teamId }
-            },
-            readFile: async path => Buffer.from(await readFile(path)),
-            loadProgress,
-            saveProgress,
-            carried: {
-              ...iosCarriedRef.current,
-              p8Content: iosCarriedRef.current.p8Content ?? (p8ContentRef.current ? Buffer.from(p8ContentRef.current) : undefined),
-            },
-            onLog: (message, color) => {
-              if (!cancelled)
-                addLog(message, color)
-            },
-          })
-          if (cancelled)
-            return
-          if (res.next === 'error') {
-            handleError(new Error(res.transient?.error ?? 'API key verification failed.'), (res.transient?.retryStep as OnboardingStep) ?? 'verifying-key')
-            return
-          }
-          if (res.transient?.teamId !== undefined) {
-            iosCarriedRef.current = { ...iosCarriedRef.current, teamId: res.transient.teamId }
-            setTeamId(res.transient.teamId)
-          }
-          setRetryCount(0)
-          // Branch on flow mode — mirrors the bespoke routing exactly:
-          //  - import + pending recovery action → the engine resumed it
-          //    (res.next === 'import-create-profile-only'); clear the React mirror.
-          //  - import (no pending action) → OVERRIDE the engine's create-new
-          //    'creating-certificate' with the import target: matches>0 ?
-          //    import-validating-all-certs : import-pick-identity (the eager batch
-          //    validation runs before the picker when there's at least one match).
-          //    Import + app_store carries the SAME wrong/missing-app risk as
-          //    create-new — the local Release bundle id may not match any App
-          //    Store app — and a verified .p8 is present here, so run verify-app
-          //    first and resume at the identity/profile picker once the invariant
-          //    holds. ad_hoc import never uploads to TestFlight (and may have
-          //    entered a one-shot .p8 via no-match recovery) → skip verify-app
-          //    entirely. redirectIfMismatch silently adopts the authoritative
-          //    Release bundle id (no prompt) before either route.
-          if (importMode && pendingRecoveryAction) {
-            setPendingRecoveryAction(null)
-            if (res.next)
-              setStep(res.next)
-          }
-          else if (importMode) {
-            const importTarget: OnboardingStep = importMatches.length > 0 ? 'import-validating-all-certs' : 'import-pick-identity'
-            if (importDistribution === 'app_store') {
-              setPendingVerifyNext(importTarget)
-              setStep(redirectIfMismatch('verify-app'))
-            }
-            else {
-              setStep(redirectIfMismatch(importTarget))
-            }
-          }
-        }
-        catch (err) {
-          if (!cancelled)
-            handleError(err, 'verifying-key')
-        }
-      })()
-    }
-
-    // ── verify-app: remote App Store Connect verification ──────────────────
-    //
-    // Fetch /v1/apps + /v1/bundleIds in parallel with a fresh token, resolve
-    // the authoritative Release build id FRESH from disk (never the memoized
-    // initial detection at app.tsx:256), and classify the invariant. On an
-    // exact match we log + persist the override + continue straight to the
-    // pending target. On any ASC fetch failure (or an unresolvable Release
-    // config) we warn and proceed — we can't verify a transient/unknown state
-    // and blocking on it would trap the user (the local bundle-id resolution
-    // still ran). Otherwise we stay parked on verify-app
-    // and the render below drives the picker + gate. Guarded by a ref so the
-    // fetch fires exactly once per entry into the step.
-    if (step === 'verify-app' && !verifyFetchStartedRef.current) {
-      verifyFetchStartedRef.current = true
-      setVerifyAppLoading(true)
-      ;(async () => {
-        // Re-detect fresh from disk so the Release build id reflects any edit
-        // the user made since the wizard started (and bypasses the memo).
-        const fresh = detectIosBundleIds({ cwd: process.cwd(), iosDir, capacitorAppId: iosBundleIdInitial })
-        const releaseBundleId = fresh.releaseResolved && fresh.pbxproj ? fresh.pbxproj.value : ''
-        const debugReleaseDiffer = fresh.debugReleaseDiffer
-        // Debug ≠ Release awareness note — informational only, never gates. Shown
-        // as a persistent boxed warning on the verify-app step (via the state set
-        // here) AND as a yellow log line for the exact-match pass-through, which
-        // never renders the step.
-        if (debugReleaseDiffer && fresh.debug && fresh.pbxproj) {
-          setVerifyDebugBundleId(fresh.debug.value)
-          addLog(
-            `⚠ Debug builds "${fresh.debug.value}" but Release builds "${fresh.pbxproj.value}" — Capgo Builder signs the RELEASE ID "${fresh.pbxproj.value}".`,
-            'yellow',
-          )
-        }
-        else {
-          setVerifyDebugBundleId('')
-        }
-
-        try {
-          const token = await getFreshToken()
-          const [apps, registeredBundleIds] = await Promise.all([listApps(token), listBundleIds(token)])
-          if (cancelled)
-            return
-
-          setVerifyApps(apps)
-          setVerifyRegisteredIds(registeredBundleIds)
-          setVerifyReleaseBundleId(releaseBundleId)
-          setVerifyAppLoading(false)
-
-          if (!verifyShownRef.current) {
-            verifyShownRef.current = true
-            trackVerifyEvent('iOS App Verify Shown', '🔍', {
-              app_count: apps.length,
-              bundle_id_count: registeredBundleIds.length,
-              debug_release_differ: debugReleaseDiffer,
-            })
-          }
-
-          // No Release config resolvable → warn, skip gating. We never gate on
-          // a Debug or plist fallback (spec: Release is authoritative).
-          if (!releaseBundleId) {
-            addLog('⚠ Could not resolve a Release PRODUCT_BUNDLE_IDENTIFIER from your Xcode project — skipping remote App Store verification.', 'yellow')
-            trackVerifyEvent('iOS App Verify Result', '🔎', {
-              result: 'no-release-config',
-              app_count: apps.length,
-              bundle_id_count: registeredBundleIds.length,
-            })
-            setStep(pendingVerifyNext ?? 'creating-certificate')
-            setPendingVerifyNext(null)
-            return
-          }
-
-          const { result, matchedApp } = classifyAppVerification({ releaseBundleId, apps, registeredBundleIds })
-          trackVerifyEvent('iOS App Verify Result', '🔎', {
-            result,
-            app_count: apps.length,
-            bundle_id_count: registeredBundleIds.length,
-          })
-
-          if (result === 'exact-match' && matchedApp) {
-            addLog(`✓ Building "${matchedApp.name}" (${releaseBundleId}) — matches your App Store app.`)
-            try {
-              await persistVerifyOverride(releaseBundleId)
-            }
-            catch {
-              // A disk error saving the override must not be reported as an ASC
-              // network failure (the outer catch's message). Non-fatal — the user
-              // may just be re-prompted on the next run.
-              addLog('⚠ Verified the App Store app but could not save the bundle ID override to disk — you may be re-prompted next run.', 'yellow')
-            }
-            trackVerifyEvent('iOS App Verify Passed', '✅', { attempts: 0, path: 'exact-match' })
-            setStep(pendingVerifyNext ?? 'creating-certificate')
-            setPendingVerifyNext(null)
-            return
-          }
-          // Not satisfied → stay on verify-app; the render drives the picker +
-          // gate. Pre-seed the path for the no-apps cases (no picker needed).
-          if (result !== 'wrong-build-id')
-            setVerifyPath('create-app')
-        }
-        catch {
-          // ASC fetch failure (auth / rate-limit / network): we can't verify a
-          // transient failure, and blocking on it would trap the user. Warn
-          // visibly and proceed — the local bundle-id resolution already ran.
-          if (cancelled)
-            return
-          setVerifyAppLoading(false)
-          addLog("⚠ Couldn't reach App Store Connect to verify your app; continuing without remote verification.", 'yellow')
-          if (!verifyShownRef.current) {
-            verifyShownRef.current = true
-            trackVerifyEvent('iOS App Verify Shown', '🔍', { app_count: 0, bundle_id_count: 0, debug_release_differ: debugReleaseDiffer })
-          }
-          trackVerifyEvent('iOS App Verify Result', '🔎', { result: 'fetch-failed', app_count: 0, bundle_id_count: 0 })
-          setStep(pendingVerifyNext ?? 'creating-certificate')
-          setPendingVerifyNext(null)
-        }
-      })()
-    }
+    // verifying-key (BOTH the create-new and import paths) and verify-app (the
+    // remote App Store Connect verification gate, PR #2397) are now
+    // engine-driven (IOS_ENGINE_CREATE_EFFECT_STEPS) — see the create-new
+    // effect driver below. The engine routes verifying-key → verify-app
+    // (create-new + import app_store, with the import continuation
+    // import-validating-all-certs / import-pick-identity riding
+    // transient.pendingVerifyNext) / the import continuation directly (ad_hoc)
+    // / import-create-profile-only (pendingRecoveryAction), then runs the
+    // verify-app fetch (parallel listApps+listBundleIds), the FRESH bundle-id
+    // re-detect, the classification and the persistVerifyOverride write. The
+    // driver mirrors the verify* transient into the React render state, fires
+    // the PostHog telemetry, and drives the PARKED gate's actions via
+    // iosCarriedRef.verifyAction + the runVerifyGateAction resolver re-drive.
 
     // creating-certificate / revoking-certificate / creating-profile /
     // deleting-duplicate-profiles are now engine-driven
@@ -1833,14 +1748,11 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
   // import-create-profile-only, import-compiling-helper, import-exporting) and
   // the import-mode verifying-key routing keep their bespoke bodies for now.
   useEffect(() => {
-    // verifying-key is SHARED between create-new and import: the engine's `next`
-    // covers only the create-new (→ creating-certificate) and pendingRecoveryAction
-    // (→ import-create-profile-only) cases — NOT the import app_store routing
-    // (verify-app → import-validating-all-certs / import-pick-identity). So route
-    // it through the engine ONLY on the create-new path; import +
-    // pendingRecoveryAction keep the bespoke body above.
-    if (step === 'verifying-key' && (importMode || pendingRecoveryAction))
-      return
+    // verifying-key is now FULLY engine-routed: the engine's `next` expresses
+    // create-new + import app_store (→ verify-app, threading the import
+    // continuation via transient.pendingVerifyNext), import ad_hoc (→ the
+    // continuation directly) and pendingRecoveryAction (→
+    // import-create-profile-only) — no import-side bespoke body remains.
     if (!IOS_ENGINE_CREATE_EFFECT_STEPS.has(step))
       return
 
@@ -1878,6 +1790,16 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
         },
         listCertificates: async () => listDistributionCerts(await getFreshToken()),
 
+        // ── verify-app (remote App Store verification, PR #2397) ──
+        listApps: async () => listApps(await getFreshToken()),
+        listBundleIds: async () => listBundleIds(await getFreshToken()),
+        // FRESH detection per check — bypasses the component-level `detectedIds`
+        // memo so the Release id reflects any edit since the wizard started.
+        detectBundleIds: () => detectIosBundleIds({ cwd: process.cwd(), iosDir, capacitorAppId: iosBundleIdInitial }),
+        writeReleaseBundleId: (fromId, toId) => writeReleaseBundleId(process.cwd(), iosDir, fromId, toId),
+        ensureBundleId: async (bundleId) => { await ensureBundleId(await getFreshToken(), bundleId) },
+        openExternal: async (url) => { await open(url) },
+
         // ── csr (shape-adapted) ──
         generateCsr: () => {
           const r = generateCsr()
@@ -1901,6 +1823,12 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
         // state so the revoke / delete effects find their (ephemeral) inputs.
         carried: {
           ...iosCarriedRef.current,
+          // verifying-key reads the raw .p8 bytes from carried — fall back to
+          // the p8ContentRef mirror when the input chain collected them outside
+          // the engine (the import path), exactly as the bespoke body did.
+          ...(step === 'verifying-key' && !iosCarriedRef.current.p8Content && p8ContentRef.current
+            ? { p8Content: Buffer.from(p8ContentRef.current) }
+            : {}),
           // cert-limit-prompt's choice handler stores the picked cert id in
           // `certToRevoke` (React) against the `existingCerts` list; the revoke
           // effect only reads `.id`, so reconstruct the minimal cert object.
@@ -1932,6 +1860,9 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
         }
         if (cancelled)
           return
+        // verify-app: surface the step loader while the initial ASC fetch runs.
+        if (step === 'verify-app')
+          setVerifyAppLoading(true)
         const result = await runIosEffect(step, current, deps)
         if (cancelled)
           return
@@ -1966,6 +1897,24 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
           // profiles (React `duplicateProfiles` drives the prompt + delete count).
           if (t.duplicateProfiles !== undefined)
             setDuplicateProfiles(t.duplicateProfiles)
+          // verify-app: mirror the engine's gate/picker transient into the
+          // React render state (the verify-app render below reads these).
+          if (t.verifyApps !== undefined)
+            setVerifyApps(t.verifyApps)
+          if (t.verifyRegisteredIds !== undefined)
+            setVerifyRegisteredIds(t.verifyRegisteredIds)
+          if (t.verifyReleaseBundleId !== undefined)
+            setVerifyReleaseBundleId(t.verifyReleaseBundleId)
+          if (t.verifyDebugBundleId !== undefined)
+            setVerifyDebugBundleId(t.verifyDebugBundleId)
+          if (t.verifyPath !== undefined)
+            setVerifyPath(t.verifyPath)
+          if (t.verifyChosenApp !== undefined)
+            setVerifyChosenApp(t.verifyChosenApp)
+          if (t.verifyAttempt !== undefined)
+            setVerifyAttempt(t.verifyAttempt)
+          if (t.verifyAskReopen !== undefined)
+            setVerifyAskReopen(t.verifyAskReopen)
         }
 
         // ── p8-method-select picker effect: mirror the persisted p8Path/keyId so
@@ -1999,24 +1948,59 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
         if (step === 'verifying-key' || step === 'creating-certificate' || step === 'creating-profile')
           setRetryCount(0)
 
+        // verify-app (initial fetch): clear the loader; an exact-match pass
+        // persisted the verified Release id — mirror persistVerifyOverride's
+        // React effects (wire it into Apple-side work + stop redirectIfMismatch
+        // re-adopting) — and the classification drives the one-shot Shown +
+        // Result (+ exact-match Passed) telemetry the bespoke effect fired.
+        if (step === 'verify-app') {
+          setVerifyAppLoading(false)
+          if (np.iosBundleIdOverride && np.iosBundleIdOverride !== current.iosBundleIdOverride) {
+            setIosBundleId(np.iosBundleIdOverride)
+            setAppIdConfirmed(true)
+          }
+          if (t?.verifyResult) {
+            const appCount = t.verifyApps?.length ?? 0
+            const bundleIdCount = t.verifyRegisteredIds?.length ?? 0
+            if (!verifyShownRef.current) {
+              verifyShownRef.current = true
+              trackVerifyEvent('iOS App Verify Shown', '🔍', {
+                app_count: appCount,
+                bundle_id_count: bundleIdCount,
+                debug_release_differ: t.verifyDebugReleaseDiffer ?? false,
+              })
+            }
+            trackVerifyEvent('iOS App Verify Result', '🔎', { result: t.verifyResult, app_count: appCount, bundle_id_count: bundleIdCount })
+            if (t.verifyResult === 'exact-match')
+              trackVerifyEvent('iOS App Verify Passed', '✅', { attempts: 0, path: 'exact-match' })
+          }
+        }
+
         // ── advance ──────────────────────────────────────────────────────────
-        // The engine returns an explicit `next` for every effect step. For the
-        // create-new verifying-key the engine's next is 'creating-certificate' —
-        // but the bespoke (PR #2397) routes through the verify-app remote App
-        // Store check first: record the engine's target in pendingVerifyNext and
-        // OVERRIDE next to 'verify-app' (the same driver-override pattern the
-        // import-mode verifying-key body uses — the engine has no way to express
-        // the bespoke verify-app detour yet; see the follow-up engine port).
-        // redirectIfMismatch runs first only to silently adopt the authoritative
-        // Release bundle id when it differs from capacitor.config.appId (a SYNC
-        // FS read the IO-free engine can't do). Every other step's next is used
-        // verbatim.
+        // The engine returns an explicit `next` for every effect step — including
+        // verifying-key's verify-app detour (PR #2397), which the engine now
+        // expresses itself (create-new + import app_store → 'verify-app' with
+        // the import continuation riding transient.pendingVerifyNext into
+        // iosCarriedRef; import ad_hoc → the continuation; pendingRecoveryAction
+        // → import-create-profile-only, whose React mirror we clear here exactly
+        // as the bespoke body did). redirectIfMismatch wraps the verifying-key
+        // advance only to silently adopt the authoritative Release bundle id
+        // when it differs from capacitor.config.appId (a SYNC FS read the
+        // IO-free engine can't do) — never on the recovery resume, matching the
+        // bespoke routing. verify-app returning next === 'verify-app' (the
+        // PARKED gate) intentionally falls through the `advanceTo !== step`
+        // guard so the render below drives the picker/gate. Every other step's
+        // next is used verbatim.
         const next = result.next ?? getIosResumeStep(np)
         if (!next)
           return
-        if (step === 'verifying-key')
-          setPendingVerifyNext(next)
-        const advanceTo = step === 'verifying-key' ? redirectIfMismatch('verify-app') : next
+        let advanceTo = next
+        if (step === 'verifying-key') {
+          if (next === 'import-create-profile-only')
+            setPendingRecoveryAction(null)
+          else
+            advanceTo = redirectIfMismatch(next)
+        }
         if (advanceTo !== step)
           setStep(advanceTo)
       }
@@ -3073,132 +3057,19 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
 
         const releaseId = verifyReleaseBundleId
 
-        // Final pass: persist the verified Release id as the override and
-        // continue to the pending target (creating-certificate).
-        const passGate = async (path: GatePath, resolvedId: string) => {
-          await persistVerifyOverride(resolvedId)
-          trackVerifyEvent('iOS App Verify Passed', '✅', { attempts: verifyAttempt, path })
-          setStep(pendingVerifyNext ?? 'creating-certificate')
-          setPendingVerifyNext(null)
-        }
-
-        // Path A Continue — re-read pbxproj FRESH from disk (never the memo)
-        // and re-check the Release build id against the chosen app.
-        const continueFixBuildId = async () => {
-          const fresh = detectIosBundleIds({ cwd: process.cwd(), iosDir, capacitorAppId: iosBundleIdInitial })
-          const newRelease = fresh.releaseResolved && fresh.pbxproj ? fresh.pbxproj.value : ''
-          setVerifyReleaseBundleId(newRelease)
-          const satisfied = Boolean(verifyChosenApp) && newRelease === verifyChosenApp!.bundleId
-          const attempt = verifyAttempt + 1
-          const gate = evaluateGate({ satisfied, attempt })
-          if (gate.proceed) {
-            addLog(`✓ Building "${verifyChosenApp!.name}" (${newRelease}) — matches your App Store app.`)
-            await passGate('fix-build-id', newRelease)
-            return
-          }
-          setVerifyAttempt(attempt)
-          trackVerifyEvent('iOS App Verify Gate Blocked', '🚧', { attempt, path: 'fix-build-id' })
-        }
-
-        // Path A auto-fix — rewrite the Release PRODUCT_BUNDLE_IDENTIFIER in the
-        // Xcode project to the chosen App Store app's bundle id, then re-check
-        // (which now passes and advances the gate). Only PRODUCT_BUNDLE_IDENTIFIER
-        // assignments equal to the current build id are touched; capacitor.config
-        // is never modified.
-        const autoFixBuildId = async () => {
-          if (!verifyChosenApp)
-            return
-          const target = verifyChosenApp.bundleId
-          try {
-            const { changed } = writeReleaseBundleId(process.cwd(), iosDir, releaseId, target)
-            if (changed > 0) {
-              addLog(`🔧 Updated PRODUCT_BUNDLE_IDENTIFIER → "${target}" in your Xcode project.`)
-              trackVerifyEvent('iOS App Verify Auto Fixed', '🔧', { attempt: verifyAttempt, path: 'fix-build-id' })
-            }
-            else {
-              addLog(`⚠ Couldn't find PRODUCT_BUNDLE_IDENTIFIER "${releaseId}" to update — edit it in Xcode, then re-check.`, 'yellow')
-            }
-          }
-          catch {
-            addLog('⚠ Could not write to your Xcode project — edit PRODUCT_BUNDLE_IDENTIFIER manually, then re-check.', 'yellow')
-          }
-          // Re-check against disk; passes the gate when the write succeeded.
-          await continueFixBuildId()
-        }
-
-        // Path B Continue — re-poll /v1/apps and check for an app matching the
-        // Release build id. Never re-opens the browser automatically.
-        const continueCreateApp = async () => {
-          // Show the step's loader while we re-poll ASC (an async network call) —
-          // otherwise the re-check feels instant and the user can't tell it ran.
-          setVerifyAppLoading(true)
-          const attempt = verifyAttempt + 1
-          try {
-            const token = await getFreshToken()
-            const apps = await listApps(token)
-            setVerifyApps(apps)
-            const satisfied = apps.some(a => a.bundleId === releaseId)
-            if (evaluateGate({ satisfied, attempt }).proceed) {
-              const matched = apps.find(a => a.bundleId === releaseId)
-              addLog(`✓ Building "${matched?.name ?? releaseId}" (${releaseId}) — matches your App Store app.`)
-              await passGate('create-app', releaseId)
-              return
-            }
-            // Still not found — count the attempt so the escalating box visibly
-            // advances, then ask before re-opening the browser.
-            setVerifyAttempt(attempt)
-            setVerifyAskReopen(true)
-            trackVerifyEvent('iOS App Verify Gate Blocked', '🚧', { attempt, path: 'create-app' })
-          }
-          catch {
-            // Couldn't reach ASC — still count the attempt so the user sees the
-            // re-check happened (not a silent no-op) and surface a connectivity
-            // message distinct from "app still missing".
-            setVerifyAttempt(attempt)
-            setVerifyAskReopen(true)
-            addLog("⚠ Couldn't reach App Store Connect to re-check — check your connection and try again.", 'yellow')
-            trackVerifyEvent('iOS App Verify Gate Blocked', '🚧', { attempt, path: 'create-app' })
-          }
-          finally {
-            setVerifyAppLoading(false)
-          }
-        }
-
-        // Open the ASC new-app page. Registers the identifier first (idempotent)
-        // so it is selectable in the form. Opens ONLY on explicit choice.
-        const openCreatePage = async () => {
-          try {
-            const token = await getFreshToken()
-            await ensureBundleId(token, releaseId)
-          }
-          catch {
-            // Registration is best-effort — the user can still create the app
-            // and pick/register the id in the web form.
-          }
-          trackVerifyEvent('iOS App Verify Create App Opened', '🌐', { attempt: verifyAttempt })
-          try {
-            await open('https://appstoreconnect.apple.com/apps')
-          }
-          catch {
-            addLog('⚠ Could not open your browser. Visit https://appstoreconnect.apple.com/apps to create the app.', 'yellow')
-          }
-          setVerifyAskReopen(false)
-        }
-
+        // Gate ACTIONS are ENGINE-driven: each Select pick records the action
+        // into iosCarriedRef.verifyAction and re-drives the engine's verify-app
+        // RESOLVER via runVerifyGateAction (fresh pbxproj re-check, the
+        // writeReleaseBundleId auto-fix, the Path B ASC re-poll +
+        // ask-before-reopen, the back-to-picker reset, the persistVerifyOverride
+        // write and the evaluateGate escalation all live in ios/flow.ts). Only
+        // CANCEL stays a bespoke driver exit: telemetry + log + exitOnboarding,
+        // exactly as before (the engine's error-sink 'cancel' is for headless
+        // drivers, which have no exitOnboarding).
         const cancelGate = (path: GatePath) => {
           trackVerifyEvent('iOS App Verify Cancelled', '🚫', { attempt: verifyAttempt, path })
           addLog('Exiting onboarding.', 'yellow')
           exitOnboarding()
-        }
-
-        // Return to the app picker (verifyPath === null) to choose a different
-        // App Store app or switch to "create a new app". Resets the per-attempt
-        // gate state so the re-picked target starts fresh.
-        const backToPicker = () => {
-          setVerifyPath(null)
-          setVerifyChosenApp(null)
-          setVerifyAttempt(0)
-          setVerifyAskReopen(false)
         }
 
         // Escalating border colour ramp so a repeatedly-blocked gate never
@@ -3246,11 +3117,11 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
                 onChange={(value) => {
                   setGateActionSeq(s => s + 1)
                   if (value === 'autofix')
-                    void autoFixBuildId()
+                    void runVerifyGateAction('autofix')
                   else if (value === 'continue')
-                    void continueFixBuildId()
+                    void runVerifyGateAction('continue')
                   else if (value === 'back')
-                    backToPicker()
+                    void runVerifyGateAction('back')
                   else
                     cancelGate('fix-build-id')
                 }}
@@ -3283,9 +3154,9 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
                   onChange={(value) => {
                     setGateActionSeq(s => s + 1)
                     if (value === 'recheck')
-                      void continueCreateApp()
+                      void runVerifyGateAction('recheck')
                     else if (value === 'reopen')
-                      void openCreatePage()
+                      void runVerifyGateAction('reopen')
                     else
                       cancelGate('create-app')
                   }}
@@ -3323,11 +3194,11 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
                 onChange={(value) => {
                   setGateActionSeq(s => s + 1)
                   if (value === 'open')
-                    void openCreatePage()
+                    void runVerifyGateAction('open')
                   else if (value === 'recheck')
-                    void continueCreateApp()
+                    void runVerifyGateAction('recheck')
                   else if (value === 'back')
-                    backToPicker()
+                    void runVerifyGateAction('back')
                   else
                     cancelGate('create-app')
                 }}
@@ -3360,7 +3231,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
               onChange={(value) => {
                 if (value === '__create_new__') {
                   trackVerifyEvent('iOS App Verify Picked', '👆', { matches_build_id: false, chose_create_new: true })
-                  setVerifyPath('create-app')
+                  void runVerifyGateAction('create-new')
                   return
                 }
                 const chosen = verifyApps.find(a => a.bundleId === value) ?? null
@@ -3368,22 +3239,12 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
                   matches_build_id: value === releaseId,
                   chose_create_new: false,
                 })
-                if (chosen && chosen.bundleId === releaseId) {
-                  // Already matches — pass straight through (defensive; the
-                  // exact-match case is normally handled in the effect).
-                  addLog(`✓ Building "${chosen.name}" (${releaseId}) — matches your App Store app.`)
-                  void (async () => {
-                    try {
-                      await passGate('fix-build-id', releaseId)
-                    }
-                    catch {
-                      addLog('⚠ Could not save the verified bundle ID; you may be re-prompted next run.', 'yellow')
-                    }
-                  })()
-                  return
-                }
-                setVerifyChosenApp(chosen)
-                setVerifyPath('fix-build-id')
+                // The engine resolver routes the pick: an app already matching
+                // the Release build id passes straight through (defensive — the
+                // exact-match case is normally handled by the initial fetch; the
+                // ✓ log + the override persist happen engine-side); any other
+                // app parks the Path A fix-build-id gate with the chosen target.
+                void runVerifyGateAction('pick', chosen)
               }}
             />
           </Box>
