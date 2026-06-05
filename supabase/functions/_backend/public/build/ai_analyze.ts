@@ -6,72 +6,11 @@ import { checkPermission } from '../../utils/rbac.ts'
 import { supabaseAdmin, supabaseApikey } from '../../utils/supabase.ts'
 import { sendEventToTracking } from '../../utils/tracking.ts'
 import { getEnv } from '../../utils/utils.ts'
+import { emitAiAnalysisResult } from './ai_analyze_telemetry.ts'
 
 interface BuilderAnalysisResponse {
   analysis?: string
   error?: string
-}
-
-type AiAnalysisResult
-  = | 'success'
-    | 'already_analyzed'
-    | 'invalid_state'
-    | 'unauthorized'
-    | 'builder_error'
-    | 'config_error'
-
-interface EmitAiAnalysisResultInput {
-  appId: string
-  jobId: string
-  result: AiAnalysisResult
-  ownerOrg?: string
-  userId: string
-  logsBytes: number
-  durationMs?: number
-}
-
-/**
- * Emit the `AI Build Analysis Result` event for an exit branch.
- *
- * Privacy boundary: the AI diagnosis text from the builder MUST NOT cross into any
- * tag here. Only the closed-enum `result`, size/duration metadata, and stable
- * identifiers are sent. Callers fire this before throwing (or before returning a
- * successful response) so every exit branch produces exactly one Result event.
- */
-async function emitAiAnalysisResult(c: Context, input: EmitAiAnalysisResultInput): Promise<void> {
-  const tags: Record<string, string> = {
-    app_id: input.appId,
-    job_id: input.jobId,
-    result: input.result,
-    logs_bytes: String(input.logsBytes),
-  }
-  if (input.ownerOrg)
-    tags.org_id = input.ownerOrg
-  if (input.durationMs !== undefined && Number.isFinite(input.durationMs))
-    tags.duration_ms = String(Math.round(input.durationMs))
-
-  // Telemetry MUST NOT break the AI analyze flow. sendEventToTracking swallows
-  // per-provider errors internally, but defend against an unexpected throw at
-  // the orchestration layer (e.g. backgroundTask unavailable in tests).
-  try {
-    await sendEventToTracking(c, {
-      event: 'AI Build Analysis Result',
-      channel: 'build-lifecycle',
-      icon: '🤖',
-      notify: false,
-      user_id: input.userId,
-      groups: input.ownerOrg ? { organization: input.ownerOrg } : undefined,
-      tags,
-    })
-  }
-  catch (error) {
-    cloudlogErr({
-      requestId: c.get('requestId'),
-      message: 'AI Build Analysis Result telemetry failed',
-      result: input.result,
-      error: serializeError(error),
-    })
-  }
 }
 
 export async function aiAnalyzeBuild(
