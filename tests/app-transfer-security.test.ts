@@ -4,6 +4,7 @@ import { createClient } from '@supabase/supabase-js'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import {
   executeSQL,
+  fetchWithRetry,
   getSupabaseClient,
   ORG_ID,
   resetAndSeedAppData,
@@ -24,6 +25,9 @@ function createAuthClient() {
   return createClient<Database>(SUPABASE_BASE_URL, SUPABASE_ANON_KEY, {
     auth: {
       persistSession: false,
+    },
+    global: {
+      fetch: (url, options) => fetchWithRetry(url, options, 5, 250),
     },
   })
 }

@@ -512,7 +512,7 @@ export const headersInternal = {
  * Useful for tests that may fail due to edge function cold starts or connection issues.
  */
 export async function fetchWithRetry(
-  url: string,
+  url: RequestInfo | URL,
   options?: RequestInit,
   maxRetries = 3,
   delayMs = 500,
