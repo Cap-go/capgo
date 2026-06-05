@@ -8,12 +8,6 @@ import { cloudlog } from '../../../utils/logging.ts'
 import { checkPermission } from '../../../utils/rbac.ts'
 import { supabaseApikey } from '../../../utils/supabase.ts'
 
-const inviteBodySchema = type({
-  orgId: 'string',
-  email: 'string.email',
-  invite_type: '"org_member" | "org_billing_admin" | "org_admin" | "org_super_admin" | "read" | "upload" | "write" | "admin" | "super_admin" | "invite_read" | "invite_upload" | "invite_write" | "invite_admin" | "invite_super_admin"',
-})
-
 const rbacInviteRoles = ['org_member', 'org_billing_admin', 'org_admin', 'org_super_admin'] as const
 
 type RbacInviteRole = (typeof rbacInviteRoles)[number]
@@ -31,11 +25,25 @@ const inviteRoleAliases: Record<string, RbacInviteRole> = {
   invite_super_admin: 'org_super_admin',
 }
 
+const allowedInviteRoles = [...rbacInviteRoles, ...Object.keys(inviteRoleAliases)]
+const allowedInviteRoleSet = new Set<string>(allowedInviteRoles)
+const rbacInviteRoleSet = new Set<string>(rbacInviteRoles)
+const inviteTypeSchema = type.enumerated(...allowedInviteRoles)
+
+const inviteBodySchema = type({
+  orgId: 'string',
+  email: 'string.email',
+  invite_type: inviteTypeSchema,
+})
+
 export function normalizeInviteRole(inviteType: string): RbacInviteRole | null {
-  if ((rbacInviteRoles as readonly string[]).includes(inviteType))
+  if (!allowedInviteRoleSet.has(inviteType))
+    return null
+
+  if (rbacInviteRoleSet.has(inviteType))
     return inviteType as RbacInviteRole
 
-  return inviteRoleAliases[inviteType] ?? null
+  return inviteRoleAliases[inviteType]
 }
 
 export async function post(c: Context<MiddlewareKeyVariables>, bodyRaw: any, _apikey: Database['public']['Tables']['apikeys']['Row']) {

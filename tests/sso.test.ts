@@ -893,6 +893,24 @@ describe('[POST] /private/sso/provision-user', () => {
       expect(membershipError).toBeNull()
       expect(membership?.org_id).toBe(managedOrgId)
       expect(membership?.user_id).toBe(createdUser.user.id)
+
+      const roleBinding = await pool.query<{ role_name: string }>(
+        `
+          select roles.name as role_name
+          from public.role_bindings
+          join public.roles
+            on roles.id = role_bindings.role_id
+            and roles.scope_type = role_bindings.scope_type
+          where role_bindings.principal_type = public.rbac_principal_user()
+            and role_bindings.principal_id = $1
+            and role_bindings.scope_type = public.rbac_scope_org()
+            and role_bindings.org_id = $2
+          limit 1
+        `,
+        [createdUser.user.id, managedOrgId],
+      )
+
+      expect(roleBinding.rows[0]?.role_name).toBe('org_member')
     }
     finally {
       await Promise.allSettled([

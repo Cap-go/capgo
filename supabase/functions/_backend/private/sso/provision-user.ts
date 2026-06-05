@@ -190,66 +190,27 @@ function buildPublicUserSeed(userId: string, email: string, userMetadata: Record
 }
 
 async function ensureOrgMembership(
-  admin: ReturnType<typeof supabaseAdmin>,
+  pgClient: ReturnType<typeof getPgClient>,
   requestId: string,
   userId: string,
   orgId: string,
   fallbackRole: OrgRoleName = 'org_member',
-  allowRetry = true,
 ): Promise<EnsureOrgMembershipResult> {
-  const { data: existingMembership, error: membershipCheckError } = await (admin as any)
-    .from('org_users')
-    .select('id, is_invite, rbac_role_name')
-    .eq('user_id', userId)
-    .eq('org_id', orgId)
-    .maybeSingle()
-
-  if (membershipCheckError) {
-    cloudlogErr({ requestId, message: 'Failed to check existing org membership', userId, orgId, error: membershipCheckError })
-    throw new Error('membership_check_failed')
+  await pgClient.query('begin')
+  try {
+    const membershipResult = await ensureOrgMembershipInTransaction(pgClient, requestId, userId, orgId, fallbackRole)
+    await pgClient.query('commit')
+    return membershipResult
   }
-
-  if (existingMembership) {
-    if (!existingMembership.is_invite) {
-      return { alreadyMember: true }
+  catch (error) {
+    try {
+      await pgClient.query('rollback')
     }
-
-    const { error: promotionError } = await (admin as any)
-      .from('org_users')
-      .update({
-        is_invite: false,
-        rbac_role_name: existingMembership.rbac_role_name ?? fallbackRole,
-      })
-      .eq('id', existingMembership.id)
-
-    if (promotionError) {
-      cloudlogErr({ requestId, message: 'Failed to promote invited org membership during SSO provisioning', userId, orgId, roleName: existingMembership.rbac_role_name ?? fallbackRole, error: promotionError })
-      throw new Error('membership_promotion_failed')
+    catch (rollbackError) {
+      cloudlogErr({ requestId, message: 'Failed to roll back SSO provisioning transaction', userId, orgId, error: rollbackError })
     }
-
-    return { alreadyMember: false }
+    throw error
   }
-
-  const { error: insertError } = await (admin as any)
-    .from('org_users')
-    .insert({
-      user_id: userId,
-      org_id: orgId,
-      rbac_role_name: fallbackRole,
-      is_invite: false,
-    })
-
-  if (!insertError) {
-    return { alreadyMember: false }
-  }
-
-  const isDuplicate = insertError.code === '23505' || insertError.message?.toLowerCase().includes('duplicate')
-  if (isDuplicate && allowRetry) {
-    return ensureOrgMembership(admin, requestId, userId, orgId, fallbackRole, false)
-  }
-
-  cloudlogErr({ requestId, message: 'Failed to insert user into org_users during SSO provisioning', userId, orgId, fallbackRole, error: insertError })
-  throw new Error('membership_insert_failed')
 }
 
 async function ensurePublicUserRowExists(
@@ -331,10 +292,68 @@ async function ensureOrgMembershipInTransaction(
   userId: string,
   orgId: string,
   fallbackRole: OrgRoleName = 'org_member',
-): Promise<void> {
-  const promoteExistingInvite = async (membershipId: string, isInvite: boolean, roleName: string | null) => {
+): Promise<EnsureOrgMembershipResult> {
+  const ensureOrgRoleBinding = async (roleName: string) => {
+    const roleResult = await pgClient.query<{ id: string }>(
+      `
+        select id
+        from public.roles
+        where name = $1
+          and scope_type = public.rbac_scope_org()
+        limit 1
+      `,
+      [roleName],
+    )
+    const roleId = roleResult.rows[0]?.id
+    if (!roleId) {
+      cloudlogErr({ requestId, message: 'Failed to resolve SSO org RBAC role', userId, orgId, roleName })
+      throw new Error('missing_org_role')
+    }
+
+    await pgClient.query(
+      `
+        delete from public.role_bindings
+        where principal_type = public.rbac_principal_user()
+          and principal_id = $1
+          and scope_type = public.rbac_scope_org()
+          and org_id = $2
+      `,
+      [userId, orgId],
+    )
+
+    await pgClient.query(
+      `
+        insert into public.role_bindings (
+          principal_type,
+          principal_id,
+          role_id,
+          scope_type,
+          org_id,
+          granted_by,
+          reason,
+          is_direct
+        )
+        values (
+          public.rbac_principal_user(),
+          $1,
+          $3,
+          public.rbac_scope_org(),
+          $2,
+          $1,
+          'SSO org membership provisioning',
+          true
+        )
+        on conflict do nothing
+      `,
+      [userId, orgId, roleId],
+    )
+  }
+
+  const promoteExistingInvite = async (membershipId: string, isInvite: boolean, roleName: string | null): Promise<EnsureOrgMembershipResult> => {
+    const effectiveRole = roleName ?? fallbackRole
     if (!isInvite) {
-      return
+      await ensureOrgRoleBinding(effectiveRole)
+      return { alreadyMember: true }
     }
 
     await pgClient.query(
@@ -346,6 +365,9 @@ async function ensureOrgMembershipInTransaction(
       `,
       [roleName, fallbackRole, membershipId],
     )
+
+    await ensureOrgRoleBinding(effectiveRole)
+    return { alreadyMember: false }
   }
 
   try {
@@ -362,8 +384,7 @@ async function ensureOrgMembershipInTransaction(
 
     const existing = existingMembership.rows[0]
     if (existing) {
-      await promoteExistingInvite(existing.id, existing.is_invite, existing.rbac_role_name)
-      return
+      return await promoteExistingInvite(existing.id, existing.is_invite, existing.rbac_role_name)
     }
 
     const insertedMembership = await pgClient.query(
@@ -376,7 +397,8 @@ async function ensureOrgMembershipInTransaction(
     )
 
     if ((insertedMembership.rowCount ?? 0) > 0) {
-      return
+      await ensureOrgRoleBinding(fallbackRole)
+      return { alreadyMember: false }
     }
 
     const racedMembership = await pgClient.query<{ id: string, is_invite: boolean, rbac_role_name: string | null }>(
@@ -392,8 +414,7 @@ async function ensureOrgMembershipInTransaction(
 
     const raced = racedMembership.rows[0]
     if (raced) {
-      await promoteExistingInvite(raced.id, raced.is_invite, raced.rbac_role_name)
-      return
+      return await promoteExistingInvite(raced.id, raced.is_invite, raced.rbac_role_name)
     }
 
     throw new Error('membership_insert_failed')
@@ -640,7 +661,7 @@ app.post('/', async (c: Context<MiddlewareKeyVariables>) => {
 
     let membershipResult: EnsureOrgMembershipResult
     try {
-      membershipResult = await ensureOrgMembership(admin, requestId, userId, provider.org_id)
+      membershipResult = await ensureOrgMembership(getSharedPgClient(), requestId, userId, provider.org_id)
     }
     catch {
       return quickError(500, 'provision_failed', 'Failed to provision user to organization')
