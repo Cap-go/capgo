@@ -3,7 +3,7 @@
 BEGIN;
 
 -- Plan the number of tests
-SELECT plan(57);
+SELECT plan(58);
 
 -- Test app_versions policies
 SELECT
@@ -164,6 +164,20 @@ SELECT
         ),
         true,
         'orgs update policy should use named RBAC instead of legacy key modes'
+    );
+
+-- Test apikey_global_permissions policies
+SELECT
+    policies_are(
+        'public',
+        'apikey_global_permissions',
+        ARRAY[
+            'Deny delete on apikey_global_permissions',
+            'Deny insert on apikey_global_permissions',
+            'Deny select on apikey_global_permissions',
+            'Deny update on apikey_global_permissions'
+        ],
+        'apikey_global_permissions should have correct restrictive policies'
     );
 
 -- Test devices policies

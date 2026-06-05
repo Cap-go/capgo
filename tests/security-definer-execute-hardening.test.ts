@@ -18,6 +18,8 @@ const INVOKER_PROCS = [
 ] as const
 
 const SERVICE_ONLY_PROCS = [
+  'public.apikey_has_current_org_create_capability(uuid)',
+  'public.apikey_has_global_permission(text, text)',
   'public.apikeys_force_server_key()',
   'public.apikeys_strip_plain_key_for_hashed()',
   'public.check_encrypted_bundle_on_insert()',

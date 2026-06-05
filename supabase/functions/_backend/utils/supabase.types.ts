@@ -34,6 +34,48 @@ export type Database = {
   }
   public: {
     Tables: {
+      apikey_global_permissions: {
+        Row: {
+          apikey_rbac_id: string
+          created_at: string
+          granted_by: string | null
+          id: number
+          permission_key: string
+          reason: string | null
+        }
+        Insert: {
+          apikey_rbac_id: string
+          created_at?: string
+          granted_by?: string | null
+          id?: number
+          permission_key: string
+          reason?: string | null
+        }
+        Update: {
+          apikey_rbac_id?: string
+          created_at?: string
+          granted_by?: string | null
+          id?: number
+          permission_key?: string
+          reason?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "apikey_global_permissions_apikey_rbac_id_fkey"
+            columns: ["apikey_rbac_id"]
+            isOneToOne: false
+            referencedRelation: "apikeys"
+            referencedColumns: ["rbac_id"]
+          },
+          {
+            foreignKeyName: "apikey_global_permissions_granted_by_fkey"
+            columns: ["granted_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       apikeys: {
         Row: {
           created_at: string | null
@@ -3037,6 +3079,14 @@ export type Database = {
     }
     Functions: {
       accept_invitation_to_org: { Args: { org_id: string }; Returns: string }
+      apikey_has_current_org_create_capability: {
+        Args: { p_apikey_rbac_id: string }
+        Returns: boolean
+      }
+      apikey_has_global_permission: {
+        Args: { p_apikey: string; p_permission_key: string }
+        Returns: boolean
+      }
       app_versions_readable_app_ids: { Args: never; Returns: string[] }
       apply_usage_overage: {
         Args: {
@@ -4074,6 +4124,7 @@ export type Database = {
       rbac_perm_channel_read_history: { Args: never; Returns: string }
       rbac_perm_channel_rollback_bundle: { Args: never; Returns: string }
       rbac_perm_channel_update_settings: { Args: never; Returns: string }
+      rbac_perm_org_create: { Args: never; Returns: string }
       rbac_perm_org_create_app: { Args: never; Returns: string }
       rbac_perm_org_delete: { Args: never; Returns: string }
       rbac_perm_org_invite_user: { Args: never; Returns: string }

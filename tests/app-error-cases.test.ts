@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { BASE_URL, fetchWithRetry, getAuthHeaders, getSupabaseClient, NON_ACCESS_APP_NAME, orgApiKeyBindings, resetAndSeedAppData, resetAppData, USER_ID } from './test-utils.ts'
+import { BASE_URL, createDirectApiKeyWithBindings, fetchWithRetry, getAuthHeaders, getSupabaseClient, NON_ACCESS_APP_NAME, resetAndSeedAppData, resetAppData, USER_ID } from './test-utils.ts'
 
 const id = randomUUID().replace(/-/g, '').slice(0, 12)
 const APPNAME = `com.app.error.${id}`
@@ -22,24 +22,22 @@ beforeAll(async () => {
     stripeCustomerId: testStripeCustomerId,
   })
 
-  const createResponse = await fetchWithRetry(`${BASE_URL}/apikey`, {
-    method: 'POST',
-    headers: authHeaders,
-    body: JSON.stringify({
-      name: `app-error-cases-${id}`,
-      bindings: orgApiKeyBindings(testOrgId, 'org_super_admin'),
-    }),
+  const createKey = await createDirectApiKeyWithBindings({
+    userId: USER_ID,
+    key: `app-error-cases-${id}-${randomUUID()}`,
+    name: `app-error-cases-${id}`,
+    orgId: testOrgId,
+    roleName: 'org_super_admin',
   })
 
-  const createData = await createResponse.json() as { id: number, key: string, error?: string }
-  if (createResponse.status !== 200 || !createData?.id || !createData?.key) {
-    throw new Error(`Failed to create isolated API key for app error case tests: ${JSON.stringify(createData)}`)
+  if (!createKey?.id || !createKey.key) {
+    throw new Error('Failed to create isolated API key for app error case tests')
   }
 
-  testApiKeyId = createData.id
+  testApiKeyId = createKey.id
   testHeaders = {
     'Content-Type': 'application/json',
-    'Authorization': createData.key,
+    'Authorization': createKey.key,
   }
 }, 60000)
 

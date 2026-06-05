@@ -98,6 +98,7 @@ export const orgs = pgTable('orgs', {
   customer_id: text('customer_id'),
   require_apikey_expiration: boolean('require_apikey_expiration').notNull().default(false),
   max_apikey_expiration_days: integer('max_apikey_expiration_days'),
+  onboarding: jsonb('onboarding').notNull().default({ intent: 'unknown' }),
   email_preferences: jsonb('email_preferences'),
   has_usage_credits: boolean('has_usage_credits').notNull().default(false),
 })
