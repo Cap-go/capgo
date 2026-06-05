@@ -41,6 +41,7 @@ const localApiDomain = `127.0.0.1:${supabaseConfig.ports.api}/functions/v1`
 const stripePort = getStripeEmulatorPort(process.env)
 const stripeApiBaseUrl = getPlaywrightStripeApiBaseUrl(process.env)
 const managedProcesses: ManagedProcess[] = []
+const isWindows = process.platform === 'win32'
 
 const devices: ScreenshotDevice[] = [
   {
@@ -164,7 +165,7 @@ function startProcess(name: string, args: string[], env: NodeJS.ProcessEnv = {})
   const child = spawn(args[0], args.slice(1), {
     cwd: repoRoot,
     env: { ...process.env, ...env },
-    detached: true,
+    detached: !isWindows,
   })
 
   child.stdout.pipe(logStream)
@@ -193,9 +194,17 @@ async function stopProcess(processToStop: ManagedProcess) {
     ])
   }
 
-  const killProcessGroup = (signal: NodeJS.Signals) => {
+  const terminateProcessTree = (signal: NodeJS.Signals) => {
     if (!processToStop.child.pid)
       return
+
+    if (isWindows) {
+      const args = ['/PID', String(processToStop.child.pid), '/T']
+      if (signal === 'SIGKILL')
+        args.push('/F')
+      spawnSync('taskkill', args, { stdio: 'ignore' })
+      return
+    }
 
     try {
       process.kill(-processToStop.child.pid, signal)
@@ -206,16 +215,18 @@ async function stopProcess(processToStop: ManagedProcess) {
   }
 
   if (processToStop.child.pid) {
-    killProcessGroup('SIGTERM')
-    spawnSync('pkill', ['-TERM', '-P', String(processToStop.child.pid)], { stdio: 'ignore' })
+    terminateProcessTree('SIGTERM')
+    if (!isWindows)
+      spawnSync('pkill', ['-TERM', '-P', String(processToStop.child.pid)], { stdio: 'ignore' })
   }
   processToStop.child.kill('SIGTERM')
   if (await waitForExit(5000))
     return
 
   if (processToStop.child.pid) {
-    killProcessGroup('SIGKILL')
-    spawnSync('pkill', ['-KILL', '-P', String(processToStop.child.pid)], { stdio: 'ignore' })
+    terminateProcessTree('SIGKILL')
+    if (!isWindows)
+      spawnSync('pkill', ['-KILL', '-P', String(processToStop.child.pid)], { stdio: 'ignore' })
   }
   if (!hasExited())
     processToStop.child.kill('SIGKILL')
