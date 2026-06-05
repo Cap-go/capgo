@@ -175,7 +175,7 @@ function sanitizeNativePackages(raw: unknown): NativePackage[] | null {
  * version. Must be called BEFORE the demotion update runs. The decision layer
  * only consumes this as the Case A baseline when the record NEWLY became the
  * public default for the platform (a real switch); on a non-switch edit the value
- * is ignored, so the prior `updated_at`-ordered baseline can no longer mis-fire.
+ * is ignored, so the prior `updated_at`-ordered baseline can no longer misfire.
  * The ordering here is only a tiebreaker; in practice a single other channel is
  * public per platform.
  */

@@ -34,6 +34,22 @@ CREATE POLICY "compatibility_events_select" ON public.compatibility_events
   FOR SELECT TO authenticated
   USING ( public.rbac_check_permission(public.rbac_perm_app_read(), org_id, app_id, NULL::bigint) );
 
+-- Explicit deny for every user-facing write (AGENTS.md RLS Rule 1.5: never rely
+-- on implicit deny). Only the service-role handler (bypasses RLS) and the
+-- SECURITY DEFINER accept RPC (runs as owner) may write; user-context roles
+-- (incl. anon API-key traffic) must never INSERT/UPDATE/DELETE directly.
+CREATE POLICY "compatibility_events_deny_insert" ON public.compatibility_events
+  AS RESTRICTIVE FOR INSERT TO anon, authenticated
+  WITH CHECK (false);
+
+CREATE POLICY "compatibility_events_deny_update" ON public.compatibility_events
+  AS RESTRICTIVE FOR UPDATE TO anon, authenticated
+  USING (false) WITH CHECK (false);
+
+CREATE POLICY "compatibility_events_deny_delete" ON public.compatibility_events
+  AS RESTRICTIVE FOR DELETE TO anon, authenticated
+  USING (false);
+
 -- Manual accept: app.write, sets the resolution fields, requires a reason.
 CREATE OR REPLACE FUNCTION public.acknowledge_compatibility_event(event_id bigint, note text)
 RETURNS void
