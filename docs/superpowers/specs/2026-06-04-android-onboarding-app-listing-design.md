@@ -1,58 +1,80 @@
-# Android Onboarding — App Existence Check via Play Developer Reporting API
+# Android Onboarding — App Existence Verification (Play Developer Reporting API)
 
 **Date:** 2026-06-04
-**Status:** Design — pending review
-**Scope:** Capgo CLI — `build init` (Android), the **OAuth / "generate" service-account path only**
+**Status:** Design — ready to implement (one empirical check outstanding, see §11)
+**Scope:** Capgo CLI — `build init` (Android), **OAuth / "generate" service-account path only**
 **Branch:** `wolny/android-onboarding-app-listing` (off `origin/main`)
+**Sibling:** mirrors the iOS verify-app gate (PR #2397, `app-verification.ts` / `verify-app` step)
 
-## Problem
+---
 
-The Android onboarding picks the Play **package name** at `android-package-select` purely from local Gradle (`findAndroidApplicationIds` → `applicationId` literals). Nothing checks that an app with that package actually **exists in the user's Play Console** — so a typo'd/flavored/stale `applicationId` flows through, the SA gets invited/granted for a package Play doesn't have, and the failure only surfaces later (the build/publish or the SA grant) instead of during onboarding. This is the Android analog of the iOS [verify-app] gap (PR #2397).
+## 1. Summary (TL;DR)
 
-The iOS feature could only *probe* and never *list* on Android — that was wrong: the **Google Play Developer Reporting API** (`playdeveloperreporting.googleapis.com`) has `apps:search`, which **does** enumerate the apps the caller can see. (The Play *Developer* API / `androidpublisher` that `supply` uses has no list — that's the source of the long-standing "no list-apps" belief.)
+After Google sign-in, list the developer's real Play Store apps via the **Play Developer Reporting API** (`apps:search`) and reconcile them against the project's Gradle `applicationId`:
 
-## Goal
+- **Match** → silently confirm the package, no question (like iOS exact-match).
+- **App exists, build id is wrong** → **Path A**: auto-rename the Android project to the chosen app's package via **Trapeze**, `cap sync`, re-check.
+- **No app exists** → **Path B**: open Play Console so the user clicks **"Create app"** (the *single* irreducible manual step on Android), then proceed — the first build uploads as a draft and succeeds.
 
-On the OAuth path, after Google sign-in, list the user's real Play apps and reconcile them against the Gradle `applicationId`(s):
-- **Gradle id matches a real Play app → don't pose the question** (auto-confirm the package, like iOS exact-match).
-- **Gradle id matches no Play app → inform the user**, iOS-style, and surface the real apps so they can pick the right one.
+OAuth-only: the listing uses the **user's** OAuth token + the `playdeveloperreporting` scope. We never enable the Reporting API on the user's service account, so the **import (custom-SA) path** keeps today's Gradle-only flow with a "verification skipped" warning. Any verification failure degrades gracefully to the plain Gradle picker — onboarding is never blocked.
 
-…without ever enabling the Reporting API on the user's *service account* — the listing happens **only via the user's OAuth token**. The import (custom-SA) path has no OAuth, so it keeps today's Gradle-only flow with a warning that verification was skipped.
+---
 
-## Key constraints (discovered / load-bearing)
+## 2. Problem
 
-- **`apps:search` is real and official.** `GET https://playdeveloperreporting.googleapis.com/v1beta1/apps:search` → `{ apps: [{ name: "apps/<pkg>", packageName, displayName }], nextPageToken }`. "Searches for Apps accessible by the user." Paginated (`pageSize` ≤ 1000, `pageToken`). It is a **separate API** from `androidpublisher` — different host, must be enabled in the Cloud project (done), single scope `https://www.googleapis.com/auth/playdeveloperreporting`.
-- **The scope is NON-sensitive.** Confirmed in this project's Cloud Console Data Access page: `playdeveloperreporting` and `androidpublisher` are listed under **non-sensitive scopes** (only `cloud-platform` is sensitive, already verified). So adding it needs **no Trust & Safety review / demo video** — just include it in the consent screen (done) and the requested scopes.
-- **OAuth-only, by design.** We use the **user's** OAuth access token (apps "accessible by the user" → the signed-in developer sees their whole account, sidestepping the SA account-level-vs-app-level grant ambiguity). We deliberately do **not** enable the Reporting API on, or grant the reporting scope to, the user's service account. → Verification runs **only on the `serviceAccountMethod === 'generate'` (Google sign-in) path.**
-- **Backend scope dependency.** OAuth client config comes from the backend (`/private/config/builder` → `scopes[]`, default `androidpublisher`). To get `playdeveloperreporting` granted, the backend must add it to `scopes[]`. The CLI also lists scopes in `OAUTH_SCOPES_FOR_ONBOARDING` (`app.tsx:179`). **The reporting scope must be OPTIONAL** — `findMissingScopes`/`MissingScopesError` must NOT fail sign-in if it wasn't granted (old backend, user on a Workspace that restricts it, etc.); instead degrade to warn-and-skip.
-- **Play can't create apps via API either.** Like iOS (`POST /v1/apps` forbidden), an Android app record requires the **first build uploaded / app created in Play Console (web)**. So the "no app" branch can only **open Play Console + inform** — never auto-create. See [[google-play-console-api-gaps]].
-- **Authoritative id = the Gradle `applicationId`** (what the build produces & publishes), exactly as the Release `PRODUCT_BUNDLE_IDENTIFIER` is on iOS. `apps:search` tells us whether a real Play app exists for it. There may be **multiple** `applicationId`s (flavors) — `findAndroidApplicationIds` already returns a list.
+`android-package-select` picks the Play package purely from local Gradle (`findAndroidApplicationIds`). Nothing checks the package actually exists in the user's Play Console, so a wrong/stale/typo'd `applicationId` flows through, the SA gets invited/granted for a package Play doesn't have, and the failure only surfaces at build/publish time. This is the Android analog of the iOS verify-app gap.
 
-## Design
+## 3. Goal / invariant
 
-### New API helper
+> **A Play Store app record exists whose `packageName` == the project's build `applicationId`.**
 
-`cli/src/build/onboarding/android/reporting-api.ts` (or extend `play-api.ts`):
-- `parseAppsSearchResponse(json): { packageName: string, displayName: string }[]` — pure, tolerant (mirrors iOS `parseAppsResponse`).
-- `listPlayApps(accessToken): Promise<{ packageName, displayName }[]>` — `GET …/v1beta1/apps:search?pageSize=1000`, follow `nextPageToken` up to a sane cap, `Authorization: Bearer <user OAuth token>`. Pure parser is unit-tested; the fetch is thin.
+That's the whole invariant. If it holds, Capgo Builder's first build uploads as a draft and succeeds (§Appendix). If it doesn't, the build 404s. Everything below is just *detecting* which case we're in and guiding the user to satisfy it.
 
-### Reuse the iOS pure classifier
+---
 
-The iOS `app-verification.ts` (`classifyAppVerification`, `evaluateGate`) is already on `main`. Reuse `classifyAppVerification({ releaseBundleId: gradleId, apps, registeredBundleIds: [] })` → `exact-match | wrong-build-id | no-app-*`. Android has no "registered identifier" concept, so pass `[]` (collapses no-app-* into the unregistered branch). Keep the decision logic shared; Android just feeds Gradle ids instead of a Release bundle id.
+## 4. Background facts (researched; confidence-flagged)
 
-### Verification layer on `android-package-select` (generate path only)
+| Fact | Confidence | Source |
+|---|---|---|
+| `apps:search` (`GET …/v1beta1/apps:search`) lists apps "accessible by the user" → `{packageName, displayName}`, paginated | HIGH | [reporting API ref](https://developers.google.com/play/developer/reporting/reference/rest/v1beta1/apps/search) |
+| It's a **separate** API from `androidpublisher`; single scope `…/auth/playdeveloperreporting`; works with SA *or* user OAuth | HIGH | reporting API getting-started |
+| `playdeveloperreporting` + `androidpublisher` are **non-sensitive** scopes (no Trust & Safety review) | HIGH | the project's Cloud Console Data Access page (only `cloud-platform` is sensitive there) |
+| Creating a **public** Play app record is **UI-only** — no `apps.create`, no fastlane/Terraform/automation, Console login is bot-blocked | HIGH | androidpublisher ref; fastlane; gradle-play-publisher README; 2024–2026 release notes |
+| The **first** AAB upload to a never-released app **works via API as a `draft`** once the app record exists | MEDIUM | [fastlane #18293](https://github.com/fastlane/fastlane/discussions/18293) ("Only releases with status draft may be created on draft app") |
+| `edits.insert` 404s until the **app record exists** — so the hard gate is *app creation*, not the first upload | HIGH | gradle-play-publisher #75/#836; Codemagic docs |
+| Capgo Builder already uploads with `release_status: ENV['PLAY_STORE_RELEASE_STATUS'] || 'draft'` to the `internal` track | HIGH | `capgo_builder_new/src/fastlaneTemplateAndroid.ts:442` |
+| Whether `apps:search` lists a **zero-release Draft** app (created, never uploaded) | **UNVERIFIED** | needs one empirical probe (§11) |
+| The Custom App Publishing API can create+upload, but only **permanently-private managed Google Play** apps — irrelevant for public apps | HIGH | custom-app-api/publish |
+
+Net: the only thing a human must do for a brand-new app is click **"Create app"** once. Listing existing apps is solved by `apps:search`; the first upload is handled by the builder's existing draft default.
+
+---
+
+## 5. Design
+
+### 5.1 New API helper
+
+`cli/src/build/onboarding/android/reporting-api.ts`:
+- `parseAppsSearchResponse(json): { packageName, displayName }[]` — pure, tolerant (mirrors iOS `parseAppsResponse`).
+- `listPlayApps(accessToken): Promise<{ packageName, displayName }[]>` — `GET …/v1beta1/apps:search?pageSize=1000`, follow `nextPageToken` to a sane cap, `Authorization: Bearer <user OAuth token>`. Thin fetch; pure parser is unit-tested.
+
+### 5.2 Reuse the iOS classifier
+
+Reuse `app-verification.ts` (`classifyAppVerification`) from `main`: feed `releaseBundleId: gradleId`, `apps`, `registeredBundleIds: []` → `exact-match | wrong-build-id | no-app-*`. Keep the decision logic shared.
+
+### 5.3 Verification on `android-package-select` (generate path only)
 
 When entering `android-package-select` AND `serviceAccountMethod === 'generate'`:
-1. Detect Gradle ids (`findAndroidApplicationIds`, already done) **and** fetch `listPlayApps(await ensureAccessToken())` in the existing effect.
-2. Reconcile ("expand the Gradle list") and route to a resolution path:
-   - **Exactly one Gradle id and it's in `apps` → auto-select it and skip the picker** (don't pose the question). `addLog('✓ Building "<name>" (<pkg>) — matches your Play Store app.')` and continue to `gcp-setup-running`.
-   - **Account has apps but the build's id matches none → Path A picker.** Render the picker enriched with the real Play apps (annotated `✓ in Play Console` + `displayName`), the Gradle ids, "type a different package name", and a **"Create a new app in Play Console" → Path B** entry. Picking a real Play app whose `packageName` ≠ the build's Gradle id offers the **Trapeze auto-rename** (Path A below).
-   - **No apps in the account at all → Path B (create app).**
-3. The chosen/renamed package still flows into `androidPackageChosen` / SA grant exactly as today.
+1. Detect Gradle ids (`findAndroidApplicationIds`) **and** `listPlayApps(await ensureAccessToken())`.
+2. Reconcile ("expand the Gradle list") and route:
+   - **Exactly one Gradle id, and it's in `apps` → auto-confirm, skip the picker.** `addLog('✓ Building "<name>" (<pkg>) — matches your Play Store app.')` → continue to `gcp-setup-running`.
+   - **Account has apps, build id matches none → Path A picker** (real Play apps annotated `✓ in Play Console`, the Gradle ids, "type a different name", and a "Create a new app → Path B" entry). Choosing a real app whose `packageName` ≠ the build id offers the Trapeze rename.
+   - **No apps at all → Path B.**
+3. The chosen/renamed package flows into `androidPackageChosen` / SA grant exactly as today.
 
-### Path A — auto-rename the Android project (Trapeze)
+### 5.4 Path A — auto-rename via Trapeze
 
-Hand-editing an Android `applicationId` to match a Play app is genuinely hard — it spans `build.gradle` (`applicationId`), the `namespace`, the manifest/package + source dirs, then needs `cap sync`. "Retype it yourself" is a non-starter. So when the user picks a real Play app whose `packageName` differs from the build's Gradle id, offer **"Rename my Android project to `<pkg>` for me"**, powered by **Trapeze** (`@trapezedev/project`):
+Hand-editing an Android `applicationId` correctly spans `build.gradle`, `namespace`, manifest/package, then needs `cap sync` — "retype it" is a non-starter. So offer **"Rename my Android project to `<pkg>` for me"**, powered by Trapeze:
 
 ```ts
 const project = new MobileProject('.', { android: { path: 'android' } })
@@ -64,87 +86,89 @@ await gradle?.setNamespace(appId)
 await project.commit()
 ```
 
-**Trapeze is NOT bundled** (the CLI stays lean — same reasoning as the iOS pbxproj rewriter being hand-coded; Trapeze is a heavy dep). It's installed **on demand** into a temp dir only when the user opts in. Orchestrated sequence:
+**Trapeze is NOT bundled** — installed on demand into a temp dir only when the user opts in (CLI stays lean). Orchestrated sequence:
 
-1. **Prepare** — `mkdtemp`; write a tiny `package.json` (`type: module`) + `rename.mjs` (the script above, reading `<appId>` from `argv`); `npm install @trapezedev/project@<pinned>` in the temp dir (spinner: "Preparing the project renamer…"). Node resolves the import from `<tmp>/node_modules`; run the script with **cwd = the user's project** so `MobileProject('.')` targets it.
-2. **Close Android Studio (gate).** Editing the Gradle/native files while Android Studio holds them open risks a half-written project / Studio clobbering the change on its next sync. So detect it and **block until closed**:
-   - **macOS:** `pgrep -f "Android Studio"` (best-effort). If running → "Please quit Android Studio — this continues automatically once it's closed" and re-check ~every 1s until gone.
-   - **Other OSes:** can't reliably detect → one-time "Close Android Studio if it's open" confirm, then proceed.
-3. **Run** the rename (`node <tmp>/rename.mjs <pkg>`, cwd = project); capture stdout/stderr.
-4. **Verify** it took — re-read `findAndroidApplicationIds(androidDir)` and confirm it now contains `<pkg>`. If not, surface the script output and fall back to manual instructions (never claim success).
-5. **`npx cap sync`** (cwd = project; spinner) to keep Capacitor's native/config state consistent after the package change. Non-zero exit is surfaced but non-fatal (the rename is the load-bearing part).
-6. **Re-reconcile** → the Gradle id now matches the Play app → proceed (mirrors iOS Path A's re-check passing).
+1. **Prepare** — `mkdtemp`; write `package.json` (`type: module`) + `rename.mjs` (script above, `<appId>` from `argv`); `npm install @trapezedev/project@<pinned>` in the temp dir (spinner "Preparing the project renamer…"). Node resolves the import from `<tmp>/node_modules`; run with **cwd = the user's project** so `MobileProject('.')` targets it.
+2. **Close Android Studio (gate).** Editing native files while Studio holds them open risks a half-written project / Studio clobbering the change.
+   - macOS: `pgrep -f "Android Studio"`; if running → "Please quit Android Studio — continues automatically once closed", re-check ~1s until gone.
+   - Other OSes: one-time "Close Android Studio if open" confirm, then proceed.
+3. **Run** `node <tmp>/rename.mjs <pkg>` (cwd = project); capture output.
+4. **Verify** — re-read `findAndroidApplicationIds` and confirm it now contains `<pkg>`; if not, surface output + manual fallback (never claim false success).
+5. **`npx cap sync`** (cwd = project; spinner) to keep Capacitor consistent; non-zero exit surfaced but non-fatal.
+6. **Re-reconcile** → matches → proceed.
 
-Loader + attempt feedback mirror iOS — each step shows a spinner; failures warn rather than silently no-op; cancel/back always available.
+Loader + feedback mirror iOS; cancel/back always available.
 
-> ⚠ `setNamespace(appId)` aligns the namespace with the applicationId. For a standard Capacitor app these already match; for a project that *intentionally* keeps `namespace ≠ applicationId`, this is more aggressive than strictly necessary (only `setApplicationId` is required for the Play-app match). See Open questions.
+### 5.5 Path B — create the app (one click), then we take over
 
-### Path B — create the app in Play Console
+Offer **"Open Play Console to create this app"** → opens `https://play.google.com/console`; the user clicks **Create app**. Then re-check (`apps:search`, loader + attempt counting + ask-before-reopen, same mechanics as iOS) and proceed.
 
-Offer **"Open Play Console to create this app"** → opens `https://play.google.com/console`; the user creates the app there. Then re-poll `apps:search` (loader + attempt counting + ask-before-reopen, same mechanics as iOS) to detect it.
+- The Create-app click is the **only** irreducible manual step (no API/automation exists — HIGH confidence).
+- **No manual first upload needed:** the builder uploads the first AAB as a `draft` to `internal` by default (`fastlaneTemplateAndroid.ts:442`), which is exactly what a never-released app accepts.
+- **Inform, don't hard-gate:** the click can't be automated, and `apps:search` freshness for a just-created app is unverified (§11), so allow proceed after informing — blocking could trap a user whose new app hasn't propagated.
+- Per-build nuance (not an onboarding blocker): `draft` means the user clicks "rollout" in Play Console to push each build to testers; `PLAY_STORE_RELEASE_STATUS` overrides for auto-rollout.
 
-**The irreducible manual step is ONE click ("Create app") — not a manual first upload.** Researched in depth (2024–2026); two separate gates with different confidence:
+### 5.6 Import (custom-SA) path — Gradle-only + warn
 
-- **App-record creation — UI-only (HIGH confidence).** There is no `apps.create` in `androidpublisher`; Google documents "Create app" as a web-only flow; nothing in the 2024–2026 release notes adds it; the only reverse-engineered Console automation is abandoned/non-functional (Google blocks automated login). So *creating the app* genuinely requires the Play Console "Create app" click. No API, no fastlane, no Terraform, no bypass. (The Custom App Publishing API can create+upload, but only **permanently-private managed Google Play** apps — never public, so irrelevant here.)
-- **First APK/AAB upload — likely API-able as a draft (MEDIUM confidence).** Earlier framing said the first upload must be manual; that's the conservative *lore* (fastlane/Bitrise/Codemagic docs), but credible dated counter-evidence (fastlane discussion #18293) shows the first upload **succeeds via the API once the app record exists** if `release_status: "draft"` is set — the error without it (*"Only releases with status draft may be created on draft app"*) proves the API reached the app and accepted the artifact. So the upload is **not** the hard blocker.
-- **Precise unblock condition:** `edits.insert` 404s until **the app record exists**. The hard gate is **app creation**, not the upload.
-- **UNVERIFIED (`apps:search`):** whether the Reporting API lists a *Draft* app (created, zero releases). No evidence either way; open empirical question (create a Draft app → call `apps:search` → observe).
-- *Aside:* Google's March-2026 "Registering Android package names" lets you reserve a package without upload, but it's Console-UI-only and for the developer-verification / off-Play program — not a Play listing. Doesn't change the above.
+When `serviceAccountMethod === 'existing'`, keep today's Gradle-only picker, plus a one-line banner: *"App existence isn't verified on the imported-service-account path (it needs Google sign-in). Proceeding with the package from build.gradle — make sure it exists in Play Console."* No `apps:search`, no OAuth.
 
-So Path B is **"create the app (one click), then we take over"**, not "do everything by hand": open Play Console → user clicks **Create app** → re-check (`apps:search` and/or `edits.insert` should now resolve) → proceed. The first build can *probably* do the first upload itself as a draft — **pending a Capgo-side check**: does our builder's publish path set `release_status: draft` for a never-released package? If yes, onboarding genuinely completes after the single "Create app" click. There is no auto-fix for the click itself (unlike Path A's Trapeze rename), but the manual burden is far smaller than "upload your first build by hand."
+### 5.7 Graceful degradation (never block)
 
-### Import (custom-SA) path — keep Gradle-only, warn
+On the generate path, if the reporting scope wasn't granted, the API is disabled (403), the token can't refresh, or the call errors/times out → **warn + fall back to the plain Gradle picker**. A verification failure must never block onboarding (the optional scope, §6, is what makes this safe).
 
-When `serviceAccountMethod === 'existing'`, `android-package-select` keeps **today's Gradle-only picker** unchanged, but shows a one-line warning banner: *"App existence isn't verified on the imported-service-account path (that needs Google sign-in). Proceeding with the package from build.gradle — make sure it exists in Play Console."* No `apps:search` call, no OAuth.
+---
 
-### Graceful degradation (never block onboarding)
+## 6. Scope / config changes
 
-If, on the generate path, the reporting scope wasn't granted, the Reporting API is disabled (403), the token can't be refreshed, or the call errors/times out → **warn and fall back to the plain Gradle picker** (same UX as the import path's banner, different reason). A verification failure must never block onboarding. The reporting scope being optional (above) is what makes this safe.
+- Add `https://www.googleapis.com/auth/playdeveloperreporting` to `OAUTH_SCOPES_FOR_ONBOARDING` (`app.tsx:179`) **as optional** — excluded from the required-scope check so its absence degrades gracefully.
+- Backend `/private/config/builder` must include it in `scopes[]` to actually be requested (coordinate; the CLI tolerates absence).
+- Consent screen already lists it (non-sensitive) — no verification submission.
 
-## Scope / config changes
+## 7. Telemetry
 
-- Add `https://www.googleapis.com/auth/playdeveloperreporting` to `OAUTH_SCOPES_FOR_ONBOARDING` (`app.tsx:179`) **as optional** — exclude it from the required-scope check so its absence degrades gracefully.
-- Backend `/private/config/builder` must include it in `scopes[]` for it to actually be requested (coordinate; the CLI tolerates its absence).
-- Consent screen already lists it (non-sensitive) — no verification submission needed.
-
-## Telemetry
-
-Mirror iOS, `channel: 'bundle'`, `tags.step: 'android-app-verify'` always set:
+`channel: 'bundle'`, `tags.step: 'android-app-verify'` always set:
 - `Android App Verify Shown` — generate path, step entered. tags: `app_count`, `gradle_id_count`.
 - `Android App Verify Result` — `result` ∈ `exact-match` / `wrong-build-id` / `no-app` / `multi-gradle` / `scope-missing` / `fetch-failed` / `skipped-import`.
-- `Android App Verify Picked` — user chose a package. tags: `matches_play_app` (bool), `source` (gradle | play-app | manual).
-- `Android App Verify Auto Fixed` — Trapeze rename completed + verified. tags: `from`, `to`, `cap_sync_ok` (bool), `studio_wait_ms`.
-- `Android App Verify Create App Opened` — opened Play Console (Path B). tags: `attempt`.
+- `Android App Verify Picked` — tags: `matches_play_app`, `source` (gradle | play-app | manual).
+- `Android App Verify Auto Fixed` — Trapeze rename verified. tags: `from`, `to`, `cap_sync_ok`, `studio_wait_ms`.
+- `Android App Verify Create App Opened` — Path B. tags: `attempt`.
 
-## Error handling
+## 8. Error handling
 
 - Reporting scope missing / 403 / network → warn + Gradle-only fallback (degraded, not blocked).
-- `ad_hoc`-equivalent N/A (Android has no ad_hoc); the only fork is generate vs import.
+- No `ad_hoc` equivalent on Android — the only fork is generate vs import.
 - Never throw out of the verification path into the wizard.
 
-## Testing
+## 9. Testing
 
-- **Unit (pure):** `parseAppsSearchResponse` (well-formed, empty, missing fields, pagination shape).
-- **Decision (pure):** reuse/extend `app-verification` tests for the Android inputs — single-match-skip, no-match, multi-Gradle (no auto-skip), empty Play list.
-- **Branch:** generate-vs-import gating, and the scope-missing/fetch-failed → fallback path, as a pure decision function.
-- **Trapeze rename (pure-testable parts):** the temp-script/`package.json` generation and the post-run **verification** (re-read Gradle ids → contains `<pkg>`), plus the Android-Studio-detection predicate (mock `pgrep` output → running/closed). The actual `npm install` + `node` + `cap sync` spawns are integration-only (mock the spawner in unit tests).
-- Wire a `test:` script + aggregate entry, matching the onboarding test pattern.
+- **Pure:** `parseAppsSearchResponse` (well-formed / empty / missing fields / pagination); reuse/extend `app-verification` decision tests for Android inputs (single-match-skip, no-match, multi-Gradle, empty list).
+- **Branch:** generate-vs-import gating; scope-missing/fetch-failed → fallback (pure decision fn).
+- **Trapeze (pure parts):** temp-script/`package.json` generation; post-run verification (re-read Gradle ids → contains `<pkg>`); Android-Studio-detection predicate (mock `pgrep`). `npm install` / `node` / `cap sync` spawns are integration-only (mock the spawner).
+- Wire `test:` script + aggregate entry, matching the onboarding test pattern.
 
-## Out of scope (v1)
+## 10. Out of scope (v1)
 
-- **Bundling Trapeze in the CLI** — it's installed **on demand** into a temp dir only when the user opts into Path A's auto-rename (keeps the dist lean). The auto-rename itself is **in scope** (see Path A).
-- **Enabling the Reporting API on, or granting the reporting scope to, the user's service account** — explicitly excluded; OAuth-token only.
+- **Bundling Trapeze** — installed on demand only (the rename itself is in scope).
+- **Enabling the Reporting API on / granting the scope to the user's service account** — OAuth-token only.
 - **Verification on the import (custom-SA) path** — warn + skip.
-- **Auto-creating the Play app** — the "Create app" click is UI-only (no API, no bypass; HIGH confidence). Path B opens Play Console for that one click, then takes over.
-- **Hard-gating Path B** — Path B **informs + allows proceed**; the one manual step (Create app) can't be automated, and `apps:search` freshness for brand-new apps is unverified, so blocking would risk trapping the user. (Open question.)
+- **Auto-creating the Play app** — the "Create app" click is UI-only (no API/bypass).
+- **Hard-gating Path B** — inform + allow proceed.
 
-## Open questions
+## 11. Open questions
 
-- **`setNamespace` aggressiveness.** Path A's script sets `applicationId` **and** `namespace` (+ `setPackageName`). Only `applicationId` is strictly required to match the Play app. Setting `namespace`/package is a fuller rename (matches the user-provided working script, fine for standard Capacitor apps) but is more invasive for projects that intentionally keep them different. Confirm we always do the full rename, or make namespace/package opt-in.
-- **Is `npx cap sync` needed after the rename?** Trapeze edits the native project directly; `applicationId` doesn't require a sync. It's included to keep Capacitor consistent after a package/namespace change. Confirm keep vs. drop (it's a slow, network-touching step).
-- **On-demand Trapeze install fragility.** Path A `npm install @trapezedev/project` mid-onboarding needs npm + network + time. Pin a version; show a spinner; on install failure fall back to manual instructions. Acceptable, or pre-resolve another way (e.g. `npx --package @trapezedev/project`)?
-- **Android Studio detection off macOS.** Only macOS gets the `pgrep` auto-detect + poll-until-closed. Linux/Windows get a one-time "close it" confirm. Acceptable for v1?
-- **Does `apps:search` list Draft apps? (UNVERIFIED — must test.)** I do not actually know whether a Play app created in the Console with zero releases appears in `apps:search`. The `androidpublisher` first-upload requirement is documented, but that's a different API and I wrongly extrapolated it. Test: create a Draft app → call `apps:search` → observe. The result decides whether Path B can ever gate, or must always inform-and-proceed.
-- **Multiple Gradle flavors.** When several `applicationId`s exist and >1 matches a Play app, show the enriched picker (no auto-skip). Confirm vs. picking the shortest/main like iOS.
-- **Does Capgo Builder's publish do the first upload as a draft? — RESOLVED: yes, by default.** The builder's generated fastlane lane (`capgo_builder_new/src/fastlaneTemplateAndroid.ts:442-453`) calls `upload_to_play_store(..., track: ENV['PLAY_STORE_TRACK'] || 'internal', release_status: ENV['PLAY_STORE_RELEASE_STATUS'] || 'draft')`. So the first build of a freshly-created app uploads as a **draft** to the `internal` track — exactly the status that fastlane #18293 confirms works for a never-released app. Path B genuinely "completes after the one Create-app click." Caveat: `draft` means the user must click "rollout" in Play Console to push each build to testers (there's a `PLAY_STORE_RELEASE_STATUS` override for those who want auto-rollout) — a per-build UX nuance, not an onboarding blocker.
-- **Backend coordination.** The reporting scope must be added to `/private/config/builder`'s `scopes[]` (optional) for this to activate in production; until then the CLI silently degrades. Track as a dependency.
+- **Does `apps:search` list a zero-release Draft app? (UNVERIFIED — one probe.)** Create a Draft app → call `apps:search` → observe. Decides whether the post-"Create app" re-check can *confirm* success or must *trust-and-proceed*. Does **not** block implementation (Path B informs-and-proceeds either way).
+- **`setNamespace` aggressiveness.** Path A sets `applicationId` + `namespace` (+ `setPackageName`). Only `applicationId` is strictly required to match the Play app; the fuller rename matches the proven script and is fine for standard Capacitor apps, but is more invasive when `namespace ≠ applicationId` by intent. Always-full vs. opt-in?
+- **`npx cap sync` after rename** — included for Capacitor consistency; `applicationId` alone doesn't need it. Keep vs. drop (slow/network step)?
+- **On-demand Trapeze install** — needs npm + network mid-onboarding. Pin + spinner + manual fallback. Acceptable, or pre-resolve differently?
+- **Android Studio detection off macOS** — only macOS auto-detects; others get a confirm. OK for v1?
+- **Multiple Gradle flavors** — when >1 `applicationId` matches a Play app, show the picker (no auto-skip). Confirm vs. iOS-style "pick the main one".
+- **Backend coordination** — reporting scope must be added (optional) to `/private/config/builder`'s `scopes[]` to activate in prod; until then the CLI silently degrades.
+
+## 12. Appendix — why Path B "completes after one click"
+
+The Android brand-new-app path used to look like a dead end ("you can't create the app or upload via API"). Research refined this into two separate gates:
+
+1. **App-record creation** — genuinely UI-only. No public API, no fastlane/Terraform/Custom-App bypass (Custom App API only makes permanently-private enterprise apps). The user must click **Create app** in Play Console once.
+2. **First upload** — *not* the blocker. Once the app record exists, the first AAB uploads via API as a `draft` (fastlane #18293), and Capgo Builder already defaults to `release_status: draft`. So the build does it automatically.
+
+Therefore the entire "no app" flow reduces to a single human action — the Create-app click — and everything after is automated.
