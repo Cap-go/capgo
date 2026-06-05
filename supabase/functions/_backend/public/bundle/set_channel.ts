@@ -22,10 +22,6 @@ export async function setChannel(c: Context<MiddlewareKeyVariables>, body: SetCh
     throw simpleError('invalid_app_id', 'App ID must be a reverse domain string', { app_id: body.app_id })
   }
 
-  if (!(await checkPermission(c, 'channel.promote_bundle', { appId: body.app_id, channelId: body.channel_id }))) {
-    throw simpleError('cannot_access_app', 'You can\'t access this app', { app_id: body.app_id, channel_id: body.channel_id })
-  }
-
   let channelName: string | null = null
   let channelOwnerOrg: string | null = null
   let versionName: string | null = null
@@ -58,26 +54,32 @@ export async function setChannel(c: Context<MiddlewareKeyVariables>, body: SetCh
       [body.channel_id, body.app_id],
     )
 
-    if ((channelResult.rowCount ?? 0) !== 1) {
-      throw simpleError('cannot_find_channel', 'Cannot find channel')
+    const channel = (channelResult.rowCount ?? 0) === 1 ? channelResult.rows[0] : null
+    const canPromoteTargetChannel = channel !== null && await checkPermission(c, 'channel.promote_bundle', { appId: body.app_id, channelId: body.channel_id })
+    const canPromoteAppChannels = canPromoteTargetChannel || (channel === null && await checkPermission(c, 'channel.promote_bundle', { appId: body.app_id }))
+    if (!canPromoteAppChannels) {
+      throw simpleError('cannot_access_app', 'You can\'t access this app', { app_id: body.app_id, channel_id: body.channel_id })
     }
-    channelName = channelResult.rows[0].name
-    channelOwnerOrg = channelResult.rows[0].owner_org
 
     const versionResult = await dbClient.query<{ name: string }>(
       `SELECT name
        FROM public.app_versions
        WHERE id = $1
          AND app_id = $2
-         AND owner_org = $3
          AND deleted = false`,
-      [body.version_id, body.app_id, channelOwnerOrg],
+      [body.version_id, body.app_id],
     )
 
     if ((versionResult.rowCount ?? 0) !== 1) {
       throw simpleError('cannot_find_version', 'Cannot find version')
     }
     versionName = versionResult.rows[0].name
+
+    if (!channel) {
+      throw simpleError('cannot_find_channel', 'Cannot find channel')
+    }
+    channelName = channel.name
+    channelOwnerOrg = channel.owner_org
 
     const updateResult = await dbClient.query(
       `UPDATE public.channels

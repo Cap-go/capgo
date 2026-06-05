@@ -70,14 +70,13 @@ describe('bundle set channel RBAC guard', () => {
       appId: 'com.example.app',
       channelId: 42,
     })
-    expect(queryMock).toHaveBeenCalledWith(expect.stringContaining('FROM public.channels'), [
-      42,
-      'com.example.app',
-    ])
     expect(queryMock).toHaveBeenCalledWith(expect.stringContaining('FROM public.app_versions'), [
       7,
       'com.example.app',
-      '046a36ac-e03c-4590-9257-bd6c9dba9ee8',
+    ])
+    expect(queryMock).toHaveBeenCalledWith(expect.stringContaining('FROM public.channels'), [
+      42,
+      'com.example.app',
     ])
     expect(queryMock).toHaveBeenCalledWith(expect.stringContaining('UPDATE public.channels'), [
       7,
@@ -102,6 +101,12 @@ describe('bundle set channel RBAC guard', () => {
       appId: 'com.example.app',
       channelId: 42,
     })
-    expect(connectMock).not.toHaveBeenCalled()
+    expect(connectMock).toHaveBeenCalledTimes(1)
+    expect(queryMock).toHaveBeenCalledWith(expect.stringContaining('FROM public.channels'), [
+      42,
+      'com.example.app',
+    ])
+    expect(queryMock).not.toHaveBeenCalledWith(expect.stringContaining('FROM public.app_versions'), expect.anything())
+    expect(queryMock).not.toHaveBeenCalledWith(expect.stringContaining('UPDATE public.channels'), expect.anything())
   })
 })
