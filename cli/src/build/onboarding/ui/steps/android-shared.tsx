@@ -236,7 +236,7 @@ export const ErrorStep: FC<ErrorStepProps> = ({ message, onChoose, hasBuildLog =
 // cols. All telemetry on the choice stays in the parent's onChoose handler.
 
 export interface AiAnalysisPromptStepProps {
-  onChoose: (choice: 'debug' | 'skip') => void
+  onChoose: (choice: 'debug' | 'skip' | 'support') => void
   dense?: boolean
 }
 
@@ -248,10 +248,11 @@ export const AiAnalysisPromptStep: FC<AiAnalysisPromptStepProps> = ({ onChoose, 
     {!dense && <Newline />}
     <Select
       options={[
+        { label: '📨  Email Capgo support', value: 'support' },
         { label: '🤖  Debug with AI', value: 'debug' },
         { label: '⏭   Skip', value: 'skip' },
       ]}
-      onChange={value => onChoose(value as 'debug' | 'skip')}
+      onChange={value => onChoose(value as 'debug' | 'skip' | 'support')}
     />
   </Box>
 )
@@ -307,6 +308,8 @@ export interface AiAnalysisResultStepProps {
   onSkipOrContinue: () => void
   /** Re-open the fullscreen scroll viewer to re-read the analysis. */
   onReread: () => void
+  /** Escalate to Capgo support (email flow), carrying the logs + this analysis. */
+  onSupport: () => void
   dense?: boolean
 }
 
@@ -319,6 +322,7 @@ export const AiAnalysisResultStep: FC<AiAnalysisResultStepProps> = ({
   onRetry,
   onSkipOrContinue,
   onReread,
+  onSupport,
   dense = false,
 }) => {
   const retriesLeft = maxRetries - retryCount
@@ -362,6 +366,7 @@ export const AiAnalysisResultStep: FC<AiAnalysisResultStepProps> = ({
             : [
                 { label: '✔  Continue', value: 'continue' },
               ]),
+          { label: '📨  Still stuck — email Capgo support', value: 'support' },
           // Only when the analysis is in the scroll viewer (collapsed); inline
           // there's nothing to re-read.
           ...(collapsed ? [{ label: '📖  Re-read analysis', value: 'reread' }] : []),
@@ -369,6 +374,8 @@ export const AiAnalysisResultStep: FC<AiAnalysisResultStepProps> = ({
         onChange={(value) => {
           if (value === 'retry')
             onRetry()
+          else if (value === 'support')
+            onSupport()
           else if (value === 'reread')
             onReread()
           else

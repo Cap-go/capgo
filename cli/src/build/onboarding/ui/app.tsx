@@ -1160,8 +1160,8 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
   // Drive the contact-support flow: confirm gate → write bundle → copy the
   // .log.gz path → reveal in Finder (macOS) → open a pre-filled mailto. Every
   // step but "write the bundle" is best-effort; failures degrade gracefully and
-  // we always return to the 'error' menu afterwards.
-  const handleSupport = useCallback(async () => {
+  // we return to the step we came from (error menu / AI prompt / AI result).
+  const handleSupport = useCallback(async (returnTo: 'error' | 'ai-analysis-prompt' | 'ai-analysis-result' = 'error') => {
     // Redact the error before it goes into the pre-filled email body — the body
     // is plain outbound text (unlike the attached bundle, which is redacted on
     // write), so an un-sanitized error could leak tokens/identifiers.
@@ -1178,15 +1178,20 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
           ...log.slice(-12).map(entry => entry.text),
           ...buildOutput.slice(-12),
         ],
-        sections: [{ title: 'Internal log', lines: readInternalLogLines() }],
+        sections: [
+          { title: 'Internal log', lines: readInternalLogLines() },
+          // When the user escalates after running AI, fold the analysis into the
+          // bundle so support sees what the AI already concluded (spec §2).
+          ...(aiAnalysisText ? [{ title: 'AI analysis', lines: aiAnalysisText.split('\n') }] : []),
+        ],
       }),
       copyPath: p => copyToClipboard(p).ok,
       reveal: (p) => { revealInFinder(p) },
       openUrl: u => open(u),
       print: msg => addLog(msg, 'cyan'),
     })
-    setStep('error')
-  }, [appId, error, log, buildOutput, askSupportConfirm, readInternalLogLines, addLog])
+    setStep(returnTo)
+  }, [appId, error, log, buildOutput, aiAnalysisText, askSupportConfirm, readInternalLogLines, addLog])
 
   // ── Credential save logic ──
 
@@ -4433,6 +4438,10 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
         <AiAnalysisPromptStep
           dense={dense}
           onChange={async (value) => {
+            if (value === 'support') {
+              await handleSupport('ai-analysis-prompt')
+              return
+            }
             if (value === 'debug') {
               setStep('ai-analysis-running')
             }
@@ -4474,6 +4483,10 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
           maxRetries={MAX_AI_RETRIES}
           dense={dense}
           onChange={async (value) => {
+            if (value === 'support') {
+              await handleSupport('ai-analysis-result')
+              return
+            }
             if (value === 'reread') {
               // Re-open the fullscreen scroll viewer (alt buffer has no
               // scrollback, so this is the only way to re-read).

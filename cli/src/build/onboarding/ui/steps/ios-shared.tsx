@@ -130,6 +130,7 @@ export const AiAnalysisPromptStep: FC<AiAnalysisPromptStepProps> = ({ dense = fa
     <Text>We can analyze the build log with Capgo AI and suggest a fix.</Text>
     <Select
       options={[
+        { label: '📨  Email Capgo support', value: 'support' },
         { label: '🤖  Debug with AI', value: 'debug' },
         { label: '⏭   Skip', value: 'skip' },
       ]}
@@ -231,6 +232,7 @@ export const AiAnalysisResultStep: FC<AiAnalysisResultStepProps> = ({
             : [
                 { label: '✔  Continue', value: 'continue' },
               ]),
+          { label: '📨  Still stuck — email Capgo support', value: 'support' },
           // Only offered when the analysis is in the scroll viewer (collapsed);
           // when shown inline there's nothing to re-read.
           ...(collapsed ? [{ label: '📖  Re-read analysis', value: 'reread' }] : []),

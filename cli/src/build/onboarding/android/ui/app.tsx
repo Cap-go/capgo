@@ -953,8 +953,8 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
   // Drive the contact-support flow: confirm gate → write bundle → copy the
   // .log.gz path → reveal in Finder (macOS) → open a pre-filled mailto. Every
   // step but "write the bundle" is best-effort; failures degrade gracefully and
-  // we always return to the 'error' menu afterwards.
-  const handleSupport = useCallback(async () => {
+  // we return to the step we came from (error menu / AI prompt / AI result).
+  const handleSupport = useCallback(async (returnTo: 'error' | 'ai-analysis-prompt' | 'ai-analysis-result' = 'error') => {
     // Redact the error before it goes into the pre-filled email body — the body
     // is plain outbound text (unlike the attached bundle, which is redacted on
     // write), so an un-sanitized error could leak tokens/identifiers.
@@ -971,15 +971,20 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
           ...logLines.slice(-12).map(entry => entry.text),
           ...buildOutput.slice(-12),
         ],
-        sections: [{ title: 'Internal log', lines: readInternalLogLines() }],
+        sections: [
+          { title: 'Internal log', lines: readInternalLogLines() },
+          // When the user escalates after running AI, fold the analysis into the
+          // bundle so support sees what the AI already concluded (spec §2).
+          ...(aiAnalysisText ? [{ title: 'AI analysis', lines: aiAnalysisText.split('\n') }] : []),
+        ],
       }),
       copyPath: p => copyToClipboard(p).ok,
       reveal: (p) => { revealInFinder(p) },
       openUrl: u => open(u),
       print: msg => addLog(msg, 'cyan'),
     })
-    setStep('error')
-  }, [appId, error, logLines, buildOutput, askSupportConfirm, readInternalLogLines, addLog])
+    setStep(returnTo)
+  }, [appId, error, logLines, buildOutput, aiAnalysisText, askSupportConfirm, readInternalLogLines, addLog])
 
   // Wire the forward-declared ref so `persistAndStep`'s catch can surface
   // saveAndroidProgress failures through the same retry/error UX without
@@ -3474,6 +3479,10 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
         <AiAnalysisPromptStep
           dense={false}
           onChoose={async (choice) => {
+            if (choice === 'support') {
+              await handleSupport('ai-analysis-prompt')
+              return
+            }
             if (choice === 'debug') {
               setStep('ai-analysis-running')
             }
@@ -3512,6 +3521,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
           maxRetries={MAX_AI_RETRIES}
           dense={false}
           onReread={() => setStep('ai-analysis-result-scroll')}
+          onSupport={() => { handleSupport('ai-analysis-result').catch(() => {}) }}
           onRetry={async () => {
             if (aiJobId) {
               await trackAiAnalysisChoice({
