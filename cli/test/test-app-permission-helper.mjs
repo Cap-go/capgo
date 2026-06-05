@@ -36,4 +36,25 @@ assert.deepEqual(calls[1].args, {
   channel_id: null,
 })
 
+calls.length = 0
+
+await checkAppExistsAndHasPermissionOrgErr(
+  supabase,
+  'ck_channel_cli_key',
+  'com.example.app',
+  'channel.delete',
+  true,
+  true,
+  42,
+)
+
+assert.deepEqual(calls.map(call => call.name), ['exist_app_v2', 'cli_check_permission'])
+assert.deepEqual(calls[1].args, {
+  apikey: 'ck_channel_cli_key',
+  permission_key: 'channel.delete',
+  org_id: null,
+  app_id: 'com.example.app',
+  channel_id: 42,
+})
+
 console.log('app permission helper tests passed')

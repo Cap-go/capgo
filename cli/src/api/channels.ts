@@ -94,7 +94,7 @@ export function createChannel(
     .single()
 }
 
-export function delChannel(supabase: SupabaseClient<Database>, name: string, appId: string, _userId: string) {
+export function delChannel(supabase: SupabaseClient<Database>, name: string, appId: string) {
   return supabase
     .from('channels')
     .delete()

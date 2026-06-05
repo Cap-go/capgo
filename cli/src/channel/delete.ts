@@ -10,7 +10,6 @@ import {
   getAppId,
   getConfig,
   getOrganizationId,
-  resolveUserIdFromApiKey,
   sendEvent,
 } from '../utils'
 
@@ -36,20 +35,6 @@ export async function deleteChannelInternal(channelId: string, appId: string, op
 
   const supabase = await createSupabaseClient(options.apikey, options.supaHost, options.supaAnon)
   await check2FAComplianceForApp(supabase, appId, silent)
-  const userId = await resolveUserIdFromApiKey(supabase, options.apikey)
-
-  await checkAppExistsAndHasPermissionOrgErr(supabase, options.apikey, appId, 'channel.delete', silent, true)
-
-  if (options.deleteBundle && !silent)
-    log.info(`Deleting bundle ${appId}#${channelId} from Capgo`)
-
-  if (options.deleteBundle) {
-    const bundle = await findBundleIdByChannelName(supabase, appId, channelId)
-    if (bundle?.name && !silent)
-      log.info(`Deleting bundle ${bundle.name} from Capgo`)
-    if (bundle?.name)
-      await deleteAppVersion(supabase, appId, bundle.name)
-  }
 
   const { data: channel, error: channelError } = await findChannel(supabase, appId, channelId)
   if (channelError || !channel) {
@@ -65,6 +50,19 @@ export async function deleteChannelInternal(channelId: string, appId: string, op
     throw new Error(`Channel ${channelId} not found`)
   }
 
+  await checkAppExistsAndHasPermissionOrgErr(supabase, options.apikey, appId, 'channel.delete', silent, true, channel.id)
+
+  if (options.deleteBundle && !silent)
+    log.info(`Deleting bundle ${appId}#${channelId} from Capgo`)
+
+  if (options.deleteBundle) {
+    const bundle = await findBundleIdByChannelName(supabase, appId, channelId)
+    if (bundle?.name && !silent)
+      log.info(`Deleting bundle ${bundle.name} from Capgo`)
+    if (bundle?.name)
+      await deleteAppVersion(supabase, appId, bundle.name)
+  }
+
   const { error: delDevicesError } = await delChannelDevices(supabase, appId, channel.id)
   if (delDevicesError) {
     if (!silent)
@@ -75,7 +73,7 @@ export async function deleteChannelInternal(channelId: string, appId: string, op
   if (!silent)
     log.info(`Deleting channel ${appId}#${channelId} from Capgo`)
 
-  const deleteStatus = await delChannel(supabase, channelId, appId, userId)
+  const deleteStatus = await delChannel(supabase, channelId, appId)
   if (deleteStatus.error) {
     if (!silent)
       log.error(`Cannot delete Channel 🙀 ${formatError(deleteStatus.error)}`)

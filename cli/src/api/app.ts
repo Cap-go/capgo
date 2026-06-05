@@ -165,6 +165,7 @@ export async function checkAppExistsAndHasPermissionOrgErr(
   requiredPermissionKey: string,
   silent = false,
   skip2FACheck = false,
+  channelId?: number | null,
 ) {
   const pm = getPMAndCommand()
 
@@ -179,7 +180,7 @@ export async function checkAppExistsAndHasPermissionOrgErr(
     throw new Error(msg)
   }
 
-  if (!(await hasCliPermission(supabase, apikey, requiredPermissionKey, { appId: appid }))) {
+  if (!(await hasCliPermission(supabase, apikey, requiredPermissionKey, { appId: appid, channelId: channelId ?? null }))) {
     const msg = `Insufficient permissions for app ${appid}. Required RBAC permission for this action: ${requiredPermissionKey}.`
     if (!silent)
       log.error(msg)
