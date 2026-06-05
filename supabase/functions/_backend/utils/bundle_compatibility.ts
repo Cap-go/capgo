@@ -1,5 +1,9 @@
 import { parseRange, rangeIntersects } from '@std/semver'
 
+// NOTE: temporarily unreferenced after the live-computed dashboard alert was
+// removed (see PR). The upcoming compatibility-events backend (verdicts
+// persisted from on_channel_update) consumes these helpers — when that lands,
+// drop the knip.json ignoreIssues entry for this file.
 export interface NativePackage {
   name: string
   version: string

@@ -4,7 +4,6 @@ import { computed, ref, watchEffect } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import IconCheck from '~icons/lucide/check'
 import AppNotFoundModal from '~/components/AppNotFoundModal.vue'
-import BundleCompatibilityAlert from '~/components/dashboard/BundleCompatibilityAlert.vue'
 import BundleUploadsCard from '~/components/dashboard/BundleUploadsCard.vue'
 import DeploymentBanner from '~/components/dashboard/DeploymentBanner.vue'
 import DeploymentStatsCard from '~/components/dashboard/DeploymentStatsCard.vue'
@@ -25,7 +24,6 @@ const devicesNb = ref(0)
 const updatesNb = ref(0)
 const channelsNb = ref(0)
 const capgoVersion = ref('')
-const compatibilityAlertRefreshKey = ref(0)
 const main = useMainStore()
 const organizationStore = useOrganizationStore()
 const isLoading = ref(false)
@@ -141,11 +139,6 @@ async function refreshData() {
   isLoading.value = false
 }
 
-async function refreshAfterDeployment() {
-  await refreshData()
-  compatibilityAlertRefreshKey.value += 1
-}
-
 function finishRealOnboarding() {
   if (!id.value)
     return
@@ -209,8 +202,7 @@ watchEffect(async () => {
               </div>
             </div>
           </div>
-          <BundleCompatibilityAlert v-if="!appNotFound" :app-id="id" :refresh-key="compatibilityAlertRefreshKey" />
-          <DeploymentBanner v-if="!appNotFound" :app-id="id" @deployed="refreshAfterDeployment" />
+          <DeploymentBanner v-if="!appNotFound" :app-id="id" @deployed="refreshData" />
           <ReleaseBanner v-if="!appNotFound" :app-id="id" />
 
           <!-- Capgo Builder promo banner (only for valid apps with no native build yet) -->
