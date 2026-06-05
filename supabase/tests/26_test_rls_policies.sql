@@ -3,7 +3,7 @@
 BEGIN;
 
 -- Plan the number of tests
-SELECT plan(44);
+SELECT plan(45);
 
 -- Test app_versions policies
 SELECT
@@ -137,6 +137,20 @@ SELECT
             'Prevent non 2FA access'
         ],
         'orgs should have correct policies'
+    );
+
+-- Test apikey_global_permissions policies
+SELECT
+    policies_are(
+        'public',
+        'apikey_global_permissions',
+        ARRAY[
+            'Deny delete on apikey_global_permissions',
+            'Deny insert on apikey_global_permissions',
+            'Deny select on apikey_global_permissions',
+            'Deny update on apikey_global_permissions'
+        ],
+        'apikey_global_permissions should have correct restrictive policies'
     );
 
 -- Test devices policies

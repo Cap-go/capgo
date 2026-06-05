@@ -1,14 +1,25 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { clearWebsitePaidUserCookie, syncWebsitePaidUserCookieFromOrganizations } from '../src/services/websiteAuthCookie.ts'
 
+const localConfig = vi.hoisted(() => ({
+  value: {
+    host: 'https://console.capgo.app',
+    hostWeb: 'https://www.capgo.app' as string | undefined,
+  },
+}))
+
 vi.mock('~/services/supabase', () => ({
-  getLocalConfig: () => ({ hostWeb: 'https://www.capgo.app' }),
+  getLocalConfig: () => localConfig.value,
 }))
 
 describe('website paid user cookie', () => {
   let cookieWrites: string[]
 
   beforeEach(() => {
+    localConfig.value = {
+      host: 'https://console.capgo.app',
+      hostWeb: 'https://www.capgo.app',
+    }
     cookieWrites = []
     vi.stubGlobal('document', {
       get cookie() {
@@ -19,6 +30,7 @@ describe('website paid user cookie', () => {
       },
     })
     vi.stubGlobal('location', {
+      hostname: 'console.capgo.app',
       protocol: 'https:',
     })
   })
@@ -36,6 +48,19 @@ describe('website paid user cookie', () => {
     expect(cookieWrites).toContain('capgo_paid_user=1; Path=/; Max-Age=2592000; SameSite=Lax; Domain=.capgo.app; Secure')
   })
 
+  it('falls back to the console host when the landing URL is not configured', () => {
+    localConfig.value = {
+      host: 'https://console.capgo.app',
+      hostWeb: undefined,
+    }
+
+    syncWebsitePaidUserCookieFromOrganizations([
+      { paying: true, role: 'owner' },
+    ])
+
+    expect(cookieWrites).toContain('capgo_paid_user=1; Path=/; Max-Age=2592000; SameSite=Lax; Domain=.capgo.app; Secure')
+  })
+
   it('clears the cookie when paid access is only from an invite', () => {
     syncWebsitePaidUserCookieFromOrganizations([
       { paying: true, role: 'invite_read' },
@@ -45,10 +70,10 @@ describe('website paid user cookie', () => {
     expect(cookieWrites).toContain('capgo_paid_user=; Path=/; Max-Age=0; SameSite=Lax; Secure')
   })
 
-  it('also clears the previous logged-in cookie name', () => {
+  it('clears the paid user cookie', () => {
     clearWebsitePaidUserCookie()
 
-    expect(cookieWrites).toContain('capgo_logged_in=; Path=/; Max-Age=0; SameSite=Lax; Domain=.capgo.app; Secure')
-    expect(cookieWrites).toContain('capgo_logged_in=; Path=/; Max-Age=0; SameSite=Lax; Secure')
+    expect(cookieWrites).toContain('capgo_paid_user=; Path=/; Max-Age=0; SameSite=Lax; Domain=.capgo.app; Secure')
+    expect(cookieWrites).toContain('capgo_paid_user=; Path=/; Max-Age=0; SameSite=Lax; Secure')
   })
 })

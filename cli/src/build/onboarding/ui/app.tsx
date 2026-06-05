@@ -22,6 +22,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 // re-renders by accident.
 const SPINNER_FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'] as const
 import { detectIosBundleIds } from '../bundle-id-detector.js'
+import { writeReleaseBundleId } from '../../pbxproj-parser.js'
 import { writeOnboardingSupportBundle } from '../../../onboarding-support.js'
 import { formatRunnerCommand, splitRunnerCommand } from '../../../runner-command.js'
 import { createSupabaseClient, findBuildCommandForProjectType, findProjectType, findSavedKeySilent, getOrganizationId, getPackageScripts, getPMAndCommand } from '../../../utils.js'
@@ -37,8 +38,11 @@ import { isAiAnalysisTooTall, resolveAiResultRoute } from '../ai-fit.js'
 // suggestion doesn't actually fix the failure mode while still giving the user
 // a couple of in-wizard chances to iterate.
 const MAX_AI_RETRIES = 2
-import type { AscDistributionCert } from '../apple-api.js'
-import { CertificateLimitError, classifyCertAvailability, computeCertSha1, createCertificate, createProfile, deleteProfile, DuplicateProfileError, ensureBundleId, findCertIdBySha1, generateJwt, listDistributionCerts, listProfilesForCert, revokeCertificate, verifyApiKey } from '../apple-api.js'
+import type { AscApp, AscDistributionCert } from '../apple-api.js'
+import { CertificateLimitError, classifyCertAvailability, computeCertSha1, createCertificate, createProfile, deleteProfile, DuplicateProfileError, ensureBundleId, findCertIdBySha1, generateJwt, listApps, listBundleIds, listDistributionCerts, listProfilesForCert, revokeCertificate, verifyApiKey } from '../apple-api.js'
+import type { AscAppLike, GatePath } from '../app-verification.js'
+import { classifyAppVerification, evaluateGate } from '../app-verification.js'
+import { trackEvent } from '../../../analytics/track.js'
 import { createP12, generateCsr } from '../csr.js'
 import { mapIosOnboardingError } from '../error-categories.js'
 import { canUseFilePicker, openFilePicker, openMobileprovisionPicker } from '../file-picker.js'
@@ -211,9 +215,10 @@ interface AppProps {
    * (cert lookup, profile filtering, ensureBundleId, createProfile, and the
    * provisioning_map key). Sourced from `config.appId` directly — what
    * `cap sync` writes into project.pbxproj's PRODUCT_BUNDLE_IDENTIFIER.
-   * The user can override at the `confirm-app-id` step when pbxproj and
-   * config.appId disagree. command.ts falls back to `appId` if config.appId
-   * is missing, so this prop is always a valid string.
+   * When pbxproj's Release id and config.appId disagree, the wizard adopts the
+   * authoritative Release id (verify-app confirms it remotely). command.ts
+   * falls back to `appId` if config.appId is missing, so this prop is always a
+   * valid string.
    */
   iosBundleIdInitial: string
   initialProgress: OnboardingProgress | null
@@ -296,9 +301,8 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
   // Trust the saved override only when it was confirmed for the SAME
   // `config.appId` we're seeing this run. If the user renamed the app
   // between CLI runs the previously-saved override is stale relative to
-  // the new files — fall back to `iosBundleIdInitial` so the mismatch
-  // detector can re-ask via the confirm-app-id step instead of silently
-  // using the old value.
+  // the new files — fall back to `iosBundleIdInitial` so redirectIfMismatch /
+  // verify-app re-resolve the bundle id instead of silently using the old value.
   const savedOverrideIsFresh = initialProgress?.iosBundleIdOverride !== undefined
     && initialProgress.iosBundleIdContextAppId === iosBundleIdInitial
   const [iosBundleId, setIosBundleId] = useState<string>(
@@ -311,30 +315,88 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
   // to suppress the question for the rest of the session in that case.
   // Stale overrides (context drift between runs) don't count as confirmed.
   const [appIdConfirmed, setAppIdConfirmed] = useState<boolean>(savedOverrideIsFresh)
-  // Where redirectIfMismatch wants to go after the user confirms.
-  const [pendingAppIdNext, setPendingAppIdNext] = useState<OnboardingStep | null>(null)
-  // Sub-mode for confirm-app-id: false = render the candidate Select;
-  // true = render a FilteredTextInput for a custom value.
-  const [confirmAppIdTyping, setConfirmAppIdTyping] = useState(false)
+
+  // ─── verify-app (remote App Store Connect verification) ────────────────
+  //
+  // Runs after verifying-key succeeds, app_store mode only (create-new is
+  // always app_store). Confirms — via the ASC API — that an App Store app
+  // exists whose bundleId == the project's Release PRODUCT_BUNDLE_IDENTIFIER
+  // before we commit to that bundle id for cert/profile creation. See
+  // app-verification.ts for the pure classify/gate logic.
+  //
+  // Where to go once verify-app passes (e.g. creating-certificate on the
+  // create-new path, or the identity/profile picker on import).
+  const [pendingVerifyNext, setPendingVerifyNext] = useState<OnboardingStep | null>(null)
+  // True while the initial parallel apps+bundleIds fetch is in flight.
+  const [verifyAppLoading, setVerifyAppLoading] = useState(false)
+  // The authoritative Release build id resolved fresh from pbxproj for this
+  // verification. Empty string when no Release config could be resolved.
+  const [verifyReleaseBundleId, setVerifyReleaseBundleId] = useState('')
+  // The Debug-config bundle id when it differs from Release (else ''). Drives a
+  // persistent, bordered warning box on the verify-app step so the user always
+  // sees which id Capgo Builder actually signs — a scrolling gray log line was
+  // being missed.
+  const [verifyDebugBundleId, setVerifyDebugBundleId] = useState('')
+  // Apps that exist in the user's App Store Connect account (picker source +
+  // Path B re-poll). Refreshed live on each Path B Continue.
+  const [verifyApps, setVerifyApps] = useState<AscApp[]>([])
+  // Registered Developer-portal bundle ids (diagnostic only — sharpens Path B
+  // wording: "identifier already exists" vs "will be registered").
+  const [verifyRegisteredIds, setVerifyRegisteredIds] = useState<string[]>([])
+  // Which resolution path the gate is enforcing once the user has chosen
+  // (Path A fix-build-id, Path B create-app). null = still showing the picker.
+  const [verifyPath, setVerifyPath] = useState<GatePath | null>(null)
+  // The existing app the user picked in Path A (its bundleId is the target the
+  // user must make PRODUCT_BUNDLE_IDENTIFIER match).
+  const [verifyChosenApp, setVerifyChosenApp] = useState<AscAppLike | null>(null)
+  // 1-based count of blocked Continue attempts — drives the escalating warning
+  // box so a repeatedly-blocked gate never looks frozen.
+  const [verifyAttempt, setVerifyAttempt] = useState(0)
+  // Path B only: when a Continue re-poll still finds no app, we flip this so
+  // the next render asks before re-opening the browser (never auto-reopen).
+  const [verifyAskReopen, setVerifyAskReopen] = useState(false)
+  // Bumped on every gate Select action so the gate Select remounts with a fresh
+  // key. @inkjs/ui's Select re-fires onChange on EVERY render once it stays
+  // mounted after a selection (its internal onChange effect deps include the
+  // inline options/onChange identities, and previousValue !== value stays true)
+  // — which otherwise loops the gate (e.g. "attempt 3427"). Every other Select in
+  // the wizard dodges this by navigating away on select; the gate stays on-step,
+  // so we force a remount to reset the Select's internal value.
+  const [gateActionSeq, setGateActionSeq] = useState(0)
+  // Guards the one-shot Shown event + the initial fetch effect from re-firing
+  // on every re-render while we're parked on verify-app.
+  const verifyShownRef = useRef(false)
+  const verifyFetchStartedRef = useRef(false)
   // Detection is synchronous (small files, no network); useMemo captures the
-  // result for the lifetime of the component. The confirm-app-id step
-  // renders only when `detectedIds.mismatch === true` AND the user hasn't
-  // already chosen this session.
+  // result for the lifetime of the component. redirectIfMismatch reads this to
+  // decide whether to adopt the Release id (on mismatch). verify-app re-detects
+  // FRESH from disk on each Continue, bypassing this memo.
   const detectedIds = useMemo(
     () => detectIosBundleIds({ cwd: process.cwd(), iosDir, capacitorAppId: iosBundleIdInitial }),
     [iosDir, iosBundleIdInitial],
   )
   // Shared sites that fan out into Apple-side work (end of import-scanning,
-  // end of verifying-key) wrap their setStep call with this so the
-  // confirmation question gets injected at the right moment without
-  // duplicating the "is there a mismatch?" logic per call site.
+  // end of verifying-key) wrap their setStep call with this.
+  //
+  // The Release-config PRODUCT_BUNDLE_IDENTIFIER is authoritative for Apple
+  // signing, and a differing capacitor.config.appId (the Capgo app key) is
+  // EXPECTED — not an error — so we no longer interrupt with the confirm-app-id
+  // prompt (which fired even before the .p8 was provided). Instead we silently
+  // adopt the detected Release id for cert/profile/provisioning work and
+  // continue. For app_store the authoritative check is verify-app (remote App
+  // Store Connect verification); for ad_hoc the Release id is simply the build
+  // id, used as-is.
   const redirectIfMismatch = (target: OnboardingStep): OnboardingStep => {
     if (appIdConfirmed)
       return target
     if (!detectedIds.mismatch)
       return target
-    setPendingAppIdNext(target)
-    return 'confirm-app-id'
+    setIosBundleId(detectedIds.recommended.value)
+    setAppIdConfirmed(true)
+    if (detectedIds.recommended.value !== iosBundleIdInitial) {
+      addLog(`ℹ Using "${detectedIds.recommended.value}" (your Xcode Release bundle ID) for Apple operations. capacitor.config.appId ("${iosBundleIdInitial}") is the Capgo app key and is left unchanged.`)
+    }
+    return target
   }
 
   // Telemetry: resolve org id once + emit per-step events
@@ -885,6 +947,47 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
     })
   }, [])
 
+  // Best-effort PostHog telemetry for the verify-app step. Mirrors
+  // builder-cta.ts's trackEvent usage (channel 'bundle') and ALWAYS sets
+  // `step` (the Builder dashboard filters null steps out of funnels via
+  // JSONExtractString — an unset step silently drops the event). Never
+  // blocks or throws into the wizard.
+  const trackVerifyEvent = useCallback((
+    event: string,
+    icon: string,
+    tags: Record<string, string | number | boolean> = {},
+  ) => {
+    void trackEvent({
+      channel: 'bundle',
+      event,
+      icon,
+      apikey: resolvedApiKeyRef.current ?? apikey ?? undefined,
+      appId,
+      orgId: resolvedOrgId ?? undefined,
+      tags: { step: 'ios-app-verify', platform: 'ios', mode: 'app_store', ...tags },
+    })
+  }, [appId, apikey, resolvedOrgId])
+
+  // Persist the verified Release build id as the iosBundleIdOverride. After the
+  // gate passes the wired-in value is always a build id that both the project
+  // produces AND the App Store has, so cert/profile creation, ensureBundleId and
+  // the provisioning_map all key off the right identifier. Also snapshots the
+  // current config.appId so a later run can detect context drift and re-verify.
+  // Marks the app id as confirmed so redirectIfMismatch doesn't re-adopt later.
+  const persistVerifyOverride = useCallback(async (releaseBundleId: string) => {
+    setIosBundleId(releaseBundleId)
+    setAppIdConfirmed(true)
+    const existing = await loadProgress(appId) || {
+      platform: 'ios' as const,
+      appId,
+      startedAt: new Date().toISOString(),
+      completedSteps: {},
+    }
+    existing.iosBundleIdOverride = releaseBundleId
+    existing.iosBundleIdContextAppId = iosBundleIdInitial
+    await saveProgress(appId, existing)
+  }, [appId, iosBundleIdInitial])
+
   const pm = getPMAndCommand()
   const addIosCommand = formatRunnerCommand(pm.runner, ['cap', 'add', 'ios'])
   const syncIosCommand = formatRunnerCommand(pm.runner, ['cap', 'sync', 'ios'])
@@ -1034,13 +1137,11 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
     // File-picker re-open guards
     pickerOpenedRef.current = false
     mobileprovisionPickerOpenedRef.current = false
-    // iOS bundle id confirmation gate — without this a restart from inside
-    // confirm-app-id would silently keep the previously chosen override in
-    // this session, so the user would never see the question again.
+    // iOS bundle id resolution — reset so a restart re-resolves the authoritative
+    // Release bundle id from scratch (redirectIfMismatch / verify-app set these
+    // again) rather than keeping a stale override from the aborted run.
     setIosBundleId(iosBundleIdInitial)
     setAppIdConfirmed(false)
-    setPendingAppIdNext(null)
-    setConfirmAppIdTyping(false)
     // No-match recovery context — without this a restart would carry the
     // previous run's reason into the next pass and surface the wrong
     // bundle/distribution/profile-source wording in the recovery alert.
@@ -1050,6 +1151,23 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
     // the previous session's emission would mute a hint that's now
     // newly relevant.
     adHocHintShownRef.current = false
+    // verify-app (remote App Store verification) — reset the one-shot guards and
+    // all step state so a Restart that re-enters verify-app re-runs the initial
+    // fetch instead of finding verifyFetchStartedRef already true and freezing on
+    // a blank/stale gate.
+    verifyShownRef.current = false
+    verifyFetchStartedRef.current = false
+    setPendingVerifyNext(null)
+    setVerifyAppLoading(false)
+    setVerifyReleaseBundleId('')
+    setVerifyDebugBundleId('')
+    setVerifyApps([])
+    setVerifyRegisteredIds([])
+    setVerifyPath(null)
+    setVerifyChosenApp(null)
+    setVerifyAttempt(0)
+    setVerifyAskReopen(false)
+    setGateActionSeq(0)
   }, [appId, iosBundleIdInitial])
 
   // Extract Key ID from .p8 filename — delegates to the module-level helper so
@@ -1302,11 +1420,11 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
     // !pendingRecoveryAction). The IMPORT path routes through the SAME engine
     // effect here, but OVERRIDES the engine's `next`: the engine expresses only
     // create-new (→ creating-certificate) and pendingRecoveryAction (→
-    // import-create-profile-only); the plain import app_store entry must instead
-    // go to import-validating-all-certs / import-pick-identity (the engine has no
-    // way to express that). So run the engine for the verify + the apiKeyVerified
-    // persist (which preserves setupMethod / importDistribution), mirror teamId,
-    // then route per flow mode.
+    // import-create-profile-only); the plain import entry must instead go through
+    // verify-app (app_store) or straight to import-validating-all-certs /
+    // import-pick-identity (ad_hoc) — the engine has no way to express that. So
+    // run the engine for the verify + the apiKeyVerified persist (which preserves
+    // setupMethod / importDistribution), mirror teamId, then route per flow mode.
     if (step === 'verifying-key' && (importMode || pendingRecoveryAction)) {
       ;(async () => {
         try {
@@ -1348,23 +1466,154 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
           // Branch on flow mode — mirrors the bespoke routing exactly:
           //  - import + pending recovery action → the engine resumed it
           //    (res.next === 'import-create-profile-only'); clear the React mirror.
-          //  - import (no pending action, app_store entry point) → OVERRIDE the
-          //    engine's create-new 'creating-certificate' with the import target:
-          //    redirectIfMismatch(matches>0 ? import-validating-all-certs :
-          //    import-pick-identity). The eager batch validation runs before the
-          //    picker when there's at least one match.
+          //  - import (no pending action) → OVERRIDE the engine's create-new
+          //    'creating-certificate' with the import target: matches>0 ?
+          //    import-validating-all-certs : import-pick-identity (the eager batch
+          //    validation runs before the picker when there's at least one match).
+          //    Import + app_store carries the SAME wrong/missing-app risk as
+          //    create-new — the local Release bundle id may not match any App
+          //    Store app — and a verified .p8 is present here, so run verify-app
+          //    first and resume at the identity/profile picker once the invariant
+          //    holds. ad_hoc import never uploads to TestFlight (and may have
+          //    entered a one-shot .p8 via no-match recovery) → skip verify-app
+          //    entirely. redirectIfMismatch silently adopts the authoritative
+          //    Release bundle id (no prompt) before either route.
           if (importMode && pendingRecoveryAction) {
             setPendingRecoveryAction(null)
             if (res.next)
               setStep(res.next)
           }
           else if (importMode) {
-            setStep(redirectIfMismatch(importMatches.length > 0 ? 'import-validating-all-certs' : 'import-pick-identity'))
+            const importTarget: OnboardingStep = importMatches.length > 0 ? 'import-validating-all-certs' : 'import-pick-identity'
+            if (importDistribution === 'app_store') {
+              setPendingVerifyNext(importTarget)
+              setStep(redirectIfMismatch('verify-app'))
+            }
+            else {
+              setStep(redirectIfMismatch(importTarget))
+            }
           }
         }
         catch (err) {
           if (!cancelled)
             handleError(err, 'verifying-key')
+        }
+      })()
+    }
+
+    // ── verify-app: remote App Store Connect verification ──────────────────
+    //
+    // Fetch /v1/apps + /v1/bundleIds in parallel with a fresh token, resolve
+    // the authoritative Release build id FRESH from disk (never the memoized
+    // initial detection at app.tsx:256), and classify the invariant. On an
+    // exact match we log + persist the override + continue straight to the
+    // pending target. On any ASC fetch failure (or an unresolvable Release
+    // config) we warn and proceed — we can't verify a transient/unknown state
+    // and blocking on it would trap the user (the local bundle-id resolution
+    // still ran). Otherwise we stay parked on verify-app
+    // and the render below drives the picker + gate. Guarded by a ref so the
+    // fetch fires exactly once per entry into the step.
+    if (step === 'verify-app' && !verifyFetchStartedRef.current) {
+      verifyFetchStartedRef.current = true
+      setVerifyAppLoading(true)
+      ;(async () => {
+        // Re-detect fresh from disk so the Release build id reflects any edit
+        // the user made since the wizard started (and bypasses the memo).
+        const fresh = detectIosBundleIds({ cwd: process.cwd(), iosDir, capacitorAppId: iosBundleIdInitial })
+        const releaseBundleId = fresh.releaseResolved && fresh.pbxproj ? fresh.pbxproj.value : ''
+        const debugReleaseDiffer = fresh.debugReleaseDiffer
+        // Debug ≠ Release awareness note — informational only, never gates. Shown
+        // as a persistent boxed warning on the verify-app step (via the state set
+        // here) AND as a yellow log line for the exact-match pass-through, which
+        // never renders the step.
+        if (debugReleaseDiffer && fresh.debug && fresh.pbxproj) {
+          setVerifyDebugBundleId(fresh.debug.value)
+          addLog(
+            `⚠ Debug builds "${fresh.debug.value}" but Release builds "${fresh.pbxproj.value}" — Capgo Builder signs the RELEASE ID "${fresh.pbxproj.value}".`,
+            'yellow',
+          )
+        }
+        else {
+          setVerifyDebugBundleId('')
+        }
+
+        try {
+          const token = await getFreshToken()
+          const [apps, registeredBundleIds] = await Promise.all([listApps(token), listBundleIds(token)])
+          if (cancelled)
+            return
+
+          setVerifyApps(apps)
+          setVerifyRegisteredIds(registeredBundleIds)
+          setVerifyReleaseBundleId(releaseBundleId)
+          setVerifyAppLoading(false)
+
+          if (!verifyShownRef.current) {
+            verifyShownRef.current = true
+            trackVerifyEvent('iOS App Verify Shown', '🔍', {
+              app_count: apps.length,
+              bundle_id_count: registeredBundleIds.length,
+              debug_release_differ: debugReleaseDiffer,
+            })
+          }
+
+          // No Release config resolvable → warn, skip gating. We never gate on
+          // a Debug or plist fallback (spec: Release is authoritative).
+          if (!releaseBundleId) {
+            addLog('⚠ Could not resolve a Release PRODUCT_BUNDLE_IDENTIFIER from your Xcode project — skipping remote App Store verification.', 'yellow')
+            trackVerifyEvent('iOS App Verify Result', '🔎', {
+              result: 'no-release-config',
+              app_count: apps.length,
+              bundle_id_count: registeredBundleIds.length,
+            })
+            setStep(pendingVerifyNext ?? 'creating-certificate')
+            setPendingVerifyNext(null)
+            return
+          }
+
+          const { result, matchedApp } = classifyAppVerification({ releaseBundleId, apps, registeredBundleIds })
+          trackVerifyEvent('iOS App Verify Result', '🔎', {
+            result,
+            app_count: apps.length,
+            bundle_id_count: registeredBundleIds.length,
+          })
+
+          if (result === 'exact-match' && matchedApp) {
+            addLog(`✓ Building "${matchedApp.name}" (${releaseBundleId}) — matches your App Store app.`)
+            try {
+              await persistVerifyOverride(releaseBundleId)
+            }
+            catch {
+              // A disk error saving the override must not be reported as an ASC
+              // network failure (the outer catch's message). Non-fatal — the user
+              // may just be re-prompted on the next run.
+              addLog('⚠ Verified the App Store app but could not save the bundle ID override to disk — you may be re-prompted next run.', 'yellow')
+            }
+            trackVerifyEvent('iOS App Verify Passed', '✅', { attempts: 0, path: 'exact-match' })
+            setStep(pendingVerifyNext ?? 'creating-certificate')
+            setPendingVerifyNext(null)
+            return
+          }
+          // Not satisfied → stay on verify-app; the render drives the picker +
+          // gate. Pre-seed the path for the no-apps cases (no picker needed).
+          if (result !== 'wrong-build-id')
+            setVerifyPath('create-app')
+        }
+        catch {
+          // ASC fetch failure (auth / rate-limit / network): we can't verify a
+          // transient failure, and blocking on it would trap the user. Warn
+          // visibly and proceed — the local bundle-id resolution already ran.
+          if (cancelled)
+            return
+          setVerifyAppLoading(false)
+          addLog("⚠ Couldn't reach App Store Connect to verify your app; continuing without remote verification.", 'yellow')
+          if (!verifyShownRef.current) {
+            verifyShownRef.current = true
+            trackVerifyEvent('iOS App Verify Shown', '🔍', { app_count: 0, bundle_id_count: 0, debug_release_differ: debugReleaseDiffer })
+          }
+          trackVerifyEvent('iOS App Verify Result', '🔎', { result: 'fetch-failed', app_count: 0, bundle_id_count: 0 })
+          setStep(pendingVerifyNext ?? 'creating-certificate')
+          setPendingVerifyNext(null)
         }
       })()
     }
@@ -1586,10 +1835,10 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
   useEffect(() => {
     // verifying-key is SHARED between create-new and import: the engine's `next`
     // covers only the create-new (→ creating-certificate) and pendingRecoveryAction
-    // (→ import-create-profile-only) cases — NOT the import app_store routing to
-    // import-validating-all-certs / import-pick-identity. So route it through the
-    // engine ONLY on the create-new path; import + pendingRecoveryAction keep the
-    // bespoke body above.
+    // (→ import-create-profile-only) cases — NOT the import app_store routing
+    // (verify-app → import-validating-all-certs / import-pick-identity). So route
+    // it through the engine ONLY on the create-new path; import +
+    // pendingRecoveryAction keep the bespoke body above.
     if (step === 'verifying-key' && (importMode || pendingRecoveryAction))
       return
     if (!IOS_ENGINE_CREATE_EFFECT_STEPS.has(step))
@@ -1752,15 +2001,22 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
 
         // ── advance ──────────────────────────────────────────────────────────
         // The engine returns an explicit `next` for every effect step. For the
-        // create-new verifying-key the bespoke wrapped its next in
-        // redirectIfMismatch (the confirm-app-id bundle-id gate, a SYNC FS read
-        // the IO-free engine can't do) — re-apply it here so the create-new path
-        // still detours through confirm-app-id when config.appId and pbxproj
-        // disagree. Every other step's next is used verbatim.
+        // create-new verifying-key the engine's next is 'creating-certificate' —
+        // but the bespoke (PR #2397) routes through the verify-app remote App
+        // Store check first: record the engine's target in pendingVerifyNext and
+        // OVERRIDE next to 'verify-app' (the same driver-override pattern the
+        // import-mode verifying-key body uses — the engine has no way to express
+        // the bespoke verify-app detour yet; see the follow-up engine port).
+        // redirectIfMismatch runs first only to silently adopt the authoritative
+        // Release bundle id when it differs from capacitor.config.appId (a SYNC
+        // FS read the IO-free engine can't do). Every other step's next is used
+        // verbatim.
         const next = result.next ?? getIosResumeStep(np)
         if (!next)
           return
-        const advanceTo = step === 'verifying-key' ? redirectIfMismatch(next) : next
+        if (step === 'verifying-key')
+          setPendingVerifyNext(next)
+        const advanceTo = step === 'verifying-key' ? redirectIfMismatch('verify-app') : next
         if (advanceTo !== step)
           setStep(advanceTo)
       }
@@ -2016,10 +2272,11 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
         // ── advance ──────────────────────────────────────────────────────────
         // import-scanning's engine `next` is getImportEntryStep(progress) — the
         // un-redirected import-entry target. The bespoke wrapped it in
-        // redirectIfMismatch (the confirm-app-id bundle-id gate, a SYNC FS read the
-        // IO-free engine can't do) so the import path detours through confirm-app-id
-        // when config.appId and pbxproj disagree. Re-apply it here for import-
-        // scanning; every other import effect's next is used verbatim.
+        // redirectIfMismatch (the bundle-id resolution, a SYNC FS read the
+        // IO-free engine can't do) so the import path silently adopts the
+        // authoritative Release bundle id when config.appId and pbxproj disagree.
+        // Re-apply it here for import-scanning; every other import effect's next
+        // is used verbatim.
         const next = result.next ?? getIosResumeStep(np)
         if (!next)
           return
@@ -2776,120 +3033,364 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
       {/* Import: scanning */}
       {step === 'import-scanning' && <ImportScanningStep />}
 
-      {/* Confirm iOS bundle id when config.appId and project.pbxproj
-          disagree. Only reached via redirectIfMismatch — never shown on
-          fresh runs where everything lines up. */}
-      {step === 'confirm-app-id' && (() => {
-        const onChoose = async (chosen: string) => {
-          setIosBundleId(chosen)
-          setAppIdConfirmed(true)
-          setConfirmAppIdTyping(false)
-          // Persist + snapshot the current config.appId so the next CLI
-          // run can detect "user changed the app id since last time" and
-          // re-ask. Merge with whatever progress already exists.
-          const existing = await loadProgress(appId) || {
-            platform: 'ios' as const,
-            appId,
-            startedAt: new Date().toISOString(),
-            completedSteps: {},
-          }
-          existing.iosBundleIdOverride = chosen
-          existing.iosBundleIdContextAppId = iosBundleIdInitial
-          await saveProgress(appId, existing)
-          if (chosen !== iosBundleIdInitial)
-            addLog(`✔ Using "${chosen}" as the iOS bundle ID for Apple operations (capacitor.config.appId is "${iosBundleIdInitial}")`)
-          else
-            addLog(`✔ Confirmed "${chosen}" as the iOS bundle ID`)
-          setStep(pendingAppIdNext ?? 'import-pick-identity')
-          setPendingAppIdNext(null)
-        }
-
-        if (confirmAppIdTyping) {
+      {/* Verify the App Store Connect app exists for the Release build id.
+          app_store mode only; reached after verifying-key. The single
+          invariant: an ASC app exists whose bundleId
+          == the Release PRODUCT_BUNDLE_IDENTIFIER. The exact-match and
+          fetch-failure cases are handled in the effect above (they transition
+          straight through); this render only drives the picker + the two
+          resolution-path gates. */}
+      {step === 'verify-app' && (
+        <Box flexDirection="column">
+          {verifyDebugBundleId && verifyReleaseBundleId
+            ? (
+                <Box flexDirection="column" borderStyle="round" borderColor="yellow" paddingX={1} marginTop={1}>
+                  <Text bold color="yellow">{'⚠  Debug and Release use different bundle IDs'}</Text>
+                  <Text>
+                    {'Debug builds '}
+                    <Text bold>{verifyDebugBundleId}</Text>
+                    {'   ·   Release builds '}
+                    <Text bold color="cyan">{verifyReleaseBundleId}</Text>
+                  </Text>
+                  <Text>
+                    {'Capgo Builder signs the '}
+                    <Text bold color="cyan">Release</Text>
+                    {' ID → '}
+                    <Text bold color="cyan">{verifyReleaseBundleId}</Text>
+                  </Text>
+                </Box>
+              )
+            : null}
+          {(() => {
+        if (verifyAppLoading) {
           return (
             <Box flexDirection="column" marginTop={1}>
-              <Alert variant="info">
-                Type the iOS bundle ID to use for Apple operations.
-              </Alert>
+              <SpinnerLine text="Checking App Store Connect for your app..." />
+              <Text dimColor>Fetching your apps and registered bundle IDs to verify the build matches a real App Store app.</Text>
+            </Box>
+          )
+        }
+
+        const releaseId = verifyReleaseBundleId
+
+        // Final pass: persist the verified Release id as the override and
+        // continue to the pending target (creating-certificate).
+        const passGate = async (path: GatePath, resolvedId: string) => {
+          await persistVerifyOverride(resolvedId)
+          trackVerifyEvent('iOS App Verify Passed', '✅', { attempts: verifyAttempt, path })
+          setStep(pendingVerifyNext ?? 'creating-certificate')
+          setPendingVerifyNext(null)
+        }
+
+        // Path A Continue — re-read pbxproj FRESH from disk (never the memo)
+        // and re-check the Release build id against the chosen app.
+        const continueFixBuildId = async () => {
+          const fresh = detectIosBundleIds({ cwd: process.cwd(), iosDir, capacitorAppId: iosBundleIdInitial })
+          const newRelease = fresh.releaseResolved && fresh.pbxproj ? fresh.pbxproj.value : ''
+          setVerifyReleaseBundleId(newRelease)
+          const satisfied = Boolean(verifyChosenApp) && newRelease === verifyChosenApp!.bundleId
+          const attempt = verifyAttempt + 1
+          const gate = evaluateGate({ satisfied, attempt })
+          if (gate.proceed) {
+            addLog(`✓ Building "${verifyChosenApp!.name}" (${newRelease}) — matches your App Store app.`)
+            await passGate('fix-build-id', newRelease)
+            return
+          }
+          setVerifyAttempt(attempt)
+          trackVerifyEvent('iOS App Verify Gate Blocked', '🚧', { attempt, path: 'fix-build-id' })
+        }
+
+        // Path A auto-fix — rewrite the Release PRODUCT_BUNDLE_IDENTIFIER in the
+        // Xcode project to the chosen App Store app's bundle id, then re-check
+        // (which now passes and advances the gate). Only PRODUCT_BUNDLE_IDENTIFIER
+        // assignments equal to the current build id are touched; capacitor.config
+        // is never modified.
+        const autoFixBuildId = async () => {
+          if (!verifyChosenApp)
+            return
+          const target = verifyChosenApp.bundleId
+          try {
+            const { changed } = writeReleaseBundleId(process.cwd(), iosDir, releaseId, target)
+            if (changed > 0) {
+              addLog(`🔧 Updated PRODUCT_BUNDLE_IDENTIFIER → "${target}" in your Xcode project.`)
+              trackVerifyEvent('iOS App Verify Auto Fixed', '🔧', { attempt: verifyAttempt, path: 'fix-build-id' })
+            }
+            else {
+              addLog(`⚠ Couldn't find PRODUCT_BUNDLE_IDENTIFIER "${releaseId}" to update — edit it in Xcode, then re-check.`, 'yellow')
+            }
+          }
+          catch {
+            addLog('⚠ Could not write to your Xcode project — edit PRODUCT_BUNDLE_IDENTIFIER manually, then re-check.', 'yellow')
+          }
+          // Re-check against disk; passes the gate when the write succeeded.
+          await continueFixBuildId()
+        }
+
+        // Path B Continue — re-poll /v1/apps and check for an app matching the
+        // Release build id. Never re-opens the browser automatically.
+        const continueCreateApp = async () => {
+          // Show the step's loader while we re-poll ASC (an async network call) —
+          // otherwise the re-check feels instant and the user can't tell it ran.
+          setVerifyAppLoading(true)
+          const attempt = verifyAttempt + 1
+          try {
+            const token = await getFreshToken()
+            const apps = await listApps(token)
+            setVerifyApps(apps)
+            const satisfied = apps.some(a => a.bundleId === releaseId)
+            if (evaluateGate({ satisfied, attempt }).proceed) {
+              const matched = apps.find(a => a.bundleId === releaseId)
+              addLog(`✓ Building "${matched?.name ?? releaseId}" (${releaseId}) — matches your App Store app.`)
+              await passGate('create-app', releaseId)
+              return
+            }
+            // Still not found — count the attempt so the escalating box visibly
+            // advances, then ask before re-opening the browser.
+            setVerifyAttempt(attempt)
+            setVerifyAskReopen(true)
+            trackVerifyEvent('iOS App Verify Gate Blocked', '🚧', { attempt, path: 'create-app' })
+          }
+          catch {
+            // Couldn't reach ASC — still count the attempt so the user sees the
+            // re-check happened (not a silent no-op) and surface a connectivity
+            // message distinct from "app still missing".
+            setVerifyAttempt(attempt)
+            setVerifyAskReopen(true)
+            addLog("⚠ Couldn't reach App Store Connect to re-check — check your connection and try again.", 'yellow')
+            trackVerifyEvent('iOS App Verify Gate Blocked', '🚧', { attempt, path: 'create-app' })
+          }
+          finally {
+            setVerifyAppLoading(false)
+          }
+        }
+
+        // Open the ASC new-app page. Registers the identifier first (idempotent)
+        // so it is selectable in the form. Opens ONLY on explicit choice.
+        const openCreatePage = async () => {
+          try {
+            const token = await getFreshToken()
+            await ensureBundleId(token, releaseId)
+          }
+          catch {
+            // Registration is best-effort — the user can still create the app
+            // and pick/register the id in the web form.
+          }
+          trackVerifyEvent('iOS App Verify Create App Opened', '🌐', { attempt: verifyAttempt })
+          try {
+            await open('https://appstoreconnect.apple.com/apps')
+          }
+          catch {
+            addLog('⚠ Could not open your browser. Visit https://appstoreconnect.apple.com/apps to create the app.', 'yellow')
+          }
+          setVerifyAskReopen(false)
+        }
+
+        const cancelGate = (path: GatePath) => {
+          trackVerifyEvent('iOS App Verify Cancelled', '🚫', { attempt: verifyAttempt, path })
+          addLog('Exiting onboarding.', 'yellow')
+          exitOnboarding()
+        }
+
+        // Return to the app picker (verifyPath === null) to choose a different
+        // App Store app or switch to "create a new app". Resets the per-attempt
+        // gate state so the re-picked target starts fresh.
+        const backToPicker = () => {
+          setVerifyPath(null)
+          setVerifyChosenApp(null)
+          setVerifyAttempt(0)
+          setVerifyAskReopen(false)
+        }
+
+        // Escalating border colour ramp so a repeatedly-blocked gate never
+        // looks frozen (spec: each blocked Continue must look visibly
+        // different). Tops out at red.
+        const escalation = evaluateGate({ satisfied: false, attempt: verifyAttempt }).escalationLevel
+        const gateBorder = escalation >= 3 ? 'red' : escalation === 2 ? 'yellow' : 'cyan'
+        const attemptMarker = verifyAttempt > 0 ? ` (attempt ${verifyAttempt})` : ''
+
+        // ── Path A: fix the build id ──────────────────────────────────────
+        if (verifyPath === 'fix-build-id' && verifyChosenApp) {
+          const wrong = releaseId
+          const right = verifyChosenApp.bundleId
+          return (
+            <Box flexDirection="column" marginTop={1}>
+              <Box flexDirection="column" borderStyle="round" borderColor={gateBorder} paddingX={1}>
+                <Text bold color={gateBorder}>{`Build ID doesn't match "${verifyChosenApp.name}"${attemptMarker}`}</Text>
+                <Newline />
+                <Text>
+                  {'Your project builds '}
+                  <Text bold color="red">{wrong || '(no Release build ID resolved)'}</Text>
+                  {', but the App Store app you picked is '}
+                  <Text bold color="green">{right}</Text>
+                  {'.'}
+                </Text>
+                <Newline />
+                <Text>
+                  {'Set '}
+                  <Text bold>PRODUCT_BUNDLE_IDENTIFIER</Text>
+                  {' (Release) to '}
+                  <Text bold color="cyan">{right}</Text>
+                  {' — pick "Update … for me" below to do it automatically, or edit it in Xcode yourself and re-check.'}
+                </Text>
+                <Text dimColor>{'capacitor.config.appId can stay as-is — only the Release PRODUCT_BUNDLE_IDENTIFIER must match.'}</Text>
+              </Box>
               <Newline />
-              <Text dimColor>
-                {`Press Enter when done. This is what we'll send to Apple's API for cert and profile lookups — it must match `}
-                <Text bold>PRODUCT_BUNDLE_IDENTIFIER</Text>
-                {' in your Xcode project (and the App ID on developer.apple.com).'}
-              </Text>
-              <Newline />
-              <FilteredTextInput
-                placeholder="e.g. com.example.myapp"
-                allowedPattern={/[A-Za-z0-9.-]/}
-                maxLength={155}
-                initialValue={detectedIds.recommended.value}
-                onSubmit={(value) => {
-                  const trimmed = value.trim()
-                  if (!trimmed)
-                    return
-                  void onChoose(trimmed)
+              <Select
+                key={`gate-a-${gateActionSeq}`}
+                options={[
+                  { label: '🔧 Update PRODUCT_BUNDLE_IDENTIFIER for me', value: 'autofix' },
+                  { label: '✅ I\'ve edited it myself — re-check', value: 'continue' },
+                  { label: '↩  Back — pick a different app', value: 'back' },
+                  { label: '❌ Cancel onboarding', value: 'cancel' },
+                ]}
+                onChange={(value) => {
+                  setGateActionSeq(s => s + 1)
+                  if (value === 'autofix')
+                    void autoFixBuildId()
+                  else if (value === 'continue')
+                    void continueFixBuildId()
+                  else if (value === 'back')
+                    backToPicker()
+                  else
+                    cancelGate('fix-build-id')
                 }}
               />
             </Box>
           )
         }
 
+        // ── Path B: create the app ────────────────────────────────────────
+        if (verifyPath === 'create-app') {
+          const alreadyRegistered = verifyRegisteredIds.includes(releaseId)
+          // After a blocked re-poll we ASK before re-opening the browser.
+          if (verifyAskReopen) {
+            return (
+              <Box flexDirection="column" marginTop={1}>
+                <Box flexDirection="column" borderStyle="round" borderColor={gateBorder} paddingX={1}>
+                  <Text bold color={gateBorder}>{`Still no App Store app for ${releaseId}${attemptMarker}`}</Text>
+                  <Newline />
+                  <Text>{`We re-checked App Store Connect and didn't find an app whose bundle ID is `}<Text bold color="cyan">{releaseId}</Text>{'.'}</Text>
+                  <Text dimColor>{'Create the app on appstoreconnect.com (the API cannot create apps), then re-check.'}</Text>
+                </Box>
+                <Newline />
+                <Select
+                  key={`gate-b-reopen-${gateActionSeq}`}
+                  options={[
+                    { label: '🔁 I\'ve created it — re-check', value: 'recheck' },
+                    { label: '🌐 Re-open the create-app page', value: 'reopen' },
+                    { label: '❌ Cancel onboarding', value: 'cancel' },
+                  ]}
+                  onChange={(value) => {
+                    setGateActionSeq(s => s + 1)
+                    if (value === 'recheck')
+                      void continueCreateApp()
+                    else if (value === 'reopen')
+                      void openCreatePage()
+                    else
+                      cancelGate('create-app')
+                  }}
+                />
+              </Box>
+            )
+          }
+          return (
+            <Box flexDirection="column" marginTop={1}>
+              <Box flexDirection="column" borderStyle="round" borderColor={gateBorder} paddingX={1}>
+                <Text bold color={gateBorder}>{`No App Store app exists for ${releaseId}${attemptMarker}`}</Text>
+                <Newline />
+                <Text>
+                  {'Your project builds '}
+                  <Text bold color="cyan">{releaseId}</Text>
+                  {`, but there's no App Store Connect app with that bundle ID yet. An app_store build needs one to upload to.`}
+                </Text>
+                <Newline />
+                <Text dimColor>
+                  {alreadyRegistered
+                    ? `The identifier ${releaseId} is already registered in your Developer account — select it when creating the app.`
+                    : `We'll register the identifier ${releaseId} (so it's selectable) when you open the create-app page.`}
+                </Text>
+                <Text dimColor>{'The App Store Connect API cannot create apps — this is a one-time manual step on the web.'}</Text>
+              </Box>
+              <Newline />
+              <Select
+                key={`gate-b-${gateActionSeq}`}
+                options={[
+                  { label: '🌐 Open App Store Connect to create the app', value: 'open' },
+                  { label: '🔁 I\'ve already created it — re-check', value: 'recheck' },
+                  ...(verifyApps.length > 0 ? [{ label: '↩  Back — pick an existing app', value: 'back' }] : []),
+                  { label: '❌ Cancel onboarding', value: 'cancel' },
+                ]}
+                onChange={(value) => {
+                  setGateActionSeq(s => s + 1)
+                  if (value === 'open')
+                    void openCreatePage()
+                  else if (value === 'recheck')
+                    void continueCreateApp()
+                  else if (value === 'back')
+                    backToPicker()
+                  else
+                    cancelGate('create-app')
+                }}
+              />
+            </Box>
+          )
+        }
+
+        // ── Picker (wrong-build-id): account has apps, none match the build
+        //    id. Let the user pick the intended app (→ Path A) or declare the
+        //    build id correct and create a new app (→ Path B). ──────────────
         return (
           <Box flexDirection="column" marginTop={1}>
             <Alert variant="warning">
-              {`The iOS bundle ID in your Xcode project doesn't match capacitor.config.`}
+              {`No App Store app matches the bundle ID your project builds (${releaseId}).`}
             </Alert>
             <Newline />
             <Text dimColor>
-              {`We use the iOS bundle ID for Apple Developer Portal operations (looking up certs, fetching/creating provisioning profiles). Picking the wrong one is the cause of "Apple returned X profiles but none target …" errors. capacitor.config.appId stays untouched — this only affects what we send to Apple.`}
+              {`An app_store build signs the Release PRODUCT_BUNDLE_IDENTIFIER and uploads to the App Store app with the same bundle ID. None of your apps use ${releaseId}, so the upload would be rejected. Which app are you building?`}
             </Text>
-            <Newline />
-            <Box flexDirection="column" marginLeft={2}>
-              {detectedIds.pbxproj && (
-                <Text>
-                  • Xcode (
-                  <Text bold>{detectedIds.pbxproj.label}</Text>
-                  ):
-                  {' '}
-                  <Text bold color="cyan">{detectedIds.pbxproj.value}</Text>
-                </Text>
-              )}
-              {detectedIds.plist && (
-                <Text>
-                  • Info.plist (CFBundleIdentifier):
-                  {' '}
-                  <Text bold color="cyan">{detectedIds.plist.value}</Text>
-                </Text>
-              )}
-              <Text>
-                • Capacitor (capacitor.config.appId):
-                {' '}
-                <Text bold color="cyan">{detectedIds.capacitor.value}</Text>
-              </Text>
-            </Box>
-            <Newline />
-            <Text>Which value should we use for Apple-side operations?</Text>
             <Newline />
             <Select
               options={[
-                ...detectedIds.candidates.map((c, i) => ({
-                  label: i === 0
-                    ? `${c.value} — ${c.label} (recommended)`
-                    : `${c.value} — ${c.label}`,
-                  value: c.value,
+                ...verifyApps.map(a => ({
+                  label: `${a.name} — ${a.bundleId}`,
+                  value: a.bundleId,
                 })),
-                { label: '✏️   Type a custom bundle ID...', value: '__type__' },
+                { label: '➕ None of these — my build ID is correct, create a new app', value: '__create_new__' },
               ]}
               onChange={(value) => {
-                if (value === '__type__') {
-                  setConfirmAppIdTyping(true)
+                if (value === '__create_new__') {
+                  trackVerifyEvent('iOS App Verify Picked', '👆', { matches_build_id: false, chose_create_new: true })
+                  setVerifyPath('create-app')
                   return
                 }
-                void onChoose(value)
+                const chosen = verifyApps.find(a => a.bundleId === value) ?? null
+                trackVerifyEvent('iOS App Verify Picked', '👆', {
+                  matches_build_id: value === releaseId,
+                  chose_create_new: false,
+                })
+                if (chosen && chosen.bundleId === releaseId) {
+                  // Already matches — pass straight through (defensive; the
+                  // exact-match case is normally handled in the effect).
+                  addLog(`✓ Building "${chosen.name}" (${releaseId}) — matches your App Store app.`)
+                  void (async () => {
+                    try {
+                      await passGate('fix-build-id', releaseId)
+                    }
+                    catch {
+                      addLog('⚠ Could not save the verified bundle ID; you may be re-prompted next run.', 'yellow')
+                    }
+                  })()
+                  return
+                }
+                setVerifyChosenApp(chosen)
+                setVerifyPath('fix-build-id')
               }}
             />
           </Box>
         )
-      })()}
+          })()}
+        </Box>
+      )}
 
       {/* Import: distribution mode (now FIRST visible step in import flow) */}
       {step === 'import-distribution-mode' && (
@@ -3537,7 +4038,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
               // on input-key-id, MATCHing the bespoke setStep('input-key-id').
               // We load the FULL persisted progress first (the sibling input-key-id
               // / input-issuer-id handlers do the same) so routing-critical fields
-              // — esp. pendingAppIdNext + appIdConfirmed (the confirm-app-id gate) —
+              // — esp. iosBundleIdOverride + iosBundleIdContextAppId (the verified bundle-id override) —
               // survive into the routing base instead of being dropped by a minimal
               // synthetic object. We then merge the new p8Path but CLEAR keyId so
               // getIosResumeStep still lands on input-key-id (the user confirms the
@@ -3581,7 +4082,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
               // — even though keyId is persisted to disk for resume restoration.
               // We load the FULL persisted progress first (the sibling input-key-id
               // / input-issuer-id handlers do the same) so routing-critical fields
-              // — esp. pendingAppIdNext + appIdConfirmed (the confirm-app-id gate) —
+              // — esp. iosBundleIdOverride + iosBundleIdContextAppId (the verified bundle-id override) —
               // survive into the routing base instead of being dropped by a minimal
               // synthetic object. We then merge the new p8Path but CLEAR keyId so
               // getIosResumeStep still lands on input-key-id (the user confirms the

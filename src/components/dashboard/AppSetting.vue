@@ -1347,6 +1347,8 @@ async function transferAppOwnership() {
                 role="button"
                 tabindex="0"
                 @click="setDefaultChannel"
+                @keydown.enter.prevent="setDefaultChannel"
+                @keydown.space.prevent="setDefaultChannel"
               >
                 <FormKit
                   type="text"
@@ -1382,6 +1384,8 @@ async function transferAppOwnership() {
                 role="button"
                 tabindex="0"
                 @click="openDefaultDownloadChannelDialog"
+                @keydown.enter.prevent="openDefaultDownloadChannelDialog"
+                @keydown.space.prevent="openDefaultDownloadChannelDialog"
               >
                 <FormKit
                   type="text"

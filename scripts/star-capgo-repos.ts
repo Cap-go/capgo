@@ -44,7 +44,6 @@ const CAPGO_REPOS = [
   "https://github.com/Cap-go/capacitor-video-player/",
   "https://github.com/Cap-go/capacitor-env/",
   "https://github.com/Cap-go/capacitor-is-root/",
-  "https://github.com/Cap-go/capacitor-ivs-player/",
   "https://github.com/Cap-go/capacitor-photo-library/",
   "https://github.com/Cap-go/capacitor-sim/",
   "https://github.com/Cap-go/capacitor-pedometer/",

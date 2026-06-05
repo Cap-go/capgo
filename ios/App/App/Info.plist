@@ -18,6 +18,17 @@
 	<string>$(PRODUCT_NAME)</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>ee.forgr.capacitorgo</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>capgo</string>
+			</array>
+		</dict>
+	</array>
 	<key>CFBundleShortVersionString</key>
 	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleVersion</key>
@@ -27,15 +38,27 @@
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSCameraUsageDescription</key>
-	<string>Allow Camera feature to try it in the sandbox app your are developing</string>
+	<string>Allow camera access to try camera features in the sandbox app you are developing.</string>
+	<key>NSCalendarsUsageDescription</key>
+	<string>Allow calendar access to try calendar features in the sandbox app you are developing.</string>
+	<key>NSCalendarsFullAccessUsageDescription</key>
+	<string>Allow full calendar access to try calendar features in the sandbox app you are developing.</string>
+	<key>NSCalendarsWriteOnlyAccessUsageDescription</key>
+	<string>Allow calendar write access to try calendar event creation features in the sandbox app you are developing.</string>
 	<key>NSMicrophoneUsageDescription</key>
-<string>Allow access to the microphone to record audio.</string>
+	<string>Allow microphone access to record audio in the sandbox app you are developing.</string>
+	<key>NSMotionUsageDescription</key>
+	<string>Allow motion access to try motion features in the sandbox app you are developing.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Allow speech recognition to try speech features in the sandbox app you are developing.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Allow location access to try background location features in the sandbox app you are developing.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Allow Geolocation feature to try it in the sandbox app your are developing</string>
+	<string>Allow location access to try geolocation features in the sandbox app you are developing.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
-	<string>Allow Photo Library feature to try it in the sandbox app your are developing</string>
+	<string>Allow photo library write access to try photo features in the sandbox app you are developing.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Allow Photo Library feature to try it in the sandbox app your are developing</string>
+	<string>Allow photo library access to try photo features in the sandbox app you are developing.</string>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>

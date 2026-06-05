@@ -128,9 +128,13 @@ test.describe('API Key Management', () => {
   })
 
   test.beforeEach(async ({ page }) => {
-    await page.addInitScript((orgId) => {
+    await page.addInitScript(({ orgId, userId }) => {
       localStorage.setItem('capgo_current_org_id', orgId)
-    }, INHERITED_ORG_ID)
+      sessionStorage.setItem('sso_enforcement_checked', JSON.stringify({
+        timestamp: Date.now(),
+        cachedUserId: userId,
+      }))
+    }, { orgId: INHERITED_ORG_ID, userId: USER_ID })
     // Login first
     await page.login('test@capgo.app', 'testtest')
     // Go to API keys page
@@ -175,6 +179,51 @@ test.describe('API Key Management', () => {
     await expect(roleSelect).toHaveValue('app_reader')
 
     await page.mouse.click(5, 5)
+    await page.getByRole('button', { name: 'Cancel' }).click()
+  })
+
+  test('should edit API key rights', async ({ page }) => {
+    const keyName = `Playwright Edit Rights ${Date.now()}`
+
+    await createRbacApiKey(page, keyName)
+
+    const keyRow = page.locator('tr', { hasText: keyName })
+    await expect(keyRow).toHaveCount(1)
+    await keyRow.locator('[data-test^="edit-key-"]').click()
+
+    const dialog = page.locator('#dialog-v2-content')
+    await expect(page.getByRole('heading', { name: 'Edit API key' })).toBeVisible()
+    await dialog.locator('[data-test="create-key-org-role-org_admin"]').check()
+    await page.getByRole('button', { name: 'Confirm' }).click()
+
+    const toast = page.locator('[data-test="toast"]')
+    await expect(toast).toContainText('API key updated')
+    await expect(keyRow).toContainText('Admin')
+  })
+
+  test('should create org-admin API key with organization creation permission', async ({ page }) => {
+    const keyName = uniqueKeyName('Org Create')
+    const dialog = await openCreateKeyDialog(page)
+    await dialog.locator('input[type="text"]').fill(keyName)
+
+    const orgCreatePermission = dialog.locator('[data-test="create-key-org-create-permission"]')
+    await expect(orgCreatePermission).toBeDisabled()
+
+    await dialog.locator('[data-test="create-key-org-role-org_admin"]').check()
+    await expect(orgCreatePermission).toBeEnabled()
+    await orgCreatePermission.check()
+
+    await page.getByRole('button', { name: 'Create' }).click()
+    await expect(page.getByText('Added new API key successfully').first()).toBeVisible()
+    await expect(page.locator('tr', { hasText: keyName })).toHaveCount(1)
+
+    await page.reload()
+    const keyRow = page.locator('tr', { hasText: keyName })
+    await expect(keyRow).toHaveCount(1)
+    await keyRow.locator('[data-test^="edit-key-"]').click()
+
+    const editDialog = page.locator('#dialog-v2-content')
+    await expect(editDialog.locator('[data-test="create-key-org-create-permission"]')).toBeChecked()
     await page.getByRole('button', { name: 'Cancel' }).click()
   })
 

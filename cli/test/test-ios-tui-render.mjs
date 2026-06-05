@@ -45,7 +45,7 @@
 //
 //   NOT covered here — these iOS step bodies are inline-JSX-only in app.tsx (no
 //   importable component), so they rely on the parity review + manual test
-//   instead: resume-prompt, confirm-app-id (warning + typing forms),
+//   instead: resume-prompt, verify-app (loader + picker + gate forms),
 //   import-validating-all-certs, import-checking-apple-cert, import-pick-identity
 //   TWO-TABLE classified form (Table-based; only the flat-list
 //   ImportPickIdentityStep is importable), import-provide-profile-path,

@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, readFileSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 export interface PbxTarget {
@@ -134,11 +134,33 @@ function findPbxprojInDir(dir: string): string | null {
     return null
   }
 
+  // 1) A .xcodeproj directly inside `dir` (React Native: ios/MyApp.xcodeproj).
   for (const entry of entries) {
     if (entry.endsWith('.xcodeproj')) {
       const pbxprojPath = join(dir, entry, 'project.pbxproj')
       if (existsSync(pbxprojPath)) {
         return pbxprojPath
+      }
+    }
+  }
+
+  // 2) A .xcodeproj one level down (Capacitor nests it at ios/App/App.xcodeproj).
+  // Only reached when nothing matched directly, so the RN layout still wins first.
+  for (const entry of entries) {
+    const sub = join(dir, entry)
+    let subEntries: string[]
+    try {
+      subEntries = readdirSync(sub)
+    }
+    catch {
+      continue // not a directory / unreadable — skip
+    }
+    for (const subEntry of subEntries) {
+      if (subEntry.endsWith('.xcodeproj')) {
+        const pbxprojPath = join(sub, subEntry, 'project.pbxproj')
+        if (existsSync(pbxprojPath)) {
+          return pbxprojPath
+        }
       }
     }
   }
@@ -165,4 +187,58 @@ export function readPbxproj(projectDir: string): string | null {
 
 function escapeRegex(str: string): string {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+/**
+ * Replace every `PRODUCT_BUNDLE_IDENTIFIER = <fromId>;` assignment in pbxproj
+ * content with `<toId>` (tolerates optional quotes and surrounding whitespace).
+ * Pure — returns the new content and the number of replacements made.
+ *
+ * Matching by exact value (rather than by config block) is deliberate: callers
+ * pass the resolved Release build id as `fromId`, and real Capacitor/RN projects
+ * give extensions a SUFFIXED id (com.app.ext), so only the main target's
+ * assignment(s) match. A Debug config that shares the exact same value is
+ * updated too (keeping Debug == Release); a Debug config with a different value
+ * is left untouched.
+ */
+export function replaceBundleIdInPbxproj(
+  content: string,
+  fromId: string,
+  toId: string,
+): { content: string, changed: number } {
+  if (!content || !fromId || fromId === toId)
+    return { content, changed: 0 }
+  let changed = 0
+  const re = new RegExp(
+    `(PRODUCT_BUNDLE_IDENTIFIER\\s*=\\s*)"?${escapeRegex(fromId)}"?(\\s*;)`,
+    'g',
+  )
+  const next = content.replace(re, (_match, prefix, suffix) => {
+    changed++
+    return `${prefix}${toId}${suffix}`
+  })
+  return { content: next, changed }
+}
+
+/**
+ * Locate the project's pbxproj (same search order as detectIosBundleIds) and
+ * rewrite its `PRODUCT_BUNDLE_IDENTIFIER = <fromId>;` assignments to `<toId>`,
+ * writing the file back only when something changed. Returns the number of
+ * replacements (0 when no project or no matching assignment was found). Throws
+ * only on a filesystem read/write error.
+ */
+export function writeReleaseBundleId(
+  cwd: string,
+  iosDir: string,
+  fromId: string,
+  toId: string,
+): { changed: number } {
+  const pbxprojPath = findXcodeProject(join(cwd, iosDir)) ?? findXcodeProject(cwd)
+  if (!pbxprojPath)
+    return { changed: 0 }
+  const content = readFileSync(pbxprojPath, 'utf-8')
+  const { content: next, changed } = replaceBundleIdInPbxproj(content, fromId, toId)
+  if (changed > 0)
+    writeFileSync(pbxprojPath, next, 'utf-8')
+  return { changed }
 }

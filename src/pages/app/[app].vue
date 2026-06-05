@@ -4,6 +4,7 @@ import { computed, ref, watchEffect } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import IconCheck from '~icons/lucide/check'
 import AppNotFoundModal from '~/components/AppNotFoundModal.vue'
+import BundleCompatibilityAlert from '~/components/dashboard/BundleCompatibilityAlert.vue'
 import BundleUploadsCard from '~/components/dashboard/BundleUploadsCard.vue'
 import DeploymentBanner from '~/components/dashboard/DeploymentBanner.vue'
 import DeploymentStatsCard from '~/components/dashboard/DeploymentStatsCard.vue'
@@ -24,6 +25,7 @@ const devicesNb = ref(0)
 const updatesNb = ref(0)
 const channelsNb = ref(0)
 const capgoVersion = ref('')
+const compatibilityAlertRefreshKey = ref(0)
 const main = useMainStore()
 const organizationStore = useOrganizationStore()
 const isLoading = ref(false)
@@ -83,37 +85,42 @@ async function loadAppInfo() {
       return
     }
 
+    const appId = id.value
+    const subscriptionStart = appOrganization.value?.subscription_start
     appNotFound.value = false
     app.value = dataApp
-    const promises = []
-    capgoVersion.value = await getCapgoVersion(id.value, app.value?.last_version)
-    updatesNb.value = await main.getTotalStatsByApp(id.value, appOrganization.value?.subscription_start)
-    devicesNb.value = await main.getTotalMauByApp(id.value, appOrganization.value?.subscription_start)
 
-    promises.push(
+    const [
+      capgoVersionResult,
+      updatesCount,
+      devicesCount,
+      bundlesCount,
+      channelsCount,
+    ] = await Promise.all([
+      getCapgoVersion(appId, dataApp.last_version),
+      main.getTotalStatsByApp(appId, subscriptionStart),
+      main.getTotalMauByApp(appId, subscriptionStart),
       supabase
         .from('app_versions')
         .select('*', { count: 'exact', head: true })
-        .eq('app_id', id.value)
+        .eq('app_id', appId)
         .eq('deleted', false)
-        .then(({ count: bundlesCount }) => {
-          if (bundlesCount)
-            bundlesNb.value = bundlesCount
-        }),
-    )
-
-    promises.push(
+        .then(({ count }) => count ?? 0),
       supabase
         .from('channels')
         .select('*', { count: 'exact', head: true })
-        .eq('app_id', id.value)
-        .then(({ count: channelsCount }) => {
-          if (channelsCount)
-            channelsNb.value = channelsCount
-        }),
-    )
+        .eq('app_id', appId)
+        .then(({ count }) => count ?? 0),
+    ])
 
-    await Promise.all(promises)
+    if (id.value !== appId)
+      return
+
+    capgoVersion.value = capgoVersionResult
+    updatesNb.value = updatesCount
+    devicesNb.value = devicesCount
+    bundlesNb.value = bundlesCount
+    channelsNb.value = channelsCount
   }
   catch (error) {
     console.error(error)
@@ -132,6 +139,11 @@ async function refreshData() {
     console.error(error)
   }
   isLoading.value = false
+}
+
+async function refreshAfterDeployment() {
+  await refreshData()
+  compatibilityAlertRefreshKey.value += 1
 }
 
 function finishRealOnboarding() {
@@ -197,7 +209,8 @@ watchEffect(async () => {
               </div>
             </div>
           </div>
-          <DeploymentBanner v-if="!appNotFound" :app-id="id" @deployed="refreshData" />
+          <BundleCompatibilityAlert v-if="!appNotFound" :app-id="id" :refresh-key="compatibilityAlertRefreshKey" />
+          <DeploymentBanner v-if="!appNotFound" :app-id="id" @deployed="refreshAfterDeployment" />
           <ReleaseBanner v-if="!appNotFound" :app-id="id" />
 
           <!-- Capgo Builder promo banner (only for valid apps with no native build yet) -->

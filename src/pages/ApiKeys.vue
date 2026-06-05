@@ -5,7 +5,7 @@ import { FormKit } from '@formkit/vue'
 import { VueDatePicker } from '@vuepic/vue-datepicker'
 import { useDark } from '@vueuse/core'
 import dayjs from 'dayjs'
-import { computed, h, ref, watch } from 'vue'
+import { computed, h, nextTick, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import IconArrowPath from '~icons/heroicons/arrow-path'
@@ -65,6 +65,13 @@ interface ScopePickerState {
   width: number
 }
 
+interface ApiKeyBindingInput {
+  role_name: string
+  scope_type: 'org' | 'app'
+  org_id: string
+  app_id?: string
+}
+
 interface ApiKeyAppAccessOption {
   appUuid: string
   publicAppId: string
@@ -72,6 +79,10 @@ interface ApiKeyAppAccessOption {
   orgId: string
   orgName: string
   roleName: string
+}
+
+type ApiKeyRow = Database['public']['Tables']['apikeys']['Row'] & {
+  global_permissions?: string[]
 }
 
 const { t } = useI18n()
@@ -88,7 +99,7 @@ const defaultScopeFilterKey = ref<string | null>(null)
 const scopePicker = ref<ScopePickerState | null>(null)
 const scopePickerQuery = ref('')
 const supabase = useSupabase()
-const keys = ref<Database['public']['Tables']['apikeys']['Row'][]>([])
+const keys = ref<ApiKeyRow[]>([])
 const organizationStore = useOrganizationStore()
 const currentOrganizationId = computed(() => organizationStore.currentOrganization?.gid ?? null)
 const columns: Ref<TableColumn[]> = ref<TableColumn[]>([])
@@ -97,8 +108,9 @@ const columns: Ref<TableColumn[]> = ref<TableColumn[]>([])
 const roles = ref<Role[]>([])
 const allBindings = ref<RoleBindingRow[]>([])
 
-// State for change name dialog
+// State for API key dialog
 const newApiKeyName = ref('')
+const editingApiKey = ref<ApiKeyRow | null>(null)
 
 // State for hashed key creation
 const createAsHashed = ref(false)
@@ -109,12 +121,15 @@ const expirationDate = ref<Date | null>(null)
 
 // RBAC creation state
 const selectedOrgRole = ref('org_member')
+const allowOrgCreation = ref(false)
 const selectedOrgsForCreation = ref<string[]>([])
+const selectedOrgRolesById = ref<Record<string, string>>({})
+const isHydratingApiKeyEdit = ref(false)
 const manageableOrgIds = ref(new Set<string>())
 const pendingAppBindings = ref<Record<string, string>>({})
 const showOrgDropdown = ref(false)
 const showAppDropdown = ref(false)
-const selectedApiKeyForChannelPermissions = ref<Database['public']['Tables']['apikeys']['Row'] | null>(null)
+const selectedApiKeyForChannelPermissions = ref<ApiKeyRow | null>(null)
 const channelPermissionAppOptions = ref<ApiKeyAppAccessOption[]>([])
 const selectedChannelPermissionAppUuid = ref('')
 const channelPermissionAppsLoading = ref(false)
@@ -661,6 +676,10 @@ const appRoleOptions = computed(() =>
 )
 
 const rolesWithInheritedAppAccess = new Set(['org_admin', 'org_super_admin'])
+const rolesWithOrgCreateAccess = new Set(['org_admin', 'org_super_admin'])
+const systemApiKeyOrgReaderRole = 'apikey_org_reader'
+const apiKeyOrgCreatePermission = 'org.create'
+const isEditingApiKey = computed(() => editingApiKey.value !== null)
 const showAppAccessInModal = computed(() =>
   !!selectedOrgRole.value && !rolesWithInheritedAppAccess.has(selectedOrgRole.value),
 )
@@ -694,6 +713,29 @@ function ensureSelectedOrgRoleAllowed() {
   selectedOrgRole.value = orgRoleOptions.value.find(role => role.name === 'org_member')?.name ?? orgRoleOptions.value[0]?.name ?? ''
 }
 
+function syncSelectedOrgRolesById(defaultRole = selectedOrgRole.value, forceRole = false) {
+  const selectedOrgIds = new Set(selectedOrgsForCreation.value)
+  const nextRoles: Record<string, string> = {}
+
+  for (const orgId of selectedOrgIds) {
+    nextRoles[orgId] = forceRole
+      ? defaultRole
+      : selectedOrgRolesById.value[orgId] || defaultRole
+  }
+
+  selectedOrgRolesById.value = nextRoles
+}
+
+function getOrgRoleForBinding(orgId: string) {
+  if (!isEditingApiKey.value)
+    return selectedOrgRole.value
+
+  return selectedOrgRolesById.value[orgId] || selectedOrgRole.value
+}
+
+const canEnableOrgCreation = computed(() =>
+  selectedOrgsForCreation.value.some(orgId => rolesWithOrgCreateAccess.has(getOrgRoleForBinding(orgId))),
+)
 const selectedAppIds = computed(() => Object.keys(pendingAppBindings.value))
 const selectedChannelPermissionApp = computed(() =>
   channelPermissionAppOptions.value.find(app => app.appUuid === selectedChannelPermissionAppUuid.value),
@@ -785,7 +827,8 @@ columns.value = [
       {
         icon: IconPencil,
         title: t('edit'),
-        onClick: (key: Database['public']['Tables']['apikeys']['Row']) => changeName(key),
+        onClick: (key: Database['public']['Tables']['apikeys']['Row']) => editApiKey(key),
+        testId: (key: Database['public']['Tables']['apikeys']['Row']) => `edit-key-${key.id}`,
       },
       {
         icon: IconArrowPath,
@@ -815,13 +858,16 @@ async function refreshData() {
 
 async function getKeys(retry = true): Promise<void> {
   isLoading.value = true
-  const { data } = await supabase
-    .from('apikeys')
-    .select()
-    .eq('user_id', main.user?.id ?? '')
-    .order('created_at', { ascending: false })
+  const { data, error } = await supabase.functions.invoke<ApiKeyRow[]>('apikey', {
+    method: 'GET',
+  })
+  if (error) {
+    console.error('Error fetching API keys:', error)
+  }
   if (data) {
-    keys.value = data
+    keys.value = [...data].sort((a, b) =>
+      new Date(b.created_at ?? 0).getTime() - new Date(a.created_at ?? 0).getTime(),
+    )
     if (data.length > 0) {
       await Promise.all([fetchAllBindings(), fetchRoles()])
       await fetchOrgAndAppNames()
@@ -954,37 +1000,7 @@ async function createApiKey() {
       return false
     }
 
-    // Build bindings array for all selected orgs
-    const bindings: Array<{
-      role_name: string
-      scope_type: 'org' | 'app'
-      org_id: string
-      app_id?: string
-    }> = []
-
-    for (const orgId of selectedOrgsForCreation.value) {
-      bindings.push({
-        role_name: selectedOrgRole.value,
-        scope_type: 'org',
-        org_id: orgId,
-      })
-    }
-
-    // Add app-level bindings
-    for (const [appId, roleName] of Object.entries(pendingAppBindings.value)) {
-      if (!roleName)
-        continue
-      // Find the app to get its owner_org
-      const app = availableApps.value.find(a => a.id === appId)
-      if (!app)
-        continue
-      bindings.push({
-        role_name: roleName,
-        scope_type: 'app',
-        org_id: app.owner_org,
-        app_id: appId,
-      })
-    }
+    const bindings = buildApiKeyBindingsFromForm()
 
     let plainKeyForDisplay: string | null = null
 
@@ -995,6 +1011,7 @@ async function createApiKey() {
         expires_at: expiresAt,
         hashed: isHashed,
         bindings,
+        global_permissions: buildApiKeyGlobalPermissionsFromForm(),
       },
     })
 
@@ -1037,13 +1054,55 @@ async function showOneTimeKeyModal(plainKey: string) {
   })
 }
 
+function buildApiKeyBindingsFromForm(): ApiKeyBindingInput[] {
+  const bindings: ApiKeyBindingInput[] = []
+
+  for (const orgId of selectedOrgsForCreation.value) {
+    bindings.push({
+      role_name: getOrgRoleForBinding(orgId),
+      scope_type: 'org',
+      org_id: orgId,
+    })
+  }
+
+  for (const [appId, roleName] of Object.entries(pendingAppBindings.value)) {
+    if (!roleName)
+      continue
+    const app = availableApps.value.find(a => a.id === appId)
+    if (!app)
+      continue
+    bindings.push({
+      role_name: roleName,
+      scope_type: 'app',
+      org_id: app.owner_org,
+      app_id: appId,
+    })
+  }
+
+  return bindings
+}
+
+function buildApiKeyGlobalPermissionsFromForm() {
+  if (!allowOrgCreation.value || !canEnableOrgCreation.value)
+    return []
+
+  return [apiKeyOrgCreatePermission]
+}
+
+function hasOrgCreatePermission(key: ApiKeyRow) {
+  return key.global_permissions?.includes(apiKeyOrgCreatePermission) === true
+}
+
 async function addNewApiKey() {
   // Clear state
+  editingApiKey.value = null
   newApiKeyName.value = ''
   createAsHashed.value = false
+  allowOrgCreation.value = false
   setExpirationCheckbox.value = false
   expirationDate.value = null
   selectedOrgRole.value = 'org_member'
+  selectedOrgRolesById.value = {}
   pendingAppBindings.value = {}
   showOrgDropdown.value = false
   showAppDropdown.value = false
@@ -1058,6 +1117,135 @@ async function addNewApiKey() {
 
   // Show creation modal
   await showAddNewKeyModal()
+}
+
+async function editApiKey(key: Database['public']['Tables']['apikeys']['Row']) {
+  isHydratingApiKeyEdit.value = true
+
+  try {
+    editingApiKey.value = key
+    newApiKeyName.value = key.name || ''
+    createAsHashed.value = isHashedKey(key)
+    allowOrgCreation.value = hasOrgCreatePermission(key as ApiKeyRow)
+    setExpirationCheckbox.value = !!key.expires_at
+    expirationDate.value = key.expires_at ? new Date(key.expires_at) : null
+    selectedOrgRolesById.value = {}
+    pendingAppBindings.value = {}
+    showOrgDropdown.value = false
+    showAppDropdown.value = false
+
+    await Promise.all([loadAllApps(), fetchRoles(), loadManageableOrganizations(), fetchAllBindings()])
+
+    const keyBindings = getBindingsForKey(key)
+    const editableOrgBindings = keyBindings
+      .filter(binding => binding.scope_type === 'org' && !!binding.org_id && binding.role_name !== systemApiKeyOrgReaderRole)
+    const appBindingOrgIds = keyBindings
+      .filter(binding => binding.scope_type === 'app' && !!binding.app_id)
+      .map(binding => availableApps.value.find(app => app.id === binding.app_id)?.owner_org)
+      .filter((orgId): orgId is string => !!orgId)
+
+    selectedOrgsForCreation.value = Array.from(new Set([
+      ...editableOrgBindings.map(binding => binding.org_id!),
+      ...appBindingOrgIds,
+    ]))
+
+    selectedOrgRolesById.value = Object.fromEntries(
+      editableOrgBindings
+        .filter(binding => !!binding.org_id && !!binding.role_name)
+        .map(binding => [binding.org_id!, binding.role_name]),
+    )
+
+    const firstOrgRole = Object.values(selectedOrgRolesById.value)[0]
+    selectedOrgRole.value = firstOrgRole && orgRoleOptions.value.some(role => role.name === firstOrgRole)
+      ? firstOrgRole
+      : orgRoleOptions.value.find(role => role.name === 'org_member')?.name ?? orgRoleOptions.value[0]?.name ?? ''
+    syncSelectedOrgRolesById(selectedOrgRole.value)
+
+    pendingAppBindings.value = Object.fromEntries(
+      keyBindings
+        .filter(binding => binding.scope_type === 'app' && !!binding.app_id && !!binding.role_name)
+        .map(binding => [binding.app_id!, binding.role_name]),
+    )
+
+    await nextTick()
+  }
+  finally {
+    isHydratingApiKeyEdit.value = false
+  }
+
+  await showEditKeyModal()
+}
+
+async function updateApiKey() {
+  const key = editingApiKey.value
+  if (!key)
+    return false
+
+  if (selectedOrgsForCreation.value.length === 0) {
+    toast.error(t('alert-no-org-selected'))
+    return false
+  }
+
+  if (!selectedOrgRole.value) {
+    toast.error(t('select-at-least-one-role'))
+    return false
+  }
+
+  if (hasIncompleteAppBindings()) {
+    toast.error(t('select-role-for-each-app'))
+    return false
+  }
+
+  const currentName = key.name || ''
+  const trimmedName = newApiKeyName.value.trim()
+  const nameChanged = trimmedName !== currentName
+
+  if (nameChanged) {
+    if (!trimmedName) {
+      toast.error(t('name-required'))
+      return false
+    }
+
+    if (trimmedName.length > 32) {
+      toast.error(t('new-name-to-long'))
+      return false
+    }
+  }
+
+  let expiresAt: string | null = null
+  if (setExpirationCheckbox.value && expirationDate.value)
+    expiresAt = dayjs(expirationDate.value).toISOString()
+
+  const { data, error } = await supabase.functions.invoke('apikey', {
+    method: 'PUT',
+    body: {
+      id: key.id,
+      ...(nameChanged ? { name: trimmedName } : {}),
+      expires_at: expiresAt,
+      bindings: buildApiKeyBindingsFromForm(),
+      global_permissions: buildApiKeyGlobalPermissionsFromForm(),
+    },
+  })
+
+  if (error || !data) {
+    console.error('Error updating API key:', error)
+    toast.error(await getUserFacingErrorMessage(error, t('error-updating-api-key')))
+    return false
+  }
+
+  if (isHashedKey(key))
+    data.key = null as any
+
+  keys.value = keys.value.map((existingKey) => {
+    if (existingKey.id === key.id)
+      return data
+    return existingKey
+  })
+
+  await fetchAllBindings()
+  await fetchOrgAndAppNames()
+  toast.success(t('api-key-updated'))
+  return true
 }
 
 async function regenrateKey(apikey: Database['public']['Tables']['apikeys']['Row']) {
@@ -1119,62 +1307,6 @@ async function deleteKey(key: Database['public']['Tables']['apikeys']['Row']) {
   keys.value = keys.value?.filter(filterKey => filterKey.id !== key.id)
 }
 
-async function changeName(key: Database['public']['Tables']['apikeys']['Row']) {
-  const currentName = key.name || ''
-  newApiKeyName.value = currentName
-
-  dialogStore.openDialog({
-    title: t('change-api-key-name'),
-    description: t('type-new-name'),
-    size: 'lg',
-    buttons: [
-      {
-        text: t('cancel'),
-        role: 'cancel',
-      },
-      {
-        text: t('button-confirm'),
-        role: 'primary',
-        handler: async () => {
-          const newName = newApiKeyName.value.trim()
-          if (currentName === newName) {
-            toast.error(t('new-name-not-changed'))
-            return false
-          }
-
-          if (newName.length > 32) {
-            toast.error(t('new-name-to-long'))
-            return false
-          }
-
-          if (newName.length < 4) {
-            toast.error(t('new-name-to-short'))
-            return false
-          }
-
-          const { error } = await supabase.from('apikeys')
-            .update({ name: newName })
-            .eq('id', key.id)
-
-          if (error) {
-            toast.error(t('cannot-change-name'))
-            console.error(error)
-            return false
-          }
-
-          toast.success(t('changed-name'))
-          keys.value = keys.value?.map((k) => {
-            if (key.id === k.id)
-              k.name = newName
-            return k
-          })
-        },
-      },
-    ],
-  })
-  return dialogStore.onDialogDismiss()
-}
-
 async function showAddNewKeyModal() {
   dialogStore.openDialog({
     title: t('alert-add-new-key'),
@@ -1190,6 +1322,28 @@ async function showAddNewKeyModal() {
         role: 'primary',
         handler: () => {
           return createApiKey()
+        },
+      },
+    ],
+  })
+  return dialogStore.onDialogDismiss()
+}
+
+async function showEditKeyModal() {
+  dialogStore.openDialog({
+    title: t('edit-api-key'),
+    description: t('type-new-name'),
+    size: '3xl',
+    buttons: [
+      {
+        text: t('button-cancel'),
+        role: 'cancel',
+      },
+      {
+        text: t('button-confirm'),
+        role: 'primary',
+        handler: () => {
+          return updateApiKey()
         },
       },
     ],
@@ -1402,6 +1556,7 @@ watch([scopeFilterLabels, currentOrganizationId], () => {
 }, { immediate: true })
 
 watch(selectedOrgsForCreation, () => {
+  syncSelectedOrgRolesById()
   pruneAppBindings()
   ensureSelectedOrgRoleAllowed()
 }, { deep: true })
@@ -1410,8 +1565,19 @@ watch(orgRoleOptions, () => {
   ensureSelectedOrgRoleAllowed()
 })
 
+watch(canEnableOrgCreation, (canEnable) => {
+  if (!canEnable)
+    allowOrgCreation.value = false
+})
+
 // Watch for org role changes - clear app bindings if role grants inherited access
 watch(selectedOrgRole, (newRole) => {
+  if (isHydratingApiKeyEdit.value)
+    return
+
+  if (isEditingApiKey.value)
+    syncSelectedOrgRolesById(newRole, true)
+
   if (rolesWithInheritedAppAccess.has(newRole)) {
     pendingAppBindings.value = {}
   }
@@ -1538,8 +1704,8 @@ getKeys()
         </div>
       </Teleport>
 
-      <!-- Teleport Content for Add New Key Modal -->
-      <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.title === t('alert-add-new-key')" defer to="#dialog-v2-content">
+      <!-- Teleport Content for Add/Edit Key Modal -->
+      <Teleport v-if="dialogStore.showDialog && (dialogStore.dialogOptions?.title === t('alert-add-new-key') || dialogStore.dialogOptions?.title === t('edit-api-key'))" defer to="#dialog-v2-content">
         <div class="space-y-6">
           <!-- API Key Name -->
           <div>
@@ -1556,7 +1722,7 @@ getKeys()
           </div>
 
           <!-- Create as Secure (Hashed) Key -->
-          <div class="p-4 border border-blue-200 rounded-lg bg-blue-50 dark:bg-blue-900/20 dark:border-blue-700">
+          <div v-if="!isEditingApiKey" class="p-4 border border-blue-200 rounded-lg bg-blue-50 dark:bg-blue-900/20 dark:border-blue-700">
             <div class="flex items-start gap-3">
               <input
                 id="create-as-hashed"
@@ -1651,6 +1817,27 @@ getKeys()
                 <span class="text-sm font-medium dark:text-white text-slate-800">{{ role.description }}</span>
               </label>
             </div>
+          </div>
+
+          <!-- Global organization permissions -->
+          <div class="rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-900/40">
+            <label class="flex items-start gap-3" :class="canEnableOrgCreation ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'">
+              <input
+                v-model="allowOrgCreation"
+                type="checkbox"
+                data-test="create-key-org-create-permission"
+                class="mt-1 d-checkbox d-checkbox-primary d-checkbox-sm"
+                :disabled="!canEnableOrgCreation"
+              >
+              <span>
+                <span class="block text-sm font-medium text-slate-800 dark:text-white">
+                  {{ t('allow-api-key-create-organizations') }}
+                </span>
+                <span class="mt-1 block text-sm text-slate-500 dark:text-slate-400">
+                  {{ t(canEnableOrgCreation ? 'allow-api-key-create-organizations-description' : 'allow-api-key-create-organizations-requires-admin') }}
+                </span>
+              </span>
+            </label>
           </div>
 
           <!-- App Access Control (only when role is not admin) -->
@@ -1838,23 +2025,6 @@ getKeys()
               :role-name="selectedChannelPermissionApp.roleName"
             />
           </template>
-        </div>
-      </Teleport>
-
-      <!-- Teleport Content for Change Name Modal -->
-      <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.title === t('change-api-key-name')" defer to="#dialog-v2-content">
-        <div class="space-y-4">
-          <FormKit
-            v-model="newApiKeyName"
-            type="text"
-            :label="t('name')"
-            :placeholder="t('type-new-name')"
-            validation="required|length:1,32"
-            :validation-messages="{
-              required: t('name-required'),
-              length: t('name-length-error'),
-            }"
-          />
         </div>
       </Teleport>
     </div>

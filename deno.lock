@@ -103,11 +103,11 @@
     "npm:@capgo/capacitor-zebra-datawedge@^8.1.1": "8.1.1_@capacitor+core@8.3.4",
     "npm:@capgo/capacitor-zip@^8.1.9": "8.1.9_@capacitor+core@8.3.4",
     "npm:@capgo/find-package-manager@^0.0.18": "0.0.18",
-    "npm:@capgo/inappbrowser@^8.6.13": "8.6.13_@capacitor+core@8.3.4",
-    "npm:@capgo/native-audio@^8.4.2": "8.4.2_@capacitor+core@8.3.4",
-    "npm:@capgo/native-market@^8.0.28": "8.0.28_@capacitor+core@8.3.4",
-    "npm:@capgo/nativegeocoder@^8.0.31": "8.0.31_@capacitor+core@8.3.4",
-    "npm:@capgo/ricoh360@^8.0.11": "8.0.11_@capacitor+core@8.3.4",
+    "npm:@capgo/capacitor-inappbrowser@^8.6.15": "8.6.15_@capacitor+core@8.3.4",
+    "npm:@capgo/capacitor-native-audio@^8.4.3": "8.4.3_@capacitor+core@8.3.4",
+    "npm:@capgo/capacitor-native-market@^8.0.29": "8.0.29_@capacitor+core@8.3.4",
+    "npm:@capgo/capacitor-nativegeocoder@^8.0.33": "8.0.33_@capacitor+core@8.3.4",
+    "npm:@capgo/capacitor-ricoh360@^8.0.12": "8.0.12_@capacitor+core@8.3.4",
     "npm:@clack/prompts@^1.4.0": "1.4.0",
     "npm:@cloudflare/workers-types@4.20260526.1": "4.20260526.1",
     "npm:@codspeed/vitest-plugin@^5.4.0": "5.4.0_tinybench@2.9.0_vite@8.0.14__@types+node@25.9.1__sass@1.100.0_vitest@4.1.7__@types+node@25.9.1__@vitest+coverage-v8@4.1.7__@vitest+ui@4.1.7__vite@8.0.14___@types+node@25.9.1___sass@1.100.0__sass@1.100.0_@types+node@25.9.1_@vitest+coverage-v8@4.1.7__vitest@4.1.7__@types+node@25.9.1__@vitest+ui@4.1.7__vite@8.0.14___@types+node@25.9.1___sass@1.100.0_@vitest+ui@4.1.7__vitest@4.1.7__@types+node@25.9.1__@vitest+coverage-v8@4.1.7__vite@8.0.14___@types+node@25.9.1___sass@1.100.0_sass@1.100.0",
@@ -1535,32 +1535,32 @@
     "@capgo/find-package-manager@0.0.18": {
       "integrity": "sha512-YTajLnUJYYOqHWH59l6Umlqq1PmdUReWY5HLgfHfVHJk/xyWzfQ8Kzo5dLd1vxqNWZV8zvGHLk9mCxMAxt/q1A=="
     },
-    "@capgo/inappbrowser@8.6.13_@capacitor+core@8.3.4": {
-      "integrity": "sha512-Ktzt7m5CrNs5ESCeeZrtCfimZHGF0+Qp4B3S9JSDkHDwsSad8IfaR+R7wrqRi2ntnSoaO0hbRYG1F1qtPicI0w==",
+    "@capgo/capacitor-inappbrowser@8.6.15_@capacitor+core@8.3.4": {
+      "integrity": "sha512-6kzqBVtnhaac9PR60Anb0B38M7Ni791SlmrAKkTJmjzDrlS1kYnSW89pGo60SsoM2xI8wTEZbWcoHBVNAOHzoA==",
       "dependencies": [
         "@capacitor/core"
       ]
     },
-    "@capgo/native-audio@8.4.2_@capacitor+core@8.3.4": {
-      "integrity": "sha512-YI85cH5IQkiab12QvSozwqq0uuhTqcfsYtrFjC0IQQCIAca7yq6hlG6zxScjr6a8XpQc8xWyyEVWuWxa3lIHPw==",
+    "@capgo/capacitor-native-audio@8.4.3_@capacitor+core@8.3.4": {
+      "integrity": "sha512-9SUFNvHNqHtae2f8hdbtGoKrMSBTVtAj45lrSg8ziJpKPmaEFLixMyn9eTvodlD/DEAiiopPfgR66Jb0WzLt6A==",
       "dependencies": [
         "@capacitor/core"
       ]
     },
-    "@capgo/native-market@8.0.28_@capacitor+core@8.3.4": {
-      "integrity": "sha512-pAnxG3/78w5aNlYA6itltvHrINP54k7NSJmCbkZ6xgUGTJ+4UNCZ5yFvkfvVCpzkdYMlMfhoKK5A4an5/4LdvQ==",
+    "@capgo/capacitor-native-market@8.0.29_@capacitor+core@8.3.4": {
+      "integrity": "sha512-b+6d/sxKUEtfXpKLN4e3floNozUb0Yjli00erJeuTd/4MyqW/pVBVEwUS+Precg5sm6ECNXfgKUSIRSO5ALlKg==",
       "dependencies": [
         "@capacitor/core"
       ]
     },
-    "@capgo/nativegeocoder@8.0.31_@capacitor+core@8.3.4": {
-      "integrity": "sha512-haVh2xpiOlCTlCG/NFEQhuXddx1C4rbzFe2zRtaSUqeYOu5dVrssvUOup79ssETd4ezEHFE810Nfv8hrG+nwXw==",
+    "@capgo/capacitor-nativegeocoder@8.0.33_@capacitor+core@8.3.4": {
+      "integrity": "sha512-ipImcmivkXkQTssIxvqEWAExyv34INyUDlZt+Wi/Jjqw+mN2EcJb44Wd4wSWTWyFiBd0XqdZ/r8o7ga6rMPv/Q==",
       "dependencies": [
         "@capacitor/core"
       ]
     },
-    "@capgo/ricoh360@8.0.11_@capacitor+core@8.3.4": {
-      "integrity": "sha512-qgJGX+Q9XKhuZ+jcnpWvxWZICFSKQkTG1W+5GuFI7SGAiO51rUclfoBScaaXCNW3DzgDoy4s+ffOW9yyAsSI0A==",
+    "@capgo/capacitor-ricoh360@8.0.12_@capacitor+core@8.3.4": {
+      "integrity": "sha512-JGrSM9yys647fmGyZsnoL6OiRTZbZlzw9s034NHdfc5wUfUZkFl+GnElkoOW/+ceYQhVLS2/7tVMU7MHW6hn5w==",
       "dependencies": [
         "@capacitor/core"
       ]
@@ -9410,11 +9410,11 @@
         "npm:@capgo/capacitor-youtube-player@^8.2.5",
         "npm:@capgo/capacitor-zebra-datawedge@^8.1.1",
         "npm:@capgo/capacitor-zip@^8.1.9",
-        "npm:@capgo/inappbrowser@^8.6.13",
-        "npm:@capgo/native-audio@^8.4.2",
-        "npm:@capgo/native-market@^8.0.28",
-        "npm:@capgo/nativegeocoder@^8.0.31",
-        "npm:@capgo/ricoh360@^8.0.11",
+        "npm:@capgo/capacitor-inappbrowser@^8.6.15",
+        "npm:@capgo/capacitor-native-audio@^8.4.3",
+        "npm:@capgo/capacitor-native-market@^8.0.29",
+        "npm:@capgo/capacitor-nativegeocoder@^8.0.33",
+        "npm:@capgo/capacitor-ricoh360@^8.0.12",
         "npm:@cloudflare/workers-types@4.20260526.1",
         "npm:@codspeed/vitest-plugin@^5.4.0",
         "npm:@formkit/core@2.0.0",

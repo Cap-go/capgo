@@ -38,9 +38,6 @@ export type OnboardingStep
     | 'backing-up'
     // ── Setup-method fork (macOS only) ──
     | 'setup-method-select'
-    // ── Apple-side bundle id confirmation (only shown when capacitor.config and
-    //    project.pbxproj disagree) ──
-    | 'confirm-app-id'
     // ── Import-existing sub-flow (macOS only) ──
     | 'import-scanning'
     | 'import-distribution-mode'
@@ -62,6 +59,7 @@ export type OnboardingStep
     | 'input-key-id'
     | 'input-issuer-id'
     | 'verifying-key'
+    | 'verify-app'
     | 'creating-certificate'
     | 'cert-limit-prompt'
     | 'revoking-certificate'
@@ -234,55 +232,43 @@ export interface OnboardingProgress extends TailProgress {
    */
   importDistribution?: 'app_store' | 'ad_hoc'
   /**
-   * When set, the user explicitly confirmed an iOS bundle id different from
-   * `capacitor.config.appId`. Used for Apple-side operations (cert lookup,
-   * profile filtering, `ensureBundleId`, `createProfile`) and as the key in
-   * the provisioning_map. The progress-file key and Capgo SaaS API calls
-   * still use `appId` so existing build commands continue to find these
-   * credentials without forcing the user to edit `capacitor.config`.
+   * The resolved iOS bundle id (the authoritative Release
+   * `PRODUCT_BUNDLE_IDENTIFIER`) when it differs from `capacitor.config.appId`.
+   * Used for Apple-side operations (cert lookup, profile filtering,
+   * `ensureBundleId`, `createProfile`) and as the key in the provisioning_map.
+   * The progress-file key and Capgo SaaS API calls still use `appId` so existing
+   * build commands keep finding these credentials without editing
+   * `capacitor.config`.
    *
-   * Persisted so the confirm-app-id step doesn't re-ask on resume — once
-   * confirmed, the override sticks unless the configuration context (see
+   * Persisted so verify-app / redirectIfMismatch don't re-resolve on resume —
+   * once set, the override sticks unless the configuration context (see
    * `iosBundleIdContextAppId`) changes between CLI runs.
    */
   iosBundleIdOverride?: string
   /**
-   * Snapshot of `config.appId` at the time the user confirmed the
-   * `iosBundleIdOverride`. On the next run we compare this to the current
-   * `config.appId`; if it changed (user renamed the app, added/removed a
-   * dev-tunnel suffix, etc.) the saved override is stale and we re-ask
-   * via the confirm-app-id step. Without this we'd silently keep using a
-   * bundle id the user already moved on from.
+   * Snapshot of `config.appId` at the time the `iosBundleIdOverride` was
+   * resolved. On the next run we compare this to the current `config.appId`;
+   * if it changed (user renamed the app, added/removed a dev-tunnel suffix,
+   * etc.) the saved override is stale and we re-resolve / re-verify via the
+   * verify-app step. Without this we'd silently keep using a bundle id the
+   * user already moved on from.
    */
   iosBundleIdContextAppId?: string
   /**
-   * Whether the user has confirmed the iOS bundle id at the `confirm-app-id`
-   * step. The confirm-app-id gate is only shown when `capacitor.config.appId`
-   * and `project.pbxproj` disagree — a mismatch detected by a SYNC FS read the
-   * pure engine can NOT re-do on resume. So the driver records the mismatch by
-   * persisting `pendingAppIdNext` (the router target) and, once the user picks,
-   * sets `appIdConfirmed = true`. The engine then lands on `confirm-app-id` only
-   * while `pendingAppIdNext` is set and `appIdConfirmed` is not yet true — never
-   * re-asking after confirmation and never performing an FS read itself.
-   *
-   * Absent on legacy/in-flight progress files → treated as "not confirmed",
-   * which is harmless because `pendingAppIdNext` (the mismatch signal) is also
-   * absent there, so the gate is simply skipped.
-   *
-   * ADDITIVE (BATCH 0): only consumed by `getIosResumeStep`'s Phase-1 gate.
+   * LEGACY (engine-era confirm-app-id gate, removed by PR #2397). Older CLI
+   * versions persisted this when the user confirmed the bundle id at the
+   * now-removed `confirm-app-id` step. No code reads it anymore — the driver
+   * silently adopts the authoritative Release bundle id and the remote
+   * `verify-app` step owns the bundle-id invariant (see `iosBundleIdOverride`).
+   * Kept in the type only so older progress files keep parsing; resume IGNORES
+   * it (see test-ios-confirm-app-id.mjs).
    */
   appIdConfirmed?: boolean
   /**
-   * Router target the `confirm-app-id` step returns to once the user confirms
-   * (or overrides) the bundle id. Persisted (not ephemeral) so the confirm-app-id
-   * branch is resume-derivable: the driver records it when it detects a mismatch
-   * and routes into the gate. Its PRESENCE is the persisted "a mismatch was
-   * detected and is awaiting confirmation" signal the pure engine uses (combined
-   * with `!appIdConfirmed`) — the engine never re-runs the FS-based mismatch
-   * detection. `undefined` → no pending mismatch → the gate is skipped.
-   *
-   * ADDITIVE (BATCH 0): populated by the driver in a later batch; the engine
-   * only reads it.
+   * LEGACY (engine-era confirm-app-id gate, removed by PR #2397). The router
+   * target the removed `confirm-app-id` step would have returned to. No code
+   * reads it anymore; resume IGNORES it so a stale value can never park the
+   * wizard on a step that no longer renders (see test-ios-confirm-app-id.mjs).
    */
   pendingAppIdNext?: OnboardingStep
   /**
@@ -358,7 +344,6 @@ export const STEP_PROGRESS: Record<OnboardingStep, number> = {
   'backing-up': 0,
   // Import-existing sub-flow (re-ordered: distribution-mode first)
   'setup-method-select': 5,
-  'confirm-app-id': 12,
   'import-scanning': 10,
   'import-distribution-mode': 15,
   'import-pick-identity': 40,
@@ -379,6 +364,7 @@ export const STEP_PROGRESS: Record<OnboardingStep, number> = {
   'input-key-id': 12,
   'input-issuer-id': 18,
   'verifying-key': 25,
+  'verify-app': 30,
   'creating-certificate': 45,
   'cert-limit-prompt': 45,
   'revoking-certificate': 48,
@@ -430,8 +416,8 @@ export function getPhaseLabel(step: OnboardingStep): string {
       return 'Resume or restart?'
     case 'setup-method-select':
       return 'Setup method'
-    case 'confirm-app-id':
-      return 'Confirm iOS bundle ID'
+    case 'verify-app':
+      return 'Verify App Store app'
     case 'import-scanning':
       return 'Step 1 of 4 · Scanning your Mac'
     case 'import-distribution-mode':

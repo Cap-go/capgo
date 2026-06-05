@@ -19,7 +19,7 @@
  *       carried.<action> = pick ; runIosEffect(step, progress, deps).next
  *
  * For EACH choice/input step + EACH of its options (including the escape hatches —
- * setup-method import fork, api-key picker/manual fork, confirm-app-id __type__,
+ * setup-method import fork, api-key picker/manual fork,
  * cert-limit __exit__, duplicate-profile exit, import-distribution __cancel__,
  * import-pick-identity __cancel__, import-pick-profile __back__, the 5-way
  * no-match-recovery hub, import-portal-explanation, import-export-warning exit)
@@ -32,7 +32,7 @@
  *   MATCH   — the engine-derived next step EQUALS the bespoke setStep target.
  *             Safe to swap to engine-derived routing as-is: the persisted fields
  *             the reducer writes (setupMethod / importDistribution / p8Path /
- *             keyId / issuerId / appIdConfirmed+pendingAppIdNext) — or, for an
+ *             keyId / issuerId) — or, for an
  *             ephemeral step, the carried pick threaded into the resolver — are
  *             enough to reproduce the in-session transition.
  *
@@ -44,7 +44,7 @@
  *             escape onto 'error' (the driver's exitOnboarding sink). For these the
  *             next-step is NOT derivable as the bespoke target — it is either:
  *               • navigation-only into a sub-screen / file-picker effect that
- *                 records no field (api-key picker/manual; confirm-app-id __type__),
+ *                 records no field (api-key picker/manual fork),
  *               • an ephemeral picker that resume re-reaches via a re-scan
  *                 (import-distribution ad_hoc → import-pick-identity), or
  *               • an exit escape the resolver maps to 'error' (cert-limit __exit__,
@@ -260,33 +260,29 @@ test("input-p8-path · path → bespoke 'input-key-id' [MATCH]", () => {
     klass: 'MATCH',
   })
 })
-// REGRESSION GUARD (input-p8-path routing loads FULL progress): when the .p8 path
-// is submitted while a confirm-app-id mismatch is still PENDING (pendingAppIdNext
-// set, !appIdConfirmed — recorded by the driver on an earlier step), the routing
-// base MUST carry those fields so getIosResumeStep's front gate fires. The fixed
-// TUI handlers route off `loadProgress(appId)` merged with {p8Path, keyId:undefined}
-// — modelled here by a progress fixture that already holds pendingAppIdNext. The
-// front gate (progress.ts:158) takes priority over the .p8 chain, so the next step
-// is confirm-app-id, NOT input-key-id. The OLD minimal-synthetic base dropped
-// pendingAppIdNext and silently skipped the gate (would have landed on input-key-id).
+// REGRESSION GUARD (input-p8-path routing loads FULL progress): the TUI handlers
+// route off `loadProgress(appId)` merged with {p8Path, keyId:undefined} so
+// persisted fields survive into the routing base. Post-#2397 the confirm-app-id
+// gate is GONE: a stale pendingAppIdNext (from an older CLI run) must be IGNORED
+// by getIosResumeStep — routing lands on the .p8 chain's input-key-id, never on
+// a step that no longer renders.
 const createNewPendingAppId = () => iosProgress({ setupMethod: 'create-new', pendingAppIdNext: 'input-key-id' })
-test("input-p8-path · path WITH pendingAppIdNext (!appIdConfirmed) → 'confirm-app-id' [MATCH: front gate survives full-progress base]", () => {
+test("input-p8-path · path WITH stale pendingAppIdNext (!appIdConfirmed) → 'input-key-id' [MATCH: stale gate fields ignored]", () => {
   parity({
     step: 'input-p8-path',
     progress: createNewPendingAppId(),
     input: { step: 'input-p8-path', value: '/Users/me/AuthKey_ABC123.p8' },
-    bespoke: 'confirm-app-id',
-    engine: 'confirm-app-id',
+    bespoke: 'input-key-id',
+    engine: 'input-key-id',
     klass: 'MATCH',
   })
 })
-test("input-p8-path · path WITH pendingAppIdNext but appIdConfirmed → gate skipped, 'input-key-id' [MATCH]", () => {
+test("input-p8-path · path WITH stale pendingAppIdNext + appIdConfirmed → 'input-key-id' [MATCH]", () => {
   parity({
     step: 'input-p8-path',
     progress: iosProgress({ setupMethod: 'create-new', pendingAppIdNext: 'input-key-id', appIdConfirmed: true }),
     input: { step: 'input-p8-path', value: '/Users/me/AuthKey_ABC123.p8' },
-    // appIdConfirmed=true + pendingAppIdNext set → post-confirm branch (progress.ts:171)
-    // routes FORWARD to the recorded target (input-key-id), never re-asking the gate.
+    // Both stale fields are ignored post-#2397 — same routing as a clean file.
     bespoke: 'input-key-id',
     engine: 'input-key-id',
     klass: 'MATCH',
@@ -369,50 +365,6 @@ test("input-issuer-id · empty → bespoke stays 'input-issuer-id' [MATCH: no-op
     input: { step: 'input-issuer-id', value: '  ' },
     bespoke: 'input-issuer-id',
     engine: 'input-issuer-id',
-    klass: 'MATCH',
-  })
-})
-
-// ════════════════════════════════════════════════════════════════════════════
-// confirm-app-id  (app.tsx L3114-3135 / L3213-3219) — bundle-id mismatch gate
-// ════════════════════════════════════════════════════════════════════════════
-// A candidate pick (or a typed custom id) persists iosBundleIdOverride +
-// iosBundleIdContextAppId + appIdConfirmed. The bespoke routes to
-// `pendingAppIdNext ?? 'import-pick-identity'`. getIosResumeStep's Phase 1b
-// (appIdConfirmed && pendingAppIdNext) returns that recorded pendingAppIdNext —
-// MATCH. The '__type__' sentinel is intercepted by the driver (flips the typing
-// sub-mode) and never reaches the reducer as a bundle id; modelled here as a no-op
-// that leaves the gate pending → DIVERGE (navigation into the input sub-mode).
-const mismatchPending = (next) => iosProgress({ pendingAppIdNext: next })
-test("confirm-app-id · candidate (import pending) → bespoke pendingAppIdNext 'import-pick-identity' [MATCH]", () => {
-  parity({
-    step: 'confirm-app-id',
-    progress: mismatchPending('import-pick-identity'),
-    input: { step: 'confirm-app-id', value: 'com.example.app' },
-    bespoke: 'import-pick-identity',
-    engine: 'import-pick-identity',
-    klass: 'MATCH',
-  })
-})
-test("confirm-app-id · candidate (create pending) → bespoke pendingAppIdNext 'creating-certificate' [MATCH]", () => {
-  parity({
-    step: 'confirm-app-id',
-    progress: mismatchPending('creating-certificate'),
-    input: { step: 'confirm-app-id', value: 'com.example.app' },
-    bespoke: 'creating-certificate',
-    engine: 'creating-certificate',
-    klass: 'MATCH',
-  })
-})
-test("confirm-app-id · __type__ → bespoke stays 'confirm-app-id' (typing sub-mode) [DIVERGE: driver-intercepted sentinel; reducer no-op leaves gate pending]", () => {
-  parity({
-    step: 'confirm-app-id',
-    progress: mismatchPending('import-pick-identity'),
-    input: { step: 'confirm-app-id', value: '__type__' },
-    // The bespoke flips confirmAppIdTyping and re-renders the SAME step as input.
-    bespoke: 'confirm-app-id',
-    // Reducer no-op → gate still pending (pendingAppIdNext set, !appIdConfirmed).
-    engine: 'confirm-app-id',
     klass: 'MATCH',
   })
 })

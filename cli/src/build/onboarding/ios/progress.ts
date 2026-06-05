@@ -11,13 +11,10 @@
 //   Phase 0 — data-safety gate (`_credentialsExistGate`)
 //             'pending' → credentials-exist   (backup-or-cancel choice)
 //             'backup'  → backing-up          (the backup effect must still run)
-//   Phase 1 — confirm-app-id gate
-//             a persisted bundle-id mismatch awaiting confirmation
-//             (`pendingAppIdNext` set AND !appIdConfirmed) → confirm-app-id
-//   Phase 1b — confirm-app-id post-confirm routing (BATCH 4)
-//             once confirmed but `pendingAppIdNext` not yet cleared by the driver
-//             (`appIdConfirmed` AND `pendingAppIdNext` set) → that recorded target
-//             (mirrors the TUI's setStep(pendingAppIdNext ?? 'import-pick-identity'))
+//   (The former Phase 1/1b confirm-app-id gates are gone: PR #2397 removed the
+//   confirm-app-id step — the driver silently adopts the authoritative Release
+//   bundle id and the remote verify-app step, routed by `getResumeStep` in
+//   ../progress.ts, now owns the bundle-id invariant.)
 //
 // Everything AFTER the gates — the create-new / import `.p8`-chain / cert /
 // profile → `saving-credentials` routing — is delegated VERBATIM to the
@@ -44,10 +41,8 @@
 // picker target either.
 //
 // PURE / IO-FREE — this function only reads `progress`; it never performs an FS
-// read (the bundle-id mismatch detection that decides whether a `confirm-app-id`
-// gate is needed is a SYNC FS read done by the DRIVER, which records the result
-// as the persisted `pendingAppIdNext` / `appIdConfirmed` fields this function
-// reads).
+// read (the bundle-id resolution is a SYNC FS read done by the DRIVER, which
+// persists the result as `iosBundleIdOverride` / `iosBundleIdContextAppId`).
 
 import type { OnboardingProgress, OnboardingStep } from '../types.js'
 import { getResumeStep } from '../progress.js'
@@ -147,29 +142,6 @@ export function getIosResumeStep(progress: OnboardingProgress | null): Onboardin
     return 'credentials-exist'
   if (progress._credentialsExistGate === 'backup')
     return 'backing-up'
-
-  // Phase 1 — confirm-app-id gate. Only shown when `capacitor.config.appId` and
-  // `project.pbxproj` disagree — a mismatch the DRIVER detects via a sync FS
-  // read and records by persisting `pendingAppIdNext` (the router target). This
-  // pure function never re-runs that detection; it lands on the gate only while
-  // a mismatch is pending (`pendingAppIdNext` set) and the user has not yet
-  // confirmed (`!appIdConfirmed`). Once confirmed, the gate is skipped so resume
-  // never re-asks. Legacy/in-flight files (no `pendingAppIdNext`) skip it.
-  if (progress.pendingAppIdNext && !progress.appIdConfirmed)
-    return 'confirm-app-id'
-
-  // Phase 1b — post-confirm routing. Once the user has confirmed at confirm-app-id
-  // (`appIdConfirmed` set) but `pendingAppIdNext` has not yet been cleared, resume
-  // routes FORWARD to that recorded target rather than re-asking or falling into
-  // the generic create-new/import routing below — mirroring the TUI's
-  // `setStep(pendingAppIdNext ?? 'import-pick-identity')` (app.tsx:3084). The
-  // driver clears `pendingAppIdNext` on the next applyInput (TUI: setPendingAppIdNext(null),
-  // app.tsx:3085), after which this branch is dormant and resume falls through to
-  // the normal routing. The TUI's `?? 'import-pick-identity'` default is already
-  // covered: `pendingAppIdNext` is the persisted mismatch signal (types.ts), so its
-  // PRESENCE is what guards this branch — when it's cleared we don't route here at all.
-  if (progress.appIdConfirmed && progress.pendingAppIdNext)
-    return progress.pendingAppIdNext
 
   // Phase 2 — Post-save "tail" (shared with android, checked FIRST after the
   // front gates exactly as `getAndroidResumeStep` checks it before the cred

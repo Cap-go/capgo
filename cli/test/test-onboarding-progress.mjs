@@ -168,6 +168,41 @@ t('getResumeStep returns import-distribution-mode when importDistribution is uns
   assert.equal(getResumeStep(progress), 'import-distribution-mode')
 })
 
+// Create-new resume must route through verify-app (the remote App Store
+// Connect gate), not straight to creating-certificate. Create-new is always
+// app_store; a user who quit while blocked on the App Store app check would
+// otherwise have the gate skipped on resume and proceed to cert/profile
+// creation for an unverified bundle id — defeating the invariant.
+t('getResumeStep returns verify-app for create-new with verified key, no cert', () => {
+  const progress = makeProgress({
+    setupMethod: 'create-new',
+    completedSteps: { apiKeyVerified: { keyId: 'X', issuerId: 'Y' } },
+  })
+  assert.equal(getResumeStep(progress), 'verify-app')
+})
+
+// Legacy progress files predate the setupMethod field; they default to the
+// create-new path and must also route through the verify-app gate on resume.
+t('getResumeStep returns verify-app for legacy (no setupMethod) verified key, no cert', () => {
+  const progress = makeProgress({
+    completedSteps: { apiKeyVerified: { keyId: 'X', issuerId: 'Y' } },
+  })
+  assert.equal(getResumeStep(progress), 'verify-app')
+})
+
+// Once the certificate exists the bundle id was already committed, so resume
+// moves on to profile creation rather than re-running verify-app.
+t('getResumeStep returns creating-profile for create-new with cert, no profile', () => {
+  const progress = makeProgress({
+    setupMethod: 'create-new',
+    completedSteps: {
+      apiKeyVerified: { keyId: 'X', issuerId: 'Y' },
+      certificateCreated: { certificateId: 'C', expirationDate: '2027-01-01', teamId: 'T', p12Base64: 'AA==' },
+    },
+  })
+  assert.equal(getResumeStep(progress), 'creating-profile')
+})
+
 // Partial .p8 inputs (the original branches) keep working — these resume
 // at the furthest input step, regardless of distribution mode.
 t('getResumeStep resumes at verifying-key when import has full .p8 inputs', () => {
