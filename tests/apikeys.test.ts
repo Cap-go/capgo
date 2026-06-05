@@ -203,7 +203,7 @@ describe('[POST] /apikey operations', () => {
     }
   })
 
-  it.concurrent('org-scoped API key cannot manage or upgrade API keys', async () => {
+  it.concurrent('org-scoped non-admin API key cannot manage or upgrade API keys', async () => {
     const createdKeyIds: number[] = []
     const orgId = orgApiKeyBindings()[0].org_id
 
@@ -211,7 +211,9 @@ describe('[POST] /apikey operations', () => {
       const managerResponse = await fetch(`${BASE_URL}/apikey`, {
         method: 'POST',
         headers: authHeaders,
-        body: JSON.stringify(orgKeyBody('org-management-blocked')),
+        body: JSON.stringify(orgKeyBody('org-management-blocked', {
+          bindings: orgApiKeyBindings(orgId, 'org_member'),
+        })),
       })
       expect(managerResponse.status).toBe(200)
       const managerData = await managerResponse.json<{ id: number, key: string }>()
@@ -302,7 +304,7 @@ describe('[POST] /apikey operations', () => {
     }
   })
 
-  it.concurrent('org super admin API key cannot manage sibling API keys', async () => {
+  it.concurrent('org super admin API key can manage sibling API keys without self-upgrade', async () => {
     const createdKeyIds: number[] = []
     const dedicatedAuthHeaders = await getAuthHeadersForCredentials(USER_EMAIL_APIKEY_MANAGEMENT, USER_PASSWORD)
     const superAdminKeyHeaders = {
@@ -326,15 +328,16 @@ describe('[POST] /apikey operations', () => {
         method: 'GET',
         headers: superAdminKeyHeaders,
       })
-      expect(listResponse.status).toBe(401)
-      await expect(listResponse.json()).resolves.toHaveProperty('error', 'cannot_list_apikeys')
+      expect(listResponse.status).toBe(200)
+      const listData = await listResponse.json<Array<{ id: number }>>()
+      expect(listData.some(apikey => apikey.id === siblingData.id)).toBe(true)
 
       const getResponse = await fetch(`${BASE_URL}/apikey/${siblingData.id}`, {
         method: 'GET',
         headers: superAdminKeyHeaders,
       })
-      expect(getResponse.status).toBe(401)
-      await expect(getResponse.json()).resolves.toHaveProperty('error', 'cannot_get_apikey')
+      expect(getResponse.status).toBe(200)
+      await expect(getResponse.json()).resolves.toHaveProperty('id', siblingData.id)
 
       const updateResponse = await fetch(`${BASE_URL}/apikey/${siblingData.id}`, {
         method: 'PUT',
@@ -343,8 +346,8 @@ describe('[POST] /apikey operations', () => {
           name: 'org-super-admin-key-renamed-sibling',
         }),
       })
-      expect(updateResponse.status).toBe(401)
-      await expect(updateResponse.json()).resolves.toHaveProperty('error', 'cannot_update_apikey')
+      expect(updateResponse.status).toBe(200)
+      await expect(updateResponse.json()).resolves.toHaveProperty('name', 'org-super-admin-key-renamed-sibling')
 
       const bindingUpdateResponse = await fetch(`${BASE_URL}/apikey/${siblingData.id}`, {
         method: 'PUT',
@@ -356,6 +359,16 @@ describe('[POST] /apikey operations', () => {
       expect(bindingUpdateResponse.status).toBe(401)
       await expect(bindingUpdateResponse.json()).resolves.toHaveProperty('error', 'cannot_update_apikey')
 
+      const regenerateResponse = await fetch(`${BASE_URL}/apikey/${siblingData.id}`, {
+        method: 'PUT',
+        headers: superAdminKeyHeaders,
+        body: JSON.stringify({
+          regenerate: true,
+        }),
+      })
+      expect(regenerateResponse.status).toBe(200)
+      await expect(regenerateResponse.json()).resolves.toHaveProperty('id', siblingData.id)
+
       const selfUpdateResponse = await fetch(`${BASE_URL}/apikey/112`, {
         method: 'PUT',
         headers: superAdminKeyHeaders,
@@ -365,6 +378,16 @@ describe('[POST] /apikey operations', () => {
       })
       expect(selfUpdateResponse.status).toBe(401)
       await expect(selfUpdateResponse.json()).resolves.toHaveProperty('error', 'cannot_update_apikey')
+
+      const selfBindingUpdateResponse = await fetch(`${BASE_URL}/apikey/112`, {
+        method: 'PUT',
+        headers: superAdminKeyHeaders,
+        body: JSON.stringify({
+          bindings: orgApiKeyBindings(ORG_ID_APIKEY_MANAGEMENT, 'org_super_admin'),
+        }),
+      })
+      expect(selfBindingUpdateResponse.status).toBe(401)
+      await expect(selfBindingUpdateResponse.json()).resolves.toHaveProperty('error', 'cannot_update_apikey')
 
       const selfDeleteResponse = await fetch(`${BASE_URL}/apikey/112`, {
         method: 'DELETE',
@@ -377,13 +400,11 @@ describe('[POST] /apikey operations', () => {
         method: 'DELETE',
         headers: superAdminKeyHeaders,
       })
-      expect(deleteResponse.status).toBe(401)
-      await expect(deleteResponse.json()).resolves.toHaveProperty('error', 'cannot_delete_apikey')
+      expect(deleteResponse.status).toBe(200)
+      await expect(deleteResponse.json()).resolves.toHaveProperty('status', 'ok')
 
       const verifySiblingResponse = await fetch(`${BASE_URL}/apikey/${siblingData.id}`, { headers: dedicatedAuthHeaders })
-      expect(verifySiblingResponse.status).toBe(200)
-      const verifySiblingData = await verifySiblingResponse.json<{ name: string }>()
-      expect(verifySiblingData.name).toBe('org-super-admin-key-sibling-management-target')
+      expect(verifySiblingResponse.status).toBe(404)
     }
     finally {
       for (const keyId of createdKeyIds.reverse()) {
@@ -655,11 +676,11 @@ describe('[PUT] /apikey/:id operations', () => {
     const oldAuthResponse = await fetch(`${BASE_URL}/apikey`, { method: 'GET', headers: oldAuthHeaders })
     expect(oldAuthResponse.status).toBe(401)
 
-    // New key must authenticate.
+    // New key must authenticate and keep its RBAC management permission.
     const newAuthHeaders = { 'Content-Type': 'application/json', 'Authorization': regenerateData.key }
     const newAuthResponse = await fetch(`${BASE_URL}/apikey`, { method: 'GET', headers: newAuthHeaders })
-    expect(newAuthResponse.status).toBe(401)
-    await expect(newAuthResponse.json()).resolves.toHaveProperty('error', 'cannot_list_apikeys')
+    expect(newAuthResponse.status).toBe(200)
+    await expect(newAuthResponse.json()).resolves.toEqual(expect.any(Array))
 
     await fetch(`${BASE_URL}/apikey/${createData.id}`, { method: 'DELETE', headers: authHeaders })
   })
@@ -698,11 +719,11 @@ describe('[PUT] /apikey/:id operations', () => {
     const oldAuthResponse = await fetch(`${BASE_URL}/apikey`, { method: 'GET', headers: oldAuthHeaders })
     expect(oldAuthResponse.status).toBe(401)
 
-    // New key must authenticate.
+    // New key must authenticate and keep its RBAC management permission.
     const newAuthHeaders = { 'Content-Type': 'application/json', 'Authorization': regenerateData.key }
     const newAuthResponse = await fetch(`${BASE_URL}/apikey`, { method: 'GET', headers: newAuthHeaders })
-    expect(newAuthResponse.status).toBe(401)
-    await expect(newAuthResponse.json()).resolves.toHaveProperty('error', 'cannot_list_apikeys')
+    expect(newAuthResponse.status).toBe(200)
+    await expect(newAuthResponse.json()).resolves.toEqual(expect.any(Array))
 
     await fetch(`${BASE_URL}/apikey/${createData.id}`, { method: 'DELETE', headers: authHeaders })
   })
@@ -912,14 +933,13 @@ describe('[POST] /apikey hashed key operations', () => {
       'Authorization': createData.key,
     }
 
-    // Try to list API keys using the hashed key for auth
+    // Try to list API keys using the hashed key for auth.
     const listResponse = await fetch(`${BASE_URL}/apikey`, {
       method: 'GET',
       headers: createdKeyHeaders,
     })
-    expect(listResponse.status).toBe(401)
-    const listData = await listResponse.json() as { error: string }
-    expect(listData.error).toBe('cannot_list_apikeys')
+    expect(listResponse.status).toBe(200)
+    await expect(listResponse.json()).resolves.toEqual(expect.any(Array))
 
     // Cleanup - use original headers since new key might have restrictions
     await fetch(`${BASE_URL}/apikey/${createData.id}`, {
@@ -993,9 +1013,8 @@ describe('[POST] /apikey hashed key with expiration', () => {
       method: 'GET',
       headers: createdKeyHeaders,
     })
-    expect(listResponse.status).toBe(401)
-    const listData = await listResponse.json() as { error: string }
-    expect(listData.error).toBe('cannot_list_apikeys')
+    expect(listResponse.status).toBe(200)
+    await expect(listResponse.json()).resolves.toEqual(expect.any(Array))
 
     // Cleanup
     await fetch(`${BASE_URL}/apikey/${createData.id}`, {

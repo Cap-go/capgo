@@ -4,9 +4,9 @@ import type { Database } from '../../utils/supabase.types.ts'
 import { honoFactory, quickError, simpleError } from '../../utils/hono.ts'
 import { middlewareAuth } from '../../utils/hono_middleware.ts'
 import { closeClient, getPgClient } from '../../utils/pg.ts'
-import { supabaseWithAuth } from '../../utils/supabase.ts'
+import { supabaseAdmin, supabaseWithAuth } from '../../utils/supabase.ts'
 import { attachApiKeyGlobalPermissions } from './global_permissions.ts'
-import { ensureApiKeyManagementAllowed, isValidApiKeyIdFormat, requireApiKeyManagementAuth, selectOwnedApiKeyByIdentifier } from './scope.ts'
+import { ensureApiKeyCanManageTargetOrgIds, ensureApiKeyManagementAllowed, filterApiKeysManageableByAuth, getApiKeyBindingOrgIds, isValidApiKeyIdFormat, requireApiKeyManagementAuth, selectOwnedApiKeyByIdentifier } from './scope.ts'
 
 const app = honoFactory.createApp()
 
@@ -43,7 +43,7 @@ app.get('/', middlewareAuth(), async (c) => {
 
   await ensureApiKeyManagementAllowed(c, auth, apikey, 'cannot_list_apikeys')
 
-  const { data: apikeys, error } = await supabaseWithAuth(c, auth)
+  const { data: apikeys, error } = await (auth.authType === 'apikey' ? supabaseAdmin(c) : supabaseWithAuth(c, auth))
     .from('apikeys')
     .select('*')
     .eq('user_id', auth.userId)
@@ -52,7 +52,8 @@ app.get('/', middlewareAuth(), async (c) => {
     throw quickError(500, 'failed_to_list_apikeys', 'Failed to list API keys', { supabaseError: error })
   }
 
-  return c.json(await withGlobalPermissions(c, apikeys ?? []))
+  const manageableApiKeys = await filterApiKeysManageableByAuth(c, auth, apikey, apikeys ?? [])
+  return c.json(await withGlobalPermissions(c, manageableApiKeys))
 })
 
 app.get('/:id', middlewareAuth(), async (c) => {
@@ -75,6 +76,7 @@ app.get('/:id', middlewareAuth(), async (c) => {
   if (error || !fetchedApikey) {
     throw quickError(404, 'failed_to_get_apikey', 'Failed to get API key', { supabaseError: error })
   }
+  await ensureApiKeyCanManageTargetOrgIds(c, auth, authApikey, fetchedApikey.rbac_id ? await getApiKeyBindingOrgIds(c, fetchedApikey.rbac_id) : [], 'cannot_get_apikey')
   const [apikeyWithPermissions] = await withGlobalPermissions(c, fetchedApikey ? [fetchedApikey] : [])
   return c.json(apikeyWithPermissions)
 })

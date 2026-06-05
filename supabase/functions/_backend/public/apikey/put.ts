@@ -12,7 +12,7 @@ import { checkPermission } from '../../utils/rbac.ts'
 import { schema } from '../../utils/postgres_schema.ts'
 import { supabaseAdmin, supabaseWithAuth, validateExpirationAgainstOrgPolicies, validateExpirationDate } from '../../utils/supabase.ts'
 import { apiKeyBindingsAllowOrgCreate, assertApiKeyCanKeepOrgCreateGrant, parseApiKeyGlobalPermissions, replaceApiKeyGlobalPermissions, validateApiKeyGlobalPermissionsForBindings } from './global_permissions.ts'
-import { ensureApiKeyManagementAllowed, isValidApiKeyIdFormat, requireApiKeyManagementAuth, selectOwnedApiKeyByIdentifier } from './scope.ts'
+import { ensureApiKeyCanManageTargetOrgIds, ensureApiKeyManagementAllowed, getApiKeyBindingOrgIds, isValidApiKeyIdFormat, requireApiKeyManagementAuth, selectOwnedApiKeyByIdentifier } from './scope.ts'
 
 const app = honoFactory.createApp()
 const APIKEY_ORG_READER_ROLE = 'apikey_org_reader'
@@ -343,8 +343,7 @@ async function handlePut(c: Context<MiddlewareKeyVariables>, idParam?: string) {
   }
 
   const supabase = supabaseWithAuth(c, auth)
-  const dataSupabase = supabase
-  const policyLookupSupabase = supabaseAdmin(c)
+  const dataSupabase = auth.authType === 'apikey' ? supabaseAdmin(c) : supabase
 
   // Check if the API key to update exists. JWT callers rely on RLS.
   const { data: existingApikey, error: fetchError } = await selectOwnedApiKeyByIdentifier<ApiKeyLookupRow>(c, auth, resolvedId, 'id, rbac_id, expires_at, key, key_hash')
@@ -362,30 +361,19 @@ async function handlePut(c: Context<MiddlewareKeyVariables>, idParam?: string) {
   if (auth.authType === 'apikey' && authApikey?.id === existingApikey.id) {
     throw quickError(401, 'cannot_update_apikey', 'API keys cannot update themselves', { requestId, apikeyId: authApikey.id })
   }
-  if (auth.authType === 'apikey' && hasBindingUpdates) {
-    throw quickError(401, 'cannot_update_apikey', 'API keys cannot update API key bindings', { requestId, apikeyId: authApikey?.id })
+  if (auth.authType === 'apikey' && (hasBindingUpdates || hasGlobalPermissionUpdates)) {
+    throw quickError(401, 'cannot_update_apikey', 'API keys cannot update API key permissions', { requestId, apikeyId: authApikey?.id })
   }
 
   // Validate expiration against org policies (only if expiration or scopes are changing)
-  const currentBindingOrgIds = await (async () => {
-    const { data: bindings, error: bindingError } = await policyLookupSupabase
-      .from('role_bindings')
-      .select('org_id')
-      .eq('principal_type', 'apikey')
-      .eq('principal_id', existingApikey.rbac_id)
-
-    if (bindingError) {
-      throw quickError(500, 'failed_to_load_apikey_bindings', 'Failed to load API key bindings', { requestId, supabaseError: bindingError })
-    }
-
-    return [...new Set((bindings || []).map(binding => binding.org_id).filter((orgId): orgId is string => !!orgId))]
-  })()
+  const currentBindingOrgIds = await getApiKeyBindingOrgIds(c, existingApikey.rbac_id)
+  await ensureApiKeyCanManageTargetOrgIds(c, auth, authApikey, currentBindingOrgIds, 'cannot_update_apikey', { requestId })
 
   if (expires_at !== undefined || hasBindingUpdates) {
     const orgsToValidate = hasBindingUpdates
       ? [...new Set(bindings.map(binding => binding.org_id))]
       : currentBindingOrgIds
-    await validateExpirationAgainstOrgPolicies(orgsToValidate, expires_at !== undefined ? expires_at : existingApikey.expires_at, supabase)
+    await validateExpirationAgainstOrgPolicies(orgsToValidate, expires_at !== undefined ? expires_at : existingApikey.expires_at, dataSupabase)
   }
 
   const isHashedKey = existingApikey.key_hash !== null

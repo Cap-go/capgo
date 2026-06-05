@@ -2,9 +2,12 @@ import type { Context } from 'hono'
 import type { AuthInfo, MiddlewareKeyVariables } from '../../utils/hono.ts'
 import type { Database } from '../../utils/supabase.types.ts'
 import { quickError } from '../../utils/hono.ts'
-import { supabaseWithAuth } from '../../utils/supabase.ts'
+import { closeClient, getPgClient } from '../../utils/pg.ts'
+import { checkPermission } from '../../utils/rbac.ts'
+import { supabaseAdmin, supabaseWithAuth } from '../../utils/supabase.ts'
 
 type ApiKeyRow = Database['public']['Tables']['apikeys']['Row']
+type ApiKeyManagementOrgMap = Map<string, string[]>
 
 export function requireApiKeyManagementAuth(
   c: Context<MiddlewareKeyVariables>,
@@ -30,16 +33,137 @@ function isNumericApiKeyId(id: string): boolean {
   return /^\d+$/.test(id)
 }
 
-export function ensureApiKeyManagementAllowed(
+async function loadApiKeyBindingOrgIdsForRbacIds(
+  c: Context<MiddlewareKeyVariables>,
+  rbacIds: string[],
+): Promise<ApiKeyManagementOrgMap> {
+  const uniqueRbacIds = [...new Set(rbacIds.filter(Boolean))]
+  const orgIdsByRbacId: ApiKeyManagementOrgMap = new Map(uniqueRbacIds.map(rbacId => [rbacId, []]))
+  if (uniqueRbacIds.length === 0) {
+    return orgIdsByRbacId
+  }
+
+  let pgClient: ReturnType<typeof getPgClient> | undefined
+  try {
+    pgClient = getPgClient(c)
+    const { rows } = await pgClient.query<{ principal_id: string, org_id: string }>(
+      `
+      SELECT DISTINCT principal_id::text, org_id::text
+      FROM public.role_bindings
+      WHERE principal_type = public.rbac_principal_apikey()
+        AND principal_id = ANY($1::uuid[])
+        AND org_id IS NOT NULL
+        AND (expires_at IS NULL OR expires_at > now())
+      `,
+      [uniqueRbacIds],
+    )
+
+    for (const row of rows) {
+      const orgIds = orgIdsByRbacId.get(row.principal_id) ?? []
+      orgIds.push(row.org_id)
+      orgIdsByRbacId.set(row.principal_id, orgIds)
+    }
+
+    return orgIdsByRbacId
+  }
+  finally {
+    if (pgClient) {
+      await closeClient(c, pgClient)
+    }
+  }
+}
+
+async function getApiKeyManageableOrgIds(
+  c: Context<MiddlewareKeyVariables>,
+  authApikey: ApiKeyRow | undefined,
+): Promise<Set<string>> {
+  if (!authApikey?.rbac_id) {
+    return new Set()
+  }
+
+  const callerOrgIds = (await loadApiKeyBindingOrgIdsForRbacIds(c, [authApikey.rbac_id])).get(authApikey.rbac_id) ?? []
+  const manageableOrgIds = new Set<string>()
+  for (const orgId of callerOrgIds) {
+    if (await checkPermission(c, 'org.update_user_roles', { orgId })) {
+      manageableOrgIds.add(orgId)
+    }
+  }
+
+  return manageableOrgIds
+}
+
+function assertTargetOrgIdsAreManageable(
+  manageableOrgIds: Set<string>,
+  targetOrgIds: string[],
+) {
+  return targetOrgIds.length > 0 && targetOrgIds.every(orgId => manageableOrgIds.has(orgId))
+}
+
+export async function ensureApiKeyManagementAllowed(
   c: Context<MiddlewareKeyVariables>,
   auth: AuthInfo,
   authApikey: ApiKeyRow | undefined,
   errorCode: string,
   moreInfo: Record<string, unknown> = {},
 ) {
-  if (auth.authType !== 'jwt') {
-    throw quickError(401, errorCode, 'API key management requires JWT', { ...moreInfo, apikeyId: authApikey?.id ?? auth.apikey?.id })
+  if (auth.authType === 'jwt') {
+    return
   }
+
+  const manageableOrgIds = await getApiKeyManageableOrgIds(c, authApikey)
+  if (manageableOrgIds.size === 0) {
+    throw quickError(401, errorCode, 'API key management requires RBAC org role management permission', { ...moreInfo, apikeyId: authApikey?.id ?? auth.apikey?.id })
+  }
+}
+
+export async function getApiKeyBindingOrgIds(
+  c: Context<MiddlewareKeyVariables>,
+  apikeyRbacId: string,
+): Promise<string[]> {
+  return (await loadApiKeyBindingOrgIdsForRbacIds(c, [apikeyRbacId])).get(apikeyRbacId) ?? []
+}
+
+export async function ensureApiKeyCanManageTargetOrgIds(
+  c: Context<MiddlewareKeyVariables>,
+  auth: AuthInfo,
+  authApikey: ApiKeyRow | undefined,
+  targetOrgIds: string[],
+  errorCode: string,
+  moreInfo: Record<string, unknown> = {},
+) {
+  if (auth.authType === 'jwt') {
+    return
+  }
+
+  const manageableOrgIds = await getApiKeyManageableOrgIds(c, authApikey)
+  if (!assertTargetOrgIdsAreManageable(manageableOrgIds, targetOrgIds)) {
+    throw quickError(401, errorCode, 'API key cannot manage this API key', { ...moreInfo, apikeyId: authApikey?.id ?? auth.apikey?.id })
+  }
+}
+
+export async function filterApiKeysManageableByAuth<T extends ApiKeyRow>(
+  c: Context<MiddlewareKeyVariables>,
+  auth: AuthInfo,
+  authApikey: ApiKeyRow | undefined,
+  apikeys: T[],
+): Promise<T[]> {
+  if (auth.authType === 'jwt') {
+    return apikeys
+  }
+
+  const manageableOrgIds = await getApiKeyManageableOrgIds(c, authApikey)
+  if (manageableOrgIds.size === 0) {
+    return []
+  }
+
+  const apikeyRbacIds = apikeys.map(apikey => apikey.rbac_id).filter((rbacId): rbacId is string => !!rbacId)
+  const orgIdsByRbacId = await loadApiKeyBindingOrgIdsForRbacIds(c, apikeyRbacIds)
+  return apikeys.filter((apikey) => {
+    if (!apikey.rbac_id) {
+      return false
+    }
+    return assertTargetOrgIdsAreManageable(manageableOrgIds, orgIdsByRbacId.get(apikey.rbac_id) ?? [])
+  })
 }
 
 export async function selectOwnedApiKeyByIdentifier<T = ApiKeyRow>(
@@ -48,7 +172,7 @@ export async function selectOwnedApiKeyByIdentifier<T = ApiKeyRow>(
   id: string,
   columns = '*',
 ) {
-  const query = supabaseWithAuth(c, auth)
+  const query = (auth.authType === 'apikey' ? supabaseAdmin(c) : supabaseWithAuth(c, auth))
     .from('apikeys')
     .select(columns)
     .eq('user_id', auth.userId)
@@ -62,7 +186,7 @@ export async function selectOwnedApiKeyByIdentifier<T = ApiKeyRow>(
 }
 
 export async function deleteOwnedApiKeyByIdentifier(c: Context<MiddlewareKeyVariables>, auth: AuthInfo, id: string) {
-  const query = supabaseWithAuth(c, auth)
+  const query = (auth.authType === 'apikey' ? supabaseAdmin(c) : supabaseWithAuth(c, auth))
     .from('apikeys')
     .delete()
     .eq('user_id', auth.userId)

@@ -1,7 +1,7 @@
 import type { Database } from '../../utils/supabase.types.ts'
 import { BRES, honoFactory, quickError, simpleError } from '../../utils/hono.ts'
 import { middlewareAuth } from '../../utils/hono_middleware.ts'
-import { deleteOwnedApiKeyByIdentifier, ensureApiKeyManagementAllowed, isValidApiKeyIdFormat, requireApiKeyManagementAuth, selectOwnedApiKeyByIdentifier } from './scope.ts'
+import { deleteOwnedApiKeyByIdentifier, ensureApiKeyCanManageTargetOrgIds, ensureApiKeyManagementAllowed, getApiKeyBindingOrgIds, isValidApiKeyIdFormat, requireApiKeyManagementAuth, selectOwnedApiKeyByIdentifier } from './scope.ts'
 
 const app = honoFactory.createApp()
 
@@ -28,6 +28,7 @@ app.delete('/:id', middlewareAuth(), async (c) => {
   if (auth.authType === 'apikey' && authApikey?.id === apikey.id) {
     throw quickError(401, 'cannot_delete_apikey', 'API keys cannot delete themselves', { apikeyId: authApikey.id })
   }
+  await ensureApiKeyCanManageTargetOrgIds(c, auth, authApikey, apikey.rbac_id ? await getApiKeyBindingOrgIds(c, apikey.rbac_id) : [], 'cannot_delete_apikey')
 
   const { error } = await deleteOwnedApiKeyByIdentifier(c, auth, id)
 
