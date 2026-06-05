@@ -42,16 +42,27 @@ vi.mock('../supabase/functions/_backend/utils/supabase.ts', () => ({
 const { put } = await import('../supabase/functions/_backend/public/organization/put.ts')
 type OrgRow = Database['public']['Tables']['orgs']['Row']
 
-function createContext() {
+function createContext(options?: {
+  auth?: {
+    userId: string
+    authType: 'apikey' | 'jwt'
+    apikey: Database['public']['Tables']['apikeys']['Row'] | null
+    jwt: string | null
+  }
+  capgkey?: string
+}) {
   return {
     get: (key: string) => {
       if (key === 'auth') {
-        return {
+        return options?.auth ?? {
           userId: 'user-123',
           authType: 'jwt',
+          apikey: null,
           jwt: 'jwt-token',
         }
       }
+      if (key === 'capgkey')
+        return options?.capgkey
       return undefined
     },
     json: (data: unknown, status = 200) => new Response(JSON.stringify(data), {
@@ -130,6 +141,51 @@ describe('organization put Stripe sync', () => {
     getStripeCustomerNameMock.mockResolvedValue(undefined)
     isDeterministicStripeCustomerUpdateErrorMock.mockReturnValue(false)
     apikeyHasOrgRightWithPolicyMock.mockResolvedValue({ valid: true })
+  })
+
+  it('uses the raw request key for hashed API key org updates', async () => {
+    const rawKey = 'ck_test_raw_hashed_org_update_key'
+    const hashedApikey = {
+      created_at: '2026-06-05T00:00:00Z',
+      expires_at: null,
+      id: 123,
+      key: null,
+      key_hash: 'stored-hash',
+      name: 'hashed org update key',
+      rbac_id: 'rbac-apikey-123',
+      updated_at: null,
+      user_id: 'user-123',
+    } satisfies Database['public']['Tables']['apikeys']['Row']
+    const rlsSupabase = { from: vi.fn(), rpc: vi.fn() }
+    const updateBuilder = createOrgUpdateBuilder(createOrgRow({
+      id: 'org-123',
+      name: 'Old Name',
+      customer_id: 'cus_123',
+      enforce_hashed_api_keys: true,
+    }))
+
+    supabaseApikeyMock.mockReturnValue(rlsSupabase)
+    supabaseAdminMock.mockReturnValue(createSupabaseClientStub(
+      vi.fn().mockReturnValueOnce(updateBuilder),
+    ))
+
+    const response = await put(createContext({
+      auth: {
+        userId: 'user-123',
+        authType: 'apikey',
+        apikey: hashedApikey,
+        jwt: null,
+      },
+      capgkey: rawKey,
+    }), {
+      orgId: 'org-123',
+      enforce_hashed_api_keys: true,
+    }, hashedApikey)
+
+    expect(response.status).toBe(200)
+    expect(supabaseApikeyMock).toHaveBeenCalledWith(expect.anything(), rawKey)
+    expect(apikeyHasOrgRightWithPolicyMock).toHaveBeenCalledWith(expect.anything(), hashedApikey, 'org-123', rlsSupabase)
+    expect(updateBuilder.update).toHaveBeenCalledWith({ enforce_hashed_api_keys: true })
   })
 
   it('updates the org row before syncing Stripe customer name', async () => {

@@ -292,9 +292,10 @@ export async function put(
     throw simpleError('cannot_access_organization', 'You can\'t access this organization', { orgId: body.orgId })
   }
 
+  const rawApiKey = apikey?.key ?? c.get('capgkey')
   const supabase = auth.authType === 'jwt' && auth.jwt
     ? supabaseClient(c, auth.jwt)
-    : supabaseApikey(c, apikey?.key)
+    : supabaseApikey(c, rawApiKey)
   const authUserId = auth.userId
 
   // Auth context is already set by middlewareAuth
