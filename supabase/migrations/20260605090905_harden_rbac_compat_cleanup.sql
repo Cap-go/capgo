@@ -11,6 +11,16 @@ DROP FUNCTION IF EXISTS public.rbac_rollback_org(uuid);
 ALTER TABLE public.orgs
   DROP COLUMN IF EXISTS use_new_rbac;
 
+-- Direct channel table updates are intentionally admin/channel-admin only.
+-- App developers can upload/promote bundles, but must not mutate channel settings
+-- through the anon API-key RLS path.
+DELETE FROM public.role_permissions
+USING public.roles, public.permissions
+WHERE role_permissions.role_id = roles.id
+  AND role_permissions.permission_id = permissions.id
+  AND roles.name = public.rbac_role_app_developer()
+  AND permissions.key = public.rbac_perm_channel_update_settings();
+
 DROP POLICY IF EXISTS "Allow update for auth (admin+)" ON public.orgs;
 DROP POLICY IF EXISTS "Allow org settings update via RBAC" ON public.orgs;
 CREATE POLICY "Allow org settings update via RBAC"

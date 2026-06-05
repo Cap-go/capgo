@@ -3,7 +3,7 @@
 BEGIN;
 
 -- Plan the number of tests
-SELECT plan(59);
+SELECT plan(60);
 
 -- Test app_versions policies
 SELECT
@@ -301,6 +301,23 @@ SELECT
               AND policyname = 'Allow RBAC channels update'
         ),
         'channels update policy should honor channel-scoped update permission'
+    );
+
+SELECT
+    ok(
+        NOT EXISTS (
+            SELECT 1
+            FROM
+                public.role_permissions
+            JOIN public.roles
+                ON roles.id = role_permissions.role_id
+            JOIN public.permissions
+                ON permissions.id = role_permissions.permission_id
+            WHERE
+                roles.name = public.rbac_role_app_developer()
+                AND permissions.key = public.rbac_perm_channel_update_settings()
+        ),
+        'app developer role should not mutate channel settings through direct RLS'
     );
 
 -- Test stripe_info policies
