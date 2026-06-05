@@ -230,4 +230,14 @@ describe('aiAnalyzeStreamBuild', () => {
     expect(updateCalls).toEqual([])
     expect(resultEvents()).toContain('config_error')
   })
+
+  it('throws 413 logs_too_big for oversized logs without claiming or calling the builder', async () => {
+    const { updateCalls } = mockDb()
+    const oversized = 'x'.repeat(10 * 1024 * 1024 + 1)
+    await expect(aiAnalyzeStreamBuild(createContext(), jobId, appId, apikey, oversized))
+      .rejects.toMatchObject({ status: 413 })
+    expect(updateCalls).toEqual([])
+    expect(globalThis.fetch).not.toHaveBeenCalled()
+    expect(resultEvents()).toContain('logs_too_big')
+  })
 })

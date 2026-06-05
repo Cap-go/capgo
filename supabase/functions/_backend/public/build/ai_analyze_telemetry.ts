@@ -9,6 +9,7 @@ export type AiAnalysisResult
     | 'unauthorized'
     | 'builder_error'
     | 'config_error'
+    | 'logs_too_big'
     | 'mid_stream_error'
     | 'refunded'
     | 'upgrade_required'

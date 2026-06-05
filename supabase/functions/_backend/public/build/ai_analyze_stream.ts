@@ -14,6 +14,10 @@ import { emitAiAnalysisResult } from './ai_analyze_telemetry.ts'
 export const FIRST_BYTE_TIMEOUT_MS = 90_000
 export const IDLE_TIMEOUT_MS = 30_000
 
+// 10 MB logs cap (spec §3.1) — mirrors the CLI's HARD_LOG_SIZE_LIMIT pre-flight
+// and the builder's own limit, so the documented 413 is emitted at this layer.
+export const MAX_LOGS_BYTES = 10 * 1024 * 1024
+
 const SSE_HEADERS = { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' }
 
 export async function aiAnalyzeStreamBuild(
@@ -24,6 +28,13 @@ export async function aiAnalyzeStreamBuild(
   logs: string,
 ): Promise<Response> {
   const logsBytes = logs?.length ?? 0
+
+  // 0. Size guard — spec §3.1: a body over the 10 MB limit is a 413 logs_too_big.
+  // Checked BEFORE any DB work so the slot is never claimed for an oversized payload.
+  if (logsBytes > MAX_LOGS_BYTES) {
+    await emitAiAnalysisResult(c, { appId, jobId, result: 'logs_too_big', userId: apikey.user_id, logsBytes })
+    throw quickError(413, 'logs_too_big', 'Build logs exceed the 10 MB limit')
+  }
 
   // 1. Permission check
   if (!(await checkPermission(c, 'app.build_native', { appId }))) {
