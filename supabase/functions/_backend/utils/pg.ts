@@ -64,7 +64,7 @@ function buildPlanValidationExpression(
   actions: PlanAction[],
   ownerColumn: typeof schema.app_versions.owner_org | typeof schema.apps.owner_org,
 ) {
-  const extraConditions = actions.map(action => ` AND COALESCE(${PLAN_EXCEEDED_COLUMNS[action]}, false) = false`).join('')
+  const extraConditions = actions.map(action => ` AND ${PLAN_EXCEEDED_COLUMNS[action]} = false`).join('')
   const customerIdSubquery = sql<string | null>`(
     SELECT ${schema.orgs.customer_id}
     FROM ${schema.orgs}
