@@ -773,7 +773,9 @@ export async function aiAnalyzeStreamBuild(
   apikey: Database['public']['Tables']['apikeys']['Row'],
   logs: string,
 ): Promise<Response> {
-  const logsBytes = logs?.length ?? 0
+  // Byte-accurate: logs.length counts UTF-16 code units, which undercounts
+  // multi-byte UTF-8 — encode once and use real bytes for the guard + telemetry.
+  const logsBytes = logs ? new TextEncoder().encode(logs).length : 0
 
   // 1. Permission check
   if (!(await checkPermission(c, 'app.build_native', { appId }))) {

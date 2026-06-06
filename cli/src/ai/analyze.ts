@@ -128,13 +128,31 @@ export async function postAnalyzeStreamRequest(input: PostAnalyzeStreamInput): P
 
     const reader = res.body.getReader()
     const decoder = new TextDecoder()
-    while (true) {
-      const { done, value } = await reader.read()
-      if (done)
-        break
-      clearTimeout(idleTimer)
-      idleTimer = setTimeout(() => controller.abort(), STREAM_IDLE_TIMEOUT_MS)
-      feed(decoder.decode(value, { stream: true }))
+    try {
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) {
+          // Flush the decoder tail — a multibyte character split across the
+          // final network chunks would otherwise be silently dropped.
+          feed(decoder.decode())
+          break
+        }
+        clearTimeout(idleTimer)
+        idleTimer = setTimeout(() => controller.abort(), STREAM_IDLE_TIMEOUT_MS)
+        feed(decoder.decode(value, { stream: true }))
+        if (terminal) {
+          // A terminal frame (done/error) decides the outcome — stop reading
+          // so a server that keeps the connection open afterwards can't
+          // idle-abort and overwrite a valid result.
+          await reader.cancel().catch(() => { /* best-effort */ })
+          break
+        }
+      }
+    }
+    catch (err) {
+      // Late transport failures must not overwrite an already-decided outcome.
+      if (!terminal)
+        throw err
     }
     return terminal ?? { kind: 'error', message: 'stream_ended_without_done', partial }
   }

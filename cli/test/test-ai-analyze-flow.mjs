@@ -84,27 +84,32 @@ await test('postAnalyzeStreamRequest sends POST with correct shape and returns a
     ])
   }
 
-  const result = await postAnalyzeStreamRequest({
-    apiHost: 'https://api.test',
-    apikey: 'apikey-abc',
-    jobId: JOB_ID,
-    appId: 'com.app',
-    logs: 'hello logs',
-  })
+  try {
+    const result = await postAnalyzeStreamRequest({
+      apiHost: 'https://api.test',
+      apikey: 'apikey-abc',
+      jobId: JOB_ID,
+      appId: 'com.app',
+      logs: 'hello logs',
+    })
 
-  globalThis.fetch = origFetch
-
-  if (captured.url !== 'https://api.test/build/ai_analyze_stream')
-    throw new Error(`url: ${captured.url}`)
-  if (captured.init.method !== 'POST')
-    throw new Error(`method: ${captured.init.method}`)
-  if (captured.init.headers.capgkey !== 'apikey-abc')
-    throw new Error('missing capgkey header')
-  const body = JSON.parse(captured.init.body)
-  if (body.jobId !== JOB_ID || body.appId !== 'com.app' || body.logs !== 'hello logs')
-    throw new Error(`body shape wrong: ${JSON.stringify(body)}`)
-  if (result.kind !== 'ok' || result.analysis !== '### Likely cause\ntest')
-    throw new Error(`result: ${JSON.stringify(result)}`)
+    if (captured.url !== 'https://api.test/build/ai_analyze_stream')
+      throw new Error(`url: ${captured.url}`)
+    if (captured.init.method !== 'POST')
+      throw new Error(`method: ${captured.init.method}`)
+    if (captured.init.headers.capgkey !== 'apikey-abc')
+      throw new Error('missing capgkey header')
+    const body = JSON.parse(captured.init.body)
+    if (body.jobId !== JOB_ID || body.appId !== 'com.app' || body.logs !== 'hello logs')
+      throw new Error(`body shape wrong: ${JSON.stringify(body)}`)
+    if (result.kind !== 'ok' || result.analysis !== '### Likely cause\ntest')
+      throw new Error(`result: ${JSON.stringify(result)}`)
+  }
+  finally {
+    // Always restore — a throw above must not leak the mocked fetch into
+    // subsequent tests and fail them for the wrong reason.
+    globalThis.fetch = origFetch
+  }
 })
 
 await test('postAnalyzeStreamRequest returns already_analyzed on 409', async () => {

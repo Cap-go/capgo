@@ -2797,14 +2797,18 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
         if (cancelled)
           return
 
-        const resultTag: 'success' | 'already_analyzed' | 'too_big' | 'error'
+        const resultTag: 'success' | 'already_analyzed' | 'too_big' | 'error' | 'mid_stream_error' | 'upgrade_required'
           = result.kind === 'ok'
             ? 'success'
             : result.kind === 'already_analyzed'
               ? 'already_analyzed'
               : result.kind === 'too_big'
                 ? 'too_big'
-                : 'error'
+                : result.kind === 'upgrade_required'
+                  ? 'upgrade_required'
+                  : result.partial !== undefined
+                    ? 'mid_stream_error'
+                    : 'error'
 
         await trackAiAnalysisResult({
           apikey: resolvedApiKeyRef.current ?? apikey ?? '',
@@ -2830,13 +2834,22 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
           setAiAnalysisText(null)
           setAiResult({ kind: 'too_big', message: 'Build log is too large for Capgo AI (>10 MB). Try a local AI tool with the captured log.' })
         }
+        else if (result.kind === 'upgrade_required') {
+          setAiAnalysisText(null)
+          setAiResult({ kind: 'error', message: result.message ?? 'AI build analysis requires a newer CLI. Please upgrade: npm i -g @capgo/cli@latest' })
+        }
         else {
           setAiAnalysisText(null)
           const detail = [
-            result.kind === 'error' && result.status ? `(status ${result.status})` : null,
+            result.status ? `(status ${result.status})` : null,
             result.message,
           ].filter(Boolean).join(' ')
-          setAiResult({ kind: 'error', message: `AI analysis failed${detail ? `: ${detail}` : ''}.` })
+          setAiResult({
+            kind: 'error',
+            message: result.partial
+              ? `AI analysis was interrupted${detail ? `: ${detail}` : ''}. The captured log is saved for local AI.`
+              : `AI analysis failed${detail ? `: ${detail}` : ''}.`,
+          })
         }
         setStep('ai-analysis-result')
       })()
