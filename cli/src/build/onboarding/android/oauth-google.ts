@@ -281,11 +281,26 @@ function escapeHtml(s: string): string {
   return s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', '\'': '&#39;' }[c] as string))
 }
 
-function successHtml(): string {
+/**
+ * Human blurbs for OPTIONAL scopes a user may decline on the consent screen —
+ * shown on the success page so they understand the implication right where the
+ * decision just happened (the consent wording, e.g. "see metrics and data", is
+ * Google's and reads scarier / vaguer than what the CLI actually does).
+ */
+const OPTIONAL_SCOPE_BLURBS: Record<string, string> = {
+  'https://www.googleapis.com/auth/playdeveloperreporting':
+    'Play app list (Google words it "see metrics and data"): without it the CLI can\'t check that the app you\'re building exists in your Play Console, so it will trust the package from your Gradle config as-is.',
+}
+
+function successHtml(skippedOptionalScopes: readonly string[] = []): string {
+  const warning = skippedOptionalScopes.length > 0
+    ? `<div class="warn"><strong>Heads-up:</strong> you skipped ${skippedOptionalScopes.length === 1 ? 'an optional permission' : 'some optional permissions'} — that\'s fine, onboarding continues without it.<ul>${skippedOptionalScopes.map(s => `<li>${escapeHtml(OPTIONAL_SCOPE_BLURBS[s] ?? s)}</li>`).join('')}</ul>Want it after all? Re-run onboarding and leave it checked on the consent screen.</div>`
+    : ''
   return `<!doctype html><html><head><meta charset="utf-8"><title>Capgo — signed in</title>
-<style>body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;max-width:480px;margin:80px auto;padding:0 20px;color:#222}h1{font-size:22px}p{color:#555;line-height:1.5}</style>
+<style>body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;max-width:480px;margin:80px auto;padding:0 20px;color:#222}h1{font-size:22px}p{color:#555;line-height:1.5}.warn{background:#fff7e6;border:1px solid #f0d59c;border-radius:6px;padding:12px 16px;color:#5c4a1a;font-size:14px;line-height:1.5}.warn ul{margin:8px 0;padding-left:20px}</style>
 </head><body><h1>✅ You can close this tab</h1>
 <p>Capgo CLI received your Google sign-in. Head back to your terminal to continue.</p>
+${warning}
 </body></html>`
 }
 
@@ -338,6 +353,30 @@ export class MissingScopesError extends Error {
 export function findMissingScopes(grantedScope: string, requestedScopes: readonly string[]): string[] {
   const granted = new Set(grantedScope.split(/\s+/).filter(s => s.length > 0))
   return requestedScopes.filter(s => !granted.has(s))
+}
+
+export interface MissingScopeSplit {
+  /** Required scopes the user didn't grant — sign-in must fail with a retry. */
+  missingRequired: string[]
+  /** Optional scopes the user declined — proceed, but tell them what they lose. */
+  skippedOptional: string[]
+}
+
+/**
+ * Split the requested-but-not-granted scopes into the required ones (block
+ * sign-in → `MissingScopesError`) and the optional ones (sign-in proceeds; the
+ * success page + caller warn about the degraded behavior).
+ */
+export function splitMissingScopes(
+  grantedScope: string,
+  scopes: readonly string[],
+  requiredScopes: readonly string[],
+): MissingScopeSplit {
+  const missingAll = findMissingScopes(grantedScope, scopes)
+  return {
+    missingRequired: missingAll.filter(s => requiredScopes.includes(s)),
+    skippedOptional: missingAll.filter(s => !requiredScopes.includes(s)),
+  }
 }
 
 export interface LoopbackCallbackResult {
@@ -576,13 +615,18 @@ export async function runOAuthFlow(
     // degrading gracefully when the granted token lacks them. Defaults to all
     // requested scopes when `requiredScopes` is omitted.
     const requiredScopes = config.requiredScopes ?? config.scopes
-    const missing = findMissingScopes(tokens.scope, requiredScopes)
-    if (missing.length > 0) {
-      finishResponse(scopeMissingHtml(missing), 400)
-      throw new MissingScopesError(missing, tokens.scope)
+    const { missingRequired, skippedOptional } = splitMissingScopes(tokens.scope, config.scopes, requiredScopes)
+    if (missingRequired.length > 0) {
+      finishResponse(scopeMissingHtml(missingRequired), 400)
+      throw new MissingScopesError(missingRequired, tokens.scope)
     }
 
-    finishResponse(successHtml())
+    // Optional scopes declined → still a success, but say so in BOTH places:
+    // the browser tab (where the decline just happened) and the CLI status
+    // stream — so the later "verification skipped" warning isn't a surprise.
+    if (skippedOptional.length > 0)
+      options.onStatus?.('Note: you skipped the optional Play app-list permission — app-existence verification will be skipped.')
+    finishResponse(successHtml(skippedOptional))
     return tokens
   }
   finally {

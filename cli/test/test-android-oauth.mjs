@@ -251,6 +251,47 @@ await test('MissingScopesError exposes missing list + granted string for downstr
   assert(/cloud-platform/.test(err.message), 'message should name the missing scope')
 })
 
+const REPORTING = 'https://www.googleapis.com/auth/playdeveloperreporting'
+const CLOUD = 'https://www.googleapis.com/auth/cloud-platform'
+const PUBLISHER = 'https://www.googleapis.com/auth/androidpublisher'
+
+await test('splitMissingScopes returns empty splits when everything was granted', async () => {
+  const { splitMissingScopes } = await importOAuth()
+  const { missingRequired, skippedOptional } = splitMissingScopes(
+    `openid ${PUBLISHER} ${CLOUD} ${REPORTING}`,
+    ['openid', PUBLISHER, CLOUD, REPORTING],
+    ['openid', PUBLISHER, CLOUD],
+  )
+  assertEquals(missingRequired.length, 0)
+  assertEquals(skippedOptional.length, 0)
+})
+
+await test('splitMissingScopes routes a declined OPTIONAL scope to skippedOptional (sign-in proceeds)', async () => {
+  const { splitMissingScopes } = await importOAuth()
+  // User unchecked only the optional playdeveloperreporting scope.
+  const { missingRequired, skippedOptional } = splitMissingScopes(
+    `openid ${PUBLISHER} ${CLOUD}`,
+    ['openid', PUBLISHER, CLOUD, REPORTING],
+    ['openid', PUBLISHER, CLOUD],
+  )
+  assertEquals(missingRequired.length, 0, 'optional decline must not block sign-in')
+  assertEquals(skippedOptional.length, 1)
+  assertEquals(skippedOptional[0], REPORTING)
+})
+
+await test('splitMissingScopes routes a declined REQUIRED scope to missingRequired even when optional is also declined', async () => {
+  const { splitMissingScopes } = await importOAuth()
+  const { missingRequired, skippedOptional } = splitMissingScopes(
+    `openid ${PUBLISHER}`,
+    ['openid', PUBLISHER, CLOUD, REPORTING],
+    ['openid', PUBLISHER, CLOUD],
+  )
+  assertEquals(missingRequired.length, 1)
+  assertEquals(missingRequired[0], CLOUD)
+  assertEquals(skippedOptional.length, 1)
+  assertEquals(skippedOptional[0], REPORTING)
+})
+
 console.log(`\n📊 Results: ${testsPassed} passed, ${testsFailed} failed`)
 if (testsFailed > 0)
   process.exit(1)
