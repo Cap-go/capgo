@@ -294,7 +294,7 @@ const OPTIONAL_SCOPE_BLURBS: Record<string, string> = {
 
 function successHtml(skippedOptionalScopes: readonly string[] = []): string {
   const warning = skippedOptionalScopes.length > 0
-    ? `<div class="warn"><strong>Heads-up:</strong> you skipped ${skippedOptionalScopes.length === 1 ? 'an optional permission' : 'some optional permissions'} — that\'s fine, onboarding continues without it.<ul>${skippedOptionalScopes.map(s => `<li>${escapeHtml(OPTIONAL_SCOPE_BLURBS[s] ?? s)}</li>`).join('')}</ul>Want it after all? Re-run onboarding and leave it checked on the consent screen.</div>`
+    ? `<div class="warn"><strong>Heads-up:</strong> you skipped ${skippedOptionalScopes.length === 1 ? 'an optional permission' : 'some optional permissions'} — that's fine, onboarding continues without it.<ul>${skippedOptionalScopes.map(s => `<li>${escapeHtml(OPTIONAL_SCOPE_BLURBS[s] ?? s)}</li>`).join('')}</ul>Want it after all? Re-run onboarding and leave it checked on the consent screen.</div>`
     : ''
   return `<!doctype html><html><head><meta charset="utf-8"><title>Capgo — signed in</title>
 <style>body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;max-width:480px;margin:80px auto;padding:0 20px;color:#222}h1{font-size:22px}p{color:#555;line-height:1.5}.warn{background:#fff7e6;border:1px solid #f0d59c;border-radius:6px;padding:12px 16px;color:#5c4a1a;font-size:14px;line-height:1.5}.warn ul{margin:8px 0;padding-left:20px}</style>
