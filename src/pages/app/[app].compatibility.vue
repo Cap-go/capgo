@@ -31,7 +31,11 @@ const app = ref<Database['public']['Tables']['apps']['Row']>()
 const events = ref<CompatibilityEventRow[]>([])
 const existingChannelIds = ref<Set<number>>(new Set())
 const existingVersionIds = ref<Set<number>>(new Set())
-const memberEmails = ref<Map<string, string>>(new Map())
+interface MemberInfo {
+  email: string
+  image_url: string | null
+}
+const memberInfo = ref<Map<string, MemberInfo>>(new Map())
 const showUnresolvedOnly = ref(true)
 
 const acceptDialogId = 'compatibility-accept-event'
@@ -186,7 +190,10 @@ async function loadMemberEmails() {
     console.error('[Compatibility] Error loading org members:', error)
     return
   }
-  memberEmails.value = new Map((data ?? []).map(member => [member.uid, member.email]))
+  memberInfo.value = new Map((data ?? []).map(member => [
+    member.uid,
+    { email: member.email, image_url: member.image_url ?? null },
+  ]))
 }
 
 // The three lookups only need `events` (and `app` for the member emails), so
@@ -219,7 +226,7 @@ function resolutionLabel(event: CompatibilityEventRow): string {
     return note.length > 0 ? note : t('compatibility-resolution-auto')
 
   if (event.resolution_kind === 'accepted') {
-    const who = (event.resolved_by ? memberEmails.value.get(event.resolved_by) : undefined)
+    const who = (event.resolved_by ? memberInfo.value.get(event.resolved_by)?.email : undefined)
       ?? event.resolved_by
       ?? t('unknown')
     const acceptedBy = t('compatibility-accepted-by', { user: who })
@@ -292,6 +299,28 @@ function openAcceptDialog(group: CompatibilityEventGroup) {
           dialogStore.closeDialog({ text: t('compatibility-accept'), role: 'primary' })
           await acknowledgeEvents(targetIds, note)
         },
+      },
+    ],
+  })
+}
+
+const resolutionDialogId = 'compatibility-resolution-detail'
+const resolutionDetail = ref<CompatibilityEventRow | null>(null)
+const resolutionDetailMember = computed<MemberInfo | null>(() => {
+  const resolvedBy = resolutionDetail.value?.resolved_by
+  return resolvedBy ? memberInfo.value.get(resolvedBy) ?? null : null
+})
+
+function openResolutionDialog(group: CompatibilityEventGroup) {
+  resolutionDetail.value = group.representative
+  dialogStore.openDialog({
+    id: resolutionDialogId,
+    title: t('compatibility-resolution-title'),
+    size: 'lg',
+    buttons: [
+      {
+        text: t('close'),
+        role: 'cancel',
       },
     ],
   })
@@ -464,9 +493,15 @@ watchEffect(async () => {
                         <span class="px-2 py-0.5 w-fit text-xs font-medium rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200">
                           {{ t('compatibility-status-resolved') }}
                         </span>
-                        <span class="text-xs text-slate-500 dark:text-slate-400 line-clamp-2 max-w-xs" :title="resolutionLabel(group.representative)">
+                        <button
+                          type="button"
+                          class="text-xs text-left text-slate-500 dark:text-slate-400 line-clamp-2 max-w-xs cursor-pointer hover:underline underline-offset-2"
+                          :title="resolutionLabel(group.representative)"
+                          data-test="compatibility-resolution-detail"
+                          @click="openResolutionDialog(group)"
+                        >
                           {{ resolutionLabel(group.representative) }}
-                        </span>
+                        </button>
                       </div>
                     </td>
                     <td class="px-4 py-3 text-right whitespace-nowrap">
@@ -530,6 +565,52 @@ watchEffect(async () => {
           class="w-full px-3 py-2 text-sm border rounded-md border-slate-300 focus:border-blue-500 focus:ring-blue-500 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
           :placeholder="t('compatibility-reason-placeholder')"
         />
+      </div>
+    </Teleport>
+
+    <!-- Resolution detail dialog (full reason + resolver) -->
+    <Teleport
+      v-if="dialogStore.showDialog && dialogStore.dialogOptions?.id === resolutionDialogId && resolutionDetail"
+      defer
+      to="#dialog-v2-content"
+    >
+      <div class="space-y-4">
+        <div v-if="resolutionDetail.resolution_kind === 'accepted'" class="flex items-center gap-3">
+          <img
+            v-if="resolutionDetailMember?.image_url"
+            :src="resolutionDetailMember.image_url"
+            alt=""
+            class="object-cover w-10 h-10 rounded-full"
+          >
+          <div
+            v-else
+            class="flex items-center justify-center w-10 h-10 text-sm font-semibold rounded-full bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200"
+          >
+            {{ (resolutionDetailMember?.email ?? resolutionDetail.resolved_by ?? '?').charAt(0).toUpperCase() }}
+          </div>
+          <div class="min-w-0">
+            <p class="text-xs text-slate-500 dark:text-slate-400">
+              {{ t('compatibility-resolved-by') }}
+            </p>
+            <p class="text-sm font-medium truncate text-slate-800 dark:text-slate-100">
+              {{ resolutionDetailMember?.email ?? resolutionDetail.resolved_by }}
+            </p>
+          </div>
+          <a
+            v-if="resolutionDetailMember?.email"
+            :href="`mailto:${resolutionDetailMember.email}`"
+            class="inline-flex items-center px-3 py-1.5 ml-auto text-xs font-medium text-white rounded-md shrink-0 bg-blue-600 hover:bg-blue-700"
+            data-test="compatibility-email-user"
+          >
+            {{ t('compatibility-email-user') }}
+          </a>
+        </div>
+        <p v-else class="text-xs text-slate-500 dark:text-slate-400">
+          {{ t('compatibility-resolution-auto') }}
+        </p>
+        <p class="text-sm whitespace-pre-wrap break-words text-slate-800 dark:text-slate-100">
+          {{ resolutionDetail.resolution_note?.trim() || resolutionLabel(resolutionDetail) }}
+        </p>
       </div>
     </Teleport>
   </div>
