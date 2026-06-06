@@ -262,8 +262,8 @@ export const AiAnalysisRunningStep: FC<{ streamText?: string, terminalRows: numb
   // sized to the ACTUAL viewport via the shared wrap-aware fit math in
   // ai-fit.ts — no arbitrary cap; lines scroll off only when the terminal is
   // genuinely out of rows. Flicker rules (learned the hard way):
-  //   • constant rendered height between flushes (helper blank-pads) — height
-  //     changes force Ink to re-layout the whole alt-screen frame;
+  //   • height only ever GROWS (text appends; the helper caps at the viewport
+  //     budget) — no padding, so the frame starts compact like other steps;
   //   • ONE <Text> node for the tail so Ink diffs the block in place;
   //   • the "… earlier lines" marker row is always rendered (blank when
   //     nothing is hidden) so it never pops in and shifts layout.

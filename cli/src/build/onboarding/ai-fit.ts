@@ -25,10 +25,12 @@
 export const AI_RESULT_CHROME_ROWS = 10
 
 // Rows the ai-analysis-running frame spends AROUND the live streaming
-// preview: compact Header + outer padding + spinner line + the
-// "… N earlier lines" marker + margins. Tighter than AI_RESULT_CHROME_ROWS
-// because the running step has no caution text or retry/skip Select.
-export const AI_RUNNING_CHROME_ROWS = 8
+// preview: shell padding (top+bottom), Header, spinner line, the
+// "… N earlier lines" marker, and the step margins. Deliberately generous —
+// the shell renders a full-height frame (minHeight=rows), so if preview +
+// chrome exceeds the viewport the whole frame scrolls and the title is
+// pushed off the top of the alt screen.
+export const AI_RUNNING_CHROME_ROWS = 10
 
 export interface AiPreviewTail {
   /** Lines to render (blank-padded to a constant rendered height). */
@@ -43,10 +45,10 @@ export interface AiPreviewTail {
  *
  * Wrap-aware: each logical line is budgeted as the rows it will actually
  * occupy at `terminalCols` (via `estimateRenderedRows`), so the running frame
- * can never grow past the viewport. The returned rows always sum to the same
- * rendered height for a given terminal size (blank-padded) — a block whose
- * height changes between flushes forces Ink to re-layout the whole
- * alt-screen frame, which reads as flicker.
+ * can never grow past the viewport. No artificial padding: streamed text only
+ * appends, so the rendered height grows monotonically on its own — the frame
+ * starts compact (matching the other wizard steps) and grows downward, and is
+ * capped at the budget so it never overflows the full-height shell frame.
  */
 export function pickAiPreviewTail(text: string, terminalRows: number, terminalCols: number): AiPreviewTail {
   if (!text)
@@ -64,11 +66,6 @@ export function pickAiPreviewTail(text: string, terminalRows: number, terminalCo
     start--
   }
   const rows = lines.slice(start).map(l => (l === '' ? ' ' : l))
-  // Blank-pad to the full budget so the rendered height is constant.
-  while (rowsUsed < budget) {
-    rows.push(' ')
-    rowsUsed++
-  }
   return { rows, hidden: start }
 }
 

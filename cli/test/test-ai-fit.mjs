@@ -292,11 +292,10 @@ await test('pickAiPreviewTail: empty text → no rows, no hidden', () => {
   if (r.rows.length !== 0 || r.hidden !== 0) throw new Error(JSON.stringify(r))
 })
 
-await test('pickAiPreviewTail: short text pads to a constant height', () => {
+await test('pickAiPreviewTail: short text returns exactly its content (no padding)', () => {
   const r = pickAiPreviewTail('one\ntwo', 40, 80)
-  const budget = 40 - AI_RUNNING_CHROME_ROWS
-  if (r.rows.length !== budget) throw new Error(`expected ${budget} rows, got ${r.rows.length}`)
-  if (r.rows[0] !== 'one' || r.rows[1] !== 'two') throw new Error(JSON.stringify(r.rows.slice(0, 3)))
+  if (r.rows.length !== 2) throw new Error(`expected 2 rows, got ${r.rows.length}`)
+  if (r.rows[0] !== 'one' || r.rows[1] !== 'two') throw new Error(JSON.stringify(r.rows))
   if (r.hidden !== 0) throw new Error(`hidden ${r.hidden}`)
 })
 
@@ -308,17 +307,17 @@ await test('pickAiPreviewTail: uses the real viewport — tall terminal hides no
 
 await test('pickAiPreviewTail: small terminal hides earliest lines only', () => {
   const lines = Array.from({ length: 30 }, (_, i) => `line ${i}`).join('\n')
-  const r = pickAiPreviewTail(lines, 20, 80) // budget 12
-  if (r.hidden !== 18) throw new Error(`hidden ${r.hidden}`)
-  if (r.rows[0] !== 'line 18') throw new Error(`first visible ${r.rows[0]}`)
+  const r = pickAiPreviewTail(lines, 20, 80) // budget 10 (chrome 10)
+  if (r.hidden !== 20) throw new Error(`hidden ${r.hidden}`)
+  if (r.rows[0] !== 'line 20') throw new Error(`first visible ${r.rows[0]}`)
   if (r.rows[r.rows.length - 1] !== 'line 29') throw new Error('tail must end at the latest line')
 })
 
 await test('pickAiPreviewTail: wrap-aware — a long line costs multiple rows of budget', () => {
   const long = 'x'.repeat(200) // 3 rows at 80 cols
   const text = [long, long, long, long, long].join('\n') // 15 rows of content
-  const r = pickAiPreviewTail(text, 20, 80) // budget 12 → only 4 long lines fit
-  if (r.hidden !== 1) throw new Error(`hidden ${r.hidden}`)
+  const r = pickAiPreviewTail(text, 20, 80) // budget 10 → only 3 long lines (9 rows) fit
+  if (r.hidden !== 2) throw new Error(`hidden ${r.hidden}`)
 })
 
 console.log(`\n${passed} passed, ${failed} failed`)
