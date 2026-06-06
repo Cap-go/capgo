@@ -182,6 +182,9 @@ export interface RunCapgoAiAnalysisInput {
   apikey: string
   jobId: string
   appId: string
+  // Fired per streamed text delta — used by the onboarding TUI for a live
+  // preview while the analysis generates. Omit for buffered behavior.
+  onChunk?: (text: string) => void
 }
 
 // Reads the captured log file for a failed job, then sends it to the Capgo AI
@@ -207,6 +210,7 @@ export async function runCapgoAiAnalysis(input: RunCapgoAiAnalysisInput): Promis
     jobId: input.jobId,
     appId: input.appId,
     logs,
+    onChunk: input.onChunk,
   })
 }
 

@@ -101,6 +101,35 @@ await test('runCapgoAiAnalysis reads the captured log and posts to /build/ai_ana
   }
 })
 
+await test('runCapgoAiAnalysis forwards onChunk per streamed delta (wizard live preview)', async () => {
+  const jobId = `job-chunks-${Date.now()}`
+  await writeFile(join(TEST_DIR, `${jobId}.log`), 'log\n')
+
+  const origFetch = globalThis.fetch
+  globalThis.fetch = async () => sseResponse([
+    'event: chunk\ndata: {"text":"### Likely"}\n\n',
+    'event: chunk\ndata: {"text":" cause"}\n\n',
+    'event: done\ndata: {"durationMs":1}\n\n',
+  ])
+  try {
+    const chunks = []
+    const result = await runCapgoAiAnalysis({
+      apiHost: 'https://api.test',
+      apikey: 'key',
+      jobId,
+      appId: 'com.test.app',
+      onChunk: t => chunks.push(t),
+    })
+    if (result.kind !== 'ok')
+      throw new Error(`expected ok, got ${result.kind}`)
+    if (chunks.join('|') !== '### Likely| cause')
+      throw new Error(`onChunk deltas wrong: ${JSON.stringify(chunks)}`)
+  }
+  finally {
+    globalThis.fetch = origFetch
+  }
+})
+
 await test('runCapgoAiAnalysis returns too_big when log exceeds HARD_LOG_SIZE_LIMIT', async () => {
   const jobId = `job-big-${Date.now()}`
   const logPath = join(TEST_DIR, `${jobId}.log`)

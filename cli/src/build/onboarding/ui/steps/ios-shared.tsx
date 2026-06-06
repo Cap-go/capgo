@@ -138,11 +138,25 @@ export const AiAnalysisPromptStep: FC<AiAnalysisPromptStepProps> = ({ dense = fa
 )
 
 // ── ai-analysis-running ─────────────────────────────────────────────────────────
-export const AiAnalysisRunningStep: FC = () => (
-  <Box flexDirection="column" marginTop={1}>
-    <SpinnerLine text="Analyzing build log with Capgo AI..." />
-  </Box>
-)
+export const AiAnalysisRunningStep: FC<{ streamText?: string }> = ({ streamText }) => {
+  // Live tail of the streaming analysis (pre-rendered ANSI from the parent).
+  // Capped to the last lines so the alt-screen frame never overflows — the
+  // result step owns full-text display with proper fit/scroll handling.
+  const MAX_TAIL_LINES = 10
+  const lines = streamText ? streamText.split('\n') : []
+  const tail = lines.length > MAX_TAIL_LINES ? lines.slice(-MAX_TAIL_LINES) : lines
+  return (
+    <Box flexDirection="column" marginTop={1}>
+      <SpinnerLine text="Analyzing build log with Capgo AI..." />
+      {tail.length > 0 && (
+        <Box flexDirection="column" marginTop={1}>
+          {lines.length > MAX_TAIL_LINES && <Text dimColor>… {lines.length - MAX_TAIL_LINES} earlier lines</Text>}
+          {tail.map((l, i) => <Text key={`${i}-${l.length}`}>{l === '' ? ' ' : l}</Text>)}
+        </Box>
+      )}
+    </Box>
+  )
+}
 
 // ── ai-analysis-result ──────────────────────────────────────────────────────────
 // Renders the diagnosis (or fallback banner), then a retry/skip Select. The

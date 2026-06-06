@@ -256,11 +256,25 @@ export const AiAnalysisPromptStep: FC<AiAnalysisPromptStepProps> = ({ onChoose, 
 // ── ai-analysis-running (spinner) ─────────────────────────────────────────────
 // Single spinner line — identical comfortable / dense.
 
-export const AiAnalysisRunningStep: FC = () => (
-  <Box flexDirection="column" marginTop={1}>
-    <SpinnerLine text="Analyzing build log with Capgo AI..." />
-  </Box>
-)
+export const AiAnalysisRunningStep: FC<{ streamText?: string }> = ({ streamText }) => {
+  // Live tail of the streaming analysis (pre-rendered ANSI from the parent).
+  // Capped to the last lines so the alt-screen frame never overflows — the
+  // result step owns full-text display with proper fit/scroll handling.
+  const MAX_TAIL_LINES = 10
+  const lines = streamText ? streamText.split('\n') : []
+  const tail = lines.length > MAX_TAIL_LINES ? lines.slice(-MAX_TAIL_LINES) : lines
+  return (
+    <Box flexDirection="column" marginTop={1}>
+      <SpinnerLine text="Analyzing build log with Capgo AI..." />
+      {tail.length > 0 && (
+        <Box flexDirection="column" marginTop={1}>
+          {lines.length > MAX_TAIL_LINES && <Text dimColor>… {lines.length - MAX_TAIL_LINES} earlier lines</Text>}
+          {tail.map((l, i) => <Text key={`${i}-${l.length}`}>{l === '' ? ' ' : l}</Text>)}
+        </Box>
+      )}
+    </Box>
+  )
+}
 
 // ── ai-analysis-result ────────────────────────────────────────────────────────
 // Renders the AI diagnosis (or a non-success banner), the "AI can make

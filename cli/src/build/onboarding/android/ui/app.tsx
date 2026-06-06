@@ -28,6 +28,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { createSupabaseClient, findBuildCommandForProjectType, findProjectType, findSavedKeySilent, getOrganizationId, getPackageScripts, getPMAndCommand } from '../../../../utils.js'
 import { loadSavedCredentials, updateSavedCredentials } from '../../../credentials.js'
 import { releaseCapturedLogs, runCapgoAiAnalysis } from '../../../../ai/analyze.js'
+import { createStreamingMarkdownRenderer } from '../../../../ai/stream-markdown.js'
 import { renderMarkdown } from '../../../../ai/render-markdown.js'
 import { aiAnalysisResultFromPostAnalyze, trackAiAnalysisChoice, trackAiAnalysisResult } from '../../../../ai/telemetry.js'
 import { requestBuildInternal } from '../../../request.js'
@@ -527,6 +528,9 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
   // requestBuildInternal returns aiAnalysis.ready=true on a failed build.
   const [aiJobId, setAiJobId] = useState<string | null>(null)
   const [aiAnalysisText, setAiAnalysisText] = useState<string | null>(null)
+  // Live ANSI preview of the streaming analysis, shown in the running step.
+  // Throttled (~120ms) so per-token updates don't re-render the whole tree.
+  const [aiStreamPreview, setAiStreamPreview] = useState('')
   // See iOS sibling — non-success outcome banner, mutually exclusive with
   // `aiAnalysisText`. One object so kind + message can't drift.
   const [aiResult, setAiResult] = useState<{ kind: AiResultKind, message: string } | null>(null)
@@ -2046,12 +2050,33 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
           triggeredBy: 'onboarding',
         }).catch(() => { /* telemetry never breaks the wizard */ })
 
+        // Stream the analysis into a throttled ANSI preview: each completed
+        // markdown line is rendered (same renderer as the plain CLI) and the
+        // accumulated text is flushed to state at most every 120ms.
+        let streamedAnsi = ''
+        let previewFlushTimer: ReturnType<typeof setTimeout> | null = null
+        const mdStream = createStreamingMarkdownRenderer((t) => {
+          streamedAnsi += t
+          previewFlushTimer ??= setTimeout(() => {
+            previewFlushTimer = null
+            if (!cancelled)
+              setAiStreamPreview(streamedAnsi)
+          }, 120)
+        }, true)
+
         const result = await runCapgoAiAnalysis({
           apiHost: supaHost ?? 'https://api.capgo.app',
           apikey: resolvedApiKeyRef.current ?? apikey ?? '',
           jobId: aiJobId,
           appId,
+          onChunk: t => mdStream.feed(t),
         })
+
+        if (previewFlushTimer) {
+          clearTimeout(previewFlushTimer)
+          previewFlushTimer = null
+        }
+        setAiStreamPreview('')
 
         if (cancelled)
           return
@@ -3433,7 +3458,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
       )}
 
       {/* AI debug — spinner while the edge function is running */}
-      {step === 'ai-analysis-running' && <AiAnalysisRunningStep />}
+      {step === 'ai-analysis-running' && <AiAnalysisRunningStep streamText={aiStreamPreview} />}
 
       {/* AI debug — render the diagnosis (or fallback message), then offer
           retry-or-skip. Retry transitions back to 'requesting-build' so the
