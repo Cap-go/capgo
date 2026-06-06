@@ -929,6 +929,7 @@
   "compatibility-filter-all": "All",
   "compatibility-filter-unresolved": "Unresolved only",
   "compatibility-offenders": "Blocking packages",
+  "compatibility-offenders-more": "+{count} more",
   "compatibility-previous-bundle": "Previous bundle",
   "compatibility-reason": "Reason",
   "compatibility-reason-placeholder": "Why is this incompatibility acceptable?",

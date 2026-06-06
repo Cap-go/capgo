@@ -28,6 +28,7 @@ const lastPath = ref('')
 const isLoading = ref(false)
 const app = ref<Database['public']['Tables']['apps']['Row']>()
 const events = ref<CompatibilityEventRow[]>([])
+const existingChannelIds = ref<Set<number>>(new Set())
 const showUnresolvedOnly = ref(false)
 
 const acceptDialogId = 'compatibility-accept-event'
@@ -69,11 +70,41 @@ async function loadEvents() {
     }
 
     events.value = (data ?? []) as CompatibilityEventRow[]
+    await loadExistingChannels()
   }
   catch (error) {
     console.error('[Compatibility] Error loading events:', error)
     events.value = []
   }
+}
+
+// Channel names are snapshots that outlive deleted channels; only link the
+// ones that still exist.
+async function loadExistingChannels() {
+  const channelIds = [...new Set(events.value
+    .map(event => event.channel_id)
+    .filter((channelId): channelId is number => channelId !== null))]
+  if (channelIds.length === 0) {
+    existingChannelIds.value = new Set()
+    return
+  }
+  const { data, error } = await supabase
+    .from('channels')
+    .select('id')
+    .eq('app_id', id.value)
+    .in('id', channelIds)
+  if (error) {
+    console.error('[Compatibility] Error checking channels:', error)
+    existingChannelIds.value = new Set()
+    return
+  }
+  existingChannelIds.value = new Set((data ?? []).map(channel => channel.id))
+}
+
+function openChannel(event: CompatibilityEventRow) {
+  if (event.channel_id === null)
+    return
+  router.push(`/app/${encodeURIComponent(id.value)}/channel/${event.channel_id}`)
 }
 
 async function refreshData() {
@@ -265,7 +296,16 @@ watchEffect(async () => {
                       {{ platformLabel(event.platform) }}
                     </td>
                     <td class="px-4 py-3 text-slate-700 dark:text-slate-200">
-                      {{ event.channel_name }}
+                      <button
+                        v-if="event.channel_id !== null && existingChannelIds.has(event.channel_id)"
+                        type="button"
+                        class="text-blue-600 underline-offset-2 hover:underline dark:text-blue-400"
+                        data-test="compatibility-channel-link"
+                        @click="openChannel(event)"
+                      >
+                        {{ event.channel_name }}
+                      </button>
+                      <span v-else>{{ event.channel_name }}</span>
                     </td>
                     <td class="px-4 py-3 font-mono text-xs text-slate-700 dark:text-slate-200">
                       {{ bundleLabel(event.current_version_name) }}
@@ -274,13 +314,19 @@ watchEffect(async () => {
                       {{ bundleLabel(event.previous_version_name) }}
                     </td>
                     <td class="px-4 py-3">
-                      <div v-if="event.offenders && event.offenders.length > 0" class="flex flex-wrap gap-1">
+                      <div v-if="event.offenders && event.offenders.length > 0" class="flex flex-wrap gap-1" :title="event.offenders.join(', ')">
                         <span
-                          v-for="offender in event.offenders"
+                          v-for="offender in event.offenders.slice(0, 3)"
                           :key="offender"
                           class="px-2 py-0.5 text-xs rounded bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-200"
                         >
                           {{ offender }}
+                        </span>
+                        <span
+                          v-if="event.offenders.length > 3"
+                          class="px-2 py-0.5 text-xs rounded bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-300"
+                        >
+                          {{ t('compatibility-offenders-more', { count: event.offenders.length - 3 }) }}
                         </span>
                       </div>
                       <span v-else class="text-slate-400">—</span>
