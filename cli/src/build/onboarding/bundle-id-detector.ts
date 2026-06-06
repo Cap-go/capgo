@@ -6,10 +6,15 @@
 //
 // We split this off from the existing pbxproj-parser.ts because that module
 // returns ALL signable targets (multi-target apps with extensions) and the
-// onboarding flow only cares about the main app's bundle ID for the
-// confirm-app-id step. Routing through one mainline-target helper keeps the
-// UI simple ("Use X from pbxproj / Use Y from capacitor.config / type your
-// own") and the detection deterministic.
+// onboarding flow only cares about the main app's bundle ID for the Apple-side
+// bundle-id resolution (redirectIfMismatch / verify-app). Routing through one
+// mainline-target helper keeps the detection deterministic.
+//
+// Release is AUTHORITATIVE: the Release-config bundle ID is the build ID used
+// for every Apple-side comparison and gate. We never silently substitute a
+// Debug value when a Release config exists. The Debug value is still exposed
+// (alongside a `debugReleaseDiffer` flag) so callers can print an awareness
+// note when Debug ≠ Release — but it is never used to gate.
 //
 // All sources are read as plain text. project.pbxproj is a NeXT-step plist
 // (mostly regex-friendly) and Info.plist is XML — we use simple regexes
@@ -20,7 +25,7 @@ import { readFileSync } from 'node:fs'
 
 import { findXcodeProject } from '../pbxproj-parser.js'
 
-export type BundleIdSource = 'pbxproj-release' | 'pbxproj-fallback' | 'plist' | 'capacitor-config'
+export type BundleIdSource = 'pbxproj-release' | 'pbxproj-debug' | 'pbxproj-fallback' | 'plist' | 'capacitor-config'
 
 export interface BundleIdCandidate {
   value: string
@@ -32,6 +37,12 @@ export interface BundleIdCandidate {
 export interface DetectedBundleIds {
   /** PRODUCT_BUNDLE_IDENTIFIER from project.pbxproj, preferring Release config. */
   pbxproj: BundleIdCandidate | null
+  /**
+   * The Debug-config PRODUCT_BUNDLE_IDENTIFIER from project.pbxproj, when a
+   * literal value exists. Exposed for the awareness note only — never used to
+   * gate. Null when no Debug-config literal value is present.
+   */
+  debug: BundleIdCandidate | null
   /**
    * Info.plist CFBundleIdentifier when it's a literal value (not the common
    * `$(PRODUCT_BUNDLE_IDENTIFIER)` placeholder, which we drop because it
@@ -48,10 +59,23 @@ export interface DetectedBundleIds {
   recommended: BundleIdCandidate
   /**
    * True when the recommended value differs from capacitor.config.appId.
-   * Used by the confirm-app-id step to decide whether to surface a question
-   * at all — when they match, nothing's worth asking about.
+   * Used by redirectIfMismatch to decide whether to adopt the Release id —
+   * when they match, capacitor.config.appId is already the build id.
    */
   mismatch: boolean
+  /**
+   * True only when BOTH a Release-config and a Debug-config literal bundle id
+   * were found AND they differ. Drives the "Debug ≠ Release" awareness note;
+   * never gates. False when either value is missing or they match.
+   */
+  debugReleaseDiffer: boolean
+  /**
+   * True when a Release-config PRODUCT_BUNDLE_IDENTIFIER was resolved from
+   * pbxproj. When false, the authoritative build ID could not be determined
+   * from Release and callers should warn/skip gating rather than gate on a
+   * Debug or plist fallback.
+   */
+  releaseResolved: boolean
   /**
    * Deduplicated, ordered list of candidates ready to render as Select
    * options. Empty list is impossible (capacitor is always included).
@@ -59,22 +83,19 @@ export interface DetectedBundleIds {
   candidates: BundleIdCandidate[]
 }
 
+interface PbxprojBundleId {
+  value: string
+  configName: string
+}
+
 /**
- * Parse `PRODUCT_BUNDLE_IDENTIFIER = "..."` lines from pbxproj content.
- * Returns the Release-config value if present, else the first non-Release
- * value. Returns null when no bundle id can be extracted.
- *
- * Looks like a re-implementation of pbxproj-parser.ts's resolveBundleId, but
- * that one needs an XCConfigurationList id (it walks from a target). This
- * one needs to work standalone given only the file contents — so it
- * collects all PRODUCT_BUNDLE_IDENTIFIER values, groups by adjacent
- * `name = Release`/`name = Debug` markers, and prefers Release. Less
- * accurate for multi-target projects but good enough for the "what should
- * we pre-fill" use case here.
+ * Collect every `{config, value}` PRODUCT_BUNDLE_IDENTIFIER pair from pbxproj
+ * content, skipping `$(...)` variable references. Shared by the Release-first
+ * resolver and the Debug exposer so the regex lives in one place.
  */
-export function parsePbxprojBundleId(pbxprojContent: string): BundleIdCandidate | null {
+function collectPbxprojBundleIds(pbxprojContent: string): PbxprojBundleId[] {
   if (!pbxprojContent)
-    return null
+    return []
 
   // Look for XCBuildConfiguration blocks (one level of nested braces tolerated
   // for `buildSettings = { ... }`). Each block has a `name = Release;` and
@@ -89,7 +110,7 @@ export function parsePbxprojBundleId(pbxprojContent: string): BundleIdCandidate 
   // "shortest bundle id" — the parent is always a prefix of any child.
 
   const buildConfigRegex = /\w+\s*\/\*[^*]*\*\/\s*=\s*\{[^{}]*(?:\{[^}]*\}[^{}]*)*\}/g
-  const candidates: { value: string, configName: string }[] = []
+  const candidates: PbxprojBundleId[] = []
 
   for (const match of pbxprojContent.matchAll(buildConfigRegex)) {
     const block = match[0]
@@ -107,23 +128,94 @@ export function parsePbxprojBundleId(pbxprojContent: string): BundleIdCandidate 
     candidates.push({ value, configName })
   }
 
+  return candidates
+}
+
+/**
+ * Pick the shortest bundle id among the entries for a given config name.
+ * The main app target is always a prefix of (so shorter than) any extension
+ * sharing that config, so "shortest = main target" is the deterministic pick.
+ */
+function shortestForConfig(candidates: PbxprojBundleId[], configName: string): PbxprojBundleId | undefined {
+  return candidates
+    .filter(c => c.configName === configName)
+    .sort((a, b) => a.value.length - b.value.length)[0]
+}
+
+/**
+ * Parse `PRODUCT_BUNDLE_IDENTIFIER = "..."` lines from pbxproj content,
+ * returning the Release and Debug candidates separately.
+ *
+ * Release is authoritative: when ANY Release-config value exists, `release`
+ * is populated and `releaseResolved` is true. The Debug value (when present)
+ * is returned alongside via `debug` for the awareness note — it is never
+ * promoted to `release`.
+ *
+ * When no Release config exists, `release` is null and `releaseResolved` is
+ * false so callers can detect the no-Release case.
+ */
+export function parsePbxprojBundleIds(pbxprojContent: string): {
+  release: BundleIdCandidate | null
+  debug: BundleIdCandidate | null
+  releaseResolved: boolean
+} {
+  const candidates = collectPbxprojBundleIds(pbxprojContent)
+
+  const releaseEntry = shortestForConfig(candidates, 'Release')
+  const debugEntry = shortestForConfig(candidates, 'Debug')
+
+  const release: BundleIdCandidate | null = releaseEntry
+    ? {
+        value: releaseEntry.value,
+        source: 'pbxproj-release',
+        label: 'project.pbxproj (Release config)',
+      }
+    : null
+
+  const debug: BundleIdCandidate | null = debugEntry
+    ? {
+        value: debugEntry.value,
+        source: 'pbxproj-debug',
+        label: 'project.pbxproj (Debug config)',
+      }
+    : null
+
+  return { release, debug, releaseResolved: release !== null }
+}
+
+/**
+ * Parse `PRODUCT_BUNDLE_IDENTIFIER = "..."` lines from pbxproj content.
+ * Returns the Release-config value if present, else the shortest non-Release
+ * value as a `pbxproj-fallback`. Returns null when no bundle id can be
+ * extracted.
+ *
+ * Release stays authoritative here: a Release value is never overridden by a
+ * Debug value. The no-Release fallback is preserved for backward
+ * compatibility — callers that need to distinguish "Release resolved" from
+ * "fell back to Debug" should use `parsePbxprojBundleIds` (or the
+ * `releaseResolved` flag on `detectIosBundleIds`).
+ *
+ * Looks like a re-implementation of pbxproj-parser.ts's resolveBundleId, but
+ * that one needs an XCConfigurationList id (it walks from a target). This
+ * one needs to work standalone given only the file contents — so it
+ * collects all PRODUCT_BUNDLE_IDENTIFIER values, groups by adjacent
+ * `name = Release`/`name = Debug` markers, and prefers Release. Less
+ * accurate for multi-target projects but good enough for the "what should
+ * we pre-fill" use case here.
+ */
+export function parsePbxprojBundleId(pbxprojContent: string): BundleIdCandidate | null {
+  const { release } = parsePbxprojBundleIds(pbxprojContent)
+  if (release)
+    return release
+
+  // No Release config — fall back to the shortest value at any (non-Release)
+  // level so we still pre-fill something. releaseResolved stays false via
+  // parsePbxprojBundleIds/detectIosBundleIds so callers can detect this.
+  const candidates = collectPbxprojBundleIds(pbxprojContent)
   if (candidates.length === 0)
     return null
 
-  // Heuristic: prefer the shortest bundle id at the Release level (the main
-  // app, not an extension). Falls back to the shortest at any level.
-  const release = candidates
-    .filter(c => c.configName === 'Release')
-    .sort((a, b) => a.value.length - b.value.length)[0]
-  if (release) {
-    return {
-      value: release.value,
-      source: 'pbxproj-release',
-      label: 'project.pbxproj (Release config)',
-    }
-  }
-
-  const fallback = candidates.sort((a, b) => a.value.length - b.value.length)[0]
+  const fallback = candidates.slice().sort((a, b) => a.value.length - b.value.length)[0]
   return {
     value: fallback.value,
     source: 'pbxproj-fallback',
@@ -179,6 +271,8 @@ export function detectIosBundleIds(opts: {
   }
 
   let pbxproj: BundleIdCandidate | null = null
+  let debug: BundleIdCandidate | null = null
+  let releaseResolved = false
   let plist: BundleIdCandidate | null = null
 
   // pbxproj — use the existing finder so we agree with the rest of the CLI
@@ -187,7 +281,14 @@ export function detectIosBundleIds(opts: {
   if (pbxprojPath) {
     try {
       const content = readFileSync(pbxprojPath, 'utf-8')
-      pbxproj = parsePbxprojBundleId(content)
+      // Release is authoritative; Debug is exposed alongside for the note.
+      const parsed = parsePbxprojBundleIds(content)
+      debug = parsed.debug
+      releaseResolved = parsed.releaseResolved
+      // Keep the public `pbxproj` field on the existing precedence: Release
+      // when resolved, else the fallback (which parsePbxprojBundleId derives
+      // without ever promoting Debug over a Release value).
+      pbxproj = parsed.release ?? parsePbxprojBundleId(content)
     }
     catch {
       // unreadable — silently skip
@@ -213,8 +314,8 @@ export function detectIosBundleIds(opts: {
     }
   }
 
-  // Build a deduplicated candidate list. Order is priority-first so the
-  // confirm-app-id step renders the recommended choice on top.
+  // Build a deduplicated candidate list (priority-first); recommended[0] is the
+  // authoritative Release id. Retained as a detector API field.
   const seen = new Set<string>()
   const ordered: BundleIdCandidate[] = []
   for (const c of [pbxproj, plist, capacitor]) {
@@ -227,12 +328,20 @@ export function detectIosBundleIds(opts: {
   const recommended = ordered[0]
   const mismatch = recommended.value !== capacitor.value
 
+  // Debug ≠ Release awareness flag: only meaningful when BOTH literal values
+  // exist. Compare against the authoritative Release value, not the fallback.
+  const debugReleaseDiffer
+    = releaseResolved && debug !== null && pbxproj !== null && debug.value !== pbxproj.value
+
   return {
     pbxproj,
+    debug,
     plist,
     capacitor,
     recommended,
     mismatch,
+    debugReleaseDiffer,
+    releaseResolved,
     candidates: ordered,
   }
 }

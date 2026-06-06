@@ -1,7 +1,6 @@
 import { app as accept_invitation } from '../_backend/private/accept_invitation.ts'
 import { app as admin_credits } from '../_backend/private/admin_credits.ts'
 import { app as admin_stats } from '../_backend/private/admin_stats.ts'
-import { app as bundle_compatibility } from '../_backend/private/bundle_compatibility.ts'
 import { app as channel_stats } from '../_backend/private/channel_stats.ts'
 import { app as config } from '../_backend/private/config.ts'
 import { app as configBuilder } from '../_backend/private/config_builder.ts'
@@ -59,7 +58,6 @@ appGlobal.route('/download_link', download_link)
 appGlobal.route('/log_as', log_as)
 appGlobal.route('/admin_credits', admin_credits)
 appGlobal.route('/admin_stats', admin_stats)
-appGlobal.route('/bundle_compatibility', bundle_compatibility)
 appGlobal.route('/stats', stats_priv)
 appGlobal.route('/stripe_checkout', stripe_checkout)
 appGlobal.route('/stripe_portal', stripe_portal)
