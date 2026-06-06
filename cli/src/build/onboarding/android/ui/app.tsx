@@ -20,7 +20,7 @@ import { copyFile, readFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { join, resolve as resolvePath } from 'node:path'
 import process from 'node:process'
-import { ProgressBar, Select } from '@inkjs/ui'
+import { Alert, ProgressBar, Select } from '@inkjs/ui'
 import type { DOMElement } from 'ink'
 import { Box, measureElement, Newline, Text, useApp, useInput, useStdout } from 'ink'
 // src/build/onboarding/android/ui/app.tsx
@@ -111,6 +111,10 @@ import {
   WelcomeStep,
 } from '../../ui/steps/android-shared.js'
 import { findAndroidApplicationIds } from '../gradle-parser.js'
+import { listPlayApps, ReportingApiHttpError } from '../reporting-api.js'
+import type { PlayApp } from '../reporting-api.js'
+import { reconcileAndroidApp } from '../app-verification-android.js'
+import type { AndroidReconcileResult } from '../app-verification-android.js'
 import { validateServiceAccountJson } from '../service-account-validation.js'
 import { diffLines } from '../../diff-utils.js'
 import type { DiffLine } from '../../diff-utils.js'
@@ -177,6 +181,22 @@ const RELEASE_ALIAS_DEFAULT = 'release'
  *  user's behalf. userinfo.email + openid are for identifying the signed-in
  *  user in the UI. */
 const OAUTH_SCOPES_FOR_ONBOARDING = [
+  ...GOOGLE_OAUTH_SCOPES_ANDROIDPUBLISHER,
+  'https://www.googleapis.com/auth/cloud-platform',
+  // OPTIONAL — used by the post-sign-in app-existence verification step to list
+  // the user's real Play Store apps (apps:search). A user who declines it on the
+  // consent screen STILL completes sign-in: it is deliberately excluded from
+  // OAUTH_REQUIRED_SCOPES below so its absence never throws MissingScopesError,
+  // and the verification degrades to the plain Gradle picker.
+  'https://www.googleapis.com/auth/playdeveloperreporting',
+] as const
+
+/**
+ * The subset of {@link OAUTH_SCOPES_FOR_ONBOARDING} whose absence must fail
+ * sign-in. Excludes the optional `playdeveloperreporting` scope so a user who
+ * declines app-listing can still finish onboarding (graceful degradation).
+ */
+const OAUTH_REQUIRED_SCOPES = [
   ...GOOGLE_OAUTH_SCOPES_ANDROIDPUBLISHER,
   'https://www.googleapis.com/auth/cloud-platform',
 ] as const
@@ -505,6 +525,33 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
   const [detectedPackageIds, setDetectedPackageIds] = useState<string[]>([])
   const [packageSelectMode, setPackageSelectMode] = useState<'choose' | 'manual'>('choose')
   const packageLoadedRef = useRef(false)
+
+  // ── Phase 4.5 — app-existence verification (generate path only) ──────────────
+  // After sign-in we list the user's real Play Store apps and reconcile them
+  // against the project's Gradle applicationId. Mirrors the iOS verify-app gate.
+  //
+  // The Play apps accessible to the signed-in user (apps:search). Picker source
+  // for the enriched wrong-build-id / multi-gradle screen + Path B "Back" gate.
+  const [verifyPlayApps, setVerifyPlayApps] = useState<PlayApp[]>([])
+  // Reconcile outcome once the apps fetch completes. null while loading / on the
+  // import path (no fetch) / when verification degraded.
+  const [verifyReconcile, setVerifyReconcile] = useState<AndroidReconcileResult | null>(null)
+  // True while the initial apps:search fetch is in flight (generate path).
+  const [verifyAppLoading, setVerifyAppLoading] = useState(false)
+  // True when verification couldn't run on the generate path (reporting scope not
+  // granted, apps:search 403, or any network/token error) — we warn and fall
+  // through to the plain Gradle picker. NEVER blocks onboarding.
+  const [verifyDegraded, setVerifyDegraded] = useState(false)
+  // True on the import (custom-SA) path: app existence isn't verified there (it
+  // needs Google sign-in) — show a "not verified" banner over the plain picker.
+  const [verifyImportSkipped, setVerifyImportSkipped] = useState(false)
+  // The Play app the user picked whose packageName != the build id → Path A
+  // (rename) target. Set when entering the rename step.
+  const [verifyChosenPlayApp, setVerifyChosenPlayApp] = useState<PlayApp | null>(null)
+  // Bumped on every verify <Select> action so a Select that stays mounted after a
+  // selection remounts with a fresh key — dodges the @inkjs/ui onChange re-fire
+  // bug (see the iOS app.tsx gateActionSeq note).
+  const [gateActionSeq, setGateActionSeq] = useState(0)
 
   // Phase 5 — provisioning status stream
   const [setupStatus, setSetupStatus] = useState<string[]>([])
@@ -880,11 +927,18 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
     setGcpProjects([])
     setGcpProjectChoice(null)
     setNewProjectDisplayName('')
-    // Phase 4.5 — Android package
+    // Phase 4.5 — Android package + app-existence verification
     setAndroidPackageChoice(null)
     setDetectedPackageIds([])
     setPackageSelectMode('choose')
     packageLoadedRef.current = false
+    setVerifyPlayApps([])
+    setVerifyReconcile(null)
+    setVerifyAppLoading(false)
+    setVerifyDegraded(false)
+    setVerifyImportSkipped(false)
+    setVerifyChosenPlayApp(null)
+    setGateActionSeq(0)
     // Phase 5 — provisioning outputs
     setServiceAccountProvisioned(null)
     setPlayInviteProvisioned(null)
@@ -978,6 +1032,28 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
     addLog('✔ Credentials saved')
     return credentials
   }
+
+  // Commit the chosen Android package and advance to whatever the package-select
+  // step flows into today (import → sa-json picker, generate → GCP provisioning).
+  // Shared by the plain Gradle picker, the enriched verify picker, and the
+  // exact-match auto-confirm so the persist+advance contract stays in one place.
+  const pickAndroidPackageAndAdvance = useCallback(
+    (packageName: string, source: AndroidPackageChoice['source']): void => {
+      const choice: AndroidPackageChoice = { packageName, source }
+      setAndroidPackageChoice(choice)
+      addLog(`✔ Android package — ${packageName}`)
+      const nextStep: AndroidOnboardingStep
+        = serviceAccountMethod === 'existing' ? 'sa-json-existing-path' : 'gcp-setup-running'
+      persistAndStep(
+        (p) => ({
+          ...p,
+          completedSteps: { ...p.completedSteps, androidPackageChosen: choice },
+        }),
+        nextStep,
+      )
+    },
+    [serviceAccountMethod, addLog, persistAndStep],
+  )
 
   useEffect(() => {
     let cancelled = false
@@ -1370,6 +1446,9 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
               clientId: cfg.clientId,
               clientSecret: cfg.clientSecret,
               scopes: OAUTH_SCOPES_FOR_ONBOARDING,
+              // playdeveloperreporting is optional — declining it must NOT fail
+              // sign-in (the app-verify step degrades gracefully without it).
+              requiredScopes: OAUTH_REQUIRED_SCOPES,
             },
             {
               onAuthUrl: (url) => {
@@ -1442,6 +1521,61 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
         if (cancelled)
           return
         setDetectedPackageIds(gradleIds)
+
+        // Import (custom-SA) path: app existence isn't verified here — it needs
+        // Google sign-in, which the import flow never performs. Skip the fetch
+        // and flag the "not verified" banner over today's Gradle-only picker.
+        if (serviceAccountMethod !== 'generate') {
+          setVerifyImportSkipped(true)
+          return
+        }
+
+        // Generate path: list the user's real Play apps (apps:search) and
+        // reconcile them against the Gradle applicationId. ANY failure degrades
+        // gracefully to the plain Gradle picker — verification NEVER blocks
+        // onboarding (the reporting scope is optional; see OAUTH_REQUIRED_SCOPES).
+        setVerifyAppLoading(true)
+        try {
+          const token = await ensureAccessToken()
+          const apps = await listPlayApps(token)
+          if (cancelled)
+            return
+          setVerifyPlayApps(apps)
+          const result = reconcileAndroidApp({ gradleIds, apps })
+          setVerifyReconcile(result)
+
+          if (result.kind === 'exact-match') {
+            // The only no-prompt case: a Play app matches the build id exactly.
+            // Auto-confirm and advance — nothing on disk changes beyond the
+            // existing package-choice persistence.
+            const matched = apps.find(a => a.packageName === result.packageName)
+            addLog(`✔ Building "${matched?.displayName || result.packageName}" (${result.packageName}) — matches your Play Store app.`)
+            pickAndroidPackageAndAdvance(result.packageName, 'gradle')
+            return
+          }
+          if (result.kind === 'no-app') {
+            // No Play apps at all → Path B (create the app in Play Console).
+            setStep('android-app-verify-create-app')
+            return
+          }
+          // wrong-build-id / multi-gradle → stay on android-package-select; the
+          // render drives the enriched picker.
+        }
+        catch (err) {
+          // Scope-missing (403) / network / token error: warn + fall through to
+          // the plain Gradle picker. We must never throw into the wizard.
+          if (cancelled)
+            return
+          setVerifyDegraded(true)
+          const why = err instanceof ReportingApiHttpError && err.status === 403
+            ? 'the Play Developer Reporting permission was not granted'
+            : 'the Play Developer Reporting API could not be reached'
+          addLog(`⚠ Skipping Play Store app verification — ${why}. Continuing with the package from your Gradle config.`, 'yellow')
+        }
+        finally {
+          if (!cancelled)
+            setVerifyAppLoading(false)
+        }
       })()
     }
 
@@ -2914,73 +3048,243 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
         />
       )}
 
-      {step === 'android-package-select' && (
-        <AndroidPackageSelectStep
-          dense={false}
-          androidDir={androidDir}
-          showChooser={detectedPackageIds.length > 0 && packageSelectMode === 'choose'}
-          detectedCount={detectedPackageIds.length}
-          detectedOptions={[
-            ...detectedPackageIds.map(id => ({
-              label: `📦  ${id}`,
-              value: id,
-            })),
-            { label: '✍️   Type a different package name', value: '__manual__' },
-          ]}
-          onChooseDetected={(value) => {
-            // Mode-switch path unmounts the <Select> synchronously, so the
-            // @inkjs/ui re-fire bug can't replay it. The package-pick path
-            // goes through async persistAndStep, which keeps the <Select>
-            // mounted long enough for the bug to spam — gate it with the
-            // per-step guard.
-            if (value === '__manual__') {
-              setPackageSelectMode('manual')
-              return
-            }
-            if (selectFiredRef.current)
-              return
-            selectFiredRef.current = true
-            const choice: AndroidPackageChoice = {
-              packageName: value,
-              source: 'gradle',
-            }
-            setAndroidPackageChoice(choice)
-            addLog(`✔ Android package — ${value}`)
-            const nextStep: AndroidOnboardingStep
-              = serviceAccountMethod === 'existing' ? 'sa-json-existing-path' : 'gcp-setup-running'
-            persistAndStep(
-              (p) => ({
-                ...p,
-                completedSteps: { ...p.completedSteps, androidPackageChosen: choice },
-              }),
-              nextStep,
-            )
-          }}
-          onSubmitManual={(val) => {
-            const name = val.trim()
-            if (!/^[a-z][\w]*(?:\.[a-z][\w]*)+$/i.test(name)) {
-              setError(`"${name}" doesn't look like a valid Android package name (e.g. com.example.app).`)
-              setRetryStep('android-package-select')
-              setStep('error')
-              return
-            }
-            const choice: AndroidPackageChoice = {
-              packageName: name,
-              source: detectedPackageIds.includes(name) ? 'gradle' : 'user-input',
-            }
-            setAndroidPackageChoice(choice)
-            addLog(`✔ Android package — ${name}`)
-            const nextStep: AndroidOnboardingStep
-              = serviceAccountMethod === 'existing' ? 'sa-json-existing-path' : 'gcp-setup-running'
-            persistAndStep(
-              (p) => ({
-                ...p,
-                completedSteps: { ...p.completedSteps, androidPackageChosen: choice },
-              }),
-              nextStep,
-            )
-          }}
-        />
+      {step === 'android-package-select' && (() => {
+        // Generate path: still listing the user's Play apps → show a loader.
+        if (verifyAppLoading) {
+          return (
+            <Box flexDirection="column" marginTop={1}>
+              <SpinnerLine text="Checking Play Console for your app..." />
+              <Text dimColor>Listing your Play Store apps to confirm the build matches a real app.</Text>
+            </Box>
+          )
+        }
+
+        const reconcileKind = verifyReconcile?.kind
+        // Enriched picker — generate path, apps exist but the build id matches
+        // none (wrong-build-id) or several Gradle flavors need disambiguation
+        // (multi-gradle). Lists the real Play apps first, then the Gradle ids.
+        const showEnriched
+          = serviceAccountMethod === 'generate'
+            && !verifyDegraded
+            && packageSelectMode === 'choose'
+            && (reconcileKind === 'wrong-build-id' || reconcileKind === 'multi-gradle')
+
+        if (showEnriched) {
+          return (
+            <Box flexDirection="column" marginTop={1}>
+              <Alert variant="warning">
+                {reconcileKind === 'multi-gradle'
+                  ? 'Your project declares multiple Gradle applicationIds — pick the Play Store app you are building.'
+                  : 'None of your Play Store apps match the package your project builds. Which app are you building?'}
+              </Alert>
+              <Newline />
+              <Text dimColor>
+                Apps marked
+                {' '}
+                <Text color="green">✓ in Play Console</Text>
+                {' '}
+                already exist in your account. Pick one whose package differs from your build id to let Capgo rename the project for you.
+              </Text>
+              <Newline />
+              <Select
+                key={`android-pkg-verify-${gateActionSeq}`}
+                options={[
+                  ...verifyPlayApps.map(a => ({
+                    label: `✓ ${a.displayName || a.packageName} — ${a.packageName}  ·  in Play Console`,
+                    value: `play:${a.packageName}`,
+                  })),
+                  ...detectedPackageIds.map(id => ({
+                    label: `📦  ${id}  (from your Gradle config)`,
+                    value: `gradle:${id}`,
+                  })),
+                  { label: '✍️   Type a different package name', value: '__manual__' },
+                  { label: '➕  Create a new app in Play Console', value: '__create_new__' },
+                ]}
+                onChange={(value) => {
+                  // This <Select> stays mounted across the async persistAndStep
+                  // pick path, so bump the remount key to dodge the @inkjs/ui
+                  // onChange re-fire bug.
+                  setGateActionSeq(s => s + 1)
+                  if (value === '__manual__') {
+                    setPackageSelectMode('manual')
+                    return
+                  }
+                  if (value === '__create_new__') {
+                    setStep('android-app-verify-create-app')
+                    return
+                  }
+                  if (value.startsWith('play:')) {
+                    const pkg = value.slice('play:'.length)
+                    // A Play app whose package already matches a Gradle build id
+                    // is a valid target → pick it, no rename needed.
+                    if (detectedPackageIds.includes(pkg)) {
+                      pickAndroidPackageAndAdvance(pkg, 'gradle')
+                      return
+                    }
+                    // packageName != any build id → Path A (offer the rename).
+                    setVerifyChosenPlayApp(verifyPlayApps.find(a => a.packageName === pkg) ?? null)
+                    setStep('android-app-verify-rename')
+                    return
+                  }
+                  if (value.startsWith('gradle:'))
+                    pickAndroidPackageAndAdvance(value.slice('gradle:'.length), 'gradle')
+                }}
+              />
+            </Box>
+          )
+        }
+
+        // Fallback — today's plain Gradle-only picker. Used on the import path,
+        // the degraded generate path, when no reconcile result applies, and for
+        // the shared manual-entry mode. A banner explains a skipped verification.
+        return (
+          <Box flexDirection="column">
+            {(verifyImportSkipped || verifyDegraded) && packageSelectMode === 'choose' && (
+              <Box marginTop={1}>
+                <Alert variant="warning">
+                  {verifyImportSkipped
+                    ? 'App existence isn\'t verified on the imported-service-account path (it needs Google sign-in). Proceeding with the package from build.gradle — make sure it exists in Play Console.'
+                    : 'Couldn\'t verify your app against Play Console — proceeding with the package from build.gradle. Make sure it exists in Play Console.'}
+                </Alert>
+              </Box>
+            )}
+            <AndroidPackageSelectStep
+              dense={false}
+              androidDir={androidDir}
+              showChooser={detectedPackageIds.length > 0 && packageSelectMode === 'choose'}
+              detectedCount={detectedPackageIds.length}
+              detectedOptions={[
+                ...detectedPackageIds.map(id => ({
+                  label: `📦  ${id}`,
+                  value: id,
+                })),
+                { label: '✍️   Type a different package name', value: '__manual__' },
+              ]}
+              onChooseDetected={(value) => {
+                // Mode-switch path unmounts the <Select> synchronously, so the
+                // @inkjs/ui re-fire bug can't replay it. The package-pick path
+                // goes through async persistAndStep, which keeps the <Select>
+                // mounted long enough for the bug to spam — gate it with the
+                // per-step guard.
+                if (value === '__manual__') {
+                  setPackageSelectMode('manual')
+                  return
+                }
+                if (selectFiredRef.current)
+                  return
+                selectFiredRef.current = true
+                pickAndroidPackageAndAdvance(value, 'gradle')
+              }}
+              onSubmitManual={(val) => {
+                const name = val.trim()
+                if (!/^[a-z][\w]*(?:\.[a-z][\w]*)+$/i.test(name)) {
+                  setError(`"${name}" doesn't look like a valid Android package name (e.g. com.example.app).`)
+                  setRetryStep('android-package-select')
+                  setStep('error')
+                  return
+                }
+                pickAndroidPackageAndAdvance(name, detectedPackageIds.includes(name) ? 'gradle' : 'user-input')
+              }}
+            />
+          </Box>
+        )
+      })()}
+
+      {/* Path A — the chosen Play app's package differs from the build id. The
+          rename orchestration (Trapeze + cap sync + re-check) is a follow-up;
+          for now offer Back/Cancel. Routing + state are complete. */}
+      {step === 'android-app-verify-rename' && (
+        <Box flexDirection="column" marginTop={1}>
+          <Box flexDirection="column" borderStyle="round" borderColor="cyan" paddingX={1}>
+            <Text bold color="cyan">{`Build ID doesn't match "${verifyChosenPlayApp?.displayName || verifyChosenPlayApp?.packageName || 'the selected app'}"`}</Text>
+            <Newline />
+            <Text>
+              {'Your project builds '}
+              <Text bold color="red">{detectedPackageIds.join(', ') || '(no applicationId found)'}</Text>
+              {', but the Play Store app you picked is '}
+              <Text bold color="green">{verifyChosenPlayApp?.packageName ?? ''}</Text>
+              {'.'}
+            </Text>
+            <Text dimColor>Renaming your Android project to match is handled in a later step.</Text>
+          </Box>
+          <Newline />
+          <Select
+            key={`android-rename-${gateActionSeq}`}
+            options={[
+              { label: '↩  Back — pick a different app', value: 'back' },
+              { label: '❌ Cancel onboarding', value: 'cancel' },
+            ]}
+            onChange={(value) => {
+              setGateActionSeq(s => s + 1)
+              if (value === 'back') {
+                setVerifyChosenPlayApp(null)
+                setStep('android-package-select')
+                return
+              }
+              addLog('Exiting onboarding.', 'yellow')
+              exitOnboarding()
+            }}
+          />
+        </Box>
+      )}
+
+      {/* Path B — no Play app exists yet. Inform + allow proceed (never hard
+          gate): the Create-app click is the only manual step; the first build
+          uploads as a draft automatically. Re-check loader is a follow-up. */}
+      {step === 'android-app-verify-create-app' && (
+        <Box flexDirection="column" marginTop={1}>
+          <Box flexDirection="column" borderStyle="round" borderColor="cyan" paddingX={1}>
+            <Text bold color="cyan">Create your app in Play Console</Text>
+            <Newline />
+            <Text>
+              {'No Play Store app exists yet for '}
+              <Text bold color="cyan">{detectedPackageIds.join(', ') || 'your project'}</Text>
+              {'. Create it once in Play Console (the only manual step), then continue — Capgo Builder uploads the first build as a draft automatically.'}
+            </Text>
+            <Text dimColor>The Play Console API cannot create apps — this is a one-time manual step on the web.</Text>
+          </Box>
+          <Newline />
+          <Select
+            key={`android-create-${gateActionSeq}`}
+            options={[
+              { label: '🌐 Open Play Console to create this app', value: 'open' },
+              { label: '➡  I\'ve created it (or will) — continue', value: 'continue' },
+              ...(verifyPlayApps.length > 0 ? [{ label: '↩  Back — pick a different app', value: 'back' }] : []),
+              { label: '❌ Cancel onboarding', value: 'cancel' },
+            ]}
+            onChange={(value) => {
+              setGateActionSeq(s => s + 1)
+              if (value === 'open') {
+                void (async () => {
+                  try {
+                    await open('https://play.google.com/console')
+                  }
+                  catch {
+                    addLog('⚠ Could not open your browser. Visit https://play.google.com/console to create the app.', 'yellow')
+                  }
+                })()
+                return
+              }
+              if (value === 'back') {
+                setStep('android-package-select')
+                return
+              }
+              if (value === 'continue') {
+                // Inform-and-proceed (spec §5.5). A single clean build id → pick
+                // it and advance; 0 or many ids → return to the plain package
+                // picker so the user picks/types the package to grant access to.
+                if (detectedPackageIds.length === 1) {
+                  pickAndroidPackageAndAdvance(detectedPackageIds[0], 'gradle')
+                  return
+                }
+                setStep('android-package-select')
+                return
+              }
+              addLog('Exiting onboarding.', 'yellow')
+              exitOnboarding()
+            }}
+          />
+        </Box>
       )}
 
       {step === 'gcp-setup-running' && (

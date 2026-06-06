@@ -42,6 +42,12 @@ export type AndroidOnboardingStep
     | 'gcp-project-create-name'
   // Phase 4.5 — Pick the Android package name to grant SA access to
     | 'android-package-select'
+  // Phase 4.5 — App-existence verification (generate path): reconcile the Gradle
+  // applicationId against the user's real Play Store apps. Path A = the chosen
+  // Play app's package differs from the build id (offer a project rename); Path B
+  // = no Play app exists yet (open Play Console to create it).
+    | 'android-app-verify-rename'
+    | 'android-app-verify-create-app'
   // Phase 5 — Automated provisioning (create project if needed, enable API, SA, key, invite)
     | 'gcp-setup-running'
   // Phase 6 — Save + build
@@ -234,6 +240,8 @@ export const ANDROID_STEP_PROGRESS: Record<AndroidOnboardingStep, number> = {
   'gcp-project-create-name': 60,
 
   'android-package-select': 65,
+  'android-app-verify-rename': 66,
+  'android-app-verify-create-app': 66,
 
   'gcp-setup-running': 70,
 
@@ -310,6 +318,8 @@ export function getAndroidPhaseLabel(step: AndroidOnboardingStep): string {
     case 'gcp-projects-select':
     case 'gcp-project-create-name':
     case 'android-package-select':
+    case 'android-app-verify-rename':
+    case 'android-app-verify-create-app':
     case 'gcp-setup-running':
       return 'Step 3 of 4 · Google Cloud Project'
     case 'saving-credentials':

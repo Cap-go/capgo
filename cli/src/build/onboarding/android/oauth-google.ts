@@ -46,6 +46,14 @@ export interface GoogleOAuthConfig {
    */
   clientSecret?: string
   scopes: readonly string[]
+  /**
+   * Subset of `scopes` whose absence must FAIL sign-in. Any scope present in
+   * `scopes` but NOT listed here is *optional*: the user may deselect it on the
+   * consent screen and sign-in still succeeds (the feature relying on it is
+   * expected to degrade gracefully). Defaults to all of `scopes` when omitted,
+   * preserving the original "every requested scope is required" behavior.
+   */
+  requiredScopes?: readonly string[]
   /** Extra params to include on the auth URL (e.g. `login_hint`, `prompt`). */
   extraAuthParams?: Record<string, string>
 }
@@ -562,7 +570,13 @@ export async function runOAuthFlow(
     // the user gets a clear "please grant all permissions" message in BOTH
     // the browser tab and the CLI, instead of failing several API calls
     // later with confusing 403s.
-    const missing = findMissingScopes(tokens.scope, config.scopes)
+    //
+    // Only the REQUIRED scopes block sign-in. Optional scopes (in `scopes` but
+    // not in `requiredScopes`) may be declined — the caller is responsible for
+    // degrading gracefully when the granted token lacks them. Defaults to all
+    // requested scopes when `requiredScopes` is omitted.
+    const requiredScopes = config.requiredScopes ?? config.scopes
+    const missing = findMissingScopes(tokens.scope, requiredScopes)
     if (missing.length > 0) {
       finishResponse(scopeMissingHtml(missing), 400)
       throw new MissingScopesError(missing, tokens.scope)
