@@ -31,6 +31,7 @@ const app = ref<Database['public']['Tables']['apps']['Row']>()
 const events = ref<CompatibilityEventRow[]>([])
 const existingChannelIds = ref<Set<number>>(new Set())
 const existingVersionIds = ref<Set<number>>(new Set())
+const memberEmails = ref<Map<string, string>>(new Map())
 const showUnresolvedOnly = ref(true)
 
 const acceptDialogId = 'compatibility-accept-event'
@@ -174,10 +175,26 @@ function openBundle(versionId: number) {
   router.push(`/app/${encodeURIComponent(id.value)}/bundle/${versionId}`)
 }
 
+// Resolve accepting users' ids to emails via the org-members RPC (the users
+// table is self-read-only under RLS).
+async function loadMemberEmails() {
+  const orgId = app.value?.owner_org
+  const needsEmails = events.value.some(event => event.resolution_kind === 'accepted' && event.resolved_by !== null)
+  if (!orgId || !needsEmails)
+    return
+  const { data, error } = await supabase.rpc('get_org_members', { guild_id: orgId })
+  if (error) {
+    console.error('[Compatibility] Error loading org members:', error)
+    return
+  }
+  memberEmails.value = new Map((data ?? []).map(member => [member.uid, member.email]))
+}
+
 async function refreshData() {
   isLoading.value = true
   try {
     await Promise.all([loadAppInfo(), loadEvents()])
+    await loadMemberEmails()
   }
   catch (error) {
     console.error(error)
@@ -197,7 +214,9 @@ function resolutionLabel(event: CompatibilityEventRow): string {
     return note.length > 0 ? note : t('compatibility-resolution-auto')
 
   if (event.resolution_kind === 'accepted') {
-    const who = event.resolved_by ?? t('unknown')
+    const who = (event.resolved_by ? memberEmails.value.get(event.resolved_by) : undefined)
+      ?? event.resolved_by
+      ?? t('unknown')
     const acceptedBy = t('compatibility-accepted-by', { user: who })
     return note.length > 0 ? `${acceptedBy} — ${note}` : acceptedBy
   }
@@ -229,6 +248,7 @@ async function acknowledgeEvents(eventIds: number[], note: string) {
 
     toast.success(t('compatibility-status-resolved'))
     await loadEvents()
+    await loadMemberEmails()
   }
   catch (error) {
     console.error('[Compatibility] Error accepting events:', error)
