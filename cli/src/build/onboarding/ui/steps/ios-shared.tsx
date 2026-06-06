@@ -31,6 +31,7 @@ import type { AiResultKind } from '../components.js'
 //     this frame renders.
 import { Select } from '@inkjs/ui'
 import { Box, Newline, Text } from 'ink'
+import { pickAiPreviewTail } from '../../ai-fit.js'
 import React from 'react'
 import { AiResultBanner, ErrorLine, SpinnerLine, SuccessLine } from '../components.js'
 
@@ -138,33 +139,25 @@ export const AiAnalysisPromptStep: FC<AiAnalysisPromptStepProps> = ({ dense = fa
 )
 
 // ── ai-analysis-running ─────────────────────────────────────────────────────────
-// Fixed height of the live streaming preview (module-level constant per repo
-// naming rules — SCREAMING_SNAKE_CASE is reserved for module scope).
-const MAX_TAIL_LINES = 8
-
-export const AiAnalysisRunningStep: FC<{ streamText?: string }> = ({ streamText }) => {
-  // Live tail of the streaming analysis (pre-rendered ANSI from the parent).
-  //
-  // Flicker rules learned the hard way:
-  //   • FIXED height once streaming starts — a block that grows line-by-line
-  //     changes the frame height every flush, forcing Ink to re-layout the
-  //     whole alt-screen (reads as flashing). Pad to MAX_TAIL_LINES instead.
-  //   • ONE <Text> node for the whole tail — per-line nodes remount and
-  //     repaint; a single node lets Ink diff the text block in place.
-  //   • The "… earlier lines" marker row is always rendered (blank when
-  //     nothing is hidden) so its appearance never shifts layout.
+export const AiAnalysisRunningStep: FC<{ streamText?: string, terminalRows: number, terminalCols: number }> = ({ streamText, terminalRows, terminalCols }) => {
+  // Live tail of the streaming analysis (pre-rendered ANSI from the parent),
+  // sized to the ACTUAL viewport via the shared wrap-aware fit math in
+  // ai-fit.ts — no arbitrary cap; lines scroll off only when the terminal is
+  // genuinely out of rows. Flicker rules (learned the hard way):
+  //   • constant rendered height between flushes (helper blank-pads) — height
+  //     changes force Ink to re-layout the whole alt-screen frame;
+  //   • ONE <Text> node for the tail so Ink diffs the block in place;
+  //   • the "… earlier lines" marker row is always rendered (blank when
+  //     nothing is hidden) so it never pops in and shifts layout.
   // The result step owns full-text display with proper fit/scroll handling.
-  const lines = streamText ? streamText.split('\n') : []
-  const hidden = Math.max(0, lines.length - MAX_TAIL_LINES)
-  const tail = lines.slice(-MAX_TAIL_LINES).map(l => (l === '' ? ' ' : l))
-  while (tail.length > 0 && tail.length < MAX_TAIL_LINES) tail.push(' ')
+  const { rows, hidden } = pickAiPreviewTail(streamText ?? '', terminalRows, terminalCols)
   return (
     <Box flexDirection="column" marginTop={1}>
       <SpinnerLine text="Analyzing build log with Capgo AI..." />
-      {tail.length > 0 && (
+      {rows.length > 0 && (
         <Box flexDirection="column" marginTop={1}>
           <Text dimColor>{hidden > 0 ? `… ${hidden} earlier line${hidden === 1 ? '' : 's'}` : ' '}</Text>
-          <Text>{tail.join('\n')}</Text>
+          <Text>{rows.join('\n')}</Text>
         </Box>
       )}
     </Box>

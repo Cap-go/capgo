@@ -24,6 +24,54 @@
 // rendered inline, so a tight reserve here is safe.
 export const AI_RESULT_CHROME_ROWS = 10
 
+// Rows the ai-analysis-running frame spends AROUND the live streaming
+// preview: compact Header + outer padding + spinner line + the
+// "… N earlier lines" marker + margins. Tighter than AI_RESULT_CHROME_ROWS
+// because the running step has no caution text or retry/skip Select.
+export const AI_RUNNING_CHROME_ROWS = 8
+
+export interface AiPreviewTail {
+  /** Lines to render (blank-padded to a constant rendered height). */
+  rows: string[]
+  /** Logical lines scrolled off the top (0 ⇒ the marker row renders blank). */
+  hidden: number
+}
+
+/**
+ * Pick the visible tail of the live streaming analysis preview for the
+ * CURRENT terminal size.
+ *
+ * Wrap-aware: each logical line is budgeted as the rows it will actually
+ * occupy at `terminalCols` (via `estimateRenderedRows`), so the running frame
+ * can never grow past the viewport. The returned rows always sum to the same
+ * rendered height for a given terminal size (blank-padded) — a block whose
+ * height changes between flushes forces Ink to re-layout the whole
+ * alt-screen frame, which reads as flicker.
+ */
+export function pickAiPreviewTail(text: string, terminalRows: number, terminalCols: number): AiPreviewTail {
+  if (!text)
+    return { rows: [], hidden: 0 }
+  const budget = Math.max(4, Math.floor(terminalRows) - AI_RUNNING_CHROME_ROWS)
+  const lines = text.split('\n')
+  // Walk from the end, spending the row budget on wrap-aware line costs.
+  let rowsUsed = 0
+  let start = lines.length
+  while (start > 0) {
+    const cost = estimateRenderedRows(lines[start - 1] || ' ', terminalCols)
+    if (rowsUsed + cost > budget)
+      break
+    rowsUsed += cost
+    start--
+  }
+  const rows = lines.slice(start).map(l => (l === '' ? ' ' : l))
+  // Blank-pad to the full budget so the rendered height is constant.
+  while (rowsUsed < budget) {
+    rows.push(' ')
+    rowsUsed++
+  }
+  return { rows, hidden: start }
+}
+
 // ESC sequence used by `renderMarkdown` and `kleur`/`chalk` to color text.
 // The escape byte (0x1B) lives in a private-use region so the regex below
 // is exact even for input that includes literal '[' or 'm' bytes.
