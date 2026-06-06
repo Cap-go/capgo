@@ -12,6 +12,8 @@ with `swiftc` on first use. This:
 
 - requires Xcode Command Line Tools at runtime (hard failure without them),
 - adds a first-run compile delay and a dedicated "compiling helper" UI step,
+- compiles and executes a binary from source at runtime — a large, security-
+  sensitive code path (`compileSwiftHelper`, tmp-dir caching, atomic renames),
 - produces a fresh ad-hoc-signed binary per CLI version, so macOS Keychain
   "Always Allow" ACL decisions do **not** persist across CLI upgrades
   (ACLs are tied to the calling binary's code signature).
@@ -19,8 +21,9 @@ with `swiftc` on first use. This:
 ## Goal
 
 Ship precompiled, Developer-ID-signed, notarized helper binaries as separate
-macOS-only npm packages, resolved at runtime by the CLI, with the existing
-swiftc compile path retained as fallback.
+macOS-only npm packages, resolved and signature-verified at runtime by the
+CLI. The runtime swiftc compilation path is **removed entirely** — the CLI
+either runs a verified Capgo-signed binary or fails with clear guidance.
 
 ## Decisions (settled during brainstorming)
 
@@ -29,12 +32,12 @@ swiftc compile path retained as fallback.
 | Source location | New top-level `cli-helper/` dir in the capgo monorepo; **Swift source moves there** (`cli-helper/src/keychain-export.swift`) as single source of truth |
 | Package shape | Per-arch packages (esbuild style): `@capgo/cli-keychain-darwin-arm64`, `@capgo/cli-keychain-darwin-x64` |
 | Install mechanism | Both listed in `@capgo/cli` `optionalDependencies` with `^` range; `os`/`cpu` fields make npm/bun/pnpm install at most one |
-| Fallback | Keep existing chain: cached tmp binary → swiftc compile from bundled source (still requires Xcode CLT) |
+| Fallback | **None.** The runtime swiftc compile path and tmp-binary cache are deleted. Missing/unverifiable binary → hard error with install guidance |
 | Min macOS | x64 slice: macOS 10.15 (oldest macOS that runs Node 20, the CLI's floor); arm64 slice: macOS 11.0 |
 | Versioning | Independent semver, starting 1.0.0; release tag `cli-helper-X.Y.Z`; released **only when helper source changes**, not per CLI release |
 | Pipeline | Tag-triggered GitHub Actions workflow on `macos-latest`: build → codesign → notarize → verify → npm publish with provenance |
 | Signing | Developer ID Application certificate; hardened runtime + secure timestamp; notarized via `notarytool` with existing App Store Connect API key secrets |
-| Binary trust | CLI verifies the package-resolved binary's code signature (Developer ID + Capgo Team ID designated requirement) before executing it; failure falls through to swiftc with a warning |
+| Binary trust | CLI verifies the package-resolved binary's code signature (Developer ID + Capgo Team ID designated requirement) before executing it; failure is a hard error |
 | Env override | `CAPGO_KEYCHAIN_HELPER_PATH` exists in dev builds only — stripped from npm release builds via build-time define + dead-code elimination |
 
 ## Architecture
@@ -52,7 +55,7 @@ cli-helper/
 │   ├── build.sh                      # swiftc per-arch builds
 │   ├── sign-and-notarize.sh          # codesign + notarytool submit --wait
 │   └── prepare-publish.mjs           # stamps tag version, copies binaries into npm/*/
-└── README.md
+└── README.md                         # includes dev bootstrap instructions
 ```
 
 ### Package manifests
@@ -95,16 +98,18 @@ Runtime resolution order in `cli/src/build/onboarding/macos-signing.ts`:
    entirely: the published `dist/index.js` contains neither the branch nor the
    string `CAPGO_KEYCHAIN_HELPER_PATH` (CI asserts this — see Testing). Dev
    builds define it `true`. Rationale: an env-controlled executable path in
-   the release artifact is an arbitrary-binary-execution vector.
+   the release artifact is an arbitrary-binary-execution vector. This is also
+   the dev bootstrap path: before the npm packages exist (or when iterating on
+   the Swift source), developers compile locally with one documented `swiftc`
+   command and point the override at the result.
 2. Precompiled package:
    `createRequire(import.meta.url).resolve('@capgo/cli-keychain-darwin-' + archSuffix + '/keychain-export')`
-   where `archSuffix` maps `process.arch` `arm64`→`arm64`, `x64`→`x64`; any
-   other arch skips this step. Wrapped in try/catch; verify the file exists
-   and is executable, **then verify its code signature** (below) before use.
-   On hit: use directly (no tmp copy, no compile); `isHelperCached()` returns
-   true so the UI skips the "compiling helper" step.
-3. Cached tmp binary at `$TMPDIR/capgo-keychain-export-v{version}` (existing).
-4. swiftc compile from bundled `.swift` source (existing; needs Xcode CLT).
+   where `archSuffix` maps `process.arch` `arm64`→`arm64`, `x64`→`x64`.
+   Wrapped in try/catch; verify the file exists and is executable, **then
+   verify its code signature** (below) before use.
+3. Anything else — unsupported arch, package not installed, file missing, or
+   signature verification failure — is a **hard error** (see Error handling).
+   There is no compilation fallback.
 
 ### Signature verification of the precompiled binary
 
@@ -129,14 +134,24 @@ know the exact binary hash).
 - The Team ID is baked into the CLI source as a constant
   (`CAPGO_APPLE_TEAM_ID`), filled in during implementation from the Apple
   Developer account.
-- On verification failure (non-zero exit): log a warning naming the package
-  and path, skip the binary, and fall through to step 3/4 — local compilation
-  of the bundled, auditable source is the safe degradation.
+- On verification failure (non-zero exit): hard error identifying the package,
+  path, and codesign output. A binary that fails verification is never
+  executed and there is nothing to fall back to — this is the desired
+  security posture (possible tampering must stop the flow, not degrade it).
 - Cost: one `codesign` spawn (~tens of ms) per export invocation — negligible
   against the Keychain prompts that follow.
 - `helperPathOverride` (existing test-only option passed programmatically to
   `exportP12FromKeychain`) bypasses the signature check; it is not reachable
   from user input.
+
+### Code removed from the CLI
+
+- `compileSwiftHelper`, `ensureSwiftHelper`, `resolveSwiftSourcePath`, and the
+  tmp-dir binary cache (`compiledHelperPath`) in `macos-signing.ts`.
+- `precompileSwiftHelper` and `isHelperCached` exports, and the
+  "compiling helper" step in the onboarding UI that calls them.
+- The `.swift`-copy-into-`dist/` step in `cli/build.mjs` (source no longer
+  ships in the npm tarball).
 
 Build changes in `cli/build.mjs`:
 
@@ -145,14 +160,6 @@ Build changes in `cli/build.mjs`:
 - Add `define: { __CAPGO_ALLOW_HELPER_ENV_OVERRIDE__: 'false' }` to the
   release build (and `'true'` under `NODE_ENV=development`) so the env
   override is dead-code-eliminated from the npm artifact.
-- The `.swift` copy into `dist/` now sources from
-  `../cli-helper/src/keychain-export.swift`.
-
-Path updates for the source move:
-
-- `resolveSwiftSourcePath()` dev-mode candidate points at
-  `cli-helper/src/keychain-export.swift`.
-- Tests referencing the old path are updated.
 
 The helper's stdout contract (one line of JSON: `ok`, `p12Path`,
 `errorCode`, `osStatus`, …) is unchanged; `exportP12FromKeychain` parsing is
@@ -213,11 +220,18 @@ To do:
 
 ## Error handling
 
-- Each runtime resolution step falls through silently to the next — except a
-  **signature verification failure**, which falls through with a logged
-  warning (possible tampering is worth surfacing). Only when all steps fail
-  does the user see an error — the existing swiftc/Xcode-CLT message,
-  extended to mention reinstalling with optional dependencies enabled.
+- Helper resolution failures are **hard errors** with specific, actionable
+  messages:
+  - Package missing (e.g. installed with `--no-optional`, or pnpm config
+    skipping optional deps): name the exact package for the user's arch and
+    instruct reinstalling with optional dependencies enabled (or
+    `npm i @capgo/cli-keychain-darwin-<arch>` directly).
+  - Unsupported arch (`process.arch` not `arm64`/`x64`): state that no helper
+    exists for this architecture (covers no real Mac today).
+  - Signature verification failure: report package, path, and codesign
+    output; instruct reinstalling. Never executes the binary.
+- Release ordering: the CLI release that adds `optionalDependencies` and
+  removes the compile path ships **after** helper 1.0.0 is live on npm.
 - No partial publishes: both packages publish at the end of the workflow,
   after both binaries pass signing, notarization, and verification gates.
 - Notarization flakiness is contained to helper releases (rare), never blocks
@@ -225,12 +239,12 @@ To do:
 
 ## Testing
 
-- **Unit** (extend `cli/test/test-macos-signing.mjs`; cross-platform, no real
+- **Unit** (rework `cli/test/test-macos-signing.mjs`; cross-platform, no real
   Keychain): resolution order — env override wins in dev builds; fake package
-  dir resolves before swiftc path; missing package falls through;
-  non-executable file falls through; signature-check failure (mocked codesign
-  exit ≠ 0) falls through with warning; signature-check pass executes the
-  package binary.
+  dir resolves; missing package → hard error naming the arch package;
+  non-executable file → hard error; signature-check failure (mocked codesign
+  exit ≠ 0) → hard error, binary never spawned; signature-check pass executes
+  the package binary. Tests covering the deleted compile path are removed.
 - **Release-artifact assertion** (in `publish_cli.yml` after the build step):
   fail the CLI release if `dist/index.js` contains the string
   `CAPGO_KEYCHAIN_HELPER_PATH` — proves the env-override branch was
@@ -246,20 +260,21 @@ To do:
 - **Manual acceptance** (once per first release): npm-install a release
   candidate on a Mac, run the onboarding export flow, confirm no "compiling
   helper" step and successful P12 export; cover x64 via Intel Mac or Rosetta.
-- **Fallback regression**: install with `--no-optional`, confirm the swiftc
-  path still engages.
+- **Missing-package regression**: install with `--no-optional`, confirm the
+  export flow fails with the actionable install-guidance error (not a crash).
 
 ## Benefits recap
 
-- No Xcode CLT requirement for the overwhelmingly common path.
-- No first-run compile delay; "compiling helper" UI step disappears.
+- No Xcode Command Line Tools requirement — at all.
+- No first-run compile delay; "compiling helper" UI step deleted, along with
+  the entire runtime-compilation code path (less code, smaller attack surface).
 - Developer ID signature is stable across releases → Keychain "Always Allow"
   decisions persist across CLI upgrades (UX improvement over today).
-- npm provenance + notarization give a verifiable supply chain for a binary
-  that reads users' keychains.
+- The CLI only ever executes a binary whose Apple-validated signature chains
+  to Capgo's team — npm provenance + notarization + runtime requirement check
+  give a verifiable supply chain for a binary that reads users' keychains.
 
 ## Out of scope
 
-- Removing the swiftc fallback (revisit in a future major).
 - Stapling (impossible for bare executables; not needed for npm distribution).
 - Windows/Linux variants (helper is macOS-only by nature).
