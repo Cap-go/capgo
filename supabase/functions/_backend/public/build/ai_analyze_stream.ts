@@ -27,7 +27,10 @@ export async function aiAnalyzeStreamBuild(
   apikey: Database['public']['Tables']['apikeys']['Row'],
   logs: string,
 ): Promise<Response> {
-  const logsBytes = logs?.length ?? 0
+  // Byte-accurate size: logs.length counts UTF-16 code units, which undercounts
+  // multi-byte UTF-8 — a payload could pass a .length check while exceeding the
+  // 10 MB wire limit. Encode once and use real bytes for both the guard and telemetry.
+  const logsBytes = logs ? new TextEncoder().encode(logs).length : 0
 
   // 0. Size guard — spec §3.1: a body over the 10 MB limit is a 413 logs_too_big.
   // Checked BEFORE any DB work so the slot is never claimed for an oversized payload.
