@@ -29,16 +29,53 @@ const isLoading = ref(false)
 const app = ref<Database['public']['Tables']['apps']['Row']>()
 const events = ref<CompatibilityEventRow[]>([])
 const existingChannelIds = ref<Set<number>>(new Set())
-const showUnresolvedOnly = ref(false)
+const showUnresolvedOnly = ref(true)
 
 const acceptDialogId = 'compatibility-accept-event'
 const acceptReason = ref('')
-const acceptTargetId = ref<number | null>(null)
+const acceptTargetIds = ref<number[]>([])
 
-const visibleEvents = computed<CompatibilityEventRow[]>(() => {
+// One logical change can produce one event per platform (the channel may be the
+// default for ios, android and electron at once). Group those rows so the table
+// shows one entry per change, with the platforms as chips.
+interface CompatibilityEventGroup {
+  key: string
+  events: CompatibilityEventRow[]
+  platforms: string[]
+  unresolvedEvents: CompatibilityEventRow[]
+  representative: CompatibilityEventRow
+  resolved: boolean
+}
+
+const groupedEvents = computed<CompatibilityEventGroup[]>(() => {
+  const groups = new Map<string, CompatibilityEventRow[]>()
+  for (const event of events.value) {
+    const key = `${event.channel_id}|${event.current_version_id}|${event.previous_version_id}|${event.source}`
+    const members = groups.get(key)
+    if (members)
+      members.push(event)
+    else
+      groups.set(key, [event])
+  }
+  // `events` is ordered newest-first; the Map preserves first-seen order.
+  return [...groups.values()].map((members) => {
+    const sorted = [...members].sort((a, b) => a.platform.localeCompare(b.platform))
+    const unresolvedEvents = sorted.filter(event => !isResolved(event))
+    return {
+      key: String(sorted[0].id),
+      events: sorted,
+      platforms: sorted.map(event => event.platform),
+      unresolvedEvents,
+      representative: sorted[0],
+      resolved: unresolvedEvents.length === 0,
+    }
+  })
+})
+
+const visibleGroups = computed<CompatibilityEventGroup[]>(() => {
   if (showUnresolvedOnly.value)
-    return events.value.filter(event => !isResolved(event))
-  return events.value
+    return groupedEvents.value.filter(group => !group.resolved)
+  return groupedEvents.value
 })
 
 async function loadAppInfo() {
@@ -145,30 +182,32 @@ function openDependencyDiff(event: CompatibilityEventRow) {
   router.push(path)
 }
 
-async function acknowledgeEvent(eventId: number, note: string) {
+async function acknowledgeEvents(eventIds: number[], note: string) {
   try {
-    const { error } = await supabase.rpc('acknowledge_compatibility_event', {
-      event_id: eventId,
-      note,
-    })
+    for (const eventId of eventIds) {
+      const { error } = await supabase.rpc('acknowledge_compatibility_event', {
+        event_id: eventId,
+        note,
+      })
 
-    if (error) {
-      console.error('[Compatibility] Error accepting event:', error)
-      toast.error(t('compatibility-reason-required'))
-      return
+      if (error) {
+        console.error('[Compatibility] Error accepting event:', error)
+        toast.error(t('compatibility-reason-required'))
+        return
+      }
     }
 
     toast.success(t('compatibility-status-resolved'))
     await loadEvents()
   }
   catch (error) {
-    console.error('[Compatibility] Error accepting event:', error)
+    console.error('[Compatibility] Error accepting events:', error)
     toast.error(t('compatibility-reason-required'))
   }
 }
 
-function openAcceptDialog(event: CompatibilityEventRow) {
-  acceptTargetId.value = event.id
+function openAcceptDialog(group: CompatibilityEventGroup) {
+  acceptTargetIds.value = group.unresolvedEvents.map(event => event.id)
   acceptReason.value = ''
 
   dialogStore.openDialog({
@@ -192,11 +231,11 @@ function openAcceptDialog(event: CompatibilityEventRow) {
             toast.error(t('compatibility-reason-required'))
             return false
           }
-          const targetId = acceptTargetId.value
-          if (targetId == null)
+          const targetIds = acceptTargetIds.value
+          if (targetIds.length === 0)
             return
           dialogStore.closeDialog({ text: t('compatibility-accept'), role: 'primary' })
-          await acknowledgeEvent(targetId, note)
+          await acknowledgeEvents(targetIds, note)
         },
       },
     ],
@@ -238,7 +277,7 @@ watchEffect(async () => {
 
             <!-- Empty state -->
             <div
-              v-if="!isLoading && visibleEvents.length === 0"
+              v-if="!isLoading && visibleGroups.length === 0"
               class="flex flex-col items-center justify-center py-16 text-center border rounded-lg border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-900/40"
             >
               <IconCheckCircle class="w-12 h-12 mb-4 text-emerald-500" />
@@ -286,57 +325,66 @@ watchEffect(async () => {
                 </thead>
                 <tbody>
                   <tr
-                    v-for="event in visibleEvents"
-                    :key="event.id"
+                    v-for="group in visibleGroups"
+                    :key="group.key"
                     data-test="compatibility-row"
-                    :data-event-id="event.id"
+                    :data-event-id="group.representative.id"
+                    :data-event-ids="group.events.map(event => event.id).join(',')"
                     class="border-t border-slate-200 dark:border-slate-700"
                   >
                     <td class="px-4 py-3 text-slate-700 dark:text-slate-200">
-                      {{ platformLabel(event.platform) }}
+                      <div class="flex flex-wrap gap-1">
+                        <span
+                          v-for="platform in group.platforms"
+                          :key="platform"
+                          class="px-2 py-0.5 text-xs rounded bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300"
+                        >
+                          {{ platformLabel(platform) }}
+                        </span>
+                      </div>
                     </td>
                     <td class="px-4 py-3 text-slate-700 dark:text-slate-200">
                       <button
-                        v-if="event.channel_id !== null && existingChannelIds.has(event.channel_id)"
+                        v-if="group.representative.channel_id !== null && existingChannelIds.has(group.representative.channel_id)"
                         type="button"
                         class="text-blue-600 underline-offset-2 hover:underline dark:text-blue-400"
                         data-test="compatibility-channel-link"
-                        @click="openChannel(event)"
+                        @click="openChannel(group.representative)"
                       >
-                        {{ event.channel_name }}
+                        {{ group.representative.channel_name }}
                       </button>
-                      <span v-else>{{ event.channel_name }}</span>
+                      <span v-else>{{ group.representative.channel_name }}</span>
                     </td>
                     <td class="px-4 py-3 font-mono text-xs text-slate-700 dark:text-slate-200">
-                      {{ bundleLabel(event.current_version_name) }}
+                      {{ bundleLabel(group.representative.current_version_name) }}
                     </td>
                     <td class="px-4 py-3 font-mono text-xs text-slate-700 dark:text-slate-200">
-                      {{ bundleLabel(event.previous_version_name) }}
+                      {{ bundleLabel(group.representative.previous_version_name) }}
                     </td>
                     <td class="px-4 py-3">
-                      <div v-if="event.offenders && event.offenders.length > 0" class="flex flex-wrap gap-1" :title="event.offenders.join(', ')">
+                      <div v-if="group.representative.offenders && group.representative.offenders.length > 0" class="flex flex-wrap gap-1" :title="group.representative.offenders.join(', ')">
                         <span
-                          v-for="offender in event.offenders.slice(0, 3)"
+                          v-for="offender in group.representative.offenders.slice(0, 3)"
                           :key="offender"
                           class="px-2 py-0.5 text-xs rounded bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-200"
                         >
                           {{ offender }}
                         </span>
                         <span
-                          v-if="event.offenders.length > 3"
+                          v-if="group.representative.offenders.length > 3"
                           class="px-2 py-0.5 text-xs rounded bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-300"
                         >
-                          {{ t('compatibility-offenders-more', { count: event.offenders.length - 3 }) }}
+                          {{ t('compatibility-offenders-more', { count: group.representative.offenders.length - 3 }) }}
                         </span>
                       </div>
                       <span v-else class="text-slate-400">—</span>
                     </td>
                     <td class="px-4 py-3 whitespace-nowrap text-slate-500 dark:text-slate-400">
-                      {{ formatLocalDateTime(event.created_at) }}
+                      {{ formatLocalDateTime(group.representative.created_at) }}
                     </td>
                     <td class="px-4 py-3">
                       <span
-                        v-if="!isResolved(event)"
+                        v-if="!group.resolved"
                         class="px-2 py-0.5 text-xs font-medium rounded-full bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200"
                       >
                         {{ t('compatibility-status-unresolved') }}
@@ -346,26 +394,26 @@ watchEffect(async () => {
                           {{ t('compatibility-status-resolved') }}
                         </span>
                         <span class="text-xs text-slate-500 dark:text-slate-400">
-                          {{ resolutionLabel(event) }}
+                          {{ resolutionLabel(group.representative) }}
                         </span>
                       </div>
                     </td>
                     <td class="px-4 py-3 text-right whitespace-nowrap">
                       <div class="flex items-center justify-end gap-2">
                         <button
-                          v-if="dependencyDiffPath(id, event)"
+                          v-if="dependencyDiffPath(id, group.representative)"
                           data-test="compatibility-diff-link"
                           class="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-md text-blue-600 hover:bg-blue-50 dark:text-blue-300 dark:hover:bg-blue-900/30"
-                          @click="openDependencyDiff(event)"
+                          @click="openDependencyDiff(group.representative)"
                         >
                           <IconExternalLink class="w-3.5 h-3.5" />
                           {{ t('compatibility-view-dependency-diff') }}
                         </button>
                         <button
-                          v-if="!isResolved(event)"
+                          v-if="!group.resolved"
                           data-test="compatibility-accept"
                           class="inline-flex items-center px-3 py-1 text-xs font-medium text-white rounded-md bg-amber-600 hover:bg-amber-700"
-                          @click="openAcceptDialog(event)"
+                          @click="openAcceptDialog(group)"
                         >
                           {{ t('compatibility-accept') }}
                         </button>
