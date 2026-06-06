@@ -2050,6 +2050,9 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
           triggeredBy: 'onboarding',
         }).catch(() => { /* telemetry never breaks the wizard */ })
 
+        // Reset any stale preview from a previous attempt BEFORE streaming
+        // starts — retries re-enter this step and must not flash old content.
+        setAiStreamPreview('')
         // Stream the analysis into a throttled ANSI preview: each completed
         // markdown line is rendered (same renderer as the plain CLI) and the
         // accumulated text is flushed to state at most every 250ms.
@@ -2072,11 +2075,18 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
           onChunk: t => mdStream.feed(t),
         })
 
+        // Publish the complete preview: flush renders the trailing partial
+        // line (it may re-arm the publish timer via the write callback, so
+        // flush FIRST, then cancel the timer, then set state once). The
+        // result step replaces this in the same React batch; the reset at
+        // the top of this block keeps retries clean.
+        mdStream.flush()
         if (previewFlushTimer) {
           clearTimeout(previewFlushTimer)
           previewFlushTimer = null
         }
-        setAiStreamPreview('')
+        if (!cancelled)
+          setAiStreamPreview(streamedAnsi)
 
         if (cancelled)
           return

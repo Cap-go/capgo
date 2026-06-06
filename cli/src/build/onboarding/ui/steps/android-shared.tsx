@@ -256,6 +256,10 @@ export const AiAnalysisPromptStep: FC<AiAnalysisPromptStepProps> = ({ onChoose, 
 // ── ai-analysis-running (spinner) ─────────────────────────────────────────────
 // Single spinner line — identical comfortable / dense.
 
+// Fixed height of the live streaming preview (module-level constant per repo
+// naming rules — SCREAMING_SNAKE_CASE is reserved for module scope).
+const MAX_TAIL_LINES = 8
+
 export const AiAnalysisRunningStep: FC<{ streamText?: string }> = ({ streamText }) => {
   // Live tail of the streaming analysis (pre-rendered ANSI from the parent).
   //
@@ -268,7 +272,6 @@ export const AiAnalysisRunningStep: FC<{ streamText?: string }> = ({ streamText 
   //   • The "… earlier lines" marker row is always rendered (blank when
   //     nothing is hidden) so its appearance never shifts layout.
   // The result step owns full-text display with proper fit/scroll handling.
-  const MAX_TAIL_LINES = 8
   const lines = streamText ? streamText.split('\n') : []
   const hidden = Math.max(0, lines.length - MAX_TAIL_LINES)
   const tail = lines.slice(-MAX_TAIL_LINES).map(l => (l === '' ? ' ' : l))
