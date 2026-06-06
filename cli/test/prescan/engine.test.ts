@@ -2,6 +2,7 @@
 import { describe, expect, it } from 'bun:test'
 import { decideOutcome, runPrescan } from '../../src/build/prescan/engine'
 import type { PrescanCheck, ScanContext } from '../../src/build/prescan/types'
+import { makeP12, makeProfileXmlWithCert, makeProject } from './helpers'
 
 const baseCtx = { appId: 'com.demo.app', platform: 'ios', projectDir: '/tmp/none' } as ScanContext
 
@@ -64,5 +65,17 @@ describe('decideOutcome', () => {
   it('blocks warnings with failOnWarnings', () => expect(decideOutcome(report(0, 1), { failOnWarnings: true })).toBe('block'))
   it('ignoreFatal always proceeds', () => {
     expect(decideOutcome(report(5, 5), { ignoreFatal: true })).toBe('proceed')
+  })
+})
+
+describe('fixture helpers', () => {
+  it('makeProject writes nested files', () => {
+    const dir = makeProject({ 'a/b/c.txt': 'hi' })
+    expect(require('node:fs').readFileSync(`${dir}/a/b/c.txt`, 'utf8')).toBe('hi')
+  })
+  it('makeP12 produces an openable p12 with a sha1', () => {
+    const p12 = makeP12()
+    expect(p12.sha1).toMatch(/^[0-9a-f]{40}$/)
+    expect(makeProfileXmlWithCert(p12)).toContain('DeveloperCertificates')
   })
 })
