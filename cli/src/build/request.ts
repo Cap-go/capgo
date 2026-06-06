@@ -1688,7 +1688,9 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
           failOnWarnings: options.failOnWarnings,
           silent,
         },
-        () => executePrescan(appId, {
+        // The gate only needs the report; the apikey in PrescanExecution is for
+        // the standalone command's telemetry (request.ts sends its own events).
+        async () => (await executePrescan(appId, {
           platform,
           path: projectDir,
           apikey: options.apikey,
@@ -1696,7 +1698,7 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
           iosDist: options.iosDistribution,
           supaHost: options.supaHost,
           supaAnon: options.supaAnon,
-        }),
+        })).report,
       )
       if (gate === 'block') {
         await sendEvent(options.apikey, {

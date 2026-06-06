@@ -4,7 +4,7 @@ import type { Database } from '../../types/supabase.types'
 import type { OutcomeOptions, Platform, PrescanReport, Severity } from './types'
 import { cwd, exit } from 'node:process'
 import { intro, log, outro } from '@clack/prompts'
-import { createSupabaseClient, findSavedKey } from '../../utils'
+import { createSupabaseClient, findSavedKey, sendEvent } from '../../utils'
 import { buildScanContext } from './context'
 import { decideOutcome, runPrescan } from './engine'
 import { resolveWarningGate } from './prompt'
@@ -40,8 +40,14 @@ export function exitCodeFor(counts: Record<Severity, number>, opts: OutcomeOptio
   return 0
 }
 
+export interface PrescanExecution {
+  report: PrescanReport
+  /** apikey actually used for the scan (flag or saved key); undefined when remote checks were skipped */
+  apikey?: string
+}
+
 /** Shared scan runner used by both the standalone command and build request's gate. */
-export async function executePrescan(appId: string | undefined, options: PrescanCommandOptions): Promise<PrescanReport> {
+export async function executePrescan(appId: string | undefined, options: PrescanCommandOptions): Promise<PrescanExecution> {
   const platform = options.platform as Platform
   if (platform !== 'ios' && platform !== 'android')
     throw new Error('--platform must be ios or android')
@@ -61,14 +67,15 @@ export async function executePrescan(appId: string | undefined, options: Prescan
     apikey,
     supabase,
   })
-  return runPrescan(ctx, ALL_CHECKS)
+  const report = await runPrescan(ctx, ALL_CHECKS)
+  return { report, apikey }
 }
 
 export async function prescanCommand(appId: string | undefined, options: PrescanCommandOptions): Promise<void> {
   validateFlags(options)
   if (!options.json)
     intro('Capgo build prescan')
-  const report = await executePrescan(appId, options)
+  const { report, apikey: apikeyUsedForScan } = await executePrescan(appId, options)
   if (options.json) {
     console.log(renderJsonReport(report))
   }
@@ -76,6 +83,21 @@ export async function prescanCommand(appId: string | undefined, options: Prescan
     log.message(renderTerminalReport(report, { verbose: options.verbose }))
     const outcome = decideOutcome(report, options)
     outro(outcome === 'block' ? 'Prescan found blocking problems — fix them before building.' : 'Prescan finished.')
+  }
+  if (apikeyUsedForScan) {
+    await sendEvent(apikeyUsedForScan, {
+      channel: 'build',
+      event: 'Prescan run',
+      icon: '🛡️',
+      tags: {
+        'app-id': appId ?? 'unknown',
+        'platform': options.platform ?? 'unknown',
+        'errors': String(report.counts.error),
+        'warnings': String(report.counts.warning),
+        'finding-ids': report.findings.filter(f => f.severity !== 'info').map(f => f.id).join(',').slice(0, 200),
+      },
+      notify: false,
+    }, options.verbose).catch(() => {})
   }
   exit(exitCodeFor(report.counts, options))
 }
