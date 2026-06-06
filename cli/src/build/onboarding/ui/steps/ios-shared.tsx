@@ -31,6 +31,7 @@ import type { AiResultKind } from '../components.js'
 //     this frame renders.
 import { Select } from '@inkjs/ui'
 import { Box, Newline, Text } from 'ink'
+import { pickAiPreviewTail } from '../../ai-fit.js'
 import React from 'react'
 import { AiResultBanner, ErrorLine, SpinnerLine, SuccessLine } from '../components.js'
 
@@ -138,11 +139,30 @@ export const AiAnalysisPromptStep: FC<AiAnalysisPromptStepProps> = ({ dense = fa
 )
 
 // ── ai-analysis-running ─────────────────────────────────────────────────────────
-export const AiAnalysisRunningStep: FC = () => (
-  <Box flexDirection="column" marginTop={1}>
-    <SpinnerLine text="Analyzing build log with Capgo AI..." />
-  </Box>
-)
+export const AiAnalysisRunningStep: FC<{ streamText?: string, terminalRows: number, terminalCols: number }> = ({ streamText, terminalRows, terminalCols }) => {
+  // Live tail of the streaming analysis (pre-rendered ANSI from the parent),
+  // sized to the ACTUAL viewport via the shared wrap-aware fit math in
+  // ai-fit.ts — no arbitrary cap; lines scroll off only when the terminal is
+  // genuinely out of rows. Flicker rules (learned the hard way):
+  //   • height only ever GROWS (text appends; the helper caps at the viewport
+  //     budget) — no padding, so the frame starts compact like other steps;
+  //   • ONE <Text> node for the tail so Ink diffs the block in place;
+  //   • the "… earlier lines" marker row is always rendered (blank when
+  //     nothing is hidden) so it never pops in and shifts layout.
+  // The result step owns full-text display with proper fit/scroll handling.
+  const { rows, hidden } = pickAiPreviewTail(streamText ?? '', terminalRows, terminalCols)
+  return (
+    <Box flexDirection="column" marginTop={1}>
+      <SpinnerLine text="Analyzing build log with Capgo AI..." />
+      {rows.length > 0 && (
+        <Box flexDirection="column" marginTop={1}>
+          <Text dimColor>{hidden > 0 ? `… ${hidden} earlier line${hidden === 1 ? '' : 's'}` : ' '}</Text>
+          <Text>{rows.join('\n')}</Text>
+        </Box>
+      )}
+    </Box>
+  )
+}
 
 // ── ai-analysis-result ──────────────────────────────────────────────────────────
 // Renders the diagnosis (or fallback banner), then a retry/skip Select. The
