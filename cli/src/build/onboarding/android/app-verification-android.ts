@@ -62,6 +62,12 @@ export function reconcileAndroidApp(input: ReconcileAndroidAppInput): AndroidRec
   // Single Gradle id (or none): defer to the shared iOS classifier.
   if (gradleIds.length <= 1) {
     const releaseBundleId = gradleIds[0] ?? ''
+    // Defensive: with no usable Gradle id there is nothing to match — never
+    // let an empty string "exact-match" (e.g. a malformed Play row that lost
+    // its packageName). Apps exist → the enriched picker (wrong-build-id);
+    // none → Path B (no-app).
+    if (!releaseBundleId)
+      return apps.length > 0 ? { kind: 'wrong-build-id' } : { kind: 'no-app' }
     const { result } = classifyAppVerification({
       releaseBundleId,
       apps: ascApps,

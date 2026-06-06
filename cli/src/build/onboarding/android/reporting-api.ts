@@ -24,18 +24,23 @@ export interface PlayApp {
 
 /**
  * Parse an `apps:search` response into {@link PlayApp} records. Tolerant of a
- * missing `apps` array and of individual apps missing `packageName` /
- * `displayName` — Google omits fields rather than nulling them, and a malformed
- * page must never throw into the wizard (the whole feature degrades gracefully).
+ * missing `apps` array and of individual apps missing `displayName` — Google
+ * omits fields rather than nulling them, and a malformed page must never throw
+ * into the wizard (the whole feature degrades gracefully).
  *
- * Mirrors iOS `parseAppsResponse`: maps every entry without dropping partial
- * ones, so the caller sees exactly what the API returned.
+ * Entries missing `packageName` are DROPPED: the package is the join key for
+ * reconciliation, and letting an empty one through could spuriously
+ * "exact-match" a project whose Gradle parse found no applicationId. The API
+ * documents `packageName` as always present, so this only guards malformed
+ * pages.
  */
 export function parseAppsSearchResponse(json: any): PlayApp[] {
-  return (json?.apps || []).map((app: any): PlayApp => ({
-    packageName: app?.packageName || '',
-    displayName: app?.displayName || '',
-  }))
+  return (json?.apps || []).flatMap((app: any): PlayApp[] => {
+    const packageName = typeof app?.packageName === 'string' ? app.packageName : ''
+    if (!packageName)
+      return []
+    return [{ packageName, displayName: app?.displayName || '' }]
+  })
 }
 
 /**

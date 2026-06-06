@@ -586,6 +586,22 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
   const [renamePhase, setRenamePhase] = useState<RenamePhase>('menu')
   const [renameOutput, setRenameOutput] = useState<string[]>([])
   const renameTmpDirRef = useRef<string | null>(null)
+  // Generation counter for the verify/rename/create-app async flows. They run
+  // from render-scope handlers (not the step effect), so they can't see the
+  // effect's `cancelled` flag: each op captures the epoch at entry and bails
+  // before its state writes if it moved. Bumped when the step leaves the
+  // verify family (see the per-step ref resets) and on unmount, so a stale
+  // npm-install / re-check can never write state or advance the wizard.
+  const verifyAsyncEpochRef = useRef(0)
+  useEffect(() => () => {
+    verifyAsyncEpochRef.current++
+  }, [])
+  // Render-scope async ops (doRename / recheckBuildId) read the Play apps via
+  // a ref so a long-running rename never acts on a stale closure snapshot.
+  const verifyPlayAppsRef = useRef<PlayApp[]>([])
+  useEffect(() => {
+    verifyPlayAppsRef.current = verifyPlayApps
+  }, [verifyPlayApps])
 
   // Phase 5 — provisioning status stream
   const [setupStatus, setSetupStatus] = useState<string[]>([])
@@ -1192,6 +1208,16 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
       saPickerOpenedRef.current = false
     if (step !== 'sa-json-validating')
       validationStartedRef.current = false
+    // Returning to the package picker (Path A "Back", Path B routes back) must
+    // re-detect Gradle ids + re-fetch Play apps — a failed/partial rename may
+    // have changed build.gradle since the first visit.
+    if (step !== 'android-package-select')
+      packageLoadedRef.current = false
+    // Leaving the verify family invalidates its in-flight render-scope async
+    // ops (they check this epoch before their state writes — see
+    // `verifyAsyncEpochRef`).
+    if (step !== 'android-package-select' && step !== 'android-app-verify-rename' && step !== 'android-app-verify-create-app')
+      verifyAsyncEpochRef.current++
     // Reset the @inkjs/ui Select re-fire guard on every step transition so each
     // new step gets a clean slate. See the JSDoc on `selectFiredRef`.
     selectFiredRef.current = false
@@ -3340,10 +3366,15 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
         // re-reconcile, advance. NEVER claims false success — an unverified
         // rename surfaces the script output + a manual fallback.
         const doRename = async (tmpDir: string, studioWaitMs: number) => {
+          const epoch = verifyAsyncEpochRef.current
           const projectCwd = process.cwd()
           setRenamePhase('renaming')
           const renameRun = await runCapture('node', [join(tmpDir, 'rename.mjs'), target], projectCwd)
           const freshIds = await findAndroidApplicationIds(androidDir)
+          if (verifyAsyncEpochRef.current !== epoch) {
+            await rm(tmpDir, { recursive: true, force: true }).catch(() => { /* best-effort cleanup */ })
+            return
+          }
           setDetectedPackageIds(freshIds)
           if (!verifyRenamed(freshIds, target)) {
             const tail = renameRun.output.trim()
@@ -3361,6 +3392,10 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
           // non-zero exit is surfaced but non-fatal (spec §5.4).
           setRenamePhase('syncing')
           const sync = await runCapture(npxCmd, ['cap', 'sync'], projectCwd)
+          if (verifyAsyncEpochRef.current !== epoch) {
+            await rm(tmpDir, { recursive: true, force: true }).catch(() => { /* best-effort cleanup */ })
+            return
+          }
           const capSyncOk = sync.code === 0
           if (!capSyncOk)
             addLog('⚠ npx cap sync reported an issue — review it later if the build misbehaves; continuing.', 'yellow')
@@ -3373,10 +3408,13 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
             studio_wait_ms: studioWaitMs,
           })
           setRenamePhase('rechecking')
-          const result = reconcileAndroidApp({ gradleIds: freshIds, apps: verifyPlayApps })
+          // Read via the ref — the closure snapshot can be stale by the time a
+          // long npm-install / cap-sync completes (see verifyPlayAppsRef).
+          const playApps = verifyPlayAppsRef.current
+          const result = reconcileAndroidApp({ gradleIds: freshIds, apps: playApps })
           setVerifyReconcile(result)
           if (result.kind === 'exact-match') {
-            const matched = verifyPlayApps.find(a => a.packageName === result.packageName)
+            const matched = playApps.find(a => a.packageName === result.packageName)
             addLog(`✔ Building "${matched?.displayName || target}" (${target}) — matches your Play Store app.`)
             pickAndroidPackageAndAdvance(result.packageName, 'gradle')
             return
@@ -3391,6 +3429,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
         // Prepare the temp workspace (mkdtemp + write files + npm install), then
         // run the close-Android-Studio gate, then doRename. Explicit opt-in only.
         const startRename = async () => {
+          const epoch = verifyAsyncEpochRef.current
           setRenameOutput([])
           setRenamePhase('preparing')
           let tmpDir: string
@@ -3401,11 +3440,17 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
             await writeFile(join(tmpDir, 'rename.mjs'), renameMjs)
           }
           catch (e) {
+            if (verifyAsyncEpochRef.current !== epoch)
+              return
             setRenameOutput([`Couldn't prepare the renamer workspace: ${e instanceof Error ? e.message : String(e)}`])
             setRenamePhase('failed')
             return
           }
           const install = await runCapture(npmCmd, ['install'], tmpDir)
+          if (verifyAsyncEpochRef.current !== epoch) {
+            await rm(tmpDir, { recursive: true, force: true }).catch(() => { /* best-effort cleanup */ })
+            return
+          }
           if (install.code !== 0) {
             const tail = install.output.trim().split('\n').slice(-8).join('\n')
             setRenameOutput([
@@ -3425,10 +3470,14 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
             const startedAt = Date.now()
             for (let i = 0; i < MAX_STUDIO_POLLS; i++) {
               const probe = await runCapture('pgrep', ['-f', 'Android Studio'])
+              if (verifyAsyncEpochRef.current !== epoch)
+                return
               if (isAndroidStudioRunning('darwin', probe.output) !== 'running')
                 break
               await sleep(STUDIO_POLL_MS)
             }
+            if (verifyAsyncEpochRef.current !== epoch)
+              return
             await doRename(tmpDir, Date.now() - startedAt)
             return
           }
@@ -3438,18 +3487,22 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
         // "I'll fix build.gradle myself — re-check": re-read Gradle ids and
         // reconcile without renaming anything.
         const recheckBuildId = async () => {
+          const epoch = verifyAsyncEpochRef.current
           setRenamePhase('rechecking')
           const freshIds = await findAndroidApplicationIds(androidDir)
+          if (verifyAsyncEpochRef.current !== epoch)
+            return
+          const playApps = verifyPlayAppsRef.current
           setDetectedPackageIds(freshIds)
-          const result = reconcileAndroidApp({ gradleIds: freshIds, apps: verifyPlayApps })
+          const result = reconcileAndroidApp({ gradleIds: freshIds, apps: playApps })
           setVerifyReconcile(result)
           trackVerifyEvent('Android App Verify Result', '🔎', {
             result: result.kind,
-            app_count: verifyPlayApps.length,
+            app_count: playApps.length,
             gradle_id_count: freshIds.length,
           })
           if (result.kind === 'exact-match') {
-            const matched = verifyPlayApps.find(a => a.packageName === result.packageName)
+            const matched = playApps.find(a => a.packageName === result.packageName)
             addLog(`✔ Building "${matched?.displayName || result.packageName}" (${result.packageName}) — matches your Play Store app.`)
             pickAndroidPackageAndAdvance(result.packageName, 'gradle')
             return
@@ -3527,7 +3580,16 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
                 onChange={(value) => {
                   setGateActionSeq(s => s + 1)
                   if (value === 'continue') {
-                    void doRename(renameTmpDirRef.current ?? '', 0)
+                    // startRename always sets the workspace ref before this
+                    // screen renders — if it's somehow gone, fail honestly
+                    // instead of running `node rename.mjs` against ''.
+                    const tmpDir = renameTmpDirRef.current
+                    if (!tmpDir) {
+                      setRenameOutput(['Internal error: the rename workspace was lost — use the manual steps below, or go Back and retry.'])
+                      setRenamePhase('failed')
+                      return
+                    }
+                    void doRename(tmpDir, 0)
                     return
                   }
                   addLog('Exiting onboarding.', 'yellow')
@@ -3659,19 +3721,29 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
             pickAndroidPackageAndAdvance(detectedPackageIds[0], 'gradle')
             return
           }
+          // "Continue anyway" must land on the PLAIN picker — mark the package
+          // step as already-loaded so its effect doesn't re-fetch, re-reconcile
+          // to no-app, and bounce straight back to this screen.
+          packageLoadedRef.current = true
           setStep('android-package-select')
         }
 
         // Open Play Console's app list so the user clicks "Create app" (the only
         // irreducible manual step). Asked before RE-opening on later attempts.
         const openCreatePlayConsole = async () => {
+          const epoch = verifyAsyncEpochRef.current
           trackVerifyEvent('Android App Verify Create App Opened', '🌐', { attempt: verifyAttempt })
+          let openFailed = false
           try {
             await open('https://play.google.com/console')
           }
           catch {
-            addLog('⚠ Could not open your browser. Visit https://play.google.com/console to create the app.', 'yellow')
+            openFailed = true
           }
+          if (verifyAsyncEpochRef.current !== epoch)
+            return
+          if (openFailed)
+            addLog('⚠ Could not open your browser. Visit https://play.google.com/console to create the app.', 'yellow')
           setVerifyAskReopen(false)
         }
 
@@ -3679,13 +3751,16 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
         // clean match advances; apps that now exist (but the build id doesn't
         // match) route to the enriched picker; otherwise ask before re-opening.
         const recheckCreateApp = async () => {
+          const epoch = verifyAsyncEpochRef.current
           setVerifyRechecking(true)
           const attempt = verifyAttempt + 1
           try {
             const gradleIds = await findAndroidApplicationIds(androidDir)
-            setDetectedPackageIds(gradleIds)
             const token = await ensureAccessToken()
             const apps = await listPlayApps(token)
+            if (verifyAsyncEpochRef.current !== epoch)
+              return
+            setDetectedPackageIds(gradleIds)
             setVerifyPlayApps(apps)
             const result = reconcileAndroidApp({ gradleIds, apps })
             setVerifyReconcile(result)
@@ -3711,6 +3786,8 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
             setVerifyAskReopen(true)
           }
           catch (err) {
+            if (verifyAsyncEpochRef.current !== epoch)
+              return
             setVerifyAttempt(attempt)
             setVerifyAskReopen(true)
             const why = err instanceof ReportingApiHttpError && err.status === 403
@@ -3719,6 +3796,10 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
             addLog(`⚠ Couldn't re-check Play Console — ${why}. You can still continue.`, 'yellow')
           }
           finally {
+            // Deliberately NOT epoch-guarded: leaving the step mid-flight must
+            // still clear the spinner flag, or a later return to this screen
+            // would show a stale loader forever (React drops the write
+            // harmlessly if the component already unmounted).
             setVerifyRechecking(false)
           }
         }

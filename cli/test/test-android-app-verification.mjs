@@ -93,4 +93,17 @@ t('reconcileAndroidApp returns wrong-build-id when there are no gradle ids but a
   assert.deepEqual(result, { kind: 'wrong-build-id' })
 })
 
+t('reconcileAndroidApp never exact-matches an empty string against a malformed empty-packageName app', () => {
+  // Defensive pairing for the parser's drop-empty-packageName rule: even if a
+  // packageName-less row reaches reconcile directly, an empty Gradle id must
+  // not "match" it and silently persist an empty package.
+  const result = reconcileAndroidApp({ gradleIds: [], apps: [app('')] })
+  assert.deepEqual(result, { kind: 'wrong-build-id' })
+})
+
+t('reconcileAndroidApp returns wrong-build-id for an empty single gradle id with real apps', () => {
+  const result = reconcileAndroidApp({ gradleIds: [''], apps: [app('ee.forgr.app')] })
+  assert.deepEqual(result, { kind: 'wrong-build-id' })
+})
+
 console.log('OK')

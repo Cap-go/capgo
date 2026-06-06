@@ -48,18 +48,20 @@ await t('parseAppsSearchResponse maps well-formed apps', () => {
   ])
 })
 
-await t('parseAppsSearchResponse tolerates missing packageName/displayName', () => {
+await t('parseAppsSearchResponse drops entries missing packageName, keeps missing displayName', () => {
+  // packageName is the reconciliation join key — an empty one could spuriously
+  // "exact-match" a project whose Gradle parse found no applicationId, so
+  // packageName-less rows are dropped instead of mapped to ''.
   const json = {
     apps: [
-      { name: 'apps/x' }, // no packageName, no displayName
-      { packageName: 'ee.forgr.three' }, // no displayName
-      { displayName: 'Nameless' }, // no packageName
+      { name: 'apps/x' }, // no packageName, no displayName → dropped
+      { packageName: 'ee.forgr.three' }, // no displayName → kept
+      { displayName: 'Nameless' }, // no packageName → dropped
+      { packageName: 42, displayName: 'NonString' }, // non-string packageName → dropped
     ],
   }
   assert.deepEqual(parseAppsSearchResponse(json), [
-    { packageName: '', displayName: '' },
     { packageName: 'ee.forgr.three', displayName: '' },
-    { packageName: '', displayName: 'Nameless' },
   ])
 })
 
