@@ -4,15 +4,47 @@ import type { Finding, OutcomeOptions, PrescanCheck, PrescanOutcome, PrescanRepo
 interface EngineOptions { checkTimeoutMs?: number }
 
 const DEFAULT_CHECK_TIMEOUT_MS = 10_000
+const MAX_CRASH_DETAIL_CHARS = 200
+
+/**
+ * Crash text is user-visible (terminal report + --json, often captured in CI logs).
+ * Cap its length and strip long base64-looking runs so a check that ever throws
+ * with credential context (e.g. a JSON.parse over a secret blob) cannot leak it.
+ */
+function sanitizeCrashDetail(error: unknown): string {
+  const msg = error instanceof Error ? error.message : String(error)
+  return msg.replace(/[A-Z0-9+/=_-]{40,}/gi, '[redacted]').slice(0, MAX_CRASH_DETAIL_CHARS)
+}
 
 export async function runPrescan(ctx: ScanContext, checks: PrescanCheck[], options: EngineOptions = {}): Promise<PrescanReport> {
   const start = Date.now()
   const timeoutMs = options.checkTimeoutMs ?? DEFAULT_CHECK_TIMEOUT_MS
-  const applicable = checks.filter(c => c.platforms.includes(ctx.platform) && (c.appliesTo ? c.appliesTo(ctx) : true))
+
+  // appliesTo predicates get the same crash isolation as run(): a throwing
+  // predicate must degrade to a notice, never reject the whole scan.
+  const applicable: PrescanCheck[] = []
+  const findings: Finding[] = []
+  for (const c of checks) {
+    if (!c.platforms.includes(ctx.platform))
+      continue
+    try {
+      if (c.appliesTo && !c.appliesTo(ctx))
+        continue
+      applicable.push(c)
+    }
+    catch (error) {
+      findings.push({
+        id: 'prescan/check-crashed',
+        severity: 'info',
+        title: `Check ${c.id} crashed and was skipped`,
+        detail: sanitizeCrashDetail(error),
+      })
+    }
+  }
   const remoteSkipped = applicable.filter(c => c.remote && !ctx.supabase)
   const runnable = applicable.filter(c => !(c.remote && !ctx.supabase))
 
-  const findings = (await Promise.all(runnable.map(c => runIsolated(c, ctx, timeoutMs)))).flat()
+  findings.push(...(await Promise.all(runnable.map(c => runIsolated(c, ctx, timeoutMs)))).flat())
 
   if (remoteSkipped.length > 0) {
     findings.push({
@@ -46,7 +78,7 @@ async function runIsolated(check: PrescanCheck, ctx: ScanContext, timeoutMs: num
       id: 'prescan/check-crashed',
       severity: 'info',
       title: `Check ${check.id} crashed and was skipped`,
-      detail: error instanceof Error ? error.message : String(error),
+      detail: sanitizeCrashDetail(error),
     }]
   }
   finally {

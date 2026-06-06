@@ -73,3 +73,87 @@ describe('shared/bundle-id-consistency', () => {
     expect(await bundleIdConsistency.run(ctx)).toEqual([])
   })
 })
+
+describe('shared/cap-sync-stale — platform sync-artifact errors', () => {
+  it('errors on android when capacitor.settings.gradle is missing (cap sync never ran)', async () => {
+    const dir = makeProject({
+      'package.json': PKG,
+      'dist/index.html': '<html></html>',
+      // no android/capacitor.settings.gradle
+    })
+    const ctx = makeCtx({ projectDir: dir, platform: 'android', config: { appId: 'com.demo.app', appName: 'x', webDir: 'dist' } as any })
+    const findings = await capSyncStale.run(ctx)
+    expect(findings.some(f => f.severity === 'error' && f.title.includes('capacitor.settings.gradle'))).toBe(true)
+  })
+
+  it('errors on ios when ios/App/Podfile is missing (cap sync never ran)', async () => {
+    const dir = makeProject({
+      'package.json': PKG,
+      'dist/index.html': '<html></html>',
+      // no ios/App/Podfile
+    })
+    const ctx = makeCtx({ projectDir: dir, platform: 'ios', config: { appId: 'com.demo.app', appName: 'x', webDir: 'dist' } as any })
+    const findings = await capSyncStale.run(ctx)
+    expect(findings.some(f => f.severity === 'error' && f.title.includes('Podfile'))).toBe(true)
+  })
+
+  it('passes on a synced ios project', async () => {
+    const dir = makeProject({
+      'package.json': PKG,
+      'dist/index.html': '<html></html>',
+      'ios/App/Podfile': `platform :ios, '14.0'\npod 'CapacitorCamera'`,
+    })
+    const ctx = makeCtx({ projectDir: dir, platform: 'ios', config: { appId: 'com.demo.app', appName: 'x', webDir: 'dist' } as any })
+    expect(await capSyncStale.run(ctx)).toEqual([])
+  })
+})
+
+// Minimal single-target pbxproj (format mirrors test/test-pbxproj-parser.mjs)
+const ONE_TARGET_PBXPROJ = (bundleId: string) => `// !$*UTF8*$!
+{
+  archiveVersion = 1;
+  objectVersion = 56;
+  objects = {
+    13B07F861A680F5B00A75B9A /* App */ = {
+      isa = PBXNativeTarget;
+      buildConfigurationList = 13B07F931A680F5B00A75B9A;
+      name = App;
+      productName = App;
+      productType = "com.apple.product-type.application";
+    };
+    13B07F931A680F5B00A75B9A /* Build configuration list for App */ = {
+      isa = XCConfigurationList;
+      buildConfigurations = (
+        13B07F941A680F5B00A75B9A,
+      );
+    };
+    13B07F941A680F5B00A75B9A /* Release */ = {
+      isa = XCBuildConfiguration;
+      buildSettings = {
+        PRODUCT_BUNDLE_IDENTIFIER = ${bundleId};
+      };
+      name = Release;
+    };
+  };
+  rootObject = 089C1665FE841187C02AAC07;
+}`
+
+describe('shared/bundle-id-consistency (ios pbxproj branch)', () => {
+  it('warns when no Xcode target uses the Capacitor appId', async () => {
+    const dir = makeProject({
+      'ios/App/App.xcodeproj/project.pbxproj': ONE_TARGET_PBXPROJ('com.other.app'),
+    })
+    const ctx = makeCtx({ projectDir: dir, platform: 'ios', config: { appId: 'com.demo.app', appName: 'x', webDir: 'dist' } as any })
+    const findings = await bundleIdConsistency.run(ctx)
+    expect(findings[0]?.severity).toBe('warning')
+    expect(findings[0]?.detail).toContain('com.other.app')
+  })
+
+  it('passes when a target bundle id matches the appId', async () => {
+    const dir = makeProject({
+      'ios/App/App.xcodeproj/project.pbxproj': ONE_TARGET_PBXPROJ('com.demo.app'),
+    })
+    const ctx = makeCtx({ projectDir: dir, platform: 'ios', config: { appId: 'com.demo.app', appName: 'x', webDir: 'dist' } as any })
+    expect(await bundleIdConsistency.run(ctx)).toEqual([])
+  })
+})

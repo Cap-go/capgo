@@ -45,6 +45,10 @@ describe('ios/profile-expiry', () => {
     const xml = makeProfileXml({ expiration: new Date(Date.now() + 5 * 86_400_000) })
     expect((await profileExpiry.run(ctxWith({ CAPGO_IOS_PROVISIONING_MAP: mapWith(xml) })))[0]?.severity).toBe('warning')
   })
+  it('passes a far-future profile', async () => {
+    const xml = makeProfileXml({ expiration: new Date(Date.now() + 90 * 86_400_000) })
+    expect(await profileExpiry.run(ctxWith({ CAPGO_IOS_PROVISIONING_MAP: mapWith(xml) }))).toEqual([])
+  })
 })
 
 describe('ios/profile-bundle-match', () => {

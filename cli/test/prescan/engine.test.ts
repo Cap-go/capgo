@@ -98,3 +98,29 @@ describe('registry', () => {
     ]) expect(ids).toContain(expected)
   })
 })
+
+describe('runPrescan crash isolation hardening', () => {
+  it('a throwing appliesTo predicate is isolated — the scan still completes', async () => {
+    const report = await runPrescan(baseCtx, [
+      check({ id: 'bad-predicate', appliesTo: () => { throw new Error('predicate boom') } }),
+      check({ id: 'good', run: async () => [{ id: 'good', severity: 'warning', title: 'w' }] }),
+    ])
+    const crash = report.findings.find(f => f.id === 'prescan/check-crashed')
+    expect(crash?.severity).toBe('info')
+    expect(crash?.detail).toContain('predicate boom')
+    // the healthy check still ran
+    expect(report.counts.warning).toBe(1)
+    expect(report.checksRun).toBe(1)
+  })
+
+  it('crash detail is truncated and base64-looking runs are redacted (never leak blobs)', async () => {
+    const blob = 'QmFzZTY0U2VjcmV0'.repeat(20) // 320 chars of base64-ish text
+    const report = await runPrescan(baseCtx, [
+      check({ id: 'leaky', run: async () => { throw new Error(`parse failed: ${blob} <- secret`) } }),
+    ])
+    const crash = report.findings.find(f => f.id === 'prescan/check-crashed')
+    expect(crash?.detail).toContain('[redacted]')
+    expect(crash?.detail).not.toContain(blob)
+    expect((crash?.detail ?? '').length).toBeLessThanOrEqual(200)
+  })
+})

@@ -4,13 +4,13 @@ import { credentialsSaved } from '../../src/build/prescan/checks/credentials'
 import { apikeyPermission, appExists } from '../../src/build/prescan/checks/shared-remote'
 import { makeCtx, makeProject } from './helpers'
 
-function fakeSupabase(opts: { permission?: boolean, appRow?: object | null }) {
+function fakeSupabase(opts: { permission?: boolean, appRow?: object | null, error?: { message: string } }) {
   return {
-    rpc: async (_fn: string, _args: object) => ({ data: opts.permission ?? false, error: null }),
+    rpc: async (_fn: string, _args: object) => ({ data: opts.error ? null : (opts.permission ?? false), error: opts.error ?? null }),
     from: (_t: string) => ({
       select: (_c: string) => ({
         eq: (_k: string, _v: string) => ({
-          maybeSingle: async () => ({ data: opts.appRow ?? null, error: null }),
+          maybeSingle: async () => ({ data: opts.error ? null : (opts.appRow ?? null), error: opts.error ?? null }),
         }),
       }),
     }),
@@ -28,6 +28,12 @@ describe('shared/apikey-permission', () => {
     const ctx = makeCtx({ projectDir: '/tmp', apikey: 'k', supabase: fakeSupabase({ permission: true }) })
     expect(await apikeyPermission.run(ctx)).toEqual([])
   })
+  it('downgrades a network/API failure to info — never blocks offline users (spec)', async () => {
+    const ctx = makeCtx({ projectDir: '/tmp', apikey: 'k', supabase: fakeSupabase({ error: { message: 'fetch failed' } }) })
+    const findings = await apikeyPermission.run(ctx)
+    expect(findings[0]?.severity).toBe('info')
+    expect(findings[0]?.title).toContain('Could not verify')
+  })
 })
 
 describe('shared/app-exists', () => {
@@ -38,6 +44,12 @@ describe('shared/app-exists', () => {
   it('passes when app found', async () => {
     const ctx = makeCtx({ projectDir: '/tmp', supabase: fakeSupabase({ appRow: { app_id: 'com.demo.app' } }) })
     expect(await appExists.run(ctx)).toEqual([])
+  })
+  it('downgrades a network/API failure to info — never blocks offline users (spec)', async () => {
+    const ctx = makeCtx({ projectDir: '/tmp', supabase: fakeSupabase({ error: { message: 'fetch failed' } }) })
+    const findings = await appExists.run(ctx)
+    expect(findings[0]?.severity).toBe('info')
+    expect(findings[0]?.title).toContain('Could not verify')
   })
 })
 

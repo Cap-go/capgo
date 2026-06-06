@@ -157,7 +157,7 @@ Severity: E = error (fatal), W = warning (prompt), E/W = threshold-split. L/R = 
 | ios/profile-type-vs-mode | profile type matches requested distribution mode | E | L |
 | ios/cert-profile-pairing | P12 cert SHA-1 ∈ profile DeveloperCertificates (top failure: 96 hits) | E | L |
 | ios/targets-covered | every signable pbxproj target covered by provisioning map | E | L |
-| ios/infoplist-sanity | CFBundleVersion/ShortVersion present+literal; URL schemes RFC-1738 valid (no underscores, #2431); purpose strings non-empty/non-placeholder | E/W | L |
+| ios/infoplist-sanity | CFBundleVersion/ShortVersion present (presence-only: `$(MARKETING_VERSION)`-style build-setting refs are valid); URL schemes RFC-1738 valid (no underscores, #2431); purpose strings non-empty/non-placeholder | E/W | L |
 | ios/asc-key-valid | .p8 parses as EC key; key-ID/issuer-ID format (when app_store without --output-upload) | E | L |
 
 ### Android core (7)

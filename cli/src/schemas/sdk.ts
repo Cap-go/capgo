@@ -336,6 +336,10 @@ export const requestBuildOptionsSchema = z.object({
   apikey: z.string().optional(),
   supaHost: z.string().optional(),
   supaAnon: z.string().optional(),
+  /** set false to skip the automatic pre-build prescan (equivalent to --no-prescan) */
+  prescan: z.boolean().optional(),
+  /** run the prescan in report-only mode: findings never block the build */
+  prescanIgnoreFatal: z.boolean().optional(),
 })
 
 export type RequestBuildOptions = z.infer<typeof requestBuildOptionsSchema>

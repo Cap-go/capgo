@@ -1,8 +1,9 @@
 // test/prescan/checks-ios-certs.test.ts
 import { describe, expect, it } from 'bun:test'
 import forge from 'node-forge'
-import { ascKeyValid, p12Expiry, p12Opens } from '../../src/build/prescan/checks/ios-certs'
-import { makeCtx, makeP12 } from './helpers'
+import { MAX_CREDENTIAL_B64_CHARS } from '../../src/build/prescan/checks/blob-limit'
+import { ascKeyValid, openP12, p12Expiry, p12Opens } from '../../src/build/prescan/checks/ios-certs'
+import { makeChainP12, makeCtx, makeP12 } from './helpers'
 
 function ctxWith(creds: Record<string, string>) {
   return makeCtx({ projectDir: '/tmp', platform: 'ios', credentials: creds })
@@ -74,5 +75,47 @@ describe('ios/asc-key-valid', () => {
   })
   it('is silent when ASC keys are absent (output-upload / ad_hoc flows)', async () => {
     expect(await ascKeyValid.run(ctxWith({}))).toEqual([])
+  })
+})
+
+describe('ios/asc-key-valid — format errors never echo the raw value', () => {
+  it('errors on malformed APPLE_KEY_ID without echoing it', async () => {
+    const wrong = 'super-secret-password' // classic field mix-up: a password pasted into the key id
+    const f = await ascKeyValid.run(ctxWith({ APPLE_KEY_ID: wrong }))
+    expect(f[0]?.severity).toBe('error')
+    expect(f[0]?.title).toContain('APPLE_KEY_ID')
+    expect(JSON.stringify(f)).not.toContain(wrong)
+  })
+  it('errors on malformed APPLE_ISSUER_ID without echoing it', async () => {
+    const wrong = 'not-a-uuid-but-maybe-a-secret'
+    const f = await ascKeyValid.run(ctxWith({ APPLE_ISSUER_ID: wrong }))
+    expect(f[0]?.severity).toBe('error')
+    expect(JSON.stringify(f)).not.toContain(wrong)
+  })
+})
+
+describe('openP12 leaf selection (chain-bearing P12s)', () => {
+  it('picks the leaf cert even when a CA cert sits at bag index 0', () => {
+    const chain = makeChainP12()
+    const opened = openP12(chain.base64, chain.password)
+    expect(opened.sha1).toBe(chain.leafSha1)
+    expect(opened.sha1).not.toBe(chain.caSha1)
+  })
+  it('cert-profile pairing logic sees the leaf, not the CA (no false mismatch)', async () => {
+    const chain = makeChainP12()
+    // p12-expiry uses the selected cert too: leaf expires in 1y → no findings
+    const f = await p12Expiry.run(ctxWith({ BUILD_CERTIFICATE_BASE64: chain.base64, P12_PASSWORD: chain.password }))
+    expect(f).toEqual([])
+  })
+})
+
+describe('credential blob size cap', () => {
+  it('refuses an absurdly large certificate blob with a clear error (no decode attempt)', async () => {
+    const huge = 'A'.repeat(MAX_CREDENTIAL_B64_CHARS + 1)
+    const started = Date.now()
+    const f = await p12Opens.run(ctxWith({ BUILD_CERTIFICATE_BASE64: huge, P12_PASSWORD: 'x' }))
+    expect(f[0]?.severity).toBe('error')
+    expect(f[0]?.detail).toContain('limit 10 MB')
+    expect(Date.now() - started).toBeLessThan(2000) // fails fast, no multi-GB forge parse
   })
 })

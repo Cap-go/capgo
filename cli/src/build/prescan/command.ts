@@ -4,7 +4,7 @@ import type { Database } from '../../types/supabase.types'
 import type { OutcomeOptions, Platform, PrescanReport, Severity } from './types'
 import { cwd, exit } from 'node:process'
 import { intro, log, outro } from '@clack/prompts'
-import { createSupabaseClient, findSavedKey, sendEvent } from '../../utils'
+import { createSupabaseClient, findSavedKeySilent, sendEvent } from '../../utils'
 import { buildScanContext } from './context'
 import { decideOutcome, runPrescan } from './engine'
 import { resolveWarningGate } from './prompt'
@@ -23,6 +23,12 @@ export interface PrescanCommandOptions {
   verbose?: boolean
   supaHost?: string
   supaAnon?: string
+  /**
+   * pre-merged credentials (CLI flags + env + saved file) when invoked from
+   * build request's gate — the scan must validate the exact set the build
+   * will use, not a fresh saved-file/env merge.
+   */
+  credentials?: Record<string, string>
 }
 
 export function validateFlags(opts: Pick<PrescanCommandOptions, 'failOnWarnings' | 'ignoreFatal'>): void {
@@ -51,13 +57,16 @@ export async function executePrescan(appId: string | undefined, options: Prescan
   const platform = options.platform as Platform
   if (platform !== 'ios' && platform !== 'android')
     throw new Error('--platform must be ios or android')
-  let apikey: string | undefined
+  // findSavedKeySilent never logs: `--json` consumers parse stdout, so a clack
+  // error line before the JSON report would break them.
+  const apikey = options.apikey ?? findSavedKeySilent()
   let supabase: SupabaseClient<Database> | undefined
-  try {
-    apikey = options.apikey ?? findSavedKey(true)
-    supabase = await createSupabaseClient(apikey, options.supaHost, options.supaAnon, true)
+  if (apikey) {
+    try {
+      supabase = await createSupabaseClient(apikey, options.supaHost, options.supaAnon, true)
+    }
+    catch { /* offline/invalid: remote checks will be skipped with a notice */ }
   }
-  catch { /* no key: remote checks will be skipped with a notice */ }
   const ctx = await buildScanContext({
     appId,
     platform,
@@ -66,6 +75,7 @@ export async function executePrescan(appId: string | undefined, options: Prescan
     androidFlavor: options.androidFlavor,
     apikey,
     supabase,
+    credentials: options.credentials,
   })
   const report = await runPrescan(ctx, ALL_CHECKS)
   return { report, apikey }
@@ -109,6 +119,14 @@ export interface PrescanGateOptions {
   /** test seam; defaults to canPromptInteractively() (via resolveWarningGate) at call time */
   interactive?: boolean
   silent?: boolean
+  /**
+   * Output sink for the report / crash notice. Callers that own the terminal
+   * (Ink onboarding, SDK, MCP stdio) pass their BuildLogger here; raw clack
+   * writes would corrupt their rendering or the JSON-RPC stdout channel.
+   * Defaults to clack when not silent, and to no output when silent.
+   */
+  print?: (msg: string) => void
+  warn?: (msg: string) => void
 }
 
 /**
@@ -122,16 +140,19 @@ export async function runPrescanGate(
 ): Promise<'proceed' | 'block'> {
   if (!opts.enabled)
     return 'proceed'
+  const noop = (): void => {}
+  const print = opts.print ?? (opts.silent ? noop : (msg: string) => log.message(msg))
+  const warn = opts.warn ?? (opts.silent ? noop : (msg: string) => log.warn(msg))
   let report: PrescanReport
   try {
     report = await scan()
   }
   catch (e) {
-    log.warn(`prescan crashed and was skipped: ${e instanceof Error ? e.message : String(e)}`)
+    warn(`prescan crashed and was skipped: ${e instanceof Error ? e.message : String(e)}`)
     return 'proceed'
   }
   if (report.findings.length > 0)
-    log.message(renderTerminalReport(report, {}))
+    print(renderTerminalReport(report, {}))
   const outcome = decideOutcome(report, { ignoreFatal: opts.ignoreFatal, failOnWarnings: opts.failOnWarnings })
   if (outcome === 'ask') {
     if (opts.interactive === false)

@@ -9,6 +9,11 @@ export type Platform = 'ios' | 'android'
 export interface Finding {
   id: string
   severity: Severity
+  /**
+   * detail/fix/title are printed to the terminal and serialized into --json reports
+   * (routinely captured in CI logs): they must NEVER contain credential material
+   * (passwords, key/cert contents, raw credential field values).
+   */
   title: string
   detail?: string
   fix?: string

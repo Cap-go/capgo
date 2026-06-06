@@ -2,6 +2,7 @@
 import type { Finding, PrescanCheck, ScanContext } from '../types'
 import { createHash } from 'node:crypto'
 import forge from 'node-forge'
+import { assertCredentialBlobSize } from './blob-limit'
 
 const JKS_MAGIC = 0xFEEDFEED
 
@@ -66,7 +67,38 @@ function readJks(buf: Buffer, password: string): JksResult {
 
 interface OpenedKeystore { kind: KeystoreKind, aliases: string[], notAfter: Date | null }
 
+// A scan opens the same keystore twice (keystore-opens, keystore-expiry) and
+// the PKCS12 KDF is expensive — memoize per input.
+const KS_CACHE_MAX = 4
+const ksCache = new Map<string, { value?: OpenedKeystore, error?: unknown }>()
+
 function openKeystore(base64: string, storePassword: string): OpenedKeystore {
+  const cacheKey = `${storePassword}\u0000${base64}`
+  const cached = ksCache.get(cacheKey)
+  if (cached) {
+    if (cached.error !== undefined)
+      throw cached.error
+    return cached.value!
+  }
+  try {
+    const value = openKeystoreUncached(base64, storePassword)
+    rememberKs(cacheKey, { value })
+    return value
+  }
+  catch (error) {
+    rememberKs(cacheKey, { error })
+    throw error
+  }
+}
+
+function rememberKs(key: string, entry: { value?: OpenedKeystore, error?: unknown }): void {
+  if (ksCache.size >= KS_CACHE_MAX)
+    ksCache.delete(ksCache.keys().next().value!)
+  ksCache.set(key, entry)
+}
+
+function openKeystoreUncached(base64: string, storePassword: string): OpenedKeystore {
+  assertCredentialBlobSize(base64, 'keystore')
   const buf = Buffer.from(base64, 'base64')
   const kind = keystoreKind(buf)
   if (kind === 'jks') {

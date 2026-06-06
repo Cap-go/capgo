@@ -44,3 +44,15 @@ describe('ios/infoplist-sanity', () => {
     expect(await infoplistSanity.run(makeCtx({ projectDir: dir, platform: 'ios' }))).toEqual([])
   })
 })
+
+describe('ios/infoplist-sanity — version keys are presence-only by design', () => {
+  it('accepts $(MARKETING_VERSION)/$(CURRENT_PROJECT_VERSION) build-setting references', async () => {
+    const f = await infoplistSanity.run(ctxFor(`<key>CFBundleVersion</key><string>$(CURRENT_PROJECT_VERSION)</string>
+<key>CFBundleShortVersionString</key><string>$(MARKETING_VERSION)</string>`))
+    expect(f).toEqual([])
+  })
+  it('warns when CFBundleShortVersionString is missing', async () => {
+    const f = await infoplistSanity.run(ctxFor(`<key>CFBundleVersion</key><string>1</string>`))
+    expect(f.some(x => x.severity === 'warning' && x.title.includes('CFBundleShortVersionString'))).toBe(true)
+  })
+})

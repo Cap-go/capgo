@@ -83,19 +83,117 @@ describe('android/play-sa-json', () => {
     const ctx = aCtx(makeProject({}), { credentials: { PLAY_CONFIG_JSON: b64({ type: 'service_account', client_email: 'a@b.iam', private_key: '-----BEGIN PRIVATE KEY-----' }) } })
     expect(await playSaJson.run(ctx)).toEqual([])
   })
+  it('errors (not crashes) when the payload is not decodable JSON', async () => {
+    const ctx = aCtx(makeProject({}), { credentials: { PLAY_CONFIG_JSON: Buffer.from('not json at all').toString('base64') } })
+    const f = await playSaJson.run(ctx)
+    expect(f[0]?.severity).toBe('error')
+    expect(f[0]?.title).toContain('valid JSON')
+  })
+  it('errors (not crashes) when the payload decodes to JSON null', async () => {
+    const ctx = aCtx(makeProject({}), { credentials: { PLAY_CONFIG_JSON: Buffer.from('null').toString('base64') } })
+    const f = await playSaJson.run(ctx)
+    expect(f[0]?.severity).toBe('error')
+    expect(f[0]?.title).toContain('valid JSON')
+  })
+  it('errors (not crashes) when the payload decodes to a JSON array', async () => {
+    const ctx = aCtx(makeProject({}), { credentials: { PLAY_CONFIG_JSON: b64([{ type: 'service_account' }]) } })
+    const f = await playSaJson.run(ctx)
+    expect(f[0]?.severity).toBe('error')
+  })
 })
 
 describe('android/flavor-exists', () => {
-  const gradle = `android { productFlavors { dev { dimension "env" } prod { dimension "env" } } }`
-  it('errors on unknown flavor', async () => {
-    const ctx = aCtx(makeProject({ 'android/app/build.gradle': gradle }), { androidFlavor: 'staging' })
+  // realistic multi-line layout: buildTypes AFTER productFlavors — a greedy regex
+  // would swallow buildTypes/release/dependencies into the flavor list
+  const GROOVY_GRADLE = `apply plugin: 'com.android.application'
+
+android {
+    namespace "com.demo.app"
+    flavorDimensions "env"
+    productFlavors {
+        dev {
+            dimension "env"
+            applicationIdSuffix ".dev"
+        }
+        prod {
+            dimension "env"
+        }
+    }
+    buildTypes {
+        release {
+            minifyEnabled true
+        }
+        debug {
+            minifyEnabled false
+        }
+    }
+}
+
+dependencies {
+    implementation project(':capacitor-android')
+}
+`
+  const KTS_GRADLE = `plugins { id("com.android.application") }
+
+android {
+    namespace = "com.demo.app"
+    flavorDimensions += "env"
+    productFlavors {
+        create("demo") {
+            dimension = "env"
+        }
+        register("prod") {
+            dimension = "env"
+        }
+    }
+    buildTypes {
+        getByName("release") {
+            isMinifyEnabled = true
+        }
+    }
+}
+`
+  it('errors on unknown flavor, listing ALL declared flavors (and nothing else)', async () => {
+    const ctx = aCtx(makeProject({ 'android/app/build.gradle': GROOVY_GRADLE }), { androidFlavor: 'staging' })
     const f = await flavorExists.run(ctx)
     expect(f[0]?.severity).toBe('error')
-    expect(f[0]?.detail).toContain('dev')
+    expect(f[0]?.detail).toBe('declared flavors: dev, prod')
   })
-  it('passes known flavor', async () => {
-    const ctx = aCtx(makeProject({ 'android/app/build.gradle': gradle }), { androidFlavor: 'dev' })
+  it('passes the FIRST declared flavor', async () => {
+    const ctx = aCtx(makeProject({ 'android/app/build.gradle': GROOVY_GRADLE }), { androidFlavor: 'dev' })
     expect(await flavorExists.run(ctx)).toEqual([])
+  })
+  it('passes the SECOND declared flavor', async () => {
+    const ctx = aCtx(makeProject({ 'android/app/build.gradle': GROOVY_GRADLE }), { androidFlavor: 'prod' })
+    expect(await flavorExists.run(ctx)).toEqual([])
+  })
+  it('errors when a buildType name is passed as a flavor (the classic user mistake)', async () => {
+    const ctx = aCtx(makeProject({ 'android/app/build.gradle': GROOVY_GRADLE }), { androidFlavor: 'release' })
+    const f = await flavorExists.run(ctx)
+    expect(f[0]?.severity).toBe('error')
+    expect(f[0]?.detail).not.toContain('release')
+    expect(f[0]?.detail).not.toContain('buildTypes')
+  })
+  it('parses Kotlin DSL create()/register() flavor declarations', async () => {
+    const dir = makeProject({ 'android/app/build.gradle.kts': KTS_GRADLE })
+    expect(await flavorExists.run(aCtx(dir, { androidFlavor: 'demo' }))).toEqual([])
+    expect(await flavorExists.run(aCtx(dir, { androidFlavor: 'prod' }))).toEqual([])
+    const f = await flavorExists.run(aCtx(dir, { androidFlavor: 'release' }))
+    expect(f[0]?.severity).toBe('error')
+    expect(f[0]?.detail).toBe('declared flavors: demo, prod')
+  })
+  it('errors when no productFlavors block is declared at all', async () => {
+    const ctx = aCtx(makeProject({ 'android/app/build.gradle': `android { buildTypes { release {} } }` }), { androidFlavor: 'dev' })
+    const f = await flavorExists.run(ctx)
+    expect(f[0]?.severity).toBe('error')
+    expect(f[0]?.title).toContain('declares no productFlavors')
+  })
+  it('also handles the single-line gradle fixture', async () => {
+    const gradle = `android { productFlavors { dev { dimension "env" } prod { dimension "env" } } }`
+    const dir = makeProject({ 'android/app/build.gradle': gradle })
+    expect(await flavorExists.run(aCtx(dir, { androidFlavor: 'prod' }))).toEqual([])
+    const f = await flavorExists.run(aCtx(dir, { androidFlavor: 'staging' }))
+    expect(f[0]?.detail).toBe('declared flavors: dev, prod')
   })
 })
 

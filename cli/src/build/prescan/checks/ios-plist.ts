@@ -37,6 +37,10 @@ export const infoplistSanity: PrescanCheck = {
     const raw = readFileSync(plistPath, 'utf8')
     const findings: Finding[] = []
 
+    // Presence-only by design (deliberate deviation from the spec's "present+literal"):
+    // modern Xcode templates set these to $(CURRENT_PROJECT_VERSION)/$(MARKETING_VERSION)
+    // build-setting references, which resolve fine at build time — flagging them
+    // would false-positive on perfectly valid projects.
     if (!raw.includes('<key>CFBundleVersion</key>')) {
       findings.push({ id: 'ios/infoplist-sanity', severity: 'warning', title: 'Info.plist has no CFBundleVersion', fix: 'Add CFBundleVersion (build number) — App Store uploads require it' })
     }

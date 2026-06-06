@@ -2,9 +2,9 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '../../types/supabase.types'
 import type { Platform, ScanContext } from './types'
-import { chdir, cwd } from 'node:process'
 import { getConfig } from '../../utils'
 import { mergeCredentials } from '../credentials'
+import { withCwd } from '../cwd'
 
 export interface BuildScanContextArgs {
   appId?: string
@@ -18,40 +18,8 @@ export interface BuildScanContextArgs {
   credentials?: Record<string, string>
 }
 
-let cwdQueue: Promise<unknown> = Promise.resolve()
-
-/**
- * Run an async function with the process working directory temporarily set to `dir`.
- *
- * NOTE: `process.chdir()` is global, so this uses a simple in-process queue to avoid
- * concurrent calls interfering with each other (mirrors `withCwd` in `../request.ts`).
- */
-async function withCwd<T>(dir: string, fn: () => Promise<T>): Promise<T> {
-  const run = async () => {
-    const previous = cwd()
-    try {
-      chdir(dir)
-    }
-    catch (error) {
-      throw new Error(`Failed to change working directory to "${dir}": ${(error as Error).message}`)
-    }
-
-    try {
-      return await fn()
-    }
-    finally {
-      try {
-        chdir(previous)
-      }
-      catch {
-        // Best-effort restore; ignore to avoid masking original errors.
-      }
-    }
-  }
-
-  const p = cwdQueue.then(run, run)
-  cwdQueue = p.then(() => undefined, () => undefined)
-  return p
+function validDistributionMode(value: string | undefined): 'app_store' | 'ad_hoc' | undefined {
+  return value === 'app_store' || value === 'ad_hoc' ? value : undefined
 }
 
 export async function buildScanContext(args: BuildScanContextArgs): Promise<ScanContext> {
@@ -69,8 +37,12 @@ export async function buildScanContext(args: BuildScanContextArgs): Promise<Scan
     projectDir: args.projectDir,
     config,
     credentials,
-    distributionMode: args.distributionMode,
-    androidFlavor: args.androidFlavor,
+    // Saved credentials carry the distribution mode / flavor the build will actually
+    // use (splitPayload reads CAPGO_IOS_DISTRIBUTION / CAPGO_ANDROID_FLAVOR), so fall
+    // back to them when no explicit flag was passed — otherwise checks like
+    // ios/profile-type-vs-mode and android/flavor-exists silently never run.
+    distributionMode: args.distributionMode ?? validDistributionMode(credentials?.CAPGO_IOS_DISTRIBUTION),
+    androidFlavor: args.androidFlavor ?? credentials?.CAPGO_ANDROID_FLAVOR,
     apikey: args.apikey,
     supabase: args.supabase,
   }

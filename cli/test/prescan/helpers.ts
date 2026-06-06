@@ -1,5 +1,6 @@
 // test/prescan/helpers.ts
 import type { ScanContext } from '../../src/build/prescan/types'
+import { Buffer } from 'node:buffer'
 import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
@@ -26,6 +27,20 @@ export interface MadeP12 {
   notAfter: Date
 }
 
+function certSha1(cert: forge.pki.Certificate): string {
+  const certDer = forge.asn1.toDer(forge.pki.certificateToAsn1(cert)).getBytes()
+  const md = forge.md.sha1.create()
+  md.update(certDer)
+  return md.digest().toHex().toLowerCase()
+}
+
+/** DER bytes of a P12's first certificate (for synthesizing JKS entries etc.). */
+export function certDerFromP12(p12: MadeP12): Buffer {
+  const p12Obj = forge.pkcs12.pkcs12FromAsn1(forge.asn1.fromDer(forge.util.decode64(p12.base64)), p12.password)
+  const certBag = p12Obj.getBags({ bagType: forge.pki.oids.certBag })[forge.pki.oids.certBag]![0]!
+  return Buffer.from(forge.asn1.toDer(forge.pki.certificateToAsn1(certBag.cert!)).getBytes(), 'binary')
+}
+
 /** Self-signed cert + key wrapped in a password-protected P12 (pure node-forge, no binaries). */
 export function makeP12(opts: { password?: string, notAfter?: Date, cn?: string } = {}): MadeP12 {
   const password = opts.password ?? 'test-pass'
@@ -44,12 +59,49 @@ export function makeP12(opts: { password?: string, notAfter?: Date, cn?: string 
   const der = forge.asn1.toDer(p12Asn1).getBytes()
   const base64 = forge.util.encode64(der)
 
-  const certDer = forge.asn1.toDer(forge.pki.certificateToAsn1(cert)).getBytes()
-  const md = forge.md.sha1.create()
-  md.update(certDer)
-  const sha1 = md.digest().toHex().toLowerCase()
+  return { base64, password, sha1: certSha1(cert), notAfter: cert.validity.notAfter }
+}
 
-  return { base64, password, sha1, notAfter: cert.validity.notAfter }
+export interface MadeChainP12 {
+  base64: string
+  password: string
+  leafSha1: string
+  caSha1: string
+}
+
+/**
+ * P12 whose cert bags carry a CA cert FIRST and the leaf second (the layout
+ * macOS `security export`/Keychain Access can produce), with no localKeyId
+ * attributes — exercises openP12's leaf-selection fallbacks.
+ */
+export function makeChainP12(opts: { password?: string } = {}): MadeChainP12 {
+  const password = opts.password ?? 'test-pass'
+  const caKeys = forge.pki.rsa.generateKeyPair(1024)
+  const caCert = forge.pki.createCertificate()
+  caCert.publicKey = caKeys.publicKey
+  caCert.serialNumber = '02'
+  caCert.validity.notBefore = new Date(Date.now() - 86_400_000)
+  caCert.validity.notAfter = new Date(Date.now() + 3650 * 86_400_000)
+  const caAttrs = [{ name: 'commonName', value: 'Test Worldwide Developer Relations CA' }]
+  caCert.setSubject(caAttrs)
+  caCert.setIssuer(caAttrs)
+  caCert.setExtensions([{ name: 'basicConstraints', cA: true }])
+  caCert.sign(caKeys.privateKey, forge.md.sha256.create())
+
+  const leafKeys = forge.pki.rsa.generateKeyPair(1024)
+  const leafCert = forge.pki.createCertificate()
+  leafCert.publicKey = leafKeys.publicKey
+  leafCert.serialNumber = '03'
+  leafCert.validity.notBefore = new Date(Date.now() - 86_400_000)
+  leafCert.validity.notAfter = new Date(Date.now() + 365 * 86_400_000)
+  leafCert.setSubject([{ name: 'commonName', value: 'Apple Distribution: Test Leaf' }])
+  leafCert.setIssuer(caAttrs)
+  leafCert.sign(caKeys.privateKey, forge.md.sha256.create())
+
+  // CA deliberately first; generateLocalKeyId=false mimics exports without key/cert pairing attributes
+  const p12Asn1 = forge.pkcs12.toPkcs12Asn1(leafKeys.privateKey, [caCert, leafCert], password, { algorithm: '3des', generateLocalKeyId: false })
+  const base64 = forge.util.encode64(forge.asn1.toDer(p12Asn1).getBytes())
+  return { base64, password, leafSha1: certSha1(leafCert), caSha1: certSha1(caCert) }
 }
 
 /** Provisioning-profile XML the existing mobileprovision parser accepts (it scans for <?xml..</plist>). */
@@ -92,10 +144,7 @@ ${typeBlock}
 
 /** Profile XML whose DeveloperCertificates contain the actual DER of a makeP12 cert (for pairing tests). */
 export function makeProfileXmlWithCert(p12: MadeP12, opts: Parameters<typeof makeProfileXml>[0] = {}): string {
-  const p12Obj = forge.pkcs12.pkcs12FromAsn1(forge.asn1.fromDer(forge.util.decode64(p12.base64)), p12.password)
-  const certBag = p12Obj.getBags({ bagType: forge.pki.oids.certBag })[forge.pki.oids.certBag]![0]!
-  const certDer = forge.asn1.toDer(forge.pki.certificateToAsn1(certBag.cert!)).getBytes()
-  const b64 = forge.util.encode64(certDer)
+  const b64 = certDerFromP12(p12).toString('base64')
   const xml = makeProfileXml(opts)
   return xml.replace('<key>DeveloperCertificates</key><array></array>', `<key>DeveloperCertificates</key><array><data>${b64}</data></array>`)
 }

@@ -130,7 +130,6 @@
   },
   "dependencies": {
     "@inkjs/ui": "^2.0.0",
-    "fast-xml-parser": "^4",
     "ink": "^7.0.4",
     "ink-spinner": "^5.0.0",
     "jsonwebtoken": "^9.0.3",

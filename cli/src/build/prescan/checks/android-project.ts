@@ -89,11 +89,16 @@ export const playSaJson: PrescanCheck = {
   platforms: ['android'],
   appliesTo: ctx => Boolean(ctx.credentials?.PLAY_CONFIG_JSON),
   async run(ctx): Promise<Finding[]> {
-    let parsed: Record<string, unknown>
+    let parsed: unknown
     try {
       parsed = JSON.parse(Buffer.from(ctx.credentials!.PLAY_CONFIG_JSON, 'base64').toString('utf8'))
     }
     catch {
+      parsed = undefined
+    }
+    // JSON.parse accepts scalars ('null', '42', '"x"') and arrays — none of which
+    // are a service-account object, so guard before any property access.
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
       return [{
         id: 'android/play-sa-json',
         severity: 'error',
@@ -101,16 +106,17 @@ export const playSaJson: PrescanCheck = {
         fix: 'Base64-encode the raw service-account .json file',
       }]
     }
-    if (parsed.type !== 'service_account') {
+    const sa = parsed as Record<string, unknown>
+    if (sa.type !== 'service_account') {
       return [{
         id: 'android/play-sa-json',
         severity: 'error',
         title: 'PLAY_CONFIG_JSON is not a service-account key',
-        detail: `type: ${String(parsed.type)}`,
+        detail: `type: ${String(sa.type)}`,
         fix: 'Create a service-account key in Google Cloud Console (IAM → Service Accounts → Keys)',
       }]
     }
-    const missing = ['private_key', 'client_email'].filter(k => !parsed[k])
+    const missing = ['private_key', 'client_email'].filter(k => !sa[k])
     if (missing.length > 0) {
       return [{
         id: 'android/play-sa-json',
@@ -124,6 +130,65 @@ export const playSaJson: PrescanCheck = {
   },
 }
 
+/**
+ * Brace-counted extraction of the body of the first `keyword { ... }` block.
+ * A greedy regex would capture to the LAST `}` in the file, swallowing
+ * buildTypes/dependencies/etc. into the flavor list.
+ */
+export function extractBraceBlock(source: string, keyword: string): string | null {
+  const headerMatch = source.match(new RegExp(`(?:^|[\\s;{}])${keyword}\\s*\\{`))
+  if (headerMatch?.index === undefined)
+    return null
+  const open = source.indexOf('{', headerMatch.index + headerMatch[0].length - 1)
+  let depth = 0
+  for (let i = open; i < source.length; i++) {
+    if (source[i] === '{') {
+      depth++
+    }
+    else if (source[i] === '}') {
+      depth--
+      if (depth === 0)
+        return source.slice(open + 1, i)
+    }
+  }
+  return null
+}
+
+/**
+ * Names of the direct (depth-1) child blocks of a Gradle DSL block body.
+ * Handles Groovy `demo { ... }` and Kotlin DSL `create("demo") { ... }`,
+ * `register("demo") { ... }`, and `val demo by creating { ... }`.
+ */
+export function childBlockNames(block: string): string[] {
+  const names: string[] = []
+  let depth = 0
+  let segmentStart = 0
+  for (let i = 0; i < block.length; i++) {
+    const ch = block[i]
+    if (ch === '{') {
+      if (depth === 0) {
+        const header = block.slice(segmentStart, i)
+        const kts = header.match(/(?:create|register)\s*\(\s*["'](\w+)["']\s*\)\s*$/)
+        const creating = header.match(/val\s+(\w+)\s+by\s+creating\s*$/)
+        const groovy = header.match(/(?:^|[\s;}])(\w+)\s*$/)
+        const name = kts?.[1] ?? creating?.[1] ?? groovy?.[1]
+        if (name)
+          names.push(name)
+      }
+      depth++
+    }
+    else if (ch === '}') {
+      depth = Math.max(0, depth - 1)
+      if (depth === 0)
+        segmentStart = i + 1
+    }
+    else if (depth === 0 && (ch === '\n' || ch === ';')) {
+      segmentStart = i + 1
+    }
+  }
+  return names
+}
+
 export const flavorExists: PrescanCheck = {
   id: 'android/flavor-exists',
   platforms: ['android'],
@@ -132,8 +197,8 @@ export const flavorExists: PrescanCheck = {
     const gradle = appBuildGradle(ctx.projectDir)
     if (!gradle)
       return []
-    const block = gradle.match(/productFlavors\s*\{([\s\S]*)\}/)?.[1]
-    if (!block) {
+    const block = extractBraceBlock(gradle, 'productFlavors')
+    if (block === null) {
       return [{
         id: 'android/flavor-exists',
         severity: 'error',
@@ -141,13 +206,17 @@ export const flavorExists: PrescanCheck = {
         fix: 'Drop the flag or add the flavor to android/app/build.gradle',
       }]
     }
-    const flavors = [...block.matchAll(/^\s*(\w+)\s*\{/gm)].map(m => m[1]).filter(f => f !== 'dimension')
+    const flavors = childBlockNames(block).filter(f => f !== 'dimension')
+    // a productFlavors block exists but our parser got nothing out of it
+    // (exotic DSL): skip rather than emit a false blocking error
+    if (flavors.length === 0)
+      return []
     if (!flavors.includes(ctx.androidFlavor!)) {
       return [{
         id: 'android/flavor-exists',
         severity: 'error',
         title: `Product flavor "${ctx.androidFlavor}" not found in build.gradle`,
-        detail: `declared flavors: ${flavors.join(', ') || '(none parsed)'}`,
+        detail: `declared flavors: ${flavors.join(', ')}`,
         fix: 'Use one of the declared flavors or add the missing one',
       }]
     }

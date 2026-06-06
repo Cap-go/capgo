@@ -33,7 +33,7 @@ import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { mkdir, readFile as readFileAsync, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, join, resolve } from 'node:path'
-import process, { chdir, cwd, exit } from 'node:process'
+import process, { cwd, exit } from 'node:process'
 import { isCancel as clackIsCancel, log as clackLog, select as clackSelect, confirm, select, spinner as spinnerC } from '@clack/prompts'
 import AdmZip from 'adm-zip'
 import { WebSocket as PartySocket } from 'partysocket'
@@ -57,6 +57,7 @@ import { trackAiAnalysisChoice, trackAiAnalysisResult } from '../ai/telemetry'
 import { assertCliPermission, canPromptInteractively, createSupabaseClient, findSavedKey, getConfig, getOrganizationId, sendEvent } from '../utils'
 import { mergeCredentials, MIN_OUTPUT_RETENTION_SECONDS, parseInAppUpdatePriority, parseOptionalBoolean, parseOutputRetentionSeconds } from './credentials'
 import { buildProvisioningMap } from './credentials-command'
+import { withCwd } from './cwd'
 import { writeBuildOutputRecord } from './output-record'
 import { getPlatformDirFromCapacitorConfig } from './platform-paths'
 import { handleCustomMsg } from './qr.js'
@@ -188,41 +189,8 @@ function createDefaultLogger(silent: boolean): BuildLogger {
   }
 }
 
-let cwdQueue: Promise<unknown> = Promise.resolve()
-
-/**
- * Run an async function with the process working directory temporarily set to `dir`.
- *
- * NOTE: `process.chdir()` is global, so this uses a simple in-process queue to avoid
- * concurrent calls interfering with each other.
- */
-async function withCwd<T>(dir: string, fn: () => Promise<T>): Promise<T> {
-  const run = async () => {
-    const previous = cwd()
-    try {
-      chdir(dir)
-    }
-    catch (error) {
-      throw new Error(`Failed to change working directory to "${dir}": ${(error as Error).message}`)
-    }
-
-    try {
-      return await fn()
-    }
-    finally {
-      try {
-        chdir(previous)
-      }
-      catch {
-        // Best-effort restore; ignore to avoid masking original errors.
-      }
-    }
-  }
-
-  const p = cwdQueue.then(run, run)
-  cwdQueue = p.then(() => undefined, () => undefined)
-  return p
-}
+// `withCwd` (the global chdir queue) lives in ./cwd so the prescan context
+// builder shares the same queue — see src/build/cwd.ts.
 
 /**
  * Fetch with retry logic for build requests
@@ -1283,6 +1251,14 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
     : baseLogger
 
   try {
+    // --prescan-ignore-fatal + --fail-on-warnings is contradictory (the spec says the
+    // CLI rejects the combination on `build request` too, not just `build prescan`).
+    // Validated before any network call so nothing is ever created server-side.
+    if (options.prescan !== false) {
+      const { validateFlags } = await import('./prescan/command')
+      validateFlags({ ignoreFatal: options.prescanIgnoreFatal, failOnWarnings: options.failOnWarnings })
+    }
+
     options.apikey = options.apikey || findSavedKey(silent)
     const projectDir = resolve(options.path || cwd())
 
@@ -1592,6 +1568,60 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
       log.info(`Build options: platform=${buildOptionsPayload.platform}, mode=${buildOptionsPayload.buildMode}, cliVersion=${buildOptionsPayload.cliVersion}`)
     }
 
+    // ---- prescan gate (see src/build/prescan/) ----
+    // Runs BEFORE the POST /build/request: a blocked prescan must not orphan a
+    // created-but-never-uploaded build job server-side (stuck "pending" row in
+    // the dashboard + skewed "Build requested" telemetry).
+    if (options.prescan !== false) {
+      const { executePrescan, runPrescanGate } = await import('./prescan/command')
+      const gate = await runPrescanGate(
+        {
+          enabled: true,
+          ignoreFatal: options.prescanIgnoreFatal,
+          failOnWarnings: options.failOnWarnings,
+          silent,
+          // Route output through the BuildLogger: Ink onboarding / SDK / MCP stdio
+          // callers own the terminal — raw clack writes would corrupt it.
+          print: msg => log.info(msg),
+          warn: msg => log.warn(msg),
+        },
+        // The gate only needs the report; the apikey in PrescanExecution is for
+        // the standalone command's telemetry (request.ts sends its own events).
+        // Pass mergedCredentials so the scan validates the exact credential set the
+        // build will use (CLI flags + env + saved file), not a fresh re-merge that
+        // would miss flag overrides; flavor/distribution fall back to the merged
+        // CAPGO_ANDROID_FLAVOR / CAPGO_IOS_DISTRIBUTION inside buildScanContext.
+        async () => (await executePrescan(appId, {
+          platform,
+          path: projectDir,
+          apikey: options.apikey,
+          credentials: mergedCredentials as Record<string, string>,
+          androidFlavor: options.androidFlavor,
+          iosDist: options.iosDistribution,
+          supaHost: options.supaHost,
+          supaAnon: options.supaAnon,
+        })).report,
+      )
+      if (gate === 'block') {
+        await sendEvent(options.apikey, {
+          channel: 'native-builder',
+          event: 'Prescan blocked',
+          icon: '🛡️',
+          org_id: orgId,
+          tracking_version: 2,
+          tags: {
+            'app-id': appId,
+            'platform': platform,
+          },
+          notify: false,
+        }).catch()
+        // Thrown (not exit(1)) so requestBuildInternal keeps its no-exit contract for SDK
+        // callers: the outer catch logs the message and returns { success: false }, and
+        // requestBuildCommand turns that into exit code 1.
+        throw new Error('Prescan found blocking problems — the build was not requested and nothing was uploaded. Fix the errors above or re-run with --prescan-ignore-fatal / --no-prescan.')
+      }
+    }
+
     // Request build from Capgo backend (POST /build/request)
     log.info('Requesting build from Capgo...')
 
@@ -1677,48 +1707,6 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
       },
       notify: false,
     }).catch()
-
-    // ---- prescan gate (see src/build/prescan/) ----
-    if (options.prescan !== false) {
-      const { executePrescan, runPrescanGate } = await import('./prescan/command')
-      const gate = await runPrescanGate(
-        {
-          enabled: true,
-          ignoreFatal: options.prescanIgnoreFatal,
-          failOnWarnings: options.failOnWarnings,
-          silent,
-        },
-        // The gate only needs the report; the apikey in PrescanExecution is for
-        // the standalone command's telemetry (request.ts sends its own events).
-        async () => (await executePrescan(appId, {
-          platform,
-          path: projectDir,
-          apikey: options.apikey,
-          androidFlavor: options.androidFlavor,
-          iosDist: options.iosDistribution,
-          supaHost: options.supaHost,
-          supaAnon: options.supaAnon,
-        })).report,
-      )
-      if (gate === 'block') {
-        await sendEvent(options.apikey, {
-          channel: 'native-builder',
-          event: 'Prescan blocked',
-          icon: '🛡️',
-          org_id: orgId,
-          tracking_version: 2,
-          tags: {
-            'app-id': appId,
-            'platform': platform,
-          },
-          notify: false,
-        }).catch()
-        // Thrown (not exit(1)) so requestBuildInternal keeps its no-exit contract for SDK
-        // callers: the outer catch logs the message and returns { success: false }, and
-        // requestBuildCommand turns that into exit code 1.
-        throw new Error('Prescan found blocking problems — nothing was uploaded. Fix the errors above or re-run with --prescan-ignore-fatal / --no-prescan.')
-      }
-    }
 
     // Create temporary directory for zip
     const tempDir = join(tmpdir(), `capgo-build-${Date.now()}`)
