@@ -51,6 +51,12 @@ export function parseMobileprovisionDetailed(filePath: string): MobileprovisionD
   return parseMobileprovisionBufferDetailed(data, filePath)
 }
 
+/** Base64 variant of {@link parseMobileprovisionDetailed} (profiles stored in CAPGO_IOS_PROVISIONING_MAP). */
+export function parseMobileprovisionDetailedFromBase64(base64Content: string): MobileprovisionDetail {
+  const data = Buffer.from(base64Content, 'base64')
+  return parseMobileprovisionBufferDetailed(data, '<base64 input>')
+}
+
 function parseMobileprovisionBuffer(data: Buffer, source: string): MobileprovisionInfo {
   const xmlStartMarker = '<?xml'
   const xmlEndMarker = '</plist>'
