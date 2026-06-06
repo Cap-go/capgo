@@ -1,5 +1,5 @@
 // cli/src/support/contact-support.ts
-import { buildMailtoUrl } from './mailto.js'
+import { buildMailtoUrl, MAILTO_BODY_MAX } from './mailto.js'
 
 const SUPPORT_EMAIL = 'support@capgo.app'
 
@@ -34,6 +34,17 @@ export interface ContactSupportDeps {
 
 export type ContactSupportResult = 'opened' | 'cancelled' | 'failed'
 
+// buildMailtoUrl caps the body and truncates from the END — which is exactly
+// where the logs link / attach path lives. Trim the free-text prefix instead,
+// so the essential suffix ALWAYS survives.
+function fitBodyPrefix(prefix: string, suffix: string): string {
+  const budget = MAILTO_BODY_MAX - suffix.length
+  if (prefix.length <= budget)
+    return prefix
+  const marker = '…(truncated)'
+  return prefix.slice(0, Math.max(0, budget - marker.length)) + marker
+}
+
 // Re-entrancy guard: TUI selects can re-fire their onChange on re-render
 // (@inkjs/ui gotcha), and a double invocation would open two mail windows.
 let supportFlowInFlight = false
@@ -64,8 +75,11 @@ async function runContactSupport(deps: ContactSupportDeps): Promise<ContactSuppo
   // Preferred path: upload the gz and put the download link in the email body —
   // the mail is send-ready, there's nothing to attach (so no clipboard/Finder).
   const uploaded = deps.upload ? await deps.upload(files.gzPath) : null
+  if (deps.upload && !uploaded)
+    deps.print('(Logs upload to Capgo failed or is unavailable — the email will include attach instructions instead.)')
   if (uploaded) {
-    const body = `${deps.body}\n\nSupport logs (kept 30 days):\n${uploaded.url}`
+    const linkBlock = `\n\nSupport logs (kept 30 days):\n${uploaded.url}`
+    const body = `${fitBodyPrefix(deps.body, linkBlock)}${linkBlock}`
     const url = buildMailtoUrl({ to: SUPPORT_EMAIL, subject: deps.subject, body })
     let mailOpened = true
     try {
@@ -90,7 +104,8 @@ async function runContactSupport(deps: ContactSupportDeps): Promise<ContactSuppo
   // the user is looking at their mail client now, not the terminal. Only claim it's
   // on the clipboard if the copy actually succeeded.
   const clipLine = copied ? '\n(The path is already on your clipboard.)' : ''
-  const body = `${deps.body}\n\nPlease attach the logs file saved at:\n${files.gzPath}${clipLine}`
+  const attachBlock = `\n\nPlease attach the logs file saved at:\n${files.gzPath}${clipLine}`
+  const body = `${fitBodyPrefix(deps.body, attachBlock)}${attachBlock}`
   const url = buildMailtoUrl({ to: SUPPORT_EMAIL, subject: deps.subject, body })
 
   let mailOpened = true

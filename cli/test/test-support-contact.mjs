@@ -75,6 +75,31 @@ await ta('upload failure degrades to the manual attach flow', async () => {
   assert.ok(decodeURIComponent(calls.opened[0]).includes('Please attach')) // attach instructions back
 })
 
+await ta('logs link survives body truncation (long error text)', async () => {
+  const url = 'https://api.capgo.app/builder_support_logs/' + 'b'.repeat(64)
+  const { deps, calls } = makeDeps({
+    body: 'Error: ' + 'x'.repeat(5000), // way past the mailto body cap
+    upload: async () => ({ id: 'b'.repeat(64), url }),
+  })
+  await contactSupport(deps)
+  const body = decodeURIComponent(calls.opened[0].split('body=')[1])
+  assert.ok(body.endsWith(url)) // the link is NEVER truncated away
+  assert.ok(body.includes('…(truncated)')) // the long prefix is what got cut
+})
+
+await ta('attach path survives body truncation in the fallback flow', async () => {
+  const { deps, calls } = makeDeps({ body: 'Error: ' + 'y'.repeat(5000) })
+  await contactSupport(deps)
+  const body = decodeURIComponent(calls.opened[0].split('body=')[1])
+  assert.ok(body.includes('/x/b.log.gz')) // attach path preserved despite truncation
+})
+
+await ta('upload failure is announced, not silent', async () => {
+  const { deps, calls } = makeDeps({ upload: async () => null })
+  await contactSupport(deps)
+  assert.ok(calls.printed.some(m => m.includes('upload to Capgo failed')))
+})
+
 await ta('confirm copy discloses the upload + 30-day retention when uploading', async () => {
   let confirmMsg = ''
   const { deps } = makeDeps({
