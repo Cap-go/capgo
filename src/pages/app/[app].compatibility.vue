@@ -29,6 +29,7 @@ const isLoading = ref(false)
 const app = ref<Database['public']['Tables']['apps']['Row']>()
 const events = ref<CompatibilityEventRow[]>([])
 const existingChannelIds = ref<Set<number>>(new Set())
+const existingVersionIds = ref<Set<number>>(new Set())
 const showUnresolvedOnly = ref(true)
 
 const acceptDialogId = 'compatibility-accept-event'
@@ -107,7 +108,7 @@ async function loadEvents() {
     }
 
     events.value = (data ?? []) as CompatibilityEventRow[]
-    await loadExistingChannels()
+    await Promise.all([loadExistingChannels(), loadExistingVersions()])
   }
   catch (error) {
     console.error('[Compatibility] Error loading events:', error)
@@ -142,6 +143,34 @@ function openChannel(event: CompatibilityEventRow) {
   if (event.channel_id === null)
     return
   router.push(`/app/${encodeURIComponent(id.value)}/channel/${event.channel_id}`)
+}
+
+// Bundle names are snapshots that outlive purged bundles; only link the ones
+// that still exist (not soft-deleted, matching the bundle pages).
+async function loadExistingVersions() {
+  const versionIds = [...new Set(events.value
+    .flatMap(event => [event.current_version_id, event.previous_version_id])
+    .filter((versionId): versionId is number => versionId !== null))]
+  if (versionIds.length === 0) {
+    existingVersionIds.value = new Set()
+    return
+  }
+  const { data, error } = await supabase
+    .from('app_versions')
+    .select('id')
+    .eq('app_id', id.value)
+    .eq('deleted', false)
+    .in('id', versionIds)
+  if (error) {
+    console.error('[Compatibility] Error checking bundles:', error)
+    existingVersionIds.value = new Set()
+    return
+  }
+  existingVersionIds.value = new Set((data ?? []).map(version => version.id))
+}
+
+function openBundle(versionId: number) {
+  router.push(`/app/${encodeURIComponent(id.value)}/bundle/${versionId}`)
 }
 
 async function refreshData() {
@@ -304,10 +333,7 @@ watchEffect(async () => {
                       {{ t('channel') }}
                     </th>
                     <th scope="col" class="px-4 py-3">
-                      {{ t('compatibility-current-bundle') }}
-                    </th>
-                    <th scope="col" class="px-4 py-3">
-                      {{ t('compatibility-previous-bundle') }}
+                      {{ t('compatibility-change') }}
                     </th>
                     <th scope="col" class="px-4 py-3">
                       {{ t('compatibility-offenders') }}
@@ -356,10 +382,29 @@ watchEffect(async () => {
                       <span v-else>{{ group.representative.channel_name }}</span>
                     </td>
                     <td class="px-4 py-3 font-mono text-xs text-slate-700 dark:text-slate-200">
-                      {{ bundleLabel(group.representative.current_version_name) }}
-                    </td>
-                    <td class="px-4 py-3 font-mono text-xs text-slate-700 dark:text-slate-200">
-                      {{ bundleLabel(group.representative.previous_version_name) }}
+                      <div class="flex items-center gap-1.5 whitespace-nowrap">
+                        <button
+                          v-if="group.representative.previous_version_id !== null && existingVersionIds.has(group.representative.previous_version_id)"
+                          type="button"
+                          class="text-blue-600 underline-offset-2 hover:underline dark:text-blue-400"
+                          data-test="compatibility-previous-bundle-link"
+                          @click="openBundle(group.representative.previous_version_id)"
+                        >
+                          {{ bundleLabel(group.representative.previous_version_name) }}
+                        </button>
+                        <span v-else>{{ bundleLabel(group.representative.previous_version_name) }}</span>
+                        <span aria-hidden="true" class="text-slate-400">→</span>
+                        <button
+                          v-if="group.representative.current_version_id !== null && existingVersionIds.has(group.representative.current_version_id)"
+                          type="button"
+                          class="text-blue-600 underline-offset-2 hover:underline dark:text-blue-400"
+                          data-test="compatibility-current-bundle-link"
+                          @click="openBundle(group.representative.current_version_id)"
+                        >
+                          {{ bundleLabel(group.representative.current_version_name) }}
+                        </button>
+                        <span v-else>{{ bundleLabel(group.representative.current_version_name) }}</span>
+                      </div>
                     </td>
                     <td class="px-4 py-3">
                       <div v-if="group.representative.offenders && group.representative.offenders.length > 0" class="flex flex-wrap gap-1" :title="group.representative.offenders.join(', ')">
