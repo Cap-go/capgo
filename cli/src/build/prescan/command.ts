@@ -7,6 +7,7 @@ import { intro, log, outro } from '@clack/prompts'
 import { createSupabaseClient, findSavedKey } from '../../utils'
 import { buildScanContext } from './context'
 import { decideOutcome, runPrescan } from './engine'
+import { resolveWarningGate } from './prompt'
 import { ALL_CHECKS } from './registry'
 import { renderJsonReport, renderTerminalReport } from './report'
 
@@ -77,4 +78,43 @@ export async function prescanCommand(appId: string | undefined, options: Prescan
     outro(outcome === 'block' ? 'Prescan found blocking problems — fix them before building.' : 'Prescan finished.')
   }
   exit(exitCodeFor(report.counts, options))
+}
+
+export interface PrescanGateOptions {
+  enabled: boolean
+  ignoreFatal?: boolean
+  failOnWarnings?: boolean
+  /** test seam; defaults to canPromptInteractively() (via resolveWarningGate) at call time */
+  interactive?: boolean
+  silent?: boolean
+}
+
+/**
+ * Used by build request. Runs the scan via the provided thunk, prints the report,
+ * and resolves to 'proceed' | 'block'. NEVER throws: a crashing scanner proceeds with a notice
+ * (the scanner must never be worse than no scanner).
+ */
+export async function runPrescanGate(
+  opts: PrescanGateOptions,
+  scan: () => Promise<PrescanReport>,
+): Promise<'proceed' | 'block'> {
+  if (!opts.enabled)
+    return 'proceed'
+  let report: PrescanReport
+  try {
+    report = await scan()
+  }
+  catch (e) {
+    log.warn(`prescan crashed and was skipped: ${e instanceof Error ? e.message : String(e)}`)
+    return 'proceed'
+  }
+  if (report.findings.length > 0)
+    log.message(renderTerminalReport(report, {}))
+  const outcome = decideOutcome(report, { ignoreFatal: opts.ignoreFatal, failOnWarnings: opts.failOnWarnings })
+  if (outcome === 'ask') {
+    if (opts.interactive === false)
+      return 'proceed'
+    return resolveWarningGate('ask', { silent: opts.silent })
+  }
+  return outcome
 }

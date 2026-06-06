@@ -76,6 +76,12 @@ export const buildRequestOptionsSchema = optionsBaseSchema.extend({
   //   - 'skip'                  — skip the AI block entirely; normal cleanup
   //     runs (log file deleted on exit).
   aiAnalysisMode: z.enum(['auto-prompt', 'caller-handled', 'skip']).optional(),
+  // Prescan gate (see src/build/prescan/). `prescan: false` (--no-prescan) skips the
+  // automatic pre-build scan; `prescanIgnoreFatal` reports but never blocks;
+  // `failOnWarnings` treats prescan warnings as fatal.
+  prescan: z.boolean().optional(),
+  prescanIgnoreFatal: z.boolean().optional(),
+  failOnWarnings: z.boolean().optional(),
 })
 
 export type BuildRequestOptions = z.infer<typeof buildRequestOptionsSchema>

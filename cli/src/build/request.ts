@@ -1678,6 +1678,46 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
       notify: false,
     }).catch()
 
+    // ---- prescan gate (see src/build/prescan/) ----
+    if (options.prescan !== false) {
+      const { executePrescan, runPrescanGate } = await import('./prescan/command')
+      const gate = await runPrescanGate(
+        {
+          enabled: true,
+          ignoreFatal: options.prescanIgnoreFatal,
+          failOnWarnings: options.failOnWarnings,
+          silent,
+        },
+        () => executePrescan(appId, {
+          platform,
+          path: projectDir,
+          apikey: options.apikey,
+          androidFlavor: options.androidFlavor,
+          iosDist: options.iosDistribution,
+          supaHost: options.supaHost,
+          supaAnon: options.supaAnon,
+        }),
+      )
+      if (gate === 'block') {
+        await sendEvent(options.apikey, {
+          channel: 'native-builder',
+          event: 'Prescan blocked',
+          icon: '🛡️',
+          org_id: orgId,
+          tracking_version: 2,
+          tags: {
+            'app-id': appId,
+            'platform': platform,
+          },
+          notify: false,
+        }).catch()
+        // Thrown (not exit(1)) so requestBuildInternal keeps its no-exit contract for SDK
+        // callers: the outer catch logs the message and returns { success: false }, and
+        // requestBuildCommand turns that into exit code 1.
+        throw new Error('Prescan found blocking problems — nothing was uploaded. Fix the errors above or re-run with --prescan-ignore-fatal / --no-prescan.')
+      }
+    }
+
     // Create temporary directory for zip
     const tempDir = join(tmpdir(), `capgo-build-${Date.now()}`)
     await mkdir(tempDir, { recursive: true })
