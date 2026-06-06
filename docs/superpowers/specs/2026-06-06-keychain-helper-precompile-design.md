@@ -34,6 +34,8 @@ swiftc compile path retained as fallback.
 | Versioning | Independent semver, starting 1.0.0; release tag `cli-helper-X.Y.Z`; released **only when helper source changes**, not per CLI release |
 | Pipeline | Tag-triggered GitHub Actions workflow on `macos-latest`: build → codesign → notarize → verify → npm publish with provenance |
 | Signing | Developer ID Application certificate; hardened runtime + secure timestamp; notarized via `notarytool` with existing App Store Connect API key secrets |
+| Binary trust | CLI verifies the package-resolved binary's code signature (Developer ID + Capgo Team ID designated requirement) before executing it; failure falls through to swiftc with a warning |
+| Env override | `CAPGO_KEYCHAIN_HELPER_PATH` exists in dev builds only — stripped from npm release builds via build-time define + dead-code elimination |
 
 ## Architecture
 
@@ -87,20 +89,62 @@ cli-helper/
 
 Runtime resolution order in `cli/src/build/onboarding/macos-signing.ts`:
 
-1. `CAPGO_KEYCHAIN_HELPER_PATH` env override (new; debugging/tests).
+1. `CAPGO_KEYCHAIN_HELPER_PATH` env override — **dev builds only**. The branch
+   is guarded by a build-time global (`__CAPGO_ALLOW_HELPER_ENV_OVERRIDE__`)
+   defined `false` in the npm release build, so the minifier removes the code
+   entirely: the published `dist/index.js` contains neither the branch nor the
+   string `CAPGO_KEYCHAIN_HELPER_PATH` (CI asserts this — see Testing). Dev
+   builds define it `true`. Rationale: an env-controlled executable path in
+   the release artifact is an arbitrary-binary-execution vector.
 2. Precompiled package:
    `createRequire(import.meta.url).resolve('@capgo/cli-keychain-darwin-' + archSuffix + '/keychain-export')`
    where `archSuffix` maps `process.arch` `arm64`→`arm64`, `x64`→`x64`; any
    other arch skips this step. Wrapped in try/catch; verify the file exists
-   and is executable. On hit: use directly (no tmp copy, no compile);
-   `isHelperCached()` returns true so the UI skips the "compiling helper" step.
+   and is executable, **then verify its code signature** (below) before use.
+   On hit: use directly (no tmp copy, no compile); `isHelperCached()` returns
+   true so the UI skips the "compiling helper" step.
 3. Cached tmp binary at `$TMPDIR/capgo-keychain-export-v{version}` (existing).
 4. swiftc compile from bundled `.swift` source (existing; needs Xcode CLT).
+
+### Signature verification of the precompiled binary
+
+Before executing a package-resolved binary (step 2), the CLI verifies it was
+signed by the Capgo team using a `codesign` designated-requirement check:
+
+```
+codesign --verify --strict
+  -R '=anchor apple generic
+      and certificate leaf[field.1.2.840.113635.100.6.1.13]
+      and certificate leaf[subject.OU] = "<CAPGO_APPLE_TEAM_ID>"'
+  <binary>
+```
+
+This asserts, validated by macOS itself: (a) an Apple-rooted certificate
+chain, (b) a Developer ID Application leaf certificate, and (c) Capgo's Apple
+Team ID as the signing team. Because the code signature seals the binary's
+contents, this also detects post-install tampering — a checksum pin is not
+needed (and is impossible anyway: the CLI depends on a `^` range, so it cannot
+know the exact binary hash).
+
+- The Team ID is baked into the CLI source as a constant
+  (`CAPGO_APPLE_TEAM_ID`), filled in during implementation from the Apple
+  Developer account.
+- On verification failure (non-zero exit): log a warning naming the package
+  and path, skip the binary, and fall through to step 3/4 — local compilation
+  of the bundled, auditable source is the safe degradation.
+- Cost: one `codesign` spawn (~tens of ms) per export invocation — negligible
+  against the Keychain prompts that follow.
+- `helperPathOverride` (existing test-only option passed programmatically to
+  `exportP12FromKeychain`) bypasses the signature check; it is not reachable
+  from user input.
 
 Build changes in `cli/build.mjs`:
 
 - Mark both helper packages as `external` in `Bun.build` so they resolve from
   `node_modules` at runtime instead of being bundled.
+- Add `define: { __CAPGO_ALLOW_HELPER_ENV_OVERRIDE__: 'false' }` to the
+  release build (and `'true'` under `NODE_ENV=development`) so the env
+  override is dead-code-eliminated from the npm artifact.
 - The `.swift` copy into `dist/` now sources from
   `../cli-helper/src/keychain-export.swift`.
 
@@ -159,7 +203,9 @@ To do:
    portal (Certificates → + → Developer ID Application). Requires the
    **Account Holder** role (Apple policy for Developer ID certs). Export as
    `.p12` with a password; add GitHub secrets `DEVELOPER_ID_CERT_BASE64` and
-   `DEVELOPER_ID_CERT_PASSWORD`.
+   `DEVELOPER_ID_CERT_PASSWORD`. Record the team's **Apple Team ID** (the
+   `subject.OU` of the cert) — it becomes the `CAPGO_APPLE_TEAM_ID` constant
+   in the CLI source for runtime signature verification.
 2. Verify the existing App Store Connect API key has **Developer role or
    higher** (required by `notarytool`); validate with a dry-run submission.
 3. One full local sign + notarize cycle on a Mac before wiring CI, to validate
@@ -167,9 +213,11 @@ To do:
 
 ## Error handling
 
-- Each runtime resolution step falls through silently to the next. Only when
-  all steps fail does the user see an error — the existing swiftc/Xcode-CLT
-  message, extended to mention reinstalling with optional dependencies enabled.
+- Each runtime resolution step falls through silently to the next — except a
+  **signature verification failure**, which falls through with a logged
+  warning (possible tampering is worth surfacing). Only when all steps fail
+  does the user see an error — the existing swiftc/Xcode-CLT message,
+  extended to mention reinstalling with optional dependencies enabled.
 - No partial publishes: both packages publish at the end of the workflow,
   after both binaries pass signing, notarization, and verification gates.
 - Notarization flakiness is contained to helper releases (rare), never blocks
@@ -178,12 +226,21 @@ To do:
 ## Testing
 
 - **Unit** (extend `cli/test/test-macos-signing.mjs`; cross-platform, no real
-  Keychain): resolution order — env override wins; fake package dir resolves
-  before swiftc path; missing package falls through; non-executable file falls
-  through.
+  Keychain): resolution order — env override wins in dev builds; fake package
+  dir resolves before swiftc path; missing package falls through;
+  non-executable file falls through; signature-check failure (mocked codesign
+  exit ≠ 0) falls through with warning; signature-check pass executes the
+  package binary.
+- **Release-artifact assertion** (in `publish_cli.yml` after the build step):
+  fail the CLI release if `dist/index.js` contains the string
+  `CAPGO_KEYCHAIN_HELPER_PATH` — proves the env-override branch was
+  dead-code-eliminated from the npm artifact.
 - **CI smoke** (in helper workflow): signed arm64 binary runs with invalid
   args → non-zero exit + `INVALID_ARGS` JSON envelope (proves the hardened-
-  runtime-signed binary executes).
+  runtime-signed binary executes). Additionally run the same
+  designated-requirement `codesign --verify -R` check the CLI will perform at
+  runtime, so a cert/team mismatch is caught at release time, not at user
+  runtime.
 - **Signature checks** (in workflow): `codesign --verify --strict`; authority
   check; notarization "Accepted" status.
 - **Manual acceptance** (once per first release): npm-install a release
