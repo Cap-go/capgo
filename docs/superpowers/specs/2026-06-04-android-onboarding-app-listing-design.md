@@ -154,15 +154,18 @@ On the generate path, if the reporting scope wasn't granted, the API is disabled
 - **Auto-creating the Play app** — the "Create app" click is UI-only (no API/bypass).
 - **Hard-gating Path B** — inform + allow proceed.
 
-## 11. Open questions
+## 11. Decisions & open questions
 
-- **Does `apps:search` list a zero-release Draft app? (UNVERIFIED — one probe.)** Create a Draft app → call `apps:search` → observe. Decides whether the post-"Create app" re-check can *confirm* success or must *trust-and-proceed*. Does **not** block implementation (Path B informs-and-proceeds either way).
-- **`setNamespace` aggressiveness.** Path A sets `applicationId` + `namespace` (+ `setPackageName`). Only `applicationId` is strictly required to match the Play app; the fuller rename matches the proven script and is fine for standard Capacitor apps, but is more invasive when `namespace ≠ applicationId` by intent. Always-full vs. opt-in?
-- **`npx cap sync` after rename** — included for Capacitor consistency; `applicationId` alone doesn't need it. Keep vs. drop (slow/network step)?
-- **On-demand Trapeze install** — needs npm + network mid-onboarding. Pin + spinner + manual fallback. Acceptable, or pre-resolve differently?
-- **Android Studio detection off macOS** — only macOS auto-detects; others get a confirm. OK for v1?
-- **Multiple Gradle flavors** — when >1 `applicationId` matches a Play app, show the picker (no auto-skip). Confirm vs. iOS-style "pick the main one".
-- **Backend coordination** — reporting scope must be added (optional) to `/private/config/builder`'s `scopes[]` to activate in prod; until then the CLI silently degrades.
+**Decided:**
+- **Always full rename (always set `namespace`).** Path A always runs the proven 3-call script (`setPackageName` + `setApplicationId` + `setNamespace`). Skipping `namespace` is not an option — AGP 8 requires it, and a package move (`setPackageName`) with a stale `namespace` breaks `R`/`BuildConfig` imports and fails the build. No "namespace opt-in."
+- **`npx cap sync` after the rename is REQUIRED** — keep it (not optional).
+- **On-demand Trapeze install** — accepted (pin version + spinner + manual fallback on failure).
+- **Android Studio detection** — accepted: macOS auto-detects (`pgrep`) + polls until closed; other OSes get a one-time confirm.
+- **Backend coordination → test via preprod.** Add the `playdeveloperreporting` scope to preprod's `/private/config/builder` `scopes[]` and point the CLI at it via `CAPGO_BUILDER_CONFIG_URL` for end-to-end testing. The scope stays optional so prod (before the scope is added) degrades gracefully.
+
+**Open:**
+- **Does `apps:search` list a zero-release Draft app? (UNVERIFIED — one probe / preprod test.)** Decides whether the post-"Create app" re-check can *confirm* success or must *trust-and-proceed*. Does **not** block implementation (Path B informs-and-proceeds either way).
+- **Multiple Gradle flavors** — when >1 `applicationId` matches a Play app, show the picker (no auto-skip). Confirm vs. iOS-style "pick the main one". (Minor; picker is the safe default.)
 
 ## 12. Appendix — why Path B "completes after one click"
 
