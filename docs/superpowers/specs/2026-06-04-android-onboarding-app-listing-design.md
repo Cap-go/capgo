@@ -13,7 +13,7 @@
 After Google sign-in, list the developer's real Play Store apps via the **Play Developer Reporting API** (`apps:search`) and reconcile them against the project's Gradle `applicationId`:
 
 - **Match** → silently confirm the package, no question (like iOS exact-match).
-- **App exists, build id is wrong** → **Path A**: auto-rename the Android project to the chosen app's package via **Trapeze**, `cap sync`, re-check.
+- **App exists, build id is wrong** → **Path A**: show a picker of the real Play apps. **Nothing is rewritten automatically.** If the user *explicitly* picks an app and then *explicitly* opts into "Rename my project for me", we run a **Trapeze** rename (+ `cap sync`, re-check) — otherwise they pick/retype/decline. The rename is a user-invoked convenience behind confirmation, never silent.
 - **No app exists** → **Path B**: open Play Console so the user clicks **"Create app"** (the *single* irreducible manual step on Android), then proceed — the first build uploads as a draft and succeeds.
 
 OAuth-only: the listing uses the **user's** OAuth token + the `playdeveloperreporting` scope. We never enable the Reporting API on the user's service account, so the **import (custom-SA) path** keeps today's Gradle-only flow with a "verification skipped" warning. Any verification failure degrades gracefully to the plain Gradle picker — onboarding is never blocked.
@@ -68,13 +68,13 @@ When entering `android-package-select` AND `serviceAccountMethod === 'generate'`
 1. Detect Gradle ids (`findAndroidApplicationIds`) **and** `listPlayApps(await ensureAccessToken())`.
 2. Reconcile ("expand the Gradle list") and route:
    - **Exactly one Gradle id, and it's in `apps` → auto-confirm, skip the picker.** `addLog('✓ Building "<name>" (<pkg>) — matches your Play Store app.')` → continue to `gcp-setup-running`.
-   - **Account has apps, build id matches none → Path A picker** (real Play apps annotated `✓ in Play Console`, the Gradle ids, "type a different name", and a "Create a new app → Path B" entry). Choosing a real app whose `packageName` ≠ the build id offers the Trapeze rename.
+   - **Account has apps, build id matches none → Path A picker** (real Play apps annotated `✓ in Play Console`, the Gradle ids, "type a different name", and a "Create a new app → Path B" entry). Choosing a real app whose `packageName` ≠ the build id **then offers** the Trapeze rename as one option (alongside "I'll fix build.gradle myself — re-check" and "Back"). The rename is **never run without that explicit second choice.**
    - **No apps at all → Path B.**
 3. The chosen/renamed package flows into `androidPackageChosen` / SA grant exactly as today.
 
-### 5.4 Path A — auto-rename via Trapeze
+### 5.4 Path A — user-invoked rename via Trapeze (explicit opt-in, never automatic)
 
-Hand-editing an Android `applicationId` correctly spans `build.gradle`, `namespace`, manifest/package, then needs `cap sync` — "retype it" is a non-starter. So offer **"Rename my Android project to `<pkg>` for me"**, powered by Trapeze:
+Hand-editing an Android `applicationId` correctly spans `build.gradle`, `namespace`, manifest/package, then needs `cap sync` — "retype it" is a non-starter. So we *offer* (never force) **"Rename my Android project to `<pkg>` for me"** as one menu option, powered by Trapeze. The orchestrated sequence below runs **only after the user explicitly selects that option** — there is no code path that rewrites the project without that choice. The script:
 
 ```ts
 const project = new MobileProject('.', { android: { path: 'android' } })
