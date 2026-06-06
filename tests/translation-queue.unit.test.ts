@@ -14,6 +14,24 @@ function stubWorkerCache() {
   return cache
 }
 
+function stubStatefulWorkerCache() {
+  const store = new Map<string, Response>()
+  const cache = {
+    match: vi.fn(async (request: Request) => {
+      const response = store.get(request.url)
+      return response?.clone() ?? null
+    }),
+    put: vi.fn(async (request: Request, response: Response) => {
+      store.set(request.url, response.clone())
+    }),
+  }
+  Object.defineProperty(globalThis, 'caches', {
+    configurable: true,
+    value: { default: cache },
+  })
+  return cache
+}
+
 function createTranslationStoreMock(latestReadyEntry: Record<string, unknown> | null) {
   return {
     prepare: vi.fn((sql: string) => ({
@@ -193,6 +211,41 @@ describe('translation queue helpers', () => {
 
     expect(response.status).toBe(202)
     expect(payload.status).toBe('pending')
+    expect(queue.send).toHaveBeenCalledTimes(1)
+  })
+
+  it('rate limits repeated public translation queue requests by client IP', async () => {
+    stubStatefulWorkerCache()
+    const db = createTranslationStoreMock(null)
+    const queue = {
+      send: vi.fn(),
+    }
+    const env = {
+      DB_TRANSLATIONS: db,
+      TRANSLATION_MESSAGES_QUEUE: queue,
+      TRANSLATION_MESSAGES_RATE_LIMIT: '1',
+    } as any
+
+    const firstResponse = await translationWorker.fetch(new Request('https://api.capgo.app/translation/messages', {
+      body: JSON.stringify({ targetLanguage: 'fr' }),
+      headers: {
+        'Content-Type': 'application/json',
+        'cf-connecting-ip': '203.0.113.10',
+      },
+      method: 'POST',
+    }), env)
+    const secondResponse = await translationWorker.fetch(new Request('https://api.capgo.app/translation/messages', {
+      body: JSON.stringify({ targetLanguage: 'es' }),
+      headers: {
+        'Content-Type': 'application/json',
+        'cf-connecting-ip': '203.0.113.10',
+      },
+      method: 'POST',
+    }), env)
+
+    expect(firstResponse.status).toBe(202)
+    expect(secondResponse.status).toBe(429)
+    expect(secondResponse.headers.get('retry-after')).toBe('60')
     expect(queue.send).toHaveBeenCalledTimes(1)
   })
 })
