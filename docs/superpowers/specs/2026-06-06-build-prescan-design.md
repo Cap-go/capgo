@@ -26,7 +26,8 @@ Goal: catch these **before** the build is requested, greenlight-style (RevylAI/g
    - `ERROR` findings always abort (auto-fail).
    - `WARNING` findings: interactive → prompt "proceed / exit and fix"; non-interactive → print and proceed.
    - `--fail-on-warnings` flag promotes warnings to fatal (CI usage).
-   - `--no-prescan` on `build request` is the escape hatch.
+   - `--prescan-ignore-fatal` (on `build request`; `--ignore-fatal` on the standalone command): **diagnostic mode** — the scan still runs and the full report is printed, but nothing blocks and warnings don't prompt. Unlike `--no-prescan`, the user still sees every finding. Mutually exclusive with `--fail-on-warnings` (the CLI rejects the combination).
+   - `--no-prescan` on `build request` skips the scan entirely (emergency escape hatch).
 4. **Output: terminal + `--json`** — findings are structured objects from day one.
 5. **Architecture: Approach A** — check-registry engine inside the CLI (not a separate package, not server-side). A server-side "deep scan" tier is an explicit v2 candidate.
 
@@ -117,14 +118,16 @@ capgo build prescan [appId]
   --ios-dist <app_store|ad_hoc>
   --json                       # structured report to stdout, exit code semantics below
   --fail-on-warnings           # warnings exit non-zero / abort build
+  --ignore-fatal               # diagnostic mode: report everything, exit 0, never block
   -v, --verbose                # show passing checks too
 
 capgo build request …          # unchanged surface, plus:
-  --no-prescan                 # skip the automatic scan
+  --no-prescan                 # skip the automatic scan entirely
+  --prescan-ignore-fatal       # scan + report, but never block the build
   --fail-on-warnings
 ```
 
-**Exit codes (standalone):** 0 = clean or warnings-accepted; 1 = errors found; 2 = warnings found with `--fail-on-warnings`. `--json` always prints the full report regardless of exit code.
+**Exit codes (standalone):** 0 = clean, warnings-accepted, or `--ignore-fatal`; 1 = errors found; 2 = warnings found with `--fail-on-warnings`. `--json` always prints the full report regardless of exit code. `--ignore-fatal`/`--prescan-ignore-fatal` and `--fail-on-warnings` together are rejected as contradictory.
 
 **Auto-run placement in `build request`:** after appId/platform/credential resolution (so ctx is complete), **before** `zipDirectory` — nothing is uploaded if prescan errors.
 
@@ -193,8 +196,7 @@ TV/Wear/ChromeOS form-factor checks; Play policy "insights" needing Console cont
 
 - **Unit per check:** fixture-driven — each check gets `fixtures/<check-id>/{pass,fail-*}/` minimal project trees. Target: every E-severity check has at least pass + fail fixtures.
 - **Parser tests:** real-world samples — expired .mobileprovision, PKCS12 + JKS keystores with known passwords, manifests from actual Capacitor templates (old AGP 7 style with `package=`, new AGP 8 style).
-- **Engine tests:** severity aggregation, warning-prompt gating (interactive vs not), `--fail-on-warnings`, JSON shape snapshot, check-crash isolation, remote-skip behavior.
-- **Integration:** `build request` aborts before zip on a fixture with an expired cert; `--no-prescan` bypasses.
+- **Engine tests:** severity aggregation, warning-prompt gating (interactive vs not), `--fail-on-warnings`, `--ignore-fatal` (reports but exits 0 / build proceeds; rejected when combined with `--fail-on-warnings`), JSON shape snapshot, check-crash isolation, remote-skip behavior.
 - **Regression suite seed:** every failure class from the June 4–5 saga gets a fixture (TutorialBuild1 permission case, cordova vars missing, bun linker, workers.max conflict, underscore URL scheme).
 
 ## Rollout
