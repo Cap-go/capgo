@@ -17,6 +17,7 @@ import { manageCredentialsCommand } from './build/credentials-manage'
 import { lastOutputCommand } from './build/last-output-command'
 import { checkBuildNeeded } from './build/needed'
 import { onboardingBuilderCommand } from './build/onboarding/command'
+import { prescanCommand } from './build/prescan/command'
 import { requestBuildCommand } from './build/request'
 import { cleanupBundle } from './bundle/cleanup'
 import { checkCompatibility } from './bundle/compatibility'
@@ -850,6 +851,24 @@ Example: npx @capgo/cli@latest build request com.example.app --platform ios --pa
   .option('--supa-host <supaHost>', optionDescriptions.supaHost)
   .option('--supa-anon <supaAnon>', optionDescriptions.supaAnon)
   .option('--verbose', optionDescriptions.verbose)
+
+build
+  .command('prescan [appId]')
+  .description(`Scan your project and saved credentials for problems that would fail a cloud build — before uploading anything.
+
+Checks credentials (expiry, passwords, profile pairing), project state (cap sync, node_modules layout), and platform config. Runs automatically inside \`build request\`; this command runs it standalone (e.g. in CI).`)
+  .option('--platform <platform>', 'Target platform: ios or android (required)')
+  .option('--path <path>', 'Path to the project directory (default: current directory)')
+  .option('-a, --apikey <apikey>', optionDescriptions.apikey)
+  .option('--android-flavor <flavor>', 'Android: product flavor the build will use')
+  .addOption(new Option('--ios-dist <mode>', 'iOS: distribution mode to validate against').choices(['app_store', 'ad_hoc']))
+  .option('--json', 'Output a machine-readable JSON report')
+  .option('--fail-on-warnings', 'Exit non-zero when warnings are found (CI)')
+  .option('--ignore-fatal', 'Diagnostic mode: report everything but always exit 0')
+  .option('--verbose', optionDescriptions.verbose)
+  .option('--supa-host <supaHost>', optionDescriptions.supaHost)
+  .option('--supa-anon <supaAnon>', optionDescriptions.supaAnon)
+  .action(prescanCommand)
 
 build
   .command('last-output')
