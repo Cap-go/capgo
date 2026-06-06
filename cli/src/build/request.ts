@@ -53,6 +53,7 @@ import {
   startCaptureForJob,
 } from '../ai/log-capture'
 import { renderMarkdown } from '../ai/render-markdown'
+import { createStreamingMarkdownRenderer } from '../ai/stream-markdown'
 import { aiAnalysisResultFromPostAnalyze, trackAiAnalysisChoice, trackAiAnalysisResult } from '../ai/telemetry'
 import { assertCliPermission, canPromptInteractively, createSupabaseClient, findSavedKey, getConfig, getOrganizationId, sendEvent } from '../utils'
 import { mergeCredentials, MIN_OUTPUT_RETENTION_SECONDS, parseInAppUpdatePriority, parseOptionalBoolean, parseOutputRetentionSeconds } from './credentials'
@@ -2057,6 +2058,11 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
           aiSpinner?.start('Analyzing build log with Capgo AI')
 
           let printedHeader = false
+          // Progressive TTY rendering goes through the streaming markdown
+          // renderer so headers/lists/code bars appear styled as lines
+          // complete — output is byte-identical to the buffered
+          // renderMarkdown of the full text (see stream-markdown.ts).
+          const mdStream = isInteractive ? createStreamingMarkdownRenderer(t => stream.write(t), true) : null
           const onChunk = isInteractive
             ? (text: string) => {
                 if (!printedHeader) {
@@ -2064,7 +2070,7 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
                   stream.write('\n--- AI analysis ---\n')
                   printedHeader = true
                 }
-                stream.write(text)
+                mdStream!.feed(text)
               }
             : undefined
 
@@ -2098,7 +2104,9 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
 
           if (result.kind === 'ok') {
             if (printedHeader) {
-              // TTY already rendered the text progressively — just close out.
+              // TTY already rendered the text progressively — render the
+              // trailing line, then close out.
+              mdStream?.flush()
               stream.write(`\n\n${AI_WARNING}\n`)
             }
             else {
@@ -2116,8 +2124,10 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
             stream.write(`\n${result.message ?? 'AI build analysis requires a newer CLI. Please upgrade: npx @capgo/cli@latest'}\n`)
           }
           else {
-            if (result.partial && !printedHeader)
-              stream.write(`\n--- AI analysis (partial) ---\n${result.partial}\n`)
+            if (printedHeader)
+              mdStream?.flush() // show whatever partial lines completed before the interruption
+            else if (result.partial)
+              stream.write(`\n--- AI analysis (partial) ---\n${renderMarkdown(result.partial, isInteractive)}\n`)
             stream.write(`\nAI analysis was interrupted${result.message ? ` (${result.message})` : ''}; this job's analysis slot is used. The full log is saved at ${logsPath} for local AI.\n`)
           }
         }

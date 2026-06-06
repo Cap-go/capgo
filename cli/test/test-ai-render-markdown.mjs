@@ -25,9 +25,9 @@ test('renderMarkdown(md, false) returns input unchanged (non-TTY)', () => {
 })
 
 // TTY: header gets styled
-test('header line gets bold+cyan styling in TTY mode', () => {
+test('header line gets bold+green styling in TTY mode', () => {
   const out = renderMarkdown('### Hello', true)
-  if (!out.includes('\x1B[1m\x1B[36mHello\x1B[0m'))
+  if (!out.includes('\x1B[1m\x1B[32mHello\x1B[0m'))
     throw new Error(`missing styled header in: ${JSON.stringify(out)}`)
 })
 
