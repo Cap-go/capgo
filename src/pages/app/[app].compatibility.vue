@@ -110,7 +110,6 @@ async function loadEvents() {
     }
 
     events.value = (data ?? []) as CompatibilityEventRow[]
-    await Promise.all([loadExistingChannels(), loadExistingVersions()])
   }
   catch (error) {
     console.error('[Compatibility] Error loading events:', error)
@@ -190,11 +189,17 @@ async function loadMemberEmails() {
   memberEmails.value = new Map((data ?? []).map(member => [member.uid, member.email]))
 }
 
+// The three lookups only need `events` (and `app` for the member emails), so
+// they run in parallel after the events query.
+async function loadLookups() {
+  await Promise.all([loadExistingChannels(), loadExistingVersions(), loadMemberEmails()])
+}
+
 async function refreshData() {
   isLoading.value = true
   try {
     await Promise.all([loadAppInfo(), loadEvents()])
-    await loadMemberEmails()
+    await loadLookups()
   }
   catch (error) {
     console.error(error)
@@ -248,7 +253,7 @@ async function acknowledgeEvents(eventIds: number[], note: string) {
 
     toast.success(t('compatibility-status-resolved'))
     await loadEvents()
-    await loadMemberEmails()
+    await loadLookups()
   }
   catch (error) {
     console.error('[Compatibility] Error accepting events:', error)
@@ -459,7 +464,7 @@ watchEffect(async () => {
                         <span class="px-2 py-0.5 w-fit text-xs font-medium rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200">
                           {{ t('compatibility-status-resolved') }}
                         </span>
-                        <span class="text-xs text-slate-500 dark:text-slate-400">
+                        <span class="text-xs text-slate-500 dark:text-slate-400 line-clamp-2 max-w-xs" :title="resolutionLabel(group.representative)">
                           {{ resolutionLabel(group.representative) }}
                         </span>
                       </div>
