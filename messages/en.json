@@ -922,7 +922,7 @@
   "compatibility-accept-message": "Acknowledge this compatibility issue and record why the incompatibility is acceptable.",
   "compatibility-accept-title": "Accept incompatibility",
   "compatibility-accepted-by": "Accepted by {user}",
-  "compatibility-current-bundle": "Current bundle",
+  "compatibility-current-bundle": "New bundle",
   "compatibility-empty": "No compatibility events",
   "compatibility-empty-description": "Your app bundles are all compatible with their previous versions.",
   "compatibility-events": "Compatibility events",
