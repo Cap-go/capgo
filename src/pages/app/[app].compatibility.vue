@@ -6,6 +6,7 @@ import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import IconAlertCircle from '~icons/lucide/alert-circle'
+import IconArrowRight from '~icons/lucide/arrow-right'
 import IconCheckCircle from '~icons/lucide/check-circle'
 import IconExternalLink from '~icons/lucide/external-link'
 import { dependencyDiffPath, isResolved, platformLabel } from '~/services/compatibilityEvents'
@@ -382,7 +383,7 @@ watchEffect(async () => {
                       <span v-else>{{ group.representative.channel_name }}</span>
                     </td>
                     <td class="px-4 py-3 font-mono text-xs text-slate-700 dark:text-slate-200">
-                      <div class="flex items-center gap-1.5 whitespace-nowrap">
+                      <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-100 dark:bg-slate-800 whitespace-nowrap">
                         <button
                           v-if="group.representative.previous_version_id !== null && existingVersionIds.has(group.representative.previous_version_id)"
                           type="button"
@@ -393,7 +394,7 @@ watchEffect(async () => {
                           {{ bundleLabel(group.representative.previous_version_name) }}
                         </button>
                         <span v-else>{{ bundleLabel(group.representative.previous_version_name) }}</span>
-                        <span aria-hidden="true" class="text-slate-400">→</span>
+                        <IconArrowRight aria-hidden="true" class="w-3.5 h-3.5 shrink-0 text-slate-500 dark:text-slate-400" />
                         <button
                           v-if="group.representative.current_version_id !== null && existingVersionIds.has(group.representative.current_version_id)"
                           type="button"
