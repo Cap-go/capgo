@@ -1,6 +1,7 @@
 // test/prescan/engine.test.ts
 import { describe, expect, it } from 'bun:test'
 import { decideOutcome, runPrescan } from '../../src/build/prescan/engine'
+import { ALL_CHECKS } from '../../src/build/prescan/registry'
 import type { PrescanCheck, ScanContext } from '../../src/build/prescan/types'
 import { makeP12, makeProfileXmlWithCert, makeProject } from './helpers'
 
@@ -77,5 +78,23 @@ describe('fixture helpers', () => {
     const p12 = makeP12()
     expect(p12.sha1).toMatch(/^[0-9a-f]{40}$/)
     expect(makeProfileXmlWithCert(p12)).toContain('DeveloperCertificates')
+  })
+})
+
+describe('registry', () => {
+  it('contains all 22 phase-1 checks with unique ids', () => {
+    const ids = ALL_CHECKS.map(c => c.id)
+    expect(new Set(ids).size).toBe(ids.length)
+    expect(ids.length).toBe(22)
+    for (const expected of [
+      'shared/apikey-permission', 'shared/app-exists', 'shared/credentials-saved',
+      'shared/cap-sync-stale', 'shared/node-linker-layout', 'shared/bundle-id-consistency',
+      'ios/p12-opens', 'ios/p12-expiry', 'ios/profile-expiry', 'ios/profile-bundle-match',
+      'ios/profile-type-vs-mode', 'ios/cert-profile-pairing', 'ios/targets-covered',
+      'ios/infoplist-sanity', 'ios/asc-key-valid',
+      'android/keystore-opens', 'android/keystore-expiry', 'android/cordova-vars-present',
+      'android/gradle-props-heuristics', 'android/play-sa-json', 'android/flavor-exists',
+      'android/agp8-package-attr',
+    ]) expect(ids).toContain(expected)
   })
 })
