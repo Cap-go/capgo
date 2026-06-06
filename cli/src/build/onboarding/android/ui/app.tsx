@@ -15,9 +15,10 @@ import type {
 } from '../types.js'
 import type { OnboardingResult } from '../../types.js'
 import { handleCustomMsg } from '../../../qr.js'
+import { spawn } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'
-import { copyFile, readFile } from 'node:fs/promises'
-import { homedir } from 'node:os'
+import { copyFile, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { homedir, tmpdir } from 'node:os'
 import { join, resolve as resolvePath } from 'node:path'
 import process from 'node:process'
 import { Alert, ProgressBar, Select } from '@inkjs/ui'
@@ -115,6 +116,8 @@ import { listPlayApps, ReportingApiHttpError } from '../reporting-api.js'
 import type { PlayApp } from '../reporting-api.js'
 import { reconcileAndroidApp } from '../app-verification-android.js'
 import type { AndroidReconcileResult } from '../app-verification-android.js'
+import { buildRenameWorkspaceFiles, isAndroidStudioRunning, verifyRenamed } from '../android-rename.js'
+import { trackEvent } from '../../../../analytics/track.js'
 import { validateServiceAccountJson } from '../service-account-validation.js'
 import { diffLines } from '../../diff-utils.js'
 import type { DiffLine } from '../../diff-utils.js'
@@ -200,6 +203,23 @@ const OAUTH_REQUIRED_SCOPES = [
   ...GOOGLE_OAUTH_SCOPES_ANDROIDPUBLISHER,
   'https://www.googleapis.com/auth/cloud-platform',
 ] as const
+
+/**
+ * Path A (Trapeze rename) orchestration phase. `menu` shows the explicit
+ * opt-in offer; the remaining phases drive spinners while the rename runs and
+ * the `failed` fallback when it can't be verified (we never claim false
+ * success). `await-studio-confirm` is the non-darwin one-time confirm — on
+ * macOS we auto-detect + poll instead.
+ */
+type RenamePhase
+  = | 'menu'
+    | 'preparing'
+    | 'await-studio'
+    | 'await-studio-confirm'
+    | 'renaming'
+    | 'syncing'
+    | 'rechecking'
+    | 'failed'
 
 function cleanPath(input: string): string {
   let s = input.trim()
@@ -552,6 +572,20 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
   // selection remounts with a fresh key — dodges the @inkjs/ui onChange re-fire
   // bug (see the iOS app.tsx gateActionSeq note).
   const [gateActionSeq, setGateActionSeq] = useState(0)
+  // Path B (create-app) re-check state. attempt is shown in the gate title +
+  // telemetry; askReopen mirrors the iOS ask-before-reopen so a blocked re-check
+  // never silently re-launches the browser. rechecking drives the create-app
+  // screen's own loader (distinct from the initial android-package-select fetch).
+  const [verifyAttempt, setVerifyAttempt] = useState(0)
+  const [verifyAskReopen, setVerifyAskReopen] = useState(false)
+  const [verifyRechecking, setVerifyRechecking] = useState(false)
+  // Path A (Trapeze rename) orchestration. renamePhase drives spinners / the
+  // failure fallback; renameOutput carries captured script output for the
+  // failed view; renameTmpDirRef holds the temp workspace across the non-darwin
+  // "close Android Studio" confirm so doRename can find it after the user OKs.
+  const [renamePhase, setRenamePhase] = useState<RenamePhase>('menu')
+  const [renameOutput, setRenameOutput] = useState<string[]>([])
+  const renameTmpDirRef = useRef<string | null>(null)
 
   // Phase 5 — provisioning status stream
   const [setupStatus, setSetupStatus] = useState<string[]>([])
@@ -698,6 +732,38 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
       ...telemetry,
     })
   }
+
+  // Best-effort PostHog telemetry for the Android app-verify step. Mirrors the
+  // iOS sibling's trackVerifyEvent (channel 'bundle') and ALWAYS sets `step` —
+  // the Builder dashboard filters null steps out of funnels (JSONExtractString),
+  // so an unset step silently drops the event. Never blocks or throws.
+  const trackVerifyEvent = useCallback((
+    event: string,
+    icon: string,
+    tags: Record<string, string | number | boolean> = {},
+  ) => {
+    void trackEvent({
+      channel: 'bundle',
+      event,
+      icon,
+      apikey: resolvedApiKeyRef.current ?? apikey ?? undefined,
+      appId,
+      orgId: resolvedOrgId ?? undefined,
+      tags: { step: 'android-app-verify', platform: 'android', ...tags },
+    })
+  }, [appId, apikey, resolvedOrgId])
+
+  // Convenience wrapper for the "Picked" event: derives matches_play_app from the
+  // listed Play apps so every pick site stays a one-liner.
+  const trackVerifyPicked = useCallback(
+    (pkg: string, source: 'gradle' | 'play-app' | 'manual') => {
+      trackVerifyEvent('Android App Verify Picked', '👆', {
+        matches_play_app: verifyPlayApps.some(a => a.packageName === pkg),
+        source,
+      })
+    },
+    [trackVerifyEvent, verifyPlayApps],
+  )
 
   const addLog = useCallback((text: string, color = 'green') => {
     setLogLines((prev) => {
@@ -939,6 +1005,12 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
     setVerifyImportSkipped(false)
     setVerifyChosenPlayApp(null)
     setGateActionSeq(0)
+    setVerifyAttempt(0)
+    setVerifyAskReopen(false)
+    setVerifyRechecking(false)
+    setRenamePhase('menu')
+    setRenameOutput([])
+    renameTmpDirRef.current = null
     // Phase 5 — provisioning outputs
     setServiceAccountProvisioned(null)
     setPlayInviteProvisioned(null)
@@ -1527,6 +1599,11 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
         // and flag the "not verified" banner over today's Gradle-only picker.
         if (serviceAccountMethod !== 'generate') {
           setVerifyImportSkipped(true)
+          trackVerifyEvent('Android App Verify Result', '🔎', {
+            result: 'skipped-import',
+            app_count: 0,
+            gradle_id_count: gradleIds.length,
+          })
           return
         }
 
@@ -1543,6 +1620,15 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
           setVerifyPlayApps(apps)
           const result = reconcileAndroidApp({ gradleIds, apps })
           setVerifyReconcile(result)
+          trackVerifyEvent('Android App Verify Shown', '🔍', {
+            app_count: apps.length,
+            gradle_id_count: gradleIds.length,
+          })
+          trackVerifyEvent('Android App Verify Result', '🔎', {
+            result: result.kind,
+            app_count: apps.length,
+            gradle_id_count: gradleIds.length,
+          })
 
           if (result.kind === 'exact-match') {
             // The only no-prompt case: a Play app matches the build id exactly.
@@ -1555,6 +1641,8 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
           }
           if (result.kind === 'no-app') {
             // No Play apps at all → Path B (create the app in Play Console).
+            setVerifyAttempt(0)
+            setVerifyAskReopen(false)
             setStep('android-app-verify-create-app')
             return
           }
@@ -1567,10 +1655,16 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
           if (cancelled)
             return
           setVerifyDegraded(true)
-          const why = err instanceof ReportingApiHttpError && err.status === 403
+          const scopeMissing = err instanceof ReportingApiHttpError && err.status === 403
+          const why = scopeMissing
             ? 'the Play Developer Reporting permission was not granted'
             : 'the Play Developer Reporting API could not be reached'
           addLog(`⚠ Skipping Play Store app verification — ${why}. Continuing with the package from your Gradle config.`, 'yellow')
+          trackVerifyEvent('Android App Verify Result', '🔎', {
+            result: scopeMissing ? 'scope-missing' : 'fetch-failed',
+            app_count: 0,
+            gradle_id_count: gradleIds.length,
+          })
         }
         finally {
           if (!cancelled)
@@ -3110,11 +3204,14 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
                     return
                   }
                   if (value === '__create_new__') {
+                    setVerifyAttempt(0)
+                    setVerifyAskReopen(false)
                     setStep('android-app-verify-create-app')
                     return
                   }
                   if (value.startsWith('play:')) {
                     const pkg = value.slice('play:'.length)
+                    trackVerifyPicked(pkg, 'play-app')
                     // A Play app whose package already matches a Gradle build id
                     // is a valid target → pick it, no rename needed.
                     if (detectedPackageIds.includes(pkg)) {
@@ -3123,11 +3220,16 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
                     }
                     // packageName != any build id → Path A (offer the rename).
                     setVerifyChosenPlayApp(verifyPlayApps.find(a => a.packageName === pkg) ?? null)
+                    setRenamePhase('menu')
+                    setRenameOutput([])
                     setStep('android-app-verify-rename')
                     return
                   }
-                  if (value.startsWith('gradle:'))
-                    pickAndroidPackageAndAdvance(value.slice('gradle:'.length), 'gradle')
+                  if (value.startsWith('gradle:')) {
+                    const id = value.slice('gradle:'.length)
+                    trackVerifyPicked(id, 'gradle')
+                    pickAndroidPackageAndAdvance(id, 'gradle')
+                  }
                 }}
               />
             </Box>
@@ -3173,6 +3275,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
                 if (selectFiredRef.current)
                   return
                 selectFiredRef.current = true
+                trackVerifyPicked(value, 'gradle')
                 pickAndroidPackageAndAdvance(value, 'gradle')
               }}
               onSubmitManual={(val) => {
@@ -3183,6 +3286,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
                   setStep('error')
                   return
                 }
+                trackVerifyPicked(name, 'manual')
                 pickAndroidPackageAndAdvance(name, detectedPackageIds.includes(name) ? 'gradle' : 'user-input')
               }}
             />
@@ -3190,102 +3294,533 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
         )
       })()}
 
-      {/* Path A — the chosen Play app's package differs from the build id. The
-          rename orchestration (Trapeze + cap sync + re-check) is a follow-up;
-          for now offer Back/Cancel. Routing + state are complete. */}
-      {step === 'android-app-verify-rename' && (
-        <Box flexDirection="column" marginTop={1}>
-          <Box flexDirection="column" borderStyle="round" borderColor="cyan" paddingX={1}>
-            <Text bold color="cyan">{`Build ID doesn't match "${verifyChosenPlayApp?.displayName || verifyChosenPlayApp?.packageName || 'the selected app'}"`}</Text>
+      {/* Path A — the chosen Play app's package differs from the build id. We
+          OFFER a Trapeze rename (applicationId + namespace) + cap sync + re-check
+          as ONE explicit opt-in; nothing is rewritten unless the user picks it.
+          Mirrors the iOS verify-app gate's loader / re-check mechanics. */}
+      {step === 'android-app-verify-rename' && (() => {
+        const target = verifyChosenPlayApp?.packageName ?? ''
+        const fromIds = detectedPackageIds.join(', ') || '(no applicationId found)'
+        const chosenName = verifyChosenPlayApp?.displayName || verifyChosenPlayApp?.packageName || 'the selected app'
+
+        // `npm`/`npx` need the `.cmd` shim on Windows when spawned without a
+        // shell; `node`/`pgrep` are bare everywhere we use them.
+        const npmCmd = process.platform === 'win32' ? 'npm.cmd' : 'npm'
+        const npxCmd = process.platform === 'win32' ? 'npx.cmd' : 'npx'
+        const STUDIO_POLL_MS = 1000
+        // Hard cap (~10 min) so a never-closing Studio can't spin forever; after
+        // it we proceed anyway rather than trapping the user.
+        const MAX_STUDIO_POLLS = 600
+
+        const sleep = (ms: number) => new Promise<void>((resolveSleep) => {
+          setTimeout(resolveSleep, ms)
+        })
+
+        // Spawn a command, accumulate combined stdout+stderr, resolve
+        // { code, output }. Never rejects — a missing binary resolves code 1 so
+        // the orchestration shows the manual fallback instead of crashing.
+        const runCapture = (cmd: string, args: string[], cwd?: string) =>
+          new Promise<{ code: number, output: string }>((resolveRun) => {
+            let out = ''
+            try {
+              const child = spawn(cmd, args, { cwd, stdio: ['ignore', 'pipe', 'pipe'] })
+              child.stdout?.setEncoding('utf8')
+              child.stderr?.setEncoding('utf8')
+              child.stdout?.on('data', (chunk: string) => { out += chunk })
+              child.stderr?.on('data', (chunk: string) => { out += chunk })
+              child.once('error', (e: Error) => resolveRun({ code: 1, output: `${out}${e.message}` }))
+              child.once('close', code => resolveRun({ code: code ?? 1, output: out }))
+            }
+            catch (e) {
+              resolveRun({ code: 1, output: e instanceof Error ? e.message : String(e) })
+            }
+          })
+
+        // Run the rename script, verify it landed (re-read Gradle ids), cap sync,
+        // re-reconcile, advance. NEVER claims false success — an unverified
+        // rename surfaces the script output + a manual fallback.
+        const doRename = async (tmpDir: string, studioWaitMs: number) => {
+          const projectCwd = process.cwd()
+          setRenamePhase('renaming')
+          const renameRun = await runCapture('node', [join(tmpDir, 'rename.mjs'), target], projectCwd)
+          const freshIds = await findAndroidApplicationIds(androidDir)
+          setDetectedPackageIds(freshIds)
+          if (!verifyRenamed(freshIds, target)) {
+            const tail = renameRun.output.trim()
+            setRenameOutput([
+              `The rename didn't take — ${androidDir}/app/build.gradle still doesn't use ${target}.`,
+              ...(tail ? [tail] : []),
+            ])
+            setRenamePhase('failed')
+            await rm(tmpDir, { recursive: true, force: true }).catch(() => { /* best-effort cleanup */ })
+            renameTmpDirRef.current = null
+            return
+          }
+          addLog(`🔧 Renamed your Android project to "${target}".`)
+          // cap sync keeps Capacitor consistent after the native rename. A
+          // non-zero exit is surfaced but non-fatal (spec §5.4).
+          setRenamePhase('syncing')
+          const sync = await runCapture(npxCmd, ['cap', 'sync'], projectCwd)
+          const capSyncOk = sync.code === 0
+          if (!capSyncOk)
+            addLog('⚠ npx cap sync reported an issue — review it later if the build misbehaves; continuing.', 'yellow')
+          await rm(tmpDir, { recursive: true, force: true }).catch(() => { /* best-effort cleanup */ })
+          renameTmpDirRef.current = null
+          trackVerifyEvent('Android App Verify Auto Fixed', '🔧', {
+            from: fromIds,
+            to: target,
+            cap_sync_ok: capSyncOk,
+            studio_wait_ms: studioWaitMs,
+          })
+          setRenamePhase('rechecking')
+          const result = reconcileAndroidApp({ gradleIds: freshIds, apps: verifyPlayApps })
+          setVerifyReconcile(result)
+          if (result.kind === 'exact-match') {
+            const matched = verifyPlayApps.find(a => a.packageName === result.packageName)
+            addLog(`✔ Building "${matched?.displayName || target}" (${target}) — matches your Play Store app.`)
+            pickAndroidPackageAndAdvance(result.packageName, 'gradle')
+            return
+          }
+          // The rename verified but reconcile didn't collapse to exact-match
+          // (e.g. several Gradle flavors). The chosen Play app is real and now
+          // matches a build id, so proceed with it rather than dead-ending.
+          addLog(`✔ Building "${chosenName}" (${target}).`)
+          pickAndroidPackageAndAdvance(target, 'gradle')
+        }
+
+        // Prepare the temp workspace (mkdtemp + write files + npm install), then
+        // run the close-Android-Studio gate, then doRename. Explicit opt-in only.
+        const startRename = async () => {
+          setRenameOutput([])
+          setRenamePhase('preparing')
+          let tmpDir: string
+          try {
+            tmpDir = await mkdtemp(join(tmpdir(), 'capgo-android-rename-'))
+            const { packageJson, renameMjs } = buildRenameWorkspaceFiles(target)
+            await writeFile(join(tmpDir, 'package.json'), packageJson)
+            await writeFile(join(tmpDir, 'rename.mjs'), renameMjs)
+          }
+          catch (e) {
+            setRenameOutput([`Couldn't prepare the renamer workspace: ${e instanceof Error ? e.message : String(e)}`])
+            setRenamePhase('failed')
+            return
+          }
+          const install = await runCapture(npmCmd, ['install'], tmpDir)
+          if (install.code !== 0) {
+            const tail = install.output.trim().split('\n').slice(-8).join('\n')
+            setRenameOutput([
+              'Couldn\'t install the project renamer (@trapezedev/project).',
+              ...(tail ? [tail] : []),
+              `Rename manually instead: set applicationId + namespace to ${target} in ${androidDir}/app/build.gradle, then re-check.`,
+            ])
+            setRenamePhase('failed')
+            await rm(tmpDir, { recursive: true, force: true }).catch(() => { /* best-effort cleanup */ })
+            return
+          }
+          renameTmpDirRef.current = tmpDir
+          // Close-Android-Studio gate. macOS auto-detects + polls; other OSes get
+          // a one-time confirm (we can't reliably probe there).
+          if (process.platform === 'darwin') {
+            setRenamePhase('await-studio')
+            const startedAt = Date.now()
+            for (let i = 0; i < MAX_STUDIO_POLLS; i++) {
+              const probe = await runCapture('pgrep', ['-f', 'Android Studio'])
+              if (isAndroidStudioRunning('darwin', probe.output) !== 'running')
+                break
+              await sleep(STUDIO_POLL_MS)
+            }
+            await doRename(tmpDir, Date.now() - startedAt)
+            return
+          }
+          setRenamePhase('await-studio-confirm')
+        }
+
+        // "I'll fix build.gradle myself — re-check": re-read Gradle ids and
+        // reconcile without renaming anything.
+        const recheckBuildId = async () => {
+          setRenamePhase('rechecking')
+          const freshIds = await findAndroidApplicationIds(androidDir)
+          setDetectedPackageIds(freshIds)
+          const result = reconcileAndroidApp({ gradleIds: freshIds, apps: verifyPlayApps })
+          setVerifyReconcile(result)
+          trackVerifyEvent('Android App Verify Result', '🔎', {
+            result: result.kind,
+            app_count: verifyPlayApps.length,
+            gradle_id_count: freshIds.length,
+          })
+          if (result.kind === 'exact-match') {
+            const matched = verifyPlayApps.find(a => a.packageName === result.packageName)
+            addLog(`✔ Building "${matched?.displayName || result.packageName}" (${result.packageName}) — matches your Play Store app.`)
+            pickAndroidPackageAndAdvance(result.packageName, 'gradle')
+            return
+          }
+          if (target && freshIds.includes(target)) {
+            addLog(`✔ Building "${chosenName}" (${target}) — matches your Play Store app.`)
+            pickAndroidPackageAndAdvance(target, 'gradle')
+            return
+          }
+          setRenamePhase('menu')
+        }
+
+        const backToPicker = () => {
+          setVerifyChosenPlayApp(null)
+          setRenamePhase('menu')
+          setRenameOutput([])
+          setStep('android-package-select')
+        }
+
+        if (renamePhase === 'preparing') {
+          return (
+            <Box flexDirection="column" marginTop={1}>
+              <SpinnerLine text="Preparing the project renamer…" />
+              <Text dimColor>Installing @trapezedev/project into a temporary folder (one-time).</Text>
+            </Box>
+          )
+        }
+        if (renamePhase === 'await-studio') {
+          return (
+            <Box flexDirection="column" marginTop={1}>
+              <SpinnerLine text="Waiting for Android Studio to close…" />
+              <Text dimColor>Quit Android Studio to avoid clobbering the rename — this continues automatically once it's closed.</Text>
+            </Box>
+          )
+        }
+        if (renamePhase === 'renaming') {
+          return (
+            <Box flexDirection="column" marginTop={1}>
+              <SpinnerLine text="Renaming your Android project…" />
+              <Text dimColor>{`Setting applicationId + namespace to ${target} via Trapeze.`}</Text>
+            </Box>
+          )
+        }
+        if (renamePhase === 'syncing') {
+          return (
+            <Box flexDirection="column" marginTop={1}>
+              <SpinnerLine text="Running npx cap sync…" />
+              <Text dimColor>Keeping your Capacitor Android project consistent after the rename.</Text>
+            </Box>
+          )
+        }
+        if (renamePhase === 'rechecking') {
+          return (
+            <Box flexDirection="column" marginTop={1}>
+              <SpinnerLine text="Re-checking against Play Console…" />
+            </Box>
+          )
+        }
+
+        if (renamePhase === 'await-studio-confirm') {
+          return (
+            <Box flexDirection="column" marginTop={1}>
+              <Box flexDirection="column" borderStyle="round" borderColor="cyan" paddingX={1}>
+                <Text bold color="cyan">Close Android Studio before continuing</Text>
+                <Newline />
+                <Text>If Android Studio has this project open, quit it first — editing the native files while it holds them open can corrupt the change.</Text>
+              </Box>
+              <Newline />
+              <Select
+                key={`android-rename-confirm-${gateActionSeq}`}
+                options={[
+                  { label: '➡  Android Studio is closed — continue', value: 'continue' },
+                  { label: '❌ Cancel onboarding', value: 'cancel' },
+                ]}
+                onChange={(value) => {
+                  setGateActionSeq(s => s + 1)
+                  if (value === 'continue') {
+                    void doRename(renameTmpDirRef.current ?? '', 0)
+                    return
+                  }
+                  addLog('Exiting onboarding.', 'yellow')
+                  exitOnboarding()
+                }}
+              />
+            </Box>
+          )
+        }
+
+        if (renamePhase === 'failed') {
+          return (
+            <Box flexDirection="column" marginTop={1}>
+              <Box flexDirection="column" borderStyle="round" borderColor="red" paddingX={1}>
+                <Text bold color="red">Couldn't rename your Android project automatically</Text>
+                <Newline />
+                <Text>
+                  {'Set '}
+                  <Text bold>applicationId</Text>
+                  {' + '}
+                  <Text bold>namespace</Text>
+                  {' to '}
+                  <Text bold color="cyan">{target}</Text>
+                  {` in ${androidDir}/app/build.gradle, run `}
+                  <Text bold>npx cap sync</Text>
+                  {', then re-check.'}
+                </Text>
+                {renameOutput.map((line, i) => (
+                  <Text key={i} dimColor>{line}</Text>
+                ))}
+              </Box>
+              <Newline />
+              <Select
+                key={`android-rename-failed-${gateActionSeq}`}
+                options={[
+                  { label: '✅ I\'ve fixed build.gradle myself — re-check', value: 'recheck' },
+                  { label: '↩  Back — pick a different app', value: 'back' },
+                  { label: '❌ Cancel onboarding', value: 'cancel' },
+                ]}
+                onChange={(value) => {
+                  setGateActionSeq(s => s + 1)
+                  if (value === 'recheck') {
+                    void recheckBuildId()
+                    return
+                  }
+                  if (value === 'back') {
+                    backToPicker()
+                    return
+                  }
+                  addLog('Exiting onboarding.', 'yellow')
+                  exitOnboarding()
+                }}
+              />
+            </Box>
+          )
+        }
+
+        // menu — the explicit opt-in offer.
+        return (
+          <Box flexDirection="column" marginTop={1}>
+            <Box flexDirection="column" borderStyle="round" borderColor="cyan" paddingX={1}>
+              <Text bold color="cyan">{`Build ID doesn't match "${chosenName}"`}</Text>
+              <Newline />
+              <Text>
+                {'Your project builds '}
+                <Text bold color="red">{fromIds}</Text>
+                {', but the Play Store app you picked is '}
+                <Text bold color="green">{target}</Text>
+                {'.'}
+              </Text>
+              <Newline />
+              <Text>
+                {'Capgo can rename your Android project ('}
+                <Text bold>applicationId</Text>
+                {' + '}
+                <Text bold>namespace</Text>
+                {') to '}
+                <Text bold color="cyan">{target}</Text>
+                {', run '}
+                <Text bold>npx cap sync</Text>
+                {', and re-check — or fix build.gradle yourself.'}
+              </Text>
+              <Text dimColor>Nothing is changed unless you pick "Rename … for me" below.</Text>
+            </Box>
             <Newline />
-            <Text>
-              {'Your project builds '}
-              <Text bold color="red">{detectedPackageIds.join(', ') || '(no applicationId found)'}</Text>
-              {', but the Play Store app you picked is '}
-              <Text bold color="green">{verifyChosenPlayApp?.packageName ?? ''}</Text>
-              {'.'}
-            </Text>
-            <Text dimColor>Renaming your Android project to match is handled in a later step.</Text>
+            <Select
+              key={`android-rename-${gateActionSeq}`}
+              options={[
+                { label: `🔧 Rename my Android project to ${target} for me`, value: 'rename' },
+                { label: '✅ I\'ll fix build.gradle myself — re-check', value: 'recheck' },
+                { label: '↩  Back — pick a different app', value: 'back' },
+                { label: '❌ Cancel onboarding', value: 'cancel' },
+              ]}
+              onChange={(value) => {
+                setGateActionSeq(s => s + 1)
+                if (value === 'rename') {
+                  void startRename()
+                  return
+                }
+                if (value === 'recheck') {
+                  void recheckBuildId()
+                  return
+                }
+                if (value === 'back') {
+                  backToPicker()
+                  return
+                }
+                addLog('Exiting onboarding.', 'yellow')
+                exitOnboarding()
+              }}
+            />
           </Box>
-          <Newline />
-          <Select
-            key={`android-rename-${gateActionSeq}`}
-            options={[
-              { label: '↩  Back — pick a different app', value: 'back' },
-              { label: '❌ Cancel onboarding', value: 'cancel' },
-            ]}
-            onChange={(value) => {
-              setGateActionSeq(s => s + 1)
-              if (value === 'back') {
-                setVerifyChosenPlayApp(null)
-                setStep('android-package-select')
-                return
-              }
-              addLog('Exiting onboarding.', 'yellow')
-              exitOnboarding()
-            }}
-          />
-        </Box>
-      )}
+        )
+      })()}
 
       {/* Path B — no Play app exists yet. Inform + allow proceed (never hard
           gate): the Create-app click is the only manual step; the first build
-          uploads as a draft automatically. Re-check loader is a follow-up. */}
-      {step === 'android-app-verify-create-app' && (
-        <Box flexDirection="column" marginTop={1}>
-          <Box flexDirection="column" borderStyle="round" borderColor="cyan" paddingX={1}>
-            <Text bold color="cyan">Create your app in Play Console</Text>
+          uploads as a draft automatically. Re-check uses a loader + attempt
+          counter + the iOS ask-before-reopen mechanics. */}
+      {step === 'android-app-verify-create-app' && (() => {
+        const pkgLabel = detectedPackageIds.join(', ') || 'your project'
+        const attemptMarker = verifyAttempt > 0 ? ` (attempt ${verifyAttempt})` : ''
+
+        // Inform-and-proceed (spec §5.5). A single clean build id → pick it and
+        // advance; 0 or many ids → return to the plain package picker so the
+        // user picks/types the package to grant access to.
+        const proceedAnyway = () => {
+          if (detectedPackageIds.length === 1) {
+            pickAndroidPackageAndAdvance(detectedPackageIds[0], 'gradle')
+            return
+          }
+          setStep('android-package-select')
+        }
+
+        // Open Play Console's app list so the user clicks "Create app" (the only
+        // irreducible manual step). Asked before RE-opening on later attempts.
+        const openCreatePlayConsole = async () => {
+          trackVerifyEvent('Android App Verify Create App Opened', '🌐', { attempt: verifyAttempt })
+          try {
+            await open('https://play.google.com/console')
+          }
+          catch {
+            addLog('⚠ Could not open your browser. Visit https://play.google.com/console to create the app.', 'yellow')
+          }
+          setVerifyAskReopen(false)
+        }
+
+        // Re-list Play apps + reconcile, with a loader + attempt counting. A
+        // clean match advances; apps that now exist (but the build id doesn't
+        // match) route to the enriched picker; otherwise ask before re-opening.
+        const recheckCreateApp = async () => {
+          setVerifyRechecking(true)
+          const attempt = verifyAttempt + 1
+          try {
+            const gradleIds = await findAndroidApplicationIds(androidDir)
+            setDetectedPackageIds(gradleIds)
+            const token = await ensureAccessToken()
+            const apps = await listPlayApps(token)
+            setVerifyPlayApps(apps)
+            const result = reconcileAndroidApp({ gradleIds, apps })
+            setVerifyReconcile(result)
+            trackVerifyEvent('Android App Verify Result', '🔎', {
+              result: result.kind,
+              app_count: apps.length,
+              gradle_id_count: gradleIds.length,
+            })
+            if (result.kind === 'exact-match') {
+              const matched = apps.find(a => a.packageName === result.packageName)
+              addLog(`✔ Building "${matched?.displayName || result.packageName}" (${result.packageName}) — matches your Play Store app.`)
+              pickAndroidPackageAndAdvance(result.packageName, 'gradle')
+              return
+            }
+            if (result.kind === 'wrong-build-id' || result.kind === 'multi-gradle') {
+              setVerifyAttempt(attempt)
+              setVerifyAskReopen(false)
+              setStep('android-package-select')
+              return
+            }
+            // Still no app → count the attempt + ask before re-opening.
+            setVerifyAttempt(attempt)
+            setVerifyAskReopen(true)
+          }
+          catch (err) {
+            setVerifyAttempt(attempt)
+            setVerifyAskReopen(true)
+            const why = err instanceof ReportingApiHttpError && err.status === 403
+              ? 'the Play Developer Reporting permission was not granted'
+              : 'Play Console could not be reached'
+            addLog(`⚠ Couldn't re-check Play Console — ${why}. You can still continue.`, 'yellow')
+          }
+          finally {
+            setVerifyRechecking(false)
+          }
+        }
+
+        if (verifyRechecking) {
+          return (
+            <Box flexDirection="column" marginTop={1}>
+              <SpinnerLine text="Re-checking Play Console for your app..." />
+              <Text dimColor>Re-listing your Play Store apps to confirm the app now exists.</Text>
+            </Box>
+          )
+        }
+
+        // After a blocked re-check we ASK before re-opening the browser.
+        if (verifyAskReopen) {
+          return (
+            <Box flexDirection="column" marginTop={1}>
+              <Box flexDirection="column" borderStyle="round" borderColor="yellow" paddingX={1}>
+                <Text bold color="yellow">{`Still no Play Store app for ${pkgLabel}${attemptMarker}`}</Text>
+                <Newline />
+                <Text>{'We re-checked Play Console and didn\'t find an app yet. Newly-created apps can take a moment to appear — re-check again, or continue (the first build still uploads as a draft once the app exists).'}</Text>
+              </Box>
+              <Newline />
+              <Select
+                key={`android-create-reopen-${gateActionSeq}`}
+                options={[
+                  { label: '🔁 I\'ve created it — re-check', value: 'recheck' },
+                  { label: '🌐 Re-open Play Console', value: 'reopen' },
+                  { label: '➡  Continue anyway', value: 'continue' },
+                  { label: '❌ Cancel onboarding', value: 'cancel' },
+                ]}
+                onChange={(value) => {
+                  setGateActionSeq(s => s + 1)
+                  if (value === 'recheck') {
+                    void recheckCreateApp()
+                    return
+                  }
+                  if (value === 'reopen') {
+                    void openCreatePlayConsole()
+                    return
+                  }
+                  if (value === 'continue') {
+                    proceedAnyway()
+                    return
+                  }
+                  addLog('Exiting onboarding.', 'yellow')
+                  exitOnboarding()
+                }}
+              />
+            </Box>
+          )
+        }
+
+        return (
+          <Box flexDirection="column" marginTop={1}>
+            <Box flexDirection="column" borderStyle="round" borderColor="cyan" paddingX={1}>
+              <Text bold color="cyan">{`Create your app in Play Console${attemptMarker}`}</Text>
+              <Newline />
+              <Text>
+                {'No Play Store app exists yet for '}
+                <Text bold color="cyan">{pkgLabel}</Text>
+                {'. Create it once in Play Console (the only manual step), then re-check — Capgo Builder uploads the first build as a draft automatically.'}
+              </Text>
+              <Text dimColor>The Play Console API cannot create apps — this is a one-time manual step on the web.</Text>
+            </Box>
             <Newline />
-            <Text>
-              {'No Play Store app exists yet for '}
-              <Text bold color="cyan">{detectedPackageIds.join(', ') || 'your project'}</Text>
-              {'. Create it once in Play Console (the only manual step), then continue — Capgo Builder uploads the first build as a draft automatically.'}
-            </Text>
-            <Text dimColor>The Play Console API cannot create apps — this is a one-time manual step on the web.</Text>
-          </Box>
-          <Newline />
-          <Select
-            key={`android-create-${gateActionSeq}`}
-            options={[
-              { label: '🌐 Open Play Console to create this app', value: 'open' },
-              { label: '➡  I\'ve created it (or will) — continue', value: 'continue' },
-              ...(verifyPlayApps.length > 0 ? [{ label: '↩  Back — pick a different app', value: 'back' }] : []),
-              { label: '❌ Cancel onboarding', value: 'cancel' },
-            ]}
-            onChange={(value) => {
-              setGateActionSeq(s => s + 1)
-              if (value === 'open') {
-                void (async () => {
-                  try {
-                    await open('https://play.google.com/console')
-                  }
-                  catch {
-                    addLog('⚠ Could not open your browser. Visit https://play.google.com/console to create the app.', 'yellow')
-                  }
-                })()
-                return
-              }
-              if (value === 'back') {
-                setStep('android-package-select')
-                return
-              }
-              if (value === 'continue') {
-                // Inform-and-proceed (spec §5.5). A single clean build id → pick
-                // it and advance; 0 or many ids → return to the plain package
-                // picker so the user picks/types the package to grant access to.
-                if (detectedPackageIds.length === 1) {
-                  pickAndroidPackageAndAdvance(detectedPackageIds[0], 'gradle')
+            <Select
+              key={`android-create-${gateActionSeq}`}
+              options={[
+                { label: '🌐 Open Play Console to create this app', value: 'open' },
+                { label: '🔁 I\'ve created it — re-check', value: 'recheck' },
+                { label: '➡  Continue anyway', value: 'continue' },
+                ...(verifyPlayApps.length > 0 ? [{ label: '↩  Back — pick a different app', value: 'back' }] : []),
+                { label: '❌ Cancel onboarding', value: 'cancel' },
+              ]}
+              onChange={(value) => {
+                setGateActionSeq(s => s + 1)
+                if (value === 'open') {
+                  void openCreatePlayConsole()
                   return
                 }
-                setStep('android-package-select')
-                return
-              }
-              addLog('Exiting onboarding.', 'yellow')
-              exitOnboarding()
-            }}
-          />
-        </Box>
-      )}
+                if (value === 'recheck') {
+                  void recheckCreateApp()
+                  return
+                }
+                if (value === 'back') {
+                  setVerifyAttempt(0)
+                  setVerifyAskReopen(false)
+                  setStep('android-package-select')
+                  return
+                }
+                if (value === 'continue') {
+                  proceedAnyway()
+                  return
+                }
+                addLog('Exiting onboarding.', 'yellow')
+                exitOnboarding()
+              }}
+            />
+          </Box>
+        )
+      })()}
 
       {step === 'gcp-setup-running' && (
         <GcpSetupRunningStep dense={false} statusMessages={setupStatus} />
