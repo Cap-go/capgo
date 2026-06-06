@@ -11,7 +11,7 @@ import type { Context } from 'hono'
 import type { Database } from '../../utils/supabase.types.ts'
 import { emitAiAnalysisResult } from './ai_analyze_telemetry.ts'
 
-export const UPGRADE_MESSAGE = 'AI build analysis requires a newer CLI. Please upgrade: npm i -g @capgo/cli@latest'
+export const UPGRADE_MESSAGE = 'AI build analysis requires a newer CLI. Please upgrade: npx @capgo/cli@latest'
 
 export async function aiAnalyzeDeprecated(
   c: Context,

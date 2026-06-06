@@ -35,7 +35,7 @@ describe('aiAnalyzeDeprecated', () => {
     expect(res.status).toBe(426)
     const body = await res.json() as { error: string, code: string }
     expect(body.error).toBe(UPGRADE_MESSAGE)
-    expect(body.error).toContain('npm i -g @capgo/cli@latest')
+    expect(body.error).toContain('npx @capgo/cli@latest')
     expect(body.code).toBe('upgrade_required')
   })
 

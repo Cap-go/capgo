@@ -53,7 +53,7 @@ import {
   startCaptureForJob,
 } from '../ai/log-capture'
 import { renderMarkdown } from '../ai/render-markdown'
-import { trackAiAnalysisChoice, trackAiAnalysisResult } from '../ai/telemetry'
+import { aiAnalysisResultFromPostAnalyze, trackAiAnalysisChoice, trackAiAnalysisResult } from '../ai/telemetry'
 import { assertCliPermission, canPromptInteractively, createSupabaseClient, findSavedKey, getConfig, getOrganizationId, sendEvent } from '../utils'
 import { mergeCredentials, MIN_OUTPUT_RETENTION_SECONDS, parseInAppUpdatePriority, parseOptionalBoolean, parseOutputRetentionSeconds } from './credentials'
 import { buildProvisioningMap } from './credentials-command'
@@ -2020,19 +2020,6 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
 
         const AI_WARNING = '⚠ AI can make mistakes. Always verify the diagnosis against the full log before applying the suggested fix.'
 
-        // Closed-enum mapper for PostAnalyzeResult → telemetry result tag.
-        // Never include the analysis text itself in telemetry.
-        const mapPostAnalyzeResultKind = (result: PostAnalyzeResult): 'success' | 'already_analyzed' | 'too_big' | 'error' | 'mid_stream_error' | 'upgrade_required' => {
-          if (result.kind === 'ok')
-            return 'success'
-          if (result.kind === 'already_analyzed')
-            return 'already_analyzed'
-          if (result.kind === 'too_big')
-            return 'too_big'
-          if (result.kind === 'upgrade_required')
-            return 'upgrade_required'
-          return result.partial !== undefined ? 'mid_stream_error' : 'error'
-        }
 
         const runCapgoAi = async (choice: 'capgo_ai' | 'auto_upload', triggeredBy: 'menu' | 'ci_flag'): Promise<void> => {
           await trackAiAnalysisChoice({
@@ -2098,7 +2085,7 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
           }
 
           // Telemetry — closed-enum result only, never the analysis text.
-          const resultTag = mapPostAnalyzeResultKind(result)
+          const resultTag = aiAnalysisResultFromPostAnalyze(result)
           await trackAiAnalysisResult({
             apikey: options.apikey,
             orgId,
@@ -2126,7 +2113,7 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
             stream.write('\nLog too big for AI analysis.\n')
           }
           else if (result.kind === 'upgrade_required') {
-            stream.write(`\n${result.message ?? 'AI build analysis requires a newer CLI. Please upgrade: npm i -g @capgo/cli@latest'}\n`)
+            stream.write(`\n${result.message ?? 'AI build analysis requires a newer CLI. Please upgrade: npx @capgo/cli@latest'}\n`)
           }
           else {
             if (result.partial && !printedHeader)

@@ -155,14 +155,14 @@ data: {"code":"ai_error" | "idle_timeout"}</code></pre>
 
 <h3>4.2 Old endpoint: <code>POST /build/ai_analyze</code> (deprecated)</h3>
 <pre><code>426 Upgrade Required
-{ "error": "AI build analysis requires a newer CLI. Please upgrade: npm i -g @capgo/cli@latest",
+{ "error": "AI build analysis requires a newer CLI. Please upgrade: npx @capgo/cli@latest",
   "code": "upgrade_required" }</code></pre>
 <div class="callout warn"><strong>Body shape matters:</strong> the human-readable text MUST be in the
 <code>error</code> field — the deployed CLI resolves the printed message as
 <code>body.error || body.message</code> (unchanged since the feature's first release, commit
 <code>803e4752c</code>), so a machine code in <code>error</code> would shadow the instruction. With this
 shape old CLIs print
-<code>AI analysis failed (426): AI build analysis requires a newer CLI. Please upgrade: npm i -g @capgo/cli@latest.</code>
+<code>AI analysis failed (426): AI build analysis requires a newer CLI. Please upgrade: npx @capgo/cli@latest.</code>
 with no client change. <code>code</code> carries the machine-readable identifier for new clients and tests.</div>
 <p>The handler keeps the apikey middleware but performs no DB reads/writes and never contacts the builder.</p>
 

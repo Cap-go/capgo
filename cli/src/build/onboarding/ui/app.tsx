@@ -29,7 +29,7 @@ import { createSupabaseClient, findBuildCommandForProjectType, findProjectType, 
 import { loadSavedCredentials, updateSavedCredentials } from '../../credentials.js'
 import { releaseCapturedLogs, runCapgoAiAnalysis } from '../../../ai/analyze.js'
 import { renderMarkdown } from '../../../ai/render-markdown.js'
-import { trackAiAnalysisChoice, trackAiAnalysisResult } from '../../../ai/telemetry.js'
+import { aiAnalysisResultFromPostAnalyze, trackAiAnalysisChoice, trackAiAnalysisResult } from '../../../ai/telemetry.js'
 import { requestBuildInternal } from '../../request.js'
 import { isAiAnalysisTooTall, resolveAiResultRoute } from '../ai-fit.js'
 
@@ -2797,18 +2797,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
         if (cancelled)
           return
 
-        const resultTag: 'success' | 'already_analyzed' | 'too_big' | 'error' | 'mid_stream_error' | 'upgrade_required'
-          = result.kind === 'ok'
-            ? 'success'
-            : result.kind === 'already_analyzed'
-              ? 'already_analyzed'
-              : result.kind === 'too_big'
-                ? 'too_big'
-                : result.kind === 'upgrade_required'
-                  ? 'upgrade_required'
-                  : result.partial !== undefined
-                    ? 'mid_stream_error'
-                    : 'error'
+        const resultTag = aiAnalysisResultFromPostAnalyze(result)
 
         await trackAiAnalysisResult({
           apikey: resolvedApiKeyRef.current ?? apikey ?? '',
@@ -2836,7 +2825,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
         }
         else if (result.kind === 'upgrade_required') {
           setAiAnalysisText(null)
-          setAiResult({ kind: 'error', message: result.message ?? 'AI build analysis requires a newer CLI. Please upgrade: npm i -g @capgo/cli@latest' })
+          setAiResult({ kind: 'error', message: result.message ?? 'AI build analysis requires a newer CLI. Please upgrade: npx @capgo/cli@latest' })
         }
         else {
           setAiAnalysisText(null)

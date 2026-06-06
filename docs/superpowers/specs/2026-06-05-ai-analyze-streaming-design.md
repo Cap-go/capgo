@@ -45,7 +45,7 @@ Secondary defects in the current design:
 
 Request (unchanged shape from the old endpoint):
 
-```
+```text
 POST /build/ai_analyze_stream
 capgkey: <apikey>
 content-type: application/json
@@ -68,7 +68,7 @@ started, so status codes still work):
 
 Success: `200` with `content-type: text/event-stream`. Events:
 
-```
+```text
 event: chunk
 data: {"text":"<token delta>"}
 
@@ -88,9 +88,9 @@ data: {"code":"ai_error" | "idle_timeout"}
 
 Always returns, regardless of body:
 
-```
+```text
 426 Upgrade Required
-{ "error": "AI build analysis requires a newer CLI. Please upgrade: npm i -g @capgo/cli@latest",
+{ "error": "AI build analysis requires a newer CLI. Please upgrade: npx @capgo/cli@latest",
   "code": "upgrade_required" }
 ```
 
@@ -99,7 +99,7 @@ error branch resolves the printed message as `body.error || body.message`
 (`cli/src/ai/analyze.ts`, unchanged since the feature's first release,
 commit `803e4752c`), so a machine code in `error` would shadow the
 instruction. With this shape, old CLIs print
-`AI analysis failed (426): AI build analysis requires a newer CLI. Please upgrade: npm i -g @capgo/cli@latest.`
+`AI analysis failed (426): AI build analysis requires a newer CLI. Please upgrade: npx @capgo/cli@latest.`
 with no client change. `code` carries the machine-readable identifier for
 new clients and tests. The handler keeps the apikey middleware (consistent
 auth surface, and telemetry below) but performs no DB reads/writes and never
@@ -113,7 +113,7 @@ Internal, `x-api-key`-authenticated, called only by the capgo edge function.
   protocol as §3.1 (the edge function pipes it through).
 - Pre-stream errors: JSON with an explicit cost marker:
 
-```
+```text
 { "error": "invalid_json" | "logs_too_big" | "ai_error", "aiStarted": true | false }
 ```
 
@@ -129,7 +129,7 @@ JSON path for the not-yet-updated edge function.
 
 ## 4. Flag lifecycle (claim-then-refund)
 
-```
+```text
 1. checkPermission(app.build_native)            — user context
 2. SELECT build_requests WHERE builder_job_id   — user context; verify
    AND app_id; require status = 'failed'          ownership + state

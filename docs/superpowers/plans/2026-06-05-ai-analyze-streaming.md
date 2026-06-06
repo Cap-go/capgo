@@ -15,7 +15,8 @@
 - `capgo_builder` — local checkout at `~/Developer/capgo_builder_new` (remote `Cap-go/capgo_builder`). It is **behind origin** — Task 1 syncs it. Tests: `bun run test` (vitest).
 
 **SSE protocol (shared contract — keep these exact shapes in all three components):**
-```
+
+```text
 event: chunk
 data: {"text":"<delta>"}
 
@@ -25,8 +26,9 @@ data: {"durationMs":48211}
 event: error
 data: {"code":"ai_error" | "idle_timeout"}
 ```
+
 Pre-stream builder errors: `{ "error": "<code>", "aiStarted": true|false }` JSON.
-Deprecated endpoint body: `{ "error": "AI build analysis requires a newer CLI. Please upgrade: npm i -g @capgo/cli@latest", "code": "upgrade_required" }` with status 426 — the human text MUST be in `error` (deployed CLIs print `body.error || body.message`).
+Deprecated endpoint body: `{ "error": "AI build analysis requires a newer CLI. Please upgrade: npx @capgo/cli@latest", "code": "upgrade_required" }` with status 426 — the human text MUST be in `error` (deployed CLIs print `body.error || body.message`).
 
 ---
 
@@ -45,6 +47,7 @@ git checkout -b feat/ai-analyze-streaming
 bun install
 bun run test
 ```
+
 Expected: all existing tests pass (baseline green, including `test/ai-analyze-handler.test.ts`).
 
 ### Task 2: SSE normalizer module (builder)
@@ -1026,7 +1029,7 @@ describe('aiAnalyzeDeprecated', () => {
     expect(res.status).toBe(426)
     const body = await res.json() as { error: string, code: string }
     expect(body.error).toBe(UPGRADE_MESSAGE)
-    expect(body.error).toContain('npm i -g @capgo/cli@latest')
+    expect(body.error).toContain('npx @capgo/cli@latest')
     expect(body.code).toBe('upgrade_required')
   })
 
@@ -1072,7 +1075,7 @@ import type { Context } from 'hono'
 import type { Database } from '../../utils/supabase.types.ts'
 import { emitAiAnalysisResult } from './ai_analyze_telemetry.ts'
 
-export const UPGRADE_MESSAGE = 'AI build analysis requires a newer CLI. Please upgrade: npm i -g @capgo/cli@latest'
+export const UPGRADE_MESSAGE = 'AI build analysis requires a newer CLI. Please upgrade: npx @capgo/cli@latest'
 
 export async function aiAnalyzeDeprecated(
   c: Context,
@@ -1576,7 +1579,7 @@ git commit -m "feat(cli)!: stream AI analysis from /build/ai_analyze_stream"
             stream.write('\nLog too big for AI analysis.\n')
           }
           else if (result.kind === 'upgrade_required') {
-            stream.write(`\n${result.message ?? 'AI build analysis requires a newer CLI. Please upgrade: npm i -g @capgo/cli@latest'}\n`)
+            stream.write(`\n${result.message ?? 'AI build analysis requires a newer CLI. Please upgrade: npx @capgo/cli@latest'}\n`)
           }
           else {
             if (result.partial && !printedHeader)
@@ -1627,9 +1630,11 @@ git commit -m "feat(cli): progressive TTY streaming + CI buffering for AI build 
 
 - [ ] **Step 1:** Merge + deploy `capgo_builder` PR (Task 3). Verify zero behavior change: trigger one failed build on the **old** capgo deployment — analysis still arrives buffered.
 - [ ] **Step 2:** Open the capgo PR (Phases B+C are one PR on this branch; `git push -u origin worktree-ai-analyze-streaming-spec` and `gh pr create`). Merge + deploy the backend. From this moment old CLIs get the 426 upgrade message — confirm by curling the old route:
+
 ```bash
 curl -s -o /dev/null -w "%{http_code}" -X POST "$CAPGO_API_HOST/build/ai_analyze" -H "capgkey: $TEST_KEY" -H 'content-type: application/json' -d '{}'
 ```
+
 Expected: `426`.
 - [ ] **Step 3:** Release the CLI (repo's normal release flow — `publish_cli.yml`). CI workflows use `bunx @capgo/cli@latest` and pick it up automatically.
 - [ ] **Step 4:** E2E: push a commit that breaks the mobile build on `Cap-go/capgo`, let `build_mobile_android.yml` fail, and confirm the workflow log shows a complete `--- AI analysis ---` block (no `aborted due to timeout`). Check the `AI Build Analysis Result` telemetry shows `success` with `duration_ms` possibly > 60000 — the old ceiling.
