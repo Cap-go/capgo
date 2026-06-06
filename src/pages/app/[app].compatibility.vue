@@ -11,6 +11,7 @@ import IconCheckCircle from '~icons/lucide/check-circle'
 import IconExternalLink from '~icons/lucide/external-link'
 import { dependencyDiffPath, isResolved, platformLabel } from '~/services/compatibilityEvents'
 import { formatLocalDateTime } from '~/services/date'
+import { createSignedImageUrl } from '~/services/storage'
 import { useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
 import { useDisplayStore } from '~/stores/display'
@@ -190,10 +191,19 @@ async function loadMemberEmails() {
     console.error('[Compatibility] Error loading org members:', error)
     return
   }
-  memberInfo.value = new Map((data ?? []).map(member => [
-    member.uid,
-    { email: member.email, image_url: member.image_url ?? null },
-  ]))
+  // Member avatars can be private storage paths — sign them (cached) so the
+  // <img> actually loads; ready-to-use URLs pass through unchanged.
+  const entries = await Promise.all((data ?? []).map(async (member) => {
+    let imageUrl: string | null = null
+    try {
+      imageUrl = (await createSignedImageUrl(member.image_url)) || null
+    }
+    catch (error) {
+      console.warn('[Compatibility] Cannot sign member image', error)
+    }
+    return [member.uid, { email: member.email, image_url: imageUrl }] as const
+  }))
+  memberInfo.value = new Map(entries)
 }
 
 // The three lookups only need `events` (and `app` for the member emails), so
@@ -306,6 +316,7 @@ function openAcceptDialog(group: CompatibilityEventGroup) {
 
 const resolutionDialogId = 'compatibility-resolution-detail'
 const resolutionDetail = ref<CompatibilityEventRow | null>(null)
+const resolutionDetailImageFailed = ref(false)
 const resolutionDetailMember = computed<MemberInfo | null>(() => {
   const resolvedBy = resolutionDetail.value?.resolved_by
   return resolvedBy ? memberInfo.value.get(resolvedBy) ?? null : null
@@ -313,6 +324,7 @@ const resolutionDetailMember = computed<MemberInfo | null>(() => {
 
 function openResolutionDialog(group: CompatibilityEventGroup) {
   resolutionDetail.value = group.representative
+  resolutionDetailImageFailed.value = false
   dialogStore.openDialog({
     id: resolutionDialogId,
     title: t('compatibility-resolution-title'),
@@ -577,10 +589,11 @@ watchEffect(async () => {
       <div class="space-y-4">
         <div v-if="resolutionDetail.resolution_kind === 'accepted'" class="flex items-center gap-3">
           <img
-            v-if="resolutionDetailMember?.image_url"
+            v-if="resolutionDetailMember?.image_url && !resolutionDetailImageFailed"
             :src="resolutionDetailMember.image_url"
             alt=""
             class="object-cover w-10 h-10 rounded-full"
+            @error="resolutionDetailImageFailed = true"
           >
           <div
             v-else
