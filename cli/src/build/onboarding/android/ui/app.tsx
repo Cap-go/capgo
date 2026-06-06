@@ -164,6 +164,8 @@ interface AppProps {
   androidDir: string
   /** Optional Capgo API key passed via -a/--apikey flag; takes precedence over saved key. */
   apikey?: string
+  // Capgo API gateway override (--supa-host); prod when omitted.
+  supaHost?: string
   /** Reports the wizard outcome to the shell when it reaches build-complete, so
    *  the caller prints an accurate post-exit message + durable summary instead of
    *  always claiming success. Never fires on cancel/missing-platform exits. */
@@ -204,7 +206,7 @@ function emptyProgress(appId: string): AndroidOnboardingProgress {
   }
 }
 
-const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir, apikey, onResult }) => {
+const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir, apikey, supaHost, onResult }) => {
   const { exit } = useApp()
   const startStep: AndroidOnboardingStep = getAndroidResumeStep(initialProgress)
 
@@ -1991,6 +1993,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
             // requestBuildInternal would corrupt rendering. Caller-handled mode
             // surfaces the captured log path via result.aiAnalysis and lets us
             // render the AI flow with Ink-native components.
+            supaHost,
             aiAnalysisMode: 'caller-handled',
           }, true, buildLogger)
           if (cancelled)
@@ -2044,7 +2047,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
         }).catch(() => { /* telemetry never breaks the wizard */ })
 
         const result = await runCapgoAiAnalysis({
-          apiHost: 'https://api.capgo.app',
+          apiHost: supaHost ?? 'https://api.capgo.app',
           apikey: resolvedApiKeyRef.current ?? apikey ?? '',
           jobId: aiJobId,
           appId,
