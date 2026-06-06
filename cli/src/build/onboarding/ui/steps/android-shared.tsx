@@ -258,18 +258,28 @@ export const AiAnalysisPromptStep: FC<AiAnalysisPromptStepProps> = ({ onChoose, 
 
 export const AiAnalysisRunningStep: FC<{ streamText?: string }> = ({ streamText }) => {
   // Live tail of the streaming analysis (pre-rendered ANSI from the parent).
-  // Capped to the last lines so the alt-screen frame never overflows — the
-  // result step owns full-text display with proper fit/scroll handling.
-  const MAX_TAIL_LINES = 10
+  //
+  // Flicker rules learned the hard way:
+  //   • FIXED height once streaming starts — a block that grows line-by-line
+  //     changes the frame height every flush, forcing Ink to re-layout the
+  //     whole alt-screen (reads as flashing). Pad to MAX_TAIL_LINES instead.
+  //   • ONE <Text> node for the whole tail — per-line nodes remount and
+  //     repaint; a single node lets Ink diff the text block in place.
+  //   • The "… earlier lines" marker row is always rendered (blank when
+  //     nothing is hidden) so its appearance never shifts layout.
+  // The result step owns full-text display with proper fit/scroll handling.
+  const MAX_TAIL_LINES = 8
   const lines = streamText ? streamText.split('\n') : []
-  const tail = lines.length > MAX_TAIL_LINES ? lines.slice(-MAX_TAIL_LINES) : lines
+  const hidden = Math.max(0, lines.length - MAX_TAIL_LINES)
+  const tail = lines.slice(-MAX_TAIL_LINES).map(l => (l === '' ? ' ' : l))
+  while (tail.length > 0 && tail.length < MAX_TAIL_LINES) tail.push(' ')
   return (
     <Box flexDirection="column" marginTop={1}>
       <SpinnerLine text="Analyzing build log with Capgo AI..." />
       {tail.length > 0 && (
         <Box flexDirection="column" marginTop={1}>
-          {lines.length > MAX_TAIL_LINES && <Text dimColor>… {lines.length - MAX_TAIL_LINES} earlier lines</Text>}
-          {tail.map((l, i) => <Text key={`${i}-${l.length}`}>{l === '' ? ' ' : l}</Text>)}
+          <Text dimColor>{hidden > 0 ? `… ${hidden} earlier line${hidden === 1 ? '' : 's'}` : ' '}</Text>
+          <Text>{tail.join('\n')}</Text>
         </Box>
       )}
     </Box>

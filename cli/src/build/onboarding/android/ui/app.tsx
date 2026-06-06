@@ -529,7 +529,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
   const [aiJobId, setAiJobId] = useState<string | null>(null)
   const [aiAnalysisText, setAiAnalysisText] = useState<string | null>(null)
   // Live ANSI preview of the streaming analysis, shown in the running step.
-  // Throttled (~120ms) so per-token updates don't re-render the whole tree.
+  // Throttled (~250ms) so per-token updates don't re-render the whole tree.
   const [aiStreamPreview, setAiStreamPreview] = useState('')
   // See iOS sibling — non-success outcome banner, mutually exclusive with
   // `aiAnalysisText`. One object so kind + message can't drift.
@@ -2052,7 +2052,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
 
         // Stream the analysis into a throttled ANSI preview: each completed
         // markdown line is rendered (same renderer as the plain CLI) and the
-        // accumulated text is flushed to state at most every 120ms.
+        // accumulated text is flushed to state at most every 250ms.
         let streamedAnsi = ''
         let previewFlushTimer: ReturnType<typeof setTimeout> | null = null
         const mdStream = createStreamingMarkdownRenderer((t) => {
@@ -2061,7 +2061,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
             previewFlushTimer = null
             if (!cancelled)
               setAiStreamPreview(streamedAnsi)
-          }, 120)
+          }, 250)
         }, true)
 
         const result = await runCapgoAiAnalysis({
