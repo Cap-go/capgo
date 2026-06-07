@@ -1,4 +1,4 @@
-import type { AnalyticsEngineDataPoint, D1Database, Hyperdrive } from '@cloudflare/workers-types'
+import type { AnalyticsEngineDataPoint, D1Database, Hyperdrive, KVNamespace } from '@cloudflare/workers-types'
 import type { Context } from 'hono'
 import type { DeviceComparable } from './deviceComparison.ts'
 import type { Database } from './supabase.types.ts'
@@ -42,6 +42,7 @@ export type Bindings = {
   APP_LOG: AnalyticsEngineDataPoint
   DEVICE_INFO: AnalyticsEngineDataPoint
   DB_STOREAPPS: D1Database
+  CHANNEL_SELF_STORE?: KVNamespace
   HYPERDRIVE_CAPGO_DIRECT_EU: Hyperdrive // Add Hyperdrive binding
   HYPERDRIVE_CAPGO_READ_NA: Hyperdrive
   HYPERDRIVE_CAPGO_READ_EU: Hyperdrive

@@ -1,5 +1,7 @@
+import type { SemVer } from '@std/semver'
 import type { Context } from 'hono'
 import type { ManifestEntry } from './downloadUrl.ts'
+import type { MiddlewareKeyVariables } from './hono.ts'
 import type { Database } from './supabase.types.ts'
 import type { AppInfos } from './types.ts'
 import {
@@ -23,6 +25,10 @@ import { isUpdateEnumerationLimited, recordUpdateEnumerationMiss, updateEnumerat
 import { backgroundTask, BROTLI_MIN_UPDATER_VERSION_V5, BROTLI_MIN_UPDATER_VERSION_V6, BROTLI_MIN_UPDATER_VERSION_V7, fixSemver, isDeprecatedPluginVersion, isInternalVersionName } from './utils.ts'
 
 const PLAN_LIMIT: Array<'mau' | 'bandwidth' | 'storage'> = ['mau', 'bandwidth']
+const CHANNEL_SELF_STORE_MIN_V5 = '5.34.0'
+const CHANNEL_SELF_STORE_MIN_V6 = '6.34.0'
+const CHANNEL_SELF_STORE_MIN_V7 = '7.34.0'
+const CHANNEL_SELF_STORE_MIN_V8 = '8.0.0'
 
 export type UpdateResponseKind = 'up_to_date' | 'blocked' | 'failed'
 
@@ -93,6 +99,19 @@ export function resToVersion(plugin_version: string, signedURL: string, version:
   return res
 }
 
+function hasChannelSelfStoreBinding(c: Context) {
+  return Boolean((c as Context<MiddlewareKeyVariables>).env?.CHANNEL_SELF_STORE)
+}
+
+function usesLegacyChannelSelfStoreVersion(pluginVersion: SemVer) {
+  return isDeprecatedPluginVersion(pluginVersion, CHANNEL_SELF_STORE_MIN_V5, CHANNEL_SELF_STORE_MIN_V6, CHANNEL_SELF_STORE_MIN_V7, CHANNEL_SELF_STORE_MIN_V8)
+}
+
+async function getStoredChannelSelfOverride(c: Context, appId: string, deviceId: string) {
+  const { getChannelSelfOverride } = await import('./channelSelfStore.ts')
+  return getChannelSelfOverride(c as Context<MiddlewareKeyVariables>, appId, deviceId)
+}
+
 export async function updateWithPG(
   c: Context,
   body: AppInfos,
@@ -152,10 +171,16 @@ export async function updateWithPG(
     return c.json({ error: 'on_premise_app', message: 'On-premise app detected' }, 429)
   }
   await setAppStatus(c, app_id, 'cloud', appOwner.allow_device_custom_id)
-  const channelDeviceCount = appOwner.channel_device_count ?? 0
-  const manifestBundleCount = appOwner.manifest_bundle_count ?? 0
-  const bypassChannelOverrides = channelDeviceCount <= 0
   const pluginVersion = parse(plugin_version)
+  const channelSelfStoreEnabled = hasChannelSelfStoreBinding(c)
+  const shouldUseChannelSelfStore = channelSelfStoreEnabled && usesLegacyChannelSelfStoreVersion(pluginVersion)
+  const channelSelfOverride = shouldUseChannelSelfStore
+    ? await getStoredChannelSelfOverride(c, app_id, device_id)
+    : null
+  const channelDeviceCount = appOwner.channel_device_count ?? 0
+  const effectiveChannelDeviceCount = channelSelfStoreEnabled ? 0 : channelDeviceCount
+  const manifestBundleCount = appOwner.manifest_bundle_count ?? 0
+  const bypassChannelOverrides = !channelSelfOverride && effectiveChannelDeviceCount <= 0
   // v5 is deprecated if < 5.10.0, v6 is deprecated if < 6.25.0, v7 is deprecated if < 7.25.0
   const isDeprecated = isDeprecatedPluginVersion(pluginVersion)
   // Ensure there is manifest and the plugin version support manifest fetching (v5.10.0+, v6.25.0+, v7.0.35+)
@@ -165,6 +190,7 @@ export async function updateWithPG(
     message: 'App channel device count evaluated',
     app_id,
     channelDeviceCount,
+    effectiveChannelDeviceCount,
     bypassChannelOverrides,
     manifestBundleCount,
     fetchManifestEntries,
@@ -223,9 +249,10 @@ export async function updateWithPG(
     device_id,
     defaultChannel,
     drizzleClient,
-    channelDeviceCount,
+    channelDeviceCount: effectiveChannelDeviceCount,
     manifestBundleCount,
     includeMetadata: needsMetadata,
+    channelSelfOverrideChannelId: channelSelfOverride?.channel_id.id,
   })
   const { channelOverride } = requestedInto
   let { channelData } = requestedInto

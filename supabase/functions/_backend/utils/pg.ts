@@ -1,3 +1,4 @@
+import type { SQL } from 'drizzle-orm'
 import type { Context } from 'hono'
 import { and, eq, isNotNull, isNull, or, sql } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/node-postgres'
@@ -18,6 +19,7 @@ const REPLICATION_LAG_CACHE_TTL_SECONDS = 60
 const REPLICATION_LAG_CACHE_TTL_MS = REPLICATION_LAG_CACHE_TTL_SECONDS * 1000
 
 type ReplicationStatus = 'ok' | 'lagging' | 'unknown'
+interface ChannelLookupResult { id: number, name: string, allow_device_self_set: boolean, public: boolean, owner_org: string }
 type PlanAction = 'mau' | 'storage' | 'bandwidth'
 type ReadReplicaHyperdriveBinding =
   | 'HYPERDRIVE_CAPGO_READ_AS_JAPAN'
@@ -523,6 +525,40 @@ export function requestInfosChannelDevicePostgres(
   return channelDevice.then(data => data.at(0))
 }
 
+export function requestInfosChannelByIdPostgres(
+  c: Context,
+  app_id: string,
+  channelId: number,
+  drizzleClient: ReturnType<typeof getDrizzleClient>,
+  includeManifest: boolean,
+  includeMetadata = false,
+) {
+  const { versionSelect, channelAlias, channelSelect, manifestSelect, versionAlias } = getSchemaUpdatesAlias(includeMetadata)
+  const baseSelect = {
+    version: versionSelect,
+    channels: channelSelect,
+  }
+  const selectShape = withOptionalManifestSelect(baseSelect, includeManifest, manifestSelect)
+
+  const baseQuery = drizzleClient
+    .select(selectShape)
+    .from(channelAlias)
+    .innerJoin(versionAlias, activeChannelVersionJoin(channelAlias.version, versionAlias))
+
+  const channel = (includeManifest
+    ? baseQuery.leftJoin(schema.manifest, eq(schema.manifest.app_version_id, versionAlias.id))
+    : baseQuery)
+    .where(and(
+      eq(channelAlias.app_id, app_id),
+      eq(channelAlias.id, channelId),
+    ))
+    .groupBy(channelAlias.id, versionAlias.id)
+    .limit(1)
+  cloudlog({ requestId: c.get('requestId'), message: 'channel self override Query:', channelSelfOverrideQuery: channel.toSQL() })
+
+  return channel.then(data => data.at(0))
+}
+
 export function requestInfosChannelPostgres(
   c: Context,
   platform: string,
@@ -588,6 +624,7 @@ interface RequestInfosPostgresOptions {
   channelDeviceCount?: number | null
   manifestBundleCount?: number | null
   includeMetadata?: boolean
+  channelSelfOverrideChannelId?: number | null
 }
 
 export function requestInfosPostgres(options: RequestInfosPostgresOptions) {
@@ -601,17 +638,22 @@ export function requestInfosPostgres(options: RequestInfosPostgresOptions) {
     channelDeviceCount,
     manifestBundleCount,
     includeMetadata = false,
+    channelSelfOverrideChannelId,
   } = options
   const shouldQueryChannelOverride = channelDeviceCount === undefined || channelDeviceCount === null ? true : channelDeviceCount > 0
   const shouldFetchManifest = manifestBundleCount === undefined || manifestBundleCount === null ? true : manifestBundleCount > 0
+  let channelDevice: ReturnType<typeof requestInfosChannelByIdPostgres> | ReturnType<typeof requestInfosChannelDevicePostgres> | Promise<null>
 
-  const channelDevice = shouldQueryChannelOverride
-    ? requestInfosChannelDevicePostgres(c, app_id, device_id, drizzleClient, shouldFetchManifest, includeMetadata)
-    : Promise.resolve(undefined)
-        .then(() => {
-          cloudlog({ requestId: c.get('requestId'), message: 'Skipping channel device override query' })
-          return null
-        })
+  if (typeof channelSelfOverrideChannelId === 'number') {
+    channelDevice = requestInfosChannelByIdPostgres(c, app_id, channelSelfOverrideChannelId, drizzleClient, shouldFetchManifest, includeMetadata)
+  }
+  else if (shouldQueryChannelOverride) {
+    channelDevice = requestInfosChannelDevicePostgres(c, app_id, device_id, drizzleClient, shouldFetchManifest, includeMetadata)
+  }
+  else {
+    cloudlog({ requestId: c.get('requestId'), message: 'Skipping channel device override query' })
+    channelDevice = Promise.resolve(null)
+  }
   const channel = requestInfosChannelPostgres(c, platform, app_id, defaultChannel, drizzleClient, shouldFetchManifest, includeMetadata)
 
   return Promise.all([channelDevice, channel])
@@ -804,14 +846,15 @@ export async function getChannelDeviceOverridePg(
   }
 }
 
-export async function getChannelByNamePg(
+async function getChannelByPg(
   c: Context,
   appId: string,
-  channelName: string,
+  channelFilter: SQL,
   drizzleClient: ReturnType<typeof getDrizzleClient>,
-): Promise<{ id: number, name: string, allow_device_self_set: boolean, public: boolean, owner_org: string } | null> {
+  logName: string,
+): Promise<ChannelLookupResult | null> {
   try {
-    const channel = await drizzleClient
+    return await drizzleClient
       .select({
         id: schema.channels.id,
         name: schema.channels.name,
@@ -822,16 +865,33 @@ export async function getChannelByNamePg(
       .from(schema.channels)
       .where(and(
         eq(schema.channels.app_id, appId),
-        eq(schema.channels.name, channelName),
+        channelFilter,
       ))
       .limit(1)
       .then(data => data[0])
-    return channel
   }
   catch (e: unknown) {
-    logPgError(c, 'getChannelByNamePg', e)
+    logPgError(c, logName, e)
     return null
   }
+}
+
+export async function getChannelByNamePg(
+  c: Context,
+  appId: string,
+  channelName: string,
+  drizzleClient: ReturnType<typeof getDrizzleClient>,
+): Promise<ChannelLookupResult | null> {
+  return getChannelByPg(c, appId, eq(schema.channels.name, channelName), drizzleClient, 'getChannelByNamePg')
+}
+
+export async function getChannelByIdPg(
+  c: Context,
+  appId: string,
+  channelId: number,
+  drizzleClient: ReturnType<typeof getDrizzleClient>,
+): Promise<ChannelLookupResult | null> {
+  return getChannelByPg(c, appId, eq(schema.channels.id, channelId), drizzleClient, 'getChannelByIdPg')
 }
 
 export async function getMainChannelsPg(
