@@ -51,7 +51,6 @@ dependencies {
     implementation project(':capgo-capacitor-date-picker')
     implementation project(':capgo-capacitor-document-scanner')
     implementation project(':capgo-capacitor-downloader')
-    implementation project(':capgo-capacitor-file')
     implementation project(':capgo-capacitor-file-compressor')
     implementation project(':capgo-capacitor-file-picker')
     implementation project(':capgo-capacitor-file-sharer')
