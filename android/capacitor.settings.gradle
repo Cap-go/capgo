@@ -131,9 +131,6 @@ project(':capgo-capacitor-downloader').projectDir = new File('../node_modules/.b
 include ':capgo-capacitor-file-compressor'
 project(':capgo-capacitor-file-compressor').projectDir = new File('../node_modules/.bun/@capgo+capacitor-file-compressor@8.0.29+1b808583819c2ac6/node_modules/@capgo/capacitor-file-compressor/android')
 
-include ':capgo-capacitor-file-picker'
-project(':capgo-capacitor-file-picker').projectDir = new File('../node_modules/.bun/@capgo+capacitor-file-picker@8.1.7+1b808583819c2ac6/node_modules/@capgo/capacitor-file-picker/android')
-
 include ':capgo-capacitor-file-sharer'
 project(':capgo-capacitor-file-sharer').projectDir = new File('../node_modules/.bun/@capgo+capacitor-file-sharer@8.1.2+1b808583819c2ac6/node_modules/@capgo/capacitor-file-sharer/android')
 
@@ -295,6 +292,3 @@ project(':capgo-capacitor-zebra-datawedge').projectDir = new File('../node_modul
 
 include ':capgo-capacitor-zip'
 project(':capgo-capacitor-zip').projectDir = new File('../node_modules/.bun/@capgo+capacitor-zip@8.1.10+1b808583819c2ac6/node_modules/@capgo/capacitor-zip/android')
-
-include ':revenuecat-purchases-capacitor'
-project(':revenuecat-purchases-capacitor').projectDir = new File('../node_modules/.bun/@revenuecat+purchases-capacitor@13.1.5+1b808583819c2ac6/node_modules/@revenuecat/purchases-capacitor/android')

@@ -52,7 +52,6 @@ dependencies {
     implementation project(':capgo-capacitor-document-scanner')
     implementation project(':capgo-capacitor-downloader')
     implementation project(':capgo-capacitor-file-compressor')
-    implementation project(':capgo-capacitor-file-picker')
     implementation project(':capgo-capacitor-file-sharer')
     implementation project(':capgo-capacitor-flash')
     implementation project(':capgo-capacitor-home-indicator')
@@ -107,7 +106,6 @@ dependencies {
     implementation project(':capgo-capacitor-youtube-player')
     implementation project(':capgo-capacitor-zebra-datawedge')
     implementation project(':capgo-capacitor-zip')
-    implementation project(':revenuecat-purchases-capacitor')
 
 }
 
