@@ -251,7 +251,6 @@
     "@capgo/capacitor-pdf-generator": "^8.0.30",
     "@capgo/capacitor-pedometer": "^8.0.32",
     "@capgo/capacitor-persistent-account": "^8.0.29",
-    "@capgo/capacitor-photo-library": "^8.0.13",
     "@capgo/capacitor-pretty-toast": "^8.1.7",
     "@capgo/capacitor-printer": "^8.0.14",
     "@capgo/capacitor-privacy-screen": "^8.3.3",

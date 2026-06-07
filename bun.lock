@@ -81,7 +81,6 @@
         "@capgo/capacitor-pdf-generator": "^8.0.30",
         "@capgo/capacitor-pedometer": "^8.0.32",
         "@capgo/capacitor-persistent-account": "^8.0.29",
-        "@capgo/capacitor-photo-library": "^8.0.13",
         "@capgo/capacitor-pretty-toast": "^8.1.7",
         "@capgo/capacitor-printer": "^8.0.14",
         "@capgo/capacitor-privacy-screen": "^8.3.3",
@@ -556,8 +555,6 @@
     "@capgo/capacitor-pedometer": ["@capgo/capacitor-pedometer@8.0.32", "", { "peerDependencies": { "@capacitor/core": ">=8.0.0" } }, "sha512-0Ckzx+7tJf74D/Z5K0QEaSd9mCvz+HvMtz088BvEUfbf9LFfRF3GdS529Ei6wFVZ63lcrrWEiXx2n9JBbXgTdw=="],
 
     "@capgo/capacitor-persistent-account": ["@capgo/capacitor-persistent-account@8.0.29", "", { "peerDependencies": { "@capacitor/core": ">=8.0.0" } }, "sha512-LUO75hllgWlbIMHvoY8ViSg2gq2/M2Pb1IIpIGiedc+hsRo5Bxr8gycna91Tn4dJSXawv5ypO0sbAz//lGe7Iw=="],
-
-    "@capgo/capacitor-photo-library": ["@capgo/capacitor-photo-library@8.0.13", "", { "peerDependencies": { "@capacitor/core": ">=8.0.0" } }, "sha512-s/HyNatiAId+veLH5Jt1vTr49/fj8QXW6CM877LxrJO1E3FGj8e+Si4jPHLcPn9zrR9HmZmrHieDKixb8MQCNA=="],
 
     "@capgo/capacitor-pretty-toast": ["@capgo/capacitor-pretty-toast@8.1.7", "", { "peerDependencies": { "@capacitor/core": ">=8.0.0" } }, "sha512-DooUVx8CPavI/O0iHr6Pn31sSyMq7i2cXzDqjWuUBRUZZkyz+Dl+mZHG6DVx0v0TyJpYwrrCTawdUfMTCTaJVw=="],
 
