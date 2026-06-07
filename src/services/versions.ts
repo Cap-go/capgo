@@ -1,6 +1,6 @@
 import type { Database } from '~/types/supabase.types'
 import { Capacitor } from '@capacitor/core'
-import { CapacitorUpdater } from '@capgo/capacitor-updater'
+import { CapacitorUpdater } from '@capgo/capacitor-updater/src'
 import dayjs from 'dayjs'
 import { toast } from 'vue-sonner'
 import { i18n } from '~/modules/i18n'

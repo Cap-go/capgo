@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import type { HttpResponse, PluginListenerHandle } from '@capacitor/core'
 import type { BarcodeScanErrorEvent, BarcodeScannedEvent, BarcodeScannerOptions } from '@capgo/camera-preview'
-import type { BundleId, BundleInfo, DownloadEvent, DownloadOptions, StartPreviewSessionOptions } from '@capgo/capacitor-updater'
+import type { BundleInfo, DownloadEvent, DownloadOptions, PreviewInfo, StartPreviewSessionOptions } from '@capgo/capacitor-updater/src'
 import type { PreviewDeepLink } from '~/services/previewLinks'
 import { Clipboard } from '@capacitor/clipboard'
 import { Capacitor, CapacitorHttp } from '@capacitor/core'
 import { CameraPreview } from '@capgo/camera-preview'
-import { CapacitorUpdater } from '@capgo/capacitor-updater'
+import { CapacitorUpdater } from '@capgo/capacitor-updater/src'
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
@@ -38,8 +38,8 @@ const manualUrl = ref('')
 const statusMessage = ref('')
 const scannerFrameRef = ref<HTMLElement | null>(null)
 const debugMessages = ref<string[]>([])
-const savedPreviews = ref<SavedPreviewInfo[]>([])
-const savedPreviewCurrent = ref<SavedPreviewInfo | null>(null)
+const savedPreviews = ref<PreviewInfo[]>([])
+const savedPreviewCurrent = ref<PreviewInfo | null>(null)
 const savedPreviewLiveBundle = ref<BundleInfo | null>(null)
 const previewManagerAvailable = ref(isNativePlatform)
 const isLoadingPreviews = ref(false)
@@ -75,48 +75,6 @@ interface PreviewPayloadFetchResult {
   sessionPayloadUrl?: string
 }
 
-interface SavedPreviewInfo {
-  id: string
-  bundle: BundleInfo
-  name?: string
-  source?: string
-  appId?: string
-  payloadUrl?: string
-  createdAt: string
-  updatedAt: string
-  lastUsedAt: string
-  isActive: boolean
-}
-
-interface PreviewListResult {
-  previews: SavedPreviewInfo[]
-  current?: SavedPreviewInfo
-  currentBundle: BundleInfo
-  liveBundle?: BundleInfo
-}
-
-interface PreviewUpdateResult {
-  preview: SavedPreviewInfo
-  latestVersion?: string
-  upToDate: boolean
-  updated: boolean
-  bundle?: BundleInfo
-}
-
-interface PreviewManagerApi {
-  listPreviews: (options?: never) => Promise<PreviewListResult>
-  setPreview: (options: BundleId) => Promise<void>
-  resetPreview: () => Promise<void>
-  deletePreview: (options: BundleId) => Promise<{ removed: boolean, deleted: boolean }>
-  checkPreviewUpdate: (options: BundleId) => Promise<PreviewUpdateResult>
-  updatePreview: (options: BundleId) => Promise<PreviewUpdateResult>
-}
-
-interface PreviewSessionOptions extends StartPreviewSessionOptions {
-  name?: string
-  source?: string
-}
-
 interface PreviewSessionMetadata {
   appId?: string
   payloadUrl?: string
@@ -125,7 +83,6 @@ interface PreviewSessionMetadata {
 }
 
 const PREVIEW_PAYLOAD_PATH = '/.capgo/preview.json'
-const previewManager = CapacitorUpdater as typeof CapacitorUpdater & PreviewManagerApi
 
 function formatDebugData(data: unknown) {
   try {
@@ -294,11 +251,11 @@ function bundleVersion(bundle?: BundleInfo | null) {
   return bundleRecord.version || bundleRecord.versionName || bundle.id
 }
 
-function previewLabel(preview: SavedPreviewInfo) {
+function previewLabel(preview: PreviewInfo) {
   return preview.name || bundleVersion(preview.bundle) || preview.id
 }
 
-function previewSourceLabel(preview: SavedPreviewInfo) {
+function previewSourceLabel(preview: PreviewInfo) {
   if (preview.source === 'channel')
     return 'Channel'
   if (preview.source === 'bundle')
@@ -322,7 +279,7 @@ function hostFromUrl(value?: string) {
   }
 }
 
-function previewSubtitle(preview: SavedPreviewInfo) {
+function previewSubtitle(preview: PreviewInfo) {
   const details = [
     previewSourceLabel(preview),
     bundleVersion(preview.bundle),
@@ -385,7 +342,7 @@ async function refreshSavedPreviews(silent = false) {
 
   isLoadingPreviews.value = true
   try {
-    const result = await previewManager.listPreviews()
+    const result = await CapacitorUpdater.listPreviews()
     savedPreviews.value = result.previews
     savedPreviewCurrent.value = result.current ?? null
     savedPreviewLiveBundle.value = result.liveBundle ?? null
@@ -406,7 +363,7 @@ async function refreshSavedPreviews(silent = false) {
   }
 }
 
-async function runPreviewAction(preview: SavedPreviewInfo | null, actionName: string, action: () => Promise<void>) {
+async function runPreviewAction(preview: PreviewInfo | null, actionName: string, action: () => Promise<void>) {
   if (isLoading.value || previewActionId.value)
     return
 
@@ -429,33 +386,33 @@ async function runPreviewAction(preview: SavedPreviewInfo | null, actionName: st
   }
 }
 
-async function switchSavedPreview(preview: SavedPreviewInfo) {
+async function switchSavedPreview(preview: PreviewInfo) {
   await runPreviewAction(preview, 'switch', async () => {
     toast.success(`Opening ${previewLabel(preview)}`)
-    await previewManager.setPreview({ id: preview.id })
+    await CapacitorUpdater.setPreview({ id: preview.id })
   })
 }
 
-async function updateSavedPreview(preview: SavedPreviewInfo) {
+async function updateSavedPreview(preview: PreviewInfo) {
   if (!preview.payloadUrl) {
     toast.error('This preview cannot be updated locally')
     return
   }
 
   await runPreviewAction(preview, 'update', async () => {
-    const result = await previewManager.updatePreview({ id: preview.id })
+    const result = await CapacitorUpdater.updatePreview({ id: preview.id })
     toast.success(result.updated ? `Updated ${previewLabel(result.preview)}` : `${previewLabel(result.preview)} is up to date`)
   })
 }
 
-async function deleteSavedPreview(preview: SavedPreviewInfo) {
+async function deleteSavedPreview(preview: PreviewInfo) {
   if (preview.isActive) {
     toast.error('Leave or switch preview before deleting it')
     return
   }
 
   await runPreviewAction(preview, 'delete', async () => {
-    const result = await previewManager.deletePreview({ id: preview.id })
+    const result = await CapacitorUpdater.deletePreview({ id: preview.id })
     toast.success(result.deleted ? `Deleted ${previewLabel(preview)}` : `Removed ${previewLabel(preview)}`)
   })
 }
@@ -463,7 +420,7 @@ async function deleteSavedPreview(preview: SavedPreviewInfo) {
 async function resetToMainApp() {
   await runPreviewAction(null, 'reset', async () => {
     toast.success('Returning to main app')
-    await previewManager.resetPreview()
+    await CapacitorUpdater.resetPreview()
   })
 }
 
@@ -754,7 +711,7 @@ async function handleBarcodeScan(scannedValue: string) {
 }
 
 async function startPreviewSession(metadata: PreviewSessionMetadata = {}) {
-  const options: PreviewSessionOptions = {}
+  const options: StartPreviewSessionOptions = {}
   if (metadata.appId)
     options.appId = metadata.appId
   if (metadata.payloadUrl)
