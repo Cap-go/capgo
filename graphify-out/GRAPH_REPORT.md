@@ -422,7 +422,7 @@ Nodes (146): filterDeviceKeys(), get(), GetDevice, publicDevice, formatBytes(), 
 
 ### Community 6 - "Community 6"
 Cohesion: 0.03
-Nodes (125): calcKeyId(), decryptChecksum(), decryptChecksumV3(), decryptSource(), encryptChecksum(), encryptChecksumV3(), encryptSource(), generateSessionKey() (+117 more)
+Nodes (128): calcKeyId(), decryptChecksum(), decryptChecksumV3(), decryptSource(), encryptChecksum(), encryptChecksumV3(), encryptSource(), generateSessionKey() (+120 more)
 
 ### Community 7 - "Community 7"
 Cohesion: 0.01
@@ -433,16 +433,16 @@ Cohesion: 0.04
 Nodes (110): get(), getAll(), app, CreateApp, post(), put(), UpdateApp, AppWithOrg (+102 more)
 
 ### Community 9 - "Community 9"
-Cohesion: 0.05
-Nodes (109): getInvocationSource(), check2FAComplianceForApp(), checkAppExists(), checkAppExistsAndHasPermissionOrgErr(), getAppIconStoragePath(), checkVersionNotUsedInChannel(), CheckVersionOptions, createChannel() (+101 more)
+Cohesion: 0.06
+Nodes (99): withSupabaseSource(), check2FAComplianceForApp(), checkAppExistsAndHasPermissionOrgErr(), getAppIconStoragePath(), checkVersionNotUsedInChannel(), CheckVersionOptions, createChannel(), delChannel() (+91 more)
 
 ### Community 10 - "Community 10"
-Cohesion: 0.03
-Nodes (81): categorizeCliError(), categorizeHttpStatus(), CliErrorCategory, getMessage(), getStatus(), OrgResolverDeps, ownerOrgCache, resolveOwnerOrgId() (+73 more)
-
-### Community 11 - "Community 11"
 Cohesion: 0.04
 Nodes (88): app, CheckoutData, app, getPublicSupabaseUrl(), isLocalHost(), isLocalSupabaseUrl(), queueOrgPlanRefreshWithRetry(), calculateRevenue() (+80 more)
+
+### Community 11 - "Community 11"
+Cohesion: 0.03
+Nodes (76): categorizeCliError(), categorizeHttpStatus(), CliErrorCategory, getMessage(), getStatus(), OrgResolverDeps, ownerOrgCache, resolveOwnerOrgId() (+68 more)
 
 ### Community 12 - "Community 12"
 Cohesion: 0.05
@@ -465,28 +465,28 @@ Cohesion: 0.06
 Nodes (78): AppOwnerResult, assertChannelSelfAppOwnerPlanValid(), assertChannelSelfCachedStatus(), ChannelSelfDeviceOperation, ChannelSelfOverrideResult, deleteChannelSelfOverrideForDevice(), deleteOverride(), getChannelSelfOverrideForDevice() (+70 more)
 
 ### Community 17 - "Community 17"
+Cohesion: 0.04
+Nodes (66): getInvocationSource(), checkAppExists(), addApp(), addAppInternal(), AppCreateSource, ensureAppDoesNotExist(), ensureOptions(), resolveAppCreateSource() (+58 more)
+
+### Community 18 - "Community 18"
 Cohesion: 0.03
 Nodes (47): pgPool, deleteUserAs(), withAuthClient(), QueryFn, supabase, supabaseServiceKey, supabaseUrl, serviceRoleSupabase (+39 more)
 
-### Community 18 - "Community 18"
+### Community 19 - "Community 19"
 Cohesion: 0.06
 Nodes (45): destinationOrgId, id, createChannel(), versionCache, createHashedKeySDK(), uploadBundleWithHashedKey(), assertCompatibilityTableColumns(), createCustomPackageJson() (+37 more)
 
-### Community 19 - "Community 19"
+### Community 20 - "Community 20"
 Cohesion: 0.03
 Nodes (79): scripts, build, check-posix-paths, dev, dev-build, generate-docs, lint, lint:fix (+71 more)
 
-### Community 20 - "Community 20"
+### Community 21 - "Community 21"
 Cohesion: 0.06
 Nodes (45): appGlobal, appGlobal, appGlobal, appGlobal, appGlobal, appGlobal, appGlobal, app (+37 more)
 
-### Community 21 - "Community 21"
-Cohesion: 0.04
-Nodes (68): classifyEmailAddress(), classifyEmailDomain(), DISPOSABLE_EMAIL_DOMAINS, disposableEmailDomainSet, EmailType, extractEmailDomain(), PERSONAL_EMAIL_DOMAINS, personalEmailDomainSet (+60 more)
-
 ### Community 22 - "Community 22"
 Cohesion: 0.04
-Nodes (58): loadConfig(), writeConfig(), CompatibilityDetails, compatibilityDetailsSchema, compatibilitySchema, IncompatibilityReason, incompatibilityReasonSchema, NativePackage (+50 more)
+Nodes (68): classifyEmailAddress(), classifyEmailDomain(), DISPOSABLE_EMAIL_DOMAINS, disposableEmailDomainSet, EmailType, extractEmailDomain(), PERSONAL_EMAIL_DOMAINS, personalEmailDomainSet (+60 more)
 
 ### Community 23 - "Community 23"
 Cohesion: 0.06
@@ -517,24 +517,24 @@ Cohesion: 0.06
 Nodes (49): CheckDomainResponse, CreditMetricType, getErrorMessage(), logAsUser(), AppUsageByApp, AppUsageGlobal, AppUsageGlobalByApp, autoAuth() (+41 more)
 
 ### Community 30 - "Community 30"
+Cohesion: 0.07
+Nodes (48): createRSA(), checkAlerts(), checkVersionStatus(), VersionCheckResult, writeConfigUpdater(), syncPendingAppIdToCapacitorConfig(), addOrganization(), addOrganizationInternal() (+40 more)
+
+### Community 31 - "Community 31"
 Cohesion: 0.05
 Nodes (48): UpdateEndpointRequest, stripeEnabled, ArrayElement, Concrete, Expand, Merge, MergeArrays, MergeNonUnionArrays (+40 more)
 
-### Community 31 - "Community 31"
+### Community 32 - "Community 32"
 Cohesion: 0.07
 Nodes (50): buildBundleInfoRequest(), buildPreviewAuthRequest(), buildPreviewDownloadPayload(), buildPreviewPayloadResponseHeaders(), buildPreviewResponseHeaders(), BundleInfoCache, generateChannelPreviewUrl(), generatePreviewUrl() (+42 more)
 
-### Community 32 - "Community 32"
+### Community 33 - "Community 33"
 Cohesion: 0.03
 Nodes (58): devDependencies, adm-zip, @antfu/eslint-config, @aws-sdk/client-s3, bun-types, @capacitor/cli, @capacitor/core, @capgo/cli (+50 more)
 
-### Community 33 - "Community 33"
+### Community 34 - "Community 34"
 Cohesion: 0.07
 Nodes (52): addTagBento(), bentoFetch(), getBentoHeaders(), isBentoConfigured(), syncBentoSubscriberTags(), trackBentoEvent(), unsubscribeBento(), buildNotifCacheRequest() (+44 more)
-
-### Community 34 - "Community 34"
-Cohesion: 0.08
-Nodes (44): createRSA(), checkAlerts(), checkVersionStatus(), VersionCheckResult, writeConfigUpdater(), syncPendingAppIdToCapacitorConfig(), addOrganization(), addOrganizationInternal() (+36 more)
 
 ### Community 35 - "Community 35"
 Cohesion: 0.06
@@ -609,32 +609,32 @@ Cohesion: 0.09
 Nodes (37): adminStore, cancelDebouncedSearchReload(), currentPage, displayStore, formatDateOrNever(), formatNumber(), formatPercent(), getOrganizationAttentionLabel() (+29 more)
 
 ### Community 53 - "Community 53"
-Cohesion: 0.10
-Nodes (41): assertRawAttachmentRouteIdHasValidEncoding(), assertValidPercentEncodedAttachmentKey(), ATTACHMENT_PLAN_LIMIT, ATTACHMENT_ROUTE_PREFIXES, buildDurableObjectRequest(), buildNormalizedUploadMetadataHeader(), calculateBytesTransferred(), canReplayUploadRequest() (+33 more)
-
-### Community 54 - "Community 54"
 Cohesion: 0.07
 Nodes (39): Actives, BuildStats, calculateChurnRevenue(), calculateConversionRate(), calculateNrr(), CurrentDayWindow, CustomerCount, CustomerIdRow (+31 more)
 
-### Community 55 - "Community 55"
+### Community 54 - "Community 54"
 Cohesion: 0.07
 Nodes (30): ConfirmPrompt, INIT_CANCEL, InitCodeDiff, InitCodeDiffLine, InitEncryptionPhase, InitEncryptionSummary, InitLogEntry, InitLogTone (+22 more)
 
-### Community 56 - "Community 56"
+### Community 55 - "Community 55"
 Cohesion: 0.09
 Nodes (40): APPLE_FALLBACK_COUNTRIES, AppleLookupResult, applyStoreUrls(), AppStoreUrlRow, BackfillFailure, BackfillMiss, BackfillResult, buildAppleLookupUrl() (+32 more)
 
-### Community 57 - "Community 57"
+### Community 56 - "Community 56"
 Cohesion: 0.11
 Nodes (40): buildSupabaseDashboardLink(), createCheckout(), createCustomer(), createOneTimeCheckout(), createPortal(), CreditCheckoutDetails, CreditCheckoutItemSummary, DatafastAttribution (+32 more)
 
-### Community 58 - "Community 58"
+### Community 57 - "Community 57"
 Cohesion: 0.05
 Nodes (40): devDependencies, adm-zip, @antfu/eslint-config, @bradenmacdonald/s3-lite-client, @capacitor/cli, @capgo/find-package-manager, ci-info, @clack/prompts (+32 more)
 
-### Community 59 - "Community 59"
+### Community 58 - "Community 58"
 Cohesion: 0.06
 Nodes (36): api_domain, development, local, preprod, prod, base_domain, development, local (+28 more)
+
+### Community 59 - "Community 59"
+Cohesion: 0.10
+Nodes (38): assertRawAttachmentRouteIdHasValidEncoding(), assertValidPercentEncodedAttachmentKey(), ATTACHMENT_PLAN_LIMIT, ATTACHMENT_ROUTE_PREFIXES, buildDurableObjectRequest(), buildNormalizedUploadMetadataHeader(), calculateBytesTransferred(), canReplayUploadRequest() (+30 more)
 
 ### Community 60 - "Community 60"
 Cohesion: 0.09
@@ -737,34 +737,38 @@ Cohesion: 0.14
 Nodes (12): createInheritedOrgAdminApiKey(), createRbacApiKey(), createSeededAppApiKey(), expectApiKeyRow(), fillApiKeyName(), INHERITED_ORG_ID, openCreateKeyDialog(), selectOnlyOrgForCreation() (+4 more)
 
 ### Community 85 - "Community 85"
+Cohesion: 0.11
+Nodes (20): isRetryableDurableObjectFetchError(), ALLOWED_HEADERS, ALLOWED_METHODS, AppScopedAttachmentPath, AsyncLock, AttachmentHeadReader, encodeR2KeyForUploadLocation(), ErrorPart (+12 more)
+
+### Community 86 - "Community 86"
 Cohesion: 0.15
 Nodes (21): CacheKey, createGuardApp(), RateLimitStatus, buildUpdateEnumerationCacheEntry(), buildUpdateEnumerationLimitRequest(), buildUpdateEnumerationSlotRequest(), bytesToHex(), countOccupiedMissSlots() (+13 more)
 
-### Community 86 - "Community 86"
+### Community 87 - "Community 87"
 Cohesion: 0.08
 Nodes (24): compilerOptions, allowImportingTsExtensions, allowJs, esModuleInterop, forceConsistentCasingInFileNames, isolatedModules, jsx, lib (+16 more)
 
-### Community 88 - "Community 88"
+### Community 89 - "Community 89"
 Cohesion: 0.11
 Nodes (9): applyCurrentOrganizationDefaultFilter(), cacheAppNames(), clearScopeFilters(), closeScopePicker(), fetchOrgAndAppNames(), isFilterableScopeItem(), isScopeItemActive(), selectScopeItem() (+1 more)
 
-### Community 89 - "Community 89"
+### Community 90 - "Community 90"
 Cohesion: 0.12
 Nodes (22): AiBinding, app, buildBatches(), extractAiText(), extractContentText(), getTargetLanguageName(), getTranslationModel(), keepTranslation() (+14 more)
 
-### Community 90 - "Community 90"
+### Community 91 - "Community 91"
 Cohesion: 0.19
 Nodes (23): Checkpoint, convertToValidS3Path(), copy_cleanup_candidates_direct(), copy_cleanup_candidates_to_backup_bucket(), delete_cleanup_candidates(), existInEnv(), export_files_folder_to_csv(), export_supabase_csv() (+15 more)
 
-### Community 91 - "Community 91"
+### Community 92 - "Community 92"
 Cohesion: 0.16
 Nodes (21): handleDeepLink(), installDeepLinkHandler(), isCapgoConsoleHost(), routePreviewLink(), routeWebLink(), buildBundlePreviewDeepLink(), buildChannelPreviewDeepLink(), buildChannelPreviewLatestOptions() (+13 more)
 
-### Community 92 - "Community 92"
+### Community 93 - "Community 93"
 Cohesion: 0.17
 Nodes (20): buildOnPremResponse(), extractAppId(), fetch(), getCacheTtlSeconds(), getCircuitBreakerCacheKey(), getEndpointName(), getOnPremCache(), getOnPremCacheKey() (+12 more)
 
-### Community 93 - "Community 93"
+### Community 94 - "Community 94"
 Cohesion: 0.08
 Nodes (20): {
   claimNotifOrgOnceMock,
@@ -778,33 +782,29 @@ Nodes (20): {
   sendNotifOrgOnceMock,
 }, apikeys, app_versions, apps, channel_devices, channels, disableUpdatePgEnum, group_members (+12 more)
 
-### Community 94 - "Community 94"
+### Community 95 - "Community 95"
 Cohesion: 0.09
 Nodes (22): author, bin, capgo, bugs, url, description, engines, node (+14 more)
 
-### Community 95 - "Community 95"
+### Community 96 - "Community 96"
 Cohesion: 0.13
 Nodes (19): allTargets(), backendDependencyMatchers, backendUtilityMatchers, deployMatchers, DeployScope, DeployScopeResult, DeployTarget, getChangedFiles() (+11 more)
 
-### Community 96 - "Community 96"
+### Community 97 - "Community 97"
 Cohesion: 0.13
 Nodes (19): child, ensureSupabaseStarted(), functionsReadyTimeoutMs, generatedEnvPath, getSupabaseStatus(), hasHealthySupabaseApi(), overriddenEnv, parseSupabaseStatus() (+11 more)
 
-### Community 97 - "Community 97"
+### Community 98 - "Community 98"
 Cohesion: 0.09
 Nodes (21): compilerOptions, baseUrl, declaration, emitDeclarationOnly, esModuleInterop, forceConsistentCasingInFileNames, ignoreDeprecations, jsx (+13 more)
 
-### Community 98 - "Community 98"
+### Community 99 - "Community 99"
 Cohesion: 0.13
 Nodes (17): Digester, noopDigester(), sha256Digester(), setKeyFromMetadata(), parseChecksum(), parseUploadMetadata(), UploadMetadata, AttachmentUploadHandler (+9 more)
 
-### Community 99 - "Community 99"
+### Community 100 - "Community 100"
 Cohesion: 0.13
 Nodes (9): DEFAULT_RETRY_PARAMS, isR2ChecksumError(), isR2Error(), isR2MultipartDoesNotExistError(), retry(), RetryBucket, RetryMultipartUpload, RetryOptions (+1 more)
-
-### Community 100 - "Community 100"
-Cohesion: 0.12
-Nodes (17): ALLOWED_HEADERS, ALLOWED_METHODS, AppScopedAttachmentPath, AsyncLock, AttachmentHeadReader, encodeR2KeyForUploadLocation(), ErrorPart, FinalPart (+9 more)
 
 ### Community 101 - "Community 101"
 Cohesion: 0.14
@@ -1490,9 +1490,9 @@ Nodes (3): bumpFiles, scripts, postbump
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `Database` connect `Community 9` to `Community 2`, `Community 131`, `Community 133`, `Community 6`, `Community 265`, `Community 10`, `Community 143`, `Community 15`, `Community 17`, `Community 18`, `Community 22`, `Community 26`, `Community 29`, `Community 30`, `Community 34`, `Community 39`, `Community 43`, `Community 44`, `Community 184`, `Community 73`, `Community 83`, `Community 84`, `Community 239`, `Community 246`?**
+- **Why does `Database` connect `Community 9` to `Community 2`, `Community 131`, `Community 133`, `Community 6`, `Community 265`, `Community 143`, `Community 15`, `Community 17`, `Community 18`, `Community 19`, `Community 26`, `Community 29`, `Community 30`, `Community 31`, `Community 39`, `Community 43`, `Community 44`, `Community 184`, `Community 73`, `Community 83`, `Community 84`, `Community 239`, `Community 246`?**
   _High betweenness centrality (0.150) - this node is a cross-community bridge._
-- **Why does `getCreditTopUpProductId()` connect `Community 65` to `Community 11`, `Community 35`?**
+- **Why does `getCreditTopUpProductId()` connect `Community 65` to `Community 10`, `Community 35`?**
   _High betweenness centrality (0.045) - this node is a cross-community bridge._
 - **Why does `log` connect `Community 35` to `Community 65`, `Community 1`?**
   _High betweenness centrality (0.045) - this node is a cross-community bridge._
