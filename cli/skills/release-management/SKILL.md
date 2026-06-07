@@ -12,6 +12,24 @@ Use this skill for OTA update workflows in Capgo Cloud.
 - Prefer `npx @capgo/cli@latest ...` examples.
 - `appId` can often be inferred from the current Capacitor project.
 - Shared public flags often include `-a, --apikey`.
+- Preview QR workflows require app preview to be enabled before the QR code can be printed.
+
+## Preview QR workflows
+
+### `get-qr [appId] [target]`
+
+- Example: `npx @capgo/cli@latest get-qr com.example.app --bundle 1.2.3`
+- Example: `npx @capgo/cli@latest get-qr com.example.app --channel production`
+- Example: `npx @capgo/cli@latest get-qr com.example.app production --type channel`
+- Use to print a terminal QR code for a bundle or channel preview.
+- The target can be a bundle name, bundle id, channel name, or channel id.
+- If a positional target matches both a bundle and a channel, add `--type bundle` or `--type channel`.
+- Preview must already be enabled for the app; enable it with `npx @capgo/cli@latest app set com.example.app --preview`.
+- Key options:
+  - `--bundle <bundle>`
+  - `--channel <channel>`
+  - `--type <bundle|channel>`
+  - `-a, --apikey <apikey>`
 
 ## Bundle workflows
 
@@ -26,6 +44,7 @@ Use this skill for OTA update workflows in Capgo Cloud.
   - Encryption is recommended for trustless distribution.
   - Interactive prompts are disabled automatically in CI and other non-interactive sessions so uploads do not block automation.
   - Optional upload prompts can remember the user's answer on the current machine so future uploads can skip the same question.
+  - Use `--qr-preview` to print a terminal QR code for the uploaded bundle after a successful upload. App preview must be enabled first.
 - Important options:
   - `-p, --path <path>`
   - `-c, --channel <channel>`
@@ -58,6 +77,7 @@ Use this skill for OTA update workflows in Capgo Cloud.
   - `--disable-brotli`
   - `--version-exists-ok`
   - `--self-assign`
+  - `--qr-preview`
   - S3 options: `--s3-region`, `--s3-apikey`, `--s3-apisecret`, `--s3-endpoint`, `--s3-bucket-name`, `--s3-port`, `--no-s3-ssl`
   - Signing options: `--key-v2`, `--key-data-v2`, `--bundle-url`, `--no-key`, `--display-iv-session`
   - Deprecated options still supported: `--multipart`, `--partial`, `--partial-only`
@@ -179,6 +199,7 @@ Use this skill for OTA update workflows in Capgo Cloud.
   - One channel must remain default.
   - Supports update policies `major`, `minor`, `metadata`, `patch`, and `none`.
   - Supports platform and device targeting.
+  - Use `--qr-preview` to print a terminal QR code for the updated channel. App preview must be enabled first.
 - Key options:
   - `-b, --bundle <bundle>`
   - `-s, --state <state>`
@@ -195,6 +216,7 @@ Use this skill for OTA update workflows in Capgo Cloud.
   - `--device`, `--no-device`
   - `--package-json <packageJson>`
   - `--ignore-metadata-check`
+  - `--qr-preview`
 
 ## Encryption key workflows
 
