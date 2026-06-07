@@ -7,6 +7,7 @@ import {
   renderTerminalQrCode,
   resolvePreviewQrTarget,
 } from '../src/preview/qr.ts'
+import { buildBundleUploadPreviewQrOptions } from '../src/bundle/upload-preview-qr.ts'
 
 let failures = 0
 
@@ -133,6 +134,25 @@ await test('renders terminal QR text', async () => {
   const qr = await renderTerminalQrCode('capgo://preview/bundle?appId=com.example.app&versionId=42')
   assert.match(qr, /\n/)
   assert.ok(qr.length > 100)
+})
+
+await test('post-upload QR options do not forward the upload channel target', () => {
+  assert.deepEqual(
+    buildBundleUploadPreviewQrOptions({
+      apikey: 'test-key',
+      bundle: 'original-bundle-option',
+      channel: 'production',
+      qrPreview: true,
+      supaAnon: 'anon',
+      supaHost: 'https://example.test',
+    }, 'uploaded-bundle'),
+    {
+      apikey: 'test-key',
+      bundle: 'uploaded-bundle',
+      supaAnon: 'anon',
+      supaHost: 'https://example.test',
+    },
+  )
 })
 
 if (failures > 0) {
