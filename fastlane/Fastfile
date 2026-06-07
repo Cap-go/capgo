@@ -1,0 +1,17 @@
+default_platform(:ios)
+
+platform :ios do
+  desc 'Upload App Store screenshots using fastlane/Deliverfile'
+  lane :upload_screenshots do
+    deliver
+  end
+end
+
+platform :android do
+  desc 'Upload Google Play screenshots'
+  lane :upload_screenshots do
+    UI.user_error!(
+      'No Android fastlane screenshots are configured. Existing screenshots are iOS deliver screenshots in fastlane/screenshots. Use `bundle exec fastlane ios upload_screenshots` for App Store screenshots, or add Google Play assets under fastlane/metadata/android before running this lane.'
+    )
+  end
+end

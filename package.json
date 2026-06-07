@@ -222,7 +222,6 @@
     "@capgo/capacitor-date-picker": "^8.0.2",
     "@capgo/capacitor-document-scanner": "^8.3.29",
     "@capgo/capacitor-downloader": "^8.1.24",
-    "@capgo/capacitor-file": "^8.0.12",
     "@capgo/capacitor-file-compressor": "^8.0.29",
     "@capgo/capacitor-file-picker": "^8.1.7",
     "@capgo/capacitor-file-sharer": "^8.1.2",
