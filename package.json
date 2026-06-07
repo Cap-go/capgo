@@ -269,7 +269,7 @@
     "@capgo/capacitor-speech-synthesis": "^8.0.15",
     "@capgo/capacitor-textinteraction": "^8.0.25",
     "@capgo/capacitor-transitions": "^8.1.8",
-    "@capgo/capacitor-updater": "github:Cap-go/capacitor-updater#codex/manage-preview-sessions",
+    "@capgo/capacitor-updater": "github:Cap-go/capacitor-updater#980300de4c8d3004f71394a2ede32ff7a844d5ed",
     "@capgo/capacitor-uploader": "^8.2.1",
     "@capgo/capacitor-video-player": "^8.1.13",
     "@capgo/capacitor-video-thumbnails": "^8.1.12",
