@@ -28,8 +28,9 @@ import { formatRunnerCommand, splitRunnerCommand } from '../../../runner-command
 import { createSupabaseClient, findBuildCommandForProjectType, findProjectType, findSavedKeySilent, getOrganizationId, getPackageScripts, getPMAndCommand } from '../../../utils.js'
 import { loadSavedCredentials, updateSavedCredentials } from '../../credentials.js'
 import { releaseCapturedLogs, runCapgoAiAnalysis } from '../../../ai/analyze.js'
+import { createStreamingMarkdownRenderer } from '../../../ai/stream-markdown.js'
 import { renderMarkdown } from '../../../ai/render-markdown.js'
-import { trackAiAnalysisChoice, trackAiAnalysisResult } from '../../../ai/telemetry.js'
+import { aiAnalysisResultFromPostAnalyze, trackAiAnalysisChoice, trackAiAnalysisResult } from '../../../ai/telemetry.js'
 import { requestBuildInternal } from '../../request.js'
 import { isAiAnalysisTooTall, resolveAiResultRoute } from '../ai-fit.js'
 
@@ -160,6 +161,8 @@ interface AppProps {
   iosDir: string
   /** Optional Capgo API key passed via -a/--apikey flag; takes precedence over saved key */
   apikey?: string
+  // Capgo API gateway override (--supa-host); prod when omitted.
+  supaHost?: string
   /** Reports the wizard outcome to the shell when it reaches build-complete, so
    *  the caller prints an accurate post-exit message + durable summary instead of
    *  always claiming success. Never fires on cancel/missing-platform exits. */
@@ -203,7 +206,7 @@ async function runRunnerCommand(runner: string, args: string[]): Promise<{ succe
   })
 }
 
-const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgress, iosDir, apikey, onResult }) => {
+const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgress, iosDir, apikey, supaHost, onResult }) => {
   const { exit } = useApp()
   const startStep = getResumeStep(initialProgress)
 
@@ -665,6 +668,9 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
   // from immediately re-routing back into the scroll step on every render.
   const [aiJobId, setAiJobId] = useState<string | null>(null)
   const [aiAnalysisText, setAiAnalysisText] = useState<string | null>(null)
+  // Live ANSI preview of the streaming analysis, shown in the running step.
+  // Throttled (~250ms) so per-token updates don't re-render the whole tree.
+  const [aiStreamPreview, setAiStreamPreview] = useState('')
   // Non-success outcome (already_analyzed / too_big / error) rendered as a
   // prominent coloured banner. Mutually exclusive with `aiAnalysisText` — a
   // successful analysis sets the text and clears this; every other outcome
@@ -2729,6 +2735,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
             // requestBuildInternal would corrupt rendering. Caller-handled mode
             // surfaces the captured log path via result.aiAnalysis and lets us
             // render the AI flow with Ink-native components.
+            supaHost,
             aiAnalysisMode: 'caller-handled',
           }, true, buildLogger) // silent=true, use our logger
           if (cancelled)
@@ -2787,24 +2794,48 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
           triggeredBy: 'onboarding',
         }).catch(() => { /* telemetry never breaks the wizard */ })
 
+        // Reset any stale preview from a previous attempt BEFORE streaming
+        // starts — retries re-enter this step and must not flash old content.
+        setAiStreamPreview('')
+        // Stream the analysis into a throttled ANSI preview: each completed
+        // markdown line is rendered (same renderer as the plain CLI) and the
+        // accumulated text is flushed to state at most every 250ms.
+        let streamedAnsi = ''
+        let previewFlushTimer: ReturnType<typeof setTimeout> | null = null
+        const mdStream = createStreamingMarkdownRenderer((t) => {
+          streamedAnsi += t
+          previewFlushTimer ??= setTimeout(() => {
+            previewFlushTimer = null
+            if (!cancelled)
+              setAiStreamPreview(streamedAnsi)
+          }, 250)
+        }, true)
+
         const result = await runCapgoAiAnalysis({
-          apiHost: 'https://api.capgo.app',
+          apiHost: supaHost ?? 'https://api.capgo.app',
           apikey: resolvedApiKeyRef.current ?? apikey ?? '',
           jobId: aiJobId,
           appId,
+          onChunk: t => mdStream.feed(t),
         })
+
+        // Publish the complete preview: flush renders the trailing partial
+        // line (it may re-arm the publish timer via the write callback, so
+        // flush FIRST, then cancel the timer, then set state once). The
+        // result step replaces this in the same React batch; the reset at
+        // the top of this block keeps retries clean.
+        mdStream.flush()
+        if (previewFlushTimer) {
+          clearTimeout(previewFlushTimer)
+          previewFlushTimer = null
+        }
+        if (!cancelled)
+          setAiStreamPreview(streamedAnsi)
 
         if (cancelled)
           return
 
-        const resultTag: 'success' | 'already_analyzed' | 'too_big' | 'error'
-          = result.kind === 'ok'
-            ? 'success'
-            : result.kind === 'already_analyzed'
-              ? 'already_analyzed'
-              : result.kind === 'too_big'
-                ? 'too_big'
-                : 'error'
+        const resultTag = aiAnalysisResultFromPostAnalyze(result)
 
         await trackAiAnalysisResult({
           apikey: resolvedApiKeyRef.current ?? apikey ?? '',
@@ -2830,13 +2861,22 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
           setAiAnalysisText(null)
           setAiResult({ kind: 'too_big', message: 'Build log is too large for Capgo AI (>10 MB). Try a local AI tool with the captured log.' })
         }
+        else if (result.kind === 'upgrade_required') {
+          setAiAnalysisText(null)
+          setAiResult({ kind: 'error', message: result.message ?? 'AI build analysis requires a newer CLI. Please upgrade: npx @capgo/cli@latest' })
+        }
         else {
           setAiAnalysisText(null)
           const detail = [
             result.status ? `(status ${result.status})` : null,
             result.message,
           ].filter(Boolean).join(' ')
-          setAiResult({ kind: 'error', message: `AI analysis failed${detail ? `: ${detail}` : ''}.` })
+          setAiResult({
+            kind: 'error',
+            message: result.partial
+              ? `AI analysis was interrupted${detail ? `: ${detail}` : ''}. The captured log is saved for local AI.`
+              : `AI analysis failed${detail ? `: ${detail}` : ''}.`,
+          })
         }
         setStep('ai-analysis-result')
       })()
@@ -4880,7 +4920,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
       )}
 
       {/* AI debug — spinner while the edge function is running */}
-      {step === 'ai-analysis-running' && <AiAnalysisRunningStep />}
+      {step === 'ai-analysis-running' && <AiAnalysisRunningStep streamText={aiStreamPreview} terminalRows={terminalRows} terminalCols={terminalCols} />}
 
       {/* AI debug — render the diagnosis (or fallback message), then offer
           retry-or-skip. Retry transitions back to 'requesting-build' so the

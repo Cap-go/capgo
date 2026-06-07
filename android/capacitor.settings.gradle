@@ -128,9 +128,6 @@ project(':capgo-capacitor-document-scanner').projectDir = new File('../node_modu
 include ':capgo-capacitor-downloader'
 project(':capgo-capacitor-downloader').projectDir = new File('../node_modules/.bun/@capgo+capacitor-downloader@8.1.24+1b808583819c2ac6/node_modules/@capgo/capacitor-downloader/android')
 
-include ':capgo-capacitor-file'
-project(':capgo-capacitor-file').projectDir = new File('../node_modules/.bun/@capgo+capacitor-file@8.0.12+1b808583819c2ac6/node_modules/@capgo/capacitor-file/android')
-
 include ':capgo-capacitor-file-compressor'
 project(':capgo-capacitor-file-compressor').projectDir = new File('../node_modules/.bun/@capgo+capacitor-file-compressor@8.0.29+1b808583819c2ac6/node_modules/@capgo/capacitor-file-compressor/android')
 

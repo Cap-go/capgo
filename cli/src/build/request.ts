@@ -43,7 +43,7 @@ import pack from '../../package.json'
 import {
   decideAnalyzeBehavior,
   isLogTooBig,
-  postAnalyzeRequest,
+  postAnalyzeStreamRequest,
   writeLocalAiFile,
 } from '../ai/analyze'
 import {
@@ -53,7 +53,8 @@ import {
   startCaptureForJob,
 } from '../ai/log-capture'
 import { renderMarkdown } from '../ai/render-markdown'
-import { trackAiAnalysisChoice, trackAiAnalysisResult } from '../ai/telemetry'
+import { createStreamingMarkdownRenderer } from '../ai/stream-markdown'
+import { aiAnalysisResultFromPostAnalyze, trackAiAnalysisChoice, trackAiAnalysisResult } from '../ai/telemetry'
 import { assertCliPermission, canPromptInteractively, createSupabaseClient, findSavedKey, getConfig, getOrganizationId, sendEvent } from '../utils'
 import { mergeCredentials, MIN_OUTPUT_RETENTION_SECONDS, parseInAppUpdatePriority, parseOptionalBoolean, parseOutputRetentionSeconds } from './credentials'
 import { buildProvisioningMap } from './credentials-command'
@@ -2020,17 +2021,6 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
 
         const AI_WARNING = '⚠ AI can make mistakes. Always verify the diagnosis against the full log before applying the suggested fix.'
 
-        // Closed-enum mapper for PostAnalyzeResult.kind → telemetry result tag.
-        // Never include the analysis text itself in telemetry.
-        const mapPostAnalyzeResultKind = (kind: PostAnalyzeResult['kind']): 'success' | 'already_analyzed' | 'too_big' | 'error' => {
-          if (kind === 'ok')
-            return 'success'
-          if (kind === 'already_analyzed')
-            return 'already_analyzed'
-          if (kind === 'too_big')
-            return 'too_big'
-          return 'error'
-        }
 
         const runCapgoAi = async (choice: 'capgo_ai' | 'auto_upload', triggeredBy: 'menu' | 'ci_flag'): Promise<void> => {
           await trackAiAnalysisChoice({
@@ -2067,22 +2057,41 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
           // plus the spinner's cycling 3-dot animation).
           aiSpinner?.start('Analyzing build log with Capgo AI')
 
+          let printedHeader = false
+          // Progressive TTY rendering goes through the streaming markdown
+          // renderer so headers/lists/code bars appear styled as lines
+          // complete — output is byte-identical to the buffered
+          // renderMarkdown of the full text (see stream-markdown.ts).
+          const mdStream = isInteractive ? createStreamingMarkdownRenderer(t => stream.write(t), true) : null
+          const onChunk = isInteractive
+            ? (text: string) => {
+                if (!printedHeader) {
+                  aiSpinner?.stop('Capgo AI streaming')
+                  stream.write('\n--- AI analysis ---\n')
+                  printedHeader = true
+                }
+                mdStream!.feed(text)
+              }
+            : undefined
+
           let result: PostAnalyzeResult
           try {
-            result = await postAnalyzeRequest({
+            result = await postAnalyzeStreamRequest({
               apiHost: host,
               apikey: options.apikey,
               jobId: capturedJobId!,
               appId,
               logs,
+              onChunk,
             })
           }
           finally {
-            aiSpinner?.stop('Capgo AI finished')
+            if (!printedHeader)
+              aiSpinner?.stop('Capgo AI finished')
           }
 
           // Telemetry — closed-enum result only, never the analysis text.
-          const resultTag = mapPostAnalyzeResultKind(result.kind)
+          const resultTag = aiAnalysisResultFromPostAnalyze(result)
           await trackAiAnalysisResult({
             apikey: options.apikey,
             orgId,
@@ -2094,7 +2103,16 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
           })
 
           if (result.kind === 'ok') {
-            stream.write(`\n--- AI analysis ---\n${renderMarkdown(result.analysis, isInteractive)}\n\n${AI_WARNING}\n`)
+            if (printedHeader) {
+              // TTY already rendered the text progressively — render the
+              // trailing line, then close out.
+              mdStream?.flush()
+              stream.write(`\n\n${AI_WARNING}\n`)
+            }
+            else {
+              // CI: buffered output, identical format to the pre-streaming CLI.
+              stream.write(`\n--- AI analysis ---\n${renderMarkdown(result.analysis, isInteractive)}\n\n${AI_WARNING}\n`)
+            }
           }
           else if (result.kind === 'already_analyzed') {
             stream.write('\nAI analysis already requested for this job (only one per job).\n')
@@ -2102,8 +2120,15 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
           else if (result.kind === 'too_big') {
             stream.write('\nLog too big for AI analysis.\n')
           }
+          else if (result.kind === 'upgrade_required') {
+            stream.write(`\n${result.message ?? 'AI build analysis requires a newer CLI. Please upgrade: npx @capgo/cli@latest'}\n`)
+          }
           else {
-            stream.write(`\nAI analysis failed${result.status ? ` (${result.status})` : ''}${result.message ? `: ${result.message}` : ''}.\n`)
+            if (printedHeader)
+              mdStream?.flush() // show whatever partial lines completed before the interruption
+            else if (result.partial)
+              stream.write(`\n--- AI analysis (partial) ---\n${renderMarkdown(result.partial, isInteractive)}\n`)
+            stream.write(`\nAI analysis was interrupted${result.message ? ` (${result.message})` : ''}; this job's analysis slot is used. The full log is saved at ${logsPath} for local AI.\n`)
           }
         }
 

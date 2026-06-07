@@ -1207,6 +1207,7 @@ Set up build credentials interactively (iOS: certificates + profiles automated; 
 | -------------- | ------------- | -------------------- |
 | **-a** | <code>string</code> | API key to link to your account |
 | **-p** | <code>string</code> | Platform to onboard (ios or android). If omitted, auto-detects when only one native folder exists; prompts otherwise. |
+| **--supa-host** | <code>string</code> | Custom Supabase host URL (for self-hosting or Capgo development) |
 
 ### <a id="build-request"></a> 🔹 **Request**
 

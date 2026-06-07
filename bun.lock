@@ -52,7 +52,6 @@
         "@capgo/capacitor-date-picker": "^8.0.2",
         "@capgo/capacitor-document-scanner": "^8.3.29",
         "@capgo/capacitor-downloader": "^8.1.24",
-        "@capgo/capacitor-file": "^8.0.12",
         "@capgo/capacitor-file-compressor": "^8.0.29",
         "@capgo/capacitor-file-picker": "^8.1.7",
         "@capgo/capacitor-file-sharer": "^8.1.2",
@@ -211,7 +210,7 @@
     },
     "cli": {
       "name": "@capgo/cli",
-      "version": "7.125.3",
+      "version": "8.0.0",
       "bin": {
         "capgo": "dist/index.js",
       },
@@ -501,8 +500,6 @@
     "@capgo/capacitor-document-scanner": ["@capgo/capacitor-document-scanner@8.3.29", "", { "peerDependencies": { "@capacitor/core": ">=8.0.0" } }, "sha512-hmLsIbaiw+nWiYx6Yl2ktJyCfZaiy3c6Rjvu8Ype+hxUmmgiY2POCZYkPT3BEP7XWcoEDpI4OVQqHgveSys6wQ=="],
 
     "@capgo/capacitor-downloader": ["@capgo/capacitor-downloader@8.1.24", "", { "peerDependencies": { "@capacitor/core": ">=8.0.0" } }, "sha512-DYylEqQ4ewWIY8X2sTBTZjaBN72ZcnaCy7zuH18U73BvvX+EyKbf/14hr5biqajf0v4jnXb1KHxFV8dMH4DFFQ=="],
-
-    "@capgo/capacitor-file": ["@capgo/capacitor-file@8.0.12", "", { "peerDependencies": { "@capacitor/core": ">=8.0.0" } }, "sha512-L7RdT1eDJRqiYaVwsviZaV9mYF6HT/FBpwBwewAyGbja5eiVnrrlXEcse6erz6GJ/CrtYfB2w0NY8GG9KA2sXQ=="],
 
     "@capgo/capacitor-file-compressor": ["@capgo/capacitor-file-compressor@8.0.29", "", { "peerDependencies": { "@capacitor/core": ">=8.0.0" } }, "sha512-Ai5hD+Vz9v3O8DRTZaMjaum8keWHq3kBsq00h8UeXpKPFUdgiQTX8Uh+Fiuy1ZXlBPZrr3gMuiM07bQHNZB6lw=="],
 

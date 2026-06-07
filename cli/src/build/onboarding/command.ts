@@ -13,6 +13,10 @@ import type { OnboardingResult } from './types.js'
 export interface OnboardingBuilderOptions {
   apikey?: string
   platform?: string
+  // Capgo API gateway override (--supa-host) — threaded to the wizard so its
+  // build request AND AI analysis hit the same host as the plain CLI flow
+  // (preprod/self-hosted testing). Defaults to prod when omitted.
+  supaHost?: string
 }
 
 type Platform = 'ios' | 'android'
@@ -137,6 +141,7 @@ export async function onboardingBuilderCommand(options: OnboardingBuilderOptions
       iosDir,
       androidDir,
       apikey: options.apikey,
+      supaHost: options.supaHost,
       initialPlatform,
       onResolvePlatform: (platform: Platform) => {
         resolvedPlatform = platform
