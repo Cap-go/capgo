@@ -69,7 +69,7 @@ include ':capacitor-toast'
 project(':capacitor-toast').projectDir = new File('../node_modules/.bun/@capacitor+toast@8.0.1+1b808583819c2ac6/node_modules/@capacitor/toast/android')
 
 include ':capgo-camera-preview'
-project(':capgo-camera-preview').projectDir = new File('../node_modules/.bun/@capgo+camera-preview@8.4.1+1b808583819c2ac6/node_modules/@capgo/camera-preview/android')
+project(':capgo-camera-preview').projectDir = new File('../node_modules/.bun/@capgo+camera-preview@8.4.4+1b808583819c2ac6/node_modules/@capgo/camera-preview/android')
 
 include ':capgo-capacitor-accelerometer'
 project(':capgo-capacitor-accelerometer').projectDir = new File('../node_modules/.bun/@capgo+capacitor-accelerometer@8.0.30+1b808583819c2ac6/node_modules/@capgo/capacitor-accelerometer/android')
@@ -264,7 +264,7 @@ include ':capgo-capacitor-textinteraction'
 project(':capgo-capacitor-textinteraction').projectDir = new File('../node_modules/.bun/@capgo+capacitor-textinteraction@8.0.25+1b808583819c2ac6/node_modules/@capgo/capacitor-textinteraction/android')
 
 include ':capgo-capacitor-updater'
-project(':capgo-capacitor-updater').projectDir = new File('../node_modules/.bun/@capgo+capacitor-updater@8.47.9+1b808583819c2ac6/node_modules/@capgo/capacitor-updater/android')
+project(':capgo-capacitor-updater').projectDir = new File('../node_modules/.bun/@capgo+capacitor-updater@8.47.10+1b808583819c2ac6/node_modules/@capgo/capacitor-updater/android')
 
 include ':capgo-capacitor-uploader'
 project(':capgo-capacitor-uploader').projectDir = new File('../node_modules/.bun/@capgo+capacitor-uploader@8.2.1+1b808583819c2ac6/node_modules/@capgo/capacitor-uploader/android')

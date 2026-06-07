@@ -31,7 +31,7 @@
         "@capacitor/status-bar": "^8.0.2",
         "@capacitor/text-zoom": "^8.0.1",
         "@capacitor/toast": "^8.0.1",
-        "@capgo/camera-preview": "8.4.1",
+        "@capgo/camera-preview": "8.4.4",
         "@capgo/capacitor-accelerometer": "^8.0.30",
         "@capgo/capacitor-age-range": "^8.1.7",
         "@capgo/capacitor-android-age-signals": "^8.1.12",
@@ -99,7 +99,7 @@
         "@capgo/capacitor-speech-synthesis": "^8.0.15",
         "@capgo/capacitor-textinteraction": "^8.0.25",
         "@capgo/capacitor-transitions": "^8.1.8",
-        "@capgo/capacitor-updater": "^8.47.9",
+        "@capgo/capacitor-updater": "^8.47.10",
         "@capgo/capacitor-uploader": "^8.2.1",
         "@capgo/capacitor-video-player": "^8.1.13",
         "@capgo/capacitor-video-thumbnails": "^8.1.12",
@@ -459,7 +459,7 @@
 
     "@capacitor/toast": ["@capacitor/toast@8.0.1", "", { "peerDependencies": { "@capacitor/core": ">=8.0.0" } }, "sha512-0uoyftoAeFjtOMiozBo7YXEo+zcpQCAxtBONSvrljJ05SKdlb1A8OFHaV/DZfIpGt+19kzUGaEaUemLdll4wUw=="],
 
-    "@capgo/camera-preview": ["@capgo/camera-preview@8.4.1", "", { "peerDependencies": { "@capacitor/core": ">=8.0.0" } }, "sha512-GxfLX5bbatu9Gj4eSHG7PBE6mCaMzMrUW0R9H/k8UP8Dy5UnOdqKdA0YyU2of02M8G04Bs3s8l4bHsAOl/bH1A=="],
+    "@capgo/camera-preview": ["@capgo/camera-preview@8.4.4", "", { "peerDependencies": { "@capacitor/core": ">=8.0.0" } }, "sha512-V8p4z7yTVN9uaw+s2/QPHyDoGZk67HGe9mQWSYz53gI48ZRNLqt3dJNr3qbpY/avZyqfhhKLDk2gcDc9u4OqyQ=="],
 
     "@capgo/capacitor-accelerometer": ["@capgo/capacitor-accelerometer@8.0.30", "", { "peerDependencies": { "@capacitor/core": ">=8.0.0" } }, "sha512-w9woRF/t+RKPpxqD6ELyJhD3Z5wC2gDwfdhQ/CPkgWghOMT0jak5dk0JQdSGh7HZggfFgdUI5pTzepJSOdyErg=="],
 
@@ -595,7 +595,7 @@
 
     "@capgo/capacitor-transitions": ["@capgo/capacitor-transitions@8.1.8", "", { "peerDependencies": { "@angular/core": ">=17.0.0", "react": ">=18.0.0", "react-dom": ">=18.0.0", "solid-js": ">=1.0.0", "svelte": ">=4.0.0", "vue": ">=3.0.0" }, "optionalPeers": ["@angular/core", "react", "react-dom", "solid-js", "svelte", "vue"] }, "sha512-tgCVvuljFWx9+gX28AYin7j7ygufdvJNzV2uP6AbkhaF7nvAvM7GmwhewBTFlomdrpQUQ9Xu6amUDdQ7v0SGpQ=="],
 
-    "@capgo/capacitor-updater": ["@capgo/capacitor-updater@8.47.9", "", { "peerDependencies": { "@capacitor/core": "^8.0.0" } }, "sha512-9HPiL143Qo+aHNQJ1hYN6p9X7zKGCK7/TfDqzX1/7ki8+Dwj6rUqlKK+hSsjiqiNzr2LYS6nTt975qN98EtRaA=="],
+    "@capgo/capacitor-updater": ["@capgo/capacitor-updater@8.47.10", "", { "peerDependencies": { "@capacitor/core": "^8.0.0" } }, "sha512-T/x2Lu9WXknYzCGLKNv1tVaV+UDqBONFI5I2iXg9I5IOSm7Q60DtHuAWckT1BHzszEZ/XqkMqh89cXhhEesViA=="],
 
     "@capgo/capacitor-uploader": ["@capgo/capacitor-uploader@8.2.1", "", { "dependencies": { "idb": "^8.0.2" }, "peerDependencies": { "@capacitor/core": ">=8.0.0" } }, "sha512-jkOew7h10Auwusu+w0TVGMKXx3wIfj3ipIvX7mZlPdDpgw9RFAEqrOqmTsMfM/h9pbOgooJF5iO0I7346KOfwA=="],
 
