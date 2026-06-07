@@ -3,7 +3,7 @@ title: 📢 channel
 description: "📢 Manage distribution channels for app updates in Capgo Cloud, controlling how updates are delivered to devices."
 sidebar_label: channel
 sidebar:
-  order: 9
+  order: 10
 ---
 
 📢 Manage distribution channels for app updates in Capgo Cloud, controlling how updates are delivered to devices.
@@ -152,6 +152,7 @@ npx @capgo/cli@latest channel set production com.example.app --bundle 1.0.0 --st
 | **--no-emulator** | <code>boolean</code> | Disable sending update to emulator devices |
 | **--device** | <code>boolean</code> | Allow sending update to physical devices |
 | **--no-device** | <code>boolean</code> | Disable sending update to physical devices |
+| **--qr-preview** | <code>boolean</code> | Print a terminal QR code for this channel preview after updating it |
 | **--package-json** | <code>string</code> | Paths to package.json files for monorepos (comma-separated) |
 | **--ignore-metadata-check** | <code>boolean</code> | Ignore checking node_modules compatibility if present in the bundle |
 | **--supa-host** | <code>string</code> | Custom Supabase host URL (for self-hosting or Capgo development) |
