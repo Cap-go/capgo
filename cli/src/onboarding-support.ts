@@ -90,6 +90,9 @@ function omittedMarker(removed: number, capBytes: number): string {
 // Dropping up to ~RESOLUTION extra oldest lines is a fine trade for fewer gzip
 // probes (each probe re-renders + re-gzips the bundle, which is the slow part).
 const TRIM_RESOLUTION = 100
+// Headroom reserved below the real cap so the omission marker(s) we prepend after
+// trimming (at most one per trimmed section) can't tip the final bundle back over.
+const MARKER_RESERVE_BYTES = 1024
 
 interface TrimTarget {
   get: () => string[]
@@ -183,10 +186,13 @@ export function renderBundleWithinGzCap(
   if (internalSection)
     targets.push({ get: () => internalSection.lines, set: (lines) => { internalSection.lines = lines } })
 
+  // Trim against a slightly reduced cap so the marker line we add afterwards still
+  // leaves the final bundle under the real cap.
+  const fitCap = Math.max(1, capBytes - MARKER_RESERVE_BYTES)
   for (const target of targets) {
     if (out.gz.length <= capBytes)
       break
-    const removed = trimTargetToFit(target, capBytes, out.gz.length, gzOf, () => onPass?.())
+    const removed = trimTargetToFit(target, fitCap, out.gz.length, gzOf, () => onPass?.())
     if (removed > 0)
       target.set([omittedMarker(removed, capBytes), ...target.get()])
     out = render(work)

@@ -39,9 +39,9 @@ t('renderBundleWithinGzCap trims the oldest build-output lines to fit, keeping t
     ],
     logs: ['recent activity line'],
   }
-  const cap = 3000 // tiny cap to force trimming without generating 10 MB of entropy
+  const cap = 6000 // tiny cap to force trimming without generating 10 MB of entropy
   const { rendered, gz } = renderBundleWithinGzCap(input, cap)
-  assert.ok(gz.length <= cap + 256, `gz ${gz.length} should be ~within cap ${cap}`)
+  assert.ok(gz.length <= cap, `gz ${gz.length} must be at or under cap ${cap} (marker included)`)
   assert.equal(rendered, gunzipSync(gz).toString('utf8')) // .log and .log.gz stay in sync
   assert.ok(rendered.includes('FATAL: the real failure is right here at the very end'), 'failure tail kept')
   assert.ok(/omitted to fit the .* MB support upload limit/.test(rendered), 'truncation marker present')
@@ -59,8 +59,8 @@ t('renderBundleWithinGzCap fits via binary search — few gzip passes, not linea
   const { gz, rendered } = renderBundleWithinGzCap({
     kind: 'build-init', appId: 'a', error: 'boom',
     sections: [{ title: 'Build output (full)', lines: buildLines }],
-  }, 2000, () => { passes++ })
-  assert.ok(gz.length <= 2000 + 256, `gz ${gz.length} within cap`)
+  }, 6000, () => { passes++ })
+  assert.ok(gz.length <= 6000, `gz ${gz.length} within cap (marker included)`)
   assert.ok(rendered.includes('FATAL tail line'), 'failure tail kept')
   // Binary search ≈ log2(n) probes; a linear 100-or-500-per-pass walk would be
   // hundreds-to-thousands. Pin that we stay tiny.
@@ -74,4 +74,22 @@ t('renderBundleWithinGzCap leaves a normal bundle untouched (no marker)', () => 
   })
   assert.ok(rendered.includes('line a') && rendered.includes('line c'))
   assert.ok(!/omitted to fit/.test(rendered), 'no marker when under cap')
+})
+
+t('renderBundleWithinGzCap terminates + degrades when non-trimmable content alone exceeds the cap', () => {
+  // A giant AI-analysis section (never trimmed) bigger than a tiny cap: the trimmer
+  // empties the build output, can't get under, and returns WITHOUT looping forever.
+  const ai = Array.from({ length: 4000 }, (_, i) => `ai reasoning line ${i} step=${i * 13}`)
+  let passes = 0
+  const { gz } = renderBundleWithinGzCap({
+    kind: 'build-init', appId: 'a', error: 'boom',
+    sections: [
+      { title: 'Build output (full)', lines: ['only', 'a', 'few', 'build', 'lines'] },
+      { title: 'AI analysis', lines: ai },
+    ],
+  }, 1000, () => { passes++ }) // cap below the AI section's own size → unfittable
+  // It returns (no hang); the result is simply still over cap → caller's upload
+  // falls back to attach. Pin termination with a tiny, bounded pass count.
+  assert.ok(gz.length > 1000, 'cannot fit when the untrimmable section alone exceeds the cap')
+  assert.ok(passes <= 60, `must still terminate in few passes, got ${passes}`)
 })
