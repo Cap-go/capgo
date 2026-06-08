@@ -36,7 +36,7 @@ either runs a verified Capgo-signed binary or fails with clear guidance.
 | Min macOS | x64 slice: macOS 10.15 (oldest macOS that runs Node 20, the CLI's floor); arm64 slice: macOS 11.0 |
 | Versioning | Independent semver, starting 1.0.0; release tag `cli-helper-X.Y.Z`; released **only when helper source changes**, not per CLI release |
 | Pipeline | Tag-triggered GitHub Actions workflow on `macos-latest`: build → codesign → notarize → verify → npm publish with provenance |
-| Signing | Developer ID Application certificate; hardened runtime + secure timestamp; notarized via `notarytool` with existing App Store Connect API key secrets |
+| Signing | Developer ID Application certificate; hardened runtime + secure timestamp; stable code-signing identifier `app.capgo.cli.helper` (preserves Keychain "Always Allow" across re-signs and a future `.app` migration); notarized via `notarytool` with existing App Store Connect API key secrets |
 | Binary trust | CLI verifies the package-resolved binary's code signature (Developer ID + Capgo Team ID designated requirement) before executing it; failure is a hard error |
 | Env override | `CAPGO_KEYCHAIN_HELPER_PATH` exists in dev builds only — stripped from npm release builds via build-time define + dead-code elimination |
 | Binary name | One generic binary named `helper`, invoked with a subcommand (`helper keychain-export …`). Future helpers are new subcommands of the same signed binary, not new files |
@@ -345,7 +345,59 @@ To do:
   to Capgo's team — npm provenance + notarization + runtime requirement check
   give a verifiable supply chain for a binary that reads users' keychains.
 
-## Out of scope
+## Future: native notifications & UI (.app bundle)
 
-- Stapling (impossible for bare executables; not needed for npm distribution).
+Not built now (YAGNI — the helper is headless and the CLI owns the terminal
+UX). Recorded so the path is understood and the one cheap-now decision is
+captured. Today's helper ships as a bare signed executable; a later subcommand
+that needs a macOS notification or a small SwiftUI panel would graduate it to a
+`Capgo.app` bundle.
+
+**Why a bundle is required for notifications.** `UNUserNotificationCenter`
+requires a bundle identifier; a bare executable has none and the call fails. A
+branded notification (Capgo name + icon) therefore needs a `Capgo.app` with an
+`Info.plist` (`CFBundleIdentifier`, `CFBundleName`, `CFBundleIconFile`) and a
+`Capgo.icns`. Renaming the bare binary to `capgo` does **not** help — the
+displayed name/icon come from the bundle, not the filename.
+
+**Staying invisible.** Set `LSUIElement = true` (accessory activation policy):
+no Dock icon, no Cmd-Tab entry, no menu bar — yet it can post notifications and
+*show a window when needed*. An accessory app keeps **no Dock icon even while a
+window is open** (Dock presence tracks the activation policy, not window
+visibility). Caveats: windows don't auto-focus (call
+`NSApp.activate(ignoringOtherApps: true)` + `makeKeyAndOrderFront`), there's no
+app menu bar, and you can optionally flip to `.regular` while a window is up for
+focus-grabbing at the cost of a brief Dock-icon flash. Pure headless work
+(today's keychain export) never touches AppKit, so it's invisible regardless.
+
+**No Gatekeeper "downloaded from the internet" prompt.** Two independent
+reasons, both holding for a bundle exactly as for the bare binary: (1) npm /
+bun / pnpm do not set the `com.apple.quarantine` xattr, and (2) the CLI
+`execve`s the inner binary directly (`Capgo.app/Contents/MacOS/capgo`), never
+`open Capgo.app` — the first-launch Gatekeeper dialog is a LaunchServices/`open`
+behavior, not an exec one. The only path that would prompt is a user manually
+downloading the GitHub release asset in a browser and double-clicking it — and
+a notarized, **stapled** bundle passes even then. (Stapling is a bonus bundles
+get that bare executables can't.)
+
+**Decision baked in now (cheap now, expensive later):** the sign step pins a
+stable code-signing identifier `app.capgo.cli.helper` (`codesign --identifier`).
+macOS keys the Keychain "Always Allow" grant to the code's designated
+requirement, which includes the identifier — so a future `Capgo.app` reusing
+the same `CFBundleIdentifier` preserves every user's grant across the
+bare-binary → bundle migration. Without this, the migration would silently
+reset everyone's "Always Allow" once.
+
+**When built, this would add:** a bundle-assembly step in `build.sh`
+(`Capgo.app/Contents/{MacOS/capgo, Info.plist, Resources/Capgo.icns}`), bundle
+signing + notarization + stapling, npm `files: ["Capgo.app"]`, a CLI resolver
+change to `…/Capgo.app/Contents/MacOS/capgo`, and (for notifications) a one-time
+`UNUserNotificationCenter` authorization prompt branded "Capgo". The runtime
+`codesign -R` requirement and the stable identifier carry over unchanged.
+
+## Out of scope (now)
+
+- Building the `.app` bundle / native UI (see Future section above).
+- Stapling the bare executable (impossible for bare executables; not needed for
+  npm distribution since npm doesn't quarantine).
 - Windows/Linux variants (helper is macOS-only by nature).

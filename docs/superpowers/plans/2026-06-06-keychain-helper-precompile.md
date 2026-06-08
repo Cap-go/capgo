@@ -1064,10 +1064,18 @@ cd "$(dirname "$0")/.."
 
 REQUIREMENT='=anchor apple generic and certificate leaf[field.1.2.840.113635.100.6.1.13] and certificate leaf[subject.OU] = "'"$CAPGO_APPLE_TEAM_ID"'"'
 
+# Stable code-signing identifier. macOS keys the Keychain "Always Allow" grant
+# to the code's designated requirement, which includes this identifier — so
+# pinning it now keeps users' grants intact across future re-signs, including a
+# possible migration to a `Capgo.app` bundle that reuses the SAME
+# CFBundleIdentifier. Never change this value. See "Future: native
+# notifications & UI" in the design spec.
+HELPER_IDENTIFIER="app.capgo.cli.helper"
+
 for arch in arm64 x64; do
   bin="dist/helper-$arch"
   echo "── Signing $bin"
-  codesign --force --sign "$DEVELOPER_ID_IDENTITY" --options runtime --timestamp "$bin"
+  codesign --force --sign "$DEVELOPER_ID_IDENTITY" --identifier "$HELPER_IDENTIFIER" --options runtime --timestamp "$bin"
 
   echo "── Notarizing $bin"
   ditto -c -k "$bin" "$bin.zip"
