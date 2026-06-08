@@ -653,28 +653,50 @@ ON public.app_versions
 FOR UPDATE
 TO anon, authenticated
 USING (
-  public.rbac_check_permission_request(
-    public.rbac_perm_app_upload_bundle(),
-    owner_org,
-    app_id,
-    NULL::bigint
+  (
+    deleted IS NOT TRUE
+    AND (
+      public.rbac_check_permission_request(
+        public.rbac_perm_app_upload_bundle(),
+        owner_org,
+        app_id,
+        NULL::bigint
+      )
+      OR public.rbac_check_permission_request(
+        public.rbac_perm_bundle_update(),
+        owner_org,
+        app_id,
+        NULL::bigint
+      )
+    )
   )
   OR public.rbac_check_permission_request(
-    public.rbac_perm_bundle_update(),
+    public.rbac_perm_bundle_delete(),
     owner_org,
     app_id,
     NULL::bigint
   )
 )
 WITH CHECK (
-  public.rbac_check_permission_request(
-    public.rbac_perm_app_upload_bundle(),
-    owner_org,
-    app_id,
-    NULL::bigint
+  (
+    deleted IS NOT TRUE
+    AND (
+      public.rbac_check_permission_request(
+        public.rbac_perm_app_upload_bundle(),
+        owner_org,
+        app_id,
+        NULL::bigint
+      )
+      OR public.rbac_check_permission_request(
+        public.rbac_perm_bundle_update(),
+        owner_org,
+        app_id,
+        NULL::bigint
+      )
+    )
   )
   OR public.rbac_check_permission_request(
-    public.rbac_perm_bundle_update(),
+    public.rbac_perm_bundle_delete(),
     owner_org,
     app_id,
     NULL::bigint

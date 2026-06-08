@@ -1,9 +1,10 @@
 import type { Database } from '../src/types/supabase.types'
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { randomUUID } from 'node:crypto'
 import { env } from 'node:process'
 import { createClient } from '@supabase/supabase-js'
 import { describe, expect, it } from 'vitest'
-import { APIKEY_TEST_APP_UPLOADER, APIKEY_TEST_ORG_SUPER_ADMIN, getAuthHeadersForCredentials, USER_EMAIL, USER_ID, USER_PASSWORD } from './test-utils'
+import { APIKEY_TEST_APP_UPLOADER, APIKEY_TEST_ORG_SUPER_ADMIN, getAuthHeadersForCredentials, getSupabaseClient, ORG_ID, USER_EMAIL, USER_ID, USER_PASSWORD } from './test-utils'
 
 function normalizeLocalhostUrl(raw: string | undefined): string {
   if (!raw)
@@ -211,5 +212,72 @@ describe('legacy CLI RBAC compatibility RPCs', () => {
     expect(allowed).toBe(true)
     expect(deniedError).toBeNull()
     expect(denied).toBe(false)
+  })
+})
+
+describe('app_versions RBAC update policy', () => {
+  it.concurrent('lets upload-only API keys update bundle metadata but not mark bundles deleted', async () => {
+    const adminClient = getSupabaseClient()
+    const uploaderClient = createApiKeyClient(APIKEY_TEST_APP_UPLOADER)
+    const versionName = `rls-upload-only-${randomUUID()}`
+
+    const { data: version, error: insertError } = await adminClient
+      .from('app_versions')
+      .insert({
+        app_id: APP_ID,
+        name: versionName,
+        owner_org: ORG_ID,
+        user_id: USER_ID,
+        deleted: false,
+        storage_provider: 'r2',
+      })
+      .select('id')
+      .single()
+
+    expect(insertError).toBeNull()
+    expect(version?.id).toBeTypeOf('number')
+
+    try {
+      const { data: metadataUpdate, error: metadataError } = await uploaderClient
+        .from('app_versions')
+        .update({ comment: 'upload-only metadata update' })
+        .eq('id', version!.id)
+        .select('id, comment, deleted')
+
+      expect(metadataError).toBeNull()
+      expect(metadataUpdate).toEqual([{
+        id: version!.id,
+        comment: 'upload-only metadata update',
+        deleted: false,
+      }])
+
+      const { data: deletedUpdate, error: deletedError } = await uploaderClient
+        .from('app_versions')
+        .update({ deleted: true })
+        .eq('id', version!.id)
+        .select('id, deleted')
+
+      if (deletedError) {
+        expect(deletedError.message.toLowerCase()).toContain('row')
+      }
+      else {
+        expect(deletedUpdate).toEqual([])
+      }
+
+      const { data: persisted, error: persistedError } = await adminClient
+        .from('app_versions')
+        .select('comment, deleted')
+        .eq('id', version!.id)
+        .single()
+
+      expect(persistedError).toBeNull()
+      expect(persisted).toEqual({
+        comment: 'upload-only metadata update',
+        deleted: false,
+      })
+    }
+    finally {
+      await adminClient.from('app_versions').delete().eq('id', version!.id)
+    }
   })
 })
