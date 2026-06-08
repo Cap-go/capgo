@@ -104,44 +104,6 @@ describe('translation queue helpers', () => {
     })).toBe(false)
   })
 
-  it('serves current ready translations with a week-long shared cache', async () => {
-    const cache = stubWorkerCache()
-    const checksum = await __translationWorkerTestUtils__.currentSourceChecksum()
-    const now = Math.floor(Date.now() / 1000)
-    const latestReadyEntry = {
-      checksum,
-      messages: JSON.stringify({ account: 'Compte' }),
-      model: 'model',
-      next_batch_index: 1,
-      status: 'ready',
-      target_language: 'fr',
-      updated_at: now - 30,
-    }
-    const db = createTranslationStoreMock(latestReadyEntry)
-    const queue = {
-      send: vi.fn(),
-    }
-    const response = await translationWorker.fetch(new Request('https://api.capgo.app/translation/messages', {
-      body: JSON.stringify({ targetLanguage: 'fr' }),
-      headers: { 'Content-Type': 'application/json' },
-      method: 'POST',
-    }), {
-      DB_TRANSLATIONS: db,
-      TRANSLATION_MESSAGES_QUEUE: queue,
-    } as any)
-    const payload = await response.json() as { checksum: string, messages: Record<string, string>, status: string }
-    const cacheTtl = __translationWorkerTestUtils__.readyTranslationCacheTtlSeconds
-
-    expect(response.status).toBe(200)
-    expect(response.headers.get('cache-control')).toBe(`public, max-age=0, s-maxage=${cacheTtl}`)
-    expect(payload.status).toBe('ready')
-    expect(payload.checksum).toBe(checksum)
-    expect(cache.put).toHaveBeenCalledTimes(1)
-    const cachePutCalls = cache.put.mock.calls as unknown as [Request, Response][]
-    expect(cachePutCalls[0][1].headers.get('cache-control')).toBe(`public, max-age=${cacheTtl}`)
-    expect(queue.send).not.toHaveBeenCalled()
-  })
-
   it('serves a recent saved translation without queueing a refresh', async () => {
     stubWorkerCache()
     const now = Math.floor(Date.now() / 1000)
@@ -243,26 +205,6 @@ describe('translation queue helpers', () => {
       headers: { 'Content-Type': 'application/json' },
       method: 'POST',
     }), {
-      TRANSLATION_MESSAGES_QUEUE: queue,
-    } as any)
-    const payload = await response.json() as { error: string, message: string }
-
-    expect(response.status).toBe(400)
-    expect(payload.error).toBe('unsupported_translation_language')
-    expect(payload.message).toBe('Target language is not enabled')
-    expect(queue.send).not.toHaveBeenCalled()
-  })
-
-  it('honors a tighter configured public generation allow-list', async () => {
-    const queue = {
-      send: vi.fn(),
-    }
-    const response = await translationWorker.fetch(new Request('https://api.capgo.app/translation/messages', {
-      body: JSON.stringify({ targetLanguage: 'de' }),
-      headers: { 'Content-Type': 'application/json' },
-      method: 'POST',
-    }), {
-      TRANSLATION_ALLOWED_LANGUAGES: 'fr',
       TRANSLATION_MESSAGES_QUEUE: queue,
     } as any)
     const payload = await response.json() as { error: string, message: string }

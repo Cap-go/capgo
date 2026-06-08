@@ -1,10 +1,9 @@
 import type { D1Database, ExecutionContext, MessageBatch, Queue } from '@cloudflare/workers-types'
 import sourceMessages from '../../messages/en.json' with { type: 'json' }
 
+const CACHE_TTL_SECONDS = 5 * 60
 const PENDING_TRANSLATION_STORE_TTL_SECONDS = 60 * 60
-const READY_TRANSLATION_CACHE_TTL_SECONDS = 7 * 24 * 60 * 60
-const READY_TRANSLATION_STORE_TTL_SECONDS = READY_TRANSLATION_CACHE_TTL_SECONDS
-const READY_TRANSLATION_REFRESH_AFTER_SECONDS = 5 * 60
+const READY_TRANSLATION_STORE_TTL_SECONDS = 7 * 24 * 60 * 60
 const DEFAULT_TRANSLATION_MODEL = '@cf/meta/llama-3.1-8b-instruct-fast'
 const MAX_BATCH_CHARACTERS = 6_000
 const MAX_BATCH_ITEMS = 60
@@ -37,7 +36,7 @@ const SUPPORTED_LANGUAGES = new Set([
   'zh-cn',
 ])
 
-const DEFAULT_TRANSLATION_ALLOWED_LANGUAGES = new Set([
+const TRANSLATION_ALLOWED_LANGUAGES = new Set([
   'de',
   'es',
   'fr',
@@ -82,7 +81,6 @@ interface TranslationWorkerBindings {
   AI?: AiBinding
   DB_TRANSLATIONS?: D1Database
   ENV_NAME?: string
-  TRANSLATION_ALLOWED_LANGUAGES?: string
   TRANSLATION_MESSAGES_QUEUE?: Queue<Required<TranslationQueuePayload>>
   TRANSLATION_MODEL?: string
 }
@@ -203,24 +201,8 @@ function targetLanguageLabel(targetLanguage: string) {
   return typeof label === 'string' ? label : targetLanguage
 }
 
-function normalizeLanguageCode(value: string) {
-  return value.trim().toLowerCase()
-}
-
-function configuredTranslationAllowedLanguages(env: TranslationWorkerBindings) {
-  if (typeof env.TRANSLATION_ALLOWED_LANGUAGES !== 'string')
-    return DEFAULT_TRANSLATION_ALLOWED_LANGUAGES
-
-  return new Set(
-    env.TRANSLATION_ALLOWED_LANGUAGES
-      .split(/[,\s]+/)
-      .map(normalizeLanguageCode)
-      .filter(language => language !== 'en' && SUPPORTED_LANGUAGES.has(language)),
-  )
-}
-
-function isTranslationLanguageAllowed(env: TranslationWorkerBindings, targetLanguage: string) {
-  return configuredTranslationAllowedLanguages(env).has(targetLanguage)
+function isTranslationLanguageAllowed(targetLanguage: string) {
+  return TRANSLATION_ALLOWED_LANGUAGES.has(targetLanguage)
 }
 
 async function sha256Hex(value: string) {
@@ -604,7 +586,7 @@ function isPendingTranslationStale(entry: TranslationStoreEntry) {
 }
 
 function isReadyTranslationFresh(entry: TranslationStoreEntry) {
-  return entry.status === 'ready' && nowSeconds() - entry.updatedAt < READY_TRANSLATION_REFRESH_AFTER_SECONDS
+  return entry.status === 'ready' && nowSeconds() - entry.updatedAt < CACHE_TTL_SECONDS
 }
 
 function isTranslationBatchLeaseExpired(entry: TranslationStoreEntry) {
@@ -835,7 +817,7 @@ async function cacheReadyTranslationPayload(requestId: string | undefined, ready
   try {
     await workerCache().put(readyRequest, new Response(JSON.stringify(payload), {
       headers: {
-        'Cache-Control': `public, max-age=${READY_TRANSLATION_CACHE_TTL_SECONDS}`,
+        'Cache-Control': `public, max-age=${CACHE_TTL_SECONDS}`,
         'Content-Type': 'application/json',
       },
     }))
@@ -913,7 +895,7 @@ async function readyTranslationResponse(requestId: string | undefined, readyRequ
   const payload = readyPayloadFromStore(entry)
   await cacheReadyTranslationPayload(requestId, readyRequest, payload, targetLanguage)
   return jsonResponse(payload, 200, {
-    'Cache-Control': `public, max-age=0, s-maxage=${READY_TRANSLATION_CACHE_TTL_SECONDS}`,
+    'Cache-Control': `public, max-age=0, s-maxage=${CACHE_TTL_SECONDS}`,
   })
 }
 
@@ -990,7 +972,7 @@ async function handleTranslationMessages(request: Request, env: TranslationWorke
   if (targetLanguage === 'en')
     fail(400, 'unsupported_translation_language', 'English messages are already bundled')
 
-  if (!isTranslationLanguageAllowed(env, targetLanguage))
+  if (!isTranslationLanguageAllowed(targetLanguage))
     fail(400, 'unsupported_translation_language', 'Target language is not enabled')
 
   const checksum = await currentSourceChecksum()
@@ -1000,7 +982,7 @@ async function handleTranslationMessages(request: Request, env: TranslationWorke
   const cached = await matchReadyTranslationPayload(readyRequest)
   if (cached) {
     return jsonResponse(cached, 200, {
-      'Cache-Control': `public, max-age=0, s-maxage=${READY_TRANSLATION_CACHE_TTL_SECONDS}`,
+      'Cache-Control': `public, max-age=0, s-maxage=${CACHE_TTL_SECONDS}`,
     })
   }
 
@@ -1034,9 +1016,9 @@ async function handleTranslationMessages(request: Request, env: TranslationWorke
   return pendingTranslationResponse(checksum)
 }
 
-function queuedTargetLanguage(body: TranslationQueuePayload, env: TranslationWorkerBindings, requestId: string | undefined) {
+function queuedTargetLanguage(body: TranslationQueuePayload, requestId: string | undefined) {
   const targetLanguage = typeof body.targetLanguage === 'string' ? body.targetLanguage.trim().toLowerCase() : ''
-  if (SUPPORTED_LANGUAGES.has(targetLanguage) && targetLanguage !== 'en' && isTranslationLanguageAllowed(env, targetLanguage))
+  if (SUPPORTED_LANGUAGES.has(targetLanguage) && targetLanguage !== 'en' && isTranslationLanguageAllowed(targetLanguage))
     return targetLanguage
 
   cloudlogErr({
@@ -1150,7 +1132,7 @@ async function persistTranslatedBatch(env: TranslationWorkerBindings, checksum: 
 }
 
 async function processTranslationQueueBatch(env: TranslationWorkerBindings, body: TranslationQueuePayload, requestId?: string) {
-  const targetLanguage = queuedTargetLanguage(body, env, requestId)
+  const targetLanguage = queuedTargetLanguage(body, requestId)
   if (!targetLanguage)
     return
 
@@ -1256,13 +1238,11 @@ export default {
 export const __translationWorkerTestUtils__ = {
   buildBatches,
   claimedTranslationBatchIndex,
-  currentSourceChecksum,
   isReadyTranslationFresh,
   isTranslationBatchLeaseExpired,
   keepTranslation,
   normalizeBatchIndex,
   parseTranslationObject,
-  readyTranslationCacheTtlSeconds: READY_TRANSLATION_CACHE_TTL_SECONDS,
   translationBatchClaimMarker,
   translationBatchIndexFromStore,
   translationStoreTtlSeconds,
