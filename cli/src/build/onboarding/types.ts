@@ -102,6 +102,8 @@ export type OnboardingStep
     | 'support-confirm'
     // Scrollable viewer of the exact bundle, reached from the confirm's "View logs first"
     | 'support-log-view'
+    // Spinner while the bundle uploads to Capgo support
+    | 'support-uploading'
 
 export type OnboardingErrorCategory
   = | 'apple_api_unauthorized'
@@ -308,6 +310,7 @@ export const STEP_PROGRESS: Record<OnboardingStep, number> = {
   'error': 0,
   'support-confirm': 0,
   'support-log-view': 0,
+  'support-uploading': 0,
 }
 
 export function getPhaseLabel(step: OnboardingStep): string {
@@ -398,6 +401,7 @@ export function getPhaseLabel(step: OnboardingStep): string {
     case 'error':
     case 'support-confirm':
     case 'support-log-view':
+    case 'support-uploading':
       return ''
   }
 }

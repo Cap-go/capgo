@@ -27,8 +27,11 @@ export async function uploadSupportLogs(input: SupportUploadInput): Promise<Supp
   catch {
     return null
   }
+  // Allow overriding the host for testing against preprod (the wizard otherwise
+  // hardcodes prod, matching the AI-analyze path): CAPGO_API_HOST=https://api.preprod.capgo.app
+  const host = (process.env.CAPGO_API_HOST?.trim() || input.apiHost).replace(/\/+$/, '')
   try {
-    const res = await fetch(`${input.apiHost}/build/support_logs`, {
+    const res = await fetch(`${host}/build/support_logs`, {
       method: 'POST',
       headers: {
         'capgkey': input.apikey,

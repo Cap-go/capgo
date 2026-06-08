@@ -988,13 +988,16 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
       reveal: p => revealInFinder(p),
       openUrl: u => open(u),
       print: msg => addLog(msg, 'cyan'),
-      upload: gzPath => uploadSupportLogs({
-        apiHost: 'https://api.capgo.app',
-        apikey: resolvedApiKeyRef.current ?? apikey ?? '',
-        appId,
-        jobId: aiJobId ?? undefined,
-        gzPath,
-      }),
+      upload: (gzPath) => {
+        setStep('support-uploading') // show a spinner while the (network) upload runs
+        return uploadSupportLogs({
+          apiHost: 'https://api.capgo.app',
+          apikey: resolvedApiKeyRef.current ?? apikey ?? '',
+          appId,
+          jobId: aiJobId ?? undefined,
+          gzPath,
+        })
+      },
     })
     setStep(returnTo)
   }, [appId, apikey, aiJobId, error, logLines, buildOutput, aiAnalysisText, askSupportConfirm, readInternalLogLines, addLog])
@@ -3534,6 +3537,12 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
 
       {/* AI debug — spinner while the edge function is running */}
       {step === 'ai-analysis-running' && <AiAnalysisRunningStep />}
+
+      {step === 'support-uploading' && (
+        <Box marginTop={1}>
+          <SpinnerLine text="Uploading your logs to Capgo support…" />
+        </Box>
+      )}
 
       {/* AI debug — render the diagnosis (or fallback message), then offer
           retry-or-skip. Retry transitions back to 'requesting-build' so the

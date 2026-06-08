@@ -528,11 +528,15 @@ async function runInitContactSupport(failureText: string): Promise<void> {
     reveal: p => revealInFinder(p),
     openUrl: u => open(u),
     print: msg => pLog.info(msg),
-    upload: (gzPath) => {
+    upload: async (gzPath) => {
       const key = findSavedKeySilent()
       if (!key)
-        return Promise.resolve(null)
-      return uploadSupportLogs({ apiHost: defaultApiHost, apikey: key, appId: globalAppId, gzPath })
+        return null
+      const spinner = pSpinner()
+      spinner.start('Uploading your logs to Capgo support…')
+      const r = await uploadSupportLogs({ apiHost: defaultApiHost, apikey: key, appId: globalAppId, gzPath })
+      spinner.stop(r ? 'Logs uploaded.' : 'Logs upload unavailable — falling back to attaching the file.')
+      return r
     },
   })
 }

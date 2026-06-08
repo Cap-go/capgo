@@ -80,6 +80,8 @@ export type AndroidOnboardingStep
     | 'support-confirm'
     // Scrollable viewer of the exact bundle, reached from the confirm's "View logs first"
     | 'support-log-view'
+    // Spinner while the bundle uploads to Capgo support
+    | 'support-uploading'
 
 export type AndroidOnboardingErrorCategory
   = | 'keystore_invalid'
@@ -273,6 +275,7 @@ export const ANDROID_STEP_PROGRESS: Record<AndroidOnboardingStep, number> = {
   'error': 0,
   'support-confirm': 0,
   'support-log-view': 0,
+  'support-uploading': 0,
 }
 
 export function getAndroidPhaseLabel(step: AndroidOnboardingStep): string {
@@ -352,6 +355,7 @@ export function getAndroidPhaseLabel(step: AndroidOnboardingStep): string {
     case 'error':
     case 'support-confirm':
     case 'support-log-view':
+    case 'support-uploading':
       return ''
   }
 }

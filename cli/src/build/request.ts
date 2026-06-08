@@ -2188,13 +2188,13 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
             reveal: p => revealInFinder(p),
             openUrl: async u => (await import('open')).default(u),
             print: msg => clackLog.info(msg),
-            upload: gzPath => uploadSupportLogs({
-              apiHost: host,
-              apikey: options.apikey,
-              appId,
-              jobId: capturedJobId ?? undefined,
-              gzPath,
-            }),
+            upload: async (gzPath) => {
+              const s = spinnerC()
+              s.start('Uploading your logs to Capgo support…')
+              const r = await uploadSupportLogs({ apiHost: host, apikey: options.apikey, appId, jobId: capturedJobId ?? undefined, gzPath })
+              s.stop(r ? 'Logs uploaded.' : 'Logs upload unavailable — falling back to attaching the file.')
+              return r
+            },
           })
         }
 

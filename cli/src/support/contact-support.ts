@@ -1,4 +1,5 @@
 // cli/src/support/contact-support.ts
+import { rmSync } from 'node:fs'
 import { buildMailtoUrl, MAILTO_BODY_MAX } from './mailto.js'
 
 const SUPPORT_EMAIL = 'support@capgo.app'
@@ -92,10 +93,18 @@ async function runContactSupport(deps: ContactSupportDeps): Promise<ContactSuppo
     catch {
       mailOpened = false
     }
+    // The logs now live in R2 (kept 30 days); the local copies are redundant on
+    // the upload path — remove them so there's nothing to attach/open.
+    try {
+      rmSync(files.gzPath, { force: true })
+      rmSync(files.logPath, { force: true })
+    }
+    catch { /* best-effort cleanup */ }
+
     if (mailOpened)
-      deps.print(`Opened an email to ${SUPPORT_EMAIL} — it already links to your uploaded logs, just press Send. (Local copies: ${files.logPath})`)
+      deps.print(`Opened an email to ${SUPPORT_EMAIL} — it links to your uploaded logs (kept 30 days). Just press Send.`)
     else
-      deps.print(`Couldn't open your mail app automatically. Please email ${SUPPORT_EMAIL} and include this link to your uploaded logs: ${uploaded.url}`)
+      deps.print(`Couldn't open your mail app automatically. Please email ${SUPPORT_EMAIL} and include this link to your uploaded logs:\n${uploaded.url}`)
     return 'opened'
   }
 
