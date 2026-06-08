@@ -57,7 +57,11 @@ const SAFE_RESPONSE_HEADERS = [
 ]
 
 // Format the allowlisted response headers as `name=value, …` (empty string if none).
-export function safeHeaders(headers: Headers): string {
+// Tolerates a missing / non-Headers value (a real fetch always provides Headers,
+// but test mocks and odd runtimes may not) — never throws.
+export function safeHeaders(headers: Headers | null | undefined): string {
+  if (!headers || typeof headers.get !== 'function')
+    return ''
   const parts: string[] = []
   for (const name of SAFE_RESPONSE_HEADERS) {
     const value = headers.get(name)
