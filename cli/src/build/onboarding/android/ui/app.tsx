@@ -2276,7 +2276,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
     || step === 'ci-secrets-failed'
     || step === 'confirm-ci-secret-overwrite'
   const showHeader = step !== 'requesting-build' && step !== 'view-workflow-diff' && !isAiResultScroll
-  const showProgress = step !== 'welcome' && step !== 'error' && step !== 'build-complete' && step !== 'requesting-build' && step !== 'ai-analysis-result' && !isAiResultScroll && !tallStep
+  const showProgress = step !== 'welcome' && step !== 'error' && step !== 'build-complete' && step !== 'requesting-build' && step !== 'ai-analysis-result' && step !== 'support-confirm' && step !== 'support-log-view' && step !== 'support-uploading' && !isAiResultScroll && !tallStep
   const showLog = step !== 'requesting-build' && step !== 'build-complete' && !isAiStep && !tallStep
 
   // Streaming build output is a fullscreen takeover — see iOS sibling. As an
