@@ -145,7 +145,7 @@ import open from 'open'
 import { contactSupport } from '../../../../support/contact-support.js'
 import { uploadSupportLogs } from '../../../../support/support-upload.js'
 import { copyToClipboard, revealInFinder } from '../../../../support/clipboard.js'
-import { getInternalLogPath } from '../../../../support/internal-log.js'
+import { appendInternalLog, getInternalLogPath } from '../../../../support/internal-log.js'
 import { redactSecrets } from '../../../../support/redact.js'
 import { writeSupportBundleFiles } from '../../../../onboarding-support.js'
 import {
@@ -679,6 +679,8 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
   }
 
   const addLog = useCallback((text: string, color = 'green') => {
+    // Mirror every activity-log line into the support bundle's internal log.
+    appendInternalLog(text)
     setLogLines((prev) => {
       // Drop a consecutive duplicate: completed-step breadcrumbs are idempotent
       // ("✔ GCP project — X" means the same thing however many times the
@@ -693,8 +695,15 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
   }, [])
 
   const addSetupStatus = useCallback((text: string) => {
+    appendInternalLog(text) // GCP/Play setup progress → internal log
     setSetupStatus(prev => [...prev, text])
   }, [])
+
+  // Persist every step transition so the support bundle carries the full onboarding
+  // trace, not just whatever screen the user was on when they hit Email support.
+  useEffect(() => {
+    appendInternalLog(`step → ${step}`)
+  }, [step])
 
   const exitOnboarding = useCallback((message?: string) => {
     if (exitRequestedRef.current)
@@ -1249,6 +1258,10 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
           }
 
           setSaValidationResult(result)
+          // Persist the full failure (incl. no-app-access / token / network) to the
+          // internal log — it's the most useful thing for support, and the UI only
+          // shows shape-errors as a banner.
+          appendInternalLog(`service-account validation failed (${result.kind}): ${result.message}`)
           trackAction('android_sa_validation_result', {
             result: 'failure',
             validation_kind: result.kind,

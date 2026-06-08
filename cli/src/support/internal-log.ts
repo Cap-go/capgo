@@ -35,7 +35,9 @@ export function appendInternalLog(line: string): void {
   if (!currentPath)
     return
   try {
-    appendFileSync(currentPath, `${redactSecrets(line)}\n`, 'utf8')
+    // Prefix an ISO timestamp so the support bundle shows ordering + timing of the
+    // whole run. The timestamp isn't secret-bearing; only the line is redacted.
+    appendFileSync(currentPath, `[${new Date().toISOString()}] ${redactSecrets(line)}\n`, 'utf8')
   }
   catch {
     // Never let logging break the build flow.

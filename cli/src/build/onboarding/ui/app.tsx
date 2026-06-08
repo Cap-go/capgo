@@ -27,7 +27,7 @@ import { writeOnboardingSupportBundle, writeSupportBundleFiles } from '../../../
 import { contactSupport } from '../../../support/contact-support.js'
 import { uploadSupportLogs } from '../../../support/support-upload.js'
 import { copyToClipboard, revealInFinder } from '../../../support/clipboard.js'
-import { getInternalLogPath } from '../../../support/internal-log.js'
+import { appendInternalLog, getInternalLogPath } from '../../../support/internal-log.js'
 import { redactSecrets } from '../../../support/redact.js'
 import { formatRunnerCommand, splitRunnerCommand } from '../../../runner-command.js'
 import { createSupabaseClient, findBuildCommandForProjectType, findProjectType, findSavedKeySilent, getOrganizationId, getPackageScripts, getPMAndCommand } from '../../../utils.js'
@@ -852,6 +852,8 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
   const [duplicateProfileOrigin, setDuplicateProfileOrigin] = useState<'creating-profile' | 'import-create-profile-only'>('creating-profile')
 
   const addLog = useCallback((text: string, color = 'green') => {
+    // Mirror every activity-log line into the support bundle's internal log.
+    appendInternalLog(text)
     setLog((prev) => {
       // Drop a consecutive duplicate: completed-step breadcrumbs are idempotent,
       // so the same line twice in a row is always spam, never information. Guards
@@ -863,6 +865,12 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
       return [...prev, { text, color }]
     })
   }, [])
+
+  // Persist every step transition so the support bundle carries the full onboarding
+  // trace, not just whatever screen the user was on when they hit Email support.
+  useEffect(() => {
+    appendInternalLog(`step → ${step}`)
+  }, [step])
 
   /**
    * Field-update breadcrumb: write/replace a single log entry identified by a

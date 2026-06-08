@@ -58,7 +58,7 @@ import { aiAnalysisResultFromPostAnalyze, trackAiAnalysisChoice, trackAiAnalysis
 import { writeSupportBundleFiles } from '../onboarding-support.js'
 import { copyToClipboard, revealInFinder } from '../support/clipboard.js'
 import { contactSupport } from '../support/contact-support.js'
-import { getInternalLogPath } from '../support/internal-log.js'
+import { appendInternalLog, getInternalLogPath, startInternalLog } from '../support/internal-log.js'
 import { uploadSupportLogs } from '../support/support-upload.js'
 import { assertCliPermission, canPromptInteractively, createSupabaseClient, findSavedKey, getConfig, getOrganizationId, sendEvent } from '../utils'
 import { mergeCredentials, MIN_OUTPUT_RETENTION_SECONDS, parseInAppUpdatePriority, parseOptionalBoolean, parseOutputRetentionSeconds } from './credentials'
@@ -1267,6 +1267,11 @@ export function splitPayload(
 }
 
 export async function requestBuildInternal(appId: string, options: BuildRequestOptions, silent = false, logger?: BuildLogger): Promise<BuildRequestResult> {
+  // Start the verbose internal log so API errors + the support flow's bundle have
+  // content (no-op if already started by a wrapping onboarding run).
+  if (!getInternalLogPath())
+    startInternalLog(appId)
+  appendInternalLog(`build request: started for ${appId} (platform ${options.platform ?? 'auto'})`)
   // Track build time
   const buildStartTime = Date.now()
   const verbose = options.verbose ?? false
