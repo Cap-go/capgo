@@ -35,6 +35,12 @@ jobs:
         run: bun install --frozen-lockfile
       - name: Build CLI
         run: bun run cli:build
+      - name: Assert dev-only env override is stripped from release bundle
+        run: |
+          if grep -q "CAPGO_KEYCHAIN_HELPER_PATH" cli/dist/index.js; then
+            echo "::error::CAPGO_KEYCHAIN_HELPER_PATH leaked into the release bundle — dead-code elimination failed"
+            exit 1
+          fi
       - name: Generate AI changelog
         id: changelog
         uses: mistricky/ccc@v0.2.6

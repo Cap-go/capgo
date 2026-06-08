@@ -1,0 +1,115 @@
+name: Build and publish CLI keychain helper
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Helper version to publish, e.g. 1.0.0 (no 'cli-helper-' prefix)"
+        required: true
+
+permissions: {}
+
+jobs:
+  publish_cli_helper:
+    runs-on: macos-latest
+    name: Build, sign, notarize, publish keychain helper
+    timeout-minutes: 45
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24.x
+          registry-url: https://registry.npmjs.org
+      - name: Validate + capture version
+        id: version
+        run: |
+          v="${{ github.event.inputs.version }}"
+          if ! echo "$v" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$'; then
+            echo "::error::version '$v' is not semver (e.g. 1.0.0)"; exit 1
+          fi
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+      - name: Build helper binaries
+        run: bash cli-helper/scripts/build.sh
+      - name: Import Developer ID certificate into throwaway keychain
+        env:
+          DEVELOPER_ID_CERT_BASE64: ${{ secrets.DEVELOPER_ID_CERT_BASE64 }}
+          DEVELOPER_ID_CERT_PASSWORD: ${{ secrets.DEVELOPER_ID_CERT_PASSWORD }}
+        run: |
+          KEYCHAIN_PATH="$RUNNER_TEMP/build.keychain-db"
+          KEYCHAIN_PWD="$(uuidgen)"
+          security create-keychain -p "$KEYCHAIN_PWD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PWD" "$KEYCHAIN_PATH"
+          echo "$DEVELOPER_ID_CERT_BASE64" | base64 -d > "$RUNNER_TEMP/cert.p12"
+          security import "$RUNNER_TEMP/cert.p12" -k "$KEYCHAIN_PATH" \
+            -P "$DEVELOPER_ID_CERT_PASSWORD" -T /usr/bin/codesign
+          rm "$RUNNER_TEMP/cert.p12"
+          security set-key-partition-list -S apple-tool:,apple:,codesign: \
+            -s -k "$KEYCHAIN_PWD" "$KEYCHAIN_PATH"
+          security list-keychains -d user -s "$KEYCHAIN_PATH" login.keychain
+          IDENTITY=$(security find-identity -v -p codesigning "$KEYCHAIN_PATH" \
+            | awk -F'"' '/Developer ID Application/ {print $2; exit}')
+          if [ -z "$IDENTITY" ]; then
+            echo "::error::No Developer ID Application identity found in imported cert"
+            exit 1
+          fi
+          echo "DEVELOPER_ID_IDENTITY=$IDENTITY" >> "$GITHUB_ENV"
+      - name: Write App Store Connect API key
+        env:
+          APPLE_KEY_CONTENT: ${{ secrets.APPLE_KEY_CONTENT }}
+        run: |
+          printf '%s' "$APPLE_KEY_CONTENT" > "$RUNNER_TEMP/AuthKey.p8"
+          echo "APPLE_KEY_PATH=$RUNNER_TEMP/AuthKey.p8" >> "$GITHUB_ENV"
+      - name: Sign and notarize
+        env:
+          CAPGO_APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_KEY_ID: ${{ secrets.APPLE_KEY_ID }}
+          APPLE_ISSUER_ID: ${{ secrets.APPLE_ISSUER_ID }}
+        run: bash cli-helper/scripts/sign-and-notarize.sh
+      - name: Smoke test signed binary
+        run: |
+          set +e
+          out=$(./cli-helper/dist/helper-arm64)
+          code=$?
+          set -e
+          [ "$code" -ne 0 ] || { echo "::error::expected non-zero exit"; exit 1; }
+          echo "$out" | jq -e '.ok == false and .errorCode == "INVALID_ARGS"' > /dev/null \
+            || { echo "::error::unexpected helper output: $out"; exit 1; }
+      - name: Gate test — keychain-export without handshake is FORBIDDEN_CALLER
+        run: |
+          set +e
+          out=$(./cli-helper/dist/helper-arm64 keychain-export --sha1 "$(printf 'a%.0s' {1..40})" --output /tmp/x.p12 --passphrase p | cat)
+          set -e
+          echo "$out" | jq -e '.ok == false and .errorCode == "FORBIDDEN_CALLER"' > /dev/null \
+            || { echo "::error::gate did not reject missing handshake: $out"; exit 1; }
+      - name: Prepare packages
+        run: node cli-helper/scripts/prepare-publish.mjs "${{ steps.version.outputs.version }}"
+      - name: Publish darwin-arm64
+        working-directory: cli-helper/npm/darwin-arm64
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --provenance --access public
+      - name: Publish darwin-x64
+        working-directory: cli-helper/npm/darwin-x64
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --provenance --access public
+      - name: Create tag + GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: cli-helper-${{ steps.version.outputs.version }}
+          target_commitish: ${{ github.sha }}
+          files: |
+            cli-helper/dist/helper-arm64
+            cli-helper/dist/helper-x64
+          make_latest: false
+          token: "${{ secrets.PERSONAL_ACCESS_TOKEN }}"
