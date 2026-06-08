@@ -65,7 +65,7 @@ function resetSpoofedUser() {
     toast.error('Stop Spoofed, will reload')
     setTimeout(() => {
       router.replace('/dashboard').then(() => {
-        window.location.reload()
+        globalThis.location.reload()
       })
     }, 1000)
   }

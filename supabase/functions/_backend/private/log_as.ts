@@ -34,7 +34,7 @@ type SupabaseAdmin = Awaited<ReturnType<typeof useSupabaseAdmin>>
 
 function normalizeIdentifierValue(value: string | undefined): string | null {
   const normalized = value?.trim()
-  return normalized ? normalized : null
+  return normalized || null
 }
 
 function assertUuid(value: string, field: string) {

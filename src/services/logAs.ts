@@ -49,7 +49,7 @@ export async function logAsUser(identifier: string, router: Router) {
     toast.success('Spoofed, will reload')
     setTimeout(() => {
       router.replace('/dashboard').then(() => {
-        window.location.reload()
+        globalThis.location.reload()
       })
     }, 1000)
   }
