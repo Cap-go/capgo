@@ -14,6 +14,7 @@ import {
 
 // ---- fixtures -------------------------------------------------------------
 
+const CHANGE_AT = '2026-06-06T12:00:00.000Z'
 const PKG_V6: NativePackage[] = [{ name: '@capacitor/core', version: '6.0.0' }]
 // Major bump → version ranges do not intersect → incompatible.
 const PKG_V7: NativePackage[] = [{ name: '@capacitor/core', version: '7.0.0' }]
@@ -43,6 +44,7 @@ function newChannel(overrides: Partial<DecideCompatibilityEventsInput['newChanne
 describe('decideCompatibilityEvents', () => {
   it('emits an event for a same-channel incompatible version change (Case B)', () => {
     const events = decideCompatibilityEvents({
+      changeOccurredAt: CHANGE_AT,
       newChannel: newChannel(),
       currentBundle: bundle(700, '7.0.0', PKG_V7),
       previousDefaults: [{
@@ -70,6 +72,7 @@ describe('decideCompatibilityEvents', () => {
 
   it('emits an event for a default-channel switch (Case A)', () => {
     const events = decideCompatibilityEvents({
+      changeOccurredAt: CHANGE_AT,
       newChannel: newChannel(),
       currentBundle: bundle(700, '7.0.0', PKG_V7),
       previousDefaults: [{
@@ -86,6 +89,7 @@ describe('decideCompatibilityEvents', () => {
 
   it('emits no event when the change is OTA-compatible', () => {
     const events = decideCompatibilityEvents({
+      changeOccurredAt: CHANGE_AT,
       newChannel: newChannel(),
       currentBundle: bundle(700, '6.0.1', PKG_V6),
       previousDefaults: [{
@@ -100,6 +104,7 @@ describe('decideCompatibilityEvents', () => {
 
   it('emits no event under the metadata (version_number) strategy', () => {
     const events = decideCompatibilityEvents({
+      changeOccurredAt: CHANGE_AT,
       newChannel: newChannel({ disable_auto_update: 'version_number' }),
       currentBundle: bundle(700, '7.0.0', PKG_V7),
       previousDefaults: [{
@@ -114,6 +119,7 @@ describe('decideCompatibilityEvents', () => {
 
   it('emits no event when the current bundle has no native_packages', () => {
     const events = decideCompatibilityEvents({
+      changeOccurredAt: CHANGE_AT,
       newChannel: newChannel(),
       currentBundle: bundle(700, '7.0.0', null),
       previousDefaults: [{
@@ -128,6 +134,7 @@ describe('decideCompatibilityEvents', () => {
 
   it('emits no event when the previous bundle has no native_packages', () => {
     const events = decideCompatibilityEvents({
+      changeOccurredAt: CHANGE_AT,
       newChannel: newChannel(),
       currentBundle: bundle(700, '7.0.0', PKG_V7),
       previousDefaults: [{
@@ -144,6 +151,7 @@ describe('decideCompatibilityEvents', () => {
     // A soft-deleted previous bundle is still a valid baseline as long as its
     // metadata is present: we must still raise the event.
     const events = decideCompatibilityEvents({
+      changeOccurredAt: CHANGE_AT,
       newChannel: newChannel(),
       currentBundle: bundle(700, '7.0.0', PKG_V7),
       previousDefaults: [{
@@ -164,6 +172,7 @@ describe('decideCompatibilityEvents', () => {
     })
 
     const events = decideCompatibilityEvents({
+      changeOccurredAt: CHANGE_AT,
       newChannel: newChannel({ ios: true, android: true, electron: false }),
       currentBundle: bundle(700, '7.0.0', PKG_V7),
       previousDefaults: [previous('ios'), previous('android'), previous('electron')],
@@ -175,6 +184,7 @@ describe('decideCompatibilityEvents', () => {
 
   it('emits no event when the channel is not public', () => {
     const events = decideCompatibilityEvents({
+      changeOccurredAt: CHANGE_AT,
       newChannel: newChannel({ public: false }),
       currentBundle: bundle(700, '7.0.0', PKG_V7),
       previousDefaults: [{
@@ -189,6 +199,7 @@ describe('decideCompatibilityEvents', () => {
 
   it('emits no event when previous and current are the same bundle id', () => {
     const events = decideCompatibilityEvents({
+      changeOccurredAt: CHANGE_AT,
       newChannel: newChannel(),
       currentBundle: bundle(700, '7.0.0', PKG_V7),
       previousDefaults: [{
