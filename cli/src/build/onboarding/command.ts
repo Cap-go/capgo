@@ -9,7 +9,7 @@ import { getAppId, getConfig } from '../../utils.js'
 import { appendInternalLog, startInternalLog } from '../../support/internal-log.js'
 import { getPlatformDirFromCapacitorConfig } from '../platform-paths.js'
 import OnboardingShell from './ui/shell.js'
-import { maybeSelfUpdate } from './self-update.js'
+import { checkForCliUpdate, runUpdateAndReexec } from './self-update.js'
 import type { OnboardingResult } from './types.js'
 
 export interface OnboardingBuilderOptions {
@@ -89,11 +89,6 @@ export async function onboardingBuilderCommand(options: OnboardingBuilderOptions
     process.exit(1)
   }
 
-  // Offer to self-update BEFORE entering Ink's alt-screen. On accept this
-  // re-execs the updated CLI (which resumes from the persisted onboarding step)
-  // and never returns; otherwise it returns and we continue on this version.
-  await maybeSelfUpdate()
-
   // Detect app ID and platform directories from capacitor.config.ts
   let appId: string | undefined
   // `iosBundleIdInitial` is the iOS-side default — the top-level
@@ -135,6 +130,11 @@ export async function onboardingBuilderCommand(options: OnboardingBuilderOptions
 
   const initialPlatform = resolveInitialPlatform(options, iosDir, androidDir)
 
+  // Resolve update availability BEFORE render so the wizard can show the
+  // self-update offer as its first screen. Timeout-bounded (and skipped on the
+  // re-exec'd child via CAPGO_SKIP_UPDATE_PROMPT), so this never stalls startup.
+  const updateInfo = await checkForCliUpdate()
+
   // The shell resolves the platform (immediately if initialPlatform is set,
   // else once the user picks). Capture it so the breadcrumb below — printed
   // after Ink restores the primary buffer — names the right platform.
@@ -157,6 +157,7 @@ export async function onboardingBuilderCommand(options: OnboardingBuilderOptions
       apikey: options.apikey,
       supaHost: options.supaHost,
       initialPlatform,
+      updateInfo: updateInfo ?? undefined,
       onResolvePlatform: (platform: Platform) => {
         resolvedPlatform = platform
       },
@@ -167,6 +168,24 @@ export async function onboardingBuilderCommand(options: OnboardingBuilderOptions
     { alternateScreen: true },
   )
   await waitUntilExit()
+
+  // The user accepted the self-update offer: Ink has restored the primary
+  // buffer, so the install + re-exec can take over the terminal (it needs
+  // stdio inheritance). On success this never returns — it exits with the
+  // child's status code; on failure, fall back to a manual-update hint instead
+  // of silently continuing on the stale version the user chose to leave.
+  if (result.outcome === 'update-requested' && updateInfo) {
+    try {
+      runUpdateAndReexec(updateInfo.latestVersion)
+    }
+    catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      log.warn(`Could not auto-update (${message}). Still on @capgo/cli@${updateInfo.currentVersion}.`)
+      process.stdout.write('Re-run `capgo build init` to try again, or update manually: npx @capgo/cli@latest build init\n')
+      process.exit(1)
+    }
+    return
+  }
 
   // Durable post-exit output in the user's normal terminal flow — the alt buffer
   // restore wiped the wizard's last frame, so anything the user needs to keep

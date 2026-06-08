@@ -3,7 +3,7 @@ import { spawnSync } from 'node:child_process'
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import process from 'node:process'
-import { isCancel, log, select } from '@clack/prompts'
+import { log } from '@clack/prompts'
 import { checkVersionStatus } from '../../api/update.js'
 import { findRoot, getPMAndCommand } from '../../utils.js'
 
@@ -202,9 +202,20 @@ export function classifyUpdateStrategy(opts: {
   return { kind: 'ephemeral' }
 }
 
-/** Resolve the latest version, capped by a timeout so a slow registry can't
- * stall the wizard. Returns null on timeout or when already up to date. */
-async function getOutdatedStatus(): Promise<{ currentVersion: string, latestVersion: string } | null> {
+/**
+ * Check whether a newer @capgo/cli is published, capped by a timeout so a slow
+ * registry can't stall the wizard. Returns the version pair when an update is
+ * available, or null when up to date / timed out / re-exec'd (the SKIP env is
+ * set on the relaunched child to avoid an update→relaunch loop).
+ *
+ * The decision UI lives in the Ink wizard (ui/update-prompt.tsx) — this only
+ * resolves the data the prompt needs. The install + re-exec is
+ * runUpdateAndReexec, run AFTER Ink tears down.
+ */
+export async function checkForCliUpdate(): Promise<{ currentVersion: string, latestVersion: string } | null> {
+  if (process.env[SKIP_UPDATE_ENV])
+    return null
+
   const timeout = new Promise<null>((resolve) => {
     const t = setTimeout(() => resolve(null), VERSION_CHECK_TIMEOUT_MS)
     t.unref?.()
@@ -216,49 +227,11 @@ async function getOutdatedStatus(): Promise<{ currentVersion: string, latestVers
 }
 
 /**
- * Offer to self-update before the onboarding wizard mounts. When the user
- * accepts, this updates in place (project dependency) or re-fetches (ephemeral)
- * and re-execs the CLI with the same arguments — the new process resumes from
- * the persisted onboarding step, so there is no manual restart.
- *
- * Returns only when onboarding should continue on the CURRENT version (no
- * update available, declined, timed out, or the update failed). On a successful
- * re-exec this never returns — it exits with the child's status code.
- */
-export async function maybeSelfUpdate(): Promise<void> {
-  if (process.env[SKIP_UPDATE_ENV])
-    return
-
-  const outdated = await getOutdatedStatus()
-  if (!outdated)
-    return
-
-  const choice = await select({
-    message: `A new version of @capgo/cli is available (${outdated.currentVersion} → ${outdated.latestVersion}). Update now?`,
-    options: [
-      { value: 'yes', label: 'Yes, update and continue', hint: 'onboarding resumes on the new version' },
-      { value: 'no', label: 'No, continue on the current version' },
-    ],
-    initialValue: 'yes',
-  })
-  if (isCancel(choice) || choice !== 'yes')
-    return
-
-  try {
-    runUpdateAndReexec(outdated.latestVersion)
-  }
-  catch (error) {
-    const message = error instanceof Error ? error.message : String(error)
-    log.warn(`Could not auto-update (${message}). Continuing on @capgo/cli@${outdated.currentVersion}.`)
-    log.info('You can update manually later with: npx @capgo/cli@latest build init')
-  }
-}
-
-/**
  * Side-effecting half of the update: classify, install/fetch, then re-exec.
+ * Called AFTER Ink unmounts (it needs the primary buffer + stdio inheritance).
  * Throws on any failure so the caller can fall back to the current version.
  */
-function runUpdateAndReexec(latest: string): void {
+export function runUpdateAndReexec(latest: string): void {
   const cwd = process.cwd()
   const { pm } = getPMAndCommand()
   const installRoot = findRoot(cwd)

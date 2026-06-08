@@ -11,6 +11,7 @@ import {
   findCliDeclaration,
   resolveInstalledCliEntry,
 } from '../src/build/onboarding/self-update.ts'
+import { updatePromptKeyAction } from '../src/build/onboarding/ui/update-prompt.tsx'
 
 function t(name, fn) {
   try {
@@ -210,6 +211,28 @@ t('resolveInstalledCliEntry returns null when the CLI is not installed', () => {
     mkdirSync(app, { recursive: true })
     assert.equal(resolveInstalledCliEntry(app), null)
   })
+})
+
+// ─── updatePromptKeyAction (Ink prompt key mapping) ────────────────────
+
+t('updatePromptKeyAction: Enter confirms', () => {
+  assert.deepEqual(updatePromptKeyAction('', { return: true }), { type: 'confirm' })
+})
+
+t('updatePromptKeyAction: left / h / 1 select update', () => {
+  assert.deepEqual(updatePromptKeyAction('', { leftArrow: true }), { type: 'select', choice: 'update' })
+  assert.deepEqual(updatePromptKeyAction('h', {}), { type: 'select', choice: 'update' })
+  assert.deepEqual(updatePromptKeyAction('1', {}), { type: 'select', choice: 'update' })
+})
+
+t('updatePromptKeyAction: right / l / 2 select skip', () => {
+  assert.deepEqual(updatePromptKeyAction('', { rightArrow: true }), { type: 'select', choice: 'skip' })
+  assert.deepEqual(updatePromptKeyAction('l', {}), { type: 'select', choice: 'skip' })
+  assert.deepEqual(updatePromptKeyAction('2', {}), { type: 'select', choice: 'skip' })
+})
+
+t('updatePromptKeyAction: unrelated keys are ignored', () => {
+  assert.equal(updatePromptKeyAction('x', {}), null)
 })
 
 process.stdout.write('\nAll self-update tests passed.\n')
