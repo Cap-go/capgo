@@ -107,3 +107,7 @@ graphify-out/*.html
 graphify-out/*.svg
 graphify-out/*.graphml
 graphify-out/cypher.txt
+
+# Capgo CLI keychain helper — locally built binaries
+cli-helper/dist/
+cli-helper/npm/*/helper

@@ -1,0 +1,14 @@
+{
+  "name": "@capgo/cli-keychain-darwin-arm64",
+  "version": "0.0.0",
+  "description": "Precompiled macOS (Apple Silicon) keychain helper for @capgo/cli",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Cap-go/capgo.git",
+    "directory": "cli-helper"
+  },
+  "license": "Apache 2.0",
+  "os": ["darwin"],
+  "cpu": ["arm64"],
+  "files": ["helper"]
+}

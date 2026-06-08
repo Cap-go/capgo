@@ -1,4 +1,4 @@
-// keychain-export.swift
+// helper.swift
 //
 // Capgo helper: export ONE iOS signing identity from the user's Keychain as a
 // PKCS#12 blob. Always emits a single line of JSON on stdout describing the
@@ -6,9 +6,10 @@
 // stderr or guess from exit codes.
 //
 // Usage:
-//   keychain-export --sha1 <40-hex-char-cert-sha1>
-//                   --output <path-to-output.p12>
-//                   --passphrase <wrap-passphrase-for-p12>
+//   helper keychain-export --sha1 <40-hex-char-cert-sha1>
+//                          --output <path-to-output.p12>
+//                          --passphrase <wrap-passphrase-for-p12>
+//                          --invoked-by capgo-cli
 //
 // JSON output (single line on stdout, ALWAYS emitted before exit):
 //
@@ -39,7 +40,7 @@
 //   "Always Allow" decisions, so subsequent runs are silent.
 //
 // Build:
-//   swiftc keychain-export.swift -framework Security -o keychain-export
+//   swiftc helper.swift -framework Security -o helper
 //
 // Tested on macOS 11+ (Swift 5.5+, CryptoKit available).
 
@@ -119,6 +120,7 @@ enum KeychainExportError: Error {
     case exportFailed(OSStatus, String)
     case writeFailed(String)
     case copyFailed(OSStatus, String)
+    case forbiddenCaller(String)
 }
 
 extension KeychainExportError {
@@ -130,6 +132,7 @@ extension KeychainExportError {
         case .exportFailed: return "EXPORT_FAILED"
         case .writeFailed: return "WRITE_FAILED"
         case .copyFailed: return "EXPORT_FAILED"
+        case .forbiddenCaller: return "FORBIDDEN_CALLER"
         }
     }
     var exitCode: Int32 {
@@ -137,12 +140,13 @@ extension KeychainExportError {
         case .invalidArgs: return 2
         case .noIdentity: return 3
         case .userDenied: return 4
+        case .forbiddenCaller: return 5
         default: return 1
         }
     }
     var message: String {
         switch self {
-        case let .invalidArgs(m), let .noIdentity(m), let .writeFailed(m): return m
+        case let .invalidArgs(m), let .noIdentity(m), let .writeFailed(m), let .forbiddenCaller(m): return m
         case let .userDenied(_, m), let .exportFailed(_, m), let .copyFailed(_, m): return m
         }
     }
@@ -174,12 +178,12 @@ struct Args {
     var sha1Hex: String = ""
     var outputPath: String = ""
     var passphrase: String = ""
+    var invokedBy: String = ""
 }
 
-func parseArgs() throws -> Args {
+func parseArgs(_ cli: [String]) throws -> Args {
     var args = Args()
-    let cli = CommandLine.arguments
-    var i = 1
+    var i = 0
     while i < cli.count {
         let flag = cli[i]
         i += 1
@@ -192,6 +196,7 @@ func parseArgs() throws -> Args {
         case "--sha1": args.sha1Hex = value.lowercased()
         case "--output": args.outputPath = value
         case "--passphrase": args.passphrase = value
+        case "--invoked-by": args.invokedBy = value
         default: throw KeychainExportError.invalidArgs("Unknown argument: \(flag)")
         }
     }
@@ -331,18 +336,46 @@ func writeP12(_ data: Data, to path: String) throws {
     }
 }
 
+// MARK: - Caller gate (anti-footgun; NOT a security boundary — see SECURITY.md)
+//
+// Stops casual / accidental / naive-script invocation of the sensitive
+// export path. It does NOT stop a determined local attacker, who can read the
+// handshake straight out of the open-source CLI (or call Apple's keychain APIs
+// directly). The macOS Keychain ACL is the real boundary.
+func enforceCallerGate(_ args: Args) throws {
+    guard args.invokedBy == "capgo-cli" else {
+        throw KeychainExportError.forbiddenCaller(
+            "Refusing to run: missing or invalid --invoked-by handshake."
+        )
+    }
+    guard isatty(STDOUT_FILENO) == 0 else {
+        throw KeychainExportError.forbiddenCaller(
+            "Refusing to run with an interactive (TTY) stdout."
+        )
+    }
+}
+
 // MARK: - Main
 
 do {
-    let args = try parseArgs()
-    let (identity, identityName) = try findIdentityBySha1(args.sha1Hex)
-    let p12 = try exportIdentityAsPkcs12(identity, passphrase: args.passphrase)
-    try writeP12(p12, to: args.outputPath)
-    emitSuccessAndExit(p12Path: args.outputPath, p12SizeBytes: p12.count, identityName: identityName)
+    let argv = CommandLine.arguments
+    guard argv.count >= 2 else {
+        throw KeychainExportError.invalidArgs("Missing subcommand. Usage: helper <subcommand> …")
+    }
+    switch argv[1] {
+    case "keychain-export":
+        let args = try parseArgs(Array(argv.dropFirst(2)))
+        try enforceCallerGate(args)
+        let (identity, identityName) = try findIdentityBySha1(args.sha1Hex)
+        let p12 = try exportIdentityAsPkcs12(identity, passphrase: args.passphrase)
+        try writeP12(p12, to: args.outputPath)
+        emitSuccessAndExit(p12Path: args.outputPath, p12SizeBytes: p12.count, identityName: identityName)
+    default:
+        throw KeychainExportError.invalidArgs("Unknown subcommand: \(argv[1])")
+    }
 } catch let error as KeychainExportError {
     emitFailureAndExit(error)
 } catch {
-    // Any other Swift error (Foundation throw, etc.) lands here.
     emitFailureAndExit(
         code: 1,
         errorCode: "INTERNAL",
