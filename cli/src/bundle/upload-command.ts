@@ -1,7 +1,9 @@
 import type { OptionsUpload } from './upload_interface'
 import { onboardingBuilderCommand } from '../build/onboarding/command'
 import { requestBuildCommand } from '../build/request'
+import { getPreviewQr } from '../preview/qr'
 import { uploadBundle } from './upload'
+import { buildBundleUploadPreviewQrOptions } from './upload-preview-qr'
 
 /**
  * `bundle upload` command handler. Uploads the bundle, then — when the bundle is
@@ -11,6 +13,9 @@ import { uploadBundle } from './upload'
  */
 export async function handleBundleUploadCommand(appId: string, options: OptionsUpload): Promise<void> {
   const result = await uploadBundle(appId, options)
+  if (options.qrPreview && result?.bundle && result.reason !== 'DRY_UPLOAD' && !result.builderAction)
+    await getPreviewQr(appId, undefined, buildBundleUploadPreviewQrOptions(options, result.bundle))
+
   if (!result?.builderAction)
     return
 

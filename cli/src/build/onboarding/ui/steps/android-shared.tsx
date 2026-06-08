@@ -29,8 +29,10 @@ import type { FC } from 'react'
 import type { AiResultKind } from '../components.js'
 import { Select } from '@inkjs/ui'
 import { Box, Newline, Text } from 'ink'
+import { pickAiPreviewTail } from '../../ai-fit.js'
 import React from 'react'
 import { AiResultBanner, ErrorLine, SpinnerLine, SuccessLine } from '../components.js'
+import { buildHelpMenuOptions } from '../../../../support/help-menu.js'
 
 // Longest a single failure message may be before we hard-truncate it with an
 // ellipsis in the DENSE form. A raw backend / CLI stderr can be hundreds of
@@ -206,22 +208,24 @@ export const BuildCompleteStep: FC<BuildCompleteStepProps> = ({ uploadSummary, b
 // text to the scrollback) and the blank line dropped, so the recovery control
 // always stays on screen within the 13-row budget.
 
+export type ErrorStepChoice = 'support' | 'ai' | 'retry' | 'exit'
+
 export interface ErrorStepProps {
   message: string
-  onChoose: (choice: 'retry' | 'exit') => void
+  onChoose: (choice: ErrorStepChoice) => void
+  /** A captured build log exists for this run (e.g. a build was attempted), so
+   *  the help menu may offer the "Ask AI for help" option. Defaults to false. */
+  hasBuildLog?: boolean
   dense?: boolean
 }
 
-export const ErrorStep: FC<ErrorStepProps> = ({ message, onChoose, dense = false }) => (
+export const ErrorStep: FC<ErrorStepProps> = ({ message, onChoose, hasBuildLog = false, dense = false }) => (
   <Box flexDirection="column" marginTop={1}>
     <ErrorLine text={dense ? truncate(message, MAX_ERROR_CHARS) : message} />
     {!dense && <Newline />}
     <Select
-      options={[
-        { label: '↻  Retry', value: 'retry' },
-        { label: '✖  Exit', value: 'exit' },
-      ]}
-      onChange={value => onChoose(value as 'retry' | 'exit')}
+      options={buildHelpMenuOptions({ hasBuildLog })}
+      onChange={value => onChoose(value as ErrorStepChoice)}
     />
   </Box>
 )
@@ -233,7 +237,7 @@ export const ErrorStep: FC<ErrorStepProps> = ({ message, onChoose, dense = false
 // cols. All telemetry on the choice stays in the parent's onChoose handler.
 
 export interface AiAnalysisPromptStepProps {
-  onChoose: (choice: 'debug' | 'skip') => void
+  onChoose: (choice: 'debug' | 'skip' | 'support') => void
   dense?: boolean
 }
 
@@ -245,10 +249,11 @@ export const AiAnalysisPromptStep: FC<AiAnalysisPromptStepProps> = ({ onChoose, 
     {!dense && <Newline />}
     <Select
       options={[
+        { label: '📨  Email Capgo support', value: 'support' },
         { label: '🤖  Debug with AI', value: 'debug' },
         { label: '⏭   Skip', value: 'skip' },
       ]}
-      onChange={value => onChoose(value as 'debug' | 'skip')}
+      onChange={value => onChoose(value as 'debug' | 'skip' | 'support')}
     />
   </Box>
 )
@@ -256,11 +261,30 @@ export const AiAnalysisPromptStep: FC<AiAnalysisPromptStepProps> = ({ onChoose, 
 // ── ai-analysis-running (spinner) ─────────────────────────────────────────────
 // Single spinner line — identical comfortable / dense.
 
-export const AiAnalysisRunningStep: FC = () => (
-  <Box flexDirection="column" marginTop={1}>
-    <SpinnerLine text="Analyzing build log with Capgo AI..." />
-  </Box>
-)
+export const AiAnalysisRunningStep: FC<{ streamText?: string, terminalRows: number, terminalCols: number }> = ({ streamText, terminalRows, terminalCols }) => {
+  // Live tail of the streaming analysis (pre-rendered ANSI from the parent),
+  // sized to the ACTUAL viewport via the shared wrap-aware fit math in
+  // ai-fit.ts — no arbitrary cap; lines scroll off only when the terminal is
+  // genuinely out of rows. Flicker rules (learned the hard way):
+  //   • height only ever GROWS (text appends; the helper caps at the viewport
+  //     budget) — no padding, so the frame starts compact like other steps;
+  //   • ONE <Text> node for the tail so Ink diffs the block in place;
+  //   • the "… earlier lines" marker row is always rendered (blank when
+  //     nothing is hidden) so it never pops in and shifts layout.
+  // The result step owns full-text display with proper fit/scroll handling.
+  const { rows, hidden } = pickAiPreviewTail(streamText ?? '', terminalRows, terminalCols)
+  return (
+    <Box flexDirection="column" marginTop={1}>
+      <SpinnerLine text="Analyzing build log with Capgo AI..." />
+      {rows.length > 0 && (
+        <Box flexDirection="column" marginTop={1}>
+          <Text dimColor>{hidden > 0 ? `… ${hidden} earlier line${hidden === 1 ? '' : 's'}` : ' '}</Text>
+          <Text>{rows.join('\n')}</Text>
+        </Box>
+      )}
+    </Box>
+  )
+}
 
 // ── ai-analysis-result ────────────────────────────────────────────────────────
 // Renders the AI diagnosis (or a non-success banner), the "AI can make
@@ -304,6 +328,8 @@ export interface AiAnalysisResultStepProps {
   onSkipOrContinue: () => void
   /** Re-open the fullscreen scroll viewer to re-read the analysis. */
   onReread: () => void
+  /** Escalate to Capgo support (email flow), carrying the logs + this analysis. */
+  onSupport: () => void
   dense?: boolean
 }
 
@@ -316,6 +342,7 @@ export const AiAnalysisResultStep: FC<AiAnalysisResultStepProps> = ({
   onRetry,
   onSkipOrContinue,
   onReread,
+  onSupport,
   dense = false,
 }) => {
   const retriesLeft = maxRetries - retryCount
@@ -359,6 +386,7 @@ export const AiAnalysisResultStep: FC<AiAnalysisResultStepProps> = ({
             : [
                 { label: '✔  Continue', value: 'continue' },
               ]),
+          { label: '📨  Still stuck — email Capgo support', value: 'support' },
           // Only when the analysis is in the scroll viewer (collapsed); inline
           // there's nothing to re-read.
           ...(collapsed ? [{ label: '📖  Re-read analysis', value: 'reread' }] : []),
@@ -366,6 +394,8 @@ export const AiAnalysisResultStep: FC<AiAnalysisResultStepProps> = ({
         onChange={(value) => {
           if (value === 'retry')
             onRetry()
+          else if (value === 'support')
+            onSupport()
           else if (value === 'reread')
             onReread()
           else

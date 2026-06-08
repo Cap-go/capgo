@@ -49,6 +49,13 @@ export interface DecideCompatibilityEventsInput {
   currentBundle: CompatibilityBundle | null
   /** Per-platform previous-default candidates the handler resolved. */
   previousDefaults: readonly PreviousDefault[]
+  /**
+   * The channel row's `updated_at` at this change — the occurrence identity.
+   * Part of the dedup key: a queue REDELIVERY of the same webhook carries the
+   * same value (still idempotent), while a genuine re-occurrence of the same
+   * transition carries a new one and inserts a fresh, unresolved row.
+   */
+  changeOccurredAt: string
 }
 
 /**
@@ -68,6 +75,7 @@ export interface CompatibilityEventInsert {
   previous_version_id: number | null
   previous_version_name: string
   offenders: string[]
+  change_occurred_at: string
 }
 
 /**
@@ -109,7 +117,7 @@ function hasNativePackages(bundle: CompatibilityBundle | null | undefined): bund
  * run it). The handler only excludes when the metadata is genuinely unavailable.
  */
 export function decideCompatibilityEvents(input: DecideCompatibilityEventsInput): CompatibilityEventInsert[] {
-  const { newChannel, currentBundle, previousDefaults } = input
+  const { newChannel, currentBundle, previousDefaults, changeOccurredAt } = input
 
   // The new channel must be a default (public) for any platform to matter.
   if (!newChannel.public)
@@ -158,6 +166,7 @@ export function decideCompatibilityEvents(input: DecideCompatibilityEventsInput)
       previous_version_id: previous.bundle.id,
       previous_version_name: previous.bundle.name,
       offenders: summary.offenders,
+      change_occurred_at: changeOccurredAt,
     })
   }
 

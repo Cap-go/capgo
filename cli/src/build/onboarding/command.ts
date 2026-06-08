@@ -6,13 +6,28 @@ import { log } from '@clack/prompts'
 import { render } from 'ink'
 import React from 'react'
 import { getAppId, getConfig } from '../../utils.js'
+import { appendInternalLog, startInternalLog } from '../../support/internal-log.js'
 import { getPlatformDirFromCapacitorConfig } from '../platform-paths.js'
 import OnboardingShell from './ui/shell.js'
+import { checkForCliUpdate, manualUpdateHint, runUpdateAndReexec } from './self-update.js'
 import type { OnboardingResult } from './types.js'
 
 export interface OnboardingBuilderOptions {
   apikey?: string
   platform?: string
+  // Capgo API gateway override (--supa-host) — threaded to the wizard so its
+  // build request AND AI analysis hit the same host as the plain CLI flow
+  // (preprod/self-hosted testing). Defaults to prod when omitted.
+  supaHost?: string
+  /**
+   * Offer the self-update prompt as the first wizard screen. ONLY the genuine
+   * `build init` / `onboarding` entrypoint sets this. Other callers that reach
+   * onboarding as a sub-step (`bundle upload`'s launch-onboarding,
+   * `build credentials manage`) must leave it false: their process.argv is the
+   * wrapper command (`bundle upload …`), so a re-exec would repeat THAT command
+   * (e.g. re-run the upload) instead of `build init`.
+   */
+  enableSelfUpdate?: boolean
 }
 
 type Platform = 'ios' | 'android'
@@ -109,6 +124,13 @@ export async function onboardingBuilderCommand(options: OnboardingBuilderOptions
     log.error('Could not detect app ID from capacitor.config.ts. Make sure you are in a Capacitor project directory.')
     process.exit(1)
   }
+
+  // Start the verbose internal log up front so EVERY step transition, validation
+  // result, and error from this run is captured for the support bundle. Without
+  // this, getInternalLogPath() is null and all appendInternalLog calls no-op —
+  // which is why the bundle's "Internal log" section used to be empty for build init.
+  startInternalLog(appId)
+  appendInternalLog(`build init: started for ${appId} (platform ${options.platform ?? 'auto'}, host ${options.supaHost ?? 'prod'})`)
   // If config.appId is missing (very rare — CapacitorConfig.appId is required
   // for `cap sync` to produce a working iOS project), fall back to the
   // resolved Capgo lookup key. Mismatch detection will still surface the
@@ -116,6 +138,13 @@ export async function onboardingBuilderCommand(options: OnboardingBuilderOptions
   const iosBundleIdForOnboarding = iosBundleIdInitial || appId
 
   const initialPlatform = resolveInitialPlatform(options, iosDir, androidDir)
+
+  // Resolve update availability BEFORE render so the wizard can show the
+  // self-update offer as its first screen. Gated to the real `build init`
+  // entrypoint (see enableSelfUpdate) so a re-exec can't repeat a wrapper
+  // command. Timeout-bounded (and skipped on the re-exec'd child via
+  // CAPGO_SKIP_UPDATE_PROMPT), so this never stalls startup.
+  const updateInfo = options.enableSelfUpdate ? await checkForCliUpdate() : null
 
   // The shell resolves the platform (immediately if initialPlatform is set,
   // else once the user picks). Capture it so the breadcrumb below — printed
@@ -137,7 +166,9 @@ export async function onboardingBuilderCommand(options: OnboardingBuilderOptions
       iosDir,
       androidDir,
       apikey: options.apikey,
+      supaHost: options.supaHost,
       initialPlatform,
+      updateInfo: updateInfo ?? undefined,
       onResolvePlatform: (platform: Platform) => {
         resolvedPlatform = platform
       },
@@ -148,6 +179,24 @@ export async function onboardingBuilderCommand(options: OnboardingBuilderOptions
     { alternateScreen: true },
   )
   await waitUntilExit()
+
+  // The user accepted the self-update offer: Ink has restored the primary
+  // buffer, so the install + re-exec can take over the terminal (it needs
+  // stdio inheritance). On success this never returns — it exits with the
+  // child's status code; on failure, fall back to a manual-update hint instead
+  // of silently continuing on the stale version the user chose to leave.
+  if (result.outcome === 'update-requested' && updateInfo) {
+    try {
+      runUpdateAndReexec(updateInfo.latestVersion)
+    }
+    catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      log.warn(`Could not auto-update (${message}). Still on @capgo/cli@${updateInfo.currentVersion}.`)
+      process.stdout.write(`Re-run \`capgo build init\` to try again, or update manually: ${manualUpdateHint()}\n`)
+      process.exit(1)
+    }
+    return
+  }
 
   // Durable post-exit output in the user's normal terminal flow — the alt buffer
   // restore wiped the wizard's last frame, so anything the user needs to keep

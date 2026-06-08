@@ -19,6 +19,7 @@ const config: CapacitorConfig = {
     },
     CapacitorUpdater: {
       shakeMenu: true,
+      shakeMenuGesture: 'threeFingerPinch',
       allowPreview: true,
       autoUpdate: 'atInstall',
       autoSplashscreen: true,

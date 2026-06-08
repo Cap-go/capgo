@@ -28,8 +28,9 @@ import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { createSupabaseClient, findBuildCommandForProjectType, findProjectType, findSavedKeySilent, getOrganizationId, getPackageScripts, getPMAndCommand } from '../../../../utils.js'
 import { loadSavedCredentials, updateSavedCredentials } from '../../../credentials.js'
 import { releaseCapturedLogs, runCapgoAiAnalysis } from '../../../../ai/analyze.js'
+import { createStreamingMarkdownRenderer } from '../../../../ai/stream-markdown.js'
 import { renderMarkdown } from '../../../../ai/render-markdown.js'
-import { trackAiAnalysisChoice, trackAiAnalysisResult } from '../../../../ai/telemetry.js'
+import { aiAnalysisResultFromPostAnalyze, trackAiAnalysisChoice, trackAiAnalysisResult } from '../../../../ai/telemetry.js'
 import { requestBuildInternal } from '../../../request.js'
 import { isAiAnalysisTooTall, resolveAiResultRoute } from '../../ai-fit.js'
 
@@ -141,6 +142,12 @@ import {
   runOAuthFlow,
 } from '../oauth-google.js'
 import open from 'open'
+import { contactSupport } from '../../../../support/contact-support.js'
+import { uploadSupportLogs } from '../../../../support/support-upload.js'
+import { copyToClipboard, revealInFinder } from '../../../../support/clipboard.js'
+import { appendInternalLog, getInternalLogPath } from '../../../../support/internal-log.js'
+import { redactSecrets } from '../../../../support/redact.js'
+import { writeSupportBundleFiles } from '../../../../onboarding-support.js'
 import {
   fetchCapgoOAuthConfig,
   PLAY_DEV_ID_TUTORIAL_URL,
@@ -164,6 +171,8 @@ interface AppProps {
   androidDir: string
   /** Optional Capgo API key passed via -a/--apikey flag; takes precedence over saved key. */
   apikey?: string
+  // Capgo API gateway override (--supa-host); prod when omitted.
+  supaHost?: string
   /** Reports the wizard outcome to the shell when it reaches build-complete, so
    *  the caller prints an accurate post-exit message + durable summary instead of
    *  always claiming success. Never fires on cancel/missing-platform exits. */
@@ -204,7 +213,7 @@ function emptyProgress(appId: string): AndroidOnboardingProgress {
   }
 }
 
-const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir, apikey, onResult }) => {
+const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir, apikey, supaHost, onResult }) => {
   const { exit } = useApp()
   const startStep: AndroidOnboardingStep = getAndroidResumeStep(initialProgress)
 
@@ -521,10 +530,27 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
   // Phase 6 — build output
   const [buildUrl, setBuildUrl] = useState('')
   const [buildOutput, setBuildOutput] = useState<string[]>([])
+  // ── Contact-support confirmation gate. `supportConfirmMessage` holds the
+  // platform-aware copy passed up by contactSupport(); the Select resolves
+  // `supportConfirmResolveRef` with the user's yes/no choice. `support-confirm`
+  // always returns to the 'error' step afterwards so the failure menu stays
+  // reachable whether the user proceeds or cancels.
+  const [supportConfirmMessage, setSupportConfirmMessage] = useState<string>('')
+  const supportConfirmResolveRef = useRef<((proceed: boolean) => void) | null>(null)
+  // The exact bundle that will be sent — shown in a scrollable viewer when the
+  // user picks "View logs first" from the confirm step.
+  const [supportLogLines, setSupportLogLines] = useState<string[]>([])
+  const supportLogPathRef = useRef<string>('')
+  // Message for the support spinner step — reused for both "preparing the bundle"
+  // (gzip/trim can take a moment on a large build) and the network upload.
+  const [supportBusyText, setSupportBusyText] = useState('Uploading your logs to Capgo support…')
   // ── AI-analysis sub-flow (see iOS sibling for full notes). Entered only when
   // requestBuildInternal returns aiAnalysis.ready=true on a failed build.
   const [aiJobId, setAiJobId] = useState<string | null>(null)
   const [aiAnalysisText, setAiAnalysisText] = useState<string | null>(null)
+  // Live ANSI preview of the streaming analysis, shown in the running step.
+  // Throttled (~250ms) so per-token updates don't re-render the whole tree.
+  const [aiStreamPreview, setAiStreamPreview] = useState('')
   // See iOS sibling — non-success outcome banner, mutually exclusive with
   // `aiAnalysisText`. One object so kind + message can't drift.
   const [aiResult, setAiResult] = useState<{ kind: AiResultKind, message: string } | null>(null)
@@ -653,6 +679,8 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
   }
 
   const addLog = useCallback((text: string, color = 'green') => {
+    // Mirror every activity-log line into the support bundle's internal log.
+    appendInternalLog(text)
     setLogLines((prev) => {
       // Drop a consecutive duplicate: completed-step breadcrumbs are idempotent
       // ("✔ GCP project — X" means the same thing however many times the
@@ -667,8 +695,15 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
   }, [])
 
   const addSetupStatus = useCallback((text: string) => {
+    appendInternalLog(text) // GCP/Play setup progress → internal log
     setSetupStatus(prev => [...prev, text])
   }, [])
+
+  // Persist every step transition so the support bundle carries the full onboarding
+  // trace, not just whatever screen the user was on when they hit Email support.
+  useEffect(() => {
+    appendInternalLog(`step → ${step}`)
+  }, [step])
 
   const exitOnboarding = useCallback((message?: string) => {
     if (exitRequestedRef.current)
@@ -913,6 +948,88 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
     [retryCount, addLog, exitOnboarding],
   )
 
+  // Show the contact-support confirmation gate as an Ink step and resolve once
+  // the user picks Yes/Cancel. Returns a promise so contactSupport() can await
+  // the user's decision before doing anything (writing logs / opening mail).
+  const askSupportConfirm = useCallback((message: string, logPath: string): Promise<boolean> => {
+    supportLogPathRef.current = logPath
+    setSupportConfirmMessage(message)
+    setStep('support-confirm')
+    return new Promise<boolean>((resolve) => {
+      supportConfirmResolveRef.current = resolve
+    })
+  }, [])
+
+  // Read the verbose internal log (raw provider/API errors, secret-redacted) so
+  // it can be folded into the support bundle's "Internal log" section.
+  const readInternalLogLines = useCallback((): string[] => {
+    const internalLogPath = getInternalLogPath()
+    if (!internalLogPath)
+      return []
+    try {
+      return readFileSync(internalLogPath, 'utf8').split('\n')
+    }
+    catch {
+      return []
+    }
+  }, [])
+
+  // Drive the contact-support flow: confirm gate → write bundle → copy the
+  // .log.gz path → reveal in Finder (macOS) → open a pre-filled mailto. Every
+  // step but "write the bundle" is best-effort; failures degrade gracefully and
+  // we return to the step we came from (error menu / AI prompt / AI result).
+  const handleSupport = useCallback(async (returnTo: 'error' | 'ai-analysis-prompt' | 'ai-analysis-result' = 'error') => {
+    // Redact the error before it goes into the pre-filled email body — the body
+    // is plain outbound text (unlike the attached bundle, which is redacted on
+    // write), so an un-sanitized error could leak tokens/identifiers.
+    const sanitizedError = redactSecrets(error ?? 'unknown error')
+    await contactSupport({
+      subject: `Capgo Builder support — ${appId} (android)`,
+      body: `Hi Capgo team,\n\nMy build failed and I'd like help.\n\nApp: ${appId}\nPlatform: android\nError: ${sanitizedError}`,
+      confirm: async (msg, logPath) => askSupportConfirm(msg, logPath),
+      buildFiles: async () => {
+        // Show a spinner while we render + gzip (and, for a huge build, trim to fit
+        // the 10 MB upload cap) — that work is synchronous, so yield once first to
+        // let Ink paint the message before it runs.
+        setSupportBusyText('Preparing your logs to send…')
+        setStep('support-uploading')
+        await new Promise<void>((resolve) => { setTimeout(resolve, 0) })
+        return writeSupportBundleFiles({
+          kind: 'build-init',
+          appId,
+          error: error ?? 'unknown error',
+          // Full activity trail + the COMPLETE build log (buildOutput holds every
+          // line streamed from the remote builder — never truncate it, or support
+          // gets a useless 12-line snippet and can't diagnose the failure).
+          logs: logLines.map(entry => entry.text),
+          sections: [
+            { title: 'Build output (full)', lines: buildOutput },
+            { title: 'Internal log', lines: readInternalLogLines() },
+            // When the user escalates after running AI, fold the analysis into the
+            // bundle so support sees what the AI already concluded (spec §2).
+            ...(aiAnalysisText ? [{ title: 'AI analysis', lines: aiAnalysisText.split('\n') }] : []),
+          ],
+        })
+      },
+      copyPath: p => copyToClipboard(p).ok,
+      reveal: p => revealInFinder(p),
+      openUrl: u => open(u),
+      print: msg => addLog(msg, 'cyan'),
+      upload: (gzPath) => {
+        setSupportBusyText('Uploading your logs to Capgo support…')
+        setStep('support-uploading') // show a spinner while the (network) upload runs
+        return uploadSupportLogs({
+          apiHost: supaHost ?? 'https://api.capgo.app',
+          apikey: resolvedApiKeyRef.current ?? apikey ?? '',
+          appId,
+          jobId: aiJobId ?? undefined,
+          gzPath,
+        })
+      },
+    })
+    setStep(returnTo)
+  }, [appId, apikey, aiJobId, error, logLines, buildOutput, aiAnalysisText, askSupportConfirm, readInternalLogLines, addLog])
+
   // Wire the forward-declared ref so `persistAndStep`'s catch can surface
   // saveAndroidProgress failures through the same retry/error UX without
   // making `handleError` a useCallback dep (it changes every retryCount tick).
@@ -1025,7 +1142,8 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
             return
           addLog(`✔ Backup saved · ${backupPath}`)
         }
-        catch {
+        catch (err) {
+          appendInternalLog(`credentials backup failed: ${err instanceof Error ? err.message : String(err)}`)
           if (cancelled)
             return
           addLog('⚠ Could not backup credentials (file may not exist yet)', 'yellow')
@@ -1141,6 +1259,10 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
           }
 
           setSaValidationResult(result)
+          // Persist the full failure (incl. no-app-access / token / network) to the
+          // internal log — it's the most useful thing for support, and the UI only
+          // shows shape-errors as a banner.
+          appendInternalLog(`service-account validation failed (${result.kind}): ${result.message}`)
           trackAction('android_sa_validation_result', {
             result: 'failure',
             validation_kind: result.kind,
@@ -1239,7 +1361,8 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
               resolution = 'probed-same'
             }
           }
-          catch {
+          catch (err) {
+            appendInternalLog(`package resolution readFile failed: ${err instanceof Error ? err.message : String(err)}`)
             // readFile failed — let the prompt step handle the error path.
           }
         }
@@ -1778,7 +1901,8 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
                   setRecommendedScript(recommended)
               }
             }
-            catch {
+            catch (err) {
+              appendInternalLog(`build-script detection failed, falling back to manual entry: ${err instanceof Error ? err.message : String(err)}`)
               // Best-effort; pick-build-script falls back to empty list + escape hatches.
             }
             // Ask the user to confirm the package manager before we build the workflow.
@@ -1816,7 +1940,8 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
               existing = readFileSync(absolutePath, 'utf8')
               isNew = false
             }
-            catch {
+            catch (err) {
+              appendInternalLog(`workflow file not readable, treating as new: ${err instanceof Error ? err.message : String(err)}`)
               // Treat unreadable file as new.
             }
           }
@@ -1991,6 +2116,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
             // requestBuildInternal would corrupt rendering. Caller-handled mode
             // surfaces the captured log path via result.aiAnalysis and lets us
             // render the AI flow with Ink-native components.
+            supaHost,
             aiAnalysisMode: 'caller-handled',
           }, true, buildLogger)
           if (cancelled)
@@ -2043,24 +2169,48 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
           triggeredBy: 'onboarding',
         }).catch(() => { /* telemetry never breaks the wizard */ })
 
+        // Reset any stale preview from a previous attempt BEFORE streaming
+        // starts — retries re-enter this step and must not flash old content.
+        setAiStreamPreview('')
+        // Stream the analysis into a throttled ANSI preview: each completed
+        // markdown line is rendered (same renderer as the plain CLI) and the
+        // accumulated text is flushed to state at most every 250ms.
+        let streamedAnsi = ''
+        let previewFlushTimer: ReturnType<typeof setTimeout> | null = null
+        const mdStream = createStreamingMarkdownRenderer((t) => {
+          streamedAnsi += t
+          previewFlushTimer ??= setTimeout(() => {
+            previewFlushTimer = null
+            if (!cancelled)
+              setAiStreamPreview(streamedAnsi)
+          }, 250)
+        }, true)
+
         const result = await runCapgoAiAnalysis({
-          apiHost: 'https://api.capgo.app',
+          apiHost: supaHost ?? 'https://api.capgo.app',
           apikey: resolvedApiKeyRef.current ?? apikey ?? '',
           jobId: aiJobId,
           appId,
+          onChunk: t => mdStream.feed(t),
         })
+
+        // Publish the complete preview: flush renders the trailing partial
+        // line (it may re-arm the publish timer via the write callback, so
+        // flush FIRST, then cancel the timer, then set state once). The
+        // result step replaces this in the same React batch; the reset at
+        // the top of this block keeps retries clean.
+        mdStream.flush()
+        if (previewFlushTimer) {
+          clearTimeout(previewFlushTimer)
+          previewFlushTimer = null
+        }
+        if (!cancelled)
+          setAiStreamPreview(streamedAnsi)
 
         if (cancelled)
           return
 
-        const resultTag: 'success' | 'already_analyzed' | 'too_big' | 'error'
-          = result.kind === 'ok'
-            ? 'success'
-            : result.kind === 'already_analyzed'
-              ? 'already_analyzed'
-              : result.kind === 'too_big'
-                ? 'too_big'
-                : 'error'
+        const resultTag = aiAnalysisResultFromPostAnalyze(result)
 
         await trackAiAnalysisResult({
           apikey: resolvedApiKeyRef.current ?? apikey ?? '',
@@ -2084,13 +2234,22 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
           setAiAnalysisText(null)
           setAiResult({ kind: 'too_big', message: 'Build log is too large for Capgo AI (>10 MB). Try a local AI tool with the captured log.' })
         }
+        else if (result.kind === 'upgrade_required') {
+          setAiAnalysisText(null)
+          setAiResult({ kind: 'error', message: result.message ?? 'AI build analysis requires a newer CLI. Please upgrade: npx @capgo/cli@latest' })
+        }
         else {
           setAiAnalysisText(null)
           const detail = [
             result.status ? `(status ${result.status})` : null,
             result.message,
           ].filter(Boolean).join(' ')
-          setAiResult({ kind: 'error', message: `AI analysis failed${detail ? `: ${detail}` : ''}.` })
+          setAiResult({
+            kind: 'error',
+            message: result.partial
+              ? `AI analysis was interrupted${detail ? `: ${detail}` : ''}. The captured log is saved for local AI.`
+              : `AI analysis failed${detail ? `: ${detail}` : ''}.`,
+          })
         }
         setStep('ai-analysis-result')
       })()
@@ -2185,7 +2344,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
     || step === 'ci-secrets-failed'
     || step === 'confirm-ci-secret-overwrite'
   const showHeader = step !== 'requesting-build' && step !== 'view-workflow-diff' && !isAiResultScroll
-  const showProgress = step !== 'welcome' && step !== 'error' && step !== 'build-complete' && step !== 'requesting-build' && step !== 'ai-analysis-result' && !isAiResultScroll && !tallStep
+  const showProgress = step !== 'welcome' && step !== 'error' && step !== 'build-complete' && step !== 'requesting-build' && step !== 'ai-analysis-result' && step !== 'support-confirm' && step !== 'support-log-view' && step !== 'support-uploading' && !isAiResultScroll && !tallStep
   const showLog = step !== 'requesting-build' && step !== 'build-complete' && !isAiStep && !tallStep
 
   // Streaming build output is a fullscreen takeover — see iOS sibling. As an
@@ -2210,6 +2369,21 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
           setAiViewedFull(true)
           setStep('ai-analysis-result')
         }}
+      />
+    )
+
+  // "View logs first" from the support confirm — a scrollable takeover of the
+  // exact bundle that will be sent (secrets already redacted). Exit returns to
+  // the confirm so the user can then send or cancel.
+  if (step === 'support-log-view')
+    return (
+      <FullscreenAiViewer
+        title="Logs that will be sent to Capgo support"
+        subtitle={`${supportLogLines.length} lines — secrets are already removed.`}
+        lines={supportLogLines}
+        terminalRows={terminalRows}
+        exitHint="Press Esc or Enter to go back to the send / cancel prompt."
+        onExit={() => setStep('support-confirm')}
       />
     )
 
@@ -2790,7 +2964,8 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
                 await open(PLAY_DEVELOPERS_URL)
                 addLog('🌐 Opened Play Console in your browser', 'cyan')
               }
-              catch {
+              catch (err) {
+                appendInternalLog(`could not auto-open Play Console in browser (headless?): ${err instanceof Error ? err.message : String(err)}`)
                 // Headless / WSL / SSH session — `open` has no display to
                 // hand off to. Don't pretend it worked.
                 addLog(`⚠ Couldn't auto-open the browser. Visit ${PLAY_DEVELOPERS_URL} manually.`, 'yellow')
@@ -3406,6 +3581,10 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
         <AiAnalysisPromptStep
           dense={false}
           onChoose={async (choice) => {
+            if (choice === 'support') {
+              await handleSupport('ai-analysis-prompt')
+              return
+            }
             if (choice === 'debug') {
               setStep('ai-analysis-running')
             }
@@ -3428,7 +3607,13 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
       )}
 
       {/* AI debug — spinner while the edge function is running */}
-      {step === 'ai-analysis-running' && <AiAnalysisRunningStep />}
+      {step === 'ai-analysis-running' && <AiAnalysisRunningStep streamText={aiStreamPreview} terminalRows={terminalRows} terminalCols={terminalCols} />}
+
+      {step === 'support-uploading' && (
+        <Box marginTop={1}>
+          <SpinnerLine text={supportBusyText} />
+        </Box>
+      )}
 
       {/* AI debug — render the diagnosis (or fallback message), then offer
           retry-or-skip. Retry transitions back to 'requesting-build' so the
@@ -3444,6 +3629,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
           maxRetries={MAX_AI_RETRIES}
           dense={false}
           onReread={() => setStep('ai-analysis-result-scroll')}
+          onSupport={() => { handleSupport('ai-analysis-result').catch(() => {}) }}
           onRetry={async () => {
             if (aiJobId) {
               await trackAiAnalysisChoice({
@@ -3470,12 +3656,52 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
 
       {/* (ai-analysis-result-scroll renders as a fullscreen early return above.) */}
 
+      {/* Contact-support confirmation gate — tells the user everything that's
+          about to happen (logs saved, revealed in Finder on macOS, email
+          opened) and waits for an explicit Yes before the mail client opens. */}
+      {step === 'support-confirm' && (
+        <Box flexDirection="column" marginTop={1} gap={1}>
+          <Text bold>Email Capgo support</Text>
+          <Text>{supportConfirmMessage}</Text>
+          <Select
+            options={[
+              { label: '📨  Yes, send to support', value: 'yes' },
+              { label: '👀  View logs first', value: 'view' },
+              { label: '✖  Cancel', value: 'no' },
+            ]}
+            onChange={(value) => {
+              if (value === 'view') {
+                let lines: string[] = []
+                try { lines = readFileSync(supportLogPathRef.current, 'utf8').split('\n') }
+                catch { lines = ['(could not read the logs file)'] }
+                setSupportLogLines(lines)
+                setStep('support-log-view')
+                return
+              }
+              const resolve = supportConfirmResolveRef.current
+              supportConfirmResolveRef.current = null
+              resolve?.(value === 'yes')
+            }}
+          />
+        </Box>
+      )}
+
       {step === 'error' && error && retryStep && (
         <ErrorStep
           message={error}
           dense={false}
+          hasBuildLog={!!aiJobId}
           onChoose={(choice) => {
-            if (choice === 'retry') {
+            if (choice === 'support') {
+              // Best-effort flow — surface unexpected failures but don't block.
+              handleSupport().catch((err) => { console.error('[support-flow]', err) })
+            }
+            else if (choice === 'ai') {
+              // A captured build-failure log is available — route into the
+              // existing AI-analysis prompt (unchanged from today).
+              setStep('ai-analysis-prompt')
+            }
+            else if (choice === 'retry') {
               setError(null)
               errorCategoryRef.current = undefined
               const target = retryStep
