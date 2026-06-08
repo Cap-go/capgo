@@ -66,7 +66,7 @@ import {
 } from '../types.js'
 import { CompletedStepsLog } from './completed-steps-log.js'
 import { IOS_MIN_ROWS, terminalFitsOnboarding } from '../min-terminal-size.js'
-import { capBuildOutputLines, sanitizeBuildLogLines } from '../build-log.js'
+import { sanitizeBuildLogLines } from '../build-log.js'
 import { TerminalTooSmallPrompt } from './min-size-gate.js'
 import { BOX_HEADER_ROWS, COMPACT_HEADER_ROWS, DiffSummary, Divider, FilteredTextInput, FullscreenAiViewer, FullscreenBuildOutput, FullscreenDiffViewer, Header, isBuildCompleteDismissKey, SecretsTable, SpinnerLine, SuccessLine, Table, WIZARD_PADDING_ROWS } from './components.js'
 import type { AiResultKind } from './components.js'
@@ -2541,7 +2541,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
             error: (msg: string) => setBuildOutput(prev => [...prev, `✖ ${msg}`]),
             warn: (msg: string) => setBuildOutput(prev => [...prev, `⚠ ${msg}`]),
             success: (msg: string) => setBuildOutput(prev => [...prev, `✔ ${msg}`]),
-            buildLog: (msg: string) => setBuildOutput(prev => capBuildOutputLines([...prev, ...sanitizeBuildLogLines(msg)])),
+            buildLog: (msg: string) => setBuildOutput(prev => [...prev, ...sanitizeBuildLogLines(msg)]),
             uploadProgress: (percent: number) => {
               setBuildOutput((prev) => {
                 const uploadLineIdx = prev.findIndex(l => l.startsWith('Uploading:'))
