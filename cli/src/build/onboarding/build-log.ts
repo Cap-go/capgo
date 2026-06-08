@@ -77,18 +77,23 @@ function expandTabs(line: string): string {
  * blank lines — e.g. the intentional spacer before the first log line — are
  * kept). A chunk may be a single line or several; callers spread the result.
  */
-// Hard cap on retained build-output lines in the TUI. A safety valve against a
-// runaway/pathological build streaming millions of lines and exhausting the
-// process's RAM (buildOutput is an in-memory React state array). Generous enough
-// that real builds — a few thousand lines — are never touched; the support-bundle
-// gz cap (see onboarding-support.ts) trims further if the upload would exceed 10 MB.
-export const MAX_BUILD_OUTPUT_LINES = 100_000
+// RAM safety valve for the TUI's in-memory build-output array against a runaway/
+// pathological build streaming millions of lines. Two watermarks so the trim is
+// BATCHED: we only drop lines once we cross the hard ceiling, and we drop a big
+// chunk back to BUILD_OUTPUT_TRIM_TO in one go.
+export const BUILD_OUTPUT_HARD_CAP = 100_000
+export const BUILD_OUTPUT_TRIM_TO = 80_000
 
-// Keep only the most recent MAX_BUILD_OUTPUT_LINES (the failure + its context live
-// at the tail). Returns the same array untouched when already within bounds.
+// Bound the retained build output. Dropping the OLDEST lines means copying every
+// kept element into a new array — O(n) — so doing it on every append once full
+// would be O(n) per line (O(n²) overall). Instead we trim only when crossing the
+// hard cap and then drop ~20k lines at once, so that O(n) copy is paid once per
+// (HARD_CAP − TRIM_TO) lines → amortized ~O(1) per line. In the common case
+// (under the cap, i.e. every real build) we return the SAME array — zero copy,
+// zero allocation. The failure and its context live at the tail, so we keep that.
 export function capBuildOutputLines(lines: string[]): string[] {
-  return lines.length > MAX_BUILD_OUTPUT_LINES
-    ? lines.slice(lines.length - MAX_BUILD_OUTPUT_LINES)
+  return lines.length > BUILD_OUTPUT_HARD_CAP
+    ? lines.slice(lines.length - BUILD_OUTPUT_TRIM_TO)
     : lines
 }
 

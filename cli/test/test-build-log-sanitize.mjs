@@ -11,7 +11,7 @@
 // sanitizer or stores raw lines again, the VT assertion fails.
 import process from 'node:process'
 import xterm from '@xterm/headless'
-import { sanitizeBuildLogLines } from '../src/build/onboarding/build-log.ts'
+import { BUILD_OUTPUT_HARD_CAP, BUILD_OUTPUT_TRIM_TO, capBuildOutputLines, sanitizeBuildLogLines } from '../src/build/onboarding/build-log.ts'
 
 const { Terminal } = xterm
 const ESC = '\x1B'
@@ -95,6 +95,28 @@ check('interior blank line kept', JSON.stringify(sanitizeBuildLogLines('a\n\nb')
   const anyFused = cleanGrid.some(r => r.includes('Cruising') && r.includes('adding:'))
   check('SANITIZED lines never fuse two log lines on one row', !anyFused)
   check('no escape bytes survive in the rendered grid', !cleanGrid.join('').includes(ESC))
+}
+
+// 6. build-output RAM cap: batched (high-watermark) trim, not per-append slicing.
+{
+  // Under the cap → SAME array returned (no copy/alloc in the hot append path).
+  const small = ['a', 'b', 'c']
+  check('cap: under the ceiling returns the same array (zero copy)', capBuildOutputLines(small) === small)
+
+  // Exactly at the ceiling → still untouched (we only trim ABOVE it; this is the
+  // headroom that makes the trim batched rather than every-append).
+  const atCap = Array.from({ length: BUILD_OUTPUT_HARD_CAP }, (_, i) => `l${i}`)
+  check('cap: at the ceiling is not trimmed', capBuildOutputLines(atCap) === atCap)
+
+  // Above the ceiling → trimmed to TRIM_TO in one pass, keeping the newest (tail).
+  const over = Array.from({ length: BUILD_OUTPUT_HARD_CAP + 1 }, (_, i) => `l${i}`)
+  const trimmed = capBuildOutputLines(over)
+  check('cap: above the ceiling trims to TRIM_TO in one batch', trimmed.length === BUILD_OUTPUT_TRIM_TO)
+  check('cap: keeps the newest line (failure tail)', trimmed[trimmed.length - 1] === `l${BUILD_OUTPUT_HARD_CAP}`)
+  check('cap: drops the oldest lines', trimmed[0] === `l${BUILD_OUTPUT_HARD_CAP + 1 - BUILD_OUTPUT_TRIM_TO}`)
+  // The batch headroom guarantees the next (HARD_CAP - TRIM_TO) appends don't trim
+  // again → the O(n) slice is amortized ~O(1) per line.
+  check('cap: trim leaves headroom below the ceiling', trimmed.length < BUILD_OUTPUT_HARD_CAP)
 }
 
 console.log(`\n${passed} passed, ${failed} failed`)
