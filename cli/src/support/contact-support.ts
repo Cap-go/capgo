@@ -7,9 +7,10 @@ const SUPPORT_EMAIL = 'support@capgo.app'
 // Tell the user everything that's about to happen — before anything happens.
 function confirmMessage(hasUpload: boolean): string {
   if (hasUpload)
-    return `We'll save your logs locally, upload a copy to Capgo support (kept 30 days), and open a pre-filled email to support@capgo.app in your mail app. Continue?`
-  const reveal = process.platform === 'darwin' ? ', reveal them in Finder,' : ''
-  return `We'll save your logs locally${reveal} and open a pre-filled email to support@capgo.app in your mail app. Continue?`
+    return `We'll upload your logs to Capgo support (kept 30 days) and open a pre-filled email to support@capgo.app in your mail app. Continue?`
+  // Fallback: no upload, so we write a logs file the user attaches manually.
+  const reveal = process.platform === 'darwin' ? ' and reveal it in Finder' : ''
+  return `We'll save a logs file for you to attach${reveal}, then open a pre-filled email to support@capgo.app in your mail app. Continue?`
 }
 
 export interface ContactSupportDeps {

@@ -118,6 +118,7 @@ await ta('confirm copy discloses the upload + 30-day retention when uploading', 
     upload: async () => null,
   })
   await contactSupport(deps)
-  assert.ok(confirmMsg.includes('upload a copy to Capgo support'))
+  assert.ok(confirmMsg.includes('upload your logs to Capgo support'))
   assert.ok(confirmMsg.includes('kept 30 days'))
+  assert.ok(!confirmMsg.includes('save your logs locally')) // no misleading "save locally" wording
 })
