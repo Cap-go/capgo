@@ -8,6 +8,26 @@ import { backgroundTask } from './utils.ts'
 
 const drizzleErrorNames = new Set(['DrizzleError', 'DrizzleQueryError', 'TransactionRollbackError'])
 const filesUploadFunctionNames = new Set(['files', 'TUS handler'])
+const sensitiveRequestBodyKeys = new Set([
+  'captchaToken',
+  'captcha_token',
+  'invite_magic_string',
+  'magic_invite_string',
+  'password',
+])
+
+function redactSensitiveRequestBody(value: unknown): unknown {
+  if (Array.isArray(value))
+    return value.map(redactSensitiveRequestBody)
+
+  if (!value || typeof value !== 'object')
+    return value
+
+  return Object.fromEntries(Object.entries(value).map(([key, entryValue]) => [
+    key,
+    sensitiveRequestBodyKeys.has(key) ? '[redacted]' : redactSensitiveRequestBody(entryValue),
+  ]))
+}
 
 function isFilesDurableObjectStorageTimeout(functionName: string, error: unknown): boolean {
   if (!filesUploadFunctionNames.has(functionName) || !error || typeof error !== 'object' || !('message' in error))
@@ -37,7 +57,7 @@ export function onError(functionName: string) {
           const textBody = await rawReq?.clone().text()
           if (textBody) {
             try {
-              body = JSON.stringify(JSON.parse(textBody))
+              body = JSON.stringify(redactSensitiveRequestBody(JSON.parse(textBody)))
             }
             catch {
               body = textBody
