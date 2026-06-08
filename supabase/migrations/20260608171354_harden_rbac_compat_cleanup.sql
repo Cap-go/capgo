@@ -26,7 +26,7 @@ DROP POLICY IF EXISTS "Allow org settings update via RBAC" ON public.orgs;
 CREATE POLICY "Allow org settings update via RBAC"
 ON public.orgs
 FOR UPDATE
-TO authenticated
+TO anon, authenticated
 USING (
   public.rbac_check_permission_request(
     public.rbac_perm_org_update_settings(),

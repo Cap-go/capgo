@@ -300,9 +300,6 @@ export async function put(
 
   // Auth context is already set by middlewareAuth
   await ensureOrgAccess(c, apikey, body.orgId, supabase)
-  const writeSupabase = auth.authType === 'apikey'
-    ? supabaseAdmin(c)
-    : supabase
 
   if (body.enforcing_2fa) {
     await enforceSelf2faRequirement(authUserId, c)
@@ -319,7 +316,7 @@ export async function put(
     ? await getOrgForNameSync(supabase, body.orgId)
     : null
 
-  const dataOrg: Database['public']['Tables']['orgs']['Row'] = await updateOrg(writeSupabase, body.orgId, updateFields, {
+  const dataOrg: Database['public']['Tables']['orgs']['Row'] = await updateOrg(supabase, body.orgId, updateFields, {
     expectedCurrentName: shouldSyncStripeName ? currentOrg?.name : undefined,
   })
 
@@ -339,7 +336,7 @@ export async function put(
         const rollbackFields = buildRollbackFields(currentOrg, updateFields)
 
         try {
-          await updateOrg(writeSupabase, body.orgId, rollbackFields, {
+          await updateOrg(supabase, body.orgId, rollbackFields, {
             expectedCurrentName: dataOrg.name,
             expectedCurrentFields: buildExpectedCurrentFields(dataOrg, updateFields),
           })

@@ -2,7 +2,7 @@
 -- This file tests all Row Level Security policies in the database
 BEGIN;
 
-SELECT plan(61);
+SELECT plan(62);
 
 -- Test app_versions policies
 SELECT
@@ -163,6 +163,23 @@ SELECT
         ),
         true,
         'orgs update policy should use named RBAC instead of legacy key modes'
+    );
+
+SELECT
+    is(
+        COALESCE(
+            (
+                SELECT roles @> ARRAY['anon'::name, 'authenticated'::name]
+                FROM pg_policies
+                WHERE
+                    schemaname = 'public'
+                    AND tablename = 'orgs'
+                    AND policyname = 'Allow org settings update via RBAC'
+            ),
+            false
+        ),
+        true,
+        'orgs update policy should support API-key anon RLS and authenticated users'
     );
 
 -- Test apikey_global_permissions policies

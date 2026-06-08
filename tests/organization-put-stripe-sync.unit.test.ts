@@ -156,18 +156,17 @@ describe('organization put Stripe sync', () => {
       updated_at: null,
       user_id: 'user-123',
     } satisfies Database['public']['Tables']['apikeys']['Row']
-    const rlsSupabase = { from: vi.fn(), rpc: vi.fn() }
     const updateBuilder = createOrgUpdateBuilder(createOrgRow({
       id: 'org-123',
       name: 'Old Name',
       customer_id: 'cus_123',
       enforce_hashed_api_keys: true,
     }))
+    const rlsSupabase = createSupabaseClientStub(
+      vi.fn().mockReturnValueOnce(updateBuilder),
+    )
 
     supabaseApikeyMock.mockReturnValue(rlsSupabase)
-    supabaseAdminMock.mockReturnValue(createSupabaseClientStub(
-      vi.fn().mockReturnValueOnce(updateBuilder),
-    ))
 
     const response = await put(createContext({
       auth: {
@@ -185,6 +184,7 @@ describe('organization put Stripe sync', () => {
     expect(response.status).toBe(200)
     expect(supabaseApikeyMock).toHaveBeenCalledWith(expect.anything(), rawKey)
     expect(apikeyHasOrgRightWithPolicyMock).toHaveBeenCalledWith(expect.anything(), hashedApikey, 'org-123', rlsSupabase)
+    expect(supabaseAdminMock).not.toHaveBeenCalled()
     expect(updateBuilder.update).toHaveBeenCalledWith({ enforce_hashed_api_keys: true })
   })
 
