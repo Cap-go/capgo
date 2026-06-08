@@ -1,6 +1,6 @@
 // register vue composition api globally
 import type { Router } from 'vue-router'
-import { CapacitorUpdater } from '@capgo/capacitor-updater/src'
+import { CapacitorUpdater } from '@capgo/capacitor-updater'
 import { setupLayouts } from 'virtual:generated-layouts'
 import { createApp } from 'vue'
 import { createRouter, createWebHistory } from 'vue-router'
