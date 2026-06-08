@@ -80,7 +80,6 @@ dependencies {
     implementation project(':capgo-capacitor-pdf-generator')
     implementation project(':capgo-capacitor-pedometer')
     implementation project(':capgo-capacitor-persistent-account')
-    implementation project(':capgo-capacitor-photo-library')
     implementation project(':capgo-capacitor-pretty-toast')
     implementation project(':capgo-capacitor-printer')
     implementation project(':capgo-capacitor-privacy-screen')
