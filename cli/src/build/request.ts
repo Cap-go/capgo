@@ -2150,7 +2150,9 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
           let buildLogLines: string[] = []
           try {
             const logsPath = `${process.env.CAPGO_AI_LOG_BASE_DIR || '/tmp/capgo-builds'}/${capturedJobId}.log`
-            buildLogLines = readFileSync(logsPath, 'utf8').split('\n').slice(-200)
+            // Full persisted build log — support needs all of it, not a tail. The
+            // bundle is gzipped + uploaded/attached, so size isn't a concern.
+            buildLogLines = readFileSync(logsPath, 'utf8').split('\n')
           }
           catch { /* best-effort */ }
           await contactSupport({

@@ -1182,11 +1182,12 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
         kind: 'build-init',
         appId,
         error: error ?? 'unknown error',
-        logs: [
-          ...log.slice(-12).map(entry => entry.text),
-          ...buildOutput.slice(-12),
-        ],
+        // Full activity trail + the COMPLETE build log (buildOutput holds every
+        // line streamed from the remote builder — never truncate it, or support
+        // gets a useless 12-line snippet and can't diagnose the failure).
+        logs: log.map(entry => entry.text),
         sections: [
+          { title: 'Build output (full)', lines: buildOutput },
           { title: 'Internal log', lines: readInternalLogLines() },
           // When the user escalates after running AI, fold the analysis into the
           // bundle so support sees what the AI already concluded (spec §2).
