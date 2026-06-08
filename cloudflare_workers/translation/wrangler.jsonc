@@ -22,7 +22,8 @@
         "binding": "AI"
       },
       "vars": {
-        "ENV_NAME": "capgo_translation_console-prod"
+        "ENV_NAME": "capgo_translation_console-prod",
+        "TRANSLATION_ALLOWED_LANGUAGES": "de,es,fr,hi,id,it,ja,ko,pl,pt,ru,tr,vi,zh"
       },
       "observability": {
         "enabled": true,
@@ -69,7 +70,8 @@
         "binding": "AI"
       },
       "vars": {
-        "ENV_NAME": "capgo_translation_console-preprod"
+        "ENV_NAME": "capgo_translation_console-preprod",
+        "TRANSLATION_ALLOWED_LANGUAGES": "de,es,fr,hi,id,it,ja,ko,pl,pt,ru,tr,vi,zh"
       },
       "observability": {
         "enabled": true
@@ -115,7 +117,8 @@
         "binding": "AI"
       },
       "vars": {
-        "ENV_NAME": "capgo_translation_console-alpha"
+        "ENV_NAME": "capgo_translation_console-alpha",
+        "TRANSLATION_ALLOWED_LANGUAGES": "de,es,fr,hi,id,it,ja,ko,pl,pt,ru,tr,vi,zh"
       },
       "observability": {
         "enabled": true
@@ -161,7 +164,8 @@
         "binding": "AI"
       },
       "vars": {
-        "ENV_NAME": "capgo_translation_console-local"
+        "ENV_NAME": "capgo_translation_console-local",
+        "TRANSLATION_ALLOWED_LANGUAGES": "de,es,fr,hi,id,it,ja,ko,pl,pt,ru,tr,vi,zh"
       },
       "d1_databases": [
         {
