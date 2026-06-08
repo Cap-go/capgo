@@ -379,7 +379,11 @@ export const FullscreenAiViewer: FC<{
   lines: string[]
   terminalRows: number
   onExit: () => void
-}> = ({ title, subtitle, lines, terminalRows, onExit }) => {
+  // Override the bottom exit line. Defaults to the AI-analysis wording; pass this
+  // when reusing the viewer elsewhere (e.g. the support log viewer) so the footer
+  // doesn't talk about a "retry/skip prompt" that doesn't exist there.
+  exitHint?: string
+}> = ({ title, subtitle, lines, terminalRows, onExit, exitHint }) => {
   // Track terminal dimensions in state so the component re-renders on resize.
   // Without this, the viewport was computed at mount and the body could
   // overflow the live screen if the user enlarged or shrank the terminal —
@@ -507,9 +511,10 @@ export const FullscreenAiViewer: FC<{
           : `Showing all ${total} lines.`}
       </Text>
       <Text color="yellow" bold>
-        {hasMoreToScroll && !atBottom
-          ? 'Press Esc or Enter when done to continue.'
-          : 'Press Esc or Enter to continue to the retry/skip prompt.'}
+        {exitHint
+          ?? (hasMoreToScroll && !atBottom
+            ? 'Press Esc or Enter when done to continue.'
+            : 'Press Esc or Enter to continue to the retry/skip prompt.')}
       </Text>
     </Box>
   )

@@ -2306,9 +2306,10 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
     return (
       <FullscreenAiViewer
         title="Logs that will be sent to Capgo support"
-        subtitle={`${supportLogLines.length} lines — secrets are already removed. Scroll to review, then press q/esc to go back.`}
+        subtitle={`${supportLogLines.length} lines — secrets are already removed.`}
         lines={supportLogLines}
         terminalRows={terminalRows}
+        exitHint="Press Esc or Enter to go back to the send / cancel prompt."
         onExit={() => setStep('support-confirm')}
       />
     )
