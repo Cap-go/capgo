@@ -2,8 +2,7 @@
 -- This file tests all Row Level Security policies in the database
 BEGIN;
 
--- Plan the number of tests
-SELECT plan(60);
+SELECT plan(61);
 
 -- Test app_versions policies
 SELECT
@@ -385,6 +384,26 @@ SELECT
         'manifest should have correct policies'
     );
 
+SELECT
+    is(
+        (
+            SELECT count(*)
+            FROM pg_policies
+            WHERE
+                schemaname = 'public'
+                AND tablename = 'manifest'
+                AND policyname = 'Prevent users from updating manifest entries'
+                AND permissive = 'RESTRICTIVE'
+                AND cmd = 'UPDATE'
+                AND roles @> ARRAY['anon', 'authenticated']::name []
+                AND array_length(roles, 1) = 2
+                AND qual = 'false'
+                AND with_check = 'false'
+        ),
+        1::bigint,
+        'manifest update deny policy should match restrictive role shape'
+    );
+
 -- Test deploy_history policies
 SELECT
     policies_are(
@@ -618,7 +637,7 @@ SELECT
                 COALESCE(qual, '')
                 || ' '
                 || COALESCE(with_check, '')
-              ) ~ 'check_min_rights|get_identity|has_app_right|is_allowed_capgkey|matches_app_storage_apikey_owner|rbac_legacy|rbac_org_role_for_legacy|rbac_permission_for_legacy|key_mode'
+              ) ~ 'check_min_rights|get_identity|has_app_right|matches_app_storage_apikey_owner|rbac_legacy|rbac_org_role_for_legacy|rbac_permission_for_legacy|key_mode'
         ),
         0::bigint,
         'user-facing RLS policies should not call old rights helpers or key-mode checks'
@@ -644,12 +663,9 @@ SELECT
                 'get_identity_org_allowed_apikey_only',
                 'get_identity_org_appid',
                 'get_org_owner_id',
-                'get_org_perm_for_apikey',
-                'get_org_perm_for_apikey_v2',
                 'has_app_right',
                 'has_app_right_apikey',
                 'has_app_right_userid',
-                'is_allowed_capgkey',
                 'force_org_rbac_enabled',
                 'invite_user_to_org',
                 'modify_permissions_tmp',
@@ -709,7 +725,7 @@ SELECT
             JOIN pg_namespace n ON n.oid = p.pronamespace
             WHERE p.prokind = 'f'
               AND n.nspname IN ('public', 'capgo_private')
-              AND pg_get_functiondef(p.oid) ~ 'check_min_rights|get_identity|has_app_right|is_allowed_capgkey|rbac_legacy|rbac_org_role_for_legacy|rbac_permission_for_legacy|transform_role_to|request_read_key_modes|apikey_permission_for_keymode|user_right|key_mode'
+              AND pg_get_functiondef(p.oid) ~ 'check_min_rights|get_identity|has_app_right|rbac_legacy|rbac_org_role_for_legacy|rbac_permission_for_legacy|transform_role_to|request_read_key_modes|apikey_permission_for_keymode|user_right|key_mode'
         ),
         0::bigint,
         'SQL functions should not reference old rights helpers, key modes, or org rights columns'
@@ -730,7 +746,7 @@ SELECT
                 'request_has_org_read_access',
                 'usage_credit_readable_org_ids'
               )
-              AND pg_get_functiondef(p.oid) ~ 'check_min_rights|get_identity|has_app_right|is_allowed_capgkey|rbac_legacy|rbac_org_role_for_legacy|rbac_permission_for_legacy|key_mode|user_min_right'
+              AND pg_get_functiondef(p.oid) ~ 'check_min_rights|get_identity|has_app_right|rbac_legacy|rbac_org_role_for_legacy|rbac_permission_for_legacy|key_mode|user_min_right'
         ),
         0::bigint,
         'RLS helper functions should be RBAC-only'
@@ -772,7 +788,7 @@ SELECT
             JOIN pg_namespace n ON n.oid = p.pronamespace
             WHERE n.nspname = 'capgo_private'
               AND p.proname = 'matches_app_storage_rbac_owner'
-              AND pg_get_functiondef(p.oid) !~ 'key_mode|check_min_rights|get_identity|is_allowed_capgkey'
+              AND pg_get_functiondef(p.oid) !~ 'key_mode|check_min_rights|get_identity'
         ),
         1::bigint,
         'storage API-key helper should use RBAC permissions without key modes'

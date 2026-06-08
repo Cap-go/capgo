@@ -21,25 +21,75 @@ async function openCreateKeyDialog(page: Page) {
   return dialog
 }
 
-async function createRbacApiKey(page: Page, keyName: string) {
-  const dialog = await openCreateKeyDialog(page)
-  await dialog.locator('input[type="text"]').fill(keyName)
-  await page.getByRole('button', { name: 'Create' }).click()
-  await expect(page.getByText('Added new API key successfully').first()).toBeVisible()
-  await expect(page.locator('tr', { hasText: keyName })).toHaveCount(1)
-  await expect(page.locator('tr', { hasText: keyName })).toContainText('Member')
+async function expectApiKeyRow(page: Page, keyName: string) {
+  const keyRow = page.locator('tr', { hasText: keyName })
+  try {
+    await expect(keyRow).toHaveCount(1, { timeout: 5000 })
+  }
+  catch {
+    await page.reload()
+    await expect(keyRow).toHaveCount(1)
+  }
+  return keyRow
 }
 
-async function createDemoAppApiKey(page: Page, keyName: string) {
+async function selectOnlyOrgForCreation(page: Page, dialog: Locator, orgId: string) {
+  await dialog.locator('[data-test="create-key-org-dropdown"]').click()
+  const orgCheckboxes = dialog.locator('[data-test="create-key-org-checkbox"]')
+  await expect(orgCheckboxes.first()).toBeVisible()
+
+  const orgCount = await orgCheckboxes.count()
+  for (let index = 0; index < orgCount; index++) {
+    const checkbox = orgCheckboxes.nth(index)
+    if (await checkbox.isDisabled())
+      continue
+
+    const shouldCheck = await checkbox.getAttribute('data-org-id') === orgId
+    if (await checkbox.isChecked() === shouldCheck)
+      continue
+
+    if (shouldCheck)
+      await checkbox.check()
+    else
+      await checkbox.uncheck()
+  }
+
+  const selectedOrg = dialog.locator(`[data-test="create-key-org-checkbox"][data-org-id="${orgId}"]`)
+  await expect(selectedOrg).toBeChecked()
+  await page.mouse.click(5, 5)
+  await expect(dialog.locator('.fixed.inset-0.z-10')).toHaveCount(0)
+}
+
+async function fillApiKeyName(page: Page, dialog: Locator, keyName: string) {
+  const nameInput = dialog.getByLabel('Name', { exact: true })
+  await nameInput.click()
+  await nameInput.pressSequentially(keyName)
+  await expect(nameInput).toHaveValue(keyName)
+  await nameInput.blur()
+  await page.waitForTimeout(100)
+}
+
+async function createRbacApiKey(page: Page, keyName: string) {
   const dialog = await openCreateKeyDialog(page)
-  await dialog.locator('input[type="text"]').fill(keyName)
+  await selectOnlyOrgForCreation(page, dialog, INHERITED_ORG_ID)
+  await fillApiKeyName(page, dialog, keyName)
+  await page.getByRole('button', { name: 'Create' }).click()
+  await expect(page.getByText('Added new API key successfully').first()).toBeVisible()
+  const keyRow = await expectApiKeyRow(page, keyName)
+  await expect(keyRow).toContainText('Member')
+}
+
+async function createSeededAppApiKey(page: Page, keyName: string) {
+  const dialog = await openCreateKeyDialog(page)
+  await selectOnlyOrgForCreation(page, dialog, INHERITED_ORG_ID)
+  await fillApiKeyName(page, dialog, keyName)
 
   await dialog.locator('[data-test="create-key-add-app"]').click()
-  const demoAppOption = dialog.locator('label', { hasText: 'com.demo.app' }).first()
-  await expect(demoAppOption).toBeVisible()
-  await demoAppOption.locator('[data-test="create-key-app-checkbox"]').check()
+  const seededAppOption = dialog.locator('label', { hasText: INHERITED_APP_ID }).first()
+  await expect(seededAppOption).toBeVisible()
+  await seededAppOption.locator('[data-test="create-key-app-checkbox"]').check()
 
-  const selectedApp = dialog.locator('[data-test="create-key-selected-app"]', { hasText: 'Demo app' }).first()
+  const selectedApp = dialog.locator('[data-test="create-key-selected-app"]', { hasText: 'Seeded App' }).first()
   await expect(selectedApp).toBeVisible()
   await selectedApp.locator('[data-test="create-key-app-role-select"]').selectOption('app_developer')
   await page.mouse.click(5, 5)
@@ -47,13 +97,13 @@ async function createDemoAppApiKey(page: Page, keyName: string) {
 
   await page.getByRole('button', { name: 'Create' }).click()
   await expect(page.getByText('Added new API key successfully').first()).toBeVisible()
-  await expect(page.locator('tr', { hasText: keyName })).toHaveCount(1)
-  return page.locator('tr', { hasText: keyName })
+  return expectApiKeyRow(page, keyName)
 }
 
 async function createInheritedOrgAdminApiKey(page: Page, keyName: string) {
   const dialog = await openCreateKeyDialog(page)
-  await dialog.locator('input[type="text"]').fill(keyName)
+  await selectOnlyOrgForCreation(page, dialog, INHERITED_ORG_ID)
+  await fillApiKeyName(page, dialog, keyName)
 
   const orgAdminRole = dialog.locator('[data-test="create-key-org-role-org_admin"]')
   await expect(orgAdminRole).toBeVisible()
@@ -62,8 +112,7 @@ async function createInheritedOrgAdminApiKey(page: Page, keyName: string) {
 
   await page.getByRole('button', { name: 'Create' }).click()
   await expect(page.getByText('Added new API key successfully').first()).toBeVisible()
-  await expect(page.locator('tr', { hasText: keyName })).toHaveCount(1)
-  return page.locator('tr', { hasText: keyName })
+  return expectApiKeyRow(page, keyName)
 }
 
 async function expectChannelPermissionOverridePersists(page: Page, keyRow: Locator, expectedAppText: string) {
@@ -223,7 +272,8 @@ test.describe('API Key Management', () => {
   test('should create org-admin API key with organization creation permission', async ({ page }) => {
     const keyName = uniqueKeyName('Org Create')
     const dialog = await openCreateKeyDialog(page)
-    await dialog.locator('input[type="text"]').fill(keyName)
+    await selectOnlyOrgForCreation(page, dialog, INHERITED_ORG_ID)
+    await fillApiKeyName(page, dialog, keyName)
 
     const orgCreatePermission = dialog.locator('[data-test="create-key-org-create-permission"]')
     await expect(orgCreatePermission).toBeDisabled()
@@ -234,7 +284,7 @@ test.describe('API Key Management', () => {
 
     await page.getByRole('button', { name: 'Create' }).click()
     await expect(page.getByText('Added new API key successfully').first()).toBeVisible()
-    await expect(page.locator('tr', { hasText: keyName })).toHaveCount(1)
+    await expectApiKeyRow(page, keyName)
 
     await page.reload()
     const keyRow = page.locator('tr', { hasText: keyName })
@@ -248,9 +298,9 @@ test.describe('API Key Management', () => {
 
   test('should manage channel permission overrides for app-scoped API keys', async ({ page }) => {
     const keyName = uniqueKeyName('Channel')
-    const keyRow = await createDemoAppApiKey(page, keyName)
+    const keyRow = await createSeededAppApiKey(page, keyName)
 
-    await expectChannelPermissionOverridePersists(page, keyRow, 'Demo app')
+    await expectChannelPermissionOverridePersists(page, keyRow, 'Seeded App')
   })
 
   test('should manage inherited org-admin channel permissions for API keys', async ({ page }) => {

@@ -11,7 +11,9 @@ import {
 } from '../../files/util.ts'
 import { getBodyOrQuery, honoFactory } from '../../utils/hono.ts'
 import { middlewareKey } from '../../utils/hono_middleware.ts'
-import { aiAnalyzeBuild } from './ai_analyze.ts'
+import { aiAnalyzeDeprecated } from './ai_analyze.ts'
+import { aiAnalyzeStreamBuild } from './ai_analyze_stream.ts'
+import { uploadSupportLogs } from './support_logs.ts'
 import { cancelBuild } from './cancel.ts'
 import { streamBuildLogs } from './logs.ts'
 import { requestBuild } from './request.ts'
@@ -69,14 +71,32 @@ app.post('/cancel/:jobId', middlewareKey(), async (c) => {
   return cancelBuild(c, jobId, body.app_id, apikey)
 })
 
-// POST /build/ai_analyze - Analyze a failed build's logs with AI
+// POST /build/ai_analyze - DEPRECATED (pre-streaming CLIs). Always 426 + upgrade message.
 app.post('/ai_analyze', middlewareKey(), async (c) => {
+  const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
+  return aiAnalyzeDeprecated(c, apikey)
+})
+
+// POST /build/ai_analyze_stream - Analyze a failed build's logs with AI (SSE streaming)
+app.post('/ai_analyze_stream', middlewareKey(), async (c) => {
   const body = await getBodyOrQuery<{ jobId: string, appId: string, logs: string }>(c)
   if (!body.jobId || !body.appId || typeof body.logs !== 'string') {
     throw new Error('jobId, appId, and logs are required in request body')
   }
   const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
-  return aiAnalyzeBuild(c, body.jobId, body.appId, apikey, body.logs)
+  return aiAnalyzeStreamBuild(c, body.jobId, body.appId, apikey, body.logs)
+})
+
+// POST /build/support_logs - Upload gzipped support logs; returns a 30-day download link.
+// (No app-ownership check on purpose: onboarding failures can reference apps that
+// were never registered — the authenticated account is the abuse anchor.)
+app.post('/support_logs', middlewareKey(), async (c) => {
+  const body = await getBodyOrQuery<{ appId?: string, jobId?: string, gzB64: string }>(c)
+  if (!body || typeof body.gzB64 !== 'string' || body.gzB64.length === 0) {
+    throw new Error('gzB64 is required in request body')
+  }
+  const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
+  return uploadSupportLogs(c, apikey, body)
 })
 
 function tusOptionsResponse() {

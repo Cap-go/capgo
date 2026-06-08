@@ -4837,9 +4837,274 @@ DROP FUNCTION IF EXISTS public.rbac_is_enabled_for_org(uuid);
 DROP FUNCTION IF EXISTS public.force_org_rbac_enabled();
 DROP FUNCTION IF EXISTS public.get_org_perm_for_apikey(text, text);
 DROP FUNCTION IF EXISTS public.get_org_perm_for_apikey_v2(text, text);
+DROP FUNCTION IF EXISTS public.exist_app(character varying);
+DROP FUNCTION IF EXISTS public.is_allowed_capgkey(text, text[]);
+DROP FUNCTION IF EXISTS public.is_allowed_capgkey(text, text[], character varying);
 
 DROP TYPE IF EXISTS public.key_mode;
 DROP TYPE IF EXISTS public.user_min_right;
+
+CREATE OR REPLACE FUNCTION public.exist_app(appid character varying)
+RETURNS boolean
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+  SELECT public.exist_app_v2(appid);
+$$;
+
+ALTER FUNCTION public.exist_app(character varying) OWNER TO postgres;
+REVOKE ALL ON FUNCTION public.exist_app(character varying) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.exist_app(character varying) TO anon;
+GRANT EXECUTE ON FUNCTION public.exist_app(character varying) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.exist_app(character varying) TO service_role;
+COMMENT ON FUNCTION public.exist_app(character varying) IS 'Compatibility RPC for pre-RBAC CLIs. App existence is still authorized through exist_app_v2 and RBAC.';
+
+CREATE OR REPLACE FUNCTION public.is_allowed_capgkey(apikey text, keymode text[])
+RETURNS boolean
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+  v_api_key public.apikeys%ROWTYPE;
+  v_modes text[];
+BEGIN
+  SELECT *
+  INTO v_api_key
+  FROM public.find_apikey_by_value(apikey)
+  LIMIT 1;
+
+  IF v_api_key.id IS NULL OR public.is_apikey_expired(v_api_key.expires_at) THEN
+    RETURN false;
+  END IF;
+
+  SELECT COALESCE(array_agg(lower(mode_value)), ARRAY[]::text[])
+  INTO v_modes
+  FROM unnest(COALESCE(keymode, ARRAY[]::text[])) AS mode_value;
+
+  IF cardinality(v_modes) = 0 THEN
+    RETURN false;
+  END IF;
+
+  RETURN EXISTS (
+    SELECT 1
+    FROM public.role_bindings rb
+    JOIN public.roles r
+      ON r.id = rb.role_id
+      AND r.scope_type = rb.scope_type
+    JOIN public.role_permissions rp
+      ON rp.role_id = r.id
+    JOIN public.permissions p
+      ON p.id = rp.permission_id
+    WHERE rb.principal_type = public.rbac_principal_apikey()
+      AND rb.principal_id = v_api_key.rbac_id
+      AND (rb.expires_at IS NULL OR rb.expires_at > now())
+      AND (
+        ('read' = ANY(v_modes) AND p.key IN (
+          public.rbac_perm_org_read(),
+          public.rbac_perm_app_read(),
+          public.rbac_perm_app_read_bundles(),
+          public.rbac_perm_channel_read()
+        ))
+        OR ('upload' = ANY(v_modes) AND p.key = public.rbac_perm_app_upload_bundle())
+        OR ('write' = ANY(v_modes) AND p.key IN (
+          public.rbac_perm_app_update_settings(),
+          public.rbac_perm_app_create_channel(),
+          public.rbac_perm_bundle_update(),
+          public.rbac_perm_channel_update_settings()
+        ))
+        OR ('all' = ANY(v_modes) AND p.key IN (
+          public.rbac_perm_org_delete(),
+          public.rbac_perm_org_update_user_roles(),
+          public.rbac_perm_app_delete(),
+          public.rbac_perm_app_update_user_roles(),
+          public.rbac_perm_app_transfer()
+        ))
+      )
+  );
+END;
+$$;
+
+ALTER FUNCTION public.is_allowed_capgkey(text, text[]) OWNER TO postgres;
+REVOKE ALL ON FUNCTION public.is_allowed_capgkey(text, text[]) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.is_allowed_capgkey(text, text[]) TO anon;
+GRANT EXECUTE ON FUNCTION public.is_allowed_capgkey(text, text[]) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.is_allowed_capgkey(text, text[]) TO service_role;
+COMMENT ON FUNCTION public.is_allowed_capgkey(text, text[]) IS 'Compatibility RPC for pre-RBAC CLIs. Legacy mode words are request vocabulary only; authorization is evaluated from RBAC role_bindings.';
+
+CREATE OR REPLACE FUNCTION public.is_allowed_capgkey(apikey text, keymode text[], appid character varying)
+RETURNS boolean
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+  v_api_key public.apikeys%ROWTYPE;
+  v_owner_org uuid;
+  v_modes text[];
+BEGIN
+  SELECT *
+  INTO v_api_key
+  FROM public.find_apikey_by_value(apikey)
+  LIMIT 1;
+
+  IF v_api_key.id IS NULL OR public.is_apikey_expired(v_api_key.expires_at) THEN
+    RETURN false;
+  END IF;
+
+  SELECT apps.owner_org
+  INTO v_owner_org
+  FROM public.apps
+  WHERE apps.app_id = is_allowed_capgkey.appid
+  LIMIT 1;
+
+  IF v_owner_org IS NULL THEN
+    RETURN false;
+  END IF;
+
+  SELECT COALESCE(array_agg(lower(mode_value)), ARRAY[]::text[])
+  INTO v_modes
+  FROM unnest(COALESCE(keymode, ARRAY[]::text[])) AS mode_value;
+
+  IF cardinality(v_modes) = 0 THEN
+    RETURN false;
+  END IF;
+
+  RETURN (
+    ('read' = ANY(v_modes) AND (
+      public.rbac_check_permission_direct(public.rbac_perm_app_read(), v_api_key.user_id, v_owner_org, appid, NULL::bigint, apikey)
+      OR public.rbac_check_permission_direct(public.rbac_perm_app_read_bundles(), v_api_key.user_id, v_owner_org, appid, NULL::bigint, apikey)
+      OR public.rbac_check_permission_direct(public.rbac_perm_channel_read(), v_api_key.user_id, v_owner_org, appid, NULL::bigint, apikey)
+    ))
+    OR ('upload' = ANY(v_modes) AND public.rbac_check_permission_direct(public.rbac_perm_app_upload_bundle(), v_api_key.user_id, v_owner_org, appid, NULL::bigint, apikey))
+    OR ('write' = ANY(v_modes) AND (
+      public.rbac_check_permission_direct(public.rbac_perm_app_update_settings(), v_api_key.user_id, v_owner_org, appid, NULL::bigint, apikey)
+      OR public.rbac_check_permission_direct(public.rbac_perm_app_create_channel(), v_api_key.user_id, v_owner_org, appid, NULL::bigint, apikey)
+      OR public.rbac_check_permission_direct(public.rbac_perm_bundle_update(), v_api_key.user_id, v_owner_org, appid, NULL::bigint, apikey)
+      OR public.rbac_check_permission_direct(public.rbac_perm_channel_update_settings(), v_api_key.user_id, v_owner_org, appid, NULL::bigint, apikey)
+    ))
+    OR ('all' = ANY(v_modes) AND (
+      public.rbac_check_permission_direct(public.rbac_perm_org_delete(), v_api_key.user_id, v_owner_org, appid, NULL::bigint, apikey)
+      OR public.rbac_check_permission_direct(public.rbac_perm_org_update_user_roles(), v_api_key.user_id, v_owner_org, appid, NULL::bigint, apikey)
+      OR public.rbac_check_permission_direct(public.rbac_perm_app_delete(), v_api_key.user_id, v_owner_org, appid, NULL::bigint, apikey)
+      OR public.rbac_check_permission_direct(public.rbac_perm_app_update_user_roles(), v_api_key.user_id, v_owner_org, appid, NULL::bigint, apikey)
+      OR public.rbac_check_permission_direct(public.rbac_perm_app_transfer(), v_api_key.user_id, v_owner_org, appid, NULL::bigint, apikey)
+    ))
+  );
+END;
+$$;
+
+ALTER FUNCTION public.is_allowed_capgkey(text, text[], character varying) OWNER TO postgres;
+REVOKE ALL ON FUNCTION public.is_allowed_capgkey(text, text[], character varying) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.is_allowed_capgkey(text, text[], character varying) TO anon;
+GRANT EXECUTE ON FUNCTION public.is_allowed_capgkey(text, text[], character varying) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.is_allowed_capgkey(text, text[], character varying) TO service_role;
+COMMENT ON FUNCTION public.is_allowed_capgkey(text, text[], character varying) IS 'Compatibility RPC for pre-RBAC CLIs. App-scoped legacy mode checks delegate to RBAC permissions for that app.';
+
+CREATE OR REPLACE FUNCTION public.get_org_perm_for_apikey(apikey text, app_id text)
+RETURNS text
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+  v_api_key public.apikeys%ROWTYPE;
+  v_owner_org uuid;
+  v_app_id character varying;
+BEGIN
+  SELECT *
+  INTO v_api_key
+  FROM public.find_apikey_by_value(apikey)
+  LIMIT 1;
+
+  IF v_api_key.id IS NULL OR public.is_apikey_expired(v_api_key.expires_at) THEN
+    RETURN 'INVALID_APIKEY';
+  END IF;
+
+  SELECT apps.owner_org, apps.app_id
+  INTO v_owner_org, v_app_id
+  FROM public.apps
+  WHERE apps.app_id = get_org_perm_for_apikey.app_id::character varying
+  LIMIT 1;
+
+  IF v_app_id IS NULL THEN
+    RETURN 'NO_APP';
+  END IF;
+
+  IF v_owner_org IS NULL THEN
+    RETURN 'NO_ORG';
+  END IF;
+
+  IF public.rbac_check_permission_direct(public.rbac_perm_org_delete(), v_api_key.user_id, v_owner_org, v_app_id, NULL::bigint, apikey)
+    OR public.rbac_check_permission_direct(public.rbac_perm_app_delete(), v_api_key.user_id, v_owner_org, v_app_id, NULL::bigint, apikey)
+    OR public.rbac_check_permission_direct(public.rbac_perm_app_transfer(), v_api_key.user_id, v_owner_org, v_app_id, NULL::bigint, apikey)
+  THEN
+    RETURN 'perm_owner';
+  END IF;
+
+  IF public.rbac_check_permission_direct(public.rbac_perm_org_update_user_roles(), v_api_key.user_id, v_owner_org, v_app_id, NULL::bigint, apikey)
+    OR public.rbac_check_permission_direct(public.rbac_perm_app_update_user_roles(), v_api_key.user_id, v_owner_org, v_app_id, NULL::bigint, apikey)
+    OR public.rbac_check_permission_direct(public.rbac_perm_app_update_settings(), v_api_key.user_id, v_owner_org, v_app_id, NULL::bigint, apikey)
+    OR public.rbac_check_permission_direct(public.rbac_perm_app_create_channel(), v_api_key.user_id, v_owner_org, v_app_id, NULL::bigint, apikey)
+    OR public.rbac_check_permission_direct(public.rbac_perm_channel_update_settings(), v_api_key.user_id, v_owner_org, v_app_id, NULL::bigint, apikey)
+  THEN
+    RETURN 'perm_admin';
+  END IF;
+
+  IF public.rbac_check_permission_direct(public.rbac_perm_bundle_update(), v_api_key.user_id, v_owner_org, v_app_id, NULL::bigint, apikey) THEN
+    RETURN 'perm_write';
+  END IF;
+
+  IF public.rbac_check_permission_direct(public.rbac_perm_app_upload_bundle(), v_api_key.user_id, v_owner_org, v_app_id, NULL::bigint, apikey) THEN
+    RETURN 'perm_upload';
+  END IF;
+
+  IF public.rbac_check_permission_direct(public.rbac_perm_app_read(), v_api_key.user_id, v_owner_org, v_app_id, NULL::bigint, apikey)
+    OR public.rbac_check_permission_direct(public.rbac_perm_app_read_bundles(), v_api_key.user_id, v_owner_org, v_app_id, NULL::bigint, apikey)
+    OR public.rbac_check_permission_direct(public.rbac_perm_channel_read(), v_api_key.user_id, v_owner_org, v_app_id, NULL::bigint, apikey)
+    OR public.rbac_check_permission_direct(public.rbac_perm_org_read(), v_api_key.user_id, v_owner_org, v_app_id, NULL::bigint, apikey)
+  THEN
+    RETURN 'perm_read';
+  END IF;
+
+  RETURN 'perm_none';
+END;
+$$;
+
+ALTER FUNCTION public.get_org_perm_for_apikey(text, text) OWNER TO postgres;
+REVOKE ALL ON FUNCTION public.get_org_perm_for_apikey(text, text) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.get_org_perm_for_apikey(text, text) TO anon;
+GRANT EXECUTE ON FUNCTION public.get_org_perm_for_apikey(text, text) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.get_org_perm_for_apikey(text, text) TO service_role;
+COMMENT ON FUNCTION public.get_org_perm_for_apikey(text, text) IS 'Compatibility RPC for pre-RBAC CLIs. The returned legacy rank is derived only from RBAC permissions.';
+
+CREATE OR REPLACE FUNCTION public.get_org_perm_for_apikey_v2(apikey text, app_id text)
+RETURNS text
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+  SELECT public.get_org_perm_for_apikey(apikey, app_id);
+$$;
+
+ALTER FUNCTION public.get_org_perm_for_apikey_v2(text, text) OWNER TO postgres;
+REVOKE ALL ON FUNCTION public.get_org_perm_for_apikey_v2(text, text) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.get_org_perm_for_apikey_v2(text, text) TO anon;
+GRANT EXECUTE ON FUNCTION public.get_org_perm_for_apikey_v2(text, text) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.get_org_perm_for_apikey_v2(text, text) TO service_role;
+COMMENT ON FUNCTION public.get_org_perm_for_apikey_v2(text, text) IS 'Compatibility alias for pre-RBAC CLIs; delegates to the RBAC-backed get_org_perm_for_apikey wrapper.';
+
+REVOKE ALL ON FUNCTION public.get_user_id(text) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.get_user_id(text) TO anon;
+GRANT EXECUTE ON FUNCTION public.get_user_id(text) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.get_user_id(text) TO service_role;
+REVOKE ALL ON FUNCTION public.get_user_id(text, text) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.get_user_id(text, text) TO anon;
+GRANT EXECUTE ON FUNCTION public.get_user_id(text, text) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.get_user_id(text, text) TO service_role;
+COMMENT ON FUNCTION public.get_user_id(text) IS 'Compatibility RPC for old CLIs. It resolves valid non-expired API keys, including hashed keys, and does not authorize any write by itself.';
+COMMENT ON FUNCTION public.get_user_id(text, text) IS 'Compatibility RPC for old CLIs. The app_id argument is ignored; write authorization must be checked through RBAC.';
 
 CREATE OR REPLACE FUNCTION public.regenerate_hashed_apikey(p_apikey_id bigint)
 RETURNS public.apikeys

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { HttpResponse, PluginListenerHandle } from '@capacitor/core'
 import type { BarcodeScanErrorEvent, BarcodeScannedEvent, BarcodeScannerOptions } from '@capgo/camera-preview'
-import type { DownloadEvent, DownloadOptions, StartPreviewSessionOptions } from '@capgo/capacitor-updater'
+import type { BundleInfo, DownloadEvent, DownloadOptions, StartPreviewSessionOptions } from '@capgo/capacitor-updater'
 import type { PreviewDeepLink } from '~/services/previewLinks'
 import { Clipboard } from '@capacitor/clipboard'
 import { Capacitor, CapacitorHttp } from '@capacitor/core'
@@ -13,9 +13,13 @@ import { toast } from 'vue-sonner'
 import IconDownload from '~icons/heroicons/arrow-down-tray-20-solid'
 import IconArrowLeft from '~icons/heroicons/arrow-left-20-solid'
 import IconArrowPath from '~icons/heroicons/arrow-path-20-solid'
+import IconArrowUturnLeft from '~icons/heroicons/arrow-uturn-left-20-solid'
 import IconClipboard from '~icons/heroicons/clipboard-document-20-solid'
 import IconLink from '~icons/heroicons/link-20-solid'
+import IconPlay from '~icons/heroicons/play-20-solid'
 import IconQrCode from '~icons/heroicons/qr-code-20-solid'
+import IconRectangleStack from '~icons/heroicons/rectangle-stack-20-solid'
+import IconTrash from '~icons/heroicons/trash-20-solid'
 import { buildChannelPreviewLatestOptions, parsePreviewDeepLink } from '~/services/previewLinks'
 import { useDisplayStore } from '~/stores/display'
 import { buildChannelPreviewSubdomain, buildPreviewSubdomain, parsePreviewHostname } from '../../shared/preview-subdomain.ts'
@@ -34,6 +38,13 @@ const manualUrl = ref('')
 const statusMessage = ref('')
 const scannerFrameRef = ref<HTMLElement | null>(null)
 const debugMessages = ref<string[]>([])
+const savedPreviews = ref<PreviewInfo[]>([])
+const savedPreviewCurrent = ref<PreviewInfo | null>(null)
+const savedPreviewLiveBundle = ref<BundleInfo | null>(null)
+const previewManagerAvailable = ref(isNativePlatform)
+const isLoadingPreviews = ref(false)
+const previewActionId = ref('')
+const previewActionName = ref('')
 
 let downloadListener: Awaited<ReturnType<typeof CapacitorUpdater.addListener>> | null = null
 let barcodeScannedListener: PluginListenerHandle | null = null
@@ -64,6 +75,33 @@ interface PreviewPayloadFetchResult {
   sessionPayloadUrl?: string
 }
 
+interface PreviewSessionMetadata {
+  appId?: string
+  payloadUrl?: string
+  name?: string
+  source?: string
+}
+
+interface PreviewInfo {
+  bundle?: BundleInfo | null
+  id: string
+  isActive?: boolean
+  name?: string
+  payloadUrl?: string
+  source?: string
+}
+
+interface PreviewManagerUpdater {
+  deletePreview?: (options: { id: string }) => Promise<{ deleted?: boolean }>
+  listPreviews?: () => Promise<{ current?: PreviewInfo | null, liveBundle?: BundleInfo | null, previews: PreviewInfo[] }>
+  resetPreview?: () => Promise<void>
+  setPreview?: (options: { id: string }) => Promise<void>
+  updatePreview?: (options: { id: string }) => Promise<{ preview: PreviewInfo, updated?: boolean }>
+}
+
+type PreviewStartOptions = StartPreviewSessionOptions & Pick<PreviewSessionMetadata, 'name' | 'source'>
+
+const previewManagerUpdater = CapacitorUpdater as typeof CapacitorUpdater & PreviewManagerUpdater
 const PREVIEW_PAYLOAD_PATH = '/.capgo/preview.json'
 
 function formatDebugData(data: unknown) {
@@ -223,6 +261,57 @@ const downloadHost = computed(() => {
 
   return new URL(scannedUrl.value).host
 })
+const hasSavedPreviewPanel = computed(() => isNativePlatform && previewManagerAvailable.value && (savedPreviews.value.length > 0 || isLoadingPreviews.value || !!savedPreviewCurrent.value))
+
+function bundleVersion(bundle?: BundleInfo | null) {
+  if (!bundle)
+    return ''
+
+  const bundleRecord = bundle as BundleInfo & { versionName?: string }
+  return bundleRecord.version || bundleRecord.versionName || bundle.id
+}
+
+function previewLabel(preview: PreviewInfo) {
+  return preview.name || bundleVersion(preview.bundle) || preview.id
+}
+
+function previewSourceLabel(preview: PreviewInfo) {
+  if (preview.source === 'channel')
+    return 'Channel'
+  if (preview.source === 'bundle')
+    return 'Bundle'
+  if (preview.source === 'payload')
+    return 'Preview'
+  if (preview.source === 'url')
+    return 'URL'
+  return 'Preview'
+}
+
+function hostFromUrl(value?: string) {
+  if (!value)
+    return ''
+
+  try {
+    return new URL(value).host
+  }
+  catch {
+    return ''
+  }
+}
+
+function previewSubtitle(preview: PreviewInfo) {
+  const details = [
+    previewSourceLabel(preview),
+    bundleVersion(preview.bundle),
+    hostFromUrl(preview.payloadUrl),
+  ].filter(Boolean)
+  return details.join(' - ')
+}
+
+function previewNameFromUrl(value: string) {
+  const parsedUrl = parseSafeUrl(value)
+  return parsedUrl?.host || 'Preview'
+}
 
 onMounted(async () => {
   displayStore.NavTitle = 'Test preview'
@@ -233,6 +322,7 @@ onMounted(async () => {
   if (previewLink) {
     debugLog('handling preview query parameter', previewLink)
     await handleBarcodeScan(previewLink)
+    await refreshSavedPreviews(true)
     return
   }
 
@@ -241,6 +331,7 @@ onMounted(async () => {
     statusMessage.value = 'Live camera scanning is available in the iOS and Android app. Paste a preview link or bundle URL below.'
     return
   }
+  await refreshSavedPreviews(true)
   await startScanner()
 })
 
@@ -263,6 +354,111 @@ async function removeDownloadListener() {
   catch (error) {
     debugWarn('failed to remove download listener', error)
   }
+}
+
+async function refreshSavedPreviews(silent = false) {
+  if (!isNativePlatform || !previewManagerAvailable.value)
+    return
+
+  if (typeof previewManagerUpdater.listPreviews !== 'function') {
+    previewManagerAvailable.value = false
+    return
+  }
+
+  isLoadingPreviews.value = true
+  try {
+    const result = await previewManagerUpdater.listPreviews()
+    savedPreviews.value = result.previews
+    savedPreviewCurrent.value = result.current ?? null
+    savedPreviewLiveBundle.value = result.liveBundle ?? null
+    previewManagerAvailable.value = true
+    debugLog('saved previews refreshed', {
+      count: result.previews.length,
+      current: result.current?.id,
+      liveBundle: result.liveBundle?.id,
+    })
+  }
+  catch (error) {
+    previewManagerAvailable.value = false
+    if (!silent)
+      debugWarn('preview manager unavailable', error)
+  }
+  finally {
+    isLoadingPreviews.value = false
+  }
+}
+
+async function runPreviewAction(preview: PreviewInfo | null, actionName: string, action: () => Promise<void>) {
+  if (isLoading.value || previewActionId.value)
+    return
+
+  previewActionId.value = preview?.id || actionName
+  previewActionName.value = actionName
+  try {
+    if (isScanning.value || cameraPreviewStarted)
+      await stopScanner(true)
+    await action()
+    await refreshSavedPreviews()
+  }
+  catch (error) {
+    debugWarn(`failed to ${actionName} preview`, error)
+    const message = error instanceof Error ? error.message : String(error)
+    toast.error(message)
+  }
+  finally {
+    previewActionId.value = ''
+    previewActionName.value = ''
+  }
+}
+
+async function switchSavedPreview(preview: PreviewInfo) {
+  await runPreviewAction(preview, 'switch', async () => {
+    if (typeof previewManagerUpdater.setPreview !== 'function')
+      throw new Error('Preview manager is not available in this app version')
+
+    toast.success(`Opening ${previewLabel(preview)}`)
+    await previewManagerUpdater.setPreview({ id: preview.id })
+  })
+}
+
+async function updateSavedPreview(preview: PreviewInfo) {
+  if (!preview.payloadUrl) {
+    toast.error('This preview cannot be updated locally')
+    return
+  }
+
+  await runPreviewAction(preview, 'update', async () => {
+    if (typeof previewManagerUpdater.updatePreview !== 'function')
+      throw new Error('Preview manager is not available in this app version')
+
+    const result = await previewManagerUpdater.updatePreview({ id: preview.id })
+    toast.success(result.updated ? `Updated ${previewLabel(result.preview)}` : `${previewLabel(result.preview)} is up to date`)
+  })
+}
+
+async function deleteSavedPreview(preview: PreviewInfo) {
+  if (preview.isActive) {
+    toast.error('Leave or switch preview before deleting it')
+    return
+  }
+
+  await runPreviewAction(preview, 'delete', async () => {
+    if (typeof previewManagerUpdater.deletePreview !== 'function')
+      throw new Error('Preview manager is not available in this app version')
+
+    const result = await previewManagerUpdater.deletePreview({ id: preview.id })
+    toast.success(result.deleted ? `Deleted ${previewLabel(preview)}` : `Removed ${previewLabel(preview)}`)
+  })
+}
+
+async function resetToMainApp() {
+  await runPreviewAction(null, 'reset', async () => {
+    if (typeof previewManagerUpdater.resetPreview !== 'function')
+      throw new Error('Preview manager is not available in this app version')
+
+    toast.success('Returning to main app')
+    await previewManagerUpdater.resetPreview()
+  })
 }
 
 async function removeScannerListeners() {
@@ -551,24 +747,32 @@ async function handleBarcodeScan(scannedValue: string) {
   await downloadUpdate(value)
 }
 
-async function startPreviewSession(appId?: string, payloadUrl?: string) {
-  const options: StartPreviewSessionOptions = {}
-  if (appId)
-    options.appId = appId
-  if (payloadUrl)
-    options.payloadUrl = payloadUrl
+async function startPreviewSession(metadata: PreviewSessionMetadata = {}) {
+  const options: PreviewStartOptions = {}
+  if (metadata.appId)
+    options.appId = metadata.appId
+  if (metadata.payloadUrl)
+    options.payloadUrl = metadata.payloadUrl
+  if (metadata.name)
+    options.name = metadata.name
+  if (metadata.source)
+    options.source = metadata.source
 
   const hasOptions = Object.keys(options).length > 0
   debugLog('starting preview session', {
     appId: options.appId,
     hasPayloadUrl: !!options.payloadUrl,
+    name: options.name,
     payloadUrl: options.payloadUrl,
+    source: options.source,
   })
   await CapacitorUpdater.startPreviewSession(hasOptions ? options : undefined)
   debugLog('preview session started', {
     appId: options.appId,
     hasPayloadUrl: !!options.payloadUrl,
+    name: options.name,
     payloadUrl: options.payloadUrl,
+    source: options.source,
   })
 }
 
@@ -761,8 +965,14 @@ async function startPreviewPayload(payloadUrl: string, appId?: string) {
     const bundle = await CapacitorUpdater.download(downloadOptionsFromPreviewPayload(payload))
     debugLog('preview payload downloaded', bundle)
 
-    await startPreviewSession(payload.appId || appId, sessionPayloadUrl)
+    await startPreviewSession({
+      appId: payload.appId || appId,
+      name: payload.version ? `Preview ${payload.version}` : previewNameFromUrl(sessionPayloadUrl || payloadUrl),
+      payloadUrl: sessionPayloadUrl,
+      source: 'payload',
+    })
     await CapacitorUpdater.set(bundle)
+    await refreshSavedPreviews(true)
     debugLog('preview payload applied', bundle)
   }
   catch (error) {
@@ -844,8 +1054,13 @@ async function startChannelPreview(previewLink: Extract<PreviewDeepLink, { type:
     })
     debugLog('channel preview downloaded', bundle)
 
-    await startPreviewSession(previewLink.appId)
+    await startPreviewSession({
+      appId: previewLink.appId,
+      name: previewLink.channelName ? `${previewLink.channelName} preview` : `Channel ${previewLink.channelId}`,
+      source: 'channel',
+    })
     await CapacitorUpdater.set(bundle)
+    await refreshSavedPreviews(true)
     debugLog('channel preview applied', bundle)
   }
   catch (error) {
@@ -881,8 +1096,13 @@ async function startPreviewDownloadUrl(downloadUrl: string, version = `preview-$
     })
     debugLog('direct preview downloaded', bundle)
 
-    await startPreviewSession(appId)
+    await startPreviewSession({
+      appId,
+      name: version,
+      source: 'url',
+    })
     await CapacitorUpdater.set(bundle)
+    await refreshSavedPreviews(true)
     debugLog('direct preview applied', bundle)
   }
   catch (error) {
@@ -1067,6 +1287,95 @@ async function goBack() {
       <section class="shrink-0">
         <div class="mx-auto max-w-md space-y-2">
           <div class="max-h-[20dvh] space-y-2 overflow-y-auto pr-1">
+            <details v-if="hasSavedPreviewPanel" class="rounded-2xl border border-white/10 bg-slate-950/80 p-3 shadow-lg shadow-black/20 backdrop-blur" open>
+              <summary class="flex cursor-pointer list-none items-center gap-3 text-sm font-semibold text-white">
+                <IconRectangleStack class="h-5 w-5 text-cyan-200" />
+                Saved previews
+                <span v-if="savedPreviews.length" class="ml-auto rounded-full bg-cyan-300/10 px-2 py-0.5 text-xs text-cyan-100">
+                  {{ savedPreviews.length }}
+                </span>
+              </summary>
+
+              <div class="mt-3 space-y-2">
+                <div v-if="savedPreviewCurrent || savedPreviewLiveBundle" class="flex items-center justify-between gap-2 rounded-xl border border-cyan-300/15 bg-cyan-300/10 px-3 py-2">
+                  <div class="min-w-0">
+                    <p class="truncate text-xs font-semibold text-cyan-100">
+                      {{ savedPreviewCurrent ? previewLabel(savedPreviewCurrent) : 'Main app' }}
+                    </p>
+                    <p class="truncate text-[11px] text-slate-300">
+                      {{ savedPreviewCurrent ? 'Current preview' : `Main ${bundleVersion(savedPreviewLiveBundle)}` }}
+                    </p>
+                  </div>
+                  <button
+                    v-if="savedPreviewCurrent"
+                    type="button"
+                    aria-label="Return to main app"
+                    class="inline-flex h-9 shrink-0 items-center justify-center rounded-lg border border-cyan-300/25 bg-slate-950/80 px-2.5 text-xs font-semibold text-cyan-100 transition-colors hover:bg-cyan-300/10 disabled:cursor-not-allowed disabled:opacity-50"
+                    :disabled="!!previewActionId || isLoading"
+                    @click="resetToMainApp"
+                  >
+                    <IconArrowUturnLeft class="h-4 w-4" />
+                  </button>
+                </div>
+
+                <div v-if="isLoadingPreviews" class="rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-xs text-slate-300">
+                  Loading previews...
+                </div>
+
+                <ol v-else-if="savedPreviews.length" class="space-y-2">
+                  <li
+                    v-for="preview in savedPreviews"
+                    :key="preview.id"
+                    class="rounded-xl border border-white/10 bg-slate-950 px-3 py-2"
+                  >
+                    <div class="flex items-center gap-2">
+                      <div class="min-w-0 flex-1">
+                        <p class="truncate text-sm font-semibold text-white">
+                          {{ previewLabel(preview) }}
+                        </p>
+                        <p class="truncate text-xs text-slate-400">
+                          {{ previewSubtitle(preview) }}
+                        </p>
+                      </div>
+                      <span v-if="preview.isActive" class="rounded-full bg-emerald-300/10 px-2 py-1 text-[11px] font-semibold text-emerald-100">
+                        Active
+                      </span>
+                    </div>
+
+                    <div class="mt-2 grid grid-cols-3 gap-2">
+                      <button
+                        type="button"
+                        class="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border border-cyan-300/25 bg-cyan-300/10 px-2 text-xs font-semibold text-cyan-100 transition-colors hover:bg-cyan-300/20 disabled:cursor-not-allowed disabled:opacity-50"
+                        :disabled="preview.isActive || !!previewActionId || isLoading"
+                        @click="switchSavedPreview(preview)"
+                      >
+                        <IconPlay class="h-4 w-4" />
+                        Open
+                      </button>
+                      <button
+                        type="button"
+                        class="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-2 text-xs font-semibold text-slate-100 transition-colors hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
+                        :disabled="!preview.payloadUrl || !!previewActionId || isLoading"
+                        @click="updateSavedPreview(preview)"
+                      >
+                        <IconArrowPath class="h-4 w-4" :class="previewActionId === preview.id && previewActionName === 'update' ? 'animate-spin' : ''" />
+                        Update
+                      </button>
+                      <button
+                        type="button"
+                        class="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border border-rose-300/20 bg-rose-300/10 px-2 text-xs font-semibold text-rose-100 transition-colors hover:bg-rose-300/20 disabled:cursor-not-allowed disabled:opacity-50"
+                        :disabled="preview.isActive || !!previewActionId || isLoading"
+                        @click="deleteSavedPreview(preview)"
+                      >
+                        <IconTrash class="h-4 w-4" />
+                        Delete
+                      </button>
+                    </div>
+                  </li>
+                </ol>
+              </div>
+            </details>
+
             <details class="rounded-2xl border border-white/10 bg-slate-950/80 p-3 shadow-lg shadow-black/20 backdrop-blur">
               <summary class="flex cursor-pointer list-none items-center gap-3 text-sm font-semibold text-white">
                 <IconLink class="h-5 w-5 text-cyan-200" />

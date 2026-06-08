@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI Build Analysis — Streaming Redesign</title>
+<style>
+  :root {
+    --bg: #0f1117; --panel: #181b24; --text: #d8dce6; --muted: #8b93a7;
+    --accent: #4fc3f7; --ok: #6fcf97; --bad: #eb5757; --warn: #f2c94c;
+    --border: #2a2f3d; --code-bg: #11141c;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 2rem 1rem 6rem;
+    background: var(--bg); color: var(--text);
+    font: 16px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+  main { max-width: 980px; margin: 0 auto; }
+  h1 { font-size: 1.9rem; color: #fff; border-bottom: 2px solid var(--accent); padding-bottom: .5rem; }
+  h2 { font-size: 1.35rem; color: var(--accent); margin-top: 2.6rem; }
+  h3 { font-size: 1.05rem; color: #b8e4ff; margin-top: 1.8rem; }
+  .meta { color: var(--muted); font-size: .9rem; margin-bottom: 2rem; }
+  .meta code { color: var(--text); }
+  table { border-collapse: collapse; width: 100%; margin: 1rem 0; font-size: .92rem; }
+  th, td { border: 1px solid var(--border); padding: .5rem .7rem; text-align: left; vertical-align: top; }
+  th { background: var(--panel); color: #fff; }
+  tr:nth-child(even) td { background: rgba(255,255,255,.02); }
+  code { background: var(--code-bg); border: 1px solid var(--border); border-radius: 4px;
+         padding: .1rem .35rem; font: .88em/1.5 "SF Mono", ui-monospace, Menlo, monospace; color: #aee3ff; }
+  pre { background: var(--code-bg); border: 1px solid var(--border); border-radius: 8px;
+        padding: 1rem; overflow-x: auto; }
+  pre code { background: none; border: none; padding: 0; color: #cfe9d8; }
+  .pill { display: inline-block; border-radius: 999px; padding: .05rem .6rem; font-size: .78rem; font-weight: 600; }
+  .pill.ok { background: rgba(111,207,151,.15); color: var(--ok); }
+  .pill.bad { background: rgba(235,87,87,.15); color: var(--bad); }
+  .callout { border-left: 4px solid var(--accent); background: var(--panel);
+             padding: .8rem 1rem; border-radius: 0 8px 8px 0; margin: 1.2rem 0; }
+  .callout.warn { border-color: var(--warn); }
+  .callout.bad { border-color: var(--bad); }
+  .diagram { background: #fafbfc; border-radius: 10px; padding: 1rem; margin: 1.4rem 0; overflow-x: auto; }
+  .evidence { font-size: .9rem; color: var(--muted); }
+  ul li { margin: .3rem 0; }
+  .small { font-size: .85rem; color: var(--muted); }
+</style>
+</head>
+<body>
+<main>
+
+<h1>AI Build Analysis — Streaming Redesign</h1>
+<p class="meta">
+  <strong>Date:</strong> 2026-06-05 &nbsp;·&nbsp;
+  <strong>Status:</strong> Draft for review &nbsp;·&nbsp;
+  <strong>Repos:</strong> <code>Cap-go/capgo</code> (edge fn + CLI), <code>Cap-go/capgo_builder</code> (worker)
+</p>
+
+<h2>1. Problem</h2>
+<p>The AI build-debug feature times out for roughly half of all failed CI builds.</p>
+<p class="evidence">Evidence (workflow logs from <code>Cap-go/capgo</code>, June 3–5 2026): of 21 failed
+builder runs that reached the AI step, <strong>10</strong> ended with
+<code>AI analysis failed: The operation was aborted due to timeout.</code> at almost exactly 60s.
+Successful runs measured 45–54s — the analysis duration distribution straddles the timeout.</p>
+<p>Root cause: two stacked, <em>equal</em> 60s wall-clock timeouts —
+<code>cli/src/ai/analyze.ts:61</code> (CLI → API) and
+<code>supabase/functions/_backend/public/build/ai_analyze.ts:195</code> (API → builder).
+The CLI's clock starts earlier and also covers auth, DB checks and uploading a multi-MB log body,
+so the CLI always aborts first whenever the LLM needs ~60s.</p>
+<ul>
+  <li>A timeout leaves <code>ai_analyzed = false</code> → the one-analysis-per-job cost control is retry-bypassed (cost leak).</li>
+  <li>If the builder finishes just after the client gives up, the flag flips and the paid-for analysis is discarded; retries get <code>409</code>.</li>
+</ul>
+
+<h2>2. Decision summary</h2>
+<table>
+  <tr><th>Topic</th><th>Decision</th></tr>
+  <tr><td>Transport</td><td>SSE streaming end-to-end (Workers AI → builder → capgo API → CLI). Fixed wall-clock budgets replaced by data-flow watchdogs.</td></tr>
+  <tr><td>New endpoint</td><td><code>POST /build/ai_analyze_stream</code> on the capgo API gateway.</td></tr>
+  <tr><td>Old endpoint</td><td><code>POST /build/ai_analyze</code> <strong>immediately deprecated</strong> — always returns <code>426 Upgrade Required</code> + "upgrade @capgo/cli" message. Handled in <code>capgo</code>, never reaches <code>capgo_builder</code>.</td></tr>
+  <tr><td>Persistence</td><td><strong>None.</strong> Analysis text is never stored (liability decision). It exists only in transit.</td></tr>
+  <tr><td>Flag semantics</td><td><strong>Claim-then-refund</strong>: atomically claim <code>ai_analyzed = true</code> <em>before</em> calling the builder; refund only on provably-pre-AI failures; ambiguity fails closed. Client disconnects never refund.</td></tr>
+  <tr><td>Handshake / ack</td><td>Rejected — the open HTTP connection is the implicit "ready to receive".</td></tr>
+  <tr><td>Durable Objects</td><td>Not used; the builder handler stays a stateless Worker handler.</td></tr>
+</table>
+
+<h2>3. End-to-end flow</h2>
+<div class="diagram">
+<pre class="mermaid">
+sequenceDiagram
+    autonumber
+    participant CLI as Capgo CLI<br/>(CI or TTY)
+    participant API as capgo API<br/>/build/ai_analyze_stream
+    participant DB as Postgres<br/>build_requests
+    participant B as capgo_builder<br/>Worker
+    participant AI as Workers AI<br/>kimi-k2.6
+
+    CLI->>API: POST {jobId, appId, logs}<br/>accept: text/event-stream
+    API->>API: checkPermission(app.build_native)
+    API->>DB: SELECT ownership + status = 'failed'
+    API->>DB: CLAIM: UPDATE ai_analyzed = true<br/>WHERE ... AND ai_analyzed = false
+    alt 0 rows returned
+        API-->>CLI: 409 already_analyzed
+    end
+    API->>B: POST /jobs/{id}/ai-analyze (SSE)
+    alt connection fails OR aiStarted = false
+        API->>DB: REFUND: ai_analyzed = false
+        API-->>CLI: 502 builder_error (retryable)
+    else builder streams
+        B->>AI: env.AI.run(stream: true)
+        AI--)B: token deltas
+        B--)API: event: chunk {text}
+        API--)CLI: event: chunk {text}<br/>(watchdogs: 90s first-byte / 30s idle)
+        Note over CLI: TTY: render progressively<br/>CI: buffer, print once
+        B--)API: event: done {durationMs}
+        API--)CLI: event: done
+        API->>API: waitUntil: telemetry<br/>(no analysis text, ever)
+    end
+</pre>
+</div>
+
+<h2>4. Protocol</h2>
+
+<h3>4.1 New endpoint: <code>POST /build/ai_analyze_stream</code></h3>
+<pre><code>POST /build/ai_analyze_stream
+capgkey: &lt;apikey&gt;
+content-type: application/json
+accept: text/event-stream
+
+{ "jobId": "...", "appId": "...", "logs": "&lt;captured build log&gt;" }</code></pre>
+
+<p>Pre-stream failures are plain JSON with an HTTP status (the stream has not started, so status codes still work):</p>
+<table>
+  <tr><th>Status</th><th>Code</th><th>Meaning</th><th>Slot consumed?</th></tr>
+  <tr><td>400</td><td><code>invalid_state</code></td><td>Build not in <code>failed</code> state / row mismatch</td><td><span class="pill ok">No (never claimed)</span></td></tr>
+  <tr><td>401/403</td><td><code>unauthorized</code></td><td>Bad key / missing <code>app.build_native</code></td><td><span class="pill ok">No</span></td></tr>
+  <tr><td>409</td><td><code>already_analyzed</code></td><td>Claim found <code>ai_analyzed = true</code></td><td><span class="pill bad">Already was</span></td></tr>
+  <tr><td>413</td><td><code>logs_too_big</code></td><td>Body over 10 MB limit</td><td><span class="pill ok">No</span></td></tr>
+  <tr><td>500</td><td><code>config_error</code></td><td><code>BUILDER_URL</code> / <code>BUILDER_API_KEY</code> missing</td><td><span class="pill ok">No</span></td></tr>
+  <tr><td>502</td><td><code>builder_error</code></td><td>Builder unreachable or pre-AI failure</td><td><span class="pill ok">No — refunded</span></td></tr>
+</table>
+
+<p>Success: <code>200</code> + <code>content-type: text/event-stream</code>:</p>
+<pre><code>event: chunk
+data: {"text":"&lt;token delta&gt;"}
+
+event: done
+data: {"durationMs":48211}
+
+event: error
+data: {"code":"ai_error" | "idle_timeout"}</code></pre>
+<ul>
+  <li><code>chunk</code> — text deltas, concatenated in order by the client.</li>
+  <li><code>done</code> — terminal; analysis = concatenation of all chunk texts.</li>
+  <li><code>error</code> — terminal; mid-stream failure. Slot <strong>stays consumed</strong> (fail closed). CLI shows partial text + notice.</li>
+</ul>
+
+<h3>4.2 Old endpoint: <code>POST /build/ai_analyze</code> (deprecated)</h3>
+<pre><code>426 Upgrade Required
+{ "error": "AI build analysis requires a newer CLI. Please upgrade: npx @capgo/cli@latest",
+  "code": "upgrade_required" }</code></pre>
+<div class="callout warn"><strong>Body shape matters:</strong> the human-readable text MUST be in the
+<code>error</code> field — the deployed CLI resolves the printed message as
+<code>body.error || body.message</code> (unchanged since the feature's first release, commit
+<code>803e4752c</code>), so a machine code in <code>error</code> would shadow the instruction. With this
+shape old CLIs print
+<code>AI analysis failed (426): AI build analysis requires a newer CLI. Please upgrade: npx @capgo/cli@latest.</code>
+with no client change. <code>code</code> carries the machine-readable identifier for new clients and tests.</div>
+<p>The handler keeps the apikey middleware but performs no DB reads/writes and never contacts the builder.</p>
+
+<h3>4.3 Builder endpoint: <code>POST {BUILDER_URL}/jobs/{jobId}/ai-analyze</code></h3>
+<p>Internal, <code>x-api-key</code>-authenticated, called only by the capgo edge function.
+Success: <code>200</code> + the same SSE event protocol (piped through). Pre-stream errors carry an explicit cost marker:</p>
+<pre><code>{ "error": "invalid_json" | "logs_too_big" | "ai_error", "aiStarted": true | false }</code></pre>
+<p><code>aiStarted: false</code> — rejected before <code>env.AI.run</code> was invoked (validation, trim overflow).
+<code>aiStarted: true</code> — <code>env.AI.run</code> was invoked and threw; billing unknown → counts as started.
+The edge fn refunds <strong>only</strong> on <code>aiStarted: false</code> or a connection-level failure.</p>
+
+<h2>5. Flag lifecycle — claim-then-refund</h2>
+
+<div class="callout">
+<strong>Why claim before calling the builder:</strong> Workers AI charges input tokens at prompt
+ingestion — cost commits at <em>submission</em>, not delivery. Flipping on first delivered chunk would
+let an abuser POST-and-disconnect repeatedly: each attempt starts a paid AI run but never flips the
+flag. Claiming first makes spam-and-disconnect consume the job's single slot on attempt #1; every
+later request is a cheap 409 that never reaches the builder.
+</div>
+
+<div class="diagram">
+<pre class="mermaid">
+flowchart TD
+    A[Request arrives] --> P{Permission +<br/>ownership + status checks}
+    P -- fail --> R1[4xx — no claim]
+    P -- pass --> C{Atomic claim<br/>UPDATE ... WHERE ai_analyzed = false}
+    C -- 0 rows --> R2[409 already_analyzed]
+    C -- claimed --> F{fetch builder}
+    F -- connection failure<br/>never reached builder --> RF1[REFUND<br/>502 retryable]:::refund
+    F -- "non-200, aiStarted = false" --> RF2[REFUND<br/>502 retryable]:::refund
+    F -- "non-200, aiStarted = true<br/>or malformed body" --> K1[NO REFUND<br/>fail closed]:::keep
+    F -- 200 SSE --> S{Stream}
+    S -- "watchdog fires<br/>(90s first-byte / 30s idle)" --> K2[NO REFUND<br/>event: error idle_timeout]:::keep
+    S -- mid-stream error event --> K3[NO REFUND<br/>partial shown]:::keep
+    S -- client disconnects --> K4[NO REFUND<br/>ever]:::keep
+    S -- done --> OK[Success<br/>telemetry via waitUntil]:::good
+
+    classDef refund fill:#1d3324,stroke:#6fcf97,color:#bfe8cf
+    classDef keep fill:#33201d,stroke:#eb5757,color:#f3c2c2
+    classDef good fill:#1c2a3a,stroke:#4fc3f7,color:#cfe9ff
+</pre>
+</div>
+
+<p><strong>Invariant:</strong> every refunded cycle is provably zero-AI-cost, so total AI runs per job
+stay ≤ 1 under any interleaving of retries, spam, races or disconnects. The conditional UPDATE
+serializes on the Postgres row lock: N parallel requests → exactly 1 claim, N−1 409s (this also
+removes the SELECT-then-flip race in the current code). If the refund write itself fails: log loudly,
+fail closed — a user rarely loses a retryable slot; Capgo never pays for an extra run.</p>
+
+<h2>6. Timeouts &amp; watchdogs</h2>
+<table>
+  <tr><th>Layer</th><th>First-byte watchdog</th><th>Idle (between chunks)</th><th>Total safety cap</th></tr>
+  <tr><td>Edge fn → builder</td><td>90 s</td><td>30 s</td><td>none (Workers has no wall-clock limit while streaming)</td></tr>
+  <tr><td>CLI → edge fn</td><td>120 s</td><td>45 s</td><td>10 min</td></tr>
+</table>
+<p class="small">First-byte is generous because prompt ingestion of a large trimmed log produces no
+tokens for a while. Watchdogs = timer reset inside a TransformStream; firing aborts the upstream
+fetch and emits <code>event: error {"code":"idle_timeout"}</code> downstream. Watchdog expiry never refunds.
+Values staggered so the inner layer always fires before the outer.</p>
+
+<h2>7. Component changes</h2>
+<h3>7.1 capgo_builder — <code>src/ai-analyze.ts</code></h3>
+<ul>
+  <li><code>env.AI.run(MODEL, { messages, stream: true })</code>; normalize Workers-AI SSE deltas into the §4.1 protocol in a TransformStream (model shape absorbed here — edge fn and CLI stay model-agnostic).</li>
+  <li>Pre-stream error responses gain <code>aiStarted</code>.</li>
+  <li>Propagate upstream cancellation into the AI stream (output-token waste reduction; best-effort, not a security control).</li>
+  <li><em>Contingency:</em> if kimi-k2.6 rejects <code>stream: true</code>, buffer internally and emit one big <code>chunk</code> + <code>done</code> — protocol unchanged.</li>
+  <li><code>extractAnalysis()</code> + buffered path deleted at rollout step 4.</li>
+</ul>
+<h3>7.2 capgo edge function</h3>
+<ul>
+  <li>New route <code>ai_analyze_stream</code>: permission → ownership SELECT → atomic claim → builder fetch with watchdogs → SSE passthrough → refund matrix → telemetry in <code>waitUntil</code>.</li>
+  <li><code>ai_analyze.ts</code> proxy logic replaced by the static 426 responder; 60s timeout and flip-after-success deleted.</li>
+  <li>Passthrough is a piped Response — no buffering, no tee, no storage of analysis text.</li>
+</ul>
+<h3>7.3 capgo CLI</h3>
+<ul>
+  <li><code>postAnalyzeStreamRequest</code>: new endpoint, SSE parsing, chunk accumulation.</li>
+  <li>TTY: progressive text rendering (replaces spinner wait). CI: buffer and print final block — GitHub Actions output format unchanged.</li>
+  <li>Mid-stream error: print partial text + <em>"AI analysis was interrupted; this job's analysis slot is used. The full log is saved at &lt;path&gt; for local AI."</em></li>
+  <li>Result kinds: <code>ok | already_analyzed | too_big | upgrade_required | error</code>.</li>
+</ul>
+
+<h2>8. Telemetry</h2>
+<p>Privacy rule unchanged: <strong>analysis text never appears in any event, tag or log.</strong></p>
+<ul>
+  <li><code>AI Build Analysis Requested</code> — unchanged (fired after claim succeeds).</li>
+  <li><code>AI Build Analysis Result</code> — result enum extended with <code>mid_stream_error</code>, <code>refunded</code>.</li>
+  <li>Old-endpoint hits emit <code>result: upgrade_required</code> → old-CLI population visible on the CLI Tracking dashboard before the builder fallback is deleted.</li>
+  <li>CLI events keep their enums, with <code>mid_stream_error</code> added.</li>
+</ul>
+
+<h2>9. Rollout</h2>
+<ol>
+  <li><strong>builder</strong> — Accept-gated streaming + <code>aiStarted</code> markers (buffered JSON path retained). Zero behavior change for the current edge fn.</li>
+  <li><strong>capgo edge fn</strong> — ship <code>ai_analyze_stream</code> + switch <code>ai_analyze</code> to 426. From this moment all old CLIs get the upgrade message.</li>
+  <li><strong>CLI release</strong> — streaming client. CI workflows on <code>bunx @capgo/cli@latest</code> pick it up on the next run.</li>
+  <li><strong>builder cleanup</strong> — delete buffered path once <code>upgrade_required</code> telemetry confirms cutover (target: within a week).</li>
+</ol>
+<p class="small">Each step independently deployable and reversible; the only user-visible discontinuity is the intended one (step 2).</p>
+
+<h2>10. Testing</h2>
+<ul>
+  <li><strong>capgo edge fn</strong> (<code>tests/build-ai-analyze.test.ts</code>, rewritten): claim-before-fetch ordering; atomic conditional UPDATE via service-role client (preserves RLS regression tests); full refund matrix; concurrent duplicates → 1 claim + 409; 426 + telemetry on old route; SSE passthrough fidelity; idle-watchdog error event.</li>
+  <li><strong>capgo_builder</strong>: stream normalization per delta shape; <code>aiStarted</code> correctness per error; single-chunk fallback.</li>
+  <li><strong>CLI</strong>: SSE parsing incl. frames split across packets; first-byte/idle/total timeouts; TTY vs CI rendering; partial-text interruption branch.</li>
+  <li><strong>Manual/E2E</strong>: one real failed CI build with <code>--ai-analytics</code> before rollout step 4.</li>
+</ul>
+
+<h2>11. Out of scope</h2>
+<ul>
+  <li>Persisting analysis text anywhere (rejected: liability).</li>
+  <li>Handshake/ack protocols, WebSockets, Durable Objects (rejected: complexity without benefit).</li>
+  <li>The log-capture truncation issue (captured log sometimes misses the actual Gradle/Fastlane error) — separate investigation; streaming neither causes nor fixes it.</li>
+  <li>Per-org rate limiting (ops nicety; the claim already makes abuse non-economic — each job requires a paid failed build and yields ≤ 1 AI run).</li>
+</ul>
+
+</main>
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({ startOnLoad: true, theme: 'neutral', sequence: { useMaxWidth: true } });
+</script>
+</body>
+</html>

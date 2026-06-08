@@ -1697,6 +1697,7 @@ getKeys()
             <FormKit
               v-model="newApiKeyName"
               type="text"
+              data-test="create-key-name"
               :label="t('name')"
               :placeholder="t('type-new-name')"
               validation="required|length:1,32"

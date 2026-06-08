@@ -55,6 +55,7 @@ export const optionsUploadSchema = optionsBaseSchema.extend({
   selfAssign: z.boolean().optional(),
   verbose: z.boolean().optional(),
   showReplicationProgress: z.boolean().optional(),
+  qrPreview: z.boolean().optional(),
 })
 
 export type OptionsUpload = z.infer<typeof optionsUploadSchema>
