@@ -51,7 +51,12 @@ async function renderShell(props) {
     React.createElement(OnboardingShell, { appId: 'com.test.app', iosDir: 'ios', androidDir: 'android', ...props }),
     { stdout, stderr: makeStdout(100, 50), stdin: makeStdin(), debug: true, exitOnCtrlC: false, patchConsole: false },
   )
-  await new Promise(r => setTimeout(r, 80))
+  // Poll for the first painted (non-empty) frame instead of a fixed sleep, so a
+  // slow CI box can't read before Ink has rendered. Bounded so a genuine
+  // empty-render bug still fails fast rather than hanging.
+  const deadline = Date.now() + 2000
+  while ((stdout.lastFrame ?? '') === '' && Date.now() < deadline)
+    await new Promise(r => setTimeout(r, 10))
   const out = stdout.lastFrame ?? ''
   instance.unmount()
   return out

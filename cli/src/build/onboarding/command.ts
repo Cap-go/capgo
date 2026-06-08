@@ -9,7 +9,7 @@ import { getAppId, getConfig } from '../../utils.js'
 import { appendInternalLog, startInternalLog } from '../../support/internal-log.js'
 import { getPlatformDirFromCapacitorConfig } from '../platform-paths.js'
 import OnboardingShell from './ui/shell.js'
-import { checkForCliUpdate, runUpdateAndReexec } from './self-update.js'
+import { checkForCliUpdate, manualUpdateHint, runUpdateAndReexec } from './self-update.js'
 import type { OnboardingResult } from './types.js'
 
 export interface OnboardingBuilderOptions {
@@ -19,6 +19,15 @@ export interface OnboardingBuilderOptions {
   // build request AND AI analysis hit the same host as the plain CLI flow
   // (preprod/self-hosted testing). Defaults to prod when omitted.
   supaHost?: string
+  /**
+   * Offer the self-update prompt as the first wizard screen. ONLY the genuine
+   * `build init` / `onboarding` entrypoint sets this. Other callers that reach
+   * onboarding as a sub-step (`bundle upload`'s launch-onboarding,
+   * `build credentials manage`) must leave it false: their process.argv is the
+   * wrapper command (`bundle upload …`), so a re-exec would repeat THAT command
+   * (e.g. re-run the upload) instead of `build init`.
+   */
+  enableSelfUpdate?: boolean
 }
 
 type Platform = 'ios' | 'android'
@@ -131,9 +140,11 @@ export async function onboardingBuilderCommand(options: OnboardingBuilderOptions
   const initialPlatform = resolveInitialPlatform(options, iosDir, androidDir)
 
   // Resolve update availability BEFORE render so the wizard can show the
-  // self-update offer as its first screen. Timeout-bounded (and skipped on the
-  // re-exec'd child via CAPGO_SKIP_UPDATE_PROMPT), so this never stalls startup.
-  const updateInfo = await checkForCliUpdate()
+  // self-update offer as its first screen. Gated to the real `build init`
+  // entrypoint (see enableSelfUpdate) so a re-exec can't repeat a wrapper
+  // command. Timeout-bounded (and skipped on the re-exec'd child via
+  // CAPGO_SKIP_UPDATE_PROMPT), so this never stalls startup.
+  const updateInfo = options.enableSelfUpdate ? await checkForCliUpdate() : null
 
   // The shell resolves the platform (immediately if initialPlatform is set,
   // else once the user picks). Capture it so the breadcrumb below — printed
@@ -181,7 +192,7 @@ export async function onboardingBuilderCommand(options: OnboardingBuilderOptions
     catch (error) {
       const message = error instanceof Error ? error.message : String(error)
       log.warn(`Could not auto-update (${message}). Still on @capgo/cli@${updateInfo.currentVersion}.`)
-      process.stdout.write('Re-run `capgo build init` to try again, or update manually: npx @capgo/cli@latest build init\n')
+      process.stdout.write(`Re-run \`capgo build init\` to try again, or update manually: ${manualUpdateHint()}\n`)
       process.exit(1)
     }
     return

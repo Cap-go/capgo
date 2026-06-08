@@ -1,6 +1,7 @@
 import type { PackageManagerType } from '@capgo/find-package-manager'
 import { spawnSync } from 'node:child_process'
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
+import { constants as osConstants } from 'node:os'
 import { dirname, join } from 'node:path'
 import process from 'node:process'
 import { log } from '@clack/prompts'
@@ -231,6 +232,18 @@ export async function checkForCliUpdate(): Promise<{ currentVersion: string, lat
  * Called AFTER Ink unmounts (it needs the primary buffer + stdio inheritance).
  * Throws on any failure so the caller can fall back to the current version.
  */
+/**
+ * Exit mirroring a finished child: its status when it exited normally, or
+ * 128 + signal number when it was killed (POSIX convention). Falling back to 0
+ * would report a signal-terminated re-exec/install as success.
+ */
+function exitMirroringChild(child: { status: number | null, signal: NodeJS.Signals | null }): never {
+  if (typeof child.status === 'number')
+    process.exit(child.status)
+  const signalNumber = child.signal ? osConstants.signals[child.signal] : undefined
+  process.exit(signalNumber ? 128 + signalNumber : 0)
+}
+
 export function runUpdateAndReexec(latest: string): void {
   const cwd = process.cwd()
   const { pm } = getPMAndCommand()
@@ -252,10 +265,22 @@ export function runUpdateAndReexec(latest: string): void {
     log.info(`Updating @capgo/cli to ${latest} via ${pm} install…`)
     const install = buildInstallCommand(pm)
     const installResult = spawnSync(install.cmd, install.args, { stdio: 'inherit', cwd: strategy.installRoot, env: childEnv })
-    if (installResult.error)
+    // A spawn error, a signal-kill (status null + signal set), OR a non-zero
+    // exit all count as failure — a signal-interrupted install must NOT slip
+    // through to a re-exec against a half-updated tree. On any failure, restore
+    // the package.json we rewrote so a failed update doesn't leave a bumped
+    // range with an un-reconciled lockfile / node_modules.
+    const installFailed = installResult.error != null
+      || installResult.signal != null
+      || (typeof installResult.status === 'number' && installResult.status !== 0)
+    if (installFailed) {
+      if (bumped)
+        writeFileSync(strategy.declaration.packageJsonPath, original)
       throw installResult.error
-    if (typeof installResult.status === 'number' && installResult.status !== 0)
-      throw new Error(`${install.cmd} ${install.args.join(' ')} exited with code ${installResult.status}`)
+        ?? new Error(installResult.signal
+          ? `${install.cmd} ${install.args.join(' ')} was killed by ${installResult.signal}`
+          : `${install.cmd} ${install.args.join(' ')} exited with code ${installResult.status}`)
+    }
 
     // Re-resolve the entry after install — hoisting may have moved it.
     const updatedEntry = resolveInstalledCliEntry(cwd) ?? strategy.entry
@@ -265,7 +290,7 @@ export function runUpdateAndReexec(latest: string): void {
     const child = spawnSync(process.execPath, [updatedEntry, ...forwardArgs], { stdio: 'inherit', cwd, env: childEnv })
     if (child.error)
       throw child.error
-    process.exit(child.status ?? 0)
+    exitMirroringChild(child)
   }
 
   // Ephemeral: nothing on disk to mutate — re-run via the runner with @latest.
@@ -274,5 +299,17 @@ export function runUpdateAndReexec(latest: string): void {
   const child = spawnSync(reexec.cmd, reexec.args, { stdio: 'inherit', cwd, env: childEnv })
   if (child.error)
     throw child.error
-  process.exit(child.status ?? 0)
+  exitMirroringChild(child)
+}
+
+/**
+ * Runner-aware "update manually" hint (e.g. `npx -y @capgo/cli@latest build
+ * init`, `pnpm dlx @capgo/cli@latest build init`) for the fallback shown when
+ * an accepted auto-update fails — so the suggested command matches the user's
+ * package manager rather than hardcoding npx.
+ */
+export function manualUpdateHint(): string {
+  const { pm } = getPMAndCommand()
+  const { cmd, args } = buildEphemeralReexec(pm, ['build', 'init'])
+  return `${cmd} ${args.join(' ')}`
 }
