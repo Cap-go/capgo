@@ -12,7 +12,7 @@
 // Every network response is validated shape-wise before we trust it. Errors
 // include enough context that the TUI can show a useful message.
 
-import { appendInternalLog } from '../../../support/internal-log.js'
+import { appendInternalLog, safeHeaders } from '../../../support/internal-log.js'
 
 const CRM_ENDPOINT = 'https://cloudresourcemanager.googleapis.com/v1'
 const SERVICEUSAGE_ENDPOINT = 'https://serviceusage.googleapis.com/v1'
@@ -129,11 +129,11 @@ async function gcpFetch<T>(args: {
     catch {}
     // Capture the raw Google Cloud API error in the internal support log
     // (secret-redacted on write) so non-build failures are diagnosable.
-    appendInternalLog(`gcp-api ${args.method ?? 'GET'} ${args.url}: HTTP ${res.status} ${detail}`)
+    appendInternalLog(`gcp-api ${args.method ?? 'GET'} ${args.url}: HTTP ${res.status} ${detail} | ${safeHeaders(res.headers)}`)
     throw new Error(`Google API ${res.status} at ${args.url}: ${detail}`)
   }
   // Log successful calls too — the bundle gets the full GCP call trace.
-  appendInternalLog(`gcp-api ${args.method ?? 'GET'} ${args.url}: HTTP ${res.status}`)
+  appendInternalLog(`gcp-api ${args.method ?? 'GET'} ${args.url}: HTTP ${res.status} | ${safeHeaders(res.headers)}`)
   if (!text.trim())
     return undefined as unknown as T
   try {

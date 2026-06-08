@@ -31,6 +31,42 @@ export function getInternalLogPath(): string | null {
   return currentPath
 }
 
+// Allowlist of RESPONSE headers that are safe + useful to log: timing (date →
+// clock-skew diagnosis), request ids (for escalation to the provider), rate-limit
+// state, and the auth challenge. We never log REQUEST headers (they carry the
+// Authorization bearer token), and redactSecrets still runs over the line as a
+// backstop. Anything not on this list (Set-Cookie, etc.) is skipped.
+const SAFE_RESPONSE_HEADERS = [
+  'date',
+  'content-type',
+  'content-length',
+  'age',
+  'retry-after',
+  'www-authenticate',
+  'x-request-id',
+  'request-id',
+  'x-goog-request-id',
+  'x-amzn-requestid',
+  'apigw-requestid',
+  'cf-ray',
+  'x-rate-limit',
+  'x-ratelimit-limit',
+  'x-ratelimit-remaining',
+  'x-ratelimit-reset',
+  'server',
+]
+
+// Format the allowlisted response headers as `name=value, …` (empty string if none).
+export function safeHeaders(headers: Headers): string {
+  const parts: string[] = []
+  for (const name of SAFE_RESPONSE_HEADERS) {
+    const value = headers.get(name)
+    if (value)
+      parts.push(`${name}=${value}`)
+  }
+  return parts.join(', ')
+}
+
 export function appendInternalLog(line: string): void {
   if (!currentPath)
     return
