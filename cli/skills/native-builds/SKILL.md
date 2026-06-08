@@ -29,6 +29,7 @@ Use this skill for Capgo Cloud native iOS and Android build workflows.
   - Optionally kicks off the first build at the end.
   - If the native `ios/` folder is missing, onboarding can offer to run `cap add ios` automatically instead of exiting immediately.
   - Unexpected failures now keep the user inside the recovery screen, show package-manager-aware commands, and save a support bundle under `~/.capgo-credentials/support/`.
+  - The recovery screen offers an "Email Capgo support" action: it writes a redacted diagnostics bundle as both `.log` and `.log.gz` under `~/.capgo-credentials/support/`, copies the `.log.gz` path to the clipboard, reveals it in Finder on macOS, and opens a pre-filled `mailto:support@capgo.app` for the user to attach the file and send (no logs are uploaded automatically). An "Ask AI for help" option is also offered when a build log exists.
 
 #### What it automates (iOS)
 

@@ -6,6 +6,7 @@ import { log } from '@clack/prompts'
 import { render } from 'ink'
 import React from 'react'
 import { getAppId, getConfig } from '../../utils.js'
+import { appendInternalLog, startInternalLog } from '../../support/internal-log.js'
 import { getPlatformDirFromCapacitorConfig } from '../platform-paths.js'
 import OnboardingShell from './ui/shell.js'
 import type { OnboardingResult } from './types.js'
@@ -113,6 +114,13 @@ export async function onboardingBuilderCommand(options: OnboardingBuilderOptions
     log.error('Could not detect app ID from capacitor.config.ts. Make sure you are in a Capacitor project directory.')
     process.exit(1)
   }
+
+  // Start the verbose internal log up front so EVERY step transition, validation
+  // result, and error from this run is captured for the support bundle. Without
+  // this, getInternalLogPath() is null and all appendInternalLog calls no-op —
+  // which is why the bundle's "Internal log" section used to be empty for build init.
+  startInternalLog(appId)
+  appendInternalLog(`build init: started for ${appId} (platform ${options.platform ?? 'auto'}, host ${options.supaHost ?? 'prod'})`)
   // If config.appId is missing (very rare — CapacitorConfig.appId is required
   // for `cap sync` to produce a working iOS project), fall back to the
   // resolved Capgo lookup key. Mismatch detection will still surface the

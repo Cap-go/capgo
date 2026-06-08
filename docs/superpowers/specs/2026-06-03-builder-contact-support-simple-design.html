@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Capgo Builder — Contact Support (Simplified)</title>
+<style>
+  :root{--bg:#0b0e14;--panel:#141925;--line:#2a3349;--ink:#e6ebf5;--muted:#94a3b8;--dim:#64748b;
+    --blue:#4f8cff;--green:#34d399;--amber:#fbbf24;--red:#fb7185;--purple:#a78bfa;
+    --mono:'SF Mono',ui-monospace,'JetBrains Mono',Menlo,monospace;}
+  *{box-sizing:border-box}
+  body{margin:0;background:radial-gradient(1200px 700px at 70% -10%,#16203a 0%,var(--bg) 55%);
+    color:var(--ink);font:15px/1.65 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;padding:48px 24px 90px}
+  .wrap{max-width:1000px;margin:0 auto}
+  h1{font-size:28px;margin:0 0 4px;letter-spacing:-.5px}
+  .meta{color:var(--dim);font-family:var(--mono);font-size:12.5px;margin:0 0 8px}
+  .status{display:inline-block;font-family:var(--mono);font-size:11px;padding:3px 10px;border-radius:20px;border:1px solid #2a3f33;background:#0f2920;color:var(--green);margin:0 0 26px}
+  h2{font-size:13px;text-transform:uppercase;letter-spacing:1.5px;color:var(--blue);margin:38px 0 14px;border-bottom:1px solid var(--line);padding-bottom:8px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px 22px;margin-bottom:14px}
+  .goal{background:linear-gradient(135deg,#1a2336,#141b2b);border-left:3px solid var(--blue)}
+  .why{border-left:3px solid var(--green);background:#0f1c19}.why b{color:var(--green)}
+  code{font-family:var(--mono);font-size:.87em;background:#0e1421;border:1px solid var(--line);padding:1.5px 6px;border-radius:5px;color:#cbd5e1}
+  pre{font-family:var(--mono);font-size:12.5px;line-height:1.55;background:#0e1421;border:1px solid var(--line);border-radius:12px;padding:16px 18px;overflow-x:auto;color:#aeb9cc}
+  table{width:100%;border-collapse:collapse;font-size:13.5px;margin:6px 0}
+  th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{color:var(--dim);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.8px}
+  ul,ol{margin:8px 0 0;padding-left:20px}li{margin:5px 0}
+  .note{font-size:13px;color:var(--muted)}
+  .strike{border-left:3px solid var(--red);background:#1f1216}.strike b{color:var(--red)}
+  a{color:var(--blue)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Capgo Builder — Contact Support <span style="color:var(--dim);font-size:18px">(Simplified)</span></h1>
+  <div class="meta">docs/superpowers/specs/2026-06-03-builder-contact-support-simple-design.md · 2026-06-03</div>
+  <span class="status">✅ ACTIVE PLAN — local logs file + mailto:, zero backend. Supersedes the shelved backend/bridge design.</span>
+
+  <h2>1 · Goal</h2>
+  <div class="card goal">When a builder run fails, save the user's logs to a local file and open a pre-filled email to <code>support@capgo.app</code>. The user attaches the file and sends. <b>Zero backend.</b> That's the whole feature.</div>
+
+  <h2>2 · Why this is simpler AND more correct</h2>
+  <div class="card why">
+    Every hard problem in the shelved design came from <b>us</b> sending a ticket <i>programmatically</i> through the <code>Cap-go/automations</code> bridge (the <code>ownedOutboundCopy</code> heuristic, the double-delivery race, CC/Reply-To threading, a backend proxy, Email Service limits…). When the <b>user</b> sends from their own client, it all evaporates:
+    <ul>
+      <li>The user is a <b>genuine external sender</b> to <code>support@capgo.app</code> → the existing bridge ingests it natively, opens a Discord thread, and <b>replies thread back to the user automatically</b>.</li>
+      <li>The team (incl. michael) sees it in <b>Discord</b> as normal — no fan-out, no relay.</li>
+      <li>We build <b>none</b> of: backend endpoint, worker <code>/support</code>, Email Service binding, rate limiting, CC/BCC, bridge changes.</li>
+    </ul>
+    Only cost: <code>mailto:</code> can't auto-attach, so the user does one "attach + send" — made trivial via save + clipboard + Finder reveal.
+  </div>
+
+  <h2>3 · Flow</h2>
+  <div class="card">
+    <ol>
+      <li><b>Hidden internal log</b> captured during builder/onboarding (verbose, secret-redacted, CLI-only) — including <b>non-build failures</b> (onboarding errors, raw Apple/Google API errors). Build failures also fold in the captured build log.</li>
+      <li>On failure → menu offers <b>📨 Email Capgo support</b> (+ <b>🤖 Ask AI</b> when a build log exists).</li>
+      <li>On "Email Capgo support", the CLI <b>first shows a confirmation</b> ("We'll save your logs<b>, reveal them in Finder (macOS),</b> and open a pre-filled email to support@capgo.app — continue?" — the Finder clause shows only on macOS). Only on confirm it:
+        <ul>
+          <li>writes ONE combined bundle in <b>both</b> forms: <code>builder-support-&lt;appId&gt;-&lt;ts&gt;.log</code> (readable) <b>and</b> <code>.log.gz</code> (compact), in <code>~/.capgo-credentials/support/</code>;</li>
+          <li><b>copies the GZIPPED <code>.log.gz</code> path to the clipboard</b>; on macOS <b>reveals it in Finder</b> (<code>open -R</code>);</li>
+          <li><b>opens <code>mailto:support@capgo.app</code></b> with a pre-filled subject + short body;</li>
+          <li>prints: <i>"Opened an email to support@capgo.app and saved your logs to &lt;path&gt;.log.gz (copied to clipboard). Attach that file and send."</i></li>
+        </ul>
+      </li>
+      <li>Done. No network calls of our own.</li>
+    </ol>
+<pre>mailto:support@capgo.app
+  ?subject=Capgo Builder support — &lt;appId&gt; (&lt;platform&gt;)
+  &body=&lt;short greeting + 1-line problem + tiny diagnostics summary +
+         "Please attach the logs file at &lt;path&gt; (copied to your clipboard)."&gt;</pre>
+    <p class="note" style="margin:0">Body kept short (mailto URLs ~1.8–2 KB limit); full logs live in the attached file. Opened via the existing <code>open</code> npm package.</p>
+  </div>
+
+  <h2>4 · Reuse map (all already in <code>cli/src</code>)</h2>
+  <div class="card" style="padding:6px 8px"><table>
+    <tr><th>Need</th><th>Reuse</th></tr>
+    <tr><td>Open mail client</td><td><code>open</code> npm pkg (used in init/command.ts, bundle/builder-cta.ts, onboarding UIs)</td></tr>
+    <tr><td>Save file + tell user where</td><td>the <code>.env</code> export pattern in <code>build/credentials-manage.ts</code></td></tr>
+    <tr><td>Copy path to clipboard</td><td><code>copyToClipboard()</code> (pbcopy/xclip/wl-copy) in <code>credentials-manage.ts</code></td></tr>
+    <tr><td>Write the bundle</td><td>extend <code>writeOnboardingSupportBundle()</code> in <code>onboarding-support.ts</code></td></tr>
+    <tr><td>Gzip variant</td><td><code>node:zlib</code> <code>gzipSync</code></td></tr>
+    <tr><td>Verbose log (non-build failures)</td><td>extend the <code>src/debug.ts</code> / internal-log idea</td></tr>
+  </table></div>
+
+  <h2>5 · Internal log</h2>
+  <div class="card">
+    <ul>
+      <li><b>Module:</b> <code>cli/src/support/internal-log.ts</code>, append-as-you-go → <code>~/.capgo-credentials/support/internal-&lt;appId&gt;-&lt;ts&gt;.log</code> (survives crashes).</li>
+      <li><b>Captures:</b> all levels incl. <code>debug</code>; API req/resp incl. <b>raw Apple &amp; Google API errors</b>; shell commands w/ stdout/stderr; diagnostics.</li>
+      <li><b>Secret redaction (CLI-only)</b> before bytes hit disk; the email body / CLI output <b>tells the user</b> secrets were removed.</li>
+    </ul>
+  </div>
+
+  <h2>6 · Components to build (CLI only)</h2>
+  <div class="card">
+    <ul>
+      <li><code>support/internal-log.ts</code> — verbose logger + redaction; wired into builder/onboarding + API/shell sites.</li>
+      <li>Extend <code>writeOnboardingSupportBundle</code> → one combined bundle, emit <b>both</b> <code>.log</code> and <code>.log.gz</code>.</li>
+      <li><code>support/contact-support.ts</code> — write files → clipboard → macOS reveal → build <code>mailto:</code> URL → <code>open()</code> → print instructions (graceful fallbacks).</li>
+      <li>Wire <b>📨 Email Capgo support</b> into iOS/Android failure menus + <code>init/command.ts</code> (support-first; AI only with a build log).</li>
+      <li>Tests: redaction, bundle assembly, both-file output, mailto URL (escaping + body length cap), menu logic, clipboard/reveal (mocked).</li>
+    </ul>
+  </div>
+
+  <h2>7 · Explicitly NOT built (vs shelved design)</h2>
+  <div class="card strike">
+    Backend <code>/build/support</code> · worker <code>/support</code> · Cloudflare Email Service / <code>send_email</code> · automations-bridge changes · CC/BCC/Reply-To · server-side rate limiting · double-delivery-race handling · Discord threading code. <b>All unnecessary</b> — the user's own client sends the email and the existing bridge handles inbound natively.
+  </div>
+
+  <h2>8 · Trade-offs</h2>
+  <div class="card">
+    <ul>
+      <li><b style="color:var(--green)">+</b> Tiny, CLI-only, no infra, no new failure modes; bridge behavior correct by construction.</li>
+      <li><b style="color:var(--green)">+</b> File saved locally regardless; if mailto/clipboard/reveal fail, the user still has the path + the address.</li>
+      <li><b style="color:var(--amber)">−</b> One manual step: attach + send (mailto can't auto-attach) — mitigated by clipboard + Finder reveal.</li>
+      <li><b style="color:var(--amber)">−</b> No automatic logs upload → no server-side support-volume telemetry by default (optional local <code>sendEvent</code> later, out of scope).</li>
+    </ul>
+  </div>
+
+  <h2>9 · Open items</h2>
+  <div class="card"><ol>
+    <li>Final <code>mailto:</code> subject/body + CLI instruction wording.</li>
+    <li>Bundle filename/format; both <code>.log</code> and <code>.log.gz</code> produced (current plan).</li>
+    <li>Non-macOS reveal (Linux/Windows: print path + clipboard; no Finder reveal).</li>
+  </ol></div>
+
+  <p class="note" style="text-align:center;margin-top:34px">Prior exploration (rejected as too complex): <code>2026-06-03-builder-contact-support-design.md</code></p>
+</div>
+</body>
+</html>

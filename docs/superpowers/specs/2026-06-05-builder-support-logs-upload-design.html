@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Capgo Builder — Support-Logs Upload (R2)</title>
+<style>
+  :root{--bg:#0b0e14;--panel:#141925;--line:#2a3349;--ink:#e6ebf5;--muted:#94a3b8;--dim:#64748b;
+    --blue:#4f8cff;--green:#34d399;--amber:#fbbf24;--red:#fb7185;--purple:#a78bfa;
+    --mono:'SF Mono',ui-monospace,'JetBrains Mono',Menlo,monospace;}
+  *{box-sizing:border-box}
+  body{margin:0;background:radial-gradient(1200px 700px at 70% -10%,#16203a 0%,var(--bg) 55%);
+    color:var(--ink);font:15px/1.65 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;padding:48px 24px 90px}
+  .wrap{max-width:1000px;margin:0 auto}
+  h1{font-size:28px;margin:0 0 4px;letter-spacing:-.5px}
+  .meta{color:var(--dim);font-family:var(--mono);font-size:12.5px;margin:0 0 8px}
+  .status{display:inline-block;font-family:var(--mono);font-size:11px;padding:3px 10px;border-radius:20px;border:1px solid #2a3f33;background:#0f2920;color:var(--green);margin:0 0 26px}
+  h2{font-size:13px;text-transform:uppercase;letter-spacing:1.5px;color:var(--blue);margin:38px 0 14px;border-bottom:1px solid var(--line);padding-bottom:8px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px 22px;margin-bottom:14px}
+  .goal{background:linear-gradient(135deg,#1a2336,#141b2b);border-left:3px solid var(--blue)}
+  .why{border-left:3px solid var(--green);background:#0f1c19}.why b{color:var(--green)}
+  .warn{border-left:3px solid var(--amber);background:#221d0d}.warn b{color:var(--amber)}
+  code{font-family:var(--mono);font-size:.87em;background:#0e1421;border:1px solid var(--line);padding:1.5px 6px;border-radius:5px;color:#cbd5e1}
+  pre{font-family:var(--mono);font-size:12.5px;line-height:1.55;background:#0e1421;border:1px solid var(--line);border-radius:12px;padding:16px 18px;overflow-x:auto;color:#aeb9cc}
+  table{width:100%;border-collapse:collapse;font-size:13.5px;margin:6px 0}
+  th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{color:var(--dim);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.8px}
+  ul,ol{margin:8px 0 0;padding-left:20px}li{margin:5px 0}
+  .note{font-size:13px;color:var(--muted)}
+  a{color:var(--blue)}
+  .hl{color:var(--amber);font-weight:600}.good{color:var(--green);font-weight:600}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Capgo Builder — Support-Logs Upload <span style="color:var(--dim);font-size:18px">(R2)</span></h1>
+  <div class="meta">docs/superpowers/specs/2026-06-05-builder-support-logs-upload-design.md · 2026-06-05</div>
+  <span class="status">✅ APPROVED follow-up — kills the manual attach. Builds on the shipped local-file + mailto flow.</span>
+
+  <h2>1 · Goal</h2>
+  <div class="card goal">On confirm, upload the gzipped logs bundle to R2 and put a <b>logs ID + download link in the email body</b>. The user just hits <b>Send</b>; support clicks the link from Discord. The local file stays as the offline/failure fallback — no attach, no Finder/Mail window dance.</div>
+
+  <h2>2 · Data flow</h2>
+  <div class="card">
+<pre>CLI (existing confirm gate; "view logs first" preview unchanged)
+  gzip bundle → <b>sha256(gz) = ID</b>
+  POST ${apiHost}/build/support_logs  { appId, jobId?, gzB64 }   (capgkey)
+        ▼
+capgo backend  public/build/support_logs.ts   (mirrors ai_analyze.ts)
+  auth capgkey → resolve user → rate limit → forward { gzB64, appId, jobId?, userId }
+        ▼
+capgo_builder worker  POST /support-logs
+  1. gz ≤ <span class="hl">10 MB</span> (413)      2. <span class="good">text-only validation</span> (gunzip 64KB → UTF-8/printable; 415)
+  3. R2 put  capgo-builder-support-logs / &lt;sha256&gt;.log.gz   (idempotent by key)
+  4. → { id, url }
+        ▼
+email body:  "Support logs (kept 30 days): &lt;url&gt;"  → SEND-READY (URL-only; the id is inside it)
+support:     GET /support-logs/&lt;sha256&gt; → streams the .log.gz (404 after expiry)
+
+FALLBACK (upload fails/offline): exactly today's shipped behavior —
+  clipboard .log.gz path + Finder reveal + attach instructions.</pre>
+  </div>
+
+  <h2>3 · Storage — NEW dedicated bucket</h2>
+  <div class="card">
+    <ul>
+      <li><b>Bucket:</b> <code>capgo-builder-support-logs</code> — separate from the artifact bucket (isolated lifecycle/access/blast radius — decided).</li>
+      <li><b>Key:</b> <code>&lt;sha256(gz)&gt;.log.gz</code> — the hash is the ID <i>and</i> the capability; <b>"upload once" by construction</b> (retries/dupes hit the same key, no new storage).</li>
+      <li><b>Custom metadata:</b> <code>app_id, job_id?, user_id</code> (account id — no email/PII).</li>
+      <li><b>Retention = bucket-wide R2 lifecycle rule, 30 days. No cron, no cleanup code:</b></li>
+    </ul>
+<pre>npx wrangler r2 bucket create capgo-builder-support-logs
+npx wrangler r2 bucket lifecycle add capgo-builder-support-logs --expire-days 30</pre>
+<pre>// worker wrangler.jsonc (prod + preprod)
+"r2_buckets": [ …, { "binding": "SUPPORT_LOGS_BUCKET", "bucket_name": "capgo-builder-support-logs" } ]</pre>
+  </div>
+
+  <h2>4 · API</h2>
+  <div class="card">
+    <ul>
+      <li><b>Backend proxy</b> <code>public/build/support_logs.ts</code> — capgkey auth → user → rate limit → forward (same internal backend→worker auth as <code>ai_analyze</code>). Errors: 401 / <span class="hl">413 too big</span> / <span class="hl">415 not-text</span> / 429.</li>
+      <li><b>Worker</b> <code>POST /support-logs</code> (validate → sha256 → put → <code>{id,url}</code>) and <code>GET /support-logs/:id</code> (stream gz, <code>Content-Disposition: attachment</code>; friendly 404 "logs expired — ask the user to re-send"). Public route on the artifact-download host pattern.</li>
+    </ul>
+  </div>
+
+  <h2>5 · Abuse posture (the honest version)</h2>
+  <div class="card why">
+    Defenses, strongest first:
+    <ol>
+      <li><b>Economics + TTL:</b> worst case (colo-hopping VPN diluting the limiter ~100×: 1,000/day × 10 MB × 30-day TTL) ≈ 300 GB ≈ <b>$4.50/month</b>, self-purging. R2 egress is <b>free</b> → the GET side can't run up a bill. No payoff.</li>
+      <li><b>10 MB gz cap</b> (hard server check).</li>
+      <li><b>Text-only validation</b> — kills the only attractive misuse (file hosting behind a capgo URL).</li>
+      <li><b>sha256 keying</b> — duplicate floods cost nothing.</li>
+      <li><b>Account-keyed limit 1/min + 10/day</b> via the existing <code>CacheHelper</code> limiter. <span class="hl">Documented caveat:</span> Cache-API-backed → <b>per-colo, fails open</b> — a speed bump, not a guarantee (acceptable given 1–4).</li>
+      <li><b>Account bans</b> as backstop (capgkey required; no anonymous path).</li>
+    </ol>
+    <p class="note" style="margin-bottom:0"><b>No captcha</b> (authenticated CLI API — wrong tool). Optional later hardening: globally-consistent per-account Postgres counter — deferred unless real abuse appears.</p>
+  </div>
+
+  <h2>6 · CLI changes</h2>
+  <div class="card">
+    <ul>
+      <li><b><code>contact-support.ts</code>:</b> new optional <code>upload</code> dep after the confirm + bundle write. <b>Upload OK</b> → email body gets the download URL + "kept 30 days" (URL-only; the id is embedded in it); <b>skip</b> clipboard-path/reveal/attach text (nothing to attach); local paths still printed. <b>Upload fails</b> (15 s timeout) → exactly today's behavior. Never blocks the flow.</li>
+      <li><b><code>support-upload.ts</code> (new):</b> gz→base64 POST to <code>${apiHost}/build/support_logs</code> (same client pattern as <code>ai/analyze.ts</code>); null on any error.</li>
+      <li><b>Confirm copy:</b> "We'll save your logs locally, <b>upload a copy to Capgo support (kept 30 days)</b>, and open a pre-filled email…" — preview choice unchanged (shows exactly what's uploaded).</li>
+      <li>All five entry points (iOS/Android error step, AI prompt, AI result escalation, init, build request) inherit this for free via <code>contactSupport</code>.</li>
+    </ul>
+  </div>
+
+  <h2>7 · Components & tests</h2>
+  <div class="card" style="padding:6px 8px"><table>
+    <tr><th>Where</th><th>What</th></tr>
+    <tr><td>Ops (one-time)</td><td>bucket + lifecycle rule; <code>SUPPORT_LOGS_BUCKET</code> binding (prod + preprod)</td></tr>
+    <tr><td>Worker</td><td>POST/GET routes; size cap; gunzip/text validation; sha256; mock-R2 tests (put/get/oversize/non-text/idempotent re-put)</td></tr>
+    <tr><td>Backend</td><td><code>support_logs.ts</code> proxy + registration; tests 401/413/429/forward</td></tr>
+    <tr><td>CLI</td><td><code>support-upload.ts</code> + upload branch + confirm copy; tests: ok-path (id+url in body, no attach text), fail-path (identical to today), timeout degrade</td></tr>
+  </table></div>
+
+  <h2>8 · Open items</h2>
+  <div class="card"><ol>
+    <li>Exact public GET host/path (reuse the artifact-download pattern — confirm in code).</li>
+    <li>Backend→worker internal auth detail (mirror <code>ai_analyze</code> — confirm in code).</li>
+    <li>Preprod: same bucket or <code>-preprod</code> twin (suggest twin).</li>
+    <li>Deferred: global Postgres rate counter (only if abuse ever appears).</li>
+  </ol></div>
+
+  <p class="note" style="text-align:center;margin-top:34px">Builds on: <code>2026-06-03-builder-contact-support-simple-design.md</code> (shipped) · Rejected alternative: backend/bridge email sending (<code>2026-06-03-builder-contact-support-design.md</code>)</p>
+</div>
+</body>
+</html>
