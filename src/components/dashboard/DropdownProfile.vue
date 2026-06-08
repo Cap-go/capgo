@@ -29,7 +29,7 @@ const isLoading = ref(false)
 const logAsInput = ref('')
 
 async function openLogAsDialog() {
-  let userId = ''
+  let identifier = ''
   logAsInput.value = ''
 
   dialogStore.openDialog({
@@ -42,17 +42,17 @@ async function openLogAsDialog() {
       {
         text: t('log-as'),
         handler: () => {
-          userId = logAsInput.value
+          identifier = logAsInput.value
         },
       },
     ],
   })
   await dialogStore.onDialogDismiss()
 
-  if (userId) {
+  if (identifier) {
     isLoading.value = true
     try {
-      await logAsUser(userId, router)
+      await logAsUser(identifier, router)
     }
     finally {
       isLoading.value = false
@@ -146,7 +146,7 @@ async function logOut() {
         <input
           v-model="logAsInput"
           type="text"
-          :placeholder="t('user-id')"
+          :placeholder="t('user-email-or-org-id')"
           class="p-3 w-full rounded-lg border border-gray-300 dark:text-white dark:bg-gray-800 dark:border-gray-600"
           @keydown.enter="$event.preventDefault()"
         >
