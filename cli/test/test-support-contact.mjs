@@ -8,11 +8,11 @@ async function ta(name, fn) {
 }
 
 function makeDeps(overrides = {}) {
-  const calls = { copied: [], opened: [], revealed: [], printed: [] }
+  const calls = { copied: [], opened: [], revealed: [], printed: [], confirmedWith: [] }
   const deps = {
     subject: 'Capgo Builder support',
     body: 'hello',
-    confirm: async () => true,
+    confirm: async (_msg, logPath) => { calls.confirmedWith.push(logPath); return true },
     buildFiles: () => ({ logPath: '/x/b.log', gzPath: '/x/b.log.gz' }),
     copyPath: (p) => { calls.copied.push(p); return true },
     reveal: (p) => { calls.revealed.push(p) },
@@ -49,6 +49,17 @@ await ta('opens a mailto: to support@capgo.app and prints instructions', async (
 await ta('returns failed when files cannot be written', async () => {
   const { deps } = makeDeps({ buildFiles: () => null })
   assert.equal(await contactSupport(deps), 'failed')
+})
+
+await ta('builds the bundle BEFORE confirm and passes the .log path for inspection', async () => {
+  const order = []
+  const { deps, calls } = makeDeps({
+    buildFiles: () => { order.push('build'); return { logPath: '/x/b.log', gzPath: '/x/b.log.gz' } },
+    confirm: async (_m, logPath) => { order.push('confirm'); calls.confirmedWith.push(logPath); return true },
+  })
+  await contactSupport(deps)
+  assert.deepEqual(order.slice(0, 2), ['build', 'confirm']) // bundle exists before we ask
+  assert.deepEqual(calls.confirmedWith, ['/x/b.log']) // readable path handed to the confirm
 })
 
 await ta('upload success: link in email body, no clipboard/reveal/attach text', async () => {

@@ -78,6 +78,8 @@ export type AndroidOnboardingStep
     | 'error'
     // Contact-support confirmation gate (shown before we save logs + open mail)
     | 'support-confirm'
+    // Scrollable viewer of the exact bundle, reached from the confirm's "View logs first"
+    | 'support-log-view'
 
 export type AndroidOnboardingErrorCategory
   = | 'keystore_invalid'
@@ -270,6 +272,7 @@ export const ANDROID_STEP_PROGRESS: Record<AndroidOnboardingStep, number> = {
   'build-complete': 100,
   'error': 0,
   'support-confirm': 0,
+  'support-log-view': 0,
 }
 
 export function getAndroidPhaseLabel(step: AndroidOnboardingStep): string {
@@ -348,6 +351,7 @@ export function getAndroidPhaseLabel(step: AndroidOnboardingStep): string {
       return 'Complete'
     case 'error':
     case 'support-confirm':
+    case 'support-log-view':
       return ''
   }
 }

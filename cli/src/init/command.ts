@@ -497,9 +497,26 @@ async function runInitContactSupport(failureText: string): Promise<void> {
   await contactSupport({
     subject: `Capgo Builder onboarding support — ${globalAppId ?? 'unknown'}`,
     body: `Hi Capgo team,\n\nI hit an error during Capgo Builder onboarding.\n\nApp: ${globalAppId ?? 'unknown'}\nError: ${failureText}\n\n(Logs saved locally; secrets removed — I'll attach the file.)`,
-    confirm: async (msg) => {
-      const proceed = await pConfirm({ message: msg })
-      return !pIsCancel(proceed) && proceed === true
+    confirm: async (msg, logPath) => {
+      for (;;) {
+        const choice = await pSelect({
+          message: msg,
+          options: [
+            { value: 'yes', label: '📨  Yes, send to support' },
+            { value: 'view', label: '👀  View logs first (opens the file)' },
+            { value: 'no', label: '✖  Cancel' },
+          ],
+        })
+        if (pIsCancel(choice) || choice === 'no')
+          return false
+        if (choice === 'view') {
+          pLog.info(`Logs to be sent: ${logPath}`)
+          try { await open(logPath) }
+          catch { /* best-effort: just the path above */ }
+          continue
+        }
+        return true
+      }
     },
     buildFiles: () => writeSupportBundleFiles({
       kind: 'init',

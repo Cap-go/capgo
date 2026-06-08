@@ -14,8 +14,10 @@ function confirmMessage(hasUpload: boolean): string {
 export interface ContactSupportDeps {
   subject: string
   body: string
-  // Show the confirmation gate; resolve true to proceed, false to cancel.
-  confirm: (message: string) => Promise<boolean>
+  // Show the confirmation gate; resolve true to proceed, false to cancel. The
+  // readable .log path is passed so the UI can offer a "View logs first" option
+  // (inspect exactly what will be sent) before the user commits.
+  confirm: (message: string, logPath: string) => Promise<boolean>
   // Write the bundle; return both paths, or null on failure.
   buildFiles: () => { logPath: string, gzPath: string } | null
   // Copy a path to the clipboard; return success.
@@ -62,15 +64,17 @@ export async function contactSupport(deps: ContactSupportDeps): Promise<ContactS
 }
 
 async function runContactSupport(deps: ContactSupportDeps): Promise<ContactSupportResult> {
-  const proceed = await deps.confirm(confirmMessage(Boolean(deps.upload)))
-  if (!proceed)
-    return 'cancelled'
-
+  // Write the bundle FIRST so the confirm step can offer "View logs first" —
+  // the file is local-only; only the upload + email (below) are gated by consent.
   const files = deps.buildFiles()
   if (!files) {
     deps.print('Could not save your logs locally. Please email support@capgo.app and describe the issue.')
     return 'failed'
   }
+
+  const proceed = await deps.confirm(confirmMessage(Boolean(deps.upload)), files.logPath)
+  if (!proceed)
+    return 'cancelled'
 
   // Preferred path: upload the gz and put the download link in the email body —
   // the mail is send-ready, there's nothing to attach (so no clipboard/Finder).

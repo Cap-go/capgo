@@ -2156,7 +2156,27 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
           await contactSupport({
             subject: `Capgo Builder support — ${appId} (${platform})`,
             body: `Hi Capgo team,\n\nMy cloud build failed and I'd like help.\n\nApp: ${appId}\nPlatform: ${platform}\nJob: ${capturedJobId}\n\n(Logs saved locally; secrets removed — I'll attach the file.)`,
-            confirm: async msg => (await confirm({ message: msg })) === true,
+            confirm: async (msg, logPath) => {
+              for (;;) {
+                const choice = await select({
+                  message: msg,
+                  options: [
+                    { value: 'yes', label: '📨  Yes, send to support' },
+                    { value: 'view', label: '👀  View logs first (opens the file)' },
+                    { value: 'no', label: '✖  Cancel' },
+                  ],
+                })
+                if (clackIsCancel(choice) || choice === 'no')
+                  return false
+                if (choice === 'view') {
+                  clackLog.info(`Logs to be sent: ${logPath}`)
+                  try { (await import('open')).default(logPath) }
+                  catch { /* best-effort: just the path above */ }
+                  continue
+                }
+                return true
+              }
+            },
             buildFiles: () => writeSupportBundleFiles({
               kind: 'build-request',
               appId,

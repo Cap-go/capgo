@@ -534,6 +534,10 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
   // reachable whether the user proceeds or cancels.
   const [supportConfirmMessage, setSupportConfirmMessage] = useState<string>('')
   const supportConfirmResolveRef = useRef<((proceed: boolean) => void) | null>(null)
+  // The exact bundle that will be sent — shown in a scrollable viewer when the
+  // user picks "View logs first" from the confirm step.
+  const [supportLogLines, setSupportLogLines] = useState<string[]>([])
+  const supportLogPathRef = useRef<string>('')
   // ── AI-analysis sub-flow (see iOS sibling for full notes). Entered only when
   // requestBuildInternal returns aiAnalysis.ready=true on a failed build.
   const [aiJobId, setAiJobId] = useState<string | null>(null)
@@ -929,7 +933,8 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
   // Show the contact-support confirmation gate as an Ink step and resolve once
   // the user picks Yes/Cancel. Returns a promise so contactSupport() can await
   // the user's decision before doing anything (writing logs / opening mail).
-  const askSupportConfirm = useCallback((message: string): Promise<boolean> => {
+  const askSupportConfirm = useCallback((message: string, logPath: string): Promise<boolean> => {
+    supportLogPathRef.current = logPath
     setSupportConfirmMessage(message)
     setStep('support-confirm')
     return new Promise<boolean>((resolve) => {
@@ -963,7 +968,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
     await contactSupport({
       subject: `Capgo Builder support — ${appId} (android)`,
       body: `Hi Capgo team,\n\nMy build failed and I'd like help.\n\nApp: ${appId}\nPlatform: android\nError: ${sanitizedError}\n\n(Logs saved locally; secrets removed — I'll attach the file.)`,
-      confirm: async msg => askSupportConfirm(msg),
+      confirm: async (msg, logPath) => askSupportConfirm(msg, logPath),
       buildFiles: () => writeSupportBundleFiles({
         kind: 'build-init',
         appId,
@@ -2294,6 +2299,20 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
       />
     )
 
+  // "View logs first" from the support confirm — a scrollable takeover of the
+  // exact bundle that will be sent (secrets already redacted). Exit returns to
+  // the confirm so the user can then send or cancel.
+  if (step === 'support-log-view')
+    return (
+      <FullscreenAiViewer
+        title="Logs that will be sent to Capgo support"
+        subtitle={`${supportLogLines.length} lines — secrets are already removed. Scroll to review, then press q/esc to go back.`}
+        lines={supportLogLines}
+        terminalRows={terminalRows}
+        onExit={() => setStep('support-confirm')}
+      />
+    )
+
   // The workflow-file diff is a fullscreen takeover too (same reasoning as the
   // AI/build viewers): rendered inside the wizard Box it inherited the header +
   // padding (a large top gap) and a too-short viewport. As an early return it
@@ -3565,10 +3584,19 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
           <Text>{supportConfirmMessage}</Text>
           <Select
             options={[
-              { label: '📨  Yes, open the email', value: 'yes' },
+              { label: '📨  Yes, send to support', value: 'yes' },
+              { label: '👀  View logs first', value: 'view' },
               { label: '✖  Cancel', value: 'no' },
             ]}
             onChange={(value) => {
+              if (value === 'view') {
+                let lines: string[] = []
+                try { lines = readFileSync(supportLogPathRef.current, 'utf8').split('\n') }
+                catch { lines = ['(could not read the logs file)'] }
+                setSupportLogLines(lines)
+                setStep('support-log-view')
+                return
+              }
               const resolve = supportConfirmResolveRef.current
               supportConfirmResolveRef.current = null
               resolve?.(value === 'yes')

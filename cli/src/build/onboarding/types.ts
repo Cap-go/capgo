@@ -100,6 +100,8 @@ export type OnboardingStep
     | 'error'
     // Contact-support confirmation gate (shown before we save logs + open mail)
     | 'support-confirm'
+    // Scrollable viewer of the exact bundle, reached from the confirm's "View logs first"
+    | 'support-log-view'
 
 export type OnboardingErrorCategory
   = | 'apple_api_unauthorized'
@@ -305,6 +307,7 @@ export const STEP_PROGRESS: Record<OnboardingStep, number> = {
   'no-platform': 0,
   'error': 0,
   'support-confirm': 0,
+  'support-log-view': 0,
 }
 
 export function getPhaseLabel(step: OnboardingStep): string {
@@ -394,6 +397,7 @@ export function getPhaseLabel(step: OnboardingStep): string {
     case 'no-platform':
     case 'error':
     case 'support-confirm':
+    case 'support-log-view':
       return ''
   }
 }

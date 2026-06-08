@@ -604,6 +604,10 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
   // reachable whether the user proceeds or cancels.
   const [supportConfirmMessage, setSupportConfirmMessage] = useState<string>('')
   const supportConfirmResolveRef = useRef<((proceed: boolean) => void) | null>(null)
+  // The exact bundle that will be sent — shown in a scrollable viewer when the
+  // user picks "View logs first" from the confirm step.
+  const [supportLogLines, setSupportLogLines] = useState<string[]>([])
+  const supportLogPathRef = useRef<string>('')
   // ── AI-analysis sub-flow (entered only when the build fails and logs were
   // captured). `aiJobId` is set when entering 'ai-analysis-prompt'; the running
   // step reads it to call runCapgoAiAnalysis; the result step renders one of
@@ -1136,8 +1140,9 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
   // Show the contact-support confirmation gate as an Ink step and resolve once
   // the user picks Yes/Cancel. Returns a promise so contactSupport() can await
   // the user's decision before doing anything (writing logs / opening mail).
-  const askSupportConfirm = useCallback((message: string): Promise<boolean> => {
+  const askSupportConfirm = useCallback((message: string, logPath: string): Promise<boolean> => {
     setSupportConfirmMessage(message)
+    supportLogPathRef.current = logPath
     setStep('support-confirm')
     return new Promise<boolean>((resolve) => {
       supportConfirmResolveRef.current = resolve
@@ -1170,7 +1175,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
     await contactSupport({
       subject: `Capgo Builder support — ${appId} (ios)`,
       body: `Hi Capgo team,\n\nMy build failed and I'd like help.\n\nApp: ${appId}\nPlatform: ios\nError: ${sanitizedError}\n\n(Logs saved locally; secrets removed — I'll attach the file.)`,
-      confirm: async msg => askSupportConfirm(msg),
+      confirm: async (msg, logPath) => askSupportConfirm(msg, logPath),
       buildFiles: () => writeSupportBundleFiles({
         kind: 'build-init',
         appId,
@@ -2851,6 +2856,20 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
           setAiViewedFull(true)
           setStep('ai-analysis-result')
         }}
+      />
+    )
+
+  // "View logs first" from the support confirm — a scrollable takeover of the
+  // exact bundle that will be sent (secrets already redacted). Exit returns to
+  // the confirm so the user can then send or cancel.
+  if (step === 'support-log-view')
+    return (
+      <FullscreenAiViewer
+        title="Logs that will be sent to Capgo support"
+        subtitle={`${supportLogLines.length} lines — secrets are already removed. Scroll to review, then press q/esc to go back.`}
+        lines={supportLogLines}
+        terminalRows={terminalRows}
+        onExit={() => setStep('support-confirm')}
       />
     )
 
@@ -4547,10 +4566,19 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
           <Text>{supportConfirmMessage}</Text>
           <Select
             options={[
-              { label: '📨  Yes, open the email', value: 'yes' },
+              { label: '📨  Yes, send to support', value: 'yes' },
+              { label: '👀  View logs first', value: 'view' },
               { label: '✖  Cancel', value: 'no' },
             ]}
             onChange={(value) => {
+              if (value === 'view') {
+                let lines: string[] = []
+                try { lines = readFileSync(supportLogPathRef.current, 'utf8').split('\n') }
+                catch { lines = ['(could not read the logs file)'] }
+                setSupportLogLines(lines)
+                setStep('support-log-view')
+                return
+              }
               const resolve = supportConfirmResolveRef.current
               supportConfirmResolveRef.current = null
               resolve?.(value === 'yes')
