@@ -10,7 +10,7 @@
 
 **Spec:** `docs/superpowers/specs/2026-06-06-keychain-helper-precompile-design.md`
 
-**⚠️ Sequencing constraint:** Task 9 (adding `optionalDependencies` to `cli/package.json`) MUST NOT merge to main until helper 1.0.0 is live on npm (Task 13). Otherwise `bun install --frozen-lockfile` in every CI job fails resolving the not-yet-published packages. Tasks 1–8 and 10–11 are safe to merge any time (the workflow only fires on `cli-helper-*` tags). The CLI release tag (Task 13) comes last.
+**⚠️ Sequencing constraint:** Task 9 (adding `optionalDependencies` to `cli/package.json`) MUST NOT merge to main until helper 1.0.0 is live on npm (Task 13). Otherwise `bun install --frozen-lockfile` in every CI job fails resolving the not-yet-published packages. Tasks 1–8 and 10–11 are safe to merge any time (the helper workflow only runs on manual `workflow_dispatch`, never automatically). The CLI release (Task 13) comes last.
 
 **⚠️ User input needed during execution:**
 - Task 4 / Task 12: Capgo's Apple **Team ID** (10-char, the `subject.OU` of the Developer ID cert). Likely `UVTJ336J2D` (appears in existing test fixtures as "digital shift oü (UVTJ336J2D)") — **confirm with the user before hardcoding**.
@@ -290,10 +290,12 @@ binary you built and trust.
 
 ## Release
 
-1. Bump nothing in-repo — versions are stamped from the tag.
-2. `git tag cli-helper-X.Y.Z && git push origin cli-helper-X.Y.Z`
+1. Bump nothing in-repo — the version comes from the dispatch input.
+2. Run the workflow from the GitHub Actions UI ("Run workflow" → enter the
+   version), or: `gh workflow run publish_cli_helper.yml -f version=X.Y.Z`
 3. `.github/workflows/publish_cli_helper.yml` builds, signs, notarizes,
-   smoke-tests, and publishes both packages with npm provenance.
+   smoke-tests, publishes both packages with npm provenance, and creates the
+   `cli-helper-X.Y.Z` tag + GitHub release.
 4. Release only when `src/helper.swift` actually changed.
 
 Required GitHub secrets: `DEVELOPER_ID_CERT_BASE64`, `DEVELOPER_ID_CERT_PASSWORD`
@@ -1137,9 +1139,11 @@ concurrency:
   cancel-in-progress: true
 
 on:
-  push:
-    tags:
-      - "cli-helper-[0-9]*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Helper version to publish, e.g. 1.0.0 (no 'cli-helper-' prefix)"
+        required: true
 
 permissions: {}
 
@@ -1159,9 +1163,14 @@ jobs:
         with:
           node-version: 24.x
           registry-url: https://registry.npmjs.org
-      - name: Extract version from tag
+      - name: Validate + capture version
         id: version
-        run: echo "version=${GITHUB_REF_NAME#cli-helper-}" >> "$GITHUB_OUTPUT"
+        run: |
+          v="${{ github.event.inputs.version }}"
+          if ! echo "$v" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$'; then
+            echo "::error::version '$v' is not semver (e.g. 1.0.0)"; exit 1
+          fi
+          echo "version=$v" >> "$GITHUB_OUTPUT"
       - name: Build helper binaries
         run: bash cli-helper/scripts/build.sh
       - name: Import Developer ID certificate into throwaway keychain
@@ -1228,9 +1237,11 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: npm publish --provenance --access public
-      - name: Create GitHub release
+      - name: Create tag + GitHub release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: cli-helper-${{ steps.version.outputs.version }}
+          target_commitish: ${{ github.sha }}
           files: |
             cli-helper/dist/helper-arm64
             cli-helper/dist/helper-x64
@@ -1312,13 +1323,17 @@ Expected: both binaries report `Notarization accepted` and both `codesign --veri
 
 - [ ] **Step 1: Merge everything except Task 9** (the `optionalDependencies` change stays unmerged/uncommitted until Step 3).
 
-- [ ] **Step 2: Tag and publish helper 1.0.0**
+- [ ] **Step 2: Dispatch the helper release for 1.0.0**
+
+From the GitHub Actions UI ("Build and publish CLI keychain helper" → Run
+workflow → version `1.0.0`), or:
 
 ```bash
-git tag cli-helper-1.0.0 && git push origin cli-helper-1.0.0
+gh workflow run publish_cli_helper.yml --repo Cap-go/capgo -f version=1.0.0
 ```
 
-Watch: `gh run watch --repo Cap-go/capgo`. Then verify:
+Watch: `gh run watch --repo Cap-go/capgo`. The run signs, notarizes, publishes,
+and creates the `cli-helper-1.0.0` tag + release. Then verify:
 
 ```bash
 npm view @capgo/cli-keychain-darwin-arm64@1.0.0 dist.tarball

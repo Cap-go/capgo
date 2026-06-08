@@ -35,7 +35,7 @@ either runs a verified Capgo-signed binary or fails with clear guidance.
 | Fallback | **None.** The runtime swiftc compile path and tmp-binary cache are deleted. Missing/unverifiable binary → hard error with install guidance |
 | Min macOS | x64 slice: macOS 10.15 (oldest macOS that runs Node 20, the CLI's floor); arm64 slice: macOS 11.0 |
 | Versioning | Independent semver, starting 1.0.0; release tag `cli-helper-X.Y.Z`; released **only when helper source changes**, not per CLI release |
-| Pipeline | Tag-triggered GitHub Actions workflow on `macos-latest`: build → codesign → notarize → verify → npm publish with provenance |
+| Pipeline | **Manually dispatched** (`workflow_dispatch` with a `version` input) GitHub Actions workflow on `macos-latest`: build → codesign → notarize → verify → npm publish with provenance; the run creates the `cli-helper-X.Y.Z` git tag + GitHub release itself. Deliberate (human-in-the-loop) because releases are rare and notarization is a flaky external dependency — intentionally diverges from the repo's auto-tag `bump_version.yml` path used by `capgo`/`cli` |
 | Signing | Developer ID Application certificate; hardened runtime + secure timestamp; stable code-signing identifier `app.capgo.cli.helper` (preserves Keychain "Always Allow" across re-signs and a future `.app` migration); notarized via `notarytool` with existing App Store Connect API key secrets |
 | Binary trust | CLI verifies the package-resolved binary's code signature (Developer ID + Capgo Team ID designated requirement) before executing it; failure is a hard error |
 | Env override | `CAPGO_KEYCHAIN_HELPER_PATH` exists in dev builds only — stripped from npm release builds via build-time define + dead-code elimination |
@@ -228,8 +228,11 @@ Security model). `exportP12FromKeychain`'s JSON parsing is otherwise untouched.
 
 ## CI pipeline — `.github/workflows/publish_cli_helper.yml`
 
-Trigger: push of tags matching `cli-helper-[0-9]*`. Single job on
+Trigger: `workflow_dispatch` with a required `version` input (e.g. `1.0.0`),
+run from the GitHub Actions UI or `gh workflow run`. Single job on
 `macos-latest` (both arches cross-compile on one runner; no artifact passing).
+The run validates the version is semver, then drives the steps below, and at
+the end creates the `cli-helper-<version>` git tag + GitHub release.
 
 1. **Build** (per arch):
    - `swiftc src/helper.swift -framework Security -O -target arm64-apple-macos11 -o dist/helper-arm64`
@@ -253,12 +256,13 @@ Trigger: push of tags matching `cli-helper-[0-9]*`. Single job on
    arm64 binary with no subcommand and assert non-zero exit + `INVALID_ARGS`
    JSON envelope on stdout (the anti-footgun gate guards only the
    `keychain-export` subcommand, so a bare invocation reaches `INVALID_ARGS`).
-5. **Publish**: `prepare-publish.mjs` reads the version from the tag, stamps
-   both manifests (failing fast on mismatch), copies each binary into its
-   package dir, then `npm publish --provenance --access public` for both
-   packages back-to-back after all gates pass.
-6. **GitHub release**: same `softprops/action-gh-release` pattern as
-   `publish_cli.yml`, with both binaries attached as release assets.
+5. **Publish**: `prepare-publish.mjs` takes the dispatched `version` input,
+   stamps both manifests, copies each binary into its package dir, then
+   `npm publish --provenance --access public` for both packages back-to-back
+   after all gates pass.
+6. **Tag + GitHub release**: `softprops/action-gh-release` with
+   `tag_name: cli-helper-<version>` (the action creates the tag on the
+   dispatched commit), both binaries attached as release assets.
 
 Required workflow permissions: `contents: write`, `id-token: write`
 (provenance).
