@@ -206,7 +206,7 @@ async function startNativePreview() {
     >
       <img
         :src="qrCodeDataUrl"
-        alt="QR Code to preview on phone"
+        :alt="t('qr-code-preview-alt')"
         class="mb-3 h-44 w-44"
       >
       <p class="max-w-40 text-center text-sm text-gray-600 dark:text-gray-400">
@@ -295,7 +295,7 @@ async function startNativePreview() {
       >
         <img
           :src="qrCodeDataUrl"
-          alt="QR Code to preview on phone"
+          :alt="t('qr-code-preview-alt')"
           class="mb-3 h-44 w-44"
         >
         <p class="text-sm text-center text-gray-600 dark:text-gray-400 max-w-40">
