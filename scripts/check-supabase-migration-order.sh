@@ -14,6 +14,17 @@ extract_timestamp() {
   fi
 }
 
+count_nonempty_lines() {
+  local value="$1"
+
+  if [[ -z "$value" ]]; then
+    echo 0
+    return
+  fi
+
+  printf '%s\n' "$value" | awk 'NF { count++ } END { print count + 0 }'
+}
+
 resolve_target_branch() {
   if [[ -n "${GITHUB_BASE_REF:-}" ]]; then
     echo "${GITHUB_BASE_REF}"
@@ -86,6 +97,8 @@ if [[ -s "${base_timestamps_file}" ]]; then
 fi
 
 status=0
+current_migration_files="$(find supabase/migrations -maxdepth 1 -type f -name '*.sql' | sort)"
+current_migration_count="$(count_nonempty_lines "$current_migration_files")"
 
 modified_files="$(git diff --name-only --diff-filter=MR "${base_ref}...HEAD" -- 'supabase/migrations/*.sql')"
 if [[ -n "$modified_files" ]]; then
@@ -114,18 +127,54 @@ if [[ -n "$modified_files" ]]; then
   fi
 fi
 
+added_files="$(git diff --name-only --diff-filter=A "${base_ref}...HEAD" -- 'supabase/migrations/*.sql')"
 deleted_files="$(git diff --name-only --diff-filter=D "${base_ref}...HEAD" -- 'supabase/migrations/*.sql')"
 if [[ -n "$deleted_files" ]]; then
-  echo '❌ Existing Supabase migrations were deleted in this change.'
-  echo '  Supabase migrations must remain append-only.'
-  while IFS= read -r file; do
-    [[ -z "$file" ]] && continue
-    echo "  - $file"
-  done <<< "$deleted_files"
-  status=1
+  allow_full_squash=0
+  remaining_migration_file=''
+  remaining_migration_rewritten=0
+
+  if [[ -z "$added_files" && "$current_migration_count" == '1' ]]; then
+    remaining_migration_file="$current_migration_files"
+    remaining_timestamp="$(extract_timestamp "$remaining_migration_file" || true)"
+    if ! git diff --quiet "${base_ref}...HEAD" -- "$remaining_migration_file"; then
+      remaining_migration_rewritten=1
+    fi
+
+    if [[ "$remaining_migration_rewritten" == '1' && -n "$remaining_timestamp" && "$remaining_timestamp" == "$latest_base_timestamp" ]]; then
+      deleted_latest_or_newer_files=''
+
+      while IFS= read -r file; do
+        [[ -z "$file" ]] && continue
+
+        ts="$(extract_timestamp "$file" || true)"
+        if [[ -z "$ts" || "$ts" == "$latest_base_timestamp" || 10#$ts > 10#$latest_base_timestamp ]]; then
+          deleted_latest_or_newer_files+="${file}"$'\n'
+        fi
+      done <<< "$deleted_files"
+
+      if [[ -z "$deleted_latest_or_newer_files" ]]; then
+        allow_full_squash=1
+      fi
+    fi
+  fi
+
+  if [[ "$allow_full_squash" == '1' ]]; then
+    echo "⚠️  Allowing intentional Supabase migration squash into baseline: ${remaining_migration_file}"
+  else
+    echo '❌ Existing Supabase migrations were deleted in this change.'
+    echo '  Supabase migrations must remain append-only except for a full baseline squash.'
+    if [[ -n "$remaining_migration_file" && "$remaining_migration_rewritten" != '1' ]]; then
+      echo "  The remaining migration was not rewritten: ${remaining_migration_file}"
+    fi
+    while IFS= read -r file; do
+      [[ -z "$file" ]] && continue
+      echo "  - $file"
+    done <<< "$deleted_files"
+    status=1
+  fi
 fi
 
-added_files="$(git diff --name-only --diff-filter=A "${base_ref}...HEAD" -- 'supabase/migrations/*.sql')"
 if [[ -n "$added_files" ]]; then
   : > "${added_timestamps_file}"
 

@@ -128,7 +128,7 @@ function ensureWorktreeSupabaseDir(repoRoot: string): { workdir: string, cfg: Re
   // Symlink everything except config.toml so we can safely rewrite ports + project_id per worktree.
   const repoSupaDir = resolve(cfg.repoRoot, 'supabase')
   const repoTemplatesDir = resolve(repoSupaDir, 'templates')
-  for (const entry of ['functions', 'migrations', 'schemas', 'tests', 'seed.sql', 'migration_guide.md', '.gitignore']) {
+  for (const entry of ['functions', 'migrations', 'repair', 'schemas', 'tests', 'seed.sql', 'migration_guide.md', '.gitignore']) {
     const src = resolve(repoSupaDir, entry)
     if (!existsSync(src))
       continue
