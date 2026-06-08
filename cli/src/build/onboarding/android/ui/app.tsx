@@ -1810,9 +1810,20 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
             const msg = err instanceof Error ? err.message : String(err)
             // Treat "already exists" style failures as success — the SA is
             // already a user on this developer account from a prior run.
-            if (!/already|exists|duplicate/i.test(msg))
+            if (/already|exists|duplicate/i.test(msg)) {
+              addSetupStatus(`ℹ Service account was already invited — continuing`)
+            }
+            // The per-package grant 400s if the package isn't a real Play app
+            // ("...packages are not available..."). On the verified generate path
+            // we gate against this earlier; this is the safety net for the
+            // import/degraded path. Turn Google's raw 400 into an actionable
+            // message instead of dumping it to the error screen.
+            else if (/not available|notFound|not found/i.test(msg) && /package/i.test(msg)) {
+              throw new Error(`The package "${androidPackageChoice?.packageName ?? 'you selected'}" doesn't exist in this Play Console account yet, so the service account couldn't be granted access. Create the app in Play Console first (one-time, on the web), then re-run onboarding.`)
+            }
+            else {
               throw err
-            addSetupStatus(`ℹ Service account was already invited — continuing`)
+            }
           }
           if (cancelled)
             return
@@ -3214,7 +3225,9 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
                     value: `play:${a.packageName}`,
                   })),
                   ...detectedPackageIds.map(id => ({
-                    label: `📦  ${id}  (from your Gradle config)`,
+                    label: verifyPlayApps.some(a => a.packageName === id)
+                      ? `📦  ${id}  (from Gradle · ✓ in Play Console)`
+                      : `📦  ${id}  (from Gradle · ⚠ not on Play yet — needs creating)`,
                     value: `gradle:${id}`,
                   })),
                   { label: '✍️   Type a different package name', value: '__manual__' },
@@ -3254,7 +3267,18 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
                   if (value.startsWith('gradle:')) {
                     const id = value.slice('gradle:'.length)
                     trackVerifyPicked(id, 'gradle')
-                    pickAndroidPackageAndAdvance(id, 'gradle')
+                    // The build id must be a REAL Play app: the SA invite grants
+                    // per-package and Google 400s on a package that doesn't exist.
+                    // If apps:search doesn't list it, steer to create-app instead
+                    // of advancing into a doomed provision.
+                    if (verifyPlayApps.some(a => a.packageName === id)) {
+                      pickAndroidPackageAndAdvance(id, 'gradle')
+                    }
+                    else {
+                      setVerifyAttempt(0)
+                      setVerifyAskReopen(false)
+                      setStep('android-app-verify-create-app')
+                    }
                   }
                 }}
               />
@@ -3313,6 +3337,17 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
                   return
                 }
                 trackVerifyPicked(name, 'manual')
+                // On the verified generate path the typed package must be a real
+                // Play app — otherwise the per-package SA invite 400s. Steer an
+                // unknown package to create-app. (The import/degraded path has no
+                // apps list to check against and keeps the old behavior + banner.)
+                const verifiedGenerate = serviceAccountMethod === 'generate' && !verifyDegraded && !verifyImportSkipped
+                if (verifiedGenerate && !verifyPlayApps.some(a => a.packageName === name)) {
+                  setVerifyAttempt(0)
+                  setVerifyAskReopen(false)
+                  setStep('android-app-verify-create-app')
+                  return
+                }
                 pickAndroidPackageAndAdvance(name, detectedPackageIds.includes(name) ? 'gradle' : 'user-input')
               }}
             />
@@ -3705,28 +3740,15 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
         )
       })()}
 
-      {/* Path B — no Play app exists yet. Inform + allow proceed (never hard
-          gate): the Create-app click is the only manual step; the first build
-          uploads as a draft automatically. Re-check uses a loader + attempt
-          counter + the iOS ask-before-reopen mechanics. */}
+      {/* Path B — no Play app exists yet. This is a real GATE on the generate
+          path, NOT inform-and-proceed: the SA invite grants per-package and
+          Google 400s on a package that doesn't exist, so onboarding cannot
+          proceed until the app exists in Play Console. Create it (one manual
+          click — the API can't), then re-check until apps:search sees it and we
+          auto-advance. Re-check uses a loader + attempt counter + ask-before-reopen. */}
       {step === 'android-app-verify-create-app' && (() => {
         const pkgLabel = detectedPackageIds.join(', ') || 'your project'
         const attemptMarker = verifyAttempt > 0 ? ` (attempt ${verifyAttempt})` : ''
-
-        // Inform-and-proceed (spec §5.5). A single clean build id → pick it and
-        // advance; 0 or many ids → return to the plain package picker so the
-        // user picks/types the package to grant access to.
-        const proceedAnyway = () => {
-          if (detectedPackageIds.length === 1) {
-            pickAndroidPackageAndAdvance(detectedPackageIds[0], 'gradle')
-            return
-          }
-          // "Continue anyway" must land on the PLAIN picker — mark the package
-          // step as already-loaded so its effect doesn't re-fetch, re-reconcile
-          // to no-app, and bounce straight back to this screen.
-          packageLoadedRef.current = true
-          setStep('android-package-select')
-        }
 
         // Open Play Console's app list so the user clicks "Create app" (the only
         // irreducible manual step). Asked before RE-opening on later attempts.
@@ -3793,7 +3815,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
             const why = err instanceof ReportingApiHttpError && err.status === 403
               ? 'the Play Developer Reporting permission was not granted'
               : 'Play Console could not be reached'
-            addLog(`⚠ Couldn't re-check Play Console — ${why}. You can still continue.`, 'yellow')
+            addLog(`⚠ Couldn't re-check Play Console — ${why}. Create the app, then re-check.`, 'yellow')
           }
           finally {
             // Deliberately NOT epoch-guarded: leaving the step mid-flight must
@@ -3820,7 +3842,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
               <Box flexDirection="column" borderStyle="round" borderColor="yellow" paddingX={1}>
                 <Text bold color="yellow">{`Still no Play Store app for ${pkgLabel}${attemptMarker}`}</Text>
                 <Newline />
-                <Text>{'We re-checked Play Console and didn\'t find an app yet. Newly-created apps can take a moment to appear — re-check again, or continue (the first build still uploads as a draft once the app exists).'}</Text>
+                <Text>{'We re-checked Play Console and didn\'t find an app yet. Newly-created apps can take a moment to appear — re-check again. Onboarding can\'t continue until the app exists, because Capgo grants your build access to that specific package.'}</Text>
               </Box>
               <Newline />
               <Select
@@ -3828,7 +3850,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
                 options={[
                   { label: '🔁 I\'ve created it — re-check', value: 'recheck' },
                   { label: '🌐 Re-open Play Console', value: 'reopen' },
-                  { label: '➡  Continue anyway', value: 'continue' },
+                  ...(verifyPlayApps.length > 0 ? [{ label: '↩  Back — pick a different app', value: 'back' }] : []),
                   { label: '❌ Cancel onboarding', value: 'cancel' },
                 ]}
                 onChange={(value) => {
@@ -3841,8 +3863,11 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
                     void openCreatePlayConsole()
                     return
                   }
-                  if (value === 'continue') {
-                    proceedAnyway()
+                  if (value === 'back') {
+                    setVerifyAttempt(0)
+                    setVerifyAskReopen(false)
+                    packageLoadedRef.current = true
+                    setStep('android-package-select')
                     return
                   }
                   addLog('Exiting onboarding.', 'yellow')
@@ -3861,7 +3886,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
               <Text>
                 {'No Play Store app exists yet for '}
                 <Text bold color="cyan">{pkgLabel}</Text>
-                {'. Create it once in Play Console (the only manual step), then re-check — Capgo Builder uploads the first build as a draft automatically.'}
+                {'. Create it once in Play Console (the only manual step), then re-check. Onboarding continues automatically once the app exists — Capgo grants your build access to that specific package, so it must exist first.'}
               </Text>
               <Text dimColor>The Play Console API cannot create apps — this is a one-time manual step on the web.</Text>
             </Box>
@@ -3871,7 +3896,6 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
               options={[
                 { label: '🌐 Open Play Console to create this app', value: 'open' },
                 { label: '🔁 I\'ve created it — re-check', value: 'recheck' },
-                { label: '➡  Continue anyway', value: 'continue' },
                 ...(verifyPlayApps.length > 0 ? [{ label: '↩  Back — pick a different app', value: 'back' }] : []),
                 { label: '❌ Cancel onboarding', value: 'cancel' },
               ]}
@@ -3888,11 +3912,8 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
                 if (value === 'back') {
                   setVerifyAttempt(0)
                   setVerifyAskReopen(false)
+                  packageLoadedRef.current = true
                   setStep('android-package-select')
-                  return
-                }
-                if (value === 'continue') {
-                  proceedAnyway()
                   return
                 }
                 addLog('Exiting onboarding.', 'yellow')
