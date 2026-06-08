@@ -1,8 +1,23 @@
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
+import process from 'node:process'
 import { gzipSync } from 'node:zlib'
+import pack from '../package.json'
 import { redactSecrets } from './support/redact.js'
+
+// Environment header so EVERY support bundle is self-contained — the "what
+// version / which OS / which runtime" context support always needs but the flow
+// itself never logs.
+function diagnosticsLines(): string[] {
+  const bun = (globalThis as { Bun?: { version: string } }).Bun
+  return [
+    `CLI version: ${pack.version}`,
+    `OS: ${process.platform} ${process.arch}`,
+    `Runtime: ${bun ? `bun ${bun.version}` : `node ${process.version}`}`,
+    `cwd: ${process.cwd()}`,
+  ]
+}
 
 const NON_SEGMENT_RE = /[^\w.-]+/g
 const DASHES_RE = /-+/g
@@ -59,6 +74,7 @@ export function renderOnboardingSupportBundle(input: OnboardingSupportBundleInpu
   const lines: string[] = [
     `Capgo ${input.kind} support bundle`,
     `Generated: ${new Date().toISOString()}`,
+    ...diagnosticsLines(),
     `Error: ${input.error}`,
   ]
 
