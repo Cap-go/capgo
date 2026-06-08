@@ -796,6 +796,7 @@ build
   .description('Set up build credentials interactively (iOS: certificates + profiles automated; Android: keystore + Google OAuth provisions GCP service account and Play Console invite)')
   .option('-a, --apikey <apikey>', 'API key to link to your account')
   .option('-p, --platform <platform>', 'Platform to onboard (ios or android). If omitted, auto-detects when only one native folder exists; prompts otherwise.')
+  .option('--supa-host <supaHost>', optionDescriptions.supaHost)
   .action(onboardingBuilderCommand)
 
 build

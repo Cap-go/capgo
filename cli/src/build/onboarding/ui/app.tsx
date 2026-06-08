@@ -160,6 +160,8 @@ interface AppProps {
   iosDir: string
   /** Optional Capgo API key passed via -a/--apikey flag; takes precedence over saved key */
   apikey?: string
+  /** Capgo API host (default prod); set via `build init --supa-host` for preprod/self-host */
+  apiHost?: string
   /** Reports the wizard outcome to the shell when it reaches build-complete, so
    *  the caller prints an accurate post-exit message + durable summary instead of
    *  always claiming success. Never fires on cancel/missing-platform exits. */
@@ -203,7 +205,7 @@ async function runRunnerCommand(runner: string, args: string[]): Promise<{ succe
   })
 }
 
-const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgress, iosDir, apikey, onResult }) => {
+const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgress, iosDir, apikey, apiHost, onResult }) => {
   const { exit } = useApp()
   const startStep = getResumeStep(initialProgress)
 
@@ -1174,7 +1176,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
     const sanitizedError = redactSecrets(error ?? 'unknown error')
     await contactSupport({
       subject: `Capgo Builder support — ${appId} (ios)`,
-      body: `Hi Capgo team,\n\nMy build failed and I'd like help.\n\nApp: ${appId}\nPlatform: ios\nError: ${sanitizedError}\n\n(Logs saved locally; secrets removed — I'll attach the file.)`,
+      body: `Hi Capgo team,\n\nMy build failed and I'd like help.\n\nApp: ${appId}\nPlatform: ios\nError: ${sanitizedError}`,
       confirm: async (msg, logPath) => askSupportConfirm(msg, logPath),
       buildFiles: () => writeSupportBundleFiles({
         kind: 'build-init',
@@ -1198,7 +1200,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
       upload: (gzPath) => {
         setStep('support-uploading') // show a spinner while the (network) upload runs
         return uploadSupportLogs({
-          apiHost: 'https://api.capgo.app',
+          apiHost: apiHost ?? 'https://api.capgo.app',
           apikey: resolvedApiKeyRef.current ?? apikey ?? '',
           appId,
           jobId: aiJobId ?? undefined,

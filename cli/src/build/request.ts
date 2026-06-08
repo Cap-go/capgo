@@ -2155,7 +2155,7 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
           catch { /* best-effort */ }
           await contactSupport({
             subject: `Capgo Builder support — ${appId} (${platform})`,
-            body: `Hi Capgo team,\n\nMy cloud build failed and I'd like help.\n\nApp: ${appId}\nPlatform: ${platform}\nJob: ${capturedJobId}\n\n(Logs saved locally; secrets removed — I'll attach the file.)`,
+            body: `Hi Capgo team,\n\nMy cloud build failed and I'd like help.\n\nApp: ${appId}\nPlatform: ${platform}\nJob: ${capturedJobId}`,
             confirm: async (msg, logPath) => {
               for (;;) {
                 const choice = await select({

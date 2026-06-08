@@ -170,6 +170,8 @@ interface AppProps {
   androidDir: string
   /** Optional Capgo API key passed via -a/--apikey flag; takes precedence over saved key. */
   apikey?: string
+  /** Capgo API host (default prod); set via `build init --supa-host` for preprod/self-host */
+  apiHost?: string
   /** Reports the wizard outcome to the shell when it reaches build-complete, so
    *  the caller prints an accurate post-exit message + durable summary instead of
    *  always claiming success. Never fires on cancel/missing-platform exits. */
@@ -210,7 +212,7 @@ function emptyProgress(appId: string): AndroidOnboardingProgress {
   }
 }
 
-const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir, apikey, onResult }) => {
+const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir, apikey, apiHost, onResult }) => {
   const { exit } = useApp()
   const startStep: AndroidOnboardingStep = getAndroidResumeStep(initialProgress)
 
@@ -967,7 +969,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
     const sanitizedError = redactSecrets(error ?? 'unknown error')
     await contactSupport({
       subject: `Capgo Builder support — ${appId} (android)`,
-      body: `Hi Capgo team,\n\nMy build failed and I'd like help.\n\nApp: ${appId}\nPlatform: android\nError: ${sanitizedError}\n\n(Logs saved locally; secrets removed — I'll attach the file.)`,
+      body: `Hi Capgo team,\n\nMy build failed and I'd like help.\n\nApp: ${appId}\nPlatform: android\nError: ${sanitizedError}`,
       confirm: async (msg, logPath) => askSupportConfirm(msg, logPath),
       buildFiles: () => writeSupportBundleFiles({
         kind: 'build-init',
@@ -991,7 +993,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
       upload: (gzPath) => {
         setStep('support-uploading') // show a spinner while the (network) upload runs
         return uploadSupportLogs({
-          apiHost: 'https://api.capgo.app',
+          apiHost: apiHost ?? 'https://api.capgo.app',
           apikey: resolvedApiKeyRef.current ?? apikey ?? '',
           appId,
           jobId: aiJobId ?? undefined,

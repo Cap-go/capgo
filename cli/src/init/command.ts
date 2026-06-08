@@ -105,6 +105,7 @@ let globalPlatform: 'ios' | 'android' = 'ios'
 let globalDelta = false
 let globalCurrentVersion: string | undefined
 let globalAppId: string | undefined
+let globalSupaHost: string | undefined
 let globalCodeDiff: InitCodeDiff | undefined
 let globalEncryptionSummary: InitEncryptionSummary | undefined
 let globalCurrentStepNumber = 0
@@ -496,7 +497,7 @@ function readInitInternalLogLines(): string[] {
 async function runInitContactSupport(failureText: string): Promise<void> {
   await contactSupport({
     subject: `Capgo Builder onboarding support — ${globalAppId ?? 'unknown'}`,
-    body: `Hi Capgo team,\n\nI hit an error during Capgo Builder onboarding.\n\nApp: ${globalAppId ?? 'unknown'}\nError: ${failureText}\n\n(Logs saved locally; secrets removed — I'll attach the file.)`,
+    body: `Hi Capgo team,\n\nI hit an error during Capgo Builder onboarding.\n\nApp: ${globalAppId ?? 'unknown'}\nError: ${failureText}`,
     confirm: async (msg, logPath) => {
       for (;;) {
         const choice = await pSelect({
@@ -534,7 +535,7 @@ async function runInitContactSupport(failureText: string): Promise<void> {
         return null
       const spinner = pSpinner()
       spinner.start('Uploading your logs to Capgo support…')
-      const r = await uploadSupportLogs({ apiHost: defaultApiHost, apikey: key, appId: globalAppId, gzPath })
+      const r = await uploadSupportLogs({ apiHost: globalSupaHost ?? defaultApiHost, apikey: key, appId: globalAppId, gzPath })
       spinner.stop(r ? 'Logs uploaded.' : 'Logs upload unavailable — falling back to attaching the file.')
       return r
     },
@@ -4288,6 +4289,7 @@ async function maybeStarCapgoRepo(includeSkillsRepository = false, repository?: 
 }
 
 export async function initApp(apikeyCommand: string, appId: string, options: SuperOptions) {
+  globalSupaHost = options.supaHost // honor --supa-host for the support-logs upload
   const pm = getPMAndCommand()
   // Start the verbose internal log early so it captures the whole run (incl.
   // raw provider/API errors) and survives crashes for the support bundle.

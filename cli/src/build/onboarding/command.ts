@@ -14,6 +14,8 @@ import type { OnboardingResult } from './types.js'
 export interface OnboardingBuilderOptions {
   apikey?: string
   platform?: string
+  /** Override the Capgo API host (e.g. preprod) — mirrors `build request --supa-host`. */
+  supaHost?: string
 }
 
 type Platform = 'ios' | 'android'
@@ -143,6 +145,7 @@ export async function onboardingBuilderCommand(options: OnboardingBuilderOptions
       iosDir,
       androidDir,
       apikey: options.apikey,
+      apiHost: options.supaHost || 'https://api.capgo.app',
       initialPlatform,
       onResolvePlatform: (platform: Platform) => {
         resolvedPlatform = platform
