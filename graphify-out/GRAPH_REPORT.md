@@ -449,7 +449,7 @@ Nodes (111): app, app, withGlobalPermissions(), apiKeyBindingsAllowOrgCreate(), 
 
 ### Community 6 - "Community 6"
 Cohesion: 0.04
-Nodes (103): AppWithOrg, checkEncryptedBundleEnforcement(), checkVersionExists(), createBundle(), CreateBundleBody, getAppOrganization(), insertBundle(), validateUrlFormat() (+95 more)
+Nodes (101): get(), getAll(), AppWithOrg, checkEncryptedBundleEnforcement(), checkVersionExists(), createBundle(), CreateBundleBody, getAppOrganization() (+93 more)
 
 ### Community 7 - "Community 7"
 Cohesion: 0.04
@@ -489,7 +489,7 @@ Nodes (69): cleanupStepsDone(), promoteEncryptionSummaryToEnabled(), streamComma
 
 ### Community 16 - "Community 16"
 Cohesion: 0.07
-Nodes (68): assertDeviceIPRateLimit(), AppOwnerResult, assertChannelSelfAppOwnerPlanValid(), assertChannelSelfCachedStatus(), assertChannelSelfIPRateLimit(), ChannelSelfDeviceOperation, ChannelSelfOverrideResult, deleteChannelSelfOverrideForDevice() (+60 more)
+Nodes (69): assertDeviceIPRateLimit(), AppOwnerResult, assertChannelSelfAppOwnerPlanValid(), assertChannelSelfCachedStatus(), assertChannelSelfIPRateLimit(), ChannelSelfDeviceOperation, ChannelSelfOverrideResult, deleteChannelSelfOverrideForDevice() (+61 more)
 
 ### Community 17 - "Community 17"
 Cohesion: 0.05
@@ -501,7 +501,7 @@ Nodes (38): createAuthenticatedSupabaseClient(), pgPool, deleteUserAs(), withAut
 
 ### Community 19 - "Community 19"
 Cohesion: 0.05
-Nodes (61): eq(), activeChannelVersionJoin(), AdminCancelledOrganizationRow, AdminCancelledOrganizationsResult, AdminCustomerCountryBreakdown, AdminDeploymentsTrend, AdminEmailTypeBreakdown, AdminGlobalStatsTrend (+53 more)
+Nodes (61): filterDeviceKeys(), get(), GetDevice, publicDevice, app, assertDeviceOperationRateLimit(), handleDeviceOperation(), logDeviceRequestContext() (+53 more)
 
 ### Community 20 - "Community 20"
 Cohesion: 0.06
@@ -509,7 +509,7 @@ Nodes (69): addCurrentSubscriptionInterval(), addInterval(), addInvoiceLineInter
 
 ### Community 21 - "Community 21"
 Cohesion: 0.05
-Nodes (57): app, assertDeviceOperationRateLimit(), handleDeviceOperation(), logDeviceRequestContext(), recordDeviceIPRateLimit(), recordDeviceRateLimitSafely(), AcceptInvitation, app (+49 more)
+Nodes (60): eq(), activeChannelVersionJoin(), AdminCancelledOrganizationRow, AdminCancelledOrganizationsResult, AdminCustomerCountryBreakdown, AdminDeploymentsTrend, AdminEmailTypeBreakdown, AdminGlobalStatsTrend (+52 more)
 
 ### Community 22 - "Community 22"
 Cohesion: 0.04
@@ -565,27 +565,27 @@ Nodes (50): checkAppIdsExist(), completePendingOnboardingApp(), checkVersionStat
 
 ### Community 35 - "Community 35"
 Cohesion: 0.08
-Nodes (42): assertRecognizedRows(), createDemoApp, daysAgoDate(), DEMO_FILE_HASHES, DemoChannel, DemoManifestEntry, DemoNativePackage, DemoVersion (+34 more)
-
-### Community 36 - "Community 36"
-Cohesion: 0.08
 Nodes (33): getAccountDisabledRedirect(), getPostRestorePath(), guard(), isDisabledAccount(), maybeProvisionSsoMembership(), updateUser(), isSsoProvider(), isSsoUser() (+25 more)
 
-### Community 37 - "Community 37"
+### Community 36 - "Community 36"
 Cohesion: 0.07
 Nodes (46): appendCommonFilters(), appendFailedCsvRows(), buildBulkUpdateQuery(), buildCandidateQuery(), createBatchClaimer(), createFailedCsv(), createProgressLogger(), createWorkerReport() (+38 more)
 
-### Community 38 - "Community 38"
+### Community 37 - "Community 37"
 Cohesion: 0.07
 Nodes (49): countDevicesCF(), getAppsFromCF(), getUpdateStatsCF(), readDevicesCF(), readDeviceVersionCountsCF(), readStatsCF(), serializeStatsMetadata(), trackBandwidthUsageCF() (+41 more)
 
-### Community 39 - "Community 39"
+### Community 38 - "Community 38"
 Cohesion: 0.05
 Nodes (35): Awaitable, ChannelInfo, ChannelsListResponse, getUniqueBaseData(), id, headers, id, TEST_ORG_ID (+27 more)
 
-### Community 40 - "Community 40"
+### Community 39 - "Community 39"
 Cohesion: 0.06
 Nodes (46): buildStripeInfoUpdateStatement(), buildSubscriptionEventMetadata(), checkoutSessionEventTypes, classifyRevenueMovement(), compactMetadata(), createdOrUpdated(), createZeroPlanBreakdown(), customerProfileEventTypes (+38 more)
+
+### Community 40 - "Community 40"
+Cohesion: 0.08
+Nodes (40): assertRecognizedRows(), createDemoApp, daysAgoDate(), DEMO_FILE_HASHES, DemoChannel, DemoManifestEntry, DemoNativePackage, DemoVersion (+32 more)
 
 ### Community 41 - "Community 41"
 Cohesion: 0.05
@@ -1603,7 +1603,7 @@ Nodes (3): bumpFiles, scripts, postbump
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `Database` connect `Community 70` to `Community 1`, `Community 261`, `Community 7`, `Community 11`, `Community 12`, `Community 13`, `Community 142`, `Community 268`, `Community 18`, `Community 149`, `Community 23`, `Community 26`, `Community 27`, `Community 28`, `Community 287`, `Community 39`, `Community 42`, `Community 43`, `Community 65`, `Community 69`, `Community 203`, `Community 75`, `Community 77`, `Community 78`, `Community 92`, `Community 246`?**
+- **Why does `Database` connect `Community 70` to `Community 1`, `Community 261`, `Community 7`, `Community 11`, `Community 12`, `Community 13`, `Community 142`, `Community 268`, `Community 18`, `Community 149`, `Community 23`, `Community 26`, `Community 27`, `Community 28`, `Community 287`, `Community 38`, `Community 42`, `Community 43`, `Community 65`, `Community 69`, `Community 203`, `Community 75`, `Community 77`, `Community 78`, `Community 92`, `Community 246`?**
   _High betweenness centrality (0.160) - this node is a cross-community bridge._
 - **Why does `getCreditTopUpProductId()` connect `Community 25` to `Community 3`, `Community 71`?**
   _High betweenness centrality (0.042) - this node is a cross-community bridge._
