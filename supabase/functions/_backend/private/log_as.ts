@@ -121,28 +121,82 @@ async function getUserEmailByAuthEmail(c: Context<MiddlewareKeyVariables>, email
   }
 }
 
-async function getOrgOwnerUserId(supabaseAdmin: SupabaseAdmin, orgId: string): Promise<string | null> {
-  const { data: orgData, error: orgError } = await supabaseAdmin
-    .from('orgs')
-    .select('created_by')
-    .eq('id', orgId)
-    .maybeSingle()
+async function getOrgOwner(c: Context<MiddlewareKeyVariables>, orgId: string): Promise<{ userId: string, email: string } | null> {
+  const pgClient = getPgClient(c)
 
-  if (orgError)
-    throw simpleError('org_lookup_error', 'Organization lookup error', { orgId, orgError })
+  try {
+    const result = await pgClient.query<{ user_id: string, email: string }>(
+      `
+        WITH target_org AS (
+          SELECT id, created_by
+          FROM public.orgs
+          WHERE id = $1
+        ),
+        current_admins AS (
+          SELECT
+            org_users.user_id,
+            auth.users.email,
+            org_users.created_at AS granted_at
+          FROM target_org
+          JOIN public.org_users
+            ON org_users.org_id = target_org.id
+            AND org_users.user_right = 'super_admin'::public.user_min_right
+            AND org_users.app_id IS NULL
+            AND org_users.channel_id IS NULL
+          JOIN auth.users
+            ON auth.users.id = org_users.user_id
+            AND auth.users.email IS NOT NULL
+          UNION
+          SELECT
+            role_bindings.principal_id AS user_id,
+            auth.users.email,
+            role_bindings.granted_at
+          FROM target_org
+          JOIN public.role_bindings
+            ON role_bindings.org_id = target_org.id
+            AND role_bindings.principal_type = public.rbac_principal_user()
+            AND role_bindings.scope_type = public.rbac_scope_org()
+            AND (role_bindings.expires_at IS NULL OR role_bindings.expires_at > now())
+          JOIN public.roles
+            ON roles.id = role_bindings.role_id
+            AND roles.name = public.rbac_role_org_super_admin()
+            AND roles.scope_type = public.rbac_scope_org()
+          JOIN auth.users
+            ON auth.users.id = role_bindings.principal_id
+            AND auth.users.email IS NOT NULL
+        )
+        SELECT current_admins.user_id, current_admins.email
+        FROM target_org
+        JOIN current_admins ON true
+        ORDER BY
+          (current_admins.user_id = target_org.created_by) DESC,
+          current_admins.granted_at ASC,
+          current_admins.user_id ASC
+        LIMIT 1
+      `,
+      [orgId],
+    )
 
-  return orgData?.created_by ?? null
+    const owner = result.rows[0]
+    return owner ? { userId: owner.user_id, email: owner.email } : null
+  }
+  catch (error) {
+    throw simpleError('org_lookup_error', 'Organization lookup error', { orgId, error })
+  }
+  finally {
+    await closeClient(c, pgClient)
+  }
 }
 
-async function getOrgOwnerEmail(supabaseAdmin: SupabaseAdmin, orgId: string): Promise<string> {
-  const ownerUserId = await getOrgOwnerUserId(supabaseAdmin, orgId)
+async function getOrgOwnerEmail(c: Context<MiddlewareKeyVariables>, supabaseAdmin: SupabaseAdmin, orgId: string): Promise<string> {
+  const owner = await getOrgOwner(c, orgId)
 
-  if (!ownerUserId)
+  if (!owner)
     throw simpleError('org_does_not_exist', 'Organization does not exist', { orgId })
 
-  const { email, error } = await getUserEmailById(supabaseAdmin, ownerUserId)
+  const { email, error } = await getUserEmailById(supabaseAdmin, owner.userId)
   if (!email)
-    throw simpleError('org_owner_does_not_exist', 'Organization owner does not exist', { orgId, ownerUserId, error })
+    throw simpleError('org_owner_does_not_exist', 'Organization owner does not exist', { orgId, ownerUserId: owner.userId, error })
 
   return email
 }
@@ -156,14 +210,14 @@ async function resolveUserEmail(c: Context<MiddlewareKeyVariables>, supabaseAdmi
   }
 
   if (identifier.kind === 'org_id')
-    return getOrgOwnerEmail(supabaseAdmin, identifier.value)
+    return getOrgOwnerEmail(c, supabaseAdmin, identifier.value)
 
   const { email, error } = await getUserEmailById(supabaseAdmin, identifier.value)
   if (email)
     return email
 
   if (identifier.kind === 'identifier' && UUID_REGEX.test(identifier.value))
-    return getOrgOwnerEmail(supabaseAdmin, identifier.value)
+    return getOrgOwnerEmail(c, supabaseAdmin, identifier.value)
 
   throw simpleError('user_does_not_exist', 'User does not exist', { userId: identifier.value, error })
 }
