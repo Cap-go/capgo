@@ -2179,13 +2179,24 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
                 return true
               }
             },
-            buildFiles: () => writeSupportBundleFiles({
-              kind: 'build-request',
-              appId,
-              error: `Cloud build ${capturedJobId} failed`,
-              logs: buildLogLines,
-              sections: internalLines.length > 0 ? [{ title: 'Internal log', lines: internalLines }] : [],
-            }),
+            buildFiles: () => {
+              // The build log can be large; show a spinner while we render + gzip
+              // (and trim to fit the 10 MB cap) so it doesn't look frozen.
+              const s = spinnerC()
+              s.start('Preparing your logs to send…')
+              try {
+                return writeSupportBundleFiles({
+                  kind: 'build-request',
+                  appId,
+                  error: `Cloud build ${capturedJobId} failed`,
+                  logs: buildLogLines,
+                  sections: internalLines.length > 0 ? [{ title: 'Internal log', lines: internalLines }] : [],
+                })
+              }
+              finally {
+                s.stop('Logs ready.')
+              }
+            },
             copyPath: p => copyToClipboard(p).ok,
             reveal: p => revealInFinder(p),
             openUrl: async u => (await import('open')).default(u),

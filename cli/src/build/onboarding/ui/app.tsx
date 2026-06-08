@@ -610,6 +610,9 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
   // user picks "View logs first" from the confirm step.
   const [supportLogLines, setSupportLogLines] = useState<string[]>([])
   const supportLogPathRef = useRef<string>('')
+  // Message for the support spinner step — reused for both "preparing the bundle"
+  // (gzip/trim can take a moment on a large build) and the network upload.
+  const [supportBusyText, setSupportBusyText] = useState('Uploading your logs to Capgo support…')
   // ── AI-analysis sub-flow (entered only when the build fails and logs were
   // captured). `aiJobId` is set when entering 'ai-analysis-prompt'; the running
   // step reads it to call runCapgoAiAnalysis; the result step renders one of
@@ -1178,27 +1181,36 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
       subject: `Capgo Builder support — ${appId} (ios)`,
       body: `Hi Capgo team,\n\nMy build failed and I'd like help.\n\nApp: ${appId}\nPlatform: ios\nError: ${sanitizedError}`,
       confirm: async (msg, logPath) => askSupportConfirm(msg, logPath),
-      buildFiles: () => writeSupportBundleFiles({
-        kind: 'build-init',
-        appId,
-        error: error ?? 'unknown error',
-        // Full activity trail + the COMPLETE build log (buildOutput holds every
-        // line streamed from the remote builder — never truncate it, or support
-        // gets a useless 12-line snippet and can't diagnose the failure).
-        logs: log.map(entry => entry.text),
-        sections: [
-          { title: 'Build output (full)', lines: buildOutput },
-          { title: 'Internal log', lines: readInternalLogLines() },
-          // When the user escalates after running AI, fold the analysis into the
-          // bundle so support sees what the AI already concluded (spec §2).
-          ...(aiAnalysisText ? [{ title: 'AI analysis', lines: aiAnalysisText.split('\n') }] : []),
-        ],
-      }),
+      buildFiles: async () => {
+        // Show a spinner while we render + gzip (and, for a huge build, trim to fit
+        // the 10 MB upload cap) — that work is synchronous, so yield once first to
+        // let Ink paint the message before it runs.
+        setSupportBusyText('Preparing your logs to send…')
+        setStep('support-uploading')
+        await new Promise<void>((resolve) => { setTimeout(resolve, 0) })
+        return writeSupportBundleFiles({
+          kind: 'build-init',
+          appId,
+          error: error ?? 'unknown error',
+          // Full activity trail + the COMPLETE build log (buildOutput holds every
+          // line streamed from the remote builder — never truncate it, or support
+          // gets a useless 12-line snippet and can't diagnose the failure).
+          logs: log.map(entry => entry.text),
+          sections: [
+            { title: 'Build output (full)', lines: buildOutput },
+            { title: 'Internal log', lines: readInternalLogLines() },
+            // When the user escalates after running AI, fold the analysis into the
+            // bundle so support sees what the AI already concluded (spec §2).
+            ...(aiAnalysisText ? [{ title: 'AI analysis', lines: aiAnalysisText.split('\n') }] : []),
+          ],
+        })
+      },
       copyPath: p => copyToClipboard(p).ok,
       reveal: p => revealInFinder(p),
       openUrl: u => open(u),
       print: msg => addLog(msg, 'cyan'),
       upload: (gzPath) => {
+        setSupportBusyText('Uploading your logs to Capgo support…')
         setStep('support-uploading') // show a spinner while the (network) upload runs
         return uploadSupportLogs({
           apiHost: apiHost ?? 'https://api.capgo.app',
@@ -4502,7 +4514,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
 
       {step === 'support-uploading' && (
         <Box marginTop={1}>
-          <SpinnerLine text="Uploading your logs to Capgo support…" />
+          <SpinnerLine text={supportBusyText} />
         </Box>
       )}
 

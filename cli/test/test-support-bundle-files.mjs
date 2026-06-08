@@ -50,6 +50,23 @@ t('renderBundleWithinGzCap trims the oldest build-output lines to fit, keeping t
   assert.ok(!rendered.includes('build line 0 '), 'oldest build line dropped')
 })
 
+t('renderBundleWithinGzCap fits via binary search — few gzip passes, not linear', () => {
+  const buildLines = []
+  for (let i = 0; i < 20000; i++)
+    buildLines.push(`build line ${i} step=${i * 7} ${'x'.repeat(20)}`)
+  buildLines.push('FATAL tail line')
+  let passes = 0
+  const { gz, rendered } = renderBundleWithinGzCap({
+    kind: 'build-init', appId: 'a', error: 'boom',
+    sections: [{ title: 'Build output (full)', lines: buildLines }],
+  }, 2000, () => { passes++ })
+  assert.ok(gz.length <= 2000 + 256, `gz ${gz.length} within cap`)
+  assert.ok(rendered.includes('FATAL tail line'), 'failure tail kept')
+  // Binary search ≈ log2(n) probes; a linear 100-or-500-per-pass walk would be
+  // hundreds-to-thousands. Pin that we stay tiny.
+  assert.ok(passes <= 60, `expected few gzip passes, got ${passes}`)
+})
+
 t('renderBundleWithinGzCap leaves a normal bundle untouched (no marker)', () => {
   const { rendered } = renderBundleWithinGzCap({
     kind: 'build-init', appId: 'com.example.app', error: 'boom',

@@ -86,56 +86,110 @@ function omittedMarker(removed: number, capBytes: number): string {
   return `[... ${removed} earlier lines omitted to fit the ${Math.round(capBytes / (1024 * 1024))} MB support upload limit ...]`
 }
 
+// Stop the binary search once we're within this many lines of the true minimum.
+// Dropping up to ~RESOLUTION extra oldest lines is a fine trade for fewer gzip
+// probes (each probe re-renders + re-gzips the bundle, which is the slow part).
+const TRIM_RESOLUTION = 100
+
+interface TrimTarget {
+  get: () => string[]
+  set: (lines: string[]) => void
+}
+
+// Binary-search the FEWEST oldest lines to drop from one target so the WHOLE
+// bundle's gz fits `capBytes`. gz shrinks monotonically as we drop more lines, so
+// binary search is valid. We seed it with a size-ratio estimate (gz ≈ linear in
+// retained lines) so we land near the answer immediately and skip re-gzipping the
+// full (possibly huge) bundle on every step. Returns how many lines were dropped
+// (0 = none needed; the target's length = even emptying it wasn't enough, so the
+// caller moves on to the next target). `gzOf` re-renders `work` and returns its gz
+// size; `onPass` fires once per gzip probe (used to surface progress / bound work).
+function trimTargetToFit(
+  target: TrimTarget,
+  capBytes: number,
+  currentGz: number,
+  gzOf: () => number,
+  onPass: () => void,
+): number {
+  const original = target.get()
+  const n = original.length
+  const probe = (drop: number): number => {
+    onPass()
+    target.set(original.slice(Math.min(drop, n)))
+    return gzOf()
+  }
+
+  // Even with this target fully emptied, does the rest still bust the cap?
+  if (probe(n) > capBytes) {
+    target.set([])
+    return n
+  }
+
+  let lo = 0 // known NOT to fit (we are only called while over the cap)
+  let hi = n // known to fit (just checked)
+  const estimate = Math.min(n, Math.max(1, Math.ceil(n * (1 - capBytes / currentGz))))
+  if (probe(estimate) <= capBytes)
+    hi = estimate
+  else
+    lo = estimate
+  while (hi - lo > TRIM_RESOLUTION) {
+    const mid = lo + Math.floor((hi - lo) / 2)
+    if (probe(mid) <= capBytes)
+      hi = mid
+    else
+      lo = mid
+  }
+  target.set(original.slice(hi))
+  return hi
+}
+
 // Render + gzip the (secret-redacted) bundle, trimming the OLDEST lines if the gz
 // would exceed the support upload cap. The failure and its context live at the
-// TAIL of each log, so we drop from the front; the error line, AI analysis, and
-// other small sections are never touched. Trim priority: build output → recent
-// logs → internal log. Returns the final rendered text and its gz (kept in sync).
+// TAIL of each log, so we drop from the front via binary search (the FEWEST lines
+// needed); the error line, AI analysis, and other small sections are never
+// touched. Trim priority: build output → recent logs → internal log. `onPass`
+// fires once per gzip probe so callers can show progress. Returns the final
+// rendered text and its gz (kept in sync).
 export function renderBundleWithinGzCap(
   input: OnboardingSupportBundleInput,
   capBytes = SUPPORT_GZ_CAP_BYTES,
+  onPass?: () => void,
 ): { rendered: string, gz: Buffer } {
-  const renderGz = (i: OnboardingSupportBundleInput): { rendered: string, gz: Buffer } => {
+  const render = (i: OnboardingSupportBundleInput): { rendered: string, gz: Buffer } => {
     const rendered = redactSecrets(renderOnboardingSupportBundle(i))
     return { rendered, gz: gzipSync(rendered) }
   }
 
-  let out = renderGz(input)
+  let out = render(input)
+  onPass?.()
   if (out.gz.length <= capBytes)
     return out
 
   // Clone the trimmable line-arrays so we never mutate the caller's input.
   const sections = (input.sections ?? []).map(section => ({ ...section, lines: [...section.lines] }))
   const work: OnboardingSupportBundleInput = { ...input, sections, logs: input.logs ? [...input.logs] : input.logs }
+  const gzOf = (): number => {
+    out = render(work)
+    return out.gz.length
+  }
 
-  const targets: string[][] = []
+  const targets: TrimTarget[] = []
   const buildSection = sections.find(section => section.title.startsWith('Build output'))
   if (buildSection)
-    targets.push(buildSection.lines)
+    targets.push({ get: () => buildSection.lines, set: (lines) => { buildSection.lines = lines } })
   if (work.logs)
-    targets.push(work.logs)
+    targets.push({ get: () => work.logs ?? [], set: (lines) => { work.logs = lines } })
   const internalSection = sections.find(section => section.title === 'Internal log')
   if (internalSection)
-    targets.push(internalSection.lines)
+    targets.push({ get: () => internalSection.lines, set: (lines) => { internalSection.lines = lines } })
 
-  for (const lines of targets) {
-    let removed = 0
-    for (;;) {
-      out = renderGz(work)
-      if (out.gz.length <= capBytes || lines.length <= 1)
-        break
-      // Drop ~25% of the oldest lines per pass (min 500) so huge logs converge in
-      // a handful of gzip probes instead of hundreds of single-line passes.
-      const drop = Math.min(lines.length - 1, Math.max(500, Math.floor(lines.length * 0.25)))
-      lines.splice(0, drop)
-      removed += drop
-    }
-    if (removed > 0) {
-      lines.unshift(omittedMarker(removed, capBytes))
-      out = renderGz(work)
-    }
+  for (const target of targets) {
     if (out.gz.length <= capBytes)
       break
+    const removed = trimTargetToFit(target, capBytes, out.gz.length, gzOf, () => onPass?.())
+    if (removed > 0)
+      target.set([omittedMarker(removed, capBytes), ...target.get()])
+    out = render(work)
   }
   return out
 }

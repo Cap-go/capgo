@@ -20,8 +20,9 @@ export interface ContactSupportDeps {
   // readable .log path is passed so the UI can offer a "View logs first" option
   // (inspect exactly what will be sent) before the user commits.
   confirm: (message: string, logPath: string) => Promise<boolean>
-  // Write the bundle; return both paths, or null on failure.
-  buildFiles: () => { logPath: string, gzPath: string } | null
+  // Write the bundle; return both paths, or null on failure. May be async so the UI
+  // can show a "Preparing your logs…" spinner while a large bundle is gzipped/trimmed.
+  buildFiles: () => ({ logPath: string, gzPath: string } | null) | Promise<{ logPath: string, gzPath: string } | null>
   // Copy a path to the clipboard; return success.
   copyPath: (path: string) => boolean
   // Optional macOS Finder reveal; return true when the reveal actually happened.
@@ -68,7 +69,7 @@ export async function contactSupport(deps: ContactSupportDeps): Promise<ContactS
 async function runContactSupport(deps: ContactSupportDeps): Promise<ContactSupportResult> {
   // Write the bundle FIRST so the confirm step can offer "View logs first" —
   // the file is local-only; only the upload + email (below) are gated by consent.
-  const files = deps.buildFiles()
+  const files = await deps.buildFiles()
   if (!files) {
     deps.print('Could not save your logs locally. Please email support@capgo.app and describe the issue.')
     return 'failed'
