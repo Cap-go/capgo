@@ -55,32 +55,65 @@ interface CompatibilityEventGroup {
   resolved: boolean
 }
 
+function buildEventGroup(members: CompatibilityEventRow[]): CompatibilityEventGroup {
+  const sorted = [...members].sort((a, b) => a.platform.localeCompare(b.platform))
+  const unresolvedEvents = sorted.filter(event => !isResolved(event))
+  return {
+    key: String(sorted[0].id),
+    events: sorted,
+    platforms: sorted.map(event => event.platform),
+    unresolvedEvents,
+    representative: sorted[0],
+    resolved: unresolvedEvents.length === 0,
+  }
+}
+
+// One channel change produces one row per platform. Those rows share
+// change_occurred_at exactly (live rows, set from the channel's updated_at) or
+// within a couple of seconds (historical rows backfilled from per-platform
+// created_at), while a genuine re-occurrence of the same transition is far
+// apart in time. So group by the transition, then split into occurrences by
+// that small time gap — one change renders as one row regardless of vintage.
+const OCCURRENCE_GAP_MS = 5000
+
 const groupedEvents = computed<CompatibilityEventGroup[]>(() => {
-  const groups = new Map<string, CompatibilityEventRow[]>()
+  const byTransition = new Map<string, CompatibilityEventRow[]>()
   for (const event of events.value) {
-    // change_occurred_at distinguishes separate occurrences of the same transition
-    // (the backend records each as its own row); all platforms of one occurrence
-    // share it, so they still group into a single row.
-    const key = `${event.channel_id}|${event.current_version_id}|${event.previous_version_id}|${event.source}|${event.change_occurred_at}`
-    const members = groups.get(key)
+    const transitionKey = `${event.channel_id}|${event.current_version_id}|${event.previous_version_id}|${event.source}`
+    const members = byTransition.get(transitionKey)
     if (members)
       members.push(event)
     else
-      groups.set(key, [event])
+      byTransition.set(transitionKey, [event])
   }
-  // `events` is ordered newest-first; the Map preserves first-seen order.
-  return [...groups.values()].map((members) => {
-    const sorted = [...members].sort((a, b) => a.platform.localeCompare(b.platform))
-    const unresolvedEvents = sorted.filter(event => !isResolved(event))
-    return {
-      key: String(sorted[0].id),
-      events: sorted,
-      platforms: sorted.map(event => event.platform),
-      unresolvedEvents,
-      representative: sorted[0],
-      resolved: unresolvedEvents.length === 0,
+
+  const groups: CompatibilityEventGroup[] = []
+  for (const members of byTransition.values()) {
+    // Oldest-first so each occurrence is detected by its gap from the cluster start.
+    const byTime = [...members].sort((a, b) => Date.parse(a.change_occurred_at) - Date.parse(b.change_occurred_at))
+    let cluster: CompatibilityEventRow[] = []
+    let clusterStart = 0
+    for (const event of byTime) {
+      const at = Date.parse(event.change_occurred_at)
+      if (cluster.length === 0) {
+        cluster = [event]
+        clusterStart = at
+      }
+      else if (at - clusterStart <= OCCURRENCE_GAP_MS) {
+        cluster.push(event)
+      }
+      else {
+        groups.push(buildEventGroup(cluster))
+        cluster = [event]
+        clusterStart = at
+      }
     }
-  })
+    if (cluster.length > 0)
+      groups.push(buildEventGroup(cluster))
+  }
+
+  // Newest occurrence first (matches the Date column ordering).
+  return groups.sort((a, b) => Date.parse(b.representative.created_at) - Date.parse(a.representative.created_at))
 })
 
 const visibleGroups = computed<CompatibilityEventGroup[]>(() => {
