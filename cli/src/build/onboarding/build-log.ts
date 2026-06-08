@@ -77,6 +77,21 @@ function expandTabs(line: string): string {
  * blank lines — e.g. the intentional spacer before the first log line — are
  * kept). A chunk may be a single line or several; callers spread the result.
  */
+// Hard cap on retained build-output lines in the TUI. A safety valve against a
+// runaway/pathological build streaming millions of lines and exhausting the
+// process's RAM (buildOutput is an in-memory React state array). Generous enough
+// that real builds — a few thousand lines — are never touched; the support-bundle
+// gz cap (see onboarding-support.ts) trims further if the upload would exceed 10 MB.
+export const MAX_BUILD_OUTPUT_LINES = 100_000
+
+// Keep only the most recent MAX_BUILD_OUTPUT_LINES (the failure + its context live
+// at the tail). Returns the same array untouched when already within bounds.
+export function capBuildOutputLines(lines: string[]): string[] {
+  return lines.length > MAX_BUILD_OUTPUT_LINES
+    ? lines.slice(lines.length - MAX_BUILD_OUTPUT_LINES)
+    : lines
+}
+
 export function sanitizeBuildLogLines(chunk: string): string[] {
   // Normalise every line break (CRLF, lone CR, LF) to LF, then split.
   const parts = chunk.replace(/\r\n?/g, '\n').split('\n')

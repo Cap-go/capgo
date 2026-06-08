@@ -78,6 +78,68 @@ export function renderOnboardingSupportBundle(input: OnboardingSupportBundleInpu
   return `${lines.join('\n')}\n`
 }
 
+// Matches the worker/proxy hard limit (see the support-logs spec): the upload is
+// rejected with 413 above this, so the bundle must come in under it.
+export const SUPPORT_GZ_CAP_BYTES = 10 * 1024 * 1024
+
+function omittedMarker(removed: number, capBytes: number): string {
+  return `[... ${removed} earlier lines omitted to fit the ${Math.round(capBytes / (1024 * 1024))} MB support upload limit ...]`
+}
+
+// Render + gzip the (secret-redacted) bundle, trimming the OLDEST lines if the gz
+// would exceed the support upload cap. The failure and its context live at the
+// TAIL of each log, so we drop from the front; the error line, AI analysis, and
+// other small sections are never touched. Trim priority: build output → recent
+// logs → internal log. Returns the final rendered text and its gz (kept in sync).
+export function renderBundleWithinGzCap(
+  input: OnboardingSupportBundleInput,
+  capBytes = SUPPORT_GZ_CAP_BYTES,
+): { rendered: string, gz: Buffer } {
+  const renderGz = (i: OnboardingSupportBundleInput): { rendered: string, gz: Buffer } => {
+    const rendered = redactSecrets(renderOnboardingSupportBundle(i))
+    return { rendered, gz: gzipSync(rendered) }
+  }
+
+  let out = renderGz(input)
+  if (out.gz.length <= capBytes)
+    return out
+
+  // Clone the trimmable line-arrays so we never mutate the caller's input.
+  const sections = (input.sections ?? []).map(section => ({ ...section, lines: [...section.lines] }))
+  const work: OnboardingSupportBundleInput = { ...input, sections, logs: input.logs ? [...input.logs] : input.logs }
+
+  const targets: string[][] = []
+  const buildSection = sections.find(section => section.title.startsWith('Build output'))
+  if (buildSection)
+    targets.push(buildSection.lines)
+  if (work.logs)
+    targets.push(work.logs)
+  const internalSection = sections.find(section => section.title === 'Internal log')
+  if (internalSection)
+    targets.push(internalSection.lines)
+
+  for (const lines of targets) {
+    let removed = 0
+    for (;;) {
+      out = renderGz(work)
+      if (out.gz.length <= capBytes || lines.length <= 1)
+        break
+      // Drop ~25% of the oldest lines per pass (min 500) so huge logs converge in
+      // a handful of gzip probes instead of hundreds of single-line passes.
+      const drop = Math.min(lines.length - 1, Math.max(500, Math.floor(lines.length * 0.25)))
+      lines.splice(0, drop)
+      removed += drop
+    }
+    if (removed > 0) {
+      lines.unshift(omittedMarker(removed, capBytes))
+      out = renderGz(work)
+    }
+    if (out.gz.length <= capBytes)
+      break
+  }
+  return out
+}
+
 export function writeOnboardingSupportBundle(input: OnboardingSupportBundleInput, supportDir = join(homedir(), '.capgo-credentials', 'support')): string | null {
   try {
     mkdirSync(supportDir, { recursive: true })
@@ -114,10 +176,11 @@ export function writeSupportBundleFiles(
     const gzPath = join(supportDir, `${base}.log.gz`)
     // Redact the WHOLE rendered bundle (logs + sections + error), not just the
     // internal-log lines — so the email's "secrets removed" promise holds for the
-    // build-output section too.
-    const rendered = redactSecrets(renderOnboardingSupportBundle(input))
+    // build-output section too. renderBundleWithinGzCap also trims the oldest
+    // build-output lines if the gz would otherwise exceed the 10 MB upload cap.
+    const { rendered, gz } = renderBundleWithinGzCap(input)
     writeFileSync(logPath, rendered, 'utf8')
-    writeFileSync(gzPath, gzipSync(rendered))
+    writeFileSync(gzPath, gz)
     return { logPath, gzPath }
   }
   catch {
