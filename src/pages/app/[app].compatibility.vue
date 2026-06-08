@@ -58,7 +58,10 @@ interface CompatibilityEventGroup {
 const groupedEvents = computed<CompatibilityEventGroup[]>(() => {
   const groups = new Map<string, CompatibilityEventRow[]>()
   for (const event of events.value) {
-    const key = `${event.channel_id}|${event.current_version_id}|${event.previous_version_id}|${event.source}`
+    // change_occurred_at distinguishes separate occurrences of the same transition
+    // (the backend records each as its own row); all platforms of one occurrence
+    // share it, so they still group into a single row.
+    const key = `${event.channel_id}|${event.current_version_id}|${event.previous_version_id}|${event.source}|${event.change_occurred_at}`
     const members = groups.get(key)
     if (members)
       members.push(event)
