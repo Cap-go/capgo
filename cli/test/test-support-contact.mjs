@@ -1,11 +1,7 @@
 // cli/test/test-support-contact.mjs
 import assert from 'node:assert/strict'
 import { contactSupport } from '../src/support/contact-support.ts'
-
-async function ta(name, fn) {
-  try { await fn(); process.stdout.write(`✓ ${name}\n`) }
-  catch (e) { process.stderr.write(`✗ ${name}\n`); throw e }
-}
+import { ta } from './support-harness.mjs'
 
 function makeDeps(overrides = {}) {
   const calls = { copied: [], opened: [], revealed: [], printed: [], confirmedWith: [] }

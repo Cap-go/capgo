@@ -1,11 +1,7 @@
 // cli/test/test-support-mailto.mjs
 import assert from 'node:assert/strict'
 import { buildMailtoUrl, MAILTO_BODY_MAX } from '../src/support/mailto.ts'
-
-function t(name, fn) {
-  try { fn(); process.stdout.write(`✓ ${name}\n`) }
-  catch (e) { process.stderr.write(`✗ ${name}\n`); throw e }
-}
+import { t } from './support-harness.mjs'
 
 t('builds a mailto url with encoded subject and body', () => {
   const url = buildMailtoUrl({ to: 'support@capgo.app', subject: 'A & B', body: 'line1\nline2' })

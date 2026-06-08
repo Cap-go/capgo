@@ -1,11 +1,7 @@
 // cli/test/test-support-redact.mjs
 import assert from 'node:assert/strict'
 import { redactSecrets } from '../src/support/redact.ts'
-
-function t(name, fn) {
-  try { fn(); process.stdout.write(`✓ ${name}\n`) }
-  catch (e) { process.stderr.write(`✗ ${name}\n`); throw e }
-}
+import { t } from './support-harness.mjs'
 
 t('redacts bearer tokens', () => {
   const out = redactSecrets('Authorization: Bearer abc123DEF456ghi789')

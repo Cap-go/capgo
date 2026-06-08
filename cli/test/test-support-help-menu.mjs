@@ -1,11 +1,7 @@
 // cli/test/test-support-help-menu.mjs
 import assert from 'node:assert/strict'
 import { buildHelpMenuOptions } from '../src/support/help-menu.ts'
-
-function t(name, fn) {
-  try { fn(); process.stdout.write(`✓ ${name}\n`) }
-  catch (e) { process.stderr.write(`✗ ${name}\n`); throw e }
-}
+import { t } from './support-harness.mjs'
 
 t('support is always first', () => {
   const opts = buildHelpMenuOptions({ hasBuildLog: false })

@@ -5,11 +5,7 @@ import { readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { renderBundleWithinGzCap, writeSupportBundleFiles } from '../src/onboarding-support.ts'
-
-function t(name, fn) {
-  try { fn(); process.stdout.write(`✓ ${name}\n`) }
-  catch (e) { process.stderr.write(`✗ ${name}\n`); throw e }
-}
+import { t } from './support-harness.mjs'
 
 t('writes both .log and .log.gz with identical decoded content', () => {
   const dir = join(tmpdir(), `capgo-bundle-${Date.now()}`)

@@ -4,11 +4,7 @@ import { readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { appendInternalLog, getInternalLogPath, startInternalLog } from '../src/support/internal-log.ts'
-
-function t(name, fn) {
-  try { fn(); process.stdout.write(`✓ ${name}\n`) }
-  catch (e) { process.stderr.write(`✗ ${name}\n`); throw e }
-}
+import { t } from './support-harness.mjs'
 
 // Runs before any startInternalLog call so the null-before-start contract is
 // actually exercised (module state is per-process).
