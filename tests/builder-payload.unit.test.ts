@@ -4,7 +4,7 @@ import { builderPayloadTestUtils } from '../supabase/functions/_backend/public/b
 const { buildBuilderPayload } = builderPayloadTestUtils
 
 describe('builder payload shape', () => {
-  it('maps build_options (snake_case input) to buildOptions (camelCase output)', () => {
+  it.concurrent('maps build_options (snake_case input) to buildOptions (camelCase output)', () => {
     const payload = buildBuilderPayload({
       orgId: 'org-123',
       actorUserId: 'user-1',
@@ -20,7 +20,7 @@ describe('builder payload shape', () => {
     expect(payload).not.toHaveProperty('build_options')
   })
 
-  it('maps build_credentials (snake_case input) to buildCredentials (camelCase output)', () => {
+  it.concurrent('maps build_credentials (snake_case input) to buildCredentials (camelCase output)', () => {
     const payload = buildBuilderPayload({
       orgId: 'org-123',
       actorUserId: 'user-1',
@@ -36,7 +36,7 @@ describe('builder payload shape', () => {
     expect(payload).not.toHaveProperty('build_credentials')
   })
 
-  it('does not include a legacy flat credentials field', () => {
+  it.concurrent('does not include a legacy flat credentials field', () => {
     const payload = buildBuilderPayload({
       orgId: 'org-123',
       actorUserId: 'user-1',
@@ -49,7 +49,7 @@ describe('builder payload shape', () => {
     expect(payload).not.toHaveProperty('credentials')
   })
 
-  it('includes userId (org), actorUserId (human), artifactKey, and fastlane with correct values', () => {
+  it.concurrent('includes userId (org), actorUserId (human), artifactKey, and fastlane with correct values', () => {
     const payload = buildBuilderPayload({
       orgId: 'org-456',
       actorUserId: 'user-789',
@@ -65,7 +65,7 @@ describe('builder payload shape', () => {
     expect(payload.fastlane).toEqual({ lane: 'android' })
   })
 
-  it('contains exactly the expected top-level keys', () => {
+  it.concurrent('contains exactly the expected top-level keys', () => {
     const payload = buildBuilderPayload({
       orgId: 'org-789',
       actorUserId: 'user-1',
@@ -99,7 +99,7 @@ describe('builder payload shape', () => {
     expect(payload.buildOptions).toEqual({ platform: 'ios' })
   })
 
-  it('passes through buildOptions and buildCredentials contents unchanged', () => {
+  it.concurrent('passes through buildOptions and buildCredentials contents unchanged', () => {
     const complexOptions = {
       platform: 'ios',
       buildMode: 'debug',
