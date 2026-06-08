@@ -105,7 +105,6 @@ export type OnboardingErrorCategory
     // Import-existing flow (keychain / provisioning profile imports)
     | 'keychain_no_identities'
     | 'keychain_export_failed'
-    | 'keychain_helper_compile_failed'
     | 'profile_no_match'
     | 'profile_read_failed'
     | 'unknown'

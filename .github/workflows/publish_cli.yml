@@ -37,6 +37,10 @@ jobs:
         run: bun run cli:build
       - name: Assert dev-only env override is stripped from release bundle
         run: |
+          test -f cli/dist/index.js || {
+            echo "::error::cli/dist/index.js not found; build output path changed or build failed"
+            exit 1
+          }
           if grep -q "CAPGO_KEYCHAIN_HELPER_PATH" cli/dist/index.js; then
             echo "::error::CAPGO_KEYCHAIN_HELPER_PATH leaked into the release bundle — dead-code elimination failed"
             exit 1

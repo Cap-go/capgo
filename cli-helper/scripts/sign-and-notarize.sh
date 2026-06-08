@@ -14,6 +14,16 @@ cd "$(dirname "$0")/.."
 
 : "${DEVELOPER_ID_IDENTITY:?}" "${CAPGO_APPLE_TEAM_ID:?}" "${APPLE_KEY_ID:?}" "${APPLE_ISSUER_ID:?}" "${APPLE_KEY_PATH:?}"
 
+# Single source of truth: the Team ID the CLI's runtime verifier enforces
+# (CAPGO_APPLE_TEAM_ID in cli/src/build/onboarding/macos-signing.ts). If the
+# APPLE_TEAM_ID secret drifts from this value the helpers would sign and notarize
+# fine here but be rejected at runtime — so fail fast before signing.
+EXPECTED_TEAM_ID="UVTJ336J2D"
+if [ "$CAPGO_APPLE_TEAM_ID" != "$EXPECTED_TEAM_ID" ]; then
+  echo "::error::CAPGO_APPLE_TEAM_ID ('$CAPGO_APPLE_TEAM_ID') != expected '$EXPECTED_TEAM_ID' enforced by the CLI runtime verifier (macos-signing.ts). Update both in lockstep." >&2
+  exit 1
+fi
+
 REQUIREMENT='=anchor apple generic and certificate leaf[field.1.2.840.113635.100.6.1.13] and certificate leaf[subject.OU] = "'"$CAPGO_APPLE_TEAM_ID"'"'
 
 # Stable code-signing identifier. macOS keys the Keychain "Always Allow" grant
