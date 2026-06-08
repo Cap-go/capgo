@@ -54,6 +54,18 @@ function fitBodyPrefix(prefix: string, suffix: string): string {
 // (@inkjs/ui gotcha), and a double invocation would open two mail windows.
 let supportFlowInFlight = false
 
+// Within ONE CLI run, upload the support logs only once. Repeated "Email support"
+// (a double-click, or re-triggering after the mail window opened) then reuses the
+// existing link instead of minting a second R2 object and burning the account's
+// upload rate limit (1/min · 10/day). A fresh CLI invocation = new process =
+// re-uploads.
+let cachedUpload: { id: string, url: string } | null = null
+
+// Test-only: reset the per-process upload cache so cases don't leak into each other.
+export function resetSupportUploadCacheForTests(): void {
+  cachedUpload = null
+}
+
 export async function contactSupport(deps: ContactSupportDeps): Promise<ContactSupportResult> {
   if (supportFlowInFlight)
     return 'cancelled'
@@ -81,7 +93,15 @@ async function runContactSupport(deps: ContactSupportDeps): Promise<ContactSuppo
 
   // Preferred path: upload the gz and put the download link in the email body —
   // the mail is send-ready, there's nothing to attach (so no clipboard/Finder).
-  const uploaded = deps.upload ? await deps.upload(files.gzPath) : null
+  // Reuse this run's earlier successful upload instead of re-uploading (a second
+  // upload would create a new link and eat the rate limit).
+  let uploaded = deps.upload ? cachedUpload : null
+  const reusedUpload = uploaded !== null
+  if (deps.upload && !uploaded) {
+    uploaded = await deps.upload(files.gzPath)
+    if (uploaded)
+      cachedUpload = uploaded
+  }
   if (deps.upload && !uploaded)
     deps.print('(Logs upload to Capgo failed or is unavailable — the email will include attach instructions instead.)')
   if (uploaded) {
@@ -104,7 +124,9 @@ async function runContactSupport(deps: ContactSupportDeps): Promise<ContactSuppo
     catch { /* best-effort cleanup */ }
 
     if (mailOpened)
-      deps.print(`Opened an email to ${SUPPORT_EMAIL} — it links to your uploaded logs (kept 30 days). Just press Send.`)
+      deps.print(reusedUpload
+        ? `Opened an email to ${SUPPORT_EMAIL} — reusing the logs you already uploaded this session (no new upload). Just press Send.`
+        : `Opened an email to ${SUPPORT_EMAIL} — it links to your uploaded logs (kept 30 days). Just press Send.`)
     else
       deps.print(`Couldn't open your mail app automatically. Please email ${SUPPORT_EMAIL} and include this link to your uploaded logs:\n${uploaded.url}`)
     return 'opened'

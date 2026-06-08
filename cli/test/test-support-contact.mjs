@@ -1,9 +1,10 @@
 // cli/test/test-support-contact.mjs
 import assert from 'node:assert/strict'
-import { contactSupport } from '../src/support/contact-support.ts'
+import { contactSupport, resetSupportUploadCacheForTests } from '../src/support/contact-support.ts'
 import { ta } from './support-harness.mjs'
 
 function makeDeps(overrides = {}) {
+  resetSupportUploadCacheForTests() // each test starts with a clean per-run upload cache
   const calls = { copied: [], opened: [], revealed: [], printed: [], confirmedWith: [] }
   const deps = {
     subject: 'Capgo Builder support',
@@ -105,6 +106,21 @@ await ta('upload failure is announced, not silent', async () => {
   const { deps, calls } = makeDeps({ upload: async () => null })
   await contactSupport(deps)
   assert.ok(calls.printed.some(m => m.includes('upload to Capgo failed')))
+})
+
+await ta('repeat Email support reuses the first upload — no second upload, no rate-limit hit', async () => {
+  const url = 'https://api.capgo.app/builder_support_logs/' + 'c'.repeat(64)
+  const uploads = []
+  const { deps, calls } = makeDeps({ // makeDeps resets the cache once, at the start
+    upload: async (gz) => { uploads.push(gz); return { id: 'c'.repeat(64), url } },
+  })
+  await contactSupport(deps) // first click → uploads
+  await contactSupport(deps) // second click → must REUSE, not upload again
+  assert.equal(uploads.length, 1) // uploaded exactly once for the whole run
+  assert.equal(calls.opened.length, 2) // but a mail was opened both times
+  assert.ok(decodeURIComponent(calls.opened[0]).includes('c'.repeat(64)))
+  assert.ok(decodeURIComponent(calls.opened[1]).includes('c'.repeat(64))) // same link reused
+  assert.ok(calls.printed.some(m => m.includes('reusing the logs you already uploaded')))
 })
 
 await ta('confirm copy discloses the upload + 30-day retention when uploading', async () => {
