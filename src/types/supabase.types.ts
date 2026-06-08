@@ -384,6 +384,11 @@ export type Database = {
       }
       audit_logs: {
         Row: {
+          actor_apikey_id: number | null
+          actor_apikey_name: string | null
+          actor_type: string
+          actor_user_email: string | null
+          actor_user_id: string | null
           changed_fields: string[] | null
           created_at: string
           id: number
@@ -396,6 +401,11 @@ export type Database = {
           user_id: string | null
         }
         Insert: {
+          actor_apikey_id?: number | null
+          actor_apikey_name?: string | null
+          actor_type?: string
+          actor_user_email?: string | null
+          actor_user_id?: string | null
           changed_fields?: string[] | null
           created_at?: string
           id?: number
@@ -408,6 +418,11 @@ export type Database = {
           user_id?: string | null
         }
         Update: {
+          actor_apikey_id?: number | null
+          actor_apikey_name?: string | null
+          actor_type?: string
+          actor_user_email?: string | null
+          actor_user_id?: string | null
           changed_fields?: string[] | null
           created_at?: string
           id?: number
@@ -419,22 +434,7 @@ export type Database = {
           table_name?: string
           user_id?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "audit_logs_org_id_fkey"
-            columns: ["org_id"]
-            isOneToOne: false
-            referencedRelation: "orgs"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "audit_logs_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       bandwidth_usage: {
         Row: {
