@@ -22,7 +22,11 @@ export interface OnboardingCompletionSummary {
 }
 
 export interface OnboardingResult {
-  outcome: 'completed' | 'cancelled'
+  // `update-requested` means the user accepted the self-update prompt (the
+  // first wizard screen, when a newer @capgo/cli exists). The caller tears Ink
+  // down, then installs + re-execs OUTSIDE the alt-screen — the spawn needs the
+  // primary buffer + stdio inheritance, which it cannot get while Ink is mounted.
+  outcome: 'completed' | 'cancelled' | 'update-requested'
   /** Present only when outcome === 'completed'. */
   summary?: OnboardingCompletionSummary
 }

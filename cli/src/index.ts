@@ -16,6 +16,7 @@ import { clearCredentialsCommand, listCredentialsCommand, migrateCredentialsComm
 import { manageCredentialsCommand } from './build/credentials-manage'
 import { lastOutputCommand } from './build/last-output-command'
 import { checkBuildNeeded } from './build/needed'
+import type { OnboardingBuilderOptions } from './build/onboarding/command'
 import { onboardingBuilderCommand } from './build/onboarding/command'
 import { requestBuildCommand } from './build/request'
 import { cleanupBundle } from './bundle/cleanup'
@@ -821,7 +822,10 @@ build
   .option('-a, --apikey <apikey>', 'API key to link to your account')
   .option('-p, --platform <platform>', 'Platform to onboard (ios or android). If omitted, auto-detects when only one native folder exists; prompts otherwise.')
   .option('--supa-host <supaHost>', optionDescriptions.supaHost)
-  .action(onboardingBuilderCommand)
+  // enableSelfUpdate is set ONLY here (the genuine `build init` entrypoint) so
+  // the self-update prompt's re-exec replays `build init`, never a wrapper
+  // command that reached onboarding as a sub-step (bundle upload / credentials).
+  .action((options: OnboardingBuilderOptions) => onboardingBuilderCommand({ ...options, enableSelfUpdate: true }))
 
 build
   .command('request [appId]')
