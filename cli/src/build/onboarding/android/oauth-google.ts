@@ -21,6 +21,7 @@ import type { AddressInfo } from 'node:net'
 import crypto from 'node:crypto'
 import { createServer } from 'node:http'
 import open from 'open'
+import { appendInternalLog } from '../../../support/internal-log.js'
 
 export const GOOGLE_OAUTH_SCOPES_ANDROIDPUBLISHER = [
   'openid',
@@ -535,7 +536,8 @@ export async function runOAuthFlow(
     try {
       await open(authUrl)
     }
-    catch {
+    catch (err) {
+      appendInternalLog(`google sign-in: could not auto-open browser: ${err instanceof Error ? err.message : String(err)}`)
       options.onStatus?.('Could not open browser automatically — open the URL above manually.')
     }
     options.onStatus?.('Waiting for browser redirect...')

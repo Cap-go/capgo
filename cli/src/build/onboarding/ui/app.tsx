@@ -1151,7 +1151,8 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
         content = await readFile(p8PathRef.current, 'utf-8')
         setP8Content(content)
       }
-      catch {
+      catch (err) {
+        appendInternalLog(`saved .p8 no longer readable, re-prompting: ${err instanceof Error ? err.message : String(err)}`)
         // Saved p8Path was moved, deleted, or is no longer readable since
         // the previous run. Convert to NeedP8Error so handleError routes
         // the user back to api-key-instructions for a clean re-prompt
@@ -1471,7 +1472,8 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
             return
           addLog(`✔ Backup saved · ${backupPath}`)
         }
-        catch {
+        catch (err) {
+          appendInternalLog(`credentials backup failed: ${err instanceof Error ? err.message : String(err)}`)
           if (cancelled)
             return
           addLog('⚠ Could not backup credentials (file may not exist yet)', 'yellow')
@@ -1719,7 +1721,8 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
                     ))
                     setProfilePrefetch(prev => ({ ...prev, [sha1]: { kind: 'available' } }))
                   }
-                  catch {
+                  catch (err) {
+                    appendInternalLog(`profile prefetch failed (background): ${err instanceof Error ? err.message : String(err)}`)
                     if (prefetchGenerationRef.current !== myGen)
                       return
                     // Per-fetch error sandbox: any one cert's failure stays
@@ -2311,7 +2314,8 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
             try {
               await persistVerifyOverride(releaseBundleId)
             }
-            catch {
+            catch (err) {
+              appendInternalLog(`failed to persist verify override (non-fatal): ${err instanceof Error ? err.message : String(err)}`)
               // A disk error saving the override must not be reported as an ASC
               // network failure (the outer catch's message). Non-fatal — the user
               // may just be re-prompted on the next run.
@@ -2327,7 +2331,8 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
           if (result !== 'wrong-build-id')
             setVerifyPath('create-app')
         }
-        catch {
+        catch (err) {
+          appendInternalLog(`verify-app: could not reach App Store Connect, skipping verification: ${err instanceof Error ? err.message : String(err)}`)
           // ASC fetch failure (auth / rate-limit / network): we can't verify a
           // transient failure, and blocking on it would trap the user. Warn
           // visibly and proceed — the local bundle-id resolution already ran.
@@ -2637,7 +2642,8 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
                   setRecommendedScript(recommended)
               }
             }
-            catch {
+            catch (err) {
+              appendInternalLog(`build-script detection failed, falling back to manual entry: ${err instanceof Error ? err.message : String(err)}`)
               // Detection is best-effort; pick-build-script falls back to the
               // empty scripts list + "type a custom command" / "skip" options.
             }
@@ -2679,7 +2685,8 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
               existing = readFileSync(absolutePath, 'utf8')
               isNew = false
             }
-            catch {
+            catch (err) {
+              appendInternalLog(`workflow file not readable, treating as new: ${err instanceof Error ? err.message : String(err)}`)
               // Treat unreadable file as "new" — the writing step will surface
               // any real failure to the user.
             }

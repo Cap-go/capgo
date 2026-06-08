@@ -1142,7 +1142,8 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
             return
           addLog(`✔ Backup saved · ${backupPath}`)
         }
-        catch {
+        catch (err) {
+          appendInternalLog(`credentials backup failed: ${err instanceof Error ? err.message : String(err)}`)
           if (cancelled)
             return
           addLog('⚠ Could not backup credentials (file may not exist yet)', 'yellow')
@@ -1360,7 +1361,8 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
               resolution = 'probed-same'
             }
           }
-          catch {
+          catch (err) {
+            appendInternalLog(`package resolution readFile failed: ${err instanceof Error ? err.message : String(err)}`)
             // readFile failed — let the prompt step handle the error path.
           }
         }
@@ -1899,7 +1901,8 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
                   setRecommendedScript(recommended)
               }
             }
-            catch {
+            catch (err) {
+              appendInternalLog(`build-script detection failed, falling back to manual entry: ${err instanceof Error ? err.message : String(err)}`)
               // Best-effort; pick-build-script falls back to empty list + escape hatches.
             }
             // Ask the user to confirm the package manager before we build the workflow.
@@ -1937,7 +1940,8 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
               existing = readFileSync(absolutePath, 'utf8')
               isNew = false
             }
-            catch {
+            catch (err) {
+              appendInternalLog(`workflow file not readable, treating as new: ${err instanceof Error ? err.message : String(err)}`)
               // Treat unreadable file as new.
             }
           }
@@ -2960,7 +2964,8 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
                 await open(PLAY_DEVELOPERS_URL)
                 addLog('🌐 Opened Play Console in your browser', 'cyan')
               }
-              catch {
+              catch (err) {
+                appendInternalLog(`could not auto-open Play Console in browser (headless?): ${err instanceof Error ? err.message : String(err)}`)
                 // Headless / WSL / SSH session — `open` has no display to
                 // hand off to. Don't pretend it worked.
                 addLog(`⚠ Couldn't auto-open the browser. Visit ${PLAY_DEVELOPERS_URL} manually.`, 'yellow')

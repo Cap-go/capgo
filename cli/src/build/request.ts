@@ -219,7 +219,8 @@ async function withCwd<T>(dir: string, fn: () => Promise<T>): Promise<T> {
       try {
         chdir(previous)
       }
-      catch {
+      catch (err) {
+        appendInternalLog(`cwd restore failed (ignored): ${err instanceof Error ? err.message : String(err)}`)
         // Best-effort restore; ignore to avoid masking original errors.
       }
     }
@@ -479,7 +480,8 @@ async function streamBuildLogs(
         try {
           ws.close()
         }
-        catch {
+        catch (err) {
+          appendInternalLog(`ws.close failed during cleanup (ignored): ${err instanceof Error ? err.message : String(err)}`)
           // ignore
         }
         resolve(status)
@@ -1876,7 +1878,8 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
             signal: cancelAbort.signal,
           })
         }
-        catch {
+        catch (err) {
+          appendInternalLog(`build cancel request errored (ignored): ${err instanceof Error ? err.message : String(err)}`)
           // ignore cancellation errors
         }
         finally {
