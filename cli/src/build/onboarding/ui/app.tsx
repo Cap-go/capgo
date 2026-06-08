@@ -2129,6 +2129,10 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
     if (step === 'verifying-key') {
       ;(async () => {
         try {
+          // Log the EXACT identifiers we're verifying with so support can compare
+          // them against App Store Connect — these are the very things the failure
+          // message tells the user to check (the .p8 itself is redacted on write).
+          appendInternalLog(`apple key verify: keyId=${keyIdRef.current}, issuerId=${issuerIdRef.current}`)
           const token = await getFreshToken()
           const verifyResult = await verifyApiKey(token)
           if (cancelled)
@@ -2215,6 +2219,10 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
           }
         }
         catch (err) {
+          // Capture the raw failure (Apple HTTP detail is already logged by the
+          // apple-api layer; this also catches local .p8/JWT-signing errors that
+          // never reach an HTTP call).
+          appendInternalLog(`apple key verify failed: ${err instanceof Error ? err.message : String(err)}`)
           if (!cancelled)
             handleError(err, 'verifying-key')
         }
