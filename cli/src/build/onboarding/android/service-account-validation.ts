@@ -17,6 +17,7 @@
 
 import type { Buffer } from 'node:buffer'
 import jwt from 'jsonwebtoken'
+import { appendInternalLog } from '../../../support/internal-log.js'
 
 const ANDROIDPUBLISHER_SCOPE = 'https://www.googleapis.com/auth/androidpublisher'
 const ANDROIDPUBLISHER_BASE = 'https://androidpublisher.googleapis.com/androidpublisher/v3'
@@ -311,6 +312,11 @@ async function probeAppAccess(args: {
   }
 
   const insertText = await insertRes.text()
+
+  // Record exactly what Play returned for this package so the support bundle can
+  // show whether "verified" came from the RIGHT package and what HTTP status the
+  // androidpublisher edits.insert probe actually got (2xx = SA can edit this app).
+  appendInternalLog(`probeAppAccess: POST ${insertUrl} → HTTP ${insertRes.status} ${insertRes.statusText}${insertRes.ok ? '' : ` :: ${insertText.slice(0, 300)}`}`)
 
   // 401 / 403 / 404 = SA exists and auth worked at the token-exchange level,
   // but this SA can't see this package. Anything in the 5xx range or other
