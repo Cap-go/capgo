@@ -36,6 +36,23 @@ const SUPPORTED_LANGUAGES = new Set([
   'zh-cn',
 ])
 
+const TRANSLATION_ALLOWED_LANGUAGES = new Set([
+  'de',
+  'es',
+  'fr',
+  'hi',
+  'id',
+  'it',
+  'ja',
+  'ko',
+  'pl',
+  'pt',
+  'ru',
+  'tr',
+  'vi',
+  'zh',
+])
+
 const LANGUAGE_NAMES: Record<string, string> = {
   'de': 'German',
   'en': 'English',
@@ -101,6 +118,31 @@ interface TranslationQueuePayload {
 type MessageEntry = [string, string]
 type TranslationStoreEntryInput = Omit<TranslationStoreEntry, 'updatedAt'>
 
+interface ReadyTranslationWriteInput {
+  batchCount?: number
+  checksum: string
+  claimedBatchIndex?: number
+  env: TranslationWorkerBindings
+  messages: Record<string, string>
+  model: string
+  nextBatchIndex: number
+  readyRequest: Request
+  requestId: string | undefined
+  targetLanguage: string
+}
+
+interface TranslatedBatchPersistenceInput {
+  batchIndex: number
+  batches: MessageEntry[][]
+  checksum: string
+  env: TranslationWorkerBindings
+  mergedMessages: Record<string, string>
+  model: string
+  readyRequest: Request
+  requestId: string | undefined
+  targetLanguage: string
+}
+
 class PublicHttpError extends Error {
   constructor(
     readonly status: number,
@@ -112,7 +154,7 @@ class PublicHttpError extends Error {
 }
 
 const sourceMessageCatalog = sourceMessages as Record<string, string>
-const sourceCatalogChecksumPromise = sha256Hex(JSON.stringify(sourceMessageCatalog))
+const sourceCatalogChecksumPromise = sha256Hex(JSON.stringify(sourceMessageCatalog)) // NOSONAR: top-level await is disallowed by lint config.
 let translationStoreInitialized = false
 let lastTranslationStoreCleanupAt = 0
 
@@ -182,6 +224,10 @@ function getTranslationModel(env: TranslationWorkerBindings) {
 function targetLanguageLabel(targetLanguage: string) {
   const label = LANGUAGE_NAMES[targetLanguage]
   return typeof label === 'string' ? label : targetLanguage
+}
+
+function isTranslationLanguageAllowed(targetLanguage: string) {
+  return TRANSLATION_ALLOWED_LANGUAGES.has(targetLanguage)
 }
 
 async function sha256Hex(value: string) {
@@ -951,6 +997,9 @@ async function handleTranslationMessages(request: Request, env: TranslationWorke
   if (targetLanguage === 'en')
     fail(400, 'unsupported_translation_language', 'English messages are already bundled')
 
+  if (!isTranslationLanguageAllowed(targetLanguage))
+    fail(400, 'unsupported_translation_language', 'Target language is not enabled')
+
   const checksum = await currentSourceChecksum()
   const model = getTranslationModel(env)
   const readyRequest = buildTranslationCacheRequest(checksum, targetLanguage)
@@ -994,12 +1043,12 @@ async function handleTranslationMessages(request: Request, env: TranslationWorke
 
 function queuedTargetLanguage(body: TranslationQueuePayload, requestId: string | undefined) {
   const targetLanguage = typeof body.targetLanguage === 'string' ? body.targetLanguage.trim().toLowerCase() : ''
-  if (SUPPORTED_LANGUAGES.has(targetLanguage) && targetLanguage !== 'en')
+  if (SUPPORTED_LANGUAGES.has(targetLanguage) && targetLanguage !== 'en' && isTranslationLanguageAllowed(targetLanguage))
     return targetLanguage
 
   cloudlogErr({
     requestId,
-    message: 'Ignoring unsupported queued translation language',
+    message: 'Ignoring disabled or unsupported queued translation language',
     targetLanguage,
   })
   return null
@@ -1041,7 +1090,19 @@ async function nextProcessableBatchIndex(env: TranslationWorkerBindings, storedE
   return released ? claimedBatchIndex : null
 }
 
-async function writeReadyTranslation(env: TranslationWorkerBindings, checksum: string, targetLanguage: string, model: string, messages: Record<string, string>, nextBatchIndex: number, readyRequest: Request, requestId: string | undefined, batchCount?: number, claimedBatchIndex?: number) {
+async function writeReadyTranslation(input: ReadyTranslationWriteInput) {
+  const {
+    batchCount,
+    checksum,
+    claimedBatchIndex,
+    env,
+    messages,
+    model,
+    nextBatchIndex,
+    readyRequest,
+    requestId,
+    targetLanguage,
+  } = input
   const readyEntry = translationStoreEntry({
     checksum,
     messages,
@@ -1085,11 +1146,33 @@ async function translateOwnedBatch(ai: AiBinding, env: TranslationWorkerBindings
   }
 }
 
-async function persistTranslatedBatch(env: TranslationWorkerBindings, checksum: string, targetLanguage: string, model: string, mergedMessages: Record<string, string>, batchIndex: number, batches: MessageEntry[][], readyRequest: Request, requestId: string | undefined) {
+async function persistTranslatedBatch(input: TranslatedBatchPersistenceInput) {
+  const {
+    batchIndex,
+    batches,
+    checksum,
+    env,
+    mergedMessages,
+    model,
+    readyRequest,
+    requestId,
+    targetLanguage,
+  } = input
   const followingBatchIndex = batchIndex + 1
 
   if (followingBatchIndex >= batches.length) {
-    await writeReadyTranslation(env, checksum, targetLanguage, model, mergedMessages, followingBatchIndex, readyRequest, requestId, batches.length, batchIndex)
+    await writeReadyTranslation({
+      batchCount: batches.length,
+      checksum,
+      claimedBatchIndex: batchIndex,
+      env,
+      messages: mergedMessages,
+      model,
+      nextBatchIndex: followingBatchIndex,
+      readyRequest,
+      requestId,
+      targetLanguage,
+    })
     return
   }
 
@@ -1138,7 +1221,16 @@ async function processTranslationQueueBatch(env: TranslationWorkerBindings, body
     return
 
   if (nextBatchIndex >= batches.length) {
-    await writeReadyTranslation(env, checksum, targetLanguage, model, storedEntry.messages, nextBatchIndex, readyRequest, requestId)
+    await writeReadyTranslation({
+      checksum,
+      env,
+      messages: storedEntry.messages,
+      model,
+      nextBatchIndex,
+      readyRequest,
+      requestId,
+      targetLanguage,
+    })
     return
   }
 
@@ -1162,7 +1254,17 @@ async function processTranslationQueueBatch(env: TranslationWorkerBindings, body
     ...storedEntry.messages,
     ...translatedBatch,
   }
-  await persistTranslatedBatch(env, checksum, targetLanguage, model, mergedMessages, batchIndex, batches, readyRequest, requestId)
+  await persistTranslatedBatch({
+    batchIndex,
+    batches,
+    checksum,
+    env,
+    mergedMessages,
+    model,
+    readyRequest,
+    requestId,
+    targetLanguage,
+  })
 }
 
 async function fetchHandler(request: Request, env: TranslationWorkerBindings) {

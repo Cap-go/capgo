@@ -195,4 +195,45 @@ describe('translation queue helpers', () => {
     expect(payload.status).toBe('pending')
     expect(queue.send).toHaveBeenCalledTimes(1)
   })
+
+  it('rejects supported aliases outside the public generation allow-list before queueing', async () => {
+    const queue = {
+      send: vi.fn(),
+    }
+    const response = await translationWorker.fetch(new Request('https://api.capgo.app/translation/messages', {
+      body: JSON.stringify({ targetLanguage: 'pt-br' }),
+      headers: { 'Content-Type': 'application/json' },
+      method: 'POST',
+    }), {
+      TRANSLATION_MESSAGES_QUEUE: queue,
+    } as any)
+    const payload = await response.json() as { error: string, message: string }
+
+    expect(response.status).toBe(400)
+    expect(payload.error).toBe('unsupported_translation_language')
+    expect(payload.message).toBe('Target language is not enabled')
+    expect(queue.send).not.toHaveBeenCalled()
+  })
+
+  it('ignores queued translations outside the generation allow-list before AI work', async () => {
+    const ai = {
+      run: vi.fn(),
+    }
+    const message = {
+      ack: vi.fn(),
+      body: {
+        batchIndex: 0,
+        checksum: 'checksum',
+        model: 'model',
+        targetLanguage: 'pt-br',
+      },
+      retry: vi.fn(),
+    }
+
+    await translationWorker.queue({ messages: [message] } as any, { AI: ai } as any, {} as any)
+
+    expect(ai.run).not.toHaveBeenCalled()
+    expect(message.ack).toHaveBeenCalledTimes(1)
+    expect(message.retry).not.toHaveBeenCalled()
+  })
 })
