@@ -53,6 +53,7 @@ function throwBuilderUnavailable(message: string, moreInfo: Record<string, unkno
  */
 export function buildBuilderPayload(input: {
   orgId: string
+  actorUserId: string
   uploadPath: string
   platform: string
   buildOptions: Record<string, unknown>
@@ -62,7 +63,11 @@ export function buildBuilderPayload(input: {
   delete buildOptions.timeoutSeconds
 
   return {
+    // userId carries the org_id (anonymized owner) — kept for backwards compat.
     userId: input.orgId,
+    // actorUserId is the human user who triggered the build (apikey.user_id). The builder
+    // uses it as the PostHog distinct_id so its build events join this same person.
+    actorUserId: input.actorUserId,
     artifactKey: input.uploadPath,
     fastlane: { lane: input.platform },
     buildOptions,
@@ -226,13 +231,14 @@ async function createBuilderJob(c: Context, input: {
   builderUrl: string
   builderApiKey: string
   orgId: string
+  actorUserId: string
   appId: string
   platform: 'ios' | 'android'
   uploadPath: string
   buildOptions: Record<string, unknown>
   buildCredentials: Record<string, string>
 }): Promise<BuilderJobResponse> {
-  const { builderUrl, builderApiKey, orgId, appId, platform, uploadPath, buildOptions, buildCredentials } = input
+  const { builderUrl, builderApiKey, orgId, actorUserId, appId, platform, uploadPath, buildOptions, buildCredentials } = input
   cloudlog({
     requestId: c.get('requestId'),
     message: 'Calling builder API',
@@ -252,6 +258,7 @@ async function createBuilderJob(c: Context, input: {
       },
       body: JSON.stringify(buildBuilderPayload({
         orgId,
+        actorUserId,
         uploadPath,
         platform,
         buildOptions,
@@ -454,6 +461,7 @@ export async function requestBuild(
     builderUrl,
     builderApiKey,
     orgId: org_id,
+    actorUserId: apikey.user_id,
     appId: app_id,
     platform,
     uploadPath: upload_path,
