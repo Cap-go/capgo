@@ -1690,6 +1690,7 @@
   "pro-tip-you-can-copy": "Pro tip: you can copy the",
   "public": "public",
   "public-key-prefix": "Public key (first 4 chars)",
+  "qr-code-preview-alt": "QR Code to preview on phone",
   "rbac-not-enabled-for-org": "RBAC is not enabled for this organization.",
   "rbac-system-enabled": "RBAC role management preview",
   "rbac-system-enabled-body": "Editing roles here will use the RBAC system. Legacy roles stay visible during migration.",

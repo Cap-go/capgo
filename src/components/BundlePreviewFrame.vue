@@ -148,7 +148,7 @@ function svgToDataUrl(svg: string): string {
 
 // Generate QR code linking to the preview URL
 function generateQRCode() {
-  if (isNativePlatform || !qrCodeUrl.value) {
+  if (!qrCodeUrl.value) {
     qrCodeDataUrl.value = ''
     return
   }
@@ -189,7 +189,7 @@ async function startNativePreview() {
 <template>
   <div
     v-if="isNativePlatform"
-    class="flex min-h-[calc(100dvh-8rem)] w-full items-center justify-center px-4 py-6"
+    class="flex min-h-[calc(100dvh-8rem)] w-full flex-col items-center justify-center gap-5 px-4 py-6"
   >
     <button
       class="inline-flex min-h-12 w-full max-w-xs items-center justify-center gap-2 rounded-xl bg-blue-500 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-500/20 transition-colors hover:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-60"
@@ -199,6 +199,20 @@ async function startNativePreview() {
       <IconPlay class="h-5 w-5" />
       {{ t('start-preview') }}
     </button>
+
+    <div
+      v-if="qrCodeDataUrl"
+      class="flex w-full max-w-xs flex-col items-center rounded-xl bg-white p-5 shadow-lg dark:bg-gray-800"
+    >
+      <img
+        :src="qrCodeDataUrl"
+        :alt="t('qr-code-preview-alt')"
+        class="mb-3 h-44 w-44"
+      >
+      <p class="max-w-40 text-center text-sm text-gray-600 dark:text-gray-400">
+        {{ t('scan-qr-to-preview') }}
+      </p>
+    </div>
   </div>
 
   <div v-else class="relative min-h-[calc(100dvh-8rem)] w-full overflow-y-auto px-3 py-4 md:px-6 md:py-6">
@@ -281,7 +295,7 @@ async function startNativePreview() {
       >
         <img
           :src="qrCodeDataUrl"
-          alt="QR Code to preview on phone"
+          :alt="t('qr-code-preview-alt')"
           class="mb-3 h-44 w-44"
         >
         <p class="text-sm text-center text-gray-600 dark:text-gray-400 max-w-40">
