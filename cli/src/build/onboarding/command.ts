@@ -9,6 +9,7 @@ import { getAppId, getConfig } from '../../utils.js'
 import { appendInternalLog, startInternalLog } from '../../support/internal-log.js'
 import { getPlatformDirFromCapacitorConfig } from '../platform-paths.js'
 import OnboardingShell from './ui/shell.js'
+import { maybeSelfUpdate } from './self-update.js'
 import type { OnboardingResult } from './types.js'
 
 export interface OnboardingBuilderOptions {
@@ -87,6 +88,11 @@ export async function onboardingBuilderCommand(options: OnboardingBuilderOptions
     console.error('Use `build credentials save` for non-interactive credential setup.')
     process.exit(1)
   }
+
+  // Offer to self-update BEFORE entering Ink's alt-screen. On accept this
+  // re-execs the updated CLI (which resumes from the persisted onboarding step)
+  // and never returns; otherwise it returns and we continue on this version.
+  await maybeSelfUpdate()
 
   // Detect app ID and platform directories from capacitor.config.ts
   let appId: string | undefined
