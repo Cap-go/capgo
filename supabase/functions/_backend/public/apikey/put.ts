@@ -11,6 +11,7 @@ import { closeClient, getDrizzleClient, getPgClient } from '../../utils/pg.ts'
 import { checkPermission } from '../../utils/rbac.ts'
 import { schema } from '../../utils/postgres_schema.ts'
 import { supabaseAdmin, supabaseWithAuth, validateExpirationAgainstOrgPolicies, validateExpirationDate } from '../../utils/supabase.ts'
+import { apiKeyBindingsAllowOrgCreate, assertApiKeyCanKeepOrgCreateGrant, parseApiKeyGlobalPermissions, replaceApiKeyGlobalPermissions, validateApiKeyGlobalPermissionsForBindings } from './global_permissions.ts'
 import { apiKeyHasLimitedScope } from './scope.ts'
 
 const app = honoFactory.createApp()
@@ -31,6 +32,7 @@ interface ApiKeyPut {
   expires_at?: string | null
   regenerate?: boolean
   bindings?: BindingInput[]
+  global_permissions?: unknown
 }
 
 interface BindingInput {
@@ -114,6 +116,7 @@ async function replaceApiKeyBindings(
   apikey: { id: number, rbac_id: string },
   currentBindingOrgIds: string[],
   bindings: BindingInput[],
+  globalPermissions?: string[],
   updateData?: ApiKeyUpdateData,
 ) {
   if (auth.authType !== 'jwt' || !auth.userId) {
@@ -136,6 +139,9 @@ async function replaceApiKeyBindings(
     pgClient = getPgClient(c)
     const drizzle = getDrizzleClient(pgClient)
     const enrichedBindings = enrichApiKeyBindings(bindings)
+    if (globalPermissions !== undefined) {
+      validateApiKeyGlobalPermissionsForBindings(globalPermissions, bindings, c.get('requestId'))
+    }
 
     await drizzle.transaction(async (tx) => {
       if (updateData && Object.keys(updateData).length > 0) {
@@ -186,6 +192,14 @@ async function replaceApiKeyBindings(
           throw quickError(result.status, 'binding_failed', result.error, { requestId: c.get('requestId'), apikeyId: apikey.id })
         }
       }
+
+      if (globalPermissions !== undefined) {
+        await replaceApiKeyGlobalPermissions(tx, apikey.rbac_id, globalPermissions, auth.userId)
+      }
+      else if (!apiKeyBindingsAllowOrgCreate(bindings)) {
+        // Legacy clients can omit global_permissions; keep stored grants aligned with the new bindings.
+        await replaceApiKeyGlobalPermissions(tx, apikey.rbac_id, [], auth.userId)
+      }
     })
 
     cloudlog({
@@ -217,6 +231,72 @@ async function replaceApiKeyBindings(
   }
 }
 
+async function replaceApiKeyGlobalPermissionsForExistingBindings(
+  c: Context<MiddlewareKeyVariables>,
+  auth: AuthInfo,
+  apikey: { id: number, rbac_id: string },
+  currentBindingOrgIds: string[],
+  globalPermissions: string[],
+  updateData?: ApiKeyUpdateData,
+) {
+  if (auth.authType !== 'jwt' || !auth.userId) {
+    throw quickError(403, 'not_authorized', 'Only user sessions can update API key permissions', { requestId: c.get('requestId') })
+  }
+
+  for (const orgId of currentBindingOrgIds) {
+    if (!(await checkPermission(c, 'org.update_user_roles', { orgId }))) {
+      throw quickError(403, 'forbidden_binding', `Forbidden - Admin rights required for org ${orgId}`, { requestId: c.get('requestId'), orgId })
+    }
+  }
+
+  let pgClient: ReturnType<typeof getPgClient> | undefined
+  try {
+    pgClient = getPgClient(c)
+    const drizzle = getDrizzleClient(pgClient)
+
+    await drizzle.transaction(async (tx) => {
+      if (updateData && Object.keys(updateData).length > 0) {
+        const result = await tx
+          .update(schema.apikeys)
+          .set(toDrizzleApiKeyUpdate(updateData))
+          .where(sql`${schema.apikeys.id} = ${apikey.id} AND ${schema.apikeys.user_id} = ${auth.userId}::uuid`)
+          .returning({ id: schema.apikeys.id })
+
+        if (result.length === 0) {
+          throw quickError(500, 'failed_to_update_apikey', 'Failed to update API key', { requestId: c.get('requestId'), apikeyId: apikey.id })
+        }
+      }
+
+      await assertApiKeyCanKeepOrgCreateGrant(tx, apikey.rbac_id, globalPermissions, c.get('requestId'))
+      await replaceApiKeyGlobalPermissions(tx, apikey.rbac_id, globalPermissions, auth.userId)
+    })
+
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'apikey_global_permissions_replaced',
+      apikeyId: apikey.id,
+      permissionsCount: globalPermissions.length,
+    })
+  }
+  catch (error: any) {
+    if (error?.status) {
+      throw error
+    }
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: 'apikey_global_permissions_replace_unexpected_error',
+      apikeyId: apikey.id,
+      error,
+    })
+    throw quickError(500, 'global_permission_update_failed', 'Failed to update API key permissions', { requestId: c.get('requestId'), apikeyId: apikey.id }, error)
+  }
+  finally {
+    if (pgClient) {
+      await closeClient(c, pgClient)
+    }
+  }
+}
+
 async function handlePut(c: Context<MiddlewareKeyVariables>, idParam?: string) {
   const requestId = c.get('requestId')
   const auth = c.get('auth') as AuthInfo
@@ -231,6 +311,8 @@ async function handlePut(c: Context<MiddlewareKeyVariables>, idParam?: string) {
   const { id, name, expires_at, regenerate } = body
   const bindings = parseBindingsForUpdate(body, requestId)
   const hasBindingUpdates = bindings !== undefined
+  const globalPermissions = parseApiKeyGlobalPermissions(body.global_permissions, requestId)
+  const hasGlobalPermissionUpdates = globalPermissions !== undefined
 
   const resolvedId = typeof idParam === 'string' && idParam.length > 0 ? idParam : (id !== undefined ? String(id) : '')
   if (!resolvedId) {
@@ -266,8 +348,8 @@ async function handlePut(c: Context<MiddlewareKeyVariables>, idParam?: string) {
     throw simpleError('regenerate_must_be_boolean', 'regenerate must be a boolean', { requestId })
   }
 
-  if (!hasUpdates && !regenerate && !hasBindingUpdates) {
-    throw simpleError('no_valid_fields_provided_for_update', 'No valid fields provided for update. Provide name, expires_at, bindings, or regenerate.', { requestId })
+  if (!hasUpdates && !regenerate && !hasBindingUpdates && !hasGlobalPermissionUpdates) {
+    throw simpleError('no_valid_fields_provided_for_update', 'No valid fields provided for update. Provide name, expires_at, bindings, global_permissions, or regenerate.', { requestId })
   }
 
   // Use supabaseWithAuth which handles both JWT and API key authentication
@@ -329,7 +411,25 @@ async function handlePut(c: Context<MiddlewareKeyVariables>, idParam?: string) {
     await replaceApiKeyBindings(c, auth, {
       id: existingApikey.id,
       rbac_id: existingApikey.rbac_id,
-    }, currentBindingOrgIds, bindings, hasUpdates ? updateData : undefined)
+    }, currentBindingOrgIds, bindings, globalPermissions, hasUpdates ? updateData : undefined)
+
+    const { data: updatedData, error: fetchUpdatedError } = await supabase
+      .from('apikeys')
+      .select()
+      .eq('id', existingApikey.id)
+      .eq('user_id', auth.userId)
+      .single()
+
+    if (fetchUpdatedError || !updatedData) {
+      throw quickError(500, 'failed_to_update_apikey', 'Failed to load updated API key', { requestId, supabaseError: fetchUpdatedError })
+    }
+    updatedApikey = updatedData
+  }
+  else if (hasGlobalPermissionUpdates) {
+    await replaceApiKeyGlobalPermissionsForExistingBindings(c, auth, {
+      id: existingApikey.id,
+      rbac_id: existingApikey.rbac_id,
+    }, currentBindingOrgIds, globalPermissions, hasUpdates ? updateData : undefined)
 
     const { data: updatedData, error: fetchUpdatedError } = await supabase
       .from('apikeys')
@@ -385,6 +485,13 @@ async function handlePut(c: Context<MiddlewareKeyVariables>, idParam?: string) {
       throw quickError(500, 'failed_to_update_apikey', 'Failed to regenerate API key', { requestId, supabaseError: updateError })
     }
     return c.json(updatedData)
+  }
+
+  if (globalPermissions !== undefined) {
+    return c.json({
+      ...updatedApikey,
+      global_permissions: globalPermissions,
+    })
   }
 
   return c.json(updatedApikey)

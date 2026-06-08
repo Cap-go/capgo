@@ -1,5 +1,5 @@
 {
-  "originHash" : "0c179d9141773b7facf8458d81f2f987504c8a05b674dfb858d2708f4dc1906e",
+  "originHash" : "ab06eac6f466fa5a658cff1940891bc0d5d22a674cbf5f219ad0cdd49e671f87",
   "pins" : [
     {
       "identity" : "alamofire",
@@ -8,15 +8,6 @@
       "state" : {
         "revision" : "7595cbcf59809f9977c5f6378500de2ad73b7ddb",
         "version" : "5.12.0"
-      }
-    },
-    {
-      "identity" : "appsflyerframework-static",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/AppsFlyerSDK/AppsFlyerFramework-Static.git",
-      "state" : {
-        "revision" : "d07a2b2ae1b5f1ef4c369ed8e3f85fabc6061915",
-        "version" : "6.18.0"
       }
     },
     {
@@ -33,8 +24,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/ionic-team/capacitor-swift-pm.git",
       "state" : {
-        "revision" : "992959f0467c781eb6a1637e69d87481238c3672",
-        "version" : "8.3.4"
+        "revision" : "44ae2505f54a80c5e559533950886d0644fc2fca",
+        "version" : "8.4.0"
       }
     },
     {
@@ -123,8 +114,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/jwplayer/JWPlayerKit-package.git",
       "state" : {
-        "revision" : "da2d38272c660cd6c34dc4cfd7a6820be65db235",
-        "version" : "4.26.1"
+        "revision" : "d5e3b35adf991191b829e745e71b29781bceb276",
+        "version" : "4.26.2"
       }
     },
     {
@@ -159,8 +150,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/RevenueCat/purchases-hybrid-common.git",
       "state" : {
-        "revision" : "aaefa0d667d225e51e13c0e3b3e13c3026f0254a",
-        "version" : "18.7.0"
+        "revision" : "a9d25f3d300cdb515b0cce464b59ebb29ad9ec14",
+        "version" : "18.10.0"
       }
     },
     {
@@ -168,8 +159,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/RevenueCat/purchases-ios-spm",
       "state" : {
-        "revision" : "6b95744e70f1edc43f89f2b522b0832ddfdd41a1",
-        "version" : "5.73.0"
+        "revision" : "92e2804a6b84b3b7ce60bfe7e9ff63dc9524ef5b",
+        "version" : "5.76.0"
       }
     },
     {

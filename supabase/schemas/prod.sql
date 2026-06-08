@@ -553,6 +553,34 @@ COMMENT ON FUNCTION "public"."accept_invitation_to_org"("org_id" "uuid") IS 'Acc
 
 
 
+CREATE OR REPLACE FUNCTION "public"."acknowledge_compatibility_event"("event_id" bigint, "note" "text") RETURNS "void"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+DECLARE v_org uuid; v_app text;
+BEGIN
+  IF note IS NULL OR length(btrim(note)) = 0 THEN
+    RAISE EXCEPTION 'reason_required';
+  END IF;
+  SELECT org_id, app_id INTO v_org, v_app
+    FROM public.compatibility_events WHERE id = event_id;
+  IF v_org IS NULL THEN RETURN; END IF;            -- unknown id: no-op
+  -- RBAC: app upload-bundle permission (release managers); NOT legacy min_rights.
+  -- Adjust the perm key in review if a different role should be allowed to accept.
+  IF NOT public.rbac_check_permission_direct(
+        public.rbac_perm_app_upload_bundle(), auth.uid(), v_org, v_app, NULL::bigint) THEN
+    RETURN;                                         -- unauthorized: no-op (no oracle)
+  END IF;
+  UPDATE public.compatibility_events
+    SET resolved_at = now(), resolved_by = auth.uid(),
+        resolution_kind = 'accepted', resolution_note = note
+    WHERE id = event_id AND resolved_at IS NULL;
+END; $$;
+
+
+ALTER FUNCTION "public"."acknowledge_compatibility_event"("event_id" bigint, "note" "text") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."aggregate_build_log_to_daily"() RETURNS "trigger"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -596,6 +624,82 @@ $$;
 
 
 ALTER FUNCTION "public"."aggregate_build_log_to_daily"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."apikey_has_current_org_create_capability"("p_apikey_rbac_id" "uuid") RETURNS boolean
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.role_bindings AS rb
+    JOIN public.roles AS r ON r.id = rb.role_id
+    WHERE rb.principal_type = public.rbac_principal_apikey()
+      AND rb.principal_id = p_apikey_rbac_id
+      AND rb.scope_type = public.rbac_scope_org()
+      AND r.scope_type = public.rbac_scope_org()
+      AND (
+        rb.expires_at IS NULL
+        OR rb.expires_at > pg_catalog.now()
+      )
+      AND r.name IN (
+        public.rbac_role_org_super_admin(),
+        public.rbac_role_org_admin()
+      )
+  )
+$$;
+
+
+ALTER FUNCTION "public"."apikey_has_current_org_create_capability"("p_apikey_rbac_id" "uuid") OWNER TO "postgres";
+
+
+COMMENT ON FUNCTION "public"."apikey_has_current_org_create_capability"("p_apikey_rbac_id" "uuid") IS 'Private helper ensuring org.create grants only remain effective while the API key still has a current org-scoped write-capable RBAC binding.';
+
+
+
+CREATE OR REPLACE FUNCTION "public"."apikey_has_global_permission"("p_apikey" "text", "p_permission_key" "text") RETURNS boolean
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+DECLARE
+  v_api_key public.apikeys%ROWTYPE;
+BEGIN
+  IF p_apikey IS NULL OR p_apikey = '' OR p_permission_key IS NULL OR p_permission_key = '' THEN
+    RETURN false;
+  END IF;
+
+  SELECT *
+  INTO v_api_key
+  FROM public.find_apikey_by_value(p_apikey)
+  LIMIT 1;
+
+  IF v_api_key.id IS NULL OR public.is_apikey_expired(v_api_key.expires_at) THEN
+    RETURN false;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1
+    FROM public.apikey_global_permissions AS agp
+    WHERE agp.apikey_rbac_id = v_api_key.rbac_id
+      AND agp.permission_key = p_permission_key
+  ) THEN
+    RETURN false;
+  END IF;
+
+  IF p_permission_key = public.rbac_perm_org_create() THEN
+    RETURN public.apikey_has_current_org_create_capability(v_api_key.rbac_id);
+  END IF;
+
+  RETURN true;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."apikey_has_global_permission"("p_apikey" "text", "p_permission_key" "text") OWNER TO "postgres";
+
+
+COMMENT ON FUNCTION "public"."apikey_has_global_permission"("p_apikey" "text", "p_permission_key" "text") IS 'Service-role helper that checks global API-key permissions such as org.create using the supplied key value, including hashed-key lookup.';
+
 
 
 CREATE OR REPLACE FUNCTION "public"."apikey_permission_for_keymode"("keymode" "public"."key_mode"[], "scope_type" "text") RETURNS "text"
@@ -1491,6 +1595,85 @@ $$;
 
 
 ALTER FUNCTION "public"."auto_owner_org_by_app_id"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."bind_creating_apikey_to_org_on_create"() RETURNS "trigger"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+DECLARE
+  api_key_text text;
+  api_key public.apikeys%ROWTYPE;
+  org_super_admin_role_id uuid;
+BEGIN
+  SELECT public.get_apikey_header() INTO api_key_text;
+  IF api_key_text IS NULL THEN
+    RETURN NEW;
+  END IF;
+
+  SELECT *
+  INTO api_key
+  FROM public.find_apikey_by_value(api_key_text)
+  LIMIT 1;
+
+  IF api_key.id IS NULL
+    OR public.is_apikey_expired(api_key.expires_at)
+    OR api_key.user_id IS DISTINCT FROM NEW.created_by
+  THEN
+    RETURN NEW;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1
+    FROM public.apikey_global_permissions AS agp
+    WHERE agp.apikey_rbac_id = api_key.rbac_id
+      AND agp.permission_key = public.rbac_perm_org_create()
+  )
+  OR NOT public.apikey_has_current_org_create_capability(api_key.rbac_id) THEN
+    RETURN NEW;
+  END IF;
+
+  SELECT roles.id
+  INTO org_super_admin_role_id
+  FROM public.roles
+  WHERE roles.name = public.rbac_role_org_super_admin()
+    AND roles.scope_type = public.rbac_scope_org()
+  LIMIT 1;
+
+  IF org_super_admin_role_id IS NULL THEN
+    RAISE EXCEPTION 'org_super_admin role not found';
+  END IF;
+
+  INSERT INTO public.role_bindings (
+    principal_type,
+    principal_id,
+    role_id,
+    scope_type,
+    org_id,
+    granted_by,
+    granted_at,
+    reason,
+    is_direct
+  )
+  VALUES (
+    public.rbac_principal_apikey(),
+    api_key.rbac_id,
+    org_super_admin_role_id,
+    public.rbac_scope_org(),
+    NEW.id,
+    NEW.created_by,
+    pg_catalog.now(),
+    'Auto-granted to API key on org creation',
+    true
+  )
+  ON CONFLICT DO NOTHING;
+
+  RETURN NEW;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."bind_creating_apikey_to_org_on_create"() OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."calculate_credit_cost"("p_metric" "public"."credit_metric_type", "p_overage_amount" numeric) RETURNS TABLE("credit_step_id" bigint, "credit_cost_per_unit" numeric, "credits_required" numeric)
@@ -5577,6 +5760,10 @@ $$;
 
 
 ALTER FUNCTION "public"."get_identity_for_apikey_creation"() OWNER TO "postgres";
+
+
+COMMENT ON FUNCTION "public"."get_identity_for_apikey_creation"() IS 'Returns auth.uid() for JWT callers; API-key creation of API keys stays disabled even when org.create is granted.';
+
 
 
 CREATE OR REPLACE FUNCTION "public"."get_identity_org_allowed"("keymode" "public"."key_mode"[], "org_id" "uuid") RETURNS "uuid"
@@ -11805,6 +11992,21 @@ CREATE OR REPLACE FUNCTION "public"."rbac_perm_channel_update_settings"() RETURN
 ALTER FUNCTION "public"."rbac_perm_channel_update_settings"() OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."rbac_perm_org_create"() RETURNS "text"
+    LANGUAGE "sql" IMMUTABLE
+    SET "search_path" TO ''
+    AS $$
+  SELECT 'org.create'::text
+$$;
+
+
+ALTER FUNCTION "public"."rbac_perm_org_create"() OWNER TO "postgres";
+
+
+COMMENT ON FUNCTION "public"."rbac_perm_org_create"() IS 'Global API-key permission for creating a new organization before an org-scoped RBAC binding can exist.';
+
+
+
 CREATE OR REPLACE FUNCTION "public"."rbac_perm_org_create_app"() RETURNS "text"
     LANGUAGE "sql" IMMUTABLE
     SET "search_path" TO ''
@@ -15812,6 +16014,35 @@ $$;
 ALTER FUNCTION "public"."verify_mfa"() OWNER TO "postgres";
 
 
+CREATE TABLE IF NOT EXISTS "public"."apikey_global_permissions" (
+    "id" bigint NOT NULL,
+    "apikey_rbac_id" "uuid" NOT NULL,
+    "permission_key" "text" NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "granted_by" "uuid",
+    "reason" "text",
+    CONSTRAINT "apikey_global_permissions_permission_key_not_empty" CHECK (("permission_key" <> ''::"text"))
+);
+
+
+ALTER TABLE "public"."apikey_global_permissions" OWNER TO "postgres";
+
+
+COMMENT ON TABLE "public"."apikey_global_permissions" IS 'Global permissions for API keys where no org/app/channel target exists yet. Currently used to grandfather org creation for existing write-capable keys without granting it to future keys by default.';
+
+
+
+ALTER TABLE "public"."apikey_global_permissions" ALTER COLUMN "id" ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME "public"."apikey_global_permissions_id_seq"
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+
 ALTER TABLE "public"."apikeys" ALTER COLUMN "id" ADD GENERATED BY DEFAULT AS IDENTITY (
     SEQUENCE NAME "public"."apikeys_id_seq"
     START WITH 1
@@ -16190,6 +16421,41 @@ COMMENT ON COLUMN "public"."channel_permission_overrides"."channel_id" IS 'publi
 
 
 COMMENT ON COLUMN "public"."channel_permission_overrides"."permission_key" IS 'RBAC permission key (channel.*).';
+
+
+
+CREATE TABLE IF NOT EXISTS "public"."compatibility_events" (
+    "id" bigint NOT NULL,
+    "org_id" "uuid" NOT NULL,
+    "app_id" "text" NOT NULL,
+    "source" "text" NOT NULL,
+    "platform" "text" NOT NULL,
+    "channel_id" bigint,
+    "channel_name" "text" NOT NULL,
+    "current_version_id" bigint,
+    "current_version_name" "text" NOT NULL,
+    "previous_version_id" bigint,
+    "previous_version_name" "text" NOT NULL,
+    "offenders" "jsonb" DEFAULT '[]'::"jsonb" NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "resolved_at" timestamp with time zone,
+    "resolved_by" "uuid",
+    "resolution_kind" "text",
+    "resolution_note" "text"
+);
+
+
+ALTER TABLE "public"."compatibility_events" OWNER TO "postgres";
+
+
+ALTER TABLE "public"."compatibility_events" ALTER COLUMN "id" ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME "public"."compatibility_events_id_seq"
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
 
 
 
@@ -17030,7 +17296,9 @@ CREATE TABLE IF NOT EXISTS "public"."orgs" (
     "has_usage_credits" boolean DEFAULT false NOT NULL,
     "website" "text",
     "stats_refresh_requested_at" timestamp without time zone,
+    "onboarding" "jsonb" DEFAULT '{"intent": "unknown"}'::"jsonb" NOT NULL,
     CONSTRAINT "orgs_max_apikey_expiration_days_valid" CHECK ((("max_apikey_expiration_days" IS NULL) OR (("max_apikey_expiration_days" >= 1) AND ("max_apikey_expiration_days" <= 365)))),
+    CONSTRAINT "orgs_onboarding_valid" CHECK ((("jsonb_typeof"("onboarding") = 'object'::"text") AND ((NOT ("onboarding" ? 'intent'::"text")) OR (("onboarding" ->> 'intent'::"text") = ANY (ARRAY['unknown'::"text", 'ota'::"text", 'builder'::"text", 'both'::"text", 'exploring'::"text"]))))),
     CONSTRAINT "orgs_password_policy_config_min_length_check" CHECK ((("password_policy_config" IS NULL) OR (("jsonb_typeof"("password_policy_config") = 'object'::"text") AND ((NOT ("password_policy_config" ? 'min_length'::"text")) OR (("jsonb_typeof"(("password_policy_config" -> 'min_length'::"text")) = 'number'::"text") AND ((("password_policy_config" ->> 'min_length'::"text"))::numeric = "trunc"((("password_policy_config" ->> 'min_length'::"text"))::numeric)) AND (((("password_policy_config" ->> 'min_length'::"text"))::numeric >= (6)::numeric) AND ((("password_policy_config" ->> 'min_length'::"text"))::numeric <= (72)::numeric))))))),
     CONSTRAINT "orgs_required_encryption_key_valid" CHECK ((("required_encryption_key" IS NULL) OR ("length"(("required_encryption_key")::"text") = ANY (ARRAY[20, 21]))))
 );
@@ -17078,6 +17346,10 @@ COMMENT ON COLUMN "public"."orgs"."use_new_rbac" IS 'Feature flag: when true, or
 
 
 COMMENT ON COLUMN "public"."orgs"."has_usage_credits" IS 'True only with positive, unexpired usage credits.';
+
+
+
+COMMENT ON COLUMN "public"."orgs"."onboarding" IS 'Onboarding answers (extensible JSONB). Currently: {"intent": unknown|ota|builder|both|exploring}. Used for segmentation and to tailor the org experience.';
 
 
 
@@ -17892,6 +18164,16 @@ ALTER TABLE ONLY "public"."usage_credit_transactions" ALTER COLUMN "id" SET DEFA
 
 
 
+ALTER TABLE ONLY "public"."apikey_global_permissions"
+    ADD CONSTRAINT "apikey_global_permissions_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "public"."apikey_global_permissions"
+    ADD CONSTRAINT "apikey_global_permissions_rbac_permission_unique" UNIQUE ("apikey_rbac_id", "permission_key");
+
+
+
 ALTER TABLE ONLY "public"."apikeys"
     ADD CONSTRAINT "apikeys_pkey" PRIMARY KEY ("id");
 
@@ -17984,6 +18266,11 @@ ALTER TABLE ONLY "public"."channels"
 
 ALTER TABLE ONLY "public"."channels"
     ADD CONSTRAINT "channels_rbac_id_key" UNIQUE ("rbac_id");
+
+
+
+ALTER TABLE ONLY "public"."compatibility_events"
+    ADD CONSTRAINT "compatibility_events_pkey" PRIMARY KEY ("id");
 
 
 
@@ -18544,6 +18831,14 @@ CREATE INDEX "idx_channels_public_app_id_ios" ON "public"."channels" USING "btre
 
 
 
+CREATE INDEX "idx_compatibility_events_app_created" ON "public"."compatibility_events" USING "btree" ("app_id", "created_at" DESC);
+
+
+
+CREATE INDEX "idx_compatibility_events_unresolved" ON "public"."compatibility_events" USING "btree" ("app_id") WHERE ("resolved_at" IS NULL);
+
+
+
 CREATE INDEX "idx_cron_tasks_enabled" ON "public"."cron_tasks" USING "btree" ("enabled") WHERE ("enabled" = true);
 
 
@@ -18808,6 +19103,10 @@ CREATE UNIQUE INDEX "unique_app_version_positive" ON "public"."version_meta" USI
 
 
 
+CREATE UNIQUE INDEX "uq_compatibility_events_dedup" ON "public"."compatibility_events" USING "btree" ("app_id", "channel_id", "platform", "current_version_id", "previous_version_id") NULLS NOT DISTINCT;
+
+
+
 CREATE UNIQUE INDEX "usage_credit_transactions_purchase_payment_intent_id_idx" ON "public"."usage_credit_transactions" USING "btree" ((("source_ref" ->> 'paymentIntentId'::"text"))) WHERE (("transaction_type" = 'purchase'::"public"."credit_transaction_type") AND (("source_ref" ->> 'paymentIntentId'::"text") IS NOT NULL));
 
 
@@ -18869,6 +19168,10 @@ CREATE OR REPLACE TRIGGER "audit_org_users_trigger" AFTER INSERT OR DELETE OR UP
 
 
 CREATE OR REPLACE TRIGGER "audit_orgs_trigger" AFTER INSERT OR DELETE OR UPDATE ON "public"."orgs" FOR EACH ROW EXECUTE FUNCTION "public"."audit_log_trigger"();
+
+
+
+CREATE OR REPLACE TRIGGER "bind_creating_apikey_to_org_on_create" AFTER INSERT ON "public"."orgs" FOR EACH ROW EXECUTE FUNCTION "public"."bind_creating_apikey_to_org_on_create"();
 
 
 
@@ -19152,6 +19455,16 @@ CREATE OR REPLACE TRIGGER "update_webhooks_updated_at" BEFORE UPDATE ON "public"
 
 
 
+ALTER TABLE ONLY "public"."apikey_global_permissions"
+    ADD CONSTRAINT "apikey_global_permissions_apikey_rbac_id_fkey" FOREIGN KEY ("apikey_rbac_id") REFERENCES "public"."apikeys"("rbac_id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."apikey_global_permissions"
+    ADD CONSTRAINT "apikey_global_permissions_granted_by_fkey" FOREIGN KEY ("granted_by") REFERENCES "public"."users"("id") ON DELETE SET NULL;
+
+
+
 ALTER TABLE ONLY "public"."apikeys"
     ADD CONSTRAINT "apikeys_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE CASCADE;
 
@@ -19254,6 +19567,16 @@ ALTER TABLE ONLY "public"."channels"
 
 ALTER TABLE ONLY "public"."channels"
     ADD CONSTRAINT "channels_version_fkey" FOREIGN KEY ("version") REFERENCES "public"."app_versions"("id") ON DELETE SET NULL;
+
+
+
+ALTER TABLE ONLY "public"."compatibility_events"
+    ADD CONSTRAINT "compatibility_events_app_id_fkey" FOREIGN KEY ("app_id") REFERENCES "public"."apps"("app_id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."compatibility_events"
+    ADD CONSTRAINT "compatibility_events_org_id_fkey" FOREIGN KEY ("org_id") REFERENCES "public"."orgs"("id") ON DELETE CASCADE;
 
 
 
@@ -19650,7 +19973,7 @@ CREATE POLICY "Allow insert for auth, api keys (write, all) (admin+)" ON "public
 
 
 
-CREATE POLICY "Allow insert org for user" ON "public"."orgs" FOR INSERT TO "authenticated" WITH CHECK (("created_by" = ( SELECT "auth"."uid"() AS "uid")));
+CREATE POLICY "Allow insert org for user" ON "public"."orgs" FOR INSERT TO "authenticated" WITH CHECK (("created_by" = ( SELECT "public"."get_identity_for_apikey_creation"() AS "get_identity_for_apikey_creation")));
 
 
 
@@ -19958,6 +20281,10 @@ CREATE POLICY "Deny delete for org members" ON "public"."usage_overage_events" A
 
 
 
+CREATE POLICY "Deny delete on apikey_global_permissions" ON "public"."apikey_global_permissions" AS RESTRICTIVE FOR DELETE TO "anon", "authenticated" USING (false);
+
+
+
 CREATE POLICY "Deny delete on daily_storage_hourly" ON "public"."daily_storage_hourly" AS RESTRICTIVE FOR DELETE TO "anon", "authenticated" USING (false);
 
 
@@ -19982,7 +20309,15 @@ CREATE POLICY "Deny insert for org members" ON "public"."usage_overage_events" A
 
 
 
+CREATE POLICY "Deny insert on apikey_global_permissions" ON "public"."apikey_global_permissions" AS RESTRICTIVE FOR INSERT TO "anon", "authenticated" WITH CHECK (false);
+
+
+
 CREATE POLICY "Deny insert on daily_storage_hourly" ON "public"."daily_storage_hourly" AS RESTRICTIVE FOR INSERT TO "anon", "authenticated" WITH CHECK (false);
+
+
+
+CREATE POLICY "Deny select on apikey_global_permissions" ON "public"."apikey_global_permissions" AS RESTRICTIVE FOR SELECT TO "anon", "authenticated" USING (false);
 
 
 
@@ -19999,6 +20334,10 @@ CREATE POLICY "Deny update for org members" ON "public"."usage_credit_transactio
 
 
 CREATE POLICY "Deny update for org members" ON "public"."usage_overage_events" AS RESTRICTIVE FOR UPDATE TO "anon", "authenticated" USING (false) WITH CHECK (false);
+
+
+
+CREATE POLICY "Deny update on apikey_global_permissions" ON "public"."apikey_global_permissions" AS RESTRICTIVE FOR UPDATE TO "anon", "authenticated" USING (false) WITH CHECK (false);
 
 
 
@@ -20114,6 +20453,9 @@ CREATE POLICY "Users can read own security status" ON "public"."user_security" F
 
 
 
+ALTER TABLE "public"."apikey_global_permissions" ENABLE ROW LEVEL SECURITY;
+
+
 ALTER TABLE "public"."apikeys" ENABLE ROW LEVEL SECURITY;
 
 
@@ -20198,6 +20540,25 @@ COMMENT ON POLICY "channel_permission_overrides_admin_update" ON "public"."chann
 
 
 ALTER TABLE "public"."channels" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."compatibility_events" ENABLE ROW LEVEL SECURITY;
+
+
+CREATE POLICY "compatibility_events_deny_delete" ON "public"."compatibility_events" AS RESTRICTIVE FOR DELETE TO "anon", "authenticated" USING (false);
+
+
+
+CREATE POLICY "compatibility_events_deny_insert" ON "public"."compatibility_events" AS RESTRICTIVE FOR INSERT TO "anon", "authenticated" WITH CHECK (false);
+
+
+
+CREATE POLICY "compatibility_events_deny_update" ON "public"."compatibility_events" AS RESTRICTIVE FOR UPDATE TO "anon", "authenticated" USING (false) WITH CHECK (false);
+
+
+
+CREATE POLICY "compatibility_events_select" ON "public"."compatibility_events" FOR SELECT TO "authenticated" USING ("public"."rbac_check_permission"("public"."rbac_perm_app_read"(), "org_id", ("app_id")::character varying, NULL::bigint));
+
 
 
 ALTER TABLE "public"."cron_tasks" ENABLE ROW LEVEL SECURITY;
@@ -20990,7 +21351,23 @@ GRANT ALL ON FUNCTION "public"."accept_invitation_to_org"("org_id" "uuid") TO "s
 
 
 
+REVOKE ALL ON FUNCTION "public"."acknowledge_compatibility_event"("event_id" bigint, "note" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."acknowledge_compatibility_event"("event_id" bigint, "note" "text") TO "service_role";
+GRANT ALL ON FUNCTION "public"."acknowledge_compatibility_event"("event_id" bigint, "note" "text") TO "authenticated";
+
+
+
 GRANT ALL ON FUNCTION "public"."aggregate_build_log_to_daily"() TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."apikey_has_current_org_create_capability"("p_apikey_rbac_id" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."apikey_has_current_org_create_capability"("p_apikey_rbac_id" "uuid") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."apikey_has_global_permission"("p_apikey" "text", "p_permission_key" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."apikey_has_global_permission"("p_apikey" "text", "p_permission_key" "text") TO "service_role";
 
 
 
@@ -21045,6 +21422,11 @@ REVOKE ALL ON FUNCTION "public"."auto_apikey_name_by_id"() FROM PUBLIC;
 
 
 REVOKE ALL ON FUNCTION "public"."auto_owner_org_by_app_id"() FROM PUBLIC;
+
+
+
+REVOKE ALL ON FUNCTION "public"."bind_creating_apikey_to_org_on_create"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."bind_creating_apikey_to_org_on_create"() TO "service_role";
 
 
 
@@ -22463,6 +22845,13 @@ GRANT ALL ON FUNCTION "public"."rbac_perm_channel_update_settings"() TO "service
 
 
 
+REVOKE ALL ON FUNCTION "public"."rbac_perm_org_create"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."rbac_perm_org_create"() TO "service_role";
+GRANT ALL ON FUNCTION "public"."rbac_perm_org_create"() TO "anon";
+GRANT ALL ON FUNCTION "public"."rbac_perm_org_create"() TO "authenticated";
+
+
+
 REVOKE ALL ON FUNCTION "public"."rbac_perm_org_create_app"() FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."rbac_perm_org_create_app"() TO "service_role";
 GRANT ALL ON FUNCTION "public"."rbac_perm_org_create_app"() TO "anon";
@@ -23159,6 +23548,16 @@ GRANT ALL ON FUNCTION "public"."verify_mfa"() TO "service_role";
 
 
 
+GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."apikey_global_permissions" TO "service_role";
+
+
+
+GRANT ALL ON SEQUENCE "public"."apikey_global_permissions_id_seq" TO "anon";
+GRANT ALL ON SEQUENCE "public"."apikey_global_permissions_id_seq" TO "authenticated";
+GRANT ALL ON SEQUENCE "public"."apikey_global_permissions_id_seq" TO "service_role";
+
+
+
 GRANT ALL ON SEQUENCE "public"."apikeys_id_seq" TO "anon";
 GRANT ALL ON SEQUENCE "public"."apikeys_id_seq" TO "authenticated";
 GRANT ALL ON SEQUENCE "public"."apikeys_id_seq" TO "service_role";
@@ -23263,6 +23662,18 @@ GRANT ALL ON SEQUENCE "public"."channel_id_seq" TO "service_role";
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."channel_permission_overrides" TO "anon";
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."channel_permission_overrides" TO "authenticated";
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."channel_permission_overrides" TO "service_role";
+
+
+
+GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."compatibility_events" TO "anon";
+GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."compatibility_events" TO "authenticated";
+GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."compatibility_events" TO "service_role";
+
+
+
+GRANT ALL ON SEQUENCE "public"."compatibility_events_id_seq" TO "anon";
+GRANT ALL ON SEQUENCE "public"."compatibility_events_id_seq" TO "authenticated";
+GRANT ALL ON SEQUENCE "public"."compatibility_events_id_seq" TO "service_role";
 
 
 

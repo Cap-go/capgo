@@ -18,6 +18,7 @@ const mockFrom = vi.fn((table: string) => {
   }
 })
 const mockRpc = vi.fn()
+const mockIsPlatformAdmin = vi.fn(async () => false)
 const mockCreateSignedImageUrl = vi.fn()
 const mockResolveImagePath = vi.fn((raw?: string | null) => ({
   normalized: raw?.trim().replace(/^\/+/, '').replace(/^images\//, '') ?? '',
@@ -27,10 +28,12 @@ const mockUpdateDashboard = vi.fn()
 const mainStore = {
   auth: { id: 'auth-user-123' } as { id: string } | undefined,
   user: { id: 'user-123' } as { id: string } | undefined,
+  isAdmin: false,
   updateDashboard: mockUpdateDashboard,
 }
 
 vi.mock('~/services/supabase', () => ({
+  isPlatformAdmin: mockIsPlatformAdmin,
   stripeEnabled: ref(true),
   useSupabase: () => ({
     auth: {
@@ -79,6 +82,7 @@ describe('organization store deleteOrganization', () => {
     setActivePinia(createPinia())
     mainStore.auth = { id: 'auth-user-123' }
     mainStore.user = { id: 'user-123' }
+    mainStore.isAdmin = false
     mockEq.mockResolvedValue({ data: null, error: null })
     mockIn.mockResolvedValue({ data: [], error: null })
     vi.stubGlobal('localStorage', {
@@ -187,19 +191,19 @@ describe('organization store refreshOrganizationLogos', () => {
     mockCreateSignedImageUrl.mockResolvedValueOnce('')
     mockRpc.mockResolvedValueOnce({
       data: [{
-        gid: 'org-auth-fallback',
-        role: 'org_super_admin',
-        app_count: 0,
-        created_by: 'owner-123',
-        name: 'Auth Fallback Org',
-        logo: null,
-        password_policy_config: null,
-        enforcing_2fa: false,
+        'gid': 'org-auth-fallback',
+        'role': 'org_super_admin',
+        'app_count': 0,
+        'created_by': 'owner-123',
+        'name': 'Auth Fallback Org',
+        'logo': null,
+        'password_policy_config': null,
+        'enforcing_2fa': false,
         '2fa_has_access': true,
-        password_has_access: true,
-        paying: true,
-        trial_left: 0,
-        can_use_more: true,
+        'password_has_access': true,
+        'paying': true,
+        'trial_left': 0,
+        'can_use_more': true,
       }],
       error: null,
     })

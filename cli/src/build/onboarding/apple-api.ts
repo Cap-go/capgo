@@ -528,6 +528,90 @@ export async function ensureBundleId(
 }
 
 /**
+ * An App Store Connect app record. Used by the iOS app-verification step to
+ * check whether an app exists whose `bundleId` matches the project's Release
+ * `PRODUCT_BUNDLE_IDENTIFIER`.
+ */
+export interface AscApp {
+  id: string
+  bundleId: string
+  name: string
+}
+
+/**
+ * Parse a `GET /v1/apps` response into {@link AscApp} records. Tolerant of
+ * missing `data`, missing `attributes`, and missing individual fields — Apple
+ * omits attributes the API key isn't entitled to see rather than nulling them.
+ */
+export function parseAppsResponse(json: any): AscApp[] {
+  return (json?.data || []).map((app: any): AscApp => ({
+    id: app?.id || '',
+    bundleId: app?.attributes?.bundleId || '',
+    name: app?.attributes?.name || '',
+  }))
+}
+
+/**
+ * Parse a `GET /v1/bundleIds` response into the list of registered identifier
+ * strings, dropping any falsy entries (missing `attributes`/`identifier`).
+ */
+export function parseBundleIdsResponse(json: any): string[] {
+  return (json?.data || [])
+    .map((b: any): string => b?.attributes?.identifier || '')
+    .filter((id: string): boolean => Boolean(id))
+}
+
+// App Store Connect returns at most `limit` resources per page and a
+// `links.next` absolute URL when more exist. We follow it (stripping the base
+// URL so it can flow back through ascFetch) up to MAX_LIST_PAGES — a hard cap
+// so a malformed/looping `next` link can never spin forever. 200 × 10 = 2000
+// records is far more than any real team has.
+const MAX_LIST_PAGES = 10
+
+/**
+ * Turn an absolute `links.next` URL into an ascFetch-relative path. Apple
+ * returns `links.next` fully-qualified, and ascFetch builds `${ASC_BASE_URL}${path}`,
+ * so we strip the base prefix to avoid a double-prefixed URL. If a future API
+ * version returns a path-relative next link, preserve it as-is rather than
+ * silently truncating pagination — mirrors `listProfilesForCert`'s handling.
+ */
+function nextPath(next: string | undefined): string | null {
+  if (!next)
+    return null
+  return next.startsWith(ASC_BASE_URL) ? next.slice(ASC_BASE_URL.length) : next
+}
+
+/**
+ * List every App Store Connect app visible to the API key, following
+ * pagination. Uses the existing {@link ascFetch} — no separate fetch path.
+ */
+export async function listApps(token: string): Promise<AscApp[]> {
+  const apps: AscApp[] = []
+  let path: string | null = '/apps?limit=200'
+  for (let page = 0; page < MAX_LIST_PAGES && path; page++) {
+    const body: any = await ascFetch(path, token)
+    apps.push(...parseAppsResponse(body))
+    path = nextPath(body?.links?.next)
+  }
+  return apps
+}
+
+/**
+ * List every registered bundle ID identifier visible to the API key, following
+ * pagination. Uses the existing {@link ascFetch} — no separate fetch path.
+ */
+export async function listBundleIds(token: string): Promise<string[]> {
+  const ids: string[] = []
+  let path: string | null = '/bundleIds?limit=200'
+  for (let page = 0; page < MAX_LIST_PAGES && path; page++) {
+    const body: any = await ascFetch(path, token)
+    ids.push(...parseBundleIdsResponse(body))
+    path = nextPath(body?.links?.next)
+  }
+  return ids
+}
+
+/**
  * Get the profile name we use for a given appId.
  */
 export function getCapgoProfileName(appId: string): string {

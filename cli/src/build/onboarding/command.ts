@@ -8,13 +8,14 @@ import React from 'react'
 import { getAppId, getConfig } from '../../utils.js'
 import { getPlatformDirFromCapacitorConfig } from '../platform-paths.js'
 import OnboardingShell from './ui/shell.js'
-import { appendInternalLog, startInternalLog } from '../../support/internal-log.js'
 import type { OnboardingResult } from './types.js'
 
 export interface OnboardingBuilderOptions {
   apikey?: string
   platform?: string
-  /** Override the Capgo API host (e.g. preprod) — mirrors `build request --supa-host`. */
+  // Capgo API gateway override (--supa-host) — threaded to the wizard so its
+  // build request AND AI analysis hit the same host as the plain CLI flow
+  // (preprod/self-hosted testing). Defaults to prod when omitted.
   supaHost?: string
 }
 
@@ -112,11 +113,6 @@ export async function onboardingBuilderCommand(options: OnboardingBuilderOptions
     log.error('Could not detect app ID from capacitor.config.ts. Make sure you are in a Capacitor project directory.')
     process.exit(1)
   }
-  // Start the verbose internal log early so it captures the whole builder run
-  // (incl. raw Apple/Google API errors) and survives crashes for the support
-  // bundle. Never shown during normal runs — surfaced only on "Email support".
-  startInternalLog(appId)
-  appendInternalLog(`build init: onboarding started for app ${appId}`)
   // If config.appId is missing (very rare — CapacitorConfig.appId is required
   // for `cap sync` to produce a working iOS project), fall back to the
   // resolved Capgo lookup key. Mismatch detection will still surface the
@@ -145,7 +141,7 @@ export async function onboardingBuilderCommand(options: OnboardingBuilderOptions
       iosDir,
       androidDir,
       apikey: options.apikey,
-      apiHost: options.supaHost || 'https://api.capgo.app',
+      supaHost: options.supaHost,
       initialPlatform,
       onResolvePlatform: (platform: Platform) => {
         resolvedPlatform = platform

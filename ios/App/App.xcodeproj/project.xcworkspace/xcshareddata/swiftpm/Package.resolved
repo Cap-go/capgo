@@ -1,5 +1,5 @@
 {
-  "originHash" : "0c179d9141773b7facf8458d81f2f987504c8a05b674dfb858d2708f4dc1906e",
+  "originHash" : "ab06eac6f466fa5a658cff1940891bc0d5d22a674cbf5f219ad0cdd49e671f87",
   "pins" : [
     {
       "identity" : "alamofire",
@@ -8,15 +8,6 @@
       "state" : {
         "revision" : "7595cbcf59809f9977c5f6378500de2ad73b7ddb",
         "version" : "5.12.0"
-      }
-    },
-    {
-      "identity" : "appsflyerframework-static",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/AppsFlyerSDK/AppsFlyerFramework-Static.git",
-      "state" : {
-        "revision" : "d07a2b2ae1b5f1ef4c369ed8e3f85fabc6061915",
-        "version" : "6.18.0"
       }
     },
     {
@@ -78,8 +69,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/intercom/intercom-ios-sp.git",
       "state" : {
-        "revision" : "acf168853d46c3e2fd21e70336643c7af1974703",
-        "version" : "19.6.0"
+        "revision" : "1ec7bb229a892b6dfa440ac5e8c0347fd91a5760",
+        "version" : "19.5.7"
       }
     },
     {
@@ -123,8 +114,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/jwplayer/JWPlayerKit-package.git",
       "state" : {
-        "revision" : "da2d38272c660cd6c34dc4cfd7a6820be65db235",
-        "version" : "4.26.1"
+        "revision" : "d5e3b35adf991191b829e745e71b29781bceb276",
+        "version" : "4.26.2"
       }
     },
     {
@@ -159,8 +150,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/RevenueCat/purchases-hybrid-common.git",
       "state" : {
-        "revision" : "c7c16adddc62342942b6a5098d0bd77a6e25825b",
-        "version" : "18.9.1"
+        "revision" : "a9d25f3d300cdb515b0cce464b59ebb29ad9ec14",
+        "version" : "18.10.0"
       }
     },
     {
@@ -168,8 +159,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/RevenueCat/purchases-ios-spm",
       "state" : {
-        "revision" : "3bbaa4a88d74c863ee5bc4295b2fc628323eff0d",
-        "version" : "5.75.0"
+        "revision" : "92e2804a6b84b3b7ce60bfe7e9ff63dc9524ef5b",
+        "version" : "5.76.0"
       }
     },
     {

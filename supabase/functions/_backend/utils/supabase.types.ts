@@ -14,6 +14,48 @@ export type Database = {
   }
   public: {
     Tables: {
+      apikey_global_permissions: {
+        Row: {
+          apikey_rbac_id: string
+          created_at: string
+          granted_by: string | null
+          id: number
+          permission_key: string
+          reason: string | null
+        }
+        Insert: {
+          apikey_rbac_id: string
+          created_at?: string
+          granted_by?: string | null
+          id?: number
+          permission_key: string
+          reason?: string | null
+        }
+        Update: {
+          apikey_rbac_id?: string
+          created_at?: string
+          granted_by?: string | null
+          id?: number
+          permission_key?: string
+          reason?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "apikey_global_permissions_apikey_rbac_id_fkey"
+            columns: ["apikey_rbac_id"]
+            isOneToOne: false
+            referencedRelation: "apikeys"
+            referencedColumns: ["rbac_id"]
+          },
+          {
+            foreignKeyName: "apikey_global_permissions_granted_by_fkey"
+            columns: ["granted_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       apikeys: {
         Row: {
           created_at: string | null
@@ -773,6 +815,81 @@ export type Database = {
           {
             foreignKeyName: "owner_org_id_fkey"
             columns: ["owner_org"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      compatibility_events: {
+        Row: {
+          app_id: string
+          channel_id: number | null
+          channel_name: string
+          created_at: string
+          current_version_id: number | null
+          current_version_name: string
+          id: number
+          offenders: Json
+          org_id: string
+          platform: string
+          previous_version_id: number | null
+          previous_version_name: string
+          resolution_kind: string | null
+          resolution_note: string | null
+          resolved_at: string | null
+          resolved_by: string | null
+          source: string
+        }
+        Insert: {
+          app_id: string
+          channel_id?: number | null
+          channel_name: string
+          created_at?: string
+          current_version_id?: number | null
+          current_version_name: string
+          id?: never
+          offenders?: Json
+          org_id: string
+          platform: string
+          previous_version_id?: number | null
+          previous_version_name: string
+          resolution_kind?: string | null
+          resolution_note?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          source: string
+        }
+        Update: {
+          app_id?: string
+          channel_id?: number | null
+          channel_name?: string
+          created_at?: string
+          current_version_id?: number | null
+          current_version_name?: string
+          id?: never
+          offenders?: Json
+          org_id?: string
+          platform?: string
+          previous_version_id?: number | null
+          previous_version_name?: string
+          resolution_kind?: string | null
+          resolution_note?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          source?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "compatibility_events_app_id_fkey"
+            columns: ["app_id"]
+            isOneToOne: false
+            referencedRelation: "apps"
+            referencedColumns: ["app_id"]
+          },
+          {
+            foreignKeyName: "compatibility_events_org_id_fkey"
+            columns: ["org_id"]
             isOneToOne: false
             referencedRelation: "orgs"
             referencedColumns: ["id"]
@@ -1847,6 +1964,7 @@ export type Database = {
           management_email: string
           max_apikey_expiration_days: number | null
           name: string
+          onboarding: Json
           password_policy_config: Json | null
           require_apikey_expiration: boolean
           required_encryption_key: string | null
@@ -1871,6 +1989,7 @@ export type Database = {
           management_email: string
           max_apikey_expiration_days?: number | null
           name: string
+          onboarding?: Json
           password_policy_config?: Json | null
           require_apikey_expiration?: boolean
           required_encryption_key?: string | null
@@ -1895,6 +2014,7 @@ export type Database = {
           management_email?: string
           max_apikey_expiration_days?: number | null
           name?: string
+          onboarding?: Json
           password_policy_config?: Json | null
           require_apikey_expiration?: boolean
           required_encryption_key?: string | null
@@ -3027,6 +3147,18 @@ export type Database = {
     }
     Functions: {
       accept_invitation_to_org: { Args: { org_id: string }; Returns: string }
+      acknowledge_compatibility_event: {
+        Args: { event_id: number; note: string }
+        Returns: undefined
+      }
+      apikey_has_current_org_create_capability: {
+        Args: { p_apikey_rbac_id: string }
+        Returns: boolean
+      }
+      apikey_has_global_permission: {
+        Args: { p_apikey: string; p_permission_key: string }
+        Returns: boolean
+      }
       apikey_permission_for_keymode: {
         Args: {
           keymode: Database["public"]["Enums"]["key_mode"][]
@@ -4273,6 +4405,7 @@ export type Database = {
       rbac_perm_channel_read_history: { Args: never; Returns: string }
       rbac_perm_channel_rollback_bundle: { Args: never; Returns: string }
       rbac_perm_channel_update_settings: { Args: never; Returns: string }
+      rbac_perm_org_create: { Args: never; Returns: string }
       rbac_perm_org_create_app: { Args: never; Returns: string }
       rbac_perm_org_delete: { Args: never; Returns: string }
       rbac_perm_org_invite_user: { Args: never; Returns: string }

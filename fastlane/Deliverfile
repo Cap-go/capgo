@@ -1,0 +1,11 @@
+platform('ios')
+
+app(1602316563)
+screenshots_path('./fastlane/screenshots')
+
+skip_binary_upload(true)
+skip_metadata(true)
+overwrite_screenshots(true)
+submit_for_review(false)
+automatic_release(false)
+force(true)

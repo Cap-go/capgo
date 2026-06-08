@@ -38,11 +38,7 @@ dependencies {
     implementation project(':capgo-capacitor-android-inline-install')
     implementation project(':capgo-capacitor-android-kiosk')
     implementation project(':capgo-capacitor-android-sms-retriever')
-    implementation project(':capgo-capacitor-android-usagestatsmanager')
     implementation project(':capgo-capacitor-app-attest')
-    implementation project(':capgo-capacitor-app-tracking-transparency')
-    implementation project(':capgo-capacitor-appinsights')
-    implementation project(':capgo-capacitor-appsflyer')
     implementation project(':capgo-capacitor-audio-recorder')
     implementation project(':capgo-capacitor-autofill-save-password')
     implementation project(':capgo-capacitor-background-task')
@@ -55,9 +51,7 @@ dependencies {
     implementation project(':capgo-capacitor-date-picker')
     implementation project(':capgo-capacitor-document-scanner')
     implementation project(':capgo-capacitor-downloader')
-    implementation project(':capgo-capacitor-file')
     implementation project(':capgo-capacitor-file-compressor')
-    implementation project(':capgo-capacitor-file-picker')
     implementation project(':capgo-capacitor-file-sharer')
     implementation project(':capgo-capacitor-flash')
     implementation project(':capgo-capacitor-home-indicator')
@@ -67,7 +61,6 @@ dependencies {
     implementation project(':capgo-capacitor-intent-launcher')
     implementation project(':capgo-capacitor-intercom')
     implementation project(':capgo-capacitor-is-root')
-    implementation project(':capgo-capacitor-ivs-player')
     implementation project(':capgo-capacitor-jw-player')
     implementation project(':capgo-capacitor-keep-awake')
     implementation project(':capgo-capacitor-launch-navigator')
@@ -113,7 +106,6 @@ dependencies {
     implementation project(':capgo-capacitor-youtube-player')
     implementation project(':capgo-capacitor-zebra-datawedge')
     implementation project(':capgo-capacitor-zip')
-    implementation project(':revenuecat-purchases-capacitor')
 
 }
 

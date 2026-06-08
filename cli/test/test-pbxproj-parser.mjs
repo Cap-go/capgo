@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict'
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'fs'
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from 'fs'
 import { join } from 'path'
 import { tmpdir } from 'os'
-import { findSignableTargets, findXcodeProject } from '../src/build/pbxproj-parser.ts'
+import { findSignableTargets, findXcodeProject, replaceBundleIdInPbxproj, writeReleaseBundleId } from '../src/build/pbxproj-parser.ts'
 
 function t(name, fn) {
   try {
@@ -98,6 +98,23 @@ t('findXcodeProject finds .xcodeproj in ios/ subdirectory', () => {
   const dir = mkdtempSync(join(tmpdir(), 'pbx-test-'))
   try {
     const xcodeprojDir = join(dir, 'ios', 'MyApp.xcodeproj')
+    mkdirSync(xcodeprojDir, { recursive: true })
+    writeFileSync(join(xcodeprojDir, 'project.pbxproj'), 'fake content')
+
+    const result = findXcodeProject(dir)
+    assert.equal(result, join(xcodeprojDir, 'project.pbxproj'))
+  }
+  finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+t('findXcodeProject finds .xcodeproj nested under ios/App (Capacitor layout)', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'pbx-test-'))
+  try {
+    // Capacitor nests the project at ios/App/App.xcodeproj — one level deeper
+    // than the React Native ios/MyApp.xcodeproj layout the first test covers.
+    const xcodeprojDir = join(dir, 'ios', 'App', 'App.xcodeproj')
     mkdirSync(xcodeprojDir, { recursive: true })
     writeFileSync(join(xcodeprojDir, 'project.pbxproj'), 'fake content')
 
@@ -246,6 +263,101 @@ t('findXcodeProject returns null when no .xcodeproj exists', () => {
 
     const result = findXcodeProject(dir)
     assert.equal(result, null)
+  }
+  finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+// ── replaceBundleIdInPbxproj (pure rewriter) ──────────────────────────
+
+t('replaceBundleIdInPbxproj replaces an unquoted value', () => {
+  const { content, changed } = replaceBundleIdInPbxproj('PRODUCT_BUNDLE_IDENTIFIER = com.foo.old;', 'com.foo.old', 'com.foo.new')
+  assert.equal(changed, 1)
+  assert.equal(content, 'PRODUCT_BUNDLE_IDENTIFIER = com.foo.new;')
+})
+
+t('replaceBundleIdInPbxproj replaces a quoted value (normalizes to unquoted)', () => {
+  const { content, changed } = replaceBundleIdInPbxproj('PRODUCT_BUNDLE_IDENTIFIER = "com.foo.old";', 'com.foo.old', 'com.foo.new')
+  assert.equal(changed, 1)
+  assert.equal(content, 'PRODUCT_BUNDLE_IDENTIFIER = com.foo.new;')
+})
+
+t('replaceBundleIdInPbxproj updates every matching occurrence (Debug + Release share the value)', () => {
+  const input = [
+    '\t\t\t\tPRODUCT_BUNDLE_IDENTIFIER = com.foo.app;',
+    '\t\t\tname = Debug;',
+    '\t\t\t\tPRODUCT_BUNDLE_IDENTIFIER = com.foo.app;',
+    '\t\t\tname = Release;',
+  ].join('\n')
+  const { content, changed } = replaceBundleIdInPbxproj(input, 'com.foo.app', 'com.foo.real')
+  assert.equal(changed, 2)
+  assert.equal(content.includes('com.foo.app;'), false)
+  assert.equal((content.match(/com\.foo\.real/g) || []).length, 2)
+})
+
+t('replaceBundleIdInPbxproj only touches the matching value (different Debug id is left alone)', () => {
+  const input = [
+    'PRODUCT_BUNDLE_IDENTIFIER = com.foo.app;',
+    'PRODUCT_BUNDLE_IDENTIFIER = com.foo.app.release.build;',
+  ].join('\n')
+  const { content, changed } = replaceBundleIdInPbxproj(input, 'com.foo.app.release.build', 'com.foo.real')
+  assert.equal(changed, 1)
+  assert.equal(content.includes('com.foo.app.release.build'), false)
+  assert.equal(content.includes('PRODUCT_BUNDLE_IDENTIFIER = com.foo.app;'), true)
+  assert.equal(content.includes('PRODUCT_BUNDLE_IDENTIFIER = com.foo.real;'), true)
+})
+
+t('replaceBundleIdInPbxproj does NOT touch suffixed extension ids', () => {
+  const input = [
+    'PRODUCT_BUNDLE_IDENTIFIER = com.foo.app;',
+    'PRODUCT_BUNDLE_IDENTIFIER = com.foo.app.notif;',
+  ].join('\n')
+  const { content, changed } = replaceBundleIdInPbxproj(input, 'com.foo.app', 'com.foo.real')
+  assert.equal(changed, 1)
+  assert.equal(content.includes('com.foo.app.notif'), true)
+})
+
+t('replaceBundleIdInPbxproj is a no-op when the value is absent', () => {
+  const input = 'PRODUCT_BUNDLE_IDENTIFIER = com.foo.other;'
+  const { content, changed } = replaceBundleIdInPbxproj(input, 'com.foo.missing', 'com.foo.new')
+  assert.equal(changed, 0)
+  assert.equal(content, input)
+})
+
+t('replaceBundleIdInPbxproj is a no-op when from === to', () => {
+  const input = 'PRODUCT_BUNDLE_IDENTIFIER = com.foo.app;'
+  const { content, changed } = replaceBundleIdInPbxproj(input, 'com.foo.app', 'com.foo.app')
+  assert.equal(changed, 0)
+  assert.equal(content, input)
+})
+
+// ── writeReleaseBundleId (read-modify-write) ──────────────────────────
+
+t('writeReleaseBundleId rewrites the pbxproj on disk (Capacitor layout)', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'pbx-test-'))
+  try {
+    const xcodeprojDir = join(dir, 'ios', 'App', 'App.xcodeproj')
+    mkdirSync(xcodeprojDir, { recursive: true })
+    const pbxprojPath = join(xcodeprojDir, 'project.pbxproj')
+    writeFileSync(pbxprojPath, 'PRODUCT_BUNDLE_IDENTIFIER = com.foo.wrong;\nname = Release;\n')
+
+    const { changed } = writeReleaseBundleId(dir, 'ios', 'com.foo.wrong', 'com.foo.real')
+    assert.equal(changed, 1)
+    const after = readFileSync(pbxprojPath, 'utf-8')
+    assert.equal(after.includes('com.foo.wrong'), false)
+    assert.equal(after.includes('PRODUCT_BUNDLE_IDENTIFIER = com.foo.real;'), true)
+  }
+  finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+t('writeReleaseBundleId returns changed:0 when no project exists', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'pbx-test-'))
+  try {
+    const { changed } = writeReleaseBundleId(dir, 'ios', 'com.foo.wrong', 'com.foo.real')
+    assert.equal(changed, 0)
   }
   finally {
     rmSync(dir, { recursive: true, force: true })

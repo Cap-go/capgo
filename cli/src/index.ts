@@ -41,6 +41,7 @@ import { login } from './login'
 import { startMcpServer } from './mcp/server'
 import { addOrganization, deleteOrganization, listMembers, listOrganizations, setOrganization } from './organization'
 import { capturePosthogException, getCommandPath, shouldCapturePosthogException } from './posthog'
+import { getPreviewQr } from './preview/qr'
 import { probe } from './probe'
 import { testRunDeviceCommand } from './run/device'
 import { getUserId } from './user/account'
@@ -157,6 +158,25 @@ Example: npx @capgo/cli@latest login YOUR_API_KEY`)
   .option('--supa-host <supaHost>', optionDescriptions.supaHost)
   .option('--supa-anon <supaAnon>', optionDescriptions.supaAnon)
 
+program
+  .command('get-qr [appId] [target]')
+  .description(`🔳 Print a terminal QR code for a bundle or channel preview.
+
+Preview must be enabled for the app.
+
+Examples:
+  npx @capgo/cli@latest get-qr com.example.app --bundle 1.2.3
+  npx @capgo/cli@latest get-qr com.example.app --bundle 123
+  npx @capgo/cli@latest get-qr com.example.app --channel production
+  npx @capgo/cli@latest get-qr com.example.app production --type channel`)
+  .action(getPreviewQr)
+  .option('-a, --apikey <apikey>', optionDescriptions.apikey)
+  .option('--bundle <bundle>', `Bundle name or id to preview`)
+  .option('--channel <channel>', `Channel name or id to preview`)
+  .addOption(new Option('--type <type>', `Type for positional target`).choices(['bundle', 'channel']))
+  .option('--supa-host <supaHost>', optionDescriptions.supaHost)
+  .option('--supa-anon <supaAnon>', optionDescriptions.supaAnon)
+
 const bundle = program
   .command('bundle')
   .description(`📦 Manage app bundles for deployment in Capgo Cloud, including upload, compatibility checks, and encryption.`)
@@ -224,6 +244,7 @@ Example: npx @capgo/cli@latest bundle upload com.example.app --path ./dist --cha
   .option('--disable-brotli', `Completely disable brotli compression even if updater version supports it`)
   .option('--version-exists-ok', `Exit successfully if bundle version already exists, useful for CI/CD workflows with monorepos`)
   .option('--self-assign', `Allow devices to auto-join this channel (updates channel setting)`)
+  .option('--qr-preview', `Print a terminal QR code for this bundle preview after upload`)
   .option('--supa-host <supaHost>', optionDescriptions.supaHost)
   .option('--supa-anon <supaAnon>', optionDescriptions.supaAnon)
   .option('--verbose', optionDescriptions.verbose)
@@ -426,6 +447,8 @@ Example: npx @capgo/cli@latest app set com.example.app --name "Updated App" --re
   .option('-a, --apikey <apikey>', optionDescriptions.apikey)
   .option('-r, --retention <retention>', `Days to keep old bundles (0 = infinite, default: 0)`)
   .option('--expose-metadata <exposeMetadata>', `Expose bundle metadata (link and comment) to the plugin (true/false, default: false)`)
+  .option('--preview', `Enable bundle and channel preview QR codes for this app`)
+  .option('--no-preview', `Disable bundle and channel preview QR codes for this app`)
   .option('--supa-host <supaHost>', optionDescriptions.supaHost)
   .option('--supa-anon <supaAnon>', optionDescriptions.supaAnon)
 
@@ -434,7 +457,7 @@ const channel = program
   .description(`📢 Manage distribution channels for app updates in Capgo Cloud, controlling how updates are delivered to devices.`)
 
 channel
-  .command('add [channelId] [appId]')
+  .command('add [channelName] [appId]')
   .alias('a')
   .description(`➕ Create a new channel for app distribution in Capgo Cloud to manage update delivery.
 
@@ -447,7 +470,7 @@ Example: npx @capgo/cli@latest channel add production com.example.app --default`
   .option('--supa-anon <supaAnon>', optionDescriptions.supaAnon)
 
 channel
-  .command('delete [channelId] [appId]')
+  .command('delete [channelName] [appId]')
   .alias('d')
   .description(`🗑️ Delete a channel from Capgo Cloud, optionally removing associated bundles to free up resources.
 
@@ -489,7 +512,7 @@ Example: npx @capgo/cli@latest channel currentBundle production com.example.app`
   .option('--supa-anon <supaAnon>', optionDescriptions.supaAnon)
 
 channel
-  .command('set [channelId] [appId]')
+  .command('set [channelName] [appId]')
   .alias('s')
   .description(`⚙️ Configure settings for a channel, such as linking a bundle, setting update strategies (major, minor, metadata, patch, none), or device targeting (iOS, Android, dev, prod, emulator, device).
 
@@ -521,6 +544,7 @@ Example: npx @capgo/cli@latest channel set production com.example.app --bundle 1
   .option('--no-emulator', `Disable sending update to emulator devices`)
   .option('--device', `Allow sending update to physical devices`)
   .option('--no-device', `Disable sending update to physical devices`)
+  .option('--qr-preview', `Print a terminal QR code for this channel preview after updating it`)
   .option('--package-json <packageJson>', optionDescriptions.packageJson)
   .option('--ignore-metadata-check', `Ignore checking node_modules compatibility if present in the bundle`)
   .option('--supa-host <supaHost>', optionDescriptions.supaHost)

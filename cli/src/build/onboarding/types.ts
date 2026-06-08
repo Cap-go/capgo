@@ -36,9 +36,6 @@ export type OnboardingStep
     | 'backing-up'
     // ── Setup-method fork (macOS only) ──
     | 'setup-method-select'
-    // ── Apple-side bundle id confirmation (only shown when capacitor.config and
-    //    project.pbxproj disagree) ──
-    | 'confirm-app-id'
     // ── Import-existing sub-flow (macOS only) ──
     | 'import-scanning'
     | 'import-distribution-mode'
@@ -60,6 +57,7 @@ export type OnboardingStep
     | 'input-key-id'
     | 'input-issuer-id'
     | 'verifying-key'
+    | 'verify-app'
     | 'creating-certificate'
     | 'cert-limit-prompt'
     | 'revoking-certificate'
@@ -210,25 +208,26 @@ export interface OnboardingProgress {
    */
   importDistribution?: 'app_store' | 'ad_hoc'
   /**
-   * When set, the user explicitly confirmed an iOS bundle id different from
-   * `capacitor.config.appId`. Used for Apple-side operations (cert lookup,
-   * profile filtering, `ensureBundleId`, `createProfile`) and as the key in
-   * the provisioning_map. The progress-file key and Capgo SaaS API calls
-   * still use `appId` so existing build commands continue to find these
-   * credentials without forcing the user to edit `capacitor.config`.
+   * The resolved iOS bundle id (the authoritative Release
+   * `PRODUCT_BUNDLE_IDENTIFIER`) when it differs from `capacitor.config.appId`.
+   * Used for Apple-side operations (cert lookup, profile filtering,
+   * `ensureBundleId`, `createProfile`) and as the key in the provisioning_map.
+   * The progress-file key and Capgo SaaS API calls still use `appId` so existing
+   * build commands keep finding these credentials without editing
+   * `capacitor.config`.
    *
-   * Persisted so the confirm-app-id step doesn't re-ask on resume — once
-   * confirmed, the override sticks unless the configuration context (see
+   * Persisted so verify-app / redirectIfMismatch don't re-resolve on resume —
+   * once set, the override sticks unless the configuration context (see
    * `iosBundleIdContextAppId`) changes between CLI runs.
    */
   iosBundleIdOverride?: string
   /**
-   * Snapshot of `config.appId` at the time the user confirmed the
-   * `iosBundleIdOverride`. On the next run we compare this to the current
-   * `config.appId`; if it changed (user renamed the app, added/removed a
-   * dev-tunnel suffix, etc.) the saved override is stale and we re-ask
-   * via the confirm-app-id step. Without this we'd silently keep using a
-   * bundle id the user already moved on from.
+   * Snapshot of `config.appId` at the time the `iosBundleIdOverride` was
+   * resolved. On the next run we compare this to the current `config.appId`;
+   * if it changed (user renamed the app, added/removed a dev-tunnel suffix,
+   * etc.) the saved override is stale and we re-resolve / re-verify via the
+   * verify-app step. Without this we'd silently keep using a bundle id the
+   * user already moved on from.
    */
   iosBundleIdContextAppId?: string
   completedSteps: {
@@ -250,7 +249,6 @@ export const STEP_PROGRESS: Record<OnboardingStep, number> = {
   'backing-up': 0,
   // Import-existing sub-flow (re-ordered: distribution-mode first)
   'setup-method-select': 5,
-  'confirm-app-id': 12,
   'import-scanning': 10,
   'import-distribution-mode': 15,
   'import-pick-identity': 40,
@@ -271,6 +269,7 @@ export const STEP_PROGRESS: Record<OnboardingStep, number> = {
   'input-key-id': 12,
   'input-issuer-id': 18,
   'verifying-key': 25,
+  'verify-app': 30,
   'creating-certificate': 45,
   'cert-limit-prompt': 45,
   'revoking-certificate': 48,
@@ -325,8 +324,8 @@ export function getPhaseLabel(step: OnboardingStep): string {
       return 'Resume or restart?'
     case 'setup-method-select':
       return 'Setup method'
-    case 'confirm-app-id':
-      return 'Confirm iOS bundle ID'
+    case 'verify-app':
+      return 'Verify App Store app'
     case 'import-scanning':
       return 'Step 1 of 4 · Scanning your Mac'
     case 'import-distribution-mode':

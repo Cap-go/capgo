@@ -165,13 +165,16 @@ function whiteCardPrimaryButtonClass() {
 }
 
 function slugify(value: string) {
-  return value
+  const slug = value
     .normalize('NFKD')
     .replace(/[^\w\s-]/g, '')
     .trim()
     .toLowerCase()
     .replace(/[_\s-]+/g, '.')
-    .replace(/^\.+|\.+$/g, '')
+
+  return slug
+    .replace(/^\./g, '')
+    .replace(/\.$/g, '')
     || 'app'
 }
 
