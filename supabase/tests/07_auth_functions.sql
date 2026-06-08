@@ -1,7 +1,7 @@
 BEGIN;
 
 
-SELECT plan(7);
+SELECT plan(8);
 
 -- Test is_platform_admin wrapper
 SELECT tests.authenticate_as('test_admin');
@@ -82,9 +82,27 @@ SELECT
             JOIN pg_namespace n ON n.oid = p.pronamespace
             WHERE n.nspname = 'public'
                 AND p.proname = 'is_allowed_capgkey'
+                AND pg_get_function_identity_arguments(p.oid) ~ 'key_mode'
         ),
         0,
-        'is_allowed_capgkey old API key rights helper is removed'
+        'is_allowed_capgkey old key_mode overloads are removed'
+    );
+
+SELECT
+    is(
+        (
+            SELECT count(*)::int
+            FROM pg_proc p
+            JOIN pg_namespace n ON n.oid = p.pronamespace
+            WHERE n.nspname = 'public'
+                AND p.proname = 'is_allowed_capgkey'
+                AND pg_get_function_identity_arguments(p.oid) IN (
+                    'apikey text, keymode text[]',
+                    'apikey text, keymode text[], appid character varying'
+                )
+        ),
+        2,
+        'is_allowed_capgkey keeps only RBAC-backed text[] compatibility wrappers'
     );
 
 -- ============================================================================
