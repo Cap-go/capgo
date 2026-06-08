@@ -48,7 +48,6 @@ export type OnboardingStep
     | 'import-provide-profile-path'
     | 'import-create-profile-only'
     | 'import-export-warning'
-    | 'import-compiling-helper'
     | 'import-exporting'
     // ── Existing create-new sub-flow (and ASC API key step reused by import for app_store) ──
     | 'api-key-instructions'
@@ -254,7 +253,6 @@ export const STEP_PROGRESS: Record<OnboardingStep, number> = {
   'import-provide-profile-path': 58,
   'import-create-profile-only': 60,
   'import-export-warning': 70,
-  'import-compiling-helper': 72,
   'import-exporting': 75,
   // Create-new sub-flow
   'api-key-instructions': 5,
@@ -338,7 +336,6 @@ export function getPhaseLabel(step: OnboardingStep): string {
     case 'import-create-profile-only':
       return 'Step 3 of 4 · Creating profile via Apple'
     case 'import-export-warning':
-    case 'import-compiling-helper':
     case 'import-exporting':
       return 'Step 4 of 4 · Export from Keychain'
     case 'api-key-instructions':

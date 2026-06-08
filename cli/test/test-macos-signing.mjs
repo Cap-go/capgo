@@ -1,17 +1,20 @@
 import assert from 'node:assert/strict'
 import { Buffer } from 'node:buffer'
 import { createHash } from 'node:crypto'
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { chmodSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
   bundleIdMatches,
   filterProfilesForApp,
   generateP12Passphrase,
+  helperPackageName,
+  helperSignatureRequirement,
   isMacOS,
   matchIdentitiesToProfiles,
   parseFindIdentityOutput,
   parseHelperJson,
+  resolveHelperBinary,
   scanProvisioningProfiles,
 } from '../src/build/onboarding/macos-signing.ts'
 
@@ -420,6 +423,139 @@ t('filterProfilesForApp accepts the bare "*" wildcard against any concrete appId
   ]
   const filtered = filterProfilesForApp(profiles, 'com.anything.here', 'ad_hoc')
   assert.equal(filtered.length, 1)
+})
+
+// ─── helperPackageName ────────────────────────────────────────────────
+
+t('helperPackageName maps arm64 and x64 to scoped packages', () => {
+  assert.equal(helperPackageName('arm64'), '@capgo/cli-keychain-darwin-arm64')
+  assert.equal(helperPackageName('x64'), '@capgo/cli-keychain-darwin-x64')
+})
+
+t('helperPackageName returns null for unsupported architectures', () => {
+  assert.equal(helperPackageName('ia32'), null)
+  assert.equal(helperPackageName('ppc64'), null)
+  assert.equal(helperPackageName(''), null)
+})
+
+// ─── helperSignatureRequirement ───────────────────────────────────────
+
+t('helperSignatureRequirement pins Developer ID + team', () => {
+  const req = helperSignatureRequirement('ABCDE12345')
+  assert.ok(req.startsWith('=anchor apple generic'))
+  assert.ok(req.includes('certificate leaf[field.1.2.840.113635.100.6.1.13]'))
+  assert.ok(req.includes('certificate leaf[subject.OU] = "ABCDE12345"'))
+})
+
+// ─── resolveHelperBinary ──────────────────────────────────────────────
+
+function makeFakeHelper() {
+  const dir = mkdtempSync(join(tmpdir(), 'capgo-helper-test-'))
+  const bin = join(dir, 'helper')
+  writeFileSync(bin, '#!/bin/sh\nexit 0\n')
+  chmodSync(bin, 0o755)
+  return { dir, bin }
+}
+
+const okCodesign = async () => ({ stdout: '', stderr: '', code: 0 })
+const failCodesign = async () => ({ stdout: '', stderr: 'test requirement failed', code: 3 })
+
+await tAsync('resolveHelperBinary rejects unsupported architectures', async () => {
+  await assert.rejects(
+    resolveHelperBinary({ arch: 'ia32', resolve: () => { throw new Error('unreachable') } }),
+    /No precompiled Capgo keychain helper exists for .*ia32/,
+  )
+})
+
+await tAsync('resolveHelperBinary names the missing package in its error', async () => {
+  await assert.rejects(
+    resolveHelperBinary({ arch: 'arm64', resolve: () => { throw new Error('not found') } }),
+    /@capgo\/cli-keychain-darwin-arm64.*not installed/s,
+  )
+})
+
+await tAsync('resolveHelperBinary returns the binary when signature verifies', async () => {
+  const { dir, bin } = makeFakeHelper()
+  try {
+    const resolved = await resolveHelperBinary({
+      arch: 'arm64',
+      resolve: () => join(dir, 'package.json'),
+      codesignRunner: okCodesign,
+    })
+    assert.equal(resolved, bin)
+  }
+  finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+await tAsync('resolveHelperBinary hard-errors when signature verification fails', async () => {
+  const { dir } = makeFakeHelper()
+  try {
+    await assert.rejects(
+      resolveHelperBinary({
+        arch: 'arm64',
+        resolve: () => join(dir, 'package.json'),
+        codesignRunner: failCodesign,
+      }),
+      /Refusing to run the keychain helper.*did not verify/s,
+    )
+  }
+  finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+await tAsync('resolveHelperBinary errors when resolved binary file is missing', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'capgo-helper-test-'))
+  try {
+    await assert.rejects(
+      resolveHelperBinary({
+        arch: 'arm64',
+        resolve: () => join(dir, 'package.json'),
+        codesignRunner: okCodesign,
+      }),
+      /not installed|missing its binary/s,
+    )
+  }
+  finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+await tAsync('env override wins when explicitly allowed (dev builds)', async () => {
+  const { dir, bin } = makeFakeHelper()
+  process.env.CAPGO_KEYCHAIN_HELPER_PATH = bin
+  try {
+    const resolved = await resolveHelperBinary({
+      allowEnvOverride: true,
+      arch: 'arm64',
+      resolve: () => { throw new Error('should not be consulted') },
+      codesignRunner: failCodesign, // override path skips signature check too
+    })
+    assert.equal(resolved, bin)
+  }
+  finally {
+    delete process.env.CAPGO_KEYCHAIN_HELPER_PATH
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+await tAsync('env override is ignored by default (release semantics)', async () => {
+  const { dir, bin } = makeFakeHelper()
+  process.env.CAPGO_KEYCHAIN_HELPER_PATH = '/nonexistent/evil-binary'
+  try {
+    const resolved = await resolveHelperBinary({
+      arch: 'arm64',
+      resolve: () => join(dir, 'package.json'),
+      codesignRunner: okCodesign,
+    })
+    assert.equal(resolved, bin)
+  }
+  finally {
+    delete process.env.CAPGO_KEYCHAIN_HELPER_PATH
+    rmSync(dir, { recursive: true, force: true })
+  }
 })
 
 process.stdout.write('OK\n')

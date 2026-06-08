@@ -47,7 +47,7 @@ import { createP12, DEFAULT_P12_PASSWORD, generateCsr } from '../csr.js'
 import { mapIosOnboardingError } from '../error-categories.js'
 import { canUseFilePicker, openFilePicker, openMobileprovisionPicker } from '../file-picker.js'
 import { parseMobileprovisionDetailed } from '../../mobileprovision-parser.js'
-import { bundleIdMatches, exportP12FromKeychain, filterProfilesForApp, isHelperCached, isMacOS, listSigningIdentities, matchIdentitiesToProfiles, precompileSwiftHelper, scanProvisioningProfiles } from '../macos-signing.js'
+import { bundleIdMatches, exportP12FromKeychain, filterProfilesForApp, isMacOS, listSigningIdentities, matchIdentitiesToProfiles, scanProvisioningProfiles } from '../macos-signing.js'
 import { deleteProgress, extractKeyIdFromP8Path, getImportEntryStep, getResumeStep, loadProgress, saveProgress } from '../progress.js'
 import { getBuildOnboardingRecoveryAdvice } from '../recovery.js'
 import { createCiSecretEntries, detectCiSecretTargets, getCiSecretRepoLabelAsync, getCiSecretTargetLabel, listExistingCiSecretKeysAsync, uploadCiSecretsAsync } from '../ci-secrets.js'
@@ -104,7 +104,6 @@ import {
   DetectingCiSecretsStep,
 } from './steps/ios-ci.js'
 import {
-  ImportCompilingHelperStep,
   ImportCreateProfileOnlyStep,
   ImportDistributionModeStep,
   ImportExportingStep,
@@ -1721,24 +1720,6 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
         catch (err) {
           if (!cancelled)
             handleError(err, 'import-checking-apple-cert')
-        }
-      })()
-    }
-
-    if (step === 'import-compiling-helper') {
-      ;(async () => {
-        try {
-          const startedAt = Date.now()
-          await precompileSwiftHelper()
-          if (cancelled)
-            return
-          const elapsedMs = Date.now() - startedAt
-          addLog(`✔ Compiled keychain-export helper in ${elapsedMs}ms`)
-          setStep('import-exporting')
-        }
-        catch (err) {
-          if (!cancelled)
-            handleError(err, 'import-compiling-helper')
         }
       })()
     }
@@ -4260,12 +4241,9 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
           dense={dense}
           onChange={(value) => {
             if (value === 'go') {
-              // First run on this CLI version: compile the Swift helper
-              // explicitly so the user sees what's happening, instead of
-              // staring at the "look for the macOS dialog" spinner while
-              // we silently do a 2-3s swiftc invocation. Cache hit skips
-              // straight to export.
-              setStep(isHelperCached() ? 'import-exporting' : 'import-compiling-helper')
+              // Go straight to the export step; the precompiled helper is
+              // resolved and signature-verified there.
+              setStep('import-exporting')
             }
             else if (value === 'back') {
               // Back goes to profile selection (distribution mode is now upstream of this step)
@@ -4277,9 +4255,6 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
           }}
         />
       )}
-
-      {/* Import: compiling helper (one-time per CLI version) */}
-      {step === 'import-compiling-helper' && <ImportCompilingHelperStep dense={dense} />}
 
       {/* Import: exporting (the one Keychain prompt happens here) */}
       {step === 'import-exporting' && <ImportExportingStep />}
