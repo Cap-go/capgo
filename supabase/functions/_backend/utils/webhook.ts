@@ -19,6 +19,11 @@ export interface WebhookPayload {
     old_record: any | null
     new_record: any | null
     changed_fields: string[] | null
+    actor_type?: 'user' | 'apikey' | 'system' | 'unknown'
+    actor_user_id?: string | null
+    actor_user_email?: string | null
+    actor_apikey_id?: number | null
+    actor_apikey_name?: string | null
   }
 }
 
@@ -70,6 +75,11 @@ export interface AuditLogData {
   new_record: any | null
   changed_fields: string[] | null
   user_id: string | null
+  actor_type?: 'user' | 'apikey' | 'system' | 'unknown'
+  actor_user_id?: string | null
+  actor_user_email?: string | null
+  actor_apikey_id?: number | null
+  actor_apikey_name?: string | null
   created_at: string
 }
 
@@ -172,6 +182,11 @@ export function buildWebhookPayload(auditLogData: AuditLogData): WebhookPayload 
       old_record: auditLogData.old_record,
       new_record: auditLogData.new_record,
       changed_fields: auditLogData.changed_fields,
+      actor_type: auditLogData.actor_type ?? (auditLogData.user_id ? 'user' : 'unknown'),
+      actor_user_id: auditLogData.actor_user_id ?? auditLogData.user_id,
+      actor_user_email: auditLogData.actor_user_email ?? null,
+      actor_apikey_id: auditLogData.actor_apikey_id ?? null,
+      actor_apikey_name: auditLogData.actor_apikey_name ?? null,
     },
   }
 }
