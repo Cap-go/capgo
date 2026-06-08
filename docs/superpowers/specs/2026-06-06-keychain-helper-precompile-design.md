@@ -29,7 +29,7 @@ either runs a verified Capgo-signed binary or fails with clear guidance.
 
 | Decision | Choice |
 | --- | --- |
-| Source location | New top-level `cli-helper/` dir in the capgo monorepo; **Swift source moves there** (`cli-helper/src/keychain-export.swift`) as single source of truth |
+| Source location | New top-level `cli-helper/` dir in the capgo monorepo; **Swift source moves there** (`cli-helper/src/helper.swift`) as single source of truth |
 | Package shape | Per-arch packages (esbuild style): `@capgo/cli-keychain-darwin-arm64`, `@capgo/cli-keychain-darwin-x64` |
 | Install mechanism | Both listed in `@capgo/cli` `optionalDependencies` with `^` range; `os`/`cpu` fields make npm/bun/pnpm install at most one |
 | Fallback | **None.** The runtime swiftc compile path and tmp-binary cache are deleted. Missing/unverifiable binary → hard error with install guidance |
@@ -39,6 +39,8 @@ either runs a verified Capgo-signed binary or fails with clear guidance.
 | Signing | Developer ID Application certificate; hardened runtime + secure timestamp; notarized via `notarytool` with existing App Store Connect API key secrets |
 | Binary trust | CLI verifies the package-resolved binary's code signature (Developer ID + Capgo Team ID designated requirement) before executing it; failure is a hard error |
 | Env override | `CAPGO_KEYCHAIN_HELPER_PATH` exists in dev builds only — stripped from npm release builds via build-time define + dead-code elimination |
+| Binary name | One generic binary named `helper`, invoked with a subcommand (`helper keychain-export …`). Future helpers are new subcommands of the same signed binary, not new files |
+| Caller hardening | Anti-footgun gate on the sensitive subcommand (requires an internal handshake flag + non-TTY stdout) — explicitly a non-security-boundary; plus a `SECURITY.md` documenting why the macOS Keychain ACL is the actual boundary. "Always Allow" caching is kept |
 
 ## Architecture
 
@@ -47,7 +49,7 @@ either runs a verified Capgo-signed binary or fails with clear guidance.
 ```
 cli-helper/
 ├── src/
-│   └── keychain-export.swift         # moved from cli/src/build/onboarding/
+│   └── helper.swift                  # moved+renamed from cli/src/build/onboarding/keychain-export.swift
 ├── npm/
 │   ├── darwin-arm64/package.json     # @capgo/cli-keychain-darwin-arm64
 │   └── darwin-x64/package.json       # @capgo/cli-keychain-darwin-x64
@@ -55,6 +57,7 @@ cli-helper/
 │   ├── build.sh                      # swiftc per-arch builds
 │   ├── sign-and-notarize.sh          # codesign + notarytool submit --wait
 │   └── prepare-publish.mjs           # stamps tag version, copies binaries into npm/*/
+├── SECURITY.md                       # threat model — why the macOS Keychain ACL is the boundary
 └── README.md                         # includes dev bootstrap instructions
 ```
 
@@ -67,14 +70,14 @@ cli-helper/
   "description": "Precompiled macOS (Apple Silicon) keychain-export helper for @capgo/cli",
   "os": ["darwin"],
   "cpu": ["arm64"],
-  "files": ["keychain-export"],
+  "files": ["helper"],
   "license": "Apache 2.0"
 }
 ```
 
 (`-x64` variant identical with `"cpu": ["x64"]`.)
 
-- The binary ships as a plain executable `keychain-export` at the package root.
+- The binary ships as a plain executable `helper` at the package root.
   No `bin` entry — it is never on PATH; the CLI resolves it by path.
   npm preserves the executable bit from the tarball.
 - Both packages always publish at the same version in the same workflow run.
@@ -103,13 +106,19 @@ Runtime resolution order in `cli/src/build/onboarding/macos-signing.ts`:
    the Swift source), developers compile locally with one documented `swiftc`
    command and point the override at the result.
 2. Precompiled package:
-   `createRequire(import.meta.url).resolve('@capgo/cli-keychain-darwin-' + archSuffix + '/keychain-export')`
+   `createRequire(import.meta.url).resolve('@capgo/cli-keychain-darwin-' + archSuffix + '/helper')`
    where `archSuffix` maps `process.arch` `arm64`→`arm64`, `x64`→`x64`.
    Wrapped in try/catch; verify the file exists and is executable, **then
    verify its code signature** (below) before use.
 3. Anything else — unsupported arch, package not installed, file missing, or
    signature verification failure — is a **hard error** (see Error handling).
    There is no compilation fallback.
+
+The CLI invokes the resolved binary as
+`helper keychain-export --sha1 … --output … --passphrase … --invoked-by capgo-cli`,
+capturing stdout (piped, not a TTY). The leading `keychain-export` subcommand
+and the `--invoked-by` handshake flag feed the anti-footgun gate (see Security
+model). The JSON stdout contract is unchanged.
 
 ### Signature verification of the precompiled binary
 
@@ -144,6 +153,56 @@ know the exact binary hash).
   `exportP12FromKeychain`) bypasses the signature check; it is not reachable
   from user input.
 
+## Security model
+
+This section is the source for `cli-helper/SECURITY.md`. It exists primarily to
+give a documented, defensible "won't fix, by design" answer to the predictable
+low-effort report: *"I can invoke your helper directly and export the user's
+keychain!"*
+
+**The macOS Keychain ACL prompt is the security boundary, and macOS — not our
+code — enforces it against our binary's code signature.** Exporting a private
+key triggers an OS-level "Allow / Always Allow" prompt bound to the calling
+binary's signature.
+
+**The helper grants a local attacker nothing they don't already have.** An
+attacker who can execute our signed `helper` on the victim's machine already
+has local code execution as that user, and can call Apple's own
+`SecItemExport` / `/usr/bin/security export` directly. The helper is not a
+privilege escalation — it is a worse-for-them version of tools already on the
+box.
+
+**Why we don't authenticate the caller (it's neither feasible nor valuable):**
+- The parent process is `node dist/index.js`; **node is signed by the user's
+  Node install, not by Capgo** — there is no Capgo signature on the parent to
+  pin.
+- A shared secret would live in readable JS in the npm tarball.
+- Parent-PID checks are TOCTOU-racy and subject to PID reuse.
+
+**The one narrow residual exposure:** after the user clicks "Always Allow", the
+cached ACL grant is bound to our binary, so a *separate malicious local
+process* could invoke our helper and ride that grant to export without a fresh
+prompt. We accept this, documented, because closing it fully requires dropping
+"Always Allow" (re-prompting on every export) and the attacker already has
+equivalent access by the reasoning above.
+
+**Anti-footgun gate (explicitly NOT a security boundary).** The sensitive
+`keychain-export` subcommand refuses to run unless:
+1. the internal handshake flag `--invoked-by capgo-cli` is present, and
+2. stdout is not a TTY (the CLI always pipes it).
+
+A failed gate emits `{"ok":false,"errorCode":"FORBIDDEN_CALLER",...}` and exits
+non-zero **without** touching the Keychain. This stops casual, accidental, and
+naive-script invocation. It does **not** stop a determined local attacker (who
+reads the flag straight out of the open-source CLI) — and SECURITY.md says so
+in plain language. It is defense-in-depth and a clear "you bypassed a speed
+bump, not a boundary" marker, nothing more.
+
+`SECURITY.md` also states the reporting expectation: invoking the helper is
+equivalent to the caller invoking Apple's keychain APIs, which any local
+process with the user's privileges can already do; reports demonstrating only
+that are out of scope by design.
+
 ### Code removed from the CLI
 
 - `compileSwiftHelper`, `ensureSwiftHelper`, `resolveSwiftSourcePath`, and the
@@ -161,9 +220,11 @@ Build changes in `cli/build.mjs`:
   release build (and `'true'` under `NODE_ENV=development`) so the env
   override is dead-code-eliminated from the npm artifact.
 
-The helper's stdout contract (one line of JSON: `ok`, `p12Path`,
-`errorCode`, `osStatus`, …) is unchanged; `exportP12FromKeychain` parsing is
-untouched.
+The helper's success/failure stdout contract (one line of JSON: `ok`,
+`p12Path`, `errorCode`, `osStatus`, …) is unchanged except for the new
+`FORBIDDEN_CALLER` error code (anti-footgun gate); the CLI invokes it with the
+`keychain-export` subcommand + `--invoked-by capgo-cli` handshake (see
+Security model). `exportP12FromKeychain`'s JSON parsing is otherwise untouched.
 
 ## CI pipeline — `.github/workflows/publish_cli_helper.yml`
 
@@ -171,8 +232,8 @@ Trigger: push of tags matching `cli-helper-[0-9]*`. Single job on
 `macos-latest` (both arches cross-compile on one runner; no artifact passing).
 
 1. **Build** (per arch):
-   - `swiftc src/keychain-export.swift -framework Security -O -target arm64-apple-macos11 -o keychain-export-arm64`
-   - `swiftc src/keychain-export.swift -framework Security -O -target x86_64-apple-macos10.15 -o keychain-export-x64`
+   - `swiftc src/helper.swift -framework Security -O -target arm64-apple-macos11 -o dist/helper-arm64`
+   - `swiftc src/helper.swift -framework Security -O -target x86_64-apple-macos10.15 -o dist/helper-x64`
 2. **Sign**: create a throwaway keychain for the job; import the Developer ID
    Application cert from secrets `DEVELOPER_ID_CERT_BASE64` (.p12) +
    `DEVELOPER_ID_CERT_PASSWORD`; then per binary:
@@ -187,8 +248,11 @@ Trigger: push of tags matching `cli-helper-[0-9]*`. Single job on
    files carry no quarantine xattr, and the notarization ticket is available
    online when Gatekeeper does evaluate.
 4. **Verify**: `codesign --verify --strict` per binary; assert signing
-   authority is the Developer ID cert; smoke-run the arm64 binary with invalid
-   args and assert non-zero exit + `INVALID_ARGS` JSON envelope on stdout.
+   authority is the Developer ID cert; run the same designated-requirement
+   `codesign --verify -R` check the CLI performs at runtime; smoke-run the
+   arm64 binary with no subcommand and assert non-zero exit + `INVALID_ARGS`
+   JSON envelope on stdout (the anti-footgun gate guards only the
+   `keychain-export` subcommand, so a bare invocation reaches `INVALID_ARGS`).
 5. **Publish**: `prepare-publish.mjs` reads the version from the tag, stamps
    both manifests (failing fast on mismatch), copies each binary into its
    package dir, then `npm publish --provenance --access public` for both
@@ -262,6 +326,13 @@ To do:
   helper" step and successful P12 export; cover x64 via Intel Mac or Rosetta.
 - **Missing-package regression**: install with `--no-optional`, confirm the
   export flow fails with the actionable install-guidance error (not a crash).
+- **Anti-footgun gate** (Swift, run in helper CI): `helper keychain-export …`
+  without `--invoked-by capgo-cli` → `FORBIDDEN_CALLER` + non-zero exit + no
+  Keychain access; the same with a forced-TTY stdout → `FORBIDDEN_CALLER`. The
+  happy path (handshake present, piped stdout) is exercised by the manual
+  acceptance run since it needs a real Keychain identity.
+- **SECURITY.md presence**: `cli-helper/SECURITY.md` exists and states the
+  boundary (macOS Keychain ACL) and the out-of-scope reporting expectation.
 
 ## Benefits recap
 
