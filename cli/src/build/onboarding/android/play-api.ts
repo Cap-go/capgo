@@ -137,6 +137,8 @@ async function playFetch<T>(args: {
     appendInternalLog(`play-api ${args.method} ${args.url}: HTTP ${res.status} ${detail}`)
     throw new Error(`Play API ${res.status} at ${args.url}: ${detail}`)
   }
+  // Log successful calls too — the bundle gets the full Play Developer call trace.
+  appendInternalLog(`play-api ${args.method} ${args.url}: HTTP ${res.status}`)
   if (!text.trim())
     return undefined as unknown as T
   try {

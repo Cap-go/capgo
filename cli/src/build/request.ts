@@ -2300,7 +2300,9 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
           }
         }
         catch (err) {
-          process.stderr.write(`AI analysis flow errored: ${err instanceof Error ? err.message : String(err)}\n`)
+          const msg = err instanceof Error ? err.message : String(err)
+          appendInternalLog(`AI analysis flow errored: ${msg}`)
+          process.stderr.write(`AI analysis flow errored: ${msg}\n`)
         }
       }
 

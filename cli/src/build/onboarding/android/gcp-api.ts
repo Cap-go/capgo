@@ -132,6 +132,8 @@ async function gcpFetch<T>(args: {
     appendInternalLog(`gcp-api ${args.method ?? 'GET'} ${args.url}: HTTP ${res.status} ${detail}`)
     throw new Error(`Google API ${res.status} at ${args.url}: ${detail}`)
   }
+  // Log successful calls too — the bundle gets the full GCP call trace.
+  appendInternalLog(`gcp-api ${args.method ?? 'GET'} ${args.url}: HTTP ${res.status}`)
   if (!text.trim())
     return undefined as unknown as T
   try {

@@ -81,6 +81,9 @@ async function ascFetch(
     throw new AppleApiHttpError(res.status, `Apple API error: HTTP ${res.status} ${res.statusText}`)
   }
 
+  // Log successful calls too, so the bundle has the FULL App Store Connect call
+  // trace (not just failures) — invaluable for "it failed somewhere" reports.
+  appendInternalLog(`apple-api ${options.method ?? 'GET'} ${path}: HTTP ${res.status}`)
   return body
 }
 

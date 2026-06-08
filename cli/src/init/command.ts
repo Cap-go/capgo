@@ -3703,6 +3703,7 @@ async function runDeviceStep(orgId: string, apikey: string, appId: string, platf
     if (runFailed) {
       const platformName = platform === 'ios' ? 'iOS' : 'Android'
       s.stop(`App failed to start ❌`)
+      appendInternalLog(`app run failed (${platformName}): ${(runError || runResult?.error) ? formatError(runError ?? runResult?.error) : `exit status ${runResult?.status ?? 'unknown'}`}`)
       if (runError || runResult?.error)
         pLog.error(formatError(runError ?? runResult?.error))
       pLog.error(`The app failed to start on your ${platformName} device.`)
@@ -4013,7 +4014,8 @@ async function maybeOfferAutoTestCleanup(orgId: string, apikey: string, appId: s
     const projectType = await findProjectType()
     buildCommand = await findBuildCommandForProjectType(projectType)
   }
-  catch {
+  catch (err) {
+    appendInternalLog(`project-type detection failed, defaulting buildCommand to 'build': ${err instanceof Error ? err.message : String(err)}`)
   }
 
   const pm = getPMAndCommand()
