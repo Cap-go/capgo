@@ -6,8 +6,8 @@ import { computed, ref, watch, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
-import AdminOnlyModal from '~/components/AdminOnlyModal.vue'
 import CreditsCta from '~/components/CreditsCta.vue'
+import RbacPermissionOnlyModal from '~/components/RbacPermissionOnlyModal.vue'
 import { formatIncludedThenPrice } from '~/services/creditPricing'
 import { checkPermissions } from '~/services/permissions'
 import { getDatafastAttribution, openCheckout } from '~/services/stripe'
@@ -35,12 +35,6 @@ const main = useMainStore()
 const organizationStore = useOrganizationStore()
 const dialogStore = useDialogV2Store()
 const isMobile = Capacitor.isNativePlatform()
-
-// Check if user is super_admin
-const isSuperAdmin = computed(() => {
-  const orgId = organizationStore.currentOrganization?.gid
-  return organizationStore.hasPermissionsInRole('super_admin', ['org_super_admin'], orgId)
-})
 
 // Modal state for non-admin access
 const showAdminModal = ref(false)
@@ -217,8 +211,9 @@ async function openSafariStripeCheckout(plan: Database['public']['Tables']['plan
 }
 
 async function openChangePlan(plan: Database['public']['Tables']['plans']['Row'], index: number) {
-  // Show admin modal for non-admins instead of blocking
-  if (!isSuperAdmin.value) {
+  // Show the permission modal instead of blocking when the user can't manage billing.
+  const orgId = currentOrganization.value?.gid
+  if (!orgId || !(await checkPermissions('org.update_billing', { orgId }))) {
     showAdminModal.value = true
     return
   }
@@ -601,8 +596,13 @@ function buttonStyle(p: Database['public']['Tables']['plans']['Row']) {
       </div>
     </div>
 
-    <!-- Admin-only modal for non-admin users -->
-    <AdminOnlyModal v-if="showAdminModal" @click="showAdminModal = false" />
+    <!-- Permission modal shown when the user can't manage billing -->
+    <RbacPermissionOnlyModal
+      v-if="showAdminModal"
+      :title="t('billing-access-required')"
+      permission="org.update_billing"
+      @click="showAdminModal = false"
+    />
   </div>
 </template>
 

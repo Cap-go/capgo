@@ -14,9 +14,10 @@ import ChevronDownIcon from '~icons/heroicons/chevron-down'
 import CloudIcon from '~icons/heroicons/cloud'
 import ScaleIcon from '~icons/heroicons/scale'
 import UserGroupIcon from '~icons/heroicons/user-group'
-import AdminOnlyModal from '~/components/AdminOnlyModal.vue'
+import RbacPermissionOnlyModal from '~/components/RbacPermissionOnlyModal.vue'
 import { creditPricingMetricOrder, formatCreditPricingPrice, formatCreditPricingTierLabel } from '~/services/creditPricing'
 import { formatLocalDate } from '~/services/date'
+import { checkPermissions } from '~/services/permissions'
 import { completeCreditTopUp, startCreditTopUp } from '~/services/stripe'
 import { getCreditPricingSteps, useSupabase } from '~/services/supabase'
 import { useDisplayStore } from '~/stores/display'
@@ -63,12 +64,6 @@ const supabase = useSupabase()
 const organizationStore = useOrganizationStore()
 const { currentOrganization } = storeToRefs(organizationStore)
 const displayStore = useDisplayStore()
-
-// Check if user is super_admin
-const isSuperAdmin = computed(() => {
-  const orgId = organizationStore.currentOrganization?.gid
-  return organizationStore.hasPermissionsInRole('super_admin', ['org_super_admin'], orgId)
-})
 
 // Modal state for non-admin access
 const showAdminModal = ref(false)
@@ -401,20 +396,21 @@ async function loadPricingSteps() {
 }
 
 async function handleBuyCredits() {
-  // Show admin modal for non-admins instead of blocking
-  if (!isSuperAdmin.value) {
+  const orgId = currentOrganization.value?.gid
+  if (!orgId)
+    return
+  // Show the permission modal instead of blocking when the user can't manage billing.
+  if (!(await checkPermissions('org.update_billing', { orgId }))) {
     showAdminModal.value = true
     return
   }
-  if (!currentOrganization.value?.gid)
-    return
   if (!isTopUpQuantityValid.value || topUpQuantity.value === null) {
     toast.error(t('credits-top-up-quantity-invalid'))
     return
   }
   try {
     isStartingCheckout.value = true
-    await startCreditTopUp(currentOrganization.value.gid, topUpQuantity.value)
+    await startCreditTopUp(orgId, topUpQuantity.value)
   }
   catch (error) {
     console.error('Failed to initiate credit checkout', error)
@@ -832,8 +828,13 @@ watch(() => currentOrganization.value?.gid, async (newOrgId: string | undefined,
         </div>
       </div>
     </div>
-    <!-- Admin-only modal for non-admin credit purchase attempts -->
-    <AdminOnlyModal v-if="showAdminModal" @click="showAdminModal = false" />
+    <!-- Permission modal shown when the user can't manage billing -->
+    <RbacPermissionOnlyModal
+      v-if="showAdminModal"
+      :title="t('billing-access-required')"
+      permission="org.update_billing"
+      @click="showAdminModal = false"
+    />
   </div>
 </template>
 
