@@ -1,12 +1,18 @@
 import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from './hono.ts'
+import { parse } from '@std/semver'
 import { getRuntimeKey } from 'hono/adapter'
 import { CacheHelper } from './cache.ts'
 import { cloudlogErr, serializeError } from './logging.ts'
+import { isDeprecatedPluginVersion } from './utils.ts'
 
 const CHANNEL_SELF_CACHE_PATH = '/.channel-self-override-v1'
 const CHANNEL_SELF_CACHE_TTL_SECONDS = 60
 const CHANNEL_SELF_KV_CACHE_TTL_SECONDS = 60
+const CHANNEL_SELF_STORE_MIN_V5 = '5.34.0'
+const CHANNEL_SELF_STORE_MIN_V6 = '6.34.0'
+const CHANNEL_SELF_STORE_MIN_V7 = '7.34.0'
+const CHANNEL_SELF_STORE_MIN_V8 = '8.0.0'
 
 // TODO: Delete this legacy channel_self KV/cache bridge once old plugin versions are no longer used. // NOSONAR
 // The cache layer only exists for those old versions so channel_self writes do not hit the primary database.
@@ -22,6 +28,7 @@ export interface ChannelSelfOverrideWrite {
   app_id: string
   device_id: string
   channel_id: number
+  plugin_version?: string | null
 }
 
 interface ChannelSelfOverridePayload {
@@ -84,7 +91,22 @@ function shouldRequireChannelSelfStore() {
   return getRuntimeKey() === 'workerd'
 }
 
+export function shouldSyncChannelSelfOverrideForPluginVersion(pluginVersion: string | null | undefined) {
+  if (!pluginVersion)
+    return false
+
+  try {
+    return isDeprecatedPluginVersion(parse(pluginVersion), CHANNEL_SELF_STORE_MIN_V5, CHANNEL_SELF_STORE_MIN_V6, CHANNEL_SELF_STORE_MIN_V7, CHANNEL_SELF_STORE_MIN_V8)
+  }
+  catch {
+    return false
+  }
+}
+
 export async function syncChannelSelfOverride(c: ChannelSelfContext, override: ChannelSelfOverrideWrite) {
+  if (!shouldSyncChannelSelfOverrideForPluginVersion(override.plugin_version))
+    return true
+
   if (!isChannelSelfStoreEnabled(c)) {
     if (shouldRequireChannelSelfStore()) {
       cloudlogErr({ requestId: c.get('requestId'), message: 'Missing channel_self override store binding', app_id: override.app_id, device_id: override.device_id })
@@ -103,7 +125,10 @@ export async function syncChannelSelfOverride(c: ChannelSelfContext, override: C
   })
 }
 
-export async function syncChannelSelfOverrideDelete(c: ChannelSelfContext, appId: string, deviceId: string) {
+export async function syncChannelSelfOverrideDelete(c: ChannelSelfContext, appId: string, deviceId: string, pluginVersion?: string | null) {
+  if (!shouldSyncChannelSelfOverrideForPluginVersion(pluginVersion))
+    return true
+
   if (!isChannelSelfStoreEnabled(c)) {
     if (shouldRequireChannelSelfStore()) {
       cloudlogErr({ requestId: c.get('requestId'), message: 'Missing channel_self override store binding', app_id: appId, device_id: deviceId })

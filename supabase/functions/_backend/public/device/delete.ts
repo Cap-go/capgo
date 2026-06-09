@@ -1,6 +1,6 @@
 import type { Context } from 'hono'
 import type { Database } from '../../utils/supabase.types.ts'
-import { syncChannelSelfOverrideDelete } from '../../utils/channelSelfStore.ts'
+import { shouldSyncChannelSelfOverrideForPluginVersion, syncChannelSelfOverrideDelete } from '../../utils/channelSelfStore.ts'
 import { BRES, quickError, simpleError } from '../../utils/hono.ts'
 import { checkPermission } from '../../utils/rbac.ts'
 import { supabaseApikey } from '../../utils/supabase.ts'
@@ -10,6 +10,23 @@ export interface DeviceLink {
   app_id: string
   device_id: string
   channel?: string
+}
+
+type PublicDeviceClient = ReturnType<typeof supabaseApikey>
+
+async function getDevicePluginVersion(c: Context, supabase: PublicDeviceClient, appId: string, deviceId: string) {
+  const { data, error } = await supabase
+    .from('devices')
+    .select('plugin_version')
+    .eq('app_id', appId)
+    .eq('device_id', deviceId.toLowerCase())
+    .maybeSingle()
+
+  if (error) {
+    throw quickError(500, 'device_error', 'Error reading device plugin version', { error, app_id: appId, device_id: deviceId })
+  }
+
+  return data?.plugin_version ?? null
 }
 
 export async function deleteOverride(c: Context, body: DeviceLink, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
@@ -27,7 +44,9 @@ export async function deleteOverride(c: Context, body: DeviceLink, apikey: Datab
     throw simpleError('cannot_access_app', 'You can\'t access this app', { app_id: body.app_id })
   }
 
-  const { error: errorChannel } = await supabaseApikey(c, apikey.key)
+  const supabase = supabaseApikey(c, apikey.key)
+  const pluginVersion = await getDevicePluginVersion(c, supabase, body.app_id, body.device_id)
+  const { error: errorChannel } = await supabase
     .from('channel_devices')
     .delete()
     .eq('app_id', body.app_id)
@@ -35,8 +54,10 @@ export async function deleteOverride(c: Context, body: DeviceLink, apikey: Datab
   if (errorChannel) {
     throw simpleError('invalid_app_id', 'You can\'t access this app', { app_id: body.app_id })
   }
-  if (!(await syncChannelSelfOverrideDelete(c, body.app_id, body.device_id))) {
-    throw quickError(500, 'channel_self_store_error', 'Error syncing channel override store', { app_id: body.app_id, device_id: body.device_id })
+  if (shouldSyncChannelSelfOverrideForPluginVersion(pluginVersion)) {
+    if (!(await syncChannelSelfOverrideDelete(c, body.app_id, body.device_id, pluginVersion))) {
+      throw quickError(500, 'channel_self_store_error', 'Error syncing channel override store', { app_id: body.app_id, device_id: body.device_id })
+    }
   }
   return c.json(BRES)
 }
