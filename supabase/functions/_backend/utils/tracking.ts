@@ -1,5 +1,6 @@
 import type { TrackOptions } from '@logsnag/node'
 import type { Context } from 'hono'
+import type { EmailPreferenceKey, NotificationAudience } from './org_email_notifications.ts'
 import type { PostHogGroups } from './posthog.ts'
 import { cloudlogErr, serializeError } from './logging.ts'
 import { logsnag } from './logsnag.ts'
@@ -19,10 +20,10 @@ export interface BentoTrackingPayload {
    * not re-fire on retries (e.g. an incompatible bundle version). Ignores `cron`.
    */
   once?: boolean
-  preferenceKey: import('./org_email_notifications.ts').EmailPreferenceKey
+  preferenceKey: EmailPreferenceKey
   uniqId: string
   /** Which org members receive the email. Defaults to 'admins'; use 'billing' for payment/subscription events. */
-  audience?: import('./org_email_notifications.ts').NotificationAudience
+  audience?: NotificationAudience
 }
 
 export interface SendEventToTrackingPayload extends TrackOptions {
