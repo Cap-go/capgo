@@ -28,16 +28,18 @@ jobs:
       FASTLANE_SKIP_UPDATE_CHECK: 'true'
     steps:
       - uses: actions/checkout@v6
-      - uses: ruby/setup-ruby@v1
-        with:
-          ruby-version: '3.4'
-      - name: Install fastlane
+      - name: Create fastlane Gemfile
         run: |
           mkdir -p "$(dirname "$BUNDLE_GEMFILE")"
           {
             echo "source 'https://rubygems.org'"
             echo "gem 'fastlane'"
           } > "$BUNDLE_GEMFILE"
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.4'
+      - name: Install fastlane
+        run: |
           bundle config set path .bundle/vendor
           bundle install --jobs 4 --retry 3
       - name: Upload iOS screenshots
@@ -54,16 +56,18 @@ jobs:
       FASTLANE_SKIP_UPDATE_CHECK: 'true'
     steps:
       - uses: actions/checkout@v6
-      - uses: ruby/setup-ruby@v1
-        with:
-          ruby-version: '3.4'
-      - name: Install fastlane
+      - name: Create fastlane Gemfile
         run: |
           mkdir -p "$(dirname "$BUNDLE_GEMFILE")"
           {
             echo "source 'https://rubygems.org'"
             echo "gem 'fastlane'"
           } > "$BUNDLE_GEMFILE"
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.4'
+      - name: Install fastlane
+        run: |
           bundle config set path .bundle/vendor
           bundle install --jobs 4 --retry 3
       - name: Decode Google Play Config File
