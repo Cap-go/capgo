@@ -40,6 +40,7 @@ declare module 'vue' {
     ChannelPermissionOverridesPanel: typeof import('./components/permissions/ChannelPermissionOverridesPanel.vue')['default']
     ChannelTable: typeof import('./components/tables/ChannelTable.vue')['default']
     ChartCard: typeof import('./components/dashboard/ChartCard.vue')['default']
+    CompatibilityBanner: typeof import('./components/dashboard/CompatibilityBanner.vue')['default']
     CreditsCta: typeof import('./components/CreditsCta.vue')['default']
     DataTable: typeof import('./components/DataTable.vue')['default']
     DemoOnboardingGate: typeof import('./components/dashboard/DemoOnboardingGate.vue')['default']
