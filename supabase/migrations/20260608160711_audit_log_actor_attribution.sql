@@ -140,6 +140,23 @@ ALTER FUNCTION "public"."prevent_org_id_reuse"() OWNER TO "postgres";
 REVOKE ALL ON FUNCTION "public"."prevent_org_id_reuse"() FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."prevent_org_id_reuse"() TO "service_role";
 
+CREATE OR REPLACE FUNCTION "public"."lock_org_tombstone_guard"() RETURNS "trigger"
+LANGUAGE "plpgsql"
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+BEGIN
+  -- Serialize org id lifecycle changes so retained audit logs cannot become
+  -- visible through a concurrent delete/recreate race on the same org UUID.
+  LOCK TABLE "public"."org_id_tombstones" IN SHARE ROW EXCLUSIVE MODE;
+  RETURN NULL;
+END;
+$$;
+
+ALTER FUNCTION "public"."lock_org_tombstone_guard"() OWNER TO "postgres";
+REVOKE ALL ON FUNCTION "public"."lock_org_tombstone_guard"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."lock_org_tombstone_guard"() TO "service_role";
+
 CREATE OR REPLACE FUNCTION "public"."tombstone_deleted_org_id"() RETURNS "trigger"
 LANGUAGE "plpgsql"
 SECURITY DEFINER
@@ -158,6 +175,11 @@ ALTER FUNCTION "public"."tombstone_deleted_org_id"() OWNER TO "postgres";
 REVOKE ALL ON FUNCTION "public"."tombstone_deleted_org_id"() FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."tombstone_deleted_org_id"() TO "service_role";
 
+DROP TRIGGER IF EXISTS "lock_org_tombstone_guard" ON "public"."orgs";
+CREATE TRIGGER "lock_org_tombstone_guard"
+  BEFORE INSERT OR DELETE OR UPDATE OF "id" ON "public"."orgs"
+  FOR EACH STATEMENT EXECUTE FUNCTION "public"."lock_org_tombstone_guard"();
+
 DROP TRIGGER IF EXISTS "prevent_org_id_reuse" ON "public"."orgs";
 CREATE TRIGGER "prevent_org_id_reuse"
   BEFORE INSERT OR UPDATE OF "id" ON "public"."orgs"
@@ -165,7 +187,7 @@ CREATE TRIGGER "prevent_org_id_reuse"
 
 DROP TRIGGER IF EXISTS "tombstone_deleted_org_id" ON "public"."orgs";
 CREATE TRIGGER "tombstone_deleted_org_id"
-  AFTER DELETE ON "public"."orgs"
+  BEFORE DELETE ON "public"."orgs"
   FOR EACH ROW EXECUTE FUNCTION "public"."tombstone_deleted_org_id"();
 
 CREATE OR REPLACE FUNCTION "public"."audit_log_trigger"() RETURNS "trigger"

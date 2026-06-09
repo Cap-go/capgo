@@ -10,7 +10,7 @@ BEGIN;
 -- Org: 046a36ac-e03c-4590-9257-bd6c9dba9ee8
 -- App: com.demo.app
 
-SELECT plan(15);
+SELECT plan(16);
 
 -- Test 1: audit_logs_allowed_orgs should fail fast when no auth and no
 -- API key header is set
@@ -336,7 +336,27 @@ END $$;
 
 SELECT ok(TRUE, 'audit log contains correct old_record and new_record data');
 
--- Tests 12-15: org ids stay safe for retained audit-log lookup
+-- Tests 12-16: org ids stay safe for retained audit-log lookup
+SELECT ok(
+    EXISTS (
+        SELECT 1
+        FROM pg_trigger AS t
+        INNER JOIN pg_class AS c ON c.oid = t.tgrelid
+        INNER JOIN pg_namespace AS n ON n.oid = c.relnamespace
+        WHERE
+            n.nspname = 'public'
+            AND c.relname = 'orgs'
+            AND t.tgname = 'lock_org_tombstone_guard'
+            AND NOT t.tgisinternal
+            AND (t.tgtype & 1) = 0
+            AND (t.tgtype & 2) = 2
+            AND (t.tgtype & 4) = 4
+            AND (t.tgtype & 8) = 8
+            AND (t.tgtype & 16) = 16
+    ),
+    'org tombstone guard serializes insert/delete/id-update statements'
+);
+
 INSERT INTO public.orgs (
     id,
     created_by,
