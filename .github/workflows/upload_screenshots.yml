@@ -28,6 +28,8 @@ jobs:
       FASTLANE_SKIP_UPDATE_CHECK: 'true'
     steps:
       - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
       - name: Create fastlane Gemfile
         run: |
           mkdir -p "$(dirname "$BUNDLE_GEMFILE")"
@@ -59,6 +61,8 @@ jobs:
       FASTLANE_SKIP_UPDATE_CHECK: 'true'
     steps:
       - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
       - name: Create fastlane Gemfile
         run: |
           mkdir -p "$(dirname "$BUNDLE_GEMFILE")"
