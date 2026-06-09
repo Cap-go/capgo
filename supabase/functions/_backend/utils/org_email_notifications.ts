@@ -178,7 +178,13 @@ async function getEligibleOrgMemberEmails(
   preferenceKey: EmailPreferenceKey,
   drizzle: ReturnType<typeof getDrizzleClient>,
 ): Promise<EligibleOrgMemberEmailsResult> {
-  const adminRoleNames = ['org_admin', 'org_super_admin']
+  // Billing/payment notifications (the `credit_usage` category: invoice upcoming, card,
+  // plan change, cancellation) are only actionable by members who can manage billing, so
+  // target the billing roles. This keeps them away from org_admins who can't change billing
+  // and delivers them to org_billing_admins who can.
+  const adminRoleNames = preferenceKey === 'credit_usage'
+    ? ['org_super_admin', 'org_billing_admin']
+    : ['org_admin', 'org_super_admin']
   const now = new Date()
   let resolutionFailed = false
   const userIds = new Set<string>()
