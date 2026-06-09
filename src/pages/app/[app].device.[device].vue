@@ -366,9 +366,8 @@ function getCurlCommand() {
   if (!device.value)
     return ''
 
-  // Use the stored default_channel from device, or empty string if not available
   const defaultChannel = device.value.default_channel || ''
-  const requestBody = transformDeviceToUpdateRequest(device.value, packageId.value, defaultChannel)
+  const requestBody = transformDeviceToUpdateRequest(device.value, packageId.value, defaultChannel, channelDevice.value?.name)
   const jsonBody = JSON.stringify(requestBody, null, 2)
 
   return String.raw`curl -X POST '${defaultApiHost}/updates' \
