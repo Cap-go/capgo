@@ -169,6 +169,18 @@ describe('channel device override KV sync', () => {
     })
   })
 
+  it('fails public device API channel override writes when KV sync fails', async () => {
+    syncChannelSelfOverrideMock.mockResolvedValue(false)
+    const { post } = await import('../supabase/functions/_backend/public/device/post.ts')
+    const c = createContext()
+
+    await expect(post(c as any, {
+      app_id: 'com.test.app',
+      channel: 'beta',
+      device_id: '11111111-1111-4111-8111-111111111111',
+    }, { key: 'capg-key' } as any)).rejects.toThrow('Error syncing channel override store')
+  })
+
   it('mirrors public device API channel override deletes into channel_self KV', async () => {
     const { deleteOverride } = await import('../supabase/functions/_backend/public/device/delete.ts')
     const c = createContext()
@@ -183,6 +195,17 @@ describe('channel device override KV sync', () => {
       'com.test.app',
       '11111111-1111-4111-8111-111111111111',
     )
+  })
+
+  it('fails public device API channel override deletes when KV sync fails', async () => {
+    syncChannelSelfOverrideDeleteMock.mockResolvedValue(false)
+    const { deleteOverride } = await import('../supabase/functions/_backend/public/device/delete.ts')
+    const c = createContext()
+
+    await expect(deleteOverride(c as any, {
+      app_id: 'com.test.app',
+      device_id: '11111111-1111-4111-8111-111111111111',
+    }, { key: 'capg-key' } as any)).rejects.toThrow('Error syncing channel override store')
   })
 
   it('mirrors dashboard channel override writes into channel_self KV', async () => {
@@ -211,6 +234,20 @@ describe('channel device override KV sync', () => {
     })
   })
 
+  it('fails dashboard channel override writes when KV sync fails', async () => {
+    const privateSupabase = createPrivateSupabase()
+    supabaseWithAuthMock.mockReturnValue(privateSupabase.client)
+    syncChannelSelfOverrideMock.mockResolvedValue(false)
+    const { setChannelDeviceOverride } = await import('../supabase/functions/_backend/private/channel_device.ts')
+    const c = createContext()
+
+    await expect(setChannelDeviceOverride(c as any, {
+      app_id: 'com.test.app',
+      channel_id: 42,
+      device_id: '11111111-1111-4111-8111-111111111111',
+    })).rejects.toThrow('Error syncing channel override store')
+  })
+
   it('mirrors dashboard channel override deletes into channel_self KV', async () => {
     const privateSupabase = createPrivateSupabase()
     supabaseWithAuthMock.mockReturnValue(privateSupabase.client)
@@ -227,5 +264,18 @@ describe('channel device override KV sync', () => {
       'com.test.app',
       '11111111-1111-4111-8111-111111111111',
     )
+  })
+
+  it('fails dashboard channel override deletes when KV sync fails', async () => {
+    const privateSupabase = createPrivateSupabase()
+    supabaseWithAuthMock.mockReturnValue(privateSupabase.client)
+    syncChannelSelfOverrideDeleteMock.mockResolvedValue(false)
+    const { deleteChannelDeviceOverride } = await import('../supabase/functions/_backend/private/channel_device.ts')
+    const c = createContext()
+
+    await expect(deleteChannelDeviceOverride(c as any, {
+      app_id: 'com.test.app',
+      device_id: '11111111-1111-4111-8111-111111111111',
+    })).rejects.toThrow('Error syncing channel override store')
   })
 })

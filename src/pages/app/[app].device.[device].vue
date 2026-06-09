@@ -281,15 +281,9 @@ async function onSelectChannel(value: string) {
 
     try {
       await upsertDevChannel(device.value?.device_id, Number(value))
-        .then(async () => {
-          toast.success(t('channel-linked'))
-          toast.info(t('cloud-replication-delay'))
-          return loadData()
-        })
-        .catch(async (error) => {
-          console.error(error)
-          toast.error(t('channel-link-fail'))
-        })
+      toast.success(t('channel-linked'))
+      toast.info(t('cloud-replication-delay'))
+      await loadData()
     }
     catch (error) {
       console.error(error)

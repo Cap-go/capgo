@@ -79,8 +79,10 @@ export function isChannelSelfStoreEnabled(c: ChannelSelfContext) {
 }
 
 export async function syncChannelSelfOverride(c: ChannelSelfContext, override: ChannelSelfOverrideWrite) {
-  if (!isChannelSelfStoreEnabled(c))
-    return true
+  if (!isChannelSelfStoreEnabled(c)) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Missing channel_self override store binding', app_id: override.app_id, device_id: override.device_id })
+    return false
+  }
 
   const normalizedDeviceId = override.device_id.toLowerCase()
   return setChannelSelfOverride(c, override.app_id, normalizedDeviceId, {
@@ -93,8 +95,10 @@ export async function syncChannelSelfOverride(c: ChannelSelfContext, override: C
 }
 
 export async function syncChannelSelfOverrideDelete(c: ChannelSelfContext, appId: string, deviceId: string) {
-  if (!isChannelSelfStoreEnabled(c))
-    return true
+  if (!isChannelSelfStoreEnabled(c)) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Missing channel_self override store binding', app_id: appId, device_id: deviceId })
+    return false
+  }
 
   return deleteChannelSelfOverride(c, appId, deviceId.toLowerCase())
 }
