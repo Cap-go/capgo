@@ -89,3 +89,85 @@ export function dependencyDiffPath(
 
   return `/app/${appId}/bundle/${row.current_version_id}/dependencies?compare=${row.previous_version_id}`
 }
+
+/** Minimal fields the occurrence grouping needs (kept narrow so lightweight
+ * callers like the banner can pass a reduced row selection). */
+type GroupableEvent = Pick<
+  CompatibilityEventRow,
+  'id' | 'platform' | 'channel_id' | 'current_version_id' | 'previous_version_id' | 'source' | 'change_occurred_at' | 'created_at' | 'resolved_at'
+>
+
+export interface CompatibilityEventGroup<T extends GroupableEvent = CompatibilityEventRow> {
+  key: string
+  events: T[]
+  platforms: string[]
+  unresolvedEvents: T[]
+  representative: T
+  resolved: boolean
+}
+
+// One channel change produces one row per platform. Those rows share
+// change_occurred_at exactly (live rows, set from the channel's updated_at) or
+// within a couple of seconds (historical rows backfilled from per-platform
+// created_at), while a genuine re-occurrence of the same transition is far
+// apart in time. Group by the transition, then split into occurrences by that
+// small time gap — one change is one group regardless of data vintage.
+const OCCURRENCE_GAP_MS = 5000
+
+function buildEventGroup<T extends GroupableEvent>(members: T[]): CompatibilityEventGroup<T> {
+  const sorted = [...members].sort((a, b) => a.platform.localeCompare(b.platform))
+  const unresolvedEvents = sorted.filter(event => !isResolved(event))
+  return {
+    key: String(sorted[0].id),
+    events: sorted,
+    platforms: sorted.map(event => event.platform),
+    unresolvedEvents,
+    representative: sorted[0],
+    resolved: unresolvedEvents.length === 0,
+  }
+}
+
+/**
+ * Group per-platform compatibility rows into one entry per channel change.
+ * Shared by the history page and the dashboard banner so both count and render
+ * occurrences identically.
+ */
+export function groupCompatibilityEvents<T extends GroupableEvent>(events: readonly T[]): CompatibilityEventGroup<T>[] {
+  const byTransition = new Map<string, T[]>()
+  for (const event of events) {
+    const transitionKey = `${event.channel_id}|${event.current_version_id}|${event.previous_version_id}|${event.source}`
+    const members = byTransition.get(transitionKey)
+    if (members)
+      members.push(event)
+    else
+      byTransition.set(transitionKey, [event])
+  }
+
+  const groups: CompatibilityEventGroup<T>[] = []
+  for (const members of byTransition.values()) {
+    // Oldest-first so each occurrence is detected by its gap from the cluster start.
+    const byTime = [...members].sort((a, b) => Date.parse(a.change_occurred_at) - Date.parse(b.change_occurred_at))
+    let cluster: T[] = []
+    let clusterStart = 0
+    for (const event of byTime) {
+      const at = Date.parse(event.change_occurred_at)
+      if (cluster.length === 0) {
+        cluster = [event]
+        clusterStart = at
+      }
+      else if (at - clusterStart <= OCCURRENCE_GAP_MS) {
+        cluster.push(event)
+      }
+      else {
+        groups.push(buildEventGroup(cluster))
+        cluster = [event]
+        clusterStart = at
+      }
+    }
+    if (cluster.length > 0)
+      groups.push(buildEventGroup(cluster))
+  }
+
+  // Newest occurrence first (matches the Date column ordering).
+  return groups.sort((a, b) => Date.parse(b.representative.created_at) - Date.parse(a.representative.created_at))
+}

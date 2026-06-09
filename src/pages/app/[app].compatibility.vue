@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { CompatibilityEventRow } from '~/services/compatibilityEvents'
+import type { CompatibilityEventGroup, CompatibilityEventRow } from '~/services/compatibilityEvents'
 import type { Database } from '~/types/supabase.types'
 import { computed, ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -9,7 +9,7 @@ import IconAlertCircle from '~icons/lucide/alert-circle'
 import IconArrowRight from '~icons/lucide/arrow-right'
 import IconCheckCircle from '~icons/lucide/check-circle'
 import IconExternalLink from '~icons/lucide/external-link'
-import { dependencyDiffPath, isResolved, platformLabel } from '~/services/compatibilityEvents'
+import { dependencyDiffPath, groupCompatibilityEvents, platformLabel } from '~/services/compatibilityEvents'
 import { formatLocalDateTime } from '~/services/date'
 import { createSignedImageUrl } from '~/services/storage'
 import { useSupabase } from '~/services/supabase'
@@ -46,75 +46,7 @@ const acceptTargetIds = ref<number[]>([])
 // One logical change can produce one event per platform (the channel may be the
 // default for ios, android and electron at once). Group those rows so the table
 // shows one entry per change, with the platforms as chips.
-interface CompatibilityEventGroup {
-  key: string
-  events: CompatibilityEventRow[]
-  platforms: string[]
-  unresolvedEvents: CompatibilityEventRow[]
-  representative: CompatibilityEventRow
-  resolved: boolean
-}
-
-function buildEventGroup(members: CompatibilityEventRow[]): CompatibilityEventGroup {
-  const sorted = [...members].sort((a, b) => a.platform.localeCompare(b.platform))
-  const unresolvedEvents = sorted.filter(event => !isResolved(event))
-  return {
-    key: String(sorted[0].id),
-    events: sorted,
-    platforms: sorted.map(event => event.platform),
-    unresolvedEvents,
-    representative: sorted[0],
-    resolved: unresolvedEvents.length === 0,
-  }
-}
-
-// One channel change produces one row per platform. Those rows share
-// change_occurred_at exactly (live rows, set from the channel's updated_at) or
-// within a couple of seconds (historical rows backfilled from per-platform
-// created_at), while a genuine re-occurrence of the same transition is far
-// apart in time. So group by the transition, then split into occurrences by
-// that small time gap — one change renders as one row regardless of vintage.
-const OCCURRENCE_GAP_MS = 5000
-
-const groupedEvents = computed<CompatibilityEventGroup[]>(() => {
-  const byTransition = new Map<string, CompatibilityEventRow[]>()
-  for (const event of events.value) {
-    const transitionKey = `${event.channel_id}|${event.current_version_id}|${event.previous_version_id}|${event.source}`
-    const members = byTransition.get(transitionKey)
-    if (members)
-      members.push(event)
-    else
-      byTransition.set(transitionKey, [event])
-  }
-
-  const groups: CompatibilityEventGroup[] = []
-  for (const members of byTransition.values()) {
-    // Oldest-first so each occurrence is detected by its gap from the cluster start.
-    const byTime = [...members].sort((a, b) => Date.parse(a.change_occurred_at) - Date.parse(b.change_occurred_at))
-    let cluster: CompatibilityEventRow[] = []
-    let clusterStart = 0
-    for (const event of byTime) {
-      const at = Date.parse(event.change_occurred_at)
-      if (cluster.length === 0) {
-        cluster = [event]
-        clusterStart = at
-      }
-      else if (at - clusterStart <= OCCURRENCE_GAP_MS) {
-        cluster.push(event)
-      }
-      else {
-        groups.push(buildEventGroup(cluster))
-        cluster = [event]
-        clusterStart = at
-      }
-    }
-    if (cluster.length > 0)
-      groups.push(buildEventGroup(cluster))
-  }
-
-  // Newest occurrence first (matches the Date column ordering).
-  return groups.sort((a, b) => Date.parse(b.representative.created_at) - Date.parse(a.representative.created_at))
-})
+const groupedEvents = computed<CompatibilityEventGroup[]>(() => groupCompatibilityEvents(events.value))
 
 const visibleGroups = computed<CompatibilityEventGroup[]>(() => {
   if (showUnresolvedOnly.value)
