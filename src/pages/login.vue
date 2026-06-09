@@ -894,6 +894,7 @@ onMounted(checkLogin)
                   <div v-else>
                     <FormKit id="login-account" type="form" :actions="false" @submit="handlePasswordSubmit">
                       <div class="space-y-5">
+                        <!-- Password managers need this hidden username field to pair the password with the selected email. -->
                         <input
                           type="email"
                           :value="emailForLogin"
