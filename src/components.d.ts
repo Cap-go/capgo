@@ -65,6 +65,7 @@ declare module 'vue' {
     Navbar: typeof import('./components/Navbar.vue')['default']
     PasswordPolicyWarningBanner: typeof import('./components/PasswordPolicyWarningBanner.vue')['default']
     PaymentRequiredModal: typeof import('./components/PaymentRequiredModal.vue')['default']
+    RbacPermissionOnlyModal: typeof import('./components/RbacPermissionOnlyModal.vue')['default']
     ReleaseBanner: typeof import('./components/dashboard/ReleaseBanner.vue')['default']
     ReleaseStatusCard: typeof import('./components/dashboard/ReleaseStatusCard.vue')['default']
     RoleSelect: typeof import('./components/forms/RoleSelect.vue')['default']

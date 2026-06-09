@@ -395,15 +395,22 @@ async function loadPricingSteps() {
   pricingSteps.value = await getCreditPricingSteps(currentOrganization.value?.gid)
 }
 
+// Returns true when the current user can manage billing for the current org.
+// Otherwise shows the permission modal; used to gate both the page and the buy action.
+async function ensureBillingAccess() {
+  const orgId = currentOrganization.value?.gid
+  if (orgId && await checkPermissions('org.update_billing', { orgId }))
+    return true
+  showAdminModal.value = true
+  return false
+}
+
 async function handleBuyCredits() {
+  if (!(await ensureBillingAccess()))
+    return
   const orgId = currentOrganization.value?.gid
   if (!orgId)
     return
-  // Show the permission modal instead of blocking when the user can't manage billing.
-  if (!(await checkPermissions('org.update_billing', { orgId }))) {
-    showAdminModal.value = true
-    return
-  }
   if (!isTopUpQuantityValid.value || topUpQuantity.value === null) {
     toast.error(t('credits-top-up-quantity-invalid'))
     return
@@ -478,12 +485,16 @@ watch(() => route.hash, (hash) => {
 onMounted(async () => {
   displayStore.NavTitle = t('credits')
   await organizationStore.awaitInitialLoad()
+  if (!(await ensureBillingAccess()))
+    return
   await Promise.allSettled([loadTransactions(), loadPricingSteps()])
   await handleCreditCheckoutReturn()
 })
 
 watch(() => currentOrganization.value?.gid, async (newOrgId: string | undefined, oldOrgId: string | undefined) => {
   if (!newOrgId || newOrgId === oldOrgId)
+    return
+  if (!(await ensureBillingAccess()))
     return
   await Promise.allSettled([loadTransactions(), loadPricingSteps()])
   await handleCreditCheckoutReturn()

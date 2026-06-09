@@ -37,13 +37,18 @@ function isCurrentUser(member: { uid?: string | null, email: string }) {
   return !!member.email && member.email.toLowerCase() === currentUser.email?.toLowerCase()
 }
 
+// Token to ignore stale completions when a newer load starts (the watch can refire mid-flight).
+let loadId = 0
+
 async function loadContacts() {
+  const myLoadId = ++loadId
   isLoading.value = true
   contacts.value = []
 
   const orgId = organizationStore.currentOrganization?.gid
   if (!orgId) {
-    isLoading.value = false
+    if (myLoadId === loadId)
+      isLoading.value = false
     return
   }
 
@@ -51,6 +56,9 @@ async function loadContacts() {
 
   try {
     const members = await organizationStore.getMembers((signedImages) => {
+      // Ignore signed-image updates that arrive after a newer load superseded this one.
+      if (myLoadId !== loadId)
+        return
       contacts.value = contacts.value.map((contact) => {
         const signedImage = signedImages.get(contact.key)
         return signedImage ? { ...contact, image_url: signedImage } : contact
@@ -69,6 +77,10 @@ async function loadContacts() {
       return null
     }))
 
+    // A newer load started while we were awaiting; discard this stale result.
+    if (myLoadId !== loadId)
+      return
+
     contacts.value = eligible
       .filter((member): member is NonNullable<typeof member> => member !== null)
       .map(member => ({ key: getMemberKey(member), email: member.email, image_url: member.image_url }))
@@ -77,7 +89,8 @@ async function loadContacts() {
     console.error('Failed to load people who can grant access:', e)
   }
   finally {
-    isLoading.value = false
+    if (myLoadId === loadId)
+      isLoading.value = false
   }
 }
 
