@@ -140,8 +140,14 @@ const chartOptions = computed<ChartOptions<'line'>>(() => ({
       position: 'bottom',
       labels: {
         color: isDark.value ? '#d1d5db' : '#4b5563',
+        boxHeight: 10,
+        boxWidth: 10,
+        font: {
+          size: 12,
+          weight: 500,
+        },
+        padding: 18,
         usePointStyle: true,
-        padding: 15,
       },
     },
     tooltip: {
