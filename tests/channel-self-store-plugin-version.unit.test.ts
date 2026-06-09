@@ -45,24 +45,28 @@ function createDeviceClient(pluginVersion: string | null) {
   }
 }
 
+const pluginVersionCases: [string | null, boolean][] = [
+  ['5.33.9', true],
+  ['5.34.0', false],
+  ['6.33.9', true],
+  ['6.34.0', false],
+  ['7.33.9', true],
+  ['7.34.0', false],
+  ['7.42.0', false],
+  ['8.0.0', false],
+  ['', false],
+  [null, false],
+  ['invalid', false],
+]
+
 describe('channel_self override KV plugin version gate', () => {
-  it.each([
-    ['5.33.9', true],
-    ['5.34.0', false],
-    ['6.33.9', true],
-    ['6.34.0', false],
-    ['7.33.9', true],
-    ['7.34.0', false],
-    ['7.42.0', false],
-    ['8.0.0', false],
-    ['', false],
-    [null, false],
-    ['invalid', false],
-  ])('returns %s for %s', (pluginVersion, expected) => {
-    expect(shouldSyncChannelSelfOverrideForPluginVersion(pluginVersion)).toBe(expected)
+  pluginVersionCases.forEach(([pluginVersion, expected]) => {
+    it.concurrent(`returns ${expected} for ${pluginVersion ?? 'null'}`, () => {
+      expect(shouldSyncChannelSelfOverrideForPluginVersion(pluginVersion)).toBe(expected)
+    })
   })
 
-  it('writes channel_self KV for legacy plugin devices', async () => {
+  it.concurrent('writes channel_self KV for legacy plugin devices', async () => {
     const store = createStore()
 
     await syncLegacyChannelSelfOverrideForDevice(createContext(store) as any, createDeviceClient('7.33.9') as any, {
@@ -80,7 +84,7 @@ describe('channel_self override KV plugin version gate', () => {
     })
   })
 
-  it('does not write channel_self KV for new plugin devices', async () => {
+  it.concurrent('does not write channel_self KV for new plugin devices', async () => {
     const store = createStore()
 
     await syncLegacyChannelSelfOverrideForDevice(createContext(store) as any, createDeviceClient('7.34.0') as any, {
@@ -92,7 +96,31 @@ describe('channel_self override KV plugin version gate', () => {
     expect(store.put).not.toHaveBeenCalled()
   })
 
-  it('deletes channel_self KV for legacy plugin devices', async () => {
+  it.concurrent('does not write channel_self KV for missing plugin versions', async () => {
+    const store = createStore()
+
+    await syncLegacyChannelSelfOverrideForDevice(createContext(store) as any, createDeviceClient(null) as any, {
+      app_id: 'com.test.app',
+      channel_id: 42,
+      device_id: 'DEVICE-ID',
+    })
+
+    expect(store.put).not.toHaveBeenCalled()
+  })
+
+  it.concurrent('does not write channel_self KV for unparsable plugin versions', async () => {
+    const store = createStore()
+
+    await syncLegacyChannelSelfOverrideForDevice(createContext(store) as any, createDeviceClient('invalid') as any, {
+      app_id: 'com.test.app',
+      channel_id: 42,
+      device_id: 'DEVICE-ID',
+    })
+
+    expect(store.put).not.toHaveBeenCalled()
+  })
+
+  it.concurrent('deletes channel_self KV for legacy plugin devices', async () => {
     const store = createStore()
 
     await syncLegacyChannelSelfOverrideDeleteForDevice(createContext(store) as any, createDeviceClient('7.33.9') as any, 'com.test.app', 'DEVICE-ID')
@@ -100,7 +128,23 @@ describe('channel_self override KV plugin version gate', () => {
     expect(store.delete).toHaveBeenCalledWith('channel_self:v1:com.test.app:device-id')
   })
 
-  it('does not delete channel_self KV for new plugin devices', async () => {
+  it.concurrent('deletes channel_self KV for missing plugin versions', async () => {
+    const store = createStore()
+
+    await syncLegacyChannelSelfOverrideDeleteForDevice(createContext(store) as any, createDeviceClient(null) as any, 'com.test.app', 'DEVICE-ID')
+
+    expect(store.delete).toHaveBeenCalledWith('channel_self:v1:com.test.app:device-id')
+  })
+
+  it.concurrent('deletes channel_self KV for unparsable plugin versions', async () => {
+    const store = createStore()
+
+    await syncLegacyChannelSelfOverrideDeleteForDevice(createContext(store) as any, createDeviceClient('invalid') as any, 'com.test.app', 'DEVICE-ID')
+
+    expect(store.delete).toHaveBeenCalledWith('channel_self:v1:com.test.app:device-id')
+  })
+
+  it.concurrent('does not delete channel_self KV for new plugin devices', async () => {
     const store = createStore()
 
     await syncLegacyChannelSelfOverrideDeleteForDevice(createContext(store) as any, createDeviceClient('7.42.0') as any, 'com.test.app', 'DEVICE-ID')

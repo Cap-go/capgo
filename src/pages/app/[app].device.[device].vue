@@ -311,20 +311,27 @@ async function onSelectChannel(value: string) {
     return
   }
 
-  if (isPublicChannelSelection(value)) {
-    await handlePublicChannelSelection()
+  try {
+    if (isPublicChannelSelection(value)) {
+      await handlePublicChannelSelection()
+    }
+    else if (channelDevice.value && value === 'none') {
+      await unlinkDeviceChannel()
+    }
+    else if (value !== 'none') {
+      await linkDeviceChannel(value)
+    }
+    else {
+      toast.error(t('channel-link-fail'))
+    }
   }
-  else if (channelDevice.value && value === 'none') {
-    await unlinkDeviceChannel()
-  }
-  else if (value !== 'none') {
-    await linkDeviceChannel(value)
-  }
-  else {
+  catch (error) {
+    console.error(error)
     toast.error(t('channel-link-fail'))
   }
-
-  closeChannelDropdown()
+  finally {
+    closeChannelDropdown()
+  }
 }
 
 watchEffect(async () => {

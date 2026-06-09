@@ -108,6 +108,18 @@ export function shouldSyncChannelSelfOverrideForPluginVersion(pluginVersion: str
   }
 }
 
+function shouldDeleteChannelSelfOverrideForPluginVersion(pluginVersion: string | null | undefined) {
+  if (!pluginVersion)
+    return true
+
+  try {
+    return isDeprecatedPluginVersion(parse(pluginVersion), CHANNEL_SELF_STORE_MIN_V5, CHANNEL_SELF_STORE_MIN_V6, CHANNEL_SELF_STORE_MIN_V7, CHANNEL_SELF_STORE_MIN_V8)
+  }
+  catch {
+    return true
+  }
+}
+
 async function getChannelSelfOverridePluginVersion(c: ChannelSelfContext, supabase: ChannelSelfDeviceClient, appId: string, deviceId: string) {
   const { data, error } = await supabase
     .from('devices')
@@ -159,7 +171,7 @@ export async function syncChannelSelfOverride(c: ChannelSelfContext, override: C
 }
 
 export async function syncChannelSelfOverrideDelete(c: ChannelSelfContext, appId: string, deviceId: string, pluginVersion?: string | null) {
-  if (!shouldSyncChannelSelfOverrideForPluginVersion(pluginVersion))
+  if (!shouldDeleteChannelSelfOverrideForPluginVersion(pluginVersion))
     return true
 
   if (!isChannelSelfStoreEnabled(c)) {
