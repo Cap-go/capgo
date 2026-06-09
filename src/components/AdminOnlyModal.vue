@@ -2,32 +2,45 @@
 import { onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import IconUserCircle from '~icons/heroicons/user-circle'
-import { isAdminRole, useOrganizationStore } from '~/stores/organization'
+import { useMainStore } from '~/stores/main'
+import { isSuperAdminRole, useOrganizationStore } from '~/stores/organization'
 
 const { t } = useI18n()
 const organizationStore = useOrganizationStore()
+const mainStore = useMainStore()
 
-const admins = ref<{ key: string, email: string, image_url: string }[]>([])
+const superAdmins = ref<{ key: string, email: string, image_url: string }[]>([])
 const isLoading = ref(true)
 
 function getMemberKey(member: { uid?: string | null, id?: string | number | null, email: string }) {
   return String(member.uid ?? member.id ?? member.email)
 }
 
+// The current user is the one being blocked, so never list them as someone to contact.
+function isCurrentUser(member: { uid?: string | null, email: string }) {
+  const currentUser = mainStore.user
+  if (!currentUser)
+    return false
+  if (member.uid && member.uid === currentUser.id)
+    return true
+  return !!member.email && member.email.toLowerCase() === currentUser.email?.toLowerCase()
+}
+
 onMounted(async () => {
   try {
     const members = await organizationStore.getMembers((signedImages) => {
-      admins.value = admins.value.map((admin) => {
+      superAdmins.value = superAdmins.value.map((admin) => {
         const signedImage = signedImages.get(admin.key)
         return signedImage ? { ...admin, image_url: signedImage } : admin
       })
     })
-    admins.value = members
-      .filter(m => isAdminRole(m.role))
+    // Only super admins can grant access to these sections, so only they are worth contacting.
+    superAdmins.value = members
+      .filter(m => isSuperAdminRole(m.role) && !isCurrentUser(m))
       .map(m => ({ key: getMemberKey(m), email: m.email, image_url: m.image_url }))
   }
   catch (e) {
-    console.error('Failed to fetch admins:', e)
+    console.error('Failed to fetch super admins:', e)
   }
   finally {
     isLoading.value = false
@@ -58,13 +71,13 @@ onMounted(async () => {
       <div v-if="isLoading" class="flex justify-center py-2">
         <div class="w-6 h-6 rounded-full border-2 border-blue-500 border-t-transparent animate-spin" />
       </div>
-      <div v-else-if="admins.length > 0" class="mt-4 p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+      <div v-else-if="superAdmins.length > 0" class="mt-4 p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
         <p class="mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
           {{ t('contact-your-admin') }}:
         </p>
         <div class="flex flex-wrap gap-2 justify-center">
           <div
-            v-for="admin in admins"
+            v-for="admin in superAdmins"
             :key="admin.email"
             class="flex items-center gap-2 px-3 py-1.5 bg-white dark:bg-gray-800 rounded-full border border-gray-200 dark:border-gray-600"
           >
