@@ -141,13 +141,13 @@ async function customDeviceOverwritePart5(
     return
   }
 
-  const { error: overwriteError } = await supabase.from('channel_devices')
-    .insert({
+  const { error: overwriteError } = await supabase.functions.invoke('private/channel_device', {
+    body: {
       app_id: route.params.app as string,
       channel_id: Number(route.params.channel),
       device_id: deviceId.toLowerCase(),
-      owner_org: channel.value?.owner_org ?? '',
-    })
+    },
+  })
 
   if (overwriteError) {
     console.error('overwriteError', overwriteError)

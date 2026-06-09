@@ -17,6 +17,12 @@ export interface ChannelSelfOverride {
   }
 }
 
+export interface ChannelSelfOverrideWrite {
+  app_id: string
+  device_id: string
+  channel_id: number
+}
+
 interface ChannelSelfOverridePayload {
   app_id: string
   device_id: string
@@ -70,6 +76,27 @@ function fromPayload(appId: string, deviceId: string, payload: ChannelSelfOverri
 
 export function isChannelSelfStoreEnabled(c: ChannelSelfContext) {
   return Boolean(getChannelSelfStore(c))
+}
+
+export async function syncChannelSelfOverride(c: ChannelSelfContext, override: ChannelSelfOverrideWrite) {
+  if (!isChannelSelfStoreEnabled(c))
+    return true
+
+  const normalizedDeviceId = override.device_id.toLowerCase()
+  return setChannelSelfOverride(c, override.app_id, normalizedDeviceId, {
+    app_id: override.app_id,
+    device_id: normalizedDeviceId,
+    channel_id: {
+      id: override.channel_id,
+    },
+  })
+}
+
+export async function syncChannelSelfOverrideDelete(c: ChannelSelfContext, appId: string, deviceId: string) {
+  if (!isChannelSelfStoreEnabled(c))
+    return true
+
+  return deleteChannelSelfOverride(c, appId, deviceId.toLowerCase())
 }
 
 export async function getChannelSelfOverride(c: ChannelSelfContext, appId: string, deviceId: string): Promise<ChannelSelfOverride | null> {

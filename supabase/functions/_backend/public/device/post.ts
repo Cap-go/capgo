@@ -2,6 +2,7 @@ import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../../utils/hono.ts'
 import type { Database } from '../../utils/supabase.types.ts'
 import type { DeviceLink } from './delete.ts'
+import { syncChannelSelfOverride } from '../../utils/channelSelfStore.ts'
 import { BRES, quickError, simpleError } from '../../utils/hono.ts'
 import { checkPermission } from '../../utils/rbac.ts'
 import { supabaseApikey, updateOrCreateChannelDevice } from '../../utils/supabase.ts'
@@ -49,6 +50,13 @@ export async function post(c: Context<MiddlewareKeyVariables, any, object>, body
     })
     if (channelDeviceError) {
       throw quickError(500, 'channel_device_error', 'Error setting channel override', { channelDeviceError })
+    }
+    if (!(await syncChannelSelfOverride(c, {
+      device_id: body.device_id,
+      channel_id: dataChannel.id,
+      app_id: body.app_id,
+    }))) {
+      throw quickError(500, 'channel_self_store_error', 'Error syncing channel override store')
     }
   }
   return c.json(BRES)
