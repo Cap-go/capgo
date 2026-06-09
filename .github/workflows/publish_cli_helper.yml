@@ -19,7 +19,10 @@ jobs:
     name: Build, sign, notarize, publish keychain helper
     timeout-minutes: 45
     permissions:
-      contents: write
+      # checkout only needs read; the tag + GitHub release run through
+      # PERSONAL_ACCESS_TOKEN, not the automatic GITHUB_TOKEN.
+      contents: read
+      # required for `npm publish --provenance` (mints the OIDC token).
       id-token: write
     steps:
       - name: Checkout
