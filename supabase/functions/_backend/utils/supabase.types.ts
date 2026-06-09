@@ -2301,6 +2301,21 @@ export type Database = {
           },
         ]
       }
+      org_id_tombstones: {
+        Row: {
+          deleted_at: string
+          org_id: string
+        }
+        Insert: {
+          deleted_at?: string
+          org_id: string
+        }
+        Update: {
+          deleted_at?: string
+          org_id?: string
+        }
+        Relationships: []
+      }
       orgs: {
         Row: {
           created_at: string | null
