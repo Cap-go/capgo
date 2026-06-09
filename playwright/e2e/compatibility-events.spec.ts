@@ -98,7 +98,7 @@ test.describe('Compatibility events', () => {
     await expect(page.getByText('Compatibility events').first()).toBeVisible()
 
     await banner.locator('[data-test="compatibility-banner-view"]').click()
-    await page.waitForURL(new RegExp(`/app/${APP_ID.replace(/\./g, '\\.')}/compatibility`))
+    await page.waitForURL(url => url.pathname === `/app/${APP_ID}/compatibility`)
   })
 
   test('renders an unresolved event row with its details and dependency-diff link', async ({ page }) => {
@@ -119,9 +119,10 @@ test.describe('Compatibility events', () => {
 
     // The dependency-diff link points at the existing bundle dependencies view,
     // comparing current vs previous bundle ids.
-    const expectedDiffPath = `/app/${APP_ID}/bundle/${CURRENT_VERSION_ID}/dependencies?compare=${PREVIOUS_VERSION_ID}`
     await row.locator('[data-test="compatibility-diff-link"]').click()
-    await page.waitForURL(new RegExp(expectedDiffPath.replace(/[.?]/g, '\\$&')))
+    await page.waitForURL(url =>
+      url.pathname === `/app/${APP_ID}/bundle/${CURRENT_VERSION_ID}/dependencies`
+      && url.searchParams.get('compare') === String(PREVIOUS_VERSION_ID))
   })
 
   test('accepts an unresolved event after requiring a reason and calls the RPC', async ({ page }) => {

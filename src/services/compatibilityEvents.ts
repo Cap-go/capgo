@@ -64,7 +64,7 @@ export function reasonLabel(
     return note.length > 0 ? note : 'Resolved automatically — the default became compatible again.'
 
   if (row.resolution_kind === 'accepted') {
-    const who = acceptedByLabel?.trim() ? acceptedByLabel.trim() : 'a team member'
+    const who = acceptedByLabel?.trim() || 'a team member'
     return note.length > 0 ? `Accepted by ${who} — ${note}` : `Accepted by ${who}`
   }
 
@@ -87,7 +87,7 @@ export function dependencyDiffPath(
   if (row.current_version_id == null || row.previous_version_id == null)
     return null
 
-  return `/app/${appId}/bundle/${row.current_version_id}/dependencies?compare=${row.previous_version_id}`
+  return `/app/${encodeURIComponent(appId)}/bundle/${row.current_version_id}/dependencies?compare=${row.previous_version_id}`
 }
 
 /** Minimal fields the occurrence grouping needs (kept narrow so lightweight

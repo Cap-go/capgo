@@ -47,7 +47,7 @@ async function fetchUnresolvedCount() {
 }
 
 function viewCompatibility() {
-  router.push(`/app/${props.appId}/compatibility`)
+  router.push(`/app/${encodeURIComponent(props.appId)}/compatibility`)
 }
 
 watch(() => props.appId, () => {

@@ -151,26 +151,34 @@ function openBundle(versionId: number) {
 // table is self-read-only under RLS).
 async function loadMemberEmails() {
   const orgId = app.value?.owner_org
-  const needsEmails = events.value.some(event => event.resolution_kind === 'accepted' && event.resolved_by !== null)
-  if (!orgId || !needsEmails)
+  // Only the users who actually accepted an event need resolving (usually one or
+  // two), so don't fetch/sign avatars for the whole org.
+  const resolverIds = new Set(
+    events.value
+      .filter(event => event.resolution_kind === 'accepted' && event.resolved_by !== null)
+      .map(event => event.resolved_by as string),
+  )
+  if (!orgId || resolverIds.size === 0)
     return
   const { data, error } = await supabase.rpc('get_org_members', { guild_id: orgId })
   if (error) {
     console.error('[Compatibility] Error loading org members:', error)
     return
   }
-  // Member avatars can be private storage paths — sign them (cached) so the
-  // <img> actually loads; ready-to-use URLs pass through unchanged.
-  const entries = await Promise.all((data ?? []).map(async (member) => {
-    let imageUrl: string | null = null
-    try {
-      imageUrl = (await createSignedImageUrl(member.image_url)) || null
-    }
-    catch (error) {
-      console.warn('[Compatibility] Cannot sign member image', error)
-    }
-    return [member.uid, { email: member.email, image_url: imageUrl }] as const
-  }))
+  // Sign only the resolvers' avatars (private storage paths need a signed URL to
+  // load; ready-to-use URLs pass through unchanged).
+  const entries = await Promise.all((data ?? [])
+    .filter(member => resolverIds.has(member.uid))
+    .map(async (member) => {
+      let imageUrl: string | null = null
+      try {
+        imageUrl = (await createSignedImageUrl(member.image_url)) || null
+      }
+      catch (error) {
+        console.warn('[Compatibility] Cannot sign member image', error)
+      }
+      return [member.uid, { email: member.email, image_url: imageUrl }] as const
+    }))
   memberInfo.value = new Map(entries)
 }
 
@@ -230,8 +238,10 @@ async function acknowledgeEvents(eventIds: number[], note: string) {
       })
 
       if (error) {
+        // The reason was already validated in the dialog handler, so an error
+        // here is an RPC/network/server failure — not a missing reason.
         console.error('[Compatibility] Error accepting event:', error)
-        toast.error(t('compatibility-reason-required'))
+        toast.error(t('something-went-wrong-try-again-later'))
         return
       }
     }
@@ -242,7 +252,7 @@ async function acknowledgeEvents(eventIds: number[], note: string) {
   }
   catch (error) {
     console.error('[Compatibility] Error accepting events:', error)
-    toast.error(t('compatibility-reason-required'))
+    toast.error(t('something-went-wrong-try-again-later'))
   }
 }
 
@@ -589,8 +599,8 @@ watchEffect(async () => {
         <p v-else class="text-xs text-slate-500 dark:text-slate-400">
           {{ t('compatibility-resolution-auto') }}
         </p>
-        <p class="text-sm whitespace-pre-wrap break-words text-slate-800 dark:text-slate-100">
-          {{ resolutionDetail.resolution_note?.trim() || resolutionLabel(resolutionDetail) }}
+        <p v-if="resolutionDetail.resolution_note?.trim()" class="text-sm whitespace-pre-wrap break-words text-slate-800 dark:text-slate-100">
+          {{ resolutionDetail.resolution_note.trim() }}
         </p>
       </div>
     </Teleport>

@@ -16,6 +16,7 @@ function makeRow(overrides: Partial<CompatibilityEventRow> = {}): CompatibilityE
     previous_version_id: 100,
     previous_version_name: '1.2.2',
     offenders: ['@capacitor/camera'],
+    change_occurred_at: '2026-06-03T00:00:00.000Z',
     created_at: '2026-06-03T00:00:00.000Z',
     resolved_at: null,
     resolved_by: null,
