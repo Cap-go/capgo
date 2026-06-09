@@ -1,3 +1,66 @@
+CREATE TABLE IF NOT EXISTS "public"."org_id_tombstones" (
+  "org_id" uuid NOT NULL,
+  "deleted_at" timestamp with time zone NOT NULL DEFAULT now()
+);
+
+ALTER TABLE "public"."org_id_tombstones" OWNER TO "postgres";
+
+ALTER TABLE ONLY "public"."org_id_tombstones"
+  DROP CONSTRAINT IF EXISTS "org_id_tombstones_pkey";
+
+ALTER TABLE ONLY "public"."org_id_tombstones"
+  ADD CONSTRAINT "org_id_tombstones_pkey" PRIMARY KEY ("org_id");
+
+COMMENT ON TABLE "public"."org_id_tombstones" IS 'Deleted organization ids that must never be reused while retained audit logs can reference them.';
+COMMENT ON COLUMN "public"."org_id_tombstones"."org_id" IS 'Deleted organization id retained without foreign keys to prevent UUID reuse from exposing retained audit logs.';
+
+ALTER TABLE "public"."org_id_tombstones" ENABLE ROW LEVEL SECURITY;
+
+REVOKE ALL ON TABLE "public"."org_id_tombstones" FROM PUBLIC;
+REVOKE ALL ON TABLE "public"."org_id_tombstones" FROM "anon";
+REVOKE ALL ON TABLE "public"."org_id_tombstones" FROM "authenticated";
+GRANT ALL ON TABLE "public"."org_id_tombstones" TO "service_role";
+
+DROP POLICY IF EXISTS "Deny client select on org_id_tombstones" ON "public"."org_id_tombstones";
+CREATE POLICY "Deny client select on org_id_tombstones"
+ON "public"."org_id_tombstones"
+AS RESTRICTIVE
+FOR SELECT
+TO "anon", "authenticated"
+USING (false);
+
+DROP POLICY IF EXISTS "Deny client insert on org_id_tombstones" ON "public"."org_id_tombstones";
+CREATE POLICY "Deny client insert on org_id_tombstones"
+ON "public"."org_id_tombstones"
+AS RESTRICTIVE
+FOR INSERT
+TO "anon", "authenticated"
+WITH CHECK (false);
+
+DROP POLICY IF EXISTS "Deny client update on org_id_tombstones" ON "public"."org_id_tombstones";
+CREATE POLICY "Deny client update on org_id_tombstones"
+ON "public"."org_id_tombstones"
+AS RESTRICTIVE
+FOR UPDATE
+TO "anon", "authenticated"
+USING (false)
+WITH CHECK (false);
+
+DROP POLICY IF EXISTS "Deny client delete on org_id_tombstones" ON "public"."org_id_tombstones";
+CREATE POLICY "Deny client delete on org_id_tombstones"
+ON "public"."org_id_tombstones"
+AS RESTRICTIVE
+FOR DELETE
+TO "anon", "authenticated"
+USING (false);
+
+INSERT INTO "public"."org_id_tombstones" ("org_id")
+SELECT DISTINCT "audit_logs"."org_id"
+FROM "public"."audit_logs" AS "audit_logs"
+LEFT JOIN "public"."orgs" AS "orgs" ON "orgs"."id" = "audit_logs"."org_id"
+WHERE "orgs"."id" IS NULL
+ON CONFLICT ("org_id") DO NOTHING;
+
 ALTER TABLE "public"."audit_logs"
   DROP CONSTRAINT IF EXISTS "audit_logs_org_id_fkey";
 
@@ -44,6 +107,66 @@ CREATE INDEX IF NOT EXISTS "idx_audit_logs_actor_type"
 
 CREATE INDEX IF NOT EXISTS "idx_audit_logs_actor_apikey_id"
   ON "public"."audit_logs"("actor_apikey_id");
+
+CREATE OR REPLACE FUNCTION "public"."prevent_org_id_reuse"() RETURNS "trigger"
+LANGUAGE "plpgsql"
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+BEGIN
+  IF TG_OP = 'UPDATE' THEN
+    IF NEW."id" IS DISTINCT FROM OLD."id" THEN
+      RAISE EXCEPTION 'org_id_update_forbidden'
+        USING ERRCODE = 'P0001';
+    END IF;
+
+    RETURN NEW;
+  END IF;
+
+  IF EXISTS (
+    SELECT 1
+    FROM "public"."org_id_tombstones"
+    WHERE "org_id" = NEW."id"
+  ) THEN
+    RAISE EXCEPTION 'org_id_reuse_forbidden'
+      USING ERRCODE = 'P0001';
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+ALTER FUNCTION "public"."prevent_org_id_reuse"() OWNER TO "postgres";
+REVOKE ALL ON FUNCTION "public"."prevent_org_id_reuse"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."prevent_org_id_reuse"() TO "service_role";
+
+CREATE OR REPLACE FUNCTION "public"."tombstone_deleted_org_id"() RETURNS "trigger"
+LANGUAGE "plpgsql"
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+BEGIN
+  INSERT INTO "public"."org_id_tombstones" ("org_id", "deleted_at")
+  VALUES (OLD."id", now())
+  ON CONFLICT ("org_id") DO NOTHING;
+
+  RETURN OLD;
+END;
+$$;
+
+ALTER FUNCTION "public"."tombstone_deleted_org_id"() OWNER TO "postgres";
+REVOKE ALL ON FUNCTION "public"."tombstone_deleted_org_id"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."tombstone_deleted_org_id"() TO "service_role";
+
+DROP TRIGGER IF EXISTS "prevent_org_id_reuse" ON "public"."orgs";
+CREATE TRIGGER "prevent_org_id_reuse"
+  BEFORE INSERT OR UPDATE OF "id" ON "public"."orgs"
+  FOR EACH ROW EXECUTE FUNCTION "public"."prevent_org_id_reuse"();
+
+DROP TRIGGER IF EXISTS "tombstone_deleted_org_id" ON "public"."orgs";
+CREATE TRIGGER "tombstone_deleted_org_id"
+  AFTER DELETE ON "public"."orgs"
+  FOR EACH ROW EXECUTE FUNCTION "public"."tombstone_deleted_org_id"();
 
 CREATE OR REPLACE FUNCTION "public"."audit_log_trigger"() RETURNS "trigger"
 LANGUAGE "plpgsql"
