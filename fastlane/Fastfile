@@ -19,7 +19,9 @@ platform :android do
     UI.user_error!('ANDROID_JSON_KEY_FILE must point to your Google Play service account JSON file') if json_key.empty?
 
     json_key_path = File.expand_path(json_key)
-    UI.user_error!("ANDROID_JSON_KEY_FILE does not point to a readable file: #{json_key_path}") unless File.file?(json_key_path)
+    unless File.file?(json_key_path) && File.readable?(json_key_path)
+      UI.user_error!("ANDROID_JSON_KEY_FILE does not point to a readable file: #{json_key_path}")
+    end
 
     upload_to_play_store(
       json_key: json_key_path,
