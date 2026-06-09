@@ -35,9 +35,17 @@ platform :android do
   desc 'Upload Google Play screenshots'
   lane :upload_screenshots do
     metadata_path = File.expand_path('metadata/android', __dir__)
-    screenshots_path = File.join(metadata_path, 'en-US/images/phoneScreenshots')
-    screenshots = %w[png jpg jpeg].flat_map { |extension| Dir[File.join(screenshots_path, "*.#{extension}")] }
-    UI.user_error!("No Android screenshots found in #{screenshots_path}") if screenshots.empty?
+    screenshot_paths = %w[
+      phoneScreenshots
+      sevenInchScreenshots
+      tenInchScreenshots
+    ].map { |directory| File.join(metadata_path, 'en-US/images', directory) }
+    missing_screenshot_paths = screenshot_paths.select do |screenshots_path|
+      %w[png jpg jpeg].flat_map { |extension| Dir[File.join(screenshots_path, "*.#{extension}")] }.empty?
+    end
+    unless missing_screenshot_paths.empty?
+      UI.user_error!("No Android screenshots found in: #{missing_screenshot_paths.join(', ')}")
+    end
 
     json_key = ENV['ANDROID_JSON_KEY_FILE'].to_s.strip
     UI.user_error!('ANDROID_JSON_KEY_FILE must point to your Google Play service account JSON file') if json_key.empty?
