@@ -22,7 +22,7 @@ jobs:
           ruby-version: '3.4'
       - name: Install Fastlane bundle
         run: bundle install
-      - name: Decode Google Play Confi File
+      - name: Decode Google Play Config File
         uses: timheuer/base64-to-file@v1
         id: service_account_json_file
         with:
