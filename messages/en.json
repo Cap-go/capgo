@@ -2039,6 +2039,7 @@
   "used-to-create": "Account with this email used to exist, cannot recreate",
   "user": "User",
   "user-already-invited": "This user is already invited to this organization",
+  "user-email-or-org-id": "User ID, email, or organization ID",
   "user-id": "User Id",
   "user-registration": "User registration",
   "user-registrations": "User registrations",
