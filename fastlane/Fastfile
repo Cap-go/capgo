@@ -3,7 +3,19 @@ default_platform(:ios)
 platform :ios do
   desc 'Upload App Store screenshots using fastlane/Deliverfile'
   lane :upload_screenshots do
-    deliver
+    missing_api_key_env = %w[APPLE_KEY_ID APPLE_ISSUER_ID APPLE_KEY_CONTENT].select { |key| ENV[key].to_s.strip.empty? }
+    unless missing_api_key_env.empty?
+      UI.user_error!("Missing App Store Connect API key environment variables: #{missing_api_key_env.join(', ')}")
+    end
+
+    api_key = app_store_connect_api_key(
+      key_id: ENV.fetch('APPLE_KEY_ID'),
+      issuer_id: ENV.fetch('APPLE_ISSUER_ID'),
+      key_content: ENV.fetch('APPLE_KEY_CONTENT'),
+      is_key_content_base64: true
+    )
+
+    deliver(api_key: api_key)
   end
 
   desc 'Submit iOS app for App Store review'
