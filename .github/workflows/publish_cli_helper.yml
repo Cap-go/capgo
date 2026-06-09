@@ -123,16 +123,21 @@ jobs:
             || { echo "::error::gate did not reject missing handshake: $out"; exit 1; }
       - name: Prepare packages
         run: node cli-helper/scripts/prepare-publish.mjs "${{ steps.version.outputs.version }}"
+      # Publish under the `rc` dist-tag while the package is new/unproven, so it
+      # never becomes npm `latest`. This does NOT affect @capgo/cli installs:
+      # its optionalDependencies `^1.0.0` resolve against published versions, not
+      # dist-tags. To promote to stable later, either change `--tag rc` to drop
+      # the flag, or run: npm dist-tag add <pkg>@<version> latest
       - name: Publish darwin-arm64
         working-directory: cli-helper/npm/darwin-arm64
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: npm publish --provenance --access public
+        run: npm publish --provenance --access public --tag rc
       - name: Publish darwin-x64
         working-directory: cli-helper/npm/darwin-x64
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: npm publish --provenance --access public
+        run: npm publish --provenance --access public --tag rc
       - name: Zip signed bundles for release assets
         run: |
           ditto -c -k --keepParent cli-helper/dist/arm64/Capgo.app cli-helper/dist/Capgo-arm64.zip

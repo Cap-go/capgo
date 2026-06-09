@@ -78,6 +78,12 @@ Either way it builds, signs, notarizes, staples, smoke-tests, publishes both
 packages with npm provenance, and creates the `cli-helper-X.Y.Z` tag + GitHub
 release. Release only when `src/helper.swift` actually changed.
 
+**npm dist-tag:** while the packages are new/unproven they publish under the
+**`rc`** dist-tag, not `latest`, so they never become the default bare install.
+This doesn't affect `@capgo/cli`, whose `optionalDependencies` (`^1.0.0`)
+resolve against published *versions*, not dist-tags. Promote to stable later by
+dropping `--tag rc` in the workflow or `npm dist-tag add <pkg>@<version> latest`.
+
 Required GitHub secrets: `DEVELOPER_ID_CERT_BASE64`, `DEVELOPER_ID_CERT_PASSWORD`
 (Developer ID Application cert as base64 .p12), `APPLE_TEAM_ID`, plus existing
 `APPLE_KEY_ID`, `APPLE_ISSUER_ID`, `APPLE_KEY_CONTENT` (App Store Connect API
