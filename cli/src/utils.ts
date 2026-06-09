@@ -44,6 +44,14 @@ export const MAX_CHUNK_SIZE_BYTES = 1024 * 1024 * 99 // 99MB
 
 export const PACKNAME = 'package.json'
 
+interface CapgoSupabaseClientMetadata {
+  apikey: string
+  functionsUrl: string
+  fetch: typeof fetch
+}
+
+const capgoSupabaseClientMetadata = new WeakMap<SupabaseClient<Database>, CapgoSupabaseClientMetadata>()
+
 export type ArrayElement<ArrayType extends readonly unknown[]>
   = ArrayType extends readonly (infer ElementType)[] ? ElementType : never
 export type Organization = ArrayElement<Database['public']['Functions']['get_orgs_v7']['Returns']>
@@ -640,6 +648,10 @@ function normalizeSupabaseHost(host: string): string {
   return `${parsed.origin}${normalizedPath}`
 }
 
+function getSupabaseFunctionsUrl(host: string): string {
+  return new URL('functions/v1', host).href
+}
+
 export async function createSupabaseClient(apikey: string, supaHost?: string, supaKey?: string, silent = false, instrument = true) {
   const config = await getRemoteConfig(silent)
   if (supaHost && supaKey) {
@@ -654,8 +666,10 @@ export async function createSupabaseClient(apikey: string, supaHost?: string, su
     throw new Error('Cannot connect to server please try again later')
   }
   const normalizedSupaHost = normalizeSupabaseHost(config.supaHost)
+  const instrumentedFetch = isSupabaseInstrumentationEnabled() && instrument ? createTimedFetch() : undefined
+  const requestFetch = instrumentedFetch ?? (((input, init) => globalThis.fetch(input, init)) as typeof fetch)
   // Custom Supabase hosts are an explicit CLI feature; normalizeSupabaseHost constrains the accepted URL shape first.
-  return createClient<Database>(normalizedSupaHost, config.supaKey, { // NOSONAR
+  const client = createClient<Database>(normalizedSupaHost, config.supaKey, { // NOSONAR
     auth: {
       persistSession: false,
     },
@@ -663,9 +677,15 @@ export async function createSupabaseClient(apikey: string, supaHost?: string, su
       headers: {
         capgkey: apikey,
       },
-      ...(isSupabaseInstrumentationEnabled() && instrument ? { fetch: createTimedFetch() } : {}),
+      ...(instrumentedFetch ? { fetch: instrumentedFetch } : {}),
     },
   })
+  capgoSupabaseClientMetadata.set(client, {
+    apikey,
+    functionsUrl: getSupabaseFunctionsUrl(normalizedSupaHost),
+    fetch: requestFetch,
+  })
+  return client
 }
 
 export async function isPayingOrg(supabase: SupabaseClient<Database>, orgId: string): Promise<boolean> {
@@ -2018,6 +2038,146 @@ export async function getRemoteDependencies(supabase: SupabaseClient<Database>, 
   return convertNativePackages(((remoteNativePackages.version as any)?.native_packages as any) ?? [])
 }
 
+interface BundleCompatibilityCompareResponse {
+  comparisons: {
+    name: string
+    candidateVersion?: string
+    baselineVersion?: string
+    candidateIosChecksum?: string
+    baselineIosChecksum?: string
+    candidateAndroidChecksum?: string
+    baselineAndroidChecksum?: string
+  }[]
+}
+
+interface BundleCompatibilityCompareRequest {
+  appId: string
+  candidate: {
+    nativePackages: NativePackage[]
+  }
+  baseline: {
+    bundleId: number
+  }
+}
+
+function mapBackendCompatibilityComparison(entry: BundleCompatibilityCompareResponse['comparisons'][number]): Compatibility {
+  return {
+    name: entry.name,
+    localVersion: entry.candidateVersion,
+    remoteVersion: entry.baselineVersion,
+    localIosChecksum: entry.candidateIosChecksum,
+    remoteIosChecksum: entry.baselineIosChecksum,
+    localAndroidChecksum: entry.candidateAndroidChecksum,
+    remoteAndroidChecksum: entry.baselineAndroidChecksum,
+  }
+}
+
+function logBackendCompatibilityFallback(reason: string, details: Record<string, string | number | undefined> = {}) {
+  if (env.CAPGO_DEBUG !== 'true')
+    return
+
+  const context = Object.entries(details)
+    .filter((entry): entry is [string, string | number] => entry[1] !== undefined)
+    .map(([key, value]) => `${key}=${value}`)
+    .join(', ')
+  log.info(`[Debug] Bundle compatibility endpoint fallback: ${reason}${context ? ` (${context})` : ''}`)
+}
+
+export function mapBackendCompatibilityResponse(response: BundleCompatibilityCompareResponse): Compatibility[] {
+  return response.comparisons.map(mapBackendCompatibilityComparison)
+}
+
+async function getChannelBaselineBundleId(supabase: SupabaseClient<Database>, appId: string, channel: string): Promise<number | null> {
+  const { data, error } = await supabase
+    .from('channels')
+    .select('version ( id )')
+    .eq('name', channel)
+    .eq('app_id', appId)
+    .single()
+
+  if (error) {
+    log.error(`Error fetching native packages: ${error.message}`)
+    throw new Error(`Error fetching native packages: ${error.message}`)
+  }
+
+  const version = data.version as { id?: number } | null
+  const bundleId = version?.id
+  return typeof bundleId === 'number' ? bundleId : null
+}
+
+async function fetchBundleCompatibilityComparison(
+  supabase: SupabaseClient<Database>,
+  body: BundleCompatibilityCompareRequest,
+): Promise<BundleCompatibilityCompareResponse | null> {
+  const metadata = capgoSupabaseClientMetadata.get(supabase)
+  if (!metadata) {
+    logBackendCompatibilityFallback('missing client metadata', { appId: body.appId, bundleId: body.baseline.bundleId })
+    return null
+  }
+
+  const response = await metadata.fetch(`${metadata.functionsUrl}/private/bundle_compatibility/compare`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'capgkey': metadata.apikey,
+    },
+    body: JSON.stringify(body),
+  })
+
+  if (!response.ok) {
+    logBackendCompatibilityFallback('request failed', {
+      appId: body.appId,
+      bundleId: body.baseline.bundleId,
+      status: response.status,
+    })
+    return null
+  }
+
+  return await response.json() as BundleCompatibilityCompareResponse
+}
+
+async function checkCompatibilityWithBackend(
+  supabase: SupabaseClient<Database>,
+  appId: string,
+  channel: string,
+  nativePackages: NativePackage[],
+): Promise<Compatibility[] | null> {
+  if (nativePackages.length === 0)
+    return null
+
+  const baselineBundleId = await getChannelBaselineBundleId(supabase, appId, channel)
+  if (!baselineBundleId) {
+    logBackendCompatibilityFallback('missing baseline bundle', { appId, channel })
+    return null
+  }
+
+  try {
+    const data = await fetchBundleCompatibilityComparison(supabase, {
+      appId,
+      candidate: {
+        nativePackages,
+      },
+      baseline: {
+        bundleId: baselineBundleId,
+      },
+    })
+
+    if (!data)
+      return null
+
+    return mapBackendCompatibilityResponse(data)
+  }
+  catch (error) {
+    logBackendCompatibilityFallback('request threw', {
+      appId,
+      channel,
+      bundleId: baselineBundleId,
+      error: error instanceof Error ? error.message : String(error),
+    })
+    return null
+  }
+}
+
 export async function checkChecksum(supabase: SupabaseClient<Database>, appId: string, channel: string, currentChecksum: string) {
   const s = spinnerC()
   s.start(`Checking bundle checksum compatibility with channel ${channel}`)
@@ -2146,6 +2306,22 @@ export function isCompatible(pkg: Compatibility): boolean {
 
 export async function checkCompatibilityCloud(supabase: SupabaseClient<Database>, appId: string, channel: string, packageJsonPath: string | undefined, nodeModules: string | undefined) {
   const dependenciesObject = await getLocalDependencies(packageJsonPath, nodeModules)
+  const localNativePackages = dependenciesObject
+    .filter(a => !!a.native)
+    .map(({ name, version, ios_checksum, android_checksum }) => ({
+      name,
+      version,
+      ...(ios_checksum && { ios_checksum }),
+      ...(android_checksum && { android_checksum }),
+    }))
+  const backendCompatibility = await checkCompatibilityWithBackend(supabase, appId, channel, localNativePackages)
+  if (backendCompatibility) {
+    return {
+      finalCompatibility: backendCompatibility,
+      localDependencies: dependenciesObject,
+    }
+  }
+
   const mappedRemoteNativePackages = await getRemoteDependencies(supabase, appId, channel)
 
   const finalDependencies: Compatibility[] = dependenciesObject
@@ -2194,6 +2370,14 @@ export async function checkCompatibilityCloud(supabase: SupabaseClient<Database>
 }
 
 export async function checkCompatibilityNativePackages(supabase: SupabaseClient<Database>, appId: string, channel: string, nativePackages: NativePackage[]) {
+  const backendCompatibility = await checkCompatibilityWithBackend(supabase, appId, channel, nativePackages)
+  if (backendCompatibility) {
+    return {
+      finalCompatibility: backendCompatibility,
+      localDependencies: nativePackages,
+    }
+  }
+
   const mappedRemoteNativePackages = await getRemoteDependencies(supabase, appId, channel)
 
   const finalDependencies: Compatibility[] = nativePackages
