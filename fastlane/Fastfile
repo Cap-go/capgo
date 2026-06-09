@@ -45,8 +45,7 @@ platform :android do
       skip_upload_changelogs: true,
       skip_upload_images: true,
       skip_upload_screenshots: false,
-      sync_image_upload: true,
-      validate_only: ENV['FASTLANE_VALIDATE_ONLY'] == 'true'
+      sync_image_upload: true
     )
   end
 end

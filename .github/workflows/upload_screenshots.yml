@@ -1,23 +1,52 @@
-name: Upload Android screenshots
+name: Upload screenshots
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ inputs.platform }}
   cancel-in-progress: false
 
 on:
   workflow_dispatch:
     inputs:
-      validate_only:
-        description: Validate with Google Play without applying screenshot changes
-        required: false
-        default: false
-        type: boolean
+      platform:
+        description: Platform to upload screenshots for
+        required: true
+        type: choice
+        options:
+          - ios
+          - android
 
 permissions:
   contents: read
 
 jobs:
+  upload_ios_screenshots:
+    if: ${{ inputs.platform == 'ios' }}
+    runs-on: macOS-latest
+    timeout-minutes: 30
+    env:
+      BUNDLE_GEMFILE: .bundle/fastlane/Gemfile
+      FASTLANE_SKIP_UPDATE_CHECK: 'true'
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.4'
+      - name: Install fastlane
+        run: |
+          mkdir -p "$(dirname "$BUNDLE_GEMFILE")"
+          {
+            echo "source 'https://rubygems.org'"
+            echo "gem 'fastlane'"
+          } > "$BUNDLE_GEMFILE"
+          bundle config set path .bundle/vendor
+          bundle install --jobs 4 --retry 3
+      - name: Upload iOS screenshots
+        env:
+          APP_STORE_CONNECT_TEAM_ID: ${{ secrets.APP_STORE_CONNECT_TEAM_ID }}
+        run: bundle exec fastlane ios upload_screenshots
+
   upload_android_screenshots:
+    if: ${{ inputs.platform == 'android' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
@@ -47,5 +76,4 @@ jobs:
         env:
           ANDROID_JSON_KEY_FILE: ${{ steps.service_account_json_file.outputs.filePath }}
           DEVELOPER_PACKAGE_NAME: ${{ secrets.DEVELOPER_PACKAGE_NAME }}
-          FASTLANE_VALIDATE_ONLY: ${{ inputs.validate_only }}
         run: bundle exec fastlane android upload_screenshots
