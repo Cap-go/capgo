@@ -894,7 +894,12 @@ onMounted(checkLogin)
                   <div v-else>
                     <FormKit id="login-account" type="form" :actions="false" @submit="handlePasswordSubmit">
                       <div class="space-y-5">
-                        <!-- Password managers need this hidden username field to pair the password with the selected email. -->
+                        <!--
+                      Hidden email input placed inside the form so browsers and password managers
+                      can associate the password field with the correct account (autocomplete="username").
+                      Uses opacity+absolute positioning instead of display:none so browsers still
+                      detect it for autofill purposes.
+                    -->
                         <input
                           type="email"
                           :value="emailForLogin"
