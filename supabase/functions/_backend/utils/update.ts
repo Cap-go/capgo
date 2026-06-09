@@ -172,13 +172,12 @@ export async function updateWithPG(
   }
   await setAppStatus(c, app_id, 'cloud', appOwner.allow_device_custom_id)
   const pluginVersion = parse(plugin_version)
-  const channelSelfStoreEnabled = hasChannelSelfStoreBinding(c)
-  const shouldUseChannelSelfStore = channelSelfStoreEnabled && usesLegacyChannelSelfStoreVersion(pluginVersion)
+  const shouldUseChannelSelfStore = usesLegacyChannelSelfStoreVersion(pluginVersion) && hasChannelSelfStoreBinding(c)
   const channelSelfOverride = shouldUseChannelSelfStore
     ? await getStoredChannelSelfOverride(c, app_id, device_id)
     : null
   const channelDeviceCount = appOwner.channel_device_count ?? 0
-  const effectiveChannelDeviceCount = channelSelfStoreEnabled ? 0 : channelDeviceCount
+  const effectiveChannelDeviceCount = channelDeviceCount
   const manifestBundleCount = appOwner.manifest_bundle_count ?? 0
   const bypassChannelOverrides = !channelSelfOverride && effectiveChannelDeviceCount <= 0
   // v5 is deprecated if < 5.10.0, v6 is deprecated if < 6.25.0, v7 is deprecated if < 7.25.0
