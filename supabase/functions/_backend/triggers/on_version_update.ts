@@ -3,14 +3,18 @@ import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import { eq } from 'drizzle-orm'
 import { Hono } from 'hono/tiny'
-import { BRES, middlewareAPISecret, simpleError, triggerValidator } from '../utils/hono.ts'
-import { cloudlog } from '../utils/logging.ts'
+import { BRES, middlewareAPISecret, quickError, simpleError, triggerValidator } from '../utils/hono.ts'
+import { cloudlog, cloudlogErr } from '../utils/logging.ts'
 import { normalizeLegacyEncodedManifestFileName } from '../utils/manifest_encoding.ts'
 import { closeClient, getDrizzleClient, getPgClient } from '../utils/pg.ts'
 import { manifest } from '../utils/postgres_schema.ts'
-import { getPath, s3 } from '../utils/s3.ts'
+import { retryWithBackoff } from '../utils/retry.ts'
+import { s3 } from '../utils/s3.ts'
 import { createStatsMeta } from '../utils/stats.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
+
+const BUNDLE_SIZE_RETRY_ATTEMPTS = 3
+const BUNDLE_SIZE_RETRY_DELAY_MS = 500
 
 /**
  * Resolves `owner_org` for an app version row.
@@ -37,19 +41,35 @@ async function resolveOwnerOrg(c: Context, record: Database['public']['Tables'][
   return data?.owner_org ?? null
 }
 
+async function getBundleSizeWithRetry(c: Context, r2Path: string): Promise<{ size: number, lastError?: unknown, attempts: number }> {
+  const { result, lastError, attempts } = await retryWithBackoff(
+    () => s3.getSize(c, r2Path),
+    {
+      attempts: BUNDLE_SIZE_RETRY_ATTEMPTS,
+      baseDelayMs: BUNDLE_SIZE_RETRY_DELAY_MS,
+      shouldRetry: size => size <= 0,
+    },
+  )
+
+  return { attempts, size: typeof result === 'number' ? result : 0, lastError }
+}
+
 /**
  * Handles v2 storage metadata updates (size/checksum/stats) for R2-backed bundles.
  *
  * Returns `false` only when processing must stop (e.g. missing owner org).
  */
 async function v2PathSize(c: Context, record: Database['public']['Tables']['app_versions']['Row'], v2Path: string): Promise<boolean> {
-  // pdate size and checksum
+  // Update size and checksum.
   cloudlog({ requestId: c.get('requestId'), message: 'V2', r2_path: record.r2_path })
-  // set checksum in s3
-  const size = await s3.getSize(c, v2Path)
-  if (!size) {
-    cloudlog({ requestId: c.get('requestId'), message: 'no size found for r2_path', r2_path: record.r2_path })
-    return true
+  const { size, lastError, attempts } = await getBundleSizeWithRetry(c, v2Path)
+  if (lastError) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'getSize failed after retries', id: record.id, app_id: record.app_id, r2_path: record.r2_path, attempts, error: lastError })
+  }
+  if (size <= 0) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'getSize returned 0 after retries', id: record.id, app_id: record.app_id, r2_path: record.r2_path, storage_provider: record.storage_provider, attempts })
+    // Return non-2xx so queue_consumer keeps the message and applies its 5-read retry budget.
+    throw quickError(503, 'bundle_size_not_found', 'Bundle file size metadata was not found', { attempts, app_id: record.app_id, id: record.id, r2_path: record.r2_path }, lastError, { alert: false })
   }
 
   const ownerOrg = await resolveOwnerOrg(c, record)
@@ -150,38 +170,56 @@ async function handleManifest(c: Context, record: Database['public']['Tables']['
     cloudlog({ requestId: c.get('requestId'), message: 'error delete manifest in app_versions', error: deleteError })
 }
 
+async function upsertZeroVersionMetadata(c: Context, record: Database['public']['Tables']['app_versions']['Row']) {
+  cloudlog({ requestId: c.get('requestId'), message: 'no v2 path' })
+  const ownerOrg = await resolveOwnerOrg(c, record)
+  if (!ownerOrg) {
+    cloudlog({ requestId: c.get('requestId'), message: 'missing owner_org for app_versions_meta upsert', id: record.id, app_id: record.app_id })
+    return false
+  }
+  const { error: errorUpdate } = await supabaseAdmin(c)
+    .from('app_versions_meta')
+    .upsert({
+      id: record.id,
+      app_id: record.app_id,
+      owner_org: ownerOrg,
+      size: 0,
+      checksum: record.checksum ?? '',
+    }, {
+      onConflict: 'id',
+    })
+    .eq('id', record.id)
+  if (errorUpdate)
+    cloudlog({ requestId: c.get('requestId'), message: 'errorUpdate', error: errorUpdate })
+  return true
+}
+
 /**
  * Handles app version metadata updates after insert/update trigger execution.
  */
 async function updateIt(c: Context, record: Database['public']['Tables']['app_versions']['Row']) {
-  const v2Path = await getPath(c, record)
-
-  if (v2Path && record.storage_provider === 'r2') {
-    const shouldContinue = await v2PathSize(c, record, v2Path)
-    if (!shouldContinue)
-      return c.json(BRES)
-  }
-  else {
-    cloudlog({ requestId: c.get('requestId'), message: 'no v2 path' })
-    const ownerOrg = await resolveOwnerOrg(c, record)
-    if (!ownerOrg) {
-      cloudlog({ requestId: c.get('requestId'), message: 'missing owner_org for app_versions_meta upsert', id: record.id, app_id: record.app_id })
+  if (record.storage_provider === 'r2') {
+    if (record.r2_path) {
+      const shouldContinue = await v2PathSize(c, record, record.r2_path)
+      if (!shouldContinue)
+        return c.json(BRES)
+    }
+    else if (isPersistedManifestOnlyVersion(record)) {
+      cloudlog({ requestId: c.get('requestId'), message: 'manifest-only r2 version already persisted, skipping bundle metadata retry', id: record.id, app_id: record.app_id, manifest_count: record.manifest_count })
+    }
+    else if (!record.manifest) {
+      cloudlogErr({ requestId: c.get('requestId'), message: 'r2 version missing r2_path', id: record.id, app_id: record.app_id, storage_provider: record.storage_provider })
+      throw quickError(503, 'bundle_r2_path_missing', 'Bundle R2 path is not ready', { app_id: record.app_id, id: record.id }, undefined, { alert: false })
+    }
+    else if (!await upsertZeroVersionMetadata(c, record)) {
       return c.json(BRES)
     }
-    const { error: errorUpdate } = await supabaseAdmin(c)
-      .from('app_versions_meta')
-      .upsert({
-        id: record.id,
-        app_id: record.app_id,
-        owner_org: ownerOrg,
-        size: 0,
-        checksum: record.checksum ?? '',
-      }, {
-        onConflict: 'id',
-      })
-      .eq('id', record.id)
-    if (errorUpdate)
-      cloudlog({ requestId: c.get('requestId'), message: 'errorUpdate', error: errorUpdate })
+  }
+  else if (record.r2_path) {
+    cloudlog({ requestId: c.get('requestId'), message: 'bundle metadata skipped for non-r2 storage provider', id: record.id, app_id: record.app_id, r2_path: record.r2_path, storage_provider: record.storage_provider })
+  }
+  else if (!await upsertZeroVersionMetadata(c, record)) {
+    return c.json(BRES)
   }
 
   // Handle manifest entries
@@ -190,6 +228,25 @@ async function updateIt(c: Context, record: Database['public']['Tables']['app_ve
   }
 
   return c.json(BRES)
+}
+
+export const onVersionUpdateTestUtils = {
+  getBundleSizeWithRetry,
+  updateIt,
+}
+
+function isManifestCleanupUpdate(record: Database['public']['Tables']['app_versions']['Row'], oldRecord: Database['public']['Tables']['app_versions']['Row']) {
+  return record.storage_provider === 'r2'
+    && !record.r2_path
+    && !record.manifest
+    && Boolean(oldRecord.manifest)
+}
+
+function isPersistedManifestOnlyVersion(record: Database['public']['Tables']['app_versions']['Row']) {
+  return record.storage_provider === 'r2'
+    && !record.r2_path
+    && !record.manifest
+    && Number(record.manifest_count ?? 0) > 0
 }
 
 /**
@@ -357,7 +414,17 @@ app.post('/', middlewareAPISecret, triggerValidator('app_versions', 'UPDATE'), (
   if (record.deleted_at && record.deleted_at !== oldRecord.deleted_at)
     return deleteIt(c, record)
 
-  if (!record.r2_path && !record.manifest) {
+  if (isManifestCleanupUpdate(record, oldRecord)) {
+    cloudlog({ requestId: c.get('requestId'), message: 'manifest cleanup update, skipping bundle metadata retry', record })
+    return c.json(BRES)
+  }
+
+  if (isPersistedManifestOnlyVersion(record)) {
+    cloudlog({ requestId: c.get('requestId'), message: 'persisted manifest-only update, skipping bundle metadata retry', record })
+    return c.json(BRES)
+  }
+
+  if (!record.r2_path && !record.manifest && record.storage_provider !== 'r2') {
     cloudlog({ requestId: c.get('requestId'), message: 'no r2_path and no manifest, skipping update', record })
     return c.json(BRES)
   }
