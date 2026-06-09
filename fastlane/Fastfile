@@ -5,6 +5,18 @@ platform :ios do
   lane :upload_screenshots do
     deliver
   end
+
+  desc 'Submit iOS app for App Store review'
+  lane :submit_review do
+    deliver(
+      submit_for_review: true,
+      automatic_release: true,
+      force: true,
+      skip_metadata: false,
+      skip_screenshots: false,
+      skip_binary_upload: true
+    )
+  end
 end
 
 platform :android do
