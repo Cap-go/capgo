@@ -317,7 +317,7 @@ async function checkVersionExists(supabase: SupabaseType, appid: string, bundle:
         ],
       })
 
-      if (pIsCancel(choice) || choice === 'cancel') {
+      if (pIsCancel(choice) || typeof choice !== 'string' || choice === 'cancel') {
         uploadFail('Upload cancelled by user')
       }
 
