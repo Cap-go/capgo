@@ -1,9 +1,26 @@
+require 'json'
+
 default_platform(:ios)
 
 platform :ios do
   desc 'Upload App Store screenshots using fastlane/Deliverfile'
   lane :upload_screenshots do
     deliver
+  end
+
+  desc 'Submit iOS app for App Store review'
+  lane :submit_review do
+    package_json = JSON.parse(File.read(File.expand_path('../package.json', __dir__)))
+
+    deliver(
+      app_version: package_json['version'],
+      submit_for_review: true,
+      automatic_release: true,
+      force: true,
+      skip_metadata: false,
+      skip_screenshots: false,
+      skip_binary_upload: true
+    )
   end
 end
 
