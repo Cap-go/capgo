@@ -1,5 +1,6 @@
 import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from './hono.ts'
+import { getRuntimeKey } from 'hono/adapter'
 import { CacheHelper } from './cache.ts'
 import { cloudlogErr, serializeError } from './logging.ts'
 
@@ -78,10 +79,18 @@ export function isChannelSelfStoreEnabled(c: ChannelSelfContext) {
   return Boolean(getChannelSelfStore(c))
 }
 
+function shouldRequireChannelSelfStore() {
+  // Supabase/Deno fallback cannot bind Cloudflare KV; Cloudflare API traffic must fail if the KV binding is missing.
+  return getRuntimeKey() === 'workerd'
+}
+
 export async function syncChannelSelfOverride(c: ChannelSelfContext, override: ChannelSelfOverrideWrite) {
   if (!isChannelSelfStoreEnabled(c)) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Missing channel_self override store binding', app_id: override.app_id, device_id: override.device_id })
-    return false
+    if (shouldRequireChannelSelfStore()) {
+      cloudlogErr({ requestId: c.get('requestId'), message: 'Missing channel_self override store binding', app_id: override.app_id, device_id: override.device_id })
+      return false
+    }
+    return true
   }
 
   const normalizedDeviceId = override.device_id.toLowerCase()
@@ -96,8 +105,11 @@ export async function syncChannelSelfOverride(c: ChannelSelfContext, override: C
 
 export async function syncChannelSelfOverrideDelete(c: ChannelSelfContext, appId: string, deviceId: string) {
   if (!isChannelSelfStoreEnabled(c)) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Missing channel_self override store binding', app_id: appId, device_id: deviceId })
-    return false
+    if (shouldRequireChannelSelfStore()) {
+      cloudlogErr({ requestId: c.get('requestId'), message: 'Missing channel_self override store binding', app_id: appId, device_id: deviceId })
+      return false
+    }
+    return true
   }
 
   return deleteChannelSelfOverride(c, appId, deviceId.toLowerCase())

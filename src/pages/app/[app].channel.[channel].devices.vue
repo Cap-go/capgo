@@ -8,7 +8,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import plusOutline from '~icons/ion/add-outline'
 import IconAlertCircle from '~icons/lucide/alert-circle'
-import { useSupabase } from '~/services/supabase'
+import { defaultApiHost, useSupabase } from '~/services/supabase'
 import { withBuiltinChannelVersion } from '~/services/versions'
 import { useAppDetailStore } from '~/stores/appDetail'
 import { useDialogV2Store } from '~/stores/dialogv2'
@@ -115,6 +115,28 @@ async function customDeviceOverwritePart4(
   await dialogStore.onDialogDismiss()
 }
 
+async function setChannelDeviceOverride(deviceId: string) {
+  const { data: currentSession } = await supabase.auth.getSession()!
+  const currentJwt = currentSession.session?.access_token
+  if (!currentJwt)
+    throw new Error('Missing session')
+
+  const response = await fetch(`${defaultApiHost}/private/channel_device`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'authorization': `Bearer ${currentJwt}`,
+    },
+    body: JSON.stringify({
+      app_id: route.params.app as string,
+      channel_id: Number(route.params.channel),
+      device_id: deviceId.toLowerCase(),
+    }),
+  })
+  if (!response.ok)
+    throw new Error(`Cannot set channel override: HTTP ${response.status}`)
+}
+
 async function customDeviceOverwritePart5(
   deviceId: string,
   platform: 'ios' | 'android',
@@ -141,16 +163,11 @@ async function customDeviceOverwritePart5(
     return
   }
 
-  const { error: overwriteError } = await supabase.functions.invoke('private/channel_device', {
-    body: {
-      app_id: route.params.app as string,
-      channel_id: Number(route.params.channel),
-      device_id: deviceId.toLowerCase(),
-    },
-  })
-
-  if (overwriteError) {
-    console.error('overwriteError', overwriteError)
+  try {
+    await setChannelDeviceOverride(deviceId)
+  }
+  catch (error) {
+    console.error('overwriteError', error)
     toast.error(t('cannot-create-overwrite'))
     return
   }

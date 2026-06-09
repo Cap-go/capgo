@@ -213,27 +213,46 @@ async function loadData() {
 }
 
 async function upsertDevChannel(device: string, channelId: number) {
-  const { error } = await supabase.functions.invoke('private/channel_device', {
-    body: {
+  const { data: currentSession } = await supabase.auth.getSession()!
+  const currentJwt = currentSession.session?.access_token
+  if (!currentJwt)
+    throw new Error('Missing session')
+
+  const response = await fetch(`${defaultApiHost}/private/channel_device`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'authorization': `Bearer ${currentJwt}`,
+    },
+    body: JSON.stringify({
       device_id: device.toLowerCase(),
       channel_id: channelId,
       app_id: packageId.value,
-    },
+    }),
   })
-  if (error)
-    throw error
+  if (!response.ok)
+    throw new Error(`Cannot set channel override: HTTP ${response.status}`)
 }
 
 async function delDevChannel(device: string) {
-  const { error } = await supabase.functions.invoke('private/channel_device', {
+  const { data: currentSession } = await supabase.auth.getSession()!
+  const currentJwt = currentSession.session?.access_token
+  if (!currentJwt)
+    throw new Error('Missing session')
+
+  const response = await fetch(`${defaultApiHost}/private/channel_device`, {
     method: 'DELETE',
-    body: {
+    headers: {
+      'Content-Type': 'application/json',
+      'authorization': `Bearer ${currentJwt}`,
+    },
+    body: JSON.stringify({
       device_id: device.toLowerCase(),
       app_id: packageId.value,
-    },
+    }),
   })
-  if (error)
-    throw error
+  if (!response.ok)
+    throw new Error(`Cannot delete channel override: HTTP ${response.status}`)
 }
 
 function closeChannelDropdown() {
