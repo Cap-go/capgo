@@ -16,6 +16,7 @@ const CHANNEL_SELF_STORE_MIN_V5 = '5.34.0'
 const CHANNEL_SELF_STORE_MIN_V6 = '6.34.0'
 const CHANNEL_SELF_STORE_MIN_V7 = '7.34.0'
 const CHANNEL_SELF_STORE_MIN_V8 = '8.0.0'
+const CHANNEL_SELF_STORE_PLACEHOLDER_PLUGIN_VERSION = '0.0.0'
 
 // TODO: Delete this legacy channel_self KV/cache bridge once old plugin versions are no longer used. // NOSONAR
 // The cache layer only exists for those old versions so channel_self writes do not hit the primary database.
@@ -99,6 +100,8 @@ function shouldRequireChannelSelfStore() {
 export function shouldSyncChannelSelfOverrideForPluginVersion(pluginVersion: string | null | undefined) {
   if (!pluginVersion)
     return false
+  if (pluginVersion === CHANNEL_SELF_STORE_PLACEHOLDER_PLUGIN_VERSION)
+    return true
 
   try {
     return isDeprecatedPluginVersion(parse(pluginVersion), CHANNEL_SELF_STORE_MIN_V5, CHANNEL_SELF_STORE_MIN_V6, CHANNEL_SELF_STORE_MIN_V7, CHANNEL_SELF_STORE_MIN_V8)
@@ -110,6 +113,8 @@ export function shouldSyncChannelSelfOverrideForPluginVersion(pluginVersion: str
 
 function shouldDeleteChannelSelfOverrideForPluginVersion(pluginVersion: string | null | undefined) {
   if (!pluginVersion)
+    return true
+  if (pluginVersion === CHANNEL_SELF_STORE_PLACEHOLDER_PLUGIN_VERSION)
     return true
 
   try {

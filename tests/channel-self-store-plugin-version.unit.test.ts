@@ -54,6 +54,7 @@ const pluginVersionCases: [string | null, boolean][] = [
   ['7.34.0', false],
   ['7.42.0', false],
   ['8.0.0', false],
+  ['0.0.0', true],
   ['', false],
   [null, false],
   ['invalid', false],
@@ -120,6 +121,18 @@ describe('channel_self override KV plugin version gate', () => {
     expect(store.put).not.toHaveBeenCalled()
   })
 
+  it.concurrent('writes channel_self KV for injected placeholder devices', async () => {
+    const store = createStore()
+
+    await syncLegacyChannelSelfOverrideForDevice(createContext(store) as any, createDeviceClient('0.0.0') as any, {
+      app_id: 'com.test.app',
+      channel_id: 42,
+      device_id: 'DEVICE-ID',
+    })
+
+    expect(store.put).toHaveBeenCalledTimes(1)
+  })
+
   it.concurrent('deletes channel_self KV for legacy plugin devices', async () => {
     const store = createStore()
 
@@ -140,6 +153,14 @@ describe('channel_self override KV plugin version gate', () => {
     const store = createStore()
 
     await syncLegacyChannelSelfOverrideDeleteForDevice(createContext(store) as any, createDeviceClient('invalid') as any, 'com.test.app', 'DEVICE-ID')
+
+    expect(store.delete).toHaveBeenCalledWith('channel_self:v1:com.test.app:device-id')
+  })
+
+  it.concurrent('deletes channel_self KV for injected placeholder devices', async () => {
+    const store = createStore()
+
+    await syncLegacyChannelSelfOverrideDeleteForDevice(createContext(store) as any, createDeviceClient('0.0.0') as any, 'com.test.app', 'DEVICE-ID')
 
     expect(store.delete).toHaveBeenCalledWith('channel_self:v1:com.test.app:device-id')
   })
