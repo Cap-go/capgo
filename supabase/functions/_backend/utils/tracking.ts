@@ -21,6 +21,8 @@ export interface BentoTrackingPayload {
   once?: boolean
   preferenceKey: import('./org_email_notifications.ts').EmailPreferenceKey
   uniqId: string
+  /** Which org members receive the email. Defaults to 'admins'; use 'billing' for payment/subscription events. */
+  audience?: import('./org_email_notifications.ts').NotificationAudience
 }
 
 export interface SendEventToTrackingPayload extends TrackOptions {
@@ -115,6 +117,7 @@ async function executeBentoTracking(c: Context, payload: SendEventToTrackingPayl
           orgId,
           bento.uniqId,
           getDrizzleClient(pgClient),
+          bento.audience,
         )
       }
       else {
@@ -127,6 +130,7 @@ async function executeBentoTracking(c: Context, payload: SendEventToTrackingPayl
           bento.uniqId,
           bento.cron ?? '* * * * *',
           getDrizzleClient(pgClient),
+          bento.audience,
         )
       }
     }

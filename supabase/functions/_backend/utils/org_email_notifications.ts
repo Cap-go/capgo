@@ -97,6 +97,18 @@ export interface EmailPreferences {
   bundle_incompatible?: boolean
 }
 
+/**
+ * Which org members receive a notification.
+ * - 'admins': org_admin + org_super_admin (org management + usage-credit data; the default).
+ * - 'billing': org_super_admin + org_billing_admin (billing/payment actions; the org.update_billing holders).
+ */
+export type NotificationAudience = 'admins' | 'billing'
+
+const AUDIENCE_ROLE_NAMES: Record<NotificationAudience, string[]> = {
+  admins: ['org_admin', 'org_super_admin'],
+  billing: ['org_super_admin', 'org_billing_admin'],
+}
+
 interface OrgWithPreferences {
   management_email: string
   email_preferences?: EmailPreferences | null
@@ -177,14 +189,9 @@ async function getEligibleOrgMemberEmails(
   orgId: string,
   preferenceKey: EmailPreferenceKey,
   drizzle: ReturnType<typeof getDrizzleClient>,
+  audience: NotificationAudience = 'admins',
 ): Promise<EligibleOrgMemberEmailsResult> {
-  // Billing/payment notifications (the `credit_usage` category: invoice upcoming, card,
-  // plan change, cancellation) are only actionable by members who can manage billing, so
-  // target the billing roles. This keeps them away from org_admins who can't change billing
-  // and delivers them to org_billing_admins who can.
-  const adminRoleNames = preferenceKey === 'credit_usage'
-    ? ['org_super_admin', 'org_billing_admin']
-    : ['org_admin', 'org_super_admin']
+  const adminRoleNames = AUDIENCE_ROLE_NAMES[audience]
   const now = new Date()
   let resolutionFailed = false
   const userIds = new Set<string>()
@@ -337,6 +344,7 @@ async function getAllEligibleEmails(
   orgId: string,
   preferenceKey: EmailPreferenceKey,
   drizzleClient: ReturnType<typeof getDrizzleClient>,
+  audience: NotificationAudience = 'admins',
 ): Promise<{ adminEmails: string[], managementEmail: string | null, org: OrgWithPreferences | null, resolutionFailed: boolean }> {
   // Get org info
   const org = await getOrgInfoWithClient(c, orgId, drizzleClient)
@@ -345,7 +353,7 @@ async function getAllEligibleEmails(
   }
 
   // Get eligible admin emails
-  const { emails: adminEmails, resolutionFailed } = await getEligibleOrgMemberEmails(c, orgId, preferenceKey, drizzleClient)
+  const { emails: adminEmails, resolutionFailed } = await getEligibleOrgMemberEmails(c, orgId, preferenceKey, drizzleClient, audience)
 
   // Check if management_email should receive the notification:
   // 1. Must be different from all admin emails
@@ -386,8 +394,9 @@ async function getPreparedEligibleEmailTargets(
   orgId: string,
   preferenceKey: EmailPreferenceKey,
   drizzleClient: ReturnType<typeof getDrizzleClient>,
+  audience: NotificationAudience = 'admins',
 ): Promise<PreparedEligibleEmailTargetsResult> {
-  const { adminEmails, managementEmail, org, resolutionFailed } = await getAllEligibleEmails(c, orgId, preferenceKey, drizzleClient)
+  const { adminEmails, managementEmail, org, resolutionFailed } = await getAllEligibleEmails(c, orgId, preferenceKey, drizzleClient, audience)
   if (!org)
     return { recipients: null, resolutionFailed }
 
@@ -499,13 +508,14 @@ export async function sendNotifToOrgMembers(
   uniqId: string,
   cron: string,
   drizzleClient: ReturnType<typeof getDrizzleClient>,
+  audience: NotificationAudience = 'admins',
 ): Promise<boolean | { sent: false, lastSendAt: string }> {
   // If Bento isn't configured, sending is impossible; skip DB work entirely.
   if (!isBentoConfigured(c))
     return false
 
   // Get all eligible emails (includes org info)
-  const { recipients } = await getPreparedEligibleEmailTargets(c, orgId, preferenceKey, drizzleClient)
+  const { recipients } = await getPreparedEligibleEmailTargets(c, orgId, preferenceKey, drizzleClient, audience)
   if (!recipients) {
     cloudlog({ requestId: c.get('requestId'), message: 'sendNotifToOrgMembers: org not found', orgId })
     return false
@@ -564,6 +574,7 @@ export async function sendNotifToOrgMembersOnce(
   orgId: string,
   uniqId: string,
   drizzleClient: ReturnType<typeof getDrizzleClient>,
+  audience: NotificationAudience = 'admins',
 ): Promise<boolean> {
   if (!isBentoConfigured(c))
     return false
@@ -593,7 +604,7 @@ export async function sendNotifToOrgMembersOnce(
     return false
   }
 
-  const { recipients, resolutionFailed } = await getPreparedEligibleEmailTargets(c, orgId, preferenceKey, writeClient)
+  const { recipients, resolutionFailed } = await getPreparedEligibleEmailTargets(c, orgId, preferenceKey, writeClient, audience)
   if (!recipients) {
     cloudlog({ requestId: c.get('requestId'), message: 'sendNotifToOrgMembersOnce: org not found', orgId })
     return false
@@ -713,6 +724,7 @@ export async function sendNotifToOrgMembersCached(
   uniqId: string,
   cron: string,
   drizzleClient: ReturnType<typeof getDrizzleClient>,
+  audience: NotificationAudience = 'admins',
 ): Promise<boolean> {
   // Check cache first - if we recently checked and it wasn't sendable, skip DB query
   const cachedSendable = await getOrgMembersNotifCacheStatus(c, orgId, eventName, uniqId)
@@ -722,7 +734,7 @@ export async function sendNotifToOrgMembersCached(
   }
 
   // Cache miss, call the actual function
-  const result = await sendNotifToOrgMembers(c, eventName, preferenceKey, eventData, orgId, uniqId, cron, drizzleClient)
+  const result = await sendNotifToOrgMembers(c, eventName, preferenceKey, eventData, orgId, uniqId, cron, drizzleClient, audience)
 
   // Handle the "not sendable" case with lastSendAt for proper TTL calculation
   if (typeof result === 'object' && result.sent === false && result.lastSendAt) {
