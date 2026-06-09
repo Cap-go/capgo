@@ -10,6 +10,14 @@
 
 **Spec:** `docs/superpowers/specs/2026-06-06-keychain-helper-precompile-design.md`
 
+> **AMENDMENT (implemented):** the helper now ships inside a hidden `Capgo.app`
+> bundle (`LSUIElement`), not a bare `helper` binary. Tasks below that say
+> `files: ["helper"]`, copy/resolve a bare `helper`, or sign a bare binary now
+> operate on `Capgo.app` (inner exec `Contents/MacOS/capgo`); `build.sh` takes a
+> version arg and bakes Info.plist; signing also staples. The branded "Capgo"
+> Keychain prompt + icon is the payoff. See `cli-helper/README.md` and the spec
+> amendment for the current shape.
+
 **⚠️ Sequencing constraint:** Task 9 (adding `optionalDependencies` to `cli/package.json`) MUST NOT merge to main until helper 1.0.0 is live on npm (Task 13). Otherwise `bun install --frozen-lockfile` in every CI job fails resolving the not-yet-published packages. Tasks 1–8 and 10–11 are safe to merge any time (the helper workflow only runs on manual `workflow_dispatch`, never automatically). The CLI release (Task 13) comes last.
 
 **⚠️ User input needed during execution:**

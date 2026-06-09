@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { Buffer } from 'node:buffer'
 import { createHash } from 'node:crypto'
-import { chmodSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
@@ -449,9 +449,13 @@ t('helperSignatureRequirement pins Developer ID + team', () => {
 
 // ─── resolveHelperBinary ──────────────────────────────────────────────
 
+// Builds a fake package dir containing a Capgo.app/Contents/MacOS/capgo bundle.
+// `bin` is the inner executable path resolveHelperBinary returns.
 function makeFakeHelper() {
   const dir = mkdtempSync(join(tmpdir(), 'capgo-helper-test-'))
-  const bin = join(dir, 'helper')
+  const macosDir = join(dir, 'Capgo.app', 'Contents', 'MacOS')
+  mkdirSync(macosDir, { recursive: true })
+  const bin = join(macosDir, 'capgo')
   writeFileSync(bin, '#!/bin/sh\nexit 0\n')
   chmodSync(bin, 0o755)
   return { dir, bin }
@@ -515,7 +519,7 @@ await tAsync('resolveHelperBinary errors when resolved binary file is missing', 
         resolve: () => join(dir, 'package.json'),
         codesignRunner: okCodesign,
       }),
-      /not installed|missing its binary/s,
+      /not installed|bundle is missing or not executable/s,
     )
   }
   finally {

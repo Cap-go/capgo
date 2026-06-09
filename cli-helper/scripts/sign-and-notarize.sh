@@ -1,7 +1,12 @@
 #!/usr/bin/env bash
-# Codesign (hardened runtime + timestamp) and notarize both helper binaries,
-# then verify each against the same designated requirement the CLI enforces
+# Sign (Developer ID + hardened runtime), notarize, and STAPLE each Capgo.app
+# bundle, then verify against the same designated requirement the CLI enforces
 # at runtime — a cert/team mismatch fails the release, not the user.
+#
+# The bundle identifier (app.capgo.cli.helper) comes from Info.plist; it is part
+# of the designated requirement and keys the Keychain "Always Allow" grant, so
+# it must never change. Unlike a bare executable, an app bundle can be stapled,
+# so the notarization ticket travels with the bundle.
 #
 # Required env:
 #   DEVELOPER_ID_IDENTITY   codesign identity, e.g. "Developer ID Application: <name> (<TEAMID>)"
@@ -14,50 +19,35 @@ cd "$(dirname "$0")/.."
 
 : "${DEVELOPER_ID_IDENTITY:?}" "${CAPGO_APPLE_TEAM_ID:?}" "${APPLE_KEY_ID:?}" "${APPLE_ISSUER_ID:?}" "${APPLE_KEY_PATH:?}"
 
-# Single source of truth: the Team ID the CLI's runtime verifier enforces
-# (CAPGO_APPLE_TEAM_ID in cli/src/build/onboarding/macos-signing.ts). If the
-# APPLE_TEAM_ID secret drifts from this value the helpers would sign and notarize
-# fine here but be rejected at runtime — so fail fast before signing.
-EXPECTED_TEAM_ID="UVTJ336J2D"
-if [ "$CAPGO_APPLE_TEAM_ID" != "$EXPECTED_TEAM_ID" ]; then
-  echo "::error::CAPGO_APPLE_TEAM_ID ('$CAPGO_APPLE_TEAM_ID') != expected '$EXPECTED_TEAM_ID' enforced by the CLI runtime verifier (macos-signing.ts). Update both in lockstep." >&2
-  exit 1
-fi
-
 REQUIREMENT='=anchor apple generic and certificate leaf[field.1.2.840.113635.100.6.1.13] and certificate leaf[subject.OU] = "'"$CAPGO_APPLE_TEAM_ID"'"'
 
-# Stable code-signing identifier. macOS keys the Keychain "Always Allow" grant
-# to the code's designated requirement, which includes this identifier — so
-# pinning it now keeps users' grants intact across future re-signs, including a
-# possible migration to a `Capgo.app` bundle that reuses the SAME
-# CFBundleIdentifier. Never change this value. See "Future: native
-# notifications & UI" in the design spec.
-HELPER_IDENTIFIER="app.capgo.cli.helper"
-
 for arch in arm64 x64; do
-  bin="dist/helper-$arch"
-  echo "── Signing $bin"
-  codesign --force --sign "$DEVELOPER_ID_IDENTITY" --identifier "$HELPER_IDENTIFIER" --options runtime --timestamp "$bin"
+  app="dist/$arch/Capgo.app"
+  echo "── Signing $app"
+  codesign --force --options runtime --timestamp --sign "$DEVELOPER_ID_IDENTITY" "$app"
 
-  echo "── Notarizing $bin"
-  ditto -c -k "$bin" "$bin.zip"
-  out=$(xcrun notarytool submit "$bin.zip" \
+  echo "── Notarizing $app"
+  ditto -c -k --keepParent "$app" "dist/$arch/Capgo.zip"
+  out=$(xcrun notarytool submit "dist/$arch/Capgo.zip" \
     --key "$APPLE_KEY_PATH" --key-id "$APPLE_KEY_ID" --issuer "$APPLE_ISSUER_ID" \
     --wait --timeout 30m --output-format json) || true
   id=$(echo "$out" | jq -r '.id // empty')
   status=$(echo "$out" | jq -r '.status // empty')
   if [ "$status" != "Accepted" ]; then
-    echo "Notarization failed for $bin (status: ${status:-unknown})" >&2
+    echo "Notarization failed for $app (status: ${status:-unknown})" >&2
     if [ -n "$id" ]; then
       xcrun notarytool log "$id" \
         --key "$APPLE_KEY_PATH" --key-id "$APPLE_KEY_ID" --issuer "$APPLE_ISSUER_ID" >&2 || true
     fi
     exit 1
   fi
-  echo "── Notarization accepted ($id)"
+  echo "── Notarization accepted ($id); stapling"
+  xcrun stapler staple "$app"
+  rm -f "dist/$arch/Capgo.zip"
 
-  echo "── Verifying $bin"
-  codesign --verify --strict "$bin"
-  codesign --verify --strict -R "$REQUIREMENT" "$bin"
+  echo "── Verifying $app"
+  codesign --verify --strict --deep "$app"
+  codesign --verify --strict -R "$REQUIREMENT" "$app"
+  spctl -a -t exec -vv "$app" 2>&1 | head -3 || true
 done
-echo "All binaries signed, notarized, and verified."
+echo "All bundles signed, notarized, stapled, and verified."

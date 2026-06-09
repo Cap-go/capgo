@@ -425,19 +425,24 @@ export async function resolveHelperBinary(options: ResolveHelperBinaryOptions = 
     )
   }
 
-  const binaryPath = join(dirname(packageJsonPath), 'helper')
+  // The package ships a signed `Capgo.app` bundle (a directory). We verify the
+  // bundle's code signature, then run the executable inside it. The bundle —
+  // not a bare binary — is what gives the macOS Keychain prompts the "Capgo"
+  // name + icon and keys the "Always Allow" grant to CFBundleIdentifier.
+  const bundlePath = join(dirname(packageJsonPath), 'Capgo.app')
+  const execPath = join(bundlePath, 'Contents', 'MacOS', 'capgo')
   try {
-    accessSync(binaryPath, constants.X_OK)
+    accessSync(execPath, constants.X_OK)
   }
   catch {
     throw new MacOSSigningError(
-      `The keychain helper package (${packageName}) is installed but missing its binary `
-      + `(or it is not executable) at ${binaryPath}. Reinstall ${packageName}.`,
+      `The keychain helper package (${packageName}) is installed but its Capgo.app `
+      + `bundle is missing or not executable at ${execPath}. Reinstall ${packageName}.`,
     )
   }
 
-  await verifyHelperSignature(binaryPath, packageName, options.codesignRunner ?? defaultCodesignRunner)
-  return binaryPath
+  await verifyHelperSignature(bundlePath, packageName, options.codesignRunner ?? defaultCodesignRunner)
+  return execPath
 }
 
 /**

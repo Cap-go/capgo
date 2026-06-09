@@ -25,6 +25,18 @@ macOS-only npm packages, resolved and signature-verified at runtime by the
 CLI. The runtime swiftc compilation path is **removed entirely** — the CLI
 either runs a verified Capgo-signed binary or fails with clear guidance.
 
+> **AMENDMENT (implemented after design):** the helper now ships **inside a
+> hidden `Capgo.app` bundle** (`LSUIElement` agent — no Dock icon), not as a
+> bare `helper` binary. Everywhere this spec says "the binary", read "the
+> bundle's inner executable at `Capgo.app/Contents/MacOS/capgo`"; the package
+> `files` is `["Capgo.app"]`; runtime resolution returns that inner exec after
+> verifying the **bundle's** code signature; CI signs + notarizes + **staples**
+> the bundle. The win: macOS Keychain prompts during export show the **Capgo
+> name + icon** (signed bundles only), and `CFBundleIdentifier =
+> app.capgo.cli.helper` keys the "Always Allow" grant. This realizes the
+> bundle-packaging half of "Future: native notifications & UI" below; only the
+> notification/window *code* remains future. See `cli-helper/README.md`.
+
 ## Decisions (settled during brainstorming)
 
 | Decision | Choice |
