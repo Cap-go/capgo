@@ -4,15 +4,13 @@ const checkPermissionMock = vi.fn()
 const isValidAppIdMock = vi.fn()
 const supabaseApikeyMock = vi.fn()
 const supabaseWithAuthMock = vi.fn()
-const shouldSyncChannelSelfOverrideForPluginVersionMock = vi.fn()
-const syncChannelSelfOverrideDeleteMock = vi.fn()
-const syncChannelSelfOverrideMock = vi.fn()
+const syncLegacyChannelSelfOverrideDeleteForDeviceMock = vi.fn()
+const syncLegacyChannelSelfOverrideForDeviceMock = vi.fn()
 const updateOrCreateChannelDeviceMock = vi.fn()
 
 vi.mock('../supabase/functions/_backend/utils/channelSelfStore.ts', () => ({
-  shouldSyncChannelSelfOverrideForPluginVersion: shouldSyncChannelSelfOverrideForPluginVersionMock,
-  syncChannelSelfOverride: syncChannelSelfOverrideMock,
-  syncChannelSelfOverrideDelete: syncChannelSelfOverrideDeleteMock,
+  syncLegacyChannelSelfOverrideDeleteForDevice: syncLegacyChannelSelfOverrideDeleteForDeviceMock,
+  syncLegacyChannelSelfOverrideForDevice: syncLegacyChannelSelfOverrideForDeviceMock,
 }))
 
 vi.mock('../supabase/functions/_backend/utils/hono.ts', () => ({
@@ -162,13 +160,12 @@ describe('channel device override KV sync', () => {
     checkPermissionMock.mockResolvedValue(true)
     isValidAppIdMock.mockReturnValue(true)
     supabaseApikeyMock.mockReturnValue(createPublicApiSupabase())
-    shouldSyncChannelSelfOverrideForPluginVersionMock.mockImplementation((pluginVersion: string | null | undefined) => pluginVersion === '7.33.0')
-    syncChannelSelfOverrideMock.mockResolvedValue(true)
-    syncChannelSelfOverrideDeleteMock.mockResolvedValue(true)
+    syncLegacyChannelSelfOverrideForDeviceMock.mockResolvedValue(true)
+    syncLegacyChannelSelfOverrideDeleteForDeviceMock.mockResolvedValue(true)
     updateOrCreateChannelDeviceMock.mockResolvedValue({ error: null })
   })
 
-  it('mirrors public device API channel override writes into channel_self KV', async () => {
+  it('syncs public device API channel override writes through the legacy channel_self helper', async () => {
     const { post } = await import('../supabase/functions/_backend/public/device/post.ts')
     const c = createContext()
 
@@ -184,31 +181,15 @@ describe('channel device override KV sync', () => {
       device_id: '11111111-1111-4111-8111-111111111111',
       owner_org: 'org-test',
     }))
-    expect(syncChannelSelfOverrideMock).toHaveBeenCalledWith(expect.anything(), {
+    expect(syncLegacyChannelSelfOverrideForDeviceMock).toHaveBeenCalledWith(expect.anything(), expect.anything(), {
       app_id: 'com.test.app',
       channel_id: 42,
       device_id: '11111111-1111-4111-8111-111111111111',
-      plugin_version: '7.33.0',
     })
   })
 
-  it('does not mirror public device API channel override writes for new plugin devices', async () => {
-    supabaseApikeyMock.mockReturnValue(createPublicApiSupabase('7.34.0'))
-    const { post } = await import('../supabase/functions/_backend/public/device/post.ts')
-    const c = createContext()
-
-    await post(c as any, {
-      app_id: 'com.test.app',
-      channel: 'beta',
-      device_id: '11111111-1111-4111-8111-111111111111',
-    }, { key: 'capg-key' } as any)
-
-    expect(shouldSyncChannelSelfOverrideForPluginVersionMock).toHaveBeenCalledWith('7.34.0')
-    expect(syncChannelSelfOverrideMock).not.toHaveBeenCalled()
-  })
-
   it('fails public device API channel override writes when KV sync fails', async () => {
-    syncChannelSelfOverrideMock.mockResolvedValue(false)
+    syncLegacyChannelSelfOverrideForDeviceMock.mockResolvedValue(false)
     const { post } = await import('../supabase/functions/_backend/public/device/post.ts')
     const c = createContext()
 
@@ -219,7 +200,7 @@ describe('channel device override KV sync', () => {
     }, { key: 'capg-key' } as any)).rejects.toThrow('Error syncing channel override store')
   })
 
-  it('mirrors public device API channel override deletes into channel_self KV', async () => {
+  it('syncs public device API channel override deletes through the legacy channel_self helper', async () => {
     const { deleteOverride } = await import('../supabase/functions/_backend/public/device/delete.ts')
     const c = createContext()
 
@@ -228,30 +209,16 @@ describe('channel device override KV sync', () => {
       device_id: '11111111-1111-4111-8111-111111111111',
     }, { key: 'capg-key' } as any)
 
-    expect(syncChannelSelfOverrideDeleteMock).toHaveBeenCalledWith(
+    expect(syncLegacyChannelSelfOverrideDeleteForDeviceMock).toHaveBeenCalledWith(
+      expect.anything(),
       expect.anything(),
       'com.test.app',
       '11111111-1111-4111-8111-111111111111',
-      '7.33.0',
     )
   })
 
-  it('does not mirror public device API channel override deletes for new plugin devices', async () => {
-    supabaseApikeyMock.mockReturnValue(createPublicApiSupabase('7.34.0'))
-    const { deleteOverride } = await import('../supabase/functions/_backend/public/device/delete.ts')
-    const c = createContext()
-
-    await deleteOverride(c as any, {
-      app_id: 'com.test.app',
-      device_id: '11111111-1111-4111-8111-111111111111',
-    }, { key: 'capg-key' } as any)
-
-    expect(shouldSyncChannelSelfOverrideForPluginVersionMock).toHaveBeenCalledWith('7.34.0')
-    expect(syncChannelSelfOverrideDeleteMock).not.toHaveBeenCalled()
-  })
-
   it('fails public device API channel override deletes when KV sync fails', async () => {
-    syncChannelSelfOverrideDeleteMock.mockResolvedValue(false)
+    syncLegacyChannelSelfOverrideDeleteForDeviceMock.mockResolvedValue(false)
     const { deleteOverride } = await import('../supabase/functions/_backend/public/device/delete.ts')
     const c = createContext()
 
@@ -261,7 +228,7 @@ describe('channel device override KV sync', () => {
     }, { key: 'capg-key' } as any)).rejects.toThrow('Error syncing channel override store')
   })
 
-  it('mirrors dashboard channel override writes into channel_self KV', async () => {
+  it('syncs dashboard channel override writes through the legacy channel_self helper', async () => {
     const privateSupabase = createPrivateSupabase()
     supabaseWithAuthMock.mockReturnValue(privateSupabase.client)
     const { setChannelDeviceOverride } = await import('../supabase/functions/_backend/private/channel_device.ts')
@@ -279,35 +246,18 @@ describe('channel device override KV sync', () => {
       device_id: '11111111-1111-4111-8111-111111111111',
       owner_org: 'org-test',
     }, { onConflict: 'app_id,device_id' })
-    expect(syncChannelSelfOverrideMock).toHaveBeenCalledWith(expect.anything(), {
+    expect(syncLegacyChannelSelfOverrideForDeviceMock).toHaveBeenCalledWith(expect.anything(), expect.anything(), {
       app_id: 'com.test.app',
       channel_id: 42,
       device_id: '11111111-1111-4111-8111-111111111111',
       owner_org: 'org-test',
-      plugin_version: '7.33.0',
     })
-  })
-
-  it('does not mirror dashboard channel override writes for new plugin devices', async () => {
-    const privateSupabase = createPrivateSupabase('7.34.0')
-    supabaseWithAuthMock.mockReturnValue(privateSupabase.client)
-    const { setChannelDeviceOverride } = await import('../supabase/functions/_backend/private/channel_device.ts')
-    const c = createContext()
-
-    await setChannelDeviceOverride(c as any, {
-      app_id: 'com.test.app',
-      channel_id: 42,
-      device_id: '11111111-1111-4111-8111-111111111111',
-    })
-
-    expect(shouldSyncChannelSelfOverrideForPluginVersionMock).toHaveBeenCalledWith('7.34.0')
-    expect(syncChannelSelfOverrideMock).not.toHaveBeenCalled()
   })
 
   it('fails dashboard channel override writes when KV sync fails', async () => {
     const privateSupabase = createPrivateSupabase()
     supabaseWithAuthMock.mockReturnValue(privateSupabase.client)
-    syncChannelSelfOverrideMock.mockResolvedValue(false)
+    syncLegacyChannelSelfOverrideForDeviceMock.mockResolvedValue(false)
     const { setChannelDeviceOverride } = await import('../supabase/functions/_backend/private/channel_device.ts')
     const c = createContext()
 
@@ -318,7 +268,7 @@ describe('channel device override KV sync', () => {
     })).rejects.toThrow('Error syncing channel override store')
   })
 
-  it('mirrors dashboard channel override deletes into channel_self KV', async () => {
+  it('syncs dashboard channel override deletes through the legacy channel_self helper', async () => {
     const privateSupabase = createPrivateSupabase()
     supabaseWithAuthMock.mockReturnValue(privateSupabase.client)
     const { deleteChannelDeviceOverride } = await import('../supabase/functions/_backend/private/channel_device.ts')
@@ -329,33 +279,18 @@ describe('channel device override KV sync', () => {
       device_id: '11111111-1111-4111-8111-111111111111',
     })
 
-    expect(syncChannelSelfOverrideDeleteMock).toHaveBeenCalledWith(
+    expect(syncLegacyChannelSelfOverrideDeleteForDeviceMock).toHaveBeenCalledWith(
+      expect.anything(),
       expect.anything(),
       'com.test.app',
       '11111111-1111-4111-8111-111111111111',
-      '7.33.0',
     )
-  })
-
-  it('does not mirror dashboard channel override deletes for new plugin devices', async () => {
-    const privateSupabase = createPrivateSupabase('7.34.0')
-    supabaseWithAuthMock.mockReturnValue(privateSupabase.client)
-    const { deleteChannelDeviceOverride } = await import('../supabase/functions/_backend/private/channel_device.ts')
-    const c = createContext()
-
-    await deleteChannelDeviceOverride(c as any, {
-      app_id: 'com.test.app',
-      device_id: '11111111-1111-4111-8111-111111111111',
-    })
-
-    expect(shouldSyncChannelSelfOverrideForPluginVersionMock).toHaveBeenCalledWith('7.34.0')
-    expect(syncChannelSelfOverrideDeleteMock).not.toHaveBeenCalled()
   })
 
   it('fails dashboard channel override deletes when KV sync fails', async () => {
     const privateSupabase = createPrivateSupabase()
     supabaseWithAuthMock.mockReturnValue(privateSupabase.client)
-    syncChannelSelfOverrideDeleteMock.mockResolvedValue(false)
+    syncLegacyChannelSelfOverrideDeleteForDeviceMock.mockResolvedValue(false)
     const { deleteChannelDeviceOverride } = await import('../supabase/functions/_backend/private/channel_device.ts')
     const c = createContext()
 

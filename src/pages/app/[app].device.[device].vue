@@ -260,46 +260,37 @@ function closeChannelDropdown() {
     channelDropdown.value.removeAttribute('open')
   }
 }
-async function onSelectChannel(value: string) {
-  if (!canManageDevices.value) {
-    toast.error(t('no-permission'))
-    return
-  }
 
-  // Check if selected channel is the public (default) channel
-  if (value !== 'none') {
-    const selectedChannel = channels.value.find(ch => ch.id === Number(value))
+function isPublicChannelSelection(value: string) {
+  if (value === 'none')
+    return false
+  const selectedChannel = channels.value.find(ch => ch.id === Number(value))
+  return selectedChannel?.public === true
+}
 
-    if (selectedChannel?.public === true) {
-      // If trying to set override to default channel, remove any existing override
-      if (channelDevice.value && device.value?.device_id) {
-        await delDevChannel(device.value?.device_id)
-        toast.info(t('channel-override-ignored-default'))
-        await loadData()
-      }
-      else {
-        toast.info(t('channel-override-ignored-default'))
-      }
-      closeChannelDropdown()
-      return
-    }
-  }
-
-  if (channelDevice.value && value === 'none') {
-    if (device.value?.device_id)
-      await delDevChannel(device.value?.device_id)
-    toast.success(t('unlink-channel'))
-    toast.info(t('cloud-replication-delay'))
+async function handlePublicChannelSelection() {
+  const deviceId = device.value?.device_id
+  if (channelDevice.value && deviceId) {
+    await delDevChannel(deviceId)
     await loadData()
   }
-  else if (value !== 'none') {
-    if (!device.value?.device_id) {
-      toast.error(t('channel-link-fail'))
-      return
-    }
+  toast.info(t('channel-override-ignored-default'))
+}
 
+async function unlinkDeviceChannel() {
+  const deviceId = device.value?.device_id
+  if (deviceId)
+    await delDevChannel(deviceId)
+  toast.success(t('unlink-channel'))
+  toast.info(t('cloud-replication-delay'))
+  await loadData()
+}
+
+async function linkDeviceChannel(value: string) {
+  const deviceId = device.value?.device_id
+  if (deviceId) {
     try {
-      await upsertDevChannel(device.value?.device_id, Number(value))
+      await upsertDevChannel(deviceId, Number(value))
       toast.success(t('channel-linked'))
       toast.info(t('cloud-replication-delay'))
       await loadData()
@@ -308,6 +299,26 @@ async function onSelectChannel(value: string) {
       console.error(error)
       toast.error(t('channel-link-fail'))
     }
+  }
+  else {
+    toast.error(t('channel-link-fail'))
+  }
+}
+
+async function onSelectChannel(value: string) {
+  if (!canManageDevices.value) {
+    toast.error(t('no-permission'))
+    return
+  }
+
+  if (isPublicChannelSelection(value)) {
+    await handlePublicChannelSelection()
+  }
+  else if (channelDevice.value && value === 'none') {
+    await unlinkDeviceChannel()
+  }
+  else if (value !== 'none') {
+    await linkDeviceChannel(value)
   }
   else {
     toast.error(t('channel-link-fail'))
@@ -353,8 +364,8 @@ function getCurlCommand() {
   const requestBody = transformDeviceToUpdateRequest(device.value, packageId.value, defaultChannel)
   const jsonBody = JSON.stringify(requestBody, null, 2)
 
-  return `curl -X POST '${defaultApiHost}/updates' \\
-  -H 'Content-Type: application/json' \\
+  return String.raw`curl -X POST '${defaultApiHost}/updates' \
+  -H 'Content-Type: application/json' \
   -d '${jsonBody}'`
 }
 
