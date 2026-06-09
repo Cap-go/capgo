@@ -58,7 +58,7 @@ either runs a verified Capgo-signed binary or fails with clear guidance.
 
 ### Repository layout
 
-```
+```text
 cli-helper/
 ├── src/
 │   └── helper.swift                  # moved+renamed from cli/src/build/onboarding/keychain-export.swift
@@ -137,7 +137,7 @@ model). The JSON stdout contract is unchanged.
 Before executing a package-resolved binary (step 2), the CLI verifies it was
 signed by the Capgo team using a `codesign` designated-requirement check:
 
-```
+```text
 codesign --verify --strict
   -R '=anchor apple generic
       and certificate leaf[field.1.2.840.113635.100.6.1.13]
@@ -363,11 +363,16 @@ To do:
 
 ## Future: native notifications & UI (.app bundle)
 
-Not built now (YAGNI — the helper is headless and the CLI owns the terminal
-UX). Recorded so the path is understood and the one cheap-now decision is
-captured. Today's helper ships as a bare signed executable; a later subcommand
-that needs a macOS notification or a small SwiftUI panel would graduate it to a
-`Capgo.app` bundle.
+> **STATUS:** The `Capgo.app` bundle described here is **now implemented** (see
+> the AMENDMENT under "Goal"). The helper ships *inside* the signed bundle
+> today. What remains future is only the **notification / SwiftUI window code** —
+> the bundle that would host it already exists. Read the paragraphs below as the
+> rationale for the bundle (delivered) plus the not-yet-built UI on top of it.
+
+Recorded so the path is understood and the cheap-now decisions are captured.
+The helper ships inside a signed, hidden (`LSUIElement`) `Capgo.app`; a later
+subcommand that needs a macOS notification or a small SwiftUI panel builds on
+that existing bundle.
 
 **Why a bundle is required for notifications.** `UNUserNotificationCenter`
 requires a bundle identifier; a bare executable has none and the call fails. A

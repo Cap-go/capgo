@@ -352,7 +352,7 @@ chmod +x cli-helper/scripts/build.sh
 
 Run: `bash cli-helper/scripts/build.sh`
 Expected output ends with:
-```
+```text
 dist/helper-arm64: Mach-O 64-bit executable arm64
 dist/helper-x64:   Mach-O 64-bit executable x86_64
 ```
@@ -1359,7 +1359,7 @@ cd "$(mktemp -d)" && npm init -y >/dev/null && npm i @capgo/cli
 node -e "const {execFileSync}=require('node:child_process');const p='node_modules/@capgo/cli-keychain-darwin-arm64/helper';execFileSync('/usr/bin/codesign',['--verify','--strict','-R','=anchor apple generic and certificate leaf[field.1.2.840.113635.100.6.1.13] and certificate leaf[subject.OU] = \"'+process.env.TEAM_ID+'\"',p]);console.log('signature OK')" TEAM_ID=<team id>
 ```
 
-Then run the real onboarding export flow once (`npx @capgo/cli build init` → iOS → import existing) and confirm: no "compiling helper" step, successful P12 export, two Keychain prompts max. If an Intel Mac or Rosetta terminal is available, repeat there (x64 package).
+Then run the real onboarding export flow once (`npx @capgo/cli@latest build init` → iOS → import existing) and confirm: no "compiling helper" step, successful P12 export, two Keychain prompts max. If an Intel Mac or Rosetta terminal is available, repeat there (x64 package).
 
 - [ ] **Step 5: Regression — `--no-optional` produces the guidance error**
 

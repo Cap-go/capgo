@@ -19,6 +19,18 @@ cd "$(dirname "$0")/.."
 
 : "${DEVELOPER_ID_IDENTITY:?}" "${CAPGO_APPLE_TEAM_ID:?}" "${APPLE_KEY_ID:?}" "${APPLE_ISSUER_ID:?}" "${APPLE_KEY_PATH:?}"
 
+# Single source of truth: the runtime verifier (CAPGO_APPLE_TEAM_ID in
+# cli/src/build/onboarding/macos-signing.ts) accepts ONLY this team. If the CI
+# secret drifts from it, the release would succeed but every shipped helper
+# would be rejected at runtime. Fail fast here instead. Keep in sync with
+# macos-signing.ts.
+EXPECTED_TEAM_ID="UVTJ336J2D"
+if [ "$CAPGO_APPLE_TEAM_ID" != "$EXPECTED_TEAM_ID" ]; then
+  echo "CAPGO_APPLE_TEAM_ID ($CAPGO_APPLE_TEAM_ID) != $EXPECTED_TEAM_ID expected by the CLI verifier." >&2
+  echo "Fix the APPLE_TEAM_ID secret or update macos-signing.ts; refusing to sign a helper users can't run." >&2
+  exit 1
+fi
+
 REQUIREMENT='=anchor apple generic and certificate leaf[field.1.2.840.113635.100.6.1.13] and certificate leaf[subject.OU] = "'"$CAPGO_APPLE_TEAM_ID"'"'
 
 for arch in arm64 x64; do
@@ -48,6 +60,11 @@ for arch in arm64 x64; do
   echo "── Verifying $app"
   codesign --verify --strict --deep "$app"
   codesign --verify --strict -R "$REQUIREMENT" "$app"
-  spctl -a -t exec -vv "$app" 2>&1 | head -3 || true
+  if ! spctl_out=$(spctl -a -t exec -vv "$app" 2>&1); then
+    echo "$spctl_out" | head -5 >&2
+    echo "Gatekeeper assessment (spctl) failed for $app" >&2
+    exit 1
+  fi
+  echo "$spctl_out" | head -3
 done
 echo "All bundles signed, notarized, stapled, and verified."
