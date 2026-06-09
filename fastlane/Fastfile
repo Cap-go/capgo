@@ -10,8 +10,31 @@ end
 platform :android do
   desc 'Upload Google Play screenshots'
   lane :upload_screenshots do
-    UI.user_error!(
-      'No Android fastlane screenshots are configured. Existing screenshots are iOS deliver screenshots in fastlane/screenshots. Use `bundle exec fastlane ios upload_screenshots` for App Store screenshots, or add Google Play assets under fastlane/metadata/android before running this lane.'
+    metadata_path = File.expand_path('metadata/android', __dir__)
+    screenshots_path = File.join(metadata_path, 'en-US/images/phoneScreenshots')
+    screenshots = %w[png jpg jpeg].flat_map { |extension| Dir[File.join(screenshots_path, "*.#{extension}")] }
+    UI.user_error!("No Android screenshots found in #{screenshots_path}") if screenshots.empty?
+
+    json_key = ENV['ANDROID_JSON_KEY_FILE'].to_s.strip
+    UI.user_error!('ANDROID_JSON_KEY_FILE must point to your Google Play service account JSON file') if json_key.empty?
+
+    json_key_path = File.expand_path(json_key)
+    unless File.file?(json_key_path) && File.readable?(json_key_path)
+      UI.user_error!("ANDROID_JSON_KEY_FILE does not point to a readable file: #{json_key_path}")
+    end
+
+    upload_to_play_store(
+      json_key: json_key_path,
+      package_name: ENV['DEVELOPER_PACKAGE_NAME'].to_s.empty? ? 'ee.forgr.capacitor_go' : ENV.fetch('DEVELOPER_PACKAGE_NAME'),
+      metadata_path: metadata_path,
+      skip_upload_apk: true,
+      skip_upload_aab: true,
+      skip_upload_metadata: true,
+      skip_upload_changelogs: true,
+      skip_upload_images: true,
+      skip_upload_screenshots: false,
+      sync_image_upload: true,
+      validate_only: ENV['FASTLANE_VALIDATE_ONLY'] == 'true'
     )
   end
 end
