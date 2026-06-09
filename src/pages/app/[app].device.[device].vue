@@ -17,7 +17,6 @@ import { checkPermissions } from '~/services/permissions'
 import { defaultApiHost, useSupabase } from '~/services/supabase'
 import { useAppDetailStore } from '~/stores/appDetail'
 import { useDisplayStore } from '~/stores/display'
-import { useOrganizationStore } from '~/stores/organization'
 
 interface Channel {
   version: Database['public']['Tables']['app_versions']['Row']
@@ -32,7 +31,6 @@ const packageId = ref<string>('')
 const id = ref<string>()
 const isLoading = ref(true)
 const appDetailStore = useAppDetailStore()
-const organizationStore = useOrganizationStore()
 
 const device = ref<Database['public']['Tables']['devices']['Row']>()
 const channels = ref<(Database['public']['Tables']['channels']['Row'] & Channel)[]>([])
@@ -215,26 +213,27 @@ async function loadData() {
 }
 
 async function upsertDevChannel(device: string, channelId: number) {
-  const currentGid = organizationStore.currentOrganization?.gid
-  if (!currentGid)
-    return
-  return supabase
-    .from('channel_devices')
-    .upsert({
+  const { error } = await supabase.functions.invoke('private/channel_device', {
+    body: {
       device_id: device.toLowerCase(),
       channel_id: channelId,
       app_id: packageId.value,
-      owner_org: currentGid,
-    }, { onConflict: 'app_id,device_id' })
-    .throwOnError()
+    },
+  })
+  if (error)
+    throw error
 }
 
 async function delDevChannel(device: string) {
-  return supabase
-    .from('channel_devices')
-    .delete()
-    .eq('device_id', device.toLowerCase())
-    .eq('app_id', packageId.value)
+  const { error } = await supabase.functions.invoke('private/channel_device', {
+    method: 'DELETE',
+    body: {
+      device_id: device.toLowerCase(),
+      app_id: packageId.value,
+    },
+  })
+  if (error)
+    throw error
 }
 
 function closeChannelDropdown() {
