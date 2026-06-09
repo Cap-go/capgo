@@ -192,7 +192,8 @@
       },
       "vars": {
         "ENV_NAME": "capgo_api-local"
-      }
+      },
+      "kv_namespaces": [{ "binding": "CHANNEL_SELF_STORE", "id": "00000000000000000000000000000001" }]
     }
   }
 }
