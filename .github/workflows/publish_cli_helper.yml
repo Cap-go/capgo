@@ -5,11 +5,17 @@ concurrency:
   cancel-in-progress: true
 
 on:
+  # Normal release: the deliberate button (choose the version).
   workflow_dispatch:
     inputs:
       version:
         description: "Helper version to publish, e.g. 1.0.0 (no 'cli-helper-' prefix)"
         required: true
+  # Also fires on a pushed cli-helper-X.Y.Z tag — lets you test the whole
+  # pipeline from a PR branch (tag a branch commit) without merging first.
+  push:
+    tags:
+      - "cli-helper-[0-9]*"
 
 permissions: {}
 
@@ -19,9 +25,10 @@ jobs:
     name: Build, sign, notarize, publish keychain helper
     timeout-minutes: 45
     permissions:
-      # checkout only needs read; the tag + GitHub release run through
-      # PERSONAL_ACCESS_TOKEN, not the automatic GITHUB_TOKEN.
-      contents: read
+      # The workflow creates the cli-helper-<version> tag + GitHub release with
+      # the built-in GITHUB_TOKEN. That is loop-safe: a GITHUB_TOKEN-created tag
+      # does NOT re-trigger the push:tags trigger above (a PAT-created tag would).
+      contents: write
       # required for `npm publish --provenance` (mints the OIDC token).
       id-token: write
     steps:
@@ -34,10 +41,16 @@ jobs:
         with:
           node-version: 24.x
           registry-url: https://registry.npmjs.org
-      - name: Validate + capture version
+      - name: Resolve + validate version
         id: version
         run: |
-          v="${{ github.event.inputs.version }}"
+          # Two ways in: the workflow_dispatch button (version input), or
+          # pushing a cli-helper-X.Y.Z tag (e.g. to test from a PR branch).
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            v="${{ github.event.inputs.version }}"
+          else
+            v="${GITHUB_REF_NAME#cli-helper-}"
+          fi
           if ! echo "$v" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$'; then
             echo "::error::version '$v' is not semver (e.g. 1.0.0)"; exit 1
           fi
@@ -133,4 +146,6 @@ jobs:
             cli-helper/dist/Capgo-arm64.zip
             cli-helper/dist/Capgo-x64.zip
           make_latest: false
-          token: "${{ secrets.PERSONAL_ACCESS_TOKEN }}"
+          # Built-in token (NOT a PAT): a GITHUB_TOKEN-created tag does not
+          # re-trigger this workflow's push:tags trigger, avoiding a publish loop.
+          token: "${{ github.token }}"

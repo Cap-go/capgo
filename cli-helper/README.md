@@ -58,13 +58,25 @@ bundle (`bash cli-helper/scripts/build.sh` then `codesign … Capgo.app`).
 
 ## Release
 
-1. Bump nothing in-repo — the version comes from the dispatch input.
-2. Run the workflow from the GitHub Actions UI ("Run workflow" → enter the
-   version), or: `gh workflow run publish_cli_helper.yml -f version=X.Y.Z`
-3. `.github/workflows/publish_cli_helper.yml` builds, signs, notarizes,
-   smoke-tests, publishes both packages with npm provenance, and creates the
-   `cli-helper-X.Y.Z` tag + GitHub release.
-4. Release only when `src/helper.swift` actually changed.
+The workflow has two triggers:
+
+- **Normal release** — the deliberate button: GitHub Actions UI → "Run
+  workflow" → enter the version, or `gh workflow run publish_cli_helper.yml -f
+  version=X.Y.Z`. (`workflow_dispatch` requires the workflow to be on the
+  default branch.)
+- **Test from a branch / manual release** — push a `cli-helper-X.Y.Z` tag.
+  The workflow runs the version of itself *at that tagged commit*, so you can
+  validate the whole pipeline from a PR branch without merging:
+
+      git tag cli-helper-1.0.0-rc.1            # tags your current HEAD
+      git push origin cli-helper-1.0.0-rc.1
+
+  (Use a `-rc.N` prerelease for tests — npm versions are immutable. The Apple
+  secrets below must exist for the signing steps to pass.)
+
+Either way it builds, signs, notarizes, staples, smoke-tests, publishes both
+packages with npm provenance, and creates the `cli-helper-X.Y.Z` tag + GitHub
+release. Release only when `src/helper.swift` actually changed.
 
 Required GitHub secrets: `DEVELOPER_ID_CERT_BASE64`, `DEVELOPER_ID_CERT_PASSWORD`
 (Developer ID Application cert as base64 .p12), `APPLE_TEAM_ID`, plus existing
