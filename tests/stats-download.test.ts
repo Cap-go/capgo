@@ -7,9 +7,9 @@ import { createAppVersions, fetchWithRetry, getBaseData, getSupabaseClient, getV
 
 const id = randomUUID().substring(0, 8)
 const APP_NAME_DOWNLOAD_STATS = `com.download.${id}`
+// Skip tests that expect primary database writes when running under Cloudflare Workers.
 const USE_CLOUDFLARE = env.USE_CLOUDFLARE_WORKERS === 'true'
 
-// Check if we're using Cloudflare Workers (which may serialize paths for consistency)
 interface StatsRes {
   error?: string
   message?: string

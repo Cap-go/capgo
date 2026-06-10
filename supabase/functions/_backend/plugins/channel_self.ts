@@ -37,8 +37,18 @@ async function assertChannelSelfIPRateLimit(c: Context, appId: string) {
   }
 }
 
-function recordChannelSelfIPRateLimit(c: Context, appId: string) {
-  backgroundTask(c, recordChannelSelfIPRequest(c, appId))
+async function recordChannelSelfIPRateLimitSafely(c: Context, appId: string) {
+  try {
+    await recordChannelSelfIPRequest(c, appId)
+  }
+  catch (error) {
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'Failed to record channel_self IP rate limit',
+      app_id: appId,
+      error,
+    })
+  }
 }
 
 async function recordChannelSelfRequestSafely(
@@ -613,6 +623,8 @@ async function runChannelSelfDeviceOperation(
   // Old KV-backed requests and new local-storage requests can use the read replica.
   const canUseReadReplica = isChannelSelfStoreEnabled(c) || isChannelSelfLocalChannelStorageVersion(c, bodyParsed, operationLabel)
   if (!canUseReadReplica && shouldSkipChannelSelfPostgresFallback(c)) {
+    await recordChannelSelfRequestSafely(c, bodyParsed.app_id, bodyParsed.device_id, operation, channel)
+    await recordChannelSelfIPRateLimitSafely(c, bodyParsed.app_id)
     logSkippedSupabaseWrite(c, 'channel_self channel_devices fallback')
     return simpleError200(c, 'channel_self_server_storage_unavailable', 'Server channel_self storage unavailable')
   }
@@ -625,7 +637,7 @@ async function runChannelSelfDeviceOperation(
     run,
     async () => {
       await recordChannelSelfRequestSafely(c, bodyParsed.app_id, bodyParsed.device_id, operation, channel)
-      recordChannelSelfIPRateLimit(c, bodyParsed.app_id)
+      await recordChannelSelfIPRateLimitSafely(c, bodyParsed.app_id)
     },
   )
 }
@@ -723,7 +735,7 @@ app.get('/', async (c) => {
       if (bodyRaw.device_id) {
         await recordChannelSelfRequestSafely(c, bodyParsed.app_id, bodyRaw.device_id, 'list')
       }
-      recordChannelSelfIPRateLimit(c, bodyParsed.app_id)
+      await recordChannelSelfIPRateLimitSafely(c, bodyParsed.app_id)
     },
   )
 })

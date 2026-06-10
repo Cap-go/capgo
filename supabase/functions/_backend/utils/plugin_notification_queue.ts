@@ -60,7 +60,7 @@ async function enqueuePluginNotification(c: Context, item: PluginNotificationQue
   const payload = {
     ...item,
     enqueuedAt: new Date().toISOString(),
-  } as PluginNotificationQueueItem
+  }
   const key = await buildQueueKey(item)
   await store.put(key, JSON.stringify(payload), { expirationTtl: PLUGIN_NOTIFICATION_QUEUE_TTL_SECONDS })
   cloudlog({ requestId: c.get('requestId'), message: 'Plugin notification queued', key, type: item.type, eventName: item.eventName, orgId: item.orgId })
@@ -87,25 +87,15 @@ export function queuePluginOrgNotification(
   })
 }
 
+type PluginOrgMembersNotificationQueueOptions = Omit<PluginOrgMembersNotificationQueueInput, 'type'>
+
 export function queuePluginOrgMembersNotification(
   c: Context,
-  eventName: string,
-  preferenceKey: EmailPreferenceKey,
-  eventData: Record<string, any>,
-  orgId: string,
-  uniqId: string,
-  cron: string,
-  audience: NotificationAudience,
+  options: PluginOrgMembersNotificationQueueOptions,
 ) {
   return enqueuePluginNotification(c, {
     type: 'org_members',
-    eventName,
-    preferenceKey,
-    eventData,
-    orgId,
-    uniqId,
-    cron,
-    audience,
+    ...options,
   })
 }
 

@@ -5,6 +5,8 @@ import { cloudlog, cloudlogErr, serializeError } from './logging.ts'
 import { getEnv } from './utils.ts'
 
 const PLUGIN_NOTIFICATION_FLUSH_LIMIT = 100
+const PLUGIN_NOTIFICATION_PROCESSING_PREFIX = 'plugin:notif:processing:v1:'
+const PLUGIN_NOTIFICATION_PROCESSING_TTL_SECONDS = 120
 
 export interface PluginNotificationFlushResult {
   status: 'ok'
@@ -51,6 +53,72 @@ async function postPluginNotificationBatch(c: Context, items: PluginNotification
   return false
 }
 
+function buildProcessingKey(queueKey: string) {
+  const suffix = queueKey.startsWith(PLUGIN_NOTIFICATION_QUEUE_PREFIX)
+    ? queueKey.slice(PLUGIN_NOTIFICATION_QUEUE_PREFIX.length)
+    : encodeURIComponent(queueKey)
+  return `${PLUGIN_NOTIFICATION_PROCESSING_PREFIX}${suffix}`
+}
+
+async function reserveQueueItem(store: KVNamespace, queueKey: string) {
+  const processingKey = buildProcessingKey(queueKey)
+  const existingLock = await store.get(processingKey)
+  if (existingLock)
+    return null
+
+  await store.put(processingKey, new Date().toISOString(), { expirationTtl: PLUGIN_NOTIFICATION_PROCESSING_TTL_SECONDS })
+  return processingKey
+}
+
+async function releaseProcessingKeys(store: KVNamespace, processingKeys: string[]) {
+  for (const key of processingKeys) {
+    await store.delete(key)
+  }
+}
+
+async function deleteQueueKeys(store: KVNamespace, itemKeys: string[]) {
+  let deleted = 0
+  for (const key of itemKeys) {
+    await store.delete(key)
+    deleted++
+  }
+  return deleted
+}
+
+async function releaseProcessingKeysSafely(c: Context, store: KVNamespace, processingKeys: string[]) {
+  try {
+    await releaseProcessingKeys(store, processingKeys)
+  }
+  catch (error) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Plugin notification queue lock release failed', error: serializeError(error) })
+  }
+}
+
+async function processBatch(
+  c: Context,
+  store: KVNamespace,
+  items: PluginNotificationQueueItem[],
+  itemKeys: string[],
+  processingKeys: string[],
+): Promise<{ transferred: number, deleted: number, failed: number }> {
+  try {
+    const accepted = await postPluginNotificationBatch(c, items)
+    if (!accepted) {
+      await releaseProcessingKeysSafely(c, store, processingKeys)
+      return { transferred: 0, deleted: 0, failed: items.length }
+    }
+
+    const deleted = await deleteQueueKeys(store, itemKeys)
+    await releaseProcessingKeysSafely(c, store, processingKeys)
+    return { transferred: items.length, deleted, failed: 0 }
+  }
+  catch (error) {
+    await releaseProcessingKeysSafely(c, store, processingKeys)
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Plugin notification queue transfer failed', error: serializeError(error) })
+    return { transferred: 0, deleted: 0, failed: items.length }
+  }
+}
+
 export async function flushQueuedPluginNotifications(c: Context, limit = PLUGIN_NOTIFICATION_FLUSH_LIMIT): Promise<PluginNotificationFlushResult> {
   const store = c.env.CHANNEL_SELF_STORE
   if (!store) {
@@ -78,6 +146,7 @@ export async function flushQueuedPluginNotifications(c: Context, limit = PLUGIN_
 
     const items: PluginNotificationQueueItem[] = []
     const itemKeys: string[] = []
+    const processingKeys: string[] = []
     for (const key of listed.keys) {
       scanned++
       const raw = await store.get(key.name)
@@ -94,28 +163,20 @@ export async function flushQueuedPluginNotifications(c: Context, limit = PLUGIN_
         continue
       }
 
+      const processingKey = await reserveQueueItem(store, key.name)
+      if (!processingKey)
+        continue
+
       items.push(item)
       itemKeys.push(key.name)
+      processingKeys.push(processingKey)
     }
 
     if (items.length > 0) {
-      try {
-        const accepted = await postPluginNotificationBatch(c, items)
-        if (accepted) {
-          for (const key of itemKeys) {
-            await store.delete(key)
-            deleted++
-          }
-          transferred += items.length
-        }
-        else {
-          failed += items.length
-        }
-      }
-      catch (error) {
-        failed += items.length
-        cloudlogErr({ requestId: c.get('requestId'), message: 'Plugin notification queue transfer failed', error: serializeError(error) })
-      }
+      const result = await processBatch(c, store, items, itemKeys, processingKeys)
+      transferred += result.transferred
+      deleted += result.deleted
+      failed += result.failed
     }
 
     if (listed.list_complete)

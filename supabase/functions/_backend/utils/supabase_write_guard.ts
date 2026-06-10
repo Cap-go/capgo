@@ -14,7 +14,7 @@ function getRequestId(c: Context) {
 
 function getBooleanContextFlag(c: Context, key: string): boolean {
   try {
-    return (c as Context & { get: (key: string) => unknown }).get(key) === true
+    return c.get(key as any) === true
   }
   catch {
     return false

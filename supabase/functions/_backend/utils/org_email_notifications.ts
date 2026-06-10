@@ -739,7 +739,15 @@ export async function sendNotifToOrgMembersCached(
   audience: NotificationAudience = 'admins',
 ): Promise<boolean> {
   if (shouldQueuePluginNotifications(c)) {
-    await queuePluginOrgMembersNotification(c, eventName, preferenceKey, eventData, orgId, uniqId, cron, audience)
+    await queuePluginOrgMembersNotification(c, {
+      eventName,
+      preferenceKey,
+      eventData,
+      orgId,
+      uniqId,
+      cron,
+      audience,
+    })
     return false
   }
 

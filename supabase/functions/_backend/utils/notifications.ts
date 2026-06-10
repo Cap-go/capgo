@@ -6,7 +6,7 @@ import { and, eq } from 'drizzle-orm'
 import { trackBentoEvent } from './bento.ts'
 import { CacheHelper } from './cache.ts'
 import { cloudlog } from './logging.ts'
-import { getDrizzleClient as createDrizzleClient, getPgClient, logPgError } from './pg.ts'
+import { closeClient, getDrizzleClient as createDrizzleClient, getPgClient, logPgError } from './pg.ts'
 import * as schema from './postgres_schema.ts'
 import { queuePluginOrgNotification } from './plugin_notification_queue.ts'
 import { logSkippedSupabaseWrite, shouldQueuePluginNotifications, shouldSkipSupabaseNotificationWrites } from './supabase_write_guard.ts'
@@ -257,6 +257,9 @@ export async function sendNotifOrg(
     logPgError(c, 'sendNotifOrg', e)
     return false
   }
+  finally {
+    await closeClient(c, pgClient)
+  }
 }
 
 export async function claimNotifOrgOnce(
@@ -271,8 +274,10 @@ export async function claimNotifOrgOnce(
     return false
   }
 
+  const ownedPgClient = writeClient ? undefined : getPgClient(c)
+  const effectiveWriteClient = writeClient ?? createDrizzleClient(ownedPgClient!)
+
   try {
-    const effectiveWriteClient = writeClient ?? createDrizzleClient(getPgClient(c))
     const claimed = await insertNotificationClaim(effectiveWriteClient, eventName, orgId, uniqId)
     if (!claimed) {
       cloudlog({ requestId: c.get('requestId'), message: 'notif once already claimed', event: eventName, orgId, uniqId })
@@ -282,6 +287,10 @@ export async function claimNotifOrgOnce(
   catch (e: unknown) {
     logPgError(c, 'claimNotifOrgOnce', e)
     return false
+  }
+  finally {
+    if (ownedPgClient)
+      await closeClient(c, ownedPgClient)
   }
 }
 
@@ -300,37 +309,45 @@ export async function sendNotifOrgOnce(
     return { sent: false, cleanupFailed: false }
   }
 
-  const effectiveWriteClient = writeClient ?? createDrizzleClient(getPgClient(c))
-  const claimed = await claimNotifOrgOnce(c, eventName, orgId, uniqId, effectiveWriteClient)
-  if (!claimed)
-    return { sent: false, cleanupFailed: false }
-
-  const cleanupClaim = async (): Promise<boolean> => {
-    try {
-      await deleteNotificationClaim(effectiveWriteClient, eventName, orgId, uniqId)
-      return true
-    }
-    catch (cleanupError) {
-      logPgError(c, 'sendNotifOrgOnce cleanup', cleanupError)
-      return false
-    }
-  }
+  const ownedPgClient = writeClient ? undefined : getPgClient(c)
+  const effectiveWriteClient = writeClient ?? createDrizzleClient(ownedPgClient!)
 
   try {
-    const res = await trackBentoEvent(c, recipientEmail, eventData, eventName)
-    if (!res) {
-      const cleanupSucceeded = await cleanupClaim()
-      cloudlog({ requestId: c.get('requestId'), message: 'trackEvent failed for one-time notif', eventName, email: recipientEmail, eventData })
-      return { sent: false, cleanupFailed: !cleanupSucceeded }
+    const claimed = await claimNotifOrgOnce(c, eventName, orgId, uniqId, effectiveWriteClient)
+    if (!claimed)
+      return { sent: false, cleanupFailed: false }
+
+    const cleanupClaim = async (): Promise<boolean> => {
+      try {
+        await deleteNotificationClaim(effectiveWriteClient, eventName, orgId, uniqId)
+        return true
+      }
+      catch (cleanupError) {
+        logPgError(c, 'sendNotifOrgOnce cleanup', cleanupError)
+        return false
+      }
     }
 
-    cloudlog({ requestId: c.get('requestId'), message: 'send one-time notif done', eventName, email: recipientEmail, uniqId })
-    return { sent: true, cleanupFailed: false }
+    try {
+      const res = await trackBentoEvent(c, recipientEmail, eventData, eventName)
+      if (!res) {
+        const cleanupSucceeded = await cleanupClaim()
+        cloudlog({ requestId: c.get('requestId'), message: 'trackEvent failed for one-time notif', eventName, email: recipientEmail, eventData })
+        return { sent: false, cleanupFailed: !cleanupSucceeded }
+      }
+
+      cloudlog({ requestId: c.get('requestId'), message: 'send one-time notif done', eventName, email: recipientEmail, uniqId })
+      return { sent: true, cleanupFailed: false }
+    }
+    catch (e: unknown) {
+      const cleanupSucceeded = await cleanupClaim()
+      logPgError(c, 'sendNotifOrgOnce', e)
+      return { sent: false, cleanupFailed: !cleanupSucceeded }
+    }
   }
-  catch (e: unknown) {
-    const cleanupSucceeded = await cleanupClaim()
-    logPgError(c, 'sendNotifOrgOnce', e)
-    return { sent: false, cleanupFailed: !cleanupSucceeded }
+  finally {
+    if (ownedPgClient)
+      await closeClient(c, ownedPgClient)
   }
 }
 
