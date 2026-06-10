@@ -8,11 +8,13 @@ import { toast } from 'vue-sonner'
 import IconAlertCircle from '~icons/lucide/alert-circle'
 import IconArrowRight from '~icons/lucide/arrow-right'
 import IconCheckCircle from '~icons/lucide/check-circle'
+import IconChevronRight from '~icons/lucide/chevron-right'
 import IconExternalLink from '~icons/lucide/external-link'
 import { dependencyDiffPath, groupCompatibilityEvents, platformLabel } from '~/services/compatibilityEvents'
 import { formatLocalDateTime } from '~/services/date'
+import { pushEvent } from '~/services/posthog'
 import { createSignedImageUrl } from '~/services/storage'
-import { useSupabase } from '~/services/supabase'
+import { getLocalConfig, useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
 import { useDisplayStore } from '~/stores/display'
 
@@ -53,6 +55,19 @@ const visibleGroups = computed<CompatibilityEventGroup[]>(() => {
     return groupedEvents.value.filter(group => !group.resolved)
   return groupedEvents.value
 })
+
+// Whether the app currently has any live incompatibility, which is when the
+// "what this means / how to fix it" guidance + Capgo Builder CTA are relevant.
+const hasUnresolved = computed(() => groupedEvents.value.some(group => !group.resolved))
+
+const config = getLocalConfig()
+// Capgo Builder sell deck (5-slide modal), opened from the fix-guidance CTA.
+const builderOpen = ref(false)
+
+function openBuilder() {
+  builderOpen.value = true
+  pushEvent('builder_cta_compatibility_clicked', config.supaHost, { app_id: id.value })
+}
 
 async function loadAppInfo() {
   try {
@@ -349,6 +364,66 @@ watchEffect(async () => {
               </label>
             </div>
 
+            <!-- Fix guidance + Capgo Builder CTA, shown while the app has live incompatibilities -->
+            <div
+              v-if="hasUnresolved"
+              data-test="compatibility-fix-guidance"
+              class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-4 dark:border-amber-800/60 dark:bg-amber-950/30"
+            >
+              <div class="flex items-start gap-3">
+                <IconAlertCircle class="mt-0.5 h-5 w-5 shrink-0 text-amber-500 dark:text-amber-400" />
+                <div class="min-w-0">
+                  <h2 class="text-sm font-semibold text-slate-900 dark:text-white">
+                    {{ t('compat-fix-title') }}
+                  </h2>
+                  <p class="mt-1 text-xs leading-relaxed text-slate-600 dark:text-slate-300">
+                    {{ t('compat-fix-explanation') }}
+                  </p>
+                </div>
+              </div>
+
+              <div class="mt-4">
+                <div class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                  {{ t('compat-fix-how-title') }}
+                </div>
+                <div class="mt-2 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <p class="min-w-0 text-xs leading-relaxed text-slate-600 dark:text-slate-300">
+                    {{ t('compat-fix-rebuild-detail') }}
+                  </p>
+                  <button
+                    type="button"
+                    data-test="compatibility-rebuild-cta"
+                    class="inline-flex shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-md bg-blue-500 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-300"
+                    @click="openBuilder"
+                  >
+                    {{ t('compat-fix-rebuild-cta') }} →
+                  </button>
+                </div>
+                <p class="mt-3 text-xs leading-relaxed text-slate-600 dark:text-slate-300">
+                  {{ t('compat-fix-rollback-detail') }}
+                  <button
+                    type="button"
+                    class="ml-1 font-medium text-blue-600 hover:underline dark:text-blue-400"
+                    @click="router.push(`/app/${encodeURIComponent(id)}/channels`)"
+                  >
+                    {{ t('compat-fix-manage-channels') }}
+                  </button>
+                </p>
+              </div>
+
+              <details class="group mt-4">
+                <summary class="cursor-pointer list-none text-xs font-medium text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200">
+                  <span class="inline-flex items-center gap-1">
+                    <IconChevronRight class="h-3.5 w-3.5 transition-transform group-open:rotate-90" />
+                    {{ t('compat-fix-why-title') }}
+                  </span>
+                </summary>
+                <p class="mt-2 pl-5 text-xs leading-relaxed text-slate-600 dark:text-slate-300">
+                  {{ t('compat-fix-why-detail') }}
+                </p>
+              </details>
+            </div>
+
             <!-- Empty state -->
             <div
               v-if="!isLoading && visibleGroups.length === 0"
@@ -604,6 +679,8 @@ watchEffect(async () => {
         </p>
       </div>
     </Teleport>
+
+    <BuilderPresentationModal :open="builderOpen" :app-id="id" @close="builderOpen = false" />
   </div>
 </template>
 
