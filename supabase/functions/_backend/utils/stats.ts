@@ -9,6 +9,7 @@ import { isDemoApp } from './demo.ts'
 import { simpleError200 } from './hono.ts'
 import { cloudlog } from './logging.ts'
 import { countDevicesSB, getAppsFromSB, getUpdateStatsSB, readBandwidthUsageSB, readDevicesSB, readDeviceUsageSB, readDeviceVersionCountsSB, readNativeVersionUsageSB, readStatsSB, readStatsStorageSB, readStatsVersionSB, supabaseWithAuth, trackBandwidthUsageSB, trackDevicesSB, trackDeviceUsageSB, trackLogsSB, trackMetaSB, trackVersionUsageSB } from './supabase.ts'
+import { logSkippedSupabaseWrite, shouldSkipSupabaseStatsFallback } from './supabase_write_guard.ts'
 import { DEFAULT_LIMIT } from './types.ts'
 import { backgroundTask, getEnv, isInternalVersionName } from './utils.ts'
 
@@ -16,6 +17,10 @@ export function createStatsMau(c: Context, device_id: string, app_id: string, or
   const lowerDeviceId = device_id
   const jobs: Promise<unknown>[] = []
   if (!c.env.DEVICE_USAGE) {
+    if (shouldSkipSupabaseStatsFallback(c)) {
+      logSkippedSupabaseWrite(c, 'trackDeviceUsageSB')
+      return Promise.resolve()
+    }
     jobs.push(Promise.resolve(trackDeviceUsageSB(c, lowerDeviceId, app_id, org_id, platform, version_build)))
   }
   else {
@@ -53,8 +58,13 @@ export function createStatsBandwidth(c: Context, device_id: string, app_id: stri
   cloudlog({ requestId: c.get('requestId'), message: 'createStatsBandwidth', device_id: lowerDeviceId, app_id, file_size })
   if (file_size === 0)
     return
-  if (!c.env.BANDWIDTH_USAGE)
+  if (!c.env.BANDWIDTH_USAGE) {
+    if (shouldSkipSupabaseStatsFallback(c)) {
+      logSkippedSupabaseWrite(c, 'trackBandwidthUsageSB')
+      return Promise.resolve()
+    }
     return backgroundTask(c, trackBandwidthUsageSB(c, lowerDeviceId, app_id, file_size))
+  }
   return trackBandwidthUsageCF(c, lowerDeviceId, app_id, file_size)
 }
 
@@ -62,8 +72,13 @@ export type VersionAction = 'get' | 'fail' | 'install' | 'uninstall'
 export function createStatsVersion(c: Context, version_name: string, app_id: string, action: VersionAction) {
   if (isInternalVersionName(version_name))
     return Promise.resolve()
-  if (!c.env.VERSION_USAGE)
+  if (!c.env.VERSION_USAGE) {
+    if (shouldSkipSupabaseStatsFallback(c)) {
+      logSkippedSupabaseWrite(c, 'trackVersionUsageSB')
+      return Promise.resolve()
+    }
     return backgroundTask(c, trackVersionUsageSB(c, version_name, app_id, action))
+  }
   return trackVersionUsageCF(c, version_name, app_id, action)
 }
 
@@ -89,8 +104,13 @@ export function createStatsLogsExternal(c: Context, app_id: string, device_id: s
   const finalVersionName = versionName && versionName !== '' ? versionName : 'unknown'
   const finalMetadata = normalizeStatsMetadata(metadata)
   // This is super important until every device get the version of plugin 6.2.5
-  if (!c.env.APP_LOG_EXTERNAL)
+  if (!c.env.APP_LOG_EXTERNAL) {
+    if (shouldSkipSupabaseStatsFallback(c)) {
+      logSkippedSupabaseWrite(c, 'trackLogsSB(external)')
+      return Promise.resolve()
+    }
     return backgroundTask(c, trackLogsSB(c, app_id, lowerDeviceId, action, finalVersionName, finalMetadata))
+  }
   return trackLogsCFExternal(c, app_id, lowerDeviceId, action, finalVersionName, finalMetadata)
 }
 
@@ -99,8 +119,13 @@ export function createStatsLogs(c: Context, app_id: string, device_id: string, a
   const finalVersionName = versionName && versionName !== '' ? versionName : 'unknown'
   const finalMetadata = normalizeStatsMetadata(metadata)
   // This is super important until every device get the version of plugin 6.2.5
-  if (!c.env.APP_LOG)
+  if (!c.env.APP_LOG) {
+    if (shouldSkipSupabaseStatsFallback(c)) {
+      logSkippedSupabaseWrite(c, 'trackLogsSB')
+      return Promise.resolve()
+    }
     return backgroundTask(c, trackLogsSB(c, app_id, lowerDeviceId, action, finalVersionName, finalMetadata))
+  }
   return trackLogsCF(c, app_id, lowerDeviceId, action, finalVersionName, finalMetadata)
 }
 
@@ -111,6 +136,11 @@ export function createStatsDevices(c: Context, device: DeviceWithoutCreatedAt) {
   // recorded and downstream APIs/tests will break.
   if (getRuntimeKey() === 'workerd' && c.env.DEVICE_INFO)
     return backgroundTask(c, trackDevicesCF(c, device))
+
+  if (shouldSkipSupabaseStatsFallback(c)) {
+    logSkippedSupabaseWrite(c, 'trackDevicesSB')
+    return Promise.resolve()
+  }
 
   return backgroundTask(c, trackDevicesSB(c, device))
 }
@@ -131,6 +161,10 @@ export function createStatsMeta(c: Context, app_id: string, version_id: number, 
   if (size === 0)
     return { error: 'size is 0' }
   cloudlog({ requestId: c.get('requestId'), message: 'createStatsMeta', app_id, version_id, size })
+  if (shouldSkipSupabaseStatsFallback(c)) {
+    logSkippedSupabaseWrite(c, 'trackMetaSB')
+    return { error: 'supabase_write_forbidden' }
+  }
   return trackMetaSB(c, app_id, version_id, size)
 }
 

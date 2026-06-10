@@ -62,6 +62,7 @@ import { app as on_channel_update } from '../../supabase/functions/_backend/trig
 import { app as on_deploy_history_create } from '../../supabase/functions/_backend/triggers/on_deploy_history_create.ts'
 import { app as on_manifest_create } from '../../supabase/functions/_backend/triggers/on_manifest_create.ts'
 import { app as on_org_update } from '../../supabase/functions/_backend/triggers/on_org_update.ts'
+import { app as plugin_notifications } from '../../supabase/functions/_backend/triggers/plugin_notifications.ts'
 import { app as on_organization_create } from '../../supabase/functions/_backend/triggers/on_organization_create.ts'
 import { app as on_organization_delete } from '../../supabase/functions/_backend/triggers/on_organization_delete.ts'
 import { app as on_user_create } from '../../supabase/functions/_backend/triggers/on_user_create.ts'
@@ -148,6 +149,7 @@ appTriggers.route('/on_app_create', on_app_create)
 appTriggers.route('/on_app_delete', on_app_delete)
 appTriggers.route('/on_app_update', on_app_update)
 appTriggers.route('/on_org_update', on_org_update)
+appTriggers.route('/plugin_notifications', plugin_notifications)
 appTriggers.route('/on_organization_delete', on_organization_delete)
 appTriggers.route('/on_user_create', on_user_create)
 appTriggers.route('/on_user_update', on_user_update)

@@ -1,11 +1,13 @@
 import type { Database } from '../src/types/supabase.types.ts'
 import { randomUUID } from 'node:crypto'
+import { env } from 'node:process'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { ALLOWED_STATS_ACTIONS } from '../supabase/functions/_backend/plugins/stats_actions.ts'
 import { createAppVersions, fetchWithRetry, getBaseData, getSupabaseClient, getVersionFromAction, headers, PLUGIN_BASE_URL, resetAndSeedAppData, resetAndSeedAppDataStats, resetAppData, resetAppDataStats } from './test-utils.ts'
 
 const id = randomUUID().substring(0, 8)
 const APP_NAME_DOWNLOAD_STATS = `com.download.${id}`
+const USE_CLOUDFLARE = env.USE_CLOUDFLARE_WORKERS === 'true'
 
 // Check if we're using Cloudflare Workers (which may serialize paths for consistency)
 interface StatsRes {
@@ -29,6 +31,41 @@ async function postStats(data: object) {
   return response
 }
 
+async function expectNoPrimaryDownloadStatsRows(deviceId: string) {
+  const { count: deviceCount, error: deviceError } = await getSupabaseClient()
+    .from('devices')
+    .select('*', { count: 'exact', head: true })
+    .eq('app_id', APP_NAME_DOWNLOAD_STATS)
+    .eq('device_id', deviceId)
+  expect(deviceError).toBeNull()
+  expect(deviceCount).toBe(0)
+
+  const { count: statsCount, error: statsError } = await getSupabaseClient()
+    .from('stats')
+    .select('*', { count: 'exact', head: true })
+    .eq('app_id', APP_NAME_DOWNLOAD_STATS)
+    .eq('device_id', deviceId)
+  expect(statsError).toBeNull()
+  expect(statsCount).toBe(0)
+}
+
+describe.skipIf(!USE_CLOUDFLARE)('download Stats Actions Cloudflare write guard', () => {
+  it('accepts composite download stats without primary device or stats writes', async () => {
+    const uuid = randomUUID().toLowerCase()
+    const baseData = getBaseData(APP_NAME_DOWNLOAD_STATS) as StatsPayload
+    baseData.device_id = uuid
+    baseData.action = 'download_manifest_file_fail'
+    baseData.version_build = getVersionFromAction('download_manifest_file_fail')
+    const version = await createAppVersions(baseData.version_build, APP_NAME_DOWNLOAD_STATS)
+    baseData.version_name = `${version.name}:main.js`
+
+    const response = await postStats(baseData)
+    expect(response.status).toBe(200)
+    expect(await response.json<StatsRes>()).toEqual({ status: 'ok' })
+    await expectNoPrimaryDownloadStatsRows(uuid)
+  })
+})
+
 beforeAll(async () => {
   await resetAndSeedAppData(APP_NAME_DOWNLOAD_STATS)
   await resetAndSeedAppDataStats(APP_NAME_DOWNLOAD_STATS)
@@ -39,7 +76,7 @@ afterAll(async () => {
   await resetAppDataStats(APP_NAME_DOWNLOAD_STATS)
 })
 
-describe('download Stats Actions', () => {
+describe.skipIf(USE_CLOUDFLARE)('download Stats Actions', () => {
   it('should verify test app is created properly', async () => {
     const supabase = getSupabaseClient()
     const { data, error } = await supabase

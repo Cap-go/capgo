@@ -8,6 +8,8 @@ import { CacheHelper } from './cache.ts'
 import { cloudlog } from './logging.ts'
 import { getDrizzleClient as createDrizzleClient, getPgClient, logPgError } from './pg.ts'
 import * as schema from './postgres_schema.ts'
+import { queuePluginOrgNotification } from './plugin_notification_queue.ts'
+import { logSkippedSupabaseWrite, shouldQueuePluginNotifications, shouldSkipSupabaseNotificationWrites } from './supabase_write_guard.ts'
 import { backgroundTask } from './utils.ts'
 
 interface EventData {
@@ -173,6 +175,11 @@ export async function sendNotifOrg(
   managementEmail: string,
   drizzleClient: ReturnType<typeof getDrizzleClient>,
 ) {
+  if (shouldSkipSupabaseNotificationWrites(c)) {
+    logSkippedSupabaseWrite(c, 'sendNotifOrg')
+    return false
+  }
+
   // Check if notification has already been sent (read from replica)
   const notif = await getNotification(c, drizzleClient, orgId, eventName, uniqId)
   if (notif === undefined) {
@@ -257,10 +264,16 @@ export async function claimNotifOrgOnce(
   eventName: string,
   orgId: string,
   uniqId: string,
-  writeClient = createDrizzleClient(getPgClient(c)),
+  writeClient?: ReturnType<typeof createDrizzleClient>,
 ): Promise<boolean> {
+  if (shouldSkipSupabaseNotificationWrites(c)) {
+    logSkippedSupabaseWrite(c, 'claimNotifOrgOnce')
+    return false
+  }
+
   try {
-    const claimed = await insertNotificationClaim(writeClient, eventName, orgId, uniqId)
+    const effectiveWriteClient = writeClient ?? createDrizzleClient(getPgClient(c))
+    const claimed = await insertNotificationClaim(effectiveWriteClient, eventName, orgId, uniqId)
     if (!claimed) {
       cloudlog({ requestId: c.get('requestId'), message: 'notif once already claimed', event: eventName, orgId, uniqId })
     }
@@ -280,15 +293,21 @@ export async function sendNotifOrgOnce(
   uniqId: string,
   recipientEmail: string,
   _drizzleClient: ReturnType<typeof getDrizzleClient>,
-  writeClient = createDrizzleClient(getPgClient(c)),
+  writeClient?: ReturnType<typeof createDrizzleClient>,
 ): Promise<SendNotifOrgOnceResult> {
-  const claimed = await claimNotifOrgOnce(c, eventName, orgId, uniqId, writeClient)
+  if (shouldSkipSupabaseNotificationWrites(c)) {
+    logSkippedSupabaseWrite(c, 'sendNotifOrgOnce')
+    return { sent: false, cleanupFailed: false }
+  }
+
+  const effectiveWriteClient = writeClient ?? createDrizzleClient(getPgClient(c))
+  const claimed = await claimNotifOrgOnce(c, eventName, orgId, uniqId, effectiveWriteClient)
   if (!claimed)
     return { sent: false, cleanupFailed: false }
 
   const cleanupClaim = async (): Promise<boolean> => {
     try {
-      await deleteNotificationClaim(writeClient, eventName, orgId, uniqId)
+      await deleteNotificationClaim(effectiveWriteClient, eventName, orgId, uniqId)
       return true
     }
     catch (cleanupError) {
@@ -337,6 +356,11 @@ export async function sendNotifOrgCached(
   managementEmail: string,
   drizzleClient: ReturnType<typeof getDrizzleClient>,
 ): Promise<boolean> {
+  if (shouldQueuePluginNotifications(c)) {
+    await queuePluginOrgNotification(c, eventName, eventData, orgId, uniqId, cron, managementEmail)
+    return false
+  }
+
   // Check cache first - if we recently checked and it wasn't sendable, skip DB query
   const cachedSendable = await getNotifCacheStatus(c, orgId, eventName, uniqId)
   if (cachedSendable === false) {

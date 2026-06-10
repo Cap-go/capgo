@@ -1,0 +1,124 @@
+import type { Context } from 'hono'
+import type { NotificationAudience, EmailPreferenceKey } from './org_email_notifications.ts'
+import { cloudlog, cloudlogErr, serializeError } from './logging.ts'
+
+export const PLUGIN_NOTIFICATION_QUEUE_PREFIX = 'plugin:notif:v1:'
+const PLUGIN_NOTIFICATION_QUEUE_TTL_SECONDS = 7 * 24 * 60 * 60
+
+export interface PluginOrgNotificationQueueItem {
+  type: 'org'
+  eventName: string
+  eventData: Record<string, any>
+  orgId: string
+  uniqId: string
+  cron: string
+  managementEmail: string
+  enqueuedAt: string
+}
+
+export interface PluginOrgMembersNotificationQueueItem {
+  type: 'org_members'
+  eventName: string
+  preferenceKey: EmailPreferenceKey
+  eventData: Record<string, any>
+  orgId: string
+  uniqId: string
+  cron: string
+  audience: NotificationAudience
+  enqueuedAt: string
+}
+
+export type PluginOrgNotificationQueueInput = Omit<PluginOrgNotificationQueueItem, 'enqueuedAt'>
+export type PluginOrgMembersNotificationQueueInput = Omit<PluginOrgMembersNotificationQueueItem, 'enqueuedAt'>
+export type PluginNotificationQueueItem = PluginOrgNotificationQueueItem | PluginOrgMembersNotificationQueueItem
+export type PluginNotificationQueueInput = PluginOrgNotificationQueueInput | PluginOrgMembersNotificationQueueInput
+
+function getStore(c: Context) {
+  return c.env.CHANNEL_SELF_STORE ?? null
+}
+
+async function sha256Hex(value: string) {
+  const encoded = new TextEncoder().encode(value)
+  const digest = await crypto.subtle.digest('SHA-256', encoded)
+  return Array.from(new Uint8Array(digest))
+    .map(byte => byte.toString(16).padStart(2, '0'))
+    .join('')
+}
+
+async function buildQueueKey(item: PluginNotificationQueueInput) {
+  const uniqHash = await sha256Hex(item.uniqId)
+  return `${PLUGIN_NOTIFICATION_QUEUE_PREFIX}${item.type}:${encodeURIComponent(item.orgId)}:${encodeURIComponent(item.eventName)}:${uniqHash}`
+}
+
+async function enqueuePluginNotification(c: Context, item: PluginNotificationQueueInput): Promise<boolean> {
+  const store = getStore(c)
+  if (!store) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Plugin notification KV queue missing', type: item.type, eventName: item.eventName, orgId: item.orgId })
+    return false
+  }
+
+  const payload = {
+    ...item,
+    enqueuedAt: new Date().toISOString(),
+  } as PluginNotificationQueueItem
+  const key = await buildQueueKey(item)
+  await store.put(key, JSON.stringify(payload), { expirationTtl: PLUGIN_NOTIFICATION_QUEUE_TTL_SECONDS })
+  cloudlog({ requestId: c.get('requestId'), message: 'Plugin notification queued', key, type: item.type, eventName: item.eventName, orgId: item.orgId })
+  return true
+}
+
+export function queuePluginOrgNotification(
+  c: Context,
+  eventName: string,
+  eventData: Record<string, any>,
+  orgId: string,
+  uniqId: string,
+  cron: string,
+  managementEmail: string,
+) {
+  return enqueuePluginNotification(c, {
+    type: 'org',
+    eventName,
+    eventData,
+    orgId,
+    uniqId,
+    cron,
+    managementEmail,
+  })
+}
+
+export function queuePluginOrgMembersNotification(
+  c: Context,
+  eventName: string,
+  preferenceKey: EmailPreferenceKey,
+  eventData: Record<string, any>,
+  orgId: string,
+  uniqId: string,
+  cron: string,
+  audience: NotificationAudience,
+) {
+  return enqueuePluginNotification(c, {
+    type: 'org_members',
+    eventName,
+    preferenceKey,
+    eventData,
+    orgId,
+    uniqId,
+    cron,
+    audience,
+  })
+}
+
+export function parsePluginNotificationQueueItem(c: Context, key: string, raw: string): PluginNotificationQueueItem | null {
+  try {
+    const item = JSON.parse(raw) as PluginNotificationQueueItem
+    if (item.type === 'org' && item.eventName && item.orgId && item.uniqId && item.cron && item.managementEmail)
+      return item
+    if (item.type === 'org_members' && item.eventName && item.preferenceKey && item.orgId && item.uniqId && item.cron && item.audience)
+      return item
+  }
+  catch (error) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Invalid plugin notification queue item', key, error: serializeError(error) })
+  }
+  return null
+}

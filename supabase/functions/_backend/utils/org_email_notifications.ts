@@ -7,6 +7,8 @@ import { cloudlog } from './logging.ts'
 import { claimNotifOrgOnce, hasNotifOrgClaim, sendNotifOrg, sendNotifOrgOnce } from './notifications.ts'
 import { getDrizzleClient, getPgClient, logPgError } from './pg.ts'
 import * as schema from './postgres_schema.ts'
+import { queuePluginOrgMembersNotification } from './plugin_notification_queue.ts'
+import { logSkippedSupabaseWrite, shouldQueuePluginNotifications, shouldSkipSupabaseNotificationWrites } from './supabase_write_guard.ts'
 import { backgroundTask } from './utils.ts'
 
 // Cache path for org member notifications (separate from single-email notifications)
@@ -510,6 +512,11 @@ export async function sendNotifToOrgMembers(
   drizzleClient: ReturnType<typeof getDrizzleClient>,
   audience: NotificationAudience = 'admins',
 ): Promise<boolean | { sent: false, lastSendAt: string }> {
+  if (shouldSkipSupabaseNotificationWrites(c)) {
+    logSkippedSupabaseWrite(c, 'sendNotifToOrgMembers')
+    return false
+  }
+
   // If Bento isn't configured, sending is impossible; skip DB work entirely.
   if (!isBentoConfigured(c))
     return false
@@ -576,6 +583,11 @@ export async function sendNotifToOrgMembersOnce(
   drizzleClient: ReturnType<typeof getDrizzleClient>,
   audience: NotificationAudience = 'admins',
 ): Promise<boolean> {
+  if (shouldSkipSupabaseNotificationWrites(c)) {
+    logSkippedSupabaseWrite(c, 'sendNotifToOrgMembersOnce')
+    return false
+  }
+
   if (!isBentoConfigured(c))
     return false
 
@@ -726,7 +738,12 @@ export async function sendNotifToOrgMembersCached(
   drizzleClient: ReturnType<typeof getDrizzleClient>,
   audience: NotificationAudience = 'admins',
 ): Promise<boolean> {
-  // Check cache first - if we recently checked and it wasn't sendable, skip DB query
+  if (shouldQueuePluginNotifications(c)) {
+    await queuePluginOrgMembersNotification(c, eventName, preferenceKey, eventData, orgId, uniqId, cron, audience)
+    return false
+  }
+
+  // Check cache first - if we recently checked and found it wasn't sendable, skip DB query
   const cachedSendable = await getOrgMembersNotifCacheStatus(c, orgId, eventName, uniqId)
   if (cachedSendable === false) {
     cloudlog({ requestId: c.get('requestId'), message: 'sendNotifToOrgMembers cache hit - not sendable', event: eventName, orgId, uniqId })

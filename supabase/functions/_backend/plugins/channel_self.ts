@@ -7,6 +7,7 @@ import type { Database } from '../utils/supabase.types.ts'
 import { parse } from '@std/semver'
 import { Hono } from 'hono/tiny'
 import { getAppStatus, setAppStatus } from '../utils/appStatus.ts'
+import { logSkippedSupabaseWrite, shouldSkipChannelSelfPostgresFallback } from '../utils/supabase_write_guard.ts'
 import { checkChannelSelfIPRateLimit, isChannelSelfRateLimited, recordChannelSelfIPRequest, recordChannelSelfRequest } from '../utils/channelSelfRateLimit.ts'
 import { deleteChannelSelfOverride, getChannelSelfOverride, isChannelSelfStoreEnabled, setChannelSelfOverride } from '../utils/channelSelfStore.ts'
 import { BRES, parseBody, simpleError200, simpleRateLimit } from '../utils/hono.ts'
@@ -180,6 +181,11 @@ async function deleteChannelSelfOverrideForDevice(
   if (isChannelSelfStoreEnabled(c))
     return deleteChannelSelfOverride(c, appId, deviceId)
 
+  if (shouldSkipChannelSelfPostgresFallback(c)) {
+    logSkippedSupabaseWrite(c, 'deleteChannelDevicePg fallback')
+    return false
+  }
+
   return deleteChannelDevicePg(c, appId, deviceId, drizzleClient)
 }
 
@@ -198,6 +204,11 @@ async function upsertChannelSelfOverrideForDevice(
         id: channel.id,
       },
     })
+  }
+
+  if (shouldSkipChannelSelfPostgresFallback(c)) {
+    logSkippedSupabaseWrite(c, 'upsertChannelDevicePg fallback')
+    return false
   }
 
   return upsertChannelDevicePg(c, {
@@ -600,7 +611,13 @@ async function runChannelSelfDeviceOperation(
   }
 
   // Old KV-backed requests and new local-storage requests can use the read replica.
-  const pgClient = getPgClient(c, isChannelSelfStoreEnabled(c) || isChannelSelfLocalChannelStorageVersion(c, bodyParsed, operationLabel))
+  const canUseReadReplica = isChannelSelfStoreEnabled(c) || isChannelSelfLocalChannelStorageVersion(c, bodyParsed, operationLabel)
+  if (!canUseReadReplica && shouldSkipChannelSelfPostgresFallback(c)) {
+    logSkippedSupabaseWrite(c, 'channel_self channel_devices fallback')
+    return simpleError200(c, 'channel_self_server_storage_unavailable', 'Server channel_self storage unavailable')
+  }
+
+  const pgClient = getPgClient(c, canUseReadReplica)
 
   return await runChannelSelfWithPgClient(
     c,

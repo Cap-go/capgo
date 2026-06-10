@@ -10,6 +10,9 @@
   ],
   "workers_dev": false,
   "upload_source_maps": true,
+  "triggers": {
+    "crons": ["* * * * *"]
+  },
   "env": {
     "prod_eu": {
       "name": "capgo_plugin-eu-prod",
@@ -1123,7 +1126,8 @@
       "vars": {
         "ENV_NAME": "capgo_plugin-local",
         "CAPGO_PREVENT_BACKGROUND_FUNCTIONS": "true"
-      }
+      },
+      "kv_namespaces": [{ "binding": "CHANNEL_SELF_STORE", "id": "local-channel-self-store" }]
     }
   }
 }

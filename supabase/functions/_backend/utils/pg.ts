@@ -13,6 +13,7 @@ import { getClientDbRegionSB } from './geolocation.ts'
 import { cloudlog, cloudlogErr } from './logging.ts'
 import * as schema from './postgres_schema.ts'
 import { withOptionalManifestSelect } from './queryHelpers.ts'
+import { shouldRequireReadReplica } from './supabase_write_guard.ts'
 
 const REPLICATION_LAG_THRESHOLD_SECONDS = 180
 const REPLICATION_LAG_CACHE_TTL_SECONDS = 60
@@ -295,6 +296,19 @@ function getReadOnlyDatabaseURL(c: Context, dbRegion: string | undefined): strin
   return c.env[selectedRoute.binding].connectionString
 }
 
+function isLocalWorkerEnv(c: Context): boolean {
+  return existInEnv(c, 'ENV_NAME') && getEnv(c, 'ENV_NAME').endsWith('-local')
+}
+
+function getLocalReadOnlyDatabaseURL(c: Context): string | null {
+  if (!isLocalWorkerEnv(c) || !existInEnv(c, 'LOCAL_READ_REPLICA_SUPABASE_DB_URL'))
+    return null
+
+  setDatabaseSource(c, 'local_read_replica')
+  cloudlog({ requestId: c.get('requestId'), message: 'Using LOCAL_READ_REPLICA_SUPABASE_DB_URL for read-only' })
+  return fixSupabaseHost(getEnv(c, 'LOCAL_READ_REPLICA_SUPABASE_DB_URL'))
+}
+
 export function getDatabaseURL(c: Context, readOnly = false): string {
   const dbRegion = getClientDbRegionSB(c)
 
@@ -303,6 +317,15 @@ export function getDatabaseURL(c: Context, readOnly = false): string {
     const readOnlyDatabaseURL = getReadOnlyDatabaseURL(c, dbRegion)
     if (readOnlyDatabaseURL)
       return readOnlyDatabaseURL
+
+    const localReadOnlyDatabaseURL = getLocalReadOnlyDatabaseURL(c)
+    if (localReadOnlyDatabaseURL)
+      return localReadOnlyDatabaseURL
+  }
+
+  if (readOnly && shouldRequireReadReplica(c)) {
+    cloudlog({ requestId: c.get('requestId'), message: 'Read replica is required for this endpoint' })
+    throw new Error('Read replica is required for this endpoint')
   }
 
   // Fallback to single Hyperdrive if available

@@ -231,17 +231,9 @@ app.post('/', async (c) => {
     return simpleRateLimit({ app_id: firstAppId })
   }
 
-  // When clients send a custom_id, the app-level allow flag should take effect
-  // immediately. Use a read-write (primary) connection in that case to avoid
-  // replica staleness.
-  const hasCustomId = events.some((event) => {
-    if (!event || typeof event !== 'object')
-      return false
-    const v = (event as AppStats).custom_id
-    return typeof v === 'string' && v.trim() !== ''
-  })
-
-  const pgClient = getPgClient(c, !hasCustomId)
+  // Plugin endpoints must not open a write-capable primary connection.
+  // Custom-id policy reads may lag until the replica catches up.
+  const pgClient = getPgClient(c, true)
   const drizzleClient = getDrizzleClient(pgClient!)
 
   try {
