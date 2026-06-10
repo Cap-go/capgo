@@ -108,13 +108,18 @@ function getQueueMessageTrace(functionName: string, body: Record<string, unknown
   const record = isRecord(body.record) ? body.record : {}
   const oldRecord = isRecord(body.old_record) ? body.old_record : {}
   const manifest = record.manifest
+  let manifestEntries = 0
+  if (Array.isArray(manifest))
+    manifestEntries = manifest.length
+  else if (manifest)
+    manifestEntries = 1
 
   return {
     app_id: record.app_id ?? null,
     deleted_at: record.deleted_at ?? null,
     id: record.id ?? null,
     manifest_count: record.manifest_count ?? null,
-    manifest_entries: Array.isArray(manifest) ? manifest.length : (manifest ? 1 : 0),
+    manifest_entries: manifestEntries,
     old_deleted_at: oldRecord.deleted_at ?? null,
     old_r2_path: oldRecord.r2_path ?? null,
     old_storage_provider: oldRecord.storage_provider ?? null,
