@@ -35,6 +35,12 @@ async function seedStaleCreatedByOrg() {
     .eq('id', STALE_CREATED_BY_ORG_ID)
   expect(cleanupError).toBeNull()
 
+  const { error: stripeCleanupError } = await supabase
+    .from('stripe_info')
+    .delete()
+    .eq('customer_id', `pending_${STALE_CREATED_BY_ORG_ID}`)
+  expect(stripeCleanupError).toBeNull()
+
   const { error: orgError } = await supabase
     .from('orgs')
     .insert({
