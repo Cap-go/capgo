@@ -2,7 +2,7 @@ import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { PluginNotificationQueueItem } from '../utils/plugin_notification_queue.ts'
 import { Hono } from 'hono/tiny'
-import { BRES, middlewareAPISecret, parseBody, simpleError } from '../utils/hono.ts'
+import { BRES, middlewareAPISecret, parseBody, quickError, simpleError } from '../utils/hono.ts'
 import { cloudlog, cloudlogErr, serializeError } from '../utils/logging.ts'
 import { closeClient, getDrizzleClient, getPgClient } from '../utils/pg.ts'
 import { sendNotifOrgCached } from '../utils/notifications.ts'
@@ -77,5 +77,8 @@ app.post('/', middlewareAPISecret, async (c) => {
     return c.json({ ...BRES, processed: 0, failed: 0, invalid })
 
   const result = await processPluginNotifications(c, items)
+  if (result.failed > 0) {
+    throw quickError(500, 'plugin_notification_batch_failed', 'Plugin notification batch failed', { ...result, invalid }, undefined, { alert: false })
+  }
   return c.json({ ...BRES, ...result, invalid })
 })
