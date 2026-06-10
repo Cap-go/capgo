@@ -97,6 +97,35 @@ function extractMessageBody(message: Message): Record<string, unknown> {
   return legacyBody
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === 'object' && !Array.isArray(value)
+}
+
+function getQueueMessageTrace(functionName: string, body: Record<string, unknown>): Record<string, unknown> | null {
+  if (functionName !== 'on_version_update' || body.table !== 'app_versions' || body.type !== 'UPDATE')
+    return null
+
+  const record = isRecord(body.record) ? body.record : {}
+  const oldRecord = isRecord(body.old_record) ? body.old_record : {}
+  const manifest = record.manifest
+
+  return {
+    app_id: record.app_id ?? null,
+    deleted_at: record.deleted_at ?? null,
+    id: record.id ?? null,
+    manifest_count: record.manifest_count ?? null,
+    manifest_entries: Array.isArray(manifest) ? manifest.length : (manifest ? 1 : 0),
+    old_deleted_at: oldRecord.deleted_at ?? null,
+    old_r2_path: oldRecord.r2_path ?? null,
+    old_storage_provider: oldRecord.storage_provider ?? null,
+    old_updated_at: oldRecord.updated_at ?? null,
+    r2_path: record.r2_path ?? null,
+    storage_provider: record.storage_provider ?? null,
+    updated_at: record.updated_at ?? null,
+    version_name: record.name ?? null,
+  }
+}
+
 function getActionableQueueFailures(failureDetails: FailureDetail[]): FailureDetail[] {
   return failureDetails.filter((detail) => {
     if (detail.read_count < MAX_QUEUE_READS)
@@ -321,22 +350,54 @@ async function processQueueMessage(c: Context, queueName: string, message: Messa
   const payloadSize = JSON.stringify(body).length
   const start = Date.now()
   const targetUrl = function_name === 'on_manifest_create' ? 'direct:on_manifest_create' : resolveFunctionUrl(c, function_name, function_type)
+  const trace = getQueueMessageTrace(function_name, body)
 
   try {
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: `[${queueName}] Queue message dispatching.`,
+      body_trace: trace,
+      cfId,
+      function_name,
+      function_type,
+      msgId: message.msg_id,
+      payloadSize,
+      readCount: message.read_ct,
+      targetUrl,
+    })
     const result = await dispatchQueueMessage(c, function_name, function_type, body, cfId, {
       msgId: message.msg_id,
       queueName,
       readCount: message.read_ct,
     }, targetUrl)
     const errorDetails = await extractErrorDetails(result.response)
+    const durationMs = Date.now() - start
+
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: `[${queueName}] Queue message processed.`,
+      body_trace: trace,
+      cfId,
+      durationMs,
+      errorCode: errorDetails.errorCode,
+      errorMessage: errorDetails.errorMessage,
+      function_name,
+      function_type,
+      msgId: message.msg_id,
+      payloadSize,
+      readCount: message.read_ct,
+      responseOk: result.response.status >= 200 && result.response.status < 300,
+      responseStatus: result.response.status,
+      targetUrl: result.targetUrl,
+    })
 
     return {
       httpResponse: result.response,
       errorDetails,
       cfId,
       payloadSize,
-      durationMs: Date.now() - start,
-      targetUrl,
+      durationMs,
+      targetUrl: result.targetUrl,
       ...message,
     }
   }
@@ -361,6 +422,7 @@ async function processQueueMessage(c: Context, queueName: string, message: Messa
       durationMs,
       error: serializedError,
       responseStatus: httpResponse.status,
+      body_trace: trace,
       function_name,
       function_type,
       msgId: message.msg_id,
@@ -368,6 +430,22 @@ async function processQueueMessage(c: Context, queueName: string, message: Messa
       targetUrl,
     })
     const errorDetails = await extractErrorDetails(httpResponse)
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: `[${queueName}] Queue message processed as failure response.`,
+      body_trace: trace,
+      cfId,
+      durationMs,
+      errorCode: errorDetails.errorCode,
+      errorMessage: errorDetails.errorMessage,
+      function_name,
+      function_type,
+      msgId: message.msg_id,
+      payloadSize,
+      readCount: message.read_ct,
+      responseStatus: httpResponse.status,
+      targetUrl,
+    })
 
     return {
       httpResponse,
@@ -979,6 +1057,7 @@ app.post('/sync', async (c) => {
 export const __queueConsumerTestUtils__ = {
   extractErrorDetails,
   extractMessageBody,
+  getQueueMessageTrace,
   getActionableQueueFailures,
   getCronHealthcheckStartUrl,
   getQueueBatchSize,

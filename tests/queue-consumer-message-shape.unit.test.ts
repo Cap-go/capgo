@@ -59,6 +59,51 @@ describe('queue_consumer legacy message compatibility', () => {
     expect(__queueConsumerTestUtils__.extractMessageBody(message!)).toEqual({})
   })
 
+  it.concurrent('summarizes app version update queue payloads for logs', () => {
+    expect(__queueConsumerTestUtils__.getQueueMessageTrace('on_version_update', {
+      old_record: {
+        deleted_at: null,
+        r2_path: null,
+        storage_provider: 'r2-direct',
+        updated_at: '2026-06-10T17:33:48.108Z',
+      },
+      record: {
+        app_id: 'at.pulserunning.rny',
+        deleted_at: null,
+        id: 181090948,
+        manifest: [{ file_name: 'index.html' }, { file_name: 'assets/app.js' }],
+        manifest_count: 0,
+        name: '1.7.0',
+        r2_path: 'orgs/org-id/apps/at.pulserunning.rny/1.7.0.zip',
+        storage_provider: 'r2',
+        updated_at: '2026-06-10T17:33:48.559Z',
+      },
+      table: 'app_versions',
+      type: 'UPDATE',
+    })).toEqual({
+      app_id: 'at.pulserunning.rny',
+      deleted_at: null,
+      id: 181090948,
+      manifest_count: 0,
+      manifest_entries: 2,
+      old_deleted_at: null,
+      old_r2_path: null,
+      old_storage_provider: 'r2-direct',
+      old_updated_at: '2026-06-10T17:33:48.108Z',
+      r2_path: 'orgs/org-id/apps/at.pulserunning.rny/1.7.0.zip',
+      storage_provider: 'r2',
+      updated_at: '2026-06-10T17:33:48.559Z',
+      version_name: '1.7.0',
+    })
+  })
+
+  it.concurrent('does not summarize unrelated queue payloads', () => {
+    expect(__queueConsumerTestUtils__.getQueueMessageTrace('cron_sync_sub', {
+      customerId: 'cus_1',
+      orgId: 'org-1',
+    })).toBeNull()
+  })
+
   it.concurrent('does not alert Discord while failed messages still have retries left', () => {
     expect(__queueConsumerTestUtils__.getActionableQueueFailures([
       {
