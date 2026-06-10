@@ -18,6 +18,24 @@ TO anon, authenticated
 USING (false)
 WITH CHECK (false);
 
+-- API-key traffic runs as anon through PostgREST. It must never read or
+-- delete API-key rows directly; key management goes through RBAC-gated APIs.
+DROP POLICY IF EXISTS "Deny anon select on apikeys" ON public.apikeys;
+CREATE POLICY "Deny anon select on apikeys"
+ON public.apikeys
+AS RESTRICTIVE
+FOR SELECT
+TO anon
+USING (false);
+
+DROP POLICY IF EXISTS "Deny anon delete on apikeys" ON public.apikeys;
+CREATE POLICY "Deny anon delete on apikeys"
+ON public.apikeys
+AS RESTRICTIVE
+FOR DELETE
+TO anon
+USING (false);
+
 DROP POLICY IF EXISTS "Allow insert org for user" ON public.orgs;
 
 CREATE POLICY "Allow insert org for user"

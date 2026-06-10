@@ -2,7 +2,7 @@
 -- This file tests all Row Level Security policies in the database
 BEGIN;
 
-SELECT plan(62);
+SELECT plan(64);
 
 -- Test app_versions policies
 SELECT
@@ -497,6 +497,8 @@ SELECT
         ARRAY[
             'Allow owner to delete own apikeys',
             'Allow owner to select own apikeys',
+            'Deny anon delete on apikeys',
+            'Deny anon select on apikeys',
             'Deny client update on apikeys',
             'Deny client insert on apikeys',
             'Prevent non 2FA access'
@@ -780,6 +782,32 @@ SELECT
         ),
         'RESTRICTIVE',
         'apikeys direct update deny should be restrictive'
+    );
+
+SELECT
+    is(
+        (
+            SELECT permissive
+            FROM pg_policies
+            WHERE schemaname = 'public'
+              AND tablename = 'apikeys'
+              AND policyname = 'Deny anon select on apikeys'
+        ),
+        'RESTRICTIVE',
+        'apikeys anon select deny should be restrictive'
+    );
+
+SELECT
+    is(
+        (
+            SELECT permissive
+            FROM pg_policies
+            WHERE schemaname = 'public'
+              AND tablename = 'apikeys'
+              AND policyname = 'Deny anon delete on apikeys'
+        ),
+        'RESTRICTIVE',
+        'apikeys anon delete deny should be restrictive'
     );
 
 SELECT

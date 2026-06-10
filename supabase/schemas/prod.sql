@@ -18287,6 +18287,14 @@ CREATE POLICY "Deny client update on apikeys" ON "public"."apikeys" AS RESTRICTI
 
 
 
+CREATE POLICY "Deny anon select on apikeys" ON "public"."apikeys" AS RESTRICTIVE FOR SELECT TO "anon" USING (false);
+
+
+
+CREATE POLICY "Deny anon delete on apikeys" ON "public"."apikeys" AS RESTRICTIVE FOR DELETE TO "anon" USING (false);
+
+
+
 CREATE POLICY "Deny delete for org members" ON "public"."usage_credit_consumptions" AS RESTRICTIVE FOR DELETE TO "authenticated", "anon" USING (false);
 
 
