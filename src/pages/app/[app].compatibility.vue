@@ -72,6 +72,17 @@ function openBuilder() {
   router.push(`/app/${encodeURIComponent(id.value)}/builds`)
 }
 
+// The guidance panel is collapsible and remembers the user's choice across
+// visits (default expanded; only collapsed if they hid it before).
+const guidanceCollapseKey = 'capgo-compat-guidance-collapsed'
+const guidanceOpen = ref(typeof localStorage === 'undefined' || localStorage.getItem(guidanceCollapseKey) !== '1')
+
+function toggleGuidance() {
+  guidanceOpen.value = !guidanceOpen.value
+  if (typeof localStorage !== 'undefined')
+    localStorage.setItem(guidanceCollapseKey, guidanceOpen.value ? '0' : '1')
+}
+
 async function loadAppInfo() {
   try {
     const { data: dataApp } = await supabase
@@ -371,24 +382,31 @@ watchEffect(async () => {
             <section
               v-if="hasUnresolved"
               data-test="compatibility-fix-guidance"
-              class="overflow-hidden border rounded-xl shadow-sm border-amber-200 bg-white dark:border-amber-900/50 dark:bg-slate-900"
+              class="overflow-hidden border rounded-xl border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900"
             >
-              <div class="flex items-start gap-3 px-5 py-4 border-b border-amber-100 bg-amber-50 dark:border-slate-800 dark:bg-amber-950/20">
-                <div class="flex items-center justify-center rounded-full shrink-0 h-9 w-9 bg-amber-100 text-amber-600 dark:bg-amber-900/40 dark:text-amber-300">
-                  <IconAlertCircle class="w-5 h-5" />
-                </div>
-                <div class="min-w-0">
-                  <h2 class="text-base font-semibold text-slate-900 dark:text-white">
-                    {{ t('compat-fix-title') }}
-                  </h2>
-                  <p class="mt-1 text-sm leading-relaxed text-slate-600 dark:text-slate-300">
-                    {{ t('compat-fix-explanation') }}
-                  </p>
-                </div>
-              </div>
+              <button
+                type="button"
+                data-test="compatibility-fix-guidance-toggle"
+                class="flex items-center w-full gap-3 px-5 py-4 text-left transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/40"
+                :aria-expanded="guidanceOpen"
+                @click="toggleGuidance"
+              >
+                <IconAlertCircle class="w-5 h-5 shrink-0 text-amber-500 dark:text-amber-400" />
+                <span class="flex-1 text-base font-semibold text-slate-900 dark:text-white">
+                  {{ t('compat-fix-title') }}
+                </span>
+                <IconChevronRight
+                  class="w-4 h-4 transition-transform shrink-0 text-slate-400"
+                  :class="guidanceOpen ? 'rotate-90' : ''"
+                />
+              </button>
 
-              <div class="px-5 py-4">
-                <h3 class="text-xs font-semibold tracking-wide uppercase text-slate-400 dark:text-slate-500">
+              <div v-show="guidanceOpen" class="px-5 pb-5 border-t border-slate-100 dark:border-slate-800">
+                <p class="pt-4 text-sm leading-relaxed text-slate-600 dark:text-slate-300">
+                  {{ t('compat-fix-explanation') }}
+                </p>
+
+                <h3 class="mt-4 text-xs font-semibold tracking-wide uppercase text-slate-400 dark:text-slate-500">
                   {{ t('compat-fix-how-title') }}
                 </h3>
                 <div class="grid gap-3 mt-3 sm:grid-cols-2">
