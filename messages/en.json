@@ -827,6 +827,7 @@
   "current-bundle": "Current bundle",
   "current-password": "Current Password",
   "current-version": "Current Version",
+  "currently-live-on": "Currently live on {channels}",
   "custom": "Custom",
   "custom-id": "Custom ID",
   "custom-input-field": "Custom Input Field",

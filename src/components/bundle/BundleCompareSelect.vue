@@ -48,6 +48,12 @@ const compareSearchRequestId = ref(0)
 const latestCompareRequestId = ref(0)
 let preferredCompareRequestId = 0
 
+// Map of bundle (version) id -> names of channels currently serving that bundle
+// (channels.version === bundleId). Used to badge a compare option that is live on
+// a channel, e.g. the one currently deployed on "production".
+const liveChannelsByVersion = ref<Map<number, string[]>>(new Map())
+let liveChannelsRequestId = 0
+
 const compareOptions = computed(() => {
   if (compareSearch.value.trim())
     return compareSearchResults.value
@@ -243,6 +249,62 @@ async function loadPreferredCompareVersions() {
     .filter((version): version is VersionRow => Boolean(version))
 }
 
+// Load every channel for the app and index its current bundle, so any compare
+// option can show which channel(s) it is live on. Channels per app are few, so a
+// single unfiltered fetch is cheaper than per-option lookups.
+async function loadLiveChannels() {
+  const requestId = ++liveChannelsRequestId
+  liveChannelsByVersion.value = new Map()
+  if (!props.appId)
+    return
+
+  const { data, error } = await supabase
+    .from('channels')
+    .select('name, version')
+    .eq('app_id', props.appId)
+
+  if (requestId !== liveChannelsRequestId)
+    return
+
+  if (error) {
+    console.error('Failed to load channel bindings', error)
+    return
+  }
+
+  const map = new Map<number, string[]>()
+  for (const channel of data ?? []) {
+    if (channel.version == null)
+      continue
+    const names = map.get(channel.version) ?? []
+    names.push(channel.name)
+    map.set(channel.version, names)
+  }
+  liveChannelsByVersion.value = map
+}
+
+function liveChannels(versionId: number): string[] {
+  return liveChannelsByVersion.value.get(versionId) ?? []
+}
+
+// Compact badge text: first channel name, with a "+N" suffix when a bundle is
+// live on several channels so the row stays uncluttered. The full list is in the
+// title tooltip.
+function liveBadgeLabel(versionId: number): string {
+  const names = liveChannels(versionId)
+  if (names.length === 0)
+    return ''
+  if (names.length === 1)
+    return names[0]
+  return `${names[0]} +${names.length - 1}`
+}
+
+function liveBadgeTitle(versionId: number): string {
+  const names = liveChannels(versionId)
+  if (names.length === 0)
+    return ''
+  return t('currently-live-on', { channels: names.join(', ') })
+}
+
 async function searchCompareVersions(term: string) {
   if (!props.appId || !term.trim()) {
     compareSearchResults.value = []
@@ -344,9 +406,10 @@ watch(
     if (!props.appId || !props.currentVersionId) {
       latestCompareVersions.value = []
       preferredCompareVersions.value = []
+      liveChannelsByVersion.value = new Map()
       return
     }
-    await Promise.all([loadLatestCompareVersions(), loadPreferredCompareVersions()])
+    await Promise.all([loadLatestCompareVersions(), loadPreferredCompareVersions(), loadLiveChannels()])
   },
   { immediate: true },
 )
@@ -364,8 +427,15 @@ watch(
           class="inline-flex w-full min-w-0 items-center justify-between rounded-lg border border-slate-300 bg-white px-3 py-2 text-left text-sm text-slate-700 shadow-sm transition hover:border-slate-400 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200"
           :disabled="disabled"
         >
-          <span class="truncate min-w-0">
-            {{ modelValue?.name ?? noneLabel }}
+          <span class="flex min-w-0 items-center gap-2">
+            <span class="truncate min-w-0">{{ modelValue?.name ?? noneLabel }}</span>
+            <span
+              v-if="modelValue && liveChannels(modelValue.id).length"
+              class="max-w-[10rem] shrink-0 truncate rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300"
+              :title="liveBadgeTitle(modelValue.id)"
+            >
+              {{ liveBadgeLabel(modelValue.id) }}
+            </span>
           </span>
           <IconDown class="w-4 h-4 shrink-0 text-slate-400" />
         </button>
@@ -399,7 +469,16 @@ watch(
               class="flex w-full min-w-0 items-center justify-between rounded-md px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-800"
               @click="selectCompareVersion(option)"
             >
-              <span class="truncate min-w-0">{{ option.name }}</span>
+              <span class="flex min-w-0 items-center gap-2">
+                <span class="truncate min-w-0">{{ option.name }}</span>
+                <span
+                  v-if="liveChannels(option.id).length"
+                  class="max-w-[8rem] shrink-0 truncate rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300"
+                  :title="liveBadgeTitle(option.id)"
+                >
+                  {{ liveBadgeLabel(option.id) }}
+                </span>
+              </span>
               <span class="ml-2 shrink-0 text-xs text-slate-400">{{ option.created_at ? formatLocalDate(option.created_at) : t('unknown') }}</span>
             </button>
             <div v-if="compareSearchLoading" class="px-3 py-2 text-xs text-slate-400">
