@@ -279,6 +279,10 @@ async function loadLiveChannels() {
     names.push(channel.name)
     map.set(channel.version, names)
   }
+  // Sort each channel list so the compact "${names[0]} +N" badge and the tooltip
+  // are deterministic regardless of the row order the database returns.
+  for (const names of map.values())
+    names.sort((a, b) => a.localeCompare(b))
   liveChannelsByVersion.value = map
 }
 
