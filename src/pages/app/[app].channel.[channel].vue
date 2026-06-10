@@ -231,7 +231,6 @@ async function handleVersionLink(appVersion: Database['public']['Tables']['app_v
   // Check if any package is incompatible
   if (localDependencies.length > 0 && finalCompatibility.find(x => !isCompatible(x))) {
     toast.error(t('bundle-not-compatible-with-channel', { channel: channel.value.name }))
-    toast.info(t('channel-not-compatible-with-channel-description'))
 
     dialogStore.openDialog({
       title: t('confirm-action'),
@@ -245,7 +244,11 @@ async function handleVersionLink(appVersion: Database['public']['Tables']['app_v
           text: t('view-dependencies'),
           role: 'cancel',
           handler: () => {
-            router.push(`/app/${route.params.app}/bundle/${appVersion.id}/dependencies`)
+            // Pre-select the channel's current bundle as the comparison baseline so the
+            // Dependencies page opens already diffed against what is live on the channel.
+            const channelBundleId = channel.value?.version?.id
+            const compareQuery = channelBundleId ? `?compare=${channelBundleId}` : ''
+            router.push(`/app/${route.params.app}/bundle/${appVersion.id}/dependencies${compareQuery}`)
           },
         },
         {
