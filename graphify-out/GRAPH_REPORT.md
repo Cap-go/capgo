@@ -1,4 +1,4 @@
-# Graph Report - capgo  (2026-06-09)
+# Graph Report - capgo  (2026-06-10)
 
 ## Generation Mode
 - Deterministic code-only AST extraction. No semantic LLM extraction or API keys are used.
@@ -459,20 +459,20 @@ Cohesion: 0.05
 Nodes (96): app, appPrivate, appTriggers, app, DataUpload, DataUpload, app, fetchRegionVersion() (+88 more)
 
 ### Community 10 - "Community 10"
+Cohesion: 0.04
+Nodes (113): calcKeyId(), decryptChecksum(), decryptChecksumV3(), decryptSource(), encryptChecksum(), encryptChecksumV3(), encryptSource(), generateSessionKey() (+105 more)
+
+### Community 11 - "Community 11"
 Cohesion: 0.07
 Nodes (103): withSupabaseSource(), check2FAComplianceForApp(), checkAppExistsAndHasPermissionOrgErr(), getAppIconStoragePath(), checkVersionNotUsedInChannel(), CheckVersionOptions, createChannel(), delChannel() (+95 more)
 
-### Community 11 - "Community 11"
-Cohesion: 0.04
-Nodes (102): calcKeyId(), decryptChecksum(), decryptChecksumV3(), decryptSource(), encryptChecksum(), encryptChecksumV3(), encryptSource(), generateSessionKey() (+94 more)
-
 ### Community 12 - "Community 12"
-Cohesion: 0.03
-Nodes (79): categorizeCliError(), categorizeHttpStatus(), CliErrorCategory, getMessage(), getStatus(), OrgResolverDeps, ownerOrgCache, resolveOwnerOrgId() (+71 more)
+Cohesion: 0.04
+Nodes (76): AcceptInvitation, app, baseInvitationSchema, DEFAULT_PASSWORD_POLICY, ensureOrgMembership(), ensurePublicUserRowExists(), isMissingCreatedViaInviteColumnError(), legacyInviteToRbac (+68 more)
 
 ### Community 13 - "Community 13"
 Cohesion: 0.04
-Nodes (76): AcceptInvitation, app, baseInvitationSchema, DEFAULT_PASSWORD_POLICY, ensureOrgMembership(), ensurePublicUserRowExists(), isMissingCreatedViaInviteColumnError(), legacyInviteToRbac (+68 more)
+Nodes (70): categorizeCliError(), categorizeHttpStatus(), CliErrorCategory, getMessage(), getStatus(), OrgResolverDeps, ownerOrgCache, resolveOwnerOrgId() (+62 more)
 
 ### Community 14 - "Community 14"
 Cohesion: 0.04
@@ -500,23 +500,23 @@ Nodes (39): appCreationApiKey, id, createAppForTest(), isDuplicateAppCreationErr
 
 ### Community 20 - "Community 20"
 Cohesion: 0.05
-Nodes (57): getInvocationSource(), checkAppExists(), addApp(), addAppInternal(), AppCreateSource, ensureAppDoesNotExist(), ensureOptions(), resolveAppCreateSource() (+49 more)
-
-### Community 21 - "Community 21"
-Cohesion: 0.05
 Nodes (56): DataDevice, devicesBodySchema, orderItemSchema, app, inviteUserSchema, LegacyInviteRole, legacyInviteRoles, legacyRoleToRbac (+48 more)
 
-### Community 22 - "Community 22"
+### Community 21 - "Community 21"
 Cohesion: 0.06
 Nodes (69): addCurrentSubscriptionInterval(), addInterval(), addInvoiceLineInterval(), BillingInterval, buildDbPlanLookup(), buildStripeInvoiceRevenueBackfillRows(), BuildStripeInvoiceRevenueRowsOptions, buildStripePriceLookup() (+61 more)
 
-### Community 23 - "Community 23"
+### Community 22 - "Community 22"
 Cohesion: 0.04
 Nodes (47): id, testOrgId, fetchRest(), getAnonHeaders(), getApiKeyHeaders(), AuditLog, auditLogSchema, auditLogsResponseSchema (+39 more)
 
-### Community 24 - "Community 24"
+### Community 23 - "Community 23"
 Cohesion: 0.05
 Nodes (58): verifyAdmin(), app, AppContext, CompleteTopUpRequest, CostCalculationRequest, CostCalculationResponse, CreditStep, getCheckoutSessionPaymentIntentId() (+50 more)
+
+### Community 24 - "Community 24"
+Cohesion: 0.05
+Nodes (55): getInvocationSource(), checkAppExists(), addApp(), addAppInternal(), AppCreateSource, ensureAppDoesNotExist(), ensureOptions(), resolveAppCreateSource() (+47 more)
 
 ### Community 25 - "Community 25"
 Cohesion: 0.05
@@ -1582,11 +1582,11 @@ Nodes (3): getUsagePlatformValue(), normalizeUsagePlatform(), trackDeviceUsageCF
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `Database` connect `Community 10` to `Community 2`, `Community 262`, `Community 138`, `Community 11`, `Community 15`, `Community 18`, `Community 19`, `Community 20`, `Community 281`, `Community 154`, `Community 25`, `Community 27`, `Community 29`, `Community 35`, `Community 36`, `Community 37`, `Community 42`, `Community 47`, `Community 53`, `Community 70`, `Community 74`, `Community 90`, `Community 255`?**
+- **Why does `Database` connect `Community 11` to `Community 2`, `Community 262`, `Community 10`, `Community 138`, `Community 15`, `Community 18`, `Community 19`, `Community 24`, `Community 281`, `Community 154`, `Community 25`, `Community 27`, `Community 29`, `Community 35`, `Community 36`, `Community 37`, `Community 42`, `Community 47`, `Community 53`, `Community 70`, `Community 74`, `Community 90`, `Community 255`?**
   _High betweenness centrality (0.169) - this node is a cross-community bridge._
-- **Why does `cloudlog()` connect `Community 9` to `Community 1`, `Community 4`, `Community 5`, `Community 6`, `Community 7`, `Community 134`, `Community 139`, `Community 13`, `Community 146`, `Community 21`, `Community 151`, `Community 24`, `Community 28`, `Community 30`, `Community 32`, `Community 166`, `Community 39`, `Community 40`, `Community 52`, `Community 58`, `Community 61`, `Community 63`, `Community 65`, `Community 66`, `Community 69`, `Community 72`, `Community 200`, `Community 75`, `Community 82`, `Community 212`, `Community 93`, `Community 99`, `Community 104`, `Community 114`, `Community 115`?**
+- **Why does `cloudlog()` connect `Community 9` to `Community 1`, `Community 4`, `Community 5`, `Community 6`, `Community 7`, `Community 134`, `Community 139`, `Community 12`, `Community 146`, `Community 20`, `Community 23`, `Community 151`, `Community 28`, `Community 30`, `Community 32`, `Community 166`, `Community 39`, `Community 40`, `Community 52`, `Community 58`, `Community 61`, `Community 63`, `Community 65`, `Community 66`, `Community 69`, `Community 72`, `Community 200`, `Community 75`, `Community 82`, `Community 212`, `Community 93`, `Community 99`, `Community 104`, `Community 114`, `Community 115`?**
   _High betweenness centrality (0.041) - this node is a cross-community bridge._
-- **Why does `getCreditTopUpProductId()` connect `Community 24` to `Community 102`?**
+- **Why does `getCreditTopUpProductId()` connect `Community 23` to `Community 102`?**
   _High betweenness centrality (0.039) - this node is a cross-community bridge._
 - **Are the 6 inferred relationships involving `simpleError()` (e.g. with `deleteOrg()` and `deleteApp()`) actually correct?**
   _`simpleError()` has 6 INFERRED edges - model-reasoned connections that need verification._
