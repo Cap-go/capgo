@@ -159,7 +159,7 @@ async function recoverUploadOffsetFromDurableObject(
 function retryableUploadUnavailableResponse(): Response {
   return new Response(JSON.stringify({
     error: 'upload_retryable',
-    message: 'Upload worker moved during this request. Retry the upload request.',
+    message: 'Upload temporarily unavailable. Retry the upload request.',
   }), {
     status: 503,
     headers: {
@@ -233,10 +233,12 @@ async function fetchUploadHandlerWithRetry(
       })
 
       if (!shouldRetry) {
-        if (!canRetryRequest && isRetryableDurableObjectError) {
+        if (isRetryableDurableObjectError) {
           cloudlog({
             requestId: c.get('requestId'),
-            message: 'upload handler - durable object fetch failed for streaming request, returning retryable response',
+            message: canRetryRequest
+              ? 'upload handler - exhausted retryable durable object fetch attempts, returning retryable response'
+              : 'upload handler - durable object fetch failed for streaming request, returning retryable response',
             attempt,
             fileId: c.get('fileId'),
           })

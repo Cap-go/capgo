@@ -41,6 +41,7 @@ export const UPLOAD_TIMEOUT = 120000
 export const ALERT_UPLOAD_SIZE_BYTES = 1024 * 1024 * 20 // 20MB
 export const MAX_UPLOAD_LENGTH_BYTES = 1024 * 1024 * 1024 // 1GB
 export const MAX_CHUNK_SIZE_BYTES = 1024 * 1024 * 99 // 99MB
+export const TUS_UPLOAD_RETRY_DELAYS = [0, 1000, 3000, 5000, 10000]
 
 export const PACKNAME = 'package.json'
 
@@ -1221,6 +1222,7 @@ export async function uploadTUS(apikey: string, data: Buffer, orgId: string, app
       endpoint: `${localConfig.hostFilesApi}/files/upload/attachments/`,
       // parallelUploads: multipart,
       chunkSize,
+      retryDelays: [...TUS_UPLOAD_RETRY_DELAYS],
       metadataForPartialUploads: {
         filename: `orgs/${orgId}/apps/${appId}/${name}.zip`,
         filetype: 'application/gzip',

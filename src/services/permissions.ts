@@ -17,6 +17,7 @@
  *   const canPromote = await checkPermissions('channel.promote_bundle', { channelId: 123 })
  */
 
+import type { Database } from '~/types/supabase.types'
 import { useSupabase } from '~/services/supabase'
 import { useMainStore } from '~/stores/main'
 
@@ -187,4 +188,45 @@ export async function checkPermissions(
       return false
   }
   return true
+}
+
+/**
+ * Check whether a SPECIFIC user holds a permission in a scope.
+ *
+ * Unlike checkPermissions() (which checks the current user), this resolves another
+ * member's access. It is used to surface "who can grant you access" when the current
+ * user is blocked, so we list the people who actually hold the required permission.
+ */
+export async function userHasPermission(
+  permission: Permission,
+  userId: string,
+  scope: PermissionScope,
+): Promise<boolean> {
+  const supabase = useSupabase()
+
+  if (!userId || !scope.orgId)
+    return false
+
+  try {
+    // p_app_id / p_channel_id are nullable in SQL for org-scoped checks, but the
+    // generated types mark them required; pass null explicitly for an org-only check.
+    const { data, error } = await supabase.rpc('rbac_check_permission_direct', {
+      p_permission_key: permission,
+      p_user_id: userId,
+      p_org_id: scope.orgId,
+      p_app_id: scope.appId ?? null,
+      p_channel_id: scope.channelId ?? null,
+    } as unknown as Database['public']['Functions']['rbac_check_permission_direct']['Args'])
+
+    if (error) {
+      console.error('[userHasPermission] RPC error:', error)
+      return false
+    }
+
+    return data === true
+  }
+  catch (err) {
+    console.error('[userHasPermission] Exception:', err)
+    return false
+  }
 }

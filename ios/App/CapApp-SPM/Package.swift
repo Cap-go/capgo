@@ -98,7 +98,7 @@ let package = Package(
         .package(name: "CapgoCapacitorSpeechRecognition", path: "../../../node_modules/.bun/@capgo+capacitor-speech-recognition@8.1.3+1b808583819c2ac6/node_modules/@capgo/capacitor-speech-recognition"),
         .package(name: "CapgoCapacitorSpeechSynthesis", path: "../../../node_modules/.bun/@capgo+capacitor-speech-synthesis@8.0.15+1b808583819c2ac6/node_modules/@capgo/capacitor-speech-synthesis"),
         .package(name: "CapgoCapacitorTextinteraction", path: "../../../node_modules/.bun/@capgo+capacitor-textinteraction@8.0.25+1b808583819c2ac6/node_modules/@capgo/capacitor-textinteraction"),
-        .package(name: "CapgoCapacitorUpdater", path: "../../../node_modules/.bun/@capgo+capacitor-updater@8.49.0+1b808583819c2ac6/node_modules/@capgo/capacitor-updater"),
+        .package(name: "CapgoCapacitorUpdater", path: "../../../node_modules/.bun/@capgo+capacitor-updater@8.49.1+1b808583819c2ac6/node_modules/@capgo/capacitor-updater"),
         .package(name: "CapgoCapacitorUploader", path: "../../../node_modules/.bun/@capgo+capacitor-uploader@8.2.1+1b808583819c2ac6/node_modules/@capgo/capacitor-uploader"),
         .package(name: "CapgoCapacitorVideoPlayer", path: "../../../node_modules/.bun/@capgo+capacitor-video-player@8.1.13+e0c29ead8bde6eb5/node_modules/@capgo/capacitor-video-player"),
         .package(name: "CapgoCapacitorVideoThumbnails", path: "../../../node_modules/.bun/@capgo+capacitor-video-thumbnails@8.1.12+1b808583819c2ac6/node_modules/@capgo/capacitor-video-thumbnails"),
