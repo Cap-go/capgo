@@ -3,6 +3,7 @@ import type { Database } from '../types/supabase.types'
 import type { Compatibility } from '../utils'
 import { intro, log, outro } from '@clack/prompts'
 import { check2FAComplianceForApp, checkAppExistsAndHasPermissionOrgErr } from '../api/app'
+import { findChannel } from '../api/channels'
 import { printPreviewQrForResolvedTarget, resolveChannelPreviewTarget } from '../preview/qr'
 import { formatTable } from '../terminal-table'
 import {
@@ -76,9 +77,6 @@ export async function setChannelInternal(channel: string, appId: string, options
   await check2FAComplianceForApp(supabase, appId, silent)
   const userId = await resolveUserIdFromApiKey(supabase, options.apikey)
 
-  await checkAppExistsAndHasPermissionOrgErr(supabase, options.apikey, appId, 'app.update_settings', silent, true)
-  const orgId = await getOrganizationId(supabase, appId)
-
   const {
     bundle,
     state,
@@ -133,6 +131,16 @@ export async function setChannelInternal(channel: string, appId: string, options
     throw new Error('No channel option provided')
   }
 
+  const { data: existingChannel, error: channelError } = await findChannel(supabase, appId, channel)
+  if (channelError || !existingChannel) {
+    if (!silent)
+      log.error(`Cannot find channel ${channel}`)
+    throw new Error(`Cannot find channel ${channel}`)
+  }
+
+  await checkAppExistsAndHasPermissionOrgErr(supabase, options.apikey, appId, 'channel.update_settings', silent, true, existingChannel.id)
+  const orgId = await getOrganizationId(supabase, appId)
+
   await checkPlanValid(supabase, orgId, options.apikey, appId)
 
   const channelPayload: Database['public']['Tables']['channels']['Insert'] = {
@@ -141,19 +149,6 @@ export async function setChannelInternal(channel: string, appId: string, options
     name: channel,
     owner_org: orgId,
     version: undefined as any,
-  }
-
-  const { error: channelError } = await supabase
-    .from('channels')
-    .select()
-    .eq('app_id', appId)
-    .eq('name', channel)
-    .single()
-
-  if (channelError) {
-    if (!silent)
-      log.error(`Cannot find channel ${channel}`)
-    throw new Error(`Cannot find channel ${channel}`)
   }
 
   const resolvedBundleVersion = latest
