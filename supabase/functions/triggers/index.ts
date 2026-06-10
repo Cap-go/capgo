@@ -16,6 +16,7 @@ import { app as on_manifest_create } from '../_backend/triggers/on_manifest_crea
 import { app as on_org_update } from '../_backend/triggers/on_org_update.ts'
 import { app as on_organization_create } from '../_backend/triggers/on_organization_create.ts'
 import { app as on_organization_delete } from '../_backend/triggers/on_organization_delete.ts'
+import { app as plugin_notifications } from '../_backend/triggers/plugin_notifications.ts'
 import { app as on_user_create } from '../_backend/triggers/on_user_create.ts'
 import { app as on_user_delete } from '../_backend/triggers/on_user_delete.ts'
 import { app as on_user_update } from '../_backend/triggers/on_user_update.ts'
@@ -57,6 +58,7 @@ appGlobal.route('/cron_reconcile_build_status', cron_reconcile_build_status)
 appGlobal.route('/credit_usage_alerts', credit_usage_alerts)
 appGlobal.route('/on_organization_delete', on_organization_delete)
 appGlobal.route('/on_deploy_history_create', on_deploy_history_create)
+appGlobal.route('/plugin_notifications', plugin_notifications)
 appGlobal.route('/queue_consumer', queue_consumer)
 appGlobal.route('/webhook_delivery', webhook_delivery)
 appGlobal.route('/webhook_dispatcher', webhook_dispatcher)
