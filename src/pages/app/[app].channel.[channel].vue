@@ -231,15 +231,22 @@ async function handleVersionLink(appVersion: Database['public']['Tables']['app_v
   // Check if any package is incompatible
   if (localDependencies.length > 0 && finalCompatibility.find(x => !isCompatible(x))) {
     toast.error(t('bundle-not-compatible-with-channel', { channel: channel.value.name }))
-    toast.info(t('channel-not-compatible-with-channel-description', { cmd: 'bunx @capgo/cli@latest bundle compatibility' }))
+    toast.info(t('channel-not-compatible-with-channel-description'))
 
     dialogStore.openDialog({
       title: t('confirm-action'),
-      description: t('set-even-not-compatible', { cmd: 'bunx @capgo/cli@latest bundle compatibility' }),
+      description: t('set-even-not-compatible'),
       buttons: [
         {
           text: t('button-cancel'),
           role: 'cancel',
+        },
+        {
+          text: t('view-dependencies'),
+          role: 'cancel',
+          handler: () => {
+            router.push(`/app/${route.params.app}/bundle/${appVersion.id}/dependencies`)
+          },
         },
         {
           text: t('button-confirm'),
