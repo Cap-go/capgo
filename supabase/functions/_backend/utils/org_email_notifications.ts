@@ -7,7 +7,6 @@ import { cloudlog } from './logging.ts'
 import { claimNotifOrgOnce, hasNotifOrgClaim, sendNotifOrg, sendNotifOrgOnce } from './notifications.ts'
 import { getDrizzleClient, getPgClient, logPgError } from './pg.ts'
 import * as schema from './postgres_schema.ts'
-import { queuePluginOrgMembersNotification } from './plugin_notification_queue.ts'
 import { logSkippedSupabaseWrite, shouldQueuePluginNotifications, shouldSkipSupabaseNotificationWrites } from './supabase_write_guard.ts'
 import { backgroundTask } from './utils.ts'
 
@@ -739,6 +738,7 @@ export async function sendNotifToOrgMembersCached(
   audience: NotificationAudience = 'admins',
 ): Promise<boolean> {
   if (shouldQueuePluginNotifications(c)) {
+    const { queuePluginOrgMembersNotification } = await import('./plugin_notification_queue.ts')
     await queuePluginOrgMembersNotification(c, {
       eventName,
       preferenceKey,

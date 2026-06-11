@@ -8,7 +8,6 @@ import { CacheHelper } from './cache.ts'
 import { cloudlog } from './logging.ts'
 import { closeClient, getDrizzleClient as createDrizzleClient, getPgClient, logPgError } from './pg.ts'
 import * as schema from './postgres_schema.ts'
-import { queuePluginOrgNotification } from './plugin_notification_queue.ts'
 import { logSkippedSupabaseWrite, shouldQueuePluginNotifications, shouldSkipSupabaseNotificationWrites } from './supabase_write_guard.ts'
 import { backgroundTask } from './utils.ts'
 
@@ -374,6 +373,7 @@ export async function sendNotifOrgCached(
   drizzleClient: ReturnType<typeof getDrizzleClient>,
 ): Promise<boolean> {
   if (shouldQueuePluginNotifications(c)) {
+    const { queuePluginOrgNotification } = await import('./plugin_notification_queue.ts')
     await queuePluginOrgNotification(c, eventName, eventData, orgId, uniqId, cron, managementEmail)
     return false
   }
