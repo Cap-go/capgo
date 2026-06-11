@@ -4,9 +4,9 @@ import type { PluginNotificationQueueItem } from '../utils/plugin_notification_q
 import { Hono } from 'hono/tiny'
 import { BRES, middlewareAPISecret, parseBody, quickError, simpleError } from '../utils/hono.ts'
 import { cloudlog, cloudlogErr, serializeError } from '../utils/logging.ts'
-import { closeClient, getDrizzleClient, getPgClient } from '../utils/pg.ts'
 import { sendNotifOrg } from '../utils/notifications.ts'
 import { sendNotifToOrgMembers } from '../utils/org_email_notifications.ts'
+import { closeClient, getDrizzleClient, getPgClient } from '../utils/pg.ts'
 
 const MAX_PLUGIN_NOTIFICATION_BATCH = 100
 
@@ -31,7 +31,7 @@ function isValidPluginNotificationItem(item: unknown): item is PluginNotificatio
 type PluginNotificationSendResult = boolean | { sent: false, lastSendAt: string }
 
 function isAcceptedPluginNotificationResult(result: PluginNotificationSendResult) {
-  return result === true || (typeof result === 'object' && result.sent === false && Boolean(result.lastSendAt))
+  return result === true
 }
 
 async function sendQueuedPluginNotification(c: Context, item: PluginNotificationQueueItem, drizzleClient: ReturnType<typeof getDrizzleClient>): Promise<PluginNotificationSendResult> {

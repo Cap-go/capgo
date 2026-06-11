@@ -292,7 +292,7 @@ export async function sendNotifOrg(
       cloudlog({ requestId: c.get('requestId'), message: isFirstSend ? 'notif never sent' : 'notif ready to sent', event: eventName, uniqId })
       const res = await trackBentoEvent(c, managementEmail, eventData, eventName)
       if (!res) {
-        const rollbackSucceeded = claimRollback ? await rollbackNotificationClaim(c, writeClient, eventName, orgId, uniqId, claimRollback) : true
+        const rollbackSucceeded = await rollbackNotificationClaim(c, writeClient, eventName, orgId, uniqId, claimRollback!)
         cloudlog({ requestId: c.get('requestId'), message: 'trackEvent failed', eventName, email: managementEmail, eventData, rollbackSucceeded })
         return false
       }

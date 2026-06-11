@@ -181,6 +181,17 @@ appScheduled.post('/flush-plugin-notifications', async (c) => {
   return c.json({ ...BRES, ...result })
 })
 
+async function runScheduledPluginNotificationFlush(env: Bindings, ctx: ExecutionContext) {
+  const request = new Request('https://api-scheduled.capgo.internal/flush-plugin-notifications', { method: 'POST' })
+  const response = await appScheduled.fetch(request, env, ctx)
+  if (!response.ok)
+    throw new Error(`flush-plugin-notifications HTTP ${response.status} ${response.statusText}`)
+
+  const body = await response.json().catch(() => null) as { failed?: unknown } | null
+  if (body && typeof body.failed === 'number' && body.failed > 0)
+    throw new Error(`flush-plugin-notifications had ${body.failed} failed transfers`)
+}
+
 createAllCatch(app, functionName)
 createAllCatch(appPrivate, functionNamePrivate)
 createAllCatch(appTriggers, functionNameTriggers)
@@ -189,7 +200,6 @@ createAllCatch(appScheduled, functionNameScheduled)
 export default {
   fetch: app.fetch,
   scheduled(_controller: ScheduledController, env: Bindings, ctx: ExecutionContext) {
-    const request = new Request('https://api-scheduled.capgo.internal/flush-plugin-notifications', { method: 'POST' })
-    ctx.waitUntil(Promise.resolve(appScheduled.fetch(request, env, ctx)))
+    ctx.waitUntil(runScheduledPluginNotificationFlush(env, ctx))
   },
 }

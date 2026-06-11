@@ -52,9 +52,77 @@ interface WranglerConfig {
   }>
 }
 
+function stripJsoncComments(raw: string) {
+  let result = ''
+  let inString = false
+  let inLineComment = false
+  let inBlockComment = false
+  let escaped = false
+
+  for (let index = 0; index < raw.length; index++) {
+    const char = raw[index]
+    const next = raw[index + 1]
+
+    if (inLineComment) {
+      if (char === '\n') {
+        inLineComment = false
+        result += char
+      }
+      continue
+    }
+
+    if (inBlockComment) {
+      if (char === '\n')
+        result += char
+      if (char === '*' && next === '/') {
+        inBlockComment = false
+        index++
+      }
+      continue
+    }
+
+    if (inString) {
+      result += char
+      if (escaped) {
+        escaped = false
+        continue
+      }
+      if (char === '\\') {
+        escaped = true
+        continue
+      }
+      if (char === '"')
+        inString = false
+      continue
+    }
+
+    if (char === '"') {
+      inString = true
+      result += char
+      continue
+    }
+
+    if (char === '/' && next === '/') {
+      inLineComment = true
+      index++
+      continue
+    }
+
+    if (char === '/' && next === '*') {
+      inBlockComment = true
+      index++
+      continue
+    }
+
+    result += char
+  }
+
+  return result
+}
+
 function readJsoncConfig(path: string) {
   const raw = readFileSync(new URL(path, import.meta.url), 'utf8')
-  return JSON.parse(raw.replace(/^\s*\/\/.*$/gm, '')) as WranglerConfig
+  return JSON.parse(stripJsoncComments(raw)) as WranglerConfig
 }
 
 function getChannelSelfStoreId(config: WranglerConfig, envName: string) {

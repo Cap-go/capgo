@@ -96,14 +96,14 @@ describe('plugin notification trigger', () => {
     expect(closeClientMock).toHaveBeenCalledTimes(1)
   })
 
-  it('accepts queued org notifications that are already throttled by cron', async () => {
+  it('keeps queued org notifications that are already throttled by cron', async () => {
     sendNotifOrgMock.mockResolvedValue({ sent: false, lastSendAt: new Date().toISOString() })
 
     const response = await requestPluginNotifications([orgQueueItem()])
-    const body = await response.json() as { processed: number, failed: number }
+    const body = await response.text()
 
-    expect(response.status).toBe(200)
-    expect(body).toMatchObject({ processed: 1, failed: 0 })
+    expect(response.status).toBe(500)
+    expect(body).toContain('Plugin notification batch failed')
   })
 
   it('accepts delivered org member notifications', async () => {
