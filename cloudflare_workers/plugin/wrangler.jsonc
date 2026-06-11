@@ -152,9 +152,6 @@
     },
     "prod_me": {
       "name": "capgo_plugin-me-prod",
-      "triggers": {
-        "crons": ["* * * * *"]
-      },
       "vars": {
         "ENV_NAME": "capgo_plugin-me-prod"
       },
@@ -254,9 +251,6 @@
     },
     "prod_hk": {
       "name": "capgo_plugin-hk-prod",
-      "triggers": {
-        "crons": ["* * * * *"]
-      },
       "vars": {
         "ENV_NAME": "capgo_plugin-hk-prod"
       },
@@ -356,9 +350,6 @@
     },
     "prod_jp": {
       "name": "capgo_plugin-jp-prod",
-      "triggers": {
-        "crons": ["* * * * *"]
-      },
       "vars": {
         "ENV_NAME": "capgo_plugin-jp-prod"
       },
@@ -458,9 +449,6 @@
     },
     "prod_as": {
       "name": "capgo_plugin-as-prod",
-      "triggers": {
-        "crons": ["* * * * *"]
-      },
       "vars": {
         "ENV_NAME": "capgo_plugin-as-prod"
       },
@@ -560,9 +548,6 @@
     },
     "prod_na": {
       "name": "capgo_plugin-na-prod",
-      "triggers": {
-        "crons": ["* * * * *"]
-      },
       "vars": {
         "ENV_NAME": "capgo_plugin-na-prod"
       },
@@ -662,9 +647,6 @@
     },
     "prod_af": {
       "name": "capgo_plugin-af-prod",
-      "triggers": {
-        "crons": ["* * * * *"]
-      },
       "vars": {
         "ENV_NAME": "capgo_plugin-af-prod"
       },
@@ -764,9 +746,6 @@
     },
     "prod_oc": {
       "name": "capgo_plugin-oc-prod",
-      "triggers": {
-        "crons": ["* * * * *"]
-      },
       "vars": {
         "ENV_NAME": "capgo_plugin-oc-prod"
       },
@@ -866,9 +845,6 @@
     },
     "prod_sa": {
       "name": "capgo_plugin-sa-prod",
-      "triggers": {
-        "crons": ["* * * * *"]
-      },
       "vars": {
         "ENV_NAME": "capgo_plugin-sa-prod"
       },

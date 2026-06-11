@@ -28,7 +28,7 @@ function isValidPluginNotificationItem(item: unknown): item is PluginNotificatio
   return false
 }
 
-type PluginNotificationSendResult = boolean | { sent: boolean, lastSendAt?: string }
+type PluginNotificationSendResult = boolean | { sent: false, lastSendAt: string }
 
 function isAcceptedPluginNotificationResult(result: PluginNotificationSendResult) {
   return result === true || (typeof result === 'object' && result.sent === false && Boolean(result.lastSendAt))

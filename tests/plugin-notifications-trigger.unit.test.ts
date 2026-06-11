@@ -42,6 +42,20 @@ function orgQueueItem() {
   }
 }
 
+function orgMembersQueueItem() {
+  return {
+    type: 'org_members' as const,
+    eventName: 'device:channel_self_set_rejected',
+    preferenceKey: 'channel_self_rejected' as const,
+    eventData: { app_id: 'com.test.app' },
+    orgId: 'org-1',
+    uniqId: 'com.test.app',
+    cron: '0 0 * * 0',
+    audience: 'admins' as const,
+    enqueuedAt: new Date().toISOString(),
+  }
+}
+
 async function requestPluginNotifications(items: unknown[]) {
   const { app } = await import('../supabase/functions/_backend/triggers/plugin_notifications.ts')
   return await app.request('http://local/', {
@@ -90,5 +104,56 @@ describe('plugin notification trigger', () => {
 
     expect(response.status).toBe(200)
     expect(body).toMatchObject({ processed: 1, failed: 0 })
+  })
+
+  it('accepts delivered org member notifications', async () => {
+    sendNotifToOrgMembersMock.mockResolvedValue(true)
+
+    const response = await requestPluginNotifications([orgMembersQueueItem()])
+    const body = await response.json() as { processed: number, failed: number }
+
+    expect(response.status).toBe(200)
+    expect(body).toMatchObject({ processed: 1, failed: 0 })
+    expect(sendNotifToOrgMembersMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('returns non-2xx when org member notification processing throws', async () => {
+    sendNotifToOrgMembersMock.mockRejectedValue(new Error('bento unavailable'))
+
+    const response = await requestPluginNotifications([orgMembersQueueItem()])
+    const body = await response.text()
+
+    expect(response.status).toBe(500)
+    expect(body).toContain('Plugin notification batch failed')
+    expect(closeClientMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('returns an ok no-op for empty batches', async () => {
+    const response = await requestPluginNotifications([])
+    const body = await response.json() as { processed: number, failed: number }
+
+    expect(response.status).toBe(200)
+    expect(body).toMatchObject({ processed: 0, failed: 0 })
+    expect(sendNotifOrgMock).not.toHaveBeenCalled()
+    expect(closeClientMock).not.toHaveBeenCalled()
+  })
+
+  it('filters invalid queued items without opening a database client', async () => {
+    const response = await requestPluginNotifications([{ type: 'org', orgId: 'org-1' }])
+    const body = await response.json() as { processed: number, failed: number, invalid: number }
+
+    expect(response.status).toBe(200)
+    expect(body).toMatchObject({ processed: 0, failed: 0, invalid: 1 })
+    expect(sendNotifOrgMock).not.toHaveBeenCalled()
+    expect(closeClientMock).not.toHaveBeenCalled()
+  })
+
+  it('rejects batches above the maximum size', async () => {
+    const response = await requestPluginNotifications(Array.from({ length: 101 }, orgQueueItem))
+    const body = await response.text()
+
+    expect(response.status).toBe(400)
+    expect(body).toContain('Too many plugin notification items')
+    expect(sendNotifOrgMock).not.toHaveBeenCalled()
   })
 })

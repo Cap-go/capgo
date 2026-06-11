@@ -174,7 +174,7 @@ export async function sendNotifOrg(
   cron: string,
   managementEmail: string,
   drizzleClient: ReturnType<typeof getDrizzleClient>,
-) {
+): Promise<boolean | { sent: false, lastSendAt: string }> {
   if (shouldSkipSupabaseNotificationWrites(c)) {
     logSkippedSupabaseWrite(c, 'sendNotifOrg')
     return false
