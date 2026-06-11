@@ -989,7 +989,6 @@ export interface EngineDeps {
   loadProgress: (appId: string) => Promise<OnboardingProgress | null>
   registerApp: (appId: string) => Promise<{ ok: true } | { ok: false, alreadyExists: boolean, error: string }>
   loadAndroidProgress: (appId: string) => Promise<AndroidOnboardingProgress | null>
-  finalizeAndroidCredentials: (appId: string) => Promise<{ ok: true } | { ok: false, error: string }>
   readBuildRecord: (path: string) => Promise<BuildOutputRecord | null>
   buildRecordPath: (appId: string, platform: Platform) => string
   setIosApiKey: (appId: string, keyId: string, issuerId: string, p8Path: string) => Promise<void>
@@ -1229,24 +1228,6 @@ async function executeAuto(result: NextStepResult, facts: PreflightFacts, deps: 
     return {
       onboarding: 'capgo-builder', phase: 'app', state: 'register-app-failed', progress: 8, kind: 'error',
       summary: `Could not register "${facts.appId}" in Capgo: ${reg.error}`,
-      rules: ONBOARDING_RULES,
-    }
-  }
-  if (result.state === 'android-finalize' && facts.appId) {
-    const fin = await deps.finalizeAndroidCredentials(facts.appId)
-    if (fin.ok)
-      return null
-    return {
-      onboarding: 'capgo-builder', phase: 'credentials', state: 'android-service-account-invalid', platform: 'android', progress: 45, kind: 'human_gate',
-      summary: `That service-account JSON could not be validated: ${fin.error}`,
-      human: { instruction: 'Provide the path to a valid Google Play service-account .json (with access to your app). The file stays on your machine do not paste its contents here.' },
-      collect: [{ field: 'serviceAccountJsonPath', desc: 'absolute path to a valid service-account .json file' }],
-      next: {
-        tool: NEXT_STEP_TOOL,
-        with: { serviceAccountJsonPath: '<path>' },
-        instruction: 'Ask the user for a corrected service-account .json path, then call next_step with serviceAccountJsonPath.',
-        call: `${NEXT_STEP_TOOL}({ serviceAccountJsonPath: "/path/to/service-account.json" })`,
-      },
       rules: ONBOARDING_RULES,
     }
   }

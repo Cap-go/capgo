@@ -17,6 +17,7 @@ export const onboardingNextStepSchema = z.object({
   androidPackage: z.string().optional().describe('The Android applicationId / package name to grant release access to, when asked'),
   saMethodChoice: z.enum(['retry', 'save-anyway', 'oauth']).optional().describe('Recovery choice at service-account validation failure'),
   checkBuild: z.boolean().optional().describe('Set true after running the build command, to read the build output record and confirm the result'),
+  credentialsExistChoice: z.enum(['backup', 'cancel']).optional().describe('Data-safety choice when saved Android credentials already exist: "backup" (back them up, then continue) or "cancel" (stop onboarding), when the step asks'),
   keystoreMethod: z.enum(['existing', 'generate']).optional().describe('Whether you already have an Android keystore ("existing") or want one created ("generate")'),
   keystorePath: z.string().optional().describe('Absolute path to your existing Android keystore file (.jks/.keystore/.p12), when asked'),
   keystoreStorePassword: z.string().optional().describe('The keystore store password, when asked'),

@@ -213,35 +213,6 @@ function buildDeps(sdk: CapgoSDK): EngineDeps {
       return { ok: false as const, alreadyExists: isAppAlreadyExistsError(error), error }
     },
     loadAndroidProgress: (appId: string) => loadAndroidProgress(appId),
-    finalizeAndroidCredentials: async (appId: string) => {
-      const prog = await loadAndroidProgress(appId)
-      if (!prog?.serviceAccountJsonPath)
-        return { ok: false as const, error: 'No service-account JSON path on file.' }
-      let jsonBytes: Buffer
-      try {
-        jsonBytes = await readFile(prog.serviceAccountJsonPath)
-      }
-      catch {
-        return { ok: false as const, error: `Could not read the service-account file at ${prog.serviceAccountJsonPath}.` }
-      }
-      const validation = await validateServiceAccountJson({ jsonBytes, packageName: appId })
-      if (!validation.ok)
-        return { ok: false as const, error: validation.message }
-      if (!prog._keystoreBase64 || !prog.keystoreAlias || !prog.keystoreStorePassword || !prog.keystoreKeyPassword)
-        return { ok: false as const, error: 'Keystore is missing — re-run keystore generation.' }
-      await updateSavedCredentials(appId, 'android', {
-        ANDROID_KEYSTORE_FILE: prog._keystoreBase64,
-        KEYSTORE_KEY_ALIAS: prog.keystoreAlias,
-        KEYSTORE_KEY_PASSWORD: prog.keystoreKeyPassword,
-        KEYSTORE_STORE_PASSWORD: prog.keystoreStorePassword,
-        PLAY_CONFIG_JSON: jsonBytes.toString('base64'),
-      })
-      await saveAndroidProgress(appId, {
-        ...prog,
-        completedSteps: { ...prog.completedSteps, serviceAccountProvisioned: { email: validation.serviceAccountEmail, projectId: validation.projectId } },
-      })
-      return { ok: true as const }
-    },
     readBuildRecord: readBuildOutputRecord,
     buildRecordPath: defaultBuildRecordPath,
     canLaunchTerminal: () => canLaunchTerminal(),
