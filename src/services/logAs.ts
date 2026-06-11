@@ -19,7 +19,7 @@ export async function logAsUser(identifier: string, router: Router) {
       throw new Error('Missing user id, email, or org id')
 
     if (isSpoofed())
-      unspoofUser()
+      await unspoofUser()
 
     const supabase = useSupabase()
     const { data, error } = await supabase.functions.invoke('private/log_as', {

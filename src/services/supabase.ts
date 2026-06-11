@@ -45,8 +45,14 @@ interface SpoofedAdminSession {
   refreshToken: string
 }
 
+const SPOOF_ADMIN_TOKEN_REFRESH_WINDOW_SECONDS = 60
+
 function getSpoofedAdminStorageKey() {
   return `supabase-${config.supbaseId}.spoof_admin_jwt`
+}
+
+function saveSpoofedAdminSession(session: SpoofedAdminSession) {
+  return localStorage.setItem(getSpoofedAdminStorageKey(), JSON.stringify({ jwt: session.jwt, refreshToken: session.refreshToken }))
 }
 
 function getSpoofedAdminSession(): SpoofedAdminSession | null {
@@ -65,6 +71,51 @@ function getSpoofedAdminSession(): SpoofedAdminSession | null {
   catch {
     return null
   }
+}
+
+function decodeBase64Url(value: string) {
+  const base64 = value.replace(/-/g, '+').replace(/_/g, '/')
+  return globalThis.atob(base64.padEnd(Math.ceil(base64.length / 4) * 4, '='))
+}
+
+function getJwtExpiresAt(jwt: string) {
+  const payload = jwt.split('.')[1]
+  if (!payload)
+    return null
+
+  try {
+    const parsed = JSON.parse(decodeBase64Url(payload)) as { exp?: unknown }
+    return typeof parsed.exp === 'number' ? parsed.exp : null
+  }
+  catch {
+    return null
+  }
+}
+
+function shouldRefreshSpoofedAdminJwt(jwt: string) {
+  const expiresAt = getJwtExpiresAt(jwt)
+  if (!expiresAt)
+    return true
+
+  return expiresAt - Date.now() / 1000 <= SPOOF_ADMIN_TOKEN_REFRESH_WINDOW_SECONDS
+}
+
+function createSpoofAdminSupabase() {
+  return createClient<Database>(getSupabaseHost(), config.supaKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+      detectSessionInUrl: false,
+    },
+  })
+}
+
+async function refreshSpoofedAdminSession(session: SpoofedAdminSession): Promise<SpoofedAdminSession | null> {
+  const { data, error } = await createSpoofAdminSupabase().auth.refreshSession({ refresh_token: session.refreshToken })
+  if (error || !data.session?.access_token || !data.session.refresh_token)
+    return null
+
+  return { jwt: data.session.access_token, refreshToken: data.session.refresh_token }
 }
 
 export function mergeRemoteConfig(localConfig: CapgoConfig, remoteConfig: Partial<CapgoConfig> | null | undefined): CapgoConfig {
@@ -127,11 +178,25 @@ export function isSpoofed() {
   return !!getSpoofedAdminSession()
 }
 export function saveSpoof(jwt: string, refreshToken: string) {
-  return localStorage.setItem(getSpoofedAdminStorageKey(), JSON.stringify({ jwt, refreshToken }))
+  return saveSpoofedAdminSession({ jwt, refreshToken })
 }
 
-export function getSpoofedAdminJwt() {
-  return getSpoofedAdminSession()?.jwt ?? null
+export async function getSpoofedAdminJwt() {
+  const spoofedAdminSession = getSpoofedAdminSession()
+  if (!spoofedAdminSession)
+    return null
+
+  if (!shouldRefreshSpoofedAdminJwt(spoofedAdminSession.jwt))
+    return spoofedAdminSession.jwt
+
+  const refreshedSession = await refreshSpoofedAdminSession(spoofedAdminSession)
+  if (refreshedSession) {
+    saveSpoofedAdminSession(refreshedSession)
+    return refreshedSession.jwt
+  }
+
+  const expiresAt = getJwtExpiresAt(spoofedAdminSession.jwt)
+  return expiresAt && expiresAt > Date.now() / 1000 ? spoofedAdminSession.jwt : null
 }
 
 export async function hashEmail(email: string) {
@@ -144,13 +209,16 @@ export async function hashEmail(email: string) {
   return hashHex
 }
 
-export function unspoofUser() {
+export async function unspoofUser() {
   const spoofedAdminSession = getSpoofedAdminSession()
   if (!spoofedAdminSession)
     return false
 
   const supabase = useSupabase()
-  supabase.auth.setSession({ access_token: spoofedAdminSession.jwt, refresh_token: spoofedAdminSession.refreshToken })
+  const { data, error } = await supabase.auth.setSession({ access_token: spoofedAdminSession.jwt, refresh_token: spoofedAdminSession.refreshToken })
+  if (error || !data.session)
+    return false
+
   localStorage.removeItem(getSpoofedAdminStorageKey())
   return true
 }

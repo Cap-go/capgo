@@ -79,7 +79,7 @@ export const install: UserModule = ({ router }) => {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${session.access_token}`,
       }
-      const spoofedAdminJwt = getSpoofedAdminJwt()
+      const spoofedAdminJwt = await getSpoofedAdminJwt()
       if (spoofedAdminJwt)
         headers[SPOOF_ADMIN_AUTHORIZATION_HEADER] = `Bearer ${spoofedAdminJwt}`
 

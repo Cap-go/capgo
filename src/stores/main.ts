@@ -53,14 +53,14 @@ export const useMainStore = defineStore('main', () => {
     return new Promise<void>((resolve) => {
       const supabase = useSupabase()
       const config = getLocalConfig()
-      const listener = supabase.auth.onAuthStateChange((event: any) => {
+      const listener = supabase.auth.onAuthStateChange(async (event: any) => {
         if (event === 'SIGNED_OUT') {
           listener.data.subscription.unsubscribe()
           auth.value = undefined
           user.value = undefined
           isAdmin.value = false
           reset(config.supaHost)
-          unspoofUser()
+          await unspoofUser()
           resolve()
         }
       })
