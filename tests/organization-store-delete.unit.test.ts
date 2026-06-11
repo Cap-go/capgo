@@ -142,6 +142,15 @@ describe('organization role helpers', () => {
     expect(roleHasOrgRank('org_super_admin', 'org_admin')).toBe(true)
     expect(roleHasOrgRank('org_billing_admin', 'org_admin')).toBe(false)
   })
+
+  it.concurrent('detects pending invites from is_invite before role text', async () => {
+    const { isPendingOrganizationInvite } = await import('../src/stores/organization.ts')
+
+    expect(isPendingOrganizationInvite({ role: 'org_member', is_invite: true } as any)).toBe(true)
+    expect(isPendingOrganizationInvite({ role: 'invite_admin', is_invite: false } as any)).toBe(false)
+    expect(isPendingOrganizationInvite({ role: 'invite_admin' } as any)).toBe(true)
+    expect(isPendingOrganizationInvite({ role: 'org_admin' } as any)).toBe(false)
+  })
 })
 
 describe('organization store refreshOrganizationLogos', () => {

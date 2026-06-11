@@ -104,8 +104,14 @@ function matchesRbacRole(role: string, requiredRole: string) {
   return role === requiredRole
 }
 
-function isSelectableOrganization(org: Pick<Organization, 'is_invite'>) {
-  return org.is_invite !== true
+export function isPendingOrganizationInvite(org: Pick<Organization, 'is_invite' | 'role'>) {
+  if (org.is_invite !== null && org.is_invite !== undefined)
+    return org.is_invite === true
+  return org.role.startsWith('invite')
+}
+
+function isSelectableOrganization(org: Pick<Organization, 'is_invite' | 'role'>) {
+  return !isPendingOrganizationInvite(org)
 }
 
 const supabase = useSupabase()

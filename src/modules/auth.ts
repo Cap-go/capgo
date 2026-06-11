@@ -10,7 +10,7 @@ import { getLocalConfig, useSupabase } from '~/services/supabase'
 import { sendEvent } from '~/services/tracking'
 import { clearWebsitePaidUserCookie, setWebsitePaidUserCookie } from '~/services/websiteAuthCookie'
 import { useMainStore } from '~/stores/main'
-import { useOrganizationStore } from '~/stores/organization'
+import { isPendingOrganizationInvite, useOrganizationStore } from '~/stores/organization'
 import { hasPendingInviteSkip } from '~/utils/pendingInviteSkip'
 import { getPlans, isPlatformAdmin } from './../services/supabase'
 
@@ -211,7 +211,7 @@ async function guard(
       return false
     if (!inviteOrgId)
       return true
-    return !organizationStore.organizations.some(org => org.gid === inviteOrgId && org.role.startsWith('invite'))
+    return !organizationStore.organizations.some(org => org.gid === inviteOrgId && isPendingOrganizationInvite(org))
   }
 
   function shouldRedirectToPendingInviteOnboarding(organizationsLoaded: boolean) {
@@ -223,7 +223,7 @@ async function guard(
       return false
     if (hasPendingInviteSkip(sessionUser?.id ?? main.auth?.id))
       return false
-    return organizationStore.organizations.some(org => org.role.startsWith('invite'))
+    return organizationStore.organizations.some(org => isPendingOrganizationInvite(org))
   }
 
   if (hasAuth && sessionUser) {

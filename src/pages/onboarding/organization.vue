@@ -25,7 +25,7 @@ import { pushEvent } from '~/services/posthog'
 import { getLocalConfig, useSupabase } from '~/services/supabase'
 import { useDisplayStore } from '~/stores/display'
 import { useMainStore } from '~/stores/main'
-import { useOrganizationStore } from '~/stores/organization'
+import { isPendingOrganizationInvite, useOrganizationStore } from '~/stores/organization'
 
 type OnboardingStep = 'details' | 'logo' | 'invite'
 type OnboardingMode = 'website' | 'name' | null
@@ -167,7 +167,7 @@ const canCreateOrganization = computed(() => {
 
   return !!orgNameInput.value.trim() && !!selectedUserCountStop.value
 })
-const hasExistingOrganization = computed(() => organizationStore.organizations.some(org => !org.role.includes('invite')))
+const hasExistingOrganization = computed(() => organizationStore.organizations.some(org => !isPendingOrganizationInvite(org)))
 const inviteSuccessCount = computed(() => sentInvites.value.length)
 const isCompactCreateOrgFlow = computed(() => isAdditionalOrgFlow.value)
 const onboardingBadge = computed(() => isCompactCreateOrgFlow.value
@@ -316,7 +316,7 @@ async function hydrateOnboardingFromQuery() {
   const queryStep = typeof route.query.step === 'string' ? route.query.step as OnboardingStep : 'details'
 
   const validatedOrg = queryOrgId
-    ? organizationStore.organizations.find(org => org.gid === queryOrgId && !org.role.includes('invite'))
+    ? organizationStore.organizations.find(org => org.gid === queryOrgId && !isPendingOrganizationInvite(org))
     : null
 
   if (validatedOrg) {
