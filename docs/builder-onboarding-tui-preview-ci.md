@@ -5,7 +5,9 @@ This repository keeps the private builder onboarding TUI suite in the
 `.github/workflows/builder_onboarding_tui_preview.yml` builds the local `cli/`
 workspace, runs the private suite with `CAPGO_CLI_ROOT=$GITHUB_WORKSPACE/cli`,
 uploads the generated `e2e-tui/results/` files to Cloudflare R2, and appends
-the suite's Markdown failure summary to the GitHub Actions run summary.
+a compact pass/fail table to the GitHub Actions run summary. The full Markdown
+failure details are still written to `failure-details.md` and uploaded with the
+rest of the result bundle.
 
 ## Trigger model
 

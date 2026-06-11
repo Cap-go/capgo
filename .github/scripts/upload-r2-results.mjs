@@ -66,8 +66,12 @@ if (await fileExists(reportPath)) {
 
 const reportUrl = `${trimTrailingSlash(process.env.REPORTS_BASE_URL)}/${prefix}/index.html`;
 const summaryUrl = `${trimTrailingSlash(process.env.REPORTS_BASE_URL)}/${prefix}/summary.md`;
+const failureDetailsUrl = `${trimTrailingSlash(process.env.REPORTS_BASE_URL)}/${prefix}/failure-details.md`;
 const runUrl = `${trimTrailingSlash(process.env.REPORTS_BASE_URL)}/${prefix}/run.json`;
 const filesUrl = `${trimTrailingSlash(process.env.REPORTS_BASE_URL)}/${prefix}/files.txt`;
+const failureDetailsLine = await fileExists(path.join(resultsDir, "failure-details.md"))
+  ? [`- [Detailed Markdown failure output](${failureDetailsUrl})`]
+  : [];
 
 await append(process.env.GITHUB_OUTPUT, `url=${reportUrl}\n`);
 await append(
@@ -77,7 +81,8 @@ await append(
     "",
     `[Open protected HTML report](${reportUrl})`,
     "",
-    `- [Markdown summary](${summaryUrl})`,
+    `- [Markdown summary table](${summaryUrl})`,
+    ...failureDetailsLine,
     `- [Raw run.json](${runUrl})`,
     `- [Uploaded file list](${filesUrl})`,
     "",

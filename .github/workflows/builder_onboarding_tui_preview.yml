@@ -149,7 +149,8 @@ jobs:
             exit 0
           fi
 
-          node e2e-tui/report/report.mjs e2e-tui/results/run.json --summary > e2e-tui/results/summary.md
+          node e2e-tui/report/report.mjs e2e-tui/results/run.json --summary > e2e-tui/results/failure-details.md
+          node "$GITHUB_WORKSPACE/.github/scripts/write-tui-summary.mjs" e2e-tui/results/run.json e2e-tui/results/summary.md
           cat e2e-tui/results/summary.md >> "$GITHUB_STEP_SUMMARY"
 
           find e2e-tui/results -type f ! -name ".gitkeep" \
