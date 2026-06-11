@@ -240,6 +240,34 @@ describe('decideCompatibilityEvents', () => {
     expect(events).toHaveLength(0)
   })
 
+  it('does NOT suppress a non-inverse transition into a known baseline (800 -> 600 with 600 -> 700 open)', () => {
+    // Only the exact inverse of the open event (700 -> 600) is a rollback; a
+    // transition from some other bundle (800) into the baseline must still
+    // raise its own event, because its immediate baseline is 800, not 700.
+    const PKG_V8: NativePackage[] = [{ name: '@capacitor/core', version: '8.0.0' }]
+    const events = decideCompatibilityEvents({
+      changeOccurredAt: CHANGE_AT,
+      newChannel: newChannel({ version: 600 }),
+      currentBundle: bundle(600, '6.0.0', PKG_V6),
+      previousDefaults: [{
+        platform: 'ios',
+        source: 'default_channel_version_changed',
+        bundle: bundle(800, '8.0.0', PKG_V8),
+      }],
+      unresolvedEvents: [{
+        id: 1,
+        platform: 'ios',
+        channel_id: 101,
+        previous_version_id: 600,
+        previous_version_name: '6.0.0',
+        current_version_id: 700,
+      }],
+    })
+
+    expect(events).toHaveLength(1)
+    expect(events[0]).toMatchObject({ previous_version_id: 800, current_version_id: 600 })
+  })
+
   it('does NOT suppress the mirror event when the downgrade guard is off', () => {
     // With disable_auto_update_under_native off, devices that already installed
     // the newer native build CAN receive the rolled-back bundle, so the mirror

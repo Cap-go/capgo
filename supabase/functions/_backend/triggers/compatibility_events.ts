@@ -156,11 +156,14 @@ export function decideCompatibilityEvents(input: DecideCompatibilityEventsInput)
     if (previous.bundle.id === currentBundle.id)
       continue
 
-    // REVERT: the new default is a baseline an unresolved event already says
-    // this channel's users are on. Returning them to it is the remediation the
-    // event recommends, not a new incompatibility — raising a mirror event here
+    // REVERT: this change is the exact inverse of an unresolved event for this
+    // channel+platform (current/previous swapped) — i.e., the channel returns to
+    // the baseline the event says users are on, which is the remediation the
+    // event recommends, not a new incompatibility. Raising a mirror event here
     // would loop forever (each rollback raising the next event). The matching
     // unresolved event is auto-resolved by decideAutoResolves on this same pass.
+    // Requiring BOTH ids to match keeps any non-inverse transition (e.g. an
+    // 800 -> 600 change while a 600 -> 700 event is open) raising its own event.
     //
     // Only safe to suppress while the channel's downgrade guard is on:
     // `disable_auto_update_under_native` makes the update endpoint refuse to
@@ -168,12 +171,15 @@ export function decideCompatibilityEvents(input: DecideCompatibilityEventsInput)
     // installed the newer native build cannot receive the rolled-back bundle.
     // With the guard off that delivery is possible and the event must be raised.
     if (newChannel.disable_auto_update_under_native) {
-      const isRevertToKnownBaseline = unresolvedEvents.some(event =>
+      // hasNativePackages' narrowing does not carry into the closure below.
+      const previousBundleId = previous.bundle.id
+      const isDirectRollback = unresolvedEvents.some(event =>
         event.channel_id === newChannel.id
         && event.platform === previous.platform
-        && event.previous_version_id === currentBundle.id,
+        && event.previous_version_id === currentBundle.id
+        && event.current_version_id === previousBundleId,
       )
-      if (isRevertToKnownBaseline)
+      if (isDirectRollback)
         continue
     }
 
