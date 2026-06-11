@@ -96,7 +96,7 @@ describe('updates channel_self store override routing', () => {
 
     expect(requestInfosPostgresMock).toHaveBeenCalledWith(expect.objectContaining({
       app_id: 'com.test.app',
-      channelDeviceCount: 0,
+      channelDeviceCount: 12,
       channelSelfOverrideChannelId: 42,
       defaultChannel: '',
       device_id: '11111111-1111-4111-8111-111111111111',
@@ -114,7 +114,7 @@ describe('updates channel_self store override routing', () => {
     expect(getChannelSelfOverrideMock).not.toHaveBeenCalled()
     expect(requestInfosPostgresMock).toHaveBeenCalledWith(expect.objectContaining({
       app_id: 'com.test.app',
-      channelDeviceCount: 0,
+      channelDeviceCount: 12,
       channelSelfOverrideChannelId: undefined,
       defaultChannel: '',
       device_id: '11111111-1111-4111-8111-111111111111',
@@ -132,7 +132,7 @@ describe('updates channel_self store override routing', () => {
     expect(getChannelSelfOverrideMock).toHaveBeenCalledOnce()
     expect(requestInfosPostgresMock).toHaveBeenCalledWith(expect.objectContaining({
       app_id: 'com.test.app',
-      channelDeviceCount: 0,
+      channelDeviceCount: 12,
       channelSelfOverrideChannelId: undefined,
       defaultChannel: '',
       device_id: '11111111-1111-4111-8111-111111111111',

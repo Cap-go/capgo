@@ -7,8 +7,8 @@ import { computed, ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import IconBilling from '~icons/mingcute/bill-fill'
-import AdminOnlyModal from '~/components/AdminOnlyModal.vue'
 import FailedCard from '~/components/FailedCard.vue'
+import RbacPermissionOnlyModal from '~/components/RbacPermissionOnlyModal.vue'
 import Tabs from '~/components/Tabs.vue'
 import { accountTabs } from '~/constants/accountTabs'
 import { organizationTabs as baseOrgTabs } from '~/constants/organizationTabs'
@@ -25,30 +25,6 @@ const route = useRoute()
 
 // Modal state for non-admin billing access (triggered by billing tab click)
 const showBillingModal = ref(false)
-
-// Routes that require super_admin access (security-sensitive settings)
-const adminOnlyRoutes = [
-  '/settings/organization/audit-logs',
-  '/settings/organization/auditlogs',
-  '/settings/organization/security',
-]
-
-// Check if user is super_admin
-const isSuperAdmin = computed(() => {
-  const orgId = organizationStore.currentOrganization?.gid
-  return organizationStore.hasPermissionsInRole('super_admin', ['org_super_admin'], orgId)
-})
-
-// Check if current route is admin-only and user is not admin
-const isOnAdminOnlyRoute = computed(() => {
-  const path = route.path.replace(/\/$/, '')
-  return adminOnlyRoutes.some(r => path === r || path.startsWith(`${r}/`))
-})
-
-// Show admin-only modal when non-admin is on admin-only route
-const showAdminOnlyModal = computed(() => {
-  return !isSuperAdmin.value && isOnAdminOnlyRoute.value
-})
 
 // Check if user needs to setup 2FA or update password for organization access
 const needsSecurityCompliance = computed(() => {
@@ -80,19 +56,41 @@ const canUpdateBilling = computedAsync(async () => {
   return await checkPermissions('org.update_billing', { orgId })
 }, false)
 
+const auditLogsAccessEvaluating = ref(false)
 const canReadAuditLogs = computedAsync(async () => {
   const orgId = organizationStore.currentOrganization?.gid
   if (!orgId)
     return false
   return await checkPermissions('org.read_audit', { orgId })
-}, false)
+}, false, { evaluating: auditLogsAccessEvaluating })
 
+const securityAccessEvaluating = ref(false)
 const canManageSecurity = computedAsync(async () => {
   const orgId = organizationStore.currentOrganization?.gid
   if (!orgId)
     return false
   return await checkPermissions('org.update_settings', { orgId })
-}, false)
+}, false, { evaluating: securityAccessEvaluating })
+
+// Security-sensitive org routes are gated by their own RBAC permission. When the
+// current user lacks it (e.g. reached the route via a direct link), show a modal
+// explaining what access is needed and who can grant it.
+const adminOnlyRouteGate = computed(() => {
+  const path = route.path.replace(/\/$/, '')
+  if (path === '/settings/organization/security') {
+    return { permission: 'org.update_settings' as const, title: t('security-access-required'), hasAccess: canManageSecurity.value, evaluating: securityAccessEvaluating.value }
+  }
+  if (path === '/settings/organization/audit-logs' || path === '/settings/organization/auditlogs') {
+    return { permission: 'org.read_audit' as const, title: t('audit-access-required'), hasAccess: canReadAuditLogs.value, evaluating: auditLogsAccessEvaluating.value }
+  }
+  return null
+})
+
+// Don't flash the modal while the permission check is still resolving.
+const showAdminOnlyModal = computed(() => {
+  const gate = adminOnlyRouteGate.value
+  return !!gate && !gate.evaluating && !gate.hasAccess
+})
 
 watchEffect(() => {
   if (!stripeEnabled.value) {
@@ -201,8 +199,8 @@ watchEffect(() => {
       icon: IconBilling,
       key: '/billing',
       onClick: () => {
-        // Check permissions at click time to handle role changes
-        if (organizationStore.hasPermissionsInRole('super_admin', ['org_super_admin'], organizationStore.currentOrganization?.gid)) {
+        // Check permission at click time to handle role changes
+        if (canUpdateBilling.value) {
           openPortal(organizationStore.currentOrganization?.gid ?? '', t)
         }
         else {
@@ -278,10 +276,19 @@ function handleSecondary(val: string) {
         <FailedCard v-if="shouldBlockContent" />
         <RouterView v-else class="w-full" />
       </div>
-      <!-- Admin-only modal for admin-only routes -->
-      <AdminOnlyModal v-if="showAdminOnlyModal" />
-      <!-- Admin-only modal for billing tab click -->
-      <AdminOnlyModal v-if="showBillingModal" @click="showBillingModal = false" />
+      <!-- Permission modal for security-sensitive org routes reached without access -->
+      <RbacPermissionOnlyModal
+        v-if="showAdminOnlyModal && adminOnlyRouteGate"
+        :title="adminOnlyRouteGate.title"
+        :permission="adminOnlyRouteGate.permission"
+      />
+      <!-- Permission modal for the billing tab click -->
+      <RbacPermissionOnlyModal
+        v-if="showBillingModal"
+        :title="t('billing-access-required')"
+        permission="org.update_billing"
+        @click="showBillingModal = false"
+      />
     </main>
   </div>
 </template>

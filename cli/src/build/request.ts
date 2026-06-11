@@ -60,7 +60,7 @@ import { copyToClipboard, revealInFinder } from '../support/clipboard.js'
 import { contactSupport } from '../support/contact-support.js'
 import { appendInternalLog, getInternalLogPath, startInternalLog } from '../support/internal-log.js'
 import { uploadSupportLogs } from '../support/support-upload.js'
-import { assertCliPermission, canPromptInteractively, createSupabaseClient, findSavedKey, getConfig, getOrganizationId, sendEvent } from '../utils'
+import { assertCliPermission, canPromptInteractively, createSupabaseClient, findSavedKey, getConfig, getOrganizationId, sendEvent, TUS_UPLOAD_RETRY_DELAYS } from '../utils'
 import { mergeCredentials, MIN_OUTPUT_RETENTION_SECONDS, parseInAppUpdatePriority, parseOptionalBoolean, parseOutputRetentionSeconds } from './credentials'
 import { buildProvisioningMap } from './credentials-command'
 import { writeBuildOutputRecord } from './output-record'
@@ -1740,6 +1740,7 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
         const upload = new tus.Upload(zipBuffer as any, {
           endpoint: buildRequest.upload_url,
           chunkSize: 5 * 1024 * 1024, // 5MB chunks
+          retryDelays: [...TUS_UPLOAD_RETRY_DELAYS],
           metadata: {
             filename: basename(zipPath),
             filetype: 'application/zip',

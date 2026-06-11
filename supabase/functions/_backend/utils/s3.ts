@@ -184,19 +184,49 @@ async function deleteObjectsWithPrefix(c: Context, prefix: string): Promise<numb
 
 async function checkIfExist(c: Context, fileId: string | null) {
   if (!fileId) {
+    cloudlog({ requestId: c.get('requestId'), message: 'checkIfExist skipped empty fileId' })
     return false
   }
+
+  const bucket = getEnv(c, 'S3_BUCKET')
+  const endpoint = getEnv(c, 'S3_ENDPOINT')
+
   try {
     const client = initS3(c)
     const url = await client.getPresignedUrl('HEAD', fileId)
     const response = await fetch(url, {
       method: 'HEAD',
     })
-    const contentLength = Number.parseInt(response.headers.get('content-length') || '0')
-    return response.status === 200 && contentLength > 0
+    const contentLengthHeader = response.headers.get('content-length')
+    const contentLength = Number.parseInt(contentLengthHeader || '0')
+    const exists = response.status === 200 && contentLength > 0
+    await response.body?.cancel()
+
+    if (!exists) {
+      cloudlog({
+        requestId: c.get('requestId'),
+        message: 'checkIfExist returned false',
+        bucket,
+        contentLength,
+        contentLengthHeader,
+        endpoint,
+        fileId,
+        status: response.status,
+        statusText: response.statusText,
+      })
+    }
+
+    return exists
   }
-  catch {
-    // cloudlog({ requestId: c.get('requestId'), message: 'checkIfExist', fileId, error  })
+  catch (error) {
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: 'checkIfExist failed',
+      bucket,
+      endpoint,
+      error: serializeStorageError(error),
+      fileId,
+    })
     return false
   }
 }
