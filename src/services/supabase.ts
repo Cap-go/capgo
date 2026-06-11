@@ -40,6 +40,33 @@ export function getLocalConfig() {
 let config: CapgoConfig = getLocalConfig()
 export const stripeEnabled = ref<boolean>(config.stripeEnabled ?? true)
 
+interface SpoofedAdminSession {
+  jwt: string
+  refreshToken: string
+}
+
+function getSpoofedAdminStorageKey() {
+  return `supabase-${config.supbaseId}.spoof_admin_jwt`
+}
+
+function getSpoofedAdminSession(): SpoofedAdminSession | null {
+  const textData = localStorage.getItem(getSpoofedAdminStorageKey())
+  if (!textData)
+    return null
+
+  try {
+    const parsed = JSON.parse(textData) as Partial<SpoofedAdminSession>
+    if (typeof parsed.jwt !== 'string' || !parsed.jwt)
+      return null
+    if (typeof parsed.refreshToken !== 'string' || !parsed.refreshToken)
+      return null
+    return { jwt: parsed.jwt, refreshToken: parsed.refreshToken }
+  }
+  catch {
+    return null
+  }
+}
+
 export function mergeRemoteConfig(localConfig: CapgoConfig, remoteConfig: Partial<CapgoConfig> | null | undefined): CapgoConfig {
   return {
     ...localConfig,
@@ -97,10 +124,14 @@ export function useSupabase() {
 }
 
 export function isSpoofed() {
-  return !!localStorage.getItem(`supabase-${config.supbaseId}.spoof_admin_jwt`)
+  return !!getSpoofedAdminSession()
 }
 export function saveSpoof(jwt: string, refreshToken: string) {
-  return localStorage.setItem(`supabase-${config.supbaseId}.spoof_admin_jwt`, JSON.stringify({ jwt, refreshToken }))
+  return localStorage.setItem(getSpoofedAdminStorageKey(), JSON.stringify({ jwt, refreshToken }))
+}
+
+export function getSpoofedAdminJwt() {
+  return getSpoofedAdminSession()?.jwt ?? null
 }
 
 export async function hashEmail(email: string) {
@@ -114,17 +145,13 @@ export async function hashEmail(email: string) {
 }
 
 export function unspoofUser() {
-  const textData: string | null = localStorage.getItem(`supabase-${config.supbaseId}.spoof_admin_jwt`)
-  if (!textData || !isSpoofed())
-    return false
-
-  const { jwt, refreshToken } = JSON.parse(textData)
-  if (!jwt || !refreshToken)
+  const spoofedAdminSession = getSpoofedAdminSession()
+  if (!spoofedAdminSession)
     return false
 
   const supabase = useSupabase()
-  supabase.auth.setSession({ access_token: jwt, refresh_token: refreshToken })
-  localStorage.removeItem(`supabase-${config.supbaseId}.spoof_admin_jwt`)
+  supabase.auth.setSession({ access_token: spoofedAdminSession.jwt, refresh_token: spoofedAdminSession.refreshToken })
+  localStorage.removeItem(getSpoofedAdminStorageKey())
   return true
 }
 

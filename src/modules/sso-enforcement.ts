@@ -1,5 +1,5 @@
 import type { UserModule } from '~/types'
-import { defaultApiHost, useSupabase } from '~/services/supabase'
+import { defaultApiHost, getSpoofedAdminJwt, useSupabase } from '~/services/supabase'
 
 interface SsoEnforcementResponse {
   allowed: boolean
@@ -8,6 +8,7 @@ interface SsoEnforcementResponse {
 
 const SSO_CHECK_CACHE_KEY = 'sso_enforcement_checked'
 const SSO_CHECK_CACHE_TTL = 5 * 60 * 1000
+const SPOOF_ADMIN_AUTHORIZATION_HEADER = 'X-Capgo-Spoof-Admin-Authorization'
 
 const PUBLIC_ROUTES = [
   '/login',
@@ -74,12 +75,17 @@ export const install: UserModule = ({ router }) => {
       return next()
 
     try {
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session.access_token}`,
+      }
+      const spoofedAdminJwt = getSpoofedAdminJwt()
+      if (spoofedAdminJwt)
+        headers[SPOOF_ADMIN_AUTHORIZATION_HEADER] = `Bearer ${spoofedAdminJwt}`
+
       const response = await fetch(`${defaultApiHost}/private/sso/check-enforcement`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`,
-        },
+        headers,
         body: JSON.stringify({
           email: session.user.email,
           auth_type: 'password',
