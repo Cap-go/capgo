@@ -54,6 +54,11 @@ Add these repository variables:
 - `BUILDER_ONBOARDING_TUI_REPORTS_URL`: Access-protected custom-domain base URL,
   for example `https://buildertuipreview.capgo.app`.
 
+The workflow uploads result files to the remote R2 bucket with Wrangler
+`--remote` and uses eight concurrent uploads by default. Adjust
+`R2_UPLOAD_CONCURRENCY` in the workflow if R2 or the runner needs a lower or
+higher parallelism limit.
+
 ## Cloudflare one-time setup
 
 The Cloudflare API token used below needs permission to manage R2 buckets/custom
