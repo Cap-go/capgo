@@ -7,12 +7,15 @@ const originalCloudflareFunctionUrl = process.env.CLOUDFLARE_FUNCTION_URL
 
 function createStore(seed: Record<string, string>) {
   const values = new Map(Object.entries(seed))
+  const puts: Array<{ key: string, options?: { expirationTtl?: number }, value: string }> = []
   return {
     values,
+    puts,
     async get(key: string) {
       return values.get(key) ?? null
     },
-    async put(key: string, value: string) {
+    async put(key: string, value: string, options?: { expirationTtl?: number }) {
+      puts.push({ key, value, options })
       values.set(key, value)
     },
     async delete(key: string) {
@@ -85,5 +88,35 @@ describe('plugin notification flush', () => {
     expect(store.values.has(failedKey)).toBe(true)
     expect(Array.from(store.values.keys()).filter(key => key.startsWith('plugin:notif:processing:v1:'))).toEqual([])
     expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('deletes throttled queue items and writes a throttle marker', async () => {
+    const throttledKey = `${PLUGIN_NOTIFICATION_QUEUE_PREFIX}org:org-1:throttled:hash`
+    const store = createStore({
+      [throttledKey]: queueItem('throttled'),
+    })
+    const lastSendAt = new Date().toISOString()
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({
+      failed: 0,
+      processed: 1,
+      results: [{ status: 'throttled', lastSendAt }],
+      throttled: 1,
+    }), { status: 200 }))
+    vi.stubGlobal('fetch', fetchMock)
+    process.env.API_SECRET = 'secret'
+    process.env.CLOUDFLARE_FUNCTION_URL = 'https://api.capgo.test'
+
+    const result = await flushQueuedPluginNotifications({
+      env: {
+        CHANNEL_SELF_STORE: store,
+      },
+      get: () => 'request-id',
+    } as any)
+
+    expect(result).toMatchObject({ scanned: 1, transferred: 1, deleted: 1, failed: 0 })
+    expect(store.values.has(throttledKey)).toBe(false)
+    const throttlePut = store.puts.find(({ key }) => key.startsWith('plugin:notif:throttle:v1:'))
+    expect(throttlePut?.options?.expirationTtl).toBeGreaterThanOrEqual(60)
+    expect(Array.from(store.values.keys()).filter(key => key.startsWith('plugin:notif:processing:v1:'))).toEqual([])
   })
 })

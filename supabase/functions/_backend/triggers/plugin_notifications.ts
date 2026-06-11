@@ -29,9 +29,14 @@ function isValidPluginNotificationItem(item: unknown): item is PluginNotificatio
 }
 
 type PluginNotificationSendResult = boolean | { sent: false, lastSendAt: string }
+type PluginNotificationItemResult = { status: 'delivered' } | { status: 'failed' } | { lastSendAt: string, status: 'throttled' }
 
-function isAcceptedPluginNotificationResult(result: PluginNotificationSendResult) {
-  return result === true
+function getPluginNotificationItemResult(result: PluginNotificationSendResult): PluginNotificationItemResult {
+  if (result === true)
+    return { status: 'delivered' }
+  if (typeof result === 'object' && result.sent === false && result.lastSendAt)
+    return { status: 'throttled', lastSendAt: result.lastSendAt }
+  return { status: 'failed' }
 }
 
 async function sendQueuedPluginNotification(c: Context, item: PluginNotificationQueueItem, drizzleClient: ReturnType<typeof getDrizzleClient>): Promise<PluginNotificationSendResult> {
@@ -44,22 +49,28 @@ async function sendQueuedPluginNotification(c: Context, item: PluginNotification
 async function processPluginNotifications(c: Context, items: PluginNotificationQueueItem[]) {
   const pgClient = getPgClient(c, true)
   const drizzleClient = getDrizzleClient(pgClient)
+  const results: PluginNotificationItemResult[] = []
   let processed = 0
   let failed = 0
+  let throttled = 0
 
   try {
     for (const item of items) {
       try {
-        const result = await sendQueuedPluginNotification(c, item, drizzleClient)
-        if (!isAcceptedPluginNotificationResult(result)) {
+        const result = getPluginNotificationItemResult(await sendQueuedPluginNotification(c, item, drizzleClient))
+        results.push(result)
+        if (result.status === 'failed') {
           failed++
           cloudlogErr({ requestId: c.get('requestId'), message: 'Plugin notification item was not delivered', type: item.type, eventName: item.eventName, orgId: item.orgId })
           continue
         }
+        if (result.status === 'throttled')
+          throttled++
         processed++
       }
       catch (error) {
         failed++
+        results.push({ status: 'failed' })
         cloudlogErr({ requestId: c.get('requestId'), message: 'Plugin notification item processing failed', type: item.type, eventName: item.eventName, orgId: item.orgId, error: serializeError(error) })
       }
     }
@@ -68,7 +79,7 @@ async function processPluginNotifications(c: Context, items: PluginNotificationQ
     await closeClient(c, pgClient)
   }
 
-  return { processed, failed }
+  return { processed, failed, throttled, results }
 }
 
 export const app = new Hono<MiddlewareKeyVariables>()
@@ -77,7 +88,7 @@ app.post('/', middlewareAPISecret, async (c) => {
   const body = await parseBody<PluginNotificationBatchBody>(c)
   const rawItems = Array.isArray(body.items) ? body.items : []
   if (rawItems.length === 0)
-    return c.json({ ...BRES, processed: 0, failed: 0 })
+    return c.json({ ...BRES, processed: 0, failed: 0, throttled: 0, results: [] })
   if (rawItems.length > MAX_PLUGIN_NOTIFICATION_BATCH)
     throw simpleError('too_many_items', 'Too many plugin notification items', { max: MAX_PLUGIN_NOTIFICATION_BATCH, count: rawItems.length })
 
@@ -87,7 +98,7 @@ app.post('/', middlewareAPISecret, async (c) => {
     cloudlog({ requestId: c.get('requestId'), message: 'Plugin notification batch contained invalid items', invalid })
   }
   if (items.length === 0)
-    return c.json({ ...BRES, processed: 0, failed: 0, invalid })
+    return c.json({ ...BRES, processed: 0, failed: 0, throttled: 0, results: [], invalid })
 
   const result = await processPluginNotifications(c, items)
   if (result.failed > 0) {

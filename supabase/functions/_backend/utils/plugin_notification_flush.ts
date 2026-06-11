@@ -1,12 +1,16 @@
 import type { Context } from 'hono'
 import type { PluginNotificationQueueItem } from './plugin_notification_queue.ts'
+import { parseCronExpression } from 'cron-schedule'
 import { cloudlog, cloudlogErr, serializeError } from './logging.ts'
-import { parsePluginNotificationQueueItem, PLUGIN_NOTIFICATION_QUEUE_PREFIX } from './plugin_notification_queue.ts'
+import { parsePluginNotificationQueueItem, PLUGIN_NOTIFICATION_QUEUE_PREFIX, suppressPluginNotificationQueue } from './plugin_notification_queue.ts'
 import { getEnv } from './utils.ts'
 
 const PLUGIN_NOTIFICATION_FLUSH_LIMIT = 100
 const PLUGIN_NOTIFICATION_PROCESSING_PREFIX = 'plugin:notif:processing:v1:'
 const PLUGIN_NOTIFICATION_PROCESSING_TTL_SECONDS = 120
+const PLUGIN_NOTIFICATION_THROTTLE_FALLBACK_TTL_SECONDS = 60
+const PLUGIN_NOTIFICATION_THROTTLE_MIN_TTL_SECONDS = 60
+const PLUGIN_NOTIFICATION_THROTTLE_MAX_TTL_SECONDS = 7 * 24 * 60 * 60
 
 export interface PluginNotificationFlushResult {
   status: 'ok'
@@ -14,6 +18,15 @@ export interface PluginNotificationFlushResult {
   transferred: number
   deleted: number
   failed: number
+}
+
+interface PluginNotificationTriggerBody {
+  results?: Array<{ lastSendAt?: string, status?: string }>
+}
+
+interface PluginNotificationTransferResult {
+  accepted: boolean
+  throttledLastSendAt?: string
 }
 
 function getPluginNotificationTriggerUrl(c: Context) {
@@ -28,12 +41,25 @@ function getPluginNotificationTriggerUrl(c: Context) {
   return null
 }
 
-async function postPluginNotificationBatch(c: Context, items: PluginNotificationQueueItem[]) {
+function getPluginNotificationThrottleTtlSeconds(c: Context, item: PluginNotificationQueueItem, lastSendAt: string) {
+  try {
+    const interval = parseCronExpression(item.cron)
+    const nextDate = interval.getNextDate(new Date(lastSendAt))
+    const diffMs = nextDate.getTime() - Date.now()
+    return Math.max(PLUGIN_NOTIFICATION_THROTTLE_MIN_TTL_SECONDS, Math.min(Math.ceil(diffMs / 1000), PLUGIN_NOTIFICATION_THROTTLE_MAX_TTL_SECONDS))
+  }
+  catch (error) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Plugin notification throttle TTL calculation failed', type: item.type, eventName: item.eventName, orgId: item.orgId, error: serializeError(error) })
+    return PLUGIN_NOTIFICATION_THROTTLE_FALLBACK_TTL_SECONDS
+  }
+}
+
+async function postPluginNotificationBatch(c: Context, items: PluginNotificationQueueItem[]): Promise<PluginNotificationTransferResult> {
   const url = getPluginNotificationTriggerUrl(c)
   const apiSecret = getEnv(c, 'API_SECRET')
   if (!url || !apiSecret) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'Plugin notification trigger config missing', hasUrl: Boolean(url), hasApiSecret: Boolean(apiSecret) })
-    return false
+    return { accepted: false }
   }
 
   const response = await fetch(url, {
@@ -45,12 +71,15 @@ async function postPluginNotificationBatch(c: Context, items: PluginNotification
     body: JSON.stringify({ items }),
   })
 
-  if (response.ok)
-    return true
+  if (response.ok) {
+    const body = await response.json().catch(() => null) as PluginNotificationTriggerBody | null
+    const throttledResult = body?.results?.find(result => result.status === 'throttled' && result.lastSendAt)
+    return { accepted: true, throttledLastSendAt: throttledResult?.lastSendAt }
+  }
 
   const body = await response.text().catch(() => '')
   cloudlogErr({ requestId: c.get('requestId'), message: 'Plugin notification trigger transfer failed', status: response.status, statusText: response.statusText, body })
-  return false
+  return { accepted: false }
 }
 
 function buildProcessingKey(queueKey: string) {
@@ -95,19 +124,25 @@ async function processBatch(
   let transferred = 0
   let deleted = 0
   let failed = 0
-
   for (const [index, item] of items.entries()) {
-    const itemKey = itemKeys[index]
-    const processingKey = processingKeys[index]
+    const itemKey = itemKeys[index]!
+    const processingKey = processingKeys[index]!
 
     try {
-      const accepted = await postPluginNotificationBatch(c, [item])
-      if (!accepted) {
+      const transfer = await postPluginNotificationBatch(c, [item])
+      if (!transfer.accepted) {
         failed++
         await releaseProcessingKeysSafely(c, store, [processingKey])
         continue
       }
 
+      if (transfer.throttledLastSendAt) {
+        await suppressPluginNotificationQueue(
+          store,
+          itemKey,
+          getPluginNotificationThrottleTtlSeconds(c, item, transfer.throttledLastSendAt),
+        )
+      }
       await store.delete(itemKey)
       deleted++
       transferred++

@@ -249,6 +249,18 @@ describe('plugin Supabase write policy', () => {
     expect(put).not.toHaveBeenCalled()
   })
 
+  it.concurrent('does not enqueue plugin notifications while a KV throttle marker exists', async () => {
+    const get = vi.fn(async (key: string) => key.startsWith('plugin:notif:throttle:v1:') ? 'throttled' : null)
+    const put = vi.fn(async (_key: string, _raw: string, _options: unknown) => undefined)
+    const context = createContext({ queuePluginNotifications: true }, { CHANNEL_SELF_STORE: { get, put } })
+    const { sendNotifOrgCached } = await import('../supabase/functions/_backend/utils/notifications.ts')
+
+    await expect(sendNotifOrgCached(context, 'org:missing_payment', { app_id: 'com.test.app' }, 'org-1', 'com.test.app', '0 0 * * 1', 'owner@example.com', {} as any)).resolves.toBe(false)
+
+    expect(get.mock.calls.some(([key]) => String(key).startsWith('plugin:notif:throttle:v1:'))).toBe(true)
+    expect(put).not.toHaveBeenCalled()
+  })
+
   it.concurrent('queues cached org notifications into plugin KV', async () => {
     const get = vi.fn(async (_key: string) => null)
     const put = vi.fn(async (_key: string, _raw: string, _options: unknown) => undefined)

@@ -1,10 +1,12 @@
 import type { Context } from 'hono'
-import type { NotificationAudience, EmailPreferenceKey } from './org_email_notifications.ts'
+import type { EmailPreferenceKey, NotificationAudience } from './org_email_notifications.ts'
 import { CacheHelper } from './cache.ts'
 import { cloudlog, cloudlogErr, serializeError } from './logging.ts'
 
 export const PLUGIN_NOTIFICATION_QUEUE_PREFIX = 'plugin:notif:v1:'
+export const PLUGIN_NOTIFICATION_THROTTLE_PREFIX = 'plugin:notif:throttle:v1:'
 const PLUGIN_NOTIFICATION_QUEUE_TTL_SECONDS = 7 * 24 * 60 * 60
+const PLUGIN_NOTIFICATION_QUEUE_MIN_TTL_SECONDS = 60
 const PLUGIN_NOTIFICATION_QUEUE_CACHE_PATH = '/.plugin-notification-queue'
 const PLUGIN_NOTIFICATION_QUEUE_CACHE_TTL_SECONDS = 60
 export interface PluginOrgNotificationQueueItem {
@@ -52,6 +54,18 @@ async function buildQueueKey(item: PluginNotificationQueueInput) {
   return `${PLUGIN_NOTIFICATION_QUEUE_PREFIX}${item.type}:${encodeURIComponent(item.orgId)}:${encodeURIComponent(item.eventName)}:${uniqHash}`
 }
 
+export function buildPluginNotificationThrottleKey(queueKey: string) {
+  const suffix = queueKey.startsWith(PLUGIN_NOTIFICATION_QUEUE_PREFIX)
+    ? queueKey.slice(PLUGIN_NOTIFICATION_QUEUE_PREFIX.length)
+    : encodeURIComponent(queueKey)
+  return `${PLUGIN_NOTIFICATION_THROTTLE_PREFIX}${suffix}`
+}
+
+export async function suppressPluginNotificationQueue(store: KVNamespace, queueKey: string, ttlSeconds: number) {
+  const boundedTtlSeconds = Math.max(PLUGIN_NOTIFICATION_QUEUE_MIN_TTL_SECONDS, Math.min(ttlSeconds, PLUGIN_NOTIFICATION_QUEUE_TTL_SECONDS))
+  await store.put(buildPluginNotificationThrottleKey(queueKey), new Date().toISOString(), { expirationTtl: boundedTtlSeconds })
+}
+
 async function getQueueCache(c: Context, key: string) {
   const helper = new CacheHelper(c)
   const request = helper.buildRequest(PLUGIN_NOTIFICATION_QUEUE_CACHE_PATH, { key })
@@ -77,6 +91,13 @@ async function enqueuePluginNotification(c: Context, item: PluginNotificationQue
   }
 
   try {
+    const throttled = await store.get(buildPluginNotificationThrottleKey(key))
+    if (throttled) {
+      await queueCache.markQueued()
+      cloudlog({ requestId: c.get('requestId'), message: 'Plugin notification queue throttle hit', key, type: item.type, eventName: item.eventName, orgId: item.orgId })
+      return true
+    }
+
     const existing = await store.get(key)
     if (existing) {
       await queueCache.markQueued()
