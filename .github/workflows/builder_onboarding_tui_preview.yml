@@ -1,0 +1,210 @@
+name: Builder onboarding TUI preview
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.event.pull_request.number || inputs.pr_number || github.ref_name }}
+  cancel-in-progress: true
+
+on:
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: "PR number to run. Leave empty when dispatching from the PR branch."
+        required: false
+        type: string
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
+    paths:
+      - ".github/workflows/builder_onboarding_tui_preview.yml"
+      - ".gitmodules"
+      - "private/cli-mcp-tests"
+      - "cli/src/build/onboarding/**"
+      - "cli/src/build/credentials*.ts"
+      - "cli/src/build/env-render.ts"
+      - "cli/src/build/mobileprovision-parser.ts"
+      - "cli/src/build/platform-paths.ts"
+      - "cli/src/build/request.ts"
+      - "cli/src/build/telemetry.ts"
+      - "cli/src/init/**"
+      - "cli/test/**onboarding**"
+      - "cli/test/**build**"
+      - "tests/*onboarding*.test.ts"
+      - "docs/superpowers/**builder**"
+
+permissions: {}
+
+env:
+  CLICOLOR: "1"
+  PRIVATE_SUITE_DIR: private/cli-mcp-tests
+  R2_UPLOAD_CONCURRENCY: "16"
+  RESULTS_DIR: private/cli-mcp-tests/e2e-tui/results
+  REPORT_PATH: private/cli-mcp-tests/e2e-tui/results/report.html
+
+jobs:
+  tui-preview:
+    name: Run private TUI suite and publish report
+    # macOS, not ubuntu: the onboarding wizard only renders the file-picker fork
+    # ("📂 Open file picker / 📝 Type the path") on darwin, and the private suite's
+    # goldens are recorded against that flow — on Linux every journey crossing a
+    # path prompt times out on `waitFor /Type the path/`. Public repo → macOS
+    # runners are free.
+    runs-on: macos-latest
+    timeout-minutes: 45
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository }}
+    permissions:
+      contents: read
+      pull-requests: write # post/refresh the report-URL comment on the PR
+    steps:
+      - name: Resolve PR context
+        id: pr
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_PR_NUMBER: ${{ github.event.pull_request.number }}
+          EVENT_HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          EVENT_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          INPUT_PR_NUMBER: ${{ inputs.pr_number }}
+          REF_NAME: ${{ github.ref_name }}
+          REPOSITORY: ${{ github.repository }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            if [ "$EVENT_HEAD_REPO" != "$REPOSITORY" ]; then
+              echo "::error::Private TUI previews only run for PR branches inside $REPOSITORY."
+              exit 1
+            fi
+
+            echo "number=$EVENT_PR_NUMBER" >> "$GITHUB_OUTPUT"
+            echo "sha=$EVENT_HEAD_SHA" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          pr_number="$INPUT_PR_NUMBER"
+          if [ -z "$pr_number" ]; then
+            pr_number="$(gh pr list --repo "$REPOSITORY" --head "$REF_NAME" --state open --json number --jq '.[0].number // empty')"
+          fi
+
+          if [ -z "$pr_number" ]; then
+            echo "::error::Manual previews are PR-only. Pass pr_number or run this from a branch with an open PR."
+            exit 1
+          fi
+
+          pr_data="$(gh pr view "$pr_number" --repo "$REPOSITORY" --json number,headRefOid,headRepository,headRepositoryOwner --jq '(.number|tostring) + "\t" + .headRefOid + "\t" + .headRepositoryOwner.login + "/" + .headRepository.name')"
+          IFS="$(printf '\t')" read -r resolved_number head_sha head_repo <<< "$pr_data"
+
+          if [ "$head_repo" != "$REPOSITORY" ]; then
+            echo "::error::Private TUI previews only run for PR branches inside $REPOSITORY."
+            exit 1
+          fi
+
+          echo "number=$resolved_number" >> "$GITHUB_OUTPUT"
+          echo "sha=$head_sha" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout PR with private suite submodule
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ steps.pr.outputs.sha }}
+          fetch-depth: 0
+          submodules: recursive
+          token: ${{ secrets.CLI_MCP_TESTS_TOKEN || secrets.PERSONAL_ACCESS_TOKEN || github.token }}
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24.x
+
+      - name: Setup bun
+        run: bash scripts/setup-bun.sh
+
+      - name: Install Capgo dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build local CLI dist
+        run: bun run cli:build
+
+      - name: Install private suite dependencies
+        working-directory: ${{ env.PRIVATE_SUITE_DIR }}
+        run: bun install --frozen-lockfile
+
+      - name: Run private TUI harness self-tests
+        working-directory: ${{ env.PRIVATE_SUITE_DIR }}
+        env:
+          CAPGO_CLI_ROOT: ${{ github.workspace }}/cli
+        run: bun run test:e2e-tui:harness
+
+      - name: Run private TUI E2E suite
+        working-directory: ${{ env.PRIVATE_SUITE_DIR }}
+        env:
+          CAPGO_CLI_ROOT: ${{ github.workspace }}/cli
+        run: bun run test:e2e-tui
+
+      - name: Generate GitHub summary report
+        if: always()
+        working-directory: ${{ env.PRIVATE_SUITE_DIR }}
+        run: |
+          set -euo pipefail
+
+          if [ ! -f e2e-tui/results/run.json ]; then
+            echo "::warning::No run.json was produced; skipping Markdown summary generation."
+            exit 0
+          fi
+
+          node e2e-tui/report/report.mjs e2e-tui/results/run.json --summary > e2e-tui/results/failure-details.md
+          node "$GITHUB_WORKSPACE/.github/scripts/write-tui-summary.mjs" e2e-tui/results/run.json e2e-tui/results/summary.md
+          cat e2e-tui/results/summary.md >> "$GITHUB_STEP_SUMMARY"
+
+          find e2e-tui/results -type f ! -name ".gitkeep" \
+            | sed 's#^e2e-tui/results/##' \
+            | sort > e2e-tui/results/files.txt
+
+      - name: Publish result files to R2
+        if: always()
+        id: r2
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          R2_RESULTS_UPLOAD_ACCESS_KEY_ID: ${{ secrets.BUILDER_ONBOARDING_TUI_RESULTS_R2_UPLOAD_ACCESS_KEY_ID }}
+          # NOTE: the repo secret is named TUI_RESULTS_R2_UPLOAD_SECRET_ACCESS_KEY
+          # (unlike its BUILDER_ONBOARDING_-prefixed ACCESS_KEY_ID sibling) — the
+          # mismatched name here made the env empty and failed every upload.
+          R2_RESULTS_UPLOAD_SECRET_ACCESS_KEY: ${{ secrets.TUI_RESULTS_R2_UPLOAD_SECRET_ACCESS_KEY }}
+          R2_BUCKET: ${{ vars.BUILDER_ONBOARDING_TUI_R2_BUCKET }}
+          REPORTS_BASE_URL: ${{ vars.BUILDER_ONBOARDING_TUI_REPORTS_URL }}
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+          HEAD_SHA: ${{ steps.pr.outputs.sha }}
+        run: |
+          node .github/scripts/upload-r2-results.mjs
+
+      # Surface the hosted report ON the PR (the job summary already links it, but
+      # a sticky PR comment is what reviewers actually see). Updated in place per
+      # PR via the marker; skipped on workflow_dispatch runs without a PR.
+      - name: Comment report URL on PR
+        if: ${{ always() && steps.r2.outputs.url != '' && steps.pr.outputs.number != '' }}
+        uses: actions/github-script@v8
+        env:
+          REPORT_URL: ${{ steps.r2.outputs.url }}
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+          HEAD_SHA: ${{ steps.pr.outputs.sha }}
+          JOB_STATUS: ${{ job.status }}
+        with:
+          script: |
+            const marker = '<!-- builder-onboarding-tui-preview -->'
+            const issue_number = Number(process.env.PR_NUMBER)
+            const ok = process.env.JOB_STATUS === 'success'
+            const body = [
+              marker,
+              `## 🧪 Builder onboarding TUI preview — ${ok ? '✅ passed' : '❌ failed'}`,
+              '',
+              `**[▶ Open the interactive HTML report](${process.env.REPORT_URL})** (zoomable journey tree + cast playback)`,
+              '',
+              `Commit: ${process.env.HEAD_SHA} · [Job summary with the result table](${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})`,
+            ].join('\n')
+            const { owner, repo } = context.repo
+            const comments = await github.paginate(github.rest.issues.listComments, { owner, repo, issue_number, per_page: 100 })
+            const mine = comments.find(c => c.body && c.body.includes(marker))
+            if (mine) await github.rest.issues.updateComment({ owner, repo, comment_id: mine.id, body })
+            else await github.rest.issues.createComment({ owner, repo, issue_number, body })
