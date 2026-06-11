@@ -85,7 +85,16 @@ jobs:
         env:
           APPLE_KEY_CONTENT: ${{ secrets.APPLE_KEY_CONTENT }}
         run: |
-          printf '%s' "$APPLE_KEY_CONTENT" > "$RUNNER_TEMP/AuthKey.p8"
+          # APPLE_KEY_CONTENT is stored base64-encoded (the Capgo CLI's own
+          # convention — see cli/src/sdk.ts). Accept raw PEM too, then validate:
+          # notarytool fails with the opaque 'Error: invalidAsn1' on a bad key.
+          if printf '%s' "$APPLE_KEY_CONTENT" | grep -q "BEGIN PRIVATE KEY"; then
+            printf '%s' "$APPLE_KEY_CONTENT" > "$RUNNER_TEMP/AuthKey.p8"
+          else
+            printf '%s' "$APPLE_KEY_CONTENT" | base64 -d > "$RUNNER_TEMP/AuthKey.p8"
+          fi
+          openssl pkey -in "$RUNNER_TEMP/AuthKey.p8" -noout 2>/dev/null \
+            || { echo "::error::APPLE_KEY_CONTENT does not decode to a valid .p8 private key (tried raw PEM and base64)"; exit 1; }
           echo "APPLE_KEY_PATH=$RUNNER_TEMP/AuthKey.p8" >> "$GITHUB_ENV"
       - name: Sign and notarize
         env:
