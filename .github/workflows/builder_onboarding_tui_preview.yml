@@ -1,0 +1,194 @@
+name: Builder onboarding TUI preview
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.event.pull_request.number || inputs.pr_number || github.ref_name }}
+  cancel-in-progress: true
+
+on:
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: "PR number to run. Leave empty when dispatching from the PR branch."
+        required: false
+        type: string
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
+    paths:
+      - ".github/workflows/builder_onboarding_tui_preview.yml"
+      - ".gitmodules"
+      - "private/cli-mcp-tests"
+      - "cli/src/build/onboarding/**"
+      - "cli/src/build/credentials*.ts"
+      - "cli/src/build/env-render.ts"
+      - "cli/src/build/mobileprovision-parser.ts"
+      - "cli/src/build/platform-paths.ts"
+      - "cli/src/build/request.ts"
+      - "cli/src/build/telemetry.ts"
+      - "cli/src/init/**"
+      - "cli/test/**onboarding**"
+      - "cli/test/**build**"
+      - "tests/*onboarding*.test.ts"
+      - "docs/superpowers/**builder**"
+
+permissions: {}
+
+env:
+  CLICOLOR: "1"
+  PRIVATE_SUITE_DIR: private/cli-mcp-tests
+  REPORT_PATH: private/cli-mcp-tests/e2e-tui/results/report.html
+
+jobs:
+  tui-preview:
+    name: Run private TUI suite and publish report
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository }}
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Resolve PR context
+        id: pr
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_PR_NUMBER: ${{ github.event.pull_request.number }}
+          EVENT_HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          EVENT_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          INPUT_PR_NUMBER: ${{ inputs.pr_number }}
+          REF_NAME: ${{ github.ref_name }}
+          REPOSITORY: ${{ github.repository }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            if [ "$EVENT_HEAD_REPO" != "$REPOSITORY" ]; then
+              echo "::error::Private TUI previews only run for PR branches inside $REPOSITORY."
+              exit 1
+            fi
+
+            echo "number=$EVENT_PR_NUMBER" >> "$GITHUB_OUTPUT"
+            echo "sha=$EVENT_HEAD_SHA" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          pr_number="$INPUT_PR_NUMBER"
+          if [ -z "$pr_number" ]; then
+            pr_number="$(gh pr list --repo "$REPOSITORY" --head "$REF_NAME" --state open --json number --jq '.[0].number // empty')"
+          fi
+
+          if [ -z "$pr_number" ]; then
+            echo "::error::Manual previews are PR-only. Pass pr_number or run this from a branch with an open PR."
+            exit 1
+          fi
+
+          pr_data="$(gh pr view "$pr_number" --repo "$REPOSITORY" --json number,headRefOid,headRepository --jq '.number + "\t" + .headRefOid + "\t" + .headRepository.nameWithOwner')"
+          IFS="$(printf '\t')" read -r resolved_number head_sha head_repo <<< "$pr_data"
+
+          if [ "$head_repo" != "$REPOSITORY" ]; then
+            echo "::error::Private TUI previews only run for PR branches inside $REPOSITORY."
+            exit 1
+          fi
+
+          echo "number=$resolved_number" >> "$GITHUB_OUTPUT"
+          echo "sha=$head_sha" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout PR with private suite submodule
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ steps.pr.outputs.sha }}
+          fetch-depth: 0
+          submodules: recursive
+          token: ${{ secrets.CLI_MCP_TESTS_TOKEN || secrets.PERSONAL_ACCESS_TOKEN || github.token }}
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24.x
+
+      - name: Setup bun
+        run: bash scripts/setup-bun.sh
+
+      - name: Install Capgo dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build local CLI dist
+        run: bun run cli:build
+
+      - name: Install private suite dependencies
+        working-directory: ${{ env.PRIVATE_SUITE_DIR }}
+        run: bun install --frozen-lockfile
+
+      - name: Run private TUI harness self-tests
+        working-directory: ${{ env.PRIVATE_SUITE_DIR }}
+        env:
+          CAPGO_CLI_ROOT: ${{ github.workspace }}/cli
+        run: bun run test:e2e-tui:harness
+
+      - name: Run private TUI E2E suite
+        working-directory: ${{ env.PRIVATE_SUITE_DIR }}
+        env:
+          CAPGO_CLI_ROOT: ${{ github.workspace }}/cli
+        run: bun run test:e2e-tui
+
+      - name: Upload report artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: builder-onboarding-tui-report-pr-${{ steps.pr.outputs.number }}-${{ steps.pr.outputs.sha }}
+          path: |
+            ${{ env.PRIVATE_SUITE_DIR }}/e2e-tui/results/report.html
+            ${{ env.PRIVATE_SUITE_DIR }}/e2e-tui/results/run.json
+            ${{ env.PRIVATE_SUITE_DIR }}/e2e-tui/results/casts/*.cast
+          if-no-files-found: warn
+
+      - name: Publish HTML report to R2
+        if: always()
+        id: r2
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          R2_BUCKET: ${{ vars.BUILDER_ONBOARDING_TUI_R2_BUCKET }}
+          REPORTS_BASE_URL: ${{ vars.BUILDER_ONBOARDING_TUI_REPORTS_URL }}
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+          HEAD_SHA: ${{ steps.pr.outputs.sha }}
+        run: |
+          set -euo pipefail
+
+          if [ ! -f "$REPORT_PATH" ]; then
+            echo "::warning::No HTML report was produced at $REPORT_PATH; skipping R2 upload."
+            exit 0
+          fi
+
+          missing=()
+          for name in CLOUDFLARE_ACCOUNT_ID CLOUDFLARE_API_TOKEN R2_BUCKET REPORTS_BASE_URL; do
+            if [ -z "${!name:-}" ]; then
+              missing+=("$name")
+            fi
+          done
+
+          if [ "${#missing[@]}" -gt 0 ]; then
+            printf 'Missing required R2 preview configuration: %s\n' "${missing[*]}" >&2
+            exit 1
+          fi
+
+          short_sha="${HEAD_SHA:0:12}"
+          key="builder-onboarding-tui/pr-${PR_NUMBER}/${short_sha}/index.html"
+
+          bunx wrangler r2 object put "$R2_BUCKET/$key" \
+            --file "$REPORT_PATH" \
+            --content-type "text/html; charset=utf-8" \
+            --cache-control "no-store"
+
+          report_url="${REPORTS_BASE_URL%/}/$key"
+          echo "url=$report_url" >> "$GITHUB_OUTPUT"
+          {
+            echo "### Builder onboarding TUI report"
+            echo
+            echo "[Open protected HTML report]($report_url)"
+          } >> "$GITHUB_STEP_SUMMARY"
