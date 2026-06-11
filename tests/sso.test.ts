@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { Pool } from 'pg'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { fetchWithRetry, getAuthHeaders, getAuthHeadersForCredentials, getEndpointUrl, getSupabaseClient, POSTGRES_URL, USER_ADMIN_EMAIL, USER_ID } from './test-utils.ts'
+import { fetchWithRetry, getAuthHeaders, getAuthHeadersForCredentials, getEndpointUrl, getSupabaseClient, POSTGRES_URL, USER_ADMIN_EMAIL, USER_EMAIL_NONMEMBER, USER_ID, USER_PASSWORD_NONMEMBER } from './test-utils.ts'
 
 const SSO_TEST_ORG_ID = randomUUID()
 const SSO_TEST_CUSTOMER_ID = `cus_sso_test_${randomUUID()}`
@@ -317,6 +317,28 @@ describe('[POST] /private/sso/check-enforcement', () => {
         headers: {
           ...targetAuthHeaders,
           'X-Capgo-Spoof-Admin-Authorization': targetAuthHeaders.Authorization,
+        },
+        body: JSON.stringify({
+          email: 'ignored@example.com',
+          auth_type: 'password',
+        }),
+      })
+
+      expect(response.status).toBe(200)
+      const data = await response.json() as { allowed: boolean, reason?: string }
+      expect(data).toEqual({ allowed: false, reason: 'sso_enforced' })
+    })
+  })
+
+  it.concurrent('should not allow a different non-admin token to bypass SSO enforcement as spoof proof', async () => {
+    await withEnforcedSsoPasswordUser(async ({ targetAuthHeaders }) => {
+      const nonAdminHeaders = await getAuthHeadersForCredentials(USER_EMAIL_NONMEMBER, USER_PASSWORD_NONMEMBER)
+
+      const response = await fetchWithRetry(getEndpointUrl('/private/sso/check-enforcement'), {
+        method: 'POST',
+        headers: {
+          ...targetAuthHeaders,
+          'X-Capgo-Spoof-Admin-Authorization': nonAdminHeaders.Authorization,
         },
         body: JSON.stringify({
           email: 'ignored@example.com',
