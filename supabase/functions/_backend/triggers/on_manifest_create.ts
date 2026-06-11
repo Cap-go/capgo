@@ -29,18 +29,17 @@ function getQueueLogMetadata(c: Context): QueueLogMetadata {
     cfId: c.req.header('x-capgo-cf-id') ?? null,
   }
 }
-
-async function getManifestSizeWithRetry(c: Context, s3Path: string): Promise<{ size: number, lastError?: unknown, attempts: number }> {
+async function getManifestSizeWithRetry(c: Context, s3Path: string): Promise<{ diagnostics?: Awaited<ReturnType<typeof s3.getSizeDiagnostics>>, lastError?: unknown, attempts: number }> {
   const { result, lastError, attempts } = await retryWithBackoff(
-    () => s3.getSize(c, s3Path),
+    () => s3.getSizeDiagnostics(c, s3Path),
     {
       attempts: SIZE_RETRY_ATTEMPTS,
       baseDelayMs: SIZE_RETRY_DELAY_MS,
-      shouldRetry: size => size <= 0,
+      shouldRetry: diagnostics => diagnostics.size <= 0,
     },
   )
 
-  return { attempts, size: typeof result === 'number' ? result : 0, lastError }
+  return { attempts, diagnostics: result, lastError }
 }
 
 function shouldRetryManifestSizeLookup(size: number, currentFileSize: number | null | undefined): boolean {
@@ -92,17 +91,18 @@ export async function updateManifestSize(c: Context, record: Database['public'][
     throw simpleError('no_s3_path', 'No s3 path', { record })
   }
 
-  const { size, lastError, attempts } = await getManifestSizeWithRetry(c, record.s3_path)
+  const { diagnostics, lastError, attempts } = await getManifestSizeWithRetry(c, record.s3_path)
+  const size = diagnostics?.size ?? 0
   if (lastError) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'getSize failed after retries', id: record.id, app_version_id: record.app_version_id, file_name: record.file_name, s3_path: record.s3_path, attempts, queue, error: lastError })
+    cloudlogErr({ requestId: c.get('requestId'), message: 'getSize failed after retries', id: record.id, app_version_id: record.app_version_id, file_name: record.file_name, s3_path: record.s3_path, attempts, queue, error: lastError, storageDiagnostics: diagnostics })
   }
   if (shouldRetryManifestSizeLookup(size, record.file_size)) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'getSize returned 0 after retries', id: record.id, app_version_id: record.app_version_id, file_name: record.file_name, s3_path: record.s3_path, attempts, queue })
+    cloudlogErr({ requestId: c.get('requestId'), message: 'getSize returned 0 after retries', id: record.id, app_version_id: record.app_version_id, file_name: record.file_name, s3_path: record.s3_path, attempts, queue, storageDiagnostics: diagnostics })
     // Return non-2xx so queue_consumer keeps the message and applies its 5-read retry budget.
-    throw quickError(503, 'manifest_size_not_found', 'Manifest file size metadata was not found', { attempts, file_name: record.file_name, id: record.id, queue, s3_path: record.s3_path }, lastError, { alert: false })
+    throw quickError(503, 'manifest_size_not_found', 'Manifest file size metadata was not found', { attempts, file_name: record.file_name, id: record.id, queue, s3_path: record.s3_path, storageDiagnostics: diagnostics }, lastError, { alert: false })
   }
   if (size <= 0) {
-    cloudlog({ requestId: c.get('requestId'), message: 'getSize returned 0, keeping existing file_size', id: record.id, app_version_id: record.app_version_id, file_name: record.file_name, s3_path: record.s3_path, file_size: record.file_size, attempts, queue })
+    cloudlog({ requestId: c.get('requestId'), message: 'getSize returned 0, keeping existing file_size', id: record.id, app_version_id: record.app_version_id, file_name: record.file_name, s3_path: record.s3_path, file_size: record.file_size, attempts, queue, storageDiagnostics: diagnostics })
     return c.json(BRES)
   }
 
@@ -111,10 +111,10 @@ export async function updateManifestSize(c: Context, record: Database['public'][
       .from('manifest')
       .update({ file_size: size })
       .eq('id', record.id))
-    cloudlog({ requestId: c.get('requestId'), message: 'manifest file_size updated', id: record.id, app_version_id: record.app_version_id, file_name: record.file_name, s3_path: record.s3_path, size, attempts, queue })
+    cloudlog({ requestId: c.get('requestId'), message: 'manifest file_size updated', id: record.id, app_version_id: record.app_version_id, file_name: record.file_name, s3_path: record.s3_path, size, attempts, queue, selectedCandidateKey: diagnostics?.selectedCandidateKey })
   }
   catch (updateError) {
-    cloudlog({ requestId: c.get('requestId'), message: 'error update manifest size', id: record.id, app_version_id: record.app_version_id, file_name: record.file_name, s3_path: record.s3_path, size, attempts, queue, error: updateError })
+    cloudlog({ requestId: c.get('requestId'), message: 'error update manifest size', id: record.id, app_version_id: record.app_version_id, file_name: record.file_name, s3_path: record.s3_path, size, attempts, queue, error: updateError, storageDiagnostics: diagnostics })
     throw simpleError('manifest_update_failed', 'Failed to update manifest file_size', { record, updateError })
   }
 
