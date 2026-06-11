@@ -3,6 +3,7 @@ import type { Database } from '../types/supabase.types'
 import type { Compatibility } from '../utils'
 import { intro, log, outro } from '@clack/prompts'
 import { check2FAComplianceForApp, checkAppExistsAndHasPermissionOrgErr } from '../api/app'
+import { printPreviewQrForResolvedTarget, resolveChannelPreviewTarget } from '../preview/qr'
 import { formatTable } from '../terminal-table'
 import {
   checkCompatibilityNativePackages,
@@ -339,6 +340,13 @@ export async function setChannelInternal(channel: string, appId: string, options
     if (!silent)
       log.error('Cannot set channel the upload key is not allowed to do that, use the "all" for this.')
     throw new Error('Upload key is not allowed to set this channel')
+  }
+
+  if (options.qrPreview && !silent) {
+    const previewTarget = await resolveChannelPreviewTarget(supabase, appId, channel)
+    if (!previewTarget)
+      throw new Error(`Channel ${channel} not found for app ${appId}`)
+    await printPreviewQrForResolvedTarget(supabase, appId, previewTarget)
   }
 
   await sendEvent(options.apikey, {

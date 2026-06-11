@@ -6,8 +6,8 @@ import { computed, ref, watch, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
-import AdminOnlyModal from '~/components/AdminOnlyModal.vue'
 import CreditsCta from '~/components/CreditsCta.vue'
+import RbacPermissionOnlyModal from '~/components/RbacPermissionOnlyModal.vue'
 import { formatIncludedThenPrice } from '~/services/creditPricing'
 import { checkPermissions } from '~/services/permissions'
 import { getDatafastAttribution, openCheckout } from '~/services/stripe'
@@ -16,7 +16,7 @@ import { openSupport } from '~/services/support'
 import { sendEvent } from '~/services/tracking'
 import { useDialogV2Store } from '~/stores/dialogv2'
 import { useMainStore } from '~/stores/main'
-import { isSuperAdminRole, useOrganizationStore } from '~/stores/organization'
+import { useOrganizationStore } from '~/stores/organization'
 
 const { t } = useI18n()
 const mainStore = useMainStore()
@@ -35,12 +35,6 @@ const main = useMainStore()
 const organizationStore = useOrganizationStore()
 const dialogStore = useDialogV2Store()
 const isMobile = Capacitor.isNativePlatform()
-
-// Check if user is super_admin
-const isSuperAdmin = computed(() => {
-  const orgId = organizationStore.currentOrganization?.gid
-  return organizationStore.hasPermissionsInRole('super_admin', ['org_super_admin'], orgId)
-})
 
 // Modal state for non-admin access
 const showAdminModal = ref(false)
@@ -217,8 +211,9 @@ async function openSafariStripeCheckout(plan: Database['public']['Tables']['plan
 }
 
 async function openChangePlan(plan: Database['public']['Tables']['plans']['Row'], index: number) {
-  // Show admin modal for non-admins instead of blocking
-  if (!isSuperAdmin.value) {
+  // Show the permission modal instead of blocking when the user can't manage billing.
+  const orgId = currentOrganization.value?.gid
+  if (!orgId || !(await checkPermissions('org.update_billing', { orgId }))) {
     showAdminModal.value = true
     return
   }
@@ -279,6 +274,18 @@ async function loadData(initial: boolean) {
   initialLoad.value = true
 }
 
+// Pick the org with the most apps where the user can actually manage billing.
+// Used as a fallback when the current org's billing is not accessible.
+async function findBillableFallbackOrg() {
+  const candidates = [...organizationStore.getAllOrgs()]
+    .map(([_, org]) => org)
+    .sort((a, b) => b.app_count - a.app_count)
+  for (const org of candidates) {
+    if (await checkPermissions('org.update_billing', { orgId: org.gid }))
+      return org
+  }
+  return undefined
+}
 watch(currentOrganization, async (newOrg, prevOrg) => {
   if (newOrg) {
     // Check permission directly instead of relying on computedAsync default
@@ -286,14 +293,9 @@ watch(currentOrganization, async (newOrg, prevOrg) => {
 
     if (!hasUpdateBillingPermission) {
       if (!initialLoad.value) {
-        const orgsMap = organizationStore.getAllOrgs()
-        const newOrg = [...orgsMap]
-          .map(([_, a]) => a)
-          .filter(org => isSuperAdminRole(org.role))
-          .sort((a, b) => b.app_count - a.app_count)[0]
-
-        if (newOrg) {
-          organizationStore.setCurrentOrganization(newOrg.gid)
+        const fallbackOrg = await findBillableFallbackOrg()
+        if (fallbackOrg) {
+          organizationStore.setCurrentOrganization(fallbackOrg.gid)
           return
         }
       }
@@ -340,14 +342,9 @@ watchEffect(async () => {
         const hasUpdateBillingPermission = await checkPermissions('org.update_billing', { orgId: currentOrganization.value.gid })
 
         if (!hasUpdateBillingPermission) {
-          const orgsMap = organizationStore.getAllOrgs()
-          const newOrg = [...orgsMap]
-            .map(([_, a]) => a)
-            .filter(org => isSuperAdminRole(org.role))
-            .sort((a, b) => b.app_count - a.app_count)[0]
-
-          if (newOrg) {
-            organizationStore.setCurrentOrganization(newOrg.gid)
+          const fallbackOrg = await findBillableFallbackOrg()
+          if (fallbackOrg) {
+            organizationStore.setCurrentOrganization(fallbackOrg.gid)
             return
           }
 
@@ -601,8 +598,13 @@ function buttonStyle(p: Database['public']['Tables']['plans']['Row']) {
       </div>
     </div>
 
-    <!-- Admin-only modal for non-admin users -->
-    <AdminOnlyModal v-if="showAdminModal" @click="showAdminModal = false" />
+    <!-- Permission modal shown when the user can't manage billing -->
+    <RbacPermissionOnlyModal
+      v-if="showAdminModal"
+      :title="t('billing-access-required')"
+      permission="org.update_billing"
+      @click="showAdminModal = false"
+    />
   </div>
 </template>
 

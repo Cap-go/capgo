@@ -35,7 +35,7 @@ TanStack Intent skills should stay focused and under the validator line limit, s
 - `app add [appId]`: create an app in Capgo Cloud.
 - `app list`: list apps under the current account.
 - `app delete [appId]`: remove an app.
-- `app set [appId]`: update app settings such as name, icon, retention, and metadata exposure.
+- `app set [appId]`: update app settings such as name, icon, retention, metadata exposure, and preview access with `--preview` or `--no-preview`.
 - `app setting [path]`: update Capacitor config values programmatically.
 - `app debug [appId]`: listen for live-update debug events, optionally for one device.
 
@@ -57,6 +57,7 @@ Load `skills/release-management/SKILL.md` when working with:
 - `bundle upload`, `bundle list`, `bundle delete`, `bundle cleanup`
 - `bundle compatibility`, `bundle releaseType`, `bundle zip`, `bundle encrypt`, `bundle decrypt`
 - `channel add`, `channel list`, `channel delete`, `channel set`, `channel currentBundle`
+- `get-qr`
 - `key save`, `key create`, `key delete_old`
 
 ### `native-builds`
@@ -88,5 +89,6 @@ npx @capgo/cli@latest login YOUR_API_KEY
 npx @capgo/cli@latest doctor
 npx @capgo/cli@latest probe --platform ios
 npx @capgo/cli@latest app add com.example.app --name "My App"
+npx @capgo/cli@latest get-qr com.example.app --channel production
 npx @capgo/cli@latest star-all
 ```

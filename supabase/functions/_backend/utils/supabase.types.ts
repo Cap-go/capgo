@@ -824,6 +824,7 @@ export type Database = {
       compatibility_events: {
         Row: {
           app_id: string
+          change_occurred_at: string
           channel_id: number | null
           channel_name: string
           created_at: string
@@ -843,6 +844,7 @@ export type Database = {
         }
         Insert: {
           app_id: string
+          change_occurred_at?: string
           channel_id?: number | null
           channel_name: string
           created_at?: string
@@ -862,6 +864,7 @@ export type Database = {
         }
         Update: {
           app_id?: string
+          change_occurred_at?: string
           channel_id?: number | null
           channel_name?: string
           created_at?: string

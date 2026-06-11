@@ -24,10 +24,14 @@ import { writeConfigUpdater } from '../config'
 import { getRepoStarStatus, isRepoStarredInSession, starAllRepositories, starRepository } from '../github'
 import { createKeyInternal } from '../key'
 import { doLoginExists, loginInternal } from '../login'
-import { writeOnboardingSupportBundle } from '../onboarding-support'
+import { writeOnboardingSupportBundle, writeSupportBundleFiles } from '../onboarding-support'
+import { contactSupport } from '../support/contact-support'
+import { uploadSupportLogs } from '../support/support-upload'
+import { copyToClipboard, revealInFinder } from '../support/clipboard'
+import { appendInternalLog, getInternalLogPath, startInternalLog } from '../support/internal-log'
 import { showReplicationProgress } from '../replicationProgress'
 import { formatRunnerCommand, splitRunnerCommand } from '../runner-command'
-import { createSupabaseClient, findBuildCommandForProjectType, findMainFile, findMainFileForProjectType, findProjectType, findRoot, findSavedKey, formatError, getAllPackagesDependencies, getAppId, getBundleVersion, getConfig, getLocalConfig, getNativeProjectResetAdvice, getOrganizationListWithPermission, getPackageScripts, getPMAndCommand, hasCliPermission, PACKNAME, projectIsMonorepo, resolveUserIdFromApiKey, updateConfigbyKey, updateConfigUpdater, validateIosUpdaterSync } from '../utils'
+import { createSupabaseClient, defaultApiHost, findBuildCommandForProjectType, findMainFile, findMainFileForProjectType, findProjectType, findRoot, findSavedKey, findSavedKeySilent, formatError, getAllPackagesDependencies, getAppId, getBundleVersion, getConfig, getLocalConfig, getNativeProjectResetAdvice, getOrganizationListWithPermission, getPackageScripts, getPMAndCommand, hasCliPermission, PACKNAME, projectIsMonorepo, resolveUserIdFromApiKey, updateConfigbyKey, updateConfigUpdater, validateIosUpdaterSync } from '../utils'
 import { buildAppIdConflictSuggestions, isAppAlreadyExistsError } from './app-conflict'
 import { cancel as pCancel, confirm as pConfirm, intro as pIntro, isCancel as pIsCancel, log as pLog, outro as pOutro, select as pSelect, spinner as pSpinner, text as pText } from './prompts'
 import { appendInitStreamingLine, clearInitStreamingOutput, setInitCodeDiff, setInitEncryptionSummary, setInitVersionWarning, startInitStreamingOutput, stopInitInkSession, updateInitStreamingStatus } from './runtime'
@@ -101,6 +105,7 @@ let globalPlatform: 'ios' | 'android' = 'ios'
 let globalDelta = false
 let globalCurrentVersion: string | undefined
 let globalAppId: string | undefined
+let globalSupaHost: string | undefined
 let globalCodeDiff: InitCodeDiff | undefined
 let globalEncryptionSummary: InitEncryptionSummary | undefined
 let globalCurrentStepNumber = 0
@@ -468,6 +473,72 @@ function writeInitSupportBundle(error: string, extraSections: { title: string, l
       },
       ...extraSections,
     ],
+  })
+}
+
+// Read the verbose internal log (raw provider/API errors, secret-redacted) so
+// it can be folded into the support bundle's "Internal log" section.
+function readInitInternalLogLines(): string[] {
+  const internalLogPath = getInternalLogPath()
+  if (!internalLogPath)
+    return []
+  try {
+    return readFileSync(internalLogPath, 'utf8').split('\n')
+  }
+  catch {
+    return []
+  }
+}
+
+// Init-flavoured contact-support flow: confirm gate → write bundle → copy the
+// .log.gz path → reveal in Finder (macOS) → open a pre-filled mailto. There's
+// no build log in init, so the support bundle carries diagnostics + the
+// internal log only. Every step but "write the bundle" is best-effort.
+async function runInitContactSupport(failureText: string): Promise<void> {
+  await contactSupport({
+    subject: `Capgo Builder onboarding support — ${globalAppId ?? 'unknown'}`,
+    body: `Hi Capgo team,\n\nI hit an error during Capgo Builder onboarding.\n\nApp: ${globalAppId ?? 'unknown'}\nError: ${failureText}`,
+    confirm: async (msg, logPath) => {
+      for (;;) {
+        const choice = await pSelect({
+          message: msg,
+          options: [
+            { value: 'yes', label: '📨  Yes, send to support' },
+            { value: 'view', label: '👀  View logs first (opens the file)' },
+            { value: 'no', label: '✖  Cancel' },
+          ],
+        })
+        if (pIsCancel(choice) || choice === 'no')
+          return false
+        if (choice === 'view') {
+          pLog.info(`Logs to be sent: ${logPath}`)
+          try { await open(logPath) }
+          catch { /* best-effort: just the path above */ }
+          continue
+        }
+        return true
+      }
+    },
+    buildFiles: () => writeSupportBundleFiles({
+      kind: 'init',
+      appId: globalAppId,
+      error: failureText,
+      sections: [{ title: 'Internal log', lines: readInitInternalLogLines() }],
+    }),
+    copyPath: p => copyToClipboard(p).ok,
+    reveal: p => revealInFinder(p),
+    openUrl: u => open(u),
+    print: msg => pLog.info(msg),
+    upload: async (gzPath) => {
+      const key = findSavedKeySilent()
+      if (!key)
+        return null
+      const spinner = pSpinner()
+      spinner.start('Uploading your logs to Capgo support…')
+      const r = await uploadSupportLogs({ apiHost: globalSupaHost ?? defaultApiHost, apikey: key, appId: globalAppId, gzPath })
+      spinner.stop(r ? 'Logs uploaded.' : 'Logs upload unavailable — falling back to attaching the file.')
+      return r
+    },
   })
 }
 
@@ -1142,13 +1213,14 @@ async function selectRecoveryOption<T extends string>(
   options: RecoveryOption<T>[],
   failureText = message,
 ): Promise<T> {
-  type RecoveryChoice = T | '__doctor__' | '__support__' | '__cancel__'
+  type RecoveryChoice = T | '__doctor__' | '__email_support__' | '__support__' | '__cancel__'
 
   while (true) {
     const choice = await pSelect<RecoveryChoice>({
       message,
       options: [
         ...options,
+        { value: '__email_support__', label: '📨 Email Capgo support' },
         { value: '__doctor__', label: 'Run doctor diagnostics now' },
         { value: '__support__', label: 'Save a support bundle' },
         { value: '__cancel__', label: 'Exit onboarding' },
@@ -1168,6 +1240,11 @@ async function selectRecoveryOption<T extends string>(
       catch (error) {
         pLog.warn(`Doctor found an issue: ${formatError(error)}`)
       }
+      continue
+    }
+
+    if (choice === '__email_support__') {
+      await runInitContactSupport(failureText)
       continue
     }
 
@@ -3626,6 +3703,7 @@ async function runDeviceStep(orgId: string, apikey: string, appId: string, platf
     if (runFailed) {
       const platformName = platform === 'ios' ? 'iOS' : 'Android'
       s.stop(`App failed to start ❌`)
+      appendInternalLog(`app run failed (${platformName}): ${(runError || runResult?.error) ? formatError(runError ?? runResult?.error) : `exit status ${runResult?.status ?? 'unknown'}`}`)
       if (runError || runResult?.error)
         pLog.error(formatError(runError ?? runResult?.error))
       pLog.error(`The app failed to start on your ${platformName} device.`)
@@ -3936,7 +4014,8 @@ async function maybeOfferAutoTestCleanup(orgId: string, apikey: string, appId: s
     const projectType = await findProjectType()
     buildCommand = await findBuildCommandForProjectType(projectType)
   }
-  catch {
+  catch (err) {
+    appendInternalLog(`project-type detection failed, defaulting buildCommand to 'build': ${err instanceof Error ? err.message : String(err)}`)
   }
 
   const pm = getPMAndCommand()
@@ -4212,7 +4291,12 @@ async function maybeStarCapgoRepo(includeSkillsRepository = false, repository?: 
 }
 
 export async function initApp(apikeyCommand: string, appId: string, options: SuperOptions) {
+  globalSupaHost = options.supaHost // honor --supa-host for the support-logs upload
   const pm = getPMAndCommand()
+  // Start the verbose internal log early so it captures the whole run (incl.
+  // raw provider/API errors) and survives crashes for the support bundle.
+  startInternalLog(appId || globalAppId)
+  appendInternalLog(`init: onboarding started for app ${appId || globalAppId || 'unknown'}`)
   pIntro('Capgo onboarding')
   renderInitOnboardingWelcome(initOnboardingSteps.length)
 

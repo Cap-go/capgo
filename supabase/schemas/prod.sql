@@ -16441,7 +16441,8 @@ CREATE TABLE IF NOT EXISTS "public"."compatibility_events" (
     "resolved_at" timestamp with time zone,
     "resolved_by" "uuid",
     "resolution_kind" "text",
-    "resolution_note" "text"
+    "resolution_note" "text",
+    "change_occurred_at" timestamp with time zone DEFAULT "now"() NOT NULL
 );
 
 
@@ -19103,7 +19104,7 @@ CREATE UNIQUE INDEX "unique_app_version_positive" ON "public"."version_meta" USI
 
 
 
-CREATE UNIQUE INDEX "uq_compatibility_events_dedup" ON "public"."compatibility_events" USING "btree" ("app_id", "channel_id", "platform", "current_version_id", "previous_version_id") NULLS NOT DISTINCT;
+CREATE UNIQUE INDEX "uq_compatibility_events_dedup" ON "public"."compatibility_events" USING "btree" ("app_id", "channel_id", "platform", "current_version_id", "previous_version_id", "change_occurred_at") NULLS NOT DISTINCT;
 
 
 
@@ -19400,10 +19401,6 @@ CREATE OR REPLACE TRIGGER "reassign_webhook_created_by_before_user_delete" BEFOR
 
 
 CREATE OR REPLACE TRIGGER "record_deployment_history_trigger" AFTER UPDATE OF "version" ON "public"."channels" FOR EACH ROW EXECUTE FUNCTION "public"."record_deployment_history"();
-
-
-
-CREATE OR REPLACE TRIGGER "replicate_devices" AFTER INSERT OR DELETE OR UPDATE ON "public"."devices" FOR EACH ROW EXECUTE FUNCTION "public"."trigger_http_queue_post_to_function"('replicate_data', 'cloudflare');
 
 
 
@@ -20429,7 +20426,7 @@ CREATE POLICY "Prevent users from inserting manifest entries" ON "public"."manif
 
 
 
-CREATE POLICY "Prevent users from updating manifest entries" ON "public"."manifest" FOR UPDATE TO "authenticated" USING (false);
+CREATE POLICY "Prevent users from updating manifest entries" ON "public"."manifest" AS RESTRICTIVE FOR UPDATE TO "anon", "authenticated" USING (false) WITH CHECK (false);
 
 
 

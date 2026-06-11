@@ -12,18 +12,18 @@ function getErrorMessage(error: unknown) {
   return 'Cannot log in, see console'
 }
 
-export async function logAsUser(userId: string, router: Router) {
+export async function logAsUser(identifier: string, router: Router) {
   const toastId = toast.loading('Logging as...')
   try {
-    if (!userId)
-      throw new Error('Missing user id')
+    if (!identifier)
+      throw new Error('Missing user id, email, or org id')
 
-    if (isSpoofed())
-      unspoofUser()
+    if (isSpoofed() && !(await unspoofUser()))
+      throw new Error('Cannot restore admin session, please sign in again')
 
     const supabase = useSupabase()
     const { data, error } = await supabase.functions.invoke('private/log_as', {
-      body: { user_id: userId },
+      body: { identifier },
     })
 
     if (error)
@@ -49,7 +49,7 @@ export async function logAsUser(userId: string, router: Router) {
     toast.success('Spoofed, will reload')
     setTimeout(() => {
       router.replace('/dashboard').then(() => {
-        window.location.reload()
+        globalThis.location.reload()
       })
     }, 1000)
   }

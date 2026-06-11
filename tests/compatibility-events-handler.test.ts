@@ -11,7 +11,7 @@ const appVersions: Record<number, { id: number, name: string, native_packages: u
 
 const { eventStore, dedupKey, supabaseAdmin } = vi.hoisted(() => {
   const store: any[] = []
-  const key = (r: any) => [r.app_id, r.channel_id, r.platform, r.current_version_id, r.previous_version_id].join('|')
+  const key = (r: any) => [r.app_id, r.channel_id, r.platform, r.current_version_id, r.previous_version_id, r.change_occurred_at].join('|')
   return { eventStore: store, dedupKey: key, supabaseAdmin: vi.fn() }
 })
 
@@ -234,6 +234,33 @@ describe('on_channel_update compatibility events (integration)', () => {
       resolution_kind: 'accepted',
       resolution_note: 'reviewed',
     })
+  })
+
+  it('creates a NEW unresolved row when the same transition re-occurs later', async () => {
+    await post(updatePayload(channelRecord({ version: 700 }), channelRecord({ version: 600 })))
+    expect(eventStore).toHaveLength(1)
+
+    // The first occurrence gets resolved (auto-resolve or manual accept).
+    Object.assign(eventStore[0], {
+      resolved_at: '2026-06-03T00:00:00.000Z',
+      resolved_by: 'user-9',
+      resolution_kind: 'accepted',
+      resolution_note: 'reviewed',
+    })
+
+    // The SAME bundle pair goes live again later — a new channel update, so a
+    // new `updated_at` (the occurrence identity in the dedup key). It must
+    // create a fresh unresolved row instead of being absorbed by the resolved
+    // first occurrence.
+    await post(updatePayload(
+      channelRecord({ version: 700, updated_at: 't2' }),
+      channelRecord({ version: 600, updated_at: 't' }),
+    ))
+
+    expect(eventStore).toHaveLength(2)
+    expect(eventStore[0].resolution_kind).toBe('accepted')
+    expect(eventStore[1].resolved_at).toBeNull()
+    expect(eventStore[1].change_occurred_at).toBe('t2')
   })
 
   it('records no event when the version change is OTA-compatible', async () => {

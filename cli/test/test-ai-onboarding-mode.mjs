@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Tests for the caller-handled AI flow used by the Ink onboarding wizard:
-//   - runCapgoAiAnalysis (reads /tmp log, delegates to postAnalyzeRequest)
+//   - runCapgoAiAnalysis (reads /tmp log, delegates to postAnalyzeStreamRequest)
 //   - releaseCapturedLogs (best-effort cleanup wrapper)
 // Plus a regression check that decideAnalyzeBehavior still returns the same
 // matrix when the new aiAnalysisMode lives elsewhere — direct CLI invocation
@@ -50,7 +50,18 @@ await test('decideAnalyzeBehavior matrix unchanged: CI alone → skip', () => {
 })
 
 // ---- runCapgoAiAnalysis ----
-await test('runCapgoAiAnalysis reads the captured log and posts to /build/ai_analyze', async () => {
+function sseResponse(frames, status = 200) {
+  const encoder = new TextEncoder()
+  const body = new ReadableStream({
+    start(controller) {
+      for (const f of frames) controller.enqueue(encoder.encode(f))
+      controller.close()
+    },
+  })
+  return new Response(body, { status, headers: { 'content-type': 'text/event-stream' } })
+}
+
+await test('runCapgoAiAnalysis reads the captured log and posts to /build/ai_analyze_stream', async () => {
   const jobId = `job-ok-${Date.now()}`
   const logPath = join(TEST_DIR, `${jobId}.log`)
   await writeFile(logPath, 'pretend xcode log line 1\npretend xcode log line 2\n')
@@ -59,9 +70,10 @@ await test('runCapgoAiAnalysis reads the captured log and posts to /build/ai_ana
   const origFetch = globalThis.fetch
   globalThis.fetch = async (url, init) => {
     captured = { url, init }
-    return new Response(JSON.stringify({ analysis: '### Likely cause\nsigning' }), {
-      status: 200, headers: { 'content-type': 'application/json' },
-    })
+    return sseResponse([
+      'event: chunk\ndata: {"text":"### Likely cause\\nsigning"}\n\n',
+      'event: done\ndata: {"durationMs":1}\n\n',
+    ])
   }
   try {
     const result = await runCapgoAiAnalysis({
@@ -76,13 +88,42 @@ await test('runCapgoAiAnalysis reads the captured log and posts to /build/ai_ana
       throw new Error('analysis text not propagated')
     if (!captured)
       throw new Error('fetch was not called')
-    if (!captured.url.endsWith('/build/ai_analyze'))
+    if (!captured.url.endsWith('/build/ai_analyze_stream'))
       throw new Error(`unexpected url ${captured.url}`)
     const body = JSON.parse(captured.init.body)
     if (body.jobId !== jobId)
       throw new Error('jobId not forwarded')
     if (!body.logs.includes('pretend xcode'))
       throw new Error('log content not forwarded')
+  }
+  finally {
+    globalThis.fetch = origFetch
+  }
+})
+
+await test('runCapgoAiAnalysis forwards onChunk per streamed delta (wizard live preview)', async () => {
+  const jobId = `job-chunks-${Date.now()}`
+  await writeFile(join(TEST_DIR, `${jobId}.log`), 'log\n')
+
+  const origFetch = globalThis.fetch
+  globalThis.fetch = async () => sseResponse([
+    'event: chunk\ndata: {"text":"### Likely"}\n\n',
+    'event: chunk\ndata: {"text":" cause"}\n\n',
+    'event: done\ndata: {"durationMs":1}\n\n',
+  ])
+  try {
+    const chunks = []
+    const result = await runCapgoAiAnalysis({
+      apiHost: 'https://api.test',
+      apikey: 'key',
+      jobId,
+      appId: 'com.test.app',
+      onChunk: t => chunks.push(t),
+    })
+    if (result.kind !== 'ok')
+      throw new Error(`expected ok, got ${result.kind}`)
+    if (chunks.join('|') !== '### Likely| cause')
+      throw new Error(`onChunk deltas wrong: ${JSON.stringify(chunks)}`)
   }
   finally {
     globalThis.fetch = origFetch

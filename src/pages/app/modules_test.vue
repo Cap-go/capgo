@@ -80,7 +80,6 @@ const pluginTests: PluginTest[] = [
   { packageName: '@capgo/capacitor-pdf-generator', pluginName: 'PdfGenerator', method: 'getPluginVersion', label: 'capacitor-pdf-generator' },
   { packageName: '@capgo/capacitor-pedometer', pluginName: 'CapacitorPedometer', method: 'getPluginVersion', label: 'capacitor-pedometer' },
   { packageName: '@capgo/capacitor-persistent-account', pluginName: 'CapacitorPersistentAccount', method: 'getPluginVersion', label: 'capacitor-persistent-account' },
-  { packageName: '@capgo/capacitor-photo-library', pluginName: 'PhotoLibrary', method: 'getPluginVersion', label: 'capacitor-photo-library' },
   {
     packageName: '@capgo/capacitor-pretty-toast',
     pluginName: 'PrettyToast',

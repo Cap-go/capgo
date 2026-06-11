@@ -93,6 +93,18 @@ export class CacheHelper {
     }
   }
 
+  async delete(key: Request) {
+    const cache = await this.ensureCache()
+    if (!cache)
+      return
+    try {
+      await cache.delete(key)
+    }
+    catch (error) {
+      this.logCacheError('Error deleting cached response', error)
+    }
+  }
+
   private buildCacheControl(ttlSeconds: number) {
     const sanitized = Math.max(0, Math.floor(ttlSeconds))
     return `public, s-maxage=${sanitized}`

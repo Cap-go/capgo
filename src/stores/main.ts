@@ -6,12 +6,12 @@ import { ref } from 'vue'
 import { getDaysBetweenDates } from '~/services/conversion'
 import { reset } from '~/services/posthog'
 import {
+  clearSpoof,
   findBestPlan,
   getAllDashboard,
   getLocalConfig,
   getTotalStorage,
   normalizeDashboardDateRange,
-  unspoofUser,
   useSupabase,
 } from '~/services/supabase'
 import { createDeferredPromise } from '../utils/promise'
@@ -49,10 +49,10 @@ export const useMainStore = defineStore('main', () => {
 
   const totalDownload = ref<number>(0)
 
-  const logout = () => {
-    return new Promise<void>((resolve) => {
-      const supabase = useSupabase()
-      const config = getLocalConfig()
+  const logout = async () => {
+    const supabase = useSupabase()
+    const config = getLocalConfig()
+    await new Promise<void>((resolve) => {
       const listener = supabase.auth.onAuthStateChange((event: any) => {
         if (event === 'SIGNED_OUT') {
           listener.data.subscription.unsubscribe()
@@ -60,7 +60,6 @@ export const useMainStore = defineStore('main', () => {
           user.value = undefined
           isAdmin.value = false
           reset(config.supaHost)
-          unspoofUser()
           resolve()
         }
       })
@@ -69,6 +68,7 @@ export const useMainStore = defineStore('main', () => {
         supabase.auth.signOut()
       }, 300)
     })
+    clearSpoof()
   }
 
   const getTotalStats: () => TotalStats = () => {

@@ -10,16 +10,16 @@ const isLoading = ref(true)
 const errorMessage = ref('')
 
 onMounted(async () => {
-  const targetUserId = route.params.userId
+  const targetIdentifier = route.params.userId
 
-  if (!targetUserId || typeof targetUserId !== 'string') {
-    errorMessage.value = 'Missing user id'
+  if (!targetIdentifier || typeof targetIdentifier !== 'string') {
+    errorMessage.value = 'Missing user id, email, or org id'
     isLoading.value = false
     return
   }
 
   try {
-    await logAsUser(targetUserId, router)
+    await logAsUser(targetIdentifier, router)
   }
   catch (error) {
     errorMessage.value = error instanceof Error ? error.message : 'Failed to log in as the requested user'
@@ -33,7 +33,7 @@ onMounted(async () => {
     <div v-if="isLoading" class="flex flex-col items-center space-y-4">
       <Spinner class="w-8 h-8" />
       <p class="text-gray-700 dark:text-gray-300">
-        Attempting to log you in as the requested user...
+        Attempting to log you in as the requested account...
       </p>
     </div>
     <div v-else class="space-y-2 text-center">
