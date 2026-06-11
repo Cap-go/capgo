@@ -125,12 +125,12 @@ function readJsoncConfig(path: string) {
   return JSON.parse(stripJsoncComments(raw)) as WranglerConfig
 }
 
-function getChannelSelfStoreId(config: WranglerConfig, envName: string) {
-  return config.env[envName]?.kv_namespaces?.find(namespace => namespace.binding === 'CHANNEL_SELF_STORE')?.id
+function getKvNamespaceId(config: WranglerConfig, envName: string, binding: string) {
+  return config.env[envName]?.kv_namespaces?.find(namespace => namespace.binding === binding)?.id
 }
 
 describe('plugin Supabase write policy', () => {
-  it.concurrent('keeps notification queue cron owned by the API worker', () => {
+  it.concurrent('keeps notification queue KV separate and cron owned by the API worker', () => {
     const pluginWrangler = readJsoncConfig('../cloudflare_workers/plugin/wrangler.jsonc')
     const apiWrangler = readJsoncConfig('../cloudflare_workers/api/wrangler.jsonc')
 
@@ -140,10 +140,29 @@ describe('plugin Supabase write policy', () => {
     for (const envName of ['prod', 'preprod', 'alpha', 'local'])
       expect(apiWrangler.env[envName]?.triggers).toEqual({ crons: ['* * * * *'] })
 
-    expect(getChannelSelfStoreId(apiWrangler, 'prod')).toBe(getChannelSelfStoreId(pluginWrangler, 'prod_eu'))
-    expect(getChannelSelfStoreId(apiWrangler, 'preprod')).toBe(getChannelSelfStoreId(pluginWrangler, 'preprod'))
-    expect(getChannelSelfStoreId(apiWrangler, 'alpha')).toBe(getChannelSelfStoreId(pluginWrangler, 'alpha'))
-    expect(getChannelSelfStoreId(apiWrangler, 'local')).toBe(getChannelSelfStoreId(pluginWrangler, 'local'))
+    const envPairs = [
+      ['prod', 'prod_eu'],
+      ['prod', 'prod_na'],
+      ['prod', 'prod_sa'],
+      ['prod', 'prod_oc'],
+      ['prod', 'prod_as'],
+      ['prod', 'prod_af'],
+      ['prod', 'prod_me'],
+      ['prod', 'prod_hk'],
+      ['prod', 'prod_jp'],
+      ['preprod', 'preprod'],
+      ['alpha', 'alpha'],
+      ['local', 'local'],
+    ] as const
+
+    for (const [apiEnv, pluginEnv] of envPairs) {
+      const apiQueueId = getKvNamespaceId(apiWrangler, apiEnv, 'PLUGIN_NOTIFICATION_QUEUE')
+      const pluginQueueId = getKvNamespaceId(pluginWrangler, pluginEnv, 'PLUGIN_NOTIFICATION_QUEUE')
+      expect(apiQueueId).toBe(pluginQueueId)
+      expect(apiQueueId).toBeTruthy()
+      expect(apiQueueId).not.toBe(getKvNamespaceId(apiWrangler, apiEnv, 'CHANNEL_SELF_STORE'))
+      expect(pluginQueueId).not.toBe(getKvNamespaceId(pluginWrangler, pluginEnv, 'CHANNEL_SELF_STORE'))
+    }
   })
 
   it.concurrent('fails closed instead of falling back from read replica to primary', async () => {
@@ -223,9 +242,11 @@ describe('plugin Supabase write policy', () => {
     })
   })
 
-  it.concurrent('does not fall back to DB notifications when plugin queue KV is missing', async () => {
+  it.concurrent('does not use channel_self KV or fall back to DB notifications when plugin queue KV is missing', async () => {
     const { sendNotifOrgCached } = await import('../supabase/functions/_backend/utils/notifications.ts')
-    const context = createContext({ queuePluginNotifications: true })
+    const channelSelfGet = vi.fn(async () => null)
+    const channelSelfPut = vi.fn(async () => undefined)
+    const context = createContext({ queuePluginNotifications: true }, { CHANNEL_SELF_STORE: { get: channelSelfGet, put: channelSelfPut } })
     const drizzleClient = {
       insert: vi.fn(() => {
         throw new Error('normal notification path called')
@@ -234,13 +255,15 @@ describe('plugin Supabase write policy', () => {
 
     await expect(sendNotifOrgCached(context, 'org:missing_payment', { app_id: 'com.test.app' }, 'org-1', 'com.test.app', '0 0 * * 1', 'owner@example.com', drizzleClient)).resolves.toBe(false)
 
+    expect(channelSelfGet).not.toHaveBeenCalled()
+    expect(channelSelfPut).not.toHaveBeenCalled()
     expect(drizzleClient.insert).not.toHaveBeenCalled()
   })
 
   it.concurrent('does not rewrite plugin notification KV when the deterministic key already exists', async () => {
     const get = vi.fn(async (_key: string) => '{"queued":true}')
     const put = vi.fn(async (_key: string, _raw: string, _options: unknown) => undefined)
-    const context = createContext({ queuePluginNotifications: true }, { CHANNEL_SELF_STORE: { get, put } })
+    const context = createContext({ queuePluginNotifications: true }, { PLUGIN_NOTIFICATION_QUEUE: { get, put } })
     const { sendNotifOrgCached } = await import('../supabase/functions/_backend/utils/notifications.ts')
 
     await expect(sendNotifOrgCached(context, 'org:missing_payment', { app_id: 'com.test.app' }, 'org-1', 'com.test.app', '0 0 * * 1', 'owner@example.com', {} as any)).resolves.toBe(false)
@@ -252,7 +275,7 @@ describe('plugin Supabase write policy', () => {
   it.concurrent('does not enqueue plugin notifications while a KV throttle marker exists', async () => {
     const get = vi.fn(async (key: string) => key.startsWith('plugin:notif:throttle:v1:') ? 'throttled' : null)
     const put = vi.fn(async (_key: string, _raw: string, _options: unknown) => undefined)
-    const context = createContext({ queuePluginNotifications: true }, { CHANNEL_SELF_STORE: { get, put } })
+    const context = createContext({ queuePluginNotifications: true }, { PLUGIN_NOTIFICATION_QUEUE: { get, put } })
     const { sendNotifOrgCached } = await import('../supabase/functions/_backend/utils/notifications.ts')
 
     await expect(sendNotifOrgCached(context, 'org:missing_payment', { app_id: 'com.test.app' }, 'org-1', 'com.test.app', '0 0 * * 1', 'owner@example.com', {} as any)).resolves.toBe(false)
@@ -264,7 +287,7 @@ describe('plugin Supabase write policy', () => {
   it.concurrent('queues cached org notifications into plugin KV', async () => {
     const get = vi.fn(async (_key: string) => null)
     const put = vi.fn(async (_key: string, _raw: string, _options: unknown) => undefined)
-    const context = createContext({ queuePluginNotifications: true }, { CHANNEL_SELF_STORE: { get, put } })
+    const context = createContext({ queuePluginNotifications: true }, { PLUGIN_NOTIFICATION_QUEUE: { get, put } })
     const { sendNotifOrgCached } = await import('../supabase/functions/_backend/utils/notifications.ts')
 
     await expect(sendNotifOrgCached(context, 'org:missing_payment', { app_id: 'com.test.app' }, 'org-1', 'com.test.app', '0 0 * * 1', 'owner@example.com', {} as any)).resolves.toBe(false)
@@ -286,7 +309,7 @@ describe('plugin Supabase write policy', () => {
   it.concurrent('queues cached org member notifications into plugin KV', async () => {
     const get = vi.fn(async (_key: string) => null)
     const put = vi.fn(async (_key: string, _raw: string, _options: unknown) => undefined)
-    const context = createContext({ queuePluginNotifications: true }, { CHANNEL_SELF_STORE: { get, put } })
+    const context = createContext({ queuePluginNotifications: true }, { PLUGIN_NOTIFICATION_QUEUE: { get, put } })
     const { sendNotifToOrgMembersCached } = await import('../supabase/functions/_backend/utils/org_email_notifications.ts')
 
     await expect(sendNotifToOrgMembersCached(context, 'device:channel_self_set_rejected', 'channel_self_rejected', { app_id: 'com.test.app' }, 'org-1', 'com.test.app', '0 0 * * 0', {} as any)).resolves.toBe(false)

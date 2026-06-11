@@ -78,7 +78,7 @@ describe('plugin notification flush', () => {
 
     const result = await flushQueuedPluginNotifications({
       env: {
-        CHANNEL_SELF_STORE: store,
+        PLUGIN_NOTIFICATION_QUEUE: store,
       },
       get: () => 'request-id',
     } as any)
@@ -108,7 +108,7 @@ describe('plugin notification flush', () => {
 
     const result = await flushQueuedPluginNotifications({
       env: {
-        CHANNEL_SELF_STORE: store,
+        PLUGIN_NOTIFICATION_QUEUE: store,
       },
       get: () => 'request-id',
     } as any)

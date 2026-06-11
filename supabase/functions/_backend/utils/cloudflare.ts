@@ -43,6 +43,7 @@ export type Bindings = {
   DEVICE_INFO: AnalyticsEngineDataPoint
   DB_STOREAPPS: D1Database
   CHANNEL_SELF_STORE?: KVNamespace
+  PLUGIN_NOTIFICATION_QUEUE?: KVNamespace
   LOCAL_READ_REPLICA_SUPABASE_DB_URL?: string
   HYPERDRIVE_CAPGO_DIRECT_EU: Hyperdrive // Add Hyperdrive binding
   HYPERDRIVE_CAPGO_READ_NA: Hyperdrive

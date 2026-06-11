@@ -159,7 +159,7 @@ async function processBatch(
 }
 
 export async function flushQueuedPluginNotifications(c: Context, limit = PLUGIN_NOTIFICATION_FLUSH_LIMIT): Promise<PluginNotificationFlushResult> {
-  const store = c.env.CHANNEL_SELF_STORE
+  const store = c.env.PLUGIN_NOTIFICATION_QUEUE
   if (!store) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'Plugin notification KV queue missing during flush' })
     return { status: 'ok', scanned: 0, transferred: 0, deleted: 0, failed: 0 }

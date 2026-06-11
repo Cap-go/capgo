@@ -38,7 +38,7 @@ export type PluginNotificationQueueItem = PluginOrgNotificationQueueItem | Plugi
 export type PluginNotificationQueueInput = PluginOrgNotificationQueueInput | PluginOrgMembersNotificationQueueInput
 
 function getStore(c: Context) {
-  return c.env.CHANNEL_SELF_STORE ?? null
+  return c.env.PLUGIN_NOTIFICATION_QUEUE ?? null
 }
 
 async function sha256Hex(value: string) {
