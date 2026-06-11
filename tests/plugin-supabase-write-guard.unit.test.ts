@@ -120,15 +120,40 @@ describe('plugin Supabase write policy', () => {
       error: 'channel_self_server_storage_unavailable',
     })
   })
-  it.concurrent('queues cached org notifications into plugin KV', async () => {
+
+  it.concurrent('does not fall back to DB notifications when plugin queue KV is missing', async () => {
+    const { sendNotifOrgCached } = await import('../supabase/functions/_backend/utils/notifications.ts')
+    const context = createContext({ queuePluginNotifications: true })
+    const drizzleClient = { insert: vi.fn(() => { throw new Error('normal notification path called') }) } as any
+
+    await expect(sendNotifOrgCached(context, 'org:missing_payment', { app_id: 'com.test.app' }, 'org-1', 'com.test.app', '0 0 * * 1', 'owner@example.com', drizzleClient)).resolves.toBe(false)
+
+    expect(drizzleClient.insert).not.toHaveBeenCalled()
+  })
+
+  it.concurrent('does not rewrite plugin notification KV when the deterministic key already exists', async () => {
+    const get = vi.fn(async (_key: string) => '{"queued":true}')
     const put = vi.fn(async (_key: string, _raw: string, _options: unknown) => undefined)
-    const context = createContext({ queuePluginNotifications: true }, { CHANNEL_SELF_STORE: { put } })
+    const context = createContext({ queuePluginNotifications: true }, { CHANNEL_SELF_STORE: { get, put } })
+    const { sendNotifOrgCached } = await import('../supabase/functions/_backend/utils/notifications.ts')
+
+    await expect(sendNotifOrgCached(context, 'org:missing_payment', { app_id: 'com.test.app' }, 'org-1', 'com.test.app', '0 0 * * 1', 'owner@example.com', {} as any)).resolves.toBe(false)
+
+    expect(get).toHaveBeenCalledTimes(1)
+    expect(put).not.toHaveBeenCalled()
+  })
+
+  it.concurrent('queues cached org notifications into plugin KV', async () => {
+    const get = vi.fn(async (_key: string) => null)
+    const put = vi.fn(async (_key: string, _raw: string, _options: unknown) => undefined)
+    const context = createContext({ queuePluginNotifications: true }, { CHANNEL_SELF_STORE: { get, put } })
     const { sendNotifOrgCached } = await import('../supabase/functions/_backend/utils/notifications.ts')
 
     await expect(sendNotifOrgCached(context, 'org:missing_payment', { app_id: 'com.test.app' }, 'org-1', 'com.test.app', '0 0 * * 1', 'owner@example.com', {} as any)).resolves.toBe(false)
 
     expect(put).toHaveBeenCalledTimes(1)
     const [key, raw, options] = put.mock.calls[0]
+    expect(get).toHaveBeenCalledWith(key)
     expect(key).toMatch(/^plugin:notif:v1:org:/)
     expect(JSON.parse(raw as string)).toMatchObject({
       type: 'org',
@@ -141,14 +166,16 @@ describe('plugin Supabase write policy', () => {
   })
 
   it.concurrent('queues cached org member notifications into plugin KV', async () => {
+    const get = vi.fn(async (_key: string) => null)
     const put = vi.fn(async (_key: string, _raw: string, _options: unknown) => undefined)
-    const context = createContext({ queuePluginNotifications: true }, { CHANNEL_SELF_STORE: { put } })
+    const context = createContext({ queuePluginNotifications: true }, { CHANNEL_SELF_STORE: { get, put } })
     const { sendNotifToOrgMembersCached } = await import('../supabase/functions/_backend/utils/org_email_notifications.ts')
 
     await expect(sendNotifToOrgMembersCached(context, 'device:channel_self_set_rejected', 'channel_self_rejected', { app_id: 'com.test.app' }, 'org-1', 'com.test.app', '0 0 * * 0', {} as any)).resolves.toBe(false)
 
     expect(put).toHaveBeenCalledTimes(1)
     const [key, raw, options] = put.mock.calls[0]
+    expect(get).toHaveBeenCalledWith(key)
     expect(key).toMatch(/^plugin:notif:v1:org_members:/)
     expect(JSON.parse(raw as string)).toMatchObject({
       type: 'org_members',
@@ -160,5 +187,4 @@ describe('plugin Supabase write policy', () => {
     })
     expect(options).toMatchObject({ expirationTtl: 604800 })
   })
-
 })

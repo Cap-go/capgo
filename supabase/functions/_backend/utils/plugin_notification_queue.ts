@@ -1,10 +1,12 @@
 import type { Context } from 'hono'
 import type { NotificationAudience, EmailPreferenceKey } from './org_email_notifications.ts'
+import { CacheHelper } from './cache.ts'
 import { cloudlog, cloudlogErr, serializeError } from './logging.ts'
 
 export const PLUGIN_NOTIFICATION_QUEUE_PREFIX = 'plugin:notif:v1:'
 const PLUGIN_NOTIFICATION_QUEUE_TTL_SECONDS = 7 * 24 * 60 * 60
-
+const PLUGIN_NOTIFICATION_QUEUE_CACHE_PATH = '/.plugin-notification-queue'
+const PLUGIN_NOTIFICATION_QUEUE_CACHE_TTL_SECONDS = 60
 export interface PluginOrgNotificationQueueItem {
   type: 'org'
   eventName: string
@@ -50,6 +52,16 @@ async function buildQueueKey(item: PluginNotificationQueueInput) {
   return `${PLUGIN_NOTIFICATION_QUEUE_PREFIX}${item.type}:${encodeURIComponent(item.orgId)}:${encodeURIComponent(item.eventName)}:${uniqHash}`
 }
 
+async function getQueueCache(c: Context, key: string) {
+  const helper = new CacheHelper(c)
+  const request = helper.buildRequest(PLUGIN_NOTIFICATION_QUEUE_CACHE_PATH, { key })
+  const cached = await helper.matchJson<{ queued: boolean }>(request)
+  return {
+    hit: cached?.queued === true,
+    markQueued: () => helper.putJson(request, { queued: true }, PLUGIN_NOTIFICATION_QUEUE_CACHE_TTL_SECONDS),
+  }
+}
+
 async function enqueuePluginNotification(c: Context, item: PluginNotificationQueueInput): Promise<boolean> {
   const store = getStore(c)
   if (!store) {
@@ -57,14 +69,34 @@ async function enqueuePluginNotification(c: Context, item: PluginNotificationQue
     return false
   }
 
-  const payload = {
-    ...item,
-    enqueuedAt: new Date().toISOString(),
-  }
   const key = await buildQueueKey(item)
-  await store.put(key, JSON.stringify(payload), { expirationTtl: PLUGIN_NOTIFICATION_QUEUE_TTL_SECONDS })
-  cloudlog({ requestId: c.get('requestId'), message: 'Plugin notification queued', key, type: item.type, eventName: item.eventName, orgId: item.orgId })
-  return true
+  const queueCache = await getQueueCache(c, key)
+  if (queueCache.hit) {
+    cloudlog({ requestId: c.get('requestId'), message: 'Plugin notification queue cache hit', key, type: item.type, eventName: item.eventName, orgId: item.orgId })
+    return true
+  }
+
+  try {
+    const existing = await store.get(key)
+    if (existing) {
+      await queueCache.markQueued()
+      cloudlog({ requestId: c.get('requestId'), message: 'Plugin notification already queued', key, type: item.type, eventName: item.eventName, orgId: item.orgId })
+      return true
+    }
+
+    const payload = {
+      ...item,
+      enqueuedAt: new Date().toISOString(),
+    }
+    await store.put(key, JSON.stringify(payload), { expirationTtl: PLUGIN_NOTIFICATION_QUEUE_TTL_SECONDS })
+    await queueCache.markQueued()
+    cloudlog({ requestId: c.get('requestId'), message: 'Plugin notification queued', key, type: item.type, eventName: item.eventName, orgId: item.orgId })
+    return true
+  }
+  catch (error) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Plugin notification KV queue failed', key, type: item.type, eventName: item.eventName, orgId: item.orgId, error: serializeError(error) })
+    return false
+  }
 }
 
 export function queuePluginOrgNotification(
