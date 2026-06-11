@@ -199,12 +199,49 @@ async function handleManifest(c: Context, record: Database['public']['Tables']['
     cloudlog({ requestId: c.get('requestId'), message: 'error delete manifest in app_versions', error: deleteError })
 }
 
+function getVersionMetadataBranch(v2Path: string | null, storageProvider: string): 'r2_bundle_size' | 'r2_missing_path' | 'r2_direct_waiting_for_finalize' | 'zero_metadata' {
+  if (storageProvider === 'r2')
+    return v2Path ? 'r2_bundle_size' : 'r2_missing_path'
+  if (storageProvider === 'r2-direct')
+    return 'r2_direct_waiting_for_finalize'
+  return 'zero_metadata'
+}
+
+async function upsertZeroVersionMetadata(c: Context, record: Database['public']['Tables']['app_versions']['Row'], v2Path: string | null): Promise<boolean> {
+  cloudlog({ requestId: c.get('requestId'), message: 'zero metadata branch selected', ...versionUpdateLogFields(record), resolved_r2_path: v2Path })
+  const ownerOrg = await resolveOwnerOrg(c, record)
+  if (!ownerOrg) {
+    cloudlog({ requestId: c.get('requestId'), message: 'missing owner_org for app_versions_meta upsert', id: record.id, app_id: record.app_id })
+    return false
+  }
+
+  const { error: errorUpdate } = await supabaseAdmin(c)
+    .from('app_versions_meta')
+    .upsert({
+      id: record.id,
+      app_id: record.app_id,
+      owner_org: ownerOrg,
+      size: 0,
+      checksum: record.checksum ?? '',
+    }, {
+      onConflict: 'id',
+    })
+    .eq('id', record.id)
+  if (errorUpdate) {
+    cloudlog({ requestId: c.get('requestId'), message: 'errorUpdate', error: errorUpdate, ...versionUpdateLogFields(record), size: 0 })
+  }
+  else {
+    cloudlog({ requestId: c.get('requestId'), message: 'app_versions_meta zero size upserted', ...versionUpdateLogFields(record), owner_org: ownerOrg, size: 0 })
+  }
+  return true
+}
+
 /**
  * Handles app version metadata updates after insert/update trigger execution.
  */
-async function updateIt(c: Context, record: Database['public']['Tables']['app_versions']['Row']) {
+export async function updateIt(c: Context, record: Database['public']['Tables']['app_versions']['Row']) {
   const v2Path = await getPath(c, record)
-  const metadataBranch = v2Path && record.storage_provider === 'r2' ? 'r2_bundle_size' : 'zero_metadata'
+  const metadataBranch = getVersionMetadataBranch(v2Path, record.storage_provider)
   cloudlog({
     requestId: c.get('requestId'),
     message: 'on_version_update metadata branch selected',
@@ -218,31 +255,26 @@ async function updateIt(c: Context, record: Database['public']['Tables']['app_ve
     if (!shouldContinue)
       return c.json(BRES)
   }
+  else if (record.storage_provider === 'r2') {
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'r2 upload finalized without readable object path, skipping app_versions_meta zero size upsert',
+      ...versionUpdateLogFields(record),
+      resolved_r2_path: v2Path,
+    })
+  }
+  else if (record.storage_provider === 'r2-direct') {
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'r2-direct upload not finalized, skipping app_versions_meta zero size upsert',
+      ...versionUpdateLogFields(record),
+      resolved_r2_path: v2Path,
+    })
+  }
   else {
-    cloudlog({ requestId: c.get('requestId'), message: 'no v2 path', ...versionUpdateLogFields(record), resolved_r2_path: v2Path })
-    const ownerOrg = await resolveOwnerOrg(c, record)
-    if (!ownerOrg) {
-      cloudlog({ requestId: c.get('requestId'), message: 'missing owner_org for app_versions_meta upsert', id: record.id, app_id: record.app_id })
+    const shouldContinue = await upsertZeroVersionMetadata(c, record, v2Path)
+    if (!shouldContinue)
       return c.json(BRES)
-    }
-    const { error: errorUpdate } = await supabaseAdmin(c)
-      .from('app_versions_meta')
-      .upsert({
-        id: record.id,
-        app_id: record.app_id,
-        owner_org: ownerOrg,
-        size: 0,
-        checksum: record.checksum ?? '',
-      }, {
-        onConflict: 'id',
-      })
-      .eq('id', record.id)
-    if (errorUpdate) {
-      cloudlog({ requestId: c.get('requestId'), message: 'errorUpdate', error: errorUpdate, ...versionUpdateLogFields(record), size: 0 })
-    }
-    else {
-      cloudlog({ requestId: c.get('requestId'), message: 'app_versions_meta zero size upserted', ...versionUpdateLogFields(record), owner_org: ownerOrg, size: 0 })
-    }
   }
 
   // Handle manifest entries

@@ -2,13 +2,17 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const {
   appVersionsMetaSelectEq,
+  appVersionsMetaUpsert,
+  appVersionsMetaUpsertEq,
   appVersionsMetaUpdate,
   appVersionsMetaUpdateEq,
   closeClient,
   createStatsMeta,
   deleteObject,
   getDrizzleClient,
+  getPath,
   getPgClient,
+  getSize,
   manifestDeleteEq,
   manifestReferenceMaybeSingle,
   manifestSelectWhere,
@@ -18,6 +22,8 @@ const {
 } = vi.hoisted(() => {
   const appVersionsMetaSelectEq = vi.fn()
   const appVersionsMetaSelect = vi.fn(() => ({ eq: appVersionsMetaSelectEq }))
+  const appVersionsMetaUpsertEq = vi.fn()
+  const appVersionsMetaUpsert = vi.fn(() => ({ eq: appVersionsMetaUpsertEq }))
   const appVersionsMetaUpdateEq = vi.fn()
   const appVersionsMetaUpdate = vi.fn(() => ({ eq: appVersionsMetaUpdateEq }))
   const manifestDeleteEq = vi.fn()
@@ -32,6 +38,7 @@ const {
       return {
         select: appVersionsMetaSelect,
         update: appVersionsMetaUpdate,
+        upsert: appVersionsMetaUpsert,
       }
     }
     if (table === 'manifest') {
@@ -47,6 +54,8 @@ const {
 
   return {
     appVersionsMetaSelectEq,
+    appVersionsMetaUpsert,
+    appVersionsMetaUpsertEq,
     appVersionsMetaUpdate,
     appVersionsMetaUpdateEq,
     closeClient: vi.fn(),
@@ -59,7 +68,9 @@ const {
         })),
       })),
     })),
+    getPath: vi.fn(),
     getPgClient: vi.fn(() => ({ query: pgQuery })),
+    getSize: vi.fn(),
     manifestDeleteEq,
     manifestReferenceMaybeSingle,
     manifestSelectWhere,
@@ -71,9 +82,10 @@ const {
 })
 
 vi.mock('../supabase/functions/_backend/utils/s3.ts', () => ({
-  getPath: vi.fn(),
+  getPath,
   s3: {
     deleteObject,
+    getSize,
     moveObjectToTrash,
   },
 }))
@@ -97,7 +109,7 @@ vi.mock('../supabase/functions/_backend/utils/logging.ts', () => ({
   cloudlogErr: vi.fn(),
 }))
 
-const { deleteIt } = await import('../supabase/functions/_backend/triggers/on_version_update.ts')
+const { deleteIt, updateIt } = await import('../supabase/functions/_backend/triggers/on_version_update.ts')
 
 function createContext() {
   return {
@@ -112,6 +124,7 @@ function createVersion(overrides: Record<string, unknown> = {}) {
     id: 123,
     manifest: null,
     name: '1.0.0',
+    owner_org: 'org-1',
     r2_path: 'orgs/org-1/apps/com.cleanup.test/1.0.0.zip',
     storage_provider: 'r2',
     ...overrides,
@@ -127,11 +140,64 @@ describe('on_version_update deleted version cleanup', () => {
     manifestSelectWhere.mockResolvedValue([])
     manifestDeleteEq.mockResolvedValue({ error: null })
     manifestReferenceMaybeSingle.mockResolvedValue({ data: null, error: null })
+    getPath.mockResolvedValue('orgs/org-1/apps/com.cleanup.test/1.0.0.zip')
+    getSize.mockResolvedValue(9876)
     pgQuery.mockResolvedValue({ rows: [] })
     appVersionsMetaSelectEq.mockReturnValue({
       single: vi.fn(async () => ({ data: { size: 1234 }, error: null })),
     })
     appVersionsMetaUpdateEq.mockResolvedValue({ error: null })
+    appVersionsMetaUpsertEq.mockResolvedValue({ error: null })
+  })
+
+  it('does not write zero metadata while an r2-direct upload is still finalizing', async () => {
+    const response = await updateIt(createContext(), createVersion({ storage_provider: 'r2-direct' }))
+
+    expect(response.status).toBe(200)
+    expect(getPath).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ storage_provider: 'r2-direct' }))
+    expect(getSize).not.toHaveBeenCalled()
+    expect(appVersionsMetaUpsert).not.toHaveBeenCalled()
+    expect(createStatsMeta).not.toHaveBeenCalled()
+  })
+
+  it('does not write zero metadata when an r2-direct upload has no object yet', async () => {
+    getPath.mockResolvedValue(null)
+
+    const response = await updateIt(createContext(), createVersion({ storage_provider: 'r2-direct' }))
+
+    expect(response.status).toBe(200)
+    expect(getSize).not.toHaveBeenCalled()
+    expect(appVersionsMetaUpsert).not.toHaveBeenCalled()
+    expect(createStatsMeta).not.toHaveBeenCalled()
+  })
+
+  it('does not write zero metadata when a finalized r2 upload has no readable object path', async () => {
+    getPath.mockResolvedValue(null)
+
+    const response = await updateIt(createContext(), createVersion({ storage_provider: 'r2' }))
+
+    expect(response.status).toBe(200)
+    expect(getSize).not.toHaveBeenCalled()
+    expect(appVersionsMetaUpsert).not.toHaveBeenCalled()
+    expect(createStatsMeta).not.toHaveBeenCalled()
+  })
+
+  it('stores the real R2 size once the upload is finalized', async () => {
+    const response = await updateIt(createContext(), createVersion({ storage_provider: 'r2' }))
+
+    expect(response.status).toBe(200)
+    expect(getSize).toHaveBeenCalledWith(expect.anything(), 'orgs/org-1/apps/com.cleanup.test/1.0.0.zip')
+    expect(appVersionsMetaUpsert).toHaveBeenCalledWith({
+      app_id: 'com.cleanup.test',
+      checksum: '',
+      id: 123,
+      owner_org: 'org-1',
+      size: 9876,
+    }, {
+      onConflict: 'id',
+    })
+    expect(appVersionsMetaUpsertEq).toHaveBeenCalledWith('id', 123)
+    expect(createStatsMeta).toHaveBeenCalledWith(expect.anything(), 'com.cleanup.test', 123, 9876)
   })
 
   it('moves the bundle to trash and clears stored size for soft-deleted versions', async () => {
