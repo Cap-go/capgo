@@ -89,7 +89,9 @@ jobs:
           echo "APPLE_KEY_PATH=$RUNNER_TEMP/AuthKey.p8" >> "$GITHUB_ENV"
       - name: Sign and notarize
         env:
-          CAPGO_APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          # Public (not a secret): the team ID appears in the cert subject and
+          # every signed binary. Must match macos-signing.ts's CAPGO_APPLE_TEAM_ID.
+          CAPGO_APPLE_TEAM_ID: UVTJ336J2D
           APPLE_KEY_ID: ${{ secrets.APPLE_KEY_ID }}
           APPLE_ISSUER_ID: ${{ secrets.APPLE_ISSUER_ID }}
         run: bash cli-helper/scripts/sign-and-notarize.sh
