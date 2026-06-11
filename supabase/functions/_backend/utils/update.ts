@@ -69,8 +69,46 @@ function updateError200(c: Context, errorCode: string, message: string, moreInfo
   })
 }
 
+interface SimplePluginVersion {
+  major: number
+  minor: number
+  patch: number
+}
+
+function parseSimplePluginVersion(pluginVersion: string): SimplePluginVersion | null {
+  const match = /^(\d+)\.(\d+)\.(\d+)$/.exec(pluginVersion)
+  if (!match)
+    return null
+  return {
+    major: Number(match[1]),
+    minor: Number(match[2]),
+    patch: Number(match[3]),
+  }
+}
+
+function simplePluginVersionAtLeast(version: SimplePluginVersion, minFive: [number, number], minSix: [number, number], minSeven: [number, number], minEight: [number, number]) {
+  if (version.major < 5 || version.major > 8)
+    return true
+
+  const minimum = version.major === 5
+    ? minFive
+    : version.major === 6
+      ? minSix
+      : version.major === 7
+        ? minSeven
+        : minEight
+  return version.minor > minimum[0] || (version.minor === minimum[0] && version.patch >= minimum[1])
+}
+
 export function resToVersion(plugin_version: string, signedURL: string, version: Database['public']['Tables']['app_versions']['Row'], manifest: ManifestEntry[], expose_metadata: boolean = false) {
-  const pluginVersion = parse(plugin_version)
+  const simplePluginVersion = parseSimplePluginVersion(plugin_version)
+  const pluginVersion = simplePluginVersion ? null : parse(plugin_version)
+  const supportsManifest = simplePluginVersion
+    ? simplePluginVersionAtLeast(simplePluginVersion, [10, 0], [25, 0], [0, 35], [0, 0])
+    : !isDeprecatedPluginVersion(pluginVersion!, BROTLI_MIN_UPDATER_VERSION_V5, BROTLI_MIN_UPDATER_VERSION_V6, BROTLI_MIN_UPDATER_VERSION_V7)
+  const supportsMetadata = simplePluginVersion
+    ? simplePluginVersionAtLeast(simplePluginVersion, [35, 0], [35, 0], [35, 0], [35, 0])
+    : !isDeprecatedPluginVersion(pluginVersion!, '5.35.0', '6.35.0', '7.35.0', '8.35.0')
   const res: {
     version: string
     url: string
@@ -87,10 +125,10 @@ export function resToVersion(plugin_version: string, signedURL: string, version:
     checksum: version.checksum,
   }
   // manifest is supported in v5.10.0+, v6.25.0+, v7.0.35+, v8+
-  if (manifest.length > 0 && !isDeprecatedPluginVersion(pluginVersion, BROTLI_MIN_UPDATER_VERSION_V5, BROTLI_MIN_UPDATER_VERSION_V6, BROTLI_MIN_UPDATER_VERSION_V7))
+  if (manifest.length > 0 && supportsManifest)
     res.manifest = manifest
   // Include link and comment for plugin v5.35.0+, v6.35.0+, v7.35.0+, v8.35.0+ (only if expose_metadata is enabled and they have values)
-  if (expose_metadata && !isDeprecatedPluginVersion(pluginVersion, '5.35.0', '6.35.0', '7.35.0', '8.35.0')) {
+  if (expose_metadata && supportsMetadata) {
     if (version.link)
       res.link = version.link
     if (version.comment)
