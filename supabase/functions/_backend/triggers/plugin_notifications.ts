@@ -5,8 +5,8 @@ import { Hono } from 'hono/tiny'
 import { BRES, middlewareAPISecret, parseBody, quickError, simpleError } from '../utils/hono.ts'
 import { cloudlog, cloudlogErr, serializeError } from '../utils/logging.ts'
 import { closeClient, getDrizzleClient, getPgClient } from '../utils/pg.ts'
-import { sendNotifOrgCached } from '../utils/notifications.ts'
-import { sendNotifToOrgMembersCached } from '../utils/org_email_notifications.ts'
+import { sendNotifOrg } from '../utils/notifications.ts'
+import { sendNotifToOrgMembers } from '../utils/org_email_notifications.ts'
 
 const MAX_PLUGIN_NOTIFICATION_BATCH = 100
 
@@ -28,6 +28,19 @@ function isValidPluginNotificationItem(item: unknown): item is PluginNotificatio
   return false
 }
 
+type PluginNotificationSendResult = boolean | { sent: boolean, lastSendAt?: string }
+
+function isAcceptedPluginNotificationResult(result: PluginNotificationSendResult) {
+  return result === true || (typeof result === 'object' && result.sent === false && Boolean(result.lastSendAt))
+}
+
+async function sendQueuedPluginNotification(c: Context, item: PluginNotificationQueueItem, drizzleClient: ReturnType<typeof getDrizzleClient>): Promise<PluginNotificationSendResult> {
+  if (item.type === 'org')
+    return await sendNotifOrg(c, item.eventName, item.eventData, item.orgId, item.uniqId, item.cron, item.managementEmail, drizzleClient)
+
+  return await sendNotifToOrgMembers(c, item.eventName, item.preferenceKey, item.eventData, item.orgId, item.uniqId, item.cron, drizzleClient, item.audience)
+}
+
 async function processPluginNotifications(c: Context, items: PluginNotificationQueueItem[]) {
   const pgClient = getPgClient(c, true)
   const drizzleClient = getDrizzleClient(pgClient)
@@ -37,11 +50,11 @@ async function processPluginNotifications(c: Context, items: PluginNotificationQ
   try {
     for (const item of items) {
       try {
-        if (item.type === 'org') {
-          await sendNotifOrgCached(c, item.eventName, item.eventData, item.orgId, item.uniqId, item.cron, item.managementEmail, drizzleClient)
-        }
-        else {
-          await sendNotifToOrgMembersCached(c, item.eventName, item.preferenceKey, item.eventData, item.orgId, item.uniqId, item.cron, drizzleClient, item.audience)
+        const result = await sendQueuedPluginNotification(c, item, drizzleClient)
+        if (!isAcceptedPluginNotificationResult(result)) {
+          failed++
+          cloudlogErr({ requestId: c.get('requestId'), message: 'Plugin notification item was not delivered', type: item.type, eventName: item.eventName, orgId: item.orgId })
+          continue
         }
         processed++
       }
