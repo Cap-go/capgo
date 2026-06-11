@@ -35,11 +35,14 @@ export interface SendEventToTrackingPayload extends TrackOptions {
 export interface SendEventToTrackingOptions {
   background?: boolean
   ip?: string
+  strict?: boolean
 }
 
-async function runTrackedCall(c: Context, provider: string, task: () => Promise<unknown>) {
+async function runTrackedCall(c: Context, provider: string, task: () => Promise<unknown>, strict = false) {
   try {
-    await task()
+    const result = await task()
+    if (strict && result === false)
+      throw new Error(`${provider} tracking returned false`)
   }
   catch (error) {
     cloudlogErr({
@@ -48,6 +51,8 @@ async function runTrackedCall(c: Context, provider: string, task: () => Promise<
       provider,
       error: serializeError(error),
     })
+    if (strict)
+      throw error
   }
 }
 
@@ -60,7 +65,7 @@ function getTrackingIp(c: Context, ip?: string) {
 
 async function executeTracking(c: Context, payload: SendEventToTrackingPayload, options: SendEventToTrackingOptions) {
   const tasks: Array<Promise<void>> = [
-    runTrackedCall(c, 'logsnag', () => logsnag(c).track(payload)),
+    runTrackedCall(c, 'logsnag', () => logsnag(c).track(payload), options.strict),
     runTrackedCall(c, 'posthog', () => trackPosthogEvent(c, {
       event: payload.event,
       user_id: payload.user_id,
@@ -69,7 +74,7 @@ async function executeTracking(c: Context, payload: SendEventToTrackingPayload, 
       description: payload.description,
       groups: payload.groups,
       ip: getTrackingIp(c, options.ip),
-    })),
+    }), options.strict),
   ]
 
   await Promise.all(tasks)

@@ -1,5 +1,4 @@
 import type { Context } from 'hono'
-import type { DevicesByPlatform, PluginBreakdownResult } from '../utils/cloudflare.ts'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { Database, Json } from '../utils/supabase.types.ts'
 
@@ -7,17 +6,16 @@ import { sql } from 'drizzle-orm'
 import { Hono } from 'hono/tiny'
 
 import { getPluginBreakdownCF, readActiveAppsCF, readLastMonthDevicesByPlatformCF, readLastMonthDevicesCF, readLastMonthUpdatesCF } from '../utils/cloudflare.ts'
-import { BRES, middlewareAPISecret } from '../utils/hono.ts'
+import { BRES, middlewareAPISecret, quickError } from '../utils/hono.ts'
 import { cloudlog, cloudlogErr } from '../utils/logging.ts'
 import { logsnagInsights } from '../utils/logsnag.ts'
 import { closeClient, getDrizzleClient, getPgClient } from '../utils/pg.ts'
 import { countAllApps, countAllUpdates, countAllUpdatesExternal, getUpdateStats } from '../utils/stats.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
 import { sendEventToTracking } from '../utils/tracking.ts'
+import { backgroundTask } from '../utils/utils.ts'
 
 interface PlanTotal { [key: string]: number }
-interface Actives { users: number, apps: number }
-interface CustomerCount { total: number, yearly: number, monthly: number }
 interface BuildStats {
   total: number
   ios: number
@@ -91,38 +89,6 @@ interface LtvStats {
   shortest_ltv: number
   longest_ltv: number
 }
-interface GlobalStats {
-  apps: PromiseLike<number>
-  updates: PromiseLike<number>
-  updates_external: PromiseLike<number>
-  updates_last_month: PromiseLike<number>
-  users: PromiseLike<number>
-  orgs: PromiseLike<number>
-  stars: Promise<number>
-  onboarded: PromiseLike<number>
-  success_rate: PromiseLike<number>
-  need_upgrade: PromiseLike<number>
-  customers: PromiseLike<CustomerCount>
-  paying_orgs_for_conversion: PromiseLike<number>
-  plans: PromiseLike<PlanTotal>
-  actives: Promise<Actives>
-  devices_last_month: PromiseLike<number>
-  devices_by_platform: PromiseLike<DevicesByPlatform>
-  registers_today: PromiseLike<number>
-  bundle_storage_gb: PromiseLike<number>
-  revenue: PromiseLike<PlanRevenue>
-  new_paying_orgs: PromiseLike<number>
-  canceled_orgs: PromiseLike<number>
-  upgraded_orgs: PromiseLike<number>
-  credits_bought: PromiseLike<number>
-  credits_consumed: PromiseLike<number>
-  demo_apps_created: PromiseLike<number>
-  plugin_breakdown: PromiseLike<PluginBreakdownResult>
-  build_stats: PromiseLike<BuildStats>
-  retention_metrics: PromiseLike<RevenueRetentionMetrics>
-  paid_product_activity_stats: PromiseLike<PaidProductActivityStats>
-  ltv_stats: PromiseLike<LtvStats>
-}
 interface CustomerIdRow {
   customer_id: string
 }
@@ -135,6 +101,205 @@ function calculateConversionRate(converted: number | null | undefined, totalOrgs
   if (totalOrgs <= 0)
     return 0
   return Number((((converted ?? 0) * 100) / totalOrgs).toFixed(1))
+}
+
+const GLOBAL_STATS_PLAN_KEYS = ['Trial', 'Solo', 'Maker', 'Team', 'Enterprise'] as const
+
+function normalizePlanTotals(plans: PlanTotal): PlanTotal {
+  const normalized: PlanTotal = {}
+
+  for (const [key, value] of Object.entries(plans))
+    normalized[key] = Number(value) || 0
+
+  for (const key of GLOBAL_STATS_PLAN_KEYS)
+    normalized[key] = Number(normalized[key]) || 0
+
+  return normalized
+}
+
+const LOGSNAG_INSIGHTS_BACKGROUND_MAX_RETRIES = 4
+const LOGSNAG_INSIGHTS_RETRY_DELAY_SECONDS = 300
+const LOGSNAG_INSIGHTS_QUEUE_NAME = 'admin_stats'
+const LOGSNAG_INSIGHTS_NOTIFICATION_DELAY_SECONDS = 180
+const GLOBAL_STATS_NOTIFICATION_LOCK_NAMESPACE = 'logsnag_insights_notifications'
+const GLOBAL_STATS_NOTIFICATION_LOGSNAG_STEP = 'notifications_logsnag'
+const GLOBAL_STATS_NOTIFICATION_TRACKING_STEP = 'notifications_tracking'
+const GLOBAL_STATS_SHARDS = [
+  'core',
+  'usage',
+  'revenue',
+  'plugins',
+  'builds',
+  'retention',
+  'paid_products',
+  'ltv',
+  'notifications',
+] as const
+const GLOBAL_STATS_COMPLETION_MARKERS = [
+  ...GLOBAL_STATS_SHARDS,
+  GLOBAL_STATS_NOTIFICATION_LOGSNAG_STEP,
+  GLOBAL_STATS_NOTIFICATION_TRACKING_STEP,
+] as const
+const GLOBAL_STATS_SHARD_SET = new Set<string>(GLOBAL_STATS_SHARDS)
+const GLOBAL_STATS_COMPLETION_MARKER_SET = new Set<string>(GLOBAL_STATS_COMPLETION_MARKERS)
+
+type GlobalStatsShard = typeof GLOBAL_STATS_SHARDS[number]
+type GlobalStatsCompletionMarker = typeof GLOBAL_STATS_COMPLETION_MARKERS[number]
+type RequiredGlobalStatsShard = Exclude<GlobalStatsShard, 'notifications'>
+const REQUIRED_GLOBAL_STATS_SHARDS = GLOBAL_STATS_SHARDS.filter((shard): shard is RequiredGlobalStatsShard => shard !== 'notifications')
+type GlobalStatsUpdate = Database['public']['Tables']['global_stats']['Update']
+type GlobalStatsRow = Database['public']['Tables']['global_stats']['Row']
+type GlobalStatsSnapshotPatch = GlobalStatsUpdate & { orgs?: number }
+type GlobalStatsSnapshotRow = GlobalStatsRow & { orgs?: number | null }
+
+interface LogsnagInsightsPayload {
+  retry_count?: unknown
+  shard?: unknown
+  date_id?: unknown
+}
+
+interface ScheduleLogsnagInsightsUpdateOptions {
+  retryCount?: number
+  retryMsgId?: number | null
+  cancelRetry?: (c: Context, retryMsgId: number) => Promise<void>
+}
+
+function normalizeLogsnagInsightsRetryCount(value: unknown): number {
+  const retryCount = Number(value)
+  if (!Number.isFinite(retryCount) || retryCount < 0)
+    return 0
+  return Math.floor(retryCount)
+}
+
+function buildLogsnagInsightsRetryMessage(retryCount: number, dateId?: string) {
+  return {
+    function_name: 'logsnag_insights',
+    function_type: 'cloudflare',
+    payload: {
+      ...(dateId ? { date_id: dateId } : {}),
+      retry_count: retryCount,
+    },
+  }
+}
+
+function getLogsnagInsightsShardFunctionName(shard: GlobalStatsShard): string {
+  return `logsnag_insights_${shard}`
+}
+
+function buildLogsnagInsightsShardMessage(shard: GlobalStatsShard, dateId: string) {
+  return {
+    function_name: getLogsnagInsightsShardFunctionName(shard),
+    function_type: 'cloudflare',
+    payload: {
+      date_id: dateId,
+    },
+  }
+}
+
+async function readLogsnagInsightsPayload(c: Context): Promise<LogsnagInsightsPayload> {
+  const rawBody = await c.req.raw.clone().text()
+  if (!rawBody.trim())
+    return {}
+
+  let body: unknown
+  try {
+    body = JSON.parse(rawBody)
+  }
+  catch (error) {
+    quickError(400, 'invalid_logsnag_insights_payload', 'Invalid LogSnag insights payload', undefined, error, { alert: false })
+  }
+
+  if (!body || typeof body !== 'object' || Array.isArray(body))
+    return {}
+  return body as LogsnagInsightsPayload
+}
+function normalizeLogsnagInsightsShard(value: unknown): GlobalStatsShard | null {
+  if (typeof value !== 'string' || !GLOBAL_STATS_SHARD_SET.has(value))
+    return null
+  return value as GlobalStatsShard
+}
+
+function normalizeGlobalStatsDateId(value: unknown): string | null {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value))
+    return null
+
+  const date = new Date(`${value}T00:00:00.000Z`)
+  if (Number.isNaN(date.getTime()) || getDateId(date) !== value)
+    return null
+
+  return value
+}
+
+function getCompletedDayWindowForDateId(dateId: string): DailyWindow {
+  const prevDayStart = new Date(`${dateId}T00:00:00.000Z`)
+  const prevDayEnd = new Date(prevDayStart.getTime() + 24 * 60 * 60 * 1000)
+  return {
+    prevDayStart,
+    prevDayEnd,
+    prevDayDateId: dateId,
+  }
+}
+
+function getMetricWindowFromDailyWindow(window: DailyWindow): CurrentDayWindow {
+  return {
+    dayStart: window.prevDayStart,
+    nextDayStart: window.prevDayEnd,
+    dayDateId: window.prevDayDateId,
+  }
+}
+
+async function reserveLogsnagInsightsRetry(c: Context, retryCount: number, dateId?: string): Promise<number | null> {
+  if (retryCount >= LOGSNAG_INSIGHTS_BACKGROUND_MAX_RETRIES)
+    return null
+
+  const nextRetryCount = retryCount + 1
+  const delaySeconds = LOGSNAG_INSIGHTS_RETRY_DELAY_SECONDS * nextRetryCount
+  const retryMessage = buildLogsnagInsightsRetryMessage(nextRetryCount, dateId)
+  const db = getPgClient(c)
+
+  try {
+    const retryMsgId = await queueLogsnagInsightsMessage(db, retryMessage, delaySeconds)
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'Reserved logsnag insights dispatcher retry',
+      retryCount: nextRetryCount,
+      delaySeconds,
+      retryMsgId,
+      dateId,
+    })
+    return retryMsgId
+  }
+  finally {
+    await closeClient(c, db)
+  }
+}
+
+async function cancelLogsnagInsightsRetry(c: Context, retryMsgId: number): Promise<void> {
+  const db = getPgClient(c)
+
+  try {
+    await db.query('SELECT pgmq.delete($1, $2::bigint[])', [
+      LOGSNAG_INSIGHTS_QUEUE_NAME,
+      [retryMsgId],
+    ])
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'Cancelled reserved logsnag insights dispatcher retry',
+      retryMsgId,
+    })
+  }
+  catch (cancelError) {
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: 'Failed to cancel reserved logsnag insights dispatcher retry',
+      retryMsgId,
+      error: cancelError,
+    })
+    throw cancelError
+  }
+  finally {
+    await closeClient(c, db)
+  }
 }
 
 function getPaidPlanTotal(plans: PlanTotal) {
@@ -223,7 +388,7 @@ function isMissingBuildMetricColumnError(error: unknown): boolean {
     || message.includes('build_count_day')
 }
 
-async function calculateRevenue(c: Context): Promise<PlanRevenue> {
+async function calculateRevenue(c: Context, referenceDate?: Date): Promise<PlanRevenue> {
   const supabase = supabaseAdmin(c)
 
   try {
@@ -267,16 +432,26 @@ async function calculateRevenue(c: Context): Promise<PlanRevenue> {
       cloudlog({ requestId: c.get('requestId'), message: `Plan ${plan.name}: monthly=$${price_m}, yearly=$${price_y}` })
     }
 
-    // Get subscription counts from stripe_info
-    const { data: subsData, error: subsError } = await supabase
+    // Get subscription counts from stripe_info. Replays use the snapshot end to avoid counting subscriptions created after the target date.
+    let subsQuery = supabase
       .from('stripe_info')
-      .select(`
-        price_id,
-        plans!stripe_info_product_id_fkey(name)
-      `)
-      .eq('status', 'succeeded')
+      .select('price_id')
       .eq('is_good_plan', true)
 
+    if (referenceDate) {
+      const snapshotEndIso = referenceDate.toISOString()
+      subsQuery = subsQuery
+        .lt('created_at', snapshotEndIso)
+        .or(`paid_at.lt.${snapshotEndIso},paid_at.is.null`)
+        .in('status', ['succeeded', 'canceled', 'deleted'])
+        .or(`canceled_at.is.null,canceled_at.gte.${snapshotEndIso}`)
+        .gt('subscription_anchor_end', snapshotEndIso)
+    }
+    else {
+      subsQuery = subsQuery.eq('status', 'succeeded')
+    }
+
+    const { data: subsData, error: subsError } = await subsQuery
     if (subsError || !subsData) {
       cloudlogErr({ requestId: c.get('requestId'), message: 'Failed to fetch subscriptions', error: subsError })
       return {
@@ -299,25 +474,27 @@ async function calculateRevenue(c: Context): Promise<PlanRevenue> {
 
     // Count subscriptions by plan and billing period
     const subCountMap = new Map<string, { monthly: number, yearly: number }>()
+    const priceToPlan = new Map<string, { planName: string, billing: 'monthly' | 'yearly' }>()
+    for (const [planName, planPrices] of priceMap) {
+      if (planPrices.price_m_id)
+        priceToPlan.set(planPrices.price_m_id, { planName, billing: 'monthly' })
+      if (planPrices.price_y_id)
+        priceToPlan.set(planPrices.price_y_id, { planName, billing: 'yearly' })
+    }
+
     for (const sub of subsData) {
-      const planName = (sub.plans as any)?.name?.toLowerCase()
-      if (!planName || !['solo', 'maker', 'team', 'enterprise'].includes(planName))
+      const priceId = sub.price_id
+      if (!priceId)
         continue
 
-      const priceId = sub.price_id
-      if (!subCountMap.has(planName)) {
-        subCountMap.set(planName, { monthly: 0, yearly: 0 })
-      }
+      const plan = priceToPlan.get(priceId)
+      if (!plan)
+        continue
 
-      const planPrices = priceMap.get(planName)
-      if (planPrices) {
-        if (priceId === planPrices.price_m_id) {
-          subCountMap.get(planName)!.monthly++
-        }
-        else if (priceId === planPrices.price_y_id) {
-          subCountMap.get(planName)!.yearly++
-        }
-      }
+      if (!subCountMap.has(plan.planName))
+        subCountMap.set(plan.planName, { monthly: 0, yearly: 0 })
+
+      subCountMap.get(plan.planName)![plan.billing]++
     }
 
     // Calculate MRR and ARR
@@ -415,8 +592,9 @@ async function getGithubStars(): Promise<number> {
 
 async function getBuildStats(c: Context, window?: DailyWindow): Promise<BuildStats> {
   const supabase = supabaseAdmin(c)
-  const last30days = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
   const { prevDayStart, prevDayEnd } = window ?? getDailyWindow()
+  const last30daysStart = new Date(prevDayEnd.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString()
+  const last30daysEnd = prevDayEnd.toISOString()
 
   try {
     // Run all count queries in parallel for better performance
@@ -439,11 +617,11 @@ async function getBuildStats(c: Context, window?: DailyWindow): Promise<BuildSta
       // Count Android builds (all time)
       supabase.from('build_logs').select('*', { count: 'exact', head: true }).eq('platform', 'android'),
       // Count total builds (last 30 days)
-      supabase.from('build_logs').select('*', { count: 'exact', head: true }).gte('created_at', last30days),
+      supabase.from('build_logs').select('*', { count: 'exact', head: true }).gte('created_at', last30daysStart).lt('created_at', last30daysEnd),
       // Count iOS builds (last 30 days)
-      supabase.from('build_logs').select('*', { count: 'exact', head: true }).eq('platform', 'ios').gte('created_at', last30days),
+      supabase.from('build_logs').select('*', { count: 'exact', head: true }).eq('platform', 'ios').gte('created_at', last30daysStart).lt('created_at', last30daysEnd),
       // Count Android builds (last 30 days)
-      supabase.from('build_logs').select('*', { count: 'exact', head: true }).eq('platform', 'android').gte('created_at', last30days),
+      supabase.from('build_logs').select('*', { count: 'exact', head: true }).eq('platform', 'android').gte('created_at', last30daysStart).lt('created_at', last30daysEnd),
       // Count successful builds (all time)
       supabase.from('build_requests').select('*', { count: 'exact', head: true }).eq('status', 'succeeded'),
       // Count successful iOS builds (all time)
@@ -810,7 +988,7 @@ async function aggregateDailyBuildStats(
   return { totalSeconds: totalSecondsByPlatform, avgSeconds: avgSecondsByPlatform, counts: countsByPlatform }
 }
 
-async function countDemoSeededApps(c: Context, createdAfterIso: string): Promise<number> {
+async function countDemoSeededApps(c: Context, createdAfterIso: string, createdBeforeIso: string): Promise<number> {
   const pgClient = getPgClient(c, false)
   const drizzleClient = getDrizzleClient(pgClient)
 
@@ -819,6 +997,7 @@ async function countDemoSeededApps(c: Context, createdAfterIso: string): Promise
       SELECT COUNT(*)::int AS count
       FROM public.apps AS apps
       WHERE apps.created_at >= ${new Date(createdAfterIso)}
+        AND apps.created_at < ${new Date(createdBeforeIso)}
         AND EXISTS (
           SELECT 1
           FROM public.app_versions AS app_versions
@@ -841,38 +1020,299 @@ async function countDemoSeededApps(c: Context, createdAfterIso: string): Promise
   }
 }
 
-function getStats(c: Context, window?: DailyWindow): GlobalStats {
+async function ensureGlobalStatsSnapshotRow(c: Context, dateId: string): Promise<void> {
+  const db = getPgClient(c)
+
+  try {
+    await db.query(
+      'INSERT INTO public.global_stats (date_id, apps, updates, stars) VALUES ($1, 0, 0, 0) ON CONFLICT (date_id) DO NOTHING',
+      [dateId],
+    )
+  }
+  finally {
+    await closeClient(c, db)
+  }
+}
+
+async function resetGlobalStatsCompletedShards(c: Context, dateId: string): Promise<void> {
+  const db = getPgClient(c)
+
+  try {
+    const result = await db.query(
+      `UPDATE public.global_stats
+      SET completed_shards = '[]'::jsonb
+      WHERE date_id = $1`,
+      [dateId],
+    )
+    if (result.rowCount !== 1)
+      throw new Error(`Expected one global_stats row for ${dateId}, reset ${result.rowCount ?? 0}`)
+  }
+  finally {
+    await closeClient(c, db)
+  }
+}
+
+async function updateGlobalStatsSnapshot(c: Context, dateId: string, patch: GlobalStatsSnapshotPatch): Promise<void> {
+  await ensureGlobalStatsSnapshotRow(c, dateId)
+
+  const { orgs, ...globalStatsPatch } = patch
+  const { error } = await supabaseAdmin(c)
+    .from('global_stats')
+    .update(globalStatsPatch as GlobalStatsUpdate)
+    .eq('date_id', dateId)
+
+  if (error)
+    throw error
+
+  if (orgs !== undefined)
+    await updateGlobalStatsSnapshotOrgCount(c, dateId, orgs)
+}
+
+async function updateGlobalStatsSnapshotOrgCount(c: Context, dateId: string, orgs: number): Promise<void> {
+  const db = getPgClient(c)
+
+  try {
+    const result = await db.query(
+      `UPDATE public.global_stats
+      SET orgs = $2
+      WHERE date_id = $1`,
+      [dateId, orgs],
+    )
+    if (result.rowCount !== 1)
+      throw new Error(`Expected one global_stats row for ${dateId}, updated orgs on ${result.rowCount ?? 0}`)
+  }
+  finally {
+    await closeClient(c, db)
+  }
+}
+
+function normalizeCompletedGlobalStatsShards(value: unknown): Set<GlobalStatsCompletionMarker> {
+  let parsed = value
+  if (typeof value === 'string') {
+    try {
+      parsed = JSON.parse(value)
+    }
+    catch {
+      parsed = []
+    }
+  }
+
+  if (!Array.isArray(parsed))
+    return new Set()
+
+  return new Set(parsed.filter((shard): shard is GlobalStatsCompletionMarker => typeof shard === 'string' && GLOBAL_STATS_COMPLETION_MARKER_SET.has(shard)))
+}
+
+function getMissingGlobalStatsRequiredShards(completedShards: ReadonlySet<GlobalStatsCompletionMarker>): RequiredGlobalStatsShard[] {
+  return REQUIRED_GLOBAL_STATS_SHARDS.filter(shard => !completedShards.has(shard))
+}
+
+function getMissingGlobalStatsShards(completedShards: ReadonlySet<GlobalStatsCompletionMarker>): GlobalStatsShard[] {
+  return GLOBAL_STATS_SHARDS.filter(shard => !completedShards.has(shard))
+}
+
+function hasCompletedGlobalStatsNotifications(completedShards: ReadonlySet<GlobalStatsCompletionMarker>): boolean {
+  return completedShards.has('notifications')
+}
+
+async function readCompletedGlobalStatsShards(c: Context, dateId: string): Promise<Set<GlobalStatsCompletionMarker>> {
+  const db = getPgClient(c)
+
+  try {
+    const result = await db.query<{ completed_shards: unknown }>(
+      'SELECT completed_shards FROM public.global_stats WHERE date_id = $1',
+      [dateId],
+    )
+    const completedShards = result.rows[0]?.completed_shards
+    return normalizeCompletedGlobalStatsShards(completedShards)
+  }
+  catch (error) {
+    quickError(503, 'global_stats_snapshot_not_ready', 'Global stats snapshot shard state is not ready', { dateId }, error, { alert: false })
+  }
+  finally {
+    await closeClient(c, db)
+  }
+}
+
+async function claimGlobalStatsNotificationDelivery(c: Context, dateId: string): Promise<ReturnType<typeof getPgClient> | null> {
+  const db = getPgClient(c)
+
+  try {
+    const result = await db.query<{ claimed: boolean }>(
+      'SELECT pg_try_advisory_lock(hashtext($1), hashtext($2)) AS claimed',
+      [GLOBAL_STATS_NOTIFICATION_LOCK_NAMESPACE, dateId],
+    )
+    if (result.rows[0]?.claimed === true)
+      return db
+
+    await closeClient(c, db)
+    return null
+  }
+  catch (error) {
+    await closeClient(c, db)
+    quickError(503, 'global_stats_notification_claim_failed', 'Global stats notification delivery claim failed', { dateId }, error, { alert: false })
+  }
+}
+
+async function releaseGlobalStatsNotificationDeliveryClaim(c: Context, db: ReturnType<typeof getPgClient>, dateId: string): Promise<void> {
+  try {
+    await db.query('SELECT pg_advisory_unlock(hashtext($1), hashtext($2))', [GLOBAL_STATS_NOTIFICATION_LOCK_NAMESPACE, dateId])
+  }
+  catch (error) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Failed to release global stats notification claim', dateId, error })
+  }
+  finally {
+    await closeClient(c, db)
+  }
+}
+
+async function shouldSkipCompletedLogsnagInsightsRetryDispatch(c: Context, dateId: string, retryCount: number): Promise<boolean> {
+  if (retryCount <= 0)
+    return false
+
+  const completedShards = await readCompletedGlobalStatsShards(c, dateId)
+  const missingRequiredShards = getMissingGlobalStatsRequiredShards(completedShards)
+  if (missingRequiredShards.length > 0)
+    return false
+
+  if (!completedShards.has('notifications')) {
+    const queued = await queueLogsnagInsightsShard(c, 'notifications', dateId)
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'Queued missing logsnag insights notification shard for completed retry',
+      dateId,
+      retryCount,
+      queued,
+      completedShards: Array.from(completedShards).sort((a, b) => a.localeCompare(b)),
+    })
+    return true
+  }
+
+  cloudlog({
+    requestId: c.get('requestId'),
+    message: 'Skipping completed logsnag insights retry dispatch',
+    dateId,
+    retryCount,
+    completedShards: Array.from(completedShards).sort((a, b) => a.localeCompare(b)),
+  })
+  return true
+}
+
+async function markGlobalStatsShardComplete(c: Context, dateId: string, shard: GlobalStatsCompletionMarker): Promise<void> {
+  const db = getPgClient(c)
+
+  try {
+    const result = await db.query(
+      `UPDATE public.global_stats
+      SET completed_shards = (
+        SELECT COALESCE(jsonb_agg(shard_name ORDER BY shard_name), '[]'::jsonb)
+        FROM (
+          SELECT DISTINCT shard_name
+          FROM (
+            SELECT jsonb_array_elements_text(completed_shards) AS shard_name
+            UNION ALL
+            SELECT $2::text AS shard_name
+          ) shards
+        ) deduped
+      )
+      WHERE date_id = $1`,
+      [dateId, shard],
+    )
+    if (result.rowCount !== 1)
+      throw new Error(`Expected one global_stats row for ${dateId}, updated ${result.rowCount ?? 0}`)
+  }
+  finally {
+    await closeClient(c, db)
+  }
+}
+
+function getLogsnagInsightsShardDelaySeconds(shard: GlobalStatsShard): number {
+  return shard === 'notifications' ? LOGSNAG_INSIGHTS_NOTIFICATION_DELAY_SECONDS : 0
+}
+
+async function queueLogsnagInsightsMessage(
+  db: ReturnType<typeof getPgClient>,
+  message: ReturnType<typeof buildLogsnagInsightsRetryMessage> | ReturnType<typeof buildLogsnagInsightsShardMessage>,
+  delaySeconds: number,
+): Promise<number> {
+  const result = await db.query<{ msg_id: number | string }>('SELECT pgmq.send($1, $2::jsonb, $3) AS msg_id', [
+    LOGSNAG_INSIGHTS_QUEUE_NAME,
+    JSON.stringify(message),
+    delaySeconds,
+  ])
+  const msgId = Number(result.rows[0]?.msg_id)
+  if (!Number.isSafeInteger(msgId))
+    throw new Error('pgmq.send did not return a message id')
+  return msgId
+}
+
+async function queueLogsnagInsightsShard(c: Context, shard: GlobalStatsShard, dateId: string): Promise<{ shard: GlobalStatsShard, msgId: number, delaySeconds: number }> {
+  const db = getPgClient(c)
+
+  try {
+    const delaySeconds = getLogsnagInsightsShardDelaySeconds(shard)
+    const msgId = await queueLogsnagInsightsMessage(db, buildLogsnagInsightsShardMessage(shard, dateId), delaySeconds)
+    return { shard, msgId, delaySeconds }
+  }
+  finally {
+    await closeClient(c, db)
+  }
+}
+
+async function dispatchLogsnagInsightsShards(c: Context, dateId: string): Promise<void> {
+  await ensureGlobalStatsSnapshotRow(c, dateId)
+  await resetGlobalStatsCompletedShards(c, dateId)
+  const db = getPgClient(c)
+  const queued: Array<{ shard: GlobalStatsShard, msgId: number, delaySeconds: number }> = []
+
+  try {
+    for (const shard of GLOBAL_STATS_SHARDS) {
+      const delaySeconds = getLogsnagInsightsShardDelaySeconds(shard)
+      const msgId = await queueLogsnagInsightsMessage(db, buildLogsnagInsightsShardMessage(shard, dateId), delaySeconds)
+      queued.push({ shard, msgId, delaySeconds })
+    }
+  }
+  finally {
+    await closeClient(c, db)
+  }
+
+  cloudlog({ requestId: c.get('requestId'), message: 'Queued logsnag insights global stats shards', dateId, queued })
+}
+
+async function runCoreGlobalStatsShard(c: Context, window: DailyWindow): Promise<void> {
   const supabase = supabaseAdmin(c)
-  const last24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
-  const metricWindow = window
-    ? {
-        dayStart: window.prevDayStart,
-        nextDayStart: window.prevDayEnd,
-        dayDateId: window.prevDayDateId,
-      }
-    : getCurrentDayWindow()
-  const { dayStart, nextDayStart } = metricWindow
-  const dayStartIso = dayStart.toISOString()
-  const nextDayStartIso = nextDayStart.toISOString()
-  return {
-    apps: countAllApps(c),
-    updates: countAllUpdates(c),
-    updates_external: countAllUpdatesExternal(c),
-    users: supabase
+  const [
+    apps,
+    updates,
+    updates_external,
+    users,
+    orgs,
+    stars,
+    customers,
+    paying_orgs_for_conversion,
+    onboarded,
+    need_upgrade,
+    plans,
+    actives,
+  ] = await Promise.all([
+    countAllApps(c),
+    countAllUpdates(c),
+    countAllUpdatesExternal(c),
+    supabase
       .from('users')
-      .select('*', { count: 'exact' })
+      .select('id', { count: 'exact', head: true })
       .then(res => res.count ?? 0),
-    orgs: supabase
+    supabase
       .from('orgs')
-      .select('*', { count: 'exact' })
+      .select('id', { count: 'exact', head: true })
       .then(res => res.count ?? 0),
-    stars: getGithubStars(),
-    customers: supabase.rpc('get_customer_counts').single().then((res) => {
+    getGithubStars(),
+    supabase.rpc('get_customer_counts').single().then((res) => {
       if (res.error || !res.data)
         cloudlog({ requestId: c.get('requestId'), message: 'get_customer_counts', error: res.error })
       return res.data ?? { total: 0, yearly: 0, monthly: 0 }
     }),
-    paying_orgs_for_conversion: supabase
+    supabase
       .from('orgs')
       .select('id, stripe_info!inner(customer_id)', { count: 'exact', head: true })
       .eq('stripe_info.status', 'succeeded')
@@ -884,32 +1324,28 @@ function getStats(c: Context, window?: DailyWindow): GlobalStats {
         }
         return res.count ?? 0
       }),
-    onboarded: supabase.rpc('count_all_onboarded').single().then((res) => {
+    supabase.rpc('count_all_onboarded').single().then((res) => {
       if (res.error || !res.data)
         cloudlog({ requestId: c.get('requestId'), message: 'count_all_onboarded', error: res.error })
       return res.data ?? 0
     }),
-    need_upgrade: supabase.rpc('count_all_need_upgrade').single().then((res) => {
+    supabase.rpc('count_all_need_upgrade').single().then((res) => {
       if (res.error || !res.data)
         cloudlog({ requestId: c.get('requestId'), message: 'count_all_need_upgrade', error: res.error })
       return res.data ?? 0
     }),
-    plans: supabase.rpc('count_all_plans_v2').then((res) => {
+    supabase.rpc('count_all_plans_v2').then((res) => {
       if (res.error || !res.data)
         cloudlog({ requestId: c.get('requestId'), message: 'count_all_plans_v2', error: res.error })
-      return res.data ?? {}
+      return res.data ?? []
     }).then((data: any) => {
       const total: PlanTotal = {}
-      for (const plan of data)
+      for (const plan of Array.isArray(data) ? data : [])
         total[plan.plan_name] = plan.count
 
-      return total
+      return normalizePlanTotals(total)
     }),
-    success_rate: getUpdateStats(c).then((res) => {
-      cloudlog({ requestId: c.get('requestId'), message: 'success_rate', success_rate: res.total.success_rate })
-      return res.total.success_rate
-    }),
-    actives: readActiveAppsCF(c).then(async (app_ids) => {
+    readActiveAppsCF(c, window.prevDayEnd).then(async (app_ids) => {
       try {
         const res2 = await supabase.rpc('count_active_users', { app_ids }).single()
         return { apps: app_ids.length, users: res2.data ?? 0 }
@@ -919,51 +1355,142 @@ function getStats(c: Context, window?: DailyWindow): GlobalStats {
       }
       return { apps: app_ids.length, users: 0 }
     }),
-    updates_last_month: readLastMonthUpdatesCF(c),
-    devices_last_month: readLastMonthDevicesCF(c),
-    devices_by_platform: readLastMonthDevicesByPlatformCF(c),
-    registers_today: (async () => {
-      // TODO: Remove backward-compat fallback once migration 20260209014020 is deployed to all environments.
-      // Backward compatible rollout: if the column doesn't exist yet, fall back to the legacy count.
-      const filtered = await supabase
-        .from('users')
-        .select('id', { count: 'exact', head: true })
-        .gte('created_at', last24h)
-        .eq('created_via_invite', false)
+  ])
 
-      const filteredCode = String((filtered.error as any)?.code ?? '').toUpperCase()
-      if (filteredCode === 'PGRST204' || filteredCode === '42703' || filtered.error?.message?.toLowerCase().includes('created_via_invite')) {
-        cloudlog({
-          requestId: c.get('requestId'),
-          message: 'registers_today: created_via_invite column missing, falling back to legacy count',
-          error: filtered.error,
-        })
-        const legacy = await supabase
-          .from('users')
-          .select('id', { count: 'exact', head: true })
-          .gte('created_at', last24h)
-        if (legacy.error)
-          cloudlog({ requestId: c.get('requestId'), message: 'registers_today legacy error', error: legacy.error })
-        return legacy.count ?? 0
-      }
+  const not_paying = users - customers.total - plans.Trial
+  const org_conversion_rate = calculateConversionRate(paying_orgs_for_conversion, orgs)
+  const planConversionRates = getPlanConversionRates(plans, orgs)
 
-      if (filtered.error)
-        cloudlog({ requestId: c.get('requestId'), message: 'registers_today error', error: filtered.error })
-      return filtered.count ?? 0
-    })(),
-    bundle_storage_gb: supabase
-      .rpc('total_bundle_storage_bytes')
-      .then((res) => {
-        if (res.error) {
-          cloudlog({ requestId: c.get('requestId'), message: 'total_bundle_storage_bytes error', error: res.error })
-          return 0
-        }
-        const bytes = res.data ?? 0
-        const gigabytes = bytes / (1024 ** 3)
-        return Number.isFinite(gigabytes) ? Number(gigabytes.toFixed(2)) : 0
-      }),
-    revenue: calculateRevenue(c),
-    new_paying_orgs: Promise.all([
+  await updateGlobalStatsSnapshot(c, window.prevDayDateId, {
+    apps,
+    apps_active: actives.apps,
+    need_upgrade,
+    not_paying,
+    onboarded,
+    orgs,
+    org_conversion_rate,
+    paying: customers.total,
+    paying_monthly: customers.monthly,
+    paying_yearly: customers.yearly,
+    plan_enterprise: plans.Enterprise || 0,
+    plan_enterprise_conversion_rate: planConversionRates.enterprise,
+    plan_maker: plans.Maker,
+    plan_maker_conversion_rate: planConversionRates.maker,
+    plan_solo: plans.Solo,
+    plan_solo_conversion_rate: planConversionRates.solo,
+    plan_team: plans.Team,
+    plan_team_conversion_rate: planConversionRates.team,
+    plan_total_conversion_rate: planConversionRates.total,
+    stars,
+    trial: plans.Trial,
+    updates,
+    updates_external,
+    users,
+    users_active: actives.users,
+  })
+
+  cloudlog({ requestId: c.get('requestId'), message: 'Updated global stats core shard', dateId: window.prevDayDateId, apps, updates, users, orgs })
+}
+
+async function getRegistersToday(c: Context, createdAfterIso: string, createdBeforeIso: string): Promise<number> {
+  const supabase = supabaseAdmin(c)
+  const filtered = await supabase
+    .from('users')
+    .select('id', { count: 'exact', head: true })
+    .gte('created_at', createdAfterIso)
+    .lt('created_at', createdBeforeIso)
+    .eq('created_via_invite', false)
+
+  const filteredCode = String((filtered.error as any)?.code ?? '').toUpperCase()
+  if (filteredCode === 'PGRST204' || filteredCode === '42703' || filtered.error?.message?.toLowerCase().includes('created_via_invite')) {
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'registers_today: created_via_invite column missing, falling back to legacy count',
+      error: filtered.error,
+    })
+    const legacy = await supabase
+      .from('users')
+      .select('id', { count: 'exact', head: true })
+      .gte('created_at', createdAfterIso)
+      .lt('created_at', createdBeforeIso)
+    if (legacy.error)
+      cloudlog({ requestId: c.get('requestId'), message: 'registers_today legacy error', error: legacy.error })
+    return legacy.count ?? 0
+  }
+
+  if (filtered.error)
+    cloudlog({ requestId: c.get('requestId'), message: 'registers_today error', error: filtered.error })
+  return filtered.count ?? 0
+}
+
+async function getBundleStorageGb(c: Context): Promise<number> {
+  const res = await supabaseAdmin(c).rpc('total_bundle_storage_bytes')
+  if (res.error) {
+    cloudlog({ requestId: c.get('requestId'), message: 'total_bundle_storage_bytes error', error: res.error })
+    return 0
+  }
+  const bytes = res.data ?? 0
+  const gigabytes = bytes / (1024 ** 3)
+  return Number.isFinite(gigabytes) ? Number(gigabytes.toFixed(2)) : 0
+}
+
+async function runUsageGlobalStatsShard(c: Context, window: DailyWindow): Promise<void> {
+  const metricWindow = getMetricWindowFromDailyWindow(window)
+  const dayStartIso = metricWindow.dayStart.toISOString()
+  const nextDayStartIso = metricWindow.nextDayStart.toISOString()
+  const successRatePromise = (async () => {
+    const res = await getUpdateStats(c)
+    cloudlog({ requestId: c.get('requestId'), message: 'success_rate', successRate: res.total.success_rate })
+    return res.total.success_rate
+  })()
+  const [
+    updatesLastMonth,
+    devicesLastMonth,
+    devicesByPlatform,
+    registersToday,
+    bundleStorageGb,
+    successRate,
+    demoAppsCreated,
+  ] = await Promise.all([
+    readLastMonthUpdatesCF(c, window.prevDayEnd),
+    readLastMonthDevicesCF(c, window.prevDayEnd),
+    readLastMonthDevicesByPlatformCF(c, window.prevDayEnd),
+    getRegistersToday(c, dayStartIso, nextDayStartIso),
+    getBundleStorageGb(c),
+    successRatePromise,
+    countDemoSeededApps(c, dayStartIso, nextDayStartIso),
+  ])
+
+  await updateGlobalStatsSnapshot(c, window.prevDayDateId, {
+    bundle_storage_gb: bundleStorageGb,
+    demo_apps_created: demoAppsCreated,
+    devices_last_month: devicesLastMonth,
+    devices_last_month_android: devicesByPlatform.android,
+    devices_last_month_ios: devicesByPlatform.ios,
+    registers_today: registersToday,
+    success_rate: successRate,
+    updates_last_month: updatesLastMonth,
+  })
+
+  cloudlog({ requestId: c.get('requestId'), message: 'Updated global stats usage shard', dateId: window.prevDayDateId, updatesLastMonth, devicesLastMonth, registersToday })
+}
+
+async function runRevenueGlobalStatsShard(c: Context, window: DailyWindow): Promise<void> {
+  const supabase = supabaseAdmin(c)
+  const metricWindow = getMetricWindowFromDailyWindow(window)
+  const { dayStart, nextDayStart } = metricWindow
+  const dayStartIso = dayStart.toISOString()
+  const nextDayStartIso = nextDayStart.toISOString()
+  const [
+    revenue,
+    new_paying_orgs,
+    canceled_orgs,
+    upgraded_orgs,
+    credits_bought,
+    credits_consumed,
+  ] = await Promise.all([
+    calculateRevenue(c, window.prevDayEnd),
+    Promise.all([
       supabase
         .from('stripe_info')
         .select('customer_id')
@@ -990,7 +1517,7 @@ function getStats(c: Context, window?: DailyWindow): GlobalStats {
       }
       return countUniqueCustomers(paidToday.data || [], legacyFallback.data || [])
     }),
-    canceled_orgs: supabase
+    supabase
       .from('stripe_info')
       .select('customer_id')
       .not('canceled_at', 'is', null)
@@ -1001,11 +1528,9 @@ function getStats(c: Context, window?: DailyWindow): GlobalStats {
           cloudlog({ requestId: c.get('requestId'), message: 'canceled_orgs error', error: res.error })
           return 0
         }
-        // Count unique customer_ids (orgs) that canceled today
-        const uniqueCustomers = new Set((res.data || []).map(row => row.customer_id))
-        return uniqueCustomers.size
+        return new Set((res.data || []).map(row => row.customer_id)).size
       }),
-    upgraded_orgs: supabase
+    supabase
       .from('stripe_info')
       .select('customer_id')
       .gte('upgraded_at', dayStartIso)
@@ -1015,13 +1540,13 @@ function getStats(c: Context, window?: DailyWindow): GlobalStats {
           cloudlog({ requestId: c.get('requestId'), message: 'upgraded_orgs error', error: res.error })
           return 0
         }
-        const uniqueCustomers = new Set((res.data || []).map(row => row.customer_id))
-        return uniqueCustomers.size
+        return new Set((res.data || []).map(row => row.customer_id)).size
       }),
-    credits_bought: supabase
+    supabase
       .from('usage_credit_grants')
       .select('credits_total')
-      .gte('granted_at', last24h)
+      .gte('granted_at', dayStartIso)
+      .lt('granted_at', nextDayStartIso)
       .then((res) => {
         if (res.error) {
           cloudlog({ requestId: c.get('requestId'), message: 'credits_bought error', error: res.error })
@@ -1029,10 +1554,11 @@ function getStats(c: Context, window?: DailyWindow): GlobalStats {
         }
         return (res.data || []).reduce((sum, row) => sum + (Number(row.credits_total) || 0), 0)
       }),
-    credits_consumed: supabase
+    supabase
       .from('usage_credit_consumptions')
       .select('credits_used')
-      .gte('applied_at', last24h)
+      .gte('applied_at', dayStartIso)
+      .lt('applied_at', nextDayStartIso)
       .then((res) => {
         if (res.error) {
           cloudlog({ requestId: c.get('requestId'), message: 'credits_consumed error', error: res.error })
@@ -1040,212 +1566,60 @@ function getStats(c: Context, window?: DailyWindow): GlobalStats {
         }
         return (res.data || []).reduce((sum, row) => sum + (Number(row.credits_used) || 0), 0)
       }),
-    demo_apps_created: countDemoSeededApps(c, last24h),
-    plugin_breakdown: getPluginBreakdownCF(c),
-    build_stats: getBuildStats(c, window),
-    retention_metrics: getRevenueRetentionMetrics(c, metricWindow.dayDateId),
-    paid_product_activity_stats: getPaidProductActivityStats(c, metricWindow),
-    ltv_stats: getLtvStats(c, metricWindow),
-  }
-}
-
-export const logsnagInsightsTestUtils = {
-  calculateChurnRevenue,
-  calculateNrr,
-  countUniqueCustomers,
-  getCompletedDayWindow,
-  getCurrentDayWindow,
-  getPreviousDateId,
-}
-
-export const app = new Hono<MiddlewareKeyVariables>()
-
-app.post('/', middlewareAPISecret, async (c) => {
-  const dailyWindow = getDailyWindow()
-  const res = getStats(c, dailyWindow)
-  const snapshotDateId = dailyWindow.prevDayDateId
-  const [
-    apps,
-    updates,
-    updates_external,
-    users,
-    orgs,
-    stars,
-    customers,
-    paying_orgs_for_conversion,
-    onboarded,
-    need_upgrade,
-    plans,
-    actives,
-    updates_last_month,
-    devices_last_month,
-    devices_by_platform,
-    registers_today,
-    bundle_storage_gb,
-    success_rate,
-    revenue,
-    new_paying_orgs,
-    canceled_orgs,
-    upgraded_orgs,
-    credits_bought,
-    credits_consumed,
-    demo_apps_created,
-    plugin_breakdown,
-    build_stats,
-    retention_metrics,
-    paid_product_activity_stats,
-    ltv_stats,
-  ] = await Promise.all([
-    res.apps,
-    res.updates,
-    res.updates_external,
-    res.users,
-    res.orgs,
-    res.stars,
-    res.customers,
-    res.paying_orgs_for_conversion,
-    res.onboarded,
-    res.need_upgrade,
-    res.plans,
-    res.actives,
-    res.updates_last_month,
-    res.devices_last_month,
-    res.devices_by_platform,
-    res.registers_today,
-    res.bundle_storage_gb,
-    res.success_rate,
-    res.revenue,
-    res.new_paying_orgs,
-    res.canceled_orgs,
-    res.upgraded_orgs,
-    res.credits_bought,
-    res.credits_consumed,
-    res.demo_apps_created,
-    res.plugin_breakdown,
-    res.build_stats,
-    Promise.resolve(res.retention_metrics).catch((error: unknown) => {
-      cloudlogErr({ requestId: c.get('requestId'), message: 'retention metrics unavailable', error })
-      return null
-    }),
-    res.paid_product_activity_stats,
-    res.ltv_stats,
   ])
-  const not_paying = users - customers.total - plans.Trial
-  const org_conversion_rate = calculateConversionRate(paying_orgs_for_conversion, orgs)
-  const planConversionRates = getPlanConversionRates(plans, orgs)
-  cloudlog({
-    requestId: c.get('requestId'),
-    message: 'All Promises',
-    apps,
-    updates,
-    updates_external,
-    users,
-    stars,
-    customers,
-    paying_orgs_for_conversion,
-    onboarded,
-    need_upgrade,
-    plans,
-    updates_last_month,
-    devices_last_month,
-    registers_today,
-    bundle_storage_gb,
-    demo_apps_created,
-  })
-  // cloudlog(c.get('requestId'), 'app', app.app_id, downloads, versions, shared, channels)
-  const newData: Database['public']['Tables']['global_stats']['Insert'] = {
-    date_id: snapshotDateId,
-    apps,
-    trial: plans.Trial,
-    users,
-    updates,
-    updates_external,
-    apps_active: actives.apps,
-    users_active: actives.users,
-    stars,
-    paying: customers.total,
-    org_conversion_rate,
-    plan_total_conversion_rate: planConversionRates.total,
-    plan_solo_conversion_rate: planConversionRates.solo,
-    plan_maker_conversion_rate: planConversionRates.maker,
-    plan_team_conversion_rate: planConversionRates.team,
-    plan_enterprise_conversion_rate: planConversionRates.enterprise,
-    paying_yearly: customers.yearly,
-    paying_monthly: customers.monthly,
-    onboarded,
-    need_upgrade,
-    not_paying,
-    updates_last_month,
-    devices_last_month,
-    devices_last_month_ios: devices_by_platform.ios,
-    devices_last_month_android: devices_by_platform.android,
-    registers_today,
-    bundle_storage_gb,
-    success_rate,
-    plan_solo: plans.Solo,
-    plan_maker: plans.Maker,
-    plan_team: plans.Team,
-    plan_enterprise: plans.Enterprise || 0,
-    // Revenue metrics
-    mrr: revenue.mrr,
-    total_revenue: revenue.total_revenue,
-    revenue_solo: revenue.revenue_solo,
-    revenue_maker: revenue.revenue_maker,
-    revenue_team: revenue.revenue_team,
-    revenue_enterprise: revenue.revenue_enterprise,
-    plan_solo_monthly: revenue.plan_solo_monthly,
-    plan_solo_yearly: revenue.plan_solo_yearly,
-    plan_maker_monthly: revenue.plan_maker_monthly,
-    plan_maker_yearly: revenue.plan_maker_yearly,
-    plan_team_monthly: revenue.plan_team_monthly,
-    plan_team_yearly: revenue.plan_team_yearly,
-    plan_enterprise_monthly: revenue.plan_enterprise_monthly,
-    plan_enterprise_yearly: revenue.plan_enterprise_yearly,
-    // Subscription flow tracking
-    new_paying_orgs,
+
+  await updateGlobalStatsSnapshot(c, window.prevDayDateId, {
     canceled_orgs,
-    upgraded_orgs,
-    // Credits tracking (round to integers for bigint column)
     credits_bought: Math.round(credits_bought),
     credits_consumed: Math.round(credits_consumed),
-    demo_apps_created,
-    // Plugin version breakdown (percentage per version)
-    plugin_version_breakdown: plugin_breakdown.version_breakdown,
+    mrr: revenue.mrr,
+    new_paying_orgs,
+    plan_enterprise_monthly: revenue.plan_enterprise_monthly,
+    plan_enterprise_yearly: revenue.plan_enterprise_yearly,
+    plan_maker_monthly: revenue.plan_maker_monthly,
+    plan_maker_yearly: revenue.plan_maker_yearly,
+    plan_solo_monthly: revenue.plan_solo_monthly,
+    plan_solo_yearly: revenue.plan_solo_yearly,
+    plan_team_monthly: revenue.plan_team_monthly,
+    plan_team_yearly: revenue.plan_team_yearly,
+    revenue_enterprise: revenue.revenue_enterprise,
+    revenue_maker: revenue.revenue_maker,
+    revenue_solo: revenue.revenue_solo,
+    revenue_team: revenue.revenue_team,
+    total_revenue: revenue.total_revenue,
+    upgraded_orgs,
+  })
+
+  cloudlog({ requestId: c.get('requestId'), message: 'Updated global stats revenue shard', dateId: window.prevDayDateId, mrr: revenue.mrr, new_paying_orgs, canceled_orgs })
+}
+
+async function runPluginsGlobalStatsShard(c: Context, window: DailyWindow): Promise<void> {
+  const plugin_breakdown = await getPluginBreakdownCF(c, window.prevDayEnd)
+
+  await updateGlobalStatsSnapshot(c, window.prevDayDateId, {
     plugin_major_breakdown: plugin_breakdown.major_breakdown,
+    plugin_version_breakdown: plugin_breakdown.version_breakdown,
     plugin_version_ladder: plugin_breakdown.version_ladder as unknown as Json,
-    builder_active_paying_clients_60d: paid_product_activity_stats.builder_active_paying_clients_60d,
-    live_updates_active_paying_clients_60d: paid_product_activity_stats.live_updates_active_paying_clients_60d,
-    average_ltv: ltv_stats.average_ltv,
-    shortest_ltv: ltv_stats.shortest_ltv,
-    longest_ltv: ltv_stats.longest_ltv,
-    // Build statistics (all time)
-    builds_total: build_stats.total,
-    builds_ios: build_stats.ios,
+  })
+
+  cloudlog({ requestId: c.get('requestId'), message: 'Updated global stats plugin shard', dateId: window.prevDayDateId })
+}
+
+async function runBuildsGlobalStatsShard(c: Context, window: DailyWindow): Promise<void> {
+  const build_stats = await getBuildStats(c, window)
+
+  await updateGlobalStatsSnapshot(c, window.prevDayDateId, {
     builds_android: build_stats.android,
-    builds_success_total: build_stats.success_total,
-    builds_success_ios: build_stats.success_ios,
-    builds_success_android: build_stats.success_android,
-    // Build statistics (last 30 days)
+    builds_ios: build_stats.ios,
     builds_last_month: build_stats.last_month,
-    builds_last_month_ios: build_stats.last_month_ios,
     builds_last_month_android: build_stats.last_month_android,
-    ...(retention_metrics
-      ? {
-          churn_revenue: retention_metrics.churnRevenue,
-          churn_revenue_solo: retention_metrics.churnRevenueSolo,
-          churn_revenue_maker: retention_metrics.churnRevenueMaker,
-          churn_revenue_team: retention_metrics.churnRevenueTeam,
-          churn_revenue_enterprise: retention_metrics.churnRevenueEnterprise,
-          nrr: retention_metrics.nrr,
-        }
-      : {}),
-  }
-  cloudlog({ requestId: c.get('requestId'), message: 'newData', newData })
-  const { error } = await supabaseAdmin(c)
-    .from('global_stats')
-    .upsert(newData)
-  if (error)
-    cloudlogErr({ requestId: c.get('requestId'), message: 'insert global_stats error', error })
+    builds_last_month_ios: build_stats.last_month_ios,
+    builds_success_android: build_stats.success_android,
+    builds_success_ios: build_stats.success_ios,
+    builds_success_total: build_stats.success_total,
+    builds_total: build_stats.total,
+  })
+
   if (build_stats.daily_metrics_available) {
     const { error: buildMetricsError } = await supabaseAdmin(c)
       .from('global_stats')
@@ -1257,7 +1631,7 @@ app.post('/', middlewareAPISecret, async (c) => {
         build_count_day_ios: build_stats.build_count_day_ios,
         build_count_day_android: build_stats.build_count_day_android,
       })
-      .eq('date_id', dailyWindow.prevDayDateId)
+      .eq('date_id', window.prevDayDateId)
 
     if (buildMetricsError) {
       if (isMissingBuildMetricColumnError(buildMetricsError)) {
@@ -1269,192 +1643,373 @@ app.post('/', middlewareAPISecret, async (c) => {
             builds_day_ios: build_stats.build_count_day_ios,
             builds_day_android: build_stats.build_count_day_android,
           } as any)
-          .eq('date_id', dailyWindow.prevDayDateId)
+          .eq('date_id', window.prevDayDateId)
 
-        if (legacyBuildMetricsError) {
-          cloudlogErr({ requestId: c.get('requestId'), message: 'legacy update build metrics error', error: legacyBuildMetricsError })
-        }
+        if (legacyBuildMetricsError)
+          throw legacyBuildMetricsError
       }
       else {
-        cloudlogErr({ requestId: c.get('requestId'), message: 'update build metrics error', error: buildMetricsError })
+        throw buildMetricsError
       }
     }
   }
   else {
     cloudlog({ requestId: c.get('requestId'), message: 'Skipping build metric update because daily aggregation failed' })
   }
-  await sendEventToTracking(c, {
-    channel: 'updates-stats',
-    event: 'Updates last month',
-    user_id: 'admin',
-    tags: {
-      updates_last_month,
-      success_rate,
-      registers_today,
-      storage_gb: bundle_storage_gb,
-      org_conversion_rate,
-    },
-    icon: '📲',
-  }).catch((e: any) => {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'insights error', e })
-  })
-  await logsnagInsights(c, [
-    {
-      title: 'Apps',
-      value: apps,
-      icon: '📱',
-    },
-    {
-      title: 'Active Apps',
-      value: actives.apps,
-      icon: '💃',
-    },
-    {
-      title: 'Updates',
-      value: updates,
-      icon: '📲',
-    },
-    {
-      title: 'Updates on premises',
-      value: updates_external,
-      icon: '📲',
-    },
-    {
-      title: 'Updates last month',
-      value: updates_last_month,
-      icon: '📲',
-    },
-    {
-      title: 'Bundle Storage (GB)',
-      value: `${bundle_storage_gb.toFixed(2)} GB`,
-      icon: '💾',
-    },
-    {
-      title: 'Total Users',
-      value: users,
-      icon: '👨',
-    },
-    {
-      title: 'Active Users',
-      value: actives.users,
-      icon: '🎉',
-    },
-    {
-      title: 'Registrations Today',
-      value: registers_today,
-      icon: '🆕',
-    },
-    {
-      title: 'User onboarded',
-      value: onboarded,
-      icon: '✅',
-    },
-    {
-      title: 'Orgs',
-      value: orgs,
-      icon: '🏢',
-    },
-    {
-      title: 'Orgs with trial',
-      value: plans.Trial,
-      icon: '👶',
-    },
-    {
-      title: 'Orgs paying',
-      value: customers.total,
-      icon: '💰',
-    },
-    {
-      title: 'Org conversion rate',
-      value: `${org_conversion_rate.toFixed(1)}%`,
-      icon: '🎯',
-    },
-    {
-      title: 'Orgs yearly',
-      value: `${(customers.yearly * 100 / customers.total).toFixed(0)}% - ${customers.yearly}`,
-      icon: '🧧',
-    },
-    {
-      title: 'Orgs monthly',
-      value: `${(customers.monthly * 100 / customers.total).toFixed(0)}% - ${customers.monthly}`,
-      icon: '🗓️',
-    },
-    {
-      title: 'Orgs not paying',
-      value: not_paying,
-      icon: '🥲',
-    },
-    {
-      title: 'Orgs need upgrade',
-      value: need_upgrade,
-      icon: '🤒',
-    },
-    {
-      title: 'Orgs Solo Plan',
-      value: `${(plans.Solo * 100 / customers.total).toFixed(0)}% - ${plans.Solo}`,
-      icon: '🎸',
-    },
-    {
-      title: 'Orgs Maker Plan',
-      value: `${(plans.Maker * 100 / customers.total).toFixed(0)}% - ${plans.Maker}`,
-      icon: '🤝',
-    },
-    {
-      title: 'Orgs Team Plan',
-      value: `${(plans.Team * 100 / customers.total).toFixed(0)}% - ${plans.Team}`,
-      icon: '👏',
-    },
-    {
-      title: 'Orgs Enterprise Plan',
-      value: `${((plans.Enterprise || 0) * 100 / customers.total).toFixed(0)}% - ${plans.Enterprise || 0}`,
-      icon: '📈',
-    },
-    {
-      title: 'Devices iOS (30d)',
-      value: devices_by_platform.ios,
-      icon: '🍎',
-    },
-    {
-      title: 'Devices Android (30d)',
-      value: devices_by_platform.android,
-      icon: '🤖',
-    },
-    {
-      title: 'Total Builds',
-      value: build_stats.total,
-      icon: '🔨',
-    },
-    {
-      title: 'iOS Builds',
-      value: build_stats.ios,
-      icon: '🍏',
-    },
-    {
-      title: 'Android Builds',
-      value: build_stats.android,
-      icon: '🤖',
-    },
-    {
-      title: 'Builds (30d)',
-      value: build_stats.last_month,
-      icon: '🔨',
-    },
-    {
-      title: 'iOS Builds (30d)',
-      value: build_stats.last_month_ios,
-      icon: '🍏',
-    },
-    {
-      title: 'Android Builds (30d)',
-      value: build_stats.last_month_android,
-      icon: '🤖',
-    },
-  ]).catch((e) => {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'insights error', e })
-  })
-  cloudlog({ requestId: c.get('requestId'), message: 'Sent to logsnag done' })
 
-  // Note: Device cleanup is no longer needed as Analytics Engine handles data retention automatically
+  cloudlog({ requestId: c.get('requestId'), message: 'Updated global stats builds shard', dateId: window.prevDayDateId, builds_total: build_stats.total })
+}
 
-  return c.json(BRES)
+async function runRetentionGlobalStatsShard(c: Context, window: DailyWindow): Promise<void> {
+  const retention_metrics = await getRevenueRetentionMetrics(c, window.prevDayDateId)
+
+  await updateGlobalStatsSnapshot(c, window.prevDayDateId, {
+    churn_revenue: retention_metrics.churnRevenue,
+    churn_revenue_enterprise: retention_metrics.churnRevenueEnterprise,
+    churn_revenue_maker: retention_metrics.churnRevenueMaker,
+    churn_revenue_solo: retention_metrics.churnRevenueSolo,
+    churn_revenue_team: retention_metrics.churnRevenueTeam,
+    nrr: retention_metrics.nrr,
+  })
+
+  cloudlog({ requestId: c.get('requestId'), message: 'Updated global stats retention shard', dateId: window.prevDayDateId, nrr: retention_metrics.nrr })
+}
+
+async function runPaidProductsGlobalStatsShard(c: Context, window: DailyWindow): Promise<void> {
+  const paid_product_activity_stats = await getPaidProductActivityStats(c, getMetricWindowFromDailyWindow(window))
+
+  await updateGlobalStatsSnapshot(c, window.prevDayDateId, {
+    builder_active_paying_clients_60d: paid_product_activity_stats.builder_active_paying_clients_60d,
+    live_updates_active_paying_clients_60d: paid_product_activity_stats.live_updates_active_paying_clients_60d,
+  })
+
+  cloudlog({ requestId: c.get('requestId'), message: 'Updated global stats paid products shard', dateId: window.prevDayDateId })
+}
+
+async function runLtvGlobalStatsShard(c: Context, window: DailyWindow): Promise<void> {
+  const ltv_stats = await getLtvStats(c, getMetricWindowFromDailyWindow(window))
+
+  await updateGlobalStatsSnapshot(c, window.prevDayDateId, {
+    average_ltv: ltv_stats.average_ltv,
+    longest_ltv: ltv_stats.longest_ltv,
+    shortest_ltv: ltv_stats.shortest_ltv,
+  })
+
+  cloudlog({ requestId: c.get('requestId'), message: 'Updated global stats ltv shard', dateId: window.prevDayDateId, average_ltv: ltv_stats.average_ltv })
+}
+
+async function readGlobalStatsSnapshot(c: Context, dateId: string): Promise<GlobalStatsSnapshotRow> {
+  const { data, error } = await supabaseAdmin(c)
+    .from('global_stats')
+    .select('*')
+    .eq('date_id', dateId)
+    .single()
+
+  if (error || !data)
+    quickError(503, 'global_stats_snapshot_not_ready', 'Global stats snapshot is not ready', { dateId }, error, { alert: false })
+
+  return data as GlobalStatsSnapshotRow
+}
+
+function getNumber(value: number | null | undefined): number {
+  return Number(value) || 0
+}
+
+function formatPercentCount(count: number, total: number): string {
+  if (total <= 0)
+    return `0% - ${count}`
+  return `${(count * 100 / total).toFixed(0)}% - ${count}`
+}
+
+async function runNotificationsGlobalStatsShard(c: Context, window: DailyWindow): Promise<void> {
+  const notificationClaim = await claimGlobalStatsNotificationDelivery(c, window.prevDayDateId)
+  if (!notificationClaim) {
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'Skipping claimed global stats notification shard',
+      dateId: window.prevDayDateId,
+    })
+    return
+  }
+
+  try {
+    const completedShards = await readCompletedGlobalStatsShards(c, window.prevDayDateId)
+    if (hasCompletedGlobalStatsNotifications(completedShards)) {
+      cloudlog({
+        requestId: c.get('requestId'),
+        message: 'Skipping completed global stats notification shard',
+        dateId: window.prevDayDateId,
+        completedShards: Array.from(completedShards).sort((a, b) => a.localeCompare(b)),
+      })
+      return
+    }
+
+    const snapshot = await readGlobalStatsSnapshot(c, window.prevDayDateId)
+
+    const apps = getNumber(snapshot.apps)
+    const users = getNumber(snapshot.users)
+    const orgs = getNumber(snapshot.orgs)
+    const missingShards = getMissingGlobalStatsRequiredShards(completedShards)
+    if (apps <= 0 || users <= 0 || orgs <= 0 || missingShards.length > 0) {
+      quickError(503, 'global_stats_snapshot_not_ready', 'Global stats snapshot is not ready', {
+        dateId: window.prevDayDateId,
+        apps,
+        users,
+        orgs,
+        completedShards: Array.from(completedShards),
+        missingShards,
+      }, undefined, { alert: false })
+    }
+
+    const paying = getNumber(snapshot.paying)
+    const bundle_storage_gb = getNumber(snapshot.bundle_storage_gb)
+    const success_rate = getNumber(snapshot.success_rate)
+    const org_conversion_rate = getNumber(snapshot.org_conversion_rate)
+    const plans = normalizePlanTotals({
+      Enterprise: getNumber(snapshot.plan_enterprise),
+      Maker: getNumber(snapshot.plan_maker),
+      Solo: getNumber(snapshot.plan_solo),
+      Team: getNumber(snapshot.plan_team),
+      Trial: getNumber(snapshot.trial),
+    })
+
+    if (!completedShards.has(GLOBAL_STATS_NOTIFICATION_LOGSNAG_STEP)) {
+      await logsnagInsights(c, [
+        { title: 'Apps', value: apps, icon: '📱' },
+        { title: 'Active Apps', value: getNumber(snapshot.apps_active), icon: '💃' },
+        { title: 'Updates', value: getNumber(snapshot.updates), icon: '📲' },
+        { title: 'Updates on premises', value: getNumber(snapshot.updates_external), icon: '📲' },
+        { title: 'Updates last month', value: getNumber(snapshot.updates_last_month), icon: '📲' },
+        { title: 'Bundle Storage (GB)', value: `${bundle_storage_gb.toFixed(2)} GB`, icon: '💾' },
+        { title: 'Total Users', value: users, icon: '👨' },
+        { title: 'Active Users', value: getNumber(snapshot.users_active), icon: '🎉' },
+        { title: 'Registrations Today', value: getNumber(snapshot.registers_today), icon: '🆕' },
+        { title: 'User onboarded', value: getNumber(snapshot.onboarded), icon: '✅' },
+        { title: 'Orgs', value: orgs, icon: '🏢' },
+        { title: 'Orgs with trial', value: plans.Trial, icon: '👶' },
+        { title: 'Orgs paying', value: paying, icon: '💰' },
+        { title: 'Org conversion rate', value: `${org_conversion_rate.toFixed(1)}%`, icon: '🎯' },
+        { title: 'Orgs yearly', value: formatPercentCount(getNumber(snapshot.paying_yearly), paying), icon: '🧧' },
+        { title: 'Orgs monthly', value: formatPercentCount(getNumber(snapshot.paying_monthly), paying), icon: '🗓️' },
+        { title: 'Orgs not paying', value: getNumber(snapshot.not_paying), icon: '🥲' },
+        { title: 'Orgs need upgrade', value: getNumber(snapshot.need_upgrade), icon: '🤒' },
+        { title: 'Orgs Solo Plan', value: formatPercentCount(plans.Solo, paying), icon: '🎸' },
+        { title: 'Orgs Maker Plan', value: formatPercentCount(plans.Maker, paying), icon: '🤝' },
+        { title: 'Orgs Team Plan', value: formatPercentCount(plans.Team, paying), icon: '👏' },
+        { title: 'Orgs Enterprise Plan', value: formatPercentCount(plans.Enterprise, paying), icon: '📈' },
+        { title: 'Devices iOS (30d)', value: getNumber(snapshot.devices_last_month_ios), icon: '🍎' },
+        { title: 'Devices Android (30d)', value: getNumber(snapshot.devices_last_month_android), icon: '🤖' },
+        { title: 'Total Builds', value: getNumber(snapshot.builds_total), icon: '🔨' },
+        { title: 'iOS Builds', value: getNumber(snapshot.builds_ios), icon: '🍏' },
+        { title: 'Android Builds', value: getNumber(snapshot.builds_android), icon: '🤖' },
+        { title: 'Builds (30d)', value: getNumber(snapshot.builds_last_month), icon: '🔨' },
+        { title: 'iOS Builds (30d)', value: getNumber(snapshot.builds_last_month_ios), icon: '🍏' },
+        { title: 'Android Builds (30d)', value: getNumber(snapshot.builds_last_month_android), icon: '🤖' },
+      ], { strict: true })
+      await markGlobalStatsShardComplete(c, window.prevDayDateId, GLOBAL_STATS_NOTIFICATION_LOGSNAG_STEP)
+      completedShards.add(GLOBAL_STATS_NOTIFICATION_LOGSNAG_STEP)
+    }
+
+    if (!completedShards.has(GLOBAL_STATS_NOTIFICATION_TRACKING_STEP)) {
+      await sendEventToTracking(c, {
+        channel: 'updates-stats',
+        event: 'Updates last month',
+        user_id: 'admin',
+        tags: {
+          updates_last_month: getNumber(snapshot.updates_last_month),
+          success_rate,
+          registers_today: getNumber(snapshot.registers_today),
+          storage_gb: bundle_storage_gb,
+          org_conversion_rate,
+        },
+        icon: '📲',
+      }, { background: false, strict: true })
+      await markGlobalStatsShardComplete(c, window.prevDayDateId, GLOBAL_STATS_NOTIFICATION_TRACKING_STEP)
+      completedShards.add(GLOBAL_STATS_NOTIFICATION_TRACKING_STEP)
+    }
+
+    await markGlobalStatsShardComplete(c, window.prevDayDateId, 'notifications')
+    cloudlog({ requestId: c.get('requestId'), message: 'Sent logsnag insights from global stats snapshot', dateId: window.prevDayDateId })
+  }
+  finally {
+    await releaseGlobalStatsNotificationDeliveryClaim(c, notificationClaim, window.prevDayDateId)
+  }
+}
+
+function scheduleLogsnagInsightsUpdate(
+  c: Context,
+  runUpdate: (c: Context) => Promise<void> = runLogsnagInsightsUpdate,
+  options: ScheduleLogsnagInsightsUpdateOptions = {},
+) {
+  const retryCount = options.retryCount ?? 0
+  const retryMsgId = options.retryMsgId ?? null
+  const cancelRetry = options.cancelRetry ?? cancelLogsnagInsightsRetry
+  let updateSucceeded = false
+  const task = Promise.resolve()
+    .then(() => runUpdate(c))
+    .then(async () => {
+      updateSucceeded = true
+      if (retryMsgId === null)
+        return
+      await cancelRetry(c, retryMsgId)
+    })
+    .catch(async (error: unknown) => {
+      cloudlogErr({ requestId: c.get('requestId'), message: 'logsnag insights background task failed', retryCount, retryMsgId, updateSucceeded, error })
+      if (retryMsgId !== null && !updateSucceeded)
+        return
+      if (retryMsgId !== null)
+        throw error
+      if (retryCount >= LOGSNAG_INSIGHTS_BACKGROUND_MAX_RETRIES)
+        cloudlogErr({ requestId: c.get('requestId'), message: 'logsnag insights background retry budget exhausted', retryCount, error })
+    })
+
+  return backgroundTask(c, task)
+}
+
+export const logsnagInsightsTestUtils = {
+  buildLogsnagInsightsRetryMessage,
+  buildLogsnagInsightsShardMessage,
+  readLogsnagInsightsPayload,
+  calculateChurnRevenue,
+  calculateNrr,
+  countUniqueCustomers,
+  getCompletedDayWindowForDateId,
+  getMetricWindowFromDailyWindow,
+  getMissingGlobalStatsRequiredShards,
+  getMissingGlobalStatsShards,
+  hasCompletedGlobalStatsNotifications,
+  normalizeCompletedGlobalStatsShards,
+  getLogsnagInsightsShardFunctionName,
+  getCompletedDayWindow,
+  getCurrentDayWindow,
+  getPreviousDateId,
+  normalizeGlobalStatsDateId,
+  normalizeLogsnagInsightsShard,
+  normalizeLogsnagInsightsRetryCount,
+  normalizePlanTotals,
+  reserveLogsnagInsightsRetry,
+  scheduleLogsnagInsightsUpdate,
+}
+
+export const app = new Hono<MiddlewareKeyVariables>()
+
+async function runLogsnagInsightsShard(c: Context, shard: GlobalStatsShard, dateId: string): Promise<void> {
+  const window = getCompletedDayWindowForDateId(dateId)
+
+  switch (shard) {
+    case 'core':
+      await runCoreGlobalStatsShard(c, window)
+      await markGlobalStatsShardComplete(c, dateId, shard)
+      return
+    case 'usage':
+      await runUsageGlobalStatsShard(c, window)
+      await markGlobalStatsShardComplete(c, dateId, shard)
+      return
+    case 'revenue':
+      await runRevenueGlobalStatsShard(c, window)
+      await markGlobalStatsShardComplete(c, dateId, shard)
+      return
+    case 'plugins':
+      await runPluginsGlobalStatsShard(c, window)
+      await markGlobalStatsShardComplete(c, dateId, shard)
+      return
+    case 'builds':
+      await runBuildsGlobalStatsShard(c, window)
+      await markGlobalStatsShardComplete(c, dateId, shard)
+      return
+    case 'retention':
+      await runRetentionGlobalStatsShard(c, window)
+      await markGlobalStatsShardComplete(c, dateId, shard)
+      return
+    case 'paid_products':
+      await runPaidProductsGlobalStatsShard(c, window)
+      await markGlobalStatsShardComplete(c, dateId, shard)
+      return
+    case 'ltv':
+      await runLtvGlobalStatsShard(c, window)
+      await markGlobalStatsShardComplete(c, dateId, shard)
+      return
+    case 'notifications':
+      await runNotificationsGlobalStatsShard(c, window)
+      return
+  }
+}
+
+async function runLogsnagInsightsUpdate(c: Context, dateId = getDailyWindow().prevDayDateId, retryCount = 0): Promise<void> {
+  if (await shouldSkipCompletedLogsnagInsightsRetryDispatch(c, dateId, retryCount))
+    return
+
+  await dispatchLogsnagInsightsShards(c, dateId)
+}
+
+function resolveLogsnagInsightsSnapshotDateId(payload: LogsnagInsightsPayload): string {
+  const payloadDateId = normalizeGlobalStatsDateId(payload.date_id)
+  if (payload.date_id !== undefined && payloadDateId === null)
+    quickError(400, 'invalid_global_stats_date_id', 'Invalid global stats date_id', { date_id: payload.date_id }, undefined, { alert: false })
+
+  return payloadDateId ?? getDailyWindow().prevDayDateId
+}
+
+function createLogsnagInsightsShardApp(shard: GlobalStatsShard): Hono<MiddlewareKeyVariables> {
+  const shardApp = new Hono<MiddlewareKeyVariables>()
+
+  shardApp.post('/', middlewareAPISecret, async (c) => {
+    const payload = await readLogsnagInsightsPayload(c)
+    const snapshotDateId = resolveLogsnagInsightsSnapshotDateId(payload)
+
+    if (payload.shard !== undefined) {
+      const payloadShard = normalizeLogsnagInsightsShard(payload.shard)
+      if (payloadShard !== shard)
+        quickError(400, 'invalid_global_stats_shard', 'Invalid global stats shard', { shard: payload.shard, expected: shard }, undefined, { alert: false })
+    }
+
+    await runLogsnagInsightsShard(c, shard, snapshotDateId)
+    return c.json(BRES)
+  })
+
+  return shardApp
+}
+
+export const logsnagInsightsShardApps: Record<GlobalStatsShard, Hono<MiddlewareKeyVariables>> = {
+  core: createLogsnagInsightsShardApp('core'),
+  usage: createLogsnagInsightsShardApp('usage'),
+  revenue: createLogsnagInsightsShardApp('revenue'),
+  plugins: createLogsnagInsightsShardApp('plugins'),
+  builds: createLogsnagInsightsShardApp('builds'),
+  retention: createLogsnagInsightsShardApp('retention'),
+  paid_products: createLogsnagInsightsShardApp('paid_products'),
+  ltv: createLogsnagInsightsShardApp('ltv'),
+  notifications: createLogsnagInsightsShardApp('notifications'),
+}
+
+app.post('/', middlewareAPISecret, async (c) => {
+  const payload = await readLogsnagInsightsPayload(c)
+  const snapshotDateId = resolveLogsnagInsightsSnapshotDateId(payload)
+
+  if (payload.shard !== undefined) {
+    const shard = normalizeLogsnagInsightsShard(payload.shard)
+    if (shard === null)
+      quickError(400, 'invalid_global_stats_shard', 'Invalid global stats shard', { shard: payload.shard }, undefined, { alert: false })
+
+    await runLogsnagInsightsShard(c, shard, snapshotDateId)
+    return c.json(BRES)
+  }
+
+  const retryCount = normalizeLogsnagInsightsRetryCount(payload.retry_count)
+  let retryMsgId: number | null = null
+
+  try {
+    // Reserve the next delayed dispatcher retry before returning 202 so queue_consumer can acknowledge the current message safely.
+    retryMsgId = await reserveLogsnagInsightsRetry(c, retryCount, snapshotDateId)
+  }
+  catch (error) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Failed to reserve logsnag insights dispatcher retry', retryCount, dateId: snapshotDateId, error })
+    quickError(503, 'logsnag_insights_retry_reserve_failed', 'Failed to reserve logsnag insights retry', { retryCount, dateId: snapshotDateId }, error, { alert: false })
+  }
+
+  await scheduleLogsnagInsightsUpdate(c, context => runLogsnagInsightsUpdate(context, snapshotDateId, retryCount), {
+    retryCount,
+    retryMsgId,
+  })
+  return c.json(BRES, 202)
 })

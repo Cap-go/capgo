@@ -986,9 +986,9 @@ export async function countUpdatesFromLogsExternalCF(c: Context): Promise<number
   return 0
 }
 
-export async function readActiveAppsCF(c: Context) {
-  const oneMonthAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
-  const query = `SELECT index1 as app_id FROM app_log WHERE timestamp >= toDateTime('${formatDateCF(oneMonthAgo)}') AND timestamp < now() AND blob2 = 'get' GROUP BY app_id`
+export async function readActiveAppsCF(c: Context, referenceDate?: Date) {
+  const { startExpression, endExpression } = getLastMonthAnalyticsWindow(referenceDate)
+  const query = `SELECT index1 as app_id FROM app_log WHERE timestamp >= ${startExpression} AND timestamp < ${endExpression} AND blob2 = 'get' GROUP BY app_id`
   cloudlog({ requestId: c.get('requestId'), message: 'readActiveAppsCF query', query })
   try {
     const response = await runQueryToCFA<{ app_id: string }>(c, query)
@@ -1003,9 +1003,28 @@ export async function readActiveAppsCF(c: Context) {
   return []
 }
 
-export async function readLastMonthUpdatesCF(c: Context) {
-  const oneMonthAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
-  const query = `SELECT sum(if(blob2 = 'get', 1, 0)) AS count FROM app_log WHERE timestamp >= toDateTime('${formatDateCF(oneMonthAgo)}') AND timestamp < now()`
+const LAST_MONTH_ANALYTICS_WINDOW_MS = 30 * 24 * 60 * 60 * 1000
+
+export function getLastMonthAnalyticsWindow(referenceDate?: Date) {
+  if (!referenceDate) {
+    const oneMonthAgo = new Date(Date.now() - LAST_MONTH_ANALYTICS_WINDOW_MS)
+    return {
+      startExpression: `toDateTime('${formatDateCF(oneMonthAgo)}')`,
+      endExpression: 'now()',
+    }
+  }
+
+  const end = Number.isNaN(referenceDate.getTime()) ? new Date() : referenceDate
+  const start = new Date(end.getTime() - LAST_MONTH_ANALYTICS_WINDOW_MS)
+  return {
+    startExpression: `toDateTime('${formatDateCF(start)}')`,
+    endExpression: `toDateTime('${formatDateCF(end)}')`,
+  }
+}
+
+export async function readLastMonthUpdatesCF(c: Context, referenceDate?: Date) {
+  const { startExpression, endExpression } = getLastMonthAnalyticsWindow(referenceDate)
+  const query = `SELECT sum(if(blob2 = 'get', 1, 0)) AS count FROM app_log WHERE timestamp >= ${startExpression} AND timestamp < ${endExpression}`
   cloudlog({ requestId: c.get('requestId'), message: 'readLastMonthUpdatesCF query', query })
   try {
     const response = await runQueryToCFA<{ count: number }>(c, query)
@@ -1018,15 +1037,16 @@ export async function readLastMonthUpdatesCF(c: Context) {
   return 0
 }
 
-export async function readLastMonthDevicesCF(c: Context): Promise<number> {
+export async function readLastMonthDevicesCF(c: Context, referenceDate?: Date): Promise<number> {
   if (!c.env.DEVICE_USAGE)
     return 0
+  const { startExpression, endExpression } = getLastMonthAnalyticsWindow(referenceDate)
   const query = `SELECT
     index1 AS app_id,
     COUNT(DISTINCT blob1) AS total
   FROM device_usage
-  WHERE timestamp >= toDateTime('${formatDateCF(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10))}')
-    AND timestamp < now()
+  WHERE timestamp >= ${startExpression}
+    AND timestamp < ${endExpression}
   GROUP BY index1`
 
   cloudlog({ requestId: c.get('requestId'), message: 'readLastMonthDevicesCF query', query })
@@ -1046,14 +1066,14 @@ export interface DevicesByPlatform {
   android: number
 }
 
-export async function readLastMonthDevicesByPlatformCF(c: Context): Promise<DevicesByPlatform> {
+export async function readLastMonthDevicesByPlatformCF(c: Context, referenceDate?: Date): Promise<DevicesByPlatform> {
   if (!c.env.DEVICE_USAGE) {
     return { total: 0, ios: 0, android: 0 }
   }
 
-  const oneMonthAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
+  const { startExpression, endExpression } = getLastMonthAnalyticsWindow(referenceDate)
   // Platform: double1 = 0 for android, 1 for ios
-  const baseWhere = `timestamp >= toDateTime('${formatDateCF(oneMonthAgo)}') AND timestamp < now()`
+  const baseWhere = `timestamp >= ${startExpression} AND timestamp < ${endExpression}`
   const totalQuery = `SELECT index1 AS app_id, COUNT(DISTINCT blob1) AS total FROM device_usage WHERE ${baseWhere} GROUP BY index1`
   const platformQuery = `SELECT index1 AS app_id, double1 AS platform, COUNT(DISTINCT blob1) AS total FROM device_usage WHERE ${baseWhere} GROUP BY index1, double1`
 
@@ -2122,12 +2142,12 @@ export function buildPluginBreakdownResult(result: PluginBreakdownRow[]): Plugin
  * Get plugin version breakdown for global stats
  * Returns percentage breakdown of plugin versions installed on devices (last 30 days)
  */
-export async function getPluginBreakdownCF(c: Context): Promise<PluginBreakdownResult> {
+export async function getPluginBreakdownCF(c: Context, referenceDate?: Date): Promise<PluginBreakdownResult> {
   const emptyResult: PluginBreakdownResult = { version_breakdown: {}, major_breakdown: {}, version_ladder: [] }
   if (!c.env.DEVICE_INFO)
     return emptyResult
 
-  const last30d = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
+  const { startExpression, endExpression } = getLastMonthAnalyticsWindow(referenceDate)
 
   // Query latest plugin_version per app/device pair, then aggregate by version and app.
   const query = `SELECT
@@ -2140,8 +2160,8 @@ export async function getPluginBreakdownCF(c: Context): Promise<PluginBreakdownR
       argMax(blob3, timestamp) AS plugin_version,
       blob1 AS device_id
     FROM device_info
-    WHERE timestamp >= toDateTime('${formatDateCF(last30d)}')
-      AND timestamp < now()
+    WHERE timestamp >= ${startExpression}
+      AND timestamp < ${endExpression}
       AND blob3 != ''
     GROUP BY index1, blob1
   )

@@ -1,5 +1,26 @@
-import { describe, expect, it } from 'vitest'
+import type { Context } from 'hono'
+import { Hono } from 'hono/tiny'
+import { describe, expect, it, vi } from 'vitest'
 import { logsnagInsightsTestUtils } from '../supabase/functions/_backend/triggers/logsnag_insights.ts'
+import { logsnagInsights } from '../supabase/functions/_backend/utils/logsnag.ts'
+import { sendEventToTracking } from '../supabase/functions/_backend/utils/tracking.ts'
+
+function withTestEnv(values: Record<string, string>) {
+  const previous = new Map<string, string | undefined>()
+  for (const [key, value] of Object.entries(values)) {
+    previous.set(key, process.env[key])
+    process.env[key] = value
+  }
+
+  return () => {
+    for (const [key, value] of previous.entries()) {
+      if (value === undefined)
+        delete process.env[key]
+      else
+        process.env[key] = value
+    }
+  }
+}
 
 describe('logsnag revenue metric helpers', () => {
   it.concurrent('counts paid customers from paid_at rows and legacy fallback rows', () => {
@@ -41,6 +62,89 @@ describe('logsnag revenue metric helpers', () => {
     expect(dayDateId).toBe('2026-03-24')
   })
 
+  it.concurrent('derives replay metric bounds from a preserved snapshot date', () => {
+    const replayWindow = logsnagInsightsTestUtils.getCompletedDayWindowForDateId('2026-03-24')
+    const { dayStart, nextDayStart, dayDateId } = logsnagInsightsTestUtils.getMetricWindowFromDailyWindow(replayWindow)
+
+    expect(dayStart.toISOString()).toBe('2026-03-24T00:00:00.000Z')
+    expect(nextDayStart.toISOString()).toBe('2026-03-25T00:00:00.000Z')
+    expect(dayDateId).toBe('2026-03-24')
+  })
+
+  it.concurrent('detects missing global stats shards before notifications', () => {
+    expect(logsnagInsightsTestUtils.getMissingGlobalStatsRequiredShards(new Set())).toEqual([
+      'core',
+      'usage',
+      'revenue',
+      'plugins',
+      'builds',
+      'retention',
+      'paid_products',
+      'ltv',
+    ])
+
+    const completed = logsnagInsightsTestUtils.normalizeCompletedGlobalStatsShards([
+      'core',
+      'usage',
+      'plugins',
+      'builds',
+      'retention',
+      'paid_products',
+      'ltv',
+      'notifications',
+      'bad',
+    ])
+
+    expect(logsnagInsightsTestUtils.getMissingGlobalStatsRequiredShards(completed)).toEqual(['revenue'])
+
+    const ready = logsnagInsightsTestUtils.normalizeCompletedGlobalStatsShards([
+      'core',
+      'usage',
+      'revenue',
+      'plugins',
+      'builds',
+      'retention',
+      'paid_products',
+      'ltv',
+    ])
+    expect(logsnagInsightsTestUtils.getMissingGlobalStatsRequiredShards(ready)).toEqual([])
+    expect(logsnagInsightsTestUtils.getMissingGlobalStatsShards(ready)).toEqual(['notifications'])
+
+    const sent = logsnagInsightsTestUtils.normalizeCompletedGlobalStatsShards([
+      ...ready,
+      'notifications',
+    ])
+    expect(logsnagInsightsTestUtils.getMissingGlobalStatsShards(sent)).toEqual([])
+  })
+
+  it.concurrent('detects completed global stats notifications for idempotent retries', () => {
+    const ready = logsnagInsightsTestUtils.normalizeCompletedGlobalStatsShards([
+      'core',
+      'usage',
+      'revenue',
+      'plugins',
+      'builds',
+      'retention',
+      'paid_products',
+      'ltv',
+    ])
+    expect(logsnagInsightsTestUtils.hasCompletedGlobalStatsNotifications(ready)).toBe(false)
+
+    const sent = logsnagInsightsTestUtils.normalizeCompletedGlobalStatsShards([
+      ...ready,
+      'notifications',
+    ])
+    expect(logsnagInsightsTestUtils.hasCompletedGlobalStatsNotifications(sent)).toBe(true)
+
+    const partiallySent = logsnagInsightsTestUtils.normalizeCompletedGlobalStatsShards([
+      ...ready,
+      'notifications_logsnag',
+      'notifications_tracking',
+    ])
+    expect(logsnagInsightsTestUtils.hasCompletedGlobalStatsNotifications(partiallySent)).toBe(false)
+    expect(logsnagInsightsTestUtils.getMissingGlobalStatsShards(partiallySent)).toEqual(['notifications'])
+  })
+
   it.concurrent('computes NRR from prior MRR, churn, contraction, and expansion', () => {
     expect(logsnagInsightsTestUtils.calculateNrr(100, {
       churnMrr: 15,
@@ -63,5 +167,298 @@ describe('logsnag revenue metric helpers', () => {
       contractionMrr: 7.75,
       expansionMrr: 0,
     })).toBe(26)
+  })
+
+  it.concurrent('defaults missing plan buckets to zero for global stats snapshots', () => {
+    expect(logsnagInsightsTestUtils.normalizePlanTotals({ Solo: 12, Team: Number.NaN })).toEqual({
+      Enterprise: 0,
+      Maker: 0,
+      Solo: 12,
+      Team: 0,
+      Trial: 0,
+    })
+  })
+
+  it.concurrent('normalizes logsnag insights retry payload counts', () => {
+    expect(logsnagInsightsTestUtils.normalizeLogsnagInsightsRetryCount('2')).toBe(2)
+    expect(logsnagInsightsTestUtils.normalizeLogsnagInsightsRetryCount(2.8)).toBe(2)
+    expect(logsnagInsightsTestUtils.normalizeLogsnagInsightsRetryCount(-1)).toBe(0)
+    expect(logsnagInsightsTestUtils.normalizeLogsnagInsightsRetryCount('bad')).toBe(0)
+  })
+
+  it.concurrent('builds retry messages for the admin stats queue', () => {
+    expect(logsnagInsightsTestUtils.buildLogsnagInsightsRetryMessage(3)).toEqual({
+      function_name: 'logsnag_insights',
+      function_type: 'cloudflare',
+      payload: {
+        retry_count: 3,
+      },
+    })
+  })
+
+  it.concurrent('preserves the snapshot date on dispatcher retry messages', () => {
+    expect(logsnagInsightsTestUtils.buildLogsnagInsightsRetryMessage(3, '2026-03-24')).toEqual({
+      function_name: 'logsnag_insights',
+      function_type: 'cloudflare',
+      payload: {
+        date_id: '2026-03-24',
+        retry_count: 3,
+      },
+    })
+  })
+
+  it.concurrent('builds shard messages as distinct queue HTTP calls', () => {
+    expect(logsnagInsightsTestUtils.getLogsnagInsightsShardFunctionName('revenue')).toBe('logsnag_insights_revenue')
+    expect(logsnagInsightsTestUtils.buildLogsnagInsightsShardMessage('revenue', '2026-03-24')).toEqual({
+      function_name: 'logsnag_insights_revenue',
+      function_type: 'cloudflare',
+      payload: {
+        date_id: '2026-03-24',
+      },
+    })
+  })
+
+  it.concurrent('normalizes global stats shard and date payloads', () => {
+    expect(logsnagInsightsTestUtils.normalizeLogsnagInsightsShard('core')).toBe('core')
+    expect(logsnagInsightsTestUtils.normalizeLogsnagInsightsShard('bad')).toBeNull()
+    expect(logsnagInsightsTestUtils.normalizeGlobalStatsDateId('2026-03-24')).toBe('2026-03-24')
+    expect(logsnagInsightsTestUtils.normalizeGlobalStatsDateId('2026-02-30')).toBeNull()
+    expect(logsnagInsightsTestUtils.normalizeGlobalStatsDateId('bad')).toBeNull()
+  })
+
+  it('rejects non-empty malformed JSON payloads', async () => {
+    const app = new Hono()
+    app.post('/', async (c) => {
+      await logsnagInsightsTestUtils.readLogsnagInsightsPayload(c)
+      return c.json({ status: 'ok' })
+    })
+
+    const response = await app.request('http://localhost/', {
+      method: 'POST',
+      body: '{',
+    })
+
+    expect(response.status).toBe(400)
+  })
+
+  it('schedules global stats snapshots in the EdgeRuntime background path', async () => {
+    const globalWithEdgeRuntime = globalThis as typeof globalThis & {
+      EdgeRuntime?: { waitUntil: (promise: Promise<unknown>) => void }
+    }
+    const previousEdgeRuntime = globalWithEdgeRuntime.EdgeRuntime
+    let scheduledPromise: Promise<unknown> | null = null
+    let resolveUpdate!: () => void
+    const updatePromise = new Promise<void>((resolve) => {
+      resolveUpdate = resolve
+    })
+    const waitUntil = vi.fn((promise: Promise<unknown>) => {
+      scheduledPromise = promise
+    })
+
+    globalWithEdgeRuntime.EdgeRuntime = { waitUntil }
+
+    try {
+      const app = new Hono()
+      const runUpdate = vi.fn(() => updatePromise)
+      app.post('/', async (c) => {
+        await logsnagInsightsTestUtils.scheduleLogsnagInsightsUpdate(c, runUpdate)
+        return c.json({ status: 'ok' })
+      })
+
+      const requestTimeoutMs = 500
+      const responseStatusPromise = (async () => {
+        const response = await app.request('http://localhost/', { method: 'POST' })
+        return response.status
+      })()
+      const result = await Promise.race([
+        responseStatusPromise,
+        new Promise<'timeout'>(resolve => setTimeout(() => resolve('timeout'), requestTimeoutMs)),
+      ])
+
+      expect(result).toBe(200)
+      expect(waitUntil).toHaveBeenCalledTimes(1)
+      if (!scheduledPromise)
+        throw new Error('Expected waitUntil to receive a promise')
+
+      resolveUpdate()
+      await scheduledPromise
+      expect(runUpdate).toHaveBeenCalledTimes(1)
+    }
+    finally {
+      globalWithEdgeRuntime.EdgeRuntime = previousEdgeRuntime
+    }
+  })
+
+  it('cancels a reserved retry when the background snapshot succeeds', async () => {
+    const globalWithEdgeRuntime = globalThis as typeof globalThis & {
+      EdgeRuntime?: { waitUntil: (promise: Promise<unknown>) => void }
+    }
+    const previousEdgeRuntime = globalWithEdgeRuntime.EdgeRuntime
+    let scheduledPromise: Promise<unknown> | null = null
+    const waitUntil = vi.fn((promise: Promise<unknown>) => {
+      scheduledPromise = promise
+    })
+
+    globalWithEdgeRuntime.EdgeRuntime = { waitUntil }
+
+    try {
+      const app = new Hono()
+      const runUpdate = vi.fn(async () => {})
+      const cancelRetry = vi.fn(async (_c: Context, _retryMsgId: number) => {})
+      app.post('/', async (c) => {
+        await logsnagInsightsTestUtils.scheduleLogsnagInsightsUpdate(c, runUpdate, {
+          cancelRetry,
+          retryCount: 2,
+          retryMsgId: 321,
+        })
+        return c.json({ status: 'ok' })
+      })
+
+      const response = await Promise.resolve(app.request('http://localhost/', { method: 'POST' }))
+      expect(response.status).toBe(200)
+      expect(waitUntil).toHaveBeenCalledTimes(1)
+      if (!scheduledPromise)
+        throw new Error('Expected waitUntil to receive a promise')
+
+      await scheduledPromise
+      expect(runUpdate).toHaveBeenCalledTimes(1)
+      expect(cancelRetry).toHaveBeenCalledTimes(1)
+      expect(cancelRetry).toHaveBeenCalledWith(expect.anything(), 321)
+    }
+    finally {
+      globalWithEdgeRuntime.EdgeRuntime = previousEdgeRuntime
+    }
+  })
+
+  it('propagates reserved retry cancel failures after the background snapshot succeeds', async () => {
+    const globalWithEdgeRuntime = globalThis as typeof globalThis & {
+      EdgeRuntime?: { waitUntil: (promise: Promise<unknown>) => void }
+    }
+    const previousEdgeRuntime = globalWithEdgeRuntime.EdgeRuntime
+    let scheduledPromise: Promise<unknown> | null = null
+    const waitUntil = vi.fn((promise: Promise<unknown>) => {
+      scheduledPromise = promise
+    })
+
+    globalWithEdgeRuntime.EdgeRuntime = { waitUntil }
+
+    try {
+      const app = new Hono()
+      const cancelFailure = new Error('retry cancel failed')
+      const runUpdate = vi.fn(async () => {})
+      const cancelRetry = vi.fn(async (_c: Context, _retryMsgId: number) => {
+        throw cancelFailure
+      })
+      app.post('/', async (c) => {
+        await logsnagInsightsTestUtils.scheduleLogsnagInsightsUpdate(c, runUpdate, {
+          cancelRetry,
+          retryCount: 2,
+          retryMsgId: 321,
+        })
+        return c.json({ status: 'ok' })
+      })
+
+      const response = await Promise.resolve(app.request('http://localhost/', { method: 'POST' }))
+      expect(response.status).toBe(200)
+      expect(waitUntil).toHaveBeenCalledTimes(1)
+      if (!scheduledPromise)
+        throw new Error('Expected waitUntil to receive a promise')
+
+      await expect(scheduledPromise).rejects.toThrow('retry cancel failed')
+      expect(runUpdate).toHaveBeenCalledTimes(1)
+      expect(cancelRetry).toHaveBeenCalledTimes(1)
+      expect(cancelRetry).toHaveBeenCalledWith(expect.anything(), 321)
+    }
+    finally {
+      globalWithEdgeRuntime.EdgeRuntime = previousEdgeRuntime
+    }
+  })
+
+  it('leaves a reserved retry queued when the background snapshot update fails', async () => {
+    const globalWithEdgeRuntime = globalThis as typeof globalThis & {
+      EdgeRuntime?: { waitUntil: (promise: Promise<unknown>) => void }
+    }
+    const previousEdgeRuntime = globalWithEdgeRuntime.EdgeRuntime
+    let scheduledPromise: Promise<unknown> | null = null
+    const waitUntil = vi.fn((promise: Promise<unknown>) => {
+      scheduledPromise = promise
+    })
+
+    globalWithEdgeRuntime.EdgeRuntime = { waitUntil }
+
+    try {
+      const app = new Hono()
+      const failure = new Error('snapshot failed')
+      const runUpdate = vi.fn(async () => {
+        throw failure
+      })
+      const cancelRetry = vi.fn(async (_c: Context, _retryMsgId: number) => {})
+      app.post('/', async (c) => {
+        await logsnagInsightsTestUtils.scheduleLogsnagInsightsUpdate(c, runUpdate, {
+          cancelRetry,
+          retryCount: 2,
+          retryMsgId: 321,
+        })
+        return c.json({ status: 'ok' })
+      })
+
+      const response = await Promise.resolve(app.request('http://localhost/', { method: 'POST' }))
+      expect(response.status).toBe(200)
+      expect(waitUntil).toHaveBeenCalledTimes(1)
+      if (!scheduledPromise)
+        throw new Error('Expected waitUntil to receive a promise')
+
+      await scheduledPromise
+      expect(runUpdate).toHaveBeenCalledTimes(1)
+      expect(cancelRetry).not.toHaveBeenCalled()
+    }
+    finally {
+      globalWithEdgeRuntime.EdgeRuntime = previousEdgeRuntime
+    }
+  })
+
+  it('propagates strict tracking provider failures', async () => {
+    const restoreEnv = withTestEnv({
+      LOGSNAG_TOKEN: '',
+      POSTHOG_API_KEY: '',
+    })
+
+    const c = {
+      get: () => undefined,
+      req: {
+        header: () => undefined,
+      },
+    } as unknown as Context
+
+    try {
+      await expect(sendEventToTracking(c, {
+        channel: 'updates-stats',
+        event: 'Updates last month',
+        user_id: 'admin',
+      }, { background: false, strict: true })).rejects.toThrow('posthog tracking returned false')
+    }
+    finally {
+      restoreEnv()
+    }
+  })
+
+  it('propagates strict LogSnag insights delivery failures', async () => {
+    const restoreEnv = withTestEnv({
+      LOGSNAG_TOKEN: '',
+      LOGSNAG_PROJECT: '',
+    })
+
+    const c = {
+      get: () => undefined,
+    } as unknown as Context
+
+    try {
+      await expect(logsnagInsights(c, [
+        { title: 'Apps', value: 1, icon: '📱' },
+      ], { strict: true })).rejects.toThrow('LogSnag insights is not configured')
+    }
+    finally {
+      restoreEnv()
+    }
   })
 })
