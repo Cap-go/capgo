@@ -39,6 +39,7 @@ permissions: {}
 env:
   CLICOLOR: "1"
   PRIVATE_SUITE_DIR: private/cli-mcp-tests
+  RESULTS_DIR: private/cli-mcp-tests/e2e-tui/results
   REPORT_PATH: private/cli-mcp-tests/e2e-tui/results/report.html
 
 jobs:
@@ -86,7 +87,7 @@ jobs:
             exit 1
           fi
 
-          pr_data="$(gh pr view "$pr_number" --repo "$REPOSITORY" --json number,headRefOid,headRepository --jq '.number + "\t" + .headRefOid + "\t" + .headRepository.nameWithOwner')"
+          pr_data="$(gh pr view "$pr_number" --repo "$REPOSITORY" --json number,headRefOid,headRepository,headRepositoryOwner --jq '(.number|tostring) + "\t" + .headRefOid + "\t" + .headRepositoryOwner.login + "/" + .headRepository.name')"
           IFS="$(printf '\t')" read -r resolved_number head_sha head_repo <<< "$pr_data"
 
           if [ "$head_repo" != "$REPOSITORY" ]; then
@@ -136,18 +137,25 @@ jobs:
           CAPGO_CLI_ROOT: ${{ github.workspace }}/cli
         run: bun run test:e2e-tui
 
-      - name: Upload report artifact
+      - name: Generate GitHub summary report
         if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: builder-onboarding-tui-report-pr-${{ steps.pr.outputs.number }}-${{ steps.pr.outputs.sha }}
-          path: |
-            ${{ env.PRIVATE_SUITE_DIR }}/e2e-tui/results/report.html
-            ${{ env.PRIVATE_SUITE_DIR }}/e2e-tui/results/run.json
-            ${{ env.PRIVATE_SUITE_DIR }}/e2e-tui/results/casts/*.cast
-          if-no-files-found: warn
+        working-directory: ${{ env.PRIVATE_SUITE_DIR }}
+        run: |
+          set -euo pipefail
 
-      - name: Publish HTML report to R2
+          if [ ! -f e2e-tui/results/run.json ]; then
+            echo "::warning::No run.json was produced; skipping Markdown summary generation."
+            exit 0
+          fi
+
+          node e2e-tui/report/report.mjs e2e-tui/results/run.json --summary > e2e-tui/results/summary.md
+          cat e2e-tui/results/summary.md >> "$GITHUB_STEP_SUMMARY"
+
+          find e2e-tui/results -type f ! -name ".gitkeep" \
+            | sed 's#^e2e-tui/results/##' \
+            | sort > e2e-tui/results/files.txt
+
+      - name: Publish result files to R2
         if: always()
         id: r2
         env:
@@ -160,8 +168,8 @@ jobs:
         run: |
           set -euo pipefail
 
-          if [ ! -f "$REPORT_PATH" ]; then
-            echo "::warning::No HTML report was produced at $REPORT_PATH; skipping R2 upload."
+          if [ ! -d "$RESULTS_DIR" ]; then
+            echo "::warning::No results directory was produced at $RESULTS_DIR; skipping R2 upload."
             exit 0
           fi
 
@@ -178,17 +186,57 @@ jobs:
           fi
 
           short_sha="${HEAD_SHA:0:12}"
-          key="builder-onboarding-tui/pr-${PR_NUMBER}/${short_sha}/index.html"
+          prefix="builder-onboarding-tui/pr-${PR_NUMBER}/${short_sha}"
+          uploaded=0
 
-          bunx wrangler r2 object put "$R2_BUCKET/$key" \
-            --file "$REPORT_PATH" \
-            --content-type "text/html; charset=utf-8" \
-            --cache-control "no-store"
+          content_type_for() {
+            case "$1" in
+              *.html) printf '%s\n' 'text/html; charset=utf-8' ;;
+              *.md) printf '%s\n' 'text/markdown; charset=utf-8' ;;
+              *.json) printf '%s\n' 'application/json; charset=utf-8' ;;
+              *.cast) printf '%s\n' 'application/x-asciicast; charset=utf-8' ;;
+              *.txt) printf '%s\n' 'text/plain; charset=utf-8' ;;
+              *) printf '%s\n' 'application/octet-stream' ;;
+            esac
+          }
 
-          report_url="${REPORTS_BASE_URL%/}/$key"
+          while IFS= read -r -d '' file; do
+            rel="${file#"$RESULTS_DIR"/}"
+            key="$prefix/$rel"
+            bunx wrangler r2 object put "$R2_BUCKET/$key" \
+              --file "$file" \
+              --content-type "$(content_type_for "$file")" \
+              --cache-control "no-store"
+            uploaded=$((uploaded + 1))
+          done < <(find "$RESULTS_DIR" -type f ! -name ".gitkeep" -print0 | sort -z)
+
+          if [ "$uploaded" -eq 0 ]; then
+            echo "::warning::No result files found under $RESULTS_DIR; skipping R2 summary links."
+            exit 0
+          fi
+
+          if [ -f "$REPORT_PATH" ]; then
+            bunx wrangler r2 object put "$R2_BUCKET/$prefix/index.html" \
+              --file "$REPORT_PATH" \
+              --content-type "text/html; charset=utf-8" \
+              --cache-control "no-store"
+          fi
+
+          report_url="${REPORTS_BASE_URL%/}/$prefix/index.html"
+          summary_url="${REPORTS_BASE_URL%/}/$prefix/summary.md"
+          run_url="${REPORTS_BASE_URL%/}/$prefix/run.json"
+          files_url="${REPORTS_BASE_URL%/}/$prefix/files.txt"
           echo "url=$report_url" >> "$GITHUB_OUTPUT"
           {
             echo "### Builder onboarding TUI report"
             echo
             echo "[Open protected HTML report]($report_url)"
+            echo
+            echo "- [Markdown summary]($summary_url)"
+            echo "- [Raw run.json]($run_url)"
+            echo "- [Uploaded file list]($files_url)"
+            echo
+            echo "Uploaded $uploaded result files to protected R2 prefix:"
+            echo
+            echo "\`$prefix/\`"
           } >> "$GITHUB_STEP_SUMMARY"

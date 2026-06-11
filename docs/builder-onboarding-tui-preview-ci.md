@@ -4,7 +4,8 @@ This repository keeps the private builder onboarding TUI suite in the
 `private/cli-mcp-tests` submodule. The GitHub Actions workflow at
 `.github/workflows/builder_onboarding_tui_preview.yml` builds the local `cli/`
 workspace, runs the private suite with `CAPGO_CLI_ROOT=$GITHUB_WORKSPACE/cli`,
-and uploads the generated `e2e-tui/results/report.html` to Cloudflare R2.
+uploads the generated `e2e-tui/results/` files to Cloudflare R2, and appends
+the suite's Markdown failure summary to the GitHub Actions run summary.
 
 ## Trigger model
 
@@ -48,27 +49,99 @@ Add these repository secrets:
 Add these repository variables:
 
 - `BUILDER_ONBOARDING_TUI_R2_BUCKET`: R2 bucket name, for example
-  `capgo-builder-onboarding-tui-preview`.
+  `capgo-builder-html-e2e`.
 - `BUILDER_ONBOARDING_TUI_REPORTS_URL`: Access-protected custom-domain base URL,
   for example `https://builder-onboarding-tui-preview.capgo.app`.
 
 ## Cloudflare one-time setup
 
-1. Create an R2 bucket for preview reports.
-2. Attach a custom domain to the bucket, for example
-   `builder-onboarding-tui-preview.capgo.app`.
-3. In Cloudflare Zero Trust, create a Self-hosted Access application for that
-   hostname.
-4. Add an Allow policy for the Capgo team identity group or approved email
-   domain.
-5. Keep the bucket's public access limited to the custom domain protected by
-   Access. The workflow writes objects under:
+The Cloudflare API token used below needs permission to manage R2 buckets/custom
+domains and Access applications/policies. Create the Access application before
+attaching the R2 custom domain; otherwise the custom domain can be reachable
+before Access protects it.
+
+```bash
+export BUCKET=capgo-builder-html-e2e
+export REPORTS_HOST=builder-onboarding-tui-preview.capgo.app
+export EMAIL_DOMAIN=capgo.app
+export CLOUDFLARE_ACCOUNT_ID=...
+export CLOUDFLARE_ZONE_ID=...
+export CLOUDFLARE_API_TOKEN=...
+
+bunx wrangler@latest r2 bucket create "$BUCKET"
+
+curl -fsS "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/access/apps" \
+  -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d "$(jq -n \
+    --arg host "$REPORTS_HOST" \
+    --arg emailDomain "$EMAIL_DOMAIN" \
+    '{
+      name: "Builder onboarding TUI reports",
+      domain: $host,
+      type: "self_hosted",
+      session_duration: "24h",
+      app_launcher_visible: false,
+      http_only_cookie_attribute: true,
+      same_site_cookie_attribute: "strict",
+      destinations: [{ type: "public", uri: $host }],
+      policies: [{
+        name: "Allow Capgo team",
+        decision: "allow",
+        precedence: 1,
+        session_duration: "24h",
+        include: [{ email_domain: { domain: $emailDomain } }]
+      }]
+    }')"
+
+curl -fsS "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/r2/buckets/$BUCKET/domains/custom" \
+  -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d "$(jq -n \
+    --arg domain "$REPORTS_HOST" \
+    --arg zoneId "$CLOUDFLARE_ZONE_ID" \
+    '{ domain: $domain, enabled: true, zoneId: $zoneId, minTLS: "1.2" }')"
+
+curl -fsS "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/r2/buckets/$BUCKET/domains/managed" \
+  -X PUT \
+  -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"enabled":false}'
+
+gh variable set BUILDER_ONBOARDING_TUI_R2_BUCKET \
+  --repo Cap-go/capgo \
+  --body "$BUCKET"
+
+gh variable set BUILDER_ONBOARDING_TUI_REPORTS_URL \
+  --repo Cap-go/capgo \
+  --body "https://$REPORTS_HOST"
+```
+
+If access should be based on an existing Cloudflare Access group instead of an
+email domain, replace the policy include rule with:
+
+```json
+[{ "group": { "id": "ACCESS_GROUP_ID" } }]
+```
+
+The workflow writes objects under:
 
 ```text
 builder-onboarding-tui/pr-<number>/<sha>/index.html
+builder-onboarding-tui/pr-<number>/<sha>/report.html
+builder-onboarding-tui/pr-<number>/<sha>/summary.md
+builder-onboarding-tui/pr-<number>/<sha>/run.json
+builder-onboarding-tui/pr-<number>/<sha>/files.txt
+builder-onboarding-tui/pr-<number>/<sha>/casts/*.cast
 ```
 
-The run summary links directly to the protected HTML report after upload.
+The run summary includes the Markdown failure report and links to the protected
+HTML report, raw `run.json`, and uploaded file list after the R2 upload.
+
+The raw cast files and `run.json` can contain terminal output, paths, and future
+debug details. Keep the custom domain behind Cloudflare Access and keep the
+bucket's `r2.dev` public URL disabled. The workflow does not upload the raw
+result tree as a GitHub Actions artifact because this repository is public.
 
 Cloudflare references:
 
@@ -78,3 +151,7 @@ Cloudflare references:
   https://developers.cloudflare.com/r2/tutorials/cloudflare-access/
 - R2 custom-domain access controls:
   https://developers.cloudflare.com/r2/buckets/public-buckets/
+- R2 custom-domain API:
+  https://developers.cloudflare.com/api/resources/r2/subresources/buckets/subresources/domains/subresources/custom/methods/create/
+- R2 managed-domain API:
+  https://developers.cloudflare.com/api/resources/r2/subresources/buckets/subresources/domains/subresources/managed/methods/update/
