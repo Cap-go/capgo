@@ -98,6 +98,74 @@ describe('tests CLI upload', () => {
     expect(result.success).toBe(true)
   }, 60000)
 
+  it('should link uploaded bundle to multiple comma-separated channels', async () => {
+    const appName = `com.cli_multi_channel_${randomUUID()}`
+    const extraChannel = `multi-${randomUUID().slice(0, 8)}`
+    await Promise.all([
+      resetAndSeedAppData(appName),
+      prepareCli(appName),
+    ])
+
+    try {
+      const supabase = getSupabaseClient()
+      const { data: versionData, error: versionError } = await supabase
+        .from('app_versions')
+        .select('id')
+        .eq('app_id', appName)
+        .limit(1)
+        .single()
+
+      expect(versionError).toBeNull()
+      if (!versionData)
+        throw new Error('Missing seeded app version')
+
+      const { error: channelError } = await supabase
+        .from('channels')
+        .insert({
+          name: extraChannel,
+          app_id: appName,
+          version: versionData.id,
+          owner_org: ORG_ID,
+          created_by: USER_ID,
+          public: false,
+          disable_auto_update_under_native: true,
+          disable_auto_update: 'major' as const,
+          allow_device_self_set: false,
+          allow_emulator: false,
+          allow_device: false,
+          allow_dev: false,
+          allow_prod: false,
+          ios: false,
+          android: false,
+        })
+
+      expect(channelError).toBeNull()
+
+      const { result, version } = await uploadWithFreshVersionRetry(appName, `production,${extraChannel}`, {
+        ignoreCompatibilityCheck: true,
+      })
+      expect(result.success).toBe(true)
+
+      const { data: channels, error } = await supabase
+        .from('channels')
+        .select('name, version(name)')
+        .eq('app_id', appName)
+        .in('name', ['production', extraChannel])
+
+      expect(error).toBeNull()
+      const versionsByChannel = new Map((channels ?? []).map(row => [row.name, (row.version as any)?.name]))
+      expect(versionsByChannel.get('production')).toBe(version)
+      expect(versionsByChannel.get(extraChannel)).toBe(version)
+    }
+    finally {
+      await Promise.all([
+        cleanupCli(appName),
+        resetAppData(appName),
+        resetAppDataStats(appName),
+      ])
+    }
+  }, 60000)
+
   it('should not upload same hash twice', async () => {
     const appName = `com.cli_duplicate_${randomUUID()}`
     await Promise.all([

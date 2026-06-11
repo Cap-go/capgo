@@ -192,11 +192,11 @@ Version must be > 0.0.0 and unique. Deleted versions cannot be reused for securi
 External option: Store only a URL link (useful for apps >200MB or privacy requirements).
 Capgo never inspects external content. Add encryption for trustless security.
 
-Example: npx @capgo/cli@latest bundle upload com.example.app --path ./dist --channel production`)
+Example: npx @capgo/cli@latest bundle upload com.example.app --path ./dist --channel production,beta`)
   .action(handleBundleUploadCommand)
   .option('-a, --apikey <apikey>', optionDescriptions.apikey)
   .option('-p, --path <path>', `Path of the folder to upload, if not provided it will use the webDir set in capacitor.config`)
-  .option('-c, --channel <channel>', `Channel to link to`)
+  .option('-c, --channel <channel>', `Channel to link to. Use commas for multiple channels, for example production,beta`)
   .option('-e, --external <url>', `Link to external URL instead of upload to Capgo Cloud`)
   .option('--iv-session-key <key>', `Set the IV and session key for bundle URL external`)
   .option('--s3-region <region>', `Region for your S3 bucket`)
