@@ -42,10 +42,12 @@ Add these repository secrets:
 - `CLI_MCP_TESTS_TOKEN`: fine-grained GitHub token with read access to
   `Cap-go/cli-mcp-tests`. If `PERSONAL_ACCESS_TOKEN` already has that access,
   the workflow falls back to it.
-- `CLOUDFLARE_ACCOUNT_ID`: Cloudflare account ID used by Wrangler.
-- `BUILDER_ONBOARDING_TUI_CLOUDFLARE_API_TOKEN`: Cloudflare API token that can
-  write R2 objects for the preview bucket. The workflow maps this secret to
-  Wrangler's required `CLOUDFLARE_API_TOKEN` environment variable at runtime.
+- `CLOUDFLARE_ACCOUNT_ID`: Cloudflare account ID used to build the R2 S3
+  endpoint.
+- `BUILDER_ONBOARDING_TUI_R2_ACCESS_KEY_ID`: R2 Access Key ID with object
+  read/write access to the preview bucket.
+- `BUILDER_ONBOARDING_TUI_R2_SECRET_ACCESS_KEY`: R2 Secret Access Key paired
+  with the Access Key ID above.
 
 Add these repository variables:
 
@@ -54,8 +56,8 @@ Add these repository variables:
 - `BUILDER_ONBOARDING_TUI_REPORTS_URL`: Access-protected custom-domain base URL,
   for example `https://buildertuipreview.capgo.app`.
 
-The workflow uploads result files to the remote R2 bucket with Wrangler
-`--remote` and uses eight concurrent uploads by default. Adjust
+The workflow uploads result files to the remote R2 bucket through the
+S3-compatible R2 endpoint and uses sixteen concurrent uploads by default. Adjust
 `R2_UPLOAD_CONCURRENCY` in the workflow if R2 or the runner needs a lower or
 higher parallelism limit.
 
@@ -66,6 +68,12 @@ domains and Access applications/policies. Create the Access application before
 attaching the R2 custom domain; otherwise the custom domain can be reachable
 before Access protects it.
 
+The CI upload credentials are separate: in Cloudflare, open **R2 Object
+Storage** -> **Overview** -> **Manage API Tokens**, create an Account or User
+R2 token with **Object Read & Write** scoped to `capgo-builder-html-e2e`, and
+copy the generated Access Key ID and Secret Access Key. Cloudflare only shows
+the Secret Access Key once.
+
 ```bash
 export BUCKET=capgo-builder-html-e2e
 export REPORTS_HOST=buildertuipreview.capgo.app
@@ -73,6 +81,8 @@ export EMAIL_DOMAIN=capgo.app
 export CLOUDFLARE_ACCOUNT_ID=...
 export CLOUDFLARE_ZONE_ID=...
 export CLOUDFLARE_API_TOKEN=...
+export R2_ACCESS_KEY_ID=...
+export R2_SECRET_ACCESS_KEY=...
 
 bunx wrangler@latest r2 bucket create "$BUCKET"
 
@@ -118,9 +128,13 @@ gh secret set CLOUDFLARE_ACCOUNT_ID \
   --repo Cap-go/capgo \
   --body "$CLOUDFLARE_ACCOUNT_ID"
 
-gh secret set BUILDER_ONBOARDING_TUI_CLOUDFLARE_API_TOKEN \
+gh secret set BUILDER_ONBOARDING_TUI_R2_ACCESS_KEY_ID \
   --repo Cap-go/capgo \
-  --body "$CLOUDFLARE_API_TOKEN"
+  --body "$R2_ACCESS_KEY_ID"
+
+gh secret set BUILDER_ONBOARDING_TUI_R2_SECRET_ACCESS_KEY \
+  --repo Cap-go/capgo \
+  --body "$R2_SECRET_ACCESS_KEY"
 
 gh variable set BUILDER_ONBOARDING_TUI_R2_BUCKET \
   --repo Cap-go/capgo \
