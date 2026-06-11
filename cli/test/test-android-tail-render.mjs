@@ -287,13 +287,16 @@ test('build-complete surfaces a non-fatal .env export error', () => {
   )
 })
 
-// ── error — recovery prompt with the failure detail + retry/exit ──────────────
-test('error shows the failure message and the retry/exit control', () => {
+// ── error — recovery prompt with the failure detail + the help menu ───────────
+// Options come from buildHelpMenuOptions (main PR #2406): support always first,
+// then 'Try again' (the old bare 'Retry' label is gone) and 'Exit'.
+test('error shows the failure message and the support/retry/exit control', () => {
   assertContains(
     h(ErrorStep, { message: 'Store password was rejected by the keystore. Try again.', onChoose: noop }),
     [
       'Store password was rejected by the keystore. Try again.',
-      'Retry',
+      'Email Capgo support',
+      'Try again',
       'Exit',
     ],
     'error',
