@@ -1957,12 +1957,15 @@ export async function runIosEffect(
     // to true (the macOS-first target) when the dep is omitted.
     case 'backing-up': {
       const date = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
+      const backupPath = credentialsBackupDestPath(date)
       try {
         await deps.copyFile?.(
           credentialsBackupSourcePath(),
-          credentialsBackupDestPath(date),
+          backupPath,
         )
-        deps.onLog?.('✔ Backup saved')
+        // Parity with the bespoke TUI (main app.tsx:1473): the log line carries
+        // the destination path so the user can find the backup.
+        deps.onLog?.(`✔ Backup saved · ${backupPath}`)
       }
       catch (err) {
         deps.onInternalLog?.(`credentials backup failed: ${err instanceof Error ? err.message : String(err)}`)
@@ -2082,7 +2085,9 @@ export async function runIosEffect(
       }
       catch (err) {
         deps.onInternalLog?.(`apple key verify failed: ${err instanceof Error ? err.message : String(err)}`)
-        deps.onLog?.(`✖ ${err instanceof Error ? err.message : String(err)}`, 'red')
+        // NO onLog echo — the bespoke TUI (main) routes this to handleError only;
+        // the error screen renders the message, so a log echo would paint the
+        // multi-line advice twice on the same frame (live e2e catch 2026-06-11).
         return iosError(progress, err instanceof Error ? err.message : String(err), step)
       }
     }
