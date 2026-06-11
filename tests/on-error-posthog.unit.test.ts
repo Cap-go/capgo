@@ -35,14 +35,14 @@ vi.mock('../supabase/functions/_backend/utils/logging.ts', () => ({
   }),
 }))
 
-function createContext() {
+function createContext(request?: Request) {
   return {
     get: (key: string) => key === 'requestId' ? 'request-id' : undefined,
     json: (body: unknown, status: number) => ({ body, status }),
     req: {
-      method: 'GET',
-      raw: new Request('https://example.com/functions/v1/app', { method: 'GET' }),
-      url: 'https://example.com/functions/v1/app',
+      method: request?.method ?? 'GET',
+      raw: request ?? new Request('https://example.com/functions/v1/app', { method: 'GET' }),
+      url: request?.url ?? 'https://example.com/functions/v1/app',
     },
   } as any
 }
@@ -62,6 +62,50 @@ afterEach(() => {
 })
 
 describe('onError PostHog capture', () => {
+  it('redacts sensitive JSON request body fields before Discord alerts', async () => {
+    const { onError } = await import('../supabase/functions/_backend/utils/on_error.ts')
+
+    const error = new HTTPException(500, {
+      cause: {
+        error: 'internal_error',
+        message: 'Something broke',
+        moreInfo: {},
+      },
+    })
+
+    const response = await onError('private')(error, createContext(new Request('https://example.com/functions/v1/private/accept_invitation', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        captchaToken: 'captcha-secret',
+        magic_invite_string: 'invite-secret',
+        nested: {
+          password: 'NestedPassword1!',
+        },
+        opt_for_newsletters: false,
+        password: 'Password1!',
+      }),
+    })))
+
+    expect(response.status).toBe(500)
+    expect(sendDiscordAlert500Mock).toHaveBeenCalledOnce()
+
+    const alertBody = sendDiscordAlert500Mock.mock.calls[0]?.[2]
+    expect(alertBody).toBe(JSON.stringify({
+      captchaToken: '[redacted]',
+      magic_invite_string: '[redacted]',
+      nested: {
+        password: '[redacted]',
+      },
+      opt_for_newsletters: false,
+      password: '[redacted]',
+    }))
+    expect(alertBody).not.toContain('captcha-secret')
+    expect(alertBody).not.toContain('invite-secret')
+    expect(alertBody).not.toContain('NestedPassword1!')
+    expect(alertBody).not.toContain('Password1!')
+  })
+
   it('captures backend HTTP exceptions in PostHog', async () => {
     const { onError } = await import('../supabase/functions/_backend/utils/on_error.ts')
 

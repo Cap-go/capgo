@@ -1,0 +1,3 @@
+[submodule "private/cli-mcp-tests"]
+	path = private/cli-mcp-tests
+	url = https://github.com/Cap-go/cli-mcp-tests.git

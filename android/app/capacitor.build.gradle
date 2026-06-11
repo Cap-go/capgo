@@ -38,11 +38,7 @@ dependencies {
     implementation project(':capgo-capacitor-android-inline-install')
     implementation project(':capgo-capacitor-android-kiosk')
     implementation project(':capgo-capacitor-android-sms-retriever')
-    implementation project(':capgo-capacitor-android-usagestatsmanager')
     implementation project(':capgo-capacitor-app-attest')
-    implementation project(':capgo-capacitor-app-tracking-transparency')
-    implementation project(':capgo-capacitor-appinsights')
-    implementation project(':capgo-capacitor-appsflyer')
     implementation project(':capgo-capacitor-audio-recorder')
     implementation project(':capgo-capacitor-autofill-save-password')
     implementation project(':capgo-capacitor-background-task')
@@ -55,9 +51,7 @@ dependencies {
     implementation project(':capgo-capacitor-date-picker')
     implementation project(':capgo-capacitor-document-scanner')
     implementation project(':capgo-capacitor-downloader')
-    implementation project(':capgo-capacitor-file')
     implementation project(':capgo-capacitor-file-compressor')
-    implementation project(':capgo-capacitor-file-picker')
     implementation project(':capgo-capacitor-file-sharer')
     implementation project(':capgo-capacitor-flash')
     implementation project(':capgo-capacitor-home-indicator')
@@ -86,7 +80,6 @@ dependencies {
     implementation project(':capgo-capacitor-pdf-generator')
     implementation project(':capgo-capacitor-pedometer')
     implementation project(':capgo-capacitor-persistent-account')
-    implementation project(':capgo-capacitor-photo-library')
     implementation project(':capgo-capacitor-pretty-toast')
     implementation project(':capgo-capacitor-printer')
     implementation project(':capgo-capacitor-privacy-screen')
@@ -112,7 +105,6 @@ dependencies {
     implementation project(':capgo-capacitor-youtube-player')
     implementation project(':capgo-capacitor-zebra-datawedge')
     implementation project(':capgo-capacitor-zip')
-    implementation project(':revenuecat-purchases-capacitor')
 
 }
 

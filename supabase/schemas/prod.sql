@@ -553,6 +553,34 @@ COMMENT ON FUNCTION "public"."accept_invitation_to_org"("org_id" "uuid") IS 'Acc
 
 
 
+CREATE OR REPLACE FUNCTION "public"."acknowledge_compatibility_event"("event_id" bigint, "note" "text") RETURNS "void"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+DECLARE v_org uuid; v_app text;
+BEGIN
+  IF note IS NULL OR length(btrim(note)) = 0 THEN
+    RAISE EXCEPTION 'reason_required';
+  END IF;
+  SELECT org_id, app_id INTO v_org, v_app
+    FROM public.compatibility_events WHERE id = event_id;
+  IF v_org IS NULL THEN RETURN; END IF;            -- unknown id: no-op
+  -- RBAC: app upload-bundle permission (release managers); NOT legacy min_rights.
+  -- Adjust the perm key in review if a different role should be allowed to accept.
+  IF NOT public.rbac_check_permission_direct(
+        public.rbac_perm_app_upload_bundle(), auth.uid(), v_org, v_app, NULL::bigint) THEN
+    RETURN;                                         -- unauthorized: no-op (no oracle)
+  END IF;
+  UPDATE public.compatibility_events
+    SET resolved_at = now(), resolved_by = auth.uid(),
+        resolution_kind = 'accepted', resolution_note = note
+    WHERE id = event_id AND resolved_at IS NULL;
+END; $$;
+
+
+ALTER FUNCTION "public"."acknowledge_compatibility_event"("event_id" bigint, "note" "text") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."aggregate_build_log_to_daily"() RETURNS "trigger"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -16396,6 +16424,42 @@ COMMENT ON COLUMN "public"."channel_permission_overrides"."permission_key" IS 'R
 
 
 
+CREATE TABLE IF NOT EXISTS "public"."compatibility_events" (
+    "id" bigint NOT NULL,
+    "org_id" "uuid" NOT NULL,
+    "app_id" "text" NOT NULL,
+    "source" "text" NOT NULL,
+    "platform" "text" NOT NULL,
+    "channel_id" bigint,
+    "channel_name" "text" NOT NULL,
+    "current_version_id" bigint,
+    "current_version_name" "text" NOT NULL,
+    "previous_version_id" bigint,
+    "previous_version_name" "text" NOT NULL,
+    "offenders" "jsonb" DEFAULT '[]'::"jsonb" NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "resolved_at" timestamp with time zone,
+    "resolved_by" "uuid",
+    "resolution_kind" "text",
+    "resolution_note" "text",
+    "change_occurred_at" timestamp with time zone DEFAULT "now"() NOT NULL
+);
+
+
+ALTER TABLE "public"."compatibility_events" OWNER TO "postgres";
+
+
+ALTER TABLE "public"."compatibility_events" ALTER COLUMN "id" ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME "public"."compatibility_events_id_seq"
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+
 CREATE TABLE IF NOT EXISTS "public"."cron_tasks" (
     "id" integer NOT NULL,
     "name" "text" NOT NULL,
@@ -18206,6 +18270,11 @@ ALTER TABLE ONLY "public"."channels"
 
 
 
+ALTER TABLE ONLY "public"."compatibility_events"
+    ADD CONSTRAINT "compatibility_events_pkey" PRIMARY KEY ("id");
+
+
+
 ALTER TABLE ONLY "public"."cron_tasks"
     ADD CONSTRAINT "cron_tasks_name_key" UNIQUE ("name");
 
@@ -18763,6 +18832,14 @@ CREATE INDEX "idx_channels_public_app_id_ios" ON "public"."channels" USING "btre
 
 
 
+CREATE INDEX "idx_compatibility_events_app_created" ON "public"."compatibility_events" USING "btree" ("app_id", "created_at" DESC);
+
+
+
+CREATE INDEX "idx_compatibility_events_unresolved" ON "public"."compatibility_events" USING "btree" ("app_id") WHERE ("resolved_at" IS NULL);
+
+
+
 CREATE INDEX "idx_cron_tasks_enabled" ON "public"."cron_tasks" USING "btree" ("enabled") WHERE ("enabled" = true);
 
 
@@ -19024,6 +19101,10 @@ CREATE UNIQUE INDEX "unique_app_version_negative" ON "public"."version_meta" USI
 
 
 CREATE UNIQUE INDEX "unique_app_version_positive" ON "public"."version_meta" USING "btree" ("app_id", "version_id") WHERE ("size" > 0);
+
+
+
+CREATE UNIQUE INDEX "uq_compatibility_events_dedup" ON "public"."compatibility_events" USING "btree" ("app_id", "channel_id", "platform", "current_version_id", "previous_version_id", "change_occurred_at") NULLS NOT DISTINCT;
 
 
 
@@ -19323,10 +19404,6 @@ CREATE OR REPLACE TRIGGER "record_deployment_history_trigger" AFTER UPDATE OF "v
 
 
 
-CREATE OR REPLACE TRIGGER "replicate_devices" AFTER INSERT OR DELETE OR UPDATE ON "public"."devices" FOR EACH ROW EXECUTE FUNCTION "public"."trigger_http_queue_post_to_function"('replicate_data', 'cloudflare');
-
-
-
 CREATE OR REPLACE TRIGGER "role_bindings_enforce_apikey_expiration_policy" BEFORE INSERT OR UPDATE OF "principal_type", "principal_id", "org_id", "expires_at" ON "public"."role_bindings" FOR EACH ROW EXECUTE FUNCTION "public"."enforce_apikey_role_binding_expiration_policy"();
 
 
@@ -19487,6 +19564,16 @@ ALTER TABLE ONLY "public"."channels"
 
 ALTER TABLE ONLY "public"."channels"
     ADD CONSTRAINT "channels_version_fkey" FOREIGN KEY ("version") REFERENCES "public"."app_versions"("id") ON DELETE SET NULL;
+
+
+
+ALTER TABLE ONLY "public"."compatibility_events"
+    ADD CONSTRAINT "compatibility_events_app_id_fkey" FOREIGN KEY ("app_id") REFERENCES "public"."apps"("app_id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."compatibility_events"
+    ADD CONSTRAINT "compatibility_events_org_id_fkey" FOREIGN KEY ("org_id") REFERENCES "public"."orgs"("id") ON DELETE CASCADE;
 
 
 
@@ -20339,7 +20426,7 @@ CREATE POLICY "Prevent users from inserting manifest entries" ON "public"."manif
 
 
 
-CREATE POLICY "Prevent users from updating manifest entries" ON "public"."manifest" FOR UPDATE TO "authenticated" USING (false);
+CREATE POLICY "Prevent users from updating manifest entries" ON "public"."manifest" AS RESTRICTIVE FOR UPDATE TO "anon", "authenticated" USING (false) WITH CHECK (false);
 
 
 
@@ -20450,6 +20537,25 @@ COMMENT ON POLICY "channel_permission_overrides_admin_update" ON "public"."chann
 
 
 ALTER TABLE "public"."channels" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."compatibility_events" ENABLE ROW LEVEL SECURITY;
+
+
+CREATE POLICY "compatibility_events_deny_delete" ON "public"."compatibility_events" AS RESTRICTIVE FOR DELETE TO "anon", "authenticated" USING (false);
+
+
+
+CREATE POLICY "compatibility_events_deny_insert" ON "public"."compatibility_events" AS RESTRICTIVE FOR INSERT TO "anon", "authenticated" WITH CHECK (false);
+
+
+
+CREATE POLICY "compatibility_events_deny_update" ON "public"."compatibility_events" AS RESTRICTIVE FOR UPDATE TO "anon", "authenticated" USING (false) WITH CHECK (false);
+
+
+
+CREATE POLICY "compatibility_events_select" ON "public"."compatibility_events" FOR SELECT TO "authenticated" USING ("public"."rbac_check_permission"("public"."rbac_perm_app_read"(), "org_id", ("app_id")::character varying, NULL::bigint));
+
 
 
 ALTER TABLE "public"."cron_tasks" ENABLE ROW LEVEL SECURITY;
@@ -21239,6 +21345,12 @@ GRANT ALL ON FUNCTION "capgo_private"."matches_app_storage_apikey_owner"("folder
 REVOKE ALL ON FUNCTION "public"."accept_invitation_to_org"("org_id" "uuid") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."accept_invitation_to_org"("org_id" "uuid") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."accept_invitation_to_org"("org_id" "uuid") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."acknowledge_compatibility_event"("event_id" bigint, "note" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."acknowledge_compatibility_event"("event_id" bigint, "note" "text") TO "service_role";
+GRANT ALL ON FUNCTION "public"."acknowledge_compatibility_event"("event_id" bigint, "note" "text") TO "authenticated";
 
 
 
@@ -23547,6 +23659,18 @@ GRANT ALL ON SEQUENCE "public"."channel_id_seq" TO "service_role";
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."channel_permission_overrides" TO "anon";
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."channel_permission_overrides" TO "authenticated";
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."channel_permission_overrides" TO "service_role";
+
+
+
+GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."compatibility_events" TO "anon";
+GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."compatibility_events" TO "authenticated";
+GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."compatibility_events" TO "service_role";
+
+
+
+GRANT ALL ON SEQUENCE "public"."compatibility_events_id_seq" TO "anon";
+GRANT ALL ON SEQUENCE "public"."compatibility_events_id_seq" TO "authenticated";
+GRANT ALL ON SEQUENCE "public"."compatibility_events_id_seq" TO "service_role";
 
 
 

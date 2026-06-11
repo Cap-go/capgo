@@ -296,6 +296,8 @@ export interface TailEffectDeps<P extends TailEffectProgress = TailEffectProgres
 
   onStatus?: (message: string) => void
   onLog?: (message: string, color?: string) => void
+  /** Internal-only diagnostic line → the support internal log (main PR #2406). Optional; no-op when absent. */
+  onInternalLog?: (line: string) => void
   signal?: AbortSignal
 }
 
@@ -713,8 +715,9 @@ async function preloadWorkflowScripts<P extends TailEffectProgress>(
     }
     return { availableScripts, recommendedScript }
   }
-  catch {
+  catch (err) {
     // Best-effort; pick-build-script falls back to its empty list + escape hatches.
+    deps.onInternalLog?.(`build-script detection failed, falling back to manual entry: ${err instanceof Error ? err.message : String(err)}`)
     return {}
   }
 }

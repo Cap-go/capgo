@@ -55,7 +55,7 @@ export async function interactiveVersionBump(
   // Manual version input
   const userVersion = await pText({
     message: `Current version is ${currentVersion}. Enter new version:`,
-    validate: (value) => {
+    validate: (value: string | undefined) => {
       if (!value)
         return 'Version is required'
       if (!/^\d+\.\d+\.\d+/.test(value))

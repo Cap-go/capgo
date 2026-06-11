@@ -195,6 +195,9 @@ export const KIND_TABLE: Record<AndroidOnboardingStep, AndroidStepKind> = {
   'ai-analysis-running': 'auto',
   'ai-analysis-result': 'auto',
   'ai-analysis-result-scroll': 'auto',
+  'support-confirm': 'choice',
+  'support-log-view': 'auto',
+  'support-uploading': 'auto',
   'credentials-exist': 'choice',
   'backing-up': 'auto',
   'no-platform': 'error',
@@ -1195,6 +1198,8 @@ export interface AndroidEffectDeps {
   // ── Callbacks (optional — callers that don't need streaming can omit) ────
   onStatus?: (message: string) => void
   onLog?: (message: string, color?: string) => void
+  /** Internal-only diagnostic line → the support internal log (main PR #2406). Optional; no-op when absent. */
+  onInternalLog?: (line: string) => void
   onAuthUrl?: (url: string) => void
   signal?: AbortSignal
 }
@@ -1358,6 +1363,7 @@ function toTailDeps(deps: AndroidEffectDeps): TailEffectDeps<AndroidOnboardingPr
     carried: deps.carried,
     onStatus: deps.onStatus,
     onLog: deps.onLog,
+    onInternalLog: deps.onInternalLog,
     signal: deps.signal,
   }
 }
@@ -1422,7 +1428,8 @@ export async function runAndroidEffect(
         await deps.copyFile(credPath, backupPath)
         deps.onLog?.(`✔ Backup saved · ${backupPath}`)
       }
-      catch {
+      catch (err) {
+        deps.onInternalLog?.(`credentials backup failed: ${err instanceof Error ? err.message : String(err)}`)
         deps.onLog?.('⚠ Could not backup credentials (file may not exist yet)', 'yellow')
       }
       const nextProgress: AndroidOnboardingProgress = { ...progress, _credentialsExistGate: 'done' }

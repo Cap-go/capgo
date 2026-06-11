@@ -821,6 +821,84 @@ export type Database = {
           },
         ]
       }
+      compatibility_events: {
+        Row: {
+          app_id: string
+          change_occurred_at: string
+          channel_id: number | null
+          channel_name: string
+          created_at: string
+          current_version_id: number | null
+          current_version_name: string
+          id: number
+          offenders: Json
+          org_id: string
+          platform: string
+          previous_version_id: number | null
+          previous_version_name: string
+          resolution_kind: string | null
+          resolution_note: string | null
+          resolved_at: string | null
+          resolved_by: string | null
+          source: string
+        }
+        Insert: {
+          app_id: string
+          change_occurred_at?: string
+          channel_id?: number | null
+          channel_name: string
+          created_at?: string
+          current_version_id?: number | null
+          current_version_name: string
+          id?: never
+          offenders?: Json
+          org_id: string
+          platform: string
+          previous_version_id?: number | null
+          previous_version_name: string
+          resolution_kind?: string | null
+          resolution_note?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          source: string
+        }
+        Update: {
+          app_id?: string
+          change_occurred_at?: string
+          channel_id?: number | null
+          channel_name?: string
+          created_at?: string
+          current_version_id?: number | null
+          current_version_name?: string
+          id?: never
+          offenders?: Json
+          org_id?: string
+          platform?: string
+          previous_version_id?: number | null
+          previous_version_name?: string
+          resolution_kind?: string | null
+          resolution_note?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          source?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "compatibility_events_app_id_fkey"
+            columns: ["app_id"]
+            isOneToOne: false
+            referencedRelation: "apps"
+            referencedColumns: ["app_id"]
+          },
+          {
+            foreignKeyName: "compatibility_events_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cron_tasks: {
         Row: {
           batch_size: number | null
@@ -3072,6 +3150,10 @@ export type Database = {
     }
     Functions: {
       accept_invitation_to_org: { Args: { org_id: string }; Returns: string }
+      acknowledge_compatibility_event: {
+        Args: { event_id: number; note: string }
+        Returns: undefined
+      }
       apikey_has_current_org_create_capability: {
         Args: { p_apikey_rbac_id: string }
         Returns: boolean

@@ -17,7 +17,6 @@ import { checkPermissions } from '~/services/permissions'
 import { defaultApiHost, useSupabase } from '~/services/supabase'
 import { useAppDetailStore } from '~/stores/appDetail'
 import { useDisplayStore } from '~/stores/display'
-import { useOrganizationStore } from '~/stores/organization'
 
 interface Channel {
   version: Database['public']['Tables']['app_versions']['Row']
@@ -32,7 +31,6 @@ const packageId = ref<string>('')
 const id = ref<string>()
 const isLoading = ref(true)
 const appDetailStore = useAppDetailStore()
-const organizationStore = useOrganizationStore()
 
 const device = ref<Database['public']['Tables']['devices']['Row']>()
 const channels = ref<(Database['public']['Tables']['channels']['Row'] & Channel)[]>([])
@@ -215,26 +213,46 @@ async function loadData() {
 }
 
 async function upsertDevChannel(device: string, channelId: number) {
-  const currentGid = organizationStore.currentOrganization?.gid
-  if (!currentGid)
-    return
-  return supabase
-    .from('channel_devices')
-    .upsert({
+  const { data: currentSession } = await supabase.auth.getSession()!
+  const currentJwt = currentSession.session?.access_token
+  if (!currentJwt)
+    throw new Error('Missing session')
+
+  const response = await fetch(`${defaultApiHost}/private/channel_device`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'authorization': `Bearer ${currentJwt}`,
+    },
+    body: JSON.stringify({
       device_id: device.toLowerCase(),
       channel_id: channelId,
       app_id: packageId.value,
-      owner_org: currentGid,
-    }, { onConflict: 'app_id,device_id' })
-    .throwOnError()
+    }),
+  })
+  if (!response.ok)
+    throw new Error(`Cannot set channel override: HTTP ${response.status}`)
 }
 
 async function delDevChannel(device: string) {
-  return supabase
-    .from('channel_devices')
-    .delete()
-    .eq('device_id', device.toLowerCase())
-    .eq('app_id', packageId.value)
+  const { data: currentSession } = await supabase.auth.getSession()!
+  const currentJwt = currentSession.session?.access_token
+  if (!currentJwt)
+    throw new Error('Missing session')
+
+  const response = await fetch(`${defaultApiHost}/private/channel_device`, {
+    method: 'DELETE',
+    headers: {
+      'Content-Type': 'application/json',
+      'authorization': `Bearer ${currentJwt}`,
+    },
+    body: JSON.stringify({
+      device_id: device.toLowerCase(),
+      app_id: packageId.value,
+    }),
+  })
+  if (!response.ok)
+    throw new Error(`Cannot delete channel override: HTTP ${response.status}`)
 }
 
 function closeChannelDropdown() {
@@ -242,55 +260,40 @@ function closeChannelDropdown() {
     channelDropdown.value.removeAttribute('open')
   }
 }
-async function onSelectChannel(value: string) {
-  if (!canManageDevices.value) {
-    toast.error(t('no-permission'))
-    return
-  }
 
-  // Check if selected channel is the public (default) channel
-  if (value !== 'none') {
-    const selectedChannel = channels.value.find(ch => ch.id === Number(value))
+function isPublicChannelSelection(value: string) {
+  if (value === 'none')
+    return false
+  const selectedChannel = channels.value.find(ch => ch.id === Number(value))
+  return selectedChannel?.public === true
+}
 
-    if (selectedChannel?.public === true) {
-      // If trying to set override to default channel, remove any existing override
-      if (channelDevice.value && device.value?.device_id) {
-        await delDevChannel(device.value?.device_id)
-        toast.info(t('channel-override-ignored-default'))
-        await loadData()
-      }
-      else {
-        toast.info(t('channel-override-ignored-default'))
-      }
-      closeChannelDropdown()
-      return
-    }
-  }
-
-  if (channelDevice.value && value === 'none') {
-    if (device.value?.device_id)
-      await delDevChannel(device.value?.device_id)
-    toast.success(t('unlink-channel'))
-    toast.info(t('cloud-replication-delay'))
+async function handlePublicChannelSelection() {
+  const deviceId = device.value?.device_id
+  if (channelDevice.value && deviceId) {
+    await delDevChannel(deviceId)
     await loadData()
   }
-  else if (value !== 'none') {
-    if (!device.value?.device_id) {
-      toast.error(t('channel-link-fail'))
-      return
-    }
+  toast.info(t('channel-override-ignored-default'))
+}
 
+async function unlinkDeviceChannel() {
+  const deviceId = device.value?.device_id
+  if (deviceId)
+    await delDevChannel(deviceId)
+  toast.success(t('unlink-channel'))
+  toast.info(t('cloud-replication-delay'))
+  await loadData()
+}
+
+async function linkDeviceChannel(value: string) {
+  const deviceId = device.value?.device_id
+  if (deviceId) {
     try {
-      await upsertDevChannel(device.value?.device_id, Number(value))
-        .then(async () => {
-          toast.success(t('channel-linked'))
-          toast.info(t('cloud-replication-delay'))
-          return loadData()
-        })
-        .catch(async (error) => {
-          console.error(error)
-          toast.error(t('channel-link-fail'))
-        })
+      await upsertDevChannel(deviceId, Number(value))
+      toast.success(t('channel-linked'))
+      toast.info(t('cloud-replication-delay'))
+      await loadData()
     }
     catch (error) {
       console.error(error)
@@ -300,8 +303,35 @@ async function onSelectChannel(value: string) {
   else {
     toast.error(t('channel-link-fail'))
   }
+}
 
-  closeChannelDropdown()
+async function onSelectChannel(value: string) {
+  if (!canManageDevices.value) {
+    toast.error(t('no-permission'))
+    return
+  }
+
+  try {
+    if (isPublicChannelSelection(value)) {
+      await handlePublicChannelSelection()
+    }
+    else if (channelDevice.value && value === 'none') {
+      await unlinkDeviceChannel()
+    }
+    else if (value !== 'none') {
+      await linkDeviceChannel(value)
+    }
+    else {
+      toast.error(t('channel-link-fail'))
+    }
+  }
+  catch (error) {
+    console.error(error)
+    toast.error(t('channel-link-fail'))
+  }
+  finally {
+    closeChannelDropdown()
+  }
 }
 
 watchEffect(async () => {
@@ -336,13 +366,12 @@ function getCurlCommand() {
   if (!device.value)
     return ''
 
-  // Use the stored default_channel from device, or empty string if not available
   const defaultChannel = device.value.default_channel || ''
-  const requestBody = transformDeviceToUpdateRequest(device.value, packageId.value, defaultChannel)
+  const requestBody = transformDeviceToUpdateRequest(device.value, packageId.value, defaultChannel, channelDevice.value?.name)
   const jsonBody = JSON.stringify(requestBody, null, 2)
 
-  return `curl -X POST '${defaultApiHost}/updates' \\
-  -H 'Content-Type: application/json' \\
+  return String.raw`curl -X POST '${defaultApiHost}/updates' \
+  -H 'Content-Type: application/json' \
   -d '${jsonBody}'`
 }
 

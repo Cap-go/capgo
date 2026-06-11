@@ -3,7 +3,7 @@ title: 📦 bundle
 description: "📦 Manage app bundles for deployment in Capgo Cloud, including upload, compatibility checks, and encryption."
 sidebar_label: bundle
 sidebar:
-  order: 7
+  order: 8
 ---
 
 📦 Manage app bundles for deployment in Capgo Cloud, including upload, compatibility checks, and encryption.
@@ -80,6 +80,7 @@ npx @capgo/cli@latest bundle upload com.example.app --path ./dist --channel prod
 | **--disable-brotli** | <code>boolean</code> | Completely disable brotli compression even if updater version supports it |
 | **--version-exists-ok** | <code>boolean</code> | Exit successfully if bundle version already exists, useful for CI/CD workflows with monorepos |
 | **--self-assign** | <code>boolean</code> | Allow devices to auto-join this channel (updates channel setting) |
+| **--qr-preview** | <code>boolean</code> | Print a terminal QR code for this bundle preview after upload |
 | **--supa-host** | <code>string</code> | Custom Supabase host URL (for self-hosting or Capgo development) |
 | **--supa-anon** | <code>string</code> | Custom Supabase anon key (for self-hosting) |
 | **--verbose** | <code>boolean</code> | Enable verbose output with detailed logging |

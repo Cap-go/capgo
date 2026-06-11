@@ -717,6 +717,8 @@ export interface IosEffectDeps {
   // ── callbacks (optional — callers that don't need streaming can omit) ────
   onStatus?: (message: string) => void
   onLog?: (message: string, color?: string) => void
+  /** Internal-only diagnostic line → the support internal log (main PR #2406). Optional; no-op when absent. */
+  onInternalLog?: (line: string) => void
   signal?: AbortSignal
 }
 
@@ -984,6 +986,7 @@ function toTailDeps(deps: IosEffectDeps): TailEffectDeps<OnboardingProgress> {
     carried: deps.carried,
     onStatus: deps.onStatus,
     onLog: deps.onLog,
+    onInternalLog: deps.onInternalLog,
     signal: deps.signal,
   }
 }
@@ -1961,7 +1964,8 @@ export async function runIosEffect(
         )
         deps.onLog?.('✔ Backup saved')
       }
-      catch {
+      catch (err) {
+        deps.onInternalLog?.(`credentials backup failed: ${err instanceof Error ? err.message : String(err)}`)
         deps.onLog?.('⚠ Could not backup credentials (file may not exist yet)', 'yellow')
       }
       const nextProgress: OnboardingProgress = { ...progress, _credentialsExistGate: 'done' }
@@ -2042,6 +2046,7 @@ export async function runIosEffect(
       const p8Content = await resolveP8Content(progress, deps)
 
       try {
+        deps.onInternalLog?.(`apple key verify: keyId=${keyId}, issuerId=${issuerId}`)
         const { teamId } = await deps.verifyApiKey!({ keyId, issuerId, p8Content })
         const apiKey: ApiKeyData = { keyId, issuerId }
         // pendingRecoveryAction (BATCH 7b): when the import no-ASC-key 'create'
@@ -2076,6 +2081,7 @@ export async function runIosEffect(
         }
       }
       catch (err) {
+        deps.onInternalLog?.(`apple key verify failed: ${err instanceof Error ? err.message : String(err)}`)
         deps.onLog?.(`✖ ${err instanceof Error ? err.message : String(err)}`, 'red')
         return iosError(progress, err instanceof Error ? err.message : String(err), step)
       }
@@ -2150,7 +2156,8 @@ export async function runIosEffect(
         try {
           await deps.saveProgress?.(progress.appId, nextProgress)
         }
-        catch {
+        catch (err) {
+          deps.onInternalLog?.(`failed to persist verify override (non-fatal): ${err instanceof Error ? err.message : String(err)}`)
           deps.onLog?.(saveFailLog, 'yellow')
         }
         return nextProgress
@@ -2326,10 +2333,11 @@ export async function runIosEffect(
           },
         }
       }
-      catch {
+      catch (err) {
         // ASC fetch failure (auth / rate-limit / network): we can't verify a
         // transient failure, and blocking on it would trap the user. Warn
         // visibly and proceed — the local bundle-id resolution already ran.
+        deps.onInternalLog?.(`verify-app: could not reach App Store Connect, skipping verification: ${err instanceof Error ? err.message : String(err)}`)
         deps.onLog?.('⚠ Couldn\'t reach App Store Connect to verify your app; continuing without remote verification.', 'yellow')
         return {
           progress,
@@ -2654,8 +2662,9 @@ export async function runIosEffect(
             const summaries = await deps.listProfilesForCert!(certId)
             profilePrefetch[m.identity.sha1] = summaries.map(s => synthesizeProfileFromAscSummary(s, m.identity))
           }
-          catch {
+          catch (err) {
             // Per-fetch error sandbox — leave this identity out of the prefetch map.
+            deps.onInternalLog?.(`profile prefetch failed (background): ${err instanceof Error ? err.message : String(err)}`)
           }
         }))
 

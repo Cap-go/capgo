@@ -24,7 +24,11 @@ export interface OnboardingCompletionSummary {
 }
 
 export interface OnboardingResult {
-  outcome: 'completed' | 'cancelled'
+  // `update-requested` means the user accepted the self-update prompt (the
+  // first wizard screen, when a newer @capgo/cli exists). The caller tears Ink
+  // down, then installs + re-execs OUTSIDE the alt-screen — the spawn needs the
+  // primary buffer + stdio inheritance, which it cannot get while Ink is mounted.
+  outcome: 'completed' | 'cancelled' | 'update-requested'
   /** Present only when outcome === 'completed'. */
   summary?: OnboardingCompletionSummary
 }
@@ -98,6 +102,12 @@ export type OnboardingStep
     | 'build-complete'
     | 'no-platform'
     | 'error'
+    // Contact-support confirmation gate (shown before we save logs + open mail)
+    | 'support-confirm'
+    // Scrollable viewer of the exact bundle, reached from the confirm's "View logs first"
+    | 'support-log-view'
+    // Spinner while the bundle uploads to Capgo support
+    | 'support-uploading'
 
 export type OnboardingErrorCategory
   = | 'apple_api_unauthorized'
@@ -402,6 +412,9 @@ export const STEP_PROGRESS: Record<OnboardingStep, number> = {
   'build-complete': 100,
   'no-platform': 0,
   'error': 0,
+  'support-confirm': 0,
+  'support-log-view': 0,
+  'support-uploading': 0,
 }
 
 export function getPhaseLabel(step: OnboardingStep): string {
@@ -490,6 +503,9 @@ export function getPhaseLabel(step: OnboardingStep): string {
       return 'Complete'
     case 'no-platform':
     case 'error':
+    case 'support-confirm':
+    case 'support-log-view':
+    case 'support-uploading':
       return ''
   }
 }
