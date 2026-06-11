@@ -8,6 +8,7 @@ import { join } from 'node:path'
 import { chdir, cwd, env } from 'node:process'
 import { CapgoSDK } from '@capgo/cli/sdk'
 import AdmZip from 'adm-zip'
+import { getChannelsToAssignByChecksum, parseUploadChannels } from '../cli/src/bundle/upload-channels'
 import { BASE_DEPENDENCIES, BASE_DEPENDENCIES_OLD, BASE_PACKAGE_JSON, TEMP_DIR_NAME } from './cli-utils'
 import { APIKEY_TEST_ORG_SUPER_ADMIN, getSupabaseClient, USER_ID } from './test-utils'
 
@@ -825,8 +826,18 @@ export function createTestSDK(apikey: string = APIKEY_TEST_ORG_SUPER_ADMIN) {
       if ('error' in uploadPayload)
         return { success: false, error: uploadPayload.error }
 
-      const currentChannelVersion = options.channel ? await getChannelVersionRecord(options.appId, options.channel) : null
-      if (currentChannelVersion?.checksum === uploadPayload.checksum) {
+      const targetChannels = parseUploadChannels(options.channel)
+      if (options.channel !== undefined && targetChannels.length === 0)
+        return { success: false, error: 'Missing channel name' }
+
+      const remoteChecksums = new Map<string, string | null>()
+      for (const targetChannel of targetChannels) {
+        const currentChannelVersion = await getChannelVersionRecord(options.appId, targetChannel)
+        remoteChecksums.set(targetChannel, currentChannelVersion?.checksum ?? null)
+      }
+      const { channelsToAssign } = getChannelsToAssignByChecksum(targetChannels, uploadPayload.checksum, remoteChecksums)
+
+      if (targetChannels.length > 0 && channelsToAssign.length === 0) {
         return {
           success: false,
           error: 'Cannot upload the same bundle content',
@@ -835,7 +846,7 @@ export function createTestSDK(apikey: string = APIKEY_TEST_ORG_SUPER_ADMIN) {
 
       const minUpdateVersion = await resolveUploadMinUpdateVersion(
         options.appId,
-        options.channel,
+        channelsToAssign[0] ?? targetChannels[0],
         options.autoMinUpdateVersion,
         options.minUpdateVersion,
       )
@@ -867,10 +878,10 @@ export function createTestSDK(apikey: string = APIKEY_TEST_ORG_SUPER_ADMIN) {
         throw uploadError
       }
 
-      if (options.channel) {
-        const channelRecord = await getChannelRecord(options.appId, options.channel)
+      for (const targetChannel of channelsToAssign) {
+        const channelRecord = await getChannelRecord(options.appId, targetChannel)
         if (!channelRecord)
-          return { success: false, error: `Channel ${options.channel} not found for app ${options.appId}` }
+          return { success: false, error: `Channel ${targetChannel} not found for app ${options.appId}` }
 
         const { error } = await getSupabaseClient()
           .from('channels')

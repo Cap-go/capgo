@@ -24,6 +24,7 @@ import {
   sortApiKeyRows,
 } from '~/services/apikeys'
 import { formatLocalDate } from '~/services/date'
+import { isNativeAppStoreContext } from '~/services/nativeCompliance'
 import { checkPermissions } from '~/services/permissions'
 import { useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
@@ -122,6 +123,7 @@ const expirationDate = ref<Date | null>(null)
 // RBAC creation state
 const selectedOrgRole = ref('org_member')
 const allowOrgCreation = ref(false)
+const hideOrgCreationPermission = isNativeAppStoreContext()
 const selectedOrgsForCreation = ref<string[]>([])
 const selectedOrgRolesById = ref<Record<string, string>>({})
 const isHydratingApiKeyEdit = ref(false)
@@ -719,7 +721,7 @@ function getOrgRoleForBinding(orgId: string) {
 }
 
 const canEnableOrgCreation = computed(() =>
-  selectedOrgsForCreation.value.some(orgId => rolesWithOrgCreateAccess.has(getOrgRoleForBinding(orgId))),
+  !hideOrgCreationPermission && selectedOrgsForCreation.value.some(orgId => rolesWithOrgCreateAccess.has(getOrgRoleForBinding(orgId))),
 )
 const selectedAppIds = computed(() => Object.keys(pendingAppBindings.value))
 const selectedChannelPermissionApp = computed(() =>
@@ -1067,11 +1069,14 @@ function buildApiKeyBindingsFromForm(): ApiKeyBindingInput[] {
   return bindings
 }
 
-function buildApiKeyGlobalPermissionsFromForm() {
-  if (!allowOrgCreation.value || !canEnableOrgCreation.value)
-    return []
+function buildApiKeyGlobalPermissionsFromForm(currentKey?: ApiKeyRow | null) {
+  if (allowOrgCreation.value && canEnableOrgCreation.value)
+    return [apiKeyOrgCreatePermission]
 
-  return [apiKeyOrgCreatePermission]
+  if (hideOrgCreationPermission && currentKey && hasOrgCreatePermission(currentKey))
+    return [apiKeyOrgCreatePermission]
+
+  return []
 }
 
 function hasOrgCreatePermission(key: ApiKeyRow) {
@@ -1208,7 +1213,7 @@ async function updateApiKey() {
       ...(nameChanged ? { name: trimmedName } : {}),
       expires_at: expiresAt,
       bindings: buildApiKeyBindingsFromForm(),
-      global_permissions: buildApiKeyGlobalPermissionsFromForm(),
+      global_permissions: buildApiKeyGlobalPermissionsFromForm(key),
     },
   })
 
@@ -1806,7 +1811,7 @@ getKeys()
           </div>
 
           <!-- Global organization permissions -->
-          <div class="rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-900/40">
+          <div v-if="!hideOrgCreationPermission" class="rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-900/40">
             <label class="flex items-start gap-3" :class="canEnableOrgCreation ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'">
               <input
                 v-model="allowOrgCreation"

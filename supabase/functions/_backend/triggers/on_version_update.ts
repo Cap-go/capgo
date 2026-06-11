@@ -64,6 +64,16 @@ function versionUpdateLogFields(
   }
 }
 
+function getMetadataBranch(storageProvider: string | null, resolvedR2Path: string | null) {
+  if (storageProvider === 'r2' && resolvedR2Path)
+    return 'r2_bundle_size'
+  if (storageProvider === 'r2')
+    return 'zero_metadata_r2_path_unavailable'
+  if (storageProvider === 'r2-direct')
+    return 'zero_metadata_r2_direct_not_finalized'
+  return 'zero_metadata_non_r2_storage'
+}
+
 /**
  * Handles v2 storage metadata updates (size/checksum/stats) for R2-backed bundles.
  *
@@ -77,7 +87,8 @@ async function v2PathSize(c: Context, record: Database['public']['Tables']['app_
     resolved_r2_path: v2Path,
   })
 
-  const size = await s3.getSize(c, v2Path)
+  const diagnostics = await s3.getSizeDiagnostics(c, v2Path)
+  const size = diagnostics.size
   if (!size) {
     cloudlog({
       requestId: c.get('requestId'),
@@ -85,6 +96,7 @@ async function v2PathSize(c: Context, record: Database['public']['Tables']['app_
       ...versionUpdateLogFields(record),
       resolved_r2_path: v2Path,
       size,
+      storageDiagnostics: diagnostics,
     })
     return true
   }
@@ -94,6 +106,7 @@ async function v2PathSize(c: Context, record: Database['public']['Tables']['app_
     message: 'on_version_update resolved bundle size',
     ...versionUpdateLogFields(record),
     resolved_r2_path: v2Path,
+    selectedCandidateKey: diagnostics.selectedCandidateKey,
     size,
   })
 
@@ -204,7 +217,7 @@ async function handleManifest(c: Context, record: Database['public']['Tables']['
  */
 async function updateIt(c: Context, record: Database['public']['Tables']['app_versions']['Row']) {
   const v2Path = await getPath(c, record)
-  const metadataBranch = v2Path && record.storage_provider === 'r2' ? 'r2_bundle_size' : 'zero_metadata'
+  const metadataBranch = getMetadataBranch(record.storage_provider, v2Path)
   cloudlog({
     requestId: c.get('requestId'),
     message: 'on_version_update metadata branch selected',
@@ -213,13 +226,13 @@ async function updateIt(c: Context, record: Database['public']['Tables']['app_ve
     resolved_r2_path: v2Path,
   })
 
-  if (v2Path && record.storage_provider === 'r2') {
+  if (metadataBranch === 'r2_bundle_size' && v2Path) {
     const shouldContinue = await v2PathSize(c, record, v2Path)
     if (!shouldContinue)
       return c.json(BRES)
   }
   else {
-    cloudlog({ requestId: c.get('requestId'), message: 'no v2 path', ...versionUpdateLogFields(record), resolved_r2_path: v2Path })
+    cloudlog({ requestId: c.get('requestId'), message: 'on_version_update zero metadata branch selected', ...versionUpdateLogFields(record), metadataBranch, resolved_r2_path: v2Path })
     const ownerOrg = await resolveOwnerOrg(c, record)
     if (!ownerOrg) {
       cloudlog({ requestId: c.get('requestId'), message: 'missing owner_org for app_versions_meta upsert', id: record.id, app_id: record.app_id })
@@ -238,10 +251,10 @@ async function updateIt(c: Context, record: Database['public']['Tables']['app_ve
       })
       .eq('id', record.id)
     if (errorUpdate) {
-      cloudlog({ requestId: c.get('requestId'), message: 'errorUpdate', error: errorUpdate, ...versionUpdateLogFields(record), size: 0 })
+      cloudlog({ requestId: c.get('requestId'), message: 'errorUpdate', error: errorUpdate, ...versionUpdateLogFields(record), metadataBranch, size: 0 })
     }
     else {
-      cloudlog({ requestId: c.get('requestId'), message: 'app_versions_meta zero size upserted', ...versionUpdateLogFields(record), owner_org: ownerOrg, size: 0 })
+      cloudlog({ requestId: c.get('requestId'), message: 'app_versions_meta zero size upserted', ...versionUpdateLogFields(record), metadataBranch, owner_org: ownerOrg, size: 0 })
     }
   }
 

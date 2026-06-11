@@ -60,8 +60,8 @@ async function openLogAsDialog() {
   }
 }
 
-function resetSpoofedUser() {
-  if (unspoofUser()) {
+async function resetSpoofedUser() {
+  if (await unspoofUser()) {
     toast.error('Stop Spoofed, will reload')
     setTimeout(() => {
       router.replace('/dashboard').then(() => {
