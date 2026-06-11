@@ -18,6 +18,9 @@
   "env": {
     "prod": {
       "name": "capgo_api-prod",
+      "triggers": {
+        "crons": ["* * * * *"]
+      },
       "ai": {
         "binding": "AI"
       },
@@ -75,6 +78,9 @@
     },
     "preprod": {
       "name": "capgo_api-preprod",
+      "triggers": {
+        "crons": ["* * * * *"]
+      },
       "ai": {
         "binding": "AI"
       },
@@ -131,6 +137,9 @@
     },
     "alpha": {
       "name": "capgo_api-alpha",
+      "triggers": {
+        "crons": ["* * * * *"]
+      },
       "ai": {
         "binding": "AI"
       },
@@ -187,13 +196,16 @@
     },
     "local": {
       "name": "capgo_api-local",
+      "triggers": {
+        "crons": ["* * * * *"]
+      },
       "ai": {
         "binding": "AI"
       },
       "vars": {
         "ENV_NAME": "capgo_api-local"
       },
-      "kv_namespaces": [{ "binding": "CHANNEL_SELF_STORE", "id": "00000000000000000000000000000001" }]
+      "kv_namespaces": [{ "binding": "CHANNEL_SELF_STORE", "id": "local-channel-self-store" }]
     }
   }
 }

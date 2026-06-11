@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { describe, expect, it, vi } from 'vitest'
 
 const { cloudlogMock } = vi.hoisted(() => ({
@@ -43,7 +44,40 @@ function createPluginPolicyContext() {
   })
 }
 
+interface WranglerConfig {
+  triggers?: { crons: string[] }
+  env: Record<string, {
+    triggers?: { crons: string[] }
+    kv_namespaces?: { binding: string, id: string }[]
+  }>
+}
+
+function readJsoncConfig(path: string) {
+  const raw = readFileSync(new URL(path, import.meta.url), 'utf8')
+  return JSON.parse(raw.replace(/^\s*\/\/.*$/gm, '')) as WranglerConfig
+}
+
+function getChannelSelfStoreId(config: WranglerConfig, envName: string) {
+  return config.env[envName]?.kv_namespaces?.find(namespace => namespace.binding === 'CHANNEL_SELF_STORE')?.id
+}
+
 describe('plugin Supabase write policy', () => {
+  it.concurrent('keeps notification queue cron owned by the API worker', () => {
+    const pluginWrangler = readJsoncConfig('../cloudflare_workers/plugin/wrangler.jsonc')
+    const apiWrangler = readJsoncConfig('../cloudflare_workers/api/wrangler.jsonc')
+
+    expect(pluginWrangler.triggers).toBeUndefined()
+    expect(Object.values(pluginWrangler.env).every(env => env.triggers === undefined)).toBe(true)
+
+    for (const envName of ['prod', 'preprod', 'alpha', 'local'])
+      expect(apiWrangler.env[envName]?.triggers).toEqual({ crons: ['* * * * *'] })
+
+    expect(getChannelSelfStoreId(apiWrangler, 'prod')).toBe(getChannelSelfStoreId(pluginWrangler, 'prod_eu'))
+    expect(getChannelSelfStoreId(apiWrangler, 'preprod')).toBe(getChannelSelfStoreId(pluginWrangler, 'preprod'))
+    expect(getChannelSelfStoreId(apiWrangler, 'alpha')).toBe(getChannelSelfStoreId(pluginWrangler, 'alpha'))
+    expect(getChannelSelfStoreId(apiWrangler, 'local')).toBe(getChannelSelfStoreId(pluginWrangler, 'local'))
+  })
+
   it.concurrent('fails closed instead of falling back from read replica to primary', async () => {
     const { getPgClient } = await import('../supabase/functions/_backend/utils/pg.ts')
 
@@ -124,7 +158,11 @@ describe('plugin Supabase write policy', () => {
   it.concurrent('does not fall back to DB notifications when plugin queue KV is missing', async () => {
     const { sendNotifOrgCached } = await import('../supabase/functions/_backend/utils/notifications.ts')
     const context = createContext({ queuePluginNotifications: true })
-    const drizzleClient = { insert: vi.fn(() => { throw new Error('normal notification path called') }) } as any
+    const drizzleClient = {
+      insert: vi.fn(() => {
+        throw new Error('normal notification path called')
+      }),
+    } as any
 
     await expect(sendNotifOrgCached(context, 'org:missing_payment', { app_id: 'com.test.app' }, 'org-1', 'com.test.app', '0 0 * * 1', 'owner@example.com', drizzleClient)).resolves.toBe(false)
 

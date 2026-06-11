@@ -10,15 +10,9 @@
   ],
   "workers_dev": false,
   "upload_source_maps": true,
-  "triggers": {
-    "crons": ["* * * * *"]
-  },
   "env": {
     "prod_eu": {
       "name": "capgo_plugin-eu-prod",
-      "triggers": {
-        "crons": ["* * * * *"]
-      },
       "vars": {
         "ENV_NAME": "capgo_plugin-eu-prod"
       },
@@ -932,9 +926,6 @@
     },
     "preprod": {
       "name": "capgo_plugin-eu-preprod",
-      "triggers": {
-        "crons": ["* * * * *"]
-      },
       "vars": {
         "ENV_NAME": "capgo_plugin-eu-preprod"
       },
@@ -1030,9 +1021,6 @@
     },
     "alpha": {
       "name": "capgo_plugin-alpha",
-      "triggers": {
-        "crons": ["* * * * *"]
-      },
       "vars": {
         "ENV_NAME": "capgo_plugin-alpha"
       },
@@ -1132,9 +1120,6 @@
     },
     "local": {
       "name": "capgo_plugin-local",
-      "triggers": {
-        "crons": ["* * * * *"]
-      },
       "vars": {
         "ENV_NAME": "capgo_plugin-local",
         "CAPGO_PREVENT_BACKGROUND_FUNCTIONS": "true"
