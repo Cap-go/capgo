@@ -52,7 +52,7 @@ Add these repository variables:
 - `BUILDER_ONBOARDING_TUI_R2_BUCKET`: R2 bucket name, for example
   `capgo-builder-html-e2e`.
 - `BUILDER_ONBOARDING_TUI_REPORTS_URL`: Access-protected custom-domain base URL,
-  for example `https://builder-onboarding-tui-preview.capgo.app`.
+  for example `https://buildertuipreview.capgo.app`.
 
 ## Cloudflare one-time setup
 
@@ -63,7 +63,7 @@ before Access protects it.
 
 ```bash
 export BUCKET=capgo-builder-html-e2e
-export REPORTS_HOST=builder-onboarding-tui-preview.capgo.app
+export REPORTS_HOST=buildertuipreview.capgo.app
 export EMAIL_DOMAIN=capgo.app
 export CLOUDFLARE_ACCOUNT_ID=...
 export CLOUDFLARE_ZONE_ID=...
