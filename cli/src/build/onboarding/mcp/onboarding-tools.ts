@@ -8,7 +8,7 @@ import type { CapgoSDK } from '../../../sdk.js'
 import type { OnboardingNextStepInput } from '../../../schemas/onboarding.js'
 import { isAppAlreadyExistsError } from '../../../init/app-conflict.js'
 import { onboardingNextStepSchema } from '../../../schemas/onboarding.js'
-import { findSavedKeySilent, getAppId, getConfig } from '../../../utils.js'
+import { findBuildCommandForProjectType, findProjectType, findSavedKeySilent, getAppId, getConfig, getPackageScripts } from '../../../utils.js'
 import { loadSavedCredentials, updateSavedCredentials } from '../../credentials.js'
 import { getPlatformDirFromCapacitorConfig } from '../../platform-paths.js'
 import type { AndroidEffectDeps } from '../android/flow.js'
@@ -16,6 +16,10 @@ import type { IosEffectDeps } from '../ios/flow.js'
 import { findAndroidApplicationIds } from '../android/gradle-parser.js'
 import { generateKeystore, listKeystoreAliases, sanitizeKeystoreAlias, tryUnlockPrivateKey } from '../android/keystore.js'
 import { fetchCapgoOAuthConfig } from '../android/oauth-config.js'
+import { createCiSecretEntries, detectCiSecretTargets, getCiSecretRepoLabelAsync, listExistingCiSecretKeysAsync, uploadCiSecretsAsync } from '../ci-secrets.js'
+import { defaultExportPath, exportCredentialsToEnv } from '../env-export.js'
+import { generateWorkflow } from '../workflow-generator.js'
+import { writeWorkflowFile } from '../workflow-writer.js'
 import { fetchUserInfo, refreshAccessToken, revokeToken, runOAuthFlow, startOAuthFlow } from '../android/oauth-google.js'
 
 import { OAUTH_SCOPES_FOR_ONBOARDING } from '../android/oauth-scopes.js'
@@ -23,7 +27,10 @@ import { createProject, createServiceAccountKey, enableService, ensureServiceAcc
 import { inviteServiceAccount } from '../android/play-api.js'
 import { deleteAndroidProgress, loadAndroidProgress, saveAndroidProgress } from '../android/progress.js'
 import { validateServiceAccountJson } from '../android/service-account-validation.js'
-import { createCertificate, createProfile, deleteProfile, ensureBundleId, generateJwt, listApps, listBundleIds, listDistributionCerts, revokeCertificate, verifyApiKey } from '../apple-api.js'
+import type { AscDistributionCert } from '../apple-api.js'
+import { classifyCertAvailability, computeCertSha1, createCertificate, createProfile, deleteProfile, ensureBundleId, findCertIdBySha1, generateJwt, listApps, listBundleIds, listDistributionCerts, listProfilesForCert, revokeCertificate, verifyApiKey } from '../apple-api.js'
+import { exportP12FromKeychain, isHelperCached, listSigningIdentities, precompileSwiftHelper, scanProvisioningProfiles } from '../macos-signing.js'
+import { parseMobileprovisionBufferDetailed } from '../../mobileprovision-parser.js'
 import { createP12, generateCsr } from '../csr.js'
 import { detectIosBundleIds } from '../bundle-id-detector.js'
 import { writeReleaseBundleId } from '../../pbxproj-parser.js'
@@ -155,6 +162,29 @@ function buildAndroidEffectDeps(
       await inviteServiceAccount(args)
     },
 
+
+    // ── S8: shared post-save tail helpers (mirrors the TUI driver wiring in
+    // ui/app.tsx ~L2498-2570 / android/ui/app.tsx — headless: no React sinks).
+    // createCiSecretEntries pre-binds the RESOLVED Capgo key (the MCP has no
+    // --apikey flag, so the saved key IS the whole precedence chain) so
+    // CAPGO_TOKEN reaches the upload + the generated workflow's secret set.
+    // The key value rides only the session-registry entries — NEVER tool
+    // results or progress.json. The MCP driver persists the SLIM tail progress
+    // + markers itself (engine S8); the tail's own saveProgress stays unused
+    // by runTailEffect (the never-saveProgress tail rule).
+    createCiSecretEntries: creds => createCiSecretEntries(creds, findSavedKeySilent() || undefined),
+    detectCiSecretTargets,
+    getCiSecretRepoLabelAsync,
+    listExistingCiSecretKeysAsync,
+    uploadCiSecretsAsync,
+    exportCredentialsToEnv,
+    defaultExportPath,
+    generateWorkflow,
+    writeWorkflowFile,
+    getPackageScripts,
+    findProjectType,
+    findBuildCommandForProjectType,
+
     // ── Android Gradle detection ──────────────────────────────────────────────
     findAndroidApplicationIds: async () => {
       let androidDir = 'android'
@@ -225,6 +255,37 @@ function buildIosEffectDeps(cwd: string, getAppIdFn: () => Promise<string | unde
     return generateJwt(prog.keyId, prog.issuerId, content)
   }
 
+  // S12: classifyCertAvailability pre-binds the single team-wide cert fetch +
+  // SHA-1 index (the TUI import driver's memo, ui/app.tsx ~L2192): one
+  // /certificates download, M SHA-1 hashes, then N O(1) lookups — NOT N
+  // re-downloads when import-validating-all-certs loops over the identities.
+  // SHORT-LIVED: the index expires after 5 minutes so a long-lived MCP server
+  // never classifies against a stale cert list (the TUI rebuilds it per
+  // effect-driver mount; a tool-call burst within one onboarding shares it).
+  let certIndexCache: { promise: Promise<Map<string, AscDistributionCert>>, builtAt: number } | null = null
+  function getCertIndex(): Promise<Map<string, AscDistributionCert>> {
+    if (!certIndexCache || Date.now() - certIndexCache.builtAt > 5 * 60_000) {
+      const promise = (async () => {
+        const token = await getFreshToken()
+        const allCerts = await listDistributionCerts(token, { includeContent: true })
+        const bySha1 = new Map<string, AscDistributionCert>()
+        for (const cert of allCerts) {
+          if (!cert.certificateContent)
+            continue
+          bySha1.set(computeCertSha1(cert.certificateContent), cert)
+        }
+        return bySha1
+      })()
+      // A failed build must not poison the cache — drop it so the next call retries.
+      promise.catch(() => {
+        if (certIndexCache?.promise === promise)
+          certIndexCache = null
+      })
+      certIndexCache = { promise, builtAt: Date.now() }
+    }
+    return certIndexCache.promise
+  }
+
   return {
     // ── apple-api (token-adapted, mirrors ui/app.tsx's engine-driver wiring) ──
     verifyApiKey: async () => {
@@ -273,6 +334,75 @@ function buildIosEffectDeps(cwd: string, getAppIdFn: () => Promise<string | unde
     readFile: (path: string) => readFile(path) as Promise<Buffer>,
     copyFile,
     isMacOS: () => process.platform === 'darwin',
+
+    // ── S12: import-existing sub-flow (macos-signing + apple-api, mirrors the
+    // TUI's engine-driven import driver in ui/app.tsx ~L2215-2280). Wiring
+    // listSigningIdentities + isMacOS is ALSO what exposes the setup-method
+    // fork (engine iosSetupForkStep: capability = macOS AND the scan dep).
+    // HEADLESS adaptations: openProfilePicker is NOT wired — decideIos injects
+    // a one-shot picker resolving the user-supplied profilePath (the manual
+    // arm); openExternal stays a no-op (the portal URL rides the result
+    // context instead of a browser open).
+    listSigningIdentities,
+    scanProvisioningProfiles,
+    exportP12FromKeychain,
+    precompileSwiftHelper: async () => {
+      await precompileSwiftHelper()
+    },
+    isHelperCached,
+    // classifyCertAvailability resolves the identity's cert from the memoized
+    // SHA-1 index, then enriches via the apple-api classifier — byte-for-byte
+    // the TUI driver's wiring (ui/app.tsx ~L2229-2249).
+    classifyCertAvailability: async (identity) => {
+      const bySha1 = await getCertIndex()
+      const cert = bySha1.get(identity.sha1.toLowerCase()) ?? null
+      const classified = classifyCertAvailability({
+        appleCertId: cert ? cert.id : null,
+        lookupError: null,
+      })
+      return {
+        available: classified.available,
+        reason: classified.reason,
+        reasonText: classified.reasonText,
+        appleCertId: classified.appleCertId,
+        ...(cert && classified.available
+          ? {
+              appleCertName: cert.name,
+              appleCertExpirationDate: cert.expirationDate,
+              appleCertSerialNumber: cert.serialNumber,
+            }
+          : {}),
+      }
+    },
+    listProfilesForCert: async certId => listProfilesForCert(await getFreshToken(), certId),
+    findCertIdBySha1: async sha1 => findCertIdBySha1(await getFreshToken(), sha1),
+    // The engine reads the .mobileprovision bytes via deps.readFile then parses
+    // them here — wire the BUFFER variant (the path-based parser re-reads the
+    // file, which the engine already did at its IO boundary).
+    parseMobileprovisionDetailed: bytes => parseMobileprovisionBufferDetailed(bytes),
+
+
+    // ── S8: shared post-save tail helpers (mirrors the TUI driver wiring in
+    // ui/app.tsx ~L2498-2570 / android/ui/app.tsx — headless: no React sinks).
+    // createCiSecretEntries pre-binds the RESOLVED Capgo key (the MCP has no
+    // --apikey flag, so the saved key IS the whole precedence chain) so
+    // CAPGO_TOKEN reaches the upload + the generated workflow's secret set.
+    // The key value rides only the session-registry entries — NEVER tool
+    // results or progress.json. The MCP driver persists the SLIM tail progress
+    // + markers itself (engine S8); the tail's own saveProgress stays unused
+    // by runTailEffect (the never-saveProgress tail rule).
+    createCiSecretEntries: creds => createCiSecretEntries(creds, findSavedKeySilent() || undefined),
+    detectCiSecretTargets,
+    getCiSecretRepoLabelAsync,
+    listExistingCiSecretKeysAsync,
+    uploadCiSecretsAsync,
+    exportCredentialsToEnv,
+    defaultExportPath,
+    generateWorkflow,
+    writeWorkflowFile,
+    getPackageScripts,
+    findProjectType,
+    findBuildCommandForProjectType,
 
     // ── persistence (the shared tail's saving-credentials needs all of these) ──
     loadProgress,

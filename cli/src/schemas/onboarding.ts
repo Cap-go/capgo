@@ -31,6 +31,29 @@ export const onboardingNextStepSchema = z.object({
   certToRevoke: z.string().optional().describe('Answer to the iOS cert-limit-prompt: the Apple resource id of the Distribution certificate to revoke (frees a slot so a new one can be created), or "__exit__" to stop'),
   duplicateProfileAction: z.enum(['delete', 'exit']).optional().describe('Answer to the iOS duplicate-profile-prompt: "delete" removes the duplicate Capgo provisioning profile(s) and recreates a fresh one, "exit" stops onboarding'),
   errorAction: z.enum(['retry', 'restart', 'exit', 'email-support']).optional().describe('Answer to the iOS error recovery screen: "retry" re-runs the failing step, "restart" wipes onboarding progress and starts over, "exit" stops here, "email-support" returns instructions for contacting Capgo support'),
+  // ── Post-build tail (CI secrets / GitHub Actions / .env export / workflow) ──
+  // One field per step FAMILY; the engine's strict tail gate enforces the
+  // per-step vocabulary (e.g. ciSecretAction "confirm"/"cancel" only at
+  // confirm-secrets-push) and one-answer-per-call.
+  ciSecretAction: z.enum(['github', 'gitlab', 'skip', 'yes', 'no', 'replace', 'retry', 'continue', 'confirm', 'cancel']).optional().describe('Answer to the post-build CI-secrets steps — the allowed values per step: ci-secrets-target-select "github"/"gitlab"/"skip"; ask-ci-secrets "yes"/"no"; confirm-ci-secret-overwrite "replace"/"skip"; confirm-secrets-push "confirm"/"cancel"; ci-secrets-setup "retry"/"skip"; ci-secrets-failed "retry"/"continue"'),
+  githubActionsSetup: z.enum(['with-workflow', 'secrets-only', 'no']).optional().describe('Answer to ask-github-actions-setup: "with-workflow" pushes the secrets AND writes a workflow file, "secrets-only" pushes only the secrets, "no" declines (offers a local .env export instead)'),
+  exportEnvAction: z.enum(['yes', 'no', 'replace', 'skip']).optional().describe('Answer to the .env export steps: ask-export-env "yes" (optionally with envExportPath)/"no"; confirm-env-export-overwrite "replace"/"skip"'),
+  envExportPath: z.string().optional().describe('Custom target path for the exported .env file — only together with exportEnvAction "yes" (defaults to the path shown in the prompt)'),
+  packageManager: z.enum(['bun', 'npm', 'pnpm', 'yarn']).optional().describe('Answer to pick-package-manager: the package manager the generated workflow should install with'),
+  buildScript: z.string().optional().describe('Answer to pick-build-script: a script name from the listed options, "__custom__" to type a custom command, or "__skip__" when the app needs no build step'),
+  buildScriptCustom: z.string().optional().describe('Answer to pick-build-script-custom: the exact custom command the workflow runs to build the web assets (e.g. "make web")'),
+  workflowFileAction: z.enum(['write', 'view', 'cancel']).optional().describe('Answer to preview-workflow-file: "write" writes the workflow file, "view" returns the proposed file content (and re-asks), "cancel" skips writing it'),
+  // ── iOS import-existing fork (S12: setup-method-select + the import sub-flow) ──
+  // One field per step; the engine's strict iOS gate enforces the per-step
+  // vocabulary and one-answer-per-call against the parked/resume step.
+  setupMethod: z.enum(['create-new', 'import-existing']).optional().describe('Answer to the iOS setup-method-select fork: "create-new" mints a fresh certificate + profile via the App Store Connect API; "import-existing" reuses a distribution certificate + provisioning profile already on this Mac (Keychain + Xcode profiles, macOS only)'),
+  importDistribution: z.enum(['app_store', 'ad_hoc', '__cancel__']).optional().describe('Answer to iOS import-distribution-mode: "app_store" (TestFlight upload, needs an ASC API key), "ad_hoc" (direct/QR install, no ASC key), or "__cancel__" to switch to the create-new path'),
+  identityChoice: z.string().optional().describe('Answer to iOS import-pick-identity: the chosen signing identity\'s SHA-1 (one of the listed option values), or "__cancel__" to switch to creating a fresh certificate'),
+  profileChoice: z.string().optional().describe('Answer to iOS import-pick-profile: the chosen provisioning profile\'s UUID (one of the listed option values), or "__back__" to return to identity selection'),
+  importRecoveryAction: z.enum(['create', 'provide-profile-path', 'browser', 'back']).optional().describe('Answer to iOS import-no-match-recovery: "create" makes a fresh App Store profile for the chosen certificate via Apple, "provide-profile-path" supplies a .mobileprovision file path, "browser" explains the manual Apple Developer Portal route, "back" returns to identity selection'),
+  portalAction: z.enum(['use-create', 'open-anyway', 'use-file', 'back']).optional().describe('Answer to iOS import-portal-explanation: "use-create" creates the profile automatically (recommended), "use-file" provides a downloaded .mobileprovision path, "open-anyway"/"back" return to the recovery menu (the portal URL is in the result context — the server never opens a browser)'),
+  profilePath: z.string().optional().describe('Absolute path to a .mobileprovision file — answers iOS import-provide-profile-path, when asked'),
+  exportConfirm: z.enum(['go', 'back', 'exit']).optional().describe('Answer to iOS import-export-warning: "go" exports the certificate from the macOS Keychain now (the user must approve the one Keychain permission dialog — tell them to click "Always Allow"), "back" returns to profile selection, "exit" stops onboarding'),
 })
 
 export type OnboardingNextStepInput = z.infer<typeof onboardingNextStepSchema>

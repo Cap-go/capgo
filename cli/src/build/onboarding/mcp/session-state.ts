@@ -39,17 +39,60 @@
 //    previously captured snapshot (a getSession() return) is never mutated.
 //    Read fresh via getSession() after any merge.
 
+import type { CiSecretSetupAdvice, CiSecretTarget } from '../ci-secrets.js'
 import type { IosEffectDeps } from '../ios/flow.js'
 import type { TailEffectDeps } from '../tail/flow.js'
+import type { OnboardingStep } from '../types.js'
 
-/** The iOS driver-held transient state — the exact `IosEffectDeps['carried']` shape. */
-export type IosCarried = NonNullable<IosEffectDeps['carried']>
+/**
+ * The iOS driver-held transient state — the exact `IosEffectDeps['carried']`
+ * shape, plus the MCP-only `parkedImportStep` (S12): the interactive import
+ * sub-flow prompt the driver parked between tool calls — the headless mirror
+ * of the TUI's React `step` state for the EPHEMERAL import prompts, which
+ * resume routing can never reproduce (see engine.ts iosParkedStep). NON-SECRET
+ * (a step name). Wiped with the session; a restart self-heals via a fresh
+ * import-scanning that re-derives the inventory and re-renders the picker.
+ */
+export type IosCarried = NonNullable<IosEffectDeps['carried']> & {
+  parkedImportStep?: OnboardingStep
+  /**
+   * The chosen identity's Apple cert resource id (import-checking-apple-cert's
+   * transient — typed on IosStepCtx, not on the engine's carried shape). The
+   * registry really holds it after the transient merge; typing it here lets
+   * the driver DROP it when the user re-picks a different identity (the TUI
+   * clears its appleCertId mirror the same way). NON-SECRET (an Apple id).
+   */
+  _appleCertIdForChosen?: string
+}
 /** The tail driver-held transient state — the exact `TailEffectDeps['carried']` shape. */
 export type TailCarried = NonNullable<TailEffectDeps['carried']>
+
+/**
+ * S9-S11: the MCP's parked interactive TAIL step + the NON-SECRET view context
+ * it was rendered with (option inventories / labels — never credential values).
+ * The TUI holds the current tail step in React state; the MCP mirrors it here so
+ * (a) the strict tail gate validates an answer against the step that actually
+ * asked, and (b) a re-render (corrective message, plain re-check) re-asks the
+ * SAME parked question instead of drifting forward through the resume router —
+ * which would collapse past consent gates like preview-workflow-file. A server
+ * restart loses the park; resume routing then takes over (the frozen
+ * tailResumeStep contract). EXPLICITLY NO SECRETS: ciSecretEntries (values)
+ * stay in tailCarried; only derived key NAMES may surface in tool results.
+ */
+export interface TailParkedState {
+  step: string
+  ciSecretTargets?: CiSecretTarget[]
+  ciSecretSetupAdvice?: CiSecretSetupAdvice[]
+  ciSecretRepoLabel?: string | null
+  ciSecretError?: string
+  availableScripts?: Record<string, string>
+  recommendedScript?: string | null
+}
 
 export interface OnboardingSessionState {
   iosCarried: IosCarried
   tailCarried: TailCarried
+  tailParked?: TailParkedState
 }
 
 const registry = new Map<string, OnboardingSessionState>()
@@ -103,6 +146,29 @@ export function mergeTailCarried(appId: string, partial: Partial<TailCarried>): 
   const tailCarried = mergeDefined(session.tailCarried, partial)
   registry.set(appId, { ...session, tailCarried })
   return tailCarried
+}
+
+/**
+ * Park the current interactive tail step (+ its non-secret view context) for
+ * `appId`. REPLACES any prior park — each render re-parks the step it shows,
+ * so the park always mirrors the question currently in front of the user.
+ * Immutable: builds a NEW session entry; prior snapshots are untouched.
+ */
+export function setTailParked(appId: string, parked: TailParkedState): void {
+  const session = getSession(appId)
+  registry.set(appId, { ...session, tailParked: parked })
+}
+
+/**
+ * Drop the tail park for `appId` (one-shot consume: the driver clears it when
+ * the parked step's answer is applied, before re-driving). Idempotent.
+ */
+export function clearTailParked(appId: string): void {
+  const session = registry.get(appId)
+  if (!session || session.tailParked === undefined)
+    return
+  const { tailParked: _dropped, ...rest } = session
+  registry.set(appId, rest)
 }
 
 /**

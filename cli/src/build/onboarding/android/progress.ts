@@ -244,22 +244,27 @@ export function getAndroidResumeStep(progress: AndroidOnboardingProgress | null)
   if (progress._credentialsExistGate === 'backup')
     return 'backing-up'
 
-  // Phase 1 — Keystore: marker + 3 ephemeral fields
-  if (!keystoreFullyValid(progress))
-    return keystoreResumeStep(progress)
-
-  // Phase 6 — Post-save "tail" (shared with iOS). `credentialsSaved` is the
-  // unambiguous "save already happened" marker: it means the whole provisioning
-  // sequence (OAuth or imported-SA) finished and credentials.json was written,
-  // so we route THROUGH the tail (build-request → CI-secrets → env/workflow)
-  // instead of past the service-account fork below. Checking it here — before
-  // the fork — keeps both the OAuth and import paths converging on one tail
-  // router. When the marker is absent (every legacy/in-flight progress file),
-  // `tailResumeStep` returns null and we fall through to the unchanged
-  // provisioning routing below.
+  // Phase 6 — Post-save "tail" (shared with iOS), checked BEFORE the keystore
+  // phase. `credentialsSaved` is the unambiguous "save already happened"
+  // marker: it means the whole provisioning sequence (OAuth or imported-SA)
+  // finished and credentials.json was written, so we route THROUGH the tail
+  // (build-request → CI-secrets → env/workflow). The MCP driver's post-save
+  // progress is SLIM (markers + non-secret tail prefs ONLY — no keystore
+  // fields; see mcp/tail-progress.ts), so the keystore validation below would
+  // misroute it back to keystore-method-select (and re-trigger the
+  // credentials-exist gate against the credentials the save itself just
+  // wrote). Routing the marker first keeps the OAuth, import AND slim-MCP
+  // paths converging on one tail router. When the marker is absent (every
+  // legacy/in-flight progress file — the Ink TUI never persists post-save),
+  // `tailResumeStep` returns null and the routing below is byte-for-byte
+  // unchanged.
   const tailStep = tailResumeStep(progress)
   if (tailStep)
     return tailStep
+
+  // Phase 1 — Keystore: marker + 3 ephemeral fields
+  if (!keystoreFullyValid(progress))
+    return keystoreResumeStep(progress)
 
   // Phase 2 — Service-account fork. Routes onto the import path or the OAuth
   // path. Legacy progress files don't have `serviceAccountMethod` — treat

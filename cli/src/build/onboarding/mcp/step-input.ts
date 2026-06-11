@@ -48,6 +48,23 @@ export const STEP_ALLOWED_FIELDS: Partial<Record<AndroidOnboardingStep, string[]
   'gcp-projects-select': ['gcpProjectId', 'gcpProjectName'],
   'gcp-project-create-name': ['gcpProjectName'],
   'android-package-select': ['androidPackage'],
+  // ── Post-build tail steps (S9-S11) ─────────────────────────────────────────
+  // Listed here so an ANDROID key sent while the user is parked on a tail step
+  // is rejected with the tail field named (the tail fields themselves are
+  // governed by validateTailStepInput, which owns the per-step vocabulary).
+  'ci-secrets-setup': ['ciSecretAction'],
+  'ci-secrets-target-select': ['ciSecretAction'],
+  'ask-ci-secrets': ['ciSecretAction'],
+  'confirm-ci-secret-overwrite': ['ciSecretAction'],
+  'confirm-secrets-push': ['ciSecretAction'],
+  'ci-secrets-failed': ['ciSecretAction'],
+  'ask-github-actions-setup': ['githubActionsSetup'],
+  'ask-export-env': ['exportEnvAction'],
+  'confirm-env-export-overwrite': ['exportEnvAction'],
+  'pick-package-manager': ['packageManager'],
+  'pick-build-script': ['buildScript'],
+  'pick-build-script-custom': ['buildScriptCustom'],
+  'preview-workflow-file': ['workflowFileAction'],
 }
 
 /** The set of all android input keys we govern (for the extras check). */
@@ -164,8 +181,28 @@ const IOS_RECOVERY_FIELD_STEPS: Record<string, OnboardingStep> = {
 }
 const IOS_RECOVERY_FIELDS = Object.keys(IOS_RECOVERY_FIELD_STEPS)
 
+/**
+ * The S12 import-fork vocabulary: each field answers EXACTLY ONE step of the
+ * iOS import-existing sub-flow — the setup-method fork + the persisted
+ * distribution fork (resume-derivable) and the session-parked EPHEMERAL import
+ * prompts (engine.ts parkedImportStep). Like the recovery fields, an import
+ * field sent anywhere else is a stale/early answer and is rejected so it can
+ * never be silently merged into the session and replayed later.
+ */
+const IOS_IMPORT_FIELD_STEPS: Record<string, OnboardingStep> = {
+  setupMethod: 'setup-method-select',
+  importDistribution: 'import-distribution-mode',
+  identityChoice: 'import-pick-identity',
+  profileChoice: 'import-pick-profile',
+  importRecoveryAction: 'import-no-match-recovery',
+  portalAction: 'import-portal-explanation',
+  profilePath: 'import-provide-profile-path',
+  exportConfirm: 'import-export-warning',
+}
+const IOS_IMPORT_FIELDS = Object.keys(IOS_IMPORT_FIELD_STEPS)
+
 /** The set of all iOS input keys the MCP governs (for the extras check). */
-export const IOS_INPUT_KEYS: string[] = [...IOS_TRIO_FIELDS, ...IOS_VERIFY_FIELDS, ...IOS_RECOVERY_FIELDS]
+export const IOS_INPUT_KEYS: string[] = [...IOS_TRIO_FIELDS, ...IOS_VERIFY_FIELDS, ...IOS_RECOVERY_FIELDS, ...IOS_IMPORT_FIELDS]
 
 /** Steps that accept the ASC API key trio (the single ios-api-key gate + the re-collect gate). */
 const IOS_TRIO_STEPS = new Set<OnboardingStep>([
@@ -215,11 +252,12 @@ export function validateIosStepInput(
   const trio = present.filter(k => IOS_TRIO_FIELDS.includes(k))
   const verify = present.filter(k => IOS_VERIFY_FIELDS.includes(k))
   const recovery = present.filter(k => IOS_RECOVERY_FIELDS.includes(k))
+  const importPicks = present.filter(k => IOS_IMPORT_FIELDS.includes(k))
 
   // ── Recovery vocabulary (S6b) ──────────────────────────────────────────────
   if (recovery.length > 0) {
     // Never mix a recovery answer with anything else (one answer per call).
-    if (recovery.length > 1 || trio.length > 0 || verify.length > 0) {
+    if (recovery.length > 1 || trio.length > 0 || verify.length > 0 || importPicks.length > 0) {
       const keep = recovery[0]
       const remove = present.filter(k => k !== keep)
       return {
@@ -229,6 +267,29 @@ export function validateIosStepInput(
     }
     const field = recovery[0]
     const target = IOS_RECOVERY_FIELD_STEPS[field]
+    if (currentStep !== target) {
+      return {
+        ok: false,
+        message: `${field} answers only the ${target} step, which is not the current step. Answer the current step instead.`,
+      }
+    }
+    return { ok: true }
+  }
+
+  // ── Import-fork vocabulary (S12) ───────────────────────────────────────────
+  // One import answer per call, never mixed with the trio / verify-app
+  // vocabularies, and only at the exact step the field answers.
+  if (importPicks.length > 0) {
+    if (importPicks.length > 1 || trio.length > 0 || verify.length > 0) {
+      const keep = importPicks[0]
+      const remove = present.filter(k => k !== keep)
+      return {
+        ok: false,
+        message: `Send ONE answer per call: a single import-flow answer ({ ${IOS_IMPORT_FIELDS.join(' } / { ')} }) must not be mixed with other iOS fields. Remove: ${remove.join(', ')}.`,
+      }
+    }
+    const field = importPicks[0]
+    const target = IOS_IMPORT_FIELD_STEPS[field]
     if (currentStep !== target) {
       return {
         ok: false,
@@ -275,5 +336,135 @@ export function validateIosStepInput(
       message: `The current step (${currentStep}) does not take App Store Connect key fields. Answer the current step instead.`,
     }
   }
+  return { ok: true }
+}
+
+// ─── Tail strict step-input gate (S9-S11 — the post-build CI/workflow steps) ──
+//
+// Mirrors the android/iOS gates for the tail answer fields. One field per step
+// FAMILY (ciSecretAction covers the six CI-secret choice steps; exportEnvAction
+// covers the two .env steps; the rest are 1:1) — the gate enforces:
+//
+//   - one answer per call (exactly one tail family field; envExportPath is the
+//     only companion, valid solely with exportEnvAction 'yes');
+//   - off-step rejection (the field must answer the CURRENT parked/resume step);
+//   - the per-step value vocabulary, copied from tail/flow.ts's TailInput +
+//     option tables (e.g. confirm-secrets-push takes 'confirm'|'cancel' ONLY);
+//   - dynamic vocabularies where the TUI options are inventory-derived:
+//     ci-secrets-target-select accepts the DETECTED providers (+ 'skip'),
+//     pick-build-script accepts the surfaced script names (+ escapes) — both
+//     degrade to the static vocabulary when the park was lost (restart).
+
+/** The tail family answer fields (one per step family; envExportPath is the ask-export-env companion). */
+export const TAIL_FAMILY_FIELDS = ['ciSecretAction', 'githubActionsSetup', 'exportEnvAction', 'packageManager', 'buildScript', 'buildScriptCustom', 'workflowFileAction'] as const
+
+/** Every tail input key the MCP governs (for presence/extras checks). */
+export const TAIL_INPUT_KEYS: string[] = [...TAIL_FAMILY_FIELDS, 'envExportPath']
+
+/** step → the single tail family field that answers it. */
+const TAIL_STEP_FIELD: Record<string, string> = {
+  'ci-secrets-setup': 'ciSecretAction',
+  'ci-secrets-target-select': 'ciSecretAction',
+  'ask-ci-secrets': 'ciSecretAction',
+  'confirm-ci-secret-overwrite': 'ciSecretAction',
+  'confirm-secrets-push': 'ciSecretAction',
+  'ci-secrets-failed': 'ciSecretAction',
+  'ask-github-actions-setup': 'githubActionsSetup',
+  'ask-export-env': 'exportEnvAction',
+  'confirm-env-export-overwrite': 'exportEnvAction',
+  'pick-package-manager': 'packageManager',
+  'pick-build-script': 'buildScript',
+  'pick-build-script-custom': 'buildScriptCustom',
+  'preview-workflow-file': 'workflowFileAction',
+}
+
+/** step → the static value vocabulary (tail/flow.ts option tables, verbatim). */
+const TAIL_STEP_VALUES: Record<string, string[]> = {
+  'ci-secrets-setup': ['retry', 'skip'],
+  'ask-ci-secrets': ['yes', 'no'],
+  'confirm-ci-secret-overwrite': ['replace', 'skip'],
+  'confirm-secrets-push': ['confirm', 'cancel'],
+  'ci-secrets-failed': ['retry', 'continue'],
+  'ask-github-actions-setup': ['with-workflow', 'secrets-only', 'no'],
+  'ask-export-env': ['yes', 'no'],
+  'confirm-env-export-overwrite': ['replace', 'skip'],
+  'pick-package-manager': ['bun', 'npm', 'pnpm', 'yarn'],
+  'preview-workflow-file': ['write', 'view', 'cancel'],
+}
+
+/**
+ * Validate an incoming tail next_step input against the step it answers.
+ *
+ * @param currentStep the EFFECTIVE tail step (the session-parked step when one
+ *   is parked, else the platform resume step — see engine.ts)
+ * @param input the next_step input object
+ * @param ctx optional parked inventories for the dynamic vocabularies
+ */
+export function validateTailStepInput(
+  currentStep: string,
+  input: Record<string, unknown>,
+  ctx?: { ciSecretTargets?: { provider: string }[], availableScripts?: Record<string, string> },
+): { ok: boolean, message?: string } {
+  const present = TAIL_FAMILY_FIELDS.filter(k => input[k] !== undefined && input[k] !== null)
+  if (present.length === 0) {
+    // envExportPath alone is never an answer.
+    if (input.envExportPath !== undefined && input.envExportPath !== null)
+      return { ok: false, message: 'envExportPath is only valid together with exportEnvAction: "yes". Call next_step with exportEnvAction (and envExportPath only when exporting).' }
+    return { ok: true }
+  }
+
+  // One answer per call — never two tail family fields, never mixed with the
+  // android/iOS vocabularies.
+  if (present.length > 1)
+    return { ok: false, message: `Send ONE answer per call — this step expects { ${TAIL_STEP_FIELD[currentStep] ?? present[0]}: ... }. Remove: ${present.filter(k => k !== (TAIL_STEP_FIELD[currentStep] ?? present[0])).join(', ')}.` }
+  const foreign = [...ANDROID_INPUT_KEYS, ...IOS_INPUT_KEYS].filter(k => input[k] !== undefined && input[k] !== null)
+  if (foreign.length > 0)
+    return { ok: false, message: `Send ONE answer per call: a tail answer ({ ${present[0]}: ... }) must not be mixed with other onboarding fields — remove: ${foreign.join(', ')}.` }
+
+  const field = present[0]
+  const expected = TAIL_STEP_FIELD[currentStep]
+  if (!expected)
+    return { ok: false, message: `${field} answers a post-build CI/workflow step; the current step (${currentStep}) takes none of those fields. Answer the current step instead.` }
+  if (field !== expected)
+    return { ok: false, message: `${field} does not answer the current step (${currentStep}) — it expects { ${expected}: ... }.` }
+
+  const value = String(input[field])
+
+  // envExportPath companion rule.
+  const pathPresent = input.envExportPath !== undefined && input.envExportPath !== null
+  if (pathPresent && !(currentStep === 'ask-export-env' && value === 'yes'))
+    return { ok: false, message: 'envExportPath is only valid together with exportEnvAction: "yes" at the ask-export-env step — remove envExportPath.' }
+
+  // Dynamic vocabulary: the detected CI targets (+ skip).
+  if (currentStep === 'ci-secrets-target-select') {
+    const providers = (ctx?.ciSecretTargets ?? []).map(t => t.provider)
+    const allowed = [...(providers.length > 0 ? providers : ['github', 'gitlab']), 'skip']
+    if (!allowed.includes(value))
+      return { ok: false, message: `ciSecretAction must be one of: ${allowed.join(', ')} (the detected destinations, or "skip").` }
+    return { ok: true }
+  }
+
+  // Dynamic vocabulary: the surfaced package.json scripts (+ escapes).
+  if (currentStep === 'pick-build-script') {
+    if (value === '__custom__' || value === '__skip__')
+      return { ok: true }
+    if (value.trim().length === 0)
+      return { ok: false, message: 'buildScript must be a script name from the options, "__custom__", or "__skip__".' }
+    const scripts = ctx?.availableScripts
+    if (scripts && !Object.hasOwn(scripts, value))
+      return { ok: false, message: `buildScript "${value}" is not one of this project's scripts (${Object.keys(scripts).join(', ') || 'none found'}) — pick a listed option, "__custom__", or "__skip__".` }
+    return { ok: true }
+  }
+
+  // Free-text custom build command: non-empty after trim.
+  if (currentStep === 'pick-build-script-custom') {
+    if (value.trim().length === 0)
+      return { ok: false, message: 'buildScriptCustom must be a non-empty build command (e.g. "make web").' }
+    return { ok: true }
+  }
+
+  const vocabulary = TAIL_STEP_VALUES[currentStep]
+  if (vocabulary && !vocabulary.includes(value))
+    return { ok: false, message: `${field} must be one of: ${vocabulary.join(', ')} at the ${currentStep} step.` }
   return { ok: true }
 }

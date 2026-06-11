@@ -3,9 +3,10 @@ import type { AndroidOnboardingProgress, AndroidOnboardingStep } from '../androi
 import type { AndroidEffectDeps, AndroidStepCtx } from '../android/flow.js'
 import type { IosEffectDeps, IosStepCtx, IosStepView } from '../ios/flow.js'
 import type { OnboardingProgress, OnboardingStep } from '../types.js'
-import type { NextStepResult, Platform } from './contract.js'
-import type { IosCarried } from './session-state.js'
+import type { ChoiceOption, NextStepResult, Platform } from './contract.js'
+import type { IosCarried, TailParkedState } from './session-state.js'
 import type { BuildOutputRecord } from '../../output-record.js'
+import type { TailEffectProgress, TailStep, TailStepCtx } from '../tail/flow.js'
 import { buildAppIdConflictSuggestions } from '../../../init/app-conflict.js'
 import { ONBOARDING_RULES } from './contract.js'
 import { explainForState } from './explanations.js'
@@ -14,10 +15,12 @@ import { ANDROID_STEP_PROGRESS } from '../android/types.js'
 import { STEP_PROGRESS } from '../types.js'
 import { getAndroidResumeStep } from '../android/progress.js'
 import { getIosResumeStep } from '../ios/progress.js'
-import { validateIosStepInput, validateStepInput, validateStorePassword } from './step-input.js'
+import { TAIL_INPUT_KEYS, validateIosStepInput, validateStepInput, validateStorePassword, validateTailStepInput } from './step-input.js'
 import { androidViewForStep, applyAndroidInput, applyGoogleSignIn, runAndroidEffect } from '../android/flow.js'
 import { applyIosInput, iosViewForStep, runIosEffect } from '../ios/flow.js'
-import { clearSession, dropIosCarried, getSession, mergeIosCarried } from './session-state.js'
+import { applyTailInput, tailViewForStep } from '../tail/flow.js'
+import { clearSession, dropIosCarried, getSession, mergeIosCarried, mergeTailCarried, setTailParked } from './session-state.js'
+import { slimAndroidTailProgress, slimIosTailProgress } from './tail-progress.js'
 import { beginOAuthSession, clearOAuthSession, pollOAuthSession } from './oauth-session.js'
 import { SUPPORT_EMAIL } from '../../../support/contact-support.js'
 
@@ -84,6 +87,44 @@ interface OnboardingInput {
    * (MCP-only arm — no host-side opens).
    */
   errorAction?: 'retry' | 'restart' | 'exit' | 'email-support'
+  // ── Post-build tail answers (S9-S11) — one field per step family ───────────
+  // The per-step value vocabulary + one-answer-per-call is enforced by the
+  // strict tail gate (validateTailStepInput) against the parked/resume step.
+  /** Answer to the CI-secrets choice steps (target-select / ask / overwrite / push-confirm / setup / failed). */
+  ciSecretAction?: 'github' | 'gitlab' | 'skip' | 'yes' | 'no' | 'replace' | 'retry' | 'continue' | 'confirm' | 'cancel'
+  /** Answer to ask-github-actions-setup ('no' maps to the persisted setupMode 'declined'). */
+  githubActionsSetup?: 'with-workflow' | 'secrets-only' | 'no'
+  /** Answer to ask-export-env (yes/no) and confirm-env-export-overwrite (replace/skip). */
+  exportEnvAction?: 'yes' | 'no' | 'replace' | 'skip'
+  /** Custom .env target path — only together with exportEnvAction 'yes'. */
+  envExportPath?: string
+  /** Answer to pick-package-manager. */
+  packageManager?: 'bun' | 'npm' | 'pnpm' | 'yarn'
+  /** Answer to pick-build-script: a script name, '__custom__', or '__skip__'. */
+  buildScript?: string
+  /** Answer to pick-build-script-custom: the exact custom build command. */
+  buildScriptCustom?: string
+  /** Answer to preview-workflow-file: write / view (returns the file text, re-asks) / cancel. */
+  workflowFileAction?: 'write' | 'view' | 'cancel'
+  // ── iOS import-existing fork answers (S12) — one field per step ─────────────
+  // The per-step vocabulary + one-answer-per-call is enforced by the strict iOS
+  // gate (validateIosStepInput) against the effective (parked/resume) step.
+  /** Answer to the iOS setup-method fork: create fresh credentials via Apple, or import from this Mac's Keychain. */
+  setupMethod?: 'create-new' | 'import-existing'
+  /** Answer to import-distribution-mode ('__cancel__' switches to the create-new path). */
+  importDistribution?: 'app_store' | 'ad_hoc' | '__cancel__'
+  /** Answer to import-pick-identity: the chosen identity's SHA-1 (an option value), or '__cancel__' for create-new. */
+  identityChoice?: string
+  /** Answer to import-pick-profile: the chosen profile's UUID (an option value), or '__back__' to re-pick the identity. */
+  profileChoice?: string
+  /** Answer to the import-no-match-recovery hub. */
+  importRecoveryAction?: 'create' | 'provide-profile-path' | 'browser' | 'back'
+  /** Answer to import-portal-explanation (the manual Apple-portal walkthrough). */
+  portalAction?: 'use-create' | 'open-anyway' | 'use-file' | 'back'
+  /** Absolute path to a .mobileprovision file — answers import-provide-profile-path (the MCP's manual-path arm of the TUI's native picker). */
+  profilePath?: string
+  /** Answer to import-export-warning: 'go' exports from the Keychain (the one macOS permission dialog), 'back' re-picks the profile, 'exit' stops. */
+  exportConfirm?: 'go' | 'back' | 'exit'
 }
 
 // decideStart
@@ -159,11 +200,18 @@ export async function decideStart(
 
 /** Which platform's credential flow is already in progress (if any). */
 function activePlatform(facts: PreflightFacts): Platform | null {
+  // completedSteps.credentialsSaved: the S8 SLIM tail progress (markers +
+  // non-secret prefs only) carries none of the credential-phase fields, so the
+  // marker itself is what keeps the post-save tail resumable — a plain
+  // next_step({}) after the save must NOT bounce to platform-select.
   const a = facts.androidProgress
-  if (a && (a.activePlatform === 'android' || Boolean(a.completedSteps?.keystoreReady) || Boolean(a.serviceAccountForkSeen)))
+  if (a && (a.activePlatform === 'android' || Boolean(a.completedSteps?.keystoreReady) || Boolean(a.serviceAccountForkSeen) || Boolean(a.completedSteps?.credentialsSaved)))
     return 'android'
   const i = facts.iosProgress
-  if (i && (Boolean(i.keyId) || Boolean(i.p8Path) || Boolean(i.completedSteps?.apiKeyVerified)))
+  // setupMethod: the S12 import fork persists it as the FIRST iOS write (before
+  // any .p8 field exists), so a fork-only progress must already count as an
+  // in-flight iOS flow — a follow-up next_step({}) may not bounce to platform-select.
+  if (i && (Boolean(i.setupMethod) || Boolean(i.keyId) || Boolean(i.p8Path) || Boolean(i.completedSteps?.apiKeyVerified) || Boolean(i.completedSteps?.credentialsSaved)))
     return 'ios'
   return null
 }
@@ -279,6 +327,103 @@ function iosApiKeyGateResult(facts: PreflightFacts): NextStepResult {
       with: { keyId: '<keyId>', issuerId: '<issuerId>', p8Path: '<path>' },
       instruction: 'Collect all three from the user, then call next_step with keyId, issuerId, and p8Path.',
       call: `${NEXT_STEP_TOOL}({ keyId: "ABC123", issuerId: "1a2b-...", p8Path: "/path/to/AuthKey.p8" })`,
+    },
+    rules: ONBOARDING_RULES,
+  }
+}
+
+// ─── iOS import-existing fork (S12) ─────────────────────────────────────────────
+//
+// The TUI's import sub-flow (ios/flow.ts BATCH 5-7b) driven headless: the
+// persisted forks (setup-method-select / import-distribution-mode) ride the
+// SAME pure reducers the TUI uses (applyIosInput via persistIosImportForkInput);
+// the EPHEMERAL prompts (pickers / recovery hub / portal walkthrough / export
+// warning / manual profile path) park in the session registry between tool
+// calls (carried.parkedImportStep — the headless mirror of the TUI's React
+// `step` state) and re-drive as ONE-SHOT resolver effects, exactly the
+// cert-limit/verify-app mechanism above. A server restart loses the park + the
+// inventory; the flow self-heals via a fresh import-scanning (the audit's
+// resume contract — pickers are NEVER resume targets).
+
+/** The interactive import prompts the MCP parks between tool calls. */
+const IOS_IMPORT_PARK_STEPS = new Set<OnboardingStep>([
+  'import-pick-identity',
+  'import-pick-profile',
+  'import-no-match-recovery',
+  'import-portal-explanation',
+  'import-export-warning',
+])
+
+/**
+ * Steps that need the carried import-scanning inventory before they can render
+ * or route. Entering one without `carried.importMatches` (fresh entry / server
+ * restart) re-runs the silent scan first — it routes back via
+ * getImportEntryStep, mirroring BOTH the TUI's scan-before-questions order and
+ * its crash-recovery resume.
+ */
+const IOS_IMPORT_INVENTORY_STEPS = new Set<OnboardingStep>([
+  'import-distribution-mode',
+  'import-pick-identity',
+  'import-pick-profile',
+])
+
+/**
+ * Whether the driver declares the import-existing capability: isMacOS() ===
+ * true AND the Keychain scan dep is wired (a fork without
+ * listSigningIdentities could never complete). Off-macOS — or for drivers
+ * that don't wire the import deps (legacy fakes, the scenario e2e world) —
+ * the fork stays hidden and the chain keeps rendering as the single
+ * ios-api-key gate (the S6a forced create-new behavior).
+ */
+function iosImportCapable(ios?: IosEffectDeps): boolean {
+  return ios?.isMacOS?.() === true && typeof ios?.listSigningIdentities === 'function'
+}
+
+/**
+ * Map a .p8-chain gate step to the setup-method fork while the fork is still
+ * undecided AND the driver is import-capable. A legacy mid-chain progress
+ * (p8Path persisted, no setupMethod) is never re-asked. NOTE: when the step
+ * is ALREADY 'setup-method-select' (backing-up routes there on macOS) but the
+ * capability is absent, the step is returned UNCHANGED — callers must branch
+ * on iosImportCapable, not on the returned name (the gate-set membership is
+ * what collapses it back to the ios-api-key gate).
+ */
+function iosSetupForkStep(step: OnboardingStep, progress: OnboardingProgress | null, ios?: IosEffectDeps): OnboardingStep {
+  if (
+    IOS_API_KEY_GATE_STEPS.has(step)
+    && !progress?.setupMethod
+    && !progress?.p8Path
+    && iosImportCapable(ios)
+  ) {
+    return 'setup-method-select'
+  }
+  return step
+}
+
+/**
+ * The S12 setup-method fork — the FIRST iOS choice on a fresh macOS entry.
+ * Option values are the PERSISTED setupMethod vocabulary (the TUI Select's
+ * 'create'/'import' map onto these via applyIosInput in
+ * persistIosImportForkInput, so progress.json stays byte-identical to a TUI run).
+ */
+function iosSetupMethodResult(facts: PreflightFacts): NextStepResult {
+  return {
+    onboarding: 'capgo-builder',
+    phase: 'credentials',
+    state: 'setup-method-select',
+    platform: 'ios',
+    progress: STEP_PROGRESS['setup-method-select'] ?? 20,
+    kind: 'choice',
+    summary: `How do you want to set up iOS signing credentials for "${facts.appId}"? Create new ones via the App Store Connect API, or import an existing distribution certificate + provisioning profile already on this Mac (Keychain + Xcode profiles).`,
+    options: [
+      { value: 'create-new', label: '🆕  Create new via App Store Connect API' },
+      { value: 'import-existing', label: '📥  Import existing from this Mac (Keychain + Xcode profiles)' },
+    ],
+    next: {
+      tool: NEXT_STEP_TOOL,
+      with: { setupMethod: '<create-new|import-existing>' },
+      instruction: 'Ask the user. "create-new" mints a fresh certificate + profile via Apple (needs an App Store Connect API key); "import-existing" reuses a signing identity already in this Mac\'s Keychain. Then call next_step with setupMethod set to their pick.',
+      call: `${NEXT_STEP_TOOL}({ setupMethod: "create-new" })`,
     },
     rules: ONBOARDING_RULES,
   }
@@ -480,6 +625,150 @@ export function mapIosView(
       }
     }
 
+    // ── import-distribution-mode (S12 — the import sub-flow's first question) ──
+    // Persisted fork: the answer rides applyIosInput('import-distribution-mode')
+    // (persistIosImportForkInput), so resume == fresh-advance with no re-ask.
+    case 'import-distribution-mode': {
+      const options = (view.options ?? []).map(o => ({ value: o.value, label: o.label, note: o.note }))
+      return {
+        ...base,
+        kind: 'choice',
+        summary: `${view.title ?? 'How will Capgo distribute your build?'} ${view.prompt ?? ''}`.trim(),
+        options,
+        next: {
+          tool: NEXT_STEP_TOOL,
+          with: { importDistribution: '<app_store|ad_hoc|__cancel__>' },
+          instruction: 'Ask the user how this build will be distributed. "app_store" uploads to TestFlight (needs an App Store Connect API key); "ad_hoc" signs for direct/QR install (no ASC key). Call next_step with importDistribution set to their pick, or "__cancel__" to switch to creating fresh credentials instead.',
+          call: `${NEXT_STEP_TOOL}({ importDistribution: "app_store" })`,
+        },
+      }
+    }
+
+    // ── import-pick-identity (S12 — Keychain identity picker, EPHEMERAL) ──────
+    // Option values are the identities' SHA-1s (+ the '__cancel__' escape) —
+    // answered via identityChoice; the driver resolves the SHA-1 against the
+    // carried inventory and re-drives the step as a resolver effect.
+    case 'import-pick-identity': {
+      const options = (view.options ?? []).map(o => ({ value: o.value, label: o.label, note: o.note }))
+      return {
+        ...base,
+        kind: 'choice',
+        summary: `${view.title ?? 'Pick a signing identity to import.'} ${view.prompt ?? ''}`.trim(),
+        options,
+        next: {
+          tool: NEXT_STEP_TOOL,
+          with: { identityChoice: '<identity SHA-1|__cancel__>' },
+          instruction: 'Present the Keychain signing identities to the user (each option label names the certificate and how many of its profiles match this app). Call next_step with identityChoice set to the chosen option\'s value (the identity SHA-1), or "__cancel__" to switch to creating a fresh certificate instead.',
+          call: `${NEXT_STEP_TOOL}({ identityChoice: "${options[0]?.value ?? '__cancel__'}" })`,
+        },
+      }
+    }
+
+    // ── import-pick-profile (S12 — provisioning-profile picker, EPHEMERAL) ────
+    // Option values are the profile UUIDs (+ the '__back__' escape) — answered
+    // via profileChoice.
+    case 'import-pick-profile': {
+      const options = (view.options ?? []).map(o => ({ value: o.value, label: o.label, note: o.note }))
+      return {
+        ...base,
+        kind: 'choice',
+        summary: `${view.title ?? 'Pick a provisioning profile to import.'} ${view.prompt ?? ''}`.trim(),
+        options,
+        next: {
+          tool: NEXT_STEP_TOOL,
+          with: { profileChoice: '<profile UUID|__back__>' },
+          instruction: 'Present the matching provisioning profiles to the user. Call next_step with profileChoice set to the chosen option\'s value (the profile UUID), or "__back__" to return to identity selection.',
+          call: `${NEXT_STEP_TOOL}({ profileChoice: "${options[0]?.value ?? '__back__'}" })`,
+        },
+      }
+    }
+
+    // ── import-no-match-recovery (S12 — the recovery hub, EPHEMERAL) ──────────
+    // The menu VARIANT (title sentence + which rows show) is the engine view's
+    // job (noMatchReason / distribution / ASC-key state); the MCP surfaces it
+    // verbatim — answered via importRecoveryAction.
+    case 'import-no-match-recovery': {
+      const options = (view.options ?? []).map(o => ({ value: o.value, label: o.label, note: o.note }))
+      return {
+        ...base,
+        kind: 'choice',
+        summary: `${view.title ?? 'No usable provisioning profile matches this identity.'} ${view.prompt ?? ''}`.trim(),
+        options,
+        next: {
+          tool: NEXT_STEP_TOOL,
+          with: { importRecoveryAction: `<${options.map(o => o.value).join('|')}>` },
+          instruction: 'Present the recovery options to the user. "create" makes a fresh App Store profile for this certificate via Apple; "provide-profile-path" lets the user supply a .mobileprovision file path; "browser" explains the manual Apple Developer Portal route; "back" returns to identity selection. Call next_step with importRecoveryAction set to their pick.',
+          call: `${NEXT_STEP_TOOL}({ importRecoveryAction: "${options[0]?.value ?? 'back'}" })`,
+        },
+      }
+    }
+
+    // ── import-portal-explanation (S12 — manual-portal walkthrough, EPHEMERAL) ─
+    // HEADLESS: the MCP never opens a browser — 'open-anyway' logs a breadcrumb
+    // engine-side and bounces back to the recovery menu; the agent gives the
+    // user the portal URL from context instead.
+    case 'import-portal-explanation': {
+      const options = (view.options ?? []).map(o => ({ value: o.value, label: o.label, note: o.note }))
+      const portalUrl = 'https://developer.apple.com/account/resources/profiles/list'
+      return {
+        ...base,
+        kind: 'choice',
+        summary: `${view.title ?? 'You can create the profile manually in the Apple Developer Portal.'} ${view.prompt ?? ''}`.trim(),
+        context: { portalUrl },
+        options,
+        next: {
+          tool: NEXT_STEP_TOOL,
+          with: { portalAction: `<${options.map(o => o.value).join('|')}>` },
+          instruction: `Present the options to the user. I cannot open a browser for them — if they want the manual route, give them the portal URL (${portalUrl}); once they have downloaded a .mobileprovision, "use-file" lets them provide its path. "use-create" (when offered) creates the profile automatically instead — recommended. "open-anyway"/"back" return to the recovery menu. Call next_step with portalAction set to their pick.`,
+          call: `${NEXT_STEP_TOOL}({ portalAction: "${options[0]?.value ?? 'back'}" })`,
+        },
+      }
+    }
+
+    // ── import-provide-profile-path (S12 — the manual-path arm, INPUT) ────────
+    // The TUI opens a native .mobileprovision picker; the headless MCP collects
+    // the path as text (decideIos synthesizes this input view) and re-drives the
+    // engine effect with a one-shot picker resolving the provided path.
+    case 'import-provide-profile-path': {
+      return {
+        ...base,
+        kind: 'human_gate',
+        summary: view.title ?? 'Use a .mobileprovision file from disk.',
+        human: {
+          instruction: 'Locate (or download from the Apple Developer Portal) the .mobileprovision profile for this app, then give me its absolute path. The file stays on your machine.',
+        },
+        collect: [
+          { field: 'profilePath', desc: 'absolute path to the .mobileprovision file' },
+        ],
+        next: {
+          tool: NEXT_STEP_TOOL,
+          with: { profilePath: '<path>' },
+          instruction: 'Ask the user for the absolute path to their .mobileprovision file, then call next_step with profilePath.',
+          call: `${NEXT_STEP_TOOL}({ profilePath: "/path/to/profile.mobileprovision" })`,
+        },
+      }
+    }
+
+    // ── import-export-warning (S12 — the Keychain-dialog heads-up, EPHEMERAL) ──
+    // 'go' runs the export INSIDE the next tool call, which BLOCKS on the single
+    // macOS Keychain permission dialog — the instruction makes the agent warn
+    // the user to expect + approve it BEFORE confirming (the accepted design).
+    case 'import-export-warning': {
+      const options = (view.options ?? []).map(o => ({ value: o.value, label: o.label, note: o.note }))
+      return {
+        ...base,
+        kind: 'choice',
+        summary: `${view.title ?? 'macOS will now ask permission to access your private key.'} ${view.prompt ?? ''}`.trim(),
+        options,
+        next: {
+          tool: NEXT_STEP_TOOL,
+          with: { exportConfirm: '<go|back|exit>' },
+          instruction: 'IMPORTANT — tell the USER first: confirming with "go" exports the certificate from the macOS Keychain during the next call, and macOS will pop up a Keychain permission dialog on their Mac. They should click "Always Allow" (the call waits until they answer; "Always Allow" prevents re-prompts on retries). Once they are ready, call next_step with exportConfirm "go". "back" returns to profile selection; "exit" stops onboarding.',
+          call: `${NEXT_STEP_TOOL}({ exportConfirm: "go" })`,
+        },
+      }
+    }
+
     default: {
       // Generic mapping for views outside the S6a create-new scope (the
       // cert-limit / duplicate-profile recoveries land in S6b as structured
@@ -526,16 +815,25 @@ function iosParkedStep(carried: IosCarried): OnboardingStep | null {
     return 'cert-limit-prompt'
   if (carried.duplicateProfiles !== undefined)
     return 'duplicate-profile-prompt'
+  // S12: the parked interactive import prompt (pickers / recovery hub / portal
+  // walkthrough / export warning / manual profile path). LAST in precedence —
+  // an error (or recovery prompt) raised while an import prompt was parked
+  // must win, exactly like the TUI's React step moving off the picker.
+  if (carried.parkedImportStep !== undefined)
+    return carried.parkedImportStep
   return null
 }
 
 /**
  * The effective iOS step an incoming answer must address: the session-parked
- * recovery step when one is parked, else the persisted resume step. This is
- * what the strict iOS input gate validates against.
+ * recovery step when one is parked, else the persisted resume step — mapped
+ * through the S12 setup-method fork (a fresh macOS entry's effective step is
+ * 'setup-method-select', not the collapsed .p8 gate). This is what the strict
+ * iOS input gate validates against.
  */
-function effectiveIosStep(appId: string, progress: OnboardingProgress | null): OnboardingStep {
-  return iosParkedStep(getSession(appId).iosCarried) ?? getIosResumeStep(progress)
+function effectiveIosStep(appId: string, progress: OnboardingProgress | null, ios?: IosEffectDeps): OnboardingStep {
+  const step = iosParkedStep(getSession(appId).iosCarried) ?? getIosResumeStep(progress)
+  return iosSetupForkStep(step, progress, ios)
 }
 
 /**
@@ -630,6 +928,25 @@ export async function decideIos(
     certToRevoke?: string
     duplicateProfileAction?: 'delete' | 'exit'
     errorAction?: 'retry' | 'restart' | 'exit' | 'email-support'
+    // ── S12: iOS import-existing fork answers (ephemeral resolver picks) ──────
+    /** import-pick-identity answer: an identity SHA-1 or '__cancel__'. */
+    identityChoice?: string
+    /** import-pick-profile answer: a profile UUID or '__back__'. */
+    profileChoice?: string
+    /** import-no-match-recovery answer. */
+    importRecoveryAction?: 'create' | 'provide-profile-path' | 'browser' | 'back'
+    /** import-portal-explanation answer. */
+    portalAction?: 'use-create' | 'open-anyway' | 'use-file' | 'back'
+    /** import-provide-profile-path answer: the .mobileprovision path. */
+    profilePath?: string
+    /** import-export-warning answer. */
+    exportConfirm?: 'go' | 'back' | 'exit'
+    /**
+     * S9-S11: the explicit tail step a validated tail answer routed to
+     * (drive() → applyMcpTailAnswer). Honored only while the slim tail
+     * progress carries credentialsSaved — the same guard as the tail park.
+     */
+    tailNext?: OnboardingStep
   },
 ): Promise<NextStepResult> {
   const appId = facts.appId!
@@ -759,25 +1076,157 @@ export async function decideIos(
     dupAnswered = true
   }
 
+  // ── Parked import sub-flow answers (S12) — validated by the strict gate ────
+  // Each ephemeral pick is recorded into the session (the MCP mirror of the
+  // TUI's React state) and the parked prompt re-driven as a ONE-SHOT resolver
+  // effect — the same mechanism as cert-limit / verify-app above. The PERSISTED
+  // forks (setupMethod / importDistribution) never reach here: drive() applies
+  // them through the pure reducers (persistIosImportForkInput) and the resume
+  // routing takes over.
+  let importAnswered: OnboardingStep | undefined
+  let profilePathAnswer: string | undefined
+
+  if (opts?.identityChoice !== undefined) {
+    const carriedNow = getSession(appId).iosCarried
+    if (opts.identityChoice === '__cancel__') {
+      // The user bailed to create-new. The DRIVER owns the persistence (switch
+      // setupMethod, drop the stale importDistribution — ui/app.tsx onPick) and
+      // clears the carried identity so the resolver routes the cancel.
+      dropIosCarried(appId, ['chosenIdentity'])
+      const { importDistribution: _droppedDist, ...rest } = progress
+      progress = { ...rest, setupMethod: 'create-new' }
+      await ios.saveProgress?.(appId, progress)
+    }
+    else {
+      const match = (carriedNow.importMatches ?? []).find(m => m.identity.sha1 === opts.identityChoice)
+      if (!match) {
+        const ctx: IosStepCtx = { appId, ...(carriedNow as Partial<IosStepCtx>) }
+        const rerender = mapIosView(iosViewForStep('import-pick-identity', progress, ctx), facts, ctx)
+        return { ...rerender, summary: `Unknown identity "${opts.identityChoice}" — call next_step with identityChoice set to one of the listed option values (the identity SHA-1), or "__cancel__".\n\n${rerender.summary}` }
+      }
+      // Stale per-identity state from a previous pick must not leak into the
+      // new identity's routing (the TUI clears its appleCertId mirror + the
+      // chosen profile when the identity changes).
+      dropIosCarried(appId, ['_appleCertIdForChosen', 'chosenProfile'])
+      mergeIosCarried(appId, { chosenIdentity: match.identity })
+    }
+    importAnswered = 'import-pick-identity'
+  }
+
+  if (opts?.profileChoice !== undefined) {
+    const carriedNow = getSession(appId).iosCarried
+    if (opts.profileChoice === '__back__') {
+      // No carried profile = the resolver's '__back__' arm (import-pick-identity).
+      dropIosCarried(appId, ['chosenProfile'])
+    }
+    else {
+      const pool = (carriedNow.importMatches ?? [])
+        .find(m => m.identity.sha1 === carriedNow.chosenIdentity?.sha1)?.profiles ?? []
+      const picked = pool.find(p => p.uuid === opts.profileChoice)
+      if (!picked) {
+        const ctx: IosStepCtx = { appId, ...(carriedNow as Partial<IosStepCtx>) }
+        const rerender = mapIosView(iosViewForStep('import-pick-profile', progress, ctx), facts, ctx)
+        return { ...rerender, summary: `Unknown profile "${opts.profileChoice}" — call next_step with profileChoice set to one of the listed option values (the profile UUID), or "__back__".\n\n${rerender.summary}` }
+      }
+      mergeIosCarried(appId, { chosenProfile: picked })
+    }
+    importAnswered = 'import-pick-profile'
+  }
+
+  if (opts?.importRecoveryAction !== undefined) {
+    mergeIosCarried(appId, { recoveryAction: opts.importRecoveryAction })
+    // Re-entering the manual-path arm must re-ask for a file — the TUI clears
+    // its picker-opened ref before routing (app.tsx:3593); same for the portal
+    // 'use-file' arm below.
+    if (opts.importRecoveryAction === 'provide-profile-path')
+      dropIosCarried(appId, ['profilePickerOpened'])
+    importAnswered = 'import-no-match-recovery'
+  }
+
+  if (opts?.portalAction !== undefined) {
+    mergeIosCarried(appId, { portalAction: opts.portalAction })
+    if (opts.portalAction === 'use-file')
+      dropIosCarried(appId, ['profilePickerOpened'])
+    importAnswered = 'import-portal-explanation'
+  }
+
+  if (opts?.exportConfirm !== undefined) {
+    mergeIosCarried(appId, { exportWarningAction: opts.exportConfirm })
+    importAnswered = 'import-export-warning'
+  }
+
+  if (opts?.profilePath !== undefined) {
+    // The manual-path arm: the engine effect's openProfilePicker is injected as
+    // a one-shot resolving this path (see the effect dispatch below).
+    profilePathAnswer = opts.profilePath
+    dropIosCarried(appId, ['profilePickerOpened'])
+    importAnswered = 'import-provide-profile-path'
+  }
+
+  // S9-S11: a validated tail answer routes its explicit next step in (the same
+  // guard as the tail park: only while the slim tail progress is in flight).
   let forcedNextStep: OnboardingStep | undefined
+    = opts?.tailNext && progress.completedSteps?.credentialsSaved ? opts.tailNext : undefined
 
   for (let i = 0; i < MAX_AUTO_STEPS; i++) {
     // Session-parked recovery steps (error / cert-limit / duplicate-profile)
     // override the persisted resume step — they are the MCP's mirror of the
     // TUI's React `step` state, which resume routing can never reproduce.
-    const step = forcedNextStep
+    // The parked interactive TAIL step (S9-S11) sits between them and resume:
+    // a re-render must re-ask the parked question, never drift forward through
+    // the resume router (which collapses past the preview consent gate).
+    let step = forcedNextStep
       ?? iosParkedStep(getSession(appId).iosCarried)
+      ?? (mcpTailParkedStep(appId, progress) as OnboardingStep | null)
       ?? getIosResumeStep(progress)
     forcedNextStep = undefined
 
-    // The TUI-only .p8 input chain renders as the single 'ios-api-key' gate.
-    if (IOS_API_KEY_GATE_STEPS.has(step))
-      return iosApiKeyGateResult(facts)
+    // S12: the import park is one-shot per drive — consumed here and re-merged
+    // only when an import prompt re-renders below, so it can never go stale
+    // once the flow moves past the prompt (e.g. export → save → ask-build).
+    if (getSession(appId).iosCarried.parkedImportStep !== undefined)
+      dropIosCarried(appId, ['parkedImportStep'])
 
+    // S12: inventory-dependent import steps re-run the silent scan first when
+    // the carried inventory is absent (fresh fork entry / server restart) —
+    // import-scanning routes back via getImportEntryStep, mirroring BOTH the
+    // TUI's scan-before-questions order and its crash-recovery resume (the
+    // ephemeral pickers are NEVER resume targets).
+    if (IOS_IMPORT_INVENTORY_STEPS.has(step) && !getSession(appId).iosCarried.importMatches)
+      step = 'import-scanning'
+
+    // The TUI-only .p8 input chain renders as the single 'ios-api-key' gate —
+    // or, on a fresh macOS entry with the import capability wired, the S12
+    // setup-method fork (create-new vs import-existing). NOTE: branch on the
+    // CAPABILITY, not on iosSetupForkStep's returned name — backing-up routes
+    // next:'setup-method-select' on macOS, which must collapse back to the
+    // api-key gate for import-incapable drivers (the S6a behavior).
+    if (IOS_API_KEY_GATE_STEPS.has(step)) {
+      if (!progress.setupMethod && !progress.p8Path && iosImportCapable(ios))
+        return iosSetupMethodResult(facts)
+      return iosApiKeyGateResult(facts)
+    }
     // ask-build is the post-save entry point — map to the shared build-ready
     // choice exactly like the android driver (the unchanged C2/D2 contract).
     if (step === 'ask-build')
       return decideBuildPhase(facts, 'ios')
+
+    // ── S8: post-save tail terminal ──────────────────────────────────────────
+    // 'build-complete' ends the shared tail. The MCP run is over: drop the
+    // slim tail progress (mirroring the TUI, which never keeps post-save state
+    // on disk) and clear the session so a later onboarding starts fresh — the
+    // credentials-exist gate re-protects the saved credentials. NEVER
+    // decideBuildPhase here: the build already happened (buildRequested).
+    if (step === 'build-complete') {
+      try {
+        await ios.deleteProgress?.(appId)
+      }
+      catch {
+        // Best-effort cleanup — a stale slim file only re-renders this terminal.
+      }
+      clearSession(appId)
+      return tailCompleteResult(appId, 'ios')
+    }
 
     // Data-safety gate (parked by a TUI run or seeded above) → the
     // backup-or-cancel choice.
@@ -786,6 +1235,37 @@ export async function decideIos(
 
     const session = getSession(appId)
     const ctx: IosStepCtx = { appId, ...(session.iosCarried as Partial<IosStepCtx>) }
+
+    // ── S9-S11: interactive tail steps render structurally (and park) ────────
+    // Includes ci-secrets-setup, whose TAIL_KIND is 'auto' but which has NO
+    // effect in runTailEffect — it is the retry/skip screen shown when no
+    // git-hosting CLI is ready. The view context comes from the session's
+    // iosCarried (where decideIos merges every tail transient) overlaid on the
+    // previously parked inventories.
+    if (MCP_TAIL_INTERACTIVE_STEPS.has(step)) {
+      return renderTailStep('ios', appId, step, progress, ctx as unknown as Record<string, unknown>, {
+        defaultExportPath: ios.defaultExportPath,
+        generateWorkflow: ios.generateWorkflow,
+      })
+    }
+
+    // ── S12: import-provide-profile-path is a PATH INPUT over MCP ────────────
+    // The TUI opens a native .mobileprovision picker inside the effect; the
+    // headless MCP parks an input gate collecting profilePath instead, then
+    // re-drives the effect with a one-shot picker resolving the provided path
+    // (see the effect dispatch below). Without this park the 'auto' view would
+    // dispatch the effect, see no picker, and bounce straight back to recovery.
+    if (step === 'import-provide-profile-path' && profilePathAnswer === undefined) {
+      mergeIosCarried(appId, { parkedImportStep: step })
+      return mapIosView({
+        step,
+        kind: 'input',
+        title: 'Use a .mobileprovision file from disk.',
+        prompt: 'Absolute path to the .mobileprovision file:',
+        collect: ['profilePath'],
+      }, facts, ctx)
+    }
+
     const view = iosViewForStep(step, progress, ctx)
 
     // A parked choice with a recorded answer re-drives as a RESOLVER effect
@@ -796,11 +1276,18 @@ export async function decideIos(
     const isCertLimitResolver = step === 'cert-limit-prompt' && certLimitAnswered
     const isDupResolver = step === 'duplicate-profile-prompt' && dupAnswered
     const isErrorResolver = step === 'error' && errorRetry
-    const isResolver = isVerifyResolver || isCertLimitResolver || isDupResolver || isErrorResolver
+    // S12: an import prompt whose answer arrived THIS call (one-shot).
+    const isImportResolver = importAnswered !== undefined && importAnswered === step
+    const isResolver = isVerifyResolver || isCertLimitResolver || isDupResolver || isErrorResolver || isImportResolver
 
     if (view.kind !== 'auto' && !isResolver) {
       if (view.kind === 'done')
         return decideBuildPhase(facts, 'ios')
+      // S12: re-park the interactive import prompt the user is now looking at
+      // (the headless mirror of the TUI's React `step`) so the next call's
+      // strict gate validates the answer against THIS prompt.
+      if (IOS_IMPORT_PARK_STEPS.has(step))
+        mergeIosCarried(appId, { parkedImportStep: step })
       // 'error' (and the recovery prompts) map to structured states in
       // mapIosView — the S6a blanket ios-credentials-failed mapping is gone.
       return mapIosView(view, facts, ctx)
@@ -820,11 +1307,83 @@ export async function decideIos(
         }
       }
 
-      const carried = getSession(appId).iosCarried
-      const r = await runIosEffect(step, progress, { ...ios, appId, carried })
+      const isTailEffectStep = MCP_TAIL_EFFECT_STEPS.has(step)
+      // S8 restart fallback: the tail carried (savedCredentials/ciSecretEntries
+      // incl. CAPGO_TOKEN) is process-local; after a server restart re-derive
+      // it from the saved credential store + the driver's pre-bound entry
+      // builder BEFORE the effect consumes it. Never at saving-credentials
+      // itself: there the store still holds the PREVIOUS credentials — the
+      // save effect builds the fresh map from carried/progress.
+      if (isTailEffectStep && step !== 'saving-credentials' && progress.completedSteps?.credentialsSaved)
+        await rederiveTailCarried(appId, 'ios', ios)
+      const liveSession = getSession(appId)
+      // Tail effects read the TailEffectDeps carried shape; merge the tail
+      // registry over the iOS one (saving-credentials still reads certData/
+      // profileData/teamId/p8Content from the iOS carried).
+      const carried = isTailEffectStep
+        ? { ...liveSession.iosCarried, ...liveSession.tailCarried }
+        : liveSession.iosCarried
+      // S12: the manual-path arm re-drives the engine's import-provide-profile-
+      // path effect with a ONE-SHOT picker resolving the user-provided path —
+      // the engine's own read/parse/invariant pipeline then runs unchanged.
+      const effectDeps: IosEffectDeps = { ...ios, appId, carried }
+      if (step === 'import-provide-profile-path' && profilePathAnswer !== undefined) {
+        const providedPath = profilePathAnswer
+        profilePathAnswer = undefined
+        effectDeps.openProfilePicker = async () => providedPath
+      }
+      const r = await runIosEffect(step, progress, effectDeps)
       progress = r.progress
       if (r.transient)
         mergeIosCarried(appId, r.transient as Partial<IosCarried>)
+
+      // ── S8: MCP tail persistence (slim + secret-free) + carried registry ──
+      // The shared tail NEVER persists post-save (the TUI keeps tail state in
+      // memory); the MCP driver owns marker persistence (android/types.ts:
+      // "markers are written by whichever driver chooses to persist the
+      // tail"). The slim writers WHITELIST fields, so secrets can never reach
+      // progress.json; the tail transients park in the session's tailCarried.
+      if (isTailEffectStep) {
+        mergeTailCarried(appId, {
+          savedCredentials: r.transient?.savedCredentials,
+          ciSecretEntries: r.transient?.ciSecretEntries,
+          ciSecretExistingKeys: r.transient?.ciSecretExistingKeys,
+        })
+        if (step === 'saving-credentials' && r.next === 'ask-build') {
+          // The save succeeded (the self-heal path returns a different next):
+          // write the credentialsSaved marker so resume routes THROUGH the
+          // tail (ask-build first) instead of bouncing to platform-select or
+          // re-seeding the credentials-exist gate against the credentials the
+          // save itself just wrote.
+          progress = slimIosTailProgress({
+            ...progress,
+            completedSteps: { ...progress.completedSteps, credentialsSaved: { savedAt: new Date().toISOString() } },
+          })
+          await ios.saveProgress?.(appId, progress)
+        }
+        else if (progress.completedSteps?.credentialsSaved) {
+          if (step === 'uploading-ci-secrets') {
+            // Marker immediately after the successful upload (the TUI's
+            // pre-delete marker semantics): a resume must never re-fire the
+            // already-completed upload.
+            progress = {
+              ...progress,
+              completedSteps: {
+                ...progress.completedSteps,
+                ciSecretsUploaded: {
+                  provider: progress.ciSecretTarget?.provider ?? 'github',
+                  count: getSession(appId).tailCarried.ciSecretEntries?.length ?? 0,
+                },
+              },
+            }
+          }
+          // Re-slim on every tail effect so the markers + non-secret prefs the
+          // effect recorded on progress (e.g. the auto-picked ciSecretTarget)
+          // survive a restart.
+          progress = slimIosTailProgress(progress)
+          await ios.saveProgress?.(appId, progress)
+        }
+      }
       // Each resolver consumed its recorded answer — drop/clear it so a later
       // re-entry renders the prompt (or re-runs the initial fetch) instead of
       // replaying a stale action.
@@ -838,6 +1397,18 @@ export async function decideIos(
         errorRetry = false
         dropIosCarried(appId, ['errorAction'])
       }
+      // S12: the import resolver + its one-shot menu picks are consumed so a
+      // later re-entry renders the prompt instead of replaying a stale action
+      // (chosenIdentity/chosenProfile stay carried — downstream effects need
+      // them, and a re-pick simply overwrites).
+      if (isImportResolver)
+        importAnswered = undefined
+      if (step === 'import-no-match-recovery')
+        dropIosCarried(appId, ['recoveryAction'])
+      if (step === 'import-portal-explanation')
+        dropIosCarried(appId, ['portalAction'])
+      if (step === 'import-export-warning')
+        dropIosCarried(appId, ['exportWarningAction'])
 
       // Recovery-park cleanup — the MCP mirror of the TUI clearing its React
       // state once a recovery resolves:
@@ -1246,11 +1817,30 @@ export function mapAndroidView(
       return { ...base, kind: 'error', summary: view.message ?? 'Android setup error.' }
 
     default:
+      // Generic mapping for views outside the structured cases (S8: the shared
+      // post-save tail's interactive steps land here until the next slice maps
+      // them structurally). Mirrors mapIosView's default: surface the engine
+      // view verbatim (prompt/title + options) and allow a plain re-check.
+      // Option-carrying views of any kind (choice, the ci-secrets-failed
+      // 'error' view) render as a choice so the options are never dropped.
+      if (view.kind === 'choice' || (view.options ?? []).length > 0) {
+        return {
+          ...base,
+          kind: 'choice',
+          summary: view.prompt ?? view.title ?? view.message ?? `Android setup: ${view.step}`,
+          options: (view.options ?? []).map(o => ({ value: o.value, label: o.label, note: o.note })),
+          next: {
+            tool: NEXT_STEP_TOOL,
+            instruction: 'Present the options to the user. Structured answers for this step arrive in a later milestone — call next_step({}) to re-check, or finish this step in the interactive wizard (`npx @capgo/cli build init`).',
+            call: `${NEXT_STEP_TOOL}({})`,
+          },
+        }
+      }
       return {
         ...base,
         kind: 'human_gate',
-        summary: `Android setup: ${view.step}`,
-        human: { instruction: 'Continue when ready.' },
+        summary: view.prompt ?? view.title ?? `Android setup: ${view.step}`,
+        human: { instruction: view.prompt ?? 'Continue when ready.' },
         next: { tool: NEXT_STEP_TOOL, instruction: 'Call next_step to continue.', call: `${NEXT_STEP_TOOL}({})` },
       }
   }
@@ -1305,7 +1895,15 @@ function androidEffectError(
 export async function decideAndroid(
   facts: PreflightFacts,
   deps: EngineDeps,
-  opts?: { signInProceed?: boolean },
+  opts?: {
+    signInProceed?: boolean
+    /**
+     * S9-S11: the explicit tail step a validated tail answer routed to
+     * (drive() → applyMcpTailAnswer). Honored only while the slim tail
+     * progress carries credentialsSaved — the same guard as the tail park.
+     */
+    tailNext?: AndroidOnboardingStep
+  },
 ): Promise<NextStepResult> {
   const appId = facts.appId!
 
@@ -1372,12 +1970,20 @@ export async function decideAndroid(
   let ctx: AndroidStepCtx = { appId }
   // When an effect signals an explicit next step (e.g. gcp-projects-loading → gcp-projects-select),
   // use that instead of re-deriving from progress on the next iteration.
+  // S9-S11: a validated tail answer routes its explicit next step in (the same
+  // guard as the tail park: only while the slim tail progress is in flight).
   let forcedNextStep: AndroidOnboardingStep | undefined
+    = opts?.tailNext && progress.completedSteps?.credentialsSaved ? opts.tailNext : undefined
   // Track whether we've already written the .p12 file this invocation so we only write once.
   let keystoreFileWritten = false
 
   for (let i = 0; i < MAX_AUTO_STEPS; i++) {
-    const step = forcedNextStep ?? getAndroidResumeStep(progress)
+    // The parked interactive TAIL step (S9-S11) overrides resume derivation —
+    // a re-render must re-ask the parked question, never drift forward through
+    // the resume router (which collapses past the preview consent gate).
+    const step = forcedNextStep
+      ?? (mcpTailParkedStep(appId, progress) as AndroidOnboardingStep | null)
+      ?? getAndroidResumeStep(progress)
     forcedNextStep = undefined
 
     if (step === 'google-sign-in') {
@@ -1440,6 +2046,36 @@ export async function decideAndroid(
     // The MCP bridge maps this to the shared build-ready choice (decideBuildPhase).
     if (step === 'ask-build')
       return decideBuildPhase(facts, 'android')
+
+    // ── S8: post-save tail terminal ──────────────────────────────────────────
+    // 'build-complete' ends the shared tail. Drop the slim tail progress
+    // (mirroring the TUI, which never keeps post-save state on disk) and clear
+    // the session so a later onboarding starts fresh — the credentials-exist
+    // gate re-protects the saved credentials. NEVER decideBuildPhase here: the
+    // build already happened (buildRequested).
+    if (step === 'build-complete') {
+      try {
+        await deps.androidEffectDeps.deleteAndroidProgress(appId)
+      }
+      catch {
+        // Best-effort cleanup — a stale slim file only re-renders this terminal.
+      }
+      clearSession(appId)
+      return tailCompleteResult(appId, 'android')
+    }
+
+    // ── S9-S11: interactive tail steps render structurally (and park) ────────
+    // Includes ci-secrets-setup, whose TAIL_KIND is 'auto' but which has NO
+    // effect in runTailEffect — it is the retry/skip screen shown when no
+    // git-hosting CLI is ready. The view context is the invocation-local ctx
+    // (the effect transients accumulated this call) overlaid on the previously
+    // parked inventories.
+    if (MCP_TAIL_INTERACTIVE_STEPS.has(step)) {
+      return renderTailStep('android', appId, step, progress, ctx as unknown as Record<string, unknown>, {
+        defaultExportPath: deps.androidEffectDeps.defaultExportPath,
+        generateWorkflow: deps.androidEffectDeps.generateWorkflow,
+      })
+    }
 
     // keystore-new-cn: the Ink wizard advances to keystore-generating immediately
     // after the CN input is submitted (persistAndStep sets step:'keystore-generating'
@@ -1504,10 +2140,59 @@ export async function decideAndroid(
     }
 
     try {
-      const r = await runAndroidEffect(step, progress, deps.androidEffectDeps)
+      const isTailEffectStep = MCP_TAIL_EFFECT_STEPS.has(step)
+      // S8 restart fallback: re-derive the process-local tail carried from the
+      // saved credential store before a post-restart tail effect consumes it
+      // (see the matching decideIos comment).
+      if (isTailEffectStep && step !== 'saving-credentials' && progress.completedSteps?.credentialsSaved)
+        await rederiveTailCarried(appId, 'android', deps.androidEffectDeps)
+      // Tail effects read the driver-held carried transients; the MCP parks
+      // them in the session registry between tool calls (the headless mirror
+      // of the Ink TUI's React tail state).
+      const effectDeps = isTailEffectStep
+        ? { ...deps.androidEffectDeps, carried: { ...getSession(appId).tailCarried } }
+        : deps.androidEffectDeps
+      const r = await runAndroidEffect(step, progress, effectDeps)
       progress = r.progress
       const transient = r.transient ?? {}
       ctx = { ...ctx, ...transient }
+
+      // ── S8: MCP tail persistence (slim + secret-free) + carried registry ──
+      // Mirrors the decideIos block: the MCP driver owns marker persistence
+      // (android/types.ts) via the WHITELISTING slim writer; tail transients
+      // park in the session's tailCarried.
+      if (isTailEffectStep) {
+        mergeTailCarried(appId, {
+          savedCredentials: transient.savedCredentials,
+          ciSecretEntries: transient.ciSecretEntries,
+          ciSecretExistingKeys: transient.ciSecretExistingKeys,
+        })
+        if (step === 'saving-credentials' && r.next === 'ask-build') {
+          progress = slimAndroidTailProgress({
+            ...progress,
+            completedSteps: { ...progress.completedSteps, credentialsSaved: { savedAt: new Date().toISOString() } },
+          })
+          await deps.androidEffectDeps.saveAndroidProgress(appId, progress)
+        }
+        else if (progress.completedSteps?.credentialsSaved) {
+          if (step === 'uploading-ci-secrets') {
+            // Marker immediately after the successful upload — resume must
+            // never re-fire the already-completed upload.
+            progress = {
+              ...progress,
+              completedSteps: {
+                ...progress.completedSteps,
+                ciSecretsUploaded: {
+                  provider: progress.ciSecretTarget?.provider ?? 'github',
+                  count: getSession(appId).tailCarried.ciSecretEntries?.length ?? 0,
+                },
+              },
+            }
+          }
+          progress = slimAndroidTailProgress(progress)
+          await deps.androidEffectDeps.saveAndroidProgress(appId, progress)
+        }
+      }
 
       // ── Transient handling (mirrors the Ink driver's logic) ─────────────────
       //
@@ -1591,6 +2276,534 @@ function decideBuildPhase(facts: PreflightFacts, platform: Platform): NextStepRe
   }
 }
 
+// ─── S8: MCP-driven post-save tail ────────────────────────────────────────────
+//
+// The step ids whose EFFECT both platform flows delegate to the shared tail
+// (mirrors the private TAIL_EFFECT_STEPS sets in ios/flow.ts + android/flow.ts).
+// For these the MCP driver: threads the session's tailCarried into the effect,
+// captures the tail transients back into it, and persists the SLIM secret-free
+// tail progress (markers + prefs — see mcp/tail-progress.ts). 'requesting-build'
+// is listed for completeness but never runs here — the MCP build path is the
+// unchanged C2/D2 handoff + checkBuild polling.
+const MCP_TAIL_EFFECT_STEPS = new Set<string>([
+  'saving-credentials',
+  'detecting-ci-secrets',
+  'checking-ci-secrets',
+  'uploading-ci-secrets',
+  'exporting-env',
+  'overwrite-and-export-env',
+  'writing-workflow-file',
+  'requesting-build',
+])
+
+/** The tail's terminal screen — onboarding is fully complete (post-build). */
+function tailCompleteResult(appId: string, platform: Platform): NextStepResult {
+  return {
+    onboarding: 'capgo-builder', phase: 'done', state: 'build-complete', platform, progress: 100, kind: 'done',
+    summary: `Capgo Builder onboarding for "${appId}" (${platform}) is complete — credentials are saved and your first cloud build went through. Run \`npx @capgo/cli@latest build request --platform ${platform}\` anytime for new builds.`,
+    rules: ONBOARDING_RULES,
+  }
+}
+
+/**
+ * S8 restart fallback: rebuild the process-local tail carried
+ * (savedCredentials + ciSecretEntries) after a server restart lost the session
+ * registry. loadSavedCredentials() returns the exact platform map
+ * saving-credentials wrote; the driver-pre-bound createCiSecretEntries folds
+ * the resolved Capgo key back in (CAPGO_TOKEN). The rebuilt values live ONLY
+ * in the session registry — never in progress.json or tool results. Degrades
+ * silently on any read error (the shared tail then falls back to its own
+ * lossy rebuildTailCredentials).
+ */
+async function rederiveTailCarried(
+  appId: string,
+  platform: Platform,
+  deps: {
+    loadSavedCredentials?: (appId: string) => Promise<unknown>
+    createCiSecretEntries?: (credentials: Record<string, string>, apiKey?: string) => import('../ci-secrets.js').CiSecretEntry[]
+  },
+): Promise<void> {
+  const tail = getSession(appId).tailCarried
+  if (tail.savedCredentials && tail.ciSecretEntries)
+    return
+  let creds: Record<string, string> | undefined
+  try {
+    const saved = await deps.loadSavedCredentials?.(appId)
+    const platformCreds = (saved as Record<string, unknown> | null | undefined)?.[platform]
+    if (platformCreds && typeof platformCreds === 'object')
+      creds = platformCreds as Record<string, string>
+  }
+  catch {
+    // Treat a load failure as "nothing to re-derive" — never block the tail.
+  }
+  if (!creds)
+    return
+  mergeTailCarried(appId, {
+    ...(tail.savedCredentials ? {} : { savedCredentials: creds }),
+    ...(tail.ciSecretEntries || !deps.createCiSecretEntries ? {} : { ciSecretEntries: deps.createCiSecretEntries(creds) }),
+  })
+}
+
+// ─── S9-S11: structured tail steps (CI secrets / GH Actions / env / workflow) ─
+//
+// Every INTERACTIVE tail step renders as a structured MCP state with its own
+// answer field (the schema's tail family fields) instead of the S8 generic
+// "later milestone" choice. The vocabulary is tail/flow.ts's — tailViewForStep
+// builds the options, applyTailInput records the prefs, and the answer routing
+// below mirrors the android TUI's onChange handlers step-for-step
+// (android/ui/app.tsx ~L3062-3470), so the MCP and the TUI cannot drift.
+//
+// PARKING: the MCP mirrors the TUI's React `step` state in the session's
+// tailParked (session-state.ts) — set on every interactive tail render,
+// consumed by the strict tail gate + the decide loops, cleared when the answer
+// is applied. Without it a re-render would drift forward through the resume
+// router and collapse past consent gates (preview-workflow-file →
+// writing-workflow-file). A server restart loses the park; the frozen
+// tailResumeStep contract then takes over.
+
+/** The interactive tail steps the MCP renders structurally (and parks on). */
+const MCP_TAIL_INTERACTIVE_STEPS = new Set<string>([
+  'ci-secrets-setup',
+  'ci-secrets-target-select',
+  'ask-ci-secrets',
+  'confirm-ci-secret-overwrite',
+  'confirm-secrets-push',
+  'ci-secrets-failed',
+  'ask-github-actions-setup',
+  'ask-export-env',
+  'confirm-env-export-overwrite',
+  'pick-package-manager',
+  'pick-build-script',
+  'pick-build-script-custom',
+  'preview-workflow-file',
+])
+
+/**
+ * The session-parked interactive tail step, if any. Only honored while the
+ * slim tail progress proves the tail is actually in flight (credentialsSaved)
+ * — a stale park from an abandoned run can never hijack a fresh onboarding.
+ */
+function mcpTailParkedStep(appId: string, progress: { completedSteps?: { credentialsSaved?: unknown } } | null): string | null {
+  if (!progress?.completedSteps?.credentialsSaved)
+    return null
+  const parked = getSession(appId).tailParked
+  if (parked && MCP_TAIL_INTERACTIVE_STEPS.has(parked.step))
+    return parked.step
+  return null
+}
+
+/**
+ * Apply a validated tail answer: record the pref via the shared applyTailInput
+ * reducer (the exact TUI write) and resolve the explicit next step from the
+ * android TUI's onChange routing (app.tsx ~L3062-3470 — the [DIVERGE]
+ * driver-routed branches are reproduced verbatim; the engine-derived [MATCH]
+ * branches land on the same step the resume router would pick). Returns the
+ * (possibly) updated progress and the forced next step.
+ */
+function applyMcpTailAnswer<P extends TailEffectProgress>(
+  step: string,
+  input: OnboardingInput,
+  progress: P,
+  parked: TailParkedState | undefined,
+): { progress: P, next: string } {
+  switch (step) {
+    // retry re-runs the read-only detection; skip ends the tail.
+    case 'ci-secrets-setup':
+      return { progress, next: input.ciSecretAction === 'retry' ? 'detecting-ci-secrets' : 'build-complete' }
+
+    case 'ci-secrets-target-select': {
+      if (input.ciSecretAction === 'skip')
+        return { progress, next: 'build-complete' }
+      const target = (parked?.ciSecretTargets ?? []).find(t => t.provider === input.ciSecretAction) ?? null
+      if (!target) {
+        // Park lost (restart) — self-heal through the idempotent re-detection
+        // instead of fabricating a target the discovery never produced.
+        return { progress, next: 'detecting-ci-secrets' }
+      }
+      const next = applyTailInput('ci-secrets-target-select', progress, { step: 'ci-secrets-target-select', ciSecretTarget: target })
+      // TUI fan-out: github → the 3-option GH Actions prompt; gitlab → the
+      // legacy 2-option ask-ci-secrets flow.
+      return { progress: next, next: target.provider === 'github' ? 'ask-github-actions-setup' : 'ask-ci-secrets' }
+    }
+
+    case 'ask-ci-secrets':
+      return { progress, next: input.ciSecretAction === 'yes' ? 'checking-ci-secrets' : 'build-complete' }
+
+    case 'confirm-ci-secret-overwrite':
+      return { progress, next: input.ciSecretAction === 'replace' ? 'uploading-ci-secrets' : 'build-complete' }
+
+    case 'confirm-secrets-push':
+      return { progress, next: input.ciSecretAction === 'confirm' ? 'uploading-ci-secrets' : 'build-complete' }
+
+    case 'ci-secrets-failed': {
+      if (input.ciSecretAction !== 'retry')
+        return { progress, next: 'build-complete' }
+      // Retry re-checks when a destination is already chosen, else re-detects.
+      return { progress, next: progress.ciSecretTarget ? 'checking-ci-secrets' : 'detecting-ci-secrets' }
+    }
+
+    case 'ask-github-actions-setup': {
+      // Option value 'no' maps to the persisted setupMode 'declined'.
+      const mode = input.githubActionsSetup === 'no' ? 'declined' : input.githubActionsSetup!
+      const next = applyTailInput('ask-github-actions-setup', progress, { step: 'ask-github-actions-setup', value: mode })
+      return { progress: next, next: mode === 'declined' ? 'ask-export-env' : 'checking-ci-secrets' }
+    }
+
+    case 'ask-export-env': {
+      if (input.exportEnvAction !== 'yes')
+        return { progress, next: 'build-complete' }
+      // Record the custom path when given; otherwise leave it unset — the
+      // exporting-env effect falls back to deps.defaultExportPath (the path
+      // the prompt surfaced).
+      const next = input.envExportPath
+        ? applyTailInput('ask-export-env', progress, { step: 'ask-export-env', value: 'yes', envExportTargetPath: input.envExportPath })
+        : progress
+      return { progress: next, next: 'exporting-env' }
+    }
+
+    case 'confirm-env-export-overwrite':
+      return { progress, next: input.exportEnvAction === 'replace' ? 'overwrite-and-export-env' : 'build-complete' }
+
+    case 'pick-package-manager': {
+      const next = applyTailInput('pick-package-manager', progress, { step: 'pick-package-manager', selectedPackageManager: input.packageManager! })
+      return { progress: next, next: 'pick-build-script' }
+    }
+
+    case 'pick-build-script': {
+      if (input.buildScript === '__custom__')
+        return { progress, next: 'pick-build-script-custom' }
+      const choice = input.buildScript === '__skip__'
+        ? { type: 'skip' as const }
+        : { type: 'npm-script' as const, name: input.buildScript! }
+      const next = applyTailInput('pick-build-script', progress, { step: 'pick-build-script', buildScriptChoice: choice })
+      // TUI parity: the preview CONFIRM gate comes before any file write.
+      return { progress: next, next: 'preview-workflow-file' }
+    }
+
+    case 'pick-build-script-custom': {
+      const next = applyTailInput('pick-build-script-custom', progress, { step: 'pick-build-script-custom', command: input.buildScriptCustom! })
+      return { progress: next, next: 'preview-workflow-file' }
+    }
+
+    case 'preview-workflow-file': {
+      if (input.workflowFileAction === 'write')
+        return { progress, next: 'writing-workflow-file' }
+      if (input.workflowFileAction === 'view') {
+        // 'view' never advances: the preview re-parks with the proposed file
+        // text in context (the MCP's flattening of the TUI's fullscreen
+        // view-workflow-diff takeover).
+        return { progress, next: 'preview-workflow-file' }
+      }
+      return { progress, next: 'build-complete' }
+    }
+
+    default:
+      return { progress, next: step }
+  }
+}
+
+/** The non-secret tail render deps a platform driver hands to renderTailStep. */
+interface TailRenderDeps {
+  defaultExportPath?: (appId: string, platform: 'ios' | 'android') => string
+  generateWorkflow?: IosEffectDeps['generateWorkflow']
+}
+
+/**
+ * Map a neutral tail view to the structured MCP result for its step — the
+ * tail's mirror of the bespoke cases in mapAndroidView/mapIosView. Options come
+ * from tailViewForStep verbatim; `next.with` names the step's answer field;
+ * `context` surfaces NAMES/labels only (secret key NAMES, repo label, advice
+ * commands, the proposed workflow YAML — never credential values).
+ */
+function mapTailView(
+  step: string,
+  platform: Platform,
+  appId: string,
+  progress: TailEffectProgress,
+  viewCtx: TailStepCtx & { ciSecretError?: string, ciSecretExistingKeys?: string[] },
+  renderDeps: TailRenderDeps,
+): NextStepResult {
+  const view = tailViewForStep(step as TailStep, progress, viewCtx)
+  const progressValue = (platform === 'android' ? ANDROID_STEP_PROGRESS[step as AndroidOnboardingStep] : STEP_PROGRESS[step as OnboardingStep]) ?? 85
+  const options: ChoiceOption[] = (view.options ?? []).map(o => ({ value: o.value, label: o.label, note: o.note }))
+  const base = {
+    onboarding: 'capgo-builder' as const,
+    phase: 'credentials' as const,
+    platform,
+    state: step,
+    progress: progressValue,
+    kind: 'choice' as const,
+    options,
+    rules: ONBOARDING_RULES,
+  }
+  const entries = getSession(appId).tailCarried.ciSecretEntries ?? []
+  const secretKeyNames = entries.map(e => e.key)
+
+  switch (step) {
+    case 'ci-secrets-setup': {
+      const advice = viewCtx.ciSecretSetupAdvice ?? []
+      return {
+        ...base,
+        summary: `${view.title ?? 'Set up your git hosting CLI to upload env vars'} — the CLI was found but is not ready yet (see context.setupAdvice for the exact commands). Credentials are already saved; this only affects the CI secret upload.`,
+        ...(advice.length > 0 ? { context: { setupAdvice: advice } } : {}),
+        next: {
+          tool: NEXT_STEP_TOOL,
+          with: { ciSecretAction: '<retry|skip>' },
+          instruction: 'Show the user the setup commands from context.setupAdvice. After they installed/logged in, call next_step with ciSecretAction "retry" to re-detect; or "skip" to finish without uploading.',
+          call: `${NEXT_STEP_TOOL}({ ciSecretAction: "retry" })`,
+        },
+      }
+    }
+
+    case 'ci-secrets-target-select':
+      return {
+        ...base,
+        summary: view.prompt ?? 'Where should Capgo upload the build env vars?',
+        next: {
+          tool: NEXT_STEP_TOOL,
+          with: { ciSecretAction: `<${options.map(o => o.value).join('|')}>` },
+          instruction: 'Present the detected destinations to the user, then call next_step with ciSecretAction set to the chosen option\'s value ("skip" uploads nothing).',
+          call: `${NEXT_STEP_TOOL}({ ciSecretAction: "${options[0]?.value ?? 'skip'}" })`,
+        },
+      }
+
+    case 'ask-ci-secrets':
+      return {
+        ...base,
+        summary: view.prompt ?? 'Upload the build env vars?',
+        context: { secretKeys: secretKeyNames },
+        next: {
+          tool: NEXT_STEP_TOOL,
+          with: { ciSecretAction: '<yes|no>' },
+          instruction: 'Ask the user whether to upload the listed env vars (context.secretKeys — names only), then call next_step with ciSecretAction.',
+          call: `${NEXT_STEP_TOOL}({ ciSecretAction: "yes" })`,
+        },
+      }
+
+    case 'confirm-ci-secret-overwrite': {
+      const existing = viewCtx.ciSecretExistingKeys ?? []
+      return {
+        ...base,
+        summary: view.prompt ?? 'These env vars already exist and will be replaced:',
+        context: { existingKeys: existing },
+        next: {
+          tool: NEXT_STEP_TOOL,
+          with: { ciSecretAction: '<replace|skip>' },
+          instruction: 'Show the user the existing env var NAMES (context.existingKeys). Replacing overwrites them irreversibly — ask before proceeding, then call next_step with ciSecretAction.',
+          call: `${NEXT_STEP_TOOL}({ ciSecretAction: "replace" })`,
+        },
+      }
+    }
+
+    case 'confirm-secrets-push': {
+      const existingSet = new Set(viewCtx.ciSecretExistingKeys ?? [])
+      const repo = viewCtx.ciSecretRepoLabel ?? 'the repository'
+      return {
+        ...base,
+        summary: view.prompt ?? `Confirm before pushing secrets to ${repo}`,
+        context: {
+          repository: repo,
+          secretKeys: secretKeyNames.map(key => ({ name: key, status: existingSet.has(key) ? 'REPLACE' : 'NEW' })),
+        },
+        next: {
+          tool: NEXT_STEP_TOOL,
+          with: { ciSecretAction: '<confirm|cancel>' },
+          instruction: `Show the user the repository (${repo}) and the secret NAMES that will be pushed (context.secretKeys; REPLACE entries overwrite silently and cannot be recovered). Then call next_step with ciSecretAction "confirm" to push, or "cancel".`,
+          call: `${NEXT_STEP_TOOL}({ ciSecretAction: "confirm" })`,
+        },
+      }
+    }
+
+    case 'ci-secrets-failed':
+      return {
+        ...base,
+        summary: `Could not upload env vars${viewCtx.ciSecretError ? `: ${viewCtx.ciSecretError}` : '.'} Your credentials are already saved — only the CI upload failed.`,
+        ...(viewCtx.ciSecretError ? { context: { error: viewCtx.ciSecretError } } : {}),
+        next: {
+          tool: NEXT_STEP_TOOL,
+          with: { ciSecretAction: '<retry|continue>' },
+          instruction: 'Show the user the upload error, then call next_step with ciSecretAction "retry" to try again, or "continue" to finish without uploading.',
+          call: `${NEXT_STEP_TOOL}({ ciSecretAction: "retry" })`,
+        },
+      }
+
+    case 'ask-github-actions-setup':
+      return {
+        ...base,
+        summary: `${view.prompt ?? 'Set up GitHub Actions for you?'} Capgo can push the ${secretKeyNames.length} build env var${secretKeyNames.length === 1 ? '' : 's'} as repository secrets and drop a ${WORKFLOW_FILE_PATH} you can dispatch manually.`,
+        next: {
+          tool: NEXT_STEP_TOOL,
+          with: { githubActionsSetup: '<with-workflow|secrets-only|no>' },
+          instruction: 'Present the three options to the user, then call next_step with githubActionsSetup: "with-workflow" (secrets + workflow file), "secrets-only", or "no" (offers a local .env export instead).',
+          call: `${NEXT_STEP_TOOL}({ githubActionsSetup: "with-workflow" })`,
+        },
+      }
+
+    case 'ask-export-env': {
+      const defaultPath = renderDeps.defaultExportPath?.(appId, platform) ?? viewCtx.defaultEnvExportPath
+      return {
+        ...base,
+        summary: `${view.prompt ?? 'Export the credentials as a .env file instead?'}${defaultPath ? ` Default path: ${defaultPath}.` : ''} The file is written locally with 0600 permissions — never commit it.`,
+        ...(defaultPath ? { context: { defaultPath } } : {}),
+        next: {
+          tool: NEXT_STEP_TOOL,
+          with: { exportEnvAction: '<yes|no>', envExportPath: '<optional custom path with "yes">' },
+          instruction: `Ask the user. To write the .env file call next_step with exportEnvAction "yes"${defaultPath ? ` (defaults to ${defaultPath}; add envExportPath for a custom location)` : ' (add envExportPath for a custom location)'}; "no" finishes without exporting.`,
+          call: `${NEXT_STEP_TOOL}({ exportEnvAction: "yes" })`,
+        },
+      }
+    }
+
+    case 'confirm-env-export-overwrite': {
+      const path = progress.envExportTargetPath ?? viewCtx.defaultEnvExportPath ?? 'the file'
+      return {
+        ...base,
+        summary: view.prompt ?? `${path} already exists. Replace it with a fresh export, or skip?`,
+        context: { path },
+        next: {
+          tool: NEXT_STEP_TOOL,
+          with: { exportEnvAction: '<replace|skip>' },
+          instruction: 'The target .env file already exists. Ask the user, then call next_step with exportEnvAction "replace" to overwrite it, or "skip" to keep the existing file.',
+          call: `${NEXT_STEP_TOOL}({ exportEnvAction: "replace" })`,
+        },
+      }
+    }
+
+    case 'pick-package-manager':
+      return {
+        ...base,
+        summary: `${view.prompt ?? 'Which package manager does this project use?'} It drives the install + build steps in the generated workflow.`,
+        next: {
+          tool: NEXT_STEP_TOOL,
+          with: { packageManager: '<bun|npm|pnpm|yarn>' },
+          instruction: 'Ask the user which package manager the project uses, then call next_step with packageManager.',
+          call: `${NEXT_STEP_TOOL}({ packageManager: "npm" })`,
+        },
+      }
+
+    case 'pick-build-script': {
+      const scriptValues = options.map(o => o.value)
+      return {
+        ...base,
+        summary: `${view.prompt ?? 'Which script builds your web assets?'} The workflow runs it before \`capgo build request\`.`,
+        next: {
+          tool: NEXT_STEP_TOOL,
+          with: { buildScript: `<${scriptValues.join('|')}>` },
+          instruction: 'Present the script options to the user, then call next_step with buildScript set to the chosen value — a listed script name, "__custom__" to type a custom command, or "__skip__" when the app needs no build step.',
+          call: `${NEXT_STEP_TOOL}({ buildScript: "${scriptValues.find(v => v !== '__custom__' && v !== '__skip__') ?? '__custom__'}" })`,
+        },
+      }
+    }
+
+    case 'pick-build-script-custom':
+      return {
+        ...base,
+        kind: 'human_gate',
+        options: undefined,
+        summary: view.prompt ?? 'Custom build command',
+        collect: [{ field: 'buildScriptCustom', desc: 'The exact command the workflow runs to build the web assets (e.g. "make web")' }],
+        human: { instruction: 'Ask the user for the exact build command the workflow should run before `capgo build request` (e.g. "make web", "bash scripts/build.sh").' },
+        next: {
+          tool: NEXT_STEP_TOOL,
+          with: { buildScriptCustom: '<command>' },
+          instruction: 'Collect the custom build command from the user, then call next_step with buildScriptCustom.',
+          call: `${NEXT_STEP_TOOL}({ buildScriptCustom: "make web" })`,
+        },
+      }
+
+    case 'preview-workflow-file': {
+      // The proposed file content (non-secret: it references secret NAMES via
+      // ${{ secrets.X }} only). Pure + best-effort: an absent dep or a thrown
+      // generator just omits the preview text.
+      let workflowContent: string | undefined
+      let workflowPath = WORKFLOW_FILE_PATH
+      if (renderDeps.generateWorkflow && progress.buildScriptChoice) {
+        try {
+          const generated = renderDeps.generateWorkflow({
+            appId,
+            defaultPlatform: platform,
+            packageManager: progress.selectedPackageManager ?? 'npm',
+            buildScript: progress.buildScriptChoice,
+            secretKeys: secretKeyNames,
+          })
+          workflowContent = generated.content
+          workflowPath = generated.path
+        }
+        catch {
+          // Best-effort preview — the write step regenerates from the same opts.
+        }
+      }
+      return {
+        ...base,
+        summary: view.prompt ?? `What should we do with ${workflowPath}?`,
+        context: { workflowPath, ...(workflowContent ? { workflowContent } : {}) },
+        next: {
+          tool: NEXT_STEP_TOOL,
+          with: { workflowFileAction: '<write|view|cancel>' },
+          instruction: 'Show the user the proposed workflow file (context.workflowContent). Then call next_step with workflowFileAction: "write" to write it, "view" to get the file text again, or "cancel" to finish without writing.',
+          call: `${NEXT_STEP_TOOL}({ workflowFileAction: "write" })`,
+        },
+      }
+    }
+
+    default:
+      return {
+        ...base,
+        summary: view.prompt ?? view.title ?? view.message ?? `Capgo setup: ${step}`,
+        next: {
+          tool: NEXT_STEP_TOOL,
+          instruction: 'Present the options to the user, then call next_step with the step\'s answer field.',
+          call: `${NEXT_STEP_TOOL}({})`,
+        },
+      }
+  }
+}
+
+/** The generated workflow's repo-relative path (workflow-generator's constant, inlined to avoid an import cycle risk). */
+const WORKFLOW_FILE_PATH = '.github/workflows/capgo-build.yml'
+
+/**
+ * Render (and PARK) an interactive tail step. Merges the invocation's fresh
+ * effect transients over the previously parked view context (so a corrective
+ * re-render in a later call still has the option inventories), persists the
+ * park, and returns the structured mapping. Secrets never enter the park:
+ * every field is an option inventory / label / advice text.
+ */
+function renderTailStep(
+  platform: Platform,
+  appId: string,
+  step: string,
+  progress: TailEffectProgress,
+  invocationCtx: Record<string, unknown>,
+  renderDeps: TailRenderDeps,
+): NextStepResult {
+  const parked = getSession(appId).tailParked
+  const carried = getSession(appId).tailCarried
+  const pick = <T>(key: string): T | undefined =>
+    (invocationCtx[key] !== undefined ? invocationCtx[key] : (parked as Record<string, unknown> | undefined)?.[key]) as T | undefined
+  const viewCtx: TailStepCtx & { ciSecretError?: string, ciSecretExistingKeys?: string[] } = {
+    ciSecretTargets: pick('ciSecretTargets'),
+    ciSecretSetupAdvice: pick('ciSecretSetupAdvice'),
+    ciSecretRepoLabel: pick('ciSecretRepoLabel'),
+    ciSecretError: pick('ciSecretError'),
+    availableScripts: pick('availableScripts'),
+    recommendedScript: pick('recommendedScript'),
+    ciSecretEntries: carried.ciSecretEntries,
+    ciSecretExistingKeys: (invocationCtx.ciSecretExistingKeys as string[] | undefined) ?? carried.ciSecretExistingKeys,
+    defaultEnvExportPath: renderDeps.defaultExportPath?.(appId, platform),
+  }
+  setTailParked(appId, {
+    step,
+    ...(viewCtx.ciSecretTargets ? { ciSecretTargets: viewCtx.ciSecretTargets } : {}),
+    ...(viewCtx.ciSecretSetupAdvice ? { ciSecretSetupAdvice: viewCtx.ciSecretSetupAdvice } : {}),
+    ...(viewCtx.ciSecretRepoLabel !== undefined ? { ciSecretRepoLabel: viewCtx.ciSecretRepoLabel } : {}),
+    ...(viewCtx.ciSecretError ? { ciSecretError: viewCtx.ciSecretError } : {}),
+    ...(viewCtx.availableScripts ? { availableScripts: viewCtx.availableScripts } : {}),
+    ...(viewCtx.recommendedScript !== undefined ? { recommendedScript: viewCtx.recommendedScript } : {}),
+  })
+  return mapTailView(step, platform, appId, progress, viewCtx, renderDeps)
+}
+
 export async function decideAdvance(
   facts: PreflightFacts,
   progress: OnboardingProgress | null,
@@ -1598,13 +2811,21 @@ export async function decideAdvance(
   deps: EngineDeps,
 ): Promise<NextStepResult> {
   // Thread a verify-app gate answer (or an S6b recovery answer — cert-limit /
-  // duplicate-profile / error screen) into the iOS driver. All validated
-  // upstream by the strict iOS step gate in drive().
+  // duplicate-profile / error screen — or an S12 ephemeral import pick) into
+  // the iOS driver. All validated upstream by the strict iOS step gate in
+  // drive(). The PERSISTED import forks (setupMethod / importDistribution)
+  // are applied in drive() via persistIosImportForkInput, not threaded here.
   const iosOpts = (input && (
     input.verifyAction !== undefined
     || input.certToRevoke !== undefined
     || input.duplicateProfileAction !== undefined
     || input.errorAction !== undefined
+    || input.identityChoice !== undefined
+    || input.profileChoice !== undefined
+    || input.importRecoveryAction !== undefined
+    || input.portalAction !== undefined
+    || input.profilePath !== undefined
+    || input.exportConfirm !== undefined
   ))
     ? {
         verifyAction: input.verifyAction,
@@ -1612,6 +2833,12 @@ export async function decideAdvance(
         certToRevoke: input.certToRevoke,
         duplicateProfileAction: input.duplicateProfileAction,
         errorAction: input.errorAction,
+        identityChoice: input.identityChoice,
+        profileChoice: input.profileChoice,
+        importRecoveryAction: input.importRecoveryAction,
+        portalAction: input.portalAction,
+        profilePath: input.profilePath,
+        exportConfirm: input.exportConfirm,
       }
     : undefined
   if (input?.platform === 'ios' || input?.platform === 'android') {
@@ -1930,6 +3157,44 @@ async function persistIosApiKeyInput(deps: EngineDeps, appId: string, input: Onb
   }
 }
 
+/**
+ * S12: apply the PERSISTED import-fork answers (setupMethod from the
+ * setup-method-select choice; importDistribution — incl. the '__cancel__'
+ * switch-to-create-new escape — from import-distribution-mode) through the
+ * SAME pure reducers the TUI's onChange handlers use (applyIosInput), so the
+ * persisted progress is byte-identical to a TUI run and the resume routing
+ * (getIosResumeStep / getImportEntryStep) takes over from there. The MCP
+ * setupMethod vocabulary IS the persisted one ('create-new'/'import-existing');
+ * the reducer's input vocabulary is the TUI Select's ('create'/'import').
+ */
+async function persistIosImportForkInput(deps: EngineDeps, appId: string, input: OnboardingInput): Promise<void> {
+  const ios = deps.iosEffectDeps
+  const loadIosProgress = ios?.loadProgress ?? deps.loadProgress
+  const progressRaw: OnboardingProgress = (await loadIosProgress(appId)) ?? {
+    platform: 'ios',
+    appId,
+    startedAt: new Date().toISOString(),
+    completedSteps: {},
+  }
+
+  let updated = progressRaw
+  if (input.setupMethod !== undefined) {
+    updated = applyIosInput('setup-method-select', updated, {
+      step: 'setup-method-select',
+      value: input.setupMethod === 'import-existing' ? 'import' : 'create',
+    })
+  }
+  if (input.importDistribution !== undefined) {
+    updated = applyIosInput('import-distribution-mode', updated, {
+      step: 'import-distribution-mode',
+      value: input.importDistribution,
+    })
+  }
+
+  if (updated !== progressRaw)
+    await ios?.saveProgress?.(appId, updated)
+}
+
 async function executeAuto(result: NextStepResult, facts: PreflightFacts, deps: EngineDeps): Promise<NextStepResult | null> {
   if (result.state === 'registering-app' && facts.appId) {
     const reg = await deps.registerApp(facts.appId)
@@ -2016,6 +3281,73 @@ function buildFailedResult(appId: string, platform: Platform, rec: BuildOutputRe
   }
 }
 
+/**
+ * S8: route a SUCCESSFUL checkBuild into the shared post-save tail instead of
+ * the legacy terminal done. Three guards keep the C2/D2 contract intact for
+ * every legacy caller:
+ *  - the slim tail progress (completedSteps.credentialsSaved) must exist on
+ *    disk — only the S8 MCP save writes it; TUI/legacy fixtures fall through
+ *    to buildDoneResult verbatim;
+ *  - the driver must have wired detectCiSecretTargets (the tail's first
+ *    effect) — callers without tail deps keep the legacy terminal result;
+ *  - any error falls back to the legacy terminal result, never breaking the
+ *    polling protocol.
+ * Persists completedSteps.buildRequested (the double-build guard) BEFORE
+ * routing, so a resume can never re-offer the build. The tail then resumes at
+ * 'detecting-ci-secrets' via the platform's tailResumeStep. Returns null when
+ * the legacy terminal result should be used.
+ */
+async function enterTailAfterBuild(
+  deps: EngineDeps,
+  appId: string,
+  platform: Platform,
+  rec: BuildOutputRecord,
+): Promise<NextStepResult | null> {
+  try {
+    const buildUrl = `https://capgo.app/app/${appId}/builds`
+    if (platform === 'ios') {
+      if (!deps.iosEffectDeps?.detectCiSecretTargets || !deps.iosEffectDeps.saveProgress)
+        return null
+      const prog = await deps.loadProgress(appId)
+      if (!prog?.completedSteps?.credentialsSaved)
+        return null
+      if (!prog.completedSteps.buildRequested) {
+        const updated = slimIosTailProgress({
+          ...prog,
+          completedSteps: { ...prog.completedSteps, buildRequested: { buildUrl } },
+        })
+        await deps.iosEffectDeps.saveProgress(appId, updated)
+      }
+    }
+    else {
+      if (!deps.androidEffectDeps.detectCiSecretTargets)
+        return null
+      const prog = await deps.loadAndroidProgress(appId)
+      if (!prog?.completedSteps?.credentialsSaved)
+        return null
+      if (!prog.completedSteps.buildRequested) {
+        const updated = slimAndroidTailProgress({
+          ...prog,
+          completedSteps: { ...prog.completedSteps, buildRequested: { buildUrl } },
+        })
+        await deps.androidEffectDeps.saveAndroidProgress(appId, updated)
+      }
+    }
+    const facts = await gatherFacts(deps)
+    const result = platform === 'ios' ? await decideIos(facts, deps) : await decideAndroid(facts, deps)
+    // Lead with the build success the user just confirmed, ahead of the
+    // tail's first question. Only the public dashboard/output URL — nothing
+    // from the carried state may serialize here.
+    return {
+      ...result,
+      summary: `First cloud build for "${appId}" (${platform}) is ready: ${rec.outputUrl ?? 'see the build record'}. ${result.summary}`,
+    }
+  }
+  catch {
+    return null
+  }
+}
+
 async function drive(deps: EngineDeps, input?: OnboardingInput): Promise<NextStepResult> {
   if (input?.checkBuild) {
     const checkAppId = await deps.getAppId()
@@ -2035,8 +3367,17 @@ async function drive(deps: EngineDeps, input?: OnboardingInput): Promise<NextSte
       const rec = await deps.readBuildRecord(recordPath)
       if (rec === null)
         return buildWaitingResult(checkPlatform)
-      if (rec.status === 'success' || Boolean(rec.outputUrl))
+      if (rec.status === 'success' || Boolean(rec.outputUrl)) {
+        // S8: a CONFIRMED first build enters the shared post-save tail
+        // (CI-secrets → env/workflow) instead of ending the conversation —
+        // but ONLY when the slim tail progress + tail deps exist (legacy
+        // callers keep the terminal result; the C2/D2 polling protocol
+        // itself is unchanged).
+        const tailEntry = await enterTailAfterBuild(deps, checkAppId, checkPlatform, rec)
+        if (tailEntry)
+          return tailEntry
         return buildDoneResult(checkAppId, checkPlatform, rec)
+      }
       return buildFailedResult(checkAppId, checkPlatform, rec, recordPath)
     }
   }
@@ -2126,7 +3467,10 @@ async function drive(deps: EngineDeps, input?: OnboardingInput): Promise<NextSte
     const gateAppId = await deps.getAppId()
     if (gateAppId) {
       const gateProgress = await deps.loadAndroidProgress(gateAppId)
-      const currentStep = getAndroidResumeStep(gateProgress)
+      // S9-S11: while parked on an interactive tail step, an android key must
+      // be gated against THAT step (whose only allowed field is its tail
+      // answer), not the resume-derived step.
+      const currentStep = (mcpTailParkedStep(gateAppId, gateProgress) as AndroidOnboardingStep | null) ?? getAndroidResumeStep(gateProgress)
       const check = validateStepInput(currentStep, input as unknown as Record<string, unknown>)
       if (!check.ok) {
         const facts = await gatherFacts(deps)
@@ -2156,13 +3500,16 @@ async function drive(deps: EngineDeps, input?: OnboardingInput): Promise<NextSte
       await persistAndroidInput(deps, inputAppId, input!)
   }
 
-  // ── iOS granular input path (S6a/S6b) ──────────────────────────────────────
+  // ── iOS granular input path (S6a/S6b/S12) ──────────────────────────────────
   // The ASC API key trio (the single ios-api-key gate, all three in one call),
-  // the verify-app gate answer, and the S6b recovery answers (certToRevoke /
-  // duplicateProfileAction / errorAction). Validated by the strict iOS gate
-  // against the EFFECTIVE current step (the session-parked recovery step when
-  // one is parked, else the persisted resume step) BEFORE anything is applied
-  // — a stale/early answer or an off-step field is rejected with a correction.
+  // the verify-app gate answer, the S6b recovery answers (certToRevoke /
+  // duplicateProfileAction / errorAction), and the S12 import-fork answers
+  // (setupMethod / importDistribution / the ephemeral import picks). Validated
+  // by the strict iOS gate against the EFFECTIVE current step (the
+  // session-parked recovery/import step when one is parked, else the persisted
+  // resume step, mapped through the setup-method fork) BEFORE anything is
+  // applied — a stale/early answer or an off-step field is rejected with a
+  // correction and nothing is applied.
   const iosInputPresent = input && (
     input.p8Path !== undefined
     || input.keyId !== undefined
@@ -2172,6 +3519,14 @@ async function drive(deps: EngineDeps, input?: OnboardingInput): Promise<NextSte
     || input.certToRevoke !== undefined
     || input.duplicateProfileAction !== undefined
     || input.errorAction !== undefined
+    || input.setupMethod !== undefined
+    || input.importDistribution !== undefined
+    || input.identityChoice !== undefined
+    || input.profileChoice !== undefined
+    || input.importRecoveryAction !== undefined
+    || input.portalAction !== undefined
+    || input.profilePath !== undefined
+    || input.exportConfirm !== undefined
   )
   if (iosInputPresent) {
     const gateAppId = await deps.getAppId()
@@ -2184,7 +3539,7 @@ async function drive(deps: EngineDeps, input?: OnboardingInput): Promise<NextSte
       // is rejected with a correction and the gate renders.
       const loaded = await deps.loadProgress(gateAppId)
       const gateProgress = await seedIosCredentialsExistGate(gateAppId, deps.iosEffectDeps, loaded)
-      const currentStep = effectiveIosStep(gateAppId, gateProgress)
+      const currentStep = effectiveIosStep(gateAppId, gateProgress, deps.iosEffectDeps)
       const check = validateIosStepInput(currentStep, input as unknown as Record<string, unknown>)
       if (!check.ok) {
         const facts = await gatherFacts(deps)
@@ -2203,12 +3558,75 @@ async function drive(deps: EngineDeps, input?: OnboardingInput): Promise<NextSte
         if (getSession(gateAppId).iosCarried.error !== undefined)
           dropIosCarried(gateAppId, ['error', 'retryStep', 'errorAction'])
       }
+      // S12: the PERSISTED import-fork reducers (the TUI's setup-method /
+      // distribution-mode onChange writes). The ephemeral import picks ride
+      // through decideAdvance → decideIos instead (the resolver mechanism).
+      if (input!.setupMethod !== undefined || input!.importDistribution !== undefined)
+        await persistIosImportForkInput(deps, gateAppId, input!)
+    }
+  }
+  // ── S9-S11: post-build tail answer path ─────────────────────────────────────
+  // The tail family fields (ciSecretAction / githubActionsSetup /
+  // exportEnvAction(+envExportPath) / packageManager / buildScript /
+  // buildScriptCustom / workflowFileAction). Validated by the strict tail gate
+  // against the EFFECTIVE tail step (the session-parked interactive step when
+  // one is parked, else the platform resume step) BEFORE anything is applied —
+  // an off-step / mis-vocabulary / batched answer is rejected with a correction
+  // and NOTHING is applied. A valid answer records its pref via the shared
+  // applyTailInput reducer, persists the SLIM progress, clears the park and
+  // re-drives the platform with the TUI-routed next step.
+  const tailInputPresent = Boolean(input && TAIL_INPUT_KEYS.some(k => (input as unknown as Record<string, unknown>)[k] !== undefined && (input as unknown as Record<string, unknown>)[k] !== null))
+  if (tailInputPresent) {
+    const tailAppId = await deps.getAppId()
+    if (tailAppId) {
+      const androidProg = await deps.loadAndroidProgress(tailAppId)
+      const iosProg = await deps.loadProgress(tailAppId)
+      const tailPlatform: Platform | null = androidProg?.completedSteps?.credentialsSaved
+        ? 'android'
+        : iosProg?.completedSteps?.credentialsSaved ? 'ios' : null
+      const facts = await gatherFacts(deps)
+      if (!tailPlatform) {
+        // No tail in flight — a tail answer here is always stale/early.
+        const corrective = await decideAdvance(facts, iosProg, undefined, deps)
+        return { ...corrective, summary: `Tail answer fields (ciSecretAction / githubActionsSetup / exportEnvAction / packageManager / buildScript / buildScriptCustom / workflowFileAction) only apply to the post-build CI/workflow steps — none is active right now. Answer the current step instead.\n\n${corrective.summary}` }
+      }
+      const tailProgress = (tailPlatform === 'android' ? androidProg! : iosProg!) as TailEffectProgress & { completedSteps: Record<string, unknown> }
+      const parked = getSession(tailAppId).tailParked
+      const effectiveStep = mcpTailParkedStep(tailAppId, tailProgress as { completedSteps?: { credentialsSaved?: unknown } })
+        ?? (tailPlatform === 'android' ? getAndroidResumeStep(androidProg) : getIosResumeStep(iosProg))
+      const check = validateTailStepInput(effectiveStep, input as unknown as Record<string, unknown>, {
+        ciSecretTargets: parked?.ciSecretTargets,
+        availableScripts: parked?.availableScripts,
+      })
+      if (!check.ok) {
+        // Corrective re-render: the park keeps the decide loop on the SAME
+        // question; nothing was applied.
+        const corrective = tailPlatform === 'android' ? await decideAndroid(facts, deps) : await decideIos(facts, deps)
+        return { ...corrective, summary: `${check.message}\n\n${corrective.summary}` }
+      }
+      const applied = applyMcpTailAnswer(effectiveStep, input!, tailProgress, parked)
+      if (applied.progress !== tailProgress) {
+        // A pref was recorded — persist it through the SLIM whitelist writer
+        // so the answer survives a restart (resume mid-tail).
+        if (tailPlatform === 'android')
+          await deps.androidEffectDeps.saveAndroidProgress(tailAppId, slimAndroidTailProgress(applied.progress as AndroidOnboardingProgress))
+        else
+          await deps.iosEffectDeps?.saveProgress?.(tailAppId, slimIosTailProgress(applied.progress as OnboardingProgress))
+      }
+      // NOTE: the park is intentionally NOT cleared here — the next interactive
+      // render REPLACES it (setTailParked), carrying the non-secret inventories
+      // (detected targets / scripts / repo label) forward exactly like the
+      // TUI's React state, and the terminal clears the whole session.
+      const freshFacts = await gatherFacts(deps)
+      return tailPlatform === 'android'
+        ? decideAndroid(freshFacts, deps, { tailNext: applied.next as AndroidOnboardingStep })
+        : decideIos(freshFacts, deps, { tailNext: applied.next as OnboardingStep })
     }
   }
 
-  // Detect sign-in proceed: plain continue (no android/ios input, no platform choice) at google-sign-in.
+  // Detect sign-in proceed: plain continue (no android/ios/tail input, no platform choice) at google-sign-in.
   let signInProceed = false
-  const isPlainContinue = !input || (!input.platform && !input.runBuild && !input.checkBuild && !androidInputPresent && !iosInputPresent)
+  const isPlainContinue = !input || (!input.platform && !input.runBuild && !input.checkBuild && !androidInputPresent && !iosInputPresent && !tailInputPresent)
   if (isPlainContinue) {
     const spAppId = await deps.getAppId()
     if (spAppId) {
