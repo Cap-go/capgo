@@ -56,6 +56,15 @@ export interface DecideCompatibilityEventsInput {
    * transition carries a new one and inserts a fresh, unresolved row.
    */
   changeOccurredAt: string
+  /**
+   * Unresolved events already on file for this channel, used to recognize a
+   * REVERT: when the new default bundle is the `previous_version` of an
+   * unresolved event, users are being returned to the baseline they are
+   * already on, so no new (mirror) event should be raised — otherwise the
+   * recommended remediation (roll the channel back) would itself raise a fresh
+   * unresolved event, forever.
+   */
+  unresolvedEvents?: readonly UnresolvedCompatibilityEvent[]
 }
 
 /**
@@ -117,7 +126,7 @@ function hasNativePackages(bundle: CompatibilityBundle | null | undefined): bund
  * run it). The handler only excludes when the metadata is genuinely unavailable.
  */
 export function decideCompatibilityEvents(input: DecideCompatibilityEventsInput): CompatibilityEventInsert[] {
-  const { newChannel, currentBundle, previousDefaults, changeOccurredAt } = input
+  const { newChannel, currentBundle, previousDefaults, changeOccurredAt, unresolvedEvents = [] } = input
 
   // The new channel must be a default (public) for any platform to matter.
   if (!newChannel.public)
@@ -145,6 +154,19 @@ export function decideCompatibilityEvents(input: DecideCompatibilityEventsInput)
 
     // Same bundle on both sides -> nothing changed for this platform.
     if (previous.bundle.id === currentBundle.id)
+      continue
+
+    // REVERT: the new default is a baseline an unresolved event already says
+    // this channel's users are on. Returning them to it is the remediation the
+    // event recommends, not a new incompatibility — raising a mirror event here
+    // would loop forever (each rollback raising the next event). The matching
+    // unresolved event is auto-resolved by decideAutoResolves on this same pass.
+    const isRevertToKnownBaseline = unresolvedEvents.some(event =>
+      event.channel_id === newChannel.id
+      && event.platform === previous.platform
+      && event.previous_version_id === currentBundle.id,
+    )
+    if (isRevertToKnownBaseline)
       continue
 
     const summary: CompatibilitySummary = summarizeBundleCompatibility(
@@ -177,6 +199,7 @@ export function decideCompatibilityEvents(input: DecideCompatibilityEventsInput)
 export interface UnresolvedCompatibilityEvent {
   id: number
   platform: CompatibilityPlatform
+  channel_id: number | null
   previous_version_id: number | null
   previous_version_name: string
   current_version_id: number | null

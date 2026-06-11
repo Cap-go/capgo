@@ -132,10 +132,13 @@ async function rollbackChannels() {
     toast.error(t('error-update-channel'))
   }
   else {
-    toast.success(t('linked-bundle'))
-    toast.info(t('cloud-replication-delay'))
+    toast.success(t('compat-fix-rollback-done'))
   }
+  // The compatibility queue resolves the event a few seconds after the channel
+  // write, so refresh now and again shortly after to catch the resolution.
   await refreshData()
+  setTimeout(() => refreshData(), 4000)
+  setTimeout(() => refreshData(), 10000)
 }
 
 // Rolling channels back to older bundles is outward-facing (devices start
