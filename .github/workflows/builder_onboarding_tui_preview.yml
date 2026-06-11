@@ -161,11 +161,10 @@ jobs:
         id: r2
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          R2_ACCESS_KEY_ID: ${{ secrets.BUILDER_ONBOARDING_TUI_R2_ACCESS_KEY_ID }}
-          R2_SECRET_ACCESS_KEY: ${{ secrets.BUILDER_ONBOARDING_TUI_R2_SECRET_ACCESS_KEY }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.BUILDER_ONBOARDING_TUI_CLOUDFLARE_API_TOKEN }}
           R2_BUCKET: ${{ vars.BUILDER_ONBOARDING_TUI_R2_BUCKET }}
           REPORTS_BASE_URL: ${{ vars.BUILDER_ONBOARDING_TUI_REPORTS_URL }}
           PR_NUMBER: ${{ steps.pr.outputs.number }}
           HEAD_SHA: ${{ steps.pr.outputs.sha }}
         run: |
-          node .github/scripts/upload-r2-results.mjs
+          .github/scripts/upload-r2-results.sh
