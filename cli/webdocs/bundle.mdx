@@ -28,15 +28,13 @@ Capgo never inspects external content. Add encryption for trustless security.
 npx @capgo/cli@latest bundle upload com.example.app --path ./dist --channel production,beta
 ```
 
-Use a comma-separated `--channel` value to assign one upload to multiple channels. Channels that already have the uploaded checksum are skipped while the remaining requested channels are assigned.
-
 **Options:**
 
 | Param          | Type          | Description          |
 | -------------- | ------------- | -------------------- |
 | **-a** | <code>string</code> | API key to link to your account |
 | **-p** | <code>string</code> | Path of the folder to upload, if not provided it will use the webDir set in capacitor.config |
-| **-c** | <code>string</code> | Channel to link to. Use comma-separated names, for example <code>production,beta</code>, to assign the upload to multiple channels |
+| **-c** | <code>string</code> | Channel to link to. Use commas for multiple channels, for example production,beta |
 | **-e** | <code>string</code> | Link to external URL instead of upload to Capgo Cloud |
 | **--iv-session-key** | <code>string</code> | Set the IV and session key for bundle URL external |
 | **--s3-region** | <code>string</code> | Region for your S3 bucket |
@@ -77,11 +75,11 @@ Use a comma-separated `--channel` value to assign one upload to multiple channel
 | **--package-json** | <code>string</code> | Paths to package.json files for monorepos (comma-separated) |
 | **--node-modules** | <code>string</code> | Paths to node_modules directories for monorepos (comma-separated) |
 | **--encrypt-partial** | <code>boolean</code> | Encrypt delta update files (auto-enabled for updater > 6.14.4) |
-| **--delete-linked-bundle-on-upload** | <code>boolean</code> | Locates the currently linked bundles in the target channel(s), and deletes them |
+| **--delete-linked-bundle-on-upload** | <code>boolean</code> | Locates the currently linked bundle in the channel you are trying to upload to, and deletes it |
 | **--no-brotli-patterns** | <code>string</code> | Files to exclude from Brotli compression (comma-separated globs, e.g., "*.jpg,*.png") |
 | **--disable-brotli** | <code>boolean</code> | Completely disable brotli compression even if updater version supports it |
 | **--version-exists-ok** | <code>boolean</code> | Exit successfully if bundle version already exists, useful for CI/CD workflows with monorepos |
-| **--self-assign** | <code>boolean</code> | Allow devices to auto-join the target channel(s) (updates channel setting) |
+| **--self-assign** | <code>boolean</code> | Allow devices to auto-join this channel (updates channel setting) |
 | **--qr-preview** | <code>boolean</code> | Print a terminal QR code for this bundle preview after upload |
 | **--supa-host** | <code>string</code> | Custom Supabase host URL (for self-hosting or Capgo development) |
 | **--supa-anon** | <code>string</code> | Custom Supabase anon key (for self-hosting) |
