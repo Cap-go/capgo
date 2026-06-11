@@ -124,4 +124,29 @@ describe('sso enforcement redirect handling', () => {
     expect(mockSignOut).not.toHaveBeenCalled()
     expect(next).toHaveBeenCalledWith()
   })
+
+  it('does not cache allow decisions from impersonation proof for later password checks', async () => {
+    mockGetSpoofedAdminJwt.mockReturnValueOnce('admin-token-456').mockReturnValueOnce(null)
+    vi.mocked(fetch).mockResolvedValue({
+      ok: true,
+      json: vi.fn().mockResolvedValue({ allowed: true }),
+    } as unknown as Response)
+
+    const guard = await getGuard()
+
+    await guard({ path: '/dashboard' }, { path: '/login' }, vi.fn())
+    await guard({ path: '/dashboard' }, { path: '/login' }, vi.fn())
+
+    expect(fetch).toHaveBeenCalledTimes(2)
+    expect(fetch).toHaveBeenNthCalledWith(1, 'https://api.capgo.test/private/sso/check-enforcement', expect.objectContaining({
+      headers: expect.objectContaining({
+        'X-Capgo-Spoof-Admin-Authorization': 'Bearer admin-token-456',
+      }),
+    }))
+    expect(fetch).toHaveBeenNthCalledWith(2, 'https://api.capgo.test/private/sso/check-enforcement', expect.objectContaining({
+      headers: expect.not.objectContaining({
+        'X-Capgo-Spoof-Admin-Authorization': expect.any(String),
+      }),
+    }))
+  })
 })

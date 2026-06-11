@@ -18,8 +18,8 @@ export async function logAsUser(identifier: string, router: Router) {
     if (!identifier)
       throw new Error('Missing user id, email, or org id')
 
-    if (isSpoofed())
-      await unspoofUser()
+    if (isSpoofed() && !(await unspoofUser()))
+      throw new Error('Cannot restore admin session, please sign in again')
 
     const supabase = useSupabase()
     const { data, error } = await supabase.functions.invoke('private/log_as', {

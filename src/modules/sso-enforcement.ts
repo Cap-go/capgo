@@ -6,7 +6,7 @@ interface SsoEnforcementResponse {
   reason?: string
 }
 
-const SSO_CHECK_CACHE_KEY = 'sso_enforcement_checked'
+const SSO_CHECK_CACHE_KEY = 'sso_enforcement_checked_v2'
 const SSO_CHECK_CACHE_TTL = 5 * 60 * 1000
 const SPOOF_ADMIN_AUTHORIZATION_HEADER = 'X-Capgo-Spoof-Admin-Authorization'
 
@@ -71,15 +71,15 @@ export const install: UserModule = ({ router }) => {
     if (!userId)
       return next()
 
-    if (isCacheValid(userId))
-      return next()
-
     try {
+      const spoofedAdminJwt = await getSpoofedAdminJwt()
+      if (!spoofedAdminJwt && isCacheValid(userId))
+        return next()
+
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${session.access_token}`,
       }
-      const spoofedAdminJwt = await getSpoofedAdminJwt()
       if (spoofedAdminJwt)
         headers[SPOOF_ADMIN_AUTHORIZATION_HEADER] = `Bearer ${spoofedAdminJwt}`
 
@@ -106,7 +106,8 @@ export const install: UserModule = ({ router }) => {
         return next('/login?sso_required=true')
       }
 
-      setCacheValid(userId)
+      if (!spoofedAdminJwt)
+        setCacheValid(userId)
     }
     catch (e) {
       // Fail closed: if enforcement check is unreachable, sign user out for safety

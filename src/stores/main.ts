@@ -6,12 +6,12 @@ import { ref } from 'vue'
 import { getDaysBetweenDates } from '~/services/conversion'
 import { reset } from '~/services/posthog'
 import {
+  clearSpoof,
   findBestPlan,
   getAllDashboard,
   getLocalConfig,
   getTotalStorage,
   normalizeDashboardDateRange,
-  unspoofUser,
   useSupabase,
 } from '~/services/supabase'
 import { createDeferredPromise } from '../utils/promise'
@@ -68,7 +68,7 @@ export const useMainStore = defineStore('main', () => {
         supabase.auth.signOut()
       }, 300)
     })
-    await unspoofUser()
+    clearSpoof()
   }
 
   const getTotalStats: () => TotalStats = () => {

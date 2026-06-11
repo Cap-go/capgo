@@ -181,6 +181,10 @@ export function saveSpoof(jwt: string, refreshToken: string) {
   return saveSpoofedAdminSession({ jwt, refreshToken })
 }
 
+export function clearSpoof() {
+  localStorage.removeItem(getSpoofedAdminStorageKey())
+}
+
 export async function getSpoofedAdminJwt() {
   const spoofedAdminSession = getSpoofedAdminSession()
   if (!spoofedAdminSession)
@@ -189,10 +193,15 @@ export async function getSpoofedAdminJwt() {
   if (!shouldRefreshSpoofedAdminJwt(spoofedAdminSession.jwt))
     return spoofedAdminSession.jwt
 
-  const refreshedSession = await refreshSpoofedAdminSession(spoofedAdminSession)
-  if (refreshedSession) {
-    saveSpoofedAdminSession(refreshedSession)
-    return refreshedSession.jwt
+  try {
+    const refreshedSession = await refreshSpoofedAdminSession(spoofedAdminSession)
+    if (refreshedSession) {
+      saveSpoofedAdminSession(refreshedSession)
+      return refreshedSession.jwt
+    }
+  }
+  catch {
+    console.error('Failed to refresh spoofed admin session')
   }
 
   const expiresAt = getJwtExpiresAt(spoofedAdminSession.jwt)
