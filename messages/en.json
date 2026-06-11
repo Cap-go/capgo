@@ -121,6 +121,8 @@
   "action-need-plan-upgrade": "Blocked - plan upgrade required",
   "action-no-channel-or-override": "No channel or override configured",
   "action-no-new": "Already has latest version",
+  "action-native-app-version-changed": "Native app version changed",
+  "action-os-version-changed": "OS version changed",
   "action-ping": "Device heartbeat",
   "action-rate-limited": "Request rate limited",
   "action-reset": "Reset to default version",

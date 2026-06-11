@@ -19,6 +19,11 @@ const HEALTH_STATS_ACTIONS = [
   'webview_content_process_terminated',
 ] as const
 
+const NATIVE_VERSION_STATS_ACTIONS = [
+  'os_version_changed',
+  'native_app_version_changed',
+] as const
+
 describe('stats action filters', () => {
   it('keeps the frontend action filters in sync with the backend action enum', () => {
     const frontendFilterKeys = statsActionFilters.map(([filterKey]) => filterKey)
@@ -33,6 +38,17 @@ describe('stats action filters', () => {
     expect(ALLOWED_STATS_ACTIONS).toEqual(expect.arrayContaining([...HEALTH_STATS_ACTIONS]))
 
     for (const action of HEALTH_STATS_ACTIONS) {
+      const filterKey = actionToFilter[action]
+
+      expect(filterKey).toBeTruthy()
+      expect(filterToAction[filterKey]).toBe(action)
+    }
+  })
+
+  it('keeps native version change actions accepted and filterable', () => {
+    expect(ALLOWED_STATS_ACTIONS).toEqual(expect.arrayContaining([...NATIVE_VERSION_STATS_ACTIONS]))
+
+    for (const action of NATIVE_VERSION_STATS_ACTIONS) {
       const filterKey = actionToFilter[action]
 
       expect(filterKey).toBeTruthy()

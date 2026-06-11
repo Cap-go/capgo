@@ -313,7 +313,9 @@ CREATE TYPE "public"."stats_action" AS ENUM (
     'webview_security_policy_violation',
     'webview_unclean_restart',
     'webview_render_process_gone',
-    'webview_content_process_terminated'
+    'webview_content_process_terminated',
+    'os_version_changed',
+    'native_app_version_changed'
 );
 
 
