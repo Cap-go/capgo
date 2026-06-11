@@ -35,6 +35,9 @@ const app = ref<Database['public']['Tables']['apps']['Row']>()
 const events = ref<CompatibilityEventRow[]>([])
 const existingChannelIds = ref<Set<number>>(new Set())
 const existingVersionIds = ref<Set<number>>(new Set())
+// Channels whose disable_auto_update_under_native guard is OFF: a rollback can
+// reach devices already on a newer native build, so the confirm dialog warns.
+const guardOffChannelIds = ref<Set<number>>(new Set())
 interface MemberInfo {
   email: string
   image_url: string | null
@@ -147,9 +150,17 @@ function openRollbackDialog() {
   const changes = rollbackTargets.value
     .map(target => `${target.channelName} → ${target.versionName}`)
     .join(', ')
+  // Without the downgrade guard, devices that already installed a newer native
+  // build could be served the rolled-back (older) bundle — warn about it.
+  const unguarded = rollbackTargets.value
+    .filter(target => guardOffChannelIds.value.has(target.channelId))
+    .map(target => target.channelName)
+  const description = unguarded.length > 0
+    ? `${t('compat-fix-rollback-confirm', { changes })} ${t('compat-fix-rollback-warn-no-guard', { channels: unguarded.join(', ') })}`
+    : t('compat-fix-rollback-confirm', { changes })
   dialogStore.openDialog({
     title: t('compat-fix-rollback-title'),
-    description: t('compat-fix-rollback-confirm', { changes }),
+    description,
     buttons: [
       {
         text: t('button-cancel'),
@@ -214,26 +225,32 @@ async function loadEvents() {
 }
 
 // Channel names are snapshots that outlive deleted channels; only link the
-// ones that still exist.
+// ones that still exist. Also remember which channels have the downgrade guard
+// (disable_auto_update_under_native) off, so the rollback confirm can warn.
 async function loadExistingChannels() {
   const channelIds = [...new Set(events.value
     .map(event => event.channel_id)
     .filter((channelId): channelId is number => channelId !== null))]
   if (channelIds.length === 0) {
     existingChannelIds.value = new Set()
+    guardOffChannelIds.value = new Set()
     return
   }
   const { data, error } = await supabase
     .from('channels')
-    .select('id')
+    .select('id, disable_auto_update_under_native')
     .eq('app_id', id.value)
     .in('id', channelIds)
   if (error) {
     console.error('[Compatibility] Error checking channels:', error)
     existingChannelIds.value = new Set()
+    guardOffChannelIds.value = new Set()
     return
   }
   existingChannelIds.value = new Set((data ?? []).map(channel => channel.id))
+  guardOffChannelIds.value = new Set((data ?? [])
+    .filter(channel => !channel.disable_auto_update_under_native)
+    .map(channel => channel.id))
 }
 
 function openChannel(event: CompatibilityEventRow) {

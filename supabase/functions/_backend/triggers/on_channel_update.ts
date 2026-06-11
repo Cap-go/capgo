@@ -272,32 +272,11 @@ async function persistCompatibilityEvents(
       }
     }
 
-    // Unresolved events for this channel, so the decision layer can recognize a
-    // revert to a known baseline and skip raising a mirror event for it.
-    const { data: channelUnresolved, error: channelUnresolvedError } = await supabaseAdmin(c)
-      .from('compatibility_events')
-      .select('id, platform, channel_id, previous_version_id, previous_version_name, current_version_id')
-      .eq('app_id', record.app_id)
-      .eq('channel_id', record.id)
-      .is('resolved_at', null)
-      .order('id', { ascending: false })
-      .limit(COMPATIBILITY_AUTO_RESOLVE_SCAN_LIMIT)
-    if (channelUnresolvedError) {
-      cloudlogErr({
-        requestId: c.get('requestId'),
-        message: 'Failed to load unresolved compatibility events for revert detection',
-        error: channelUnresolvedError,
-        app_id: record.app_id,
-        channel_id: record.id,
-      })
-    }
-
     const events = decideCompatibilityEvents({
       newChannel: record,
       currentBundle,
       previousDefaults,
       changeOccurredAt: record.updated_at ?? new Date().toISOString(),
-      unresolvedEvents: (channelUnresolved ?? []) as UnresolvedCompatibilityEvent[],
     })
 
     for (const event of events) {
@@ -347,7 +326,7 @@ async function autoResolveCompatibilityEvents(
 
   const { data: unresolved, error } = await supabaseAdmin(c)
     .from('compatibility_events')
-    .select('id, platform, channel_id, previous_version_id, previous_version_name, current_version_id')
+    .select('id, platform, previous_version_id, previous_version_name, current_version_id')
     .eq('app_id', record.app_id)
     .is('resolved_at', null)
     .order('id', { ascending: false })
