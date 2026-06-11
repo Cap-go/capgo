@@ -160,7 +160,7 @@ jobs:
         id: r2
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.BUILDER_ONBOARDING_TUI_CLOUDFLARE_API_TOKEN }}
           R2_BUCKET: ${{ vars.BUILDER_ONBOARDING_TUI_R2_BUCKET }}
           REPORTS_BASE_URL: ${{ vars.BUILDER_ONBOARDING_TUI_REPORTS_URL }}
           PR_NUMBER: ${{ steps.pr.outputs.number }}

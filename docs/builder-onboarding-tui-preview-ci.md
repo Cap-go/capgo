@@ -43,8 +43,9 @@ Add these repository secrets:
   `Cap-go/cli-mcp-tests`. If `PERSONAL_ACCESS_TOKEN` already has that access,
   the workflow falls back to it.
 - `CLOUDFLARE_ACCOUNT_ID`: Cloudflare account ID used by Wrangler.
-- `CLOUDFLARE_API_TOKEN`: Cloudflare API token that can write R2 objects for the
-  preview bucket.
+- `BUILDER_ONBOARDING_TUI_CLOUDFLARE_API_TOKEN`: Cloudflare API token that can
+  write R2 objects for the preview bucket. The workflow maps this secret to
+  Wrangler's required `CLOUDFLARE_API_TOKEN` environment variable at runtime.
 
 Add these repository variables:
 
@@ -107,6 +108,14 @@ curl -fsS "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/
   -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"enabled":false}'
+
+gh secret set CLOUDFLARE_ACCOUNT_ID \
+  --repo Cap-go/capgo \
+  --body "$CLOUDFLARE_ACCOUNT_ID"
+
+gh secret set BUILDER_ONBOARDING_TUI_CLOUDFLARE_API_TOKEN \
+  --repo Cap-go/capgo \
+  --body "$CLOUDFLARE_API_TOKEN"
 
 gh variable set BUILDER_ONBOARDING_TUI_R2_BUCKET \
   --repo Cap-go/capgo \
