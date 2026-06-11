@@ -6,6 +6,7 @@ import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import IconSettings from '~icons/lucide/settings'
 import IconDown from '~icons/material-symbols/keyboard-arrow-down-rounded'
+import { isNativeAppStoreContext } from '~/services/nativeCompliance'
 import { resolveImagePath } from '~/services/storage'
 import { useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
@@ -26,6 +27,7 @@ const dropdown = useTemplateRef('dropdown')
 const hasVisibleOrganizations = computed(() => organizationStore.organizations.length > 0)
 const currentLabel = computed(() => currentOrganization.value?.name ?? t('select-organization'))
 const invitationCount = computed(() => organizationStore.organizations.filter(org => org.role.startsWith('invite')).length)
+const canCreateOrganizationInContext = !isNativeAppStoreContext()
 const ORGANIZATION_LOGO_REFRESH_INTERVAL_MS = 10 * 60 * 1000
 const isRefreshingBrokenLogos = ref(false)
 const lastOrganizationLogoRefreshAt = ref(0)
@@ -237,6 +239,9 @@ function onOrganizationClick(org: Organization) {
 }
 
 async function createNewOrg() {
+  if (!canCreateOrganizationInContext)
+    return
+
   closeDropdown()
   await router.push({
     path: '/onboarding/organization',
@@ -426,7 +431,7 @@ watch(
             </div>
           </li>
         </ul>
-        <div class="p-2 border-t border-gray-700">
+        <div v-if="canCreateOrganizationInContext" class="p-2 border-t border-gray-700">
           <div class="block p-px rounded-lg from-cyan-500 to-purple-500 bg-linear-to-r">
             <a
               class="flex justify-center items-center py-3 px-3 text-center text-white rounded-lg bg-[#1a1d24] hover:bg-gray-600 cursor-pointer"
@@ -437,10 +442,13 @@ watch(
         </div>
       </div>
     </details>
-    <div v-else class="p-px rounded-lg from-cyan-500 to-purple-500 bg-linear-to-r">
+    <div v-else-if="canCreateOrganizationInContext" class="p-px rounded-lg from-cyan-500 to-purple-500 bg-linear-to-r">
       <button class="block w-full text-white d-btn d-btn-outline bg-slate-800 d-btn-sm" @click="createNewOrg">
         {{ t('create-new-org') }}
       </button>
+    </div>
+    <div v-else class="rounded-lg border border-gray-700 bg-[#1a1d24] px-3 py-2 text-sm text-slate-300">
+      {{ t('select-organization') }}
     </div>
   </div>
 </template>
