@@ -18,6 +18,22 @@ and uploads the generated `e2e-tui/results/report.html` to Cloudflare R2.
 - The workflow deliberately uses `pull_request`, not `pull_request_target`, so it
   never runs unreviewed fork code with repository secrets.
 
+## Fork PR approval policy
+
+GitHub's manual approval gate for fork pull request workflows is a repository or
+organization setting, not a per-workflow YAML option. Keep Capgo configured with:
+
+- Settings > Actions > General > Approval for running fork pull request workflows
+  from contributors: `Require approval for all external contributors`.
+- REST API value:
+  `gh api repos/Cap-go/capgo/actions/permissions/fork-pr-contributor-approval`
+  should return `{"approval_policy":"all_external_contributors"}`.
+
+That setting prevents workflows from unknown or external fork contributors from
+starting until someone with write access approves the run. This workflow still
+blocks fork PRs at the job level after approval, because the private suite token
+and Cloudflare credentials are only intended for same-repository PR branches.
+
 ## GitHub configuration
 
 Add these repository secrets:
