@@ -49,18 +49,17 @@ export const useMainStore = defineStore('main', () => {
 
   const totalDownload = ref<number>(0)
 
-  const logout = () => {
-    return new Promise<void>((resolve) => {
-      const supabase = useSupabase()
-      const config = getLocalConfig()
-      const listener = supabase.auth.onAuthStateChange(async (event: any) => {
+  const logout = async () => {
+    const supabase = useSupabase()
+    const config = getLocalConfig()
+    await new Promise<void>((resolve) => {
+      const listener = supabase.auth.onAuthStateChange((event: any) => {
         if (event === 'SIGNED_OUT') {
           listener.data.subscription.unsubscribe()
           auth.value = undefined
           user.value = undefined
           isAdmin.value = false
           reset(config.supaHost)
-          await unspoofUser()
           resolve()
         }
       })
@@ -69,6 +68,7 @@ export const useMainStore = defineStore('main', () => {
         supabase.auth.signOut()
       }, 300)
     })
+    await unspoofUser()
   }
 
   const getTotalStats: () => TotalStats = () => {
