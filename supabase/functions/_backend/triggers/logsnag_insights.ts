@@ -841,6 +841,81 @@ async function countDemoSeededApps(c: Context, createdAfterIso: string): Promise
   }
 }
 
+interface AppActivationRow extends Record<string, unknown> {
+  app_id: string
+  owner_org: string
+  app_created_at: string
+  org_created_by: string | null
+  activation_date: string
+}
+
+// Detect apps that just delivered their first update to a device and emit a
+// one-time 'First Device Update Delivered' activation event per app.
+// Idempotent via apps.first_update_delivered_at (claimed with RETURNING).
+async function trackFirstUpdateDelivered(c: Context) {
+  const pgClient = getPgClient(c, false)
+  const drizzleClient = getDrizzleClient(pgClient)
+  try {
+    const result = await drizzleClient.execute<AppActivationRow>(sql`
+      SELECT
+        apps.app_id,
+        apps.owner_org,
+        apps.created_at AS app_created_at,
+        orgs.created_by AS org_created_by,
+        MIN(dv.date)::date AS activation_date
+      FROM public.apps AS apps
+      INNER JOIN public.daily_version AS dv ON dv.app_id = apps.app_id
+      LEFT JOIN public.orgs AS orgs ON orgs.id = apps.owner_org
+      WHERE apps.first_update_delivered_at IS NULL
+        AND dv.install > 0
+      GROUP BY apps.app_id, apps.owner_org, apps.created_at, orgs.created_by
+      LIMIT 200
+    `)
+
+    for (const row of result.rows ?? []) {
+      const activationDate = new Date(row.activation_date)
+      const claimed = await drizzleClient.execute<{ app_id: string }>(sql`
+        UPDATE public.apps
+        SET first_update_delivered_at = ${activationDate}
+        WHERE app_id = ${row.app_id}
+          AND first_update_delivered_at IS NULL
+        RETURNING app_id
+      `)
+      // Already claimed by a concurrent run; skip to keep the event one-time.
+      if (!(claimed.rows ?? []).length)
+        continue
+
+      // Backlog drain guard: historical apps (activated long before this column
+      // existed) get the flag set silently; only fresh activations emit events.
+      const daysSinceActivation = Math.floor((Date.now() - activationDate.getTime()) / (24 * 60 * 60 * 1000))
+      if (daysSinceActivation > 7)
+        continue
+
+      const daysSinceAppCreated = Math.max(0, Math.floor((activationDate.getTime() - new Date(row.app_created_at).getTime()) / (24 * 60 * 60 * 1000)))
+      await sendEventToTracking(c, {
+        channel: 'app-activation',
+        event: 'First Device Update Delivered',
+        icon: '🚀',
+        user_id: row.org_created_by ?? row.owner_org,
+        groups: { organization: row.owner_org },
+        tags: {
+          app_id: row.app_id,
+          owner_org: row.owner_org,
+          days_since_app_created: daysSinceAppCreated,
+        },
+        setPersonProperties: false,
+        notify: false,
+      }, { background: false })
+    }
+  }
+  catch (error) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'trackFirstUpdateDelivered error', error })
+  }
+  finally {
+    closeClient(c, pgClient)
+  }
+}
+
 function getStats(c: Context, window?: DailyWindow): GlobalStats {
   const supabase = supabaseAdmin(c)
   const last24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
@@ -1453,6 +1528,10 @@ app.post('/', middlewareAPISecret, async (c) => {
     cloudlogErr({ requestId: c.get('requestId'), message: 'insights error', e })
   })
   cloudlog({ requestId: c.get('requestId'), message: 'Sent to logsnag done' })
+
+  // Activation events run last; trackFirstUpdateDelivered swallows its own
+  // errors so a failure never breaks the daily stats snapshot above.
+  await trackFirstUpdateDelivered(c)
 
   // Note: Device cleanup is no longer needed as Analytics Engine handles data retention automatically
 

@@ -36,6 +36,7 @@ export const apps = pgTable('apps', {
   existing_app: boolean('existing_app').notNull().default(false),
   ios_store_url: text('ios_store_url'),
   android_store_url: text('android_store_url'),
+  first_update_delivered_at: timestamp('first_update_delivered_at', { withTimezone: true }),
 })
 
 export const app_versions = pgTable('app_versions', {

@@ -5,6 +5,7 @@ import { setupLayouts } from 'virtual:generated-layouts'
 import { createApp } from 'vue'
 import { createRouter, createWebHistory } from 'vue-router'
 import { routes } from 'vue-router/auto-routes'
+import { captureFirstTouch } from '~/services/attribution'
 import { installDeepLinkHandler } from '~/services/deepLinks'
 import { posthogLoader } from '~/services/posthog'
 import { getErrorMessage, isKnownCrawlerNoiseErrorMessage, isStaleAssetErrorMessage } from '~/services/staleAssetErrors'
@@ -187,6 +188,8 @@ router.beforeEach((to, from, next) => {
 
 const config = getLocalConfig()
 posthogLoader(config.supaHost)
+// Capture first-touch attribution (UTM params, referrer) before any navigation strips them
+captureFirstTouch()
 
 // install all modules under `modules/`
 type UserModule = (ctx: { app: typeof app, router: Router }) => void

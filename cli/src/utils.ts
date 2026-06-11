@@ -254,6 +254,57 @@ export function getBundleVersion(f: string = findRoot(cwd()), file: string | und
   return packageJson.version ?? ''
 }
 
+// Cached so analytics call sites read package.json at most once per process.
+let cachedCapgoPackages: string[] | undefined
+
+/**
+ * List the @capgo/* packages declared in the project's package.json files
+ * (dependencies + devDependencies), sorted alphabetically.
+ * Used for telemetry only: never throws, returns [] when nothing is readable.
+ * The first call wins the cache, later calls reuse it regardless of path.
+ */
+export function listCapgoPackages(packageJsonPath?: string): string[] {
+  if (cachedCapgoPackages)
+    return cachedCapgoPackages
+  const found = new Set<string>()
+  try {
+    const files = packageJsonPath
+      ? packageJsonPath.split(',').map(file => file.trim()).filter(Boolean)
+      : [join(findRoot(cwd()), PACKNAME)]
+    for (const file of files) {
+      try {
+        if (!existsSync(file))
+          continue
+        const pkg = JSON.parse(readFileSync(file, 'utf-8'))
+        const dependencies = [...Object.keys(pkg.dependencies ?? {}), ...Object.keys(pkg.devDependencies ?? {})]
+        for (const dependency of dependencies) {
+          if (dependency.startsWith('@capgo/'))
+            found.add(dependency)
+        }
+      }
+      catch {
+        // Unreadable or invalid package.json: skip it, telemetry must not break commands.
+      }
+    }
+  }
+  catch {
+    // Root resolution failed: report no plugins instead of throwing.
+  }
+  cachedCapgoPackages = [...found].sort()
+  return cachedCapgoPackages
+}
+
+/**
+ * Plugin tags shared by key analytics events (init steps, doctor, upload).
+ */
+export function getCapgoPluginTags(packageJsonPath?: string): { capgo_plugins: string, capgo_plugin_count: number } {
+  const plugins = listCapgoPackages(packageJsonPath)
+  return {
+    capgo_plugins: plugins.join(','),
+    capgo_plugin_count: plugins.length,
+  }
+}
+
 function returnVersion(version: string) {
   const tmpVersion = version.replace('^', '').replace('~', '')
   if (canParse(tmpVersion)) {

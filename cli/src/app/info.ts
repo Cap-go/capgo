@@ -3,7 +3,7 @@ import { version as nodeVersion } from 'node:process'
 import { log, spinner } from '@clack/prompts'
 import pack from '../../package.json'
 import { trackEvent } from '../analytics/track'
-import { getAllPackagesDependencies, getAppId, getBundleVersion, getConfig } from '../utils'
+import { getAllPackagesDependencies, getAppId, getBundleVersion, getCapgoPluginTags, getConfig } from '../utils'
 import { getLatestVersion } from '../utils/latest-version'
 
 async function getLatestDependencies(installedDependencies: Record<string, string>) {
@@ -109,7 +109,10 @@ export async function getInfoInternal(options: DoctorInfoOptions, silent = false
     channel: 'cli-usage',
     event: 'Doctor Ran',
     icon: '👨‍⚕️',
-    tags: computeDoctorAnalyticsTags(installedDependencies, latestDependencies),
+    tags: {
+      ...computeDoctorAnalyticsTags(installedDependencies, latestDependencies),
+      ...getCapgoPluginTags(options.packageJson),
+    },
   })
 
   if (JSON.stringify(installedDependencies) !== JSON.stringify(latestDependencies)) {

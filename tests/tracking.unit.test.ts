@@ -136,4 +136,27 @@ describe('sendEventToTracking', () => {
       provider: 'logsnag',
     }))
   })
+
+  it('forwards setPersonProperties to PostHog so tags do not pollute person properties', async () => {
+    const { sendEventToTracking } = await import('../supabase/functions/_backend/utils/tracking.ts')
+
+    await sendEventToTracking(createContext(), {
+      channel: 'app-activation',
+      event: 'First Device Update Delivered',
+      user_id: 'user-id',
+      groups: { organization: 'org-id' },
+      tags: { app_id: 'app-id' },
+      setPersonProperties: false,
+      notify: false,
+    }, {
+      background: false,
+    })
+
+    expect(posthogMock).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      event: 'First Device Update Delivered',
+      user_id: 'user-id',
+      groups: { organization: 'org-id' },
+      setPersonProperties: false,
+    }))
+  })
 })

@@ -35,6 +35,19 @@ try {
   assert.equal(body.user_id, undefined, 'CLI must not send user_id (backend derives the actor from the key)')
   assert.deepEqual(body.tags, { 'app-id': 'com.example.app' })
 
+  // The optional tags parameter merges caller tags with the app-id tag.
+  await markSnag('onboarding-v2', 'org-123', 'capgo-key', 'canceled', undefined, '🤷', {
+    last_step: 'add-app',
+    elapsed_ms: 1234,
+  })
+
+  const eventRequests = requests.filter(request => request.url.endsWith('/private/events'))
+  assert.equal(eventRequests.length, 2, 'Expected one request per markSnag call')
+  const canceledBody = JSON.parse(eventRequests[1].init.body)
+  assert.equal(canceledBody.event, 'canceled')
+  assert.equal(canceledBody.icon, '🤷')
+  assert.deepEqual(canceledBody.tags, { last_step: 'add-app', elapsed_ms: 1234 })
+
   console.log('✅ v2 event migration tests passed')
 }
 finally {

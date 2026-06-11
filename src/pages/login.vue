@@ -15,11 +15,13 @@ import iconEmail from '~icons/oui/email?raw'
 import iconPassword from '~icons/ph/key?raw'
 import mfaIcon from '~icons/simple-icons/2fas?raw'
 import { hideLoader } from '~/services/loader'
-import { autoAuth, defaultApiHost, hashEmail, useSupabase } from '~/services/supabase'
+import { pushEvent } from '~/services/posthog'
+import { autoAuth, defaultApiHost, getLocalConfig, hashEmail, useSupabase } from '~/services/supabase'
 import { openSupport } from '~/services/support'
 
 const route = useRoute('/login')
 const supabase = useSupabase()
+const config = getLocalConfig()
 const isLoading = ref(false)
 const isMobile = ref(Capacitor.isNativePlatform())
 const turnstileToken = ref('')
@@ -296,6 +298,11 @@ async function login(form: { email: string, password: string }) {
     isLoading.value = false
     console.error('error', error)
     setErrors('login-account', [error.message], {})
+    // Coarse failure reason for analytics; never include credentials
+    const reason = error.message.includes('Invalid login credentials')
+      ? 'invalid_credentials'
+      : error.message.includes('captcha') ? 'captcha' : 'unknown'
+    pushEvent('user:login-failed', config.supaHost, { reason })
     if (error.message.includes('Invalid login credentials')) {
       turnstileToken.value = ''
       captchaComponent.value?.reset()
@@ -389,6 +396,7 @@ async function handleSsoLogin() {
 
     if (error) {
       console.error('SSO login error', error)
+      pushEvent('user:login-failed', config.supaHost, { reason: error.message.includes('captcha') ? 'captcha' : 'sso_failed' })
       turnstileToken.value = ''
       captchaComponent.value?.reset()
       if (error.message.includes('captcha')) {
@@ -407,6 +415,7 @@ async function handleSsoLogin() {
   }
   catch (err) {
     console.error('SSO login error', err)
+    pushEvent('user:login-failed', config.supaHost, { reason: 'sso_failed' })
     turnstileToken.value = ''
     captchaComponent.value?.reset()
     toast.error(t('invalid-auth'))
@@ -423,6 +432,7 @@ async function handleMfaSubmit(form: { code: string }) {
   })
 
   if (verify.error) {
+    pushEvent('user:login-failed', config.supaHost, { reason: 'mfa_failed' })
     toast.error(t('invalid-mfa-code'))
     console.error('verify error', verify.error)
     isLoading.value = false

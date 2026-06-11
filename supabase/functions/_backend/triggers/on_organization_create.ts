@@ -54,8 +54,13 @@ app.post('/', middlewareAPISecret, triggerValidator('orgs', 'INSERT'), async (c)
     event: 'Org Created',
     icon: '🎉',
     sentToBento: true,
-    user_id: record.id,
+    // PostHog person must be the org creator, not the org id, so signup funnels
+    // can join this event with real user identities. Org id stays in groups/tags.
+    user_id: record.created_by ?? record.id,
     groups: { organization: record.id },
+    tags: {
+      owner_org: record.id,
+    },
     notify: false,
   })
 

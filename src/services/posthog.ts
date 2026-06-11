@@ -1,4 +1,5 @@
 // @ts-nocheck
+import { getFirstTouch } from '~/services/attribution'
 import { shouldSuppressPostHogExceptionEvent } from '~/services/staleAssetErrors'
 import { isLocal } from '~/services/supabase'
 
@@ -69,6 +70,13 @@ export function pushEvent(nameEvent: string, supaHost: string, properties?: Post
   posthog.capture(nameEvent, properties)
 }
 
+export function setOrganization(orgId: string, supaHost: string): void {
+  if (isLocal(supaHost))
+    return
+  // Attach the organization group to every subsequent browser event
+  posthog.group('organization', orgId)
+}
+
 export function setUser(uuid: string, data: {
   nickname?: string
   phone?: string
@@ -85,6 +93,20 @@ export function setUser(uuid: string, data: {
   posthog.setPersonProperties(
     { avatar: data.avatar },
   )
+  const firstTouch = getFirstTouch()
+  if (firstTouch) {
+    // setPersonProperties(setProps, setOnceProps): pass the first-touch map
+    // as $set_once so it never overwrites previously captured attribution
+    posthog.setPersonProperties({}, {
+      first_touch_landing_url: firstTouch.landing_url,
+      first_touch_referrer: firstTouch.referrer,
+      first_touch_utm_source: firstTouch.utm_source,
+      first_touch_utm_medium: firstTouch.utm_medium,
+      first_touch_utm_campaign: firstTouch.utm_campaign,
+      first_touch_ref: firstTouch.ref,
+      first_touch_captured_at: firstTouch.captured_at,
+    })
+  }
 }
 
 export function reset(supaHost: string): void {

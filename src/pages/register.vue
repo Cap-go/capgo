@@ -9,11 +9,13 @@ import iconEmail from '~icons/oui/email?raw'
 import iconPassword from '~icons/ph/key?raw'
 import iconName from '~icons/ph/user?raw'
 import { authGhostButtonClass, authInlineLinkClass, authPanelClass, authPrimaryButtonClass } from '~/components/auth/pageStyles'
-import { hashEmail, useSupabase } from '~/services/supabase'
+import { pushEvent } from '~/services/posthog'
+import { getLocalConfig, hashEmail, useSupabase } from '~/services/supabase'
 import { openSupport } from '~/services/support'
 
 const router = useRouter()
 const supabase = useSupabase()
+const config = getLocalConfig()
 const { t } = useI18n()
 const turnstileToken = ref('')
 const captchaKey = ref(import.meta.env.VITE_CAPTCHA_KEY)
@@ -34,6 +36,7 @@ async function submit(form: { first_name: string, last_name: string, password: s
   if (errorDeleted)
     console.error(errorDeleted)
   if (!deleted) {
+    pushEvent('user:signup-failed', config.supaHost, { reason: 'email_previously_used' })
     setErrors('register-account', [t('used-to-create')], {})
     return
   }
@@ -52,6 +55,14 @@ async function submit(form: { first_name: string, last_name: string, password: s
   )
   isLoading.value = false
   if (error || !user) {
+    // Coarse failure category for analytics; never include the raw error message
+    const message = (error?.message ?? '').toLowerCase()
+    const reason = message.includes('captcha')
+      ? 'captcha'
+      : message.includes('already')
+        ? 'already_registered'
+        : message.includes('password') ? 'weak_password' : 'unknown'
+    pushEvent('user:signup-failed', config.supaHost, { reason })
     setErrors('register-account', [error?.message || 'user not found'], {})
     return
   }
@@ -73,6 +84,7 @@ async function submit(form: { first_name: string, last_name: string, password: s
       console.error('Failed to seed user profile after signup', profileError)
   }
 
+  pushEvent('user:signup-completed', config.supaHost, { method: 'email' })
   router.push('/dashboard')
 }
 </script>

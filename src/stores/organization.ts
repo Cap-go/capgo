@@ -3,8 +3,9 @@ import type { ArrayElement, Concrete, Merge } from '~/services/types'
 import type { Database } from '~/types/supabase.types'
 import { defineStore } from 'pinia'
 import { computed, ref, watch } from 'vue'
+import { setOrganization } from '~/services/posthog'
 import { createSignedImageUrl, getImmediateImageUrl, resolveImagePath } from '~/services/storage'
-import { isPlatformAdmin, stripeEnabled, useSupabase } from '~/services/supabase'
+import { getLocalConfig, isPlatformAdmin, stripeEnabled, useSupabase } from '~/services/supabase'
 import { clearWebsitePaidUserCookie, setWebsitePaidUserCookie, syncWebsitePaidUserCookieFromOrganizations } from '~/services/websiteAuthCookie'
 import { createDeferredPromise } from '../utils/promise'
 import { useDashboardAppsStore } from './dashboardApps'
@@ -299,6 +300,8 @@ export const useOrganizationStore = defineStore('organization', () => {
     }
 
     localStorage.setItem(STORAGE_KEY, currentOrganizationRaw.gid)
+    // Tag all subsequent PostHog browser events with the active organization group
+    setOrganization(currentOrganizationRaw.gid, getLocalConfig().supaHost)
     currentRole.value = await getCurrentRole(currentOrganizationRaw.created_by)
     // Don't mark as failed if user lacks 2FA or password access - the data is redacted and unreliable
     const lacks2FAAccess = currentOrganizationRaw.enforcing_2fa === true && currentOrganizationRaw['2fa_has_access'] === false

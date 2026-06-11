@@ -14,6 +14,7 @@ import IconTerminal from '~icons/lucide/terminal-square'
 import IconAndroid from '~icons/mdi/android'
 import IconApple from '~icons/mdi/apple'
 import { createDefaultApiKey, findUsablePlainApiKey } from '~/services/apikeys'
+import { stepElapsed } from '~/services/onboardingTimer'
 import { pushEvent } from '~/services/posthog'
 import { getLocalConfig, isLocal, useSupabase } from '~/services/supabase'
 import { sendEvent } from '~/services/tracking'
@@ -150,6 +151,7 @@ function setLog() {
         org_id: orgId,
         tracking_version: 2,
         notify: false,
+        tags: { step_elapsed_ms: stepElapsed() },
       }).catch()
       pushEvent(`user:onboarding-build-${stepToName(step.value)}`, config.supaHost, { org_id: orgId })
     }

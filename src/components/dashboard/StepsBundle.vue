@@ -6,6 +6,7 @@ import arrowBack from '~icons/ion/arrow-back?width=2em&height=2em'
 import IconLoader from '~icons/lucide/loader-2'
 import InviteTeammateModal from '~/components/dashboard/InviteTeammateModal.vue'
 import { createDefaultApiKey, findUsablePlainApiKey } from '~/services/apikeys'
+import { stepElapsed } from '~/services/onboardingTimer'
 import { pushEvent } from '~/services/posthog'
 import { getLocalConfig, isLocal, useSupabase } from '~/services/supabase'
 import { sendEvent } from '~/services/tracking'
@@ -80,6 +81,7 @@ function setLog() {
         org_id: orgId,
         tracking_version: 2,
         notify: false,
+        tags: { step_elapsed_ms: stepElapsed() },
       }).catch()
       pushEvent(`user:onboarding-bundle-${stepToName(step.value)}`, config.supaHost, { org_id: orgId })
     }

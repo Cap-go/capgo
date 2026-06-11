@@ -30,6 +30,8 @@ export interface SendEventToTrackingPayload extends TrackOptions {
   bento?: BentoTrackingPayload
   groups?: PostHogGroups
   sentToBento?: boolean
+  /** Forwarded to PostHog: false prevents tags from being $set as person properties. */
+  setPersonProperties?: boolean
 }
 
 export interface SendEventToTrackingOptions {
@@ -68,6 +70,7 @@ async function executeTracking(c: Context, payload: SendEventToTrackingPayload, 
       channel: payload.channel,
       description: payload.description,
       groups: payload.groups,
+      setPersonProperties: payload.setPersonProperties,
       ip: getTrackingIp(c, options.ip),
     })),
   ]

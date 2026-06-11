@@ -31,7 +31,7 @@ import { copyToClipboard, revealInFinder } from '../support/clipboard'
 import { appendInternalLog, getInternalLogPath, startInternalLog } from '../support/internal-log'
 import { showReplicationProgress } from '../replicationProgress'
 import { formatRunnerCommand, splitRunnerCommand } from '../runner-command'
-import { createSupabaseClient, defaultApiHost, findBuildCommandForProjectType, findMainFile, findMainFileForProjectType, findProjectType, findRoot, findSavedKey, findSavedKeySilent, formatError, getAllPackagesDependencies, getAppId, getBundleVersion, getConfig, getLocalConfig, getNativeProjectResetAdvice, getOrganizationListWithPermission, getPackageScripts, getPMAndCommand, hasCliPermission, PACKNAME, projectIsMonorepo, resolveUserIdFromApiKey, updateConfigbyKey, updateConfigUpdater, validateIosUpdaterSync } from '../utils'
+import { createSupabaseClient, defaultApiHost, findBuildCommandForProjectType, findMainFile, findMainFileForProjectType, findProjectType, findRoot, findSavedKey, findSavedKeySilent, formatError, getAllPackagesDependencies, getAppId, getBundleVersion, getCapgoPluginTags, getConfig, getLocalConfig, getNativeProjectResetAdvice, getOrganizationListWithPermission, getPackageScripts, getPMAndCommand, hasCliPermission, PACKNAME, projectIsMonorepo, resolveUserIdFromApiKey, updateConfigbyKey, updateConfigUpdater, validateIosUpdaterSync } from '../utils'
 import { buildAppIdConflictSuggestions, isAppAlreadyExistsError } from './app-conflict'
 import { cancel as pCancel, confirm as pConfirm, intro as pIntro, isCancel as pIsCancel, log as pLog, outro as pOutro, select as pSelect, spinner as pSpinner, text as pText } from './prompts'
 import { appendInitStreamingLine, clearInitStreamingOutput, setInitCodeDiff, setInitEncryptionSummary, setInitVersionWarning, startInitStreamingOutput, stopInitInkSession, updateInitStreamingStatus } from './runtime'
@@ -552,7 +552,11 @@ async function runInitDoctorDiagnostics(): Promise<void> {
 }
 
 async function exitCanceledInitOnboarding(orgId: string, apikey: string, message = 'You can resume the onboarding anytime by running the same command again'): Promise<never> {
-  await markSnag('onboarding-v2', orgId, apikey, 'canceled', undefined, '🤷')
+  await markSnag('onboarding-v2', orgId, apikey, 'canceled', undefined, '🤷', {
+    last_step: lastStepName,
+    elapsed_ms: Date.now() - initStartedAt,
+    ...getCapgoPluginTags(globalPathToPackageJson),
+  })
   pOutro(`Bye 👋\n💡 ${message}`)
   exit(1)
 }
@@ -1371,8 +1375,27 @@ async function warnIfNotInCapacitorRoot() {
   }
 }
 
+// Onboarding telemetry context: step timing plus the last reached step so the
+// 'canceled' event can report where and how late users abort.
+let initStartedAt = Date.now()
+let lastStepStartedAt = initStartedAt
+let lastStepName = 'init-start'
+
+function resetInitTelemetryContext() {
+  initStartedAt = Date.now()
+  lastStepStartedAt = initStartedAt
+  lastStepName = 'init-start'
+}
+
 async function markStep(orgId: string, apikey: string, step: string, appId: string) {
-  return markSnag('onboarding-v2', orgId, apikey, `onboarding-step-${step}`, appId)
+  const now = Date.now()
+  const elapsedMs = now - lastStepStartedAt
+  lastStepStartedAt = now
+  lastStepName = step
+  return markSnag('onboarding-v2', orgId, apikey, `onboarding-step-${step}`, appId, '✅', {
+    elapsed_ms: elapsedMs,
+    ...getCapgoPluginTags(globalPathToPackageJson),
+  })
 }
 
 /**
@@ -4291,6 +4314,7 @@ async function maybeStarCapgoRepo(includeSkillsRepository = false, repository?: 
 }
 
 export async function initApp(apikeyCommand: string, appId: string, options: SuperOptions) {
+  resetInitTelemetryContext()
   globalSupaHost = options.supaHost // honor --supa-host for the support-logs upload
   const pm = getPMAndCommand()
   // Start the verbose internal log early so it captures the whole run (incl.

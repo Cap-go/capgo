@@ -33,14 +33,17 @@ app.post('/', middlewareAPISecret, triggerValidator('apps', 'INSERT'), async (c)
   const drizzleClient = getDrizzleClient(pg)
   let appExists = false
   let ownerOrg: string | undefined
+  let orgCreatedBy: string | undefined
   try {
     const rows = await drizzleClient
-      .select({ owner_org: schema.apps.owner_org })
+      .select({ owner_org: schema.apps.owner_org, org_created_by: schema.orgs.created_by })
       .from(schema.apps)
+      .leftJoin(schema.orgs, eq(schema.orgs.id, schema.apps.owner_org))
       .where(or(eq(schema.apps.id, record.id), eq(schema.apps.app_id, record.app_id)))
       .limit(1)
     appExists = rows.length > 0
     ownerOrg = rows[0]?.owner_org ?? undefined
+    orgCreatedBy = rows[0]?.org_created_by ?? undefined
   }
   catch (error) {
     cloudlog({ requestId: c.get('requestId'), message: 'Error fetching app owner_org', error, appId: record.id, app_id: record.app_id })
@@ -115,6 +118,8 @@ app.post('/', middlewareAPISecret, triggerValidator('apps', 'INSERT'), async (c)
           throw simpleError('error_fetching_organization', 'Error fetching organization', { error })
         }
 
+        orgCreatedBy = orgCreatedBy ?? (data.created_by ?? undefined)
+
         return {
           cron: '* * * * *',
           event: 'app:created',
@@ -135,10 +140,13 @@ app.post('/', middlewareAPISecret, triggerValidator('apps', 'INSERT'), async (c)
     event: isDemo ? 'Demo App Created' : isPendingOnboarding ? 'Onboarding App Created' : 'App Created',
     icon: isDemo ? '🎮' : isPendingOnboarding ? '🧭' : '🎉',
     sentToBento: Boolean(appCreatedBentoEvent),
-    user_id: ownerOrg,
+    // PostHog person must be the org creator, not the org id, so signup funnels
+    // can join this event with real user identities. Org id stays in groups/tags.
+    user_id: orgCreatedBy ?? ownerOrg,
     groups: { organization: ownerOrg },
     tags: {
       app_id: record.app_id,
+      owner_org: ownerOrg,
       is_demo: isDemo ? 'true' : 'false',
       need_onboarding: isPendingOnboarding ? 'true' : 'false',
     },
