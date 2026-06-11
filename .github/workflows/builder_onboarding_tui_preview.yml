@@ -46,12 +46,17 @@ env:
 jobs:
   tui-preview:
     name: Run private TUI suite and publish report
-    runs-on: ubuntu-latest
+    # macOS, not ubuntu: the onboarding wizard only renders the file-picker fork
+    # ("📂 Open file picker / 📝 Type the path") on darwin, and the private suite's
+    # goldens are recorded against that flow — on Linux every journey crossing a
+    # path prompt times out on `waitFor /Type the path/`. Public repo → macOS
+    # runners are free.
+    runs-on: macos-latest
     timeout-minutes: 45
     if: ${{ github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository }}
     permissions:
       contents: read
-      pull-requests: read
+      pull-requests: write # post/refresh the report-URL comment on the PR
     steps:
       - name: Resolve PR context
         id: pr
@@ -163,10 +168,43 @@ jobs:
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           R2_RESULTS_UPLOAD_ACCESS_KEY_ID: ${{ secrets.BUILDER_ONBOARDING_TUI_RESULTS_R2_UPLOAD_ACCESS_KEY_ID }}
-          R2_RESULTS_UPLOAD_SECRET_ACCESS_KEY: ${{ secrets.BUILDER_ONBOARDING_TUI_RESULTS_R2_UPLOAD_SECRET_ACCESS_KEY }}
+          # NOTE: the repo secret is named TUI_RESULTS_R2_UPLOAD_SECRET_ACCESS_KEY
+          # (unlike its BUILDER_ONBOARDING_-prefixed ACCESS_KEY_ID sibling) — the
+          # mismatched name here made the env empty and failed every upload.
+          R2_RESULTS_UPLOAD_SECRET_ACCESS_KEY: ${{ secrets.TUI_RESULTS_R2_UPLOAD_SECRET_ACCESS_KEY }}
           R2_BUCKET: ${{ vars.BUILDER_ONBOARDING_TUI_R2_BUCKET }}
           REPORTS_BASE_URL: ${{ vars.BUILDER_ONBOARDING_TUI_REPORTS_URL }}
           PR_NUMBER: ${{ steps.pr.outputs.number }}
           HEAD_SHA: ${{ steps.pr.outputs.sha }}
         run: |
           node .github/scripts/upload-r2-results.mjs
+
+      # Surface the hosted report ON the PR (the job summary already links it, but
+      # a sticky PR comment is what reviewers actually see). Updated in place per
+      # PR via the marker; skipped on workflow_dispatch runs without a PR.
+      - name: Comment report URL on PR
+        if: ${{ always() && steps.r2.outputs.url != '' && steps.pr.outputs.number != '' }}
+        uses: actions/github-script@v8
+        env:
+          REPORT_URL: ${{ steps.r2.outputs.url }}
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+          HEAD_SHA: ${{ steps.pr.outputs.sha }}
+          JOB_STATUS: ${{ job.status }}
+        with:
+          script: |
+            const marker = '<!-- builder-onboarding-tui-preview -->'
+            const issue_number = Number(process.env.PR_NUMBER)
+            const ok = process.env.JOB_STATUS === 'success'
+            const body = [
+              marker,
+              `## 🧪 Builder onboarding TUI preview — ${ok ? '✅ passed' : '❌ failed'}`,
+              '',
+              `**[▶ Open the interactive HTML report](${process.env.REPORT_URL})** (zoomable journey tree + cast playback)`,
+              '',
+              `Commit: ${process.env.HEAD_SHA} · [Job summary with the result table](${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})`,
+            ].join('\n')
+            const { owner, repo } = context.repo
+            const comments = await github.paginate(github.rest.issues.listComments, { owner, repo, issue_number, per_page: 100 })
+            const mine = comments.find(c => c.body && c.body.includes(marker))
+            if (mine) await github.rest.issues.updateComment({ owner, repo, comment_id: mine.id, body })
+            else await github.rest.issues.createComment({ owner, repo, issue_number, body })
