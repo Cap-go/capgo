@@ -1,7 +1,7 @@
 import type { Context } from 'hono'
 import type { PluginNotificationQueueItem } from './plugin_notification_queue.ts'
-import { parsePluginNotificationQueueItem, PLUGIN_NOTIFICATION_QUEUE_PREFIX } from './plugin_notification_queue.ts'
 import { cloudlog, cloudlogErr, serializeError } from './logging.ts'
+import { parsePluginNotificationQueueItem, PLUGIN_NOTIFICATION_QUEUE_PREFIX } from './plugin_notification_queue.ts'
 import { getEnv } from './utils.ts'
 
 const PLUGIN_NOTIFICATION_FLUSH_LIMIT = 100
@@ -76,15 +76,6 @@ async function releaseProcessingKeys(store: KVNamespace, processingKeys: string[
   }
 }
 
-async function deleteQueueKeys(store: KVNamespace, itemKeys: string[]) {
-  let deleted = 0
-  for (const key of itemKeys) {
-    await store.delete(key)
-    deleted++
-  }
-  return deleted
-}
-
 async function releaseProcessingKeysSafely(c: Context, store: KVNamespace, processingKeys: string[]) {
   try {
     await releaseProcessingKeys(store, processingKeys)
@@ -101,22 +92,35 @@ async function processBatch(
   itemKeys: string[],
   processingKeys: string[],
 ): Promise<{ transferred: number, deleted: number, failed: number }> {
-  try {
-    const accepted = await postPluginNotificationBatch(c, items)
-    if (!accepted) {
-      await releaseProcessingKeysSafely(c, store, processingKeys)
-      return { transferred: 0, deleted: 0, failed: items.length }
-    }
+  let transferred = 0
+  let deleted = 0
+  let failed = 0
 
-    const deleted = await deleteQueueKeys(store, itemKeys)
-    await releaseProcessingKeysSafely(c, store, processingKeys)
-    return { transferred: items.length, deleted, failed: 0 }
+  for (const [index, item] of items.entries()) {
+    const itemKey = itemKeys[index]
+    const processingKey = processingKeys[index]
+
+    try {
+      const accepted = await postPluginNotificationBatch(c, [item])
+      if (!accepted) {
+        failed++
+        await releaseProcessingKeysSafely(c, store, [processingKey])
+        continue
+      }
+
+      await store.delete(itemKey)
+      deleted++
+      transferred++
+      await releaseProcessingKeysSafely(c, store, [processingKey])
+    }
+    catch (error) {
+      failed++
+      await releaseProcessingKeysSafely(c, store, [processingKey])
+      cloudlogErr({ requestId: c.get('requestId'), message: 'Plugin notification queue transfer failed', key: itemKey, error: serializeError(error) })
+    }
   }
-  catch (error) {
-    await releaseProcessingKeysSafely(c, store, processingKeys)
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Plugin notification queue transfer failed', error: serializeError(error) })
-    return { transferred: 0, deleted: 0, failed: items.length }
-  }
+
+  return { transferred, deleted, failed }
 }
 
 export async function flushQueuedPluginNotifications(c: Context, limit = PLUGIN_NOTIFICATION_FLUSH_LIMIT): Promise<PluginNotificationFlushResult> {
