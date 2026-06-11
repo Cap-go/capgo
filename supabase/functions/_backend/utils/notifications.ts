@@ -131,6 +131,7 @@ async function insertNotificationClaim(
   eventName: string,
   orgId: string,
   uniqId: string,
+  claimedAt: Date = new Date(),
 ): Promise<boolean> {
   const inserted = await writeClient
     .insert(schema.notifications)
@@ -138,7 +139,7 @@ async function insertNotificationClaim(
       event: eventName,
       uniq_id: uniqId,
       owner_org: orgId,
-      last_send_at: new Date(),
+      last_send_at: claimedAt,
       total_send: 1,
     })
     .onConflictDoNothing({
@@ -162,6 +163,51 @@ async function deleteNotificationClaim(
       eq(schema.notifications.uniq_id, uniqId),
       eq(schema.notifications.owner_org, orgId),
     ))
+}
+
+type NotificationClaimRollback
+  = | { claimedAt: Date, kind: 'insert' }
+    | { claimedAt: Date, kind: 'update', previousLastSendAt: Date, previousTotalSend: number }
+
+async function rollbackNotificationClaim(
+  c: Context,
+  writeClient: ReturnType<typeof getDrizzleClient>,
+  eventName: string,
+  orgId: string,
+  uniqId: string,
+  claim: NotificationClaimRollback,
+) {
+  try {
+    if (claim.kind === 'insert') {
+      await writeClient
+        .delete(schema.notifications)
+        .where(and(
+          eq(schema.notifications.event, eventName),
+          eq(schema.notifications.uniq_id, uniqId),
+          eq(schema.notifications.owner_org, orgId),
+          eq(schema.notifications.last_send_at, claim.claimedAt),
+        ))
+      return true
+    }
+
+    await writeClient
+      .update(schema.notifications)
+      .set({
+        last_send_at: claim.previousLastSendAt,
+        total_send: claim.previousTotalSend,
+      })
+      .where(and(
+        eq(schema.notifications.event, eventName),
+        eq(schema.notifications.uniq_id, uniqId),
+        eq(schema.notifications.owner_org, orgId),
+        eq(schema.notifications.last_send_at, claim.claimedAt),
+      ))
+    return true
+  }
+  catch (e: unknown) {
+    logPgError(c, 'rollbackNotificationClaim', e)
+    return false
+  }
 }
 
 export async function sendNotifOrg(
@@ -192,6 +238,7 @@ export async function sendNotifOrg(
 
   let shouldSend = false
   let isFirstSend = false
+  let claimRollback: NotificationClaimRollback | undefined
 
   try {
     if (!notif) {
@@ -199,11 +246,13 @@ export async function sendNotifOrg(
       isFirstSend = true
 
       // Only send if we successfully inserted (won the race)
-      shouldSend = await insertNotificationClaim(writeClient, eventName, orgId, uniqId)
+      const claimedAt = new Date()
+      shouldSend = await insertNotificationClaim(writeClient, eventName, orgId, uniqId, claimedAt)
       if (!shouldSend) {
         cloudlog({ requestId: c.get('requestId'), message: 'notif insert race lost', event: eventName, orgId })
         return false
       }
+      claimRollback = { kind: 'insert', claimedAt }
     }
     else {
       // Notification exists, check if sendable
@@ -214,10 +263,11 @@ export async function sendNotifOrg(
       }
 
       // Atomically update ONLY if timestamp hasn't changed (optimistic locking to prevent race)
+      const claimedAt = new Date()
       const updated = await writeClient
         .update(schema.notifications)
         .set({
-          last_send_at: new Date(),
+          last_send_at: claimedAt,
           total_send: notif.total_send + 1,
         })
         .where(and(
@@ -234,6 +284,7 @@ export async function sendNotifOrg(
         cloudlog({ requestId: c.get('requestId'), message: 'notif update race lost', event: eventName, orgId })
         return false
       }
+      claimRollback = { kind: 'update', claimedAt, previousLastSendAt: notif.last_send_at, previousTotalSend: notif.total_send }
     }
 
     // Only send if we successfully claimed the notification
@@ -241,8 +292,8 @@ export async function sendNotifOrg(
       cloudlog({ requestId: c.get('requestId'), message: isFirstSend ? 'notif never sent' : 'notif ready to sent', event: eventName, uniqId })
       const res = await trackBentoEvent(c, managementEmail, eventData, eventName)
       if (!res) {
-        cloudlog({ requestId: c.get('requestId'), message: 'trackEvent failed', eventName, email: managementEmail, eventData })
-        // Note: We already claimed it in DB, but email failed. On next attempt, cron will determine if we retry.
+        const rollbackSucceeded = claimRollback ? await rollbackNotificationClaim(c, writeClient, eventName, orgId, uniqId, claimRollback) : true
+        cloudlog({ requestId: c.get('requestId'), message: 'trackEvent failed', eventName, email: managementEmail, eventData, rollbackSucceeded })
         return false
       }
 
@@ -253,6 +304,8 @@ export async function sendNotifOrg(
     return false
   }
   catch (e: unknown) {
+    if (claimRollback)
+      await rollbackNotificationClaim(c, writeClient, eventName, orgId, uniqId, claimRollback)
     logPgError(c, 'sendNotifOrg', e)
     return false
   }
